@@ -19,19 +19,19 @@
 FIVP_MindistSettingsStorage G_IVP_MindistSettingsStorage;
 IVP_Mindist_Settings& G_IVP_MindistSettings = G_IVP_MindistSettingsStorage.Settings;
 
-// FUN_0634db40: SetCollisionTolerance(0.01f) (PUSH 0x3c23d70a), SetField_0x130(1.0f)
+// FUN_0634db40: SetCollisionTolerance(0.01f) (PUSH 0x3c23d70a), SetEventNudgeEpsScale(1.0f)
 // (PUSH 0x3f800000), then +0x12c = 0x3e8; returns this. +0x134 is left alone.
 IVP_Mindist_Settings::IVP_Mindist_Settings()
 {
     SetCollisionTolerance(0.00999999977648258f); // 0x3c23d70a
-    SetField_0x130(1.0f);
+    SetEventNudgeEpsScale(1.0f);
     max_spawned_mindist_count = 0x3e8;
 }
 
 // FUN_0634db30: MOV EAX,[ESP+4]; MOV [ECX+0x130],EAX; RET 4.
-void IVP_Mindist_Settings::SetField_0x130(float Value)
+void IVP_Mindist_Settings::SetEventNudgeEpsScale(float Value)
 {
-    Field_0x130 = Value;
+    EventNudgeEpsScale = Value;
 }
 
 // FUN_0634da50. Constants: DAT_063a5464 0.1f, DAT_063a53fc 0.9f, DAT_063a55a0

@@ -371,11 +371,11 @@ namespace
         if (bIs3d != 0)
         {
             if ((Manager->CapsFlags & 2) != 0 && Node->DistSq < Node->MaxDistSq &&
-                HwUsed < Manager->Field50)
+                HwUsed < Manager->FreeHwMixingBuffers)
                 Node->StatusFlags |= 8;
         }
         else if ((Manager->CapsFlags & 0x20) == 0 && (Manager->CapsFlags & 1) != 0 &&
-                 HwUsed < Manager->Field50)
+                 HwUsed < Manager->FreeHwMixingBuffers)
         {
             Node->StatusFlags |= 8;
         }
@@ -388,13 +388,13 @@ namespace
         if (G_DisplayExtraDebug == 0)
             return bNeed;
         char Line[0x2000];
-        if (HwUsed > Manager->Field50)
+        if (HwUsed > Manager->FreeHwMixingBuffers)
         {
             Fdump(kFdumpNotice, 0xC2B,
                   FormatMessage2000(
                       Line, "Had to remove HW instance of arch %d with priority %d greater than %d.\n",
                       Node->PlayKey->GetArchId(), static_cast<int>(HwUsed),
-                      static_cast<int>(Manager->Field50)));
+                      static_cast<int>(Manager->FreeHwMixingBuffers)));
             return bNeed;
         }
         // 06ee6014 TEST AL,1 tests EAX after the AND ~1 at 06ee5fb0, so this notice never
@@ -801,8 +801,8 @@ namespace
         Node->Buffer = nullptr;
         Node->Buffer3d = nullptr;
         Node->NotifyEvent = nullptr;
-        Node->Pad18 = 0;
-        Node->FeatureFlags = 0;
+        Node->LoopStartBytes = 0;
+        Node->LoopEndBytes = 0;
         Node->StatusFlags = 0;
         Node->DsCapsFlags = 0;
         Node->DistSq = 0.0f;
@@ -872,8 +872,8 @@ namespace
         if (Dest->Buffer3d != nullptr)
             Dest->Buffer3d->AddRef();
         Dest->NotifyEvent = Src->NotifyEvent;
-        Dest->Pad18 = Src->Pad18;
-        Dest->FeatureFlags = Src->FeatureFlags;
+        Dest->LoopStartBytes = Src->LoopStartBytes;
+        Dest->LoopEndBytes = Src->LoopEndBytes;
         Dest->CapsFlags = Src->CapsFlags;
         Dest->StatusFlags = Src->StatusFlags;
         Dest->DsCapsFlags = Src->DsCapsFlags;
@@ -919,7 +919,7 @@ namespace
     }
 
     // FUN_06ee18e0 stdcall RET 4: DS-notify thread. Collect node+0x14 events +
-    // DAT_06eeaf70, WFMO; looping wrap SetCurrentPosition(Pad18); else CloseHandle.
+    // DAT_06eeaf70, WFMO; looping wrap SetCurrentPosition(LoopStartBytes); else CloseHandle.
     DWORD WINAPI NotifyThreadProc(void* /*Unused*/)
     {
         HANDLE* Handles = nullptr;
@@ -968,8 +968,8 @@ namespace
                             // 06ee19ae: GetCurrentPosition(&play, NULL) - no write cursor;
                             // the result is not tested.
                             Node->Buffer->GetCurrentPosition(&PlayPos, nullptr);
-                            if (PlayPos > Node->FeatureFlags)
-                                Node->Buffer->SetCurrentPosition(Node->Pad18);
+                            if (PlayPos > Node->LoopEndBytes)
+                                Node->Buffer->SetCurrentPosition(Node->LoopStartBytes);
                             ResetEvent(Signaled);
                         }
                         else
@@ -1032,7 +1032,7 @@ namespace
 }
 
 FSoundArchetype::FSoundArchetype()
-    : nChannels(0), Field06(0), nSamplesPerSec(0), nBlockAlign(0), LoopStart(0), LoopEnd(0),
+    : nChannels(0), BytesPerSample(0), nSamplesPerSec(0), nBlockAlign(0), LoopStart(0), LoopEnd(0),
       NumFrames(0), Gain(0.0f), DurationMs(0), Flags(0), Buffer(nullptr), bSamplesReady(0),
       RefCount(1) // caller after FUN_06ee11f0 stores 1 at +0x2C; ctor itself does not
 {
@@ -1383,10 +1383,10 @@ GENRESULT DACOM_API FSoundManagerFactory::CreateInstance(AGGDESC* Desc, void** I
 }
 
 FSoundManager::FSoundManager()
-    : bParserBound(0), MasterGain(0.0f), Field4C(0), Field50(0), MaxChannels(0), EaxEnv(0),
-      EaxVol(0.0f), EaxDecay(0.0f), EaxDamp(0.0f), Field68(0), Field6C(0), Field70(0), Field74(0),
-      ReverbMix(0.0f), Field7C(0), Field80(0), Field84(0), Field88(0), Flags(0x113), CapsFlags(0),
-      Field94(0), SampleRate(0x5622), Channels(2), BitsPerSample(0x10), CoordScale(1),
+    : bParserBound(0), MasterGain(0.0f), CurrentTickMs(0), FreeHwMixingBuffers(0), MaxChannels(0), EaxEnv(0),
+      EaxVol(0.0f), EaxDecay(0.0f), EaxDamp(0.0f), SavedEaxEnv(0), SavedEaxVol(0), SavedEaxDecay(0), SavedEaxDamp(0),
+      ReverbMix(0.0f), Ds3dAlgGuid0(0), Ds3dAlgGuid1(0), Ds3dAlgGuid2(0), Ds3dAlgGuid3(0), Flags(0x113), CapsFlags(0),
+      FreeHw3dBuffers(0), SampleRate(0x5622), Channels(2), BitsPerSample(0x10), CoordScale(1),
       DistanceFactor(1.0f), DopplerFactor(1.0f), RolloffFactor(1.0f), Max3dPan(10000.0f),
       Window(nullptr), ArchEntries(nullptr), ArchCount(0), ArchCap(0), bArchEmpty(1), Pad108(0),
       AttachedUnused(nullptr), AttachedSentinel(nullptr), AttachedCount(0),
@@ -1666,10 +1666,10 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
         // ignored; whatever is there lands in +0x68..+0x74.
         unsigned long Cached[4];
         PropertySet->Get(kDsPropSetEax20Buffer, 0, nullptr, 0, Cached, 0x10, nullptr);
-        Field68 = Cached[0];
-        Field6C = Cached[1];
-        Field70 = Cached[2];
-        Field74 = Cached[3];
+        SavedEaxEnv = Cached[0];
+        SavedEaxVol = Cached[1];
+        SavedEaxDecay = Cached[2];
+        SavedEaxDamp = Cached[3];
         CapsFlags |= 4;
     }
 
@@ -2518,7 +2518,7 @@ unsigned char FSoundManager::OneShotAlreadyExpired(ISoundSource* PlayKey)
 {
     // FUN_06ee6070 thiscall RET 4 (sole caller 06ee4c60): IsLooping (+0x1C) -> 0 (keep);
     // GetArchId (+0x20) -> FUN_06ee31d0 lookup, miss -> 1; else
-    // Field4C > FUN_06ee16c0(arch, key) + GetStartTick (+0x10) (unsigned, SETA), then the
+    // CurrentTickMs > FUN_06ee16c0(arch, key) + GetStartTick (+0x10) (unsigned, SETA), then the
     // archetype is released. No play-key null check.
     if (PlayKey->IsLooping() != 0)
         return 0;
@@ -2529,7 +2529,7 @@ unsigned char FSoundManager::OneShotAlreadyExpired(ISoundSource* PlayKey)
     const unsigned long DurationMs = ScaledDurationMs(Archetype, PlayKey);
     const unsigned long StartTick = PlayKey->GetStartTick();
     Archetype->Release();
-    return Field4C > (DurationMs + StartTick) ? 1 : 0;
+    return CurrentTickMs > (DurationMs + StartTick) ? 1 : 0;
 }
 
 void FSoundManager::ApplyListenerFromSource(ISoundListenerPose* Pose)
@@ -2575,7 +2575,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     unsigned long Tick;
     if ((Node->StatusFlags & 0x40) == 0)
     {
-        PlayKey->Slot3();
+        PlayKey->MarkStarted();
         Tick = PlayKey->GetStartTick();
     }
     else
@@ -2590,7 +2590,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     FSoundArchetype* Archetype = LookupArchetype(PlayKey->GetArchId());
     if (Archetype == nullptr)
         return 0;
-    unsigned long Delta = Field4C - Tick;
+    unsigned long Delta = CurrentTickMs - Tick;
     if ((Node->StatusFlags & 0x20) != 0)
     {
         // 06ee6bfa: GetPitch (+0x28) into its own slot; 0 -> FUN_06ee1670(pitch), else clear
@@ -2721,8 +2721,8 @@ FSoundInstanceNode* FSoundManager::CreateInstanceFromKey(ISoundSource* PlayKey)
     if ((Caps.dwFlags & 0x100) != 0)
     {
         const unsigned long Align = Archetype->nBlockAlign;
-        Node->Pad18 = Archetype->LoopStart * Align;
-        Node->FeatureFlags = Archetype->LoopEnd * Align;
+        Node->LoopStartBytes = Archetype->LoopStart * Align;
+        Node->LoopEndBytes = Archetype->LoopEnd * Align;
     }
 
     Archetype->Release();
@@ -3002,14 +3002,14 @@ void FSoundManager::DumpDeviceNotices()
     const char* Requested = ((Flags & 1) != 0) ? "" : " NOT";
     Fdump(kFdumpNotice, 0xBA0,
           FormatMessage2000(Line, "SoundMgr:2D HW%s requested and %s with %d HW buffers available.\n",
-                            Requested, Enabled, Field50));
+                            Requested, Enabled, FreeHwMixingBuffers));
 
     Enabled = ((CapsFlags & 2) != 0) ? "ENABLED" : "DISABLED";
     Requested = ((Flags & 2) != 0) ? "" : " NOT";
     Fdump(kFdumpNotice, 0xBA5,
           FormatMessage2000(Line,
                             "SoundMgr:3D HW%s requested and %s with %d 3D HW buffers available.\n",
-                            Requested, Enabled, Field94));
+                            Requested, Enabled, FreeHw3dBuffers));
 
     if ((CapsFlags & 3) != 0)
     {
@@ -3099,8 +3099,8 @@ GENRESULT FSoundManager::CreateDirectSound()
     DSCAPS Caps = {};
     Caps.dwSize = 0x60;
     DirectSound->GetCaps(&Caps);
-    Field94 = Caps.dwFreeHw3DAllBuffers;
-    Field50 = Caps.dwFreeHwMixingAllBuffers;
+    FreeHw3dBuffers = Caps.dwFreeHw3DAllBuffers;
+    FreeHwMixingBuffers = Caps.dwFreeHwMixingAllBuffers;
     if (Caps.dwFreeHwMixingAllBuffers + Caps.dwFreeHw3DAllBuffers != 0 && MaxChannels == 0)
     {
         unsigned long Mix = Caps.dwFreeHw3DAllBuffers;
@@ -3365,30 +3365,30 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     {
         Flags |= 0x200;
         CapsFlags |= 0x200;
-        CopyAlgGuid(&Field7C, &kDs3dAlgHrtfFull);
+        CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgHrtfFull);
     }
     else if (_stricmp(AlgBuf, "LIGHT") == 0)
     {
         Flags |= 0x100;
         CapsFlags |= 0x100;
-        CopyAlgGuid(&Field7C, &kDs3dAlgHrtfLight);
+        CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgHrtfLight);
     }
     else if (_stricmp(AlgBuf, "BASIC") == 0)
     {
         Flags |= 0x80;
         CapsFlags |= 0x80;
-        CopyAlgGuid(&Field7C, &kDs3dAlgNoVirtual);
+        CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgNoVirtual);
     }
     else if (_stricmp(AlgBuf, "USER") == 0)
     {
         Flags |= 0x40;
         CapsFlags |= 0x40;
-        CopyAlgGuid(&Field7C, &kDs3dAlgGuidNull);
+        CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgGuidNull);
     }
     else if (_stricmp(AlgBuf, "NONE") == 0)
     {
         G_Ds3dCreateFlags = (G_Ds3dCreateFlags & ~0x10u) | 0x40u;
-        CopyAlgGuid(&Field7C, &kDs3dAlgGuidNull);
+        CopyAlgGuid(&Ds3dAlgGuid0, &kDs3dAlgGuidNull);
     }
 
     // 06ee41a3..4369 useNoHW (default = current bit 0x800) - a non-zero value clears bits 0/1.
@@ -3534,7 +3534,7 @@ unsigned char FSoundManager::SetupInstanceNotify(FSoundInstanceNode* Node)
         return 0;
     }
     DSBPOSITIONNOTIFY Pos;
-    Pos.dwOffset = Node->FeatureFlags;
+    Pos.dwOffset = Node->LoopEndBytes;
     Pos.hEventNotify = Node->NotifyEvent;
     const HRESULT Hr = Notify->SetNotificationPositions(1, &Pos);
     Notify->Release();
@@ -3588,8 +3588,10 @@ GENRESULT DACOM_API FSoundManager::ShutdownDevice()
     }
     DestroyAllArchetypes(); // 06ee49fe FUN_06ee4800
     if ((CapsFlags & 4) != 0)
-        SetEaxPreview(static_cast<int>(Field68), *reinterpret_cast<float*>(&Field74),
-                      *reinterpret_cast<float*>(&Field70), *reinterpret_cast<float*>(&Field6C));
+        // Retail quirk (soundmanager.dll 0x06EE4A0E): retail pushes (SavedEaxEnv, SavedEaxDamp,
+        // SavedEaxDecay, SavedEaxVol) into SetEaxPreview (vol and damp swapped). Preserved verbatim.
+        SetEaxPreview(static_cast<int>(SavedEaxEnv), *reinterpret_cast<float*>(&SavedEaxDamp),
+                      *reinterpret_cast<float*>(&SavedEaxDecay), *reinterpret_cast<float*>(&SavedEaxVol));
     if (Primary != nullptr)
     {
         Primary->Release();
@@ -3635,7 +3637,7 @@ GENRESULT FSoundManager::GetDeviceSnapshot(void* Out)
     unsigned char* Bytes = static_cast<unsigned char*>(Out);
     memcpy(Bytes + 4, &CapsFlags, 4);
     memcpy(Bytes + 8, &MaxChannels, 4);
-    memcpy(Bytes + 12, &Field94, 4);
+    memcpy(Bytes + 12, &FreeHw3dBuffers, 4);
     if (DirectSound != nullptr)
     {
         // 06ee4afd..4b0d: only dwSize is set before GetCaps (+0x10), whose result is ignored.
@@ -3654,7 +3656,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
     // LAB_06ee4b50 stdcall RET 8. Listing-complete: 6e20, prune, is_active/start-tick/
     // 6070, pose+range cull, 1040/60e0/5f00/7c00 pending, 7c70 splice, 64c0, Play+6b70.
     unsigned char bDirty = 0;
-    Field4C = GetTickCount();
+    CurrentTickMs = GetTickCount();
     if (ListenerPose != nullptr)
         ApplyListenerFromSource(ListenerPose);
 
@@ -3687,7 +3689,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
                 bSkip = 1;
             else if (OneShotAlreadyExpired(PlayKey) != 0)
                 bSkip = 1;
-            else if (Field4C < PlayKey->GetStartTick())
+            else if (CurrentTickMs < PlayKey->GetStartTick())
                 bSkip = 1;
 
             if (bSkip != 0)

@@ -13,7 +13,7 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstring> // std::memcpy -- the GotoOp copy in Slot10 (LAB_062fe670)
+#include <cstring> // std::memcpy -- the GotoOp copy in OnApplyDirective (LAB_062fe670)
 
 // GotoBehavior -- see common_gotobehavior.h for the full RTTI/layout writeup
 // this pass relied on. Ported from EXE/Disasm/Common.dll.txt (raw
@@ -47,10 +47,10 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , SubObjectA()
     , SubObjectB()
     , SubObjectC()
-    , Field2d8(0)
-    , Field2dc(0)
-    , Field2e0(0)
-    , Field2e4(0)
+    , SteerAxisX(0)
+    , SteerAxisY(0)
+    , SteerAxisZ(0)
+    , UserThrottle(0)
     , Flag2e8(0)
     , Flag2e9(1)
     , Flag2ea(0)
@@ -58,18 +58,18 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Flag2ec(0)
     , Pad2ed{}
     , Field2f0(1.5f)
-    , Field2f4(3)
-    , Field2f8{}    // not written by retail's ctor; value-initialised (Slot10/Update write it first)
-    , Field304{}    // 062fd6fe-062fd70a: three zero dwords
+    , GotoKind(3)
+    , ActiveTargetPos{}    // not written by retail's ctor; value-initialised (OnApplyDirective/Update write it first)
+    , Destination{}    // 062fd6fe-062fd70a: three zero dwords
     , Watcher310()
     , Spline()
-    , Field358(200.0f)
+    , ArrivalRange(200.0f)
     , Field35c(-1.0f)
-    , Field360(1.0f)
+    , MaxThrottle(1.0f)
     , Flag364(0)    // not written by retail's ctor; Update writes it before any read
     , Flag365(1)
     , Flag366(0)
-    , Flag367(0)    // not written by retail's ctor; SetContext/Slot10 set it before any read
+    , Flag367(0)    // not written by retail's ctor; SetContext/OnApplyDirective set it before any read
     , Flag368(0)
     , Flag369(0)
     , Flag36a(0)
@@ -77,12 +77,12 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Flag36c(1)
     , Pad36d{}
     , Watcher370()
-    , Field378(0.0f)
-    , Field37c(0.0f)
-    // Field380/Flags384/SavedFlags388 are the recovered tail of the shared
+    , ProxNearDistance(0.0f)
+    , ProxFarDistance(0.0f)
+    // ProxCruiseSpeedRatio/Flags384/SavedFlags388 are the recovered tail of the shared
     // 0x1c-byte proximity-watcher struct (common_gotobehavior.h). The shared
     // ctor FUN_062c29b0 zeroes only the FIRST FOUR DWORDS of it -- Watcher370's
-    // two words plus Field378/Field37c -- and stops. Retail therefore leaves
+    // two words plus ProxNearDistance/ProxFarDistance -- and stops. Retail therefore leaves
     // these three uninitialized at construction, exactly as DockBehavior's own
     // ctor does at +0x460/+0x464/+0x468. They are zeroed here anyway: reading
     // an uninitialized member is UB in C++ (unlike x86, which just reads
@@ -90,7 +90,7 @@ GotoBehavior::GotoBehavior(int InTypeId)
     // (.text:062fe1c4) on a path reachable before FUN_062c2af0 has necessarily
     // written it. Deliberate, documented divergence from retail, not an
     // oversight.
-    , Field380(0.0f)
+    , ProxCruiseSpeedRatio(0.0f)
     , Flags384(0)
     , SavedFlags388(0)
     , GotoOp()
@@ -103,9 +103,9 @@ GotoBehavior::GotoBehavior(int InTypeId)
     // class was RTTI-identified as SplineMoveIdea; nothing is deferred here
     // any more.
 
-    // Every other field write above (Field2d8.. through Flag36c, plus the
-    // Watcher310/Watcher370 zero-init and the Field2f0/Field358/Field35c/
-    // Field360/Flag365/Flag36c non-zero defaults) is retail's own explicit
+    // Every other field write above (SteerAxisX.. through Flag36c, plus the
+    // Watcher310/Watcher370 zero-init and the Field2f0/ArrivalRange/Field35c/
+    // MaxThrottle/Flag365/Flag36c non-zero defaults) is retail's own explicit
     // ctor body, fully reproduced via the member-initializer list -- nothing
     // further to do here.
 }
@@ -186,7 +186,7 @@ GotoBehavior::~GotoBehavior()
 
 // FUN_062c29f0 (.text:062c29f0-062c2aa5, RET 0x14, item 1254). Ported 2026-10-08
 // (claude-code:cmn-ai5); its "blocked on the qhull cluster" note was stale -- the struct is
-// the shared proximity watcher and its only caller is GotoBehavior::Slot10.
+// the shared proximity watcher and its only caller is GotoBehavior::OnApplyDirective.
 void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, float Near, float Far,
                      float CruiseRatio)
 {
@@ -843,7 +843,7 @@ bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollow
 // of the file used to sit in src/Common/common_stubs.cpp, lines 8412-10865, as one
 // contiguous GotoBehavior cluster: the vtable slot bodies (FUN_062fd780 / FUN_062fd7a0 /
 // FUN_062fd920 / FUN_062fd9c0 / LAB_062fd890 / LAB_062fda20 / LAB_062fda60 / LAB_062feb00 /
-// FUN_062fe940 / FUN_062fe970), GotoBehavior::Update (LAB_062fdb80, item 1996),
+// CopyGotoOp / FUN_062fe970), GotoBehavior::Update (LAB_062fdb80, item 1996),
 // GotoBehavior::EnterState (LAB_062fe670, item 2000), and the twelve file-static helpers
 // they share (GotoMoveIdea/GotoFaceIdea/GotoSplineMoveIdea, the four FollowSibling_* and
 // the six Follower* ones).
@@ -952,9 +952,9 @@ bool GotoBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 }
 
 // Slot 3, FUN_062fd920 (.text:062fd920-062fd9be).
-void GotoBehavior::Slot3()
+void GotoBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062fd924 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062fd924 FUN_062d20d0
     Flag369 = 0;                                                    // 062fd92c
     // 062fd933-062fd93c: OwnerContext->is_cruise_active(Flag368) (+0x60). Retail does not
     // clear Flag368 first (the old port did).
@@ -965,7 +965,7 @@ void GotoBehavior::Slot3()
     Flag365 = 1;                                                    // 062fd95f
     Flag36c = 1;                                                    // 062fd966
     SubObjectA.SetAngle38(3.14159274f);                             // 062fd96d, 0x40490fdb
-    Field2e4 = Field360;                                            // 062fd97a
+    UserThrottle = MaxThrottle;                                            // 062fd97a
     Flag2ea = 0;                                                    // 062fd984
     Flag2ec = 0;                                                    // 062fd98b
     SetCruiseLock(1, 3);                                            // 062fd992 FUN_062d21d0
@@ -977,24 +977,24 @@ void GotoBehavior::Slot3()
 }
 
 // Slot 4, FUN_062fd9c0 (.text:062fd9c0-062fda1b).
-void GotoBehavior::Slot4()
+void GotoBehavior::OnDisengage()
 {
     SubObjectB.Commit();                                            // 062fd9cf vtbl+0x10
     // 062fd9d2-062fd9fd: ExternalIface->is_player() and goto kind 0 -> MoveIdea::SetField44(2)
     // (FUN_062d88b0).
     SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
-    if (Sys->SelfTarget.Iface->is_player() && Field2f4 == 0)
+    if (Sys->SelfTarget.Iface->is_player() && GotoKind == 0)
         SubObjectA.SetField44(2);
     SubObjectA.Commit();                                            // 062fda08 vtbl+0x10
     // 062fda0b-062fda13: FUN_062e9030(NavHelper + 0x18, 0). The old port dropped this call.
     ((SystemManager*)NavHelperPtr24)->Thrust.SetStrafeDir(StrafeNone);
-    Behavior::Slot4();                                              // 062fda1b JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062fda1b JMP FUN_062d20f0
 }
 
 // Slot 5, LAB_062fda20 (.text:062fda20-062fda52, RET 4, argument unread). EAX = 2; Flags28
 // bit 0x2 set -> (Flag29 ? 3 : 1), clear -> (Flag29 ? 3 : 2); stored to +0xc and returned
 // (the old free function returned nothing).
-int GotoBehavior::Slot5(float Value)
+int GotoBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     int Result = 2;                                                 // 062fda23
@@ -1051,7 +1051,7 @@ EvaluateResult GotoBehavior::evaluate(unsigned int Context)
 
 // Slot 21, FUN_062c6d30 (.text:062c6d30-062c6da5, RET 4): drop Watcher310 and then Watcher370
 // when their object's get_id() (+0x20) equals the argument.
-void GotoBehavior::Slot21(void* Arg)
+void GotoBehavior::OnObjectLeftSystem(void* Arg)
 {
     unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
     IObjRW* const Dest = ObjRwFromWatchable(const_cast<Watchable*>(Watcher310.target()));
@@ -1081,11 +1081,11 @@ IObjRW const* GotoBehavior::get_target()
 //   E+0x12 byte  bTargetCruise  -- the watched object's is_cruise_active
 //   E+0x13 byte  owner is_cruise_active out-param (never read back)
 //   E+0x14 int   Result         -- EBP = 3 at entry
-//   E+0x18 float Throttle       -- Field360, overridden from Field2e4 / 1.0f for the player
+//   E+0x18 float Throttle       -- MaxThrottle, overridden from UserThrottle / 1.0f for the player
 //   E+0x1c float Clearance      -- 0 at entry; case 1 / case 0 store the FUN_062e4ea0 /
 //                                  FUN_062e4bb0 result here, the tail stores the
 //                                  FUN_062c2c70 speed cap here.
-// Both `switch` statements dispatch on Field2f4 (0 watch an object, 1 a point, 2 a spline).
+// Both `switch` statements dispatch on GotoKind (0 watch an object, 1 a point, 2 a spline).
 // ============================================================================
 
 namespace
@@ -1148,26 +1148,26 @@ int GotoBehavior::Update()
     }
 
     // 062fdbf5-062fdc13: the lead point starts as our own cached position.
-    Field2f8 = Elem->CachedPos;
+    ActiveTargetPos = Elem->CachedPos;
 
-    // 062fdc0d-062fdc66: Throttle = Field360; Clearance = 0; for the player ship Field2e4, or
+    // 062fdc0d-062fdc66: Throttle = MaxThrottle; Clearance = 0; for the player ship UserThrottle, or
     // 1.0f while Flag2e8 is set and Flag36b clear.
-    float Throttle = Field360;
+    float Throttle = MaxThrottle;
     float Clearance = 0.0f;
     if (Elem->Iface->is_player())
     {
         if (Flag2e8 != 0 && Flag36b == 0)
             Throttle = 1.0f;
         else
-            Throttle = Field2e4;
+            Throttle = UserThrottle;
     }
 
     // 062fdc66-062fdc85: `SUB 0 / JZ`, `DEC / JZ`, `SUB 2 / JNZ`; value 3 stores EBP (3) into
     // Result, which already holds 3. Everything but 0 and 1 goes straight to the tail.
-    if (Field2f4 == 1)
+    if (GotoKind == 1)
     {
-        // LAB_062fdc8a: Clearance = FUN_062e4ea0(Elem, &Field304), `FSTP float`.
-        Clearance = static_cast<float>(GetSignedRadialClearanceToPoint(Elem, Field304));
+        // LAB_062fdc8a: Clearance = FUN_062e4ea0(Elem, &Destination), `FSTP float`.
+        Clearance = static_cast<float>(GetSignedRadialClearanceToPoint(Elem, Destination));
 
         if (Flag2ea != 0)
         {
@@ -1192,9 +1192,9 @@ int GotoBehavior::Update()
                 static_cast<float>(static_cast<double>(Dir.z) * 1750.0f + Elem->CachedPos.z) };
 
             // 062fdd5f-062fdda3: `FCOMP 0.0f; TEST AH,0x41; JNZ` -- a non-zero (strictly
-            // positive) steering triple Field2d8 makes the FaceIdea face that axis
+            // positive) steering triple SteerAxisX makes the FaceIdea face that axis
             // (FUN_062d75e0), otherwise it faces the point ahead (FUN_062d7560).
-            Vector const& Steer = *reinterpret_cast<Vector const*>(&Field2d8);
+            Vector const& Steer = *reinterpret_cast<Vector const*>(&SteerAxisX);
             if (LengthSquaredXyz(Steer) > 0.0)
                 SubObjectB.SetAxis(Steer);
             else
@@ -1204,15 +1204,15 @@ int GotoBehavior::Update()
             SubObjectA.SetField44(2);
             SubObjectA.SetDirection(Dir);
 
-            // 062fddc0-062fddd6: `FLD Clearance; FCOMP Field358`, Flag366 = 1 stored between,
+            // 062fddc0-062fddd6: `FLD Clearance; FCOMP ArrivalRange`, Flag366 = 1 stored between,
             // `TEST AH,0x5; JP LAB_062fde2d` -- only strictly-less falls through.
             Flag366 = 1;
-            if (Clearance < Field358)
+            if (Clearance < ArrivalRange)
             {
                 // 062fddd8-062fde17: arrived.
                 Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
                 Flag368 = 0;
-                Slot4();
+                OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
                 BehaviorMgrPtr20->SetDirectiveResult(2, 0);
                 UpdateResult10 = 2;
@@ -1223,21 +1223,21 @@ int GotoBehavior::Update()
         {
             // LAB_062fde18: FaceIdea faces the destination (FUN_062d7560), MoveIdea moves to it
             // (FUN_062d5840).
-            SubObjectB.SetPosition(Field304);
-            SubObjectA.SetPosition(Field304);
+            SubObjectB.SetPosition(Destination);
+            SubObjectA.SetPosition(Destination);
         }
 
         // LAB_062fde2d: the lead point is the destination.
-        Field2f8 = Field304;
+        ActiveTargetPos = Destination;
     }
-    else if (Field2f4 == 0)
+    else if (GotoKind == 0)
     {
         // LAB_062fde43.
         if (GotoWatchedObject(Watcher310) == nullptr)
         {
             // LAB_062fde58: the watched object is gone.
             Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
-            Slot4();
+            OnDisengage();
             Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
             BehaviorMgrPtr20->SetDirectiveResult(2, 2);
 
@@ -1248,7 +1248,7 @@ int GotoBehavior::Update()
             // LAB_062fdea8.
             Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
             Flag368 = 0;
-            Slot4();
+            OnDisengage();
             Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
             BehaviorMgrPtr20->SetDirectiveResult(2, 2);
             UpdateResult10 = Result;
@@ -1267,7 +1267,7 @@ int GotoBehavior::Update()
                 ObjAffectOf(OwnerContextPtr14)->slot_6c(2, 0);
                 Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
                 Flag368 = 0;
-                Slot4();
+                OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
                 BehaviorMgrPtr20->SetDirectiveResult(2, 2);
                 // 062fdf80-062fdf8c: `MOV [ESI+0x10],EBP; MOV EAX,EBP` -- 3.
@@ -1280,7 +1280,7 @@ int GotoBehavior::Update()
         // Clearance = FUN_062e4bb0(Elem, watched), `FSTP float`.
         Vector WatchedPos;
         GetIfacePositionOrZero(&WatchedPos, GotoWatchedObject(Watcher310));
-        Field2f8 = WatchedPos;
+        ActiveTargetPos = WatchedPos;
         Clearance = static_cast<float>(GetInterceptClearanceOfIface(Elem, GotoWatchedObject(Watcher310)));
 
         if (Flag2ea != 0)
@@ -1288,15 +1288,15 @@ int GotoBehavior::Update()
             // 062fdff2-062fe046: Dir (E+0x38) = -column 2 of our own frame; the FaceIdea faces
             // the steering triple unconditionally (FUN_062d75e0), the MoveIdea flies along Dir.
             Vector const Dir = NegatedColumn2(Elem->Iface->get_transform().Rotation);
-            SubObjectB.SetAxis(*reinterpret_cast<Vector const*>(&Field2d8));
+            SubObjectB.SetAxis(*reinterpret_cast<Vector const*>(&SteerAxisX));
             SubObjectA.SetDirection(Dir);
 
-            // 062fe04b-062fe05a: `FCOMP Field358; TEST AH,0x5; JP LAB_062fe0d3`.
-            if (Clearance < Field358)
+            // 062fe04b-062fe05a: `FCOMP ArrivalRange; TEST AH,0x5; JP LAB_062fe0d3`.
+            if (Clearance < ArrivalRange)
             {
                 Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
                 Flag368 = 0;
-                Slot4();
+                OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
                 BehaviorMgrPtr20->SetDirectiveResult(2, 0);
                 UpdateResult10 = 2;
@@ -1313,23 +1313,23 @@ int GotoBehavior::Update()
 
     // LAB_062fe0d3: FUN_062c2af0 / FUN_062c2d90 on the proximity watcher at +0x370.
     unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&Watcher370);
-    ProxWatcherRecomputeZoneFlags(ProxWatcher, NavHelperPtr24, Field2f8);
-    ProxWatcherNotifyZoneChange(ProxWatcher, NavHelperPtr24, BehaviorMgrPtr20, Field2f8);
+    ProxWatcherRecomputeZoneFlags(ProxWatcher, NavHelperPtr24, ActiveTargetPos);
+    ProxWatcherNotifyZoneChange(ProxWatcher, NavHelperPtr24, BehaviorMgrPtr20, ActiveTargetPos);
 
-    if (Field2f4 == 2)
+    if (GotoKind == 2)
     {
         // 062fe11b-062fe148: the lead point is the spline's end point (Spline.P2 at +0x330);
         // FUN_062da4d0 (SplineMoveIdea::SetBankBlendCap) with Throttle.
-        Field2f8 = Spline.P2;
+        ActiveTargetPos = Spline.P2;
         SubObjectC.SetBankBlendCap(Throttle);
 
         if (GotoWatchedObject(Watcher370) != nullptr)
         {
-            // 062fe15a-062fe197: Clearance = FUN_062c2c70(Owner, Sys, 1, Field360) (`FSTP
+            // 062fe15a-062fe197: Clearance = FUN_062c2c70(Owner, Sys, 1, MaxThrottle) (`FSTP
             // float`); when Owner's get_speed(Throttle, engine) (FUN_062e5af0) is strictly
             // greater (`TEST AH,0x41; JNZ`), FUN_062da4e0 with that cap.
             Clearance = static_cast<float>(
-                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContextPtr14, NavHelperPtr24, 1, Field360));
+                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContextPtr14, NavHelperPtr24, 1, MaxThrottle));
             if (Behavior_InvokeManagerSlotD8(Owner, Throttle, ThrustEquipEngine) > Clearance)
                 SubObjectC.SetThrottleScale(Clearance);
         }
@@ -1360,7 +1360,7 @@ int GotoBehavior::Update()
             Result = 2;
         }
     }
-    else if (Field2f4 == 0 || Field2f4 == 1)
+    else if (GotoKind == 0 || GotoKind == 1)
     {
         // LAB_062fe1fb: FUN_062d88b0(Flag366 ? 2 : 0) -- `NEG DL; SBB EDX,EDX; AND EDX,2`.
         SubObjectA.SetField44(Flag366 != 0 ? 2 : 0);
@@ -1449,7 +1449,7 @@ int GotoBehavior::Update()
             else
             {
                 // 062fe3df-062fe3f9: DeviceTRC::bind_to_dc fold == MoveIdea::SetRange3c.
-                SubObjectA.SetRange3c(Field358);
+                SubObjectA.SetRange3c(ArrivalRange);
                 SubObjectA.SetMode(0);
                 Flag368 = 0;
             }
@@ -1463,7 +1463,7 @@ int GotoBehavior::Update()
         if (GotoWatchedObject(Watcher370) != nullptr)
         {
             Clearance = static_cast<float>(ProxWatcherComputeSpeedCap(
-                ProxWatcher, OwnerContextPtr14, NavHelperPtr24, Flag368 != 0 ? 4 : 1, Field360));
+                ProxWatcher, OwnerContextPtr14, NavHelperPtr24, Flag368 != 0 ? 4 : 1, MaxThrottle));
             ThrustEquipType const QueryType =
                 (Flag368 != 0 && bTargetCruise != 0) ? ThrustEquipCruise : ThrustEquipEngine;
             if (Behavior_InvokeManagerSlotD8(Owner, Throttle, QueryType) > Clearance)
@@ -1537,11 +1537,11 @@ int GotoBehavior::Update()
         }
     }
 
-    // LAB_062fe5ea: finish -- request disengage, Slot4 (vtable +0x10), report to the manager:
+    // LAB_062fe5ea: finish -- request disengage, OnDisengage (vtable +0x10), report to the manager:
     // SetDirectiveResult(2, 0) when Result is 2, (2, 2) otherwise.
     Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
     Flag368 = 0;
-    Slot4();
+    OnDisengage();
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
     if (Result == 2)
         BehaviorMgrPtr20->SetDirectiveResult(2, 0);
@@ -1562,14 +1562,14 @@ int GotoBehavior::Update()
 // previous body (EnterState, raw offsets) stubbed FUN_062e74a0 to null, skipped
 // FUN_062da380 / FUN_062d7510 / FUN_062c29f0, swapped the DAT_0639f418 arms and routed
 // FUN_062da400 / FUN_062d21d0 into empty stubs.
-bool GotoBehavior::Slot10(void* DirectiveOp)
+bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
 {
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfe);           // 062fe680 / 062fe691
     // 062fe682-062fe68f: REP MOVSD of 0x1c dwords, the whole op (vptr included) -> GotoOp.
     std::memcpy(static_cast<void*>(&GotoOp), DirectiveOp, sizeof(GotoOp));
     pub::AI::DirectiveGotoOp const& Op = *static_cast<pub::AI::DirectiveGotoOp const*>(DirectiveOp);
     SystemManagerTimerTable const* const ObjDb = &static_cast<SystemManager*>(NavHelperPtr24)->Timers;
-    Field2f4 = Op.Field_0C;                                         // 062fe699
+    GotoKind = Op.Field_0C;                                         // 062fe699
 
     switch (Op.Field_0C)
     {
@@ -1579,7 +1579,7 @@ bool GotoBehavior::Slot10(void* DirectiveOp)
         IObjRW* const Dest = static_cast<IObjRW*>(
             ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.Field_1C));
         Watcher310.set(Dest != nullptr ? static_cast<Watchable const*>(Dest) : nullptr);
-        SubObjectA.SetRange3c(Field358);                            // 062fe7d5 (bind_to_dc fold)
+        SubObjectA.SetRange3c(ArrivalRange);                            // 062fe7d5 (bind_to_dc fold)
         IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher310.target()));
         SubObjectA.SetWatchObject(Watched);                         // 062fe7ea FUN_062d5760
         SubObjectB.SetWatchObject(Watched);                         // 062fe803 FUN_062d7510
@@ -1587,9 +1587,9 @@ bool GotoBehavior::Slot10(void* DirectiveOp)
     }
     case 1:
         // LAB_062fe76b: the destination point, into both Ideas.
-        Field304 = Op.Destination;
-        SubObjectA.SetPosition(Field304);                           // 062fe78a FUN_062d5840
-        SubObjectB.SetPosition(Field304);                           // 062fe796 FUN_062d7560
+        Destination = Op.Destination;
+        SubObjectA.SetPosition(Destination);                           // 062fe78a FUN_062d5840
+        SubObjectB.SetPosition(Destination);                           // 062fe796 FUN_062d7560
         break;
     case 2:
         // LAB_062fe6c4: the spline's four control points from op+0x38/+0x20/+0x2c/+0x44.
@@ -1600,7 +1600,7 @@ bool GotoBehavior::Slot10(void* DirectiveOp)
         Spline.calculate_arclength();                               // 062fe72e
         SubObjectC.SetSpline(&Spline);                              // 062fe73a FUN_062da380
         SubObjectC.SetWideMode(Op.Field_5A);                        // 062fe74b FUN_062da410 (raw byte)
-        Field2f8 = Spline.P2;                                       // 062fe750-062fe763
+        ActiveTargetPos = Spline.P2;                                       // 062fe750-062fe763
         break;
     default:
         // 062fe6b2-062fe6c1.
@@ -1609,23 +1609,23 @@ bool GotoBehavior::Slot10(void* DirectiveOp)
     }
 
     // LAB_062fe808: shared tail.
-    Field358 = Op.Field_50;                                         // 062fe816
-    SubObjectA.SetRange3c(Field358);                                // 062fe81f
+    ArrivalRange = Op.Field_50;                                         // 062fe816
+    SubObjectA.SetRange3c(ArrivalRange);                                // 062fe81f
     Field35c = Op.Field_54;                                         // 062fe82b
     // 062fe831-062fe83c: FCOMP double DAT_0639f418 (1.0e-5, bytes f1 68 e3 88 b5 f8 e4 3e);
     // TEST AH,0x41 + JP is taken on greater OR unordered -> owner's get_projected_throttle
     // (FUN_062e5b70, slot 0xd4) of that speed; less-or-equal -> 1.0f. (The old port had the
     // two arms swapped and never made the call.)
     if (!(static_cast<double>(Op.Field_54) <= 1.0e-5))
-        Field360 = Behavior_InvokeManagerSlotD4(ObjInspectOf(OwnerContextPtr14), Op.Field_54,
+        MaxThrottle = Behavior_InvokeManagerSlotD4(ObjInspectOf(OwnerContextPtr14), Op.Field_54,
                                                 IObject::ThrustEquipEngine);   // PUSH 0x1
     else
-        Field360 = 1.0f;                                            // 062fe83e
+        MaxThrottle = 1.0f;                                            // 062fe83e
     Flag367 = Op.Field_59;                                          // 062fe86a
     SubObjectA.SetEnabled(Flag367);                                 // 062fe871 FUN_062d5a10 (raw byte)
     Flag366 = Op.Field_58;                                          // 062fe87b
     SubObjectA.SetField44(Op.Field_58 != 0 ? 2 : 0);                // 062fe887/062fe892
-    SubObjectC.SetField158(Op.Field_58 != 0 ? 2 : 0);               // 062fe89f FUN_062da400
+    SubObjectC.SetStopStyle(Op.Field_58 != 0 ? 2 : 0);               // 062fe89f FUN_062da400
     SetCruiseLock(Op.Field_6C == 0 ? 1 : 0, 3);                     // 062fe8b1 (SETZ)
     Flag36a = Op.Field_5A;                                          // 062fe8b9
     Flag36b = Op.Field_5B;                                          // 062fe8c2
@@ -1652,12 +1652,12 @@ bool GotoBehavior::Slot10(void* DirectiveOp)
 }
 
 // Common.dll.txt 282558-282576 / Common.dll.c 136404-136417 (decomp-tracker item 2001,
-// FUN_062fe940). Tiny getter/predicate pair for the same sibling class as LAB_062fda60/
+// CopyGotoOp). Tiny getter/predicate pair for the same sibling class as LAB_062fda60/
 // LAB_062fe670/LAB_062fdb80 above: copies the 0x70-byte state block back OUT of
 // this+0x38c (the exact inverse of LAB_062fe670's own IN-copy above) into a caller-
 // supplied buffer, and returns bit 1 of Flags28 (this+0x28) as a bool.
 // thiscall(this, void* OutBuffer).
-extern "C" bool __fastcall FUN_062fe940(unsigned char* param_1, void* outBuffer)
+extern "C" bool __fastcall CopyGotoOp(unsigned char* param_1, void* outBuffer)
 {
     std::memcpy(outBuffer, param_1 + 0x38c, 0x70);
     return (param_1[0x28] & 0x2) != 0;
@@ -1682,11 +1682,11 @@ void GotoBehavior::set_direction(Vector const& Dir)
     // y*y) + z*z)) is strictly greater than 0.0f (TEST AH,0x41 + JZ). Anything else clears
     // Flag2ea. (The old port proceeded on the NOT-greater side.)
     bool bProceed = false;
-    if (Field2f4 == 1)
+    if (GotoKind == 1)
     {
         bProceed = true;
     }
-    else if (Field2f4 == 0)
+    else if (GotoKind == 0)
     {
         double const LengthSq = static_cast<double>(Dir.x) * Dir.x
                               + static_cast<double>(Dir.y) * Dir.y
@@ -1700,28 +1700,28 @@ void GotoBehavior::set_direction(Vector const& Dir)
     }
 
     Flag2ea = 1;                                                    // 062fe9bf
-    Field2d8 = -Dir.y;                                              // 062fe9c6-062fe9cb
-    Field2e0 = 0.0f;                                                // 062fe9d3 (ECX == 0)
-    Field2dc = -Dir.x;                                              // 062fe9d1-062fe9de
+    SteerAxisX = -Dir.y;                                              // 062fe9c6-062fe9cb
+    SteerAxisZ = 0.0f;                                                // 062fe9d3 (ECX == 0)
+    SteerAxisY = -Dir.x;                                              // 062fe9d1-062fe9de
     // 062fe9e4-062fea16: factor kept on the FPU; FCOM double 0.0 with TEST AH,0x41 + JNZ ->
     // only a strictly positive factor scales; FDIVR gives 1/factor, each product FSTP dword.
     double const Factor = BehaviorMgrPtr20->get_turn_sensitivity_factor();
     if (Factor > 0.0)
     {
         double const InvFactor = 1.0 / Factor;
-        Field2d8 = static_cast<float>(InvFactor * Field2d8);
-        Field2dc = static_cast<float>(InvFactor * Field2dc);
+        SteerAxisX = static_cast<float>(InvFactor * SteerAxisX);
+        SteerAxisY = static_cast<float>(InvFactor * SteerAxisY);
     }
-    Field2d8 = GotoClampUnit(Field2d8);                             // LAB_062fea1a-062fea69
-    Field2dc = GotoClampUnit(Field2dc);                             // 062fea6f-062feabe
-    Field2e0 = -Dir.z;                                              // 062feac4-062feaca
+    SteerAxisX = GotoClampUnit(SteerAxisX);                             // LAB_062fea1a-062fea69
+    SteerAxisY = GotoClampUnit(SteerAxisY);                             // 062fea6f-062feabe
+    SteerAxisZ = -Dir.z;                                              // 062feac4-062feaca
 }
 
 // Slot 13, LAB_062feae0 (.text:062feae0-062feaf8, RET 4).
 void GotoBehavior::set_throttle(float Throttle)
 {
     Flag2eb = 1;
-    Field2e4 = Throttle;
+    UserThrottle = Throttle;
     Flag2e9 = 1;
 }
 
@@ -1731,12 +1731,12 @@ void GotoBehavior::set_cruise(bool bOn)
     if (bOn)
     {
         Flag2e8 = 1;                                                // 062feb12 (BL)
-        Field2e4 = Field360;                                        // 062feb18
+        UserThrottle = MaxThrottle;                                        // 062feb18
         Flag2e9 = 1;                                                // 062feb1e
         return;
     }
     if (Flag2e8 != 0)
-        Field2e4 = Field360;                                        // 062feb3a
+        UserThrottle = MaxThrottle;                                        // 062feb3a
     // 062feb40-062feb48: ThrustManager::engage_cruise(NavHelper + 0x18, false). The old port
     // dropped this call as "ThrustManager not ported"; it is (common_systemmanager.h).
     static_cast<SystemManager*>(NavHelperPtr24)->Thrust.engage_cruise(false);

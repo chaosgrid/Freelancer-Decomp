@@ -317,8 +317,7 @@ void UpdateMouseFlightDirection()
     bool bSuppressMouseFlight = false;
     if (ShipBehavior != nullptr)
     {
-        unsigned char const Opaque168 = reinterpret_cast<unsigned char const*>(ShipBehavior)[0x168];
-        bSuppressMouseFlight = (Opaque168 == 0);
+        bSuppressMouseFlight = (ShipBehavior->bAllowUserSteering == 0);
     }
 
     // 0x004c7d33/0x004c7d47: the cinematic letterbox, or riding a tradelane, forces the reset path

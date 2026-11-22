@@ -50,11 +50,11 @@ namespace
         Desc->Size = 0x34;
         Desc->ComponentName = "FileSystem";
         Desc->DataPath = Path;
-        Desc->Field10 = 0x80000000u;
-        Desc->Field14 = 1;
-        Desc->Field1C = 3;
-        Desc->Field20 = 0x8000080u;
-        Desc->Field30 = 0xffffffffu;
+        Desc->Access = 0x80000000u;
+        Desc->ShareMode = 1;
+        Desc->Creation = 3;
+        Desc->Flags = 0x8000080u;
+        Desc->FindHandle = 0xffffffffu;
     }
 
     // DAT_0067dcf4 -- the Win3D model cache. Constructed empty by the static initializer
@@ -159,11 +159,11 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = Path;
-    Desc.Field10 = 0x80000000u;
-    Desc.Field14 = 1;
-    Desc.Field1C = 3;
-    Desc.Field20 = 0x8000080u;
-    Desc.Field30 = 0xffffffffu;
+    Desc.Access = 0x80000000u;
+    Desc.ShareMode = 1;
+    Desc.Creation = 3;
+    Desc.Flags = 0x8000080u;
+    Desc.FindHandle = 0xffffffffu;
 
     void* FsOut = nullptr;
     // 00420e58: DALib::Data vt+0xc CreateInstance(&Desc, &Fs).

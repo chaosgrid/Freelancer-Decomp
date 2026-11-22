@@ -35,7 +35,7 @@ struct FClientMarketGood
     // stored by the dealer's list sorts (0x0048304e in FUN_00482f10, 0x00483310 in FUN_00483230)
     // and read by their comparisons; the list refresh FUN_00482a90 passes it on to the row
     // (NnDealer::SortMarketGoodsByName / SortEquipmentMarketGoods / RefreshMarketList).
-    unsigned Field24;
+    unsigned CanBuyFlags;
 };
 
 static_assert(sizeof(FClientMarketGood) == 0x28, "the client market value is 0x28 bytes");

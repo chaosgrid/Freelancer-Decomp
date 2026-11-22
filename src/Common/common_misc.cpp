@@ -1049,7 +1049,7 @@ void __cdecl DAEngine_create_filesystem(char const* Path, IFileSystem** Out,
     Desc.ShareMode = 1;
     Desc.Creation = 3;
     Desc.Flags = 0x8000080;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.FindHandle = 0xFFFFFFFF;
 
     // +0x0C IComponentFactory::CreateInstance -- the FileSystem desc stands in for AGGDESC.
     Filesys->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(Out));

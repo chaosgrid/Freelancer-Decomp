@@ -263,7 +263,7 @@
 //     this and a transcription that hands them a matrix reads 0x1c bytes early.
 //     Incidental: that these three take the object rather than the matrix is
 //     real evidence for the IVP_Cache_Object reading of
-//     FIVP_Sweep_Cache_Source below, which this header declined to assert.
+//     IVP_NarrowPhaseCacheSlot below, which this header declined to assert.
 //     Still not asserted -- recorded as evidence.
 //
 //   * the "shared scalar block" (InnerThreshold = Radius*0.5 + ToleranceBase;
@@ -278,7 +278,7 @@
 // Item 3377 (FUN_0635f020, 96 insns) also landed this pass, as
 // EstimateBallVsBallContact -- the family's base case, two objects treated as
 // points at their own frame origins, with no ledge, edge or point array
-// touched anywhere in its body. It takes its two FIVP_Sweep_Cache_Source
+// touched anywhere in its body. It takes its two IVP_NarrowPhaseCacheSlot
 // arguments DIRECTLY rather than through FIVP_Sweep_Ledge_Side, and it is
 // reached from a THIRD dispatcher, FUN_0635fe30 (item 3381, :0635fed5).
 //
@@ -321,7 +321,7 @@
 // IVP_RotateSlotToWorldSpace and IVP_RotateWorldToSlotSpace, whose receiver is
 // `IVP_NarrowPhaseCacheSlot*` (ivp_real_object.h:811-873, item 3076/3077 plus
 // the item-3514/3518 pass). Lay the two declarations side by side:
-//       IVP_NarrowPhaseCacheSlot      FIVP_Sweep_Cache_Source
+//       IVP_NarrowPhaseCacheSlot      IVP_NarrowPhaseCacheSlot
 //         +0x00 LastRefreshTick         +0x00 Field_0x00 -> cache's +0x10
 //         +0x04 RefCount                +0x04 (never read by Init)
 //         +0x08 Owner  IVP_Real_Object* +0x08 Object IVP_Real_Object*
@@ -329,12 +329,12 @@
 // Same type, derived twice from opposite directions. That also explains the
 // three helpers' `this + 0x1c` matrix base, which lane w23 flagged as a trap:
 // they take the SLOT, not the matrix, because the slot is what the sweep
-// drivers carry. FIVP_Sweep_Cache_Source is deliberately NOT deleted in favour
+// drivers carry. IVP_NarrowPhaseCacheSlot is deliberately NOT deleted in favour
 // of the other name here -- IVP_NarrowPhaseCacheSlot is defined inside
 // ivp_real_object.cpp, not its header, so it is not reachable from this file,
 // and hoisting it is a cross-file edit. OPEN TODO, recorded not accepted:
 // hoist IVP_NarrowPhaseCacheSlot into ivp_real_object.h and make
-// FIVP_Sweep_Cache_Source an alias of it. Until then the two are layout-
+// IVP_NarrowPhaseCacheSlot an alias of it. Until then the two are layout-
 // compatible by construction and this file uses `Source->Frame.<op>()` where
 // retail calls the three helpers -- identical code, one indirection fewer.
 //
@@ -390,7 +390,7 @@ class IVP_Time;
 // Total 0x68 + 21*0x40 = 0x5a8, matching local_5a8 in every driver.
 // ============================================================================
 // ----------------------------------------------------------------------------
-// FIVP_Sweep_Cache_Source -- PORT-LOCAL PLACEHOLDER for the single argument
+// IVP_NarrowPhaseCacheSlot -- PORT-LOCAL PLACEHOLDER for the single argument
 // IVP_Sweep_Frame_Cache::Init takes. Retail's own type for it is NOT
 // recovered and is deliberately NOT guessed here.
 //
@@ -414,19 +414,7 @@ class IVP_Time;
 // IVP's IVP_Cache_Object, but this port has no such class and the match was
 // NOT established, so the name is not borrowed.
 // ----------------------------------------------------------------------------
-struct FIVP_Sweep_Cache_Source
-{
-    const void *Field_0x00;             // +0x00 -- copied into the cache's +0x10
-    int Field_0x04;                     // +0x04 -- never read by Init
-    IVP_Real_Object *Object;            // +0x08
-    int Field_0x0c;                     // +0x0c -- never read by Init
-    int Field_0x10;                     // +0x10 -- never read by Init
-    int Field_0x14;                     // +0x14 -- never read by Init
-    int Field_0x18;                     // +0x18 -- never read by Init
-    IVP_U_Matrix Frame;                 // +0x1c
-};
-static_assert(offsetof(FIVP_Sweep_Cache_Source, Object) == 0x08, "FIVP_Sweep_Cache_Source::Object");
-static_assert(offsetof(FIVP_Sweep_Cache_Source, Frame) == 0x1c, "FIVP_Sweep_Cache_Source::Frame");
+struct IVP_NarrowPhaseCacheSlot;
 
 struct IVP_Sweep_Frame_Cache
 {
@@ -434,7 +422,7 @@ struct IVP_Sweep_Frame_Cache
     IVP_Core *Core;                     // +0x04
     int Field_0x08;                     // +0x08 -- purpose unknown, never written by the ctor
     int Field_0x0c;                     // +0x0c -- purpose unknown, never written by the ctor
-    const void *Field_0x10;             // +0x10 -- ctor: `= *CtorArg`
+    int32_t LastRefreshTick;            // +0x10 -- ctor: `= Source->LastRefreshTick`
     IVP_U_Matrix *FrameAtSlot[21];      // +0x14
     IVP_U_Matrix FrameStorage[21];      // +0x68
 
@@ -451,7 +439,7 @@ struct IVP_Sweep_Frame_Cache
     // `Source + 0x1c` straight into FrameAtSlot[], which the solvers then
     // hand out as a live frame pointer, so the cache genuinely aliases the
     // source's own storage rather than copying it.
-    void Init(FIVP_Sweep_Cache_Source *Source);
+    void Init(IVP_NarrowPhaseCacheSlot *Source);
 };
 static_assert(sizeof(IVP_Sweep_Frame_Cache) == 0x5a8, "IVP_Sweep_Frame_Cache size");
 static_assert(offsetof(IVP_Sweep_Frame_Cache, FrameAtSlot) == 0x14, "IVP_Sweep_Frame_Cache::FrameAtSlot");
@@ -1023,7 +1011,7 @@ namespace IVP_LedgeSweepEvaluatorsDeferred
 //                   FUN_06353510(this = ObjectB). This is what the driver
 //                   feeds to IVP_Sweep_Frame_Cache::Init, and Init's own use
 //                   of +0x08/+0x1c is what types it as
-//                   FIVP_Sweep_Cache_Source.
+//                   IVP_NarrowPhaseCacheSlot.
 //   +0x0c Object -- `[ESP+0x24] = EBP` (:0635fd9c), Mindist->ObjectB. Never
 //                   read by item 3371; kept because the dispatcher writes it
 //                   and a larger sibling driver may.
@@ -1032,7 +1020,7 @@ struct FIVP_Sweep_Ledge_Side
 {
     const void *Points;                 // +0x00 -- IVP_U_Float_Point[], 0x10 stride
     const void *Ledge;                  // +0x04 -- IVP_Compact_Ledge *
-    FIVP_Sweep_Cache_Source *Source;    // +0x08
+    IVP_NarrowPhaseCacheSlot *Source;    // +0x08
     IVP_Real_Object *Object;            // +0x0c
 };
 static_assert(offsetof(FIVP_Sweep_Ledge_Side, Source) == 0x08, "FIVP_Sweep_Ledge_Side::Source");
@@ -1078,7 +1066,7 @@ struct IVP_Sweep_Estimator_Context
     // 109 insns; decomp-tracker item 3371). thiscall, three stack arguments,
     // `RET 0xc`. Reached only from LAB_0635fd10's ShapeTypeB == 2 arm.
     void EstimateBallVsLedgeFaceContact(const void *FeatureEdge,
-                                        FIVP_Sweep_Cache_Source *SourceA,
+                                        IVP_NarrowPhaseCacheSlot *SourceA,
                                         FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635da70 (Common.dll.txt:449341-449699, bytes 0x0635da70-0x0635de83,
@@ -1136,8 +1124,8 @@ struct IVP_Sweep_Estimator_Context
     // Its one XREF is :0635fed5, inside FUN_0635fe30 (item 3381) -- a THIRD
     // dispatcher, distinct from LAB_0635fd10 (which reaches item 3371) and
     // LAB_0635fef0 (which reaches items 3369, 3374 and 3378).
-    void EstimateBallVsBallContact(FIVP_Sweep_Cache_Source *SourceA,
-                                   FIVP_Sweep_Cache_Source *SourceB);
+    void EstimateBallVsBallContact(IVP_NarrowPhaseCacheSlot *SourceA,
+                                   IVP_NarrowPhaseCacheSlot *SourceB);
 
     // FUN_0635e790 (Common.dll.txt:450564-450914, bytes 0x0635e790 through the
     // `RET 0x10` at 0x0635e880 inclusive, 340 insns; decomp-tracker item 3375).
@@ -1162,7 +1150,7 @@ struct IVP_Sweep_Estimator_Context
     // (:0635fdef-:0635fe07 and :0635fde8-:0635fdf0).
     void EstimateBallVsLedgeVertexContact(IVP_Real_Object *ObjectA,
                                           const void *FeatureEdgeB,
-                                          FIVP_Sweep_Cache_Source *SourceA,
+                                          IVP_NarrowPhaseCacheSlot *SourceA,
                                           FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635f8c0 (Common.dll.txt:451980-452276, bytes 0x0635f8c0 through the
@@ -1179,7 +1167,7 @@ struct IVP_Sweep_Estimator_Context
     // for item 3376's -- so the parameter is kept rather than dropped.
     void EstimateBallVsLedgeEdgeContact(IVP_Real_Object *ObjectA,
                                         const void *FeatureEdgeB,
-                                        FIVP_Sweep_Cache_Source *SourceA,
+                                        IVP_NarrowPhaseCacheSlot *SourceA,
                                         FIVP_Sweep_Ledge_Side *SideB);
 };
 static_assert(sizeof(IVP_Sweep_Estimator_Context) == 0x34, "IVP_Sweep_Estimator_Context size");

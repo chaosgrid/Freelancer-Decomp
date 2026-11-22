@@ -91,7 +91,7 @@ void qh_qhull (void) {
       if (qh DOcheckmax){
         if (qh REPORTfreq) {
 	  qh_buildtracing (NULL, NULL);
-	  FUN_06356960 (/* retail 0637d6f4 */ "\nTesting all coplanar points.\n");
+	  ivp_message (/* retail 0637d6f4 */ "\nTesting all coplanar points.\n");
         }
         qh_check_maxout();
       }
@@ -100,7 +100,7 @@ void qh_qhull (void) {
       qh_nearcoplanar();
   }
   if (qh_setsize ((setT*)qhmem.tempstack) != 0) {
-    FUN_06356960 (/* retail 0637d740 */ "qhull internal error (qh_qhull): temporary sets not empty (%d)\n",
+    ivp_message (/* retail 0637d740 */ "qhull internal error (qh_qhull): temporary sets not empty (%d)\n",
 	     qh_setsize ((setT*)qhmem.tempstack));
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -175,7 +175,7 @@ boolT qh_addpoint (pointT *furthest, facetT *facet, boolT checkdist) {
   if (qh_pointid (furthest) == -1)
     qh_setappend (&qh other_points, furthest);
   if (!facet) {
-    FUN_06356960 (/* retail 0637d7d3 (retail text) */ "qh_addpoint: NULL facet.  Use qh_findbestfacet\n");
+    ivp_message (/* retail 0637d7d3 (retail text) */ "qh_addpoint: NULL facet.  Use qh_findbestfacet\n");
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
   if (checkdist) {
@@ -372,14 +372,14 @@ void qh_buildhull(void) {
   trace1((qh ferr, "qh_buildhull: start build hull\n"));
   FORALLfacets {
     if (facet->visible || facet->newfacet) {
-      FUN_06356960 (/* retail 0637de67 */ "qhull internal error (qh_buildhull): visible or new facet f%d in facet list\n",
+      ivp_message (/* retail 0637de67 */ "qhull internal error (qh_buildhull): visible or new facet f%d in facet list\n",
                    facet->id);    
       qh_errexit (qh_ERRqhull, facet, NULL);
     }
   }
   FORALLvertices {
     if (vertex->newlist) {
-      FUN_06356960 (/* retail 0637deb8 */ "qhull internal error (qh_buildhull): new vertex f%d in vertex list\n",
+      ivp_message (/* retail 0637deb8 */ "qhull internal error (qh_buildhull): new vertex f%d in vertex list\n",
                    vertex->id);
       qh_errprint ("ERRONEOUS", NULL, NULL, NULL, vertex);
       qh_errexit (qh_ERRqhull, NULL, NULL);
@@ -401,7 +401,7 @@ void qh_buildhull(void) {
   if (qh NARROWhull) /* move points from outsideset to coplanarset */
     qh_outcoplanar( /* facet_list */ );
   if (qh num_outside && !furthest) {
-    FUN_06356960 (/* retail 0637dfa3 */ "qhull internal error (qh_buildhull): %d outside points were never processed.\n", qh num_outside);
+    ivp_message (/* retail 0637dfa3 */ "qhull internal error (qh_buildhull): %d outside points were never processed.\n", qh num_outside);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
   trace1((qh ferr, "qh_buildhull: completed the hull construction\n"));
@@ -450,7 +450,7 @@ void qh_buildtracing (pointT *furthest, facetT *facet) {
     cpu= qh_CPUclock - qh hulltime;
     cpu /= qh_SECticks;
     total= zzval_(Ztotmerge) - zzval_(Zcyclehorizon) + zzval_(Zcyclefacettot);
-    FUN_06356960 (/* retail 0637e0a3 */ "\n\
+    ivp_message (/* retail 0637e0a3 */ "\n\
 At %02d:%02d:%02d & %2.5g CPU secs, qhull has created %d facets and merged %d.\n\
  The current hull contains %d facets and %d vertices.  Last point was p%d\n",
       tp->tm_hour, tp->tm_min, tp->tm_sec, cpu, qh facet_id -1,
@@ -474,7 +474,7 @@ At %02d:%02d:%02d & %2.5g CPU secs, qhull has created %d facets and merged %d.\n
     total= zzval_(Ztotmerge) - zzval_(Zcyclehorizon) + zzval_(Zcyclefacettot);
     zinc_(Zdistio);
     qh_distplane (furthest, facet, &dist);
-    FUN_06356960 (/* retail 0637e1ca */ "\n\
+    ivp_message (/* retail 0637e1ca */ "\n\
 At %02d:%02d:%02d & %2.5g CPU secs, qhull has created %d facets and merged %d.\n\
  The current hull contains %d facets and %d vertices.  There are %d\n\
  outside points.  Next is point p%d (v%d), %2.2g above f%d.\n",
@@ -485,7 +485,7 @@ At %02d:%02d:%02d & %2.5g CPU secs, qhull has created %d facets and merged %d.\n
     cpu= qh_CPUclock - qh hulltime;
     cpu /= qh_SECticks;
     qh_distplane (furthest, facet, &dist);
-    FUN_06356960 (/* retail 0637e258 */ "qh_addpoint: add p%d (v%d) to hull of %d facets (%2.2g above f%d) and %d outside at %4.4g CPU secs.  Previous was p%d.\n",
+    ivp_message (/* retail 0637e258 */ "qh_addpoint: add p%d (v%d) to hull of %d facets (%2.2g above f%d) and %d outside at %4.4g CPU secs.  Previous was p%d.\n",
       furthestid, qh vertex_id, qh num_facets, dist,
       getid_(facet), qh num_outside+1, cpu, qh furthest_id);
   }
@@ -721,7 +721,7 @@ pointT *qh_nextfurthest (facetT **visible) {
             index -= size;
         }
       }
-      FUN_06356960 (/* retail 0637e8dc */ "qhull internal error (qh_nextfurthest): num_outside %d is too low\nby at least %d, or a random real %g >= 1.0\n",
+      ivp_message (/* retail 0637e8dc */ "qhull internal error (qh_nextfurthest): num_outside %d is too low\nby at least %d, or a random real %g >= 1.0\n",
               qh num_outside, index+1, randr);
       qh_errexit (qh_ERRqhull, NULL, NULL);
     }else { /* VIRTUALmemory */
@@ -951,7 +951,7 @@ void qh_partitioncoplanar (pointT *point, facetT *facet, realT *dist) {
     if (bestdist <= qh TRACEdist)
       goto LABELtrace;
   }
-  FUN_06356960 (/* retail 0637ef02 */ "qh_partitioncoplanar: ====== p%d increases max_outside to %2.2g of f%d last p%d\n",
+  ivp_message (/* retail 0637ef02 */ "qh_partitioncoplanar: ====== p%d increases max_outside to %2.2g of f%d last p%d\n",
 		 qh_pointid(point), bestdist, bestfacet->id, qh furthest_id);
   qh_errprint ("DISTANT", bestfacet, NULL, NULL, NULL);
 LABELtrace:

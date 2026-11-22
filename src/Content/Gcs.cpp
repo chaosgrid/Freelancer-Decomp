@@ -206,7 +206,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
         // patrol; 5, 6 and the rest nothing), plural with formation wingmen, then the
         // legality of the ship's faction ("_leg" DAT_06fb759c for lawful, else "_ill"
         // DAT_06fb7594). FUN_06ea9f40 copies, clamped to the room left.
-        if (!Object->Slot04())
+        if (!static_cast<FContentShipBase*>(Object)->IsNpcShip())
             return Result;
         char const* Name = nullptr;
         switch (static_cast<FContentNpcShip*>(Object)->GetGuideType())
@@ -233,7 +233,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
     case 1:
     {
         // 06eeb396-06eeb412.
-        if (Object->Slot04())
+        if (static_cast<FContentShipBase*>(Object)->IsNpcShip())
         {
             int Value = 0;
             if (!static_cast<FNpcNameReputation*>(Object->ReputationHandle)
@@ -249,7 +249,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
     case 2:
     {
         // 06eeb413-06eeb4b3.
-        if (Object->Slot04())
+        if (static_cast<FContentShipBase*>(Object)->IsNpcShip())
         {
             int Value = 0;
             if (!static_cast<FNpcNameReputation*>(Object->ReputationHandle)
@@ -272,7 +272,7 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
     {
         // 06eeb4cd-06eeb534: the NPC's rolled value (the call's result is not read); a
         // player gets 1 (FUN_06f49bc0 is called, its result dropped).
-        if (Object->Slot04())
+        if (static_cast<FContentShipBase*>(Object)->IsNpcShip())
         {
             int Value = 0;
             static_cast<FNpcNameReputation*>(Object->ReputationHandle)->RollNameValue(&Value);
@@ -422,8 +422,8 @@ FGcsLine::FGcsLine(FSystemInfo* InSystem, unsigned int InSpeaker, unsigned int I
     , VoiceId(0)
     , CostumeId(0)
     , System(InSystem)
-    , Field_0x28(0)
-    , Field_0x2c(0)
+    , PermutationIds(0)
+    , CaptionIds(0)
 {
 }
 
@@ -435,7 +435,7 @@ FGcsLine::~FGcsLine()
 bool FGcsLine::CanPlay()
 {
     // FUN_06ed6780.
-    return Field_0x28 != 0 && System != nullptr && System->FindShipOrSolar(Speaker) != nullptr &&
+    return PermutationIds != 0 && System != nullptr && System->FindShipOrSolar(Speaker) != nullptr &&
            !TextIds.empty();
 }
 
@@ -459,14 +459,14 @@ void FGcsLine::Play()
         CommCostume.PartIds[3] = 0;
         CommCostume.AccessoryCount = 0;
         pub::GF::GetCostumeByID(CostumeId, CommCostume);
-        SendSpaceComm(System, Speaker, Listener, Texts, &TextCount, VoiceId, Field_0x2c,
-                      &CommCostume, Field_0x28, 0.5f, true);
+        SendSpaceComm(System, Speaker, Listener, Texts, &TextCount, VoiceId, CaptionIds,
+                      &CommCostume, PermutationIds, 0.5f, true);
     }
     else
     {
         // 06ed6af3-06ed6b35.
-        SendSpaceComm(System, Speaker, Listener, Texts, &TextCount, VoiceId, Field_0x2c,
-                      nullptr, Field_0x28, 0.5f, true);
+        SendSpaceComm(System, Speaker, Listener, Texts, &TextCount, VoiceId, CaptionIds,
+                      nullptr, PermutationIds, 0.5f, true);
     }
 
     // 06ed6b3e-06ed6d86: outside single player the manager's delayed messages get
@@ -476,10 +476,10 @@ void FGcsLine::Play()
         return;
     FGcsDelayedMessage Entry;
     Entry.Delay = static_cast<float>(static_cast<double>(GetDuration()) + 1.25);
-    Entry.Field_0x00 = System->SystemId;
-    Entry.Field_0x04 = Speaker;
-    Entry.Field_0x08 = Listener;
-    Entry.Field_0x0c = TextIds.back();
+    Entry.SystemId = System->SystemId;
+    Entry.Speaker = Speaker;
+    Entry.Listener = Listener;
+    Entry.LastTextId = TextIds.back();
     Entry.Elapsed = 0.0f;
     GGcsConversations.DelayedMessages.insert(GGcsConversations.DelayedMessages.end(), 1, Entry);
 }
@@ -546,7 +546,7 @@ void FGcsLine::BuildSingleVoiceLine(unsigned int Roles, char const* Name)
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64(Name).Data, "-", VoiceId).Data);
 }
@@ -622,7 +622,7 @@ void FGcsPlayerListLine::Play()
         System = LastState->GetSystemRecord();
         int const TextCount = static_cast<int>(TextIds.size());
         SendSpaceComm(System, Speaker, LastState->GetShipId(), Texts, &TextCount, VoiceId,
-                      Field_0x2c, CommCostumePtr, Field_0x28, 0.0f, false);
+                      CaptionIds, CommCostumePtr, PermutationIds, 0.0f, false);
     }
 
     // 06ed62f2-06ed6551: outside single player, with a last player, the manager's delayed
@@ -632,10 +632,10 @@ void FGcsPlayerListLine::Play()
         return;
     FGcsDelayedMessage Entry;
     Entry.Delay = static_cast<float>(static_cast<double>(GetDuration()) + 1.25);
-    Entry.Field_0x08 = LastState->GetShipId();
-    Entry.Field_0x00 = System->SystemId;
-    Entry.Field_0x04 = Speaker;
-    Entry.Field_0x0c = TextIds.back();
+    Entry.Listener = LastState->GetShipId();
+    Entry.SystemId = System->SystemId;
+    Entry.Speaker = Speaker;
+    Entry.LastTextId = TextIds.back();
     Entry.Elapsed = 0.0f;
     GGcsConversations.DelayedMessages.insert(GGcsConversations.DelayedMessages.end(), 1, Entry);
 }
@@ -731,7 +731,7 @@ FGcsLineLaunchClearance::FGcsLineLaunchClearance(FSystemInfo* InSystem, unsigned
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a41;
+    PermutationIds = 0x4a41;
     TextIds.reserve(9);
 
     // 06ed9466-06ed94d8: the ship's faction prefix + "_short".
@@ -782,7 +782,7 @@ FGcsLineAck::FGcsLineAck(FSystemInfo* InSystem, unsigned int InSpeaker,
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06edf8d7-06edf91b: FUN_06f937c0 insert(end, 1, id).
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
@@ -800,7 +800,7 @@ FGcsLineDockRequest::FGcsLineDockRequest(FSystemInfo* InSystem, unsigned int InS
     System->FindShipOrSolar(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a42;
+    PermutationIds = 0x4a42;
     TextIds.reserve(10);
 
     PushText("gcs_misc_thisis+");
@@ -828,7 +828,7 @@ FGcsLineDockHostile::FGcsLineDockHostile(FSystemInfo* InSystem, unsigned int InS
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06ed7416-06ed749f: the name copied into a local TString (clamp 0x3f) first.
     PushText(MakeVoiceLineName("gcs_dockrequest_responsehostile", "-", VoiceId).Data);
@@ -846,7 +846,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
     if (DockType == 6)
     {
         // 06ed7583-06ed777d: landing.
-        Field_0x28 = 0x4a3e;
+        PermutationIds = 0x4a3e;
         TextIds.reserve(6);
         PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
         PushText("gcs_dockrequest_yourrequest+");
@@ -859,7 +859,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
     if (DockIndex <= 0x14)
     {
         // 06ed7782-06ed7aaf: a terminal up to 20, its number (DockIndex + 1) at the end.
-        Field_0x28 = 0x4a3f;
+        PermutationIds = 0x4a3f;
         TextIds.reserve(7);
         PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
         PushText("gcs_dockrequest_yourrequest+");
@@ -875,7 +875,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
         return;
     }
     // 06ed7ab4-06ed7d4b: a terminal above 20, its number digit by digit (two digits).
-    Field_0x28 = 0x4a40;
+    PermutationIds = 0x4a40;
     TextIds.reserve(8);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText("gcs_dockrequest_yourrequest+");
@@ -900,7 +900,7 @@ FGcsLineDockStandby::FGcsLineDockStandby(FSystemInfo* InSystem, unsigned int InS
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_standby", "-", VoiceId).Data);
@@ -917,7 +917,7 @@ FGcsLineDockDenied::FGcsLineDockDenied(FSystemInfo* InSystem, unsigned int InSpe
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3d;
+    PermutationIds = 0x4a3d;
     TextIds.reserve(5);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText("gcs_dockrequest_yourrequest+");
@@ -936,7 +936,7 @@ FGcsLineDockNowCleared::FGcsLineDockNowCleared(FSystemInfo* InSystem, unsigned i
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3f;
+    PermutationIds = 0x4a3f;
     TextIds.reserve(7);
     PushText(MakeShortFactionName(Ship).Data);
     PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
@@ -956,7 +956,7 @@ FGcsLineJumpGateOpen::FGcsLineJumpGateOpen(FSystemInfo* InSystem, unsigned int I
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3b;
+    PermutationIds = 0x4a3b;
     TextIds.reserve(3);
     PushText(MakeVoiceLineName("gcs_dockrequest_jumpgateopen", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_goingto", "+", VoiceId).Data);
@@ -973,7 +973,7 @@ FGcsLineJumpGateDelayed::FGcsLineJumpGateDelayed(FSystemInfo* InSystem, unsigned
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName("gcs_dockrequest_jumpgatedelayed", "-", VoiceId).Data);
     PushText(MakeSystemPrefixName(TargetSystem).Data);
@@ -1007,7 +1007,7 @@ FGcsLineThisOurStop::FGcsLineThisOurStop(FSystemInfo* InSystem, unsigned int InS
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName("gcs_dockrequest_thisourstop", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_thankshelp", "-", VoiceId).Data);
@@ -1027,7 +1027,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     if (!(Attitude > -0.6f))
     {
         // 06ed9e66-06ed9f3c.
-        Field_0x28 = 0x4a3c;
+        PermutationIds = 0x4a3c;
         TextIds.reserve(4);                                         // FUN_06eec150
         PushText("gcs_dockhail_dock_incoming+");
         TString<0x40> ShipPrefix;
@@ -1045,7 +1045,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     if (Pick == 1)
     {
         // 06ed98ce-06ed9bbe.
-        Field_0x28 = 0x4a3f;
+        PermutationIds = 0x4a3f;
         TextIds.reserve(7);
         PushText("gcs_dockhail_dock_incoming+");
         TString<0x40> ShipPrefix;
@@ -1063,7 +1063,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     if (Pick != 0)
         return;
     // 06ed9bca-06ed9e4a.
-    Field_0x28 = 0x4a3e;
+    PermutationIds = 0x4a3e;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
     PushText(MakeObjectLocationName(Speaker).Data);                 // FUN_06eeb730 inlined
@@ -1085,7 +1085,7 @@ FGcsLineDockHailReceived::FGcsLineDockHailReceived(FSystemInfo* InSystem, unsign
     if (!HasVoiceRoles(0x20))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Listener);
-    Field_0x28 = 0x4a3d;
+    PermutationIds = 0x4a3d;
     TextIds.reserve(5);
     PushText(MakeVoiceLineName("gcs_dockhail_dock_transreceived", "+", VoiceId).Data);
     PushText(MakeShortFactionName(Ship).Data);
@@ -1104,7 +1104,7 @@ FGcsLineHaileeDataSubmit::FGcsLineHaileeDataSubmit(FSystemInfo* InSystem, unsign
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3d;
+    PermutationIds = 0x4a3d;
     TextIds.reserve(5);
     PushText("gcs_misc_thisis+");
     // 06eda3d0-06eda441: GetFactionProps (FUN_06f50650) directly: null ->
@@ -1134,7 +1134,7 @@ FGcsLineGoingTo::FGcsLineGoingTo(FSystemInfo* InSystem, unsigned int InSpeaker,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_misc_goingto", "+", VoiceId).Data);
     // 06eda9e7-06edaa9f: the guide's second target (slot +0x34), its place.
@@ -1156,7 +1156,7 @@ FGcsLinePatrolIdHome::FGcsLinePatrolIdHome(FSystemInfo* InSystem, unsigned int I
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_idhome", "+", VoiceId).Data);
     // The guide's first target (slot +0x34), its place.
@@ -1185,13 +1185,13 @@ FGcsLinePatrolStatus::FGcsLinePatrolStatus(FSystemInfo* InSystem, unsigned int I
         // 06edaf42-06edb0b4: +0x28 = 0x4a39, room for one; "gcs_patrol_finished" (FUN_06ead640
         // copy) + "_p" when the formation has more than one member (FUN_06f66220 into a local,
         // SETA), else "_s", "%s%s%s" with "", then FUN_06eeaf10 with "-" and FUN_06eb5770.
-        Field_0x28 = 0x4a39;
+        PermutationIds = 0x4a39;
         TextIds.reserve(1);
         PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_finished", "-", VoiceId).Data);
         return;
     }
     // 06edb0b9-06edb11a: +0x28 = 0x4a3b, room for three.
-    Field_0x28 = 0x4a3b;
+    PermutationIds = 0x4a3b;
     TextIds.reserve(3);
     // 06edb11d-06edb1a5: the formation (FUN_06f66220) with more than one member speaks as
     // "we", else as "I"; "only" for a single point.
@@ -1221,7 +1221,7 @@ FGcsLineTradeStatus::FGcsLineTradeStatus(FSystemInfo* InSystem, unsigned int InS
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
 
     // 06edb396-06edb50d: the trade guide's slot +0x4c (its trade good) ...
@@ -1276,7 +1276,7 @@ FGcsLineTradeIdHome::FGcsLineTradeIdHome(FSystemInfo* InSystem, unsigned int InS
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_trade_idhome", "+", VoiceId).Data);
     // The guide's first target (slot +0x34), its place.
@@ -1299,7 +1299,7 @@ FGcsLinePlayerHailBlowOff::FGcsLinePlayerHailBlowOff(FSystemInfo* InSystem,
     // 06ee1265-06ee1279.
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06ee12f6-06ee1334: the name copied into a local TString (clamp 0x3f); 06ee1338-06ee137f:
     // FUN_06eeaf10 with "-" (DAT_06fb6064), GetNicknameId, FUN_06f937c0 insert(end, 1, id).
@@ -1316,7 +1316,7 @@ FGcsLinePlayerHailCombatBlowOff::FGcsLinePlayerHailCombatBlowOff(FSystemInfo* In
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06ee14e6-06ee156f.
     PushText(MakeVoiceLineName(MakeTString64("gcs_phail_combatblowoff").Data, "-", VoiceId).Data);
@@ -1334,7 +1334,7 @@ FGcsLinePlayerHailIdentify::FGcsLinePlayerHailIdentify(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     // 06ee16cc-06ee16eb.
     PushText("gcs_misc_thisis+");
@@ -1399,7 +1399,7 @@ FGcsLineCombatTakingLead::FGcsLineCombatTakingLead(FSystemInfo* InSystem, unsign
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3e;
+    PermutationIds = 0x4a3e;
     TextIds.reserve(6);
     // 06edbdb4-06edbec7 (FUN_06f937c0 / FUN_06eb5770 appends).
     PushText("gcs_misc_thisis+");
@@ -1421,7 +1421,7 @@ FGcsLineCombatScream::FGcsLineCombatScream(FSystemInfo* InSystem, unsigned int I
     // 06edc054-06edc16a: the one-name body.
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_scream").Data, "-", VoiceId).Data);
 }
@@ -1444,7 +1444,7 @@ FGcsLineCombatTakingDamage::FGcsLineCombatTakingDamage(FSystemInfo* InSystem,
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06edc502-06edc514: FLD Health, FCOMP double DAT_06fb6aa0 (0.49), TEST AH,5 / JP: C0
     // alone (below) -> "_worst"; the name copied with FUN_06ea9f40 (room 0x40).
@@ -1465,7 +1465,7 @@ FGcsLineCombatInflictingDamage::FGcsLineCombatInflictingDamage(FSystemInfo* InSy
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     // 06edc71f-06edc731: FCOMP double DAT_06fb6b00 (0.33), TEST AH,5 / JP: C0 alone (below)
     // -> "_worst".
@@ -1511,7 +1511,7 @@ FGcsLineCombatOrderDisengage::FGcsLineCombatOrderDisengage(FSystemInfo* InSystem
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     // 06edceeb-06edcf59 / 06edcf5e-06edcfcd: each name copied (FUN_06ea9f40), with "-".
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_order_disengage").Data, "-",
@@ -1540,7 +1540,7 @@ FGcsLineCombatResumeTrade::FGcsLineCombatResumeTrade(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3b;
+    PermutationIds = 0x4a3b;
     TextIds.reserve(3);
     // 06edd32e-06edd3a7: the name copied (FUN_06ea9f40) with "+" (DAT_06fb62ec).
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_resume_trade").Data, "+",
@@ -1587,7 +1587,7 @@ FGcsLineCombatEngaging::FGcsLineCombatEngaging(FSystemInfo* InSystem, unsigned i
     }
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     // 06edd841-06edd8ae: the name copied (FUN_06ead640) with "+".
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_engaging").Data, "+", VoiceId).Data);
@@ -1622,7 +1622,7 @@ FGcsLineCombatNoEngaging::FGcsLineCombatNoEngaging(FSystemInfo* InSystem,
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     // 06eddb38-06eddba8: the name copied (FUN_06ea9f40) with "+".
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_noengaging").Data, "+", VoiceId).Data);
@@ -1659,7 +1659,7 @@ FGcsLineCombatOrderNoEngage::FGcsLineCombatOrderNoEngage(FSystemInfo* InSystem,
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_order_noengage").Data, "-",
                                VoiceId).Data);
@@ -1689,7 +1689,7 @@ FGcsLineCombatAskForHelp::FGcsLineCombatAskForHelp(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     // 06ede50b-06ede590: GetFactionProps directly (null -> "gcs_refer_faction_player") +
     // "_short" -- the MakeShortFactionName outcome.
@@ -1712,7 +1712,7 @@ FGcsLineCombatComingIn::FGcsLineCombatComingIn(FSystemInfo* InSystem, unsigned i
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     // 06ede7fb-06ede872: "gcs_misc_ack" copied (FUN_06ea9f40) with "-".
     PushText(MakeVoiceLineName(MakeTString64("gcs_misc_ack").Data, "-", VoiceId).Data);
@@ -1733,7 +1733,7 @@ FGcsLineCombatOfferHelp::FGcsLineCombatOfferHelp(FSystemInfo* InSystem, unsigned
     FContentSpaceObj* const ListenerShip = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a41;
+    PermutationIds = 0x4a41;
     TextIds.reserve(9);
     // 06edeaf8-06edec2b (FUN_06eb5770 appends).
     PushText("gcs_misc_thisis+");
@@ -1761,7 +1761,7 @@ FGcsLineCombatRetreatTowards::FGcsLineCombatRetreatTowards(FSystemInfo* InSystem
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     // 06edef0e-06edef7b (FUN_06ead640 copy) / 06edef80-06edeff6 (FUN_06ea9f40 copy), "+".
     PushText(MakeVoiceLineName(MakeTString64("gcs_misc_attentionallwingmen").Data, "+",
@@ -1790,7 +1790,7 @@ FGcsLineCombatAnnounceFlee::FGcsLineCombatAnnounceFlee(FSystemInfo* InSystem,
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3a;
+    PermutationIds = 0x4a3a;
     TextIds.reserve(2);
     // 06edf2a7-06edf312: the name copied (FUN_06ea9f40) with "-".
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_announce_flee").Data, "-",
@@ -1825,7 +1825,7 @@ FGcsLineStationAllClear::FGcsLineStationAllClear(FSystemInfo* InSystem, unsigned
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3c;
+    PermutationIds = 0x4a3c;
     TextIds.reserve(4);
     // 06ee195a-06ee19c9: the name copied (FUN_06ead640) with "-".
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_attentionallunits").Data, "-",
@@ -1855,7 +1855,7 @@ FGcsLineStationEngage::FGcsLineStationEngage(FSystemInfo* InSystem, unsigned int
     if (Pick == 1)
     {
         // 06ee1cb4-06ee1e44: room for four (FUN_06eb6b30 capacity test).
-        Field_0x28 = 0x4a3c;
+        PermutationIds = 0x4a3c;
         TextIds.reserve(4);
         PushText(MakeVoiceLineName(MakeTString64("gcs_combat_attentionallunits").Data, "-",
                                    VoiceId).Data);
@@ -1868,7 +1868,7 @@ FGcsLineStationEngage::FGcsLineStationEngage(FSystemInfo* InSystem, unsigned int
     if (Pick != 0)
         return;
     // 06ee1e49-06ee1f19.
-    Field_0x28 = 0x4a39;
+    PermutationIds = 0x4a39;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_manturrets").Data, "-", VoiceId).Data);
 }
@@ -1889,7 +1889,7 @@ FGcsLineScanAnnounce::FGcsLineScanAnnounce(FSystemInfo* InSystem, unsigned int I
     FContentSpaceObj* const ListenerShip = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a43;
+    PermutationIds = 0x4a43;
     // 06ee5d00-06ee5d5d: room for eleven (FUN_06eb6b30 capacity test).
     TextIds.reserve(11);
     // 06ee5d60-06ee5e93 (FUN_06eb5770 appends).
@@ -1988,7 +1988,7 @@ FGcsLineFidgetTradeIHear::FGcsLineFidgetTradeIHear(FSystemInfo* InSystem, unsign
         return;
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3b;
+    PermutationIds = 0x4a3b;
     // 06edfc09-06edfc67: room for three.
     TextIds.reserve(3);
     // 06edfc6a-06edfce1: the name copied (FUN_06ea9f40, 0x40), FUN_06eeaf10 with "+".
@@ -2024,7 +2024,7 @@ FGcsLineFidgetStatusQuery::FGcsLineFidgetStatusQuery(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a40;
+    PermutationIds = 0x4a40;
     // 06ee00a8-06ee0106: room for eight.
     TextIds.reserve(8);
     // 06ee0109-06ee017e: FUN_06ead640 copy, FUN_06eeaf10 with "+".
@@ -2054,7 +2054,7 @@ FGcsLineFidgetStatusReport::FGcsLineFidgetStatusReport(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3e;
+    PermutationIds = 0x4a3e;
     // 06ee046d-06ee04cb: room for six.
     TextIds.reserve(6);
     // 06ee04ce-06ee05e1.
@@ -2116,7 +2116,7 @@ FGcsLineFidgetWaypointQuery::FGcsLineFidgetWaypointQuery(FSystemInfo* InSystem,
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3f;
+    PermutationIds = 0x4a3f;
     // 06ee0b90-06ee0bee: room for seven.
     TextIds.reserve(7);
     // 06ee0bf1-06ee0d75.
@@ -2152,7 +2152,7 @@ FGcsLineFidgetPatrolStatus::FGcsLineFidgetPatrolStatus(FSystemInfo* InSystem,
         // finished" (FUN_06ead640 copy) + "_p" when the formation has more than one member
         // (FUN_06f66220 into a local, SETA), else "_s", formatted "%s%s%s" with "", then
         // FUN_06eeaf10 with "-" and FUN_06eb5770.
-        Field_0x28 = 0x4a39;
+        PermutationIds = 0x4a39;
         TextIds.reserve(1);
         PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_finished", "-", VoiceId).Data);
         return;
@@ -2160,7 +2160,7 @@ FGcsLineFidgetPatrolStatus::FGcsLineFidgetPatrolStatus(FSystemInfo* InSystem,
     // 06ee105a-06ee106e.
     if (rand() / 32768 != 0)
         return;
-    Field_0x28 = 0x4a3b;
+    PermutationIds = 0x4a3b;
     // 06ee107d-06ee10db: room for three.
     TextIds.reserve(3);
     // 06ee10de-06ee1106.
@@ -2301,7 +2301,7 @@ FGcsPlayerHailConversation::FGcsPlayerHailConversation(FGcsPlayerObjectEvent con
     // The player's ship id as the lines' listener: +0x10 -> +0x04 read directly by the
     // blow-off paths (06ee4e29-06ee4e33, 06ee4eca-06ee4ed0), FUN_06f481e0 by the identify path.
     FGcsLine* Line = nullptr;
-    if (Leader->Slot08())
+    if (Leader->IsInCombat())
     {
         // 06ee4e03-06ee4e46: vt[+8] (busy).
         Line = new FGcsLinePlayerHailCombatBlowOff(System, Leader->SpaceObjId,
@@ -2694,12 +2694,12 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
     {
         // 06ee427d-06ee42de: two NPC ships (slot 1), A no wingman.
         FContentSpaceObj* const ObjA = System->FindSpaceObj(ObjectA);
-        if (ObjA == nullptr || !ObjA->Slot04())
+        if (ObjA == nullptr || !static_cast<FContentShipBase*>(ObjA)->IsNpcShip())
             return;
         if (IsFormationWingman(static_cast<FContentShipBase*>(ObjA)))
             return;
         FContentSpaceObj* const ObjB = System->FindSpaceObj(ObjectB);
-        if (ObjB == nullptr || !ObjB->Slot04())
+        if (ObjB == nullptr || !static_cast<FContentShipBase*>(ObjB)->IsNpcShip())
             return;
         // 06ee42e4-06ee4302.
         if ((rand() * 2) / 32768 != 0)
@@ -3452,10 +3452,10 @@ void FGcsConversationManager::QueueMessage(unsigned int const* A, unsigned int c
     // LAB_06ee91b0: vector::insert(end, 1, entry) (reallocation FUN_06eee7a0 /
     // FUN_06eee050 / FUN_06eee010).
     FGcsDelayedMessage Entry;
-    Entry.Field_0x00 = *A;
-    Entry.Field_0x04 = *B;
-    Entry.Field_0x08 = *C;
-    Entry.Field_0x0c = *D;
+    Entry.SystemId = *A;
+    Entry.Speaker = *B;
+    Entry.Listener = *C;
+    Entry.LastTextId = *D;
     Entry.Elapsed = 0.0f;
     Entry.Delay = *Delay;
     DelayedMessages.insert(DelayedMessages.end(), 1, Entry);
@@ -3523,10 +3523,10 @@ void FGcsConversationManager::Update(float DeltaTime)
         }
         // 06ee8cb6-06ee8ce1: words {+8, +0, +4, +0xc}; the fifth is not written.
         FGcsSentMessage Message;
-        Message.Words[0] = It->Field_0x08;
-        Message.Words[1] = It->Field_0x00;
-        Message.Words[2] = It->Field_0x04;
-        Message.Words[3] = It->Field_0x0c;
+        Message.Words[0] = It->Listener;
+        Message.Words[1] = It->SystemId;
+        Message.Words[2] = It->Speaker;
+        Message.Words[3] = It->LastTextId;
         Message.Words[4] = 0;
         Due.insert(Due.end(), 1, Message);
         It = DelayedMessages.erase(It);
@@ -4232,7 +4232,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
             FContentShipBase* const Candidate = static_cast<FContentShipBase*>(*ObjIt);
             if (Candidate->FormationSlot != 0 && Candidate->FormationId != 0xffffffffu)
                 continue;
-            if (Candidate->Slot08())
+            if (Candidate->IsInCombat())
                 continue;
             Candidates.insert(Candidates.end(), 1, Candidate);
         }
@@ -4265,7 +4265,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
                     for (std::vector<FContentShipBase*>::iterator Member = Members.begin();
                          Member != Members.end(); ++Member)
                     {
-                        if ((*Member)->Slot08())
+                        if ((*Member)->IsInCombat())
                         {
                             bBusy = true;
                             break;
@@ -4402,7 +4402,12 @@ bool __cdecl IsGcsCommAllowed(int Category, FSystemInfo* System, unsigned int Sp
         FContentSpaceObj* const SpeakerObject = System->FindShipOrSolar(Speaker);
         if (SpeakerObject == nullptr)
             return false;
-        if (SpeakerObject->Slot04())                                        // vt[+4]
+        if (FSolarNpc* const SolarSpeaker = dynamic_cast<FSolarNpc*>(SpeakerObject))
+        {
+            if (SolarSpeaker->IsInCombat())
+                return false;
+        }
+        else if (static_cast<FContentShipBase*>(SpeakerObject)->IsNpcShip())
             return false;
         if (FindContentPlayerStateByShip(&Listener) != nullptr)
             return true;

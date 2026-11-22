@@ -205,7 +205,7 @@ void ServerFilterDialog::ReadControls()
     Rows[3].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
     Target->bFilterPassword = static_cast<unsigned char>(State == 0);
     Rows[4].Check->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
-    Target->bFilterField3e = static_cast<unsigned char>(State == 0);
+    Target->bFilterLan = static_cast<unsigned char>(State == 0);
 
     // 0x005630ae..0x005630e0: the ping box's first 15 characters through _wtoi into the
     // maximum; the minimum back to 0.
@@ -224,7 +224,7 @@ void ServerFilterDialog::WriteControls()
     Rows[1].Check->SetProperty(0x30, Target->bFilterKnown, 0);
     Rows[2].Check->SetProperty(0x30, Target->bFilterVersion, 0);
     Rows[3].Check->SetProperty(0x30, Target->bFilterPassword, 0);
-    Rows[4].Check->SetProperty(0x30, Target->bFilterField3e, 0);
+    Rows[4].Check->SetProperty(0x30, Target->bFilterLan, 0);
 
     // 0x0056318f..0x005631b6: the maximum ping in decimal into the box, current attributes.
     wchar_t Text[0x10];
@@ -352,7 +352,7 @@ bool ServerFilterDialog::KeyEvent(unsigned Key, unsigned char* Modifiers)
     return true;
 }
 
-bool ServerFilterDialog::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool ServerFilterDialog::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00563630.
     if (Msg == 0xf004)
@@ -374,7 +374,7 @@ bool ServerFilterDialog::Slot23(unsigned Msg, unsigned A, unsigned B)
         Close();
         return true;
     }
-    return WinControl::Slot23(Msg, A, B); // FUN_005a0840
+    return WinControl::ProcessMessage(Msg, A, B); // FUN_005a0840
 }
 
 intptr_t ServerFilterDialog::SetProperty(int Msg, uintptr_t A, uintptr_t B)

@@ -15,7 +15,7 @@
 #include <cstring>
 #include <windows.h>
 
-// FUN_06356960 (item 3255, Common.dll.txt:437865-437897, 25 insns). Generic
+// ivp_message (item 3255, Common.dll.txt:437865-437897, 25 insns). Generic
 // "print an error message to the debugger" helper: reserves a 10000-byte
 // (0x2710) stack buffer (retail's own `_chkstk`-style probe via
 // FUN_06391dc0, see ivp_compact_ledge.h's own precedent for this exact
@@ -34,7 +34,7 @@
 // Retail also zero-fills only the first 1000 bytes (0xfa dwords) of the
 // buffer before either call, not the whole 10000-byte reservation -- also
 // reproduced as-is.
-extern "C" void FUN_06356960(const char* Format, ...)
+extern "C" void ivp_message(const char* Format, ...)
 {
     char Buffer[10000]; // retail's own 0x2710-byte stack reservation
     memset(Buffer, 0, 1000); // retail only zero-fills the first 0xfa dwords

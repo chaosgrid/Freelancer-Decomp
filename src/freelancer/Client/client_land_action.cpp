@@ -131,7 +131,7 @@ bool Action_Land::update(float Dt)
     if (static_cast<void*>(static_cast<IObjRW*>(Gameobj)) == GetPlayerObjRW())
         SetPendingLandBase(&BaseId);
     else
-        Gameobj->Slot15c(true);
+        Gameobj->MarkForRemoval(true);
     return true;
 }
 
@@ -213,9 +213,9 @@ Action_JumpOut::Action_JumpOut(FClientShipGameobj* InShip, float InDuration, uns
         reinterpret_cast<Transform const&>(Ship->get_orientation());
     std::memcpy(&StartXform, &ShipXform, sizeof(Transform));
     std::memcpy(&EndXform, &ShipXform, sizeof(Transform));
-    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Ship->Field_0x188);
+    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Ship->JumpEffect);
     if (Effect != nullptr)
-        std::memcpy(&EndXform, &Effect->Field_0xa8, sizeof(Transform));
+        std::memcpy(&EndXform, &Effect->GateHardpointFrame, sizeof(Transform));
 
     // 0x00543034..0x00543098: MatrixToQuaternion (vt+0x50) on the start frame into +0x28, on
     // the end frame into +0x44, and once more on the start frame into a local nothing reads.

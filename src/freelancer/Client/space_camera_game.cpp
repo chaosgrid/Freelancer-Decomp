@@ -1078,20 +1078,20 @@ void HudCameraUpdateShake(FHudCamera* Cam)
 
     // 0x0051db4d..0x0051db60: +0x18c bit 0 (a hull hit, set by slot 105 FUN_00545ed0 at
     // 0x00545f07) -> amplitude 0.02f (0x3ca3d70a), bit cleared.
-    if ((Ship->Field_0x18c & 0x1u) != 0)
+    if ((Ship->ShipFlags & 0x1u) != 0)
     {
         G_CameraShakeAmount = 0.02f;
-        Ship->Field_0x18c = static_cast<unsigned char>(Ship->Field_0x18c & 0xfeu);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfeu);
     }
 
     // 0x0051db67..0x0051db8d: bit 1 (a shield hit) -> FCOMP 0.005f (.rdata 0x005d3e44),
     // TEST AH,0x41 / JZ: unless the amplitude is already strictly greater, it becomes 0.005f
     // (0x3ba3d70a); the bit is cleared either way.
-    if ((Ship->Field_0x18c & 0x2u) != 0)
+    if ((Ship->ShipFlags & 0x2u) != 0)
     {
         if (!(G_CameraShakeAmount > 0.005f))
             G_CameraShakeAmount = 0.005f;
-        Ship->Field_0x18c = static_cast<unsigned char>(Ship->Field_0x18c & 0xfdu);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfdu);
     }
 
     // 0x0051db94..0x0051dbc5: with +0x158 (the FUN_005437d0 state) and the +0x188 jump object
@@ -1099,9 +1099,9 @@ void HudCameraUpdateShake(FHudCamera* Cam)
     // result, TEST AH,0x41 / JZ -- strictly greater keeps it, otherwise (NaN included) the
     // result is stored (FSTP float). +0x188 is built by FUN_00543530 / FUN_00543630
     // (client_gameobj.cpp).
-    if (Ship->Field_0x158 != 0 && Ship->Field_0x188 != nullptr)
+    if (Ship->JumpState != 0 && Ship->JumpEffect != nullptr)
     {
-        double const Jump = static_cast<FJumpShipEffect*>(Ship->Field_0x188)->ShakeAmplitude();
+        double const Jump = static_cast<FJumpShipEffect*>(Ship->JumpEffect)->ShakeAmplitude();
         if (!(static_cast<double>(G_CameraShakeAmount) > Jump))
             G_CameraShakeAmount = static_cast<float>(Jump);
     }

@@ -48,7 +48,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API AddRec16(const FAleRec16* Rec, unsigned long* OutId,
                                      unsigned long Flag) override;
         GENRESULT DACOM_API RemoveRec16(unsigned long Id) override;
-        GENRESULT DACOM_API Slot8(unsigned long Id, unsigned long Value) override;
+        GENRESULT DACOM_API SetRec16Parent(unsigned long Id, unsigned long Value) override;
         GENRESULT DACOM_API AddRec8(const FAleRec8* Rec) override;
         GENRESULT DACOM_API RemoveRec8(const FAleRec8* Rec) override;
 

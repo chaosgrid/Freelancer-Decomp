@@ -71,7 +71,7 @@ namespace AlchemyImpl
         Desc.ShareMode = bWrite != 0 ? 0 : kAleShareRead;
         Desc.Creation = bWrite != 0 ? kAleCreateAlways : kAleOpenExisting;
         Desc.Flags = kAleFileFlags;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.FindHandle = 0xFFFFFFFF;
         const int Result = Filesys->OpenByDesc(&Desc);
         Handle = static_cast<unsigned long>(Result);
         if (Result == -1)

@@ -127,7 +127,7 @@ void NnError::Dismiss()
 {
     G_NnErrorPending = 0;
     if (Parent != nullptr)
-        Parent->Slot23(0x3006, 0, 0);
+        Parent->ProcessMessage(0x3006, 0, 0);
     NnModalResumeGame(bCursorDrawFlag);
     ReleaseMouse();
     Win3D* Child = ChildHead;

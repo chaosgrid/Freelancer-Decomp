@@ -398,7 +398,7 @@ struct IGunHost : public IUnknown
 {
     // +0x0c FUN_10004790, RET 8: the session (server) name, wide. FLServer UpdateGunReport
     // .text:0040c77d passes ServerName.c_str(); non-zero aborts the report.
-    virtual long __stdcall Slot03(const wchar_t* Name) = 0;
+    virtual long __stdcall SetSessionName(const wchar_t* Name) = 0;
     // +0x10 LAB_10004b40, RET 4.
     virtual long __stdcall Slot04() = 0;
     // +0x14 FUN_10004eb0, RET 0xc. TODO: argument meaning.
@@ -412,7 +412,7 @@ struct IGunHost : public IUnknown
     // +0x24 LAB_100053a0, RET 0x10: (selector, narrow key, wide value); 0x80070057 when the
     // key is null/empty or the value null. FLServer .text:0040c881 ("GameOpts") /
     // 0040c89f ("GameDesc") with selector 0.
-    virtual long __stdcall Slot09(unsigned long Selector, const char* Key, const wchar_t* Value) = 0;
+    virtual long __stdcall SetProperty(unsigned long Selector, const char* Key, const wchar_t* Value) = 0;
     // +0x28..+0x34 (FUN_10005500 RET 0x14, LAB_10005610 / FUN_10005750 / FUN_10005830 RET 0xc)
     // are not called by any ported module and are not declared.
 };

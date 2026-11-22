@@ -166,7 +166,7 @@ struct FSystemZoneEnumerator : public pub::System::ZoneEnumerator
     std::vector<FZonePathLabel>* PathLabels;    // +0x10
 
     // FUN_06fa77c0 (RET 8).
-    void Slot00(unsigned int const* ZoneId, INI_Reader* Reader) override;
+    void OnZone(unsigned int const* ZoneId, INI_Reader* Reader) override;
 };
 
 // FUN_06fa7980 (RET 0xc): parse one [Zone] section into Zone / PathLabel; false = drop.
@@ -328,7 +328,7 @@ struct FSystemInfo : public CommReferrable
     std::vector<unsigned int> MissionObjects;
     // +0xa8: ids flagged by RM FUN_06f745a0 (06f8a9a3, flag = 1); dropped together with
     // +0x98. TODO(CNT-POP): no reader besides the removers found yet -- meaning unknown.
-    std::vector<unsigned int> Field_0xa8;
+    std::vector<unsigned int> DeferredDestroyObjects;
     // +0xb8: the player states in the system, added uniquely by FUN_06f72a20 (SpaceSupport
     // 06f5df27); searched through the player's ship (+0x10) by FUN_06f73930 / FUN_06f73a40.
     std::vector<FContentPlayerState*> Players;
@@ -382,9 +382,9 @@ struct FSystemInfo : public CommReferrable
     // FUN_06f743e0 (RET 4): push_back into MissionObjects.
     void AddMissionObject(unsigned int SpaceObjId);
     // FUN_06f74620 (RET 4): erase SpaceObjId from MissionObjects -- when it was there, its
-    // reputation (pub::SpaceObj::GetRep) is freed on success -- then from Field_0xa8.
+    // reputation (pub::SpaceObj::GetRep) is freed on success -- then from DeferredDestroyObjects.
     void RemoveMissionObject(unsigned int SpaceObjId);
-    // FUN_06f745a0 (RET 8): bFlag adds SpaceObjId to Field_0xa8 unless present, !bFlag
+    // FUN_06f745a0 (RET 8): bFlag adds SpaceObjId to DeferredDestroyObjects unless present, !bFlag
     // erases it.
     void SetObjectFlag(unsigned int SpaceObjId, bool bFlag);
     // FUN_06f746e0: &MissionObjects. Caller TU56 06f7065a.
@@ -464,7 +464,7 @@ struct FSystemInfo : public CommReferrable
     // 15 when that distance is at most 2500 or no player has a ship.
     double GetNpcShipLifeRate(FContentNpcShip* Ship);
     // FUN_06f73dd0 (RET 4, the argument is not read; caller SpaceSupport 06f5d699 passes the
-    // tick DAT_06fce770): the ids of Field_0xa8 with no player ship within 10000 are
+    // tick DAT_06fce770): the ids of DeferredDestroyObjects with no player ship within 10000 are
     // destroyed (DESTROY_NORMAL) and removed (the RemoveMissionObject body inlined).
     void DestroyFlaggedObjectsAwayFromPlayers(float Unused);
     // FUN_06f73fa0 (RET 4; caller SpaceSupport 06f5d64c with the tick DAT_06fce770): runs

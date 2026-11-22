@@ -134,9 +134,9 @@ public:
     FSystemInfo* System;                // +0x24 null makes the line unplayable
     // +0x28: SendSpaceComm's ninth argument (the port calls it Mood); the ctors store
     // 0x4a39 / 0x4a41 ... TODO: meaning of the values. CanPlay needs it non-zero.
-    unsigned int Field_0x28;
+    unsigned int PermutationIds;
     // +0x2c: SendSpaceComm's seventh argument (the port calls it CommType). TODO: meaning.
-    unsigned int Field_0x2c;
+    unsigned int CaptionIds;
 
 protected:
     // The inline base part of every line ctor (e.g. 06ed9363-06ed938f): +0x0c / +0x10 /
@@ -1124,10 +1124,10 @@ public:
 // A delayed controller message (0x18 bytes): four words, the time waited and the delay.
 struct FGcsDelayedMessage
 {
-    unsigned int Field_0x00;            // +0x00 sent as message word 1
-    unsigned int Field_0x04;            // +0x04 sent as message word 2
-    unsigned int Field_0x08;            // +0x08 sent as message word 0
-    unsigned int Field_0x0c;            // +0x0c sent as message word 3
+    unsigned int SystemId;            // +0x00 sent as message word 1
+    unsigned int Speaker;            // +0x04 sent as message word 2
+    unsigned int Listener;            // +0x08 sent as message word 0
+    unsigned int LastTextId;            // +0x0c sent as message word 3
     float Elapsed;                      // +0x10 0 when queued
     float Delay;                        // +0x14
 };

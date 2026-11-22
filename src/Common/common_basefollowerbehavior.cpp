@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll -- BaseFollowerBehavior (the shared base of FormationBehavior and FollowBehavior):
-// ctor/dtor, the per-tick Slot7 body and its slot overrides.
+// ctor/dtor, the per-tick OnUpdate body and its slot overrides.
 // CMN-SPLIT stage 1 (2026-10-14): split out of common_behavior.cpp unchanged; the
 // FollowerDirectiveRecord_* helpers it calls stay in common_behavior.cpp
 // (common_behavior_internal.h).
@@ -14,7 +14,7 @@
 #include "common_behavior_internal.h" // CmnBehavior:: follower helpers (common_behavior.cpp)
 #include "common_aisteer.h" // GetIfacePositionOrZero, IsWithinInterceptRangeOfIface
 #include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::NavHelper's real type
-#include "common_misc.h" // SinglePlayer() -- Slot7's multiplayer group test
+#include "common_misc.h" // SinglePlayer() -- OnUpdate's multiplayer group test
 #include "common_csys.h"  // Matrix, Transform
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // FVector, FMatrix
@@ -42,7 +42,7 @@ BaseFollowerBehavior::BaseFollowerBehavior(int InTypeId)
     , ModeSelector0xc(2)
     , UpdateResult(1)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)
@@ -81,7 +81,7 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 }
 
 // ============================================================================
-// BaseFollowerBehavior::Slot7 -- LAB_062cb700, decomp-tracker item 1390.
+// BaseFollowerBehavior::OnUpdate -- LAB_062cb700, decomp-tracker item 1390.
 //
 // 488 instructions, hand-translated from EXE\Disasm\Common.dll.txt 199822-200354.
 // There is NO Ghidra decompilation for this function; every branch below is read
@@ -115,17 +115,17 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 //      delegate as a pub::AI::DirectiveDockOp, or -- when already inside the dock
 //      candidate's physical radius -- commit it through the owner's IObjAffect slot
 //      0x64.
-//   8. With nothing pending at all, pick between the subclass's own Slot27() and the
+//   8. With nothing pending at all, pick between the subclass's own UpdateFollowerSteering() and the
 //      final-leg payload FUN_062cbcf0 on three gate checks.
 //
 // WHAT IT SETTLES. This is the only caller of the two virtuals BaseFollowerBehavior
 // adds to Behavior's 27, and both signatures now have a live call site in the port:
-//   * Slot27() at .text:062cbcb9 `MOV EAX,[ESI]; MOV ECX,ESI; CALL [EAX+0x6c]` -- no
+//   * UpdateFollowerSteering() at .text:062cbcb9 `MOV EAX,[ESI]; MOV ECX,ESI; CALL [EAX+0x6c]` -- no
 //     argument is pushed and EAX is overwritten with EBX before the epilogue, so it is
-//     `void Slot27()`.
-//   * Slot28() at .text:062cbc2d `LEA EAX,[ESP+0x64]; PUSH EAX; CALL [EDX+0x70]`,
+//     `void UpdateFollowerSteering()`.
+//   * GetRotatedOffset() at .text:062cbc2d `LEA EAX,[ESP+0x64]; PUSH EAX; CALL [EDX+0x70]`,
 //     whose returned EAX is then handed straight to FUN_062c50c0 -- the MSVC hidden
-//     return-buffer protocol, so it is `Vector Slot28()` and not `void Slot28(void*)`.
+//     return-buffer protocol, so it is `Vector GetRotatedOffset()` and not `void GetRotatedOffset(void*)`.
 // ============================================================================
 
 // Already-ported helpers this body calls, all defined elsewhere in this DLL. Local
@@ -144,23 +144,23 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 // positionally; what this body proves about it is written on each field.
 struct FollowerDirectiveOrder
 {
-    unsigned int Field00;      // record +0xa8. Resolved by id into the dock candidate and
+    unsigned int DockObjectId;      // record +0xa8. Resolved by id into the dock candidate and
                                // written to DirectiveDockOp::DockObjectId.
-    unsigned int Field04;      // record +0xac. Resolved by id into a second object and
+    unsigned int SecondaryObjectId;      // record +0xac. Resolved by id into a second object and
                                // written to DirectiveDockOp::Field_10.
-    unsigned char Field08;     // record +0xbd. "There is an order pending" -- gates the
+    unsigned char bOrderPending;     // record +0xbd. "There is an order pending" -- gates the
                                // whole block at .text:062cbad1/062cbb33.
-    unsigned char Field09;     // record +0xc2. When 1, skip the range test entirely and
+    unsigned char bMidLane;     // record +0xc2. When 1, skip the range test entirely and
                                // commit immediately; also passed on as go_tradelane's bool.
     unsigned char Pad0A[2];
-    float Field0C;             // record +0xb8. Passed on as IObjAffect::go_tradelane's 4th
+    float MaxRange;             // record +0xb8. Passed on as IObjAffect::go_tradelane's 4th
                                // argument, which Server's Ship body forwards to
                                // CShip::go_tradelane's `float` (.text:06d028c0), so a float.
 };
 static_assert(sizeof(FollowerDirectiveOrder) == 0x10, "FollowerDirectiveOrder must match FUN_062ec610's 0x10-byte output block");
 
 
-int BaseFollowerBehavior::Slot7()
+int BaseFollowerBehavior::OnUpdate()
 {
     // .text:062cb70b-062cb713. EBX is loaded from the same +0x14 later at 062cb79c;
     // one variable here, since retail re-reads the identical field.
@@ -333,8 +333,8 @@ int BaseFollowerBehavior::Slot7()
                     Op.Field_0C = 0;
                     Op.Field_1C = static_cast<int32_t>(Watched->get_id());
                     Op.Field_50 = 100.0f;   // 0x42c80000
-                    GotoDelegate->Slot10(&Op);
-                    GotoDelegate->Slot3();
+                    GotoDelegate->OnApplyDirective(&Op);
+                    GotoDelegate->OnEngage();
                     // Retail writes the literal 1 here and then tests it
                     // (`MOV AL,BL; TEST AL,AL; MOV [ESI+0x284],BL; JZ ...`), so the
                     // branch is dead and control always continues below.
@@ -344,7 +344,7 @@ int BaseFollowerBehavior::Slot7()
                 // IBehaviorManager hands it to this behavior: store to the child's own
                 // +0x1c, then dispatch its slot 7. +0x27c is not null-tested.
                 GotoDelegate->SetTickDelta(DeltaTime);
-                int const ChildResult = GotoDelegate->Slot7();
+                int const ChildResult = GotoDelegate->OnUpdate();
                 if (ChildResult == 1 || ChildResult == 0)
                 {
                     UpdateResult = ChildResult;   // LAB_062cbcd5
@@ -358,21 +358,21 @@ int BaseFollowerBehavior::Slot7()
     {
         // LAB_062cba53.
         Flag284 = 0;
-        GotoDelegate->Slot4();
+        GotoDelegate->OnDisengage();
     }
 
     // LAB_062cba6f.
     if (Flag282 != 0 && DockDelegate != nullptr)
     {
         DockDelegate->SetTickDelta(DeltaTime);
-        int const ChildResult = DockDelegate->Slot7();
+        int const ChildResult = DockDelegate->OnUpdate();
         if (ChildResult == 1 || ChildResult == 0)
         {
             UpdateResult = ChildResult;
             return ChildResult;
         }
         Flag282 = 0;
-        DockDelegate->Slot4();
+        DockDelegate->OnDisengage();
     }
 
     // LAB_062cbab6.
@@ -383,7 +383,7 @@ int BaseFollowerBehavior::Slot7()
     bool RunPendingLookup = false;
     if (Flag281 != 0)
     {
-        if (Order.Field08 != 0 || Flag280 == 0)
+        if (Order.bOrderPending != 0 || Flag280 == 0)
         {
             UpdateResult = 0;   // LAB_062cbb23
             return 0;
@@ -392,7 +392,7 @@ int BaseFollowerBehavior::Slot7()
         Flag281 = 0;
         RunPendingLookup = true;   // falls into LAB_062cbaf3
     }
-    else if (Order.Field08 == 0)
+    else if (Order.bOrderPending == 0)
     {
         RunPendingLookup = true;   // .text:062cbb35 JZ LAB_062cbaf3
     }
@@ -407,13 +407,13 @@ int BaseFollowerBehavior::Slot7()
         // (+0x2c) -- the identical pair the NavHelper refresh below writes into
         // SystemManager::CachedPhysicalRadius / CachedPhysicalCenter.
         IObjInspect const* const Candidate =
-            Sys->Timers.FindVerifiedObject(&Order.Field00);   // FUN_062e74a0
+            Sys->Timers.FindVerifiedObject(&Order.DockObjectId);   // FUN_062e74a0
         // Not null-tested: retail dispatches through the result at .text:062cbb4d.
         float CandidateRadius = 0.0f;
         Vector CandidateCenter = { 0.0f, 0.0f, 0.0f };
         Candidate->get_physical_radius(CandidateRadius, CandidateCenter);
 
-        bool CommitDirectly = (Order.Field09 == 1);   // .text:062cbb5b CMP [ESP+0x21],BL
+        bool CommitDirectly = (Order.bMidLane == 1);   // .text:062cbb5b CMP [ESP+0x21],BL
         if (!CommitDirectly)
         {
             // .text:062cbb61-062cbb87 -- the same "refresh NavHelper's cached physical
@@ -442,15 +442,15 @@ int BaseFollowerBehavior::Slot7()
         {
             // LAB_062cbbc2. Second id -> object lookup, then the owner's own IObjAffect
             // sub-object (IObjRW's second base, at +4) slot 0x64.
-            void* const Secondary = Sys->Timers.FindVerifiedObject(&Order.Field04);   // FUN_062e74a0
+            void* const Secondary = Sys->Timers.FindVerifiedObject(&Order.SecondaryObjectId);   // FUN_062e74a0
             IObjAffect* const Affect = static_cast<IObjAffect*>(Owner);
             // .text:062cbbdc-062cbbec: IObjAffect slot 25, go_tradelane (named 2026-09-24 from
             // Server.dll's Ship body .text:06d028c0, a forwarder to CShip::go_tradelane).
-            // The third push is a dword read at [ESP+0x25] == Field09 plus the pad bytes; the
-            // callee only uses its low byte, so the bool Field09 carries is what arrives.
+            // The third push is a dword read at [ESP+0x25] == bMidLane plus the pad bytes; the
+            // callee only uses its low byte, so the bool bMidLane carries is what arrives.
             int const Committed =
                 Affect->go_tradelane(Candidate, static_cast<IObjInspect const*>(Secondary),
-                                     Order.Field09 != 0, Order.Field0C);
+                                     Order.bMidLane != 0, Order.MaxRange);
             if (Committed != 0)
             {
                 UpdateResult = 1;   // LAB_062cbc54
@@ -464,15 +464,15 @@ int BaseFollowerBehavior::Slot7()
         // LAB_062cbc02. +0x278 is not null-tested on this path.
         {
             pub::AI::DirectiveDockOp Op;
-            Op.DockObjectId = Order.Field00;
-            Op.Field_10 = static_cast<int32_t>(Order.Field04);
-            DockDelegate->Slot10(&Op);
-            // .text:062cbc2b-062cbc3e. Slot28 returns a Vector by value; retail hands
+            Op.DockObjectId = Order.DockObjectId;
+            Op.Field_10 = static_cast<int32_t>(Order.SecondaryObjectId);
+            DockDelegate->OnApplyDirective(&Op);
+            // .text:062cbc2b-062cbc3e. GetRotatedOffset returns a Vector by value; retail hands
             // the returned buffer straight to FUN_062c50c0, which copies three dwords
             // into the delegate's own +0x444.
-            Vector const Offset = Slot28();
+            Vector const Offset = GetRotatedOffset();
             static_cast<DockBehavior*>(DockDelegate)->SetDestPointOffset(Offset);   // FUN_062c50c0
-            DockDelegate->Slot3();
+            DockDelegate->OnEngage();
         }
         Flag282 = 1;
         UpdateResult = 1;
@@ -511,7 +511,7 @@ int BaseFollowerBehavior::Slot7()
     }
     else
     {
-        Slot27();   // LAB_062cbcb9, CALL [EAX+0x6c]
+        UpdateFollowerSteering();   // LAB_062cbcb9, CALL [EAX+0x6c]
     }
     UpdateResult = 1;
     return 1;
@@ -591,9 +591,9 @@ bool BaseFollowerBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 }
 
 // Slot 3, FUN_062cb540 (.text:062cb540-062cb5d5).
-void BaseFollowerBehavior::Slot3()
+void BaseFollowerBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062cb544 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062cb544 FUN_062d20d0
     Flag285 = 0;
     Field288 = 0;
     Flag281 = 0;
@@ -610,7 +610,7 @@ void BaseFollowerBehavior::Slot3()
 }
 
 // Slot 4, FUN_062cb5e0 (.text:062cb5e0-062cb6c1).
-void BaseFollowerBehavior::Slot4()
+void BaseFollowerBehavior::OnDisengage()
 {
     Field29c = 0;                                                   // 062cb5ee
     if (Flag281 != 0)
@@ -632,23 +632,23 @@ void BaseFollowerBehavior::Slot4()
     BreakAway.Commit();                                             // 062cb665
     Afterburner.Commit();                                           // 062cb674
     if (Flag282 != 0 && DockDelegate != nullptr)
-        DockDelegate->Slot4();                                      // 062cb68b
+        DockDelegate->OnDisengage();                                      // 062cb68b
     if (Flag284 != 0 && GotoDelegate != nullptr)
-        GotoDelegate->Slot4();                                      // 062cb6a2
+        GotoDelegate->OnDisengage();                                      // 062cb6a2
     Flag282 = 0;
     Flag284 = 0;
     GotoDelegate = nullptr;
     DockDelegate = nullptr;
-    Behavior::Slot4();                                              // 062cb6c1 JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062cb6c1 JMP FUN_062d20f0
 }
 
 // Slot 8, LAB_062cb6d0: unless the dock delegate runs or a lane order is out, MatchThrottle's
 // slot 2 with DeltaTime.
-void BaseFollowerBehavior::Slot8()
+void BaseFollowerBehavior::PostUpdate()
 {
     if (Flag282 != 0 || Flag281 != 0)
         return;
-    MatchThrottle.Slot2(DeltaTime);                                 // 062cb6f0 [+0x34]+0x8
+    MatchThrottle.SyncCruise(DeltaTime);                                 // 062cb6f0 [+0x34]+0x8
 }
 
 // Slot 17, LAB_062cbfc0: `MOV ECX,[ECX+0x24]; MOV [ESP+4],0; ADD ECX,0x18; JMP FUN_062e9030`
@@ -660,7 +660,7 @@ void BaseFollowerBehavior::slide_strafe_burst(StrafeDir Dir)
 }
 
 // Slot 21, LAB_062cf300 (.text:062cf300-062cf339, RET 4).
-void BaseFollowerBehavior::Slot21(void* Arg)
+void BaseFollowerBehavior::OnObjectLeftSystem(void* Arg)
 {
     unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
@@ -671,11 +671,11 @@ void BaseFollowerBehavior::Slot21(void* Arg)
 }
 
 // Slot 22, FUN_062cbea0 (.text:062cbea0-062cbfb0, RET 4).
-void BaseFollowerBehavior::Slot22(void* Arg)
+void BaseFollowerBehavior::OnEvent(void* Arg)
 {
     FBehaviorManagerEvent const* const Event = static_cast<FBehaviorManagerEvent const*>(Arg);
     if (Flag282 != 0 && DockDelegate != nullptr)
-        DockDelegate->Slot22(Arg);                                  // 062cbebf [+0x278]+0x58
+        DockDelegate->OnEvent(Arg);                                  // 062cbebf [+0x278]+0x58
     if (Event->Type != 4)
         return;
     FBehaviorTradelaneEvent const* const Lane =
@@ -704,7 +704,7 @@ void BaseFollowerBehavior::Slot22(void* Arg)
         else if (Flag282 != 0 && DockDelegate != nullptr)
         {
             Flag282 = 0;                                            // LAB_062cbf42
-            DockDelegate->Slot4();
+            DockDelegate->OnDisengage();
         }
     }
 

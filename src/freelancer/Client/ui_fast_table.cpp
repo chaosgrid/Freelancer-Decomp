@@ -87,7 +87,7 @@ namespace
             wcsncpy(Self->Text, Other->Text, Length);
             Self->Text[Length] = L'\0';
         }
-        Self->Field08 = Other->Field08;
+        Self->MaxLines = Other->MaxLines;
         // +0x0c is the child vector's allocator byte; +0x0d..+0x0f are not written by retail.
         Self->Field0C = Other->Field0C;
         Self->Pad0D[0] = 0;
@@ -603,7 +603,7 @@ bool UiFastTable::SelectRow(unsigned Row)
     SelectedRow = Row;
     bSelected = 1;
     if (Parent != nullptr && bChanged)
-        Parent->Slot23(0x300du, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), Row);
+        Parent->ProcessMessage(0x300du, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), Row);
     return true;
 }
 
@@ -1259,9 +1259,9 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
                 bSelected = 1;
                 unsigned const Self = static_cast<unsigned>(reinterpret_cast<uintptr_t>(this));
                 if (Parent != nullptr && bChanged)
-                    Parent->Slot23(0x300du, Self, Row);
+                    Parent->ProcessMessage(0x300du, Self, Row);
                 if (Parent != nullptr)
-                    Parent->Slot23(0xf002u, Self, Row);
+                    Parent->ProcessMessage(0xf002u, Self, Row);
             }
         }
         return true;
@@ -1279,7 +1279,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
                 SelectedRow = Row;
                 bSelected = 1;
                 if (Parent != nullptr && bChanged)
-                    Parent->Slot23(0x300du, Self, Row);
+                    Parent->ProcessMessage(0x300du, Self, Row);
                 return true;
             }
         }
@@ -1291,7 +1291,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
         }
         // 0x0058f37e: the press lands on a cell that is not selected -- (row << 16) | column to
         // the parent, which is read without a null test.
-        Parent->Slot23(0xf001u, Self, (HoverRow << 16) | HoverColumn);
+        Parent->ProcessMessage(0xf001u, Self, (HoverRow << 16) | HoverColumn);
         return true;
     }
 
@@ -1408,7 +1408,7 @@ void UiScrollTable::SetScrollBarGap(float Gap)
     ScrollBar->SetTransform(Orientation);
 }
 
-bool UiScrollTable::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool UiScrollTable::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_0058f8b0: the own scrollbar's value change goes to the callback; the base class's
     // horizontal bar (+0x3f4) is swallowed; anything else is BaseRichTextWin's (FUN_0057afd0).
@@ -1427,5 +1427,5 @@ bool UiScrollTable::Slot23(unsigned Msg, unsigned A, unsigned B)
         if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBarH)))
             return true;
     }
-    return BaseRichTextWin::Slot23(Msg, A, B);
+    return BaseRichTextWin::ProcessMessage(Msg, A, B);
 }

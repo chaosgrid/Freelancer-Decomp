@@ -116,7 +116,7 @@ void NnRolloverControl::InitRolloverDefaults()
         }
         Text.LayoutGen = 0; // +0xa4
     }
-    Text.Field08 = 4; // +0x84
+    Text.MaxLines = 4; // +0x84
     if (Text.bMultiLine != 1)
     {
         Text.bMultiLine = 1; // +0xac
@@ -187,7 +187,7 @@ void NnRolloverControl::LoadRolloverTable()
     } while (Reader.read_header());
 }
 
-bool NnRolloverControl::Slot23(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
+bool NnRolloverControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
 {
     // LAB_004b5700 (RET 0xc).
     if (Msg != 0xef02)
@@ -479,8 +479,8 @@ void NnRolloverControl::Draw()
     Origin.Y = ScreenY;
     Origin.Scale = ExtentW;
     Origin.Height = ExtentH;
-    Origin.Field10 = 0;
-    Origin.Field14 = 0;
+    Origin.HAlign = 0;
+    Origin.VAlign = 0;
     FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
 
     Win3DEnable(kWin3DDepthTest); // FUN_00421dd0(0xb71)

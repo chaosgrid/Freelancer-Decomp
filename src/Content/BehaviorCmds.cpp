@@ -28,9 +28,9 @@ FContentShipBase::FContentShipBase(FContentShipParams const* Params)
     : FContentSpaceObj(Params)
     , ClassIds(Params->ClassIds)
     , ShipArchId(Params->ShipArchId)
-    , FormationSlot(Params->Field_0x48)
+    , FormationSlot(Params->FormationSlot)
     , Formation(Params->Formation)
-    , FormationId(Params->Field_0x4c)
+    , FormationId(Params->FormationId)
     , Priority(Params->Priority)
     , ControllerId(Params->ControllerId)
 {
@@ -52,13 +52,13 @@ FContentShipBase::~FContentShipBase()
 }
 
 // 06ea1480: XOR AL,AL; RET.
-bool FContentShipBase::Slot04()
+bool FContentShipBase::IsNpcShip()
 {
     return false;
 }
 
 // 06f33cf0: MOV AL,[ECX+0x11c]; RET.
-bool FContentShipBase::Slot08()
+bool FContentShipBase::IsInCombat()
 {
     return bInCombat != 0;
 }
@@ -212,20 +212,20 @@ void FContentShipBase::SetFormation(unsigned int InFormationId, unsigned int InF
 }
 
 // FUN_06f576f0 (06f576f0-06f57708).
-void FContentShipBase::SetField120(unsigned int const* Value120, unsigned int const* Value124)
+void FContentShipBase::SetTradeLaneRings(unsigned int const* Value120, unsigned int const* Value124)
 {
     TradeLaneEntryRing = *Value120;
     TradeLaneEndRing = *Value124;
 }
 
 // FUN_06f57710 (06f57710-06f5771d): +0x120 != 0.
-bool FContentShipBase::HasField120() const
+bool FContentShipBase::IsInTradeLane() const
 {
     return TradeLaneEntryRing != 0;
 }
 
 // FUN_06f57720 (06f57720-06f57738).
-void FContentShipBase::GetField120(unsigned int* Out120, unsigned int* Out124) const
+void FContentShipBase::GetTradeLaneRings(unsigned int* Out120, unsigned int* Out124) const
 {
     *Out120 = TradeLaneEntryRing;
     *Out124 = TradeLaneEndRing;

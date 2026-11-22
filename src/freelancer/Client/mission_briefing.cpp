@@ -41,10 +41,10 @@ namespace
     //   10 0x00401e90   11 0x0053aaa0   12 LAB_0043d2f0 13 LAB_0043d300 14 LAB_0043d360
     struct MissionBriefing : public IEnvironment
     {
-        bool Slot00(unsigned A, unsigned Message, unsigned B, unsigned C) override;
+        bool OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C) override;
         bool Slot01(unsigned A, unsigned B, unsigned C) override;
-        bool Slot02(unsigned A, unsigned B, unsigned long Packed) override;
-        bool Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
+        bool OnMouseMove(unsigned A, unsigned B, unsigned long Packed) override;
+        bool OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
         bool Slot04(unsigned A, unsigned B, unsigned C) override;
         void Slot05() override;
         void Slot06(unsigned A) override;
@@ -97,7 +97,7 @@ namespace
     // Slot 0 (LAB_0043d130, RET 0x10) -- a key message (A, Message, B, C). Unless the chat
     // input "CTID" is up (FUN_0046a480), GetKeyState(VK_SHIFT) and GetKeyState(VK_CONTROL) with
     // their results dropped; true either way.
-    bool MissionBriefing::Slot00(unsigned A, unsigned Message, unsigned B, unsigned C)
+    bool MissionBriefing::OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C)
     {
         (void)A;
         (void)Message;
@@ -120,7 +120,7 @@ namespace
         return true;
     }
 
-    bool MissionBriefing::Slot02(unsigned A, unsigned B, unsigned long Packed)
+    bool MissionBriefing::OnMouseMove(unsigned A, unsigned B, unsigned long Packed)
     {
         (void)A;
         (void)B;
@@ -137,7 +137,7 @@ namespace
     }
 
     // Slot 3 (LAB_0043d150, MOV AL,1 / RET 0x10) -- true.
-    bool MissionBriefing::Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
+    bool MissionBriefing::OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
     {
         (void)A;
         (void)Message;
@@ -241,7 +241,7 @@ namespace
         // (0xef02, 0, 0), the close.
         Win3D* const NavMap = State->ParentWindow->GetChildHead();
         if (NavMap != nullptr)
-            NavMap->Slot23(0xef02, 0, 0);
+            NavMap->ProcessMessage(0xef02, 0, 0);
     }
 
     // Slot 14 (LAB_0043d360, RET 4). EBX = 0, EBP = DeltaSeconds throughout.
@@ -298,7 +298,7 @@ namespace
             G_bMissionBriefingNavMapUp = 1;
             Win3D* const NavMap = WinFactoryCreate("NeuroNetNavMap", "NeuroNetNavMap",
                                                    State->ParentWindow, nullptr);
-            NavMap->Slot23(0xef01, 0, 0);
+            NavMap->ProcessMessage(0xef01, 0, 0);
             NavMap->Flags = static_cast<unsigned char>(NavMap->Flags | 3);
             G_bMissionBriefingNavMapUp = 0;
             // 0x0043d47e..0x0043d48d: FUN_0041dde0("arrow", 0), FUN_0041dda0(1).

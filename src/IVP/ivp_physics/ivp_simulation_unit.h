@@ -409,7 +409,7 @@ void IVP_Simulation_Unit_Free_Vector_Buffers(IVP_Simulation_Unit* Unit);
 // ControllerBucket, dispatches a virtual call on Bucket->Controller (vtable
 // slot at raw offset +0x8, thiscall) to fetch an IVP_U_Vector<IVP_Core>-shaped
 // list of the cores THAT controller connects, then unions every pair in that
-// list via FUN_063557c0/get_master_core; 3) walks Unit->Cores comparing each
+// list via IVP_Core_UnionFindGetFather/get_master_core; 3) walks Unit->Cores comparing each
 // Core's master against the FIRST Core's master, returning the first
 // DIFFERING master found (i.e. "this core's group is no longer connected to
 // the rest"), or nullptr if the whole unit is still one connected component.

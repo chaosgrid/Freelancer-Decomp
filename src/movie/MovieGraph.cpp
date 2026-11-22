@@ -825,7 +825,7 @@ long __stdcall Movie_ShiftFieldLimbs(unsigned int* Source, unsigned int Shift, i
     {
         Out[Index] = High[Index] | Low[Index];
     }
-    *(unsigned int*)((unsigned char*)Out + Words * 4u - 4u) &= Field[0x4a];
+    Out[Words - 1u] &= Field[0x4a];
     return Flag;
 }
 
@@ -967,7 +967,7 @@ long __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right
             }
         }
     }
-    *(unsigned int*)((unsigned char*)Product + Count * 4u - 4u) &= Field[0x4a];
+    Product[Count - 1u] &= Field[0x4a];
     return Square != 0 ? 1 : 0;
 }
 
@@ -1154,7 +1154,7 @@ long __stdcall Movie_BuildModulusRecord(unsigned int* Limbs, unsigned int Count,
                         Fill = Fill - 1u;
                     }
                 }
-                *(unsigned int*)((unsigned char*)Block + Span * 4u - 4u) = Movie_Shr(0xffffffffu, Shift);
+                Block[Span - 1u] = Movie_Shr(0xffffffffu, Shift);
                 At180 = (unsigned int*)((unsigned char*)Block + 0x180);
                 At204 = (unsigned int*)((unsigned char*)Block + 0x204);
                 Movie_DivideLimbs(Block, Span, Limbs, (int)Count, Record + 0x45, (unsigned int)At180, At204);

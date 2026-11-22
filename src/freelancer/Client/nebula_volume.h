@@ -115,7 +115,7 @@ namespace NebulaVolume
     // transmittance up to the star, not by the whole ray's (a star in front of a nebula stays
     // visible; behind it, it is hidden as before).
     void NoteStarGlow(float const* WorldPos, float Radius, float Alpha);
-    // FClientSolarGameobj::Slot188 (planets and moons; the far bucket draws them without a depth
+    // FClientSolarGameobj::SubmitDraw (planets and moons; the far bucket draws them without a depth
     // test): their bounding sphere ends the volume's rays like the scene depth would.
     void NoteOpaqueSphere(float const* WorldCentre, float Radius);
     // CliAsteroidTickOne's extended cube walk (AsteroidSpawnReach): its cubes fade out between

@@ -494,9 +494,9 @@ struct FTypedChannel
 
     IChannelOwner* Owner;                            // +0x04
     unsigned long Kind;                              // +0x08
-    unsigned long Field0C;                           // +0x0C
-    unsigned long Field10;                           // +0x10
-    unsigned long Field14;                           // +0x14
+    unsigned long Sink;                              // +0x0C IChannelSink* / callback sink
+    unsigned long SinkContext;                       // +0x10 sink user context
+    unsigned long Instance;                          // +0x14 FEngineInstance* / 0xFFFFFFFF unbound
     void* Bind;                                      // +0x18
     float Time;                                      // +0x1C
     // Retail +0x20: header[1] as FUN_0661af30 stores it (0661af37..3a); bit 1 loop, bit 2
@@ -506,7 +506,7 @@ struct FTypedChannel
     float Weight;                                    // +0x28 (header[2])
     float Scale;                                     // +0x2C (header[4])
     // TODO: name this play-header position factor when its purpose is known.
-    float Field_0x30;                                // +0x30
+    float TranslationScale;                          // +0x30
     unsigned long PlayFlags;                         // +0x34
     // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play
     // (066164a0..a7), tested by IChannel::StopGraph (06616527) and by the standalone pass of
@@ -598,9 +598,9 @@ static_assert(sizeof(void*) != 4 || sizeof(FVectorTypedChannel) == 0x48, "type-2
 static_assert(sizeof(void*) != 4 || sizeof(FQuatTypedChannel) == 0x4C, "type-4 channel 0x4C");
 static_assert(sizeof(void*) != 4 || sizeof(FPosQuatTypedChannel) == 0x94, "type-6 channel 0x94");
 
-// &typed+0x08: the 16-byte bind descriptor. FTypedChannel keeps Kind/Field0C/Field10/Field14
+// &typed+0x08: the 16-byte bind descriptor. FTypedChannel keeps Kind/Sink/SinkContext/Instance
 // as four consecutive dwords, which is FAnimBindOut's layout on this 32-bit target.
-static_assert(offsetof(FTypedChannel, Field14) - offsetof(FTypedChannel, Kind) == 0xC,
+static_assert(offsetof(FTypedChannel, Instance) - offsetof(FTypedChannel, Kind) == 0xC,
               "bind descriptor is four consecutive dwords");
 static_assert(sizeof(FAnimBindOut) == 0x10, "bind descriptor is 16 bytes");
 inline FAnimBindOut* TypedBindDesc(FTypedChannel* This)

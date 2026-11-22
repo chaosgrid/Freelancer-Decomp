@@ -85,7 +85,7 @@ void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
                                  FClientGameobj* Munition);
 
 // FUN_00534240 (thiscall on the EquippedObj, RET 0x14) -- the body of
-// FClientEquippedObj::Slot1c0 (vtable +0x1c0): the first fuse named FuseId on the burning list
+// FClientEquippedObj::LightFuse (vtable +0x1c0): the first fuse named FuseId on the burning list
 // (+0xc4) gets Fuse::IgniteAt(SourceId, SubObjId, AtT); otherwise the ClientFuseDB prototype is
 // copied onto the list, bound to Host, randomised, given OverrideLifetime unless it is -1 and
 // ignited. False (FDUMP "Fuse(%s) not found in FuseDB") only when the prototype is missing.

@@ -355,9 +355,9 @@ void FChatChannelTable::AddChannel(CHAT_ID Id, RenderDisplayList const& Name)
         ChatAppendRdlCopy(*Copy, Name);
         Names[Id.Id] = Copy;
         FChatPlayerInfo& Info = PlayerInfo[Id.Id];
-        Info.Field_0x0 = 0;
+        Info.GroupId = 0;
         Info.Rank = 0;
-        Info.Field_0x8 = 0;
+        Info.SystemId = 0;
         ++Generation;
         ChatNotice(0x552, "Channel add successful.\n");
         return;
@@ -369,9 +369,9 @@ void FChatChannelTable::AddChannel(CHAT_ID Id, RenderDisplayList const& Name)
     RdlClear(*Existing);
     ChatAppendRdlCopy(*Existing, Name);
     FChatPlayerInfo& Info = PlayerInfo[Id.Id];
-    Info.Field_0x0 = 0;
+    Info.GroupId = 0;
     Info.Rank = 0;
-    Info.Field_0x8 = 0;
+    Info.SystemId = 0;
     ++Generation;
 }
 
@@ -722,7 +722,7 @@ void ChatPlayerLeft(unsigned PlayerId, bool bNotify)
     ++Table->Generation;
 }
 
-void ChatSetPlayerInfoField0(unsigned PlayerId, unsigned Value)
+void ChatSetPlayerGroupId(unsigned PlayerId, unsigned Value)
 {
     // FUN_0046ad60
     if (G_ChatChannelTable == nullptr)
@@ -730,7 +730,7 @@ void ChatSetPlayerInfoField0(unsigned PlayerId, unsigned Value)
     FChatPlayerInfo* const Info = G_ChatChannelTable->FindPlayerInfo(ChatIdForPlayer(PlayerId));
     if (Info == nullptr)
         return;
-    Info->Field_0x0 = Value;
+    Info->GroupId = Value;
     ++G_ChatChannelTable->Generation;
 }
 
@@ -746,7 +746,7 @@ void ChatSetPlayerRank(unsigned PlayerId, unsigned Rank)
     ++G_ChatChannelTable->Generation;
 }
 
-void ChatSetPlayerInfoField8(unsigned PlayerId, unsigned Value)
+void ChatSetPlayerSystemId(unsigned PlayerId, unsigned Value)
 {
     // FUN_0046ae40
     if (G_ChatChannelTable == nullptr)
@@ -754,7 +754,7 @@ void ChatSetPlayerInfoField8(unsigned PlayerId, unsigned Value)
     FChatPlayerInfo* const Info = G_ChatChannelTable->FindPlayerInfo(ChatIdForPlayer(PlayerId));
     if (Info == nullptr)
         return;
-    Info->Field_0x8 = Value;
+    Info->SystemId = Value;
     ++G_ChatChannelTable->Generation;
 }
 

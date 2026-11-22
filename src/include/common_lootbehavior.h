@@ -32,17 +32,17 @@ struct IObjRW;
 // Vtable .rdata:0639fdbc, 27 slots. Overrides of Behavior's table:
 //    0  FUN_062ce4a0  scalar-deleting dtor around FUN_062ce4c0
 //    1  LAB_062ce550  SetContext
-//    3  LAB_062cd5d0  Slot3 (`JMP FUN_062d20d0`, shared with IdleBehavior)
-//    4  FUN_062ce660  Slot4
-//    5  FUN_062ce6b0  Slot5
-//    7  LAB_062ceb50  Slot7
-//   10  FUN_062cedd0  Slot10
+//    3  LAB_062cd5d0  OnEngage (`JMP FUN_062d20d0`, shared with IdleBehavior)
+//    4  FUN_062ce660  OnDisengage
+//    5  FUN_062ce6b0  OnEvaluateReadiness
+//    7  LAB_062ceb50  OnUpdate
+//   10  FUN_062cedd0  OnApplyDirective
 // ============================================================================
 class LootBehavior : public Behavior
 {
 public:
     // The +0x174 record FUN_062ce870 receives by pointer: the loot object being collected and
-    // a byte at +8 that Slot10 sets and the search / release paths clear.
+    // a byte at +8 that OnApplyDirective sets and the search / release paths clear.
     struct FLootTarget
     {
         BaseWatcher Watcher;            // +0x00
@@ -62,15 +62,15 @@ public:
     // Slot 1, LAB_062ce550 (RET 0xc).
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
     // Slot 3, LAB_062cd5d0: `JMP FUN_062d20d0`.
-    void Slot3() override;
+    void OnEngage() override;
     // Slot 4, FUN_062ce660.
-    void Slot4() override;
+    void OnDisengage() override;
     // Slot 5, FUN_062ce6b0 (RET 4, argument unread). Result stored at +0x0c.
-    int Slot5(float Unused) override;
+    int OnEvaluateReadiness(float Unused) override;
     // Slot 7, LAB_062ceb50. Result stored at +0x10 (except the "collected" exit).
-    int Slot7() override;
+    int OnUpdate() override;
     // Slot 10, FUN_062cedd0 (RET 4).
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
 
     // FUN_062ce740 (RET 4, non-virtual): true unless the loot object is a nearly-empty
     // container already claimed by another ship's LootBehavior.
@@ -81,10 +81,10 @@ public:
     // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
     int TypeId;                     // +0x04
     unsigned CachedHandle08;        // +0x08
-    int ModeSelector0xc;            // +0x0c, Slot5's result.
-    int UpdateResult10;             // +0x10, Slot7's result.
+    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result.
+    int UpdateResult10;             // +0x10, OnUpdate's result.
     void* OwnerContext;             // +0x14, the owner IObjRW* (binder).
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime;                // +0x1c
     IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
     SystemManager* NavHelper;       // +0x24 (binder)
@@ -98,7 +98,7 @@ public:
     unsigned char bHasTractor164;   // +0x164, SetContext: the owner carries tractor equipment
     unsigned char Pad165[3];
     float TractorReach168;          // +0x168, SetContext: tractor range * 0.75
-    unsigned char Flag16c;          // +0x16c, ctor 1; Slot10's failure path copies op+0x10
+    unsigned char Flag16c;          // +0x16c, ctor 1; OnApplyDirective's failure path copies op+0x10
     unsigned char Pad16d[3];
     float Field170;                 // +0x170, ctor 13.0f; no reader in this class's code
     FLootTarget Target;             // +0x174

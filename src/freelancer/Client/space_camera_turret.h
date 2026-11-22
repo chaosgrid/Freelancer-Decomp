@@ -31,13 +31,13 @@ struct FTurretCamera : FHudCamera
 
 
     float Tether[3];             // +0x100  [TurretCamera] tether, default (0, 5, 25)
-    float Field10C;              // +0x10c  zeroed by the ctor; the current yaw FUN_0051a7d0 turns by
-    float Field110;              // +0x110  zeroed; the yaw it eases towards (wrapped by 2*pi)
-    float Field114;              // +0x114  zeroed; the current pitch
-    float Field118;              // +0x118  zeroed; the pitch it eases towards (+/- pi/3)
-    float Field11C;              // +0x11c  zeroed; the yaw key rate (event 0x32 / 0x33)
-    float Field120;              // +0x120  zeroed; the pitch key rate (event 0x34 / 0x35)
-    float Field124;              // +0x124  0.75f, no ini key reaches it
+    float Yaw;              // +0x10c  zeroed by the ctor; the current yaw FUN_0051a7d0 turns by
+    float TargetYaw;              // +0x110  zeroed; the yaw it eases towards (wrapped by 2*pi)
+    float Pitch;              // +0x114  zeroed; the current pitch
+    float TargetPitch;              // +0x118  zeroed; the pitch it eases towards (+/- pi/3)
+    float YawKeyRate;              // +0x11c  zeroed; the yaw key rate (event 0x32 / 0x33)
+    float PitchKeyRate;              // +0x120  zeroed; the pitch key rate (event 0x34 / 0x35)
+    float KeyRotateRate;              // +0x124  0.75f, no ini key reaches it
     float YawRotateSpeed;        // +0x128  [TurretCamera] yaw_rotate_speed,   default 2.0
     float PitchRotateSpeed;      // +0x12c  [TurretCamera] pitch_rotate_speed, default 1.5
     float AccelSpeed;            // +0x130  [TurretCamera] accel_speed,        default 5.0 (0x0051a277)
@@ -49,7 +49,7 @@ struct FTurretCamera : FHudCamera
 // The rear-view camera sits at controller + 0x500 and this one at + 0x3c8.
 static_assert(sizeof(FTurretCamera) == 0x138, "FTurretCamera must be 0x138");
 static_assert(offsetof(FTurretCamera, Tether) == 0x100, "TC +0x100");
-static_assert(offsetof(FTurretCamera, Field124) == 0x124, "TC +0x124");
+static_assert(offsetof(FTurretCamera, KeyRotateRate) == 0x124, "TC +0x124");
 static_assert(offsetof(FTurretCamera, YawRotateSpeed) == 0x128, "TC +0x128");
 static_assert(offsetof(FTurretCamera, PitchRotateSpeed) == 0x12c, "TC +0x12c");
 static_assert(offsetof(FTurretCamera, AccelSpeed) == 0x130, "TC +0x130");

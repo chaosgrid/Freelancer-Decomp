@@ -70,7 +70,7 @@ namespace
 // FUN_062c9540 (.text:062c9540-062c95bc): FUN_062d2020(TypeId); MoveIdea +0x70,
 // FaceIdea +0xe8, AfterburnerIdea +0x1a8 (EH states 0/1/2 = the member order); vptr
 // 0639f9dc; +0x60 = 2; +0x48 = 2. The port zeroes the fields retail leaves to
-// SetContext/Slot3 (+0x2c..+0x6c); every one is written there before a reader runs.
+// SetContext/OnEngage (+0x2c..+0x6c); every one is written there before a reader runs.
 // ----------------------------------------------------------------------------
 StrafeBehavior::StrafeBehavior(int InTypeId)
     : Behavior()
@@ -79,7 +79,7 @@ StrafeBehavior::StrafeBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)
@@ -136,7 +136,7 @@ bool StrafeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // ----------------------------------------------------------------------------
 // Slot 10, LAB_062c96e0 (Common.dll.txt 197026-197050).
 // ----------------------------------------------------------------------------
-bool StrafeBehavior::Slot10(void* DirectiveOp)
+bool StrafeBehavior::OnApplyDirective(void* DirectiveOp)
 {
     if (DirectiveOp != nullptr)
     {
@@ -154,7 +154,7 @@ bool StrafeBehavior::Slot10(void* DirectiveOp)
 // ----------------------------------------------------------------------------
 // Slot 5, LAB_062c9720 (Common.dll.txt 197062-197160).
 // ----------------------------------------------------------------------------
-int StrafeBehavior::Slot5(float Unused)
+int StrafeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     SystemManager* const Sys = NavHelper;
@@ -197,9 +197,9 @@ int StrafeBehavior::Slot5(float Unused)
 // ----------------------------------------------------------------------------
 // Slot 3, LAB_062ca1e0 (Common.dll.txt 197977-198076).
 // ----------------------------------------------------------------------------
-void StrafeBehavior::Slot3()
+void StrafeBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062ca1e6 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062ca1e6 FUN_062d20d0
     SetCruiseLock(1, 3);                                            // 062ca1f1 FUN_062d21d0
 
     IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
@@ -252,19 +252,19 @@ void StrafeBehavior::Slot3()
 // ----------------------------------------------------------------------------
 // Slot 4, FUN_062ca310 (Common.dll.txt 198082-198101).
 // ----------------------------------------------------------------------------
-void StrafeBehavior::Slot4()
+void StrafeBehavior::OnDisengage()
 {
     SubObjectA.PublishTargetId(0);                                  // 062ca31b FUN_062d4e50
     SubObjectA.Commit();                                            // 062ca324 [EAX+0x10]
     SubObjectB.Commit();                                            // 062ca333
     SubObjectC.Commit();                                            // 062ca342
-    Behavior::Slot4();                                              // 062ca349 JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062ca349 JMP FUN_062d20f0
 }
 
 // ----------------------------------------------------------------------------
 // Slot 7, LAB_062c9d20 (Common.dll.txt 197576-197942), 354 instructions.
 // ----------------------------------------------------------------------------
-int StrafeBehavior::Slot7()
+int StrafeBehavior::OnUpdate()
 {
     SystemManager* const Sys = NavHelper;
 

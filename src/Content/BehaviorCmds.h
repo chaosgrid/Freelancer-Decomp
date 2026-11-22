@@ -39,8 +39,8 @@ struct FFormation;         // Encounters.h (TU31 formations.ini record, FUN_06ef
 struct FContentShipParams : public FContentSpaceObjParams
 {
     FFormation* Formation = nullptr;       // +0x44 -> ship +0x150
-    unsigned int Field_0x48 = 0xffffffffu; // +0x48 -> ship +0x14c
-    unsigned int Field_0x4c = 0xffffffffu; // +0x4c -> ship +0x154
+    unsigned int FormationSlot = 0xffffffffu; // +0x48 -> ship +0x14c
+    unsigned int FormationId = 0xffffffffu; // +0x4c -> ship +0x154
     std::vector<unsigned int> ClassIds;    // +0x50 -> ship +0x128
     // +0x60: the directives the NPC ship starts with (FUN_06f336a0 06f33bb1 hands it to
     // SetDirectives), one reference held on each. Retail's member is the ref-holding list
@@ -76,9 +76,9 @@ public:
     ~FContentShipBase() override;
 
     // Slot 1 (06ea1480): XOR AL,AL. FContentSpaceObj +0x04.
-    bool Slot04() override;
+    virtual bool IsNpcShip();
     // Slot 2 (06f33cf0): byte +0x11c.
-    virtual bool Slot08();
+    virtual bool IsInCombat();
     // Slot 3 (06f57c30): &ActiveDirective.
     virtual FObjListDirective** GetActiveDirectiveSlot();
     // Slot 4 (06f57c40): Release and clear ActiveDirective.
@@ -113,12 +113,12 @@ public:
     // FUN_06f576f0 (RET 8): TradeLaneEntryRing = *Value120, TradeLaneEndRing = *Value124.
     // GameSupport msg 0x16 (06efee22 / 06efee5f) sets {entry ring, last or first ring of the
     // lane in the travel direction}; msg 0x17 (06efed3f) clears both to 0 (DAT_06fb7d60).
-    void SetField120(unsigned int const* Value120, unsigned int const* Value124);
+    void SetTradeLaneRings(unsigned int const* Value120, unsigned int const* Value124);
     // FUN_06f57710: TradeLaneEntryRing != 0, i.e. the ship is travelling a trade lane.
-    bool HasField120() const;
+    bool IsInTradeLane() const;
     // FUN_06f57720 (RET 8): *Out120 = TradeLaneEntryRing, *Out124 = TradeLaneEndRing
     // (readers: SpaceSupport 06f5d959 -> RemoveTradeLaneShip; TU58 06f73184 / 06f73260).
-    void GetField120(unsigned int* Out120, unsigned int* Out124) const;
+    void GetTradeLaneRings(unsigned int* Out120, unsigned int* Out124) const;
     // FUN_06f57740: cancel the AI directive, release and drop every queued directive.
     void CancelDirectives();
     // FUN_06f577d0 (RET 4): push_back + AddRef.

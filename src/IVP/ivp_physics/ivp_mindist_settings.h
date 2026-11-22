@@ -79,8 +79,8 @@ public:
     // each spawn (06362... sites in ivp_mindist_limiter.cpp); PhySys overwrites it with
     // MAX_SPAWNED_MINDIST_COUNT (formerly Field_0x12C).
     int32_t max_spawned_mindist_count; // +0x12c = 1000 (constructor) (DAT_0658ab3c)
-    float Field_0x130;         // +0x130 = 1.0f (FUN_0634db30)       (DAT_0658ab40)
-    int32_t Field_0x134;       // +0x134 not written by the constructor; a counter of
+    float EventNudgeEpsScale;  // +0x130 = 1.0f (FUN_0634db30)       (DAT_0658ab40)
+    int32_t ToleranceDecayCounter; // +0x134 not written by the constructor; a counter of
                                // FUN_0634f320 (DAT_0658ab44). Zero in .bss.
 
     // FUN_0634db40 (.text:0634db40-0634db66).
@@ -90,7 +90,7 @@ public:
     void SetCollisionTolerance(float D);
 
     // FUN_0634db30 (.text:0634db30-0634db3a, thiscall, RET 4): *(this+0x130) = Value.
-    void SetField_0x130(float Value);
+    void SetEventNudgeEpsScale(float Value);
 };
 
 static_assert(offsetof(IVP_Mindist_Settings, CollDistRamp) == 0x008, "IVP_Mindist_Settings+0x008");
@@ -99,7 +99,7 @@ static_assert(offsetof(IVP_Mindist_Settings, friction_dist) == 0x10C, "IVP_Mindi
 static_assert(offsetof(IVP_Mindist_Settings, distance_keepers_safety) == 0x118, "IVP_Mindist_Settings+0x118");
 static_assert(offsetof(IVP_Mindist_Settings, max_distance_for_friction) == 0x11C, "IVP_Mindist_Settings+0x11c");
 static_assert(offsetof(IVP_Mindist_Settings, max_spawned_mindist_count) == 0x12C, "IVP_Mindist_Settings+0x12c");
-static_assert(offsetof(IVP_Mindist_Settings, Field_0x134) == 0x134, "IVP_Mindist_Settings+0x134");
+static_assert(offsetof(IVP_Mindist_Settings, ToleranceDecayCounter) == 0x134, "IVP_Mindist_Settings+0x134");
 static_assert(sizeof(IVP_Mindist_Settings) == 0x138, "IVP_Mindist_Settings is 0x138 bytes");
 
 // The ramp index is `(StateFlags >> 22) & 0xff` (Common.dll.txt:0634f3bc-0634f3c9,

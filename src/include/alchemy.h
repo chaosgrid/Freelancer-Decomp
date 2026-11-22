@@ -45,7 +45,7 @@ struct IFxEffectArchetype : IDAComponent
     virtual GENRESULT DACOM_API AddRec16(const FAleRec16* Rec, unsigned long* OutId,
                                          unsigned long Flag) = 0;                // 6  +0x18 FUN_0621e7d0 RET 0x10
     virtual GENRESULT DACOM_API RemoveRec16(unsigned long Id) = 0;               // 7  +0x1C FUN_0621e890 RET 8
-    virtual GENRESULT DACOM_API Slot8(unsigned long Id, unsigned long Value) = 0; // 8  +0x20 LAB_0621e950 RET 0xC
+    virtual GENRESULT DACOM_API SetRec16Parent(unsigned long Id, unsigned long Value) = 0; // 8  +0x20 LAB_0621e950 RET 0xC
     virtual GENRESULT DACOM_API AddRec8(const FAleRec8* Rec) = 0;                // 9  +0x24 FUN_0621e990 RET 8
     virtual GENRESULT DACOM_API RemoveRec8(const FAleRec8* Rec) = 0;             // 10 +0x28 FUN_0621eb70 RET 8
     // 11/12: retail LAB_06220e40 / LAB_06220e60 are thiscall (RET 0). No retail DLL is loaded,
@@ -74,15 +74,15 @@ struct IFxNodeLibrary : IDAComponent
     virtual GENRESULT DACOM_API LoadNodeLibrary(IFileSystem* FileSystem) = 0;   // 3  RET 8
     virtual GENRESULT DACOM_API SaveNodeLibrary(IFileSystem* FileSystem) = 0;   // 4  RET 8
     virtual unsigned long DACOM_API HashNodeName(const char* Name) = 0;         // 5  RET 8 → FUN_0623ef70
-    virtual GENRESULT DACOM_API NodeLibSlot6(const char* Name, IDAComponent* Node,
+    virtual GENRESULT DACOM_API InsertNode(const char* Name, IDAComponent* Node,
                                            unsigned long* OutHash) = 0;        // 6 RET 0x10
-    virtual GENRESULT DACOM_API NodeLibSlot7(unsigned long Hash) = 0;          // 7 RET 8
-    virtual GENRESULT DACOM_API NodeLibSlot8(FNodeLibraryEnumCallback Callback,
+    virtual GENRESULT DACOM_API RemoveNodeByHash(unsigned long Hash) = 0;          // 7 RET 8
+    virtual GENRESULT DACOM_API EnumerateNodes(FNodeLibraryEnumCallback Callback,
                                            void* Context) = 0;                // 8 RET 0xC
     virtual GENRESULT DACOM_API ClearNodeLibrary() = 0;                         // 9  RET 4
-    virtual GENRESULT DACOM_API NodeLibSlot10(void* A, void* B) = 0;            // 10 RET 0xC
-    virtual GENRESULT DACOM_API NodeLibSlot11(unsigned long Hash, IDAComponent** Out) = 0; // 11 RET 0xC
-    virtual GENRESULT DACOM_API NodeLibSlot12(unsigned long Hash, IDAComponent** Out) = 0; // 12 RET 0xC
+    virtual GENRESULT DACOM_API MakeUniqueName(void* A, void* B) = 0;            // 10 RET 0xC
+    virtual GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) = 0; // 11 RET 0xC
+    virtual GENRESULT DACOM_API FindNodeByHash(unsigned long Hash, IDAComponent** Out) = 0; // 12 RET 0xC
 };
 
 // IAlchemy retains the same slots 0–40; slots 3–12 are inherited unchanged.
@@ -90,13 +90,13 @@ struct IAlchemy : IFxNodeLibrary
 {
     virtual GENRESULT DACOM_API CreateVertexBuffer() = 0;                       // 13 RET 4
     virtual GENRESULT DACOM_API ReleaseVertexBuffer() = 0;                      // 14 RET 4
-    virtual GENRESULT DACOM_API Slot15(void* A, void* B) = 0;                   // 15 RET 0xC
-    virtual GENRESULT DACOM_API Slot16(void* A, void* B) = 0;                   // 16 RET 0xC
+    virtual GENRESULT DACOM_API ComposeNodeTransforms(void* A, void* B) = 0;    // 15 RET 0xC
+    virtual GENRESULT DACOM_API UpdateNodes(void* A, void* B) = 0;              // 16 RET 0xC
     virtual GENRESULT DACOM_API DrawNodes(void* A, void* B) = 0;                // 17 RET 0xC
     virtual GENRESULT DACOM_API GetDrawCookie() = 0;                            // 18 RET 4
     virtual GENRESULT DACOM_API Slot19(const char* Name, void* Unused) = 0;    // 19 +0x4C RET 0xC
     virtual GENRESULT DACOM_API AttachNode(void* A, void* B) = 0;               // 20 RET 0xC
-    virtual GENRESULT DACOM_API Slot21(void* A, void* B) = 0;                   // 21 RET 0xC
+    virtual GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) = 0;       // 21 RET 0xC
     virtual GENRESULT DACOM_API DetachNode(void* Node) = 0;                     // 22 RET 8
     virtual GENRESULT DACOM_API SubmitNode(void* Node) = 0;                     // 23 RET 8
     virtual GENRESULT DACOM_API SubmitChildNodes(void* Node) = 0;               // 24 RET 8
@@ -123,11 +123,11 @@ struct IAlchemy : IFxNodeLibrary
 // not recovered -- each comment says what FLFxMesh does in that slot. Arity from RET imm16.
 struct IFxMesh : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(void* Transform) = 0; // +0x0C LAB_004f6910 RET 8: IEngine::SetInstanceMatrix
-    virtual float* DACOM_API Slot4() = 0;                   // +0x10 LAB_004f6930 RET 4: IEngine::GetInstanceTransform
-    virtual GENRESULT DACOM_API Slot5(void* Arg) = 0;       // +0x14 LAB_004f6940 RET 8: IEngine::UpdateInstance(inst, 0, Arg)
-    virtual GENRESULT DACOM_API Slot6(void* Camera) = 0;    // +0x18 FUN_004f6970 RET 8: draw (ZWRITEENABLE 0, ZFUNC 4 LESSEQUAL)
-    virtual GENRESULT DACOM_API Slot7() = 0;                // +0x1C FUN_004f6a70 RET 4: drop material + instance
+    virtual GENRESULT DACOM_API SetTransform(void* Transform) = 0; // +0x0C LAB_004f6910 RET 8: IEngine::SetInstanceMatrix
+    virtual float* DACOM_API GetTransform() = 0;                   // +0x10 LAB_004f6930 RET 4: IEngine::GetInstanceTransform
+    virtual GENRESULT DACOM_API Update(void* Arg) = 0;      // +0x14 LAB_004f6940 RET 8: IEngine::UpdateInstance(inst, 0, Arg)
+    virtual GENRESULT DACOM_API Render(void* Camera) = 0;    // +0x18 FUN_004f6970 RET 8: draw (ZWRITEENABLE 0, ZFUNC 4 LESSEQUAL)
+    virtual GENRESULT DACOM_API Destroy() = 0;              // +0x1C FUN_004f6a70 RET 4: drop material + instance
     virtual GENRESULT DACOM_API Slot8(void* Arg) = 0;       // +0x20 LAB_004f6ab0 RET 8: returns -1
 };
 
@@ -139,7 +139,7 @@ struct IFxMesh : IDAComponent
 // implementation deletes itself.
 struct IFxMeshFactory : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(void* ArgA, void* ArgB, float const* Position,
+    virtual GENRESULT DACOM_API CreateMesh(void* ArgA, void* ArgB, float const* Position,
                                       IFxMesh** Out) = 0; // +0x0C FUN_004f6810 RET 0x14
 };
 
@@ -181,19 +181,19 @@ struct IFxEffectLibrary : IDAComponent
 
 struct IFxEffect : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(void* A, void* B) = 0;           // FUN_0621f610 RET 0xC
-    virtual GENRESULT DACOM_API Slot4(void* A, void* B) = 0;           // LAB_0621f6a0 JMP node+0x40 RET 0xC
-    virtual GENRESULT DACOM_API Slot5(float Age) = 0;                  // LAB_0621f7f0 RET 8: node +0x64
-    virtual GENRESULT DACOM_API Slot6(float OuterTime) = 0;            // LAB_0621f820 RET 8: node +0x5C
-    virtual GENRESULT DACOM_API Slot7(void* Arg) = 0;                  // FUN_0621f6d0 RET 8
-    virtual GENRESULT DACOM_API Slot8(void* Arg) = 0;                  // FUN_0621f730 RET 8
-    virtual GENRESULT DACOM_API Slot9(void* Arg) = 0;                  // FUN_0621f790 RET 8
-    virtual GENRESULT DACOM_API Slot10(void* A, void* B) = 0;          // LAB_0621fa40 RET 0xC
-    virtual GENRESULT DACOM_API Slot11(void* Arg) = 0;                 // LAB_0621fa80 RET 8
-    virtual GENRESULT DACOM_API Slot12(void* A, void* B) = 0;          // LAB_0621fb50 RET 0xC
+    virtual GENRESULT DACOM_API SetTransform(void* A, void* B) = 0;    // FUN_0621f610 RET 0xC
+    virtual GENRESULT DACOM_API GetTransform(void* A, void* B) = 0;    // LAB_0621f6a0 JMP node+0x40 RET 0xC
+    virtual GENRESULT DACOM_API SetAge(float Age) = 0;                  // LAB_0621f7f0 RET 8: node +0x64
+    virtual GENRESULT DACOM_API SetOuterTime(float OuterTime) = 0;            // LAB_0621f820 RET 8: node +0x5C
+    virtual GENRESULT DACOM_API ComposeTransforms(void* Arg) = 0;      // FUN_0621f6d0 RET 8
+    virtual GENRESULT DACOM_API Update(void* Arg) = 0;                 // FUN_0621f730 RET 8
+    virtual GENRESULT DACOM_API Draw(void* Arg) = 0;                   // FUN_0621f790 RET 8
+    virtual GENRESULT DACOM_API FindNodeById(void* A, void* B) = 0;    // LAB_0621fa40 RET 0xC
+    virtual GENRESULT DACOM_API IsFinished(void* Arg) = 0;             // LAB_0621fa80 RET 8
+    virtual GENRESULT DACOM_API EnumerateNodes(void* A, void* B) = 0;  // LAB_0621fb50 RET 0xC
     virtual GENRESULT DACOM_API DestroyNodes(void* Arg) = 0;           // formerly Slot13; FUN_0621fba0 RET 8 (destroy/free effect nodes by mask: 1=emitters, 2=fields, 4=appearances, 7=all)
-    virtual GENRESULT DACOM_API Slot14(float LodInput) = 0;            // LAB_0621f850 RET 8: node +0x88
-    virtual GENRESULT DACOM_API Slot15(void* Arg) = 0;                 // LAB_0621f880 RET 8
+    virtual GENRESULT DACOM_API SetLodInput(float LodInput) = 0;            // LAB_0621f850 RET 8: node +0x88
+    virtual GENRESULT DACOM_API GetBoundingSphere(void* Arg) = 0;      // LAB_0621f880 RET 8
     virtual GENRESULT DACOM_API GetBoundComponent(void** Out) = 0;     // 16 LAB_0621fd00 RET 8
     virtual GENRESULT DACOM_API Slot17() = 0;                          // FUN_06220d70 dtor-with-flag
     virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;         // +0x48 FUN_0621eed0 RET 8

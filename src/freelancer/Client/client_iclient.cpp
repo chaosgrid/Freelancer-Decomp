@@ -393,7 +393,7 @@ void IClientImpl::SendServerSetReputation(unsigned int /*ClientId*/, const FServ
     {
         Reputation::Vibe::EnsureExists(Info.VibeHandle);
         Reputation::Vibe::SetAttitudeTowardsPlayer(Info.VibeHandle, Info.Attitude);
-        Reputation::Vibe::SetAffiliation(Info.VibeHandle, Info.Field_0x08, false);
+        Reputation::Vibe::SetAffiliation(Info.VibeHandle, Info.Affiliation, false);
         return;
     }
     wchar_t const* DisplayName = Info.DisplayName;
@@ -407,7 +407,7 @@ void IClientImpl::SendServerSetReputation(unsigned int /*ClientId*/, const FServ
     // rank's initial value (kept when GetRank leaves it alone) is the pointer's own bits.
     unsigned Rank = static_cast<unsigned>(reinterpret_cast<uintptr_t>(&Info));
     Reputation::Vibe::GetRank(Info.VibeHandle, Rank);
-    Reputation::Vibe::Set(Info.VibeHandle, Info.Field_0x08, Rank, Info.RelationCount,
+    Reputation::Vibe::Set(Info.VibeHandle, Info.Affiliation, Rank, Info.RelationCount,
                           Info.Relations, Info.NameA, Info.NameB, DisplayName);
 }
 
@@ -418,8 +418,8 @@ void IClientImpl::SendServerSetReputation(unsigned int /*ClientId*/, const FServ
 void IClientImpl::SendServerAdjustAttitude(unsigned int /*ClientId*/, const FPayloadServerAdjustAttitude& Info)
 {
     int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670 -> DAT_0061226c
-    Reputation::Vibe::AdjustAttitude(*reinterpret_cast<int const*>(&Info.Field_0x00), PlayerVibe,
-                                     Info.Field_0x04);
+    Reputation::Vibe::AdjustAttitude(*reinterpret_cast<int const*>(&Info.VibeHandle), PlayerVibe,
+                                     Info.Attitude);
 }
 
 // LAB_005a5ba0 (RET 8) -- ch2 0x45 SET_MISSION_MESSAGE: FUN_004b9c60(&Message.Text,
@@ -480,14 +480,14 @@ void IClientImpl::SendServerCfgInterfaceNotification(const unsigned int& /*Clien
 {
     unsigned int const TargetWindow = MakeId("target_window");
     unsigned int const StatusWindow = MakeId("status_window");
-    if (Info.Field_0x00 == TargetWindow)
+    if (Info.NotifType == TargetWindow)
     {
-        SetUnknownFloat673568(DwordAsFloat(Info.Field_0x04));
+        SetUnknownFloat673568(DwordAsFloat(Info.Param));
         return;
     }
-    if (Info.Field_0x00 == StatusWindow)
+    if (Info.NotifType == StatusWindow)
     {
-        SetUnknownFloat67356c(DwordAsFloat(Info.Field_0x04));
+        SetUnknownFloat67356c(DwordAsFloat(Info.Param));
     }
 }
 
@@ -646,7 +646,7 @@ void IClientImpl::SendCommonPlayerTradeRequestTrade(unsigned int /*ClientId*/, u
     if (Found != nullptr && Found->ManagerKind == 1)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
-        Ship->Field_0x18c = static_cast<unsigned char>(Ship->Field_0x18c | 0x04);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags | 0x04);
         ChatGroupTradeRequestReceived(ShipId); // FUN_0046b500
     }
     ++G_PendingTradeRequestCount;
@@ -660,7 +660,7 @@ void IClientImpl::SendCommonPlayerTradeStopTradeRequest(unsigned int /*ClientId*
     if (Found != nullptr && Found->ManagerKind == 1)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
-        Ship->Field_0x18c = static_cast<unsigned char>(Ship->Field_0x18c & 0xfb);
+        Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfb);
         ChatGroupTradeRequestRemoved(ShipId); // FUN_0046b520
     }
     G_bTradeRequested = 0; // DAT_00674b00

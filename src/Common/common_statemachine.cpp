@@ -306,8 +306,8 @@ void StateMachine::process(const SMEventData* Event)
     // 0x063339c0: byte[+0xd]=1; if (!vtbl[+8](Event, &[+4])) vtbl[+8](Event, &063a4978);
     // vtbl[+0xc](); byte[+0xd]=0.
     bProcessing = 1;
-    if (!Slot2(Event, CurrentState))
-        Slot2(Event, GStateMachineAnyState);
+    if (!OnStateEvent(Event, CurrentState))
+        OnStateEvent(Event, GStateMachineAnyState);
     handle_state_change();
     bProcessing = 0;
 }
@@ -320,11 +320,11 @@ void StateMachine::handle_state_change()
     while (bPendingChange != 0)
     {
         SMEventData Event(SMET_Message);
-        Slot2(&Event, CurrentState);
+        OnStateEvent(&Event, CurrentState);
         CurrentState = PendingState;
         bPendingChange = 0;
         Event.EventType = SMET_Tick;
-        Slot2(&Event, CurrentState);
+        OnStateEvent(&Event, CurrentState);
     }
 }
 
@@ -455,8 +455,8 @@ void StateMachineGroup::process(const SMEventData* Event)
     // get_event_type(); 3 ends the call. Otherwise every machine processes the event and a
     // second dying-machine pass follows. No null checks on the event or the machines.
     bProcessing = 1;
-    if (!Slot2(Event, CurrentState))
-        Slot2(Event, GStateMachineAnyState);
+    if (!OnStateEvent(Event, CurrentState))
+        OnStateEvent(Event, GStateMachineAnyState);
     handle_state_change();
     bProcessing = 0;
 

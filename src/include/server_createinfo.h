@@ -142,7 +142,7 @@ struct CEqObjCreateInfo
         , CostumeAccessoryCount(0)
         , VoiceId(0u)
         , HitPts(-1)
-        , Field_0x6c(0u)
+        , LoadoutId(0u)
         , bMarkedBy(0u)
     {
         for (int Index = 0; Index < 8; ++Index)
@@ -206,7 +206,7 @@ struct CEqObjCreateInfo
         , Position(Other.Position)
         , Orientation(Other.Orientation)
         , HitPts(Other.HitPts)
-        , Field_0x6c(Other.Field_0x6c)
+        , LoadoutId(Other.LoadoutId)
         , CollisionGroups(Other.CollisionGroups)
         , Damage(Other.Damage)
         , bMarkedBy(Other.bMarkedBy)
@@ -250,7 +250,7 @@ struct CEqObjCreateInfo
         ArchetypeNickname = 0u;
         DockingBaseId = 0u;
         VoiceId = 0u;
-        Field_0x6c = 0u;
+        LoadoutId = 0u;
         bMarkedBy = 0u;
         VibeGroupId = -1;
         Equipment.End = Equipment.Begin;
@@ -286,7 +286,7 @@ struct CEqObjCreateInfo
     // An INTEGER: rpclocal .text:06da3a9c `FILD dword ptr [EBP+0x68]` on the way
     // out and .text:06da4394 stores ftol's result back in.
     int HitPts;                         // +0x68  (int)CSimple::get_hit_pts(); ctor seeds -1
-    unsigned int Field_0x6c;            // +0x6c  always stored 0 (.text:06d07778)
+    unsigned int LoadoutId;            // +0x6c  always stored 0 (.text:06d07778)
     EquipDescVector Equipment;          // +0x70  CEqObj::get_equip_desc_list, vtable +0xac
     // Node operator_new(0x10) -> an 8-byte value; the destructor erases it
     // through .rdata:06d643d0, COMMON.DLL::std::list<CollisionGroupDesc>::erase.
@@ -332,11 +332,11 @@ struct CShipCreateInfo : CEqObjCreateInfo
     // The port zeroes the two Vectors as well (see the base constructor).
     CShipCreateInfo()
         : OwnerPlayer(0u)
-        , Field_0xb0(0u)
+        , GroupNameId(0u)
         , ReputationRank(0u)
         , Throttle(0.0f)
         , VibeOtherGroupId(-1)
-        , Field_0xd8(0u)
+        , GroupId(0u)
         , bUsingTradelane(0u)
     {
         Velocity.x = 0.0f;
@@ -357,10 +357,10 @@ struct CShipCreateInfo : CEqObjCreateInfo
     {
         CEqObjCreateInfo::clear();
         OwnerPlayer = 0u;
-        Field_0xb0 = 0u;
+        GroupNameId = 0u;
         ReputationRank = 0u;
         Throttle = 0.0f;
-        Field_0xd8 = 0u;
+        GroupId = 0u;
         VibeOtherGroupId = -1;
         bUsingTradelane = 0u;
     }
@@ -370,7 +370,7 @@ struct CShipCreateInfo : CEqObjCreateInfo
     unsigned int OwnerPlayer;      // +0xac  CSimple::OwnerPlayer (+0xb4)
     // Wire: only the LOW WORD travels (rpclocal .text:06d89478 / .text:06d89483)
     // and the receiver widens it back with MOVZX (.text:06d82058).
-    unsigned int Field_0xb0;       // +0xb0  CShip+0x21c
+    unsigned int GroupNameId;       // +0xb0  CShip+0x21c
     // Wire: only the LOW BYTE travels (.text:06d8948a / .text:06d89494,
     // MOVZX back at .text:06d82064).
     unsigned int ReputationRank;   // +0xb4  Reputation::Vibe::GetRank out-parameter
@@ -384,7 +384,7 @@ struct CShipCreateInfo : CEqObjCreateInfo
     int VibeOtherGroupId;          // +0xd4  PlayerData::rep_vibe; ctor seeds -1
     // Wire: only the LOW WORD travels (.text:06d8951a / .text:06d89528,
     // MOVZX back at .text:06d8204b).
-    unsigned int Field_0xd8;       // +0xd8  CShip+0x1b4
+    unsigned int GroupId;       // +0xd8  CShip+0x1b4
     unsigned char bUsingTradelane; // +0xdc  CShip::is_using_tradelane()
 };
 
@@ -439,26 +439,26 @@ struct FShipCreateRequest : CShipCreateInfo
 struct CSolarCreateInfo : CEqObjCreateInfo
 {
     CSolarCreateInfo()
-        : Field_0xac(0u)
-        , Field_0xad(0u)
+        : bDynamic(0u)
+        , bDestructible(0u)
         , VibeOtherGroupId(-1)
     {
     }
 
     // pub::SpaceObj::CreateSolar stores 1 (.text:06cf82af); FUN_06d0a200
     // hands it to CSolar::init's parameter block (.text:06d0a512 / .text:06d0a530).
-    unsigned char Field_0xac;       // +0xac
+    unsigned char bDynamic;       // +0xac
     // pub::SpaceObj::CreateSolar stores 1 (.text:06cf82b7). Wire payload+0x7c
     // (rpclocal .text:06d891d8 out, .text:06d82d90 back in).
-    unsigned char Field_0xad;       // +0xad
+    unsigned char bDestructible;       // +0xad
     // The second group of Reputation::Vibe::AttitudeTowards (rpclocal
     // .text:06d89239). FUN_06d0a200 stores PlayerData::rep_vibe here per
     // player (.text:06d0a64f / .text:06d0a65b), the same `id*0x418 - 0x100`
     // expression the ship path uses for its +0xd4.
     int VibeOtherGroupId;           // +0xb0  ctor seeds -1
-    unsigned char Field_0xb4;       // +0xb4
-    ID_String Field_0xb8;           // +0xb8
-    unsigned int Field_0xbc;        // +0xbc
+    unsigned char VisitValue;       // +0xb4
+    ID_String NicknameSrc;           // +0xb8
+    unsigned int MarkPlayerId;        // +0xbc
 };
 
 // ===========================================================================
@@ -524,8 +524,8 @@ struct FServerCreateProjectileInfo
     // and the mine branch at .text:06cf5b17 (`LEA ECX,[ESP + 0x19c]`, record at
     // S+0x158) both hand record+0x38 to FUN_06ce7c10, the three-float Vector
     // constructor, with three zeroes.
-    Vector Field_0x38;                // +0x38
-    unsigned int Field_0x44;          // +0x44  .text:06d07d13  MOV [ESI + 0x44],0x0
+    Vector AngularVelocity;                // +0x38
+    unsigned int OwnerPlayer;          // +0x44  .text:06d07d13  MOV [ESI + 0x44],0x0
 };
 
 // The 0x38-byte record FUN_06d07d40 fills, sent through IClient +0x0c8 (SendServerCreateGuided).
@@ -538,7 +538,7 @@ struct FServerCreateGuidedInfo
     unsigned short TargetSubObjId;    // +0x24  .text:06d07e04, CGuided+0xf8
     unsigned short Pad26;
     unsigned int ArchetypeNickname;   // +0x28  .text:06d07d58
-    unsigned int Field_0x2c;          // +0x2c  .text:06d07d5b  MOV [ESI + 0x2c],0x0
+    unsigned int OwnerPlayer;          // +0x2c  .text:06d07d5b  MOV [ESI + 0x2c],0x0
     unsigned int OwnerId;             // +0x30  .text:06d07dc6, CProjectile::OwnerId (+0xe4)
     unsigned short SubObjId;          // +0x34  .text:06d07e12, SUBOBJ_ID_NONE
     unsigned short Pad36;

@@ -50,8 +50,8 @@ namespace
     // The inlined label walk (e.g. 06f131d0-06f1321f): the NPC's +0x17c list holds LabelId.
     bool HasLabelId(FContentNpcShip const* Npc, unsigned int LabelId)
     {
-        std::list<unsigned int>::const_iterator It = Npc->Field_0x17c.begin();
-        for (; It != Npc->Field_0x17c.end(); ++It)
+        std::list<unsigned int>::const_iterator It = Npc->LabelIds.begin();
+        for (; It != Npc->LabelIds.end(); ++It)
         {
             if (*It == LabelId)
                 return true;
@@ -74,7 +74,7 @@ namespace
     // TEST AH,0x44 + JNP taken = equal), or it carries "Mission_Random_Encounter".
     bool IsVibeParty(FContentNpcShip const* Npc)
     {
-        if (Npc->Field_0x1bc == -1.0f)
+        if (Npc->Longevity == -1.0f)
             return true;
         return HasLabelId(Npc, GIdMissionRandomEncounter);
     }
@@ -249,7 +249,7 @@ void FMissionObject::SnapshotMissionObjects()
         {
             // 06f13221-06f13239: only NPCs whose +0x1bc is -1.0f (TEST AH,0x44 + JP taken when
             // not equal).
-            if (!(Npc->Field_0x1bc == -1.0f))
+            if (!(Npc->Longevity == -1.0f))
                 continue;
             unsigned int const FormationRef = Npc->FormationId;
             if (FormationRef != 0xffffffffu)
@@ -806,7 +806,7 @@ void FMissionObject::SaveMission(FILE* File)
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
     for (; InvIt != Invulnerables.end(); ++InvIt)
         std::fprintf(File, "invulnerable = %s, %f, %d\n", InvIt->Nickname.Data,
-                     static_cast<double>(InvIt->Duration), InvIt->bParam3 != 0 ? 1 : 0);
+                     static_cast<double>(InvIt->MaxHpLoss), InvIt->bPlayerCanDamage != 0 ? 1 : 0);
 
     // 06f105c5-06f1060d.
     if (!DecloakedNames.empty())
@@ -1092,12 +1092,12 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
             {
                 if (!Reader->is_value("invulnerable"))
                     continue;
-                bool const bParam3 = Reader->get_value_bool(2);
-                float const Duration = Reader->get_value_float(1);
+                bool const bPlayerCanDamage = Reader->get_value_bool(2);
+                float const MaxHpLoss = Reader->get_value_float(1);
                 FMissionInvulnerable Row;
                 Row.Nickname = Reader->get_indexed_value(0);
-                Row.Duration = Duration;
-                Row.bParam3 = bParam3 ? 1 : 0;
+                Row.MaxHpLoss = MaxHpLoss;
+                Row.bPlayerCanDamage = bPlayerCanDamage ? 1 : 0;
                 Invulnerables.push_back(Row);
             }
         }

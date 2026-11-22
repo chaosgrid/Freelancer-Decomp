@@ -32,8 +32,8 @@
 // the "still-unidentified" note this line used to carry was stale, see the
 // field comment in the header), installs the vtable (implicit, via C++
 // construction), and finally zeroes/defaults the trailing own-field block
-// (Flag1c5/Field1c8/Field1cc/Flag1b4/Flag1c4=1/Field1d0=0.9f/Field1b8/
-// Field1bc/Field1c0/Flag1d4/Field1d8).
+// (Flag1c5/EngineKillStateElapsed/Field1cc/Flag1b4/Flag1c4=1/Field1d0=0.9f/FaceAxisX/
+// FaceAxisY/FaceAxisZ/Flag1d4/AfterburnerElapsed).
 FaceBehavior::FaceBehavior(int InTypeId)
     : Behavior()
     , TypeId(InTypeId)
@@ -41,7 +41,7 @@ FaceBehavior::FaceBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , ThreatSourcePtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
@@ -57,18 +57,18 @@ FaceBehavior::FaceBehavior(int InTypeId)
     , SubObjectC()
     , Flag1b4(0)
     , Pad1b5{}
-    , Field1b8(0.0f)
-    , Field1bc(0.0f)
-    , Field1c0(0.0f)
+    , FaceAxisX(0.0f)
+    , FaceAxisY(0.0f)
+    , FaceAxisZ(0.0f)
     , Flag1c4(1)
     , Flag1c5(0)
     , Pad1c6{}
-    , Field1c8(0.0f)
+    , EngineKillStateElapsed(0.0f)
     , Field1cc(0.0f)
     , Field1d0(0.9f)
     , Flag1d4(0)
     , Pad1d5{}
-    , Field1d8(0.0f)
+    , AfterburnerElapsed(0.0f)
 {
     ConstructBase(InTypeId);   // FUN_062d2020 -- Behavior's own field initialisation
     // ALL THREE sub-objects now construct for real via the member-initializer
@@ -153,12 +153,12 @@ bool FaceBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 
 // Own vtable slot 3 (offset 0x0c). Common.dll.txt 196670-196695
 // (FUN_062c9320).
-void FaceBehavior::Slot3()
+void FaceBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062c9324 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062c9324 FUN_062d20d0
 
     Flag1c5 = 0;                                                    // 062c9330
-    Field1c8 = 0.0f;                                                // 062c9336 (dword 0)
+    EngineKillStateElapsed = 0.0f;                                                // 062c9336 (dword 0)
 
     SetCruiseLock(0, 3);                                            // 062c933c FUN_062d21d0
 
@@ -166,15 +166,15 @@ void FaceBehavior::Slot3()
     NavHelperPtr24->Thrust.SetEngineActive(Flag1c4 == 0);
 
     Flag1b4 = 0;
-    Field1b8 = 0.0f;
-    Field1bc = 0.0f;
-    Field1c0 = 0.0f;
-    Field1d8 = 0.0f;
+    FaceAxisX = 0.0f;
+    FaceAxisY = 0.0f;
+    FaceAxisZ = 0.0f;
+    AfterburnerElapsed = 0.0f;
 }
 
 // Own vtable slot 4 (offset 0x10). Common.dll.txt 196706-196727
 // (FUN_062c9380).
-void FaceBehavior::Slot4()
+void FaceBehavior::OnDisengage()
 {
     if ((Flags28 & 0x2) == 0 && Watcher30.target() != nullptr)
     {
@@ -192,12 +192,12 @@ void FaceBehavior::Slot4()
     // which is exactly what a Disengage() should do here.
     SubObjectC.Commit();
 
-    Behavior::Slot4();                                              // 062c93bb JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062c93bb JMP FUN_062d20f0
 }
 
 // Own vtable slot 5 (offset 0x14). Common.dll.txt 196016-196152
 // (LAB_062c8c10).
-int FaceBehavior::Slot5(float Unused)
+int FaceBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     // Fast path, 062c8c17-062c8c5e: Flags28 bit 0x2 set, TargetKind2c == 1 and Watcher30
@@ -343,7 +343,7 @@ static void EnsurePhysicalCacheFresh(SystemManager* Sys)
 // layout. So FaceBehavior is the ENGINE-KILL manoeuvre: cut the engines, coast,
 // and rotate to face a target. That reading is self-consistent with every gate
 // below (Field_08 as the "engine kill enabled" switch, Field_0C/Field_00/
-// Field_04 as dwell timeouts on the two second-accumulators Field1d8/Field1c8,
+// Field_04 as dwell timeouts on the two second-accumulators AfterburnerElapsed/EngineKillStateElapsed,
 // and Field_10 == 700.0 by default as a clearance distance compared against
 // GetInterceptClearanceOfIface's metres).
 //
@@ -411,7 +411,7 @@ int FaceBehavior::Update()
                 // alone -> odd parity -> PF=0, so JNP would be "<" and the JP
                 // actually coded here is ">=". Bail out once the turn has been
                 // running longer than the personality allows.
-                if (Field1d8 < EngineKill.EngineKillAfterburnerTime)
+                if (AfterburnerElapsed < EngineKill.EngineKillAfterburnerTime)
                 {
                     // 062c8e8c-062c8ea4. NOTE THE ARGUMENT ORDER, which is the
                     // OPPOSITE of the second BearingAngleToIface call at
@@ -435,9 +435,9 @@ int FaceBehavior::Update()
         {
             // ---- 062c8ea6-062c8f09: keep coasting and keep steering. Returns
             // ---- 0 directly, never reaching the switch.
-            // 062c8ea6-062c8ec5: Field1d8 += DeltaTime1c, then SubObjectC's own
+            // 062c8ea6-062c8ec5: AfterburnerElapsed += DeltaTime1c, then SubObjectC's own
             // vtable slot 1 with the same delta.
-            Field1d8 += DeltaTime1c;
+            AfterburnerElapsed += DeltaTime1c;
             // Slot offset +0x04 is index 1 == BaseIdea::Update(float).
             // AfterburnerIdea's own override is "hold the afterburner on".
             SubObjectC.Update(DeltaTime1c);
@@ -466,16 +466,16 @@ int FaceBehavior::Update()
             // 062c8f23-062c8f37: `TEST AH,0x5; JNP` -- strictly-less jumps to
             // LAB_062c8fd1, so the accumulator keeps running while it is under
             // EngineKillParams.EngineKillFaceTime.
-            if (Field1c8 < EngineKill.EngineKillFaceTime)
+            if (EngineKillStateElapsed < EngineKill.EngineKillFaceTime)
             {
                 // LAB_062c8fd1, 062c8fd1-062c8fe4.
                 Result = 0;
-                Field1c8 += DeltaTime1c;
+                EngineKillStateElapsed += DeltaTime1c;
             }
             else
             {
                 // 062c8f3d-062c8f53. Give up on this watch entirely.
-                Field1c8 = 0.0f;
+                EngineKillStateElapsed = 0.0f;
                 if (Watcher30.target() != nullptr)
                     Watcher30.set(nullptr);
                 Result = 2;   // LAB_062c9030
@@ -511,7 +511,7 @@ int FaceBehavior::Update()
             {
                 // 062c8fbb-062c8fcf: `TEST AH,0x5; JP LAB_062c8fe6` -- JP is
                 // ">= or unordered", so anything but strictly-less ends the attempt.
-                if (!(Field1c8 < EngineKill.EngineKillSearchTime))
+                if (!(EngineKillStateElapsed < EngineKill.EngineKillSearchTime))
                 {
                     Result = 3;   // LAB_062c8fe6, `MOV [ESP+0x10],EBX`
                 }
@@ -519,14 +519,14 @@ int FaceBehavior::Update()
                 {
                     // Falls into LAB_062c8fd1, the same two stores as above.
                     Result = 0;
-                    Field1c8 += DeltaTime1c;
+                    EngineKillStateElapsed += DeltaTime1c;
                 }
             }
             else
             {
                 // ---- LAB_062c8fec, 062c8fec-062c902e: locked on.
                 Flag1c5 = 1;
-                Field1c8 = 0.0f;
+                EngineKillStateElapsed = 0.0f;
                 // `MOV dword ptr [ESP+0x10],0x1` at 062c8ffd is unconditional,
                 // ahead of the JZ, so Result is 1 on both arms below.
                 Result = 1;
@@ -571,10 +571,10 @@ int FaceBehavior::Update()
             // than optimised away, so the call count matches retail.
             (void)Sys->SelfTarget.Iface->get_transform();
 
-            // `LEA EAX,[EBP+0x1b8]` -- the three contiguous floats Field1b8/
-            // Field1bc/Field1c0 read as one Vector. FaceIdea tag 5.
+            // `LEA EAX,[EBP+0x1b8]` -- the three contiguous floats FaceAxisX/
+            // FaceAxisY/FaceAxisZ read as one Vector. FaceIdea tag 5.
             Vector Axis;
-            Vec3Assign(&Axis, Field1b8, Field1bc, Field1c0);
+            Vec3Assign(&Axis, FaceAxisX, FaceAxisY, FaceAxisZ);
             SubObjectB.SetAxis(Axis);
         }
         else
@@ -611,11 +611,11 @@ int FaceBehavior::Update()
             // what they look like: `FLD ST0` duplicates x, then `FMUL ST1` is
             // x*x, `FLD ST2`/`FMUL ST3` is y*y and `FLD ST3`/`FMUL ST4` is z*z.
             // Every factor comes from the SAME vector -- this is |V|^2 of
-            // (Field1b8, Field1bc, Field1c0), NOT a dot product against the
+            // (FaceAxisX, FaceAxisY, FaceAxisZ), NOT a dot product against the
             // negated column just built. The three trailing `FSTP ST0`s drop
             // the x/y/z copies left on the stack.
             Vector Axis;
-            Vec3Assign(&Axis, Field1b8, Field1bc, Field1c0);
+            Vec3Assign(&Axis, FaceAxisX, FaceAxisY, FaceAxisZ);
             // (x*x + y*y) + z*z stays on the FPU (extended): double, not float.
             double const MagnitudeSquared = (static_cast<double>(Axis.x) * Axis.x
                                              + static_cast<double>(Axis.y) * Axis.y)
@@ -725,7 +725,7 @@ int FaceBehavior::Update()
 
 // Own vtable slot 10 (offset 0x28). Common.dll.txt 195918-196015
 // (LAB_062c8b30).
-bool FaceBehavior::Slot10(void* Message)
+bool FaceBehavior::OnApplyDirective(void* Message)
 {
     // Every failure path is the shared tail at 062c8bf2 (the JZ at 062c8b3a, the JA at
     // 062c8b53 and both JZs at 062c8b8d/062c8b94 all encode rel32/rel8 to 062c8bf2).
@@ -808,9 +808,9 @@ void FaceBehavior::set_direction(Vector const& Offset)
     }
 
     Flag1b4 = 1;
-    Field1b8 = -Offset.y;
-    Field1bc = -Offset.x;
-    Field1c0 = Offset.z;
+    FaceAxisX = -Offset.y;
+    FaceAxisY = -Offset.x;
+    FaceAxisZ = Offset.z;
 
     // .text:062c9429-062c9464. `MOV ECX,[ESI+0x20]; CALL FUN_062d4b20` ==
     // BehaviorMgrPtr20->get_turn_sensitivity_factor(). The FCOM against the
@@ -823,8 +823,8 @@ void FaceBehavior::set_direction(Vector const& Offset)
     if (TurnSensitivity > 0.0f)
     {
         double const Rescale = 1.0 / static_cast<double>(TurnSensitivity);
-        Field1b8 = static_cast<float>(Rescale * Field1b8);
-        Field1bc = static_cast<float>(Rescale * Field1bc);
+        FaceAxisX = static_cast<float>(Rescale * FaceAxisX);
+        FaceAxisY = static_cast<float>(Rescale * FaceAxisY);
     }
 
     // .text:062c9468-062c9523: each axis clamped into [-1.0f, +1.0f]. Retail
@@ -833,15 +833,15 @@ void FaceBehavior::set_direction(Vector const& Offset)
     // no observable effect), so a plain clamp reproduces it exactly. Note the
     // lower-bound test is <= rather than <: `TEST AH,0x41; JNZ` at 062c9476
     // takes the "use -1.0f" branch on equal as well as less.
-    if (!(Field1b8 > -1.0f))
-        Field1b8 = -1.0f;
-    else if (!(Field1b8 < 1.0f))
-        Field1b8 = 1.0f;
+    if (!(FaceAxisX > -1.0f))
+        FaceAxisX = -1.0f;
+    else if (!(FaceAxisX < 1.0f))
+        FaceAxisX = 1.0f;
 
-    if (!(Field1bc > -1.0f))
-        Field1bc = -1.0f;
-    else if (!(Field1bc < 1.0f))
-        Field1bc = 1.0f;
+    if (!(FaceAxisY > -1.0f))
+        FaceAxisY = -1.0f;
+    else if (!(FaceAxisY < 1.0f))
+        FaceAxisY = 1.0f;
 }
 
 // Own vtable slot 13 (offset 0x34). Common.dll.txt 196853-196855
@@ -855,7 +855,7 @@ void FaceBehavior::set_throttle(float Throttle)
 // Own vtable slot 21 (offset 0x54). Common.dll.txt 195748-195776
 // (LAB_062c89c0, RET 4): drop the watch when the watched object's get_id (+0x20) equals
 // the argument.
-void FaceBehavior::Slot21(void* Arg)
+void FaceBehavior::OnObjectLeftSystem(void* Arg)
 {
     IObjRW* const Watched = GetWatchedRawBlock();
     if (Watched == nullptr)                                         // 062c89c3-062c89d0

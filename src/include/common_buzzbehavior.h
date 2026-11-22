@@ -282,7 +282,7 @@ public:
     // (LAB_062c5dd0), 186 instructions. Resets the tick-state prefix (shared
     // FUN_062d20d0, same as IdleBehavior::ResetTickState), re-rolls
     // WatcherA/B/C/D/E's per-tick tunables from NavHelper's large tunable
-    // block, and re-derives HeadTowardStyle/PassByStyle/MinDistanceToHeadToward/Field344 via
+    // block, and re-derives HeadTowardStyle/PassByStyle/MinDistanceToHeadToward/FastPathRange via
     // RandomVector()/rand()-driven weighted picks.
     void RecomputeApproach();
 
@@ -437,18 +437,18 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // Slots 3/4/5 of retail's BuzzBehavior vftable (.rdata:0639f564), wired 2026-10-08
     // (claude-code:cmn-ai2): until then these three were plain members and IBehaviorManager's
     // Behavior* dispatch reached the base bodies. Slot 5 is `RET 4` (float timer unused).
-    void Slot3() override { RecomputeApproach(); }             // 3 +0x0c LAB_062c5dd0
-    void Slot4() override { Disengage(); }                     // 4 +0x10 FUN_062c60a0
-    int Slot5(float) override { return EvaluateReadiness(); }  // 5 +0x14 FUN_062c60f0
+    void OnEngage() override { RecomputeApproach(); }             // 3 +0x0c LAB_062c5dd0
+    void OnDisengage() override { Disengage(); }                     // 4 +0x10 FUN_062c60a0
+    int OnEvaluateReadiness(float) override { return EvaluateReadiness(); }  // 5 +0x14 FUN_062c60f0
 
 private:
     // SetCruiseLock (FUN_062d21d0) is Behavior::SetCruiseLock now (common_behavior.h).
@@ -546,7 +546,7 @@ public:
     int ModeSelector0xc;        // +0x0c. FUN_062d20d0 sets =1; EvaluateReadiness() also writes it.
     int UpdateResult10;         // +0x10. Update()'s own tri-state result (EDI at return); FUN_062d20d0 sets =1.
     void* OwnerContext;         // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    IObjDB* ObjectDb;           // +0x18, formerly Opaque18. Written only by Behavior::Slot2
+    IObjDB* ObjectDb;           // +0x18, formerly Opaque18. Written only by Behavior::SetObjectDb
                                 // (.text:0629afd0, the manager's IObjDB; see common_behavior.h).
     float DeltaTime;            // +0x1c. Zeroed by FUN_062d20d0; read constantly by Update().
     // +0x20. Same role/offset as IdleBehavior::BehaviorMgrPtr20 (shared initializer).
@@ -628,13 +628,13 @@ public:
     float Field300;             // +0x300. Set to 300.0f by SetContext().
     unsigned char Field304;     // +0x304. Set to 0 by both SetContext() and RecomputeApproach().
     unsigned char Pad305[0x308 - 0x305];
-    float Field308;              // +0x308. Ctor-uninitialized (first real write is RecomputeApproach()'s
-                                  // reset to 0); per-tick accumulator compared against Field30c in Update().
-    float Field30c;               // +0x30c. Set to 5.0f by RecomputeApproach(). Threshold for Field308.
-    float Field310;                // +0x310. Reset to 0 by RecomputeApproach(); accumulator compared
-                                    // against Field314 in Update().
+    float FastPathElapsed;              // +0x308. Ctor-uninitialized (first real write is RecomputeApproach()'s
+                                  // reset to 0); per-tick accumulator compared against FastPathMaxDuration in Update().
+    float FastPathMaxDuration;               // +0x30c. Set to 5.0f by RecomputeApproach(). Threshold for FastPathElapsed.
+    float AlignedElapsed;                // +0x310. Reset to 0 by RecomputeApproach(); accumulator compared
+                                    // against AfterburnerDelay in Update().
 
-    float Field314;             // +0x314. Ctor 1.5f. Threshold for Field310.
+    float AfterburnerDelay;             // +0x314. Ctor 1.5f. Threshold for AlignedElapsed.
 
     // Names below +0x314 come from the personality keys RecomputeApproach() (.text:062c5dd0)
     // copies in: NavHelper+0x1584 is the SystemManager's pub::AI::Personality, so +0x1618.. is
@@ -671,8 +671,8 @@ public:
     float HeadAwayElapsed;           // +0x340, formerly Field340. Ctor 0. DeltaTime sum in stage 0,
                                      // compared against MaxTimeToHeadAway (.text:062c670d,
                                      // EvaluateReadiness .text:062c60f3).
-    float Field344;                  // +0x344. Set to 300.0f by RecomputeApproach(). The fast path runs
-                                     // only while GetInterceptClearance(...) < Field344 (.text:062c6340).
+    float FastPathRange;                  // +0x344. Set to 300.0f by RecomputeApproach(). The fast path runs
+                                     // only while GetInterceptClearance(...) < FastPathRange (.text:062c6340).
     float PassByRollThrottle;        // +0x348, formerly Field348. Ctor 0; BuzzPassByRollThrottle (the
                                      // z of FaceIdea::SetAxis in PassByStyle 1).
     float HeadTowardEngineThrottle;  // +0x34c, formerly Field34c. Ctor 1.0f; BuzzHeadTowardEngineThrottle
@@ -699,10 +699,10 @@ static_assert(offsetof(BuzzBehavior, WatcherE) == 0x258, "BuzzBehavior::WatcherE
 static_assert(offsetof(BuzzBehavior, Field2f4) == 0x2f4, "BuzzBehavior::Field2f4 offset");
 static_assert(offsetof(BuzzBehavior, Field300) == 0x300, "BuzzBehavior::Field300 offset");
 static_assert(offsetof(BuzzBehavior, Field304) == 0x304, "BuzzBehavior::Field304 offset");
-static_assert(offsetof(BuzzBehavior, Field308) == 0x308, "BuzzBehavior::Field308 offset");
-static_assert(offsetof(BuzzBehavior, Field30c) == 0x30c, "BuzzBehavior::Field30c offset");
-static_assert(offsetof(BuzzBehavior, Field310) == 0x310, "BuzzBehavior::Field310 offset");
-static_assert(offsetof(BuzzBehavior, Field314) == 0x314, "BuzzBehavior::Field314 offset");
+static_assert(offsetof(BuzzBehavior, FastPathElapsed) == 0x308, "BuzzBehavior::FastPathElapsed offset");
+static_assert(offsetof(BuzzBehavior, FastPathMaxDuration) == 0x30c, "BuzzBehavior::FastPathMaxDuration offset");
+static_assert(offsetof(BuzzBehavior, AlignedElapsed) == 0x310, "BuzzBehavior::AlignedElapsed offset");
+static_assert(offsetof(BuzzBehavior, AfterburnerDelay) == 0x314, "BuzzBehavior::AfterburnerDelay offset");
 static_assert(offsetof(BuzzBehavior, BuzzState) == 0x318, "BuzzBehavior::BuzzState offset");
 static_assert(offsetof(BuzzBehavior, HeadTowardStyle) == 0x31c, "BuzzBehavior::HeadTowardStyle offset");
 static_assert(offsetof(BuzzBehavior, PassByStyle) == 0x320, "BuzzBehavior::PassByStyle offset");
@@ -714,7 +714,7 @@ static_assert(offsetof(BuzzBehavior, PassByTime) == 0x334, "BuzzBehavior::PassBy
 static_assert(offsetof(BuzzBehavior, PassByElapsed) == 0x338, "BuzzBehavior::PassByElapsed offset");
 static_assert(offsetof(BuzzBehavior, MaxTimeToHeadAway) == 0x33c, "BuzzBehavior::MaxTimeToHeadAway offset");
 static_assert(offsetof(BuzzBehavior, HeadAwayElapsed) == 0x340, "BuzzBehavior::HeadAwayElapsed offset");
-static_assert(offsetof(BuzzBehavior, Field344) == 0x344, "BuzzBehavior::Field344 offset");
+static_assert(offsetof(BuzzBehavior, FastPathRange) == 0x344, "BuzzBehavior::FastPathRange offset");
 static_assert(offsetof(BuzzBehavior, PassByRollThrottle) == 0x348, "BuzzBehavior::PassByRollThrottle offset");
 static_assert(offsetof(BuzzBehavior, HeadTowardEngineThrottle) == 0x34c, "BuzzBehavior::HeadTowardEngineThrottle offset");
 static_assert(offsetof(BuzzBehavior, HeadTowardTurnThrottle) == 0x350, "BuzzBehavior::HeadTowardTurnThrottle offset");

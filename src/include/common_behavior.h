@@ -15,7 +15,7 @@
 
 #include <cstddef>
 
-struct IObjDB; // common_cobjdb.h -- Behavior::Slot2's argument (pointer-only use here)
+struct IObjDB; // common_cobjdb.h -- Behavior::SetObjectDb's argument (pointer-only use here)
 
 // Common.dll AI/formation-flying state machine family (FormationBehavior and friends).
 //
@@ -170,8 +170,8 @@ float Behavior_InvokeManagerSlotD4(IObjInspect const* Obj, float Value, ThrustEq
 // pointer -- a release/teardown pair, which is what the name records.
 //
 // WHAT THE TARGET IS. `[vtable+0x10]` is BYTE offset 0x10, i.e. vtable index 4 --
-// Behavior::Slot4, the family's own disengage. GuideBehavior already types its two
-// targets (CachedPtr60/CachedPtr64) as `Behavior*` and calls `->Slot4()` there for
+// Behavior::OnDisengage, the family's own disengage. GuideBehavior already types its two
+// targets (CachedPtr60/CachedPtr64) as `Behavior*` and calls `->OnDisengage()` there for
 // real, so the target is a Behavior-family object and +0x28 is that family's
 // Flags28 byte -- the same byte BaseFollowerBehavior_DefaultRequestFlag
 // (LAB_062cd630) sets bit 0x2 of, which this function then clears.
@@ -384,7 +384,7 @@ Transform const* Behavior_InvokeNodeSlotC(void* Node);
 // 2) and FUN_062ecc50 (SetFlagC3, formerly FollowerDirectiveRecord_SetFlagC3) are thiscall on
 // the 0xC8-byte block at SystemManager+0x1364: FGunConvergenceStateBlock members
 // (common_systemmanager.h, common_gunconvergence.cpp; CMN-GC 2026-10-14). Notify callers:
-// EvadeBehavior::Slot7 (.text:062c7e80/062c7ebc, 062c7e98/062c7ed4) and BuzzBehavior::Update
+// EvadeBehavior::OnUpdate (.text:062c7e80/062c7ebc, 062c7e98/062c7ed4) and BuzzBehavior::Update
 // (.text:062c64ec/062c67be, 062c6506/062c67d4); SetFlagC3's: IBehaviorManager::QueueNotification
 // cases 1 / 2 (.text:062d4949 / 062d496c).
 
@@ -398,7 +398,7 @@ Transform const* Behavior_InvokeNodeSlotC(void* Node);
 // <= Owner->PersonalityData.MissileReaction.EvadeBreak / EvadeSlide / EvadeAfterburn
 // MissileReactionTime (Sys+0x17b4 /
 // +0x17b8 / +0x17bc; `TEST AH,0x41; JP false`, so equality is true). Owner (+4) is
-// dereferenced unconditionally. Only caller: EvadeBehavior::Slot7 mode 4. Retail names
+// dereferenced unconditionally. Only caller: EvadeBehavior::OnUpdate mode 4. Retail names
 // unknown; until 2026-10-08 they were EvadeBehavior::ExternalNavHelperCheck3/4/5.
 struct SystemManagerTimerTable;
 bool TimerTableMissileWithinReaction00(SystemManagerTimerTable const* Self);   // FUN_062e8910
@@ -560,8 +560,7 @@ public:
     // those the binder does not run -- item 1991 / the BaseFollower slot-1 item stay
     // `simplified`. (StrafeBehavior's LAB_062c9660 is ported since 2026-10-08.)
     // FULLPORT-DEFERRED: make `= 0` once those three supply an override.
-    virtual bool SetContext(void* Owner, void* Manager, void* Sys)
-    { (void)Owner; (void)Manager; (void)Sys; return true; }
+    virtual bool SetContext(void* Owner, void* Manager, void* Sys) = 0;
     // 2 +0x08. `MOV EAX,[ESP+4]; MOV [ECX+0x18],EAX; RET 4` (0x0629afd0, an ICF fold Ghidra
     // labels CEquip::ConnectServerEquip) -- a plain setter for Behavior's own +0x18, one of the
     // nine fields FUN_062d2020 zeroes. Its one caller is ConnectBehaviorManagerObjectDb
@@ -571,20 +570,20 @@ public:
     // body was empty and no behavior ever received the database. The store goes through the
     // same raw-offset device as SetTickDelta, for the same reason (the +0x04..+0x29 block is
     // still declared on the subclasses, see below). No subclass overrides this slot.
-    virtual void Slot2(IObjDB* ObjectDb);
+    virtual void SetObjectDb(IObjDB* ObjectDb);
     // 3 +0x0c. FUN_062d20d0, decomp-tracker item 1533, fold count 1 -- Behavior's own.
     // Retail: `+0xc = 1; +0x10 = 1; +0x28 &= 0xfe; +0x1c = 0`, i.e. it re-arms the same
     // fields the constructor set (the constructor leaves +0xc = 2), then RET with no
-    // arguments. Written through the same raw-offset device as Slot2 (the +0x04..+0x29
+    // arguments. Written through the same raw-offset device as SetObjectDb (the +0x04..+0x29
     // block is still declared on the subclasses). Derived slot-3 bodies that begin with
-    // `CALL FUN_062d20d0` call it as Behavior::Slot3().
-    virtual void Slot3();
+    // `CALL FUN_062d20d0` call it as Behavior::OnEngage().
+    virtual void OnEngage();
     // 4 +0x10. FUN_062d20f0, decomp-tracker item 1534, fold count 1 -- Behavior's own.
     // Retail: `P = [[this+0x20]+0xc]; if (P) [P+0x64] = 0; byte [this+0x29] = 0` --
     // this+0x20 is the IBehaviorManager, +0x0C its PathfindManager, whose Field_064 is
     // cleared. Derived slot-4 bodies that end in `CALL/JMP FUN_062d20f0` call it as
-    // Behavior::Slot4().
-    virtual void Slot4();
+    // Behavior::OnDisengage().
+    virtual void OnDisengage();
     // 5 +0x14. PURE VIRTUAL in retail (_purecall); NullBehavior's override returns int 1
     // and pops one dword. FULLPORT-DEFERRED: make `= 0` once every subclass overrides it.
     //
@@ -598,11 +597,11 @@ public:
     // .text:062d2dfc `FSTP float ptr [ESI + 0xdc]`. Manager+0xdc is a float accumulator,
     // and it is passed here verbatim. The other site's [ESP+0x14] is the same
     // accumulated per-tick timer.
-    virtual int Slot5(float Value) { (void)Value; return 1; }
+    virtual int OnEvaluateReadiness(float Value) = 0;
     // 6 +0x18 -- ?external_player_evaluate@IBehaviorManager@@QAE?AW4EvaluateResult@@H@Z
     // tail-jumps here. NOTE: the older claim that "the manager passes its own +0xdc
     // through as the context word" was written when +0xdc was thought to be an opaque
-    // context dword; it is a float (see Slot5 above), and it is Slot5 that receives it,
+    // context dword; it is a float (see OnEvaluateReadiness above), and it is OnEvaluateReadiness that receives it,
     // not this slot.
     // Retail's base body is LAB_062cf5e0 `MOV EAX,2; RET 4`, and EvalSkip == 2, so the
     // default below is retail's own answer, not a placeholder.
@@ -615,7 +614,7 @@ public:
     // condition is met: every CONCRETE class in the Behavior family now supplies a slot-7
     // body. The last four holes closed this pass were BaseFollowerBehavior (which covers
     // FormationBehavior and FollowBehavior too, since retail's slot 7 for all three is the
-    // single shared LAB_062cb700 -- see BaseFollowerBehavior::Slot7 below), EvadeBehavior
+    // single shared LAB_062cb700 -- see BaseFollowerBehavior::OnUpdate below), EvadeBehavior
     // (its already-ported Perform() was simply never wired to the slot) and FleeBehavior
     // (LAB_062c72c0, ported this pass).
     //
@@ -628,20 +627,20 @@ public:
     // mem-initialisers, and their static_asserts use sizeof, which is legal on an abstract
     // type), and nothing anywhere constructs a bare `Behavior`.
     //
-    // SetContext (slot 1) and Slot5 stay non-pure. They are pure in retail too, but Goto,
-    // Strafe and BaseFollower do not override SetContext yet and no subclass overrides Slot5,
+    // SetContext (slot 1) and OnEvaluateReadiness stay non-pure. They are pure in retail too, but Goto,
+    // Strafe and BaseFollower do not override SetContext yet and no subclass overrides OnEvaluateReadiness,
     // so `= 0` there would make classes uninstantiable. That half of the debt is still open.
-    virtual int Slot7() = 0;
+    virtual int OnUpdate() = 0;
     // 8 +0x20. Bare `RET` -- a real, empty, zero-argument base implementation.
-    virtual void Slot8() {}
+    virtual void PostUpdate() {}
     // 9 +0x24. `MOV EAX,[ECX+0x10]; RET` (ICF fold Ghidra labels IObjInspectImpl::cobject) --
     // a getter for Behavior's own +0x10 (the subclasses' UpdateResult10). Read through the
     // raw-offset device; until 2026-10-08 this returned a constant 0.
-    virtual int Slot9();
+    virtual int GetStatus();
     // 10 +0x28. `MOV AL,1; RET 4` -- returns true, pops one dword the body never reads.
     // The argument width comes from `RET 4`, and from the confirmed derived override
     // BaseFollowerBehavior_DefaultRequestFlag (LAB_062cd630), which has the same shape and
-    // additionally sets bit 0x2 of +0x28. Declared `void Slot10()` until 2026-09-17, which
+    // additionally sets bit 0x2 of +0x28. Declared `void OnApplyDirective()` until 2026-09-17, which
     // was both the wrong return type and four bytes of caller stack left unpopped.
     //
     // The parameter is NOT unused by callers, only by this base body -- renamed from
@@ -652,7 +651,7 @@ public:
     //
     // TYPE PROMOTED int -> void* 2026-09-17 (claude:common-follower). The old comment here
     // said "do not promote it to `void*` without a deref site"; this pass found two, both
-    // inside BaseFollowerBehavior::Slot7 (LAB_062cb700, item 1390), and they agree:
+    // inside BaseFollowerBehavior::OnUpdate (LAB_062cb700, item 1390), and they agree:
     //   * .text:062cba08 `PUSH EDX; CALL [EAX+0x28]` where EDX == `LEA EDX,[ESP+0x70]`, a
     //     stack-local the two preceding blocks construct as a `pub::AI::DirectiveGotoOp`
     //     (its real ctor is called at 062cb9ce, then +0x0c/+0x1c/+0x50 are filled in).
@@ -663,9 +662,9 @@ public:
     // reads its own parameter's +0x10/+0x14/+0x18/+0x1c/+0x20 -- i.e. it derefs a
     // pub::AI::DirectiveFollowOp. So this slot is "hand the behavior a directive op"; the
     // pointee type varies per subclass, hence `void*` and not one concrete op type.
-    virtual bool Slot10(void* DirectiveOp) { (void)DirectiveOp; return true; }
+    virtual bool OnApplyDirective(void* DirectiveOp) { (void)DirectiveOp; return true; }
     // 11 +0x2c. `XOR AL,AL; RET` -- returns false, no arguments.
-    virtual bool Slot11() { return false; }
+    virtual bool allow_user_steering() { return false; }
     virtual void set_direction(Vector const& Dir) { (void)Dir; }             // 12 +0x30
     virtual void set_throttle(float Throttle) { (void)Throttle; }            // 13 +0x34
     virtual void set_cruise(bool bOn) { (void)bOn; }                        // 14 +0x38
@@ -714,12 +713,12 @@ public:
     virtual bool cancel_behavior(CancelRequestType Request) { (void)Request; return true; }
     // 21 +0x54, 22 +0x58. Empty `RET 4` bodies -- one dword argument each, not zero as
     // declared until 2026-09-17.
-    virtual void Slot21(void* Arg) { (void)Arg; }
-    virtual void Slot22(void* Arg) { (void)Arg; }
+    virtual void OnObjectLeftSystem(void* Arg) { (void)Arg; }
+    virtual void OnEvent(void* Arg) { (void)Arg; }
     // 23 +0x5C. LAB_062c2f50, `AND byte ptr [ECX+0x28],0xfd; RET` -- clears exactly the
     // +0x28 bit slot 10's derived override sets. All 21 Behavior vtables point here
     // (LAB_062c2f50's XREF list); no subclass overrides it. Written with the same raw-offset
-    // device as SetTickDelta/Slot2, since +0x28 is declared on the subclasses.
+    // device as SetTickDelta/SetObjectDb, since +0x28 is declared on the subclasses.
     virtual void cancel_notify();
     virtual IObjRW const* get_target() { return nullptr; }                   // 24 +0x60
     // 25 +0x64. ADDED 2026-09-17 -- previously missing, which left every Behavior object
@@ -737,7 +736,7 @@ public:
     // which shares the identical ICF-folded body; `int` would be equally consistent with
     // the asm and nothing observed distinguishes them, so this one is deliberately typed
     // after its neighbour rather than guessed at semantically.
-    virtual void* Slot26() { return nullptr; }
+    virtual void* GetDockTarget() { return nullptr; }
 
     // ---- Behavior's OWN data block is +0x04..+0x29 ---------------------------------------
     // RECOVERED 2026-09-17 (claude:common-behavior-layout) from the constructor itself,
@@ -769,10 +768,10 @@ public:
     // What IS closed here is the one call site that had to reach into the base by raw offset
     // regardless of which class declares the storage. IBehaviorManager::UpdateBehaviorTick
     // hands the active behavior its accumulated per-tick delta immediately before calling
-    // Slot7(): Common.dll.txt .text:062d335d-062d336a,
+    // OnUpdate(): Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]      ; the manager's own float accumulator
     //     FSTP float ptr [EDI + 0x1c]     ; EDI is a bare Behavior* out of the dispatch table
-    //     CALL dword ptr [EAX + 0x1c]     ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]     ; vtable +0x1c IS OnUpdate
     // An `FSTP float` is a four-byte float store, which is independent confirmation of the
     // constructor's own dword zero at the same offset. The two accessors below own that
     // offset so common_behaviormanager.cpp does not have to open-code it. They are deliberately NOT
@@ -856,21 +855,21 @@ public:
 // Vtable 0639fae4, overrides of Behavior's 27 plus the two this class adds:
 //    0  062cb390  scalar-deleting dtor around FUN_062cb3b0
 //    1  062cb470  SetContext
-//    3  062cb540  Slot3
-//    4  062cb5e0  Slot4
+//    3  062cb540  OnEngage
+//    4  062cb5e0  OnDisengage
 //    5  06391fb0  _purecall
 //    6  06391fb0  _purecall (evaluate)
-//    7  062cb700  Slot7, the subtree's per-tick body (no subclass overrides it)
-//    8  062cb6d0  Slot8
+//    7  062cb700  OnUpdate, the subtree's per-tick body (no subclass overrides it)
+//    8  062cb6d0  PostUpdate
 //   10  06391fb0  _purecall -- Behavior's concrete slot 10 is re-pured here
 //   16  062ed730  set_afterburner: bare `RET 4`
 //   17  062cbfc0  slide_strafe_burst: FUN_062e9030(Sys+0x18, 0), the argument replaced by 0
 //   19  0629ba00  allow_head_tracking: `XOR AL,AL; RET`
-//   21  062cf300  Slot21
-//   22  062cbea0  Slot22
-//   27  06391fb0  _purecall, Slot27 (void, no arguments: the one call site .text:062cbcbd
+//   21  062cf300  OnObjectLeftSystem
+//   22  062cbea0  OnEvent
+//   27  06391fb0  _purecall, UpdateFollowerSteering (void, no arguments: the one call site .text:062cbcbd
 //                 pushes nothing and discards EAX)
-//   28  06391fb0  _purecall, Slot28 (Vector by value: the `RET 4` pops MSVC's hidden
+//   28  06391fb0  _purecall, GetRotatedOffset (Vector by value: the `RET 4` pops MSVC's hidden
 //                 return-buffer pointer -- .text:062cbc2d pushes a bare local and hands the
 //                 returned EAX to FUN_062c50c0, which copies three dwords out of it)
 // All four _purecall slots are `= 0` below; both subclasses override every one of them.
@@ -894,17 +893,17 @@ public:
     // Slot 1, LAB_062cb470 (RET 0xc).
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
     // Slot 3, FUN_062cb540.
-    void Slot3() override;
+    void OnEngage() override;
     // Slot 4, FUN_062cb5e0.
-    void Slot4() override;
+    void OnDisengage() override;
     // Slots 5, 6 and 10 are _purecall in this table.
-    int Slot5(float Value) override = 0;
+    int OnEvaluateReadiness(float Value) override = 0;
     EvaluateResult evaluate(unsigned int Context) override = 0;
     // Slot 7, LAB_062cb700 (488 instructions).
-    int Slot7() override;
+    int OnUpdate() override;
     // Slot 8, LAB_062cb6d0.
-    void Slot8() override;
-    bool Slot10(void* DirectiveOp) override = 0;
+    void PostUpdate() override;
+    bool OnApplyDirective(void* DirectiveOp) override = 0;
     // Slot 16, 062ed730: a bare `RET 4`.
     void set_afterburner(bool bOn) override { (void)bOn; }
     // Slot 17, LAB_062cbfc0.
@@ -913,15 +912,15 @@ public:
     bool allow_head_tracking() override { return false; }
     // Slot 21, LAB_062cf300 (RET 4). The argument is an object id (the manager's loop at
     // .text:062d405c hands every entry the dword at [Data+8]).
-    void Slot21(void* Arg) override;
+    void OnObjectLeftSystem(void* Arg) override;
     // Slot 22, FUN_062cbea0 (RET 4). The argument is the manager's FBehaviorManagerEvent.
-    void Slot22(void* Arg) override;
+    void OnEvent(void* Arg) override;
     // Slots 27 and 28, _purecall here.
-    virtual void Slot27() = 0;
-    virtual Vector Slot28() = 0;
+    virtual void UpdateFollowerSteering() = 0;
+    virtual Vector GetRotatedOffset() = 0;
 
 protected:
-    // FUN_062cbcf0 (RET 4), Slot7's "final leg" payload, called at .text:062cbca4 with
+    // FUN_062cbcf0 (RET 4), OnUpdate's "final leg" payload, called at .text:062cbca4 with
     // DeltaTime. A switch on SystemManager+0x1810 (0..3; anything above 3 does nothing).
     void UpdateTickPayload(float Delta);
 
@@ -929,11 +928,11 @@ public:
     // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
     int TypeId;                     // +0x04, FUN_062d2020's argument
     unsigned CachedHandle08;        // +0x08, the binder's Owner->get_id()
-    int ModeSelector0xc;            // +0x0c, Slot5's result
-    int UpdateResult;               // +0x10, Slot7's result
+    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result
+    int UpdateResult;               // +0x10, OnUpdate's result
     void* OwnerContext;             // +0x14, the owner IObjRW* (binder)
-    unsigned char Opaque18[0x1c - 0x18];
-    float DeltaTime;                // +0x1c, stored by the manager before Slot7
+    IObjDB* ObjectDb;
+    float DeltaTime;                // +0x1c, stored by the manager before OnUpdate
     IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
     SystemManager* NavHelper;       // +0x24 (binder)
     unsigned char Flags28;          // +0x28, bit 1 set/cleared by slot 10
@@ -941,7 +940,7 @@ public:
     unsigned char Pad2a[0x2c - 0x2a];
 
     // ---- BaseFollowerBehavior's own block, built by FUN_062cb2b0 ----
-    // +0x2c: the ship being followed. Slot7 re-points it every tick from the SystemManager's
+    // +0x2c: the ship being followed. OnUpdate re-points it every tick from the SystemManager's
     // +0x1364 directive record (FUN_062ecaf0); FormationBehavior's slots 5/27 from
     // FUN_062ecab0 / FUN_062ecad0, FollowBehavior's slot 10 from the directive op.
     BaseWatcher LeadWatcher;        // +0x2c
@@ -951,25 +950,25 @@ public:
     BreakAwayIdea BreakAway;        // +0x1c8 (ctor FUN_062d8970)
     AfterburnerIdea Afterburner;    // +0x264 (ctor FUN_062da500)
     // +0x278 / +0x27c: the manager's own Dock (BehaviorDispatchTable[7], Manager+0x190) and
-    // Goto (BehaviorDispatchTable[2], Manager+0x17c) behaviors, captured by Slot3
-    // (062cb58f / 062cb5c7). Slot7 drives them as child behaviors: it stores its DeltaTime
+    // Goto (BehaviorDispatchTable[2], Manager+0x17c) behaviors, captured by OnEngage
+    // (062cb58f / 062cb5c7). OnUpdate drives them as child behaviors: it stores its DeltaTime
     // to their +0x1c and dispatches slots 3/4/7/10, the manager's own protocol.
     Behavior* DockDelegate;         // +0x278
     Behavior* GotoDelegate;         // +0x27c
-    unsigned char Flag280;          // +0x280: Slot22 sets it when the owner left a trade lane
+    unsigned char Flag280;          // +0x280: OnEvent sets it when the owner left a trade lane
     unsigned char Flag281;          // +0x281: a trade-lane order was handed to go_tradelane
     unsigned char Flag282;          // +0x282: DockDelegate is running
-    unsigned char Flag283;          // +0x283: Slot3 latches the owner's is_player()
+    unsigned char Flag283;          // +0x283: OnEngage latches the owner's is_player()
     unsigned char Flag284;          // +0x284: GotoDelegate is running
     unsigned char Flag285;          // +0x285: the record's +0xb0 order was consumed
     unsigned char Pad286[2];
-    int Field288;                   // +0x288: Slot3 zeroes it; no reader found in this class
-    unsigned char Flag28c;          // +0x28c: FormationBehavior::Slot3 sets it from is_player()
+    int Field288;                   // +0x288: OnEngage zeroes it; no reader found in this class
+    unsigned char Flag28c;          // +0x28c: FormationBehavior::OnEngage sets it from is_player()
     unsigned char Pad28d[3];
-    // +0x290: FormationBehavior: the owner's get_formation_offset (Slot3, Slot27);
+    // +0x290: FormationBehavior: the owner's get_formation_offset (OnEngage, UpdateFollowerSteering);
     // FollowBehavior: the follow offset its slot 10 copies from the directive op.
     Vector Offset290;               // +0x290
-    int Field29c;                   // +0x29c: Slot4 zeroes it; no reader found in this class
+    int Field29c;                   // +0x29c: OnDisengage zeroes it; no reader found in this class
 };
 static_assert(offsetof(BaseFollowerBehavior, TypeId) == 0x04, "BaseFollowerBehavior::TypeId offset");
 static_assert(offsetof(BaseFollowerBehavior, ModeSelector0xc) == 0x0c, "BaseFollowerBehavior::ModeSelector0xc offset");
@@ -1005,10 +1004,10 @@ static_assert(sizeof(BaseFollowerBehavior) == 0x2a0, "BaseFollowerBehavior size 
 // DockBehavior's and lives in common_dockbehavior.cpp (items 1279/1285).
 //
 // Own slots (the rest are BaseFollowerBehavior's):
-//    3  FUN_062cc3b0  Slot3          4  LAB_062cc410  Slot4
-//    5  FUN_062cc030  Slot5          6  LAB_062cc0d0  evaluate
-//   10  LAB_062cd630  Slot10        12  LAB_062cc990  set_direction
-//   27  LAB_062cc470  Slot27        28  LAB_062cc8f0  Slot28
+//    3  FUN_062cc3b0  OnEngage          4  LAB_062cc410  OnDisengage
+//    5  FUN_062cc030  OnEvaluateReadiness          6  LAB_062cc0d0  evaluate
+//   10  LAB_062cd630  OnApplyDirective        12  LAB_062cc990  set_direction
+//   27  LAB_062cc470  UpdateFollowerSteering        28  LAB_062cc8f0  GetRotatedOffset
 // Re-ported 2026-10-08 (claude-code:cmn-ai5): slots 3/4/5/6/12 were unbound or empty.
 // ============================================================================
 class FormationBehavior : public BaseFollowerBehavior
@@ -1019,36 +1018,36 @@ public:
     explicit FormationBehavior(int InTypeId);
 
     // Slot 3, FUN_062cc3b0.
-    void Slot3() override;
+    void OnEngage() override;
     // Slot 4, LAB_062cc410.
-    void Slot4() override;
+    void OnDisengage() override;
     // Slot 5, FUN_062cc030 (RET 4, argument unread).
-    int Slot5(float Value) override;
+    int OnEvaluateReadiness(float Value) override;
     // Slot 6, LAB_062cc0d0 (RET 4, argument unread): 1 when the owner's target is a valid
     // formation candidate, else 2.
     EvaluateResult evaluate(unsigned int Context) override;
     // Slot 10, LAB_062cd630: `OR byte [ECX+0x28],0x2; MOV AL,1; RET 4` (shared with
     // IdleBehavior's slot 10).
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
     // Slot 12, LAB_062cc990 (RET 4).
     void set_direction(Vector const& Dir) override;
 
     // Slot 27, LAB_062cc470 (362 instructions): place the ship in the leader's formation slot.
-    void Slot27() override;
+    void UpdateFollowerSteering() override;
     // Slot 28, LAB_062cc8f0 (`RET 4` = hidden return buffer): the owner's formation offset
     // rotated into the leader's frame.
-    Vector Slot28() override;
+    Vector GetRotatedOffset() override;
 
     // ---- FormationBehavior's own fields (+0x2a0..+0x2b8) ----
-    // +0x2a0 / +0x2a4: the standoff Slot27 adds to the own physical radius -- +0x2a4 when
+    // +0x2a0 / +0x2a4: the standoff UpdateFollowerSteering adds to the own physical radius -- +0x2a4 when
     // cruising outside a trade lane, +0x2a0 otherwise. Ctor 200.0f / 500.0f (062cc007/062cc011).
     float StandoffDistance2a0;       // +0x2a0
     float CruiseStandoffDistance2a4; // +0x2a4
-    // +0x2a8: set_direction writes 1 (non-zero direction) or 0; Slot3 clears it; Slot27
+    // +0x2a8: set_direction writes 1 (non-zero direction) or 0; OnEngage clears it; UpdateFollowerSteering
     // steers along FaceAxis2ac while it is set. Ctor 0.
     unsigned char bDirectionSet2a8;  // +0x2a8
     unsigned char Pad2a9[3];
-    // +0x2ac: set_direction's (-y*k, -x*k, -z), the first two clamped to [-1, 1]; Slot27 hands
+    // +0x2ac: set_direction's (-y*k, -x*k, -z), the first two clamped to [-1, 1]; UpdateFollowerSteering hands
     // it to FaceIdea::SetAxis. Not ctor-initialised in retail.
     Vector FaceAxis2ac;              // +0x2ac
 };

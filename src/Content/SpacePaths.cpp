@@ -972,7 +972,7 @@ void __cdecl SetFormationAttitudes(FSystemInfo* System, unsigned int ShipId, uns
         for (std::vector<FContentShipBase*>::iterator Member = ShipMembers.begin();
              Member != ShipMembers.end(); ++Member)
         {
-            if ((*Member)->Slot04())
+            if ((*Member)->IsNpcShip())
             {
                 int MemberRep = (*Member)->ReputationHandle->GetReputation();
                 pub::Reputation::SetAttitude(MemberRep, OtherRep, Attitude);
@@ -1000,12 +1000,12 @@ void __cdecl SetFormationAttitudes(FSystemInfo* System, unsigned int ShipId, uns
     for (std::vector<FContentShipBase*>::iterator Member = ShipMembers.begin();
          Member != ShipMembers.end(); ++Member)
     {
-        if ((*Member)->Slot04())
+        if ((*Member)->IsNpcShip())
         {
             for (std::vector<FContentShipBase*>::iterator Target = OtherMembers.begin();
                  Target != OtherMembers.end(); ++Target)
             {
-                if ((*Target)->Slot04())
+                if ((*Target)->IsNpcShip())
                 {
                     int TargetRep = (*Target)->ReputationHandle->GetReputation();
                     int MemberRep = (*Member)->ReputationHandle->GetReputation();
@@ -1033,7 +1033,7 @@ void __cdecl SetFormationAttitudes(FSystemInfo* System, unsigned int ShipId, uns
             for (std::vector<FContentShipBase*>::iterator Target = OtherMembers.begin();
                  Target != OtherMembers.end(); ++Target)
             {
-                if (!(*Target)->Slot04())
+                if (!(*Target)->IsNpcShip())
                     continue;
                 int MemberRep;
                 pub::SpaceObj::GetRep((*Member)->SpaceObjId, MemberRep);

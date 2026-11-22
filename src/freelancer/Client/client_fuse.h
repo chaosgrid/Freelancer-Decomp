@@ -89,8 +89,8 @@ class StartExplosionAction : public ClientFuseAction
 public:
     StartExplosionAction();
 
-    FuseAction* Slot04() const override;       // FUN_0052a0f0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_0052b020
+    FuseAction* Clone() const override;       // FUN_0052a0f0
+    bool Read(INI_Reader& Reader) override;  // FUN_0052b020
     // FUN_0052b290: the explosion archetype resolved into +0x3c and AddRef'd (FUN_00536100),
     // then FuseAction::Load (tail JMP).
     int Load() override;
@@ -103,7 +103,8 @@ public:
     void UnTrigger(unsigned short SubObjId) override; // LAB_0052b430
 
 protected:
-    virtual void Slot30(StartExplosionAction const& Other); // FUN_0052b110
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(StartExplosionAction const& Other); // FUN_0052b110
 
 public:
     ID_String Explosion;                      // +0x28 "explosion"
@@ -120,8 +121,8 @@ class StartCameraParticlesAction : public ClientFuseAction
 public:
     StartCameraParticlesAction();
 
-    FuseAction* Slot04() const override;       // FUN_0052a1b0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_0052b2e0
+    FuseAction* Clone() const override;       // FUN_0052a1b0
+    bool Read(INI_Reader& Reader) override;  // FUN_0052b2e0
     // FUN_0052b4a0: +0x2c = FUN_0040f080(+0x28), a found arch referenced (FUN_0040e960(0)); then
     // FuseAction::Load (tail JMP).
     int Load() override;
@@ -135,7 +136,8 @@ public:
     void UnTrigger(unsigned short SubObjId) override; // LAB_0052b430
 
 protected:
-    virtual void Slot30(StartCameraParticlesAction const& Other); // FUN_0052b350 (ICF)
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(StartCameraParticlesAction const& Other); // FUN_0052b350 (ICF)
 
 public:
     ID_String Effect;         // +0x28 "effect"
@@ -162,8 +164,8 @@ public:
     // ~FuseAction.
     ~StartEffectAction() override;
 
-    FuseAction* Slot04() const override;       // FUN_0052a280
-    bool Slot08(INI_Reader& Reader) override;  // FUN_0052b5f0
+    FuseAction* Clone() const override;       // FUN_0052a280
+    bool Read(INI_Reader& Reader) override;  // FUN_0052b5f0
     // FUN_0052bf40: +0x40 = FUN_0040f080(+0x28), a found arch referenced (FUN_0040e960(0)); then
     // FuseAction::Load (tail JMP).
     int Load() override;
@@ -178,7 +180,8 @@ public:
     void UnTrigger(unsigned short SubObjId) override; // FUN_0052be90
 
 protected:
-    virtual void Slot30(StartEffectAction const& Other); // FUN_0052b8c0
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(StartEffectAction const& Other); // FUN_0052b8c0
 
 public:
     ID_String Effect;                               // +0x28 "effect"
@@ -198,15 +201,16 @@ class ClientImpulseAction : public ClientFuseAction
 public:
     ClientImpulseAction();
 
-    FuseAction* Slot04() const override;       // FUN_0052a360
-    bool Slot08(INI_Reader& Reader) override;  // FUN_0052bf90
+    FuseAction* Clone() const override;       // FUN_0052a360
+    bool Read(INI_Reader& Reader) override;  // FUN_0052bf90
     // LAB_0052c0c0 (RET 8): unless already triggered, every ObjDB kind-10 object within radius
     // of the host's hardpoint (+ pos_offset) gets a linear impulse (PhySys::LinearImpulse);
     // then the FuseAction::Trigger tail (inlined in retail).
     void Trigger(unsigned SourceId, unsigned short SubObjId) override;
 
 protected:
-    virtual void Slot30(ClientImpulseAction const& Other); // FUN_0052c080
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(ClientImpulseAction const& Other); // FUN_0052c080
 
 public:
     CacheString Hardpoint; // +0x28 "hardpoint" (NOT copied by Slot30 -- retail)
@@ -223,13 +227,14 @@ class ClientIgniteFuseAction : public ClientFuseAction
 public:
     ClientIgniteFuseAction();
 
-    FuseAction* Slot04() const override;       // FUN_0052a430
-    bool Slot08(INI_Reader& Reader) override;  // FUN_0052c340
+    FuseAction* Clone() const override;       // FUN_0052a430
+    bool Read(INI_Reader& Reader) override;  // FUN_0052c340
     int Load() override;                       // LAB_0052c3b0
     int UnLoad() override;                     // LAB_0052c420
 
 protected:
-    virtual void Slot30(ClientIgniteFuseAction const& Other); // FUN_0052b350 (ICF)
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(ClientIgniteFuseAction const& Other); // FUN_0052b350 (ICF)
 
 public:
     ID_String FuseId;  // +0x28 "fuse"

@@ -120,7 +120,7 @@ bool ClientFuse::Read(INI_Reader& Reader)
         if (Action != nullptr)
         {
             // 0052a071 vt+8; a failed read returns false and leaks the action (retail).
-            if (!Action->Slot08(Reader))
+            if (!Action->Read(Reader))
                 return false;
             // 0052a078-0052a094: FLD [action+4] -> key, FUN_0052aae0 multimap insert.
             Actions.insert(std::multimap<float, FuseAction*>::value_type(
@@ -183,15 +183,15 @@ StartExplosionAction::StartExplosionAction()
     PosOffset.z = 0.0f;
 }
 
-FuseAction* StartExplosionAction::Slot04() const
+FuseAction* StartExplosionAction::Clone() const
 {
     // FUN_0052a0f0: new 0x40 object, then its slot 12 copies *this.
     StartExplosionAction* Copy = new StartExplosionAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool StartExplosionAction::Slot08(INI_Reader& Reader)
+bool StartExplosionAction::Read(INI_Reader& Reader)
 {
     // FUN_0052b020.
     while (Reader.read_value())
@@ -287,7 +287,7 @@ void StartExplosionAction::UnTrigger(unsigned short SubObjId)
     UnTriggerAndSettle(SubObjId);
 }
 
-void StartExplosionAction::Slot30(StartExplosionAction const& Other)
+void StartExplosionAction::CopyArchProperties(StartExplosionAction const& Other)
 {
     // FUN_0052b110: CopyArchProperties, +0x28, +0x2c, +0x30..+0x38. +0x3c is not copied.
     FuseAction::CopyArchProperties(Other);
@@ -307,15 +307,15 @@ StartCameraParticlesAction::StartCameraParticlesAction()
     Effect.clear();
 }
 
-FuseAction* StartCameraParticlesAction::Slot04() const
+FuseAction* StartCameraParticlesAction::Clone() const
 {
     // FUN_0052a1b0.
     StartCameraParticlesAction* Copy = new StartCameraParticlesAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool StartCameraParticlesAction::Slot08(INI_Reader& Reader)
+bool StartCameraParticlesAction::Read(INI_Reader& Reader)
 {
     // FUN_0052b2e0.
     while (Reader.read_value())
@@ -379,7 +379,7 @@ void StartCameraParticlesAction::UnTrigger(unsigned short SubObjId)
     UnTriggerAndSettle(SubObjId);
 }
 
-void StartCameraParticlesAction::Slot30(StartCameraParticlesAction const& Other)
+void StartCameraParticlesAction::CopyArchProperties(StartCameraParticlesAction const& Other)
 {
     // FUN_0052b350: CopyArchProperties, +0x28.
     FuseAction::CopyArchProperties(Other);
@@ -413,15 +413,15 @@ StartEffectAction::~StartEffectAction()
     CliEffectCompanionClear(Companion);
 }
 
-FuseAction* StartEffectAction::Slot04() const
+FuseAction* StartEffectAction::Clone() const
 {
     // FUN_0052a280.
     StartEffectAction* Copy = new StartEffectAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool StartEffectAction::Slot08(INI_Reader& Reader)
+bool StartEffectAction::Read(INI_Reader& Reader)
 {
     // FUN_0052b5f0.
     while (Reader.read_value())
@@ -670,7 +670,7 @@ void StartEffectAction::UnTrigger(unsigned short SubObjId)
     bTriggered = false;
 }
 
-void StartEffectAction::Slot30(StartEffectAction const& Other)
+void StartEffectAction::CopyArchProperties(StartEffectAction const& Other)
 {
     // FUN_0052b8c0: CopyArchProperties, +0x28, +0x2c, then the inlined vector::operator=
     // (skipped for self-assignment; elements are copied bitwise, FUN_0052c7d0).
@@ -696,15 +696,15 @@ ClientImpulseAction::ClientImpulseAction()
     PosOffset.z = 0.0f;
 }
 
-FuseAction* ClientImpulseAction::Slot04() const
+FuseAction* ClientImpulseAction::Clone() const
 {
     // FUN_0052a360.
     ClientImpulseAction* Copy = new ClientImpulseAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool ClientImpulseAction::Slot08(INI_Reader& Reader)
+bool ClientImpulseAction::Read(INI_Reader& Reader)
 {
     // FUN_0052bf90.
     while (Reader.read_value())
@@ -834,7 +834,7 @@ void ClientImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
     FuseAction::Trigger(SourceId, SubObjId);
 }
 
-void ClientImpulseAction::Slot30(ClientImpulseAction const& Other)
+void ClientImpulseAction::CopyArchProperties(ClientImpulseAction const& Other)
 {
     // FUN_0052c080: CopyArchProperties, +0x2c, +0x30, +0x34..+0x3c. The hardpoint at +0x28 is
     // NOT copied, so a clone keeps the cleared CacheString of its constructor (retail).
@@ -855,15 +855,15 @@ ClientIgniteFuseAction::ClientIgniteFuseAction()
     FuseId.clear();
 }
 
-FuseAction* ClientIgniteFuseAction::Slot04() const
+FuseAction* ClientIgniteFuseAction::Clone() const
 {
     // FUN_0052a430.
     ClientIgniteFuseAction* Copy = new ClientIgniteFuseAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool ClientIgniteFuseAction::Slot08(INI_Reader& Reader)
+bool ClientIgniteFuseAction::Read(INI_Reader& Reader)
 {
     // FUN_0052c340.
     while (Reader.read_value())
@@ -903,7 +903,7 @@ int ClientIgniteFuseAction::UnLoad()
     return FuseAction::UnLoad();
 }
 
-void ClientIgniteFuseAction::Slot30(ClientIgniteFuseAction const& Other)
+void ClientIgniteFuseAction::CopyArchProperties(ClientIgniteFuseAction const& Other)
 {
     // FUN_0052b350 (same body as StartCameraParticlesAction's): CopyArchProperties, +0x28.
     // bFuseLoaded is not copied.

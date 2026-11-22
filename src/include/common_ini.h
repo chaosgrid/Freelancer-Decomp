@@ -338,7 +338,7 @@ class ILoadingScreen
 {
 public:
     virtual void Refresh() = 0;
-    virtual void Slot01() = 0;   // +0x04
+    virtual void Start() = 0;   // +0x04
 };
 
 COMMON_API void __cdecl RegisterLoadingScreen(ILoadingScreen* Screen);

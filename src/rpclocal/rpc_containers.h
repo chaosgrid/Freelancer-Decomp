@@ -183,8 +183,8 @@ struct FRpcCollisionGroupNode {
     // The type below stays `unsigned int` because every other user of this node moves
     // the pair as raw dwords; the codec bit-casts. TODO: retype +0x04 to float once the
     // remaining movers are ported and can be checked in one pass.
-    unsigned int Field_0x00;        // +0x08  low byte == CollisionGroupDesc::Id
-    unsigned int Field_0x04;        // +0x0c  float health fraction, bit pattern
+    unsigned int Id;        // +0x08  low byte == CollisionGroupDesc::Id
+    unsigned int HealthBits;        // +0x0c  float health fraction, bit pattern
 };
 
 static_assert(sizeof(FRpcCollisionGroupNode) == 0x10,
@@ -204,8 +204,8 @@ static_assert(sizeof(FRpcCollisionGroupList) == 0x0c,
 
 // The 8-byte element on its own, for callers that only want the value.
 struct FRpcCollisionGroupDescMirror {
-    unsigned int Field_0x00;
-    unsigned int Field_0x04;
+    unsigned int Id;
+    unsigned int HealthBits;
 };
 
 static_assert(sizeof(FRpcCollisionGroupDescMirror) == 8,
@@ -230,7 +230,7 @@ struct FRpcEquipWireRecord {
     //            into EquipDesc+0x18, without a setter, exactly as caseD_55 does it.
     // The other four users (06d8c79c, 06d8d00d, 06d8d15d and FUN_06d913f0 at 06d914e7)
     // only zero it and copy it, which is why it read as padding for so long.
-    unsigned char Field_0x0f;       // +0x0f  EquipDesc::bMission
+    unsigned char bMission;       // +0x0f  EquipDesc::bMission
     unsigned short HardpointSize;   // +0x10  strlen + 1, or 0 for internal equipment
     unsigned char Pad_0x12[2];      // +0x12
     char* Hardpoint;                // +0x14  owned by the record
@@ -408,7 +408,7 @@ struct FRpcCollisionGroupNodeIterator {
     explicit FRpcCollisionGroupNodeIterator(const FRpcCollisionGroupNode* InNode)
         : Node(InNode) {}
     const FRpcCollisionGroupDescMirror& operator*() const {
-        return *reinterpret_cast<const FRpcCollisionGroupDescMirror*>(&Node->Field_0x00);
+        return *reinterpret_cast<const FRpcCollisionGroupDescMirror*>(&Node->Id);
     }
     FRpcCollisionGroupNodeIterator& operator++() {
         Node = Node->Next;
@@ -605,33 +605,33 @@ struct FRpcCreateObjectHead {
     FRpcCreateObjectHead(const FRpcCreateObjectHead&) = delete;
     FRpcCreateObjectHead& operator=(const FRpcCreateObjectHead&) = delete;
 
-    unsigned int Field_0x00;                // +0x00 <- src+0x04
-    unsigned int Field_0x04;                // +0x04 <- src+0x08
-    unsigned int Field_0x08;                // +0x08 <- src+0x0c
+    unsigned int ObjId;                // +0x00 <- src+0x04
+    unsigned int ArchetypeNickname;                // +0x04 <- src+0x08
+    unsigned int DockingBaseId;                // +0x08 <- src+0x0c
     int VibeGroupId;                        // +0x0c <- src+0x10
-    unsigned int Field_0x10;                // +0x10 <- src+0x14
-    unsigned int Field_0x14;                // +0x14 <- src+0x18
-    unsigned int Field_0x18;                // +0x18 <- src+0x1c
-    unsigned int Field_0x1c;                // +0x1c <- src+0x20
+    unsigned int CostumeHead;                // +0x10 <- src+0x14
+    unsigned int CostumeBody;                // +0x14 <- src+0x18
+    unsigned int CostumeLeftHand;                // +0x18 <- src+0x1c
+    unsigned int CostumeRightHand;                // +0x1c <- src+0x20
     int IdCount;                            // +0x20 <- src+0x44
     unsigned int* Ids;                      // +0x24    operator new(IdCount << 2)
-    unsigned int Field_0x28;                // +0x28 <- src+0x48
-    float Field_0x2c;                       // +0x2c <- src+0x4c
-    float Field_0x30;                       // +0x30 <- src+0x50
-    float Field_0x34;                       // +0x34 <- src+0x54
+    unsigned int VoiceId;                // +0x28 <- src+0x48
+    float PosX;                       // +0x2c <- src+0x4c
+    float PosY;                       // +0x30 <- src+0x50
+    float PosZ;                       // +0x34 <- src+0x54
     // CEqObjCreateInfo::Orientation (src+0x58..+0x64), a unit float quaternion. It
     // ships as four quantized bytes in the order x,y,z,w -- the encoder FLDs all four as
     // `float ptr` (06da398f/39a3/39b3/39c5) and scales by 127.0, the decoder sign-extends
     // the byte back through 1/127 (06da42ed..06da433c).
-    float Field_0x38;                       // +0x38 <- src+0x58  quaternion w
-    float Field_0x3c;                       // +0x3c <- src+0x5c  quaternion x
-    float Field_0x40;                       // +0x40 <- src+0x60  quaternion y
-    float Field_0x44;                       // +0x44 <- src+0x64  quaternion z
+    float OrientW;                       // +0x38 <- src+0x58  quaternion w
+    float OrientX;                       // +0x3c <- src+0x5c  quaternion x
+    float OrientY;                       // +0x40 <- src+0x60  quaternion y
+    float OrientZ;                       // +0x44 <- src+0x64  quaternion z
     // +0x48: an INTEGER hit-point count, not a float -- 06da3a9c `FILD dword ptr
     // [EBP+0x68]` on the way out and 06da4394 stores ftol's long back into it. It ships
-    // as one byte of percentage against Archetype::GetArchMaxHitPts(Field_0x04).
-    unsigned int Field_0x48;                // +0x48 <- src+0x68  current hit points
-    unsigned int Field_0x4c;                // +0x4c <- src+0x6c
+    // as one byte of percentage against Archetype::GetArchMaxHitPts(ArchetypeNickname).
+    unsigned int HitPts;                // +0x48 <- src+0x68  current hit points
+    unsigned int LoadoutId;                // +0x4c <- src+0x6c
     FRpcEquipWireHandle Equipment;          // +0x50    packet+0x70, FUN_06d91580's this
 };
 
@@ -682,8 +682,8 @@ void RpcCollisionGroupListAssignRange(FRpcCollisionGroupList* List, TIterator Fi
     FRpcCollisionGroupNode* Node = Dummy->Next;
     while (Node != Dummy && First != Last) {
         const unsigned int* Value = reinterpret_cast<const unsigned int*>(&(*First));
-        Node->Field_0x00 = Value[0];
-        Node->Field_0x04 = Value[1];
+        Node->Id = Value[0];
+        Node->HealthBits = Value[1];
         Node = Node->Next;
         ++First;
     }
@@ -716,8 +716,8 @@ void RpcCollisionGroupListAssignRange(FRpcCollisionGroupList* List, TIterator Fi
         Dummy->Prev = New;
         New->Prev->Next = New;
         const unsigned int* Value = reinterpret_cast<const unsigned int*>(&(*First));
-        New->Field_0x00 = Value[0];
-        New->Field_0x04 = Value[1];
+        New->Id = Value[0];
+        New->HealthBits = Value[1];
         ++List->Size;
         ++First;
     }
@@ -767,8 +767,8 @@ __declspec(dllexport) void RpcCollisionGroupListFromWire(std::list<CollisionGrou
 // ---------------------------------------------------------------------------
 struct FPayloadServerCreateSolar {
     FRpcCreateObjectWire Common;    // retail +0x00 .. +0x7b; the tail follows at sizeof
-    unsigned char Field_0x7c;       // +0x7c <- src+0xad
-    unsigned char Field_0x7d;       // +0x7d <- src+0xa8
+    unsigned char bDestructible;       // +0x7c <- src+0xad
+    unsigned char bMarkedBy;       // +0x7d <- src+0xa8
     unsigned char Pad_0x7e[2];      // +0x7e
     unsigned int NameASize;         // +0x80
     void* NameABuffer;              // +0x84
@@ -807,30 +807,30 @@ struct FPayloadServerCreateSolar {
 // ---------------------------------------------------------------------------
 struct FPayloadServerCreateShip {
     FRpcCreateObjectWire Common;    // retail +0x00 .. +0x7b; the tail follows at sizeof
-    unsigned char Field_0x7c;       // +0x7c <- src+0xdc  (06d8945c read / 06d89462 store,
+    unsigned char bUsingTradelane;       // +0x7c <- src+0xdc  (06d8945c read / 06d89462 store,
                                     //        `MOV byte ptr [EAX + 0x9c],DL` == payload+0x7c;
                                     //        the old 06d8943e was inside a CALL opcode)
     unsigned char Pad_0x7d[3];      // +0x7d
-    unsigned int Field_0x80;        // +0x80 <- src+0xb8
-    float Field_0x84;               // +0x84 <- src+0xbc  (receiver FLDs it, 06d820af)
-    float Field_0x88;               // +0x88 <- src+0xc0  (06d820a9)
-    unsigned int Field_0x8c;        // +0x8c <- src+0xc4
-    float Field_0x90;               // +0x90 <- src+0xc8  (06d8208c)
-    float Field_0x94;               // +0x94 <- src+0xcc  (06d82083)
+    unsigned int VelXBits;        // +0x80 <- src+0xb8
+    float VelY;               // +0x84 <- src+0xbc  (receiver FLDs it, 06d820af)
+    float VelZ;               // +0x88 <- src+0xc0  (06d820a9)
+    unsigned int AngVelXBits;        // +0x8c <- src+0xc4
+    float AngVelY;               // +0x90 <- src+0xc8  (06d8208c)
+    float AngVelZ;               // +0x94 <- src+0xcc  (06d82083)
     // CORRECTED 2026-09-17 by the outer wire slots: this is a FLOAT, not a dword. The
     // encoder 06d97e47 does `FLD float ptr [EBX+0xb8]` (packet+0xb8 == payload+0x98) and
     // quantizes it with the 127.0 scale; the decoder 06d9834c..06d9835d sign-extends the
     // byte back (`MOVSX EAX,CL`) and FSTPs 1/127 * it into the same slot. The sender and
     // the receiver only ever MOV it, which is why the type was invisible until now.
-    float Field_0x98;               // +0x98 <- src+0xd0, [-1,+1], one quantized byte
+    float Throttle;               // +0x98 <- src+0xd0, [-1,+1], one quantized byte
     // +0x9c is the wire's own discriminator as well as a value: the encoder sets flag
-    // bit 0x04 from `Field_0x9c != 0` (06d97d96) and only then ships its LOW BYTE
-    // (06d97f09) plus Field_0xa4 -- and the display name instead of the two FmtStrs.
-    unsigned int Field_0x9c;        // +0x9c <- src+0xac
-    unsigned short Field_0xa0;      // +0xa0 <- LOW WORD of src+0xb0
-    unsigned char Field_0xa2;       // +0xa2 <- LOW BYTE of src+0xb4
+    // bit 0x04 from `OwnerPlayer != 0` (06d97d96) and only then ships its LOW BYTE
+    // (06d97f09) plus GroupId -- and the display name instead of the two FmtStrs.
+    unsigned int OwnerPlayer;        // +0x9c <- src+0xac
+    unsigned short GroupNameId;      // +0xa0 <- LOW WORD of src+0xb0
+    unsigned char ReputationRank;       // +0xa2 <- LOW BYTE of src+0xb4
     unsigned char Pad_0xa3;         // +0xa3
-    unsigned short Field_0xa4;      // +0xa4 <- LOW WORD of src+0xd8
+    unsigned short GroupId;      // +0xa4 <- LOW WORD of src+0xd8
     unsigned char Pad_0xa6[2];      // +0xa6
     unsigned int NameASize;         // +0xa8
     void* NameABuffer;              // +0xac
@@ -840,7 +840,7 @@ struct FPayloadServerCreateShip {
     wchar_t* DisplayName;           // +0xbc    operator new((len*2)+2) + wcscpy
     unsigned int Affiliation;       // +0xc0
     float Attitude;                 // +0xc4
-    unsigned char Field_0xc8;       // +0xc8 <- src+0xa8  (06d8950a read / 06d89514 store,
+    unsigned char bMarkedBy;       // +0xc8 <- src+0xa8  (06d8950a read / 06d89514 store,
                                     //        `MOV byte ptr [ECX + 0xe8],AL` == payload+0xc8;
                                     //        the old 06d894f2 was inside 06d894ee)
     unsigned char Pad_0xc9[3];      // +0xc9
@@ -897,10 +897,10 @@ struct FPayloadServerCreateShip {
 
 // The id block as it travels: 06d89b30 "PUSH 0x18" then the five fields and the array.
 struct FRpcIdArrayBlockWire {
-    unsigned int Field_0x00;        // +0x00
-    unsigned int Field_0x04;        // +0x04
-    unsigned int Field_0x08;        // +0x08
-    unsigned int Field_0x0c;        // +0x0c
+    unsigned int Head;        // +0x00
+    unsigned int Body;        // +0x04
+    unsigned int LeftHand;        // +0x08
+    unsigned int RightHand;        // +0x0c
     int Count;                      // +0x10
     unsigned int* Ids;              // +0x14  operator new(Count << 2)
 };
@@ -913,9 +913,9 @@ static_assert(sizeof(FRpcIdArrayBlockWire) == 0x18,
 // 0x23c],EDX` is the last store of the run; the 06d84730 that stood here is inside it).
 struct FRpcCharacterInfoWireRecord {
     CHARACTER_ID Name;              // +0x000 CHARACTER_ID::operator= (06d899ef / 06d8462a)
-    unsigned char Field_0x200;      // +0x200 <- src+0x200; the receiver re-normalises it
+    unsigned char bIsRestart;      // +0x200 <- src+0x200; the receiver re-normalises it
                                     //          to 0/1 with SETNZ (06d84638)
-    unsigned char Field_0x201;      // +0x201 <- src+0x201, same SETNZ (06d84649)
+    unsigned char bIsAutoSave;      // +0x201 <- src+0x201, same SETNZ (06d84649)
     // +0x204 / +0x214: retail MSVCP60 basic_string, 0x10 bytes each. The ELEMENT TYPE is
     // 16-bit, not char: the IAT entries this record's ctor/assign/_Tidy go through are
     // .rdata:06db31a0 / 06db31a4 / 06db31ac / 06db3190, and the listing decorates all
@@ -928,16 +928,16 @@ struct FRpcCharacterInfoWireRecord {
     // modern equivalent is std::wstring.
     std::wstring TextA;             // +0x204
     std::wstring TextB;             // +0x214
-    unsigned int Field_0x224;       // +0x224 <- src+0x224
-    unsigned int Field_0x228;       // +0x228 <- src+0x228
-    unsigned int Field_0x22c;       // +0x22c <- src+0x22c
-    unsigned int Field_0x230;       // +0x230 <- src+0x230
-    unsigned int Field_0x234;       // +0x234 <- src+0x234
-    unsigned int Field_0x238;       // +0x238 <- src+0x260   (06d89aa6 / 06d846f8)
-    unsigned int Field_0x23c;       // +0x23c <- src+0x264   (06d89ad6 / 06d8472e)
-    unsigned int Field_0x240;       // +0x240 <- src+0x268   (06d89ae6 / 06d8471c)
-    unsigned int Field_0x244;       // +0x244 <- src+0x26c   (06d89ab6 / 06d846c8)
-    unsigned int Field_0x248;       // +0x248 <- src+0x270   (06d89ac6 / 06d846d4)
+    unsigned int DescripStrId;       // +0x224 <- src+0x224
+    unsigned int TimestampLow;       // +0x228 <- src+0x228
+    unsigned int TimestampHigh;       // +0x22c <- src+0x22c
+    unsigned int ShipArchetype;       // +0x230 <- src+0x230
+    unsigned int Money;       // +0x234 <- src+0x234
+    unsigned int SystemId;       // +0x238 <- src+0x260   (06d89aa6 / 06d846f8)
+    unsigned int BaseId;       // +0x23c <- src+0x264   (06d89ad6 / 06d8472e)
+    unsigned int LocationId;       // +0x240 <- src+0x268   (06d89ae6 / 06d8471c)
+    unsigned int VoiceId;       // +0x244 <- src+0x26c   (06d89ab6 / 06d846c8)
+    unsigned int Rank;       // +0x248 <- src+0x270   (06d89ac6 / 06d846d4)
     // +0x24c: a DEAD field of the wire record that nevertheless TRAVELS. Both record
     // constructors zero it (06d89986 in the sender, 06d935f2 in the decoder), the
     // sender never fills it, the receiver never reads it -- but the codec pair carries
@@ -950,17 +950,17 @@ struct FRpcCharacterInfoWireRecord {
     // and its decoder writes it back with a plain `MOV` (06d93b29), and the sender
     // moves it as a raw dword (06d89af6/06d89b00). The four bytes are the whole story,
     // so the port keeps the bit pattern and marshals it as a dword.
-    unsigned int Field_0x250;       // +0x250 <- src+0x244   (06d89af6 / 06d84704)
-    unsigned int Field_0x254;       // +0x254 <- src+0x238   (06d89b06 / 06d84710)
-    unsigned int Field_0x258;       // +0x258 <- src+0x240   (06d89b16 / 06d8471c)
-    unsigned int Field_0x25c;       // +0x25c <- src+0x23c   (06d89b26 / 06d84728)
+    unsigned int HullStatusBits;       // +0x250 <- src+0x244   (06d89af6 / 06d84704)
+    unsigned int NumKills;       // +0x254 <- src+0x238   (06d89b06 / 06d84710)
+    unsigned int NumMissionFailures;       // +0x258 <- src+0x240   (06d89b16 / 06d8471c)
+    unsigned int NumMissionSuccesses;       // +0x25c <- src+0x23c   (06d89b26 / 06d84728)
     // +0x260: the EQUIPMENT ELEMENT COUNT, and it does travel. The first copy hop
     // (06d899a4) only zeroes it; the packet-bound hop FUN_06d955c0 fills it at
     // 06d959c6..06d959d2 -- `FUN_06d913e0(&rec+0x264)` (i.e. *(header**)(rec+0x264)),
     // then `MOV CL,[EAX+0x8] ; MOV [ESI+0x260],CL`, the low byte of the equipment
     // list's Size, or 0 when the handle is still null. The encoder writes it at
     // 06d9528e and the decoder reads it back at 06d93fcf and uses it as the loop bound.
-    unsigned char Field_0x260;      // +0x260
+    unsigned char EquipmentCount;      // +0x260
     FRpcEquipWireHandle Equipment;  // +0x264 built from the caller's EquipDescList
     FRpcCollisionGroupList CollisionGroups; // +0x268 <- the caller's list at src+0x254
     FRpcIdArrayBlockWire* BlockA;   // +0x274 <- the inline block at src+0x274
@@ -993,7 +993,7 @@ struct FRpcCharacterInfoWireList {
 static_assert(sizeof(FRpcCharacterInfoWireList) == 0x0c, "retail std::list header is 0x0c");
 
 struct FPayloadServerCharacterInfo {
-    unsigned int Field_0x00;                // +0x00 <- argument struct +0x14
+    unsigned int SaveFailureCount;                // +0x00 <- argument struct +0x14
     FRpcCharacterInfoWireList Records;      // +0x04 .. +0x0f
 };
 static_assert(sizeof(FPayloadServerCharacterInfo) == 0x10, "CHARACTERINFO payload 0x10");

@@ -93,7 +93,7 @@ struct FRpcServerCreateObjectFields {
     Vector Position;                    // +0x4c <- Position (+0x4c)
     Quaternion Orientation;             // +0x58 <- Orientation (+0x58), w first
     int HitPts;                         // +0x68 <- HitPts (+0x68), FILD on encode
-    unsigned int Field_0x6c;            // +0x6c <- Field_0x6c; travels only in SP
+    unsigned int LoadoutId;            // +0x6c <- LoadoutId; travels only in SP
     FRpcServerEquipHandle Equipment;    // +0x70 <- Equipment (+0x70) as wire records
     std::list<CollisionGroupDesc> CollisionGroups; // +0x74 <- CollisionGroups (+0x80)
     DamageList Damage;                  // +0x80 <- Damage (+0x8c); list travels only in SP
@@ -130,486 +130,6 @@ void RpcServerBuildHardpointDictionary();
 using FPacketServerConnectResponse = FRpcConnectResponsePacket;
 
 using FPacketServerLoginResponse = FRpcLoginResponsePacket;
-
-struct FPacketServerRequestReturned : public FPacketBase {
-    unsigned int Field_00;
-    unsigned char Field_04;
-    unsigned char Field_05;
-    unsigned char Field_06;
-
-    FPacketServerRequestReturned() : FPacketBase(0x20044), Field_00(0), Field_04(0), Field_05(0), Field_06(0) {}
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (Capacity < 7) return 0x16;
-        unsigned char* Buffer = *BufferHolder;
-        *reinterpret_cast<unsigned int*>(Buffer) = Field_00;
-        *(Buffer + 4) = Field_04;
-        *(Buffer + 5) = Field_05;
-        *(Buffer + 6) = Field_06;
-        *BufferHolder = Buffer + 7;
-        if (OutLength) *OutLength = 7;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        if (Size < 7) return 0x17;
-        Field_00 = *reinterpret_cast<const unsigned int*>(Buffer);
-        Field_04 = *(Buffer + 4);
-        Field_05 = *(Buffer + 5);
-        Field_06 = *(Buffer + 6);
-        if (OutLength) *OutLength = 7;
-        return 0;
-    }
-};
-
-
-// Local factory for RemoteClient instead of missing RpcGetPacketSerializer
-
-struct FPacketServerMissionSaveAvailable : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned char* Field_24 = nullptr;
-
-    FPacketServerMissionSaveAvailable() : FPacketBase(0x2005b) {}
-    ~FPacketServerMissionSaveAvailable() {
-        if (Field_24) delete[] Field_24;
-    }
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (Field_20 > 0) {
-            Field_24 = new unsigned char[Field_20];
-            if (!ReadBytes(Field_24, Field_20)) return 0x17;
-        }
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerGFMissionVendorWhyEmpty : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned char* Field_24 = nullptr;
-
-    FPacketServerGFMissionVendorWhyEmpty() : FPacketBase(0x2005a) {}
-    ~FPacketServerGFMissionVendorWhyEmpty() {
-        if (Field_24) delete[] Field_24;
-    }
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (Field_20 > 0) {
-            Field_24 = new unsigned char[Field_20];
-            if (!ReadBytes(Field_24, Field_20)) return 0x17;
-        }
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerCfgInterfaceNotification : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned char Field_24 = 0;
-
-    FPacketServerCfgInterfaceNotification() : FPacketBase(0x20047) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (!ReadBytes(&Field_24, 1)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerMarkObj : public FPacketBase {
-
-
-    FPacketServerMarkObj() : FPacketBase(0x20046) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerSetStoryCue : public FPacketBase {
-    unsigned char Field_20[12] = {0};
-    unsigned char Field_2C[16] = {0};
-    unsigned int Field_3C = 0;
-    unsigned int Field_40 = 0;
-
-    FPacketServerSetStoryCue() : FPacketBase(0x20043) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(Field_20, 12)) return 0x17;
-        if (!ReadBytes(Field_2C, 16)) return 0x17;
-        if (!ReadBytes(&Field_3C, 4)) return 0x17;
-        if (!ReadBytes(&Field_40, 4)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-
-struct FPacketServerSetCamera : public FPacketBase {
-
-
-    FPacketServerSetCamera() : FPacketBase(0x2004b) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerRevertCamera : public FPacketBase {
-    unsigned int Field_28 = 0;
-    unsigned int Field_20 = 0;
-    unsigned char* Field_24 = nullptr;
-
-    FPacketServerRevertCamera() : FPacketBase(0x2004c) {}
-    ~FPacketServerRevertCamera() { if (Field_24) delete[] Field_24; }
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_28, 4)) return 0x17;
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (Field_20 > 0) {
-            Field_24 = new unsigned char[Field_20];
-            if (!ReadBytes(Field_24, Field_20)) return 0x17;
-        }
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerSetMissionMessage : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned int Field_24 = 0;
-    unsigned int Field_28 = 0;
-
-    FPacketServerSetMissionMessage() : FPacketBase(0x20045) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (!ReadBytes(&Field_24, 4)) return 0x17;
-        if (!ReadBytes(&Field_28, 4)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-
-struct FPacketServerSetMissionFailures : public FPacketBase {
-
-
-    FPacketServerSetMissionFailures() : FPacketBase(0x20040) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerBurnFuse : public FPacketBase {
-
-
-    FPacketServerBurnFuse() : FPacketBase(0x20041) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-
-
-using FPacketServerSetHullStatus = FRpcSetHullStatusPacket;
-
-struct FPacketServerSetGuidedTarget : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned int Field_24 = 0;
-    unsigned int Field_28 = 0;
-    unsigned char Field_74 = 0;
-    unsigned int Field_2C = 0;
-    unsigned int Field_30 = 0;
-    unsigned int Field_34 = 0;
-    unsigned int Field_38 = 0;
-    unsigned int Field_5C = 0;
-    unsigned int Field_3C[8] = {0};
-    unsigned int Field_60 = 0;
-    unsigned char Field_68 = 0;
-    unsigned int* Field_64 = nullptr;
-
-    FPacketServerSetGuidedTarget() : FPacketBase(0x2004a) {}
-    ~FPacketServerSetGuidedTarget() { if (Field_64) delete[] Field_64; }
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (!ReadBytes(&Field_24, 4)) return 0x17;
-        if (!ReadBytes(&Field_28, 4)) return 0x17;
-        if (!ReadBytes(&Field_74, 1)) return 0x17;
-        if (Field_74 != 0) {
-            if (!ReadBytes(&Field_2C, 4)) return 0x17;
-            if (!ReadBytes(&Field_30, 4)) return 0x17;
-            Field_34 = 0;
-            Field_38 = 0;
-            unsigned char count1 = 0;
-            if (!ReadBytes(&count1, 1)) return 0x17;
-            Field_5C = count1;
-            for (unsigned int i = 0; i < Field_5C && i < 8; ++i) {
-                if (!ReadBytes(&Field_3C[i], 4)) return 0x17;
-            }
-        } else {
-            Field_2C = 0;
-            Field_30 = 0;
-            Field_34 = 0;
-            Field_38 = 0;
-            Field_5C = 0;
-        }
-        if (!ReadBytes(&Field_60, 4)) return 0x17;
-        if (!ReadBytes(&Field_68, 1)) return 0x17;
-        if (Field_68 > 0) {
-            Field_64 = new unsigned int[Field_68];
-            for (unsigned int i = 0; i < Field_68; ++i) {
-                if (!ReadBytes(&Field_64[i], 4)) return 0x17;
-            }
-        }
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerUseItem : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned int Field_24 = 0;
-
-    FPacketServerUseItem() : FPacketBase(0x20051) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (!ReadBytes(&Field_24, 4)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerFormationUpdate : public FPacketBase {
-    unsigned int Field_20 = 0;
-    unsigned int Field_24 = 0;
-    unsigned short Field_28 = 0;
-    unsigned short Field_2A = 0;
-    unsigned int Field_2C = 0;
-    unsigned char Field_30 = 0;
-
-    FPacketServerFormationUpdate() : FPacketBase(0x20053) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (!ReadBytes(&Field_24, 4)) return 0x17;
-        if (!ReadBytes(&Field_28, 2)) return 0x17;
-        if (!ReadBytes(&Field_2A, 2)) return 0x17;
-        if (!ReadBytes(&Field_2C, 4)) return 0x17;
-        if (!ReadBytes(&Field_30, 1)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
-
-struct FPacketServerObjectCargoUpdate : public FPacketBase {
-    unsigned int Field_20 = 0;
-
-    FPacketServerObjectCargoUpdate() : FPacketBase(0x20055) {}
-
-
-    unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) override {
-        if (OutLength) *OutLength = 0;
-        return 0;
-    }
-
-    unsigned int Decode(const unsigned char* Buffer, unsigned int Size, unsigned int* OutLength) override {
-        unsigned int Cursor = 0;
-        auto ReadBytes = [&](void* Dest, unsigned int Count) -> bool {
-            if (Cursor + Count > Size) return false;
-            if (Dest) memcpy(Dest, Buffer + Cursor, Count);
-            Cursor += Count;
-            return true;
-        };
-        if (!ReadBytes(&Field_20, 4)) return 0x17;
-        if (OutLength) *OutLength = Cursor;
-        return 0;
-    }
-};
 #endif
 
 // ===== SERVER 0x01..0x1f (RS-P1) =====
@@ -713,7 +233,7 @@ public:
     }
     unsigned int ObjectId;
     unsigned char bActivate; // Raw native byte, never normalized.
-    unsigned int Field_0x08; // Activate-state index (rpc_iclient_args.h).
+    unsigned int ActivateParam; // Activate-state index (rpc_iclient_args.h).
 };
 
 // 0x0b FLPACKET_SERVER_LAND: RC 06b4b140 / ctor 06b4b180, RS 06be5c60 / 06be5ca0;
@@ -840,9 +360,9 @@ public:
     Vector AngularVelocity;              // +0xac <- AngularVelocity (+0xc4); never on the wire
     float Throttle;                      // +0xb8 <- Throttle (+0xd0), 127-scale byte
     unsigned int OwnerPlayer;            // +0xbc <- OwnerPlayer (+0xac); low byte travels
-    unsigned short Field_0xc0;           // +0xc0 <- Field_0xb0 (+0xb0), low word
+    unsigned short GroupNameId;           // +0xc0 <- Field_0xb0 (+0xb0), low word
     unsigned char ReputationRank;        // +0xc2 <- ReputationRank (+0xb4), low byte
-    unsigned short Field_0xc4;           // +0xc4 <- Field_0xd8 (+0xd8), low word
+    unsigned short GroupId;           // +0xc4 <- Field_0xd8 (+0xd8), low word
     unsigned int NameASize;              // +0xc8 flattened FmtStr (Vibe::GetName name 1)
     unsigned char* NameA;                // +0xcc
     unsigned int NameBSize;              // +0xd0 flattened FmtStr (name 2)
@@ -917,7 +437,7 @@ public:
     unsigned int ObjectId;        // +0x20  SendServerRequestReturned ShipId (Server: the requesting object's id)
     unsigned char RequestType;    // +0x24  A2 low byte; the receiver zero-extends it
     unsigned char Response;       // +0x25  A3 low byte; the receiver sign-extends it
-    unsigned char Field_0x26;     // +0x26  A4 low byte; sign-extended. TODO: meaning
+    unsigned char DockPort;     // +0x26  A4 low byte; sign-extended. TODO: meaning
 };
 
 // 0x45 FLPACKET_SERVER_SET_MISSION_MESSAGE. RC 06b4b7d0 / ctor 06b4b810 / dtor
@@ -981,7 +501,7 @@ public:
 class FRpcServerSetGuidedTargetPacket : public FPacketBase {
 public:
     FRpcServerSetGuidedTargetPacket()
-        : FPacketBase(0x2004au), Field_0x20(0), Field_0x24(0), Field_0x28(0) {}
+        : FPacketBase(0x2004au), GuidedId(0), TargetId(0), TargetSubObjId(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -991,9 +511,9 @@ public:
     }
     // TODO: semantic names; SendServerSetGuidedTarget's GuidedId, TargetId and
     // TargetSubObjId (a word), in this order.
-    unsigned int Field_0x20;
-    unsigned int Field_0x24;
-    unsigned short Field_0x28;
+    unsigned int GuidedId;
+    unsigned int TargetId;
+    unsigned short TargetSubObjId;
 };
 
 // 0x4b FLPACKET_SERVER_SET_CAMERA. RC 06b4b680 / ctor 06b4b6c0, RS 06be61a0 / 06be61e0.
@@ -1088,12 +608,12 @@ public:
         return RpcWirePacketFactory<FRpcServerSetMusicPacket>(OutPacket);
     }
     // TODO: semantic names of the Tryptich fields.
-    unsigned int Field_0x20;
-    unsigned int Field_0x24;
-    unsigned int Field_0x28;
-    unsigned int Field_0x2c;
-    unsigned char Field_0x30;
-    float Field_0x34;
+    unsigned int SpaceMusic;
+    unsigned int DangerMusic;
+    unsigned int BattleMusic;
+    unsigned int OverrideMusic;
+    unsigned char bNoLoop;
+    float Fade;
 };
 
 // 0x4d FLPACKET_SERVER_LOADHINT (RS-P4). RC 06b4abf0 / ctor 06b4ac30 / deleting dtor
@@ -1151,7 +671,7 @@ public:
 class FRpcServerPlayerListPacket : public FPacketBase {
 public:
     FRpcServerPlayerListPacket()
-        : FPacketBase(0x20052u), Kind(kPlayerListKindNone), Name(nullptr), PlayerId(0), Field_0x2c(0) {}
+        : FPacketBase(0x20052u), Kind(kPlayerListKindNone), Name(nullptr), PlayerId(0), bAlreadyPresent(0) {}
     ~FRpcServerPlayerListPacket() override;
     FRpcServerPlayerListPacket(const FRpcServerPlayerListPacket&) = delete;
     FRpcServerPlayerListPacket& operator=(const FRpcServerPlayerListPacket&) = delete;
@@ -1170,7 +690,7 @@ public:
     unsigned int PlayerId;        // +0x28
     // TODO: meaning. SendServerPlayerListAdd's bAlreadyPresent byte; Server passes 1 for players already present and 0
     // for the newcomer, the client tests it against zero. Raw byte here, SETNZ on receive.
-    unsigned char Field_0x2c;     // +0x2c
+    unsigned char bAlreadyPresent;     // +0x2c
 };
 
 #include "common_archetype.h" // CollisionGroupDesc (0x48)
@@ -1221,17 +741,17 @@ public:
         return RpcWirePacketFactory<FRpcServerSendCommPacket>(OutPacket);
     }
     // TODO: semantic names. SendServerSendComm's SenderId, ReceiverId, VoiceId in this order.
-    unsigned int Field_0x20;      // +0x20
-    unsigned int Field_0x24;      // +0x24
-    unsigned int Field_0x28;      // +0x28
+    unsigned int SenderId;      // +0x20
+    unsigned int ReceiverId;      // +0x24
+    unsigned int VoiceId;      // +0x28
     Costume Body;                 // +0x2c  SendServerSendComm CommCostume (13 dwords by value)
-    unsigned int Field_0x60;      // +0x60  SendServerSendComm CommType. TODO: meaning
-    unsigned int* Field_0x64;     // +0x64  owned array (operator new / operator delete), TextIds
-    signed char Field_0x68;       // +0x68  its count, signed (MOVSX everywhere), TextCount
-    unsigned int Field_0x6c;      // +0x6c  Mood; the wire carries the low word
-    float Field_0x70;             // +0x70  Duration; one quantized byte on the wire
+    unsigned int CommType;      // +0x60  SendServerSendComm CommType. TODO: meaning
+    unsigned int* TextIds;     // +0x64  owned array (operator new / operator delete), TextIds
+    signed char TextCount;       // +0x68  its count, signed (MOVSX everywhere), TextCount
+    unsigned int Mood;      // +0x6c  Mood; the wire carries the low word
+    float Duration;             // +0x70  Duration; one quantized byte on the wire
     // TODO: meaning. bReceiverIsOwnShip's byte, raw; the codec sends the costume only when it is not 0.
-    unsigned char Field_0x74;     // +0x74
+    unsigned char bReceiverIsOwnShip;     // +0x74
 };
 static_assert(sizeof(FRpcServerSendCommPacket) == 0x78, "SERVER 0x4f size 0x78");
 
@@ -1267,16 +787,16 @@ public:
     }
     unsigned short Flags;         // +0x20  (0x100 is bit 0 of the byte +0x21)
     // TODO: semantic names; the flag bit that carries each field is proven.
-    unsigned int Field_0x24;      // +0x24  0x04 (Rank/PlayerGroup/System PlayerId)
-    unsigned int Field_0x28;      // +0x28  0x08 (ObjectGroup/Affiliation ObjectId)
-    unsigned short Field_0x2c;    // +0x2c  0x40 (Rank Rank)
-    unsigned int Field_0x30;      // +0x30  0x80 (System SystemId)
-    unsigned int Field_0x34;      // +0x34  0x01 (ObjectGroup/PlayerGroup GroupId)
-    unsigned int Field_0x38;      // +0x38  0x02 (Mission MissionId)
-    unsigned int Field_0x3c;      // +0x3c  0x02 (Mission MissionSetBy)
+    unsigned int PlayerId;      // +0x24  0x04 (Rank/PlayerGroup/System PlayerId)
+    unsigned int ObjectId;      // +0x28  0x08 (ObjectGroup/Affiliation ObjectId)
+    unsigned short Rank;    // +0x2c  0x40 (Rank Rank)
+    unsigned int SystemId;      // +0x30  0x80 (System SystemId)
+    unsigned int GroupId;      // +0x34  0x01 (ObjectGroup/PlayerGroup GroupId)
+    unsigned int MissionId;      // +0x38  0x02 (Mission MissionId)
+    unsigned int MissionSetBy;      // +0x3c  0x02 (Mission MissionSetBy)
     std::wstring Text;            // VC6 +0x40, 0x10 (Motd)
     unsigned int Field_0x50;      // VC6 +0x50, ctor 0; no coder or setter touches it
-    unsigned int Field_0x54;      // VC6 +0x54, 0x20 (Affiliation Affiliation); ctor -1
+    unsigned int Affiliation;      // VC6 +0x54, 0x20 (Affiliation Affiliation); ctor -1
     std::vector<unsigned int> Ids; // VC6 +0x58, 0x100 (Formation MemberIds)
     // (names: IClient::SendServerMiscObjUpdate<Name> and its parameter)
     unsigned char IdCount;        // VC6 +0x68, the low byte of the vector size
@@ -1305,7 +825,7 @@ public:
         return RpcWirePacketFactory<FRpcServerCreateSolarPacket>(OutPacket);
     }
     FRpcServerCreateObjectFields Fields; // +0x20..+0x9b
-    unsigned char Field_0x9c;     // +0x9c  <- CSolarCreateInfo::Field_0xad
+    unsigned char bDestructible;     // +0x9c  <- CSolarCreateInfo::Field_0xad
     unsigned char bMarkedBy;      // +0x9d  <- CEqObjCreateInfo::bMarkedBy (+0xa8), raw byte
     unsigned int NameASize;       // +0xa0  Reputation::Vibe::GetName's first FmtStr, flattened
     unsigned char* NameA;         // +0xa4  owned, operator new / operator delete
@@ -1372,8 +892,8 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerRequestCreateShipRespPacket>(OutPacket);
     }
-    unsigned char Field_0x00; // +0x20 TODO: response byte semantics; kept raw
-    unsigned int Field_0x04;  // +0x24 TODO: semantics unproven
+    unsigned char bSuccess; // +0x20 TODO: response byte semantics; kept raw
+    unsigned int ShipId;  // +0x24 TODO: semantics unproven
 };
 
 // 0x2a FLPACKET_SERVER_ADJUSTATTITUDE: RC 06b4b000 / ctor 06b4b040, RS 06be5b20 /
@@ -1389,8 +909,8 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerAdjustAttitudePacket>(OutPacket);
     }
-    unsigned int Field_0x00; // +0x20 TODO: group/vibe id semantics unproven
-    float Field_0x04;        // +0x24 TODO: attitude delta semantics unproven
+    unsigned int VibeHandle; // +0x20 TODO: group/vibe id semantics unproven
+    float Attitude;        // +0x24 TODO: attitude delta semantics unproven
 };
 
 // 0x2f FLPACKET_SERVER_SETREMOVEITEM: RC 06b49e90 / ctor 06b49ed0, RS 06be4970 /
@@ -1441,8 +961,8 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerSystemSwitchInPacket>(OutPacket);
     }
-    unsigned int Field_0x00; // +0x20 object id (argument +0x00)
-    unsigned int Field_0x04; // +0x24 jump object type bits (argument +0x04)
+    unsigned int ShipId; // +0x20 object id (argument +0x00)
+    unsigned int JumpObjTypeBits; // +0x24 jump object type bits (argument +0x04)
     Vector Position;         // +0x28
     Quaternion Orientation;  // +0x34
 };
@@ -1460,7 +980,7 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerExplodeAsteroidMinePacket>(OutPacket);
     }
-    unsigned int Field_0x00; // +0x20 TODO: object id per contract; semantics unproven
+    unsigned int MineId; // +0x20 TODO: object id per contract; semantics unproven
     Vector Position;         // +0x24 TODO: explosion position; semantics unproven
 };
 
@@ -1477,10 +997,10 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerItemTractoredPacket>(OutPacket);
     }
-    unsigned int Field_0x00;   // +0x20 loot object id
-    unsigned int Field_0x04;   // +0x24 tractoring ship id
-    unsigned short Field_0x08; // +0x28 tractor equipment id
-    unsigned short Field_0x0a; // +0x2a units taken
+    unsigned int LootId;   // +0x20 loot object id
+    unsigned int ShipId;   // +0x24 tractoring ship id
+    unsigned short TractorEquipId; // +0x28 tractor equipment id
+    unsigned short UnitsTaken; // +0x2a units taken
 };
 
 // 0x2e FLPACKET_SERVER_SETADDITEM: RC factory 06b49e20 / ctor 06b49e60 / dtor 06b3c800,
@@ -1509,7 +1029,7 @@ public:
     unsigned int ArchId;         // +0x20 EquipDesc +0x04
     int Count;                   // +0x24 EquipDesc +0x14
     unsigned int HardpointSize;  // +0x28 strlen + 1, 0 for an internal item
-    unsigned int Field_0x0c;     // +0x2c IClient::SendServerSetAddItem's AddResult
+    unsigned int AddResult;     // +0x2c IClient::SendServerSetAddItem's AddResult
     unsigned int Id;             // +0x30 EquipDesc +0x02, zero-extended
     float Health;                // +0x34 EquipDesc +0x10
     unsigned char bEquipped;     // +0x38 EquipDesc +0x0c, raw byte
@@ -1541,7 +1061,7 @@ public:
     // Name, Name = operator new(Length + 1) with no null test, copy Length + 1 bytes,
     // NameSize = Length + 1.
     void SetName(const char* Source, unsigned int Length);
-    unsigned int Field_0x00;   // +0x20 object id (argument +0x000)
+    unsigned int ObjectId;   // +0x20 object id (argument +0x000)
     unsigned int NameSize;     // +0x24 strlen + 1
     unsigned int Position[3];  // +0x28 argument +0x108..+0x110, float bits; not on the wire
     unsigned char Mode;        // +0x34 1 unless the argument's +0x114 is 2; not on the wire
@@ -1562,9 +1082,9 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerSetMissionObjectiveStatePacket>(OutPacket);
     }
-    unsigned int Field_0x00;   // +0x20 argument +0x00
-    unsigned int Field_0x04;   // +0x24 argument byte +0x04, zero-extended
-    unsigned short Field_0x08; // +0x28 argument word +0x08
+    unsigned int MissionId;   // +0x20 argument +0x00
+    unsigned int ObjectiveIndex;   // +0x24 argument byte +0x04, zero-extended
+    unsigned short State; // +0x28 argument word +0x08
 };
 
 // 0x34 FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE: RC factory 06b4b530 / ctor 06b4b570 / dtor
@@ -1587,8 +1107,8 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerReplaceMissionObjectivePacket>(OutPacket);
     }
-    unsigned int Field_0x00;  // +0x20 mission id (argument +0x00)
-    unsigned int State;       // +0x24 argument byte +0x20, zero-extended
+    unsigned int MissionId;  // +0x20 mission id (argument +0x00)
+    unsigned int ObjectiveIndex;       // +0x24 argument byte +0x20, zero-extended
     unsigned int TextSize;    // +0x28
     unsigned char* TextData;  // +0x2c owned, flattened argument +0x04 FmtStr
 };
@@ -1647,8 +1167,8 @@ public:
     void PushObjective(FRpcServerMissionObjectiveRecord* Record);
     // RS 06bdac30 (thiscall, RET 4): the Index-th record, or null past the end.
     FRpcServerMissionObjectiveRecord* ObjectiveAt(unsigned int Index) const;
-    unsigned int Field_0x00;  // +0x20 mission id (argument +0x00)
-    unsigned int State;       // +0x24 argument byte +0x3c, zero-extended
+    unsigned int MissionId;  // +0x20 mission id (argument +0x00)
+    unsigned int MissionType;       // +0x24 argument byte +0x3c, zero-extended
     FRpcServerFlatTextBlock TextA; // +0x28 flattened argument +0x0c FmtStr
     FRpcServerFlatTextBlock TextB; // +0x30 flattened argument +0x24 FmtStr
     unsigned int Count;       // +0x38
@@ -1692,13 +1212,13 @@ public:
     }
     unsigned int ArchetypeNickname; // +0x20 info +0x04
     unsigned int ObjId;             // +0x24 info +0x00
-    unsigned int Field_0x08;        // +0x28 info +0x44 (TODO: semantics unproven)
+    unsigned int OwnerPlayer;        // +0x28 info +0x44 (TODO: semantics unproven)
     unsigned int OwnerId;           // +0x2c info +0x08
     unsigned short SubObjId;        // +0x30 info +0x0c
     Quaternion Orientation;         // +0x34 info +0x1c
     Vector Position;                // +0x44 info +0x10
     Vector Velocity;                // +0x50 info +0x2c
-    Vector Field_0x3c;              // +0x5c info +0x38 (TODO: semantics unproven)
+    Vector AngularVelocity;              // +0x5c info +0x38 (TODO: semantics unproven)
 };
 
 // 0x37 FLPACKET_SERVER_CREATEGUIDED: RC factory 06b4a420 / ctor 06b4a460, RS
@@ -1717,7 +1237,7 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerCreateGuidedPacket>(OutPacket);
     }
-    unsigned int Field_0x00;        // +0x20 info +0x2c, not on the wire
+    unsigned int OwnerPlayer;        // +0x20 info +0x2c, not on the wire
     unsigned int ArchetypeNickname; // +0x24 info +0x28
     unsigned int OwnerId;           // +0x28 info +0x30
     unsigned short SubObjId;        // +0x2c info +0x34
@@ -1879,8 +1399,8 @@ public:
     Quaternion Orientation;         // +0x30 info +0x1c
     Vector Position;                // +0x40 info +0x10
     Vector Velocity;                // +0x4c info +0x2c
-    Vector Field_0x38;              // +0x58 info +0x38 (TODO: semantics unproven)
-    unsigned int Field_0x44;        // +0x64 info +0x44, not on the wire
+    Vector AngularVelocity;              // +0x58 info +0x38 (TODO: semantics unproven)
+    unsigned int OwnerPlayer;        // +0x64 info +0x44, not on the wire
 };
 
 // 0x3d FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE: RC factory 06b4cf60 / ctor 06b4cfa0 /
@@ -1913,10 +1433,10 @@ public:
 // an operator new(Count * 4) array. Built from a Costume by the sender (RC 06b355f8 /
 // 06b3569a), read back into one by HandleCharacterInfo (RS 06bd49f4..06bd4af7).
 struct FRpcServerCharacterIdBlock {
-    unsigned int Field_0x00; // +0x00 Costume::PartIds[0]
-    unsigned int Field_0x04; // +0x04 Costume::PartIds[1]
-    unsigned int Field_0x08; // +0x08 Costume::PartIds[2]
-    unsigned int Field_0x0c; // +0x0c Costume::PartIds[3]
+    unsigned int Head; // +0x00 Costume::PartIds[0]
+    unsigned int Body; // +0x04 Costume::PartIds[1]
+    unsigned int LeftHand; // +0x08 Costume::PartIds[2]
+    unsigned int RightHand; // +0x0c Costume::PartIds[3]
     int Count;               // +0x10 Costume::AccessoryCount
     unsigned int* Ids;       // +0x14 Costume::AccessoryIds, Count entries
 };
@@ -1942,26 +1462,26 @@ struct FRpcServerCharacterRecord {
     FRpcServerCharacterRecord& operator=(const FRpcServerCharacterRecord&) = delete;
 
     CHARACTER_ID Name;               // +0x000
-    unsigned char Field_0x200;       // +0x200 CharacterInfo::bIsRestart, raw on the wire
-    unsigned char Field_0x201;       // +0x201 CharacterInfo::bIsAutoSave, raw on the wire
+    unsigned char bIsRestart;       // +0x200 CharacterInfo::bIsRestart, raw on the wire
+    unsigned char bIsAutoSave;       // +0x201 CharacterInfo::bIsAutoSave, raw on the wire
     std::wstring TextA;              // +0x204 CharacterInfo::Name
     std::wstring TextB;              // +0x214 CharacterInfo::Description
-    unsigned int Field_0x224;        // +0x224 <- CharacterInfo +0x224 DescripStrId
-    unsigned int Field_0x228;        // +0x228 <- +0x228 TimestampLow
-    unsigned int Field_0x22c;        // +0x22c <- +0x22c TimestampHigh
-    unsigned int Field_0x230;        // +0x230 <- +0x230 ShipArchetype
-    unsigned int Field_0x234;        // +0x234 <- +0x234 Money
-    unsigned int Field_0x238;        // +0x238 <- +0x260 SystemId
-    unsigned int Field_0x23c;        // +0x23c <- +0x264 BaseId
-    unsigned int Field_0x240;        // +0x240 <- +0x268 LocationId
-    unsigned int Field_0x244;        // +0x244 <- +0x26c VoiceId
-    unsigned int Field_0x248;        // +0x248 <- +0x270 Rank
+    unsigned int DescripStrId;        // +0x224 <- CharacterInfo +0x224 DescripStrId
+    unsigned int TimestampLow;        // +0x228 <- +0x228 TimestampLow
+    unsigned int TimestampHigh;        // +0x22c <- +0x22c TimestampHigh
+    unsigned int ShipArchetype;        // +0x230 <- +0x230 ShipArchetype
+    unsigned int Money;        // +0x234 <- +0x234 Money
+    unsigned int SystemId;        // +0x238 <- +0x260 SystemId
+    unsigned int BaseId;        // +0x23c <- +0x264 BaseId
+    unsigned int LocationId;        // +0x240 <- +0x268 LocationId
+    unsigned int VoiceId;        // +0x244 <- +0x26c VoiceId
+    unsigned int Rank;        // +0x248 <- +0x270 Rank
     unsigned int Field_0x24c;        // +0x24c TODO: no writer but the ctors' zero; travels
-    unsigned int Field_0x250;        // +0x250 <- +0x244 HullStatus bits (encoder FLD/FSTP)
-    unsigned int Field_0x254;        // +0x254 <- +0x238 NumKills
-    unsigned int Field_0x258;        // +0x258 <- +0x240 NumMissionFailures
-    unsigned int Field_0x25c;        // +0x25c <- +0x23c NumMissionSuccesses
-    unsigned char Field_0x260;       // +0x260 equipment element count (low byte of size)
+    unsigned int HullStatusBits;        // +0x250 <- +0x244 HullStatus bits (encoder FLD/FSTP)
+    unsigned int NumKills;        // +0x254 <- +0x238 NumKills
+    unsigned int NumMissionFailures;        // +0x258 <- +0x240 NumMissionFailures
+    unsigned int NumMissionSuccesses;        // +0x25c <- +0x23c NumMissionSuccesses
+    unsigned char EquipmentCount;       // +0x260 equipment element count (low byte of size)
     FRpcServerEquipHandle Equipment; // +0x264 RS-P2's 4-byte handle, inline
     std::list<CollisionGroupDesc> CollisionGroups; // +0x268 Common.dll's list
     FRpcServerCharacterIdBlock* BlockA; // +0x274 <- CharacterInfo::ComCostume

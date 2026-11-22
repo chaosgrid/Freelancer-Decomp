@@ -185,7 +185,7 @@ namespace AlchemyImpl
         return Next;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot3(void* A, void* B)
+    GENRESULT DACOM_API FFxEffectObject::SetTransform(void* A, void* B)
     {
         // FUN_0621f610 (alchemy.dll.txt:64408-64466):
         //   if (this+0x18 != 0)  →  JMP (*(+0x18))->vtable+0x3C(node, A, B)
@@ -226,7 +226,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot4(void* A, void* B)
+    GENRESULT DACOM_API FFxEffectObject::GetTransform(void* A, void* B)
     {
         // LAB_0621f6a0: this+0x18 (TransformExtra_) override target takes
         // priority over the node list when set (previously not ported -- Slot4
@@ -246,28 +246,28 @@ namespace AlchemyImpl
         return AsFx(Nodes_[0].Node)->GetNodeTransform(SlotIndex, OutSlot);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot7(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::ComposeTransforms(void* Arg)
     {
         // FUN_0621f6d0, re-verified: self-contained WalkNodesAlchemy(0x3C)
         // only. No 0x64 call anywhere in this function's body.
-        return WalkNodesAlchemy(&IAlchemy::Slot15, Arg);
+        return WalkNodesAlchemy(&IAlchemy::ComposeNodeTransforms, Arg);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot8(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::Update(void* Arg)
     {
         // FUN_0621f730, re-verified: self-contained WalkNodesAlchemy(0x40)
         // only. No 0x64 call anywhere in this function's body.
-        return WalkNodesAlchemy(&IAlchemy::Slot16, Arg);
+        return WalkNodesAlchemy(&IAlchemy::UpdateNodes, Arg);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot9(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::Draw(void* Arg)
     {
         // FUN_0621f790, re-verified: self-contained WalkNodesAlchemy(0x44)
         // only. No 0x64 call anywhere in this function's body.
         return WalkNodesAlchemy(&IAlchemy::DrawNodes, Arg);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot10(void* IdRaw, void* Out)
+    GENRESULT DACOM_API FFxEffectObject::FindNodeById(void* IdRaw, void* Out)
     {
         const unsigned long Id =
             static_cast<unsigned long>(reinterpret_cast<unsigned int>(IdRaw));
@@ -281,12 +281,12 @@ namespace AlchemyImpl
         return GR_GENERIC;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot11(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::IsFinished(void* Arg)
     {
         return WalkNodesFlagged(static_cast<unsigned long>(reinterpret_cast<unsigned int>(Arg)));
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot12(void* A, void* B)
+    GENRESULT DACOM_API FFxEffectObject::EnumerateNodes(void* A, void* B)
     {
         return WalkNodesEnumerate(A, B);
     }
@@ -296,7 +296,7 @@ namespace AlchemyImpl
         return DispatchFlagsToAlchemy(static_cast<unsigned long>(reinterpret_cast<unsigned int>(Arg)));
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot15(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::GetBoundingSphere(void* Arg)
     {
         return MergeNodeBoundsSphere(Arg);
     }
@@ -687,7 +687,7 @@ namespace AlchemyImpl
                 // Rec.B = HashNameCrc(instance name) as inserted by
                 // LoadNodeLibrary → InsertNodeByName(InsertName).
                 const GENRESULT Lookup =
-                    G_EffectNodeLibrary->NodeLibSlot11(Rec.B, &Node);
+                    G_EffectNodeLibrary->CreateNodeByHash(Rec.B, &Node);
                 if (Lookup < 0)
                 {
                     FDUMP(0x100001, "%s(%d) : ERROR:General:%s",

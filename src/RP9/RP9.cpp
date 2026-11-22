@@ -6985,7 +6985,7 @@ namespace
         Desc->TemplateFile = nullptr;
         Desc->Parent = nullptr;
         Desc->Extra = 0;
-        Desc->Field30 = 0xFFFFFFFF;
+        Desc->FindHandle = 0xFFFFFFFF;
     }
 
     // The file mapping load_texture (06d14972..06d14ab5, 06d14cb1..06d14d58) and load_cubemap

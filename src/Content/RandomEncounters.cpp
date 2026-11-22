@@ -730,10 +730,10 @@ bool FRandEncTLParams::SpawnLaneFormation(FTransform const* Placement, int Count
         Params.Position.x = Placement->Translation.X;
         Params.Position.y = Placement->Translation.Y;
         Params.Position.z = Placement->Translation.Z;
-        Params.Field_0x104 = 24.0f;
+        Params.Longevity = 24.0f;
         for (std::list<unsigned int>::iterator Label = Labels.begin(); Label != Labels.end();
              ++Label)
-            Params.Field_0x118.push_back(*Label);                          // FUN_06f1e390
+            Params.LabelIds.push_back(*Label);                          // FUN_06f1e390
 
         // 06f83554-06f83645: the ship classes -- a weighted ship choice (retail reads the
         // list head's value when nothing is picked; the port leaves them empty) or Choices'
@@ -1276,7 +1276,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
     FSystemInfo* const PlayerSystem = Player->GetSystemRecord();
     if (Player->ShipObject == nullptr || PlayerSystem == nullptr || Ship == nullptr)
         return bTrigger;
-    if (Ship->HasField120())
+    if (Ship->IsInTradeLane())
         return bTrigger;
 
     // 06f8071a-06f80766: +8 = the player's system; without a target (+0x84, masked with

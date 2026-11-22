@@ -159,35 +159,35 @@ struct ICRSpline : IDAComponent
 {
     // Retail outer wrappers validate an index against the inner spline and
     // forward these two-argument operations (this, index, output).
-    virtual GENRESULT DACOM_API Slot3(unsigned int Index, float* OutPoint) = 0;
-    virtual GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, unsigned long Count) = 0;
-    virtual unsigned long DACOM_API Slot5() = 0;
-    virtual GENRESULT DACOM_API Slot6(unsigned int Index, float* OutPoint) = 0;
-    virtual GENRESULT DACOM_API Slot7(unsigned int Index, float* OutValue) = 0;
-    virtual GENRESULT DACOM_API Slot8(unsigned char bClosed) = 0;
-    virtual GENRESULT DACOM_API Slot9() = 0;
+    virtual GENRESULT DACOM_API SetPoint(unsigned int Index, float* Point) = 0;
+    virtual GENRESULT DACOM_API LoadPoints(const float* Pts, unsigned long Count) = 0;
+    virtual unsigned long DACOM_API GetPointCount() = 0;
+    virtual GENRESULT DACOM_API GetPoint(unsigned int Index, float* OutPoint) = 0;
+    virtual GENRESULT DACOM_API GetPointTime(unsigned int Index, float* OutValue) = 0;
+    virtual GENRESULT DACOM_API SetClosed(unsigned char bClosed) = 0;
+    virtual GENRESULT DACOM_API IsClosed() = 0;
     // Orientation-spline extension slots (present on the orientation vtable).
     // Slot10/Slot11 are per-index / bulk ORIENTATION SETTERS (confirmed
     // 2026-09-10 via FUN_06f22a20's instruction-level trace: the [this+0x5d]
     // orientation-gate + -8 return and the 16-byte/4-float record stride
     // only match a Quats_ writer, never Points_ -- the earlier "indexed
     // point"/"OutRecords" names and getter framing were misattributions).
-    virtual GENRESULT DACOM_API Slot10(unsigned int Index, float* Orientation) = 0;
-    virtual GENRESULT DACOM_API Slot11(unsigned int Count, float* Orientations) = 0;
-    virtual GENRESULT DACOM_API Slot12(unsigned int Index, float* OutOrientation) = 0;
+    virtual GENRESULT DACOM_API SetOrientation(unsigned int Index, float* Orientation) = 0;
+    virtual GENRESULT DACOM_API SetOrientations(unsigned int Count, float* Orientations) = 0;
+    virtual GENRESULT DACOM_API GetOrientation(unsigned int Index, float* OutOrientation) = 0;
     // Slot13/Slot14 widened 2026-09-10 from the 0-argument position-only
     // stub shape to the orientation variant's real, distinct implementations
     // (LAB_06f35270 / LAB_06f352f0, retraced against thorn.dll.txt). Neither
     // is called anywhere outside SplinePath.cpp (grepped across src/Thorn/),
     // so widening is safe.
-    virtual GENRESULT DACOM_API Slot13(unsigned int Index, const float* MatrixRecords) = 0;
-    virtual GENRESULT DACOM_API Slot14(unsigned int Count, const float* TransformRecords) = 0;
+    virtual GENRESULT DACOM_API SetTransform(unsigned int Index, const float* MatrixRecords) = 0;
+    virtual GENRESULT DACOM_API SetTransforms(unsigned int Count, const float* TransformRecords) = 0;
     // Slot15 (RET 0xc on both variants): position-only LAB_06f34820 is a
     // constant -7 stub; the orientation variant LAB_06f35410 (.rdata
     // 06f5ab2c / 06f5acc4 = vtable head + 0x3c) is the inverse of Slot13 --
     // it writes the indexed point's [3x3 rotation | position] 12-float
     // transform record into OutTransform and always returns -1.
-    virtual GENRESULT DACOM_API Slot15(unsigned int Index, float* OutTransform) = 0;
+    virtual GENRESULT DACOM_API GetTransform(unsigned int Index, float* OutTransform) = 0;
 };
 
 // FUN_06f27bf0: diagnostic event aliases (separate from THN save names).

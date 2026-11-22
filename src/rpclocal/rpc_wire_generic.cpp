@@ -977,7 +977,7 @@ bool RpcPutEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle* const* Slot
                 if (!Stream.PutByte(Item->bEquipped)) {                 // 06da23b6
                     return false;
                 }
-                if (!Stream.PutByte(Item->Field_0x0f)) {                // 06da23e0
+                if (!Stream.PutByte(Item->bMission)) {                // 06da23e0
                     return false;
                 }
                 if (!Stream.PutWord(Item->HardpointSize)) {             // 06da240b
@@ -1028,7 +1028,7 @@ bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot) {
             Item->Status = 0.0f;
             Item->Id = 0;
             Item->bEquipped = 0;
-            Item->Field_0x0f = 0;
+            Item->bMission = 0;
             Item->HardpointSize = 0;
             Item->Pad_0x12[0] = 0;
             Item->Pad_0x12[1] = 0;
@@ -1053,7 +1053,7 @@ bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot) {
             if (!Stream.GetByte(Item->bEquipped)) {                     // 06da2600
                 return false;
             }
-            if (!Stream.GetByte(Item->Field_0x0f)) {                    // 06da2620
+            if (!Stream.GetByte(Item->bMission)) {                    // 06da2620
                 return false;
             }
             if (!Stream.GetWord(Item->HardpointSize)) {                 // 06da2647

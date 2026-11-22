@@ -388,7 +388,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             // (DAT_0067e940). The three temporaries die in reverse order (0x00574dd3 temp,
             // 0x00574de7 signature, 0x00574dfe..0x00574e7b the FServerInfo copy).
             G_LoginMgr.LoginName = std::wstring(
-                Account.GetServerSignature(G_LoginMgr.GetCurrentServer().Field_0x64.c_str())
+                Account.GetServerSignature(G_LoginMgr.GetCurrentServer().ServerSig.c_str())
                     .c_str());
             // 0x00574e81..0x00574f04: +0x198 (DAT_0067e950) = L"" (DAT_005c8ce0), through a
             // temporary (EH state 8).

@@ -71,14 +71,14 @@ bool FBaseNpcKnow::IsOffered(FContentPlayerState const* Player, float Feeling) c
 {
     if (!(Feeling >= GBaseNpcRepThresholds[RepLevel]))
         return false;
-    return Player->FindRumor(static_cast<unsigned int>(Field_0x04)) == 0;
+    return Player->FindRumor(static_cast<unsigned int>(InfoIds)) == 0;
 }
 
 // FUN_06ed3fd0 (06ed3fd0-06ed400b).
 bool FBaseNpcKnow::Parse(INI_Reader* Reader)
 {
-    Field_0x08 = Reader->get_value_int(0);
-    Field_0x04 = Reader->get_value_int(1);
+    OfferIds = Reader->get_value_int(0);
+    InfoIds = Reader->get_value_int(1);
     Price = Reader->get_value_int(2);
     RepLevel = static_cast<unsigned int>(Reader->get_value_int(3));
     return RepLevel < 4;

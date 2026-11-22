@@ -43,13 +43,13 @@ ScriptBehavior::ScriptBehavior(ScriptBehavior const& Other)
     , DescFmtStr(Other.DescFmtStr)                                      // .text:0632d85c
 {
     BehaviorId = Other.BehaviorId;                                      // .text:0632d781
-    Field04 = Other.Field04;                                            // .text:0632d786
-    Flag08 = Other.Flag08;                                              // .text:0632d78c
-    Flag09 = Other.Flag09;                                              // .text:0632d792
-    Flag0a = Other.Flag0a;                                              // .text:0632d798
-    Field0c = Other.Field0c;                                            // .text:0632d79e
-    Field10 = Other.Field10;                                            // .text:0632d7a4
-    Flag14 = Other.Flag14;                                              // .text:0632d7aa
+    LocationId = Other.LocationId;                                            // .text:0632d786
+    bApplySpatial = Other.bApplySpatial;                                              // .text:0632d78c
+    bAutoplay = Other.bAutoplay;                                              // .text:0632d792
+    bGenericScript = Other.bGenericScript;                                              // .text:0632d798
+    RelocateLocationId = Other.RelocateLocationId;                                            // .text:0632d79e
+    StartRoomLocationId = Other.StartRoomLocationId;                                            // .text:0632d7a4
+    bBindSingleCharacter = Other.bBindSingleCharacter;                                              // .text:0632d7aa
     for (int I = 0; I < 32; ++I)                                        // .text:0632d7ba
     {
         IdArray[I] = Other.IdArray[I];
@@ -68,10 +68,10 @@ ScriptBehavior::ScriptBehavior(ScriptBehavior const& Other)
         StringArray2Dword[I] = Other.StringArray2Dword[I];
     }
     StringArray2Count = Other.StringArray2Count;                        // .text:0632d807
-    Field220 = Other.Field220;                                          // .text:0632d813
-    Field224 = Other.Field224;                                          // .text:0632d825
-    Field228 = Other.Field228;                                          // .text:0632d83c
-    Field25c = Other.Field25c;                                          // .text:0632d86d
+    DialogType = Other.DialogType;                                          // .text:0632d813
+    OfferArg = Other.OfferArg;                                          // .text:0632d825
+    OfferMissionId = Other.OfferMissionId;                                          // .text:0632d83c
+    RtcId = Other.RtcId;                                          // .text:0632d86d
 }
 
 // .text:0632ddb0. The body is destroy() inlined (free StringArray[i] for i < IdArrayCount,
@@ -89,13 +89,13 @@ ScriptBehavior& ScriptBehavior::operator=(ScriptBehavior const& Other)
 {
     destroy();
     BehaviorId = Other.BehaviorId;                                      // .text:0632e3dd
-    Field04 = Other.Field04;                                            // .text:0632e3e2
-    Flag08 = Other.Flag08;                                              // .text:0632e3e8
-    Flag09 = Other.Flag09;                                              // .text:0632e3ee
-    Flag0a = Other.Flag0a;                                              // .text:0632e3f4
-    Field0c = Other.Field0c;                                            // .text:0632e3fa
-    Field10 = Other.Field10;                                            // .text:0632e400
-    Flag14 = Other.Flag14;                                              // .text:0632e406
+    LocationId = Other.LocationId;                                            // .text:0632e3e2
+    bApplySpatial = Other.bApplySpatial;                                              // .text:0632e3e8
+    bAutoplay = Other.bAutoplay;                                              // .text:0632e3ee
+    bGenericScript = Other.bGenericScript;                                              // .text:0632e3f4
+    RelocateLocationId = Other.RelocateLocationId;                                            // .text:0632e3fa
+    StartRoomLocationId = Other.StartRoomLocationId;                                            // .text:0632e400
+    bBindSingleCharacter = Other.bBindSingleCharacter;                                              // .text:0632e406
 
     IdArrayCount = Other.IdArrayCount;                                  // .text:0632e411
     for (int I = 0; I < IdArrayCount; ++I)                              // .text:0632e434-0632e467
@@ -111,12 +111,12 @@ ScriptBehavior& ScriptBehavior::operator=(ScriptBehavior const& Other)
         StringArray2Dword[I] = Other.StringArray2Dword[I];              // .text:0632e4ad
     }
 
-    Field220 = Other.Field220;                                          // .text:0632e4d5
-    Field224 = Other.Field224;                                          // .text:0632e4e7
-    Field228 = Other.Field228;                                          // .text:0632e4fa
+    DialogType = Other.DialogType;                                          // .text:0632e4d5
+    OfferArg = Other.OfferArg;                                          // .text:0632e4e7
+    OfferMissionId = Other.OfferMissionId;                                          // .text:0632e4fa
     NameFmtStr = Other.NameFmtStr;                                      // .text:0632e500
     DescFmtStr = Other.DescFmtStr;                                      // .text:0632e512
-    Field25c = Other.Field25c;                                          // .text:0632e51e
+    RtcId = Other.RtcId;                                          // .text:0632e51e
     return *this;
 }
 
@@ -127,14 +127,14 @@ ScriptBehavior& ScriptBehavior::operator=(ScriptBehavior const& Other)
 // and then their 0x18 bytes zeroed (REP STOSD x6, .text:0632def7 / 0632df0d).
 void ScriptBehavior::clear()
 {
-    Flag08 = 1;                                                         // .text:0632de78
-    Flag0a = 1;                                                         // .text:0632de7b
-    Flag14 = 1;                                                         // .text:0632de7e
+    bApplySpatial = 1;                                                         // .text:0632de78
+    bGenericScript = 1;                                                         // .text:0632de7b
+    bBindSingleCharacter = 1;                                                         // .text:0632de7e
     BehaviorId = -1;                                                    // .text:0632de82
-    Field04 = 0;                                                        // .text:0632de88
-    Flag09 = 0;                                                         // .text:0632de8b
-    Field0c = 0;                                                        // .text:0632de8e
-    Field10 = 0;                                                        // .text:0632de91
+    LocationId = 0;                                                        // .text:0632de88
+    bAutoplay = 0;                                                         // .text:0632de8b
+    RelocateLocationId = 0;                                                        // .text:0632de8e
+    StartRoomLocationId = 0;                                                        // .text:0632de91
     for (int I = 0; I < 32; ++I)                                        // .text:0632dea0-0632dea9
     {
         IdArray[I] = 0;
@@ -147,14 +147,14 @@ void ScriptBehavior::clear()
         StringArray2Dword[I] = 0;
     }
     StringArray2Count = 0;                                              // .text:0632ded3
-    Field220 = 0;                                                       // .text:0632ded9
-    Field224 = 0;                                                       // .text:0632dedf
-    Field228 = 0;                                                       // .text:0632dee5
+    DialogType = 0;                                                       // .text:0632ded9
+    OfferArg = 0;                                                       // .text:0632dedf
+    OfferMissionId = 0;                                                       // .text:0632dee5
     NameFmtStr.destroy();                                               // .text:0632deeb
     memset(&NameFmtStr, 0, sizeof(NameFmtStr));                         // .text:0632def7
     DescFmtStr.destroy();                                               // .text:0632df01
     memset(&DescFmtStr, 0, sizeof(DescFmtStr));                         // .text:0632df0d
-    Field25c = 0;                                                       // .text:0632df10
+    RtcId = 0;                                                       // .text:0632df10
 }
 
 // .text:0632df20. Releases the owned strings and the FmtStr contents; counts and the other
@@ -177,7 +177,7 @@ unsigned long ScriptBehavior::get_key() const
 {
     // .text:06261d90 (export 2848, ICF-folded with Rect::leftmost, BaseData::get_base_id and
     // a dozen other getters): `MOV EAX,dword ptr [this]; RET` -- the dword at +0x00, which is
-    // BehaviorId. The previous body returned Field04 (+0x04).
+    // BehaviorId. The previous body returned LocationId (+0x04).
     return static_cast<unsigned long>(BehaviorId);
 }
 
@@ -189,13 +189,13 @@ void ScriptBehavior::init(CharacterBehaviorDescription const& Desc)
 {
     destroy();
     BehaviorId = -1;                                                    // .text:0632e599
-    Field04 = static_cast<unsigned>(Desc.Field00);                      // .text:0632e5a1
-    Flag08 = Desc.Field04;                                              // .text:0632e5a7
-    Flag09 = Desc.Field05;                                              // .text:0632e5ad
-    Flag0a = Desc.Field06;                                              // .text:0632e5b3
-    Field0c = Desc.Field08;                                             // .text:0632e5b9
-    Field10 = Desc.Field0c;                                             // .text:0632e5bf
-    Flag14 = Desc.Field10;                                              // .text:0632e5c5
+    LocationId = static_cast<unsigned>(Desc.LocationId);                      // .text:0632e5a1
+    bApplySpatial = Desc.bApplySpatial;                                              // .text:0632e5a7
+    bAutoplay = Desc.bAutoplay;                                              // .text:0632e5ad
+    bGenericScript = Desc.bGenericScript;                                              // .text:0632e5b3
+    RelocateLocationId = Desc.RelocateLocationId;                                             // .text:0632e5b9
+    StartRoomLocationId = Desc.StartRoomLocationId;                                             // .text:0632e5bf
+    bBindSingleCharacter = Desc.bBindSingleCharacter;                                              // .text:0632e5c5
 
     IdArrayCount = Desc.IdArrayCount;                                   // .text:0632e5d0
     for (int I = 0; I < IdArrayCount; ++I)                              // .text:0632e5f0-0632e619
@@ -211,12 +211,12 @@ void ScriptBehavior::init(CharacterBehaviorDescription const& Desc)
         StringArray2Dword[I] = Desc.StringArray2Dword[I];               // .text:0632e656
     }
 
-    Field220 = Desc.Field21c;                                           // .text:0632e674
-    Field224 = Desc.Field220;                                           // .text:0632e680
-    Field228 = Desc.Field224;                                           // .text:0632e699
+    DialogType = Desc.DialogType;                                           // .text:0632e674
+    OfferArg = Desc.OfferArg;                                           // .text:0632e680
+    OfferMissionId = Desc.OfferMissionId;                                           // .text:0632e699
     NameFmtStr = Desc.NameFmtStr;                                       // .text:0632e69f
     DescFmtStr = Desc.DescFmtStr;                                       // .text:0632e6b1
-    Field25c = Desc.Field258;                                           // .text:0632e6bd
+    RtcId = Desc.RtcId;                                           // .text:0632e6bd
 }
 
 // .text:0632df90. Field order on the wire as retail; the bools go through put_bool, which
@@ -224,13 +224,13 @@ void ScriptBehavior::init(CharacterBehaviorDescription const& Desc)
 void ScriptBehavior::marshal(MarshalBuffer* Buf) const
 {
     Buf->put_void(&BehaviorId, 4);                                      // .text:0632dfaa
-    Buf->put_void(&Field04, 4);                                         // .text:0632dfbf
-    Buf->put_bool(Flag08 != 0);                                         // .text:0632dfcc
-    Buf->put_bool(Flag09 != 0);                                         // .text:0632dfd9
-    Buf->put_bool(Flag0a != 0);                                         // .text:0632dfe6
-    Buf->put_void(&Field0c, 4);                                         // .text:0632dffb
-    Buf->put_void(&Field10, 4);                                         // .text:0632e010
-    Buf->put_bool(Flag14 != 0);                                         // .text:0632e01d
+    Buf->put_void(&LocationId, 4);                                         // .text:0632dfbf
+    Buf->put_bool(bApplySpatial != 0);                                         // .text:0632dfcc
+    Buf->put_bool(bAutoplay != 0);                                         // .text:0632dfd9
+    Buf->put_bool(bGenericScript != 0);                                         // .text:0632dfe6
+    Buf->put_void(&RelocateLocationId, 4);                                         // .text:0632dffb
+    Buf->put_void(&StartRoomLocationId, 4);                                         // .text:0632e010
+    Buf->put_bool(bBindSingleCharacter != 0);                                         // .text:0632e01d
     Buf->put_void(&IdArrayCount, 4);                                    // .text:0632e035
     for (int I = 0; I < IdArrayCount; ++I)                              // .text:0632e050-0632e07b
     {
@@ -243,12 +243,12 @@ void ScriptBehavior::marshal(MarshalBuffer* Buf) const
         Buf->put_string(StringArray2[I]);                               // .text:0632e0ad
         Buf->put_void(&StringArray2Dword[I], 4);                        // .text:0632e0c1
     }
-    Buf->put_void(&Field220, 4);                                        // .text:0632e0e7
-    Buf->put_void(&Field224, 4);                                        // .text:0632e0ff
-    Buf->put_void(&Field228, 4);                                        // .text:0632e117
+    Buf->put_void(&DialogType, 4);                                        // .text:0632e0e7
+    Buf->put_void(&OfferArg, 4);                                        // .text:0632e0ff
+    Buf->put_void(&OfferMissionId, 4);                                        // .text:0632e117
     Buf->put_FmtStr(NameFmtStr);                                        // .text:0632e125
     Buf->put_FmtStr(DescFmtStr);                                        // .text:0632e133
-    Buf->put_void(&Field25c, 4);                                        // .text:0632e14b
+    Buf->put_void(&RtcId, 4);                                        // .text:0632e14b
 }
 
 // .text:0632e160. No clear(), no clamp: every field is overwritten in place (string slots
@@ -266,15 +266,15 @@ void ScriptBehavior::unmarshal(MarshalBuffer* Buf)
     Buf->get_void(&Scratch, 4);                                         // .text:0632e18b
     BehaviorId = static_cast<int>(Scratch);                             // .text:0632e19a
     Buf->get_void(&Scratch, 4);                                         // .text:0632e19f
-    Field04 = Scratch;                                                  // .text:0632e1aa
-    Flag08 = Buf->get_bool();                                           // .text:0632e1b4
-    Flag09 = Buf->get_bool();                                           // .text:0632e1be
-    Flag0a = Buf->get_bool();                                           // .text:0632e1cf
+    LocationId = Scratch;                                                  // .text:0632e1aa
+    bApplySpatial = Buf->get_bool();                                           // .text:0632e1b4
+    bAutoplay = Buf->get_bool();                                           // .text:0632e1be
+    bGenericScript = Buf->get_bool();                                           // .text:0632e1cf
     Buf->get_void(&Scratch, 4);                                         // .text:0632e1d2
-    Field0c = Scratch;                                                  // .text:0632e1e4
+    RelocateLocationId = Scratch;                                                  // .text:0632e1e4
     Buf->get_void(&Scratch, 4);                                         // .text:0632e1e7
-    Field10 = Scratch;                                                  // .text:0632e1f0
-    Flag14 = Buf->get_bool();                                           // .text:0632e203
+    StartRoomLocationId = Scratch;                                                  // .text:0632e1f0
+    bBindSingleCharacter = Buf->get_bool();                                           // .text:0632e203
     Buf->get_void(&Scratch, 4);                                         // .text:0632e206
     IdArrayCount = static_cast<int>(Scratch);                           // .text:0632e213
     for (int I = 0; I < IdArrayCount; ++I)                              // .text:0632e221-0632e24b
@@ -292,14 +292,14 @@ void ScriptBehavior::unmarshal(MarshalBuffer* Buf)
         StringArray2Dword[I] = Scratch;                                 // .text:0632e28d
     }
     Buf->get_void(&Scratch, 4);                                         // .text:0632e2a6
-    Field220 = Scratch;                                                 // .text:0632e2b8
+    DialogType = Scratch;                                                 // .text:0632e2b8
     Buf->get_void(&Scratch, 4);                                         // .text:0632e2be
-    Field224 = Scratch;                                                 // .text:0632e2d0
+    OfferArg = Scratch;                                                 // .text:0632e2d0
     Buf->get_void(&Scratch, 4);                                         // .text:0632e2d6
-    Field228 = Scratch;                                                 // .text:0632e2e3
+    OfferMissionId = Scratch;                                                 // .text:0632e2e3
     NameFmtStr = Buf->get_FmtStr();                                     // .text:0632e2ec / 0632e300
     DescFmtStr = Buf->get_FmtStr();                                     // .text:0632e31c / 0632e330
     unsigned int TrailingScratch = 0;
     Buf->get_void(&TrailingScratch, 4);                                 // .text:0632e34b
-    Field25c = TrailingScratch;                                         // .text:0632e358
+    RtcId = TrailingScratch;                                         // .text:0632e358
 }

@@ -2549,7 +2549,7 @@ FNebulaCloudsListStorage::~FNebulaCloudsListStorage()
 }
 
 FNebulaEffect::FNebulaEffect()
-    : Field24(0), Field28(0), Flag2C(0), Field30(0)
+    : ActiveExclusionZone(0), ExclusionImmersion(0), Flag2C(0), ActiveExclusionShell(0)
 {
     FNebulaEffect* const This = this;
     // FUN_00504970: member construction registers the native cleanup order for exceptions.
@@ -3566,18 +3566,18 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
     // FUN_005b7010(0) seeds the format id, TextureLib slot 23 (+0x5c, GetGroupPixelFormat) reads
     // the shape record's, then FUN_00552420's body inline -- ids 10..14 have alpha, any other id
     // takes its descriptor's +0x48 byte (FUN_005b7030).
-    if (BoundShape->Field04 < 0)
+    if (BoundShape->AlphaCache < 0)
     {
         int Format = PixelFormatFromD3D(0);
         DALib::TextureLib->GetGroupPixelFormat(BoundShape->Texture, nullptr, &Format);
         unsigned char bHasAlpha = 1;
         if (Format < 10 || Format > 14)
             bHasAlpha = static_cast<unsigned char>(PixelFormatGetDesc(Format)->HasAlpha & 0xffu);
-        BoundShape->Field04 = bHasAlpha;
+        BoundShape->AlphaCache = bHasAlpha;
     }
     // 0x0050836f..0x00508387: FUN_004220c0(5, 6) with alpha, (2, 2) without. The SETNZ result
     // is kept ([ESP+0xf]) and picks the colour call per bolt below.
-    bool const bHasAlpha = BoundShape->Field04 != 0;
+    bool const bHasAlpha = BoundShape->AlphaCache != 0;
     if (bHasAlpha)
         Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
     else

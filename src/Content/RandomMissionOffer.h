@@ -151,9 +151,8 @@ public:
     int SpeakerKind;                            // +0x40 FRmCommLine::Speaker
     int TargetKind;                             // +0x44 FRmCommSequence::Target
     TString<0x40> Text;                         // +0x48 FRmCommLine::Text
-    // +0x8c: TODO: meaning; CanPlay needs it non-zero, the ctor and FUN_06f9e770 leave it 0
-    // (writer not found yet -- the runtime machine side).
-    unsigned char Field_0x8c;
+    // +0x8c: set to 1 by FRmOfferComponent::PrepareConversation; checked by CanPlay.
+    unsigned char bPrepared;
 };
 
 // TU61 -- conversation base with a copy (vtable 06fbc690: FGcsConversation's five slots with
@@ -244,7 +243,7 @@ struct FRmLootSpawn : public FMissionLoot
     // +0xfc: 2 marks the critical loot (FUN_06f89650 and LAB_06f896f0 count its +0x94 units
     // and take its +0x104). TODO: the other values.
     int Kind = 0;
-    int Field_0x100 = 0;                        // +0x100 TODO: meaning
+    int CriticalLootMode = 0;                   // +0x100 0=none, 1=destroy, 2=tractor, 3=bring_back
     // +0x104: the critical loot record (LAB_06f896f0 appends its +0x08 Name as a loot).
     FRmCriticalLoot const* CriticalLoot = nullptr;
 };
@@ -265,8 +264,8 @@ public:
     // &offer+0x1e0 only on the FUN_06f9c100 path (06f9c3d2). FUN_06f88940 keeps the name
     // reserved while one ship carries it.
     FNpcNameParams* TargetName = nullptr;
-    int Field_0xd8 = 2;                         // +0xd8 TODO: meaning
-    int Field_0xdc = 1;                         // +0xdc TODO: meaning
+    int TargetFlags = 2;                        // +0xd8 2 = required kill target, 0 = optional
+    int ShipKind = 1;                           // +0xdc 2 = assassination target/big ship, 1 = escort
     std::vector<FRmLootSpawn> Loot;             // +0xe0 (alloc byte) / +0xe4..+0xec
 };
 
@@ -276,18 +275,18 @@ struct FRmShipGroup
 {
     FRmShipGroup();                             // FUN_06f865e0
 
-    unsigned char Field_0x00 = 1;               // +0x00 ship block +0x00. TODO: meaning
-    unsigned char Field_0x01 = 0;               // +0x01 TODO: meaning (read by FUN_06f88940)
-    unsigned char Field_0x02 = 0;               // +0x02 ship block +0x03. TODO: meaning
-    int Field_0x04 = 0;                         // +0x04 ship block +0x18. TODO: meaning
-    int Field_0x08 = -1;                        // +0x08 ship block +0x1c. TODO: meaning
+    unsigned char bRequired = 1;                // +0x00 ship block +0x00
+    unsigned char bSpawned = 0;                 // +0x01 set to 1 by SpawnShipGroup (read by FUN_06f88940)
+    unsigned char bClearPriorTargets = 0;       // +0x02 ship block +0x03
+    int SpawnTriggerMode = 0;                   // +0x04 ship block +0x18 (0=imm, 1=phase delay, 2=wave delay, 3=count)
+    int SpawnTriggerParam = -1;                 // +0x08 ship block +0x1c (seconds or remaining ship count)
     FSystemInfo* System = nullptr;              // +0x0c FindSystemInfo(query DestSys)
     FMatrix Orientation;                        // +0x10 identity
     Vector Position;                            // +0x34 the objective position
-    float Field_0x40 = -2.0f;                   // +0x40 DAT_06fbc2e8; 0.9 / -0.9. TODO: meaning
-    TString<0x30> Name;                         // +0x44 (FUN_06f85020 builds it)
-    int Field_0x78 = 0;                         // +0x78 TODO: meaning
-    int Field_0x7c = -1;                        // +0x7c TODO: meaning
+    float Attitude = -2.0f;                     // +0x40 DAT_06fbc2e8; 0.9 friendly / -0.9 hostile
+    TString<0x30> Name;                         // +0x44 arrival solar nickname (read by SpawnShipGroup)
+    int ArrivalObjId = 0;                       // +0x78 fallback arrival dock object ID
+    int ArrivalDockIndex = -1;                  // +0x7c arrival dock hardpoint index
     ID_String Formation;                        // +0x80 CreateID("transport_liberty")
     std::vector<FRmShipSpawn> Ships;            // +0x84 (alloc byte) / +0x88..+0x90
     unsigned int Serial;                        // +0x94 ++DAT_06fd3c08
@@ -306,7 +305,7 @@ struct FRmSolarSpawn : public FMissionSolar
     // +0x4c8: the solar's attitude towards the players (DAT_06fbc2e8 -2.0 = none; FUN_06f9af40
     // -0.9). FUN_06f926b0 sets it with pub::Reputation::SetAttitude and keeps it in the
     // record's Attitude.
-    float Field_0x4c8 = -2.0f;
+    float Attitude = -2.0f;
     FRmKillableSolar const* Arch = nullptr;     // +0x4cc KillableSolars entry
     int SolarType = -1;                         // +0x4d0 GRmSolarTypes value
     unsigned int DestSys = 0;                   // +0x4d4 the mission system
@@ -314,11 +313,10 @@ struct FRmSolarSpawn : public FMissionSolar
     // flags), 0 otherwise. FUN_06f926b0: bit 0 makes the solar invincible; the value becomes
     // the record's Flags. TODO: exact meaning of 2.
     int ModeFlag = 1;
-    // +0x4dc: SetInvincible's duration when ModeFlag bit 0 is set (FUN_06f926b0 06f92c3f, a
-    // float pushed as a dword).
-    float InvincibleDuration = 0.0f;
-    // +0x4e0: SetInvincible's third argument (FUN_06f926b0 06f92c4e). TODO: meaning.
-    unsigned char Field_0x4e0 = 0;
+    // +0x4dc: SetInvincible's MaxHpLoss when ModeFlag bit 0 is set (FUN_06f926b0 06f92c3f).
+    float MaxHpLoss = 0.0f;
+    // +0x4e0: SetInvincible's third argument (!bFromPlayers, FUN_06f926b0 06f92c4e).
+    unsigned char bPlayerCanDamage = 0;
     int Hitpoints = -1;                         // +0x4e4
     std::vector<FRmLootSpawn> Loot;             // +0x4e8 (alloc byte) / +0x4ec..+0x4f4
 };
@@ -355,8 +353,8 @@ public:
     FRmTargetShipComponent() = default;         // inline at 06f882d1-06f88303
     ~FRmTargetShipComponent() override;         // FUN_06f88500 (ICF)
 
-    int Field_0x50 = 0;                         // +0x50 TODO: meaning
-    int Field_0x54 = -1;                        // +0x54 TODO: meaning
+    int EndTriggerMode = 0;                     // +0x50 0=none, 1=timer, 2=ship count, 3=ship health
+    int EndTriggerParam = -1;                   // +0x54 seconds / ship count / health percent
 };
 
 // TU61 -- solar component (retail 0x4c bytes, vtable 06fbc8bc: [0] FUN_06f88ad0 / dtor

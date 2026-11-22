@@ -88,15 +88,15 @@ struct FEngBaseFileSystemDesc
     const char* ComponentName;
     const char* BackendName;
     const char* DataPath;
-    unsigned long Field10;
-    unsigned long Field14;
-    unsigned long Field18;
-    unsigned long Field1C;
-    unsigned long Field20;
-    unsigned long Field24;
-    unsigned long Field28;
-    unsigned long Field2C;
-    unsigned long Field30;
+    unsigned long Access;
+    unsigned long ShareMode;
+    unsigned long Security;
+    unsigned long Creation;
+    unsigned long Flags;
+    unsigned long TemplateFile;
+    unsigned long Parent;
+    unsigned long Extra;
+    unsigned long FindHandle;
 };
 
 // FEngineObject holds a real std::map (the instance-root map), so only the facet offset is
@@ -770,7 +770,7 @@ static unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.FindHandle = (unsigned long)FindHandle;
             void* NestedFs = nullptr;
             Fs->CreateInstance((AGGDESC*)(&Desc), &NestedFs);
             if (((FindData.dwFileAttributes >> 4) & 1) != 0)
@@ -1280,7 +1280,7 @@ static unsigned long DACOM_API TypedBind(FTypedChannel* This, unsigned long* Hea
     This->LoopFlags = Header[1];
     This->Weight = HeaderF[2];
     This->Scale = HeaderF[4];
-    This->Field_0x30 = HeaderF[5];
+    This->TranslationScale = HeaderF[5];
     This->SetTime(HeaderF[0]);
     This->PlayFlags &= ~3UL;
     return This->PlayFlags;
@@ -1319,7 +1319,7 @@ static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsign
     }
     const float* HeaderF = (const float*)Header;
     const float* Block = (const float*)((size_t)(Header[6]));
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Field14));
+    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Instance));
     if (HeaderF[0] == 0.0f || (Header[1] & 0x40) != 0)
     {
         if (Block != nullptr)
@@ -1344,7 +1344,7 @@ static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsign
     This->Interpolate(Pose, (const float*)KeyA,
                                            (const float*)KeyB,
                                            (double)Alpha);
-    const double Factor = (double)(This->Field_0x30) * (double)(This->Scale);
+    const double Factor = (double)(This->TranslationScale) * (double)(This->Scale);
     float Pos[3];
     Pos[0] = (float)((double)(Pose[0]) * Factor);
     Pos[1] = (float)((double)(Pose[1]) * Factor);
@@ -1418,9 +1418,9 @@ static unsigned long ChannelPayloadBytesFromFlags(unsigned long Flags)
 static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* Map, void* Bind)
 {
     This->Kind = Map[0];
-    This->Field0C = Map[1];
-    This->Field10 = Map[2];
-    This->Field14 = Map[3];
+    This->Sink = Map[1];
+    This->SinkContext = Map[2];
+    This->Instance = Map[3];
     This->Bind = Bind;
     if (This->Owner != nullptr)
         return 1;
@@ -1430,7 +1430,7 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     if (This->Kind == 0 && G_AnimEngine != nullptr)
     {
         unsigned long* Relative = G_AnimEngine->GetInstanceRelative(
-            (void*)(This->Field14));
+            (void*)(This->Instance));
         unsigned long MixKind = 0;
         if (Relative != nullptr)
         {
@@ -1597,7 +1597,7 @@ static unsigned long DACOM_API TypedLerpScaledVec3(FVectorTypedChannel* This, fl
     Out[0] = Out0;
     Out[1] = Out1;
     Out[2] = Out2;
-    const double Factor = (double)(This->Field_0x30) * (double)(This->Scale);
+    const double Factor = (double)(This->TranslationScale) * (double)(This->Scale);
     Out[0] = (float)(Factor * (double)(Out[0]));
     Out[1] = (float)(Factor * (double)(Out[1]));
     Out[2] = (float)(Factor * (double)(Out[2]));
@@ -1856,7 +1856,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
         Result = TypedCollect(This, OldTime, This->Time, 3, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)                                       // 0661b4d6..d8
             return Result;
-        void* Sink = (void*)((size_t)(This->Field0C));
+        void* Sink = (void*)((size_t)(This->Sink));
         if (Sink == nullptr)                                     // 0661b4de..e3
             return Result;
         FChannelKeyBatch Batch;                                  // frame +0xA0
@@ -1865,7 +1865,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
         IChannelSink* KeySink = (IChannelSink*)Sink;
         KeySink->OnKeys((unsigned long)((size_t)This),
-                        (void*)((size_t)(This->Field10)),
+                        (void*)((size_t)(This->SinkContext)),
                         &Batch);                                  // 0661b50c..1c
         return Result;
     }
@@ -1916,13 +1916,13 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
                 Math->QuaternionToMatrix(*(FMatrix*)(&Frame[12]),
                                          *(const FQuaternion*)(Pose->AppliedQuat));
                 std::memcpy(Frame, &Frame[12], 9 * sizeof(float)); // 0661b648..5d
-                void* Sink = (void*)((size_t)(This->Field0C));
+                void* Sink = (void*)((size_t)(This->Sink));
                 if (Sink != nullptr)                             // 0661b65b..6e
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
                     LoopSink->OnLoop((unsigned long)((size_t)This),
                                      Frame,
-                                     (void*)((size_t)(This->Field10)));
+                                     (void*)((size_t)(This->SinkContext)));
                 }
             }
             // 0661b673..0661b6d6: rebind at the start the channel wraps back to.
@@ -1934,7 +1934,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
             std::memcpy(&Header[2], &This->Weight, sizeof(float));
             Header[3] = 0;
             std::memcpy(&Header[4], &This->Scale, sizeof(float));
-            std::memcpy(&Header[5], &This->Field_0x30, sizeof(float));
+            std::memcpy(&Header[5], &This->TranslationScale, sizeof(float));
             Header[6] = This->Kind == 1
                             ? (unsigned long)((size_t)(&Frame[0]))
                             : 0;
@@ -1963,7 +1963,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
             std::memcpy(&Header[2], &NewWeight, sizeof(float));
             Header[3] = 0;
             std::memcpy(&Header[4], &This->Scale, sizeof(float));
-            std::memcpy(&Header[5], &This->Field_0x30, sizeof(float));
+            std::memcpy(&Header[5], &This->TranslationScale, sizeof(float));
             Header[6] = 0;
             This->BindHeader(Header);
         }
@@ -2008,9 +2008,9 @@ static unsigned long DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* T
     const float P1Scaled = P1 * This->Scale;
     const double P2Scaled = P2 * (double)(This->Scale);
     float Pos[3];
-    Pos[0] = P0Scaled * This->Field_0x30;
-    Pos[1] = P1Scaled * This->Field_0x30;
-    Pos[2] = (float)(P2Scaled * (double)(This->Field_0x30));
+    Pos[0] = P0Scaled * This->TranslationScale;
+    Pos[1] = P1Scaled * This->TranslationScale;
+    Pos[2] = (float)(P2Scaled * (double)(This->TranslationScale));
     float Xformed[3];
     MathTransformMatrix(Acquire3DMathEngine(), Xformed, This->Matrix, Pos);
     This->Delta[0] = Target[0] - Xformed[0];
@@ -2086,7 +2086,7 @@ static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChanne
     const unsigned long Kind = This->Kind;
     if (Kind == 1)
     {
-        const double Factor = (double)(This->Field_0x30) * (double)(This->Scale);
+        const double Factor = (double)(This->TranslationScale) * (double)(This->Scale);
         float Pos[3];
         Pos[0] = (float)((double)(Local[0]) * Factor);
         Pos[1] = (float)((double)(Local[1]) * Factor);
@@ -2259,7 +2259,7 @@ static void TypedType6SampleXform(FPosQuatTypedChannel* This, float Time, const 
     V[0] = V[0] + A[0];
     V[1] = V[1] + A[1];
     V[2] = V[2] + A[2];
-    const double Factor = (double)(This->Scale) * (double)(This->Field_0x30);
+    const double Factor = (double)(This->Scale) * (double)(This->TranslationScale);
     V[0] = (float)((double)(V[0]) * Factor);
     V[1] = (float)((double)(V[1]) * Factor);
     V[2] = (float)((double)(V[2]) * Factor);
@@ -2306,9 +2306,9 @@ static void TypedType6ScaledFrame(FPosQuatTypedChannel* This, unsigned char bLas
     Scaled[0] = This->Scale * Frame[0];
     Scaled[1] = This->Scale * Frame[1];
     Scaled[2] = This->Scale * Frame[2];
-    Out[0] = Scaled[0] * This->Field_0x30;
-    Out[1] = Scaled[1] * This->Field_0x30;
-    Out[2] = Scaled[2] * This->Field_0x30;
+    Out[0] = Scaled[0] * This->TranslationScale;
+    Out[1] = Scaled[1] * This->TranslationScale;
+    Out[2] = Scaled[2] * This->TranslationScale;
 }
 
 // LAB_0661bd30, the type-6 table's slot 0x38, thiscall RET 0x8 (Out, Dt), 0661bd30..0661c26b.
@@ -2347,7 +2347,7 @@ static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, flo
     Lerp[0] = KeyA[0] + Lerp[0];
     Lerp[1] = KeyA[1] + Lerp[1];
     Lerp[2] = KeyA[2] + Lerp[2];
-    const double Factor = (double)(This->Scale) * (double)(This->Field_0x30);
+    const double Factor = (double)(This->Scale) * (double)(This->TranslationScale);
     float Now[3];
     Now[0] = (float)((double)(Lerp[0]) * Factor);
     Now[1] = (float)((double)(Lerp[1]) * Factor);
@@ -2434,7 +2434,7 @@ static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel
     Quat[1] = Pose[4];
     Quat[2] = Pose[5];
     Quat[3] = Pose[6];
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Field14));
+    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Instance));
     const float* InstanceOrient = G_AnimEngine->GetInstanceOrientation(Instance);
     float Transposed[9];                                         // FUN_0661caa0
     Transposed[0] = InstanceOrient[0];
@@ -2541,7 +2541,7 @@ static void TypedResetPlayState(FTypedChannel* This)
     This->Weight = 1.0f;
     This->Scale = 1.0f;
     This->PlayFlags &= 0xFFFFFFF8u;
-    This->Field_0x30 = 1.0f;
+    This->TranslationScale = 1.0f;
 }
 
 // FUN_0661ad50 thiscall RET 4 (Owner), 0661ad50..7d: +4 Owner, +8 Kind 2, +0x14 -1,
@@ -2551,9 +2551,9 @@ FTypedChannel::FTypedChannel(IChannelOwner* NewOwner)
 {
     Owner = NewOwner;
     Kind = 2;
-    Field14 = 0xFFFFFFFF;
-    Field0C = 0;
-    Field10 = 0;
+    Instance = 0xFFFFFFFF;
+    Sink = 0;
+    SinkContext = 0;
     Archetype = nullptr;
     TypedResetPlayState(this);
 }
@@ -2564,9 +2564,9 @@ FTypedChannel::FTypedChannel(FChannelArchetypeObject* NewArchetype)
 {
     Owner = nullptr;
     Kind = 2;
-    Field14 = 0xFFFFFFFF;
-    Field0C = 0;
-    Field10 = 0;
+    Instance = 0xFFFFFFFF;
+    Sink = 0;
+    SinkContext = 0;
     Archetype = NewArchetype;
     if (NewArchetype != nullptr)
         NewArchetype->AddRef();
@@ -3497,11 +3497,11 @@ static void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, c
     Desc->ComponentName = G_NameFileSystem;
     Desc->BackendName = Backend;
     Desc->DataPath = Path;
-    Desc->Field10 = 0x80000000;
-    Desc->Field14 = 1;
-    Desc->Field1C = 3;
-    Desc->Field20 = 0x8000080;
-    Desc->Field30 = 0xFFFFFFFF;
+    Desc->Access = 0x80000000;
+    Desc->ShareMode = 1;
+    Desc->Creation = 3;
+    Desc->Flags = 0x8000080;
+    Desc->FindHandle = 0xFFFFFFFF;
 }
 
 // 0662002f..0662003d: Path[1] == ':' or Path[0] == '\\' && Path[1] == '\\'. No other test.
@@ -4577,7 +4577,7 @@ static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback)
     std::memcpy(&Header[2], &Longest->Weight, sizeof(float));
     Header[3] = 0;
     std::memcpy(&Header[4], &Longest->Scale, sizeof(float));
-    std::memcpy(&Header[5], &Longest->Field_0x30, sizeof(float));
+    std::memcpy(&Header[5], &Longest->TranslationScale, sizeof(float));
     Header[6] = 0;
     return PlaybackBindAll(Playback, (float*)Header, 0);
 }
@@ -4686,7 +4686,7 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.FindHandle = (unsigned long)FindHandle;
             const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
             if (Handle == -1)
                 continue;
@@ -4700,7 +4700,7 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
             continue;
         FEngBaseFileSystemDesc Desc;
         FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-        Desc.Field30 = (unsigned long)FindHandle;
+        Desc.FindHandle = (unsigned long)FindHandle;
         void* MapFs = nullptr;
         Fs->CreateInstance((AGGDESC*)(&Desc), &MapFs); // +0xC
         if (std::strncmp(FindData.cFileName, G_NameEventMap, G_EventMapLength) != 0)
@@ -5011,7 +5011,7 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
 {
     FEngBaseFileSystemDesc PartDesc;
     FillFileSystemDesc(&PartDesc, Name, nullptr);
-    PartDesc.Field30 = FindHandle;
+    PartDesc.FindHandle = FindHandle;
     void* FileFs = nullptr;
     void* PartFs = nullptr;
     GENRESULT ObjectResult = (GENRESULT)0xFFFFFFFF;
@@ -5220,7 +5220,7 @@ static void ParseConsConstraints(FArchetypeHandle* Handle, IFileSystem* Fs)
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.FindHandle = (unsigned long)FindHandle;
             const int File = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
             if (File == -1)
                 continue;

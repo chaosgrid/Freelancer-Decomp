@@ -18,7 +18,7 @@
 // vftable 0x005d0eec (47 slots) -- WinControl's 45 with these overrides:
 //    0 FUN_0047fd30 scalar deleting dtor (dtor FUN_00477da0)
 //    5 FUN_0047fbb0 SetPosition     9 FUN_0047b3e0 Create       11 FUN_0047b310 Update
-//   13 FUN_00479700 Draw           23 FUN_0047ade0 Slot23       42 FUN_00479d10 SetProperty
+//   13 FUN_00479700 Draw           23 FUN_0047ade0 ProcessMessage       42 FUN_00479d10 SetProperty
 // and two slots of its own:
 //   45 (+0xb4) FUN_00478100 -- builds the window's controls (called by BindControls on the
 //      first Update after Create); NN_Dealer overrides it with FUN_00480d10
@@ -104,7 +104,7 @@ private:
     FInventoryShipModel& operator=(FInventoryShipModel const&) = delete;
 };
 
-// Result callback at +0x500 (cdecl): called by Slot23 0xef02 with (byte +0x4e5, +0x504).
+// Result callback at +0x500 (cdecl): called by ProcessMessage 0xef02 with (byte +0x4e5, +0x504).
 typedef void (*FNnInventoryResultFn)(unsigned char Result, void* Arg);
 
 // Number of item rows the window shows at once (every per-row array below is [5]).
@@ -132,21 +132,21 @@ public:
     // slot 13 FUN_00479700
     void Draw() override;
     // slot 23 FUN_0047ade0 -- 0xef02 closes the window, 0xef01 shows it
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 FUN_00479d10
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     // --- NN_Inventory's own slots ---
     // slot 45 (+0xb4) FUN_00478100 -- build the controls
-    virtual void Slot45();
+    virtual void CreateControls();
     // slot 46 (+0xb8) FUN_0044fd00 -- false
-    virtual bool Slot46();
+    virtual bool IsScanner();
 
     // FUN_00477ee0 -- the field reset every ctor runs (NN_Dealer's twice).
     void ResetFields();
     // FUN_0047ad20 -- close the window: hide the partner dealer (trade mode 0), show the
     // player's loadout again, run the result callback once, then unlink, delete the subtree,
-    // Destroy and delete this. Slot23 0xef02 runs the same body (inlined in retail); NN_Scanner
+    // Destroy and delete this. ProcessMessage 0xef02 runs the same body (inlined in retail); NN_Scanner
     // calls it at 0x004b719a / 0x004b71ef.
     void Close();
     // FUN_0047b410 -- first Update after Create: slot 45, then look every control up by name.
@@ -249,10 +249,10 @@ public:
     WinControl* TransferPriceText;    // +0x380 "TransferPriceText" -- NN_Dealer's slot 45 stores
                                       // it on the dealer (0x00481cc0); not written by the ctor
     WinControl* PlayerTitle;          // +0x384 "PlayerTitle"
-    int Field388;                     // +0x388
-    int Field38c;                     // +0x38c
-    unsigned Field390;                // +0x390 -- an archetype id (Draw 0x00479871)
-    CacheString Field394;             // +0x394
+    int TransferItemUnitPrice;                     // +0x388
+    int TransferItemMaxCount;                     // +0x38c
+    unsigned TransferItemArchId;                // +0x390 -- an archetype id (Draw 0x00479871)
+    CacheString PendingMountHardpoint;             // +0x394
     // +0x398..+0x3a0: the dealer's three-pane info card -- NN_Dealer's slot 45 creates them with
     // FUN_005a10e0 (0x004811d5 / 0x00481218 / 0x0048125c, each hidden at once); NN_Dealer's
     // Update copies them into the partner inventory (0x0047ff1c..0x0047ff46). ShowInfoCard and
@@ -264,16 +264,16 @@ public:
     EquipDescList SavedLoadout;       // +0x3a8 -- EquipDescList (VC6 list: +0x3ac head, +0x3b0
                                       // size); SetProperty 0x0047a697 assigns the player's list
     WinControl* PlayerCash;           // +0x3b4 "PlayerCash"
-    unsigned char Field3b8;           // +0x3b8
-    unsigned char Field3b9;           // +0x3b9
+    unsigned char bTradePending;           // +0x3b8
+    unsigned char bCheckHardpointAfterBuy;           // +0x3b9
     unsigned char Pad3ba[2];
-    unsigned Field3bc;                // +0x3bc -- a good id (written by FUN_0047eab0 0x0047ee67,
+    unsigned PendingBuyGoodId;                // +0x3bc -- a good id (written by FUN_0047eab0 0x0047ee67,
                                       // not by the ctor); RefreshItemList reads it after +0x3b9
-    unsigned char Field3c0;           // +0x3c0
-    unsigned char Field3c1;           // +0x3c1
+    unsigned char bCheckStockAfterBuy;           // +0x3c0
+    unsigned char bDeselectBoughtGoodIfEmpty;           // +0x3c1
     unsigned char Pad3c2[2];
     int FirstRow;                     // +0x3c4 -- list index shown in row 0
-    int Field3c8;                     // +0x3c8 -- -1
+    int LastRowCount;                     // +0x3c8 -- -1
     int HoverIndex;                   // +0x3cc -- -1 = none
     WinControl* InventoryScroll;      // +0x3d0 "Inventory_Scroll"
     WinControl* FilterWeapons;        // +0x3d4 "Filter_Weapons"
@@ -298,43 +298,43 @@ public:
     WinControl* InfoCardClose;        // +0x4c0 "InfoCard_Close"
     WinControl* InfoCardView;         // +0x4c4 "InfoCard_View"
     WinControl* InfoCardScroll;       // +0x4c8 "InfoCard_Scroll"
-    WinControl* Field4cc;             // +0x4cc "Empty_Cargobar" -- Draw's bar controls (+0x84 instance)
-    WinControl* Field4d0;             // +0x4d0 "Full_Cargobar"
-    WinControl* Field4d4;             // +0x4d4 "SelectedCargobar"
+    WinControl* EmptyCargoBar;             // +0x4cc "Empty_Cargobar" -- Draw's bar controls (+0x84 instance)
+    WinControl* FullCargoBar;             // +0x4d0 "Full_Cargobar"
+    WinControl* SelectedCargoBar;             // +0x4d4 "SelectedCargobar"
     WinControl* CloseButton;          // +0x4d8 "Inventory_Close" (slot 45)
     WinControl* CargoLabel;           // +0x4dc "CargoLabel" (slot 45 stores it)
-    unsigned char Field4e0;           // +0x4e0
-    unsigned char Field4e1;           // +0x4e1
-    unsigned char Field4e2;           // +0x4e2
-    unsigned char Field4e3;           // +0x4e3
-    unsigned char Field4e4;           // +0x4e4
+    unsigned char bShowShipInfoCard;           // +0x4e0
+    unsigned char Field4e1;           // +0x4e1 -- vestigial (only zeroed and passed to FInventoryShipModel::Stub_0053e4a0)
+    unsigned char Field4e2;           // +0x4e2 -- vestigial (only zeroed and passed to FInventoryShipModel::Stub_0053e4a0)
+    unsigned char Field4e3;           // +0x4e3 -- vestigial jettison-lock flag (tested == 0, never set to 1 in retail)
+    unsigned char Field4e4;           // +0x4e4 -- vestigial write-only confirm-dismissed flag
     unsigned char Result4e5;          // +0x4e5 -- passed to the result callback
-    unsigned char Field4e6;           // +0x4e6
+    unsigned char bSelectedSellable;           // +0x4e6
     unsigned char bNeedBind;          // +0x4e7 -- Create sets it; BindControls clears it
-    unsigned Field4e8;                // +0x4e8
-    unsigned Field4ec;                // +0x4ec
-    int Field4f0;                     // +0x4f0
+    unsigned ShownInfoArchId;                // +0x4e8
+    unsigned ShownInfoIds;                // +0x4ec
+    int Field4f0;                     // +0x4f0 -- vestigial (only zeroed in ResetFields)
     EquipDesc* SelectedItem;          // +0x4f4 -- GetSelectedItem's cache (FUN_0047e790)
-    int Field4f8;                     // +0x4f8 (not written by the ctor)
-    int Field4fc;                     // +0x4fc (not written by the ctor)
+    int Field4f8;                     // +0x4f8 -- unreferenced in retail Freelancer.exe
+    int Field4fc;                     // +0x4fc -- unreferenced in retail Freelancer.exe
     FNnInventoryResultFn ResultFn;    // +0x500
     void* ResultArg;                  // +0x504
     wchar_t ToolTipText[0xff];        // +0x508 -- SetProperty 0x4f swprintf target
     wchar_t ToolTipFormat[0xff];      // +0x706 -- IDS 0x49b
-    int Field904;                     // +0x904
-    int Field908;                     // +0x908 -- -1
-    int Field90c;                     // +0x90c -- -1
-    int Field910;                     // +0x910
-    float Field914;                   // +0x914 -- counted down by Update
-    int Field918;                     // +0x918
+    int Field904;                     // +0x904 -- vestigial (only zeroed in ResetFields)
+    int LastEquipRevision;                     // +0x908 -- -1
+    int LastCollisionRevision;                     // +0x90c -- -1
+    int HoveredCargoVolume;                     // +0x910
+    float JettisonCooldown;                   // +0x914 -- counted down by Update
+    int Field918;                     // +0x918 -- vestigial (only zeroed in ResetFields)
     WinControl* QuantityControl[8];   // +0x91c..+0x938 -- ShowQuantityControls
-    int Field93c;                     // +0x93c -- 1
-    int Field940;                     // +0x940 -- 1 (slot 45: 100)
-    WinControl* Field944;             // +0x944 "Infocard_Title" -- paired with InfoCardInfo in
+    int JettisonQuantity;                     // +0x93c -- 1
+    int JettisonMaxQuantity;                     // +0x940 -- 1 (slot 45: 100)
+    WinControl* InfoCardTitle;             // +0x944 "Infocard_Title" -- paired with InfoCardInfo in
                                       // ShowQuantityControls
-    unsigned short Field948;          // +0x948 -- SUBOBJ_ID_NONE
+    unsigned short FocusEquipId;          // +0x948 -- SUBOBJ_ID_NONE
     unsigned char Pad94a[2];
-    EquipDesc Field94c;               // +0x94c
+    EquipDesc EmptyAmmoStandIn;               // +0x94c
     WinControl* TradeRouteText;       // +0x96c "TradeRouteText" (slot 45 stores it)
     WinControl* TradeRouteButton;     // +0x970 "TradeRouteButton" (slot 45 stores it)
 

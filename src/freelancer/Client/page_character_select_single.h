@@ -13,7 +13,7 @@
 // CharSelTime, ScreenTitle). One static instance, DAT_0067ae10 (static init LAB_0056b030 ->
 // ctor FUN_0056b050, atexit LAB_0056d4e0 -> dtor FUN_0056d360). vftables: main 0x005e2a84
 // (0 FUN_0056d340 scalar deleting dtor, 9 LAB_0056b330 Create, 10 LAB_0056b240 Destroy,
-// 11 FUN_0056ce30 Update, 23 LAB_0056c360 Slot23), IUIPage face (+0x7c) 0x00575ce0,
+// 11 FUN_0056ce30 Update, 23 LAB_0056c360 ProcessMessage), IUIPage face (+0x7c) 0x00575ce0,
 // Event::Handler face (+0x80) 0x0056d310.
 //
 // CharSelDesc / CharSelTime are UIListBox (the page file's type; WINFACTORY<UIListBox>
@@ -69,7 +69,7 @@ public:
     // slot 11 FUN_0056ce30.
     void Update() override;
     // slot 23 LAB_0056c360 (RET 0xc).
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // Event::Handler face (+0x80) slot 0 LAB_0056d310 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
@@ -118,7 +118,7 @@ private:
     void ShowDetails(CCharacterSet::CharacterInfo const* Info);
     // FUN_0056cb40 -- the roster (all but the restart save) into Entries and both lists.
     void RefillLists();
-    // The leave sequence Slot23 spells inline three times (0x0056c3bb..0x0056c4a7,
+    // The leave sequence ProcessMessage spells inline three times (0x0056c3bb..0x0056c4a7,
     // 0x0056c732..0x0056c824, 0x0056c9b6..0x0056caa2, then 0x0056caac..0x0056cac1).
     void BeginLeave(int Direction);
 

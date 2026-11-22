@@ -126,7 +126,7 @@ int qh_new_qhull (int dim, int numpoints, coordT *points, boolT ismalloc,
     firstcall= False;
   }
   if (strncmp (qhull_cmd,"qhull ", 6)) {
-    FUN_06356960 ("qh_new_qhull: start qhull_cmd argument with \"qhull \"\n"); /* retail 063784f3 */
+    ivp_message ("qh_new_qhull: start qhull_cmd argument with \"qhull \"\n"); /* retail 063784f3 */
     exit(1);
   }
   qh_initqhull_start (NULL, outfile, errfile);
@@ -190,30 +190,30 @@ void qh_errexit(int exitcode, facetT *facet, ridgeT *ridge) {
     longjmp(qh errexit, exitcode);
   }
   if (qh ERREXITcalled) {
-    FUN_06356960 ("\nqhull error while processing previous error.  Exit program\n"); /* retail 0637861c */
+    ivp_message ("\nqhull error while processing previous error.  Exit program\n"); /* retail 0637861c */
     exit(1);
   }
   qh ERREXITcalled= True;
   if (!qh QHULLfinished)
     qh hulltime= qh_CPUclock - qh hulltime;
   qh_errprint("ERRONEOUS", facet, NULL, ridge, NULL);
-  FUN_06356960 ("\nWhile executing: %s | %s\n", qh rbox_command, qh qhull_command); /* retail 0637867d */
-  FUN_06356960 ("Options selected for %s:\n%s\n", qh_VERSION, qh qhull_options); /* retail 06378694 */
+  ivp_message ("\nWhile executing: %s | %s\n", qh rbox_command, qh qhull_command); /* retail 0637867d */
+  ivp_message ("Options selected for %s:\n%s\n", qh_VERSION, qh qhull_options); /* retail 06378694 */
   if (qh furthest_id >= 0) {
-    FUN_06356960 ("Last point added to hull was p%d.", qh furthest_id); /* retail 063786ab */
+    ivp_message ("Last point added to hull was p%d.", qh furthest_id); /* retail 063786ab */
     if (zzval_(Ztotmerge))
-      FUN_06356960 ("  Last merge was #%d.", zzval_(Ztotmerge)); /* retail 063786c2 */
+      ivp_message ("  Last merge was #%d.", zzval_(Ztotmerge)); /* retail 063786c2 */
     if (qh QHULLfinished)
-      FUN_06356960 ("\nQhull has finished constructing the hull."); /* retail 063786e8 */
+      ivp_message ("\nQhull has finished constructing the hull."); /* retail 063786e8 */
     else if (qh POSTmerging)
-      FUN_06356960 ("\nQhull has started post-merging."); /* retail 063786e8 */
-    FUN_06356960 ("\n"); /* retail 063786f5 */
+      ivp_message ("\nQhull has started post-merging."); /* retail 063786e8 */
+    ivp_message ("\n"); /* retail 063786f5 */
   }
   if (qh FORCEoutput && (qh QHULLfinished || (!facet && !ridge)))
     qh_produce_output();
   else {
     if (exitcode != qh_ERRsingular && zzval_(Zsetplane) > qh hull_dim+1) {
-      FUN_06356960 ("\nAt error exit:\n"); /* retail 0637873c */
+      ivp_message ("\nAt error exit:\n"); /* retail 0637873c */
       qh_printsummary (qh ferr);
       if (qh PRINTstatistics) {
 	qh_collectstatistics();
@@ -231,7 +231,7 @@ void qh_errexit(int exitcode, facetT *facet, ridgeT *ridge) {
   else if (exitcode == qh_ERRprec && !qh PREmerge)
     qh_printhelp_degenerate (qh ferr);
   if (qh NOerrexit) {
-    FUN_06356960 ("qhull error while ending program.  Exit program\n"); /* retail 063787e8 */
+    ivp_message ("qhull error while ending program.  Exit program\n"); /* retail 063787e8 */
     exit(1);
   }
   qh NOerrexit= True;
@@ -255,15 +255,15 @@ void qh_errprint(char *string, facetT *atfacet, facetT *otherfacet, ridgeT *atri
   if (!qh ferr)  /* retail 06378820: nothing is printed without an error file */
     return;
   if (atfacet) {
-    FUN_06356960 ("%s FACET:\n", string); /* retail 06378843 */
+    ivp_message ("%s FACET:\n", string); /* retail 06378843 */
     qh_printfacet(qh ferr, atfacet);
   }
   if (otherfacet && qh ferr) {  /* retail 0637885f re-reads qh ferr here */
-    FUN_06356960 ("%s OTHER FACET:\n", string); /* retail 0637886e */
+    ivp_message ("%s OTHER FACET:\n", string); /* retail 0637886e */
     qh_printfacet(qh ferr, otherfacet);
   }
   if (atridge) {
-    FUN_06356960 ("%s RIDGE:\n", string); /* retail 06378891 */
+    ivp_message ("%s RIDGE:\n", string); /* retail 06378891 */
     qh_printridge(qh ferr, atridge);
     if (atridge->top && atridge->top != atfacet && atridge->top != otherfacet)
       qh_printfacet(qh ferr, atridge->top);
@@ -276,11 +276,11 @@ void qh_errprint(char *string, facetT *atfacet, facetT *otherfacet, ridgeT *atri
       otherfacet= otherfacet_(atridge, atfacet);
   }
   if (atvertex) {
-    FUN_06356960 ("%s VERTEX:\n", string); /* retail 06378906 */
+    ivp_message ("%s VERTEX:\n", string); /* retail 06378906 */
     qh_printvertex (qh ferr, atvertex);
   }
   if (qh fout && qh FORCEoutput && atfacet && !qh QHULLfinished && !qh IStracing) {
-    FUN_06356960 ("ERRONEOUS and NEIGHBORING FACETS to output\n"); /* retail 06378949 */
+    ivp_message ("ERRONEOUS and NEIGHBORING FACETS to output\n"); /* retail 06378949 */
     for (i= 0; i < qh_PRINTEND; i++)  /* use fout for geomview output */
       qh_printneighborhood (qh fout, qh PRINTout[i], atfacet, otherfacet,
 			    !qh_ALL);

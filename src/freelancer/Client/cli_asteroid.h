@@ -323,7 +323,7 @@ void CliAsteroidLightAround(FCliAsteroid* Field, FSpaceCamera* Cam, float Scale)
 void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt);
 
 // FUN_00520170 — per-frame walk of DAT_006753c4, gated on ASTEROIDS (0x21).
-// FUN_00522a60 Pass2: cube envelope + selection filters; GPU draw deferred (see cpp).
+// FUN_00522a60 Pass2: cube envelope + selection filters + near-field mesh draw (CliAsteroidDrawNearField).
 void CliAsteroidTickFields(FSpaceCamera* Cam);
 // LAB_0051bdf0 → FUN_00522850 — FAR band piece draw from deferred node.
 void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIndex);

@@ -814,8 +814,8 @@ void NnTextControl::Draw()
     FFontStringDrawOrigin Origin;
     Origin.X = 0.0f;
     Origin.Y = 0.0f;
-    Origin.Field10 = 0;
-    Origin.Field14 = 0;
+    Origin.HAlign = 0;
+    Origin.VAlign = 0;
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
     TextWinProjectExtent(Width, Height, World[2], &ScreenWidth, &ScreenHeight);
@@ -843,14 +843,14 @@ void NnTextControl::Draw()
             CachedSurfaceWidth = G_RenderSurfaceWidth;
         }
         // 0058acf2..0058ad06: left-aligned at the cached point.
-        Origin.Field10 = 0;
+        Origin.HAlign = 0;
         Origin.X = CachedX;
         Origin.Y = CachedY;
     }
     else
     {
         // 0058ad0c..0058ad35: aligned by +0x358 at FUN_00417730(World).
-        Origin.Field10 = static_cast<unsigned>(Dword358);
+        Origin.HAlign = static_cast<unsigned>(Dword358);
         TextWinProjectPoint(World, &Origin.X, &Origin.Y);
     }
     FontStringDrawChildren(&Origin, FontString,

@@ -35,9 +35,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             Info.ObjectId = Wire->ObjectId;
             Info.Orientation = Wire->Orientation;
             Info.Position = Wire->Position;
-            Info.State = Wire->Field_0x00;
+            Info.State = Wire->State;
             const float* TimeSource = &Wire->UpdateTime;
-            const float* FieldSource = &Wire->Field_0x28;
+            const float* FieldSource = &Wire->Throttle;
             double* TimeDestination = &Info.Timestamp;
             unsigned int* FieldDestination = &Info.ThrottleBits;
             float StoredTime;
@@ -104,7 +104,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             XActivateCruise Info;
             Info.ObjectId = Wire->ObjectId;
             Info.bActivate = (Wire->bActive != 0);
-            Info.bDisruptCruise = (Wire->Field_0x05 != 0) ? 1u : 0u;
+            Info.bDisruptCruise = (Wire->bDisruptCruise != 0) ? 1u : 0u;
             Server->ActivateCruise(ClientId, Info);
             break;
         }
@@ -115,7 +115,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             Info.ObjectId = Wire->ObjectId;
             Info.TradelaneRing1 = Wire->TradelaneRing1;
             Info.TradelaneRing2 = Wire->TradelaneRing2;
-            Info.Field_0x0c = (Wire->Field_0x0c != 0);
+            Info.bMidLane = (Wire->bMidLane != 0);
             Server->GoTradelane(ClientId, Info);
             break;
         }
@@ -237,7 +237,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case 0x1B: // FLPACKET_COMMON_POP_UP_DIALOG
         {
             const FRpcPopUpDialogPacket* Wire = static_cast<const FRpcPopUpDialogPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
-            Server->PopUpDialog(ClientId, Wire->Field_0x10);
+            Server->PopUpDialog(ClientId, Wire->Buttons);
             break;
         }
         case 0x1C: // FLPACKET_COMMON_SET_INTERFACE_STATE
@@ -268,13 +268,13 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                 wchar_t AccountName[256];
                 wchar_t SecondString[256];
                 memcpy(AccountName, Wire->AccountName, sizeof(AccountName));
-                memcpy(SecondString, Wire->Field_0x220, sizeof(SecondString));
+                memcpy(SecondString, Wire->Password, sizeof(SecondString));
                 const unsigned char CreateFlag = Wire->CreateFlag;
                 wcsncpy(GStaticLoginInfo.AccountName, AccountName, 0x28);
-                wcsncpy(GStaticLoginInfo.Field_0xA0, SecondString, 0x10);
+                wcsncpy(GStaticLoginInfo.Password, SecondString, 0x10);
                 *reinterpret_cast<unsigned char*>(&GStaticLoginInfo.CreateFlag) = CreateFlag;
                 GStaticLoginInfo.AccountName[39] = L'\0';
-                GStaticLoginInfo.Field_0xA0[15] = L'\0';
+                GStaticLoginInfo.Password[15] = L'\0';
                 Server->Login(GStaticLoginInfo, ClientId);
             }
             break;
@@ -283,10 +283,10 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             {
                 const FRpcMunitionCollisionPacket* Wire = static_cast<const FRpcMunitionCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
                 SSPMunitionCollisionInfo Info;
-                Info.ProjectileArchId = Wire->Field_0x00;
-                Info.AttackerId = Wire->Field_0x04;
+                Info.ProjectileArchId = Wire->ProjectileArchId;
+                Info.AttackerId = Wire->AttackerId;
                 Info.ObjectId = Wire->ObjectId;
-                Info.SubObjId = Wire->Field_0x0c;
+                Info.SubObjId = Wire->SubObjId;
                 std::memcpy(&Info.HitPosX, &Wire->HitPosition.x, 4u);
                 std::memcpy(&Info.HitPosY, &Wire->HitPosition.y, 4u);
                 std::memcpy(&Info.HitPosZ, &Wire->HitPosition.z, 4u);
@@ -352,7 +352,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                 Info.Pad_0x06 = 0;
                 Info.ObjectId = Wire->ObjectId;
                 Info.SubObjId = Wire->SubObjId;
-                std::memcpy(&Info.DamageBits, &Wire->Field_0x10, 4u);
+                std::memcpy(&Info.DamageBits, &Wire->Damage, 4u);
                 Server->SPObjCollision(Info, ClientId);
             }
             break;
@@ -411,7 +411,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case 0x14: // FLPACKET_CLIENT_MISSIONRESPONSE
         {
             const FRpcMissionResponsePacket* Wire = static_cast<const FRpcMissionResponsePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
-            Server->MissionResponse(Wire->Field_0x00, Wire->MissionId, Wire->bAccepted, ClientId);
+            Server->MissionResponse(Wire->OfferId, Wire->OfferKind, Wire->bAccepted, ClientId);
             break;
         }
         case 0x15: // FLPACKET_CLIENT_REQSHIPARCH
@@ -588,9 +588,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcSetManeuverPacket* Wire = static_cast<const FRpcSetManeuverPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             XSetManeuver Info;
-            Info.ShipFrom = Wire->Field_0x00;
+            Info.ShipFrom = Wire->ShipFrom;
             Info.ObjectId = Wire->ObjectId;
-            Info.Flag = Wire->Field_0x08;
+            Info.Flag = Wire->Flag;
             Server->SetManeuver(ClientId, Info);
             break;
         }
@@ -603,7 +603,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcRequestEventPacket* Wire = static_cast<const FRpcRequestEventPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             const int Tail = static_cast<signed char>(Wire->Field_0x10);
-            Server->RequestEvent(static_cast<int>(Wire->EventType), Wire->Arg1, Wire->Arg2, Wire->Arg3,
+            Server->RequestEvent(static_cast<int>(Wire->EventType), Wire->ShipId, Wire->TargetId, Wire->SecondId,
                                  static_cast<unsigned long>(Tail), ClientId);
             break;
         }
@@ -611,7 +611,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcRequestCancelPacket* Wire = static_cast<const FRpcRequestCancelPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             const int Tail = static_cast<signed char>(Wire->Field_0x0c);
-            Server->RequestCancel(static_cast<int>(Wire->EventType), Wire->Arg1, Wire->Arg2,
+            Server->RequestCancel(static_cast<int>(Wire->EventType), Wire->ShipId, Wire->TargetId,
                                   static_cast<unsigned long>(Tail), ClientId);
             break;
         }
@@ -641,10 +641,10 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcCreateNewCharacterPacket* Wire = static_cast<const FRpcCreateNewCharacterPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             wcscpy(GStaticCreateCharacterInfo.Name, Wire->Name);
-            GStaticCreateCharacterInfo.Field_0x30 = Wire->Field_0x80;
-            GStaticCreateCharacterInfo.Field_0x34 = Wire->Field_0x84;
-            GStaticCreateCharacterInfo.Field_0x38 = Wire->Field_0x88;
-            GStaticCreateCharacterInfo.Field_0x3c = Wire->Field_0x8c;
+            GStaticCreateCharacterInfo.FactionId = Wire->FactionId;
+            GStaticCreateCharacterInfo.BaseId = Wire->BaseId;
+            GStaticCreateCharacterInfo.PackageId = Wire->PackageId;
+            GStaticCreateCharacterInfo.PilotId = Wire->PilotId;
             Server->CreateNewCharacter(GStaticCreateCharacterInfo, ClientId);
             break;
         }
@@ -674,9 +674,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcBadlandsObjectCollisionPacket* Wire = static_cast<const FRpcBadlandsObjectCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             SSPBadLandsObjCollisionInfo Info;
-            Info.Field_0x00 = Wire->Field_0x00;
+            Info.BadLandsObjId = Wire->BadLandsObjId;
             Info.ObjectId = Wire->ObjectId;
-            Info.Field_0x08 = Wire->Field_0x08;
+            Info.SubObjId = Wire->SubObjId;
             Server->SPBadLandsObjCollision(Info, ClientId);
         }
             break;

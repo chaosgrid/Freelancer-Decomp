@@ -106,7 +106,7 @@ namespace
 
         // FUN_005658d0 (thiscall, RET 8): 0 when the file is mapped; -8 open failed, -6 mapping
         // failed, -1 view failed.
-        int Open(char const* Path, unsigned long Field30)
+        int Open(char const* Path, unsigned long FindHandle)
         {
             FFileSystemDesc Desc;
             memset(&Desc, 0, 0x34);
@@ -117,7 +117,7 @@ namespace
             Desc.ShareMode = 1;
             Desc.Creation = 3;
             Desc.Flags = 0x8000080u;
-            Desc.Field30 = Field30;
+            Desc.FindHandle = FindHandle;
             Handle = static_cast<unsigned long>(Fs->OpenByDesc(&Desc)); // slot 31 (+0x7c)
             if (Handle == 0xffffffffu)
                 return -8;
@@ -355,7 +355,7 @@ bool Image::LoadTga(char const* Path)
     Desc.ShareMode = 1;
     Desc.Creation = 3;
     Desc.Flags = 0x8000080u;
-    Desc.Field30 = 0xffffffffu;
+    Desc.FindHandle = 0xffffffffu;
     IFileSystem* SubFs = nullptr;
     if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                     reinterpret_cast<void**>(&SubFs)) != 0)

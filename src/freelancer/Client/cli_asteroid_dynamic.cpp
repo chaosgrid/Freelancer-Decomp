@@ -159,14 +159,14 @@ bool FCliDynamicAsteroidGameobj::find(unsigned const& Id)
     return false;
 }
 
-void FCliDynamicAsteroidGameobj::Slot194(void const* A, void const* B, FClientGameobj* Other,
+void FCliDynamicAsteroidGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
                                          void const* D)
 {
     // LAB_00525480 (RET 0x10). B is not read.
     (void)B;
     // 0x00525490..0x005254a5: Other's slot 104 (+0x1a0) with (A, D, this, SUBOBJ_ID_NONE's
     // word zero-extended). Unlike GameObject's slot 101 there is no own slot 107 afterwards.
-    Other->Slot1a0(A, D, this,
+    Other->OnSurfaceCollisionHit(A, D, this,
                    reinterpret_cast<void const*>(static_cast<uintptr_t>(SUBOBJ_ID_NONE)));
 
     // 0x005254ab..0x005254d8: an active asteroid, Other's object narrowed by class & 7.
@@ -177,7 +177,7 @@ void FCliDynamicAsteroidGameobj::Slot194(void const* A, void const* B, FClientGa
         return;
 
     // 0x005254de..0x005254e3: own slot 108 at A.
-    Slot1b0(static_cast<Vector const*>(A));
+    Explode(static_cast<Vector const*>(A));
 
     // 0x005254e9..0x00525503: the shot's owner (+0xe4) must be the player's character
     // (DAT_00673378), and there must be an owner manager (+0xa8).
@@ -226,7 +226,7 @@ void FCliDynamicAsteroidGameobj::Slot194(void const* A, void const* B, FClientGa
                                 GetPlayerConnectionId());
 }
 
-void FCliDynamicAsteroidGameobj::Slot1b0(Vector const* Pos)
+void FCliDynamicAsteroidGameobj::Explode(Vector const* Pos)
 {
     // LAB_005255e0 (RET 4).
     bActive = 0;
@@ -388,7 +388,7 @@ void CliDynamicAsteroidReleaseSlots(FCliDynamicAsteroid* This)
     {
         if (This->SlotPtrs[Index] == nullptr)
             continue;
-        This->SlotPtrs[Index]->Slot15c(true);
+        This->SlotPtrs[Index]->MarkForRemoval(true);
         This->SlotPtrs[Index] = nullptr;
     }
 }
@@ -602,7 +602,7 @@ FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This)
     if (Go->GetObject() != nullptr)
         PhySys::SetCollisionState(Go->GetObject(), false);
     // 0x00526775..0x00526781: slot 92 (FUN_00539740), then FUN_00540c30(Go, 0).
-    Go->Slot170();
+    Go->PostCreateInit();
     ClientObjDb_RegisterGameobj(Go, false);
     Go->bActive = 0;
     Go->bPlaced = 0;
@@ -624,7 +624,7 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
         {
             if (This->SlotPtrs[Index] == nullptr)
                 continue;
-            This->SlotPtrs[Index]->Slot15c(true);
+            This->SlotPtrs[Index]->MarkForRemoval(true);
             This->SlotPtrs[Index] = nullptr;
         }
         ::operator delete(This->SlotPtrs);
@@ -733,7 +733,7 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
             // 0x0052616d..0x00526184: out of range with spawning blocked -- released.
             if (This->SlotPtrs[Index] != nullptr)
             {
-                This->SlotPtrs[Index]->Slot15c(true);
+                This->SlotPtrs[Index]->MarkForRemoval(true);
                 This->SlotPtrs[Index] = nullptr;
             }
             continue;

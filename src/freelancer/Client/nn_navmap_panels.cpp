@@ -279,7 +279,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
     // 0049a858..0049a895: the abort button is hidden for routes of kind 7 and 8.
     unsigned char bHideAbort = 1;
     FBestPath const* const First = BestPathGetFirst(); // FUN_004c5040
-    if (First != nullptr && First->Field_0x50 != 7 && First->Field_0x50 != 8)
+    if (First != nullptr && First->MissionType != 7 && First->MissionType != 8)
         bHideAbort = 0;
     AbortMissionButton->SetProperty(1, bHideAbort, 0);
     AbortMissionText->SetProperty(1, bHideAbort, 0);
@@ -385,7 +385,7 @@ void NeuroNetNavMap::RefreshObjectives()
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index);
         if (Waypoint == nullptr)
             continue;
-        unsigned const Kind = Waypoint->Field_0x18 & 0xf;
+        unsigned const Kind = Waypoint->ObjectiveState & 0xf;
         if (Kind != 9)
             ++Listed;
         if (Index < ObjectiveFirstRow)

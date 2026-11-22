@@ -76,7 +76,7 @@ struct ISoundSource : IDAComponent
     // 3 +0x0C RET 0x4 -- FUN_004298b0. Refresh pass slot 4 runs first: on flag 0x4 without
     // 0x10 it asks DALib::Sound for the tick (slot 44) and restamps this+0x14. The mixer
     // never calls this one directly; it is slot 4's own first instruction.
-    virtual unsigned long DACOM_API Slot3() = 0;
+    virtual unsigned long DACOM_API MarkStarted() = 0;
     // 4 +0x10 RET 0x4 -- FUN_004298f0: unless flag 0x10 is set, call slot 3, then return
     // this+0x14. That field is the tick the sound started on.
     virtual unsigned long DACOM_API GetStartTick() = 0;
@@ -152,7 +152,7 @@ struct ISoundSource : IDAComponent
     // SoundManager handing looping buffers DSBPLAY_LOOPING. Slot 42 calls it.
     virtual unsigned char __thiscall IsFinished() = 0;
     // 30 LAB_00429730 bare RET, 0 args -- sets up an SEH frame, so it owns a C++ object.
-    virtual unsigned long __thiscall Slot30() = 0;
+    virtual unsigned long __thiscall GetDurationMs() = 0;
     // 31 LAB_00429450 RET 0x4: write mixer score, preserving x87 rounding and unordered branches.
     virtual void __thiscall ComputeMixerScore(const float* Listener) = 0;
     // 32 LAB_00429330: clamps source attenuation to [-96, 0] dB, preserving NaN bits.
@@ -163,7 +163,7 @@ struct ISoundSource : IDAComponent
     virtual void __thiscall SetLooping(unsigned char bLooping) = 0;
     // 35 LAB_00429ca0 RET 0x4, one argument. In the two non-3D vtables this slot is folded
     // onto IDPMsgHandler::OnAddHost (`RET 0x4`), an unrelated do-nothing of the same shape.
-    virtual unsigned long __thiscall Slot35(void* Arg) = 0;
+    virtual unsigned long __thiscall SetPosition(void* Arg) = 0;
 
     // 36..39: __thiscall, object in ECX -- see the header note above.
     // 36 +0x90 RET 0x4 -- LAB_00429dc0 copies three floats into this+0x48.
@@ -179,7 +179,7 @@ struct ISoundSource : IDAComponent
 
     // 40 +0xA0 FUN_0044fd00 -- `XOR AL,AL; RET`. Bare RET, no arguments, always false; the
     // same folded stub sits in 20 other vtables.
-    virtual unsigned char __thiscall Slot40() = 0;
+    virtual unsigned char __thiscall IsFadedOut() = 0;
     // 41 +0xA4 FUN_00428820 RET 0x4 -- MSVC's scalar deleting destructor (the base class uses
     // its own, FUN_004290a0, which reinstalls PTR_LAB_005c9fac first).
     virtual void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) = 0;

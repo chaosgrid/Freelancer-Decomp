@@ -113,7 +113,7 @@ void FTriMeshGroup::Initialize()
     this->Type = D3DPT_TRIANGLELIST;
     this->MaterialCrc = 0;
     this->Material = nullptr;
-    this->Field_0x0C = nullptr;
+    this->MaterialContext = nullptr;
     this->MinIndex = 0;
     this->MaxIndex = 0;
     this->Indices = nullptr;
@@ -273,7 +273,7 @@ void FTriMeshGroup::CopyFrom(const FTriMeshGroup* Source)
     this->Material = Source->Material;
     if (this->Material != nullptr)
         this->Material->AddRef();
-    this->Field_0x0C = Source->Field_0x0C;
+    this->MaterialContext = Source->MaterialContext;
     this->SharedVertices = Source->SharedVertices;
     this->Bucket = Source->Bucket;
     if (Source->Vertices != Source->SharedVertices)
@@ -326,7 +326,7 @@ void FTriMeshGroup::CopyHeader(const FTriMeshGroup* Source)
     this->Material = Source->Material;
     if (this->Material != nullptr)
         this->Material->AddRef();
-    this->Field_0x0C = Source->Field_0x0C;
+    this->MaterialContext = Source->MaterialContext;
 }
 
 // formerly TriMeshGroupHasChannels
@@ -500,7 +500,7 @@ FTriMeshArch::FTriMeshArch()
     , RenderableFacet(this)
     , Cursor(0)
     , LockedMask(0)
-    , Field_0x1E4(nullptr)
+    , PrebuiltVertexBuffer(nullptr)
     , EditMode(0)
     , MaterialLibrary(nullptr)
     , Pipeline(nullptr)
@@ -763,7 +763,7 @@ int DACOM_API FTriMeshArch::ResetMesh()
 {
     if (Reset() < 0)
         return -1;
-    Field_0x1E4 = nullptr;
+    PrebuiltVertexBuffer = nullptr;
     return 0;
 }
 
@@ -938,7 +938,7 @@ int DACOM_API FTriMeshArch::GetFaceGroupMaterialContext(void** Out)
 {
     if (CursorAtEnd())
         return -1;
-    *Out = Groups[Cursor]->Field_0x0C;
+    *Out = Groups[Cursor]->MaterialContext;
     return 0;
 }
 
@@ -948,7 +948,7 @@ int DACOM_API FTriMeshArch::SetFaceGroupMaterialContext(void* A)
 {
     if (CursorAtEnd())
         return -1;
-    Groups[Cursor]->Field_0x0C = A;
+    Groups[Cursor]->MaterialContext = A;
     return 0;
 }
 
@@ -1858,8 +1858,8 @@ int FTriMeshArch::VertexCount()
 // FUN_06c265f0 (thiscall, RET 4): *Out = +0x1E4; AL = (+0x1E4 != 0).
 bool FTriMeshArch::GetPrebuiltListing(void** Out)
 {
-    *Out = Field_0x1E4;
-    return Field_0x1E4 != nullptr;
+    *Out = PrebuiltVertexBuffer;
+    return PrebuiltVertexBuffer != nullptr;
 }
 
 int FTriMeshArch::GetBox(float* Out)

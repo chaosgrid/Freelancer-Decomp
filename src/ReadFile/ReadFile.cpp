@@ -2236,7 +2236,7 @@ namespace
             char Dest[0x105] = {};
             ResolvePath(Dest, Desc->Path,
                    0x104);
-            const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+            const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
             FUtfHandle* Found =
                 ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
             if (Found == nullptr)
@@ -2631,7 +2631,7 @@ namespace
             FUtfHandle* Opened = nullptr;
             if (OpenNodeHandle != nullptr)
             {
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+                const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
                 Opened = ActiveW->Open(Desc->Path, (unsigned long)(OpenNodeHandle),
                                        Extra);
             }
@@ -2644,7 +2644,7 @@ namespace
                     LastError = 0xA1;
                     return -1;
                 }
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+                const unsigned long Extra = Desc->Size == 0x34 ? Desc->FindHandle : 0xFFFFFFFFu;
                 Opened = ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
             }
             if (Opened == nullptr)
@@ -3230,7 +3230,7 @@ namespace
         Desc->ShareMode = 1;
         Desc->Creation = kOpenExisting;
         Desc->Flags = 0x08000080;
-        Desc->Field30 = 0xFFFFFFFF;
+        Desc->FindHandle = 0xFFFFFFFF;
 
         bool bResult = false;
         IFileSystem* Created = nullptr;

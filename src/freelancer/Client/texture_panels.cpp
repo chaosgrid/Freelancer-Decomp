@@ -429,7 +429,7 @@ FTexturePanels::FTexturePanels()
     MeshBuffer = nullptr;
     PieceCount = 0;
     Pieces = nullptr;
-    Field34 = 0;
+    MeshVertexCount = 0;
     NumSegments = 0x20;
     TransitionDist = 150.0f;
     DetailTileU = 10.0f;
@@ -863,7 +863,7 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
         int Twice = First * 2;
         for (int I = First; I <= Last; ++I)
         {
-            int const MeshCount = Field34;
+            int const MeshCount = MeshVertexCount;
             int IndexA = Twice;
             if (IndexA >= MeshCount)
                 IndexA -= MeshCount;
@@ -1096,7 +1096,7 @@ void FTexturePanels::Load(char const* IniPath,
     // pieces (+0x3c) of 0x18 bytes (+0x40, not cleared).
     double const kTwoPi = 6.2831854820251465; // DAT_005c97f8
     float const AngleStep = static_cast<float>(kTwoPi / static_cast<double>(NumSegments));
-    Field34 = NumSegments * 2;
+    MeshVertexCount = NumSegments * 2;
     MeshBuffer = operator new(static_cast<size_t>(NumSegments * 2 * 3) * 4u);
     PieceCount = 8;
     Pieces = static_cast<FTexturePanelPiece*>(operator new(0xc0));
@@ -1118,11 +1118,11 @@ void FTexturePanels::Load(char const* IniPath,
         double const Sin = sin(static_cast<double>(Angle));
         double const Cos = cos(static_cast<double>(Angle));
         int OuterIndex = Twice;
-        if (OuterIndex >= Field34)
-            OuterIndex -= Field34;
+        if (OuterIndex >= MeshVertexCount)
+            OuterIndex -= MeshVertexCount;
         int InnerIndex = Twice + 1;
-        if (InnerIndex >= Field34)
-            InnerIndex -= Field34;
+        if (InnerIndex >= MeshVertexCount)
+            InnerIndex -= MeshVertexCount;
 
         // [S+0x70] first (sin*y, 0, y*cos), then [S+0x58] (sin*x, 0, cos*x).
         FVector LocalY;
@@ -1178,8 +1178,8 @@ void FTexturePanels::Load(char const* IniPath,
         for (int Vertex = FirstVertex; Vertex <= LastVertex; ++Vertex)
         {
             int MeshIndex = Vertex;
-            if (Vertex >= Field34)
-                MeshIndex = Vertex - Field34;
+            if (Vertex >= MeshVertexCount)
+                MeshIndex = Vertex - MeshVertexCount;
             float const X = Mesh[MeshIndex * 3 + 0];
             float const Y = Mesh[MeshIndex * 3 + 1];
             float const Z = Mesh[MeshIndex * 3 + 2];
@@ -1371,13 +1371,13 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     // FUN_005b7010(0) seeds the id, TextureLib slot 23 (+0x5c, GetGroupPixelFormat) on the
     // shape's record fills it (result untested), then FUN_00552420, zero-extended into +0x04.
     FTexShape* const Shape0 = *reinterpret_cast<FTexShape**>(B + 0x28);
-    if (Shape0->Field04 < 0)
+    if (Shape0->AlphaCache < 0)
     {
         int Fmt = PixelFormatFromD3D(0);
         DALib::TextureLib->GetGroupPixelFormat(Shape0->Texture, nullptr, &Fmt);
-        Shape0->Field04 = static_cast<int>(TextureFormatHasAlpha(Fmt));
+        Shape0->AlphaCache = static_cast<int>(TextureFormatHasAlpha(Fmt));
     }
-    unsigned char const bAlpha = static_cast<unsigned char>(Shape0->Field04 != 0);
+    unsigned char const bAlpha = static_cast<unsigned char>(Shape0->AlphaCache != 0);
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
 

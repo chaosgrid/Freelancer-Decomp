@@ -93,15 +93,14 @@ unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, u
         unsigned int Carry = 0;
         int Left = Count;
         unsigned int* Cursor = Source;
-        int Delta = (int)((unsigned char*)Dest - (unsigned char*)Source);
+        unsigned int* Out = Dest;
         unsigned int Inverse = (unsigned int)(0x20 - Shift);
         while (Left != 0)
         {
-            unsigned int Limb = Cursor[0];
-            Cursor = Cursor + 1;
+            unsigned int Limb = *Cursor++;
             unsigned int Low = (Limb << ((unsigned int)Shift & 31u)) | Carry;
             Carry = Limb >> (Inverse & 31u);
-            *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Low;
+            *Out++ = Low;
             Left = Left - 1;
         }
         return Carry;
@@ -130,16 +129,15 @@ unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, u
         unsigned int Carry = 0;
         unsigned int Amount = 0u - (unsigned int)Shift;
         unsigned int* Cursor = Source + (Count - 1);
-        int Delta = (int)((unsigned char*)Dest - (unsigned char*)Source);
+        unsigned int* Out = Dest + (Count - 1);
         int Left = Count;
         unsigned int Cross = ((unsigned int)Shift + 0x20u) & 31u;
         while (Left != 0)
         {
-            unsigned int Limb = Cursor[0];
-            Cursor = Cursor - 1;
+            unsigned int Limb = *Cursor--;
             unsigned int High = (Limb >> (Amount & 31u)) | Carry;
             Carry = Limb << Cross;
-            *(unsigned int*)((unsigned char*)Cursor + Delta + 4) = High;
+            *Out-- = High;
             Left = Left - 1;
         }
         return Carry >> Cross;

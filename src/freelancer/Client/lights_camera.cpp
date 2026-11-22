@@ -93,10 +93,10 @@ void FLightsCameraParticles::Draw(ICamera* Camera)
         return;
 
     float Scratch[5];
-    Effect->Slot4(nullptr, &Scratch[0]);
-    if (Effect->Slot15(&Scratch[1]) < 0)
+    Effect->GetTransform(nullptr, &Scratch[0]);
+    if (Effect->GetBoundingSphere(&Scratch[1]) < 0)
         return;
     if (!MiscUtilSphereInView(Camera, &Scratch[1], Scratch[4]))
         return;
-    Effect->Slot9(Camera);
+    Effect->Draw(Camera);
 }

@@ -196,7 +196,7 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
     // +0x514 scene scripts started (FUN_0044aca0), +0x515 a start script runs, +0x516 the
     // character start script requested again (FUN_0044ad70), +0x517 a character script ran.
     unsigned char Flags514[4];          // +0x514 .. +0x517
-    FCharacterObject* Slot518[0x40];    // +0x518 the room's characters (FUN_00449e60)
+    FCharacterObject* Characters[0x40];    // +0x518 the room's characters (FUN_00449e60)
     // +0x618: the room's props -- FUN_0044a030 appends one Gf::ObjectProp per enabled
     // RoomData+0x158 record, FUN_0044a380 appends one more, FUN_0044a2f0 finds one by name.
     FObjectProp* Props[0x80];           // +0x618
@@ -248,7 +248,7 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
     void* CameraDoneB;                  // +0x13a0
     // +0x13a4 -- FUN_0044bfd0's dword ("Camera_Track_%d" step; stored as a dword at 0x0044bff3
     // / 0x0044c08f / 0x0044c128). FUN_0044bfd0 is not ported (HOLE).
-    int Field_0x13a4;                   // +0x13a4
+    int TrackCameraIndex;                   // +0x13a4
     // +0x13a8 -- a dword FUN_0044ceb0 (0x0044cec8) and FUN_0044ced0 (0x0044cef0) zero; no
     // [reg+0x13a8] read anywhere in the listing. TODO: meaning not recovered.
     int Field_0x13a8;                   // +0x13a8
@@ -283,7 +283,7 @@ static_assert(offsetof(FRoomRuntime, SingleLightIndex) == 0x4F8, "FRoomRuntime +
 static_assert(offsetof(FRoomRuntime, bSingleLight) == 0x4FC, "FRoomRuntime +0x4FC");
 static_assert(offsetof(FRoomRuntime, Camera) == 0x500, "FRoomRuntime Camera +0x500");
 static_assert(offsetof(FRoomRuntime, Placements) == 0x504, "FRoomRuntime +0x504");
-static_assert(offsetof(FRoomRuntime, Slot518) == 0x518, "FRoomRuntime +0x518");
+static_assert(offsetof(FRoomRuntime, Characters) == 0x518, "FRoomRuntime +0x518");
 static_assert(offsetof(FRoomRuntime, Props) == 0x618, "FRoomRuntime +0x618");
 static_assert(offsetof(FRoomRuntime, PropCount) == 0x818, "FRoomRuntime +0x818");
 static_assert(offsetof(FRoomRuntime, Flashlights) == 0x81C, "FRoomRuntime +0x81C");
@@ -299,7 +299,7 @@ static_assert(offsetof(FRoomRuntime, bCameraMoveSkippable) == 0x1340, "FRoomRunt
 static_assert(offsetof(FRoomRuntime, CameraToQuat) == 0x1348, "FRoomRuntime +0x1348");
 static_assert(offsetof(FRoomRuntime, CameraFromQuat) == 0x1370, "FRoomRuntime +0x1370");
 static_assert(offsetof(FRoomRuntime, CameraDone) == 0x1398, "FRoomRuntime +0x1398");
-static_assert(offsetof(FRoomRuntime, Field_0x13a4) == 0x13a4, "FRoomRuntime +0x13a4");
+static_assert(offsetof(FRoomRuntime, TrackCameraIndex) == 0x13a4, "FRoomRuntime +0x13a4");
 static_assert(sizeof(FRoomRuntime) == 0x13AC, "FRoomRuntime sizeof 0x13AC");
 #endif
 
@@ -404,17 +404,17 @@ void FRoomObject::DrawEffects(ICamera* /*Camera*/)
     // IDPMsgHandler::OnAddHost (0x0053e4a0): RET 4.
 }
 
-void FRoomObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
+void FRoomObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Point*/)
 {
     // IDPMsgHandler::OnReceive (0x0053aaa0): RET 8.
 }
 
-void FRoomObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
+void FRoomObject::OnHotspotLeave(unsigned long /*Cookie*/, int const* /*Point*/)
 {
     // IDPMsgHandler::OnReceive (0x0053aaa0): RET 8.
 }
 
-void FRoomObject::Slot12(unsigned long /*Cookie*/, int const* /*Point*/)
+void FRoomObject::OnHotspotClick(unsigned long /*Cookie*/, int const* /*Point*/)
 {
     // IDPMsgHandler::OnReceive (0x0053aaa0): RET 8.
 }
@@ -612,7 +612,7 @@ FRoomRuntime::FRoomRuntime()
     Flags514[2] = 0;
     Flags514[3] = 0;
     for (Index = 0; Index < 0x40; ++Index)
-        Slot518[Index] = nullptr;
+        Characters[Index] = nullptr;
     PropCount = 0;
     for (Index = 0; Index < 0x80; ++Index)
         Props[Index] = nullptr;
@@ -640,7 +640,7 @@ FRoomRuntime::FRoomRuntime()
     SceneTrafficCount = 0;
     SceneOnceCount = 0;
     bCameraMoving = 0;
-    Field_0x13a4 = 0;
+    TrackCameraIndex = 0;
     bCameraMoveSkippable = 0;
 }
 
@@ -1153,10 +1153,10 @@ bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0,
     char const* const kFirstTrack = "Camera_Track_1"; // s_Camera_Track_1_005cb893+1
     char Name[0x100];
 
-    if (Runtime->Field_0x13a4 == 0)
+    if (Runtime->TrackCameraIndex == 0)
     {
         // 0x0044bfea..0x0044c071: the first step goes to Camera_Track_1.
-        Runtime->Field_0x13a4 = 1;
+        Runtime->TrackCameraIndex = 1;
         if (bArg4 != 0 && IsRoomCameraAt(Runtime, kFirstTrack))
             return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
         return RoomControlTrackCamera(Runtime, kFirstTrack, Done, A, B);
@@ -1165,38 +1165,38 @@ bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0,
     if (bForward)
     {
         // 0x0044c083..0x0044c0e5: the next number.
-        Runtime->Field_0x13a4 += 1;
-        sprintf(Name, "Camera_Track_%d", Runtime->Field_0x13a4);
+        Runtime->TrackCameraIndex += 1;
+        sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
         if (bArg4 != 0 && IsRoomCameraAt(Runtime, Name))
             return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
         // 0x0044c0e8..0x0044c11c: a move there -> true.
         if (RoomControlTrackCamera(Runtime, Name, Done, A, B))
             return true;
         // 0x0044c11f..0x0044c16d: none (no such camera, or already there) -> back to 1.
-        Runtime->Field_0x13a4 = 1;
+        Runtime->TrackCameraIndex = 1;
         if (bArg4 != 0 && IsRoomCameraAt(Runtime, kFirstTrack))
             return RoomControlTrackScriptCamera(Runtime, Arg0, Done, A, B, 0);
         return RoomControlTrackCamera(Runtime, kFirstTrack, Done, A, B);
     }
 
     // 0x0044c170..0x0044c179: the previous number.
-    Runtime->Field_0x13a4 -= 1;
-    if (Runtime->Field_0x13a4 == 0)
+    Runtime->TrackCameraIndex -= 1;
+    if (Runtime->TrackCameraIndex == 0)
     {
         // 0x0044c180..0x0044c1f3: below 1 wraps to the highest number whose camera exists
         // (counting up from 1 until a name has no RoomData camera; 0 when there is none).
         for (;;)
         {
-            Runtime->Field_0x13a4 += 1;
-            sprintf(Name, "Camera_Track_%d", Runtime->Field_0x13a4);
+            Runtime->TrackCameraIndex += 1;
+            sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
             if (FindRoomDataCamera(Runtime, Name) == nullptr)
                 break;
         }
-        Runtime->Field_0x13a4 -= 1;
+        Runtime->TrackCameraIndex -= 1;
     }
 
     // 0x0044c1f5..0x0044c282: the chosen number; the repeat passes Arg0 = 0 (backward).
-    sprintf(Name, "Camera_Track_%d", Runtime->Field_0x13a4);
+    sprintf(Name, "Camera_Track_%d", Runtime->TrackCameraIndex);
     if (bArg4 != 0 && IsRoomCameraAt(Runtime, Name))
         return RoomControlTrackScriptCamera(Runtime, 0, Done, A, B, 0);
     return RoomControlTrackCamera(Runtime, Name, Done, A, B);
@@ -1227,7 +1227,7 @@ FCharacterObject* RoomControlFindCharacterByKey(FRoomRuntime* Runtime, unsigned 
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character != nullptr && Character->Props.Key == Key)
             return Character;
     }
@@ -1240,7 +1240,7 @@ FCharacterObject* RoomControlPlayerCharacter(FRoomRuntime* Runtime)
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character == nullptr)
             continue;
         CharPlaceInfo const* const Placement = Character->Placement;
@@ -1256,7 +1256,7 @@ FCharacterObject* RoomControlFindCharacterByRole(FRoomRuntime* Runtime, int Role
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character != nullptr && Character->Role == Role)
             return Character;
     }
@@ -1270,7 +1270,7 @@ FCharacterObject* RoomControlFindCharacterByName(FRoomRuntime* Runtime, char con
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character == nullptr)
             continue;
         CharPlaceInfo const* const Placement = Character->Placement;
@@ -1287,15 +1287,15 @@ FCharacterObject* RoomControlFindCharacterByName(FRoomRuntime* Runtime, char con
 static void RoomControlDeleteCharacter(FRoomRuntime* Runtime, int Slot)
 {
     // FUN_00449e10. 0x00449e18..0x00449e21: an empty slot, nothing.
-    FCharacterObject* const Character = Runtime->Slot518[Slot];
+    FCharacterObject* const Character = Runtime->Characters[Slot];
     if (Character == nullptr)
         return;
     // 0x00449e23..0x00449e35: its placement free again (FUN_00435b20).
     if (Character->PlacementIndex != -1)
         Runtime->Placements[Character->PlacementIndex].Character = nullptr;
     // 0x00449e3a..0x00449e4b: the deleting destructor (slot 0 with 1), the slot cleared.
-    delete Runtime->Slot518[Slot];
-    Runtime->Slot518[Slot] = nullptr;
+    delete Runtime->Characters[Slot];
+    Runtime->Characters[Slot] = nullptr;
 }
 
 void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const& Props)
@@ -1310,7 +1310,7 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character != nullptr && Character->Props.Key == Props.Key)
             break;
     }
@@ -1319,11 +1319,11 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
         // 0x00449eed..0x00449f27: the character updated in place -- the record replaced
         // (CharacterProperties::destroy + operator=), the hotspot re-gated (FUN_00445a60) and
         // the record's idle script made the own one (FUN_00445580 with 0).
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         Character->Props.destroy();
         Character->Props = Props;
         Character->UpdateHotspotEnabled();
-        Runtime->Slot518[Slot]->SetOwnScript(Props.Script, 0);
+        Runtime->Characters[Slot]->SetOwnScript(Props.Script, 0);
         return;
     }
 
@@ -1333,7 +1333,7 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     int Free = -1;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        if (Runtime->Slot518[Slot] == nullptr)
+        if (Runtime->Characters[Slot] == nullptr)
         {
             Free = Slot;
             break;
@@ -1345,7 +1345,7 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
         memcpy(Runtime->Flags514, &Character, sizeof(Runtime->Flags514));
         return;
     }
-    Runtime->Slot518[Free] = Character;
+    Runtime->Characters[Free] = Character;
 }
 
 namespace
@@ -1434,7 +1434,7 @@ static bool RoomControlFindStartScript(FRoomRuntime* Runtime, int* OutCharacterK
                 break;
             }
         }
-        if (Behavior->Flag09 == 1)
+        if (Behavior->bAutoplay == 1)
         {
             *OutCharacterKey = static_cast<int>(Character->Key);
             *OutBehaviorKey = Behavior->BehaviorId;
@@ -1455,7 +1455,7 @@ static void RoomControlRunStartScript(FRoomRuntime* Runtime, int CharacterKey, i
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Candidate = Runtime->Slot518[Slot];
+        FCharacterObject* const Candidate = Runtime->Characters[Slot];
         if (Candidate != nullptr && Candidate->Props.Key == static_cast<unsigned>(CharacterKey))
         {
             Character = Candidate;
@@ -1608,7 +1608,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
     int Slot = 0;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
-        FCharacterObject* const Character = Runtime->Slot518[Slot];
+        FCharacterObject* const Character = Runtime->Characters[Slot];
         if (Character == nullptr)
             continue;
         if (Character->PlacementIndex == -1)
@@ -1626,7 +1626,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             Frame.Pos.z = 0.0f;
             MatrixSetIdentity(Frame.Orient);
             Sequence->AddScript(StartScript, 0, &Frame, nullptr);
-            Sequence->Mirror.Add(Runtime->Slot518[Slot], nullptr);
+            Sequence->Mirror.Add(Runtime->Characters[Slot], nullptr);
             Sequence->BindMode = 1;
             Sequence->bLetterbox = 1;
             Sequence->bApplySpatial = 1;

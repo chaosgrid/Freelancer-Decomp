@@ -35,7 +35,7 @@ void ClientMarketFill(FClientMarket* Market, float PriceVariance, BaseData const
         FClientMarketGood Entry;
         Entry.Stock = 0;
         Entry.PriceScale = 0.0f;
-        Entry.Field24 = 0;
+        Entry.CanBuyFlags = 0;
         unsigned const Key = Good->Id; // +0x48
 
         // 00437e4e..00437e6a: the given base's market, else the current base's.

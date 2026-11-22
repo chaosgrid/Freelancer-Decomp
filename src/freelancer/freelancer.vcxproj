@@ -168,7 +168,6 @@
     <ClInclude Include="Client\part_cache.h" />
     <ClInclude Include="Client\space_client_objects_fx.h" />
     <ClInclude Include="Client\ship_space_supt_fx.h" />
-    <ClInclude Include="Client\menu_pilot_select.h" />
     <ClInclude Include="Client\menu_keymap_config.h" />
     <ClInclude Include="Client\screen_quad_state.h" />
     <ClInclude Include="Client\character_select_equip.h" />

@@ -150,7 +150,7 @@ NnPreferences::~NnPreferences()
     // dtor -- the std::vector members do it here.
 }
 
-bool NnPreferences::Slot23(unsigned, unsigned, unsigned)
+bool NnPreferences::ProcessMessage(unsigned, unsigned, unsigned)
 {
     // FUN_004ada30
     OutputDebugStringA("OnMessage\n");

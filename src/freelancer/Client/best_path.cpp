@@ -169,7 +169,7 @@ int BestPathFirstWaypointNotKind3()
     for (int Index = 0; Index < Count; ++Index)
     {
         FBestPathWaypoint const* const Waypoint = BestPathGetWaypoint(Index);
-        if (Waypoint->Field_0x18 != 3)
+        if (Waypoint->ObjectiveState != 3)
             return Index;
     }
     return -1;
@@ -263,13 +263,13 @@ void BestPathObjectivesChanged()
         // FUN_004c4ff0 cannot fail for Index < Count; retail would read +0x18 through the null
         // at 0x004bcd06 anyway.
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index);
-        if ((Waypoint->Field_0x18 & 0x80u) != 0) // 0x004bcc43 TEST AL,AL / JNS
+        if ((Waypoint->ObjectiveState & 0x80u) != 0) // 0x004bcc43 TEST AL,AL / JNS
             StoryStarReset();                    // FUN_004b9bb0, inlined at 0x004bcc4e..0x004bcce6
-        if ((Waypoint->Field_0x18 & 0x20u) != 0)
+        if ((Waypoint->ObjectiveState & 0x20u) != 0)
             StoryStarAddHistory(&Waypoint->Marker);  // FUN_004ba2a0 (0x004bccef)
-        if ((Waypoint->Field_0x18 & 0x10u) != 0)
+        if ((Waypoint->ObjectiveState & 0x10u) != 0)
             StoryStarPushPending(&Waypoint->Marker); // FUN_004b9f90 (0x004bccfe)
-        Waypoint->Field_0x18 &= 0xfu;
+        Waypoint->ObjectiveState &= 0xfu;
     }
 }
 
@@ -277,10 +277,10 @@ void BestPathReplaceObjective(FServerReplaceMissionObjectiveInfo const* Info)
 {
     // FUN_005a5b60 (RET 8): FUN_005a6620 (operator[]) on the key, then record (byte) +0x20 of
     // its vector -- unchecked -- gets FmtStr::operator=(+0x04) and +0x18 = +0x1c.
-    FBestPath& Path = G_BestPaths[Info->Field_0x00];
+    FBestPath& Path = G_BestPaths[Info->MissionId];
     FBestPathWaypoint* const Records = Path.Waypoints.data();
-    Records[Info->State].Marker = Info->Text;
-    Records[Info->State].Field_0x18 = Info->ObjectiveType;
+    Records[Info->ObjectiveIndex].Marker = Info->Text;
+    Records[Info->ObjectiveIndex].ObjectiveState = Info->ObjectiveType;
 }
 
 void BestPathSetObjectives(FServerSetMissionObjectivesInfo const* Info)
@@ -292,7 +292,7 @@ void BestPathSetObjectives(FServerSetMissionObjectivesInfo const* Info)
     // (FUN_004c4690 > 0) and a +0x3c of 7 or 8 returns at once -- without FUN_004bcbf0.
     unsigned const TitleMadLib = Info->TextA.MadLibId;
     if ((TitleMadLib == 0 || TitleMadLib == 1) && GetPlayerWaypointCountRetail() > 0 &&
-        (Info->Field_0x3c == 7 || Info->Field_0x3c == 8))
+        (Info->MissionType == 7 || Info->MissionType == 8))
         return;
 
     // 0x005a5c23: no records -> straight to FUN_004bcbf0 with the map left empty.
@@ -301,7 +301,7 @@ void BestPathSetObjectives(FServerSetMissionObjectivesInfo const* Info)
         // 0x005a5c31..0x005a5ca9: a default value (FUN_005a6900 vector, two FmtStr
         // FUN_005a5e40) paired with the key (FUN_005a6a10) and inserted (FUN_005a6950).
         std::pair<std::map<unsigned, FBestPath>::iterator, bool> const Inserted =
-            G_BestPaths.insert(std::make_pair(Info->Field_0x00, FBestPath()));
+            G_BestPaths.insert(std::make_pair(Info->MissionId, FBestPath()));
         FBestPath& Path = Inserted.first->second;
 
         // 0x005a5cd2..0x005a5d8a: reserve(count) -- a new block when the capacity is short,
@@ -314,13 +314,13 @@ void BestPathSetObjectives(FServerSetMissionObjectivesInfo const* Info)
         {
             FBestPathWaypoint Record;
             Record.Marker = Info->Entries[Index].Text;
-            Record.Field_0x18 = Info->Entries[Index].State;
+            Record.ObjectiveState = Info->Entries[Index].State;
             Path.Waypoints.push_back(Record);
         }
 
         // 0x005a5df9..0x005a5e15: Title = +0x0c, byte +0x40 = +0x3c, Text = +0x24.
         Path.Title = Info->TextA;
-        Path.Field_0x50 = Info->Field_0x3c;
+        Path.MissionType = Info->MissionType;
         Path.Text = Info->TextB;
     }
 
@@ -331,8 +331,8 @@ void BestPathSetObjectiveState(FServerMissionObjectiveStateInfo const* Info)
 {
     // LAB_005a5e80 (RET 8): FUN_0052c7a0 lower_bound, a hit when not end and not key < node
     // key -- find(); then record (byte) +0x04, unchecked, gets +0x18 = the dword at +0x08.
-    std::map<unsigned, FBestPath>::iterator const It = G_BestPaths.find(Info->Field_0x00);
+    std::map<unsigned, FBestPath>::iterator const It = G_BestPaths.find(Info->MissionId);
     if (It == G_BestPaths.end())
         return;
-    It->second.Waypoints.data()[Info->Field_0x04].Field_0x18 = Info->Field_0x08;
+    It->second.Waypoints.data()[Info->ObjectiveIndex].ObjectiveState = Info->State;
 }

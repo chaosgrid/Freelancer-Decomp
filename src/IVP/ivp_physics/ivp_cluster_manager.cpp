@@ -492,7 +492,7 @@ void IVP_Cluster_Manager::fire_event_collision_object_deleted(IVP_Real_Object* O
 }
 
 // FUN_0634b0e0 (RET 8): `TEST byte [listener+4],4` (:0634b10c), slot 2 with Event.
-void IVP_Cluster_Manager::fire_event_friction_slot2(IVP_Real_Object* Object, void* Event)
+void IVP_Cluster_Manager::fire_event_friction_created(IVP_Real_Object* Object, void* Event)
 {
     IVP_Collision_Callback_Table* const Table = collision_callback_hash->find_table(Object);
     if (Table == nullptr)
@@ -506,7 +506,7 @@ void IVP_Cluster_Manager::fire_event_friction_slot2(IVP_Real_Object* Object, voi
         {
             continue;
         }
-        Listener->Slot02(Event);
+        Listener->event_friction_created(Event);
         if (I > 0 && collision_callback_hash->find_table(Object) == nullptr)
         {
             return;
@@ -515,7 +515,7 @@ void IVP_Cluster_Manager::fire_event_friction_slot2(IVP_Real_Object* Object, voi
 }
 
 // FUN_0634b140 (RET 8): `TEST byte [listener+4],4` (:0634b16c), slot 3 with Event.
-void IVP_Cluster_Manager::fire_event_friction_slot3(IVP_Real_Object* Object, void* Event)
+void IVP_Cluster_Manager::fire_event_friction_deleted(IVP_Real_Object* Object, void* Event)
 {
     IVP_Collision_Callback_Table* const Table = collision_callback_hash->find_table(Object);
     if (Table == nullptr)
@@ -529,7 +529,7 @@ void IVP_Cluster_Manager::fire_event_friction_slot3(IVP_Real_Object* Object, voi
         {
             continue;
         }
-        Listener->Slot03(Event);
+        Listener->event_friction_deleted(Event);
         if (I > 0 && collision_callback_hash->find_table(Object) == nullptr)
         {
             return;

@@ -1044,7 +1044,7 @@ namespace
     void GameobjUpdateDrawLighting(FClientGameobj* Self, void* Camera)
     {
         Vector Center;
-        float const Radius = Self->Slot178(Center);
+        float const Radius = Self->GetPhysicalRadius(Center);
 
         unsigned Type;
         Self->get_type(Type);
@@ -1154,7 +1154,7 @@ namespace
             // far plane, then the plane back to the pass's far (queue +8).
             CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
             unsigned Lod = 0;
-            Go->Slot17c(&Lod, Cam, nullptr);
+            Go->PickLod(&Lod, Cam, nullptr);
             CameraSetNearFar(Cam, Camera->GetZNear(), G_DrawCtxZFar);
 
             // 0x0051f3b5..0x0051f3c7: low word >= 3 (unsigned), high word < 2 (signed).
@@ -1165,7 +1165,7 @@ namespace
 
             // 0x0051f3cd..0x0051f3de: vt+0x18c (DrawStateA) must be 0.
             unsigned DrawStateB = 0;
-            if (Go->Slot18c(&DrawStateB) != 0)
+            if (Go->GetNebula(&DrawStateB) != 0)
                 return;
 
             PushNode(2, Go, DistSq, Lod); // DAT_00675310, bucket 2
@@ -1182,10 +1182,10 @@ namespace
             if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
                 Solar = static_cast<CSolar*>(Obj);
             if ((static_cast<unsigned char>(Solar->TypeBits) & 7u) != 0 &&
-                static_cast<FClientSolarGameobj*>(Go)->Field_0xe4 == 0)
+                static_cast<FClientSolarGameobj*>(Go)->StarSphere == 0)
             {
                 Vector Center;
-                const double Radius = Go->Slot178(Center);
+                const double Radius = Go->GetPhysicalRadius(Center);
                 DistSq = static_cast<float>(static_cast<double>(DistSq) - Radius * Radius);
             }
         }
@@ -1196,7 +1196,7 @@ namespace
         if (G_FieldController != nullptr)
         {
             unsigned EncloseBits = 0;
-            const unsigned DrawStateA = Go->Slot18c(&EncloseBits);
+            const unsigned DrawStateA = Go->GetNebula(&EncloseBits);
             float Enclose = 0.0f;
             memcpy(&Enclose, &EncloseBits, sizeof(float));
 
@@ -1243,7 +1243,7 @@ namespace
         // 0x0051f53e..0x0051f561: the LOD pick (vt+0x17c, no cached LOD); low word >= 3, high
         // word < 2.
         unsigned Lod = 0;
-        Go->Slot17c(&Lod, Cam, nullptr);
+        Go->PickLod(&Lod, Cam, nullptr);
         if (static_cast<unsigned short>(Lod) < 3)
             return;
         if (static_cast<short>(Lod >> 16) >= 2)
@@ -1700,7 +1700,7 @@ namespace
         // slot and is never read.
         unsigned OutLod = 0;
         static_cast<FClientGameobj*>(static_cast<IObjInspect*>(Object))
-            ->Slot188(&OutLod, Cam, LodWord, nullptr, nullptr);
+            ->SubmitDraw(&OutLod, Cam, LodWord, nullptr, nullptr);
     }
 
     int FZItemGameObject::Slot04()
@@ -2225,7 +2225,7 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
 
     // 0x00539843..0x00539854: the radius about Center through this object's own vt+0x178.
     Vector Center;
-    const float Radius = Self->Slot178(Center);
+    const float Radius = Self->GetPhysicalRadius(Center);
 
     // 0x00539858..0x00539885: the camera's view transform (vt+0x40) applied to Center through
     // DAT_006789d0 vt+0x28 (TransformXform); the result is copied to a second local.
@@ -2293,7 +2293,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     // 0x0053998d..0x005399ac: *vt+0x17c(&Local, Camera, &CachedLod) is written back over the
     // CachedLod argument, which every later read uses.
     unsigned PickedLod = 0;
-    CachedLod = *Self->Slot17c(&PickedLod, Camera, &CachedLod);
+    CachedLod = *Self->PickLod(&PickedLod, Camera, &CachedLod);
     unsigned short const Lo = static_cast<unsigned short>(CachedLod);
     short const Hi = static_cast<short>(CachedLod >> 16);
 
@@ -2310,7 +2310,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         GameobjSweepEffectList(&Self->EffectList);
 
     // 0x005399d7..0x005399de: own vt+0x184(Camera).
-    Self->Slot184(Camera);
+    Self->UpdateDrawLighting(Camera);
 
     // 0x005399e4..0x00539a2d: 8 unless this object is the player's IObjRW (FUN_0054baf0). For
     // the player, FUN_004022d0(&Scale) (DAT_006101d4) FCOMP double 0.75 (DAT_005debf8), TEST
@@ -2419,7 +2419,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
         // 0x005337bd..0x005337db: FSUBR double 1.0 (DAT_005c89b8), +0xe0 = 1, FSTP float; then
         // FUN_00533880(get_index (vt+0x1c), the float's bits).
         float const Opacity = static_cast<float>(1.0 - static_cast<double>(Fade));
-        Self->Field_0xe0 = 1;
+        Self->bCloakOverrideActive = 1;
         long const Inst = Self->get_index();
         void* OpacityBits = nullptr;
         memcpy(&OpacityBits, &Opacity, sizeof(float));
@@ -2435,10 +2435,10 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
                 GetAppearanceOverrideMaterial(3u, &Extra);
         }
     }
-    else if (Self->Field_0xe0 != 0)
+    else if (Self->bCloakOverrideActive != 0)
     {
         // 0x00533827..0x0053384c: +0xe0 = 0; get_index != -1 -> FUN_00532170(index).
-        Self->Field_0xe0 = 0;
+        Self->bCloakOverrideActive = 0;
         long const Inst = Self->get_index();
         if (Inst != -1)
             RemoveAppearanceInstanceValue(static_cast<int>(Inst));
@@ -2496,7 +2496,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     {
         FClientShipGameobj* const Ship =
             static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(PlayerRW));
-        if (Ship->Field_0x158 == 2 || Ship->Field_0x158 == 3)
+        if (Ship->JumpState == 2 || Ship->JumpState == 3)
         {
             // 0x0051c235..0x0051c24d: DAT_00675244 = 0; FUN_0040fb60(GetZNear, DAT_006164d4).
             G_FieldController = nullptr;
@@ -2508,12 +2508,12 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
                 SpaceCameraSetHalfFovX(Cam, Gc->BaseHalfFovXDeg);
 
             // 0x0051c273..0x0051c27a: FUN_00504890 on the +0x188 object, used unchecked.
-            JumpShipEffectDrawTunnel(Ship->Field_0x188, Cam);
+            JumpShipEffectDrawTunnel(Ship->JumpEffect, Cam);
 
             // 0x0051c27f..0x0051c29c: the player's own draw, vt+0x188(&Lod, this, Lod, 0, 0)
             // with Lod = {word 0, word 0xffff} -- the Ship's override FUN_00546050.
             unsigned Lod = 0xffff0000u;
-            Ship->Slot188(&Lod, Cam, Lod, nullptr, nullptr);
+            Ship->SubmitDraw(&Lod, Cam, Lod, nullptr, nullptr);
 
             // 0x0051c2a2..0x0051c2d5: [EFFECTS] -> FUN_004f7480(this, frame time, 0x25), then
             // the same with 0x1b; FUN_0042d680 is read afresh for each call.
@@ -2525,7 +2525,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
 
             // 0x0051c2d8..0x0051c315: FUN_00504880's colour, when there is one, becomes the
             // clear colour (+0xe8 |= 1, +0xe9..+0xeb); +0xbc = 0 on both exits (0x0051c893).
-            unsigned char const* const Rgb = JumpShipEffectColor(Ship->Field_0x188);
+            unsigned char const* const Rgb = JumpShipEffectColor(Ship->JumpEffect);
             if (Rgb != nullptr)
             {
                 const unsigned char B2 = Rgb[2];

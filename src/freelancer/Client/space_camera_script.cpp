@@ -581,7 +581,7 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     {
         // 0x0051e59c: slot 8 hands back a pointer whose FIRST dword is the entity type.
         const int* const Entity =
-            static_cast<const int*>(ScriptOf(Cam->Script)->Slot8(Index));
+            static_cast<const int*>(ScriptOf(Cam->Script)->Slot8EntitySnapInorder(Index));
 
         // 0x0051e59f: CMP dword [EAX],4 -- the pointer is dereferenced without a test.
         if (*Entity == kScriptEntityTypeCamera)

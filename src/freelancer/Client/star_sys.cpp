@@ -903,7 +903,7 @@ void StarSysLeave(IObjRW* Player)
     // 00554b62..00554b6e: a non-null Player gets its vtable slot 100 (+0x190, LAB_00524e60 on
     // the Gameobj base: draw states cleared, +0x34 = 10.0f).
     if (Player != nullptr)
-        static_cast<FClientGameobj*>(Player)->Slot190();
+        static_cast<FClientGameobj*>(Player)->ResetNebula();
     RefreshLoadingProgress();
     // 00554b7e: FUN_005200b0 -- destroy every client asteroid field (FUN_005205d0 per field).
     CliAsteroidDestroyAll();

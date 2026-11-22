@@ -84,9 +84,9 @@ namespace PhySys
         {
         }
 
-        virtual void Slot00() override {}                // .text:062a8920 `RET` (ICF-shared)
-        virtual void Slot01(int32_t /*Arg*/) override {} // .text:062ed730 `RET 4` (ICF-shared)
-        virtual void Slot02() override {}                // .text:062a8920 `RET` (ICF-shared)
+        virtual void start_pcount() override {}                // .text:062a8920 `RET` (ICF-shared)
+        virtual void pcount(int32_t /*Arg*/) override {} // .text:062ed730 `RET 4` (ICF-shared)
+        virtual void stop_pcount() override {}                // .text:062a8920 `RET` (ICF-shared)
 
         // LAB_06285e30: `if (this) this->vtbl[5](1)` -- the deleting destructor.
         virtual void environment_is_going_to_be_deleted(IVP_Environment* /*Env*/) override
@@ -94,7 +94,7 @@ namespace PhySys
             delete this;
         }
 
-        virtual void Slot04(float /*Arg0*/, float /*Arg1*/) override {} // .text:0628f050 `RET 8`
+        virtual void reset_and_print_performance_counters(float /*Arg0*/, float /*Arg1*/) override {} // .text:0628f050 `RET 8`
 
         // .text:063602c0 (ICF-folded): FUN_06360290 stamps IVP_PerformanceCounter's vtable
         // 0639bac8, then operator delete when bit 0 of the flag is set.

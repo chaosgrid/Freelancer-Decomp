@@ -116,8 +116,8 @@ void TextWin::Draw()
     Origin.Y = ScreenY;
     Origin.Scale = ScreenWidth;
     Origin.Height = ScreenHeight;
-    Origin.Field10 = FieldE8;
-    Origin.Field14 = 0;
+    Origin.HAlign = FieldE8;
+    Origin.VAlign = 0;
     FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
 }
 

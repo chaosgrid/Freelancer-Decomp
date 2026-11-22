@@ -66,7 +66,7 @@
 // BaseWatcher::set_pointer(nullptr) unwatch calls at the same six offsets
 // (+0x370/+0x310/+0x204/+0x18c/+0xb8/+0x40), same FUN_062d2080(this,-1) tail
 // call. FreeFlightBehavior's only own field is the byte at +0x3fc (retail
-// allocates 0x400; Slot3 clears that byte), which needs no teardown, so there is
+// allocates 0x400; OnEngage clears that byte), which needs no teardown, so there is
 // nothing extra for a FreeFlightBehavior-specific destructor body to clean up -- retail's
 // compiler simply re-emitted (rather than folding via ICF, for whatever
 // linker-internal reason) the identical base-class teardown logic at a
@@ -90,16 +90,16 @@ public:
     // Behavior's in GotoBehavior's table. Every other slot is GotoBehavior's pointer. All six
     // are overrides as of 2026-10-08 (claude-code:cmn-ai5); bodies in the .cpp.
     //   0 FUN_062c6dd0 -> FUN_062c6df0   ~FreeFlightBehavior (chains into ~GotoBehavior)
-    //   3 FUN_062c6ee0   Slot3            4 LAB_062c6fc0   Slot4 (`JMP FUN_062d20f0`)
-    //   6 LAB_062d1730   evaluate (1)    10 LAB_062c6fd0   Slot10   15 LAB_062c7000 engage_engine
+    //   3 FUN_062c6ee0   OnEngage            4 LAB_062c6fc0   OnDisengage (`JMP FUN_062d20f0`)
+    //   6 LAB_062d1730   evaluate (1)    10 LAB_062c6fd0   OnApplyDirective   15 LAB_062c7000 engage_engine
     // ------------------------------------------------------------------
-    void Slot3() override;
-    void Slot4() override;
+    void OnEngage() override;
+    void OnDisengage() override;
     EvaluateResult evaluate(unsigned int Context) override;
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
     void engage_engine(bool bOn) override;
 
-    // +0x3fc: FreeFlightBehavior's one own byte, past GotoBehavior's 0x3fc. Slot3 clears it
+    // +0x3fc: FreeFlightBehavior's one own byte, past GotoBehavior's 0x3fc. OnEngage clears it
     // (.text:062c6f01); nothing in the port reads it yet. Not written by the ctor.
     unsigned char Flag3fc;
     unsigned char Pad3fd[0x400 - 0x3fd];

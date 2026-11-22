@@ -2260,7 +2260,7 @@ void CShip::request_exit_tradelane()
         FBehaviorManagerEvent Event;
         Event.Type = 4;
         Event.Data = &Payload;
-        BehMgr->Slot00(&Event);
+        BehMgr->OnEvent(&Event);
     }
 }
 

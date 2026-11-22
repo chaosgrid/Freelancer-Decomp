@@ -114,7 +114,7 @@ public:
     FContentGuideHandle Guide;
     std::vector<FMissionShipCargo> Cargo;             // +0x6c "cargo"
     int HitPoints;                                    // +0x7c "hit_points" (-1)
-    int Field_0x80;                                   // +0x80 "hit_points" as well (-1). TODO: meaning
+    int OriginalHitPoints;                            // +0x80 "hit_points" initial value (-1), restored on respawn
     float Radius;                                     // +0x84 "radius" (7.0f); "arrival_obj" zeroes it
 };
 
@@ -144,7 +144,7 @@ struct FMissionShipGroup
     // jumper that is out of every system; the save writes it as "arrival_obj = %u" in place of
     // the position and orientation when (id & 0x3fffffff) != 0.
     unsigned int ArrivalObjId;
-    int Field_0xe0;                                   // +0xe0 "arrival_obj" value 1 (-1). TODO: meaning
+    int ArrivalDockIndex;                             // +0xe0 "arrival_obj" value 1 (-1)
     ID_String Formation;                              // +0xe4 "formation" (transport_liberty)
     std::vector<FMissionShip> Ships;                  // +0xe8
 };
@@ -205,11 +205,11 @@ struct FMissionSolar
     unsigned int ArchetypeId;                         // +0x44c "archetype" (pub::GetNicknameId)
     unsigned int SystemId;                            // +0x450 "system" (pub::GetSystemID)
     unsigned int LoadoutId;                           // +0x454 "loadout" (pub::GetLoadoutID)
-    int Field_0x458;                                  // +0x458 TODO: meaning (template -1)
+    int VibeGroupId;                                  // +0x458 SolarInfo::VibeGroupId (template -1)
     unsigned int Faction;                             // +0x45c "faction" reputation group (-1)
     unsigned int BaseId;                              // +0x460 "base" (pub::GetBaseID)
     unsigned int VoiceId;                             // +0x464 "voice" (pub::GetVoiceID)
-    unsigned int Field_0x468;                         // +0x468 TODO: meaning (template 0)
+    unsigned int CostumeId;                           // +0x468 solar costume ID (template 0)
     std::list<unsigned int> LabelIds;                 // +0x46c CreateID of the nickname and labels
     Costume SpaceCostume;                             // +0x478 "costume" (FUN_06f31390)
     FmtStr Name;                                      // +0x4ac "string_id" (begin/end_mad_lib)
@@ -608,9 +608,9 @@ public:
     // then the members: +0x28, +8.
     virtual ~FMissionPlayer();
     // Slot 1, FUN_06f1d3d0 (RET 4): +0x25 = b; a false value deletes the +0x28 objectives.
-    virtual void SetField25(bool bValue);
+    virtual void SetForceResendObjectives(bool bValue);
     // Slot 2, LAB_06f1d420: return +0x25.
-    virtual bool GetField25();
+    virtual bool GetForceResendObjectives();
 
     // FUN_06f1d110: send the player's objective list (pub::Player::SetMissionObjectives).
     void SendObjectives();
@@ -624,8 +624,8 @@ public:
     FMissionOwnedObjectiveList Objectives;                // +0x08 (Owner +0x18 = this)
     FMissionObject* Mission;                              // +0x1c
     FContentPlayerState* PlayerState;                     // +0x20
-    unsigned char Field_0x24;                             // +0x24 TODO: meaning (ctor 0)
-    unsigned char Field_0x25;                             // +0x25 TODO: meaning (slots 1/2)
+    unsigned char bTradelanePathChecked;                  // +0x24 checked once per tradelane ride (ctor 0)
+    unsigned char bForceResendObjectives;                 // +0x25 bypasses SentObjectives dedup (slots 1/2)
     FMissionOwnedObjectiveList SentObjectives;            // +0x28 (clones kept by FUN_06f1d110; Owner +0x38 = 0)
 };
 
@@ -634,8 +634,8 @@ public:
 struct FMissionInvulnerable
 {
     TString<0x30> Nickname;
-    float Duration;
-    unsigned char bParam3;
+    float MaxHpLoss;
+    unsigned char bPlayerCanDamage;
 };
 
 // One attitude between two mission parties (the element of the mission +0x164 vector, 0x74
@@ -692,8 +692,8 @@ public:
 
     // Slots 7-10: LAB_06ea1450 (XOR EAX,EAX; RET).
     virtual int Slot07();
-    virtual int Slot08();
-    virtual int Slot09();
+    virtual int GetTargetSystemId();
+    virtual int GetJumpPreference();
     virtual int Slot10();
     // Slot 11, LAB_06f1b9f0 (RET 0x2c): replace the type 5 run of List (the first type 5 node and
     // the type 5 nodes after it) by two objectives per kind 0 leg / one per kind 1 leg of Legs,
@@ -706,11 +706,11 @@ public:
                                      std::list<FMissionObjective*>::iterator const* Where);
     // Slots 12..17:LAB_06ea1460 (MOV AL,1; RET), LAB_06ea1470 (XOR AL,AL; RET 4),
     // LAB_06ea1480 (XOR AL,AL; RET).
-    virtual bool Slot12();
-    virtual bool Slot13(unsigned int Arg);
-    virtual bool Slot14();
-    virtual bool Slot15();
-    virtual bool Slot16(unsigned int Arg);
+    virtual bool FailOnPlayerDeath();
+    virtual bool FailOnGroupMemberDeath(unsigned int Arg);
+    virtual bool FailOnSoloPlayerDeath();
+    virtual bool FailOnPlayerLeave();
+    virtual bool FailOnGroupMemberLeave(unsigned int Arg);
     virtual bool Slot17();
     // Slot 18, FUN_06f1ca50: +0xc = PlayerId, +8 = FUN_06f49b00(&PlayerId).
     virtual void SetPlayer(unsigned int InPlayerId);
@@ -739,7 +739,7 @@ public:
     // Slot 28, FUN_06ebf6f0 (RET 4, empty; TU21 override FUN_06ebab90). The argument is a
     // message parms pointer: FUN_06f14b40 06f14bc8 passes &{npc SpaceObj id, system id} of a
     // jumper that arrived.
-    virtual void Slot28(void const* Parms);
+    virtual void OnNpcSystemEnter(void const* Parms);
 
     // FUN_06f15940: SpaceObj id of a mission label ("Player" = the player's ship), or 0.
     unsigned int GetLabelShipId(TString<0x30> const* Label);
@@ -916,15 +916,15 @@ public:
     std::map<unsigned int, FMissionPlayer*> Players;  // +0x3c
     // +0x50 / +0x68: FmtStr, ctor inlined (06f0e471-06f0e4ce zero Head, MadLibId and the
     // 14 counters, as Common's inline FmtStr ctor does); ~FmtStr at 06f0f0b4/06f0f0be.
-    FmtStr Field_0x50;                                // +0x50 [Mission] "mission_title"
-    FmtStr Field_0x68;                                // +0x68 [Mission] "mission_offer"
+    FmtStr MissionTitle;                              // +0x50 [Mission] "mission_title"
+    FmtStr MissionOffer;                              // +0x68 [Mission] "mission_offer"
     // +0x80 (ctor 7): the mission type byte - the Type argument of
     // pub::Player::SetMissionObjectives (06f1d38d), the random mission's offer type
     // (DestroyMission ctor, RandomMissionDB completion counters). Not renamed yet: the RM lane's
     // files use the name.
-    unsigned char Field_0x80;
+    unsigned char MissionType;
     unsigned char bDestroyed;                         // +0x81 (FUN_06f0f100)
-    float Field_0x84;                                 // +0x84 slot 19 accumulates dt (FADD)
+    float ObjectiveResendTimer;                       // +0x84 slot 19 accumulates dt (FADD)
     unsigned int Field_0x88;                          // +0x88 TODO: meaning (ctor 0)
     // +0x8c list (ctor FUN_06f1e5b0): random-encounter formations to create again, consumed by
     // FUN_06f145d0 (message 0x36).

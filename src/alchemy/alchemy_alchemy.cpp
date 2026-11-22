@@ -290,18 +290,18 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot6(const char* Name, IDAComponent* Node,
+    GENRESULT DACOM_API FAlchemy::InsertNode(const char* Name, IDAComponent* Node,
                                                        unsigned long* OutHash)
     {
         return InsertNodeByName(Name, Node, OutHash);
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot7(unsigned long Hash)
+    GENRESULT DACOM_API FAlchemy::RemoveNodeByHash(unsigned long Hash)
     {
-        return RemoveNodeByHash(Hash);
+        return NodeRegistry_.Remove(Hash);
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot8(FNodeLibraryEnumCallback Callback, void* Context)
+    GENRESULT DACOM_API FAlchemy::EnumerateNodes(FNodeLibraryEnumCallback Callback, void* Context)
     {
         return NodeRegistry_.Enumerate(Callback, Context);
     }
@@ -312,7 +312,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot10(void* NameRaw, void* OutRaw)
+    GENRESULT DACOM_API FAlchemy::MakeUniqueName(void* NameRaw, void* OutRaw)
     {
         // 062277e0: borrowed original name or the independent DAT_06257d80 buffer.
         const char* CurrentName = static_cast<const char*>(NameRaw);
@@ -348,7 +348,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot11(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FAlchemy::CreateNodeByHash(unsigned long Hash, IDAComponent** Out)
     {
         IDAComponent* Prototype = FindNodeEntry(Hash);
         if (Prototype == nullptr)
@@ -356,7 +356,7 @@ namespace AlchemyImpl
         return InstantiateFromNodeLibPrototype(Prototype, Out);
     }
 
-    GENRESULT DACOM_API FAlchemy::NodeLibSlot12(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FAlchemy::FindNodeByHash(unsigned long Hash, IDAComponent** Out)
     {
         return NodeRegistry_.FindWithRef(Hash, Out);
     }
@@ -398,7 +398,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::Slot15(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::ComposeNodeTransforms(void* A, void* B)
     {
         // LAB_062016c0 (alchemy.dll.txt:4581-4680, RET 0xC): Start = B, or DAT_062578b0
         // (G_RootNode) when B is null -- no null test after that, retail dereferences it.
@@ -423,7 +423,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::Slot16(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::UpdateNodes(void* A, void* B)
     {
         // LAB_06201870: B (root when null) + descendants via FUN_06201810.
         // Flag bit0 → SubmitNode(this, node), not A->+0x5C (see helper).
@@ -531,7 +531,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::Slot21(void* A, void* B)
+    GENRESULT DACOM_API FAlchemy::AttachNodeFiltered(void* A, void* B)
     {
         // LAB_06201ed0: filter the parent before attaching the child.
         unsigned long FilterResult = 0;
@@ -895,11 +895,6 @@ namespace AlchemyImpl
                                              unsigned long* OutHash)
     {
         return NodeRegistry_.Insert(this, Name, Node, OutHash);
-    }
-
-    GENRESULT FAlchemy::RemoveNodeByHash(unsigned long Hash)
-    {
-        return NodeRegistry_.Remove(Hash);
     }
 
     void FAlchemy::ClearNodeList()

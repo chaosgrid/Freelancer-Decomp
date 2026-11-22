@@ -14,7 +14,7 @@
 #include "common_aisteer.h"
 #include "common_systemmanager.h" // SystemManager -- NavHelper's real type
 #include "common_misc.h" // SinglePlayer() -- evaluate()'s multiplayer group test
-#include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine (Slot27/Slot28)
+#include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine (UpdateFollowerSteering/GetRotatedOffset)
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
 #include "common_pathfind.h"
@@ -99,9 +99,9 @@ static double VecMagSq3(Vector const& V)
 // was correct all along -- only the callee was left disconnected.
 
 // Slot 3, FUN_062cc3b0 (.text:062cc3b0-062cc40c).
-void FormationBehavior::Slot3()
+void FormationBehavior::OnEngage()
 {
-    BaseFollowerBehavior::Slot3();                                  // 062cc3b3 FUN_062cb540
+    BaseFollowerBehavior::OnEngage();                                  // 062cc3b3 FUN_062cb540
     (void)ObjInspectOf(OwnerContext)->get_formation_offset(Offset290);   // 062cc3c4 slot 0xac
     if (NavHelper->SelfTarget.Iface->is_player())        // 062cc3dc slot 0xbc
     {
@@ -113,9 +113,9 @@ void FormationBehavior::Slot3()
 }
 
 // Slot 4, LAB_062cc410 (.text:062cc410-062cc466).
-void FormationBehavior::Slot4()
+void FormationBehavior::OnDisengage()
 {
-    BaseFollowerBehavior::Slot4();                                  // 062cc414 FUN_062cb5e0
+    BaseFollowerBehavior::OnDisengage();                                  // 062cc414 FUN_062cb5e0
     if (!NavHelper->SelfTarget.Iface->is_player())       // 062cc42b slot 0xbc
         return;
     (void)NavHelper->GunConvergenceStateBytes.RequestRelease();     // 062cc43e FUN_062ecd30
@@ -124,7 +124,7 @@ void FormationBehavior::Slot4()
 }
 
 // Slot 5, FUN_062cc030 (.text:062cc030-062cc0bf, RET 4, argument unread).
-int FormationBehavior::Slot5(float Value)
+int FormationBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     int Result = (Flag285 != 0) ? 1 : 2;                            // 062cc034-062cc043
@@ -196,7 +196,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
         return EvalSkip;
 
     // LAB_062cc242: the leader chain must not come back to the owner. The out-param is
-    // zeroed once, before the loop (062cc23e), as in Slot7.
+    // zeroed once, before the loop (062cc23e), as in OnUpdate.
     {
         IObjRW* Node = Target;
         IObjRW* Leader = nullptr;
@@ -263,7 +263,7 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
 }
 
 // Slot 10, LAB_062cd630: `OR byte [ECX+0x28],0x2; MOV AL,1; RET 4`.
-bool FormationBehavior::Slot10(void* DirectiveOp)
+bool FormationBehavior::OnApplyDirective(void* DirectiveOp)
 {
     (void)DirectiveOp;
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
@@ -302,7 +302,7 @@ void FormationBehavior::set_direction(Vector const& Dir)
     FaceAxis2ac.z = -Dir.z;                                         // 062ccad6
 }
 
-// The NavHelper cached-physical-bounds latch, emitted twice inside Slot27 (062cc6b6-062cc6cf
+// The NavHelper cached-physical-bounds latch, emitted twice inside UpdateFollowerSteering (062cc6b6-062cc6cf
 // and 062cc748-062cc75f) and already ported byte-for-byte three other times in this port
 // (FormationMoveFx::Update here, ComputeLeadFirePosition and its neighbour in
 // common_aifirecontrol.cpp). +0x157a is the "already refreshed this frame" flag, +0x1580 the
@@ -332,7 +332,7 @@ static void NavRefreshPhysicalBounds(SystemManager* Nav)
 // in this function is stdcall or thiscall (there is not one `ADD ESP,n` after a vtable
 // call anywhere in the body), so L is stable and `[ESP+N]` means L+N except across the
 // four explicit pushes and the one `SUB ESP,0xc`, which are called out where they matter.
-void FormationBehavior::Slot27()
+void FormationBehavior::UpdateFollowerSteering()
 {
     // 062cc47a-062cc49f: re-point LeadWatcher at whatever the SystemManager's directive
     // record currently names. Retail's `CMP EAX,[EBX]; JZ; CALL BaseWatcher::set_pointer`
@@ -498,9 +498,9 @@ void FormationBehavior::Slot27()
 // 201516-201570. PORTED 2026-09-17 (claude:w23-stubsweep2).
 //
 // UNTIL THIS PASS FormationBehavior DID NOT OVERRIDE SLOT 28 AT ALL, so every call landed on
-// BaseFollowerBehavior's `virtual Vector Slot28() { return Vector{0,0,0}; }` -- the exact
+// BaseFollowerBehavior's `virtual Vector GetRotatedOffset() { return Vector{0,0,0}; }` -- the exact
 // twin of the slot-27 hole commit d178e12 closed on this same class. The single caller is
-// BaseFollowerBehavior::Slot7, the whole subtree's per-tick body, at .text:062cbc2d
+// BaseFollowerBehavior::OnUpdate, the whole subtree's per-tick body, at .text:062cbc2d
 // `LEA EAX,[ESP+0x64]; PUSH EAX; CALL [EDX+0x70]`, and it feeds the returned vector straight
 // into FUN_062c50c0, which copies it to this->NestedPtr278 + 0x444. So for every
 // FormationBehavior in the game the child delegate's target offset was being overwritten
@@ -513,17 +513,17 @@ void FormationBehavior::Slot27()
 //   * E-0x24 .. E-0x01  the nine dwords REP MOVSD copies out of the leader's transform
 // The epilogue's `MOV EAX,[ESP+0x40]` at 062cc96d is [E+4], the incoming return buffer, and
 // 062cc971-062cc984 copy E-0x30/E-0x2c/E-0x28 through it -- which is what makes this a
-// by-value Vector return rather than the `void Slot28(void*)` its `RET 0x4` looks like.
+// by-value Vector return rather than the `void GetRotatedOffset(void*)` its `RET 0x4` looks like.
 //
-// The shape is FollowBehavior::Slot28's (LAB_062cd4c0, item 1409, common_followbehavior.cpp)
+// The shape is FollowBehavior::GetRotatedOffset's (LAB_062cd4c0, item 1409, common_followbehavior.cpp)
 // with one extra step in front: FollowBehavior transforms its own TargetOffset member, this
 // class transforms whatever OwnerContext's slot 0xac writes into a freshly zeroed local.
-Vector FormationBehavior::Slot28()
+Vector FormationBehavior::GetRotatedOffset()
 {
     // 062cc8fe-062cc916: three explicit zero dwords, then 062cc919 `CALL [EAX+0xac]` on
     // OwnerContext (+0x14) with a pointer to them. Slot 0xac is
     // IObjInspect::get_formation_offset(Vector&) -- the same slot, with a different
-    // out-param, that UpdateThreatFlag() and Slot27() above both drive.
+    // out-param, that UpdateThreatFlag() and UpdateFollowerSteering() above both drive.
     // Note it is a LOCAL here, not this->FormationOffset (+0x290): retail's `LEA EDX,[ESP+8]`
     // is a frame address, where the other two sites use `LEA EDX,[ESI+0x290]`.
     Vector FormationOffsetLocal{ 0.0f, 0.0f, 0.0f };

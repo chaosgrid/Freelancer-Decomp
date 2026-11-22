@@ -60,15 +60,15 @@ static FRpcServerCharacterIdBlock* RpcServerCharacterIdBlockFromCostume(const Co
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
-    Block->Field_0x04 = Source.PartIds[1];
-    Block->Field_0x00 = Source.PartIds[0];
-    Block->Field_0x08 = Source.PartIds[2];
-    Block->Field_0x0c = Source.PartIds[3];
+    Block->Body = Source.PartIds[1];
+    Block->Head = Source.PartIds[0];
+    Block->LeftHand = Source.PartIds[2];
+    Block->RightHand = Source.PartIds[3];
     Block->Count = static_cast<int>(Source.AccessoryCount);
     if (static_cast<unsigned int>(Block->Count) != 0) {
         Block->Ids = static_cast<unsigned int*>(
@@ -88,24 +88,24 @@ static FRpcServerCharacterIdBlock* RpcServerCharacterIdBlockFromCostume(const Co
 static void RpcServerCharacterRecordFromInfo(FRpcServerCharacterRecord* Record,
     const CCharacterSet::CharacterInfo* Source) {
     Record->Name = Source->Id;                                    // 06b354af
-    Record->Field_0x200 = Source->bIsRestart;                     // 06b354bf raw byte
-    Record->Field_0x201 = Source->bIsAutoSave;                    // 06b354cf raw byte
+    Record->bIsRestart = Source->bIsRestart;                     // 06b354bf raw byte
+    Record->bIsAutoSave = Source->bIsAutoSave;                    // 06b354cf raw byte
     Record->TextA = Source->Name;                                 // 06b354ef assign
     Record->TextB = Source->Description;                          // 06b35510 assign
-    Record->Field_0x224 = Source->DescripStrId;
-    Record->Field_0x228 = Source->TimestampLow;
-    Record->Field_0x22c = Source->TimestampHigh;
-    Record->Field_0x230 = Source->ShipArchetype;
-    Record->Field_0x234 = static_cast<unsigned int>(Source->Money);
-    Record->Field_0x238 = Source->SystemId;                       // 06b35570 <- +0x260
-    Record->Field_0x244 = Source->VoiceId;                        // 06b35580 <- +0x26c
-    Record->Field_0x248 = Source->Rank;                           // 06b35590 <- +0x270
-    Record->Field_0x23c = Source->BaseId;                         // 06b355a0 <- +0x264
-    Record->Field_0x240 = Source->LocationId;                     // 06b355b0 <- +0x268
-    std::memcpy(&Record->Field_0x250, &Source->HullStatus, 4u);   // 06b355c0 integer move
-    Record->Field_0x254 = static_cast<unsigned int>(Source->NumKills);             // <- +0x238
-    Record->Field_0x258 = static_cast<unsigned int>(Source->NumMissionFailures);   // <- +0x240
-    Record->Field_0x25c = static_cast<unsigned int>(Source->NumMissionSuccesses);  // <- +0x23c
+    Record->DescripStrId = Source->DescripStrId;
+    Record->TimestampLow = Source->TimestampLow;
+    Record->TimestampHigh = Source->TimestampHigh;
+    Record->ShipArchetype = Source->ShipArchetype;
+    Record->Money = static_cast<unsigned int>(Source->Money);
+    Record->SystemId = Source->SystemId;                       // 06b35570 <- +0x260
+    Record->VoiceId = Source->VoiceId;                        // 06b35580 <- +0x26c
+    Record->Rank = Source->Rank;                           // 06b35590 <- +0x270
+    Record->BaseId = Source->BaseId;                         // 06b355a0 <- +0x264
+    Record->LocationId = Source->LocationId;                     // 06b355b0 <- +0x268
+    std::memcpy(&Record->HullStatusBits, &Source->HullStatus, 4u);   // 06b355c0 integer move
+    Record->NumKills = static_cast<unsigned int>(Source->NumKills);             // <- +0x238
+    Record->NumMissionFailures = static_cast<unsigned int>(Source->NumMissionFailures);   // <- +0x240
+    Record->NumMissionSuccesses = static_cast<unsigned int>(Source->NumMissionSuccesses);  // <- +0x23c
     Record->BlockA = RpcServerCharacterIdBlockFromCostume(Source->ComCostume);
     Record->BlockB = RpcServerCharacterIdBlockFromCostume(Source->BaseCostume);
     // 06b357d4..06b3588c: one 0x18 record per EquipDesc, no filter.
@@ -123,7 +123,7 @@ static void RpcServerCharacterRecordFromInfo(FRpcServerCharacterRecord* Record,
             E->HardpointSize = 0;
             E->Hardpoint = nullptr;
             E->bEquipped = 0;
-            E->Field_0x0f = 0;
+            E->bMission = 0;
         }
         E->ArchId = It->ArchId;                                   // 06b35816
         E->Count = It->Count;                                     // 06b3581b
@@ -131,7 +131,7 @@ static void RpcServerCharacterRecordFromInfo(FRpcServerCharacterRecord* Record,
         E->Id = It->Id;                                           // 06b35828
         E->bEquipped = It->bEquipped;                             // 06b3582f raw byte
         // 06b35832 / 06b35835: EquipDesc +0x18 (bMission) copied as a raw byte.
-        std::memcpy(&E->Field_0x0f, &It->bMission, 1u);
+        std::memcpy(&E->bMission, &It->bMission, 1u);
         // 06b35842..06b3586d: strlen + 1 bytes allocated (bare), strcpy, and the
         // size stored as strlen + 1 truncated to a word.
         const unsigned int Length = static_cast<unsigned int>(std::strlen(It->Hardpoint)) + 1u;
@@ -147,7 +147,7 @@ static void RpcServerCharacterRecordFromInfo(FRpcServerCharacterRecord* Record,
         Record->Equipment.PushBack(E);                            // 06b3587c
     }
     // Hop 2's postscript: +0x260 = low byte of the equipment list size, or 0.
-    Record->Field_0x260 = (Record->Equipment.Records != nullptr)
+    Record->EquipmentCount = (Record->Equipment.Records != nullptr)
         ? static_cast<unsigned char>(Record->Equipment.Records->size() & 0xffu) : 0u;
     // 06b358e2..06b35906: list<CollisionGroupDesc>::operator= from src+0x254.
     Record->CollisionGroups = Source->CollisionGroups;
@@ -242,7 +242,7 @@ void CClientImpl::SendServerActivateObject(unsigned int ClientId, const FPayload
     if (Serializer->Allocate(2, 0xa, &Packet) == 0) {
         FRpcServerActivateObjectPacket* Typed = static_cast<FRpcServerActivateObjectPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
-        Typed->Field_0x08 = Info.Field_0x08;
+        Typed->ActivateParam = Info.ActivateParam;
         Typed->bActivate = Info.bActivate;
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -448,13 +448,13 @@ void CClientImpl::SendServerCreateShip(unsigned int ClientId, const CShipCreateI
     RpcServerCreateObjectFill(&Info, &Typed->Object);                        // 06b34f13
     Typed->bUsingTradelane = Info.bUsingTradelane;                           // 06b34f1c
     Typed->OwnerPlayer = Info.OwnerPlayer;                                   // 06b34f2c
-    Typed->Field_0xc0 = static_cast<unsigned short>(Info.Field_0xb0 & 0xffffu);        // 06b34f38
+    Typed->GroupNameId = static_cast<unsigned short>(Info.GroupNameId & 0xffffu);        // 06b34f38
     Typed->ReputationRank = static_cast<unsigned char>(Info.ReputationRank & 0xffu);   // 06b34f4a
     std::memcpy(&Typed->Throttle, &Info.Throttle, 4u);                       // 06b34f5a
     std::memcpy(&Typed->Velocity, &Info.Velocity, 12u);                      // 06b34f6a..
     std::memcpy(&Typed->AngularVelocity, &Info.AngularVelocity, 12u);        // ..06b34fc4
     Typed->bMarkedBy = Info.bMarkedBy;                                       // 06b34fca
-    Typed->Field_0xc4 = static_cast<unsigned short>(Info.Field_0xd8 & 0xffffu);        // 06b34fda
+    Typed->GroupId = static_cast<unsigned short>(Info.GroupId & 0xffffu);        // 06b34fda
     if (!SinglePlayer()) {                                                   // 06b34fef
         FmtStr NameA;                                                        // 06b35000
         FmtStr NameB;                                                        // 06b35044
@@ -531,7 +531,7 @@ void CClientImpl::SendServerSetAddItem(unsigned int ClientId, int AddResult, con
         Typed->Count = Item.Count;
         Typed->bEquipped = Item.bEquipped;
         std::memcpy(&Typed->bMission, &Item.bMission, 1u); // raw byte, not a bool test
-        Typed->Field_0x0c = static_cast<unsigned int>(AddResult);
+        Typed->AddResult = static_cast<unsigned int>(AddResult);
         if (!Item.is_internal()) {
             Typed->SetHardpoint(Item.Hardpoint,
                 static_cast<unsigned int>(std::strlen(Item.Hardpoint)));
@@ -549,9 +549,9 @@ void CClientImpl::SendServerSetMissionObjectiveState(const unsigned int& ClientI
     if (Serializer->Allocate(2, 0x33, &Packet) == 0) {
         FRpcServerSetMissionObjectiveStatePacket* Typed =
             static_cast<FRpcServerSetMissionObjectiveStatePacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->Field_0x04 = Info.Field_0x04;
-        Typed->Field_0x08 = static_cast<unsigned short>(Info.Field_0x08);
+        Typed->MissionId = Info.MissionId;
+        Typed->ObjectiveIndex = Info.ObjectiveIndex;
+        Typed->State = static_cast<unsigned short>(Info.State);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -565,13 +565,13 @@ void CClientImpl::SendServerRequestSpaceScript(unsigned int ClientId, const FSer
     if (Serializer->Allocate(2, 0x32, &Packet) == 0) {
         FRpcServerRequestSpaceScriptPacket* Typed =
             static_cast<FRpcServerRequestSpaceScriptPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x000;
-        Typed->Position[0] = Info.Field_0x108;
-        Typed->Position[1] = Info.Field_0x10c;
-        Typed->Position[2] = Info.Field_0x110;
-        if (Info.Field_0x114 == 1u) {
+        Typed->ObjectId = Info.ObjectId;
+        Typed->Position[0] = Info.PosXBits;
+        Typed->Position[1] = Info.PosYBits;
+        Typed->Position[2] = Info.PosZBits;
+        if (Info.CameraMode == 1u) {
             Typed->Mode = 1;
-        } else if (Info.Field_0x114 == 2u) {
+        } else if (Info.CameraMode == 2u) {
             Typed->Mode = 0;
         }
         Typed->SetName(Info.Name, static_cast<unsigned int>(std::strlen(Info.Name)));
@@ -590,8 +590,8 @@ void CClientImpl::SendServerReplaceMissionObjective(const unsigned int& ClientId
     if (Serializer->Allocate(2, 0x34, &Packet) == 0) {
         FRpcServerReplaceMissionObjectivePacket* Typed =
             static_cast<FRpcServerReplaceMissionObjectivePacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->State = Info.State;
+        Typed->MissionId = Info.MissionId;
+        Typed->ObjectiveIndex = Info.ObjectiveIndex;
         Typed->TextSize = RpcGetFlattenedFmtStrSize(Info.Text);
         Typed->TextData = static_cast<unsigned char*>(::operator new(Typed->TextSize, std::nothrow));
         Info.Text.flatten(Typed->TextData, Typed->TextSize);
@@ -611,8 +611,8 @@ void CClientImpl::SendServerSetMissionObjectives(const unsigned int& ClientId,
     if (Serializer->Allocate(2, 0x35, &Packet) == 0) {
         FRpcServerSetMissionObjectivesPacket* Typed =
             static_cast<FRpcServerSetMissionObjectivesPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->State = Info.Field_0x3c;
+        Typed->MissionId = Info.MissionId;
+        Typed->MissionType = Info.MissionType;
         Typed->TextA.Size = RpcGetFlattenedFmtStrSize(Info.TextA);
         Typed->TextA.Data = static_cast<unsigned char*>(::operator new(Typed->TextA.Size, std::nothrow));
         Info.TextA.flatten(Typed->TextA.Data, Typed->TextA.Size);
@@ -678,7 +678,7 @@ void CClientImpl::SendServerExplodeAsteroidMine(unsigned int ClientId, const FMi
     if (Serializer->Allocate(2, 0x31, &Packet) == 0) {
         FRpcServerExplodeAsteroidMinePacket* Typed =
             static_cast<FRpcServerExplodeAsteroidMinePacket*>(Packet);
-        Typed->Field_0x00 = Info.MineId;
+        Typed->MineId = Info.MineId;
         std::memcpy(&Typed->Position.x, &Info.Offset.x, 4u);
         std::memcpy(&Typed->Position.y, &Info.Offset.y, 4u);
         std::memcpy(&Typed->Position.z, &Info.Offset.z, 4u);
@@ -694,8 +694,8 @@ void CClientImpl::SendServerSystemSwitchIn(unsigned int ClientId, const FPayload
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x22, &Packet) == 0) {
         FRpcServerSystemSwitchInPacket* Typed = static_cast<FRpcServerSystemSwitchInPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->Field_0x04 = Info.Field_0x04;
+        Typed->ShipId = Info.ShipId;
+        Typed->JumpObjTypeBits = Info.JumpObjTypeBits;
         std::memcpy(&Typed->Position, &Info.Position, sizeof(Typed->Position));
         std::memcpy(&Typed->Orientation, &Info.Orientation, sizeof(Typed->Orientation));
         PushToClient(ClientId, Packet->AsRaw());
@@ -708,10 +708,10 @@ void CClientImpl::SendServerItemTractored(unsigned int ClientId, const FPayloadS
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x38, &Packet) == 0) {
         FRpcServerItemTractoredPacket* Typed = static_cast<FRpcServerItemTractoredPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->Field_0x04 = Info.Field_0x04;
-        Typed->Field_0x08 = Info.Field_0x08;
-        Typed->Field_0x0a = Info.Field_0x0a;
+        Typed->LootId = Info.LootId;
+        Typed->ShipId = Info.ShipId;
+        Typed->TractorEquipId = Info.TractorEquipId;
+        Typed->UnitsTaken = Info.UnitsTaken;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -723,9 +723,9 @@ void CClientImpl::SendServerRepairObject(unsigned int ClientId, const FServerRep
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x3c, &Packet) == 0) {
         FRpcServerRepairObjectPacket* Typed = static_cast<FRpcServerRepairObjectPacket*>(Packet);
-        Typed->EquipId = Info.Field_0x04;
-        Typed->ObjectId = Info.Field_0x00;
-        std::memcpy(&Typed->Points, &Info.Field_0x08, 4u);
+        Typed->EquipId = Info.EquipId;
+        Typed->ObjectId = Info.ObjectId;
+        std::memcpy(&Typed->Points, &Info.Points, 4u);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -748,8 +748,8 @@ void CClientImpl::SendServerRequestCreateShipResp(unsigned int ClientId, bool bS
     if (Serializer->Allocate(2, 0x27, &Packet) == 0) {
         FRpcServerRequestCreateShipRespPacket* Typed =
             static_cast<FRpcServerRequestCreateShipRespPacket*>(Packet);
-        Typed->Field_0x04 = ShipId;
-        Typed->Field_0x00 = static_cast<unsigned char>(bSuccess);
+        Typed->ShipId = ShipId;
+        Typed->bSuccess = static_cast<unsigned char>(bSuccess);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -760,8 +760,8 @@ void CClientImpl::SendServerAdjustAttitude(unsigned int ClientId, const FPayload
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x2a, &Packet) == 0) {
         FRpcServerAdjustAttitudePacket* Typed = static_cast<FRpcServerAdjustAttitudePacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        RpcServerX87CopyFloat(&Typed->Field_0x04, &Info.Field_0x04);
+        Typed->VibeHandle = Info.VibeHandle;
+        RpcServerX87CopyFloat(&Typed->Attitude, &Info.Attitude);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -773,7 +773,7 @@ void CClientImpl::SendServerCreateGuided(const unsigned int& ClientId, const FSe
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x37, &Packet) == 0) {
         FRpcServerCreateGuidedPacket* Typed = static_cast<FRpcServerCreateGuidedPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x2c;
+        Typed->OwnerPlayer = Info.OwnerPlayer;
         Typed->ArchetypeNickname = Info.ArchetypeNickname;
         Typed->OwnerId = Info.OwnerId;
         Typed->SubObjId = Info.SubObjId;
@@ -800,7 +800,7 @@ void CClientImpl::SendServerCreateCounter(const unsigned int& ClientId, const FS
         FRpcServerCreateCounterPacket* Typed = static_cast<FRpcServerCreateCounterPacket*>(Packet);
         Typed->ArchetypeNickname = Info.ArchetypeNickname;
         Typed->ObjId = Info.ObjId;
-        Typed->Field_0x08 = Info.Field_0x44;
+        Typed->OwnerPlayer = Info.OwnerPlayer;
         Typed->OwnerId = Info.OwnerId;
         Typed->SubObjId = Info.SubObjId;
         std::memcpy(&Typed->Position.x, &Info.Position.x, 4u);
@@ -813,9 +813,9 @@ void CClientImpl::SendServerCreateCounter(const unsigned int& ClientId, const FS
         std::memcpy(&Typed->Velocity.x, &Info.Velocity.x, 4u);
         std::memcpy(&Typed->Velocity.y, &Info.Velocity.y, 4u);
         std::memcpy(&Typed->Velocity.z, &Info.Velocity.z, 4u);
-        std::memcpy(&Typed->Field_0x3c.x, &Info.Field_0x38.x, 4u);
-        std::memcpy(&Typed->Field_0x3c.y, &Info.Field_0x38.y, 4u);
-        std::memcpy(&Typed->Field_0x3c.z, &Info.Field_0x38.z, 4u);
+        std::memcpy(&Typed->AngularVelocity.x, &Info.AngularVelocity.x, 4u);
+        std::memcpy(&Typed->AngularVelocity.y, &Info.AngularVelocity.y, 4u);
+        std::memcpy(&Typed->AngularVelocity.z, &Info.AngularVelocity.z, 4u);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -914,8 +914,8 @@ void CClientImpl::SendServerCreateMine(unsigned int ClientId, const FServerCreat
         std::memcpy(&Typed->Position, &Info.Position, sizeof(Typed->Position));
         std::memcpy(&Typed->Orientation, &Info.Orientation, sizeof(Typed->Orientation));
         std::memcpy(&Typed->Velocity, &Info.Velocity, sizeof(Typed->Velocity));
-        std::memcpy(&Typed->Field_0x38, &Info.Field_0x38, sizeof(Typed->Field_0x38));
-        Typed->Field_0x44 = Info.Field_0x44;
+        std::memcpy(&Typed->AngularVelocity, &Info.AngularVelocity, sizeof(Typed->AngularVelocity));
+        Typed->OwnerPlayer = Info.OwnerPlayer;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -932,7 +932,7 @@ void CClientImpl::SendServerSetReputation(unsigned int ClientId, const FServerSe
     if (Serializer->Allocate(2, 0x29, &Packet) == 0) {
         FRpcServerSetReputationPacket* Typed = static_cast<FRpcServerSetReputationPacket*>(Packet);
         Typed->Target = static_cast<unsigned int>(Info.VibeHandle);
-        Typed->Affiliation = Info.Field_0x08;
+        Typed->Affiliation = Info.Affiliation;
         Typed->NameA.Size = RpcGetFlattenedFmtStrSize(Info.NameA);
         Typed->NameA.Data = static_cast<unsigned char*>(::operator new(Typed->NameA.Size, std::nothrow));
         Info.NameA.flatten(Typed->NameA.Data, Typed->NameA.Size);
@@ -1040,9 +1040,9 @@ void CClientImpl::SendServerSetGuidedTarget(unsigned int ClientId, unsigned int 
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x4a, &Packet) == 0) {
         FRpcServerSetGuidedTargetPacket* Typed = static_cast<FRpcServerSetGuidedTargetPacket*>(Packet);
-        Typed->Field_0x20 = GuidedId;
-        Typed->Field_0x24 = TargetId;
-        Typed->Field_0x28 = TargetSubObjId;
+        Typed->GuidedId = GuidedId;
+        Typed->TargetId = TargetId;
+        Typed->TargetSubObjId = TargetSubObjId;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1052,9 +1052,9 @@ void CClientImpl::SendServerUseItem(unsigned int ClientId, const FPayloadServerU
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x51, &Packet) == 0) {
         FRpcServerUseItemPacket* Typed = static_cast<FRpcServerUseItemPacket*>(Packet);
-        Typed->ObjectId = Info.Field_0x00;
-        Typed->EquipId = Info.Field_0x04;
-        Typed->Count = Info.Field_0x06;
+        Typed->ObjectId = Info.ObjectId;
+        Typed->EquipId = Info.EquipId;
+        Typed->Count = Info.Count;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1109,9 +1109,9 @@ void CClientImpl::SendServerCfgInterfaceNotification(const unsigned int& ClientI
     if (Serializer->Allocate(2, 0x47, &Packet) == 0) {
         FRpcServerCfgInterfaceNotificationPacket* Typed =
             static_cast<FRpcServerCfgInterfaceNotificationPacket*>(Packet);
-        Typed->NotifType = Info.Field_0x00;
-        Typed->Param = Info.Field_0x04;
-        Typed->bEnable = Info.Field_0x08;
+        Typed->NotifType = Info.NotifType;
+        Typed->Param = Info.Param;
+        Typed->bEnable = Info.bEnable;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1135,7 +1135,7 @@ void CClientImpl::SendServerRequestReturned(const unsigned int& ClientId, unsign
         Typed->ObjectId = ShipId;
         Typed->RequestType = static_cast<unsigned char>(RequestType);
         Typed->Response = static_cast<unsigned char>(Response);
-        Typed->Field_0x26 = static_cast<unsigned char>(Extra);
+        Typed->DockPort = static_cast<unsigned char>(Extra);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1230,12 +1230,12 @@ void CClientImpl::SendServerSetMusic(unsigned int ClientId, unsigned int SpaceMu
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x57, &Packet) == 0) {
         FRpcServerSetMusicPacket* Typed = static_cast<FRpcServerSetMusicPacket*>(Packet);
-        Typed->Field_0x20 = SpaceMusic;
-        Typed->Field_0x24 = DangerMusic;
-        Typed->Field_0x28 = BattleMusic;
-        Typed->Field_0x2c = OverrideMusic;
-        Typed->Field_0x30 = static_cast<unsigned char>(bFlag);
-        RpcServerX87CopyFloat(&Typed->Field_0x34, &Fade);
+        Typed->SpaceMusic = SpaceMusic;
+        Typed->DangerMusic = DangerMusic;
+        Typed->BattleMusic = BattleMusic;
+        Typed->OverrideMusic = OverrideMusic;
+        Typed->bNoLoop = static_cast<unsigned char>(bFlag);
+        RpcServerX87CopyFloat(&Typed->Fade, &Fade);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1293,7 +1293,7 @@ void CClientImpl::SendServerPlayerListAdd(unsigned int ClientId, const wchar_t* 
     if (Serializer->Allocate(2, 0x52, &Packet) == 0) {
         FRpcServerPlayerListPacket* Typed = static_cast<FRpcServerPlayerListPacket*>(Packet);
         Typed->Kind = kPlayerListKindEntry;
-        Typed->Field_0x2c = static_cast<unsigned char>(bAlreadyPresent);
+        Typed->bAlreadyPresent = static_cast<unsigned char>(bAlreadyPresent);
         Typed->SetEntry(Name, PlayerId);
         PushToClient(ClientId, Packet->AsRaw());
     }
@@ -1351,9 +1351,9 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x4f, &Packet) == 0) {
         FRpcServerSendCommPacket* Typed = static_cast<FRpcServerSendCommPacket*>(Packet);
-        Typed->Field_0x20 = SenderId;
-        Typed->Field_0x24 = ReceiverId;
-        Typed->Field_0x28 = VoiceId;
+        Typed->SenderId = SenderId;
+        Typed->ReceiverId = ReceiverId;
+        Typed->VoiceId = VoiceId;
         // The retail frame image as raw dwords: the costume local, the return-address slot,
         // then the 23 argument dwords (the costume a second time among them). The pointer,
         // float and bool arguments enter as their stack-slot bits; the bool's slot holds 0/1
@@ -1383,17 +1383,17 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
         for (int Index = 0; Index < static_cast<int>(Typed->Body.AccessoryCount); ++Index) {
             Ids[Index] = Frame[4 + Index];
         }
-        Typed->Field_0x60 = CommType;
-        if (Typed->Field_0x64 != nullptr) ::operator delete(Typed->Field_0x64);
-        Typed->Field_0x64 = static_cast<unsigned int*>(
+        Typed->CommType = CommType;
+        if (Typed->TextIds != nullptr) ::operator delete(Typed->TextIds);
+        Typed->TextIds = static_cast<unsigned int*>(
             ::operator new(static_cast<unsigned int>(TextCount) * 4u, std::nothrow));
-        Typed->Field_0x68 = static_cast<signed char>(TextCount);
+        Typed->TextCount = static_cast<signed char>(TextCount);
         for (int Index = 0; Index < TextCount; ++Index) {
-            Typed->Field_0x64[Index] = TextIds[Index];
+            Typed->TextIds[Index] = TextIds[Index];
         }
-        Typed->Field_0x6c = Mood;
-        RpcServerX87CopyFloat(&Typed->Field_0x70, &Duration);
-        Typed->Field_0x74 = static_cast<unsigned char>(bReceiverIsOwnShip);
+        Typed->Mood = Mood;
+        RpcServerX87CopyFloat(&Typed->Duration, &Duration);
+        Typed->bReceiverIsOwnShip = static_cast<unsigned char>(bReceiverIsOwnShip);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1499,7 +1499,7 @@ void CClientImpl::SendServerCreateSolar(unsigned int ClientId, const CSolarCreat
     if (Serializer->Allocate(2, 0x42, &Packet) == 0) {
         FRpcServerCreateSolarPacket* Typed = static_cast<FRpcServerCreateSolarPacket*>(Packet);
         RpcServerCreateObjectFill(&Info, &Typed->Fields);
-        Typed->Field_0x9c = Info.Field_0xad;
+        Typed->bDestructible = Info.bDestructible;
         Typed->bMarkedBy = Info.bMarkedBy;
         if (!SinglePlayer()) {
             Reputation::Vibe::GetAffiliation(Typed->Fields.VibeGroupId, Typed->Affiliation, false);

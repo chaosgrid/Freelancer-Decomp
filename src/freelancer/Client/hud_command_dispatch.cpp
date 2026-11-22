@@ -392,9 +392,9 @@ bool SpaceSendCommand(FSpaceCommand* Command)
         {
             FClientGameobj* const Object = reinterpret_cast<FClientGameobj*>(Held - 8);
             // ManagerKind 1 is the ship bucket: the object is an FClientShipGameobj, whose
-            // slot 115 is FClientEquippedObj::Slot1cc (overridden by the ship).
+            // slot 115 is FClientEquippedObj::HandleEquipMsg (overridden by the ship).
             if (Object != nullptr && Object->ManagerKind == 1)
-                static_cast<FClientShipGameobj*>(Object)->Slot1cc(
+                static_cast<FClientShipGameobj*>(Object)->HandleEquipMsg(
                     reinterpret_cast<FCliEquipFirePacket const*>(Command));
         }
     }

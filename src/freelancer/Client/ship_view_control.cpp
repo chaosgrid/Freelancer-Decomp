@@ -585,7 +585,7 @@ void ShipViewControl::SetPosition(float const* NewPosition)
     Win3D::SetPosition(NewPosition);
 }
 
-bool ShipViewControl::Slot6(unsigned A)
+bool ShipViewControl::IsPositionInViewport(unsigned A)
 {
     // LAB_005846b0 (RET 4): A is a position; true when its view box lies strictly inside the
     // Win3D camera's viewport (DAT_0067dca4..DAT_0067dcb0).

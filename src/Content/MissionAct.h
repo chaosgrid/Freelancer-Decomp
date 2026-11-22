@@ -76,7 +76,7 @@ public:
     bool Execute() override;                 // LAB_06ec5640
 
     int State;              // +0x0c (ctor -1)
-    unsigned int Field_0x10; // +0x10 (ctor 1); passed to mission +0x2e8. TODO: name.
+    unsigned int MadLibId;   // +0x10 (ctor 1); passed to mission +0x2e8.
 };
 
 // Act_GCSClamp: new(0x10), ctor FUN_06ec8b00, vtable 06fb5c58. +0x0c byte (ctor 0).
@@ -871,8 +871,8 @@ public:
 
     TString<0x30> Label;         // +0x0c s0: "Player", a formation (+0xec key) or a label
     unsigned char bInvulnerable; // +0x40 (ctor 0) b1
-    unsigned char bParam3;       // +0x41 (ctor 0) optional b2: SetInvincible's third argument
-    float Duration;              // +0x44 (ctor 0) optional f3
+    unsigned char bPlayerCanDamage; // +0x41 (ctor 0) optional b2: SetInvincible's third argument (!bFromPlayers)
+    float MaxHpLoss;             // +0x44 (ctor 0) optional f3: SetInvincible's max HP loss fraction
 };
 
 // Act_MarkObj: new(0x44), ctor FUN_06ec5fc0, vtable 06fb5b34.

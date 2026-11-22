@@ -385,14 +385,14 @@ static_assert(sizeof(FSysObj) == 0x64, "FSysObj size is 0x64");
 // One virtual in slot 0 (.text:06cfb43d-06cfb446: MOV EDX,[EDI]; PUSH &record; CALL [EDX]);
 // the enumeration stops when it returns false (.text:06cfb448 TEST AL,AL).
 struct SysObjEnumerator {
-    virtual bool Slot00(FSysObj const* Object) = 0;
+    virtual bool OnObject(FSysObj const* Object) = 0;
 };
 
 // One virtual in slot 0 (.text:06cfae20-06cfae35: PUSH &reader; PUSH &zoneId; CALL [EAX]),
 // called with the reader already set_state'd to the zone's [Zone] section. The return
 // value is not read, and retail's own name/return type are not exported.
 struct ZoneEnumerator {
-    virtual void Slot00(unsigned int const* ZoneId, INI_Reader* Reader) = 0;
+    virtual void OnZone(unsigned int const* ZoneId, INI_Reader* Reader) = 0;
 };
 
 // ?EnumerateObjects@System@pub@@YAHABIAAUSysObjEnumerator@12@@Z -- Server.dll .text:06cfb2e0,

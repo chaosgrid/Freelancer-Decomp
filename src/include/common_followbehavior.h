@@ -24,10 +24,10 @@
 // +0x290 offset) is BaseFollowerBehavior's: FUN_062cb2b0 builds it for both subclasses.
 //
 // Vtable .rdata:0639fbe4 (29 slots). Own slots; the rest are BaseFollowerBehavior's:
-//    3  FUN_062ccc80  Slot3            4  FUN_062ccce0  Slot4
-//    5  FUN_062ccb70  Slot5            6  LAB_062ccc10  evaluate
-//   10  FUN_062cd3d0  Slot10          27  LAB_062ccd30  Slot27
-//   28  LAB_062cd4c0  Slot28
+//    3  FUN_062ccc80  OnEngage            4  FUN_062ccce0  OnDisengage
+//    5  FUN_062ccb70  OnEvaluateReadiness            6  LAB_062ccc10  evaluate
+//   10  FUN_062cd3d0  OnApplyDirective          27  LAB_062ccd30  UpdateFollowerSteering
+//   28  LAB_062cd4c0  GetRotatedOffset
 // Re-ported 2026-10-08 (claude-code:cmn-ai5): slots 3/4/5/6 were unbound members and slot 8
 // was a FollowBehavior-local stub of the base's own LAB_062cb6d0.
 // ============================================================================
@@ -40,44 +40,44 @@ public:
     explicit FollowBehavior(int InTypeId);
 
     // Slot 3, FUN_062ccc80.
-    void Slot3() override;
+    void OnEngage() override;
     // Slot 4, FUN_062ccce0.
-    void Slot4() override;
+    void OnDisengage() override;
     // Slot 5, FUN_062ccb70 (RET 4, argument unread).
-    int Slot5(float Value) override;
+    int OnEvaluateReadiness(float Value) override;
     // Slot 6, LAB_062ccc10 (RET 4, argument unread).
     EvaluateResult evaluate(unsigned int Context) override;
     // Slot 10, FUN_062cd3d0 (RET 4): take a pub::AI::DirectiveFollowOp.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
     // Slot 27, LAB_062ccd30 (536 instructions): the per-tick follow work.
-    void Slot27() override;
+    void UpdateFollowerSteering() override;
     // Slot 28, LAB_062cd4c0: Offset290 rotated out of the leader's frame, by value.
-    Vector Slot28() override;
+    Vector GetRotatedOffset() override;
 
 private:
-    // Not a retail function: the engage toggle Slot27 inlines twice (062ccf83-062cd043 and
+    // Not a retail function: the engage toggle UpdateFollowerSteering inlines twice (062ccf83-062cd043 and
     // 062cd0a3-062cd164) -- Enabled2a4 follows IsWithinInterceptRangeOfIface and each
     // transition goes to IBehaviorManager::NotifyFollowEvent (FUN_062d29c0).
     void UpdateInterceptEngageState();
 
 public:
     // ---- FollowBehavior's own fields (+0x2a0..+0x2bc) ----
-    float SpeedParam2a0;        // +0x2a0. Ctor 150.0f; Slot10 copies op+0x10.
-    unsigned char Enabled2a4;   // +0x2a4. Ctor 1; Slot27 toggles it on range transitions.
+    float SpeedParam2a0;        // +0x2a0. Ctor 150.0f; OnApplyDirective copies op+0x10.
+    unsigned char Enabled2a4;   // +0x2a4. Ctor 1; UpdateFollowerSteering toggles it on range transitions.
     unsigned char Pad2a5[3];
-    float Distance2a8;          // +0x2a8. Not ctor-set; Slot10: |Offset290|.
+    float Distance2a8;          // +0x2a8. Not ctor-set; OnApplyDirective: |Offset290|.
     float Field2ac;             // +0x2ac. Ctor 150.0f.
-    float Field2b0;             // +0x2b0. Ctor 2.0f; Slot27's weight factor.
-    float Field2b4;             // +0x2b4. Ctor 400.0f; Slot5's range; Slot10's failure path
+    float LeadClearanceScale;             // +0x2b0. Ctor 2.0f; UpdateFollowerSteering's weight factor.
+    float EngageRange;             // +0x2b4. Ctor 400.0f; OnEvaluateReadiness's range; OnApplyDirective's failure path
                                 // copies op+0x20.
-    float Field2b8;             // +0x2b8. Ctor 100.0f; Slot27's range bias.
+    float FollowRangeBias;             // +0x2b8. Ctor 100.0f; UpdateFollowerSteering's range bias.
 };
 
 static_assert(offsetof(FollowBehavior, SpeedParam2a0) == 0x2a0, "FollowBehavior::SpeedParam2a0 offset");
 static_assert(offsetof(FollowBehavior, Enabled2a4) == 0x2a4, "FollowBehavior::Enabled2a4 offset");
 static_assert(offsetof(FollowBehavior, Distance2a8) == 0x2a8, "FollowBehavior::Distance2a8 offset");
 static_assert(offsetof(FollowBehavior, Field2ac) == 0x2ac, "FollowBehavior::Field2ac offset");
-static_assert(offsetof(FollowBehavior, Field2b0) == 0x2b0, "FollowBehavior::Field2b0 offset");
-static_assert(offsetof(FollowBehavior, Field2b4) == 0x2b4, "FollowBehavior::Field2b4 offset");
-static_assert(offsetof(FollowBehavior, Field2b8) == 0x2b8, "FollowBehavior::Field2b8 offset");
+static_assert(offsetof(FollowBehavior, LeadClearanceScale) == 0x2b0, "FollowBehavior::LeadClearanceScale offset");
+static_assert(offsetof(FollowBehavior, EngageRange) == 0x2b4, "FollowBehavior::EngageRange offset");
+static_assert(offsetof(FollowBehavior, FollowRangeBias) == 0x2b8, "FollowBehavior::FollowRangeBias offset");
 static_assert(sizeof(FollowBehavior) == 0x2bc, "FollowBehavior size == retail operator_new(0x2bc)");

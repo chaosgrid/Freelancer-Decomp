@@ -285,19 +285,19 @@ struct FRmShipSize
 // FUN_06f979b0. Field meanings are open: the names say what writes and reads them.
 struct FRmShipBlock
 {
-    unsigned char Field_0x00;                   // -> ship group +0x00 (pk flag)
+    unsigned char bRequired;                   // -> ship group +0x00 (pk flag)
     // FUN_06f979b0: non-zero -> the first ship's +0xd8 = 2, the others' 0, and the first
     // ship's +0xdc = 2 (its random name off, +0xd4 = the caller's last argument).
-    unsigned char Field_0x01;
-    unsigned char Field_0x02;                   // FUN_06f979b0: +0xd8 = 2 for every ship; pk flag
-    unsigned char Field_0x03;                   // -> ship group +0x02
+    unsigned char bHasTargetShip;
+    unsigned char bKillAllShips;                // FUN_06f979b0: +0xd8 = 2 for every ship; pk flag
+    unsigned char bClearPriorTargets;           // -> ship group +0x02
     // FUN_06f979b0: non-zero -> the first ship carries a critical loot (FUN_06f95cd0 of
     // Field_0x14); 0 -> a bonus loot when the drop chance roll succeeds.
-    unsigned char Field_0x04;
+    unsigned char bDropsCriticalLoot;
     FRmShipSize Size;                           // +0x08 FUN_06f98780
-    int Field_0x14;                             // FUN_06f979b0 critical loot (FUN_06f95cd0)
-    int Field_0x18;                             // -> ship group +0x04
-    int Field_0x1c;                             // -> ship group +0x08
+    int CriticalLootMode;                       // FUN_06f979b0 critical loot (FUN_06f95cd0)
+    int SpawnTriggerMode;                       // -> ship group +0x04
+    int SpawnTriggerParam;                      // -> ship group +0x08
 };
 
 // TU63 FUN_06f98780 (cdecl): the formation size for Difficulty among the class_fighter

@@ -717,13 +717,13 @@ namespace
             // 06efee0a-06efee12: JAE (unsigned) -- forward when the entry comes first.
             if (EntryIndex < TargetIndex)
             {
-                Ship->SetField120(&Message[1], &Rings.back().ObjectId);         // FUN_06f576f0
+                Ship->SetTradeLaneRings(&Message[1], &Rings.back().ObjectId);         // FUN_06f576f0
                 int const Direction = 1;
                 System->AddTradeLaneShip(&Message[1], &Direction, &ShipId);     // FUN_06f78110
             }
             else
             {
-                Ship->SetField120(&Message[1], &Rings.front().ObjectId);
+                Ship->SetTradeLaneRings(&Message[1], &Rings.front().ObjectId);
                 int const Direction = -1;
                 System->AddTradeLaneShip(&Message[1], &Direction, &ShipId);
             }
@@ -739,7 +739,7 @@ namespace
             if (Ship == nullptr || System == nullptr)
                 break;
             unsigned int const NoRing = 0;                                      // DAT_06fb7d60
-            Ship->SetField120(&NoRing, &NoRing);                                // FUN_06f576f0
+            Ship->SetTradeLaneRings(&NoRing, &NoRing);                                // FUN_06f576f0
             System->RemoveTradeLaneShip(&Message[0], &Message[1]);              // FUN_06f78dd0
             break;
         }

@@ -635,7 +635,7 @@ FBarMissionOffer::~FBarMissionOffer()
 {
     if (Data.Loader != nullptr)
     {
-        Data.Loader->Slot05(Data.Mission);
+        Data.Loader->ReleaseMission(Data.Mission);
         Data.Loader->Release();
         Data.Loader = nullptr;
     }
@@ -779,7 +779,7 @@ bool FBarOffer::Accept(FContentPlayerState* State, FBarCharacter* Character)
         if (static_cast<unsigned int>(Cash) < static_cast<unsigned int>(Know->Price))
             return false;
         pub::Player::AdjustCash(State->PlayerId, -Know->Price);
-        State->AddRumor(static_cast<unsigned int>(Know->Field_0x04));       // FUN_06f48db0
+        State->AddRumor(static_cast<unsigned int>(Know->InfoIds));       // FUN_06f48db0
         return true;
     }
 
@@ -1018,12 +1018,12 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     GBarSceneBases.insert(std::pair<int const, FContentBase*>(SceneId, this));
 
     CharacterBehaviorDescription Behavior;                                  // FUN_06eac990
-    Behavior.Field05 = static_cast<unsigned char>(Script->bAutoplay);
-    Behavior.Field00 = static_cast<int>(Script->LocationId);
-    Behavior.Field258 = Script->SequenceId;
-    Behavior.Field06 = 0;
-    Behavior.Field10 = 0;
-    Behavior.Field04 = 1;
+    Behavior.bAutoplay = static_cast<unsigned char>(Script->bAutoplay);
+    Behavior.LocationId = static_cast<int>(Script->LocationId);
+    Behavior.RtcId = Script->SequenceId;
+    Behavior.bGenericScript = 0;
+    Behavior.bBindSingleCharacter = 0;
+    Behavior.bApplySpatial = 1;
 
     // 06ea9738-06ea98d4: greet..offer (1, 0, 2, 3) paired with 0, then decision 1,
     // accept 2, decline 3 -- seven inlined copies of FUN_06f01ab0.
@@ -1035,16 +1035,16 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     AppendBehaviorText(&Behavior, Script->FindActionText(5), 2);
     AppendBehaviorText(&Behavior, Script->FindActionText(6), 3);
 
-    Behavior.Field0c = Script->StartRoomLocationId;
+    Behavior.StartRoomLocationId = Script->StartRoomLocationId;
     Behavior.IdArrayCount = 0;
-    Behavior.Field08 = Script->RelocateLocationId;
+    Behavior.RelocateLocationId = Script->RelocateLocationId;
     Behavior.NameFmtStr.begin_mad_lib(static_cast<unsigned int>(Script->MissionTextId));
     Behavior.NameFmtStr.end_mad_lib();
     // 06ea9914-06ea992e: 3 with an offer text (pointer test only), 5 without.
-    Behavior.Field21c = Script->FindActionText(3) != nullptr ? 3 : 5;
+    Behavior.DialogType = Script->FindActionText(3) != nullptr ? 3 : 5;
     Behavior.Filter = PlayerId;
-    Behavior.Field220 = ControllerId;
-    Behavior.Field224 = 0;
+    Behavior.OfferArg = ControllerId;
+    Behavior.OfferMissionId = 0;
 
     // 06ea9943-06ea99b1: insert {room, empty state} (FUN_06eacef0 / FUN_06ead9b0 /
     // FUN_06ead830); an existing entry is kept.
@@ -1200,7 +1200,7 @@ namespace
         // LAB_06eac560 (06eac560-06eac5a3): dock_with (+0x58) != base -> go on; else
         // nickname id (pub::GetNicknameId of the record's name), ids name (+0x30),
         // position (+0x20), stop.
-        bool Slot00(pub::System::FSysObj const* Object) override
+        bool OnObject(pub::System::FSysObj const* Object) override
         {
             if (Object->DockWith != BaseId)
                 return true;
@@ -1505,7 +1505,7 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
         else
         {
             // Retail does not test the loader (FUN_06f4d220 stores 0 only when new fails).
-            OfferData.Loader->Slot05(OfferData.Mission);
+            OfferData.Loader->ReleaseMission(OfferData.Mission);
             OfferData.Loader->Release();
         }
         break;

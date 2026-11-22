@@ -113,28 +113,27 @@ namespace AlchemyImpl
             return HashNameCrc(Name);
         }
         // FUN_062274b0 RET 0x10: name, prototype, optional output hash.
-        GENRESULT DACOM_API NodeLibSlot6(const char* Name, IDAComponent* Node,
+        GENRESULT DACOM_API InsertNode(const char* Name, IDAComponent* Node,
                                        unsigned long* OutHash) override;
-        GENRESULT DACOM_API NodeLibSlot7(unsigned long Hash) override;
+        GENRESULT DACOM_API RemoveNodeByHash(unsigned long Hash) override;
         // FUN_06228b00: enumerate this object's own node-lib entries,
         // Callback(Node, Context) cdecl, stop at first nonzero result.
-        GENRESULT DACOM_API NodeLibSlot8(FNodeLibraryEnumCallback Callback, void* Context) override;
+        GENRESULT DACOM_API EnumerateNodes(FNodeLibraryEnumCallback Callback, void* Context) override;
         GENRESULT DACOM_API ClearNodeLibrary() override;
         // FUN_062277e0: "#N" collision-avoidance MakeUniqueName, checked
         // against this object's own table (not FAlchemy's).
-        GENRESULT DACOM_API NodeLibSlot10(void* Name, void* Out) override;
+        GENRESULT DACOM_API MakeUniqueName(void* Name, void* Out) override;
         // LAB_06227710: find the prototype by hash, then CloneNode(Out).
         // Miss = GR_ALE_CREATE_FAIL (-8), output untouched.
-        GENRESULT DACOM_API NodeLibSlot11(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) override;
         // LAB_06227770: find CRC in this object's own table, out = stored
         // node, AddRef.
-        GENRESULT DACOM_API NodeLibSlot12(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API FindNodeByHash(unsigned long Hash, IDAComponent** Out) override;
 
     private:
         IDAComponent* FindNodeEntry(unsigned long Hash);
         GENRESULT InsertNodeByName(const char* Name, IDAComponent* Node,
                                   unsigned long* OutHash = nullptr);
-        GENRESULT RemoveNodeByHash(unsigned long Hash);
         void ClearNodeList();
 
         unsigned long RefCount_;

@@ -76,9 +76,9 @@ void qh_distplane (pointT *point, facetT *facet, realT *dist) {
       qh MAXabs_coord * qh RANDOMfactor;
   }
   if (qh IStracing >= 4) {
-    FUN_06356960 (/* retail 0637feb8 */ "qh_distplane: ");
-    FUN_06356960 (/* retail 0637fecc */ qh_REAL_1, *dist);
-    FUN_06356960 (/* retail 0637fee7 */ "from p%d to f%d\n", qh_pointid(point), facet->id);
+    ivp_message (/* retail 0637feb8 */ "qh_distplane: ");
+    ivp_message (/* retail 0637fecc */ qh_REAL_1, *dist);
+    ivp_message (/* retail 0637fee7 */ "from p%d to f%d\n", qh_pointid(point), facet->id);
   }
   return;
 } /* distplane */
@@ -120,16 +120,16 @@ facetT *qh_findbest (pointT *point, facetT *startfacet,
   isfindfacet= (!isnewfacets && isoutside) ? True : False;
   testhorizon= (ispartition && (bestoutside || qh APPROXhull || qh MERGING)) ? True : False;
   if (!ischeckmax && !ispartition && !isfindfacet) {
-    FUN_06356960 (/* retail 0637ffc4 */ "qhull internal error (qh_findbest): unknown combination of arguments\n");
+    ivp_message (/* retail 0637ffc4 */ "qhull internal error (qh_findbest): unknown combination of arguments\n");
     qh_errexit (qh_ERRqhull, startfacet, NULL);
   }
   if (qh TRACElevel && qh TRACEpoint >= 0 && qh TRACEpoint == qh_pointid (point)) {
     qh IStracing= qh TRACElevel;
-    FUN_06356960 (/* retail 06380029 */ "qh_findbest: point p%d starting at f%d bestoutside? %d newfacets %d\n",
+    ivp_message (/* retail 06380029 */ "qh_findbest: point p%d starting at f%d bestoutside? %d newfacets %d\n",
 	     qh TRACEpoint, startfacet->id, bestoutside, isnewfacets);
     fprintf (qh ferr, "  ischeckmax %d ispartition %d isfindfacet %d testhorizon %d\n",
 	     ischeckmax, ispartition, isfindfacet, testhorizon);
-    FUN_06356960 (/* retail 0638005e */ "  Last point added to hull was p%d.", qh furthest_id);
+    ivp_message (/* retail 0638005e */ "  Last point added to hull was p%d.", qh furthest_id);
     fprintf (qh ferr, "  Last merge was #%d.\n", zzval_(Ztotmerge));
   }
   if (isoutside)
@@ -240,7 +240,7 @@ facetT *qh_findbest (pointT *point, facetT *startfacet,
   }
   if (!ischeckmax) {
     if (!bestfacet) {
-      FUN_06356960 (/* retail 063804db */ "qh_findbest: point p%d starting at f%d bestoutside? %d newfacets %d\n",
+      ivp_message (/* retail 063804db */ "qh_findbest: point p%d starting at f%d bestoutside? %d newfacets %d\n",
 	       qh TRACEpoint, startfacet->id, bestoutside, isnewfacets);
       fprintf (qh ferr, "\nqh_findbest: all neighbors of facet %d are flipped or upper Delaunay.\n\
 Please report this error to qhull_bug@geom.umn.edu with the input and all of the output.\n",
@@ -500,7 +500,7 @@ void qh_gausselim(realT **rows, int numrow, int numcol, boolT *sign, boolT *near
       *nearzero= True;
       if (pivot_abs == 0.0) {   /* remainder of column == 0 */
 	if (qh IStracing >= 4) {
-	  FUN_06356960 (/* retail 06380b1e */ "qh_gausselim: 0 pivot at column %d. (%2.2g < %2.2g)\n", k, pivot_abs, qh DISTround);
+	  ivp_message (/* retail 06380b1e */ "qh_gausselim: 0 pivot at column %d. (%2.2g < %2.2g)\n", k, pivot_abs, qh DISTround);
 	  qh_printmatrix (qh ferr, "Matrix:", rows, numrow, numcol);
 	}
 	zzinc_(Zgauss0);
@@ -570,7 +570,7 @@ pointT *qh_getcenter(setT *vertices) {
   int count= qh_setsize(vertices);
 
   if (count < 2) {
-    FUN_06356960 (/* retail 06380d0e */ "qhull internal error (qh_getcenter): not defined for %d points\n", count);
+    ivp_message (/* retail 06380d0e */ "qhull internal error (qh_getcenter): not defined for %d points\n", count);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
   center= (pointT *)qh_memalloc(qh normal_size);
@@ -841,11 +841,11 @@ void qh_setfacetplane(facetT *facet) {
   if (facet == qh tracefacet) {
     oldtrace= qh IStracing;
     qh IStracing= 5;
-    FUN_06356960 (/* retail 06381376 */ "qh_setfacetplane: facet f%d created.\n", facet->id);
-    FUN_06356960 (/* retail 06381389 */ "  Last point added to hull was p%d.", qh furthest_id);
+    ivp_message (/* retail 06381376 */ "qh_setfacetplane: facet f%d created.\n", facet->id);
+    ivp_message (/* retail 06381389 */ "  Last point added to hull was p%d.", qh furthest_id);
     if (zzval_(Ztotmerge))
       fprintf(qh ferr, "  Last merge was #%d.", zzval_(Ztotmerge)); /* retail 063813a7 keeps fprintf */
-    FUN_06356960 (/* retail 063813b5 */ "\n\nCurrent summary is:\n");
+    ivp_message (/* retail 063813b5 */ "\n\nCurrent summary is:\n");
       qh_printsummary (qh ferr);
   }
   if (qh hull_dim <= 4) {
@@ -934,7 +934,7 @@ void qh_setfacetplane(facetT *facet) {
 	}else if (-dist > qh TRACEdist)
 	  istrace= True;
 	if (istrace) {
-	  FUN_06356960 (/* retail 063817c9 */ "qh_setfacetplane: ====== vertex p%d (v%d) increases max_outside to %2.2g for new facet f%d last p%d\n",
+	  ivp_message (/* retail 063817c9 */ "qh_setfacetplane: ====== vertex p%d (v%d) increases max_outside to %2.2g for new facet f%d last p%d\n",
 	        qh_pointid(vertex->point), vertex->id, dist, facet->id, qh furthest_id);
 	  qh_errprint ("DISTANT", facet, NULL, NULL, NULL);
 	}
@@ -943,11 +943,11 @@ void qh_setfacetplane(facetT *facet) {
     qh RANDOMdist= qh old_randomdist;
   }
   if (qh IStracing >= 3) {
-    FUN_06356960 (/* retail 06381813 */ "qh_setfacetplane: f%d offset %2.2g normal: ",
+    ivp_message (/* retail 06381813 */ "qh_setfacetplane: f%d offset %2.2g normal: ",
 	     facet->id, facet->offset);
     for (k=0; k < qh hull_dim; k++)
-      FUN_06356960 (/* retail 06381837 */ "%2.2g ", facet->normal[k]);
-    FUN_06356960 (/* retail 0638184e */ "\n");
+      ivp_message (/* retail 06381837 */ "%2.2g ", facet->normal[k]);
+    ivp_message (/* retail 0638184e */ "\n");
   }
   if (facet == qh tracefacet)
     qh IStracing= oldtrace;

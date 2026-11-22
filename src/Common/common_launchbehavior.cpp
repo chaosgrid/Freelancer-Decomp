@@ -71,7 +71,7 @@ LaunchBehavior::LaunchBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , ThreatSourcePtr14(nullptr)
-    , Field18(nullptr)
+    , ObjectDb(nullptr)
     , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
@@ -84,23 +84,23 @@ LaunchBehavior::LaunchBehavior(int InTypeId)
     , Watcher168()
     , CachedSystemId170(0)
     , TargetType174(0)
-    , DirectiveField178(0)
-    , Flag17c(0)
+    , DockPortIndex(0)
+    , bStraightLaunch(0)
     , Pad17d{}
-    , Field180(3.5f)
-    , Field184(0.0f)
-    , Field188(0.0f)
-    , Field18c(0.0f)
-    , Field190{}
-    , Field19c{}
+    , LaunchDwellDuration(3.5f)
+    , LaunchDwellElapsed(0.0f)
+    , TotalLaunchElapsed(0.0f)
+    , LaunchTimeout(0.0f)
+    , LaunchOffset{}
+    , DockPointC{}
     , LaunchBasis{}
-    , Field1cc{}
+    , DockPointB{}
     , ApproachBasis2{}
-    , Field1fc{}
+    , DockPointA{}
     , ApproachBasis3{}
-    , Field22c(15.0f)
-    , Flag230(0)
-    , Flag231(0)
+    , LaunchThrottleScale(15.0f)
+    , bHalfThrottleOnExit(0)
+    , bFlipHeadingOnExit(0)
 {
     ConstructBase(InTypeId);   // FUN_062d2020 -- Behavior's own field initialisation
     // SubObjectA/B are IDENTIFIED (2026-09-11, d285:common-port) as real
@@ -175,7 +175,7 @@ bool LaunchBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // launch timeout and an NPC gets 60. The 2026-09-17 (claude:w16-behavior) fix that
     // made the store unconditional was right and is unchanged -- only the predicate
     // was standing in.
-    Field18c = NestedNavQuery0xbc() ? 15.0f : 60.0f;
+    LaunchTimeout = NestedNavQuery0xbc() ? 15.0f : 60.0f;
 
     return true;
 }
@@ -185,7 +185,7 @@ bool LaunchBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 void LaunchBehavior::Engage()
 {
     // .text:062cd833: `CALL FUN_062d20d0` -- Behavior's own slot 3 body.
-    Behavior::Slot3();
+    Behavior::OnEngage();
 
     // .text:062cd838-062cd846: the current system's id through the manager's object database.
     CachedSystemId170 = FetchSystemId();
@@ -201,9 +201,9 @@ void LaunchBehavior::Engage()
     ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(0);
 
     ModeState164 = 1;
-    Flag17c = 0;
-    Field184 = 0.0f;
-    Field188 = 0.0f;
+    bStraightLaunch = 0;
+    LaunchDwellElapsed = 0.0f;
+    TotalLaunchElapsed = 0.0f;
 
     // .text:062cd87c-062cd8a7: `CALL FUN_062d21d0(this, 0, 3)` -- Behavior::SetCruiseLock.
     SetCruiseLock(0, 3);
@@ -222,7 +222,7 @@ void LaunchBehavior::Disengage()
 
     // .text:062cd8cb-062cd8cd: `MOV ECX,ESI; CALL FUN_062d20f0` -- Behavior's own slot 4 body
     // (PathfindManager::Field_064 = 0, Flag29 = 0).
-    Behavior::Slot4();
+    Behavior::OnDisengage();
 
     // .text:062cd8d2-062cd8dd: `MOV ECX,[ESI+0x24]; PUSH 1; ADD ECX,0x12c;
     // CALL FUN_062e9a60` -- GunGroups.SetShieldActive.
@@ -266,8 +266,8 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
     if (AdjustedWatchable != Watcher168.target())
         Watcher168.set(AdjustedWatchable);
 
-    // retail: `ECX = Param->+0x10; this->DirectiveField178 = ECX;`
-    DirectiveField178 = *reinterpret_cast<int const*>(static_cast<unsigned char const*>(Param) + 0x10);
+    // retail: `ECX = Param->+0x10; this->DockPortIndex = ECX;`
+    DockPortIndex = *reinterpret_cast<int const*>(static_cast<unsigned char const*>(Param) + 0x10);
 
     Watchable const* Watched168 = Watcher168.target();
     void const* RawBlock = Watched168 ? (reinterpret_cast<unsigned char const*>(Watched168) - 8) : nullptr;
@@ -299,24 +299,24 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
 //
 // [2026-09-17 claude:w16-behavior] THREE CORRECTIONS, each from re-reading the
 // raw bytes rather than trusting the two prior passes' own "re-verified" notes:
-//   (a) the Field188/Field18c entry gate was INVERTED (203186-203191);
-//   (b) case 1's Field184/Field180 gate was INVERTED (203203-203209);
+//   (a) the TotalLaunchElapsed/LaunchTimeout entry gate was INVERTED (203186-203191);
+//   (b) case 1's LaunchDwellElapsed/LaunchDwellDuration gate was INVERTED (203203-203209);
 //   (c) the pi-rotation's sin() term is -8.742278e-08, not 0 (203572-203590,
 //       DAT_0639e2d0 is FLOAT pi widened to double, so it overshoots true pi).
 // (a) and (b) are the same mistake twice: `TEST AH,0x41` + `JZ`/`JNZ` names the
 // STRICTLY-GREATER case in the fall-through, not the `<=` case. Both had been
 // transcribed as `<=`, which made the launch abort on tick 2 and skip mode 1's
 // 3.5-second dwell entirely. See each site's own inline comment.
-// A fourth correction lives in SetContext(): retail's Field18c store was being
+// A fourth correction lives in SetContext(): retail's LaunchTimeout store was being
 // skipped along with its deferred predicate.
 //
 //   if (ThreatSourcePtr14==nullptr || Watcher168.target()==nullptr ||
 //       Watcher168.target()-8==nullptr) { UpdateResult10=3; return 3; }
-//   void* fresh = Field18->vtbl[2]()->vtbl[0]();   // SAME chain as Engage()'s
+//   void* fresh = ObjectDb->vtbl[2]()->vtbl[0]();   // SAME chain as Engage()'s
 //                                                   // own FetchCachedResult()
 //   if (CachedResultPtr170 != fresh) { UpdateResult10=2; return 2; }
-//   if (Field188 > Field18c) { UpdateResult10=3; return 3; }   // launch timed out
-//   Field188 += DeltaTime1c;
+//   if (TotalLaunchElapsed > LaunchTimeout) { UpdateResult10=3; return 3; }   // launch timed out
+//   TotalLaunchElapsed += DeltaTime1c;
 //   switch (ModeState164) { case 1..6: ...; default: UpdateResult10=0; return 0; }
 //
 // (the raw JA/JNZ byte-targets for EVERY "out of range" and "abort mid-case"
@@ -329,19 +329,19 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
 // checking raw bytes, not the display text).
 //
 // Case bodies (ModeState164 value before the switch):
-//   1: `if (Field184>Field180) ModeState164=2; Field184+=DeltaTime1c;
+//   1: `if (LaunchDwellElapsed>LaunchDwellDuration) ModeState164=2; LaunchDwellElapsed+=DeltaTime1c;
 //       UpdateResult10=0; return 0;` -- fully self-contained, ported for real.
-//      (Dwell in mode 1 until Field180 == 3.5f seconds have accumulated.)
+//      (Dwell in mode 1 until LaunchDwellDuration == 3.5f seconds have accumulated.)
 //   2: computes an "approach transform" via ComputeLaunchApproachTransform()
 //      (FULLPORT-DEFERRED, see that method's own declaration comment), then
 //      ModeState164=3 and falls straight into case 3's OWN body in the same
 //      call (confirmed: no RET between them in the raw bytes).
-//   3: `if (DirectiveField178>=0) { StartLaunchSequence(); ModeState164=4;
+//   3: `if (DockPortIndex>=0) { StartLaunchSequence(); ModeState164=4;
 //       return 0; } else if (==-1) { ModeState164=2; return 0; }
 //       else if (==-2) { Disengage(); UpdateResult10=3; return 3; }
 //       else { UpdateResult10=0; return 0; }` -- fully self-contained aside
 //      from StartLaunchSequence() itself; ported for real.
-//   4: `if (Flag17c) { SetApproachSpeedParam(25); ReleaseApproachStep(0);
+//   4: `if (bStraightLaunch) { SetApproachSpeedParam(25); ReleaseApproachStep(0);
 //       ModeState164=5; return 0; } else { <SubObjectA/B tick sequence>;
 //       if (TickSubObject(SubObjectA)!=1) return 0; SetApproachSpeedParam(15);
 //       ModeState164=5; return 0; }` -- control flow ported for real, sub-
@@ -349,8 +349,8 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
 //   5: SubObjectA/B tick + a nested-position dot-product gate (CONFIRMED pure
 //      FPU math, ported for real -- see inline comment below) that can bail
 //      early; otherwise releases SubObjectA, resumes input, optionally
-//      throttles (Flag230), then either rotates LaunchBasis by pi radians
-//      (Flag231 set -- CONFIRMED pure FPU math, ported for real) and moves to
+//      throttles (bHalfThrottleOnExit), then either rotates LaunchBasis by pi radians
+//      (bFlipHeadingOnExit set -- CONFIRMED pure FPU math, ported for real) and moves to
 //      mode 6, or sets Flags28 bits and returns 2 staying in mode 5.
 //   6: `SetHardpointCone(pi/8); if (TickSubObject(SubObjectB)!=1) return 0;
 //       Flags28|=1; Flags28&=~2; UpdateResult10=2; return 2;` -- control flow
@@ -378,21 +378,21 @@ int LaunchBehavior::Update()
 
     // CORRECTED 2026-09-17 (claude:w16-behavior): this test was INVERTED in the
     // prior transcription. Retail, Common.dll.txt 203186-203191:
-    //   FLD  float ptr [EBX+0x188]      ; ST0 = Field188
-    //   FCOMP float ptr [EBX+0x18c]     ; compare Field188 against Field18c, pop
+    //   FLD  float ptr [EBX+0x188]      ; ST0 = TotalLaunchElapsed
+    //   FCOMP float ptr [EBX+0x18c]     ; compare TotalLaunchElapsed against LaunchTimeout, pop
     //   FNSTSW AX
     //   TEST AH,0x41                    ; C0 (0x01) | C3 (0x40)
     //   JZ   LAB_062cdefa               ; -> UpdateResult10 = 3; return 3
     // ZF is set exactly when neither C0 nor C3 is set, i.e. the strictly-greater
-    // case, so the JZ (the abort) is taken for `Field188 > Field18c`. The port
-    // previously read `Field188 <= Field18c`, which aborted the launch on the
-    // very first tick (Field188 starts at 0 and Field18c is a 15s/60s timeout).
-    if (Field188 > Field18c)
+    // case, so the JZ (the abort) is taken for `TotalLaunchElapsed > LaunchTimeout`. The port
+    // previously read `TotalLaunchElapsed <= LaunchTimeout`, which aborted the launch on the
+    // very first tick (TotalLaunchElapsed starts at 0 and LaunchTimeout is a 15s/60s timeout).
+    if (TotalLaunchElapsed > LaunchTimeout)
     {
         UpdateResult10 = 3;
         return 3;
     }
-    Field188 += DeltaTime1c;
+    TotalLaunchElapsed += DeltaTime1c;
 
     switch (ModeState164)
     {
@@ -400,19 +400,19 @@ int LaunchBehavior::Update()
     {
         // CORRECTED 2026-09-17 (claude:w16-behavior): this test was INVERTED in
         // the prior transcription. Retail, Common.dll.txt 203203-203209:
-        //   FLD   float ptr [EBX+0x184]   ; ST0 = Field184
-        //   FCOMP float ptr [EBX+0x180]   ; compare Field184 against Field180, pop
+        //   FLD   float ptr [EBX+0x184]   ; ST0 = LaunchDwellElapsed
+        //   FCOMP float ptr [EBX+0x180]   ; compare LaunchDwellElapsed against LaunchDwellDuration, pop
         //   FNSTSW AX
         //   TEST  AH,0x41                 ; C0 (0x01) | C3 (0x40)
         //   JNZ   LAB_062cda0c            ; -> SKIP the ModeState164 = 2 store
         // The JNZ (skip) is taken for `less` (C0) or `equal` (C3); the
         // FALL-THROUGH that performs `MOV dword ptr [EBX+0x164],0x2` is the
-        // strictly-greater case. So the store happens on `Field184 > Field180`.
-        // The port previously read `Field184 <= Field180`, which advanced out of
-        // mode 1 immediately instead of after Field180 (== 3.5f, ctor) seconds.
-        if (Field184 > Field180)
+        // strictly-greater case. So the store happens on `LaunchDwellElapsed > LaunchDwellDuration`.
+        // The port previously read `LaunchDwellElapsed <= LaunchDwellDuration`, which advanced out of
+        // mode 1 immediately instead of after LaunchDwellDuration (== 3.5f, ctor) seconds.
+        if (LaunchDwellElapsed > LaunchDwellDuration)
             ModeState164 = 2;
-        Field184 += DeltaTime1c;
+        LaunchDwellElapsed += DeltaTime1c;
         UpdateResult10 = 0;
         return 0;
     }
@@ -434,7 +434,7 @@ int LaunchBehavior::Update()
     }
     case 3:
     {
-        if (DirectiveField178 >= 0)
+        if (DockPortIndex >= 0)
         {
             // retail: `CALL FUN_062cdfa0(this)` -- FULLPORT-DEFERRED.
             StartLaunchSequence();
@@ -442,13 +442,13 @@ int LaunchBehavior::Update()
             UpdateResult10 = 0;
             return 0;
         }
-        if (DirectiveField178 == -1)
+        if (DockPortIndex == -1)
         {
             ModeState164 = 2;
             UpdateResult10 = 0;
             return 0;
         }
-        if (DirectiveField178 == -2)
+        if (DockPortIndex == -2)
         {
             // retail: `CALL this->vtbl[4]()` -- own vtable slot 4 = Disengage().
             Disengage();
@@ -460,7 +460,7 @@ int LaunchBehavior::Update()
     }
     case 4:
     {
-        if (Flag17c != 0)
+        if (bStraightLaunch != 0)
         {
             SetApproachSpeedParam(25.0f);
             ReleaseApproachStep(0);
@@ -471,10 +471,10 @@ int LaunchBehavior::Update()
 
         PushApproachBasisToSubObjectB(&ApproachBasis2[0]);
         TickSubObject(&SubObjectB, DeltaTime1c);
-        SetApproachOffset(&Field1cc);
+        SetApproachOffset(&DockPointB);
         SetApproachSpeedParam(5.0f);
         ReleaseApproachStep(1);
-        SetApproachThrottleScale(Field22c);
+        SetApproachThrottleScale(LaunchThrottleScale);
         SetApproachMode(2);
         int TickResult = TickSubObject(&SubObjectA, DeltaTime1c);
         if (TickResult != 1)
@@ -491,15 +491,15 @@ int LaunchBehavior::Update()
     {
         PushApproachBasisToSubObjectB(&LaunchBasis[0]);
         TickSubObject(&SubObjectB, DeltaTime1c);
-        SetApproachOffset(&Field19c);
+        SetApproachOffset(&DockPointC);
         SetApproachMode(2);
         int TickResult = TickSubObject(&SubObjectA, DeltaTime1c);
 
-        // .text:062cdd4f-062cdd83: Delta1 = Field19c - Field1cc, each component FSTP'd to a
+        // .text:062cdd4f-062cdd83: Delta1 = DockPointC - DockPointB, each component FSTP'd to a
         // float stack slot (ESP+0x10/0x14/0x18), interleaved with the cache-latch test.
-        float const Delta1X = Field19c.x - Field1cc.x;
-        float const Delta1Y = Field19c.y - Field1cc.y;
-        float const Delta1Z = Field19c.z - Field1cc.z;
+        float const Delta1X = DockPointC.x - DockPointB.x;
+        float const Delta1Y = DockPointC.y - DockPointB.y;
+        float const Delta1Z = DockPointC.z - DockPointB.z;
 
         // .text:062cdd57-062cdd9d: ESI = SystemManager+0x14fc; if Flags1578[2] (+0x7e) is
         // clear, the inlined FUN_062e6d40 cache refresh runs (latch, get_physical_radius).
@@ -507,13 +507,13 @@ int LaunchBehavior::Update()
         if (Sys->SelfTarget.bPosValid == 0)
             EnsureNestedNavPositionCached();
 
-        // .text:062cdda0-062cddb5: Delta2 = CachedPhysicalCenter - Field19c is loaded onto the
+        // .text:062cdda0-062cddb5: Delta2 = CachedPhysicalCenter - DockPointC is loaded onto the
         // FPU stack unconditionally and never stored (double here); `CMP EAX,1 / JZ` on the
         // SubObjectA tick result then skips the dot test entirely (the three values are popped
         // at 062cdde5-062cdde9).
-        double const Delta2X = static_cast<double>(Sys->SelfTarget.CachedPos.x) - Field19c.x;
-        double const Delta2Y = static_cast<double>(Sys->SelfTarget.CachedPos.y) - Field19c.y;
-        double const Delta2Z = static_cast<double>(Sys->SelfTarget.CachedPos.z) - Field19c.z;
+        double const Delta2X = static_cast<double>(Sys->SelfTarget.CachedPos.x) - DockPointC.x;
+        double const Delta2Y = static_cast<double>(Sys->SelfTarget.CachedPos.y) - DockPointC.y;
+        double const Delta2Z = static_cast<double>(Sys->SelfTarget.CachedPos.z) - DockPointC.z;
         if (TickResult != 1)
         {
             // .text:062cddba-062cddce: (d1.z*d2.z + d1.y*d2.y) + d1.x*d2.x on the FPU stack;
@@ -531,10 +531,10 @@ int LaunchBehavior::Update()
         // .text:062cddf3-062cddfe: FUN_062e9a60 = GunGroups.SetShieldActive(1).
         ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(1);
 
-        if (Flag230 != 0)
+        if (bHalfThrottleOnExit != 0)
             AdjustNavHelperThrottle(0.5f);                                // 062cde0d-062cde1a
 
-        if (Flag231 != 0)
+        if (bFlipHeadingOnExit != 0)
         {
             // .text:062cde29-062cde6d: the pi rotation of LaunchBasis (EAX = EBX+0x1b0),
             // DAT_0639e2d0 == double 0x400921FB60000000 (the float pi widened).
@@ -578,14 +578,14 @@ int LaunchBehavior::Update()
 // ----------------------------------------------------------------------------
 // The +0x18 chain of Engage() (.text:062cd838-062cd844) and Update() (.text:062cd980-
 // 062cd98c): `ECX = [this+0x18]; CALL [[ECX]+8]; ECX = EAX; CALL [[EAX]+0]`, no null tests.
-// +0x18 is written by Behavior's own vtable slot 2 (Behavior::Slot2, the ICF-folded setter
+// +0x18 is written by Behavior's own vtable slot 2 (Behavior::SetObjectDb, the ICF-folded setter
 // 0629afd0) from ConnectBehaviorManagerObjectDb (FUN_062d2830), which hands every behavior
 // the manager's IObjDB; IObjDB slot 2 (+0x08) is GetZoneDb, the current Universe::ISystem,
 // and ISystem slot 0 returns its id. So Update() aborts with 2 when the ship has changed
 // systems since Engage().
 unsigned LaunchBehavior::FetchSystemId() const
 {
-    Universe::ISystem const* const System = Field18->GetZoneDb();
+    Universe::ISystem const* const System = ObjectDb->GetZoneDb();
     return System->GetId();
 }
 
@@ -599,7 +599,7 @@ void* LaunchBehavior::FindLaunchHardpoint(void* NavHelper, void const* Param)
 }
 
 // ----------------------------------------------------------------------------
-// SetContext()'s Field18c selector. SETTLED AND PORTED FOR REAL 2026-09-17
+// SetContext()'s LaunchTimeout selector. SETTLED AND PORTED FOR REAL 2026-09-17
 // (claude:w18-behavior), replacing the `return false` stub and its premise.
 //
 // THE PREMISE WAS TWICE WRONG. It described the chain as
@@ -630,7 +630,7 @@ void* LaunchBehavior::FindLaunchHardpoint(void* NavHelper, void const* Param)
 // FaceBehavior::Update (.text:062c8e0a and .text:062c92d8) contains the
 // byte-identical chain and was ported against the same identification this pass.
 //
-// So the answer is: a PLAYER-flown ship gets Field18c = 15.0f (0x41700000) and an
+// So the answer is: a PLAYER-flown ship gets LaunchTimeout = 15.0f (0x41700000) and an
 // NPC gets 60.0f (0x42700000) -- a much shorter launch timeout for the player,
 // which is what the gameplay would want.
 bool LaunchBehavior::NestedNavQuery0xbc()
@@ -664,16 +664,16 @@ bool LaunchBehavior::NestedNavQuery0xbc()
 //     062cda5c  PUSH 0 / PUSH [EBX+0x178]          ESP = B-0x18
 //     062cda5f  CALL [EAX+0xc8]  (stdcall, 6 args) ESP = B
 // Last push is the first argument, so the call is
-//     get_dock_hardpoints(DirectiveField178, nullptr, &XformA, &XformB, &XformC, nullptr)
+//     get_dock_hardpoints(DockPortIndex, nullptr, &XformA, &XformB, &XformC, nullptr)
 // with XformA at B+0x2c, XformB at B+0x8c, XformC at B+0x5c. sizeof(Transform)==0x30
 // and its Vector sits at +0x24, which is exactly why the three discrete 3-dword
 // stores read B+0x50 (A+0x24), B+0xb0 (B+0x24) and B+0x80 (C+0x24) while the three
 // 9-dword REP MOVSDs read B+0x2c, B+0x8c and B+0x5c -- the matrices. B+0x2c..B+0x5b,
 // B+0x5c..B+0x8b and B+0x8c..B+0xbb are three disjoint 0x30-byte slots; nothing
 // overlaps. The retail store order, .text:062cda65-062cdb01, is
-//     Field1fc <- A.Translation   ApproachBasis3 <- A.Rotation
-//     Field1cc <- B.Translation   ApproachBasis2 <- B.Rotation
-//     Field19c <- C.Translation   LaunchBasis    <- C.Rotation
+//     DockPointA <- A.Translation   ApproachBasis3 <- A.Rotation
+//     DockPointB <- B.Translation   ApproachBasis2 <- B.Rotation
+//     DockPointC <- C.Translation   LaunchBasis    <- C.Rotation
 // The receiver is ECX == Watcher168's target minus 8 (.text:062cda2f-062cda40), the
 // same "-8 watcher back-adjustor to the owning IObjRW" the entry gate already tested.
 //
@@ -690,10 +690,10 @@ bool LaunchBehavior::NestedNavQuery0xbc()
 // twice, and that is the other thing that made it look tangled:
 //     - B+0x10..B+0x18 first receives hardpointPos - CachedPhysicalCenter (the FSUBs
 //       at 062cdb4a-062cdb7c read the hardpoint Pos back out of B+0x20);
-//     - Field190 is stored from it (062cdb77-062cdb84);
+//     - LaunchOffset is stored from it (062cdb77-062cdb84);
 //     - it is then passed as the Dst out-param of the vtbl+0x38 call
-//       (062cdbb5 `LEA EDX,[ESP+0x18]` at ESP == B-8 -> B+0x10) while Field190 itself
-//       is the Source, and Field190 is re-stored from it afterwards
+//       (062cdbb5 `LEA EDX,[ESP+0x18]` at ESP == B-8 -> B+0x10) while LaunchOffset itself
+//       is the Source, and LaunchOffset is re-stored from it afterwards
 //       (062cdbbe-062cdbd1).
 // FUN_062d5a80 (item 1587, 9 instructions: three float stores into receiver+0x4c) is
 // then called with ECX == EBX+0x2c == &SubObjectA, whose +0x4c is MoveIdea::Offset4c.
@@ -709,14 +709,14 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
     Transform XformA;
     Transform XformB;
     Transform XformC;
-    ObjInspectOf(Owner)->get_dock_hardpoints(DirectiveField178, nullptr,
+    ObjInspectOf(Owner)->get_dock_hardpoints(DockPortIndex, nullptr,
                                              &XformA, &XformB, &XformC, nullptr);
 
-    Field1fc = XformA.Translation;                                   // 062cda65-062cda7c
+    DockPointA = XformA.Translation;                                   // 062cda65-062cda7c
     std::memcpy(ApproachBasis3, &XformA.Rotation, sizeof(ApproachBasis3));  // 062cda86-062cda95
-    Field1cc = XformB.Translation;                                   // 062cda97-062cdab0
+    DockPointB = XformB.Translation;                                   // 062cda97-062cdab0
     std::memcpy(ApproachBasis2, &XformB.Rotation, sizeof(ApproachBasis2));  // 062cdac1-062cdad3
-    Field19c = XformC.Translation;                                   // 062cdad5-062cdae7
+    DockPointC = XformC.Translation;                                   // 062cdad5-062cdae7
     std::memcpy(LaunchBasis, &XformC.Rotation, sizeof(LaunchBasis));        // 062cdaf2-062cdb01
 
     Vector HardpointPos;
@@ -733,9 +733,9 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
         EnsureNestedNavPositionCached();
 
     // 062cdb4a-062cdb84
-    Field190.x = HardpointPos.x - Sys->SelfTarget.CachedPos.x;
-    Field190.y = HardpointPos.y - Sys->SelfTarget.CachedPos.y;
-    Field190.z = HardpointPos.z - Sys->SelfTarget.CachedPos.z;
+    LaunchOffset.x = HardpointPos.x - Sys->SelfTarget.CachedPos.x;
+    LaunchOffset.y = HardpointPos.y - Sys->SelfTarget.CachedPos.y;
+    LaunchOffset.z = HardpointPos.z - Sys->SelfTarget.CachedPos.z;
 
     // 062cdb87-062cdb9c: ExternalIface->vtbl[0x0c]. Slot +0x00C is
     // IObjInspect::get_transform() returning `Transform const&` (common_iface.h notes
@@ -748,40 +748,40 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
     // 062cdbb1-062cdbbb, last push first: (Dst = B+0x10, Matrix = the transform above,
-    // Source = &Field190). Slot +0x38 == I3DMathEngine::TransposeTransform, i.e. the
+    // Source = &LaunchOffset). Slot +0x38 == I3DMathEngine::TransposeTransform, i.e. the
     // world-space hardpoint offset rotated INTO the owner's local frame.
     Vector Rotated = {0.0f, 0.0f, 0.0f};
     Math->TransposeTransform(reinterpret_cast<FVector&>(Rotated),
                              reinterpret_cast<FMatrix const&>(OwnerXform.Rotation),
-                             reinterpret_cast<FVector const&>(Field190));
-    Field190 = Rotated;  // 062cdbbe-062cdbd1
+                             reinterpret_cast<FVector const&>(LaunchOffset));
+    LaunchOffset = Rotated;  // 062cdbbe-062cdbd1
 
-    // 062cdbd4-062cdbd8: FUN_062d5a80(&SubObjectA, &Field190) == item 1587's
+    // 062cdbd4-062cdbd8: FUN_062d5a80(&SubObjectA, &LaunchOffset) == item 1587's
     // three-float store into receiver+0x4c, which on a MoveIdea is Offset4c.
-    SubObjectA.Offset4c = Field190;
+    SubObjectA.Offset4c = LaunchOffset;
 }
 
 // FUN_062cdfa0 (.text:062cdfa0-062ce2f0, item 1425), called only from Update() case 3
 // (.text:062cdbef), which ignores the returned AL. Re-reads the dock hardpoints of the
 // launch terminal and decides whether the approach is already straight enough to skip the
-// alignment stage (Flag17c), then special-cases the terminal type.
+// alignment stage (bStraightLaunch), then special-cases the terminal type.
 //
 // Stack map (B = ESP after SUB ESP,0xf4 and the four register pushes): the
 // get_dock_hardpoints call at .text:062ce000 receives, last push first,
-// (DirectiveField178, &Type = B+0x40, &XformA = B+0x74, &XformB = B+0xa4, &XformC = B+0xd4,
+// (DockPortIndex, &Type = B+0x40, &XformA = B+0x74, &XformB = B+0xa4, &XformC = B+0xd4,
 // null). The stores that follow (.text:062ce006-062ce0b2) are the same mapping as Update()
-// case 2: Field1fc/ApproachBasis3 <- A, Field1cc/ApproachBasis2 <- B, Field19c/LaunchBasis <- C.
+// case 2: DockPointA/ApproachBasis3 <- A, DockPointB/ApproachBasis2 <- B, DockPointC/LaunchBasis <- C.
 // Then (FUN_0628b030 = Vec3Assign of float differences, FUN_062e1680 = VecNormalize3(Out,
 // Src), FUN_062e1630 = ClampedDot3, FUN_062887d0 = Vec3Add(Out, A, B)):
-//   Dir1 (B+0x44) = normalize(Field1cc - Field1fc)                     062ce0b4-062ce0e5
-//   Dir2 (B+0x68) = normalize(Field19c - Field1cc)                     062ce0ea-062ce122
+//   Dir1 (B+0x44) = normalize(DockPointB - DockPointA)                     062ce0b4-062ce0e5
+//   Dir2 (B+0x68) = normalize(DockPointC - DockPointB)                     062ce0ea-062ce122
 //   Dot1 (B+0x38, FSTP float) = ClampedDot3(Dir1, Dir2)                062ce127-062ce136
 //   Dot2 (B+0x10, FSTP float) = ClampedDot3(ApproachBasis2 column z, Dir1)  062ce13a-062ce162
 //   Sum  (B+0x20) = ApproachBasis3 column z + ApproachBasis2 column z  062ce166-062ce1be
 //   Dir3 (B+0x5c) = normalize(Sum + LaunchBasis column z)              062ce1c3-062ce1fc
 //   Dot3 (left on the FPU stack) = ClampedDot3(Dir1, Dir3)             062ce201-062ce20b
 // ("column z" = the +0x8/+0x14/+0x20 floats, i.e. Rows[0..2].z.)
-// Flag17c = Dot1 > 0.999 && Dot2 > 0.99 && Dot3 > 0.9999 (doubles DAT_0639fd40 /
+// bStraightLaunch = Dot1 > 0.999 && Dot2 > 0.99 && Dot3 > 0.9999 (doubles DAT_0639fd40 /
 // DAT_0639dfe8 / DAT_0639fd38; each FCOMP + TEST AH,0x41 + JNZ takes the "clear" side on
 // less, equal or unordered, so the store of 1 is the strictly-greater fall-through).
 bool LaunchBehavior::StartLaunchSequence()
@@ -797,25 +797,25 @@ bool LaunchBehavior::StartLaunchSequence()
     Transform XformA;
     Transform XformB;
     Transform XformC;
-    ObjInspectOf(Owner)->get_dock_hardpoints(DirectiveField178, &Type,           // 062ce000
+    ObjInspectOf(Owner)->get_dock_hardpoints(DockPortIndex, &Type,           // 062ce000
                                              &XformA, &XformB, &XformC, nullptr);
-    Field1fc = XformA.Translation;                                               // 062ce015
+    DockPointA = XformA.Translation;                                               // 062ce015
     std::memcpy(ApproachBasis3, &XformA.Rotation, sizeof(ApproachBasis3));       // 062ce047
-    Field1cc = XformB.Translation;                                               // 062ce04b
+    DockPointB = XformB.Translation;                                               // 062ce04b
     std::memcpy(ApproachBasis2, &XformB.Rotation, sizeof(ApproachBasis2));       // 062ce07e
-    Field19c = XformC.Translation;                                               // 062ce086
+    DockPointC = XformC.Translation;                                               // 062ce086
     std::memcpy(LaunchBasis, &XformC.Rotation, sizeof(LaunchBasis));             // 062ce0b2
 
     Vector Scratch;
-    Scratch.x = Field1cc.x - Field1fc.x;                                         // 062ce0cf-062ce0d3
-    Scratch.y = Field1cc.y - Field1fc.y;
-    Scratch.z = Field1cc.z - Field1fc.z;
+    Scratch.x = DockPointB.x - DockPointA.x;                                         // 062ce0cf-062ce0d3
+    Scratch.y = DockPointB.y - DockPointA.y;
+    Scratch.z = DockPointB.z - DockPointA.z;
     Vector Dir1;
     VecNormalize3(&Scratch, &Dir1);                                              // 062ce0e5
 
-    Scratch.x = Field19c.x - Field1cc.x;                                         // 062ce104-062ce110
-    Scratch.y = Field19c.y - Field1cc.y;
-    Scratch.z = Field19c.z - Field1cc.z;
+    Scratch.x = DockPointC.x - DockPointB.x;                                         // 062ce104-062ce110
+    Scratch.y = DockPointC.y - DockPointB.y;
+    Scratch.z = DockPointC.z - DockPointB.z;
     Vector Dir2;
     VecNormalize3(&Scratch, &Dir2);                                              // 062ce122
 
@@ -852,15 +852,15 @@ bool LaunchBehavior::StartLaunchSequence()
     double const StraightDot2 = 0.99;    // DAT_0639dfe8
     double const StraightDot3 = 0.9999;  // DAT_0639fd38
     if (Dot1 > StraightDot1 && Dot2 > StraightDot2 && Dot3 > StraightDot3)       // 062ce210-062ce240
-        Flag17c = 1;                                                             // 062ce242
+        bStraightLaunch = 1;                                                             // 062ce242
     else
-        Flag17c = 0;                                                             // 062ce24d
+        bStraightLaunch = 0;                                                             // 062ce24d
 
     // .text:062ce254-062ce262: switch (Type - 1), unsigned `CMP EAX,7 / JA` -> plain return.
     switch (static_cast<int>(Type))
     {
     case 1:
-        Flag230 = 1;                                                             // 062ce269
+        bHalfThrottleOnExit = 1;                                                             // 062ce269
         [[fallthrough]];
     case 6:
     case 7:
@@ -877,8 +877,8 @@ bool LaunchBehavior::StartLaunchSequence()
     case 3:
     case 4:
     case 5:
-        Flag17c = 0;                                                             // 062ce2d6
-        Flag231 = 1;                                                             // 062ce2dd
+        bStraightLaunch = 0;                                                             // 062ce2d6
+        bFlipHeadingOnExit = 1;                                                             // 062ce2dd
         return true;
     default:
         return true;                                                             // 062ce2e4
@@ -988,8 +988,8 @@ void LaunchBehavior::PushApproachBasisToSubObjectB(void const* SrcVectorBlock)
 //
 // The name also changes with it. `SetApproachRadius(float Radius)` was wrong about
 // what the value IS: it is not a radius, it is the throttle scale that
-// get_projected_throttle is asked to project. Field22c is passed to it, and this
-// header's own comment on Field22c inherited the same misreading.
+// get_projected_throttle is asked to project. LaunchThrottleScale is passed to it, and this
+// header's own comment on LaunchThrottleScale inherited the same misreading.
 void LaunchBehavior::SetApproachThrottleScale(float Scale)
 {
     SubObjectA.SetThrottleScale(Scale);

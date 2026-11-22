@@ -63,10 +63,10 @@ struct SpaceApp : public IEnvironment
     SpaceApp();
     ~SpaceApp();
 
-    bool Slot00(unsigned A, unsigned Message, unsigned B, unsigned C) override;
+    bool OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C) override;
     bool Slot01(unsigned A, unsigned B, unsigned C) override;
-    bool Slot02(unsigned A, unsigned B, unsigned long Packed) override;
-    bool Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
+    bool OnMouseMove(unsigned A, unsigned B, unsigned long Packed) override;
+    bool OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
     bool Slot04(unsigned A, unsigned B, unsigned C) override;
     void Slot05() override;
     void Slot06(unsigned A) override;

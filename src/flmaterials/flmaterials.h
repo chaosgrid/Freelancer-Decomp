@@ -226,10 +226,10 @@ private:
     float WireColorR_;
     float WireColorG_;
     float WireColorB_;
-    float WireField74_;
+    float WireColorA_;
     // Wire ARGB color; Wire2 additionally keeps a reduced RGB color for shifted points.
-    unsigned long WireField78_;
-    unsigned long WireField7C_;
+    unsigned long WireColorArgb_;
+    unsigned long WireColorRgb555_;
     // Cached facegroup cursor; retry group zero once when selection fails.
     unsigned long WireGroupIndex_;
     unsigned long Exclusion68_;

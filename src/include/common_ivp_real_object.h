@@ -1011,7 +1011,7 @@ public:
     // phase-2 helper, sole caller is ~IVP_Real_Object (FUN_06345300/item
     // 2795) immediately after the hull_manager WalkActiveEntries broadcast.
     // Drains the anchors list (+0x7c) via the already-ported
-    // FUN_06356910 notify trampoline (retail expects each listener to
+    // IVP_Anchor_ObjectDeletedEvent notify trampoline (retail expects each listener to
     // unlink itself from the anchors list as a side effect -- an infinite-loop
     // safety net, the same assert-fail-on-stuck-head idiom already used by
     // IVP_Hull_Manager::WalkActiveEntries' own retail sibling), calls

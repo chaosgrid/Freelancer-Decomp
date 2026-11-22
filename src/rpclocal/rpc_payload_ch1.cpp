@@ -62,15 +62,15 @@ static bool MarshalUpdateObject(FPacketBase* Packet, const unsigned int* Args, u
     const FCommonUpdateObjectInfo* Info =
         reinterpret_cast<const FCommonUpdateObjectInfo*>(Args[1]);
     FPayloadCommonUpdateObject Wire;
-    Wire.Field_0x00 = Info->Field_0x28;
+    Wire.State = Info->State;
     Wire.Pad_0x01[0] = 0;
     Wire.Pad_0x01[1] = 0;
     Wire.Pad_0x01[2] = 0;
     Wire.ObjectId = Info->ObjectId;
     Wire.Position = Info->Position;
     Wire.Orientation = Info->Orientation;
-    Wire.Field_0x24 = Info->Field_0x20;
-    Wire.Field_0x28 = Info->Field_0x24;
+    Wire.Timestamp = Info->Timestamp;
+    Wire.Throttle = Info->Throttle;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -80,9 +80,9 @@ static bool DeliverUpdateObject(const FPacketBase* Packet, IClient* Client, ICha
     Info.ObjectId = Wire.ObjectId;
     Info.Orientation = Wire.Orientation;
     Info.Position = Wire.Position;
-    Info.Field_0x20 = Wire.Field_0x24;
-    Info.Field_0x24 = Wire.Field_0x28;
-    Info.Field_0x28 = Wire.Field_0x00;
+    Info.Timestamp = Wire.Timestamp;
+    Info.Throttle = Wire.Throttle;
+    Info.State = Wire.State;
     Info.Pad_0x29[0] = 0;
     Info.Pad_0x29[1] = 0;
     Info.Pad_0x29[2] = 0;
@@ -177,8 +177,8 @@ static bool DeliverSetTarget(const FPacketBase* Packet, IClient* Client, IChatCl
 // ===========================================================================
 static bool MarshalChatMsg(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadCommonChatMsg Wire;
-    Wire.Field_0x00 = Args[0];
-    Wire.Field_0x04 = Args[1];
+    Wire.TargetId = Args[0];
+    Wire.SenderId = Args[1];
     // Retail: `if (Buffer != 0 && Size != 0) { new(Size); memcpy } else { Size = 0; Buffer = 0 }`.
     Wire.Size = 0;
     Wire.Buffer = nullptr;
@@ -198,7 +198,7 @@ static bool DeliverChatMsg(const FPacketBase* Packet, IClient*, IChatClient* Cha
     const FPayloadCommonChatMsg Wire = RpcPayloadRead<FPayloadCommonChatMsg>(Packet, 0);
     // Retail pushes the payload's +0x04, +0x08 and +0x0c and a literal 1 -- payload+0x00
     // is written by the sender and then never read.
-    ChatClient->SendCommonChatMsg(CHAT_ID(1u), CHAT_ID(Wire.Field_0x04), Wire.Size, Wire.Buffer);
+    ChatClient->SendCommonChatMsg(CHAT_ID(1u), CHAT_ID(Wire.SenderId), Wire.Size, Wire.Buffer);
     return true;
 }
 
@@ -236,7 +236,7 @@ static bool MarshalActivateCruise(FPacketBase* Packet, const unsigned int* Args,
     FPayloadCommonActivateCruise Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.bActivate = Info->bActivate ? 1u : 0u;
-    Wire.Field_0x05 = Info->bDisruptCruise;
+    Wire.bDisruptCruise = Info->bDisruptCruise;
     Wire.Pad_0x06[0] = 0;
     Wire.Pad_0x06[1] = 0;
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -247,7 +247,7 @@ static bool DeliverActivateCruise(const FPacketBase* Packet, IClient* Client, IC
     XActivateCruise Info;
     Info.ObjectId = Wire.ObjectId;
     Info.bActivate = (Wire.bActivate != 0);
-    Info.bDisruptCruise = (Wire.Field_0x05 != 0) ? 1u : 0u;   // retail: `param_1[0x25] != 0`
+    Info.bDisruptCruise = (Wire.bDisruptCruise != 0) ? 1u : 0u;   // retail: `param_1[0x25] != 0`
     Info.Pad_0x06[0] = 0;
     Info.Pad_0x06[1] = 0;
     Client->SendCommonActivateCruise(1u, Info);
@@ -264,7 +264,7 @@ static bool MarshalGoTradelane(FPacketBase* Packet, const unsigned int* Args, un
     Wire.ObjectId = Info->ObjectId;
     Wire.TradelaneRing1 = Info->TradelaneRing1;
     Wire.TradelaneRing2 = Info->TradelaneRing2;
-    Wire.Field_0x0c = Info->Field_0x0c ? 1u : 0u;
+    Wire.bMidLane = Info->bMidLane ? 1u : 0u;
     Wire.Pad_0x0d[0] = 0;
     Wire.Pad_0x0d[1] = 0;
     Wire.Pad_0x0d[2] = 0;
@@ -277,7 +277,7 @@ static bool DeliverGoTradelane(const FPacketBase* Packet, IClient* Client, IChat
     Info.ObjectId = Wire.ObjectId;
     Info.TradelaneRing1 = Wire.TradelaneRing1;
     Info.TradelaneRing2 = Wire.TradelaneRing2;
-    Info.Field_0x0c = (Wire.Field_0x0c != 0);
+    Info.bMidLane = (Wire.bMidLane != 0);
     Info.Pad_0x0d[0] = 0;
     Info.Pad_0x0d[1] = 0;
     Info.Pad_0x0d[2] = 0;
@@ -291,15 +291,15 @@ static bool DeliverGoTradelane(const FPacketBase* Packet, IClient* Client, IChat
 // ===========================================================================
 static bool MarshalStopTradelane(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadCommonStopTradelane Wire;
-    Wire.Field_0x00 = Args[1];
-    Wire.Field_0x04 = 0;   // retail never writes these two
-    Wire.Field_0x08 = 0;
+    Wire.ShipId = Args[1];
+    Wire.TradelaneRing1 = 0;   // retail never writes these two
+    Wire.TradelaneRing2 = 0;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverStopTradelane(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonStopTradelane Wire = RpcPayloadRead<FPayloadCommonStopTradelane>(Packet, 0);
-    Client->SendCommonStopTradeLane(1u, Wire.Field_0x00, Wire.Field_0x04, Wire.Field_0x08);
+    Client->SendCommonStopTradeLane(1u, Wire.ShipId, Wire.TradelaneRing1, Wire.TradelaneRing2);
     return true;
 }
 
@@ -418,10 +418,10 @@ static bool DeliverSetInterfaceState(const FPacketBase* Packet, IClient* Client,
 static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadCommonPlayerTrade Wire;
     Wire.SubType = Args[0];
-    Wire.Field_0x04 = 0;
-    Wire.Field_0x08 = 0;
-    Wire.Field_0x0c = 0;
-    Wire.Field_0x10 = 0;
+    Wire.Reason = 0;
+    Wire.ShipId = 0;
+    Wire.Money = 0;
+    Wire.bAccepted = 0;
     Wire.Pad_0x11[0] = 0;
     Wire.Pad_0x11[1] = 0;
     Wire.Pad_0x11[2] = 0;
@@ -445,24 +445,24 @@ static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, un
     case 0x01:   // 0x06d8b8e0 InitiateTrade-shaped
     case 0x20:   // 0x06d8bb10
     case 0x80:   // 0x06d8bb60
-        Wire.Field_0x08 = A1;
+        Wire.ShipId = A1;
         break;
     case 0x02:   // 0x06d8b980
-        Wire.Field_0x04 = A1;
+        Wire.Reason = A1;
         break;
     case 0x04:   // 0x06d8b9d0
-        Wire.Field_0x08 = A1;
-        Wire.Field_0x0c = A2;
+        Wire.ShipId = A1;
+        Wire.Money = A2;
         break;
     case 0x40:   // 0x06d8b930
-        Wire.Field_0x08 = A1;
-        Wire.Field_0x10 = (unsigned char)(A2 & 0xffu);
+        Wire.ShipId = A1;
+        Wire.bAccepted = (unsigned char)(A2 & 0xffu);
         break;
     case 0x08:   // 0x06d8ba20 -- EquipDesc, status included
     case 0x10: { // 0x06d8baa0 -- EquipDesc, status NOT written
         // 06d8ba48 / 06d8ba52 / 06d8ba5c / 06d8ba71: direct loads off the caller's
         // EquipDesc (+0x04, +0x14, float +0x10, word +0x02); 0x06d8baa0 skips the float.
-        Wire.Field_0x08 = A1;
+        Wire.ShipId = A1;
         const EquipDesc* Desc = reinterpret_cast<const EquipDesc*>(A2);
         Wire.EquipArchId = Desc->ArchId;
         Wire.EquipCount = (unsigned int)Desc->Count;
@@ -482,13 +482,13 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
     const FPayloadCommonPlayerTrade Wire = RpcPayloadRead<FPayloadCommonPlayerTrade>(Packet, 0);
     switch (Wire.SubType) {
     case 0x01:
-        Client->SendCommonPlayerTradeInitiateTrade(1u, Wire.Field_0x08);
+        Client->SendCommonPlayerTradeInitiateTrade(1u, Wire.ShipId);
         return true;
     case 0x02:
-        Client->SendCommonPlayerTradeTerminateTrade(1u, static_cast<int>(Wire.Field_0x04));
+        Client->SendCommonPlayerTradeTerminateTrade(1u, static_cast<int>(Wire.Reason));
         return true;
     case 0x04:
-        Client->SendCommonPlayerTradeSetTradeMoney(1u, Wire.Field_0x08, Wire.Field_0x0c);
+        Client->SendCommonPlayerTradeSetTradeMoney(1u, Wire.ShipId, Wire.Money);
         return true;
     case 0x08: {
         // caseD_8 0x06d837df: COMMON's EquipDesc::EquipDesc() (06d837e3), then
@@ -499,7 +499,7 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
         Desc.set_count((int)Wire.EquipCount);
         Desc.set_status(Wire.EquipStatus);
         Desc.set_id(Wire.EquipId);
-        Client->SendCommonPlayerTradeAddTradeEquip(1u, Wire.Field_0x08, Desc);
+        Client->SendCommonPlayerTradeAddTradeEquip(1u, Wire.ShipId, Desc);
         return true;
     }
     case 0x10: {
@@ -510,18 +510,18 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
         Desc.set_arch_id(Wire.EquipArchId);
         Desc.set_count((int)Wire.EquipCount);
         Desc.set_id(Wire.EquipId);
-        Client->SendCommonPlayerTradeDelTradeEquip(1u, Wire.Field_0x08, Desc);
+        Client->SendCommonPlayerTradeDelTradeEquip(1u, Wire.ShipId, Desc);
         return true;
     }
     case 0x20:
-        Client->SendCommonPlayerTradeRequestTrade(1u, Wire.Field_0x08);
+        Client->SendCommonPlayerTradeRequestTrade(1u, Wire.ShipId);
         return true;
     case 0x40:
         // The byte goes out zero-extended; the sender only ever stored a bool's 0/1.
-        Client->SendCommonPlayerTradeAcceptTrade(1u, Wire.Field_0x08, Wire.Field_0x10 != 0);
+        Client->SendCommonPlayerTradeAcceptTrade(1u, Wire.ShipId, Wire.bAccepted != 0);
         return true;
     case 0x80:
-        Client->SendCommonPlayerTradeStopTradeRequest(1u, Wire.Field_0x08);
+        Client->SendCommonPlayerTradeStopTradeRequest(1u, Wire.ShipId);
         return true;
     default:
         // Retail's sub-switch has no default: anything else falls out and the packet dies.
@@ -609,7 +609,7 @@ static bool MarshalPopUpDialog(FPacketBase* Packet, const unsigned int* Args, un
     Wire.SizeB = 0;
     Wire.BufferA = RpcFlattenFmtStr(*SourceA, Wire.SizeA);   // 06d8b6ff..06d8b719
     Wire.BufferB = RpcFlattenFmtStr(*SourceB, Wire.SizeB);   // 06d8b760..06d8b776
-    Wire.Field_0x10 = Args[3];                               // 06d8b780
+    Wire.Buttons = Args[3];                               // 06d8b780
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -620,7 +620,7 @@ static bool DeliverPopUpDialog(const FPacketBase* Packet, IClient* Client, IChat
     RpcUnflattenFmtStr(TextA, Wire.BufferA, Wire.SizeA);     // 06d8368a
     RpcUnflattenFmtStr(TextB, Wire.BufferB, Wire.SizeB);     // 06d83698
     // 06d836a5..06d836b2: PUSH packet+0x30, PUSH &B, PUSH &A, PUSH 1.
-    Client->SendCommonPopUpDialog(1u, TextA, TextB, Wire.Field_0x10);
+    Client->SendCommonPopUpDialog(1u, TextA, TextB, Wire.Buttons);
     return true;
 }
 

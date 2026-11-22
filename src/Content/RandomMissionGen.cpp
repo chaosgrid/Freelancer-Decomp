@@ -2017,15 +2017,15 @@ namespace
 // -> false, |arch +0x24 - level| >= 2 (CDQ/XOR/SUB abs) -> false. The ship local (FUN_06f862e0,
 // EH state 1): +0x50 = 1, Npc +0x88 = GroupId, Npc +0x90 = arch +0x00. Per ship 0..Count-1 while
 // the slot budget (post-decrement) was > 0: the first ship appends *Loot (FUN_06fa13d0) when
-// Loot is set, +0xd8 = FirstField_0xd8, +0xdc = FirstField_0xdc and, for 2, +0x50 = 0 and +0xd4
+// Loot is set, +0xd8 = FirstTargetFlags, +0xdc = FirstShipKind and, for 2, +0x50 = 0 and +0xd4
 // = TargetName; later ships clear the loot vector (FUN_06f93d80 / FUN_06f936d0), +0xd8 =
-// OtherField_0xd8, +0xdc = OtherField_0xdc, +0x50 = 1, +0xd4 = 0. Then sprintf(DAT_06fd3d20,
+// OtherTargetFlags, +0xdc = OtherShipKind, +0x50 = 1, +0xd4 = 0. Then sprintf(DAT_06fd3d20,
 // "Vignette_ship_%X", DAT_06fd3d84++), the nickname assigned (FUN_06ea9f40, 0x30), the ship
 // appended to Group +0x84 (FUN_06fa1760). The ship local and the class vector are destroyed;
 // true.
 bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize Size,
-                          int FirstField_0xd8, int OtherField_0xd8, int FirstField_0xdc,
-                          int OtherField_0xdc, FRmLootSpawn const* Loot, FNpcNameParams* TargetName,
+                          int FirstTargetFlags, int OtherTargetFlags, int FirstShipKind,
+                          int OtherShipKind, FRmLootSpawn const* Loot, FNpcNameParams* TargetName,
                           bool bMatchLevel)
 {
     if (Size.Count == 0)
@@ -2079,9 +2079,9 @@ bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize
             bFirst = false;
             if (bHasLoot)
                 Ship.Loot.insert(Ship.Loot.end(), 1, *Loot);
-            Ship.Field_0xd8 = FirstField_0xd8;
-            Ship.Field_0xdc = FirstField_0xdc;
-            if (FirstField_0xdc == 2)
+            Ship.TargetFlags = FirstTargetFlags;
+            Ship.ShipKind = FirstShipKind;
+            if (FirstShipKind == 2)
             {
                 Ship.bRandomName = 0;
                 Ship.TargetName = TargetName;
@@ -2090,8 +2090,8 @@ bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize
         else
         {
             Ship.Loot.clear();
-            Ship.Field_0xd8 = OtherField_0xd8;
-            Ship.Field_0xdc = OtherField_0xdc;
+            Ship.TargetFlags = OtherTargetFlags;
+            Ship.ShipKind = OtherShipKind;
             Ship.bRandomName = 1;
             Ship.TargetName = nullptr;
         }
@@ -2130,29 +2130,29 @@ bool __cdecl BuildRmShipGroup(FRmOfferQuery const* Query, FRmShipComponent* Comp
 
     Component->Groups.insert(Component->Groups.end(), 1, FRmShipGroup());
     FRmShipGroup* const Group = &Component->Groups.back();
-    Group->Field_0x00 = Block->Field_0x00;
-    Group->Field_0x02 = Block->Field_0x03;
-    Group->Field_0x04 = Block->Field_0x18;
-    Group->Field_0x08 = Block->Field_0x1c;
+    Group->bRequired = Block->bRequired;
+    Group->bClearPriorTargets = Block->bClearPriorTargets;
+    Group->SpawnTriggerMode = Block->SpawnTriggerMode;
+    Group->SpawnTriggerParam = Block->SpawnTriggerParam;
     Group->Position = *Position;
-    Group->Field_0x40 = bFriendly ? 0.9f : -0.9f;
+    Group->Attitude = bFriendly ? 0.9f : -0.9f;
     Group->System = FindSystemInfo(&Query->DestSys);
 
-    int FirstField_0xd8 = 0;
-    int OtherField_0xd8 = 0;
-    if (Block->Field_0x02 != 0)
+    int FirstTargetFlags = 0;
+    int OtherTargetFlags = 0;
+    if (Block->bKillAllShips != 0)
     {
-        FirstField_0xd8 = 2;
-        OtherField_0xd8 = 2;
+        FirstTargetFlags = 2;
+        OtherTargetFlags = 2;
     }
-    if (Block->Field_0x01 != 0)
+    if (Block->bHasTargetShip != 0)
     {
-        FirstField_0xd8 = 2;
-        OtherField_0xd8 = 0;
+        FirstTargetFlags = 2;
+        OtherTargetFlags = 0;
     }
 
     bool bLoot = true;
-    if (Block->Field_0x04 == 0)
+    if (Block->bDropsCriticalLoot == 0)
     {
         float const Roll = static_cast<float>(static_cast<double>(rand()) *
                                               static_cast<double>(1.0f / 32768.0f));
@@ -2164,13 +2164,13 @@ bool __cdecl BuildRmShipGroup(FRmOfferQuery const* Query, FRmShipComponent* Comp
     if (bLoot)
     {
         Loot.Info.bCanAiTractor = 0;
-        if (Block->Field_0x04 != 0)
+        if (Block->bDropsCriticalLoot != 0)
         {
             FRmCriticalLoot* const Critical =
-                PickCriticalLoot(GroupId, static_cast<unsigned int>(Block->Field_0x14));
+                PickCriticalLoot(GroupId, static_cast<unsigned int>(Block->CriticalLootMode));
             Loot.Kind = 2;
             Loot.CriticalLoot = Critical;
-            Loot.Field_0x100 = Block->Field_0x14;
+            Loot.CriticalLootMode = Block->CriticalLootMode;
             Loot.Info.EquipArchID = Critical->ArchetypeId;
             Loot.Info.Units = 1;
         }
@@ -2180,7 +2180,7 @@ bool __cdecl BuildRmShipGroup(FRmOfferQuery const* Query, FRmShipComponent* Comp
                 PickRmBonusLoot(Query->EnemyGroup, Query->Difficulty);
             Loot.Kind = 1;
             Loot.CriticalLoot = nullptr;
-            Loot.Field_0x100 = 0;
+            Loot.CriticalLootMode = 0;
             Loot.Info.EquipArchID = Bonus->Archetype;
             int const Min = Bonus->NumToDropMin;
             Loot.Info.Units = static_cast<unsigned int>(
@@ -2198,9 +2198,9 @@ bool __cdecl BuildRmShipGroup(FRmOfferQuery const* Query, FRmShipComponent* Comp
         LootArg = &Loot;
     }
 
-    int const FirstField_0xdc = (Block->Field_0x01 != 0) ? 2 : 1;
-    return BuildRmShips(Group, GroupId, Block->Size, FirstField_0xd8, OtherField_0xd8,
-                        FirstField_0xdc, 1, LootArg, TargetName, !bFriendly);
+    int const FirstShipKind = (Block->bHasTargetShip != 0) ? 2 : 1;
+    return BuildRmShips(Group, GroupId, Block->Size, FirstTargetFlags, OtherTargetFlags,
+                        FirstShipKind, 1, LootArg, TargetName, !bFriendly);
 }
 
 // FUN_06f9a410 (RET 8): a held offer is released through its interface at +0x04 and the
@@ -2258,10 +2258,10 @@ bool FRmDestroySolarsFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** 
     if (bHostileShipsAtInstallation)
     {
         FRmShipBlock Block = {};
-        Block.Field_0x00 = bPkHostileShips;
-        Block.Field_0x02 = bPkHostileShips;
+        Block.bRequired = bPkHostileShips;
+        Block.bKillAllShips = bPkHostileShips;
         Block.Size.Difficulty = 0.0f;
-        Block.Field_0x1c = -1;
+        Block.SpawnTriggerParam = -1;
         PickRmShipFormationSize(&Block.Size, HostileShare, Query->EnemyGroup);
         bool const bBuilt =
             BuildRmShipGroup(Query, &Offer->Ships, &Block, &Position, false, nullptr);
@@ -2272,8 +2272,8 @@ bool FRmDestroySolarsFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** 
     {
         FRmShipBlock Block = {};
         Block.Size.Difficulty = 0.0f;
-        Block.Field_0x18 = 1;
-        Block.Field_0x1c = 1;
+        Block.SpawnTriggerMode = 1;
+        Block.SpawnTriggerParam = 1;
         PickRmShipFormationSize(&Block.Size, FriendlyShare, static_cast<unsigned int>(Query->OfferGroup));
         FRmShipBlock Friendly = Block;
         if (Block.Size.Count == 0)
@@ -2290,18 +2290,18 @@ bool FRmDestroySolarsFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** 
     if (bHostileShipsAfter30S)
     {
         FRmShipBlock Block = {};
-        Block.Field_0x00 = bPkHostileShips;
-        Block.Field_0x02 = bPkHostileShips;
+        Block.bRequired = bPkHostileShips;
+        Block.bKillAllShips = bPkHostileShips;
         Block.Size.Difficulty = 0.0f;
         if (bHostileShipsAtInstallation)
         {
-            Block.Field_0x18 = 3;
-            Block.Field_0x1c = 1;
+            Block.SpawnTriggerMode = 3;
+            Block.SpawnTriggerParam = 1;
         }
         else
         {
-            Block.Field_0x18 = 1;
-            Block.Field_0x1c = 8;
+            Block.SpawnTriggerMode = 1;
+            Block.SpawnTriggerParam = 8;
         }
         PickRmShipFormationSize(&Block.Size, HostileShare, Query->EnemyGroup);
         bool const bBuilt =
@@ -2313,8 +2313,8 @@ bool FRmDestroySolarsFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** 
     {
         FRmShipBlock Block = {};
         Block.Size.Difficulty = 0.0f;
-        Block.Field_0x18 = 1;
-        Block.Field_0x1c = 9;
+        Block.SpawnTriggerMode = 1;
+        Block.SpawnTriggerParam = 9;
         PickRmShipFormationSize(&Block.Size, FriendlyShare, static_cast<unsigned int>(Query->OfferGroup));
         FRmShipBlock Friendly = Block;
         if (Block.Size.Count == 0)
@@ -2331,17 +2331,17 @@ bool FRmDestroySolarsFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** 
     if (bHostileWaves)
     {
         FRmShipBlock Block = {};
-        Block.Field_0x02 = bPkHostileShips;
+        Block.bKillAllShips = bPkHostileShips;
         Block.Size.Difficulty = 0.0f;
         if ((bHostileShipsAtInstallation || bHostileShipsAfter30S) && (rand() % 2) != 0)
         {
-            Block.Field_0x18 = 3;
-            Block.Field_0x1c = 1;
+            Block.SpawnTriggerMode = 3;
+            Block.SpawnTriggerParam = 1;
         }
         else
         {
-            Block.Field_0x18 = 1;
-            Block.Field_0x1c = 0xf0;
+            Block.SpawnTriggerMode = 1;
+            Block.SpawnTriggerParam = 0xf0;
         }
         PickRmShipFormationSize(&Block.Size, HostileShare, Query->EnemyGroup);
         bool const bBuilt =
@@ -2506,7 +2506,7 @@ void FRmDestroySolarsFilter::SpawnSolars(
                 unsigned int PilotId = CreateID(GRmSolarPilotNames[PilotIndex]);
                 GetPilotPersonality(&PilotId, &Solar.Personality);
 
-                Solar.Field_0x4c8 = -0.9f;
+                Solar.Attitude = -0.9f;
                 Solar.bPilot = 1;
                 Solar.DestSys = Query->DestSys;
                 Solar.ModeFlag = Mode;
@@ -2626,17 +2626,17 @@ namespace
                           unsigned char Field02, unsigned char Field03, unsigned char Field04,
                           int Field18, int Field1c)
     {
-        Block->Field_0x00 = Field00;
-        Block->Field_0x01 = Field01;
-        Block->Field_0x02 = Field02;
-        Block->Field_0x03 = Field03;
-        Block->Field_0x04 = Field04;
+        Block->bRequired = Field00;
+        Block->bHasTargetShip = Field01;
+        Block->bKillAllShips = Field02;
+        Block->bClearPriorTargets = Field03;
+        Block->bDropsCriticalLoot = Field04;
         Block->Size.Difficulty = 0.0f;
         Block->Size.Level = 0;
         Block->Size.Count = 0;
-        Block->Field_0x14 = 0;
-        Block->Field_0x18 = Field18;
-        Block->Field_0x1c = Field1c;
+        Block->CriticalLootMode = 0;
+        Block->SpawnTriggerMode = Field18;
+        Block->SpawnTriggerParam = Field1c;
     }
 
     // The friendly block fix of FUN_06f9c410 (as FUN_06f9a700): a copy of the block; with no
@@ -2706,8 +2706,8 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
         bSuccess = BuildRmShipGroup(Query, TargetShips, &Block, &Position, false, nullptr);
         if (Flags[21])
         {
-            Block.Field_0x18 = 3;
-            Block.Field_0x1c = 1;
+            Block.SpawnTriggerMode = 3;
+            Block.SpawnTriggerParam = 1;
             PickRmShipFormationSize(&Block.Size, Share, Query->EnemyGroup);
             bool const bBuilt =
                 BuildRmShipGroup(Query, TargetShips, &Block, &Position, false, nullptr);
@@ -2738,24 +2738,24 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
         {
             ResetRmShipBlock(&Block, 1, 1, 0, 1, Flags[2] ? 1 : 0, 0, -1);
             if (Flags[2])
-                Block.Field_0x14 = GetRmCriticalLootKind(Flags);
+                Block.CriticalLootMode = GetRmCriticalLootKind(Flags);
             if (Flags[9])
             {
                 std::vector<FRmShipSpawn> const& Ships = TargetShips->Groups.back().Ships;
                 if (Ships.size() > 1)
                 {
-                    Block.Field_0x18 = 3;
-                    Block.Field_0x1c = 1;
+                    Block.SpawnTriggerMode = 3;
+                    Block.SpawnTriggerParam = 1;
                 }
                 else
                 {
-                    Block.Field_0x18 = 2;
-                    Block.Field_0x1c = 8;
+                    Block.SpawnTriggerMode = 2;
+                    Block.SpawnTriggerParam = 8;
                 }
             }
             else
             {
-                Block.Field_0x18 = 0;
+                Block.SpawnTriggerMode = 0;
             }
             Field50 = 3;
             Field54 = 0x63;
@@ -2766,8 +2766,8 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
         }
     }
 
-    TargetShips->Field_0x50 = Field50;
-    TargetShips->Field_0x54 = Field54;
+    TargetShips->EndTriggerMode = Field50;
+    TargetShips->EndTriggerParam = Field54;
     return bSuccess;
 }
 
@@ -2824,13 +2824,13 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         {
             if (Flags[22])
             {
-                Hostile.Field_0x18 = 3;
-                Hostile.Field_0x1c = 1;
+                Hostile.SpawnTriggerMode = 3;
+                Hostile.SpawnTriggerParam = 1;
             }
             else
             {
-                Hostile.Field_0x18 = 1;
-                Hostile.Field_0x1c = 8;
+                Hostile.SpawnTriggerMode = 1;
+                Hostile.SpawnTriggerParam = 8;
             }
             PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
             bool const bBuilt =
@@ -2839,8 +2839,8 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         }
         if (Flags[25])
         {
-            Friendly.Field_0x18 = 1;
-            Friendly.Field_0x1c = 0x3c;
+            Friendly.SpawnTriggerMode = 1;
+            Friendly.SpawnTriggerParam = 0x3c;
             PickRmShipFormationSize(&Friendly.Size, FriendlyShare, OfferGroup);
             FRmShipBlock const Copy = CopyFriendlyRmShipBlock(&Friendly);
             bool const bBuilt = BuildRmShipGroup(Query, Ships, &Copy, &Position, true, nullptr);
@@ -2848,10 +2848,10 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         }
         if (Flags[18])
         {
-            Hostile.Field_0x00 = 0;
-            Hostile.Field_0x02 = 1;
-            Hostile.Field_0x18 = 2;
-            Hostile.Field_0x1c = 0xf0;
+            Hostile.bRequired = 0;
+            Hostile.bKillAllShips = 1;
+            Hostile.SpawnTriggerMode = 2;
+            Hostile.SpawnTriggerParam = 0xf0;
             PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
             bool const bBuilt =
                 BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
@@ -2859,13 +2859,13 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         }
         if (Flags[26])
         {
-            Friendly.Field_0x18 = 2;
-            Friendly.Field_0x1c = 9;
+            Friendly.SpawnTriggerMode = 2;
+            Friendly.SpawnTriggerParam = 9;
             PickRmShipFormationSize(&Friendly.Size, FriendlyShare, OfferGroup);
             for (int Wave = 0; Wave < 3; ++Wave)
             {
                 if (Wave != 0)
-                    Friendly.Field_0x1c = 0x19;
+                    Friendly.SpawnTriggerParam = 0x19;
                 FRmShipBlock const Copy = CopyFriendlyRmShipBlock(&Friendly);
                 bool const bBuilt =
                     BuildRmShipGroup(Query, Ships, &Copy, &Position, true, nullptr);
@@ -2888,16 +2888,16 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         ResetRmShipBlock(&Hostile, 1, 1, 0, 1, 0, 0, -1);
         if (Flags[16])
         {
-            Hostile.Field_0x18 = 2;
-            Hostile.Field_0x1c = 0x2d;
+            Hostile.SpawnTriggerMode = 2;
+            Hostile.SpawnTriggerParam = 0x2d;
         }
         else
         {
-            Hostile.Field_0x18 = 0;
+            Hostile.SpawnTriggerMode = 0;
         }
-        Hostile.Field_0x04 = Flags[2] ? 1 : 0;
+        Hostile.bDropsCriticalLoot = Flags[2] ? 1 : 0;
         if (Flags[2])
-            Hostile.Field_0x14 = GetRmCriticalLootKind(Flags);
+            Hostile.CriticalLootMode = GetRmCriticalLootKind(Flags);
         FriendlyShare = Share * 1.5f;
         if (!Flags[16])
             FriendlyShare = FriendlyShare * 1.3f;
@@ -3021,7 +3021,7 @@ void FRmAssassinateFilter::SpawnSolars(
                 unsigned int PilotId = CreateID(GRmSolarPilotNames[PilotIndex]);
                 GetPilotPersonality(&PilotId, &Solar.Personality);
 
-                Solar.Field_0x4c8 = -0.9f;
+                Solar.Attitude = -0.9f;
                 Solar.bPilot = 1;
                 Solar.DestSys = Query->DestSys;
                 Solar.ModeFlag = 0;

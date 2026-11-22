@@ -392,7 +392,7 @@ void __cdecl FormFormation(std::list<FContentShipBase*>* Ships, FFormation* Form
         return;
 
     FContentShipBase* First = Ships->front();
-    if (First->FormationId != 0xffffffffu && First->Slot04())
+    if (First->FormationId != 0xffffffffu && First->IsNpcShip())
         ReleaseFormationMembers(First, Ships);
 
     unsigned int FormationId = AllocateFormationId();
@@ -1517,7 +1517,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
         RemoveFromFormation(Member);
         Member->FollowDirectivesOf(Leader);
         FContentGuide* LeaderGuide =
-            Leader->Slot04() ? static_cast<FContentNpcShip*>(Leader)->GetGuide() : nullptr;
+            Leader->IsNpcShip() ? static_cast<FContentNpcShip*>(Leader)->GetGuide() : nullptr;
         if (LeaderGuide == nullptr)
             continue;
         Member->SetGuide(LeaderGuide->Clone(), true, false);                  // FUN_06f34b70
@@ -2032,11 +2032,11 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
             }
 
             FContentNpcShipParams& Params = *It;
-            DockIndex = Params.Field_0x110;
+            DockIndex = Params.DockIndex;
 
             if ((TargetType & 0xc40) != 0)
             {
-                if (Params.Field_0x48 == 0 || Params.Field_0x4c == 0xffffffffu)
+                if (Params.FormationSlot == 0 || Params.FormationId == 0xffffffffu)
                 {
                     TRefHandle<FObjListDirective> Directive;                  // EH state 0
                     CreateObjListDirective(1, &Directive.Pointer);            // FUN_06f24870
@@ -2063,7 +2063,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 }
                 if (Response == 3)
                 {
-                    if (Params.Field_0x104 >= 0.0f)
+                    if (Params.Longevity >= 0.0f)
                     {
                         EraseLaunchQueue(&Queue);
                         break;
@@ -2082,7 +2082,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                                   &HardpointOrientation);
                 bool bOpenTerminal = !(Info.Value == 2 || Info.Value == 3 || Info.Value == 4 ||
                                        Info.Value == 5);
-                if (Params.Field_0x104 != -1.0f || bOpenTerminal)
+                if (Params.Longevity != -1.0f || bOpenTerminal)
                 {
                     TRefHandle<FObjListDirective> Directive;                  // EH state 1
                     CreateObjListDirective(0x15, &Directive.Pointer);         // FUN_06f24870
@@ -2092,10 +2092,10 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 }
             }
 
-            Params.Field_0x110 = DockIndex;
+            Params.DockIndex = DockIndex;
             Params.GuideTargetId = *DockTargetId;
             FContentNpcShip* Ship = new FContentNpcShip(&Params);             // FUN_06f336a0
-            if (Params.Field_0x104 >= 0.0f)
+            if (Params.Longevity >= 0.0f)
                 Result = Ship;
             Params.System->AddSpaceObj(Ship);                                 // FUN_06f74380
             unsigned int const Controller = 0;
@@ -2180,9 +2180,9 @@ void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFor
     {
         if (!Formation->IsPlayerSlot(Slot))
         {
-            It->Field_0x48 = static_cast<unsigned int>(Slot);
+            It->FormationSlot = static_cast<unsigned int>(Slot);
             It->Formation = Formation;
-            It->Field_0x4c = FormationId;
+            It->FormationId = FormationId;
         }
         ++Slot;
     }
@@ -2201,7 +2201,7 @@ void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFor
     for (std::list<FContentNpcShipParams>::iterator It = Blocks->begin(); It != Blocks->end();
          ++It)
     {
-        Formation->GetSlotTransform(It->Field_0x48, &SlotPosition, &SlotOrientation);
+        Formation->GetSlotTransform(It->FormationSlot, &SlotPosition, &SlotOrientation);
 
         FVector World;
         GetSpaceMathEngine()->TransformXform(World, *Placement, SlotPosition);

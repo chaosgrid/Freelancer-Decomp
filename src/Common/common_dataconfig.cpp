@@ -42,7 +42,7 @@ namespace
     int CallProgressCb(DataConfig::ProgressCB* Progress, char const* ValueString)
     {
         // listing 06308f3c: thiscall vtable[0], arg = get_value_string().
-        return Progress->Slot00(ValueString);
+        return Progress->OnProgress(ValueString);
     }
 
     void DispatchDataValue(INI_Reader& Reader, Archetype::ICliObjFactory* Factory)

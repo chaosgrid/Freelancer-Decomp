@@ -66,8 +66,8 @@ FShapeDB G_UiShapeDB;
 
 // ---------------------------------------------------------------- texture reference
 
-// LAB_004cc950 (the static initializer of the HUD's DAT_00673570): Field04 = -1, Texture = 0.
-FTextureRef::FTextureRef() : Texture(nullptr), Field04(-1)
+// LAB_004cc950 (the static initializer of the HUD's DAT_00673570): AlphaCache = -1, Texture = 0.
+FTextureRef::FTextureRef() : Texture(nullptr), AlphaCache(-1)
 {
 }
 
@@ -78,7 +78,7 @@ FTextureRef::FTextureRef(FTextureRef const& Other)
     Texture = Other.Texture;
     if (Texture != nullptr)
         DALib::TextureLib->CreatePlaybackGroup(Texture, nullptr);
-    Field04 = Other.Field04;
+    AlphaCache = Other.AlphaCache;
 }
 
 // FUN_00426de0 (also inlined as LAB_004cc970 and into the node destructor FUN_00420cb0).
@@ -252,7 +252,7 @@ FTexShape* FShapeDB::FindOrCreate(TString<24> const& Key)
     // Retail copies Key and a value whose record is null into a pair (FUN_00426f80 and the MOV
     // chain at 00426e76), inserts it (FUN_00427250), destroys the temporaries and returns
     // node + 0x28. Its value is a stack local with only the record cleared; the port's value
-    // is FTexShape() -- record null, Field04 -1 (FTextureRef's constructor), the rest zero.
+    // is FTexShape() -- record null, AlphaCache -1 (FTextureRef's constructor), the rest zero.
     FShapeMap::value_type Entry(Key, FTexShape());
     std::pair<FShapeMap::iterator, bool> const Result = Shapes.insert(Entry);
     return &Result.first->second;
@@ -379,7 +379,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         Desc.ShareMode = 1;
                         Desc.Creation = 3;
                         Desc.Flags = 0x8000080u;
-                        Desc.Field30 = 0xffffffffu;
+                        Desc.FindHandle = 0xffffffffu;
                         if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                                         reinterpret_cast<void**>(&Archive)) == GR_OK)
                         {
@@ -657,7 +657,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                 }
                 else
                 {
-                    // 0042687a: key via FUN_00427020, a {record 0, Field04 -1} value, map insert
+                    // 0042687a: key via FUN_00427020, a {record 0, AlphaCache -1} value, map insert
                     // (FUN_00427160 + FUN_00427080) -- the same find-or-insert as FUN_00426e20.
                     TString<24> Key;
                     Key = ShapeName.Data;

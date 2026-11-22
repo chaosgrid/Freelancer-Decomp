@@ -14,17 +14,17 @@ ServerFilter::ServerFilter()
     : bFilterPing(0)
     , bFilterKnown(0)
     , bFilterVersion(0)
-    , bFilterField95(0)
+    , bFilterAllowNewPlayers(0)
     , bFilterPassword(0)
-    , bFilterField3e(0)
+    , bFilterLan(0)
     , PingMin(0)
     , PingMax(1000)
     , KnownLogin(1)
     , VersionMin(g_client.packed_version)
     , VersionMax(g_client.packed_version)
-    , Field95(1)
+    , AllowNewPlayers(1)
     , Password(0)
-    , Field3e(1)
+    , Lan(1)
 {
 }
 
@@ -34,17 +34,17 @@ ServerFilter& ServerFilter::operator=(ServerFilter const& Other)
     bFilterPing = Other.bFilterPing;
     bFilterKnown = Other.bFilterKnown;
     bFilterVersion = Other.bFilterVersion;
-    bFilterField95 = Other.bFilterField95;
+    bFilterAllowNewPlayers = Other.bFilterAllowNewPlayers;
     bFilterPassword = Other.bFilterPassword;
-    bFilterField3e = Other.bFilterField3e;
+    bFilterLan = Other.bFilterLan;
     PingMin = Other.PingMin;
     PingMax = Other.PingMax;
     KnownLogin = Other.KnownLogin;
     VersionMin = Other.VersionMin;
     VersionMax = Other.VersionMax;
-    Field95 = Other.Field95;
+    AllowNewPlayers = Other.AllowNewPlayers;
     Password = Other.Password;
-    Field3e = Other.Field3e;
+    Lan = Other.Lan;
     return *this;
 }
 
@@ -70,11 +70,11 @@ bool ServerFilter::Match(FServerInfo const& Server) const
         if (Server.Version > VersionMax || Server.Version < VersionMin)
             return false;
     }
-    if (bFilterField95 && Server.Field_0x95 != Field95)
+    if (bFilterAllowNewPlayers && Server.bAllowNewPlayers != AllowNewPlayers)
         return false;
     if (bFilterPassword && Server.bPassword != Password)
         return false;
-    if (bFilterField3e && Server.Field_0x3e != Field3e)
+    if (bFilterLan && Server.bLan != Lan)
         return false;
     return true;
 }

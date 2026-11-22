@@ -119,12 +119,12 @@ namespace
     // FUN_00565f00 -- column 6: +0x3e set first; otherwise the pointers (A < B).
     bool CompareField3eAsc(FServerInfo const* A, FServerInfo const* B)
     {
-        if (A->Field_0x3e != 0)
+        if (A->bLan != 0)
         {
-            if (B->Field_0x3e == 0)
+            if (B->bLan == 0)
                 return true;
         }
-        else if (B->Field_0x3e != 0)
+        else if (B->bLan != 0)
         {
             return false;
         }
@@ -143,12 +143,12 @@ namespace
         {
             return false;
         }
-        if (A->Field_0x96 != 0)
+        if (A->bAllowPvp != 0)
         {
-            if (B->Field_0x96 == 0)
+            if (B->bAllowPvp == 0)
                 return true;
         }
-        else if (B->Field_0x96 != 0)
+        else if (B->bAllowPvp != 0)
         {
             return false;
         }
@@ -209,12 +209,12 @@ namespace
     // FUN_005660e0 -- +0x3e clear first; otherwise the pointers (B < A).
     bool CompareField3eDesc(FServerInfo const* A, FServerInfo const* B)
     {
-        if (A->Field_0x3e != 0)
+        if (A->bLan != 0)
         {
-            if (B->Field_0x3e == 0)
+            if (B->bLan == 0)
                 return false;
         }
-        else if (B->Field_0x3e != 0)
+        else if (B->bLan != 0)
         {
             return true;
         }
@@ -233,12 +233,12 @@ namespace
         {
             return true;
         }
-        if (A->Field_0x96 != 0)
+        if (A->bAllowPvp != 0)
         {
-            if (B->Field_0x96 == 0)
+            if (B->bAllowPvp == 0)
                 return false;
         }
-        else if (B->Field_0x96 != 0)
+        else if (B->bAllowPvp != 0)
         {
             return true;
         }
@@ -913,7 +913,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
     }
 
     // 0x00570f42..0x00570f61: column 6, +0x3e.
-    SetCell(Row, 6, Server->Field_0x3e != 0 ? &TextYes : &TextNo, bVersionMatch, bSelected);
+    SetCell(Row, 6, Server->bLan != 0 ? &TextYes : &TextNo, bVersionMatch, bSelected);
 
     // 0x00570f66..0x00571180: column 7, the lock (+0x94) and the skull (+0x96) -- plain when
     // selected, blue for this version, grey otherwise.
@@ -924,7 +924,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
             ImageNode const Image(bSelected ? Locked : (bVersionMatch ? BlueLock : GrayLock));
             AppendNodeClone(Icons, Image);
         }
-        if (Server->Field_0x96 != 0)
+        if (Server->bAllowPvp != 0)
         {
             ImageNode const Image(bSelected ? Skull : (bVersionMatch ? BlueSkull : GraySkull));
             AppendNodeClone(Icons, Image);
@@ -943,7 +943,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
     Data->Release();
 }
 
-bool PageServerSelect::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_005714d0.
     unsigned const TableId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(ServerTable));
@@ -973,7 +973,7 @@ bool PageServerSelect::Slot23(unsigned Msg, unsigned A, unsigned B)
             // 0x005716f4..0x00571770: "Refresh" -- only before the first list request
             // (CLoginMgr +0x23c, DAT_0067e9f4); the rows emptied, the details reset, the lists
             // reset and requested again.
-            if (G_LoginMgr.Field_0x23c != 0)
+            if (G_LoginMgr.ServerListPage != 0)
                 return false;
             int const RowCount = EdgeCount(ServerTable->RowEdges);
             for (int Row = 1; Row < RowCount; ++Row)
@@ -1148,7 +1148,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
         ServerDetails->AppendNode(Style);
     }
     RenderDisplayList Description;
-    AppendTextAsRdl(Server->Field_0x54.c_str(), static_cast<unsigned>(Server->Field_0x54.size()),
+    AppendTextAsRdl(Server->Description.c_str(), static_cast<unsigned>(Server->Description.size()),
                     Description, false);
     ServerDetails->AppendContent(Description);
     {
@@ -1158,7 +1158,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
 
     // 0x00571d52..0x00571ed5: the restrictions -- shown unless +0x95 is set and there is no
     // password: +0x95 clear adds 0x74f, a password adds 0x750.
-    if (Server->Field_0x95 != 0 && Server->bPassword == 0)
+    if (Server->bAllowNewPlayers != 0 && Server->bPassword == 0)
         return;
     {
         StyleNode const Style(0x4433);
@@ -1176,7 +1176,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
         StyleNode const Style(0x76ec);
         ServerDetails->AppendNode(Style);
     }
-    if (Server->Field_0x95 == 0)
+    if (Server->bAllowNewPlayers == 0)
     {
         {
             RDLRefNode const Ref(DetailsField95);

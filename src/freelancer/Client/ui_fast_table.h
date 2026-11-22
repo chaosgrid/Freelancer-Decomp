@@ -30,7 +30,7 @@
 //   13 LAB_0058eb30 Draw, 16 LAB_0058f210 MouseLeave, 19 LAB_0058f230 MouseEvent,
 //   45 FUN_0058d9d0 Relayout, 46 LAB_0058d8f0 GetToolTipHoverInfo.
 // UIScrollTable vftable 0x005e524c: 0 FUN_0058f4b0 (dtor FUN_0058f4d0 = the UIFastTable dtor
-//   inlined), 9 FUN_0058f7a0 Create, 23 LAB_0058f8b0 Slot23; every other slot is UIFastTable's.
+//   inlined), 9 FUN_0058f7a0 Create, 23 LAB_0058f8b0 ProcessMessage; every other slot is UIFastTable's.
 //
 // Layout (after BaseRichTextWin's 0x488; the port keeps the members, not the VC6 containers):
 //   +0x488 Width, +0x48c Height (payload [0], [1])
@@ -372,7 +372,7 @@ private:
 };
 
 // +0x578: called (cdecl) with the context, ftol(scrollbar value) and the visible row count
-// (rows - fixed rows) whenever the scrollbar moves (Slot23) and once when it is installed
+// (rows - fixed rows) whenever the scrollbar moves (ProcessMessage) and once when it is installed
 // (FUN_0058f740). The return value is not read.
 typedef void (*FUiScrollTableCallback)(void* Context, int FirstItem, unsigned VisibleRows);
 
@@ -388,7 +388,7 @@ public:
     // slot 9 FUN_0058f7a0 (RET 8)
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 23 LAB_0058f8b0 (RET 0xc)
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
     // FUN_0058f640 (RET 8) -- the scrollbar's range for ItemCount items with FixedRows rows
     // not scrolled; hidden (value 0) when everything fits.

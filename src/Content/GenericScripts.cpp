@@ -322,10 +322,10 @@ namespace
     void FormatKnowOfferText(CharacterBehaviorDescription* Behavior, FBaseNpcKnow const* Know)
     {
         Behavior->DescFmtStr.begin_mad_lib(0x3efe);
-        Behavior->DescFmtStr.append_string(static_cast<unsigned int>(Know->Field_0x04));
+        Behavior->DescFmtStr.append_string(static_cast<unsigned int>(Know->InfoIds));
         Behavior->DescFmtStr.end_mad_lib();
         Behavior->NameFmtStr.begin_mad_lib(static_cast<unsigned int>(rand() / 0x8000 + 0x3efd));
-        Behavior->NameFmtStr.append_string(static_cast<unsigned int>(Know->Field_0x08));
+        Behavior->NameFmtStr.append_string(static_cast<unsigned int>(Know->OfferIds));
         Behavior->NameFmtStr.append_int(static_cast<unsigned int>(Know->Price));
         Behavior->NameFmtStr.end_mad_lib();
     }
@@ -336,7 +336,7 @@ namespace
                                   CharacterBehaviorDescription* Behavior, int Posture,
                                   FContentPlayerState* State)
     {
-        Behavior->Field21c = 3;
+        Behavior->DialogType = 3;
         AppendGenericScript(Behavior, 0x24, Character, Posture, 0);
         // 06f008c4-06f008d2: FUN_06f487c0, a player already on a mission.
         if ((State->GetLiveMission() & 0x3fffffff) != 0)
@@ -487,7 +487,7 @@ namespace
                                 Character, Posture, 2);
             AppendGenericScript(Behavior, pub::SinglePlayer() ? 0x3a : 0x3b, Character, Posture, 3);
             FormatBribeOfferText(&Behavior->NameFmtStr, Bribe);
-            Behavior->Field21c = 1;
+            Behavior->DialogType = 1;
             return;
         }
 
@@ -530,7 +530,7 @@ namespace
             AppendGenericScript(Behavior, 0x33, Character, Posture, 3);
             AppendGenericScript(Behavior, pub::SinglePlayer() ? 0x3a : 0x3b, Character, Posture, 3);
             FormatKnowOfferText(Behavior, Know);
-            Behavior->Field21c = 4;
+            Behavior->DialogType = 4;
             return;
         }
 
@@ -550,7 +550,7 @@ namespace
             for (int const* Id = &Rumor->Ids[1]; *Id != 0; ++Id)
                 Behavior->DescFmtStr.append_string(static_cast<unsigned int>(*Id));
             Behavior->DescFmtStr.end_mad_lib();
-            Behavior->Field21c = 2;
+            Behavior->DialogType = 2;
             return;
         }
 
@@ -594,19 +594,19 @@ namespace
     {
         CharacterBehaviorDescription Behavior;
         // 06f00be8-06f00c28.
-        Behavior.Field00 = static_cast<int>(Character->RoomId);
-        Behavior.Field05 = 0;
-        Behavior.Field06 = 1;
-        Behavior.Field10 = 1;
-        Behavior.Field04 = 0;
+        Behavior.LocationId = static_cast<int>(Character->RoomId);
+        Behavior.bAutoplay = 0;
+        Behavior.bGenericScript = 1;
+        Behavior.bBindSingleCharacter = 1;
+        Behavior.bApplySpatial = 0;
         Behavior.IdArrayCount = 0;
-        Behavior.Field08 = 0;
-        Behavior.Field0c = 0;
+        Behavior.RelocateLocationId = 0;
+        Behavior.StartRoomLocationId = 0;
         // 06f00c57-06f00c82: NEG / SBB / AND 2.
         bool const bShop = IsShopRole(Character);
-        Behavior.Field224 = 1;
-        Behavior.Field21c = bShop ? 2 : 0;
-        Behavior.Field220 = Character->CharacterId;
+        Behavior.OfferMissionId = 1;
+        Behavior.DialogType = bShop ? 2 : 0;
+        Behavior.OfferArg = Character->CharacterId;
         Behavior.Filter = Character->PlayerId;
 
         FContentPlayerState* State = FindContentPlayerState(Character->PlayerId);

@@ -17,7 +17,7 @@
 // vftable 0x005e459c (47 slots) + IDataViewOwner face 0x005e4590. Overrides of WinControl:
 //   0 FUN_00579600, 4 LAB_0057aa80 HitTest, 5 FUN_0057b0a0 SetPosition, 9 FUN_0057a810 Create,
 //   11 FUN_0057b0e0 Update, 12 LAB_0057b140 UpdateInactive, 13 FUN_0057ab10 Draw,
-//   23 FUN_0057afd0 Slot23, 42 LAB_0057ebb0 SetProperty;
+//   23 FUN_0057afd0 ProcessMessage, 42 LAB_0057ebb0 SetProperty;
 // own slots 45 FUN_004b6c50 Relayout (MOV AL,1) and 46 LAB_005798a0 GetToolTipHoverInfo.
 // Direct subclasses: RichTextWin, UIFastTable (0x005e511c).
 //
@@ -107,7 +107,7 @@ public:
     // slot 13 FUN_0057ab10
     void Draw() override;
     // slot 23 FUN_0057afd0 -- 0xf005 from the scrollbars
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_0057ebb0 -- property 6 sets the attach offset
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

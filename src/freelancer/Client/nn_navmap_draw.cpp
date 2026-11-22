@@ -294,12 +294,12 @@ namespace
     void BindMapModelview(NeuroNetNavMap const* Map, float Depth)
     {
         FTransform Offset;
-        memcpy(&Offset.Rotation, Map->Field_0x3d4, sizeof(Offset.Rotation));
+        memcpy(&Offset.Rotation, Map->MapRotation, sizeof(Offset.Rotation));
         Offset.Translation.X = 0.0f;
         Offset.Translation.Y = 0.0f;
         Offset.Translation.Z = Depth;
         FTransform Model;
-        memcpy(&Model.Rotation, Map->Field_0x3d4, sizeof(Model.Rotation));
+        memcpy(&Model.Rotation, Map->MapRotation, sizeof(Model.Rotation));
         FVector Zero;
         Zero.X = 0.0f;
         Zero.Y = 0.0f;
@@ -1305,7 +1305,7 @@ void NeuroNetNavMap::EnsureItemLabel(IFont* Font, FNavMapItem* Item)
         FFontString* const Label = new FFontString; // operator_new(0x34) + FUN_004144b0
         Item->Label = Label;
         FontStringSetFont(Label, Font); // FUN_004ea670, inline at 0x00499837..0x0049987b
-        FontStringSetScale(Label, 1.0f, Field_0x3c8[2]); // FUN_004145d0
+        FontStringSetScale(Label, 1.0f, MapLabelOrigin[2]); // FUN_004145d0
 
         // 0x00499895..0x004998eb: the name (empty when the ids is missing), its width cached.
         if (GetIdsStringWWithRawFallback(static_cast<unsigned>(Item->StridName), Name, 0x80) == 0)
@@ -1355,7 +1355,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         static_cast<double>(Item->LabelWidth) / static_cast<double>(SurfaceWidth);
 #endif
     float const Width = static_cast<float>(WidthExt);
-    float const Depth = Field_0x3c8[2];
+    float const Depth = MapLabelOrigin[2];
 
     bool const bZoomed = (ViewMode != 1 && ViewMode != 0) ||
                          (bTransition != 0 && TransitionView == 2);
@@ -1448,8 +1448,8 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     // and its corner projected through the Win3D camera; the zoomed view takes x from a point
     // just in front and y from one behind.
     FFontStringDrawOrigin Origin;
-    Origin.Field10 = 0;
-    Origin.Field14 = 0;
+    Origin.HAlign = 0;
+    Origin.VAlign = 0;
     TextWinProjectExtent(1.0f, kNavMapLabelBoxH, Depth, &Origin.Scale, &Origin.Height); // FUN_004176c0
     float const LiftedY = static_cast<float>(static_cast<double>(Y) + static_cast<double>(kNavMapLabelLift));
     if (bZoomed)
@@ -1795,7 +1795,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             if (!ShadeZoneQualifies(Zone, Population, G_NavMapFilterMode, MissionZoneIds,
                                     MissionZoneCount))
                 continue;
-            if (Field_0x87e != 0 || IsZoneVisited(Zone, 1))
+            if (bDebugShowAll != 0 || IsZoneVisited(Zone, 1))
                 ++Count;
         }
         if (Count == ShadeZoneCount)
@@ -1824,7 +1824,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         if (!ShadeZoneQualifies(Zone, Population, G_NavMapFilterMode, MissionZoneIds,
                                 MissionZoneCount))
             continue;
-        if (Field_0x87e == 0 && !IsZoneVisited(Zone, 1))
+        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
             continue;
 
         // 0x0049cc72..0x0049cd2b: the population's feeling towards the player, weighted.
@@ -2166,7 +2166,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             Universe::IZone const* const Zone = MapZones[static_cast<size_t>(Index)];
             if ((Zone->GetProperties() & 0x3ffc0) == 0)
                 continue;
-            if (Field_0x87e != 0 || IsZoneVisited(Zone, 1))
+            if (bDebugShowAll != 0 || IsZoneVisited(Zone, 1))
                 ++Count;
         }
         if (Count == TerrainZoneCount)
@@ -2193,7 +2193,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         unsigned long const Properties = Zone->GetProperties();
         if ((Properties & 0x3ffc0) == 0)
             continue;
-        if (Field_0x87e == 0 && !IsZoneVisited(Zone, 1))
+        if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
             continue;
 
         // 0x0049b9bf..0x0049bad3: the terrain texture by the first property bit; a 0x8000

@@ -394,7 +394,7 @@ void FSystemInfo::UnloadFull()
     }
     SolarNpcs.clear();                                                    // 06f75c00-06f75c48
     MissionObjects.clear();                                               // 06f75c4e-06f75c6e
-    Field_0xa8.clear();                                                   // 06f75c74-06f75c94
+    DeferredDestroyObjects.clear();                                                   // 06f75c74-06f75c94
     if (pub::SinglePlayer())
         SpacePopSetSolarDetection(1);                                     // FUN_06f5a7c0
     // 06f75cae-06f75d00: the body of FUN_06f75840, inlined.
@@ -490,11 +490,11 @@ void FSystemInfo::RemoveMissionObject(unsigned int SpaceObjId)
         break;
     }
     // 06f74694-06f746d5: erase the first match from +0xa8.
-    for (std::vector<unsigned int>::iterator It = Field_0xa8.begin(); It != Field_0xa8.end(); ++It)
+    for (std::vector<unsigned int>::iterator It = DeferredDestroyObjects.begin(); It != DeferredDestroyObjects.end(); ++It)
     {
         if (*It == SpaceObjId)
         {
-            Field_0xa8.erase(It);
+            DeferredDestroyObjects.erase(It);
             break;
         }
     }
@@ -503,18 +503,18 @@ void FSystemInfo::RemoveMissionObject(unsigned int SpaceObjId)
 // FUN_06f745a0 (06f745a0-06f74615, RET 8).
 void FSystemInfo::SetObjectFlag(unsigned int SpaceObjId, bool bFlag)
 {
-    std::vector<unsigned int>::iterator It = Field_0xa8.begin();
-    while (It != Field_0xa8.end() && *It != SpaceObjId)
+    std::vector<unsigned int>::iterator It = DeferredDestroyObjects.begin();
+    while (It != DeferredDestroyObjects.end() && *It != SpaceObjId)
         ++It;
     if (bFlag)
     {
         // 06f745cb-06f745e3: FUN_06f937c0 insert(end, 1, id) when absent.
-        if (It == Field_0xa8.end())
-            Field_0xa8.insert(Field_0xa8.end(), 1, SpaceObjId);
+        if (It == DeferredDestroyObjects.end())
+            DeferredDestroyObjects.insert(DeferredDestroyObjects.end(), 1, SpaceObjId);
     }
-    else if (It != Field_0xa8.end())
+    else if (It != DeferredDestroyObjects.end())
     {
-        Field_0xa8.erase(It);                                             // 06f745f1-06f7460c
+        DeferredDestroyObjects.erase(It);                                             // 06f745f1-06f7460c
     }
 }
 
@@ -719,11 +719,11 @@ bool FSystemInfo::IsNearPlayerField124Object(Vector const* Point, float const* R
     for (std::vector<FContentPlayerState*>::iterator It = Players.begin(); It != Players.end(); ++It)
     {
         FContentPlayerShip* Ship = (*It)->ShipObject;
-        if (Ship == nullptr || !Ship->HasField120())                      // FUN_06f57710
+        if (Ship == nullptr || !Ship->IsInTradeLane())                      // FUN_06f57710
             continue;
         unsigned int Id120;
         unsigned int Id124;
-        Ship->GetField120(&Id120, &Id124);                                // FUN_06f57720
+        Ship->GetTradeLaneRings(&Id120, &Id124);                                // FUN_06f57720
         Vector Position;
         Matrix Orientation;
         pub::SpaceObj::GetLocation(Id124, Position, Orientation);         // 06f73198, result ignored
@@ -741,11 +741,11 @@ bool FSystemInfo::IsNearPlayerField120Segment(Vector const* Point, float const* 
     for (std::vector<FContentPlayerState*>::iterator It = Players.begin(); It != Players.end(); ++It)
     {
         FContentPlayerShip* Ship = (*It)->ShipObject;
-        if (Ship == nullptr || !Ship->HasField120())                      // FUN_06f57710
+        if (Ship == nullptr || !Ship->IsInTradeLane())                      // FUN_06f57710
             continue;
         unsigned int Id120;
         unsigned int Id124;
-        Ship->GetField120(&Id120, &Id124);                                // FUN_06f57720
+        Ship->GetTradeLaneRings(&Id120, &Id124);                                // FUN_06f57720
         Vector Start;
         Vector End;
         Matrix Orientation;
@@ -825,7 +825,7 @@ void FSystemInfo::SetNpcShipsField1b1(bool bClear)
 {
     bool const bValue = !bClear;
     for (std::list<FContentSpaceObj*>::iterator It = SpaceObjs.begin(); It != SpaceObjs.end(); ++It)
-        static_cast<FContentNpcShip*>(*It)->SetField1b1(bValue);
+        static_cast<FContentNpcShip*>(*It)->SetCommMuted(bValue);
 }
 
 // FUN_06f73bf0 (06f73bf0-06f73dc1, RET 4). The squared distance out-parameter of
@@ -834,7 +834,7 @@ void FSystemInfo::SetNpcShipsField1b1(bool bClear)
 double FSystemInfo::GetNpcShipLifeRate(FContentNpcShip* Ship)
 {
     float const PlayerNear = -1.0f;                                       // 06f73bfe local_40
-    if (Ship->HasField120())                                              // FUN_06f57710
+    if (Ship->IsInTradeLane())                                              // FUN_06f57710
         return PlayerNear;
 
     float DistanceSq;
@@ -902,14 +902,14 @@ void FSystemInfo::DestroyFlaggedObjectsAwayFromPlayers(float Unused)
 {
     (void)Unused;
     // 06f73deb-06f73e08: no buffer or no element -> nothing.
-    if (Field_0xa8.empty())
+    if (DeferredDestroyObjects.empty())
         return;
 
     // 06f73e0e-06f73e88: the ids whose object has no player ship within 10000
     // (DAT_06fbbee4) -- VC6 insert(end, 1, id) (FUN_06f937c0) into a local vector.
     std::vector<unsigned int> AwayIds;
     float const Radius = 10000.0f;
-    for (std::vector<unsigned int>::iterator It = Field_0xa8.begin(); It != Field_0xa8.end(); ++It)
+    for (std::vector<unsigned int>::iterator It = DeferredDestroyObjects.begin(); It != DeferredDestroyObjects.end(); ++It)
     {
         Vector Position;
         Matrix Orientation;
@@ -964,12 +964,12 @@ void FSystemInfo::UpdateNpcShipLives(float DeltaTime)
         // only has its life refilled: FCOMP, TEST AH,5, JP -> copy only when less.
         if (Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
         {
-            if (Ship->Field_0x1c8 < Ship->Field_0x1bc)
-                Ship->Field_0x1c8 = Ship->Field_0x1bc;
+            if (Ship->LifeTime < Ship->Longevity)
+                Ship->LifeTime = Ship->Longevity;
             continue;
         }
         // 06f74054-06f74065: FCOMP -1.0f (DAT_06fbbee0), TEST AH,0x44, JNP -> equal: immortal.
-        if (Ship->Field_0x1bc == -1.0f)
+        if (Ship->Longevity == -1.0f)
             continue;
 
         // 06f7406b-06f7408a: the product stays on the x87 stack for the compare and is kept as
@@ -979,18 +979,18 @@ void FSystemInfo::UpdateNpcShipLives(float DeltaTime)
         if (Product < 0.0)
         {
             // 06f7408c-06f740af: a player is near -- refill as above.
-            if (Ship->Field_0x1c8 < Ship->Field_0x1bc)
-                Ship->Field_0x1c8 = Ship->Field_0x1bc;
+            if (Ship->LifeTime < Ship->Longevity)
+                Ship->LifeTime = Ship->Longevity;
             continue;
         }
         // 06f740b4-06f740cb: FCOMP 0.0f, TEST AH,1, JNZ -> less or unordered: skip.
-        if (!(Ship->Field_0x1c8 >= 0.0f))
+        if (!(Ship->LifeTime >= 0.0f))
             continue;
-        Ship->Field_0x1c8 = static_cast<float>(static_cast<double>(Ship->Field_0x1c8) - Step);
+        Ship->LifeTime = static_cast<float>(static_cast<double>(Ship->LifeTime) - Step);
         // 06f740d9-06f740e6: FCOMP 0.0f, TEST AH,5, JP -> only a negative life expires.
-        if (!(Ship->Field_0x1c8 < 0.0f))
+        if (!(Ship->LifeTime < 0.0f))
             continue;
-        Ship->Field_0x1c8 = 0.0f;                                         // 06f740ec
+        Ship->LifeTime = 0.0f;                                         // 06f740ec
 
         if (pub::SinglePlayer() && IsTargetedByPlayerShip(Players, Ship->SpaceObjId))
             continue;

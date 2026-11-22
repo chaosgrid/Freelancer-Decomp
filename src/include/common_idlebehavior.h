@@ -249,11 +249,11 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // Own vtable slot 10 (offset 0x28). Common.dll.txt 202839-202842
     // (LAB_062cd630), 3 instructions -- see class comment for the ICF-shared
@@ -267,11 +267,11 @@ public:
 
     // Slots 3/4/5/10 of retail's IdleBehavior vftable (.rdata:0639fc5c), wired 2026-10-08
     // (claude-code:cmn-ai2) -- until then the manager's Behavior* dispatch reached the base
-    // bodies. Slot 3 is `JMP FUN_062d20d0` (Behavior::Slot3 itself); slot 5 (LAB_062ce3c0)
+    // bodies. Slot 3 is `JMP FUN_062d20d0` (Behavior::OnEngage itself); slot 5 (LAB_062ce3c0)
     // and slot 10 (LAB_062cd630) are `RET 4`, their argument unread.
-    void Slot4() override { Disengage(); }                           // 4 FUN_062cd5e0
-    int Slot5(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
-    bool Slot10(void*) override { return RequestFlag(); }            // 10 LAB_062cd630
+    void OnDisengage() override { Disengage(); }                           // 4 FUN_062cd5e0
+    int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
+    bool OnApplyDirective(void*) override { return RequestFlag(); }            // 10 LAB_062cd630
 
 public:
     // ------------------------------------------------------------------
@@ -303,7 +303,7 @@ public:
                                // Update(). Same role/offset as
                                // BaseFollowerBehavior::OwnerContext /
                                // DockBehaviorFields::ThreatSourcePtr14.
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime1c;         // +0x1c. Zeroed by ResetTickState(); passed to
                                // IdleWatcher's Evaluate(dt) call in Update().
                                // Same role/offset as

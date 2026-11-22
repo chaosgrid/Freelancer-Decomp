@@ -94,7 +94,7 @@ struct FEncounterFormation
     std::vector<unsigned int> CreatedObjects;
     int TimesToCreate;                  // +0x70 -1 = "infinite"
     bool bAllowSimultaneousCreation;    // +0x74 yes/true 1, no/false 0 (1)
-    int Field_0x78;                     // +0x78 0; FUN_06ef52d0 zeroes it on a reroll
+    int TimesCreated;                     // +0x78 0; FUN_06ef52d0 zeroes it on a reroll
     int Longevity;                      // +0x7c value 0 (24)
 
     // FUN_06ef5b50 (RET 4).

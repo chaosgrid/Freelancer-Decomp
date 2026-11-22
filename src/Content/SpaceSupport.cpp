@@ -177,7 +177,7 @@ namespace
         for (std::list<FContentShipBase*>::iterator It = Ships->begin(); It != Ships->end();
              ++It)
         {
-            FContentShipBase* Candidate = (*It)->Slot04() ? *It : nullptr;
+            FContentShipBase* Candidate = (*It)->IsNpcShip() ? *It : nullptr;
             if (Best == nullptr)
             {
                 if (Candidate != nullptr)
@@ -485,7 +485,7 @@ namespace
 
         // 06f5d2b2-06f5d2d9: phantom loot only when asked for, for a ship whose vtable slot 1
         // is true, and whose affiliation (FUN_06eb7070) is not 0x62e8.
-        if (bAddPhantomLoot && Ship->Slot04() && Ship->GetAffiliation() != 0x62e8)
+        if (bAddPhantomLoot && Ship->IsNpcShip() && Ship->GetAffiliation() != 0x62e8)
         {
             // 06f5d2df-06f5d30f: the records for the ship's reputation rank (FUN_06f33e40,
             // kept in the reused flag slot [ESP+0x74]; FUN_06f05440).
@@ -1010,17 +1010,17 @@ namespace
             Ship = static_cast<FContentShipBase*>(System->FindShip(ObjectId));
         if (Ship != nullptr)
         {
-            if (Ship->HasField120())                                          // FUN_06f57710
+            if (Ship->IsInTradeLane())                                          // FUN_06f57710
             {
                 unsigned int Id120 = 0;
                 unsigned int Id124 = 0;
-                Ship->GetField120(&Id120, &Id124);                            // FUN_06f57720
+                Ship->GetTradeLaneRings(&Id120, &Id124);                            // FUN_06f57720
                 System->RemoveTradeLaneShip(&ObjectId, &Id120);               // 06f5d96a FUN_06f78dd0
             }
 
             FContentNpcShip* NpcShip = nullptr;
             bool bGuideKept = false;                                          // local_a1
-            if (Ship->Slot04())
+            if (Ship->IsNpcShip())
                 NpcShip = static_cast<FContentNpcShip*>(Ship);
 
             if (Event->Kind == 1)

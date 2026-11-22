@@ -109,9 +109,9 @@ FSolarNpc::FSolarNpc(FSolarNpcDesc const* Desc)
 }
 
 // 06ed59f0.
-bool FSolarNpc::Slot04()
+bool FSolarNpc::IsInCombat()
 {
-    return Field_0x164;
+    return bInCombat;
 }
 
 // LAB_06ed5a00 (06ed5a00-06ed5a60), ContentCallback +0x1c. Message block (0x10, stack
@@ -125,7 +125,7 @@ void FSolarNpc::combat_state_notification(CSNType Type, uint Param1, uint Param2
     Msg.Param1 = Param1;
     Msg.Param2 = Param2;
     Msg.SystemId = GetSystem()->SystemId;
-    Field_0x164 = (Type == 0);
+    bInCombat = (Type == 0);
     unsigned int Controller = 0;
     pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::CombatState, &Msg);
 }

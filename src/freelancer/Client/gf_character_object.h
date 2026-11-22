@@ -101,9 +101,9 @@ struct FCharacterObject : FRoomObject
     void Update(double DeltaSeconds) override;      // 5  LAB_004449d0
     void* GetEngineInstance() override;             // 6  LAB_00444970
     void DrawOpaque(ICamera* Camera) override;      // 7  LAB_00445150
-    void Slot10(unsigned long Cookie, int const* Point) override; // 10 FUN_00445a90 (enter)
-    void Slot11(unsigned long Cookie, int const* Point) override; // 11 FUN_00445be0 (leave)
-    void Slot12(unsigned long Cookie, int const* Point) override; // 12 FUN_00445c10 (click)
+    void OnHotspotEnter(unsigned long Cookie, int const* Point) override; // 10 FUN_00445a90 (enter)
+    void OnHotspotLeave(unsigned long Cookie, int const* Point) override; // 11 FUN_00445be0 (leave)
+    void OnHotspotClick(unsigned long Cookie, int const* Point) override; // 12 FUN_00445c10 (click)
 
     // FUN_00445280 (thiscall) -- restart the own script: a live sequence is restarted (or
     // played when it never was), else the idle script (+0x1ac) is created and played.

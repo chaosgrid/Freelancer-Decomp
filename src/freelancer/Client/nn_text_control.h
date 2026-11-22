@@ -117,7 +117,7 @@ public:
     // FUN_0058b770 (thiscall, RET 4) -- the Font::String's +0x08 (sentinel 0x7fff from
     // FUN_004144b0; meaning not recovered) = Value. Caller: HUD_ContactList::Create 0x004cf850
     // (Value 1 on every name text).
-    void SetFontStringField08(int Value) { FontString->Field08 = Value; }
+    void SetMaxLines(int Value) { FontString->MaxLines = Value; }
 
     float Width;                    // +0x32c
     float Height;                   // +0x330

@@ -37,13 +37,13 @@ struct IObjRW;
 // Vtable .rdata:0639fa6c, 27 slots. Overrides of Behavior's table (vtd.py, raw .rdata):
 //    0  FUN_062ca4a0  scalar-deleting dtor around FUN_062ca4c0
 //    1  LAB_062ca570  SetContext
-//    3  LAB_062ca640  Slot3
-//    4  FUN_062ca7b0  Slot4
-//    5  LAB_062ca820  Slot5
+//    3  LAB_062ca640  OnEngage
+//    4  FUN_062ca7b0  OnDisengage
+//    5  LAB_062ca820  OnEvaluateReadiness
 //    6  LAB_062ca940  evaluate
-//    7  LAB_062caa60  Slot7 (the per-tick update)
-//    8  LAB_062caa40  Slot8
-//   10  LAB_062cb110  Slot10
+//    7  LAB_062caa60  OnUpdate (the per-tick update)
+//    8  LAB_062caa40  PostUpdate
+//   10  LAB_062cb110  OnApplyDirective
 //   12  FUN_062cb170  set_direction
 //   14  LAB_062cb2a0  set_cruise
 // Every other slot is Behavior's own entry.
@@ -64,20 +64,20 @@ public:
     // Slot 1, LAB_062ca570 (RET 0xc).
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
     // Slot 3, LAB_062ca640 (RET 0): re-arm from the personality's TrailUseStruct.
-    void Slot3() override;
-    // Slot 4, FUN_062ca7b0 (RET 0): release everything, then Behavior::Slot4.
-    void Slot4() override;
+    void OnEngage() override;
+    // Slot 4, FUN_062ca7b0 (RET 0): release everything, then Behavior::OnDisengage.
+    void OnDisengage() override;
     // Slot 5, LAB_062ca820 (RET 4, argument unread). Result stored at +0x0c.
-    int Slot5(float Unused) override;
+    int OnEvaluateReadiness(float Unused) override;
     // Slot 6, LAB_062ca940 (RET 4, argument unread): retarget the owner's target for the
     // player trail.
     EvaluateResult evaluate(unsigned int Context) override;
     // Slot 7, LAB_062caa60 (516 instructions). Result stored at +0x10.
-    int Slot7() override;
-    // Slot 8, LAB_062caa40 (RET 0): MatchThrottle2Idea::Slot2(DeltaTime) while it drives.
-    void Slot8() override;
+    int OnUpdate() override;
+    // Slot 8, LAB_062caa40 (RET 0): MatchThrottle2Idea::SetObjectDb(DeltaTime) while it drives.
+    void PostUpdate() override;
     // Slot 10, LAB_062cb110 (RET 4): take the DirectiveTrailOp's target and distance.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
     // Slot 12, FUN_062cb170 (RET 4).
     void set_direction(Vector const& Dir) override;
     // Slot 14, LAB_062cb2a0: `ADD ECX,0x2c; JMP FUN_062d6700` -- MatchThrottle2Idea::SetFlag38.
@@ -86,10 +86,10 @@ public:
     // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
     int TypeId;                     // +0x04
     unsigned CachedHandle08;        // +0x08
-    int ModeSelector0xc;            // +0x0c, Slot5's result.
-    int UpdateResult10;             // +0x10, Slot7's result.
+    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result.
+    int UpdateResult10;             // +0x10, OnUpdate's result.
     void* OwnerContext;             // +0x14, the owner IObjRW* (binder).
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime;                // +0x1c
     IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
     SystemManager* NavHelper;       // +0x24 (binder)
@@ -102,17 +102,17 @@ public:
     FaceIdea Face;                  // +0x88
     MoveIdea Move;                  // +0x148
     AfterburnerIdea Afterburner;    // +0x1c0
-    BaseWatcher DirectiveTarget;    // +0x1d4, Slot10's DirectiveTrailOp target
-    unsigned LeaderId1dc;           // +0x1dc, id of the ship last trailed (Slot3 / Slot7)
-    unsigned char bHasDirectiveTarget1e0; // +0x1e0, Slot10 sets, SetContext / Slot4 clear
+    BaseWatcher DirectiveTarget;    // +0x1d4, OnApplyDirective's DirectiveTrailOp target
+    unsigned LeaderId1dc;           // +0x1dc, id of the ship last trailed (OnEngage / OnUpdate)
+    unsigned char bHasDirectiveTarget1e0; // +0x1e0, OnApplyDirective sets, SetContext / OnDisengage clear
     unsigned char Pad1e1[3];
-    float TrailOffset1e4;           // +0x1e4, ctor 0; Slot7: leader extent + TrailDistance1e8
+    float TrailOffset1e4;           // +0x1e4, ctor 0; OnUpdate: leader extent + TrailDistance1e8
     float TrailDistance1e8;         // +0x1e8, ctor 50.0f; op +0x10, set_direction z, TrailParams.TrailDistance
-    unsigned char bLagging1ec;      // +0x1ec, not written by the ctor; Slot3 clears
+    unsigned char bLagging1ec;      // +0x1ec, not written by the ctor; OnEngage clears
     unsigned char Pad1ed[3];
-    float FacingCos1f0;             // +0x1f0, ctor cos(pi/6); Slot3 cos(TrailParams.TrailLockConeAngle)
-    float LagTimer1f4;              // +0x1f4, not written by the ctor; Slot3 clears
-    float AxisTimer1f8;             // +0x1f8, not written by the ctor; Slot3 clears
+    float FacingCos1f0;             // +0x1f0, ctor cos(pi/6); OnEngage cos(TrailParams.TrailLockConeAngle)
+    float LagTimer1f4;              // +0x1f4, not written by the ctor; OnEngage clears
+    float AxisTimer1f8;             // +0x1f8, not written by the ctor; OnEngage clears
     float LagTime1fc;               // +0x1fc, ctor 2.5f; TrailParams.TrailBreakTime
     float AxisPause200;             // +0x200, ctor 5.0f; never reloaded
     float AxisTime204;              // +0x204, ctor 3.0f; TrailParams.TrailMinNoLockTime
@@ -122,17 +122,17 @@ public:
     float Scale210;                 // +0x210, ctor 1.0f; TrailParams.TrailMaxTurnThrottle (also FaceIdea +0x94)
     unsigned char bAxisArmed214;    // +0x214, ctor 0
     unsigned char Pad215[3];
-    float SightTimer218;            // +0x218, not written by the ctor; Slot3 clears
+    float SightTimer218;            // +0x218, not written by the ctor; OnEngage clears
     float SightTime21c;             // +0x21c, ctor 4.0f
-    float TrailExtent220;           // +0x220, not written by the ctor; Slot7
+    float TrailExtent220;           // +0x220, not written by the ctor; OnUpdate
     float Field224;                 // +0x224, ctor 0x3d1de9e7; no reader in this class's code
     float Field228;                 // +0x228, ctor 400.0f; no reader in this class's code
-    unsigned char bDirectionSet22c; // +0x22c, set_direction sets, ctor / Slot3 clear
+    unsigned char bDirectionSet22c; // +0x22c, set_direction sets, ctor / OnEngage clear
     unsigned char Pad22d[3];
     float DirectionX230;            // +0x230, set_direction: -Dir.y normalised, clamped [-1,1]
     float DirectionY234;            // +0x234, set_direction: -Dir.x normalised, clamped [-1,1]
     float DirectionZ238;            // +0x238, set_direction: 0
-    unsigned char bMatchThrottle23c; // +0x23c, Slot7: the MatchThrottle2Idea is driving
+    unsigned char bMatchThrottle23c; // +0x23c, OnUpdate: the MatchThrottle2Idea is driving
     unsigned char Pad23d[3];
     float Field240;                 // +0x240, ctor 20.0f; no reader in this class's code
     float CatchUpRange244;          // +0x244, ctor 1500.0f; handed to MatchThrottle2Idea

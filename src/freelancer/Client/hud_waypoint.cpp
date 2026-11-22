@@ -84,7 +84,7 @@ namespace
         IObjRW* const Obj = WatchedObjRw(Watcher);
         if (Obj == nullptr)
             return;
-        AsGameobj(Obj)->Slot15c(true);
+        AsGameobj(Obj)->MarkForRemoval(true);
         Watcher.set(nullptr);
     }
 
@@ -453,7 +453,7 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     if (SolarObject != nullptr && (static_cast<unsigned>(SolarObject->ObjectClass) & 0x303u) == 0x303u)
         SolarCObject = static_cast<CSolar*>(SolarObject);
     SolarCObject->init(Parms);
-    Solar->Slot170();
+    Solar->PostCreateInit();
     ClientObjDb_RegisterGameobj(Solar, false);
 
     // 0x004f475a..0x004f4767

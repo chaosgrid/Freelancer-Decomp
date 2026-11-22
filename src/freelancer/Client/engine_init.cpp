@@ -108,7 +108,7 @@ namespace
         // read. The same loop as PumpInitMessages (MouseDispatchEvents FUN_0041ef20, then
         // Peek / Get / IMEFocus::IgnoreHotKey / FUN_00577850 / Translate / Dispatch); WM_QUIT
         // returns 1 (0x005b208b), an empty queue 0 (0x005b2080).
-        int Slot00(char const* ValueString) override
+        int OnProgress(char const* ValueString) override
         {
             (void)ValueString;
             return PumpInitMessages() ? 0 : 1;

@@ -157,7 +157,7 @@ public:
     // Slot 5 (FUN_06ebf6f0: RET 4, no body). Both callers pass the mission CreateMission
     // handed out: the failed bar offer (FUN_06ea8370 06ea8785-06ea8790) and the mission
     // offer dtor (FUN_06ea7b90 06ea7bc2-06ea7bc8). TODO: name unknown.
-    virtual void Slot05(FRandomMissionData* Mission);
+    virtual void ReleaseMission(FRandomMissionData* Mission);
     // Slot 6 (FUN_06ef0be0, RET 8): the mission vendor offer of Mission (caller TU35
     // 06f04986, then pub::GF::MissionVendorOfferCreate).
     virtual void GetOfferDescription(FRandomMissionData const* InMission,

@@ -16,7 +16,7 @@
 #include "nn_tooltip.h"       // NnToolTipWasFedThisFrame (FUN_004be2d0)
 #include "tooltip_hover.h"    // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
 #include "character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830)
-#include "client_gameobj.h"   // FClientGameobj::Slot158 (player slot +0x158)
+#include "client_gameobj.h"   // FClientGameobj::IsDead (player slot +0x158)
 #include "client_mesh_load.h"
 #include "client_objdb.h"     // GetClientObjDb (DAT_00678a2c)
 #include "common_id.h"        // CreateID
@@ -3671,7 +3671,7 @@ void HudTargetableObjects::CollectLeadMarkers()
     {
         // 0x004f1e4b..0x004f1e81: not being reaped (slot 86), with a collision state (the
         // object is passed only when its class has bit 0).
-        if (Gameobj->Slot158())
+        if (Gameobj->IsDead())
             continue;
         CObject* const Object = CObjectOfGameobj(Gameobj);
         CObject const* const Engine =
@@ -4167,7 +4167,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
     // 004f4f64..004f4fb0: no player, a player whose slot +0x158 answers true, or a CSimple
     // (class & 3) at zero relative health (FCOMP DAT_005c7474 = 0.0) -> reset.
     bool bReset = (Player == nullptr);
-    if (!bReset && Player->Slot158())
+    if (!bReset && Player->IsDead())
         bReset = true;
     if (!bReset)
     {

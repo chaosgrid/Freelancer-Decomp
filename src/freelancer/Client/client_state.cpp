@@ -66,7 +66,7 @@ namespace
         FMenuNavState Nav;
 
         // Slots 0 and 3 (0x0043d8f0): XOR AL,AL / RET 0x10.
-        bool Slot00(unsigned A, unsigned Message, unsigned B, unsigned C) override
+        bool OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C) override
         {
             (void)A;
             (void)Message;
@@ -84,7 +84,7 @@ namespace
             return false;
         }
 
-        bool Slot02(unsigned A, unsigned B, unsigned long Packed) override
+        bool OnMouseMove(unsigned A, unsigned B, unsigned long Packed) override
         {
             (void)A;
             (void)B;
@@ -92,7 +92,7 @@ namespace
             return false;
         }
 
-        bool Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override
+        bool OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override
         {
             (void)A;
             (void)Message;

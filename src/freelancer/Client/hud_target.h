@@ -280,17 +280,17 @@ public:
     virtual void SetViewObject(IObjRW* Target);
     // slot 12 (+0x30) FUN_00401e90 -- RET. SetProperty(0x26, ToggleButton) calls it; HUD_Target
     // FUN_004e2fe0 starts the slide-out there.
-    virtual void Slot12();
+    virtual void ToggleExpanded();
     // slot 13 (+0x34) FUN_0053e4a0 -- RET 4. OnMoveFinished passes 0; HUD_Target FUN_004e1930
     // hands the byte to SetProperty(1, bHide, 0) of its panel controls -- WinControl property 1
     // hides on A == 1 (wincontrol_base.cpp), so the byte is "hide".
-    virtual void Slot13(bool bHide);
+    virtual void HideExpandedControls(bool bHide);
     // slot 14 (+0x38) FUN_00401e90 -- Draw calls it right after drawing ViewPanel.
-    virtual void Slot14();
+    virtual void DrawViewObject();
     // slot 15 (+0x3c) FUN_00401e90
-    virtual void Slot15();
+    virtual void UpdateLabels();
     // slot 16 (+0x40) FUN_00401e90 -- SetViewObject calls it after re-pointing the view.
-    virtual void Slot16();
+    virtual void OnViewObjectChanged();
 
     // --- WinControl face ---
     // LAB_004e7d20 (RET 4)
@@ -323,12 +323,12 @@ protected:
     // player-ship -> object direction (GetDirectionMatrix; four times as far for loot) or, with
     // bFixedOrbit, along the object's own z axis turned -90 degrees about x. Then
     // Win3DSetViewport, the perspective, and bSubTargetPickEnabled = 1. Caller: HUD_Target
-    // Slot14 0x004e3d0f (GetGameOption(0xc) != 0, -0.0125f).
+    // DrawViewObject 0x004e3d0f (GetGameOption(0xc) != 0, -0.0125f).
     void SetupViewCamera(bool bFixedOrbit, float ScreenShift);
 
     // FUN_004e7070 -- recolour the part cache for the damage view: clear the active flag of the
     // hidden non-root parts (FUN_004059d0), then the collision groups (FUN_004e6cb0) and the
-    // equipment (FUN_004e6ec0, tail jump). Caller: HUD_Target Slot14 0x004e3e73.
+    // equipment (FUN_004e6ec0, tail jump). Caller: HUD_Target DrawViewObject 0x004e3e73.
     void ColourViewParts();
 
     // FUN_004e6cb0 -- for a CEqObj view: every collision group root re-activated (no recursion)
@@ -366,8 +366,8 @@ public:
     FVector HitCenter;                 // +0x4b4  derived ctors (HUD_Target {-0.387, -0.29, -1})
     float HitHalfWidth;                // +0x4c0  HUD_Target 0.11
     float HitHalfHeight;               // +0x4c4  HUD_Target 0.11
-    WinControl* ToggleButton;          // +0x4c8  SetProperty(0x26, this) -> Slot12
-    WinControl* ViewPanel;             // +0x4cc  Draw -> Slot14 after drawing it
+    WinControl* ToggleButton;          // +0x4c8  SetProperty(0x26, this) -> ToggleExpanded
+    WinControl* ViewPanel;             // +0x4cc  Draw -> DrawViewObject after drawing it
     unsigned char bExpanded;           // +0x4d0  toggled by OnMoveFinished
     unsigned char Pad4d1[3];
     FVector HomePosition;              // +0x4d4  derived ctors
@@ -435,15 +435,15 @@ public:
 
     // --- HUDItem face ---
     // FUN_004e2fe0 -- start the open (mover) or the close (scaler) animation.
-    void Slot12() override;
+    void ToggleExpanded() override;
     // FUN_004e1930 -- SetProperty(1, bHide, 0) on the expanded-view controls.
-    void Slot13(bool bHide) override;
+    void HideExpandedControls(bool bHide) override;
     // FUN_004e3c90 -- the wireframe target view (drawn right after ViewPanel).
-    void Slot14() override;
+    void DrawViewObject() override;
     // FUN_004e3f80 -- the target / sub-target name labels.
-    void Slot15() override;
+    void UpdateLabels() override;
     // FUN_004e4690 -- the view object changed.
-    void Slot16() override;
+    void OnViewObjectChanged() override;
 
     // --- WinControl face ---
     // FUN_004e0ee0 (RET 8)
@@ -516,7 +516,7 @@ public:
     std::map<unsigned short, long> SubTargets; // +0x560 sub id -> root instance (FUN_004e4dd0)
     int SubTargetCursor;                   // +0x574
     int SubTargetCount;                    // +0x578
-    std::vector<std::string> HardpointNames; // +0x57c (Slot16's hardpoint walk)
+    std::vector<std::string> HardpointNames; // +0x57c (OnViewObjectChanged's hardpoint walk)
     int HardpointCount;                    // +0x58c
     int HardpointCursor;                   // +0x590
     unsigned char bScannerOpen;            // +0x594

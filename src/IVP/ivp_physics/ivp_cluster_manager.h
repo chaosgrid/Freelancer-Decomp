@@ -139,8 +139,8 @@ public:
     // enabled_callbacks (+0x04):
     void fire_event_pre_collision(IVP_Real_Object* Object, void* Event);  // 0634b030, flag 1, slot 0
     void fire_event_collision_object_deleted(IVP_Real_Object* Object);    // 0634b090, flag 2, slot 1
-    void fire_event_friction_slot2(IVP_Real_Object* Object, void* Event); // 0634b0e0, flag 4, slot 2
-    void fire_event_friction_slot3(IVP_Real_Object* Object, void* Event); // 0634b140, flag 4, slot 3
+    void fire_event_friction_created(IVP_Real_Object* Object, void* Event); // 0634b0e0, flag 4, slot 2
+    void fire_event_friction_deleted(IVP_Real_Object* Object, void* Event); // 0634b140, flag 4, slot 3
 
     // The ICF-shared getter 06261d90 (`MOV EAX,[ECX]; RET`) reached through
     // IVP_Environment::get_root_cluster (0634cb90).

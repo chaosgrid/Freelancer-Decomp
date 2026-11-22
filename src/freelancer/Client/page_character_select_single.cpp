@@ -517,7 +517,7 @@ void PageCharacterSelectSingle::BeginLeave(int Direction)
     PlayUiSoundSlot(0x1b); // FUN_00564570
 }
 
-bool PageCharacterSelectSingle::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_0056c360.
     if (Msg == 0x3004)
@@ -667,12 +667,12 @@ bool PageCharacterSelectSingle::Slot23(unsigned Msg, unsigned A, unsigned B)
         // LAB_0056c93b: the confirm box's answer, back through slot 23.
         if (A == 0)
         {
-            Slot23(0x3004, 0xf003, 0);
+            ProcessMessage(0x3004, 0xf003, 0);
             return true;
         }
         if (A == 1)
         {
-            Slot23(0x3004, 0x3002, 0);
+            ProcessMessage(0x3004, 0x3002, 0);
             return true;
         }
         return true;
@@ -761,9 +761,9 @@ void PageCharacterSelectSingle::Update()
     if (CharSelTime->HoverIndex != -1)
         Hover = CharSelTime->HoverIndex;
     if (Hover >= -1 && Hover < CharSelDesc->ItemCount)
-        CharSelDesc->Field80 = Hover;
+        CharSelDesc->HighlightIndex = Hover;
     if (Hover >= -1 && Hover < CharSelTime->ItemCount)
-        CharSelTime->Field80 = Hover;
+        CharSelTime->HighlightIndex = Hover;
 
     // 0x0056ceba..0x0056ced9: FCOMP 1.0 (DAT_005c89b8), TEST AH,5 / JP -- the jump (not below
     // 1.0, or unordered) goes to LAB_0056d136, which slides out only while leaving; the

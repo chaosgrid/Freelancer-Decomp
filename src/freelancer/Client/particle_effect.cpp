@@ -396,7 +396,7 @@ void FParticleEffect::SetIntensity(float Intensity)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)
         std::memcpy(&Value, &GEffectFloatOne, sizeof(Value));
-    ForwardAlchemyEffectFloat(Fx, &IFxEffect::Slot6, Value);
+    ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetOuterTime, Value);
 }
 
 void ParticleEffectSetIntensity(FParticleEffect* This, float Intensity)
@@ -434,7 +434,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
         {
             // 0x004f8762: vt+0x18c with a zeroed out-dword.
             unsigned DrawStateB = 0;
-            unsigned const DrawStateA = Watched->Slot18c(&DrawStateB);
+            unsigned const DrawStateA = Watched->GetNebula(&DrawStateB);
             if (DrawStateA == 0)
             {
                 // 0x004f877d: outside every field while the camera is fully inside one.
@@ -567,7 +567,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         // LAB_004f8a7e: with the ale bit (4), IFxEffect slot +0x2c(4) returning a non-zero
         // byte also finishes it.
         if (!bFinished && (Flags & 4u) != 0 &&
-            static_cast<unsigned char>(This->FxEffect->Slot11(reinterpret_cast<void*>(4))) != 0)
+            static_cast<unsigned char>(This->FxEffect->IsFinished(reinterpret_cast<void*>(4))) != 0)
             bFinished = true;
     }
     if (bFinished)
@@ -609,9 +609,9 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         EffectGetWorldTransform(AsEffectBase(This), &World);
         This->SetLod(This->Float80);
         IFxEffect* const Fx = This->FxEffect;
-        Fx->Slot3(nullptr, &World);
-        Fx->Slot7(nullptr);
-        Fx->Slot8(FloatArg(Dt));
+        Fx->SetTransform(nullptr, &World);
+        Fx->ComposeTransforms(nullptr);
+        Fx->Update(FloatArg(Dt));
     }
     return 1;
 }
@@ -630,7 +630,7 @@ unsigned char FParticleEffect::BuildGeometry(FSpaceCamera* Cam)
     if (GetGameOption(kGameOptParticles) == 0)
         return 0;
     if (This->FxEffect != nullptr)
-        This->FxEffect->Slot9(Cam);
+        This->FxEffect->Draw(Cam);
     return 1;
 }
 
@@ -658,7 +658,7 @@ void FParticleEffect::SetLod(float Lod)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)
         std::memcpy(&Value, &GEffectFloatOne, sizeof(Value));
-    ForwardAlchemyEffectFloat(Fx, &IFxEffect::Slot14, Value);
+    ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetLodInput, Value);
 }
 
 void ParticleEffectSetLod(FParticleEffect* This, float Lod)
@@ -703,7 +703,7 @@ void FParticleEffectCruise::SetIntensity(float Scale)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)
         std::memcpy(&Value, &GEffectFloatOne, sizeof(Value));
-    ForwardAlchemyEffectFloat(Fx, &IFxEffect::Slot6, Value);
+    ForwardAlchemyEffectFloat(Fx, &IFxEffect::SetOuterTime, Value);
 }
 
 void ParticleEffectCruiseSetScale(FParticleEffectCruise* This, float Scale)
@@ -1192,7 +1192,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     // 0x0050407f vt+0x90 (slot 36, SetVelocity) with Pos3.
     if (Sound != nullptr)
     {
-        Sound->Slot35(const_cast<float*>(&LocalXform->Translation.X));
+        Sound->SetPosition(const_cast<float*>(&LocalXform->Translation.X));
         Sound->SetVelocity(Pos3);
     }
 

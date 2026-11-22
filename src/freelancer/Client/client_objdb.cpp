@@ -372,7 +372,7 @@ namespace
         while (Go != nullptr)
         {
             FClientGameobj* const Next = Go->ListNext;
-            if (Go->Slot158())
+            if (Go->IsDead())
             {
                 ClientObjDb_Unregister(Go);
                 delete Go;
@@ -729,8 +729,8 @@ namespace
     struct FClientCollisionRecord
     {
         Vector Point;      // +0x00  event +0x10
-        Vector Field_0x0c; // +0x0c  event +0x1c
-        Vector Field_0x18; // +0x18  event +0x28
+        Vector SurfaceNormal; // +0x0c  event +0x1c
+        Vector RelativeVelocity; // +0x18  event +0x28
     };
     static_assert(sizeof(FClientCollisionRecord) == 0x24, "collision record 0x24");
 
@@ -816,7 +816,7 @@ void ClientObjDb_ProcessCollisions()
             Beam = static_cast<CBeam*>(Obj);
         if (!(Beam->Lifetime >= 0.0f))
             continue;
-        if (Go->Slot158())
+        if (Go->IsDead())
             continue;
         ++Count;
         PhySys::GenerateCollisions(Beam);                                      // 0x0052fca6
@@ -851,22 +851,22 @@ void ClientObjDb_ProcessCollisions()
             continue;                                                          // 0x0052fd52
 
         // 0x0052fd58..0x0052fdf0: side A's record -- the shared point, both vectors negated
-        // (FLD / FCHS / FSTP per component) -- then GoA->Slot194(&Rec, SubA, GoB, SubB).
+        // (FLD / FCHS / FSTP per component) -- then GoA->OnCollision(&Rec, SubA, GoB, SubB).
         FClientCollisionRecord Rec;
         Rec.Point = Event->Point;
-        Rec.Field_0x0c.x = -Event->SurfaceNormal.x;
-        Rec.Field_0x0c.y = -Event->SurfaceNormal.y;
-        Rec.Field_0x0c.z = -Event->SurfaceNormal.z;
-        Rec.Field_0x18.x = -Event->RelativeVelocity.x;
-        Rec.Field_0x18.y = -Event->RelativeVelocity.y;
-        Rec.Field_0x18.z = -Event->RelativeVelocity.z;
-        GoA->Slot194(&Rec, SubObjArg(SubA), GoB, SubObjArg(SubB));
+        Rec.SurfaceNormal.x = -Event->SurfaceNormal.x;
+        Rec.SurfaceNormal.y = -Event->SurfaceNormal.y;
+        Rec.SurfaceNormal.z = -Event->SurfaceNormal.z;
+        Rec.RelativeVelocity.x = -Event->RelativeVelocity.x;
+        Rec.RelativeVelocity.y = -Event->RelativeVelocity.y;
+        Rec.RelativeVelocity.z = -Event->RelativeVelocity.z;
+        GoA->OnCollision(&Rec, SubObjArg(SubA), GoB, SubObjArg(SubB));
 
         // 0x0052fdf6..0x0052fe38: the same record with both vectors copied as they are, then
-        // GoB->Slot194(&Rec, SubB, GoA, SubA).
-        Rec.Field_0x0c = Event->SurfaceNormal;
-        Rec.Field_0x18 = Event->RelativeVelocity;
-        GoB->Slot194(&Rec, SubObjArg(SubB), GoA, SubObjArg(SubA));
+        // GoB->OnCollision(&Rec, SubB, GoA, SubA).
+        Rec.SurfaceNormal = Event->SurfaceNormal;
+        Rec.RelativeVelocity = Event->RelativeVelocity;
+        GoB->OnCollision(&Rec, SubObjArg(SubB), GoA, SubObjArg(SubA));
     }
 }
 

@@ -27,16 +27,16 @@ struct FGameobjEffectList; // client_gameobj.h
 // (0x005399d2, inside this file) and the dynamic asteroid draw FUN_005261b0 (0x005265ea).
 void GameobjSweepEffectListRetail(FGameobjEffectList* List);
 
-// FUN_00539820 -- GameObject's vt+0x17c body (the LOD pick), called by FClientGameobj::Slot17c
+// FUN_00539820 -- GameObject's vt+0x17c body (the LOD pick), called by FClientGameobj::PickLod
 // and, non-virtually, by EquippedObj's override FUN_00533710. *OutLod: low word = the camera's
-// ClassifySphere class (vt+0x3c) of the object's Slot178 sphere, high word 0xffff below class 3,
+// ClassifySphere class (vt+0x3c) of the object's GetPhysicalRadius sphere, high word 0xffff below class 3,
 // else 0 / 1 / 2 by the companion's +0x08 / +0x0c distances.
 unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
                                unsigned const* CachedLod);
 
 // FUN_00539b40 -- GameObject's vt+0x184 body (per-object lighting): own +0x178 radius,
 // get_type & 0x807, 1 - perf against 0.999, then FUN_005554d0(position, radius, Camera, +0x38,
-// +0x3c, flag). For FClientGameobj::Slot184 to call.
+// +0x3c, flag). For FClientGameobj::UpdateDrawLighting to call.
 void GameobjUpdateDrawLightingRetail(FClientGameobj* Self, void* Camera);
 
 // FUN_004f70c0 (cdecl) -- 1.0 - the generic effect perf (DAT_006129c8), left unrounded on the
@@ -52,16 +52,16 @@ void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, uns
 // FUN_0040fb60 (thiscall on the camera, RET 8) -- ZNear (+0xa4) and ZFar (+0xa8) written.
 void SpaceCameraSetNearFar(FSpaceCamera* Cam, float ZNear, float ZFar);
 
-// FUN_00539980 -- GameObject's vt+0x188 body (the draw submit), for FClientGameobj::Slot188:
-// Slot180, the Slot17c LOD pick written back over CachedLod, the gate (low word < 3 or high
-// word >= 2 returns the LOD), the effect-list sweep FUN_004fd040 (high word < 1), Slot184, the
+// FUN_00539980 -- GameObject's vt+0x188 body (the draw submit), for FClientGameobj::SubmitDraw:
+// Slot180, the PickLod LOD pick written back over CachedLod, the gate (low word < 3 or high
+// word >= 2 returns the LOD), the effect-list sweep FUN_004fd040 (high word < 1), UpdateDrawLighting, the
 // player flags, the IFLAppearance envmap arm, IRenderer2::Slot7(Camera, get_index, 1.0f, Flags,
 // Matrix, Extra), FlushAll(1) on a result >= 3; *OutLod = {result, 0xffff}. The draw drain
 // reaches it through the node slot LAB_0051f7a0 (vt+0x188(&scratch, Cam, node LOD, 0, 0)).
 unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* Camera,
                                   unsigned CachedLod, void* Matrix, void* Extra);
 
-// FUN_00533780 -- EquippedObj's vt+0x188 body, for FClientEquippedObj::Slot188: the CEqObj's
+// FUN_00533780 -- EquippedObj's vt+0x188 body, for FClientEquippedObj::SubmitDraw: the CEqObj's
 // +0x140 fade above 0 pushes 1 - fade through IFLAppearance Slot3 (latch +0xe0 = 1) and, for a
 // non-nomad archetype, Slot8(3, &Extra); otherwise a set latch is cleared through Slot5. Then
 // FUN_00539980 non-virtually. Also called directly by 0x005462a3 and 0x005482d3.

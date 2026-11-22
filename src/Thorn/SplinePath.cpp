@@ -1189,16 +1189,16 @@ namespace
 
         // FUN_06f34950: outer wrapper rejects a missing inner object or an
         // index >= LastLive (FUN_06f224f0), then forwards to FUN_06f22880.
-        GENRESULT DACOM_API Slot3(unsigned int Index, float* OutPoint) override
+        GENRESULT DACOM_API SetPoint(unsigned int Index, float* OutPoint) override
         {
             if (!bInnerAllocated_ || Index >= static_cast<unsigned int>(LastLive_))
                 return static_cast<GENRESULT>(-1);
             return SetPointInternal(static_cast<int>(Index), OutPoint);
         }
 
-        GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, unsigned long Count) override
+        GENRESULT DACOM_API LoadPoints(const float* Pts, unsigned long Count) override
         {
-            return LoadPoints(Pts, static_cast<int>(Count));
+            return LoadPointsInternal(Pts, static_cast<int>(Count));
         }
 
         // FUN_06f22880: update one live point, repair the endpoint ghosts, and
@@ -1238,7 +1238,7 @@ namespace
 
         // LAB_06f34930 -> FUN_06f224f0: return inner+0x58 (LastLive).
         // FUN_06f22500 sets it to N+1 for a closed path, N for an open path.
-        unsigned long DACOM_API Slot5() override
+        unsigned long DACOM_API GetPointCount() override
         {
             if (!bInnerAllocated_)
                 return 0;
@@ -1247,14 +1247,14 @@ namespace
 
         // FUN_06f34990 / FUN_06f349d0: wrapper-level failure is -1; the
         // inner accessors use -2 only after a valid wrapper dispatch.
-        GENRESULT DACOM_API Slot6(unsigned int Index, float* OutPoint) override
+        GENRESULT DACOM_API GetPoint(unsigned int Index, float* OutPoint) override
         {
             if (!bInnerAllocated_ || Index > static_cast<unsigned int>(LastLive_))
                 return static_cast<GENRESULT>(-1);
             return GetPointRetail(Index, OutPoint);
         }
 
-        GENRESULT DACOM_API Slot7(unsigned int Index, float* OutValue) override
+        GENRESULT DACOM_API GetPointTime(unsigned int Index, float* OutValue) override
         {
             if (!bInnerAllocated_ || Index > static_cast<unsigned int>(LastLive_))
                 return static_cast<GENRESULT>(-1);
@@ -1262,7 +1262,7 @@ namespace
         }
         // LAB_06f347a0: forward the requested open/closed byte to the inner
         // path, repair its ghost points and rebuild normalized arc lengths.
-        GENRESULT DACOM_API Slot8(unsigned char bClosed) override
+        GENRESULT DACOM_API SetClosed(unsigned char bClosed) override
         {
             bClosed_ = bClosed;
             ApplyPersistGhosts();
@@ -1271,14 +1271,14 @@ namespace
         }
         // Retail LAB_06f347c0 forwards to FUN_06f225f0, which returns the
         // closed-state byte (not a GENRESULT success code).
-        GENRESULT DACOM_API Slot9() override
+        GENRESULT DACOM_API IsClosed() override
         {
             return static_cast<GENRESULT>(bClosed_);
         }
         // 351e0: missing inner / unsigned Index >= LastLive -> -1;
         // otherwise return the actual orientation setter result.
         // Position-only slot10 (347d0) returns -7 without reading inputs.
-        GENRESULT DACOM_API Slot10(unsigned int Index, float* Orientation) override
+        GENRESULT DACOM_API SetOrientation(unsigned int Index, float* Orientation) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1289,7 +1289,7 @@ namespace
         // 35220: require an inner and Count == its LastLive snapshot.
         // Each four-word source record is forwarded; ignore setter returns.
         // Position-only slot11 (347e0) returns -7 without reading inputs.
-        GENRESULT DACOM_API Slot11(unsigned int Count, float* Records) override
+        GENRESULT DACOM_API SetOrientations(unsigned int Count, float* Records) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1301,7 +1301,7 @@ namespace
         }
         // 353d0: missing inner / unsigned Index > LastLive fail; delegate raw getter.
         // Position-only slot12 (34810) returns -7 independently.
-        GENRESULT DACOM_API Slot12(unsigned int Index, float* OutOrientation) override
+        GENRESULT DACOM_API GetOrientation(unsigned int Index, float* OutOrientation) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1336,7 +1336,7 @@ namespace
         // No loop: one call
         // processes exactly one Index using exactly 2 consecutive
         // MatrixRecords entries.
-        GENRESULT DACOM_API Slot13(unsigned int Index, const float* MatrixRecords) override
+        GENRESULT DACOM_API SetTransform(unsigned int Index, const float* MatrixRecords) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1351,17 +1351,17 @@ namespace
             const float* NextRecord = MatrixRecords + 9;
             float Position[3];
             std::memcpy(Position, NextRecord, sizeof(Position));
-            GENRESULT PositionResult = Slot3(Index, Position);
+            GENRESULT PositionResult = SetPoint(Index, Position);
             if (PositionResult != GR_OK)
                 return static_cast<GENRESULT>(-1);
 
-            return Slot10(Index, &Quat.W);
+            return SetOrientation(Index, &Quat.W);
         }
         // 352f0: raw position snapshot precedes math acquisition; the foreign
         // converter writes directly into the allocated quaternion buffer.
         // Dispatch both bulk setters, ignore results, then free in order.
         // Position-only variant 34800 returns -7 independently.
-        GENRESULT DACOM_API Slot14(unsigned int Count, const float* TransformRecords) override
+        GENRESULT DACOM_API SetTransforms(unsigned int Count, const float* TransformRecords) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1383,8 +1383,8 @@ namespace
                 std::memcpy(QuatBuffer + Index * 4, &QuaternionResult, sizeof(QuaternionResult));
             }
 
-            Slot4LoadPoints(PositionBuffer, Count);
-            Slot11(Count, QuatBuffer);
+            LoadPoints(PositionBuffer, Count);
+            SetOrientations(Count, QuatBuffer);
 
             delete[] PositionBuffer;
             delete[] QuatBuffer;
@@ -1409,7 +1409,7 @@ namespace
         // REP MOVSD'd into OutTransform[0..8].  The common exit is
         // `OR EAX,-1`, so the function returns -1 even after writing the
         // record.  This is the exact inverse of Slot13's input record.
-        GENRESULT DACOM_API Slot15(unsigned int Index, float* OutTransform) override
+        GENRESULT DACOM_API GetTransform(unsigned int Index, float* OutTransform) override
         {
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
@@ -1501,7 +1501,7 @@ namespace
         // + point copy + ApplyCtorGhosts() + FillIdentityQuats() sequence
         // for normal nonempty input, with a separately allocated modern core.
         // Empty/one-point producer paths still differ (tracker 22ec0/233b0).
-        GENRESULT LoadPoints(const float* Pts, int Count)
+        GENRESULT LoadPointsInternal(const float* Pts, int Count)
         {
             FreePath();
             CoreStorage_ = std::make_unique<FSplineCoreStorage>();
@@ -1588,7 +1588,7 @@ namespace
         }
 
         // LAB_06f34420 (PTR_LAB_06f5ab68) / LAB_06f35530 (PTR_LAB_06f5aad0). Out = quat WXYZ.
-        GENRESULT EvaluateSlot5(const float* T, float* Out)
+        GENRESULT EvaluateOrientation(const float* T, float* Out)
         {
             // Both concrete slot-5 bodies test the logical inner owner first.
             if (!bInnerAllocated_)
@@ -1709,9 +1709,9 @@ namespace
                 Written++;
             }
 
-            LoadPoints(Packed, static_cast<int>(Written));
+            LoadPointsInternal(Packed, static_cast<int>(Written));
             if (bOrientation_)
-                Slot11(Written, PackedQuats);
+                SetOrientations(Written, PackedQuats);
             bClosed_ = bClosed;
             ApplyPersistGhosts();
             RebuildSampleTables();
@@ -1729,7 +1729,7 @@ namespace
         GENRESULT SavePersist(char* Buffer, unsigned long Size)
         {
             // FUN_06f34bc0: ICRSpline slot 5 = LastLive, then persist slot 5 size check.
-            const unsigned long SavedCount = Slot5();
+            const unsigned long SavedCount = GetPointCount();
             const unsigned long RequiredSize = PersistEstimateSize();
             if (SavedCount == 0 || RequiredSize > Size)
                 return GR_GENERIC;
@@ -1803,9 +1803,9 @@ namespace
         // Slot 5: LAB_06f34420 (position) / LAB_06f35530 (orientation). 34420 owns the
         // position-mode return; 35530 forces success only after its inner exists.
         // EvaluateSlot5 preserves both contracts.
-        GENRESULT DACOM_API Slot5(float T, float* Out) override
+        GENRESULT DACOM_API Slot5Orientation(float T, float* Out) override
         {
-            return EvaluateSlot5(&T, Out);
+            return EvaluateOrientation(&T, Out);
         }
 
         // Slot 6, LAB_06f34640.

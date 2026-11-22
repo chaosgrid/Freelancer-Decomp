@@ -17,7 +17,7 @@
 //      0 FUN_00464f20 (scalar deleting around the dtor FUN_00464f40)
 //      9 LAB_004670c0 Create          10 FUN_00467030 Destroy
 //     11 FUN_00468260 Update          12 LAB_004682f0 UpdateInactive (Win3D's, shared)
-//     23 LAB_00467f10 Slot23          42 LAB_00468220 SetProperty
+//     23 LAB_00467f10 ProcessMessage          42 LAB_00468220 SetProperty
 //   The IDataViewOwner face at +0x7c keeps WinControl's entries.
 //
 // Layout past WinControl (0x32c):
@@ -79,7 +79,7 @@ public:
     // slot 11 FUN_00468260
     void Update() override;
     // slot 23 LAB_00467f10 (RET 0xc) -- 0xef01 / 0xef02 / 0x300d / 0xf001 / 0xf002
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_00468220 (RET 0xc) -- 0x26 on BtnCCClose
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

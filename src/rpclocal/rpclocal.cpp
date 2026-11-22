@@ -119,15 +119,15 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
     // 06d8dc87 `MOV EDX,dword ptr [EAX]`: the argument is dereferenced untested.
     const SSPObjUpdateInfo* Info = reinterpret_cast<const SSPObjUpdateInfo*>(Args[1]);
     FPayloadCommonUpdateObject Wire;
-    Wire.Field_0x00 = Info->State;
+    Wire.State = Info->State;
     Wire.Pad_0x01[0] = 0;
     Wire.Pad_0x01[1] = 0;
     Wire.Pad_0x01[2] = 0;
     Wire.ObjectId = Info->ObjectId;
     Wire.Position = Info->Position;
     Wire.Orientation = Info->Orientation;
-    Wire.Field_0x24 = (float)Info->Timestamp;
-    Wire.Field_0x28 = 0.0f;
+    Wire.Timestamp = (float)Info->Timestamp;
+    Wire.Throttle = 0.0f;
     RpcPayloadWrite(Packet, 0, Wire);
     // payload+0x28 is a plain dword copy in retail, not a float conversion; the wire field
     // is typed float only because the RECEIVER of the other direction reads it with FLD.
@@ -157,8 +157,8 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
 static bool MarshalServerChatMsg(FPacketBase* Packet, const unsigned int* Args,
                                  unsigned int ArgCount) {
     FPayloadCommonChatMsg Wire;
-    Wire.Field_0x00 = Args[3];
-    Wire.Field_0x04 = 0;
+    Wire.TargetId = Args[3];
+    Wire.SenderId = 0;
     Wire.Size = 0;
     Wire.Buffer = nullptr;
     if (Args[2] != 0 && Args[1] != 0) {
@@ -206,9 +206,9 @@ static bool MarshalServerBufferCopy(FPacketBase* Packet, const unsigned int* Arg
 static bool MarshalServerStopTradelane(FPacketBase* Packet, const unsigned int* Args,
                                       unsigned int ArgCount) {
     FPayloadCommonStopTradelane Wire;
-    Wire.Field_0x00 = Args[1];
-    Wire.Field_0x04 = Args[2];
-    Wire.Field_0x08 = Args[3];
+    Wire.ShipId = Args[1];
+    Wire.TradelaneRing1 = Args[2];
+    Wire.TradelaneRing2 = Args[3];
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 

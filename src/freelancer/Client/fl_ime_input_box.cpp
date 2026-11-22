@@ -106,8 +106,8 @@ void FLImeInputBox::DrawString(int X, int Y, unsigned Color, const wchar_t* Text
     Origin.Y = static_cast<float>(static_cast<double>(SumY));
     Origin.Scale = 0.0f;
     Origin.Height = 0.0f;
-    Origin.Field10 = 0;
-    Origin.Field14 = 0;
+    Origin.HAlign = 0;
+    Origin.VAlign = 0;
     TextString->Paint(&Origin, nullptr, nullptr);
 
     // 0x005644a2..0x005644d4: the previous material key back, then FUN_00403ea0 for the

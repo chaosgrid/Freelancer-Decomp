@@ -68,7 +68,7 @@ public:
     int AddItem(wchar_t const* Text, int Data);
 
     int HoverIndex;                         // +0x07c
-    int Field80;                            // +0x080
+    int HighlightIndex;                            // +0x080
     IFont* Font;                            // +0x084
     float TextScale;                        // +0x088
     int ItemData[0x100];                    // +0x08c

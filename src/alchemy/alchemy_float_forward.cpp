@@ -63,19 +63,19 @@ namespace AlchemyImpl
     }
 
     // LAB_0621f7f0: node+0x64, with the original argument.
-    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::Slot5(float Age)
+    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::SetAge(float Age)
     {
         return WalkNodes(&IGenericFx::SetNodeAge, Age);
     }
 
     // LAB_0621f820: node+0x5c, with the original argument.
-    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::Slot6(float OuterTime)
+    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::SetOuterTime(float OuterTime)
     {
         return WalkNodes(&IGenericFx::SetNodeOuterTime, OuterTime);
     }
 
     // LAB_0621f850: node+0x88, with the original argument.
-    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::Slot14(float LodInput)
+    __declspec(noinline) GENRESULT DACOM_API FFxEffectObject::SetLodInput(float LodInput)
     {
         return WalkNodes(&IGenericFx::SetNodeLodInput, LodInput);
     }

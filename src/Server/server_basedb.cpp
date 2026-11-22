@@ -159,7 +159,7 @@ void BehaviorRecord::send_update(unsigned int SessionId)
 // LAB_06d119a0 (IClient +0x84): (sid, [this+0x10], [this+0xc]).
 void BehaviorRecord::send_destroy(unsigned int SessionId)
 {
-    g_pClientInterface->SendServerGFDestroyScriptBehavior(SessionId, Props.Field04, (unsigned int)Props.BehaviorId);
+    g_pClientInterface->SendServerGFDestroyScriptBehavior(SessionId, Props.LocationId, (unsigned int)Props.BehaviorId);
 }
 
 // FUN_06d119d0 (IClient +0x8c).
@@ -605,11 +605,11 @@ void FBaseEntry::send_start_room(unsigned int SessionId)
     for (int Index = 0; Index < NumRooms; ++Index)
     {
         MetaNode<BehaviorRecord>* Node = Rooms[Index].Behaviors.Records.get_head();
-        while (Node != nullptr && Node->Data->Props.Field10 == 0)
+        while (Node != nullptr && Node->Data->Props.StartRoomLocationId == 0)
             Node = Node->Next;
         if (Node != nullptr)
         {
-            StartRoom = Node->Data->Props.Field10;
+            StartRoom = Node->Data->Props.StartRoomLocationId;
             break;
         }
     }
@@ -1168,11 +1168,11 @@ void BaseDB::set_character_behavior(unsigned int Handle, unsigned long Behavior)
 unsigned int BaseDB::create_behavior(ScriptBehavior const& Props, unsigned int RecordFilter)
 {
     FRoomEntry* Room = nullptr;
-    std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Props.Field04);
+    std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Props.LocationId);
     if (It != LocationMap.end())
         Room = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.Field04);
+        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.LocationId);
     unsigned int const Handle = Room->create_behavior(Props, RecordFilter);
     BehaviorMap.insert(std::map<unsigned int, FRoomEntry*>::value_type(Handle, Room));
     return Handle;

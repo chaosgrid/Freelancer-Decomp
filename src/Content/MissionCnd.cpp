@@ -259,7 +259,7 @@ void Cnd::OnActivate()
 }
 
 // FUN_06ebf720: RET.
-void Cnd::Slot10()
+void Cnd::OnMissionEnd()
 {
 }
 
@@ -328,8 +328,8 @@ bool CndBaseExit::Matches(pub::Controller::EMessage /*EventId*/, void const* Eve
 // 06ebb9c2-06ebba15.
 CndCargoScanned::CndCargoScanned(FMissionScript* InMission)
     : Cnd(InMission)
-    , Field_0x74(0)
-    , Field_0x78(0)
+    , ScannerId(0)
+    , ScannedId(0)
 {
     InitEmpty(ScannerLabel);
     InitEmpty(ScannedLabel);
@@ -354,26 +354,26 @@ bool CndCargoScanned::Matches(pub::Controller::EMessage /*EventId*/, void const*
     if (EventParms == nullptr)
         return false;
     bool bScannerMissing = false;
-    if (strcmp(ScannerLabel.Data, "none") != 0 && (Field_0x74 & GIdValueMask) == 0)
+    if (strcmp(ScannerLabel.Data, "none") != 0 && (ScannerId & GIdValueMask) == 0)
     {
-        Field_0x74 = Mission->GetLabelShipId(&ScannerLabel);
-        if ((Field_0x74 & GIdValueMask) == 0)
+        ScannerId = Mission->GetLabelShipId(&ScannerLabel);
+        if ((ScannerId & GIdValueMask) == 0)
             bScannerMissing = true;
     }
-    if (strcmp(ScannedLabel.Data, "none") != 0 && (Field_0x78 & GIdValueMask) == 0)
+    if (strcmp(ScannedLabel.Data, "none") != 0 && (ScannedId & GIdValueMask) == 0)
     {
-        Field_0x78 = Mission->GetLabelShipId(&ScannedLabel);
-        if ((Field_0x78 & GIdValueMask) == 0)
+        ScannedId = Mission->GetLabelShipId(&ScannedLabel);
+        if ((ScannedId & GIdValueMask) == 0)
             return false;
     }
     if (bScannerMissing)
         return false;
     unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
-    bool const bScannerMatch = Field_0x74 == Parms[0];
-    bool const bScannedMatch = Field_0x78 == Parms[1];
-    if ((Field_0x74 & GIdValueMask) != 0 && (Field_0x78 & GIdValueMask) != 0)
+    bool const bScannerMatch = ScannerId == Parms[0];
+    bool const bScannedMatch = ScannedId == Parms[1];
+    if ((ScannerId & GIdValueMask) != 0 && (ScannedId & GIdValueMask) != 0)
         return bScannerMatch && bScannedMatch;
-    if ((Field_0x74 & GIdValueMask) == 0)
+    if ((ScannerId & GIdValueMask) == 0)
         return false;
     return bScannerMatch;
 }
@@ -382,9 +382,9 @@ bool CndCargoScanned::Matches(pub::Controller::EMessage /*EventId*/, void const*
 void CndCargoScanned::OnActivate()
 {
     if (strcmp(ScannerLabel.Data, "none") != 0)
-        Field_0x74 = Mission->GetLabelShipId(&ScannerLabel);
+        ScannerId = Mission->GetLabelShipId(&ScannerLabel);
     if (strcmp(ScannedLabel.Data, "none") != 0)
-        Field_0x78 = Mission->GetLabelShipId(&ScannedLabel);
+        ScannedId = Mission->GetLabelShipId(&ScannedLabel);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1347,9 +1347,9 @@ bool CndInTradelane::Matches(pub::Controller::EMessage /*EventId*/, void const* 
         Object = Mission->FindNpcByName(&ObjectLabel);
     if (Object == nullptr)
         return false;
-    if (Object->HasField120() && bInLane != 0)
+    if (Object->IsInTradeLane() && bInLane != 0)
         return true;
-    if (Object->HasField120())
+    if (Object->IsInTradeLane())
         return false;
     return bInLane == 0;
 }
@@ -2328,7 +2328,7 @@ bool CndRtcDone::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
     std::list<FStoryMissionListNode_0x2f4>::iterator It = Mission->List_0x2f4.begin();
     while (It != Mission->List_0x2f4.end())
     {
-        FCharacterEncounter* Script = It->Field_0x90;
+        FCharacterEncounter* Script = It->Encounter;
         if (Script != nullptr && Parms[1] == Script->SequenceId &&
             _stricmp(It->Path, RtcFile.Data) == 0)
         {
@@ -2498,13 +2498,13 @@ CndTetherBroke::CndTetherBroke(FMissionScript* InMission)
     : Cnd(InMission)
     , ShipAId(0)
     , ShipBId(0)
-    , Field_0x7c(0)
+    , bTethered(0)
     , DistanceSq(0.0f)
-    , Field_0x84(0.0f)
-    , Field_0x88(0.0f)
-    , Field_0x8c(0.0f)
-    , Field_0x90(0.0f)
-    , Field_0x94(0.0f)
+    , InnerDistanceSq(0.0f)
+    , LastDistanceSq(0.0f)
+    , BreakDuration(0.0f)
+    , ElapsedBeyond(0.0f)
+    , LastCheckTime(0.0f)
 {
     InitEmpty(ShipA);
     InitEmpty(ShipB);
@@ -2516,9 +2516,9 @@ void CndTetherBroke::Parse(INI_Reader& Reader)
     ShipA = Reader.get_value_string(0);
     ShipB = Reader.get_value_string(1);
     DistanceSq = SquareIfGreater(Reader.get_value_float(2));
-    Field_0x8c = Reader.get_value_float(3);
+    BreakDuration = Reader.get_value_float(3);
     if (!Reader.is_value_empty(4))
-        Field_0x84 = SquareUnlessLess(Reader.get_value_float(4));
+        InnerDistanceSq = SquareUnlessLess(Reader.get_value_float(4));
 }
 
 // LAB_06ec1330. Parms (optional): +0 ship A, +4 ship B, +0xc byte "tether released".
@@ -2539,11 +2539,11 @@ bool CndTetherBroke::Matches(pub::Controller::EMessage /*EventId*/, void const* 
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
         if (Parms[0] == ShipAId && Parms[1] == ShipBId)
-            Field_0x7c = (static_cast<unsigned char const*>(EventParms)[0xc] == 0) ? 1 : 0;
+            bTethered = (static_cast<unsigned char const*>(EventParms)[0xc] == 0) ? 1 : 0;
     }
-    if (Field_0x7c == 0)
+    if (bTethered == 0)
     {
-        Field_0x90 = 0.0f;
+        ElapsedBeyond = 0.0f;
         return false;
     }
     // FCOMP / TEST AH,0x41 / JP out: only while the limit is <= the distance.
@@ -2552,26 +2552,26 @@ bool CndTetherBroke::Matches(pub::Controller::EMessage /*EventId*/, void const* 
     double const Now = Mission->ElapsedTime;
     // TEST AH,0x44 / JP: no step on the first check (+0x94 == 0).
     float TimeStep = 0.0f;
-    if (!(Field_0x94 == 0.0f))
-        TimeStep = static_cast<float>(Now - Field_0x94);
-    Field_0x94 = static_cast<float>(Now);
+    if (!(LastCheckTime == 0.0f))
+        TimeStep = static_cast<float>(Now - LastCheckTime);
+    LastCheckTime = static_cast<float>(Now);
     double DistanceStep = 0.0;
-    if (!(Field_0x88 == 0.0f))
-        DistanceStep = static_cast<double>(Distance) - Field_0x88;
-    Field_0x88 = Distance;
+    if (!(LastDistanceSq == 0.0f))
+        DistanceStep = static_cast<double>(Distance) - LastDistanceSq;
+    LastDistanceSq = Distance;
     // 06ec1454-06ec148d: within the inner radius (+0x84 > distance) only a non-shrinking
     // distance counts; unordered compares fail.
-    if (!(Field_0x84 <= Distance))
+    if (!(InnerDistanceSq <= Distance))
     {
-        if (!(Field_0x84 > Distance))
+        if (!(InnerDistanceSq > Distance))
             return false;
         if (!(DistanceStep >= 0.0))
             return false;
     }
     // FADD / FST +0x90 / FCOMP +0x8c / TEST AH,0x1 / JNZ false: done when not less.
-    double const Accumulated = static_cast<double>(TimeStep) + Field_0x90;
-    Field_0x90 = static_cast<float>(Accumulated);
-    return !(Accumulated < Field_0x8c);
+    double const Accumulated = static_cast<double>(TimeStep) + ElapsedBeyond;
+    ElapsedBeyond = static_cast<float>(Accumulated);
+    return !(Accumulated < BreakDuration);
 }
 
 // FUN_06f242e0.
@@ -2594,9 +2594,9 @@ double __cdecl GetObjectDistanceSq(unsigned int const* IdA, unsigned int const* 
 // LAB_06ec12f0: +0x90/+0x88/+0x94 = 0; +0x74/+0x78 = FUN_06f15940 of both labels.
 void CndTetherBroke::OnActivate()
 {
-    Field_0x90 = 0.0f;
-    Field_0x88 = 0.0f;
-    Field_0x94 = 0.0f;
+    ElapsedBeyond = 0.0f;
+    LastDistanceSq = 0.0f;
+    LastCheckTime = 0.0f;
     ShipAId = Mission->GetLabelShipId(&ShipA);
     ShipBId = Mission->GetLabelShipId(&ShipB);
 }
@@ -2604,8 +2604,8 @@ void CndTetherBroke::OnActivate()
 // LAB_06ec14d0.
 void CndTetherBroke::Save(FILE* File)
 {
-    fprintf(File, "Cnd_TetherBroke = %f, %f\n", static_cast<double>(Field_0x90),
-            static_cast<double>(Field_0x88));
+    fprintf(File, "Cnd_TetherBroke = %f, %f\n", static_cast<double>(ElapsedBeyond),
+            static_cast<double>(LastDistanceSq));
 }
 
 // FUN_06ec1500.
@@ -2615,8 +2615,8 @@ void CndTetherBroke::Load(INI_Reader* Reader)
     {
         if (Reader->is_value("Cnd_TetherBroke"))
         {
-            Field_0x90 = Reader->get_value_float(0);
-            Field_0x88 = Reader->get_value_float(1);
+            ElapsedBeyond = Reader->get_value_float(0);
+            LastDistanceSq = Reader->get_value_float(1);
         }
     }
 }

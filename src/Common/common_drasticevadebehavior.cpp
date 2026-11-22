@@ -13,7 +13,7 @@
 
 // FUN_062c8730 (Common.dll.txt 195469-195488), all 15 instructions: FUN_062d2020(TypeId),
 // +0x40 = 0, vptr, +0x30 = 4.0f (0x40800000), +0x34/+0x38/+0x3c = 0. +0x2c is left to
-// Slot3 in retail; the port zeroes it (Slot3 runs before Slot7 reads it).
+// OnEngage in retail; the port zeroes it (OnEngage runs before OnUpdate reads it).
 DrasticEvadeBehavior::DrasticEvadeBehavior(int InTypeId)
     : Behavior()
     , TypeId(InTypeId)
@@ -21,7 +21,7 @@ DrasticEvadeBehavior::DrasticEvadeBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContextPtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
@@ -48,16 +48,16 @@ bool DrasticEvadeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 }
 
 // Slot 3, FUN_062c8790: `CALL FUN_062d20d0; MOV dword [ESI+0x2c],0; RET`.
-void DrasticEvadeBehavior::Slot3()
+void DrasticEvadeBehavior::OnEngage()
 {
-    Behavior::Slot3();
+    Behavior::OnEngage();
     StateTimer2c = 0.0f;
 }
 
 // Slot 4, FUN_062c87b0: `CALL FUN_062d20f0; OR byte [ESI+0x28],0x2; RET`.
-void DrasticEvadeBehavior::Slot4()
+void DrasticEvadeBehavior::OnDisengage()
 {
-    Behavior::Slot4();
+    Behavior::OnDisengage();
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
 }
 
@@ -65,7 +65,7 @@ void DrasticEvadeBehavior::Slot4()
 //   set:   `XOR EAX,EAX; CMP DL,AL` with DL = Flag29 -> JZ (Flag29 == 0) keeps EAX = 0.
 //   clear: `TEST DL,DL` -> JZ (Flag29 == 0) keeps EAX = 2.
 //   Not taken (Flag29 != 0) -> EAX = 3. Then [ECX+0xc] = EAX, RET 4 (EAX returned).
-int DrasticEvadeBehavior::Slot5(float Unused)
+int DrasticEvadeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     int Result = 2;
@@ -78,7 +78,7 @@ int DrasticEvadeBehavior::Slot5(float Unused)
 }
 
 // Slot 7, LAB_062c8800 (Common.dll.txt 195590-195666), 76 instructions.
-int DrasticEvadeBehavior::Slot7()
+int DrasticEvadeBehavior::OnUpdate()
 {
     if (TargetKind40 == 0)
     {
@@ -124,7 +124,7 @@ int DrasticEvadeBehavior::Slot7()
 }
 
 // Slot 10, LAB_062c87c0 (Common.dll.txt 195559-195584), all 26 instructions.
-bool DrasticEvadeBehavior::Slot10(void* DirectiveOp)
+bool DrasticEvadeBehavior::OnApplyDirective(void* DirectiveOp)
 {
     unsigned char const* const Op = static_cast<unsigned char const*>(DirectiveOp);
     std::memcpy(&TargetKind40, Op + 0xc, sizeof(TargetKind40));             // 062c87c9

@@ -4915,7 +4915,7 @@ namespace AlchemyImpl
         void* const MeshIdArg = reinterpret_cast<void*>(static_cast<std::uintptr_t>(Set->MeshId));
         void* const MeshNameArg = Set->MeshName.Buffer;
         IFxMeshFactory* const Factory = static_cast<IFxMeshFactory*>(G_FxMeshFactory);
-        if (Factory->Slot3(MeshIdArg, MeshNameArg, WorldSix, &Mesh) != 0)
+        if (Factory->CreateMesh(MeshIdArg, MeshNameArg, WorldSix, &Mesh) != 0)
         {
             if (Mesh != nullptr)
                 Mesh->Release();
@@ -4953,7 +4953,7 @@ namespace AlchemyImpl
             Math->MulTransform(*reinterpret_cast<FTransform*>(B),
                                *reinterpret_cast<const FTransform*>(A),
                                *reinterpret_cast<const FTransform*>(Anim)); // +0x1C
-            Mesh->Slot3(B);
+            Mesh->SetTransform(B);
         }
 
         // 06224edc..06224eeb: a counted local copy ([ESP+0x18]), released by FUN_06225940 at
@@ -5058,7 +5058,7 @@ namespace AlchemyImpl
                 Particle->PosZ += Step[2];
                 IFxMesh* const ParticleMesh = *reinterpret_cast<IFxMesh**>(
                     reinterpret_cast<unsigned char*>(Particle) + 0x30);
-                ParticleMesh->Slot5(reinterpret_cast<void*>(static_cast<std::uintptr_t>(DtBits)));
+                ParticleMesh->Update(reinterpret_cast<void*>(static_cast<std::uintptr_t>(DtBits)));
                 Particle = Particle->Next;
             }
             else
@@ -5134,12 +5134,12 @@ namespace AlchemyImpl
                     Math->MulTransform(*reinterpret_cast<FTransform*>(Y),
                                        *reinterpret_cast<const FTransform*>(X),
                                        *reinterpret_cast<const FTransform*>(Anim)); // +0x1C
-                    Mesh->Slot3(Y);
+                    Mesh->SetTransform(Y);
                 }
                 else
                 {
                     float M[12];
-                    std::memcpy(M, Mesh->Slot4(), sizeof(M));
+                    std::memcpy(M, Mesh->GetTransform(), sizeof(M));
                     float WorldPos[3];
                     Math->TransformXform(*reinterpret_cast<FVector*>(WorldPos),
                                          *reinterpret_cast<const FTransform*>(World),
@@ -5147,7 +5147,7 @@ namespace AlchemyImpl
                     M[9] = WorldPos[0];
                     M[10] = WorldPos[1];
                     M[11] = WorldPos[2];
-                    Mesh->Slot3(M);
+                    Mesh->SetTransform(M);
                 }
             }
             Item = Item->Next;
@@ -5167,7 +5167,7 @@ namespace AlchemyImpl
         {
             IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
                 reinterpret_cast<unsigned char*>(Item) + 0x30);
-            Mesh->Slot6(reinterpret_cast<void*>(static_cast<std::uintptr_t>(G_DrawCookie)));
+            Mesh->Render(reinterpret_cast<void*>(static_cast<std::uintptr_t>(G_DrawCookie)));
             Item = Item->Next;
         }
         return GR_OK;
@@ -5625,7 +5625,7 @@ namespace AlchemyImpl
             std::memcpy(M, &Rotation, sizeof(float) * 9);
         }
 
-        R->LifeEffect->Slot3(reinterpret_cast<void*>(1), M);
+        R->LifeEffect->SetTransform(reinterpret_cast<void*>(1), M);
     }
 #pragma float_control(pop)
 
@@ -5721,9 +5721,9 @@ namespace AlchemyImpl
                 IntegrateRecord(InstanceListTail_, 0.0f);
 
                 if (IsNonzeroParticleField(AppearanceOuterTime_))
-                    ForwardEffectFloat(Child.Value, &IFxEffect::Slot6, AppearanceOuterTime_);
+                    ForwardEffectFloat(Child.Value, &IFxEffect::SetOuterTime, AppearanceOuterTime_);
                 if (IsNonunitParticleField(LodInput_))
-                    ForwardEffectFloat(Child.Value, &IFxEffect::Slot14, LodInput_);
+                    ForwardEffectFloat(Child.Value, &IFxEffect::SetLodInput, LodInput_);
             }
         }
         return GR_OK;
@@ -5756,18 +5756,18 @@ namespace AlchemyImpl
                 if (!(Record->Age > Record->Duration))
                     IntegrateRecord(Record, Dt);
                 else if (static_cast<unsigned char>(
-                             R->LifeEffect->Slot11(reinterpret_cast<void*>(7))) == 0)
+                             R->LifeEffect->IsFinished(reinterpret_cast<void*>(7))) == 0)
                     R->LifeEffect->DestroyNodes(reinterpret_cast<void*>(1));
                 Record = Record->Next;
                 continue;
             }
-            if (static_cast<unsigned char>(R->LifeEffect->Slot11(reinterpret_cast<void*>(7))) == 0)
+            if (static_cast<unsigned char>(R->LifeEffect->IsFinished(reinterpret_cast<void*>(7))) == 0)
             {
                 Record = Record->Next;
                 continue;
             }
             if (R->DeathEffect != nullptr &&
-                static_cast<unsigned char>(R->DeathEffect->Slot11(reinterpret_cast<void*>(7))) == 0)
+                static_cast<unsigned char>(R->DeathEffect->IsFinished(reinterpret_cast<void*>(7))) == 0)
             {
                 Record = Record->Next;
                 continue;
@@ -5809,12 +5809,12 @@ namespace AlchemyImpl
                                        0.0f, 0.0f, 0.0f};
                         // 0622fe42..fe53 copies position DWORDs without conversion.
                         std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
-                        R->DeathEffect->Slot3(reinterpret_cast<void*>(1), M);
+                        R->DeathEffect->SetTransform(reinterpret_cast<void*>(1), M);
                         if (IsNonzeroParticleField(AppearanceOuterTime_))
-                            ForwardEffectFloat(R->DeathEffect, &IFxEffect::Slot6,
+                            ForwardEffectFloat(R->DeathEffect, &IFxEffect::SetOuterTime,
                                                AppearanceOuterTime_);
                         if (IsNonunitParticleField(LodInput_))
-                            ForwardEffectFloat(R->DeathEffect, &IFxEffect::Slot14, LodInput_);
+                            ForwardEffectFloat(R->DeathEffect, &IFxEffect::SetLodInput, LodInput_);
                     }
                 }
                 Record = Record->Next;
@@ -5827,7 +5827,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FxParticleAppearance::SetNodeOuterTime(float OuterTime)
     {
         AppearanceOuterTime_ = OuterTime;
-        ForwardChildFloat(&IFxEffect::Slot6, OuterTime);
+        ForwardChildFloat(&IFxEffect::SetOuterTime, OuterTime);
         return GR_OK;
     }
 
@@ -5836,7 +5836,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FxParticleAppearance::SetNodeLodInput(float LodInput)
     {
         LodInput_ = LodInput;
-        ForwardChildFloat(&IFxEffect::Slot14, LodInput);
+        ForwardChildFloat(&IFxEffect::SetLodInput, LodInput);
         return GR_OK;
     }
 
@@ -5851,7 +5851,7 @@ namespace AlchemyImpl
         {
             FParticleAppRecord* const R = AsParticleRecord(Record);
             float Child[4];
-            if (R->LifeEffect != nullptr && R->LifeEffect->Slot15(Child) == GR_OK)
+            if (R->LifeEffect != nullptr && R->LifeEffect->GetBoundingSphere(Child) == GR_OK)
             {
                 if (Merged == 0)
                 {
@@ -5863,7 +5863,7 @@ namespace AlchemyImpl
                 }
                 ++Merged;
             }
-            if (R->DeathEffect != nullptr && R->DeathEffect->Slot15(Child) == GR_OK)
+            if (R->DeathEffect != nullptr && R->DeathEffect->GetBoundingSphere(Child) == GR_OK)
             {
                 if (Merged == 0)
                 {

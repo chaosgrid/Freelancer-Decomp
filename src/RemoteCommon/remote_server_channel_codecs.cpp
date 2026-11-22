@@ -193,7 +193,7 @@ static const char* RpcServerHardpointCodeToName(unsigned int Code) {
 
 FRpcServerCreateObjectFields::FRpcServerCreateObjectFields()
     : ObjId(0), ArchetypeId(0), DockingBaseId(0), VibeGroupId(0), VoiceId(0), HitPts(0),
-      Field_0x6c(0) {
+      LoadoutId(0) {
     Position.x = 0.0f;                                   // 06be539e..06be53a4
     Position.y = 0.0f;
     Position.z = 0.0f;
@@ -219,7 +219,7 @@ static bool RpcServerEncodeCreateObjectEquip(FRpcWireStream& Stream,
     const FRpcServerEquipRecord* Record) {
     unsigned char Flags = 0;
     if (Record->bEquipped != 0) Flags = kRpcServerEquipEquipped;              // 06c08ac8
-    if (Record->Field_0x0f != 0) Flags |= kRpcServerEquipField0f;            // 06c08ad5
+    if (Record->bMission != 0) Flags |= kRpcServerEquipField0f;            // 06c08ad5
     if (Record->Count > 0xff) Flags |= kRpcServerEquipWideCount;             // 06c08ae4 signed
     if (Record->Id > 0xffu) Flags |= kRpcServerEquipWideId;                  // 06c08aeb unsigned
     unsigned char Code = 0;                                                  // 06c08aca
@@ -303,7 +303,7 @@ unsigned int RpcServerCreateObjectEncode(FPacketBase& Packet, FRpcWireStream& St
     const unsigned char Hull = RpcServerQuantizeHull(Fields.HitPts, Fields.ArchetypeId);
     if (!Stream.Put(&Hull, 1u)) return 0x16u;                                 // 06c08a14
     if (SinglePlayer()) {                                                    // 06c08a1a
-        if (!Stream.Put(&Fields.Field_0x6c, 4u)) return 0x16u;                // 06c08a52
+        if (!Stream.Put(&Fields.LoadoutId, 4u)) return 0x16u;                // 06c08a52
     }
     // 06c08a5d (06bdc830): the handle's list pointer. A null list ships a zero word.
     const std::list<FRpcServerEquipRecord*>* Records = Fields.Equipment.Records;
@@ -351,7 +351,7 @@ static unsigned int RpcServerDecodeCreateObjectEquip(FPacketBase& Packet,
     FRpcWireStream& Stream, FRpcServerEquipRecord* Record) {
     unsigned char Flags = 0;
     if (!Stream.Get(&Flags, 1u)) return Packet.MarshalError;                 // 06c09393
-    Record->Field_0x0f = static_cast<unsigned char>((Flags >> 1) & 1u);      // 06c093aa
+    Record->bMission = static_cast<unsigned char>((Flags >> 1) & 1u);      // 06c093aa
     Record->bEquipped = static_cast<unsigned char>(Flags & 1u);              // 06c093ad
     if ((Flags & kRpcServerEquipUnitCount) != 0) {                           // 06c093b0 JNS
         Record->Count = 1;
@@ -479,7 +479,7 @@ unsigned int RpcServerCreateObjectDecode(FPacketBase& Packet, FRpcWireStream& St
     if (!Stream.Get(&Hull, 1u)) return Packet.MarshalError;                  // 06c09280
     Fields.HitPts = RpcServerExpandHull(Hull, Fields.ArchetypeId);           // 06c092b4
     if (SinglePlayer()) {                                                    // 06c092b7
-        if (!Stream.Get(&Fields.Field_0x6c, 4u)) return Packet.MarshalError; // 06c092ed
+        if (!Stream.Get(&Fields.LoadoutId, 4u)) return Packet.MarshalError; // 06c092ed
     }
     unsigned short EquipCount = 0;
     if (!Stream.Get(&EquipCount, 2u)) return Packet.MarshalError;            // 06c0931c
@@ -495,7 +495,7 @@ unsigned int RpcServerCreateObjectDecode(FPacketBase& Packet, FRpcWireStream& St
         Record->Health = 0.0f;
         Record->Id = 0;
         Record->bEquipped = 0;
-        Record->Field_0x0f = 0;
+        Record->bMission = 0;
         Record->HardpointSize = 0;
         Record->Hardpoint = nullptr;
         const unsigned int Error = RpcServerDecodeCreateObjectEquip(Packet, Stream, Record);
@@ -553,7 +553,7 @@ void RpcServerCreateObjectFill(const CEqObjCreateInfo* Info,
     Fields->VibeGroupId = Info->VibeGroupId;                                 // 06b38312
     Fields->VoiceId = Info->VoiceId;                                         // 06b38318
     Fields->HitPts = Info->HitPts;                                           // 06b3831e
-    Fields->Field_0x6c = Info->Field_0x6c;                                   // 06b38324
+    Fields->LoadoutId = Info->LoadoutId;                                   // 06b38324
     Fields->Costume.Head = Info->CostumeHead;                                // 06b3832a
     Fields->Costume.Body = Info->CostumeBody;
     Fields->Costume.LeftHand = Info->CostumeLeftHand;
@@ -630,7 +630,7 @@ void RpcServerCreateObjectRead(const FRpcServerCreateObjectFields* Fields,
     Info->VibeGroupId = Fields->VibeGroupId;                                 // 06bd5307
     Info->VoiceId = Fields->VoiceId;                                         // 06bd530d
     Info->HitPts = Fields->HitPts;                                           // 06bd5313
-    Info->Field_0x6c = Fields->Field_0x6c;                                   // 06bd5319
+    Info->LoadoutId = Fields->LoadoutId;                                   // 06bd5319
     // 06bd531c..06bd532b: FLD z, y, x, then FSTP x, y, z.
     const float* PositionIn = &Fields->Position.x;
     float* PositionOut = &Info->Position.x;
@@ -1158,7 +1158,7 @@ unsigned int FRpcServerActivateObjectPacket::Encode(unsigned char** BufferHolder
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;                      // 06b5ccd5
     if (!Stream.Put(&bActivate, 1u)) return 0x16u;                     // 06b5cd08
-    if (!Stream.Put(&Field_0x08, 4u)) return 0x16u;                    // 06b5cd3b
+    if (!Stream.Put(&ActivateParam, 4u)) return 0x16u;                    // 06b5cd3b
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -1168,7 +1168,7 @@ unsigned int FRpcServerActivateObjectPacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
     if (!Stream.Get(&bActivate, 1u)) return MarshalError;
-    if (!Stream.Get(&Field_0x08, 4u)) return MarshalError;
+    if (!Stream.Get(&ActivateParam, 4u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1218,7 +1218,7 @@ unsigned int RpcServerBlobDecode(FPacketBase& Packet, unsigned int& Size,
 // RS 06be5340 (the block's members are built by FRpcServerCreateObjectFields).
 FRpcServerCreateShipPacket::FRpcServerCreateShipPacket()
     : FPacketBase(0x20004u), bUsingTradelane(0), Throttle(0.0f), OwnerPlayer(0),
-      Field_0xc0(0), ReputationRank(0), Field_0xc4(0), NameASize(0), NameA(nullptr),
+      GroupNameId(0), ReputationRank(0), GroupId(0), NameASize(0), NameA(nullptr),
       NameBSize(0), NameB(nullptr), DisplayNameLength(0), DisplayName(nullptr),
       Affiliation(0), Attitude(0.0f), bMarkedBy(0) {
     Velocity.x = 0.0f;                                   // 06be53e3..06be53eb
@@ -1256,12 +1256,12 @@ unsigned int FRpcServerCreateShipPacket::Encode(unsigned char** BufferHolder,
     if (!Stream.Put(&Velocity, 12u)) return 0x16u;
     const unsigned char ThrottleByte = RpcServerQuantize127(&Throttle);     // 06bf0ec7
     if (!Stream.Put(&ThrottleByte, 1u)) return 0x16u;                       // 06bf0f0a
-    if (!Stream.Put(&Field_0xc0, 2u)) return 0x16u;                         // 06bf0f3e
+    if (!Stream.Put(&GroupNameId, 2u)) return 0x16u;                         // 06bf0f3e
     if (!Stream.Put(&ReputationRank, 1u)) return 0x16u;                     // 06bf0f72
     if ((Flags & 4) != 0) {
         const unsigned char Owner = static_cast<unsigned char>(OwnerPlayer & 0xffu);
         if (!Stream.Put(&Owner, 1u)) return 0x16u;                          // 06bf0faf
-        if (!Stream.Put(&Field_0xc4, 2u)) return 0x16u;                     // 06bf0fe3
+        if (!Stream.Put(&GroupId, 2u)) return 0x16u;                     // 06bf0fe3
         if (!SinglePlayer()) {                                              // 06bf0feb
             // 06bf0fff: the low byte of the length, then 2 * length bytes.
             const unsigned char Length =
@@ -1302,13 +1302,13 @@ unsigned int FRpcServerCreateShipPacket::Decode(const unsigned char* Buffer,
     unsigned char ThrottleByte = 0;
     if (!Stream.Get(&ThrottleByte, 1u)) return MarshalError;                 // 06bf13c7
     RpcServerExpand127(ThrottleByte, &Throttle);                             // 06bf13dd
-    if (!Stream.Get(&Field_0xc0, 2u)) return MarshalError;                   // 06bf1405
+    if (!Stream.Get(&GroupNameId, 2u)) return MarshalError;                   // 06bf1405
     if (!Stream.Get(&ReputationRank, 1u)) return MarshalError;               // 06bf1434
     if ((Flags & 4) != 0) {
         unsigned char Owner = 0;
         if (!Stream.Get(&Owner, 1u)) return MarshalError;                    // 06bf146a
         OwnerPlayer = static_cast<unsigned int>(Owner);                      // 06bf1473
-        if (!Stream.Get(&Field_0xc4, 2u)) return MarshalError;               // 06bf149b
+        if (!Stream.Get(&GroupId, 2u)) return MarshalError;               // 06bf149b
         if (!SinglePlayer()) {                                               // 06bf14aa
             unsigned char Length = 0;
             if (!Stream.Get(&Length, 1u)) return MarshalError;               // 06bf14dc
@@ -1399,7 +1399,7 @@ void FRpcServerEquipHandle::AppendCopy(const FRpcServerEquipHandle& Source) {
         Record->Count = From->Count;
         Record->Id = From->Id;
         Record->bEquipped = From->bEquipped;
-        Record->Field_0x0f = From->Field_0x0f;
+        Record->bMission = From->bMission;
         if (Record->HardpointSize > 0) {
             Record->Hardpoint = static_cast<char*>(
                 ::operator new(Record->HardpointSize, std::nothrow));
@@ -1433,7 +1433,7 @@ void RpcServerEquipHandleFromVector(const EquipDescVector* Source,
             std::memset(&Record->Health, 0, 4u);
             Record->Id = 0;
             Record->bEquipped = 0;
-            Record->Field_0x0f = 0;
+            Record->bMission = 0;
             Record->HardpointSize = 0;
             Record->Hardpoint = nullptr;
         }
@@ -1575,7 +1575,7 @@ unsigned int FRpcServerEquipListPacketBase::EncodeEquipment(FRpcWireStream& Stre
         if (!Stream.Put(&Record->ArchId, 4u)) return 0x16u;
         if (!Stream.Put(&Record->Id, 2u)) return 0x16u;
         if (!Stream.Put(&Record->bEquipped, 1u)) return 0x16u;
-        if (!Stream.Put(&Record->Field_0x0f, 1u)) return 0x16u;
+        if (!Stream.Put(&Record->bMission, 1u)) return 0x16u;
         if (!Stream.Put(&Record->HardpointSize, 2u)) return 0x16u;
         // RC06b4facb..06b4faf1: cached REP MOVSD/MOVSB body, Ptr=cached+size.
         if (!Stream.PutBlock(Record->Hardpoint, Record->HardpointSize)) return 0x16u;
@@ -1605,7 +1605,7 @@ unsigned int FRpcServerEquipListPacketBase::DecodeEquipment(FRpcWireStream& Stre
         std::memset(&Record->Health, 0, 4u);
         Record->Id = 0;
         Record->bEquipped = 0;
-        Record->Field_0x0f = 0;
+        Record->bMission = 0;
         Record->HardpointSize = 0;
         Record->Hardpoint = nullptr;
         if (!Stream.Get(&Record->Count, 4u)) return MarshalError;
@@ -1613,7 +1613,7 @@ unsigned int FRpcServerEquipListPacketBase::DecodeEquipment(FRpcWireStream& Stre
         if (!Stream.Get(&Record->ArchId, 4u)) return MarshalError;
         if (!Stream.Get(&Record->Id, 2u)) return MarshalError;
         if (!Stream.Get(&Record->bEquipped, 1u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x0f, 1u)) return MarshalError;
+        if (!Stream.Get(&Record->bMission, 1u)) return MarshalError;
         if (!Stream.Get(&Record->HardpointSize, 2u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
         if (MarshalCursor + Record->HardpointSize > MarshalLimit) MarshalError = 0x17u;
@@ -1635,16 +1635,16 @@ unsigned int FRpcServerRequestCreateShipRespPacket::Encode(unsigned char** Buffe
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 1u)) return 0x16u;                    // 06b5bb03
-    if (!Stream.Put(&Field_0x04, 4u)) return 0x16u;                    // 06b5bb36
+    if (!Stream.Put(&bSuccess, 1u)) return 0x16u;                    // 06b5bb03
+    if (!Stream.Put(&ShipId, 4u)) return 0x16u;                    // 06b5bb36
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
 unsigned int FRpcServerRequestCreateShipRespPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 1u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
+    if (!Stream.Get(&bSuccess, 1u)) return MarshalError;
+    if (!Stream.Get(&ShipId, 4u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1655,16 +1655,16 @@ unsigned int FRpcServerAdjustAttitudePacket::Encode(unsigned char** BufferHolder
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;                    // 06b5e2a5
-    if (!Stream.PutFloat(Field_0x04)) return 0x16u;                    // 06b5e2da FSTP
+    if (!Stream.Put(&VibeHandle, 4u)) return 0x16u;                    // 06b5e2a5
+    if (!Stream.PutFloat(Attitude)) return 0x16u;                    // 06b5e2da FSTP
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
 unsigned int FRpcServerAdjustAttitudePacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
+    if (!Stream.Get(&VibeHandle, 4u)) return MarshalError;
+    if (!Stream.Get(&Attitude, 4u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1675,7 +1675,7 @@ static_assert(sizeof(FRpcServerCreateCounterPacket) == 0x68, "CREATECOUNTER is o
 FRpcServerCreateCounterPacket::FRpcServerCreateCounterPacket() : FPacketBase(0x2002du) {
     ArchetypeNickname = 0;
     ObjId = 0;
-    Field_0x08 = 0;
+    OwnerPlayer = 0;
     OwnerId = 0;
     SubObjId = SUBOBJ_ID_NONE;
     Orientation.w = 1.0f;
@@ -1688,9 +1688,9 @@ FRpcServerCreateCounterPacket::FRpcServerCreateCounterPacket() : FPacketBase(0x2
     Velocity.x = 0.0f;
     Velocity.y = 0.0f;
     Velocity.z = 0.0f;
-    Field_0x3c.x = 0.0f;
-    Field_0x3c.y = 0.0f;
-    Field_0x3c.z = 0.0f;
+    AngularVelocity.x = 0.0f;
+    AngularVelocity.y = 0.0f;
+    AngularVelocity.z = 0.0f;
 }
 
 // RC 06b5dcc0 / RS 06bf1c40. Every failure returns 0x16 (EAX=0x16 from 06b5dd1d into
@@ -1702,13 +1702,13 @@ unsigned int FRpcServerCreateCounterPacket::Encode(unsigned char** BufferHolder,
     Stream.PutHeader();
     if (!Stream.Put(&ArchetypeNickname, 4u)) return 0x16u;
     if (!Stream.Put(&ObjId, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x08, 4u)) return 0x16u;
+    if (!Stream.Put(&OwnerPlayer, 4u)) return 0x16u;
     if (!Stream.Put(&OwnerId, 4u)) return 0x16u;
     if (!Stream.Put(&SubObjId, 2u)) return 0x16u;
     if (!Stream.Put(&Orientation, 16u)) return 0x16u;
     if (!Stream.Put(&Position, 12u)) return 0x16u;
     if (!Stream.Put(&Velocity, 12u)) return 0x16u;
-    if (!Stream.Put(&Field_0x3c, 12u)) return 0x16u;
+    if (!Stream.Put(&AngularVelocity, 12u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5df3e
 }
 
@@ -1718,13 +1718,13 @@ unsigned int FRpcServerCreateCounterPacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&ArchetypeNickname, 4u)) return MarshalError;
     if (!Stream.Get(&ObjId, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x08, 4u)) return MarshalError;
+    if (!Stream.Get(&OwnerPlayer, 4u)) return MarshalError;
     if (!Stream.Get(&OwnerId, 4u)) return MarshalError;
     if (!Stream.Get(&SubObjId, 2u)) return MarshalError;
     if (!Stream.Get(&Orientation, 16u)) return MarshalError;
     if (!Stream.Get(&Position, 12u)) return MarshalError;
     if (!Stream.Get(&Velocity, 12u)) return MarshalError;
-    if (!Stream.Get(&Field_0x3c, 12u)) return MarshalError;
+    if (!Stream.Get(&AngularVelocity, 12u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1775,7 +1775,7 @@ unsigned int FRpcServerCreateGuidedPacket::Encode(unsigned char** BufferHolder,
 unsigned int FRpcServerCreateGuidedPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    Field_0x00 = 0;
+    OwnerPlayer = 0;
     unsigned short SmallId;
     if (!Stream.Get(&SmallId, 2u)) return MarshalError;
     ArchetypeNickname = Archetype::SmallIDToLargeID(SmallId);
@@ -1821,8 +1821,8 @@ unsigned int FRpcServerSystemSwitchInPacket::Encode(unsigned char** BufferHolder
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x04, 4u)) return 0x16u;
+    if (!Stream.Put(&ShipId, 4u)) return 0x16u;
+    if (!Stream.Put(&JumpObjTypeBits, 4u)) return 0x16u;
     if (!Stream.Put(&Position, 12u)) return 0x16u;
     if (!Stream.Put(&Orientation, 16u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5d53c
@@ -1832,8 +1832,8 @@ unsigned int FRpcServerSystemSwitchInPacket::Encode(unsigned char** BufferHolder
 unsigned int FRpcServerSystemSwitchInPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
+    if (!Stream.Get(&ShipId, 4u)) return MarshalError;
+    if (!Stream.Get(&JumpObjTypeBits, 4u)) return MarshalError;
     if (!Stream.Get(&Position, 12u)) return MarshalError;
     if (!Stream.Get(&Orientation, 16u)) return MarshalError;
     return Stream.Finish(OutLength, false);
@@ -1846,7 +1846,7 @@ static_assert(sizeof(FRpcServerExplodeAsteroidMinePacket) == 0x30,
 // RC 06b4ab90 / RS 06be56b0: +0x20..+0x2c = 0 as dwords.
 FRpcServerExplodeAsteroidMinePacket::FRpcServerExplodeAsteroidMinePacket()
     : FPacketBase(0x20031u) {
-    Field_0x00 = 0;
+    MineId = 0;
     std::memset(&Position, 0, sizeof(Position));
 }
 
@@ -1856,7 +1856,7 @@ unsigned int FRpcServerExplodeAsteroidMinePacket::Encode(unsigned char** BufferH
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
+    if (!Stream.Put(&MineId, 4u)) return 0x16u;
     if (!Stream.Put(&Position, 12u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b42d75
 }
@@ -1865,7 +1865,7 @@ unsigned int FRpcServerExplodeAsteroidMinePacket::Encode(unsigned char** BufferH
 unsigned int FRpcServerExplodeAsteroidMinePacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
+    if (!Stream.Get(&MineId, 4u)) return MarshalError;
     if (!Stream.Get(&Position, 12u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
@@ -1875,10 +1875,10 @@ static_assert(sizeof(FRpcServerItemTractoredPacket) == 0x2c, "ITEMTRACTORED is o
 
 // RC 06b4a510 / RS 06be5010.
 FRpcServerItemTractoredPacket::FRpcServerItemTractoredPacket() : FPacketBase(0x20038u) {
-    Field_0x00 = 0;
-    Field_0x04 = 0;
-    Field_0x08 = 0;
-    Field_0x0a = 0;
+    LootId = 0;
+    ShipId = 0;
+    TractorEquipId = 0;
+    UnitsTaken = 0;
 }
 
 // RC 06b5c980 / RS 06befe50. Every failure returns 0x16 (EBP=0x16 from 06b5c9d7).
@@ -1886,10 +1886,10 @@ unsigned int FRpcServerItemTractoredPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x04, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x08, 2u)) return 0x16u;
-    if (!Stream.Put(&Field_0x0a, 2u)) return 0x16u;
+    if (!Stream.Put(&LootId, 4u)) return 0x16u;
+    if (!Stream.Put(&ShipId, 4u)) return 0x16u;
+    if (!Stream.Put(&TractorEquipId, 2u)) return 0x16u;
+    if (!Stream.Put(&UnitsTaken, 2u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5ca96
 }
 
@@ -1897,10 +1897,10 @@ unsigned int FRpcServerItemTractoredPacket::Encode(unsigned char** BufferHolder,
 unsigned int FRpcServerItemTractoredPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x08, 2u)) return MarshalError;
-    if (!Stream.Get(&Field_0x0a, 2u)) return MarshalError;
+    if (!Stream.Get(&LootId, 4u)) return MarshalError;
+    if (!Stream.Get(&ShipId, 4u)) return MarshalError;
+    if (!Stream.Get(&TractorEquipId, 2u)) return MarshalError;
+    if (!Stream.Get(&UnitsTaken, 2u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1941,7 +1941,7 @@ unsigned int FRpcServerSetAddItemPacket::Encode(unsigned char** BufferHolder,
     if (!Stream.PutFloat(Health)) return 0x16u;
     if (!Stream.Put(&bEquipped, 1u)) return 0x16u;
     if (!Stream.Put(&bMission, 1u)) return 0x16u;
-    if (!Stream.Put(&Field_0x0c, 4u)) return 0x16u;
+    if (!Stream.Put(&AddResult, 4u)) return 0x16u;
     if (!Stream.Put(&HardpointSize, 4u)) return 0x16u;
     if (HardpointSize != 0) {                                          // 06b3ca12
         if (!Stream.PutBlock(Hardpoint, HardpointSize)) return 0x16u;
@@ -1963,7 +1963,7 @@ unsigned int FRpcServerSetAddItemPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&Health, 4u)) return MarshalError;
     if (!Stream.Get(&bEquipped, 1u)) return MarshalError;
     if (!Stream.Get(&bMission, 1u)) return MarshalError;
-    if (!Stream.Get(&Field_0x0c, 4u)) return MarshalError;
+    if (!Stream.Get(&AddResult, 4u)) return MarshalError;
     if (!Stream.Get(&HardpointSize, 4u)) return MarshalError;
     if (HardpointSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
@@ -1987,7 +1987,7 @@ static_assert(sizeof(FRpcServerRequestSpaceScriptPacket) == 0x3c,
 // RC 06b4b990 / RS 06be64b0.
 FRpcServerRequestSpaceScriptPacket::FRpcServerRequestSpaceScriptPacket()
     : FPacketBase(0x20032u) {
-    Field_0x00 = 0;
+    ObjectId = 0;
     Position[0] = 0;
     Position[1] = 0;
     Position[2] = 0;
@@ -2016,7 +2016,7 @@ unsigned int FRpcServerRequestSpaceScriptPacket::Encode(unsigned char** BufferHo
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
+    if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
     if (!Stream.Put(&NameSize, 4u)) return 0x16u;
     if (NameSize != 0) {                                               // 06b43fd4
         if (!Stream.PutBlock(Name, NameSize)) return 0x16u;
@@ -2030,7 +2030,7 @@ unsigned int FRpcServerRequestSpaceScriptPacket::Encode(unsigned char** BufferHo
 unsigned int FRpcServerRequestSpaceScriptPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
+    if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
     if (!Stream.Get(&NameSize, 4u)) return MarshalError;
     if (NameSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
@@ -2055,9 +2055,9 @@ unsigned int FRpcServerSetMissionObjectiveStatePacket::Encode(unsigned char** Bu
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x04, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x08, 2u)) return 0x16u;
+    if (!Stream.Put(&MissionId, 4u)) return 0x16u;
+    if (!Stream.Put(&ObjectiveIndex, 4u)) return 0x16u;
+    if (!Stream.Put(&State, 2u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -2065,9 +2065,9 @@ unsigned int FRpcServerSetMissionObjectiveStatePacket::Encode(unsigned char** Bu
 unsigned int FRpcServerSetMissionObjectiveStatePacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x08, 2u)) return MarshalError;
+    if (!Stream.Get(&MissionId, 4u)) return MarshalError;
+    if (!Stream.Get(&ObjectiveIndex, 4u)) return MarshalError;
+    if (!Stream.Get(&State, 2u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -2087,8 +2087,8 @@ unsigned int FRpcServerReplaceMissionObjectivePacket::Encode(unsigned char** Buf
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
-    if (!Stream.Put(&State, 4u)) return 0x16u;
+    if (!Stream.Put(&MissionId, 4u)) return 0x16u;
+    if (!Stream.Put(&ObjectiveIndex, 4u)) return 0x16u;
     if (!Stream.Put(&TextSize, 4u)) return 0x16u;
     if (!Stream.PutBlock(TextData, TextSize)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5f43b
@@ -2100,8 +2100,8 @@ unsigned int FRpcServerReplaceMissionObjectivePacket::Encode(unsigned char** Buf
 unsigned int FRpcServerReplaceMissionObjectivePacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&State, 4u)) return MarshalError;
+    if (!Stream.Get(&MissionId, 4u)) return MarshalError;
+    if (!Stream.Get(&ObjectiveIndex, 4u)) return MarshalError;
     RpcWireDecodeOwnedBlock(*this, Stream, TextSize, TextData);
     MarshalError = 0;
     return Stream.Finish(OutLength, false);
@@ -2159,9 +2159,9 @@ unsigned int FRpcServerSetMissionObjectivesPacket::Encode(unsigned char** Buffer
     // (06b44fc8, 06b4505c, 06b45124).
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
+    if (!Stream.Put(&MissionId, 4u)) return 0x16u;
     if (!Stream.Put(&Count, 4u)) return 0x16u;
-    if (!Stream.Put(&State, 4u)) return 0x16u;
+    if (!Stream.Put(&MissionType, 4u)) return 0x16u;
     if (!Stream.Put(&TextA.Size, 4u)) return 0x16u;
     if (!Stream.PutBlock(TextA.Data, TextA.Size)) return 0x16u;
     if (!Stream.Put(&TextB.Size, 4u)) return 0x16u;
@@ -2186,9 +2186,9 @@ unsigned int FRpcServerSetMissionObjectivesPacket::Encode(unsigned char** Buffer
 unsigned int FRpcServerSetMissionObjectivesPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
+    if (!Stream.Get(&MissionId, 4u)) return MarshalError;
     if (!Stream.Get(&Count, 4u)) return MarshalError;
-    if (!Stream.Get(&State, 4u)) return MarshalError;
+    if (!Stream.Get(&MissionType, 4u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
     if (RpcWireDecodeOwnedBlock(*this, Stream, TextA.Size, TextA.Data) != 0) return 0x17u;
     if (RpcWireDecodeOwnedBlock(*this, Stream, TextB.Size, TextB.Data) != 0) return 0x17u;
@@ -2660,10 +2660,10 @@ FRpcServerCreateMinePacket::FRpcServerCreateMinePacket() : FPacketBase(0x2002cu)
     Velocity.x = 0.0f;
     Velocity.y = 0.0f;
     Velocity.z = 0.0f;
-    Field_0x38.x = 0.0f;
-    Field_0x38.y = 0.0f;
-    Field_0x38.z = 0.0f;
-    Field_0x44 = 0;
+    AngularVelocity.x = 0.0f;
+    AngularVelocity.y = 0.0f;
+    AngularVelocity.z = 0.0f;
+    OwnerPlayer = 0;
 }
 
 // RC 06b5d740 / RS 06bf16c0. The small id is computed before its reservation; the
@@ -2683,7 +2683,7 @@ unsigned int FRpcServerCreateMinePacket::Encode(unsigned char** BufferHolder,
     if (SinglePlayer()) {
         if (!Stream.Put(&Orientation, 16u)) return 0x16u;
         if (!Stream.Put(&Velocity, 12u)) return 0x16u;
-        if (!Stream.Put(&Field_0x38, 12u)) return 0x16u;
+        if (!Stream.Put(&AngularVelocity, 12u)) return 0x16u;
     }
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5d9d3
 }
@@ -2703,9 +2703,9 @@ unsigned int FRpcServerCreateMinePacket::Decode(const unsigned char* Buffer,
     if (SinglePlayer()) {
         if (!Stream.Get(&Orientation, 16u)) return MarshalError;
         if (!Stream.Get(&Velocity, 12u)) return MarshalError;
-        if (!Stream.Get(&Field_0x38, 12u)) return MarshalError;
+        if (!Stream.Get(&AngularVelocity, 12u)) return MarshalError;
     }
-    Field_0x44 = 0;
+    OwnerPlayer = 0;
     return Stream.Finish(OutLength, false);
 }
 
@@ -2789,7 +2789,7 @@ unsigned int FRpcServerRequestReturnedPacket::Encode(unsigned char** BufferHolde
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
     if (!Stream.Put(&RequestType, 1u)) return 0x16u;
     if (!Stream.Put(&Response, 1u)) return 0x16u;
-    if (!Stream.Put(&Field_0x26, 1u)) return 0x16u;
+    if (!Stream.Put(&DockPort, 1u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5a646
 }
 
@@ -2800,7 +2800,7 @@ unsigned int FRpcServerRequestReturnedPacket::Decode(const unsigned char* Buffer
     if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
     if (!Stream.Get(&RequestType, 1u)) return MarshalError;
     if (!Stream.Get(&Response, 1u)) return MarshalError;
-    if (!Stream.Get(&Field_0x26, 1u)) return MarshalError;
+    if (!Stream.Get(&DockPort, 1u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -2886,9 +2886,9 @@ unsigned int FRpcServerSetGuidedTargetPacket::Encode(unsigned char** BufferHolde
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x20, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x24, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x28, 2u)) return 0x16u;
+    if (!Stream.Put(&GuidedId, 4u)) return 0x16u;
+    if (!Stream.Put(&TargetId, 4u)) return 0x16u;
+    if (!Stream.Put(&TargetSubObjId, 2u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -2896,9 +2896,9 @@ unsigned int FRpcServerSetGuidedTargetPacket::Encode(unsigned char** BufferHolde
 unsigned int FRpcServerSetGuidedTargetPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x20, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x24, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x28, 2u)) return MarshalError;
+    if (!Stream.Get(&GuidedId, 4u)) return MarshalError;
+    if (!Stream.Get(&TargetId, 4u)) return MarshalError;
+    if (!Stream.Get(&TargetSubObjId, 2u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -3031,12 +3031,12 @@ unsigned int FRpcServerSetMusicPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x20, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x24, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x28, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x2c, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x30, 1u)) return 0x16u;
-    if (!Stream.PutFloat(Field_0x34)) return 0x16u;
+    if (!Stream.Put(&SpaceMusic, 4u)) return 0x16u;
+    if (!Stream.Put(&DangerMusic, 4u)) return 0x16u;
+    if (!Stream.Put(&BattleMusic, 4u)) return 0x16u;
+    if (!Stream.Put(&OverrideMusic, 4u)) return 0x16u;
+    if (!Stream.Put(&bNoLoop, 1u)) return 0x16u;
+    if (!Stream.PutFloat(Fade)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b6471c
 }
 
@@ -3044,12 +3044,12 @@ unsigned int FRpcServerSetMusicPacket::Encode(unsigned char** BufferHolder,
 unsigned int FRpcServerSetMusicPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x20, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x24, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x28, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x2c, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x30, 1u)) return MarshalError;
-    if (!Stream.Get(&Field_0x34, 4u)) return MarshalError;
+    if (!Stream.Get(&SpaceMusic, 4u)) return MarshalError;
+    if (!Stream.Get(&DangerMusic, 4u)) return MarshalError;
+    if (!Stream.Get(&BattleMusic, 4u)) return MarshalError;
+    if (!Stream.Get(&OverrideMusic, 4u)) return MarshalError;
+    if (!Stream.Get(&bNoLoop, 1u)) return MarshalError;
+    if (!Stream.Get(&Fade, 4u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -3123,36 +3123,36 @@ static void RpcServerCopyDirectiveFields(void* Destination, const void* Source) 
 // RC 06b4aca0 / RS 06be57c0: +0x00 and the padding stay as operator new left them.
 FRpcServerSetDirectivePacket::FRpcServerSetDirectivePacket() : FPacketBase(0x2004eu) {
     Directive.Field_0x04 = 0;
-    Directive.Field_0x08 = 0;
-    Directive.Field_0x0c = 0.0f;
-    Directive.Field_0x10 = 0;
-    Directive.Field_0x14 = 0;
-    Directive.Field_0x18 = -1;
-    Directive.Field_0x1c = 0;
-    Directive.Field_0x20 = 0.0f;
-    Directive.Field_0x24 = 0.0f;
-    Directive.Field_0x28 = 0;
-    Directive.Field_0x2c = 0.0f;
-    Directive.Field_0x30.x = 0.0f;
-    Directive.Field_0x30.y = 0.0f;
-    Directive.Field_0x30.z = 0.0f;
+    Directive.bDockApproachCleared = 0;
+    Directive.DelaySeconds = 0.0f;
+    Directive.DockObjectId = 0;
+    Directive.DockSecondaryObjectId = 0;
+    Directive.DockPortIndex = -1;
+    Directive.ProxTargetId = 0;
+    Directive.ProxNearDist = 0.0f;
+    Directive.ProxFarDist = 0.0f;
+    Directive.FollowTargetId = 0;
+    Directive.FollowDistance = 0.0f;
+    Directive.FollowOffset.x = 0.0f;
+    Directive.FollowOffset.y = 0.0f;
+    Directive.FollowOffset.z = 0.0f;
     Directive.Field_0x3c = 0.0f;
-    Directive.Field_0x40 = 3;
-    Directive.Field_0x44.x = 0.0f;
-    Directive.Field_0x44.y = 0.0f;
-    Directive.Field_0x44.z = 0.0f;
-    Directive.Field_0x50 = 0;
-    Directive.Block_0x54 = FRpcDirectiveBlock{0u, 0u, 0u};
-    Directive.Block_0x60 = FRpcDirectiveBlock{0u, 0u, 0u};
-    Directive.Block_0x6c = FRpcDirectiveBlock{0u, 0u, 0u};
-    Directive.Block_0x78 = FRpcDirectiveBlock{0u, 0u, 0u};
-    Directive.Field_0x84 = 0.0f;
-    Directive.Field_0x88 = 0.0f;
+    Directive.GotoMode = 3;
+    Directive.GotoDestination.x = 0.0f;
+    Directive.GotoDestination.y = 0.0f;
+    Directive.GotoDestination.z = 0.0f;
+    Directive.GotoTargetId = 0;
+    Directive.SplineP1 = FRpcDirectiveBlock{0u, 0u, 0u};
+    Directive.SplineP2 = FRpcDirectiveBlock{0u, 0u, 0u};
+    Directive.SplineP0 = FRpcDirectiveBlock{0u, 0u, 0u};
+    Directive.SplineP3 = FRpcDirectiveBlock{0u, 0u, 0u};
+    Directive.GotoRange = 0.0f;
+    Directive.GotoSpeed = 0.0f;
     Directive.Field_0x8c = 0;
     Directive.Field_0x8d = 0;
-    Directive.Field_0x8e = 0;
-    Directive.Field_0x8f = 0;
-    Directive.Field_0x90 = 0;
+    Directive.bGotoCruise = 0;
+    Directive.bGotoNoCruise = 0;
+    Directive.bGotoAllowCruise = 0;
 }
 
 // The copy inlined in the sender RC 06b35f40 (Source -> packet +0x20).
@@ -3226,7 +3226,7 @@ unsigned int FRpcServerPlayerListPacket::Encode(unsigned char** BufferHolder,
     Stream.PutHeader();
     if (!Stream.Put(&Kind, 4u)) return 0x16u;
     if (!Stream.Put(&PlayerId, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x2c, 1u)) return 0x16u;
+    if (!Stream.Put(&bAlreadyPresent, 1u)) return 0x16u;
     unsigned char Count = 0;
     if (Name != nullptr) {
         Count = static_cast<unsigned char>(std::wcslen(Name) + 1u);
@@ -3249,7 +3249,7 @@ unsigned int FRpcServerPlayerListPacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&Kind, 4u)) return MarshalError;
     if (!Stream.Get(&PlayerId, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x2c, 1u)) return MarshalError;
+    if (!Stream.Get(&bAlreadyPresent, 1u)) return MarshalError;
     unsigned char Count = 0;
     if (!Stream.Get(&Count, 1u)) return MarshalError;
     if (Count != 0) {
@@ -3341,7 +3341,7 @@ static void RpcServerSendCommExpand(unsigned char Encoded, float* Value) {
 
 // RC 06b4cd10 / RS 06be7910.
 FRpcServerSendCommPacket::FRpcServerSendCommPacket()
-    : FPacketBase(0x2004fu), Field_0x64(nullptr), Field_0x74(1) {
+    : FPacketBase(0x2004fu), TextIds(nullptr), bReceiverIsOwnShip(1) {
     Body.PartIds[0] = 0;
     Body.PartIds[1] = 0;
     Body.PartIds[2] = 0;
@@ -3351,8 +3351,8 @@ FRpcServerSendCommPacket::FRpcServerSendCommPacket()
 
 // RC 06b4cd70 / RS 06be7970: operator delete of a held array, then the pointer cleared.
 FRpcServerSendCommPacket::~FRpcServerSendCommPacket() {
-    if (Field_0x64 != nullptr) ::operator delete(Field_0x64);
-    Field_0x64 = nullptr;
+    if (TextIds != nullptr) ::operator delete(TextIds);
+    TextIds = nullptr;
 }
 
 // RC 06b63190 / RS 06bf9370 (they differ only in the constant addresses). Part ids 2 and 3
@@ -3366,11 +3366,11 @@ unsigned int FRpcServerSendCommPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x20, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x24, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x28, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x74, 1u)) return 0x16u;
-    if (Field_0x74 != 0) {
+    if (!Stream.Put(&SenderId, 4u)) return 0x16u;
+    if (!Stream.Put(&ReceiverId, 4u)) return 0x16u;
+    if (!Stream.Put(&VoiceId, 4u)) return 0x16u;
+    if (!Stream.Put(&bReceiverIsOwnShip, 1u)) return 0x16u;
+    if (bReceiverIsOwnShip != 0) {
         if (!Stream.Put(&Body.PartIds[0], 4u)) return 0x16u;
         if (!Stream.Put(&Body.PartIds[1], 4u)) return 0x16u;
         const unsigned char CountByte = static_cast<unsigned char>(Body.AccessoryCount);
@@ -3380,14 +3380,14 @@ unsigned int FRpcServerSendCommPacket::Encode(unsigned char** BufferHolder,
             if (!Stream.Put(&Ids[Index], 4u)) return 0x16u;
         }
     }
-    if (!Stream.Put(&Field_0x60, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x68, 1u)) return 0x16u;
-    for (int Index = 0; Index < static_cast<int>(Field_0x68); ++Index) {
-        if (!Stream.Put(&Field_0x64[Index], 4u)) return 0x16u;
+    if (!Stream.Put(&CommType, 4u)) return 0x16u;
+    if (!Stream.Put(&TextCount, 1u)) return 0x16u;
+    for (int Index = 0; Index < static_cast<int>(TextCount); ++Index) {
+        if (!Stream.Put(&TextIds[Index], 4u)) return 0x16u;
     }
-    const unsigned short LowWord = static_cast<unsigned short>(Field_0x6c);
+    const unsigned short LowWord = static_cast<unsigned short>(Mood);
     if (!Stream.Put(&LowWord, 2u)) return 0x16u;
-    const unsigned char Quantized = RpcServerSendCommQuantize(&Field_0x70);
+    const unsigned char Quantized = RpcServerSendCommQuantize(&Duration);
     if (!Stream.Put(&Quantized, 1u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b6344a
 }
@@ -3405,11 +3405,11 @@ unsigned int FRpcServerSendCommPacket::Encode(unsigned char** BufferHolder,
 unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x20, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x24, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x28, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x74, 1u)) return MarshalError;
-    if (Field_0x74 != 0) {
+    if (!Stream.Get(&SenderId, 4u)) return MarshalError;
+    if (!Stream.Get(&ReceiverId, 4u)) return MarshalError;
+    if (!Stream.Get(&VoiceId, 4u)) return MarshalError;
+    if (!Stream.Get(&bReceiverIsOwnShip, 1u)) return MarshalError;
+    if (bReceiverIsOwnShip != 0) {
         if (!Stream.Get(&Body.PartIds[0], 4u)) return MarshalError;
         if (!Stream.Get(&Body.PartIds[1], 4u)) return MarshalError;
         Body.PartIds[2] = 0;
@@ -3428,27 +3428,27 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
         Body.PartIds[3] = 0;
         Body.AccessoryCount = 0;
     }
-    if (!Stream.Get(&Field_0x60, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x68, 1u)) return MarshalError;
-    const unsigned int ExtraBytes = static_cast<unsigned int>(static_cast<int>(Field_0x68)) * 4u;
+    if (!Stream.Get(&CommType, 4u)) return MarshalError;
+    if (!Stream.Get(&TextCount, 1u)) return MarshalError;
+    const unsigned int ExtraBytes = static_cast<unsigned int>(static_cast<int>(TextCount)) * 4u;
 #if defined(REMOTECLIENT_EXPORTS)
     if (MarshalCursor + ExtraBytes > MarshalLimit) MarshalError = 0x17u;
     if (MarshalError != 0) return MarshalError;
 #endif
-    if (Field_0x64 != nullptr) ::operator delete(Field_0x64);
-    Field_0x64 = static_cast<unsigned int*>(::operator new(ExtraBytes, std::nothrow));
+    if (TextIds != nullptr) ::operator delete(TextIds);
+    TextIds = static_cast<unsigned int*>(::operator new(ExtraBytes, std::nothrow));
 #if defined(REMOTECLIENT_EXPORTS)
-    if (Field_0x64 == nullptr) return 5u;
+    if (TextIds == nullptr) return 5u;
 #endif
-    for (int Index = 0; Index < static_cast<int>(Field_0x68); ++Index) {
-        if (!Stream.Get(&Field_0x64[Index], 4u)) return MarshalError;
+    for (int Index = 0; Index < static_cast<int>(TextCount); ++Index) {
+        if (!Stream.Get(&TextIds[Index], 4u)) return MarshalError;
     }
     unsigned short LowWord = 0;
     if (!Stream.Get(&LowWord, 2u)) return MarshalError;
-    Field_0x6c = LowWord;
+    Mood = LowWord;
     unsigned char Quantized = 0;
     if (!Stream.Get(&Quantized, 1u)) return MarshalError;
-    RpcServerSendCommExpand(Quantized, &Field_0x70);
+    RpcServerSendCommExpand(Quantized, &Duration);
     return Stream.Finish(OutLength, false);
 }
 
@@ -3456,39 +3456,39 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
 
 // RC 06b4d0b0 / RS 06be7cd0.
 FRpcServerMiscObjUpdatePacket::FRpcServerMiscObjUpdatePacket()
-    : FPacketBase(0x20054u), Flags(0), Field_0x24(0), Field_0x28(0), Field_0x2c(0),
-      Field_0x30(0), Field_0x34(0), Field_0x38(0), Field_0x3c(0), Field_0x50(0),
-      Field_0x54(0xffffffffu), IdCount(0) {}
+    : FPacketBase(0x20054u), Flags(0), PlayerId(0), ObjectId(0), Rank(0),
+      SystemId(0), GroupId(0), MissionId(0), MissionSetBy(0), Field_0x50(0),
+      Affiliation(0xffffffffu), IdCount(0) {}
 
 // RC 06b45830.
 void FRpcServerMiscObjUpdatePacket::SetField0x28(unsigned int Value) {
     Flags |= 0x08u;
-    Field_0x28 = Value;
+    ObjectId = Value;
 }
 
 // RC 06b45840.
 void FRpcServerMiscObjUpdatePacket::SetField0x24(unsigned int Value) {
     Flags |= 0x04u;
-    Field_0x24 = Value;
+    PlayerId = Value;
 }
 
 // RC 06b45850.
 void FRpcServerMiscObjUpdatePacket::SetField0x54(unsigned int Value) {
     Flags |= 0x20u;
-    Field_0x54 = Value;
+    Affiliation = Value;
 }
 
 // RC 06b45860.
 void FRpcServerMiscObjUpdatePacket::SetField0x34(unsigned int Value) {
     Flags |= 0x01u;
-    Field_0x34 = Value;
+    GroupId = Value;
 }
 
 // RC 06b45870.
 void FRpcServerMiscObjUpdatePacket::SetFields0x38(unsigned int Value0x38, unsigned int Value0x3c) {
     Flags |= 0x02u;
-    Field_0x38 = Value0x38;
-    Field_0x3c = Value0x3c;
+    MissionId = Value0x38;
+    MissionSetBy = Value0x3c;
 }
 
 // RC 06b45890: the flag, then VC6 basic_string<unsigned short>::assign(const&) (the whole
@@ -3501,13 +3501,13 @@ void FRpcServerMiscObjUpdatePacket::SetText(const std::wstring& Source) {
 // RC 06b45a40.
 void FRpcServerMiscObjUpdatePacket::SetField0x30(unsigned int Value) {
     Flags |= 0x80u;
-    Field_0x30 = Value;
+    SystemId = Value;
 }
 
 // RC 06b45a50.
 void FRpcServerMiscObjUpdatePacket::SetField0x2c(unsigned short Value) {
     Flags |= 0x40u;
-    Field_0x2c = Value;
+    Rank = Value;
 }
 
 // RC 06b45a60: byte +0x21 |= 1, insert(end(), 1, Id), then the low byte of the size.
@@ -3528,17 +3528,17 @@ unsigned int FRpcServerMiscObjUpdatePacket::Encode(unsigned char** BufferHolder,
     Stream.PutHeader();
     if (!Stream.Put(&Flags, 2u)) return 0x16u;
     if ((Flags & 0x08u) != 0) {
-        if (!Stream.Put(&Field_0x28, 4u)) return 0x16u;
+        if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
     }
     if ((Flags & 0x04u) != 0) {
-        if (!Stream.Put(&Field_0x24, 4u)) return 0x16u;
+        if (!Stream.Put(&PlayerId, 4u)) return 0x16u;
     }
     if ((Flags & 0x01u) != 0) {
-        if (!Stream.Put(&Field_0x34, 4u)) return 0x16u;
+        if (!Stream.Put(&GroupId, 4u)) return 0x16u;
     }
     if ((Flags & 0x02u) != 0) {
-        if (!Stream.Put(&Field_0x38, 4u)) return 0x16u;
-        if (!Stream.Put(&Field_0x3c, 4u)) return 0x16u;
+        if (!Stream.Put(&MissionId, 4u)) return 0x16u;
+        if (!Stream.Put(&MissionSetBy, 4u)) return 0x16u;
     }
     if ((Flags & 0x10u) != 0) {
         const unsigned short Length = static_cast<unsigned short>(Text.size());
@@ -3546,13 +3546,13 @@ unsigned int FRpcServerMiscObjUpdatePacket::Encode(unsigned char** BufferHolder,
         if (!Stream.PutBlock(Text.c_str(), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
     }
     if ((Flags & 0x20u) != 0) {
-        if (!Stream.Put(&Field_0x54, 4u)) return 0x16u;
+        if (!Stream.Put(&Affiliation, 4u)) return 0x16u;
     }
     if ((Flags & 0x40u) != 0) {
-        if (!Stream.Put(&Field_0x2c, 2u)) return 0x16u;
+        if (!Stream.Put(&Rank, 2u)) return 0x16u;
     }
     if ((Flags & 0x80u) != 0) {
-        if (!Stream.Put(&Field_0x30, 4u)) return 0x16u;
+        if (!Stream.Put(&SystemId, 4u)) return 0x16u;
     }
     if ((Flags & 0x100u) != 0) {
         if (!Stream.Put(&IdCount, 1u)) return 0x16u;
@@ -3577,17 +3577,17 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&Flags, 2u)) return MarshalError;
     if ((Flags & 0x08u) != 0) {
-        if (!Stream.Get(&Field_0x28, 4u)) return MarshalError;
+        if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
     }
     if ((Flags & 0x04u) != 0) {
-        if (!Stream.Get(&Field_0x24, 4u)) return MarshalError;
+        if (!Stream.Get(&PlayerId, 4u)) return MarshalError;
     }
     if ((Flags & 0x01u) != 0) {
-        if (!Stream.Get(&Field_0x34, 4u)) return MarshalError;
+        if (!Stream.Get(&GroupId, 4u)) return MarshalError;
     }
     if ((Flags & 0x02u) != 0) {
-        if (!Stream.Get(&Field_0x38, 4u)) return MarshalError;
-        if (!Stream.Get(&Field_0x3c, 4u)) return MarshalError;
+        if (!Stream.Get(&MissionId, 4u)) return MarshalError;
+        if (!Stream.Get(&MissionSetBy, 4u)) return MarshalError;
     }
     if ((Flags & 0x10u) != 0) {
         unsigned short Length = 0;
@@ -3606,13 +3606,13 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
         std::free(Chars);
     }
     if ((Flags & 0x20u) != 0) {
-        if (!Stream.Get(&Field_0x54, 4u)) return MarshalError;
+        if (!Stream.Get(&Affiliation, 4u)) return MarshalError;
     }
     if ((Flags & 0x40u) != 0) {
-        if (!Stream.Get(&Field_0x2c, 2u)) return MarshalError;
+        if (!Stream.Get(&Rank, 2u)) return MarshalError;
     }
     if ((Flags & 0x80u) != 0) {
-        if (!Stream.Get(&Field_0x30, 4u)) return MarshalError;
+        if (!Stream.Get(&SystemId, 4u)) return MarshalError;
     }
     if ((Flags & 0x100u) != 0) {
         if (!Stream.Get(&IdCount, 1u)) return MarshalError;
@@ -3630,7 +3630,7 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
 // RC 06b4c810 / RS 06be7410: the block (base vtable, +0x20..+0x9b, EH states 1..3), then
 // +0xa0..+0xac = 0 and the two bytes 0; +0xb0 and +0xb4 are left.
 FRpcServerCreateSolarPacket::FRpcServerCreateSolarPacket()
-    : FPacketBase(0x20042u), Field_0x9c(0), bMarkedBy(0), NameASize(0), NameA(nullptr),
+    : FPacketBase(0x20042u), bDestructible(0), bMarkedBy(0), NameASize(0), NameA(nullptr),
       NameBSize(0), NameB(nullptr) {}
 
 // RC 06b4c920 / RS 06be7520: operator delete of a non-null NameB (+0xac), then of a
@@ -3652,7 +3652,7 @@ unsigned int FRpcServerCreateSolarPacket::Encode(unsigned char** BufferHolder,
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     RpcServerCreateObjectEncode(*this, Stream, Fields);
-    if (!Stream.Put(&Field_0x9c, 1u)) return 0x16u;
+    if (!Stream.Put(&bDestructible, 1u)) return 0x16u;
     if (!Stream.Put(&bMarkedBy, 1u)) return 0x16u;
     if (!SinglePlayer()) {
         if (!Stream.Put(&Affiliation, 4u)) return 0x16u;
@@ -3676,7 +3676,7 @@ unsigned int FRpcServerCreateSolarPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     RpcServerCreateObjectDecode(*this, Stream, Fields);
-    if (!Stream.Get(&Field_0x9c, 1u)) return MarshalError;
+    if (!Stream.Get(&bDestructible, 1u)) return MarshalError;
     if (!Stream.Get(&bMarkedBy, 1u)) return MarshalError;
     if (!SinglePlayer()) {
         if (!Stream.Get(&Affiliation, 4u)) return MarshalError;
@@ -3703,10 +3703,10 @@ void RpcServerCharacterIdBlockFree(FRpcServerCharacterIdBlock* Block) {
 }
 
 FRpcServerCharacterRecord::FRpcServerCharacterRecord()
-    : Field_0x200(0), Field_0x201(0), Field_0x224(0), Field_0x228(0), Field_0x22c(0),
-      Field_0x230(0), Field_0x234(0), Field_0x238(0), Field_0x23c(0), Field_0x240(0),
-      Field_0x244(0), Field_0x248(0), Field_0x24c(0), Field_0x250(0), Field_0x254(0),
-      Field_0x258(0), Field_0x25c(0), Field_0x260(0), BlockA(nullptr), BlockB(nullptr) {
+    : bIsRestart(0), bIsAutoSave(0), DescripStrId(0), TimestampLow(0), TimestampHigh(0),
+      ShipArchetype(0), Money(0), SystemId(0), BaseId(0), LocationId(0),
+      VoiceId(0), Rank(0), Field_0x24c(0), HullStatusBits(0), NumKills(0),
+      NumMissionFailures(0), NumMissionSuccesses(0), EquipmentCount(0), BlockA(nullptr), BlockB(nullptr) {
     Name.Buffer[0] = '\0';
 }
 
@@ -3745,10 +3745,10 @@ static bool RpcServerPutIdBlock(FRpcWireStream& Stream, const FRpcServerCharacte
     const unsigned char Present = (Block != nullptr) ? 1u : 0u;
     if (!Stream.Put(&Present, 1u)) return false;
     if (Block == nullptr) return true;
-    if (!Stream.Put(&Block->Field_0x04, 4u)) return false;               // 06be0690
-    if (!Stream.Put(&Block->Field_0x00, 4u)) return false;               // 06be06bf
-    if (!Stream.Put(&Block->Field_0x08, 4u)) return false;               // 06be06ef
-    if (!Stream.Put(&Block->Field_0x0c, 4u)) return false;               // 06be071f
+    if (!Stream.Put(&Block->Body, 4u)) return false;               // 06be0690
+    if (!Stream.Put(&Block->Head, 4u)) return false;               // 06be06bf
+    if (!Stream.Put(&Block->LeftHand, 4u)) return false;               // 06be06ef
+    if (!Stream.Put(&Block->RightHand, 4u)) return false;               // 06be071f
     if (!Stream.Put(&Block->Count, 4u)) return false;                    // 06be074f
     // Count dwords as Count*4 bytes (06be0762), checked before the copy (06be0773), then
     // a REP MOVSD/MOVSB into the cached destination (06be079d / 06be093b).
@@ -3776,32 +3776,32 @@ unsigned int FRpcServerCharacterInfoPacket::Encode(unsigned char** BufferHolder,
                 static_cast<unsigned short>(std::strlen(Record->Name.Buffer));
             if (!Stream.Put(&NameLength, 2u)) return 0x16u;                 // 06be01cb
             if (!Stream.PutBlock(Record->Name.Buffer, NameLength)) return 0x16u; // 06be020e
-            if (!Stream.Put(&Record->Field_0x200, 1u)) return 0x16u;         // 06be0252
-            if (!Stream.Put(&Record->Field_0x201, 1u)) return 0x16u;         // 06be027b
+            if (!Stream.Put(&Record->bIsRestart, 1u)) return 0x16u;         // 06be0252
+            if (!Stream.Put(&Record->bIsAutoSave, 1u)) return 0x16u;         // 06be027b
             if (!RpcServerPutWideText(Stream, Record->TextA)) return 0x16u;
             if (!RpcServerPutWideText(Stream, Record->TextB)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x224, 4u)) return 0x16u;         // 06be03b7
-            if (!Stream.Put(&Record->Field_0x22c, 4u)) return 0x16u;         // 06be03e4
-            if (!Stream.Put(&Record->Field_0x228, 4u)) return 0x16u;         // 06be0411
-            if (!Stream.Put(&Record->Field_0x230, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x234, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x238, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x23c, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x240, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x244, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x248, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->DescripStrId, 4u)) return 0x16u;         // 06be03b7
+            if (!Stream.Put(&Record->TimestampHigh, 4u)) return 0x16u;         // 06be03e4
+            if (!Stream.Put(&Record->TimestampLow, 4u)) return 0x16u;         // 06be0411
+            if (!Stream.Put(&Record->ShipArchetype, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->Money, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->SystemId, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->BaseId, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->LocationId, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->VoiceId, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->Rank, 4u)) return 0x16u;
             if (!Stream.Put(&Record->Field_0x24c, 4u)) return 0x16u;
             // 06be059d FLD / 06be05a9 FSTP: the hull status crosses the x87 stack.
-            if (!Stream.PutFloat(*reinterpret_cast<const float*>(&Record->Field_0x250)))
+            if (!Stream.PutFloat(*reinterpret_cast<const float*>(&Record->HullStatusBits)))
                 return 0x16u;
-            if (!Stream.Put(&Record->Field_0x254, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x258, 4u)) return 0x16u;
-            if (!Stream.Put(&Record->Field_0x25c, 4u)) return 0x16u;         // 06be062e
+            if (!Stream.Put(&Record->NumKills, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->NumMissionFailures, 4u)) return 0x16u;
+            if (!Stream.Put(&Record->NumMissionSuccesses, 4u)) return 0x16u;         // 06be062e
             if (!RpcServerPutIdBlock(Stream, Record->BlockA)) return 0x16u;
             if (!RpcServerPutIdBlock(Stream, Record->BlockB)) return 0x16u;
             // 06be099e: the stored count byte, then the whole list (06be09b0 header
             // test only).
-            if (!Stream.Put(&Record->Field_0x260, 1u)) return 0x16u;
+            if (!Stream.Put(&Record->EquipmentCount, 1u)) return 0x16u;
             if (Record->Equipment.Records != nullptr) {
                 for (std::list<FRpcServerEquipRecord*>::const_iterator Item =
                          Record->Equipment.Records->begin();
@@ -3812,7 +3812,7 @@ unsigned int FRpcServerCharacterInfoPacket::Encode(unsigned char** BufferHolder,
                     if (!Stream.Put(&E->ArchId, 4u)) return 0x16u;           // 06be0a5a
                     if (!Stream.Put(&E->Id, 2u)) return 0x16u;               // 06be0a85
                     if (!Stream.Put(&E->bEquipped, 1u)) return 0x16u;        // 06be0aae
-                    if (!Stream.Put(&E->Field_0x0f, 1u)) return 0x16u;       // 06be0ad4
+                    if (!Stream.Put(&E->bMission, 1u)) return 0x16u;       // 06be0ad4
                     if (!Stream.Put(&E->HardpointSize, 2u)) return 0x16u;
                     if (!Stream.PutBlock(E->Hardpoint, E->HardpointSize))
                         return 0x16u;                                        // 06be0b3a
@@ -3861,16 +3861,16 @@ static unsigned int RpcServerGetIdBlock(FRpcWireStream& Stream, FPacketBase& Pac
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
     Out = Block;                                                             // 06bdf31e
-    if (!Stream.Get(&Block->Field_0x04, 4u)) return Packet.MarshalError;
-    if (!Stream.Get(&Block->Field_0x00, 4u)) return Packet.MarshalError;    // 06bdf38a
-    if (!Stream.Get(&Block->Field_0x08, 4u)) return Packet.MarshalError;
-    if (!Stream.Get(&Block->Field_0x0c, 4u)) return Packet.MarshalError;    // 06bdf3f5
+    if (!Stream.Get(&Block->Body, 4u)) return Packet.MarshalError;
+    if (!Stream.Get(&Block->Head, 4u)) return Packet.MarshalError;    // 06bdf38a
+    if (!Stream.Get(&Block->LeftHand, 4u)) return Packet.MarshalError;
+    if (!Stream.Get(&Block->RightHand, 4u)) return Packet.MarshalError;    // 06bdf3f5
     if (!Stream.Get(&Block->Count, 4u)) return Packet.MarshalError;         // 06bdf42e
     if (static_cast<unsigned int>(Block->Count) != 0) {                      // 06bdf43e JBE
         const unsigned int Bytes = static_cast<unsigned int>(Block->Count) << 2;
@@ -3911,32 +3911,32 @@ unsigned int FRpcServerCharacterInfoPacket::Decode(const unsigned char* Buffer,
         // bound (06bdedf0): reproduced on purpose.
         if (!Stream.Get(Record->Name.Buffer, NameLength)) return MarshalError;
         Record->Name.Buffer[NameLength] = '\0';
-        if (!Stream.Get(&Record->Field_0x200, 1u)) return MarshalError;     // 06bdee20
-        if (!Stream.Get(&Record->Field_0x201, 1u)) return MarshalError;     // 06bdee49
+        if (!Stream.Get(&Record->bIsRestart, 1u)) return MarshalError;     // 06bdee20
+        if (!Stream.Get(&Record->bIsAutoSave, 1u)) return MarshalError;     // 06bdee49
         if (!RpcServerGetWideText(Stream, Record->TextA)) return MarshalError;
         if (!RpcServerGetWideText(Stream, Record->TextB)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x224, 4u)) return MarshalError;     // 06bdf04a
-        if (!Stream.Get(&Record->Field_0x22c, 4u)) return MarshalError;     // 06bdf077
-        if (!Stream.Get(&Record->Field_0x228, 4u)) return MarshalError;     // 06bdf0a4
-        if (!Stream.Get(&Record->Field_0x230, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x234, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x238, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x23c, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x240, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x244, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x248, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->DescripStrId, 4u)) return MarshalError;     // 06bdf04a
+        if (!Stream.Get(&Record->TimestampHigh, 4u)) return MarshalError;     // 06bdf077
+        if (!Stream.Get(&Record->TimestampLow, 4u)) return MarshalError;     // 06bdf0a4
+        if (!Stream.Get(&Record->ShipArchetype, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->Money, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->SystemId, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->BaseId, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->LocationId, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->VoiceId, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->Rank, 4u)) return MarshalError;
         if (!Stream.Get(&Record->Field_0x24c, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x250, 4u)) return MarshalError;     // 06bdf239 MOV
-        if (!Stream.Get(&Record->Field_0x254, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x258, 4u)) return MarshalError;
-        if (!Stream.Get(&Record->Field_0x25c, 4u)) return MarshalError;     // 06bdf2bd
+        if (!Stream.Get(&Record->HullStatusBits, 4u)) return MarshalError;     // 06bdf239 MOV
+        if (!Stream.Get(&Record->NumKills, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->NumMissionFailures, 4u)) return MarshalError;
+        if (!Stream.Get(&Record->NumMissionSuccesses, 4u)) return MarshalError;     // 06bdf2bd
         unsigned int Error = RpcServerGetIdBlock(Stream, *this, Record->BlockA);
         if (Error != 0) return Error;
         Error = RpcServerGetIdBlock(Stream, *this, Record->BlockB);
         if (Error != 0) return Error;
-        if (!Stream.Get(&Record->Field_0x260, 1u)) return MarshalError;     // 06bdf6df
+        if (!Stream.Get(&Record->EquipmentCount, 1u)) return MarshalError;     // 06bdf6df
         // 06bdf6e7..06bdf8f2: word counter against the stored byte, re-read each round.
-        for (unsigned short Item = 0; Item < static_cast<unsigned short>(Record->Field_0x260);
+        for (unsigned short Item = 0; Item < static_cast<unsigned short>(Record->EquipmentCount);
              ++Item) {
             // 06bdf702 operator new(0x18); null skips this element's reads (06bdf712).
             FRpcServerEquipRecord* E = static_cast<FRpcServerEquipRecord*>(
@@ -3947,7 +3947,7 @@ unsigned int FRpcServerCharacterInfoPacket::Decode(const unsigned char* Buffer,
             E->Health = 0.0f;
             E->Id = 0;
             E->bEquipped = 0;
-            E->Field_0x0f = 0;
+            E->bMission = 0;
             E->HardpointSize = 0;
             E->Hardpoint = nullptr;
             if (!Stream.Get(&E->Count, 4u)) return MarshalError;             // 06bdf760
@@ -3955,7 +3955,7 @@ unsigned int FRpcServerCharacterInfoPacket::Decode(const unsigned char* Buffer,
             if (!Stream.Get(&E->ArchId, 4u)) return MarshalError;            // 06bdf7b8
             if (!Stream.Get(&E->Id, 2u)) return MarshalError;                // 06bdf7e4
             if (!Stream.Get(&E->bEquipped, 1u)) return MarshalError;         // 06bdf80d
-            if (!Stream.Get(&E->Field_0x0f, 1u)) return MarshalError;        // 06bdf835
+            if (!Stream.Get(&E->bMission, 1u)) return MarshalError;        // 06bdf835
             if (!Stream.Get(&E->HardpointSize, 2u)) return MarshalError;     // 06bdf85f
 #if defined(REMOTECLIENT_EXPORTS)
             // RC 06b411fc..06b41226: the run is checked first, a null block returns 5.

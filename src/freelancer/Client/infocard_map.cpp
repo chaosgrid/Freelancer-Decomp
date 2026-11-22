@@ -39,20 +39,20 @@ void FInfocardMap::Load()
             unsigned const Key = static_cast<unsigned>(static_cast<int>(Reader.get_value_float(0)));
             FInfocardMapEntry Entry;
             Entry.ExtraIds = static_cast<int>(Reader.get_value_float(1));
-            Entry.Field_0x04 = 1;
-            Entry.Field_0x08 = 1;
-            Entry.Field_0x0c = 1;
+            Entry.bShowEquipment = 1;
+            Entry.bShowCommodities = 1;
+            Entry.bShowShips = 1;
             if (!Reader.is_value_empty(2))
             {
-                Entry.Field_0x04 = static_cast<int>(Reader.get_value_float(2));
+                Entry.bShowEquipment = static_cast<int>(Reader.get_value_float(2));
             }
             if (!Reader.is_value_empty(3))
             {
-                Entry.Field_0x08 = static_cast<int>(Reader.get_value_float(3));
+                Entry.bShowCommodities = static_cast<int>(Reader.get_value_float(3));
             }
             if (!Reader.is_value_empty(4))
             {
-                Entry.Field_0x0c = static_cast<int>(Reader.get_value_float(4));
+                Entry.bShowShips = static_cast<int>(Reader.get_value_float(4));
             }
             // 0x00458520..0x00458615: the unique insert (FUN_00458d00) -- a key already in the
             // tree keeps its first line (0x00458602).

@@ -25,7 +25,7 @@ __declspec(noinline) void FObjectShip::SetEngineSparam(float Sparam)
     {
         IFxEffect* const Effect = EngineFx[Index].Particles.Effect;
         if (Effect != nullptr)
-            Effect->Slot6(Sparam);
+            Effect->SetOuterTime(Sparam);
     }
 }
 #pragma float_control(pop)

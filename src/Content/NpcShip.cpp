@@ -136,12 +136,12 @@ FContentNpcShipParams::FContentNpcShipParams(FContentNpcShipParams const& Other)
     , Voice(Other.Voice)
     , GuideDesc(Other.GuideDesc)
     , Pilot(Other.Pilot)
-    , Field_0x104(Other.Field_0x104)
-    , Field_0x108(Other.Field_0x108)
+    , Longevity(Other.Longevity)
+    , InitialLifeTime(Other.InitialLifeTime)
     , Field_0x10c(Other.Field_0x10c)
-    , Field_0x110(Other.Field_0x110)
+    , DockIndex(Other.DockIndex)
     , GuideTargetId(Other.GuideTargetId)
-    , Field_0x118(Other.Field_0x118)
+    , LabelIds(Other.LabelIds)
     , Personality(Other.Personality)
     , CreationType(Other.CreationType)
     , Level(Other.Level)
@@ -217,13 +217,13 @@ bool __cdecl ApplyNpcShipArchById(FContentNpcShipParams* Params, unsigned int co
 // FUN_06f34a80 (06f34a80-06f34acc). Retail: FP = FUN_06f50650(&FactionId); null -> false;
 // FUN_06f4f430(FP, Param2, &Params->CommCostume); FUN_06f4f620(FP, (Param2 != 1) + 1,
 // &Params->Voice); true. Both pick results are ignored.
-bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Param2, FContentNpcShipParams* Params)
+bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Gender, FContentNpcShipParams* Params)
 {
     FFactionProps* FactionProps = GetFactionProps(&FactionId);
     if (FactionProps == nullptr)
         return false;
-    FactionProps->PickSpaceCostume(Param2, &Params->CommCostume);
-    FactionProps->PickVoice(static_cast<unsigned int>((Param2 != 1) ? 1 : 0) + 1, &Params->Voice);
+    FactionProps->PickSpaceCostume(Gender, &Params->CommCostume);
+    FactionProps->PickVoice(static_cast<unsigned int>((Gender != 1) ? 1 : 0) + 1, &Params->Voice);
     return true;
 }
 
@@ -235,14 +235,14 @@ bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Param2, FContentNpc
 FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     : FContentShipBase(Params)
     , CreationKind(Params->CreationType)
-    , Field_0x1bc(Params->Field_0x104)
+    , Longevity(Params->Longevity)
     , Field_0x1c0(Params->Field_0x10c)
     , Loadout(Params->Loadout)
-    , Field_0x1c8(Params->Field_0x108)
+    , LifeTime(Params->InitialLifeTime)
     , Field_0x5a8(Params->Field_0x78)
 {
     // 06f336e8-06f337ac: the members above in retail order; both ID_Strings cleared.
-    Field_0x1cc.clear();
+    PilotId.clear();
     EncounterParamsId.clear();
 
     // 06f337c9: the TU20 base copied the handle raw; the NPC ship takes a reference
@@ -265,7 +265,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     Info.Velocity.x = 0.0f;
     Info.Velocity.y = 0.0f;
     Info.Velocity.z = 0.0f;
-    Info.Field_0x54 = 0;
+    Info.GroupNameId = 0;
     Info.LoadoutID = 0;
     Info.CostumeHead = 0;
     Info.CostumeBody = 0;
@@ -279,7 +279,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     Info.DockingBaseId = 0;
     Info.HitPts = -1;
     Info.Field_0xb4 = 0;
-    Info.Field_0xb8 = 0;
+    Info.MarkPlayerId = 0;
     Info.ReputationRank = 0;
     Info.Orientation = Matrix(1.0f, 0.0f, 0.0f,
                               0.0f, 1.0f, 0.0f,
@@ -326,7 +326,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     Info.ReputationRank = static_cast<unsigned int>(Params->Level);
 
     // 06f33a3f-06f33a95: list assignment (FUN_06fa8370 / FUN_06ed0230).
-    Field_0x17c = Params->Field_0x118;
+    LabelIds = Params->LabelIds;
 
     // 06f33a9a-06f33aaf.
     CreationKind = Params->CreationType;
@@ -436,7 +436,7 @@ FContentNpcShip::~FContentNpcShip()
 }
 
 // 06ea1460: MOV AL,1; RET.
-bool FContentNpcShip::Slot04()
+bool FContentNpcShip::IsNpcShip()
 {
     return true;
 }
@@ -450,7 +450,7 @@ pub::AI::Personality* FContentNpcShip::GetPersonality()
 // LAB_06f341f0 (06f341f0-06f3423b). Retail: FP = FUN_06f50650(&Affiliation of +8) (no null
 // check); Out[n++] = FP+0x60 element key while n < MaxCount; returns n. The +0x60 list is
 // the scan_for_cargo pairs (FFactionProps::ScanForCargo), the key their archetype.
-int FContentNpcShip::Slot18(unsigned int* Out, int MaxCount)
+int FContentNpcShip::GetScanForCargo(unsigned int* Out, int MaxCount)
 {
     unsigned int Affiliation = ReputationHandle->GetAffiliation();
     FFactionProps* FactionProps = GetFactionProps(&Affiliation);
@@ -485,7 +485,7 @@ void FContentNpcShip::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
 void FContentNpcShip::tether_object_event(uint ObjectId1, uint ObjectId2, TetherStatusType Status,
                                           Vector const& Position)
 {
-    if (Field_0x1b1)
+    if (bCommMuted)
         return;
     if (GNpcShipEvents.LastTetherStatus == static_cast<unsigned int>(Status))
         return;
@@ -551,7 +551,7 @@ void FContentNpcShip::lead_object_event(uint ObjectId1, uint ObjectId2, LeadProg
                                         float Value, Vector const& Position)
 {
     unsigned int const ProgressValue = static_cast<unsigned int>(Progress);
-    if (!Field_0x1b1 && GNpcShipEvents.LastLeadProgress != ProgressValue)
+    if (!bCommMuted && GNpcShipEvents.LastLeadProgress != ProgressValue)
     {
         FSystemInfo* Sys = GetSystem();
         if (Sys != nullptr)
@@ -816,17 +816,17 @@ void FContentNpcShip::ClearFlee()
 
 // FUN_06f33fd0 (06f33fd0-06f33fec): byte +0x1b1 = Value; non-zero -> JMP FUN_06f68600
 // (ECX = DAT_06fd1bd8, the ship as its argument).
-void FContentNpcShip::SetField1b1(bool Value)
+void FContentNpcShip::SetCommMuted(bool Value)
 {
-    Field_0x1b1 = Value;
+    bCommMuted = Value;
     if (Value)
         GNpcShipEvents.ClearTimer(this);
 }
 
 // FUN_06f33ff0: MOV AL,[ECX+0x1b1]; RET.
-bool FContentNpcShip::GetField1b1() const
+bool FContentNpcShip::IsCommMuted() const
 {
-    return Field_0x1b1;
+    return bCommMuted;
 }
 
 // FUN_06f34100 (06f34100-06f341e1). --CommLinesLeft; > 0 -> done. Otherwise block {ship,
@@ -1065,7 +1065,7 @@ void FNpcShipEventList::HandleMessage(pub::Controller::EMessage MsgId, void cons
         switch (It->Kind)
         {
         case 0:
-            Ship->SetField1b1(false);
+            Ship->SetCommMuted(false);
             It->TimerId = 0;
             break;
         case 1:
@@ -1121,13 +1121,13 @@ void FNpcShipEventList::ClearTimer(FContentNpcShip* Ship)
         Found->TimerId = 0;
 }
 
-// FUN_06f68630 (06f68630-06f68701, RET 8). Id = DAT_06fce76c++; Ship->SetField1b1(true);
+// FUN_06f68630 (06f68630-06f68701, RET 8). Id = DAT_06fce76c++; Ship->SetCommMuted(true);
 // Ship +0x1b8 = 5; an existing record gets TimerId = Id, Kind = 0; otherwise {Ship, 0, Id,
 // Kind 0} is appended; +0xc/+0x10/+0x14 = 0; pub::SetTimer(&SpaceSupport, {Id, 0}, Delay).
 void FNpcShipEventList::StartTimer(FContentNpcShip* Ship, float Delay)
 {
     unsigned int Id = GContentNextUniqueId++;
-    Ship->SetField1b1(true);
+    Ship->SetCommMuted(true);
     Ship->CommLinesLeft = 5;
 
     std::list<FNpcShipEvent>::iterator Found = FindShipEvent(Events, Ship);

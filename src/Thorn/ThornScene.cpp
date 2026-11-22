@@ -1863,8 +1863,8 @@ namespace
                 Entity->LightControl->GetDirection(reinterpret_cast<float*>(Blob + 0x0C));
                 Entity->LightControl->GetRange(reinterpret_cast<float*>(Blob + 0x18));
                 Entity->LightControl->GetCutoff(reinterpret_cast<float*>(Blob + 0x1C));
-                Entity->LightControl->GetSlot14(reinterpret_cast<float*>(Blob + 0x24));
-                Entity->LightControl->GetSlot13(reinterpret_cast<float*>(Blob + 0x20));
+                Entity->LightControl->GetInfinite(reinterpret_cast<float*>(Blob + 0x24));
+                Entity->LightControl->GetOn(reinterpret_cast<float*>(Blob + 0x20));
                 ConvertCompactLight(Out);
             }
             std::memcpy(&Entity->LightEntityDescriptor, Out, sizeof(Entity->LightEntityDescriptor));
@@ -1944,7 +1944,7 @@ namespace
                 Entity->LightControl->SetCutoff(-1.0f);
             else
                 Entity->LightControl->SetCutoff(Live.Cutoff * PiOver180);
-            Entity->LightControl->SetIsSpot((Live.Type == 3) ? 1 : 0);
+            Entity->LightControl->SetInfinite((Live.Type == 3) ? 1 : 0);
             Entity->LightControl->SetOn(Live.On);
         }
     }
@@ -3110,15 +3110,15 @@ FThornEvent::FThornEvent(int DescriptorStorageType)
                                       ? FloorDesc.Common : DescriptorStorageType == kThornTypePathAnim
                                           ? PathDesc.Common : UserEventDesc.Common),
       PcurvePeriod(DescriptorStorageType == kThornTypeFogPropAnim
-          ? FogDesc.Common.Field28 : DescriptorStorageType == kThornTypePsysPropAnim
-              ? PsysPropDesc.Common.Field28 : DescriptorStorageType == kThornTypeAudioPropAnim
-                  ? AudioPropDesc.Common.Field28 : DescriptorStorageType == kThornTypeLightPropAnim
-                      ? LightDesc.Common.Field28 : DescriptorStorageType == kThornTypeReverbPropAnim
-                          ? ReverbDesc.Common.Field28 : DescriptorStorageType == kThornTypeCameraPropAnim
-                              ? CameraDesc.Common.Field28 : DescriptorStorageType == kThornTypeSetCamera
-                                  ? SetCameraDesc.Field28 : DescriptorStorageType == kThornTypeFloorHeightAnim
-                                      ? FloorDesc.Common.Field28 : DescriptorStorageType == kThornTypePathAnim
-                                          ? PathDesc.Common.Field28 : UserEventDesc.Common.Field28), SpatialMask(0),
+          ? FogDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypePsysPropAnim
+              ? PsysPropDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypeAudioPropAnim
+                  ? AudioPropDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypeLightPropAnim
+                      ? LightDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypeReverbPropAnim
+                          ? ReverbDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypeCameraPropAnim
+                              ? CameraDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypeSetCamera
+                                  ? SetCameraDesc.ParamCurvePeriod : DescriptorStorageType == kThornTypeFloorHeightAnim
+                                      ? FloorDesc.Common.ParamCurvePeriod : DescriptorStorageType == kThornTypePathAnim
+                                          ? PathDesc.Common.ParamCurvePeriod : UserEventDesc.Common.ParamCurvePeriod), SpatialMask(0),
       AxisRotAngle(0.0f), AxisRotAxis(1), AxisRotApplied(0.0f), SpatialWrapLast(0.0f),
       bHasTargetPos(false),
       bHasTargetOrient(false), bCaptured(false), UserEventString(nullptr), CamMask(CameraDesc.Mask), CamTarget(CameraDesc.Target), LightMask(LightDesc.Mask), LightTarget(LightDesc.Target),
@@ -3145,7 +3145,7 @@ FThornEvent::FThornEvent(int DescriptorStorageType)
     Desc.UniqueId = -1;
     Desc.PrimaryIndex = -1;
     Desc.SecondaryIndex = -1;
-    Desc.Field28 = -1;
+    Desc.ParamCurvePeriod = -1;
     StartPercent = 0.0f;
     StopPercent = 1.0f;
     PercentDelta = 1.0f;
@@ -3501,7 +3501,7 @@ void FThornEvent::ApplyCommonDesc(const void* DescIn)
     ParamCurve = Incoming.ParamCurve;
     if (ParamCurve != nullptr)
         ParamCurve->AddRef();
-    PcurvePeriod = Incoming.Field28;
+    PcurvePeriod = Incoming.ParamCurvePeriod;
 }
 
 void FThornEvent::FinalizeDesc()
@@ -5070,7 +5070,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
         const unsigned int LowWord = static_cast<unsigned int>(Converted);
         int StartValue;
         std::memcpy(&StartValue, &LowWord, sizeof(StartValue));
-        return HrToAl(Control->Slot3Start(StartValue));
+        return HrToAl(Control->Start(StartValue));
     }
     if (NativeEventType == kThornTypeStartPsys)
     {
@@ -5103,7 +5103,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
             return 0;
         IUserEventControl* Control = Primary->UserEventControl;
         // Retail passes owner+28 directly, without an event virtual getter.
-        return HrToAl(Control->Slot3(&UserEventDesc));
+        return HrToAl(Control->StartUserEvent(&UserEventDesc));
     }
     if (Type == kThornTypeCameraPropAnim)
         return StartCameraPropAnim(Scene);
@@ -5296,7 +5296,7 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
             break;
         case kThornTypeStartSubScene:
             if (Primary->ScriptControl != nullptr)
-                Primary->ScriptControl->Slot5Stop();
+                Primary->ScriptControl->Stop();
             break;
         case kThornTypeStartPsys:
             if (Primary->PsysControl != nullptr)
@@ -5333,7 +5333,7 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
         if (Primary != nullptr && Primary->UserEventControl != nullptr)
         {
             IUserEventControl* Control = Primary->UserEventControl;
-                Control->Slot4(&UserEventDesc);
+                Control->StopUserEvent(&UserEventDesc);
         }
         return 0;
     }
@@ -5347,7 +5347,7 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
         Primary->SoundControl->StopSound(&Desc);
     else if (Type == kThornTypeStartSubScene && Primary != nullptr &&
              Primary->ScriptControl != nullptr)
-        Primary->ScriptControl->Slot5Stop();
+        Primary->ScriptControl->Stop();
     else if (Type == kThornTypeStartPsys && Primary != nullptr && Primary->PsysControl != nullptr)
         Primary->PsysControl->StopEffect();
     else if (Type == kThornTypeConnectHardpoints && Primary != nullptr &&
@@ -5490,8 +5490,8 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
                     Secondary->LightControl->GetDirection(Live.Direction);
                     Secondary->LightControl->GetRange(&Live.RangeTemp);
                     Secondary->LightControl->GetCutoff(&Live.CutoffTemp);
-                    Secondary->LightControl->GetSlot14(reinterpret_cast<float*>(&Live.Infinite));
-                    Secondary->LightControl->GetSlot13(reinterpret_cast<float*>(&Live.On));
+                    Secondary->LightControl->GetInfinite(reinterpret_cast<float*>(&Live.Infinite));
+                    Secondary->LightControl->GetOn(reinterpret_cast<float*>(&Live.On));
                     ConvertCompactLightRetail(reinterpret_cast<const unsigned char*>(&Live),
                                               reinterpret_cast<unsigned char*>(&Live.Type));
                 }
@@ -5807,7 +5807,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
         else
         {
             float QuaternionWords[4];
-            if (Secondary->MotionPath->Slot5(Percent, QuaternionWords) == GR_OK)
+            if (Secondary->MotionPath->Slot5Orientation(Percent, QuaternionWords) == GR_OK)
             {
                 FQuaternion Quaternion;
                 std::memcpy(&Quaternion, QuaternionWords, sizeof(Quaternion));
@@ -7800,7 +7800,7 @@ void FThornScene::FrameUpdateEntities(int TimeMs)
             Entity->CompoundControl->AdvanceTime(static_cast<int>(static_cast<unsigned int>(TimeMs) -
                             static_cast<unsigned int>(ClockMs_)));
         else if (Type == kThornEntitySubScene && Entity->ScriptControl != nullptr)
-            Entity->ScriptControl->Slot4Tick(static_cast<int>(static_cast<unsigned int>(TimeMs) -
+            Entity->ScriptControl->Tick(static_cast<int>(static_cast<unsigned int>(TimeMs) -
                             static_cast<unsigned int>(ClockMs_)));
         else if (Type == kThornEntityPsys && Entity->PsysControl != nullptr)
             Entity->PsysControl->Tick(static_cast<int>(static_cast<unsigned int>(TimeMs) -
@@ -8620,7 +8620,7 @@ namespace
             return;
         SaveParamCurve(Buf, Descriptor->ParamCurve);
         // 2c1bc reads the period AFTER all curve and flush callbacks.
-        SaveBufAppendInteger(Buf, ", pcurve_period = %d", Descriptor->Field28);
+        SaveBufAppendInteger(Buf, ", pcurve_period = %d", Descriptor->ParamCurvePeriod);
     }
 
     // 2cf60 promotes the matrix by columns: 0,3,6,1,4,7,2,5,8.
@@ -8936,11 +8936,11 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             if (ComContext != nullptr)
             {
                 FThornUserEventDesc* UserDescriptor = reinterpret_cast<FThornUserEventDesc*>(Descriptor);
-                const unsigned int Size = ComContext->Slot5(UserDescriptor);
+                const unsigned int Size = ComContext->GetUserEventStringLength(UserDescriptor);
                 if (Size != 0)
                 {
                     char* Buffer = static_cast<char*>(::operator new(Size + 1u));
-                    const GENRESULT Hr = ComContext->Slot4(UserDescriptor, Buffer, Size);
+                    const GENRESULT Hr = ComContext->GetUserEventString(UserDescriptor, Buffer, Size);
                     if (Hr == GR_OK)
                         SaveBufAppendStringValue(&Buf, ", user_event_string = \"%s\"", Buffer);
                     ::operator delete(Buffer);

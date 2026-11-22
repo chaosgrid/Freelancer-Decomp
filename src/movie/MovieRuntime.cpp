@@ -1212,7 +1212,7 @@ static void MovieOldSbhTrim(int Limit)
             }
             FMovieOldSbhDesc* Current = Desc;
             Desc = Desc->Prev;
-            if (Freed != 0 && *(uint32_t*)((uint8_t*)Current + 0x18) == 0xFFFFFFFFu)
+            if (Freed != 0 && Current->PageInfo[0] == 0xFFFFFFFFu)
             {
                 uint32_t* Scan = (uint32_t*)((uint8_t*)Current + 0x20);
                 int Count = 1;

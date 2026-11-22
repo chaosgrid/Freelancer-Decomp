@@ -1114,10 +1114,10 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
     // those finds by name; common_newchar.h declares them in this slot order
     // (labels corrected 2026-09-24).
     NewChar::IDatabase const* Database = NewChar::TheDB;
-    FNewCharFaction const* Faction = Database->FindFaction(Info.Field_0x30);   // S+0x6c
-    FNewCharPackage const* Package = Database->FindPackage(Info.Field_0x38);   // S+0x18
-    FNewCharExtra const* HomeBase = Database->FindExtra(Info.Field_0x34);      // S+0x1c
-    FNewCharPilot const* Pilot = Database->FindPilot(Info.Field_0x3c);         // S+0x14
+    FNewCharFaction const* Faction = Database->FindFaction(Info.FactionId);   // S+0x6c
+    FNewCharPackage const* Package = Database->FindPackage(Info.PackageId);   // S+0x18
+    FNewCharExtra const* HomeBase = Database->FindExtra(Info.BaseId);      // S+0x1c
+    FNewCharPilot const* Pilot = Database->FindPilot(Info.PilotId);         // S+0x14
 
     // .text:06d4b905 .. .text:06d4b93a -- all four missing: false, no file.
     if (Faction == nullptr && Package == nullptr && HomeBase == nullptr && Pilot == nullptr)
@@ -1242,7 +1242,7 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
                                         // find matched; a missing base or system keeps
                                         // the literal placeholder (.text:06d4be4f /
                                         // .text:06d4be64 jump past the store).
-                                        Universe::IBase const* Base = Universe::get_base(Info.Field_0x34);
+                                        Universe::IBase const* Base = Universe::get_base(Info.BaseId);
                                         if (Base != nullptr) {
                                             // IBase vtable +0x10 / ISystem vtable +0x08 --
                                             // the port's plain SystemId / Nickname fields.

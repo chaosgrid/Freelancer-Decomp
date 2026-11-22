@@ -89,8 +89,8 @@ public:
     // from ~IVP_Real_Object (.text:0634537a-06345381) with the object being
     // deleted. cmn-phy7 2026-10-08 (was event_post_collision(IVP_Event_Collision*)).
     virtual void event_collision_object_deleted(IVP_Real_Object* /*Object*/) {}
-    virtual void Slot02(void* /*Arg*/) {}                                 // slot 2 (enabled_callbacks & 4): 0634b0e0, 0634cfa0
-    virtual void Slot03(void* /*Arg*/) {}                                 // slot 3 (enabled_callbacks & 4): 0634b140, 0634cfe0
+    virtual void event_friction_created(void* /*Arg*/) {}                 // slot 2 (enabled_callbacks & 4): 0634b0e0, 0634cfa0
+    virtual void event_friction_deleted(void* /*Arg*/) {}                 // slot 3 (enabled_callbacks & 4): 0634b140, 0634cfe0
     virtual ~IVP_Listener_Collision() {}                              // slot 4
 
     int32_t enabled_callbacks; // +0x04
@@ -181,12 +181,12 @@ public:
 class IVP_PerformanceCounter
 {
 public:
-    virtual void Slot00() = 0;                                                  // slot 0
-    virtual void Slot01(int32_t Arg) = 0;                                       // slot 1
-    virtual void Slot02() = 0;                                                  // slot 2
+    virtual void start_pcount() = 0;                                                  // slot 0
+    virtual void pcount(int32_t Arg) = 0;                                       // slot 1
+    virtual void stop_pcount() = 0;                                                  // slot 2
     // slot 3: PhyPerfCounter's body (LAB_06285e30) deletes the counter.
     virtual void environment_is_going_to_be_deleted(IVP_Environment* Env) = 0;
     // slot 4: 8 bytes of stack arguments; their type is not derived.
-    virtual void Slot04(float Arg0, float Arg1) = 0;
+    virtual void reset_and_print_performance_counters(float Arg0, float Arg1) = 0;
     virtual ~IVP_PerformanceCounter() {}                                        // slot 5
 };

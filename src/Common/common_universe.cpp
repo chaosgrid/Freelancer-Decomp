@@ -136,7 +136,7 @@ namespace
         Desc.ShareMode = 1;
         Desc.Creation = 3;
         Desc.Flags = 0x8000080;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.FindHandle = 0xFFFFFFFF;
 
         void* Object = nullptr;
         GENRESULT Result = DALib::Dacom->CreateInstance((AGGDESC*)&Desc, &Object);

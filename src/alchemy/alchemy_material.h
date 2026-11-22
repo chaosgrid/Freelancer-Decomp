@@ -80,13 +80,13 @@ namespace AlchemyImpl
     // QI/AddRef/Release).
     struct IALBatchedMaterial : IDAComponent
     {
-        virtual GENRESULT DACOM_API Slot3(void* A) = 0;                    // +0x0C LAB_062032a0 RET 8, returns -1
-        virtual GENRESULT DACOM_API Slot4(void* A) = 0;                    // +0x10 LAB_062032b0 RET 8, returns -1
-        virtual GENRESULT DACOM_API Slot5(unsigned long* Out) = 0;         // +0x14 LAB_062032c0 RET 8, *Out=1, returns 0
-        virtual GENRESULT DACOM_API Slot6(void* A) = 0;                    // +0x18 LAB_06203300 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot7(void* A) = 0;                    // +0x1C LAB_06203310 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot8(void* A, void* B, void* C, void* D,
-                                          void* E, void* F, void* G) = 0;  // +0x20 LAB_062032f0 RET 0x20, returns 0
+        virtual GENRESULT DACOM_API CreateInnerMaterial(void* A) = 0;       // +0x0C LAB_062032a0 RET 8, returns -1 (formerly Slot3)
+        virtual GENRESULT DACOM_API SetBatchBin(void* A) = 0;               // +0x10 LAB_062032b0 RET 8, returns -1 (formerly Slot4)
+        virtual GENRESULT DACOM_API GetBatchBin(unsigned long* Out) = 0;    // +0x14 LAB_062032c0 RET 8, *Out=1, returns 0 (formerly Slot5)
+        virtual GENRESULT DACOM_API Bind(void* A) = 0;                      // +0x18 LAB_06203300 RET 8, returns 0 (formerly Slot6)
+        virtual GENRESULT DACOM_API Teardown(void* A) = 0;                  // +0x1C LAB_06203310 RET 8, returns 0 (formerly Slot7)
+        virtual GENRESULT DACOM_API Submit(void* A, void* B, void* C, void* D,
+                                           void* E, void* F, void* G) = 0;  // +0x20 LAB_062032f0 RET 0x20, returns 0 (formerly Slot8)
     };
 
     class FALBatchedMaterialFacet final : public IALBatchedMaterial
@@ -98,13 +98,13 @@ namespace AlchemyImpl
         unsigned long DACOM_API AddRef() override;
         unsigned long DACOM_API Release() override;
 
-        GENRESULT DACOM_API Slot3(void* A) override;
-        GENRESULT DACOM_API Slot4(void* A) override;
-        GENRESULT DACOM_API Slot5(unsigned long* Out) override;
-        GENRESULT DACOM_API Slot6(void* A) override;
-        GENRESULT DACOM_API Slot7(void* A) override;
-        GENRESULT DACOM_API Slot8(void* A, void* B, void* C, void* D, void* E, void* F,
-                                  void* G) override;
+        GENRESULT DACOM_API CreateInnerMaterial(void* A) override;
+        GENRESULT DACOM_API SetBatchBin(void* A) override;
+        GENRESULT DACOM_API GetBatchBin(unsigned long* Out) override;
+        GENRESULT DACOM_API Bind(void* A) override;
+        GENRESULT DACOM_API Teardown(void* A) override;
+        GENRESULT DACOM_API Submit(void* A, void* B, void* C, void* D, void* E, void* F,
+                                   void* G) override;
 
     private:
         FALMaterial* Outer_;
@@ -113,24 +113,24 @@ namespace AlchemyImpl
     // Retail vtable1 (PTR_LAB_0624b358, "1.11_IMaterial").
     struct IALMaterial : IDAComponent
     {
-        virtual GENRESULT DACOM_API Slot3(void* A) = 0;                    // +0x0C LAB_062031d0 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot4(void* A) = 0;                    // +0x10 LAB_062031e0 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot5(void* A) = 0;                    // +0x14 LAB_062031f0 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot6(void* A, void* B) = 0;           // +0x18 LAB_06203200 RET 0xC, returns 0
-        virtual GENRESULT DACOM_API Slot7(void* A) = 0;                    // +0x1C LAB_06203210 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot8(void* A) = 0;                    // +0x20 LAB_06203320 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot9(void* A) = 0;                    // +0x24 LAB_06203330 RET 8, returns 0
-        virtual GENRESULT DACOM_API Slot10(void* A, void* B, void* C, void* D,
-                                           void* E, void* F, void* G) = 0; // +0x28 LAB_062032e0 RET 0x20, returns -1
-        virtual GENRESULT DACOM_API Slot11(void* A) = 0;                   // +0x2C LAB_06203220 RET 8, returns -1
-        virtual GENRESULT DACOM_API Slot12(void* A, void* B) = 0;          // +0x30 LAB_06203230 RET 0xC, returns -1
-        virtual GENRESULT DACOM_API Slot13(void* A, void* B) = 0;          // +0x34 LAB_06203240 RET 0xC, returns -1
-        virtual GENRESULT DACOM_API Slot14(unsigned long* Out) = 0;        // +0x38 LAB_06203250 RET 8, *Out=1, returns 0
-        virtual GENRESULT DACOM_API Slot15(unsigned long* Out) = 0;        // +0x3C LAB_062032d0 RET 8, *Out=2, returns 0
-        virtual GENRESULT DACOM_API Slot16(unsigned long* Out) = 0;        // +0x40 LAB_06203260 RET 8, *Out=0, returns 0
-        virtual GENRESULT DACOM_API Slot17(void* A, void* B) = 0;          // +0x44 LAB_06203270 RET 0xC, returns -1
-        virtual GENRESULT DACOM_API Slot18(void* A, void* B) = 0;          // +0x48 LAB_06203280 RET 0xC, returns -1
-        virtual GENRESULT DACOM_API Slot19(void* A, void* B) = 0;          // +0x4C LAB_06203290 RET 0xC, returns -1
+        virtual GENRESULT DACOM_API Initialize(void* A) = 0;                // +0x0C LAB_062031d0 RET 8, returns 0 (formerly Slot3)
+        virtual GENRESULT DACOM_API LoadFromFileSystem(void* A) = 0;        // +0x10 LAB_062031e0 RET 8, returns 0 (formerly Slot4)
+        virtual GENRESULT DACOM_API SaveProperties(void* A) = 0;            // +0x14 LAB_062031f0 RET 8, returns 0 (formerly Slot5)
+        virtual GENRESULT DACOM_API ApplyVerify(void* A, void* B) = 0;      // +0x18 LAB_06203200 RET 0xC, returns 0 (formerly Slot6)
+        virtual GENRESULT DACOM_API ResolveTextures(void* A) = 0;           // +0x1C LAB_06203210 RET 8, returns 0 (formerly Slot7)
+        virtual GENRESULT DACOM_API Bind(void* A) = 0;                      // +0x20 LAB_06203320 RET 8, returns 0 (formerly Slot8)
+        virtual GENRESULT DACOM_API Teardown(void* A) = 0;                  // +0x24 LAB_06203330 RET 8, returns 0 (formerly Slot9)
+        virtual GENRESULT DACOM_API Submit(void* A, void* B, void* C, void* D,
+                                           void* E, void* F, void* G) = 0;  // +0x28 LAB_062032e0 RET 0x20, returns -1 (formerly Slot10)
+        virtual GENRESULT DACOM_API SetName(void* A) = 0;                   // +0x2C LAB_06203220 RET 8, returns -1 (formerly Slot11)
+        virtual GENRESULT DACOM_API GetName(void* A, void* B) = 0;          // +0x30 LAB_06203230 RET 0xC, returns -1 (formerly Slot12)
+        virtual GENRESULT DACOM_API CopyClassName(void* A, void* B) = 0;    // +0x34 LAB_06203240 RET 0xC, returns -1 (formerly Slot13)
+        virtual GENRESULT DACOM_API GetPassCount(unsigned long* Out) = 0;   // +0x38 LAB_06203250 RET 8, *Out=1, returns 0 (formerly Slot14)
+        virtual GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) = 0; // +0x3C LAB_062032d0 RET 8, *Out=2, returns 0 (formerly Slot15)
+        virtual GENRESULT DACOM_API GetParameterCount(unsigned long* Out) = 0; // +0x40 LAB_06203260 RET 8, *Out=0, returns 0 (formerly Slot16)
+        virtual GENRESULT DACOM_API GetParameterDescriptor(void* A, void* B) = 0; // +0x44 LAB_06203270 RET 0xC, returns -1 (formerly Slot17)
+        virtual GENRESULT DACOM_API GetParameterValue(void* A, void* B) = 0; // +0x48 LAB_06203280 RET 0xC, returns -1 (formerly Slot18)
+        virtual GENRESULT DACOM_API SetParameterValue(void* A, void* B) = 0; // +0x4C LAB_06203290 RET 0xC, returns -1 (formerly Slot19)
         // +0x50 LAB_06203340 -> "ALMaterial": `MOV EAX,str; RET` -- no stack argument popped,
         // so not a DACOM_API (stdcall, `this` on the stack, RET 4) slot. __thiscall, as the
         // shared IMaterial::ClassName (render/IMaterial.h) declares the same slot.
@@ -148,24 +148,24 @@ namespace AlchemyImpl
         unsigned long DACOM_API AddRef() override { return ++RefCount_; }
         unsigned long DACOM_API Release() override;
 
-        GENRESULT DACOM_API Slot3(void* A) override;
-        GENRESULT DACOM_API Slot4(void* A) override;
-        GENRESULT DACOM_API Slot5(void* A) override;
-        GENRESULT DACOM_API Slot6(void* A, void* B) override;
-        GENRESULT DACOM_API Slot7(void* A) override;
-        GENRESULT DACOM_API Slot8(void* A) override;
-        GENRESULT DACOM_API Slot9(void* A) override;
-        GENRESULT DACOM_API Slot10(void* A, void* B, void* C, void* D, void* E, void* F,
+        GENRESULT DACOM_API Initialize(void* A) override;
+        GENRESULT DACOM_API LoadFromFileSystem(void* A) override;
+        GENRESULT DACOM_API SaveProperties(void* A) override;
+        GENRESULT DACOM_API ApplyVerify(void* A, void* B) override;
+        GENRESULT DACOM_API ResolveTextures(void* A) override;
+        GENRESULT DACOM_API Bind(void* A) override;
+        GENRESULT DACOM_API Teardown(void* A) override;
+        GENRESULT DACOM_API Submit(void* A, void* B, void* C, void* D, void* E, void* F,
                                    void* G) override;
-        GENRESULT DACOM_API Slot11(void* A) override;
-        GENRESULT DACOM_API Slot12(void* A, void* B) override;
-        GENRESULT DACOM_API Slot13(void* A, void* B) override;
-        GENRESULT DACOM_API Slot14(unsigned long* Out) override;
-        GENRESULT DACOM_API Slot15(unsigned long* Out) override;
-        GENRESULT DACOM_API Slot16(unsigned long* Out) override;
-        GENRESULT DACOM_API Slot17(void* A, void* B) override;
-        GENRESULT DACOM_API Slot18(void* A, void* B) override;
-        GENRESULT DACOM_API Slot19(void* A, void* B) override;
+        GENRESULT DACOM_API SetName(void* A) override;
+        GENRESULT DACOM_API GetName(void* A, void* B) override;
+        GENRESULT DACOM_API CopyClassName(void* A, void* B) override;
+        GENRESULT DACOM_API GetPassCount(unsigned long* Out) override;
+        GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;
+        GENRESULT DACOM_API GetParameterCount(unsigned long* Out) override;
+        GENRESULT DACOM_API GetParameterDescriptor(void* A, void* B) override;
+        GENRESULT DACOM_API GetParameterValue(void* A, void* B) override;
+        GENRESULT DACOM_API SetParameterValue(void* A, void* B) override;
         const char* __thiscall GetClassName() override;
 
         // LAB_06203300 / LAB_06203320 call the same render/texture-stage

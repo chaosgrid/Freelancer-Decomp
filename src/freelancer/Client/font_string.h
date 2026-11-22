@@ -253,7 +253,7 @@ struct FFontString
 
     wchar_t* Text;              // +0x00
     unsigned Capacity;          // +0x04
-    int Field08;                // +0x08  sentinel 0x7fff
+    int MaxLines;                // +0x08  sentinel 0x7fff
     unsigned char Field0C;      // +0x0c
     unsigned char Pad0D[3];
     FFontStringChildSlot* ChildBegin; // +0x10
@@ -301,8 +301,8 @@ struct FFontStringDrawOrigin
     float Y;     // +0x04
     float Scale; // +0x08 box width: ftol -> ScaleKey (004143e7); FUN_004142f0 aligns X in it
     float Height; // +0x0c box height; FUN_004142f0 aligns Y in it
-    unsigned Field10; // +0x10 horizontal mode (FUN_004142f0): 1 centre, 2 right, else left
-    unsigned Field14; // +0x14 vertical mode: 1 centre, 2 bottom, else top
+    unsigned HAlign; // +0x10 horizontal mode (FUN_004142f0): 1 centre, 2 right, else left
+    unsigned VAlign; // +0x14 vertical mode: 1 centre, 2 bottom, else top
 };
 
 void FontStringDrawChildren(FFontStringDrawOrigin* Origin, FFontString* Self, void* DrawCtx,

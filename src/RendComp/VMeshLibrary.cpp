@@ -651,7 +651,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
             Desc.Flags = 0x8000080;
             Desc.Path = FindData.cFileName;
             Desc.Size = 0x34;
-            Desc.Field30 = (unsigned long)Find;
+            Desc.FindHandle = (unsigned long)Find;
             if (LodFilter >= 0)
             {
                 const char* Lod = std::strstr(FindData.cFileName, ".lod");

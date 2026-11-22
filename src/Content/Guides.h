@@ -210,7 +210,7 @@ public:
     TString<0x30> TargetName;                    // +0x140 value 0
     unsigned char Field_0x174 = 0;               // +0x174 guide +0x16c. TODO: writer
     unsigned char Field_0x175 = 0;               // +0x175 guide +0x16d. TODO: writer
-    unsigned char Field_0x176 = 1;               // +0x176 value 8 (bool); guide +0x16e
+    unsigned char bStartFollowing = 1;               // +0x176 value 8 (bool); guide +0x16e
 };
 
 // MB_DOCKGUIDE (0x17c, vtable 06fb82b8 {.., sdd 06f07c10, Parse 06f0a030}; the loader runs

@@ -52,10 +52,10 @@ BuzzBehavior::BuzzBehavior(int InTypeId)
     , Field300(0.0f)
     , Field304(0)
     , Pad305{}
-    , Field308(0.0f)
-    , Field30c(0.0f)
-    , Field310(0.0f)
-    , Field314(1.5f)
+    , FastPathElapsed(0.0f)
+    , FastPathMaxDuration(0.0f)
+    , AlignedElapsed(0.0f)
+    , AfterburnerDelay(1.5f)
     , BuzzState(0)
     , HeadTowardStyle(0)
     , PassByStyle(0)
@@ -67,7 +67,7 @@ BuzzBehavior::BuzzBehavior(int InTypeId)
     , PassByElapsed(0.0f)
     , MaxTimeToHeadAway(6.0f)
     , HeadAwayElapsed(0.0f)
-    , Field344(0.0f)
+    , FastPathRange(0.0f)
     , PassByRollThrottle(0.0f)
     , HeadTowardEngineThrottle(1.0f)
     , HeadTowardTurnThrottle(1.0f)
@@ -89,8 +89,8 @@ BuzzBehavior::BuzzBehavior(int InTypeId)
     // 0.2f/1.0f/30.0f/{0.1,0,1}, BreakAwayIdea's 350.0f/4.0f/100.0f/6.0f/
     // 100000.0f) are present now instead of zeros.
 
-    // Retail's own explicit zeroing of Field2f4/Field300/Field304/Field308/
-    // Field30c/Field310/BuzzState/PassByElapsed/HeadAwayElapsed is duplicated by
+    // Retail's own explicit zeroing of Field2f4/Field300/Field304/FastPathElapsed/
+    // FastPathMaxDuration/AlignedElapsed/BuzzState/PassByElapsed/HeadAwayElapsed is duplicated by
     // SetContext()/RecomputeApproach() at runtime anyway (both re-zero large
     // parts of this same region) -- nothing further to do here beyond the
     // member-initializer list above.
@@ -231,27 +231,27 @@ bool BuzzBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 void BuzzBehavior::RecomputeApproach()
 {
     // .text:062c5dd8: `CALL FUN_062d20d0` -- Behavior's own slot 3 body.
-    Behavior::Slot3();
+    Behavior::OnEngage();
 
     // .text:062c5ddd-062c5de3: FUN_062d21d0(this, 1, 3) -- Behavior::SetCruiseLock.
     SetCruiseLock(1, 3);
 
-    // retail: `Field344 = 300.0f; Field308 = 0; Field304 = 0;` then
+    // retail: `FastPathRange = 300.0f; FastPathElapsed = 0; Field304 = 0;` then
     // `Field2f4 = RandomVector(1.0f)` (retail copies the returned Vector's
     // three floats field-by-field into +0x2f4/+0x2f8/+0x2fc).
-    Field344 = 300.0f;
-    Field308 = 0.0f;
+    FastPathRange = 300.0f;
+    FastPathElapsed = 0.0f;
     Field304 = 0;
     Field2f4 = RandomVector(1.0f);
 
-    // retail: `Field30c = 5.0f; Field310 = 0; BuzzState = 0; PassByElapsed = 0;
+    // retail: `FastPathMaxDuration = 5.0f; AlignedElapsed = 0; BuzzState = 0; PassByElapsed = 0;
     // HeadAwayElapsed = 0;` -- BuzzState being reset here means RecomputeApproach()
     // restarts BuzzBehavior's own state machine at "head away" (state 0)
     // every time it runs, consistent with it being the mode this class'
     // vtable slot 3 (the family's usual "(re)compute the maneuver, entering
     // or re-entering the approach state" slot) is expected to perform.
-    Field30c = 5.0f;
-    Field310 = 0.0f;
+    FastPathMaxDuration = 5.0f;
+    AlignedElapsed = 0.0f;
     BuzzState = 0;
     PassByElapsed = 0.0f;
     HeadAwayElapsed = 0.0f;
@@ -403,7 +403,7 @@ void BuzzBehavior::Disengage()
     WatcherE.Commit();
 
     // .text:062c60e8-062c60eb: `MOV ECX,ESI; JMP FUN_062d20f0` -- Behavior's own slot 4.
-    Behavior::Slot4();
+    Behavior::OnDisengage();
 }
 
 // ----------------------------------------------------------------------------
@@ -654,9 +654,9 @@ int BuzzBehavior::Update()
     if (BuzzState != 2)
     {
         // retail: `FUN_062e4f60(NavHelper+0x14fc, &Record, 0)` then, if true,
-        // `FUN_062e4d00(NavHelper+0x14fc, &Record)` FCOMP'd against Field344.
+        // `FUN_062e4d00(NavHelper+0x14fc, &Record)` FCOMP'd against FastPathRange.
         // The `TEST AH,0x5; JP` at 062c634b is "jump unless less", so the path
-        // continues only while the lead distance is below Field344.
+        // continues only while the lead distance is below FastPathRange.
         //
         // BOTH ARE REAL CALLS NOW (2026-09-17). FUN_062e4f60 is item 1753,
         // IsTargetCoAlignedAndAhead, and FUN_062e4d00 is item 1750,
@@ -668,7 +668,7 @@ int BuzzBehavior::Update()
         // attempt is made to re-derive which side item 1753 calls "Target" and
         // which "Reference", because the push order settles it either way.
         if (IsTargetCoAlignedAndAhead(NavRecord, &Record, 0.0f) &&
-            GetInterceptClearance(NavRecord, &Record) < Field344)
+            GetInterceptClearance(NavRecord, &Record) < FastPathRange)
         {
             // retail: `Basis = Handle->vtbl[0xc]()` (062c6354-062c6360). The
             // result is a 3x3 basis: FUN_062d75c0 block-copies nine dwords
@@ -701,15 +701,15 @@ int BuzzBehavior::Update()
                     // `TEST AH,0x41; JNZ` at 062c63a6 skips the tick for
                     // "less or equal", so the tick fires only when strictly
                     // greater.
-                    if (Field310 > Field314)
+                    if (AlignedElapsed > AfterburnerDelay)
                     {
                         WatcherC.Update(DeltaTime);
                     }
-                    Field310 += DeltaTime;
+                    AlignedElapsed += DeltaTime;
                 }
                 else
                 {
-                    Field310 = 0.0f;
+                    AlignedElapsed = 0.0f;
                 }
 
                 // retail: `FUN_062d58f0(&WatcherA, Basis)` --
@@ -726,20 +726,20 @@ int BuzzBehavior::Update()
                 WatcherA.Update(DeltaTime);
             }
 
-            // retail (192281-192297, own fields only): `Field308 += DeltaTime;
-            // Result = (Field308 > Field30c) ? 0 : (Field308 = 0, 1);`. The
+            // retail (192281-192297, own fields only): `FastPathElapsed += DeltaTime;
+            // Result = (FastPathElapsed > FastPathMaxDuration) ? 0 : (FastPathElapsed = 0, 1);`. The
             // `TEST AH,0x41; JNZ LAB_062c641a` at 062c640e routes "less or
             // equal" (and unordered) to the reset-and-1 arm. 062c6400 is FST,
             // not FSTP: the compare is on the unrounded x87 sum.
-            double const Sum308 = (double)(Field308) + (double)(DeltaTime);
-            Field308 = (float)(Sum308);
-            if (Sum308 > (double)(Field30c))
+            double const Sum308 = (double)(FastPathElapsed) + (double)(DeltaTime);
+            FastPathElapsed = (float)(Sum308);
+            if (Sum308 > (double)(FastPathMaxDuration))
             {
                 Result = 0;
             }
             else
             {
-                Field308 = 0.0f;
+                FastPathElapsed = 0.0f;
                 Result = 1;
             }
             bFastPathTaken = true;
@@ -1110,8 +1110,8 @@ int BuzzBehavior::Update()
                             Guide.y = CandidatePos.y - NavRecord->CachedPos.y;
                             Guide.z = CandidatePos.z - NavRecord->CachedPos.z;
                             // FUN_062d88c0 (.text:062c69a0, receiver EBP ==
-                            // &WatcherD): DodgeIdea::SetField58.
-                            WatcherD.SetField58(Guide);
+                            // &WatcherD): DodgeIdea::SetPreferredForward.
+                            WatcherD.SetPreferredForward(Guide);
 
                             // 062c69a5-062c69ae: `WatcherD->vtbl[4](DeltaTime)`,
                             // i.e. DodgeIdea::Update.

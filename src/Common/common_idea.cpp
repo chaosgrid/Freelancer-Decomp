@@ -90,9 +90,8 @@ bool StopIdea::SetContext(void* /*InObject*/, void* /*InHandle*/, void* /*InCont
     return true;
 }
 
-// Own vtable slot 1 override -- LAB_0632b010. FULLPORT-DEFERRED: this address
-// sits far outside this cluster's own 0x062d6000-0x062da600 range and was not
-// traced this pass.
+// Own vtable slot 1 override -- LAB_0632b010 (`33 C0 C2 04 00`: `XOR EAX,EAX; RET 4`,
+// ICF-folded in retail Common.dll).
 int StopIdea::Update(float /*DeltaTime*/)
 {
     return 0;

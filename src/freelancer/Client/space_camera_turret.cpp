@@ -80,14 +80,14 @@ void TurretCameraConstruct(FTurretCamera* Cam)
     Cam->Tether[0] = 0.0f;
     Cam->Tether[1] = 5.0f;       // 0x40a00000
 
-    Cam->Field10C = 0.0f;
-    Cam->Field110 = 0.0f;
-    Cam->Field114 = 0.0f;
-    Cam->Field118 = 0.0f;
-    Cam->Field11C = 0.0f;
-    Cam->Field120 = 0.0f;
+    Cam->Yaw = 0.0f;
+    Cam->TargetYaw = 0.0f;
+    Cam->Pitch = 0.0f;
+    Cam->TargetPitch = 0.0f;
+    Cam->YawKeyRate = 0.0f;
+    Cam->PitchKeyRate = 0.0f;
 
-    Cam->Field124 = 0.75f;       // 0x3f400000 -- nothing in the ini can move this
+    Cam->KeyRotateRate = 0.75f;       // 0x3f400000 -- nothing in the ini can move this
     Cam->YawRotateSpeed = 2.0f;  // 0x40000000
     Cam->PitchRotateSpeed = 1.5f;// 0x3fc00000
     Cam->AccelSpeed = 5.0f;      // 0x0051a277: ECX, still 0x40a00000 from 0x0051a22a
@@ -144,11 +144,11 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         // Keys: the clock resets; each non-zero key rate (TEST AH,0x44 / JNP skips only an
         // ordered zero) times its speed and dt.
         Cam->MouseAimTime = 0.0f;
-        if (Cam->Field11C != 0.0f)
-            Yaw = static_cast<float>(static_cast<double>(Cam->YawRotateSpeed) * Cam->Field11C *
+        if (Cam->YawKeyRate != 0.0f)
+            Yaw = static_cast<float>(static_cast<double>(Cam->YawRotateSpeed) * Cam->YawKeyRate *
                                      DeltaSeconds);
-        if (Cam->Field120 != 0.0f)
-            Pitch = static_cast<double>(Cam->PitchRotateSpeed) * Cam->Field120 * DeltaSeconds;
+        if (Cam->PitchKeyRate != 0.0f)
+            Pitch = static_cast<double>(Cam->PitchRotateSpeed) * Cam->PitchKeyRate * DeltaSeconds;
     }
     else
     {
@@ -182,26 +182,26 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     if (bSteer && (Yaw != 0.0f || Pitch != 0.0))
     {
         // Yaw target (+0x110), wrapped into [0, 2*pi] by moving the current yaw (+0x10c) along.
-        const double YawTarget = static_cast<double>(Yaw) + Cam->Field110;
-        Cam->Field110 = static_cast<float>(YawTarget);
+        const double YawTarget = static_cast<double>(Yaw) + Cam->TargetYaw;
+        Cam->TargetYaw = static_cast<float>(YawTarget);
         if (YawTarget > kTurretYawWrap)
         {
-            Cam->Field110 = static_cast<float>(YawTarget - kTurretYawWrap);
-            Cam->Field10C = static_cast<float>(static_cast<double>(Cam->Field10C) - kTurretYawWrap);
+            Cam->TargetYaw = static_cast<float>(YawTarget - kTurretYawWrap);
+            Cam->Yaw = static_cast<float>(static_cast<double>(Cam->Yaw) - kTurretYawWrap);
         }
         else if (YawTarget < 0.0)
         {
-            Cam->Field110 = static_cast<float>(YawTarget + kTurretYawWrap);
-            Cam->Field10C = static_cast<float>(static_cast<double>(Cam->Field10C) + kTurretYawWrap);
+            Cam->TargetYaw = static_cast<float>(YawTarget + kTurretYawWrap);
+            Cam->Yaw = static_cast<float>(static_cast<double>(Cam->Yaw) + kTurretYawWrap);
         }
 
         // Pitch target (+0x118), clamped to +/- pi/3 (0x3f860a92 / 0xbf860a92).
-        const double PitchTarget = Pitch + Cam->Field118;
-        Cam->Field118 = static_cast<float>(PitchTarget);
+        const double PitchTarget = Pitch + Cam->TargetPitch;
+        Cam->TargetPitch = static_cast<float>(PitchTarget);
         if (PitchTarget > kTurretPitchLimit)
-            Cam->Field118 = kTurretPitchLimit;
+            Cam->TargetPitch = kTurretPitchLimit;
         else if (PitchTarget < kTurretPitchLimitNeg)
-            Cam->Field118 = kTurretPitchLimitNeg;
+            Cam->TargetPitch = kTurretPitchLimitNeg;
     }
 
     // 0x0051a9fa..0x0051aa7b: ease the current angles towards the targets by dt * accel_speed;
@@ -210,15 +210,15 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         const double Ease = static_cast<double>(DeltaSeconds) * Cam->AccelSpeed;
         if (Ease > 1.0f)
         {
-            Cam->Field10C = Cam->Field110;
-            Cam->Field114 = Cam->Field118;
+            Cam->Yaw = Cam->TargetYaw;
+            Cam->Pitch = Cam->TargetPitch;
         }
         else
         {
-            Cam->Field10C = static_cast<float>(
-                (static_cast<double>(Cam->Field110) - Cam->Field10C) * Ease + Cam->Field10C);
-            Cam->Field114 = static_cast<float>(
-                (static_cast<double>(Cam->Field118) - Cam->Field114) * Ease + Cam->Field114);
+            Cam->Yaw = static_cast<float>(
+                (static_cast<double>(Cam->TargetYaw) - Cam->Yaw) * Ease + Cam->Yaw);
+            Cam->Pitch = static_cast<float>(
+                (static_cast<double>(Cam->TargetPitch) - Cam->Pitch) * Ease + Cam->Pitch);
         }
     }
 
@@ -227,7 +227,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     float M[9];
     memcpy(M, ShipRot, sizeof(M));
     {
-        const double Angle = -static_cast<double>(Cam->Field10C);
+        const double Angle = -static_cast<double>(Cam->Yaw);
         const float CosA = static_cast<float>(cos(Angle));
         const double SinA = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
@@ -240,7 +240,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     }
     // 0x0051aace..0x0051ab19: then by -pitch (columns 1 and 2).
     {
-        const double Angle = -static_cast<double>(Cam->Field114);
+        const double Angle = -static_cast<double>(Cam->Pitch);
         const float CosB = static_cast<float>(cos(Angle));
         const double SinB = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
@@ -289,10 +289,10 @@ void TurretCameraAttach(FTurretCamera* Cam, void* Object)
     // FUN_0051a6a0 (slot 0x58, thiscall RET 4): the four angles zeroed (+0x10c, +0x114, +0x110,
     // +0x118, in that order), HUDCamera's attach (FUN_0051cbb0), FUN_0051a7d0(&view, 0, 1) on an
     // identity 3x4 whatever it answers, view dirty, view copied to the world transform.
-    Cam->Field10C = 0.0f;
-    Cam->Field114 = 0.0f;
-    Cam->Field110 = 0.0f;
-    Cam->Field118 = 0.0f;
+    Cam->Yaw = 0.0f;
+    Cam->Pitch = 0.0f;
+    Cam->TargetYaw = 0.0f;
+    Cam->TargetPitch = 0.0f;
     HudCameraAttach((FHudCamera*)Cam, Object);
 
     float View[12];
@@ -324,28 +324,28 @@ bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
         return true;
 
     // 0x0051ac4b..0x0051ac5a: ids 0x32..0x36 through a five-entry table; anything else -> false.
-    // The key-down byte of the record decides between +/-Field124 (+0x124) and 0.
+    // The key-down byte of the record decides between +/-KeyRotateRate (+0x124) and 0.
     const bool bDown = HudCommandRecord()->Byte18 != 0;
     switch (MsgId)
     {
     case 0x32:
-        Cam->Field11C = bDown ? -Cam->Field124 : 0.0f;   // 0x0051ac61, face + 0x24
+        Cam->YawKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;   // 0x0051ac61, face + 0x24
         return true;
     case 0x33:
-        Cam->Field11C = bDown ? Cam->Field124 : 0.0f;    // 0x0051ac81
+        Cam->YawKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;    // 0x0051ac81
         return true;
     case 0x34:
-        Cam->Field120 = bDown ? -Cam->Field124 : 0.0f;   // 0x0051ac9f, face + 0x28
+        Cam->PitchKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;   // 0x0051ac9f, face + 0x28
         return true;
     case 0x35:
-        Cam->Field120 = bDown ? Cam->Field124 : 0.0f;    // 0x0051acbf
+        Cam->PitchKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;    // 0x0051acbf
         return true;
     case 0x36:
         // 0x0051acdd: face + 0x14, + 0x1c, + 0x18, + 0x20.
-        Cam->Field10C = 0.0f;
-        Cam->Field114 = 0.0f;
-        Cam->Field110 = 0.0f;
-        Cam->Field118 = 0.0f;
+        Cam->Yaw = 0.0f;
+        Cam->Pitch = 0.0f;
+        Cam->TargetYaw = 0.0f;
+        Cam->TargetPitch = 0.0f;
         return true;
     default:
         return false;

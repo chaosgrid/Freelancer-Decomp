@@ -390,7 +390,7 @@ namespace
                         if (!bKept)
                         {
                             // 06f04718-06f0472c: loader slot 5 (the mission), Release.
-                            Offer.Loader->Slot05(Offer.Mission);
+                            Offer.Loader->ReleaseMission(Offer.Mission);
                             Offer.Loader->Release();
                         }
                     }
@@ -503,7 +503,7 @@ void __cdecl ClearMissionVendorOffers(FBaseVisit* Visit)
          It != Visit->VendorOffers.end(); ++It)
     {
         pub::GF::MissionVendorOfferDestroy(&It->VendorHandle);             // 06f04a5a
-        It->Data.Loader->Slot05(It->Data.Mission);                         // +0x14
+        It->Data.Loader->ReleaseMission(It->Data.Mission);                         // +0x14
         It->Data.Loader->Release();                                        // +0x04
     }
     // 06f04a7a-06f04aa8: unlink and free every node, --size.

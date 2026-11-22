@@ -76,7 +76,7 @@ static void InitializeMaFileDesc(FFileSystemDesc* Desc, const char* Name)
     Desc->ShareMode = 1;
     Desc->Creation = 3;
     Desc->Flags = 0x08000080;
-    Desc->Field30 = 0xFFFFFFFF;
+    Desc->FindHandle = 0xFFFFFFFF;
 }
 
 static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
@@ -489,7 +489,7 @@ void* DACOM_API FMaterialAnimation::LoadAnimationGroup(void* FileSystem)
                 Data->NameCrc = Crc;
                 FFileSystemDesc Desc;
                 InitializeMaFileDesc(&Desc, ChildName);
-                Desc.Field30 = (unsigned long)Find;
+                Desc.FindHandle = (unsigned long)Find;
                 IFileSystem* ChildFs = nullptr;
                 const GENRESULT Result = Fs->CreateInstance(
                     (AGGDESC*)&Desc, (void**)&ChildFs);

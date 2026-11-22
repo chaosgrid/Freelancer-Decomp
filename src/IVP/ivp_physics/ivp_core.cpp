@@ -85,8 +85,8 @@ namespace
 // ============================================================================
 
 
-// FUN_06346fb0: Halts movement, zeros accumulators and velocities for static cores
-void __fastcall FUN_06346fb0(IVP_Core* Core)
+// IVP_Core_StopMovementWithoutCollisionRecheck: Halts movement, zeros accumulators and velocities for static cores
+void __fastcall IVP_Core_StopMovementWithoutCollisionRecheck(IVP_Core* Core)
 {
     Core->MovementState = (Core->MovementState & 0xFFFFFF08) | 8;
 
@@ -121,7 +121,7 @@ void __fastcall FUN_06346fb0(IVP_Core* Core)
 }
 
 // ============================================================================
-// FUN_063464a0 / FUN_063465a0 (cmn-ivp3d 2026-10-08, re-ported from the
+// FUN_063464a0 / IVP_Core_RefreshContactPoints (cmn-ivp3d 2026-10-08, re-ported from the
 // listing; the old lookalike read env->memory_manager as the arena, invented
 // null guards and dropped every contact-point call).
 // ============================================================================
@@ -181,10 +181,10 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
     Arena->reset_chunks(); // :06346587 FUN_06344070
 }
 
-// FUN_063465a0 (.text:063465a0-06346767), the library's
+// IVP_Core_RefreshContactPoints (.text:063465a0-06346767), the library's
 // IVP_Core::values_changed_recalc_redundants. Name kept as the raw address
 // because ivp_real_object.cpp calls it so; rename with that caller.
-void __fastcall FUN_063465a0(IVP_Core* Core)
+void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
 {
     // :063465a9-:063465ca: inertia terms inside an arena bracket.
     ++Core->Environment->vector_cores_frozen->State;
@@ -219,7 +219,7 @@ void __fastcall FUN_063465a0(IVP_Core* Core)
     if ((static_cast<uint8_t>(Core->Flags) & 0xcu) != 0) // :06346632 (re-tested)
     {
         // :0634672b-:06346732.
-        FUN_06346fb0(Core);
+        IVP_Core_StopMovementWithoutCollisionRecheck(Core);
         IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(Core);
         // :06346737-:0634675c: retail then walks every object's contact-node
         // list to its end without reading or writing anything else -- a loop
@@ -263,14 +263,14 @@ void __fastcall FUN_063465a0(IVP_Core* Core)
     Core->Environment->vector_cores_frozen->reset_chunks(); // :0634671c
 }
 
-// FUN_063557c0: IVP_Core::get_master_core() equivalent. Cores can be merged
+// IVP_Core_UnionFindGetFather: IVP_Core::get_master_core() equivalent. Cores can be merged
 // (welded together, e.g. by a fixed constraint); when that happens one core's
 // MergedCoreWhichReplacedIt is linked to point at the other (see FUN_06348ad0,
 // which unions two cores' chains together and zero-initializes the field for a
 // fresh group). This walks that chain to its terminal (null-linked) node, i.e.
 // the current representative/master core for the merged group. A null input
 // core is passed straight through, matching retail's explicit ECX==0 check.
-IVP_Core* __fastcall FUN_063557c0(IVP_Core* Core)
+IVP_Core* __fastcall IVP_Core_UnionFindGetFather(IVP_Core* Core)
 {
     if (Core == nullptr)
         return Core;
@@ -1832,7 +1832,7 @@ void IVP_Real_Object_Free_Cache_Object(IVP_Real_Object* Object)
 // ============================================================================
 void IVP_Core::freeze_simulation_core()
 {
-    FUN_06346fb0(this); // stop movement
+    IVP_Core_StopMovementWithoutCollisionRecheck(this); // stop movement
 
     // :0634704c-:06347065 -- current_time captured once (dword copies).
     const float NowHi = Environment->current_time.time_base;

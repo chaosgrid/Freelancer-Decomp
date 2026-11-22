@@ -118,7 +118,7 @@ bool TextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
     if (Parent == nullptr)
         return false;
-    return Parent->Slot23(0x3004, static_cast<unsigned>(Command), 0);
+    return Parent->ProcessMessage(0x3004, static_cast<unsigned>(Command), 0);
 }
 
 void TextMsgButton::Init(Win3D* NewParent, wchar_t const* Caption, float BoxWidth,
@@ -409,7 +409,7 @@ void TypeSelect::Draw()
     Win3DDrawChildren(this);
 }
 
-bool TypeSelect::Slot23(unsigned Msg, unsigned A, unsigned /*B*/)
+bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 {
     // FUN_00566bd0.
     if (Msg != 0x3004)

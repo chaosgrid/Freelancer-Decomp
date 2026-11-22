@@ -94,7 +94,7 @@ static void RpcContainerInitRecord(FRpcEquipWireRecord* Record) {
     Record->Status = 0.0f;
     Record->Id = 0;
     Record->bEquipped = 0;
-    Record->Field_0x0f = 0;
+    Record->bMission = 0;
     Record->HardpointSize = 0;
     Record->Pad_0x12[0] = 0;
     Record->Pad_0x12[1] = 0;
@@ -274,7 +274,7 @@ void RpcEquipHandleCopy(FRpcEquipWireHandle* Dest, const FRpcEquipWireHandle* So
         To->Count = From->Count;
         To->Id = From->Id;
         To->bEquipped = From->bEquipped;
-        To->Field_0x0f = From->Field_0x0f;
+        To->bMission = From->bMission;
         if (To->HardpointSize != 0) {                                     // 06d914e1 JBE
             To->Hardpoint = RpcContainerCopyString(From->Hardpoint, To->HardpointSize);
         }
@@ -582,8 +582,8 @@ void RpcCollisionGroupListInit(FRpcCollisionGroupList* List) {
                                                             std::nothrow));
     Dummy->Next = Dummy;
     Dummy->Prev = Dummy;
-    Dummy->Field_0x00 = 0;   // the dummy's value is never read
-    Dummy->Field_0x04 = 0;
+    Dummy->Id = 0;   // the dummy's value is never read
+    Dummy->HealthBits = 0;
     List->Allocator = 0;
     List->Pad_0x01[0] = 0;
     List->Pad_0x01[1] = 0;
@@ -686,8 +686,8 @@ void RpcRelationListPushBack(FRpcRelationList* List, const FRpcRelation& Value) 
     // result is stored through with no test (06d88e9d).
     FRpcRelation* Block =
         static_cast<FRpcRelation*>(::operator new(sizeof(FRpcRelation), std::nothrow));
-    Block->Field_0x00 = Value.Field_0x00;
-    Block->Field_0x04 = Value.Field_0x04;
+    Block->GroupId = Value.GroupId;
+    Block->FeelingBits = Value.FeelingBits;
     RpcRelationListLink(List, Block);
 }
 
@@ -783,14 +783,14 @@ __declspec(dllexport) void RpcCollisionGroupListFromWire(std::list<CollisionGrou
     const FRpcCollisionGroupNode* Node = Dummy->Next;
     std::list<CollisionGroupDesc>::iterator It = Dest.begin();
     while (It != Dest.end() && Node != Dummy) {
-        RpcCollisionGroupDescDecode(*It, Node->Field_0x00, Node->Field_0x04);
+        RpcCollisionGroupDescDecode(*It, Node->Id, Node->HealthBits);
         ++It;
         Node = Node->Next;
     }
     Dest.erase(It, Dest.end());
     while (Node != Dummy) {
         CollisionGroupDesc Desc;
-        RpcCollisionGroupDescDecode(Desc, Node->Field_0x00, Node->Field_0x04);
+        RpcCollisionGroupDescDecode(Desc, Node->Id, Node->HealthBits);
         Dest.push_back(Desc);
         Node = Node->Next;
     }
@@ -911,26 +911,26 @@ static void RpcEquipDescVectorAppendFromHandle(EquipDescVector& Dest,
 // Nothing is tested. The two Common.dll containers that follow are the derived
 // FRpcCreateObjectWire's members and are built by their own constructors.
 FRpcCreateObjectHead::FRpcCreateObjectHead() {
-    Field_0x00 = 0;                                     // 06d9cca2
-    Field_0x04 = 0;                                     // 06d9cca5
-    Field_0x08 = 0;                                     // 06d9cca8
+    ObjId = 0;                                     // 06d9cca2
+    ArchetypeNickname = 0;                                     // 06d9cca5
+    DockingBaseId = 0;                                     // 06d9cca8
     VibeGroupId = 0;                                    // 06d9ccab
     Ids = nullptr;                                      // 06d9cda4 (+0x44)
     IdCount = 0;                                        // 06d9cda7 (+0x40)
-    Field_0x1c = 0;                                     // 06d9cdaa (+0x3c)
-    Field_0x18 = 0;                                     // 06d9cdad (+0x38)
-    Field_0x14 = 0;                                     // 06d9cdb0 (+0x34)
-    Field_0x10 = 0;                                     // 06d9cdb3 (+0x30)
-    Field_0x28 = 0;                                     // 06d9ccb3
-    Field_0x2c = 0.0f;                                  // 06d9ccbe (integer 0 == +0.0f)
-    Field_0x30 = 0.0f;                                  // 06d9ccc1
-    Field_0x34 = 0.0f;                                  // 06d9ccc4
-    Field_0x38 = 1.0f;                                  // 06d931c4 MOV [EAX],0x3f800000
-    Field_0x3c = 0.0f;                                  // FUN_06d931c0
-    Field_0x40 = 0.0f;
-    Field_0x44 = 0.0f;
-    Field_0x48 = 0;                                     // 06d9cccc
-    Field_0x4c = 0;                                     // 06d9cccf
+    CostumeRightHand = 0;                                     // 06d9cdaa (+0x3c)
+    CostumeLeftHand = 0;                                     // 06d9cdad (+0x38)
+    CostumeBody = 0;                                     // 06d9cdb0 (+0x34)
+    CostumeHead = 0;                                     // 06d9cdb3 (+0x30)
+    VoiceId = 0;                                     // 06d9ccb3
+    PosX = 0.0f;                                  // 06d9ccbe (integer 0 == +0.0f)
+    PosY = 0.0f;                                  // 06d9ccc1
+    PosZ = 0.0f;                                  // 06d9ccc4
+    OrientW = 1.0f;                                  // 06d931c4 MOV [EAX],0x3f800000
+    OrientX = 0.0f;                                  // FUN_06d931c0
+    OrientY = 0.0f;
+    OrientZ = 0.0f;
+    HitPts = 0;                                     // 06d9cccc
+    LoadoutId = 0;                                     // 06d9cccf
     Equipment.List = nullptr;                           // 06d9ccd2
 }
 
@@ -954,14 +954,14 @@ FRpcCreateObjectHead::~FRpcCreateObjectHead() {
 
 void RpcCreateObjectHeaderWrite(FRpcCreateObjectWire* Wire,
                                 const CEqObjCreateInfo& Source) {
-    Wire->Field_0x00 = Source.ObjId;                    // 06d8c836 / 06d8c840
-    Wire->Field_0x04 = Source.ArchetypeNickname;        // 06d8c843 / 06d8c846
-    Wire->Field_0x08 = Source.DockingBaseId;            // 06d8c849 / 06d8c84c
+    Wire->ObjId = Source.ObjId;                    // 06d8c836 / 06d8c840
+    Wire->ArchetypeNickname = Source.ArchetypeNickname;        // 06d8c843 / 06d8c846
+    Wire->DockingBaseId = Source.DockingBaseId;            // 06d8c849 / 06d8c84c
     Wire->VibeGroupId = Source.VibeGroupId;             // 06d8c84f / 06d8c852
-    Wire->Field_0x10 = Source.CostumeHead;              // 06d8c867 / 06d8c86a
-    Wire->Field_0x14 = Source.CostumeBody;              // 06d8c86d / 06d8c870
-    Wire->Field_0x18 = Source.CostumeLeftHand;          // 06d8c873 / 06d8c876
-    Wire->Field_0x1c = Source.CostumeRightHand;         // 06d8c879 / 06d8c87c
+    Wire->CostumeHead = Source.CostumeHead;              // 06d8c867 / 06d8c86a
+    Wire->CostumeBody = Source.CostumeBody;              // 06d8c86d / 06d8c870
+    Wire->CostumeLeftHand = Source.CostumeLeftHand;          // 06d8c873 / 06d8c876
+    Wire->CostumeRightHand = Source.CostumeRightHand;         // 06d8c879 / 06d8c87c
 
     // 06d8c87f..06d8c8b6: the accessory count, then operator new(count << 2) -- a bare
     // call, made unconditionally, a count of 0 included (06d8c88c) -- and the copy: a
@@ -978,16 +978,16 @@ void RpcCreateObjectHeaderWrite(FRpcCreateObjectWire* Wire,
         Block[i] = Accessory[i];
     }
 
-    Wire->Field_0x28 = Source.VoiceId;                  // 06d8c855 / 06d8c858
-    Wire->Field_0x2c = Source.Position.x;               // 06d8c8b8 / 06d8c8bb
-    Wire->Field_0x30 = Source.Position.y;               // 06d8c8be / 06d8c8c1
-    Wire->Field_0x34 = Source.Position.z;               // 06d8c8c4 / 06d8c8c7
-    Wire->Field_0x38 = Source.Orientation.w;            // 06d8c8ca / 06d8c8cd
-    Wire->Field_0x3c = Source.Orientation.x;            // 06d8c8d0 / 06d8c8d3
-    Wire->Field_0x40 = Source.Orientation.y;            // 06d8c8d6 / 06d8c8d9
-    Wire->Field_0x44 = Source.Orientation.z;            // 06d8c8dc / 06d8c8df
-    Wire->Field_0x48 = static_cast<unsigned int>(Source.HitPts);  // 06d8c85b / 06d8c85e
-    Wire->Field_0x4c = Source.Field_0x6c;               // 06d8c861 / 06d8c864
+    Wire->VoiceId = Source.VoiceId;                  // 06d8c855 / 06d8c858
+    Wire->PosX = Source.Position.x;               // 06d8c8b8 / 06d8c8bb
+    Wire->PosY = Source.Position.y;               // 06d8c8be / 06d8c8c1
+    Wire->PosZ = Source.Position.z;               // 06d8c8c4 / 06d8c8c7
+    Wire->OrientW = Source.Orientation.w;            // 06d8c8ca / 06d8c8cd
+    Wire->OrientX = Source.Orientation.x;            // 06d8c8d0 / 06d8c8d3
+    Wire->OrientY = Source.Orientation.y;            // 06d8c8d6 / 06d8c8d9
+    Wire->OrientZ = Source.Orientation.z;            // 06d8c8dc / 06d8c8df
+    Wire->HitPts = static_cast<unsigned int>(Source.HitPts);  // 06d8c85b / 06d8c85e
+    Wire->LoadoutId = Source.LoadoutId;               // 06d8c861 / 06d8c864
 
     RpcEquipHandleFromEquipDescVector(&Wire->Equipment, Source.Equipment);
     // 06d8c9a1..06d8ca2c: std::list<CollisionGroupDesc>::operator= inlined -- overwrite the
@@ -1003,14 +1003,14 @@ void RpcCreateObjectHeaderWrite(FRpcCreateObjectWire* Wire,
 
 __declspec(dllexport) void RpcCreateObjectHeaderRead(CEqObjCreateInfo& Dest,
                                const FRpcCreateObjectWire* Wire) {
-    Dest.ObjId = Wire->Field_0x00;                      // 06d84edd / 06d84ee0
-    Dest.ArchetypeNickname = Wire->Field_0x04;          // 06d84ee3 / 06d84ee6
-    Dest.DockingBaseId = Wire->Field_0x08;              // 06d84ee9 / 06d84eec
+    Dest.ObjId = Wire->ObjId;                      // 06d84edd / 06d84ee0
+    Dest.ArchetypeNickname = Wire->ArchetypeNickname;          // 06d84ee3 / 06d84ee6
+    Dest.DockingBaseId = Wire->DockingBaseId;              // 06d84ee9 / 06d84eec
     Dest.VibeGroupId = Wire->VibeGroupId;               // 06d84f34 / 06d84f37
-    Dest.CostumeHead = Wire->Field_0x10;                // 06d84ef5 / 06d84ef8
-    Dest.CostumeBody = Wire->Field_0x14;                // 06d84eef / 06d84ef2
-    Dest.CostumeLeftHand = Wire->Field_0x18;            // 06d84f01 / 06d84f05
-    Dest.CostumeRightHand = Wire->Field_0x1c;           // 06d84efb / 06d84efe
+    Dest.CostumeHead = Wire->CostumeHead;                // 06d84ef5 / 06d84ef8
+    Dest.CostumeBody = Wire->CostumeBody;                // 06d84eef / 06d84ef2
+    Dest.CostumeLeftHand = Wire->CostumeLeftHand;            // 06d84f01 / 06d84f05
+    Dest.CostumeRightHand = Wire->CostumeRightHand;           // 06d84efb / 06d84efe
 
     // 06d84f08..06d84f32. Retail's loop condition is unsigned (`CMP EAX,EDX ; JC`) after
     // a signed `JLE` guard, so a negative count copies nothing. No bound on dest+0x24 and
@@ -1025,16 +1025,16 @@ __declspec(dllexport) void RpcCreateObjectHeaderRead(CEqObjCreateInfo& Dest,
         }
     }
 
-    Dest.VoiceId = Wire->Field_0x28;                    // 06d84f3a / 06d84f3d
-    Dest.Position.x = Wire->Field_0x2c;                 // 06d84f52 / 06d84f55
-    Dest.Position.y = Wire->Field_0x30;                 // 06d84f4f / 06d84f58
-    Dest.Position.z = Wire->Field_0x34;                 // 06d84f4c / 06d84f5b
-    Dest.Orientation.w = Wire->Field_0x38;              // 06d84f6e / 06d84f71
-    Dest.Orientation.x = Wire->Field_0x3c;              // 06d84f74 / 06d84f77
-    Dest.Orientation.y = Wire->Field_0x40;              // 06d84f7a / 06d84f7d
-    Dest.Orientation.z = Wire->Field_0x44;              // 06d84f80 / 06d84f83
-    Dest.HitPts = static_cast<int>(Wire->Field_0x48);   // 06d84f40 / 06d84f43
-    Dest.Field_0x6c = Wire->Field_0x4c;                 // 06d84f46 / 06d84f49
+    Dest.VoiceId = Wire->VoiceId;                    // 06d84f3a / 06d84f3d
+    Dest.Position.x = Wire->PosX;                 // 06d84f52 / 06d84f55
+    Dest.Position.y = Wire->PosY;                 // 06d84f4f / 06d84f58
+    Dest.Position.z = Wire->PosZ;                 // 06d84f4c / 06d84f5b
+    Dest.Orientation.w = Wire->OrientW;              // 06d84f6e / 06d84f71
+    Dest.Orientation.x = Wire->OrientX;              // 06d84f74 / 06d84f77
+    Dest.Orientation.y = Wire->OrientY;              // 06d84f7a / 06d84f7d
+    Dest.Orientation.z = Wire->OrientZ;              // 06d84f80 / 06d84f83
+    Dest.HitPts = static_cast<int>(Wire->HitPts);   // 06d84f40 / 06d84f43
+    Dest.LoadoutId = Wire->LoadoutId;                 // 06d84f46 / 06d84f49
 
     // 06d84f86..06d85056.
     RpcEquipDescVectorAppendFromHandle(Dest.Equipment, &Wire->Equipment);
@@ -1070,16 +1070,16 @@ static void RpcIdBlockToWire(FRpcIdArrayBlockWire** Out, const Costume& Source) 
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
     *Out = Block;                                     // 06d89b5d
-    Block->Field_0x04 = Source.PartIds[1];            // 06d89b73 <- src+0x278
-    Block->Field_0x00 = Source.PartIds[0];            // 06d89b86 <- src+0x274
-    Block->Field_0x08 = Source.PartIds[2];            // 06d89b98
-    Block->Field_0x0c = Source.PartIds[3];            // 06d89bab
+    Block->Body = Source.PartIds[1];            // 06d89b73 <- src+0x278
+    Block->Head = Source.PartIds[0];            // 06d89b86 <- src+0x274
+    Block->LeftHand = Source.PartIds[2];            // 06d89b98
+    Block->RightHand = Source.PartIds[3];            // 06d89bab
     Block->Count = static_cast<int>(Source.AccessoryCount);   // 06d89bbe <- src+0x2a4
     // 06d89bce `CMP EAX,EBX ; JBE` and 06d89c21 `JC`: the count is UNSIGNED and the copy
     // is not bounded by the eight-slot array -- it walks on from src+0x284.
@@ -1109,10 +1109,10 @@ static void RpcIdBlockFromWire(Costume& Dest, const FRpcIdArrayBlockWire* Block)
         // retail 06d8473c / 06d847c1: a null block pointer skips the whole group.
         return;
     }
-    Dest.PartIds[1] = Block->Field_0x04;              // 06d84741
-    Dest.PartIds[0] = Block->Field_0x00;              // 06d8474f
-    Dest.PartIds[3] = Block->Field_0x0c;              // 06d8475e
-    Dest.PartIds[2] = Block->Field_0x08;              // 06d8476d
+    Dest.PartIds[1] = Block->Body;              // 06d84741
+    Dest.PartIds[0] = Block->Head;              // 06d8474f
+    Dest.PartIds[3] = Block->RightHand;              // 06d8475e
+    Dest.PartIds[2] = Block->LeftHand;              // 06d8476d
     Dest.AccessoryCount = static_cast<unsigned int>(Block->Count);   // 06d8477c
     // 06d8478b `JBE` / 06d847b5 `JC`: unsigned count, no bound against the eight slots,
     // and the wire array is not tested -- exactly the sender's loop mirrored.
@@ -1163,34 +1163,34 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
     RpcCollisionGroupListInit(&Wire->CollisionGroups);
 
     Wire->Name = Source->Id;                         // 06d899ef CHARACTER_ID::operator=
-    Wire->Field_0x200 = Source->bIsRestart;          // 06d899f5
-    Wire->Field_0x201 = Source->bIsAutoSave;         // 06d89a05
+    Wire->bIsRestart = Source->bIsRestart;          // 06d899f5
+    Wire->bIsAutoSave = Source->bIsAutoSave;         // 06d89a05
     Wire->TextA = Source->Name;                      // 06d89a2f basic_string::assign
     Wire->TextB = Source->Description;               // 06d89a50
-    Wire->Field_0x224 = Source->DescripStrId;        // 06d89a56
-    Wire->Field_0x228 = Source->TimestampLow;        // 06d89a66
-    Wire->Field_0x22c = Source->TimestampHigh;       // 06d89a76
-    Wire->Field_0x230 = Source->ShipArchetype;       // 06d89a86
-    Wire->Field_0x234 = static_cast<unsigned int>(Source->Money);   // 06d89a96
+    Wire->DescripStrId = Source->DescripStrId;        // 06d89a56
+    Wire->TimestampLow = Source->TimestampLow;        // 06d89a66
+    Wire->TimestampHigh = Source->TimestampHigh;       // 06d89a76
+    Wire->ShipArchetype = Source->ShipArchetype;       // 06d89a86
+    Wire->Money = static_cast<unsigned int>(Source->Money);   // 06d89a96
     // The permuted nine. Each line is one MOV pair in the sender and its inverse in the
     // receiver; the addresses are on the struct in rpc_containers.h.
-    Wire->Field_0x238 = Source->SystemId;            // 06d89aa6 <- src+0x260
-    Wire->Field_0x244 = Source->VoiceId;             // 06d89ab6 <- src+0x26c
-    Wire->Field_0x248 = Source->Rank;                // 06d89ac6 <- src+0x270
-    Wire->Field_0x23c = Source->BaseId;              // 06d89ad6 <- src+0x264
-    Wire->Field_0x240 = Source->LocationId;          // 06d89ae6 <- src+0x268
+    Wire->SystemId = Source->SystemId;            // 06d89aa6 <- src+0x260
+    Wire->VoiceId = Source->VoiceId;             // 06d89ab6 <- src+0x26c
+    Wire->Rank = Source->Rank;                // 06d89ac6 <- src+0x270
+    Wire->BaseId = Source->BaseId;              // 06d89ad6 <- src+0x264
+    Wire->LocationId = Source->LocationId;          // 06d89ae6 <- src+0x268
     // 06d89986: the record ctor's zero is the ONLY write retail ever makes to +0x24c.
     // It still travels -- see the note on the struct.
     Wire->Field_0x24c = 0;
     // src+0x244 is the float HullStatus; the sender moves its four bytes as a dword.
-    std::memcpy(&Wire->Field_0x250, &Source->HullStatus, sizeof(Wire->Field_0x250));  // 06d89af6
-    Wire->Field_0x254 = static_cast<unsigned int>(Source->NumKills);             // 06d89b06 <- src+0x238
-    Wire->Field_0x258 = static_cast<unsigned int>(Source->NumMissionFailures);   // 06d89b16 <- src+0x240
-    Wire->Field_0x25c = static_cast<unsigned int>(Source->NumMissionSuccesses);  // 06d89b26 <- src+0x23c
+    std::memcpy(&Wire->HullStatusBits, &Source->HullStatus, sizeof(Wire->HullStatusBits));  // 06d89af6
+    Wire->NumKills = static_cast<unsigned int>(Source->NumKills);             // 06d89b06 <- src+0x238
+    Wire->NumMissionFailures = static_cast<unsigned int>(Source->NumMissionFailures);   // 06d89b16 <- src+0x240
+    Wire->NumMissionSuccesses = static_cast<unsigned int>(Source->NumMissionSuccesses);  // 06d89b26 <- src+0x23c
     // 06d899a4: hop one only zeroes it. The real value is written by the PACKET-BOUND
     // hop FUN_06d955c0 at 06d959c6..06d959d2, which this port folds in below, once the
     // equipment list exists.
-    Wire->Field_0x260 = 0;
+    Wire->EquipmentCount = 0;
 
     RpcIdBlockToWire(&Wire->BlockA, Source->ComCostume);   // 06d89b30..06d89c23 <- src+0x274
     RpcIdBlockToWire(&Wire->BlockB, Source->BaseCostume);  // 06d89c25..06d89d12 <- src+0x2a8
@@ -1216,7 +1216,7 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
         // "MOV AL,[ESI+0xf] ; MOV [EDI+0x18],AL". That pair is what finally names
         // FRpcEquipWireRecord::Field_0x0f, which every other user of the record leaves
         // at zero.
-        Record->Field_0x0f = (unsigned char)(It->bMission ? 1 : 0);
+        Record->bMission = (unsigned char)(It->bMission ? 1 : 0);
         const unsigned int Length = RpcContainerStringLength(It->Hardpoint);
         Record->Hardpoint = RpcContainerCopyString(It->Hardpoint, Length + 1u);
         Record->HardpointSize = (unsigned short)(Length + 1u);        // 06d89dad
@@ -1234,7 +1234,7 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
     // the wire as empty.
     {
         const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(&Wire->Equipment);
-        Wire->Field_0x260 = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
+        Wire->EquipmentCount = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
     }
 
     // 06d89dd2..06d89e46: std::list<CollisionGroupDesc>::operator= of the caller's list
@@ -1251,24 +1251,24 @@ void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
     Dest->Id = Wire->Name;                           // 06d8462a
     // 06d84636 "TEST CL,CL ; SETNZ DL" and 06d84647: the receiver re-normalises both
     // flags to 0/1 instead of copying the byte back verbatim.
-    Dest->bIsRestart = (unsigned char)(Wire->Field_0x200 != 0 ? 1 : 0);
-    Dest->bIsAutoSave = (unsigned char)(Wire->Field_0x201 != 0 ? 1 : 0);
+    Dest->bIsRestart = (unsigned char)(Wire->bIsRestart != 0 ? 1 : 0);
+    Dest->bIsAutoSave = (unsigned char)(Wire->bIsAutoSave != 0 ? 1 : 0);
     Dest->Name = Wire->TextA;                        // 06d84669
     Dest->Description = Wire->TextB;                 // 06d84686
-    Dest->DescripStrId = Wire->Field_0x224;          // 06d8468c
-    Dest->TimestampLow = Wire->Field_0x228;          // 06d84698
-    Dest->TimestampHigh = Wire->Field_0x22c;         // 06d846a4
-    Dest->ShipArchetype = Wire->Field_0x230;         // 06d846b0
-    Dest->Money = static_cast<int>(Wire->Field_0x234);                 // 06d846bc
-    Dest->VoiceId = Wire->Field_0x244;               // 06d846c8 -> dst+0x26c
-    Dest->Rank = Wire->Field_0x248;                  // 06d846d4 -> dst+0x270
-    Dest->BaseId = Wire->Field_0x23c;                // 06d846e0 -> dst+0x264
-    Dest->LocationId = Wire->Field_0x240;            // 06d846ec -> dst+0x268
-    Dest->SystemId = Wire->Field_0x238;              // 06d846f8 -> dst+0x260
-    std::memcpy(&Dest->HullStatus, &Wire->Field_0x250, sizeof(Dest->HullStatus));  // 06d84704 -> dst+0x244
-    Dest->NumKills = static_cast<int>(Wire->Field_0x254);              // 06d84710 -> dst+0x238
-    Dest->NumMissionFailures = static_cast<int>(Wire->Field_0x258);    // 06d8471c -> dst+0x240
-    Dest->NumMissionSuccesses = static_cast<int>(Wire->Field_0x25c);   // 06d84728 -> dst+0x23c
+    Dest->DescripStrId = Wire->DescripStrId;          // 06d8468c
+    Dest->TimestampLow = Wire->TimestampLow;          // 06d84698
+    Dest->TimestampHigh = Wire->TimestampHigh;         // 06d846a4
+    Dest->ShipArchetype = Wire->ShipArchetype;         // 06d846b0
+    Dest->Money = static_cast<int>(Wire->Money);                 // 06d846bc
+    Dest->VoiceId = Wire->VoiceId;               // 06d846c8 -> dst+0x26c
+    Dest->Rank = Wire->Rank;                  // 06d846d4 -> dst+0x270
+    Dest->BaseId = Wire->BaseId;                // 06d846e0 -> dst+0x264
+    Dest->LocationId = Wire->LocationId;            // 06d846ec -> dst+0x268
+    Dest->SystemId = Wire->SystemId;              // 06d846f8 -> dst+0x260
+    std::memcpy(&Dest->HullStatus, &Wire->HullStatusBits, sizeof(Dest->HullStatus));  // 06d84704 -> dst+0x244
+    Dest->NumKills = static_cast<int>(Wire->NumKills);              // 06d84710 -> dst+0x238
+    Dest->NumMissionFailures = static_cast<int>(Wire->NumMissionFailures);    // 06d8471c -> dst+0x240
+    Dest->NumMissionSuccesses = static_cast<int>(Wire->NumMissionSuccesses);   // 06d84728 -> dst+0x23c
 
     RpcIdBlockFromWire(Dest->ComCostume, Wire->BlockA);   // 06d84734..06d847b7 -> dst+0x274
     RpcIdBlockFromWire(Dest->BaseCostume, Wire->BlockB);  // 06d847b9..06d84837 -> dst+0x2a8
@@ -1290,7 +1290,7 @@ void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
             Item.set_id(Record->Id);                          // 06d848da set_id
             Item.set_equipped(Record->bEquipped);        // 06d848e8 set_equipped
             Item.set_status(Record->Status);                  // 06d848f4 set_status
-            Item.bMission = (Record->Field_0x0f != 0);        // 06d848fd, a direct store
+            Item.bMission = (Record->bMission != 0);        // 06d848fd, a direct store
             // 06d84900..06d8491a: `MOV ESI,[ESI+0x14] ; PUSH 0 ; PUSH ESI ; CALL
             // StringAlloc ; ... set_hardpoint`. Unlike the other two equipment receivers
             // this one has NO conditional and no make_internal branch -- it interns and
@@ -1312,7 +1312,7 @@ void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
          Node != Wire->CollisionGroups.Head; Node = Node->Next) {
         // The value moves as two raw dwords (06d8495d / 06d84963), pad included.
         CollisionGroupDesc Item;
-        std::memcpy(&Item, &Node->Field_0x00, sizeof(Item));
+        std::memcpy(&Item, &Node->Id, sizeof(Item));
         Dest->CollisionGroups.push_back(Item);
     }
 }
@@ -1412,16 +1412,16 @@ static void RpcIdBlockWireCopy(FRpcIdArrayBlockWire** Out, const FRpcIdArrayBloc
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
     *Out = Block;                                                    // 06d946c1
-    Block->Field_0x04 = Source->Field_0x04;                          // 06d946d0
-    Block->Field_0x00 = Source->Field_0x00;                          // 06d946e1
-    Block->Field_0x0c = Source->Field_0x0c;                          // 06d946f2
-    Block->Field_0x08 = Source->Field_0x08;                          // 06d94704
+    Block->Body = Source->Body;                          // 06d946d0
+    Block->Head = Source->Head;                          // 06d946e1
+    Block->RightHand = Source->RightHand;                          // 06d946f2
+    Block->LeftHand = Source->LeftHand;                          // 06d94704
     Block->Count = Source->Count;                                    // 06d94716
     if ((unsigned int)Block->Count != 0) {                           // 06d94722 / 06d94724
         Block->Ids = static_cast<unsigned int*>(
@@ -1486,25 +1486,25 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
         RpcCollisionGroupListInit(&To->CollisionGroups);             // 06d94555..06d9455e
 
         To->Name = From->Name;                                       // 06d94588 CHARACTER_ID::operator=
-        To->Field_0x200 = From->Field_0x200;                         // 06d94594
-        To->Field_0x201 = From->Field_0x201;                         // 06d945a0
+        To->bIsRestart = From->bIsRestart;                         // 06d94594
+        To->bIsAutoSave = From->bIsAutoSave;                         // 06d945a0
         To->TextA = From->TextA;                                     // 06d945bc basic_string::assign
         To->TextB = From->TextB;                                     // 06d945d8
-        To->Field_0x224 = From->Field_0x224;                         // 06d945e4
-        To->Field_0x228 = From->Field_0x228;                         // 06d945f0
-        To->Field_0x22c = From->Field_0x22c;                         // 06d945fc
-        To->Field_0x230 = From->Field_0x230;                         // 06d94608
-        To->Field_0x234 = From->Field_0x234;                         // 06d94614
-        To->Field_0x238 = From->Field_0x238;                         // 06d94620
-        To->Field_0x23c = From->Field_0x23c;                         // 06d9462c
-        To->Field_0x240 = From->Field_0x240;                         // 06d94638
-        To->Field_0x244 = From->Field_0x244;                         // 06d94644
-        To->Field_0x248 = From->Field_0x248;                         // 06d94650
+        To->DescripStrId = From->DescripStrId;                         // 06d945e4
+        To->TimestampLow = From->TimestampLow;                         // 06d945f0
+        To->TimestampHigh = From->TimestampHigh;                         // 06d945fc
+        To->ShipArchetype = From->ShipArchetype;                         // 06d94608
+        To->Money = From->Money;                         // 06d94614
+        To->SystemId = From->SystemId;                         // 06d94620
+        To->BaseId = From->BaseId;                         // 06d9462c
+        To->LocationId = From->LocationId;                         // 06d94638
+        To->VoiceId = From->VoiceId;                         // 06d94644
+        To->Rank = From->Rank;                         // 06d94650
         To->Field_0x24c = From->Field_0x24c;                         // 06d9465c
-        To->Field_0x250 = From->Field_0x250;                         // 06d94668
-        To->Field_0x254 = From->Field_0x254;                         // 06d94674
-        To->Field_0x258 = From->Field_0x258;                         // 06d94680
-        To->Field_0x25c = From->Field_0x25c;                         // 06d9468c
+        To->HullStatusBits = From->HullStatusBits;                         // 06d94668
+        To->NumKills = From->NumKills;                         // 06d94674
+        To->NumMissionFailures = From->NumMissionFailures;                         // 06d94680
+        To->NumMissionSuccesses = From->NumMissionSuccesses;                         // 06d9468c
 
         RpcIdBlockWireCopy(&To->BlockA, From->BlockA);               // 06d94692..06d9476e
         RpcIdBlockWireCopy(&To->BlockB, From->BlockB);               // 06d94770..06d9484e
@@ -1515,7 +1515,7 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
         // of the new list's Size, or 0 without a list (same postscript as FUN_06d955c0).
         {
             const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(&To->Equipment);
-            To->Field_0x260 = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
+            To->EquipmentCount = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
         }
 
         // 06d94880..06d94968: std::list<CollisionGroupDesc>::operator= inlined -- the
@@ -1595,8 +1595,8 @@ static FRpcCollisionGroupNode* RpcCollisionGroupListPushBack(FRpcCollisionGroupL
     New->Prev = Tail;
     Dummy->Prev = New;
     New->Prev->Next = New;
-    New->Field_0x00 = Field_0x00;
-    New->Field_0x04 = Field_0x04;
+    New->Id = Field_0x00;
+    New->HealthBits = Field_0x04;
     ++List->Size;                                     // 06d94272 INC [EDI+0x270]
     return New;
 }
@@ -1618,10 +1618,10 @@ static void RpcEncodeIdBlock(FRpcMarshalStream& Stream, const FRpcIdArrayBlockWi
         return;
     }
     Stream.PutByte(1);                                // 06d94f51 / 06d950f1
-    Stream.PutDword(Block->Field_0x04);               // 06d94f74
-    Stream.PutDword(Block->Field_0x00);               // 06d94fa4
-    Stream.PutDword(Block->Field_0x08);               // 06d94fd3
-    Stream.PutDword(Block->Field_0x0c);               // 06d95003
+    Stream.PutDword(Block->Body);               // 06d94f74
+    Stream.PutDword(Block->Head);               // 06d94fa4
+    Stream.PutDword(Block->LeftHand);               // 06d94fd3
+    Stream.PutDword(Block->RightHand);               // 06d95003
     Stream.PutDword((unsigned int)Block->Count);      // 06d95033
     // 06d95047: `SHL ECX,0x2` -- Count DWORDS, copied as Count*4 bytes from +0x14. The
     // encoder has no zero test here, and a zero-length run costs nothing.
@@ -1645,21 +1645,21 @@ static bool RpcDecodeIdBlock(FRpcMarshalStream& Stream, FRpcIdArrayBlockWire** O
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
     *Out = Block;
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) { return false; }
-    Block->Field_0x04 = Scratch;                      // 06d93c44
+    Block->Body = Scratch;                      // 06d93c44
     if (!Stream.GetDword(Scratch)) { return false; }
-    Block->Field_0x00 = Scratch;                      // 06d93c7a
+    Block->Head = Scratch;                      // 06d93c7a
     if (!Stream.GetDword(Scratch)) { return false; }
-    Block->Field_0x08 = Scratch;                      // 06d93caf
+    Block->LeftHand = Scratch;                      // 06d93caf
     if (!Stream.GetDword(Scratch)) { return false; }
-    Block->Field_0x0c = Scratch;                      // 06d93ce5
+    Block->RightHand = Scratch;                      // 06d93ce5
     if (!Stream.GetDword(Scratch)) { return false; }
     Block->Count = (int)Scratch;                      // 06d93d1e
     if ((unsigned int)Block->Count != 0) {            // 06d93d2c TEST / JBE: unsigned
@@ -1697,8 +1697,8 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
             const unsigned int NameLen = RpcCharacterIdLength(Record->Name);
             Stream.PutWord((unsigned short)NameLen);                // 06d94abb
             Stream.PutBytes(Record->Name.Buffer, NameLen);          // 06d94afe
-            Stream.PutByte(Record->Field_0x200);                    // 06d94b42
-            Stream.PutByte(Record->Field_0x201);                    // 06d94b6b
+            Stream.PutByte(Record->bIsRestart);                    // 06d94b42
+            Stream.PutByte(Record->bIsAutoSave);                    // 06d94b6b
             // 06d94b73 / 06d94ba8: the length is in CHARACTERS and the run is 2*that.
             const unsigned short LenA = (unsigned short)(Record->TextA.size() & 0xffffu);
             Stream.PutWord(LenA);
@@ -1708,28 +1708,28 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
             Stream.PutWord(LenB);                                   // 06d94c1b
             Stream.PutBytes(LenB != 0 ? Record->TextB.data() : nullptr,
                             (unsigned int)LenB * 2u);
-            Stream.PutDword(Record->Field_0x224);                   // 06d94ca7
-            Stream.PutDword(Record->Field_0x22c);                   // 06d94cd4
-            Stream.PutDword(Record->Field_0x228);                   // 06d94d01
-            Stream.PutDword(Record->Field_0x230);                   // 06d94d2e
-            Stream.PutDword(Record->Field_0x234);                   // 06d94d5b
-            Stream.PutDword(Record->Field_0x238);                   // 06d94d88
-            Stream.PutDword(Record->Field_0x23c);                   // 06d94db5
-            Stream.PutDword(Record->Field_0x240);                   // 06d94de2
-            Stream.PutDword(Record->Field_0x244);                   // 06d94e0f
-            Stream.PutDword(Record->Field_0x248);                   // 06d94e3c
+            Stream.PutDword(Record->DescripStrId);                   // 06d94ca7
+            Stream.PutDword(Record->TimestampHigh);                   // 06d94cd4
+            Stream.PutDword(Record->TimestampLow);                   // 06d94d01
+            Stream.PutDword(Record->ShipArchetype);                   // 06d94d2e
+            Stream.PutDword(Record->Money);                   // 06d94d5b
+            Stream.PutDword(Record->SystemId);                   // 06d94d88
+            Stream.PutDword(Record->BaseId);                   // 06d94db5
+            Stream.PutDword(Record->LocationId);                   // 06d94de2
+            Stream.PutDword(Record->VoiceId);                   // 06d94e0f
+            Stream.PutDword(Record->Rank);                   // 06d94e3c
             Stream.PutDword(Record->Field_0x24c);                   // 06d94e69
-            Stream.PutDword(Record->Field_0x250);                   // 06d94e8d FLD/FSTP
-            Stream.PutDword(Record->Field_0x254);                   // 06d94ec4
-            Stream.PutDword(Record->Field_0x258);                   // 06d94ef1
-            Stream.PutDword(Record->Field_0x25c);                   // 06d94f1e
+            Stream.PutDword(Record->HullStatusBits);                   // 06d94e8d FLD/FSTP
+            Stream.PutDword(Record->NumKills);                   // 06d94ec4
+            Stream.PutDword(Record->NumMissionFailures);                   // 06d94ef1
+            Stream.PutDword(Record->NumMissionSuccesses);                   // 06d94f1e
             RpcEncodeIdBlock(Stream, Record->BlockA);
             RpcEncodeIdBlock(Stream, Record->BlockB);
             // 06d9528e: the stored count byte, then the WHOLE list. Retail trusts the
             // two to agree because FUN_06d955c0 derives the byte from the list's Size;
             // reproduced rather than recomputed, so a caller that desynchronises them
             // gets retail's behaviour and not a quieter one.
-            Stream.PutByte(Record->Field_0x260);
+            Stream.PutByte(Record->EquipmentCount);
             // 06d952a0 FUN_06d913e0 + 06d952ab JZ: the header is tested, the dummy
             // (06d952b1) and each node's record (06d952c8) are not.
             const FRpcEquipWireListHeader* Equip = RpcEquipHandleGetList(&Record->Equipment);
@@ -1742,7 +1742,7 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
                     Stream.PutDword(E->ArchId);                     // 06d9534a  E+0x00
                     Stream.PutWord(E->Id);                          // 06d95375  E+0x0c
                     Stream.PutByte(E->bEquipped);                   // 06d9539e  E+0x0e
-                    Stream.PutByte(E->Field_0x0f);                  // 06d953c4  E+0x0f
+                    Stream.PutByte(E->bMission);                  // 06d953c4  E+0x0f
                     Stream.PutWord(E->HardpointSize);               // 06d953ed  E+0x10
                     // 06d953f6 `MOVZX ECX,word [EDX+0x10]` with NO shift -- a BYTE count,
                     // unlike the two strings above.
@@ -1758,12 +1758,12 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
                 // 06d954c3 `MOV AX,word ptr [ECX+0x8]` -- only the LOW HALF of the
                 // first dword travels, which is why common_cobject.h's reading of
                 // CollisionGroupDesc as { ushort Id; ushort Pad; float Health; } fits.
-                Stream.PutWord((unsigned short)(Group->Field_0x00 & 0xffffu));
-                Stream.PutDword(Group->Field_0x04);                 // 06d954ec FLD/FSTP
+                Stream.PutWord((unsigned short)(Group->Id & 0xffffu));
+                Stream.PutDword(Group->HealthBits);                 // 06d954ec FLD/FSTP
             }
         }
     }
-    Stream.PutDword(Wire->Field_0x00);                              // 06d9554c packet+0x20
+    Stream.PutDword(Wire->SaveFailureCount);                              // 06d9554c packet+0x20
     // 06d9555c FUN_06da13c0 -- `XOR EAX,EAX ; RET 0xc`, nothing to emit.
     *OutLength = Stream.Length();                               // 06d9557d
     // The byte-statistics tail retail runs on the SUCCESS PATH ONLY -- its error
@@ -1816,8 +1816,8 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             return Stream.GetError();
         }
         NameBytes[Length] = '\0';
-        if (!Stream.GetByte(Record->Field_0x200)) { return Stream.GetError(); }   // 06d93710
-        if (!Stream.GetByte(Record->Field_0x201)) { return Stream.GetError(); }   // 06d93739
+        if (!Stream.GetByte(Record->bIsRestart)) { return Stream.GetError(); }   // 06d93710
+        if (!Stream.GetByte(Record->bIsAutoSave)) { return Stream.GetError(); }   // 06d93739
         // 06d93761..06d937f5: the CHARACTER count, append(count, 0x20) through
         // FUN_06d94420, then 2*count bytes over it.
         if (!Stream.GetWord(Length)) {
@@ -1836,32 +1836,32 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
                              (unsigned int)Length * 2u)) {
             return Stream.GetError();
         }
-        if (!Stream.GetDword(Record->Field_0x224)) { return Stream.GetError(); }  // 06d9393a
-        if (!Stream.GetDword(Record->Field_0x22c)) { return Stream.GetError(); }  // 06d93967
-        if (!Stream.GetDword(Record->Field_0x228)) { return Stream.GetError(); }  // 06d93994
-        if (!Stream.GetDword(Record->Field_0x230)) { return Stream.GetError(); }  // 06d939c1
-        if (!Stream.GetDword(Record->Field_0x234)) { return Stream.GetError(); }  // 06d939ee
-        if (!Stream.GetDword(Record->Field_0x238)) { return Stream.GetError(); }  // 06d93a1b
-        if (!Stream.GetDword(Record->Field_0x23c)) { return Stream.GetError(); }  // 06d93a48
-        if (!Stream.GetDword(Record->Field_0x240)) { return Stream.GetError(); }  // 06d93a75
-        if (!Stream.GetDword(Record->Field_0x244)) { return Stream.GetError(); }  // 06d93aa2
-        if (!Stream.GetDword(Record->Field_0x248)) { return Stream.GetError(); }  // 06d93acf
+        if (!Stream.GetDword(Record->DescripStrId)) { return Stream.GetError(); }  // 06d9393a
+        if (!Stream.GetDword(Record->TimestampHigh)) { return Stream.GetError(); }  // 06d93967
+        if (!Stream.GetDword(Record->TimestampLow)) { return Stream.GetError(); }  // 06d93994
+        if (!Stream.GetDword(Record->ShipArchetype)) { return Stream.GetError(); }  // 06d939c1
+        if (!Stream.GetDword(Record->Money)) { return Stream.GetError(); }  // 06d939ee
+        if (!Stream.GetDword(Record->SystemId)) { return Stream.GetError(); }  // 06d93a1b
+        if (!Stream.GetDword(Record->BaseId)) { return Stream.GetError(); }  // 06d93a48
+        if (!Stream.GetDword(Record->LocationId)) { return Stream.GetError(); }  // 06d93a75
+        if (!Stream.GetDword(Record->VoiceId)) { return Stream.GetError(); }  // 06d93aa2
+        if (!Stream.GetDword(Record->Rank)) { return Stream.GetError(); }  // 06d93acf
         if (!Stream.GetDword(Record->Field_0x24c)) { return Stream.GetError(); }  // 06d93afc
-        if (!Stream.GetDword(Record->Field_0x250)) { return Stream.GetError(); }  // 06d93b29
-        if (!Stream.GetDword(Record->Field_0x254)) { return Stream.GetError(); }  // 06d93b56
-        if (!Stream.GetDword(Record->Field_0x258)) { return Stream.GetError(); }  // 06d93b83
-        if (!Stream.GetDword(Record->Field_0x25c)) { return Stream.GetError(); }  // 06d93bad
+        if (!Stream.GetDword(Record->HullStatusBits)) { return Stream.GetError(); }  // 06d93b29
+        if (!Stream.GetDword(Record->NumKills)) { return Stream.GetError(); }  // 06d93b56
+        if (!Stream.GetDword(Record->NumMissionFailures)) { return Stream.GetError(); }  // 06d93b83
+        if (!Stream.GetDword(Record->NumMissionSuccesses)) { return Stream.GetError(); }  // 06d93bad
         if (!RpcDecodeIdBlock(Stream, &Record->BlockA)) {            // 06d93bd8..06d93daf
             return Stream.GetError();
         }
         if (!RpcDecodeIdBlock(Stream, &Record->BlockB)) {            // 06d93ddd..06d93fa8
             return Stream.GetError();
         }
-        if (!Stream.GetByte(Record->Field_0x260)) {                  // 06d93fcf
+        if (!Stream.GetByte(Record->EquipmentCount)) {                  // 06d93fcf
             return Stream.GetError();
         }
         // 06d93fdd `TEST AL,AL ; JBE` then a do/while over the byte just stored.
-        for (unsigned int i = 0; i < (unsigned int)Record->Field_0x260; ++i) {
+        for (unsigned int i = 0; i < (unsigned int)Record->EquipmentCount; ++i) {
             // 06d93ff2 operator new(0x18); 06d94002 `TEST ESI,ESI ; JZ LAB_06d941ce`:
             // a failed allocation skips this element's reads and goes to the next index.
             FRpcEquipWireRecord* E = static_cast<FRpcEquipWireRecord*>(
@@ -1876,7 +1876,7 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             if (!Stream.GetDword(E->ArchId)) { return Stream.GetError(); } // 06d940a8 E+0x00
             if (!Stream.GetWord(E->Id)) { return Stream.GetError(); }      // 06d940d4 E+0x0c
             if (!Stream.GetByte(E->bEquipped)) { return Stream.GetError(); }   // 06d940fd
-            if (!Stream.GetByte(E->Field_0x0f)) { return Stream.GetError(); }  // 06d94125
+            if (!Stream.GetByte(E->bMission)) { return Stream.GetError(); }  // 06d94125
             if (!Stream.GetWord(E->HardpointSize)) { return Stream.GetError(); }  // 06d9414f
             // 06d9415d: operator new(HardpointSize) UNCONDITIONALLY -- a zero length gives
             // a zero-byte block -- untested, and stored before the stream bound check
@@ -1905,15 +1905,15 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             if (!Stream.GetWord(GroupId)) {                          // 06d942a8
                 return Stream.GetError();
             }
-            Group->Field_0x00 = (Group->Field_0x00 & 0xffff0000u) | (unsigned int)GroupId;
-            if (!Stream.GetDword(Group->Field_0x04)) {               // 06d942eb
+            Group->Id = (Group->Id & 0xffff0000u) | (unsigned int)GroupId;
+            if (!Stream.GetDword(Group->HealthBits)) {               // 06d942eb
                 return Stream.GetError();
             }
         }
         // 06d94305..06d94341: operator new(0xc), splice before the dummy, INC packet+0x2c.
         RpcCharacterInfoWireListPushBack(&Wire->Records, Record);
     }
-    Stream.GetDword(Wire->Field_0x00);                              // 06d94384 packet+0x20
+    Stream.GetDword(Wire->SaveFailureCount);                              // 06d94384 packet+0x20
     // 06d94393 FUN_06da13c0 -- the trailer hook, a no-op on this side too.
     *OutLength = Stream.Length();                               // 06d943c6
     // The byte-statistics tail retail runs on the SUCCESS PATH ONLY -- its error
@@ -2094,7 +2094,7 @@ static void RpcEncodeCreateObjectEquip(FRpcMarshalStream& Stream,
     if (Record->bEquipped != 0) {                        // 06da3ba3 / 06da3bb0
         Flags |= kEquipFlagEquipped;
     }
-    if (Record->Field_0x0f != 0) {                       // 06da3bb2 / 06da3bb9
+    if (Record->bMission != 0) {                       // 06da3bb2 / 06da3bb9
         Flags |= kEquipFlagMission;
     }
     // 06da3bc4 `CMP ECX,EAX ; JLE` with EAX == 0xff -- a SIGNED compare on the int Count.
@@ -2169,7 +2169,7 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
         return false;
     }
     // 06da4479..06da448d: both bits land as a plain 0/1, not as the mask.
-    Record->Field_0x0f = static_cast<unsigned char>((Flags >> 1) & 0x01u);
+    Record->bMission = static_cast<unsigned char>((Flags >> 1) & 0x01u);
     Record->bEquipped = static_cast<unsigned char>(Flags & 0x01u);
 
     unsigned int Scratch = 0;
@@ -2272,39 +2272,39 @@ static bool RpcDecodeCreateObjectEquip(FRpcMarshalStream& Stream,
 
 unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
                                          const FRpcCreateObjectWire* Wire) {
-    Stream.PutDword(Wire->Field_0x00);                                   // 06da3760
+    Stream.PutDword(Wire->ObjId);                                   // 06da3760
     // 06da376c -- the archetype id goes out narrowed to 16 bits and comes back through
     // SmallIDToLargeID at 06da4091.
-    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->Field_0x04));       // 06da37a0
-    Stream.PutDword(Wire->Field_0x08);                                   // 06da37d6
+    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));       // 06da37a0
+    Stream.PutDword(Wire->DockingBaseId);                                   // 06da37d6
     Stream.PutDword(static_cast<unsigned int>(Wire->VibeGroupId));       // 06da380b
     // The swap is retail's: packet+0x34 (Wire+0x14) goes out BEFORE packet+0x30.
-    Stream.PutDword(Wire->Field_0x14);                                   // 06da3840
-    Stream.PutDword(Wire->Field_0x10);                                   // 06da3875
+    Stream.PutDword(Wire->CostumeBody);                                   // 06da3840
+    Stream.PutDword(Wire->CostumeHead);                                   // 06da3875
     // 06da3877 reads the count as a BYTE off the int field, before the bounds check.
     Stream.PutByte(static_cast<unsigned char>(
         static_cast<unsigned int>(Wire->IdCount) & 0xffu));              // 06da38a9
     // 06da38b8 `SHL EAX,0x2` -- IdCount DWORDS, checked and copied as IdCount*4 bytes.
     Stream.PutBytes(Wire->Ids, static_cast<unsigned int>(Wire->IdCount) * 4u);
-    Stream.PutDword(Wire->Field_0x28);                                   // 06da3934
+    Stream.PutDword(Wire->VoiceId);                                   // 06da3934
     // 06da393c checks 0xc at once and 06da398a hands FUN_06d8f510 the three dwords
     // Wire+0x2c/0x30/0x34 in memory order; FUN_06d8f510 is a plain three-dword copy
     // (06d8f514..06d8f521), not a quantizer.
-    Stream.PutBytes(&Wire->Field_0x2c, 12u);
+    Stream.PutBytes(&Wire->PosX, 12u);
     // 06da398f..06da3a9a: four ftol(f * 127.0) bytes. Memory order is w,x,y,z but the
     // wire order is x,y,z,w -- Field_0x38 goes LAST.
-    Stream.PutQuantized(Wire->Field_0x3c, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Field_0x40, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Field_0x44, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Field_0x38, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire->OrientX, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire->OrientY, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire->OrientZ, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire->OrientW, FRpcMarshalStream::kOrientationScale);
     {
         // 06da3a9c..06da3af4, the hull fraction:
         //   FILD  [EBP+0x68]            -- Field_0x48 read as a SIGNED int
         //   FSTP  float [local_14]      -- rounded to float before the divide
         //   FILD  GetArchMaxHitPts(Field_0x04)
         //   FDIVR float [local_14] ; FMUL 255.0 ; ftol ; store one byte
-        const float HullPoints = static_cast<float>(static_cast<int>(Wire->Field_0x48));
-        const int MaxHitPts = Archetype::GetArchMaxHitPts(Wire->Field_0x04);
+        const float HullPoints = static_cast<float>(static_cast<int>(Wire->HitPts));
+        const int MaxHitPts = Archetype::GetArchMaxHitPts(Wire->ArchetypeNickname);
         unsigned char Percent = 0;
         if (MaxHitPts != 0) {
             const double Scaled = (static_cast<double>(HullPoints) /
@@ -2320,7 +2320,7 @@ unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
         Stream.PutByte(Percent);                                         // 06da3af4
     }
     if (SinglePlayer()) {                                                // 06da3afa / 06da3b02
-        Stream.PutDword(Wire->Field_0x4c);                               // 06da3b32
+        Stream.PutDword(Wire->LoadoutId);                               // 06da3b32
     }
     // 06da3b3a FUN_06d913e0 -- the handle's list pointer, which is null until the first
     // push_back. A null list ships a zero COUNT and no records (LAB_06da3e3f), which is
@@ -2374,15 +2374,15 @@ unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
 
 unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
                                          FRpcCreateObjectWire* Wire) {
-    if (!Stream.GetDword(Wire->Field_0x00)) {                            // 06da4057
+    if (!Stream.GetDword(Wire->ObjId)) {                            // 06da4057
         return Stream.GetError();
     }
     unsigned short Small = 0;
     if (!Stream.GetWord(Small)) {                                        // 06da4087
         return Stream.GetError();
     }
-    Wire->Field_0x04 = Archetype::SmallIDToLargeID(Small);               // 06da4091 / 06da4097
-    if (!Stream.GetDword(Wire->Field_0x08)) {                            // 06da40bf
+    Wire->ArchetypeNickname = Archetype::SmallIDToLargeID(Small);               // 06da4091 / 06da4097
+    if (!Stream.GetDword(Wire->DockingBaseId)) {                            // 06da40bf
         return Stream.GetError();
     }
     unsigned int Scratch = 0;
@@ -2390,16 +2390,16 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
         return Stream.GetError();
     }
     Wire->VibeGroupId = static_cast<int>(Scratch);
-    if (!Stream.GetDword(Wire->Field_0x14)) {                            // 06da4119
+    if (!Stream.GetDword(Wire->CostumeBody)) {                            // 06da4119
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->Field_0x10)) {                            // 06da4146
+    if (!Stream.GetDword(Wire->CostumeHead)) {                            // 06da4146
         return Stream.GetError();
     }
     // 06da4151 / 06da4154: two fields the encoder never sends are cleared here, which is
     // the only thing in either direction that touches packet+0x38 / +0x3c.
-    Wire->Field_0x18 = 0;
-    Wire->Field_0x1c = 0;
+    Wire->CostumeLeftHand = 0;
+    Wire->CostumeRightHand = 0;
 
     unsigned char Narrow = 0;
     if (!Stream.GetByte(Narrow)) {                                       // 06da4178
@@ -2414,12 +2414,12 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
             return Stream.GetError();                                    // 06da41d6
         }
     }
-    if (!Stream.GetDword(Wire->Field_0x28)) {                            // 06da4210
+    if (!Stream.GetDword(Wire->VoiceId)) {                            // 06da4210
         return Stream.GetError();
     }
     // 06da421b checks 0xc and 06da4242 hands FUN_06d8f510 the stream cursor as the
     // SOURCE this time -- the arguments are the mirror of the encoder's.
-    if (!Stream.GetBytes(&Wire->Field_0x2c, 12u)) {
+    if (!Stream.GetBytes(&Wire->PosX, 12u)) {
         return Stream.GetError();
     }
     {
@@ -2433,16 +2433,16 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
             }
         }
         // MOVSX at 06da42ed / 06da42f6 / 06da4307 / 06da430a, then FILD * (1/127).
-        Wire->Field_0x3c = static_cast<float>(
+        Wire->OrientX = static_cast<float>(
             static_cast<double>(static_cast<signed char>(Raw[0])) *
             FRpcMarshalStream::kOrientationInvScale);                    // 06da430d
-        Wire->Field_0x40 = static_cast<float>(
+        Wire->OrientY = static_cast<float>(
             static_cast<double>(static_cast<signed char>(Raw[1])) *
             FRpcMarshalStream::kOrientationInvScale);                    // 06da431e
-        Wire->Field_0x44 = static_cast<float>(
+        Wire->OrientZ = static_cast<float>(
             static_cast<double>(static_cast<signed char>(Raw[2])) *
             FRpcMarshalStream::kOrientationInvScale);                    // 06da432f
-        Wire->Field_0x38 = static_cast<float>(
+        Wire->OrientW = static_cast<float>(
             static_cast<double>(static_cast<signed char>(Raw[3])) *
             FRpcMarshalStream::kOrientationInvScale);                    // 06da433c
     }
@@ -2457,14 +2457,14 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
             return Stream.GetError();
         }
         const double MaxHitPts =
-            static_cast<double>(Archetype::GetArchMaxHitPts(Wire->Field_0x04));
+            static_cast<double>(Archetype::GetArchMaxHitPts(Wire->ArchetypeNickname));
         const double Fraction = static_cast<double>(static_cast<unsigned int>(Percent)) *
                                 FRpcMarshalStream::kPercentInvScale;
-        Wire->Field_0x48 = static_cast<unsigned int>(
+        Wire->HitPts = static_cast<unsigned int>(
             static_cast<long>(MaxHitPts * Fraction));                    // 06da4394
     }
     if (SinglePlayer()) {                                                // 06da4397 / 06da439f
-        if (!Stream.GetDword(Wire->Field_0x4c)) {                        // 06da43c8
+        if (!Stream.GetDword(Wire->LoadoutId)) {                        // 06da43c8
             return Stream.GetError();
         }
     }
@@ -2612,36 +2612,36 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
 // toolchain's std::list and DamageList, FRpcCreateObjectWire), so each tail is pinned
 // RELATIVE to its first field, which follows the header directly: retail offset minus
 // 0x7c on the right-hand side.
-static_assert(offsetof(FPayloadServerCreateShip, Field_0x7c) == sizeof(FRpcCreateObjectWire),
+static_assert(offsetof(FPayloadServerCreateShip, bUsingTradelane) == sizeof(FRpcCreateObjectWire),
               "CREATESHIP's tail follows the shared header directly");
-static_assert(offsetof(FPayloadServerCreateSolar, Field_0x7c) == sizeof(FRpcCreateObjectWire),
+static_assert(offsetof(FPayloadServerCreateSolar, bDestructible) == sizeof(FRpcCreateObjectWire),
               "CREATESOLAR's tail follows the shared header directly");
-static_assert(offsetof(FPayloadServerCreateShip, Field_0x80) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0x80 - 0x7c,
+static_assert(offsetof(FPayloadServerCreateShip, VelXBits) -
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0x80 - 0x7c,
               "the twelve-byte run starts at CREATESHIP payload+0x80");
-static_assert(offsetof(FPayloadServerCreateShip, Field_0x84) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0x84 - 0x7c,
+static_assert(offsetof(FPayloadServerCreateShip, VelY) -
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0x84 - 0x7c,
               "FUN_06d8f510 moves packet+0xa0, +0xa4 and +0xa8 back to back");
-static_assert(offsetof(FPayloadServerCreateShip, Field_0x88) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0x88 - 0x7c,
+static_assert(offsetof(FPayloadServerCreateShip, VelZ) -
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0x88 - 0x7c,
               "FUN_06d8f510 moves packet+0xa0, +0xa4 and +0xa8 back to back");
-static_assert(offsetof(FPayloadServerCreateShip, Field_0x98) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0x98 - 0x7c,
+static_assert(offsetof(FPayloadServerCreateShip, Throttle) -
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0x98 - 0x7c,
               "the 127.0-quantized float is CREATESHIP payload+0x98");
 static_assert(offsetof(FPayloadServerCreateShip, DisplayNameLength) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0xb8 - 0x7c,
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0xb8 - 0x7c,
               "the wide display name is length at payload+0xb8, buffer at +0xbc");
 static_assert(sizeof(FPayloadServerCreateShip) -
-                  offsetof(FPayloadServerCreateShip, Field_0x7c) == 0xcc - 0x7c,
+                  offsetof(FPayloadServerCreateShip, bUsingTradelane) == 0xcc - 0x7c,
               "CREATESHIP's tail is 0x50 bytes (retail payload 0xcc)");
 static_assert(offsetof(FPayloadServerCreateSolar, NameASize) -
-                  offsetof(FPayloadServerCreateSolar, Field_0x7c) == 0x80 - 0x7c,
+                  offsetof(FPayloadServerCreateSolar, bDestructible) == 0x80 - 0x7c,
               "FUN_06da1620 is handed &payload+0x80 for CREATESOLAR's first name block");
 static_assert(offsetof(FPayloadServerCreateSolar, NameBSize) -
-                  offsetof(FPayloadServerCreateSolar, Field_0x7c) == 0x88 - 0x7c,
+                  offsetof(FPayloadServerCreateSolar, bDestructible) == 0x88 - 0x7c,
               "FUN_06da1620 is handed &payload+0x88 for CREATESOLAR's second name block");
 static_assert(sizeof(FPayloadServerCreateSolar) -
-                  offsetof(FPayloadServerCreateSolar, Field_0x7c) == 0x98 - 0x7c,
+                  offsetof(FPayloadServerCreateSolar, bDestructible) == 0x98 - 0x7c,
               "CREATESOLAR's tail is 0x1c bytes (retail payload 0x98)");
 
 // The create-object encoders inline this pair twice each: a dword byte-count followed by
@@ -2693,13 +2693,13 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
     RpcEncodeCreateObjectCommon(Stream, &Wire->Common);
 
     unsigned char Flags = 0;                                             // 06d97d8a
-    if (Wire->Field_0x7c != 0) {                                         // 06d97d82 byte test
+    if (Wire->bUsingTradelane != 0) {                                         // 06d97d82 byte test
         Flags |= kCreateShipFlagField_0x7c;
     }
-    if (Wire->Field_0x9c != 0) {                                         // 06d97d96 DWORD test
+    if (Wire->OwnerPlayer != 0) {                                         // 06d97d96 DWORD test
         Flags |= kCreateShipFlagField_0x9c;
     }
-    if (Wire->Field_0xc8 != 0) {                                         // 06d97da5 byte test
+    if (Wire->bMarkedBy != 0) {                                         // 06d97da5 byte test
         Flags |= kCreateShipFlagField_0xc8;
     }
     if (!Stream.PutByte(Flags)) {                                        // 06d97db4 / 06d97de7
@@ -2710,30 +2710,30 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
     // three dwords at packet+0xa0..0xa8; FUN_06d8f510 is a plain three-dword move, so
     // the twelve bytes go out in memory order.
     unsigned char VectorBytes[12];
-    memcpy(VectorBytes, &Wire->Field_0x80, sizeof(VectorBytes));         // 06d97e1b..06d97e3e
+    memcpy(VectorBytes, &Wire->VelXBits, sizeof(VectorBytes));         // 06d97e1b..06d97e3e
     if (!Stream.PutBytes(VectorBytes, sizeof(VectorBytes))) {
         return Stream.GetError();
     }
     // 06d97e47 `FLD float ptr [EBX+0xb8]` * DAT_06db3fd8 (127.0), ftol, one byte.
-    if (!Stream.PutQuantized(Wire->Field_0x98, FRpcMarshalStream::kOrientationScale)) {
+    if (!Stream.PutQuantized(Wire->Throttle, FRpcMarshalStream::kOrientationScale)) {
         return Stream.GetError();
     }
-    if (!Stream.PutWord(Wire->Field_0xa0)) {                             // 06d97eb7
+    if (!Stream.PutWord(Wire->GroupNameId)) {                             // 06d97eb7
         return Stream.GetError();
     }
-    if (!Stream.PutByte(Wire->Field_0xa2)) {                             // 06d97eec
+    if (!Stream.PutByte(Wire->ReputationRank)) {                             // 06d97eec
         return Stream.GetError();
     }
 
     if ((Flags & kCreateShipFlagField_0x9c) != 0) {                      // 06d97ef9 TEST AL,0x4
         // Only the LOW BYTE of the dword travels (06d97f09 `MOV DL,byte [EBX+0xbc]`);
         // the decoder zero-extends it back into all four bytes.
-        if (!Stream.PutByte((unsigned char)(Wire->Field_0x9c & 0xffu))) {
+        if (!Stream.PutByte((unsigned char)(Wire->OwnerPlayer & 0xffu))) {
             return Stream.GetError();
         }
         // Field_0xa4 rides on this branch ONLY -- nothing writes it when the bit is
         // clear, and the decoder leaves the packet's zero in place.
-        if (!Stream.PutWord(Wire->Field_0xa4)) {                         // 06d97f5c
+        if (!Stream.PutWord(Wire->GroupId)) {                         // 06d97f5c
             return Stream.GetError();
         }
         if (!SinglePlayer()) {                                           // 06d97f6b / 06d97f73
@@ -2796,27 +2796,27 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
     // field alone rather than zeroing it. The packet arrives zeroed, so it comes to the
     // same thing; transcribed as retail has it.
     if ((Flags & kCreateShipFlagField_0x7c) != 0) {                      // 06d982d2
-        Wire->Field_0x7c = 1;                                            // 06d982da
+        Wire->bUsingTradelane = 1;                                            // 06d982da
     }
     if ((Flags & kCreateShipFlagField_0xc8) != 0) {                      // 06d982e0
-        Wire->Field_0xc8 = 1;                                            // 06d982e5
+        Wire->bMarkedBy = 1;                                            // 06d982e5
     }
 
     // 06d982eb checks 0xc at once, 06d98318 hands FUN_06d8f510 the cursor as the source
     // and &packet+0xa0 as the destination -- the same three dwords, read back in place.
-    if (!Stream.GetBytes(&Wire->Field_0x80, 12u)) {
+    if (!Stream.GetBytes(&Wire->VelXBits, 12u)) {
         return Stream.GetError();
     }
     // 06d9834c `MOVSX EAX,CL` then FILD * DAT_06db3fe0 (1/127): SIGNED, which is what
     // makes the byte cover [-1,+1].
-    if (!Stream.GetQuantizedSigned(Wire->Field_0x98,
+    if (!Stream.GetQuantizedSigned(Wire->Throttle,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    if (!Stream.GetWord(Wire->Field_0xa0)) {                             // 06d98385
+    if (!Stream.GetWord(Wire->GroupNameId)) {                             // 06d98385
         return Stream.GetError();
     }
-    if (!Stream.GetByte(Wire->Field_0xa2)) {                             // 06d983b4
+    if (!Stream.GetByte(Wire->ReputationRank)) {                             // 06d983b4
         return Stream.GetError();
     }
 
@@ -2826,8 +2826,8 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
             return Stream.GetError();
         }
         // 06d983ef `XOR EAX,EAX ; MOV AL,CL` -- ZERO-extended into the whole dword.
-        Wire->Field_0x9c = (unsigned int)Narrow;                         // 06d983f3
-        if (!Stream.GetWord(Wire->Field_0xa4)) {                         // 06d9841b
+        Wire->OwnerPlayer = (unsigned int)Narrow;                         // 06d983f3
+        if (!Stream.GetWord(Wire->GroupId)) {                         // 06d9841b
             return Stream.GetError();
         }
         if (!SinglePlayer()) {                                           // 06d9842a / 06d98432
@@ -2888,10 +2888,10 @@ unsigned int RpcEncodeServerCreateSolar(FPacketBase& Packet, unsigned char** Buf
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);           // 06dac7ce
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));     // 06dac7f1
     RpcEncodeCreateObjectCommon(Stream, &Wire->Common);                  // 06dac816
-    if (!Stream.PutByte(Wire->Field_0x7c)) {                             // 06dac845
+    if (!Stream.PutByte(Wire->bDestructible)) {                             // 06dac845
         return Stream.GetError();
     }
-    if (!Stream.PutByte(Wire->Field_0x7d)) {                             // 06dac87a
+    if (!Stream.PutByte(Wire->bMarkedBy)) {                             // 06dac87a
         return Stream.GetError();
     }
     if (!SinglePlayer()) {                                               // 06dac885 / 06dac88d
@@ -2926,10 +2926,10 @@ unsigned int RpcDecodeServerCreateSolar(FPacketBase& Packet, const unsigned char
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     // 06dacaaa FUN_06da13c0, then 06dacacf FUN_06da4020 with its result discarded.
     RpcDecodeCreateObjectCommon(Stream, &Wire->Common);
-    if (!Stream.GetByte(Wire->Field_0x7c)) {                             // 06dacaf7
+    if (!Stream.GetByte(Wire->bDestructible)) {                             // 06dacaf7
         return Stream.GetError();
     }
-    if (!Stream.GetByte(Wire->Field_0x7d)) {                             // 06dacb20
+    if (!Stream.GetByte(Wire->bMarkedBy)) {                             // 06dacb20
         return Stream.GetError();
     }
     if (!SinglePlayer()) {                                               // 06dacb2b / 06dacb33
@@ -3624,20 +3624,20 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
 
     switch (Wire->SubType) {
     case kPlayerTradeSubFlag:                        // 0x40, caseD_40 at 06da70d0
-        if (!Stream.PutByte(Wire->Field_0x10)) {
+        if (!Stream.PutByte(Wire->bAccepted)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
     case kPlayerTradeSubCash:                        // 0x02, caseD_2 at 06da7134
         // 06da7139 takes the LOW BYTE of payload+0x04 and 06da7165 jumps straight to the
         // pointer update, past every trailing-dword label. Sub-type 2 sends no more.
-        if (!Stream.PutByte((unsigned char)(Wire->Field_0x04 & 0xffu))) {
+        if (!Stream.PutByte((unsigned char)(Wire->Reason & 0xffu))) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         bNeedTrailer = false;
         break;
     case kPlayerTradeSubOffer:                       // 0x04, caseD_4 at 06da716a
-        if (!Stream.PutDword(Wire->Field_0x0c)) {
+        if (!Stream.PutDword(Wire->Money)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
@@ -3667,7 +3667,7 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
         if (Stream.Failed()) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
-        if (!Stream.PutDwordUncounted(Wire->Field_0x08)) {
+        if (!Stream.PutDwordUncounted(Wire->ShipId)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         bNeedTrailer = false;
@@ -3687,7 +3687,7 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
         if (Stream.Failed()) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
-        if (!Stream.PutDwordUncounted(Wire->Field_0x08)) {
+        if (!Stream.PutDwordUncounted(Wire->ShipId)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
     }
@@ -3732,7 +3732,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
             return FRpcMarshalStream::kDecodeOverrun;
         }
         // 06da74f0 MOVSX -- signed, where the sub-type byte above was not.
-        Wire->Field_0x04 = (unsigned int)(int)(signed char)Value;
+        Wire->Reason = (unsigned int)(int)(signed char)Value;
         bNeedTrailer = false;
         break;
     }
@@ -3742,7 +3742,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
             return FRpcMarshalStream::kDecodeOverrun;
         }
         // 06da7522 `TEST CL,CL ; SETNZ AL` -- any non-zero byte comes back as 1.
-        Wire->Field_0x10 = (unsigned char)(Value != 0 ? 1 : 0);
+        Wire->bAccepted = (unsigned char)(Value != 0 ? 1 : 0);
         // 06da752f..06da7558: the ONE place in this decoder that uses the encoder's
         // error code. Reproduced, not corrected.
         if (bAccountTrailer) {
@@ -3753,14 +3753,14 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         }
         // 06da755b..06da7561 write the EXISTING packet target into the input.
         // The pointer advances four bytes at 06da75c3 even when MP omitted Reserve.
-        if (!Stream.PutDwordUncounted(Wire->Field_0x08)) {
+        if (!Stream.PutDwordUncounted(Wire->ShipId)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         bNeedTrailer = false;
         break;
     }
     case kPlayerTradeSubOffer:                       // 0x04, caseD_4 at 06da7565
-        if (!Stream.GetDword(Wire->Field_0x0c)) {
+        if (!Stream.GetDword(Wire->Money)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
         break;
@@ -3791,7 +3791,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         if (Stream.Failed()) {
             return Stream.GetError();
         }
-        if (!Stream.GetDwordUncounted(Wire->Field_0x08)) {
+        if (!Stream.GetDwordUncounted(Wire->ShipId)) {
             return Stream.GetError();
         }
         bNeedTrailer = false;
@@ -3809,7 +3809,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         if (Stream.Failed()) {
             return Stream.GetError();
         }
-        if (!Stream.GetDwordUncounted(Wire->Field_0x08)) {
+        if (!Stream.GetDwordUncounted(Wire->ShipId)) {
             return Stream.GetError();
         }
     }
@@ -3907,7 +3907,7 @@ unsigned int RpcEncodeServerDamageObject(FPacketBase& Packet, unsigned char** Bu
     // 06d90491/06d90496: Limit = arg2, Ptr = *arg1.
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06d904b1 FUN_06da1380
-    if (!Stream.PutDword(Wire->Field_0x00)) {                      // 06d904c9..06d904fb
+    if (!Stream.PutDword(Wire->ObjectId)) {                      // 06d904c9..06d904fb
         return FRpcMarshalStream::kEncodeOverflow;
     }
     // 06d9051e: DamageList+0x0c, moved as a byte.
@@ -3957,7 +3957,7 @@ unsigned int RpcDecodeServerDamageObject(FPacketBase& Packet, const unsigned cha
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     // 06d906ed FUN_06da13c0 -- no header consumed.
 
-    if (!Stream.GetDword(Wire->Field_0x00)) {                      // 06d90708..06d90734
+    if (!Stream.GetDword(Wire->ObjectId)) {                      // 06d90708..06d90734
         return Stream.GetError();                                  // 06d90976
     }
     unsigned char Destroyed = 0;

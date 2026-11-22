@@ -247,7 +247,7 @@ static_assert(sizeof(IVP_Synapse_Real) == 0x1C, "IVP_Synapse_Real stride -- mind
 // that pointer is `Objects[N]->core`, not `Objects[N]` itself.
 //
 // CONCLUSION: ivp_core.h needs NO changes -- RotSpeed.y at IVP_Core+0x98 was
-// correct all along (also independently reconfirmed by FUN_06346fb0's
+// correct all along (also independently reconfirmed by IVP_Core_StopMovementWithoutCollisionRecheck's
 // zeroing sequence, Common.dll.txt:410439-410451, which zeroes +0x94/+0x98/
 // +0x9c as one Vector alongside Speed/SpeedChange/RotSpeedChange at their
 // own already-declared offsets). The bug was entirely in THIS class: the
@@ -2035,7 +2035,7 @@ public:
     // so only a node with a NULL +0x78 is the head -- +0x78 is prev, +0x74 next.
     IVP_Ledge_Mindist* ManagerNext;        // +0x74
     IVP_Ledge_Mindist* ManagerPrev;        // +0x78
-    int32_t Field_0x7c;                    // +0x7c: zeroed by FUN_0634dd10 (:0634dd22); TODO: no reader traced yet.
+    const IVP_Compact_Edge* LastPretensionEdge; // +0x7c: zeroed by FUN_0634dd10; guards duplicate pretension in recalc_all_exact_wheel_mindist.
 
     // FUN_0634dd10 (.text:0634dd10-0634dd38, RET 8): IVP_Mindist_Base's ctor
     // FUN_0634db70 first. Defined in ivp_mindist_limiter.cpp.

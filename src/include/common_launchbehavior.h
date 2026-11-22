@@ -59,7 +59,7 @@
 // (d285:common-port) as real MoveIdea/FaceIdea (common_idea.h) -- independent
 // confirmation both classes share this sub-object pair's retail types, now
 // constructed for real via the member-initializer list. Ctor also zeroes
-// several fields and sets two float thresholds (Field180=3.5f, Field22c=15.0f).
+// several fields and sets two float thresholds (LaunchDwellDuration=3.5f, LaunchThrottleScale=15.0f).
 // ============================================================================
 
 class LaunchBehavior : public Behavior
@@ -85,7 +85,7 @@ public:
     //                                 already documented in common_idlebehavior.h's own slot 6), skipped
     //   7  (0x1c) LAB_062cd950        GAP:AI-LAUNCH-STATE-MACHINE -- 457 instructions. [2026-09-11]
     //                                 The FULL control-flow skeleton (every guard check, the
-    //                                 CachedResultPtr170 refresh-detect, the Field188-vs-Field18c
+    //                                 CachedResultPtr170 refresh-detect, the TotalLaunchElapsed-vs-LaunchTimeout
     //                                 gate, the DeltaTime1c accumulation, and the real 6-way
     //                                 ModeState164 dispatch with every mode transition/return value)
     //                                 is now hand-traced and ported for real below -- see Update()'s
@@ -175,11 +175,11 @@ public:
     //     DockBehavior) and calls ITS OWN vtbl+0xbc "is threatening"-shaped
     //     bool getter -- FULLPORT-DEFERRED (nested sub-object's class isn't
     //     identified either);
-    //   - sets Field18c to 15.0f if that bool was true, 60.0f otherwise
+    //   - sets LaunchTimeout to 15.0f if that bool was true, 60.0f otherwise
     //     (0x41700000 / 0x42700000, Common.dll.txt 203016 / 203021).
     // CORRECTED 2026-09-17 (claude:w16-behavior): the prior port skipped the
-    // Field18c store altogether because the deciding bool is deferred. That was
-    // wrong in kind -- retail writes Field18c on every successful SetContext and
+    // LaunchTimeout store altogether because the deciding bool is deferred. That was
+    // wrong in kind -- retail writes LaunchTimeout on every successful SetContext and
     // there is no path where it keeps its old value. The store is now ported,
     // with the deferred predicate behind NestedNavQuery0xbc() (currently false,
     // selecting the 60.0f arm). TODO: identify the +0x14fc/+0x84 pointee's class
@@ -193,7 +193,7 @@ public:
     // (FetchSystemId) into CachedSystemId170, caches GetObjectTypeOrZero
     // (FUN_062e6200) of the watched target (Watcher168 target - 8, or null)
     // into TargetType174, calls FUN_062e9a60(NavHelperPtr24+0x12c, 0), then
-    // sets ModeState164=1, Flags17c=0, Field184=0.0f, Field188=0.0f, and
+    // sets ModeState164=1, Flags17c=0, LaunchDwellElapsed=0.0f, TotalLaunchElapsed=0.0f, and
     // calls `SetCruiseLock(0, 3)`-equivalent via FUN_062d21d0
     // (FULLPORT-DEFERRED, same shared name/role as FormationBehavior/
     // DockBehavior's own SetCruiseLock).
@@ -236,7 +236,7 @@ public:
     // result by the same "-8 node adjustor" idiom; if that differs from the
     // current Watcher168.Watched, re-points Watcher168 via
     // `BaseWatcher::set_pointer` (already-ported, common_goods.h); copies
-    // Param->+0x10 into DirectiveField178; then re-derives the (possibly
+    // Param->+0x10 into DockPortIndex; then re-derives the (possibly
     // just-updated) raw block from Watcher168 and, if non-null, sets Flags28
     // bit 0x2 and UpdateResult10=1 and returns true, otherwise clears Flags28
     // bit 0x2 and returns false.
@@ -263,21 +263,21 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // The other slots retail's LaunchBehavior vftable (.rdata:0639fccc) overrides, wired
     // 2026-10-08 (claude-code:cmn-ai2): until then Engage/Disengage/SetModeFromFlags/
     // ApplyDirective were plain members and IBehaviorManager's Behavior* dispatch
-    // (common_behaviormanager.cpp Incoming->Slot3() / Outgoing->Slot4() / Slot5 / Slot10) reached the
+    // (common_behaviormanager.cpp Incoming->OnEngage() / Outgoing->OnDisengage() / OnEvaluateReadiness / OnApplyDirective) reached the
     // base bodies instead. Slot 5 is `RET 4`: the float argument is ignored.
-    void Slot3() override { Engage(); }                        // 3 +0x0c FUN_062cd830
-    void Slot4() override { Disengage(); }                     // 4 +0x10 FUN_062cd8b0
-    int Slot5(float) override { return SetModeFromFlags(); }   // 5 +0x14 LAB_062cd910
-    bool Slot10(void* DirectiveOp) override { return ApplyDirective(DirectiveOp); } // 10 +0x28 FUN_062cdf30
+    void OnEngage() override { Engage(); }                        // 3 +0x0c FUN_062cd830
+    void OnDisengage() override { Disengage(); }                     // 4 +0x10 FUN_062cd8b0
+    int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }   // 5 +0x14 LAB_062cd910
+    bool OnApplyDirective(void* DirectiveOp) override { return ApplyDirective(DirectiveOp); } // 10 +0x28 FUN_062cdf30
 
 private:
     // FULLPORT-DEFERRED stand-ins for not-yet-ported cross-cutting retail
@@ -336,16 +336,16 @@ private:
     //     -- the same acquire already ported as Acquire3DMathEngine() (common_csys.h),
     //     which AnimDB::Update uses at .text:0627e162 for its own cache DAT_063fc018.
     //   * Its vtbl+0x38 is I3DMathEngine::TransposeTransform(FVector&, FMatrix const&,
-    //     FVector const&) (x86math.h, slot 14). It yields the rotated Field190 VECTOR,
+    //     FVector const&) (x86math.h, slot 14). It yields the rotated LaunchOffset VECTOR,
     //     not a distance scalar -- .text:062cdbbe-062cdbd1 reads all three dwords of
-    //     its out-buffer straight back into Field190.
+    //     its out-buffer straight back into LaunchOffset.
     // Original (still accurate) slot writeup:
     //   * "rawblock vtbl+0xc8 get transform" -- slot +0x0C8 is IObjInspect slot 50,
     //     `get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transform* XformA,
     //     Transform* XformB, Transform* XformC, float* Distance)`, recovered from its
     //     mangled name in common_iface.h. The call site matches exactly: six pushes at
     //     .text:062cda42-062cda5f, last push first, giving
-    //     (Index = DirectiveField178, Type = null, XformA = ESP+0x38, XformB = ESP+0x94,
+    //     (Index = DockPortIndex, Type = null, XformA = ESP+0x38, XformB = ESP+0x94,
     //     XformC = ESP+0x60, Distance = null). Six-for-six.
     //   * "ThreatSourcePtr14 vtbl+0xc0 hpmount lookup" -- slot +0x0C0 is IObjInspect
     //     slot 48, `get_hardpoint(char const* Name, Vector* Pos, Matrix* Orient)`, and
@@ -357,13 +357,13 @@ private:
     //     distance scalar, not the transform.
     // The stack-depth bookkeeping the previous note flagged is now done, in the .cpp,
     // with every ESP value derived from the function's own prologue. Populates
-    // Field1fc/ApproachBasis3 from XformA, Field1cc/ApproachBasis2 from XformB and
-    // Field19c/LaunchBasis from XformC, then (only when get_hardpoint FAILS) Field190
+    // DockPointA/ApproachBasis3 from XformA, DockPointB/ApproachBasis2 from XformB and
+    // DockPointC/LaunchBasis from XformC, then (only when get_hardpoint FAILS) LaunchOffset
     // and MoveIdea::Offset4c via FUN_062d5a80.
     void ComputeLaunchApproachTransform();
-    // case 3: FUN_062cdfa0(this), item 1425 -- re-reads the dock hardpoints, sets Flag17c
-    // from three alignment dot products and special-cases the terminal type (Flag230,
-    // Flag231, pi rotation of the three bases). Returns retail's AL (false only when the
+    // case 3: FUN_062cdfa0(this), item 1425 -- re-reads the dock hardpoints, sets bStraightLaunch
+    // from three alignment dot products and special-cases the terminal type (bHalfThrottleOnExit,
+    // bFlipHeadingOnExit, pi rotation of the three bases). Returns retail's AL (false only when the
     // watcher target is gone); the only caller ignores it.
     bool StartLaunchSequence();
     void SetApproachSpeedParam(float Value);   // ICF-mislabeled `DeviceTRC::bind_to_dc(SubObjectA,
@@ -412,7 +412,7 @@ private:
     // called with SubObjectB as `this` at all 3 call sites (case 4/5/6), so
     // the redundant SubObjectPtr parameter is dropped.
     void PushApproachBasisToSubObjectB(void const* SrcVectorBlock);
-    // FUN_062d5a20(SubObjectA, Field22c), decomp-tracker item 1585. CLOSED
+    // FUN_062d5a20(SubObjectA, LaunchThrottleScale), decomp-tracker item 1585. CLOSED
     // 2026-09-17 (claude:orch-dockpreamble): this is now a one-line forward to
     // MoveIdea::SetThrottleScale, which is where the function actually belongs --
     // a second call site (DockBehavior::AdvancePreamble, .text:062c48ca) proved it
@@ -463,7 +463,7 @@ private:
     // site (the item's own genuine blocker is about a DIFFERENT owning class
     // at the other 4 XREFs, not this one).
     void SetHardpointCone(float Angle);
-    // FUN_062e89a0(NavHelperPtr24+0x18, Value, 0) -- case 5, gated by Flag230:
+    // FUN_062e89a0(NavHelperPtr24+0x18, Value, 0) -- case 5, gated by bHalfThrottleOnExit:
     // ThrustManager::SetThrottle(Value, 0) on SystemManager::Thrust.
     void AdjustNavHelperThrottle(float Value);
 
@@ -474,7 +474,7 @@ public:
     // Opaque padding. Update()'s own large state machine (slot 7, control
     // flow ported for real, several sub-object payload calls still
     // FULLPORT-DEFERRED -- see the vtable-slot-table comment above) touches
-    // every field up through +0x232 (Flag231); this struct is therefore NOT
+    // every field up through +0x232 (bFlipHeadingOnExit); this struct is therefore NOT
     // sizeof()-asserted the way DockBehavior is -- only offsets this pass's
     // ported methods actually touch are asserted.
     // ------------------------------------------------------------------
@@ -486,12 +486,12 @@ public:
     int ModeSelector0xc;        // +0x0c. Written by Engage() (=1) and SetModeFromFlags() (0/2/3).
     int UpdateResult10;         // +0x10. Update()'s own tri-state result (documented, not ported).
     void* ThreatSourcePtr14;    // +0x14. Set by SetContext() (Param1).
-    IObjDB* Field18;            // +0x18. The manager's object database, stored by Behavior's
-                                 // own vtable slot 2 (Behavior::Slot2, 0629afd0 `MOV [ECX+0x18],
+    IObjDB* ObjectDb;            // +0x18. The manager's object database, stored by Behavior's
+                                 // own vtable slot 2 (Behavior::SetObjectDb, 0629afd0 `MOV [ECX+0x18],
                                  // EAX`) from ConnectBehaviorManagerObjectDb (FUN_062d2830).
-                                 // Engage()/Update() read Field18->GetZoneDb()->GetId().
+                                 // Engage()/Update() read ObjectDb->GetZoneDb()->GetId().
     float DeltaTime1c;           // +0x1c. Per-tick delta time; read (never written) by Update()'s
-                                  // own state machine (Field184/Field188 accumulation, and passed
+                                  // own state machine (LaunchDwellElapsed/TotalLaunchElapsed accumulation, and passed
                                   // as the "advance by DeltaTime1c" argument to SubObjectA/B's own
                                   // vtbl slot 1 calls). Same offset/role LootBehavior's own
                                   // Update() reads too (common_lootbehavior.h).
@@ -522,23 +522,23 @@ public:
     BaseWatcher Watcher168;     // +0x168 (8 bytes, ends +0x170). Zeroed by ctor (both dwords in
                                  // one instruction pair, matching DockBehavior::Watcher324's own
                                  // ctor pattern); dtor clears it via BaseWatcher::set_pointer(nullptr).
-    unsigned CachedSystemId170; // +0x170. Engage(): Field18->GetZoneDb()->GetId() (the current
+    unsigned CachedSystemId170; // +0x170. Engage(): ObjectDb->GetZoneDb()->GetId() (the current
                                  // system's id); Update() aborts with 2 when it changes.
     unsigned TargetType174;     // +0x174. Engage(): FUN_062e6200 == GetObjectTypeOrZero on the
                                  // watched launch target (target - 8).
-    int DirectiveField178;      // +0x178. Zeroed by ctor; copied from ApplyDirective()'s Param+0x10.
-    unsigned char Flag17c;      // +0x17c. Cleared by Engage().
+    int DockPortIndex;      // +0x178. Zeroed by ctor; copied from ApplyDirective()'s Param+0x10.
+    unsigned char bStraightLaunch;      // +0x17c. Cleared by Engage().
     unsigned char Pad17d[0x180 - 0x17d];
-    float Field180;             // +0x180. Set to 3.5f by ctor (MOV [ESI+0x180],0x40600000 at
+    float LaunchDwellDuration;             // +0x180. Set to 3.5f by ctor (MOV [ESI+0x180],0x40600000 at
                                  // Common.dll.txt 202888). Mode-1 dwell threshold: Update()'s case 1
-                                 // leaves mode 1 once Field184 > Field180.
-    float Field184;             // +0x184. Mode-1 dwell accumulator. Cleared by Engage() (NOT by the
-                                 // ctor -- FUN_062cd640 never touches +0x184). `Field184 += DeltaTime1c`
+                                 // leaves mode 1 once LaunchDwellElapsed > LaunchDwellDuration.
+    float LaunchDwellElapsed;             // +0x184. Mode-1 dwell accumulator. Cleared by Engage() (NOT by the
+                                 // ctor -- FUN_062cd640 never touches +0x184). `LaunchDwellElapsed += DeltaTime1c`
                                  // every mode-1 tick.
-    float Field188;             // +0x188. Whole-launch elapsed-time accumulator. Cleared by ctor
-                                 // (202883) AND by Engage(). `Field188 += DeltaTime1c` every tick,
-                                 // and Update() aborts with result 3 once Field188 > Field18c.
-    float Field18c;             // +0x18c. Launch timeout. Set by SetContext() to 15.0f or 60.0f
+    float TotalLaunchElapsed;             // +0x188. Whole-launch elapsed-time accumulator. Cleared by ctor
+                                 // (202883) AND by Engage(). `TotalLaunchElapsed += DeltaTime1c` every tick,
+                                 // and Update() aborts with result 3 once TotalLaunchElapsed > LaunchTimeout.
+    float LaunchTimeout;             // +0x18c. Launch timeout. Set by SetContext() to 15.0f or 60.0f
                                  // (never left alone -- see SetContext()'s own comment). NOT
                                  // ctor-initialized in retail.
     // ------------------------------------------------------------------
@@ -550,10 +550,10 @@ public:
     // still-FULLPORT-DEFERRED payload; LaunchBasis is additionally rotated
     // in place by Update()'s own case 5 (ported for real, pure FPU math).
     // ------------------------------------------------------------------
-    Vector Field190;             // +0x190 (ends +0x19c). Delta vector computed by
+    Vector LaunchOffset;             // +0x190 (ends +0x19c). Delta vector computed by
                                   // ComputeLaunchApproachTransform() (hardpoint pos minus
                                   // NavHelper nested-object pos).
-    Vector Field19c;             // +0x19c (ends +0x1a8). Result vector from
+    Vector DockPointC;             // +0x19c (ends +0x1a8). Result vector from
                                   // ComputeLaunchApproachTransform()'s DAT_063fc538 singleton call;
                                   // also written by Update()'s case 5 nested-object query.
     Vector LaunchBasis[3];       // +0x1a8 (ends +0x1cc). 3-Vector "launch orientation/direction
@@ -562,24 +562,24 @@ public:
                                   // call's out-buffer), then rotated in place by pi radians around
                                   // the (x,z) plane (DAT_0639e2d0) by Update()'s own case 5 --
                                   // CONFIRMED, ported for real (see Update()'s .cpp comment).
-    Vector Field1cc;             // +0x1cc (ends +0x1d8). Discrete-store vector from
+    Vector DockPointB;             // +0x1cc (ends +0x1d8). Discrete-store vector from
                                   // ComputeLaunchApproachTransform()'s rawblock vtbl+0xc8 out-params.
     Vector ApproachBasis2[3];    // +0x1d8 (ends +0x1fc). Second 9-dword MOVSD.REP copy destination
                                   // from the same rawblock vtbl+0xc8 call.
-    Vector Field1fc;             // +0x1fc (ends +0x208). Discrete-store vector from the SAME call.
+    Vector DockPointA;             // +0x1fc (ends +0x208). Discrete-store vector from the SAME call.
     Vector ApproachBasis3[3];    // +0x208 (ends +0x22c). Third 9-dword MOVSD.REP copy destination;
-                                  // ends exactly at Field22c below (confirmed contiguous).
-    float Field22c;              // +0x22c. Set to 15.0f by ctor. Read by case 4 (passed as
+                                  // ends exactly at LaunchThrottleScale below (confirmed contiguous).
+    float LaunchThrottleScale;              // +0x22c. Set to 15.0f by ctor. Read by case 4 (passed as
                                   // SetApproachThrottleScale()'s argument, FULLPORT-DEFERRED).
-    unsigned char Flag230;       // +0x230. Zeroed by ctor.
-    unsigned char Flag231;       // +0x231. Zeroed by ctor.
+    unsigned char bHalfThrottleOnExit;       // +0x230. Zeroed by ctor.
+    unsigned char bFlipHeadingOnExit;       // +0x231. Zeroed by ctor.
 };
 
 static_assert(offsetof(LaunchBehavior, CachedHandle08) == 0x08, "LaunchBehavior::CachedHandle08 offset");
 static_assert(offsetof(LaunchBehavior, ModeSelector0xc) == 0x0c, "LaunchBehavior::ModeSelector0xc offset");
 static_assert(offsetof(LaunchBehavior, UpdateResult10) == 0x10, "LaunchBehavior::UpdateResult10 offset");
 static_assert(offsetof(LaunchBehavior, ThreatSourcePtr14) == 0x14, "LaunchBehavior::ThreatSourcePtr14 offset");
-static_assert(offsetof(LaunchBehavior, Field18) == 0x18, "LaunchBehavior::Field18 offset");
+static_assert(offsetof(LaunchBehavior, ObjectDb) == 0x18, "LaunchBehavior::ObjectDb offset");
 static_assert(offsetof(LaunchBehavior, BehaviorMgrPtr20) == 0x20, "LaunchBehavior::BehaviorMgrPtr20 offset");
 static_assert(offsetof(LaunchBehavior, NavHelperPtr24) == 0x24, "LaunchBehavior::NavHelperPtr24 offset");
 static_assert(offsetof(LaunchBehavior, Flags28) == 0x28, "LaunchBehavior::Flags28 offset");
@@ -590,22 +590,22 @@ static_assert(offsetof(LaunchBehavior, ModeState164) == 0x164, "LaunchBehavior::
 static_assert(offsetof(LaunchBehavior, Watcher168) == 0x168, "LaunchBehavior::Watcher168 offset");
 static_assert(offsetof(LaunchBehavior, CachedSystemId170) == 0x170, "LaunchBehavior::CachedSystemId170 offset");
 static_assert(offsetof(LaunchBehavior, TargetType174) == 0x174, "LaunchBehavior::TargetType174 offset");
-static_assert(offsetof(LaunchBehavior, DirectiveField178) == 0x178, "LaunchBehavior::DirectiveField178 offset");
-static_assert(offsetof(LaunchBehavior, Flag17c) == 0x17c, "LaunchBehavior::Flag17c offset");
-static_assert(offsetof(LaunchBehavior, Field180) == 0x180, "LaunchBehavior::Field180 offset");
-static_assert(offsetof(LaunchBehavior, Field184) == 0x184, "LaunchBehavior::Field184 offset");
-static_assert(offsetof(LaunchBehavior, Field188) == 0x188, "LaunchBehavior::Field188 offset");
-static_assert(offsetof(LaunchBehavior, Field18c) == 0x18c, "LaunchBehavior::Field18c offset");
-static_assert(offsetof(LaunchBehavior, Field190) == 0x190, "LaunchBehavior::Field190 offset");
-static_assert(offsetof(LaunchBehavior, Field19c) == 0x19c, "LaunchBehavior::Field19c offset");
+static_assert(offsetof(LaunchBehavior, DockPortIndex) == 0x178, "LaunchBehavior::DockPortIndex offset");
+static_assert(offsetof(LaunchBehavior, bStraightLaunch) == 0x17c, "LaunchBehavior::bStraightLaunch offset");
+static_assert(offsetof(LaunchBehavior, LaunchDwellDuration) == 0x180, "LaunchBehavior::LaunchDwellDuration offset");
+static_assert(offsetof(LaunchBehavior, LaunchDwellElapsed) == 0x184, "LaunchBehavior::LaunchDwellElapsed offset");
+static_assert(offsetof(LaunchBehavior, TotalLaunchElapsed) == 0x188, "LaunchBehavior::TotalLaunchElapsed offset");
+static_assert(offsetof(LaunchBehavior, LaunchTimeout) == 0x18c, "LaunchBehavior::LaunchTimeout offset");
+static_assert(offsetof(LaunchBehavior, LaunchOffset) == 0x190, "LaunchBehavior::LaunchOffset offset");
+static_assert(offsetof(LaunchBehavior, DockPointC) == 0x19c, "LaunchBehavior::DockPointC offset");
 static_assert(offsetof(LaunchBehavior, LaunchBasis) == 0x1a8, "LaunchBehavior::LaunchBasis offset");
-static_assert(offsetof(LaunchBehavior, Field1cc) == 0x1cc, "LaunchBehavior::Field1cc offset");
+static_assert(offsetof(LaunchBehavior, DockPointB) == 0x1cc, "LaunchBehavior::DockPointB offset");
 static_assert(offsetof(LaunchBehavior, ApproachBasis2) == 0x1d8, "LaunchBehavior::ApproachBasis2 offset");
-static_assert(offsetof(LaunchBehavior, Field1fc) == 0x1fc, "LaunchBehavior::Field1fc offset");
+static_assert(offsetof(LaunchBehavior, DockPointA) == 0x1fc, "LaunchBehavior::DockPointA offset");
 static_assert(offsetof(LaunchBehavior, ApproachBasis3) == 0x208, "LaunchBehavior::ApproachBasis3 offset");
-static_assert(offsetof(LaunchBehavior, Field22c) == 0x22c, "LaunchBehavior::Field22c offset");
-static_assert(offsetof(LaunchBehavior, Flag230) == 0x230, "LaunchBehavior::Flag230 offset");
-static_assert(offsetof(LaunchBehavior, Flag231) == 0x231, "LaunchBehavior::Flag231 offset");
+static_assert(offsetof(LaunchBehavior, LaunchThrottleScale) == 0x22c, "LaunchBehavior::LaunchThrottleScale offset");
+static_assert(offsetof(LaunchBehavior, bHalfThrottleOnExit) == 0x230, "LaunchBehavior::bHalfThrottleOnExit offset");
+static_assert(offsetof(LaunchBehavior, bFlipHeadingOnExit) == 0x231, "LaunchBehavior::bFlipHeadingOnExit offset");
 
 // Retail object size, read off the factory body that allocates this class (`PUSH 0x234`
 // immediately before `CALL operator_new`). This is an UPPER bound on purpose: the existing

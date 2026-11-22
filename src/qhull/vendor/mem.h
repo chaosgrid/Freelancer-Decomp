@@ -160,7 +160,7 @@ struct qhmemT {               /* global memory management variables */
 #endif
 
 /*-------------------------------------------------------------
-  FUN_06356960 (src/Common/common_stubs.cpp): the IVP message printf
+  ivp_message (src/Common/common_stubs.cpp): the IVP message printf
     (vsprintf into a stack buffer, OutputDebugStringA).
 
   notes:
@@ -170,7 +170,7 @@ struct qhmemT {               /* global memory management variables */
     site names its retail call address in a comment.  qhull is a static
     library linked only into Common.dll, which defines this function.
 */
-void FUN_06356960(const char *Format, ...);
+void ivp_message(const char *Format, ...);
 
 /*=============== prototypes in alphabetical order ============*/
 

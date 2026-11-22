@@ -230,7 +230,8 @@ public:
     // cobject) independently require. A trade-lane state machine asking its target for
     // get_lane_start is also exactly the semantic this class's RTTI name predicts.
     IObjRW* TargetPtr14;
-    unsigned char Opaque18[0x20 - 0x18]; // +0x18, never touched by anything read this pass
+    IObjDB* ObjectDb;
+    float DeltaTime1c; // +0x18, never touched by anything read this pass
 
     // +0x20. RENAMED 2026-09-17 from `HelperPtr20`. This is the Behavior family's ordinary
     // IBehaviorManager back-pointer: the shared context initializer FUN_062d2090 (item 1532,
@@ -358,7 +359,7 @@ public:
     //            "on vcall failure (result == 0)" -- backwards; `JZ` takes the SUCCESS path.
     //            Skipped entirely when LanePtr38 is already set.
     //   state 3: IObjAffect(TargetPtr14 + 4)'s slot 0x64, args (SubObjPtr34, LanePtr38, 1,
-    //            Field58). Zero -> BehaviorMgrPtr20->QueueNotification(TargetPtr14, 0, 0.0f)
+    //            LaneSpeed). Zero -> BehaviorMgrPtr20->QueueNotification(TargetPtr14, 0, 0.0f)
     //            (FUN_062d4520 == item 1561, ported), UpdateResult10 = 0, Flags54 = 1,
     //            State30 = 4, return 0. Nonzero -> State30 = 6, UpdateResult10 = 1,
     //            return 1. (An older summary said the failure path returns 0; it does not --
@@ -376,19 +377,19 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // The other overrides retail's vftable .rdata:0639fe44 holds (raw .rdata dwords,
     // 2026-10-08). Until then slots 3/4/5/10/22 reached Behavior's base bodies.
-    void Slot3() override { TurnOff(); }                                   // 3  FUN_062cef10
-    void Slot4() override { RequestExitTradeLane(); }                      // 4  FUN_062cef40
-    int Slot5(float) override { return UpdateMode(); }                     // 5  LAB_062ceeb0 (RET 4)
-    bool Slot10(void* DirectiveOp) override { return AttachDirective(DirectiveOp); } // 10 LAB_062cf0f0
-    void Slot22(void* Event) override { HandleTargetEvent(Event); }        // 22 LAB_062cf1d0
+    void OnEngage() override { TurnOff(); }                                   // 3  FUN_062cef10
+    void OnDisengage() override { RequestExitTradeLane(); }                      // 4  FUN_062cef40
+    int OnEvaluateReadiness(float) override { return UpdateMode(); }                     // 5  LAB_062ceeb0 (RET 4)
+    bool OnApplyDirective(void* DirectiveOp) override { return AttachDirective(DirectiveOp); } // 10 LAB_062cf0f0
+    void OnEvent(void* Event) override { HandleTargetEvent(Event); }        // 22 LAB_062cf1d0
 
     // Own vtable slot 10 (offset 0x28). Common.dll.txt 205524-205562
     // (LAB_062cf0f0). CLOSED 2026-09-17 (claude:common-largeship-itl) -- every one of the
@@ -480,7 +481,7 @@ public:
     unsigned char Flag56;       // +0x56. Same clearing group as Flag55; OnResult() sets it
                                  // to 1 on one path.
     unsigned char Pad57;        // +0x57, alignment only.
-    float Field58;              // +0x58. Set by AttachDirective() from the directive
+    float LaneSpeed;              // +0x58. Set by AttachDirective() from the directive
                                  // struct's own +0x14 field. Ends the object at +0x5c.
                                  // A float: it is only ever passed on as the fourth
                                  // argument of IObjAffect::go_tradelane, which Server's
@@ -496,5 +497,5 @@ static_assert(offsetof(InstantTradeLaneBehavior, LaneEnd48) == 0x48, "InstantTra
 static_assert(offsetof(InstantTradeLaneBehavior, Flags54) == 0x54, "InstantTradeLaneBehavior::Flags54 offset");
 static_assert(offsetof(InstantTradeLaneBehavior, Flag55) == 0x55, "InstantTradeLaneBehavior::Flag55 offset");
 static_assert(offsetof(InstantTradeLaneBehavior, Flag56) == 0x56, "InstantTradeLaneBehavior::Flag56 offset");
-static_assert(offsetof(InstantTradeLaneBehavior, Field58) == 0x58, "InstantTradeLaneBehavior::Field58 offset");
+static_assert(offsetof(InstantTradeLaneBehavior, LaneSpeed) == 0x58, "InstantTradeLaneBehavior::LaneSpeed offset");
 static_assert(sizeof(InstantTradeLaneBehavior) == 0x5c, "InstantTradeLaneBehavior size -- CONFIRMED via operator_new(0x5c) in the factory (item 1514), not just the largest field referenced");

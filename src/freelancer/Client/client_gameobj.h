@@ -156,7 +156,7 @@ static_assert(sizeof(FEquippedFuseList) == 0x0c, "EquippedObj fuse list 0xc");
 // (vt+0x8) the interface at +4 of every 8-byte element.
 struct FGameobjSound
 {
-    unsigned Field_0x00;  // +0x00  not read by any function ported so far
+    unsigned SourceId;    // +0x00  sound owner / source id (FUN_0053a4c0)
     ISoundSource* Source; // +0x04
 };
 static_assert(sizeof(FGameobjSound) == 8, "GameObject sound element 8 bytes");
@@ -189,13 +189,13 @@ public:
 
     // ---- the extension vtable, retail slot order --------------------------------------
     // 85 +0x154 LAB_00524e20: bit 2 of Flags (set by destroy(1)).
-    virtual bool Slot154() const;
+    virtual bool IsExploding() const;
     // 86 +0x158 LAB_00524e30: bit 0 of Flags. FUN_005424e0 (the ObjDB reap) removes and deletes
     // every gameobj that answers true.
-    virtual bool Slot158() const;
+    virtual bool IsDead() const;
     // 87 +0x15c FUN_00539c10 (RET 4): bit 0 of Flags = the argument; then, when there is an
     // object, CObject::enable_collisions_r(false) (a tail JMP, whatever the argument was).
-    virtual void Slot15c(bool bValue);
+    virtual void MarkForRemoval(bool bValue);
     // 88 +0x160 LAB_00524e40: bit 1 of Flags.
     virtual bool Slot160() const;
     // 89 +0x164 LAB_00539c40 (RET 4): bit 1 of Flags = the argument.
@@ -212,76 +212,76 @@ public:
     // 92 +0x170 FUN_00539740: resolve the archetype's explosion into ExplosionArch (+ preload),
     // FDUMP a warning when the archetype names one that does not exist, then join the watch list
     // when get_type & 0x107ffdff and bWatchListed.
-    virtual void Slot170();
-    // 93 +0x174 FUN_00539c60 (RET 4): Actions.update(Dt), then Slot1b8(Dt).
+    virtual void PostCreateInit();
+    // 93 +0x174 FUN_00539c60 (RET 4): Actions.update(Dt), then UpdateNebula(Dt).
     virtual void update(float Dt);
     // 94 +0x178 FUN_00539810 (RET 4): the object's vt+0x64 (the physical radius about Center).
-    virtual float Slot178(Vector& Center);
+    virtual float GetPhysicalRadius(Vector& Center);
     // 95 +0x17c FUN_00539820 (RET 0xc): the LOD pick. Returns its first argument: a non-zero
     // low word in *CachedLod is copied straight to *OutLod (0x0053982c..0x0053983a), otherwise
-    // the pick runs (Slot178 radius, camera vt+0x40, ...). The pick's port is the free function
+    // the pick runs (GetPhysicalRadius radius, camera vt+0x40, ...). The pick's port is the free function
     // GameobjPickLod in space_scene_obj_draw.cpp -- see client_gameobj.cpp.
-    virtual unsigned* Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod);
+    virtual unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod);
     // 96 +0x180 LAB_00401e90: empty (EquippedObj overrides).
     virtual void Slot180();
     // 97 +0x184 FUN_00539b40 (RET 4): per-object lighting (FUN_005554d0). Body: the free
     // function GameobjUpdateDrawLightingRetail in space_scene_obj_draw.cpp.
-    virtual void Slot184(void* Camera);
-    // 98 +0x188 FUN_00539980 (RET 0x14): draw submit -- Slot180, Slot17c(&Lod, Camera,
+    virtual void UpdateDrawLighting(void* Camera);
+    // 98 +0x188 FUN_00539980 (RET 0x14): draw submit -- Slot180, PickLod(&Lod, Camera,
     // &CachedLod), the LOD gate (a failed gate writes the LOD to *OutLod and returns),
-    // the effect-list sweep, Slot184(Camera), the player flags, get_index, the envmap arm,
+    // the effect-list sweep, UpdateDrawLighting(Camera), the player flags, get_index, the envmap arm,
     // IRenderer2::Slot7(Camera, Inst, 1.0f, Flags, Matrix, Extra). Matrix = retail arg 4
     // (flags |= 0x120 when non-null), Extra = retail arg 5 (the IFLAppearance Slot8 out-param
     // when it was null). Body: GameobjSubmitDrawRetail in space_scene_obj_draw.cpp; the draw
     // drain calls this slot through the node LAB_0051f7a0.
-    virtual unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                               void* Extra);
     // 99 +0x18c LAB_00524e50 (RET 4): *OutB = DrawStateB; return DrawStateA.
-    virtual unsigned Slot18c(unsigned* OutB);
-    // 100 +0x190 LAB_00524e60: DrawStateA = DrawStateB = 0, Field_0x34 = 10.0f.
-    virtual void Slot190();
+    virtual unsigned GetNebula(unsigned* OutB);
+    // 100 +0x190 LAB_00524e60: DrawStateA = DrawStateB = 0, NebulaUpdateTimer = 10.0f.
+    virtual void ResetNebula();
     // 101 +0x194 FUN_00539c90 (RET 0x10): the collision pair --
-    // Other->Slot1a0(A, D, this, B), then this->Slot1ac(A, B, Other, D).
-    virtual void Slot194(void const* A, void const* B, FClientGameobj* Other, void const* D);
+    // Other->OnSurfaceCollisionHit(A, D, this, B), then this->ReportCollisionToServer(A, B, Other, D).
+    virtual void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D);
     // 102 +0x198 LAB_0053e4a0 (RET 4): empty. Simple FUN_005474a0 applies the root entry.
-    virtual void Slot198(DamageList const& Damage);
-    // 103 +0x19c FUN_0053a820 (RET 4): DestroyType 0 -> Slot15c(true); 1 -> Flags |= 4 and
-    // Slot1b0(nullptr); anything else FDUMPs "Invalid DestroyType!".
-    virtual void Slot19c(int DestroyType);
+    virtual void ApplyDamageList(DamageList const& Damage);
+    // 103 +0x19c FUN_0053a820 (RET 4): DestroyType 0 -> MarkForRemoval(true); 1 -> Flags |= 4 and
+    // Explode(nullptr); anything else FDUMPs "Invalid DestroyType!".
+    virtual void Destroy(int DestroyType);
     // 104 +0x1a0 FUN_00539cd0 (RET 0x10): surface-hit effect (PickDistanceRecord 0x00407450,
     // FUN_00539f90). Contact points at two Vectors: the hit point (+0x00) and the surface
     // normal (+0x0c); B and D are not read.
-    virtual void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    virtual void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                          void const* D);
     // 105 +0x1a4 FUN_00539d80 (RET 0xc): munition-hit effect (0x00408a70, FUN_0053a230). The
     // munition gameobj is the THIRD argument: FUN_00539d80 reads its +0x10 object from
     // [ESP+0xc] (0x00539d84), and Munition's slot 101 pushes `this` last (0x0053ed94).
-    virtual void Slot1a4(void const* A, void const* B, FClientGameobj* Munition);
+    virtual void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition);
     // 106 +0x1a8 LAB_0053f780 (RET 0xc): empty. The arguments are EquippedObj's
     // (FUN_005356c0): a gun hardpoint's sub-object id, the target object id and its sub-object.
-    virtual void Slot1a8(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj);
+    virtual void SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj);
     // 107 +0x1ac FUN_00539e70 (RET 0x10): multiplayer collision report through the server
     // interface DAT_0067ecd0 vt+0xdc.
-    virtual void Slot1ac(void const* A, void const* B, FClientGameobj* Other, void const* D);
+    virtual void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D);
     // 108 +0x1b0 FUN_0053a880 (RET 4): explode at Pos (null = get_position()) through
-    // FUN_005361e0 + Actions.add, or Slot15c(true) when there is no explosion.
-    virtual void Slot1b0(Vector const* Pos);
+    // FUN_005361e0 + Actions.add, or MarkForRemoval(true) when there is no explosion.
+    virtual void Explode(Vector const* Pos);
     // 109 +0x1b4 FUN_0053a4c0 (RET 0xc): the hit sound. SourceId keys the per-source voice
     // pool at +0x80; SoundArch is an EffectArch's +0x18 (vt+0x30 tested first); Pos goes to the
     // voice's vt+0x8c. Caller: FUN_00539f90 (0x0053a21f).
-    virtual void Slot1b4(unsigned SourceId, void* SoundArch, Vector const* Pos);
+    virtual void PlayHitSound(unsigned SourceId, void* SoundArch, Vector const* Pos);
     // 110 +0x1b8 LAB_0053e4a0 (RET 4): empty.
-    virtual void Slot1b8(float Dt);
+    virtual void UpdateNebula(float Dt);
 
     // ---- non-virtual members --------------------------------------------------------
     // FUN_0053a960: the cached attitude towards the player, refreshed through FUN_0045a490
     // every eighth call (AttitudeCountdown).
     int GetCachedAttitude();
     // FUN_0053a9c0 / FUN_0053a9d0 (callers 0x0051cf24 / 0x0051cfb5): read / write +0xa4.
-    unsigned char GetFieldA4() const { return Field_0xa4; }
-    void SetFieldA4(unsigned char Value) { Field_0xa4 = Value; }
+    unsigned char GetFieldA4() const { return bFactionDiscovered; }
+    void SetFieldA4(unsigned char Value) { bFactionDiscovered = Value; }
     // FUN_0053a9e0 (callers 0x004d2763 .. 0x004d376a): the address of the font string at +0x48.
-    FFontString* GetFontString48() { return &Field_0x48; }
+    FFontString* GetFontString48() { return &HudLabel; }
     // FUN_0053a9f0 (callers 0x004d2756 / 0x004d2d9a): Flags bit 3, but only while +0x7c still
     // equals the surface width DAT_00610850; false otherwise.
     bool GetFlag3IfSurfaceWidthUnchanged() const;
@@ -291,7 +291,7 @@ public:
 
     // FUN_00539f90 (RET 0x14): the surface-hit particle -- a new ParticleEffect for
     // EffectArch->VisEffect in one of the three HitEffects slots, attached at Pos / Normal in
-    // object space -- then Slot1b4(SourceId, EffectArch->SndEffect, Pos). Skipped entirely for
+    // object space -- then PlayHitSound(SourceId, EffectArch->SndEffect, Pos). Skipped entirely for
     // the player's ship while SURFACE_HIT_EFFECTS (option 0x38) is off. The fifth argument
     // is never read ([ESP+0xb0] at that frame is not touched): slots 104/105 pass 0, the shield
     // wrapper's hit slots (0x0052e84d, 0x0052e9bd) pass the address of a zeroed local effect
@@ -359,14 +359,14 @@ public:
     int ManagerKind;                   // +0x1c  ObjDB bucket (1 ship, 2 solar, 3 beam, ...)
     ActionDB Actions;                  // +0x20  update(Dt) by slot 93, add by slot 108
     FGameobjEffectList EffectList;     // +0x28
-    float Field_0x34;                  // +0x34  ctor 0; slot 100 sets 10.0f; Ship ctor rand()/32768
+    float NebulaUpdateTimer;                  // +0x34  ctor 0; slot 100 sets 10.0f; Ship ctor rand()/32768
     unsigned DrawStateA;               // +0x38  slot 99 / slot 100; lighting FUN_005554d0 arg
     unsigned DrawStateB;               // +0x3c
     Archetype::Explosion* ExplosionArch; // +0x40 slot 92 resolves; the dtor releases
     unsigned char Flags;               // +0x44  bit0 slot 86/87, bit1 slot 88/89, bit2 slot 85
     unsigned char Pad45[3];
-    FFontString Field_0x48;            // +0x48  FUN_004144b0; FUN_0053a9e0 returns its address
-    int Field_0x7c;                    // +0x7c  surface width DAT_00610850 (FUN_0053aa10 / 0053a9f0)
+    FFontString HudLabel;            // +0x48  FUN_004144b0; FUN_0053a9e0 returns its address
+    int HudLabelSurfaceWidth;                    // +0x7c  surface width DAT_00610850 (FUN_0053aa10 / 0053a9f0)
     unsigned char SoundAllocatorByte;  // +0x80  the ctor copies the kind's low byte here
     unsigned char Pad81[3];
     FGameobjSound* SoundsBegin;        // +0x84
@@ -375,10 +375,14 @@ public:
     FParticleEffect* HitEffects[3];    // +0x90  FUN_00539f90 fills (DAT_00613e60 = 3)
     int CachedAttitude;                // +0x9c  FUN_0053a960
     int AttitudeCountdown;             // +0xa0  ctor -1
-    unsigned char Field_0xa4;          // +0xa4  FUN_0053a9c0 get / FUN_0053a9d0 set
+    unsigned char bFactionDiscovered;          // +0xa4  FUN_0053a9c0 get / FUN_0053a9d0 set
     unsigned char Pada5[3];
-    // +0xa8 -- read by slot 92 (FUN_00539740) and the HUD; written by Simple's ctor
-    // (FUN_00547440, 0) and FUN_00547550. GameObject's own ctor leaves it alone.
+    // +0xa8 -- In retail Freelancer.exe, sizeof(GameObject) is 0xa8 (ctor FUN_005392d0 stops at +0xa4),
+    // and +0xa8 is the first derived field of Simple (bWatchListed), MedAsteroid (bInstantKill),
+    // DynamicAsteroid (Owner), and Debris (DeathMethod). GameObject::PostCreateInit (FUN_00539740)
+    // checks `if ((type & 0x107ffdff) != 0)` before reading +0xa8, where 0x107ffdff excludes
+    // MedAsteroid (0x200), DynamicAsteroid (0x20000000), and Debris (0x80000000) to guarantee
+    // `this` is a Simple* before accessing Simple::bWatchListed at +0xa8.
     unsigned char bWatchListed;        // +0xa8
     unsigned char Pada9[3];
 };
@@ -388,18 +392,18 @@ static_assert(offsetof(FClientGameobj, ListPrev) == 0x18, "Gameobj ListPrev +0x1
 static_assert(offsetof(FClientGameobj, ManagerKind) == 0x1c, "Gameobj ManagerKind +0x1c");
 static_assert(offsetof(FClientGameobj, Actions) == 0x20, "Gameobj ActionDB +0x20");
 static_assert(offsetof(FClientGameobj, EffectList) == 0x28, "Gameobj effect list +0x28");
-static_assert(offsetof(FClientGameobj, Field_0x34) == 0x34, "Gameobj +0x34");
+static_assert(offsetof(FClientGameobj, NebulaUpdateTimer) == 0x34, "Gameobj +0x34");
 static_assert(offsetof(FClientGameobj, DrawStateA) == 0x38, "Gameobj +0x38");
 static_assert(offsetof(FClientGameobj, DrawStateB) == 0x3c, "Gameobj +0x3c");
 static_assert(offsetof(FClientGameobj, ExplosionArch) == 0x40, "Gameobj explosion +0x40");
 static_assert(offsetof(FClientGameobj, Flags) == 0x44, "Gameobj flags +0x44");
-static_assert(offsetof(FClientGameobj, Field_0x48) == 0x48, "Gameobj font string +0x48");
-static_assert(offsetof(FClientGameobj, Field_0x7c) == 0x7c, "Gameobj +0x7c");
+static_assert(offsetof(FClientGameobj, HudLabel) == 0x48, "Gameobj font string +0x48");
+static_assert(offsetof(FClientGameobj, HudLabelSurfaceWidth) == 0x7c, "Gameobj +0x7c");
 static_assert(offsetof(FClientGameobj, SoundsBegin) == 0x84, "Gameobj sounds +0x84");
 static_assert(offsetof(FClientGameobj, HitEffects) == 0x90, "Gameobj hit effects +0x90");
 static_assert(offsetof(FClientGameobj, CachedAttitude) == 0x9c, "Gameobj attitude +0x9c");
 static_assert(offsetof(FClientGameobj, AttitudeCountdown) == 0xa0, "Gameobj countdown +0xa0");
-static_assert(offsetof(FClientGameobj, Field_0xa4) == 0xa4, "Gameobj +0xa4");
+static_assert(offsetof(FClientGameobj, bFactionDiscovered) == 0xa4, "Gameobj +0xa4");
 static_assert(offsetof(FClientGameobj, bWatchListed) == 0xa8, "Gameobj +0xa8");
 static_assert(sizeof(FClientGameobj) == 0xac, "GameObject sizeof 0xac");
 
@@ -415,12 +419,12 @@ public:
     void create(Archetype::Root* Arch) override = 0;
     // 102 +0x198 FUN_005474a0 (RET 4): multiplayer only -- the root entry's hit points go to
     // CSimple::set_hit_pts (vt+0x98).
-    void Slot198(DamageList const& Damage) override;
+    void ApplyDamageList(DamageList const& Damage) override;
     // 103 +0x19c FUN_00547500 (RET 4): CSimple::set_hit_pts(0), then GameObject's slot 103.
-    void Slot19c(int DestroyType) override;
+    void Destroy(int DestroyType) override;
 
     // 111 +0x1bc LAB_00547530: the CSimple's TypeBits (+0xe0).
-    virtual unsigned Slot1bc() const;
+    virtual unsigned GetTypeBits() const;
 
     // FUN_00547550 (RET 8): bWatchListed = (bWatch == 1), then join or leave the watch list.
     // The first argument is not read.
@@ -441,7 +445,7 @@ public:
     void notify(Event Code, void* Param) override;
 
     // IObjInspect slot 14 (+0x38) LAB_00534860: `MOV EAX,[ECX]; JMP [EAX+0x1c8]` -- the object
-    // is dying while a death fuse on it still burns (Slot1c8, virtual). Slot 14 of the
+    // is dying while a death fuse on it still burns (IsDeathFuseBurning, virtual). Slot 14 of the
     // EquippedObj (.rdata:005de274), Ship (005dfda4) and Solar (005e033c) vtables.
     bool is_dying() const override;
     // IObjInspect slot 72 (+0x120) LAB_00535650 (RET 8): Common's scan_cargo, then -- for the
@@ -452,25 +456,25 @@ public:
     // 90 +0x168: pure (0x005b8064).
     void create(Archetype::Root* Arch) override = 0;
     // 92 +0x170 FUN_00533e10.
-    void Slot170() override;
+    void PostCreateInit() override;
     // 93 +0x174 FUN_00534010.
     void update(float Dt) override;
     // 95 +0x17c FUN_00533710.
-    unsigned* Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
+    unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
     // 96 +0x180 LAB_0051b480.
     void Slot180() override;
     // 98 +0x188 FUN_00533780.
-    unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                       void* Extra) override;
     // 102 +0x198 FUN_005339e0.
-    void Slot198(DamageList const& Damage) override;
+    void ApplyDamageList(DamageList const& Damage) override;
     // 104 +0x1a0 FUN_005340b0.
-    void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00534190.
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 106 +0x1a8 FUN_005356c0 (RET 0xc): SubTargets[SubObj] = {TargetId, TargetSubObj}.
-    void Slot1a8(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj) override;
+    void SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj) override;
 
     // FUN_005357f0 (RET 4): re-aim the gun at SubObj on the target SubTargets holds for it
     // (inserting the {0, SUBOBJ_ID_NONE} default when there is none), through IObjAffect slot 17
@@ -478,7 +482,7 @@ public:
     // multiplayer arm of slot_34 (0x00534bf6).
     void ApplySubTarget(unsigned short SubObj);
     // 108 +0x1b0 FUN_00533be0.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
 
     // 112 +0x1c0 FUN_00534240 (RET 0x14): ignite the fuse FuseId on this object -- the first
     // burning fuse of that name on the +0xc4 list gets Fuse::IgniteAt(SourceId, SubObjId,
@@ -487,17 +491,17 @@ public:
     // not in the database (FDUMP). Callers: the equip-FX rebuild FUN_00533e10 (0x00533ee7,
     // 0x00533f92), BURNFUSE FUN_0053e090, the ship override FUN_00545a90. Body:
     // EquippedObjIgniteFuse (client_equip_fx.cpp).
-    virtual bool Slot1c0(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId,
+    virtual bool LightFuse(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId,
                          float AtT, float Lifetime);
     // 113 +0x1c4 FUN_005343d0 (RET 0xc): the first fuse named FuseId on the +0xc4 list gets
     // Fuse::UnBurn(SubObjId, AtT); true when one did.
-    virtual bool Slot1c4(ID_String const* FuseId, unsigned short SubObjId, float AtT);
+    virtual bool UnLightFuse(ID_String const* FuseId, unsigned short SubObjId, float AtT);
     // 114 +0x1c8 FUN_00534420 (bare RET): true when a death fuse (Fuse +0xc) on the +0xc4 list
     // is not yet spent (Fuse::IsSpent).
-    virtual bool Slot1c8();
+    virtual bool IsDeathFuseBurning();
     // 115 +0x1cc FUN_00534460 (RET 4): the equipment message -- 0x18 fire, 0x19 activate.
     // Port: EquippedObjHandleEquipMsg (cli_projectile_fx.cpp).
-    virtual unsigned char Slot1cc(FCliEquipFirePacket const* Packet);
+    virtual unsigned char HandleEquipMsg(FCliEquipFirePacket const* Packet);
 
     // FUN_00533d10 (RET 0xc): a part that came off becomes a Debris gameobj (its [Debris]
     // record by DebrisType, the default with a warning when there is none), the part's effects
@@ -534,14 +538,14 @@ public:
     // in the same 0x14 bytes (no retail ABI).
     std::map<unsigned short, FEquipSubTarget> SubTargets; // +0xcc
     unsigned char PadSubTargets[0x14 - sizeof(std::map<unsigned short, FEquipSubTarget>)];
-    unsigned char Field_0xe0;          // +0xe0
+    unsigned char bCloakOverrideActive;          // +0xe0
     unsigned char Pade1[3];
 };
 static_assert(offsetof(FClientEquippedObj, EquipFlags) == 0xb0, "EquippedObj +0xb0");
 static_assert(offsetof(FClientEquippedObj, EquipFx) == 0xb4, "EquippedObj equip-FX list +0xb4");
 static_assert(offsetof(FClientEquippedObj, Fuses) == 0xc0, "EquippedObj fuse list +0xc0");
 static_assert(offsetof(FClientEquippedObj, SubTargets) == 0xcc, "EquippedObj sub-target map +0xcc");
-static_assert(offsetof(FClientEquippedObj, Field_0xe0) == 0xe0, "EquippedObj +0xe0");
+static_assert(offsetof(FClientEquippedObj, bCloakOverrideActive) == 0xe0, "EquippedObj +0xe0");
 static_assert(sizeof(FClientEquippedObj) == 0xe4, "EquippedObj sizeof 0xe4");
 
 class FClientSolarGameobj : public FClientEquippedObj
@@ -560,21 +564,21 @@ public:
     // 91 +0x16c FUN_00547760.
     bool find(unsigned const& Id) override;
     // 92 +0x170 FUN_00547850.
-    void Slot170() override;
+    void PostCreateInit() override;
     // 93 +0x174 FUN_00547880.
     void update(float Dt) override;
     // 94 +0x178 FUN_00548110.
-    float Slot178(Vector& Center) override;
+    float GetPhysicalRadius(Vector& Center) override;
     // 98 +0x188 FUN_00548220.
-    unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                       void* Extra) override;
     // 104 +0x1a0 FUN_00548520.
-    void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00548570.
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 108 +0x1b0 FUN_005485b0.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
 
     // FUN_005485c0 (thiscall, RET 4) -- the client half of an [Object] section, read after the
     // spawn FUN_00548a20 rewound the reader (0x00548c73 set_state, call at 0x00548c7c): ring,
@@ -585,20 +589,20 @@ public:
     // +0xe4 -- the star (StarEffects::Star, FStarSphere, vtable 005db658) a sun solar gets
     // from its "star" key (FUN_0050c630 at 0x0054880d, ReadIni); the update ticks it through
     // its slot 2 (0x005478db). space_scene_obj_draw.cpp tests it.
-    FStarSphere* Field_0xe4;           // +0xe4  ctor 0
+    FStarSphere* StarSphere;           // +0xe4  ctor 0
     // +0xe8 -- "dock_script" (ReadIni 0x0054872c..0x00548783, the inlined TString assign). The
     // ctor zeroes the length and the first char only.
     TString<0x104> DockScript;         // +0xe8 .. +0x1ef
-    unsigned char Field_0x1f0;         // +0x1f0 ctor 1
+    unsigned char bTradeLaneIdle;         // +0x1f0 ctor 1
     unsigned char Pad1f1[3];
     float BurnColor[3];                // +0x1f4 ctor 1.0f x3; "burn_color" / 255 (ReadIni)
-    ID_String Field_0x200;             // +0x200 ctor ID_String::clear; "jump_effect" CreateID
-    void* Field_0x204;                 // +0x204 ctor 0; the dtor runs FUN_00502e40 and frees it
+    ID_String JumpEffectId;             // +0x200 ctor ID_String::clear; "jump_effect" CreateID
+    void* JumpGateEffect;                 // +0x204 ctor 0; the dtor runs FUN_00502e40 and frees it
 };
 static_assert(offsetof(FClientSolarGameobj, DockScript) == 0xe8, "Solar +0xe8 dock_script");
 static_assert(offsetof(FClientSolarGameobj, BurnColor) == 0x1f4, "Solar +0x1f4 burn_color");
-static_assert(offsetof(FClientSolarGameobj, Field_0x1f0) == 0x1f0, "Solar +0x1f0");
-static_assert(offsetof(FClientSolarGameobj, Field_0x200) == 0x200, "Solar +0x200");
+static_assert(offsetof(FClientSolarGameobj, bTradeLaneIdle) == 0x1f0, "Solar +0x1f0");
+static_assert(offsetof(FClientSolarGameobj, JumpEffectId) == 0x200, "Solar +0x200");
 static_assert(sizeof(FClientSolarGameobj) == 0x208, "Solar sizeof 0x208");
 
 class FClientShipGameobj : public FClientEquippedObj
@@ -617,34 +621,34 @@ public:
     // 91 +0x16c FUN_005465d0.
     bool find(unsigned const& Id) override;
     // 92 +0x170 FUN_005447b0.
-    void Slot170() override;
+    void PostCreateInit() override;
     // 93 +0x174 FUN_00545050.
     void update(float Dt) override;
     // 97 +0x184 FUN_00546480.
-    void Slot184(void* Camera) override;
+    void UpdateDrawLighting(void* Camera) override;
     // 98 +0x188 FUN_00546050.
-    unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
+    unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                       void* Extra) override;
     // 102 +0x198 FUN_00545f50.
-    void Slot198(DamageList const& Damage) override;
+    void ApplyDamageList(DamageList const& Damage) override;
     // 104 +0x1a0 FUN_00545e90.
-    void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 105 +0x1a4 FUN_00545ed0.
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 108 +0x1b0 FUN_00545d80.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
     // 110 +0x1b8 FUN_005455b0.
-    void Slot1b8(float Dt) override;
+    void UpdateNebula(float Dt) override;
     // 112 +0x1c0 FUN_00545a90 (RET 0x14): EquippedObj's ignite (FUN_00534240) and, when it
     // lit DEATH_COMM_FUSE, the formation / follow followers' behaviours are told (event 7 with
     // this ship's id) and the player drops this ship as its target.
-    bool Slot1c0(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId, float AtT,
+    bool LightFuse(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId, float AtT,
                  float Lifetime) override;
     // 115 +0x1cc FUN_00544d70 (RET 4). Port: CliShipHandleEquipUpdate (cli_projectile_fx.cpp).
-    unsigned char Slot1cc(FCliEquipFirePacket const* Packet) override;
+    unsigned char HandleEquipMsg(FCliEquipFirePacket const* Packet) override;
     // 116 +0x1d0 LAB_00545cc0 (bare RET).
-    virtual void Slot1d0();
+    virtual void PlayFireFailedSound();
 
     // IObjAffect overrides (.rdata:005dfcec).
     int set_throttle(float Throttle) override;                               // 00546640
@@ -749,58 +753,58 @@ public:
     // CShip::close_bay runs +0xe8 times and both return to 0. The writer is the server arm of
     // IObjAffect slot 14 (FUN_005467e0, 0x005468ba..0x005468cd): one more close per jettison,
     // the countdown += open_bay's result + CShip::JETTISON_CLEARANCE_TIME.
-    float Field_0xe4;                  // +0xe4
-    int Field_0xe8;                    // +0xe8
-    RequestCB* Field_0xec;             // +0xec  slot_5c (00546df4) stores its callback, slot_60 clears
-    ISoundSource* Field_0xf0;          // +0xf0  the dtor stops (vt+0x60) and releases (vt+8) it
+    float BayCloseTimer;                  // +0xe4
+    int BayCloseCount;                    // +0xe8
+    RequestCB* PendingRequestCB;             // +0xec  slot_5c (00546df4) stores its callback, slot_60 clears
+    ISoundSource* ThrusterSound;          // +0xf0  the dtor stops (vt+0x60) and releases (vt+8) it
     // +0xf4 .. +0x103 -- a 0x10 effect companion (arch, sound, particle, light): the dtor
     // releases +0xfc (FUN_004f7a90), +0xf8 (vt+8), +0x100 (FUN_00537ad0), then zeroes +0xf4.
-    void* Field_0xf4[4];
-    Archetype::Root* Field_0x104;      // +0x104 the dtor releases it (0x00544501)
-    FMeshHolder Field_0x108;           // +0x108 FUN_00420d40 (the dtor runs FUN_00420f70)
-    Transform Field_0x118;             // +0x118 identity orientation, zero position
-    Archetype::ISound* Field_0x148;     // +0x148 fire-failed sound archetype
-    ISoundSource* Field_0x14c;         // +0x14c the dtor stops and releases it
-    float Field_0x150;                 // +0x150 the update runs it down by Dt while above 0
-    unsigned char Field_0x154;         // +0x154
+    void* AtmosphereBurnCompanion[4];
+    Archetype::Root* PilotMeshArch;      // +0x104 the dtor releases it (0x00544501)
+    FMeshHolder PilotMeshHolder;           // +0x108 FUN_00420d40 (the dtor runs FUN_00420f70)
+    Transform PilotTransform;             // +0x118 identity orientation, zero position
+    Archetype::ISound* FireFailedSoundArch;     // +0x148 fire-failed sound archetype
+    ISoundSource* FireFailedSound;         // +0x14c the dtor stops and releases it
+    float FireFailedCooldown;                 // +0x150 the update runs it down by Dt while above 0
+    unsigned char bHullBreachWarned;         // +0x154
     unsigned char Pad155[3];
     // +0x158 -- the state FUN_005437d0 (switch 0..5) stores last (0x00543b12). Readers: the
     // draw pass (0x0051c221 compares 2 and 3), StarSys music (0x005550c4), 0x0054380d (== 5).
-    int Field_0x158;
-    unsigned char Field_0x15c;         // +0x15c FUN_00543630 sets 1 (0x0054364b)
+    int JumpState;
+    unsigned char bJumpInReady;         // +0x15c FUN_00543630 sets 1 (0x0054364b)
     unsigned char Pad15d[3];
     // +0x160 .. +0x183 -- one 0x24-byte member whose destructor is FUN_00544710 (inlined in the
     // Ship dtor at 0x00544613..0x0054468c): a dword, then two 0x10 effect companions. They are
     // the tradelane ring FX binders tradelane_fx.cpp reaches by offset (+0x164 / +0x174). The
     // earlier "0xdc-byte object at +0x17c" was the dtor's ESI-relative +0x17c misread: the Ship
     // dtor runs with ESI = this + 0xc, so that object is +0x188.
-    unsigned Field_0x160;              // +0x160
-    void* Field_0x164[4];              // +0x164 companion (arch, sound, particle, light)
-    void* Field_0x174[4];              // +0x174 companion
-    unsigned Field_0x184;              // +0x184 (tradelane_fx.cpp reads bytes +0x184/+0x185)
+    unsigned TradeLaneRing;              // +0x160
+    void* TradeLaneShipCompanion[4];              // +0x164 companion (arch, sound, particle, light)
+    void* TradeLaneTunnelCompanion[4];              // +0x174 companion
+    unsigned TradeLaneFlags;              // +0x184 (tradelane_fx.cpp reads bytes +0x184/+0x185)
     // +0x188 -- a 0xdc-byte object built by FUN_00543530 (FUN_00503440(this, Arg)) or
     // FUN_00543630 (FUN_005038c0(this)), destroyed by FUN_00503a80 + free (FUN_005437d0 case 0,
     // FUN_00543530, FUN_00543630, the dtor). FUN_005437d0's tail clears its +0x70.
-    void* Field_0x188;
+    void* JumpEffect;
     // +0x18c -- flag byte: bit 0 / bit 1 set by slot 105 (FUN_00545ed0, 0x00545f07), both
     // cleared by slot 92 (FUN_005447b0, 0x005447c6), bit 3 set by FUN_00543b40 (0x00543b71).
     // The ctor clears bits 0..1 and then stores 0 over the whole dword (0x00543498/0x005434a5).
-    unsigned char Field_0x18c;
+    unsigned char ShipFlags;
     unsigned char Pad18d[3];
 };
-static_assert(offsetof(FClientShipGameobj, Field_0xec) == 0xec, "Ship +0xec");
-static_assert(offsetof(FClientShipGameobj, Field_0xf0) == 0xf0, "Ship +0xf0");
-static_assert(offsetof(FClientShipGameobj, Field_0x104) == 0x104, "Ship +0x104");
-static_assert(offsetof(FClientShipGameobj, Field_0x108) == 0x108, "Ship mesh holder +0x108");
-static_assert(offsetof(FClientShipGameobj, Field_0x118) == 0x118, "Ship transform +0x118");
-static_assert(offsetof(FClientShipGameobj, Field_0x148) == 0x148, "Ship +0x148");
-static_assert(offsetof(FClientShipGameobj, Field_0x158) == 0x158, "Ship +0x158");
-static_assert(offsetof(FClientShipGameobj, Field_0x160) == 0x160, "Ship +0x160");
-static_assert(offsetof(FClientShipGameobj, Field_0x164) == 0x164, "Ship companion +0x164");
-static_assert(offsetof(FClientShipGameobj, Field_0x174) == 0x174, "Ship companion +0x174");
-static_assert(offsetof(FClientShipGameobj, Field_0x184) == 0x184, "Ship +0x184");
-static_assert(offsetof(FClientShipGameobj, Field_0x188) == 0x188, "Ship +0x188");
-static_assert(offsetof(FClientShipGameobj, Field_0x18c) == 0x18c, "Ship +0x18c");
+static_assert(offsetof(FClientShipGameobj, PendingRequestCB) == 0xec, "Ship +0xec");
+static_assert(offsetof(FClientShipGameobj, ThrusterSound) == 0xf0, "Ship +0xf0");
+static_assert(offsetof(FClientShipGameobj, PilotMeshArch) == 0x104, "Ship +0x104");
+static_assert(offsetof(FClientShipGameobj, PilotMeshHolder) == 0x108, "Ship mesh holder +0x108");
+static_assert(offsetof(FClientShipGameobj, PilotTransform) == 0x118, "Ship transform +0x118");
+static_assert(offsetof(FClientShipGameobj, FireFailedSoundArch) == 0x148, "Ship +0x148");
+static_assert(offsetof(FClientShipGameobj, JumpState) == 0x158, "Ship +0x158");
+static_assert(offsetof(FClientShipGameobj, TradeLaneRing) == 0x160, "Ship +0x160");
+static_assert(offsetof(FClientShipGameobj, TradeLaneShipCompanion) == 0x164, "Ship companion +0x164");
+static_assert(offsetof(FClientShipGameobj, TradeLaneTunnelCompanion) == 0x174, "Ship companion +0x174");
+static_assert(offsetof(FClientShipGameobj, TradeLaneFlags) == 0x184, "Ship +0x184");
+static_assert(offsetof(FClientShipGameobj, JumpEffect) == 0x188, "Ship +0x188");
+static_assert(offsetof(FClientShipGameobj, ShipFlags) == 0x18c, "Ship +0x18c");
 static_assert(sizeof(FClientShipGameobj) == 0x190, "Ship sizeof 0x190 (operator_new(400))");
 
 // ===========================================================================
@@ -839,18 +843,18 @@ public:
     void create(Archetype::Root* Arch) override = 0;
     // 92 +0x170 FUN_005426e0: GameObject's slot 92, then the munition companion's const_effect
     // -- started now through FUN_00503070 when its delay is 0, else the delay is armed.
-    void Slot170() override;
+    void PostCreateInit() override;
     // 93 +0x174 FUN_00542790 (RET 4): unless done, GameObject's update, then the armed delay
     // counts down and, on reaching 0, starts the const_effect.
     void update(float Dt) override;
     // 104 +0x1a0 FUN_0053d4f0: RET 0x10, empty.
-    void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 108 +0x1b0 FUN_00542870 (RET 4): drop the companion's node from the effect list
     // (FUN_004fcef0), then GameObject's slot 108.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
     // 112 +0x1c0 LAB_005428a0 (RET 4): *Out = identity rotation, zero translation.
-    virtual void Slot1c0(Transform* Out);
+    virtual void GetConstEffectTransform(Transform* Out);
 
     float ConstEffectDelay;     // +0xac  -1.0f = not armed
     void* OneShotCompanion[4];  // +0xb0  {EffectArch, ISoundSource*, particle, light}
@@ -867,9 +871,9 @@ public:
     // Projectile's body (the thunk FUN_0053d470); deleting wrapper FUN_0053d440.
     ~FClientMunitionGameobj() override;
 
-    // 101 +0x194 FUN_0053ed80 (RET 0x10): Other->Slot1a4(A, D, this), then
-    // this->Slot1ac(A, B, Other, D).
-    void Slot194(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    // 101 +0x194 FUN_0053ed80 (RET 0x10): Other->OnMunitionHit(A, D, this), then
+    // this->ReportCollisionToServer(A, B, Other, D).
+    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
 };
 static_assert(sizeof(FClientMunitionGameobj) == 0xc0, "Munition sizeof 0xc0");
 
@@ -890,22 +894,22 @@ public:
     // 91 +0x16c FUN_0053f330: XOR AL,AL / RET 4.
     bool find(unsigned const& Id) override;
     // 93 +0x174 LAB_0053f610 (RET 4): Projectile's update, the object's vt+0x50
-    // update(Dt, CObject::UPDATE_DEFAULT), then Slot15c(true) once the object's +0xe8 life
-    // goes below 0 (unless Slot154).
+    // update(Dt, CObject::UPDATE_DEFAULT), then MarkForRemoval(true) once the object's +0xe8 life
+    // goes below 0 (unless IsExploding).
     void update(float Dt) override;
-    // 101 +0x194 LAB_0053f690 (RET 0x10): unless Slot154 -- the pair (Other->Slot1a4,
-    // this->Slot1ac), the CBeam's +0xf8 velocity zeroed, the beam effect flagged hit
+    // 101 +0x194 LAB_0053f690 (RET 0x10): unless IsExploding -- the pair (Other->OnMunitionHit,
+    // this->ReportCollisionToServer), the CBeam's +0xf8 velocity zeroed, the beam effect flagged hit
     // (FUN_004fc8f0(1, Other == player)) and released, the companion's node dropped, then
     // Projectile's slot 108 at A.
-    void Slot194(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 105 +0x1a4 LAB_0053f780: RET 0xc, empty.
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 107 +0x1ac LAB_0053f790 (RET 0x10): the munition-collision report to the server,
     // IServer::SPMunitionCollision (slot 53, +0xd4) -- in multiplayer only for the player's
     // own shots.
-    void Slot1ac(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 111 +0x1bc LAB_0052e130: 0x2000000.
-    unsigned Slot1bc() const override;
+    unsigned GetTypeBits() const override;
 
     void* Companion[4];       // +0xc0  FUN_005154a0; the effect list gets a copy
     FBeamEffect* BeamAlloc;   // +0xd0  FUN_0053f340's beam effect
@@ -938,10 +942,10 @@ public:
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053eaa0 (RET 0xc): only a CBeam (class & 0x67) munition reaches
     // GameObject's munition-hit effect (a tail JMP to FUN_00539d80).
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
-    // 110 +0x1b8 FUN_0053ea60 (RET 4): while Field_0x34 is exactly 0, the nebula at the position
-    // into DrawStateA / its fog factor into DrawStateB, and Field_0x34 = 1.0f.
-    void Slot1b8(float Dt) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
+    // 110 +0x1b8 FUN_0053ea60 (RET 4): while NebulaUpdateTimer is exactly 0, the nebula at the position
+    // into DrawStateA / its fog factor into DrawStateB, and NebulaUpdateTimer = 1.0f.
+    void UpdateNebula(float Dt) override;
 };
 static_assert(sizeof(FClientMineGameobj) == 0xc0, "Mine sizeof 0xc0 (operator new(0xc0))");
 
@@ -961,9 +965,9 @@ public:
     // 93 +0x174 FUN_00530000 (RET 4): as Mine's with class & 0x17.
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053f780: RET 0xc, empty.
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 110 +0x1b8 FUN_0053ea60: Mine's.
-    void Slot1b8(float Dt) override;
+    void UpdateNebula(float Dt) override;
 };
 static_assert(sizeof(FClientCounterMeasureGameobj) == 0xc0, "CounterMeasure sizeof 0xc0");
 
@@ -984,22 +988,22 @@ public:
     // 93 +0x174 FUN_0053ecb0 (RET 4): as Mine's with class & 0xa7.
     void update(float Dt) override;
     // 105 +0x1a4 LAB_0053eaa0: Mine's (CBeam munitions only).
-    void Slot1a4(void const* A, void const* B, FClientGameobj* Munition) override;
+    void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 107 +0x1ac LAB_0053ee00 (RET 0x10): the munition-collision report to the server
     // (IServer::SPMunitionCollision, slot 53) -- in multiplayer only when Other belongs to this
     // connection.
-    void Slot1ac(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 FUN_0053edc0 (RET 4): the const_effect particle (OneShotCompanion +8) is let go
     // of this gameobj (FUN_004f7d20 with no owner, part -1 and the gameobj's frame), then
     // Projectile's slot 108.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
     // 110 +0x1b8 FUN_0053ea60: Mine's.
-    void Slot1b8(float Dt) override;
+    void UpdateNebula(float Dt) override;
     // 111 +0x1bc LAB_0053d430: 0x1000000.
-    unsigned Slot1bc() const override;
+    unsigned GetTypeBits() const override;
     // 112 +0x1c0 LAB_0053f030 (RET 4): the const_effect / trail frame -- the munition
     // companion's HP_trail_parent hardpoint, else the mesh's bounds on the renderer.
-    void Slot1c0(Transform* Out) override;
+    void GetConstEffectTransform(Transform* Out) override;
 
     // IObjAffect slot 18 (+0x48) LAB_0053eed0 (RET 0xc): re-target a seeking missile, and tell
     // the server (IServer::SetTarget) when the request came from this connection.
@@ -1023,15 +1027,15 @@ public:
     bool find(unsigned const& Id) override;
     // 92 +0x170 LAB_0053e5e0: GameObject's slot 92, the crate's tractored_explosion into +0xac,
     // then the nebula lookup (FUN_005553b0) into DrawStateA / DrawStateB.
-    void Slot170() override;
+    void PostCreateInit() override;
     // 93 +0x174 FUN_0053e6a0 (RET 4): GameObject's update, then the CLoot's vt+0x50 update.
     void update(float Dt) override;
     // 102 +0x198 FUN_0053e770 (RET 4): multiplayer only -- the root entry sets the hit points,
     // any other entry the contents' hit points (a unit lost when they ran out).
-    void Slot198(DamageList const& Damage) override;
+    void ApplyDamageList(DamageList const& Damage) override;
     // 103 +0x19c LAB_0053e8a0 (RET 4): DestroyType 2 (tractored in) explodes with the
     // tractored_explosion; anything else goes to Simple's slot 103.
-    void Slot19c(int DestroyType) override;
+    void Destroy(int DestroyType) override;
 
     Archetype::Explosion* TractoredExplosionArch; // +0xac  slot 92 resolves; the dtor releases
 };

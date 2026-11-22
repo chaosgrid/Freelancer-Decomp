@@ -102,7 +102,7 @@ static_assert(sizeof(void*) != 4 || offsetof(MissionObjectiveWindow, Text) == 0x
 //
 // vftable 0x005d5b74 -- WinControl's with six overrides:
 //   0 FUN_004bb760 (scalar deleting dtor around FUN_004bb780), 9 FUN_004bb810 Create,
-//   11 FUN_004bc970 Update, 13 FUN_004bc940 Draw, 23 LAB_004bc090 Slot23,
+//   11 FUN_004bc970 Update, 13 FUN_004bc940 Draw, 23 LAB_004bc090 ProcessMessage,
 //   42 LAB_004bc110 SetProperty.
 //
 // Two layouts, chosen in Create by NN_MainButton's force-mission-log flag (+0x52f): normally a
@@ -125,7 +125,7 @@ public:
     // slot 13 FUN_004bc940
     void Draw() override;
     // slot 23 LAB_004bc090 (RET 0xc) -- 0xef01 show / 0xef02 tear down
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_004bc110 (RET 0xc) -- 0x26, a button was clicked
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

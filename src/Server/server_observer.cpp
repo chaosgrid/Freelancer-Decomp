@@ -472,10 +472,10 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             Info.Velocity.x = 0.0f;
             Info.Velocity.y = 0.0f;
             Info.Velocity.z = 0.0f;
-            Info.Field_0x38.x = 0.0f;
-            Info.Field_0x38.y = 0.0f;
-            Info.Field_0x38.z = 0.0f;
-            Info.Field_0x44 = 0u;            // .text:06cf5a94
+            Info.AngularVelocity.x = 0.0f;
+            Info.AngularVelocity.y = 0.0f;
+            Info.AngularVelocity.z = 0.0f;
+            Info.OwnerPlayer = 0u;            // .text:06cf5a94
             ServerCreateProjectileInfo_Fill(&Info, static_cast<CProjectile*>(Raw));
 
             // .text:06cf5ab3 / .text:06cf5ab7 push `&View->PlayerId`, not
@@ -507,10 +507,10 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             Info.Velocity.x = 0.0f;
             Info.Velocity.y = 0.0f;
             Info.Velocity.z = 0.0f;
-            Info.Field_0x38.x = 0.0f;
-            Info.Field_0x38.y = 0.0f;
-            Info.Field_0x38.z = 0.0f;
-            Info.Field_0x44 = 0u;
+            Info.AngularVelocity.x = 0.0f;
+            Info.AngularVelocity.y = 0.0f;
+            Info.AngularVelocity.z = 0.0f;
+            Info.OwnerPlayer = 0u;
             ServerCreateProjectileInfo_Fill(&Info, static_cast<CProjectile*>(Raw));
 
             // .text:06cf5b59  ff92c4000000  CALL dword ptr [EDX + 0xc4]
@@ -672,7 +672,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 
         FCommonUpdateObjectInfo Msg;
         Msg.ObjectId = Obj->get_id();
-        Msg.Field_0x24 = 0.0f;         // .text:06cf5faa, the non-ship default
+        Msg.Throttle = 0.0f;         // .text:06cf5faa, the non-ship default
         Msg.Pad_0x29[0] = 0u;
         Msg.Pad_0x29[1] = 0u;
         Msg.Pad_0x29[2] = 0u;
@@ -680,10 +680,10 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         Msg.Position = Position;
         // .text:06cf5f14 FLD double [EBP+0x30] / .text:06cf5f39 FSTP float --
         // the observer clock crosses the wire NARROWED to a float.
-        Msg.Field_0x20 = static_cast<float>(View->ElapsedTime);
+        Msg.Timestamp = static_cast<float>(View->ElapsedTime);
         // .text:06cf5f68  MOV byte ptr [ESP + 0x94],0xff -- seeded, and only
         // the ship path replaces it.
-        Msg.Field_0x28 = 0xffu;
+        Msg.State = 0xffu;
 
         CObject* const Raw = Obj->cobj();
         CShip* const Ship =
@@ -692,10 +692,10 @@ void SystemPlayerView_Update(Observer* View, double Dt)
                 ? static_cast<CShip*>(Raw) : nullptr;
         if (Ship != nullptr) {
             // .text:06cf5f8a  MOV EDX,[EAX + 0x29c] == CShip::Throttle.
-            Msg.Field_0x24 = Ship->Throttle;
+            Msg.Throttle = Ship->Throttle;
             // .text:06cf5f9b  CALL [EAX + 0x148] -- IObjInspect slot 82,
             // get_behavior_id, stored as a BYTE.
-            Msg.Field_0x28 =
+            Msg.State =
                 static_cast<unsigned char>(Obj->get_behavior_id());
         }
 

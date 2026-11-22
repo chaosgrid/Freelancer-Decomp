@@ -58,7 +58,7 @@ bool FCliMedAsteroidGameobj::find(unsigned const& Id)
     return Object != nullptr;
 }
 
-void FCliMedAsteroidGameobj::Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+void FCliMedAsteroidGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     // LAB_00524f20 (RET 0x10). 0x00524f20..0x00524f4d: bWatchListed, Other, Other's CBase
@@ -67,22 +67,22 @@ void FCliMedAsteroidGameobj::Slot1a0(void const* Contact, void const* B, FClient
         (static_cast<unsigned>(Other->GetObject()->ObjectClass) & 0x503u) == 0x503u)
     {
         // 0x00524f4f..0x00524f5c: own slot 108 with the contact point (the first argument).
-        Slot1b0(static_cast<Vector const*>(Contact));
+        Explode(static_cast<Vector const*>(Contact));
         return;
     }
     // 0x00524f5f..0x00524f73: the arguments rewritten in place unchanged and a tail JMP to
     // GameObject's FUN_00539cd0.
-    FClientGameobj::Slot1a0(Contact, B, Other, D);
+    FClientGameobj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FCliMedAsteroidGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other,
+void FCliMedAsteroidGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     // LAB_00524f80 (RET 0x10).
     if (bWatchListed == 0)
     {
         // 0x0052501a..0x00525030: GameObject's FUN_00539e70 with the same four arguments.
-        FClientGameobj::Slot1ac(A, B, Other, D);
+        FClientGameobj::ReportCollisionToServer(A, B, Other, D);
         return;
     }
 
@@ -108,15 +108,15 @@ void FCliMedAsteroidGameobj::Slot1ac(void const* A, void const* B, FClientGameob
     // 0x00524fd9..0x0052500c: {this id, Other's id, D's low word} and DAT_00673344 into
     // DAT_0067ecd0 slot 54 (+0xd8), no null test. The word at +0x0a is the stack's.
     SSPBadLandsObjCollisionInfo Info;
-    Info.Field_0x00 = get_id();
+    Info.BadLandsObjId = get_id();
     Info.ObjectId = Other->get_id();
-    Info.Field_0x08 = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
+    Info.SubObjId = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
     Info.Pad_0x0a = 0;
     static_cast<IServer*>(GetLocalServerInterface())
         ->SPBadLandsObjCollision(Info, GetPlayerConnectionId());
 }
 
-void FCliMedAsteroidGameobj::Slot1b0(Vector const* Pos)
+void FCliMedAsteroidGameobj::Explode(Vector const* Pos)
 {
     // FUN_00525040 (RET 4). 0x00525044..0x00525051: nothing while an action is pending.
     if (Actions.get_action_count() != 0)
@@ -181,7 +181,7 @@ FCliAsteroidCube::~FCliAsteroidCube()
     for (std::map<unsigned long, FCliMedAsteroidGameobj*>::iterator It = Asteroids.begin();
          It != Asteroids.end(); ++It)
     {
-        It->second->Slot15c(true);
+        It->second->MarkForRemoval(true);
     }
     // 0x00524b68..0x00524c87: the map's erase(begin, end) and its destructor (the member's).
 }
@@ -208,7 +208,7 @@ void FCliAsteroidCube::ApplyEvent(CmnAsteroid::asteroid_marker const* Event)
             Event->AsteroidId, Med));
         // 0x00524d63..0x00524d75: vt+0x16c find(&Event->ObjId), then vt+0x170 (FUN_00539740).
         Med->find(Event->ObjId);
-        Med->Slot170();
+        Med->PostCreateInit();
         // 0x00524d7b..0x00524d87: bWatchListed = bInstantKill (+0x0e), then FUN_00540c30(Med, 0).
         Med->bWatchListed = Event->bInstantKill ? 1 : 0;
         ClientObjDb_RegisterGameobj(Med, false);
@@ -224,7 +224,7 @@ void FCliAsteroidCube::ApplyEvent(CmnAsteroid::asteroid_marker const* Event)
     }
     // 0x00524dba..0x00524dd3: slot 87 (vt+0x15c) with true on the gameobj, then erase
     // (FUN_0046c8c0).
-    It->second->Slot15c(true);
+    It->second->MarkForRemoval(true);
     Asteroids.erase(It);
 }
 

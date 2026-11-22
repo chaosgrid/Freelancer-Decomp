@@ -26,9 +26,9 @@ FollowBehavior::FollowBehavior(int InTypeId)
     , Pad2a5{}
     , Distance2a8(0.0f)              // not written by retail; the port zeroes it
     , Field2ac(150.0f)               // 062ccb34
-    , Field2b0(2.0f)                 // 062ccb3a
-    , Field2b4(400.0f)               // 062ccb44
-    , Field2b8(100.0f)               // 062ccb4e
+    , LeadClearanceScale(2.0f)                 // 062ccb3a
+    , EngageRange(400.0f)               // 062ccb44
+    , FollowRangeBias(100.0f)               // 062ccb4e
 {
     Flag281 = 0;                     // 062ccaff
     Flag280 = 0;                     // 062ccb05
@@ -39,9 +39,9 @@ FollowBehavior::FollowBehavior(int InTypeId)
 }
 
 // Slot 3, FUN_062ccc80 (.text:062ccc80-062cccdd).
-void FollowBehavior::Slot3()
+void FollowBehavior::OnEngage()
 {
-    BaseFollowerBehavior::Slot3();                                  // 062ccc83 FUN_062cb540
+    BaseFollowerBehavior::OnEngage();                                  // 062ccc83 FUN_062cb540
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
     if (Lead == nullptr)
         return;
@@ -53,9 +53,9 @@ void FollowBehavior::Slot3()
 }
 
 // Slot 4, FUN_062ccce0 (.text:062ccce0-062ccd21).
-void FollowBehavior::Slot4()
+void FollowBehavior::OnDisengage()
 {
-    BaseFollowerBehavior::Slot4();                                  // 062ccce3 FUN_062cb5e0
+    BaseFollowerBehavior::OnDisengage();                                  // 062ccce3 FUN_062cb5e0
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
     if (Lead == nullptr)
         return;
@@ -65,7 +65,7 @@ void FollowBehavior::Slot4()
 }
 
 // Slot 5, FUN_062ccb70 (.text:062ccb70-062ccc07, RET 4, argument unread).
-int FollowBehavior::Slot5(float Value)
+int FollowBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
@@ -74,8 +74,8 @@ int FollowBehavior::Slot5(float Value)
         ModeSelector0xc = (Flag29 != 0) ? 3 : 2;                    // LAB_062ccbee
         return ModeSelector0xc;
     }
-    // 062ccb9b-062ccbad: FUN_062e4500(Sys+0x14fc, Lead, Field2b4).
-    if (IsWithinInterceptRangeOfIface(&NavHelper->SelfTarget, Lead, Field2b4))
+    // 062ccb9b-062ccbad: FUN_062e4500(Sys+0x14fc, Lead, EngageRange).
+    if (IsWithinInterceptRangeOfIface(&NavHelper->SelfTarget, Lead, EngageRange))
         ModeSelector0xc = (Flag29 != 0) ? 3 : 1;
     else
         ModeSelector0xc = (Flag29 != 0) ? 3 : 0;
@@ -101,7 +101,7 @@ EvaluateResult FollowBehavior::evaluate(unsigned int Context)
 }
 
 // Slot 10, FUN_062cd3d0 (.text:062cd3d0-062cd4b9, RET 4).
-bool FollowBehavior::Slot10(void* Param)
+bool FollowBehavior::OnApplyDirective(void* Param)
 {
     if (Param != nullptr)
     {
@@ -144,7 +144,7 @@ bool FollowBehavior::Slot10(void* Param)
             return true;
         }
 
-        Field2b4 = *reinterpret_cast<float const*>(P + 0x20);
+        EngageRange = *reinterpret_cast<float const*>(P + 0x20);
     }
 
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
@@ -169,7 +169,7 @@ IObjRW* LeaderObjectOf(BaseWatcher const& Watcher)
 }
 
 // Common.dll.txt 062cd236-062cd251 and 062cd2cc-062cd2f3 -- the SAME lazy per-frame refill,
-// inlined twice into Slot27: when Flags1578[2] (NavHelper+0x14fc+0x7e) is clear, set it FIRST
+// inlined twice into UpdateFollowerSteering: when Flags1578[2] (NavHelper+0x14fc+0x7e) is clear, set it FIRST
 // (062cd24a / 062cd2ec) and then ExternalIface (+0x14fc+0x84) slot 0x2c,
 // IObjInspect::get_physical_radius(+0x14fc+0x18 Radius, +0x14fc+0xc Center). No null tests
 // in retail.
@@ -185,16 +185,16 @@ void RefreshNavPhysicalBounds(SystemManager* Nav)
 } // namespace
 
 // Common.dll.txt 062ccf83-062cd043, inlined a second time verbatim at 062cd0a3-062cd164 (the
-// first copy opens Slot27's watch block, the second its point block). Toggle Enabled2a4 when
+// first copy opens UpdateFollowerSteering's watch block, the second its point block). Toggle Enabled2a4 when
 // the leader crosses the follow range and report the transition to the manager. Retail re-reads
 // LeadWatcher (`MOV EAX,[EBP+0x2c]` + the `- 8`) for every use, and so does this.
 void FollowBehavior::UpdateInterceptEngageState()
 {
     // 062ccf83-062ccfa5: FUN_062e4500 (IsWithinInterceptRangeOfIface) with the float
-    // Field2b8 + SpeedParam2a0 (`FLD; FADD; FSTP [ESP]` -- one float rounding).
+    // FollowRangeBias + SpeedParam2a0 (`FLD; FADD; FSTP [ESP]` -- one float rounding).
     bool const bInRange = IsWithinInterceptRangeOfIface(
         &NavHelper->SelfTarget, LeaderObjectOf(LeadWatcher),
-        Field2b8 + SpeedParam2a0);
+        FollowRangeBias + SpeedParam2a0);
 
     if (bInRange)
     {
@@ -207,7 +207,7 @@ void FollowBehavior::UpdateInterceptEngageState()
         unsigned const OwnId = NavHelper->SelfTarget.Iface->get_id();
         // 062ccfe1-062ccff9: the float and the status are pushed for FUN_062d29c0 BEFORE the
         // leader's own zero-argument slot 8 get_id() runs; they stay on the stack under it.
-        float const Range = Field2b8 + SpeedParam2a0;
+        float const Range = FollowRangeBias + SpeedParam2a0;
         unsigned const LeaderId = ObjInspectOf(Leader)->get_id();
         // 062cd03e-062cd043: BehaviorMgrPtr (+0x20), FUN_062d29c0, result discarded.
         (void)BehaviorMgrPtr->NotifyFollowEvent(OwnId, LeaderId,
@@ -229,7 +229,7 @@ void FollowBehavior::UpdateInterceptEngageState()
 }
 
 // Own vtable slot 27 (offset 0x6c) -- LAB_062ccd30, item 1407, Common.dll.txt 201942-202527.
-void FollowBehavior::Slot27()
+void FollowBehavior::UpdateFollowerSteering()
 {
     // Frame: S = ESP after `SUB ESP,0x9c`. Locals: S+0x0 Rotated (later the forward column and
     // then the aim point), S+0xf the cruise bool, S+0x10 Speed, S+0x14 TargetPoint, S+0x20
@@ -379,12 +379,12 @@ void FollowBehavior::Slot27()
 
             RefreshNavPhysicalBounds(NavHelper); // 062cd2cc-062cd2f3
 
-            // 062cd2f6-062cd368, off the x87 stack: Scalar = (Weight * Field2b0 +
+            // 062cd2f6-062cd368, off the x87 stack: Scalar = (Weight * LeadClearanceScale +
             // CachedPhysicalRadius) + Speed stays unrounded. The x and y products (-col2 *
             // Scalar) are stored to float (S+0x20 / S+0x24) before TargetPoint is added; the z
             // product stays on the stack and is added unrounded. FUN_062d7560 on Face.
             double const Scalar =
-                (static_cast<double>(Weight) * Field2b0 + NavHelper->SelfTarget.CachedRadius) + Speed;
+                (static_cast<double>(Weight) * LeadClearanceScale + NavHelper->SelfTarget.CachedRadius) + Speed;
             float const ProductX = static_cast<float>(-static_cast<double>(Forward.x) * Scalar);
             float const ProductY = static_cast<float>(-static_cast<double>(Forward.y) * Scalar);
             double const ProductZ = -static_cast<double>(Forward.z) * Scalar;
@@ -408,7 +408,7 @@ void FollowBehavior::Slot27()
 }
 
 // Own vtable slot 28 (offset 0x70) -- LAB_062cd4c0, item 1409, Common.dll.txt 202640-202681.
-Vector FollowBehavior::Slot28()
+Vector FollowBehavior::GetRotatedOffset()
 {
     // 062cd4c0-062cd4c5: the 0xc-byte local that 062cd506-062cd521 copies through the hidden
     // return-buffer pointer (`RET 0x4`).

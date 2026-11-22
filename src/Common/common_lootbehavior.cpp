@@ -118,7 +118,7 @@ LootBehavior::LootBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)
@@ -185,28 +185,28 @@ bool LootBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // ----------------------------------------------------------------------------
 // Slot 3, LAB_062cd5d0: `JMP FUN_062d20d0`.
 // ----------------------------------------------------------------------------
-void LootBehavior::Slot3()
+void LootBehavior::OnEngage()
 {
-    Behavior::Slot3();
+    Behavior::OnEngage();
 }
 
 // ----------------------------------------------------------------------------
 // Slot 4, FUN_062ce660 (.text:062ce660-062ce6aa).
 // ----------------------------------------------------------------------------
-void LootBehavior::Slot4()
+void LootBehavior::OnDisengage()
 {
     Target.Watcher.set(nullptr);                                    // 062ce663-062ce675
     Target.bDirected = 0;                                           // 062ce680
     Move.Commit();                                                  // 062ce687
     Face.Commit();                                                  // 062ce696
     (void)TractorRelease(NavHelper);                                // 062ce6a2 FUN_062ece40(Sys+0x1498)
-    Behavior::Slot4();                                              // 062ce6aa JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062ce6aa JMP FUN_062d20f0
 }
 
 // ----------------------------------------------------------------------------
 // Slot 5, FUN_062ce6b0 (.text:062ce6b0-062ce73a).
 // ----------------------------------------------------------------------------
-int LootBehavior::Slot5(float Unused)
+int LootBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     // 062ce6b3-062ce6c8: only with a tractor and the TargetManager in attack state 2.
@@ -357,7 +357,7 @@ Done:
 // ----------------------------------------------------------------------------
 // Slot 7, LAB_062ceb50 (.text:062ceb50-062cedc7).
 // ----------------------------------------------------------------------------
-int LootBehavior::Slot7()
+int LootBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)                                    // 062ceb56
     {
@@ -433,7 +433,7 @@ int LootBehavior::Slot7()
 // ----------------------------------------------------------------------------
 // Slot 10, FUN_062cedd0 (.text:062cedd0-062cee3f).
 // ----------------------------------------------------------------------------
-bool LootBehavior::Slot10(void* DirectiveOp)
+bool LootBehavior::OnApplyDirective(void* DirectiveOp)
 {
     unsigned char* const Op = static_cast<unsigned char*>(DirectiveOp);
     void* const Found = NavHelper->Timers.FindVerifiedObject((unsigned const*)(Op + 0xc));   // 062cede3

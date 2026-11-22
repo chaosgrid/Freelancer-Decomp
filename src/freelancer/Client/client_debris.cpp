@@ -268,21 +268,21 @@ void FClientDebrisGameobj::update(float Dt)
     {
         if (Method == 0)
         {
-            Slot1b0(nullptr);
+            Explode(nullptr);
             return;
         }
         if (Method == 1)
-            Slot15c(true);
+            MarkForRemoval(true);
     }
 }
 
-unsigned* FClientDebrisGameobj::Slot17c(unsigned* OutLod, void* Camera,
+unsigned* FClientDebrisGameobj::PickLod(unsigned* OutLod, void* Camera,
                                         unsigned const* CachedLod)
 {
     // FUN_005300f0 (RET 0xc): GameObject's pick FUN_00539820 into a local (retail reuses the
     // third argument's stack slot), its return value ignored.
     unsigned Lod = 0;
-    FClientGameobj::Slot17c(&Lod, Camera, CachedLod);
+    FClientGameobj::PickLod(&Lod, Camera, CachedLod);
     // 0x00530109..0x0053011b: CMP CX,3 / JC (unsigned low word < 3), CMP word,2 / JL (the
     // signed high word below 2 keeps the flag).
     unsigned short const LowWord = static_cast<unsigned short>(Lod & 0xffffu);
@@ -293,13 +293,13 @@ unsigned* FClientDebrisGameobj::Slot17c(unsigned* OutLod, void* Camera,
     return OutLod;
 }
 
-void FClientDebrisGameobj::Slot1b0(Vector const* Pos)
+void FClientDebrisGameobj::Explode(Vector const* Pos)
 {
     // LAB_005305a0 (RET 4).
     if (Explosion == nullptr)
     {
         // 0x005305f6..0x005305f9: GameObject's slot 108 FUN_0053a880.
-        FClientGameobj::Slot1b0(Pos);
+        FClientGameobj::Explode(Pos);
         return;
     }
     // 0x005305b4..0x005305e9: Pos, or get_position() (vt+0) when it is null, copied to the
@@ -315,7 +315,7 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
     // FUN_005301d0 (RET 4).
     // 0x005301db: GameObject's slot 92 FUN_00539740, called directly. It reads bWatchListed
     // only after get_type, and Debris's get_type (0x80000000) has none of the bits it tests.
-    FClientGameobj::Slot170();
+    FClientGameobj::PostCreateInit();
 
     // 0x005301e7..0x00530200: +0xa8 = the death method (the retail dword store overwrites the
     // bWatchListed byte too), +0xac = lifetime min, +0xb0 = lifetime max.

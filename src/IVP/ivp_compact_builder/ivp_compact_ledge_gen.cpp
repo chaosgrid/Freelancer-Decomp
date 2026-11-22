@@ -18,7 +18,7 @@
 
 // Raw port in src/IVP/ivp_collision/ivp_mindist_limiter.cpp: the
 // IVP_Compact_Triangle constructor (16 zero bytes).
-extern "C" void* FUN_0635aa20(void* param_1_00);
+extern "C" void* IVP_Compact_Triangle_Init(void* param_1_00);
 
 namespace
 {
@@ -137,7 +137,7 @@ int32_t IVP_Compact_Ledge_Generator::prepare_compact_ledge(IVP_U_Vector<IVP_Tria
     {
         IVP_Triangle* const Triangle = Triangles->elems[I];
         IVP_Compact_Triangle* const CompactTriangle =
-            static_cast<IVP_Compact_Triangle*>(FUN_0635aa20(::operator new(0x10)));
+            static_cast<IVP_Compact_Triangle*>(IVP_Compact_Triangle_Init(::operator new(0x10)));
 
         uint32_t Info = CompactTriangle->TriInfo;
         Info ^= (static_cast<uint32_t>(Triangle->index) ^ Info) & 0xfffu;

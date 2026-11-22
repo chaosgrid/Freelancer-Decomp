@@ -18,7 +18,7 @@
 // button: a TextWin whose click sends parent slot 23 (0x3004, command, 0).
 //
 // Call path: IntroFocus::Update (0x00573eb0) polls TypeSelect+0x80 (DAT_0067b800) in state 1;
-// TypeSelect::Slot23 starts the slide-out animation for commands 3 / 0xa / 0x10, and
+// TypeSelect::ProcessMessage starts the slide-out animation for commands 3 / 0xa / 0x10, and
 // TypeSelect::Update copies the command into +0x80 once the buttons are gone.
 
 #include "event_handler.h"
@@ -74,7 +74,7 @@ public:
     // slot 13 FUN_00566500 -- JMP FUN_0059e5c0
     void Draw() override;
     // slot 23 FUN_00566bd0 (RET 0xc)
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
     // Event::Handler slot 0 at +0x7c, FUN_00566fc0 (RET 4) -- 0xf -> FUN_00471f30(0), true.
     bool OnEvent(unsigned MsgId) override;

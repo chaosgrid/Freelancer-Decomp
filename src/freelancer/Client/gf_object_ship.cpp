@@ -253,9 +253,9 @@ void FObjectShipEngineFx::Update(float Delta)
     FTransform Xform = Product;
 
     // 0x00446e0f..0x00446e34: slot 3 (0, &frame), slot 7 (Delta), slot 8 (Delta).
-    Particles.Effect->Slot3(nullptr, &Xform);
-    Particles.Effect->Slot7(FloatArg(Delta));
-    Particles.Effect->Slot8(FloatArg(Delta));
+    Particles.Effect->SetTransform(nullptr, &Xform);
+    Particles.Effect->ComposeTransforms(FloatArg(Delta));
+    Particles.Effect->Update(FloatArg(Delta));
 
     if (bStopping == 0)
     {
@@ -277,7 +277,7 @@ void FObjectShipEngineFx::Update(float Delta)
     }
 
     // 0x00446e8d..0x00446e9d: stopping -- slot 11 (4); AL set -> FUN_005574a0.
-    GENRESULT const Done = Particles.Effect->Slot11(reinterpret_cast<void*>(4));
+    GENRESULT const Done = Particles.Effect->IsFinished(reinterpret_cast<void*>(4));
     if ((static_cast<unsigned>(Done) & 0xffu) != 0)
         Particles.Destroy();
 }
@@ -492,7 +492,7 @@ void FObjectShip::Update(double DeltaSeconds)
         {
             float const* const At = DALib::Engine->GetInstancePosition(Loop.Instance);
             float Where[3] = {At[0], At[1], At[2]};
-            Loop.Source->Slot35(Where);
+            Loop.Source->SetPosition(Where);
         }
         // 0x00447439..0x0044747e: the same for the rumble.
         FObjectShipEngineSound& Rumble = RumbleSounds[Index];
@@ -500,7 +500,7 @@ void FObjectShip::Update(double DeltaSeconds)
         {
             float const* const At = DALib::Engine->GetInstancePosition(Rumble.Instance);
             float Where[3] = {At[0], At[1], At[2]};
-            Rumble.Source->Slot35(Where);
+            Rumble.Source->SetPosition(Where);
         }
         // 0x00447484..0x00447495: FUN_00446d90 on the flame effect.
         EngineFx[Index].Update(Delta);

@@ -1044,7 +1044,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         // 00497143..00497180: the record's kind (low nibble of +0x18): 0xa numbered stops,
         // 9 no number, anything else -1. No null test of the record, as in retail.
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index); // FUN_004c4ff0
-        unsigned const RecordKind = Waypoint->Field_0x18 & 0xf;
+        unsigned const RecordKind = Waypoint->ObjectiveState & 0xf;
         if (RecordKind == 0xa)
             Item->Variant = NextNumber++;
         else if (RecordKind == 9)
@@ -1312,14 +1312,14 @@ void NeuroNetNavMap::PlaceItems()
         Engine->UpdateInstance(Item->Mesh.EngineInstance, 0, nullptr);
 
         // 00496cd5..00496d0e: an object with an id takes the visit map's flags; bit 0 shows it
-        // (or Field_0x87e every one).
+        // (or bDebugShowAll every one).
         if (Item->Id != 0)
         {
             unsigned char VisitFlags = 0;
             GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0 0x00496ceb
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
-            if (Field_0x87e != 0)
+            if (bDebugShowAll != 0)
                 Item->bShown = 1;
         }
     }
@@ -1527,11 +1527,11 @@ void NeuroNetNavMap::Update()
             {
                 FToolTipHoverInfo Record;
                 ToolTipHoverInit(&Record); // FUN_004144b0 + FUN_00413df0(0, -1), -1 / 0 / 0
-                if (Item->Kind == 4 && Item->Field_0x5c.c_str()[0] != L'\0')
+                if (Item->Kind == 4 && Item->TooltipText.c_str()[0] != L'\0')
                 {
                     // 00494d5e..00494ff5: a best-path marker with its own text (wcscmp against
                     // L"" at DAT_005c8ce0) shows that text, always fed.
-                    ToolTipHoverSetCaption(&Record, Item->Field_0x5c.c_str());
+                    ToolTipHoverSetCaption(&Record, Item->TooltipText.c_str());
                     NavMapPlaceHoverAtCursor(&Record);
                     NavMapSubmitHover(&Record);
                 }
@@ -1595,7 +1595,7 @@ void NeuroNetNavMap::Update()
                     Pos[2] = static_cast<float>(static_cast<double>(InvScale) *
                                                 static_cast<double>(MapPos[2]));
                     Universe::IZone const* const Zone =
-                        NavMapZoneAt(CurrentSystem, Pos, 1, 0, Field_0x87e); // FUN_004a1b50
+                        NavMapZoneAt(CurrentSystem, Pos, 1, 0, bDebugShowAll); // FUN_004a1b50
                     if (Zone != nullptr)
                     {
                         FToolTipHoverInfo Record;
@@ -1667,23 +1667,23 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 004959c4..00495ba5: ScreenRect -- the frame's two corners (with G_NavMapGlobal_67203c's
+    // 004959c4..00495ba5: ScreenRect -- the frame's two corners (with G_NavMapScreenRectOffset's
     // offset, at z -1.25) through the Win3D camera, floored; then this map's own camera takes
     // the Win3D camera's near / far / half fov and ScreenRect as its viewport.
     FSpaceCamera* const SceneCamera = Win3DGetCamera(); // DAT_0067dbf8
     float Corner[3];
-    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapGlobal_67203c[0]) +
+    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
                                    static_cast<double>(MapCorner0[0]));
-    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapGlobal_67203c[1]) +
+    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
                                    static_cast<double>(MapCorner2[1]));
     Corner[2] = -1.25f;
     AsCamera(SceneCamera)->Project(&ScreenRectMin[0], &ScreenRectMin[1], &ScreenRectMin[2],
                                    Corner);
     ScreenRectMin[0] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[0])));
     ScreenRectMin[1] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[1])));
-    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapGlobal_67203c[0]) +
+    Corner[0] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
                                    static_cast<double>(MapCorner2[0]));
-    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapGlobal_67203c[1]) +
+    Corner[1] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
                                    static_cast<double>(MapCorner0[1]));
     float Far[3];
     AsCamera(SceneCamera)->Project(&Far[0], &Far[1], &Far[2], Corner);

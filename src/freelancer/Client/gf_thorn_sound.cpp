@@ -470,7 +470,7 @@ void FThornSound::RefreshSound()
         return;
     Handle->SetAttenuation(Fade + Attenuation);
     Handle->SetPan(static_cast<float>(static_cast<double>(Pan) * 100.0));
-    Handle->Slot35(&Local.Pos);
+    Handle->SetPosition(&Local.Pos);
 }
 
 // LAB_00456ea0 (identity). +0x77 or +0x76.

@@ -132,7 +132,7 @@ public:
     int ModeSelector0xc;        // +0x0c.
     int UpdateResult10;         // +0x10.
     void* OwnerContextPtr14;    // +0x14.
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     // +0x1c: the per-tick delta IBehaviorManager::UpdateBehaviorTick stores before it calls
     // slot 7 (.text:062d335d-062d3364, `FSTP float [EDI+0x1c]`). Update() hands it to each
     // Idea's Update (`PUSH [ESI+0x1c]` at .text:062fe19c / 062fe4b0 / 062fe527).
@@ -186,11 +186,11 @@ public:
     // Behavior::`vftable' 063a02c4 (raw dwords, 2026-10-08): 0, 1, 3, 4, 5, 6, 7, 10, 11, 12,
     // 13, 14, 18, 21, 24. Every other slot is a Behavior pointer (the ICF-folded symbol names
     // Ghidra prints there belong to unrelated classes). All own slots are overrides below:
-    //   0 ~GotoBehavior (062fd780 / 062fd7a0)   1 SetContext 062fd890   3 Slot3 062fd920
-    //   4 Slot4 062fd9c0   5 Slot5 062fda20   6 evaluate 062fda60   7 Slot7 -> Update 062fdb80
-    //  10 Slot10 062fe670  11 Slot11 0627a710  12 set_direction 062fe970
+    //   0 ~GotoBehavior (062fd780 / 062fd7a0)   1 SetContext 062fd890   3 OnEngage 062fd920
+    //   4 OnDisengage 062fd9c0   5 OnEvaluateReadiness 062fda20   6 evaluate 062fda60   7 OnUpdate -> Update 062fdb80
+    //  10 OnApplyDirective 062fe670  11 allow_user_steering 0627a710  12 set_direction 062fe970
     //  13 set_throttle 062feae0  14 set_cruise 062feb00  18 brake_reverse 062feb60
-    //  21 Slot21 062c6d30  24 get_target 062c6db0
+    //  21 OnObjectLeftSystem 062c6d30  24 get_target 062c6db0
     // FreeFlightBehavior (0639f5dc) replaces 0/3/4/6/10 and adds 15; see its header.
     // ------------------------------------------------------------------
 
@@ -236,12 +236,12 @@ public:
     // +0x2d8..+0x2e0: the steering triple set_direction (FUN_062fe970) writes -- -Dir.y and
     // -Dir.x scaled by 1/turn-sensitivity and clamped to [-1,1], then -Dir.z. Floats
     // (FSTP dword at .text:062fe9cb/062fe9de/062feaca); retyped from int 2026-10-08.
-    float Field2d8;             // +0x2d8. Zeroed by ctor.
-    float Field2dc;              // +0x2dc. Zeroed by ctor.
-    float Field2e0;               // +0x2e0. Zeroed by ctor.
+    float SteerAxisX;             // +0x2d8. Zeroed by ctor.
+    float SteerAxisY;              // +0x2dc. Zeroed by ctor.
+    float SteerAxisZ;               // +0x2e0. Zeroed by ctor.
     // +0x2e4: a throttle. set_throttle (LAB_062feae0) stores its float argument here and
-    // set_cruise / Slot3 copy Field360 into it. Retyped from int 2026-10-08.
-    float Field2e4;                // +0x2e4. Zeroed by ctor.
+    // set_cruise / OnEngage copy MaxThrottle into it. Retyped from int 2026-10-08.
+    float UserThrottle;                // +0x2e4. Zeroed by ctor.
     unsigned char Flag2e8;          // +0x2e8. Zeroed by ctor.
     unsigned char Flag2e9;           // +0x2e9. Set to 1 by ctor.
     unsigned char Flag2ea;            // +0x2ea. Zeroed by ctor.
@@ -252,29 +252,29 @@ public:
     unsigned char Flag2ec;              // +0x2ec. Zeroed by ctor.
     unsigned char Pad2ed[0x2f0 - 0x2ed]; // unconfirmed span
     float Field2f0;               // +0x2f0. Set to 1.5f by ctor (retail: 0x3fc00000).
-    int Field2f4;                  // +0x2f4. Set to 3 by ctor. Slot10 mirrors GotoOp's
+    int GotoKind;                  // +0x2f4. Set to 3 by ctor. OnApplyDirective mirrors GotoOp's
                                    // Field_0C (the 0/1/2 goto kind) into it.
-    // +0x2f8: lead point. Slot10's spline case copies Spline.P2 here (.text:062fe750-062fe763);
+    // +0x2f8: lead point. OnApplyDirective's spline case copies Spline.P2 here (.text:062fe750-062fe763);
     // Update mirrors other points into it. Not written by the ctor (value-initialised here).
-    Vector Field2f8;
-    // +0x304..+0x30c: the goto destination point. Slot10's case 1 copies GotoOp.Destination
-    // here (.text:062fe76b-062fe783); FreeFlightBehavior::Slot3 sets all three to 1e6f.
+    Vector ActiveTargetPos;
+    // +0x304..+0x30c: the goto destination point. OnApplyDirective's case 1 copies GotoOp.Destination
+    // here (.text:062fe76b-062fe783); FreeFlightBehavior::OnEngage sets all three to 1e6f.
     // Retyped from three ints 2026-10-08; the ctor zeroes the three dwords.
-    Vector Field304;
+    Vector Destination;
     BaseWatcher Watcher310;      // +0x310 (8 bytes, ends +0x318). Zeroed by ctor;
                                   // unwatched via set(nullptr) by the real destructor.
     ICRSplineSegment Spline;    // +0x318 (ends +0x358). Real, already-ported type
                                   // (common_aisteer.h).
-    float Field358;             // +0x358. Set to 200.0f by ctor (retail: 0x43480000).
+    float ArrivalRange;             // +0x358. Set to 200.0f by ctor (retail: 0x43480000).
     float Field35c;               // +0x35c. Set to -1.0f by ctor (retail: 0xbf800000).
-    float Field360;                // +0x360. Set to 1.0f by ctor (retail: 0x3f800000).
+    float MaxThrottle;                // +0x360. Set to 1.0f by ctor (retail: 0x3f800000).
     // +0x364: Update()'s "far enough to cruise" byte -- written only at .text:062fe237 as
     // (clearance > 1750.0f) while Flag365 is set, read at 062fe26e / 062fe27a. Not written by
     // retail's ctor (value-initialised here).
     unsigned char Flag364;
     unsigned char Flag365;         // +0x365. Set to 1 by ctor.
-    unsigned char Flag366;          // +0x366. Zeroed by ctor. Slot10: GotoOp.Field_58.
-    unsigned char Flag367;          // +0x367. Not ctor-written. SetContext sets 1, Slot10 copies
+    unsigned char Flag366;          // +0x366. Zeroed by ctor. OnApplyDirective: GotoOp.Field_58.
+    unsigned char Flag367;          // +0x367. Not ctor-written. SetContext sets 1, OnApplyDirective copies
                                     // GotoOp.Field_59; both feed MoveIdea::SetEnabled.
     unsigned char Flag368;         // +0x368. Zeroed by ctor.
     unsigned char Flag369;          // +0x369. Zeroed by ctor.
@@ -324,14 +324,14 @@ public:
     // common_dockbehavior.h, which this lane does not own. Recorded on
     // decomp-tracker items 1257/1258/1259 instead so the owning lane can do it.
     BaseWatcher Watcher370;        // +0x370 (ends +0x378). Struct-relative +0x00.
-    float Field378;                // +0x378. Struct-relative +0x08 (DockProximityWatcher
+    float ProxNearDistance;                // +0x378. Struct-relative +0x08 (DockProximityWatcher
                                    // ::Unknown08). Zeroed by the shared ctor. A threshold
                                    // item 1257 compares a distance against; exact meaning
                                    // not recovered. TODO.
-    float Field37c;                // +0x37c. Struct-relative +0x0c (::Unknown0c). Zeroed by
+    float ProxFarDistance;                // +0x37c. Struct-relative +0x0c (::Unknown0c). Zeroed by
                                    // the shared ctor. Second threshold of the same triple.
                                    // TODO.
-    float Field380;                // +0x380. Struct-relative +0x10 (::Unknown10). Cruise
+    float ProxCruiseSpeedRatio;                // +0x380. Struct-relative +0x10 (::Unknown10). Cruise
                                    // speed ratio, written by ProxWatcherInit (FUN_062c29f0);
                                    // NOT zeroed by the shared ctor (which stops after 4
                                    // dwords). Retyped from unsigned 2026-10-08.
@@ -369,55 +369,55 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // ---- Retail's own slots of .rdata:063a2284, bound as overrides 2026-10-08
     // ---- (claude-code:cmn-ai5). Until then they were extern "C" free functions over a raw
     // ---- `unsigned char*` that the manager's Behavior* dispatch never reached, so goto and
     // ---- free-flight ships ran Behavior's base bodies. Bodies in common_gotobehavior.cpp.
     bool SetContext(void* Owner, void* Manager, void* Sys) override;   //  1 LAB_062fd890 (RET 0xc)
-    void Slot3() override;                                             //  3 FUN_062fd920
-    void Slot4() override;                                             //  4 FUN_062fd9c0
-    int Slot5(float Value) override;                                   //  5 LAB_062fda20 (RET 4)
+    void OnEngage() override;                                             //  3 FUN_062fd920
+    void OnDisengage() override;                                             //  4 FUN_062fd9c0
+    int OnEvaluateReadiness(float Value) override;                                   //  5 LAB_062fda20 (RET 4)
     EvaluateResult evaluate(unsigned int Context) override;            //  6 LAB_062fda60 (RET 4)
     // 10 LAB_062fe670 (RET 4): applies a pub::AI::DirectiveGotoOp (0x70 bytes, copied into
     // GotoOp) and dispatches on its Field_0C goto kind.
-    bool Slot10(void* DirectiveOp) override;
-    bool Slot11() override { return true; }                            // 11 0627a710 `MOV AL,1; RET`
+    bool OnApplyDirective(void* DirectiveOp) override;
+    bool allow_user_steering() override { return true; }                            // 11 0627a710 `MOV AL,1; RET`
     void set_direction(Vector const& Dir) override;                    // 12 FUN_062fe970 (RET 4)
     void set_throttle(float Throttle) override;                        // 13 LAB_062feae0 (RET 4)
     void set_cruise(bool bOn) override;                                // 14 LAB_062feb00 (RET 4)
     void brake_reverse(bool bOn) override;                             // 18 LAB_062feb60 (RET 4)
-    void Slot21(void* Arg) override;                                   // 21 FUN_062c6d30 (RET 4)
+    void OnObjectLeftSystem(void* Arg) override;                                   // 21 FUN_062c6d30 (RET 4)
     IObjRW const* get_target() override;                               // 24 LAB_062c6db0
 };
 
 static_assert(offsetof(GotoBehavior, SubObjectA) == 0x2c, "GotoBehavior::SubObjectA offset");
 static_assert(offsetof(GotoBehavior, SubObjectB) == 0xa4, "GotoBehavior::SubObjectB offset");
 static_assert(offsetof(GotoBehavior, SubObjectC) == 0x164, "GotoBehavior::SubObjectC offset");
-static_assert(offsetof(GotoBehavior, Field2d8) == 0x2d8, "GotoBehavior::Field2d8 offset");
-static_assert(offsetof(GotoBehavior, Field2dc) == 0x2dc, "GotoBehavior::Field2dc offset");
-static_assert(offsetof(GotoBehavior, Field2e0) == 0x2e0, "GotoBehavior::Field2e0 offset");
-static_assert(offsetof(GotoBehavior, Field2e4) == 0x2e4, "GotoBehavior::Field2e4 offset");
+static_assert(offsetof(GotoBehavior, SteerAxisX) == 0x2d8, "GotoBehavior::SteerAxisX offset");
+static_assert(offsetof(GotoBehavior, SteerAxisY) == 0x2dc, "GotoBehavior::SteerAxisY offset");
+static_assert(offsetof(GotoBehavior, SteerAxisZ) == 0x2e0, "GotoBehavior::SteerAxisZ offset");
+static_assert(offsetof(GotoBehavior, UserThrottle) == 0x2e4, "GotoBehavior::UserThrottle offset");
 static_assert(offsetof(GotoBehavior, Flag2e8) == 0x2e8, "GotoBehavior::Flag2e8 offset");
 static_assert(offsetof(GotoBehavior, Flag2e9) == 0x2e9, "GotoBehavior::Flag2e9 offset");
 static_assert(offsetof(GotoBehavior, Flag2ea) == 0x2ea, "GotoBehavior::Flag2ea offset");
 static_assert(offsetof(GotoBehavior, Flag2eb) == 0x2eb, "GotoBehavior::Flag2eb offset");
 static_assert(offsetof(GotoBehavior, Flag2ec) == 0x2ec, "GotoBehavior::Flag2ec offset");
 static_assert(offsetof(GotoBehavior, Field2f0) == 0x2f0, "GotoBehavior::Field2f0 offset");
-static_assert(offsetof(GotoBehavior, Field2f4) == 0x2f4, "GotoBehavior::Field2f4 offset");
-static_assert(offsetof(GotoBehavior, Field2f8) == 0x2f8, "GotoBehavior::Field2f8 offset");
-static_assert(offsetof(GotoBehavior, Field304) == 0x304, "GotoBehavior::Field304 offset");
+static_assert(offsetof(GotoBehavior, GotoKind) == 0x2f4, "GotoBehavior::GotoKind offset");
+static_assert(offsetof(GotoBehavior, ActiveTargetPos) == 0x2f8, "GotoBehavior::ActiveTargetPos offset");
+static_assert(offsetof(GotoBehavior, Destination) == 0x304, "GotoBehavior::Destination offset");
 static_assert(offsetof(GotoBehavior, Flag367) == 0x367, "GotoBehavior::Flag367 offset");
 static_assert(offsetof(GotoBehavior, Watcher310) == 0x310, "GotoBehavior::Watcher310 offset");
 static_assert(offsetof(GotoBehavior, Spline) == 0x318, "GotoBehavior::Spline offset");
-static_assert(offsetof(GotoBehavior, Field358) == 0x358, "GotoBehavior::Field358 offset");
+static_assert(offsetof(GotoBehavior, ArrivalRange) == 0x358, "GotoBehavior::ArrivalRange offset");
 static_assert(offsetof(GotoBehavior, Field35c) == 0x35c, "GotoBehavior::Field35c offset");
-static_assert(offsetof(GotoBehavior, Field360) == 0x360, "GotoBehavior::Field360 offset");
+static_assert(offsetof(GotoBehavior, MaxThrottle) == 0x360, "GotoBehavior::MaxThrottle offset");
 static_assert(offsetof(GotoBehavior, Flag364) == 0x364, "GotoBehavior::Flag364 offset");
 static_assert(offsetof(GotoBehavior, Flag365) == 0x365, "GotoBehavior::Flag365 offset");
 static_assert(offsetof(GotoBehavior, Flag366) == 0x366, "GotoBehavior::Flag366 offset");
@@ -427,9 +427,9 @@ static_assert(offsetof(GotoBehavior, Flag36a) == 0x36a, "GotoBehavior::Flag36a o
 static_assert(offsetof(GotoBehavior, Flag36b) == 0x36b, "GotoBehavior::Flag36b offset");
 static_assert(offsetof(GotoBehavior, Flag36c) == 0x36c, "GotoBehavior::Flag36c offset");
 static_assert(offsetof(GotoBehavior, Watcher370) == 0x370, "GotoBehavior::Watcher370 offset");
-static_assert(offsetof(GotoBehavior, Field378) == 0x378, "GotoBehavior::Field378 offset");
-static_assert(offsetof(GotoBehavior, Field37c) == 0x37c, "GotoBehavior::Field37c offset");
-static_assert(offsetof(GotoBehavior, Field380) == 0x380, "GotoBehavior::Field380 offset");
+static_assert(offsetof(GotoBehavior, ProxNearDistance) == 0x378, "GotoBehavior::ProxNearDistance offset");
+static_assert(offsetof(GotoBehavior, ProxFarDistance) == 0x37c, "GotoBehavior::ProxFarDistance offset");
+static_assert(offsetof(GotoBehavior, ProxCruiseSpeedRatio) == 0x380, "GotoBehavior::ProxCruiseSpeedRatio offset");
 static_assert(offsetof(GotoBehavior, Flags384) == 0x384, "GotoBehavior::Flags384 offset (== Watcher370 + 0x14, the DockProximityWatcher::Flags14 slot read at .text:062fe1c4)");
 static_assert(offsetof(GotoBehavior, SavedFlags388) == 0x388, "GotoBehavior::SavedFlags388 offset");
 static_assert(offsetof(GotoBehavior, GotoOp) == 0x38c, "GotoBehavior::GotoOp offset");
@@ -445,7 +445,7 @@ static_assert(sizeof(GotoBehavior) == 0x3fc, "GotoBehavior sizeof 0x3fc (operato
 //
 // They take the struct's BASE ADDRESS as a raw `unsigned char*` rather than a
 // typed pointer on purpose: the type is still declared twice (as this class's
-// Watcher370/Field378/Field37c/Field380/Flags384/SavedFlags388 run of members,
+// Watcher370/ProxNearDistance/ProxFarDistance/ProxCruiseSpeedRatio/Flags384/SavedFlags388 run of members,
 // and as DockBehavior::DockProximityWatcher), and hoisting it into one shared
 // declaration would edit a header outside this wave's file ownership. The
 // struct-relative offsets used below are exactly the ones retail uses:
@@ -465,7 +465,7 @@ static_assert(sizeof(GotoBehavior) == 0x3fc, "GotoBehavior sizeof 0x3fc (operato
 // when something is watched, +0x10 = CruiseRatio if it is > 0.0, else own ship's
 // get_speed(1.0f, cruise) / Target's get_speed(1.0f, engine), clamped up to 1.0f.
 // `NavHelper` is the SystemManager whose +0x08 Watcher names the own ship. GotoBehavior's
-// Slot10 calls it; DockBehavior::Slot10 inlines the same sequence.
+// OnApplyDirective calls it; DockBehavior::OnApplyDirective inlines the same sequence.
 void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, float Near, float Far,
                      float CruiseRatio);
 
@@ -474,7 +474,7 @@ void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, floa
 // family's NavHelperPtr24; retail only ever uses `NavHelper + 0x14FC`, the
 // AI steering element common_aisteer.h's GetSignedRadialClearanceToPoint /
 // GetInterceptClearanceOfIface operate on. `RefPoint` is the world point the
-// zones are measured against (GotoBehavior passes &this->Field2f8).
+// zones are measured against (GotoBehavior passes &this->ActiveTargetPos).
 void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, void* NavHelper, Vector const& RefPoint);
 
 // FUN_062c2c70 (Common.dll.txt 187107-187226, 99 insns, item 1258). Returns a

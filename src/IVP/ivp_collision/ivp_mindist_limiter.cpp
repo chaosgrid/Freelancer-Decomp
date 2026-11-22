@@ -100,13 +100,13 @@ namespace
     float IVP_ToleranceBase() { return G_IVP_MindistSettings.real_coll_dist; } // DAT_0658aa10
     float IVP_ToleranceMinRate() { return G_IVP_MindistSettings.speed_after_keeper_dist; } // DAT_0658ab24
     float IVP_ToleranceBias() { return G_IVP_MindistSettings.mindist_change_force_dist; } // DAT_0658ab34
-    float IVP_ToleranceEpsScale() { return G_IVP_MindistSettings.Field_0x130; } // DAT_0658ab40
+    float IVP_ToleranceEpsScale() { return G_IVP_MindistSettings.EventNudgeEpsScale; } // DAT_0658ab40
 
     // DAT_0658ab44 (+0x134), only read/written by FUN_0634f320 (:0634f57b /
     // :0634f586 / :0634f5a6) as a plain int counter.
     int32_t& IVP_ToleranceRecomputeCounter()
     {
-        return G_IVP_MindistSettings.Field_0x134;
+        return G_IVP_MindistSettings.ToleranceDecayCounter;
     }
 }
 
@@ -2405,7 +2405,7 @@ void IVP_Mindist_Manager::recalc_all_exact_wheel_mindist()
             Other = Tmp;
         }
 
-        if (static_cast<int32_t>(reinterpret_cast<uintptr_t>(Other->edge)) == Mindist->Field_0x7c)
+        if (Other->edge == Mindist->LastPretensionEdge)
             continue;
         if (Other->status != IVP_SYNAPSE_POLY)
             continue;
@@ -2418,7 +2418,7 @@ void IVP_Mindist_Manager::recalc_all_exact_wheel_mindist()
             continue;
 
         IVP_Create_Cp_In_Advance_Pretension(Mindist, Ball->l_obj, Gap); // FUN_0634fd10
-        Mindist->Field_0x7c = static_cast<int32_t>(reinterpret_cast<uintptr_t>(Other->edge));
+        Mindist->LastPretensionEdge = Other->edge;
     }
 }
 
@@ -3200,7 +3200,7 @@ IVP_Ledge_Mindist::IVP_Ledge_Mindist(IVP_Environment* Environment, IVP_Collision
     , LastDispatchTick(0)                                        // :0634dd1f
     , ManagerNext(nullptr)
     , ManagerPrev(nullptr)
-    , Field_0x7c(0)                                              // :0634dd22
+    , LastPretensionEdge(nullptr)                                              // :0634dd22
 {
     ++Environment->sum_of_mindists;                              // :0634dd2f
     ++Environment->mindists_generated;                           // :0634dd32
@@ -3662,7 +3662,7 @@ void IVP_ComputePairRecordMassFactor(IVP_Contact_Point* Record)
 
 
 // ---------------------------------------------------------------------------
-// d230:cluster-063568a0 pass (2026-09-10): item 3306, FUN_0635aa20
+// d230:cluster-063568a0 pass (2026-09-10): item 3306, IVP_Compact_Triangle_Init
 // (Common.dll.txt:444010-444034, 22 insns). Zero-initializes a 4-float (or
 // 4-dword) structure. Retail calls FUN_0635aa10 (`AND [field],0x80000000` --
 // "preserve sign bit, clear the rest", a common "reset to signed zero"
@@ -3679,7 +3679,7 @@ void IVP_ComputePairRecordMassFactor(IVP_Contact_Point* Record)
 // class/semantic field names (plausibly an IVP_U_Float_Hesse-shaped
 // plane-equation value, given the 4-float shape, but not confirmed) aren't
 // independently determined here -- ported as a generic 4-float zero-init.
-extern "C" void* FUN_0635aa20(void* param_1_00)
+extern "C" void* IVP_Compact_Triangle_Init(void* param_1_00)
 {
     float* fields = static_cast<float*>(param_1_00);
     fields[0] = 0.0f;

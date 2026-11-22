@@ -43,16 +43,16 @@ static void RpcServerCharacterIdBlockCopy(FRpcServerCharacterIdBlock** Out,
     if (Block != nullptr) {
         Block->Ids = nullptr;
         Block->Count = 0;
-        Block->Field_0x0c = 0;
-        Block->Field_0x08 = 0;
-        Block->Field_0x04 = 0;
-        Block->Field_0x00 = 0;
+        Block->RightHand = 0;
+        Block->LeftHand = 0;
+        Block->Body = 0;
+        Block->Head = 0;
     }
     *Out = Block;
-    Block->Field_0x04 = Source->Field_0x04;
-    Block->Field_0x00 = Source->Field_0x00;
-    Block->Field_0x0c = Source->Field_0x0c;
-    Block->Field_0x08 = Source->Field_0x08;
+    Block->Body = Source->Body;
+    Block->Head = Source->Head;
+    Block->RightHand = Source->RightHand;
+    Block->LeftHand = Source->LeftHand;
     Block->Count = Source->Count;
     if (static_cast<unsigned int>(Block->Count) != 0) {
         Block->Ids = static_cast<unsigned int*>(
@@ -74,30 +74,30 @@ static void RpcServerCharacterRecordListCopy(std::list<FRpcServerCharacterRecord
         if (From == nullptr) continue;                                      // 06bdfbb5
         FRpcServerCharacterRecord* To = new (std::nothrow) FRpcServerCharacterRecord();
         To->Name = From->Name;                                              // 06bdfc98
-        To->Field_0x200 = From->Field_0x200;
-        To->Field_0x201 = From->Field_0x201;
+        To->bIsRestart = From->bIsRestart;
+        To->bIsAutoSave = From->bIsAutoSave;
         To->TextA = From->TextA;                                            // 06bdfccc
         To->TextB = From->TextB;                                            // 06bdfce8
-        To->Field_0x224 = From->Field_0x224;
-        To->Field_0x228 = From->Field_0x228;
-        To->Field_0x22c = From->Field_0x22c;
-        To->Field_0x230 = From->Field_0x230;
-        To->Field_0x234 = From->Field_0x234;
-        To->Field_0x238 = From->Field_0x238;
-        To->Field_0x23c = From->Field_0x23c;
-        To->Field_0x240 = From->Field_0x240;
-        To->Field_0x244 = From->Field_0x244;
-        To->Field_0x248 = From->Field_0x248;
+        To->DescripStrId = From->DescripStrId;
+        To->TimestampLow = From->TimestampLow;
+        To->TimestampHigh = From->TimestampHigh;
+        To->ShipArchetype = From->ShipArchetype;
+        To->Money = From->Money;
+        To->SystemId = From->SystemId;
+        To->BaseId = From->BaseId;
+        To->LocationId = From->LocationId;
+        To->VoiceId = From->VoiceId;
+        To->Rank = From->Rank;
         To->Field_0x24c = From->Field_0x24c;
-        To->Field_0x250 = From->Field_0x250;
-        To->Field_0x254 = From->Field_0x254;
-        To->Field_0x258 = From->Field_0x258;
-        To->Field_0x25c = From->Field_0x25c;                                // 06bdfd9c
+        To->HullStatusBits = From->HullStatusBits;
+        To->NumKills = From->NumKills;
+        To->NumMissionFailures = From->NumMissionFailures;
+        To->NumMissionSuccesses = From->NumMissionSuccesses;                                // 06bdfd9c
         RpcServerCharacterIdBlockCopy(&To->BlockA, From->BlockA);
         RpcServerCharacterIdBlockCopy(&To->BlockB, From->BlockB);
         To->Equipment.AppendCopy(From->Equipment);                          // 06bdff6f
         // 06bdff76..06bdff8a: +0x260 = low byte of the copied list's size, or 0.
-        To->Field_0x260 = (To->Equipment.Records != nullptr)
+        To->EquipmentCount = (To->Equipment.Records != nullptr)
             ? static_cast<unsigned char>(To->Equipment.Records->size() & 0xffu) : 0u;
         To->CollisionGroups = From->CollisionGroups;                        // 06bdff90..
         Dest.push_back(To);
@@ -109,24 +109,24 @@ static void RpcServerCharacterRecordListCopy(std::list<FRpcServerCharacterRecord
 static void RpcServerCharacterInfoFromRecord(CCharacterSet::CharacterInfo* Dest,
     const FRpcServerCharacterRecord* Source) {
     Dest->Id = Source->Name;                                                // 06bd48ea
-    Dest->bIsRestart = (Source->Field_0x200 != 0) ? 1u : 0u;                // 06bd48f8 SETNE
-    Dest->bIsAutoSave = (Source->Field_0x201 != 0) ? 1u : 0u;               // 06bd4909 SETNE
+    Dest->bIsRestart = (Source->bIsRestart != 0) ? 1u : 0u;                // 06bd48f8 SETNE
+    Dest->bIsAutoSave = (Source->bIsAutoSave != 0) ? 1u : 0u;               // 06bd4909 SETNE
     Dest->Name = Source->TextA;                                             // 06bd4929
     Dest->Description = Source->TextB;                                      // 06bd4946
-    Dest->DescripStrId = Source->Field_0x224;
-    Dest->TimestampLow = Source->Field_0x228;
-    Dest->TimestampHigh = Source->Field_0x22c;
-    Dest->ShipArchetype = Source->Field_0x230;
-    Dest->Money = static_cast<int>(Source->Field_0x234);
-    Dest->VoiceId = Source->Field_0x244;                                    // 06bd498e -> +0x26c
-    Dest->Rank = Source->Field_0x248;                                       // 06bd499a -> +0x270
-    Dest->BaseId = Source->Field_0x23c;                                     // 06bd49a6 -> +0x264
-    Dest->LocationId = Source->Field_0x240;                                 // 06bd49b2 -> +0x268
-    Dest->SystemId = Source->Field_0x238;                                   // 06bd49be -> +0x260
-    std::memcpy(&Dest->HullStatus, &Source->Field_0x250, 4u);               // 06bd49ca -> +0x244
-    Dest->NumKills = static_cast<int>(Source->Field_0x254);                 // -> +0x238
-    Dest->NumMissionFailures = static_cast<int>(Source->Field_0x258);       // -> +0x240
-    Dest->NumMissionSuccesses = static_cast<int>(Source->Field_0x25c);      // -> +0x23c
+    Dest->DescripStrId = Source->DescripStrId;
+    Dest->TimestampLow = Source->TimestampLow;
+    Dest->TimestampHigh = Source->TimestampHigh;
+    Dest->ShipArchetype = Source->ShipArchetype;
+    Dest->Money = static_cast<int>(Source->Money);
+    Dest->VoiceId = Source->VoiceId;                                    // 06bd498e -> +0x26c
+    Dest->Rank = Source->Rank;                                       // 06bd499a -> +0x270
+    Dest->BaseId = Source->BaseId;                                     // 06bd49a6 -> +0x264
+    Dest->LocationId = Source->LocationId;                                 // 06bd49b2 -> +0x268
+    Dest->SystemId = Source->SystemId;                                   // 06bd49be -> +0x260
+    std::memcpy(&Dest->HullStatus, &Source->HullStatusBits, 4u);               // 06bd49ca -> +0x244
+    Dest->NumKills = static_cast<int>(Source->NumKills);                 // -> +0x238
+    Dest->NumMissionFailures = static_cast<int>(Source->NumMissionFailures);       // -> +0x240
+    Dest->NumMissionSuccesses = static_cast<int>(Source->NumMissionSuccesses);      // -> +0x23c
     // 06bd49f4..06bd4af7: a null block leaves the Costume as constructed; otherwise
     // [1],[0],[3],[2], the count, and an unsigned copy NOT bounded by the eight slots
     // (reproduced on purpose), the bound re-read from the block every round.
@@ -136,10 +136,10 @@ static void RpcServerCharacterInfoFromRecord(CCharacterSet::CharacterInfo* Dest,
         const FRpcServerCharacterIdBlock* Block = Blocks[Which];
         if (Block == nullptr) continue;
         Costume& Out = *Costumes[Which];
-        Out.PartIds[1] = Block->Field_0x04;
-        Out.PartIds[0] = Block->Field_0x00;
-        Out.PartIds[3] = Block->Field_0x0c;
-        Out.PartIds[2] = Block->Field_0x08;
+        Out.PartIds[1] = Block->Body;
+        Out.PartIds[0] = Block->Head;
+        Out.PartIds[3] = Block->RightHand;
+        Out.PartIds[2] = Block->LeftHand;
         Out.AccessoryCount = static_cast<unsigned int>(Block->Count);
         unsigned int* OutIds = &Out.AccessoryIds[0];
         for (unsigned int Index = 0; Index < static_cast<unsigned int>(Block->Count); ++Index) {
@@ -161,7 +161,7 @@ static void RpcServerCharacterInfoFromRecord(CCharacterSet::CharacterInfo* Dest,
             Item.set_equipped(E->bEquipped);                                // 06bd4ba8 raw byte
             Item.set_status(E->Health);                                     // 06bd4bb4
             // 06bd4bba / 06bd4bbd: the wire byte stored raw into EquipDesc +0x18.
-            std::memcpy(&Item.bMission, &E->Field_0x0f, 1u);
+            std::memcpy(&Item.bMission, &E->bMission, 1u);
             CacheString Hardpoint;
             Hardpoint.Value = StringAlloc(E->Hardpoint, false);             // 06bd4bc6
             Item.set_hardpoint(Hardpoint);                                  // 06bd4bda
@@ -289,8 +289,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 RpcServerCreateObjectRead(&Typed->Object, &GCreateShipInfo);        // 06bd211f
                 GCreateShipInfo.bUsingTradelane = Typed->bUsingTradelane;           // 06bd212a
                 GCreateShipInfo.OwnerPlayer = Typed->OwnerPlayer;                   // 06bd2135
-                GCreateShipInfo.Field_0xd8 = static_cast<unsigned int>(Typed->Field_0xc4);       // MOVZX
-                GCreateShipInfo.Field_0xb0 = static_cast<unsigned int>(Typed->Field_0xc0);       // MOVZX
+                GCreateShipInfo.GroupId = static_cast<unsigned int>(Typed->GroupId);       // MOVZX
+                GCreateShipInfo.GroupNameId = static_cast<unsigned int>(Typed->GroupNameId);       // MOVZX
                 GCreateShipInfo.ReputationRank = static_cast<unsigned int>(Typed->ReputationRank); // MOVZX
                 std::memcpy(&GCreateShipInfo.Throttle, &Typed->Throttle, 4u);      // 06bd2167
                 // 06bd216d..06bd21b1: x by integer move, y and z through the x87 stack
@@ -382,7 +382,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 static FPayloadServerActivateObject GActivateObjectStatic;
                 GActivateObjectStatic.ObjectId = Typed->ObjectId;
                 GActivateObjectStatic.bActivate = Typed->bActivate;
-                GActivateObjectStatic.Field_0x08 = Typed->Field_0x08;
+                GActivateObjectStatic.ActivateParam = Typed->ActivateParam;
                 Client->SendServerActivateObject(1u, GActivateObjectStatic);
                 break;
             }
@@ -522,8 +522,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     sizeof(GSystemSwitchInStatic.Position));
                 std::memcpy(&GSystemSwitchInStatic.Orientation, &Typed->Orientation,
                     sizeof(GSystemSwitchInStatic.Orientation));
-                GSystemSwitchInStatic.Field_0x00 = Typed->Field_0x00;
-                GSystemSwitchInStatic.Field_0x04 = Typed->Field_0x04;
+                GSystemSwitchInStatic.ShipId = Typed->ShipId;
+                GSystemSwitchInStatic.JumpObjTypeBits = Typed->JumpObjTypeBits;
                 Client->SendServerSystemSwitchIn(1u, GSystemSwitchInStatic);
                 break;
             }
@@ -565,7 +565,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<const FRpcServerRequestCreateShipRespPacket*>(Packet);
                 // The wire byte as the bool: the callee keeps one byte (rpclocal 06d8a158),
                 // so only values above 1 would differ.
-                Client->SendServerRequestCreateShipResp(1u, Typed->Field_0x00 != 0, Typed->Field_0x04);
+                Client->SendServerRequestCreateShipResp(1u, Typed->bSuccess != 0, Typed->ShipId);
                 break;
             }
             case 0x28: // FLPACKET_SERVER_CREATELOOT, RS 06bd12b8
@@ -652,7 +652,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 FServerSetReputationInfo Info;
                 Info.Relations = nullptr;
                 Info.RelationCount = 0;
-                Info.Field_0x0c = 0;
+                Info.Rank = 0;
                 Info.Pad_0x15[0] = 0;
                 Info.Pad_0x15[1] = 0;
                 Info.Pad_0x15[2] = 0;
@@ -661,7 +661,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 std::list< ::Reputation::Relation*> Local;
                 Info.VibeHandle = static_cast<int>(Typed->Target);
-                Info.Field_0x08 = Typed->Affiliation;
+                Info.Affiliation = Typed->Affiliation;
                 std::memcpy(&Info.Attitude, &Typed->Attitude, 4u);
                 Info.NameA.unflatten(Typed->NameA.Data, Typed->NameA.Size);
                 Info.NameB.unflatten(Typed->NameB.Data, Typed->NameB.Size);
@@ -689,8 +689,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerAdjustAttitudePacket* Typed =
                     static_cast<const FRpcServerAdjustAttitudePacket*>(Packet);
                 FPayloadServerAdjustAttitude Local;
-                Local.Field_0x00 = Typed->Field_0x00;
-                RpcServerX87CopyFloat(&Local.Field_0x04, &Typed->Field_0x04);
+                Local.VibeHandle = Typed->VibeHandle;
+                RpcServerX87CopyFloat(&Local.Attitude, &Typed->Attitude);
                 Client->SendServerAdjustAttitude(1u, Local);
                 break;
             }
@@ -740,8 +740,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 std::memcpy(&Info.Position, &Typed->Position, sizeof(Info.Position));
                 std::memcpy(&Info.Orientation, &Typed->Orientation, sizeof(Info.Orientation));
                 std::memcpy(&Info.Velocity, &Typed->Velocity, sizeof(Info.Velocity));
-                std::memcpy(&Info.Field_0x38, &Typed->Field_0x38, sizeof(Info.Field_0x38));
-                Info.Field_0x44 = Typed->Field_0x44;
+                std::memcpy(&Info.AngularVelocity, &Typed->AngularVelocity, sizeof(Info.AngularVelocity));
+                Info.OwnerPlayer = Typed->OwnerPlayer;
                 Client->SendServerCreateMine(1u, Info);
                 break;
             }
@@ -761,8 +761,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 std::memcpy(&Info.Position, &Typed->Position, sizeof(Info.Position));
                 std::memcpy(&Info.Orientation, &Typed->Orientation, sizeof(Info.Orientation));
                 std::memcpy(&Info.Velocity, &Typed->Velocity, sizeof(Info.Velocity));
-                std::memcpy(&Info.Field_0x38, &Typed->Field_0x3c, sizeof(Info.Field_0x38));
-                Info.Field_0x44 = Typed->Field_0x08;
+                std::memcpy(&Info.AngularVelocity, &Typed->AngularVelocity, sizeof(Info.AngularVelocity));
+                Info.OwnerPlayer = Typed->OwnerPlayer;
                 unsigned int One = 1u;
                 Client->SendServerCreateCounter(One, Info);
                 break;
@@ -787,7 +787,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 } else {
                     Desc.make_internal();
                 }
-                Client->SendServerSetAddItem(1u, static_cast<int>(Typed->Field_0x0c), Desc);
+                Client->SendServerSetAddItem(1u, static_cast<int>(Typed->AddResult), Desc);
                 break;
             }
             case 0x2f: // FLPACKET_SERVER_SETREMOVEITEM, RS 06bd1b90
@@ -813,7 +813,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerExplodeAsteroidMinePacket* Typed =
                     static_cast<const FRpcServerExplodeAsteroidMinePacket*>(Packet);
                 FMineExplosion Info;
-                Info.MineId = Typed->Field_0x00;
+                Info.MineId = Typed->MineId;
                 std::memcpy(&Info.Offset.x, &Typed->Position.x, 4u);
                 std::memcpy(&Info.Offset.y, &Typed->Position.y, 4u);
                 std::memcpy(&Info.Offset.z, &Typed->Position.z, 4u);
@@ -832,11 +832,11 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerRequestSpaceScriptPacket* Typed =
                     static_cast<const FRpcServerRequestSpaceScriptPacket*>(Packet);
                 FServerRequestSpaceScriptInfo Info;
-                Info.Field_0x000 = Typed->Field_0x00;
-                Info.Field_0x108 = Typed->Position[0];
-                Info.Field_0x10c = Typed->Position[1];
-                Info.Field_0x110 = Typed->Position[2];
-                Info.Field_0x114 = (Typed->Mode == 0) ? 2u : 1u;
+                Info.ObjectId = Typed->ObjectId;
+                Info.PosXBits = Typed->Position[0];
+                Info.PosYBits = Typed->Position[1];
+                Info.PosZBits = Typed->Position[2];
+                Info.CameraMode = (Typed->Mode == 0) ? 2u : 1u;
                 if (Typed->Name != nullptr) {
                     unsigned int i = 0;
                     do {
@@ -854,12 +854,12 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerSetMissionObjectiveStatePacket* Typed =
                     static_cast<const FRpcServerSetMissionObjectiveStatePacket*>(Packet);
                 FServerMissionObjectiveStateInfo Info;
-                Info.Field_0x00 = Typed->Field_0x00;
-                Info.Field_0x04 = static_cast<unsigned char>(Typed->Field_0x04);
+                Info.MissionId = Typed->MissionId;
+                Info.ObjectiveIndex = static_cast<unsigned char>(Typed->ObjectiveIndex);
                 Info.Pad_0x05[0] = 0;
                 Info.Pad_0x05[1] = 0;
                 Info.Pad_0x05[2] = 0;
-                Info.Field_0x08 = Typed->Field_0x08;
+                Info.State = Typed->State;
                 unsigned int One = 1u;
                 Client->SendServerSetMissionObjectiveState(One, Info);
                 break;
@@ -874,9 +874,9 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerReplaceMissionObjectivePacket* Typed =
                     static_cast<const FRpcServerReplaceMissionObjectivePacket*>(Packet);
                 FServerReplaceMissionObjectiveInfo Info;
-                Info.Field_0x00 = Typed->Field_0x00;
+                Info.MissionId = Typed->MissionId;
                 Info.ObjectiveType = 0;
-                Info.State = static_cast<unsigned char>(Typed->State);
+                Info.ObjectiveIndex = static_cast<unsigned char>(Typed->ObjectiveIndex);
                 Info.Pad_0x21[0] = 0;
                 Info.Pad_0x21[1] = 0;
                 Info.Pad_0x21[2] = 0;
@@ -898,11 +898,11 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerSetMissionObjectivesPacket* Typed =
                     static_cast<const FRpcServerSetMissionObjectivesPacket*>(Packet);
                 FServerSetMissionObjectivesInfo Info;
-                Info.Field_0x00 = Typed->Field_0x00;
+                Info.MissionId = Typed->MissionId;
                 Info.Entries = nullptr;
                 Info.TextA.unflatten(Typed->TextA.Data, Typed->TextA.Size);
                 Info.TextB.unflatten(Typed->TextB.Data, Typed->TextB.Size);
-                Info.Field_0x3c = static_cast<unsigned char>(Typed->State);
+                Info.MissionType = static_cast<unsigned char>(Typed->MissionType);
                 Info.Pad_0x3d[0] = 0;
                 Info.Pad_0x3d[1] = 0;
                 Info.Pad_0x3d[2] = 0;
@@ -938,7 +938,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Info.TargetId = Typed->TargetId;
                 Info.TargetSubObjId = Typed->TargetSubObjId;
                 Info.ArchetypeNickname = Typed->ArchetypeNickname;
-                Info.Field_0x2c = Typed->Field_0x00;
+                Info.OwnerPlayer = Typed->OwnerPlayer;
                 Info.OwnerId = Typed->OwnerId;
                 Info.SubObjId = Typed->SubObjId;
                 unsigned int One = 1u; // stack dword passed by reference (06bd1f14)
@@ -951,10 +951,10 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerItemTractoredPacket* Typed =
                     static_cast<const FRpcServerItemTractoredPacket*>(Packet);
                 FPayloadServerItemTractored Info;
-                Info.Field_0x00 = Typed->Field_0x00;
-                Info.Field_0x04 = Typed->Field_0x04;
-                Info.Field_0x08 = Typed->Field_0x08;
-                Info.Field_0x0a = Typed->Field_0x0a;
+                Info.LootId = Typed->LootId;
+                Info.ShipId = Typed->ShipId;
+                Info.TractorEquipId = Typed->TractorEquipId;
+                Info.UnitsTaken = Typed->UnitsTaken;
                 Client->SendServerItemTractored(1u, Info);
                 break;
             }
@@ -972,10 +972,10 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerRepairObjectPacket* Typed =
                     static_cast<const FRpcServerRepairObjectPacket*>(Packet);
                 FServerRepairObjectInfo Info;
-                Info.Field_0x00 = Typed->ObjectId;
-                Info.Field_0x04 = static_cast<unsigned short>(Typed->EquipId);
+                Info.ObjectId = Typed->ObjectId;
+                Info.EquipId = static_cast<unsigned short>(Typed->EquipId);
                 Info.Pad_0x06 = 0;
-                std::memcpy(&Info.Field_0x08, &Typed->Points, 4u);
+                std::memcpy(&Info.Points, &Typed->Points, 4u);
                 Client->SendServerRepairObject(1u, Info);
                 break;
             }
@@ -1047,7 +1047,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 FRpcServerCreateSolarPacket* Typed = static_cast<FRpcServerCreateSolarPacket*>(Packet);
                 static CSolarCreateInfo Static;
                 RpcServerCreateObjectRead(&Typed->Fields, &Static);
-                Static.Field_0xad = Typed->Field_0x9c;
+                Static.bDestructible = Typed->bDestructible;
                 Static.bMarkedBy = Typed->bMarkedBy;
                 if (!SinglePlayer()) {
                     FmtStr NameA;
@@ -1078,7 +1078,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Client->SendServerRequestReturned(One, Typed->ObjectId,
                     static_cast<int>(Typed->RequestType),
                     static_cast<int>(static_cast<signed char>(Typed->Response)),
-                    static_cast<int>(static_cast<signed char>(Typed->Field_0x26)));
+                    static_cast<int>(static_cast<signed char>(Typed->DockPort)));
                 break;
             }
             case 0x45: // SET_MISSION_MESSAGE, caseD_45 06bd2713 (EH state 0x13 owns the FmtStr)
@@ -1103,9 +1103,9 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerCfgInterfaceNotificationPacket* Typed =
                     static_cast<FRpcServerCfgInterfaceNotificationPacket*>(Packet);
                 FPayloadServerCfgInterfaceNotification Info = {};
-                Info.Field_0x00 = Typed->NotifType;
-                Info.Field_0x04 = Typed->Param;
-                Info.Field_0x08 = static_cast<unsigned char>(Typed->bEnable != 0 ? 1 : 0);
+                Info.NotifType = Typed->NotifType;
+                Info.Param = Typed->Param;
+                Info.bEnable = static_cast<unsigned char>(Typed->bEnable != 0 ? 1 : 0);
                 unsigned int One = 1u;
                 Client->SendServerCfgInterfaceNotification(One, Info);
                 break;
@@ -1131,8 +1131,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
             {
                 const FRpcServerSetGuidedTargetPacket* Typed =
                     static_cast<FRpcServerSetGuidedTargetPacket*>(Packet);
-                Client->SendServerSetGuidedTarget(1u, Typed->Field_0x20, Typed->Field_0x24,
-                    Typed->Field_0x28);
+                Client->SendServerSetGuidedTarget(1u, Typed->GuidedId, Typed->TargetId,
+                    Typed->TargetSubObjId);
                 break;
             }
             case 0x4b: // SET_CAMERA, caseD_4b 06bd2663: the quaternion through FLD/FSTP
@@ -1202,19 +1202,19 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 Costume Local;
                 std::memcpy(&Local, &Typed->Body, sizeof(Costume));
                 float Level;
-                RpcServerX87CopyFloat(&Level, &Typed->Field_0x70);
-                Client->SendServerSendComm(1u, Typed->Field_0x20, Typed->Field_0x24, Typed->Field_0x28,
-                    Local, Typed->Field_0x60, Typed->Field_0x64,
-                    static_cast<int>(Typed->Field_0x68), Typed->Field_0x6c, Level, false);
+                RpcServerX87CopyFloat(&Level, &Typed->Duration);
+                Client->SendServerSendComm(1u, Typed->SenderId, Typed->ReceiverId, Typed->VoiceId,
+                    Local, Typed->CommType, Typed->TextIds,
+                    static_cast<int>(Typed->TextCount), Typed->Mood, Level, false);
                 break;
             }
             case 0x51: // USE_ITEM, caseD_51 06bd1f67: a stack FPayloadServerUseItem
             {
                 const FRpcServerUseItemPacket* Typed = static_cast<FRpcServerUseItemPacket*>(Packet);
                 FPayloadServerUseItem Info;
-                Info.Field_0x00 = Typed->ObjectId;
-                Info.Field_0x04 = Typed->EquipId;
-                Info.Field_0x06 = Typed->Count;
+                Info.ObjectId = Typed->ObjectId;
+                Info.EquipId = Typed->EquipId;
+                Info.Count = Typed->Count;
                 Client->SendServerUseItem(1u, Info);
                 break;
             }
@@ -1231,7 +1231,7 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 }
                 if (Typed->Kind == kPlayerListKindEntry) {
                     Client->SendServerPlayerListAdd(1u, Typed->Name, Typed->PlayerId,
-                        Typed->Field_0x2c != 0);
+                        Typed->bAlreadyPresent != 0);
                     break;
                 }
                 if (Typed->Kind == kPlayerListKindDrop) {
@@ -1258,27 +1258,27 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 // packet; the word +0x2c by MOVZX.
                 FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
                 if ((Typed->Flags & 0x20u) != 0) {
-                    Client->SendServerMiscObjUpdateAffiliation(1u, Typed->Field_0x28, Typed->Field_0x54);
+                    Client->SendServerMiscObjUpdateAffiliation(1u, Typed->ObjectId, Typed->Affiliation);
                 }
                 const unsigned short Snapshot = Typed->Flags;
                 if ((Snapshot & 0x01u) != 0) {
                     if ((Snapshot & 0x04u) != 0) {
-                        Client->SendServerMiscObjUpdatePlayerGroup(1u, Typed->Field_0x24, Typed->Field_0x34);
+                        Client->SendServerMiscObjUpdatePlayerGroup(1u, Typed->PlayerId, Typed->GroupId);
                     } else {
-                        Client->SendServerMiscObjUpdateObjectGroup(1u, Typed->Field_0x28, Typed->Field_0x34);
+                        Client->SendServerMiscObjUpdateObjectGroup(1u, Typed->ObjectId, Typed->GroupId);
                     }
                 }
                 if ((Typed->Flags & 0x02u) != 0) {
-                    Client->SendServerMiscObjUpdateMission(1u, Typed->Field_0x38, Typed->Field_0x3c);
+                    Client->SendServerMiscObjUpdateMission(1u, Typed->MissionId, Typed->MissionSetBy);
                 }
                 if ((Typed->Flags & 0x10u) != 0) {
                     Client->SendServerMiscObjUpdateMotd(1u, Typed->Text);
                 }
                 if ((Typed->Flags & 0x40u) != 0) {
-                    Client->SendServerMiscObjUpdateRank(1u, Typed->Field_0x24, static_cast<int>(Typed->Field_0x2c));
+                    Client->SendServerMiscObjUpdateRank(1u, Typed->PlayerId, static_cast<int>(Typed->Rank));
                 }
                 if ((Typed->Flags & 0x80u) != 0) {
-                    Client->SendServerMiscObjUpdateSystem(1u, Typed->Field_0x24, Typed->Field_0x30);
+                    Client->SendServerMiscObjUpdateSystem(1u, Typed->PlayerId, Typed->SystemId);
                 }
                 if ((Typed->Flags & 0x100u) != 0) {
                     Client->SendServerMiscObjUpdateFormation(1u, Typed->Ids);
@@ -1311,11 +1311,11 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 const FRpcServerSetMusicPacket* Typed = static_cast<FRpcServerSetMusicPacket*>(Packet);
                 // Bit copy, not an x87 load: retail pushes the packet's dword unchanged.
                 float Fade;
-                std::memcpy(&Fade, &Typed->Field_0x34, 4u);
+                std::memcpy(&Fade, &Typed->Fade, 4u);
                 // The wire byte as the bool: the callee keeps one byte (rpclocal 06d8c6ad),
                 // so only values above 1 would differ.
-                Client->SendServerSetMusic(1u, Typed->Field_0x20, Typed->Field_0x24, Typed->Field_0x28,
-                    Typed->Field_0x2c, Typed->Field_0x30 != 0, Fade);
+                Client->SendServerSetMusic(1u, Typed->SpaceMusic, Typed->DangerMusic, Typed->BattleMusic,
+                    Typed->OverrideMusic, Typed->bNoLoop != 0, Fade);
                 break;
             }
             case 0x58: // CANCEL_MUSIC

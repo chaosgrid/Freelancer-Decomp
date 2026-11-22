@@ -72,7 +72,7 @@ public:
     void Refresh() override;
     // slot 1 LAB_00578f50 (ILoadingScreen +0x04, name unrecoverable): DAT_0067c3e0 = 1,
     // Update(-1.0f) -- the body FUN_00579290 (LoadingScreenStart) runs non-virtually.
-    void Slot01() override;
+    void Start() override;
 
     // FUN_00578f70 (thiscall, RET 4).
     void Update(float DeltaSeconds);

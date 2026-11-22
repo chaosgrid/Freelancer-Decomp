@@ -1078,7 +1078,7 @@ namespace AlchemyImpl
             IFxMesh** const MeshSlot = reinterpret_cast<IFxMesh**>(Bytes + 0x30);
             FPoolComponentSlotOwner<IFxMesh> MeshOwner = {MeshSlot};
             if (*MeshSlot != nullptr)
-                (*MeshSlot)->Slot7();
+                (*MeshSlot)->Destroy();
             MeshOwner.Release();
         }
         else if (Pool->Stride != kStridePerp && Pool->Stride >= 0x34 &&

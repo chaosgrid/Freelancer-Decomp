@@ -65,24 +65,24 @@ namespace AlchemyImpl
             return HashNameCrc(Name);
         }
         // FUN_062274b0 RET 0x10: name, prototype, optional output hash.
-        GENRESULT DACOM_API NodeLibSlot6(const char* Name, IDAComponent* Node,
+        GENRESULT DACOM_API InsertNode(const char* Name, IDAComponent* Node,
                                        unsigned long* OutHash) override;
-        GENRESULT DACOM_API NodeLibSlot7(unsigned long Hash) override;
+        GENRESULT DACOM_API RemoveNodeByHash(unsigned long Hash) override;
         // FUN_06228b00: enumerate node-lib entries, Callback(Node, Context),
         // stop at first nonzero result.
-        GENRESULT DACOM_API NodeLibSlot8(FNodeLibraryEnumCallback Callback, void* Context) override;
+        GENRESULT DACOM_API EnumerateNodes(FNodeLibraryEnumCallback Callback, void* Context) override;
         GENRESULT DACOM_API ClearNodeLibrary() override;
         // FUN_062277e0: MakeUniqueName-style "#N" collision avoidance.
-        GENRESULT DACOM_API NodeLibSlot10(void* Name, void* Out) override;
+        GENRESULT DACOM_API MakeUniqueName(void* Name, void* Out) override;
         // LAB_06227710: find prototype by hash, then CloneNode(Out).
-        GENRESULT DACOM_API NodeLibSlot11(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API CreateNodeByHash(unsigned long Hash, IDAComponent** Out) override;
         // LAB_06227770: find CRC, write stored ptr, AddRef.
-        GENRESULT DACOM_API NodeLibSlot12(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API FindNodeByHash(unsigned long Hash, IDAComponent** Out) override;
 
         GENRESULT DACOM_API CreateVertexBuffer() override;
         GENRESULT DACOM_API ReleaseVertexBuffer() override;
-        GENRESULT DACOM_API Slot15(void* A, void* B) override;
-        GENRESULT DACOM_API Slot16(void* A, void* B) override;
+        GENRESULT DACOM_API ComposeNodeTransforms(void* A, void* B) override;
+        GENRESULT DACOM_API UpdateNodes(void* A, void* B) override;
         GENRESULT DACOM_API DrawNodes(void* Cookie, void* StartNode) override;
         GENRESULT DACOM_API GetDrawCookie() override
         {
@@ -90,7 +90,7 @@ namespace AlchemyImpl
         }
         GENRESULT DACOM_API Slot19(const char* Name, void* Unused) override;
         GENRESULT DACOM_API AttachNode(void* ParentRaw, void* ChildRaw) override;
-        GENRESULT DACOM_API Slot21(void* A, void* B) override;
+        GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) override;
         GENRESULT DACOM_API DetachNode(void* Node) override;
         GENRESULT DACOM_API SubmitNode(void* Node) override;
         GENRESULT DACOM_API SubmitChildNodes(void* Node) override;
@@ -155,7 +155,6 @@ namespace AlchemyImpl
         IDAComponent* FindNodeEntry(unsigned long Hash);
         GENRESULT InsertNodeByName(const char* Name, IDAComponent* Node,
                                   unsigned long* OutHash = nullptr);
-        GENRESULT RemoveNodeByHash(unsigned long Hash);
         void ClearNodeList();
         void ClearAttaches();
         // FUN_06202070: shared submit walk used by SubmitNode/SubmitChildNodes.

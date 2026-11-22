@@ -332,8 +332,8 @@ public:
         return RpcWirePacketFactory<FRpcMissionResponsePacket>(OutPacket);
     }
     // TODO: recover the semantic name of the first native DWORD argument.
-    unsigned int Field_0x00;
-    unsigned long MissionId;
+    unsigned int OfferId;
+    unsigned long OfferKind;
     unsigned char bAccepted;
 };
 
@@ -446,10 +446,10 @@ public:
         return RpcWirePacketFactory<FRpcMunitionCollisionPacket>(OutPacket);
     }
     // TODO: semantic names of the neutral native fields are not yet proven.
-    unsigned int Field_0x00;
-    unsigned int Field_0x04;
+    unsigned int ProjectileArchId;
+    unsigned int AttackerId;
     unsigned int ObjectId;
-    unsigned short Field_0x0c;
+    unsigned short SubObjId;
     Vector HitPosition;
 };
 
@@ -468,7 +468,7 @@ public:
     unsigned short TargetSubObjId;
     unsigned int ObjectId;
     unsigned short SubObjId;
-    float Field_0x10;
+    float Damage;
 };
 
 class FRpcBadlandsObjectCollisionPacket : public FPacketBase {
@@ -482,8 +482,8 @@ public:
         return RpcWirePacketFactory<FRpcBadlandsObjectCollisionPacket>(OutPacket);
     }
     // TODO: semantic names of the neutral native fields are not yet proven.
-    unsigned int Field_0x00;
-    unsigned short Field_0x08;
+    unsigned int BadLandsObjId;
+    unsigned short SubObjId;
     unsigned int ObjectId;
 };
 
@@ -515,9 +515,9 @@ public:
         return RpcWirePacketFactory<FRpcSetManeuverPacket>(OutPacket);
     }
     // TODO: semantic names of the neutral native fields are not yet proven.
-    unsigned int Field_0x00;
+    unsigned int ShipFrom;
     unsigned int ObjectId;
-    unsigned int Field_0x08;
+    unsigned int Flag;
 };
 
 class FRpcRequestEventPacket : public FPacketBase {
@@ -532,9 +532,9 @@ public:
     }
     // TODO: semantic names of the neutral native fields are not yet proven.
     unsigned char EventType;
-    unsigned int Arg1;
-    unsigned int Arg2;
-    unsigned int Arg3;
+    unsigned int ShipId;
+    unsigned int TargetId;
+    unsigned int SecondId;
     unsigned char Field_0x10;
 };
 
@@ -550,8 +550,8 @@ public:
     }
     // TODO: semantic names of the neutral native fields are not yet proven.
     unsigned char EventType;
-    unsigned int Arg1;
-    unsigned int Arg2;
+    unsigned int ShipId;
+    unsigned int TargetId;
     unsigned char Field_0x0c;
 };
 
@@ -887,10 +887,10 @@ public:
     // Retail RC uses 24 wchar_t, RS 64. The codec preserves each copy policy;
     // these fields express values, never offsets in a VC6 object representation.
     wchar_t Name[64];
-    unsigned int Field_0x80;
-    unsigned int Field_0x84;
-    unsigned int Field_0x88;
-    unsigned int Field_0x8c;
+    unsigned int FactionId;
+    unsigned int BaseId;
+    unsigned int PackageId;
+    unsigned int PilotId;
 };
 
 // These eight retail classes share the byte-buffer wire body, but their senders
@@ -946,12 +946,12 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcUpdateObjectPacket>(OutPacket);
     }
-    unsigned char Field_0x00; // TODO: object-update flag semantics.
+    unsigned char State; // TODO: object-update flag semantics.
     unsigned int ObjectId;
     Vector Position;
     Quaternion Orientation;
     float UpdateTime;
-    float Field_0x28; // TODO: meaning of the fifth quantized float.
+    float Throttle; // TODO: meaning of the fifth quantized float.
 };
 
 class FRpcPlayerTradePacket : public FPacketBase {
@@ -988,7 +988,7 @@ public:
         return RpcWirePacketFactory<FRpcChatMsgPacket>(OutPacket);
     }
     unsigned int TargetId;
-    unsigned int Field_0x04; // TODO: meaning of the second chat DWORD.
+    unsigned int SenderId; // TODO: meaning of the second chat DWORD.
     unsigned int DataSize;
     unsigned char* Data;
 };
@@ -1008,7 +1008,7 @@ public:
     unsigned char* DataA;
     unsigned int SizeB;
     unsigned char* DataB;
-    unsigned int Field_0x10; // TODO: semantics of the final dialog DWORD.
+    unsigned int Buttons; // TODO: semantics of the final dialog DWORD.
 };
 
 class FRpcClientLoginPacket : public FPacketBase {
@@ -1023,7 +1023,7 @@ public:
         return RpcWirePacketFactory<FRpcClientLoginPacket>(OutPacket);
     }
     wchar_t AccountName[256];
-    wchar_t Field_0x220[256]; // TODO: semantic identity of the second login string.
+    wchar_t Password[256]; // TODO: semantic identity of the second login string.
     unsigned char CreateFlag;
     unsigned char Padding[3];
 };
@@ -1062,7 +1062,7 @@ public:
     unsigned int ObjectId;
     unsigned int TradelaneRing1;
     unsigned int TradelaneRing2;
-    unsigned char Field_0x0c; // TODO: semantics of the fourth value, passed as a bool.
+    unsigned char bMidLane; // TODO: semantics of the fourth value, passed as a bool.
 };
 
 class FRpcJettisonCargoPacket : public FPacketBase {
@@ -1114,7 +1114,7 @@ public:
         Stream.PutHeader();
         if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
         if (!Stream.Put(&bActive, 1u)) return 0x16u;
-        if (!Stream.Put(&Field_0x05, 1u)) return 0x16u;
+        if (!Stream.Put(&bDisruptCruise, 1u)) return 0x16u;
         return Stream.FinishEncodeSuccess(OutLength);
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -1122,12 +1122,12 @@ public:
         FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
         if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
         if (!Stream.Get(&bActive, 1u)) return MarshalError;
-        if (!Stream.Get(&Field_0x05, 1u)) return MarshalError;
+        if (!Stream.Get(&bDisruptCruise, 1u)) return MarshalError;
         return Stream.Finish(OutLength, false);
     }
     unsigned int ObjectId;
     unsigned char bActive;
-    unsigned char Field_0x05; // TODO: second cruise flag semantics beyond bool normalization.
+    unsigned char bDisruptCruise; // TODO: second cruise flag semantics beyond bool normalization.
 };
 
 class FRpcActivateThrustersPacket : public FPacketBase {

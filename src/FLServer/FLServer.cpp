@@ -74,7 +74,7 @@ class FServerLoadingScreen : public ILoadingScreen
 {
 public:
 	virtual void Refresh() override {}   // .text:0040b350
-	virtual void Slot01() override {}    // .text:0040b360 — ILoadingScreen +0x04, never called
+	virtual void Start() override {}    // .text:0040b360 — ILoadingScreen +0x04, never called
 };
 static FServerLoadingScreen GServerLoadingScreen;
 
@@ -833,7 +833,7 @@ bool CFLServerApp::UpdateGunReport()
 	bool bResult = true;
 	WaitForSingleObject(GAppMutex, INFINITE);
 	IGunHost* Host = GunWrapper != NULL ? GunWrapper->GetHost() : NULL;
-	if (Host != NULL && Host->Slot03(ServerControl.ServerName.c_str()) == 0)
+	if (Host != NULL && Host->SetSessionName(ServerControl.ServerName.c_str()) == 0)
 	{
 		wchar_t Text[0x400];
 		wchar_t* Cursor = Text;
@@ -855,8 +855,8 @@ bool CFLServerApp::UpdateGunReport()
 		_swprintf(Cursor, L":%d:%d:%d:%d:%S:%d", ServerControl.StartupInfo.MaxPlayers,
 			wcslen(Password) > 0 ? 1 : 0, (int)ServerControl.GetAllowPvp(),
 			(int)ServerControl.GetAllowNewPlayers(), Server.GetServerSig(), Server.GetServerID());
-		Host->Slot09(0, "GameOpts", Text);
-		Host->Slot09(0, "GameDesc", ServerControl.ServerDescription.c_str());
+		Host->SetProperty(0, "GameOpts", Text);
+		Host->SetProperty(0, "GameDesc", ServerControl.ServerDescription.c_str());
 	}
 	else
 	{

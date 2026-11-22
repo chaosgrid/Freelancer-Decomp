@@ -484,7 +484,7 @@ inline void InitializeShadingFileDesc(FFileSystemDesc* Desc, const char* Path,
     Desc->ShareMode = 1;
     Desc->Creation = 3;
     Desc->Flags = 0x08000080;
-    Desc->Field30 = 0xFFFFFFFF;
+    Desc->FindHandle = 0xFFFFFFFF;
 }
 
 inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, unsigned long Size)

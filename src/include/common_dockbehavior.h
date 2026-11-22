@@ -130,12 +130,12 @@
 // sites total across the class now, not 2). Reading these bodies also turned up
 // many MORE offsets that read/write byte-for-byte identically to
 // FormationBehavior's own documented fields, well beyond the original 3:
-// DockBehavior's ThreatSourcePtr14/Field20/Field24 (+0x14/+0x20/+0x24) are
+// DockBehavior's ThreatSourcePtr14/BehaviorMgrPtr20/NavHelperPtr24 (+0x14/+0x20/+0x24) are
 // populated by the exact same shared initializer FUN_062d2090 (see item 1271
 // below) that other Behavior-family siblings' own +0x14/+0x20/+0x24-shaped
 // fields go through elsewhere in this module (15 call sites total, spanning
 // the whole 0x062cXXXX Behavior neighborhood) -- i.e. these are NOT
-// DockBehavior-private "Field20/Field24" ints as this pass's own predecessor
+// DockBehavior-private "BehaviorMgrPtr20/NavHelperPtr24" ints as this pass's own predecessor
 // assumed; they are genuinely BaseFollowerBehavior::BehaviorMgrPtr/NavHelper
 // -shaped pointers (FUN_062d2090 literally writes `P1`/`P2`/`P3` raw pointer
 // arguments into them). Also newly confirmed identical to FormationBehavior:
@@ -202,8 +202,9 @@ public:
                                  // BaseFollowerBehavior::OwnerContext@+0x14 -- both are populated by
                                  // the identical shared initializer FUN_062d2090 at the identical
                                  // offset (see item 1271 / the class comment above).
-    unsigned char Opaque18[0x20 - 0x18]; // +0x18, never touched by anything read this pass
-    void* Field20;                // +0x20. CONFIRMED (this pass, item 1277/LAB_062c3910) to be an
+    IObjDB* ObjectDb;
+    float DeltaTime1c; // +0x18, never touched by anything read this pass
+    void* BehaviorMgrPtr20;                // +0x20. CONFIRMED (this pass, item 1277/LAB_062c3910) to be an
                                    // `IBehaviorManager*` -- that function calls
                                    // `IBehaviorManager::lock_maneuvers` on it BY LINKED SYMBOL NAME,
                                    // matching FormationBehavior::BaseFollowerBehavior::BehaviorMgrPtr
@@ -212,7 +213,7 @@ public:
                                    // pointer by every confirmed caller; not yet cast to
                                    // `IBehaviorManager*` directly since that header isn't included
                                    // here).
-    void* Field24;                 // +0x24. CONFIRMED (this pass) structurally identical to
+    void* NavHelperPtr24;                 // +0x24. CONFIRMED (this pass) structurally identical to
                                     // FormationBehavior/BaseFollowerBehavior::NavHelper@+0x24 (same
                                     // shared FUN_062d2090 initializer, same `+0x14fc`-offset nested
                                     // vtable-having sub-object access pattern seen in items
@@ -228,8 +229,8 @@ static_assert(offsetof(DockBehaviorFields, CachedHandle08) == 0x08, "DockBehavio
 static_assert(offsetof(DockBehaviorFields, ModeSelector0xc) == 0x0c, "DockBehaviorFields::ModeSelector0xc offset");
 static_assert(offsetof(DockBehaviorFields, UpdateResult10) == 0x10, "DockBehaviorFields::UpdateResult10 offset");
 static_assert(offsetof(DockBehaviorFields, ThreatSourcePtr14) == 0x14, "DockBehaviorFields::ThreatSourcePtr14 offset");
-static_assert(offsetof(DockBehaviorFields, Field20) == 0x20, "DockBehaviorFields::Field20 offset");
-static_assert(offsetof(DockBehaviorFields, Field24) == 0x24, "DockBehaviorFields::Field24 offset");
+static_assert(offsetof(DockBehaviorFields, BehaviorMgrPtr20) == 0x20, "DockBehaviorFields::BehaviorMgrPtr20 offset");
+static_assert(offsetof(DockBehaviorFields, NavHelperPtr24) == 0x24, "DockBehaviorFields::NavHelperPtr24 offset");
 static_assert(offsetof(DockBehaviorFields, Flags28) == 0x28, "DockBehaviorFields::Flags28 offset");
 static_assert(offsetof(DockBehaviorFields, Flag29) == 0x29, "DockBehaviorFields::Flag29 offset");
 static_assert(sizeof(DockBehaviorFields) == 0x2c, "DockBehaviorFields size (own data ends right before the RequestCB secondary vtable ptr at +0x2c)");
@@ -263,7 +264,7 @@ public:
     //   7  (0x1c) LAB_062c3b70        item 1278  ported (outer logic): Update()
     //   8  (0x20) Exclusion::AsteroidExclusionZone..  ICF fold
     //   9  (0x24) IObjInspectImpl::cobject          ICF fold
-    //  10  (0x28) FUN_062c3370        item 1272  ported 2026-10-08: Slot10() (apply DirectiveDockOp)
+    //  10  (0x28) FUN_062c3370        item 1272  ported 2026-10-08: OnApplyDirective() (apply DirectiveDockOp)
     //  11  (0x2c) LAB_062c3000        item 1266  ported for real: IsClearanceState()
     //  12  (0x30) LAB_062c5540        item 1290  ported (outer logic): SubmitGotoDirective()
     //  13  (0x34) LAB_062c5650        item 1291  documented, not ported this pass
@@ -274,7 +275,7 @@ public:
     //  18  (0x48) MetaList<GoodDesc>::operator[]    ICF fold (same target as slot 15)
     //  19  (0x4c) Archetype::AttachedEquipment::i.. ICF fold
     //  20  (0x50) LAB_062c2f40        item 1262  trivial (2 insns), skipped
-    //  21  (0x54) FUN_062c2f60        item 1264  ported 2026-10-08: Slot21() (drop watchers on id)
+    //  21  (0x54) FUN_062c2f60        item 1264  ported 2026-10-08: OnObjectLeftSystem() (drop watchers on id)
     //  22  (0x58) LAB_062c54b0        item 1289  ported (outer logic): OnWatchedObjectDestroyed()
     //  23  (0x5c) LAB_062c2f50        item 1263  trivial (2 insns), skipped
     //  24  (0x60) LAB_062c2fe0        item 1265  ported for real: GetWatchedRawBlock()
@@ -345,24 +346,24 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // The other slots retail's DockBehavior vftable (.rdata:0639f4a4) overrides, wired
     // 2026-10-08 (claude-code:cmn-ai2) -- until then the methods below were plain members and
     // the manager's Behavior* dispatch reached the base bodies. Slots 10 (FUN_062c3370) and
     // 21 (FUN_062c2f60) were ported 2026-10-08 (claude-code:cmn-ai5).
-    bool Slot10(void* DirectiveOp) override;                              // 10 FUN_062c3370 (RET 4)
-    void Slot21(void* Arg) override;                                      // 21 FUN_062c2f60 (RET 4)
-    void Slot3() override { RecomputeApproach(); }                       // 3  LAB_062c3720
-    void Slot4() override { Disengage(); }                               // 4  LAB_062c3910
-    int Slot5(float) override { return SetModeFromFlags(); }             // 5  LAB_062c35c0 (RET 4)
+    bool OnApplyDirective(void* DirectiveOp) override;                              // 10 FUN_062c3370 (RET 4)
+    void OnObjectLeftSystem(void* Arg) override;                                      // 21 FUN_062c2f60 (RET 4)
+    void OnEngage() override { RecomputeApproach(); }                       // 3  LAB_062c3720
+    void OnDisengage() override { Disengage(); }                               // 4  LAB_062c3910
+    int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }             // 5  LAB_062c35c0 (RET 4)
     EvaluateResult evaluate(unsigned int) override                       // 6  LAB_062c35f0 (RET 4)
     { return static_cast<EvaluateResult>(CheckClearanceProgress()); }
-    bool Slot11() override { return IsClearanceState(); }                // 11 LAB_062c3000
+    bool allow_user_steering() override { return IsClearanceState(); }                // 11 LAB_062c3000
     void set_direction(Vector const& Dir) override { SubmitGotoDirective(Dir); } // 12 LAB_062c5540
     // 13 LAB_062c5650 / 14 LAB_062c5670: `ECX = [this+0x2f0]; if (ECX) JMP [[ECX]+0x34/+0x38]`
     // with the argument passed through -- forwarded to the Goto pilot when there is one.
@@ -372,7 +373,7 @@ public:
     // with this unchanged -- Behavior's own bodies, only while a pilot is attached.
     void set_afterburner(bool bOn) override;
     void slide_strafe_burst(StrafeDir Dir) override;
-    void Slot22(void* Message) override { OnWatchedObjectDestroyed(Message); } // 22 LAB_062c54b0
+    void OnEvent(void* Message) override { OnWatchedObjectDestroyed(Message); } // 22 LAB_062c54b0
 
     // FUN_062c3590 (item 1273), `RET 4`, sole caller FleeBehavior::Perform (.text:062c7403):
     // `REP MOVSD` of 0xb dwords from this+0x2f4 (DockOp) into *Out, then
@@ -380,7 +381,7 @@ public:
     bool CopyDockOp(pub::AI::DirectiveDockOp* Out) const;
     // 24 / 26: both LAB_062c2fe0 -- Watcher324's object (target - 8) or null.
     IObjRW const* get_target() override { return static_cast<IObjRW const*>(GetWatchedRawBlock()); }
-    void* Slot26() override { return GetWatchedRawBlock(); }
+    void* GetDockTarget() override { return GetWatchedRawBlock(); }
 
     // IObjAffect::RequestCB override -- own single secondary-vtable slot.
     // Common.dll.txt 190855-190928 (LAB_062c53f0), 66 instructions, fully
@@ -397,15 +398,15 @@ public:
     // Own vtable slot 1 (offset 0x04). Common.dll.txt 187726-187871
     // (LAB_062c31c0), 141 instructions. First calls the shared Behavior-family
     // context initializer FUN_062d2090(this, P1, P2, P3) (see
-    // DockBehaviorFields::ThreatSourcePtr14/Field20/Field24 above); if it
+    // DockBehaviorFields::ThreatSourcePtr14/BehaviorMgrPtr20/NavHelperPtr24 above); if it
     // returns false (P1/P3 null -- NOT P1/P2; confirmed directly from
     // FUN_062d2090's own raw disassembly), returns immediately. Otherwise resets
     // AbortFlag398/Flag39b, calls SubObjectA/B/C's own vtable slot 0, clears
-    // SubStateValue440/Field330/Flags28 bit 0x2 [CORRECTED 2026-09-11
+    // TerminalType/RequestedDockPortIndex/Flags28 bit 0x2 [CORRECTED 2026-09-11
     // d285:common-port: re-reading Common.dll.txt 187783-187789 byte-for-byte
     // shows this call site actually zeroes the 3 unconfirmed dwords at
-    // +0x444/+0x448/+0x44c (Opaque444), NOT SubStateValue440(+0x440)/
-    // Field330(+0x330) -- no instruction anywhere in this function touches
+    // +0x444/+0x448/+0x44c (Opaque444), NOT TerminalType(+0x440)/
+    // RequestedDockPortIndex(+0x330) -- no instruction anywhere in this function touches
     // either of those two fields; the prior pass's claim was wrong, fixed in
     // the .cpp], and (if a "hpmount" hardpoint lookup on ThreatSourcePtr14
     // fails) recomputes OrientMatrix3d8 from NavHelper's nested +0x14fc/+0x84
@@ -416,9 +417,9 @@ public:
     // SubObjectA/B's own vtable slot 0 calls are now WIRED FOR REAL (2026-09-11
     // d285:common-port), now that they're identified as MoveIdea/FaceIdea:
     // re-read from the raw bytes, both calls pass the identical 3 arguments
-    // `(ThreatSourcePtr14, Field24, <this function's own raw Param2>)` -- NOT
-    // `Field20` (which also holds the same value, since FUN_062d2090 sets
-    // Field20=Param2, but retail's own EDI register here is never reloaded
+    // `(ThreatSourcePtr14, NavHelperPtr24, <this function's own raw Param2>)` -- NOT
+    // `BehaviorMgrPtr20` (which also holds the same value, since FUN_062d2090 sets
+    // BehaviorMgrPtr20=Param2, but retail's own EDI register here is never reloaded
     // from +0x20, it's the still-live raw incoming Param2 captured before the
     // FUN_062d2090 call). SubObjectC's own slot-0 call is wired for real
     // too as of 2026-09-17 (claude:abi-pass50), with the same three
@@ -432,7 +433,7 @@ public:
     // Own vtable slot 3 (offset 0x0c). Common.dll.txt 188246-188420
     // (LAB_062c3720), 163 instructions. Early-outs to `EnterState(0xd)` if
     // Watcher324's watched block is gone; otherwise resets several per-tick
-    // fields (Field43c=-1, CombatFlag344=0, Field33c via FUN_062e5af0/
+    // fields (DockPortIndex=-1, CombatFlag344=0, BrakingDistance via FUN_062e5af0/
     // FUN_062e5ab0*3.0, SetCruiseLock(1,3) via FUN_062d21d0), then branches on
     // StateFlags32c's sign bit: if clear, calls ThreatSourcePtr14's vtbl+0x138
     // "get transform" (writes Opaque388/Facing38c/an intercept-point out-param
@@ -462,7 +463,7 @@ public:
     //      unconditionally. When ModeState320==0, retail instead takes a
     //      completely separate short tail (LAB_062c3afc) that the prior port
     //      didn't reproduce AT ALL (an early-out on ApproachClearedFlag334==0,
-    //      else resets SubStateValue440/Field330/ApproachClearedFlag334 and a
+    //      else resets TerminalType/RequestedDockPortIndex/ApproachClearedFlag334 and a
     //      still-unidentified "get watched position, feed ThreatSourcePtr14's
     //      own +4 nested vtbl+0x60" call). Now reproduced (position/vtbl part
     //      still FULLPORT-DEFERRED, nested class unidentified).
@@ -472,8 +473,8 @@ public:
     //      Retail is the opposite AND neither branch returns early -- both
     //      fall into one shared tail (LAB_062c3a9e). Sign-bit SET (`bClearance
     //      Requested`): `FUN_062d88b0(&SubObjectA, 2)` (hardcoded level),
-    //      then -- only if Flags28 bit 0 is clear -- the SubStateValue440/
-    //      Field330/ApproachClearedFlag334 resets plus the AbortFlag398/
+    //      then -- only if Flags28 bit 0 is clear -- the TerminalType/
+    //      RequestedDockPortIndex/ApproachClearedFlag334 resets plus the AbortFlag398/
     //      Flag399-gated CShip::request_exit_tradelane call and the
     //      independent Flag39a-gated "position" call. Sign-bit CLEAR: level
     //      is CONDITIONAL (2 only if ThreatSourcePtr14's nested +0x14fc+0x84
@@ -488,8 +489,8 @@ public:
     //      own header comment), then `SubObjectB.Commit()`, then
     //      `SubObjectA.Commit()` (own vtable slot 4, retail `vtbl+0x10` --
     //      WIRED FOR REAL this pass now that MoveIdea/FaceIdea are identified),
-    //      `SetCruiseLock(1,3)`, `FUN_062e9a60(Field24+0x12c, 1)` -- WIRED FOR
-    //      REAL 2026-09-17, now Field24->GunGroups.SetShieldActive(1); it
+    //      `SetCruiseLock(1,3)`, `FUN_062e9a60(NavHelperPtr24+0x12c, 1)` -- WIRED FOR
+    //      REAL 2026-09-17, now NavHelperPtr24->GunGroups.SetShieldActive(1); it
     //      had been FULLPORT-DEFERRED under the guessed name "ResumeUserInput"
     //      for a function that was fully ported on 2026-09-11 -- and a
     //      still-FULLPORT-DEFERRED `FUN_062d20f0(this)`, and finally
@@ -507,7 +508,7 @@ public:
     // Otherwise calls ThreatSourcePtr14's vtbl+0x74 to get a "candidate"
     // object; if null, returns 2. Else calls the candidate's own vtbl+0x88 to
     // get a status dword and tests it against several bit patterns
-    // (0x600de0/0x8c0/0x120, or a fallback vtbl+0x8c + FUN_062e7400(Field24+
+    // (0x600de0/0x8c0/0x120, or a fallback vtbl+0x8c + FUN_062e7400(NavHelperPtr24+
     // 0x34, candidate) path) to decide whether to proceed to a
     // distance/facing check: candidate's vtbl+0x40 (float getter, compared to
     // DAT_06399408) then vtbl+0x4 (3-float getter, dotted against itself and
@@ -526,13 +527,13 @@ public:
     // not-separately-modeled dispatch path -- FULLPORT-DEFERRED). Otherwise
     // builds a `pub::AI::DirectiveGotoOp` (Field_50 from the same
     // DAT_063ebdb4 tunable FormationBehavior::EnterState(1) uses,
-    // ArrivalRadius-shaped fields from ProxWatcher450.Unknown08/Unknown0c,
+    // ArrivalRadius-shaped fields from ProxWatcher450.NearDistance/FarDistance,
     // Destination from either an intercept-point Vector at +0x3cc -- not
     // separately typed out this pass -- when StateFlags32c bits 0xc0 are set,
     // or from the watched-block's own vtbl+0x20 "position" getter otherwise)
     // and submits it via `NavPilotPtr->vtbl[0x28](&Op)` -- the exact same
     // submit convention as FormationBehavior::EnterState(1)'s own
-    // `Slot28(NavPilotPtr, &Op)` call.
+    // `GetRotatedOffset(NavPilotPtr, &Op)` call.
     void SubmitGotoDirective(Vector const& ReferencePoint);
 
     // Own vtable slot 22 (offset 0x58). Common.dll.txt 190940-190996
@@ -589,9 +590,9 @@ private:
     // The "refresh NavHelper's cached lead point unless it was already recomputed
     // this frame" idiom, verbatim from retail and used at three sites inside these
     // two bodies (Common.dll.txt 062c4a72, 062c4b0e and 062c3e97, all identical
-    // byte-for-byte): read the flag at Field24+0x157a, and if it is clear, set the
-    // byte at Field24+0x14fc+0x7e and dispatch slot 0x2c of the sub-object pointer
-    // at Field24+0x14fc+0x84 with (Field24+0x14fc+0x18, Field24+0x14fc+0xc). Same
+    // byte-for-byte): read the flag at NavHelperPtr24+0x157a, and if it is clear, set the
+    // byte at NavHelperPtr24+0x14fc+0x7e and dispatch slot 0x2c of the sub-object pointer
+    // at NavHelperPtr24+0x14fc+0x84 with (NavHelperPtr24+0x14fc+0x18, NavHelperPtr24+0x14fc+0xc). Same
     // shape FormationBehavior::DisengageSelf() documents and decomp-tracker item
     // 1996 independently confirmed.
     void NavHelperRefreshLeadPoint();
@@ -604,7 +605,7 @@ private:
     // Both are pure virtuals with real overrides on all three classes, so a direct
     // member call on the typed member dispatches exactly where retail dispatches.
     // .rdata:DAT_0639f518, the double 0x3fe3333333333333 == 0.6, the only multiplier
-    // EnterState()'s case 9 applies to Field408 (.text:062c439f).
+    // EnterState()'s case 9 applies to DockPointRadius (.text:062c439f).
     static double const kEnterState9RadiusScale;   // DAT_0639f518, a double
 
     // ---- The five "shared sub-object setter" stubs are GONE ----------------
@@ -666,7 +667,7 @@ private:
     // Disengage's three owner IObjAffect slot-0x60 sites (RequestType, &Watcher324 id, 0).
     void CancelOwnerRequest(int RequestType);
     // FUN_062c50e0 (item 1287), thiscall, RET 0: re-reads the dock hardpoints of Watcher324's
-    // object for Field43c into the approach fields and sets CombatFlag344 / Facing38c.
+    // object for DockPortIndex into the approach fields and sets CombatFlag344 / Facing38c.
     // Called from RecomputeApproach() and OnResult()'s Param1==0 path.
     void RefreshApproachState();
 
@@ -776,16 +777,16 @@ public:
                                 // slot 24/26) reads its raw Watched pointer directly.
     unsigned StateFlags32c;    // +0x32c. Zeroed by ctor. OnResult() tests it against mask 0x840
                                 // (== FormationBehavior's documented StateFlags bits 0x40|0x800).
-    int Field330;               // +0x330. Set to -1 (sentinel) by RecomputeApproach()/Disengage().
+    int RequestedDockPortIndex;               // +0x330. Set to -1 (sentinel) by RecomputeApproach()/Disengage().
     unsigned char ApproachClearedFlag334; // +0x334. Cleared by RecomputeApproach()/Disengage() --
                                            // CONFIRMED (this pass) same offset/role as
                                            // FormationBehavior::ApproachClearedFlag@0x334.
     unsigned char Pad335[0x338 - 0x335];
-    float Field338;              // +0x338. EnterState(2) (.text:062c4148, FSTP dword): the
+    float StandOffRadius;              // +0x338. EnterState(2) (.text:062c4148, FSTP dword): the
                                   // watched object's FUN_062e6010 attribute times 0.5f
                                   // (StateFlags32c bit 0x80) or 1/3 (bit 0x40). Retail's ctor
                                   // (062c2e60) leaves it unwritten, and so does the port.
-    float Field33c;              // +0x33c. Written by RecomputeApproach() from
+    float BrakingDistance;              // +0x33c. Written by RecomputeApproach() from
                                   // FUN_062e5af0/FUN_062e5ab0 (both FULLPORT-DEFERRED, not yet
                                   // individually processed).
     // +0x340. RETYPED 2026-09-17 (claude:common-dockmove) from `Opaque340[4]`: this is the
@@ -830,7 +831,7 @@ public:
     // rather than naming a type. Written by RecomputeApproach()'s (FULLPORT-DEFERRED)
     // "get transform" call, out-param 1. Held (wrongly) on FormationBehavior as
     // `TargetShipPtr` until this pass.
-    void* TargetShipPtr388;
+    void* LaneNextRing;
     Vector Facing38c;          // +0x38c (ends +0x398). CONFIRMED (this pass) same absolute
                                 // offset AND same "3-float Vector consumed by a look/orient
                                 // helper" role as FormationBehavior::Facing@0x38c -- a
@@ -876,7 +877,7 @@ public:
     // `FADD float ptr [ESI + 0x3fc]` when case 9 builds its retreat point. Held (wrongly) on
     // FormationBehavior as `SavedPosition` until this pass.
     Vector SavedPosition3fc;
-    float Field408;            // +0x408. Set to 16.0f by OnResult() under one branch (retail:
+    float DockPointRadius;            // +0x408. Set to 16.0f by OnResult() under one branch (retail:
                                 // `MOV dword ptr [outer+0x408],0x41800000`). Also the float*
                                 // out-param of get_dock_hardpoints in RefreshApproachState.
     // +0x40c (ends +0x430). A Matrix: RefreshApproachState copies the first dock-hardpoint
@@ -884,19 +885,19 @@ public:
     // column z (+0x414/+0x420/+0x42c). Split out of `Opaque40c[0x30]` 2026-10-08.
     Matrix Orient40c;
     unsigned char Opaque430[0x43c - 0x430]; // +0x430: EnterState reads a Vector here (RawAt)
-    int Field43c;              // +0x43c. Set by OnResult() to its own 3rd int parameter; also
+    int DockPortIndex;              // +0x43c. Set by OnResult() to its own 3rd int parameter; also
                                 // reset to -1 by RecomputeApproach().
-    int SubStateValue440;       // +0x440. Cleared by RecomputeApproach()/Disengage() -- CONFIRMED
+    int TerminalType;       // +0x440. Cleared by RecomputeApproach()/Disengage() -- CONFIRMED
                                  // (this pass) same offset/role as
                                  // FormationBehavior::SubStateValue@0x440.
     // +0x444: a Vector offset from DestPoint3cc. SetContext zeroes its three dwords;
     // BuildFinalApproachSpline (FUN_062c56d0, .text:062c57a4-062c57b7) adds it to
     // DestPoint3cc through FUN_062887d0 (Vector add) for the spline's P2. Typed 2026-10-08.
-    Vector Field444;
+    Vector DestPointOffset;
 
-    // formerly FUN_062c50c0 (`MOV EAX,[param]; MOV [this+0x444],EAX` x3, RET 4): Field444 =
+    // formerly FUN_062c50c0 (`MOV EAX,[param]; MOV [this+0x444],EAX` x3, RET 4): DestPointOffset =
     // Offset. Sole caller BaseFollowerBehavior (.text:062cbc3e) on its DockDelegate
-    // (BehaviorDispatchTable[7], the Dock behaviour) with the Vector its Slot28 returned.
+    // (BehaviorDispatchTable[7], the Dock behaviour) with the Vector its GetRotatedOffset returned.
     // Defined in common_dockbehavior.cpp.
     void SetDestPointOffset(Vector const& Offset);
 
@@ -915,9 +916,9 @@ public:
     struct DockProximityWatcher
     {
         BaseWatcher Watcher;   // +0x00 (absolute +0x450)
-        float Unknown08;       // +0x08 (absolute +0x458). Ctor zeroes as a raw dword.
-        float Unknown0c;       // +0x0c (absolute +0x45c). Ctor zeroes as a raw dword.
-        float Unknown10;       // +0x10 (absolute +0x460). Slot10 (FUN_062c3370) writes it:
+        float NearDistance;       // +0x08 (absolute +0x458). Ctor zeroes as a raw dword.
+        float FarDistance;       // +0x0c (absolute +0x45c). Ctor zeroes as a raw dword.
+        float CruiseSpeedRatio;       // +0x10 (absolute +0x460). OnApplyDirective (FUN_062c3370) writes it:
                                 // the op's +0x28 when > 0, else own get_speed(1, 4) over the
                                 // docking target's get_speed(1, 1), clamped up to 1.0f
                                 // (FCOMP float at 062c3547). Not ctor-zeroed.
@@ -965,13 +966,13 @@ static_assert(offsetof(DockBehavior, DockOp) == 0x2f4, "DockBehavior::DockOp off
 static_assert(offsetof(DockBehavior, ModeState320) == 0x320, "DockBehavior::ModeState320 offset");
 static_assert(offsetof(DockBehavior, Watcher324) == 0x324, "DockBehavior::Watcher324 offset");
 static_assert(offsetof(DockBehavior, StateFlags32c) == 0x32c, "DockBehavior::StateFlags32c offset");
-static_assert(offsetof(DockBehavior, Field330) == 0x330, "DockBehavior::Field330 offset");
+static_assert(offsetof(DockBehavior, RequestedDockPortIndex) == 0x330, "DockBehavior::RequestedDockPortIndex offset");
 static_assert(offsetof(DockBehavior, ApproachClearedFlag334) == 0x334, "DockBehavior::ApproachClearedFlag334 offset");
-static_assert(offsetof(DockBehavior, Field33c) == 0x33c, "DockBehavior::Field33c offset");
+static_assert(offsetof(DockBehavior, BrakingDistance) == 0x33c, "DockBehavior::BrakingDistance offset");
 static_assert(offsetof(DockBehavior, StateTimer340) == 0x340, "DockBehavior::StateTimer340 offset (Common.dll.txt 062c5019/062c501f/062c5049)");
 static_assert(offsetof(DockBehavior, CombatFlag344) == 0x344, "DockBehavior::CombatFlag344 offset");
 static_assert(offsetof(DockBehavior, Spline) == 0x348, "DockBehavior::Spline offset");
-static_assert(offsetof(DockBehavior, TargetShipPtr388) == 0x388, "DockBehavior::TargetShipPtr388 offset (Common.dll.txt 062c4a2c/062c4c8b/062c4f2e)");
+static_assert(offsetof(DockBehavior, LaneNextRing) == 0x388, "DockBehavior::LaneNextRing offset (Common.dll.txt 062c4a2c/062c4c8b/062c4f2e)");
 static_assert(offsetof(DockBehavior, Facing38c) == 0x38c, "DockBehavior::Facing38c offset");
 static_assert(offsetof(DockBehavior, AbortFlag398) == 0x398, "DockBehavior::AbortFlag398 offset");
 static_assert(offsetof(DockBehavior, Flag399) == 0x399, "DockBehavior::Flag399 offset");
@@ -981,11 +982,11 @@ static_assert(offsetof(DockBehavior, InterceptPoint39c) == 0x39c, "DockBehavior:
 static_assert(offsetof(DockBehavior, DestPoint3cc) == 0x3cc, "DockBehavior::DestPoint3cc offset (Common.dll.txt 062c4c6f-062c4c88, the 3-dword copy into SavedPosition3fc)");
 static_assert(offsetof(DockBehavior, OrientMatrix3d8) == 0x3d8, "DockBehavior::OrientMatrix3d8 offset");
 static_assert(offsetof(DockBehavior, SavedPosition3fc) == 0x3fc, "DockBehavior::SavedPosition3fc offset (Common.dll.txt 062c4c77/062c4ebb)");
-static_assert(offsetof(DockBehavior, Field408) == 0x408, "DockBehavior::Field408 offset");
+static_assert(offsetof(DockBehavior, DockPointRadius) == 0x408, "DockBehavior::DockPointRadius offset");
 static_assert(offsetof(DockBehavior, Orient3a8) == 0x3a8, "DockBehavior::Orient3a8 offset (.text:062c51d4)");
 static_assert(offsetof(DockBehavior, Orient40c) == 0x40c, "DockBehavior::Orient40c offset (.text:062c5175)");
-static_assert(offsetof(DockBehavior, Field43c) == 0x43c, "DockBehavior::Field43c offset");
-static_assert(offsetof(DockBehavior, SubStateValue440) == 0x440, "DockBehavior::SubStateValue440 offset");
+static_assert(offsetof(DockBehavior, DockPortIndex) == 0x43c, "DockBehavior::DockPortIndex offset");
+static_assert(offsetof(DockBehavior, TerminalType) == 0x440, "DockBehavior::TerminalType offset");
 static_assert(offsetof(DockBehavior, ProxWatcher450) == 0x450, "DockBehavior::ProxWatcher450 offset");
 static_assert(sizeof(DockBehavior::DockProximityWatcher) == 0x1c, "DockProximityWatcher size (0x450..0x46c span confirmed by items 1257/1259/1272)");
 static_assert(offsetof(DockBehavior, MaxApproachSpeed46c) == 0x46c, "DockBehavior::MaxApproachSpeed46c offset (Common.dll.txt 062c3d76/062c4213/062c4270/062c47fc)");

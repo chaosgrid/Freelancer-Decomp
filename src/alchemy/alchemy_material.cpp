@@ -37,41 +37,41 @@ namespace AlchemyImpl
         return Outer_->Release();
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot3(void* /*A*/)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::CreateInnerMaterial(void* /*A*/)
     {
         // LAB_062032a0: OR EAX,0xFFFFFFFF; RET 8.
         return -1;
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot4(void* /*A*/)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::SetBatchBin(void* /*A*/)
     {
         // LAB_062032b0: OR EAX,0xFFFFFFFF; RET 8.
         return -1;
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot5(unsigned long* Out)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::GetBatchBin(unsigned long* Out)
     {
         // LAB_062032c0: MOV EAX,[ESP+8]; MOV dword ptr [EAX],1; XOR EAX,EAX; RET 8.
         *Out = 1;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot6(void* /*A*/)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::Bind(void* /*A*/)
     {
         // LAB_06203300: CALL FUN_0623f450 (see
         // FALMaterial::ApplyDefaultRenderPipelineState); XOR EAX,EAX; RET 8.
         return FALMaterial::ApplyDefaultRenderPipelineState();
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot7(void* /*A*/)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::Teardown(void* /*A*/)
     {
         // LAB_06203310: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALBatchedMaterialFacet::Slot8(void* /*A*/, void* /*B*/, void* /*C*/,
-                                                       void* /*D*/, void* /*E*/, void* /*F*/,
-                                                       void* /*G*/)
+    GENRESULT DACOM_API FALBatchedMaterialFacet::Submit(void* /*A*/, void* /*B*/, void* /*C*/,
+                                                        void* /*D*/, void* /*E*/, void* /*F*/,
+                                                        void* /*G*/)
     {
         // LAB_062032f0: XOR EAX,EAX; RET 0x20 (7 args).
         return GR_OK;
@@ -121,107 +121,107 @@ namespace AlchemyImpl
         return Next;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot3(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::Initialize(void* /*A*/)
     {
         // LAB_062031d0: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot4(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::LoadFromFileSystem(void* /*A*/)
     {
         // LAB_062031e0: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot5(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::SaveProperties(void* /*A*/)
     {
         // LAB_062031f0: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot6(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::ApplyVerify(void* /*A*/, void* /*B*/)
     {
         // LAB_06203200: XOR EAX,EAX; RET 0xC.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot7(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::ResolveTextures(void* /*A*/)
     {
         // LAB_06203210: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot8(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::Bind(void* /*A*/)
     {
         // LAB_06203320: CALL FUN_0623f450; XOR EAX,EAX; RET 8.
         return ApplyDefaultRenderPipelineState();
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot9(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::Teardown(void* /*A*/)
     {
         // LAB_06203330: XOR EAX,EAX; RET 8.
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot10(void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/,
+    GENRESULT DACOM_API FALMaterial::Submit(void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/,
                                             void* /*E*/, void* /*F*/, void* /*G*/)
     {
         // LAB_062032e0: OR EAX,0xFFFFFFFF; RET 0x20 (7 args).
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot11(void* /*A*/)
+    GENRESULT DACOM_API FALMaterial::SetName(void* /*A*/)
     {
         // LAB_06203220: OR EAX,0xFFFFFFFF; RET 8.
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot12(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::GetName(void* /*A*/, void* /*B*/)
     {
         // LAB_06203230: OR EAX,0xFFFFFFFF; RET 0xC.
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot13(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::CopyClassName(void* /*A*/, void* /*B*/)
     {
         // LAB_06203240: OR EAX,0xFFFFFFFF; RET 0xC.
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot14(unsigned long* Out)
+    GENRESULT DACOM_API FALMaterial::GetPassCount(unsigned long* Out)
     {
         // LAB_06203250: MOV EAX,[ESP+8]; MOV dword ptr [EAX],1; XOR EAX,EAX; RET 8.
         *Out = 1;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot15(unsigned long* Out)
+    GENRESULT DACOM_API FALMaterial::GetRenderFlags(unsigned long* Out)
     {
         // LAB_062032d0: MOV EAX,[ESP+8]; MOV dword ptr [EAX],2; XOR EAX,EAX; RET 8.
         *Out = 2;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot16(unsigned long* Out)
+    GENRESULT DACOM_API FALMaterial::GetParameterCount(unsigned long* Out)
     {
         // LAB_06203260: MOV EAX,[ESP+8]; MOV dword ptr [EAX],0; XOR EAX,EAX; RET 8.
         *Out = 0;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot17(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::GetParameterDescriptor(void* /*A*/, void* /*B*/)
     {
         // LAB_06203270: OR EAX,0xFFFFFFFF; RET 0xC.
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot18(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::GetParameterValue(void* /*A*/, void* /*B*/)
     {
         // LAB_06203280: OR EAX,0xFFFFFFFF; RET 0xC.
         return -1;
     }
 
-    GENRESULT DACOM_API FALMaterial::Slot19(void* /*A*/, void* /*B*/)
+    GENRESULT DACOM_API FALMaterial::SetParameterValue(void* /*A*/, void* /*B*/)
     {
         // LAB_06203290: OR EAX,0xFFFFFFFF; RET 0xC.
         return -1;

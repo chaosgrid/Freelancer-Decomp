@@ -331,11 +331,11 @@ namespace Archetype
         virtual void FreeResources() = 0;                   // 6 +0x18  thunk → Slot11
         virtual void Inherit(ICliObj* Donor) = 0;           // 7 +0x1C
         virtual unsigned long Load(int LoadMode) = 0;       // 8 +0x20  LAB_00407380
-        virtual void* Slot09(unsigned Flags) = 0;           // 9 +0x24  FUN_00406940 scalar dtor
-        virtual void Slot10() = 0;                          // 10 +0x28 FUN_00407320
-        virtual void Slot11() = 0;                          // 11 +0x2C FUN_00406d20
-        virtual void Slot12(unsigned Arg) = 0;              // 12 +0x30 FUN_004074f0
-        virtual void Slot13() = 0;                          // 13 +0x34 LAB_00407530
+        virtual void* ScalarDeletingDtor(unsigned Flags) = 0;           // 9 +0x24  FUN_00406940 scalar dtor
+        virtual void RealizeMaterials() = 0;                          // 10 +0x28 FUN_00407320
+        virtual void ReleaseResources() = 0;                          // 11 +0x2C FUN_00406d20
+        virtual void LoadHitEffects(unsigned Arg) = 0;              // 12 +0x30 FUN_004074f0
+        virtual void ReleaseHitEffects() = 0;                          // 13 +0x34 LAB_00407530
     };
 
     // Slot 2 on Root is redefine; these offsets are the *companion* vtable (Load*/Root).

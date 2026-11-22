@@ -138,11 +138,11 @@ struct FNebulaEffect : INebula
     unsigned char ShapePadding[0x18 - sizeof(FShapeDB)];
     float FrameDelta;                                // +0x1c
     Universe::IZone* Zone;                            // +0x20
-    unsigned Field24;                                // +0x24 TODO: exclusion state
-    unsigned Field28;                                // +0x28 TODO: exclusion state
+    unsigned ActiveExclusionZone;                    // +0x24 Exclusion::NebulaExclusionZone*
+    float ExclusionImmersion;                        // +0x28 exclusion immersion factor
     unsigned char Flag2C;                            // +0x2c
     unsigned char Pad2D[3];
-    unsigned Field30;                                // +0x30 TODO: exclusion state
+    unsigned ActiveExclusionShell;                   // +0x30 FNebulaZoneShell*
     Exclusion::NebulaExclusionZoneMgr* ExclusionMgr;  // +0x34
     FNebulaZoneShellMap ZoneShells;                  // +0x38
     unsigned char MapPadding[0x14 - sizeof(FNebulaZoneShellMap)];

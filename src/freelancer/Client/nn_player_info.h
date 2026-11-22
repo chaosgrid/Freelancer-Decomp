@@ -24,7 +24,7 @@
 //
 // vftable 0x005d4794 -- WinControl's (0x005e5e44) with these overrides (raw dword diff):
 //   0 FUN_004a7850 scalar deleting dtor (dtor FUN_004a7870), 9 FUN_004a78c0 Create,
-//   13 LAB_004a8200 Draw, 23 LAB_00475430 Slot23 (the body NN_Help's slot 23 shares by ICF),
+//   13 LAB_004a8200 Draw, 23 LAB_00475430 ProcessMessage (the body NN_Help's slot 23 shares by ICF),
 //   42 LAB_004a80e0 SetProperty.
 
 #include "win_factory.h"
@@ -96,8 +96,8 @@ public:
     // then once a second (+0x424) ask the server for fresh stats (IServer slot 73).
     void Draw() override;
     // slot 23 LAB_00475430 (RET 0xc) -- 0xef02 removes the window from its parent and deletes it
-    // (every child first); anything else is WinControl's Slot23.
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    // (every child first); anything else is WinControl's ProcessMessage.
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_004a80e0 (RET 0xc) -- 0x3e from the scroll: FirstRow = B. 0x26: the close
     // button closes the NeuroNet screen; the infocard's close button restores the statistics;
     // a faction frame opens that faction's infocard. Everything else returns 0.

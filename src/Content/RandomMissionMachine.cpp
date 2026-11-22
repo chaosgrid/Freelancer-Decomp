@@ -411,8 +411,8 @@ void FRmOfferComponent::PrepareConversation(FRmConversation* Conversation,
         TString<0x40> const Name = MakeVoiceLineName(Line->Text.Data, "-", Line->VoiceId);
         unsigned int const TextId = pub::GetNicknameId(Name.Data);
         Line->TextIds.push_back(TextId);
-        Line->Field_0x28 = 0x4a39;
-        Line->Field_0x8c = 1;
+        Line->PermutationIds = 0x4a39;
+        Line->bPrepared = 1;
     }
 }
 
@@ -652,7 +652,7 @@ FRmSolarMachine::~FRmSolarMachine()
 }
 
 // LAB_06f86a00 (06f86a00-06f86ab7, RET 8). True for every message 0x39 in state 0.
-bool FRmSolarMachine::Slot2(SMEventData const* Event, int const& State)
+bool FRmSolarMachine::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0 || State != 0)
         return false;
@@ -709,7 +709,7 @@ FRmShipMachine::~FRmShipMachine()
 // LAB_06f87e90 (06f87e90-06f880b8, RET 8). After the destroyed message: the record's group;
 // every member destroyed (State 3) -> DAT_06fd3ba4; a record with Flags bit 1 and no alive
 // member with Flags bit 1 left -> DAT_06fd3ba0. True for every message 0x39 in state 0.
-bool FRmShipMachine::Slot2(SMEventData const* Event, int const& State)
+bool FRmShipMachine::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0 || State != 0)
         return false;
@@ -806,7 +806,7 @@ FRmLootMachine::~FRmLootMachine()
 }
 
 // LAB_06f86fb0 (06f86fb0-06f877b6, RET 8). State 0 only; every handled message answers true.
-bool FRmLootMachine::Slot2(SMEventData const* Event, int const& State)
+bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0 || State != 0)
         return false;
@@ -1043,7 +1043,7 @@ FRmRuntimeMachine::~FRmRuntimeMachine()
 }
 
 // LAB_06f8a5c0 (RET 8).
-bool FRmRuntimeMachine::Slot2(SMEventData const* Event, int const& State)
+bool FRmRuntimeMachine::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0)
         return false;
@@ -1107,7 +1107,7 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
             Line->Speaker = 0;
             Line->CostumeId = Offer->McCostume;
             Line->VoiceId = Offer->VoiceId;
-            Line->Field_0x2c = 0x32d7;
+            Line->CaptionIds = 0x32d7;
             return true;
         case 2:
         {
@@ -1346,14 +1346,14 @@ void FRmRuntimeMachine::UpdatePlayerObjectives(unsigned int InPlayerId)
         return;
 
     bool bPathChanged = false;
-    if (State->ShipObject != nullptr && State->ShipObject->HasField120())
+    if (State->ShipObject != nullptr && State->ShipObject->IsInTradeLane())
     {
         // 06f8b4e2-06f8b579: once per launch, a reached first path objective is dropped
         // (squared distance < 1e6, DAT_06fb8570; TEST AH,0x5 + JP skips greater, equal and
         // unordered).
-        if (Player->Field_0x24 == 0)
+        if (Player->bTradelanePathChecked == 0)
         {
-            Player->Field_0x24 = 1;
+            Player->bTradelanePathChecked = 1;
             if (!List.empty())
             {
                 FMissionObjective* Front = Player->Objectives.GetFront();
@@ -1385,7 +1385,7 @@ void FRmRuntimeMachine::UpdatePlayerObjectives(unsigned int InPlayerId)
     {
         // 06f8b580-06f8b5ca: the path objectives (slot 19); a single path objective makes
         // the objective after it carry flags 0x50.
-        Player->Field_0x24 = 0;
+        Player->bTradelanePathChecked = 0;
         UpdatePathObjectives(Player, &bPathChanged);
         if (bPathChanged)
         {
@@ -1551,7 +1551,7 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
     Info.Orientation.E[1][1] = 1.0f;
     Info.Orientation.E[2][2] = 1.0f;
     Info.VibeGroupId = -1;
-    Info.Field_0x80 = 1;
+    Info.VisitValue = 1;
     Info.HitPts = -1;
     Costume SolarCostume;
     FSystemInfo* System = FindSystemInfo(&Solar->DestSys);
@@ -1565,9 +1565,9 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
     Info.LoadoutID = Solar->LoadoutId;
     Info.VoiceId = Solar->VoiceId;
     Info.DockingBaseId = Solar->BaseId;
-    if (Solar->Field_0x468 != 0)
+    if (Solar->CostumeId != 0)
     {
-        pub::GF::GetCostumeByID(static_cast<int>(Solar->Field_0x468), SolarCostume);
+        pub::GF::GetCostumeByID(static_cast<int>(Solar->CostumeId), SolarCostume);
         Info.CostumeHead = SolarCostume.PartIds[0];
         Info.CostumeBody = SolarCostume.PartIds[1];
         Info.CostumeLeftHand = SolarCostume.PartIds[2];
@@ -1576,7 +1576,7 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
             Info.CostumeAccessory[Index] = SolarCostume.AccessoryIds[Index];
         Info.CostumeAccessoryCount = static_cast<int>(SolarCostume.AccessoryCount);
     }
-    Info.Field_0x80 = 0;
+    Info.VisitValue = 0;
 
     // 06f92877-06f9294f: the reputation, named by the killable solar's string (+0x507d0).
     FmtStr Name;
@@ -1594,10 +1594,10 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
     Record.State = 2;
     Record.Loot = Solar->Loot;
     Record.Flags = static_cast<unsigned int>(Solar->ModeFlag);
-    Record.Attitude = Solar->Field_0x4c8;
+    Record.Attitude = Solar->Attitude;
     Record.SolarType = Solar->SolarType;
     Record.Reputation = Info.VibeGroupId;
-    Record.Field_0x04 = true;
+    Record.bHostile = true;
     pub::Reputation::SetAffiliation(Info.VibeGroupId, Solar->Faction);
 
     if (pub::SpaceObj::CreateSolar(Record.ObjectId, Info) == 0)
@@ -1616,8 +1616,8 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
         pub::AI::SubmitState(Record.ObjectId, &Op);
         if ((Solar->ModeFlag & 1) != 0)
         {
-            pub::SpaceObj::SetInvincible(Record.ObjectId, true, Solar->Field_0x4e0 != 0,
-                                         Solar->InvincibleDuration);
+            pub::SpaceObj::SetInvincible(Record.ObjectId, true, Solar->bPlayerCanDamage != 0,
+                                         Solar->MaxHpLoss);
         }
         // 06f92c62-06f92cc2: the attitude towards every mission player (FCOMP -2.0, TEST
         // AH,0x44 + JNP skips equal).
@@ -1721,7 +1721,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
     bool bSpawned = false;
     std::list<FContentNpcShipParams> Blocks;
     std::vector<FRmShipRecord> Records;
-    Group->Field_0x01 = 1;
+    Group->bSpawned = 1;
     if (!Group->Ships.empty())
         Records.reserve(Group->Ships.size());
 
@@ -1793,8 +1793,8 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
         Block->CreationType = 1;
         std::memcpy(&Block->Orientation, &Group->Orientation, sizeof(FMatrix));
         Block->ControllerId = Mission->ControllerId;
-        Block->Field_0x118 = Ship->LabelIds;
-        Block->Field_0x110 = Group->Field_0x7c;
+        Block->LabelIds = Ship->LabelIds;
+        Block->DockIndex = Group->ArrivalDockIndex;
         Block->Cargo.clear();
         for (std::vector<FMissionShipCargo>::iterator Cargo = Ship->Cargo.begin();
              Cargo != Ship->Cargo.end(); ++Cargo)
@@ -1812,10 +1812,10 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
         Record->State = 2;
         Record->Loot = Ship->Loot;
         Record->Group = Group->Serial;
-        Record->Flags = static_cast<unsigned int>(Ship->Field_0xd8);
-        Record->Attitude = Group->Field_0x40;
-        Record->Kind = Ship->Field_0xdc;
-        Record->Field_0x04 = Ship->Npc.Affiliation == Offer->HostileGroup;
+        Record->Flags = static_cast<unsigned int>(Ship->TargetFlags);
+        Record->Attitude = Group->Attitude;
+        Record->Kind = Ship->ShipKind;
+        Record->bHostile = Ship->Npc.Affiliation == Offer->HostileGroup;
 
         // 06f91e16-06f91f15: StayInRange 2000 (DAT_06fbc2cc) of the group's position; the first
         // ship also GotoVec there (500, -1.0, no cruise flags, Op +8 = 1); each appended to the
@@ -1858,7 +1858,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
 
     // 06f91fcb-06f92038: the dock target -- the solar of the group's name, else its +0x78;
     // TU58 FUN_06f73810 in the group's system.
-    unsigned int DockTarget = static_cast<unsigned int>(Group->Field_0x78);
+    unsigned int DockTarget = static_cast<unsigned int>(Group->ArrivalObjId);
     if (Group->Name.Length != 0)
         DockTarget = Solars->Records.FindByName(Group->Name)->ObjectId;
     std::list<FContentNpcShip*> Created;
@@ -1977,7 +1977,7 @@ bool FRmRuntimeMachine::SpawnLoot(FRmLootSpawn* InLoot)
     Record.ObjectId = InLoot->SpaceObjId;
     Record.ParentId = Info->OwnerObjId;
     Record.Units = static_cast<int>(Info->Units);
-    Record.Field_0x6c = InLoot->Field_0x100;
+    Record.CriticalLootMode = InLoot->CriticalLootMode;
     Record.Kind = InLoot->Kind;
     Record.HolderId = 0;
     Record.CargoSlot = SUBOBJ_ID_NONE;
@@ -1985,7 +1985,7 @@ bool FRmRuntimeMachine::SpawnLoot(FRmLootSpawn* InLoot)
     if (InLoot->Kind == 2)
     {
         Record.Flags = 2;
-        if (InLoot->Field_0x100 != 1)
+        if (InLoot->CriticalLootMode != 1)
             pub::SpaceObj::SetInvincible2(Record.ObjectId, false, true, 1.0f);
         Loot->Records.Records.push_back(new FRmLootRecord(Record));
         FRmLootMessage Message(GRmMsgType06fd3b98, Record.ObjectId, 0);
@@ -2148,7 +2148,7 @@ void FRmVignetteMachine::Shutdown()
          It != ShipList.Records.end(); ++It)
     {
         FContentNpcShip* const Ship = (*It)->NpcShip;
-        Ship->Field_0x1bc = 24.0f;
+        Ship->Longevity = 24.0f;
         pub::AI::SubmitState(Ship->SpaceObjId, &ZoneParams);
         if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
         {
@@ -2279,7 +2279,7 @@ FRmRecordList FRmLootMachine::Query(int Field6c, int Kind, unsigned int Field60,
             continue;
         if (InHolderId != 0 && Record->HolderId != InHolderId)
             continue;
-        if (Field6c != 0 && Record->Field_0x6c != Field6c)
+        if (Field6c != 0 && Record->CriticalLootMode != Field6c)
             continue;
         if (Kind != 0 && Record->Kind != Kind)
             continue;

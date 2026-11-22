@@ -212,7 +212,7 @@ public:
     // argument and an int result). The one caller found, TrailBehavior slot 8
     // (.text:062caa4a-062caa56), pushes the behavior's DeltaTime (+0x1c).
     // MatchThrottle2Idea overrides it (LAB_062d5bf0). Retail has no name for it.
-    virtual void Slot2(float DeltaTime) { (void)DeltaTime; }
+    virtual void SyncCruise(float DeltaTime) { (void)DeltaTime; }
 
     // Slot 3 (offset 0x0c). "Kind" tag getter -- always overridden by a
     // trivial `MOV AX,<constant>; RET` in every confirmed sibling.
@@ -302,9 +302,8 @@ public:
     // unconditionally returns true, touches no fields.
     bool SetContext(void* InObject, void* InHandle, void* InContext) override;
 
-    // Own vtable slot 1 (LAB_0632b010). NOT traced this pass (address is far
-    // outside this cluster's own 0x062d6000-0x062da600 range -- a distinct
-    // investigation). FULLPORT-DEFERRED.
+    // Own vtable slot 1 (LAB_0632b010: `33 C0 C2 04 00`, `XOR EAX,EAX; RET 4`,
+    // ICF-folded). Unconditionally returns 0.
     int Update(float DeltaTime) override;
 
     // Own vtable slot 3. Always returns the constant 2.
@@ -891,7 +890,7 @@ public:
 
     // Slot 2, LAB_062d5bf0 (RET 4, argument unread): engage or drop cruise to
     // follow the watched ship.
-    void Slot2(float DeltaTime) override;
+    void SyncCruise(float DeltaTime) override;
 
     // Slot 3, LAB_062d6540 `MOV AX,0x6; RET` -- the same address as MoveIdea's.
     short GetKind() const override { return 6; }
@@ -1395,7 +1394,7 @@ public:
     // The stored value is an INTEGER literal (0 or 2) at both sites, which is
     // why Field158 is an int below rather than the float it used to be typed as
     // -- 0x00000002 read as a float is a denormal, not 2.0f.
-    void SetField158(int Value);
+    void SetStopStyle(int Value);
 
     // FUN_062da380 (item 1652), RET 4, Common.dll.txt 223563-223589. Receiver
     // proved this class at .text:062fe73a (GotoBehavior's this+0x164, the member
@@ -1432,7 +1431,7 @@ public:
     unsigned char WideMode;        // +0x150. Ctor-zeroed byte.
     unsigned char Pad151[0x154 - 0x151];
     float BankBlendCap;             // +0x154. Ctor default 1.0f.
-    int Field158;                    // +0x158. Ctor-zeroed. RETYPED float -> int
+    int StopStyle;                   // +0x158. Ctor-zeroed. RETYPED float -> int
                                       // 2026-09-17 (claude:w21-stubsweep): both
                                       // SetField158() call sites push an integer
                                       // literal (0 / 2), never a float bit
@@ -1469,7 +1468,7 @@ static_assert(offsetof(SplineMoveIdea, Face) == 0x8c, "SplineMoveIdea::Face offs
 static_assert(offsetof(SplineMoveIdea, Spline) == 0x14c, "SplineMoveIdea::Spline offset");
 static_assert(offsetof(SplineMoveIdea, WideMode) == 0x150, "SplineMoveIdea::WideMode offset");
 static_assert(offsetof(SplineMoveIdea, BankBlendCap) == 0x154, "SplineMoveIdea::BankBlendCap offset");
-static_assert(offsetof(SplineMoveIdea, Field158) == 0x158, "SplineMoveIdea::Field158 offset");
+static_assert(offsetof(SplineMoveIdea, StopStyle) == 0x158, "SplineMoveIdea::StopStyle offset");
 static_assert(offsetof(SplineMoveIdea, MaxSpeed15c) == 0x15c, "SplineMoveIdea::MaxSpeed15c offset");
 static_assert(offsetof(SplineMoveIdea, LookaheadScale) == 0x160, "SplineMoveIdea::LookaheadScale offset");
 static_assert(offsetof(SplineMoveIdea, SpeedNorm) == 0x164, "SplineMoveIdea::SpeedNorm offset");
@@ -1622,7 +1621,7 @@ public:
     // FUN_062d88c0 (.text:062d88c0-062d88dd, RET 4): copies the three dwords of *Value
     // into +0x58..+0x60, then `MOV byte [ECX+0x64],1`. Receivers: EvadeBehavior+0x30
     // (.text:062c85c9) and BuzzBehavior's DodgeIdea.
-    void SetField58(Vector const& Value);
+    void SetPreferredForward(Vector const& Value);
 
     // ---- Confirmed own-data fields, ascending offset order. Every constant is
     // ---- the raw IEEE-754 dword the ctor stores, decoded from .text bytes. ----
@@ -1652,16 +1651,16 @@ public:
     float DodgeDistance;               // +0x4c, formerly Field4c. Ctor default 150.0f; Evade's
                                        // SetContext seeds 50.0f. EvadeDodgeDistance
                                        // (.text:062a33d0); the limit in Update is Field50 * this.
-    float Field50;                                 // +0x50. Ctor-zeroed; Commit()
+    float DodgeDistanceScale;                      // +0x50. Ctor-zeroed; Commit()
                                                     // zeroes it again. RETYPED int ->
                                                     // float 2026-10-08: Update FSTPs a
                                                     // float into it (062d79fa) and FLDs
                                                     // it (062d829f).
-    float Field54;                                   // +0x54. Ctor default 0.2f
+    float DodgeDistanceVariance;                     // +0x54. Ctor default 0.2f
                                                       // (0x3e4ccccd).
-    Vector Field58;                                    // +0x58, untouched by the ctor. Written
-                                                        // only by SetField58 (FUN_062d88c0).
-    unsigned char Field64;                               // +0x64. Ctor-zeroed byte.
+    Vector PreferredForward;                           // +0x58, untouched by the ctor. Written
+                                                        // only by SetPreferredForward (FUN_062d88c0).
+    unsigned char bHasPreferredForward;                  // +0x64. Ctor-zeroed byte.
     unsigned char Pad65[0x68 - 0x65];                      // +0x65, alignment only.
     Matrix WorkingFrame;                                     // +0x68..+0x8b. Ctor-zeroed
                                                               // by `MOV ECX,9; REP STOSD`;
@@ -1703,17 +1702,17 @@ public:
     unsigned char FlagD9;                                                          // +0xd9. Ctor-zeroed.
     unsigned char FlagDa;                                                           // +0xda. Ctor-zeroed.
     unsigned char PadDb;                                                             // +0xdb, alignment.
-    float FieldDc;                                                                    // +0xdc. Ctor
+    float ChaseSpeedScale;                                                            // +0xdc. Ctor
                                                                                        // default 1.0f.
 };
 static_assert(offsetof(DodgeIdea, Picker) == 0x14, "DodgeIdea::Picker offset");
 static_assert(offsetof(DodgeIdea, IntervalTime) == 0x34, "DodgeIdea::IntervalTime offset");
 static_assert(offsetof(DodgeIdea, ConeAngle) == 0x3c, "DodgeIdea::ConeAngle offset");
 static_assert(offsetof(DodgeIdea, DodgeDistance) == 0x4c, "DodgeIdea::DodgeDistance offset");
-static_assert(offsetof(DodgeIdea, Field54) == 0x54, "DodgeIdea::Field54 offset");
-static_assert(offsetof(DodgeIdea, Field64) == 0x64, "DodgeIdea::Field64 offset");
+static_assert(offsetof(DodgeIdea, DodgeDistanceVariance) == 0x54, "DodgeIdea::DodgeDistanceVariance offset");
+static_assert(offsetof(DodgeIdea, bHasPreferredForward) == 0x64, "DodgeIdea::bHasPreferredForward offset");
 static_assert(offsetof(DodgeIdea, WorkingFrame) == 0x68, "DodgeIdea::WorkingFrame offset");
-static_assert(offsetof(DodgeIdea, Field50) == 0x50, "DodgeIdea::Field50 offset");
+static_assert(offsetof(DodgeIdea, DodgeDistanceScale) == 0x50, "DodgeIdea::DodgeDistanceScale offset");
 static_assert(offsetof(DodgeIdea, IntervalTimeLeft) == 0x8c, "DodgeIdea::IntervalTimeLeft offset");
 static_assert(offsetof(DodgeIdea, TurnThrottle) == 0x90, "DodgeIdea::TurnThrottle offset");
 static_assert(offsetof(DodgeIdea, Throttle) == 0x94, "DodgeIdea::Throttle offset");
@@ -1724,7 +1723,7 @@ static_assert(offsetof(DodgeIdea, FieldC4) == 0xc4, "DodgeIdea::FieldC4 offset")
 static_assert(offsetof(DodgeIdea, VectorCc) == 0xcc, "DodgeIdea::VectorCc offset");
 static_assert(offsetof(DodgeIdea, SlideThrottle) == 0xc8, "DodgeIdea::SlideThrottle offset");
 static_assert(offsetof(DodgeIdea, bRollFlipDirection) == 0xd8, "DodgeIdea::bRollFlipDirection offset");
-static_assert(offsetof(DodgeIdea, FieldDc) == 0xdc, "DodgeIdea::FieldDc offset");
+static_assert(offsetof(DodgeIdea, ChaseSpeedScale) == 0xdc, "DodgeIdea::ChaseSpeedScale offset");
 static_assert(sizeof(DodgeIdea) == 0xe0, "DodgeIdea size (BuzzBehavior's 0x178..0x258 ctor gap meets the ctor's own +0xdc write)");
 
 // ============================================================================
@@ -1835,7 +1834,7 @@ public:
     // 1 = Sideways, 2 = Reverse (the arm that runs the AttemptReverseTime / ReverseDistance
     // checks; EvadeBehavior case 3 writes 2). BuzzBehavior writes 1.
     int BreakStyle;
-    float Field38;                      // +0x38. Ctor default 350.0f (0x43af0000). The range
+    float BreakAwayRange;               // +0x38. Ctor default 350.0f (0x43af0000). The range
                                         // Update() hands IsWithinInterceptRangeOfIface
                                         // (062d90d4 / 062d91dc). Evade and Buzz never set it.
     unsigned char Flag3c;                // +0x3c. Ctor default 1.
@@ -1851,7 +1850,7 @@ public:
                                         // against AttemptReverseTime (062d8d8e).
     float AttemptReverseTime;           // +0x4c, formerly Field4c. Ctor default 4.0f.
                                         // EvadeBreakAttemptReverseTime (.text:062a33d0).
-    float Field50;                                  // +0x50. Ctor-zeroed. RETYPED
+    float ReverseHoldElapsed;                       // +0x50. Ctor-zeroed. RETYPED
                                                      // int -> float for the same reason
                                                      // (`FADD [EBP+0x50]; FST; FCOMP
                                                      // [EBP+0x58]` at 062d8def).
@@ -1859,8 +1858,8 @@ public:
                                         // clearance threshold EvaluateBreakAwayClearance()
                                         // compares against (062d92f9). EvadeBreakReverseDistance
                                         // (FUN_062d93b0).
-    float Field58;                                      // +0x58. Ctor default 6.0f -- the
-                                                         // cap on Field50.
+    float ReverseHoldTime;                              // +0x58. Ctor default 6.0f -- the
+                                                         // cap on ReverseHoldElapsed.
     unsigned char Flag5c;                                 // +0x5c. Ctor-zeroed byte.
     unsigned char Pad5d[0x60 - 0x5d];                       // +0x5d, alignment only.
     Matrix Frame60;                                           // +0x60, ends +0x84. NOT
@@ -1908,13 +1907,13 @@ public:
 };
 static_assert(offsetof(BreakAwayIdea, Picker) == 0x14, "BreakAwayIdea::Picker offset");
 static_assert(offsetof(BreakAwayIdea, BreakStyle) == 0x34, "BreakAwayIdea::BreakStyle offset");
-static_assert(offsetof(BreakAwayIdea, Field38) == 0x38, "BreakAwayIdea::Field38 offset");
+static_assert(offsetof(BreakAwayIdea, BreakAwayRange) == 0x38, "BreakAwayIdea::BreakAwayRange offset");
 static_assert(offsetof(BreakAwayIdea, Flag3c) == 0x3c, "BreakAwayIdea::Flag3c offset");
 static_assert(offsetof(BreakAwayIdea, Throttle) == 0x40, "BreakAwayIdea::Throttle offset");
 static_assert(offsetof(BreakAwayIdea, Flag44) == 0x44, "BreakAwayIdea::Flag44 offset");
 static_assert(offsetof(BreakAwayIdea, AttemptReverseTime) == 0x4c, "BreakAwayIdea::AttemptReverseTime offset");
 static_assert(offsetof(BreakAwayIdea, ReverseDistance) == 0x54, "BreakAwayIdea::ReverseDistance offset");
-static_assert(offsetof(BreakAwayIdea, Field58) == 0x58, "BreakAwayIdea::Field58 offset");
+static_assert(offsetof(BreakAwayIdea, ReverseHoldTime) == 0x58, "BreakAwayIdea::ReverseHoldTime offset");
 static_assert(offsetof(BreakAwayIdea, Flag5c) == 0x5c, "BreakAwayIdea::Flag5c offset");
 static_assert(offsetof(BreakAwayIdea, Frame60) == 0x60, "BreakAwayIdea::Frame60 offset");
 static_assert(offsetof(BreakAwayIdea, IntervalElapsed) == 0x84, "BreakAwayIdea::IntervalElapsed offset");

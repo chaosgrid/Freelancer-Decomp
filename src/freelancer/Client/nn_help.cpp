@@ -496,11 +496,11 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
                     {
                         // 0x004750fc..0x0047514a: a section only when the visit bit and the
                         // entry's value for it are both set.
-                        if ((VisitFlags & 4) != 0 && Entry->Field_0x08 != 0)
+                        if ((VisitFlags & 4) != 0 && Entry->bShowCommodities != 0)
                             bCommodities = 1;
-                        if ((VisitFlags & 8) != 0 && Entry->Field_0x04 != 0)
+                        if ((VisitFlags & 8) != 0 && Entry->bShowEquipment != 0)
                             bEquipment = 1;
-                        if ((VisitFlags & 0x10) != 0 && Entry->Field_0x0c != 0)
+                        if ((VisitFlags & 0x10) != 0 && Entry->bShowShips != 0)
                             bShips = 1;
                         NnHelpAppendBaseGoods(&Card, BaseId, bCommodities, bEquipment, bShips);
 
@@ -560,11 +560,11 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 
-bool NnHelp::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnHelp::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00475430 (RET 0xc).
     if (Msg != 0xef02)
-        return WinControl::Slot23(Msg, A, B); // FUN_005a0840
+        return WinControl::ProcessMessage(Msg, A, B); // FUN_005a0840
 
     // 0x0047543e..0x00475477: out of the parent (no parent test), then every child deleted (the
     // next sibling read first), slot 10 and slot 0 with 1.

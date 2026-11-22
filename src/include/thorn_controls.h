@@ -94,10 +94,10 @@ struct ICameraControl : IDAComponent
 // Until 2026-10-16 this declared slots 7..15 as well; they never existed.
 struct IScriptControl : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3Start(int Arg) = 0;      // 3  LAB_06f3c080 -> engine slot 22
-    virtual GENRESULT DACOM_API Slot4Tick(int DtMs) = 0;      // 4  LAB_06f3c0a0 -> engine slot 26
-    virtual GENRESULT DACOM_API Slot5Stop() = 0;              // 5  LAB_06f3c0c0 -> engine slot 23
-    virtual int DACOM_API Slot6GetDuration() = 0;             // 6  LAB_06f3c0e0 -> engine slot 17
+    virtual GENRESULT DACOM_API Start(int Arg) = 0;      // 3  LAB_06f3c080 -> engine slot 22
+    virtual GENRESULT DACOM_API Tick(int DtMs) = 0;      // 4  LAB_06f3c0a0 -> engine slot 26
+    virtual GENRESULT DACOM_API Stop() = 0;              // 5  LAB_06f3c0c0 -> engine slot 23
+    virtual int DACOM_API GetDuration() = 0;             // 6  LAB_06f3c0e0 -> engine slot 17
 };
 
 // "1.11_ICompoundControl" -- compound and deformable entities: motions, hardpoints, floor
@@ -164,8 +164,8 @@ struct ILightControl : IDAComponent
     virtual GENRESULT DACOM_API SetRange(float Range) = 0;     // 5
     virtual GENRESULT DACOM_API SetCutoff(float Radians) = 0;  // 6
     virtual GENRESULT DACOM_API SetOn(int On) = 0;             // 7
-    // 8: placeholder took nothing; ThornScene sends `(Type == 3) ? 1 : 0`, i.e. a spot flag.
-    virtual GENRESULT DACOM_API SetIsSpot(int IsSpot) = 0;
+    // 8: placeholder took nothing; ThornScene sends `(Type == 3) ? 1 : 0` (D3DLIGHT_DIRECTIONAL == 3).
+    virtual GENRESULT DACOM_API SetInfinite(int IsInfinite) = 0;
     virtual GENRESULT DACOM_API GetColor(float* OutRgb) = 0;      // 9
     virtual GENRESULT DACOM_API GetDirection(float* OutDir3) = 0; // 10
     virtual GENRESULT DACOM_API GetRange(float* OutRange) = 0;    // 11
@@ -173,8 +173,8 @@ struct ILightControl : IDAComponent
     // 13 and 14: placeholders took nothing; ThornScene reads both with a float*. Which
     // property each returns is not recovered -- the port's callers only copy them into a
     // light blob -- so they keep numeric names.
-    virtual GENRESULT DACOM_API GetSlot13(float* Out) = 0;
-    virtual GENRESULT DACOM_API GetSlot14(float* Out) = 0;
+    virtual GENRESULT DACOM_API GetOn(float* Out) = 0;
+    virtual GENRESULT DACOM_API GetInfinite(float* Out) = 0;
     virtual GENRESULT DACOM_API Slot15() = 0;                  // 15 TODO
     virtual GENRESULT DACOM_API Slot16(void* Arg) = 0;         // 16..19 TODO
     virtual GENRESULT DACOM_API Slot17(void* Arg) = 0;
@@ -309,9 +309,9 @@ struct ISubtitleControl : IDAComponent
 // facet; foreign providers remain unresolved.
 struct IUserEventControl : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(void* Desc) = 0;         // 3
+    virtual GENRESULT DACOM_API StartUserEvent(void* Desc) = 0; // 3
     // 4: placeholder took nothing, ThornScene passes a descriptor.
-    virtual GENRESULT DACOM_API Slot4(void* Desc) = 0;
+    virtual GENRESULT DACOM_API StopUserEvent(void* Desc) = 0;
     virtual GENRESULT DACOM_API Slot5() = 0;                   // 5, 6 TODO
     virtual GENRESULT DACOM_API Slot6() = 0;
     virtual GENRESULT DACOM_API Slot7(void* Arg) = 0;          // 7..15 TODO

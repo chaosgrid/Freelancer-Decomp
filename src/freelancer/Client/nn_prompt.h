@@ -19,7 +19,7 @@
 //
 // vftable 0x005d07bc -- WinControl's with these overrides:
 //   0 FUN_00472a00 (scalar deleting dtor around FUN_00472a20), 9 FUN_00472ab0 Create,
-//   13 FUN_00488960 Draw, 23 LAB_00473240 Slot23, 42 LAB_00473420 SetProperty.
+//   13 FUN_00488960 Draw, 23 LAB_00473240 ProcessMessage, 42 LAB_00473420 SetProperty.
 // Event::Handler face +0x32c vftable 0x005d07a4 (LAB_00473070).
 //
 // Layout:
@@ -64,7 +64,7 @@ public:
     // slot 13 FUN_00488960
     void Draw() override;
     // slot 23 LAB_00473240
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_00473420
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
@@ -126,7 +126,7 @@ bool NnPromptRunYesNo(unsigned Ids, unsigned short StyleId, bool bUpdateServer,
 // FUN_00474260 (cdecl) -- mode 2, the same loop with RDL text and captions. False on WM_QUIT
 // or when the dialog was closed without a choice (result 0: the X box or events 0xf / 0x12);
 // Yes (result 2) -> *OutChoice = 0, No (result 3) -> *OutChoice = 1; true. Any other result
-// (1, from Slot23 0xf004) returns true and leaves *OutChoice alone.
+// (1, from ProcessMessage 0xf004) returns true and leaves *OutChoice alone.
 bool NnPromptRunChoice(RenderDisplayList const* Text, unsigned short StyleId,
                        RenderDisplayList const* YesCaption, RenderDisplayList const* NoCaption,
                        int* OutChoice, bool bUpdateServer);

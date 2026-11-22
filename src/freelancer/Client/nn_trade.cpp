@@ -702,14 +702,14 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     {
         bHudStatusWasExpanded = Status->bExpanded;
         if (bHudStatusWasExpanded != 0)
-            Status->Slot12(); // HUDItem vt+0x30
+            Status->ToggleExpanded(); // HUDItem vt+0x30
     }
     HudTargetBase* const Target = G_HudTargetPanel; // DAT_00674b04
     if (Target != nullptr)
     {
         bHudTargetWasExpanded = Target->bExpanded;
         if (bHudTargetWasExpanded != 0)
-            Target->Slot12();
+            Target->ToggleExpanded();
     }
 
     ChatPlaceMsgWinForTrade(1); // FUN_0046b450(1), 0x004c19e4
@@ -1272,7 +1272,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // cleared and the row is lifted: layer 2 when selected (bit 6), else 1 while hovered.
         // Only ButtonControls send these (0x0055b8cb, 0x0055bbf9); the rows' buttons carry the
         // row in +0x2f0.
-        CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->Field2f0);
+        CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->OwnerData);
         if (Line == nullptr)
             return 0;
         if (Control == Line->InfoCard)
@@ -1318,7 +1318,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 SetQuantity(static_cast<int>(B));
             return 0;
         }
-        CTradeEquipList* const List = reinterpret_cast<CTradeEquipList*>(Control->Field2f0);
+        CTradeEquipList* const List = reinterpret_cast<CTradeEquipList*>(Control->OwnerData);
         if (List != nullptr && List->TopIndex != static_cast<int>(B))
         {
             List->TopIndex = static_cast<int>(B);
@@ -1335,13 +1335,13 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         {
             HUD_Status* const Status = GetHudStatus();
             if (Status != nullptr && Status->bExpanded == 0)
-                Status->Slot12();
+                Status->ToggleExpanded();
         }
         if (bHudTargetWasExpanded != 0)
         {
             HudTargetBase* const Target = G_HudTargetPanel;
             if (Target != nullptr && Target->bExpanded == 0)
-                Target->Slot12();
+                Target->ToggleExpanded();
         }
         ChatPlaceMsgWinForTrade(0); // FUN_0046b450(0), 0x004c3707
         Win3DReparent(this, nullptr); // FUN_0059dd00
@@ -1542,7 +1542,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     // 0x004c3500..0x004c35b0: a row's button.
-    CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->Field2f0);
+    CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->OwnerData);
     if (Line == nullptr || Line->bInUse == 0)
         return 0;
     CTradeEquipList* const List = Line->Owner;

@@ -120,7 +120,7 @@ FSystemZone& FSystemZone::operator=(FSystemZone const& Other)
 }
 
 // FUN_06fa77c0 (06fa77c0-06fa797a, RET 8).
-void FSystemZoneEnumerator::Slot00(unsigned int const* ZoneId, INI_Reader* Reader)
+void FSystemZoneEnumerator::OnZone(unsigned int const* ZoneId, INI_Reader* Reader)
 {
     FSystemZone Zone;
     Zone.ZoneId = *ZoneId;

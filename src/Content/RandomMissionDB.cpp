@@ -388,7 +388,7 @@ FRandomMissionLoader::~FRandomMissionLoader()
 }
 
 // FUN_06ebf6f0: RET 4, no body (ICF-shared empty slot).
-void FRandomMissionLoader::Slot05(FRandomMissionData* /*Mission*/)
+void FRandomMissionLoader::ReleaseMission(FRandomMissionData* /*Mission*/)
 {
 }
 
@@ -1040,7 +1040,7 @@ FRandomMissionObject::FRandomMissionObject(unsigned int const* InControllerId,
     , StateMachineGroup(GMessageRouter)
     , Data(InData)
 {
-    Field_0x68 = Data->Description;
+    MissionOffer = Data->Description;
     HeartbeatInterval = 1.0f;
     pub::Controller::SetHeartbeatInterval(ControllerId, 1.0f);
     FRandomMissionObject::SetPlayer(Data->PlayerId);
@@ -1048,8 +1048,8 @@ FRandomMissionObject::FRandomMissionObject(unsigned int const* InControllerId,
     for (int Index = 0; Index < static_cast<int>(PlayerStates.size()); ++Index)
     {
         FMissionPlayer* Record = FMissionObject::GetOrCreatePlayer(PlayerStates[Index]->PlayerId);
-        if (Record->GetField25())
-            Record->SetField25(false);
+        if (Record->GetForceResendObjectives())
+            Record->SetForceResendObjectives(false);
         Record->SendPlaceholderObjective();
     }
     {
@@ -1059,7 +1059,7 @@ FRandomMissionObject::FRandomMissionObject(unsigned int const* InControllerId,
         pub::Player::DisplayMissionMessage(Data->PlayerId, Empty,
                                            static_cast<MissionMessageType>(0xa), true);
     }
-    pub::Player::DisplayMissionMessage(Data->PlayerId, Field_0x68, static_cast<MissionMessageType>(8),
+    pub::Player::DisplayMissionMessage(Data->PlayerId, MissionOffer, static_cast<MissionMessageType>(8),
                                        true);
 }
 
@@ -1076,8 +1076,8 @@ FRandomMissionObject::~FRandomMissionObject()
 FMissionPlayer* FRandomMissionObject::GetOrCreatePlayer(unsigned int InPlayerId)
 {
     FMissionPlayer* Record = FMissionObject::GetOrCreatePlayer(InPlayerId);
-    if (Record->GetField25())
-        Record->SetField25(false);
+    if (Record->GetForceResendObjectives())
+        Record->SetForceResendObjectives(false);
     return Record;
 }
 
@@ -1127,12 +1127,12 @@ void FRandomMissionObject::AddPlayerName(std::wstring const& Name)
 }
 
 // LAB_06f4b680 (06f4b680-06f4b6b6, RET 8): a stack SMControllerEvent {4, MessageId, Parms}
-// goes to the group's slot 1 (StateMachineGroup::process). The TU38 body is reached from Slot2.
+// goes to the group's slot 1 (StateMachineGroup::process). The TU38 body is reached from OnStateEvent.
 void FRandomMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                                                 void const* MessageParms)
 {
     // SMControllerEvent (common_net.h, Common.dll's export) keeps the message id as a plain int
-    // in its +0x08 field (named ControllerId there); the readers in Slot2 cast it back.
+    // in its +0x08 field (named ControllerId there); the readers in OnStateEvent cast it back.
     SMControllerEvent Event(static_cast<int>(MessageId), MessageParms);
     process(&Event);
 }
@@ -1146,7 +1146,7 @@ void FRandomMissionObject::OnMissionSucceed()
     for (int Index = 0; Index < static_cast<int>(PlayerStates.size()); ++Index)
     {
         FContentPlayerState* State = PlayerStates[Index];
-        State->CountRandomMissionCompleted(Field_0x80);
+        State->CountRandomMissionCompleted(MissionType);
         if (State->ShipObject != nullptr)
             pub::Audio::SetMusic(State->PlayerId, Music);
     }
@@ -1239,9 +1239,9 @@ void FRandomMissionObject::FailMission(int Reason)
         FContentPlayerState* State = PlayerStates[Index];
         State->SetFlags(0);
         if (Reason == 1)
-            State->CountRandomMissionAborted(Field_0x80);
+            State->CountRandomMissionAborted(MissionType);
         else
-            State->CountRandomMissionFailed(Field_0x80);
+            State->CountRandomMissionFailed(MissionType);
         if (State->ShipObject != nullptr)
             pub::Audio::SetMusic(State->PlayerId, Music);
     }
@@ -1282,13 +1282,13 @@ void FRandomMissionObject::RemoveMissionPlayer(unsigned int InPlayerId, int Reas
         State->SetFlags(0);
     if (Reason == 1)
     {
-        State->CountRandomMissionAborted(Field_0x80);
+        State->CountRandomMissionAborted(MissionType);
         State->EndLiveMission(ControllerId, 4, false);
         return;
     }
     if (Reason == 0xe)
         return;
-    State->CountRandomMissionFailed(Field_0x80);
+    State->CountRandomMissionFailed(MissionType);
     State->EndLiveMission(ControllerId, 3, false);
 }
 
@@ -1370,7 +1370,7 @@ bool FRandomMissionObject::UpdateDockedObjective(FMissionPlayer* Player, bool* b
 // object, types 0x5a / 9 / 0x1a, at the front), its result in *bChanged.
 bool FRandomMissionObject::UpdatePathObjectives(FMissionPlayer* Player, bool* bChanged)
 {
-    unsigned int const TargetSystem = static_cast<unsigned int>(Slot08());
+    unsigned int const TargetSystem = static_cast<unsigned int>(GetTargetSystemId());
     if (TargetSystem == 0)
     {
         *bChanged = false;
@@ -1391,11 +1391,11 @@ bool FRandomMissionObject::UpdatePathObjectives(FMissionPlayer* Player, bool* bC
         return false;
     }
     FContentPlayerShip* Ship = State->ShipObject;
-    if (Ship != nullptr && Ship->HasField120())
+    if (Ship != nullptr && Ship->IsInTradeLane())
     {
-        if (Player->Field_0x24 != 0)
+        if (Player->bTradelanePathChecked != 0)
             return *bChanged;
-        Player->Field_0x24 = 1;
+        Player->bTradelanePathChecked = 1;
         if (List->Objectives.empty())
             return *bChanged;
         FMissionObjective* Front = List->GetFront();
@@ -1420,9 +1420,9 @@ bool FRandomMissionObject::UpdatePathObjectives(FMissionPlayer* Player, bool* bC
         *bChanged = true;
         return true;
     }
-    Player->Field_0x24 = 0;
+    Player->bTradelanePathChecked = 0;
     unsigned int const JumpObject =
-        GetNextHopConnectionObject(System->SystemId, TargetSystem, Slot09());
+        GetNextHopConnectionObject(System->SystemId, TargetSystem, GetJumpPreference());
     // Retail's stack slot keeps whatever it held when FUN_06f2a190 finds no connection.
     Vector JumpPosition = {0.0f, 0.0f, 0.0f};
     GetConnectionPosition(System->SystemId, JumpObject, &JumpPosition);
@@ -1602,7 +1602,7 @@ void FRandomMissionObject::AddGroupMember(unsigned int InPlayerId)
         pub::Player::DisplayMissionMessage(Target, Empty, static_cast<MissionMessageType>(0xa),
                                            false);
     }
-    pub::Player::DisplayMissionMessage(Target, Field_0x68, static_cast<MissionMessageType>(8), false);
+    pub::Player::DisplayMissionMessage(Target, MissionOffer, static_cast<MissionMessageType>(8), false);
 }
 
 // FUN_06f4bf30 (06f4bf30-06f4c3aa, RET 8). Only with players (+0x200 non-empty) and for the
@@ -1616,7 +1616,7 @@ void FRandomMissionObject::AddGroupMember(unsigned int InPlayerId)
 // 3 multiplayer). 0x1009: swallowed. 5: a mapped player rejoins (FUN_06f4bd30). 0xa:
 // FUN_06f4caa0. 8 / 9: a mapped player leaves (slot 36 with 0xe / 1), then the TU38 body.
 // Anything else: the TU38 body FUN_06f0f150.
-bool FRandomMissionObject::Slot2(SMEventData const* Event, int const& State)
+bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (PlayerStates.empty())
         return false;
@@ -1952,11 +1952,11 @@ bool FRandEncParams::SpawnFormation(FTransform const* Placement, int Count,
         Params.Position.x = Placement->Translation.X;
         Params.Position.y = Placement->Translation.Y;
         Params.Position.z = Placement->Translation.Z;
-        Params.Field_0x104 = bNoDockTarget ? 24.0f : -1.0f;
+        Params.Longevity = bNoDockTarget ? 24.0f : -1.0f;
         Params.Priority = Priority;
         for (std::list<unsigned int>::iterator Label = Labels.begin(); Label != Labels.end();
              ++Label)
-            Params.Field_0x118.push_back(*Label);
+            Params.LabelIds.push_back(*Label);
 
         // 06efbd57-06efbe8d. Retail reads the classes of the list's head when nothing is
         // picked (undefined); the port leaves them empty.

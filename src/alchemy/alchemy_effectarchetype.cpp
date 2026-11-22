@@ -143,7 +143,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::Slot8(unsigned long Id, unsigned long Value)
+    GENRESULT DACOM_API FFxEffectArchetype::SetRec16Parent(unsigned long Id, unsigned long Value)
     {
         for (unsigned long Index = 0; Index < Rec16Count_; ++Index)
         {

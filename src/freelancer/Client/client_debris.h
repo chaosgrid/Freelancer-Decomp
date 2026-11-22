@@ -81,10 +81,10 @@ public:
     void update(float Dt) override;
     // 95 +0x17c FUN_005300f0 (RET 0xc): GameObject's LOD pick; a picked LOD whose low word is
     // below 3, or whose high word is 2 or more, clears Field_0xbc.
-    unsigned* Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
+    unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
     // 108 +0x1b0 LAB_005305a0 (RET 4): with an explosion, FUN_005361e0(Explosion, this, Pos or
     // get_position()) into the action list; without one, GameObject's slot 108.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
 
     // FUN_005301d0 (RET 4): bind the piece to its [Debris] record -- GameObject's slot 92, the
     // record's lifetime / death method / explosion, the trail effect, the drag, the nebula.

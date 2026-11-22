@@ -69,9 +69,9 @@ namespace
 #include <cstdlib>
 #include <new>
 
-// Behavior::Slot5 used to be declared `int Slot5(void* Arg)`, so this file carried a
+// Behavior::OnEvaluateReadiness used to be declared `int OnEvaluateReadiness(void* Arg)`, so this file carried a
 // bit-copy helper to push a float through a pointer parameter. The declaration is fixed
-// (common_behavior.h, 2026-09-17) and the helper is gone -- Slot5 is called directly.
+// (common_behavior.h, 2026-09-17) and the helper is gone -- OnEvaluateReadiness is called directly.
 // The decisive evidence, for anyone re-reading this: both call sites push a plain dword,
 // which proves nothing on its own, but the manager does `FADD float ptr [ESI+0xdc]` /
 // `FSTP float ptr [ESI+0xdc]` at .text:062d2df2-062d2dfc, fifty instructions earlier in
@@ -127,7 +127,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     InitNotificationQueue();
 
     // .text:062d22a7-062d22cb
-    Opaque168[0] = 1;
+    bAllowUserSteering = 1;
     DockingPortFlag = 0;
     DockingPortStatus = 0;
     TickSuppressedFlag = 0;
@@ -148,8 +148,8 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     for (int Index = 0; Index < 5; ++Index)
         DirectiveCallbacks[Index] = nullptr;
     ContentCbPtr = nullptr;
-    Field118 = 0;
-    Field11c = -1;
+    PendingDirectiveResult = 0;
+    PendingCompletedBehavior = -1;
 
     // .text:062d2327-062d2369: operator_new(0x580) + FUN_062db3b0(this) -> +0x0C.
     // PathfindManager's ctor queries the watched object without a null test, exactly as here.
@@ -184,9 +184,9 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
 
     // .text:062d2442-062d2490: IObjInspect::is_player (slot 47, +0xBC) on the owner.
     if (Owner != nullptr && static_cast<IObjInspect*>(Owner)->is_player())
-        Field120 = 0x13;
+        DefaultBehaviorIndex = 0x13;
     else
-        Field120 = 6;
+        DefaultBehaviorIndex = 6;
 
     // .text:062d2494-062d2506
     LevelCameraFlag = 1;
@@ -258,7 +258,7 @@ void ConnectBehaviorManagerObjectDb(IBehaviorManager* Self, IObjDB* ObjectDb)
     {
         if (Self->BehaviorDispatchTable[Index] == nullptr)
             break;
-        Self->BehaviorDispatchTable[Index]->Slot2(Self->ObjectDb);
+        Self->BehaviorDispatchTable[Index]->SetObjectDb(Self->ObjectDb);
     }
 
     SetSystemManagerSharedListHead(Self->Sys, ObjectDb);      // .text:062d286c-062d2870
@@ -409,11 +409,11 @@ bool IBehaviorManager::get_docking_port(IObjRW const*& OutPort, int& OutIndex)
         return false;
 
     // 062d4b56-062d4b6b: Watcher324's watched pointer (+0x324); non-null -> minus 8 (the
-    // Watchable base inside IObjRW), else 0, into OutPort. 062d4b6d-062d4b77: Field43c
+    // Watchable base inside IObjRW), else 0, into OutPort. 062d4b6d-062d4b77: DockPortIndex
     // (+0x43c) into OutIndex. true.
     Watchable const* const Watched = Dock->Watcher324.target();
     OutPort = Watched != nullptr ? static_cast<IObjRW const*>(Watched) : nullptr;
-    OutIndex = Dock->Field43c;
+    OutIndex = Dock->DockPortIndex;
     return true;
 }
 
@@ -564,12 +564,12 @@ bool IBehaviorManager::set_current_directive(IDirectiveInfo const& Dir,
     if (Incoming[0] == 0)
     {
         // 062d3d9c-062d3de0: no directive. Zero +0xCC, cancel the current behavior (slot
-        // 23, +0x5C -- no null test on the table entry), fall back to Field120 without a
+        // 23, +0x5C -- no null test on the table entry), fall back to DefaultBehaviorIndex without a
         // directive argument, then drop the follow leader.
         Stored[2] = 0;
         if (CurrentBehaviorIndex != -1)
             BehaviorDispatchTable[CurrentBehaviorIndex]->cancel_notify();
-        SetCurrentBehavior(static_cast<int>(Field120), false, nullptr);
+        SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr);
         Sys->GunConvergenceStateBytes.SetFollowLeader(nullptr);
         return true;
     }
@@ -591,8 +591,8 @@ bool IBehaviorManager::set_current_directive(IDirectiveInfo const& Dir,
     if (Stored[0] == 1)
         return SetCurrentBehavior(Stored[2], true, const_cast<pub::AI::BaseOp*>(Op));
 
-    // 062d3e47-062d3e60: anything else falls back to Field120; returns local_1 = 1.
-    SetCurrentBehavior(static_cast<int>(Field120), false, nullptr);
+    // 062d3e47-062d3e60: anything else falls back to DefaultBehaviorIndex; returns local_1 = 1.
+    SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr);
     return true;
 }
 
@@ -1307,11 +1307,11 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         // CORRECTED 2026-09-17: +0x19C is not a separate "Field19c" callback
         // object, it is BehaviorDispatchTable[10] with the index constant-folded
         // against the `== 0xa` guard on the line above (0x174 + 10*4 == 0x19C),
-        // and slot +0x1c is Behavior::Slot7 -- so this is an ordinary typed
+        // and slot +0x1c is Behavior::OnUpdate -- so this is an ordinary typed
         // virtual call, not a raw dispatch into an unidentified class.
         if (Mgr->CurrentBehaviorIndex == 0xa && Mgr->BehaviorDispatchTable[0xa] != nullptr)
         {
-            Mgr->BehaviorDispatchTable[0xa]->Slot7();
+            Mgr->BehaviorDispatchTable[0xa]->OnUpdate();
         }
         [[fallthrough]];
     case 1:
@@ -1524,8 +1524,8 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     //
     // The prior comment here called Behavior vtable slots 0x14/0x24/0x2c/0x68
     // "genuinely unidentified". They are not: class Behavior in
-    // common_behavior.h declares all four (Slot5 +0x14, Slot9 +0x24,
-    // Slot11 +0x2c, Slot26 +0x68), with bodies recovered from retail. Every
+    // common_behavior.h declares all four (OnEvaluateReadiness +0x14, GetStatus +0x24,
+    // allow_user_steering +0x2c, GetDockTarget +0x68), with bodies recovered from retail. Every
     // dispatch below is therefore a typed virtual call. The four helper
     // functions the same comment listed as "not-yet-checked" are all ported
     // too: FUN_062d3420 is SetCurrentBehavior (below, item 1555),
@@ -1539,9 +1539,9 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     // overwrites it with fmodf(Sum, 3.0f) once Sum reaches or exceeds 3.0f
     // (DAT_063a0340 == 0x40400000 == 3.0f) -- reproduced in that same order.
     // The new BehaviorTimerC value is additionally kept in a local: retail
-    // spills it to [ESP+0x14] here and feeds it to Behavior::Slot5 further
-    // down (212137), which is the evidence that Slot5's one argument is a
-    // float -- Behavior::Slot5 takes it directly (see common_behavior.h).
+    // spills it to [ESP+0x14] here and feeds it to Behavior::OnEvaluateReadiness further
+    // down (212137), which is the evidence that OnEvaluateReadiness's one argument is a
+    // float -- Behavior::OnEvaluateReadiness takes it directly (see common_behavior.h).
     //
     // bTimerAWrapped (retail's CL) and bReevaluate (retail's byte at
     // [ESP+0x13]) both start clear here and both get set by the wrap.
@@ -1600,10 +1600,10 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     // Common.dll.txt 212119-212167: only when the 3-second timer just wrapped
     // (or CurrentBehaviorIndex==6 forced it), poll the active behavior. A
     // result of 4 means "this behavior is done" and triggers an immediate
-    // transition back to Field120 plus a DirectiveCallbacks[] fan-out.
+    // transition back to DefaultBehaviorIndex plus a DirectiveCallbacks[] fan-out.
     if (bTimerAWrapped)
     {
-        int const Polled = CurrentBehavior->Slot5(NewTimerC);
+        int const Polled = CurrentBehavior->OnEvaluateReadiness(NewTimerC);
 
         // 212141-212147: a directive that is armed but whose behavior did not
         // itself ask for re-evaluation suppresses the wrap-driven one.
@@ -1613,19 +1613,19 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
         if (Polled == 4)
         {
             // 212148-212158. CurrentBehaviorIndex is re-read here because
-            // Slot5 may have changed it; that is also why retail bothers to
+            // OnEvaluateReadiness may have changed it; that is also why retail bothers to
             // test it against -1 again on a path the entry guard above
             // already excluded.
             int const FinishedIndex = CurrentBehaviorIndex;
-            Field118 = 2;
-            Field11c = FinishedIndex;
+            PendingDirectiveResult = 2;
+            PendingCompletedBehavior = FinishedIndex;
             if (FinishedIndex != -1)
             {
                 DirDwords[0] = 0;
-                SetCurrentBehavior(static_cast<int>(Field120), true, nullptr);
+                SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);
                 NotifyDirectiveCallbacks();
             }
-            Field11c = -1;                                          // LAB_062d33e2
+            PendingCompletedBehavior = -1;                                          // LAB_062d33e2
             return;
         }
     }
@@ -1634,7 +1634,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     // status word decides whether a re-evaluation is wanted. 2 and 3 force one
     // on, 0 forces one off, everything else leaves the wrap's verdict alone.
     // Retail keeps this in EBX for the next ~90 instructions.
-    int const BehaviorStatus = CurrentBehavior->Slot9();
+    int const BehaviorStatus = CurrentBehavior->GetStatus();
     if (BehaviorStatus == 2 || BehaviorStatus == 3)
         bReevaluate = true;
     if (BehaviorStatus == 0)
@@ -1663,12 +1663,12 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     if (WatchedObj->is_player())
     {
         // 212236-212243: a behavior that reported status 2 or 3 is abandoned
-        // for Field120 right away on the player's own ship.
+        // for DefaultBehaviorIndex right away on the player's own ship.
         if (BehaviorStatus == 2 || BehaviorStatus == 3)
-            SetCurrentBehavior(static_cast<int>(Field120), true, nullptr);
+            SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);
 
         // 212244-212248: optimistic defaults, overwritten below.
-        Opaque168[0] = 1;
+        bAllowUserSteering = 1;
         DockingPortFlag = 0;
         DockingPortStatus = 0;
         bReevaluate = false;
@@ -1682,7 +1682,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
             Behavior* const Active = BehaviorDispatchTable[CurrentBehaviorIndex];
             {
                 // 212260-212276.
-                Opaque168[0] = Active->Slot11() ? 1 : 0;
+                bAllowUserSteering = Active->allow_user_steering() ? 1 : 0;
                 if (BehaviorStatus == 0 || LockManeuversByte != 0)
                     DockingPortFlag = 1;
 
@@ -1694,7 +1694,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                 {
                     // 212285-212291: the dock behavior hands its target over
                     // directly.
-                    Target = static_cast<IObjRW*>(Active->Slot26());
+                    Target = static_cast<IObjRW*>(Active->GetDockTarget());
                 }
                 else if (CurrentBehaviorIndex == 0xa)
                 {
@@ -1725,7 +1725,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                                 if (PartnerMgr != nullptr && PartnerMgr->CurrentBehaviorIndex == 7)
                                 {
                                     Target = static_cast<IObjRW*>(
-                                        PartnerMgr->BehaviorDispatchTable[7]->Slot26());
+                                        PartnerMgr->BehaviorDispatchTable[7]->GetDockTarget());
                                 }
                             }
                         }
@@ -1799,7 +1799,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
             // Retail re-reads BOTH StateGraph (`MOV EAX,[ESI+4]`) and
             // CurrentBehaviorIndex (`MOV EDX,[ESI+0xc0]`) on every iteration,
             // at the top of the loop body -- reproduced here rather than
-            // hoisted, because Behavior::Slot5 below can change either.
+            // hoisted, because Behavior::OnEvaluateReadiness below can change either.
             float const* const TransitionWeights =
                 reinterpret_cast<float const*>(reinterpret_cast<char const*>(StateGraph) + 0x48);
             float Weight = TransitionWeights[CurrentBehaviorIndex * 21 + Index];
@@ -1823,7 +1823,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
             // weight. 0 means "definitely me" (1.0f, DAT_0639a1d0); 2..4 mean
             // "definitely not me" (0.0f, DAT_06399408, which the `> 0` test
             // immediately below then rejects); anything else keeps the weight.
-            int const Verdict = Candidate->Slot5(BehaviorTimerC);
+            int const Verdict = Candidate->OnEvaluateReadiness(BehaviorTimerC);
             float Value;
             if (Verdict == 0)
                 Value = 1.0f;
@@ -1847,15 +1847,15 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
         if (ScoreCount == 0)
         {
             // 212589-212606: nothing is eligible. Retire any armed directive
-            // and fall back to Field120 unless it is already current.
+            // and fall back to DefaultBehaviorIndex unless it is already current.
             if (DirDwords[0] == 1)
             {
-                Field118 = 2;
-                Field11c = DirDwords[2];
+                PendingDirectiveResult = 2;
+                PendingCompletedBehavior = DirDwords[2];
                 DirDwords[0] = 0;
             }
-            if (CurrentBehaviorIndex != static_cast<int>(Field120))
-                SetCurrentBehavior(static_cast<int>(Field120), false, nullptr);
+            if (CurrentBehaviorIndex != static_cast<int>(DefaultBehaviorIndex))
+                SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr);
         }
         else
         {
@@ -1943,26 +1943,26 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
             // and .text:062d335d `FLD [ESI+0xd4]; FSTP float [EDI+0x1c];
             // CALL [EAX+0x1c]` through a bare Behavior*.
             TickBehavior->SetTickDelta(BehaviorTimerB);
-            TickBehavior->Slot7();
+            TickBehavior->OnUpdate();
             BehaviorTimerB = 0.0f;
             BehaviorDirty = 0;
         }
 
         // 212728-212731: an unconditional end-of-tick poke at the active
         // behavior (retail's base body for this slot is a bare RET).
-        TickBehavior->Slot8();
+        TickBehavior->PostUpdate();
     }
 
     // Common.dll.txt 212732-212745: a pending directive result whose behavior
     // is either the one still running or index 8 completes now -- transition
-    // back to Field120 and notify. Anything else just clears the pending slot.
-    if (Field11c != -1 && (Field11c == CurrentBehaviorIndex || Field11c == 8))
+    // back to DefaultBehaviorIndex and notify. Anything else just clears the pending slot.
+    if (PendingCompletedBehavior != -1 && (PendingCompletedBehavior == CurrentBehaviorIndex || PendingCompletedBehavior == 8))
     {
         DirDwords[0] = 0;
-        SetCurrentBehavior(static_cast<int>(Field120), true, nullptr);
+        SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);
         NotifyDirectiveCallbacks();
     }
-    Field11c = -1;
+    PendingCompletedBehavior = -1;
 
     // LAB_062d33ec: KeepCacheScope's destructor releases the AI target list's keep-cache
     // flag on the way out.
@@ -1974,8 +1974,8 @@ void IBehaviorManager::NotifyDirectiveCallbacks()
     // transition-completed sites (Common.dll.txt 212168-212180 and
     // 212570-212586 -- two byte-identical unrolled-by-5 loops, factored into
     // one helper here). Retail's dispatch is `PUSH [this+0x118]; PUSH
-    // [this+0x11C]; CALL [*Cb]`, i.e. vtable slot 0 with Field11c as the first
-    // argument and Field118 as the second.
+    // [this+0x11C]; CALL [*Cb]`, i.e. vtable slot 0 with PendingCompletedBehavior as the first
+    // argument and PendingDirectiveResult as the second.
     //
     // RESOLVED 2026-09-17: common_pub.h has been corrected, so the two arguments
     // this call site used to drop are passed for real. DirectiveCallback now has
@@ -1985,12 +1985,12 @@ void IBehaviorManager::NotifyDirectiveCallbacks()
     // `MOV EDX,[ECX]` / `PUSH EAX` / `MOV EAX,[ESI+0x11c]` / `PUSH EAX` /
     // `CALL dword ptr [EDX]` -- slot 0, two arguments -- with `MOV EBX,0x5` /
     // `DEC EBX` / `ADD EDI,4` bounding it at five entries. Arguments are pushed
-    // right-to-left, so Field11c is the first parameter and Field118 the second.
+    // right-to-left, so PendingCompletedBehavior is the first parameter and PendingDirectiveResult the second.
     for (int Index = 0; Index < 5; ++Index)
     {
         pub::AI::DirectiveCallback* const Cb = DirectiveCallbacks[Index];
         if (Cb != nullptr)
-            Cb->OnDirectiveComplete(Field11c, Field118);
+            Cb->OnDirectiveComplete(PendingCompletedBehavior, PendingDirectiveResult);
     }
 }
 
@@ -1998,8 +1998,8 @@ void IBehaviorManager::NotifyDirectiveCallbacks()
 // `MOV EAX,[ESP+8]; MOV EDX,[ESP+4]; MOV [ECX+0x118],EAX; MOV [ECX+0x11c],EDX; RET 8`.
 void IBehaviorManager::SetDirectiveResult(int Word11c, int Word118)
 {
-    Field118 = Word118;   // 062d29a8
-    Field11c = Word11c;   // 062d29ae
+    PendingDirectiveResult = Word118;   // 062d29a8
+    PendingCompletedBehavior = Word11c;   // 062d29ae
 }
 
 // FUN_062d35c0 (Common.dll.txt 062d35c0-062d368c), all 60 instructions.
@@ -2114,11 +2114,11 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
         if (LockManeuversByte != 0)
             return false;
 
-        // 062d3471-062d3503: behavior 6 as the player becomes Field120 instead, and every
+        // 062d3471-062d3503: behavior 6 as the player becomes DefaultBehaviorIndex instead, and every
         // steering input on the ThrustManager (Sys+0x18) is released on the way.
         if (NewIndex == 6)
         {
-            EffectiveIndex = static_cast<int>(Field120);
+            EffectiveIndex = static_cast<int>(DefaultBehaviorIndex);
             ThrustManager* const Thrust = &Sys->Thrust;
             Thrust->SetThrottle(0.0f, 2);                           // FUN_062e89a0(0, 2)
             Thrust->SetThrottle(0.0f, 0);                           // FUN_062e89a0(0, 0)
@@ -2155,15 +2155,15 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
 
     // 062d354f-062d3555: Behavior slot 4 (+0x10) on the outgoing entry.
     if (Outgoing != nullptr)
-        Outgoing->Slot4();
+        Outgoing->OnDisengage();
 
     // 062d3558-062d3572: with a directive, the incoming entry's slot 10 (+0x28) answers
     // (`MOV BL,AL`); then its slot 3 (+0x0c) runs regardless.
     if (Incoming != nullptr)
     {
         if (DirectiveArg != nullptr)
-            bResult = Incoming->Slot10(DirectiveArg);
-        Incoming->Slot3();
+            bResult = Incoming->OnApplyDirective(DirectiveArg);
+        Incoming->OnEngage();
     }
 
     // 062d3575: commit.
@@ -2192,7 +2192,7 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
 //   062d3f95-062d3fa1  CurrentBehaviorIndex == -1 -> return
 //   062d3fa7-062d3fb6  Type = [Event]; (unsigned) Type > 7 -> return; switch
 // In every case `Rec` is Sys+0x1364 and `Data` is [Event+4].
-void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
+void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 {
     if (CurrentBehaviorIndex == -1)                                         // .text:062d3fa1
         return;
@@ -2221,8 +2221,8 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
     case 2:
     {
         // 062d4165-062d41a2. DirectiveStorage dword 0 (+0xc4) == 2 and [Data+8] == dword 2
-        // (+0xcc): +0xc4 = 0, +0xcc = -1 (EDX, still the -1 from 062d3f9b), Field118 = 0,
-        // Field11c = the old +0xcc.
+        // (+0xcc): +0xc4 = 0, +0xcc = -1 (EDX, still the -1 from 062d3f9b), PendingDirectiveResult = 0,
+        // PendingCompletedBehavior = the old +0xcc.
         int* const Dir = reinterpret_cast<int*>(DirectiveStorage);
         if (Dir[0] != 2)                                                    // .text:062d416c
             return;
@@ -2231,8 +2231,8 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
             return;
         Dir[0] = 0;                                                         // .text:062d4187
         Dir[2] = -1;                                                        // .text:062d418d
-        Field118 = 0;                                                       // .text:062d4193
-        Field11c = OldTarget;                                               // .text:062d4199
+        PendingDirectiveResult = 0;                                                       // .text:062d4193
+        PendingCompletedBehavior = OldTarget;                                               // .text:062d4199
         return;
     }
 
@@ -2266,7 +2266,7 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
         {
             Behavior* const Entry = BehaviorDispatchTable[Index];
             if (Entry != nullptr)
-                Entry->Slot21(reinterpret_cast<void*>(static_cast<uintptr_t>(LeftId))); // .text:062d405c
+                Entry->OnObjectLeftSystem(reinterpret_cast<void*>(static_cast<uintptr_t>(LeftId))); // .text:062d405c
         }
 
         if ((LeftFlags & 0xc40u) != 0)                                      // .text:062d406c
@@ -2287,13 +2287,13 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
             }
             // 062d40dc-062d40f0: the current behavior's slot 22 (+0x58) gets the event
             // itself; the entry is not null-tested.
-            BehaviorDispatchTable[CurrentBehaviorIndex]->Slot22(
+            BehaviorDispatchTable[CurrentBehaviorIndex]->OnEvent(
                 const_cast<FBehaviorManagerEvent*>(Event));                 // .text:062d40f0
         }
 
         // 062d40f3-062d4159: flags & 0x840, ExternalIface is_player() (+0xbc), the current
         // behavior is 10 and ExternalIface get_id() == [Data+8] -> SetCurrentBehavior(
-        // Field120, true, 0).
+        // DefaultBehaviorIndex, true, 0).
         if ((LeftFlags & 0x840u) == 0)                                      // .text:062d40fb
             return;
         if (!Sys->SelfTarget.Iface->is_player())                 // .text:062d411b
@@ -2302,7 +2302,7 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
             return;
         if (LeftId != Sys->SelfTarget.Iface->get_id())            // .text:062d4146
             return;
-        SetCurrentBehavior(static_cast<int>(Field120), true, nullptr);      // .text:062d4159
+        SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), true, nullptr);      // .text:062d4159
         return;
     }
 
@@ -2323,7 +2323,7 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
                                        Data[2],
                                        *reinterpret_cast<unsigned int const*>(Data + 4)); // .text:062d41e6
         }
-        BehaviorDispatchTable[CurrentBehaviorIndex]->Slot22(
+        BehaviorDispatchTable[CurrentBehaviorIndex]->OnEvent(
             const_cast<FBehaviorManagerEvent*>(Event));                     // .text:062d41fb
         return;
     }
@@ -2352,12 +2352,12 @@ void IBehaviorManager::Slot00(FBehaviorManagerEvent const* Event)
 
     case 7:
         // 062d429d-062d42eb. ExternalIface get_id() == [Data] -> SetCurrentBehavior(
-        // Field120, false, 0), then TickSuppressedFlag = 1; otherwise FUN_062ec6a0(Rec)
+        // DefaultBehaviorIndex, false, 0), then TickSuppressedFlag = 1; otherwise FUN_062ec6a0(Rec)
         // (sets Rec+0xc5).
         if (*reinterpret_cast<unsigned int const*>(Data) ==
             Sys->SelfTarget.Iface->get_id())                      // .text:062d42b5
         {
-            SetCurrentBehavior(static_cast<int>(Field120), false, nullptr); // .text:062d42c6
+            SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr); // .text:062d42c6
             TickSuppressedFlag = 1;                                         // .text:062d42cc
             return;
         }

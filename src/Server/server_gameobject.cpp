@@ -541,7 +541,7 @@ void GameObject::on_object_left_system(unsigned int ObjId)
     FBehaviorManagerEvent Event;
     Event.Type = 3;
     Event.Data = Payload;
-    Behavior->Slot00(&Event);
+    Behavior->OnEvent(&Event);
 }
 
 // +0x17c -- .text:06ceeb00 (RET 8).
@@ -1121,7 +1121,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
                             FBehaviorManagerEvent Event;
                             Event.Type = 7;
                             Event.Data = &SelfId;
-                            Behavior->Slot00(&Event);               // .text:06ce81c3
+                            Behavior->OnEvent(&Event);               // .text:06ce81c3
                         }
 
                         // .text:06ce81c5 .. 06ce81de -- once per DockQueue entry.
@@ -1145,7 +1145,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
             // control message 0x14 with the player's id to every active player
             // (FUN_06d19110), and ServerStats+0x10 counts it (.data:06d8f9a8).
             Server_BroadcastGroupControl(0x14, EqObj_OwnerPlayer(this));
-            ++GServerStats.Field_0x10;
+            ++GServerStats.PlayerDeathCount;
         }
     }
 
@@ -1519,7 +1519,7 @@ static void EqObj_NotifyBehaviorOfDamage(IBehaviorManager* Behavior, FSubObjDama
     FBehaviorManagerEvent Event;
     Event.Type = 0;
     Event.Data = &Record;
-    Behavior->Slot00(&Event);
+    Behavior->OnEvent(&Event);
 }
 
 // +0x234 -- .text:06ceb550 (RET 8).
@@ -2939,7 +2939,7 @@ void EqObj::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
         FBehaviorManagerEvent Event;
         Event.Type = 1;
         Event.Data = const_cast<FMunitionImpact*>(&Hit);
-        Behavior->Slot00(&Event);                                   // .text:06ce9395
+        Behavior->OnEvent(&Event);                                   // .text:06ce9395
     }
 
     Archetype::Munition const* const Munition = Hit.Munition;
@@ -3281,8 +3281,8 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                     Record.ContentsHitPts = 0.0f;
                     Record.Count = 0;
                     Record.MarkForPlayer = 0;
-                    Record.Field_0x1c = 0;
-                    Record.Field_0x68 = 1;
+                    Record.NameId = 0;
+                    Record.bCanAiTractor = 1;
                     Record.bMission = 0;
                     if (build_equip_loot(static_cast<CAttachedEquip const*>(Equip), Record))
                     {
@@ -3396,8 +3396,8 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                         Record.ContentsHitPts = 0.0f;
                         Record.Count = 0;
                         Record.MarkForPlayer = 0;
-                        Record.Field_0x1c = 0;
-                        Record.Field_0x68 = 1;
+                        Record.NameId = 0;
+                        Record.bCanAiTractor = 1;
                         Record.bMission = 0;
                         if (build_equip_loot(Attached, Record))            // vt +0x248
                         {
@@ -3891,8 +3891,8 @@ int EqObj::build_loot(EquipDesc const& Desc, std::vector<FLootRecord>& Out)
     Record.HitPts = 0.0f;
     Record.Count = 0;
     Record.MarkForPlayer = 0;
-    Record.Field_0x1c = 0;
-    Record.Field_0x68 = 1;
+    Record.NameId = 0;
+    Record.bCanAiTractor = 1;
     Record.bMission = 0;
     Record.ContentsArch = Arch;
     Record.ContentsHitPts = Desc.Health * Arch->HitPts;
@@ -4787,8 +4787,8 @@ Ship::Ship()
     // +0xB4 is deliberately not touched: retail's constructor never writes it
     // (there is no store between .text:06d00ef9 and .text:06d00eff). Zeroed
     // here anyway, because leaving a member indeterminate buys nothing.
-    Field_0xB4 = nullptr;
-    Field_0xB8 = 0;                    // .text:06d00eff
+    EquipStateData = nullptr;
+    bLaunchInvincible = 0;                    // .text:06d00eff
     AccumulatedDamage = 0.0f;          // .text:06d00f05
     AccumulatedDamageTime = 0.0f;      // .text:06d00f0b
     // EquipIds at +0xC4 constructs itself (.text:06d00f11).
@@ -4858,7 +4858,7 @@ bool Ship::create(Archetype::Root* Arch)
 //   MOV EAX,[ECX+0xb4] / MOV ECX,[ESP+4] / MOV [ECX],EAX / XOR EAX,EAX / RET 4
 int Ship::get_data(void const*& OutData) const
 {
-    OutData = Field_0xB4;
+    OutData = EquipStateData;
     return 0;
 }
 
@@ -4907,12 +4907,12 @@ CShip* Ship::cship() const
 //   .text:06d010ec  MOV  CX,word ptr [EAX]
 //   .text:06d010ef  MOV  word ptr [ESI + 0xc4],CX  ; EquipIds
 //   .text:06d010f6  MOV  EDX,dword ptr [EAX + 0x4]
-//   .text:06d010f9  MOV  dword ptr [ESI + 0xb4],EDX ; Field_0xB4
+//   .text:06d010f9  MOV  dword ptr [ESI + 0xb4],EDX ; EquipStateData
 void Ship::set_equip_state(FEquipState const& State)
 {
     EqObj::check_fuses();
     EquipIds = State.EquipIds;
-    Field_0xB4 = State.Data;
+    EquipStateData = State.Data;
 }
 
 // FUN_06d01110 (.text:06d01110, RET 0):
@@ -4926,9 +4926,9 @@ void Ship::set_equip_state(FEquipState const& State)
 //   .text:06d01143  CALL [EAX + 0x194]             ; set_invincible(&Cmd)
 void Ship::apply_launch_invincibility()
 {
-    if (Field_0xB8 != 0)
+    if (bLaunchInvincible != 0)
         return;
-    Field_0xB8 = 1;
+    bLaunchInvincible = 1;
     FInvincibility Cmd = {};
     Cmd.Type = 1u;
     Cmd.bProtect = true;
@@ -5129,8 +5129,8 @@ void Ship::tick_jettison(float Dt)
     Record.ContentsHitPts = 0.0f;
     Record.Count = 0;
     Record.MarkForPlayer = 0u;
-    Record.Field_0x1c = 0u;
-    Record.Field_0x68 = 1;
+    Record.NameId = 0u;
+    Record.bCanAiTractor = 1;
     Record.bMission = 0;
 
     // .text:06d01675 .. 06d0168a -- CFLIDMaker::GetInstance, the id counter at
@@ -5424,7 +5424,7 @@ bool Ship::light_fuse(unsigned int SourceId, ID_String const& FuseId,
         FBehaviorManagerEvent FuseEvent;
         FuseEvent.Type = 7;
         FuseEvent.Data = &LeaderId;
-        Behavior->Slot00(&FuseEvent);
+        Behavior->OnEvent(&FuseEvent);
     };
 
     // .text:06d01ad8 .. 06d01b75 -- CShip +0x1d4; the end (+0x1d8) is re-read
@@ -6002,17 +6002,17 @@ int Ship::stop_tradelane()
 }
 
 // .text:06d02000 (RET 4).
-//   .text:06d02000 .. 06d0200d  Field_0xB8 clear -> return 0
-//   .text:06d02010              Field_0xB8 = 0
+//   .text:06d02000 .. 06d0200d  bLaunchInvincible clear -> return 0
+//   .text:06d02010              bLaunchInvincible = 0
 //   .text:06d02019 .. 06d0203a  set_invincible({1, 0, 0, 1.0f}) -- lifts the
 //                               launch grant apply_launch_invincibility made
 //   .text:06d02040 .. 06d0205a  controller event 0x28 {Id, get_id()}
 // Returns 0.
 int Ship::slot_70(unsigned Id)
 {
-    if (Field_0xB8 != 0)
+    if (bLaunchInvincible != 0)
     {
-        Field_0xB8 = 0;
+        bLaunchInvincible = 0;
         FInvincibility Cmd = {};
         Cmd.Type = 1u;
         Cmd.bProtect = false;
@@ -6191,7 +6191,7 @@ void Solar::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
         FBehaviorManagerEvent DamageEvent;
         DamageEvent.Type = 0;
         DamageEvent.Data = &Payload;
-        Behavior->Slot00(&DamageEvent);
+        Behavior->OnEvent(&DamageEvent);
     }
 
     damage_power(Hit.Munition->EnergyDamage, Damage);
@@ -6239,7 +6239,7 @@ void Solar::explosion_hit_hull(ExplosionDamageEvent const& Blast, DamageList& Ou
         FBehaviorManagerEvent DamageEvent;
         DamageEvent.Type = 0;
         DamageEvent.Data = &Payload;
-        Behavior->Slot00(&DamageEvent);
+        Behavior->OnEvent(&DamageEvent);
     }
 }
 

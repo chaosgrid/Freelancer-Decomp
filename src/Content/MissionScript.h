@@ -81,17 +81,17 @@ struct FStoryMissionListNode_0x2f4
 {
     unsigned int PathLength;
     char Path[0x80];
-    int Field_0x8c;                     // handle: RTC location slot / ambient script (-1 none)
-    FCharacterEncounter* Field_0x90;    // +0x90 the started script (0x2f0 list) / room (0x310)
-    unsigned char Field_0x94;           // +0x94 finished (0x2f0 list)
-    unsigned char Field_0x95;           // +0x95 "rtc = %s, true/false" (FUN_06ebabb0)
+    int BarSceneHandle;                     // handle: RTC location slot / ambient script (-1 none)
+    FCharacterEncounter* Encounter;    // +0x90 the started script (0x2f0 list) / room (0x310)
+    unsigned char bFinished;           // +0x94 finished (0x2f0 list)
+    unsigned char bRepeatable;           // +0x95 "rtc = %s, true/false" (FUN_06ebabb0)
 
     FStoryMissionListNode_0x2f4()
         : PathLength(0)
-        , Field_0x8c(-1)
-        , Field_0x90(nullptr)
-        , Field_0x94(0)
-        , Field_0x95(0)
+        , BarSceneHandle(-1)
+        , Encounter(nullptr)
+        , bFinished(0)
+        , bRepeatable(0)
     {
         Path[0] = '\0';
     }
@@ -134,7 +134,7 @@ struct FMissionScript : FMissionObject
     // Slot 26, LAB_06eb8260: "FAIL" -> 0, "SUCCEED" -> 1, "NO_STATE" -> 2, else -1 (stricmp).
     int MissionStateFromName(char const* Name) override;
     // Slot 28, FUN_06ebab90 (RET 4): message 0x100f with the argument as the parms.
-    void Slot28(void const* Parms) override;
+    void OnNpcSystemEnter(void const* Parms) override;
     // Slot 29 (vtbl+0x74), LAB_06eb9730 (RET 8): unless (+0x2b0 == 1 && State == FAIL):
     // +0x2ac = State, +0x2e8 = MadLibId.
     virtual void SetDesiredMissionState(int State, unsigned int MadLibId);
@@ -215,7 +215,7 @@ struct FMissionScript : FMissionObject
     int CampaignSlotSucceed;                                  // +0x2b8 (mission ctor)
     int StoryCue;                                             // +0x2bc "story_cue" (ctor 0)
     unsigned int Field_0x2c0;                                 // +0x2c0 TODO: meaning (mission ctor)
-    unsigned int Field_0x2c4;                                 // +0x2c4 objective ids of the accepted offer (06eba19e)
+    unsigned int AcceptedObjectiveIds;                                 // +0x2c4 objective ids of the accepted offer (06eba19e)
     unsigned char Field_0x2c8;                                // +0x2c8 TODO: meaning (ctor 0)
     // +0x2cc: the reputation pop-up is up (FUN_06eba1f0 sets it, message 0x30 answers it).
     unsigned char bRepPopUpShown;
@@ -228,9 +228,9 @@ struct FMissionScript : FMissionObject
     unsigned int SaveTriggerId = 0;
     // +0x2e8 (ctor 1): mad-lib id shown with the state change (Act_ChangeState +0x10, message
     // 0x1006, FUN_06eb99a0).
-    unsigned int Field_0x2e8;
+    unsigned int StateMessageId;
     // +0x2ec (ctor 0): objectives need a renumber (base enter / space enter clear it).
-    unsigned char Field_0x2ec;
+    unsigned char bNeedsObjectiveRenumber;
     // +0x2f0 (head +0x2f4, size +0x2f8): started RTC scripts. Pushed by Mission_01b (06ea23a7)
     // and FUN_06eb8a20's callers; walked by FUN_06eb8b70, FUN_06eb9ef0 and Cnd_RTCDone.
     std::list<FStoryMissionListNode_0x2f4> List_0x2f4;

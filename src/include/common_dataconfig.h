@@ -26,7 +26,7 @@ namespace DataConfig
     // Freelancer.exe's DataConfigPump (vftable 0x005e6ab8 = {LAB_005b1fe0}, one slot).
     struct ProgressCB
     {
-        virtual int Slot00(char const* ValueString) = 0; // +0x00
+        virtual int OnProgress(char const* ValueString) = 0; // +0x00
     };
 
     COMMON_API int __cdecl startup(char const* IniPath, Archetype::ICliObjFactory* Factory,

@@ -353,10 +353,10 @@ IVP_Core* IVP_Simulation_Unit_Find_Disconnected_Core(IVP_Simulation_Unit* Unit)
             continue;
         }
 
-        IVP_Core* const FirstMaster = FUN_063557c0(Cores->elems[0]);
+        IVP_Core* const FirstMaster = IVP_Core_UnionFindGetFather(Cores->elems[0]);
         for (int32_t J = Count - 1; J >= 0; --J)
         {
-            IVP_Core* const Master = FUN_063557c0(Cores->elems[J]);
+            IVP_Core* const Master = IVP_Core_UnionFindGetFather(Cores->elems[J]);
             if (Master != FirstMaster)
             {
                 Master->MergedCoreWhichReplacedIt = FirstMaster;
@@ -368,10 +368,10 @@ IVP_Core* IVP_Simulation_Unit_Find_Disconnected_Core(IVP_Simulation_Unit* Unit)
     // count test (an empty unit reads elems[0], as retail -- the port's old
     // `n == 0 -> return nullptr` was invented), then the first core whose
     // master differs is returned.
-    IVP_Core* const FirstMaster = FUN_063557c0(Unit->Cores.elems[0]);
+    IVP_Core* const FirstMaster = IVP_Core_UnionFindGetFather(Unit->Cores.elems[0]);
     for (int32_t I = 0; I < static_cast<int32_t>(Unit->Cores.n_elems); ++I)
     {
-        IVP_Core* const Master = FUN_063557c0(Unit->Cores.elems[I]);
+        IVP_Core* const Master = IVP_Core_UnionFindGetFather(Unit->Cores.elems[I]);
         if (Master != FirstMaster)
         {
             return Master;
@@ -401,7 +401,7 @@ void IVP_Simulation_Unit_Split_Off_Core_Group(IVP_Simulation_Unit* Unit, IVP_Cor
         while (Index < static_cast<int>(Unit->Cores.n_elems))
         {
             IVP_Core* Core = Unit->Cores.ElementAt(Index);
-            IVP_Core* CurrentMaster = FUN_063557c0(Core);
+            IVP_Core* CurrentMaster = IVP_Core_UnionFindGetFather(Core);
 
             if (CurrentMaster == TargetMaster)
             {

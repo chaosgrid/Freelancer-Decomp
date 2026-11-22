@@ -194,7 +194,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
         InfoCard = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
             G_TradeWidgetName, kQuestionMesh, kQuestionMesh, nullptr, nullptr, At, nullptr, Zero,
             0, 0, 0, 1, 0, 0, 0));
-        InfoCard->Field2f0 = PointerField(this);
+        InfoCard->OwnerData = PointerField(this);
         WinControlHalfExtentsFromMesh(InfoCard->HalfExtents, &InfoCard->MeshHolder);
         InfoCard->HitPriority = 1000;
         InfoCard->SetProperty(1, 1, 0);
@@ -212,7 +212,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
     InfoFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
         G_TradeWidgetName, kItemInfoMesh, kItemInfoMesh, nullptr, nullptr, Base, nullptr, Zero, 1,
         0, 0, 1, 0, 0, 0));
-    InfoFrame->Field2f0 = PointerField(this);
+    InfoFrame->OwnerData = PointerField(this);
     WinControlHalfExtentsFromMesh(InfoFrame->HalfExtents, &InfoFrame->MeshHolder);
 
     // 0x004be994..0x004bea4c: the item frame 0.175 left of Base ("333>" read as a float,
@@ -227,7 +227,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
     IconFrame = static_cast<NnButtonControl*>(Parent->CreateButtonControl(
         G_TradeWidgetName, kItemViewMesh, kItemViewMesh, nullptr, nullptr, At, nullptr, Zero, 1,
         0, 0, 1, 0, 0, 0));
-    IconFrame->Field2f0 = PointerField(this);
+    IconFrame->OwnerData = PointerField(this);
     IconFrame->SetByte337(1);
     WinControlHalfExtentsFromMesh(IconFrame->HalfExtents, &IconFrame->MeshHolder);
 
@@ -246,10 +246,10 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
     FormatTradeWidgetName("IconMesh");
     IconMesh = Parent->CreateStaticControl(G_TradeWidgetName, kItemViewMesh, IconAt, nullptr, At, 0,
                                            0, 0, 1, 0, 1, 1, 100, 0, 0, Zero);
-    IconMesh->Field2ec = PointerField(IconMesh);
-    IconMesh->Field2f0 = PointerField(this);
+    IconMesh->UserData = PointerField(IconMesh);
+    IconMesh->OwnerData = PointerField(this);
     WinControlHalfExtentsFromMesh(IconMesh->HalfExtents, &IconMesh->MeshHolder);
-    InfoFrame->Field2ec = PointerField(IconMesh);
+    InfoFrame->UserData = PointerField(IconMesh);
 
     // 0x004beb33..0x004bebc6: the name, 0.01 left of Base (DAT_005c99c8), style "ItemName".
     IconAt[0] = Base[0] - 0.01f;
@@ -471,7 +471,7 @@ CTradeEquipList::CTradeEquipList(WinControl* NewParent, char const* RowsHp,
         NextOffset, ScrollDownHp, NextMouse, false, kUpArrowMesh, PrevOffset, ScrollUpHp,
         PrevMouse, false, kScrollHandleMesh, ThumbOffset0, ThumbOffset1, ThumbTopHp,
         ThumbBottomHp, ThumbMouse, false, 0, 0, VisibleRows, false, false);
-    ScrollBar->Field2f0 = PointerField(this);
+    ScrollBar->OwnerData = PointerField(this);
 
     Refresh(-1);
 }

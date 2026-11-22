@@ -115,7 +115,7 @@ inline T RpcPayloadRead(const FPacketBase* Packet, unsigned int Offset) {
 // Sender 0x06d897c0 (IClient+0x0d8), receiver caseD_1 at 0x06d83a4a.
 struct FPayloadCommonUpdateObject {
     // TODO: semantics unproven. Sender: `MOV this+0x3,byte [A1+0x28]` -> payload+0x00.
-    unsigned char Field_0x00;
+    unsigned char State;
     unsigned char Pad_0x01[3];
     unsigned int ObjectId;       // +0x04  <- argument struct +0x00
     Vector Position;             // +0x08  <- FUN_06d8f510 (3-dword copier), struct +0x14
@@ -125,8 +125,8 @@ struct FPayloadCommonUpdateObject {
     // common_server_types.h) narrows a double `Timestamp` into the first of the two and carries an
     // unidentified dword in the second -- but that is a DIFFERENT struct (0x30 bytes, with
     // the double still at +0x20), so the correspondence is a lead, not a proof.
-    float Field_0x24;            // +0x24  <- argument struct +0x20
-    float Field_0x28;            // +0x28  <- argument struct +0x24
+    float Timestamp;            // +0x24  <- argument struct +0x20
+    float Throttle;            // +0x28  <- argument struct +0x24
 };
 static_assert(sizeof(FPayloadCommonUpdateObject) == 0x2c, "UPDATEOBJECT payload 0x2c");
 
@@ -169,9 +169,9 @@ struct FPayloadCommonChatMsg {
     // TODO: semantics unproven. Written from the sender's 1st explicit argument; the
     // receiver does NOT forward it (it pushes the literal 1 in its place), so nothing
     // downstream reads it.
-    unsigned int Field_0x00;   // +0x00
+    unsigned int TargetId;   // +0x00
     // TODO: semantics unproven. 2nd argument; forwarded as the chat slot's 2nd argument.
-    unsigned int Field_0x04;   // +0x04
+    unsigned int SenderId;   // +0x04
     unsigned int Size;         // +0x08  operator new() argument and memcpy length
     void* Buffer;              // +0x0c  owned by the packet
 };
@@ -193,7 +193,7 @@ static_assert(sizeof(FPayloadCommonActivateEquip) == 0x08, "ACTIVATEEQUIP payloa
 struct FPayloadCommonActivateCruise {
     unsigned int ObjectId;     // +0x00
     unsigned char bActivate;   // +0x04
-    unsigned char Field_0x05;  // +0x05  TODO: semantics unproven (XActivateCruise +0x05)
+    unsigned char bDisruptCruise;  // +0x05  TODO: semantics unproven (XActivateCruise +0x05)
     unsigned char Pad_0x06[2]; // +0x06
 };
 static_assert(sizeof(FPayloadCommonActivateCruise) == 0x08, "ACTIVATECRUISE payload 0x08");
@@ -204,7 +204,7 @@ struct FPayloadCommonGoTradelane {
     unsigned int ObjectId;       // +0x00
     unsigned int TradelaneRing1; // +0x04
     unsigned int TradelaneRing2; // +0x08
-    unsigned char Field_0x0c;    // +0x0c  TODO: semantics unproven (XGoTradelane +0x0c)
+    unsigned char bMidLane;    // +0x0c  TODO: semantics unproven (XGoTradelane +0x0c)
     unsigned char Pad_0x0d[3];   // +0x0d
 };
 static_assert(sizeof(FPayloadCommonGoTradelane) == 0x10, "GOTRADELANE payload 0x10");
@@ -215,9 +215,9 @@ static_assert(sizeof(FPayloadCommonGoTradelane) == 0x10, "GOTRADELANE payload 0x
 // The opposite IServerImpl sender 06d8e770 writes all three payload dwords at
 // 06d8e791 / 06d8e79c / 06d8e7a7. Both receivers forward all three fields.
 struct FPayloadCommonStopTradelane {
-    unsigned int Field_0x00;   // +0x00  <- the sender's 2nd argument
-    unsigned int Field_0x04;   // +0x04  entrance ring (IServer); zero (IClient)
-    unsigned int Field_0x08;   // +0x08  exit ring (IServer); zero (IClient)
+    unsigned int ShipId;   // +0x00  <- the sender's 2nd argument
+    unsigned int TradelaneRing1;   // +0x04  entrance ring (IServer); zero (IClient)
+    unsigned int TradelaneRing2;   // +0x08  exit ring (IServer); zero (IClient)
 };
 static_assert(sizeof(FPayloadCommonStopTradelane) == 0x0c, "STOPTRADELANE payload 0x0c");
 
@@ -258,10 +258,10 @@ static_assert(sizeof(FPayloadCommonBuffer) == 0x0c, "buffer-family payload 0x0c"
 // the fields it needs and leaves the rest at the constructor's zeros.
 struct FPayloadCommonPlayerTrade {
     unsigned int SubType;       // +0x00  1, 2, 4, 8, 0x10, 0x20, 0x40 or 0x80
-    unsigned int Field_0x04;    // +0x04  sub-type 2 only. TODO: semantics unproven.
-    unsigned int Field_0x08;    // +0x08  every sub-type except 2. TODO: semantics unproven.
-    unsigned int Field_0x0c;    // +0x0c  sub-type 4 only. TODO: semantics unproven.
-    unsigned char Field_0x10;   // +0x10  sub-type 0x40 only. TODO: semantics unproven.
+    unsigned int Reason;    // +0x04  sub-type 2 only. TODO: semantics unproven.
+    unsigned int ShipId;    // +0x08  every sub-type except 2. TODO: semantics unproven.
+    unsigned int Money;    // +0x0c  sub-type 4 only. TODO: semantics unproven.
+    unsigned char bAccepted;   // +0x10  sub-type 0x40 only. TODO: semantics unproven.
     unsigned char Pad_0x11[3];  // +0x11
     unsigned int EquipArchId;   // +0x14  sub-types 8 / 0x10  <- EquipDesc +0x04
     unsigned int EquipCount;    // +0x18  sub-types 8 / 0x10  <- EquipDesc +0x14
@@ -301,7 +301,7 @@ struct FPayloadCommonPopUpDialog {
     void* BufferA;          // +0x04  flattened bytes of the 1st FmtStr
     unsigned int SizeB;     // +0x08  flattened size of the 2nd FmtStr
     void* BufferB;          // +0x0c  flattened bytes of the 2nd FmtStr
-    unsigned int Field_0x10;// +0x10  the sender's 4th argument. TODO: semantics unproven.
+    unsigned int Buttons;// +0x10  the sender's 4th argument. TODO: semantics unproven.
 };
 static_assert(sizeof(FPayloadCommonPopUpDialog) == 0x14, "POP_UP_DIALOG payload 0x14");
 
@@ -325,7 +325,7 @@ struct FPayloadServerRemoteObjectCargoUpdate {
     unsigned int EquipHandle;    // +0x00, owned by the packet
     unsigned char Field_0x04;    // +0x04  TODO: semantics unproven (a mode/flag byte)
     unsigned char Pad_0x05[3];   // +0x05
-    unsigned int Field_0x08;     // +0x08  TODO: semantics unproven (an object id)
+    unsigned int ObjectId;     // +0x08  TODO: semantics unproven (an object id)
 };
 static_assert(sizeof(FPayloadServerRemoteObjectCargoUpdate) == 0x0c,
               "ch2 0x3d payload 0x0c");
@@ -421,7 +421,7 @@ static_assert(sizeof(FPayloadServerBlobReversed) == 0x08, "ch2 reversed-blob pay
 // and clearing the three padding bytes.
 struct FPayloadServerDestroyObject {
     unsigned int ObjectId;      // +0x00  <- arg struct +0x00
-    unsigned char Field_0x04;   // +0x04  <- arg struct +0x04. TODO: semantics unproven.
+    unsigned char DestroyType;   // +0x04  <- arg struct +0x04. TODO: semantics unproven.
     unsigned char Pad_0x05[3];
 };
 static_assert(sizeof(FPayloadServerDestroyObject) == 0x08, "DESTROYOBJECT payload 0x08");
@@ -436,9 +436,9 @@ static_assert(sizeof(FPayloadServerDestroyObject) == 0x08, "DESTROYOBJECT payloa
 // 4-dword copier). The receiver puts all ten dwords back exactly where they came from --
 // the two mappings are strict inverses, which is what pins this layout down.
 struct FPayloadServerLaunch {
-    unsigned int Field_0x00;    // +0x00  <- arg +0x00. TODO: semantics unproven.
-    unsigned int Field_0x04;    // +0x04  <- arg +0x04. TODO: semantics unproven.
-    unsigned int Field_0x08;    // +0x08  <- arg +0x08. TODO: semantics unproven.
+    unsigned int ShipId;    // +0x00  <- arg +0x00. TODO: semantics unproven.
+    unsigned int LaunchObjId;    // +0x04  <- arg +0x04. TODO: semantics unproven.
+    unsigned int LaunchPosIndex;    // +0x08  <- arg +0x08. TODO: semantics unproven.
     Vector Position;            // +0x0c  <- arg +0x1c (FUN_06d8f510)
     Quaternion Orientation;     // +0x18  <- arg +0x0c (FUN_06d8f4f0)
 };
@@ -465,9 +465,9 @@ static_assert(sizeof(FPayloadServerThreeDwords) == 0x0c, "three-dword payload 0x
 // ch2 0x27 FLPACKET_SERVER_REQUESTCREATESHIPRESP, size 0x28 -> payload 0x08.
 // Sender 0x06d8a130 (IClient+0x0f4, three arguments), receiver caseD_27 at 0x06d819b1.
 struct FPayloadServerRequestCreateShipResp {
-    unsigned char Field_0x00;   // +0x00  <- 2nd argument, truncated to a byte
+    unsigned char bSuccess;   // +0x00  <- 2nd argument, truncated to a byte
     unsigned char Pad_0x01[3];
-    unsigned int Field_0x04;    // +0x04  <- 3rd argument
+    unsigned int ShipId;    // +0x04  <- 3rd argument
 };
 static_assert(sizeof(FPayloadServerRequestCreateShipResp) == 0x08, "REQUESTCREATESHIPRESP payload 0x08");
 
@@ -477,25 +477,25 @@ static_assert(sizeof(FPayloadServerRequestCreateShipResp) == 0x08, "REQUESTCREAT
 // carries arg+0x0c as a WORD (the receiver reads a word back and leaves the upper half of
 // its local untouched -- retail's own gap, reproduced).
 struct FPayloadServerCreateMine {
-    unsigned int Field_0x00;    // +0x00  <- arg +0x00
-    unsigned int Field_0x04;    // +0x04  <- arg +0x04
-    unsigned int Field_0x08;    // +0x08  <- arg +0x08
-    unsigned short Field_0x0c;  // +0x0c  <- arg +0x0c (word only)
+    unsigned int ObjId;    // +0x00  <- arg +0x00
+    unsigned int ArchetypeNickname;    // +0x04  <- arg +0x04
+    unsigned int OwnerId;    // +0x08  <- arg +0x08
+    unsigned short SubObjId;  // +0x0c  <- arg +0x0c (word only)
     unsigned short Pad_0x0e;
-    unsigned int Field_0x10;    // +0x10  <- arg +0x1c
-    unsigned int Field_0x14;    // +0x14  <- arg +0x20
-    unsigned int Field_0x18;    // +0x18  <- arg +0x24
-    unsigned int Field_0x1c;    // +0x1c  <- arg +0x28
-    unsigned int Field_0x20;    // +0x20  <- arg +0x10
-    unsigned int Field_0x24;    // +0x24  <- arg +0x14
-    unsigned int Field_0x28;    // +0x28  <- arg +0x18
-    unsigned int Field_0x2c;    // +0x2c  <- arg +0x2c
-    unsigned int Field_0x30;    // +0x30  <- arg +0x30
-    unsigned int Field_0x34;    // +0x34  <- arg +0x34
-    unsigned int Field_0x38;    // +0x38  <- arg +0x38
-    unsigned int Field_0x3c;    // +0x3c  <- arg +0x3c
-    unsigned int Field_0x40;    // +0x40  <- arg +0x40
-    unsigned int Field_0x44;    // +0x44  <- arg +0x44
+    unsigned int OrientWBits;    // +0x10  <- arg +0x1c
+    unsigned int OrientXBits;    // +0x14  <- arg +0x20
+    unsigned int OrientYBits;    // +0x18  <- arg +0x24
+    unsigned int OrientZBits;    // +0x1c  <- arg +0x28
+    unsigned int PosXBits;    // +0x20  <- arg +0x10
+    unsigned int PosYBits;    // +0x24  <- arg +0x14
+    unsigned int PosZBits;    // +0x28  <- arg +0x18
+    unsigned int VelXBits;    // +0x2c  <- arg +0x2c
+    unsigned int VelYBits;    // +0x30  <- arg +0x30
+    unsigned int VelZBits;    // +0x34  <- arg +0x34
+    unsigned int AngVelXBits;    // +0x38  <- arg +0x38
+    unsigned int AngVelYBits;    // +0x3c  <- arg +0x3c
+    unsigned int AngVelZBits;    // +0x40  <- arg +0x40
+    unsigned int OwnerPlayer;    // +0x44  <- arg +0x44
 };
 static_assert(sizeof(FPayloadServerCreateMine) == 0x48, "CREATEMINE payload 0x48");
 
@@ -514,7 +514,7 @@ struct FPayloadServerSetAddItem {
     unsigned int ArchId;            // +0x00  <- EquipDesc +0x04
     int Count;                      // +0x04  <- EquipDesc +0x14
     unsigned int HardpointSize;     // +0x08  <- strlen(EquipDesc.Hardpoint) + 1, or 0
-    unsigned int Field_0x0c;        // +0x0c  <- the slot's 2nd argument. TODO: unproven.
+    unsigned int AddResult;        // +0x0c  <- the slot's 2nd argument. TODO: unproven.
     unsigned int Id;                // +0x10  <- EquipDesc +0x02, zero-extended from a word
     float Health;                   // +0x14  <- EquipDesc +0x10
     unsigned char bEquipped;        // +0x18  <- EquipDesc +0x0c
@@ -528,9 +528,9 @@ static_assert(sizeof(FPayloadServerSetAddItem) == 0x20, "SETADDITEM payload 0x20
 // Sender 0x06d88670 (IClient+0x06c, four arguments), receiver caseD_2f at 0x06d81aa0.
 // The wire order is NOT the argument order: A2 (a word) lands first, then A3, then A1.
 struct FPayloadServerSetRemoveItem {
-    unsigned int Field_0x00;    // +0x00  <- 3rd argument, zero-extended from a word
-    unsigned int Field_0x04;    // +0x04  <- 4th argument
-    unsigned int Field_0x08;    // +0x08  <- 2nd argument
+    unsigned int ItemId;    // +0x00  <- 3rd argument, zero-extended from a word
+    unsigned int Count;    // +0x04  <- 4th argument
+    unsigned int RemoveResult;    // +0x08  <- 2nd argument
 };
 static_assert(sizeof(FPayloadServerSetRemoveItem) == 0x0c, "SETREMOVEITEM payload 0x0c");
 
@@ -551,9 +551,9 @@ static_assert(sizeof(FPayloadServerFourDwords) == 0x10, "four-dword payload 0x10
 // payload dword, and carries arg+0x08 as a word; the receiver writes the byte back as a
 // byte and the word back as a zero-extended dword.
 struct FPayloadServerSetMissionObjectiveState {
-    unsigned int Field_0x00;    // +0x00  <- arg +0x00
-    unsigned int Field_0x04;    // +0x04  <- arg +0x04, zero-extended from a byte
-    unsigned short Field_0x08;  // +0x08  <- arg +0x08 (word)
+    unsigned int MissionId;    // +0x00  <- arg +0x00
+    unsigned int ObjectiveIndex;    // +0x04  <- arg +0x04, zero-extended from a byte
+    unsigned short State;  // +0x08  <- arg +0x08 (word)
     unsigned short Pad_0x0a;
 };
 static_assert(sizeof(FPayloadServerSetMissionObjectiveState) == 0x0c, "SETMISSIONOBJECTIVESTATE payload 0x0c");
@@ -569,9 +569,9 @@ static_assert(sizeof(FPayloadServerSetMissionObjectiveState) == 0x0c, "SETMISSIO
 // Sender 0x06d8bfe0 (IClient+0x150), receiver caseD_3c at 0x06d82b55.
 // The middle field travels as a zero-extended dword and comes back as a word.
 struct FPayloadServerRepairObject {
-    unsigned int Field_0x00;    // +0x00  <- arg +0x00
-    unsigned int Field_0x04;    // +0x04  <- arg +0x04, zero-extended from a word
-    unsigned int Field_0x08;    // +0x08  <- arg +0x08
+    unsigned int ObjectId;    // +0x00  <- arg +0x00
+    unsigned int EquipId;    // +0x04  <- arg +0x04, zero-extended from a word
+    unsigned int Points;    // +0x08  <- arg +0x08
 };
 static_assert(sizeof(FPayloadServerRepairObject) == 0x0c, "REPAIROBJECT payload 0x0c");
 
@@ -582,14 +582,14 @@ static_assert(sizeof(FPayloadServerRepairObject) == 0x0c, "REPAIROBJECT payload 
 // Sender 0x06d8c170 (IClient+0x15c), receiver caseD_41 at 0x06d82c04. Straight copy both
 // ways, mixed widths.
 struct FPayloadServerBurnFuse {
-    unsigned int Field_0x00;
-    unsigned int Field_0x04;
-    unsigned int Field_0x08;
-    unsigned short Field_0x0c;
+    unsigned int SourceId;
+    unsigned int ObjectId;
+    unsigned int FuseId;
+    unsigned short SubObjId;
     unsigned short Pad_0x0e;
-    unsigned int Field_0x10;
-    unsigned int Field_0x14;
-    unsigned char Field_0x18;
+    unsigned int AtTBits;
+    unsigned int LifetimeBits;
+    unsigned char bLit;
     unsigned char Pad_0x19[3];
 };
 static_assert(sizeof(FPayloadServerBurnFuse) == 0x1c, "BURNFUSE payload 0x1c");
@@ -599,10 +599,10 @@ static_assert(sizeof(FPayloadServerBurnFuse) == 0x1c, "BURNFUSE payload 0x1c");
 // The receiver sign-extends the last two bytes and zero-extends the first -- so the
 // three trailing arguments are (unsigned char, signed char, signed char).
 struct FPayloadServerRequestReturned {
-    unsigned int Field_0x00;    // +0x00  <- 2nd argument
-    unsigned char Field_0x04;   // +0x04  <- 3rd argument, delivered zero-extended
-    signed char Field_0x05;     // +0x05  <- 4th argument, delivered sign-extended
-    signed char Field_0x06;     // +0x06  <- 5th argument, delivered sign-extended
+    unsigned int ShipId;    // +0x00  <- 2nd argument
+    unsigned char RequestType;   // +0x04  <- 3rd argument, delivered zero-extended
+    signed char Response;     // +0x05  <- 4th argument, delivered sign-extended
+    signed char Extra;     // +0x06  <- 5th argument, delivered sign-extended
     unsigned char Pad_0x07;
 };
 static_assert(sizeof(FPayloadServerRequestReturned) == 0x08, "REQUEST_RETURNED payload 0x08");
@@ -624,9 +624,9 @@ static_assert(sizeof(FPayloadServerDwordByte) == 0x08, "dword+byte payload 0x08"
 // ch2 0x4a FLPACKET_SERVER_SETGUIDEDTARGET, size 0x2c -> payload 0x0c.
 // Sender 0x06d8a800 (IClient+0x0d4, four arguments), receiver caseD_4a at 0x06d83048.
 struct FPayloadServerSetGuidedTarget {
-    unsigned int Field_0x00;    // +0x00  <- 2nd argument
-    unsigned int Field_0x04;    // +0x04  <- 3rd argument
-    unsigned short Field_0x08;  // +0x08  <- 4th argument, truncated to a word
+    unsigned int GuidedId;    // +0x00  <- 2nd argument
+    unsigned int TargetId;    // +0x04  <- 3rd argument
+    unsigned short TargetSubObjId;  // +0x08  <- 4th argument, truncated to a word
     unsigned short Pad_0x0a;
 };
 static_assert(sizeof(FPayloadServerSetGuidedTarget) == 0x0c, "SETGUIDEDTARGET payload 0x0c");
@@ -648,7 +648,7 @@ static_assert(sizeof(FPayloadServerSetGuidedTarget) == 0x0c, "SETGUIDEDTARGET pa
 // Receiver caseD_1 at 0x06d816d8 is the ONE channel-2 case that does not push a leading
 // 1: it calls `RealClient->vt[+0x2c](payload+0x00)` with a single argument.
 struct FPayloadServerConnectResponse {
-    unsigned int Field_0x00;    // +0x00  always the literal 1
+    unsigned int ClientId;    // +0x00  always the literal 1
 };
 static_assert(sizeof(FPayloadServerConnectResponse) == 0x04, "CONNECTRESPONSE payload 0x04");
 
@@ -658,10 +658,10 @@ static_assert(sizeof(FPayloadServerConnectResponse) == 0x04, "CONNECTRESPONSE pa
 // whatever was on the receiver's stack there. The port zeroes it -- the same harmless
 // deviation already recorded for CREATEMINE and REPAIROBJECT.
 struct FPayloadServerCharSelectVerified {
-    unsigned int Field_0x00;    // +0x00
+    unsigned int VibeHandle;    // +0x00
     unsigned int Unused_0x04;   // +0x04  never written, never read
-    unsigned int Field_0x08;    // +0x08
-    unsigned int Field_0x0c;    // +0x0c
+    unsigned int ServerTimeLo;    // +0x08
+    unsigned int ServerTimeHi;    // +0x0c
 };
 static_assert(sizeof(FPayloadServerCharSelectVerified) == 0x10, "CHARSELECTVERIFIED payload 0x10");
 
@@ -682,7 +682,7 @@ static_assert(sizeof(FPayloadServerCharSelectVerified) == 0x10, "CHARSELECTVERIF
 // FLD/FSTP, so they are floats -- a Vector, rebuilt on the receiver's stack and passed
 // by address as the slot's second argument.
 struct FPayloadServerFormationUpdate {
-    unsigned int Field_0x00;    // +0x00  <- 2nd argument, delivered by value
+    unsigned int LeaderId;    // +0x00  <- 2nd argument, delivered by value
     Vector Offset;              // +0x04  <- the 3rd argument's first three floats
 };
 static_assert(sizeof(FPayloadServerFormationUpdate) == 0x10, "FORMATION_UPDATE payload 0x10");
@@ -693,13 +693,13 @@ static_assert(sizeof(FPayloadServerFormationUpdate) == 0x10, "FORMATION_UPDATE p
 // in reverse, zero-extends the byte (`XOR EAX,EAX; MOV AL,[EBP+0x30]`) and leaves the
 // last one alone, because it is a float the slot takes by value.
 struct FPayloadServerSetMusic {
-    unsigned int Field_0x00;    // +0x00
-    unsigned int Field_0x04;    // +0x04
-    unsigned int Field_0x08;    // +0x08
-    unsigned int Field_0x0c;    // +0x0c
-    unsigned char Field_0x10;   // +0x10  delivered zero-extended
+    unsigned int SpaceMusic;    // +0x00
+    unsigned int DangerMusic;    // +0x04
+    unsigned int BattleMusic;    // +0x08
+    unsigned int OverrideMusic;    // +0x0c
+    unsigned char bNoLoop;   // +0x10  delivered zero-extended
     unsigned char Pad_0x11[3];
-    float Field_0x14;           // +0x14  FLD [ESP+0x24] / FSTP [EDX+0x34]
+    float Fade;           // +0x14  FLD [ESP+0x24] / FSTP [EDX+0x34]
 };
 static_assert(sizeof(FPayloadServerSetMusic) == 0x18, "SET_MUSIC payload 0x18");
 
@@ -730,8 +730,8 @@ static_assert(sizeof(FPayloadServerSetMusic) == 0x18, "SET_MUSIC payload 0x18");
 struct FPayloadServerPlayerList {
     unsigned int Kind;          // +0x00  0, 1 or 2; the ctor's 3 means "nothing to send"
     wchar_t* Name;              // +0x04  malloc'd copy, freed by the packet
-    unsigned int Field_0x08;    // +0x08
-    unsigned char Field_0x0c;   // +0x0c  delivered as bool: SETNZ against zero
+    unsigned int PlayerId;    // +0x08
+    unsigned char bAlreadyPresent;   // +0x0c  delivered as bool: SETNZ against zero
     unsigned char Pad_0x0d[3];
 };
 static_assert(sizeof(FPayloadServerPlayerList) == 0x10, "PLAYERLIST payload 0x10");
@@ -795,20 +795,20 @@ static_assert(sizeof(FPayloadServerPlayerList) == 0x10, "PLAYERLIST payload 0x10
 struct FPayloadServerMiscObjUpdate {
     unsigned short Flags;             // +0x00  ctor zeroes this word and nothing more
     unsigned short Pad_0x02;          // +0x02  retail leaves these two bytes uninitialised
-    unsigned int Field_0x04;          // +0x04  flag 0x0004
-    unsigned int Field_0x08;          // +0x08  flag 0x0008
-    unsigned short Field_0x0c;        // +0x0c  flag 0x0040
+    unsigned int PlayerId;          // +0x04  flag 0x0004
+    unsigned int ObjectId;          // +0x08  flag 0x0008
+    unsigned short Rank;        // +0x0c  flag 0x0040
     unsigned short Pad_0x0e;          // +0x0e
-    unsigned int Field_0x10;          // +0x10  flag 0x0080
-    unsigned int Field_0x14;          // +0x14  flag 0x0001
-    unsigned int Field_0x18;          // +0x18  flag 0x0002
-    unsigned int Field_0x1c;          // +0x1c  flag 0x0002
+    unsigned int SystemId;          // +0x10  flag 0x0080
+    unsigned int GroupId;          // +0x14  flag 0x0001
+    unsigned int MissionId;          // +0x18  flag 0x0002
+    unsigned int MissionSetBy;          // +0x1c  flag 0x0002
     // From here on the offsets in the NAMES are retail's; the port's members after Text
     // sit wherever std::wstring's size puts them.
     std::wstring Text;                // +0x20  flag 0x0010
 
     unsigned int Field_0x30;          // +0x30  zeroed by the ctor, no sender ever writes it
-    unsigned int Field_0x34;          // +0x34  flag 0x0020; the ctor seeds it with -1
+    unsigned int Affiliation;          // +0x34  flag 0x0020; the ctor seeds it with -1
     std::vector<unsigned int> Ids;    // +0x38  flag 0x0100
     // +0x48 is the Ids ELEMENT COUNT, and the earlier "no sender writes it" here was
     // wrong -- it is written on a second hop the port had collapsed away. FUN_06d98cf0,
@@ -821,7 +821,7 @@ struct FPayloadServerMiscObjUpdate {
     // the encoder writes this byte before the elements (06d99017) and the decoder uses
     // it as the loop bound (06d9960d `MOVZX ECX,byte ptr [EBP+0x68]`), so a zero here
     // means the whole array is dropped on the wire.
-    unsigned char Field_0x48;         // +0x48
+    unsigned char IdCount;         // +0x48
     unsigned char Pad_0x49[3];        // +0x49
 };
 // Retail payload 0x4c (registry 0x6c). The port's is larger (std::wstring / std::vector
@@ -960,7 +960,7 @@ static_assert(sizeof(FRpcDamageListMirror) == 0x1c, "DAMAGEOBJECT argument struc
 // (rpc_packet_registry.cpp), so the block always holds it. It is the class's typed
 // member, built and destroyed with it.
 struct FPayloadServerDamageObject {
-    unsigned int Field_0x00;        // +0x00  the 2nd argument, by value
+    unsigned int ObjectId;        // +0x00  the 2nd argument, by value
     DamageList Damage;              // +0x04
 };
 // The offset contract, not retail's byte count: the payload starts right after the
@@ -999,26 +999,26 @@ static_assert(offsetof(FPayloadServerDamageObject, Damage) == sizeof(unsigned in
 // The record as it travels: FUN_06d93280 copies 0x46 bytes of it, the node is
 // operator new(0x50) so the value is padded back out to 0x48.
 struct FRpcLootWireRecord {
-    unsigned int Field_0x00;        // +0x00 <- record+0x00
-    unsigned int Field_0x04;        // +0x04 <- record+0x04
-    unsigned int Field_0x08;        // +0x08 <- record+0x08
-    unsigned short Field_0x0c;      // +0x0c <- record+0x0c
+    unsigned int LootId;        // +0x00 <- record+0x00
+    unsigned int ContentsNickname;        // +0x04 <- record+0x04
+    unsigned int ContentsHitPtsBits;        // +0x08 <- record+0x08
+    unsigned short Units;      // +0x0c <- record+0x0c
     unsigned short Pad_0x0e;        // +0x0e
-    unsigned int Field_0x10;        // +0x10 <- record+0x10
-    unsigned int Field_0x14;        // +0x14 <- record+0x14
-    unsigned int Field_0x18;        // +0x18 <- record+0x18
-    unsigned int Field_0x1c;        // +0x1c <- record+0x1c
-    unsigned int Field_0x20;        // +0x20 <- record+0x20
-    unsigned int Field_0x24;        // +0x24 <- record+0x24
-    unsigned int Field_0x28;        // +0x28 <- record+0x38
-    unsigned int Field_0x2c;        // +0x2c <- record+0x3c
-    unsigned int Field_0x30;        // +0x30 <- record+0x40
-    unsigned int Field_0x34;        // +0x34 <- record+0x28  (sender seeds it with 1.0f)
-    unsigned int Field_0x38;        // +0x38 <- record+0x30  (receiver puts it back at +0x2c)
-    unsigned int Field_0x3c;        // +0x3c <- record+0x2c  (receiver puts it back at +0x30)
-    unsigned int Field_0x40;        // +0x40 <- record+0x34
-    unsigned char Field_0x44;       // +0x44 <- record+0x46
-    unsigned char Field_0x45;       // +0x45 <- record+0x45
+    unsigned int ContainerNickname;        // +0x10 <- record+0x10
+    unsigned int HitPtsBits;        // +0x14 <- record+0x14
+    unsigned int NameOverride;        // +0x18 <- record+0x18
+    unsigned int PosXBits;        // +0x1c <- record+0x1c
+    unsigned int PosYBits;        // +0x20 <- record+0x20
+    unsigned int PosZBits;        // +0x24 <- record+0x24
+    unsigned int VelXBits;        // +0x28 <- record+0x38
+    unsigned int VelYBits;        // +0x2c <- record+0x3c
+    unsigned int VelZBits;        // +0x30 <- record+0x40
+    unsigned int OrientWBits;        // +0x34 <- record+0x28  (sender seeds it with 1.0f)
+    unsigned int OrientYBits;        // +0x38 <- record+0x30  (receiver puts it back at +0x2c)
+    unsigned int OrientXBits;        // +0x3c <- record+0x2c  (receiver puts it back at +0x30)
+    unsigned int OrientZBits;        // +0x40 <- record+0x34
+    unsigned char bMarkedBy;       // +0x44 <- record+0x46
+    unsigned char bTemporary;       // +0x45 <- record+0x45
     unsigned char Pad_0x46[2];      // +0x46  inside the 0x50 node, never written
 };
 static_assert(sizeof(FRpcLootWireRecord) == 0x48, "CREATELOOT wire record is 0x50 - 8 links");
@@ -1039,8 +1039,8 @@ struct FRpcLootWireList {
 static_assert(sizeof(FRpcLootWireList) == 0x0c, "retail std::list header is 0x0c");
 
 struct FPayloadServerCreateLoot {
-    unsigned int Field_0x00;        // +0x00 <- argument+0x00 (06d8ab03/06d8ab09)
-    unsigned char Field_0x04;       // +0x04 <- LOW BYTE of argument+0x04 (06d8ab0c MOV CL,[EAX+0x4])
+    unsigned int OwnerId;        // +0x00 <- argument+0x00 (06d8ab03/06d8ab09)
+    unsigned char Kind;       // +0x04 <- LOW BYTE of argument+0x04 (06d8ab0c MOV CL,[EAX+0x4])
     unsigned char Pad_0x05[3];      // +0x05
     FRpcLootWireList Items;         // +0x08
 };
@@ -1065,25 +1065,25 @@ static_assert(sizeof(FPayloadServerCreateLoot) == 0x14, "CREATELOOT payload 0x14
 // LEA EDX,[ESP+0x1e4] ; PUSH EDX), and so does the sender, which dereferences its own
 // first argument (06d8a34a MOV ECX,[ESP+0xc] ; MOV EAX,[ECX] ; PUSH EAX).
 struct FPayloadServerCreateCounter {
-    unsigned int Field_0x00;        // +0x00 <- argument+0x04
-    unsigned int Field_0x04;        // +0x04 <- argument+0x00
-    unsigned int Field_0x08;        // +0x08 <- argument+0x44
-    unsigned int Field_0x0c;        // +0x0c <- argument+0x08
-    unsigned short Field_0x10;      // +0x10 <- argument+0x0c, a word on both sides
+    unsigned int ArchetypeNickname;        // +0x00 <- argument+0x04
+    unsigned int ObjId;        // +0x04 <- argument+0x00
+    unsigned int OwnerPlayer;        // +0x08 <- argument+0x44
+    unsigned int OwnerId;        // +0x0c <- argument+0x08
+    unsigned short SubObjId;      // +0x10 <- argument+0x0c, a word on both sides
     unsigned short Pad_0x12;        // +0x12
-    unsigned int Field_0x14;        // +0x14 <- argument+0x1c
-    unsigned int Field_0x18;        // +0x18 <- argument+0x20
-    unsigned int Field_0x1c;        // +0x1c <- argument+0x24
-    unsigned int Field_0x20;        // +0x20 <- argument+0x28
-    unsigned int Field_0x24;        // +0x24 <- argument+0x10
-    unsigned int Field_0x28;        // +0x28 <- argument+0x14
-    unsigned int Field_0x2c;        // +0x2c <- argument+0x18
-    unsigned int Field_0x30;        // +0x30 <- argument+0x2c
-    unsigned int Field_0x34;        // +0x34 <- argument+0x30
-    unsigned int Field_0x38;        // +0x38 <- argument+0x34
-    unsigned int Field_0x3c;        // +0x3c <- argument+0x38
-    unsigned int Field_0x40;        // +0x40 <- argument+0x3c
-    unsigned int Field_0x44;        // +0x44 <- argument+0x40
+    unsigned int OrientWBits;        // +0x14 <- argument+0x1c
+    unsigned int OrientXBits;        // +0x18 <- argument+0x20
+    unsigned int OrientYBits;        // +0x1c <- argument+0x24
+    unsigned int OrientZBits;        // +0x20 <- argument+0x28
+    unsigned int PosXBits;        // +0x24 <- argument+0x10
+    unsigned int PosYBits;        // +0x28 <- argument+0x14
+    unsigned int PosZBits;        // +0x2c <- argument+0x18
+    unsigned int VelXBits;        // +0x30 <- argument+0x2c
+    unsigned int VelYBits;        // +0x34 <- argument+0x30
+    unsigned int VelZBits;        // +0x38 <- argument+0x34
+    unsigned int AngVelXBits;        // +0x3c <- argument+0x38
+    unsigned int AngVelYBits;        // +0x40 <- argument+0x3c
+    unsigned int AngVelZBits;        // +0x44 <- argument+0x40
 };
 static_assert(sizeof(FPayloadServerCreateCounter) == 0x48, "CREATECOUNTER payload 0x48");
 
@@ -1099,22 +1099,22 @@ static_assert(sizeof(FPayloadServerCreateCounter) == 0x48, "CREATECOUNTER payloa
 // first eight dwords go to payload+0x18.., and its tail +0x20..+0x34 comes back at
 // payload+0x00..+0x14. The literal 1 travels by reference on both sides.
 struct FPayloadServerCreateGuided {
-    unsigned int Field_0x00;        // +0x00 <- argument+0x2c
-    unsigned int Field_0x04;        // +0x04 <- argument+0x28
-    unsigned int Field_0x08;        // +0x08 <- argument+0x30
-    unsigned short Field_0x0c;      // +0x0c <- argument+0x34, a word on both sides
+    unsigned int OwnerPlayer;        // +0x00 <- argument+0x2c
+    unsigned int ArchetypeNickname;        // +0x04 <- argument+0x28
+    unsigned int OwnerId;        // +0x08 <- argument+0x30
+    unsigned short SubObjId;      // +0x0c <- argument+0x34, a word on both sides
     unsigned short Pad_0x0e;        // +0x0e
-    unsigned int Field_0x10;        // +0x10 <- argument+0x20
-    unsigned short Field_0x14;      // +0x14 <- argument+0x24, a word on both sides
+    unsigned int TargetId;        // +0x10 <- argument+0x20
+    unsigned short TargetSubObjId;      // +0x14 <- argument+0x24, a word on both sides
     unsigned short Pad_0x16;        // +0x16
-    unsigned int Field_0x18;        // +0x18 <- argument+0x00
-    unsigned int Field_0x1c;        // +0x1c <- argument+0x04
-    unsigned int Field_0x20;        // +0x20 <- argument+0x08
-    unsigned int Field_0x24;        // +0x24 <- argument+0x0c
-    unsigned int Field_0x28;        // +0x28 <- argument+0x10
-    unsigned int Field_0x2c;        // +0x2c <- argument+0x14
-    unsigned int Field_0x30;        // +0x30 <- argument+0x18
-    unsigned int Field_0x34;        // +0x34 <- argument+0x1c
+    unsigned int ObjId;        // +0x18 <- argument+0x00
+    unsigned int PosXBits;        // +0x1c <- argument+0x04
+    unsigned int PosYBits;        // +0x20 <- argument+0x08
+    unsigned int PosZBits;        // +0x24 <- argument+0x0c
+    unsigned int OrientWBits;        // +0x28 <- argument+0x10
+    unsigned int OrientXBits;        // +0x2c <- argument+0x14
+    unsigned int OrientYBits;        // +0x30 <- argument+0x18
+    unsigned int OrientZBits;        // +0x34 <- argument+0x1c
 };
 static_assert(sizeof(FPayloadServerCreateGuided) == 0x38, "CREATEGUIDED payload 0x38");
 
@@ -1142,12 +1142,12 @@ static_assert(sizeof(FPayloadServerCreateGuided) == 0x38, "CREATEGUIDED payload 
 //   receiver 06d81ca4  payload+0x14 == 0 -> argument+0x114 = 2, else 1
 //                      (CMP AL,BL ; SETZ DL ; INC EDX)
 struct FPayloadServerRequestSpaceScript {
-    unsigned int Field_0x00;        // +0x00 <- argument+0x000
+    unsigned int ObjectId;        // +0x00 <- argument+0x000
     unsigned int NameSize;          // +0x04 = strlen(argument+0x004) + 1
-    unsigned int Field_0x08;        // +0x08 <- argument+0x108
-    unsigned int Field_0x0c;        // +0x0c <- argument+0x10c
-    unsigned int Field_0x10;        // +0x10 <- argument+0x110
-    unsigned char Field_0x14;       // +0x14 <- the enum remap above
+    unsigned int PosXBits;        // +0x08 <- argument+0x108
+    unsigned int PosYBits;        // +0x0c <- argument+0x10c
+    unsigned int PosZBits;        // +0x10 <- argument+0x110
+    unsigned char CameraModeWire;       // +0x14 <- the enum remap above
     unsigned char Pad_0x15[3];      // +0x15
     char* Name;                     // +0x18  owned by the packet
 };
@@ -1212,8 +1212,8 @@ static_assert(sizeof(FPayloadServerRequestSpaceScript) == 0x1c, "REQUESTSPACESCR
 // (?Get@Vibe@Reputation@@YAHABHAAI1AAEQAURelation@2@AAUFmtStr@@4AAPBG@Z), typed so in
 // FServerSetReputationInfo (src/include/rpc_iclient_args.h).
 struct FRpcRelation {
-    unsigned int Field_0x00;        // +0x00  Reputation::Relation::GroupId
-    unsigned int Field_0x04;        // +0x04  Reputation::Relation::Feeling, as float bits
+    unsigned int GroupId;        // +0x00  Reputation::Relation::GroupId
+    unsigned int FeelingBits;        // +0x04  Reputation::Relation::Feeling, as float bits
 };
 static_assert(sizeof(FRpcRelation) == 0x08, "reputation relation element is 8 bytes");
 static_assert(sizeof(FRpcRelation) == sizeof(::Reputation::Relation),
@@ -1260,17 +1260,17 @@ struct FPayloadServerSetReputation {
     // packet+0x38 is payload+0x18. Both codec slots (LAB_06d91ed0 / LAB_06d92350,
     // ported in rpc_wire_ch2.cpp) read the VALUES out of these five and test them
     // against the mask byte at +0x34; nothing ever uses a literal.
-    unsigned int Field_0x14;        // +0x14  ctor seeds 1     06d9d2ef
-    unsigned int Field_0x18;        // +0x18  ctor seeds 2     06d9d2e1
-    unsigned int Field_0x1c;        // +0x1c  ctor seeds 4     06d9d2f2
-    unsigned int Field_0x20;        // +0x20  ctor seeds 8     06d9d2f9
-    unsigned int Field_0x24;        // +0x24  ctor seeds 0x10  06d9d300
+    unsigned int MaskAffiliation;        // +0x14  ctor seeds 1     06d9d2ef
+    unsigned int MaskNames;        // +0x18  ctor seeds 2     06d9d2e1
+    unsigned int MaskDisplayName;        // +0x1c  ctor seeds 4     06d9d2f2
+    unsigned int MaskRelationsByte;        // +0x20  ctor seeds 8     06d9d2f9
+    unsigned int MaskRelationsWord;        // +0x24  ctor seeds 0x10  06d9d300
     FRpcRelationList Relations;     // +0x28  packet+0x48..+0x53 (FUN_06d92760 / FUN_06d927e0)
-    unsigned char Field_0x34;       // +0x34  the presence MASK; ctor clears it (06d9d323)
+    unsigned char Flags;       // +0x34  the presence MASK; ctor clears it (06d9d323)
                                     //        and the ENCODER rebuilds it (06d91f1c..)
     unsigned char Pad_0x35[3];      // +0x35
     unsigned int VibeHandle;        // +0x38  06d88db2 <- arg+0x00
-    unsigned int Field_0x3c;        // +0x3c  06d88dbc <- arg+0x08 ; ctor seeds 0xffffffff
+    unsigned int Affiliation;        // +0x3c  06d88dbc <- arg+0x08 ; ctor seeds 0xffffffff
     unsigned int DisplayNameLength; // +0x40  FUN_06d92710: wcslen(arg+0x48) + 1, in wchar_t
     wchar_t* DisplayName;           // +0x44  operator new((len+1)*4) -- see the note below
 };
@@ -1317,7 +1317,7 @@ static_assert(sizeof(FPayloadServerSetGroupFeelings) == 0x14,
 // vtable +0x11c. The packet destructor (FUN_06d9d7d0) frees packet+0x2c and nothing else.
 // ===========================================================================
 struct FPayloadServerReplaceMissionObjective {
-    unsigned int Field_0x00;        // +0x00  06d8adba <- arg+0x00
+    unsigned int MissionId;        // +0x00  06d8adba <- arg+0x00
     unsigned int State;             // +0x04  06d8adbd MOVZX from the BYTE at arg+0x20
     unsigned int TextSize;          // +0x08  06d8ae12
     void* TextBuffer;               // +0x0c  06d8ae22
@@ -1337,7 +1337,7 @@ static_assert(sizeof(FPayloadServerReplaceMissionObjective) == 0x10,
 struct FPayloadServerSetMissionMessage {
     unsigned int TextSize;          // +0x00  06d8afd0
     void* TextBuffer;               // +0x04  06d8afe0
-    unsigned int Field_0x08;        // +0x08  06d8aff4 <- arg+0x18
+    unsigned int Type;        // +0x08  06d8aff4 <- arg+0x18
 };
 static_assert(sizeof(FPayloadServerSetMissionMessage) == 0x0c,
               "SET_MISSION_MESSAGE payload 0x0c");
@@ -1379,8 +1379,8 @@ static_assert(sizeof(FRpcMissionObjectiveList) == 0x0c,
               "retail std::list header is 0x0c: allocator, head, size");
 
 struct FPayloadServerSetMissionObjectives {
-    unsigned int Field_0x00;        // +0x00  06d8b04b <- arg+0x00
-    unsigned int Field_0x04;        // +0x04  06d8b058 MOVZX from the BYTE at arg+0x3c
+    unsigned int MissionId;        // +0x00  06d8b04b <- arg+0x00
+    unsigned int MissionType;        // +0x04  06d8b058 MOVZX from the BYTE at arg+0x3c
     unsigned int TextASize;         // +0x08  06d8b0a0  flattened size of arg+0x0c
     void* TextABuffer;              // +0x0c  06d8b0b3
     unsigned int TextBSize;         // +0x10  06d8b100  flattened size of arg+0x24
@@ -1492,10 +1492,10 @@ static_assert(sizeof(FPayloadServerObjectCargoUpdate) == 0x14,
 // The array capacity is 8 in both: (count offset - array offset) / 4.
 // ===========================================================================
 struct FRpcIdArrayBlock {
-    unsigned int Field_0x00;        // +0x00
-    unsigned int Field_0x04;        // +0x04
-    unsigned int Field_0x08;        // +0x08
-    unsigned int Field_0x0c;        // +0x0c
+    unsigned int Head;        // +0x00
+    unsigned int Body;        // +0x04
+    unsigned int LeftHand;        // +0x08
+    unsigned int RightHand;        // +0x0c
     unsigned int Ids[8];            // +0x10 .. +0x2f
     int Count;                      // +0x30
 };
@@ -1542,19 +1542,19 @@ static_assert(sizeof(FRpcIdArrayBlock) == 0x34,
 //     1 (06d9eab7 "MOV EDX,0x1" / 06d9eae4 "MOV byte ptr [EAX+0x74],DL"). "The receiver
 //     does not read it" was true of one of the three readers.
 struct FPayloadServerSendComm {
-    unsigned int Field_0x00;        // +0x00 <- A1
-    unsigned int Field_0x04;        // +0x04 <- A2
-    unsigned int Field_0x08;        // +0x08 <- A3
+    unsigned int SenderId;        // +0x00 <- A1
+    unsigned int ReceiverId;        // +0x04 <- A2
+    unsigned int VoiceId;        // +0x08 <- A3
     FRpcIdArrayBlock Body;          // +0x0c .. +0x3f <- A4..A16
-    unsigned int Field_0x40;        // +0x40 <- A17
+    unsigned int CommType;        // +0x40 <- A17
     unsigned int* Buffer;           // +0x44    operator new(A19 << 2), copied from A18
     unsigned char BufferCount;      // +0x48 <- LOW BYTE of A19
     unsigned char Pad_0x49[3];      // +0x49
-    unsigned int Field_0x4c;        // +0x4c <- A20
+    unsigned int Mood;        // +0x4c <- A20
     // The float travels as its four raw bytes. Retail moves it with FLD/FSTP on both
     // sides and the IClient slot takes it as a stack dword, so bits are the whole story.
-    unsigned int Field_0x50Bits;    // +0x50 <- A21
-    unsigned char Field_0x54;       // +0x54 <- LOW BYTE of A22; never read back
+    unsigned int DurationBits;    // +0x50 <- A21
+    unsigned char bReceiverIsOwnShip;       // +0x54 <- LOW BYTE of A22; never read back
     unsigned char Pad_0x55[3];      // +0x55
 };
 static_assert(sizeof(FPayloadServerSendComm) == 0x58, "SENDCOMM payload 0x58");
@@ -1672,14 +1672,14 @@ static_assert(sizeof(FPayloadClientLogin) == 0x404, "LOGIN payload 0x404");
 // Identity mapping of SSPMunitionCollisionInfo; the receiver rebuilds the struct
 // field by field on its own stack and calls IServer+0xd4 (slot 53) with it.
 struct FPayloadClientMunCollision {
-    unsigned int Field_0x00;
-    unsigned int Field_0x04;
+    unsigned int ProjectileArchId;
+    unsigned int AttackerId;
     unsigned int ObjectId;        // +0x08
-    unsigned short Field_0x0c;    // +0x0c  the only 2-byte write on either side
+    unsigned short SubObjId;    // +0x0c  the only 2-byte write on either side
     unsigned short Pad_0x0e;
-    unsigned int Field_0x10;
-    unsigned int Field_0x14;
-    unsigned int Field_0x18;
+    unsigned int HitPosX;
+    unsigned int HitPosY;
+    unsigned int HitPosZ;
 };
 static_assert(sizeof(FPayloadClientMunCollision) == 0x1c, "MUNCOLLISION payload 0x1c");
 
@@ -1712,14 +1712,14 @@ struct FPayloadClientObjCollision {
     unsigned int TargetObjectId;    // +0x08  <- +0x00
     unsigned short TargetSubObjId;  // +0x0c  <- +0x04
     unsigned short Pad_0x0e;
-    unsigned int Field_0x10;        // +0x10  <- +0x10
+    unsigned int DamageBits;        // +0x10  <- +0x10
 };
 static_assert(sizeof(FPayloadClientObjCollision) == 0x14, "OBJCOLLISION payload 0x14");
 
 // ch3 0x14 FLPACKET_CLIENT_MISSIONRESPONSE, size 0x2c -> payload 0x0c.
 // Sender IServerImpl::MissionResponse 0x06d8da80, receiver caseD_14.
 struct FPayloadClientMissionResponse {
-    unsigned int Field_0x00;      // +0x00  <- 1st argument
+    unsigned int OfferId;      // +0x00  <- 1st argument
     unsigned int MissionId;       // +0x04  <- 2nd argument (ulong)
     unsigned char bAccepted;      // +0x08  <- 3rd argument
     unsigned char Pad_0x09[3];
@@ -1926,9 +1926,9 @@ static_assert(sizeof(FPayloadClientDbgConsole) == 0x84, "DBGCONSOLE payload 0x84
 struct FPayloadClientRequestEvent {
     unsigned char EventType;      // +0x00  <- int, truncated
     unsigned char Pad_0x01[3];
-    unsigned int Field_0x04;
-    unsigned int Field_0x08;
-    unsigned int Field_0x0c;
+    unsigned int ShipId;
+    unsigned int TargetId;
+    unsigned int SecondId;
     unsigned char Field_0x10;     // +0x10  <- ulong, truncated
     unsigned char Pad_0x11[3];
 };
@@ -1939,8 +1939,8 @@ static_assert(sizeof(FPayloadClientRequestEvent) == 0x14, "REQUEST_EVENT payload
 struct FPayloadClientRequestCancel {
     unsigned char EventType;      // +0x00  <- int, truncated
     unsigned char Pad_0x01[3];
-    unsigned int Field_0x04;
-    unsigned int Field_0x08;
+    unsigned int ShipId;
+    unsigned int TargetId;
     unsigned char Field_0x0c;     // +0x0c  <- ulong, truncated
     unsigned char Pad_0x0d[3];
 };
@@ -1960,10 +1960,10 @@ static_assert(sizeof(FPayloadClientRequestCancel) == 0x10, "REQUEST_CANCEL paylo
 // actually owns and zeroes the rest, which is the one place we are tidier than retail.
 struct FPayloadClientCreateNewChar {
     wchar_t Name[0x40];           // +0x00 .. +0x7f
-    unsigned int Field_0x80;      // +0x80  <- SCreateCharacterInfo+0x30
-    unsigned int Field_0x84;      // +0x84  <- +0x34
-    unsigned int Field_0x88;      // +0x88  <- +0x38
-    unsigned int Field_0x8c;      // +0x8c  <- +0x3c
+    unsigned int FactionId;      // +0x80  <- SCreateCharacterInfo+0x30
+    unsigned int BaseId;      // +0x84  <- +0x34
+    unsigned int PackageId;      // +0x88  <- +0x38
+    unsigned int PilotId;      // +0x8c  <- +0x3c
 };
 static_assert(sizeof(FPayloadClientCreateNewChar) == 0x90, "CREATENEWCHAR payload 0x90");
 
@@ -1973,9 +1973,9 @@ static_assert(sizeof(FPayloadClientCreateNewChar) == 0x90, "CREATENEWCHAR payloa
 // arg+0x08 -> wire+0x04); receiver caseD_3d rotates them back.
 struct FPayloadClientBadLandsObjCollision {
     unsigned int ObjectId;        // +0x00  <- SSPBadLandsObjCollisionInfo+0x04
-    unsigned short Field_0x04;    // +0x04  <- +0x08
+    unsigned short SubObjId;    // +0x04  <- +0x08
     unsigned short Pad_0x06;
-    unsigned int Field_0x08;      // +0x08  <- +0x00
+    unsigned int BadLandsObjId;      // +0x08  <- +0x00
 };
 static_assert(sizeof(FPayloadClientBadLandsObjCollision) == 0x0c, "BADLANDSOBJCOLLISION payload 0x0c");
 

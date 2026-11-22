@@ -83,8 +83,8 @@ WinControl::WinControl()
     bCaptured = 0;
     bNoZEnable = 0;
     ToolTipIds = 0;
-    Field2ec = 0;
-    Field2f0 = 0;
+    UserData = 0;
+    OwnerData = 0;
     PositionFlags = static_cast<unsigned char>(PositionFlags | 1);
     bIdentityHitOrientation = 1;
     HitOffset[0] = 0.0f;
@@ -311,7 +311,7 @@ bool WinControl::MouseEvent(FWin3DMouseEvent const* Event)
     return HitTest(Win3DGetMouseRay(Ray));
 }
 
-bool WinControl::Slot23(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
+bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
 {
     // FUN_005a0840.
     if (Msg == 0xef01)
@@ -416,7 +416,7 @@ void WinControl::LoadIni(char const* Path)
     }
 }
 
-void WinControl::Slot29(FILE* /*File*/)
+void WinControl::SaveIni(FILE* /*File*/)
 {
     // FUN_0053e4a0: RET 4.
 }

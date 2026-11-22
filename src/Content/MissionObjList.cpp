@@ -60,12 +60,12 @@ namespace
     // !FUN_06f33ff0 -> FUN_06f68630(&DAT_06fd1bd8, ship, 10.0f)` (DAT_06fb8e24).
     void MuteNpcShip(FContentShipBase* Ship)
     {
-        if (!Ship->Slot04())
+        if (!Ship->IsNpcShip())
             return;
         FContentNpcShip* NpcShip = static_cast<FContentNpcShip*>(Ship);
         if (NpcShip->IsSpacePopShip())
             return;
-        if (NpcShip->GetField1b1())
+        if (NpcShip->IsCommMuted())
             return;
         GNpcShipEvents.StartTimer(NpcShip, 10.0f);
     }
@@ -384,7 +384,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
 // FUN_06f26190 (06f26190-06f2638e).
 void FObjListGotoShip::Parse(INI_Reader* Reader)
 {
-    Field_0x17c = 1;
+    bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
     Op.Field_0C = 0;
     TargetName = Reader->get_value_string(1);
@@ -400,7 +400,7 @@ void FObjListGotoShip::Parse(INI_Reader* Reader)
     if (!Reader->is_value_empty(8))
         StoreFloatBits(&Op.Field_68, Reader->get_value_float(8));
     if (!Reader->is_value_empty(9))
-        Field_0x17c = Reader->get_value_int(9);
+        bNoFailOnTimeout = Reader->get_value_int(9);
 }
 
 // 06f5e540: MOV EAX,3.
@@ -435,7 +435,7 @@ bool FObjListGotoSpline::Execute(FContentShipBase* Ship)
 // +0x150); Field_50 is a float here.
 void FObjListGotoSpline::Parse(INI_Reader* Reader)
 {
-    Field_0x17c = 1;
+    bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
     Op.Field_0C = 2;
 
@@ -464,7 +464,7 @@ void FObjListGotoSpline::Parse(INI_Reader* Reader)
     if (!Reader->is_value_empty(19))
         StoreFloatBits(&Op.Field_68, Reader->get_value_float(19));
     if (!Reader->is_value_empty(20))
-        Field_0x17c = Reader->get_value_int(20);
+        bNoFailOnTimeout = Reader->get_value_int(20);
 }
 
 // 06f25080: MOV EAX,4.
@@ -487,7 +487,7 @@ bool FObjListGotoVec::Execute(FContentShipBase* Ship)
 // FUN_06f264d0 (06f264d0-06f2669d). Field_0C = 1 (a point); the point and Field_50 are ints.
 void FObjListGotoVec::Parse(INI_Reader* Reader)
 {
-    Field_0x17c = 1;
+    bNoFailOnTimeout = 1;
     ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
     Op.Field_0C = 1;
     Op.Destination.x = static_cast<float>(Reader->get_value_int(1));
@@ -505,7 +505,7 @@ void FObjListGotoVec::Parse(INI_Reader* Reader)
     if (!Reader->is_value_empty(10))
         StoreFloatBits(&Op.Field_68, Reader->get_value_float(10));
     if (!Reader->is_value_empty(11))
-        Field_0x17c = Reader->get_value_int(11);
+        bNoFailOnTimeout = Reader->get_value_int(11);
 }
 
 // 06ee99a0: MOV EAX,5.
@@ -515,13 +515,13 @@ int FObjListGotoVec::GetType()
 }
 
 // FUN_06f26460 (06f26460-06f264c6).
-void FObjListGotoVec::SetDestination(Vector const* Destination, float Field50, float Field54,
+void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                                      unsigned int ObjectId, bool bNoCruise, bool bCruise)
 {
     Op.Field_0C = 1;
     Op.Destination = *Destination;
-    Op.Field_50 = Field50;
-    Op.Field_54 = Field54;
+    Op.Field_50 = Range;
+    Op.Field_54 = MaxSpeed;
     Op.Field_58 = 0;
     Op.Field_5A = bCruise ? 1 : 0;
     if ((ObjectId & 0x3fffffff) != 0)
@@ -543,7 +543,7 @@ FObjListTrail::FObjListTrail()
 // finishes the directive), priority default, FUN_06f57c60.
 bool FObjListTrail::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     if (TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
@@ -607,7 +607,7 @@ bool FObjListFollow::Execute(FContentShipBase* Ship)
 // 2500.0 (DAT_06fb8e2c; `FCOMP -1.0; TEST AH,0x44; JP` skips unless equal).
 void FObjListFollow::Parse(INI_Reader* Reader)
 {
-    Field_0x10c = 1;
+    bNoFailOnTimeout = 1;
     TargetName = Reader->get_value_string(0);
     Op.FollowDistance = static_cast<float>(Reader->get_value_int(1));
     if (Op.FollowDistance == -1.0f)
@@ -643,7 +643,7 @@ FObjListGuide::FObjListGuide()
 // default, mute, FUN_06f57c60.
 bool FObjListGuide::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     if (TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
@@ -663,7 +663,7 @@ bool FObjListGuide::Execute(FContentShipBase* Ship)
 // FUN_06f26810 (06f26810-06f26a8b).
 void FObjListGuide::Parse(INI_Reader* Reader)
 {
-    Field_0x1c8 = 1;
+    bNoFailOnTimeout = 1;
     TargetName = Reader->get_value_string(0);
     Op.FollowParams.Field_14 = static_cast<float>(Reader->get_value_int(1));
     Op.FollowParams.Field_18 = static_cast<float>(Reader->get_value_int(2));
@@ -691,7 +691,7 @@ void FObjListGuide::Parse(INI_Reader* Reader)
     if (!Reader->is_value_empty(18))
         Op.Field_A8 = Reader->get_value_float(18);
     if (!Reader->is_value_empty(19))
-        Field_0x1c8 = Reader->get_value_int(19);
+        bNoFailOnTimeout = Reader->get_value_int(19);
 }
 
 // 06ee99a0: MOV EAX,5.
@@ -704,13 +704,13 @@ int FObjListGuide::GetType()
 // Field_5C, the cruise flags, Field_60 = 200.0, Field_64 = 500.0; FollowParams target and
 // offset; Field_A0.
 void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowOffset,
-                             Vector const* Destination, float Field50, bool bNoCruise,
-                             bool bCruise, bool FieldA0, bool Field58)
+                             Vector const* Destination, float Range, bool bNoCruise,
+                             bool bCruise, bool bStartFollowing, bool Field58)
 {
     Op.GotoParams.Field_0C = 1;
     Op.GotoParams.Destination = *Destination;
     Op.GotoParams.Field_58 = Field58 ? 1 : 0;
-    Op.GotoParams.Field_50 = Field50;
+    Op.GotoParams.Field_50 = Range;
     Op.GotoParams.Field_5C = *TargetId;
     Op.GotoParams.Field_5B = bNoCruise ? 1 : 0;
     Op.GotoParams.Field_5A = bCruise ? 1 : 0;
@@ -720,7 +720,7 @@ void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowO
     Op.FollowParams.Field_14 = FollowOffset->x;
     Op.FollowParams.Field_18 = FollowOffset->y;
     Op.FollowParams.Field_1C = FollowOffset->z;
-    Op.Field_A0 = FieldA0 ? 1 : 0;
+    Op.Field_A0 = bStartFollowing ? 1 : 0;
 }
 
 // Factory case 9 (06f24b66-06f24bcb): +0x1cc and +0x200 names emptied.
@@ -737,7 +737,7 @@ FObjListGuideShip::FObjListGuideShip()
 // mute; FUN_06f57c60.
 bool FObjListGuideShip::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     unsigned int TargetId = FindTargetId(Ship, &TargetName);
     Op.GotoParams.Field_5C = TargetId;
     if ((TargetId & 0x3fffffff) == 0)
@@ -765,7 +765,7 @@ bool FObjListGuideShip::Execute(FContentShipBase* Ship)
 // FUN_06f26bb0 (06f26bb0-06f26e51). Field_0C = 0 (the goto target is an object).
 void FObjListGuideShip::Parse(INI_Reader* Reader)
 {
-    Field_0x1c8 = 1;
+    bNoFailOnTimeout = 1;
     TargetName = Reader->get_value_string(0);
     Op.FollowParams.Field_14 = static_cast<float>(Reader->get_value_int(1));
     Op.FollowParams.Field_18 = static_cast<float>(Reader->get_value_int(2));
@@ -791,7 +791,7 @@ void FObjListGuideShip::Parse(INI_Reader* Reader)
     if (!Reader->is_value_empty(16))
         Op.Field_A8 = Reader->get_value_float(16);
     if (!Reader->is_value_empty(17))
-        Field_0x1c8 = Reader->get_value_int(17);
+        bNoFailOnTimeout = Reader->get_value_int(17);
 }
 
 // 06ee99a0: MOV EAX,5.
@@ -815,7 +815,7 @@ FObjListFace::FObjListFace()
 // FUN_06f57c60.
 bool FObjListFace::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     if (Op.Mode == 1 && TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
@@ -870,12 +870,12 @@ int FObjListFace::GetType()
 // gets +0x1bc = +0x1c8 = (float)LifeTime, and so do its formation mates; FUN_06f57b00; true.
 bool FObjListSetLifeTime::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
-    if (Ship->Slot04())
+    Ship->IsNpcShip();
+    if (Ship->IsNpcShip())
     {
         FContentNpcShip* NpcShip = static_cast<FContentNpcShip*>(Ship);
-        NpcShip->Field_0x1bc = static_cast<float>(LifeTime);
-        NpcShip->Field_0x1c8 = static_cast<float>(LifeTime);
+        NpcShip->Longevity = static_cast<float>(LifeTime);
+        NpcShip->LifeTime = static_cast<float>(LifeTime);
     }
     FSystemInfo* System = Ship->GetSystem();
     if (System != nullptr)
@@ -890,8 +890,8 @@ bool FObjListSetLifeTime::Execute(FContentShipBase* Ship)
                 continue;
             if (Other->FormationId != Ship->FormationId)
                 continue;
-            Other->Field_0x1bc = static_cast<float>(LifeTime);
-            Other->Field_0x1c8 = static_cast<float>(LifeTime);
+            Other->Longevity = static_cast<float>(LifeTime);
+            Other->LifeTime = static_cast<float>(LifeTime);
         }
     }
     Ship->AdvanceDirective();
@@ -992,6 +992,8 @@ namespace
             Op->BoxMax.z = Reader->get_value_float(5);
             Index = 6;
         }
+        // Retail quirk (content.dll 0x06F27E7E): retail falls directly into is_value_empty(3)
+        // without an else branch. Preserved verbatim.
         if (!Reader->is_value_empty(3))
         {
             Op->Mode = 0;
@@ -1080,7 +1082,7 @@ int FObjListStayOutOfRange::GetType()
 // FUN_06f57b00 either way; true.
 bool FObjListMakeNewFormation::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     std::list<FContentShipBase*> Members;
     FSystemInfo* System = Ship->GetSystem();
     if (System != nullptr)
@@ -1150,7 +1152,7 @@ int FObjListMakeNewFormation::GetType()
 // (true without members).
 bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     bool bResult = true;
     std::list<FContentShipBase*> UnusedShips;                           // 06f2887f
     FSystemInfo* System = Ship->GetSystem();
@@ -1306,17 +1308,17 @@ int FObjListDock::GetType()
 }
 
 // FUN_06f276f0 (06f276f0-06f27708).
-void FObjListDock::SetTarget(unsigned int const* DockObjectId, unsigned int const* Field10)
+void FObjListDock::SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId)
 {
     Op.DockObjectId = *DockObjectId;
-    Op.Field_10 = static_cast<int32_t>(*Field10);
+    Op.Field_10 = static_cast<int32_t>(*NextRingId);
 }
 
 // LAB_06f27830 (06f27830-06f27866): vtbl[+4] (result unused), priority default,
 // FUN_06f57c60.
 bool FObjListInstantTradelane::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     DefaultPriority(&Op, Ship);
     return Ship->SubmitDirective(&Op);
 }
@@ -1340,12 +1342,12 @@ int FObjListInstantTradelane::GetType()
 }
 
 // FUN_06f27870 (06f27870-06f27892).
-void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned int Field14,
-                                       unsigned int const* Field10)
+void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned int OffsetBits,
+                                       unsigned int const* NextRingId)
 {
     Op.TradeLaneId = *TradeLaneId;
-    Op.Field_10 = static_cast<int32_t>(*Field10);
-    Op.Field_14 = static_cast<int32_t>(Field14);
+    Op.Field_10 = static_cast<int32_t>(*NextRingId);
+    Op.Field_14 = static_cast<int32_t>(OffsetBits);
 }
 
 // LAB_06f27970 (06f27970-06f279ff): vtbl[+4] (result unused); without a launch object or
@@ -1354,7 +1356,7 @@ void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned
 // FUN_06f57c60.
 bool FObjListLaunch::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     if (Op.Field_10 == -1 || Op.LaunchObjectId == 0)
     {
         unsigned int ShipId = Ship->SpaceObjId;
@@ -1401,11 +1403,11 @@ int FObjListLaunch::GetType()
 }
 
 // FUN_06f27a10 (06f27a10-06f27a30).
-void FObjListLaunch::SetLaunch(unsigned int const* LaunchObjectId, int Field10, int Field14)
+void FObjListLaunch::SetLaunch(unsigned int const* LaunchObjectId, int DockIndex, int TerminalType)
 {
     Op.LaunchObjectId = *LaunchObjectId;
-    Op.Field_10 = Field10;
-    Op.Field_14 = Field14;
+    Op.Field_10 = DockIndex;
+    Op.Field_14 = TerminalType;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1425,7 +1427,7 @@ FObjListWaitForPlayerManeuver::FObjListWaitForPlayerManeuver()
 // (FUN_06f57b00, true). Else priority default and FUN_06f57c60.
 bool FObjListWaitForPlayerManeuver::Execute(FContentShipBase* Ship)
 {
-    Ship->Slot04();
+    Ship->IsNpcShip();
     TString<0x30> PlayerName;
     PlayerName = "Player";
     unsigned int PlayerId = FindTargetId(Ship, &PlayerName);

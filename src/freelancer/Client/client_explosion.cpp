@@ -197,7 +197,7 @@ bool Action_Explode::update(float Dt)
 {
     // FUN_00536460 (RET 4).
     // 0x00536466..0x0053647b: the Gameobj is done (slot 86) -- the action is too.
-    if (Gameobj->Slot158())
+    if (Gameobj->IsDead())
         return false;
 
     // 0x0053647e..0x005364ae: PrevElapsed = Elapsed; Elapsed = Dt the first time (still the
@@ -245,7 +245,7 @@ bool Action_Explode::update(float Dt)
     if (LifetimeEndedThisTick())
     {
         if (Arch->Process != 2u)
-            Gameobj->Slot15c(true);
+            Gameobj->MarkForRemoval(true);
         if (Arch->Process == 0u)
             Shatter();
     }

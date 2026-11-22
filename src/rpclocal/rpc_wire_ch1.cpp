@@ -97,7 +97,7 @@ unsigned int RpcEncodeCommonUpdateObject(FPacketBase& Packet, unsigned char** Bu
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da4a14 FUN_06da1380
 
-    Stream.PutByte(Wire->Field_0x00);                              // 06da4a4b
+    Stream.PutByte(Wire->State);                              // 06da4a4b
     Stream.PutDword(Wire->ObjectId);                               // 06da4a75
     // 06da4aba FUN_06d8f510 moves three dwords out of a stack copy of packet+0x28..+0x30
     // (06da4aa7 / 06da4aaf / 06da4ab6 -- the last of those is written AFTER a PUSH, so
@@ -108,8 +108,8 @@ unsigned int RpcEncodeCommonUpdateObject(FPacketBase& Packet, unsigned char** Bu
     Stream.PutQuantized(Wire->Orientation.y, FRpcMarshalStream::kOrientationScale); // 06da4b58
     Stream.PutQuantized(Wire->Orientation.z, FRpcMarshalStream::kOrientationScale); // 06da4b7f
     Stream.PutQuantized(Wire->Orientation.w, FRpcMarshalStream::kOrientationScale); // 06da4ba2
-    Stream.PutQuantized(Wire->Field_0x28, FRpcMarshalStream::kOrientationScale);    // 06da4be4
-    Stream.PutFloat(Wire->Field_0x24);                             // 06da4c1d FSTP
+    Stream.PutQuantized(Wire->Throttle, FRpcMarshalStream::kOrientationScale);    // 06da4be4
+    Stream.PutFloat(Wire->Timestamp);                             // 06da4c1d FSTP
 
     // 06da4c2d FUN_06da13c0 -- `XOR EAX,EAX ; RET 0xc`, emits nothing.
     if (Stream.Failed()) {
@@ -142,7 +142,7 @@ unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned cha
     unsigned char Small8 = 0;
     unsigned int Scratch = 0;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->Field_0x00 = Small8;                                     // 06da4d0c
+    Wire->State = Small8;                                     // 06da4d0c
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
     Wire->ObjectId = Scratch;                                      // 06da4d38
     if (!Stream.GetBytes(&Wire->Position, 12u)) { return Stream.GetError(); }  // 06da4d5f
@@ -163,12 +163,12 @@ unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned cha
                                    FRpcMarshalStream::kOrientationInvScale)) { // 06da4e51
         return Stream.GetError();
     }
-    if (!Stream.GetQuantizedSigned(Wire->Field_0x28,
+    if (!Stream.GetQuantizedSigned(Wire->Throttle,
                                    FRpcMarshalStream::kOrientationInvScale)) { // 06da4e88
         return Stream.GetError();
     }
     // 06da4ea7 `MOV EDX,[EAX]` -- a plain dword, no FILD and no scale.
-    if (!Stream.GetFloat(Wire->Field_0x24)) { return Stream.GetError(); }      // 06da4eb7
+    if (!Stream.GetFloat(Wire->Timestamp)) { return Stream.GetError(); }      // 06da4eb7
 
     // 06da4eba FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {

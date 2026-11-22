@@ -158,15 +158,15 @@ unsigned int RpcEncodeWireDwordDwordWord(FPacketBase& Packet, unsigned char** Bu
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06daafc0
-    Stream.PutDword(Wire->Field_0x00);                                 // 06dab000
+    Stream.PutDword(Wire->MissionId);                                 // 06dab000
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daaff3
     }
-    Stream.PutDword(Wire->Field_0x04);                                 // 06dab035
+    Stream.PutDword(Wire->ObjectiveIndex);                                 // 06dab035
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dab028
     }
-    Stream.PutWord(Wire->Field_0x08);                                  // 06dab06a
+    Stream.PutWord(Wire->State);                                  // 06dab06a
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dab05d
     }
@@ -189,15 +189,15 @@ unsigned int RpcDecodeWireDwordDwordWord(FPacketBase& Packet, const unsigned cha
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daceff
     }
-    Wire->Field_0x00 = ScratchDword;                                   // 06dacf05
+    Wire->MissionId = ScratchDword;                                   // 06dacf05
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06dacf27
     }
-    Wire->Field_0x04 = ScratchDword;                                   // 06dacf2d
+    Wire->ObjectiveIndex = ScratchDword;                                   // 06dacf2d
     if (!Stream.GetWord(ScratchWord)) {
         return Stream.GetError();                                      // 06dacf4f
     }
-    Wire->Field_0x08 = ScratchWord;                                    // 06dacf51
+    Wire->State = ScratchWord;                                    // 06dacf51
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -218,15 +218,15 @@ unsigned int RpcEncodeWireDwordWordWord(FPacketBase& Packet, unsigned char** Buf
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06db19e0
-    Stream.PutDword(Wire->Field_0x00);                                 // 06db1a20
+    Stream.PutDword(Wire->ObjectId);                                 // 06db1a20
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06db1a13
     }
-    Stream.PutWord(Wire->Field_0x04);                                  // 06db1a55
+    Stream.PutWord(Wire->EquipId);                                  // 06db1a55
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06db1a48
     }
-    Stream.PutWord(Wire->Field_0x06);                                  // 06db1a8c
+    Stream.PutWord(Wire->Count);                                  // 06db1a8c
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06db1a7f
     }
@@ -249,15 +249,15 @@ unsigned int RpcDecodeWireDwordWordWord(FPacketBase& Packet, const unsigned char
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06dad6ef
     }
-    Wire->Field_0x00 = ScratchDword;                                   // 06dad6f5
+    Wire->ObjectId = ScratchDword;                                   // 06dad6f5
     if (!Stream.GetWord(ScratchWord)) {
         return Stream.GetError();                                      // 06dad717
     }
-    Wire->Field_0x04 = ScratchWord;                                    // 06dad71d
+    Wire->EquipId = ScratchWord;                                    // 06dad71d
     if (!Stream.GetWord(ScratchWord)) {
         return Stream.GetError();                                      // 06dad741
     }
-    Wire->Field_0x06 = ScratchWord;                                    // 06dad743
+    Wire->Count = ScratchWord;                                    // 06dad743
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -430,7 +430,7 @@ unsigned int RpcEncodeWireDwordTwoBytes(FPacketBase& Packet, unsigned char** Buf
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06db1bf6
     }
-    Stream.PutByte(Wire->Field_0x05);                                  // 06db1c34
+    Stream.PutByte(Wire->bDisruptCruise);                                  // 06db1c34
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06db1c27
     }
@@ -461,7 +461,7 @@ unsigned int RpcDecodeWireDwordTwoBytes(FPacketBase& Packet, const unsigned char
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06da6af9
     }
-    Wire->Field_0x05 = ScratchByte;                                    // 06da6afb
+    Wire->bDisruptCruise = ScratchByte;                                    // 06da6afb
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -563,7 +563,7 @@ unsigned int RpcEncodeCommonGoTradelane(FPacketBase& Packet, unsigned char** Buf
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da6c44
     }
-    Stream.PutByte(Wire->Field_0x0c);                                  // 06da6c7c
+    Stream.PutByte(Wire->bMidLane);                                  // 06da6c7c
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da6c71
     }
@@ -598,7 +598,7 @@ unsigned int RpcDecodeCommonGoTradelane(FPacketBase& Packet, const unsigned char
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06da6dc5
     }
-    Wire->Field_0x0c = ScratchByte;                                    // 06da6dc7
+    Wire->bMidLane = ScratchByte;                                    // 06da6dc7
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -627,7 +627,7 @@ unsigned int RpcEncodeServerActivateObject(FPacketBase& Packet, unsigned char** 
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da8ec6
     }
-    Stream.PutDword(Wire->Field_0x08);                                 // 06da8f06
+    Stream.PutDword(Wire->ActivateParam);                                 // 06da8f06
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da8ef9
     }
@@ -658,7 +658,7 @@ unsigned int RpcDecodeServerActivateObject(FPacketBase& Packet, const unsigned c
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06da902b
     }
-    Wire->Field_0x08 = ScratchDword;                                   // 06da902d
+    Wire->ActivateParam = ScratchDword;                                   // 06da902d
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -688,15 +688,15 @@ unsigned int RpcEncodeServerCfgInterfaceNotification(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06dab230
-    Stream.PutDword(Wire->Field_0x00);                                 // 06dab272
+    Stream.PutDword(Wire->NotifType);                                 // 06dab272
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dab263
     }
-    Stream.PutByte(Wire->Field_0x08);                                  // 06dab2a5
+    Stream.PutByte(Wire->bEnable);                                  // 06dab2a5
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dab296
     }
-    Stream.PutDword(Wire->Field_0x04);                                 // 06dab2d8
+    Stream.PutDword(Wire->Param);                                 // 06dab2d8
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dab2c9
     }
@@ -721,15 +721,15 @@ unsigned int RpcDecodeServerCfgInterfaceNotification(FPacketBase& Packet,
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06dab3af
     }
-    Wire->Field_0x00 = ScratchDword;                                   // 06dab3b5
+    Wire->NotifType = ScratchDword;                                   // 06dab3b5
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06dab3d5
     }
-    Wire->Field_0x08 = ScratchByte;                                    // 06dab3db
+    Wire->bEnable = ScratchByte;                                    // 06dab3db
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06dab3fb
     }
-    Wire->Field_0x04 = ScratchDword;                                   // 06dab3fd
+    Wire->Param = ScratchDword;                                   // 06dab3fd
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -750,7 +750,7 @@ unsigned int RpcEncodeClientMissionResponse(FPacketBase& Packet, unsigned char**
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06daeef0
-    Stream.PutDword(Wire->Field_0x00);                                 // 06daef30
+    Stream.PutDword(Wire->OfferId);                                 // 06daef30
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daef23
     }
@@ -781,7 +781,7 @@ unsigned int RpcDecodeClientMissionResponse(FPacketBase& Packet, const unsigned 
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daf06f
     }
-    Wire->Field_0x00 = ScratchDword;                                   // 06daf075
+    Wire->OfferId = ScratchDword;                                   // 06daf075
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daf097
     }
@@ -812,19 +812,19 @@ unsigned int RpcEncodeServerRequestReturned(FPacketBase& Packet, unsigned char**
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06daa851
-    Stream.PutDword(Wire->Field_0x00);                                 // 06daa891
+    Stream.PutDword(Wire->ShipId);                                 // 06daa891
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa886
     }
-    Stream.PutByte(Wire->Field_0x04);                                  // 06daa8be
+    Stream.PutByte(Wire->RequestType);                                  // 06daa8be
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa8b3
     }
-    Stream.PutByte((unsigned char)Wire->Field_0x05);                   // 06daa8e9
+    Stream.PutByte((unsigned char)Wire->Response);                   // 06daa8e9
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa8de
     }
-    Stream.PutByte((unsigned char)Wire->Field_0x06);                   // 06daa914
+    Stream.PutByte((unsigned char)Wire->Extra);                   // 06daa914
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa909
     }
@@ -847,19 +847,19 @@ unsigned int RpcDecodeServerRequestReturned(FPacketBase& Packet, const unsigned 
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daa9ef
     }
-    Wire->Field_0x00 = ScratchDword;                                   // 06daa9f5
+    Wire->ShipId = ScratchDword;                                   // 06daa9f5
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06daaa15
     }
-    Wire->Field_0x04 = ScratchByte;                                    // 06daaa1b
+    Wire->RequestType = ScratchByte;                                    // 06daaa1b
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06daaa39
     }
-    Wire->Field_0x05 = (signed char)ScratchByte;                       // 06daaa3f
+    Wire->Response = (signed char)ScratchByte;                       // 06daaa3f
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06daaa5d
     }
-    Wire->Field_0x06 = (signed char)ScratchByte;                       // 06daaa5f
+    Wire->Extra = (signed char)ScratchByte;                       // 06daaa5f
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -885,11 +885,11 @@ unsigned int RpcEncodeClientRequestCancel(FPacketBase& Packet, unsigned char** B
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa5c4
     }
-    Stream.PutDword(Wire->Field_0x04);                                 // 06daa5fc
+    Stream.PutDword(Wire->ShipId);                                 // 06daa5fc
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa5f1
     }
-    Stream.PutDword(Wire->Field_0x08);                                 // 06daa62b
+    Stream.PutDword(Wire->TargetId);                                 // 06daa62b
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa620
     }
@@ -920,11 +920,11 @@ unsigned int RpcDecodeClientRequestCancel(FPacketBase& Packet, const unsigned ch
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daa753
     }
-    Wire->Field_0x04 = ScratchDword;                                   // 06daa759
+    Wire->ShipId = ScratchDword;                                   // 06daa759
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06daa77b
     }
-    Wire->Field_0x08 = ScratchDword;                                   // 06daa781
+    Wire->TargetId = ScratchDword;                                   // 06daa781
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06daa7a1
     }
@@ -950,11 +950,11 @@ unsigned int RpcEncodeServerRequestCreateShipResp(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da8010
-    Stream.PutByte(Wire->Field_0x00);                                  // 06da804e
+    Stream.PutByte(Wire->bSuccess);                                  // 06da804e
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da8041
     }
-    Stream.PutDword(Wire->Field_0x04);                                 // 06da8081
+    Stream.PutDword(Wire->ShipId);                                 // 06da8081
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da8074
     }
@@ -979,11 +979,11 @@ unsigned int RpcDecodeServerRequestCreateShipResp(FPacketBase& Packet,
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();                                      // 06da815c
     }
-    Wire->Field_0x00 = ScratchByte;                                    // 06da8162
+    Wire->bSuccess = ScratchByte;                                    // 06da8162
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();                                      // 06da8188
     }
-    Wire->Field_0x04 = ScratchDword;                                   // 06da818a
+    Wire->ShipId = ScratchDword;                                   // 06da818a
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -1067,7 +1067,7 @@ unsigned int RpcDecodeClientDbgDestroyObject(FPacketBase& Packet, const unsigned
 //     +0xaa  FSTP float ptr [EAX]
 // Same four bytes, moved through the x87 stack instead of a GPR -- which is MSVC's
 // signature for a `float` lvalue and is the third independent confirmation that
-// FPayloadServerAdjustAttitude::Field_0x04 is a float (the sender at 06d88f96 and the
+// FPayloadServerAdjustAttitude::Attitude is a float (the sender at 06d88f96 and the
 // receiver at 06d8131a are the other two).
 // ===========================================================================
 unsigned int RpcEncodeServerAdjustAttitude(FPacketBase& Packet, unsigned char** BufferHolder,
@@ -1077,11 +1077,11 @@ unsigned int RpcEncodeServerAdjustAttitude(FPacketBase& Packet, unsigned char** 
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06daa0f0
-    Stream.PutDword(Wire->Field_0x00);                                 // 06daa130
+    Stream.PutDword(Wire->VibeHandle);                                 // 06daa130
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa123
     }
-    Stream.PutFloat(Wire->Field_0x04);                                 // 06daa167 FLD / 06daa16a FSTP
+    Stream.PutFloat(Wire->Attitude);                                 // 06daa167 FLD / 06daa16a FSTP
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06daa158
     }
@@ -1116,7 +1116,7 @@ unsigned int RpcEncodeServerCharSelectVerified(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06dabe20
-    Stream.PutDword(Wire->Field_0x00);                                 // 06dabe60
+    Stream.PutDword(Wire->VibeHandle);                                 // 06dabe60
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dabe53
     }
@@ -1130,7 +1130,7 @@ unsigned int RpcEncodeServerCharSelectVerified(FPacketBase& Packet,
     // every value except a signalling NaN, which FLD quiets on the way through; moving
     // the bytes through the same two instructions keeps that case too. (The decoder,
     // 06dabfa0 / 06dabfa6, reads the window back as two plain dwords.)
-    const void* DoubleSource = &Wire->Field_0x08;
+    const void* DoubleSource = &Wire->ServerTimeLo;
     void* DoubleDest = reinterpret_cast<void*>(Packet.MarshalPtr);
     __asm {
         mov eax, DoubleSource
@@ -1159,7 +1159,7 @@ unsigned int RpcDecodeServerCharSelectVerified(FPacketBase& Packet,
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();                                      // 06dabf6e
     }
-    Wire->Field_0x00 = Scratch;                                        // 06dabf74
+    Wire->VibeHandle = Scratch;                                        // 06dabf74
     // Retail reserves eight bytes once (06dabf85 ADD EDX,0x8) and then lifts both dwords
     // out of that one window, so the second dword has no bounds check of its own.
     if (!Stream.Reserve(8, FRpcMarshalStream::kDecodeOverrun)) {
@@ -1168,11 +1168,11 @@ unsigned int RpcDecodeServerCharSelectVerified(FPacketBase& Packet,
     if (!Stream.GetDwordUncounted(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Field_0x08 = Scratch;                                        // 06dabfa3
+    Wire->ServerTimeLo = Scratch;                                        // 06dabfa3
     if (!Stream.GetDwordUncounted(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Field_0x0c = Scratch;                                        // 06dabfaa
+    Wire->ServerTimeHi = Scratch;                                        // 06dabfaa
     if (Stream.Failed()) {
         return Stream.GetError();
     }

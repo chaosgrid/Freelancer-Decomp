@@ -36,13 +36,13 @@ struct IObjRW;  // common_iface.h -- get_target()'s result
 // Vtable .rdata:0639f874, 27 slots. Overrides of Behavior's table (vtd.py, raw .rdata):
 //    0  FUN_062c78e0  scalar-deleting dtor around FUN_062c7900
 //    1  LAB_062c79d0  SetContext
-//    3  LAB_062c8260  Slot3
-//    4  FUN_062c85e0  Slot4
-//    5  LAB_062c7ab0  Slot5
-//    7  LAB_062c7d60  Slot7
-//    8  FUN_062c7d00  Slot8
-//   10  LAB_062c8630  Slot10
-//   21  LAB_062c7870  Slot21
+//    3  LAB_062c8260  OnEngage
+//    4  FUN_062c85e0  OnDisengage
+//    5  LAB_062c7ab0  OnEvaluateReadiness
+//    7  LAB_062c7d60  OnUpdate
+//    8  FUN_062c7d00  PostUpdate
+//   10  LAB_062c8630  OnApplyDirective
+//   21  LAB_062c7870  OnObjectLeftSystem
 //   24  LAB_062c78c0  get_target
 // Every other slot is Behavior's own entry.
 // ============================================================================
@@ -69,27 +69,27 @@ public:
 
     // Slot 3, LAB_062c8260: re-arms the evade from the personality's EvadeDodge /
     // EvadeBreak blocks (see the .cpp).
-    void Slot3() override;
+    void OnEngage() override;
 
     // Slot 4, FUN_062c85e0: Flag2b5 = 0, Commit on Dodge, BreakAway, DodgeMissile and
-    // Afterburner (not Face), then `JMP FUN_062d20f0` (Behavior::Slot4).
-    void Slot4() override;
+    // Afterburner (not Face), then `JMP FUN_062d20f0` (Behavior::OnDisengage).
+    void OnDisengage() override;
 
     // Slot 5, LAB_062c7ab0 (RET 4, argument unread). Result stored at +0x0c.
-    int Slot5(float Unused) override;
+    int OnEvaluateReadiness(float Unused) override;
 
     // Slot 7, LAB_062c7d60 (391 instructions). Result stored at +0x10.
-    int Slot7() override;
+    int OnUpdate() override;
 
     // Slot 8, FUN_062c7d00 (RET 0).
-    void Slot8() override;
+    void PostUpdate() override;
 
     // Slot 10, LAB_062c8630 (RET 4): watch the op's target (FUN_062e74a0 on Sys+0x34) or,
     // with no op, the closest hostile (FindClosestHostileTarget); Flags28 |= 2; true.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
 
     // Slot 21, LAB_062c7870 (RET 4): drop the watched object when its id is Id.
-    void Slot21(void* Arg) override;
+    void OnObjectLeftSystem(void* Arg) override;
 
     // Slot 24, LAB_062c78c0: the watched object (Watched - 8) or null.
     IObjRW const* get_target() override;
@@ -101,10 +101,10 @@ public:
     // ---- Behavior's own +0x04..+0x29 block, still declared per class ----
     int TypeId;                  // +0x04
     unsigned CachedHandle08;     // +0x08
-    int ModeSelector0xc;         // +0x0c, Slot5's result.
-    int UpdateResult10;          // +0x10, Slot7's result.
+    int ModeSelector0xc;         // +0x0c, OnEvaluateReadiness's result.
+    int UpdateResult10;          // +0x10, OnUpdate's result.
     void* OwnerContext;          // +0x14, the owner IObjRW* (binder).
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime;             // +0x1c
     void* BehaviorMgrPtr;        // +0x20, the IBehaviorManager (binder).
     SystemManager* NavHelper;    // +0x24, the SystemManager (binder).
@@ -113,22 +113,22 @@ public:
     unsigned char Pad2a[0x2c - 0x2a];
 
     // ---- EvadeBehavior's own fields ----
-    int Mode2c;                  // +0x2c. Slot7's mode 1..4; ctor and Slot3 zero it.
+    int Mode2c;                  // +0x2c. OnUpdate's mode 1..4; ctor and OnEngage zero it.
     DodgeIdea Dodge;             // +0x30
     BreakAwayIdea BreakAway;     // +0x110
     DodgeMissileIdea DodgeMissile; // +0x1ac
     FaceIdea Face;               // +0x1cc
     AfterburnerIdea Afterburner; // +0x28c
     BaseWatcher Watcher2a0;      // +0x2a0, the object being evaded.
-    float DodgeTime2a8;          // +0x2a8. SetContext 10.0f; Slot3: EvadeDodge.Field_30.
-    float BreakTime2ac;          // +0x2ac. Ctor 3.0f; Slot3: EvadeBreak.Field_00.
-    float Elapsed2b0;            // +0x2b0. Slot7 accumulates DeltaTime; SetContext/Slot3 zero
-                                 // it; Slot5/Slot8 set it to DodgeTime2a8.
-    unsigned char Flag2b4;       // +0x2b4. Slot5/Slot8: Timers[0].Active latch.
-    unsigned char Flag2b5;       // +0x2b5. Slot8: Timers[1].Active latch; Slot4 clears it.
+    float DodgeTime2a8;          // +0x2a8. SetContext 10.0f; OnEngage: EvadeDodge.Field_30.
+    float BreakTime2ac;          // +0x2ac. Ctor 3.0f; OnEngage: EvadeBreak.Field_00.
+    float Elapsed2b0;            // +0x2b0. OnUpdate accumulates DeltaTime; SetContext/OnEngage zero
+                                 // it; OnEvaluateReadiness/PostUpdate set it to DodgeTime2a8.
+    unsigned char Flag2b4;       // +0x2b4. OnEvaluateReadiness/PostUpdate: Timers[0].Active latch.
+    unsigned char Flag2b5;       // +0x2b5. PostUpdate: Timers[1].Active latch; OnDisengage clears it.
     unsigned char Flag2b6;       // +0x2b6. Ctor 0; no other writer in the listing.
     unsigned char Flag2b7;       // +0x2b7. Ctor 0; no other writer in the listing.
-    float ConeCos2b8;            // +0x2b8. Ctor 0; Slot3 -cos(pi/3) when the dodge style is 2.
+    float ConeCos2b8;            // +0x2b8. Ctor 0; OnEngage -cos(pi/3) when the dodge style is 2.
     float ConeCos2bc;            // +0x2bc. Ctor 0x3f34fdf4.
 };
 

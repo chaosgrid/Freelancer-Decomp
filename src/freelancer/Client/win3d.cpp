@@ -281,7 +281,7 @@ namespace
     bool WheelWidescreen(Win3D* Object, int Wheel)
     {
         FWidescreenHudShiftScope const Scope(WidescreenHudShiftPixelsFor(Object), false);
-        return Object->Slot18(Wheel);
+        return Object->MouseWheelEvent(Wheel);
     }
 #endif
 
@@ -403,7 +403,7 @@ void Win3D::SetPosition(float const* NewPosition)
     Position[2] = NewPosition[2];
 }
 
-bool Win3D::Slot6(unsigned /*A*/)
+bool Win3D::IsPositionInViewport(unsigned /*A*/)
 {
     // LAB_0043d8e0: MOV AL,1 / RET 4.
     return true;
@@ -502,7 +502,7 @@ void Win3D::Slot17()
     // FUN_00401e90: RET.
 }
 
-bool Win3D::Slot18(int /*Value*/)
+bool Win3D::MouseWheelEvent(int /*Value*/)
 {
     // FUN_0053f330: XOR AL,AL / RET 4.
     return false;
@@ -529,13 +529,13 @@ bool Win3D::Slot21(unsigned /*A*/, unsigned /*B*/, unsigned /*C*/, unsigned /*D*
     return false;
 }
 
-bool Win3D::Slot22(unsigned /*A*/, unsigned /*B*/)
+bool Win3D::CharEvent(unsigned /*A*/, unsigned /*B*/)
 {
     // LAB_0043d8a0: XOR AL,AL / RET 8.
     return false;
 }
 
-bool Win3D::Slot23(unsigned /*Msg*/, unsigned /*A*/, unsigned /*B*/)
+bool Win3D::ProcessMessage(unsigned /*Msg*/, unsigned /*A*/, unsigned /*B*/)
 {
     // LAB_004b50e0: XOR AL,AL / RET 0xc.
     return false;
@@ -989,7 +989,7 @@ bool Win3DBroadcast(unsigned Msg, unsigned A, unsigned B)
         Win3D* const Object = static_cast<Win3D*>(Node->Payload);
         if (Object == nullptr)
             continue;
-        bHandled = bHandled || Object->Slot23(Msg, A, B);
+        bHandled = bHandled || Object->ProcessMessage(Msg, A, B);
         if (bHandled)
             break;
     }
@@ -1278,11 +1278,11 @@ void Win3DStartupManager(int Width, int Height)
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = "interface\\interface.generic.vms";
-    Desc.Field10 = 0x80000000u;
-    Desc.Field14 = 1;
-    Desc.Field1C = 3;
-    Desc.Field20 = 0x8000080u;
-    Desc.Field30 = 0xffffffffu;
+    Desc.Access = 0x80000000u;
+    Desc.ShareMode = 1;
+    Desc.Creation = 3;
+    Desc.Flags = 0x8000080u;
+    Desc.FindHandle = 0xffffffffu;
     void* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                                                &FsOut) >= 0)
@@ -1494,14 +1494,14 @@ namespace
             unsigned const B = HudCommandRecord()->Arg14;
             unsigned const A = HudCommandRecord()->Arg10;
             if (G_KeyFocus != nullptr)
-                return G_KeyFocus->Slot22(A, B);
+                return G_KeyFocus->CharEvent(A, B);
             bool bHandled = false;
             for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
             {
                 Win3D* const Object = static_cast<Win3D*>(Node->Payload);
                 if (Object == nullptr)
                     continue;
-                bHandled = Object->Slot22(A, B) || bHandled;
+                bHandled = Object->CharEvent(A, B) || bHandled;
                 if (bHandled)
                     break;
             }
@@ -1521,11 +1521,11 @@ namespace
             return WheelWidescreen(Picked, GetClientMouseWheel());
 #else
             if (G_CaptureHead != nullptr)
-                return G_CaptureHead->Slot18(GetClientMouseWheel());
+                return G_CaptureHead->MouseWheelEvent(GetClientMouseWheel());
             Win3D* const Picked = Win3DPick(G_MouseRay);
             if (Picked == nullptr)
                 return false;
-            return Picked->Slot18(GetClientMouseWheel());
+            return Picked->MouseWheelEvent(GetClientMouseWheel());
 #endif
         }
 

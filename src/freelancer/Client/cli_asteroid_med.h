@@ -41,15 +41,15 @@ public:
     // 104 +0x1a0 LAB_00524f20 (RET 0x10): an instant-kill asteroid (bWatchListed) touched by a
     // ship ((class & 0x503) == 0x503) explodes at the contact point (slot 108); anything else
     // goes to GameObject's FUN_00539cd0 with the same arguments.
-    void Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+    void OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                  void const* D) override;
     // 107 +0x1ac LAB_00524f80 (RET 0x10): an ordinary asteroid reports through GameObject's
     // FUN_00539e70; an instant-kill one sends IServer::SPBadLandsObjCollision (slot 54) --
     // in multiplayer only for objects the local player owns.
-    void Slot1ac(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 FUN_00525040 (RET 4): explode once (no action pending) with the explosion
     // archetype, whose process must be 2; FDUMP warnings otherwise.
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
     // 111 +0x1bc LAB_005250f0 (RET 0x14): *(ushort*)Out = 0, *(ushort*)(Out + 2) = 0xffff;
     // returns Out. The four stack arguments after Out are not read. No freelancer.exe call
     // site reaches it through an asteroid (the vt+0x1bc callers at 0x005479b1.. are Solar's).

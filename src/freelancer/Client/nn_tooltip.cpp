@@ -318,8 +318,8 @@ void NnToolTipControl::Draw()
     Origin.Y = Screen.Y;
     Origin.Scale = Width;
     Origin.Height = Height;
-    Origin.Field10 = 1;
-    Origin.Field14 = 0;
+    Origin.HAlign = 1;
+    Origin.VAlign = 0;
     FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
 
     // FUN_00421dd0(0xb71) + FUN_00422190(1).

@@ -37,7 +37,7 @@ ListBox::ListBox()
     Timer894 = 0.0f;
     SelectedIndex = -1;
     HoverIndex = -1;
-    Field80 = -1;
+    HighlightIndex = -1;
     ItemCount = 0;
     VisibleRows = 0x10;
     FirstVisible = 0;
@@ -88,7 +88,7 @@ bool ListBox::Create(Win3D* NewParent, void* /*Data*/)
     // LAB_005a2070 (RET 8).
     SelectedIndex = -1;
     HoverIndex = -1;
-    Field80 = -1;
+    HighlightIndex = -1;
     ItemCount = 0;
     FirstVisible = 0;
     bDrawRowRules = 0;
@@ -175,7 +175,7 @@ void ListBox::Draw()
         {
             Color = G_NnPaletteArgb_679ba4; // DAT_00679ba4
         }
-        else if (Field80 == Index)
+        else if (HighlightIndex == Index)
         {
             unsigned long Pulsed = 0;
             NnUiPulseBlendArgb(&Pulsed);
@@ -305,12 +305,12 @@ bool ListBox::MouseEvent(FWin3DMouseEvent const* Event)
     unsigned const TextArg = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Text));
     if (Event->Field1 == 2)
     {
-        Parent->Slot23(0xf001, TextArg, static_cast<unsigned>(SelectedIndex));
+        Parent->ProcessMessage(0xf001, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;
     }
     if (Event->Field1 == 3)
     {
-        Parent->Slot23(0xf002, TextArg, static_cast<unsigned>(SelectedIndex));
+        Parent->ProcessMessage(0xf002, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;
     }
     return false;

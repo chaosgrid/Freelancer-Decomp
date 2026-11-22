@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// TU61 -- the vignette runtime machine's state machine (FRmVignetteMachine::Slot2, FUN_06f8c460,
+// TU61 -- the vignette runtime machine's state machine (FRmVignetteMachine::OnStateEvent, FUN_06f8c460,
 // 5106 insns) and its helpers FUN_06f8bc70..FUN_06f8c3c0 / FUN_06f90b40 / FUN_06f90b70, plus the
 // two TU61 trigger classes it builds (vtables 06fbca40 / 06fbca84). Content.md section 7, lane
 // CNT-RM. Declarations in RandomMissionMachine.h.
@@ -125,7 +125,7 @@ namespace
         for (std::vector<FRmShipGroup>::const_iterator It = Groups->begin(); It != Groups->end();
              ++It)
         {
-            if (It->Field_0x00 != 0 && It->Field_0x01 == 0)
+            if (It->bRequired != 0 && It->bSpawned == 0)
                 return true;
         }
         return false;
@@ -187,7 +187,7 @@ int FRmShipCountTrigger::CountAlive()
     for (std::list<FRmSpawnRecord*>::iterator It = Records->Records.begin();
          It != Records->Records.end(); ++It)
     {
-        if ((*It)->Field_0x04 && (*It)->State == 2)
+        if ((*It)->bHostile && (*It)->State == 2)
             ++Count;
     }
     return Count;
@@ -269,7 +269,7 @@ int FRmShipHealthTrigger::GetLowestHealth()
          It != Records->Records.end(); ++It)
     {
         FRmSpawnRecord* const Record = *It;
-        if (!Record->Field_0x04 || Record->State != 2)
+        if (!Record->bHostile || Record->State != 2)
             continue;
         if (static_cast<FRmShipRecord*>(Record)->Kind != Kind)
             continue;
@@ -334,9 +334,9 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
     std::vector<FRmShipGroup>::iterator Group = Component->Groups.begin();
     while (Group != Component->Groups.end() && Group->Serial != Serial)
         ++Group;
-    if (Group->Field_0x01 != 0)
+    if (Group->bSpawned != 0)
         return;
-    if (Group->Field_0x02 != 0)
+    if (Group->bClearPriorTargets != 0)
         ClearShipTargets();
 
     // 06f8bf0b-06f8bf44: slot 24, the group's records, their objectives.
@@ -346,7 +346,7 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
 
     // 06f8bf49-06f8c025: the first-spawn comm sequences. Field_0x40 > 0.0 (FCOMP 0.0, TEST
     // AH,0x41 + JNZ: less, equal or unordered go to the hostile side) is a friendly group.
-    if (Group->Field_0x40 > 0.0f)
+    if (Group->Attitude > 0.0f)
     {
         if (!bFriendlySpawnSent)
         {
@@ -383,7 +383,7 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
     // 06f8c02c-06f8c193: the next group not spawned yet gets a trigger for "all ships dead"
     // and, by its +0x04 mode, a delayed cookie (2) or a "Field_0x08 ships left" trigger (3).
     std::vector<FRmShipGroup>::iterator Next = Group + 1;
-    while (Next != Component->Groups.end() && Next->Field_0x01 != 0)
+    while (Next != Component->Groups.end() && Next->bSpawned != 0)
         ++Next;
     if (Next == Component->Groups.end())
         return;
@@ -392,15 +392,15 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
         new FRmShipCountTrigger(Cookie, get_id(), &Ships->Records, 0);
     AllDead->SetActivator(Next->Serial);
     AddStateMachine(AllDead);
-    if (Next->Field_0x04 == 2)
+    if (Next->SpawnTriggerMode == 2)
     {
         FRmCookieMessage Delayed(Next->Serial);
-        send_delayed_message_to_me(&Delayed, static_cast<float>(Next->Field_0x08), SMMS_Self, 0);
+        send_delayed_message_to_me(&Delayed, static_cast<float>(Next->SpawnTriggerParam), SMMS_Self, 0);
     }
-    else if (Next->Field_0x04 == 3)
+    else if (Next->SpawnTriggerMode == 3)
     {
         FRmShipCountTrigger* FewLeft =
-            new FRmShipCountTrigger(Cookie, get_id(), &Ships->Records, Next->Field_0x08);
+            new FRmShipCountTrigger(Cookie, get_id(), &Ships->Records, Next->SpawnTriggerParam);
         FewLeft->SetActivator(Next->Serial);
         AddStateMachine(FewLeft);
     }
@@ -521,11 +521,11 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
 }
 
 // =======================================================================================
-// FRmVignetteMachine::Slot2 (FUN_06f8c460)
+// FRmVignetteMachine::OnStateEvent (FUN_06f8c460)
 // =======================================================================================
 
 // FUN_06f8c460 (06f8c460-06f90a32, RET 8).
-bool FRmVignetteMachine::Slot2(SMEventData const* Event, int const& State)
+bool FRmVignetteMachine::OnStateEvent(SMEventData const* Event, int const& State)
 {
     RmVignetteEntryCookies();
     if (State < 0)
@@ -676,9 +676,9 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         ClearSolarTargets();
         set_state(12);
         int Key = 0;
-        if (Record->Field_0x6c == 1)
+        if (Record->CriticalLootMode == 1)
             Key = 0xa;
-        else if (Record->Field_0x6c == 2 || Record->Field_0x6c == 3)
+        else if (Record->CriticalLootMode == 2 || Record->CriticalLootMode == 3)
             Key = 0xb;
         else
             return true;
@@ -691,7 +691,7 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         std::vector<FRmObjective*>::iterator Active = FindObjective(Key);
         if (Active != ActiveObjectives.end())
         {
-            FRmRecordList Critical = Loot->Query(Record->Field_0x6c, 2, 0, 2, 0);
+            FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, 2, 0, 2, 0);
             static_cast<FRmObjectiveType3*>(*Active)
                 ->SetTargetRecords(&Critical, Mission->GetPlayerStates(), 2, SystemId, Where);
             RebuildObjective((*Active)->Key);
@@ -957,30 +957,30 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
             for (std::vector<FRmShipGroup>::iterator It = VignetteOffer->TargetShips.Groups.begin() + 1;
                  It != VignetteOffer->TargetShips.Groups.end(); ++It)
             {
-                if (It->Field_0x04 != 1)
+                if (It->SpawnTriggerMode != 1)
                     continue;
                 FRmCookieMessage Delayed(It->Serial);
-                send_delayed_message_to_me(&Delayed, static_cast<float>(It->Field_0x08),
+                send_delayed_message_to_me(&Delayed, static_cast<float>(It->SpawnTriggerParam),
                                            SMMS_Self, 0);
             }
         }
-        int const Mode = VignetteOffer->TargetShips.Field_0x50;
+        int const Mode = VignetteOffer->TargetShips.EndTriggerMode;
         if (Mode == 1)
         {
             AddStateMachine(new FRmTimerTrigger(
                 CookieTargetDone, get_id(),
-                static_cast<float>(VignetteOffer->TargetShips.Field_0x54)));
+                static_cast<float>(VignetteOffer->TargetShips.EndTriggerParam)));
         }
         else if (Mode == 2)
         {
             AddStateMachine(new FRmShipCountTrigger(CookieTargetDone, get_id(), &Ships->Records,
-                                                    VignetteOffer->TargetShips.Field_0x54));
+                                                    VignetteOffer->TargetShips.EndTriggerParam));
         }
         else if (Mode == 3)
         {
             AddStateMachine(new FRmShipHealthTrigger(CookieTargetDone, get_id(),
                                                      &Ships->Records,
-                                                     VignetteOffer->TargetShips.Field_0x54, 2));
+                                                     VignetteOffer->TargetShips.EndTriggerParam, 2));
         }
         return true;
     }
@@ -1329,15 +1329,15 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
         if (!VignetteOffer->Ships.Groups.empty())
         {
             std::vector<FRmShipGroup>::iterator First = VignetteOffer->Ships.Groups.begin();
-            if (First->Field_0x04 != 1)
+            if (First->SpawnTriggerMode != 1)
                 SpawnGroupWithTriggers(First->Serial, &VignetteOffer->Ships, CookieNextGroup);
             for (std::vector<FRmShipGroup>::iterator It = First;
                  It != VignetteOffer->Ships.Groups.end(); ++It)
             {
-                if (It->Field_0x04 != 1)
+                if (It->SpawnTriggerMode != 1)
                     continue;
                 FRmCookieMessage Delayed(It->Serial);
-                send_delayed_message_to_me(&Delayed, static_cast<float>(It->Field_0x08),
+                send_delayed_message_to_me(&Delayed, static_cast<float>(It->SpawnTriggerParam),
                                            SMMS_Self, 0);
             }
         }
@@ -1477,7 +1477,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
     {
         FRmLootMessage const* Picked = static_cast<FRmLootMessage const*>(Message);
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(Picked->ObjectId));
-        int const Mode = Record->Field_0x6c;
+        int const Mode = Record->CriticalLootMode;
         if (Mode == 1)
         {
             FDrop::Send(this, Record);
@@ -1525,7 +1525,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
-        int const Mode = Record->Field_0x6c;
+        int const Mode = Record->CriticalLootMode;
         if (Mode == 3)
         {
             RemoveObjective(0xc);
@@ -1551,7 +1551,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         unsigned int SystemId = 0;
         pub::SpaceObj::GetSystem(Record->ObjectId, SystemId);
         std::vector<FRmObjective*>::iterator Active = FindObjective(Mode == 1 ? 0xa : 0xb);
-        FRmRecordList Critical = Loot->Query(Record->Field_0x6c, 2, 0, 2, 0);
+        FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, 2, 0, 2, 0);
         FRmObjective* const Objective = *Active;
         static_cast<FRmObjectiveType3*>(Objective)
             ->SetTargetRecords(&Critical, GetMissionPlayers(), 2, SystemId, Where);
@@ -1567,7 +1567,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         FRmLootMessage const* Destroyed = static_cast<FRmLootMessage const*>(Message);
         FRmLootRecord* Record =
             static_cast<FRmLootRecord*>(Loot->Records.FindById(Destroyed->ObjectId));
-        int const Mode = Record->Field_0x6c;
+        int const Mode = Record->CriticalLootMode;
         if (Mode == 1)
         {
             RemoveObjective(0xa);
@@ -1590,7 +1590,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
-        int const Mode = Record->Field_0x6c;
+        int const Mode = Record->CriticalLootMode;
         if (Mode == 1)
             FailReason = 6;
         else if (Mode == 2)
@@ -1627,7 +1627,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         FRmLootPlayerMessage const* Docked = static_cast<FRmLootPlayerMessage const*>(Message);
         FRmLootRecord* Record =
             static_cast<FRmLootRecord*>(Loot->Records.FindById(Docked->ObjectId));
-        if (Record->Field_0x6c != 3)
+        if (Record->CriticalLootMode != 3)
             return true;
         if (Docked->Value1 == VignetteOffer->OfferBase)
         {

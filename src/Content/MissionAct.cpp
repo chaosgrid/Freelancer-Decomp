@@ -126,7 +126,7 @@ bool ActActTrig::Execute()
 ActChangeState::ActChangeState(FMissionScript* InMission)
     : Act(InMission)
     , State(-1)
-    , Field_0x10(1)
+    , MadLibId(1)
 {
 }
 
@@ -136,13 +136,13 @@ void ActChangeState::Parse(INI_Reader& Reader)
 {
     State = Mission->MissionStateFromName(Reader.get_value_string(0));
     if (!Reader.is_value_empty(1))
-        Field_0x10 = static_cast<unsigned int>(Reader.get_value_int(1));
+        MadLibId = static_cast<unsigned int>(Reader.get_value_int(1));
 }
 
 // LAB_06ec5640: mission->vtbl[+0x74](+0x0c, +0x10) (LAB_06eb9730); return AL=1.
 bool ActChangeState::Execute()
 {
-    Mission->SetDesiredMissionState(State, Field_0x10);
+    Mission->SetDesiredMissionState(State, MadLibId);
     return true;
 }
 
@@ -577,9 +577,9 @@ void ActSetOffer::Parse(INI_Reader& Reader)
 // (pub::Player::DisplayMissionMessage type 8); then FUN_06f1b610.
 bool ActSetOffer::Execute()
 {
-    ResetMadLib(Mission->Field_0x68, OfferId);
-    if (Mission->Field_0x68.MadLibId != 1 && Mission->Field_0x68.MadLibId != 0)
-        pub::Player::DisplayMissionMessage(Mission->PlayerId, Mission->Field_0x68,
+    ResetMadLib(Mission->MissionOffer, OfferId);
+    if (Mission->MissionOffer.MadLibId != 1 && Mission->MissionOffer.MadLibId != 0)
+        pub::Player::DisplayMissionMessage(Mission->PlayerId, Mission->MissionOffer,
                                            static_cast<MissionMessageType>(8), true);
     Mission->RenumberAllObjectives();
     return true;
@@ -601,7 +601,7 @@ void ActSetTitle::Parse(INI_Reader& Reader)
 // FUN_06ec9ae0: rebuild mission+0x50 with mad-lib +0x0c, then FUN_06f1b610.
 bool ActSetTitle::Execute()
 {
-    ResetMadLib(Mission->Field_0x50, TitleId);
+    ResetMadLib(Mission->MissionTitle, TitleId);
     Mission->RenumberAllObjectives();
     return true;
 }
@@ -874,7 +874,7 @@ bool ActNagClamp::Execute()
 {
     std::map<unsigned int, FContentNpcShip*>::iterator It = Mission->NpcObjects.begin();
     for (; It != Mission->NpcObjects.end(); ++It)
-        It->second->SetField1b1(bClamp != 0);
+        It->second->SetCommMuted(bClamp != 0);
     Mission->NagClamp = bClamp;
     return true;
 }
@@ -1484,7 +1484,7 @@ bool FMissionNagGreet::HandleMessage(pub::Controller::EMessage /*MessageId*/, vo
     FContentShipBase* const Speaker = static_cast<FContentShipBase*>(System->FindSpaceObj(SpeakerId));
     if (Speaker == nullptr)
         return true;
-    if (Speaker->Slot08())
+    if (Speaker->IsInCombat())
     {
         Say("nag_greet_combat");
         return true;
@@ -1668,9 +1668,9 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
                     static_cast<FContentShipBase*>(System->FindSpaceObj(TargetId));
                 if (Target != nullptr)
                 {
-                    if (Target->Slot08() && bNagInCombat != 0)
+                    if (Target->IsInCombat() && bNagInCombat != 0)
                         Say("nag_dst_ship");
-                    else if (!Target->Slot08() && bNagOutOfCombat != 0)
+                    else if (!Target->IsInCombat() && bNagOutOfCombat != 0)
                         Say("nag_pos");
                     else
                         bArmed = 0;
@@ -2182,7 +2182,7 @@ bool ActCallThorn::Execute()
     Mission->NagClamp = 1;
     std::map<unsigned int, FContentNpcShip*>::iterator It = Mission->NpcObjects.begin();
     for (; It != Mission->NpcObjects.end(); ++It)
-        It->second->SetField1b1(true);
+        It->second->SetCommMuted(true);
     SpacePopSetGcsClampEnabled(1);
     return true;
 }
@@ -2500,7 +2500,7 @@ bool ActAddRtc::Execute()
     FStoryMissionListNode_0x2f4 Record;
     Record.PathLength = Path.Length;
     memcpy(Record.Path, Path.Data, Path.Length + 1);
-    Record.Field_0x95 = bRepeatable;
+    Record.bRepeatable = bRepeatable;
     Mission->StartRtcScript(&Record);
     Mission->List_0x2f4.push_back(Record);
     return true;
@@ -2754,8 +2754,8 @@ bool ActSetLifeTime::Execute()
     FContentNpcShip* const Named = Mission->FindNpcByName(&Label);
     if (Named != nullptr)
     {
-        Named->Field_0x1bc = LifeTime;
-        Named->Field_0x1c8 = LifeTime;
+        Named->Longevity = LifeTime;
+        Named->LifeTime = LifeTime;
         return true;
     }
     unsigned int const LabelId = CreateID(Label.Data);
@@ -2763,13 +2763,13 @@ bool ActSetLifeTime::Execute()
     for (; It != Mission->NpcObjects.end(); ++It)
     {
         FContentNpcShip* const Ship = It->second;
-        std::list<unsigned int>::iterator LabelIt = Ship->Field_0x17c.begin();
-        for (; LabelIt != Ship->Field_0x17c.end(); ++LabelIt)
+        std::list<unsigned int>::iterator LabelIt = Ship->LabelIds.begin();
+        for (; LabelIt != Ship->LabelIds.end(); ++LabelIt)
         {
             if (*LabelIt == LabelId)
             {
-                Ship->Field_0x1bc = LifeTime;
-                Ship->Field_0x1c8 = LifeTime;
+                Ship->Longevity = LifeTime;
+                Ship->LifeTime = LifeTime;
                 break;
             }
         }
@@ -2882,8 +2882,8 @@ namespace
 ActInvulnerable::ActInvulnerable(FMissionScript* InMission)
     : Act(InMission)
     , bInvulnerable(0)
-    , bParam3(0)
-    , Duration(0.0f)
+    , bPlayerCanDamage(0)
+    , MaxHpLoss(0.0f)
 {
     ClearTString(Label);
 }
@@ -2895,9 +2895,9 @@ void ActInvulnerable::Parse(INI_Reader& Reader)
     Label = Reader.get_value_string(0);
     bInvulnerable = Reader.get_value_bool(1) ? 1 : 0;
     if (!Reader.is_value_empty(2))
-        bParam3 = Reader.get_value_bool(2) ? 1 : 0;
+        bPlayerCanDamage = Reader.get_value_bool(2) ? 1 : 0;
     if (!Reader.is_value_empty(3))
-        Duration = Reader.get_value_float(3);
+        MaxHpLoss = Reader.get_value_float(3);
 }
 
 // LAB_06ecb0d0 (06ecb0d0-06ecb34f). CreateID(+0x10) == DAT_06fcefcc ("Player"): without a live
@@ -2917,7 +2917,7 @@ bool ActInvulnerable::Execute()
         if (FindContentPlayerState(Mission->PlayerId) == nullptr)
             return true;
         pub::SpaceObj::SetInvincible(Mission->PlayerState->GetShipId(), bInvulnerable != 0,
-                                     bParam3 != 0, Duration);
+                                     bPlayerCanDamage != 0, MaxHpLoss);
         return true;
     }
 
@@ -2932,14 +2932,14 @@ bool ActInvulnerable::Execute()
             return true;
         unsigned int const ObjectId = System->FindObjectIdByName(&Label, Mission->ControllerId);
         if ((ObjectId & GNagIdMask) != 0)
-            pub::SpaceObj::SetInvincible(ObjectId, bInvulnerable != 0, bParam3 != 0, Duration);
+            pub::SpaceObj::SetInvincible(ObjectId, bInvulnerable != 0, bPlayerCanDamage != 0, MaxHpLoss);
         return true;
     }
 
     do
     {
         int const Result = pub::SpaceObj::SetInvincible(Member->second, bInvulnerable != 0,
-                                                        bParam3 != 0, Duration);
+                                                        bPlayerCanDamage != 0, MaxHpLoss);
         TString<0x30> const Name = Mission->GetMissionObjectName(&Member->second);
         bool bListed = false;
         std::list<FMissionInvulnerable>::iterator Listed = Mission->Invulnerables.begin();
@@ -2957,8 +2957,8 @@ bool ActInvulnerable::Execute()
             {
                 FMissionInvulnerable Record;
                 Record.Nickname = Name;
-                Record.Duration = Duration;
-                Record.bParam3 = bParam3;
+                Record.MaxHpLoss = MaxHpLoss;
+                Record.bPlayerCanDamage = bPlayerCanDamage;
                 Mission->Invulnerables.push_back(Record);
             }
         }
@@ -3083,10 +3083,10 @@ bool ActJumper::Execute()
     for (; It != Mission->NpcObjects.end(); ++It)
     {
         FContentNpcShip* const Npc = It->second;
-        std::list<unsigned int>::iterator LabelIt = Npc->Field_0x17c.begin();
-        while (LabelIt != Npc->Field_0x17c.end() && *LabelIt != LabelId)
+        std::list<unsigned int>::iterator LabelIt = Npc->LabelIds.begin();
+        while (LabelIt != Npc->LabelIds.end() && *LabelIt != LabelId)
             ++LabelIt;
-        if (LabelIt == Npc->Field_0x17c.end())
+        if (LabelIt == Npc->LabelIds.end())
             continue;
         FMissionShip* const Ship = Mission->FindMissionShip(&Npc->Nickname);
         if (Ship == nullptr)
@@ -3694,7 +3694,7 @@ bool ActStaticCam::Execute()
     Mission->NagClamp = 1;
     std::map<unsigned int, FContentNpcShip*>::iterator It = Mission->NpcObjects.begin();
     for (; It != Mission->NpcObjects.end(); ++It)
-        It->second->SetField1b1(true);
+        It->second->SetCommMuted(true);
     SpacePopSetGcsClampEnabled(1);
     return true;
 }
@@ -3710,7 +3710,7 @@ namespace
     // its position; the enumeration stops there.
     struct FNnPathObjectFinder : public pub::System::SysObjEnumerator
     {
-        bool Slot00(pub::System::FSysObj const* Object) override
+        bool OnObject(pub::System::FSysObj const* Object) override
         {
             if (bFound != 0)
                 return true;
@@ -3999,8 +3999,8 @@ namespace
     // The +0x17c label list of an NPC holds LabelId (the inline walks with FUN_06f68e30).
     bool NpcHasLabel(FContentNpcShip const* Npc, unsigned int LabelId)
     {
-        std::list<unsigned int>::const_iterator It = Npc->Field_0x17c.begin();
-        for (; It != Npc->Field_0x17c.end(); ++It)
+        std::list<unsigned int>::const_iterator It = Npc->LabelIds.begin();
+        for (; It != Npc->LabelIds.end(); ++It)
         {
             if (*It == LabelId)
                 return true;
@@ -4400,7 +4400,7 @@ bool ActSpawnShip::Execute()
     FMissionShipGroup Group = *It;
     std::vector<FMissionShip>::iterator Slot = Group.Ships.begin();
     for (; Slot != Group.Ships.end(); ++Slot)
-        Slot->HitPoints = Slot->Field_0x80;
+        Slot->HitPoints = Slot->OriginalHitPoints;
     if (ObjList != 0)
     {
         if (ObjList != CreateID("no_ol"))
@@ -4600,7 +4600,7 @@ bool ActSpawnFormation::Execute()
         return true;
     std::vector<FMissionShip>::iterator Slot = It->Ships.begin();
     for (; Slot != It->Ships.end(); ++Slot)
-        Slot->HitPoints = Slot->Field_0x80;
+        Slot->HitPoints = Slot->OriginalHitPoints;
     if (bPosition == 0)
     {
         Mission->SpawnMissionShipGroup(&*It);

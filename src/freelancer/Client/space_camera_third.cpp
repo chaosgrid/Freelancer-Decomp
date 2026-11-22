@@ -15,7 +15,7 @@
 #include "space_camera_third.h"
 #include "space_scene_obj_draw.h"
 
-#include "client_gameobj.h"          // FClientShipGameobj::Field_0x158
+#include "client_gameobj.h"          // FClientShipGameobj::JumpState
 #include "hud_command_dispatch.h"    // HudRegisterCommandHandler (FUN_005760d0)
 #include "hud_target.h"              // HudIsMousePickBlocked (FUN_0045a740)
 #include "ship_camera_params.h"      // FShipCameraParams (ship companion +0x68)
@@ -694,7 +694,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                 FClientShipGameobj* const ShipGo = static_cast<FClientShipGameobj*>(
                     dynamic_cast<FClientGameobj*>(reinterpret_cast<IObjInspect*>(
                         const_cast<unsigned char*>(Held - kWatchableOffset))));
-                const int State = ShipGo->Field_0x158;
+                const int State = ShipGo->JumpState;
                 if ((State == 2 || State == 3) &&
                     (V14[0] != 0.0f || V14[1] != 1.0f || V14[2] != 0.0f))
                 {

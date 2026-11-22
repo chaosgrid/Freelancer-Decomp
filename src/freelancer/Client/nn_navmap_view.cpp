@@ -113,9 +113,9 @@ void NeuroNetNavMap::SetMapMeshTransform(int View, float Alpha)
                sizeof(Transform));
         Transform.Rotation.D[0][0] = Scale;
         Transform.Rotation.D[1][1] = Scale;
-        Transform.Translation.X = static_cast<float>(static_cast<double>(Field_0x828[0]) + PanX);
-        Transform.Translation.Y = static_cast<float>(static_cast<double>(Field_0x828[1]) + PanY);
-        Transform.Translation.Z = Field_0x828[2];
+        Transform.Translation.X = static_cast<float>(static_cast<double>(ZoomedMeshPosition[0]) + PanX);
+        Transform.Translation.Y = static_cast<float>(static_cast<double>(ZoomedMeshPosition[1]) + PanY);
+        Transform.Translation.Z = ZoomedMeshPosition[2];
         Engine->SetInstanceMatrix(ZoomedMapMesh2.EngineInstance, &Transform);
 
         // 004964aa..004964e9: white, the alpha through a byte.

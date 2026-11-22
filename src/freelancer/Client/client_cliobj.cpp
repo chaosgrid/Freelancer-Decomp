@@ -213,9 +213,9 @@ namespace Archetype
         enum ECliObjStateFlags : unsigned char
         {
             CliObjFlagCacheBuilt = 0x01,
-            CliObjFlagSlot10Done = 0x02,
+            CliObjFlagMaterialsRealized = 0x02,
             CliObjFlagEngineSide = 0x04,
-            CliObjFlagSlot12Done = 0x08,
+            CliObjFlagHitEffectsLoaded = 0x08,
             CliObjFlagLodPickDone = 0x10,
         };
 
@@ -236,11 +236,11 @@ namespace Archetype
             void FreeResources() override;
             void Inherit(ICliObj* Donor) override;
             unsigned long Load(int LoadMode) override;
-            void* Slot09(unsigned Flags) override;
-            void Slot10() override;
-            void Slot11() override;
-            void Slot12(unsigned Arg) override;
-            void Slot13() override;
+            void* ScalarDeletingDtor(unsigned Flags) override;
+            void RealizeMaterials() override;
+            void ReleaseResources() override;
+            void LoadHitEffects(unsigned Arg) override;
+            void ReleaseHitEffects() override;
 
             // FUN_00407310 — public non-virtual thunk: [ESP+4] = [ESP+4]; JMP FUN_00407100.
             bool PreloadMaterials(bool bLatchSlot10) { return BuildMaterialCache(bLatchSlot10); }
@@ -532,7 +532,7 @@ namespace Archetype
             void Redefine(ICliObj* Donor) override;
             void Inherit(ICliObj* Donor) override;
             unsigned long Load(int LoadMode) override;
-            void Slot11() override;
+            void ReleaseResources() override;
 
             // FUN_00408a70 — random pick from LiveEffects.
             FEffectArch* PickLiveEffect();
@@ -560,7 +560,7 @@ namespace Archetype
         class FCliEQShield : public FCliObj
         {
         public:
-            void Slot10() override;
+            void RealizeMaterials() override;
         };
 
         static_assert(sizeof(FCliEQShield) == 0x54, "CliEQShield sizeof 0x54");
@@ -595,8 +595,8 @@ namespace Archetype
             bool ReadUnknown(INI_Reader* Reader) override;
             void Redefine(ICliObj* Donor) override;
             void Inherit(ICliObj* Donor) override;
-            void Slot12(unsigned Arg) override;
-            void Slot13() override;
+            void LoadHitEffects(unsigned Arg) override;
+            void ReleaseHitEffects() override;
 
             // FUN_00409f10 -- not a vtable slot; the shield-hit twin of PickDistanceRecord over
             // the +0x60 list. Retail callers 0x0052e81a / 0x0052e96a.
@@ -915,11 +915,11 @@ namespace Archetype
                 Desc.Size = 0x34;
                 Desc.ComponentName = "FileSystem";
                 Desc.DataPath = Path;
-                Desc.Field10 = 0x80000000u;
-                Desc.Field14 = 1;
-                Desc.Field1C = 3;
-                Desc.Field20 = 0x8000080u;
-                Desc.Field30 = 0xffffffffu;
+                Desc.Access = 0x80000000u;
+                Desc.ShareMode = 1;
+                Desc.Creation = 3;
+                Desc.Flags = 0x8000080u;
+                Desc.FindHandle = 0xffffffffu;
 
                 void* FsOut = nullptr;
                 GENRESULT const OpenResult = static_cast<IFileSystem*>(DALib::Data)->CreateInstance(
@@ -1968,12 +1968,12 @@ namespace Archetype
 
         void FCliObj::Release()
         {
-            // FUN_00406b60: --ref; at 0 → Slot11 then Slot09(1).
+            // FUN_00406b60: --ref; at 0 → Slot11 then ScalarDeletingDtor(1).
             RefCount -= 1;
             if (RefCount == 0)
             {
-                Slot11();
-                Slot09(1);
+                ReleaseResources();
+                ScalarDeletingDtor(1);
             }
         }
 
@@ -2069,7 +2069,7 @@ namespace Archetype
         void FCliObj::FreeResources()
         {
             // LAB_00406d10: JMP Slot11.
-            Slot11();
+            ReleaseResources();
         }
 
         void FCliObj::AssignRootMembers(FCliObj const* Src)
@@ -2225,17 +2225,17 @@ namespace Archetype
                 PushResolvedEntry(RootEntry);
 
             if (bLatchSlot10)
-                StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagSlot10Done);
+                StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagMaterialsRealized);
 
             return true;
         }
 
-        void FCliObj::Slot10()
+        void FCliObj::RealizeMaterials()
         {
             // FUN_00407320
-            if ((StateFlags & CliObjFlagSlot10Done) == 0)
+            if ((StateFlags & CliObjFlagMaterialsRealized) == 0)
             {
-                StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagSlot10Done);
+                StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagMaterialsRealized);
                 FCliMaterialEntry** It = ResolvedEntries.Begin;
                 FCliMaterialEntry** End = ResolvedEntries.End;
                 while (It != End)
@@ -2255,7 +2255,7 @@ namespace Archetype
             }
         }
 
-        void FCliObj::Slot11()
+        void FCliObj::ReleaseResources()
         {
             // FUN_00406d20
             if ((StateFlags & CliObjFlagCacheBuilt) != 0)
@@ -2272,14 +2272,14 @@ namespace Archetype
                 StateFlags = static_cast<unsigned char>(StateFlags & 0xFCu);
             }
 
-            Slot13();
+            ReleaseHitEffects();
             StateFlags = static_cast<unsigned char>(StateFlags & 0xEBu);
         }
 
-        void FCliObj::Slot12(unsigned Arg)
+        void FCliObj::LoadHitEffects(unsigned Arg)
         {
             // FUN_004074f0
-            StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagSlot12Done);
+            StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagHitEffectsLoaded);
             FCliDistanceRecord* It = DistanceRecords.Begin;
             FCliDistanceRecord* End = DistanceRecords.End;
             while (It != End)
@@ -2289,10 +2289,10 @@ namespace Archetype
             }
         }
 
-        void FCliObj::Slot13()
+        void FCliObj::ReleaseHitEffects()
         {
             // LAB_00407530
-            if ((StateFlags & CliObjFlagSlot12Done) == 0)
+            if ((StateFlags & CliObjFlagHitEffectsLoaded) == 0)
                 return;
 
             FCliDistanceRecord* It = DistanceRecords.Begin;
@@ -2310,7 +2310,7 @@ namespace Archetype
             this->~FCliObj();
         }
 
-        void* FCliObj::Slot09(unsigned Flags)
+        void* FCliObj::ScalarDeletingDtor(unsigned Flags)
         {
             // FUN_00406940: dtor body then optional operator delete.
             DestroyMostDerived();
@@ -2369,11 +2369,11 @@ namespace Archetype
             if ((StateFlags & CliObjFlagCacheBuilt) == 0)
             {
                 if (BuildMaterialCache(true))
-                    Slot10();
+                    RealizeMaterials();
             }
 
-            if ((StateFlags & CliObjFlagSlot12Done) == 0)
-                Slot12(0);
+            if ((StateFlags & CliObjFlagHitEffectsLoaded) == 0)
+                LoadHitEffects(0);
 
             if ((StateFlags & CliObjFlagLodPickDone) != 0)
                 return 1;
@@ -3481,10 +3481,10 @@ namespace Archetype
 
         // FUN_004089a0: release + erase the live list, then CliRoot's Slot11 inlined
         // (004089e1..00408a69 is 00406d20's body byte for byte).
-        void FCliMunition::Slot11()
+        void FCliMunition::ReleaseResources()
         {
             ReleaseLiveEffects();
-            FCliObj::Slot11();
+            FCliObj::ReleaseResources();
         }
 
         // LAB_004081c0. 004081c9..004081e1: "skip" = cache built AND Slot12 done, sampled
@@ -3493,7 +3493,7 @@ namespace Archetype
         {
             bool bSkipEffectRebuild =
                 ((StateFlags & CliObjFlagCacheBuilt) != 0) &&
-                ((StateFlags & CliObjFlagSlot12Done) != 0);
+                ((StateFlags & CliObjFlagHitEffectsLoaded) != 0);
 
             unsigned long Result = FCliObj::Load(LoadMode);
 
@@ -3546,7 +3546,7 @@ namespace Archetype
         }
 
         // 00401e90: RET.
-        void FCliEQShield::Slot10()
+        void FCliEQShield::RealizeMaterials()
         {
         }
 
@@ -3693,9 +3693,9 @@ namespace Archetype
 
         // FUN_00409fb0: flag 8 raised, FUN_00555860(Arg) on every +0x40 record, then on every
         // +0x60 record.
-        void FCliShieldGenerator::Slot12(unsigned Arg)
+        void FCliShieldGenerator::LoadHitEffects(unsigned Arg)
         {
-            FCliObj::Slot12(Arg);
+            FCliObj::LoadHitEffects(Arg);
             FCliDistanceRecord* It = ShieldHitEffects.Begin;
             while (It != ShieldHitEffects.End)
             {
@@ -3706,9 +3706,9 @@ namespace Archetype
 
         // FUN_0040a010: the +0x40 records released and flag 8 dropped only when flag 8 was set
         // (FUN_00407530's body); the +0x60 records are released (FUN_005559c0) unconditionally.
-        void FCliShieldGenerator::Slot13()
+        void FCliShieldGenerator::ReleaseHitEffects()
         {
-            FCliObj::Slot13();
+            FCliObj::ReleaseHitEffects();
             FCliDistanceRecord* It = ShieldHitEffects.Begin;
             while (It != ShieldHitEffects.End)
             {
@@ -3820,7 +3820,7 @@ namespace Archetype
         unsigned long FCliLauncher::Load(int LoadMode)
         {
             bool const bWasLoaded = (StateFlags & CliObjFlagCacheBuilt) != 0 &&
-                                    (StateFlags & CliObjFlagSlot12Done) != 0;
+                                    (StateFlags & CliObjFlagHitEffectsLoaded) != 0;
 
             unsigned long const Result = FCliObj::Load(LoadMode);
             if (bWasLoaded)

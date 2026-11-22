@@ -254,7 +254,7 @@ int FVMeshPart::Claim(IFileSystem* File)
     Desc.Flags = 0x8000080;
     Desc.Path = "VMeshRef";
     Desc.Size = 0x34;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.FindHandle = 0xFFFFFFFF;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
     {
@@ -418,7 +418,7 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, void* Inst, unsigned long Flags
         (unsigned long)Ref->IndexStart * 2);
     Context.VbListing = &Listing;
     Context.IbScratch = &Scratch;
-    Context.Field20 = 0;
+    Context.MaterialContext = 0;
 
     unsigned long IndexStart = 0;
     const unsigned int FacegroupCount = Ref->FacegroupCount;

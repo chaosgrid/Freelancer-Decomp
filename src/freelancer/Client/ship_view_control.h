@@ -18,7 +18,7 @@
 // vftable 0x005e4bcc (45 slots) -- WinControl's with these overrides:
 //    0 FUN_00583b70 scalar deleting dtor (FUN_00583c30)
 //    4 LAB_00584bd0 HitTest           5 LAB_004b5020 (Win3D's SetPosition, not WinControl's)
-//    6 LAB_005846b0 Slot6             9 FUN_00583e30 Create        11 LAB_00584740 Update
+//    6 LAB_005846b0 IsPositionInViewport             9 FUN_00583e30 Create        11 LAB_00584740 Update
 //   13 LAB_00584470 Draw             19 LAB_005846a0 (JMP FUN_005a0650, WinControl's MouseEvent)
 //   42 LAB_005864c0 SetProperty
 // UIShipViewControl (vftable 0x005e59a4) derives from this class and replaces slots 0 / 8 / 9
@@ -113,7 +113,7 @@ public:
     // --- Win3D / WinControl overrides ---
     bool HitTest(float const* Ray) override;                       // slot 4  LAB_00584bd0
     void SetPosition(float const* NewPosition) override;           // slot 5  LAB_004b5020
-    bool Slot6(unsigned A) override;                               // slot 6  LAB_005846b0
+    bool IsPositionInViewport(unsigned A) override;                               // slot 6  LAB_005846b0
     bool Create(Win3D* NewParent, void* Data) override;            // slot 9  FUN_00583e30
     void Update() override;                                        // slot 11 LAB_00584740
     void Draw() override;                                          // slot 13 LAB_00584470

@@ -55,7 +55,7 @@ public:
     // Slot 18, FUN_06f4c3b0 (RET 4): rebuild the player map / vector from the new player's group.
     void SetPlayer(unsigned int InPlayerId) override;
     // Slot 21, LAB_06f4b680 (RET 8): the message goes to the state machine group as an
-    // SMControllerEvent; the TU38 body runs from Slot2.
+    // SMControllerEvent; the TU38 body runs from OnStateEvent.
     void HandleMissionMessage(pub::Controller::EMessage MessageId, void const* MessageParms) override;
     // Slot 22 is 06f4cd40, a JMP to the TU38 body FUN_06f0fc40: no override.
     // Slot 23, FUN_06f4c9c0: victory music, completed statistics, reputation, then the TU38 body.
@@ -99,7 +99,7 @@ public:
 protected:
     // StateMachine slot 2, FUN_06f4bf30 (RET 8): the "any state" handler of the controller
     // messages. Called directly by the DestroyMission override (06eef740) with State -1.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06f4be60 (RET 8): the +0xd0 mission flags of a mapped player for SystemId.
     void UpdatePlayerSystemFlags(unsigned int InPlayerId, unsigned int SystemId);
@@ -131,7 +131,7 @@ protected:
     int PlayerCount = 0;
     // +0x224: the names seen (vector of wstring, elements destroyed by FUN_06f4eaf0).
     std::vector<std::wstring> PlayerNames;
-    // +0x234: seconds since the start (Slot2, message 0x20); -1.0f once it reached the
+    // +0x234: seconds since the start (OnStateEvent, message 0x20); -1.0f once it reached the
     // mission's +0x48 (360.0f), after which the +0xd0 system flags are no longer updated.
     // Ctor 0.
     float ElapsedTime = 0.0f;
@@ -154,11 +154,11 @@ public:
     ~FDestroyMission() override;
 
     // Slot 8, LAB_06eef6e0: the first runtime machine's slot 8, else the system id of +0x244.
-    int Slot08() override;
+    int GetTargetSystemId() override;
     // Slot 9, LAB_06eef730: the jump preference of the mission (+0x240 +0x50).
-    int Slot09() override;
+    int GetJumpPreference() override;
     // Slot 12: LAB_06ea1480 (XOR AL,AL; RET) where the TU47 table has LAB_06ea1460.
-    bool Slot12() override;
+    bool FailOnPlayerDeath() override;
     // Slot 22, FUN_06ef0480: slot 7 of every +0x28c machine, then the TU38 body.
     void EndMission() override;
     // Slot 23, LAB_06ef0460: +0x10 = the mission reward, then the TU47 body.
@@ -173,7 +173,7 @@ public:
 protected:
     // StateMachine slot 2, LAB_06eef740 (RET 8): states 0 (brief), 1 (launch the runtime
     // machines), 2 (running), 3 (succeeded), 4 (failed) and the "any state" messages.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06ef0100: a runtime machine per offer of the mission, added to the group; the new
     // handler ids go to +0x26c.

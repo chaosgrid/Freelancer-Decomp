@@ -21,7 +21,6 @@
 #include "../include/server_cobject.h"
 #include "../include/common_physys.h"
 #include "../include/server_gameobject.h"
-#include "../include/server_cship.h"
 #include "../include/server_sysdb.h"
 #include "../include/common_misc.h"
 #include "../include/common_net.h"      // IsMPServer (AdjustCash's gate)
@@ -2494,7 +2493,7 @@ SERVER_API int __cdecl Create(unsigned int& out_id, const SpaceObj::ShipInfo& in
     Request.ReputationRank = info.ReputationRank;                        // .text:06cf7df3
     Request.VoiceId = info.VoiceId;                                      // .text:06cf7dfa
     Request.VibeGroupId = info.VibeGroupId;                              // .text:06cf7e04
-    Request.Field_0xb0 = info.Field_0x54;                                // .text:06cf7e0e
+    Request.GroupNameId = info.GroupNameId;                                // .text:06cf7e0e
     Request.ArchetypeNickname = info.ShipArchID;                         // .text:06cf7e17
     Request.Position = info.Position;                                    // .text:06cf7e21 .. 06cf7e36
     Quaternion ShipOrient;
@@ -2503,11 +2502,11 @@ SERVER_API int __cdecl Create(unsigned int& out_id, const SpaceObj::ShipInfo& in
     Request.Velocity = info.Velocity;                                    // .text:06cf7e8f .. 06cf7ea2
     Request.AngularVelocity = info.AngularVelocity;                      // .text:06cf7eaf .. 06cf7ecd
     Request.DockingBaseId = info.DockingBaseId;                          // .text:06cf7ec6
-    Request.Field_0x6c = info.LoadoutID;                                 // .text:06cf7eda
+    Request.LoadoutId = info.LoadoutID;                                 // .text:06cf7eda
     Request.Throttle = 0.0f;                                             // .text:06cf7ee8
     Request.OwnerPlayer = 0u;                                            // .text:06cf7ef3
     Request.HitPts = info.HitPts;                                        // .text:06cf7efa
-    Request.MarkPlayerId = info.Field_0xb8;                              // .text:06cf7f01
+    Request.MarkPlayerId = info.MarkPlayerId;                              // .text:06cf7f01
     Archetype::Ship* const ShipArch = Archetype::GetShip(info.ShipArchID); // .text:06cf7f08
     ShipArch->get_undamaged_collision_group_list(Request.CollisionGroups); // .text:06cf7f1d
 
@@ -2549,7 +2548,7 @@ SERVER_API int __cdecl CreateLoot(unsigned int& out_id, const SpaceObj::LootInfo
     // .text:06cf84c5-06cf84ea: the record's first eight dwords zero (so no player to mark
     // and no name id until they are written below), +0x68 = 1, +0x69 = 0.
     FLootRecord Record = {};
-    Record.Field_0x68 = 1;
+    Record.bCanAiTractor = 1;
     Record.bMission = 0;
 
     // .text:06cf84ee-06cf8510: the id maker's dynamic counter, post-incremented and masked
@@ -2574,12 +2573,12 @@ SERVER_API int __cdecl CreateLoot(unsigned int& out_id, const SpaceObj::LootInfo
                                        static_cast<double>(loot_info.HitPtsScale));
 
     // .text:06cf853d-06cf85c6: the remaining fields, slot for slot.
-    Record.Field_0x1c = loot_info.NameId;            // .text:06cf8543  record +0x1c
+    Record.NameId = loot_info.NameId;            // .text:06cf8543  record +0x1c
     Record.Velocity = loot_info.Velocity;            // .text:06cf8547  record +0x20
     Record.Position = loot_info.Position;            // .text:06cf8562  record +0x2c
     Record.Orientation = loot_info.Orientation;      // .text:06cf8579  REP MOVSD 9, record +0x38
     Record.AngularVelocity = loot_info.AngularVelocity; // .text:06cf8587 record +0x5c
-    Record.Field_0x68 = loot_info.bCanAiTractor;     // .text:06cf8596  record +0x68
+    Record.bCanAiTractor = loot_info.bCanAiTractor;     // .text:06cf8596  record +0x68
     Record.bMission = loot_info.bMission;            // .text:06cf85a3  record +0x69
     Record.MarkForPlayer = loot_info.MarkForPlayer;     // .text:06cf85c0  record +0x18
 
@@ -2812,7 +2811,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
                 FBehaviorManagerEvent Event;
                 Event.Type = 5;                                          // .text:06cfa835
                 Event.Data = &Block;                                     // .text:06cfa824
-                Manager->Slot00(&Event);                                 // .text:06cfa83d
+                Manager->OnEvent(&Event);                                 // .text:06cfa83d
             }
         }
     }
@@ -3256,8 +3255,8 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
         return Obj->toggle_cruise(true, true, 0) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
                                                  : EQUIPMENT_RTYPE_OK;                  // .text:06cf9464 .. 06cf946e
     case 1: {
-        if (eq_info->Field_0x0c == 0) return EQUIPMENT_RTYPE_INVALID; // .text:06cf947b
-        GameObject* const Other = Server_LookupLiveObject(eq_info->Field_0x0c); // .text:06cf9482
+        if (eq_info->TargetObjId == 0) return EQUIPMENT_RTYPE_INVALID; // .text:06cf947b
+        GameObject* const Other = Server_LookupLiveObject(eq_info->TargetObjId); // .text:06cf9482
         if (Other == nullptr) return EQUIPMENT_RTYPE_BAD_TYPE;   // .text:06cf948c / 06cf94af
         EquipDescVector& Cargo = *reinterpret_cast<EquipDescVector*>(eq_info->CargoOut); // .text:06cf9490
         return Obj->scan_cargo(Other, Cargo) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
@@ -3485,15 +3484,15 @@ SERVER_API int __cdecl CreateSolar(unsigned int& out_id, const SpaceObj::SolarIn
     if (System == nullptr) return -4;                                    // .text:06cf8107
 
     CSolarCreateInfo Request;                                            // .text:06cf8111 .. 06cf812f
-    Request.Field_0xb8.clear();                                          // .text:06cf814d
-    Request.Field_0xbc = 0u;                                             // .text:06cf8153
+    Request.NicknameSrc.clear();                                          // .text:06cf814d
+    Request.MarkPlayerId = 0u;                                             // .text:06cf8153
     int Result;
     if (solar_info.Nickname[0] == '\0') {                               // .text:06cf8173
         Result = -4;                                                     // .text:06cf82cf
     } else {
         unsigned int const Id = CreateID(solar_info.Nickname);           // .text:06cf817a
         out_id = Id;                                                     // .text:06cf8187
-        Request.Field_0xb8.Id = Id;                                      // .text:06cf818f
+        Request.NicknameSrc.Id = Id;                                      // .text:06cf818f
         Request.ObjId = Id;                                              // .text:06cf8196
         Request.HitPts = solar_info.HitPts;                              // .text:06cf81a0
         Request.DockingBaseId = solar_info.DockingBaseId;                // .text:06cf81aa
@@ -3511,13 +3510,13 @@ SERVER_API int __cdecl CreateSolar(unsigned int& out_id, const SpaceObj::SolarIn
         Quaternion SolarOrient;
         SpaceObj_MatrixToQuat(SolarOrient, solar_info.Orientation);      // .text:06cf8217 .. 06cf823e
         Request.Orientation = SolarOrient;                               // .text:06cf8241 .. 06cf8267
-        Request.Field_0x6c = solar_info.LoadoutID;                       // .text:06cf826e
+        Request.LoadoutId = solar_info.LoadoutID;                       // .text:06cf826e
         Archetype::Solar* const SolarArch = Archetype::GetSolar(solar_info.SolarArchID); // .text:06cf8275
         SolarArch->get_undamaged_collision_group_list(Request.CollisionGroups); // .text:06cf8288
-        Request.Field_0xbc = solar_info.Field_0xcc;                      // .text:06cf829e
-        Request.Field_0xb4 = solar_info.Field_0x80;                      // .text:06cf82a8
-        Request.Field_0xac = 1u;                                         // .text:06cf82af
-        Request.Field_0xad = 1u;                                         // .text:06cf82b7
+        Request.MarkPlayerId = solar_info.MarkPlayerId;                      // .text:06cf829e
+        Request.VisitValue = solar_info.VisitValue;                      // .text:06cf82a8
+        Request.bDynamic = 1u;                                         // .text:06cf82af
+        Request.bDestructible = 1u;                                         // .text:06cf82b7
         ::Solar* const Created = System->create_solar(Request);         // .text:06cf82bf
         Result = (Created != nullptr) ? 0 : -1;                          // .text:06cf82c4 .. 06cf82cc
     }
@@ -3967,11 +3966,11 @@ SERVER_API int __cdecl RequestSpaceScript(const unsigned int& obj_id_ref, const 
     // (Until 2026-09-26 the port used {id, Vector, int, name} here, which put the name where
     // rpclocal's sender 0x06d8aa40 reads the position.)
     FServerRequestSpaceScriptInfo Payload;
-    Payload.Field_0x000 = obj_id_ref;
-    memcpy(&Payload.Field_0x108, &pos.x, sizeof(float));
-    memcpy(&Payload.Field_0x10c, &pos.y, sizeof(float));
-    memcpy(&Payload.Field_0x110, &pos.z, sizeof(float));
-    Payload.Field_0x114 = static_cast<unsigned int>(priority);
+    Payload.ObjectId = obj_id_ref;
+    memcpy(&Payload.PosXBits, &pos.x, sizeof(float));
+    memcpy(&Payload.PosYBits, &pos.y, sizeof(float));
+    memcpy(&Payload.PosZBits, &pos.z, sizeof(float));
+    Payload.CameraMode = static_cast<unsigned int>(priority);
     safe_strcpy(Payload.Name, static_cast<int>(kRequestSpaceScriptNameSize), script_name);
     ::g_pClientInterface->SendServerRequestSpaceScript(client_id, Payload);
     return 0;
@@ -4254,9 +4253,9 @@ SERVER_API int __cdecl CfgInterfaceNotification(unsigned int player_id, unsigned
     // notif_type, +0x04 param, byte +0x08 enable); retail leaves the three pad bytes
     // unwritten, and so does this.
     FPayloadServerCfgInterfaceNotification Payload;
-    Payload.Field_0x00 = notif_type;
-    Payload.Field_0x04 = static_cast<unsigned int>(param);
-    Payload.Field_0x08 = enable ? 1u : 0u;
+    Payload.NotifType = notif_type;
+    Payload.Param = static_cast<unsigned int>(param);
+    Payload.bEnable = enable ? 1u : 0u;
     // .text:06d54a62 LEA EDX,[ESP+0x18] -- &param_1 (rpclocal's sender 0x06d8ad30
     // dereferences it); DAT_06d8fb14 is not null-tested.
     ::g_pClientInterface->SendServerCfgInterfaceNotification(player_id, Payload);
@@ -5275,10 +5274,10 @@ SERVER_API int __cdecl SetMissionObjectives(const unsigned int& player_id, const
     if (!IsValidPlayer(player_id)) return -2;
 
     FServerSetMissionObjectivesInfo Payload;
-    Payload.Field_0x00 = mission_id;                                      // .text:06d55a4c
+    Payload.MissionId = mission_id;                                      // .text:06d55a4c
     Payload.Count = count;                                                // .text:06d55a59
     Payload.TextA = title;                                                // .text:06d55a5d
-    Payload.Field_0x3c = type;                                            // .text:06d55a6c
+    Payload.MissionType = type;                                            // .text:06d55a6c
     Payload.TextB = desc;                                                 // .text:06d55a70
 
     FServerMissionObjectiveEntry* Entries = nullptr;
@@ -5332,8 +5331,8 @@ SERVER_API int __cdecl SetMissionObjectives(const unsigned int& player_id, const
 SERVER_API int __cdecl ReplaceMissionObjective(const unsigned int& player_id, const unsigned int& mission_id, unsigned int index, const MissionObjective& obj) {
     if (!IsValidPlayer(player_id)) return -2;
     FServerReplaceMissionObjectiveInfo Record;
-    Record.Field_0x00 = mission_id;
-    Record.State = static_cast<unsigned char>(index);
+    Record.MissionId = mission_id;
+    Record.ObjectiveIndex = static_cast<unsigned char>(index);
     Record.Text = obj.Description;
     Record.ObjectiveType = obj.Type;
     ::g_pClientInterface->SendServerReplaceMissionObjective(player_id, Record);
@@ -5348,9 +5347,9 @@ SERVER_API int __cdecl ReplaceMissionObjective(const unsigned int& player_id, co
 SERVER_API int __cdecl SetMissionObjectiveState(const unsigned int& player_id, const unsigned int& mission_id, int index, unsigned int state) {
     if (!IsValidPlayer(player_id)) return -2;
     FServerMissionObjectiveStateInfo Record;
-    Record.Field_0x00 = mission_id;
-    Record.Field_0x04 = static_cast<unsigned char>(index);
-    Record.Field_0x08 = state;
+    Record.MissionId = mission_id;
+    Record.ObjectiveIndex = static_cast<unsigned char>(index);
+    Record.State = state;
     ::g_pClientInterface->SendServerSetMissionObjectiveState(player_id, Record);
     return 0;
 }
@@ -5932,8 +5931,8 @@ static void Server_NotifyRepChange(int const* vibe_handle, unsigned int session_
     if (SinglePlayer()) {
         FServerSetReputationInfo Info;
         Info.Attitude = 0.0f;               // never written by retail (stack residue)
-        Info.Field_0x08 = 0;
-        Info.Field_0x0c = 0;
+        Info.Affiliation = 0;
+        Info.Rank = 0;
         Info.Relations = nullptr;           // .text:06d5f17b
         Info.RelationCount = 0;             // .text:06d5f182
         Info.Pad_0x15[0] = 0;
@@ -5944,7 +5943,7 @@ static void Server_NotifyRepChange(int const* vibe_handle, unsigned int session_
         Info.Relations = static_cast< ::Reputation::Relation*>(
             ::operator new(GlobalReputation::group_count() * 8));      // .text:06d5f1b6
         wchar_t const* VibeName = nullptr;                              // .text:06d5f1f8
-        GlobalReputation::Vibe::Get(Info.VibeHandle, Info.Field_0x08, Info.Field_0x0c,
+        GlobalReputation::Vibe::Get(Info.VibeHandle, Info.Affiliation, Info.Rank,
                                     Info.RelationCount, Info.Relations, Info.NameA,
                                     Info.NameB, VibeName);             // .text:06d5f1fc
         if (VibeName != nullptr) {
@@ -5964,8 +5963,8 @@ static void Server_NotifyRepChange(int const* vibe_handle, unsigned int session_
     if (Players[session_id].client_id == 0) return;
 
     FServerSetReputationInfo Info;
-    Info.Field_0x08 = 0;                    // stack residue in retail
-    Info.Field_0x0c = 0;
+    Info.Affiliation = 0;                    // stack residue in retail
+    Info.Rank = 0;
     Info.Relations = nullptr;               // .text:06d5f334
     Info.RelationCount = 0;                 // .text:06d5f338
     Info.Pad_0x15[0] = 0;
@@ -6810,7 +6809,7 @@ SERVER_API int __cdecl EnumerateObjects(const unsigned int& system_id, SysObjEnu
         Object.DockWith = Record.DockWith;
         Object.Goto = Record.Goto;
         Object.SystemId = system_id;
-        if (!enumerator.Slot00(&Object)) break;
+        if (!enumerator.OnObject(&Object)) break;
     }
     return Result;
 }
@@ -6841,7 +6840,7 @@ SERVER_API int __cdecl EnumerateZones(const unsigned int& system_id, ZoneEnumera
     for (; It != End; ++It) {
         Reader.set_state(It->State);
         unsigned int ZoneId = It->Zone->GetId();      // zone vt+0x04
-        enumerator.Slot00(&ZoneId, &Reader);
+        enumerator.OnZone(&ZoneId, &Reader);
     }
     Result = 0;
     return Result;
@@ -7175,71 +7174,71 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
         // Pad_0x09 / Pad_0x91 are left as stack residue by retail; zero here (rpclocal's
         // marshal zeroes them again).
         FPayloadServerSetDirective Info = {};
-        Info.Field_0x18 = -1;
-        Info.Field_0x40 = 3;
+        Info.DockPortIndex = -1;
+        Info.GotoMode = 3;
 
         if (Op->OpType == OpType_DirectiveCancelOp) {
             // caseD_15, 06d5ccc3..06d5cdd1
-            Info.Field_0x00 = 0;
+            Info.DirectiveKind = 0;
         } else if (Op->OpType == OpType_DirectiveDelayOp) {
             // caseD_c, 06d5cdd6..06d5ceb6
             DirectiveDelayOp* Delay = static_cast<DirectiveDelayOp*>(Op);
-            Info.Field_0x0c = Delay->DelaySeconds;
-            Info.Field_0x00 = 1;
+            Info.DelaySeconds = Delay->DelaySeconds;
+            Info.DirectiveKind = 1;
         } else if (Op->OpType == OpType_DirectiveDockOp) {
             // caseD_d, 06d5cebb..06d5cfc5
             DirectiveDockOp* Dock = static_cast<DirectiveDockOp*>(Op);
-            Info.Field_0x10 = Dock->DockObjectId;
-            Info.Field_0x14 = Dock->Field_10;
-            Info.Field_0x08 = Dock->Field_14;
-            Info.Field_0x18 = Dock->DockPortIndex;
-            Info.Field_0x1c = static_cast<unsigned int>(Dock->Field_1C);
-            Info.Field_0x20 = Dock->Field_20;
-            Info.Field_0x24 = Dock->Field_24;
-            Info.Field_0x00 = 2;
+            Info.DockObjectId = Dock->DockObjectId;
+            Info.DockSecondaryObjectId = Dock->Field_10;
+            Info.bDockApproachCleared = Dock->Field_14;
+            Info.DockPortIndex = Dock->DockPortIndex;
+            Info.ProxTargetId = static_cast<unsigned int>(Dock->Field_1C);
+            Info.ProxNearDist = Dock->Field_20;
+            Info.ProxFarDist = Dock->Field_24;
+            Info.DirectiveKind = 2;
         } else if (Op->OpType == OpType_DirectiveFollowOp) {
             // caseD_4, 06d5cfca..06d5d0dd
             DirectiveFollowOp* Follow = static_cast<DirectiveFollowOp*>(Op);
-            Info.Field_0x28 = Follow->TargetId;
-            Info.Field_0x2c = Follow->FollowDistance;
-            Info.Field_0x30.x = Follow->Field_14;
-            Info.Field_0x30.y = Follow->Field_18;
-            Info.Field_0x30.z = Follow->Field_1C;
+            Info.FollowTargetId = Follow->TargetId;
+            Info.FollowDistance = Follow->FollowDistance;
+            Info.FollowOffset.x = Follow->Field_14;
+            Info.FollowOffset.y = Follow->Field_18;
+            Info.FollowOffset.z = Follow->Field_1C;
             Info.Field_0x3c = Follow->Field_20;
-            Info.Field_0x00 = 3;
+            Info.DirectiveKind = 3;
         } else if (Op->OpType == OpType_DirectiveIdleOp) {
             // caseD_14, 06d5d0e2..06d5d1c5
-            Info.Field_0x00 = 5;
+            Info.DirectiveKind = 5;
         } else if (Op->OpType == OpType_DirectiveGotoOp) {
             // caseD_3, 06d5d22e..06d5d40c. The only kind that fills +0x84..+0x90, and the
             // only one that jumps straight to the send at 06d5d413.
             DirectiveGotoOp* Goto = static_cast<DirectiveGotoOp*>(Op);
-            Info.Field_0x40 = Goto->Field_0C;
-            Info.Field_0x44 = Goto->Destination;
-            Info.Field_0x50 = Goto->Field_1C;
-            Info.Block_0x54.Field_0x00 = Goto->Field_20;
-            Info.Block_0x54.Field_0x04 = Goto->Field_24;
-            Info.Block_0x54.Field_0x08 = Goto->Field_28;
-            Info.Block_0x60.Field_0x00 = Goto->Field_2C;
-            Info.Block_0x60.Field_0x04 = Goto->Field_30;
-            Info.Block_0x60.Field_0x08 = Goto->Field_34;
-            Info.Block_0x6c.Field_0x00 = Goto->Field_38;
-            Info.Block_0x6c.Field_0x04 = Goto->Field_3C;
-            Info.Block_0x6c.Field_0x08 = Goto->Field_40;
-            Info.Block_0x78.Field_0x00 = Goto->Field_44;
-            Info.Block_0x78.Field_0x04 = Goto->Field_48;
-            Info.Block_0x78.Field_0x08 = Goto->Field_4C;
-            Info.Field_0x84 = Goto->Field_50;
-            Info.Field_0x88 = Goto->Field_54;
+            Info.GotoMode = Goto->Field_0C;
+            Info.GotoDestination = Goto->Destination;
+            Info.GotoTargetId = Goto->Field_1C;
+            Info.SplineP1.Field_0x00 = Goto->Field_20;
+            Info.SplineP1.Field_0x04 = Goto->Field_24;
+            Info.SplineP1.Field_0x08 = Goto->Field_28;
+            Info.SplineP2.Field_0x00 = Goto->Field_2C;
+            Info.SplineP2.Field_0x04 = Goto->Field_30;
+            Info.SplineP2.Field_0x08 = Goto->Field_34;
+            Info.SplineP0.Field_0x00 = Goto->Field_38;
+            Info.SplineP0.Field_0x04 = Goto->Field_3C;
+            Info.SplineP0.Field_0x08 = Goto->Field_40;
+            Info.SplineP3.Field_0x00 = Goto->Field_44;
+            Info.SplineP3.Field_0x04 = Goto->Field_48;
+            Info.SplineP3.Field_0x08 = Goto->Field_4C;
+            Info.GotoRange = Goto->Field_50;
+            Info.GotoSpeed = Goto->Field_54;
             Info.Field_0x8c = Goto->Field_58;
             Info.Field_0x8d = Goto->Field_59;
-            Info.Field_0x8e = Goto->Field_5A;
-            Info.Field_0x8f = Goto->Field_5B;
-            Info.Field_0x1c = Goto->Field_5C;
-            Info.Field_0x20 = Goto->Field_60;
-            Info.Field_0x24 = Goto->Field_64;
-            Info.Field_0x90 = Goto->Field_6C;
-            Info.Field_0x00 = 4;
+            Info.bGotoCruise = Goto->Field_5A;
+            Info.bGotoNoCruise = Goto->Field_5B;
+            Info.ProxTargetId = Goto->Field_5C;
+            Info.ProxNearDist = Goto->Field_60;
+            Info.ProxFarDist = Goto->Field_64;
+            Info.bGotoAllowCruise = Goto->Field_6C;
+            Info.DirectiveKind = 4;
         } else {
             // caseD_5, 06d5d723: byte-table entry 6 (Trail, Strafe, Face, Ram, TractorBeam,
             // Evade, DrasticEvade, Launch, InstantTradelane, Formation, Guide, WaitForShip,

@@ -527,7 +527,7 @@ void FMissionScript::SetDesiredMissionState(int State, unsigned int MadLibId)
     if (Field_0x2b0 == 1 && State == MissionStateFail)
         return;
     MissionState = State;
-    Field_0x2e8 = MadLibId;
+    StateMessageId = MadLibId;
 }
 
 // FUN_06eb8f50 case 0x1000 (06eb94ec-06eb9541): in-order walk of mission+0x1e4, activating
@@ -570,18 +570,18 @@ void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path)
         if (Base != nullptr)
         {
             FBaseRoomState* const Room = Base->FindRoomState(&Script->CurrentLocationId);
-            if (Room != nullptr && It->Field_0x90 != nullptr &&
+            if (Room != nullptr && It->Encounter != nullptr &&
                 FindContentPlayerState(Script->PlayerId) != nullptr)
             {
                 FBarCharacterList::iterator Character;
-                if (Room->FindCharacter(GetFirstRtcRole(It->Field_0x90), Script->PlayerId,
+                if (Room->FindCharacter(GetFirstRtcRole(It->Encounter), Script->PlayerId,
                                         &Character))
                 {
                     Character->SetBehavior(static_cast<unsigned long>(-1));
                 }
             }
         }
-        It->Field_0x94 = 1;
+        It->bFinished = 1;
     }
 }
 
@@ -637,13 +637,13 @@ FMissionScript::FMissionScript(unsigned int const* InControllerId,
     , CampaignSlotSucceed(0)
     , StoryCue(0)
     , Field_0x2c0(0)
-    , Field_0x2c4(0)
+    , AcceptedObjectiveIds(0)
     , Field_0x2c8(0)
     , bRepPopUpShown(0)
     , bRepPopUpArmed(0)
     , RepPopUpSystemId(0)
-    , Field_0x2e8(1)
-    , Field_0x2ec(0)
+    , StateMessageId(1)
+    , bNeedsObjectiveRenumber(0)
 {
     GMissionScriptDat06fcf018 = 0;
     FMissionObject::SetPlayer(Parms->PlayerId);
@@ -701,17 +701,17 @@ void FMissionScript::ReleaseRtcScripts()
     std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
     for (; It != List_0x2f4.end(); ++It)
     {
-        if (It->Field_0x90 == nullptr)
+        if (It->Encounter == nullptr)
             continue;
-        if (Base != nullptr && It->Field_0x8c != -1)
+        if (Base != nullptr && It->BarSceneHandle != -1)
         {
-            // 06eb8bb9-06eb8bc3: FUN_06ea9fc0(Base, Field_0x8c, 0).
-            Base->RemoveBarScene(It->Field_0x8c, nullptr);
-            It->Field_0x8c = -1;
+            // 06eb8bb9-06eb8bc3: FUN_06ea9fc0(Base, BarSceneHandle, 0).
+            Base->RemoveBarScene(It->BarSceneHandle, nullptr);
+            It->BarSceneHandle = -1;
         }
         // 06eb8bcd-06eb8be7: FUN_06eb8c40 (the member-wise teardown) + free of the script.
-        delete It->Field_0x90;
-        It->Field_0x90 = nullptr;
+        delete It->Encounter;
+        It->Encounter = nullptr;
     }
     // 06eb8bfb-06eb8c32: unlink and free every node.
     List_0x2f4.clear();
@@ -738,8 +738,8 @@ void FMissionScript::StartRtcScript(FStoryMissionListNode_0x2f4* Rtc)
             Script->SequenceId = AllocateFormationId();
             // 06eb8ad1-06eb8af1: Rtc +0x84 = FUN_06ea9640(Base, Script, +0xc, +0x4), then
             // Rtc +0x88 = Script.
-            Rtc->Field_0x8c = Base->CreateBarScene(Script, PlayerId, ControllerId);
-            Rtc->Field_0x90 = Script;
+            Rtc->BarSceneHandle = Base->CreateBarScene(Script, PlayerId, ControllerId);
+            Rtc->Encounter = Script;
             return;
         }
     }
@@ -761,7 +761,7 @@ void FMissionScript::RevertStaticCam()
     // 06eb8d68-06eb8d93: FUN_06f33fd0(npc, 0) over the +0xa4 NPC map, in order.
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.begin();
     for (; NpcIt != NpcObjects.end(); ++NpcIt)
-        NpcIt->second->SetField1b1(false);
+        NpcIt->second->SetCommMuted(false);
     // 06eb8d95-06eb8ecd: with a player ship object (+0x10): a local directive list holding one
     // new Avoidance directive (FUN_06f24870 type 0, FUN_06f26020(1), pushed and AddRef'ed),
     // FUN_06f57840(&list, 0); then the local reference is released and the list's elements
@@ -787,7 +787,7 @@ void FMissionScript::SetChapter(int SlotCurrent, int SlotSucceed, unsigned int V
     CampaignSlotCurrent = SlotCurrent;
     CampaignSlotSucceed = SlotSucceed;
     Field_0x2c0 = Value2c0;
-    Field_0x2c4 = Value2c4;
+    AcceptedObjectiveIds = Value2c4;
 }
 
 void FMissionScript::LoadMissionIni(char const* IniPath)
@@ -807,7 +807,7 @@ void FMissionScript::UpdateObjectiveTimer(EMessage MessageId, void const* Messag
 }
 
 // FUN_06ebab90: FUN_06eb9af0(&0x100f, Arg).
-void FMissionScript::Slot28(void const* Parms)
+void FMissionScript::OnNpcSystemEnter(void const* Parms)
 {
     EMessage EventId = EMessage::NpcSystemEnter;
     DispatchMissionTriggerEvent(this, &EventId, Parms);
@@ -839,12 +839,12 @@ void FMissionScript::ApplyDesiredMissionState()
 // FUN_06f49090(+8, 7) and FUN_06f171a0(this); always FUN_06f0fda0(this) last.
 void FMissionScript::OnMissionSucceed()
 {
-    if (Field_0x2e8 != 0 && FindContentPlayerState(PlayerId) != nullptr)
+    if (StateMessageId != 0 && FindContentPlayerState(PlayerId) != nullptr)
     {
-        if (Field_0x2e8 == 1)
-            Field_0x2e8 = 0x4cf;
+        if (StateMessageId == 1)
+            StateMessageId = 0x4cf;
         FmtStr MissionMsg;
-        MissionMsg.begin_mad_lib(Field_0x2e8);
+        MissionMsg.begin_mad_lib(StateMessageId);
         MissionMsg.end_mad_lib();
         pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_1, true);
         // 06eb9823-06eb982b: FUN_06f49090 on the cached player state (+0x08) with type 7.
@@ -858,17 +858,17 @@ void FMissionScript::OnMissionSucceed()
 void FMissionScript::OnMissionFail()
 {
     // 06eb988d-06eb9896: madlib 1 -> 0x412.
-    if (Field_0x2e8 == 1)
-        Field_0x2e8 = 0x412;
+    if (StateMessageId == 1)
+        StateMessageId = 0x412;
     // 06eb98a0-06eb990d: DisplayMissionMessage(&PlayerId, madlib, type 0, true).
     FmtStr MissionMsg;
-    MissionMsg.begin_mad_lib(Field_0x2e8);
+    MissionMsg.begin_mad_lib(StateMessageId);
     MissionMsg.end_mad_lib();
     pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_0, true);
     // 06eb9913-06eb996a: in-order walk of the +0xa4 NPC map; FUN_06f33fd0(npc, 1).
     std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.begin();
     for (; It != NpcObjects.end(); ++It)
-        It->second->SetField1b1(true);
+        It->second->SetCommMuted(true);
     // 06eb996e: FUN_06f171a0.
     DestroyMissionObjects();
     FMissionObject::OnMissionFail();
@@ -894,7 +894,7 @@ void FMissionScript::EndMission()
     // 06eb80fb-06eb811a: every active trigger's condition gets slot 4 (+0x10).
     std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
     for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
-        (*ActiveIt)->second.Condition->Slot10();
+        (*ActiveIt)->second.Condition->OnMissionEnd();
     // 06eb811c: FUN_06eb8b70.
     ReleaseRtcScripts();
     // 06eb8123-06eb8138: +0x2fc erase(begin, end).
@@ -1238,9 +1238,9 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         if (Parms[1] == 0)
         {
             if (Parms[2] == 1)
-                Field_0x2e8 = 0x5462;
+                StateMessageId = 0x5462;
             else
-                Field_0x2e8 = Parms[2];
+                StateMessageId = Parms[2];
         }
         break;
     case EMessage::PlayerMissionChanged:
@@ -1272,7 +1272,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     // 06eb90ef-06eb913b: the tail.
     if (bPendingDestroy == 0)
     {
-        if (Field_0x2ec == 0 && NnPath.bActive != 0
+        if (bNeedsObjectiveRenumber == 0 && NnPath.bActive != 0
             && (PlayerState->GetLiveMission() == ControllerId
                 || (PlayerState->GetLiveMission() & 0x3fffffff) == 0))
             NnPath.HandleMessage(MessageId, MessageParms);
@@ -1291,7 +1291,7 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
     std::list<FStoryMissionListNode_0x2f4>::iterator ScriptIt = List_0x2f4.begin();
     for (; ScriptIt != List_0x2f4.end(); ++ScriptIt)
     {
-        if (ScriptIt->Field_0x8c == -1)
+        if (ScriptIt->BarSceneHandle == -1)
             StartRtcScript(&*ScriptIt);                                 // 06eb9dff
     }
     // 06eb9e0e-06eb9e79: every ambient scene of this base is created.
@@ -1309,10 +1309,10 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
         SceneIt->Handle = static_cast<int>(pub::GF::AmbientScriptCreate(Desc));
     }
     // 06eb9e7c-06eb9eb1.
-    if (Field_0x2ec != 0)
+    if (bNeedsObjectiveRenumber != 0)
     {
         RenumberAllObjectives();
-        Field_0x2ec = 0;
+        bNeedsObjectiveRenumber = 0;
     }
     else if (NnPath.bActive != 0)
     {
@@ -1335,17 +1335,17 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
         std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
         while (It != List_0x2f4.end())
         {
-            if (It->Field_0x90 != nullptr)
+            if (It->Encounter != nullptr)
             {
-                // 06eb9f2a-06eb9f42: FUN_06ea9fc0(Base, Field_0x8c, 0), -1 not tested.
-                Base->RemoveBarScene(It->Field_0x8c, nullptr);
-                It->Field_0x8c = -1;
+                // 06eb9f2a-06eb9f42: FUN_06ea9fc0(Base, BarSceneHandle, 0), -1 not tested.
+                Base->RemoveBarScene(It->BarSceneHandle, nullptr);
+                It->BarSceneHandle = -1;
                 // 06eb9f3a-06eb9f5e: FUN_06eb8c40 + free of the script.
-                delete It->Field_0x90;
-                It->Field_0x90 = nullptr;
+                delete It->Encounter;
+                It->Encounter = nullptr;
             }
             // 06eb9f68-06eb9f99: a finished script's node is unlinked.
-            if (It->Field_0x94 != 0)
+            if (It->bFinished != 0)
                 It = List_0x2f4.erase(It);
             else
                 ++It;
@@ -1372,11 +1372,11 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
     std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
     for (; It != List_0x2f4.end(); ++It)
     {
-        if (It->Field_0x94 != 0 || It->Field_0x95 != 0)
+        if (It->bFinished != 0 || It->bRepeatable != 0)
             continue;
         if (FindContentPlayerState(PlayerId) == nullptr)
             continue;
-        if (It->Field_0x90 == nullptr)
+        if (It->Encounter == nullptr)
             continue;
         // 06eba398-06eba3ed: the player's base, its room state of +0x308,
         // FindCharacter(script +0x10 role, PlayerId); a character whose id (+0x0c) equals
@@ -1388,12 +1388,12 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
         if (Room == nullptr)
             continue;
         FBarCharacterList::iterator Character;
-        if (!Room->FindCharacter(GetFirstRtcRole(It->Field_0x90), PlayerId, &Character))
+        if (!Room->FindCharacter(GetFirstRtcRole(It->Encounter), PlayerId, &Character))
             continue;
         if (Character->CharacterId != *static_cast<unsigned int const*>(MessageParms))
             continue;
         Character->SetBehavior(static_cast<unsigned long>(-1));
-        It->Field_0x94 = 1;
+        It->bFinished = 1;
     }
     EMessage EventId = EMessage::GFObjSelect;
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
@@ -1414,12 +1414,12 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
         std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
         for (; It != List_0x2f4.end(); ++It)
         {
-            if (It->Field_0x94 != 0 || It->Field_0x90 == nullptr)
+            if (It->bFinished != 0 || It->Encounter == nullptr)
                 continue;
-            if (It->Field_0x90->LocationId != LocationId)
+            if (It->Encounter->LocationId != LocationId)
                 continue;
-            std::vector<FRtcScriptRole>::const_iterator Role = It->Field_0x90->Roles.begin();
-            for (; Role != It->Field_0x90->Roles.end(); ++Role)
+            std::vector<FRtcScriptRole>::const_iterator Role = It->Encounter->Roles.begin();
+            for (; Role != It->Encounter->Roles.end(); ++Role)
                 KeepRoles.push_back(*Role);
         }
         // 06eba5ef-06eba6b3: every finished script (+0x94 == 1) with an object is released
@@ -1427,15 +1427,15 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
         It = List_0x2f4.begin();
         while (It != List_0x2f4.end())
         {
-            if (It->Field_0x94 != 1 || It->Field_0x90 == nullptr)
+            if (It->bFinished != 1 || It->Encounter == nullptr)
             {
                 ++It;
                 continue;
             }
-            Base->RemoveBarScene(It->Field_0x8c, &KeepRoles);
-            It->Field_0x8c = -1;
-            delete It->Field_0x90;
-            It->Field_0x90 = nullptr;
+            Base->RemoveBarScene(It->BarSceneHandle, &KeepRoles);
+            It->BarSceneHandle = -1;
+            delete It->Encounter;
+            It->Encounter = nullptr;
             It = List_0x2f4.erase(It);
         }
         // 06eba6b9-06eba6ec: KeepRoles destroyed.
@@ -1485,7 +1485,7 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
     // +0x2c4) -- the group joins this mission. Arguments in retail's positional order.
     ID_String NoVnpc;
     NoVnpc.clear();
-    PlayerState->JoinMissionAsGroup(ControllerId, 0, &NoVnpc, true, Field_0x2c4);
+    PlayerState->JoinMissionAsGroup(ControllerId, 0, &NoVnpc, true, AcceptedObjectiveIds);
 }
 
 // FUN_06eba720 (06eba720-06eba859).
@@ -1522,7 +1522,7 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
         HideAllObjectives();
         NnPath.SendObjectives(false, false);
     }
-    Field_0x2ec = 0;
+    bNeedsObjectiveRenumber = 0;
 }
 
 // FUN_06ebaae0 (06ebaae0-06ebab81).
@@ -1594,7 +1594,7 @@ void FMissionScript::OnMessage24(void const* MessageParms)
     if (PlayerState->GetLiveMission() != ControllerId)
         return;
     FmtStr MissionMsg;
-    MissionMsg.begin_mad_lib(Field_0x2e8);
+    MissionMsg.begin_mad_lib(StateMessageId);
     MissionMsg.end_mad_lib();
     pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_0, true);
     bPendingDestroy = 1;
@@ -1651,8 +1651,8 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
         std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
         for (; It != List_0x2f4.end(); ++It)
         {
-            if (It->Field_0x90 == nullptr || It->Field_0x90->MissionTextId == 0 ||
-                It->Field_0x94 != 0)
+            if (It->Encounter == nullptr || It->Encounter->MissionTextId == 0 ||
+                It->bFinished != 0)
             {
                 continue;
             }
@@ -1666,12 +1666,12 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
             memcpy(Restart.Path, It->Path, PathLength);
             Restart.Path[PathLength] = '\0';
             Restart.PathLength = static_cast<unsigned int>(PathLength);
-            Restart.Field_0x95 = It->Field_0x95;
+            Restart.bRepeatable = It->bRepeatable;
             // 06eba9d1-06ebaa29: FUN_06ea9fc0(Base, +0x8c, 0), FUN_06eb8c40 + free, unlink.
-            Base->RemoveBarScene(It->Field_0x8c, nullptr);
-            It->Field_0x8c = -1;
-            delete It->Field_0x90;
-            It->Field_0x90 = nullptr;
+            Base->RemoveBarScene(It->BarSceneHandle, nullptr);
+            It->BarSceneHandle = -1;
+            delete It->Encounter;
+            It->Encounter = nullptr;
             List_0x2f4.erase(It);
             break;
         }
@@ -1692,9 +1692,9 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
     FMissionObjective* First = Player->Objectives.GetFront();
     unsigned int const SavedType = First->Objective.Type;
     First->Objective.Type = SavedType | 0x30;
-    Player->SetField25(true);
+    Player->SetForceResendObjectives(true);
     Player->SendObjectives();
-    Player->SetField25(false);
+    Player->SetForceResendObjectives(false);
     First->Objective.Type = SavedType;
 }
 
@@ -1714,8 +1714,8 @@ void FMissionScript::SaveMissionState(FILE* File)
     fprintf(File, SpacePopGetPopulationEnabled() != 0 ? "random_pop = true\n"
                                                        : "random_pop = false\n");
     // 06ebac80-06ebac99: the madlib ids of the TU38 FmtStrs +0x68 and +0x50.
-    fprintf(File, "msn_offer = %d\n", Field_0x68.MadLibId);
-    fprintf(File, "msn_title = %d\n", Field_0x50.MadLibId);
+    fprintf(File, "msn_offer = %d\n", MissionOffer.MadLibId);
+    fprintf(File, "msn_title = %d\n", MissionTitle.MadLibId);
     if (NnPath.bActive != 0)
         NnPath.Save(File);
     if (bTriggerSavePending != 0)
@@ -1729,9 +1729,9 @@ void FMissionScript::SaveMissionState(FILE* File)
     std::list<FStoryMissionListNode_0x2f4>::iterator ScriptIt = List_0x2f4.begin();
     for (; ScriptIt != List_0x2f4.end(); ++ScriptIt)
     {
-        if (ScriptIt->Field_0x94 != 0)
+        if (ScriptIt->bFinished != 0)
             continue;
-        fprintf(File, "rtc = %s, %s\n", ScriptIt->Path, ScriptIt->Field_0x95 != 0 ? "true" : "false");
+        fprintf(File, "rtc = %s, %s\n", ScriptIt->Path, ScriptIt->bRepeatable != 0 ? "true" : "false");
     }
     std::list<FMissionAmbientScene>::iterator SceneIt = AmbientScenes.begin();
     for (; SceneIt != AmbientScenes.end(); ++SceneIt)
@@ -1765,7 +1765,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
         if (Reader->is_header("MissionState"))
         {
             // 06ebae79-06ebae80.
-            Field_0x2ec = 1;
+            bNeedsObjectiveRenumber = 1;
             bMissionStateSeen = true;
             while (Reader->read_value())
             {
@@ -1781,7 +1781,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                     Path = Reader->get_value_string(0);
                     Script.PathLength = Path.Length;
                     memcpy(Script.Path, Path.Data, Path.Length + 1);
-                    Script.Field_0x95 = Reader->get_value_bool(1) ? 1 : 0;
+                    Script.bRepeatable = Reader->get_value_bool(1) ? 1 : 0;
                     List_0x2f4.push_back(Script);
                     bRtcReleased = true;
                     continue;
@@ -1865,12 +1865,12 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 if (Reader->is_value("msn_offer"))
                 {
                     if (Reader->get_value_int(0) != 0)
-                        MadLib = &Field_0x68;
+                        MadLib = &MissionOffer;
                 }
                 else if (Reader->is_value("msn_title"))
                 {
                     if (Reader->get_value_int(0) != 0)
-                        MadLib = &Field_0x50;
+                        MadLib = &MissionTitle;
                 }
                 else if (Reader->is_value("nnpath"))
                 {
@@ -1970,7 +1970,7 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
         // when that is empty, from the pilot of its npcships entry (FUN_06f324d0 on
         // ship arch +0x138, value +0xc); on success its job fields replace the live ones.
         pub::AI::Personality PilotPersonality;
-        ID_String PilotId = Npc->Field_0x1cc;
+        ID_String PilotId = Npc->PilotId;
         bool bLoaded = false;
         if (PilotId.IsEmpty())
         {

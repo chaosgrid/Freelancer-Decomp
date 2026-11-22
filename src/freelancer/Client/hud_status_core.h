@@ -165,10 +165,10 @@ public:
     // weapon groups' ship (DAT_00674c0c).
     void SetTarget(IObjRW* NewTarget) override;
     // HUDItem slot 12 LAB_004dccf0 -- open (mover, then scaler) or close (scaler, then mover).
-    void Slot12() override;
+    void ToggleExpanded() override;
     // HUDItem slot 13 LAB_004db120 (RET 4) -- SetProperty(1, bHide, 0) on the weapon rows and
-    // the scroll bar (while Field5a0), then on ViewPanel and CloseButton.
-    void Slot13(bool bHide) override;
+    // the scroll bar (while bShowWeaponList), then on ViewPanel and CloseButton.
+    void HideExpandedControls(bool bHide) override;
 
     // WinControl slot 19 LAB_004db8f0 (RET 4) -- a right click (-1, 2) on a sub-target toggles
     // that launcher.
@@ -178,7 +178,7 @@ public:
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     // ButtonMover slot 0 LAB_004dcf80 / ButtonScaler slot 0 LAB_004dd080 -- the second and the
-    // last stage of Slot12's open / close.
+    // last stage of ToggleExpanded's open / close.
     void OnMoveFinished() override;
     void OnScaleFinished() override;
 
@@ -252,7 +252,7 @@ public:
     // ship's archetype allows on Hardpoint; cached per name in HpRowCache. 0 when nothing fits.
     int FindHardpointRow(char const* Hardpoint);
 
-    unsigned char Byte500;         // +0x500 ctor 1
+    unsigned char bPendingWeaponGroupInit;         // +0x500 ctor 1
     unsigned char Pad501[3];
     // +0x504 ctor 0: the weapon group OnEvent 0x91..0x96 selected last. Firing that group
     // (FireWeaponGroup, OnEvent 0xab) fires every active launcher instead of the group's list.
@@ -261,20 +261,20 @@ public:
     WinControl* WeaponNumberText[10];  // +0x530 "WeaponNumberText%d"
     WinControl* AmmoText[10];          // +0x558 "AmmoText%d"
     WinControl* CloseButton;       // +0x580 "StatusCloseButton"
-    unsigned char Byte584;         // +0x584 ctor 0
-    unsigned char Byte585;         // +0x585 ctor 0
-    unsigned char Byte586;         // +0x586 ctor 0
+    unsigned char bThrustersOn;         // +0x584 ctor 0
+    unsigned char bHasThruster;         // +0x585 ctor 0
+    unsigned char bCruiseActive;         // +0x586 ctor 0
     unsigned char Pad587;
-    float Field588;                // +0x588 ctor 1.0f (DAT_005d8484)
+    float RefreshTimer;                // +0x588 ctor 1.0f (DAT_005d8484)
     std::vector<FHudStatusWeapon> Weapons; // +0x58c (retail VC6 vector, 0x10 bytes)
     WinControl* MinimizedFrame;    // +0x59c "StatusMinimizedFrame"
-    int Field5a0;                  // +0x5a0 ctor 1 -- Slot13 touches the weapon rows while set
-    int Field5a4;                  // +0x5a4 ctor 1
+    int bShowWeaponList;                  // +0x5a0 ctor 1 -- HideExpandedControls touches the weapon rows while set
+    int bLastShowWeaponList;                  // +0x5a4 ctor 1
     WinControl* RepairButton;      // +0x5a8 "HudRepairButton"
     WinControl* RepairCountText;   // +0x5ac "RepairCountText"
     WinControl* UseBatteryButton;  // +0x5b0 "UseBatteryButton"
     WinControl* BatteryCountText;  // +0x5b4 "BatteryCountText"
-    unsigned char Byte5b8;         // +0x5b8 ctor 0
+    unsigned char bUsingTradeLane;         // +0x5b8 ctor 0
     // +0x5b9: the turret view is up. Flipped by the space state's command switch (0x0054a655),
     // not by OnEvent (its switch stops at 0xc1). Read by HUD_Steer::Render 0x004c870f,
     // client_gameobj, UpdateSpecialModeCaptions and OnEvent 0xb7..0xba.
@@ -287,8 +287,8 @@ public:
     WinControl* SpecialModeTextCancel; // +0x5c0 "SpecialModeTextCancel"
     UiScroll* WeaponListScroll;    // +0x5c4 "WeaponListScroll"
     int WeaponTopRow;              // +0x5c8 ctor 0 -- first Weapons row shown (FUN_004de0a0)
-    unsigned char Byte5cc;         // +0x5cc ctor 1
-    unsigned char Byte5cd;         // +0x5cd ctor 0
+    unsigned char bPendingExpandedSync;         // +0x5cc ctor 1
+    unsigned char bDockingOrTradeLaneCaption;         // +0x5cd ctor 0
     unsigned char Pad5ce[2];
     FHudStatusCaption Caption;     // +0x5d0 filled by FUN_004e8100 (Update 0x004db4b2)
     WinControl* LootButton;        // +0x5d8 "LootButton"

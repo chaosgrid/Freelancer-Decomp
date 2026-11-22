@@ -45,7 +45,7 @@ public:
     // slot 11 LAB_00572cc0 -- the slide in / out, then Win3D's child walk.
     void Update() override;
     // slot 23 FUN_00573010 (RET 0xc).
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // Event::Handler face (+0x80) slot 0 LAB_005733b0 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
@@ -67,7 +67,7 @@ public:
     RenderDisplayList Text601eb;   // +0x100 -- StyleNode 0x9ca4 + IDS 0x601eb; no reader here
 
 private:
-    // The leave sequence Slot23 and OnEvent spell out inline, identical at all four sites
+    // The leave sequence ProcessMessage and OnEvent spell out inline, identical at all four sites
     // (0x005730fd.., 0x0057322d.., 0x005732dd.., 0x005733bc..): leaving from SlideT 0, both
     // buttons inert and their surfaces frozen, the edit field and the explanation hidden, the
     // slide sound, the three ToolTips off, then the direction.

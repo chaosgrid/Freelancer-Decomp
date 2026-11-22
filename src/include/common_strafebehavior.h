@@ -24,11 +24,11 @@ struct IObjInspect;          // common_iface.h -- SelectStrafePoint's second arg
 // 2026-10-08):
 //    0  FUN_062c95c0  scalar-deleting dtor around FUN_062c95e0
 //    1  LAB_062c9660  SetContext
-//    3  LAB_062ca1e0  Slot3
-//    4  FUN_062ca310  Slot4
-//    5  LAB_062c9720  Slot5
-//    7  LAB_062c9d20  Slot7
-//   10  LAB_062c96e0  Slot10
+//    3  LAB_062ca1e0  OnEngage
+//    4  FUN_062ca310  OnDisengage
+//    5  LAB_062c9720  OnEvaluateReadiness
+//    7  LAB_062c9d20  OnUpdate
+//   10  LAB_062c96e0  OnApplyDirective
 // Every other slot is Behavior's own entry.
 // ============================================================================
 class StrafeBehavior : public Behavior
@@ -53,23 +53,23 @@ public:
     // Slot 3, LAB_062ca1e0: FUN_062d20d0, SetCruiseLock(1, 3), the angular trigger range
     // (+0x2c), the ship's forward extent (+0x44), the strafe direction (-column 2), and the
     // personality's StrafeParams into +0x34/+0x58/+0x5c; +0x48 = 2.
-    void Slot3() override;
+    void OnEngage() override;
 
     // Slot 4, FUN_062ca310: MoveIdea.PublishTargetId(0), the three ideas' Commit
     // (MoveIdea, FaceIdea, AfterburnerIdea), then `JMP FUN_062d20f0`.
-    void Slot4() override;
+    void OnDisengage() override;
 
     // Slot 5, LAB_062c9720 (RET 4, argument unread): 1 (and +0x60 = 1) when the gun
     // convergence gate is clear, the target is a ship-class object, this ship is one too,
     // and the target's speed squared is <= 400; else 2; 3 with +0x29. Stored at +0x0c.
-    int Slot5(float Unused) override;
+    int OnEvaluateReadiness(float Unused) override;
 
     // Slot 7, LAB_062c9d20 (Common.dll.txt 197576-197942), 354 instructions.
-    int Slot7() override;
+    int OnUpdate() override;
 
     // Slot 10, LAB_062c96e0 (RET 4): Op non-null and FUN_062e74a0(Sys+0x34, Op+0xc) non-null
     // -> Flags28 |= 2, true; else Flags28 &= ~2, false.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
 
     // FUN_062c9810 (item 1365), thiscall, RET 8. Mode 0 aims at Target (or its subtarget),
     // mode 1 picks a point StrafeDistance34 off to the side; both arms hand the point to the
@@ -79,10 +79,10 @@ public:
     // ---- Behavior's own +0x04..+0x29 block, still declared per class ----
     int TypeId;                  // +0x04
     unsigned CachedHandle08;     // +0x08
-    int ModeSelector0xc;         // +0x0c, Slot5's result.
-    int UpdateResult10;          // +0x10, Slot7's result.
+    int ModeSelector0xc;         // +0x0c, OnEvaluateReadiness's result.
+    int UpdateResult10;          // +0x10, OnUpdate's result.
     void* OwnerContext;          // +0x14, the owner IObjRW* (binder).
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime;             // +0x1c
     void* BehaviorMgrPtr;        // +0x20, the IBehaviorManager (binder).
     SystemManager* NavHelper;    // +0x24, the SystemManager (binder).
@@ -91,20 +91,20 @@ public:
     unsigned char Pad2a[0x2c - 0x2a];
 
     // ---- StrafeBehavior's own fields ----
-    float TriggerRange2c;        // +0x2c. Slot3: angular distance * (1 + the 0.1-step
-                                 // loop counter); Slot7 mode 0 re-picks the strafe point
+    float TriggerRange2c;        // +0x2c. OnEngage: angular distance * (1 + the 0.1-step
+                                 // loop counter); OnUpdate mode 0 re-picks the strafe point
                                  // once the obstacle/target distance drops below it.
     unsigned char Opaque30[0x34 - 0x30];
-    float StrafeDistance34;      // +0x34. Slot3: Personality.StrafeParams.StrafeRunAwayDistance.
-    Vector StrafeDir38;          // +0x38. Slot3: -column 2 of the ship's rotation.
-    float ForwardExtent44;       // +0x44. Slot3: the watched object's archetype Min.z.
-    int StrafeMode48;            // +0x48. 0/1/2; ctor, SetContext and Slot3 set 2.
+    float StrafeDistance34;      // +0x34. OnEngage: Personality.StrafeParams.StrafeRunAwayDistance.
+    Vector StrafeDir38;          // +0x38. OnEngage: -column 2 of the ship's rotation.
+    float ForwardExtent44;       // +0x44. OnEngage: the watched object's archetype Min.z.
+    int StrafeMode48;            // +0x48. 0/1/2; ctor, SetContext and OnEngage set 2.
     Vector StrafePoint4c;        // +0x4c
-    float ScaleNear58;           // +0x58. Slot3: StrafeParams.StrafeAttackThrottle (MoveIdea
+    float ScaleNear58;           // +0x58. OnEngage: StrafeParams.StrafeAttackThrottle (MoveIdea
                                  // scale when the bearing to the target is below pi/8).
-    float ScaleFar5c;            // +0x5c. Slot3: StrafeParams.StrafeTurnThrottle.
-    int Field60;                 // +0x60. Ctor/SetContext 2; Slot5 writes 1.
-    unsigned char Field64;       // +0x64. SetContext/Slot3 clear it.
+    float ScaleFar5c;            // +0x5c. OnEngage: StrafeParams.StrafeTurnThrottle.
+    int Field60;                 // +0x60. Ctor/SetContext 2; OnEvaluateReadiness writes 1.
+    unsigned char Field64;       // +0x64. SetContext/OnEngage clear it.
     unsigned char Pad65[0x68 - 0x65];
     int Field68;                 // +0x68. SetContext: 999.
     int Field6c;                 // +0x6c. SetContext: 0.

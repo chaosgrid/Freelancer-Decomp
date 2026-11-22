@@ -83,7 +83,7 @@ FRmTrigger::FRmTrigger(unsigned int InCookie, unsigned int InOwnerId, bool bInOn
 }
 
 // LAB_06f71090 (RET 8): the state value picks the slot; the slot's result is dropped.
-bool FRmTrigger::Slot2(SMEventData const* Event, int const& State)
+bool FRmTrigger::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0)
         return false;
@@ -365,7 +365,7 @@ void FRmMachineGroup::handle_state_change()
     while (bPendingChange)
     {
         SMEventData Exit(static_cast<STATE_MACHINE_EVENT_TYPE>(2));
-        Slot2(&Exit, CurrentState);
+        OnStateEvent(&Exit, CurrentState);
         while (!StateMachines.empty())
         {
             remove_state_machine(StateMachines.front());
@@ -374,6 +374,6 @@ void FRmMachineGroup::handle_state_change()
         CurrentState = PendingState;
         bPendingChange = 0;
         SMEventData Enter(static_cast<STATE_MACHINE_EVENT_TYPE>(1));
-        Slot2(&Enter, CurrentState);
+        OnStateEvent(&Enter, CurrentState);
     }
 }

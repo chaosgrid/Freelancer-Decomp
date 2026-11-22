@@ -117,12 +117,8 @@ public:
     explicit FContentSpaceObj(FContentSpaceObjParams const* Params);
     // FUN_06eb7230 (vptr reset + free the +0x108 buffer); slot 0 FUN_06eb7210.
     virtual ~FContentSpaceObj();
-    // +0x04 (slot 1). Retail's base vtable 06fb464c has only the dtor: every derived class
-    // declares slot 1 itself (FSolarNpc 06ed59f0 = byte +0x164, FContentShipBase 06ea1480 =
-    // false, FContentNpcShip 06ea1460 = true), and TU25 06eebd10 / TU53 call it on objects
-    // that FindShipOrSolar / the SpaceObjs list give as the base type. The base is never
-    // created on its own, so the port declares it here, pure. Name unknown.
-    virtual bool Slot04() = 0;
+    // Retail's FContentSpaceObj vtable (06fb464c) has only the destructor at +0x00.
+    // FContentShipBase defines virtual IsNpcShip() at +0x04; FSolarNpc defines virtual IsInCombat() at +0x04.
 
     // FUN_06eb6e00 (RET 0xc; only the second argument is read).
     void SendPendingComm(unsigned int Unused1, unsigned int Key, unsigned int Unused3);

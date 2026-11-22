@@ -13,7 +13,7 @@
 // LAB_00573580 -> ctor FUN_0055fea0(&DAT_0067bcf8), atexit LAB_005735a0 -> dtor FUN_005600c0).
 // vftables: main 0x005e1a4c (0 FUN_005600a0 scalar deleting dtor, 9 FUN_00560310 Create,
 // 10 FUN_005602f0 Destroy, 11 LAB_00561790 Update, 13 FUN_00566500 Draw, 19 LAB_00561730
-// MouseEvent, 23 LAB_00561630 Slot23), IUIPage face (+0x7c) 0x005e1a34 (slot 0 LAB_00561bd0 =
+// MouseEvent, 23 LAB_00561630 ProcessMessage), IUIPage face (+0x7c) 0x005e1a34 (slot 0 LAB_00561bd0 =
 // the scalar deleting dtor through `this - 0x7c`), Event::Handler face (+0x80) 0x005e1a2c
 // (slot 0 LAB_00561700).
 //
@@ -64,7 +64,7 @@ public:
     // slot 19 LAB_00561730 (RET 4).
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 23 LAB_00561630 (RET 0xc).
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // Event::Handler face (+0x80) slot 0 LAB_00561700 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
@@ -115,7 +115,7 @@ private:
     void Confirm();
     // FUN_00561b20 -- start the leave slide.
     void BeginLeave();
-    // The name read-back Slot23 and Confirm spell inline (0x00561649..0x005616ad,
+    // The name read-back ProcessMessage and Confirm spell inline (0x00561649..0x005616ad,
     // 0x00561563..0x005615c4): GetText into the pick's Name (0x18 chars), and the easter egg.
     void ReadNameIntoSelection();
 

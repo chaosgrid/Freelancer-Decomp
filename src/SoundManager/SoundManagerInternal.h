@@ -101,7 +101,7 @@ public:
     GENRESULT DuplicateBuffer(IDirectSound* DirectSound, IDirectSoundBuffer** Out) const;
 
     unsigned short nChannels;      // +0x04
-    unsigned short Field06;        // +0x06
+    unsigned short BytesPerSample; // +0x06
     unsigned short nSamplesPerSec; // +0x08
     unsigned short nBlockAlign;    // +0x0A
     unsigned long LoopStart;       // +0x0C
@@ -131,8 +131,8 @@ struct FSoundInstanceNode
     IDirectSoundBuffer* Buffer;    // +0x0C
     IDirectSound3DBuffer* Buffer3d;// +0x10
     HANDLE NotifyEvent;            // +0x14 payload+0x0C (FUN_06ee1a40)
-    unsigned long Pad18;           // +0x18 payload+0x10
-    unsigned long FeatureFlags;    // +0x1C payload+0x14 notify offset / loop-end bytes
+    unsigned long LoopStartBytes;  // +0x18 payload+0x10
+    unsigned long LoopEndBytes;    // +0x1C payload+0x14 notify offset / loop-end bytes
     unsigned long CapsFlags;       // +0x20 → Status +8 via node+0x28
     unsigned long StatusFlags;     // +0x24
     unsigned long DsCapsFlags;     // +0x28
@@ -289,25 +289,25 @@ public:
     char DeviceIdString[0x28];      // +0x0D
     GUID DeviceGuid;                // +0x38
     float MasterGain;               // +0x48
-    unsigned long Field4C;
-    unsigned long Field50;
+    unsigned long CurrentTickMs;    // +0x4C GetTickCount() snapshot for MixerTick
+    unsigned long FreeHwMixingBuffers; // +0x50 DSCAPS::dwFreeHwMixingAllBuffers
     unsigned long MaxChannels;      // +0x54
     int EaxEnv;                     // +0x58
     float EaxVol;                   // +0x5C
     float EaxDecay;                 // +0x60
     float EaxDamp;                  // +0x64
-    unsigned long Field68;
-    unsigned long Field6C;
-    unsigned long Field70;
-    unsigned long Field74;
+    unsigned long SavedEaxEnv;      // +0x68 cached EAX preset for restore
+    unsigned long SavedEaxVol;      // +0x6C cached EAX volume bits for restore
+    unsigned long SavedEaxDecay;    // +0x70 cached EAX decay bits for restore
+    unsigned long SavedEaxDamp;     // +0x74 cached EAX damping bits for restore
     float ReverbMix;                // +0x78
-    unsigned long Field7C;          // +0x7C DS3DALG GUID dword0 (ctor DAT_06ee95e4 = 0)
-    unsigned long Field80;          // +0x80 DAT_06ee95e8
-    unsigned long Field84;          // +0x84 DAT_06ee95ec
-    unsigned long Field88;          // +0x88 DAT_06ee95f0
+    unsigned long Ds3dAlgGuid0;     // +0x7C DS3DALG GUID dword0 (ctor DAT_06ee95e4 = 0)
+    unsigned long Ds3dAlgGuid1;     // +0x80 DAT_06ee95e8
+    unsigned long Ds3dAlgGuid2;     // +0x84 DAT_06ee95ec
+    unsigned long Ds3dAlgGuid3;     // +0x88 DAT_06ee95f0
     unsigned long Flags;            // +0x8C
     unsigned long CapsFlags;        // +0x90
-    unsigned long Field94;
+    unsigned long FreeHw3dBuffers;  // +0x94 DSCAPS::dwFreeHw3DAllBuffers
     unsigned long SampleRate;       // +0x98
     unsigned long Channels;         // +0x9C
     unsigned long BitsPerSample;    // +0xA0
@@ -360,7 +360,7 @@ static_assert(offsetof(FSoundManager, bParserBound) == 0x0C, "bParserBound +0x0C
 static_assert(offsetof(FSoundManager, DeviceGuid) == 0x38, "DeviceGuid +0x38");
 static_assert(offsetof(FSoundManager, MasterGain) == 0x48, "MasterGain +0x48");
 static_assert(offsetof(FSoundManager, MaxChannels) == 0x54, "MaxChannels +0x54");
-static_assert(offsetof(FSoundManager, Field7C) == 0x7C, "DS3DALG +0x7C");
+static_assert(offsetof(FSoundManager, Ds3dAlgGuid0) == 0x7C, "DS3DALG +0x7C");
 static_assert(offsetof(FSoundManager, Flags) == 0x8C, "Flags +0x8C");
 static_assert(offsetof(FSoundManager, SampleRate) == 0x98, "SampleRate +0x98");
 static_assert(offsetof(FSoundManager, Front) == 0xA8, "Front +0xA8");

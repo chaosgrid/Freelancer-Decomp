@@ -60,7 +60,7 @@ namespace
     {
         std::vector<unsigned int> Zones;            // +0x04 (alloc byte) / +0x08..+0x10
 
-        void Slot00(unsigned int const* ZoneId, INI_Reader* /*Reader*/) override
+        void OnZone(unsigned int const* ZoneId, INI_Reader* /*Reader*/) override
         {
             Zones.push_back(*ZoneId);
         }
@@ -181,7 +181,7 @@ FDestroyMission::FDestroyMission(unsigned int const* InControllerId, FRandomMiss
     , MissionData(InData)
 {
     DestSystem = FindSystemInfo(&MissionData->DestSys);
-    Field_0x80 = MissionData->Offers.front()->Type;
+    MissionType = MissionData->Offers.front()->Type;
     SMEventData const Enter(static_cast<STATE_MACHINE_EVENT_TYPE>(1));
     StateMachineGroup::process(&Enter);
 }
@@ -200,7 +200,7 @@ FDestroyMission::~FDestroyMission()
 
 // LAB_06eef6e0: with a running machine, its slot 8 (tail call through the router lookup of
 // +0x290[0], -0x10); otherwise the system id of +0x244.
-int FDestroyMission::Slot08()
+int FDestroyMission::GetTargetSystemId()
 {
     if (!RunningMachines.empty())
         return static_cast<int>(DmLookupMachine(RunningMachines[0])->GetSystemId());
@@ -208,13 +208,13 @@ int FDestroyMission::Slot08()
 }
 
 // LAB_06eef730: +0x240 +0x50.
-int FDestroyMission::Slot09()
+int FDestroyMission::GetJumpPreference()
 {
     return MissionData->JumpPref;
 }
 
 // LAB_06ea1480: XOR AL,AL; RET.
-bool FDestroyMission::Slot12()
+bool FDestroyMission::FailOnPlayerDeath()
 {
     return false;
 }
@@ -330,7 +330,7 @@ void FDestroyMission::CreateRuntimeMachines()
 //   group; with nothing running or starting: nothing pending -> state 3, else the next pending
 //   machine is started as in state 1.
 // State 3: enter -> slot 23. State 4: enter -> slot 35 with +0x23c.
-bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
+bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0)
     {
@@ -343,7 +343,7 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
             static_cast<EMessage>(Controller->ControllerId) == EMessage::Heartbeat)
         {
             RefreshAllObjectives();
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 3 && DmIsForCurrentState(this, Wrapped->Message) &&
@@ -367,7 +367,7 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
             static_cast<EMessage>(Controller->ControllerId) == EMessage::ObjectDestroyed)
         {
             if (RunningMachines.empty())
-                FRandomMissionObject::Slot2(Event, GDmAnyState);
+                FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 4 &&
@@ -381,13 +381,13 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
                 if (RmPlayerHasShip(PlayerStates[Index]))
                     break;
             }
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 4 &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::Msg0x27)
         {
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 4 &&
@@ -396,7 +396,7 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
             FRmPlayerLeftMessage Left(*static_cast<unsigned int const*>(Controller->DataPtr));
             for (int Index = 0; Index < static_cast<int>(RunningMachines.size()); ++Index)
                 send_immediate_message(&Left, RunningMachines[Index]);
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 4 &&
@@ -415,12 +415,12 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
                     MissionData->Save(File);
                 }
             }
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         if (Event->get_event_type() == 4)
         {
-            FRandomMissionObject::Slot2(Event, GDmAnyState);
+            FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
         return false;
@@ -430,13 +430,13 @@ bool FDestroyMission::Slot2(SMEventData const* Event, int const& State)
     {
         if (Event->get_event_type() < 4 && Event->get_event_type() == 1)
         {
-            Field_0x50.destroy();
-            Field_0x50 = FmtStr();
-            Field_0x68.destroy();
-            Field_0x68 = FmtStr();
-            Field_0x50.begin_mad_lib(0x32fa + MissionData->Offers.front()->Type);
-            Field_0x50.end_mad_lib();
-            Field_0x68 = MissionData->Description;
+            MissionTitle.destroy();
+            MissionTitle = FmtStr();
+            MissionOffer.destroy();
+            MissionOffer = FmtStr();
+            MissionTitle.begin_mad_lib(0x32fa + MissionData->Offers.front()->Type);
+            MissionTitle.end_mad_lib();
+            MissionOffer = MissionData->Description;
             StateMachineMessage Timeout(SMM_TIMEOUT);
             send_delayed_message_to_me(&Timeout, 1.1f, SMMS_Self, 0);
             return true;

@@ -14,7 +14,7 @@
 // vftable 0x005e5e44 (45 slots): slots 0..27 are Win3D's (win3d.h) with these overrides --
 //   0 FUN_0059fa30 dtor, 2 FUN_0043d950 (returns this), 4 FUN_005a0340 HitTest,
 //   5 FUN_005a0880 SetPosition, 7 FUN_005a0950 SetOrientation, 10 FUN_0059fb60 Destroy,
-//   13 FUN_005a0760 Draw, 19 FUN_005a0650 MouseEvent, 23 FUN_005a0840 Slot23
+//   13 FUN_005a0760 Draw, 19 FUN_005a0650 MouseEvent, 23 FUN_005a0840 ProcessMessage
 // -- and slots 28..44 are WinControl's own (declared below).
 // The IDataViewOwner face sits at +0x7c (vftable 0x005e5e38).
 //
@@ -79,7 +79,7 @@ public:
     // slot 19 FUN_005a0650
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
     // slot 23 FUN_005a0840 -- 0xef01 show / 0xef02 hide
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
     // --- IDataViewOwner (vftable 0x005e5e38) ---
     // LAB_0053aaa0 -- RET 8
@@ -94,7 +94,7 @@ public:
     // slots 29 / 30 (+0x74 / +0x78) FUN_0053e4a0 -- RET 4. Slot 29's argument is a FILE*: the
     // one override seen, NavBar's FUN_0043efd0, fprintf's its [NavBar] section into it (the
     // counterpart of slot 28 LoadIni). Name not recovered.
-    virtual void Slot29(FILE* File);
+    virtual void SaveIni(FILE* File);
     virtual void Slot30(unsigned A);
     // slot 31 (+0x7c) FUN_005a0250
     virtual void SetOffset(float X, float Y, float Z);
@@ -260,8 +260,8 @@ public:
     // it to ButtonMover as the slide start (0x0045ce55, 0x004e4188).
     float HomeOffset[3];
     float Field2e0[3];              // +0x2e0 -- ctor {0, 0, 10000.0f}
-    int Field2ec;                   // +0x2ec -- ctor 0
-    int Field2f0;                   // +0x2f0 -- ctor 0
+    int UserData;                   // +0x2ec -- ctor 0
+    int OwnerData;                   // +0x2f0 -- ctor 0
     unsigned char PositionFlags;    // +0x2f4 -- bit0: instance position includes +0xa8
     unsigned char Pad2f5[3];        // +0x2f5
     float AttachOrientation[9];     // +0x2f8

@@ -107,7 +107,7 @@ FEncounterFormation::FEncounterFormation(INI_Reader* Reader)
     , ZoneCreationDistance(1500.0)                  // 0x4097700000000000
     , TimesToCreate(-1)
     , bAllowSimultaneousCreation(true)
-    , Field_0x78(0)
+    , TimesCreated(0)
     , Longevity(0x18)
 {
     Formation.clear();
@@ -662,7 +662,7 @@ bool FEncounterParameters::Refresh(float Time)
                 ++Object;
         }
         if (bReroll)
-            Formation->Field_0x78 = 0;
+            Formation->TimesCreated = 0;
 
         bool bPick;
         switch (Formation->RerollFrequency)
@@ -796,7 +796,7 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
 
         // 06ef55fa-06ef56c8: a ship in combat (slot 2, +0x11c) takes new ships only below the
         // zone's max_battle_size; otherwise relief_time must have passed since combat ended.
-        if (PlayerShip->Slot08())
+        if (PlayerShip->IsInCombat())
         {
             FSystemZone* Zone = FindSystemInfo(&SystemId)->FindZone(ZoneId);
             if (static_cast<unsigned int>(PlayerShip->GetHostileContactCount()) >=
@@ -826,7 +826,7 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
         bool bSpawned = false;
         if (Entry->bStar == *bStarred &&
             (Formation->bAllowSimultaneousCreation || Formation->CreatedObjects.empty()) &&
-            (Formation->TimesToCreate == -1 || Formation->Field_0x78 < Formation->TimesToCreate) &&
+            (Formation->TimesToCreate == -1 || Formation->TimesCreated < Formation->TimesToCreate) &&
             Formation->Faction != 0xffffffffu && !Formation->Ships.empty())
         {
             // 06ef5727-06ef576a: every ship line needs an arch -- its npc arch, else a pick
@@ -847,7 +847,7 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
             }
             if (bArchs)
             {
-                ++Formation->Field_0x78;                                    // 06ef576c
+                ++Formation->TimesCreated;                                    // 06ef576c
                 // 06ef576f-06ef57a2: unstarred spawns must pass the density restrictions.
                 if (*bStarred ||
                     CheckDensityRestrictions(&Request->Placement, Restrictions, Formation))
@@ -954,7 +954,7 @@ void FEncounterParameters::SpawnFormation(FSpawnRequest const* Request, FSpawnPl
     BuildFormationBlocks(Formation, Blocks, Zone, Request->ControllerId);   // FUN_06ef4780
     // 06ef4f05-06ef4f2d: arrivals in single player: the first block's +0x108 = 76.0f.
     if (pub::SinglePlayer() && Request->bArrival && !Blocks->empty())
-        Blocks->front().Field_0x108 = 76.0f;
+        Blocks->front().InitialLifeTime = 76.0f;
 
     // 06ef4f37-06ef4f73: TU53 places the blocks and fills the plan.
     bool const bPlaced = PlaceSpawnFormation(Request, System, Zone,
@@ -1065,8 +1065,8 @@ void BuildFormationBlocks(FEncounterFormation const* Formation,
             Params.GuideDesc = nullptr;
         }
         // 06ef488f-06ef48a3: FILD longevity, FST, FADD ST0,ST0.
-        Params.Field_0x104 = static_cast<float>(Formation->Longevity);
-        Params.Field_0x108 = static_cast<float>(static_cast<double>(Formation->Longevity) * 2.0);
+        Params.Longevity = static_cast<float>(Formation->Longevity);
+        Params.InitialLifeTime = static_cast<float>(static_cast<double>(Formation->Longevity) * 2.0);
 
         // 06ef48aa-06ef48cc: min + rand() * (max - min + 1) / 32768 ships.
         int const Count = rand() * (Line->MaxCount - Line->MinCount + 1) / 0x8000 + Line->MinCount;

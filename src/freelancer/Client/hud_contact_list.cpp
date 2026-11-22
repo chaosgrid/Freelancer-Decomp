@@ -641,7 +641,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         NameTexts[Index]->HomeOffset[1] = NamePos[1];
         NameTexts[Index]->HomeOffset[2] = NamePos[2];
         NameTexts[Index]->SetProperty(0x24, 1, 0);
-        static_cast<NnTextControl*>(NameTexts[Index])->SetFontStringField08(1); // FUN_0058b770
+        static_cast<NnTextControl*>(NameTexts[Index])->SetMaxLines(1); // FUN_0058b770
     }
 
     // 0x004cf866..0x004cf904: the row icons.

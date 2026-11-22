@@ -59,7 +59,7 @@ void CClientImpl::SendCommonActivateCruise(unsigned int ClientId, const XActivat
         FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->bActive = Info.bActivate;
-        TypedPacket->Field_0x05 = Info.bDisruptCruise;
+        TypedPacket->bDisruptCruise = Info.bDisruptCruise;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -108,7 +108,7 @@ void CClientImpl::SendCommonGoTradeLane(unsigned int ClientId, const XGoTradelan
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->TradelaneRing1 = Info.TradelaneRing1;
         TypedPacket->TradelaneRing2 = Info.TradelaneRing2;
-        TypedPacket->Field_0x0c = Info.Field_0x0c;
+        TypedPacket->bMidLane = Info.bMidLane;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -144,12 +144,12 @@ void CClientImpl::SendCommonUpdateObject(unsigned int ClientId, const FCommonUpd
     if (Serializer->Allocate(1, 1, &Packet) == 0)
     {
         FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x28;
+        TypedPacket->State = Info.State;
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->Position = Info.Position;
         TypedPacket->Orientation = Info.Orientation;
-        memcpy(&TypedPacket->UpdateTime, &Info.Field_0x20, sizeof(float));
-        memcpy(&TypedPacket->Field_0x28, &Info.Field_0x24, sizeof(float));
+        memcpy(&TypedPacket->UpdateTime, &Info.Timestamp, sizeof(float));
+        memcpy(&TypedPacket->Throttle, &Info.Throttle, sizeof(float));
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -208,7 +208,7 @@ void CClientImpl::SendCommonPopUpDialog(unsigned int ClientId, const FmtStr& Tit
         TypedPacket->SizeB = RpcGetFlattenedFmtStrSize(Text);
         TypedPacket->DataB = static_cast<unsigned char*>(::operator new(TypedPacket->SizeB, std::nothrow));
         Text.flatten(TypedPacket->DataB, TypedPacket->SizeB);
-        TypedPacket->Field_0x10 = Buttons;
+        TypedPacket->Buttons = Buttons;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -378,7 +378,7 @@ void CClientImpl::SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, unsigned
             TypedPacket->Data = nullptr;
         }
         TypedPacket->TargetId = TargetId.Id;
-        TypedPacket->Field_0x04 = SenderId.Id;
+        TypedPacket->SenderId = SenderId.Id;
         // The client id is the CHAT_ID's low word (06d8c4ed MOVZX).
         PushToClient(static_cast<unsigned short>(TargetId.Id), Packet->AsRaw());
     }

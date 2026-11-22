@@ -41,15 +41,15 @@ public:
     unsigned char bFilterPing;      // +0x04
     unsigned char bFilterKnown;     // +0x05
     unsigned char bFilterVersion;   // +0x06
-    unsigned char bFilterField95;   // +0x07
+    unsigned char bFilterAllowNewPlayers;   // +0x07
     unsigned char bFilterPassword;  // +0x08
-    unsigned char bFilterField3e;   // +0x09
+    unsigned char bFilterLan;   // +0x09
     unsigned PingMin;               // +0x0c -- 0
     unsigned PingMax;               // +0x10 -- 1000
     unsigned char KnownLogin;       // +0x14 -- 1
     unsigned VersionMin;            // +0x18 -- DAT_0067ecb8
     unsigned VersionMax;            // +0x1c -- DAT_0067ecb8
-    unsigned char Field95;          // +0x20 -- 1. TODO: meaning of FServerInfo +0x95
+    unsigned char AllowNewPlayers;          // +0x20 -- 1. FServerInfo +0x95 (bAllowNewPlayers)
     unsigned char Password;         // +0x21 -- 0
-    unsigned char Field3e;          // +0x22 -- 1. TODO: meaning of FServerInfo +0x3e
+    unsigned char Lan;          // +0x22 -- 1. FServerInfo +0x3e (bLan)
 };

@@ -813,18 +813,18 @@ public:
     // (06d9cca2..06d9ccf3: the head, then COMMON.DLL's std::list<CollisionGroupDesc> ctor
     // at +0x74 and DamageList ctor at +0x80); the body is the tail, 06d9ccfd..06d9cd77.
     FPacket_FLPACKET_SERVER_CREATESHIP() : FRpcCreateObjectPacket(0x20004u) {
-        Wire.Field_0x7c = 0;              // 06d9ccfd  byte +0x9c
-        Wire.Field_0x80 = 0;              // 06d9cd03  +0xa0
-        Wire.Field_0x84 = 0.0f;           // 06d9cd09  +0xa4 (integer 0 == +0.0f)
-        Wire.Field_0x88 = 0.0f;           // 06d9cd0f  +0xa8
-        Wire.Field_0x8c = 0;              // 06d9cd15  +0xac
-        Wire.Field_0x90 = 0.0f;           // 06d9cd1b  +0xb0
-        Wire.Field_0x94 = 0.0f;           // 06d9cd21  +0xb4
-        Wire.Field_0x98 = 0.0f;           // 06d9cd27  +0xb8
-        Wire.Field_0x9c = 0;              // 06d9cd2d  +0xbc
-        Wire.Field_0xa0 = 0;              // 06d9cd33  word +0xc0
-        Wire.Field_0xa2 = 0;              // 06d9cd3a  byte +0xc2
-        Wire.Field_0xa4 = 0;              // 06d9cd40  word +0xc4
+        Wire.bUsingTradelane = 0;         // 06d9ccfd  byte +0x9c
+        Wire.VelXBits = 0;                // 06d9cd03  +0xa0
+        Wire.VelY = 0.0f;                 // 06d9cd09  +0xa4 (integer 0 == +0.0f)
+        Wire.VelZ = 0.0f;                 // 06d9cd0f  +0xa8
+        Wire.AngVelXBits = 0;             // 06d9cd15  +0xac
+        Wire.AngVelY = 0.0f;              // 06d9cd1b  +0xb0
+        Wire.AngVelZ = 0.0f;              // 06d9cd21  +0xb4
+        Wire.Throttle = 0.0f;             // 06d9cd27  +0xb8
+        Wire.OwnerPlayer = 0;             // 06d9cd2d  +0xbc
+        Wire.GroupNameId = 0;             // 06d9cd33  word +0xc0
+        Wire.ReputationRank = 0;          // 06d9cd3a  byte +0xc2
+        Wire.GroupId = 0;                 // 06d9cd40  word +0xc4
         Wire.NameASize = 0;               // 06d9cd47  +0xc8
         Wire.NameABuffer = nullptr;       // 06d9cd4d  +0xcc
         Wire.NameBSize = 0;               // 06d9cd53  +0xd0
@@ -833,7 +833,7 @@ public:
         Wire.DisplayName = nullptr;       // 06d9cd65  +0xdc
         Wire.Affiliation = 0;             // 06d9cd6b  +0xe0
         Wire.Attitude = 0.0f;             // 06d9cd71  +0xe4
-        Wire.Field_0xc8 = 0;              // 06d9cd77  byte +0xe8
+        Wire.bMarkedBy = 0;               // 06d9cd77  byte +0xe8
     }
     // FUN_06d97b90
     ~FPacket_FLPACKET_SERVER_CREATESHIP() override {
@@ -2362,8 +2362,8 @@ public:
         Wire.NameABuffer = nullptr;       // 06d9e6d8  +0xa4
         Wire.NameBSize = 0;               // 06d9e6de  +0xa8
         Wire.NameBBuffer = nullptr;       // 06d9e6e4  +0xac
-        Wire.Field_0x7c = 0;              // 06d9e6ea  byte +0x9c
-        Wire.Field_0x7d = 0;              // 06d9e6f0  byte +0x9d
+        Wire.bDestructible = 0;           // 06d9e6ea  byte +0x9c
+        Wire.bMarkedBy = 0;               // 06d9e6f0  byte +0x9d
     }
     // FUN_06d9e740
     ~FPacket_FLPACKET_SERVER_CREATESOLAR() override {
@@ -2594,17 +2594,17 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE) == 0x2cu, 
 class FPacket_FLPACKET_SERVER_MISCOBJUPDATE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_MISCOBJUPDATE() : FPacketBase(0x20054u) {
-        Wire.Field_0x08 = 0;   // 06d9ee02
-        Wire.Field_0x14 = 0;   // 06d9ee05
+        Wire.ObjectId = 0;   // 06d9ee02
+        Wire.GroupId = 0;   // 06d9ee05
         Wire.Flags = 0;   // 06d9ee08
-        Wire.Field_0x04 = 0;   // 06d9ee0c
-        Wire.Field_0x18 = 0;   // 06d9ee0f
-        Wire.Field_0x1c = 0;   // 06d9ee12
+        Wire.PlayerId = 0;   // 06d9ee0c
+        Wire.MissionId = 0;   // 06d9ee0f
+        Wire.MissionSetBy = 0;   // 06d9ee12
         Wire.Field_0x30 = 0;   // 06d9ee15
-        Wire.Field_0x34 = 0xffffffffu;   // 06d9ee18
-        Wire.Field_0x0c = 0;   // 06d9ee1f
-        Wire.Field_0x10 = 0;   // 06d9ee23
-        Wire.Field_0x48 = 0;   // 06d9ee26
+        Wire.Affiliation = 0xffffffffu;   // 06d9ee18
+        Wire.Rank = 0;   // 06d9ee1f
+        Wire.SystemId = 0;   // 06d9ee23
+        Wire.IdCount = 0;   // 06d9ee26
     }
     // FUN_06d98a30
     ~FPacket_FLPACKET_SERVER_MISCOBJUPDATE() override {

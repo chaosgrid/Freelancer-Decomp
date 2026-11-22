@@ -8,7 +8,7 @@
 
 // Retail Client\Space\JumpEffect.cpp (path string .rdata 0x005da80c) -- the JumpShipEffect,
 // the 0xdc-byte object a client Ship keeps at +0x188 while it jumps (FClientShipGameobj::
-// Field_0x188). Built by FUN_00543530 (FUN_00503440(ship, gate solar)) or FUN_00543630
+// JumpEffect). Built by FUN_00543530 (FUN_00503440(ship, gate solar)) or FUN_00543630
 // (FUN_005038c0(ship)), destroyed by FUN_00503a80 + operator delete (FUN_005437d0 case 0,
 // FUN_00543530, FUN_00543630 and the Ship dtor FUN_005444a0 at 0x0054456b).
 //
@@ -38,12 +38,12 @@ class FClientShipGameobj;     // client_gameobj.h
 // members in reverse order (0x00503c07, then inline 0x00503c0c.., 0x00503c43.., 0x00503c78..).
 struct FJumpFxCompanion
 {
-    void* Slot0;               // +0x00
+    void* EffectArch;               // +0x00
     ISoundSource* Sound;       // +0x04
     FParticleEffect* Particle; // +0x08
     FGameLight* Light;         // +0x0c
 
-    FJumpFxCompanion() : Slot0(nullptr), Sound(nullptr), Particle(nullptr), Light(nullptr) {}
+    FJumpFxCompanion() : EffectArch(nullptr), Sound(nullptr), Particle(nullptr), Light(nullptr) {}
     ~FJumpFxCompanion();
 
     FJumpFxCompanion(FJumpFxCompanion const&) = delete;
@@ -162,18 +162,18 @@ struct FJumpShipEffect
     FJumpFxCompanion FxD;              // +0x58  also linked into the ship's +0x28 effect list
     FClientShipGameobj* Ship;          // +0x68
     unsigned char Field_0x6c;          // +0x6c  ctor 0
-    unsigned char Field_0x6d;          // +0x6d  ctor 0; FUN_00503cd0 sets 1, FUN_00503ea0 0
+    unsigned char bTunnelEffectKilled;          // +0x6d  ctor 0; FUN_00503cd0 sets 1, FUN_00503ea0 0
     unsigned char Pad6e[2];
-    float Field_0x70;                  // +0x70  ctor 0; the effect's clock (FUN_00503e20)
+    float Clock;                  // +0x70  ctor 0; the effect's clock (FUN_00503e20)
     // +0x74 / +0x80 -- where the ship comes out of the jump: FUN_00543630 copies 3 dwords of
     // its Vector argument to +0x74 (0x0054366b..0x00543679 / 0x005436ff..0x0054370d) and 9 of
     // its Matrix argument to +0x80 (MOVSD.REP ECX=9); FUN_005437d0 case 4 hands both to
     // CShip::jump_in / CObject::beam_object as (Vector const&, Matrix const&).
     Vector JumpInPosition;             // +0x74
     Matrix JumpInOrientation;          // +0x80
-    unsigned Field_0xa4;               // +0xa4  FUN_00503440: the gate CSolar's +0x1b4 (player)
-    Transform Field_0xa8;              // +0xa8  identity; FUN_00503440: the gate hardpoint
-    unsigned char Field_0xd8;          // +0xd8  ctor 0; FUN_00503cd0 clears it
+    unsigned DestSystem;               // +0xa4  FUN_00503440: the gate CSolar's +0x1b4 (player)
+    Transform GateHardpointFrame;              // +0xa8  identity; FUN_00503440: the gate hardpoint
+    unsigned char bSkipFirstJumpInTick;          // +0xd8  ctor 0; FUN_00503cd0 clears it
     unsigned char Padd9[3];
 };
 static_assert(offsetof(FJumpShipEffect, TunnelEffect) == 0x18, "JumpShipEffect +0x18");
@@ -181,12 +181,12 @@ static_assert(offsetof(FJumpShipEffect, Color) == 0x20, "JumpShipEffect colour +
 static_assert(offsetof(FJumpShipEffect, FxA) == 0x28, "JumpShipEffect +0x28");
 static_assert(offsetof(FJumpShipEffect, FxD) == 0x58, "JumpShipEffect +0x58");
 static_assert(offsetof(FJumpShipEffect, Ship) == 0x68, "JumpShipEffect ship +0x68");
-static_assert(offsetof(FJumpShipEffect, Field_0x70) == 0x70, "JumpShipEffect +0x70");
+static_assert(offsetof(FJumpShipEffect, Clock) == 0x70, "JumpShipEffect +0x70");
 static_assert(offsetof(FJumpShipEffect, JumpInPosition) == 0x74, "JumpShipEffect +0x74");
 static_assert(offsetof(FJumpShipEffect, JumpInOrientation) == 0x80, "JumpShipEffect +0x80");
-static_assert(offsetof(FJumpShipEffect, Field_0xa4) == 0xa4, "JumpShipEffect +0xa4");
-static_assert(offsetof(FJumpShipEffect, Field_0xa8) == 0xa8, "JumpShipEffect transform +0xa8");
-static_assert(offsetof(FJumpShipEffect, Field_0xd8) == 0xd8, "JumpShipEffect +0xd8");
+static_assert(offsetof(FJumpShipEffect, DestSystem) == 0xa4, "JumpShipEffect +0xa4");
+static_assert(offsetof(FJumpShipEffect, GateHardpointFrame) == 0xa8, "JumpShipEffect transform +0xa8");
+static_assert(offsetof(FJumpShipEffect, bSkipFirstJumpInTick) == 0xd8, "JumpShipEffect +0xd8");
 static_assert(sizeof(FJumpShipEffect) == 0xdc, "JumpShipEffect operator_new(0xdc)");
 
 // FUN_00502b00 (cdecl) -- DAT_00674fd0, the JumpShipEffectDesc the [JumpShipEffect] section

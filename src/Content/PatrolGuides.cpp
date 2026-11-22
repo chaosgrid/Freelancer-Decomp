@@ -77,7 +77,7 @@ namespace
         {
             Info.Type = 1;
             Info.EquipId = 1;
-            Info.Field_0x0c = TargetId;
+            Info.TargetObjId = TargetId;
             Result = new (Info.CargoOut) EquipDescVector();
         }
         FCargoScanRequest(FCargoScanRequest const&) = delete;
@@ -520,7 +520,7 @@ bool FCargoScanRoute::FindScanTarget()
         FContentShipBase* First = Members[0];
         if (First->bScanTarget != 0)
             continue;
-        if (First->HasField120())
+        if (First->IsInTradeLane())
             continue;
         unsigned int FirstId = First->SpaceObjId;
         AddMemberIds(&ScannedIds, Members);
@@ -650,7 +650,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
         if (State == 1 || State == 0)
             break;
         FContentShipBase* Target = FindSystemShip(Ship, TargetId);
-        if (Target == nullptr || Target->HasField120())
+        if (Target == nullptr || Target->IsInTradeLane())
         {
             Reset();
             break;
@@ -853,7 +853,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
         {
             // 06f0cf91-06f0d39c.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);
-            if (Target == nullptr || Target->HasField120())
+            if (Target == nullptr || Target->IsInTradeLane())
             {
                 Reset();
                 return;
@@ -952,7 +952,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
         {
             // 06f0d4fe-06f0d57f.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);
-            if (Target == nullptr || Target->HasField120())
+            if (Target == nullptr || Target->IsInTradeLane())
             {
                 Reset();
                 return;
@@ -986,7 +986,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
         {
             // 06f0d584-06f0d627.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);
-            if (Target == nullptr || Target->HasField120())
+            if (Target == nullptr || Target->IsInTradeLane())
             {
                 Reset();
                 return;

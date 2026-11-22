@@ -271,7 +271,7 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
     Desc.Flags = 0x8000080;
     Desc.Path = "VWireData";
     Desc.Size = 0x34;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.FindHandle = 0xFFFFFFFF;
     void* Blob = nullptr;
     int bRead = 0;
     const int Handle = File->OpenByDesc(&Desc);

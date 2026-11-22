@@ -19,7 +19,7 @@
 #include <cmath>
 #include <cstring>
 
-#include "x87_trig.h" // X87CosF (ctor 062ca3c7, Slot3 062ca73b FCOS; FSTP float)
+#include "x87_trig.h" // X87CosF (ctor 062ca3c7, OnEngage 062ca73b FCOS; FSTP float)
 
 // TrailBehavior -- see common_trailbehavior.h. Every method re-ported from
 // EXE/Disasm/Common.dll.txt 2026-10-08 (claude-code:cmn-ai5).
@@ -28,7 +28,7 @@
 
 namespace
 {
-    // .data:DAT_063fc538, the 3DMathEngine pointer Slot7 fetches lazily through FUN_06391cf0.
+    // .data:DAT_063fc538, the 3DMathEngine pointer OnUpdate fetches lazily through FUN_06391cf0.
     I3DMathEngine* GTrailMathEngine = nullptr;
 
     // SystemManager+0x14fc, the owner's own FAiTarget record.
@@ -88,7 +88,7 @@ TrailBehavior::TrailBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)
@@ -105,11 +105,11 @@ TrailBehavior::TrailBehavior(int InTypeId)
     , Pad1e1{}
     , TrailOffset1e4(0.0f)          // 062ca3cf
     , TrailDistance1e8(50.0f)       // 062ca3d5 0x42480000
-    , bLagging1ec(0)                // not written by retail's ctor; Slot3 clears it
+    , bLagging1ec(0)                // not written by retail's ctor; OnEngage clears it
     , Pad1ed{}
     , FacingCos1f0(X87CosF(0.5235987901687622))   // 062ca3c1 FCOS, 062ca454 FSTP
-    , LagTimer1f4(0.0f)             // not written by retail's ctor; Slot3 clears it
-    , AxisTimer1f8(0.0f)            // not written by retail's ctor; Slot3 clears it
+    , LagTimer1f4(0.0f)             // not written by retail's ctor; OnEngage clears it
+    , AxisTimer1f8(0.0f)            // not written by retail's ctor; OnEngage clears it
     , LagTime1fc(2.5f)              // 062ca415 0x40200000
     , AxisPause200(5.0f)            // 062ca429 0x40a00000
     , AxisTime204(3.0f)             // 062ca41f 0x40400000
@@ -119,9 +119,9 @@ TrailBehavior::TrailBehavior(int InTypeId)
     , Scale210(1.0f)                // 062ca43f 0x3f800000
     , bAxisArmed214(0)              // 062ca468
     , Pad215{}
-    , SightTimer218(0.0f)           // not written by retail's ctor; Slot3 clears it
+    , SightTimer218(0.0f)           // not written by retail's ctor; OnEngage clears it
     , SightTime21c(4.0f)            // 062ca3f3 0x40800000
-    , TrailExtent220(0.0f)          // not written by retail's ctor; Slot7 writes it
+    , TrailExtent220(0.0f)          // not written by retail's ctor; OnUpdate writes it
     , Field224(0.0385f)             // overwritten below with the exact bits
     , Field228(400.0f)              // 062ca3e9 0x43c80000
     , bDirectionSet22c(0)           // 062ca3fd
@@ -171,9 +171,9 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // ----------------------------------------------------------------------------
 // Slot 3, LAB_062ca640 (.text:062ca640-062ca7a3).
 // ----------------------------------------------------------------------------
-void TrailBehavior::Slot3()
+void TrailBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062ca646 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062ca646 FUN_062d20d0
     SetCruiseLock(1, 3);                                            // 062ca651 FUN_062d21d0
 
     // 062ca656-062ca67b: the owner's target, else the directive target.
@@ -227,7 +227,7 @@ void TrailBehavior::Slot3()
 // ----------------------------------------------------------------------------
 // Slot 4, FUN_062ca7b0 (.text:062ca7b0-062ca811).
 // ----------------------------------------------------------------------------
-void TrailBehavior::Slot4()
+void TrailBehavior::OnDisengage()
 {
     bHasDirectiveTarget1e0 = 0;                                     // 062ca7b9
     DirectiveTarget.set(nullptr);                                   // 062ca7c0-062ca7c8
@@ -236,13 +236,13 @@ void TrailBehavior::Slot4()
     MatchThrottle.Commit();                                         // 062ca7ec
     Move.Commit();                                                  // 062ca7fb
     Afterburner.Commit();                                           // 062ca80a
-    Behavior::Slot4();                                              // 062ca811 JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062ca811 JMP FUN_062d20f0
 }
 
 // ----------------------------------------------------------------------------
 // Slot 5, LAB_062ca820 (.text:062ca820-062ca936).
 // ----------------------------------------------------------------------------
-int TrailBehavior::Slot5(float Unused)
+int TrailBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     SystemManager* const Sys = NavHelper;
@@ -329,17 +329,17 @@ EvaluateResult TrailBehavior::evaluate(unsigned int Context)
 // ----------------------------------------------------------------------------
 // Slot 8, LAB_062caa40 (.text:062caa40-062caa59).
 // ----------------------------------------------------------------------------
-void TrailBehavior::Slot8()
+void TrailBehavior::PostUpdate()
 {
     if (bMatchThrottle23c != 0)
-        MatchThrottle.Slot2(DeltaTime);                             // 062caa56 [EDX+0x8]
+        MatchThrottle.SyncCruise(DeltaTime);                             // 062caa56 [EDX+0x8]
 }
 
 // ----------------------------------------------------------------------------
 // Slot 7, LAB_062caa60 (.text:062caa60-062cb10f). Frame names B+n are [ESP0+n], ESP0 = ESP
 // after `SUB ESP,0x68`.
 // ----------------------------------------------------------------------------
-int TrailBehavior::Slot7()
+int TrailBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)                                    // 062caa67
     {
@@ -391,7 +391,7 @@ int TrailBehavior::Slot7()
     Face.PublishTargetId(Leader->get_id());                         // 062cab83
     Move.PublishTargetId(Leader->get_id());                         // 062cab98
     if (Leader->get_id() != LeaderId1dc)                            // 062caba4
-        Slot3();                                                    // 062cabb1 [EAX+0xc]
+        OnEngage();                                                    // 062cabb1 [EAX+0xc]
     LeaderId1dc = Leader->get_id();                                 // 062cabbb
 
     if (bTrailTarget && !OwnShipIsPlayer(Sys))                      // 062cabc1-062cabe7
@@ -568,7 +568,7 @@ int TrailBehavior::Slot7()
 // ----------------------------------------------------------------------------
 // Slot 10, LAB_062cb110 (.text:062cb110-062cb16c).
 // ----------------------------------------------------------------------------
-bool TrailBehavior::Slot10(void* DirectiveOp)
+bool TrailBehavior::OnApplyDirective(void* DirectiveOp)
 {
     if (DirectiveOp != nullptr)
     {

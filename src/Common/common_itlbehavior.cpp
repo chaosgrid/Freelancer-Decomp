@@ -47,7 +47,7 @@ InstantTradeLaneBehavior::InstantTradeLaneBehavior(int InTypeId)
     , Flag55(0)
     , Flag56(0)
     , Pad57(0)
-    , Field58(0)
+    , LaneSpeed(0)
 {
 }
 
@@ -88,7 +88,7 @@ bool InstantTradeLaneBehavior::SetContext(void* Param1, void* Param2, void* Para
         Flags54 = 0;
         SubObjPtr34 = nullptr;
         LanePtr38 = nullptr;
-        Field58 = 0;
+        LaneSpeed = 0;
     }
 
     return bInstalled;
@@ -100,12 +100,12 @@ void InstantTradeLaneBehavior::TurnOff()
 {
     // 2026-10-08 (claude-code:cmn-ai3), all 16 instructions: `[ESI+0x14]` null -> RET;
     // FUN_062d21d0(0, 3) (Behavior::SetCruiseLock); +0x30 = 0; FUN_062d20d0
-    // (Behavior::Slot3); ThrustManager::engage_cruise(false) on [ESI+0x24]+0x18.
+    // (Behavior::OnEngage); ThrustManager::engage_cruise(false) on [ESI+0x24]+0x18.
     if (TargetPtr14 == nullptr)
         return;
     SetCruiseLock(0, 3);                                                    // 062cef1e
     State30 = 0;                                                            // 062cef25
-    Behavior::Slot3();                                                      // 062cef2c
+    Behavior::OnEngage();                                                      // 062cef2c
     NavHelperPtr24->Thrust.engage_cruise(false);   // 062cef39
 }
 
@@ -148,10 +148,10 @@ void InstantTradeLaneBehavior::RequestExitTradeLane()
         Ship->request_exit_tradelane();
     }
 
-    // LAB_062cef8c: FUN_062d20f0 (Behavior::Slot4 -- Pathfind->Field_064 = 0, Flag29 = 0),
+    // LAB_062cef8c: FUN_062d20f0 (Behavior::OnDisengage -- Pathfind->Field_064 = 0, Flag29 = 0),
     // +0x34 = 0, FUN_062d21d0(0, 3) (Behavior::SetCruiseLock). Both calls were deferred
     // until 2026-10-08.
-    Behavior::Slot4();
+    Behavior::OnDisengage();
     SubObjPtr34 = nullptr;
     SetCruiseLock(0, 3);
 }
@@ -263,10 +263,10 @@ int InstantTradeLaneBehavior::Update()
     {
         // .text:062cf04e-062cf09c. `MOV EDX,[ECX+0x4]` reads the vtable pointer of the
         // IObjAffect sub-object at TargetPtr14+4; `ADD ECX,0x4` makes it the call's `this`.
-        // Arguments, right-to-left off the stack: (SubObjPtr34, LanePtr38, 1, Field58).
+        // Arguments, right-to-left off the stack: (SubObjPtr34, LanePtr38, 1, LaneSpeed).
         // That is IObjAffect slot 25, go_tradelane(EntranceRing, ExitRing, bFastExit, Speed)
         // (named 2026-09-24 from Server.dll's Ship body .text:06d028c0).
-        int const AffectResult = TargetPtr14->go_tradelane(SubObjPtr34, LanePtr38, true, Field58);
+        int const AffectResult = TargetPtr14->go_tradelane(SubObjPtr34, LanePtr38, true, LaneSpeed);
 
         // `TEST EAX,EAX; JNZ LAB_062cf08d` -- zero is success.
         if (AffectResult != 0)
@@ -308,7 +308,7 @@ int InstantTradeLaneBehavior::Update()
         int const ManagerArg118 = (State30 == 6) ? 2 : 0;
 
         Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
-        Slot4();                                                   // `CALL [EDX+0x10]`, virtual
+        OnDisengage();                                                   // `CALL [EDX+0x10]`, virtual
         BehaviorMgrPtr20->SetDirectiveResult(9, ManagerArg118);    // FUN_062d29a0
         UpdateResult10 = 2;
         return 2;
@@ -336,7 +336,7 @@ bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
     //   Flags28 &= ~0x1;                                              (`AND DL,0xfe`)
     //   SubObjPtr34 = FUN_062e74a0(NavHelperPtr24 + 0x34, Directive + 0xc);
     //   LanePtr38   = FUN_062e74a0(NavHelperPtr24 + 0x34, Directive + 0x10);
-    //   Field58     = *(float*)(Directive + 0x14);   (a dword copy; go_tradelane's Speed)
+    //   LaneSpeed     = *(float*)(Directive + 0x14);   (a dword copy; go_tradelane's Speed)
     //   Flags28 = SubObjPtr34 ? (Flags28 | 0x2) : (Flags28 & ~0x2);
     //   return SubObjPtr34 != nullptr;
     // Both lookups use this+0x24 (the NavHelper), NOT this+0x20 -- re-confirmed against the
@@ -351,7 +351,7 @@ bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
     SubObjPtr34 = LookupThis->FindVerifiedObject((unsigned const*)(DirectiveBytes + 0xc));
     LanePtr38 = LookupThis->FindVerifiedObject((unsigned const*)(DirectiveBytes + 0x10));
 
-    Field58 = *reinterpret_cast<float*>(DirectiveBytes + 0x14);
+    LaneSpeed = *reinterpret_cast<float*>(DirectiveBytes + 0x14);
 
     if (SubObjPtr34 != nullptr)
         Flags28 |= 0x2;

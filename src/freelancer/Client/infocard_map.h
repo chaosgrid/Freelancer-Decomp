@@ -22,11 +22,11 @@
 struct FInfocardMapEntry
 {
     int ExtraIds;   // +0x00 value 1: appended after the info text (FUN_00497970, visit bit 2)
-    int Field_0x04; // +0x04 value 2: (visit & 8) && it -> FUN_00476080's 4th argument, the
+    int bShowEquipment; // +0x04 value 2: (visit & 8) && it -> FUN_00476080's 4th argument, the
                     //       equipment list (ids 0x66a; NnHelpAppendBaseGoods)
-    int Field_0x08; // +0x08 value 3: (visit & 4) && it -> 3rd argument, the commodity lists
+    int bShowCommodities; // +0x08 value 3: (visit & 4) && it -> 3rd argument, the commodity lists
                     //       (ids 0x668 / 0x667)
-    int Field_0x0c; // +0x0c value 4: (visit & 0x10) && it -> 5th argument, the ships for sale
+    int bShowShips; // +0x0c value 4: (visit & 0x10) && it -> 5th argument, the ships for sale
                     //       (ids 0x669)
 };
 

@@ -212,7 +212,7 @@ namespace
         {
             FClientShipGameobj const* const Ship = static_cast<FClientShipGameobj const*>(
                 static_cast<IObjRW const*>(PlayerObjRW));
-            int const DockState = Ship->Field_0x158;
+            int const DockState = Ship->JumpState;
             if (State->bDockingActive != 0)
             {
                 if (DockState == 0)
@@ -283,12 +283,12 @@ IEnvironment* GetSpaceState()
 }
 
 // Slots 0, 2, 3 and 4 (LAB_0054a0e0 RET 0x10, LAB_0054a210 RET 0xc, LAB_0054a2e0 RET 0x10,
-// LAB_0054a450 RET 0xc): window-message handlers that build an input event and offer it to the
-// active camera (+0xba0) slots 0x70 / 0x74 and the watched gameobj's slot 0x1cc. Nothing in the
-// exe calls slots 0..6 of any state (every holder of the state pointer read -- tracker
-// LAB_0054a0e0 has the survey), so their bodies are not ported (tracker: skipped, dead in
-// retail); these overrides only fill the slots and answer false.
-bool SpaceApp::Slot00(unsigned A, unsigned Message, unsigned B, unsigned C)
+// LAB_0054a450 RET 0xc): vestigial pre-DirectInput window-message handlers that build a 0x28-byte
+// input event and offer it to the active camera (+0xba0) slots 0x70 / 0x74 and the watched
+// gameobj's slot 0x1cc. Ghidra verification against retail Freelancer.exe confirms zero callers
+// invoke IInputEvent slots 0..6 on any IEnvironment state (only slots 7..14 are ever called via
+// DAT_0067ecac or G_SpaceApp); these overrides only fill the vtable slots and return false.
+bool SpaceApp::OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C)
 {
     (void)A;
     (void)Message;
@@ -306,7 +306,7 @@ bool SpaceApp::Slot01(unsigned A, unsigned B, unsigned C)
     return false;
 }
 
-bool SpaceApp::Slot02(unsigned A, unsigned B, unsigned long Packed)
+bool SpaceApp::OnMouseMove(unsigned A, unsigned B, unsigned long Packed)
 {
     (void)A;
     (void)B;
@@ -314,7 +314,7 @@ bool SpaceApp::Slot02(unsigned A, unsigned B, unsigned long Packed)
     return false;
 }
 
-bool SpaceApp::Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
+bool SpaceApp::OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
 {
     (void)A;
     (void)Message;

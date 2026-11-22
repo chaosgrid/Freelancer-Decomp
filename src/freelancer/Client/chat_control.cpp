@@ -11,7 +11,7 @@
 //   LAB_00465a90 private callback   FUN_00465ab0 RenderPrivateRow
 //   LAB_004666d0..LAB_00466980 the eight qsort comparators (tables 0x006115a8 / 0x006115b8)
 //   FUN_004669c0 FillPrivate        FUN_00467030 Destroy    LAB_004670c0 Create
-//   LAB_00467f10 Slot23             LAB_00468220 SetProperty
+//   LAB_00467f10 ProcessMessage             LAB_00468220 SetProperty
 //   FUN_00468260 Update             FUN_00468310 RefreshCounts
 //   LAB_0045fc50..LAB_0045fd50 the layout floats (DAT_0066d4a8..DAT_0066d4d8)
 
@@ -107,12 +107,12 @@ namespace
         return lex_compare(*Ea->Name, *Eb->Name, false);
     }
 
-    int __cdecl ChatCompareField0Asc(void const* A, void const* B)
+    int __cdecl ChatCompareGroupAsc(void const* A, void const* B)
     {
         // LAB_004666f0
         FChatControlEntry const* const Ea = static_cast<FChatControlEntry const*>(A);
         FChatControlEntry const* const Eb = static_cast<FChatControlEntry const*>(B);
-        return static_cast<int>(Ea->Info->Field_0x0 - Eb->Info->Field_0x0);
+        return static_cast<int>(Ea->Info->GroupId - Eb->Info->GroupId);
     }
 
     int __cdecl ChatCompareRankAsc(void const* A, void const* B)
@@ -128,8 +128,8 @@ namespace
         // LAB_00466730 -- FUN_00466770 on DAT_0066da70 for B first, then A.
         FChatControlEntry const* const Ea = static_cast<FChatControlEntry const*>(A);
         FChatControlEntry const* const Eb = static_cast<FChatControlEntry const*>(B);
-        RenderDisplayList* const NameB = ChatGetSystemName(Eb->Info->Field_0x8);
-        RenderDisplayList* const NameA = ChatGetSystemName(Ea->Info->Field_0x8);
+        RenderDisplayList* const NameB = ChatGetSystemName(Eb->Info->SystemId);
+        RenderDisplayList* const NameA = ChatGetSystemName(Ea->Info->SystemId);
         return lex_compare(*NameA, *NameB, false);
     }
 
@@ -141,12 +141,12 @@ namespace
         return -lex_compare(*Ea->Name, *Eb->Name, false);
     }
 
-    int __cdecl ChatCompareField0Desc(void const* A, void const* B)
+    int __cdecl ChatCompareGroupDesc(void const* A, void const* B)
     {
         // LAB_00466940
         FChatControlEntry const* const Ea = static_cast<FChatControlEntry const*>(A);
         FChatControlEntry const* const Eb = static_cast<FChatControlEntry const*>(B);
-        return static_cast<int>(Eb->Info->Field_0x0 - Ea->Info->Field_0x0);
+        return static_cast<int>(Eb->Info->GroupId - Ea->Info->GroupId);
     }
 
     int __cdecl ChatCompareRankDesc(void const* A, void const* B)
@@ -162,17 +162,17 @@ namespace
         // LAB_00466980
         FChatControlEntry const* const Ea = static_cast<FChatControlEntry const*>(A);
         FChatControlEntry const* const Eb = static_cast<FChatControlEntry const*>(B);
-        RenderDisplayList* const NameB = ChatGetSystemName(Eb->Info->Field_0x8);
-        RenderDisplayList* const NameA = ChatGetSystemName(Ea->Info->Field_0x8);
+        RenderDisplayList* const NameB = ChatGetSystemName(Eb->Info->SystemId);
+        RenderDisplayList* const NameA = ChatGetSystemName(Ea->Info->SystemId);
         return -lex_compare(*NameA, *NameB, false);
     }
 
     typedef int(__cdecl* FChatCompareFn)(void const*, void const*);
 
     // PTR_LAB_006115a8 (direction byte non-zero) / PTR_LAB_006115b8 (zero), by sort column.
-    FChatCompareFn const kChatCompareAsc[4] = {ChatCompareNameAsc, ChatCompareField0Asc,
+    FChatCompareFn const kChatCompareAsc[4] = {ChatCompareNameAsc, ChatCompareGroupAsc,
                                                ChatCompareRankAsc, ChatCompareSystemAsc};
-    FChatCompareFn const kChatCompareDesc[4] = {ChatCompareNameDesc, ChatCompareField0Desc,
+    FChatCompareFn const kChatCompareDesc[4] = {ChatCompareNameDesc, ChatCompareGroupDesc,
                                                 ChatCompareRankDesc, ChatCompareSystemDesc};
 
     // LAB_004650f0 (cdecl)
@@ -697,7 +697,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         static_cast<unsigned short>(Entry->Key == Current.Id ? 0x3dbc : 0x5203);
     wchar_t Buffer[64];
 
-    // 0x00465e19..0x004660c6: column 1 -- Field_0x0, or the "None" text when zero.
+    // 0x00465e19..0x004660c6: column 1 -- GroupId, or the "None" text when zero.
     if (PrivateList->GetCell(Detail, 1, &Cell))
     {
         RenderDisplayList& Text = Cell->Source;
@@ -710,9 +710,9 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
             StyleNode Style(DetailStyle);
             AppendNodeClone(Text, Style);
         }
-        if (Entry->Info->Field_0x0 != 0)
+        if (Entry->Info->GroupId != 0)
         {
-            swprintf(Buffer, sizeof(Buffer) / sizeof(Buffer[0]), L"%u", Entry->Info->Field_0x0);   // DAT_005cfb80
+            swprintf(Buffer, sizeof(Buffer) / sizeof(Buffer[0]), L"%u", Entry->Info->GroupId);   // DAT_005cfb80
             TextNode Value(Buffer, -1);
             AppendNodeClone(Text, Value);
         }
@@ -761,7 +761,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         }
         if (G_ChatNameCache70 != nullptr)
         {
-            RDLRefNode System(*ChatGetSystemName(Entry->Info->Field_0x8));
+            RDLRefNode System(*ChatGetSystemName(Entry->Info->SystemId));
             AppendNodeClone(Text, System);
         }
         PrivateList->SetCellSpanToEnd(Detail, 3, false);
@@ -919,7 +919,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
     }
 }
 
-bool ChatControl::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00467f10
     if (Msg == 0xef01)
@@ -1003,7 +1003,7 @@ bool ChatControl::Slot23(unsigned Msg, unsigned A, unsigned B)
     if (Msg == 0xf002 && bOwnList)
         return true;
 
-    return WinControl::Slot23(Msg, A, B);
+    return WinControl::ProcessMessage(Msg, A, B);
 }
 
 intptr_t ChatControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)

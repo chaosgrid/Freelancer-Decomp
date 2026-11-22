@@ -113,7 +113,7 @@ FGotoGuide::FGotoGuide(FMbGotoGuide const* Desc)
     , Range(Desc->Range)
     , bCruise(Desc->Field_0x174)
     , bNoCruise(Desc->Field_0x175)
-    , Field_0x16e(Desc->Field_0x176)
+    , bStartFollowing(Desc->bStartFollowing)
     , Priority(Desc->Priority)
     , Path(Desc->Legs)
 {
@@ -147,7 +147,7 @@ FGotoGuide::FGotoGuide(FGotoGuide const& Other)
     , TargetId(Other.TargetId)
     , bCruise(Other.bCruise)
     , bNoCruise(Other.bNoCruise)
-    , Field_0x16e(Other.Field_0x16e)
+    , bStartFollowing(Other.bStartFollowing)
     , Directive(Other.Directive)
     , State(Other.State)
     , PrevState(Other.PrevState)
@@ -469,7 +469,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         }
         if (CombatIds.empty())
         {
-            Ship->SetField1b1(false);                                   // FUN_06f33fd0
+            Ship->SetCommMuted(false);                                   // FUN_06f33fd0
             if (PrevState != State)
             {
                 int const Old = State;
@@ -499,7 +499,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
                 }
                 if (CombatIds.empty())
                 {
-                    Ship->SetField1b1(false);
+                    Ship->SetCommMuted(false);
                     if (PrevState != State)
                     {
                         int const Old = State;
@@ -546,7 +546,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
             CombatIds.push_back(A);
         if (State == 7)
             State = 3;
-        Ship->SetField1b1(true);
+        Ship->SetCommMuted(true);
         SetState(4);
         break;
     }
@@ -730,7 +730,7 @@ void FGotoGuide::Start()
     FNnPathLeg const Leg = GetFirstLeg();
     if (!bRestart)
         return;
-    if (Ship->HasField120())                                            // FUN_06f57710
+    if (Ship->IsInTradeLane())                                            // FUN_06f57710
         return;
     bRestart = false;
 
@@ -743,7 +743,7 @@ void FGotoGuide::Start()
         CreateObjListDirective(8, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Leg.PointA, 500.0f, bNoCruise != 0,
-                        bCruise != 0, Field_0x16e != 0, false);         // FUN_06f26770
+                        bCruise != 0, bStartFollowing != 0, false);         // FUN_06f26770
         Guide->Op.Priority = (uint32_t)Priority;
         KeepAndQueue(this, New, &Directives);
         break;
@@ -757,7 +757,7 @@ void FGotoGuide::Start()
         CreateObjListDirective(8, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Waypoint, 500.0f, bNoCruise != 0,
-                        bCruise != 0, Field_0x16e != 0, false);
+                        bCruise != 0, bStartFollowing != 0, false);
         KeepAndQueue(this, New, &Directives);
         break;
     }
@@ -767,7 +767,7 @@ void FGotoGuide::Start()
         CreateObjListDirective(8, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Leg.PointB, 500.0f, bNoCruise != 0,
-                        bCruise != 0, Field_0x16e != 0, true);
+                        bCruise != 0, bStartFollowing != 0, true);
         Guide->Op.Priority = (uint32_t)Priority;
         KeepAndQueue(this, New, &Directives);
         break;
@@ -803,7 +803,7 @@ void FGotoGuide::Start()
         CreateObjListDirective(8, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Destination, Range, bNoCruise != 0,
-                        bCruise != 0, Field_0x16e != 0, false);
+                        bCruise != 0, bStartFollowing != 0, false);
         Guide->Op.Priority = (uint32_t)Priority;
         KeepAndQueue(this, New, &Directives);
         break;
@@ -982,7 +982,7 @@ void FDockGuide::Start()
         FGotoGuide::Start();
     if (!bDockRestart)
         return;
-    if (Ship->HasField120())
+    if (Ship->IsInTradeLane())
         return;
     if (State == 12)
     {

@@ -29,7 +29,7 @@ bool UiListBox::Create(Win3D* NewParent, void* Payload)
     // the payload's width / height into both the unprojected and the projected extent.
     SelectedIndex = -1;
     HoverIndex = -1;
-    Field80 = -1;
+    HighlightIndex = -1;
     ItemCount = 0;
     VisibleRows = 0x10;
     FirstVisible = 0;

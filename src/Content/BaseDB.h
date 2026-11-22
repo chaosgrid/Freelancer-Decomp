@@ -62,9 +62,9 @@ struct FBaseNpcKnow
 {
     int Price;                  // +0x00 value 2: compared with the player's cash and
                                 // appended as an int (TU34 FUN_06f01600, FUN_06f01a30)
-    int Field_0x04;             // +0x04 value 1 (an ids number): the rumor record key, and
+    int InfoIds;             // +0x04 value 1 (an ids number): the rumor record key, and
                                 // the string of mad-lib 0x3efe (FUN_06f01a30)
-    int Field_0x08;             // +0x08 value 0 (an ids number): the string of mad-lib
+    int OfferIds;             // +0x08 value 0 (an ids number): the string of mad-lib
                                 // 0x3efd (FUN_06f01a30). TODO: names from BaseSupport.
     unsigned int RepLevel;      // +0x0c value 3, index into GBaseNpcRepThresholds; picks
                                 // the generic script 0x26/0x26/0x27/0x28 (FUN_06f01600)
@@ -340,7 +340,7 @@ struct FBarCharacter
 
     int UseCount;                  // +0x00 1; one per player visit holding it
     unsigned long Behavior;         // +0x04 -1, pub::GF::CharacterBehaviorCreate handle
-    int Field_0x08;                 // +0x08 not written by the ctor or Create.
+    int Field_0x08;               // +0x08 not written by the ctor or Create.
                                     // TODO: find its writer/readers.
     unsigned int CharacterId;       // +0x0c 0, pub::GF::CharacterCreate
     unsigned int RoomId;            // +0x10 0

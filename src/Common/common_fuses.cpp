@@ -493,7 +493,7 @@ Fuse::Fuse(Fuse const& Other)
     for (std::multimap<float, FuseAction*>::const_iterator It = Other.Actions.begin();
          It != Other.Actions.end(); ++It)
     {
-        FuseAction* Clone = It->second->Slot04();
+        FuseAction* Clone = It->second->Clone();
         Actions.insert(std::pair<float const, FuseAction*>(It->first, Clone));
     }
 }

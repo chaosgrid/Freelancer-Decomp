@@ -28,8 +28,8 @@ struct FBatchRecord
     FVbListing VertexBufferListing; // +0xCC, formerly OptionalAData
     FIbScratch IndexBufferScratch;  // +0xD8, formerly OptionalBData
     unsigned long Flags;         // +0xE0
-    void* Field78;               // +0xE4
-    void* Field7C;               // +0xE8
+    void* RecordTag;               // +0xE4
+    void* RecordTagContext;               // +0xE8
     void* Unused;                // +0xEC (Arg8; sort depth when flags&0x20)
 
     FBatchRecord();
@@ -125,8 +125,8 @@ public:
     unsigned long BinOrder[2];     // retail this+0x60/+0x64
     FBatchBin* SelectedBin;        // retail this+0x70, slots 6/7
     IMaterialBatcherEvents* CachedInterface; // retail this+0x74, slots 14/15 (AddRef/Release-managed)
-    void* Field78;                 // retail this+0x78, slots 16/17 (plain)
-    void* Field7C;                 // retail this+0x7C, slots 18/19 (plain)
+    void* RecordTag;                 // retail this+0x78, slots 16/17 (plain)
+    void* RecordTagContext;                 // retail this+0x7C, slots 18/19 (plain)
     unsigned long FrameValue;      // retail this+0x88
     unsigned long PendingFrameValue; // retail this+0x8C
     FMaterialBatcherController Controller; // retail nondelegating unknown @ +0x94

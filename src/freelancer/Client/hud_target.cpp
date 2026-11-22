@@ -1263,7 +1263,7 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
         // Ship gameobj byte +0x18c bit 2 (0x0045a517; bucket 1 holds ships only). No instruction
         // in freelancer.exe sets bit 2 (writers: ctor 0x005434a5 zeroes the dword, 0x00543b71
         // sets bit 3, 0x00545f07 bits 0/1, 0x005447c6 / 0x0051db60 / 0x0051db8d clear 0/1).
-        if ((static_cast<FClientShipGameobj*>(Gameobj)->Field_0x18c & 4) != 0)
+        if ((static_cast<FClientShipGameobj*>(Gameobj)->ShipFlags & 4) != 0)
         {
             *OutArgb = G_NnPaletteArgb_679b9c;
             return;
@@ -1409,7 +1409,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     // the destructor for why the port calls set).
     Watchable const* const NewWatched = (Found != nullptr) ? static_cast<Watchable*>(Found) : nullptr;
     ViewObject.set(NewWatched);
-    Slot16();
+    OnViewObjectChanged();
 
     IObjRW* const Viewed = ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target()));
     if (Viewed == nullptr)
@@ -1463,27 +1463,27 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     HideGroupAndEquipParts();
 }
 
-void HudTargetBase::Slot12()
+void HudTargetBase::ToggleExpanded()
 {
     // FUN_00401e90 -- RET.
 }
 
-void HudTargetBase::Slot13(bool /*bHide*/)
+void HudTargetBase::HideExpandedControls(bool /*bHide*/)
 {
     // FUN_0053e4a0 -- RET 4.
 }
 
-void HudTargetBase::Slot14()
+void HudTargetBase::DrawViewObject()
 {
     // FUN_00401e90 -- RET.
 }
 
-void HudTargetBase::Slot15()
+void HudTargetBase::UpdateLabels()
 {
     // FUN_00401e90 -- RET.
 }
 
-void HudTargetBase::Slot16()
+void HudTargetBase::OnViewObjectChanged()
 {
     // FUN_00401e90 -- RET.
 }
@@ -2072,7 +2072,7 @@ void HudTargetBase::Draw()
             Child->Draw();
             if (AsControl == ViewPanel)
             {
-                Slot14();
+                DrawViewObject();
             }
         }
     }
@@ -2098,7 +2098,7 @@ intptr_t HudTargetBase::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
     // is not called.
     if (Msg == 0x26 && A == reinterpret_cast<uintptr_t>(ToggleButton))
     {
-        Slot12();
+        ToggleExpanded();
     }
     return 0;
 }
@@ -2109,7 +2109,7 @@ void HudTargetBase::OnMoveFinished()
     // un-hide the panel controls; then the flag re-read and inverted.
     if (bExpanded == 0)
     {
-        Slot13(false);
+        HideExpandedControls(false);
     }
     bExpanded = (bExpanded == 0) ? 1 : 0;
 }

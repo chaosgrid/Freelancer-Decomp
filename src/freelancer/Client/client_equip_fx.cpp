@@ -175,7 +175,7 @@ namespace
 
     // FUN_00534240 — Host vt+0x1c0 Ignite (NOT FUN_005340b0 which is +0x1a0).
     // Params (RET 0x14): SourceId, ID_String const* FuseId, SubObjId, AtT, OverrideLifetime.
-    // Published as HostIgniteFuse (end of file); FClientEquippedObj::Slot1c0 runs it.
+    // Published as HostIgniteFuse (end of file); FClientEquippedObj::LightFuse runs it.
     bool HostIgniteFuseImpl(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
                             unsigned short SubObjId, float AtT, float OverrideLifetime)
     {
@@ -815,7 +815,7 @@ namespace
     {
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
             return false;
-        return !Host->Slot158();
+        return !Host->IsDead();
     }
 
     bool CliEquipHostIsLivePlayer(FClientGameobj* Host, unsigned Mask)
@@ -1109,7 +1109,7 @@ namespace
         case ShieldWentOffline:
         {
             // 0x0052e47d..0x0052e48a: a host already destroyed (vtable +0x154) -> nothing.
-            if (Host->Slot154())
+            if (Host->IsExploding())
                 break;
             // 0x0052e490..0x0052e4f5: the player's live host (not reaped, class 0x503 hit
             // points above 0: FCOMP DAT_005c7474, TEST AH,0x41, JNZ skips) ->
@@ -3415,7 +3415,7 @@ namespace
                 // object's own vtable +0x1c0 (a ship runs FUN_00545a90).
                 if (static_cast<CSimple*>(Obj)->get_hit_pts() <= Node.Value1)
                 {
-                    static_cast<FClientEquippedObj*>(Host)->Slot1c0(0u, &Node.Fuse, SUBOBJ_ID_ROOT,
+                    static_cast<FClientEquippedObj*>(Host)->LightFuse(0u, &Node.Fuse, SUBOBJ_ID_ROOT,
                                                                    Node.Value2, -1.0f);
                 }
                 // 00533ef0-00533f0a: FUN_00432240 find in DAT_00675400, Fuse::Load on the value.
@@ -3442,7 +3442,7 @@ namespace
                     // arch (+4) id (+4, no test), vtable +0x1c0 as above.
                     if (Group->GetHitPoints() <= Node.Value1)
                     {
-                        static_cast<FClientEquippedObj*>(Host)->Slot1c0(
+                        static_cast<FClientEquippedObj*>(Host)->LightFuse(
                             0u, &Node.Fuse, Group->Arch->Id, Node.Value2, -1.0f);
                     }
                     // 00533f98-00533fd2: FUN_0052c7a0 lower_bound + key check (= find) in
@@ -3666,7 +3666,7 @@ FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipI
 bool HostIgniteFuse(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
                     unsigned short SubObjId, float AtT, float OverrideLifetime)
 {
-    // FUN_00534240 (FClientEquippedObj::Slot1c0's body).
+    // FUN_00534240 (FClientEquippedObj::LightFuse's body).
     return HostIgniteFuseImpl(Host, SourceId, FuseId, SubObjId, AtT, OverrideLifetime);
 }
 

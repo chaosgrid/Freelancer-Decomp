@@ -277,11 +277,11 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 Info.Orientation = Wire->Orientation;
                 Info.Position = Wire->Position;
                 const float* TimeSource = &Wire->UpdateTime;
-                const float* FieldSource = &Wire->Field_0x28;
+                const float* FieldSource = &Wire->Throttle;
                 float TimeRounded;
                 float FieldRounded;
-                float* TimeDestination = &Info.Field_0x20;
-                float* FieldDestination = &Info.Field_0x24;
+                float* TimeDestination = &Info.Timestamp;
+                float* FieldDestination = &Info.Throttle;
                 // 06bd3b9a..3bca retains the two intermediate FST operations.
                 __asm {
                     mov eax, TimeSource
@@ -296,7 +296,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                     mov eax, FieldDestination
                     fstp dword ptr [eax]
                 }
-                Info.Field_0x28 = Wire->Field_0x00;
+                Info.State = Wire->State;
                 Client->SendCommonUpdateObject(1, Info);
                 break;
             }
@@ -324,7 +324,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
             case 0x05:
             {
                 const FRpcChatMsgPacket* Wire = reinterpret_cast<const FRpcChatMsgPacket*>(Packet);
-                GGameChatClient->SendCommonChatMsg(CHAT_ID(1u), CHAT_ID(Wire->Field_0x04), Wire->DataSize,
+                GGameChatClient->SendCommonChatMsg(CHAT_ID(1u), CHAT_ID(Wire->SenderId), Wire->DataSize,
                     Wire->Data);
                 break;
             }
@@ -344,7 +344,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 XActivateCruise Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.bActivate = (Wire->bActive != 0);
-                Info.bDisruptCruise = (Wire->Field_0x05 != 0);
+                Info.bDisruptCruise = (Wire->bDisruptCruise != 0);
                 Client->SendCommonActivateCruise(1, Info);
                 break;
             }
@@ -355,7 +355,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 Info.ObjectId = Wire->ObjectId;
                 Info.TradelaneRing1 = Wire->TradelaneRing1;
                 Info.TradelaneRing2 = Wire->TradelaneRing2;
-                Info.Field_0x0c = (Wire->Field_0x0c != 0);
+                Info.bMidLane = (Wire->bMidLane != 0);
                 Client->SendCommonGoTradeLane(1, Info);
                 break;
             }
@@ -481,7 +481,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 FmtStr TextB;
                 TextA.unflatten(Wire->DataA, Wire->SizeA);
                 TextB.unflatten(Wire->DataB, Wire->SizeB);
-                Client->SendCommonPopUpDialog(1, TextA, TextB, Wire->Field_0x10);
+                Client->SendCommonPopUpDialog(1, TextA, TextB, Wire->Buttons);
                 break;
             }
             case 0x1c:

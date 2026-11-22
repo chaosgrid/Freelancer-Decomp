@@ -493,12 +493,12 @@ public:
             Context.SourceVertices = Group->Vertices;
             Context.Indices = Group->Indices;
             IMaterial* Material = Group->Material;
-            Context.Field20 = Group->Field_0x0C;
+            Context.MaterialContext = Group->MaterialContext;
             Context.ReplacedMaterial = nullptr;
             if (Extra != nullptr)
             {
                 Context.ReplacedMaterial = Material;
-                Context.Field20 = Group->Field_0x0C;
+                Context.MaterialContext = Group->MaterialContext;
                 Material = Extra;
             }
             if (Group->IndexCount == 0 || Material == nullptr)
@@ -1731,7 +1731,7 @@ public:
                                   //       tessellation radius and the level formula's scale
     FSphereHandle* Arch;          // +0x10
     void* InstId;                 // +0x14
-    float Field_0x18;             // +0x18 1.5f; ISphereMesh Slot03/04. The draw multiplies the
+    float LodDistanceScale;             // +0x18 1.5f; ISphereMesh Slot03/04. The draw multiplies the
                                   //       camera distance by it before the level update.
                                   //       TODO: a name (a detail bias; the exe's level_of_detail
                                   //       option writes it through Slot03)
@@ -1755,7 +1755,7 @@ public:
         , Radius(1.0f)
         , Arch(nullptr)
         , InstId((void*)((intptr_t)-1))
-        , Field_0x18(1.5f)
+        , LodDistanceScale(1.5f)
         , LevelMin(3)
         , LevelMax(9)
         , Field_0x24(0)
@@ -1818,7 +1818,7 @@ public:
         InstId = InInstId;
         bHasAtmosphere = 0;
         Flags = 0;
-        Field_0x18 = 1.5f;
+        LodDistanceScale = 1.5f;
         CachedLevel = -1;
         Field_0x24 = 0;
         LevelMin = 3;
@@ -2001,7 +2001,7 @@ public:
         FVector ViewCentre; // ESP+0x2F0
         MathEngineCached(G_MathSphere)->TransformXform(ViewCentre, Pipelined, Origin);
 
-        const float Biased = Distance * Field_0x18; // ESP+0x70
+        const float Biased = Distance * LodDistanceScale; // ESP+0x70
         const float XScale = (float)(Camera->GetXScaleOverNear()); // FSTP float
         UpdateLevel(Biased / (Camera->GetZNear() * XScale));
 
@@ -2026,7 +2026,7 @@ public:
         Context.VbListing = &Lock.Listing;
         Context.IbScratch = nullptr;
         Context.ReplacedMaterial = nullptr;
-        Context.Field20 = nullptr;
+        Context.MaterialContext = nullptr;
 
         FTransform Rotation; // ESP+0x18
         SphereFaceRotation(Rotation, 0, HalfPi);
@@ -2108,7 +2108,7 @@ public:
                                (double)ToCamera.X * Corners[Corner].X;
             bVisible[Corner] = (Dot > AtmosphereThreshold) ? 1 : 0;
         }
-        Context.Field20 = G_Engine; // 06c2bff2: DAT_06c37d4c
+        Context.MaterialContext = G_Engine; // 06c2bff2: DAT_06c37d4c
         FTransform AtmosphereWorld; // ESP+0x26C
         for (int Face = 0; Face < 6; ++Face)
         {
@@ -2171,7 +2171,7 @@ public:
     // formerly Slot03
     int DACOM_API SetLodDistanceScale(float Value) override
     {
-        Field_0x18 = Value;
+        LodDistanceScale = Value;
         return 0;
     }
 
@@ -2179,7 +2179,7 @@ public:
     // formerly Slot04
     int DACOM_API GetLodDistanceScale(float* Out) override
     {
-        *Out = Field_0x18;
+        *Out = LodDistanceScale;
         return 0;
     }
 

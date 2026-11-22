@@ -47,7 +47,7 @@ struct IFileSystem;
 struct FTextureRef
 {
     void* Texture; // +0x00 ITextureLibrary2 texture record* (Slot12 OutTex)
-    int Field04;   // +0x04 FUN_00552420 cache (-1 = unprobed; 0/1 = has-alpha)
+    int AlphaCache;   // +0x04 FUN_00552420 cache (-1 = unprobed; 0/1 = has-alpha)
 
     FTextureRef();
     FTextureRef(FTextureRef const& Other);

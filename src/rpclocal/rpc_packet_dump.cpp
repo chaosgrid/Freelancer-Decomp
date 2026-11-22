@@ -183,9 +183,9 @@ void RpcDumpServerCharSelectVerified(const FPacketBase& Packet, std::ostream& Ou
     const FPayloadServerCharSelectVerified* Wire =
         reinterpret_cast<const FPayloadServerCharSelectVerified*>(Packet.Payload());
     double Time = 0.0;
-    ::memcpy(&Time, &Wire->Field_0x08, sizeof(Time));         // 06dac020 / 06dac023
+    ::memcpy(&Time, &Wire->ServerTimeLo, sizeof(Time));         // 06dac020 / 06dac023
     Out << "   RepInstance: ";                                // 06dac047
-    Out << Wire->Field_0x00;                                  // 06dac04e  packet+0x20
+    Out << Wire->VibeHandle;                                  // 06dac04e  packet+0x20
     Out << " time: ";                                         // 06dac055
     Out << Time;                                              // 06dac05c
     Out << kRpcDumpEol;                                       // 06dac063
@@ -204,7 +204,7 @@ void RpcDumpServerSetReputation(const FPacketBase& Packet, std::ostream& Out) {
     Out << Wire->VibeHandle;                                  // 06d92885  packet+0x58
     Out << kRpcDumpEol;                                       // 06d9288c
     Out << "   Affiliation: ";                                // 06d928a0
-    Out << Wire->Field_0x3c;                                  // 06d928a7  packet+0x5c
+    Out << Wire->Affiliation;                                  // 06d928a7  packet+0x5c
     Out << kRpcDumpEol;                                       // 06d928ae
 }
 
@@ -295,12 +295,12 @@ void RpcDumpClientCreateNewChar(const FPacketBase& Packet, std::ostream& Out) {
     Out << "   Name: ";                                       // 06daf7aa
     Out << static_cast<const void*>(Wire->Name);              // 06daf7b1  the ADDRESS
     Out << "   Fac: ";                                        // 06daf7b8
-    Out << Wire->Field_0x80;                                  // 06daf7bf  packet+0xa0
+    Out << Wire->FactionId;                                  // 06daf7bf  packet+0xa0
     Out << "   Base: ";                                       // 06daf7c6
-    Out << Wire->Field_0x84;                                  // 06daf7cd  packet+0xa4
+    Out << Wire->BaseId;                                  // 06daf7cd  packet+0xa4
     Out << "   Pkg: ";                                        // 06daf7d4
-    Out << Wire->Field_0x88;                                  // 06daf7db  packet+0xa8
+    Out << Wire->PackageId;                                  // 06daf7db  packet+0xa8
     Out << "   Pilot: ";                                      // 06daf7e2
-    Out << Wire->Field_0x8c;                                  // 06daf7e9  packet+0xac
+    Out << Wire->PilotId;                                  // 06daf7e9  packet+0xac
     Out << kRpcDumpEol;                                       // 06daf7f0
 }

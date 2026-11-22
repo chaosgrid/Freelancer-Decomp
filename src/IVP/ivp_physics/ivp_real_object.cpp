@@ -33,7 +33,7 @@ void IVP_Core_Remove_Object(IVP_Core* Core, IVP_Real_Object* Object); // ivp_cor
 namespace
 {
     // Anchor teardown notification; the unused outer argument is retained.
-    void FUN_06356910(IVP_Anchor* Anchor, IVP_Real_Object* /*Outer, unused*/)
+    void IVP_Anchor_ObjectDeletedEvent(IVP_Anchor* Anchor, IVP_Real_Object* /*Outer, unused*/)
     {
         Anchor->l_actuator->AnchorWillBeDeleted(Anchor);
     }
@@ -737,8 +737,6 @@ void IVP_RefreshNarrowPhaseCacheSlot(IVP_NarrowPhaseCacheSlot* Slot)
     }
 }
 
-static void IVP_DEFERRED_RefreshNarrowPhaseCacheSlot(IVP_NarrowPhaseCacheSlot* Slot) { IVP_RefreshNarrowPhaseCacheSlot(Slot); }
-
 // FUN_0634d530 (.text:0634d530-0634d5b5), thiscall on the IVP_Cache_Object_Manager
 // (ECX = [env + 0x94] at all 18 call sites), (object), RET 4:
 //   slot = &cache_objects[next_free_index] (index*0x70); while slot->RefCount
@@ -777,7 +775,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Cache_Object_Manager::get_cache_object(IVP_Real_Ob
     Slot->LastRefreshTick = 0;
 
     if (int8_t(Owner->flags & 0xff) >= 8)
-        IVP_DEFERRED_RefreshNarrowPhaseCacheSlot(Slot);
+        IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
 }
@@ -794,7 +792,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::ResolveNarrowPhaseCacheSlot()
     ++Slot->RefCount;
 
     if (int8_t(flags & 0xff) < 8 && environment->sim_step_count > Slot->LastRefreshTick)
-        IVP_DEFERRED_RefreshNarrowPhaseCacheSlot(Slot);
+        IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
 }
@@ -811,7 +809,7 @@ IVP_NarrowPhaseCacheSlot* IVP_Real_Object::get_cache_object_no_lock()
 
     IVP_NarrowPhaseCacheSlot* Slot = cache_object;
     if (int8_t(flags & 0xff) < 8 && environment->sim_step_count > Slot->LastRefreshTick)
-        IVP_DEFERRED_RefreshNarrowPhaseCacheSlot(Slot);
+        IVP_RefreshNarrowPhaseCacheSlot(Slot);
 
     return Slot;
 }
@@ -1044,7 +1042,7 @@ void IVP_Real_Object::TeardownMindistListenersAndCandidates()
 {
     // Common.dll.txt:063455c7-063455e6. Drain anchors's own listener chain.
     // Retail expects each listener's own notify handler (invoked through
-    // FUN_06356910, already ported) to unlink itself from anchors as a
+    // IVP_Anchor_ObjectDeletedEvent, already ported) to unlink itself from anchors as a
     // side effect of being notified; the "did the head actually change"
     // compare below is retail's own infinite-loop safety net for a listener
     // that doesn't (same assert-fail-on-stuck-head idiom already used by
@@ -1060,7 +1058,7 @@ void IVP_Real_Object::TeardownMindistListenersAndCandidates()
             if (Head == nullptr)
                 break;
 
-            FUN_06356910(Head, this);
+            IVP_Anchor_ObjectDeletedEvent(Head, this);
 
             if (Head == PreviousHead)
             {
@@ -2625,7 +2623,7 @@ void IVP_RealObjectConstructionTemplate::set_long_name(const char* Name)
 // ============================================================================
 
 void IVP_Core_Add_Object(IVP_Core* Core, IVP_Real_Object* Object); // ivp_core.cpp, FUN_06346ef0
-void __fastcall FUN_063465a0(IVP_Core* Core);                      // ivp_core.cpp
+void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core);                      // ivp_core.cpp
 void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar, int32_t EventMode); // ivp_mindist_limiter.cpp, FUN_0634f320
 
 // FUN_06344dc0: `MOV EAX,[ECX+0x98]; CMP byte ptr [EAX+0x60],0x8; JNZ ret;
@@ -2755,7 +2753,7 @@ void IVP_Real_Object::beam_object_to_new_position(const IVP_U_Quat* RotationWs, 
 //     NewCore->add (06346ef0).
 //   :063438fc-:06343923 Object's movement byte = Host's.
 //   :06343926 06343cc0(0, Object, &Quat, &Position, 0) = PhySys::BeamBodyToWorldPose.
-//   :06343930 FUN_063465a0(NewCore).
+//   :06343930 IVP_Core_RefreshContactPoints(NewCore).
 void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, float Distance)
 {
     if (!(Distance >= 0.0f))
@@ -2813,7 +2811,7 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
     Object->flags = (Object->flags & ~0xffu) | (Host->flags & 0xffu);
 
     PhySys::BeamBodyToWorldPose(nullptr, Object, &Quat.x, Position);
-    FUN_063465a0(NewCore);
+    IVP_Core_RefreshContactPoints(NewCore);
 }
 
 // FUN_06343940 (.text:06343940-06343cb3, cdecl):
@@ -2827,7 +2825,7 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
 //   :06343a2d-:06343a4e Template->ShortNameTag[0] != 0 -> strncpy(name, tag, 8).
 //   :06343a51-:06343a74 count = OldCore->Objects.n_elems; OldCore->remove (06346f20);
 //     count <= 1 (signed JG) -> OldCore = 0 (the core was deleted), else
-//     FUN_063465a0(OldCore).
+//     IVP_Core_RefreshContactPoints(OldCore).
 //   :06343a79-:06343acf flags = (flags & 0xffffff08) | 8; NewCore = new IVP_Core(
 //     Object, &Quat, &Position, 0, Template->FlagsLo); core / original_core /
 //     +0xa0 = NewCore.
@@ -2885,7 +2883,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     if (OldObjectCount <= 1)
         OldCore = nullptr;
     else if (OldCore != nullptr)
-        FUN_063465a0(OldCore);
+        IVP_Core_RefreshContactPoints(OldCore);
 
     Object->flags = (Object->flags & 0xffffff08u) | 8u;
     IVP_Core* NewCore = new IVP_Core(Object, &Quat, &Position, 0, Template->FlagsLo);

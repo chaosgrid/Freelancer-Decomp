@@ -441,7 +441,7 @@ void BaseRichTextWin::Draw()
     Slot39();
 }
 
-bool BaseRichTextWin::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool BaseRichTextWin::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_0057afd0 (RET 0xc). 0xf005 is a scrollbar's value change; A is the sender.
     if (Msg == 0xf005)
@@ -478,7 +478,7 @@ bool BaseRichTextWin::Slot23(unsigned Msg, unsigned A, unsigned B)
             return true;
         }
     }
-    return WinControl::Slot23(Msg, A, B);
+    return WinControl::ProcessMessage(Msg, A, B);
 }
 
 intptr_t BaseRichTextWin::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -1367,14 +1367,14 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->Slot23(0xf004u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->ProcessMessage(0xf004u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
         case 0x1b:
             // Escape (0x0057cd75): the same with 0xf003.
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->Slot23(0xf003u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->ProcessMessage(0xf003u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
         case 0x23:
             // End (0x0057cc90).

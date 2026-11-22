@@ -452,7 +452,7 @@ FClientShipGameobj* SpawnPlayerShip()
     Archetype::HookUpInstanceTreeMaterials(Go->get_index());
 
     // 0x0054b803..0x0054b80a: the gameobj's slot 92 (+0x170).
-    Go->Slot170();
+    Go->PostCreateInit();
 
     // 0x0054b810..0x0054b813: FUN_00540c30(Go, 1) -- ObjDB bucket + remote-physics block.
     ClientObjDb_RegisterGameobj(Go, true);

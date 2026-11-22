@@ -74,11 +74,11 @@ inline CHAT_ID ChatIdForPlayer(unsigned PlayerId)
 struct FChatPlayerInfo
 {
     // Node +0x10: MISCOBJUPDATE 0x0005 (IClient slot 118 -> FUN_0046ad60). TODO: meaning.
-    unsigned Field_0x0;
+    unsigned GroupId;
     // Node +0x14: MISCOBJUPDATE 0x0044 (slot 117 -> FUN_0046add0) -- the player's rank.
     unsigned Rank;
     // Node +0x18: MISCOBJUPDATE 0x0084 (slot 119 -> FUN_0046ae40). TODO: meaning.
-    unsigned Field_0x8;
+    unsigned SystemId;
 };
 
 class FChatChannelTable
@@ -233,9 +233,9 @@ void ChatPlayerJoined(wchar_t const* Name, unsigned PlayerId, bool bNotify);
 void ChatPlayerLeft(unsigned PlayerId, bool bNotify);
 // FUN_0046ad60 / FUN_0046add0 / FUN_0046ae40 (cdecl) -- set one FChatPlayerInfo field of an
 // existing player; generation + 1. No-op for an unknown player.
-void ChatSetPlayerInfoField0(unsigned PlayerId, unsigned Value);
+void ChatSetPlayerGroupId(unsigned PlayerId, unsigned Value);
 void ChatSetPlayerRank(unsigned PlayerId, unsigned Rank);
-void ChatSetPlayerInfoField8(unsigned PlayerId, unsigned Value);
+void ChatSetPlayerSystemId(unsigned PlayerId, unsigned Value);
 // FUN_0046b400 (cdecl) -- the player's name RDL or null. No null test on the table (retail's
 // caller, HUD 0x004e2d53, only runs with the chat built).
 RenderDisplayList* ChatFindPlayerName(unsigned PlayerId);

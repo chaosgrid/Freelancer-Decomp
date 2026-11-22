@@ -255,7 +255,7 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
     Desc.ShareMode = 1;
     Desc.Creation = 3;
     Desc.Flags = 0x08000080;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.FindHandle = 0xFFFFFFFF;
     const int CountHandle = FileSystemOpenByDesc(FileSystem, &Desc);
     if (CountHandle != -1)
     {

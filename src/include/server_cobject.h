@@ -16,245 +16,11 @@
 // All offsets verified against GetAtmosphereRange (0x19800), GetType (0x18da0),
 // and constructor FUN_06cee360
 
-struct FCEquipManager; // forward declaration for FCObject::EquipMgr pointer
-
-// ===========================================================================
-// DEPRECATED, DO NOT ADD USERS.
-//
-// FCObject (and FCShip in server_cship.h) is a flat
-// placeholder struct that conflates TWO different retail objects: the IObjRW
-// wrapper Server.dll owns (vtables at +0x00/+0x04, CBase::Object at +0x10) and
-// the Common.dll CObject it points at (ObjectClass at +0x4c, archetype at +0x88,
-// physics body at +0x54). Nothing in retail has that layout.
-//
-// As of the "real objects instead of malloc blocks" pass, pub::SpaceObj::Create /
-// CreateSolar / CreateLoot build genuine GameObject/Ship/Solar/Loot wrappers
-// (src/include/server_gameobject.h) around genuine Common.dll CShip/CSolar/CLoot
-// instances, and the FLID registry holds those wrappers. Every pub::SpaceObj::
-// export now dispatches through IObjInspect instead of reading raw offsets.
-//
-// These structs and the FCEquipManager/FCEquipItem pair below survive only
-// because nothing has claimed the job of deleting them yet; they have no users
-// left in src/Server. TODO: remove them, along with COBJECT_MIN_SIZE and
-// CSHIP_SIZE, once nothing in the tree mentions them.
-// ===========================================================================
-struct FCObject {
-    // +0x00: vtable pointer (IObjInspect)
-    void* VTable_Inspect;
-    // +0x04: vtable pointer (IObjAffect)
-    void* VTable_Affect;
-    // +0x08: FLID / object ID
-    unsigned int ObjectID;
-    // +0x0C: PhySys-related vtable/pointer
-    void* PhySysVTable;
-    // +0x10: flags byte
-    unsigned char Flags;
-    // +0x11..0x17: padding/various small fields
-    unsigned char Padding1[7];
-    // +0x18: linked list node pointer (owner list)
-    void* OwnerListNode;
-    // +0x1C..0x34: various fields
-    unsigned char Reserved1[0x18];
-    // +0x38: radius (float) — used by GetAtmosphereRange, GetRadius
-    float Radius;
-    // +0x3C..0x4B: padding/fields
-    unsigned char Reserved2[0x10];
-    // +0x4C: type flags (uint)
-    //   & 3 == 3 → game object
-    //   & 0x103 == 0x103 → generic game object (ship, solar, loot)
-    //   & 0x303 == 0x303 → planet/sun
-    //   & 0x503 == 0x503 → ship
-    //   & 0x803 == 0x803 → loot/cargo container
-    unsigned int TypeFlags;
-    // +0x50: unidentified dword. Retail's physics-body read is [CObject + 0x54], not
-    // +0x50 — see pub::SpaceObj::AddImpulse at .text:06cf90f1 (MOV ECX,[EAX + 0x54]).
-    unsigned int Field_0x50;
-    // +0x54: physics body pointer (PhySys::Body*)
-    void* PhysicsBody;
-    // +0x58..0x87: controllers, system ref, etc.
-    unsigned char Reserved3[0x30];
-    // +0x88: archetype pointer (Archetype::Base* or similar)
-    //   *(arch_ptr + 8) = archetype hash ID
-    void* ArchetypePtr;
-    // +0x8C: archetype array end (for terminal info iteration)
-    void* ArchetypeEnd;
-    // +0x90..0xDF: various fields
-    unsigned char Reserved4[0x50];
-    // +0xE0: object type (uint) — returned by GetType
-    unsigned int ObjectType;
-    // +0xE4: equipment manager pointer (CEquipManager*)
-    FCEquipManager* EquipMgr;
-    // +0xE8..0x103: various fields
-    unsigned char Reserved5[0x1C];
-    // +0x104: reputation vibe handle (int)
-    int RepVibe;
-    // +0x108: costume data (Costume struct, 0x34 bytes = 13 dwords)
-    unsigned int Costume[13];
-    // +0x13C: voice ID (uint)
-    unsigned int VoiceID;
-    // +0x140..0x14F: various fields
-    unsigned char Reserved6[0x10];
-    // +0x150: solar vtable/get_solar function pointer
-    void* SolarVTable;
-    // +0x154..0x15F: various fields
-    unsigned char Reserved7[0xC];
-    // +0x160: docking target primary (uint)
-    unsigned int DockTargetPrimary;
-    // +0x164: docking target secondary (uint) — preferred if valid FLID
-    unsigned int DockTargetSecondary;
-    // +0x168..0x193: various fields
-    unsigned char Reserved8[0x2C];
-    // +0x194: behavior interface pointer (IBehaviorManager*)
-    void* BehaviorInterface;
-    // +0x198..0x1AB: various fields
-    unsigned char Reserved9[0x14];
-    // +0x1AC: atmosphere range (float) — used by GetAtmosphereRange
-    float AtmosphereRange;
-    // +0x1B0..0x1D7: various fields
-    unsigned char Reserved10[0x28];
-    // +0x1D8: tradelane previous gate/ring (uint)
-    unsigned int TradelanePrev;
-    // +0x1DC: tradelane next gate/ring (uint)
-    unsigned int TradelaneNext;
-    // +0x1E0..0x1F7: various fields
-    unsigned char Reserved11[0x18];
-    // +0x1F8: wingman list begin pointer
-    void** WingmanListBegin;
-    // +0x1FC: wingman list end pointer
-    void** WingmanListEnd;
-    // +0x200+: additional fields
-};
-
-// Object lookup (defined in server_pub.cpp): Server_LookupGameObject
-// (server_gameobject.h) with the result flattened to void*. Server-internal,
-// not exported.
-void* Server_LookupObject(unsigned int obj_id);
-
-// Minimum allocation size for FCObject
-static const unsigned int COBJECT_MIN_SIZE = 0x1B0;
-
-// Helper to check if object is a game object (type flags & 3 == 3)
-inline bool IsGameObject(const FCObject* obj) {
-    return obj && (obj->TypeFlags & 3) == 3;
-}
-
-// Helper to check if object is planet/sun (type flags & 0x303 == 0x303)
-inline bool IsPlanetOrSun(const FCObject* obj) {
-    return obj && (obj->TypeFlags & 0x303) == 0x303;
-}
-
-// Helper to check if object is a generic game object (type flags & 0x103 == 0x103)
-inline bool IsGenericObject(const FCObject* obj) {
-    return obj && (obj->TypeFlags & 0x103) == 0x103;
-}
-
-// Helper to check if object is a ship (type flags & 0x503 == 0x503)
-inline bool IsShip(const FCObject* obj) {
-    return obj && (obj->TypeFlags & 0x503) == 0x503;
-}
-
-// Helper to check if object is a loot/cargo container (type flags & 0x803 == 0x803)
-inline bool IsLootContainer(const FCObject* obj) {
-    return obj && (obj->TypeFlags & 0x803) == 0x803;
-}
-
-// ===========================================================================
-// Equipment system — CEquipManager / CEquip / CECargo
-// Layout derived from retail Server.dll.c decompilation
-// CEquipManager stored at FCObject + 0xE4
-// ===========================================================================
-
-// Equipment type masks (used by CEquipTraverser)
-//
-// Only two of these are confirmed against retail:
-//   0x10000 - pub::SpaceObj::EnumerateCargo   (CEquipTraverser(0x10000))
-//   0x80000 - pub::SpaceObj::GetScannerRange  (CEquipManager::FindFirst(mgr, 0x80000))
-// The rest are unverified guesses from an earlier pass, and at least one NAME is
-// provably wrong: pub::SpaceObj::ActivateEquipment case 2 uses mask 0x1000 - called
-// EQUIP_TYPE_COUNTERMEASURE here - while its case 3, which walks CELightEquip items,
-// uses mask 1, for which there is no constant below at all (EQUIP_TYPE_LIGHT is 0x100).
-// TODO: re-derive the whole table from the retail CEquip class hierarchy before
-// trusting any of the unconfirmed entries.
+// Confirmed CEquip::ClassType mask constants used by pub::SpaceObj::GetCargo / EnumerateCargo.
 enum EEquipTypeMask {
-    EQUIP_TYPE_CARGO       = 0x10000,   // confirmed
-    EQUIP_TYPE_SCANNER     = 0x80000,   // confirmed
-    EQUIP_TYPE_LIGHT       = 0x100,     // unconfirmed - retail traverses lights with mask 1
-    EQUIP_TYPE_SHIELD      = 0x200,     // unconfirmed
-    EQUIP_TYPE_WEAPON      = 0x400,     // unconfirmed
-    EQUIP_TYPE_MINE        = 0x800,     // unconfirmed
-    EQUIP_TYPE_COUNTERMEASURE = 0x1000, // value confirmed (ActivateEquipment case 2), name is not
+    EQUIP_TYPE_CARGO   = 0x10000,
+    EQUIP_TYPE_SCANNER = 0x80000,
 };
-
-// Single equipment/cargo item
-struct FCEquipItem {
-    FCEquipItem* Next;            // +0x00: next in linked list
-    FCEquipItem* Prev;            // +0x04: prev in linked list
-    unsigned int ArchetypeID;     // +0x08: archetype hash
-    unsigned short EquipID;       // +0x0C: unique equipment slot ID
-    unsigned short Padding;       // +0x0E
-    unsigned int Count;           // +0x10: stack count (for cargo)
-    float Health;                 // +0x14: item health/status (0..1)
-    unsigned int TypeMask;        // +0x18: equipment type flags
-    bool bEquipped;               // +0x1C: is currently equipped
-    unsigned char Padding2[3];    // +0x1D
-    void* OwnerObject;            // +0x20: owning CObject pointer
-    // vtable at +0x00 when used as CEquip (vtable+0x28 = GetEquipDesc)
-    void* VTable;                 // +0x24
-};
-
-// Equipment manager — manages all equipment on a CObject
-struct FCEquipManager {
-    FCEquipItem* Head;            // +0x00: first item
-    FCEquipItem* Tail;            // +0x04: last item  
-    unsigned int ItemCount;       // +0x08: total items
-    unsigned short NextEquipID;   // +0x0C: next available equip slot ID
-
-    // Traverse items matching type_mask
-    // Returns first matching item, or nullptr
-    FCEquipItem* Traverse(unsigned int type_mask) {
-        FCEquipItem* item = Head;
-        while (item) {
-            if (item->TypeMask & type_mask) return item;
-            item = item->Next;
-        }
-        return nullptr;
-    }
-
-    // Find item by equip slot ID
-    FCEquipItem* FindByID(unsigned short equip_id) {
-        FCEquipItem* item = Head;
-        while (item) {
-            if (item->EquipID == equip_id) return item;
-            item = item->Next;
-        }
-        return nullptr;
-    }
-
-    // Add item to manager
-    void AddItem(FCEquipItem* item) {
-        item->Prev = Tail;
-        item->Next = nullptr;
-        if (Tail) Tail->Next = item;
-        else Head = item;
-        Tail = item;
-        ItemCount++;
-    }
-
-    // Remove item from manager
-    void RemoveItem(FCEquipItem* item) {
-        if (item->Prev) item->Prev->Next = item->Next;
-        else Head = item->Next;
-        if (item->Next) item->Next->Prev = item->Prev;
-        else Tail = item->Prev;
-        ItemCount--;
-    }
-};
-
-// Get CEquipManager pointer from FCObject (at offset +0xE4)
-inline FCEquipManager* GetEquipManager(FCObject* obj) {
-    if (!obj) return nullptr;
-    return *(FCEquipManager**)((char*)obj + 0xE4);
-}
 
 // ===========================================================================
 // pub::SpaceObj info structures — input to Create / CreateSolar / CreateLoot
@@ -319,7 +85,7 @@ struct ShipInfo {
     // quaternion -> request +0x58; FUN_06d0a880 turns it back into a matrix
     // (QuaternionToMatrix, .text:06d0aaed) and copies 9 dwords -> Parms +0x1c.
     Matrix Orientation;              // +0x30 .. +0x53
-    unsigned int Field_0x54;         // +0x54  request +0xb0 (.text:06cf7e01) -> Parms +0xec (CShip+0x21c); TODO: semantic name unknown
+    unsigned int GroupNameId;         // +0x54  request +0xb0 (.text:06cf7e01) -> Parms +0xec (CShip+0x21c); TODO: semantic name unknown
     unsigned int LoadoutID;          // +0x58  Loadout::Get (.text:06cf7f29), request +0x6c (.text:06cf7ec3)
     // FUN_06d5f990's third argument is &info+0x5c (.text:06cf7f4c). It reads
     // the dword at +4 and walks `node = *node` until NULL (.text:06d5f9ae ..
@@ -344,7 +110,7 @@ struct ShipInfo {
     unsigned int Field_0xb4;         // +0xb4  not read by Create
     // request +0xe8 (.text:06cf7ee1); FUN_06d0a880 tests it `& 0x3fffffff` after
     // the ship is built (.text:06d0ad30 / .text:06d0ad36).
-    unsigned int Field_0xb8;         // +0xb8  TODO: semantic name unknown
+    unsigned int MarkPlayerId;         // +0xb8  TODO: semantic name unknown
     unsigned int ReputationRank;     // +0xbc  request +0xb4 (.text:06cf7de7)       -> Parms +0xf0 (CShip::CreateParms::Rank)
 };
 
@@ -375,7 +141,7 @@ struct SolarInfo {
     int VibeGroupId;                 // +0x74  request +0x10 (.text:06cf81fd)       -> Parms +0x60
     unsigned int VoiceId;            // +0x78  request +0x48 (.text:06cf81fa)       -> Parms +0x98
     unsigned int DockingBaseId;      // +0x7c  request +0x0c (.text:06cf8189)       -> Parms +0x5c and +0xe0
-    unsigned char Field_0x80;        // +0x80  byte, request +0xb4 (.text:06cf8294) -> Parms +0xbc (VisitValue)
+    unsigned char VisitValue;        // +0x80  byte, request +0xb4 (.text:06cf8294) -> Parms +0xbc (VisitValue)
     unsigned char Pad81[3];          // +0x81
     // An INTEGER: FUN_06d0a200 FILDs the request copy (.text:06d0a352).
     int HitPts;                      // +0x84  request +0x68 (.text:06cf819a)
@@ -385,7 +151,7 @@ struct SolarInfo {
     char Nickname[0x44];             // +0x88 .. +0xcb
     // request +0xbc (.text:06cf828e); FUN_06d0a200 calls FUN_06cef3b0(value, 1)
     // when `value & 0x3fffffff` (.text:06d0a53d .. 06d0a54f).
-    unsigned int Field_0xcc;         // +0xcc  TODO: semantic name unknown
+    unsigned int MarkPlayerId;         // +0xcc  TODO: semantic name unknown
 };
 
 // LootInfo — passed to pub::SpaceObj::CreateLoot (.text:06cf84a0), which copies it
@@ -423,7 +189,7 @@ struct EQInfo {
     unsigned short EquipId;         // +0x04: low byte is the on/off flag Dock writes
     unsigned short Pad06;           // +0x06: alignment
     unsigned int Count;             // +0x08: case 0 requires this to be exactly 1
-    unsigned int Field_0x0c;        // +0x0c: case 1 gate — the branch is taken when != 0
+    unsigned int TargetObjId;        // +0x0c: case 1 gate — the branch is taken when != 0
                                     //        TODO: semantic name unknown
     // +0x10: case 1 hands &CargoOut to the object's IObjInspect::scan_cargo (+0x120,
     // `ADD ESI,0x10; PUSH ESI` at .text:06cf9490) as its EquipDescVector& out-parameter,

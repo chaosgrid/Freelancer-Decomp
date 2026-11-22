@@ -27,7 +27,7 @@ IdleBehavior::IdleBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContextPtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
@@ -83,7 +83,7 @@ bool IdleBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 // `simplified` status.
 void IdleBehavior::ResetTickState()
 {
-    Behavior::Slot3();   // `JMP FUN_062d20d0` -- retail's slot 3 IS Behavior's body
+    Behavior::OnEngage();   // `JMP FUN_062d20d0` -- retail's slot 3 IS Behavior's body
 }
 
 // Own vtable slot 4 (offset 0x10). Common.dll.txt 202786-202797
@@ -91,7 +91,7 @@ void IdleBehavior::ResetTickState()
 void IdleBehavior::Disengage()
 {
     Watcher2c.Commit();     // 062cd5e9 `CALL [EAX+0x10]` on +0x2c (IdleIdea: bare RET)
-    Behavior::Slot4();      // 062cd5ef `JMP FUN_062d20f0`
+    Behavior::OnDisengage();      // 062cd5ef `JMP FUN_062d20f0`
 }
 
 // Own vtable slot 5 (offset 0x14). Common.dll.txt 204100-204108

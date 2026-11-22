@@ -60,7 +60,7 @@ namespace AlchemyImpl
     {
         const unsigned long Hash = Library->HashNodeName(Name);
         FAlchemyComponentReference Existing;
-        Library->NodeLibSlot12(Hash, &Existing.Component);
+        Library->FindNodeByHash(Hash, &Existing.Component);
         if (Existing.Component != nullptr)
         {
             const char* ExistingName;
@@ -299,7 +299,7 @@ namespace AlchemyImpl
                 Set.Value->SetPropName(0xefa8ce01, CurrentName);
                 Set.Value->GetPropName(0xefa8ce01, &CurrentName);
             }
-            Result = Library->NodeLibSlot6(CurrentName, Fx.Value, nullptr);
+            Result = Library->InsertNode(CurrentName, Fx.Value, nullptr);
         }
         Filesys->OpenNode(kAleLeaveNode);
         Chunk.CloseChunk();
@@ -391,18 +391,18 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot6(const char* Name, IDAComponent* Node,
+    GENRESULT DACOM_API FFxNodeLibrary::InsertNode(const char* Name, IDAComponent* Node,
                                                        unsigned long* OutHash)
     {
         return InsertNodeByName(Name, Node, OutHash);
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot7(unsigned long Hash)
+    GENRESULT DACOM_API FFxNodeLibrary::RemoveNodeByHash(unsigned long Hash)
     {
-        return RemoveNodeByHash(Hash);
+        return NodeRegistry_.Remove(Hash);
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot8(FNodeLibraryEnumCallback Callback, void* Context)
+    GENRESULT DACOM_API FFxNodeLibrary::EnumerateNodes(FNodeLibraryEnumCallback Callback, void* Context)
     {
         return NodeRegistry_.Enumerate(Callback, Context);
     }
@@ -413,7 +413,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot10(void* NameRaw, void* OutRaw)
+    GENRESULT DACOM_API FFxNodeLibrary::MakeUniqueName(void* NameRaw, void* OutRaw)
     {
         // 062277e0: borrowed original name or the independent DAT_06257d80 buffer.
         const char* CurrentName = static_cast<const char*>(NameRaw);
@@ -449,7 +449,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot11(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FFxNodeLibrary::CreateNodeByHash(unsigned long Hash, IDAComponent** Out)
     {
         IDAComponent* Prototype = FindNodeEntry(Hash);
         if (Prototype == nullptr)
@@ -457,7 +457,7 @@ namespace AlchemyImpl
         return InstantiateFromNodeLibPrototype(Prototype, Out);
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot12(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FFxNodeLibrary::FindNodeByHash(unsigned long Hash, IDAComponent** Out)
     {
         return NodeRegistry_.FindWithRef(Hash, Out);
     }
@@ -471,11 +471,6 @@ namespace AlchemyImpl
                                              unsigned long* OutHash)
     {
         return NodeRegistry_.Insert(this, Name, Node, OutHash);
-    }
-
-    GENRESULT FFxNodeLibrary::RemoveNodeByHash(unsigned long Hash)
-    {
-        return NodeRegistry_.Remove(Hash);
     }
 
     void FFxNodeLibrary::ClearNodeList()

@@ -21,7 +21,7 @@
 //
 // vftable 0x005d0acc -- WinControl's (0x005e5e44) with these overrides (raw dword diff):
 //   0 FUN_0055e9f0 scalar deleting dtor (shared by ICF; NN_Help has no destructor body of its
-//   own), 9 FUN_00474b90 Create, 23 LAB_00475430 Slot23, 42 LAB_00475400 SetProperty.
+//   own), 9 FUN_00474b90 Create, 23 LAB_00475430 ProcessMessage, 42 LAB_00475400 SetProperty.
 //
 // Layout: retail's -- WinControl (0x32c) and four dwords.
 
@@ -48,8 +48,8 @@ public:
     // in space, the system, the sector and the zone the player is in. Win3D's Create last.
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 23 LAB_00475430 (RET 0xc) -- 0xef02 removes the window from its parent and deletes it
-    // (every child first); anything else is WinControl's Slot23.
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    // (every child first); anything else is WinControl's ProcessMessage.
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_00475400 (RET 0xc) -- a click (0x26) on the close button closes the NeuroNet
     // screen (FUN_0045a460) and returns 1; everything else returns 0 (WinControl's SetProperty
     // is not called).

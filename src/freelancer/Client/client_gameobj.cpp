@@ -278,17 +278,17 @@ FClientGameobj::FClientGameobj(EClientGameobjKind Kind)
     // 0x00539356..0053936f: the low nibble of the flag byte is cleared; the rest of it keeps
     // whatever the allocation held.
     Flags = static_cast<unsigned char>(Flags & 0xf0u);
-    Field_0x34 = 0.0f;
+    NebulaUpdateTimer = 0.0f;
     DrawStateA = 0;
     DrawStateB = 0;
     ExplosionArch = nullptr;
-    // Field_0x48: FUN_004144b0 -- FFontString's own constructor, run as a member.
-    Field_0x7c = 0;
+    // HudLabel: FUN_004144b0 -- FFontString's own constructor, run as a member.
+    HudLabelSurfaceWidth = 0;
     SoundAllocatorByte = KindByte;                                            // 0x0053937e
     SoundsBegin = nullptr;
     SoundsEnd = nullptr;
     SoundsCap = nullptr;
-    Field_0xa4 = 0;
+    bFactionDiscovered = 0;
     AttitudeCountdown = -1;                                                   // 0x0053939c
     HitEffects[0] = nullptr;                                                  // 0x005393c2..c7
     HitEffects[1] = nullptr;
@@ -299,7 +299,7 @@ FClientGameobj::~FClientGameobj()
 {
     // FUN_005394b0 (this = the CBase sub-object; the offsets below are the gameobj's).
     // 0x005394f7: FUN_004144f0 on the font string.
-    FontStringClearContents(&Field_0x48);
+    FontStringClearContents(&HudLabel);
 
     // 0x005394fc..00539537: every sound element's interface is stopped (vt+0x60) and released
     // (vt+8); the count is taken once, (end - begin) / 8, and a null begin counts as empty.
@@ -343,7 +343,7 @@ FClientGameobj::~FClientGameobj()
     // freed, then the text buffer freed through msvcrt free when there is one (the clear
     // already freed and nulled it). Called here to keep retail's member order against the
     // hand-written teardowns around it; ~FFontString then runs on an empty string.
-    FontStringDestroy(&Field_0x48);
+    FontStringDestroy(&HudLabel);
 
     // 0x0053960f..0053966b is the effect list's destructor inlined (FUN_005393e0's body:
     // FUN_004fd0d0(0), then the erase-every-node loop through FUN_0053ab20 / FUN_0053aab0 and
@@ -363,19 +363,19 @@ unsigned int const FClientGameobj::get_id() const
     return static_cast<CSimple const*>(Obj)->Id;
 }
 
-bool FClientGameobj::Slot154() const
+bool FClientGameobj::IsExploding() const
 {
     // LAB_00524e20.
     return ((Flags >> 2) & 1u) != 0;
 }
 
-bool FClientGameobj::Slot158() const
+bool FClientGameobj::IsDead() const
 {
     // LAB_00524e30.
     return (Flags & 1u) != 0;
 }
 
-void FClientGameobj::Slot15c(bool bValue)
+void FClientGameobj::MarkForRemoval(bool bValue)
 {
     // FUN_00539c10: bit 0 = the argument; then the object's collisions go off whatever the
     // argument was (the tail JMP pushes 0 over it, 0x00539c2c).
@@ -402,7 +402,7 @@ void FClientGameobj::create(Archetype::Root* Arch)
     GameobjCreateOfClass(this, CObject::ClassObject, Arch);
 }
 
-void FClientGameobj::Slot170()
+void FClientGameobj::PostCreateInit()
 {
     // FUN_00539740 -- no null tests on the object or its archetype.
     Archetype::Root* const Arch = Object->get_archetype();
@@ -438,16 +438,16 @@ void FClientGameobj::update(float Dt)
 {
     // FUN_00539c60.
     Actions.update(Dt);
-    Slot1b8(Dt);
+    UpdateNebula(Dt);
 }
 
-float FClientGameobj::Slot178(Vector& Center)
+float FClientGameobj::GetPhysicalRadius(Vector& Center)
 {
     // FUN_00539810: the object's vt+0x64, no null test.
     return Object->get_physical_radius_r(Center);
 }
 
-unsigned* FClientGameobj::Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
+unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
 {
     // FUN_00539820 -- the body is GameobjPickLodRetail (space_scene_obj_draw.cpp), which
     // EquippedObj's override FUN_00533710 also calls directly.
@@ -459,68 +459,68 @@ void FClientGameobj::Slot180()
     // LAB_00401e90: RET.
 }
 
-void FClientGameobj::Slot184(void* Camera)
+void FClientGameobj::UpdateDrawLighting(void* Camera)
 {
     // FUN_00539b40 -- the body is GameobjUpdateDrawLightingRetail (space_scene_obj_draw.cpp,
-    // W3-B), the same split as Slot17c / GameobjPickLodRetail.
+    // W3-B), the same split as PickLod / GameobjPickLodRetail.
     GameobjUpdateDrawLightingRetail(this, Camera);
 }
 
-unsigned* FClientGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
                                   void* Matrix, void* Extra)
 {
     // FUN_00539980 -- the body is GameobjSubmitDrawRetail (space_scene_obj_draw.cpp, W3-B),
-    // the same split as Slot17c / Slot184.
+    // the same split as PickLod / UpdateDrawLighting.
     return GameobjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Matrix, Extra);
 }
 
-unsigned FClientGameobj::Slot18c(unsigned* OutB)
+unsigned FClientGameobj::GetNebula(unsigned* OutB)
 {
     // LAB_00524e50.
     *OutB = DrawStateB;
     return DrawStateA;
 }
 
-void FClientGameobj::Slot190()
+void FClientGameobj::ResetNebula()
 {
     // LAB_00524e60.
     DrawStateA = 0;
     DrawStateB = 0;
-    Field_0x34 = 10.0f; // 0x41200000
+    NebulaUpdateTimer = 10.0f; // 0x41200000
 }
 
-void FClientGameobj::Slot194(void const* A, void const* B, FClientGameobj* Other, void const* D)
+void FClientGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D)
 {
-    // FUN_00539c90: Other->Slot1a0(A, D, this, B) (0x00539cae), then this->Slot1ac(A, B, Other,
+    // FUN_00539c90: Other->OnSurfaceCollisionHit(A, D, this, B) (0x00539cae), then this->ReportCollisionToServer(A, B, Other,
     // D) (0x00539cc0). No null test on Other.
-    Other->Slot1a0(A, D, this, B);
-    Slot1ac(A, B, Other, D);
+    Other->OnSurfaceCollisionHit(A, D, this, B);
+    ReportCollisionToServer(A, B, Other, D);
 }
 
-void FClientGameobj::Slot198(DamageList const& Damage)
+void FClientGameobj::ApplyDamageList(DamageList const& Damage)
 {
     // LAB_0053e4a0: RET 4.
     (void)Damage;
 }
 
-void FClientGameobj::Slot19c(int DestroyType)
+void FClientGameobj::Destroy(int DestroyType)
 {
     // FUN_0053a820.
     if (DestroyType == 0)
     {
-        Slot15c(true);                                                         // 0x0053a871
+        MarkForRemoval(true);                                                         // 0x0053a871
         return;
     }
     if (DestroyType == 1)
     {
         Flags = static_cast<unsigned char>(Flags | 4u);                        // 0x0053a853
-        Slot1b0(nullptr);                                                      // 0x0053a861
+        Explode(nullptr);                                                      // 0x0053a861
         return;
     }
     FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kGameobjSourceFile, 0x2a4, "Invalid DestroyType!");
 }
 
-void FClientGameobj::Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                              void const* D)
 {
     // FUN_00539cd0 (RET 0x10). B and D are not read.
@@ -542,7 +542,7 @@ void FClientGameobj::Slot1a0(void const* Contact, void const* B, FClientGameobj*
     SpawnSurfaceHitEffect(Other->get_id(), Effect, Hit, Hit + 1, nullptr);
 }
 
-void FClientGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // FUN_00539d80 (RET 0xc). A points at the hit point and the surface normal (+0x0c); B is
     // not read.
@@ -571,7 +571,7 @@ void FClientGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munit
     SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
 }
 
-void FClientGameobj::Slot1a8(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj)
+void FClientGameobj::SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj)
 {
     // LAB_0053f780: RET 0xc.
     (void)SubObj;
@@ -579,7 +579,7 @@ void FClientGameobj::Slot1a8(unsigned short SubObj, unsigned TargetId, unsigned 
     (void)TargetSubObj;
 }
 
-void FClientGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other, void const* D)
+void FClientGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other, void const* D)
 {
     // FUN_00539e70 (RET 0x10). A is not read; B and D are sub-object ids (low words).
     (void)A;
@@ -627,12 +627,12 @@ void FClientGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other
     LocalServer()->SPObjCollision(Info, GetPlayerConnectionId());
 }
 
-void FClientGameobj::Slot1b0(Vector const* Pos)
+void FClientGameobj::Explode(Vector const* Pos)
 {
     // FUN_0053a880.
     if (ExplosionArch == nullptr)
     {
-        Slot15c(true);                                                         // 0x0053a8e2
+        MarkForRemoval(true);                                                         // 0x0053a8e2
         return;
     }
     CliEffectListClear(&EffectList, nullptr);                                  // 0x0053a892
@@ -644,7 +644,7 @@ void FClientGameobj::Slot1b0(Vector const* Pos)
     Actions.add(Action_Explode::Create(ExplosionArch, this, &Copy));
 }
 
-void FClientGameobj::Slot1b4(unsigned SourceId, void* SoundArch, Vector const* Pos)
+void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector const* Pos)
 {
     // FUN_0053a4c0 (RET 0xc). SoundArch is a client sound archetype (SoundArch.cpp).
     // 0x0053a4c6..0x0053a4df: none, or one whose slot 12 (+0x30, the lod link) is null -> nothing.
@@ -661,7 +661,7 @@ void FClientGameobj::Slot1b4(unsigned SourceId, void* SoundArch, Vector const* P
     for (Index = 0; Index < Count; ++Index)
     {
         FGameobjSound* const Entry = &SoundsBegin[Index];
-        if (Entry->Field_0x00 != SourceId)
+        if (Entry->SourceId != SourceId)
             continue;
         void* const VoiceArch = GetClientSoundSourceArch(Entry->Source);
         void* const Linked = GetClientSoundArchLinked(SoundArch);
@@ -682,7 +682,7 @@ void FClientGameobj::Slot1b4(unsigned SourceId, void* SoundArch, Vector const* P
             if (!Entry->Source->IsActive())
             {
                 Voice = Entry->Source;
-                Entry->Field_0x00 = SourceId;
+                Entry->SourceId = SourceId;
                 break;
             }
         }
@@ -704,7 +704,7 @@ void FClientGameobj::Slot1b4(unsigned SourceId, void* SoundArch, Vector const* P
         Voice->SetPose(Attach, reinterpret_cast<float const*>(&Pose));
 
         FGameobjSound Added;
-        Added.Field_0x00 = SourceId;
+        Added.SourceId = SourceId;
         Added.Source = Voice;
         if (SoundsCap - SoundsEnd < 1)
         {
@@ -734,7 +734,7 @@ void FClientGameobj::Slot1b4(unsigned SourceId, void* SoundArch, Vector const* P
     // 0x0053a7bd..0x0053a80a: the voice goes to Pos (vt+0x8c), takes the archetype's random
     // pitch (slot 11, +0x2c) through vt+0x98, and plays: a voice already playing is rewound
     // (vt+0x64 SetStartOffset(0)), an idle one starts on the archetype (vt+0x58 Start(Arch, 0)).
-    Voice->Slot35(const_cast<Vector*>(Pos));
+    Voice->SetPosition(const_cast<Vector*>(Pos));
     Voice->SetPitch(GetClientSoundArchRandomPitch(SoundArch));
     if (Voice->IsActive())
         Voice->SetStartOffset(0);
@@ -820,9 +820,9 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
         }
     }
 
-    // 0x0053a202..0x0053a21f: the sound arch (+0x18) -> Slot1b4(SourceId, Sound, Pos).
+    // 0x0053a202..0x0053a21f: the sound arch (+0x18) -> PlayHitSound(SourceId, Sound, Pos).
     if (EffectArch->SndEffect != nullptr)
-        Slot1b4(SourceId, EffectArch->SndEffect, Pos);
+        PlayHitSound(SourceId, EffectArch->SndEffect, Pos);
 }
 
 void FClientGameobj::SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const* Pos,
@@ -879,7 +879,7 @@ void FClientGameobj::SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const*
                            CompanionOut);
 }
 
-void FClientGameobj::Slot1b8(float Dt)
+void FClientGameobj::UpdateNebula(float Dt)
 {
     // LAB_0053e4a0: RET 4.
     (void)Dt;
@@ -911,7 +911,7 @@ int FClientGameobj::GetCachedAttitude()
 bool FClientGameobj::GetFlag3IfSurfaceWidthUnchanged() const
 {
     // FUN_0053a9f0.
-    if (static_cast<unsigned>(Field_0x7c) != G_RenderSurfaceWidth)
+    if (static_cast<unsigned>(HudLabelSurfaceWidth) != G_RenderSurfaceWidth)
         return false;
     return ((Flags >> 3) & 1u) != 0;
 }
@@ -921,7 +921,7 @@ void FClientGameobj::SetFlag3(bool bValue)
     // FUN_0053aa10.
     Flags = static_cast<unsigned char>((Flags & ~8u) | ((static_cast<unsigned>(bValue) << 3) & 8u));
     if ((Flags & 8u) != 0)
-        Field_0x7c = static_cast<int>(G_RenderSurfaceWidth);                   // 0x0053aa2c
+        HudLabelSurfaceWidth = static_cast<int>(G_RenderSurfaceWidth);                   // 0x0053aa2c
 }
 
 // IObjAffect -- FClientGameobj's own table, .rdata:005de76c (FUN_005392d0 stores it at +4,
@@ -979,7 +979,7 @@ FClientSimpleGameobj::~FClientSimpleGameobj()
     // FUN_00547470 -> thunk_FUN_005394b0: nothing of Simple's own.
 }
 
-void FClientSimpleGameobj::Slot198(DamageList const& Damage)
+void FClientSimpleGameobj::ApplyDamageList(DamageList const& Damage)
 {
     // FUN_005474a0: multiplayer only. Every entry of the list whose sub-object is the root
     // (SUBOBJ_ID_ROOT) sets the CSimple's hit points through vt+0x98; the object is narrowed
@@ -995,14 +995,14 @@ void FClientSimpleGameobj::Slot198(DamageList const& Damage)
     }
 }
 
-void FClientSimpleGameobj::Slot19c(int DestroyType)
+void FClientSimpleGameobj::Destroy(int DestroyType)
 {
     // FUN_00547500: CSimple::set_hit_pts(0) (vt+0x98, no null test), then FUN_0053a820.
     static_cast<CSimple*>(NarrowObject(this, 3u))->set_hit_pts(0.0f);
-    FClientGameobj::Slot19c(DestroyType);
+    FClientGameobj::Destroy(DestroyType);
 }
 
-unsigned FClientSimpleGameobj::Slot1bc() const
+unsigned FClientSimpleGameobj::GetTypeBits() const
 {
     // LAB_00547530: the CSimple's +0xe0, no null test.
     return static_cast<CSimple const*>(NarrowObject(this, 3u))->TypeBits;
@@ -1119,7 +1119,7 @@ FClientEquippedObj::FClientEquippedObj(EClientGameobjKind Kind)
 
     // 0x00532c4e..0x00532cb5: the sub-target map at +0xcc built empty (comparator/allocator
     // bytes, nil node, head node, size 0) -- SubTargets' own constructor in the port.
-    Field_0xe0 = 0;                                                            // 0x00532cbe
+    bCloakOverrideActive = 0;                                                            // 0x00532cbe
 }
 
 FClientEquippedObj::~FClientEquippedObj()
@@ -1197,7 +1197,7 @@ void FClientEquippedObj::notify(Event Code, void* Param)
         // &arch->SeparationExplosion (+0x70). AttachedEquipArch is fetched for +0x70 first.
         CAttachedEquip* const Attached = static_cast<CAttachedEquip*>(Param);
         CObject* const PartObject = Attached->RetrieveDebrisObject();
-        if (Slot154())
+        if (IsExploding())
         {
             SpawnPartDebris(PartObject, &Attached->AttachedEquipArch()->DebrisType, nullptr);
         }
@@ -1222,7 +1222,7 @@ void FClientEquippedObj::notify(Event Code, void* Param)
         // slot 85 ? null : &ExplosionTypeName()); ExplosionTypeName is fetched first.
         CArchGroup* const Group = static_cast<CArchGroup*>(Param);
         CObject* const PartObject = Group->RetreiveDestroyedObj();
-        if (Slot154())
+        if (IsExploding())
         {
             SpawnPartDebris(PartObject, &Group->DebrisTypeName(), nullptr);
         }
@@ -1280,7 +1280,7 @@ void FClientEquippedObj::SpawnPartDebris(CObject* PartObject, ID_String const* D
           kEquippedObjSourceFile, 0x202, Explosion->get_string());
 }
 
-void FClientEquippedObj::Slot170()
+void FClientEquippedObj::PostCreateInit()
 {
     // FUN_00533e10 -- ported as EquippedObjRebuildEquipFx (client_equip_fx.cpp).
     EquippedObjRebuildEquipFx(this);
@@ -1323,7 +1323,7 @@ void FClientEquippedObj::update(float Dt)
         Node->Live.Burn(Dt);
 }
 
-unsigned* FClientEquippedObj::Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
+unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod)
 {
     // FUN_00533710 (RET 0xc). 0x00533710..0x00533735: the object narrowed to a CEqObj (0x103,
     // else null -- the test of `this` is only the CBase this-adjustment), its +0x140 read with
@@ -1346,14 +1346,14 @@ void FClientEquippedObj::Slot180()
     // own slot 96 (LAB_00401e90).
 }
 
-unsigned* FClientEquippedObj::Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientEquippedObj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
                                       void* Matrix, void* Extra)
 {
     // FUN_00533780 -- the body is EquippedObjSubmitDrawRetail (space_scene_obj_draw.cpp, W3-B).
     return EquippedObjSubmitDrawRetail(this, OutLod, Camera, CachedLod, Matrix, Extra);
 }
 
-void FClientEquippedObj::Slot198(DamageList const& Damage)
+void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
 {
     // FUN_005339e0 (RET 4). 0x005339e5..0x00533a02: in multiplayer only, every entry of the
     // list (head's next up to the head) is applied to the object; each arm narrows the object
@@ -1418,7 +1418,7 @@ void FClientEquippedObj::Slot198(DamageList const& Damage)
     static_cast<CEqObj*>(NarrowObject(this, 0x103u))->EquipManager.CleanUp();
 }
 
-void FClientEquippedObj::Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // FUN_005340b0 (RET 0x10). B is the hit sub-object id (its low word).
@@ -1445,10 +1445,10 @@ void FClientEquippedObj::Slot1a0(void const* Contact, void const* B, FClientGame
         }
     }
     // 0x00534116..0x00534128: FUN_00539cd0 with the four arguments.
-    FClientGameobj::Slot1a0(Contact, B, Other, D);
+    FClientGameobj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FClientEquippedObj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientEquippedObj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // FUN_00534190 (RET 0xc). B is the hit sub-object id (its low word).
     unsigned short const SubObj = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(B));
@@ -1466,10 +1466,10 @@ void FClientEquippedObj::Slot1a4(void const* A, void const* B, FClientGameobj* M
         }
     }
     // 0x005341f3..0x00534200: FUN_00539d80 with the three arguments.
-    FClientGameobj::Slot1a4(A, B, Munition);
+    FClientGameobj::OnMunitionHit(A, B, Munition);
 }
 
-void FClientEquippedObj::Slot1a8(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj)
+void FClientEquippedObj::SetSubTarget(unsigned short SubObj, unsigned TargetId, unsigned short TargetSubObj)
 {
     // LAB_005356c0 (RET 0xc): the map's operator[] -- lower_bound on SubObj, a {SubObj,
     // {0, SUBOBJ_ID_NONE}} node inserted at the hint when the key is missing (FUN_00535dd0) --
@@ -1541,7 +1541,7 @@ void FClientEquippedObj::ApplySubTarget(unsigned short SubObj)
                                             Entry.TargetSubObj, 0);
 }
 
-void FClientEquippedObj::Slot1b0(Vector const* Pos)
+void FClientEquippedObj::Explode(Vector const* Pos)
 {
     // FUN_00533be0 (RET 4) -- the explosion of an equipped object.
     // 0x00533be9..0x00533c66: every piece of equipment (CEquipTraverser default ctor,
@@ -1579,17 +1579,17 @@ void FClientEquippedObj::Slot1b0(Vector const* Pos)
     // 0x00533cc7..0x00533cf2: CArchGroupManager::DestroyDeadGroups; 0x00533cf8..0x00533cff:
     // GameObject's slot 108 FUN_0053a880(Pos).
     static_cast<CEqObj*>(NarrowObject(this, 0x103u))->ArchGroups.DestroyDeadGroups();
-    FClientGameobj::Slot1b0(Pos);
+    FClientGameobj::Explode(Pos);
 }
 
-bool FClientEquippedObj::Slot1c0(unsigned SourceId, ID_String const* FuseId,
+bool FClientEquippedObj::LightFuse(unsigned SourceId, ID_String const* FuseId,
                                  unsigned short SubObjId, float AtT, float Lifetime)
 {
     // FUN_00534240 (RET 0x14) -- its body is HostIgniteFuse (client_equip_fx.cpp).
     return HostIgniteFuse(this, SourceId, *FuseId, SubObjId, AtT, Lifetime);
 }
 
-bool FClientEquippedObj::Slot1c4(ID_String const* FuseId, unsigned short SubObjId, float AtT)
+bool FClientEquippedObj::UnLightFuse(ID_String const* FuseId, unsigned short SubObjId, float AtT)
 {
     // FUN_005343d0 (RET 0xc). 0x005343d4..0x0053440a: the +0xc4 list from the head's next;
     // the loop top leaves once a fuse was found (BL); a node whose Fuse +4 (the name) equals
@@ -1607,7 +1607,7 @@ bool FClientEquippedObj::Slot1c4(ID_String const* FuseId, unsigned short SubObjI
     return bFound;
 }
 
-bool FClientEquippedObj::Slot1c8()
+bool FClientEquippedObj::IsDeathFuseBurning()
 {
     // FUN_00534420 (bare RET). 0x00534423..0x00534449: the +0xc4 list; a node whose Fuse +0xc
     // (bDeathFuse) is set and which Fuse::IsSpent says is not spent -> true at once; the end
@@ -1624,7 +1624,7 @@ bool FClientEquippedObj::Slot1c8()
 bool FClientEquippedObj::is_dying() const
 {
     // LAB_00534860: a tail jump through this object's own vtable +0x1c8 (slot 114).
-    return const_cast<FClientEquippedObj*>(this)->Slot1c8();
+    return const_cast<FClientEquippedObj*>(this)->IsDeathFuseBurning();
 }
 
 int FClientEquippedObj::scan_cargo(IObjRW* Scanned, EquipDescVector& OutCargo) const
@@ -1644,7 +1644,7 @@ int FClientEquippedObj::scan_cargo(IObjRW* Scanned, EquipDescVector& OutCargo) c
     return Result;
 }
 
-unsigned char FClientEquippedObj::Slot1cc(FCliEquipFirePacket const* Packet)
+unsigned char FClientEquippedObj::HandleEquipMsg(FCliEquipFirePacket const* Packet)
 {
     // FUN_00534460 -- ported as EquippedObjHandleEquipMsg (cli_projectile_fx.cpp), which reads
     // the gameobj through its fire-host view (+0x10 object, +0xb8 equip-FX list).
@@ -1864,15 +1864,15 @@ FClientSolarGameobj::FClientSolarGameobj()
 {
     // FUN_005475b0: EquippedObj's ctor (kind 2), then its own members. +0xf0..+0x1ef are not
     // written.
-    Field_0xe4 = 0;
+    StarSphere = 0;
     DockScript.Length = 0;
     DockScript.Data[0] = '\0';
-    Field_0x1f0 = 1;
+    bTradeLaneIdle = 1;
     BurnColor[0] = 1.0f;
     BurnColor[1] = 1.0f;
     BurnColor[2] = 1.0f;
-    Field_0x200.clear();                                                       // 0x00547611
-    Field_0x204 = nullptr;
+    JumpEffectId.clear();                                                       // 0x00547611
+    JumpGateEffect = nullptr;
 }
 
 FClientSolarGameobj::~FClientSolarGameobj()
@@ -1881,8 +1881,8 @@ FClientSolarGameobj::~FClientSolarGameobj()
     // 0x005476bf..005476de: the JumpGateEffect at +0x204, when set -- its destructor
     // FUN_00502e40 (0x005476d3) and the global operator delete FUN_005b7e1d. The field is not
     // written back.
-    if (Field_0x204 != nullptr)
-        delete static_cast<FJumpGateEffect*>(Field_0x204);
+    if (JumpGateEffect != nullptr)
+        delete static_cast<FJumpGateEffect*>(JumpGateEffect);
     // 0x005476e1..00547730: with an object, the CEqObj (0x103) gets vt+0x94
     // disconnect(IObjDB* = &DAT_00678a2c) and vt+0xbc disconnect(INotify* = this+0xac); the
     // narrowing has no null test on the result.
@@ -1910,12 +1910,12 @@ bool FClientSolarGameobj::find(unsigned const& Id)
     return FindAndConnect(this, CObject::ClassSolar, Id);
 }
 
-void FClientSolarGameobj::Slot170()
+void FClientSolarGameobj::PostCreateInit()
 {
     // FUN_00547850 (bare RET). 0x00547853: EquippedObj's slot 92 (FUN_00533e10), called
     // directly; 0x00547858..0x0054786d: the nebula at get_position (vt+0) into +0x38 and its
     // fog factor into +0x3c (FUN_005553b0, no hint).
-    FClientEquippedObj::Slot170();
+    FClientEquippedObj::PostCreateInit();
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
     DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
@@ -1932,15 +1932,15 @@ void FClientSolarGameobj::update(float Dt)
     FClientEquippedObj::update(Dt);
 
     // 0x005478cb..0x005478d6: the jump gate effect, when there is one (FUN_00502f00).
-    if (Field_0x204 != nullptr)
-        static_cast<FJumpGateEffect*>(Field_0x204)->Update(Dt);
+    if (JumpGateEffect != nullptr)
+        static_cast<FJumpGateEffect*>(JumpGateEffect)->Update(Dt);
 
     // 0x005478db..0x005478e8: the star, when there is one, through its slot 2 (+8,
     // LAB_00511690, RET 4).
-    if (Field_0xe4 != nullptr)
+    if (StarSphere != nullptr)
     {
         typedef void(__thiscall * FStarUpdate)(FStarSphere*, float);
-        Field_0xe4->UpdateIntensity(Dt);
+        StarSphere->UpdateIntensity(Dt);
     }
 }
 
@@ -1951,17 +1951,17 @@ namespace
     I3DMathEngine* G_SolarMath = nullptr;
 }
 
-float FClientSolarGameobj::Slot178(Vector& Center)
+float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
 {
     // LAB_00548110 (RET 4) -- the solar's radius about Center.
     // 0x00548116..0x00548149: with a star (+0xe4): Center = the star owner's position
     // (FUN_005125f0), the radius is the star's glow extent (FUN_00512620).
-    if (Field_0xe4 != nullptr)
+    if (StarSphere != nullptr)
     {
         Vector StarPos;
-        StarSphereGetOwnerPosition(Field_0xe4, &StarPos);
+        StarSphereGetOwnerPosition(StarSphere, &StarPos);
         Center = StarPos;
-        return StarSphereMaxGlowScale(Field_0xe4);
+        return StarSphereMaxGlowScale(StarSphere);
     }
 
     // 0x00548150..0x00548178: a planet / star / moon type (CSolar TypeBits +0xe0 & 7; the
@@ -1986,10 +1986,10 @@ float FClientSolarGameobj::Slot178(Vector& Center)
     }
 
     // 0x005481fe..0x00548205: GameObject's slot 94 (FUN_00539810).
-    return FClientGameobj::Slot178(Center);
+    return FClientGameobj::GetPhysicalRadius(Center);
 }
 
-unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
                                        void* Matrix, void* Extra)
 {
     // LAB_00548220 (RET 0x14) -- the solar draw. 0x00548227..0x00548233: the local LOD starts
@@ -1999,7 +1999,7 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
 
     // 0x0054825b..0x00548299: a star -> only when option 0x24 is on: the sphere's slot 3
     // (DrawSimple, +0xc) with the camera, and {4, 0xffff}.
-    if (Field_0xe4 != nullptr)
+    if (StarSphere != nullptr)
     {
         if (GetGameOption(0x24) == 0)
         {
@@ -2007,7 +2007,7 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
             return OutLod;
         }
         typedef void(__thiscall * FStarDrawSimple)(FStarSphere*, void*);
-        Field_0xe4->DrawSimple(Camera);
+        StarSphere->DrawSimple(Camera);
         *OutLod = 0xffff0004u;
         return OutLod;
     }
@@ -2030,7 +2030,7 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
         if (NebulaVolume::IsActive())
         {
             Vector Centre;
-            const float Radius = Slot178(Centre);
+            const float Radius = GetPhysicalRadius(Centre);
             NebulaVolume::NoteOpaqueSphere(&Centre.x, Radius);
         }
 #endif
@@ -2140,7 +2140,7 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     return OutLod;
 }
 
-void FClientSolarGameobj::Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                                   void const* D)
 {
     // LAB_00548520 (RET 0x10): a solar of type bits 0..3 (TypeBits +0xe0 & 0xf; the object
@@ -2148,21 +2148,21 @@ void FClientSolarGameobj::Slot1a0(void const* Contact, void const* B, FClientGam
     // (a tail JMP to FUN_005340b0 with the arguments unchanged).
     if ((static_cast<CSimple*>(NarrowObject(this, 0x303u))->TypeBits & 0xfu) != 0)
         return;
-    FClientEquippedObj::Slot1a0(Contact, B, Other, D);
+    FClientEquippedObj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
 
-void FClientSolarGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientSolarGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00548570 (RET 0xc): the same test, then a tail JMP to FUN_00534190.
     if ((static_cast<CSimple*>(NarrowObject(this, 0x303u))->TypeBits & 0xfu) != 0)
         return;
-    FClientEquippedObj::Slot1a4(A, B, Munition);
+    FClientEquippedObj::OnMunitionHit(A, B, Munition);
 }
 
-void FClientSolarGameobj::Slot1b0(Vector const* Pos)
+void FClientSolarGameobj::Explode(Vector const* Pos)
 {
     // LAB_005485b0 (RET 4): a bare JMP to EquippedObj's slot 108 (FUN_00533be0).
-    FClientEquippedObj::Slot1b0(Pos);
+    FClientEquippedObj::Explode(Pos);
 }
 
 void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
@@ -2170,7 +2170,7 @@ void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
     // FUN_005485c0 (thiscall, RET 4).
     // 0x005485ca: the EquippedObj body FUN_00533e10, called directly (not the solar's own
     // slot 92).
-    FClientEquippedObj::Slot170();
+    FClientEquippedObj::PostCreateInit();
 
     // 0x005485d8..0x00548862: every value of the (rewound) section; the first key that matches
     // wins, unknown keys are skipped.
@@ -2217,17 +2217,17 @@ void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
         else if (Reader.is_value("jump_effect"))
         {
             // 0x005487e9..0x005487ff: +0x200 = CreateID(value).
-            Field_0x200.Id = CreateID(Reader.get_value_string());
+            JumpEffectId.Id = CreateID(Reader.get_value_string());
         }
         else if (Reader.is_value("star"))
         {
             // 0x0054880c..0x00548855: +0xe4 = FUN_0050c630(this) (a listed star), then its slot 1
             // Load(GetFileSysPath("solar\\stararch.ini", DALib::Data), value).
-            Field_0xe4 = StarSphereCreateListed(this);
+            StarSphere = StarSphereCreateListed(this);
             char Path[0x104];
             GetFileSysPath(Path, "solar\\stararch.ini", DALib::Data);
             using FStarLoad = int(__thiscall*)(FStarSphere*, char const*, char const*);
-            Field_0xe4->Load(Path, Reader.get_value_string());
+            StarSphere->Load(Path, Reader.get_value_string());
         }
     }
 
@@ -2246,42 +2246,42 @@ FClientShipGameobj::FClientShipGameobj()
     : FClientEquippedObj(EClientGameobjKind::Ship)
 {
     // FUN_00543380: EquippedObj's ctor (kind 1), then its own members in store order.
-    Field_0xe4 = 0;
-    Field_0xe8 = 0;
-    Field_0xec = nullptr;
-    Field_0xf0 = nullptr;
-    Field_0xf4[0] = nullptr;
-    Field_0xf4[1] = nullptr;
-    Field_0xf4[2] = nullptr;
-    Field_0xf4[3] = nullptr;
-    Field_0x104 = nullptr;                                                     // 0x005433e6
-    MeshHolderConstruct(&Field_0x108);                                         // FUN_00420d40
-    Field_0x118.Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
-    Field_0x118.Translation.x = 0.0f;                                          // 0x0054342c..3e
-    Field_0x118.Translation.y = 0.0f;
-    Field_0x118.Translation.z = 0.0f;
-    Field_0x148 = nullptr;
-    Field_0x14c = nullptr;
-    Field_0x150 = 0;
-    Field_0x154 = 0;
-    Field_0x15c = 0;
+    BayCloseTimer = 0;
+    BayCloseCount = 0;
+    PendingRequestCB = nullptr;
+    ThrusterSound = nullptr;
+    AtmosphereBurnCompanion[0] = nullptr;
+    AtmosphereBurnCompanion[1] = nullptr;
+    AtmosphereBurnCompanion[2] = nullptr;
+    AtmosphereBurnCompanion[3] = nullptr;
+    PilotMeshArch = nullptr;                                                     // 0x005433e6
+    MeshHolderConstruct(&PilotMeshHolder);                                         // FUN_00420d40
+    PilotTransform.Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    PilotTransform.Translation.x = 0.0f;                                          // 0x0054342c..3e
+    PilotTransform.Translation.y = 0.0f;
+    PilotTransform.Translation.z = 0.0f;
+    FireFailedSoundArch = nullptr;
+    FireFailedSound = nullptr;
+    FireFailedCooldown = 0;
+    bHullBreachWarned = 0;
+    bJumpInReady = 0;
     // 0x0054345c..0x00543492: +0x160 .. +0x184 zeroed, one dword at a time.
-    Field_0x160 = 0;
+    TradeLaneRing = 0;
     int CompanionSlot = 0;
     for (CompanionSlot = 0; CompanionSlot < 4; ++CompanionSlot)
-        Field_0x164[CompanionSlot] = nullptr;
+        TradeLaneShipCompanion[CompanionSlot] = nullptr;
     for (CompanionSlot = 0; CompanionSlot < 4; ++CompanionSlot)
-        Field_0x174[CompanionSlot] = nullptr;
-    Field_0x184 = 0;
-    Field_0x18c = static_cast<unsigned char>(Field_0x18c & 0xfcu);             // 0x00543498
-    Field_0x188 = nullptr;
-    Field_0x18c = 0;                                                           // 0x005434a5
+        TradeLaneTunnelCompanion[CompanionSlot] = nullptr;
+    TradeLaneFlags = 0;
+    ShipFlags = static_cast<unsigned char>(ShipFlags & 0xfcu);             // 0x00543498
+    JumpEffect = nullptr;
+    ShipFlags = 0;                                                           // 0x005434a5
     Pad18d[0] = 0;
     Pad18d[1] = 0;
     Pad18d[2] = 0;
-    Field_0x158 = 0;                                                           // 0x005434c9
+    JumpState = 0;                                                           // 0x005434c9
     // 0x005434cf..005434e9: +0x34 = rand() * (1 / 32768) (DAT_005caeec).
-    Field_0x34 = static_cast<float>(static_cast<double>(rand()) * 3.0517578125e-05);
+    NebulaUpdateTimer = static_cast<float>(static_cast<double>(rand()) * 3.0517578125e-05);
 }
 
 FClientShipGameobj::~FClientShipGameobj()
@@ -2290,37 +2290,37 @@ FClientShipGameobj::~FClientShipGameobj()
     // object at +0x10), so every ESI-relative offset in the listing is 0xc below the gameobj
     // offset used here.
     // 0x005444e2..0x005444f0: FUN_00420f70 on the mesh holder (+0x108).
-    ClientMeshHolderRelease(&Field_0x108);
+    ClientMeshHolderRelease(&PilotMeshHolder);
     // 0x005444f5..0x00544507: the archetype at +0x104, Archetype::Root::Release.
-    if (Field_0x104 != nullptr)
+    if (PilotMeshArch != nullptr)
     {
-        Field_0x104->Release();
-        Field_0x104 = nullptr;
+        PilotMeshArch->Release();
+        PilotMeshArch = nullptr;
     }
     // 0x0054450d..0x00544519: +0x148's vt+0x10, the pointer left as it is.
-    if (Field_0x148 != nullptr)
+    if (FireFailedSoundArch != nullptr)
     {
-        Field_0x148->Release();
+        FireFailedSoundArch->Release();
     }
     // 0x0054451c..0x0054455e: the two sounds (+0x14c, +0xf0) -- vt+0x60 stop, vt+8 release.
-    if (Field_0x14c != nullptr)
+    if (FireFailedSound != nullptr)
     {
-        Field_0x14c->Stop();
-        Field_0x14c->Release();
-        Field_0x14c = nullptr;
+        FireFailedSound->Stop();
+        FireFailedSound->Release();
+        FireFailedSound = nullptr;
     }
-    if (Field_0xf0 != nullptr)
+    if (ThrusterSound != nullptr)
     {
-        Field_0xf0->Stop();
-        Field_0xf0->Release();
-        Field_0xf0 = nullptr;
+        ThrusterSound->Stop();
+        ThrusterSound->Release();
+        ThrusterSound = nullptr;
     }
     // 0x0054455f..0x00544579: the 0xdc-byte jump effect at +0x188 -- when set, its destructor
     // FUN_00503a80 (0x0054456b), the global operator delete FUN_005b7e1d, and the field zeroed.
-    if (Field_0x188 != nullptr)
+    if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(Field_0x188);
-        Field_0x188 = nullptr;
+        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        JumpEffect = nullptr;
     }
     // 0x0054457f..0x00544610: with an object -- in single player only for a ship the local
     // player owns (the class & 3 object's +0xb4 OwnerPlayer, FUN_0054bb00 = DAT_00673344 when
@@ -2345,12 +2345,12 @@ FClientShipGameobj::~FClientShipGameobj()
     // 0x00544613..0x0054468c: the +0x160 member's destructor (FUN_00544710, inlined) --
     // companion +0x174, then companion +0x164, each: particle (FUN_004f7a90), sound (vt+8),
     // light (FUN_00537ad0), arch slot zeroed -- FUN_00502d90's sequence.
-    CliEffectCompanionClear(Field_0x174);
-    CliEffectCompanionClear(Field_0x164);
+    CliEffectCompanionClear(TradeLaneTunnelCompanion);
+    CliEffectCompanionClear(TradeLaneShipCompanion);
     // 0x00544686..0x00544694: FUN_00420d10 on +0x108 only restores the holder's vptr.
     // 0x00544699..0x005446e0: the companion at +0xf4 -- particle +0xfc, sound +0xf8, light
     // +0x100, then +0xf4 zeroed.
-    CliEffectCompanionClear(Field_0xf4);
+    CliEffectCompanionClear(AtmosphereBurnCompanion);
     // 0x005446ee: FUN_00532d40, EquippedObj's destructor, runs next.
 }
 
@@ -2746,10 +2746,10 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             // +0x204 -- operator new(0xe0) and FUN_00502ba0(this) (0x00547e1f); a failed
             // allocation stores null.
             SolarDoorSound(this, true);
-            if ((Slot1bc() & 0x40u) != 0u || (Slot1bc() & 0x800u) != 0u)
+            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
             {
-                if (Field_0x204 == nullptr)
-                    Field_0x204 = new (std::nothrow) FJumpGateEffect(this);
+                if (JumpGateEffect == nullptr)
+                    JumpGateEffect = new (std::nothrow) FJumpGateEffect(this);
             }
         }
         else if (Sub == 2)
@@ -2757,21 +2757,21 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
             // 0x005479f7..0x00547bdf: close sound, then FUN_00503380 on the effect, when there is
             // one (0x00547bda: its +0x18 fire flag = 1).
             SolarDoorSound(this, false);
-            if ((Slot1bc() & 0x40u) != 0u || (Slot1bc() & 0x800u) != 0u)
+            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
             {
-                if (Field_0x204 != nullptr)
-                    JumpGateEffectFire(static_cast<FJumpGateEffect*>(Field_0x204));
+                if (JumpGateEffect != nullptr)
+                    JumpGateEffectFire(static_cast<FJumpGateEffect*>(JumpGateEffect));
             }
         }
         else if (Sub == 3)
         {
             // 0x005479a3..0x005479f2: destroy the effect, when there is one (FUN_00502e40 at
             // 0x005479da + operator delete), and clear +0x204 either way.
-            if ((Slot1bc() & 0x40u) != 0u || (Slot1bc() & 0x800u) != 0u)
+            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
             {
-                if (Field_0x204 != nullptr)
-                    delete static_cast<FJumpGateEffect*>(Field_0x204);
-                Field_0x204 = nullptr;
+                if (JumpGateEffect != nullptr)
+                    delete static_cast<FJumpGateEffect*>(JumpGateEffect);
+                JumpGateEffect = nullptr;
             }
         }
     }
@@ -2785,7 +2785,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
                 ? static_cast<CSimple const*>(Obj)
                 : nullptr;
         if ((Simple->TypeBits & 0x80u) != 0u)
-            Field_0x1f0 =
+            bTradeLaneIdle =
                 TradeLaneSolarLaneSwitch(this, *static_cast<unsigned char const*>(Param));
     }
     FClientEquippedObj::notify(Code, Param);
@@ -2803,11 +2803,11 @@ bool FClientShipGameobj::find(unsigned const& Id)
     return FindAndConnect(this, CObject::ClassShip, Id);
 }
 
-void FClientShipGameobj::Slot170()
+void FClientShipGameobj::PostCreateInit()
 {
     // FUN_005447b0 (RET 0).
-    FClientEquippedObj::Slot170();                                             // 0x005447b4
-    Field_0x18c = static_cast<unsigned char>(Field_0x18c & 0xfcu);             // 0x005447c6
+    FClientEquippedObj::PostCreateInit();                                             // 0x005447b4
+    ShipFlags = static_cast<unsigned char>(ShipFlags & 0xfcu);             // 0x005447c6
     // 0x005447c2..0x005447cc: the jump state back to 0 (FUN_005437d0).
     SetJumpState(0);
 
@@ -2845,18 +2845,18 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
         return;
 
     // 0x005443cc..0x005443e0: the simple archetype PilotMesh names, kept at +0x104.
-    Field_0x104 = Archetype::GetSimple(PilotMesh->Id);
-    if (Field_0x104 == nullptr)
+    PilotMeshArch = Archetype::GetSimple(PilotMesh->Id);
+    if (PilotMeshArch == nullptr)
         return;
     // 0x005443e6..0x005443fa: its load (vt+0xc), then its companion's Load(0) (vt+0x20).
-    Field_0x104->load();
-    Field_0x104->Companion->Load(0);
+    PilotMeshArch->load();
+    PilotMeshArch->Companion->Load(0);
     // 0x005443fd..0x00544420: an engine instance of it (no parent); -1 stops here, anything
     // else goes to +0x10c (the mesh holder's instance).
-    long const Instance = Field_0x104->create_instance(nullptr);
+    long const Instance = PilotMeshArch->create_instance(nullptr);
     if (Instance == -1)
         return;
-    Field_0x108.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+    PilotMeshHolder.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
 
     // 0x00544410..0x00544426: "HpConnect" on the pilot mesh, into the same handle; the result
     // is not tested. Retail reads its stack HardpointInfo whether or not the lookup filled it;
@@ -2867,10 +2867,10 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
     // 0x00544428..0x00544488: +0x118 = {HpPilot's orientation, HpPilot's position minus
     // HpConnect's position} (twelve dwords, MOVSD.REP). Each difference is an x87 FSUB stored
     // to a float.
-    Field_0x118.Rotation = PilotInfo.Orient;
-    Field_0x118.Translation.x = PilotInfo.Position.x - ConnectInfo.Position.x;
-    Field_0x118.Translation.y = PilotInfo.Position.y - ConnectInfo.Position.y;
-    Field_0x118.Translation.z = PilotInfo.Position.z - ConnectInfo.Position.z;
+    PilotTransform.Rotation = PilotInfo.Orient;
+    PilotTransform.Translation.x = PilotInfo.Position.x - ConnectInfo.Position.x;
+    PilotTransform.Translation.y = PilotInfo.Position.y - ConnectInfo.Position.y;
+    PilotTransform.Translation.z = PilotInfo.Position.z - ConnectInfo.Position.z;
 }
 
 IObjRW* FClientShipGameobj::PickNextTarget(int ConnectionId)
@@ -3015,7 +3015,7 @@ void FClientShipGameobj::update(float Dt)
 {
     // FUN_00545050 (RET 4). 0x00545056..0x00545060: nothing for a gameobj slot 86 marks as
     // reaped.
-    if (Slot158())
+    if (IsDead())
         return;
 
     // 0x00545066..0x0054508e: the CShip (0x503), kept for the whole function with no null
@@ -3054,39 +3054,39 @@ void FClientShipGameobj::update(float Dt)
     // JNP: equal skips, NaN goes on) it runs down by Dt (FST keeps the x87 value for the
     // compare); at or below 0 (TEST AH,0x41 / JP: greater and NaN skip) close_bay runs +0xe8
     // times, the CShip narrowed again each time, and +0xe4 returns to 0.
-    if (Field_0xe4 != 0.0f)
+    if (BayCloseTimer != 0.0f)
     {
-        double const Remaining = static_cast<double>(Field_0xe4) - static_cast<double>(Dt);
-        Field_0xe4 = static_cast<float>(Remaining);
+        double const Remaining = static_cast<double>(BayCloseTimer) - static_cast<double>(Dt);
+        BayCloseTimer = static_cast<float>(Remaining);
         if (Remaining <= 0.0)
         {
-            while (Field_0xe8 > 0)
+            while (BayCloseCount > 0)
             {
                 static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->close_bay();
-                Field_0xe8 = Field_0xe8 - 1;
+                BayCloseCount = BayCloseCount - 1;
             }
-            Field_0xe4 = 0.0f;
+            BayCloseTimer = 0.0f;
         }
     }
 
     // 0x005451d9..0x00545374: the jump, while the state is non-zero and there is an effect.
-    if (Field_0x158 != 0 && Field_0x188 != nullptr)
+    if (JumpState != 0 && JumpEffect != nullptr)
     {
-        FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(Field_0x188);
+        FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(JumpEffect);
         // 0x005451f5..0x0054521d: the step is Dt, or 0.1f (0x3dcccccd) when Dt is above
         // DAT_005d3ee0 (0.1f; TEST AH,0x41 / JNZ keeps Dt for not-above and NaN); the effect's
         // clock advances by it.
         float JumpDt = Dt;
         if (Dt > 0.1f)
             JumpDt = 0.1f;
-        JumpFx->Field_0x70 = JumpFx->Field_0x70 + JumpDt;
+        JumpFx->Clock = JumpFx->Clock + JumpDt;
 
         // 0x00545220..0x0054527b: in the tunnel (state 2), once, when no more than 1.5 s of
         // JumpOutTunnelTime remain (TEST AH,0x41 / JP: greater and NaN skip), the screen fades
         // out to white (FUN_004122a0).
-        if (G_bJumpTunnelFadeOutPending != 0 && Field_0x158 == 2 &&
+        if (G_bJumpTunnelFadeOutPending != 0 && JumpState == 2 &&
             static_cast<double>(JumpFx->JumpOutTunnelTime) -
-                    static_cast<double>(JumpFx->Field_0x70) <=
+                    static_cast<double>(JumpFx->Clock) <=
                 static_cast<double>(G_JumpTunnelFadeOutTime))
         {
             G_bJumpTunnelFadeOutPending = 0;
@@ -3096,16 +3096,16 @@ void FClientShipGameobj::update(float Dt)
 
         // 0x0054527e..0x0054535b: each state moves on once its time is below the clock
         // (FCOMP + TEST AH,0x5 / JP: only "less" goes on).
-        switch (Field_0x158)
+        switch (JumpState)
         {
         case 1:
-            if (JumpFx->JumpOutTime < JumpFx->Field_0x70)
+            if (JumpFx->JumpOutTime < JumpFx->Clock)
                 SetJumpState(2);
             break;
         case 2:
             // 0x005452ca..0x005452ff: the fade latch re-armed, the switch requested, and the
             // screen faded back in from white (FUN_004121d0, starting opaque).
-            if (JumpFx->JumpOutTunnelTime < JumpFx->Field_0x70)
+            if (JumpFx->JumpOutTunnelTime < JumpFx->Clock)
             {
                 G_bJumpTunnelFadeOutPending = 1;
                 SetJumpState(3);
@@ -3115,16 +3115,16 @@ void FClientShipGameobj::update(float Dt)
             break;
         case 3:
             // 0x0054531c..0x00545324: only once the jump in was ordered (+0x15c).
-            if (JumpFx->JumpInTunnelTime < JumpFx->Field_0x70 && Field_0x15c != 0)
+            if (JumpFx->JumpInTunnelTime < JumpFx->Clock && bJumpInReady != 0)
                 SetJumpState(4);
             break;
         case 4:
-            if (JumpFx->JumpInTime < JumpFx->Field_0x70)
+            if (JumpFx->JumpInTime < JumpFx->Clock)
                 SetJumpState(5);
             break;
         case 5:
             // 0x00545341..0x00545357: done once the clock is above 1.0f (TEST AH,0x41 / JNZ).
-            if (JumpFx->Field_0x70 > 1.0f)
+            if (JumpFx->Clock > 1.0f)
                 SetJumpState(0);
             break;
         default:
@@ -3133,8 +3133,8 @@ void FClientShipGameobj::update(float Dt)
 
         // 0x00545360..0x0054536f: the effect, when it survived the switch (state 0 frees it),
         // gets the same clamped step (FUN_00503cd0).
-        if (Field_0x188 != nullptr)
-            static_cast<FJumpShipEffect*>(Field_0x188)->Update(JumpDt);
+        if (JumpEffect != nullptr)
+            static_cast<FJumpShipEffect*>(JumpEffect)->Update(JumpDt);
     }
 
     // 0x00545374..0x0054537e: PhySys's collision state of the object (+0x10, not narrowed).
@@ -3146,14 +3146,14 @@ void FClientShipGameobj::update(float Dt)
     // 0x00545386..0x005453c2: the burn companion at +0xf4 is alive when its particle is not
     // finished (+8 bit 1 clear), its sound is active or its light's +0xd4 is 0 -- the
     // FUN_00503330 test, inlined here.
-    if (CreateEffectCompanionAlive(Field_0xf4) != 0)
+    if (CreateEffectCompanionAlive(AtmosphereBurnCompanion) != 0)
     {
         // 0x005454f6..0x00545511: it leaves the effect list (FUN_004fcef0) once the ship stops
         // colliding, leaves the atmosphere or is landing (+0x18c bit 3).
-        if (!bCollides || Atmosphere == nullptr || (Field_0x18c & 0x8u) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(this) + 0x28, Field_0xf4);
+        if (!bCollides || Atmosphere == nullptr || (ShipFlags & 0x8u) != 0)
+            CliEffectListRemove(reinterpret_cast<unsigned char*>(this) + 0x28, AtmosphereBurnCompanion);
     }
-    else if (bCollides && Atmosphere != nullptr && (Field_0x18c & 0x8u) == 0)
+    else if (bCollides && Atmosphere != nullptr && (ShipFlags & 0x8u) == 0)
     {
         // 0x005453eb..0x0054548f: "atmosphere_burn" started on the ship's own instance with an
         // identity transform, through DAT_00674c60, into the companion and the effect list.
@@ -3171,7 +3171,7 @@ void FClientShipGameobj::update(float Dt)
         int const Index = static_cast<int>(get_index());
         if (!BurnEffect.IsEmpty())
             CliCreateEffectOneShot(FindEffectArch(&BurnEffect.Id), this, Index, &Local,
-                                   Field_0xf4);
+                                   AtmosphereBurnCompanion);
 
         // 0x00545494..0x005454f4: the player hears "danger" and "entering_sun_corona" in a sun
         // (bit 2), else "danger" and "entering_atmosphere" in a planet (bit 1), through the NN
@@ -3196,26 +3196,26 @@ void FClientShipGameobj::update(float Dt)
     // FUN_0052efb0(this), class CliThrusterSound, vtable 005ddbfc) the first time the CShip
     // carries a thruster (CEquipManager::FindFirst(0x400)), a failed allocation storing null;
     // then, while set, ticked (FUN_0052f110(Dt)) every update. Both live in menu_sound_arch.cpp.
-    if (Field_0xf0 == nullptr && Ship->EquipManager.FindFirst(EquipTypeThruster) != nullptr)
-        Field_0xf0 = CreateClientThrusterSound(this);
-    if (Field_0xf0 != nullptr)
-        TickClientThrusterSound(Field_0xf0, Dt);
+    if (ThrusterSound == nullptr && Ship->EquipManager.FindFirst(EquipTypeThruster) != nullptr)
+        ThrusterSound = CreateClientThrusterSound(this);
+    if (ThrusterSound != nullptr)
+        TickClientThrusterSound(ThrusterSound, Dt);
 
     // 0x0054556c..0x00545589: +0x150 runs down by Dt while above 0 (TEST AH,0x41 / JNZ).
-    if (Field_0x150 > 0.0f)
-        Field_0x150 = Field_0x150 - Dt;
+    if (FireFailedCooldown > 0.0f)
+        FireFailedCooldown = FireFailedCooldown - Dt;
 }
 
-void FClientShipGameobj::Slot184(void* Camera)
+void FClientShipGameobj::UpdateDrawLighting(void* Camera)
 {
     // LAB_00546480 (RET 4). 0x00546486..0x005464a1: only the player's ship in jump states 2
     // or 3 (the tunnel) lights itself; everything else is GameObject's slot 97 (FUN_00539b40).
-    if ((Field_0x158 == 2 || Field_0x158 == 3) && this == GetPlayerObjRW())
+    if ((JumpState == 2 || JumpState == 3) && this == GetPlayerObjRW())
     {
         // 0x005464a7: FUN_004101e0 -- every registered light off and unlinked.
         EngineLightClearRegisteredList();
         // 0x005464ac..0x005464b4: no jump effect -> done.
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Field_0x188);
+        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
         if (Effect == nullptr)
             return;
         // 0x005464ba..0x005464c9: its jump_ambient bytes (FUN_00504870 = [+0x1c]), when set,
@@ -3238,7 +3238,7 @@ void FClientShipGameobj::Slot184(void* Camera)
         EngineLightApplyList(Lights, 1u, static_cast<ICamera*>(Camera), &Pos.x);
         return;
     }
-    FClientGameobj::Slot184(Camera);
+    FClientGameobj::UpdateDrawLighting(Camera);
 }
 
 namespace
@@ -3283,7 +3283,7 @@ namespace
     }
 }
 
-unsigned* FClientShipGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod,
+unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod,
                                       void* Matrix, void* Extra)
 {
     // LAB_00546050 (RET 0x14) -- the ship draw.
@@ -3301,7 +3301,7 @@ unsigned* FClientShipGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned C
     unsigned short const LodLow = static_cast<unsigned short>(CachedLod & 0xffffu);
     short const LodHigh = static_cast<short>(CachedLod >> 16);
     if (GetGameOption(0x1d) > 0 && LodLow >= 3 && LodHigh < 2 && LodHigh < 1 &&
-        ClientMeshHolderHasInstance(&Field_0x108))
+        ClientMeshHolderHasInstance(&PilotMeshHolder))
     {
         // 0x005460e2..0x00546118: the CEqObj's +0x140 fade (the object narrowed by 0x103, no
         // test) strictly above 0 (FCOMP 0.0 / TEST AH,0x41 / JNZ skips not-greater): the
@@ -3314,26 +3314,26 @@ unsigned* FClientShipGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned C
             // Retail leaves this local unwritten when the QI fails; zeroed here.
             void* Value = nullptr;
             GetAppearanceInstanceValue(static_cast<int>(get_index()), &Value);
-            SetAppearanceInstanceValue(Field_0x108.EngineInstance, Value);
+            SetAppearanceInstanceValue(PilotMeshHolder.EngineInstance, Value);
         }
 
-        // 0x00546152..0x00546158: vt+0x184 (Slot184) with the camera.
-        Slot184(Camera);
+        // 0x00546152..0x00546158: vt+0x184 (UpdateDrawLighting) with the camera.
+        UpdateDrawLighting(Camera);
         // 0x0054615e..0x0054618a: the pilot's world transform -- vt+0x10 (the object's
         // transform) times +0x118 through ship.cpp's 3DMathEngine (DAT_00678b68) slot 7
         // MulTransform into a local.
         FTransform const& ShipXform = reinterpret_cast<FTransform const&>(get_orientation());
         FTransform PilotXform;
         GetShipMathEngine()->MulTransform(PilotXform, ShipXform,
-                                          reinterpret_cast<FTransform const&>(Field_0x118));
+                                          reinterpret_cast<FTransform const&>(PilotTransform));
         // 0x0054618d..0x005461a2: copied (FUN_00406880) and set on the pilot instance
         // (FUN_00421050).
         FTransform Copy;
         CopyTransform12(&Copy, &PilotXform);
-        ClientMeshHolderSetMatrix(&Field_0x108, &Copy);
+        ClientMeshHolderSetMatrix(&PilotMeshHolder, &Copy);
         // 0x005461a7..0x005461cb: DALib::Renderer slot 7 (Camera, pilot instance, 1.0f, 8, 0,
         // Extra).
-        DALib::Renderer->RenderInstance(Camera, Field_0x108.EngineInstance, 1.0f, 8u, nullptr, Extra);
+        DALib::Renderer->RenderInstance(Camera, PilotMeshHolder.EngineInstance, 1.0f, 8u, nullptr, Extra);
     }
 
     // 0x005461cf..0x005461d6: FUN_00546400(0) -- the appearance Slot7(0).
@@ -3367,7 +3367,7 @@ unsigned* FClientShipGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned C
     return OutLod;
 }
 
-void FClientShipGameobj::Slot198(DamageList const& Damage)
+void FClientShipGameobj::ApplyDamageList(DamageList const& Damage)
 {
     // LAB_00545f50 (RET 4). 0x00545f52..0x00545fac: damage of cause 6 on the player's ship ->
     // IObjAffect (+4) vt+0x50 slot_50(false, true, DAT_00673344), then the ship's behavior
@@ -3384,7 +3384,7 @@ void FClientShipGameobj::Slot198(DamageList const& Damage)
     }
 
     // 0x00545fb2..0x00545fb5: EquippedObj's slot 102 (FUN_005339e0), called directly.
-    FClientEquippedObj::Slot198(Damage);
+    FClientEquippedObj::ApplyDamageList(Damage);
 
     // 0x00545fba..0x0054603b: the player's ship -- CSimple::get_relative_health against 0.2f
     // (DAT_005dfb40; FCOMP / TEST AH,0x1 / JNZ: the jump is taken on strictly-less). At or
@@ -3396,13 +3396,13 @@ void FClientShipGameobj::Slot198(DamageList const& Damage)
         CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, 0x503u));
         if (!(Simple->get_relative_health() < 0.2f))
         {
-            Field_0x154 = 0;
+            bHullBreachWarned = 0;
             StarSysNoteDamage(this, &Damage);
             return;
         }
-        if (Field_0x154 == 0 && !Damage.bDestroyed)
+        if (bHullBreachWarned == 0 && !Damage.bDestroyed)
         {
-            Field_0x154 = 1;
+            bHullBreachWarned = 1;
             NnVoiceEnqueue(G_ShipVoiceHullBreachId, 0);
         }
     }
@@ -3411,12 +3411,12 @@ void FClientShipGameobj::Slot198(DamageList const& Damage)
     StarSysNoteDamage(this, &Damage);
 }
 
-void FClientShipGameobj::Slot1a0(void const* Contact, void const* B, FClientGameobj* Other,
+void FClientShipGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_00545e90 (RET 0x10). 0x00545ea4..0x00545eaa: EquippedObj's slot 104 (FUN_005340b0)
     // with the four arguments.
-    FClientEquippedObj::Slot1a0(Contact, B, Other, D);
+    FClientEquippedObj::OnSurfaceCollisionHit(Contact, B, Other, D);
     // 0x00545eaf..0x00545ec3: the player's ship with a live HUD_DamageIndicator (DAT_00674a10)
     // -> FUN_004d6d40(Contact): the arrow towards the contact point.
     if (this != GetPlayerObjRW())
@@ -3427,18 +3427,18 @@ void FClientShipGameobj::Slot1a0(void const* Contact, void const* B, FClientGame
     Indicator->FlashFromPosition(static_cast<Vector const*>(Contact));
 }
 
-void FClientShipGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientShipGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00545ed0 (RET 0xc). 0x00545ee3..0x00545ee8: EquippedObj's slot 105 (FUN_00534190).
-    FClientEquippedObj::Slot1a4(A, B, Munition);
+    FClientEquippedObj::OnMunitionHit(A, B, Munition);
 
     // 0x00545eed..0x00545f07: the hit sub-object id (B's low word) -- a shield equipment id
     // (SubObjectID::IsShieldEquipID) sets bit 1 of +0x18c, anything else bit 0.
     unsigned short const SubObj = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(B));
     if (SubObjectID::IsShieldEquipID(SubObj))
-        Field_0x18c |= 2;
+        ShipFlags |= 2;
     else
-        Field_0x18c |= 1;
+        ShipFlags |= 1;
 
     // 0x00545f0d..0x00545f33: the player's ship with a live HUD_DamageIndicator -> the
     // munition's velocity (its vt+4, into a local) and FUN_004d6cd0(A, &velocity).
@@ -3450,26 +3450,26 @@ void FClientShipGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* M
     GetHudDamageIndicator()->FlashAlongRay(static_cast<Vector const*>(A), &Velocity);
 }
 
-void FClientShipGameobj::Slot1b0(Vector const* Pos)
+void FClientShipGameobj::Explode(Vector const* Pos)
 {
     // LAB_00545d80 (RET 4). 0x00545d86..0x00545e1c: the +0xf4 companion's stop prelude
     // (particle slot 1, sound vt+0x94(-1, identity pose) and vt+0x60, light FUN_005379b0 and
     // vt+8); 0x00545e1c..0x00545e7d: its release (particle FUN_004f7a90, sound vt+8, light
     // FUN_00537ad0, each slot zeroed) and +0xf4 = 0 -- the same inline sequences the two
     // helpers carry.
-    CliEffectCompanionArmStop(Field_0xf4);
-    CliEffectCompanionClear(Field_0xf4);
+    CliEffectCompanionArmStop(AtmosphereBurnCompanion);
+    CliEffectCompanionClear(AtmosphereBurnCompanion);
     // 0x00545e76..0x00545e83: EquippedObj's slot 108 (FUN_00533be0).
-    FClientEquippedObj::Slot1b0(Pos);
+    FClientEquippedObj::Explode(Pos);
 }
 
-void FClientShipGameobj::Slot1b8(float Dt)
+void FClientShipGameobj::UpdateNebula(float Dt)
 {
     // LAB_005455b0 (RET 4) -- the lazy nebula lookup. 0x005455b0..0x005455c3: +0x34 += Dt.
-    Field_0x34 += Dt;
+    NebulaUpdateTimer += Dt;
 
     // 0x005455ba..0x005455d6: jump states 2 and 3 (in the tunnel) -> no nebula, no factor.
-    if (Field_0x158 == 2 || Field_0x158 == 3)
+    if (JumpState == 2 || JumpState == 3)
     {
         DrawStateA = 0;
         DrawStateB = 0;
@@ -3492,7 +3492,7 @@ void FClientShipGameobj::Slot1b8(float Dt)
 
     // 0x0054561a..0x00545626: TEST AH,0x41 / JNZ -- only a clock strictly above the period
     // goes on.
-    if (!(Field_0x34 > Period))
+    if (!(NebulaUpdateTimer > Period))
         return;
 
     // 0x00545628..0x00545643: FUN_005553b0(get_position() (vt+0), &+0x3c, hint +0x38) into
@@ -3504,22 +3504,22 @@ void FClientShipGameobj::Slot1b8(float Dt)
 
     // 0x0054563c..0x0054565f: the clock reloaded; above the period it is reduced on the FPU
     // stack (FSUB / FCOM / TEST AH,0x41 / JZ loops while still greater) and stored once.
-    double Clock = Field_0x34;
+    double Clock = NebulaUpdateTimer;
     if (!(Clock > Period))
         return;
     do
     {
         Clock -= Period;
     } while (Clock > Period);
-    Field_0x34 = static_cast<float>(Clock);
+    NebulaUpdateTimer = static_cast<float>(Clock);
 }
 
-bool FClientShipGameobj::Slot1c0(unsigned SourceId, ID_String const* FuseId,
+bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
                                  unsigned short SubObjId, float AtT, float Lifetime)
 {
     // FUN_00545a90 (RET 0x14). 0x00545a93..0x00545abe: FUN_00534240 called directly with the
     // same five arguments; not lit -> that result.
-    bool const bLit = FClientEquippedObj::Slot1c0(SourceId, FuseId, SubObjId, AtT, Lifetime);
+    bool const bLit = FClientEquippedObj::LightFuse(SourceId, FuseId, SubObjId, AtT, Lifetime);
     if (!bLit)
         return bLit;
     // 0x00545ac4..0x00545ace: only DEATH_COMM_FUSE goes on.
@@ -3552,7 +3552,7 @@ bool FClientShipGameobj::Slot1c0(unsigned SourceId, ID_String const* FuseId,
         FBehaviorManagerEvent Event;
         Event.Type = 7;
         Event.Data = &SelfId;
-        Behavior->Slot00(&Event);
+        Behavior->OnEvent(&Event);
     }
 
     // 0x00545ba0..0x00545c3c: the same over the follow followers (+0x1f8..+0x1fc).
@@ -3575,7 +3575,7 @@ bool FClientShipGameobj::Slot1c0(unsigned SourceId, ID_String const* FuseId,
         FBehaviorManagerEvent Event;
         Event.Type = 7;
         Event.Data = &SelfId;
-        Behavior->Slot00(&Event);
+        Behavior->OnEvent(&Event);
     }
 
     // 0x00545c42..0x00545ca2: the player's gameobj (FUN_0054baf0) with a ship object whose
@@ -3598,53 +3598,53 @@ bool FClientShipGameobj::Slot1c0(unsigned SourceId, ID_String const* FuseId,
     return bLit;
 }
 
-unsigned char FClientShipGameobj::Slot1cc(FCliEquipFirePacket const* Packet)
+unsigned char FClientShipGameobj::HandleEquipMsg(FCliEquipFirePacket const* Packet)
 {
     // FUN_00544d70 -- ported as CliShipHandleEquipUpdate (cli_projectile_fx.cpp).
     return CliShipHandleEquipUpdate(this, Packet);
 }
 
-void FClientShipGameobj::Slot1d0()
+void FClientShipGameobj::PlayFireFailedSound()
 {
     // LAB_00545cc0 (bare RET) -- the "fire failed" beep. 0x00545cc3..0x00545cd4: FCOMP 0.0 /
     // TEST AH,0x41 / JP -- a cooldown (+0x150) strictly above zero (or unordered) returns.
-    if (!(Field_0x150 <= 0.0f))
+    if (!(FireFailedCooldown <= 0.0f))
         return;
 
     // 0x00545cda..0x00545d00: the FIRE_FAILED_SOUND archetype, looked up once (FUN_0042ae40)
     // into +0x148 and acquired (its vt+0xc) when found.
-    if (Field_0x148 == nullptr)
+    if (FireFailedSoundArch == nullptr)
     {
-        Field_0x148 = (Archetype::ISound*)LookupClientSoundArch(&FIRE_FAILED_SOUND);
-        if (Field_0x148 != nullptr)
-            AcquireClientSoundArch(Field_0x148);
+        FireFailedSoundArch = (Archetype::ISound*)LookupClientSoundArch(&FIRE_FAILED_SOUND);
+        if (FireFailedSoundArch != nullptr)
+            AcquireClientSoundArch(FireFailedSoundArch);
     }
 
     // 0x00545d03..0x00545d0c: no archetype -> only the cooldown.
-    if (Field_0x148 != nullptr)
+    if (FireFailedSoundArch != nullptr)
     {
-        if (Field_0x14c == nullptr)
+        if (FireFailedSound == nullptr)
         {
             // 0x00545d0e..0x00545d38: no source yet -> FUN_00428680(arch, 0, &+0x14c, 0), then
             // the cooldown.
-            PlayClientSoundArch(Field_0x148, nullptr, reinterpret_cast<void**>(&Field_0x14c), 0);
-            Field_0x150 = FIRE_FAILED_DELAY;
+            PlayClientSoundArch(FireFailedSoundArch, nullptr, reinterpret_cast<void**>(&FireFailedSound), 0);
+            FireFailedCooldown = FIRE_FAILED_DELAY;
             return;
         }
-        if (Field_0x14c->IsActive())
+        if (FireFailedSound->IsActive())
         {
             // 0x00545d3a..0x00545d5c: still playing -> vt+0x64 SetStartOffset(0) (rewind),
             // then the cooldown.
-            Field_0x14c->SetStartOffset(0);
-            Field_0x150 = FIRE_FAILED_DELAY;
+            FireFailedSound->SetStartOffset(0);
+            FireFailedCooldown = FIRE_FAILED_DELAY;
             return;
         }
         // 0x00545d5d..0x00545d66: stopped -> vt+0x58 Start(arch, 0).
-        Field_0x14c->Start(Field_0x148, 0);
+        FireFailedSound->Start(FireFailedSoundArch, 0);
     }
 
     // 0x00545d69..0x00545d70: +0x150 = FIRE_FAILED_DELAY.
-    Field_0x150 = FIRE_FAILED_DELAY;
+    FireFailedCooldown = FIRE_FAILED_DELAY;
 }
 
 int FClientShipGameobj::set_throttle(float Throttle)
@@ -3752,9 +3752,9 @@ int FClientShipGameobj::jettison_cargo(unsigned short EquipId, int Count, int So
         return 0;
     Cargo->RemoveFromStack(static_cast<unsigned>(Count));
     float const BayTime = static_cast<CShip*>(NarrowObject(this, 0x503u))->open_bay();
-    ++Field_0xe8;
-    Field_0xe4 = static_cast<float>(
-        (static_cast<double>(BayTime) + CShip::JETTISON_CLEARANCE_TIME) + Field_0xe4);
+    ++BayCloseCount;
+    BayCloseTimer = static_cast<float>(
+        (static_cast<double>(BayTime) + CShip::JETTISON_CLEARANCE_TIME) + BayCloseTimer);
     return 0;
 }
 
@@ -3872,7 +3872,7 @@ int FClientShipGameobj::request_event(int RequestType, unsigned const* TargetId,
     // LAB_00546df0: keep the callback at +0xec, then IServer::RequestEvent (vt+0xf0) with
     // (RequestType, get_id(), *TargetId, *SecondId, bFlag, DAT_00673344). get_id is called
     // after both ids are read (0x00546e22).
-    Field_0xec = Callback;
+    PendingRequestCB = Callback;
     unsigned const Second = *SecondId;
     unsigned const Target = *TargetId;
     unsigned const SelfId = get_id();
@@ -3885,7 +3885,7 @@ int FClientShipGameobj::request_cancel(int RequestType, unsigned const* TargetId
 {
     // LAB_00546e40: drop the callback, then IServer::RequestCancel (vt+0xf4) with
     // (RequestType, get_id(), *TargetId, Arg3, DAT_00673344).
-    Field_0xec = nullptr;
+    PendingRequestCB = nullptr;
     unsigned const Target = *TargetId;
     unsigned const SelfId = get_id();
     LocalServer()->RequestCancel(RequestType, SelfId, Target, static_cast<unsigned long>(Arg3),
@@ -3914,7 +3914,7 @@ int FClientShipGameobj::go_tradelane(IObjInspect const* EntranceRing, IObjInspec
     Info.ObjectId = Self->get_id();
     Info.TradelaneRing1 = EntranceRing->get_id();
     Info.TradelaneRing2 = ExitRing->get_id();
-    Info.Field_0x0c = bFastExit;
+    Info.bMidLane = bFastExit;
     LocalServer()->GoTradelane(GetPlayerConnectionId(), Info);
 
     // 0x00546f2b..0x00546f59: both rings through the ObjDB (FUN_005416c0(id, 2)), then
@@ -3949,7 +3949,7 @@ int FClientShipGameobj::stop_tradelane()
     FBehaviorManagerEvent Event;
     Event.Type = 4;
     Event.Data = &Block;
-    Behavior->Slot00(&Event);
+    Behavior->OnEvent(&Event);
 
     // 0x00547061..0x005470d5: IServer::StopTradelane (vt+0x1c) with DAT_00673344, own id,
     // entrance ring, exit ring (evaluated exit ring first, then entrance, then the id).
@@ -3996,15 +3996,15 @@ void FClientShipGameobj::RequestReturned(int Result, int Code, int Extra)
 {
     // FUN_00546d00 (thiscall, RET 0xc). 0x00546d04..0x00546d36: no pending callback (+0xec)
     // -> the "stale request detected" warning (ship.cpp line 0x863).
-    if (Field_0xec == nullptr)
+    if (PendingRequestCB == nullptr)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kShipSourceFile, 0x863,
               "stale request detected");
         return;
     }
     // 0x00546d39..0x00546d50: the callback's slot 0 (Result, Code, Extra); false drops it.
-    if (!Field_0xec->OnResult(Result, Code, Extra))
-        Field_0xec = nullptr;
+    if (!PendingRequestCB->OnResult(Result, Code, Extra))
+        PendingRequestCB = nullptr;
 
     // 0x00546d5a..0x00546d61: the player's ship only.
     if (GetPlayerObjRW() != this)
@@ -4084,7 +4084,7 @@ int FClientShipGameobj::slot_74(unsigned Arg)
 void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* BaseId)
 {
     // FUN_00543b40 (RET 8). 0x00543b5e..0x00543b71: bit 3 of the +0x18c flag byte.
-    Field_0x18c |= 8;
+    ShipFlags |= 8;
 
     if (DockGo != nullptr)
     {
@@ -4151,7 +4151,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
         return;
     }
     // Any other ship: slot 87 (vt+0x15c) with true.
-    Slot15c(true);
+    MarkForRemoval(true);
 }
 
 void FClientGameobj::SetOwnerPlayer(unsigned PlayerId)
@@ -4170,14 +4170,14 @@ void FClientShipGameobj::SetJumpState(int State)
     case 0:
     {
         // 0x005437ed..0x00543807: the effect deleted (FUN_00503a80 + free) and cleared.
-        if (Field_0x188 != nullptr)
+        if (JumpEffect != nullptr)
         {
-            delete static_cast<FJumpShipEffect*>(Field_0x188);
-            Field_0x188 = nullptr;
+            delete static_cast<FJumpShipEffect*>(JumpEffect);
+            JumpEffect = nullptr;
         }
         // 0x0054380d..0x00543851: leaving state 5 on the player's ship: control exclusion
         // cleared on its CShip (0x503, no null test) and the NeuroNet screen byte dropped.
-        if (Field_0x158 == 5 &&
+        if (JumpState == 5 &&
             static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
         {
             static_cast<CShip*>(NarrowObject(this, 0x503u))->set_control_exclusion(0);
@@ -4188,8 +4188,8 @@ void FClientShipGameobj::SetJumpState(int State)
     case 1:
     {
         // 0x0054385c..0x00543866: FUN_00503ea0.
-        if (Field_0x188 != nullptr)
-            static_cast<FJumpShipEffect*>(Field_0x188)->StartJumpOut();
+        if (JumpEffect != nullptr)
+            static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpOut();
         // 0x0054386b..0x0054387e: the player's ship takes the player camera (FUN_0054bc10).
         if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
             RequestSpaceCameraMode("player");
@@ -4210,8 +4210,8 @@ void FClientShipGameobj::SetJumpState(int State)
     case 2:
     {
         // 0x00543904..0x0054390e: FUN_00504210.
-        if (Field_0x188 != nullptr)
-            static_cast<FJumpShipEffect*>(Field_0x188)->EnterTunnel();
+        if (JumpEffect != nullptr)
+            static_cast<FJumpShipEffect*>(JumpEffect)->EnterTunnel();
         // 0x00543913..0x0054392a: the "JumpOut" action taken off the list when still there.
         IAction* const JumpOut = Actions.find("JumpOut");
         if (JumpOut != nullptr)
@@ -4222,7 +4222,7 @@ void FClientShipGameobj::SetJumpState(int State)
         // exclusion.
         if (static_cast<void*>(static_cast<IObjRW*>(this)) != GetPlayerObjRW())
         {
-            Slot15c(true);
+            MarkForRemoval(true);
             if (SinglePlayer())
             {
                 CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
@@ -4242,9 +4242,9 @@ void FClientShipGameobj::SetJumpState(int State)
         // 0x005439ad..0x005439d6: with an effect, IDPMsgHandler::OnDisconnect on it (0x00401e90,
         // a bare RET the linker folded the effect's hook into -- nothing to do), then its +0xa4
         // (the destination system) as the pending jump system with flag 0 (FUN_00548ed0).
-        if (Field_0x188 != nullptr)
+        if (JumpEffect != nullptr)
         {
-            unsigned const DestSystem = static_cast<FJumpShipEffect*>(Field_0x188)->Field_0xa4;
+            unsigned const DestSystem = static_cast<FJumpShipEffect*>(JumpEffect)->DestSystem;
             SetPendingJumpSystem(&DestSystem, false);
         }
         break;
@@ -4255,7 +4255,7 @@ void FClientShipGameobj::SetJumpState(int State)
         // effect's +0x74 / +0x80 (CShip::jump_in with this gameobj and the effect's +0x10) and
         // the effect's jump-in hook runs; any other ship is just beamed there (CObject vt+0x7c,
         // not attached).
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Field_0x188);
+        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
         if (Effect != nullptr)
         {
             if (get_id() == GetPlayerCharacterId())
@@ -4264,7 +4264,7 @@ void FClientShipGameobj::SetJumpState(int State)
                 static_cast<CShip*>(NarrowObject(this, 0x503u))
                     ->jump_in(static_cast<IObjRW*>(this), Effect->JumpInPosition,
                               Effect->JumpInOrientation, Speed);
-                static_cast<FJumpShipEffect*>(Field_0x188)->StartJumpIn();
+                static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpIn();
             }
             else
             {
@@ -4274,14 +4274,14 @@ void FClientShipGameobj::SetJumpState(int State)
         }
         // 0x00543a88..0x00543ab2: the target dropped, +0x15c cleared.
         static_cast<CShip*>(NarrowObject(this, 0x503u))->set_target(nullptr);
-        Field_0x15c = 0;
+        bJumpInReady = 0;
         break;
     }
     case 5:
     {
         // 0x00543aba..0x00543ad4: FUN_00504640 with no null test; the player's character gets
         // the arrival caption (FUN_0045b310).
-        static_cast<FJumpShipEffect*>(Field_0x188)->FinishJump();
+        static_cast<FJumpShipEffect*>(JumpEffect)->FinishJump();
         if (get_id() == GetPlayerCharacterId())
             NnArrivalTextShow();
         break;
@@ -4294,22 +4294,22 @@ void FClientShipGameobj::SetJumpState(int State)
     }
 
     // 0x00543b04..0x00543b12: the effect's clock restarts; the state is stored.
-    if (Field_0x188 != nullptr)
-        static_cast<FJumpShipEffect*>(Field_0x188)->Field_0x70 = 0.0f;
-    Field_0x158 = State;
+    if (JumpEffect != nullptr)
+        static_cast<FJumpShipEffect*>(JumpEffect)->Clock = 0.0f;
+    JumpState = State;
 }
 
 void FClientShipGameobj::BeginJumpOut(FClientGameobj* Gate)
 {
     // FUN_00543530 (RET 4). 0x0054354c..0x00543566: any previous effect deleted.
-    if (Field_0x188 != nullptr)
+    if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(Field_0x188);
-        Field_0x188 = nullptr;
+        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        JumpEffect = nullptr;
     }
     // 0x00543570..0x005435a8: operator new(0xdc) + FUN_00503440(this, Gate); null on a failed
     // new.
-    Field_0x188 = new (std::nothrow) FJumpShipEffect(this, static_cast<FClientSolarGameobj*>(Gate));
+    JumpEffect = new (std::nothrow) FJumpShipEffect(this, static_cast<FClientSolarGameobj*>(Gate));
 
     // 0x005435ae..0x005435c1: the gate's type (vt+0x88 get_type), 0 without a gate.
     unsigned GateType = 0;
@@ -4321,20 +4321,20 @@ void FClientShipGameobj::BeginJumpOut(FClientGameobj* Gate)
 
     // 0x005435d0..0x00543616: IAction::operator new(0x64) + FUN_00542f10(this, the effect's
     // JumpOutTime (+4, no null test), type), added to the action list.
-    Actions.add(new Action_JumpOut(this, static_cast<FJumpShipEffect*>(Field_0x188)->JumpOutTime,
+    Actions.add(new Action_JumpOut(this, static_cast<FJumpShipEffect*>(JumpEffect)->JumpOutTime,
                                    GateType));
 }
 
 void FClientShipGameobj::BeginJumpIn(Vector const* Pos, Matrix const* Orient)
 {
     // FUN_00543630 (RET 8). 0x0054364b.
-    Field_0x15c = 1;
+    bJumpInReady = 1;
 
     // 0x00543652..0x00543694: the player's ship: its effect (no null test) takes the exit
     // position and orientation, and the active camera's cut flag is raised (FUN_0054bd50).
     if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
     {
-        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Field_0x188);
+        FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
         Effect->JumpInPosition = *Pos;
         Effect->JumpInOrientation = *Orient;
         RaiseActiveSpaceCameraCut();
@@ -4342,15 +4342,15 @@ void FClientShipGameobj::BeginJumpIn(Vector const* Pos, Matrix const* Orient)
     }
 
     // 0x005436a8..0x005436c4: any other ship: the previous effect deleted.
-    if (Field_0x188 != nullptr)
+    if (JumpEffect != nullptr)
     {
-        delete static_cast<FJumpShipEffect*>(Field_0x188);
-        Field_0x188 = nullptr;
+        delete static_cast<FJumpShipEffect*>(JumpEffect);
+        JumpEffect = nullptr;
     }
     // 0x005436ca..0x00543721: operator new(0xdc) + FUN_005038c0(this), and the exit frame
     // copied in (no null test).
-    Field_0x188 = new (std::nothrow) FJumpShipEffect(this);
-    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(Field_0x188);
+    JumpEffect = new (std::nothrow) FJumpShipEffect(this);
+    FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
     Effect->JumpInPosition = *Pos;
     Effect->JumpInOrientation = *Orient;
     // 0x00543723..0x0054372f: state 4.
@@ -4496,10 +4496,10 @@ namespace
     }
 }
 
-void FClientProjectileGameobj::Slot170()
+void FClientProjectileGameobj::PostCreateInit()
 {
     // FUN_005426e0.
-    FClientGameobj::Slot170();                                                 // 0x005426e8
+    FClientGameobj::PostCreateInit();                                                 // 0x005426e8
     // 0x005426ed..0x0054270d: the object narrowed by class & 7 (no null test before +0x88),
     // its archetype's companion, the companion's +0x58 const_effect.
     Archetype::ICliObj* const Companion = NarrowObject(this, 0x7u)->Archetype->Companion;
@@ -4513,9 +4513,9 @@ void FClientProjectileGameobj::Slot170()
         ConstEffectDelay = Delay;                                              // 0x00542779
         return;
     }
-    // 0x00542729..0x0054276a: Slot1c0(&Xform), get_index, start.
+    // 0x00542729..0x0054276a: GetConstEffectTransform(&Xform), get_index, start.
     Transform Xform;
-    Slot1c0(&Xform);
+    GetConstEffectTransform(&Xform);
     long const EngineIndex = get_index();
     ProjectileStartConstEffect(this, Effect, EngineIndex, Xform);
 }
@@ -4523,7 +4523,7 @@ void FClientProjectileGameobj::Slot170()
 void FClientProjectileGameobj::update(float Dt)
 {
     // FUN_00542790 (RET 4).
-    if (Slot158())                                                             // 0x0054279a
+    if (IsDead())                                                             // 0x0054279a
         return;
     FClientGameobj::update(Dt);                                                // 0x005427af
     // 0x005427b4..0x005427c5: a delay below 0 (or NaN) is not armed.
@@ -4535,7 +4535,7 @@ void FClientProjectileGameobj::update(float Dt)
         return;
     ConstEffectDelay = -1.0f;                                                  // 0x005427f1
     Transform Xform;
-    Slot1c0(&Xform);                                                           // 0x005427fb
+    GetConstEffectTransform(&Xform);                                                           // 0x005427fb
     // 0x00542801..0x00542825: the class & 7 object's archetype companion (no null test), then
     // get_index.
     Archetype::ICliObj* const Companion = NarrowObject(this, 0x7u)->Archetype->Companion;
@@ -4544,7 +4544,7 @@ void FClientProjectileGameobj::update(float Dt)
                                Xform);
 }
 
-void FClientProjectileGameobj::Slot1a0(void const* Contact, void const* B,
+void FClientProjectileGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B,
                                        FClientGameobj* Other, void const* D)
 {
     // FUN_0053d4f0: RET 0x10.
@@ -4554,15 +4554,15 @@ void FClientProjectileGameobj::Slot1a0(void const* Contact, void const* B,
     (void)D;
 }
 
-void FClientProjectileGameobj::Slot1b0(Vector const* Pos)
+void FClientProjectileGameobj::Explode(Vector const* Pos)
 {
     // FUN_00542870 (RET 4): FUN_004fcef0(&EffectList, &OneShotCompanion), then GameObject's
     // slot 108 FUN_0053a880 called directly.
     CliEffectListRemove(&EffectList, OneShotCompanion);
-    FClientGameobj::Slot1b0(Pos);
+    FClientGameobj::Explode(Pos);
 }
 
-void FClientProjectileGameobj::Slot1c0(Transform* Out)
+void FClientProjectileGameobj::GetConstEffectTransform(Transform* Out)
 {
     // LAB_005428a0 (RET 4): 1.0f at +0x00 / +0x10 / +0x20, every other dword of the 0x30 zero.
     Out->Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
@@ -4586,12 +4586,12 @@ FClientMunitionGameobj::~FClientMunitionGameobj()
     // The thunk FUN_0053d470 -> FUN_005425f0: Projectile's destructor body, nothing of its own.
 }
 
-void FClientMunitionGameobj::Slot194(void const* A, void const* B, FClientGameobj* Other,
+void FClientMunitionGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
                                      void const* D)
 {
     // FUN_0053ed80 (RET 0x10).
-    Other->Slot1a4(A, D, this);                                                // 0x0053ed99
-    Slot1ac(A, B, Other, D);                                                   // 0x0053edab
+    Other->OnMunitionHit(A, D, this);                                                // 0x0053ed99
+    ReportCollisionToServer(A, B, Other, D);                                                   // 0x0053edab
 }
 
 // ===========================================================================
@@ -4646,23 +4646,23 @@ void FClientBeamGameobj::update(float Dt)
     // 0x0053f61e..0x0053f640: the class & 7 object's vt+0x50 update(Dt, UPDATE_DEFAULT), no
     // null test, result dropped.
     NarrowObject(this, 0x7u)->update(Dt, CObject::UPDATE_DEFAULT);
-    if (Slot154())                                                             // 0x0053f647
+    if (IsExploding())                                                             // 0x0053f647
         return;
-    // 0x0053f651..0x0053f67e: the object's +0xe8 life below 0 -> Slot15c(true). TEST AH,1 /
+    // 0x0053f651..0x0053f67e: the object's +0xe8 life below 0 -> MarkForRemoval(true). TEST AH,1 /
     // JZ skips only when C0 is clear, so a NaN life (C0 set) also expires the beam.
     CProjectile const* const Projectile = static_cast<CProjectile const*>(NarrowObject(this, 0x7u));
     if (!(Projectile->Lifetime >= 0.0f))
-        Slot15c(true);
+        MarkForRemoval(true);
 }
 
-void FClientBeamGameobj::Slot194(void const* A, void const* B, FClientGameobj* Other,
+void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_0053f690 (RET 0x10).
-    if (Slot154())                                                             // 0x0053f698
+    if (IsExploding())                                                             // 0x0053f698
         return;
-    Other->Slot1a4(A, D, this);                                                // 0x0053f6bc
-    Slot1ac(A, B, Other, D);                                                   // 0x0053f6ce
+    Other->OnMunitionHit(A, D, this);                                                // 0x0053f6bc
+    ReportCollisionToServer(A, B, Other, D);                                                   // 0x0053f6ce
     // 0x0053f6d4..0x0053f6de: whether Other is the player's ship (FUN_0054baf0).
     bool const bOtherIsPlayer = static_cast<void*>(static_cast<IObjRW*>(Other)) == GetPlayerObjRW();
     // 0x0053f6e7..0x0053f724: the CBeam's velocity (+0xf8) zeroed -- no null test.
@@ -4681,10 +4681,10 @@ void FClientBeamGameobj::Slot194(void const* A, void const* B, FClientGameobj* O
     // 0x0053f752..0x0053f75c: FUN_004fcef0(&EffectList, &Companion).
     CliEffectListRemove(&EffectList, Companion);
     // 0x0053f761..0x0053f764: Projectile's slot 108 FUN_00542870 at A, called directly.
-    FClientProjectileGameobj::Slot1b0(static_cast<Vector const*>(A));
+    FClientProjectileGameobj::Explode(static_cast<Vector const*>(A));
 }
 
-void FClientBeamGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientBeamGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053f780: RET 0xc.
     (void)A;
@@ -4692,7 +4692,7 @@ void FClientBeamGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* M
     (void)Munition;
 }
 
-void FClientBeamGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other,
+void FClientBeamGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
                                  void const* D)
 {
     // LAB_0053f790 (RET 0x10). B is not read.
@@ -4722,7 +4722,7 @@ void FClientBeamGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* O
     LocalServer()->SPMunitionCollision(Info, GetPlayerConnectionId());
 }
 
-unsigned FClientBeamGameobj::Slot1bc() const
+unsigned FClientBeamGameobj::GetTypeBits() const
 {
     // LAB_0052e130: MOV EAX,0x2000000 / RET.
     return 0x2000000u;
@@ -4765,12 +4765,12 @@ namespace
     // (FUN_005553b0, no hint), then +0x34 = 1.0f.
     void ProjectileLazyNebula(FClientGameobj* Self)
     {
-        if (!(Self->Field_0x34 == 0.0f))
+        if (!(Self->NebulaUpdateTimer == 0.0f))
             return;
         FNebulaEffect* const Nebula = StarSysFindNebula(
             &Self->get_position(), reinterpret_cast<float*>(&Self->DrawStateB), nullptr);
         Self->DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
-        Self->Field_0x34 = 1.0f;
+        Self->NebulaUpdateTimer = 1.0f;
     }
 
     // LAB_0053eaa0 (RET 0xc) -- Mine and Guided slot 105: a munition whose object is a CBeam
@@ -4836,15 +4836,15 @@ void FClientMineGameobj::update(float Dt)
     GameobjOwnerUpdate(this, 0xfu, Dt);
 }
 
-void FClientMineGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientMineGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053eaa0 (RET 0xc).
     if (!IsBeamMunition(Munition))
         return;
-    FClientGameobj::Slot1a4(A, B, Munition);
+    FClientGameobj::OnMunitionHit(A, B, Munition);
 }
 
-void FClientMineGameobj::Slot1b8(float Dt)
+void FClientMineGameobj::UpdateNebula(float Dt)
 {
     // FUN_0053ea60 (RET 4).
     (void)Dt;
@@ -4887,7 +4887,7 @@ void FClientCounterMeasureGameobj::update(float Dt)
     GameobjOwnerUpdate(this, 0x17u, Dt);
 }
 
-void FClientCounterMeasureGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientCounterMeasureGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053f780: RET 0xc.
     (void)A;
@@ -4895,7 +4895,7 @@ void FClientCounterMeasureGameobj::Slot1a4(void const* A, void const* B, FClient
     (void)Munition;
 }
 
-void FClientCounterMeasureGameobj::Slot1b8(float Dt)
+void FClientCounterMeasureGameobj::UpdateNebula(float Dt)
 {
     // FUN_0053ea60 (RET 4).
     (void)Dt;
@@ -4939,15 +4939,15 @@ void FClientGuidedGameobj::update(float Dt)
     GameobjOwnerUpdate(this, 0xa7u, Dt);
 }
 
-void FClientGuidedGameobj::Slot1a4(void const* A, void const* B, FClientGameobj* Munition)
+void FClientGuidedGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_0053eaa0 (RET 0xc) -- Mine's slot 105.
     if (!IsBeamMunition(Munition))
         return;
-    FClientGameobj::Slot1a4(A, B, Munition);
+    FClientGameobj::OnMunitionHit(A, B, Munition);
 }
 
-void FClientGuidedGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other,
+void FClientGuidedGameobj::ReportCollisionToServer(void const* A, void const* B, FClientGameobj* Other,
                                    void const* D)
 {
     // LAB_0053ee00 (RET 0x10). B is not read.
@@ -4982,7 +4982,7 @@ void FClientGuidedGameobj::Slot1ac(void const* A, void const* B, FClientGameobj*
     LocalServer()->SPMunitionCollision(Info, GetPlayerConnectionId());
 }
 
-void FClientGuidedGameobj::Slot1b0(Vector const* Pos)
+void FClientGuidedGameobj::Explode(Vector const* Pos)
 {
     // FUN_0053edc0 (RET 4). 0x0053edc3..0x0053eddd: with a const_effect particle (+0xb8),
     // FUN_004f7d20(0, -1, frame) on it -- no owner, no part, the frame this gameobj's vt+0x10
@@ -4995,23 +4995,23 @@ void FClientGuidedGameobj::Slot1b0(Vector const* Pos)
         ParticleEffectAttach(Particle, nullptr, -1, reinterpret_cast<FTransform const*>(&Frame));
     }
     // 0x0053ede9: Projectile's slot 108 FUN_00542870, called directly.
-    FClientProjectileGameobj::Slot1b0(Pos);
+    FClientProjectileGameobj::Explode(Pos);
 }
 
-void FClientGuidedGameobj::Slot1b8(float Dt)
+void FClientGuidedGameobj::UpdateNebula(float Dt)
 {
     // FUN_0053ea60 (RET 4).
     (void)Dt;
     ProjectileLazyNebula(this);
 }
 
-unsigned FClientGuidedGameobj::Slot1bc() const
+unsigned FClientGuidedGameobj::GetTypeBits() const
 {
     // LAB_0053d430: MOV EAX,0x1000000 / RET.
     return 0x1000000u;
 }
 
-void FClientGuidedGameobj::Slot1c0(Transform* Out)
+void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
 {
     // LAB_0053f030 (RET 4).
     // 0x0053f03b..0x0053f059: the local frame -- FUN_004215b0 (identity rotation), zero
@@ -5167,10 +5167,10 @@ bool FClientLootGameobj::find(unsigned const& Id)
     return Object != nullptr;
 }
 
-void FClientLootGameobj::Slot170()
+void FClientLootGameobj::PostCreateInit()
 {
     // LAB_0053e5e0.
-    FClientGameobj::Slot170();                                                 // 0x0053e5e5
+    FClientGameobj::PostCreateInit();                                                 // 0x0053e5e5
     // 0x0053e5ea..0x0053e61d: the class & 0x803 object's archetype (no null test), a
     // LootCrate / Equipment, and its +0x68 tractored_explosion.
     Archetype::Equipment const* const Crate =
@@ -5207,7 +5207,7 @@ void FClientLootGameobj::update(float Dt)
     GameobjOwnerUpdate(this, 0x803u, Dt);
 }
 
-void FClientLootGameobj::Slot198(DamageList const& Damage)
+void FClientLootGameobj::ApplyDamageList(DamageList const& Damage)
 {
     // FUN_0053e770 (RET 4): multiplayer only.
     if (SinglePlayer())
@@ -5237,19 +5237,19 @@ void FClientLootGameobj::Slot198(DamageList const& Damage)
     }
 }
 
-void FClientLootGameobj::Slot19c(int DestroyType)
+void FClientLootGameobj::Destroy(int DestroyType)
 {
     // LAB_0053e8a0 (RET 4).
     if (DestroyType != 2)
     {
-        FClientSimpleGameobj::Slot19c(DestroyType);                            // FUN_00547500
+        FClientSimpleGameobj::Destroy(DestroyType);                            // FUN_00547500
         return;
     }
     // 0x0053e8ac..0x0053e8e4: tractored in -- no explosion: slot 87 with true; else
     // FUN_005361e0(TractoredExplosionArch, this, &get_position()) into ActionDB::add.
     if (TractoredExplosionArch == nullptr)
     {
-        Slot15c(true);
+        MarkForRemoval(true);
         return;
     }
     Actions.add(Action_Explode::Create(TractoredExplosionArch, this, &get_position()));

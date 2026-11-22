@@ -409,11 +409,11 @@ intptr_t NnPlayerInfo::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     return 0;
 }
 
-bool NnPlayerInfo::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnPlayerInfo::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00475430 (RET 0xc) -- the body NN_Help's slot 23 (nn_help.cpp) is folded with.
     if (Msg != 0xef02)
-        return WinControl::Slot23(Msg, A, B); // FUN_005a0840
+        return WinControl::ProcessMessage(Msg, A, B); // FUN_005a0840
 
     // 0x0047543e..0x00475477: out of the parent (no parent test), then every child deleted (the
     // next sibling read first), slot 10 and slot 0 with 1.

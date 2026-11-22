@@ -191,18 +191,18 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // Slots 3/4/5/6 of retail's CruiseBehavior vftable (.rdata:0639fd4c), wired 2026-10-08
     // (claude-code:cmn-ai2). Slot 6 is LAB_062d1730 `MOV EAX,1; RET 4` (shared with
     // FreeFlightBehavior slot 6 and NullBehavior slot 5).
-    void Slot3() override { Engage(); }                              // 3 FUN_062ce380
-    void Slot4() override { Disengage(); }                           // 4 FUN_062ce3a0
-    int Slot5(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
+    void OnEngage() override { Engage(); }                              // 3 FUN_062ce380
+    void OnDisengage() override { Disengage(); }                           // 4 FUN_062ce3a0
+    int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
     EvaluateResult evaluate(unsigned int) override { return static_cast<EvaluateResult>(1); } // 6
 
     // The ThrustManager::engage_cruise stand-in (EngageCruiseThruster) is gone 2026-10-08:
@@ -229,7 +229,8 @@ public:
     int UpdateResult10;        // +0x10. Update()'s own tri-state result (1=active/3=idle)
                                // and Engage()'s own write (=1, via FUN_062d20d0).
     void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    unsigned char Opaque18[0x20 - 0x18];
+    IObjDB* ObjectDb;
+    float DeltaTime1c;
     // +0x20. Set by SetContext() (Param2); read by Disengage()'s shared FUN_062d20f0 tail-call.
     //
     // LEFT `void*` DELIBERATELY. SEARCHED AND NOT FOUND, 2026-09-17

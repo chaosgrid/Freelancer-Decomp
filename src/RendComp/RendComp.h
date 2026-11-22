@@ -233,7 +233,7 @@ struct FVmeshChannelRecord
     void* Pointer;              // +0x00 first element of the channel
     int ElemBytes;              // +0x04 table entry +8
     int Stride;                 // +0x08 FVF vertex stride
-    int Unwritten0C;            // +0x0C never written by FUN_06c2e020 / FUN_06c31500
+    int IndexArray;             // +0x0C index array ptr (left unwritten by VMeshFillChannelRecord; matches FRpVertexStream)
     int VertexCount;            // +0x10
 };
 

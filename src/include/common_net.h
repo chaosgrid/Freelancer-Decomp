@@ -473,7 +473,7 @@ public:
     // process (0x063339d5 / 063339e6) and handle_state_change (06333a2d / 06333a4f):
     // (event, pointer to a state -- &CurrentState, or the .rdata -1 "any state"), returning
     // a bool that process tests. The second argument is taken as a const reference.
-    virtual bool Slot2(const SMEventData* Event, int const& State) = 0;
+    virtual bool OnStateEvent(const SMEventData* Event, int const& State) = 0;
 
     COMMON_API StateMachine();                                          // 0x063331e0
 

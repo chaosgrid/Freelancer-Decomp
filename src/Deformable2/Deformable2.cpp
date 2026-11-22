@@ -306,7 +306,7 @@ void FillFileDesc(FFileSystemDesc* Desc, const char* Path)
     Desc->ShareMode = FILE_SHARE_READ;
     Desc->Creation = OPEN_EXISTING;
     Desc->Flags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL;
-    Desc->Field30 = 0xFFFFFFFF;
+    Desc->FindHandle = 0xFFFFFFFF;
 }
 
 // Enumerate FileSystem children using the published ReadFile contract.
@@ -930,7 +930,7 @@ static int DrawFaceGroup(FFaceGroup* Group, FMaterialSubmitContext* Context, int
         return 0;
     const int NumVerts =
         (int)Group->IndexMax - (int)Group->IndexMin + 1;
-    Context->Field20 = Group->UvBinding;
+    Context->MaterialContext = Group->UvBinding;
     IMaterial* Material = Group->Material;
     Material->Bind(Context);
     Material->Submit(Context, Group->Kind, Group->IndexMin, (unsigned long)NumVerts,
@@ -987,7 +987,7 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
     Context.IbScratch = &Part->Ib.Scratch;
     // Retail leaves +0x1C as stack garbage; the port cannot reproduce that and stores 0.
     Context.ReplacedMaterial = nullptr;
-    Context.Field20 = nullptr;
+    Context.MaterialContext = nullptr;
 
     FUvDeformBinding Binding;
     Binding.Record = nullptr;
@@ -1258,7 +1258,7 @@ static int MapFileNode(FMappedFileNode* Node, const char* NodeName, unsigned lon
 {
     FFileSystemDesc Desc;
     FillFileDesc(&Desc, NodeName);
-    Desc.Field30 = FindHandle;
+    Desc.FindHandle = FindHandle;
     Node->Handle = Node->Fs->OpenByDesc(&Desc);
     if (Node->Handle == -1)
         return -8;
@@ -1313,7 +1313,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
             DropFileSystem(&Child);
             FFileSystemDesc ChildDesc;
             FillFileDesc(&ChildDesc, FindData.cFileName);
-            ChildDesc.Field30 = (unsigned long)Finder;
+            ChildDesc.FindHandle = (unsigned long)Finder;
             if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
                                    (void**)(&Child)) < 0)
             {
@@ -1891,7 +1891,7 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
         {
             FFileSystemDesc ChildDesc;
             FillFileDesc(&ChildDesc, FindData.cFileName);
-            ChildDesc.Field30 = (unsigned long)Finder;
+            ChildDesc.FindHandle = (unsigned long)Finder;
             IFileSystem* Child = nullptr;
             if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
                                    (void**)(&Child)) >= 0)
@@ -5107,7 +5107,7 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
                             {
                                 FFileSystemDesc MeshDesc;
                                 FillFileDesc(&MeshDesc, FindData.cFileName);
-                                MeshDesc.Field30 = (unsigned long)Finder;
+                                MeshDesc.FindHandle = (unsigned long)Finder;
                                 IFileSystem* MeshFs = nullptr;
                                 bool bFull = false;
                                 if (RootFs->CreateInstance((AGGDESC*)(&MeshDesc),

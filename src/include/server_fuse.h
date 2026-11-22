@@ -97,14 +97,15 @@ class IgniteFuseAction : public ServerFuseAction
 public:
     IgniteFuseAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcea0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfefd0
+    FuseAction* Clone() const override;       // FUN_06cfcea0
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfefd0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // FUN_06cff050
     // LAB_06cff0e0 -- the only UnTrigger override in the family (slot 8).
     void UnTrigger(unsigned short SubObjId) override;
 
 protected:
-    virtual void Slot30(IgniteFuseAction const& Other); // FUN_06cff150
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(IgniteFuseAction const& Other); // FUN_06cff150
 
 public:
     ID_String FuseId; // +0x28 "fuse"
@@ -120,8 +121,8 @@ class DestroyRootAction : public ServerFuseAction
 public:
     DestroyRootAction();
 
-    FuseAction* Slot04() const override;                          // LAB_06cfcb30
-    bool Slot08(INI_Reader& Reader) override;                     // FUN_06cfe040
+    FuseAction* Clone() const override;                          // LAB_06cfcb30
+    bool Read(INI_Reader& Reader) override;                     // FUN_06cfe040
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // FUN_06cfe070
 };
 
@@ -133,12 +134,13 @@ class DamageRootAction : public ServerFuseAction
 public:
     DamageRootAction();
 
-    FuseAction* Slot04() const override;       // LAB_06cfcb90
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfe0f0
+    FuseAction* Clone() const override;       // LAB_06cfcb90
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfe0f0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cfe180
 
 protected:
-    virtual void Slot30(DamageRootAction const& Other); // FUN_06cfe330
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DamageRootAction const& Other); // FUN_06cfe330
 
 public:
     int Hitpoints;    // +0x28 "hitpoints"
@@ -153,12 +155,13 @@ class DestroyGroupAction : public ServerFuseAction
 public:
     DestroyGroupAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcc00
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfe370
+    FuseAction* Clone() const override;       // FUN_06cfcc00
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfe370
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cfe490
 
 protected:
-    virtual void Slot30(DestroyGroupAction const& Other); // FUN_06cff150 (ICF)
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DestroyGroupAction const& Other); // FUN_06cff150 (ICF)
 
 public:
     CacheString GroupName; // +0x28 "group_name"
@@ -173,12 +176,13 @@ class DamageGroupAction : public ServerFuseAction
 public:
     DamageGroupAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcca0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfe6c0
+    FuseAction* Clone() const override;       // FUN_06cfcca0
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfe6c0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cfe7d0
 
 protected:
-    virtual void Slot30(DamageGroupAction const& Other); // FUN_06cfe950
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DamageGroupAction const& Other); // FUN_06cfe950
 
 public:
     CacheString GroupName; // +0x28 "group_name"
@@ -195,12 +199,13 @@ class DestroyHardpointAttachmentAction : public ServerFuseAction
 public:
     DestroyHardpointAttachmentAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcd50
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfe9a0
+    FuseAction* Clone() const override;       // FUN_06cfcd50
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfe9a0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cfeae0
 
 protected:
-    virtual void Slot30(DestroyHardpointAttachmentAction const& Other); // FUN_06cff150 (ICF)
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DestroyHardpointAttachmentAction const& Other); // FUN_06cff150 (ICF)
 
 public:
     CacheString Hardpoint; // +0x28 "hardpoint"
@@ -216,12 +221,13 @@ class DamageHardpointAttachmentAction : public ServerFuseAction
 public:
     DamageHardpointAttachmentAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcdf0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cfed40
+    FuseAction* Clone() const override;       // FUN_06cfcdf0
+    bool Read(INI_Reader& Reader) override;  // FUN_06cfed40
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cfee50
 
 protected:
-    virtual void Slot30(DamageHardpointAttachmentAction const& Other); // FUN_06cfe950 (ICF)
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DamageHardpointAttachmentAction const& Other); // FUN_06cfe950 (ICF)
 
 public:
     CacheString Hardpoint; // +0x28 "hardpoint"
@@ -237,12 +243,13 @@ class ImpulseAction : public ServerFuseAction
 public:
     ImpulseAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfcf60
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cff170
+    FuseAction* Clone() const override;       // FUN_06cfcf60
+    bool Read(INI_Reader& Reader) override;  // FUN_06cff170
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cff290
 
 protected:
-    virtual void Slot30(ImpulseAction const& Other); // FUN_06cff550
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(ImpulseAction const& Other); // FUN_06cff550
 
 public:
     CacheString Hardpoint; // +0x28 "hardpoint"
@@ -260,12 +267,13 @@ class TumbleAction : public ServerFuseAction
 public:
     TumbleAction();
 
-    FuseAction* Slot04() const override;       // LAB_06cfd010
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cff5a0
+    FuseAction* Clone() const override;       // LAB_06cfd010
+    bool Read(INI_Reader& Reader) override;  // FUN_06cff5a0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cff6c0
 
 protected:
-    virtual void Slot30(TumbleAction const& Other); // FUN_06cff940
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(TumbleAction const& Other); // FUN_06cff940
 
 public:
     float AngDragScale;      // +0x28 "ang_drag_scale" (1.0f by default)
@@ -285,12 +293,13 @@ class MakeInvincibleAction : public ServerFuseAction
 public:
     MakeInvincibleAction();
 
-    FuseAction* Slot04() const override;       // LAB_06cfd0a0
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cff970
+    FuseAction* Clone() const override;       // LAB_06cfd0a0
+    bool Read(INI_Reader& Reader) override;  // FUN_06cff970
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cff9d0
 
 protected:
-    virtual void Slot30(MakeInvincibleAction const& Other); // FUN_06cffa80
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(MakeInvincibleAction const& Other); // FUN_06cffa80
 
 public:
     bool bTurnOn; // +0x28 "turn_on" (1 by default)
@@ -304,12 +313,13 @@ class DumpCargoAction : public ServerFuseAction
 public:
     DumpCargoAction();
 
-    FuseAction* Slot04() const override;       // FUN_06cfd110
-    bool Slot08(INI_Reader& Reader) override;  // FUN_06cffaa0
+    FuseAction* Clone() const override;       // FUN_06cfd110
+    bool Read(INI_Reader& Reader) override;  // FUN_06cffaa0
     void Trigger(unsigned SourceId, unsigned short SubObjId) override; // LAB_06cffb10
 
 protected:
-    virtual void Slot30(DumpCargoAction const& Other); // FUN_06cffc80
+    using FuseAction::CopyArchProperties;
+    virtual void CopyArchProperties(DumpCargoAction const& Other); // FUN_06cffc80
 
 public:
     CacheString OriginHardpoint; // +0x28 "origin_hardpoint"

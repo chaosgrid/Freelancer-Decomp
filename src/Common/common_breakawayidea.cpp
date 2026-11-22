@@ -89,7 +89,7 @@ BreakAwayIdea::BreakAwayIdea()
     : BaseIdea()
     , Picker()
     , BreakStyle(0)                         // 062d89f2
-    , Field38(350.0f)                    // 0x43af0000, 062d8a12
+    , BreakAwayRange(350.0f)                    // 0x43af0000, 062d8a12
     , Flag3c(1)                          // 062d8a19
     , Pad3d{}
     , Throttle(1.0f)                      // 062d89d7
@@ -97,9 +97,9 @@ BreakAwayIdea::BreakAwayIdea()
     , Pad45{}
     , AttemptReverseElapsed(0.0f)                      // 062d89f8 (retail stores an integer 0)
     , AttemptReverseTime(4.0f)                      // 0x40800000, 062d8a1d
-    , Field50(0.0f)                      // 062d89fb (retail stores an integer 0)
+    , ReverseHoldElapsed(0.0f)                      // 062d89fb (retail stores an integer 0)
     , ReverseDistance(100.0f)                    // 0x42c80000, 062d8a2b
-    , Field58(6.0f)                      // 0x40c00000, 062d8a24
+    , ReverseHoldTime(6.0f)                      // 0x40c00000, 062d8a24
     , Flag5c(0)                          // 062d89fe
     , Pad5d{}
     , Frame60(0.0f, 0.0f, 0.0f,          // +0x60: NOT touched by retail's ctor --
@@ -274,7 +274,7 @@ int BreakAwayIdea::Update(float DeltaTime)
         {
             // LAB_062d8e18.
             AttemptReverseElapsed = 0.0f;
-            Field50 = 0.0f;
+            ReverseHoldElapsed = 0.0f;
             Flag5c = 0;
             return 0;
         }
@@ -286,23 +286,23 @@ int BreakAwayIdea::Update(float DeltaTime)
 
         if (Clearance == 0)
         {
-            // LAB_062d8de8. `FLD DeltaTime; FADD Field50; FST Field50; FCOMP Field58`
+            // LAB_062d8de8. `FLD DeltaTime; FADD ReverseHoldElapsed; FST ReverseHoldElapsed; FCOMP ReverseHoldTime`
             // compares the unrounded sum; `TEST AH,0x41; JNZ` keeps waiting on
             // not-greater (or unordered).
-            double const Waited = static_cast<double>(DeltaTime) + Field50;
-            Field50 = static_cast<float>(Waited);
-            if (!(Waited > Field58))
+            double const Waited = static_cast<double>(DeltaTime) + ReverseHoldElapsed;
+            ReverseHoldElapsed = static_cast<float>(Waited);
+            if (!(Waited > ReverseHoldTime))
             {
                 return 0;
             }
-            Field50 = 0.0f;
+            ReverseHoldElapsed = 0.0f;
             return 1;
         }
         if (Clearance == 1)
         {
             // LAB_062d8dd0.
             AttemptReverseElapsed = 0.0f;
-            Field50 = 0.0f;
+            ReverseHoldElapsed = 0.0f;
             return 1;
         }
         if (Clearance != 2)
@@ -421,7 +421,7 @@ int BreakAwayIdea::Update(float DeltaTime)
         // before the range test -- unlike the BreakStyle == 0 arm below, which
         // does. Kept as retail has it.
         IObjRW* const RangeTarget = WatchedObjectOf(Picker.Watcher);
-        if (IsWithinInterceptRangeOfIface(&Handle->SelfTarget, RangeTarget, Field38))
+        if (IsWithinInterceptRangeOfIface(&Handle->SelfTarget, RangeTarget, BreakAwayRange))
         {
             return 0;
         }
@@ -471,7 +471,7 @@ int BreakAwayIdea::Update(float DeltaTime)
     {
         return 0;
     }
-    if (IsWithinInterceptRangeOfIface(&Handle->SelfTarget, RangeTarget, Field38))
+    if (IsWithinInterceptRangeOfIface(&Handle->SelfTarget, RangeTarget, BreakAwayRange))
     {
         return 0;
     }

@@ -146,9 +146,9 @@ GENRESULT DACOM_API FThornPsys::Tick(int DeltaMs)
         Xform[9] = Local.Pos.x;
         Xform[10] = Local.Pos.y;
         Xform[11] = Local.Pos.z;
-        Particles.Effect->Slot3(reinterpret_cast<void*>(1), Xform);
-        Particles.Effect->Slot7(FloatArg(Dt));
-        Particles.Effect->Slot8(FloatArg(Dt));
+        Particles.Effect->SetTransform(reinterpret_cast<void*>(1), Xform);
+        Particles.Effect->ComposeTransforms(FloatArg(Dt));
+        Particles.Effect->Update(FloatArg(Dt));
     }
     return GR_OK;
 }
@@ -159,7 +159,7 @@ GENRESULT DACOM_API FThornPsys::SetSparam(float Value)
 {
     Sparam = Value;
     if (Particles.Effect != nullptr)
-        ForwardAlchemyEffectFloat(Particles.Effect, &IFxEffect::Slot6, Value);
+        ForwardAlchemyEffectFloat(Particles.Effect, &IFxEffect::SetOuterTime, Value);
     return GR_OK;
 }
 

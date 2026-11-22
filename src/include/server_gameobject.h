@@ -173,12 +173,12 @@ struct FLootRecord
     float ContentsHitPts;                            // +0x10
     int Count;                                       // +0x14
     unsigned int MarkForPlayer;                      // +0x18  optional player id to mark loot for (0 = none; 0x06cf85c0 / mark_for_player)
-    unsigned int Field_0x1c;                         // +0x1c  zeroed by build_loot; meaning not derived
+    unsigned int NameId;                         // +0x1c  zeroed by build_loot; meaning not derived
     Vector Velocity;                                 // +0x20
     Vector Position;                                 // +0x2c
     Matrix Orientation;                              // +0x38  (9 dwords, copied with REP MOVSD ECX=9)
     Vector AngularVelocity;                          // +0x5c
-    unsigned char Field_0x68;                        // +0x68  build_loot stores 1 (.text:06cebecf)
+    unsigned char bCanAiTractor;                        // +0x68  build_loot stores 1 (.text:06cebecf)
     unsigned char bMission;                          // +0x69  EquipDesc+0x18 / CEquip vt+0x14
     unsigned char Pad6a[2];
 };
@@ -1162,7 +1162,7 @@ public:
     struct FEquipState
     {
         SubObjectID::EquipIdMaker EquipIds;   // +0x00
-        void const* Data;                     // +0x04  -> Field_0xB4
+        void const* Data;                     // +0x04  -> EquipStateData
     };
 
     // Retail FUN_06d010e0 (.text:06d010e0, RET 4). A DIRECT call of EqObj's
@@ -1172,7 +1172,7 @@ public:
     void set_equip_state(FEquipState const& State);
 
     // Retail FUN_06d01110 (.text:06d01110, RET 0). The one-shot
-    // invincibility grant behind the Field_0xB8 latch (see that member).
+    // invincibility grant behind the bLaunchInvincible latch (see that member).
     // Callers: .text:06cf00d5 (after a player ship is built) and
     // StarSystem FUN_06d0cee0 (.text:06d0cf66, after CShip::launch).
     void apply_launch_invincibility();
@@ -1307,7 +1307,7 @@ public:
     // word 0 seeds EquipIds (.text:06d010ef). Its only reader is get_data
     // (.text:06d02ae0, main vtable slot 42 +0xA8), which hands it out as the
     // IObjInspect `void const*` data pointer -- hence the type.
-    void const* Field_0xB4;
+    void const* EquipStateData;
     // +0xB8 -- a ONE-SHOT latch, not a toggle. FUN_06d01110 (.text:06d01110,
     // called from .text:06cf00d5 and .text:06d0cf66) is its whole story:
     //   .text:06d01110  8a81b8000000  MOV  AL,byte ptr [ECX + 0xb8]
@@ -1320,7 +1320,7 @@ public:
     // (.text:06d01130), byte 1 (.text:06d01134), float 0.0f (.text:06d0113b)
     // -- not {1, 0, 0} as this note used to say. ECX is the Ship BASE: the
     // vtable it calls through is `[ECX]`, at +0x00.
-    unsigned char Field_0xB8;
+    unsigned char bLaunchInvincible;
     float AccumulatedDamage;              // +0xBC
     float AccumulatedDamageTime;          // +0xC0
 

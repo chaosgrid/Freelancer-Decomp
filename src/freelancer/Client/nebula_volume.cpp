@@ -1435,13 +1435,13 @@ namespace
                             FMediumParams const& Medium, bool bInside)
     {
         double Sigma = (double)(Medium.HazeSigma);
-        if (bInside && Nebula->Field24 != 0)
+        if (bInside && Nebula->ActiveExclusionZone != 0)
         {
             Exclusion::NebulaExclusionZone const* const Excl =
                 reinterpret_cast<Exclusion::NebulaExclusionZone const*>(
-                    (uintptr_t)(Nebula->Field24));
+                    (uintptr_t)(Nebula->ActiveExclusionZone));
             float Immersion = 0.0f;
-            memcpy(&Immersion, &Nebula->Field28, sizeof(float));
+            Immersion = Nebula->ExclusionImmersion;
             Immersion = Clamp(Immersion, 0.0f, 1.0f);
             const float Scale = ExclusionInsideScale(Excl, Medium, S);
             Sigma *= (double)(1.0f + (Scale - 1.0f) * Immersion);

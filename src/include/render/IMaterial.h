@@ -96,7 +96,7 @@ struct FMaterialSubmitContext
     FVbListing* VbListing;
     FIbScratch* IbScratch;
     IMaterial* ReplacedMaterial; // Original facegroup material while an override draws.
-    void* Field20; // Material-specific context; meaning remains unknown.
+    void* MaterialContext; // Material-specific context; meaning remains unknown.
 };
 
 static_assert(offsetof(FVbListing, BaseVertex) == 8, "listing+8 base vertex");

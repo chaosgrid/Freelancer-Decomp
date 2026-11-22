@@ -779,7 +779,8 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
     Half = Steps >> 1;
     Cursor = Left;
     RightPast = Right + Count;
-    Delta = (int)((unsigned char*)Dest - (unsigned char*)Left);
+    unsigned int* Out = (unsigned int*)Dest;
+    (void)Delta;
     Sum = Cursor[0];
     Other = Right[0];
     Carry = 0u;
@@ -792,10 +793,10 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
         Half = Half + 1;
         if (Half == 0)
         {
-            *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
+            *Out = Sum;
             return (long)Carry;
         }
-        *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
+        *Out++ = Sum;
         Sum = Cursor[0];
         Other = *(RightPast + (Half * 2));
     }
@@ -806,7 +807,7 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
         Sum = (unsigned int)Wide;
         Carry = (unsigned int)(Wide >> 32);
         Other = *(RightPast + (Half * 2) + 1);
-        *(unsigned int*)((unsigned char*)Cursor + Delta - 8) = Sum;
+        *Out++ = Sum;
         Sum = Cursor[-1];
         Wide = (unsigned long long)Sum + Other + Carry;
         Sum = (unsigned int)Wide;
@@ -816,11 +817,11 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
         {
             break;
         }
-        *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
+        *Out++ = Sum;
         Sum = Cursor[0];
         Other = *(RightPast + (Half * 2));
     }
-    *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
+    *Out = Sum;
     return (long)Carry;
 }
 

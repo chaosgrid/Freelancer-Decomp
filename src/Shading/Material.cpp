@@ -2165,8 +2165,8 @@ GENRESULT FMaterial::SubmitAtmosphereLock(void* Context, unsigned long PrimType,
 
     FVector Center = {};
     float Radius = 1.0f;
-    if (SubmitContext->Field20 != nullptr)
-        ((IEngine*)(SubmitContext->Field20))->GetInstanceExtent(
+    if (SubmitContext->MaterialContext != nullptr)
+        ((IEngine*)(SubmitContext->MaterialContext))->GetInstanceExtent(
             SubmitContext->Inst, 0, &Radius, &Center.X);
     const float RadiusOverScale = (float)((double)Radius / Scale);
     if (G_MathEngine == nullptr)

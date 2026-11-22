@@ -85,10 +85,10 @@ bool NnScanner::Create(Win3D* NewParent, void* Data)
             Ship.Toggle->SetProperty(1, 1, 0);
         if (CargoLabel != nullptr)
             CargoLabel->SetProperty(1, 1, 0);
-        if (Field4d0 != nullptr)
+        if (FullCargoBar != nullptr)
         {
-            Field4d0->SetProperty(1, 1, 0);
-            Field4d0 = nullptr;   // 0x004b6df9
+            FullCargoBar->SetProperty(1, 1, 0);
+            FullCargoBar = nullptr;   // 0x004b6df9
         }
 
         // 0x004b6e03..0x004b6e09: FUN_0047f240(4, 1) -- the commodity filter.
@@ -105,10 +105,10 @@ void NnScanner::Update()
     // LAB_004b6e30.
     //
     // 0x004b6e36..0x004b6e92: the scan cannot stand -> slot 23 (0xef02, 0, 0), a virtual call
-    // that lands in this class's Slot23 (sound 0xe and Close, which deletes this).
+    // that lands in this class's ProcessMessage (sound 0xe and Close, which deletes this).
     if (!NnScannerMayStand())
     {
-        Slot23(0xef02, 0, 0);
+        ProcessMessage(0xef02, 0, 0);
         return;
     }
 
@@ -143,7 +143,7 @@ void NnScanner::Update()
     // 0x004b6f2d..0x004b6f4f: FUN_0047ba90 -- +0x4e0 set: the scanned ship (+0x348); otherwise
     // the selected item's archetype, or 0.
     unsigned InfoArchId = 0;
-    if (Field4e0 != 0)
+    if (bShowShipInfoCard != 0)
         InfoArchId = Ship.ShipArchId;
     else if (Selected != nullptr)
         InfoArchId = Selected->ArchId;
@@ -156,7 +156,7 @@ void NnScanner::Update()
     // bare `RET 4` (ICF-named IDPMsgHandler::OnAddHost). Nothing happens.
 
     // 0x004b6f82..0x004b7014: the list length changed.
-    if (Counter != Field3c8)
+    if (Counter != LastRowCount)
     {
         SelectedIndex = -1;
         if (InventoryScroll != nullptr)
@@ -176,7 +176,7 @@ void NnScanner::Update()
         }
 
         // 0x004b700a..0x004b7014: remember the length, then slot 11 again (this function).
-        Field3c8 = Counter;
+        LastRowCount = Counter;
         Update();
     }
 
@@ -186,10 +186,10 @@ void NnScanner::Update()
 
     // 0x004b702f..0x004b7039
     if (SelectedIndex == -1)
-        Field4e0 = 1;
+        bShowShipInfoCard = 1;
 }
 
-bool NnScanner::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnScanner::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004b7180 (RET 0xc).
     if (Msg == 0xef02)
@@ -198,7 +198,7 @@ bool NnScanner::Slot23(unsigned Msg, unsigned A, unsigned B)
         Close();
         return true;
     }
-    return NnInventory::Slot23(Msg, A, B);
+    return NnInventory::ProcessMessage(Msg, A, B);
 }
 
 intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -209,7 +209,7 @@ intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // 0x004b714e..0x004b7177: the close button -> slot 23 (0xef02, 0, 0), return 1.
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
-            Slot23(0xef02, 0, 0);
+            ProcessMessage(0xef02, 0, 0);
             return 1;
         }
     }
@@ -235,7 +235,7 @@ intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     return NnInventory::SetProperty(Msg, A, B);
 }
 
-bool NnScanner::Slot46()
+bool NnScanner::IsScanner()
 {
     // FUN_004b6c50: MOV AL,1 / RET.
     return true;

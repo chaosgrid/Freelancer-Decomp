@@ -89,7 +89,7 @@ namespace
             GetPlayerVisitFlagsRetail(Item->Id, &Flags, 0, 0); // FUN_004c4da0 0x00493899 / 0x00497e70
             Item->Visit = static_cast<unsigned char>(Item->Visit | Flags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
-            if (Map.Field_0x87e != 0)
+            if (Map.bDebugShowAll != 0)
                 Item->bShown = 1;
         }
         int const IdsName = Item->StridName;
@@ -110,7 +110,7 @@ namespace
         Pos[1] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos[1]));
         Pos[2] = static_cast<float>(InvScale * static_cast<double>(Map.ClickMapPos[2]));
         Universe::IZone const* const Zone =
-            NavMapZoneAt(Map.CurrentSystem, Pos, 0, 1, Map.Field_0x87e); // FUN_004a1b50
+            NavMapZoneAt(Map.CurrentSystem, Pos, 0, 1, Map.bDebugShowAll); // FUN_004a1b50
         if (Zone == nullptr)
             return false;
         unsigned char Visit = 0;
@@ -341,7 +341,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // 0x00493d42..0x00493d63
         RequestMissionBriefingContinue(); // FUN_0043d580
-        Slot23(0xef02, 0, 0);
+        ProcessMessage(0xef02, 0, 0);
         return 1;
     }
     if (A == reinterpret_cast<uintptr_t>(ShipButton))
@@ -667,7 +667,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     // LAB_00497fa7: a release, unless it ended a drag.
     if (bDragging != 0)
         return true;
-    if (Field_0x818 == 0 || (ViewMode != 1 && ViewMode != 2))
+    if (bDebugTeleportMode == 0 || (ViewMode != 1 && ViewMode != 2))
     {
         ShowObjectTools(); // FUN_0049ea50
         return true;
@@ -704,7 +704,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     // false). Retail takes the orientation through IObjInspect slot 3 (+0x0c, get_transform),
     // whose body 0x062bf1f0 is folded with slot 4 get_orientation.
     Object->beam_object(Pos, Player->get_orientation(), false);
-    Field_0x818 = 0;
+    bDebugTeleportMode = 0;
     DebugText->SetProperty(1, 1, 0);
     return true;
 }
@@ -875,7 +875,7 @@ void NeuroNetNavMap::ShowObjectTools()
         Scaled[0] = static_cast<float>(static_cast<double>(MapPos[0]) * InvScale);
         Scaled[1] = static_cast<float>(static_cast<double>(MapPos[1]) * InvScale);
         Scaled[2] = static_cast<float>(InvScale * static_cast<double>(MapPos[2]));
-        if (NavMapZoneAt(CurrentSystem, Scaled, 0, 1, Field_0x87e) != nullptr) // FUN_004a1b50
+        if (NavMapZoneAt(CurrentSystem, Scaled, 0, 1, bDebugShowAll) != nullptr) // FUN_004a1b50
         {
             bInfo = 1;
             bZoneHit = 1;
@@ -1027,11 +1027,11 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
             if (BaseId != 0)
             {
                 unsigned char const bSection1 =
-                    ((Visit & 4) != 0 && Entry->Field_0x08 != 0) ? 1 : 0;
+                    ((Visit & 4) != 0 && Entry->bShowCommodities != 0) ? 1 : 0;
                 unsigned char const bSection2 =
-                    ((Visit & 8) != 0 && Entry->Field_0x04 != 0) ? 1 : 0;
+                    ((Visit & 8) != 0 && Entry->bShowEquipment != 0) ? 1 : 0;
                 unsigned char const bSection3 =
-                    ((Visit & 0x10) != 0 && Entry->Field_0x0c != 0) ? 1 : 0;
+                    ((Visit & 0x10) != 0 && Entry->bShowShips != 0) ? 1 : 0;
                 // 0x00497b9e..0x00497bb3: FUN_00476080(&card, base, commodities, equipment,
                 // ships).
                 NnHelpAppendBaseGoods(&Card, BaseId, bSection1, bSection2, bSection3);
@@ -1123,14 +1123,14 @@ void NeuroNetNavMap::ConfirmAbortMission()
     // 0x0049f6ef..0x0049f741: abort the first route's mission (not kinds 7 / 8), then leave
     // the briefing (continue + close) or the NeuroNet screen.
     FBestPath const* const First = BestPathGetFirst(); // FUN_004c5040
-    if (First == nullptr || First->Field_0x50 == 7 || First->Field_0x50 == 8)
+    if (First == nullptr || First->MissionType == 7 || First->MissionType == 8)
         return;
-    G_Server->AbortMission(GetPlayerConnectionId(), First->Field_0x50); // IServer slot 68
+    G_Server->AbortMission(GetPlayerConnectionId(), First->MissionType); // IServer slot 68
     StoryStarReset(); // FUN_004b9bb0 (0x0049f71b)
     if (bBriefing != 0)
     {
         RequestMissionBriefingContinue(); // FUN_0043d580
-        Slot23(0xef02, 0, 0);
+        ProcessMessage(0xef02, 0, 0);
     }
     else
     {

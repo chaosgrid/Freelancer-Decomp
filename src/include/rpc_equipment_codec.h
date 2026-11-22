@@ -19,7 +19,7 @@ struct FRpcServerEquipRecord {
     float Health;                 // +0x08 EquipDesc +0x10
     unsigned short Id;            // +0x0c EquipDesc +0x02
     unsigned char bEquipped;      // +0x0e EquipDesc +0x0c, raw byte
-    unsigned char Field_0x0f;     // +0x0f TODO: no builder writes it (zeroed); still on the wire
+    unsigned char bMission;       // +0x0f EquipDesc::bMission
     unsigned short HardpointSize; // +0x10 strlen + 1; 0 for the internal cargo bay
     char* Hardpoint;              // +0x14 operator new(HardpointSize)
 };

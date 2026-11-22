@@ -37,8 +37,8 @@
 struct FServerSetReputationInfo {
     int VibeHandle;                         // +0x00
     float Attitude;                         // +0x04  Reputation::Vibe::AttitudeTowards out-param
-    unsigned int Field_0x08;                // +0x08  Reputation::Vibe::Get out-param 2
-    unsigned int Field_0x0c;                // +0x0c  Get out-param 3 -- never reaches the wire
+    unsigned int Affiliation;                // +0x08  Reputation::Vibe::Get out-param 2
+    unsigned int Rank;                // +0x0c  Get out-param 3 -- never reaches the wire
     ::Reputation::Relation* Relations;      // +0x10  Get out-param 5
     unsigned char RelationCount;            // +0x14  Get out-param 4 (a byte on both sides)
     unsigned char Pad_0x15[3];              // +0x15
@@ -87,7 +87,7 @@ struct FPayloadServerActivateObject {
     unsigned int ObjectId;      // +0x00
     unsigned char bActivate;    // +0x04
     unsigned char Pad_0x05[3];
-    unsigned int Field_0x08;    // +0x08  index into CObject::get_activate_state's vector
+    unsigned int ActivateParam;    // +0x08  index into CObject::get_activate_state's vector
 };
 static_assert(sizeof(FPayloadServerActivateObject) == 0x0c, "ACTIVATEOBJECT payload 0x0c");
 
@@ -109,8 +109,8 @@ static_assert(sizeof(FPayloadServerActivateObject) == 0x0c, "ACTIVATEOBJECT payl
 // The field names stay offset names because rpclocal's codec reads them so.
 // ---------------------------------------------------------------------------
 struct FPayloadServerSystemSwitchIn {
-    unsigned int Field_0x00;     // +0x00  object id              -> .data:0x06dbb91c
-    unsigned int Field_0x04;     // +0x04  jump object type bits  -> .data:0x06dbb920
+    unsigned int ShipId;     // +0x00  object id              -> .data:0x06dbb91c
+    unsigned int JumpObjTypeBits;     // +0x04  jump object type bits  -> .data:0x06dbb920
     Vector Position;             // +0x08  -> 0x06dbb924/928/92c
     Quaternion Orientation;      // +0x14  -> 0x06dbb930/934/938/93c
 };
@@ -129,10 +129,10 @@ static_assert(sizeof(FPayloadServerSystemSwitchIn) == 0x24, "SYSTEM_SWITCH_IN pa
 // The field names stay offset names because rpclocal's codec reads them so.
 // ---------------------------------------------------------------------------
 struct FPayloadServerItemTractored {
-    unsigned int Field_0x00;     // +0x00  loot object id
-    unsigned int Field_0x04;     // +0x04  tractoring ship id
-    unsigned short Field_0x08;   // +0x08  tractor equipment id
-    unsigned short Field_0x0a;   // +0x0a  units taken
+    unsigned int LootId;     // +0x00  loot object id
+    unsigned int ShipId;     // +0x04  tractoring ship id
+    unsigned short TractorEquipId;   // +0x08  tractor equipment id
+    unsigned short UnitsTaken;   // +0x0a  units taken
 };
 static_assert(sizeof(FPayloadServerItemTractored) == 0x0c, "ITEMTRACTORED payload 0x0c");
 
@@ -147,9 +147,9 @@ static_assert(sizeof(FPayloadServerItemTractored) == 0x0c, "ITEMTRACTORED payloa
 // The field names stay offset names because rpclocal's codec reads them so.
 // ---------------------------------------------------------------------------
 struct FPayloadServerUseItem {
-    unsigned int Field_0x00;     // +0x00  object id
-    unsigned short Field_0x04;   // +0x04  equipment id
-    unsigned short Field_0x06;   // +0x06  count
+    unsigned int ObjectId;     // +0x00  object id
+    unsigned short EquipId;   // +0x04  equipment id
+    unsigned short Count;   // +0x06  count
 };
 static_assert(sizeof(FPayloadServerUseItem) == 0x08, "USE_ITEM payload 0x08");
 
@@ -195,9 +195,9 @@ struct FCommonUpdateObjectInfo {
     unsigned int ObjectId;       // +0x00
     Quaternion Orientation;      // +0x04
     Vector Position;             // +0x14
-    float Field_0x20;            // +0x20  timestamp
-    float Field_0x24;            // +0x24  SSPObjUpdateInfo::Field_0x28, bit copy
-    unsigned char Field_0x28;    // +0x28  SSPObjUpdateInfo::Field_0x2c
+    float Timestamp;            // +0x20  timestamp
+    float Throttle;            // +0x24  SSPObjUpdateInfo::State, bit copy
+    unsigned char State;    // +0x28  SSPObjUpdateInfo::Field_0x2c
     unsigned char Pad_0x29[3];
 };
 static_assert(sizeof(FCommonUpdateObjectInfo) == 0x2c, "UPDATEOBJECT arg struct 0x2c");
@@ -240,41 +240,41 @@ struct FRpcDirectiveBlock {
 static_assert(sizeof(FRpcDirectiveBlock) == 0x0c, "FUN_06d8f510 moves exactly three dwords");
 
 struct FPayloadServerSetDirective {
-    unsigned int Field_0x00;        // +0x00  directive kind 0..5 (see above); never seeded
+    unsigned int DirectiveKind;        // +0x00  directive kind 0..5 (see above); never seeded
     unsigned int Field_0x04;        // +0x04  always 0 from SubmitDirective
-    unsigned char Field_0x08;       // +0x08  a byte on both sides (06d8a4b4); dock op+0x14
+    unsigned char bDockApproachCleared;       // +0x08  a byte on both sides (06d8a4b4); dock op+0x14
     unsigned char Pad_0x09[3];      // +0x09  retail leaves these three bytes untouched
-    float Field_0x0c;               // +0x0c  delay op+0x0c (DelaySeconds)
-    unsigned int Field_0x10;        // +0x10  dock op+0x0c (DockObjectId)
-    int Field_0x14;                 // +0x14  dock op+0x10
-    int Field_0x18;                 // +0x18  ctor seed -1; dock op+0x18 (DockPortIndex)
-    unsigned int Field_0x1c;        // +0x1c  dock op+0x1c / goto op+0x5c
-    float Field_0x20;               // +0x20  dock op+0x20 / goto op+0x60
-    float Field_0x24;               // +0x24  dock op+0x24 / goto op+0x64
-    unsigned int Field_0x28;        // +0x28  follow op+0x0c (TargetId)
-    float Field_0x2c;               // +0x2c  follow op+0x10 (FollowDistance)
-    Vector Field_0x30;              // +0x30  follow op+0x14..0x1c
+    float DelaySeconds;               // +0x0c  delay op+0x0c (DelaySeconds)
+    unsigned int DockObjectId;        // +0x10  dock op+0x0c (DockObjectId)
+    int DockSecondaryObjectId;                 // +0x14  dock op+0x10
+    int DockPortIndex;                 // +0x18  ctor seed -1; dock op+0x18 (DockPortIndex)
+    unsigned int ProxTargetId;        // +0x1c  dock op+0x1c / goto op+0x5c
+    float ProxNearDist;               // +0x20  dock op+0x20 / goto op+0x60
+    float ProxFarDist;               // +0x24  dock op+0x24 / goto op+0x64
+    unsigned int FollowTargetId;        // +0x28  follow op+0x0c (TargetId)
+    float FollowDistance;               // +0x2c  follow op+0x10 (FollowDistance)
+    Vector FollowOffset;              // +0x30  follow op+0x14..0x1c
     float Field_0x3c;               // +0x3c  follow op+0x20
-    int Field_0x40;                 // +0x40  ctor seed 3; goto op+0x0c
-    Vector Field_0x44;              // +0x44  goto op+0x10 (Destination)
-    int Field_0x50;                 // +0x50  goto op+0x1c
-    FRpcDirectiveBlock Block_0x54;  // +0x54  goto op+0x20..0x28
-    FRpcDirectiveBlock Block_0x60;  // +0x60  goto op+0x2c..0x34
-    FRpcDirectiveBlock Block_0x6c;  // +0x6c  goto op+0x38..0x40
-    FRpcDirectiveBlock Block_0x78;  // +0x78  goto op+0x44..0x4c
-    float Field_0x84;               // +0x84  goto op+0x50
-    float Field_0x88;               // +0x88  goto op+0x54
+    int GotoMode;                 // +0x40  ctor seed 3; goto op+0x0c
+    Vector GotoDestination;              // +0x44  goto op+0x10 (Destination)
+    int GotoTargetId;                 // +0x50  goto op+0x1c
+    FRpcDirectiveBlock SplineP1;  // +0x54  goto op+0x20..0x28
+    FRpcDirectiveBlock SplineP2;  // +0x60  goto op+0x2c..0x34
+    FRpcDirectiveBlock SplineP0;  // +0x6c  goto op+0x38..0x40
+    FRpcDirectiveBlock SplineP3;  // +0x78  goto op+0x44..0x4c
+    float GotoRange;               // +0x84  goto op+0x50
+    float GotoSpeed;               // +0x88  goto op+0x54
     unsigned char Field_0x8c;       // +0x8c  goto op+0x58
     unsigned char Field_0x8d;       // +0x8d  goto op+0x59
-    unsigned char Field_0x8e;       // +0x8e  goto op+0x5a
-    unsigned char Field_0x8f;       // +0x8f  goto op+0x5b
-    unsigned char Field_0x90;       // +0x90  goto op+0x6c
+    unsigned char bGotoCruise;       // +0x8e  goto op+0x5a
+    unsigned char bGotoNoCruise;       // +0x8f  goto op+0x5b
+    unsigned char bGotoAllowCruise;       // +0x90  goto op+0x6c
     unsigned char Pad_0x91[3];      // +0x91  swept up by the receiver's REP MOVSD
 };
-static_assert(offsetof(FPayloadServerSetDirective, Field_0x30) == 0x30, "SETDIRECTIVE +0x30");
-static_assert(offsetof(FPayloadServerSetDirective, Field_0x44) == 0x44, "SETDIRECTIVE +0x44");
-static_assert(offsetof(FPayloadServerSetDirective, Block_0x78) == 0x78, "SETDIRECTIVE +0x78");
-static_assert(offsetof(FPayloadServerSetDirective, Field_0x90) == 0x90, "SETDIRECTIVE +0x90");
+static_assert(offsetof(FPayloadServerSetDirective, FollowOffset) == 0x30, "SETDIRECTIVE +0x30");
+static_assert(offsetof(FPayloadServerSetDirective, GotoDestination) == 0x44, "SETDIRECTIVE +0x44");
+static_assert(offsetof(FPayloadServerSetDirective, SplineP3) == 0x78, "SETDIRECTIVE +0x78");
+static_assert(offsetof(FPayloadServerSetDirective, bGotoAllowCruise) == 0x90, "SETDIRECTIVE +0x90");
 static_assert(sizeof(FPayloadServerSetDirective) == 0x94, "SETDIRECTIVE payload 0x94");
 
 // ---------------------------------------------------------------------------
@@ -310,10 +310,10 @@ typedef CSetMissionMessage FServerSetMissionMessageInfo;
 // src/rpclocal/rpc_payloads.h (2026-09-24, claude-code:w5-server-06d4).
 // ---------------------------------------------------------------------------
 struct FServerReplaceMissionObjectiveInfo {
-    unsigned int Field_0x00;        // +0x00  mission id
+    unsigned int MissionId;        // +0x00  mission id
     FmtStr Text;                    // +0x04  MissionObjective::Description
     unsigned int ObjectiveType;     // +0x1c  MissionObjective::Type (Server writes it, rpclocal never reads it)
-    unsigned char State;            // +0x20  ReplaceMissionObjective's third argument, as a byte
+    unsigned char ObjectiveIndex;            // +0x20  ReplaceMissionObjective's third argument, as a byte
     unsigned char Pad_0x21[3];      // +0x21
 };
 static_assert(sizeof(FServerReplaceMissionObjectiveInfo) == 0x24,
@@ -330,10 +330,10 @@ static_assert(sizeof(FServerReplaceMissionObjectiveInfo) == 0x24,
 // claude-code:w5-server-06d4).
 // ---------------------------------------------------------------------------
 struct FServerMissionObjectiveStateInfo {
-    unsigned int Field_0x00;    // +0x00  mission id
-    unsigned char Field_0x04;   // +0x04  objective index (third argument, as a byte)
+    unsigned int MissionId;    // +0x00  mission id
+    unsigned char ObjectiveIndex;   // +0x04  objective index (third argument, as a byte)
     unsigned char Pad_0x05[3];
-    unsigned int Field_0x08;    // +0x08  the fourth argument; receiver zero-extends the word
+    unsigned int State;    // +0x08  the fourth argument; receiver zero-extends the word
 };
 static_assert(sizeof(FServerMissionObjectiveStateInfo) == 0x0c, "SETMISSIONOBJECTIVESTATE arg struct 0x0c");
 
@@ -387,12 +387,12 @@ static_assert(sizeof(FServerMissionObjectiveEntry) == 0x1c,
               "objective entry is 0x1c: FmtStr plus one dword");
 
 struct FServerSetMissionObjectivesInfo {
-    unsigned int Field_0x00;                // +0x00
+    unsigned int MissionId;                // +0x00
     FServerMissionObjectiveEntry* Entries;  // +0x04
     unsigned int Count;                     // +0x08
     FmtStr TextA;                           // +0x0c
     FmtStr TextB;                           // +0x24
-    unsigned char Field_0x3c;               // +0x3c
+    unsigned char MissionType;               // +0x3c
     unsigned char Pad_0x3d[3];              // +0x3d
 };
 static_assert(sizeof(FServerSetMissionObjectivesInfo) == 0x40,
@@ -415,12 +415,12 @@ static_assert(sizeof(FServerSetMissionObjectivesInfo) == 0x40,
 const unsigned int kRequestSpaceScriptNameSize = 0x104;
 
 struct FServerRequestSpaceScriptInfo {
-    unsigned int Field_0x000;                       // +0x000  object id
+    unsigned int ObjectId;                       // +0x000  object id
     char Name[kRequestSpaceScriptNameSize];         // +0x004  script name
-    unsigned int Field_0x108;                       // +0x108  position x (float bits)
-    unsigned int Field_0x10c;                       // +0x10c  position y (float bits)
-    unsigned int Field_0x110;                       // +0x110  position z (float bits)
-    unsigned int Field_0x114;                       // +0x114  1 or 2; see rpc_payloads.h remap
+    unsigned int PosXBits;                       // +0x108  position x (float bits)
+    unsigned int PosYBits;                       // +0x10c  position y (float bits)
+    unsigned int PosZBits;                       // +0x110  position z (float bits)
+    unsigned int CameraMode;                       // +0x114  1 or 2; see rpc_payloads.h remap
 };
 static_assert(sizeof(FServerRequestSpaceScriptInfo) == 0x118, "REQUESTSPACESCRIPT argument struct 0x118");
 
@@ -514,10 +514,10 @@ static_assert(sizeof(FServerDestroyObjectInfo) == 0x08, "DESTROYOBJECT arg struc
 // leaves +0x06 untouched. The wire shape is FPayloadServerRepairObject (rpc_payloads.h).
 // ---------------------------------------------------------------------------
 struct FServerRepairObjectInfo {
-    unsigned int Field_0x00;
-    unsigned short Field_0x04;
+    unsigned int ObjectId;
+    unsigned short EquipId;
     unsigned short Pad_0x06;    // the receiver never writes this half
-    unsigned int Field_0x08;
+    unsigned int Points;
 };
 static_assert(sizeof(FServerRepairObjectInfo) == 0x0c, "REPAIROBJECT arg struct 0x0c");
 
@@ -531,9 +531,9 @@ static_assert(sizeof(FServerRepairObjectInfo) == 0x0c, "REPAIROBJECT arg struct 
 // freelancer.exe reads +0x04 as float bits -- TODO(type).
 // ---------------------------------------------------------------------------
 struct FPayloadServerCfgInterfaceNotification {
-    unsigned int Field_0x00;
-    unsigned int Field_0x04;
-    unsigned char Field_0x08;
+    unsigned int NotifType;
+    unsigned int Param;
+    unsigned char bEnable;
     unsigned char Pad_0x09[3];
 };
 static_assert(sizeof(FPayloadServerCfgInterfaceNotification) == 0x0c, "CFGINTERFACENOTIFICATION payload 0x0c");
@@ -564,8 +564,8 @@ static_assert(sizeof(FPayloadServerSetCamera) == 0x24, "SET_CAMERA payload 0x24"
 // 0x06d88f96 and 0x06d8131a). The argument IS the wire payload; no Server.dll caller.
 // ---------------------------------------------------------------------------
 struct FPayloadServerAdjustAttitude {
-    unsigned int Field_0x00;    // +0x00
-    float Field_0x04;           // +0x04
+    unsigned int VibeHandle;    // +0x00
+    float Attitude;           // +0x04
 };
 static_assert(sizeof(FPayloadServerAdjustAttitude) == 0x08, "ADJUSTATTITUDE payload 0x08");
 

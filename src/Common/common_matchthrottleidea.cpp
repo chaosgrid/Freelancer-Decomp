@@ -109,7 +109,7 @@ bool MatchThrottle2Idea::SetContext(void* InObject, void* InHandle, void* InCont
 }
 
 // Slot 2, LAB_062d5bf0 (.text:062d5bf0-062d5cd0, RET 4). The argument is never read.
-void MatchThrottle2Idea::Slot2(float DeltaTime)
+void MatchThrottle2Idea::SyncCruise(float DeltaTime)
 {
     (void)DeltaTime;
     IObjRW* const Watched = MatchWatched(Watcher);

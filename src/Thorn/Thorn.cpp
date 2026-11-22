@@ -416,7 +416,7 @@ namespace
 
         void* DACOM_API Slot7EntityHandle(int Index) override { return Scene_.EntityHandle(Index); }
 
-        void* DACOM_API Slot8(int Index) override
+        void* DACOM_API Slot8EntitySnapInorder(int Index) override
         {
             // LAB_06f388c0: same inorder walk as slot 7, inner vtable+0x1C snapshot; fail → 0.
             return Scene_.EntitySnapInorder(Index);
@@ -523,13 +523,13 @@ namespace
             return GR_GENERIC;
         }
 
-        unsigned long DACOM_API Slot31(int Index) override
+        unsigned long DACOM_API Slot31UserPropCount(int Index) override
         {
             // LAB_06f38ca0: lookup entity; return inner+0x80 (_Mysize of string userprops).
             return Scene_.UserPropCount(Index);
         }
 
-        const char* DACOM_API Slot32(int Index, int N) override
+        const char* DACOM_API Slot32UserPropKey(int Index, int N) override
         {
             // LAB_06f38d20: N-th inorder key of the same map as slots 33/34 (inner+0x74).
             return Scene_.UserPropKey(Index, N);
@@ -631,7 +631,7 @@ namespace
                 Desc.ShareMode = 1;
                 Desc.Creation = 3;
                 Desc.Flags = 0x08000080;
-                Desc.Field30 = 0xFFFFFFFF;
+                Desc.FindHandle = 0xFFFFFFFF;
                 ICOManager* Manager = DACOM_Acquire();
                 const GENRESULT Result = Manager->CreateInstance(
                     reinterpret_cast<AGGDESC*>(&Desc),
@@ -658,7 +658,7 @@ namespace
             Desc.ShareMode = 1;
             Desc.Creation = 2;
             Desc.Flags = 0x08000080;
-            Desc.Field30 = 0xFFFFFFFF;
+            Desc.FindHandle = 0xFFFFFFFF;
             IFileSystem* FileSystem;
             ICOManager* Manager = DACOM_Acquire();
             GENRESULT Result = Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
@@ -728,13 +728,13 @@ namespace
         // IScriptControl facet (+8, .rdata:06f5ad18). Each slot is an adjustor thunk:
         // `this -= 8; JMP [vtbl + n]` into this object's IScriptEngine slot.
         // Slot 3, LAB_06f3c080 -> +0x58, slot 22.
-        GENRESULT DACOM_API Slot3Start(int Arg) override { return Slot22Start(Arg); }
+        GENRESULT DACOM_API Start(int Arg) override { return Slot22Start(Arg); }
         // Slot 4, LAB_06f3c0a0 -> +0x68, slot 26.
-        GENRESULT DACOM_API Slot4Tick(int DtMs) override { return Slot26Tick(DtMs); }
+        GENRESULT DACOM_API Tick(int DtMs) override { return Slot26Tick(DtMs); }
         // Slot 5, LAB_06f3c0c0 -> +0x5c, slot 23.
-        GENRESULT DACOM_API Slot5Stop() override { return Slot23Stop(); }
+        GENRESULT DACOM_API Stop() override { return Slot23Stop(); }
         // Slot 6, LAB_06f3c0e0 -> +0x44, slot 17.
-        int DACOM_API Slot6GetDuration() override { return Slot17GetDuration(); }
+        int DACOM_API GetDuration() override { return Slot17GetDuration(); }
 
         float* ScenePos() { return Scene_.ForwardCsys().Pos; }
         float* SceneOrient() { return Scene_.ForwardCsys().Orient; }

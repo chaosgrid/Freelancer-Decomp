@@ -93,7 +93,7 @@ namespace
         Desc.ShareMode = 1;       // FILE_SHARE_READ
         Desc.Creation = 3;        // OPEN_EXISTING
         Desc.Flags = 0x8000080;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.FindHandle = 0xFFFFFFFF;
         const int Handle = FileSystem->OpenByDesc(&Desc);
         if (Handle == -1)
             return false;

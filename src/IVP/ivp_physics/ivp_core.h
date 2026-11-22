@@ -325,7 +325,7 @@ public:
     // +0x1B0: Union-find "next" pointer for merged cores. When two cores are welded
     // together (e.g. by a fixed constraint), one core's chain of these pointers is
     // relinked to point at the other, so walking this field to its null terminator
-    // (see FUN_063557c0 / get_master_core()) finds the current representative core
+    // (see IVP_Core_UnionFindGetFather / get_master_core()) finds the current representative core
     // for the merged group. Null means this core is its own master. Was previously
     // (incorrectly) modeled as unused padding.
     IVP_Core* MergedCoreWhichReplacedIt;
@@ -486,7 +486,7 @@ public:
     void register_controller(IVP_Controller* Controller);
 
     // FUN_06347040 (.text:06347040-063470d9): IVP_Core::freeze_simulation_core -- stop
-    // movement (FUN_06346fb0), then per object (backward): movement byte = 8, mindist
+    // movement (IVP_Core_StopMovementWithoutCollisionRecheck), then per object (backward): movement byte = 8, mindist
     // manager RecheckOvElement, bring the hull values to "now" with both gradients zeroed
     // (the hull's edit time is NOT updated), DrainAndShift, release the narrow-phase cache
     // slot when +0x40 is set (FUN_0634d510).
@@ -550,7 +550,7 @@ public:
     void update_time_of_last_motion();
 
     // FUN_06346e70 (Common.dll.txt:410293-410326, decomp-tracker item 2850,
-    // 29 insns). Two confirmed callers pass different pairs: FUN_06346fb0's
+    // 29 insns). Two confirmed callers pass different pairs: IVP_Core_StopMovementWithoutCollisionRecheck's
     // tail (ivp_core.cpp, "TODO: Synchronize simulation time snapshot")
     // passes {Environment->delta_time, Environment->inv_delta_time} (+0xAC/
     // +0xB0) directly; FUN_0634b480 (item 2989's revive_pass() below) instead
@@ -915,12 +915,12 @@ static_assert(offsetof(IVP_Core, Controllers) == 0x150, "IVP_Core+0x150");
 static_assert(offsetof(IVP_Core, OwningSimUnit) == 0x15C, "IVP_Core+0x15C");
 static_assert(offsetof(IVP_Core, Unconfirmed_0x1B8) == 0x1B8, "IVP_Core+0x1B8");
 
-// FUN_063557c0: IVP_Core::get_master_core() equivalent, defined in
+// IVP_Core_UnionFindGetFather: IVP_Core::get_master_core() equivalent, defined in
 // ivp_core.cpp (decomp-tracker Common.dll item 3227). Declared here (rather
 // than only file-local in ivp_core.cpp) so other IVP_Core-adjacent
 // translation units -- e.g. ivp_simulation_unit.cpp's merge/split logic,
 // decomp-tracker items 2911/2913 -- can call it directly.
-IVP_Core* __fastcall FUN_063557c0(IVP_Core* Core);
+IVP_Core* __fastcall IVP_Core_UnionFindGetFather(IVP_Core* Core);
 
 // FUN_0634d510 (cdecl): release an object's narrow-phase cache slot -- if +0x40 is set,
 // clear the slot's owner (+0x08) and +0x40.

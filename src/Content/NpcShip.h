@@ -58,14 +58,14 @@ struct FContentNpcShipParams : public FContentShipParams
     // CreateGuide.
     FGuideDescHandle GuideDesc;
     ID_String Pilot;                                     // +0x100 cleared
-    float Field_0x104 = -1.0f;                           // +0x104 DAT_06fb956c -> ship +0x1bc
-    float Field_0x108 = 24.0f;                           // +0x108 -> ship +0x1c8
+    float Longevity = -1.0f;                           // +0x104 DAT_06fb956c -> ship +0x1bc
+    float InitialLifeTime = 24.0f;                           // +0x108 -> ship +0x1c8
     float Field_0x10c = 500.0f;                          // +0x10c -> ship +0x1c0
-    int Field_0x110 = -1;                                // +0x110 TODO: no reader in TU43
+    int DockIndex = -1;                                // +0x110 TODO: no reader in TU43
     // +0x114: an object id; when set, the guide starts only if the object's type has a bit
     // of 0xc40 (06f33bea-06f33c13).
     unsigned int GuideTargetId = 0;
-    std::list<unsigned int> Field_0x118;                 // +0x118 -> ship +0x17c
+    std::list<unsigned int> LabelIds;                 // +0x118 -> ship +0x17c
     pub::AI::Personality Personality;                    // +0x124
     unsigned int CreationType = 2;                       // +0x4fc -> ship +0x1b4
     int Level = 0;                                       // +0x500 arch +0x24; ShipInfo +0xbc
@@ -94,7 +94,7 @@ bool __cdecl ApplyNpcShipArchById(FContentNpcShipParams* Params, unsigned int co
 // FUN_06f34a80 (cdecl): costume and voice of FactionId's faction properties (TU48).
 // Param2 goes to the costume pick as is and to the voice pick as (Param2 != 1) + 1.
 // TODO: meaning of Param2 (TU48 FUN_06f4f430 / FUN_06f4f620).
-bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Param2, FContentNpcShipParams* Params);
+bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Gender, FContentNpcShipParams* Params);
 
 // Retail vtables: primary 06fb95a0 {sdd 06f33d00, 06ea1460, 06f33cf0, 06f57c30, 06f57c40,
 // 06f33e70, 06f341f0}; DirectiveCallback at +0x118 06fb959c {06f33f90}; ContentCallback at
@@ -109,12 +109,12 @@ public:
     ~FContentNpcShip() override;
 
     // Slot 1, 06ea1460: MOV AL,1.
-    bool Slot04() override;
+    bool IsNpcShip() override;
     // Slot 5, 06f33e70: &Personality.
     virtual pub::AI::Personality* GetPersonality();
     // Slot 6, 06f341f0 (RET 8): up to MaxCount keys of the faction properties' +0x60 list
     // into Out; returns the count. TODO: meaning of the list (TU48).
-    virtual int Slot18(unsigned int* Out, int MaxCount);
+    virtual int GetScanForCargo(unsigned int* Out, int MaxCount);
 
     // DirectiveCallback slot 0, 06f33f90.
     void OnDirectiveComplete(int ResultWord11c, int ResultWord118) override;
@@ -147,9 +147,9 @@ public:
     void ClearFlee();
     // FUN_06f33fd0 (RET 4): +0x1b1 = Value; when set, the event list stops this ship's timer
     // (FUN_06f68600). While set the tether / lead callbacks do nothing.
-    void SetField1b1(bool Value);
+    void SetCommMuted(bool Value);
     // FUN_06f33ff0.
-    bool GetField1b1() const;
+    bool IsCommMuted() const;
     // FUN_06f34100: a comm line of this ship ended (SpaceSupport msg 0xb via the event list).
     void OnCommLineDone();
     // FUN_06f34800 (RET 0xc): move the ship to System (null: out of every system) at
@@ -171,7 +171,7 @@ public:
     // +0x178 with FUN_06f28e10 after state 2 destroyed +0x17c), so it is destroyed after
     // Field_0x17c and before the TU50 base.
     FContentGuideHandle Guide;
-    std::list<unsigned int> Field_0x17c;           // +0x17c params +0x118. TODO: meaning
+    std::list<unsigned int> LabelIds;           // +0x17c params +0x118. TODO: meaning
     // +0x188 flee destination kind read by request_flee_destination: 0 ask the guide,
     // 1 position (+0x190), 2 / 3 object (+0x19c).
     int FleeState = 0;
@@ -182,18 +182,18 @@ public:
     // the hailing player state); +0x1a8 the game time of that hail.
     FContentPlayerState* LastHailPlayer = nullptr;
     double LastHailTime = -1.0;
-    bool Field_0x1b1 = false;                      // +0x1b1 see SetField1b1
+    bool bCommMuted = false;                      // +0x1b1 see SetField1b1
     // +0x1b4 params +0x4fc, mapped by get_creation_type (the name CreationType is taken by
     // ContentCallback's enum).
     unsigned int CreationKind;
     // +0x1b8: 5 from the ctor and from the event list's timer; each finished comm line
     // counts it down, at 0 the owning controller gets message 0x1006.
     int CommLinesLeft = 5;
-    float Field_0x1bc;                             // +0x1bc params +0x104. TODO: meaning
+    float Longevity;                             // +0x1bc params +0x104. TODO: meaning
     float Field_0x1c0;                             // +0x1c0 params +0x10c. TODO: meaning
     unsigned int Loadout;                          // +0x1c4 params +0x7c
-    float Field_0x1c8;                             // +0x1c8 params +0x108. TODO: meaning
-    ID_String Field_0x1cc;                         // +0x1cc cleared. TODO: writer
+    float LifeTime;                             // +0x1c8 params +0x108. TODO: meaning
+    ID_String PilotId;                         // +0x1cc cleared. TODO: writer
     pub::AI::Personality Personality;              // +0x1d0
     unsigned char Field_0x5a8;                     // +0x5a8 params +0x78. TODO: meaning
     // +0x5ac cleared by the ctor; the only writer is FEncounterParameters::Spawn (06ef58f7):

@@ -95,11 +95,11 @@ namespace
     {
         ~FLFxMesh() override;
 
-        GENRESULT DACOM_API Slot3(void* Transform) override;
-        float* DACOM_API Slot4() override;
-        GENRESULT DACOM_API Slot5(void* Arg) override;
-        GENRESULT DACOM_API Slot6(void* Camera) override;
-        GENRESULT DACOM_API Slot7() override;
+        GENRESULT DACOM_API SetTransform(void* Transform) override;
+        float* DACOM_API GetTransform() override;
+        GENRESULT DACOM_API Update(void* Arg) override;
+        GENRESULT DACOM_API Render(void* Camera) override;
+        GENRESULT DACOM_API Destroy() override;
         GENRESULT DACOM_API Slot8(void* Arg) override;
     };
     static_assert(offsetof(FLFxMesh, EngineInstance) == 0x08, "FLFxMesh +0x04 ObjectHandle base");
@@ -124,7 +124,7 @@ namespace
         // FUN_004f6b50 (entered on the ObjectHandle face): the abstract vtables (005d991c /
         // 005d9914), then FUN_004f6a70 called directly (not through the vtable), then
         // FUN_00420d10 on the handle, which only restores its own vtable.
-        FLFxMesh::Slot7();
+        FLFxMesh::Destroy();
     }
 
     GENRESULT DACOM_API FLFxMeshComponent::QueryInterface(const char* Iid, void** Out)
@@ -163,27 +163,27 @@ namespace
         return 0;
     }
 
-    GENRESULT DACOM_API FLFxMesh::Slot3(void* Transform)
+    GENRESULT DACOM_API FLFxMesh::SetTransform(void* Transform)
     {
         // LAB_004f6910 (RET 8): FUN_00421050 on the handle.
         ClientMeshHolderSetMatrix(this, Transform);
         return GR_OK;
     }
 
-    float* DACOM_API FLFxMesh::Slot4()
+    float* DACOM_API FLFxMesh::GetTransform()
     {
         // LAB_004f6930 (RET 4): FUN_00421030 on the handle, its result returned.
         return ClientMeshHolderGetTransform(this);
     }
 
-    GENRESULT DACOM_API FLFxMesh::Slot5(void* Arg)
+    GENRESULT DACOM_API FLFxMesh::Update(void* Arg)
     {
         // LAB_004f6940 (RET 8): DALib::Engine slot 27 UpdateInstance(+0x08, 0, Arg).
         DALib::Engine->UpdateInstance(EngineInstance, 0, Arg);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FLFxMesh::Slot6(void* Camera)
+    GENRESULT DACOM_API FLFxMesh::Render(void* Camera)
     {
         // FUN_004f6970 (RET 8). 0x004f6988..0x004f69bf: D3DRS_ZWRITEENABLE (0xe) saved and set
         // to 0.
@@ -201,7 +201,7 @@ namespace
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FLFxMesh::Slot7()
+    GENRESULT DACOM_API FLFxMesh::Destroy()
     {
         // FUN_004f6a70 (RET 4): FUN_0041b030 on the material entry (+0x0c; the auxiliary one at
         // +0x10 is left alone), then a bound instance (+0x08 != -1) destroyed through
@@ -226,7 +226,7 @@ namespace
     {
         virtual ~FLFxMeshFactory() {} // FUN_004f6bf0; private implementation slot 4.
 
-        GENRESULT DACOM_API Slot3(void* ArgA, void* ArgB, float const* Position,
+        GENRESULT DACOM_API CreateMesh(void* ArgA, void* ArgB, float const* Position,
                                   IFxMesh** Out) override;
     };
     static_assert(sizeof(FLFxMeshFactory) == 0x4, "FLFxMeshFactory abstract base is 0x4");
@@ -278,7 +278,7 @@ namespace
         return 0;
     }
 
-    GENRESULT DACOM_API FLFxMeshFactory::Slot3(void* /*ArgA*/, void* /*ArgB*/,
+    GENRESULT DACOM_API FLFxMeshFactory::CreateMesh(void* /*ArgA*/, void* /*ArgB*/,
                                                float const* Position, IFxMesh** Out)
     {
         // FUN_004f6810 (RET 0x14). ArgA and ArgB (alchemy's appearance +0x60 / +0x74) are never

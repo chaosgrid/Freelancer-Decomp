@@ -48,7 +48,7 @@ public:
     // info card, the welcome block, the buy / sell arrows, the partner's transfer panel
     // (+0x364..+0x380 of NN_Inventory), the quantity panel and, for the ship dealer, the
     // continue / back / price controls.
-    void Slot45() override;
+    void CreateControls() override;
 
     // slot 11 FUN_0047fef0 -- follow the partner's visibility and info card panes, update the
     // children, and while active refresh the list and lay out the buy / sell / quantity / ship
@@ -127,19 +127,19 @@ public:
 
     // --- retail members (retail offsets) ---
     NnInventory* Inventory;          // +0x974 -- the inventory this dealer sits next to
-    int TradeMode;                   // +0x978 -- 1 (ctor); Slot23 0xef02 resets it to 0
-    int Field97c;                    // +0x97c
+    int TradeMode;                   // +0x978 -- 1 (ctor); ProcessMessage 0xef02 resets it to 0
+    int ShipPackageGoodId;                    // +0x97c
     int Field980;                    // +0x980 -- 1
     unsigned char Field984;          // +0x984 -- 0
     unsigned char Pad985[3];
-    int Field988;                    // +0x988 -- 1
-    unsigned char Field98c;          // +0x98c -- 0; RestorePlayerShipView clears it
+    int Quantity;                    // +0x988 -- 1
+    unsigned char bPreviewingShip;          // +0x98c -- 0; RestorePlayerShipView clears it
     unsigned char Pad98d[3];
     float BaseFeeling;               // +0x990 -- GetBaseFactionFeeling() (ctor)
     WinControl* WelcomeText;         // +0x994 "WelcomeText"
     WinControl* WelcomeLine;         // +0x998 "WelcomeLine"
     WinControl* WelcomeHelp;         // +0x99c "WelcomeHelp"
-    // +0x994..+0x9f0: the controls Slot45 (FUN_00480d10) creates; the names are the retail
+    // +0x994..+0x9f0: the controls CreateControls (FUN_00480d10) creates; the names are the retail
     // control names it passes to the factory (stores at 0x00481339..0x00481ffa).
     WinControl* BuyText;             // +0x9a0 "BuyText"
     WinControl* BuyArrow;            // +0x9a4 "BuyArrow"
@@ -162,10 +162,10 @@ public:
     WinControl* ShipBuyProblem;      // +0x9e8 "ShipBuyProblem" (ship dealer with a ship)
     WinControl* BackToShipDealer;    // +0x9ec "BackToShipDealer" (ship dealer with a ship)
     WinControl* ShipDealerShipPrice; // +0x9f0 "ShipDealerShipPrice" (ship dealer with a ship)
-    unsigned char Field9f4;          // +0x9f4 -- 1
+    unsigned char bTransferPanelHidden;          // +0x9f4 -- 1
     unsigned char Pad9f5[3];
-    int Field9f8;                    // +0x9f8 -- 0
-    int Field9fc;                    // +0x9fc -- the partner ship's value (RestorePlayerShipView)
+    int ShipHullPrice;                    // +0x9f8 -- 0
+    int PlayerShipTradeInValue;                    // +0x9fc -- the partner ship's value (RestorePlayerShipView)
 
 private:
     NnDealer(NnDealer const&) = delete;

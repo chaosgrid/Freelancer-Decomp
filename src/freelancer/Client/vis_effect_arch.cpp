@@ -1060,11 +1060,11 @@ int AleLibLoad(char const* AleName)
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = AleName;
-    Desc.Field10 = 0x80000000u;
-    Desc.Field14 = 1;
-    Desc.Field1C = 3;
-    Desc.Field20 = 0x8000080u;
-    Desc.Field30 = 0xffffffffu;
+    Desc.Access = 0x80000000u;
+    Desc.ShareMode = 1;
+    Desc.Creation = 3;
+    Desc.Flags = 0x8000080u;
+    Desc.FindHandle = 0xffffffffu;
 
     void* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)

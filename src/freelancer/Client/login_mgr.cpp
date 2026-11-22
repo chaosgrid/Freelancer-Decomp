@@ -93,23 +93,23 @@ namespace
 FServerInfo::FServerInfo()
     : IpAddress(-1)
     , Port(0)
-    , Field_0x28(0)
+    , bAddressValid(0)
     , Ping(-2)
     , LastResponseTime(0)
-    , Field_0x34(0)
+    , EnumAttempts(0)
     , ResponseCount(0)
     , Field_0x3c(0)
-    , Field_0x3d(0)
-    , Field_0x3e(0)
-    , Field_0x40(0)
+    , bEnumInFlight(0)
+    , bLan(0)
+    , MissedPingCount(0)
     , PlayerCount(0)
     , MaxPlayers(0)
     , Version(0)
     , Id(0)
     , bPassword(0)
-    , Field_0x95(1)
-    , Field_0x96(1)
-    , Field_0x98(0)
+    , bAllowNewPlayers(1)
+    , bAllowPvp(1)
+    , bSessionValid(0)
 {
 }
 
@@ -286,26 +286,26 @@ bool FLoginHistory::Save()
 
 // .text:005a8be0
 CLoginMgr::CLoginMgr()
-    : Field_0x180(90.0f)            // DAT_005e64c0 = 42B40000h
+    : ConnectTimeout(90.0f)            // DAT_005e64c0 = 42B40000h
     , bConnected(0)
     , LoginName(L"SinglePlayer")    // .rdata:005e3094
     , bCreateAccount(0)
-    , Field_0x1ac(50000.0f)         // DAT_005e64c4 = 47435000h
+    , LoginTimeout(50000.0f)         // DAT_005e64c4 = 47435000h
     , bLoginResponse(0)
     , LoginStatus(5)
     , Field_0x1c8(0)
     , SaveFailureCount(0)
-    , Field_0x1d0(3000.0f)          // DAT_005e64c8 = 453B8000h
+    , CharacterInfoTimeout(3000.0f)          // DAT_005e64c8 = 453B8000h
     , bCharacterInfoArrived(0)
-    , Field_0x218(3000.0f)          // DAT_005e64cc = 453B8000h
-    , Field_0x21c(0)
+    , CharacterSelectTimeout(3000.0f)          // DAT_005e64cc = 453B8000h
+    , bCharacterSelectResponse(0)
     , ListServerHost("FLListServer2") // .rdata:005e650c
     , ListServerPort(0x708a)
     , Gun(nullptr)
-    , Field_0x238(0)
-    , Field_0x23c(0)
-    , Field_0x240(0)
-    , Field_0x25c(0)
+    , bServerListChanged(0)
+    , ServerListPage(0)
+    , bServerListRequestPending(0)
+    , InFlightDirectEnums(0)
 {
     SelectCharacterName[0] = L'\0'; // .text:005a8efb `MOV word ptr [ESI+0x1e8],BX`
     Logins.Load();                  // .text:005a8f02 FUN_005b62a0
@@ -356,7 +356,7 @@ CLoginMgr::~CLoginMgr()
     ResetServerLists();          // .text:005a907b FUN_005abc80
     bLoginResponse = 0;          // .text:005a9088
     bCharacterInfoArrived = 0;   // .text:005a908e
-    Field_0x21c = 0;             // .text:005a9094
+    bCharacterSelectResponse = 0;             // .text:005a9094
 }
 
 // .text:005ab590 (Gun2::IGUNQueueRead slot 0, RET 8) -- the list server's server-list reply
@@ -382,13 +382,13 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
     }
     if (Body->bHasEntries != 0 && EntryCount > 0)                      // 005ab60e JBE
     {
-        unsigned int const Page = Field_0x23c;                         // 005ab617
-        Field_0x23c = Page + 1;                                        // 005ab623
+        unsigned int const Page = ServerListPage;                         // 005ab617
+        ServerListPage = Page + 1;                                        // 005ab623
         Gun->GetBrowser()->SendRequest7104(0x65, Page, 0, 0, 0);                // 005ab629..005ab638
     }
     else
     {
-        Field_0x23c = 0;                                               // 005ab644
+        ServerListPage = 0;                                               // 005ab644
     }
 
     for (unsigned long Index = 0; Index < EntryCount; ++Index)         // 005abc05..005abc14
@@ -399,12 +399,12 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
         // +0x88 = 1, +0x98 = 2 (the other stores it repeats -- +0x2c -2, +0x84 / +0x8c /
         // +0x90 / +0x94 0, +0x95 / +0x96 1 -- are the default constructor's values).
         FServerInfo Info;
-        Info.Field_0x28 = 1;                                           // 005ab746
+        Info.bAddressValid = 1;                                           // 005ab746
         Info.MaxPlayers = 1;                                           // 005ab755
-        Info.Field_0x98 = 2;                                           // 005ab75c
+        Info.bSessionValid = 2;                                           // 005ab75c
 
         Info.Name = Entry->Name;                                       // 005ab76e..005ab7b7
-        Info.Field_0x54 = Entry->Description;                          // 005ab7bd..005ab802
+        Info.Description = Entry->Description;                          // 005ab7bd..005ab802
         Info.Version = static_cast<unsigned int>(MsvcrtWtoi(Entry->Version)); // 005ab808..005ab812
         Info.Address = Entry->Address;                                 // 005ab819..005ab858
 
@@ -461,7 +461,7 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
                 break;
             }
             *Colon = '\0';
-            Info.Field_0x96 = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ab9c4..005ab9cb
+            Info.bAllowPvp = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ab9c4..005ab9cb
 
             Field = Colon + 1;                                         // 005ab9d2
             Colon = strchr(Field, ':');
@@ -470,7 +470,7 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
                 break;
             }
             *Colon = '\0';
-            Info.Field_0x95 = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ab9f2..005ab9fd
+            Info.bAllowNewPlayers = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ab9f2..005ab9fd
 
             Field = Colon + 1;                                         // 005ab9f9
             Colon = strchr(Field, ':');                                // 005aba04
@@ -479,7 +479,7 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
                 break;
             }
             *Colon = '\0';                                             // 005aba18
-            Info.Field_0x64 = Field;                                   // 005aba1a..005aba62
+            Info.ServerSig = Field;                                   // 005aba1a..005aba62
 
             Info.Id = static_cast<unsigned int>(MsvcrtAtoi(Colon + 1));      // 005aba65..005aba75
             if (Info.Id == 0xffffffffu)                                // 005aba72 CMP EAX,-1
@@ -488,13 +488,13 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
             }
 
             // 005aba82..005abb01: always true here (1 and 2 above), tested all the same.
-            if (Info.Field_0x28 != 0 && Info.Field_0x98 != 0)
+            if (Info.bAddressValid != 0 && Info.bSessionValid != 0)
             {
                 bool bKnown = false;
                 for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
                 {
                     FServerInfo const& Server = Servers[ServerIndex];
-                    if (Server.Id == Info.Id && Server.Field_0x64 == Info.Field_0x64)
+                    if (Server.Id == Info.Id && Server.ServerSig == Info.ServerSig)
                     {
                         bKnown = true;                                 // 005abacf -> 005abb0a
                         break;
@@ -503,26 +503,26 @@ long __stdcall CLoginMgr::Read(Gun2::GUNQueueMessage* Message)
                 if (!bKnown)
                 {
                     Servers.push_back(Info);                           // 005abaf5 FUN_005adfc0
-                    Field_0x238 = 1;                                   // 005abafa
+                    bServerListChanged = 1;                                   // 005abafa
                 }
             }
 
             // 005abb0a..005abb84
-            if (!Info.Field_0x64.empty())
+            if (!Info.ServerSig.empty())
             {
                 FServerInfo* Match = nullptr;
                 for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
                 {
                     FServerInfo& Server = Servers[ServerIndex];
-                    if (Server.Field_0x64 == Info.Field_0x64 && Server.Id == Info.Id)
+                    if (Server.ServerSig == Info.ServerSig && Server.Id == Info.Id)
                     {
                         Match = &Server;                               // 005abb53 -> 005abb67
                         break;
                     }
                 }
-                if (Match != nullptr && Match->Field_0x3e == 0)        // 005abb67..005abb6e
+                if (Match != nullptr && Match->bLan == 0)        // 005abb67..005abb6e
                 {
-                    Field_0x160.push_back(Info);                       // 005abb84 FUN_005adfc0
+                    PendingDirectServers.push_back(Info);                       // 005abb84 FUN_005adfc0
                 }
             }
         } while (false);
@@ -542,7 +542,7 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
     // 005acd06..005acdf3: the FServerInfo default spelled inline.
     FServerInfo Info;
     Info.Port = 0;                                                     // 005acdfd
-    Info.Field_0x28 = 1;                                               // 005ace01
+    Info.bAddressValid = 1;                                               // 005ace01
     Info.Ping = static_cast<int>(Response->dwRoundTripLatencyMS); // 005acdfa / 005ace09
     if (Desc->dwCurrentPlayers != 0)                                   // 005ace10
     {
@@ -553,12 +553,12 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
         Info.PlayerCount = 0;                                           // 005ace29
     }
     Info.MaxPlayers = static_cast<int>(Desc->dwMaxPlayers - 1);        // 005ace30..005ace34
-    Info.Field_0x98 = 2;                                               // 005ace3b
+    Info.bSessionValid = 2;                                               // 005ace3b
     Info.LastResponseTime = static_cast<int>(timeGetTime());                 // 005ace46
     Info.Version = 0;                                                  // 005ace53
     if (Response->pvUserContext == nullptr)                            // 005ace50
     {
-        Info.Field_0x3e = 1;                                           // 005ace5c
+        Info.bLan = 1;                                           // 005ace5c
     }
     Info.Name = Desc->pwszSessionName;                                 // 005ace61..005acea3
 
@@ -592,7 +592,7 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
             return;                                                    // LAB_005ad212
         }
         *Colon = '\0';                                                 // 005acfdd
-        Info.Field_0x96 = static_cast<unsigned char>(MsvcrtAtoi(Data) != 0); // 005acfdf..005acfec
+        Info.bAllowPvp = static_cast<unsigned char>(MsvcrtAtoi(Data) != 0); // 005acfdf..005acfec
 
         char* Field = Colon + 1;                                       // 005acfe3
         Colon = strchr(Field, ':');
@@ -601,7 +601,7 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
             return;
         }
         *Colon = '\0';
-        Info.Field_0x95 = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ad00d..005ad014
+        Info.bAllowNewPlayers = static_cast<unsigned char>(MsvcrtAtoi(Field) != 0); // 005ad00d..005ad014
 
         Field = Colon + 1;                                             // 005ad01b
         Colon = strchr(Field, ':');
@@ -628,8 +628,8 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
             return;                                                    // 005ad07a -> LAB_005ad214
         }
         *Colon = '\0';                                                 // 005ad085
-        Info.Field_0x64 = Field;                                       // 005ad080..005ad0c8
-        Info.Field_0x54 = reinterpret_cast<wchar_t const*>(Colon + 1); // 005ad0ce..005ad103
+        Info.ServerSig = Field;                                       // 005ad080..005ad0c8
+        Info.Description = reinterpret_cast<wchar_t const*>(Colon + 1); // 005ad0ce..005ad103
     }
 
     if (Info.Id == 0xffffffffu)                                        // 005ad109..005ad115
@@ -644,14 +644,14 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
     for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
     {
         FServerInfo& Server = Servers[ServerIndex];
-        if (Server.Field_0x64 == Info.Field_0x64 && Server.Id == Info.Id)
+        if (Server.ServerSig == Info.ServerSig && Server.Id == Info.Id)
         {
             // 005ad283..005ad33a: refresh the known entry. Address, Port, +0x10, +0x64 and Id
             // are left as they are.
-            Server.Field_0x96 = Info.Field_0x96;
-            Server.Field_0x95 = Info.Field_0x95;
+            Server.bAllowPvp = Info.bAllowPvp;
+            Server.bAllowNewPlayers = Info.bAllowNewPlayers;
             Server.bPassword = Info.bPassword;
-            Server.Field_0x54 = Info.Field_0x54;                       // 005ad2bf assign(s, 0, npos)
+            Server.Description = Info.Description;                       // 005ad2bf assign(s, 0, npos)
             Server.Name = Info.Name;                                   // 005ad2d7
             Server.PlayerCount = Info.PlayerCount;
             Server.MaxPlayers = Info.MaxPlayers;
@@ -661,30 +661,30 @@ void CLoginMgr::OnAddHost(_DPNMSG_ENUM_HOSTS_RESPONSE* Response)
             {
                 Server.Ping = Info.Ping;
             }
-            Server.Field_0x40 = 0;                                     // 005ad30e
+            Server.MissedPingCount = 0;                                     // 005ad30e
             Server.LastResponseTime = Info.LastResponseTime;                       // 005ad315
             Server.Version = Info.Version;                             // 005ad326
-            Server.Field_0x3e = Info.Field_0x3e;                       // 005ad330
-            Field_0x238 = 1;                                           // 005ad333 [CDPClient+0x234]
-            Server.Field_0x3d = 0;                                     // 005ad33a
+            Server.bLan = Info.bLan;                       // 005ad330
+            bServerListChanged = 1;                                           // 005ad333 [CDPClient+0x234]
+            Server.bEnumInFlight = 0;                                     // 005ad33a
             return;
         }
     }
 
     // 005ad19b..005ad20b: always true here (1 and 2 above), tested all the same; the second
     // search, with the terms the other way round, cannot find what the first one missed.
-    if (Info.Field_0x28 != 0 && Info.Field_0x98 != 0)
+    if (Info.bAddressValid != 0 && Info.bSessionValid != 0)
     {
         for (size_t ServerIndex = 0; ServerIndex < Servers.size(); ++ServerIndex)
         {
             FServerInfo const& Server = Servers[ServerIndex];
-            if (Server.Id == Info.Id && Server.Field_0x64 == Info.Field_0x64)
+            if (Server.Id == Info.Id && Server.ServerSig == Info.ServerSig)
             {
                 return;                                                // 005ad1e2 -> LAB_005ad212
             }
         }
         Servers.push_back(Info);                                       // 005ad206 FUN_005ad6a0
-        Field_0x238 = 1;                                               // 005ad20b
+        bServerListChanged = 1;                                               // 005ad20b
     }
     // 005ad212..005ad262: Info destroyed.
 }
@@ -702,7 +702,7 @@ int CLoginMgr::Connect(bool bDisconnectFirst)
         bLoginResponse = 0;
         bCharacterInfoArrived = 0;
         Characters.free();          // FUN_005ae7a0
-        Field_0x21c = 0;
+        bCharacterSelectResponse = 0;
     }
 
     bConnected = 0;                 // .text:005a9a7b
@@ -774,14 +774,14 @@ bool CLoginMgr::SetupSinglePlayer()
 
     CurrentServer.Address = L"localpass";          // .rdata:005e65b8
     CurrentServer.IpAddress = -1;
-    CurrentServer.Field_0x28 = 1;
+    CurrentServer.bAddressValid = 1;
     CurrentServer.Ping = 0;
     CurrentServer.PlayerCount = 0;
     CurrentServer.MaxPlayers = 1;
-    CurrentServer.Field_0x98 = 2;
+    CurrentServer.bSessionValid = 2;
     CurrentServer.Version = g_client.packed_version; // DAT_0067ecb8
     CurrentServer.Name = L"";                       // .rdata:005c8ce0
-    CurrentServer.Field_0x54 = L"";
+    CurrentServer.Description = L"";
     CurrentServer.Field_0x74 = "";                  // .rdata:005c865c
 
     // .text:005aa3a9-005aa432: the body of FUN_005abc80, inlined.
@@ -801,7 +801,7 @@ bool CLoginMgr::Logout()
         bLoginResponse = 0;
         bCharacterInfoArrived = 0;
         Characters.free();          // inlined OwnerList::free (.text:005aa47f-005aa4ef)
-        Field_0x21c = 0;
+        bCharacterSelectResponse = 0;
     }
     return true;
 }
@@ -819,9 +819,9 @@ int CLoginMgr::Login()
     SLoginInfo Info = {};
     Info.CreateFlag = bCreateAccount;                      // byte at +0xc0
     wcsncpy(Info.AccountName, LoginName.c_str(), 0x28);
-    wcsncpy(Info.Field_0xA0, LoginPassword.c_str(), 0x10);
+    wcsncpy(Info.Password, LoginPassword.c_str(), 0x10);
     Info.AccountName[0x27] = L'\0';                        // word at +0x4e
-    Info.Field_0xA0[0x0f] = L'\0';                         // word at +0xbe
+    Info.Password[0x0f] = L'\0';                         // word at +0xbe
     G_Server->Login(Info, GetPlayerConnectionId());        // +0x48
 
     int const Result = WaitForServerResponse(&bLoginResponse, 5.0f, 60.0f);
@@ -953,7 +953,7 @@ void CLoginMgr::Reset()
     ResetServerLists();
     bLoginResponse = 0;
     bCharacterInfoArrived = 0;
-    Field_0x21c = 0;
+    bCharacterSelectResponse = 0;
 }
 
 // .text:005abc80
@@ -962,16 +962,16 @@ void CLoginMgr::ResetServerLists()
     CancelEnums();
     // erase(begin, end) through FUN_005ad910: the three lists end up empty.
     Servers.clear();
-    Field_0x160.clear();
-    Field_0x170.clear();
-    Field_0x25c = 0;
+    PendingDirectServers.clear();
+    RetryDirectServers.clear();
+    InFlightDirectEnums = 0;
 
     // .text:005abd80: clear +0x3d on the source entry, then insert a copy at the end of
     // +0x160 (FUN_005adfc0(end, 1, entry)).
     for (size_t Index = 0; Index < DirectServers.size(); ++Index)
     {
-        DirectServers[Index].Field_0x3d = 0;
-        Field_0x160.push_back(DirectServers[Index]);
+        DirectServers[Index].bEnumInFlight = 0;
+        PendingDirectServers.push_back(DirectServers[Index]);
     }
 }
 
@@ -1049,7 +1049,7 @@ FServerInfo* CLoginMgr::FindServer(unsigned int Id)
 // .text:005a9c30
 bool CLoginMgr::SetCurrentServer(FServerInfo const& Server)
 {
-    if (Server.Field_0x28 == 0 || Server.Field_0x98 == 0)
+    if (Server.bAddressValid == 0 || Server.bSessionValid == 0)
         return false;
     // .text:005a9c4c..005a9e87: FServerInfo::operator= (FUN_005a9ea0) inline into +0x94.
     CurrentServer = Server;
@@ -1067,7 +1067,7 @@ bool CLoginMgr::CreateGun()
         // (the empty string when there is none), the port and no cd-key.
         Gun = new CGunWrapper("..\\exe\\gundll.dll", Guid, ListServerHost.c_str(),
                               ListServerPort, nullptr);
-        Field_0x23c = 0;
+        ServerListPage = 0;
     }
     return true;
 }
@@ -1078,14 +1078,14 @@ bool CLoginMgr::RequestServerList()
     if (Gun != nullptr && Gun->GetBrowser() != nullptr &&
         static_cast<int>(Gun->GetStatus()) == 2)
     {
-        Field_0x240 = 0;
-        if (Field_0x23c != 0)
+        bServerListRequestPending = 0;
+        if (ServerListPage != 0)
             return false;
         Gun->GetBrowser()->SendRequest7104(0x65, 0, 0, 0, 0);
-        ++Field_0x23c;
+        ++ServerListPage;
         return true;
     }
-    Field_0x240 = 1;
+    bServerListRequestPending = 1;
     return false;
 }
 
@@ -1098,7 +1098,7 @@ namespace
     {
         for (size_t Index = 0; Index < Servers.size(); ++Index)
         {
-            if (Servers[Index].Field_0x64 == Entry.Field_0x64 && Servers[Index].Id == Entry.Id)
+            if (Servers[Index].ServerSig == Entry.ServerSig && Servers[Index].Id == Entry.Id)
                 return &Servers[Index];
         }
         return nullptr;
@@ -1107,7 +1107,7 @@ namespace
     // The match RemovePendingDirect / RemoveRetryDirect share (0x005abe00..0x005abe46).
     bool IsSameDirectServer(FServerInfo const& Entry, FServerInfo const& Server)
     {
-        if (!Entry.Field_0x64.empty() && Entry.Field_0x64 == Server.Field_0x64 &&
+        if (!Entry.ServerSig.empty() && Entry.ServerSig == Server.ServerSig &&
             Entry.Id == Server.Id)
             return true;
         if (Entry.Port != 0 && Entry.Address == Server.Address && Entry.Port == Server.Port)
@@ -1131,86 +1131,86 @@ void CLoginMgr::PingServers()
     {
         FServerInfo& Entry = Servers[Index];
         unsigned long const Age = Now - static_cast<unsigned long>(Entry.LastResponseTime);
-        if (Entry.Field_0x3e != 0 && Age > 5000)
+        if (Entry.bLan != 0 && Age > 5000)
         {
             bool const bDrop = Age > 30000;
             Entry.Ping = -1;
-            Field_0x238 = 1;
+            bServerListChanged = 1;
             if (bDrop)
             {
                 Servers.erase(Servers.begin() + Index);
-                Field_0x238 = 1;
+                bServerListChanged = 1;
                 continue;
             }
         }
         ++Index;
     }
 
-    if (Field_0x23c != 0)
+    if (ServerListPage != 0)
         return;
 
     // 0x005ac3e0..0x005ac4f6: direct servers whose enumeration has run for a second. Under
     // five tries they go to the retry list +0x170; after that their list-server twin (if any)
     // shows no ping. Either way they leave +0x160 and the in-flight count drops.
     Index = 0;
-    while (Index < Field_0x160.size())
+    while (Index < PendingDirectServers.size())
     {
-        FServerInfo& Entry = Field_0x160[Index];
-        if (Entry.Field_0x3d == 0 ||
+        FServerInfo& Entry = PendingDirectServers[Index];
+        if (Entry.bEnumInFlight == 0 ||
             Now - static_cast<unsigned long>(Entry.LastResponseTime) < 1000)
         {
             ++Index;
             continue;
         }
-        if (static_cast<unsigned>(Entry.Field_0x34) < 5)
+        if (static_cast<unsigned>(Entry.EnumAttempts) < 5)
         {
-            Entry.Field_0x3d = 0;
-            Field_0x170.push_back(Entry);
+            Entry.bEnumInFlight = 0;
+            RetryDirectServers.push_back(Entry);
         }
         else
         {
             FServerInfo* const Twin =
-                Entry.Field_0x64.empty() ? nullptr : FindServerByKey(Servers, Entry);
+                Entry.ServerSig.empty() ? nullptr : FindServerByKey(Servers, Entry);
             if (Twin != nullptr)
             {
                 Twin->Ping = -1;
-                Field_0x238 = 1;
+                bServerListChanged = 1;
             }
         }
-        Field_0x160.erase(Field_0x160.begin() + Index);
-        --Field_0x25c;
+        PendingDirectServers.erase(PendingDirectServers.begin() + Index);
+        --InFlightDirectEnums;
     }
 
-    if (Field_0x25c >= 5)
+    if (InFlightDirectEnums >= 5)
         return;
 
     // 0x005ac509..0x005ac658: +0x160 drained -> every retry goes back into it (+0x3d cleared),
     // its list-server twin showing "????" (-2); then +0x170 is emptied.
-    if (Field_0x160.empty() && !Field_0x170.empty())
+    if (PendingDirectServers.empty() && !RetryDirectServers.empty())
     {
-        for (size_t Retry = 0; Retry < Field_0x170.size(); ++Retry)
+        for (size_t Retry = 0; Retry < RetryDirectServers.size(); ++Retry)
         {
-            FServerInfo& Entry = Field_0x170[Retry];
-            Entry.Field_0x3d = 0;
-            Field_0x160.push_back(Entry);
+            FServerInfo& Entry = RetryDirectServers[Retry];
+            Entry.bEnumInFlight = 0;
+            PendingDirectServers.push_back(Entry);
             FServerInfo* const Twin =
-                Entry.Field_0x64.empty() ? nullptr : FindServerByKey(Servers, Entry);
+                Entry.ServerSig.empty() ? nullptr : FindServerByKey(Servers, Entry);
             if (Twin != nullptr)
             {
                 Twin->Ping = -2;
-                Field_0x238 = 1;
+                bServerListChanged = 1;
             }
         }
-        Field_0x170.clear();
+        RetryDirectServers.clear();
     }
 
     // 0x005ac676..0x005ac6f9: start an enumeration on every port of each idle entry until five
     // are in flight.
-    size_t const End = Field_0x160.size();
+    size_t const End = PendingDirectServers.size();
     for (Index = 0; Index < End; ++Index)
     {
-        FServerInfo& Entry = Field_0x160[Index];
-        if (Entry.Field_0x3d != 0)
+        FServerInfo& Entry = PendingDirectServers[Index];
+        if (Entry.bEnumInFlight != 0)
             continue;
         bool bStarted = false;
         for (size_t PortIndex = 0; PortIndex < Entry.Ports.size(); ++PortIndex)
@@ -1220,12 +1220,12 @@ void CLoginMgr::PingServers()
         }
         if (bStarted)
         {
-            ++Field_0x25c;
-            Entry.Field_0x3d = 1;
+            ++InFlightDirectEnums;
+            Entry.bEnumInFlight = 1;
         }
         Entry.LastResponseTime = static_cast<int>(timeGetTime());
-        ++Entry.Field_0x34;
-        if (Field_0x25c >= 5)
+        ++Entry.EnumAttempts;
+        if (InFlightDirectEnums >= 5)
             return;
     }
 }
@@ -1244,10 +1244,10 @@ bool CLoginMgr::PumpServerList()
     // DAT_0067ea58 -- the last time the page was told to refresh.
     static DWORD LastRefreshTime = 0;
     bool bRefresh = false;
-    if (Field_0x238 != 0 && timeGetTime() - LastRefreshTime >= 1000)
+    if (bServerListChanged != 0 && timeGetTime() - LastRefreshTime >= 1000)
     {
         bRefresh = true;
-        Field_0x238 = 0;
+        bServerListChanged = 0;
         LastRefreshTime = timeGetTime();
     }
     return bRefresh;
@@ -1276,13 +1276,13 @@ void CLoginMgr::GetFilteredServers(std::vector<FServerInfo*>& Out, FServerCompar
 // .text:005ac010
 void CLoginMgr::RemovePendingDirect(FServerInfo const& Server)
 {
-    for (size_t Index = 0; Index < Field_0x160.size(); ++Index)
+    for (size_t Index = 0; Index < PendingDirectServers.size(); ++Index)
     {
-        FServerInfo const& Entry = Field_0x160[Index];
-        if (Entry.Field_0x3d != 0 && IsSameDirectServer(Entry, Server))
+        FServerInfo const& Entry = PendingDirectServers[Index];
+        if (Entry.bEnumInFlight != 0 && IsSameDirectServer(Entry, Server))
         {
-            Field_0x160.erase(Field_0x160.begin() + Index);
-            --Field_0x25c;
+            PendingDirectServers.erase(PendingDirectServers.begin() + Index);
+            --InFlightDirectEnums;
             return;
         }
     }
@@ -1291,11 +1291,11 @@ void CLoginMgr::RemovePendingDirect(FServerInfo const& Server)
 // .text:005abde0
 void CLoginMgr::RemoveRetryDirect(FServerInfo const& Server)
 {
-    for (size_t Index = 0; Index < Field_0x170.size(); ++Index)
+    for (size_t Index = 0; Index < RetryDirectServers.size(); ++Index)
     {
-        if (IsSameDirectServer(Field_0x170[Index], Server))
+        if (IsSameDirectServer(RetryDirectServers[Index], Server))
         {
-            Field_0x170.erase(Field_0x170.begin() + Index);
+            RetryDirectServers.erase(RetryDirectServers.begin() + Index);
             return;
         }
     }
@@ -1475,10 +1475,10 @@ bool CLoginMgr::SelectCharacter(CCharacterSet::CharacterInfo* Info)
     {
         return false;
     }
-    Field_0x21c = 0;
+    bCharacterSelectResponse = 0;
     G_Server->CharacterSelect(Info->Id, GetPlayerConnectionId()); // +0x50
-    WaitForServerResponse(&Field_0x21c, 5.0f, 60.0f);              // FUN_005a89b0
-    if (Field_0x21c == 0)
+    WaitForServerResponse(&bCharacterSelectResponse, 5.0f, 60.0f);              // FUN_005a89b0
+    if (bCharacterSelectResponse == 0)
     {
         return false;
     }
@@ -1491,7 +1491,7 @@ bool CLoginMgr::SelectCharacter(CCharacterSet::CharacterInfo* Info)
 // .text:005ab380 (RET 4), reached from IClient slot 14 (LAB_005a8240).
 void CLoginMgr::OnCharacterSelectResponse(unsigned int const* Response)
 {
-    Field_0x21c = 1;
+    bCharacterSelectResponse = 1;
     NotifyCharacterSelectComplete(Response);
 }
 

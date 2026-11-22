@@ -85,8 +85,8 @@ struct FTexturePanels : IPlanetRing
     float InnerEdge;                      // +0x28
     float OuterEdge;                      // +0x2c
     float TransitionDist;                 // +0x30  150.0
-    int Field34;                          // +0x34  ring mesh vertex count, 2 * NumSegments (Load)
-    void* MeshBuffer;                     // +0x38  ring mesh, Field34 world-space XYZ; freed on Clear
+    int MeshVertexCount;                          // +0x34  ring mesh vertex count, 2 * NumSegments (Load)
+    void* MeshBuffer;                     // +0x38  ring mesh, MeshVertexCount world-space XYZ; freed on Clear
     int PieceCount;                       // +0x3c  Load sets 8; GetPiece bounds
     FTexturePanelPiece* Pieces;           // +0x40  stride 0x18
     float ColorR;                         // +0x44

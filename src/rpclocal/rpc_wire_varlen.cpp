@@ -208,14 +208,14 @@ unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** B
     if (Count != 0) {
         const FRpcCollisionGroupNode* Node = List->Head->Next;
         while (Node != List->Head) {
-            Stream.PutWord((unsigned short)(Node->Field_0x00 & 0xffffu));  // 06d8f58f
+            Stream.PutWord((unsigned short)(Node->Id & 0xffffu));  // 06d8f58f
             if (Stream.Failed()) {
                 return Stream.GetError();                              // 06d8f588
             }
             // The value is moved as a float through the x87 stack, but FLD/FSTP of a
             // single-precision slot is a bit-exact 4-byte move; Field_0x04 already holds
             // the bit pattern, so no reinterpretation is needed either way.
-            Stream.PutDword(Node->Field_0x04);                         // 06d8f5b6 / 06d8f5bc
+            Stream.PutDword(Node->HealthBits);                         // 06d8f5b6 / 06d8f5bc
             if (Stream.Failed()) {
                 return Stream.GetError();                              // 06d8f5b2
             }
@@ -279,20 +279,20 @@ unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned ch
         Dummy->Prev = New;
         Tail->Next = New;
         // Retail's FUN_06d85500 copies eight uninitialised bytes here.
-        New->Field_0x00 = 0;
-        New->Field_0x04 = 0;
+        New->Id = 0;
+        New->HealthBits = 0;
         ++List->Size;                                                  // 06d8f67d
 
         unsigned short Id = 0;
         if (!Stream.GetWord(Id)) {                                     // 06d8f68c / 06d8f6ac
             return Stream.GetError();                                  // 06d8f6a5
         }
-        New->Field_0x00 = (unsigned int)Id;                            // 06d8f6af, low word only
+        New->Id = (unsigned int)Id;                            // 06d8f6af, low word only
         unsigned int Health = 0;
         if (!Stream.GetDword(Health)) {                                // 06d8f6be / 06d8f6db
             return Stream.GetError();                                  // 06d8f6d4
         }
-        New->Field_0x04 = Health;                                      // 06d8f6e6
+        New->HealthBits = Health;                                      // 06d8f6e6
     }
 
     // 06dacdcd FUN_06da13c0 -- the trailer hook, the same no-op.
@@ -337,7 +337,7 @@ unsigned int RpcEncodeServerSetMissionMessage(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06dabbe1
-    Stream.PutDword(Wire->Field_0x08);                                 // 06dabbfe / 06dabc21
+    Stream.PutDword(Wire->Type);                                 // 06dabbfe / 06dabc21
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06dabc14
     }
@@ -366,7 +366,7 @@ unsigned int RpcDecodeServerSetMissionMessage(FPacketBase& Packet,
     if (!Stream.GetDword(Scratch)) {                                   // 06dabd47 / 06dabd62
         return Stream.GetError();                                      // 06dabd5c
     }
-    Wire->Field_0x08 = Scratch;                                        // 06dabd67
+    Wire->Type = Scratch;                                        // 06dabd67
     // The decoder overwrites the pointer WITHOUT freeing whatever the payload already
     // held; only the packet's destructor (FUN_06d9d9e0) ever frees packet+0x24. Retail
     // leaks on a second decode into the same packet, and so does this.
@@ -417,7 +417,7 @@ unsigned int RpcEncodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06d8f871
-    Stream.PutDword(Wire->Field_0x08);                                 // 06d8f88e / 06d8f8b8
+    Stream.PutDword(Wire->ObjectId);                                 // 06d8f88e / 06d8f8b8
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06d8f8a3
     }
@@ -451,7 +451,7 @@ unsigned int RpcDecodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
     if (!Stream.GetDword(Scratch)) {                                   // 06d8f9b7 / 06d8f9d6
         return Stream.GetError();                                      // 06d8f9cc
     }
-    Wire->Field_0x08 = Scratch;                                        // 06d8f9dd
+    Wire->ObjectId = Scratch;                                        // 06d8f9dd
     unsigned char Flag = 0;
     if (!Stream.GetByte(Flag)) {                                       // 06d8f9e5 / 06d8fa02
         return Stream.GetError();                                      // 06d8f9f8

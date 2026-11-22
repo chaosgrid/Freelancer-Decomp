@@ -32,7 +32,7 @@
 //     and IVP_ListManager::CorePairEntries (+0x34, count/array at +0x36/+0x38)
 //     respectively. Both functions union-find over IVP_Core::
 //     MergedCoreWhichReplacedIt (+0x1b0, via the already-ported
-//     FUN_063557c0/"get_master_core", ivp_core.cpp) exactly mirroring
+//     IVP_Core_UnionFindGetFather/"get_master_core", ivp_core.cpp) exactly mirroring
 //     IVP_Simulation_Unit_Find_Disconnected_Core / Split_Off_Core_Group in
 //     ivp_simulation_unit.cpp -- same algorithm shape, different owning class
 //     (IVP_ListManager instead of IVP_Simulation_Unit).
@@ -71,7 +71,7 @@
 #include "../ivp_physics/ivp_mindist.h"
 #include "../ivp_physics/ivp_core.h"
 
-// FUN_063557c0 (decomp-tracker item 3227, already ported): union-find
+// IVP_Core_UnionFindGetFather (decomp-tracker item 3227, already ported): union-find
 // "get master core" walk over IVP_Core::MergedCoreWhichReplacedIt.
 // Already declared in ivp_core.h (included above) -- do not redeclare
 // here with a different linkage spec (a prior redeclaration with

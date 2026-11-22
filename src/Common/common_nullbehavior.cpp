@@ -29,7 +29,7 @@ NullBehavior::NullBehavior(int InTypeId)
     , ModeSelector0xc(2)
     , UpdateResult10(1)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)

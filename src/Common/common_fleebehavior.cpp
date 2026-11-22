@@ -16,8 +16,8 @@
 
 // FUN_062ecaf0 (item 1869) is FGunConvergenceStateBlock::GetCurrentLeader: the follow /
 // formation leader watched at SystemManager+0x1364 (an IObjRW*, already "-8"ed), or 0.
-// FUN_062fe940 (item 2001, common_gotobehavior.cpp): GotoBehavior's own DirectiveGotoOp copy-out.
-extern "C" bool __fastcall FUN_062fe940(unsigned char* This, void* OutBuffer);
+// CopyGotoOp (item 2001, common_gotobehavior.cpp): GotoBehavior's own DirectiveGotoOp copy-out.
+extern "C" bool __fastcall CopyGotoOp(unsigned char* This, void* OutBuffer);
 
 namespace
 {
@@ -32,7 +32,7 @@ char const* const GPerformUninitialized =
 char const* const GDeactivateUninitialized =
     "FleeBehavior::deactivate() running uninitialized flee_type. Quitting behavior. Ship id: %d (decimal)";
 
-// Slot5's hostile-power-ratio thresholds, indexed by JobParams.FleeSceneThreatStyle (0..4), default
+// OnEvaluateReadiness's hostile-power-ratio thresholds, indexed by JobParams.FleeSceneThreatStyle (0..4), default
 // 0.5f: DAT_0639e0e0 0.15f, DAT_0639e0dc 0.35f, DAT_0639e0d8 0.65f, DAT_0639e0d4 0.85f,
 // DAT_0639a1d0 1.0f, DAT_0639c13c 0.5f (raw .rdata bytes 9a99193e / 3333b33e / 6666263f /
 // 9a99593f / 0000803f / 0000003f).
@@ -52,7 +52,7 @@ float FleeHostileRatioThreshold(int Level)
 
 // FUN_062c7020 (Common.dll.txt 193301-193339), all 31 instructions: FUN_062d2020(TypeId),
 // DirectiveGotoOp ctor on +0x4c, DirectiveDockOp ctor on +0xbc, byte +0x2c = 0, byte +0x38 = 0,
-// +0x34 = 0, vptr, +0x30 = 4. Retail leaves +0x3c..+0x48 unwritten (Slot3/4/5/22 write the
+// +0x34 = 0, vptr, +0x30 = 4. Retail leaves +0x3c..+0x48 unwritten (OnEngage/4/5/22 write the
 // three delegate pointers before anything reads them); the port zeroes them.
 FleeBehavior::FleeBehavior(int InTypeId)
     : Behavior()
@@ -61,22 +61,23 @@ FleeBehavior::FleeBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContextPtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
+    , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
     , Flags28(0)
     , Flag29(0)
     , Pad2a{}
-    , Field2c(0)
+    , bFleeActive(0)
     , Pad2d{}
-    , Field30(4)
-    , Field34(0)
-    , Field38(0)
+    , FleeReason(4)
+    , FleeDestType(0)
+    , bFollowFleeingTarget(0)
     , Pad39{}
-    , Field3c(nullptr)
-    , Field40(nullptr)
-    , Field44(nullptr)
-    , Field48(0)
+    , GotoDelegate(nullptr)
+    , DockDelegate(nullptr)
+    , FormationDelegate(nullptr)
+    , bHasSavedDirective(0)
     , Pad49{}
     , GotoOp()
     , DockOp()
@@ -101,22 +102,22 @@ bool FleeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // MOV [EAX+0x40],EDX; ... MOV ECX,[ECX+0x19c]; MOV [EAX+0x44],ECX`.
 void FleeBehavior::RefreshDelegates()
 {
-    Field3c = BehaviorMgrPtr20->BehaviorDispatchTable[2];    // +0x17c
-    Field40 = BehaviorMgrPtr20->BehaviorDispatchTable[7];    // +0x190
-    Field44 = BehaviorMgrPtr20->BehaviorDispatchTable[10];   // +0x19c
+    GotoDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[2];    // +0x17c
+    DockDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[7];    // +0x190
+    FormationDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[10];   // +0x19c
 }
 
 // ============================================================================
 // Slot 5 -- LAB_062c70b0 (Common.dll.txt 193365-193551), 161 instructions, `RET 4`.
 // ============================================================================
-int FleeBehavior::Slot5(float Unused)
+int FleeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     SystemManager* const Sys = NavHelperPtr24;
     pub::AI::Personality::JobStruct const& Job = Sys->PersonalityData.JobParams;
 
     // 062c70ba-062c70fc. EBP = 2 is the "do not flee" answer, also parked at [ESP+0x1c].
-    Field38 = 0;
+    bFollowFleeingTarget = 0;
     int Result = 2;
     if (Job.bFleeWhenLeaderFleesStyle != 0)                                  // Sys+0x1950
     {
@@ -127,15 +128,15 @@ int FleeBehavior::Slot5(float Unused)
             IBehaviorManager* const TargetMgr = GetBehaviorManager(Watched);
             if (TargetMgr->CurrentBehaviorIndex == 4)
             {
-                Field38 = 1;
-                Field2c = 1;
-                Field30 = 1;
+                bFollowFleeingTarget = 1;
+                bFleeActive = 1;
+                FleeReason = 1;
             }
         }
     }
 
     // 062c7103-062c712f: a flee already running answers 3 (with +0x29) or 0.
-    if (Field2c != 0)
+    if (bFleeActive != 0)
     {
         if (Flag29 != 0)
         {
@@ -174,7 +175,7 @@ int FleeBehavior::Slot5(float Unused)
     // 062c71cb-062c71ef: (HitPtsA + ShieldCur) / (MaxHitPtsB + ShieldMax) FCOMP
     // Sys+0x194c (JobParams.FleeWhenHullDamagedPercent); `TEST AH,0x5; JP`
     // jumps (bFlee = 0) when C0 and C2 are both clear, i.e. ratio >= threshold or unordered
-    // with C0==C2==1; fall-through (C0 alone, ratio < threshold) sets bFlee and Field30 = 2.
+    // with C0==C2==1; fall-through (C0 alone, ratio < threshold) sets bFlee and FleeReason = 2.
     bool bFlee = false;
     {
         double const Ratio = (static_cast<double>(HitPtsA) + static_cast<double>(ShieldCur)) /
@@ -182,26 +183,26 @@ int FleeBehavior::Slot5(float Unused)
         if (Ratio < static_cast<double>(Job.FleeWhenHullDamagedPercent))
         {
             bFlee = true;
-            Field30 = 2;
+            FleeReason = 2;
         }
     }
 
     // 062c71f2-062c724b: Targeting.AggressionRatio (Sys+0x1438) FCOMP the per-level constant
     // after FXCH, so ST0 is the ratio; `TEST AH,0x41; JNZ` skips when ratio < or ==
-    // constant; fall-through (ratio > constant) sets bFlee and Field30 = 0.
+    // constant; fall-through (ratio > constant) sets bFlee and FleeReason = 0.
     if (static_cast<double>(Sys->Targeting.AggressionRatio) >
         static_cast<double>(FleeHostileRatioThreshold(Job.FleeSceneThreatStyle)))   // Sys+0x1948
     {
         bFlee = true;
-        Field30 = 0;
+        FleeReason = 0;
     }
 
     // 062c7252-062c727c: with JobParams.bFleeNoWeaponsStyle (Sys+0x1951), no ready weapon in
-    // GunGroups (Sys+0x12c) forces the flee with Field30 = 3 (EBP = 0 directly); a ready
+    // GunGroups (Sys+0x12c) forces the flee with FleeReason = 3 (EBP = 0 directly); a ready
     // weapon reloads EBP from [ESP+0x20] (the 2 parked above) and falls to the bFlee test.
     if (Job.bFleeNoWeaponsStyle != 0 && !Sys->GunGroups.HasReadyWeaponSlot())
     {
-        Field30 = 3;
+        FleeReason = 3;
         Result = 0;
     }
     else if (bFlee)
@@ -228,9 +229,9 @@ int FleeBehavior::Perform()
 {
     SystemManager* const Sys = NavHelperPtr24;
 
-    if (Field2c == 0)                                                        // 062c72ca
+    if (bFleeActive == 0)                                                        // 062c72ca
     {
-        Field2c = 1;                                                         // 062c72dd
+        bFleeActive = 1;                                                         // 062c72dd
 
         // 062c72e0-062c7316. Radius [ESP+8] is seeded with 500.0f (0x43fa0000); the type,
         // position and target-id out-params are uninitialised stack in retail.
@@ -241,7 +242,7 @@ int FleeBehavior::Perform()
         float Radius = 500.0f;
         uint const OwnerId = Sys->SelfTarget.Iface->get_id();    // 062c72f7
         if (!BehaviorMgrPtr20->RequestFleeDestination(
-                OwnerId, static_cast<pub::AI::ContentCallback::FleeReason>(Field30),
+                OwnerId, static_cast<pub::AI::ContentCallback::FleeReason>(FleeReason),
                 Type, Destination, DestinationId, Radius))
         {
             // 062c731f-062c7389: type 3, destination = the cached physical centre pushed
@@ -259,28 +260,28 @@ int FleeBehavior::Perform()
             Radius = 500.0f;
         }
 
-        Field34 = static_cast<int>(Type);                                    // 062c738e
-        if (Field34 == 2)
+        FleeDestType = static_cast<int>(Type);                                    // 062c738e
+        if (FleeDestType == 2)
         {
             // 062c73cc-062c7427. A fresh DirectiveDockOp with DockObjectId = target id.
             pub::AI::DirectiveDockOp Op;
             Op.DockObjectId = DestinationId;
-            Field48 = 0;
+            bHasSavedDirective = 0;
             IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
             if (Current != nullptr &&
                 *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 7)
             {
-                if (static_cast<DockBehavior*>(Field40)->CopyDockOp(&DockOp))
-                    Field48 = 1;
+                if (static_cast<DockBehavior*>(DockDelegate)->CopyDockOp(&DockOp))
+                    bHasSavedDirective = 1;
             }
-            Field40->Slot10(&Op);
-            Field40->Slot3();
+            DockDelegate->OnApplyDirective(&Op);
+            DockDelegate->OnEngage();
         }
-        else if (Field34 == 1 || Field34 == 3)
+        else if (FleeDestType == 1 || FleeDestType == 3)
         {
             // 062c742c-062c74ad.
             pub::AI::DirectiveGotoOp Op;
-            if (Field34 == 3)
+            if (FleeDestType == 3)
             {
                 Op.Field_0C = 1;
                 Op.Destination = Destination;
@@ -291,16 +292,16 @@ int FleeBehavior::Perform()
                 Op.Field_1C = static_cast<int32_t>(DestinationId);
             }
             Op.Field_50 = Radius;
-            Field48 = 0;
+            bHasSavedDirective = 0;
             IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
             if (Current != nullptr &&
                 *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 2)
             {
-                if (FUN_062fe940(reinterpret_cast<unsigned char*>(Field3c), &GotoOp))
-                    Field48 = 1;
+                if (CopyGotoOp(reinterpret_cast<unsigned char*>(GotoDelegate), &GotoOp))
+                    bHasSavedDirective = 1;
             }
-            Field3c->Slot10(&Op);
-            Field3c->Slot3();
+            GotoDelegate->OnApplyDirective(&Op);
+            GotoDelegate->OnEngage();
         }
         else
         {
@@ -312,7 +313,7 @@ int FleeBehavior::Perform()
         }
 
         // LAB_062c74b0.
-        if (Field2c == 0)
+        if (bFleeActive == 0)
         {
             UpdateResult10 = 1;
             return 1;
@@ -320,22 +321,22 @@ int FleeBehavior::Perform()
     }
 
     // LAB_062c74b7.
-    if (Field38 != 0)
+    if (bFollowFleeingTarget != 0)
     {
-        Field44->Slot3();
-        Field44->SetTickDelta(GetTickDelta());
-        (void)Field44->Slot7();
+        FormationDelegate->OnEngage();
+        FormationDelegate->SetTickDelta(GetTickDelta());
+        (void)FormationDelegate->OnUpdate();
         UpdateResult10 = 1;                                                  // LAB_062c74d7
         return 1;
     }
 
-    // LAB_062c74e5: switch on +0x34 (DEC/JZ chain); types 1/3 drive Field3c (062c752d),
-    // type 2 Field40 (062c751f), both called unguarded.
-    if (Field34 == 1 || Field34 == 2 || Field34 == 3)
+    // LAB_062c74e5: switch on +0x34 (DEC/JZ chain); types 1/3 drive GotoDelegate (062c752d),
+    // type 2 DockDelegate (062c751f), both called unguarded.
+    if (FleeDestType == 1 || FleeDestType == 2 || FleeDestType == 3)
     {
-        Behavior* const Delegate = (Field34 == 2) ? Field40 : Field3c;
+        Behavior* const Delegate = (FleeDestType == 2) ? DockDelegate : GotoDelegate;
         Delegate->SetTickDelta(GetTickDelta());
-        int const ChildResult = Delegate->Slot7();                           // 062c753b
+        int const ChildResult = Delegate->OnUpdate();                           // 062c753b
         if (ChildResult != 2 && ChildResult != 3)
         {
             UpdateResult10 = 1;                                              // LAB_062c74d7
@@ -351,7 +352,7 @@ int FleeBehavior::Perform()
     }
 
     // LAB_062c7548.
-    Field2c = 0;
+    bFleeActive = 0;
     BehaviorMgrPtr20->SetDirectiveResult(4, 0);                              // FUN_062d29a0
     UpdateResult10 = 2;
     return 2;
@@ -360,24 +361,24 @@ int FleeBehavior::Perform()
 // ============================================================================
 // Slot 3 -- LAB_062c7570 (Common.dll.txt 193788-193844), 52 instructions.
 // ============================================================================
-void FleeBehavior::Slot3()
+void FleeBehavior::OnEngage()
 {
     RefreshDelegates();
-    if (Field2c == 0)                                                        // 062c759b
+    if (bFleeActive == 0)                                                        // 062c759b
         return;
-    if (Field38 != 0)
+    if (bFollowFleeingTarget != 0)
     {
-        Field44->Slot3();                                                    // 062c75a6
-        return;
-    }
-    if (Field34 == 1 || Field34 == 3)
-    {
-        Field3c->Slot3();                                                    // 062c7604
+        FormationDelegate->OnEngage();                                                    // 062c75a6
         return;
     }
-    if (Field34 == 2)
+    if (FleeDestType == 1 || FleeDestType == 3)
     {
-        Field40->Slot3();                                                    // 062c75f3
+        GotoDelegate->OnEngage();                                                    // 062c7604
+        return;
+    }
+    if (FleeDestType == 2)
+    {
+        DockDelegate->OnEngage();                                                    // 062c75f3
         return;
     }
     // 062c75bc-062c75e2: NavHelper+0x14fc+0x84 (ExternalIface) get_id, then the
@@ -390,42 +391,42 @@ void FleeBehavior::Slot3()
 // ============================================================================
 // Slot 4 -- LAB_062c7610 (Common.dll.txt 193847-193938), 86 instructions.
 // ============================================================================
-void FleeBehavior::Slot4()
+void FleeBehavior::OnDisengage()
 {
     RefreshDelegates();
-    if (Field38 != 0)
+    if (bFollowFleeingTarget != 0)
     {
-        Field44->Slot4();                                                    // 062c7642
+        FormationDelegate->OnDisengage();                                                    // 062c7642
         return;
     }
-    if (Field34 == 1 || Field34 == 3)
+    if (FleeDestType == 1 || FleeDestType == 3)
     {
         // LAB_062c76cd.
-        if (Field3c == nullptr)
+        if (GotoDelegate == nullptr)
             return;
-        Field3c->Slot4();
+        GotoDelegate->OnDisengage();
         IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
         if (Current != nullptr &&
             *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 2 &&
-            Field48 != 0)
+            bHasSavedDirective != 0)
         {
-            Field3c->Slot10(&GotoOp);                                        // 062c76fb
+            GotoDelegate->OnApplyDirective(&GotoOp);                                        // 062c76fb
         }
         return;
     }
-    if (Field34 == 2)
+    if (FleeDestType == 2)
     {
         // LAB_062c7689.
-        if (Field40 == nullptr)
+        if (DockDelegate == nullptr)
             return;
-        Field40->Slot4();
-        Behavior_ReleaseDirectiveTarget(Field40);                            // 062c7698 FUN_062d21c0
+        DockDelegate->OnDisengage();
+        Behavior_ReleaseDirectiveTarget(DockDelegate);                            // 062c7698 FUN_062d21c0
         IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
         if (Current != nullptr &&
             *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 7 &&
-            Field48 != 0)
+            bHasSavedDirective != 0)
         {
-            Field40->Slot10(&DockOp);                                        // 062c76c2
+            DockDelegate->OnApplyDirective(&DockOp);                                        // 062c76c2
         }
         return;
     }
@@ -438,25 +439,25 @@ void FleeBehavior::Slot4()
 // ============================================================================
 // Slot 22 -- LAB_062c7710 (Common.dll.txt 193949-193997), 44 instructions, `RET 4`.
 // ============================================================================
-void FleeBehavior::Slot22(void* Event)
+void FleeBehavior::OnEvent(void* Event)
 {
     RefreshDelegates();
-    if (Field38 != 0)
+    if (bFollowFleeingTarget != 0)
     {
-        if (Field44 != nullptr)
-            Field44->Slot22(Event);                                          // 062c773d JMP [EAX+0x58]
+        if (FormationDelegate != nullptr)
+            FormationDelegate->OnEvent(Event);                                          // 062c773d JMP [EAX+0x58]
         return;
     }
-    if (Field34 == 1 || Field34 == 3)
+    if (FleeDestType == 1 || FleeDestType == 3)
     {
-        if (Field3c != nullptr)
-            Field3c->Slot22(Event);                                          // 062c778c
+        if (GotoDelegate != nullptr)
+            GotoDelegate->OnEvent(Event);                                          // 062c778c
         return;
     }
-    if (Field34 == 2)
+    if (FleeDestType == 2)
     {
-        if (Field40 != nullptr)
-            Field40->Slot22(Event);                                          // 062c777e
+        if (DockDelegate != nullptr)
+            DockDelegate->OnEvent(Event);                                          // 062c777e
         return;
     }
     // 062c774c-062c776d.

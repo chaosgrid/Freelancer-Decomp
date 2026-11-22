@@ -101,7 +101,7 @@ struct SLoginInfo {
     unsigned char Field_0x50[0x50]; // +0x50: TODO: not written by Login's sender
     // TODO: semantics unrecovered -- retail decorates neither side of this call,
     // so all that is confirmed is a second 16-wide-character string at +0xA0.
-    wchar_t Field_0xA0[16];     // +0xA0: second wide string, 0x20 bytes
+    wchar_t Password[16];     // +0xA0: second wide string, 0x20 bytes
     unsigned int CreateFlag;    // +0xC0: nonzero = allow account creation
     unsigned int Pad_C4;        // +0xC4: padding
 };
@@ -203,7 +203,7 @@ struct XGoTradelane {
     unsigned int TradelaneRing1;  // +0x04
     unsigned int TradelaneRing2;  // +0x08
     // TODO: semantics unproven (direction?). One byte; 5th argument of FUN_06d0df40.
-    bool Field_0x0c;              // +0x0c
+    bool bMidLane;              // +0x0c
     unsigned char Pad_0x0d[3];    // +0x0d
 };
 static_assert(sizeof(XGoTradelane) == 0x10, "XGoTradelane sizeof 0x10");
@@ -295,9 +295,9 @@ static_assert(sizeof(SSPObjCollisionInfo) == 0x14, "SSPObjCollisionInfo sizeof 0
 
 // SSPBadLandsObjCollisionInfo — 0x0c bytes, fully recovered (§3.20). Slot 54.
 struct SSPBadLandsObjCollisionInfo {
-    unsigned int Field_0x00;    // TODO: semantics unproven
+    unsigned int BadLandsObjId;    // TODO: semantics unproven
     unsigned int ObjectId;      // +0x04
-    unsigned short Field_0x08;  // TODO: semantics unproven (SubObjId?)
+    unsigned short SubObjId;  // TODO: semantics unproven (SubObjId?)
     unsigned short Pad_0x0a;    // +0x0a
 };
 static_assert(sizeof(SSPBadLandsObjCollisionInfo) == 0xc, "SSPBadLandsObjCollisionInfo sizeof 0xc");
@@ -468,10 +468,10 @@ struct SCreateCharacterInfo {
     // Proven 2026-09-24 (claude:srv-save-2) by Server.dll FUN_06d4b790, which
     // looks each one up in NewChar::TheDB (.text:06d4b8b1 .. .text:06d4b8fe),
     // against Common.dll's Load that fills those trees (.text:063149d0):
-    unsigned int Field_0x30;  // [Faction] nickname id -- slot 0, faction tree +0x04
-    unsigned int Field_0x34;  // home base id (a [Faction] `base`) -- slot 3, tree +0x40
-    unsigned int Field_0x38;  // [Package] nickname id -- slot 1, tree +0x18
-    unsigned int Field_0x3c;  // [Pilot] nickname id -- slot 2, tree +0x2c
+    unsigned int FactionId;  // [Faction] nickname id -- slot 0, faction tree +0x04
+    unsigned int BaseId;  // home base id (a [Faction] `base`) -- slot 3, tree +0x40
+    unsigned int PackageId;  // [Package] nickname id -- slot 1, tree +0x18
+    unsigned int PilotId;  // [Pilot] nickname id -- slot 2, tree +0x2c
     // Names kept as offsets only because rpclocal's codec (in another lane's
     // hands this wave) spells them; rename to FactionId/BaseId/PackageId/PilotId.
 };
@@ -498,7 +498,7 @@ struct ServerStats {
     // after FUN_06d19110 broadcasts control message 0x14 with that player's id:
     // a count of multiplayer player-ship deaths. Ported: EqObj::destroy
     // (src/Server/server_gameobject.cpp) increments it on that path.
-    unsigned int Field_0x10;
+    unsigned int PlayerDeathCount;
     unsigned int Field_0x14;            // +0x14: only the Startup zero-fill writes it
     unsigned int Field_0x18;            // +0x18: only the Startup zero-fill writes it
     unsigned int AbortMissionCount;     // +0x1c: INC at .text:06d4582f (AbortMission)

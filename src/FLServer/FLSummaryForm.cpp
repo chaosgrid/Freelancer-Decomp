@@ -204,9 +204,9 @@ void CFLSummaryForm::Refresh()
 		sprintf(Text, "%d", Stats.AbortMissionCount);
 		StatsList.SetItem(4, 1, LVIF_TEXT, Text, 0, 0, 0, 0);
 	}
-	if (Stats.Field_0x10 != ShownStats.Field_0x10)
+	if (Stats.PlayerDeathCount != ShownStats.PlayerDeathCount)
 	{
-		sprintf(Text, "%d", Stats.Field_0x10);
+		sprintf(Text, "%d", Stats.PlayerDeathCount);
 		StatsList.SetItem(5, 1, LVIF_TEXT, Text, 0, 0, 0, 0);
 	}
 	ShownStats = Stats;

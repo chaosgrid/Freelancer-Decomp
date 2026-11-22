@@ -154,7 +154,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
     Desc.ShareMode = 1;
     Desc.Creation = 3;
     Desc.Flags = 0x8000080;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.FindHandle = 0xFFFFFFFF;
     IFileSystem* Filesys = nullptr;
     // FFileSystemDesc begins with AGGDESC's {size, interface name} (readfile.h).
     if (DALib::Data->CreateInstance((AGGDESC*)&Desc, (void**)&Filesys) != 0)

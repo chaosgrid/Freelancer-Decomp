@@ -154,7 +154,7 @@ bool ServerFuse::Read(INI_Reader& Reader)
             // .text:06cfcaa1 vt+8. Unlike the exe reader (FUN_00529e10), a failed read does NOT
             // end the fuse: .text:06cfcaa6 `JZ LAB_06cfcad8` skips the insert and goes on to the
             // next header, leaking the action (retail).
-            if (Action->Slot08(Reader))
+            if (Action->Read(Reader))
             {
                 // .text:06cfcaa8-06cfcac4: FLD [action+4] -> key, FUN_06cfd7e0 multimap insert.
                 Actions.insert(std::multimap<float, FuseAction*>::value_type(
@@ -205,15 +205,15 @@ IgniteFuseAction::IgniteFuseAction()
     FuseId.clear();
 }
 
-FuseAction* IgniteFuseAction::Slot04() const
+FuseAction* IgniteFuseAction::Clone() const
 {
     // FUN_06cfcea0: new 0x30 object, then its slot 12 copies *this.
     IgniteFuseAction* Copy = new IgniteFuseAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool IgniteFuseAction::Slot08(INI_Reader& Reader)
+bool IgniteFuseAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfefd0.
     while (Reader.read_value())
@@ -228,7 +228,7 @@ bool IgniteFuseAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void IgniteFuseAction::Slot30(IgniteFuseAction const& Other)
+void IgniteFuseAction::CopyArchProperties(IgniteFuseAction const& Other)
 {
     // FUN_06cff150 (shared by DestroyGroupAction and DestroyHardpointAttachmentAction):
     // CopyArchProperties, then the dwords at +0x28 and +0x2c.
@@ -276,7 +276,7 @@ DestroyRootAction::DestroyRootAction()
     // .text:06cfc733-06cfc73e: FuseAction(), +0x24 = 0, vftable. No fields of its own.
 }
 
-FuseAction* DestroyRootAction::Slot04() const
+FuseAction* DestroyRootAction::Clone() const
 {
     // LAB_06cfcb30: new 0x28 object (FuseAction constructor inlined), then vt+0x2c
     // (CopyArchProperties, slot 11) on it with *this.
@@ -285,7 +285,7 @@ FuseAction* DestroyRootAction::Slot04() const
     return Copy;
 }
 
-bool DestroyRootAction::Slot08(INI_Reader& Reader)
+bool DestroyRootAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfe040: every value goes to ReadFuseActionValue; its result is not tested.
     while (Reader.read_value())
@@ -317,15 +317,15 @@ DamageRootAction::DamageRootAction()
     // .text:06cfc782-06cfc788 / 06cfcbcb-06cfcbce: +0x28 = 0, +0x2c = 1.
 }
 
-FuseAction* DamageRootAction::Slot04() const
+FuseAction* DamageRootAction::Clone() const
 {
     // LAB_06cfcb90.
     DamageRootAction* Copy = new DamageRootAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DamageRootAction::Slot08(INI_Reader& Reader)
+bool DamageRootAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfe0f0.
     while (Reader.read_value())
@@ -348,7 +348,7 @@ bool DamageRootAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DamageRootAction::Slot30(DamageRootAction const& Other)
+void DamageRootAction::CopyArchProperties(DamageRootAction const& Other)
 {
     // FUN_06cfe330: CopyArchProperties, dword +0x28, byte +0x2c.
     FuseAction::CopyArchProperties(Other);
@@ -388,15 +388,15 @@ DestroyGroupAction::DestroyGroupAction()
     GroupName.clear();
 }
 
-FuseAction* DestroyGroupAction::Slot04() const
+FuseAction* DestroyGroupAction::Clone() const
 {
     // FUN_06cfcc00.
     DestroyGroupAction* Copy = new DestroyGroupAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DestroyGroupAction::Slot08(INI_Reader& Reader)
+bool DestroyGroupAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfe370.
     while (Reader.read_value())
@@ -423,7 +423,7 @@ bool DestroyGroupAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DestroyGroupAction::Slot30(DestroyGroupAction const& Other)
+void DestroyGroupAction::CopyArchProperties(DestroyGroupAction const& Other)
 {
     // FUN_06cff150 (ICF with IgniteFuseAction's): CopyArchProperties, dwords +0x28 and +0x2c.
     FuseAction::CopyArchProperties(Other);
@@ -505,15 +505,15 @@ DamageGroupAction::DamageGroupAction()
     GroupName.clear();
 }
 
-FuseAction* DamageGroupAction::Slot04() const
+FuseAction* DamageGroupAction::Clone() const
 {
     // FUN_06cfcca0.
     DamageGroupAction* Copy = new DamageGroupAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DamageGroupAction::Slot08(INI_Reader& Reader)
+bool DamageGroupAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfe6c0.
     while (Reader.read_value())
@@ -543,7 +543,7 @@ bool DamageGroupAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DamageGroupAction::Slot30(DamageGroupAction const& Other)
+void DamageGroupAction::CopyArchProperties(DamageGroupAction const& Other)
 {
     // FUN_06cfe950: CopyArchProperties, dwords +0x28 / +0x2c, byte +0x30.
     FuseAction::CopyArchProperties(Other);
@@ -584,15 +584,15 @@ DestroyHardpointAttachmentAction::DestroyHardpointAttachmentAction()
     Hardpoint.clear();
 }
 
-FuseAction* DestroyHardpointAttachmentAction::Slot04() const
+FuseAction* DestroyHardpointAttachmentAction::Clone() const
 {
     // FUN_06cfcd50.
     DestroyHardpointAttachmentAction* Copy = new DestroyHardpointAttachmentAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DestroyHardpointAttachmentAction::Slot08(INI_Reader& Reader)
+bool DestroyHardpointAttachmentAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfe9a0.
     while (Reader.read_value())
@@ -620,7 +620,7 @@ bool DestroyHardpointAttachmentAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DestroyHardpointAttachmentAction::Slot30(DestroyHardpointAttachmentAction const& Other)
+void DestroyHardpointAttachmentAction::CopyArchProperties(DestroyHardpointAttachmentAction const& Other)
 {
     // FUN_06cff150 (ICF): CopyArchProperties, dwords +0x28 and +0x2c.
     FuseAction::CopyArchProperties(Other);
@@ -713,15 +713,15 @@ DamageHardpointAttachmentAction::DamageHardpointAttachmentAction()
     Hardpoint.clear();
 }
 
-FuseAction* DamageHardpointAttachmentAction::Slot04() const
+FuseAction* DamageHardpointAttachmentAction::Clone() const
 {
     // FUN_06cfcdf0.
     DamageHardpointAttachmentAction* Copy = new DamageHardpointAttachmentAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DamageHardpointAttachmentAction::Slot08(INI_Reader& Reader)
+bool DamageHardpointAttachmentAction::Read(INI_Reader& Reader)
 {
     // FUN_06cfed40.
     while (Reader.read_value())
@@ -750,7 +750,7 @@ bool DamageHardpointAttachmentAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DamageHardpointAttachmentAction::Slot30(DamageHardpointAttachmentAction const& Other)
+void DamageHardpointAttachmentAction::CopyArchProperties(DamageHardpointAttachmentAction const& Other)
 {
     // FUN_06cfe950 (ICF with DamageGroupAction's): CopyArchProperties, +0x28, +0x2c, +0x30.
     FuseAction::CopyArchProperties(Other);
@@ -797,15 +797,15 @@ ImpulseAction::ImpulseAction()
     PosOffset.z = 0.0f;
 }
 
-FuseAction* ImpulseAction::Slot04() const
+FuseAction* ImpulseAction::Clone() const
 {
     // FUN_06cfcf60.
     ImpulseAction* Copy = new ImpulseAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool ImpulseAction::Slot08(INI_Reader& Reader)
+bool ImpulseAction::Read(INI_Reader& Reader)
 {
     // FUN_06cff170.
     while (Reader.read_value())
@@ -842,7 +842,7 @@ bool ImpulseAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void ImpulseAction::Slot30(ImpulseAction const& Other)
+void ImpulseAction::CopyArchProperties(ImpulseAction const& Other)
 {
     // FUN_06cff550: CopyArchProperties, then +0x28 .. +0x40 -- the hardpoint IS copied here
     // (unlike the exe-side impulse action class).
@@ -949,15 +949,15 @@ TumbleAction::TumbleAction()
     TurnThrottleHigh.z = 1.0f;
 }
 
-FuseAction* TumbleAction::Slot04() const
+FuseAction* TumbleAction::Clone() const
 {
     // LAB_06cfd010.
     TumbleAction* Copy = new TumbleAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool TumbleAction::Slot08(INI_Reader& Reader)
+bool TumbleAction::Read(INI_Reader& Reader)
 {
     // FUN_06cff5a0.
     while (Reader.read_value())
@@ -996,7 +996,7 @@ bool TumbleAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void TumbleAction::Slot30(TumbleAction const& Other)
+void TumbleAction::CopyArchProperties(TumbleAction const& Other)
 {
     // FUN_06cff940: CopyArchProperties, +0x28, +0x44, +0x48 and +0x4c ONLY. The two turn
     // throttle vectors (+0x2c .. +0x40) are NOT copied, so a clone keeps the constructor's
@@ -1096,15 +1096,15 @@ MakeInvincibleAction::MakeInvincibleAction()
     // .text:06cfca2e / 06cfd0db: +0x28 = 1.
 }
 
-FuseAction* MakeInvincibleAction::Slot04() const
+FuseAction* MakeInvincibleAction::Clone() const
 {
     // LAB_06cfd0a0.
     MakeInvincibleAction* Copy = new MakeInvincibleAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool MakeInvincibleAction::Slot08(INI_Reader& Reader)
+bool MakeInvincibleAction::Read(INI_Reader& Reader)
 {
     // FUN_06cff970.
     while (Reader.read_value())
@@ -1117,7 +1117,7 @@ bool MakeInvincibleAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void MakeInvincibleAction::Slot30(MakeInvincibleAction const& Other)
+void MakeInvincibleAction::CopyArchProperties(MakeInvincibleAction const& Other)
 {
     // FUN_06cffa80: CopyArchProperties, byte +0x28.
     FuseAction::CopyArchProperties(Other);
@@ -1159,15 +1159,15 @@ DumpCargoAction::DumpCargoAction()
     OriginHardpoint.clear();
 }
 
-FuseAction* DumpCargoAction::Slot04() const
+FuseAction* DumpCargoAction::Clone() const
 {
     // FUN_06cfd110.
     DumpCargoAction* Copy = new DumpCargoAction();
-    Copy->Slot30(*this);
+    Copy->CopyArchProperties(*this);
     return Copy;
 }
 
-bool DumpCargoAction::Slot08(INI_Reader& Reader)
+bool DumpCargoAction::Read(INI_Reader& Reader)
 {
     // FUN_06cffaa0.
     while (Reader.read_value())
@@ -1180,7 +1180,7 @@ bool DumpCargoAction::Slot08(INI_Reader& Reader)
     return true;
 }
 
-void DumpCargoAction::Slot30(DumpCargoAction const& Other)
+void DumpCargoAction::CopyArchProperties(DumpCargoAction const& Other)
 {
     // FUN_06cffc80: CopyArchProperties, dword +0x28.
     FuseAction::CopyArchProperties(Other);

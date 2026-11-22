@@ -19,8 +19,8 @@
 //
 // vftable 0x005d561c (NN_Inventory's 47 slots) overrides:
 //    0 FUN_004b6c60 scalar deleting dtor (dtor FUN_004b6c80)
-//    9 FUN_004b6d40 Create      11 LAB_004b6e30 Update      23 LAB_004b7180 Slot23
-//   42 LAB_004b7050 SetProperty 46 FUN_004b6c50 Slot46 (`MOV AL,1 / RET`)
+//    9 FUN_004b6d40 Create      11 LAB_004b6e30 Update      23 LAB_004b7180 ProcessMessage
+//   42 LAB_004b7050 SetProperty 46 FUN_004b6c50 IsScanner (`MOV AL,1 / RET`)
 // Event::Handler vftable 0x005d5604: slot 0 FUN_004b71c0 OnEvent.
 //
 // WINFACTORY<NN_Scanner> "NN_Scanner": DAT_00672294, static init LAB_004b6b30 (ctor
@@ -49,12 +49,12 @@ public:
     // and the rows of the scanned cargo.
     void Update() override;
     // slot 23 LAB_004b7180 (RET 0xc) -- 0xef02: UI sound 0xe and FUN_0047ad20; else NN_Inventory.
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_004b7050 (RET 0xc) -- 0x26 on the close button, 0x49 (A = the cargo list,
     // B = the scanned ship's archetype), 0x4a (show); then NN_Inventory's SetProperty.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
     // slot 46 FUN_004b6c50 -- true (read by NN_Inventory at 0x0047f6bf).
-    bool Slot46() override;
+    bool IsScanner() override;
 
     // Event::Handler slot 0 FUN_004b71c0 (RET 4) -- command 0xf closes the window.
     bool OnEvent(unsigned MsgId) override;

@@ -495,7 +495,7 @@ void NnLoadSave::Draw()
         bSaveAllowed = 1;
 }
 
-bool NnLoadSave::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnLoadSave::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00486c50 (RET 0xc): the list clicks (0xf001 / 0xf002), NN_Confirm's answer (0x3006)
     // and USER_CANCEL / USER_ENTER relays (0xf003 / 0xf004) go on to slot 42; always false.
@@ -1067,9 +1067,9 @@ void NnLoadSave::Update()
         if (Row >= -1)
         {
             if (Row < NameList.ItemCount)
-                NameList.Field80 = Row;
+                NameList.HighlightIndex = Row;
             if (Row >= -1 && Row < TimeList.ItemCount)
-                TimeList.Field80 = Row;
+                TimeList.HighlightIndex = Row;
         }
     }
 

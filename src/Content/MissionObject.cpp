@@ -94,9 +94,9 @@ FMissionObject::FMissionObject(unsigned int const* InControllerId, void const* P
     , bPendingDestroy(0)
     , bJumpPending(0)
     , JumpTimer(-1.0f)
-    , Field_0x80(7)
+    , MissionType(7)
     , bDestroyed(0)
-    , Field_0x84(0.0f)
+    , ObjectiveResendTimer(0.0f)
     , Field_0x88(0)
     , JumpDelay(3)
 {
@@ -147,8 +147,8 @@ void FMissionObject::HandleMessage(pub::Controller::EMessage MessageId, void con
 
 // LAB_06ea1450: XOR EAX,EAX; RET.
 int FMissionObject::Slot07() { return 0; }
-int FMissionObject::Slot08() { return 0; }
-int FMissionObject::Slot09() { return 0; }
+int FMissionObject::GetTargetSystemId() { return 0; }
+int FMissionObject::GetJumpPreference() { return 0; }
 int FMissionObject::Slot10() { return 0; }
 
 namespace
@@ -303,13 +303,13 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
 }
 
 // LAB_06ea1460: MOV AL,1; RET.
-bool FMissionObject::Slot12() { return true; }
+bool FMissionObject::FailOnPlayerDeath() { return true; }
 // LAB_06ea1470: XOR AL,AL; RET 4.
-bool FMissionObject::Slot13(unsigned int Arg) { (void)Arg; return false; }
-bool FMissionObject::Slot14() { return true; }
+bool FMissionObject::FailOnGroupMemberDeath(unsigned int Arg) { (void)Arg; return false; }
+bool FMissionObject::FailOnSoloPlayerDeath() { return true; }
 // LAB_06ea1480: XOR AL,AL; RET.
-bool FMissionObject::Slot15() { return false; }
-bool FMissionObject::Slot16(unsigned int Arg) { (void)Arg; return false; }
+bool FMissionObject::FailOnPlayerLeave() { return false; }
+bool FMissionObject::FailOnGroupMemberLeave(unsigned int Arg) { (void)Arg; return false; }
 bool FMissionObject::Slot17() { return true; }
 
 // ---------------------------------------------------------------------------------------
@@ -1057,8 +1057,8 @@ FMissionPlayer::FMissionPlayer(unsigned int InPlayerId, FMissionObject* InMissio
     : PlayerId(InPlayerId)
     , Mission(InMission)
     , PlayerState(FindContentPlayerState(InPlayerId))
-    , Field_0x24(0)
-    , Field_0x25(0)
+    , bTradelanePathChecked(0)
+    , bForceResendObjectives(0)
 {
     // 06f1b7d8, after the vtable store.
     Objectives.Owner = this;
@@ -1073,18 +1073,18 @@ FMissionPlayer::~FMissionPlayer()
 }
 
 // FUN_06f1d3d0 (06f1d3d0-06f1d413, RET 4).
-void FMissionPlayer::SetField25(bool bValue)
+void FMissionPlayer::SetForceResendObjectives(bool bValue)
 {
-    Field_0x25 = bValue ? 1 : 0;
+    bForceResendObjectives = bValue ? 1 : 0;
     if (bValue)
         return;
     SentObjectives.Clear();
 }
 
 // LAB_06f1d420.
-bool FMissionPlayer::GetField25()
+bool FMissionPlayer::GetForceResendObjectives()
 {
-    return Field_0x25 != 0;
+    return bForceResendObjectives != 0;
 }
 
 // FUN_06f1d110 (06f1d110-06f1d3c0).
@@ -1101,7 +1101,7 @@ void FMissionPlayer::SendObjectives()
         return;
 
     // 06f1d16f: mission +0x84 = 0.
-    Mission->Field_0x84 = 0.0f;
+    Mission->ObjectiveResendTimer = 0.0f;
 
     // 06f1d178-06f1d1a9: objectives with +4 == 0 whose slot 3 is true.
     unsigned int Count = 0;
@@ -1118,8 +1118,8 @@ void FMissionPlayer::SendObjectives()
     {
         // LAB_06f1d38d: no array.
         pub::Player::SetMissionObjectives(PlayerId, Mission->ControllerId, nullptr, 0,
-                                          Mission->Field_0x50, Mission->Field_0x80,
-                                          Mission->Field_0x68);
+                                          Mission->MissionTitle, Mission->MissionType,
+                                          Mission->MissionOffer);
         return;
     }
 
@@ -1141,7 +1141,7 @@ void FMissionPlayer::SendObjectives()
             Objective->Index = -1;
             continue;
         }
-        if (Field_0x25 == 0 && (Objective->Objective.Type & 0x10) != 0)
+        if (bForceResendObjectives == 0 && (Objective->Objective.Type & 0x10) != 0)
         {
             // 06f1d230-06f1d259: already sent (slot 6 of a kept clone)?
             bool bKnown = false;
@@ -1196,8 +1196,8 @@ void FMissionPlayer::SendObjectives()
     // 06f1d332-06f1d372: send with Count (EBX is reloaded from the count after every write,
     // 06f1d2d3), then delete[] the array (FUN_06fa9036 with the element dtor LAB_06f1c980).
     pub::Player::SetMissionObjectives(PlayerId, Mission->ControllerId, Sent, Count,
-                                      Mission->Field_0x50, Mission->Field_0x80,
-                                      Mission->Field_0x68);
+                                      Mission->MissionTitle, Mission->MissionType,
+                                      Mission->MissionOffer);
     delete[] Sent;
 }
 
@@ -1303,10 +1303,10 @@ void FMissionObject::EndMission()
         Player = GetFirstPlayer();
     }
     // 06f0fc68-06f0fc8c: FmtStr::destroy and zero both FmtStr (6 dwords each).
-    Field_0x50.destroy();
-    std::memset(&Field_0x50, 0, sizeof(Field_0x50));
-    Field_0x68.destroy();
-    std::memset(&Field_0x68, 0, sizeof(Field_0x68));
+    MissionTitle.destroy();
+    std::memset(&MissionTitle, 0, sizeof(MissionTitle));
+    MissionOffer.destroy();
+    std::memset(&MissionOffer, 0, sizeof(MissionOffer));
     // 06f0fc8e-06f0fca3: +0x184 erase(begin, end) (FUN_06f1f130).
     MissionNpcs.clear();
     // 06f0fca8-06f0fcbd: +0xa4 cleared.
@@ -1364,8 +1364,8 @@ void FMissionObject::UpdateObjectiveTimer(pub::Controller::EMessage MessageId,
     // The compare uses the unrounded x87 sum (FST keeps ST0); a double sum of two floats is
     // exact here.
     double const Sum = static_cast<double>(*static_cast<float const*>(MessageParms)) +
-                       static_cast<double>(Field_0x84);
-    Field_0x84 = static_cast<float>(Sum);
+                       static_cast<double>(ObjectiveResendTimer);
+    ObjectiveResendTimer = static_cast<float>(Sum);
     if (!(Sum >= 180.0))
         return;
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.begin();
@@ -1374,9 +1374,9 @@ void FMissionObject::UpdateObjectiveTimer(pub::Controller::EMessage MessageId,
         FMissionPlayer* Player = FindPlayer(It->first);
         if (Player == nullptr)
             continue;
-        Player->SetField25(true);
+        Player->SetForceResendObjectives(true);
         Player->SendObjectives();
-        Player->SetField25(false);
+        Player->SetForceResendObjectives(false);
     }
 }
 
@@ -1578,7 +1578,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         {
             // 06f0f27d-06f0f2a5: the mission's own player: slot 15 set -> fail; else slot 18
             // with the first remaining record's player (0 without one).
-            if (Slot15())
+            if (FailOnPlayerLeave())
             {
                 bFail = true;
             }
@@ -1592,7 +1592,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             }
         }
         else if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->IsGroupMember(Parms[0]) &&
-                 Slot16(Parms[0]))
+                 FailOnGroupMemberLeave(Parms[0]))
         {
             // 06f0f2a7-06f0f2cf: a group member left and slot 16 says so -> fail.
             bFail = true;
@@ -1794,17 +1794,17 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         unsigned int ShipId = 0;
         if (PlayerState->ShipObject != nullptr)
             ShipId = PlayerState->ShipObject->SpaceObjId;
-        if (PlayerId == Parms[3] && ShipId == Parms[0] && Slot12())
+        if (PlayerId == Parms[3] && ShipId == Parms[0] && FailOnPlayerDeath())
         {
             OnMissionFail();
             break;
         }
-        if (PlayerState->IsGroupMember(Parms[3]) && Slot13(Parms[3]))
+        if (PlayerState->IsGroupMember(Parms[3]) && FailOnGroupMemberDeath(Parms[3]))
         {
             OnMissionFail();
             break;
         }
-        if (PlayerId == Parms[3] && ShipId == Parms[0] && PlayerState->GetGroupSize() == 1 && Slot14())
+        if (PlayerId == Parms[3] && ShipId == Parms[0] && PlayerState->GetGroupSize() == 1 && FailOnSoloPlayerDeath())
             OnMissionFail();
         break;
     }
@@ -1910,8 +1910,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         AttachRandEncNpc(MessageParms);
         // 06f0fa50-06f0fa9a: every formation id on the npc (+0x17c) -> FUN_06f003e0 insert
         // {id, npc+4} into the +0xec multimap.
-        std::list<unsigned int>::iterator FormIt = Npc->Field_0x17c.begin();
-        for (; FormIt != Npc->Field_0x17c.end(); ++FormIt)
+        std::list<unsigned int>::iterator FormIt = Npc->LabelIds.begin();
+        for (; FormIt != Npc->LabelIds.end(); ++FormIt)
             FormationMembers.insert(std::make_pair(*FormIt, Npc->SpaceObjId));
         break;
     }
@@ -1979,7 +1979,7 @@ char const* FMissionObject::MissionStateToName(int State)
 }
 
 // FUN_06ebf6f0: RET 4.
-void FMissionObject::Slot28(void const* Parms)
+void FMissionObject::OnNpcSystemEnter(void const* Parms)
 {
     (void)Parms;
 }
@@ -2415,7 +2415,7 @@ void FMissionObject::UpdateJumpers(float DeltaTime)
         unsigned int Arrival[2];
         Arrival[0] = It->Npc->SpaceObjId;
         Arrival[1] = JumpSystem->SystemId;
-        Slot28(Arrival);
+        OnNpcSystemEnter(Arrival);
         It->State = 0;
     }
     // 06f14be6-06f14bea.
@@ -2503,7 +2503,7 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
         Arrival[0] = It->Npc->SpaceObjId;
         Arrival[1] = Parms[0];
         Arrival[2] = Parms[3];
-        Slot28(Arrival);
+        OnNpcSystemEnter(Arrival);
         It->State = 0;
     }
 }
@@ -2641,8 +2641,8 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
     for (; EncIt != RandEncs.end(); ++EncIt)
     {
         bool bMember = false;
-        std::list<unsigned int>::iterator IdIt = Npc->Field_0x17c.begin();
-        for (; IdIt != Npc->Field_0x17c.end(); ++IdIt)
+        std::list<unsigned int>::iterator IdIt = Npc->LabelIds.begin();
+        for (; IdIt != Npc->LabelIds.end(); ++IdIt)
         {
             if (*IdIt == EncIt->NicknameId.Id)
             {
@@ -2657,7 +2657,7 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
         return;
 
     // LAB_06f14f15.
-    Npc->Field_0x1bc = 24.0f;
+    Npc->Longevity = 24.0f;
     std::list<FMissionRandEncArm>::iterator ArmIt = EncIt->Arms.begin();
     for (; ArmIt != EncIt->Arms.end(); ++ArmIt)
     {
@@ -2667,7 +2667,7 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
     if (ArmIt != EncIt->Arms.end())
     {
         // LAB_06f1507d: the arm's id onto the npc list, the npc id into the arm.
-        Npc->Field_0x17c.push_back(ArmIt->Id);
+        Npc->LabelIds.push_back(ArmIt->Id);
         ArmIt->MemberIds.push_back(Npc->SpaceObjId);
     }
     else
@@ -2686,7 +2686,7 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
         Arm.FormationRef = Npc->FormationId;
         Arm.Id = NameB.Id;
         Arm.MemberIds.push_back(Npc->SpaceObjId);
-        Npc->Field_0x17c.push_back(NameB.Id);
+        Npc->LabelIds.push_back(NameB.Id);
         EncIt->Arms.push_back(Arm);
         EncIt->FormationIndex = EncIt->FormationIndex + 1;
     }
@@ -2822,8 +2822,8 @@ bool FMissionObject::HasObjectLabel(unsigned int ObjId, unsigned int const* Labe
 
     if (Npc != nullptr)
     {
-        std::list<unsigned int>::iterator IdIt = Npc->Field_0x17c.begin();
-        for (; IdIt != Npc->Field_0x17c.end(); ++IdIt)
+        std::list<unsigned int>::iterator IdIt = Npc->LabelIds.begin();
+        for (; IdIt != Npc->LabelIds.end(); ++IdIt)
         {
             if (*IdIt == *LabelId)
                 return true;
@@ -3097,9 +3097,9 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         Params->CreationType = 0;
         Params->ControllerId = ControllerId;
         // 06f164d6-06f16521: the labels (list assignment FUN_06fa8370 / FUN_06ed0230).
-        Params->Field_0x118 = Ship->LabelIds;
+        Params->LabelIds = Ship->LabelIds;
         // 06f16526-06f16542: the record's +0xe0.
-        Params->Field_0x110 = Group->Field_0xe0;
+        Params->DockIndex = Group->ArrivalDockIndex;
         // 06f16548-06f16639: the cargo (the vector assignment inlined; same 8-byte pairs).
         Params->Cargo.clear();
         std::vector<FMissionShipCargo>::iterator Cargo = Ship->Cargo.begin();
@@ -3203,7 +3203,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     Info.Orientation.E[1][1] = 1.0f;
     Info.Orientation.E[2][2] = 1.0f;
     Info.VibeGroupId = -1;
-    Info.Field_0x80 = 1;
+    Info.VisitValue = 1;
     Info.HitPts = -1;
 
     // 06f16a63-06f16aa5: the nickname copied (strcpy loop), the record's id = its nickname id
@@ -3246,10 +3246,10 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     // 06f16b5b-06f16c26: the record's values.
     Info.Position = Position;
     Info.LoadoutID = Solar->LoadoutId;
-    Info.VibeGroupId = static_cast<int>(Solar->Field_0x458);
+    Info.VibeGroupId = static_cast<int>(Solar->VibeGroupId);
     std::memcpy(&Info.Orientation, &Solar->Orientation, sizeof(FMatrix));
     Info.DockingBaseId = Solar->BaseId;
-    Info.Field_0x80 = Solar->Visit;
+    Info.VisitValue = Solar->Visit;
     Info.CostumeHead = Solar->SpaceCostume.PartIds[0];
     Info.CostumeBody = Solar->SpaceCostume.PartIds[1];
     Info.CostumeLeftHand = Solar->SpaceCostume.PartIds[2];
@@ -3333,7 +3333,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     {
         if (std::strcmp(Solar->Nickname.Data, InvIt->Nickname.Data) != 0)
             continue;
-        pub::SpaceObj::SetInvincible(Solar->SpaceObjId, true, InvIt->bParam3 != 0, InvIt->Duration);
+        pub::SpaceObj::SetInvincible(Solar->SpaceObjId, true, InvIt->bPlayerCanDamage != 0, InvIt->MaxHpLoss);
     }
 
     // 06f16e6e-06f16eee: [Decloaked] rows of this nickname -> ActivateEquipment {Type 2, 0}.
@@ -3428,7 +3428,7 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
     {
         if (std::strcmp(Loot->Nickname.Data, InvIt->Nickname.Data) != 0)
             continue;
-        pub::SpaceObj::SetInvincible(Loot->SpaceObjId, true, InvIt->bParam3 != 0, InvIt->Duration);
+        pub::SpaceObj::SetInvincible(Loot->SpaceObjId, true, InvIt->bPlayerCanDamage != 0, InvIt->MaxHpLoss);
     }
 }
 
@@ -3486,7 +3486,7 @@ void FMissionObject::RegisterNpc(void const* MessageParms)
     {
         if (std::strcmp(Npc->Nickname.Data, InvIt->Nickname.Data) != 0)
             continue;
-        pub::SpaceObj::SetInvincible(NpcId, true, InvIt->bParam3 != 0, InvIt->Duration);
+        pub::SpaceObj::SetInvincible(NpcId, true, InvIt->bPlayerCanDamage != 0, InvIt->MaxHpLoss);
     }
 
     std::list<TString<0x30>>::iterator DecIt = DecloakedNames.begin();
@@ -3738,13 +3738,13 @@ namespace
         {
             if (Reader->is_value("mission_title"))
             {
-                Mission->Field_0x50.begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
-                Mission->Field_0x50.end_mad_lib();
+                Mission->MissionTitle.begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
+                Mission->MissionTitle.end_mad_lib();
             }
             else if (Reader->is_value("mission_offer"))
             {
-                Mission->Field_0x68.begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
-                Mission->Field_0x68.end_mad_lib();
+                Mission->MissionOffer.begin_mad_lib(static_cast<unsigned int>(Reader->get_value_int(0)));
+                Mission->MissionOffer.end_mad_lib();
             }
             else if (Reader->is_value("reward"))
             {
@@ -3831,7 +3831,7 @@ namespace
             {
                 int const HitPoints = Reader->get_value_int(0);
                 Current->HitPoints = HitPoints;
-                Current->Field_0x80 = HitPoints;
+                Current->OriginalHitPoints = HitPoints;
             }
             else if (Reader->is_value("radius"))
             {
@@ -3889,7 +3889,7 @@ namespace
                     ShipIt->Radius = 0.0f;
                 Group->ArrivalObj = Reader->get_value_string(0);
                 if (!Reader->is_value_empty(1))
-                    Group->Field_0xe0 = Reader->get_value_int(1);
+                    Group->ArrivalDockIndex = Reader->get_value_int(1);
             }
             else if (Reader->is_value("formation"))
             {
@@ -3974,11 +3974,11 @@ FMissionSolar::FMissionSolar()
     , ArchetypeId(0)
     , SystemId(0)
     , LoadoutId(0)
-    , Field_0x458(-1)
+    , VibeGroupId(-1)
     , Faction(0xffffffffu)
     , BaseId(0)
     , VoiceId(0)
-    , Field_0x468(0)
+    , CostumeId(0)
     , Visit(0)
 {
     Nickname.Length = 0;
@@ -4028,7 +4028,7 @@ FMissionShip::FMissionShip()
     , Priority(0)
     , bRandomName(0)
     , HitPoints(-1)
-    , Field_0x80(-1)
+    , OriginalHitPoints(-1)
     , Radius(7.0f)
 {
     Nickname.Length = 0;
@@ -4057,7 +4057,7 @@ FMissionShip::FMissionShip(FMissionShip const& Other)
     , Guide(Other.Guide)
     , Cargo(Other.Cargo)
     , HitPoints(Other.HitPoints)
-    , Field_0x80(Other.Field_0x80)
+    , OriginalHitPoints(Other.OriginalHitPoints)
     , Radius(Other.Radius)
 {
 }
@@ -4091,7 +4091,7 @@ FMissionShip& FMissionShip::operator=(FMissionShip const& Other)
     // 06ed3677: FUN_06ef8910 (vector assignment).
     Cargo = Other.Cargo;
     HitPoints = Other.HitPoints;
-    Field_0x80 = Other.Field_0x80;
+    OriginalHitPoints = Other.OriginalHitPoints;
     Radius = Other.Radius;
     return *this;
 }
@@ -4118,7 +4118,7 @@ FMissionShipGroup::FMissionShipGroup()
     , bRelPos(0)
     , bOrientation(0)
     , ArrivalObjId(0)
-    , Field_0xe0(-1)
+    , ArrivalDockIndex(-1)
 {
     Nickname.Length = 0;
     Nickname.Data[0] = '\0';
@@ -4145,8 +4145,8 @@ FMissionShipGroup::FMissionShipGroup()
 void FMissionObject::LoadMission(INI_Reader* Reader)
 {
     Reader->reset();
-    ResetMissionFmtStr(Field_0x50);
-    ResetMissionFmtStr(Field_0x68);
+    ResetMissionFmtStr(MissionTitle);
+    ResetMissionFmtStr(MissionOffer);
 
     while (Reader->read_header())
     {
@@ -4570,8 +4570,8 @@ void FMissionNnPath::SendObjectives(bool bSkipFirst, bool bLaunched)
     }
 
     pub::Player::SetMissionObjectives(Mission->PlayerId, Mission->ControllerId, Sent.data(),
-                                      static_cast<unsigned int>(Count), Mission->Field_0x50,
-                                      Mission->Field_0x80, Mission->Field_0x68);
+                                      static_cast<unsigned int>(Count), Mission->MissionTitle,
+                                      Mission->MissionType, Mission->MissionOffer);
 }
 
 // FUN_06f1c990 (06f1c990-06f1ca49): +0x74 = 0; every objective deleted (FUN_06f1a610 on a copy

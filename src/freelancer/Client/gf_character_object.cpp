@@ -975,7 +975,7 @@ void FCharacterObject::UpdateHotspotEnabled()
     Hotspot->bEnabled = 1;
 }
 
-void FCharacterObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
+void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Point*/)
 {
     // FUN_00445a90 (RET 8). Not while a window holds the mouse.
     if (Win3DAnyCaptured())
@@ -1002,13 +1002,13 @@ void FCharacterObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
         if (Node != nullptr && Node->Data != nullptr)
         {
             ScriptBehavior const* const Behavior = Node->Data;
-            if (Behavior->Flag0a == 0)
+            if (Behavior->bGenericScript == 0)
             {
                 Cursor = "talk_story";
             }
             else
             {
-                unsigned const Kind = Behavior->Field220;
+                unsigned const Kind = Behavior->DialogType;
                 if (Kind == 0)
                     Cursor = "talk_blowoff";
                 else if (Kind == 1)
@@ -1027,7 +1027,7 @@ void FCharacterObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
     MouseSetCursor(Cursor, false);
 }
 
-void FCharacterObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
+void FCharacterObject::OnHotspotLeave(unsigned long /*Cookie*/, int const* /*Point*/)
 {
     // FUN_00445be0 (RET 8): unless a window holds the mouse, the arrow, no name, the tooltip
     // hidden (FUN_004be390).
@@ -1038,13 +1038,13 @@ void FCharacterObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
     NnToolTipHideGlobal();
 }
 
-void FCharacterObject::Slot12(unsigned long Cookie, int const* Point)
+void FCharacterObject::OnHotspotClick(unsigned long Cookie, int const* Point)
 {
     // FUN_00445c10 (RET 8). Not while a window holds the mouse.
     if (Win3DAnyCaptured())
         return;
     // 0x00445c20..0x00445c2f: the leave handling first (slot 11).
-    Slot11(Cookie, Point);
+    OnHotspotLeave(Cookie, Point);
 
     // 0x00445c32..0x00445c72: the character's faction (+0x164) marked met in the visit map
     // (flags | 0x41, the server told) unless bit 0 is already set.
@@ -1344,14 +1344,14 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
     }
 
     // 0x00435eac..0x00435ed1: the dialog (+0x220 / +0x224 / +0x228 and the two texts).
-    Sequence->SetDialog(static_cast<int>(Behavior->Field220), static_cast<int>(Behavior->Field224),
-                        static_cast<int>(Behavior->Field228), Behavior->NameFmtStr,
+    Sequence->SetDialog(static_cast<int>(Behavior->DialogType), static_cast<int>(Behavior->OfferArg),
+                        static_cast<int>(Behavior->OfferMissionId), Behavior->NameFmtStr,
                         Behavior->DescFmtStr);
 
     // 0x00435ed6..0x00435f44: +0x14 set -- this character alone, bound as the mirror's first;
     // clear -- the listed characters by key under their names, bound by name.
     int BindMode = 0;
-    if (Behavior->Flag14 != 0)
+    if (Behavior->bBindSingleCharacter != 0)
     {
         Sequence->Mirror.Add(Character, nullptr);
         BindMode = 1;
@@ -1373,7 +1373,7 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
     // dealer role; then played.
     Sequence->BindMode = BindMode;
     Sequence->bLetterbox = 1;
-    Sequence->bApplySpatial = Behavior->Flag08;
+    Sequence->bApplySpatial = Behavior->bApplySpatial;
     Sequence->SetName(PlacementName);
     Sequence->Priority = 0;
     Sequence->Callback = Callback;
@@ -1381,9 +1381,9 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
     Sequence->bDuckAmbient = 1;
     Sequence->bDuckMusic = 1;
     Sequence->CallbackA = CallbackA;
-    Sequence->Location = Behavior->Field0c;
-    Sequence->Field_0x15 = Behavior->Flag0a;
-    Sequence->RtcId = Behavior->Field25c;
+    Sequence->Location = Behavior->RelocateLocationId;
+    Sequence->Field_0x15 = Behavior->bGenericScript;
+    Sequence->RtcId = Behavior->RtcId;
     int const Role = Character->Role;
     Sequence->Field_0x16 = (Role == 2 || Role == 3 || Role == 4) ? 1 : 0;
     Sequence->Play();

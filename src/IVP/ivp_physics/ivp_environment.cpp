@@ -28,7 +28,7 @@
 #include <new>
 
 // QueryPerformanceCounter / QueryPerformanceFrequency, which retail's
-// IVP_PerformanceCounter_Simple::Slot01 (063602e0) calls through the IAT.
+// IVP_PerformanceCounter_Simple::pcount (063602e0) calls through the IAT.
 // Included after the IVP headers so its macros cannot reach them.
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -324,26 +324,26 @@ void IVP_Environment_Notify_Object_Listeners_Slot1(IVP_Environment* env, void* a
 // pass, no null test; `TEST byte ptr [ECX+4],4` gates `CALL [EDX+0x8]` (slot 2)
 // and `CALL [EDX+0xc]` (slot 3) respectively. The old bodies skipped the call
 // and added a null test.
-void IVP_Environment_Notify_Listeners_C8_Slot2(IVP_Environment* env, void* arg)
+void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg)
 {
     for (int i = static_cast<int>(env->vector_listeners_c8.n_elems) - 1; i >= 0; --i)
     {
         IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->vector_listeners_c8.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
-            Listener->Slot02(arg);
+            Listener->event_friction_created(arg);
         }
     }
 }
 
-void IVP_Environment_Notify_Listeners_C8_Slot3(IVP_Environment* env, void* arg)
+void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg)
 {
     for (int i = static_cast<int>(env->vector_listeners_c8.n_elems) - 1; i >= 0; --i)
     {
         IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->vector_listeners_c8.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
-            Listener->Slot03(arg);
+            Listener->event_friction_deleted(arg);
         }
     }
 }
@@ -1388,7 +1388,7 @@ void IVP_Event_Manager::simulate_time_events(IVP_Sim_Unit_Manager* TimeManager, 
             static_cast<IVP_Time_Event*>(Pool->PoolEntries[Pool->PoolLiveIndex].Payload); // :06360707-:06360713
         Pool->Remove(static_cast<uint16_t>(Event->EventQueueHandle));           // :06360717-:0636071b
         Event->EventQueueHandle = 0xffff;                                       // :06360724
-        TimeManager->Field_0x10 = MinKey;                                       // :0636072b
+        TimeManager->LastEventRelTime = MinKey;                                       // :0636072b
 
         // x87: Hi/Lo stay on the FPU stack (double) through the loop and are
         // rounded to float only by the FSTPs at :0636076a/:0636076e.
@@ -1450,7 +1450,7 @@ void IVP_Event_Manager::simulate_variable_time_step(IVP_Sim_Unit_Manager* TimeMa
             IVP_Environment_SetDeltaPsiTime(Environment, DeltaTime);            // :0636085d-:06360864 FUN_0634c6d0
         }
 
-        TimeManager->Field_0x10 = MinKey;                                       // :06360869-:0636086d
+        TimeManager->LastEventRelTime = MinKey;                                       // :06360869-:0636086d
         Pool->Remove(static_cast<uint16_t>(Event->EventQueueHandle));           // :06360870-:06360877
         Event->EventQueueHandle = 0xffff;                                       // :06360881
         Event->simulate_time_event(Environment);                                // :0636087c-:06360888
@@ -1504,7 +1504,7 @@ void IVP_Time_Event_PSI::simulate_time_event(IVP_Environment* Environment)
     // :06360ba1-:06360bb5 -- the time manager's base moves to this PSI.
     TimeManager->TimeBaseHi = Environment->time_of_last_psi.time_base;
     TimeManager->TimeBaseLo = Environment->time_of_last_psi.time_offset;
-    TimeManager->Field_0x10 = 0.0f;
+    TimeManager->LastEventRelTime = 0.0f;
 
     // :06360bbc-:06360bcc -- FUN_0634d090(env, {+0x108, +0x10c}).
     IVP_Environment_Simulate_Psi(Environment, Environment->time_of_last_psi);
@@ -1731,13 +1731,13 @@ IVP_PerformanceCounter_Simple::IVP_PerformanceCounter_Simple()
 }
 
 // LAB_06360350: `MOV dword ptr [ECX+0x10],0; RET`.
-void IVP_PerformanceCounter_Simple::Slot00()
+void IVP_PerformanceCounter_Simple::start_pcount()
 {
     CurrentElement = 0;
 }
 
 // LAB_063602e0 (.text:063602e0-0636034c, RET 4).
-void IVP_PerformanceCounter_Simple::Slot01(int32_t Element)
+void IVP_PerformanceCounter_Simple::pcount(int32_t Element)
 {
     if (Element == 1)                                                        // :063602e8-:063602ef
         ++CountPSIs;                                                         // :063602f1
@@ -1769,12 +1769,12 @@ void IVP_PerformanceCounter_Simple::environment_is_going_to_be_deleted(IVP_Envir
 
 // FUN_06356960 lives in src/IVP/ivp_utility/ivp_message.cpp (the IVP message
 // printf; C linkage because the vendored qhull also calls it).
-extern "C" void FUN_06356960(const char* Format, ...);
+extern "C" void ivp_message(const char* Format, ...);
 
 // FUN_06360110 (.text:06360110-0636027a, RET 8) -- the library's
 // reset_and_print_performance_counters(IVP_Time). Nothing happens unless at
 // least one PSI was counted (`FILD +0x14; FCOMP 0.0; TEST AH,0x40; JNZ`).
-void IVP_PerformanceCounter_Simple::Slot04(float TimeHi, float TimeLo)
+void IVP_PerformanceCounter_Simple::reset_and_print_performance_counters(float TimeHi, float TimeLo)
 {
     const float PsiCount = (float)(CountPSIs);                    // :0636011d-:06360121
     if (PsiCount == 0.0f)                                                     // :06360125-:06360130
@@ -1793,7 +1793,7 @@ void IVP_PerformanceCounter_Simple::Slot04(float TimeHi, float TimeLo)
 
     // :063601bc-:06360249 -- the eleven double arguments, 66.0f (DAT_063a5710)
     // and 0.1 (DAT_063a5708, double) for the percentage.
-    FUN_06356960("TOT %2.1f%% %2.2f COLL %2.2f  DYN %2.2f     det:  UNIV: %2.2f CONTR: %2.2f INTEGR: %2.2f HULL: %2.2f SHORT: %2.2f CRITIC: %2.2f AT %2.2f",
+    ivp_message("TOT %2.1f%% %2.2f COLL %2.2f  DYN %2.2f     det:  UNIV: %2.2f CONTR: %2.2f INTEGR: %2.2f HULL: %2.2f SHORT: %2.2f CRITIC: %2.2f AT %2.2f",
                  ((double)(Total) * 66.0f) * 0.1,
                  (double)(Total),
                  (double)(Scale) * Coll,

@@ -218,28 +218,28 @@ static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned in
 static bool MarshalMunCollision(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const SSPMunitionCollisionInfo* Info = reinterpret_cast<const SSPMunitionCollisionInfo*>(Args[0]);
     FPayloadClientMunCollision Wire;
-    Wire.Field_0x00 = Info->ProjectileArchId;
-    Wire.Field_0x04 = Info->AttackerId;
+    Wire.ProjectileArchId = Info->ProjectileArchId;
+    Wire.AttackerId = Info->AttackerId;
     Wire.ObjectId = Info->ObjectId;
-    Wire.Field_0x0c = Info->SubObjId;
+    Wire.SubObjId = Info->SubObjId;
     Wire.Pad_0x0e = 0;
-    Wire.Field_0x10 = Info->HitPosX;
-    Wire.Field_0x14 = Info->HitPosY;
-    Wire.Field_0x18 = Info->HitPosZ;
+    Wire.HitPosX = Info->HitPosX;
+    Wire.HitPosY = Info->HitPosY;
+    Wire.HitPosZ = Info->HitPosZ;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverMunCollision(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientMunCollision Wire = RpcPayloadRead<FPayloadClientMunCollision>(Packet, 0);
     SSPMunitionCollisionInfo Info;
-    Info.ProjectileArchId = Wire.Field_0x00;
-    Info.AttackerId = Wire.Field_0x04;
+    Info.ProjectileArchId = Wire.ProjectileArchId;
+    Info.AttackerId = Wire.AttackerId;
     Info.ObjectId = Wire.ObjectId;
-    Info.SubObjId = Wire.Field_0x0c;
+    Info.SubObjId = Wire.SubObjId;
     Info.Pad_0x0e = 0;
-    Info.HitPosX = Wire.Field_0x10;
-    Info.HitPosY = Wire.Field_0x14;
-    Info.HitPosZ = Wire.Field_0x18;
+    Info.HitPosX = Wire.HitPosX;
+    Info.HitPosY = Wire.HitPosY;
+    Info.HitPosZ = Wire.HitPosZ;
     Server->SPMunitionCollision(Info, SessionId);
     return true;
 }
@@ -410,7 +410,7 @@ static bool MarshalObjCollision(FPacketBase* Packet, const unsigned int* Args, u
     Wire.TargetObjectId = Info->TargetObjectId;
     Wire.TargetSubObjId = Info->TargetSubObjId;
     Wire.Pad_0x0e = 0;
-    Wire.Field_0x10 = Info->DamageBits;
+    Wire.DamageBits = Info->DamageBits;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -423,7 +423,7 @@ static bool DeliverObjCollision(const FPacketBase* Packet, IServer* Server, unsi
     Info.ObjectId = Wire.ObjectId;
     Info.SubObjId = Wire.SubObjId;
     Info.Pad_0x0e = 0;
-    Info.DamageBits = Wire.Field_0x10;
+    Info.DamageBits = Wire.DamageBits;
     Server->SPObjCollision(Info, SessionId);
     return true;
 }
@@ -437,9 +437,9 @@ static bool MarshalBadLandsObjCollision(FPacketBase* Packet, const unsigned int*
         reinterpret_cast<const SSPBadLandsObjCollisionInfo*>(Args[0]);
     FPayloadClientBadLandsObjCollision Wire;
     Wire.ObjectId = Info->ObjectId;
-    Wire.Field_0x04 = Info->Field_0x08;
+    Wire.SubObjId = Info->SubObjId;
     Wire.Pad_0x06 = 0;
-    Wire.Field_0x08 = Info->Field_0x00;
+    Wire.BadLandsObjId = Info->BadLandsObjId;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -447,9 +447,9 @@ static bool DeliverBadLandsObjCollision(const FPacketBase* Packet, IServer* Serv
     const FPayloadClientBadLandsObjCollision Wire =
         RpcPayloadRead<FPayloadClientBadLandsObjCollision>(Packet, 0);
     SSPBadLandsObjCollisionInfo Info;
-    Info.Field_0x00 = Wire.Field_0x08;
+    Info.BadLandsObjId = Wire.BadLandsObjId;
     Info.ObjectId = Wire.ObjectId;
-    Info.Field_0x08 = Wire.Field_0x04;
+    Info.SubObjId = Wire.SubObjId;
     Info.Pad_0x0a = 0;
     Server->SPBadLandsObjCollision(Info, SessionId);
     return true;
@@ -498,7 +498,7 @@ static bool DeliverGFGoodBuy(const FPacketBase* Packet, IServer* Server, unsigne
 // ===========================================================================
 static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientMissionResponse Wire;
-    Wire.Field_0x00 = Args[0];
+    Wire.OfferId = Args[0];
     Wire.MissionId = Args[1];
     Wire.bAccepted = (unsigned char)(Args[2] & 0xffu);
     Wire.Pad_0x09[0] = 0;
@@ -510,7 +510,7 @@ static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args
 static bool DeliverMissionResponse(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientMissionResponse Wire =
         RpcPayloadRead<FPayloadClientMissionResponse>(Packet, 0);
-    Server->MissionResponse(Wire.Field_0x00, Wire.MissionId, Wire.bAccepted, SessionId);
+    Server->MissionResponse(Wire.OfferId, Wire.MissionId, Wire.bAccepted, SessionId);
     return true;
 }
 
@@ -733,9 +733,9 @@ static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, u
     Wire.Pad_0x01[0] = 0;
     Wire.Pad_0x01[1] = 0;
     Wire.Pad_0x01[2] = 0;
-    Wire.Field_0x04 = Args[1];
-    Wire.Field_0x08 = Args[2];
-    Wire.Field_0x0c = Args[3];
+    Wire.ShipId = Args[1];
+    Wire.TargetId = Args[2];
+    Wire.SecondId = Args[3];
     Wire.Field_0x10 = (unsigned char)(Args[4] & 0xffu);
     Wire.Pad_0x11[0] = 0;
     Wire.Pad_0x11[1] = 0;
@@ -745,7 +745,7 @@ static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, u
 
 static bool DeliverRequestEvent(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientRequestEvent Wire = RpcPayloadRead<FPayloadClientRequestEvent>(Packet, 0);
-    Server->RequestEvent((int)Wire.EventType, Wire.Field_0x04, Wire.Field_0x08, Wire.Field_0x0c,
+    Server->RequestEvent((int)Wire.EventType, Wire.ShipId, Wire.TargetId, Wire.SecondId,
                          (unsigned long)Wire.Field_0x10, SessionId);
     return true;
 }
@@ -756,8 +756,8 @@ static bool MarshalRequestCancel(FPacketBase* Packet, const unsigned int* Args, 
     Wire.Pad_0x01[0] = 0;
     Wire.Pad_0x01[1] = 0;
     Wire.Pad_0x01[2] = 0;
-    Wire.Field_0x04 = Args[1];
-    Wire.Field_0x08 = Args[2];
+    Wire.ShipId = Args[1];
+    Wire.TargetId = Args[2];
     Wire.Field_0x0c = (unsigned char)(Args[3] & 0xffu);
     Wire.Pad_0x0d[0] = 0;
     Wire.Pad_0x0d[1] = 0;
@@ -767,7 +767,7 @@ static bool MarshalRequestCancel(FPacketBase* Packet, const unsigned int* Args, 
 
 static bool DeliverRequestCancel(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientRequestCancel Wire = RpcPayloadRead<FPayloadClientRequestCancel>(Packet, 0);
-    Server->RequestCancel((int)Wire.EventType, Wire.Field_0x04, Wire.Field_0x08,
+    Server->RequestCancel((int)Wire.EventType, Wire.ShipId, Wire.TargetId,
                           (unsigned long)Wire.Field_0x0c, SessionId);
     return true;
 }
@@ -809,10 +809,10 @@ static bool MarshalCreateNewCharacter(FPacketBase* Packet, const unsigned int* A
     // into the payload (06d8ce67). Every one of the 0x90 bytes is written.
     FPayloadClientCreateNewChar Wire;
     wcsncpy(Wire.Name, Info->Name, 0x40);
-    Wire.Field_0x80 = Info->Field_0x30;
-    Wire.Field_0x84 = Info->Field_0x34;
-    Wire.Field_0x88 = Info->Field_0x38;
-    Wire.Field_0x8c = Info->Field_0x3c;
+    Wire.FactionId = Info->FactionId;
+    Wire.BaseId = Info->BaseId;
+    Wire.PackageId = Info->PackageId;
+    Wire.PilotId = Info->PilotId;
     Wire.Name[0x3f] = 0;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
@@ -823,10 +823,10 @@ static bool DeliverCreateNewCharacter(const FPacketBase* Packet, IServer* Server
     // Name (06d86e9a), no clearing first, then the four dwords (06d86ea0..06d86ed3), which
     // land after the string and so overwrite whatever a long name spilled into them.
     wcscpy(GStaticCreateCharacterInfo.Name, Wire.Name);
-    GStaticCreateCharacterInfo.Field_0x30 = Wire.Field_0x80;
-    GStaticCreateCharacterInfo.Field_0x34 = Wire.Field_0x84;
-    GStaticCreateCharacterInfo.Field_0x38 = Wire.Field_0x88;
-    GStaticCreateCharacterInfo.Field_0x3c = Wire.Field_0x8c;
+    GStaticCreateCharacterInfo.FactionId = Wire.FactionId;
+    GStaticCreateCharacterInfo.BaseId = Wire.BaseId;
+    GStaticCreateCharacterInfo.PackageId = Wire.PackageId;
+    GStaticCreateCharacterInfo.PilotId = Wire.PilotId;
     Server->CreateNewCharacter(GStaticCreateCharacterInfo, SessionId);
     return true;
 }
@@ -1271,10 +1271,10 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Info.Orientation = Wire.Orientation;
         Info.Position = Wire.Position;
         // Retail widens the wire float into the struct's double with FLD/FSTP.
-        Info.Timestamp = (double)Wire.Field_0x24;
+        Info.Timestamp = (double)Wire.Timestamp;
         // Retail copies packet+0x48 as a plain dword into the struct's +0x28.
-        Info.ThrottleBits = *reinterpret_cast<const unsigned int*>(&Wire.Field_0x28);
-        Info.State = Wire.Field_0x00;
+        Info.ThrottleBits = *reinterpret_cast<const unsigned int*>(&Wire.Throttle);
+        Info.State = Wire.State;
         Info.Pad_0x2d[0] = 0;
         Info.Pad_0x2d[1] = 0;
         Info.Pad_0x2d[2] = 0;
@@ -1316,7 +1316,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         }
         const FPayloadCommonChatMsg Wire = RpcPayloadRead<FPayloadCommonChatMsg>(Packet, 0);
         const CHAT_ID Sender(SessionId & 0xffffu);
-        const CHAT_ID Target(Wire.Field_0x00);
+        const CHAT_ID Target(Wire.TargetId);
         ChatServer->SubmitChat(Sender, Wire.Size, Wire.Buffer, Target, -1);
         return true;
     }
@@ -1337,7 +1337,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         XActivateCruise Info;
         Info.ObjectId = Wire.ObjectId;
         Info.bActivate = (Wire.bActivate != 0);
-        Info.bDisruptCruise = (unsigned char)(Wire.Field_0x05 != 0 ? 1 : 0);
+        Info.bDisruptCruise = (unsigned char)(Wire.bDisruptCruise != 0 ? 1 : 0);
         Info.Pad_0x06[0] = 0;
         Info.Pad_0x06[1] = 0;
         Server->ActivateCruise(SessionId, Info);
@@ -1349,7 +1349,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         Info.ObjectId = Wire.ObjectId;
         Info.TradelaneRing1 = Wire.TradelaneRing1;
         Info.TradelaneRing2 = Wire.TradelaneRing2;
-        Info.Field_0x0c = (Wire.Field_0x0c != 0);
+        Info.bMidLane = (Wire.bMidLane != 0);
         Info.Pad_0x0d[0] = 0;
         Info.Pad_0x0d[1] = 0;
         Info.Pad_0x0d[2] = 0;
@@ -1360,7 +1360,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
                    // IServerImpl sender 06d8e770; SessionId comes from this dispatcher.
         const FPayloadCommonStopTradelane Wire =
             RpcPayloadRead<FPayloadCommonStopTradelane>(Packet, 0);
-        Server->StopTradelane(SessionId, Wire.Field_0x00, Wire.Field_0x04, Wire.Field_0x08);
+        Server->StopTradelane(SessionId, Wire.ShipId, Wire.TradelaneRing1, Wire.TradelaneRing2);
         return true;
     }
     case 0x11: {   // SET_WEAPON_GROUP -> slot 70
@@ -1373,13 +1373,13 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
             RpcPayloadRead<FPayloadCommonPlayerTrade>(Packet, 0);
         switch (Wire.SubType) {
         case 0x01:
-            Server->InitiateTrade(SessionId, Wire.Field_0x08);
+            Server->InitiateTrade(SessionId, Wire.ShipId);
             return true;
         case 0x02:
-            Server->TerminateTrade(SessionId, (int)Wire.Field_0x04);
+            Server->TerminateTrade(SessionId, (int)Wire.Reason);
             return true;
         case 0x04:
-            Server->SetTradeMoney(SessionId, Wire.Field_0x0c);
+            Server->SetTradeMoney(SessionId, Wire.Money);
             return true;
         case 0x08: {
             EquipDesc Desc;                                  // 06d878eb, the real ctor
@@ -1401,15 +1401,15 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
             return true;
         }
         case 0x20:
-            Server->RequestTrade(SessionId, Wire.Field_0x08);
+            Server->RequestTrade(SessionId, Wire.ShipId);
             return true;
         case 0x40:
-            Server->AcceptTrade(SessionId, Wire.Field_0x10 != 0);
+            Server->AcceptTrade(SessionId, Wire.bAccepted != 0);
             return true;
         case 0x80:
             // Retail quirk, reproduced: this is the ONE sub-type that does not forward
             // the dispatcher's session id. StopTradeRequest gets payload+0x08 instead.
-            Server->StopTradeRequest(Wire.Field_0x08);
+            Server->StopTradeRequest(Wire.ShipId);
             return true;
         default:
             return false;
@@ -1472,7 +1472,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
                    // flattened FmtStr blocks are dropped on this side of the wire.
         const FPayloadCommonPopUpDialog Wire =
             RpcPayloadRead<FPayloadCommonPopUpDialog>(Packet, 0);
-        Server->PopUpDialog(SessionId, Wire.Field_0x10);
+        Server->PopUpDialog(SessionId, Wire.Buttons);
         return true;
     }
     case 0x1c: {   // SET_INTERFACE_STATE -> slot 77

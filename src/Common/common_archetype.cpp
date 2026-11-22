@@ -683,7 +683,7 @@ namespace Archetype
         Desc.ShareMode = 1;
         Desc.Creation = 3;
         Desc.Flags = 0x8000080;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.FindHandle = 0xFFFFFFFF;
 
         IFileSystem* Filesys = nullptr;
         if (DALib::Data->CreateInstance((AGGDESC*)&Desc, (void**)&Filesys) != 0)

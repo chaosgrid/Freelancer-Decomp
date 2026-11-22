@@ -617,7 +617,7 @@ void NN_MainButton::OnScaleFinished()
 
     // 0x0045d432..0x0045d4ff
     OpenButton->SetPosition(PanelOrigin[NnPanelSlot(OpenPanelId)]);
-    Window->Slot23(0xef01, 0, 0);
+    Window->ProcessMessage(0xef01, 0, 0);
     Window->Flags = static_cast<unsigned char>(Window->Flags | 3);
     PlayOrRewindUiSoundSlot(2);
     HudPushCancelHandler(AsHudCmdHandler(), 0);
@@ -757,7 +757,7 @@ void NN_MainButton::ClosePanel()
     Win3D* const Window = Win3DFindByName(Name);
     if (Window != nullptr)
     {
-        Window->Slot23(0xef02, 0, 0);
+        Window->ProcessMessage(0xef02, 0, 0);
     }
 
     // 0x0045d0c1..0x0045d14d: a full-size background shrinks to the slot's scale.

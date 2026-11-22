@@ -9,7 +9,7 @@
 // for the full class-identity evidence trail. This TU only needs PUBLIC API
 // (IVP_ListManager/IVP_ListManager_CorePairEntry/IVP_Contact_Point's
 // already-declared fields and methods, IVP_Core's already-declared fields
-// and methods, the already-ported FUN_063557c0/IVP_Contact_Point::ShiftTimeStamp) --
+// and methods, the already-ported IVP_Core_UnionFindGetFather/IVP_Contact_Point::ShiftTimeStamp) --
 // items 3231/3243 are NOT here because they need the anonymous-namespace-
 // local helpers (IVP_PopulatePairRecordIntoOwner/
 // IVP_ResolvePairRecordSideMaterialSlots) declared inside
@@ -26,7 +26,7 @@
 #include <cstring>
 #include <utility>
 
-#include "../ivp_physics/ivp_cluster_manager.h" // IVP_Cluster_Manager::fire_event_friction_slot3 (0634b140)
+#include "../ivp_physics/ivp_cluster_manager.h" // IVP_Cluster_Manager::fire_event_friction_deleted (0634b140)
 
 namespace
 {
@@ -59,7 +59,7 @@ namespace
 //   06355232-06355255: the same for Object2 / Feature2;
 //   06355255-06355288: the stack event (above), Environment = Object1's
 //     environment (+0x18), then FUN_0634cfe0 on that environment
-//     (IVP_Environment_Notify_Listeners_C8_Slot3);
+//     (IVP_Environment_Notify_Friction_Deleted);
 //   0635528d-063552b4: for Object1 then Object2, when flags (+0x78) has 0x2000
 //     (`TEST AH,0x20`): FUN_0634b140(environment->controller_manager (+0xc),
 //     object, &event) -- the environment of Object1 for both.
@@ -87,15 +87,15 @@ void IVP_UnlinkPairRecordFromObjects(IVP_Contact_Point* Record)
     Event.CompactEdges[0] = Record->Feature1;
     Event.CompactEdges[1] = Record->Feature2;
 
-    IVP_Environment_Notify_Listeners_C8_Slot3(Environment, &Event);
+    IVP_Environment_Notify_Friction_Deleted(Environment, &Event);
 
     if ((Object1->flags & 0x2000u) != 0)
     {
-        Environment->cluster_manager->fire_event_friction_slot3(Object1, &Event); // 0634b140
+        Environment->cluster_manager->fire_event_friction_deleted(Object1, &Event); // 0634b140
     }
     if ((Object2->flags & 0x2000u) != 0)
     {
-        Environment->cluster_manager->fire_event_friction_slot3(Object2, &Event); // 0634b140
+        Environment->cluster_manager->fire_event_friction_deleted(Object2, &Event); // 0634b140
     }
 
     // Side 1 (Common.dll.txt:063552b9-063552dd): unlink node #1
@@ -151,8 +151,8 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
         if ((CoreB->Flags & 0xc) != 0)
             continue;
 
-        IVP_Core* MasterA = FUN_063557c0(CoreA);
-        IVP_Core* MasterB = FUN_063557c0(CoreB);
+        IVP_Core* MasterA = IVP_Core_UnionFindGetFather(CoreA);
+        IVP_Core* MasterB = IVP_Core_UnionFindGetFather(CoreB);
         if (MasterA != MasterB)
             MasterB->MergedCoreWhichReplacedIt = MasterA;
     }
@@ -165,7 +165,7 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
     {
         IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
         if ((Core->Flags & 0xc) == 0)
-            ReferenceMaster = FUN_063557c0(Core);
+            ReferenceMaster = IVP_Core_UnionFindGetFather(Core);
     }
 
     // Phase 4 (0635585f-06355881): scan every non-kinematic Core for a
@@ -176,7 +176,7 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
         IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
         if ((Core->Flags & 0xc) != 0)
             continue;
-        IVP_Core* Master = FUN_063557c0(Core);
+        IVP_Core* Master = IVP_Core_UnionFindGetFather(Core);
         if (Master != ReferenceMaster)
             Disconnected = Master;
     }
@@ -268,7 +268,7 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
                 NewManager->RegisterCore(Core);       // 06355925
                 Core->register_object_hash_entry(Handle); // 0635592d: FUN_06347c80
             }
-            else if (FUN_063557c0(Core) == TargetMaster)
+            else if (IVP_Core_UnionFindGetFather(Core) == TargetMaster)
             {
                 Manager->UnregisterCore(Core);
                 NewManager->RegisterCore(Core);
@@ -317,7 +317,7 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
                 KinHandleUnderNewManager = IVP_FindFrictionInfo(KinematicSide, NewManager); // 063559ab-063559bb
             }
 
-            if (FUN_063557c0(PickA) != TargetMaster)
+            if (IVP_Core_UnionFindGetFather(PickA) != TargetMaster)
                 continue;
 
             Manager->CorePairEntries.RemoveElement(Entry);

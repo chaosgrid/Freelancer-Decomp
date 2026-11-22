@@ -40,7 +40,7 @@ struct FBestPathWaypoint
     // stop (ids 0x4df), anything else ids 0x331c; FUN_004c5490 looks for the first one not 3.
     // Bits 0x80 / 0x20 / 0x10 are one-shot requests FUN_004bcbf0 serves and clears (story star
     // reset, mission-log history FUN_004ba2a0, mission-log queue FUN_004b9f90).
-    unsigned Field_0x18;
+    unsigned ObjectiveState;
 };
 
 // The value of one map entry (node +0x10, 0x44 bytes).
@@ -55,7 +55,7 @@ struct FBestPath
     // node +0x50 -- read as a byte through FUN_004c5040 (+0x40): 7 and 8 hide the nav map's
     // abort-mission button (0x0049a866); any other value is the mission id NeuroNetNavMap's
     // abort sends (IServer::AbortMission, 0x0049f70e). Slot 72 copies it from +0x3c.
-    unsigned char Field_0x50;
+    unsigned char MissionType;
 };
 
 // DAT_0067294c.

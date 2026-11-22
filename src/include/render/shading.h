@@ -15,6 +15,12 @@
 
 // Tagged DWORD payload with explicit string/component ownership.
 // Scalar payloads retain their bit patterns; lifetime is managed explicitly.
+struct FTextureQuery
+{
+    const char* Name;
+    unsigned long Crc;
+};
+
 struct FShadingPropertyValue
 {
     unsigned long Type;       // +0x00

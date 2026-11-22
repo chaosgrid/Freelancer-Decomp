@@ -70,13 +70,13 @@ public:
     //
     //   0  FUN_062cf340  scalar-deleting dtor around FUN_062cf360
     //   1  LAB_062cf3e0  SetContext (`JMP FUN_062d2090`)
-    //   3  LAB_062cf3f0  Slot3 (engage)
-    //   4  FUN_062cf4f0  Slot4 (disengage)
-    //   5  FUN_062cf530  Slot5
+    //   3  LAB_062cf3f0  OnEngage (engage)
+    //   4  FUN_062cf4f0  OnDisengage (disengage)
+    //   5  FUN_062cf530  OnEvaluateReadiness
     //   6  LAB_062cf5e0  Behavior's own evaluate body (`MOV EAX,2; RET 4`), inherited
-    //   7  LAB_062cf5f0  Slot7 -> Update()
-    //  10  LAB_062cfc70  Slot10 (apply a DirectiveGuideOp)
-    //  21  LAB_062cf300  Slot21 (shared with BaseFollowerBehavior)
+    //   7  LAB_062cf5f0  OnUpdate -> Update()
+    //  10  LAB_062cfc70  OnApplyDirective (apply a DirectiveGuideOp)
+    //  21  LAB_062cf300  OnObjectLeftSystem (shared with BaseFollowerBehavior)
     //  24  LAB_062cf2f0  get_target
     // Every other slot is Behavior's own entry.
     // ------------------------------------------------------------------
@@ -91,16 +91,16 @@ public:
 
     // Slot 3, LAB_062cf3f0 (Engage): re-arm, capture the manager's Goto (+0x17c) and Follow
     // (+0x1b8) behaviors, hand them GotoOp/FollowOp and engage both.
-    void Slot3() override;
+    void OnEngage() override;
 
     // Slot 4, FUN_062cf4f0: disengage both siblings and release their directive bit.
-    void Slot4() override;
+    void OnDisengage() override;
 
     // Slot 5, FUN_062cf530 (RET 4, argument unread).
-    int Slot5(float Value) override;
+    int OnEvaluateReadiness(float Value) override;
 
     // Slot 10, LAB_062cfc70 (RET 4): take a pub::AI::DirectiveGuideOp.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
 
     // ------------------------------------------------------------------
     // Own vtable slot 7 (offset 0x1c). LAB_062cf5f0, Common.dll.txt 206092-206730, 575
@@ -122,50 +122,50 @@ public:
     //      UpdateResult10 = 3. No OwnerContextPtr14 (or, re-tested, no WatcherA) -> return 3
     //      WITHOUT touching Flags28. Retail re-reads +0x2c twice more; nothing in between can
     //      change it, so the port evaluates it once.
-    //   2. 062cf630-062cf6bd  Refresh the guide destination Field48 from GotoOp.Field_0C
+    //   2. 062cf630-062cf6bd  Refresh the guide destination GuideDestination from GotoOp.Field_0C
     //      (retail reads it at raw offset +0x74 == GotoOp+0x0C):
     //        0 -> WatcherB's world position via GetIfacePositionOrZero; if WatcherB is unset,
     //             clear Flags28 bit 0x2, NotifyBehaviorDone(0xe, 1) and return 2.
     //        1 -> a straight copy of GotoOp.Destination (raw +0x78 == GotoOp+0x10).
-    //        anything else -> Field48 is left at whatever the last tick put there.
-    //   3. 062cf6c0-062cf729  Field54 = GotoOp.Field_50 (raw +0xb8); then three steering
+    //        anything else -> GuideDestination is left at whatever the last tick put there.
+    //   3. 062cf6c0-062cf729  ArrivalRadius = GotoOp.Field_50 (raw +0xb8); then three steering
     //      queries on the NavHelperPtr24+0x14fc element: Clearance (to WatcherA),
-    //      RadialClearance (to Field48) and Dist (WatcherA position to Field48).
+    //      RadialClearance (to GuideDestination) and Dist (WatcherA position to GuideDestination).
     //   4. 062cf74e-062cf7ef  Two independent "is the escorted object actually mine" tests,
     //      either of which clears Flag120: (a) WatcherA's get_behavior_id() == 10 and its
     //      get_formation_leader() has the same object id as the NavHelper element's own +0x84
     //      ship -- this one also latches bLeaderIsSelf; (b) WatcherA's id appears in the
     //      +0x1364 sub-object's formation-followers list (FUN_062ec520).
-    //   5. 062cf7f1-062cf8b2  Field108 accumulates DeltaTime1c until it passes Field104
-    //      (ctor default 10.0f). On overflow it samples: Field58 = previous Field10c - Dist
-    //      (distance closed since the last sample, positive == closing), Field5c =
+    //   5. 062cf7f1-062cf8b2  SampleElapsed accumulates DeltaTime1c until it passes SampleInterval
+    //      (ctor default 10.0f). On overflow it samples: ProgressDelta = previous LastSampleDistance - Dist
+    //      (distance closed since the last sample, positive == closing), ApproachAngleRad =
     //      acos(clamped dot of the escorted ship's negated forward axis with the normalized
-    //      Field48-minus-its-own-position delta) == how far off-course it is pointing, then
-    //      Field10c = Dist and Field108 = 0. Only on a sampling tick does step 6 run.
+    //      GuideDestination-minus-its-own-position delta) == how far off-course it is pointing, then
+    //      LastSampleDistance = Dist and SampleElapsed = 0. Only on a sampling tick does step 6 run.
     //   6. 062cf8b4-062cfba5  The event table. Two mirror-image halves selected by Flag120:
-    //        Flag120 set  (following): 8 = fell behind hard (Field58 < FieldLow114),
-    //                                  6 = caught up hard but pointing away (Field58 >
-    //                                      FieldHigh118 and Field5c > AngleThreshold11c),
+    //        Flag120 set  (following): 8 = fell behind hard (ProgressDelta < FieldLow114),
+    //                                  6 = caught up hard but pointing away (ProgressDelta >
+    //                                      FieldHigh118 and ApproachAngleRad > AngleThreshold11c),
     //                                  5 = caught up hard and pointing the right way,
-    //                                  7 = neither, but Clearance dropped below Field44.
+    //                                  7 = neither, but Clearance dropped below EscortMinClearance.
     //                                  8/6/7 also clear Flag120; 5 does not.
     //        Flag120 clear (leading):  3 = fell behind hard, 1 = caught up and on course and
-    //                                  inside Field3c, 2 = steady but outside Field3c,
+    //                                  inside EscortMaxClearance, 2 = steady but outside EscortMaxClearance,
     //                                  4 = the "leader is me" shortcut. 1 and 2 set Flag120.
     //      The Dist < RadialClearance byte gates them unevenly, and the asymmetry is retail's,
     //      not a transcription slip: 8/6/7/3/2 are SUPPRESSED when it is set, 4's second entry
     //      (via 062cfb2d) REQUIRES it, and 1, 5 and 4's bLeaderIsSelf entry ignore it entirely.
-    //      Each event is a NotifyManagerGuideEvent(SelfId, WatchedId, Code, Clearance, Field48).
-    //   7. 062cfa15 / 062cfba7  Hand off to a sibling: Flag120 set -> CachedPtr64 drives and
-    //      CachedPtr60 is parked; Flag120 clear -> the reverse. A transition disengages the
+    //      Each event is a NotifyManagerGuideEvent(SelfId, WatchedId, Code, Clearance, GuideDestination).
+    //   7. 062cfa15 / 062cfba7  Hand off to a sibling: Flag120 set -> FollowDelegate drives and
+    //      GotoDelegate is parked; Flag120 clear -> the reverse. A transition disengages the
     //      outgoing one (slot 4), pushes this class's matching directive struct into the
     //      incoming one (slot 10) and engages it (slot 3); no transition just writes
     //      DeltaTime1c into the active one's own +0x1c and ticks it (slot 7).
-    //   8. 062cfbc7-062cfc66  Termination test: if the radial clearance to Field48 exceeds
-    //      Field54, or the intercept clearance to WatcherA exceeds GotoOp.Field_60 (raw
+    //   8. 062cfbc7-062cfc66  Termination test: if the radial clearance to GuideDestination exceeds
+    //      ArrivalRadius, or the intercept clearance to WatcherA exceeds GotoOp.Field_60 (raw
     //      +0xc8), the directive is still running -> UpdateResult10 = 1. Otherwise clear
     //      Flags28 bit 0x2, NotifyBehaviorDone(0xe, 0) and finish with UpdateResult10 = 2.
-    //      (CachedPtr60's slot-7 result == 2 skips straight to the intercept test.)
+    //      (GotoDelegate's slot-7 result == 2 skips straight to the intercept test.)
     //
     // FP-idiom care taken (this marathon's own standing warning): every FCOMP here was decoded
     // from its mask AND its jump, not from the mask alone. `TEST AH,0x41` + `JNZ` guards a
@@ -184,16 +184,16 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
     // ------------------------------------------------------------------
 
     // Slot 21, LAB_062cf300 (RET 4), the same body as BaseFollowerBehavior's slot 21 on this
     // class's own +0x2c: release WatcherA when its object id equals the argument.
-    void Slot21(void* Arg) override;
+    void OnObjectLeftSystem(void* Arg) override;
 
     // Slot 24, LAB_062cf2f0: WatcherA's object (target - 8) or null.
     IObjRW const* get_target() override;
@@ -249,10 +249,10 @@ public:
     int ModeSelector0xc;       // +0x0c. Written by the GAP'd Engage() (=1) and SetModeFromFlags() (0/2/3).
     int UpdateResult10;        // +0x10. The GAP'd Update()'s own tri-state result.
     void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1).
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime1c;         // +0x1c. Zeroed by the shared FUN_062d20d0 reset effect inside the
-                                // GAP'd Engage(). Update() accumulates it into Field108 and copies
-                                // it into whichever of CachedPtr60/64 is driving, at that object's
+                                // GAP'd Engage(). Update() accumulates it into SampleElapsed and copies
+                                // it into whichever of GotoDelegate/64 is driving, at that object's
                                 // OWN +0x1c -- the same per-tick delta slot BaseFollowerBehavior
                                 // already names DeltaTime at +0x1c (common_behavior.h), which is
                                 // what makes the float typing here evidence rather than a guess.
@@ -282,36 +282,36 @@ public:
 
     BaseWatcher WatcherA;       // +0x2c (8 bytes, ends +0x34). Zeroed by ctor; cleared by dtor;
                                  // read by SetModeFromFlags()/ReleaseWatcherAIfIdMatches()/GetRawBlockA().
-    float Field34;               // +0x34. Ctor 0. Slot10 copies DirectiveGuideOp+0xb8; Slot5 hands
+    float GuideRange;               // +0x34. Ctor 0. OnApplyDirective copies DirectiveGuideOp+0xb8; OnEvaluateReadiness hands
                                   // it to FUN_062e4500 as the float range (062cf586), hence float.
     unsigned char Flag38;        // +0x38. Set to 1 by ctor. The GAP'd ApplyDirective() overwrites it
                                   // from DirectiveGuideOp::Field_A0 (retail default 1). Also read
                                   // (copied to +0x120) by the GAP'd Engage()/Update().
     unsigned char Pad39[0x3c - 0x39];
-    float Field3c;                // +0x3c. Set by the GAP'd ApplyDirective() from
+    float EscortMaxClearance;                // +0x3c. Set by the GAP'd ApplyDirective() from
                                    // DirectiveGuideOp::Field_6C (raw dword copy at 062cfd62). Update()
                                    // FCOMPs the intercept clearance against it at 062cfac3 -- that
                                    // read is what types it float.
     unsigned Field40;             // +0x40. Set by the GAP'd ApplyDirective() from
                                    // DirectiveGuideOp::Field_70 (062cfd68). Never read by any ported
                                    // code; width is all that is proven. TODO: semantic role unknown.
-    float Field44;                // +0x44. Zeroed by ctor. Conditionally written by the GAP'd
+    float EscortMinClearance;                // +0x44. Zeroed by ctor. Conditionally written by the GAP'd
                                    // Engage()/ApplyDirective() from an FPU vector-magnitude result.
                                    // Update() FCOMPs the intercept clearance against it (062cf9be).
-    Vector Field48;               // +0x48..+0x54. The live "guide destination" point. Update()
+    Vector GuideDestination;               // +0x48..+0x54. The live "guide destination" point. Update()
                                    // refreshes it each tick (062cf637-062cf6bd) either from WatcherB's
                                    // world position or from GotoOp.Destination, then uses it as the
                                    // reference point for every clearance/distance query and passes
                                    // its address as the 5th argument of every guide event.
-    float Field54;                // +0x54. Update() reloads it from GotoOp.Field_50 every tick
+    float ArrivalRadius;                // +0x54. Update() reloads it from GotoOp.Field_50 every tick
                                    // (062cf6c0, a raw dword copy from +0xb8) and compares the radial
                                    // clearance against it to decide whether the directive is done.
-    float Field58;                // +0x58. Written only on a sampling tick (062cf81a): the previous
-                                   // Field10c minus the current distance, i.e. how much ground was
+    float ProgressDelta;                // +0x58. Written only on a sampling tick (062cf81a): the previous
+                                   // LastSampleDistance minus the current distance, i.e. how much ground was
                                    // closed since the last sample. Drives the guide event table.
-    float Field5c;                // +0x5c. Written only on a sampling tick (062cf894): the acos of
+    float ApproachAngleRad;                // +0x5c. Written only on a sampling tick (062cf894): the acos of
                                    // the clamped dot between the escorted ship's negated forward axis
-                                   // and the normalized delta to Field48 -- an angle in radians,
+                                   // and the normalized delta to GuideDestination -- an angle in radians,
                                    // compared against AngleThreshold11c.
     // +0x60/+0x64. Set by the GAP'd Engage() from BehaviorMgrPtr20's own +0x17c/+0x1b8.
     // IDENTIFIED 2026-09-17 (claude:common-guide), previously "vtable-having, real class not
@@ -322,10 +322,10 @@ public:
     // itself implements: 0x0c == slot 3 (engage/reset), 0x10 == slot 4 (disengage), 0x1c ==
     // slot 7 (Update), 0x28 == slot 10 (apply directive) -- plus each object's own +0x1c
     // per-tick delta float. What settles WHICH siblings they are is the argument Update()
-    // hands slot 10: CachedPtr60 always receives &GotoOp and CachedPtr64 always receives
+    // hands slot 10: GotoDelegate always receives &GotoOp and FollowDelegate always receives
     // &FollowOp, and the two are engaged in strict alternation by Flag120.
-    Behavior* CachedPtr60;
-    Behavior* CachedPtr64;
+    Behavior* GotoDelegate;
+    Behavior* FollowDelegate;
 
     pub::AI::DirectiveGotoOp GotoOp;    // +0x68. Real, already-ported type (common_pub.h).
                                           // Ends at +0xd8 (sizeof(DirectiveGotoOp) == 0x70).
@@ -333,14 +333,14 @@ public:
                                           // Ends at +0xfc (sizeof(DirectiveFollowOp) == 0x24).
 
     BaseWatcher WatcherB;        // +0xfc (8 bytes, ends +0x104). Zeroed by ctor; cleared by dtor.
-    float Field104;               // +0x104. Set to 10.0f by ctor. The GAP'd ApplyDirective()
+    float SampleInterval;               // +0x104. Set to 10.0f by ctor. The GAP'd ApplyDirective()
                                    // overwrites it from DirectiveGuideOp::Field_A4 (retail default 10.0).
-    float Field108;                // +0x108. Zeroed by ctor. RETYPED int -> float 2026-09-17: the
+    float SampleElapsed;                // +0x108. Zeroed by ctor. RETYPED int -> float 2026-09-17: the
                                     // ctor's integer zero store is just `0.0f`'s bit pattern, and
                                     // Update() genuinely does `FLD [+0x1c]; FADD [+0x108]; FSTP
                                     // [+0x108]` (062cf8a5) on it. A sampling-period accumulator.
-    float Field10c;                 // +0x10c. Not touched by ctor. Update()'s cached "distance to
-                                     // Field48 as of the last sampling tick".
+    float LastSampleDistance;                 // +0x10c. Not touched by ctor. Update()'s cached "distance to
+                                     // GuideDestination as of the last sampling tick".
     float Field110;                  // +0x110. Not touched by ctor. The GAP'd ApplyDirective() sets
                                       // it from `(float)DirectiveGuideOp::Field_AC` (retail default 3).
     float FieldLow114;                // +0x114. Set to -10.0f by ctor. The GAP'd ApplyDirective()
@@ -354,7 +354,7 @@ public:
                                           // while Update() reads and writes this byte eleven times
                                           // (062cf7b8/062cf7ea/062cf8b4/062cfa0e/062cfa15/062cfb24/
                                           // 062cfba7 ...). It is the "escort is following me" latch
-                                          // that selects which of CachedPtr60/CachedPtr64 drives.
+                                          // that selects which of GotoDelegate/FollowDelegate drives.
                                           // Seeded from Flag38 by the GAP'd Engage().
 };
 
@@ -368,23 +368,23 @@ static_assert(offsetof(GuideBehavior, NavHelperPtr24) == 0x24, "GuideBehavior::N
 static_assert(offsetof(GuideBehavior, Flags28) == 0x28, "GuideBehavior::Flags28 offset");
 static_assert(offsetof(GuideBehavior, Flag29) == 0x29, "GuideBehavior::Flag29 offset");
 static_assert(offsetof(GuideBehavior, WatcherA) == 0x2c, "GuideBehavior::WatcherA offset");
-static_assert(offsetof(GuideBehavior, Field34) == 0x34, "GuideBehavior::Field34 offset");
+static_assert(offsetof(GuideBehavior, GuideRange) == 0x34, "GuideBehavior::GuideRange offset");
 static_assert(offsetof(GuideBehavior, Flag38) == 0x38, "GuideBehavior::Flag38 offset");
-static_assert(offsetof(GuideBehavior, Field3c) == 0x3c, "GuideBehavior::Field3c offset");
+static_assert(offsetof(GuideBehavior, EscortMaxClearance) == 0x3c, "GuideBehavior::EscortMaxClearance offset");
 static_assert(offsetof(GuideBehavior, Field40) == 0x40, "GuideBehavior::Field40 offset");
-static_assert(offsetof(GuideBehavior, Field44) == 0x44, "GuideBehavior::Field44 offset");
-static_assert(offsetof(GuideBehavior, Field48) == 0x48, "GuideBehavior::Field48 offset");
-static_assert(offsetof(GuideBehavior, Field54) == 0x54, "GuideBehavior::Field54 offset");
-static_assert(offsetof(GuideBehavior, Field58) == 0x58, "GuideBehavior::Field58 offset");
-static_assert(offsetof(GuideBehavior, Field5c) == 0x5c, "GuideBehavior::Field5c offset");
-static_assert(offsetof(GuideBehavior, CachedPtr60) == 0x60, "GuideBehavior::CachedPtr60 offset");
-static_assert(offsetof(GuideBehavior, CachedPtr64) == 0x64, "GuideBehavior::CachedPtr64 offset");
+static_assert(offsetof(GuideBehavior, EscortMinClearance) == 0x44, "GuideBehavior::EscortMinClearance offset");
+static_assert(offsetof(GuideBehavior, GuideDestination) == 0x48, "GuideBehavior::GuideDestination offset");
+static_assert(offsetof(GuideBehavior, ArrivalRadius) == 0x54, "GuideBehavior::ArrivalRadius offset");
+static_assert(offsetof(GuideBehavior, ProgressDelta) == 0x58, "GuideBehavior::ProgressDelta offset");
+static_assert(offsetof(GuideBehavior, ApproachAngleRad) == 0x5c, "GuideBehavior::ApproachAngleRad offset");
+static_assert(offsetof(GuideBehavior, GotoDelegate) == 0x60, "GuideBehavior::GotoDelegate offset");
+static_assert(offsetof(GuideBehavior, FollowDelegate) == 0x64, "GuideBehavior::FollowDelegate offset");
 static_assert(offsetof(GuideBehavior, GotoOp) == 0x68, "GuideBehavior::GotoOp offset");
 static_assert(offsetof(GuideBehavior, FollowOp) == 0xd8, "GuideBehavior::FollowOp offset");
 static_assert(offsetof(GuideBehavior, WatcherB) == 0xfc, "GuideBehavior::WatcherB offset");
-static_assert(offsetof(GuideBehavior, Field104) == 0x104, "GuideBehavior::Field104 offset");
-static_assert(offsetof(GuideBehavior, Field108) == 0x108, "GuideBehavior::Field108 offset");
-static_assert(offsetof(GuideBehavior, Field10c) == 0x10c, "GuideBehavior::Field10c offset");
+static_assert(offsetof(GuideBehavior, SampleInterval) == 0x104, "GuideBehavior::SampleInterval offset");
+static_assert(offsetof(GuideBehavior, SampleElapsed) == 0x108, "GuideBehavior::SampleElapsed offset");
+static_assert(offsetof(GuideBehavior, LastSampleDistance) == 0x10c, "GuideBehavior::LastSampleDistance offset");
 static_assert(offsetof(GuideBehavior, Field110) == 0x110, "GuideBehavior::Field110 offset");
 static_assert(offsetof(GuideBehavior, FieldLow114) == 0x114, "GuideBehavior::FieldLow114 offset");
 static_assert(offsetof(GuideBehavior, FieldHigh118) == 0x118, "GuideBehavior::FieldHigh118 offset");

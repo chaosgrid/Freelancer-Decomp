@@ -21,7 +21,7 @@
 //
 // vftable 0x005e20ec (45 slots) -- WinControl's with these overrides:
 //   0 FUN_00562f40 (scalar deleting dtor around FUN_00562f60), 9 FUN_005631c0 Create,
-//   19 FUN_005635a0 MouseEvent, 20 FUN_00563530 KeyEvent, 23 FUN_00563630 Slot23,
+//   19 FUN_005635a0 MouseEvent, 20 FUN_00563530 KeyEvent, 23 FUN_00563630 ProcessMessage,
 //   42 FUN_005636d0 SetProperty.
 // IDataViewOwner face +0x7c vftable 0x005e20e0 (WinControl's LAB_0053aaa0 / FUN_0053e4a0).
 //
@@ -88,7 +88,7 @@ public:
     // slot 20 FUN_00563530 (RET 8)
     bool KeyEvent(unsigned Key, unsigned char* Modifiers) override;
     // slot 23 FUN_00563630 (RET 0xc)
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 FUN_005636d0 (RET 0xc)
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

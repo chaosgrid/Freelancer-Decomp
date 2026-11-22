@@ -20,7 +20,7 @@
 //   WinControl face 0x005d2f84 (45 slots) -- overrides 0 FUN_0048e630 (scalar deleting dtor
 //     around FUN_0048e650), 4 LAB_00492270 HitTest, 5 LAB_004948a0 SetPosition, 9 LAB_0048eba0
 //     Create, 11 LAB_00494920 Update, 13 LAB_004926d0 Draw, 19 LAB_00497d30 MouseEvent,
-//     23 LAB_004945e0 Slot23 (0xef01 show / 0xef02 close), 42 LAB_00493680 SetProperty; every
+//     23 LAB_004945e0 ProcessMessage (0xef01 show / 0xef02 close), 42 LAB_00493680 SetProperty; every
 //     other slot is WinControl's 0x005e5e44 entry.
 //   IDataViewOwner face 0x005d2f74 -- WinControl's LAB_0053aaa0 / FUN_0053e4a0.
 //   Event::Handler 0x005d2f6c -- LAB_0049e190 OnEvent.
@@ -112,7 +112,7 @@ struct FNavMapItem
     // empty (wcscmp against L"" at DAT_005c8ce0). No writer in NavMap.cpp (0x0048dc10..
     // 0x004a3f90) sets it (only FUN_00491f90's null); the port's empty string stands for both
     // retail's null and L"", which Update treats alike. TODO: meaning / writer.
-    std::wstring Field_0x5c;
+    std::wstring TooltipText;
     Universe::ISystem const* System; // +0x64 the universe view's system
     float PulseRate;            // +0x68 universe view: (rand() * 100 >> 15 + 1) * 0.01
     float PulsePhase;           // +0x6c universe view: (rand() * 900 >> 15 + 100) * 0.001;
@@ -207,7 +207,7 @@ public:
     // slot 9 LAB_0048eba0 (RET 8)
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 23 LAB_004945e0 (RET 0xc) -- 0xef01 show, 0xef02 close and delete.
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
     // --- Event::Handler ---
     // LAB_0049e190 (RET 4) -- 0xf while briefing: tell the MissionBriefing state to continue
@@ -398,8 +398,8 @@ public:
     FClientMeshHolder ZoomedMapMesh;    // +0x350 zoomedmap_liberty.3db, rotation * 1.5
     FClientMeshHolder ZoomedMapMesh2;   // +0x378 zoomedmap_liberty.3db
     FClientMeshHolder PrettyMapMesh;    // +0x3a0 NAV_prettymap.3db, [0] * 1.175, [4] * 1.5
-    float Field_0x3c8[3];               // +0x3c8 SetPosition: position + (0.2, -0.25, 0). TODO
-    float Field_0x3d4[9];               // +0x3d4 ctor identity. TODO
+    float MapLabelOrigin[3];            // +0x3c8 SetPosition: position + (0.2, -0.25, 0); [2] is label depth
+    float MapRotation[9];               // +0x3d4 ctor 3x3 identity rotation for BindMapModelview
     float ZoomScale;                    // +0x3f8 ctor 1.0f; the map's zoom (MapExtentX /
                                         //        (ZoomDistance + PanOffset z) at the end of a
                                         //        transition, 8.6 zoomed in)
@@ -423,7 +423,7 @@ public:
     unsigned char bTransition;          // +0x478 ctor 0; a view transition runs
     unsigned char Pad479[3];
     float TransitionEase;               // +0x47c Update: 0.5 - 0.5 cos(pi t / T)
-    float TransitionTime;               // +0x480 t; Slot23 show: = TransitionDuration
+    float TransitionTime;               // +0x480 t; ProcessMessage show: = TransitionDuration
     float TransitionDuration;           // +0x484 T (0.4 s a view switch, 1.5 s a zoom)
     float TransitionDelta[3];           // +0x488 FUN_0049f1a0: the pan (and distance) to add
     float TransitionStart[3];           // +0x494 FUN_0049f1a0: PanOffset at the start
@@ -464,13 +464,13 @@ public:
     WinControl* CloseButton;            // +0x808 "NavMapCloseButton"
     // +0x80c -- retail VC6 std::list<FNavMapJumpLink*> (head +0x810, size +0x814).
     std::list<FNavMapJumpLink*> JumpLinks;
-    unsigned char Field_0x818;          // +0x818 ctor 0; shows "NavMapDebugText" when clear.
+    unsigned char bDebugTeleportMode;   // +0x818 ctor 0; shows "NavMapDebugText" ("TELEPORT TO?") when set.
                                         //        MouseEvent (0x00497fbe): while set, a release
                                         //        in a system view beams the player ship to the
                                         //        cursor and clears it. TODO: the writer of 1
     unsigned char Pad819[3];
     float MeshPosition[3];              // +0x81c ctor {0, 0, -0.71}: the three map meshes
-    float Field_0x828[3];               // +0x828 ctor {0, 0, -0.55}. TODO
+    float ZoomedMeshPosition[3];        // +0x828 ctor {0, 0, -0.55}: ZoomedMapMesh2 origin in zoomed view
     unsigned char bResourcesLoaded;     // +0x834 FUN_00490cd0's latch
     unsigned char Pad835[3];
     unsigned CachedObjectId;            // +0x838 ctor -1; FUN_00491e10's cache key
@@ -492,7 +492,7 @@ public:
     unsigned char bSystemViewPending;   // +0x87c ctor 0; InitialShow 1: Update builds the system
                                         //        view once Draw has run
     unsigned char bDrawnOnce;           // +0x87d ctor 0; InitialShow 0; Draw sets it (0x004932f5)
-    unsigned char Field_0x87e;          // +0x87e ctor 0; forces every universe item shown. TODO
+    unsigned char bDebugShowAll;        // +0x87e ctor 0; bypasses visit checks for stars, objects, and zones
     unsigned char Pad87f;
     FShapeDB Shapes;                    // +0x880 NavMapTextures.ini (retail 0x18 bytes)
     unsigned char bDrawZoneOutlines;    // +0x898 ctor 0 (0x0048e337), its only writer in the
@@ -696,7 +696,7 @@ extern unsigned char G_bNavMapNoBestPath;   // DAT_006720a8 -- ctor 0; IClient s
 extern unsigned G_NavMapRequestedSystem;    // DAT_006720c4 -- the system InitialShow opens
 extern float G_NavMapRequestedPos[3];       // DAT_00672084..8c -- FUN_004a2aa0's focus point
 extern unsigned char G_bNavMapRequestedPos; // DAT_006720c8 -- set with it; Update consumes it
-extern float G_NavMapGlobal_67203c[3];      // DAT_0067203c..44 -- LAB_00494900 {0.005, 0.048,
+extern float G_NavMapScreenRectOffset[3];      // DAT_0067203c..44 -- LAB_00494900 {0.005, 0.048,
                                             // 0}; Update reads [0] / [1]. TODO: meaning
 extern unsigned char G_bNavMapRouteChanged; // DAT_006720c9 -- FUN_004bcbf0 1, RefreshObjectives 0
 extern unsigned char G_bNavMapShowLabels;   // DAT_00611c5c -- .data 1; LabelButton's toggle

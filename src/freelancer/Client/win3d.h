@@ -68,7 +68,7 @@ struct Win3D : public LinkTree<Win3D>
     // slot 5 (+0x14) LAB_004b5020 -- copy three dwords to +0x60
     virtual void SetPosition(float const* NewPosition);
     // slot 6 (+0x18) LAB_0043d8e0 -- MOV AL,1 / RET 4
-    virtual bool Slot6(unsigned A);
+    virtual bool IsPositionInViewport(unsigned A);
     // slot 7 (+0x1c) FUN_004b5040 -- copy nine dwords to +0x3c
     virtual void SetOrientation(float const* NewOrientation);
     // slot 8 (+0x20) LAB_00595f70 -- slot 7 (Transform), then slot 5 (Transform + 9)
@@ -91,7 +91,7 @@ struct Win3D : public LinkTree<Win3D>
     // slot 17 (+0x44) FUN_00401e90 -- RET
     virtual void Slot17();
     // slot 18 (+0x48) FUN_0053f330 -- false. FUN_0059d140 case 4 passes DAT_0061684c.
-    virtual bool Slot18(int Value);
+    virtual bool MouseWheelEvent(int Value);
     // slot 19 (+0x4c) LAB_004b50c0 -- bubble to the parent's slot 19, false at the root
     virtual bool MouseEvent(FWin3DMouseEvent const* Event);
     // slot 20 (+0x50) LAB_0043d8a0 -- false. FUN_0059dfd0 passes (key, &modifier byte).
@@ -99,9 +99,9 @@ struct Win3D : public LinkTree<Win3D>
     // slot 21 (+0x54) LAB_0043d8f0 -- XOR AL,AL / RET 0x10
     virtual bool Slot21(unsigned A, unsigned B, unsigned C, unsigned D);
     // slot 22 (+0x58) LAB_0043d8a0 -- false. FUN_0059d140 event 2 passes record +0x10/+0x14.
-    virtual bool Slot22(unsigned A, unsigned B);
+    virtual bool CharEvent(unsigned A, unsigned B);
     // slot 23 (+0x5c) LAB_004b50e0 -- XOR AL,AL / RET 0xc. Broadcast by FUN_0059df40.
-    virtual bool Slot23(unsigned Msg, unsigned A, unsigned B);
+    virtual bool ProcessMessage(unsigned Msg, unsigned A, unsigned B);
     // slot 24 (+0x60) LAB_0043d900 -- slot 24 on every child
     virtual void Slot24(unsigned A);
     // slots 25 / 26 (+0x64 / +0x68) LAB_0043d930 -- FLD 1.0f (DAT_005c75dc)

@@ -124,7 +124,7 @@ namespace
     {
         FEffectListNode* Next; // +0x00
         FEffectListNode* Prev; // +0x04
-        void* Slot0;           // +0x08
+        void* EffectArch;           // +0x08
         void* SlotOther;       // +0x0C
         FEffectBase* Effect;   // +0x10
         void* SlotExplosion;   // +0x14
@@ -208,9 +208,9 @@ void GameLightSetFreeMotionOffset(FGameLight* Light, float const* Offset3)
 {
     // FUN_005377a0 (thiscall, RET 4) -- copy 3 floats to Light+0x120, the free-motion
     // velocity FUN_00537860 integrates. No null tests.
-    Light->Field120 = Offset3[0];
-    Light->Field124 = Offset3[1];
-    Light->Field128 = Offset3[2];
+    Light->VelocityX = Offset3[0];
+    Light->VelocityY = Offset3[1];
+    Light->VelocityZ = Offset3[2];
 }
 
 void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
@@ -233,7 +233,7 @@ void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
     Head->Prev = Node;
     Node->Prev->Next = Node;
 
-    CliEffectListCopyPayload(&Node->Slot0, Payload16);
+    CliEffectListCopyPayload(&Node->EffectArch, Payload16);
     CountRef = CountRef + 1;
 }
 
@@ -322,7 +322,7 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
             continue;
 
         // Clear node-owned copies first (004fcef0 004fcf2c..).
-        void* NodeSlots[4] = {Cursor->Slot0, Cursor->SlotOther, Cursor->Effect,
+        void* NodeSlots[4] = {Cursor->EffectArch, Cursor->SlotOther, Cursor->Effect,
                               Cursor->SlotExplosion};
         if (NodeSlots[2] != nullptr)
         {
@@ -339,7 +339,7 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
             GameLightRelease(static_cast<FGameLight*>(NodeSlots[3]));
             Cursor->SlotExplosion = nullptr;
         }
-        Cursor->Slot0 = nullptr;
+        Cursor->EffectArch = nullptr;
 
         CliEffectCompanionArmStop(Payload16);
         CliEffectCompanionClear(Payload16);
@@ -366,11 +366,11 @@ void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
     {
         if (ArchFilter != nullptr)
         {
-            if (Node->Slot0 == nullptr || *static_cast<void**>(Node->Slot0) != ArchFilter)
+            if (Node->EffectArch == nullptr || *static_cast<void**>(Node->EffectArch) != ArchFilter)
                 continue;
         }
-        CliEffectCompanionArmStop(&Node->Slot0);
-        CliEffectCompanionClear(&Node->Slot0);
+        CliEffectCompanionArmStop(&Node->EffectArch);
+        CliEffectCompanionClear(&Node->EffectArch);
     }
 
     // Pass 2 (004fd1e1..004fd21d): erase every node, filtered or not -- unlink, FUN_00502d90 on
@@ -381,7 +381,7 @@ void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
         FEffectListNode* const Next = Node->Next;
         Node->Prev->Next = Node->Next;
         Node->Next->Prev = Node->Prev;
-        CliEffectCompanionClear(&Node->Slot0);
+        CliEffectCompanionClear(&Node->EffectArch);
         ::operator delete(Node);
         CountRef = CountRef - 1;
         Node = Next;
@@ -406,7 +406,7 @@ namespace
         Node->Prev = Prev;
         Where->Prev = Node;
         Node->Prev->Next = Node;
-        CliEffectListCopyPayload(&Node->Slot0, Payload16);
+        CliEffectListCopyPayload(&Node->EffectArch, Payload16);
         CountRef = CountRef + 1;
         return Node;
     }
@@ -437,7 +437,7 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
     {
         FEffectListNode* const Node = Next;
         Next = Node->Next;
-        void** const Companion = reinterpret_cast<void**>(&Node->Slot0);
+        void** const Companion = reinterpret_cast<void**>(&Node->EffectArch);
         FEffectBase* const Particle = static_cast<FEffectBase*>(Companion[2]);
         ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
 
@@ -647,7 +647,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
     }
 
     // 0x0053f5fa..0x0053f5fc: Projectile's slot 92 FUN_005426e0, called directly.
-    This->FClientProjectileGameobj::Slot170();
+    This->FClientProjectileGameobj::PostCreateInit();
 }
 
 void CliLauncherFireProjectiles(FCliLauncherFx* Launcher, Vector const* Target)
@@ -765,7 +765,7 @@ unsigned char FCliLauncherFx::TryFire(Vector const* Target)
         // 0x0052d4ba..0x0052d4de: cruise / tradelane / cloak-active (6..8) on the player's
         // own host -> its vtable +0x1d0 (the ship's LAB_00545cc0).
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW())
-            static_cast<FClientShipGameobj*>(Host)->Slot1d0();
+            static_cast<FClientShipGameobj*>(Host)->PlayFireFailedSound();
     }
     return 0;
 }
@@ -894,7 +894,7 @@ void FCliLauncherFx::PlayFireSound(Vector const* Pos, int ShotCount)
     if (FireVoice == nullptr)
         FireVoice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
     // 0x0052cf01..0x0052cf0c: vtable +0x8c with the position.
-    FireVoice->Slot35(const_cast<Vector*>(Pos));
+    FireVoice->SetPosition(const_cast<Vector*>(Pos));
     // 0x0052cf12..0x0052cf38: attenuation = -(archetype slot 6 * (ShotCount - 1)) (IMUL, NEG,
     // FILD) through vtable +0x80.
     Archetype::ISound* const Arch = static_cast<Archetype::ISound*>(OneShotSoundArch);
@@ -1816,14 +1816,14 @@ namespace
 
     // The block every family notify opens its code-0xa arm with (0x0052d5d2..0x0052d627,
     // 0x0052d77b..0x0052d7d0, 0x0052da15..0x0052da72): the host is the player's (FUN_0054baf0,
-    // a pointer compare), not reaped (vtable +0x158, Slot158), and its CSimple (class 0x103, else
+    // a pointer compare), not reaped (vtable +0x158, IsDead), and its CSimple (class 0x103, else
     // null -- get_hit_pts is called on it regardless) still has hit points above 0 (FCOMP 0,
     // TEST AH,0x41, JNZ skips on <= / NaN).
     bool IsLivePlayerHost(FClientGameobj* Host)
     {
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
             return false;
-        if (Host->Slot158())
+        if (Host->IsDead())
             return false;
         CSimple* Simple = nullptr;
         if (Host != nullptr && Host->Object != nullptr &&

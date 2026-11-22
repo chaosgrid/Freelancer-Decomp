@@ -168,7 +168,7 @@ void LoadingScreen::Refresh()
         // seconds since the reset (unordered stays) starts the bar through slot 1.
         long long const SinceReset = Now - ResetTicks;
         if (Timing::seconds(SinceReset) > 2.0)
-            Slot01();
+            Start();
         return;
     }
 
@@ -189,7 +189,7 @@ void LoadingScreen::Refresh()
     }
 }
 
-void LoadingScreen::Slot01()
+void LoadingScreen::Start()
 {
     // LAB_00578f50.
     G_LoadingScreenStarted = 1;

@@ -30,15 +30,15 @@ struct FFileSystemAggDesc
     const char* ComponentName;
     const char* BackendName;
     const char* DataPath;
-    unsigned long Field10;
-    unsigned long Field14;
-    unsigned long Field18;
-    unsigned long Field1C;
-    unsigned long Field20;
-    unsigned long Field24;
-    unsigned long Field28;
-    unsigned long Field2C;
-    unsigned long Field30;
+    unsigned long Access;            // +0x10 GENERIC_READ (0x80000000)
+    unsigned long ShareMode;         // +0x14 FILE_SHARE_READ (1)
+    unsigned long Security;          // +0x18
+    unsigned long Creation;          // +0x1C OPEN_EXISTING (3)
+    unsigned long Flags;             // +0x20 0x08000080
+    unsigned long TemplateFile;      // +0x24
+    unsigned long Parent;            // +0x28
+    unsigned long Extra;             // +0x2C
+    unsigned long FindHandle;        // +0x30 0xFFFFFFFF or WIN32 find handle
 };
 
 using FatalErrorFnType = void(__cdecl*)(unsigned int, const char*);

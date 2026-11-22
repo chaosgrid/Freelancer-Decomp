@@ -56,12 +56,12 @@ I3DMathEngine* Server_Acquire3DMathEngine()
     {
         unsigned long Size;       // +0x00  0xc
         const char* Name;         // +0x04  "3DMathEngine"
-        void* Field_0x08;         // +0x08  0
+        void* OuterUnknown;         // +0x08  0
     };
     FAGGDESC12 Desc;
     Desc.Size = 0xc;
     Desc.Name = "3DMathEngine";
-    Desc.Field_0x08 = nullptr;
+    Desc.OuterUnknown = nullptr;
 
     void* Engine = nullptr;
     DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Engine);
@@ -172,7 +172,7 @@ void __cdecl CShipCreateInfo_Fill(CShipCreateInfo* Info, CShip* Ship)
 
     // .text:06d0776c  MOV ECX,[ESI + 0xb0] -- CObject::Id, read as a field.
     Info->ObjId = Ship->Id;
-    Info->Field_0x6c = 0u;                      // .text:06d07778
+    Info->LoadoutId = 0u;                      // .text:06d07778
 
     // .text:06d07780  ff92ac000000  CALL dword ptr [EDX + 0xac]
     // .rdata:0639bf08 == CEqObj vtable base + 0xac == CEqObj::get_equip_desc_list.
@@ -206,13 +206,13 @@ void __cdecl CShipCreateInfo_Fill(CShipCreateInfo* Info, CShip* Ship)
         Info->CostumeAccessory[Index] = Ship->SpaceCostume.AccessoryIds[Index];
 
     Info->VoiceId = Ship->VoiceId;               // .text:06d077fe,  CEqObj+0x13c
-    Info->Field_0xb0 = Ship->GroupNameId;        // .text:06d07807,  CShip+0x21c
+    Info->GroupNameId = Ship->GroupNameId;        // .text:06d07807,  CShip+0x21c
     Info->OwnerPlayer = Ship->OwnerPlayer;       // .text:06d07813,  CSimple+0xb4
     Info->DockingBaseId = Ship->DockingBaseId;   // .text:06d0781f,  CEqObj+0x160
     // .text:06d07822  MOV ECX,dword ptr [ESI + 0x1b4]
     // .text:06d07828  MOV dword ptr [EDI + 0xd8],ECX
     // CShip+0x1b4 is the multiplayer group id (common_cobject.h GroupId).
-    Info->Field_0xd8 = Ship->GroupId;
+    Info->GroupId = Ship->GroupId;
 
     // .text:06d07830  CALL [->COMMON.DLL::CSimple::get_hit_pts]
     // .text:06d07836  CALL MSVCRT.DLL::ftol            ; truncate toward zero
@@ -306,7 +306,7 @@ void __cdecl CSolarCreateInfo_Fill(CSolarCreateInfo* Info, CSolar* Solar)
     Server_MatrixToQuat(Info->Orientation, Solar->Orientation);
 
     Info->ObjId = Solar->Id;                     // .text:06d079da / .text:06d079e0
-    Info->Field_0x6c = 0u;                       // .text:06d079e6  MOV [EDI + 0x6c],EBX
+    Info->LoadoutId = 0u;                       // .text:06d079e6  MOV [EDI + 0x6c],EBX
 
     // .text:06d079ee  ff92ac000000  CALL dword ptr [EDX + 0xac] on Info+0x70 --
     // CEqObj::get_equip_desc_list, the same slot the ship fill uses.
@@ -337,8 +337,8 @@ void __cdecl CSolarCreateInfo_Fill(CSolarCreateInfo* Info, CSolar* Solar)
 
     // .text:06d07a72 / .text:06d07a78 -- CSolar+0x1a8 into +0xad, and
     // .text:06d07a7e / .text:06d07a86 -- CSolar+0x1a9 into +0xac.
-    Info->Field_0xad = static_cast<unsigned char>(Solar->bDestructible ? 1 : 0);
-    Info->Field_0xac = static_cast<unsigned char>(Solar->bDynamic ? 1 : 0);
+    Info->bDestructible = static_cast<unsigned char>(Solar->bDestructible ? 1 : 0);
+    Info->bDynamic = static_cast<unsigned char>(Solar->bDynamic ? 1 : 0);
 
     // .text:06d07a8c  CALL [->COMMON.DLL::CSimple::get_hit_pts]
     // .text:06d07a92  CALL MSVCRT.DLL::ftol / .text:06d07a97 MOV [EDI + 0x68],EAX
@@ -446,7 +446,7 @@ void __cdecl ServerCreateProjectileInfo_Fill(FServerCreateProjectileInfo* Info,
     Server_MatrixToQuat(Info->Orientation, Projectile->Orientation); // .text:06d07cc5..cef
     Info->OwnerId = Projectile->OwnerId;         // .text:06d07cf0, CProjectile+0xe4
     Info->Position = Projectile->WorldPosition;  // .text:06d07cf9 .. .text:06d07d0c
-    Info->Field_0x44 = 0u;                       // .text:06d07d13
+    Info->OwnerPlayer = 0u;                       // .text:06d07d13
     Info->Velocity = Projectile->get_velocity(); // .text:06d07d1f  CALL [EDX + 0x54]
 }
 
@@ -460,7 +460,7 @@ void __cdecl ServerCreateGuidedInfo_Fill(FServerCreateGuidedInfo* Info, CGuided*
     // reads the archetype and 06d07d58 stores through Info.
     Archetype::Root const* const Arch = Guided->get_archetype();
     Info->ArchetypeNickname = Arch->get_id();    // .text:06d07d58
-    Info->Field_0x2c = 0u;                       // .text:06d07d5b
+    Info->OwnerPlayer = 0u;                       // .text:06d07d5b
     Info->ObjId = Guided->Id;                    // .text:06d07d62 / .text:06d07d68
     Info->Position = Guided->WorldPosition;      // .text:06d07d6a .. .text:06d07d7d
     Server_MatrixToQuat(Info->Orientation, Guided->Orientation); // .text:06d07d95..dbd

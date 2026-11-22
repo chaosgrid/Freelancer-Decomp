@@ -167,7 +167,7 @@ namespace
         unsigned long Path; // see comment above -- EntryFlags for indices 8/9, else 0
         const char* ShortTag;
         const char* Name;
-        const char* Field0C; // "" for entries 0-9 (ESI = 067016d4), "flcopt" for entry 10
+        const char* Metadata; // "" for entries 0-9 (ESI = 067016d4), "flcopt" for entry 10
         unsigned long Type0;
         unsigned long Value0[4];
         unsigned long Type1;
@@ -216,7 +216,7 @@ namespace
                 const void* Value1 = bVector ? Seed.Value1 : (const void*)(Seed.Value1[0]);
                 const void* Value2 = bVector ? Seed.Value2 : (const void*)(Seed.Value2[0]);
                 FlmSetDescriptorEntry(&Descriptors[Index].Entry, (int)(Seed.Type0),
-                                      Seed.Path, Seed.ShortTag, Seed.Name, Seed.Field0C,
+                                      Seed.Path, Seed.ShortTag, Seed.Name, Seed.Metadata,
                                       Value0, Value1, Value2);
             }
         }
@@ -247,7 +247,7 @@ namespace
         Entry->Path = 0;
         Entry->ShortTag = nullptr;
         Entry->Name = nullptr;
-        Entry->Field0C = nullptr;
+        Entry->Metadata = nullptr;
         return Entry;
     }
 
@@ -282,7 +282,7 @@ namespace
             Entry.Path = 0;
             Entry.ShortTag = "Dc";
             Entry.Name = "Color";
-            Entry.Field0C = "";
+            Entry.Metadata = "";
             FlmReleaseTypedValue(&Entry.Type0);
             Entry.Value0[3] = White[3];
             Entry.Value0[0] = White[0];
@@ -659,7 +659,7 @@ namespace
         Entry->Path = Flags;
         Entry->ShortTag = Tag;
         Entry->Name = Name;
-        Entry->Field0C = Metadata;
+        Entry->Metadata = Metadata;
         FlmSetDescriptorSubBlockValue(&Entry->Type0, Type, Value0);
         FlmSetDescriptorSubBlockValue(&Entry->Type1, Type, Value1);
         FlmSetDescriptorSubBlockValue(&Entry->Type2, Type, Value2);
@@ -697,7 +697,7 @@ namespace
         Desc->ShareMode = 1;       // FILE_SHARE_READ
         Desc->Creation = 3;        // OPEN_EXISTING
         Desc->Flags = 0x08000080;
-        Desc->Field30 = 0xFFFFFFFF;
+        Desc->FindHandle = 0xFFFFFFFF;
         return Desc;
     }
 
@@ -847,7 +847,7 @@ namespace
         Desc->ShareMode = 1;
         Desc->Creation = 2;
         Desc->Flags = 0x08000080;
-        Desc->Field30 = 0xFFFFFFFF;
+        Desc->FindHandle = 0xFFFFFFFF;
     }
 
     unsigned long FsOpenForWrite(void* FileSystem, const char* Path)
@@ -1951,9 +1951,9 @@ FMaterialImpl::FMaterialImpl(const FMaterialSpec& Spec)
       WireColorR_(0.0f),
       WireColorG_(0.0f),
       WireColorB_(0.0f),
-      WireField74_(0.0f),
-      WireField78_(0),
-      WireField7C_(0),
+      WireColorA_(0.0f),
+      WireColorArgb_(0),
+      WireColorRgb555_(0),
       WireGroupIndex_(0),
       Exclusion68_(0),
       ColorizeExtraW_(0.0f),
@@ -2649,7 +2649,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
 
     if (Kind_ == KindWire)
     {
-        return SubmitWireGeometry(WireField78_, Pipeline_, VertexBufferManager_, &WireGroupIndex_, Context, Start,
+        return SubmitWireGeometry(WireColorArgb_, Pipeline_, VertexBufferManager_, &WireGroupIndex_, Context, Start,
                           Count, IndexSpan);
     }
 
@@ -2657,7 +2657,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
     {
         // 066fc150: IMesh path; Color0 for original points, Color1 for shifted duplicates.
         // Four triangles (twelve vertices) per edge, including shifted P0 with Color1.
-        return SubmitWire2Geometry(WireField78_, WireField7C_, Pipeline_, VertexBufferManager_,
+        return SubmitWire2Geometry(WireColorArgb_, WireColorRgb555_, Pipeline_, VertexBufferManager_,
                            &WireGroupIndex_, Context, Count, IndexSpan);
     }
 
@@ -2931,10 +2931,10 @@ GENRESULT __thiscall FMaterialImpl::InitializeFromDescriptor(void* Arg)
         WireColorR_ = 1.0f;
         WireColorG_ = 1.0f;
         WireColorB_ = 1.0f;
-        WireField74_ = 1.0f;
-        WireField78_ = 0xFFFFFFFFu;
+        WireColorA_ = 1.0f;
+        WireColorArgb_ = 0xFFFFFFFFu;
         if (Kind_ == KindWire2)
-            WireField7C_ = 0xFFFFFFFFu;
+            WireColorRgb555_ = 0xFFFFFFFFu;
         return GR_OK;
     }
 
@@ -3119,16 +3119,16 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
                 WireColorR_ = Components[0];
                 WireColorG_ = Components[1];
                 WireColorB_ = Components[2];
-                WireField74_ = Components[3];
-                Alpha = FlmWireColorByte(WireField74_);
+                WireColorA_ = Components[3];
+                Alpha = FlmWireColorByte(WireColorA_);
                 Red = FlmWireColorByte(WireColorR_);
                 Green = FlmWireColorByte(WireColorG_);
                 Blue = FlmWireColorByte(WireColorB_);
-                WireField78_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
+                WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
                 MaterialBlock_[4] = WireColorR_;
                 MaterialBlock_[5] = WireColorG_;
                 MaterialBlock_[6] = WireColorB_;
-                MaterialBlock_[3] = WireField74_;
+                MaterialBlock_[3] = WireColorA_;
             }
             else
             {
@@ -3138,8 +3138,8 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
                 Green = FlmWireColorByte(Components[1]);
                 Blue = FlmWireColorByte(Components[2]);
                 Alpha = FlmWireColorByte(Components[3]);
-                WireField78_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
-                WireField7C_ = ((Red & 0xf8) << 13) | ((Green & 0xf8) << 5) | (Blue >> 3);
+                WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
+                WireColorRgb555_ = ((Red & 0xf8) << 13) | ((Green & 0xf8) << 5) | (Blue >> 3);
             }
             WireGroupIndex_ = 0; // retail Wire+0x7c / Wire2+0x80
         }
@@ -3627,7 +3627,7 @@ void FMaterialImpl::BindCloak(void* Context)
 
     IDAComponent* Candidate = nullptr;
     if (Context != nullptr)
-        Candidate = *(IDAComponent**)((unsigned char*)(Context) + 0x1C);
+        Candidate = static_cast<const FMaterialSubmitContext*>(Context)->ReplacedMaterial;
 
     if (Candidate != nullptr)
     {
@@ -3677,7 +3677,7 @@ void FMaterialImpl::BindCloak(void* Context)
 void FMaterialImpl::BindWire()
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
-    if ((double)(WireField74_) < kWireBlendThreshold)
+    if ((double)(WireColorA_) < kWireBlendThreshold)
         PipelineApplyRsTable(Pipeline_, kWireRsBlend);
     else
         PipelineApplyRsTable(Pipeline_, kWireRsPlain);
@@ -3707,7 +3707,7 @@ void FMaterialImpl::BindEnvMap(void* Context)
     EnvMapFlag_ = 0;
     const char* Name = nullptr;
     IDAComponent* Candidate = Context != nullptr
-        ? *(IDAComponent**)((unsigned char*)(Context) + 0x1c)
+        ? static_cast<const FMaterialSubmitContext*>(Context)->ReplacedMaterial
         : nullptr;
     if (Candidate != nullptr)
     {
@@ -3734,7 +3734,7 @@ void FMaterialImpl::BindEnvMap(void* Context)
         }
         else
         {
-            void* Root = *(void**)(Context);
+            void* Root = static_cast<const FMaterialSubmitContext*>(Context)->Inst;
             // 066fc970 returns DAT_06704630, published by 066fca80.
             if (G_FlmEngineOuter != nullptr)
                 Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(Root);
@@ -3899,8 +3899,7 @@ GENRESULT FMaterialImpl::DrawShadow(void* Context, unsigned long Prim, unsigned 
         bool bDrawn = false;
         if ((Flags & 0x100) != 0)
         {
-            const unsigned long IbBase = *(const unsigned long*)(
-                (unsigned char*)(Submit->IbWrapper) + 4);
+            const unsigned long IbBase = static_cast<const FIbScratch*>(Submit->IbWrapper)->Bias;
             Result = RpDraw_->DrawIndexedPrimitive(Prim, Start, Count,
                 IbBase + IbStart, IndexSpan);
             bDrawn = Result >= 0;

@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-#include "x87_trig.h" // X87CosF (Slot3, 062c8431 FCOS; FCHS; FSTP float)
+#include "x87_trig.h" // X87CosF (OnEngage, 062c8431 FCOS; FCHS; FSTP float)
 
 // EvadeBehavior -- see common_evadebehavior.h. Every method re-ported from
 // EXE/Disasm/Common.dll.txt 2026-10-08 (claude-code:cmn-ai4).
@@ -64,7 +64,7 @@ EvadeBehavior::EvadeBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContext(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime(0.0f)
     , BehaviorMgrPtr(nullptr)
     , NavHelper(nullptr)
@@ -153,9 +153,9 @@ int EvadeBehavior::PickDodgeStyle()
 // ----------------------------------------------------------------------------
 // Slot 3, LAB_062c8260 (.text:062c8260-062c85d5).
 // ----------------------------------------------------------------------------
-void EvadeBehavior::Slot3()
+void EvadeBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062c8269 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062c8269 FUN_062d20d0
     Mode2c = 0;                                                     // 062c8276
     SetCruiseLock(1, 3);                                            // 062c8279 FUN_062d21d0
     Elapsed2b0 = 0.0f;                                              // 062c827e (dword 0)
@@ -251,27 +251,27 @@ void EvadeBehavior::Slot3()
         Forward.x = -Xf.Rotation.E[0][2];                           // +0x08
         Forward.y = -Xf.Rotation.E[1][2];                           // +0x14
         Forward.z = -Xf.Rotation.E[2][2];                           // +0x20
-        Dodge.SetField58(Forward);
+        Dodge.SetPreferredForward(Forward);
     }
 }
 
 // ----------------------------------------------------------------------------
 // Slot 4, FUN_062c85e0 (.text:062c85e0-062c8623).
 // ----------------------------------------------------------------------------
-void EvadeBehavior::Slot4()
+void EvadeBehavior::OnDisengage()
 {
     Flag2b5 = 0;                                                    // 062c85e9
     Dodge.Commit();                                                 // 062c85f0
     BreakAway.Commit();                                             // 062c85ff
     DodgeMissile.Commit();                                          // 062c860e
     Afterburner.Commit();                                           // 062c861d
-    Behavior::Slot4();                                              // 062c8623 JMP FUN_062d20f0
+    Behavior::OnDisengage();                                              // 062c8623 JMP FUN_062d20f0
 }
 
 // ----------------------------------------------------------------------------
 // Slot 5, LAB_062c7ab0 (.text:062c7ab0-062c7cf7).
 // ----------------------------------------------------------------------------
-int EvadeBehavior::Slot5(float Unused)
+int EvadeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     SystemManager* const Sys = NavHelper;
@@ -349,7 +349,7 @@ int EvadeBehavior::Slot5(float Unused)
 // ----------------------------------------------------------------------------
 // Slot 8, FUN_062c7d00 (.text:062c7d00-062c7d57).
 // ----------------------------------------------------------------------------
-void EvadeBehavior::Slot8()
+void EvadeBehavior::PostUpdate()
 {
     SystemManager* const Sys = NavHelper;
     Flag2b4 = 0;                                                    // 062c7d06
@@ -366,7 +366,7 @@ void EvadeBehavior::Slot8()
 // {062c8030, 062c8219, 062c7fd2, 062c7f03} for Mode2c 1..4; the JA default (062c7ef6,
 // rel32 -> 062c823f) is the shared `return 2`.
 // ----------------------------------------------------------------------------
-int EvadeBehavior::Slot7()
+int EvadeBehavior::OnUpdate()
 {
     SystemManager* const Sys = NavHelper;
     pub::AI::Personality const& Pers = Sys->PersonalityData;
@@ -430,7 +430,7 @@ int EvadeBehavior::Slot7()
             if (Pers.FormationParams.bRegroupFormationOnEvadeBreak != 0)      // Sys+0x180c
                 NavHelper->GunConvergenceStateBytes.NotifyFormationLeader2();
         }
-        Slot4();                                                    // 062c7edd CALL [EAX+0x10]
+        OnDisengage();                                                    // 062c7edd CALL [EAX+0x10]
     }
 
     Elapsed2b0 = Elapsed2b0 + DeltaTime;                            // 062c7ee0-062c7ef0
@@ -556,7 +556,7 @@ int EvadeBehavior::Slot7()
 // ----------------------------------------------------------------------------
 // Slot 10, LAB_062c8630 (.text:062c8630-062c8680).
 // ----------------------------------------------------------------------------
-bool EvadeBehavior::Slot10(void* DirectiveOp)
+bool EvadeBehavior::OnApplyDirective(void* DirectiveOp)
 {
     SystemManager* const Sys = NavHelper;
     void* Target;
@@ -581,7 +581,7 @@ bool EvadeBehavior::Slot10(void* DirectiveOp)
 // ----------------------------------------------------------------------------
 // Slot 21, LAB_062c7870 (.text:062c7870-062c78af).
 // ----------------------------------------------------------------------------
-void EvadeBehavior::Slot21(void* Arg)
+void EvadeBehavior::OnObjectLeftSystem(void* Arg)
 {
     if (!IsWatching(Watcher2a0))                                    // 062c7876-062c7886
         return;

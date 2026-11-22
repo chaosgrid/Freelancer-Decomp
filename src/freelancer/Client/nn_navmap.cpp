@@ -53,7 +53,7 @@ unsigned G_NavMapRequestedSystem = 0;     // DAT_006720c4
 float G_NavMapRequestedPos[3] = {0.0f, 0.0f, 0.0f}; // DAT_00672084..8c
 unsigned char G_bNavMapRequestedPos = 0;  // DAT_006720c8
 // DAT_0067203c..44 -- the XC-table initializer LAB_00494900 stores 0.005f / 0.048f / 0.
-float G_NavMapGlobal_67203c[3] = {0.005f, 0.048f, 0.0f};
+float G_NavMapScreenRectOffset[3] = {0.005f, 0.048f, 0.0f};
 unsigned char G_bNavMapRouteChanged = 0;  // DAT_006720c9
 unsigned char G_bNavMapShowLabels = 1;    // DAT_00611c5c
 
@@ -152,7 +152,7 @@ FNavMapItem::~FNavMapItem()
         delete Label;
         Label = nullptr;
     }
-    Field_0x5c.clear();
+    TooltipText.clear();
     // Then the member dtors: the +0x5c string, the holder (FUN_0059ef20, ~FClientMeshHolder).
 }
 
@@ -174,18 +174,18 @@ NeuroNetNavMap::NeuroNetNavMap()
     WaypointMarkerSize = 4500.0f;
 
     // 0048e130..0048e172: +0x3c8 zero, +0x3d4 identity.
-    Field_0x3c8[0] = 0.0f;
-    Field_0x3c8[1] = 0.0f;
-    Field_0x3c8[2] = 0.0f;
-    Field_0x3d4[0] = 1.0f;
-    Field_0x3d4[1] = 0.0f;
-    Field_0x3d4[2] = 0.0f;
-    Field_0x3d4[3] = 0.0f;
-    Field_0x3d4[4] = 1.0f;
-    Field_0x3d4[5] = 0.0f;
-    Field_0x3d4[6] = 0.0f;
-    Field_0x3d4[7] = 0.0f;
-    Field_0x3d4[8] = 1.0f;
+    MapLabelOrigin[0] = 0.0f;
+    MapLabelOrigin[1] = 0.0f;
+    MapLabelOrigin[2] = 0.0f;
+    MapRotation[0] = 1.0f;
+    MapRotation[1] = 0.0f;
+    MapRotation[2] = 0.0f;
+    MapRotation[3] = 0.0f;
+    MapRotation[4] = 1.0f;
+    MapRotation[5] = 0.0f;
+    MapRotation[6] = 0.0f;
+    MapRotation[7] = 0.0f;
+    MapRotation[8] = 1.0f;
 
     // 0048e178..0048e193 -- the three map holders' instance slot (already -1), the object
     // cache key and +0xaf0.
@@ -201,7 +201,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     ViewMode = 1;
     bMouseDown = 0;
     bDragging = 0;
-    Field_0x818 = 0;
+    bDebugTeleportMode = 0;
     bTransition = 0;
     PendingSystem = nullptr;
     bSystemViewPending = 0;
@@ -221,9 +221,9 @@ NeuroNetNavMap::NeuroNetNavMap()
     MeshPosition[0] = 0.0f;
     MeshPosition[1] = 0.0f;
     MeshPosition[2] = -0.71f;
-    Field_0x828[0] = 0.0f;
-    Field_0x828[1] = 0.0f;
-    Field_0x828[2] = -0.55f;
+    ZoomedMeshPosition[0] = 0.0f;
+    ZoomedMeshPosition[1] = 0.0f;
+    ZoomedMeshPosition[2] = -0.55f;
     CachedWaypointHash = 0;
 
     // 0048e277..0048e2f8
@@ -247,7 +247,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     bBlink = 0;
     SolarTypeMask = 0x2020bdffu;
     bResourcesLoaded = 0;
-    Field_0x87e = 0;
+    bDebugShowAll = 0;
     bDrawZoneOutlines = 0;
     GroupMarkerMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     Field_0x8c4 = 0;
@@ -474,9 +474,9 @@ void NeuroNetNavMap::SetPosition(float const* NewPosition)
 {
     // LAB_004948a0: FUN_005a0880, then +0x3c8 = position + (0.2, -0.25, 0).
     WinControl::SetPosition(NewPosition);
-    Field_0x3c8[0] = NewPosition[0] + 0.2f;
-    Field_0x3c8[1] = NewPosition[1] - 0.25f;
-    Field_0x3c8[2] = NewPosition[2];
+    MapLabelOrigin[0] = NewPosition[0] + 0.2f;
+    MapLabelOrigin[1] = NewPosition[1] - 0.25f;
+    MapLabelOrigin[2] = NewPosition[2];
 }
 
 bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
@@ -969,7 +969,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     return Win3D::Create(NewParent, Data);
 }
 
-bool NeuroNetNavMap::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004945e0.
     (void)A;
@@ -982,7 +982,7 @@ bool NeuroNetNavMap::Slot23(unsigned Msg, unsigned A, unsigned B)
         InitialShow();
         TransitionTime = TransitionDuration;
         Flags = static_cast<unsigned char>(Flags | 3);
-        Field_0x818 = 0;
+        bDebugTeleportMode = 0;
 
         // 0049462e..00494806: the system view's filter row.
         if (ViewMode != 0)
@@ -1020,7 +1020,7 @@ bool NeuroNetNavMap::Slot23(unsigned Msg, unsigned A, unsigned B)
         }
 
         // 0049480c..0049483c
-        DebugText->SetProperty(1, Field_0x818 == 0 ? 1 : 0, 0);
+        DebugText->SetProperty(1, bDebugTeleportMode == 0 ? 1 : 0, 0);
         NoBestPathText->SetProperty(1, 1, 0);
         return false;
     }
@@ -1051,7 +1051,7 @@ bool NeuroNetNavMap::OnEvent(unsigned MsgId)
     if (MsgId == 0xf && bBriefing != 0)
     {
         RequestMissionBriefingContinue(); // FUN_0043d580
-        Slot23(0xef02, 0, 0);
+        ProcessMessage(0xef02, 0, 0);
         return true;
     }
     return false;
@@ -1266,7 +1266,7 @@ void NeuroNetNavMap::BuildUniverseItems()
             GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0 0x0049176a
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
-            if (Field_0x87e != 0)
+            if (bDebugShowAll != 0)
                 Item->bShown = 1;
         }
     }

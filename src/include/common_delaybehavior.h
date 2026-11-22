@@ -101,14 +101,14 @@ public:
     // (OwnerContextPtr14, NavHelperPtr24, Param2) -- the EXACT SAME call
     // shape IdleBehavior::SetContext() documents (FULLPORT-DEFERRED, the
     // Watcher sub-object's real class isn't identified) -- then zeroes
-    // Field40 and Field44 (the delay-timer pair, see field comments below).
+    // DelayDuration and DelayElapsed (the delay-timer pair, see field comments below).
     bool SetContext(void* Param1, void* Param2, void* Param3);
 
     // Own vtable slot 3 (offset 0x0c). Common.dll.txt 208024-208029
     // (FUN_062d0ac0), 6 instructions. Tail-calls the shared FUN_062d20d0
     // reset-tick-state effect (`ModeSelector0xc=1; UpdateResult10=1;
     // Flags28&=~1;` -- see common_idlebehavior.cpp's ResetTickState() for
-    // the fully-traced shared body) then additionally zeroes Field44 (the
+    // the fully-traced shared body) then additionally zeroes DelayElapsed (the
     // delay accumulator).
     void ResetTickState();
 
@@ -140,12 +140,12 @@ public:
     // deferred Watcher call.
     //   if (OwnerContextPtr14 == nullptr) { UpdateResult10 = 3; return 3; }
     //   Watcher2c.vtbl[1](DeltaTime1c);   // Evaluate-shaped, FULLPORT-DEFERRED
-    //   Field44 += DeltaTime1c;
-    //   // FCOMP Field44 (post-add) against Field40; the notify branch below
-    //   // is taken when Field44 is STRICTLY GREATER than Field40 (raw
+    //   DelayElapsed += DeltaTime1c;
+    //   // FCOMP DelayElapsed (post-add) against DelayDuration; the notify branch below
+    //   // is taken when DelayElapsed is STRICTLY GREATER than DelayDuration (raw
     //   // FNSTSW/TEST AH,0x41 polarity, re-verified this pass)
-    //   if (Field44 > Field40) {
-    //       Field44 = <float bit-pattern 0xccbebc20>;  // fixed sentinel/reset value
+    //   if (DelayElapsed > DelayDuration) {
+    //       DelayElapsed = <float bit-pattern 0xccbebc20>;  // fixed sentinel/reset value
     //       NotifyBehaviorDone(BehaviorMgrPtr20, 0x14, 0); // FUN_062d29a0, FULLPORT-DEFERRED,
     //                                                       // same shared helper LaunchBehavior::
     //                                                       // Disengage() documents (common_launchbehavior.h)
@@ -158,18 +158,18 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // Own vtable slot 10 (offset 0x28). Common.dll.txt 208098-208106
     // (LAB_062d0b40), 10 instructions, 1 parameter (a caller-owned
-    // directive-shaped struct pointer). Sets Field40 = Param->Field_0c AND
-    // Field44 = Param->Field_0c (the SAME incoming float value written to
+    // directive-shaped struct pointer). Sets DelayDuration = Param->Field_0c AND
+    // DelayElapsed = Param->Field_0c (the SAME incoming float value written to
     // both fields -- confirmed exactly as traced, not simplified; the
-    // asymmetry with SetContext()/ResetTickState()'s own Field44=0 writes
+    // asymmetry with SetContext()/ResetTickState()'s own DelayElapsed=0 writes
     // is retail's, not a porting artifact), sets Flags28 bit 0x2, and always
     // returns true.
     bool ApplyDirective(void const* Param);
@@ -177,10 +177,10 @@ public:
     // Slots 3/4/5/10 of retail's DelayBehavior vftable (.rdata:0639ff9c), wired 2026-10-08
     // (claude-code:cmn-ai2). Slot 4 is FUN_062cd5e0 (shared with IdleBehavior), slot 5
     // LAB_062ce3c0 (shared), slot 10 LAB_062d0b40; 5 and 10 are `RET 4`.
-    void Slot3() override { ResetTickState(); }                      // 3 FUN_062d0ac0
-    void Slot4() override { Disengage(); }                           // 4 FUN_062cd5e0
-    int Slot5(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
-    bool Slot10(void* DirectiveOp) override { return ApplyDirective(DirectiveOp); } // 10
+    void OnEngage() override { ResetTickState(); }                      // 3 FUN_062d0ac0
+    void OnDisengage() override { Disengage(); }                           // 4 FUN_062cd5e0
+    int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
+    bool OnApplyDirective(void* DirectiveOp) override { return ApplyDirective(DirectiveOp); } // 10
 
 public:
     // ------------------------------------------------------------------
@@ -206,9 +206,9 @@ public:
     int UpdateResult10;        // +0x10. Update()'s own tri-state result (1=active/3=idle)
                                // and ResetTickState()'s own write (=1).
     void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime1c;         // +0x1c. Passed to Watcher2c's Evaluate(dt) call and
-                               // accumulated into Field44 by Update().
+                               // accumulated into DelayElapsed by Update().
     // +0x20. Set by SetContext() (Param2); read by Disengage()'s shared FUN_062d20f0 tail-call
     // and by Update()'s NotifyBehaviorDone() call.
     // TYPED 2026-09-17 (claude:common-behavior-fields) from DelayBehavior's OWN call site, not
@@ -237,13 +237,13 @@ public:
 
     IdleIdea Watcher2c;        // +0x2c. IdleIdea (common_idea.h; ctor FUN_062d9b10 at
                                // .text:062d0a42), identified 2026-10-08, 0x14 bytes.
-    float Field40;             // +0x40. Zeroed by SetContext(); set to Param->Field_0c by
-                               // ApplyDirective(); compared (FCOMP) against Field44 in Update().
-    float Field44;             // +0x44. Zeroed by SetContext()/ResetTickState(); ALSO set to
+    float DelayDuration;             // +0x40. Zeroed by SetContext(); set to Param->Field_0c by
+                               // ApplyDirective(); compared (FCOMP) against DelayElapsed in Update().
+    float DelayElapsed;             // +0x44. Zeroed by SetContext()/ResetTickState(); ALSO set to
                                // Param->Field_0c by ApplyDirective() (see ApplyDirective()'s
                                // own comment); accumulated (+= DeltaTime1c) by Update(), and
                                // reset to a fixed sentinel bit-pattern (0xccbebc20) once it
-                               // exceeds Field40.
+                               // exceeds DelayDuration.
 };
 
 static_assert(offsetof(DelayBehavior, CachedHandle08) == 0x08, "DelayBehavior::CachedHandle08 offset");
@@ -256,8 +256,8 @@ static_assert(offsetof(DelayBehavior, NavHelperPtr24) == 0x24, "DelayBehavior::N
 static_assert(offsetof(DelayBehavior, Flags28) == 0x28, "DelayBehavior::Flags28 offset");
 static_assert(offsetof(DelayBehavior, Flag29) == 0x29, "DelayBehavior::Flag29 offset");
 static_assert(offsetof(DelayBehavior, Watcher2c) == 0x2c, "DelayBehavior::Watcher2c offset");
-static_assert(offsetof(DelayBehavior, Field40) == 0x40, "DelayBehavior::Field40 offset");
-static_assert(offsetof(DelayBehavior, Field44) == 0x44, "DelayBehavior::Field44 offset");
+static_assert(offsetof(DelayBehavior, DelayDuration) == 0x40, "DelayBehavior::DelayDuration offset");
+static_assert(offsetof(DelayBehavior, DelayElapsed) == 0x44, "DelayBehavior::DelayElapsed offset");
 
 // Retail object size, read off the factory body that allocates this class (`PUSH 0x48`
 // immediately before `CALL operator_new`). This is an UPPER bound on purpose: the existing

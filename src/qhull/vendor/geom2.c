@@ -82,7 +82,7 @@ realT qh_determinant (realT **rows, int dim, boolT *nearzero) {
 
   *nearzero= False;
   if (dim < 2) {
-    FUN_06356960 (/* retail 06381f39 */ "qhull internal error (qh_determinate): only implemented for dimension >= 2\n");
+    ivp_message (/* retail 06381f39 */ "qhull internal error (qh_determinate): only implemented for dimension >= 2\n");
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }else if (dim == 2) {
     det= det2_(rows[0][0], rows[0][1],
@@ -246,7 +246,7 @@ void qh_detroundoff (void) {
   if (qh KEEPnearinside)
     qh_option ("_near-inside", NULL, &qh NEARinside);
   if (qh JOGGLEmax < qh DISTround) {
-    FUN_06356960 (/* retail 0638259c */ "qhull error: the joggle for 'QJn', %.2g, is below roundoff for distance computations, %.2g\n",
+    ivp_message (/* retail 0638259c */ "qhull error: the joggle for 'QJn', %.2g, is below roundoff for distance computations, %.2g\n",
          qh JOGGLEmax, qh DISTround);
     qh_errexit (qh_ERRinput, NULL, NULL);
   }
@@ -277,7 +277,7 @@ void qh_detroundoff (void) {
   qh_option ("_wide-facet", NULL, &qh WIDEfacet);
   if (qh MINvisible > qh MINoutside + 3 * REALepsilon 
   && !qh BESToutside && !qh FORCEoutput)
-    FUN_06356960 (/* retail 063827c7 */ "qhull input warning: minimum visibility V%.2g is greater than \nminimum outside W%.2g.  Flipped facets are likely.\n",
+    ivp_message (/* retail 063827c7 */ "qhull input warning: minimum visibility V%.2g is greater than \nminimum outside W%.2g.  Flipped facets are likely.\n",
 	     qh MINvisible, qh MINoutside);
   qh max_vertex= qh DISTround;
   qh min_vertex= -qh DISTround;
@@ -319,7 +319,7 @@ realT qh_detsimplex(pointT *apex, setT *points, int dim, boolT *nearzero) {
       *(gmcoord++)= *coordp++ - *coorda++;
   }
   if (i < dim) {
-    FUN_06356960 (/* retail 06382889 */ "qhull internal error (qh_detsimplex): #points %d < dimension %d\n", 
+    ivp_message (/* retail 06382889 */ "qhull internal error (qh_detsimplex): #points %d < dimension %d\n", 
                i, dim);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -550,7 +550,7 @@ realT qh_facetarea_simplex (int dim, coordT *apex, setT *vertices,
     }
   }
   if (i != dim-1) {
-    FUN_06356960 (/* retail 06382ce0 */ "qhull internal error (qh_facetarea_simplex): #points %d != dim %d -1\n", 
+    ivp_message (/* retail 06382ce0 */ "qhull internal error (qh_facetarea_simplex): #points %d != dim %d -1\n", 
                i, dim);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -704,7 +704,7 @@ void qh_getarea (facetT *facetlist) {
   facetT *facet;
 
   if (qh REPORTfreq)
-    FUN_06356960 (/* retail 06383208 */ "computing area of each facet and volume of the convex hull\n");
+    ivp_message (/* retail 06383208 */ "computing area of each facet and volume of the convex hull\n");
   else 
     trace1((qh ferr, "qh_getarea: computing volume and area for each facet\n"));
   qh totarea= qh totvol= 0.0;
@@ -896,7 +896,7 @@ void qh_joggleinput (void) {
     qh_option ("QJoggle", NULL, &qh JOGGLEmax);
   }
   if (qh build_cnt > 1 && qh JOGGLEmax > fmax_(qh MAXwidth/4, 0.1)) {
-      FUN_06356960 (/* retail 063836b3 */ "qhull error: the current joggle for 'QJn', %.2g, is too large for the width\nof the input.  If possible, recompile Qhull with higher-precision reals.\n",
+      ivp_message (/* retail 063836b3 */ "qhull error: the current joggle for 'QJn', %.2g, is too large for the width\nof the input.  If possible, recompile Qhull with higher-precision reals.\n",
 	        qh JOGGLEmax);
       qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -1120,12 +1120,12 @@ void qh_maxsimplex (int dim, setT *maxpoints, pointT *points, int numpoints, set
       qh_precision ("input has same x coordinate");
       if (zzval_(Zsetplane) > qh hull_dim+1) {
 	if (qh ferr)  /* retail 06383c68: ferr != NULL guard */
-	FUN_06356960 (/* retail 06383c83 */ "qhull precision error (qh_maxsimplex for voronoi_center):\n%d points with the same x coordinate.\n",
+	ivp_message (/* retail 06383c83 */ "qhull precision error (qh_maxsimplex for voronoi_center):\n%d points with the same x coordinate.\n",
 		 qh_setsize(maxpoints)+numpoints);
 	qh_errexit (qh_ERRprec, NULL, NULL);
       }else {
 	if (qh ferr)  /* retail 06383c9b: ferr != NULL guard */
-	FUN_06356960 (/* retail 06383ca3 */ "qhull input error: input is less than %d-dimensional since it has the same x coordinate\n", qh hull_dim);
+	ivp_message (/* retail 06383ca3 */ "qhull input error: input is less than %d-dimensional since it has the same x coordinate\n", qh hull_dim);
 	qh_errexit (qh_ERRinput, NULL, NULL);
       }
     }
@@ -1165,7 +1165,7 @@ void qh_maxsimplex (int dim, setT *maxpoints, pointT *points, int numpoints, set
       }
     } /* !maxpoint */
     if (!maxpoint) {
-      FUN_06356960 (/* retail 06383e61 */ "qhull internal error (qh_maxsimplex): not enough points available\n");
+      ivp_message (/* retail 06383e61 */ "qhull internal error (qh_maxsimplex): not enough points available\n");
       qh_errexit (qh_ERRqhull, NULL, NULL);
     }
     qh_setappend(simplex, maxpoint);
@@ -1508,7 +1508,7 @@ void qh_projectpoints (signed char *project, int n, realT *points,
   for (k= 0; k < n; k++)
     testdim += project[k];
   if (testdim != newdim) {
-    FUN_06356960 (/* retail 0638452b */ "qhull internal error (qh_projectpoints): newdim %d should be %d after projection\n",
+    ivp_message (/* retail 0638452b */ "qhull internal error (qh_projectpoints): newdim %d should be %d after projection\n",
       newdim, testdim);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -1751,7 +1751,7 @@ void qh_scalelast (coordT *points, int numpoints, int dim, coordT low,
                   qh MINdenom_1, &nearzero);
   if (nearzero) {
     /* retail 06384977: a single message (no 'Qz' / DELAUNAY variant in the 2.6 build) */
-    FUN_06356960 ("qhull input error: last coordinate's new bounds [0, %2.2g] too wide for\nexisting bounds [%2.2g, %2.2g] with width %2.2g\n",
+    ivp_message ("qhull input error: last coordinate's new bounds [0, %2.2g] too wide for\nexisting bounds [%2.2g, %2.2g] with width %2.2g\n",
 		newhigh, low, high, high-low);
     qh_errexit (qh_ERRinput, NULL, NULL);
   }
@@ -1801,14 +1801,14 @@ void qh_scalepoints (pointT *points, int numpoints, int dim,
     if (newlow < -REALmax/2)
       newlow= low;
     if (qh DELAUNAY && k == dim-1 && newhigh < newlow) {
-      FUN_06356960 (/* retail 06384b37 */ "qhull input error: 'Qb%d' or 'QB%d' inverts paraboloid since high bound %.2g < low bound %.2g\n",
+      ivp_message (/* retail 06384b37 */ "qhull input error: 'Qb%d' or 'QB%d' inverts paraboloid since high bound %.2g < low bound %.2g\n",
 	       k, k, newhigh, newlow);
       qh_errexit (qh_ERRinput, NULL, NULL);
     }
     scale= qh_divzero (newhigh - newlow, high - low,
                   qh MINdenom_1, &nearzero);
     if (nearzero) {
-      FUN_06356960 (/* retail 06384bbb */ "qhull input error: %d'th dimension's new bounds [%2.2g, %2.2g] too wide for\nexisting bounds [%2.2g, %2.2g]\n",
+      ivp_message (/* retail 06384bbb */ "qhull input error: %d'th dimension's new bounds [%2.2g, %2.2g] too wide for\nexisting bounds [%2.2g, %2.2g]\n",
               k, newlow, newhigh, low, high);
       qh_errexit (qh_ERRinput, NULL, NULL);
     }
@@ -1927,12 +1927,12 @@ boolT qh_sethalfspace (int dim, coordT *coords, coordT **nextp,
   }
   *nextp= coordp;
   if (qh IStracing >= 4) {
-    FUN_06356960 (/* retail 06384e4d */ "qh_sethalfspace: halfspace at offset %6.2g to point: ", *offset);
+    ivp_message (/* retail 06384e4d */ "qh_sethalfspace: halfspace at offset %6.2g to point: ", *offset);
     for (k= dim, coordp= coords; k--; ) {
       r= *coordp++;
-      FUN_06356960 (/* retail 06384e7f */ " %6.2g", r);
+      ivp_message (/* retail 06384e7f */ " %6.2g", r);
     }
-    FUN_06356960 (/* retail 06384e8f */ "\n");
+    ivp_message (/* retail 06384e8f */ "\n");
   }
   return True;
 LABELerroroutside:
@@ -1940,15 +1940,15 @@ LABELerroroutside:
   normp= normal;
   fprintf(qh ferr, "qhull input error: feasible point is not clearly inside halfspace\nfeasible point: "); /* retail 06384f1f keeps fprintf */
   for (k= dim; k--; )
-    FUN_06356960 (/* retail 06384f4e */ qh_REAL_1, r=*(feasiblep++));
-  FUN_06356960 (/* retail 06384f5e */ "\n     halfspace: ");
+    ivp_message (/* retail 06384f4e */ qh_REAL_1, r=*(feasiblep++));
+  ivp_message (/* retail 06384f5e */ "\n     halfspace: ");
   for (k= dim; k--; )
-    FUN_06356960 (/* retail 06384f8c */ qh_REAL_1, r=*(normp++));
-  FUN_06356960 (/* retail 06384f9c */ "\n     at offset: ");
-  FUN_06356960 (/* retail 06384fb3 */ qh_REAL_1, *offset);
-  FUN_06356960 (/* retail 06384fc0 */ " and distance: ");
-  FUN_06356960 (/* retail 06384fd7 */ qh_REAL_1, dist);
-  FUN_06356960 (/* retail 06384fe4 */ "\n");
+    ivp_message (/* retail 06384f8c */ qh_REAL_1, r=*(normp++));
+  ivp_message (/* retail 06384f9c */ "\n     at offset: ");
+  ivp_message (/* retail 06384fb3 */ qh_REAL_1, *offset);
+  ivp_message (/* retail 06384fc0 */ " and distance: ");
+  ivp_message (/* retail 06384fd7 */ qh_REAL_1, dist);
+  ivp_message (/* retail 06384fe4 */ "\n");
   return False;
 } /* sethalfspace */
 
@@ -1990,7 +1990,7 @@ coordT *qh_sethalfspace_all (int dim, int count, coordT *halfspaces, pointT *fea
   for (i= 0; i < count; i++) {
     offsetp= normalp + newdim;
     if (!qh_sethalfspace (newdim, coordp, &coordp, normalp, offsetp, feasible)) {
-      FUN_06356960 (/* retail 0638509a */ "The halfspace was at index %d\n", i);
+      ivp_message (/* retail 0638509a */ "The halfspace was at index %d\n", i);
       qh_errexit (qh_ERRinput, NULL, NULL);
     }
     normalp= offsetp + 1;
@@ -2084,7 +2084,7 @@ pointT *qh_voronoi_center (int dim, setT *points) {
   if (size == dim+1)
     simplex= points;
   else if (size < dim+1) {
-    FUN_06356960 (/* retail 0638510f */ "qhull internal error (qh_voronoi_center):\n  need at least %d points to construct a Voronoi center\n",
+    ivp_message (/* retail 0638510f */ "qhull internal error (qh_voronoi_center):\n  need at least %d points to construct a Voronoi center\n",
 	     dim+1);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }else {
@@ -2136,14 +2136,14 @@ pointT *qh_voronoi_center (int dim, setT *points) {
     }
 #ifndef qh_NOtrace
     if (qh IStracing >= 3) {
-      FUN_06356960 (/* retail 0638534b */ "qh_voronoi_center: det %2.2g factor %2.2g ", det, factor);
+      ivp_message (/* retail 0638534b */ "qh_voronoi_center: det %2.2g factor %2.2g ", det, factor);
       qh_printmatrix (qh ferr, "center:", &center, 1, dim);
       if (qh IStracing >= 5) {
 	qh_printpoints (qh ferr, "points", simplex);
 	FOREACHpoint_(simplex)
-	  FUN_06356960 (/* retail 063853c8 */ "p%d dist %.2g, ", qh_pointid (point),
+	  ivp_message (/* retail 063853c8 */ "p%d dist %.2g, ", qh_pointid (point),
 		   qh_pointdist (point, center, dim));
-	FUN_06356960 (/* retail 063853de */ "\n");
+	ivp_message (/* retail 063853de */ "\n");
       }
     }
 #endif

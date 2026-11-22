@@ -60,7 +60,7 @@ static void* HeaderBlockFromWatched(Watchable const* Watched)
 //   062c2ed1  +0x324 = +0x328 = 0                Watcher324
 //   062c2ee8  ICRSplineSegment ctor on +0x348    Spline
 //   062c2eed  +0x450 = +0x454 = 0                ProxWatcher450.Watcher
-//   062c2efd  +0x45c = +0x458 = 0                ProxWatcher450.Unknown0c / Unknown08
+//   062c2efd  +0x45c = +0x458 = 0                ProxWatcher450.FarDistance / NearDistance
 //   062c2f09  +0x320 = 0, +0x32c = 0, byte +0x39b = 0
 //   062c2f1b  both vtables (implicit here).
 // Nothing else is written: GotoDirective.NavPilotPtr (+0x2f0) is first stored by
@@ -86,8 +86,8 @@ DockBehavior::DockBehavior(int InTypeId)
 {
     // 062c2eed-062c2f03: ProxWatcher450's watcher dwords are zeroed by its own default
     // ctor; the two floats after it are zeroed as raw dwords.
-    ProxWatcher450.Unknown0c = 0.0f;
-    ProxWatcher450.Unknown08 = 0.0f;
+    ProxWatcher450.FarDistance = 0.0f;
+    ProxWatcher450.NearDistance = 0.0f;
 }
 
 // FUN_062c30d0 (Common.dll.txt 187641-187718), the destructor proper; FUN_062c3020
@@ -230,10 +230,10 @@ int DockBehavior::Update()
     // get_position() (+0x00), re-read for each call.
     unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&ProxWatcher450);
     ProxWatcherRecomputeZoneFlags(
-        ProxWatcher, Field24,
+        ProxWatcher, NavHelperPtr24,
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_position());
     ProxWatcherNotifyZoneChange(
-        ProxWatcher, Field24, Field20,
+        ProxWatcher, NavHelperPtr24, BehaviorMgrPtr20,
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_position());
 
     // 062c3ce8-062c3cf4: FUN_062c4900 with `this`; its EAX is the return value.
@@ -268,8 +268,8 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
         if (Param2 == 3)
             return true;
 
-        // retail: `MOV [ESI+0x410],ECX` == outer+0x43c = Field43c = Param3.
-        Field43c = Param3;
+        // retail: `MOV [ESI+0x410],ECX` == outer+0x43c = DockPortIndex = Param3.
+        DockPortIndex = Param3;
 
         // retail: `MOV EAX,[ESI+0x2f8]` == outer+0x324 = Watcher324's raw
         // Watched pointer, then the usual "-8 header, null either way is
@@ -307,7 +307,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
                 return false;
             }
             // retail: `MOV [ESI+0x3dc],0x41800000` == outer+0x408 = 16.0f.
-            Field408 = 16.0f;
+            DockPointRadius = 16.0f;
             EnterState(6);
             return false;
         }
@@ -336,20 +336,20 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 {
     // retail: `CALL FUN_062d2090(this, Param1, Param2, Param3)` -- the shared
     // Behavior-family context initializer (see DockBehaviorFields'
-    // ThreatSourcePtr14/Field20/Field24 comments). Ported inline here since
+    // ThreatSourcePtr14/BehaviorMgrPtr20/NavHelperPtr24 comments). Ported inline here since
     // it's a small (24-instruction), fully-decoded leaf with no cross-cutting
     // dependency of its own:
     //   if (Param1 == nullptr || Param3 == nullptr) return false;  // retail's 2nd null check is on P3
     //   ThreatSourcePtr14 = Param1;
     //   CachedHandle08 = Param1->vtbl[0x20](Param1);   // a getter call
-    //   Field24 = Param3;
-    //   Field20 = Param2;
+    //   NavHelperPtr24 = Param3;
+    //   BehaviorMgrPtr20 = Param2;
     //   return true;
     // NOTE: parameter-to-field mapping confirmed directly from FUN_062d2090's
     // raw disassembly (not just call-site order) -- P2 and P3 land on
-    // Field20/Field24 in the OPPOSITE order a naive "P1/P2/P3 -> +0x14/+0x20/
+    // BehaviorMgrPtr20/NavHelperPtr24 in the OPPOSITE order a naive "P1/P2/P3 -> +0x14/+0x20/
     // +0x24" reading would suggest (this function's own P3 stack slot is read
-    // BEFORE its P2 slot, into Field24 first).
+    // BEFORE its P2 slot, into NavHelperPtr24 first).
     // 2026-10-08: the shared binder is Behavior::BindContext now (common_behavior.cpp).
     bool const bOk = BindContext(Param1, Param2, Param3);          // 062c31d9
     if (!bOk)
@@ -363,18 +363,18 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // WIRED FOR REAL (2026-09-11, d285:common-port): retail calls SubObjectA/
     // B's own vtable slot 0 here -- re-read directly from Common.dll.txt
     // 187744-187774 byte-for-byte: both calls push the SAME 3 arguments,
-    // `(ThreatSourcePtr14, Field24, Param2)` -- Param2 is this function's own
+    // `(ThreatSourcePtr14, NavHelperPtr24, Param2)` -- Param2 is this function's own
     // raw incoming 2nd parameter (captured into EDI at function entry, BEFORE
-    // the FUN_062d2090 call above, and never reloaded from +0x20/Field20
-    // afterward; Field20 holds the identical value since FUN_062d2090 sets
-    // Field20=Param2, but retail's own register-level source really is the
+    // the FUN_062d2090 call above, and never reloaded from +0x20/BehaviorMgrPtr20
+    // afterward; BehaviorMgrPtr20 holds the identical value since FUN_062d2090 sets
+    // BehaviorMgrPtr20=Param2, but retail's own register-level source really is the
     // still-live Param2, not a reload of the field). Argument order confirmed
     // by push order (ECX=ThreatSourcePtr14 pushed last = 1st param, matching
     // SetContext(InObject, InHandle, InContext)).
-    SubObjectA.SetContext(ThreatSourcePtr14, Field24, Param2);     // 062c320a
+    SubObjectA.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);     // 062c320a
     SubObjectA.SetMode(0);                                          // 062c320f FUN_062d5980(0)
-    GotoDirective.Idea.SetContext(ThreatSourcePtr14, Field24, Param2); // 062c3229 (+0x2dc slot 0)
-    SubObjectB.SetContext(ThreatSourcePtr14, Field24, Param2);     // 062c3240
+    GotoDirective.Idea.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2); // 062c3229 (+0x2dc slot 0)
+    SubObjectB.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);     // 062c3240
 
     // WIRED FOR REAL 2026-09-17 (claude:abi-pass50): Common.dll.txt
     // 187778-187784 (`.text:062c3245 MOV EDX,[ESI+0x168]`, `062c3250 LEA
@@ -382,20 +382,20 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // vtable slot 0, pushing the SAME three arguments as SubObjectA/SubObjectB
     // above. SubObjectC is a SplineMoveIdea (common_idea.h), so slot 0 is
     // BaseIdea::SetContext and this is now a typed call.
-    SubObjectC.SetContext(ThreatSourcePtr14, Field24, Param2);
+    SubObjectC.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
 
     // CORRECTED 2026-09-11 (d285:common-port): re-reading Common.dll.txt
     // 187783-187789 byte-for-byte while wiring the calls above -- this call
     // site actually zeroes the 3 unconfirmed dwords at +0x444/+0x448/+0x44c
-    // (Opaque444), NOT SubStateValue440(+0x440)/Field330(+0x330) as the prior
+    // (Opaque444), NOT TerminalType(+0x440)/RequestedDockPortIndex(+0x330) as the prior
     // pass's port claimed (no instruction anywhere in this function touches
-    // either of those two fields). Fixed here; SubStateValue440/Field330
+    // either of those two fields). Fixed here; TerminalType/RequestedDockPortIndex
     // remain untouched by SetContext(), matching their own field comments
     // ("Cleared by RecomputeApproach()/Disengage()" -- not SetContext()).
-    // (Three zero dwords == a zero Vector; Field444 since 2026-10-08.)
-    Field444.x = 0.0f;
-    Field444.y = 0.0f;
-    Field444.z = 0.0f;
+    // (Three zero dwords == a zero Vector; DestPointOffset since 2026-10-08.)
+    DestPointOffset.x = 0.0f;
+    DestPointOffset.y = 0.0f;
+    DestPointOffset.z = 0.0f;
     Flags28 = static_cast<unsigned char>(Flags28 & ~0x2);
 
     // 062c3271-062c328d: owner->get_hardpoint("hpmount", &Pos, nullptr) (IObjInspect +0xc0).
@@ -412,7 +412,7 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 
     // 062c3293-062c32ba: the SystemManager's physical-radius cache (+0x14fc block), the same
     // inlined refresh LaunchBehavior::EnsureNestedNavPositionCached reproduces.
-    SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
     if (Sys->SelfTarget.bPosValid == 0)
     {
         Sys->SelfTarget.bPosValid = 1;                                       // 062c32b3
@@ -456,7 +456,7 @@ void DockBehavior::RecomputeApproach()
     GotoDirective.NavPilotPtr = nullptr;
 
     // .text:062c3741: `CALL FUN_062d20d0` -- Behavior's own slot 3 body.
-    Behavior::Slot3();
+    Behavior::OnEngage();
 
     void const* Watched = Watcher324.target();
     bool const bInvalidBlock =
@@ -467,16 +467,16 @@ void DockBehavior::RecomputeApproach()
         return;
     }
 
-    Field43c = -1;                                                   // 062c3773
+    DockPortIndex = -1;                                                   // 062c3773
     CombatFlag344 = 0;                                               // 062c377d (byte)
 
     // .text:062c3766-062c37a5: FUN_062e5af0(owner, 1.0f, 1) (get_speed, Engine) is FSTP'd to
     // a float stack slot and passed to FUN_062e5ab0(owner, speed) (the coast distance at
-    // 1000.0f); the result times 1.4f (DAT_0639f510 == 0x3fb33333) is FSTP'd to Field33c.
+    // 1000.0f); the result times 1.4f (DAT_0639f510 == 0x3fb33333) is FSTP'd to BrakingDistance.
     {
         float const Speed = Behavior_InvokeManagerSlotD8(ObjInspectOf(ThreatSourcePtr14), 1.0f,
                                                          IObject::ThrustEquipEngine);
-        Field33c = static_cast<float>(
+        BrakingDistance = static_cast<float>(
             static_cast<double>(Behavior_QueryFixedFalloffEffect(ThreatSourcePtr14, Speed)) * 1.4f);
     }
 
@@ -488,13 +488,13 @@ void DockBehavior::RecomputeApproach()
     // branches swapped).
     if (static_cast<signed char>(StateFlags32c) < 0)
     {
-        // 062c37bc-062c37e8: owner->get_lane_start(watched object, &TargetShipPtr388,
+        // 062c37bc-062c37e8: owner->get_lane_start(watched object, &LaneNextRing,
         // &DestPoint3cc, &Facing38c) (IObjInspect +0x138; the object is target - 8, or null).
         IObjInspect const* const WatchedObj = ObjInspectOf(Watched != nullptr
             ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
             : nullptr);
         ObjInspectOf(ThreatSourcePtr14)->get_lane_start(
-            WatchedObj, *static_cast<IObjInspect const**>(static_cast<void*>(&TargetShipPtr388)),
+            WatchedObj, *static_cast<IObjInspect const**>(static_cast<void*>(&LaneNextRing)),
             DestPoint3cc, Facing38c);
         // 062c37ee-062c3806: LookMatrixYup(Facing38c) copied (9 dwords) into OrientMatrix3d8.
         OrientMatrix3d8 = LookMatrixYup(Facing38c);
@@ -511,11 +511,11 @@ void DockBehavior::RecomputeApproach()
     {
         // .text:062c3841 `MOV dword ptr [EBP + 0x43c],EBX` with EBX held at 0
         // by the function's entry `XOR EBX,EBX` (.text:062c3724). This write
-        // was missing from the port: Field43c is set to -1 unconditionally
+        // was missing from the port: DockPortIndex is set to -1 unconditionally
         // earlier (.text:062c3773, `MOV [EBP+0x43c],0xffffffff`), and retail
         // resets it to 0 again here, on this branch only, right before the
         // call below. Found 2026-09-17 while wiring this method's closing gate.
-        Field43c = 0;
+        DockPortIndex = 0;
 
         RefreshApproachState();                                      // 062c3847 FUN_062c50e0
     }
@@ -616,21 +616,21 @@ void DockBehavior::Disengage()
 
         // LAB_062c3afc (byte +0x334 set): +0x440 = 0, +0x330 = -1, byte +0x334 = 0, then the
         // owner's IObjAffect slot 0x60 (0, &id, 0) with Watcher324's object id.
-        SubStateValue440 = 0;
-        Field330 = -1;
+        TerminalType = 0;
+        RequestedDockPortIndex = -1;
         ApproachClearedFlag334 = 0;
         CancelOwnerRequest(0);
         return;
     }
 
-    // 062c3925-062c3929: IBehaviorManager::lock_maneuvers(false) on Field20.
-    static_cast<IBehaviorManager*>(Field20)->lock_maneuvers(false);
+    // 062c3925-062c3929: IBehaviorManager::lock_maneuvers(false) on BehaviorMgrPtr20.
+    static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->lock_maneuvers(false);
 
     // 062c392e-062c3948: with a Goto pilot, its Behavior slot 4, FUN_062d21c0 on it, and
     // the pointer is cleared.
     if (GotoDirective.NavPilotPtr != nullptr)
     {
-        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->Slot4();  // 062c393a
+        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();  // 062c393a
         Behavior_ReleaseDirectiveTarget(GotoDirective.NavPilotPtr);  // 062c3943
         GotoDirective.NavPilotPtr = nullptr;                         // 062c3948
     }
@@ -663,7 +663,7 @@ void DockBehavior::Disengage()
     {
         // LAB_062c3a01: level 2 when the SystemManager's external interface is a player
         // and ModeState320 == 1, else 0.
-        SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+        SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
         int const Level = (Sys->SelfTarget.Iface->is_player() && ModeState320 == 1) ? 2 : 0;
         SubObjectA.SetField44(Level);                                // 062c3a30 FUN_062d88b0
 
@@ -671,8 +671,8 @@ void DockBehavior::Disengage()
         // owner's IObjAffect slot 0x60 (0, &id, 0).
         if ((Flags28 & 0x1) == 0)
         {
-            SubStateValue440 = 0;
-            Field330 = -1;
+            TerminalType = 0;
+            RequestedDockPortIndex = -1;
             ApproachClearedFlag334 = 0;
             CancelOwnerRequest(0);
         }
@@ -685,8 +685,8 @@ void DockBehavior::Disengage()
     SubObjectB.Commit();                                             // 062c3ac5 (+0xa8)
     SubObjectA.Commit();                                             // 062c3acc (+0x30)
     SetCruiseLock(1, 3);                                             // 062c3ad5 FUN_062d21d0
-    ((SystemManager*)Field24)->GunGroups.SetShieldActive(1);         // 062c3add-062c3ae5 FUN_062e9a60
-    Behavior::Slot4();                                               // 062c3aec FUN_062d20f0
+    ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(1);         // 062c3add-062c3ae5 FUN_062e9a60
+    Behavior::OnDisengage();                                               // 062c3aec FUN_062d20f0
     ModeState320 = 0;                                                // 062c3af2
 }
 
@@ -748,7 +748,7 @@ int DockBehavior::CheckClearanceProgress()
         if (Base == 0)
             return 2;
         // 062c36fe-062c370c: FUN_062e7400(NavHelper+0x34, Candidate); zero -> 2.
-        if (static_cast<SystemManager*>(Field24)->Timers.FindObjectDockingAtBase(Candidate) == nullptr)
+        if (static_cast<SystemManager*>(NavHelperPtr24)->Timers.FindObjectDockingAtBase(Candidate) == nullptr)
             return 2;
     }
 
@@ -771,7 +771,7 @@ int DockBehavior::CheckClearanceProgress()
 // Own vtable slot 12 (offset 0x30). Common.dll.txt 191005-191094 (LAB_062c5540).
 // All 81 instructions traced. NavPilotPtr (+0x2f0) is the manager's dispatch-table Goto
 // behavior (EnterState case 1 loads it from IBehaviorManager+0x17c), so its +0x30 / +0x28
-// calls are Behavior::set_direction / Behavior::Slot10.
+// calls are Behavior::set_direction / Behavior::OnApplyDirective.
 void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
 {
     Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
@@ -800,8 +800,8 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
         Op.Field_5C = ObjInspectOf(ProxObj)->get_id();               // [EDX+0x20]
     else
         Op.Field_5C = 0;
-    Op.Field_60 = ProxWatcher450.Unknown08;                          // 062c55c2-062c55d0
-    Op.Field_64 = ProxWatcher450.Unknown0c;                          // 062c55d4-062c55da
+    Op.Field_60 = ProxWatcher450.NearDistance;                          // 062c55c2-062c55d0
+    Op.Field_64 = ProxWatcher450.FarDistance;                          // 062c55d4-062c55da
 
     if ((StateFlags32c & 0xc0) != 0)                                 // 062c55c8 byte test
     {
@@ -820,7 +820,7 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
         Op.Field_1C = static_cast<int32_t>(ObjInspectOf(Obj)->get_id()); // 062c561f
     }
 
-    Pilot->Slot10(&Op);                                              // 062c5633 [EAX+0x28]
+    Pilot->OnApplyDirective(&Op);                                              // 062c5633 [EAX+0x28]
 }
 
 // Own vtable slot 22 (offset 0x58). Common.dll.txt 190940-190996 (LAB_062c54b0).
@@ -858,7 +858,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         // interface id must equal Payload+8. No Flag399 store on this path.
         if (Payload == nullptr)
             return;
-        SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+        SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
         if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
             Sys->SelfTarget.Iface->get_id())
             return;
@@ -893,7 +893,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
 //     the FaceIdea (062c419a-062c41b8).
 //   * cases 2/6/7/9 drove the wrong vectors and dropped every DeviceTRC::bind_to_dc
 //     radius and every MaxApproachSpeed46c write. The radii are 64.0f / 10.0f /
-//     15.0f / 25.0f and Field408*DAT_0639f518; the timeouts are 10.0f (0x41200000) and
+//     15.0f / 25.0f and DockPointRadius*DAT_0639f518; the timeouts are 10.0f (0x41200000) and
 //     18.0f (.data:DAT_063ebdb8), never the generic 1000.0f those branches were left at.
 //   * cases 0xc/0xd dropped the Flags28 |= 1 / own-slot-0x10 / Flags28 &= ~2 sequence
 //     that precedes the FUN_062d29a0 call (062c44be-062c44ea).
@@ -902,12 +902,12 @@ void DockBehavior::EnterState(int NewState)
     if (NewState != 1 && ModeState320 == 1)
     {
         // 062c3d34-062c3d3c: the Goto pilot's Behavior slot 4, no null test in retail.
-        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->Slot4();
+        static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
         // 062c3d45: FUN_062d21c0 with ECX == NavPilotPtr's value.
         Behavior_ReleaseDirectiveTarget(GotoDirective.NavPilotPtr);
         GotoDirective.NavPilotPtr = nullptr;                         // 062c3d53
-        // 062c3d4a-062c3d59: ThrustManager::engage_cruise(false) on Field24 + 0x18.
-        static_cast<SystemManager*>(Field24)->Thrust.engage_cruise(false);
+        // 062c3d4a-062c3d59: ThrustManager::engage_cruise(false) on NavHelperPtr24 + 0x18.
+        static_cast<SystemManager*>(NavHelperPtr24)->Thrust.engage_cruise(false);
         // 062c3d5e-062c3d6a: the embedded AfterburnerIdea at +0x2dc, BaseIdea slot 4.
         GotoDirective.Idea.Commit();
     }
@@ -922,7 +922,7 @@ void DockBehavior::EnterState(int NewState)
     {
         // caseD_1 at 062c3d95: +0x17c of the manager is BehaviorDispatchTable[2], the Goto
         // behavior. Retail reads it with no null test (the old port had one).
-        GotoDirective.NavPilotPtr = static_cast<IBehaviorManager*>(Field20)->BehaviorDispatchTable[2];
+        GotoDirective.NavPilotPtr = static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->BehaviorDispatchTable[2];
 
         pub::AI::DirectiveGotoOp Op;
         // 062c3dad: .data:DAT_063ebdb4 == 0x447a0000 == 1000.0f.
@@ -940,9 +940,9 @@ void DockBehavior::EnterState(int NewState)
             Op.Field_5C = 0;
         }
 
-        // 062c3de8 / 062c3df8: +0x458 is ProxWatcher450.Unknown08, read as a float;
+        // 062c3de8 / 062c3df8: +0x458 is ProxWatcher450.NearDistance, read as a float;
         // FUN_062c2ad0(this+0x450, 0) is the far threshold unscaled (PUSH EBP == 0).
-        Op.Field_60 = ProxWatcher450.Unknown08;
+        Op.Field_60 = ProxWatcher450.NearDistance;
         Op.Field_64 = QueryHandleRange(&ProxWatcher450, 0);
 
         if ((StateFlags32c & 0xc0) != 0)
@@ -964,8 +964,8 @@ void DockBehavior::EnterState(int NewState)
         // +0x36c byte cleared -- all on [this+0x2f0] with no null test (the old port had one).
         GotoBehavior* const Pilot = static_cast<GotoBehavior*>(
             static_cast<Behavior*>(GotoDirective.NavPilotPtr));
-        Pilot->Slot10(&Op);                                          // 062c3e58 vtbl+0x28
-        Pilot->Slot3();                                              // 062c3e63 vtbl+0x0c
+        Pilot->OnApplyDirective(&Op);                                          // 062c3e58 vtbl+0x28
+        Pilot->OnEngage();                                              // 062c3e63 vtbl+0x0c
         Pilot->Flag36c = 0;                                          // 062c3e6f
         return;
     }
@@ -979,7 +979,7 @@ void DockBehavior::EnterState(int NewState)
             // 062c3e97-062c4148, ported 2026-10-08 (claude-code:cmn-ai5) from the x87 sequence.
             // Each FSTP dword is a float below; everything kept on the FPU stack is double.
             NavHelperRefreshLeadPoint();                             // 062c3e97-062c3ebd
-            SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
 
             // 062c3ec0-062c3eeb: D = own cached centre - DestPoint3cc, each FSTP float.
             Vector Delta;
@@ -1055,15 +1055,15 @@ void DockBehavior::EnterState(int NewState)
             InterceptPoint39c.y = static_cast<float>(BaseY + JitterY);
             InterceptPoint39c.z = static_cast<float>(static_cast<double>(BaseZ) + JitterZ);
 
-            // 062c40f2-062c4148: Field338 from the watched object's size -- times 0.5f
+            // 062c40f2-062c4148: StandOffRadius from the watched object's size -- times 0.5f
             // (DAT_0639c13c) when the type's 0x80 bit is set (JNS on the low byte), times 1/3
             // when only 0x40 is; neither leaves it alone.
             unsigned int const TypeBits = StateFlags32c;
             if ((TypeBits & 0x80) != 0)
-                Field338 = static_cast<float>(
+                StandOffRadius = static_cast<float>(
                     static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Watched)) * 0.5);
             else if ((TypeBits & 0x40) != 0)
-                Field338 = static_cast<float>(
+                StandOffRadius = static_cast<float>(
                     static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Watched)) * OneThird);
         }
 
@@ -1133,7 +1133,7 @@ void DockBehavior::EnterState(int NewState)
         // at +0x168 (062c4358), not the behavior.
         BuildFinalApproachSpline();                         // 062c4347 FUN_062c56d0
         SetCruiseLock(0, 3);
-        SubObjectC.SetField158(2);                          // 062c435e FUN_062da400
+        SubObjectC.SetStopStyle(2);                          // 062c435e FUN_062da400
         return;
     case 9:
     {
@@ -1141,11 +1141,11 @@ void DockBehavior::EnterState(int NewState)
         SetCruiseLock(0, 3);
         SubObjectA.SetPosition(SavedPosition3fc);           // 062c4386 FUN_062d5840
         SubObjectA.Offset4c = *static_cast<Vector const*>(RawAt(0x430)); // 062c4394 FUN_062d5a80
-        // 062c4399-062c43a8: FLD float Field408, FMUL double DAT_0639f518 (0.6), FSTP dword as
+        // 062c4399-062c43a8: FLD float DockPointRadius, FMUL double DAT_0639f518 (0.6), FSTP dword as
         // the bind_to_dc argument -- one rounding of the double product (the old port
         // multiplied two floats).
         SubObjectA.SetRange3c(static_cast<float>(
-            static_cast<double>(Field408) * kEnterState9RadiusScale));      // 062c43ab
+            static_cast<double>(DockPointRadius) * kEnterState9RadiusScale));      // 062c43ab
 
         if ((StateFlags32c & 0xc0) != 0)
         {
@@ -1167,11 +1167,11 @@ void DockBehavior::EnterState(int NewState)
             SubObjectB.SetPosition(SavedPosition3fc);       // 062c4415 FUN_062d7560
             return;
         }
-        // LAB_062c4427. Field20 is IBehaviorManager::lock_maneuvers' receiver -- item
+        // LAB_062c4427. BehaviorMgrPtr20 is IBehaviorManager::lock_maneuvers' receiver -- item
         // 1277 calls that function on it BY LINKED SYMBOL NAME, which is what settled
         // the field's type. Stored as void*, so the cast is explicit here.
-        // Retail has no null test on Field20 here (the old port did).
-        static_cast<IBehaviorManager*>(Field20)->lock_maneuvers(true);   // 062c442b
+        // Retail has no null test on BehaviorMgrPtr20 here (the old port did).
+        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->lock_maneuvers(true);   // 062c442b
         SubObjectA.SetField44(0);                           // 062c4434 FUN_062d88b0
         if (CombatFlag344 != 0)
         {
@@ -1186,9 +1186,9 @@ void DockBehavior::EnterState(int NewState)
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         if ((StateFlags32c & 0x20) != 0)
             break;                                          // 062c448c -> default
-        // 062c448e-062c4499: FUN_062e9a60 = Field24->GunGroups.SetShieldActive, 0 here (the
+        // 062c448e-062c4499: FUN_062e9a60 = NavHelperPtr24->GunGroups.SetShieldActive, 0 here (the
         // Disengage site pushes 1).
-        ((SystemManager*)Field24)->GunGroups.SetShieldActive(0);
+        ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(0);
         return;
     }
     case 0xb:
@@ -1200,14 +1200,14 @@ void DockBehavior::EnterState(int NewState)
         Flags28 = static_cast<unsigned char>(Flags28 | 1);
         Disengage();                                        // own vtbl slot 4 (offset 0x10)
         Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        static_cast<IBehaviorManager*>(Field20)->SetDirectiveResult(7, 0);   // FUN_062d29a0
+        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->SetDirectiveResult(7, 0);   // FUN_062d29a0
         return;
     case 0xd:
         // caseD_d at 062c44be -- same sequence, result 2.
         Flags28 = static_cast<unsigned char>(Flags28 | 1);
         Disengage();
         Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        static_cast<IBehaviorManager*>(Field20)->SetDirectiveResult(7, 2);   // FUN_062d29a0
+        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->SetDirectiveResult(7, 2);   // FUN_062d29a0
         return;
     default:
         // caseD_3/caseD_5/caseD_a and anything outside 1..0xd: nothing beyond the
@@ -1242,26 +1242,26 @@ void DockBehavior::EnterState(int NewState)
 // name for FUN_062d88b0, whose receiver is SubObjectA at every one of this
 // class's eleven call sites, and which is MoveIdea::SetField44(int) --
 // a real, ported one-line method in common_idea.h. Every site now calls it.
-// FUN_062d29a0 is IBehaviorManager::SetDirectiveResult (common_behaviormanager.cpp), called on Field20.
+// FUN_062d29a0 is IBehaviorManager::SetDirectiveResult (common_behaviormanager.cpp), called on BehaviorMgrPtr20.
 
 // FUN_062c50e0 (Common.dll.txt, .text:062c50e0-062c53e7), 207 instructions, all traced.
 void DockBehavior::RefreshApproachState()
 {
-    // 062c50e9-062c510c: Field43c < -1 (signed JL) or no Watcher324 object -> return.
-    if (Field43c < -1)
+    // 062c50e9-062c510c: DockPortIndex < -1 (signed JL) or no Watcher324 object -> return.
+    if (DockPortIndex < -1)
         return;
     Watchable const* const Watched = Watcher324.target();
     if (Watched == nullptr || reinterpret_cast<char const*>(Watched) - 8 == nullptr)
         return;
 
-    // 062c5112-062c5148: object->get_dock_hardpoints(Field43c, &SubStateValue440, &A, &B,
-    // &C, &Field408) (IObjInspect +0xc8; the object is re-read as target - 8).
+    // 062c5112-062c5148: object->get_dock_hardpoints(DockPortIndex, &TerminalType, &A, &B,
+    // &C, &DockPointRadius) (IObjInspect +0xc8; the object is re-read as target - 8).
     IObjInspect const* const Obj = ObjInspectOf(reinterpret_cast<char const*>(Watched) - 8);
     Transform XformA;   // [ESP+0x40] local_90 -- left uninitialised by retail
     Transform XformB;   // [ESP+0x70] local_60
     Transform XformC;   // [ESP+0xa0] local_30
-    Obj->get_dock_hardpoints(Field43c, reinterpret_cast<TERMINAL_TYPE*>(&SubStateValue440),
-                             &XformA, &XformB, &XformC, &Field408);
+    Obj->get_dock_hardpoints(DockPortIndex, reinterpret_cast<TERMINAL_TYPE*>(&TerminalType),
+                             &XformA, &XformB, &XformC, &DockPointRadius);
     SavedPosition3fc = XformA.Translation;                           // 062c514e-062c5165
     Orient40c = XformA.Rotation;                                     // 062c5175-062c5184
     DestPoint3cc = XformB.Translation;                               // 062c516f-062c519b
@@ -1343,7 +1343,7 @@ void DockBehavior::RefreshApproachState()
 // Each of these was wrong in the port before that re-derivation, and is now what the
 // retail bytes say:
 //   * case 2's give-up gate tested only `OwnerContext == nullptr`; retail tests
-//     `TargetShipPtr388 == 0 && !ObjInspect(ThreatSourcePtr14)->slot_bc() &&
+//     `LaneNextRing == 0 && !ObjInspect(ThreatSourcePtr14)->slot_bc() &&
 //     (char)StateFlags32c < 0` (062c4a2c-062c4a4b), and derefs the context
 //     unconditionally.
 //   * LAB_062c4c04's watcher result was allowed to fall into the "enter hold" tail
@@ -1373,7 +1373,7 @@ int DockBehavior::UpdateApproachTail()
         // NavPilotPtr for null nowhere (the old port did, 2026-10-08).
         Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
         *reinterpret_cast<float*>(reinterpret_cast<char*>(Pilot) + 0x1c) = DeltaTime;
-        if (Pilot->Slot7() != 2)
+        if (Pilot->OnUpdate() != 2)
             return UpdateResult10;
 
         if ((StateFlags32c & 0xc0) != 0)
@@ -1430,7 +1430,7 @@ int DockBehavior::UpdateApproachTail()
     {
         // 062c4a2c-062c4a4b. All three conditions, in retail's order; ThreatSourcePtr14 is
         // dereferenced with no null test (the old port had one, removed 2026-10-08).
-        if ((TargetShipPtr388 == nullptr) &&
+        if ((LaneNextRing == nullptr) &&
             !ObjInspectOf(ThreatSourcePtr14)->is_player() &&                 // vtbl+0xbc
             (static_cast<char>(StateFlags32c) < 0))
         {
@@ -1448,7 +1448,7 @@ int DockBehavior::UpdateApproachTail()
             // ((Dz*Fz + Dy*Fy) + Dx*Fx) on the FPU against 0.0f with TEST AH,0x5 + JP: >= 0 or
             // unordered falls to LAB_062c4c04.
             NavHelperRefreshLeadPoint();
-            SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
             Vector Delta;
             Delta.x = Sys->SelfTarget.CachedPos.x - DestPoint3cc.x;
             Delta.y = Sys->SelfTarget.CachedPos.y - DestPoint3cc.y;
@@ -1487,9 +1487,9 @@ int DockBehavior::UpdateApproachTail()
             // 062c4c6f-062c4c88: SavedPosition3fc@0x3fc <- DestPoint3cc@0x3cc, copied
             // dword by dword.
             SavedPosition3fc = DestPoint3cc;
-            // 062c4c8b-062c4c96: TargetShipPtr388's get_id (IObjInspect slot 8, +0x20), no
+            // 062c4c8b-062c4c96: LaneNextRing's get_id (IObjInspect slot 8, +0x20), no
             // null test.
-            TargetQuery = static_cast<int>(ObjInspectOf(TargetShipPtr388)->get_id());
+            TargetQuery = static_cast<int>(ObjInspectOf(LaneNextRing)->get_id());
             SlotMode = 2;
         }
         if (ApproachClearedFlag334 != 0)
@@ -1617,14 +1617,14 @@ int DockBehavior::UpdateApproachTail()
             (void)ObjAffectOf(ThreatSourcePtr14)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
 
             // 062c4f1a-062c4f3f: IObjAffect slot 25, go_tradelane(<-8 header of the
-            // watched block>, TargetShipPtr388, false, 0.0f) -- the two `PUSH 0` are the
+            // watched block>, LaneNextRing, false, 0.0f) -- the two `PUSH 0` are the
             // bool and the float. Retail enters state 0xd when this returns NON-zero
             // (062c4f44 JNZ). WIRED 2026-09-24: this used to call the RunCollisionProbe
             // stub (FUN_062e53e0's stand-in), which always returned true.
             void* EngineObj = HeaderBlockFromWatched(Watcher324.target());
             if (ObjAffectOf(ThreatSourcePtr14)->go_tradelane(
                     static_cast<IObjInspect const*>(EngineObj),
-                    static_cast<IObjInspect const*>(TargetShipPtr388), false, 0.0f) != 0)
+                    static_cast<IObjInspect const*>(LaneNextRing), false, 0.0f) != 0)
             {
                 EnterState(0xd);    // LAB_062c4f81
                 return UpdateResult10;
@@ -1639,9 +1639,9 @@ int DockBehavior::UpdateApproachTail()
             //   .text:062c4f49  PUSH EAX (== 0)       <- arg 3, Duration
             //   .text:062c4f4a  PUSH EAX (== 0)       <- arg 2, Extra
             //   .text:062c4f4b  PUSH ECX
-            //   .text:062c4f4c  MOV  ECX,[ESI+0x20]   <- the RECEIVER, Field20
+            //   .text:062c4f4c  MOV  ECX,[ESI+0x20]   <- the RECEIVER, BehaviorMgrPtr20
             //   .text:062c4f4f  CALL FUN_062d4520
-            static_cast<IBehaviorManager*>(Field20)->QueueNotification(
+            static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->QueueNotification(
                 static_cast<IObjRW*>(ThreatSourcePtr14), 0, 0.0f);
             SubObjectA.SetField44(2);   // 062c4f58 FUN_062d88b0
             EnterState(10);
@@ -1653,7 +1653,7 @@ int DockBehavior::UpdateApproachTail()
         // LAB_062c4f99.
         if (MoveResult != 1)
             break;                  // 062c4f9b JNZ default
-        if (SubStateValue440 != 3 && SubStateValue440 != 4 && SubStateValue440 != 5)
+        if (TerminalType != 3 && TerminalType != 4 && TerminalType != 5)
         {
             EnterState(0xb);
             return UpdateResult10;
@@ -1717,7 +1717,7 @@ int DockBehavior::UpdateApproachTail()
 // (double DAT_0639f528)).
 bool DockBehavior::CheckCanProceed()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
     switch (ModeState320)
     {
     case 3:
@@ -1781,7 +1781,7 @@ bool DockBehavior::CheckCanProceed()
 //
 //   LinearCap  = MaxApproachSpeed46c                      ; 062c47fc
 //   AngularCap = DAT_0639f47c == 0x447a0000 == 1000.0f    ; 062c47f6
-//   if (ComputeFormationFollowerEnvelope(Field24 + 0x1364, &Envelope))   ; 062c4839
+//   if (ComputeFormationFollowerEnvelope(NavHelperPtr24 + 0x1364, &Envelope))   ; 062c4839
 //   {
 //       LinearCap  = min(LinearCap,  Envelope.Speed);        ; 062c4842-062c4855
 //       AngularCap = min(AngularCap, Envelope.AngularSpeed); ; 062c4859-062c486c
@@ -1826,10 +1826,10 @@ void DockBehavior::AdvancePreamble()
     Envelope.AngularSpeed = 0.0f;
     Envelope.AngularThrottle = 0.0f;
 
-    // 062c4806-062c4839: ECX == Field24 + 0x1364, the GunConvergenceState blob.
+    // 062c4806-062c4839: ECX == NavHelperPtr24 + 0x1364, the GunConvergenceState blob.
     // This caller reads only +0x00 and +0x08; GotoBehavior::Update reads the other
     // three.
-    if (((SystemManager*)Field24)->GunConvergenceStateBytes.ComputeFormationFollowerEnvelope(&Envelope))
+    if (((SystemManager*)NavHelperPtr24)->GunConvergenceStateBytes.ComputeFormationFollowerEnvelope(&Envelope))
     {
         if (!(LinearCap < Envelope.Speed))
             LinearCap = Envelope.Speed;
@@ -1849,11 +1849,11 @@ void DockBehavior::AdvancePreamble()
         // `TEST AH,0x41; JZ` skips only when it is strictly greater, and 062c48b9
         // calls again with the same arguments and FSTPs that result.
         if (!(ProxWatcherComputeSpeedCap(reinterpret_cast<unsigned char*>(&ProxWatcher450),
-                                         ThreatSourcePtr14, Field24, 1, 1.0f) >
+                                         ThreatSourcePtr14, NavHelperPtr24, 1, 1.0f) >
               static_cast<double>(LinearCap)))
         {
             LinearCap = static_cast<float>(ProxWatcherComputeSpeedCap(
-                reinterpret_cast<unsigned char*>(&ProxWatcher450), ThreatSourcePtr14, Field24, 1, 1.0f));
+                reinterpret_cast<unsigned char*>(&ProxWatcher450), ThreatSourcePtr14, NavHelperPtr24, 1, 1.0f));
         }
     }
 
@@ -1871,7 +1871,7 @@ void DockBehavior::AdvancePreamble()
 // the scale, and are kept in double.
 void DockBehavior::BuildFinalApproachSpline()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
 
     // 062c56e1-062c5761: FormationOffset starts zero. When FUN_062ecab0 on Sys+0x1364 finds no
     // formation leader, it is the owner's get_formation_offset (+0xac) rotated into world space
@@ -1900,11 +1900,11 @@ void DockBehavior::BuildFinalApproachSpline()
     Spline.P1.y = Sys->SelfTarget.CachedPos.y + FormationOffset.y;
     Spline.P1.z = Sys->SelfTarget.CachedPos.z + FormationOffset.z;
 
-    // 062c57a4-062c5804: P2 = (DestPoint3cc + Field444) + offset.
+    // 062c57a4-062c5804: P2 = (DestPoint3cc + DestPointOffset) + offset.
     Vector DockPoint;
-    DockPoint.x = DestPoint3cc.x + Field444.x;
-    DockPoint.y = DestPoint3cc.y + Field444.y;
-    DockPoint.z = DestPoint3cc.z + Field444.z;
+    DockPoint.x = DestPoint3cc.x + DestPointOffset.x;
+    DockPoint.y = DestPoint3cc.y + DestPointOffset.y;
+    DockPoint.z = DestPoint3cc.z + DestPointOffset.z;
     Spline.P2.x = DockPoint.x + FormationOffset.x;
     Spline.P2.y = DockPoint.y + FormationOffset.y;
     Spline.P2.z = DockPoint.z + FormationOffset.z;
@@ -1962,11 +1962,11 @@ void DockBehavior::BuildFinalApproachSpline()
 // Common.dll.txt 062c4a72-062c4a98 (identical copies at 062c4b0e and 062c3e97).
 // The SystemManager's physical-radius cache: +0x157a (Flags1578[2], == +0x14fc + 0x7e) set
 // once, then ExternalIface->get_physical_radius (+0x2c) into CachedPhysicalRadius (+0x1514)
-// and CachedPhysicalCenter (+0x1508). Retail tests neither Field24 nor ExternalIface; the two
+// and CachedPhysicalCenter (+0x1508). Retail tests neither NavHelperPtr24 nor ExternalIface; the two
 // "DEVIATION" null guards that stood here are gone (2026-10-08).
 void DockBehavior::NavHelperRefreshLeadPoint()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
     if (Sys->SelfTarget.bPosValid != 0)
         return;
     Sys->SelfTarget.bPosValid = 1;
@@ -2007,13 +2007,13 @@ float DockBehavior::QueryHandleRange(void* HandleField, int Mode)
 {
     DockProximityWatcher const* const Watcher = static_cast<DockProximityWatcher const*>(HandleField);
     if (static_cast<unsigned char>(Mode) != 0)
-        return static_cast<float>(static_cast<double>(Watcher->Unknown0c) * Watcher->Unknown10);
-    return Watcher->Unknown0c;
+        return static_cast<float>(static_cast<double>(Watcher->FarDistance) * Watcher->CruiseSpeedRatio);
+    return Watcher->FarDistance;
 }
 // PlayApproachWarning (FUN_062d93c0) and RequestBehaviorSwitch (FUN_062da400) are
 // GONE too (2026-09-17, claude:w21-stubsweep). Both were guessed names, and both
 // targets are real: FUN_062d93c0 is FaceIdea::SetAngleWeight8c (item 1632) and
-// FUN_062da400 is SplineMoveIdea::SetField158 (item 1654) -- common_idea.h exposes
+// FUN_062da400 is SplineMoveIdea::SetStopStyle (item 1654) -- common_idea.h exposes
 // both fields and both setters now, so the two call sites dispatch for real.
 
 // FUN_062e74a0 (item 1798): the checked id lookup through the IObjDB at SystemManager+0x34,
@@ -2021,9 +2021,9 @@ float DockBehavior::QueryHandleRange(void* HandleField, int Mode)
 
 // Slot 10, FUN_062c3370 (.text:062c3370-062c3587, RET 4). The argument is a
 // pub::AI::DirectiveDockOp. Always returns true.
-bool DockBehavior::Slot10(void* DirectiveOp)
+bool DockBehavior::OnApplyDirective(void* DirectiveOp)
 {
-    SystemManagerTimerTable* const ObjDb = &static_cast<SystemManager*>(Field24)->Timers;
+    SystemManagerTimerTable* const ObjDb = &static_cast<SystemManager*>(NavHelperPtr24)->Timers;
     // 062c337c-062c3387: REP MOVSD of 0xb dwords -- the whole op, vptr included.
     std::memcpy(static_cast<void*>(&DockOp), DirectiveOp, sizeof(DockOp));
     ModeState320 = 0;                                               // 062c3398
@@ -2050,27 +2050,27 @@ bool DockBehavior::Slot10(void* DirectiveOp)
     StateFlags32c = GetObjectTypeOrZero(
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target())));
     // 062c341f-062c3437: +0x388 = the object DockOp.Field_10 names (stored raw).
-    TargetShipPtr388 = ObjDb->FindVerifiedObject((unsigned const*)&DockOp.Field_10);
+    LaneNextRing = ObjDb->FindVerifiedObject((unsigned const*)&DockOp.Field_10);
     ApproachClearedFlag334 = DockOp.Field_14;                       // 062c3445
-    Field408 = -1.0f;                                               // 062c344b
+    DockPointRadius = -1.0f;                                               // 062c344b
     if (DockOp.Field_14 != 0)
     {
-        Field330 = DockOp.DockPortIndex;                            // 062c345f
-        Field43c = DockOp.DockPortIndex;                            // 062c3465
+        RequestedDockPortIndex = DockOp.DockPortIndex;                            // 062c345f
+        DockPortIndex = DockOp.DockPortIndex;                            // 062c3465
         RefreshApproachState();                                     // 062c346b FUN_062c50e0
     }
     else
     {
-        SubStateValue440 = 0;                                       // 062c3472
-        Field330 = -1;                                              // 062c3478
+        TerminalType = 0;                                       // 062c3472
+        RequestedDockPortIndex = -1;                                              // 062c3478
     }
 
     // 062c3482-062c34e8: the proximity watcher on the object DockOp.Field_1C names, with the
     // op's +0x20/+0x24 floats; its flag words cleared.
     IObjRW* const Prox = static_cast<IObjRW*>(
         ObjDb->FindVerifiedObject((unsigned const*)&DockOp.Field_1C));
-    ProxWatcher450.Unknown08 = DockOp.Field_20;
-    ProxWatcher450.Unknown0c = DockOp.Field_24;
+    ProxWatcher450.NearDistance = DockOp.Field_20;
+    ProxWatcher450.FarDistance = DockOp.Field_24;
     ProxWatcher450.Watcher.set(Prox != nullptr ? static_cast<Watchable const*>(Prox) : nullptr);
     ProxWatcher450.Flags14 = 0;
     ProxWatcher450.SavedFlags18 = 0;
@@ -2082,23 +2082,23 @@ bool DockBehavior::Slot10(void* DirectiveOp)
         float const Ratio = *reinterpret_cast<float const*>(&DockOp.Field_28);
         if (Ratio > 0.0)
         {
-            ProxWatcher450.Unknown10 = Ratio;                       // 062c3509
+            ProxWatcher450.CruiseSpeedRatio = Ratio;                       // 062c3509
         }
         else
         {
             // LAB_062c350e: own ship (SystemManager::Watcher target - 8) get_speed(1.0f, 4),
             // rounded to float, divided by the prox object's get_speed(1.0f, 1) (FDIVR).
-            SystemManager* const Sys = static_cast<SystemManager*>(Field24);
+            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
             IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
             float const OwnSpeed = Behavior_InvokeManagerSlotD8(
                 ObjInspectOf(Self), 1.0f, IObject::ThrustEquipCruise);      // PUSH 0x4
             double const ProxSpeed = Behavior_InvokeManagerSlotD8(
                 ObjInspectOf(ProxObj), 1.0f, IObject::ThrustEquipEngine);   // PUSH 0x1
-            ProxWatcher450.Unknown10 = static_cast<float>(OwnSpeed / ProxSpeed);
+            ProxWatcher450.CruiseSpeedRatio = static_cast<float>(OwnSpeed / ProxSpeed);
         }
         // LAB_062c3544: TEST AH,0x5 + JP keeps the value on >= 1.0f or unordered.
-        if (ProxWatcher450.Unknown10 < 1.0f)
-            ProxWatcher450.Unknown10 = 1.0f;
+        if (ProxWatcher450.CruiseSpeedRatio < 1.0f)
+            ProxWatcher450.CruiseSpeedRatio = 1.0f;
     }
     // LAB_062c355b.
     Flags28 = static_cast<unsigned char>((Flags28 & 0xfe) | 0x2);
@@ -2108,7 +2108,7 @@ bool DockBehavior::Slot10(void* DirectiveOp)
 // Slot 21, FUN_062c2f60 (.text:062c2f60-062c2fd5, RET 4): release Watcher324 and then the
 // proximity watcher when their object's id equals the argument (the object id the manager's
 // loop at .text:062d405c passes).
-void DockBehavior::Slot21(void* Arg)
+void DockBehavior::OnObjectLeftSystem(void* Arg)
 {
     unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
     IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()));
@@ -2121,12 +2121,12 @@ void DockBehavior::Slot21(void* Arg)
 
 // DockBehavior::SetDestPointOffset -- formerly FUN_062c50c0 (the dissolved common_stubs.cpp), Common.dll.c
 // 0x62c50c0: `MOV EAX,[param_1]; MOV [this+0x444],EAX` x3, RET 4 -- the three dwords of the
-// argument copied into Field444. Its single call site (.text:062cbc3e, BaseFollowerBehavior's
+// argument copied into DestPointOffset. Its single call site (.text:062cbc3e, BaseFollowerBehavior's
 // vtable slot 0x10 FUN_062cb5e0) passes ECX = *(ESI+0x278) = BaseFollowerBehavior::DockDelegate,
 // which FUN_062cb5e0 loads from IBehaviorManager::BehaviorDispatchTable[7] (+0x190, behaviour
 // type 7 "Dock", GDescDock) -- a DockBehavior; and 0x062c50c0 sits inside DockBehavior's own
 // address run (0x062c2ad0-0x062c56d0). That settles the receiver the old stub comment left open.
 void DockBehavior::SetDestPointOffset(Vector const& Offset)
 {
-    Field444 = Offset;
+    DestPointOffset = Offset;
 }

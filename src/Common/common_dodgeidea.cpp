@@ -6,7 +6,7 @@
 
 // Common.dll DodgeIdea (ctor 0x062d77d0, Update LAB_062d7950). See src/include/common_idea.h.
 //
-// CMN-SPLIT stage 1 (2026-10-14): split out of common_idea.cpp (ctor, SetField58, Commit) and
+// CMN-SPLIT stage 1 (2026-10-14): split out of common_idea.cpp (ctor, SetPreferredForward, Commit) and
 // common_aisteer.cpp (Update), code unchanged.
 
 #include "common_idea.h"
@@ -46,10 +46,10 @@ DodgeIdea::DodgeIdea()
     , WaggleAxisConeAngle(0.0f)                      // 062d7833 (dword 0)
     , RollAngle(0.0f)                      // 062d7836 (dword 0)
     , DodgeDistance(150.0f)                    // 0x43160000, 062d7839
-    , Field50(0.0f)                      // 062d7840 (dword 0)
-    , Field54(BitsToFloat(0x3e4ccccdu))  // 0.2f, 062d7843
-    , Field58{}                          // not written by retail's ctor
-    , Field64(0)                         // 062d7850
+    , DodgeDistanceScale(0.0f)                      // 062d7840 (dword 0)
+    , DodgeDistanceVariance(BitsToFloat(0x3e4ccccdu))  // 0.2f, 062d7843
+    , PreferredForward{}                          // not written by retail's ctor
+    , bHasPreferredForward(0)                         // 062d7850
     , Pad65{}
     , WorkingFrame(0.0f, 0.0f, 0.0f,     // 062d787a-062d7882, `MOV ECX,9; REP STOSD`
                    0.0f, 0.0f, 0.0f,
@@ -68,7 +68,7 @@ DodgeIdea::DodgeIdea()
     , FlagD9(0)                          // 062d78e9
     , FlagDa(0)                          // 062d78ef
     , PadDb(0)
-    , FieldDc(1.0f)                      // 062d78f5
+    , ChaseSpeedScale(1.0f)                      // 062d78f5
 {
     // The DirectionPicker sub-object's own initialization (+0x14..+0x33) is
     // FDirectionPicker's job -- see its constructor below; retail inlines it here,
@@ -82,10 +82,10 @@ DodgeIdea::DodgeIdea()
 
 // FUN_062d88c0, .text:062d88c0-062d88dd: three dword copies into +0x58, then
 // `MOV byte [ECX+0x64],1`.
-void DodgeIdea::SetField58(Vector const& Value)
+void DodgeIdea::SetPreferredForward(Vector const& Value)
 {
-    Field58 = Value;
-    Field64 = 1;
+    PreferredForward = Value;
+    bHasPreferredForward = 1;
 }
 
 // Own vtable slot 4 -- LAB_062d8830, .text:062d8830-062d88a8, 28 instructions.
@@ -106,7 +106,7 @@ void DodgeIdea::Commit()
 
     Handle->Thrust.SetThrustersActive(false);   // 062d8898
 
-    Field50 = 0.0f;   // 062d889d (dword 0)
+    DodgeDistanceScale = 0.0f;   // 062d889d (dword 0)
 }
 
 namespace
@@ -177,8 +177,8 @@ int DodgeIdea::Update(float DeltaTime)
         IntervalTimeLeft = static_cast<float>(static_cast<double>(IntervalTime) -
                                      (static_cast<double>(IntervalTimeVariancePercent) * IntervalTime) * Draw8c);
 
-        // 062d79d9-062d79fa: Field50 = (rand() * Field54) * 2^-15 + 1.0, one rounding.
-        Field50 = static_cast<float>((static_cast<double>(rand()) * Field54) * (1.0 / 32768.0) + 1.0);
+        // 062d79d9-062d79fa: DodgeDistanceScale = (rand() * DodgeDistanceVariance) * 2^-15 + 1.0, one rounding.
+        DodgeDistanceScale = static_cast<float>((static_cast<double>(rand()) * DodgeDistanceVariance) * (1.0 / 32768.0) + 1.0);
 
         // 062d79db-062d7a07: thunk_FUN_062ddcd0 on ECX = Manager->Pathfind, OutDir [S+0x64].
         Vector ProbeDirection{};
@@ -217,13 +217,13 @@ int DodgeIdea::Update(float DeltaTime)
                 double const Spread2 = Draw2 * WaggleAxisConeAngle;
                 float const Angle2 = static_cast<float>((Spread2 + Spread2) - WaggleAxisConeAngle);
 
-                // 062d7e79-062d7f41: up hint (0, 1, 0); Field64 set -> forward Field58,
+                // 062d7e79-062d7f41: up hint (0, 1, 0); bHasPreferredForward set -> forward PreferredForward,
                 // else -column 2 of a first get_transform(); BuildOrientationBasis on a
                 // second get_transform() straight into WorkingFrame.
                 Vector const UpHint{ 0.0f, 1.0f, 0.0f };
-                if (Field64 != 0)
+                if (bHasPreferredForward != 0)
                 {
-                    BuildOrientationBasis(WorkingFrame, *IfaceOrientation(Sys), Field58, &UpHint);
+                    BuildOrientationBasis(WorkingFrame, *IfaceOrientation(Sys), PreferredForward, &UpHint);
                 }
                 else
                 {
@@ -280,9 +280,9 @@ int DodgeIdea::Update(float DeltaTime)
 
                 // 062d7c25-062d7d64: the basis built into [S+0x74], UpHint null on both arms.
                 Matrix Basis;
-                if (Field64 != 0)
+                if (bHasPreferredForward != 0)
                 {
-                    BuildOrientationBasis(Basis, *IfaceOrientation(Sys), Field58, nullptr);
+                    BuildOrientationBasis(Basis, *IfaceOrientation(Sys), PreferredForward, nullptr);
                 }
                 else
                 {
@@ -312,11 +312,11 @@ int DodgeIdea::Update(float DeltaTime)
                     BuildRandomSpreadFrame(WorkingFrame, Basis, Angle1, RollAngle);
                     break;
                 }
-                // 062d7d86-062d7ddf: FUN_062e92e0(Sys+0x18), then FUN_062e3460(&Field58,
+                // 062d7d86-062d7ddf: FUN_062e92e0(Sys+0x18), then FUN_062e3460(&PreferredForward,
                 // [S+0xe0], 0x3f7fbe77 (0.999f), null); both true -> spread that frame, bank 0.
                 Matrix Perpendicular;
                 if (Sys->Thrust.CheckSteeringGate() &&
-                    BuildPerpendicularFrame(Field58, &Perpendicular, 0.999f, nullptr))
+                    BuildPerpendicularFrame(PreferredForward, &Perpendicular, 0.999f, nullptr))
                 {
                     BuildRandomSpreadFrame(WorkingFrame, Perpendicular, Angle1, 0.0f);
                     break;
@@ -377,13 +377,13 @@ int DodgeIdea::Update(float DeltaTime)
             // 062d8296: FUN_062e5af0(Target, 1.0f, 1) FSTP'd into [S+0x10].
             float Value = Behavior_InvokeManagerSlotD8(ObjInspectOf(Target), 1.0f, ThrustEquipEngine);
 
-            // 062d829f-062d82f3: Limit = Field50 * DodgeDistance stays on the stack. FCOMPP
+            // 062d829f-062d82f3: Limit = DodgeDistanceScale * DodgeDistance stays on the stack. FCOMPP
             // (Limit + 5.0) against Clearance, TEST AH,0x5 / JP: only "less" scales by
-            // FieldDc; else FCOMPP (Limit - 5.0), TEST AH,0x41 / JNZ: only "greater" asks
+            // ChaseSpeedScale; else FCOMPP (Limit - 5.0), TEST AH,0x41 / JNZ: only "greater" asks
             // the own ship's speed; otherwise Value is unchanged.
-            double const Limit = static_cast<double>(Field50) * DodgeDistance;
+            double const Limit = static_cast<double>(DodgeDistanceScale) * DodgeDistance;
             if (Limit + 5.0 < static_cast<double>(Clearance))
-                Value = static_cast<float>(static_cast<double>(Value) * FieldDc);
+                Value = static_cast<float>(static_cast<double>(Value) * ChaseSpeedScale);
             else if (Limit - 5.0 > static_cast<double>(Clearance))
                 Value = Behavior_InvokeManagerSlotD8(SelfIface, 1.0f, ThrustEquipEngine);
 

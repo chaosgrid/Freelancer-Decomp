@@ -328,12 +328,12 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
     AppendParagraph(StartingDesc);
     AppendStyle(StartingDesc, 0x9ca4);
     AppendJustify(StartingDesc, TextJustifyCenter);
-    AppendRef(StartingDesc, *ChatGetBaseName(Selection->Field_0x34));
+    AppendRef(StartingDesc, *ChatGetBaseName(Selection->BaseId));
     AppendParagraph(StartingDesc);
     AppendParagraph(StartingDesc);
 
     // 0x00560deb..0x00560e0e: NewChar::TheDB slot 1 (+0x04) with the pick's package.
-    FNewCharPackage const* const Package = NewChar::TheDB->FindPackage(Selection->Field_0x38);
+    FNewCharPackage const* const Package = NewChar::TheDB->FindPackage(Selection->PackageId);
     if (Package != nullptr)
     {
         // 0x00560e14..0x005610b7: the money caption, then the package's money through a
@@ -386,7 +386,7 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
 
     // 0x0056134f..0x0056136e: NewChar::TheDB slot 2 (+0x08) with the pick's pilot; none ->
     // FDUMP (0x100002, line 0x19d).
-    FNewCharPilot const* const Pilot = NewChar::TheDB->FindPilot(Selection->Field_0x3c);
+    FNewCharPilot const* const Pilot = NewChar::TheDB->FindPilot(Selection->PilotId);
     if (Pilot == nullptr)
     {
         FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kCharCreateCpp, 0x19d,
@@ -480,7 +480,7 @@ void PageCharacterCreate::Confirm()
     BeginLeave();
 }
 
-bool PageCharacterCreate::Slot23(unsigned Msg, unsigned A, unsigned /*B*/)
+bool PageCharacterCreate::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 {
     // LAB_00561630 (RET 0xc).
     bool bBack = false;

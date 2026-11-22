@@ -53,29 +53,29 @@ struct FServerInfo
                                     //       005aa282); PageServerSelect's address column key
     unsigned int Port;              // +0x14 0 = use Ports (005a9b3c)
     std::vector<unsigned int> Ports; // +0x18 ports joined with ',' by Connect (005a9b49..)
-    int Field_0x28;                 // +0x28 0; 1 in single player (005aa28c). TODO: meaning
+    int bAddressValid;              // +0x28 0; 1 when host/port populated (checked by FUN_005accb0)
     int Ping;                       // +0x2c -2; 0 in single player; DirectPlay round-trip ms,
                                     //       kept as the unsigned minimum (OnAddHost 005ad301);
                                     //       ServerFilter range key
     int LastResponseTime;           // +0x30 timeGetTime of the last enum reply (005ace46)
-    int Field_0x34;                 // +0x34
+    int EnumAttempts;                 // +0x34
     int ResponseCount;              // +0x38 raised by every enum reply for a known server (005ad2f7)
     unsigned char Field_0x3c;       // +0x3c
-    unsigned char Field_0x3d;       // +0x3d cleared on every copy into +0x160 (005abd81)
-    unsigned char Field_0x3e;       // +0x3e ServerFilter key (562990)
-    int Field_0x40;                 // +0x40
+    unsigned char bEnumInFlight;       // +0x3d cleared on every copy into +0x160 (005abd81)
+    unsigned char bLan;       // +0x3e ServerFilter key (562990)
+    int MissedPingCount;                 // +0x40
     std::wstring Name;              // +0x44 "MP Connect: Server %S" (005a9adc)
-    std::wstring Field_0x54;        // +0x54 L"" in single player (005aa30b)
-    std::string Field_0x64;         // +0x64
+    std::wstring Description;        // +0x54 L"" in single player (005aa30b)
+    std::string ServerSig;         // +0x64
     std::string Field_0x74;         // +0x74 "" in single player (005aa35b)
     int PlayerCount;                // +0x84 0 in single player; dwCurrentPlayers - 1 (005ace1f)
     int MaxPlayers;                 // +0x88 1 in single player; dwMaxPlayers - 1 (005ace33)
     unsigned int Version;           // +0x8c DAT_0067ecb8 in single player (005aa2ae)
     unsigned int Id;                // +0x90 key of FindServer (005abdc4) / the login history
     unsigned char bPassword;        // +0x94 PageServerSelect asks for a password (00572184)
-    unsigned char Field_0x95;       // +0x95 1
-    unsigned char Field_0x96;       // +0x96 1
-    int Field_0x98;                 // +0x98 2 in single player
+    unsigned char bAllowNewPlayers;       // +0x95 1
+    unsigned char bAllowPvp;       // +0x96 1
+    int bSessionValid;              // +0x98 0; 2 when session description populated (checked by FUN_005accb0)
 };
 
 // One account the player logged in with before, loaded from
@@ -239,20 +239,20 @@ public:
     std::wstring ServerPassword;                    // +0x130 handed to IServer::Connect
     std::vector<FServerInfo> Servers;               // +0x140 searched by FindServer
     std::vector<FServerInfo> DirectServers;         // +0x150 copied into +0x160 on reset
-    std::vector<FServerInfo> Field_0x160;           // +0x160
-    std::vector<FServerInfo> Field_0x170;           // +0x170
-    float Field_0x180;                              // +0x180 90.0f (DAT_005e64c0)
+    std::vector<FServerInfo> PendingDirectServers;           // +0x160
+    std::vector<FServerInfo> RetryDirectServers;           // +0x170
+    float ConnectTimeout;                              // +0x180 90.0f (DAT_005e64c0)
     unsigned char bConnected;                       // +0x184 set by OnConnectResponse
     std::wstring LoginName;                         // +0x188 L"SinglePlayer"
     std::wstring LoginPassword;                     // +0x198
     unsigned char bCreateAccount;                   // +0x1a8 SLoginInfo+0xc0
-    float Field_0x1ac;                              // +0x1ac 50000.0f (DAT_005e64c4)
+    float LoginTimeout;                              // +0x1ac 50000.0f (DAT_005e64c4)
     unsigned char bLoginResponse;                   // +0x1b0 set by OnLoginResponse
     unsigned char LoginStatus;                      // +0x1b1 5 at construction, 3 = accepted
     OwnerList<CCharacterSet::CharacterInfo> Characters; // +0x1b4 filled by FUN_005aa9c0
     unsigned int Field_0x1c8;                       // +0x1c8 never written by this class
     unsigned int SaveFailureCount;                  // +0x1cc FUN_005aa9c0 (.text:005aac82)
-    float Field_0x1d0;                              // +0x1d0 3000.0f (DAT_005e64c8)
+    float CharacterInfoTimeout;                              // +0x1d0 3000.0f (DAT_005e64c8)
     unsigned char bCharacterInfoArrived;            // +0x1d4
     // +0x1d8 -- a copy of every NewChar [Faction] record (0x50 bytes each, FNewCharFaction,
     // common_newchar.h), rebuilt by ReloadFactions (FUN_005aade0); element copy FUN_005af120,
@@ -260,16 +260,16 @@ public:
     // reader FUN_005ab590 never writes +0x1d8.)
     std::vector<FNewCharFaction> Factions;          // +0x1d8
     wchar_t SelectCharacterName[24];                // +0x1e8 [Login] char (FUN_005ab3e0)
-    float Field_0x218;                              // +0x218 3000.0f (DAT_005e64cc)
-    unsigned char Field_0x21c;                      // +0x21c CharacterSelect answered (005ab385)
+    float CharacterSelectTimeout;                              // +0x218 3000.0f (DAT_005e64cc)
+    unsigned char bCharacterSelectResponse;                      // +0x21c CharacterSelect answered (005ab385)
     std::string ListServerHost;                     // +0x220 "FLListServer2"
     unsigned int ListServerPort;                    // +0x230 0x708a
     CGunWrapper* Gun;                               // +0x234
-    unsigned char Field_0x238;                      // +0x238
-    unsigned int Field_0x23c;                       // +0x23c
-    unsigned char Field_0x240;                      // +0x240
+    unsigned char bServerListChanged;                      // +0x238
+    unsigned int ServerListPage;                       // +0x23c
+    unsigned char bServerListRequestPending;                      // +0x240
     FLoginHistory Logins;                           // +0x244
-    unsigned int Field_0x25c;                       // +0x25c
+    unsigned int InFlightDirectEnums;                       // +0x25c
 };
 
 // .data:0067e7b8

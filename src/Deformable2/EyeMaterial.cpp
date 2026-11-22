@@ -1423,7 +1423,7 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
 
     if (Ctx == nullptr)
         return GR_OK;
-    FUvDeformBinding* const Binding = (FUvDeformBinding*)(Ctx->Field20);
+    FUvDeformBinding* const Binding = (FUvDeformBinding*)(Ctx->MaterialContext);
     if (Binding == nullptr || Binding->Record == nullptr)
         return GR_OK;
     const FBoneRuntime* const Bone = Binding->Bone;

@@ -792,7 +792,7 @@ void NavBar::Update()
         if (PendingCharacter != nullptr)
         {
             int const Point[2] = {0, 0};
-            PendingCharacter->Slot12(0, Point);
+            PendingCharacter->OnHotspotClick(0, Point);
             PendingCharacter = nullptr;
             bCharacterPending = 0;
         }
@@ -873,7 +873,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
             if (Character != nullptr)
             {
                 int const Point[2] = {0, 0}; // FUN_00415850
-                Character->Slot12(0, Point);
+                Character->OnHotspotClick(0, Point);
                 return 1;
             }
         }
@@ -891,7 +891,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
     return 1;
 }
 
-void NavBar::Slot29(FILE* File)
+void NavBar::SaveIni(FILE* File)
 {
     // LAB_0043efd0 (RET 4).
     fprintf(File, "[NavBar]\n");
@@ -1082,7 +1082,7 @@ FNavBarButton* NavBar::AddButton(unsigned Type, int /*Unused*/, unsigned char bR
     Button->Control->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
     if (Ids == 0x196b && Type == 8)
         Button->Control->SetProperty(3, 0x1968, 0);
-    Button->Control->Field2ec = Ids;
+    Button->Control->UserData = Ids;
     if (bRoomSwitch == 0)
         Button->Control->SetProperty(0x36, 1, 0);
 
@@ -1115,9 +1115,9 @@ void NavBar::SelectRoomButton(FNavBarButton* Button)
     // fades out (FUN_00412050(1.0, 1 / duration)); the room camera released, the cursor hidden
     // and the service windows told.
     WinControl* const Control = Button->Control;
-    if ((Control->Field2ec & 0x10000) == 0)
+    if ((Control->UserData & 0x10000) == 0)
     {
-        Control->Field2ec |= 0x10000;
+        Control->UserData |= 0x10000;
         Current = Button;
         SetFadeTarget(1.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
         bFadingOut = 1;
@@ -1130,7 +1130,7 @@ void NavBar::SelectRoomButton(FNavBarButton* Button)
 
     // 0x0043fda5..0x0043ff26: the second (after the fade) clears the latch word, enters the
     // virtual room (or none) and rebuilds.
-    Control->Field2ec &= 0xffff;
+    Control->UserData &= 0xffff;
     RoomButtonInfo const* const Hotspot = Button->Hotspot;
     if (Hotspot != nullptr && Hotspot->RoomSwitch != nullptr)
         VirtualRoom.assign(Hotspot->RoomSwitch);

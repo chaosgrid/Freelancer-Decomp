@@ -73,11 +73,11 @@ void FHotspot::SendEvent(int Event, int const* Point)
     if (Owner == nullptr)
         return;
     if (Event == 1)
-        Owner->Slot10(Cookie, Point);
+        Owner->OnHotspotEnter(Cookie, Point);
     else if (Event == 2)
-        Owner->Slot11(Cookie, Point);
+        Owner->OnHotspotLeave(Cookie, Point);
     else if (Event == 3)
-        Owner->Slot12(Cookie, Point);
+        Owner->OnHotspotClick(Cookie, Point);
 }
 
 bool FindHotspotAt(int const* Point, FHotspot** OutHotspot)

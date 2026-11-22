@@ -62,7 +62,7 @@ NnDealer::NnDealer()
 
     // 0047fc8b..0047fcc6. The control pointers +0x994..+0x9f0, +0x97c and +0x9fc are not
     // written here in retail (operator_new memory); the port starts them at zero.
-    Field97c = 0;
+    ShipPackageGoodId = 0;
     WelcomeText = nullptr;
     WelcomeLine = nullptr;
     WelcomeHelp = nullptr;
@@ -87,18 +87,18 @@ NnDealer::NnDealer()
     ShipBuyProblem = nullptr;
     BackToShipDealer = nullptr;
     ShipDealerShipPrice = nullptr;
-    Field9fc = 0;
+    PlayerShipTradeInValue = 0;
 
     TradeMode = 1;      // +0x978
     bDealerMode = 1;    // +0x35c
     Inventory = nullptr; // +0x974
     Field980 = 1;
     Field984 = 0;
-    Field988 = 1;
-    Field9f4 = 1;
-    Field98c = 0;
-    Field9f8 = 0;
-    Field4e8 = 0;
+    Quantity = 1;
+    bTransferPanelHidden = 1;
+    bPreviewingShip = 0;
+    ShipHullPrice = 0;
+    ShownInfoArchId = 0;
 
     // 0047fccc..0047fcd1
     BaseFeeling = GetBaseFactionFeeling(); // FUN_00483df0
@@ -127,7 +127,7 @@ static void NnDealerMakeMultiLine(WinControl* Control)
     }
 }
 
-void NnDealer::Slot45()
+void NnDealer::CreateControls()
 {
     // FUN_00480d10 -- every position is absolute (the dealer half of the screen); where x87 keeps
     // an intermediate at extended precision across two operations, the port carries it in
@@ -545,7 +545,7 @@ void NnDealer::Slot45()
         return;
 
     // 00481e4f..00481ef5: the ship dealer's continue button.
-    Field98c = 1;
+    bPreviewingShip = 1;
     {
         float const ButtonPosition[3] = {0.645f, -0.473f, 0.0f};
         float const ButtonHalfExtents[3] = {0.134f, 0.026f, 0.0f};
@@ -647,7 +647,7 @@ void NnDealer::Update()
     bool bPartnerSelection = Inventory->bDealerMode != 0 ? Inventory->SelectedIndex != -1
                                                          : Inventory->GetSelectedItem() != nullptr;
     bool bAnySelection = bOwnSelection || bPartnerSelection; // BL
-    if (Field98c != 0)
+    if (bPreviewingShip != 0)
     {
         bAnySelection = false;
         bPartnerSelection = false;
@@ -708,15 +708,15 @@ void NnDealer::Update()
 
     // 00480304..00480380: the transfer panel appeared or went -- the quantity starts at the
     // partner's selected stack (1 without one). The partner is not null-tested.
-    if (Field9f4 != static_cast<unsigned char>(HideTransfer))
+    if (bTransferPanelHidden != static_cast<unsigned char>(HideTransfer))
     {
-        Field9f4 = static_cast<unsigned char>(HideTransfer);
-        Field988 = 1;
+        bTransferPanelHidden = static_cast<unsigned char>(HideTransfer);
+        Quantity = 1;
         EquipDesc* const PartnerItem = Inventory->GetSelectedItem();
         if (PartnerItem != nullptr)
-            Field988 = PartnerItem->Count;
-        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Field988), 0);
-        swprintf(ToolTipText, 0xff, L"%d", Field988); // PTR_DAT_005d0ec4
+            Quantity = PartnerItem->Count;
+        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Quantity), 0);
+        swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4
         QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
@@ -724,11 +724,11 @@ void NnDealer::Update()
     if (bAnySelection)
     {
         // 00480396..004803ef: the unit price, and a quantity of at least 1.
-        FormatGroupedNumber(ToolTipText, Field388, -1); // FUN_004779a0
+        FormatGroupedNumber(ToolTipText, TransferItemUnitPrice, -1); // FUN_004779a0
         TransferPriceText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
-        if (Field988 == 0)
+        if (Quantity == 0)
         {
-            Field988 = 1;
+            Quantity = 1;
             swprintf(ToolTipText, 0xff, L"%d", 1);
             QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         }
@@ -736,7 +736,7 @@ void NnDealer::Update()
         if (SelectedIndex != -1)
         {
             // 00480402..004806d0: how many can be bought / taken.
-            MaxCount = Field38c;
+            MaxCount = TransferItemMaxCount;
             float RankRequired = 0.0f; // [ESP+0x1c]
             // [ESP+0x18]: GetMaxBuyCount writes it; on the ship dealer's path retail leaves it
             // uninitialised unless a cap below sets it -- the port starts it at 0 (no message).
@@ -860,11 +860,11 @@ void NnDealer::Update()
             {
                 // 004807c0..0048081d: the slider's range, and the quantity capped by it.
                 QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(MaxCount));
-                if (Field988 > MaxCount)
+                if (Quantity > MaxCount)
                 {
-                    Field988 = MaxCount;
+                    Quantity = MaxCount;
                     QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(MaxCount), 0);
-                    swprintf(ToolTipText, 0xff, L"%d", Field988);
+                    swprintf(ToolTipText, 0xff, L"%d", Quantity);
                     QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
                 }
             }
@@ -902,7 +902,7 @@ void NnDealer::Update()
                 QuantityEdit->SetProperty(0x43, 0, 0);
                 QuantityPrompt->SetProperty(1, 1, 0);
             }
-            Archetype::Equipment* const Shown = Archetype::GetEquipment(Field390);
+            Archetype::Equipment* const Shown = Archetype::GetEquipment(TransferItemArchId);
             if (Shown != nullptr && Shown->get_class_type() == Archetype::AClassEngine &&
                 TradeMode == 2)
                 ShowErrorText(0x52d, 0);
@@ -910,26 +910,26 @@ void NnDealer::Update()
         else
         {
             // 004808d3..004809ae: the partner's item is sold -- up to its whole stack.
-            QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(Field38c));
+            QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(TransferItemMaxCount));
             if ((TradeMode == 1 || TradeMode == 3) && Inventory != nullptr)
             {
                 EquipDesc* const PartnerItem = Inventory->GetSelectedItem();
                 if (PartnerItem != nullptr && PartnerItem->bMission) // +0x18
                     ShowErrorText(0x575, 0);
             }
-            Archetype::Equipment* const Shown = Archetype::GetEquipment(Field390);
+            Archetype::Equipment* const Shown = Archetype::GetEquipment(TransferItemArchId);
             if (Shown != nullptr && Shown->get_class_type() == Archetype::AClassEngine)
                 ShowErrorText(TradeMode == 2 ? 0x52d : 0x52c, 0);
-            swprintf(ToolTipText, 0xff, L"%d", Field38c);
+            swprintf(ToolTipText, 0xff, L"%d", TransferItemMaxCount);
             TransferItemQuantity->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
-            if (Field38c > 1)
+            if (TransferItemMaxCount > 1)
                 QuantityEdit->SetProperty(0x43, 1, 8);
             else
                 QuantityEdit->SetProperty(0x43, 0, 0);
         }
 
         // 004809b4..004809e0: the total.
-        FormatGroupedNumber(ToolTipText, Field988 * Field388, -1);
+        FormatGroupedNumber(ToolTipText, Quantity * TransferItemUnitPrice, -1);
         QuantityTotalText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
@@ -946,13 +946,13 @@ void NnDealer::Update()
                                                    &Inventory->SavedLoadout); // FUN_004c6f70
         int const PartnerResale = NnLoadoutResaleValue(&Inventory->Ship.Loadout, &Inventory->Ship,
                                                        &Inventory->SavedLoadout);
-        int ShipPrice = Field9f8 - OwnResale + PartnerResale;
+        int ShipPrice = ShipHullPrice - OwnResale + PartnerResale;
         if (ShipPrice < 0) // JNS
             ShipPrice = 0;
         FormatGroupedNumber(ToolTipText, ShipPrice, 0x3c9);
         ShipDealerShipPrice->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
 
-        int const Cost = Field9f8 - Field9fc - OwnResale + PartnerResale;
+        int const Cost = ShipHullPrice - PlayerShipTradeInValue - OwnResale + PartnerResale;
         if (ShipBuyProblem != nullptr && Cost > static_cast<int>(GetPlayerCreditsRetail())) // JLE
         {
             ContinueButton->SetProperty(1, 1, 0);
@@ -971,7 +971,7 @@ void NnDealer::Update()
     }
 
     // 00480b99..00480c05: the partner just traded (+0x3b8) -- the buy / sell controls hide.
-    if (Inventory->Field3b8 != 0)
+    if (Inventory->bTradePending != 0)
     {
         BuySellTradeButton->SetProperty(1, 1, 0);
         BuyText->SetProperty(1, 1, 0);
@@ -981,18 +981,18 @@ void NnDealer::Update()
     }
 
     // 00480c0b..00480c31
-    if (Inventory->Field3c0 != 0 || Inventory->Field3b9 != 0)
+    if (Inventory->bCheckStockAfterBuy != 0 || Inventory->bCheckHardpointAfterBuy != 0)
         ErrorHelp->SetProperty(0x1e, 0, 0);
 
     // 00480c37..00480cd0: the partner's pending good no longer fits -- drop the selection when
     // it is the one selected here and nothing can be bought.
-    if (Inventory->Field3c1 == 0)
+    if (Inventory->bDeselectBoughtGoodIfEmpty == 0)
         return;
-    Inventory->Field3c1 = 0;
+    Inventory->bDeselectBoughtGoodIfEmpty = 0;
     if (SelectedIndex == -1 || TradeMode == 2)
         return;
     unsigned const SelectedGood = GetSelectedMarketGood(); // FUN_00483580
-    if (MaxCount != 0 || SelectedGood != Inventory->Field3bc)
+    if (MaxCount != 0 || SelectedGood != Inventory->PendingBuyGoodId)
         return;
     ClearSelection();
     ErrorHelp->SetProperty(0x1e, 0, 0);
@@ -1076,10 +1076,10 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (reinterpret_cast<WinControl*>(A) != QuantitySlider) // +0x9b8
             return 0;
-        Field988 = static_cast<int>(B);
-        if (Field988 < 0)
-            Field988 = 0;
-        swprintf(ToolTipText, 0xff, L"%d", Field988); // PTR_DAT_005d0ec4
+        Quantity = static_cast<int>(B);
+        if (Quantity < 0)
+            Quantity = 0;
+        swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4
         QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         return 0;
 
@@ -1095,15 +1095,15 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         int Value = 1; // the argument's slot, 1 before swscanf
         swscanf(Text, L"%d", &Value);
         if (Value < 1)
-            Field988 = 1;
-        else if (Value > Field38c)
-            Field988 = Field38c;
+            Quantity = 1;
+        else if (Value > TransferItemMaxCount)
+            Quantity = TransferItemMaxCount;
         else
-            Field988 = Value;
-        swprintf(ToolTipText, 0xff, L"%d", Field988);
+            Quantity = Value;
+        swprintf(ToolTipText, 0xff, L"%d", Quantity);
         if (_wcsicmp(Text, ToolTipText) != 0)
             QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
-        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Field988), 0);
+        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Quantity), 0);
         return 0;
     }
 
@@ -1131,7 +1131,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 NnMainButtonOnModalOpen();
                 return 1;
             }
-            if (Field98c != 0)
+            if (bPreviewingShip != 0)
                 return 1;
             BuyShip(); // FUN_00483ae0
             return 1;
@@ -1152,9 +1152,9 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     NnInventory* const Partner = Inventory;
                     EquipDesc* const Item = Partner->GetSelectedItem();
                     if (Item != nullptr && Partner->Dealer != nullptr &&
-                        Partner->Dealer->Field988 != 0)
+                        Partner->Dealer->Quantity != 0)
                     {
-                        int const Count = Partner->Dealer->Field988;
+                        int const Count = Partner->Dealer->Quantity;
                         Item->set_equipped(false);
                         if (Partner->Dealer->Ship.AddItem(Item, Count, true)) // FUN_004c64b0
                             Partner->Ship.RemoveItem(Item, Count);             // FUN_004c6430
@@ -1167,19 +1167,19 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             else if (SelectedIndex != -1)
             {
                 // 00482826..0048284a: buy.
-                Inventory->BuyFromDealer(Field988); // FUN_0047eab0
-                Inventory->Field394.clear();
+                Inventory->BuyFromDealer(Quantity); // FUN_0047eab0
+                Inventory->PendingMountHardpoint.clear();
             }
             else
             {
                 // 0048284c..00482859: sell.
-                Inventory->SellSelected(Field988); // FUN_0047eea0
+                Inventory->SellSelected(Quantity); // FUN_0047eea0
             }
 
             // 0048285e..004828a5: the quantity goes back to 1.
-            Field988 = 1;
+            Quantity = 1;
             QuantitySlider->SetProperty(0x38, 1, 0);
-            swprintf(ToolTipText, 0xff, L"%d", Field988);
+            swprintf(ToolTipText, 0xff, L"%d", Quantity);
             QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             return 1;
         }
@@ -1194,7 +1194,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (Control == ItemButton[Row])
                 Field984 = 0;
             SelectDealerRow(Row, 1); // FUN_00482120
-            Field4e0 = 0;
+            bShowShipInfoCard = 0;
             if (Inventory != nullptr)
                 Inventory->ClearSelection();
         }
@@ -1222,7 +1222,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Control == Ship.InfoText) // +0x344 "ShipView_Info"
         {
             SelectDealerRow(-1, 1);
-            Field4e0 = 1;
+            bShowShipInfoCard = 1;
         }
         return 0;
     }
@@ -1273,9 +1273,9 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
     SelectRow(Row, 1); // FUN_0047e0e0
 
     // 00482131..00482178: quantity 1 on the slider and the edit box.
-    Field988 = 1;
+    Quantity = 1;
     QuantitySlider->SetProperty(0x38, 1, 0);
-    swprintf(ToolTipText, 0xff, L"%d", Field988); // PTR_DAT_005d0ec4, into +0x508
+    swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4, into +0x508
     QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
 
     // 0048217e..004821c4: the row's item on the ship model; the flag byte reuses the first
@@ -1292,14 +1292,14 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
     // on (this dealer's weapons / equipment filters).
     if (Inventory != nullptr)
     {
-        Inventory->Field394.clear();
+        Inventory->PendingMountHardpoint.clear();
         unsigned const GoodId = GetSelectedMarketGood(); // FUN_00483580
         if (GoodId != 0 && (Mode == 0 || Mode == 2))
         {
             char const* const Hardpoint =
                 Inventory->Ship.ShipView->FindHardpointForGood(GoodId, false); // FUN_00585f20
             if (Hardpoint != nullptr)
-                Inventory->Field394.Value = StringAlloc(Hardpoint, false);
+                Inventory->PendingMountHardpoint.Value = StringAlloc(Hardpoint, false);
         }
     }
 
@@ -1317,7 +1317,7 @@ void NnDealer::BuyShip()
                                                &Inventory->SavedLoadout); // FUN_004c6f70
     int const PartnerResale = NnLoadoutResaleValue(&Inventory->Ship.Loadout, &Inventory->Ship,
                                                    &Inventory->SavedLoadout);
-    int const Cost = Field9f8 - Field9fc - OwnResale + PartnerResale;
+    int const Cost = ShipHullPrice - PlayerShipTradeInValue - OwnResale + PartnerResale;
     if (static_cast<int>(GetPlayerCreditsRetail()) < Cost) // FUN_004c4ce0, signed (JGE)
     {
         // 00483b5a..00483b67: FUN_00489e80(DAT_00671c74, 0) -- the "not_enough_money" voice.
@@ -1330,7 +1330,7 @@ void NnDealer::BuyShip()
     {
         unsigned const BaseId = GetClientLocationCurrentBase();
         ClientMarketRequestBuy(GetClientLocationBaseMarket(BaseId), BaseId,
-                               static_cast<unsigned>(Field97c), 1);
+                               static_cast<unsigned>(ShipPackageGoodId), 1);
     }
 
     // 00483b9f..00483bc1: the new loadout is the partner's (it shows the new ship); the ship
@@ -1427,7 +1427,7 @@ void NnDealer::RefreshMarketList()
         // 00482be3..00482c10: FillItemRow(&Counter, arch, filter, stock, package price, 0, 0,
         // 0, 0, the CanBuyGood byte, 0, 0, 0).
         int const Price = GetMarketPackagePrice(Entry->Info.GoodId); // FUN_0047f040
-        unsigned char const bCanBuy = static_cast<unsigned char>(Entry->Field24 & 0xffu);
+        unsigned char const bCanBuy = static_cast<unsigned char>(Entry->CanBuyFlags & 0xffu);
         bool const bRowSelected =
             FillItemRow(&Counter, ArchId, Filter, Stock, Price, 0, 0, 0, 0, bCanBuy, 0, 0, 0);
 
@@ -1446,7 +1446,7 @@ void NnDealer::RefreshMarketList()
 
     // 00482c6a..00482cdc: the row count changed -- rescale the scroll bar, keep no gap below the
     // last row, build the list again.
-    if (Counter != Field3c8)
+    if (Counter != LastRowCount)
     {
         if (InventoryScroll != nullptr)
             InventoryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Counter - 1));
@@ -1460,7 +1460,7 @@ void NnDealer::RefreshMarketList()
             if (InventoryScroll != nullptr)
                 InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
         }
-        Field3c8 = Counter;
+        LastRowCount = Counter;
         RefreshMarketList();
     }
 
@@ -1533,12 +1533,12 @@ bool NnDealer::CanBuyGood(unsigned GoodId)
 static void NnDealerSetCanBuyByte(FClientMarketGood const* Entry, bool bCanBuy)
 {
     FClientMarketGood* const Writable = const_cast<FClientMarketGood*>(Entry);
-    Writable->Field24 = (Writable->Field24 & ~0xffu) | (bCanBuy ? 1u : 0u);
+    Writable->CanBuyFlags = (Writable->CanBuyFlags & ~0xffu) | (bCanBuy ? 1u : 0u);
 }
 
 static unsigned char NnDealerCanBuyByte(FClientMarketGood const* Entry)
 {
-    return static_cast<unsigned char>(Entry->Field24 & 0xffu);
+    return static_cast<unsigned char>(Entry->CanBuyFlags & 0xffu);
 }
 
 // FUN_00482f10's 8-byte record: the entry and its index into the name buffer.
@@ -1769,19 +1769,19 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
     // min(n, min(stock, 1)).
     if (Inventory != nullptr)
     {
-        if (Inventory->Field394.Value[0] == '\0')
+        if (Inventory->PendingMountHardpoint.Value[0] == '\0')
         {
-            Inventory->Field394.clear();
+            Inventory->PendingMountHardpoint.clear();
             unsigned const Selected = GetSelectedMarketGood(); // FUN_00483580
             if (Selected != 0 && (Mode == 0 || Mode == 2))
             {
                 char const* const Hardpoint =
                     Inventory->Ship.ShipView->FindHardpointForGood(Selected, false);
                 if (Hardpoint != nullptr)
-                    Inventory->Field394.Value = StringAlloc(Hardpoint, false);
+                    Inventory->PendingMountHardpoint.Value = StringAlloc(Hardpoint, false);
             }
         }
-        if (Inventory->Field394.Value[0] != '\0')
+        if (Inventory->PendingMountHardpoint.Value[0] != '\0')
         {
             int Cap = Entry->Stock;
             if (Cap > 1)
@@ -1904,7 +1904,7 @@ int NnDealer::GetMaxBuyCount(unsigned GoodId, int* OutReason)
 void NnDealer::RestorePlayerShipView()
 {
     // FUN_00482040.
-    Field98c = 0;
+    bPreviewingShip = 0;
     if (Inventory == nullptr)
         return;
 
@@ -1916,7 +1916,7 @@ void NnDealer::RestorePlayerShipView()
 
     // 004820b4..004820d1: +0x9fc = FUN_004c6e90(partner ship arch (+0x348), 1), the value of
     // the partner's ship at this base.
-    Field9fc = NnShipResaleValue(Inventory->Ship.ShipArchId, true);
+    PlayerShipTradeInValue = NnShipResaleValue(Inventory->Ship.ShipArchId, true);
 
     // 004820d7..00482109: the partner shows this dealer's ship and loadout.
     Inventory->Ship.ShipArchId = Ship.ShipArchId;
@@ -1942,7 +1942,7 @@ void NnDealer::ShowShipPackage(unsigned GoodId)
 
     // 00483d84..00483db3: remember the package, show its hull (the hull good is not
     // null-tested) with the package's first addon list (GoodInfo +0x94).
-    Field97c = static_cast<int>(Package->Id);
+    ShipPackageGoodId = static_cast<int>(Package->Id);
     GoodInfo const* const Hull = GoodList::find_by_id(Package->HullGoodId);
     Ship.ShipArchId = Hull->ShipArchId;
     // Retail hands the GoodInfo's list itself to FUN_004c62b0; the port's GoodInfo keeps the
@@ -1956,7 +1956,7 @@ void NnDealer::ShowShipPackage(unsigned GoodId)
     // FUN_00438060(Hull->Id).
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
     if (Market != nullptr)
-        Field9f8 = static_cast<int>(ClientMarketGetPrice(Market, Hull->Id));
+        ShipHullPrice = static_cast<int>(ClientMarketGetPrice(Market, Hull->Id));
 }
 
 unsigned NnDealer::GetSelectedMarketGood()

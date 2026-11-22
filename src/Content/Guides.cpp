@@ -137,7 +137,7 @@ void FMbGotoGuide::Parse(INI_Reader* Reader)
     Destination.x = Reader->get_value_float(4);
     Range = static_cast<float>(Reader->get_value_int(7));             // FILD / FSTP float
     if (!Reader->is_value_empty(8))
-        Field_0x176 = Reader->get_value_bool(8) ? 1 : 0;
+        bStartFollowing = Reader->get_value_bool(8) ? 1 : 0;
     if (Reader->is_value_empty(9))
         return;
     if (_stricmp(Reader->get_value_string(9), "NORMAL") == 0)
@@ -571,7 +571,7 @@ bool FTradeRoute::AddFormationWaitDirective(std::list<FObjListDirective*>* Out)
     {
         if ((*It)->SpaceObjId == Ship->SpaceObjId)
             continue;
-        if (!(*It)->HasField120())                                      // FUN_06f57710
+        if (!(*It)->IsInTradeLane())                                      // FUN_06f57710
             continue;
         // Ref-holding local (FuncInfo 06fc1d5c state 1: FUN_06f28e10; state 0 the vector).
         TRefHandle<FObjListDirective> Directive;

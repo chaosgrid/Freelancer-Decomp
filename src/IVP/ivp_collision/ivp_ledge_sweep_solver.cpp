@@ -727,7 +727,7 @@ int IVP_Ledge_Sweep_Evaluator::SearchContactTimeFromContact(float Threshold, flo
 // and the asymmetry is the point:
 //
 //   >= 8 (non-moving): every one of the 21 slots is pointed at the SAME
-//        prepared frame, Source->Frame. A static object has one transform for
+//        prepared frame, Source->WorldTransform. A static object has one transform for
 //        all 21 time samples, so the solvers' lazy-fill path can never fire
 //        for it and FrameStorage stays untouched.
 //
@@ -746,12 +746,12 @@ int IVP_Ledge_Sweep_Evaluator::SearchContactTimeFromContact(float Threshold, flo
 // sizeof(IVP_U_Matrix), not sizeof(this project's own Csys) -- see the
 // header's note on the retail name collision.
 // ============================================================================
-void IVP_Sweep_Frame_Cache::Init(FIVP_Sweep_Cache_Source *Source)
+void IVP_Sweep_Frame_Cache::Init(IVP_NarrowPhaseCacheSlot *Source)
 {
     // :0635de95-:0635dea2. Object first, then Core through it -- retail
     // re-reads [ECX] at :0635dea0 rather than reusing EAX, and reads flags
     // through that re-read pointer, so the two are provably the same object.
-    this->Object = Source->Object;
+    this->Object = Source->Owner;
     this->Core = this->Object->core;
 
     // :0635dea5-:0635deb0 `SHL EAX,0x18; CMP EAX,0x8000000; JL`: the signed
@@ -762,7 +762,7 @@ void IVP_Sweep_Frame_Cache::Init(FIVP_Sweep_Cache_Source *Source)
     // found the contact (ivp_signed_byte.h).
     const int32_t MovementByte = IVP_SignedLowByte(this->Object->flags);
 
-    IVP_U_Matrix *const PreparedFrame = &Source->Frame;
+    IVP_U_Matrix *const PreparedFrame = &Source->WorldTransform;
 
     if (MovementByte < 8)
     {
@@ -785,7 +785,7 @@ void IVP_Sweep_Frame_Cache::Init(FIVP_Sweep_Cache_Source *Source)
 
     // :0635dec6/:0635dec9 and :0635deea/:0635deec -- both paths end with the
     // same store, and retail really does emit it twice.
-    this->Field_0x10 = Source->Field_0x00;
+    this->LastRefreshTick = Source->LastRefreshTick;
 }
 
 // ============================================================================
@@ -1191,7 +1191,7 @@ namespace
 // while CacheB is seeded from param_3->Source (:0635df40 `MOV ECX,[EBX+0x8]`).
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
-    const void *FeatureEdge, FIVP_Sweep_Cache_Source *SourceA, FIVP_Sweep_Ledge_Side *SideB)
+    const void *FeatureEdge, IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     // :0635df0c-:0635df34. local_5a8.
     IVP_Sweep_Frame_Cache CacheA;
@@ -1469,10 +1469,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     // both matrices are the caches' SOURCE frames (`Source + 0x1c`), not any
     // frame the solver later fills.
     IVP_U_Point WorldNormal;
-    SideB->Source->Frame.vmult(&EdgeNormal.Normal, &WorldNormal);
+    SideB->Source->WorldTransform.vmult(&EdgeNormal.Normal, &WorldNormal);
 
     IVP_U_Point LocalNormalA;
-    SideA->Source->Frame.vimult(&WorldNormal, &LocalNormalA);
+    SideA->Source->WorldTransform.vimult(&WorldNormal, &LocalNormalA);
 
     // :0635dcef-:0635dd2b. A different speed bound from pass 1's: the sum of
     // the two cores' own bounds plus 1e-10, not the context's ClosingBound.
@@ -1734,10 +1734,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     // [ESP+0]: at :0635e3d9 that is &DirectionB (pushed second, :0635e3c7), so
     // DirectionB is p_in and frame+0x2c is p_out; likewise at :0635e3f8.
     IVP_U_Point WorldDirectionB;
-    SideB->Source->Frame.vmult(&EdgeEdge.DirectionB, &WorldDirectionB);
+    SideB->Source->WorldTransform.vmult(&EdgeEdge.DirectionB, &WorldDirectionB);
 
     IVP_U_Point WorldDirectionA;
-    SideA->Source->Frame.vmult(&EdgeEdge.DirectionA, &WorldDirectionA);
+    SideA->Source->WorldTransform.vmult(&EdgeEdge.DirectionA, &WorldDirectionA);
 
     // :0635e407-:0635e40b. FUN_0628bed0(this = out, param_1, param_2) computes
     // `out = param_1 x param_2` with the products on the x87 stack and one
@@ -1974,14 +1974,14 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
 //      `this`. Passing the matrix where retail passes the enclosing object
 //      would read 0x1c bytes too early. At every call site here ECX is
 //      `Side->Source` (:0635f32a, :0635f343, :0635f34b, :0635f3c8), and
-//      FIVP_Sweep_Cache_Source::Frame is at +0x1c, so the port spells them
-//      `Source->Frame.vmult4/vmult`.
+//      IVP_NarrowPhaseCacheSlot::Frame is at +0x1c, so the port spells them
+//      `Source->WorldTransform.vmult4/vmult`.
 //      A third member of the same family sits between them and IS used here:
 //      FUN_0634d970 (:0634d970-:0634d9c7, also read in full) computes the
 //      TRANSPOSED rotation -- out.x = M00*px + M10*py + M20*pz -- i.e.
 //      vimult, again on the matrix at this+0x1c.
 //      Incidental: that all three take the object and not the matrix is real
-//      evidence for the IVP_Cache_Object reading of FIVP_Sweep_Cache_Source
+//      evidence for the IVP_Cache_Object reading of IVP_NarrowPhaseCacheSlot
 //      that this file's header deliberately declined to assert. Still not
 //      asserted here; recorded as evidence, not as a rename.
 //
@@ -2097,13 +2097,13 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     // Argument order for FUN_0628bed0 taken from which PUSH lands at [ESP+0]:
     // &Separation is pushed second (:0635f38b) so it is param_1.
     IVP_U_Point WorldVertexA;
-    SideA->Source->Frame.vmult4(&Moment.PointA, &WorldVertexA);
+    SideA->Source->WorldTransform.vmult4(&Moment.PointA, &WorldVertexA);
 
     IVP_U_Point WorldVertexB;
-    SideB->Source->Frame.vmult4(&Moment.PointB, &WorldVertexB);
+    SideB->Source->WorldTransform.vmult4(&Moment.PointB, &WorldVertexB);
 
     IVP_U_Point WorldDirectionB;
-    SideB->Source->Frame.vmult(&Moment.DirectionB, &WorldDirectionB);
+    SideB->Source->WorldTransform.vmult(&Moment.DirectionB, &WorldDirectionB);
 
     // :0635f360-:0635f3af, component by component in retail's x/y/z order.
     IVP_U_Point Separation;
@@ -2117,9 +2117,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     IVP_CalcCrossProduct(&WorldMoment, &Separation, &WorldDirectionB);
 
     // :0635f3c8-:0635f3d4. Back into B's local frame through the TRANSPOSED
-    // rotation (FUN_0634d970 == vimult on Source->Frame), then normalized in
+    // rotation (FUN_0634d970 == vimult on Source->WorldTransform), then normalized in
     // place with retail ignoring the bool return.
-    SideB->Source->Frame.vimult(&WorldMoment, &Moment.MeasureB);
+    SideB->Source->WorldTransform.vimult(&WorldMoment, &Moment.MeasureB);
     Moment.MeasureB.normize();
 
     // :0635f3d9-:0635f431. Ten pushes; from [ESP+0] outward they are
@@ -2376,7 +2376,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
 // 3369 and 3371 pass a real one.
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
-    FIVP_Sweep_Cache_Source *SourceA, FIVP_Sweep_Cache_Source *SourceB)
+    IVP_NarrowPhaseCacheSlot *SourceA, IVP_NarrowPhaseCacheSlot *SourceB)
 {
     // :0635f02c-:0635f07e. Two caches, two inline 21-iteration Csys::Csys
     // loops (:0635f038 and :0635f065). This driver spells the
@@ -2405,15 +2405,15 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
     CenterDistance.PointA.set(0.0f, 0.0f, 0.0f);
     CenterDistance.PointB.set(0.0f, 0.0f, 0.0f);
 
-    // :0635f08f-:0635f0ec. `[Source+0x4c]` is Source->Frame.vv -- Frame at
+    // :0635f08f-:0635f0ec. `[Source+0x4c]` is Source->WorldTransform.vv -- Frame at
     // +0x1c plus IVP_U_Matrix::vv at +0x30 -- i.e. each object's world-space
     // origin as the caller prepared it. The difference runs B minus A, and
     // retail normalizes it in place and ignores normize's bool return, so a
     // pair of exactly-coincident origins leaves this unnormalized rather than
     // zeroed.
-    CenterDistance.Axis.set(SourceB->Frame.vv.k[0] - SourceA->Frame.vv.k[0],
-                            SourceB->Frame.vv.k[1] - SourceA->Frame.vv.k[1],
-                            SourceB->Frame.vv.k[2] - SourceA->Frame.vv.k[2]);
+    CenterDistance.Axis.set(SourceB->WorldTransform.vv.k[0] - SourceA->WorldTransform.vv.k[0],
+                            SourceB->WorldTransform.vv.k[1] - SourceA->WorldTransform.vv.k[1],
+                            SourceB->WorldTransform.vv.k[2] - SourceA->WorldTransform.vv.k[2]);
     CenterDistance.Axis.normize();
 
     // :0635f0f1-:0635f10f.
@@ -2834,7 +2834,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
 //            reach ->core. Side A has no ledge, no points and no side record,
 //            so the dispatcher hands the object itself.
 //   param_2  the tagged feature edge on side B.
-//   param_3  a FIVP_Sweep_Cache_Source passed DIRECTLY (:0635ecb2 pushes the
+//   param_3  a IVP_NarrowPhaseCacheSlot passed DIRECTLY (:0635ecb2 pushes the
 //            parameter slot, not something read through it) -- exactly as item
 //            3377 takes its two.
 //   param_4  the FIVP_Sweep_Ledge_Side for side B.
@@ -2861,7 +2861,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
     IVP_Real_Object *ObjectA, const void *FeatureEdgeB,
-    FIVP_Sweep_Cache_Source *SourceA, FIVP_Sweep_Ledge_Side *SideB)
+    IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     // :0635ec9a-:0635ecc1 and :0635ecd0-:0635eceb. Both vector-constructor-
     // iterator calls (FUN_06273bc0 over 21 * 0x40 bytes with Csys::Csys) are
@@ -3095,17 +3095,17 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
 // IVP_RotateSlotToWorldSpace (vmult) and IVP_RotateWorldToSlotSpace (vimult),
 // and all three read their matrix at `this + 0x1c` -- so the receiver is the
 // cache source and NOT a matrix. Handing them a matrix reads 0x1c bytes early.
-// This file spells them `Source->Frame.<op>()`, which is the same three
+// This file spells them `Source->WorldTransform.<op>()`, which is the same three
 // operations on the same three matrices with one indirection fewer; the
-// equivalence is exact because FIVP_Sweep_Cache_Source::Frame is at +0x1c.
+// equivalence is exact because IVP_NarrowPhaseCacheSlot::Frame is at +0x1c.
 // (:0635fa93 appears verbatim in FUN_0634d970's own XREF list in
 // ivp_real_object.h, which is the independent confirmation that these are the
 // same functions -- and, with the +0x08/+0x1c field match, that
-// FIVP_Sweep_Cache_Source is IVP_NarrowPhaseCacheSlot. See the header.)
+// IVP_NarrowPhaseCacheSlot is IVP_NarrowPhaseCacheSlot. See the header.)
 // ============================================================================
 void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     IVP_Real_Object * /*ObjectA*/, const void *FeatureEdgeB,
-    FIVP_Sweep_Cache_Source *SourceA, FIVP_Sweep_Ledge_Side *SideB)
+    IVP_NarrowPhaseCacheSlot *SourceA, FIVP_Sweep_Ledge_Side *SideB)
 {
     // :0635f8ca-:0635f8f1 and :0635f900-:0635f91e. CacheA from param_3
     // directly (the ball side), CacheB from param_4->Source.
@@ -3163,20 +3163,20 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     // :0635fa2f. FUN_0634d8d0 on SideB->Source: B's feature vertex carried into
     // WORLD space, translation included.
     IVP_U_Point WorldVertexB;
-    SideB->Source->Frame.vmult4(&EdgeMoment.PointB, &WorldVertexB);
+    SideB->Source->WorldTransform.vmult4(&EdgeMoment.PointB, &WorldVertexB);
 
     // :0635fa44. FUN_0634d9d0 on the same receiver: the edge direction rotated
     // into world space, no translation.
     IVP_U_Point WorldDirectionB;
-    SideB->Source->Frame.vmult(&EdgeMoment.DirectionB, &WorldDirectionB);
+    SideB->Source->WorldTransform.vmult(&EdgeMoment.DirectionB, &WorldDirectionB);
 
-    // :0635fa49-:0635fa77. `[EBP+0x4c/+0x50/+0x54]` is SourceA->Frame.vv --
+    // :0635fa49-:0635fa77. `[EBP+0x4c/+0x50/+0x54]` is SourceA->WorldTransform.vv --
     // Frame at +0x1c plus IVP_U_Matrix::vv at +0x30 -- i.e. the ball's own
     // world-space origin. The difference runs (vertex - ball).
     IVP_U_Point WorldDelta;
-    WorldDelta.set(WorldVertexB.k[0] - SourceA->Frame.vv.k[0],
-                   WorldVertexB.k[1] - SourceA->Frame.vv.k[1],
-                   WorldVertexB.k[2] - SourceA->Frame.vv.k[2]);
+    WorldDelta.set(WorldVertexB.k[0] - SourceA->WorldTransform.vv.k[0],
+                   WorldVertexB.k[1] - SourceA->WorldTransform.vv.k[1],
+                   WorldVertexB.k[2] - SourceA->WorldTransform.vv.k[2]);
 
     // :0635fa7b CALL FUN_0628bed0, whose receiver is the OUTPUT and whose
     // param_1 is the argument sitting at [ESP+0]. Retail pushes
@@ -3190,7 +3190,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
 
     // :0635fa93 FUN_0634d970 (the transpose rotate, world -> B-local) then
     // :0635fa9f normize in place. This is the evaluator's +0x48.
-    SideB->Source->Frame.vimult(&WorldMoment, &EdgeMoment.MeasureB);
+    SideB->Source->WorldTransform.vimult(&WorldMoment, &EdgeMoment.MeasureB);
     EdgeMoment.MeasureB.normize();
 
     // :0635faa4-:0635faff. Threshold = Ramp + CombinedRadius as usual, but the
@@ -3349,25 +3349,7 @@ namespace
     // fixed spellings fall out: i == 0 gives +0x28/+0x2c/+0x32, i == 1 gives
     // +0x44/+0x48/+0x4e. The flat names in ivp_mindist.h and this stride are
     // the same bytes; this struct is a view, not a second declaration.
-    struct FIVP_Sweep_Mindist_Side
-    {
-        int32_t Field_0x00;              // +0x00 -- SynapseLinkDelta word + pad
-        int32_t Field_0x04;              // +0x04 -- SidePool handle
-        int32_t Field_0x08;              // +0x08 -- unread here
-        int32_t Field_0x0c;              // +0x0c -- unread here
-        IVP_Real_Object *Object;         // +0x10
-        IVP_Compact_Edge *Feature;       // +0x14 -- tagged pointer
-        int16_t Field_0x18;              // +0x18 -- unread here
-        int16_t ShapeType;               // +0x1a
-    };
-    static_assert(sizeof(FIVP_Sweep_Mindist_Side) == 0x1c,
-                  "mindist side slot must be retail's 0x1c-byte stride");
 
-    FIVP_Sweep_Mindist_Side *SweepMindistSide(IVP_Ledge_Mindist *Mindist, uint32_t Index)
-    {
-        return reinterpret_cast<FIVP_Sweep_Mindist_Side *>(
-            reinterpret_cast<char *>(Mindist) + 0x18 + Index * 0x1c);
-    }
 
     // Retail's own "this cannot happen" store, `MOV dword ptr [0x00000000],0x0`.
     // Reproduced as a null dereference so it stays exactly as loud as retail
@@ -3406,8 +3388,8 @@ void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     // the object is moving and the environment's tick counter is newer than the
     // slot's stamp) and CALLS it for the other side at :0635fd8f. Same
     // function, two spellings; this port uses the method for both.
-    FIVP_Sweep_Cache_Source *const SourceA =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectA->ResolveNarrowPhaseCacheSlot());
+    IVP_NarrowPhaseCacheSlot *const SourceA =
+        ObjectA->ResolveNarrowPhaseCacheSlot();
 
     // :0635fd74-:0635fd87. The containing ledge, recovered from the tagged
     // feature edge -- `Edge & ~0xf`, then back off (tri_index + 1) triangles.
@@ -3422,7 +3404,7 @@ void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     SideB.Points = LedgeB->GetPointArray();
     SideB.Ledge = LedgeB;
     SideB.Source =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectB->ResolveNarrowPhaseCacheSlot());
+        ObjectB->ResolveNarrowPhaseCacheSlot();
     SideB.Object = ObjectB;
 
     // :0635fda8. Cleared before dispatch, which is why every driver only ever
@@ -3456,9 +3438,9 @@ void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
 
     // :0635fe0c-:0635fe1e. Both refcounts released, ObjectA's first.
     ObjectA->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SourceA));
+        SourceA);
     ObjectB->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SideB.Source));
+        SideB.Source);
 }
 
 // ============================================================================
@@ -3492,10 +3474,10 @@ void IVP_SweepEstimate_BallVsBall(IVP_Sweep_Estimator_Context *Ctx)
     // :0635fe40-:0635fe87 and :0635fe82-:0635fec7. Two inlined copies of
     // IVP_Real_Object::ResolveNarrowPhaseCacheSlot, one per side, byte for byte
     // the shape of that method's own body.
-    FIVP_Sweep_Cache_Source *const SourceA =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectA->ResolveNarrowPhaseCacheSlot());
-    FIVP_Sweep_Cache_Source *const SourceB =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectB->ResolveNarrowPhaseCacheSlot());
+    IVP_NarrowPhaseCacheSlot *const SourceA =
+        ObjectA->ResolveNarrowPhaseCacheSlot();
+    IVP_NarrowPhaseCacheSlot *const SourceB =
+        ObjectB->ResolveNarrowPhaseCacheSlot();
 
     // :0635fece.
     Ctx->OutCode = 0;
@@ -3505,9 +3487,9 @@ void IVP_SweepEstimate_BallVsBall(IVP_Sweep_Estimator_Context *Ctx)
 
     // :0635feda-:0635fedd, an inline `DEC [Slot+4]` per side rather than a call.
     ObjectA->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SourceA));
+        SourceA);
     ObjectB->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SourceB));
+        SourceB);
 }
 
 // ============================================================================
@@ -3538,11 +3520,11 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     const uint32_t TagA = (Mindist->StateFlags >> 8) & 3;
     const uint32_t TagB = ((Mindist->StateFlags ^ 0x100) >> 8) & 3;
 
-    FIVP_Sweep_Mindist_Side *const SlotA = SweepMindistSide(Mindist, TagA);
-    FIVP_Sweep_Mindist_Side *const SlotB = SweepMindistSide(Mindist, TagB);
+    IVP_Synapse_Real *const SynapseA = &Mindist->synapse[TagA];
+    IVP_Synapse_Real *const SynapseB = &Mindist->synapse[TagB];
 
-    IVP_Real_Object *const ObjectA = SlotA->Object;
-    IVP_Compact_Edge *const FeatureA = SlotA->Feature;
+    IVP_Real_Object *const ObjectA = SynapseA->l_obj;
+    IVP_Compact_Edge *const FeatureA = SynapseA->edge;
 
     // :0635ff3c-:0635ff6b. Side A's record: ledge from the tagged edge, points
     // from the ledge, source from the object.
@@ -3552,36 +3534,36 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     SideA.Points = LedgeA->GetPointArray();
     SideA.Ledge = LedgeA;
     SideA.Source =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectA->ResolveNarrowPhaseCacheSlot());
+        ObjectA->ResolveNarrowPhaseCacheSlot();
     SideA.Object = ObjectA;
 
     // :0635ff6f-:0635ffa4. Side B's record, the same four fields. Note retail
     // reads SlotB's feature back out of its own frame spill at :0635ff6f rather
     // than from the mindist again; same value.
-    IVP_Real_Object *const ObjectB = SlotB->Object;
-    IVP_Compact_Edge *const FeatureB = SlotB->Feature;
+    IVP_Real_Object *const ObjectB = SynapseB->l_obj;
+    IVP_Compact_Edge *const FeatureB = SynapseB->edge;
     IVP_Compact_Ledge *const LedgeB = FeatureB->GetCompactLedge();
 
     FIVP_Sweep_Ledge_Side SideB;
     SideB.Points = LedgeB->GetPointArray();
     SideB.Ledge = LedgeB;
     SideB.Source =
-        reinterpret_cast<FIVP_Sweep_Cache_Source *>(ObjectB->ResolveNarrowPhaseCacheSlot());
+        ObjectB->ResolveNarrowPhaseCacheSlot();
     SideB.Object = ObjectB;
 
     // :0635ffa8.
     Ctx->OutCode = 0;
 
-    // :0635ffaf-:06360060. Two nested switches, on SlotA->ShapeType and then
-    // SlotB->ShapeType. Every combination retail does not handle is its own
+    // :0635ffaf-:06360060. Two nested switches, on SynapseA->status and then
+    // SynapseB->status. Every combination retail does not handle is its own
     // null-store trap, and there are three of them: shape tag 1 on side A
     // accepts only tag 1 on side B, and tag 2 or 3 on side A is rejected
     // outright. That asymmetry is the mindist's own normalization showing
     // through -- the lower-dimensional feature is always put on side A.
-    switch (SlotA->ShapeType)
+    switch (SynapseA->status)
     {
     case 0:
-        switch (SlotB->ShapeType)
+        switch (SynapseB->status)
         {
         case 0:
             // :0636004c-:06360060.
@@ -3602,7 +3584,7 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
         }
         break;
     case 1:
-        if (SlotB->ShapeType == 1)
+        if (SynapseB->status == 1)
         {
             // :0635ffe0-:0635fff4.
             Ctx->EstimateLedgeEdgeVsLedgeEdgeContact(FeatureA, FeatureB, &SideA, &SideB);
@@ -3621,9 +3603,9 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
 
     // :06360065-:06360077.
     ObjectA->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SideA.Source));
+        SideA.Source);
     ObjectB->ReleaseNarrowPhaseCacheSlot(
-        reinterpret_cast<struct IVP_NarrowPhaseCacheSlot *>(SideB.Source));
+        SideB.Source);
 }
 
 // ============================================================================

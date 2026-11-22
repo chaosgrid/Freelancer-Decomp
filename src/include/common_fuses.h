@@ -88,12 +88,12 @@ public:
     // (.text:062bda55 CALL [EAX+0x4]) and its result stored as the clone's action pointer; every
     // freelancer.exe override (FUN_0052a0f0 / 0052a1b0 / 0052a280 / 0052a360 / 0052a430) is
     // `new <same class>` + slot-12 copy of *this. Retail name unknown.
-    virtual FuseAction* Slot04() const = 0;
+    virtual FuseAction* Clone() const = 0;
     // Slot 2 (+0x08): pure. Called by freelancer.exe FUN_00529e10 (.text:0052a071 CALL
     // [EDX+0x8], one INI_Reader& argument, bool result) right after the action object is
     // created for its section header; every override loops read_value and calls
     // ReadFuseActionValue first. Retail name unknown.
-    virtual bool Slot08(INI_Reader& Reader) = 0;
+    virtual bool Read(INI_Reader& Reader) = 0;
 
     virtual int Load();
     virtual int UnLoad();

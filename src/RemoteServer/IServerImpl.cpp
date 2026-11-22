@@ -143,7 +143,7 @@ void IServerImpl::ActivateCruise(unsigned int PlayerId, const XActivateCruise& I
         FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->bActive = Info.bActivate;
-        TypedPacket->Field_0x05 = Info.bDisruptCruise;
+        TypedPacket->bDisruptCruise = Info.bDisruptCruise;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -188,7 +188,7 @@ void IServerImpl::GoTradelane(unsigned int PlayerId, const XGoTradelane& Info) {
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->TradelaneRing1 = Info.TradelaneRing1;
         TypedPacket->TradelaneRing2 = Info.TradelaneRing2;
-        TypedPacket->Field_0x0c = Info.Field_0x0c;
+        TypedPacket->bMidLane = Info.bMidLane;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -251,7 +251,7 @@ void IServerImpl::Login(const SLoginInfo& Info, unsigned int SessionId) {
     if (Serializer->Allocate(3, 0x01, &Packet) == 0) {
         FRpcClientLoginPacket* TypedPacket = static_cast<FRpcClientLoginPacket*>(Packet);
         std::wcscpy(TypedPacket->AccountName, Info.AccountName);
-        std::wcscpy(TypedPacket->Field_0x220, Info.Field_0xA0);
+        std::wcscpy(TypedPacket->Password, Info.Password);
         TypedPacket->CreateFlag = static_cast<unsigned char>(Info.CreateFlag);
         this->PushToServer(Packet->AsRaw());
     }
@@ -285,17 +285,17 @@ void IServerImpl::CreateNewCharacter(const SCreateCharacterInfo& Info, unsigned 
     if (Serializer->Allocate(3, FLPACKET_CLIENT_CREATENEWCHAR, &Packet) == 0) {
         wchar_t Name[64];
         std::wcsncpy(Name, Info.Name, 64);
-        const unsigned int Field_0x80 = Info.Field_0x30;
-        const unsigned int Field_0x84 = Info.Field_0x34;
-        const unsigned int Field_0x88 = Info.Field_0x38;
-        const unsigned int Field_0x8c = Info.Field_0x3c;
+        const unsigned int Field_0x80 = Info.FactionId;
+        const unsigned int Field_0x84 = Info.BaseId;
+        const unsigned int Field_0x88 = Info.PackageId;
+        const unsigned int Field_0x8c = Info.PilotId;
         Name[63] = L'\0';
         FRpcCreateNewCharacterPacket* TypedPacket = static_cast<FRpcCreateNewCharacterPacket*>(Packet);
         memcpy(TypedPacket->Name, Name, sizeof(Name));
-        TypedPacket->Field_0x80 = Field_0x80;
-        TypedPacket->Field_0x84 = Field_0x84;
-        TypedPacket->Field_0x88 = Field_0x88;
-        TypedPacket->Field_0x8c = Field_0x8c;
+        TypedPacket->FactionId = Field_0x80;
+        TypedPacket->BaseId = Field_0x84;
+        TypedPacket->PackageId = Field_0x88;
+        TypedPacket->PilotId = Field_0x8c;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -363,7 +363,7 @@ void IServerImpl::ReqEquipment(const EquipDescList& Equipment, unsigned int Sess
                 std::memset(&Record->Health, 0, 4u);
                 Record->Id = 0;
                 Record->bEquipped = 0;
-                Record->Field_0x0f = 0;
+                Record->bMission = 0;
                 Record->HardpointSize = 0;
                 Record->Hardpoint = nullptr;
             }
@@ -402,7 +402,7 @@ void IServerImpl::ReqCargo(const EquipDescList& Cargo, unsigned int SessionId) {
                 std::memset(&Record->Health, 0, 4u);
                 Record->Id = 0;
                 Record->bEquipped = 0;
-                Record->Field_0x0f = 0;
+                Record->bMission = 0;
                 Record->HardpointSize = 0;
                 Record->Hardpoint = nullptr;
             }
@@ -590,8 +590,8 @@ void IServerImpl::MissionResponse(unsigned int Arg0, unsigned long MissionId, un
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MISSIONRESPONSE, &Packet) == 0) {
         FRpcMissionResponsePacket* TypedPacket = static_cast<FRpcMissionResponsePacket*>(Packet);
-        TypedPacket->Field_0x00 = Arg0; // TODO: first argument's game meaning.
-        TypedPacket->MissionId = MissionId;
+        TypedPacket->OfferId = Arg0; // TODO: first argument's game meaning.
+        TypedPacket->OfferKind = MissionId;
         TypedPacket->bAccepted = bAccepted;
         this->PushToServer(Packet->AsRaw());
     }
@@ -690,12 +690,12 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& Info, unsigned int Session
             fstp dword ptr NarrowedTime
         }
         FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.State;
+        TypedPacket->State = Info.State;
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->Position = Info.Position;
         TypedPacket->Orientation = Info.Orientation;
         std::memcpy(&TypedPacket->UpdateTime, &NarrowedTime, sizeof(NarrowedTime));
-        std::memcpy(&TypedPacket->Field_0x28, &Info.ThrottleBits, sizeof(Info.ThrottleBits));
+        std::memcpy(&TypedPacket->Throttle, &Info.ThrottleBits, sizeof(Info.ThrottleBits));
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -704,10 +704,10 @@ void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& Info, unsi
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MUNCOLLISION, &Packet) == 0) {
         FRpcMunitionCollisionPacket* TypedPacket = static_cast<FRpcMunitionCollisionPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.ProjectileArchId;
-        TypedPacket->Field_0x04 = Info.AttackerId;
+        TypedPacket->ProjectileArchId = Info.ProjectileArchId;
+        TypedPacket->AttackerId = Info.AttackerId;
         TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Field_0x0c = Info.SubObjId;
+        TypedPacket->SubObjId = Info.SubObjId;
         std::memcpy(&TypedPacket->HitPosition.x, &Info.HitPosX, 4u);
         std::memcpy(&TypedPacket->HitPosition.y, &Info.HitPosY, 4u);
         std::memcpy(&TypedPacket->HitPosition.z, &Info.HitPosZ, 4u);
@@ -719,9 +719,9 @@ void IServerImpl::SPBadLandsObjCollision(const SSPBadLandsObjCollisionInfo& Info
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_BADLANDSOBJCOLLISION, &Packet) == 0) {
         FRpcBadlandsObjectCollisionPacket* TypedPacket = static_cast<FRpcBadlandsObjectCollisionPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x00;
+        TypedPacket->BadLandsObjId = Info.BadLandsObjId;
         TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Field_0x08 = Info.Field_0x08;
+        TypedPacket->SubObjId = Info.SubObjId;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -734,7 +734,7 @@ void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& Info, unsigned int S
         TypedPacket->TargetSubObjId = Info.TargetSubObjId;
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->SubObjId = Info.SubObjId;
-        std::memcpy(&TypedPacket->Field_0x10, &Info.DamageBits, 4u);
+        std::memcpy(&TypedPacket->Damage, &Info.DamageBits, 4u);
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -786,9 +786,9 @@ void IServerImpl::RequestEvent(int EventType, unsigned int Arg1, unsigned int Ar
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_EVENT, &Packet) == 0) {
         FRpcRequestEventPacket* TypedPacket = static_cast<FRpcRequestEventPacket*>(Packet);
         TypedPacket->EventType = static_cast<unsigned char>(EventType);
-        TypedPacket->Arg1 = Arg1;
-        TypedPacket->Arg2 = Arg2;
-        TypedPacket->Arg3 = Arg3;
+        TypedPacket->ShipId = Arg1;
+        TypedPacket->TargetId = Arg2;
+        TypedPacket->SecondId = Arg3;
         TypedPacket->Field_0x10 = static_cast<unsigned char>(Arg4);
         this->PushToServer(Packet->AsRaw());
     }
@@ -799,8 +799,8 @@ void IServerImpl::RequestCancel(int EventType, unsigned int Arg1, unsigned int A
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_CANCEL, &Packet) == 0) {
         FRpcRequestCancelPacket* TypedPacket = static_cast<FRpcRequestCancelPacket*>(Packet);
         TypedPacket->EventType = static_cast<unsigned char>(EventType);
-        TypedPacket->Arg1 = Arg1;
-        TypedPacket->Arg2 = Arg2;
+        TypedPacket->ShipId = Arg1;
+        TypedPacket->TargetId = Arg2;
         TypedPacket->Field_0x0c = static_cast<unsigned char>(Arg3);
         this->PushToServer(Packet->AsRaw());
     }
@@ -854,9 +854,9 @@ void IServerImpl::SetManeuver(unsigned int SessionId, const XSetManeuver& Info) 
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_SETMANEUVER, &Packet) == 0) {
         FRpcSetManeuverPacket* TypedPacket = static_cast<FRpcSetManeuverPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.ShipFrom;
+        TypedPacket->ShipFrom = Info.ShipFrom;
         TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Field_0x08 = Info.Flag;
+        TypedPacket->Flag = Info.Flag;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -928,7 +928,7 @@ void IServerImpl::PopUpDialog(unsigned int SessionId, unsigned int Arg1) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x1b, &Packet) == 0) {
         FRpcPopUpDialogPacket* TypedPacket = static_cast<FRpcPopUpDialogPacket*>(Packet);
-        TypedPacket->Field_0x10 = Arg1;
+        TypedPacket->Buttons = Arg1;
         this->PushToServer(Packet->AsRaw());
     }
 }

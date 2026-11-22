@@ -385,10 +385,10 @@ namespace
     // --------------------------------------------------------------------------------------
     struct GF : public IEnvironment
     {
-        bool Slot00(unsigned A, unsigned Message, unsigned B, unsigned C) override;
+        bool OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C) override;
         bool Slot01(unsigned A, unsigned B, unsigned C) override;
-        bool Slot02(unsigned A, unsigned B, unsigned long Packed) override;
-        bool Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
+        bool OnMouseMove(unsigned A, unsigned B, unsigned long Packed) override;
+        bool OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override;
         bool Slot04(unsigned A, unsigned B, unsigned C) override;
         void Slot05() override;
         void Slot06(unsigned A) override;
@@ -413,7 +413,7 @@ namespace
     // on Message - 0x100 (0x100/0x104 and 0x101/0x105 ask FUN_0044fd00 -- `XOR AL,AL / RET`,
     // always false -- and fall through; 0x102/0x103 and anything else go straight there) ends in
     // GetKeyState(VK_SHIFT), GetKeyState(VK_CONTROL), their results dropped, and true.
-    bool GF::Slot00(unsigned A, unsigned Message, unsigned B, unsigned C)
+    bool GF::OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C)
     {
         (void)A;
         (void)Message;
@@ -437,7 +437,7 @@ namespace
 
     // Slot 2 (+0x08, LAB_00437200, RET 0xc) -- a mouse move (A, B, Packed): the point unpacked
     // (FUN_00415850 zeroes it, FUN_00558d80 fills it), FUN_00558e00, and true whatever it said.
-    bool GF::Slot02(unsigned A, unsigned B, unsigned long Packed)
+    bool GF::OnMouseMove(unsigned A, unsigned B, unsigned long Packed)
     {
         (void)A;
         (void)B;
@@ -449,7 +449,7 @@ namespace
 
     // Slot 3 (+0x0c, LAB_00437230, RET 0x10) -- a mouse button (A, Message, B, Packed):
     // FUN_00558ed0(Message, point) is the answer.
-    bool GF::Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
+    bool GF::OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
     {
         (void)A;
         (void)B;

@@ -91,7 +91,7 @@ public:
     void SetTarget(unsigned int const* TargetId, float Range, float Param3);
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
-    int Field_0x17c = 0;                             // +0x17c Parse: 1, value 9. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 9 (0 = fail mission on comm expire)
     TString<0x30> TargetName;                        // +0x180 -> Op.Field_1C
     TString<0x30> ObjectName;                        // +0x1b4 -> Op.Field_5C
 };
@@ -106,7 +106,7 @@ public:
     int GetType() override;                          // 06f25080: 4
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
-    int Field_0x17c = 0;                             // +0x17c Parse: 1, value 20. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 20 (0 = fail mission on comm expire)
     TString<0x30> ObjectName;                        // +0x180 -> Op.Field_5C
 };
 
@@ -122,11 +122,11 @@ public:
     // 06f34e95, ...): Field_0C = 1 (a point), Destination, Field_50 / Field_54, Field_5C =
     // ObjectId when (ObjectId & 0x3fffffff) != 0, Field_58 = 0, Field_5A = bCruise, Field_5B
     // = bNoCruise.
-    void SetDestination(Vector const* Destination, float Field50, float Field54,
+    void SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                         unsigned int ObjectId, bool bNoCruise, bool bCruise);
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
-    int Field_0x17c = 0;                             // +0x17c Parse: 1, value 11. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 11 (0 = fail mission on comm expire)
     TString<0x30> ObjectName;                        // +0x180 -> Op.Field_5C
 };
 
@@ -154,7 +154,7 @@ public:
     void Parse(INI_Reader* Reader) override;         // 06f27400
     int GetType() override;                          // 06f250d0: 7
 
-    int Field_0x10c = 0;                             // +0x10c Parse: 1. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x10c Parse: 1 (0 = fail mission on comm expire)
     TString<0x30> TargetName;                        // +0x110 -> Op.TargetId
     pub::AI::DirectiveFollowOp Op;                   // +0x144
 };
@@ -173,7 +173,7 @@ public:
                   bool FieldA0, bool Field58);
 
     pub::AI::DirectiveGuideOp Op;                    // +0x10c
-    int Field_0x1c8 = 0;                             // +0x1c8 Parse: 1, value 19. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x1c8 Parse: 1, value 19 (0 = fail mission on comm expire)
     TString<0x30> TargetName;                        // +0x1cc -> GotoParams.Field_5C
 };
 
@@ -187,7 +187,7 @@ public:
     int GetType() override;                          // 06ee99a0: 5
 
     pub::AI::DirectiveGuideOp Op;                    // +0x10c
-    int Field_0x1c8 = 0;                             // +0x1c8 Parse: 1, value 17. TODO: meaning
+    int bNoFailOnTimeout = 0;                        // +0x1c8 Parse: 1, value 17 (0 = fail mission on comm expire)
     TString<0x30> ObjectName;                        // +0x1cc -> GotoParams.Field_1C
     TString<0x30> TargetName;                        // +0x200 -> GotoParams.Field_5C
 };
@@ -308,7 +308,7 @@ public:
     void Parse(INI_Reader* Reader) override;         // 06f27710
     int GetType() override;                          // 06f250a0: 0x13
     // FUN_06f276f0 (RET 8; callers TU37 06f06965, 06f09d90, 06f0a8cf, TU53 06f60148).
-    void SetTarget(unsigned int const* DockObjectId, unsigned int const* Field10);
+    void SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId);
 
     pub::AI::DirectiveDockOp Op;                     // +0x10c
     TString<0x30> ObjectName;                        // +0x138 -> Op.Field_1C
@@ -322,8 +322,8 @@ public:
     void Parse(INI_Reader* Reader) override;         // 06f278a0
     int GetType() override;                          // 06f250a0: 0x13 (same body as Dock's)
     // FUN_06f27870 (RET 0xc; caller TU53 06f65e7a).
-    void SetLane(unsigned int const* TradeLaneId, unsigned int Field14,
-                 unsigned int const* Field10);
+    void SetLane(unsigned int const* TradeLaneId, unsigned int OffsetBits,
+                 unsigned int const* NextRingId);
 
     pub::AI::DirectiveInstantTradelaneOp Op;         // +0x10c
 };
@@ -336,7 +336,7 @@ public:
     void Parse(INI_Reader* Reader) override;         // 06f27a40
     int GetType() override;                          // 06f25090: 0x15
     // FUN_06f27a10 (RET 0xc; caller TU53 06f60a48).
-    void SetLaunch(unsigned int const* LaunchObjectId, int Field10, int Field14);
+    void SetLaunch(unsigned int const* LaunchObjectId, int DockIndex, int TerminalType);
 
     pub::AI::DirectiveLaunchOp Op;                   // +0x10c
 };
@@ -372,15 +372,15 @@ public:
 // 7 -> +0x10c, 8/9 -> +0x1c8). GetType 5 is shared by GotoVec, Guide and GuideShip (all
 // three vtables' slot +0x14 are 06ee99a0), so the +0x17c read also lands on the Guide ops'
 // GotoParams.Field_64. These asserts pin the offsets that read depends on.
-static_assert(offsetof(FObjListGotoShip, Field_0x17c) == 0x17c, "GotoShip +0x17c");
-static_assert(offsetof(FObjListGotoSpline, Field_0x17c) == 0x17c, "GotoSpline +0x17c");
-static_assert(offsetof(FObjListGotoVec, Field_0x17c) == 0x17c, "GotoVec +0x17c");
-static_assert(offsetof(FObjListFollow, Field_0x10c) == 0x10c, "Follow +0x10c");
+static_assert(offsetof(FObjListGotoShip, bNoFailOnTimeout) == 0x17c, "GotoShip +0x17c");
+static_assert(offsetof(FObjListGotoSpline, bNoFailOnTimeout) == 0x17c, "GotoSpline +0x17c");
+static_assert(offsetof(FObjListGotoVec, bNoFailOnTimeout) == 0x17c, "GotoVec +0x17c");
+static_assert(offsetof(FObjListFollow, bNoFailOnTimeout) == 0x10c, "Follow +0x10c");
 static_assert(offsetof(FObjListGuide, Op) + offsetof(pub::AI::DirectiveGuideOp, GotoParams) +
                   offsetof(pub::AI::DirectiveGotoOp, Field_64) == 0x17c,
               "Guide +0x17c is GotoParams.Field_64");
 static_assert(offsetof(FObjListGuideShip, Op) + offsetof(pub::AI::DirectiveGuideOp, GotoParams) +
                   offsetof(pub::AI::DirectiveGotoOp, Field_64) == 0x17c,
               "GuideShip +0x17c is GotoParams.Field_64");
-static_assert(offsetof(FObjListGuide, Field_0x1c8) == 0x1c8, "Guide +0x1c8");
-static_assert(offsetof(FObjListGuideShip, Field_0x1c8) == 0x1c8, "GuideShip +0x1c8");
+static_assert(offsetof(FObjListGuide, bNoFailOnTimeout) == 0x1c8, "Guide +0x1c8");
+static_assert(offsetof(FObjListGuideShip, bNoFailOnTimeout) == 0x1c8, "GuideShip +0x1c8");

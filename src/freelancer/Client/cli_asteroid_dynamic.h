@@ -41,13 +41,13 @@ public:
     void create(Archetype::Root* Arch) override;
     // 91 +0x16c FUN_0053f330: XOR AL,AL / RET 4 (Beam's and Debris's body).
     bool find(unsigned const& Id) override;
-    // 101 +0x194 LAB_00525480 (RET 0x10): Other->Slot1a0(A, D, this, SUBOBJ_ID_NONE); then an
+    // 101 +0x194 LAB_00525480 (RET 0x10): Other->OnSurfaceCollisionHit(A, D, this, SUBOBJ_ID_NONE); then an
     // active asteroid hit by a munition ((class & 7) == 7) explodes at A and, when the shot is
     // the player's and the owner's zone is lootable, may drop loot (IServer::MineAsteroid).
-    void Slot194(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
+    void OnCollision(void const* A, void const* B, FClientGameobj* Other, void const* D) override;
     // 108 +0x1b0 LAB_005255e0 (RET 4): deactivate, collisions off, the companion's effect
     // dropped, then the explosion (process must be 2) at Pos or get_position().
-    void Slot1b0(Vector const* Pos) override;
+    void Explode(Vector const* Pos) override;
     // 111 +0x1bc LAB_005250f0 (RET 0x14): MedAsteroid's body (CliAsteroidSlot1bcBody).
     virtual unsigned short* Slot1bc(unsigned short* Out, unsigned A, unsigned B, unsigned C,
                                     unsigned D);

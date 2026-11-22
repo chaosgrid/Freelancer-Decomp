@@ -13,7 +13,7 @@ struct IMotionPath : IDAComponent
 {
     virtual GENRESULT DACOM_API Slot3Transform(float T, float* OutXform) = 0;     // 3  RET 0xC
     virtual GENRESULT DACOM_API Slot4Evaluate(float T, float* OutVec3) = 0;       // 4  RET 0xC
-    virtual GENRESULT DACOM_API Slot5(float T, float* Out) = 0;                    // 5  +0x14 quat
+    virtual GENRESULT DACOM_API Slot5Orientation(float T, float* Out) = 0;                    // 5  +0x14 quat
     virtual GENRESULT DACOM_API Slot6LookAt(float T, float* OutVec3) = 0;        // 6  +0x18 LOOK_AT
     // 7  RET 0x8 LAB_06f34670: *OutLength = inner+0x4 (FUN_06f224e0), the
     // un-normalised total arc length accumulated by FUN_06f22630; -1 when the
@@ -214,7 +214,7 @@ struct FThornEventDesc
     int PrimaryIndex;   // +0x1c the entity the event drives
     int SecondaryIndex; // +0x20
     IParamCurve* ParamCurve; // +0x24 curve, or null
-    int Field28;        // +0x28 TODO: meaning not recovered
+    int ParamCurvePeriod;        // +0x28 TODO: meaning not recovered
 };
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornEventDesc) == 0x2c,
@@ -506,9 +506,9 @@ static_assert(sizeof(void*) != 4 || sizeof(FThornFloorEventDesc) == 0x38,
 // Descriptor is the complete event packet, including type-specific trailing words.
 struct IThornComContext : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(FThornUserEventDesc* Descriptor, const char* String) = 0; // +0x0c, 25fe4; return ignored
-    virtual GENRESULT DACOM_API Slot4(FThornUserEventDesc* Descriptor, char* Buffer, unsigned int Size) = 0; // +0x10, 2b509
-    virtual unsigned int DACOM_API Slot5(FThornUserEventDesc* Descriptor) = 0; // +0x14, 2b4e1
+    virtual GENRESULT DACOM_API SetUserEventString(FThornUserEventDesc* Descriptor, const char* String) = 0; // +0x0c, 25fe4; return ignored
+    virtual GENRESULT DACOM_API GetUserEventString(FThornUserEventDesc* Descriptor, char* Buffer, unsigned int Size) = 0; // +0x10, 2b509
+    virtual unsigned int DACOM_API GetUserEventStringLength(FThornUserEventDesc* Descriptor) = 0; // +0x14, 2b4e1
 };
 
 // Six-slot borrowed load parser, retail vtable 06f5a1ec. The explicit
@@ -548,7 +548,7 @@ struct IScriptEngine : IDAComponent
     virtual GENRESULT DACOM_API Slot5Save(void* FileSystem) = 0;                   // 5  RET 0x8 save FUN_06f2aa10
     virtual unsigned long DACOM_API Slot6EntityCount() = 0;                       // 6  RET 0x4
     virtual void* DACOM_API Slot7EntityHandle(int Index) = 0;                     // 7  RET 0x8
-    virtual void* DACOM_API Slot8(int Index) = 0;                                 // 8  RET 0x8 inorder snapshot
+    virtual void* DACOM_API Slot8EntitySnapInorder(int Index) = 0;                                 // 8  RET 0x8 inorder snapshot
     virtual void* DACOM_API Slot9Entity(int Index) = 0;                           // 9  RET 0x8
     virtual GENRESULT DACOM_API Slot10GetPos(int Index, float* OutVec3) = 0;      // 10 RET 0xC
     virtual GENRESULT DACOM_API Slot11GetOrient(int Index, float* OutMat9) = 0;   // 11 RET 0xC
@@ -572,8 +572,8 @@ struct IScriptEngine : IDAComponent
     virtual GENRESULT DACOM_API Slot28(void* A, void* B) = 0;                     // 28 RET 0xC stub 0
     virtual GENRESULT DACOM_API Slot29(void* A, void* B, void* C) = 0;            // 29 RET 0x10 stub −1
     virtual GENRESULT DACOM_API Slot30(void* A, void* B, void* C) = 0;            // 30 RET 0x10 stub −1
-    virtual unsigned long DACOM_API Slot31(int Index) = 0;                        // 31 RET 0x8 userprop count
-    virtual const char* DACOM_API Slot32(int Index, int N) = 0;                   // 32 RET 0xC N-th userprop key
+    virtual unsigned long DACOM_API Slot31UserPropCount(int Index) = 0;                        // 31 RET 0x8 userprop count
+    virtual const char* DACOM_API Slot32UserPropKey(int Index, int N) = 0;                   // 32 RET 0xC N-th userprop key
     virtual GENRESULT DACOM_API Slot33UserProp(void* Handle, const char* Key,
                                                char** Out) = 0;                  // 33 RET 0x10
     virtual GENRESULT DACOM_API Slot34SetUserProp(int Index, const char* Key,

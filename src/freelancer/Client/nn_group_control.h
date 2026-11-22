@@ -15,7 +15,7 @@
 //   0 FUN_00460090 (scalar deleting dtor around FUN_00460170)
 //   9 FUN_00460550 Create           10 LAB_00460540 (JMP FUN_0059fb60, WinControl::Destroy)
 //  11 FUN_00462ba0 Update           12 LAB_00462ab0 UpdateInactive
-//  23 FUN_00462a40 Slot23           42 LAB_00462bd0 SetProperty
+//  23 FUN_00462a40 ProcessMessage           42 LAB_00462bd0 SetProperty
 // The IDataViewOwner face at +0x7c keeps WinControl's two entries.
 //
 // Layout (ctor FUN_0045fd70):
@@ -95,7 +95,7 @@ public:
     // slot 12 LAB_00462ab0
     void UpdateInactive() override;
     // slot 23 FUN_00462a40 (RET 0xc) -- 0xef01 / 0xef02
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // slot 42 LAB_00462bd0 (RET 0xc) -- 0x26, a child button clicked
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

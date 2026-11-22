@@ -914,7 +914,7 @@ namespace
         Desc.ShareMode = FILE_SHARE_READ;
         Desc.Creation = OPEN_EXISTING;
         Desc.Flags = 0x08000080;
-        Desc.Field30 = 0xffffffff;
+        Desc.FindHandle = 0xffffffff;
         return Desc;
     }
 
@@ -1302,7 +1302,7 @@ namespace
                 Source->AddRef();
             }
             FFileSystemDesc Desc = MakeTextureDescriptor(Name);
-            Desc.Field30 = FindHandle;
+            Desc.FindHandle = FindHandle;
             File = FileSystem->OpenByDesc(&Desc);
             if (File != -1)
             {
@@ -1536,7 +1536,7 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* Out
                 if (FindData.cFileName[0] != '.')
                 {
                     FFileSystemDesc Desc = MakeTextureDescriptor(FindData.cFileName);
-                    Desc.Field30 = (unsigned long)FindHandle;
+                    Desc.FindHandle = (unsigned long)FindHandle;
                     FTextureEntry* Entry;
                     const GENRESULT Result = LoadTextureRecord(Source, &Desc, &Entry, false);
                     if (Result >= 0)
@@ -1672,7 +1672,7 @@ GENRESULT DACOM_API FTextureLibrary::FindTextureByCrc(void* Query, void** OutTex
 {
     // LAB_06ec2810 RET 0xC: CRC at Query+4 → map this+0x54 (FUN_06ecaa00).
     // Hit: FUN_06ebe560(tex) then *OutTex = node+0x10. Miss: EAX=-1.
-    const unsigned long Crc = *(unsigned long*)((unsigned char*)Query + 4);
+    const unsigned long Crc = static_cast<const FTextureQuery*>(Query)->Crc;
     FTextureEntry* Entry = FindEntryByCrc(Crc);
     if (Entry == nullptr)
         return GR_GENERIC;

@@ -50,8 +50,8 @@ struct FEngineLight
     virtual bool Enable();
     virtual void Disable();
 
-    unsigned Field04;     // +0x04 intrusive light-list Next (retail DAT_006164e0 = list head)
-    unsigned Field08;     // +0x08 intrusive light-list Prev (retail DAT_006164e4 = list tail,
+    unsigned RegListNext;     // +0x04 intrusive light-list Next (retail DAT_006164e0 = list head)
+    unsigned RegListPrev;     // +0x08 intrusive light-list Prev (retail DAT_006164e4 = list tail,
                            // DAT_006164e8 = count). The list-insert routine that actually links a
                            // light in (setting Flags bit 4) is a different, not yet ported
                            // function; this batch only ports the unlink side (dtor / Unregister),
@@ -105,7 +105,7 @@ bool EngineLightRegister(FEngineLight* Light);
 // FUN_00410e20 — vtable slot 2 ("Unregister"): drop the enabled bit and, if linked into the
 // global light list, unlink it and tell the pipeline to drop the light (slot 41). Distinct from
 // EngineLightDestroy: this clears Flags bit 3 (enabled), the destructor clears bit 2
-// (registered). Nothing currently sets bit 4 (see FEngineLight::Field04 above), so the unlink
+// (registered). Nothing currently sets bit 4 (see FEngineLight::RegListNext above), so the unlink
 // branch is presently dead, same as in retail before the light is ever list-inserted.
 void EngineLightUnregister(FEngineLight* Light);
 // FUN_00410ec0 — the PushLightUpdate tail every setter below already runs inline; exposed
@@ -365,9 +365,9 @@ struct FGameLight : FEngineLight
     FGameLightAnimSlot Anim;    // +0xD4
     unsigned EngineIndex;       // +0xEC  -1 none
     float LocalXform[12];       // +0xF0
-    float Field120;             // +0x120 velocity/offset
-    float Field124;             // +0x124
-    float Field128;             // +0x128
+    float VelocityX;             // +0x120 velocity/offset
+    float VelocityY;             // +0x124
+    float VelocityZ;             // +0x128
 };
 
 static_assert(offsetof(FGameLight, RefCount) == 0xD0, "GameLight RefCount +0xD0");

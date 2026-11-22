@@ -4664,10 +4664,10 @@ bool CPlayerGroup::DelMember(unsigned int PlayerId) {
     g_pClientInterface->SendServerMiscObjUpdateMission(PlayerId, 0, 0);    // .text:06d5ba50
 
     FServerSetMissionObjectivesInfo NoObjectives;                          // .text:06d5ba56
-    NoObjectives.Field_0x00 = 0;                                           // .text:06d5ba7b
+    NoObjectives.MissionId = 0;                                           // .text:06d5ba7b
     NoObjectives.Entries = nullptr;                                        // .text:06d5ba87
     NoObjectives.Count = 0;                                                // .text:06d5ba7f
-    NoObjectives.Field_0x3c = 0;                                           // .text:06d5ba83
+    NoObjectives.MissionType = 0;                                           // .text:06d5ba83
     g_pClientInterface->SendServerSetMissionObjectives(PlayerId, NoObjectives); // .text:06d5ba96
 
     Players.SendGroupID(PlayerId, 0);                                      // .text:06d5baa7
@@ -6230,7 +6230,7 @@ bool StarSystem::activate_object(GameObject* Obj, bool bOn, unsigned int Index)
     FPayloadServerActivateObject Rec;
     Rec.ObjectId = Obj->get_id();
     Rec.bActivate = static_cast<unsigned char>(bOn);
-    Rec.Field_0x08 = Index;
+    Rec.ActivateParam = Index;
 
     // .text:06d0d928 .. 06d0d971 -- every player node; FUN_06cf73d0 on node+8
     // only when there is no solar, IClient +0xe0 (SendServerActivateObject) with node+0x40.
@@ -6258,8 +6258,8 @@ void StarSystem::spawn_mined_loot(Vector const& Pos, unsigned int ContainerArchI
     Rec.ContentsHitPts = 0.0f;
     Rec.Count = 0;
     Rec.MarkForPlayer = 0u;
-    Rec.Field_0x1c = 0u;
-    Rec.Field_0x68 = 1;
+    Rec.NameId = 0u;
+    Rec.bCanAiTractor = 1;
     Rec.bMission = 0;
 
     // .text:06d0d9e2 .. 06d0da05 -- CFLIDMaker::AllocateObjectID inlined, taken
@@ -6418,21 +6418,21 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
     // constructor's {0, 0, SUBOBJ_ID_NONE, 0} is overwritten field by field
     // with {loot id, ship id, TractorId, (ushort)Take}.
     FPayloadServerItemTractored Tractored;
-    Tractored.Field_0x00 = 0u;
-    Tractored.Field_0x04 = 0u;
-    Tractored.Field_0x08 = SUBOBJ_ID_NONE;
-    Tractored.Field_0x0a = 0;
-    Tractored.Field_0x00 = LootObj->get_id();
-    Tractored.Field_0x04 = Ship->get_id();
-    Tractored.Field_0x08 = TractorId;
-    Tractored.Field_0x0a = static_cast<unsigned short>(Take);
+    Tractored.LootId = 0u;
+    Tractored.ShipId = 0u;
+    Tractored.TractorEquipId = SUBOBJ_ID_NONE;
+    Tractored.UnitsTaken = 0;
+    Tractored.LootId = LootObj->get_id();
+    Tractored.ShipId = Ship->get_id();
+    Tractored.TractorEquipId = TractorId;
+    Tractored.UnitsTaken = static_cast<unsigned short>(Take);
 
     // .text:06d0eec5 .. 06d0ef09 -- every player node that sees the ship
     // (FUN_06cf7370): IClient +0x100 (SendServerItemTractored) with node+0x40.
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
          Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Tractored.Field_0x04))
+        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Tractored.ShipId))
             continue;
         ::g_pClientInterface->SendServerItemTractored(Node->View.PlayerId, Tractored);
     }
@@ -6531,16 +6531,16 @@ void StarSystem::use_item(GameObject* Obj, unsigned short EquipId, int Count)
 
     // .text:06d0f05c .. 06d0f073 -- USE_ITEM {get_id() again, EquipId, (ushort)Count}.
     FPayloadServerUseItem Rec;
-    Rec.Field_0x00 = Obj->get_id();
-    Rec.Field_0x04 = EquipId;
-    Rec.Field_0x06 = static_cast<unsigned short>(Count);
+    Rec.ObjectId = Obj->get_id();
+    Rec.EquipId = EquipId;
+    Rec.Count = static_cast<unsigned short>(Count);
 
     // .text:06d0f06b .. 06d0f0ad -- every player node that sees the object
     // (FUN_06cf7370): IClient +0x104 (SendServerUseItem) with node+0x40.
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
          Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Rec.Field_0x00))
+        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Rec.ObjectId))
             continue;
         ::g_pClientInterface->SendServerUseItem(Node->View.PlayerId, Rec);
     }
@@ -6577,9 +6577,9 @@ void StarSystem::sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int Sessio
     Rec.ObjectId = Info.ObjectId;
     Rec.Orientation = Info.Orientation;
     Rec.Position = Info.Position;
-    Rec.Field_0x20 = static_cast<float>(Info.Timestamp);
-    std::memcpy(&Rec.Field_0x24, &Info.ThrottleBits, sizeof(Rec.Field_0x24));
-    Rec.Field_0x28 = Info.State;
+    Rec.Timestamp = static_cast<float>(Info.Timestamp);
+    std::memcpy(&Rec.Throttle, &Info.ThrottleBits, sizeof(Rec.Throttle));
+    Rec.State = Info.State;
 
     // .text:06d0bc69 .. 06d0bc99 -- every player node but the sender's
     // (node+0x40 == SessionId skipped): FUN_06cf65b0 on the view at node+8.
@@ -7072,7 +7072,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     Server_QuatToMatrix(Parms.Orient, Req.Orientation);            // DAT_06d8da08 vt +0x54, REP MOVSD
 
     // .text:06d0a3b3 .. 06d0a453
-    Parms.VisitValue = Req.Field_0xb4;
+    Parms.VisitValue = Req.VisitValue;
     Parms.DockingCount = Req.DockingBaseId;                        // +0x0c -> +0x5c
     Parms.DockWithBaseId = Req.DockingBaseId;                      //       -> +0xe0
     Parms.VibeId = static_cast<unsigned int>(Req.VibeGroupId);     // +0x10 -> +0x60
@@ -7091,9 +7091,9 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     // Parms.Equipment is still empty here, so VC6's operator= takes its
     // reallocating branch for a non-empty source and does nothing for an
     // empty one. Loadout::Get's result is not tested.
-    if (Req.Field_0x6c != 0u)
+    if (Req.LoadoutId != 0u)
     {
-        Loadout::Map const* const Map = Loadout::Get(Req.Field_0x6c);
+        Loadout::Map const* const Map = Loadout::Get(Req.LoadoutId);
         int const Count = static_cast<int>(Map->Items.size());
         if (Count > 0)
         {
@@ -7117,14 +7117,14 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     Parms.ArchGroupDescs = Req.CollisionGroups;
 
     // .text:06d0a50c .. 06d0a537
-    Parms.NicknameSrc = Req.Field_0xb8;                            // +0xb8
+    Parms.NicknameSrc = Req.NicknameSrc;                            // +0xb8
     Parms.bDestructible = 1u;                                      // +0xc4
-    Parms.bDynamic = Req.Field_0xac;                               // +0xc5
+    Parms.bDynamic = Req.bDynamic;                               // +0xc5
     Cs->init(Parms);
 
     // .text:06d0a53d .. 06d0a54f
-    if ((Req.Field_0xbc & 0x3fffffffu) != 0u)
-        Wrapper->mark_for_player(Req.Field_0xbc, 1);
+    if ((Req.MarkPlayerId & 0x3fffffffu) != 0u)
+        Wrapper->mark_for_player(Req.MarkPlayerId, 1);
 
     Wrapper->enter_system(this, nullptr);                          // .text:06d0a55f vt +0x170
     Wrapper->check_fuses();                                        // .text:06d0a569 vt +0x1bc
@@ -7253,9 +7253,9 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         // .text:06d0abdf .. 06d0abff -- vector<EquipDesc>::operator= from the
         // loadout's items (see create_solar: the destination is empty, so only
         // the reallocating branch or nothing). No test on Loadout::Get.
-        if (Copy.Field_0x6c != 0u)
+        if (Copy.LoadoutId != 0u)
         {
-            Loadout::Map const* const Map = Loadout::Get(Copy.Field_0x6c);
+            Loadout::Map const* const Map = Loadout::Get(Copy.LoadoutId);
             int const Count = static_cast<int>(Map->Items.size());
             if (Count > 0)
             {
@@ -7278,7 +7278,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         Parms.ArchGroupDescs = Copy.CollisionGroups;
 
         // .text:06d0ac94 .. 06d0acbd
-        Parms.GroupNameId = Copy.Field_0xb0;                       // +0xb0 -> +0xec
+        Parms.GroupNameId = Copy.GroupNameId;                       // +0xb0 -> +0xec
         Parms.DockingCount = Copy.DockingBaseId;                   // +0x0c -> +0x5c
         Cs->init(Parms);                                           // vt +0x10c
 
@@ -7487,7 +7487,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 // +0x04/+0x08 come back from the two Reputation calls; +0x0c is
                 // never written (stack residue in retail, zeroed here).
                 FServerSetReputationInfo Rep;
-                Rep.Field_0x0c = 0u;
+                Rep.Rank = 0u;
                 Rep.Relations = nullptr;
                 Rep.RelationCount = 0;
                 Rep.DisplayName[0] = L'\0';
@@ -7496,7 +7496,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 ::Reputation::Vibe::AttitudeTowards(Rep.VibeHandle, PlayerRep,
                                                     Rep.Attitude);
                 // .text:06d08069  GetAffiliation(&Rep+0, &Rep+8, false)
-                ::Reputation::Vibe::GetAffiliation(Rep.VibeHandle, Rep.Field_0x08,
+                ::Reputation::Vibe::GetAffiliation(Rep.VibeHandle, Rep.Affiliation,
                                                    false);
                 // .text:06d08083  CALL [EDX + 0x108] -- IClient::SendServerSetReputation.
                 ::g_pClientInterface->SendServerSetReputation(SessionId, Rep);
@@ -7548,7 +7548,7 @@ void StarSystem::add_player(unsigned int SessionId)
                         Activate.Pad_0x05[0] = 0;
                         Activate.Pad_0x05[1] = 0;
                         Activate.Pad_0x05[2] = 0;
-                        Activate.Field_0x08 = Index;
+                        Activate.ActivateParam = Index;
                         ::g_pClientInterface->SendServerActivateObject(SessionId, Activate);
                     }
                 }
@@ -8141,7 +8141,7 @@ void SystemPlayerView_SendObjectUpdate(Observer* View, FCommonUpdateObjectInfo c
             ::g_pClientInterface->SendCommonUpdateObject(View->PlayerId, *Rec);
 
         Tracked->Simulation.RemoteUpdate(Rec->Position, Rec->Orientation,
-                                         static_cast<double>(Rec->Field_0x20));
+                                         static_cast<double>(Rec->Timestamp));
         return;
     }
 }
@@ -8588,7 +8588,7 @@ void SystemPlayerView_CreateSolarForPlayer(Observer* View, CSolarCreateInfo* Inf
 {
     if (View->bShipGone != 0)
         return;
-    if (!SystemPlayerView_ShouldBeVisible(View, Obj) && Info->Field_0xac == 0)
+    if (!SystemPlayerView_ShouldBeVisible(View, Obj) && Info->bDynamic == 0)
         return;
     g_pClientInterface->SendServerCreateSolar(View->PlayerId, *Info);
 }
@@ -9360,11 +9360,11 @@ void StarSystem::create_loot(unsigned int SourceObjId, int Mode, FLootRecord con
             Parms.AngularVelocity = Record->AngularVelocity;   // .text:06d08c7f .. 06d08cac  +0x4c
             Parms.OwnerId = SourceObjId;                       // .text:06d08c91 / 06d08c98  +0x5c
             Parms.Units = static_cast<unsigned int>(Record->Count); // .text:06d08c9f / 06d08cb6  +0x68
-            Parms.NameId = static_cast<int>(Record->Field_0x1c);    // .text:06d08ca9 / 06d08cc0  +0x60
+            Parms.NameId = static_cast<int>(Record->NameId);    // .text:06d08ca9 / 06d08cc0  +0x60
             Parms.ContentsArch = Record->ContentsArch;         // .text:06d08cb3 / 06d08cca  +0x64
             Parms.bTemporary = Record->bMission != 0;          // .text:06d08cbd / 06d08cd4  +0x71 <- rec +0x69
             Parms.ContentsHitPts = Record->ContentsHitPts;     // .text:06d08cc7 / 06d08cdb  +0x6c
-            Parms.bCanAiTractor = Record->Field_0x68 != 0;     // .text:06d08cd1 / 06d08ce6  +0x70 <- rec +0x68
+            Parms.bCanAiTractor = Record->bCanAiTractor != 0;     // .text:06d08cd1 / 06d08ce6  +0x70 <- rec +0x68
 
             // .text:06d08ced .. 06d08cf2  CALL [EDX + 0xa0] -- CLoot::init.
             LootObject->init(Parms);
@@ -9515,8 +9515,8 @@ void StarSystem::create_mine(FServerLaunchRecord const& Rec)
     Info.Position = Parms.Pos;                                      // .text:06d09166 .. 06d09199
     Server_MatrixToQuat(Info.Orientation, Parms.Orient);            // .text:06d09183 .. 06d091f1
     Info.Velocity = Parms.Velocity;                                 // .text:06d091cc .. 06d0920e
-    Info.Field_0x38 = Parms.AngularVelocity;                        // .text:06d091ea .. 06d09228
-    Info.Field_0x44 = 0u;                                           // .text:06d0916d
+    Info.AngularVelocity = Parms.AngularVelocity;                        // .text:06d091ea .. 06d09228
+    Info.OwnerPlayer = 0u;                                           // .text:06d0916d
 
     // .text:06d09225 .. 06d0924a -- every player view: FUN_06cf6d60.
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
@@ -9597,8 +9597,8 @@ void StarSystem::create_counter_measure(FServerLaunchRecord const& Rec)
     Info.Position = Parms.Pos;
     Server_MatrixToQuat(Info.Orientation, Parms.Orient);
     Info.Velocity = Parms.Velocity;
-    Info.Field_0x38 = Parms.AngularVelocity;
-    Info.Field_0x44 = 0u;
+    Info.AngularVelocity = Parms.AngularVelocity;
+    Info.OwnerPlayer = 0u;
 
     // Every player view: FUN_06cf6bc0.
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
@@ -9686,7 +9686,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
     Info.TargetSubObjId = Rec.TargetSubId;                          // .text:06d09900 / 06d09913  +0x24
     Info.Pad26 = 0;
     Info.ArchetypeNickname = Arch->get_id();                        // .text:06d09884 .. 06d098a0  +0x28
-    Info.Field_0x2c = 0u;                                           // .text:06d098b6  +0x2c
+    Info.OwnerPlayer = 0u;                                           // .text:06d098b6  +0x2c
     Info.OwnerId = Rec.OwnerId;                                     // .text:06d098f9 / 06d0990b  +0x30
     Info.SubObjId = Rec.EquipId;                                    // .text:06d0990f / 06d0991f  +0x34
     Info.Pad36 = 0;
@@ -9718,7 +9718,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
                 FBehaviorManagerEvent MissileEvent;
                 MissileEvent.Type = 6;
                 MissileEvent.Data = MissileBlock;
-                Behavior->Slot00(&MissileEvent);
+                Behavior->OnEvent(&MissileEvent);
             }
         }
     }
@@ -9849,7 +9849,7 @@ void StarSystem::badlands_collision(SSPBadLandsObjCollisionInfo const& Info)
         return;
     if (Obj->is_invincible())
         return;
-    Obj->destroy(1, Info.Field_0x00);
+    Obj->destroy(1, Info.BadLandsObjId);
 }
 
 // FUN_06d0cd60 (.text:06d0cd60 .. .text:06d0ce40, RET 8). PORTED 2026-09-24
@@ -10231,7 +10231,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
         FBehaviorManagerEvent LeftEvent;
         LeftEvent.Type = 3;
         LeftEvent.Data = LeftBlock;
-        Behavior->Slot00(&LeftEvent);
+        Behavior->OnEvent(&LeftEvent);
     }
 
     // .text:06d0ca48 .. 06d0ca85 -- controller event 0x11.
@@ -10325,8 +10325,8 @@ void StarSystem::arrive_ship(GameObject* Obj, GameObject* JumpObj, Vector const&
 
     // .text:06d0ccb2 .. 06d0cd17 -- the SYSTEM_SWITCH_IN record.
     FPayloadServerSystemSwitchIn Record;
-    Record.Field_0x00 = Obj->get_id();                              // .text:06d0ccb6
-    Record.Field_0x04 = Bits;                                       // .text:06d0ccd0
+    Record.ShipId = Obj->get_id();                              // .text:06d0ccb6
+    Record.JumpObjTypeBits = Bits;                                       // .text:06d0ccd0
     Record.Position = Pos;                                          // .text:06d0ccb9 .. 06d0ccd8
     Server_MatrixToQuat(Record.Orientation, Orient);                // .text:06d0ccc9 .. 06d0ccf1
 
@@ -10530,14 +10530,14 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
         FBehaviorManagerEvent LaneEvent;
         LaneEvent.Type = 4;
         LaneEvent.Data = &Payload;
-        Behavior->Slot00(&LaneEvent);
+        Behavior->OnEvent(&LaneEvent);
     }
 
     XGoTradelane Record = {};
     Record.ObjectId = ShipId;
     Record.TradelaneRing1 = EntranceId;
     Record.TradelaneRing2 = ExitId;
-    Record.Field_0x0c = bFastExit;
+    Record.bMidLane = bFastExit;
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
@@ -10622,7 +10622,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
         FBehaviorManagerEvent LaneEvent;
         LaneEvent.Type = 4;
         LaneEvent.Data = &Payload;
-        Behavior->Slot00(&LaneEvent);
+        Behavior->OnEvent(&LaneEvent);
     }
 
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);

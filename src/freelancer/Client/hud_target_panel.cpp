@@ -194,7 +194,7 @@ namespace
         return sqrtf(Dz * Dz + Dy * Dy + Dx * Dx);
     }
 
-    // FUN_004e45b0 (cdecl, the IHardpoint::EnumerateHardpoints callback of Slot16): push a copy
+    // FUN_004e45b0 (cdecl, the IHardpoint::EnumerateHardpoints callback of OnViewObjectChanged): push a copy
     // of the hardpoint name onto HUD_Target +0x57c (FUN_004e5ab0 insert at end).
     void __cdecl CollectHardpointName(char const* Name, void* Context)
     {
@@ -467,7 +467,7 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     // +0x500..+0x520, +0x648 and +0x64c are zeroed here (the init list); +0x524 is left alone
     // (Create below sets it). Retail never writes +0x58c/+0x590, the sweep block, the trail
     // count or +0x634..+0x644 in the ctor; the init list zeroes them for determinism --
-    // Create, Slot16 and DrawScanSweep write each before it is read.
+    // Create, OnViewObjectChanged and DrawScanSweep write each before it is read.
 
     HUDItem::Name = "Target";
     // 0x004e0a3b: the direct call FUN_004e0ee0(0, 0) -- before the Win3D name is set.
@@ -636,7 +636,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
                                  0.9f, 0, 1, 0x574, 1);
 
     // 0x004e1775: HUDItem slot 13(1), then the sub-target arrows and the trade button hidden.
-    Slot13(true);
+    HideExpandedControls(true);
     PreviousButton->SetProperty(1, 1, 0);
     NextButton->SetProperty(1, 1, 0);
     TradeButton->SetProperty(1, 1, 0);
@@ -666,7 +666,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
 // HUDItem face
 // =============================================================================================
 
-void HudTarget::Slot12()
+void HudTarget::ToggleExpanded()
 {
     // FUN_004e2fe0: nothing while either animation runs.
     if (ButtonMover::IsActive() || ButtonScaler::IsActive())
@@ -702,13 +702,13 @@ void HudTarget::Slot12()
 
     // Closing: hide the panel controls, shrink the view panel 1.0 -> 0.1, hide the formation
     // button's flags.
-    Slot13(true);
+    HideExpandedControls(true);
     ButtonScaler::Start(kAnimSeconds);
     ButtonScaler::AddButton(ViewPanel, kOne, kScaleSmall);
     ClearFlagBits(FormationButton);
 }
 
-void HudTarget::Slot13(bool bHide)
+void HudTarget::HideExpandedControls(bool bHide)
 {
     // FUN_004e1930.
     uintptr_t const Hide = bHide ? 1 : 0;
@@ -722,7 +722,7 @@ void HudTarget::Slot13(bool bHide)
     TradeButton->SetProperty(1, Hide, 0);
 }
 
-void HudTarget::Slot14()
+void HudTarget::DrawViewObject()
 {
     // FUN_004e3c90 -- the target view, drawn by HudTargetBase::Draw right after ViewPanel.
     IObjRW* const View = WatchedObjRw(ViewObject);
@@ -831,7 +831,7 @@ void HudTarget::Slot14()
     SubTargetFlash.Draw(Win3DGetCamera(), Screen);
 }
 
-void HudTarget::Slot15()
+void HudTarget::UpdateLabels()
 {
     // FUN_004e3f80 -- the target / sub-target name labels.
     if (ShipName == nullptr || SubtargetName == nullptr)
@@ -1004,7 +1004,7 @@ void HudTarget::Slot15()
     }
 }
 
-void HudTarget::Slot16()
+void HudTarget::OnViewObjectChanged()
 {
     // FUN_004e4690 -- the view object changed.
     SubTargetFlash.SubId = SUBOBJ_ID_NONE;
@@ -1013,7 +1013,7 @@ void HudTarget::Slot16()
     Win3D* const Scanner = Win3DFindByName("NN_Scanner");
     if (Scanner != nullptr)
     {
-        Scanner->Slot23(0xef02, 0, 0);
+        Scanner->ProcessMessage(0xef02, 0, 0);
     }
 
     IObjRW* const View = WatchedObjRw(ViewObject);
@@ -1099,7 +1099,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
-            Slot12();
+            ToggleExpanded();
             return 1;
         }
         IObjRW* const View = WatchedObjRw(ViewObject);
@@ -1116,7 +1116,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 {
                     SelectPreviousSubTarget();
                 }
-                Slot15();
+                UpdateLabels();
                 SubtargetName->SetProperty(0x50, 1, 0x14);
                 return 1;
             }
@@ -1189,7 +1189,7 @@ void HudTarget::Update()
         unsigned char const bSessionExpanded = TestGameSessionFlags(1) ? 1 : 0;
         if (bSessionExpanded != bExpanded)
         {
-            Slot12();
+            ToggleExpanded();
         }
     }
 
@@ -1388,7 +1388,7 @@ void HudTarget::Update()
         SubTargetFlash.Update(static_cast<float>(GetClientFrameTimeCapped()), Sub);
         if (bExpanded != 0 && bChanged)
         {
-            Slot15();
+            UpdateLabels();
             SubtargetName->SetProperty(0x50, 1, 0x14);
         }
         UpdateButtons(true);
@@ -1437,7 +1437,7 @@ void HudTarget::OnMoveFinished()
     {
         // The slide ended: show the panel controls, hide the toggle and the minimized frame,
         // grow the view panel 0.1 -> 1.0.
-        Slot13(false);
+        HideExpandedControls(false);
         ClearFlagBits(ToggleButton);
         ClearFlagBits(MinimizedFrame);
         ButtonScaler::Start(kAnimSeconds);
@@ -1496,7 +1496,7 @@ void HudTarget::OnScaleFinished()
         {
             ClearFlagBits(ToggleButton);
             ClearFlagBits(MinimizedFrame);
-            Slot15();
+            UpdateLabels();
             SetFlagBits(RankText);
             SetFlagBits(PreviousButton);
             SetFlagBits(NextButton);
@@ -1634,7 +1634,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
             OpenScanner();
             return true;
         }
-        Scanner->Slot23(0xef02, 0, 0);
+        Scanner->ProcessMessage(0xef02, 0, 0);
         return true;
     }
 
@@ -1646,20 +1646,20 @@ bool HudTarget::OnEvent(unsigned MsgId)
         }
         if (Mode == 1)
         {
-            Slot15();
+            UpdateLabels();
         }
         LabelRefreshTimer = kOne;
         return false;
 
     case 0x21:
         SelectNextSubTarget();
-        Slot15();
+        UpdateLabels();
         SubtargetName->SetProperty(0x50, 1, 0x14);
         return true;
 
     case 0x22:
         SelectPreviousSubTarget();
-        Slot15();
+        UpdateLabels();
         SubtargetName->SetProperty(0x50, 1, 0x14);
         return true;
 
@@ -1667,7 +1667,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         Mode = 0;
         if (bExpanded == 0)
         {
-            Slot12();
+            ToggleExpanded();
         }
         return true;
 
@@ -1675,21 +1675,21 @@ bool HudTarget::OnEvent(unsigned MsgId)
         Mode = 2;
         if (bExpanded == 0)
         {
-            Slot12();
+            ToggleExpanded();
         }
         return true;
 
     case 0x6d:
     case 0x5f:
-        // Jump-table entries into the Slot12 calls of 0x54 / 0x59 (LAB_004e2bdb / 0x004e2c0a).
-        Slot12();
+        // Jump-table entries into the ToggleExpanded calls of 0x54 / 0x59 (LAB_004e2bdb / 0x004e2c0a).
+        ToggleExpanded();
         return true;
 
     case 0x58:
         Mode = 1;
         if (bExpanded == 0)
         {
-            Slot12();
+            ToggleExpanded();
         }
         LabelRefreshTimer = kOne;
         return true;
@@ -1859,7 +1859,7 @@ void HudTarget::UpdateButtons(bool bFull)
             ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
             SubtargetName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
         }
-        Slot15();
+        UpdateLabels();
     }
 
     CObject* const ViewCObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
@@ -1960,7 +1960,7 @@ RankDone:
             ScanButton->SetProperty(0xc, bScannerOpen, 0);
             if (ScannerWindow != nullptr && bHideScan != 0)
             {
-                ScannerWindow->Slot23(0xef02, 0, 0);
+                ScannerWindow->ProcessMessage(0xef02, 0, 0);
             }
         }
 

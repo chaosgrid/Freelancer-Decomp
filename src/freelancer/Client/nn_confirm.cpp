@@ -134,7 +134,7 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
 void NnConfirm::Answer(unsigned bYes)
 {
     if (Parent != nullptr)
-        Parent->Slot23(0x3006, bYes, 0);
+        Parent->ProcessMessage(0x3006, bYes, 0);
     ReleaseMouse();
     Win3D* Child = ChildHead;
     while (Child != nullptr)
@@ -154,7 +154,7 @@ void NnConfirm::Draw()
     WinControl::Draw();            // JMP FUN_005a0760
 }
 
-bool NnConfirm::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnConfirm::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004887d0 (RET 0xc): 0xf003 / 0xf004 go on to slot 42 with A and B; always false.
     if (Msg == 0xf003 || Msg == 0xf004)

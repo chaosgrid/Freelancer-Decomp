@@ -606,25 +606,25 @@ FHudStatusCaption::~FHudStatusCaption()
 }
 
 HUD_Status::HUD_Status(INI_Reader& /*Reader*/)
-    : Byte500(1)
+    : bPendingWeaponGroupInit(1)
     , ActiveWeaponGroup(0)
-    , Byte584(0)
-    , Byte585(0)
-    , Byte586(0)
-    , Field588(1.0f)
-    , Field5a0(1)
-    , Field5a4(1)
-    , Byte5b8(0)
+    , bThrustersOn(0)
+    , bHasThruster(0)
+    , bCruiseActive(0)
+    , RefreshTimer(1.0f)
+    , bShowWeaponList(1)
+    , bLastShowWeaponList(1)
+    , bUsingTradeLane(0)
     , bTurretView(0)
     , bRearView(0)
     , WeaponTopRow(0)
-    , Byte5cc(1)
-    , Byte5cd(0)
+    , bPendingExpandedSync(1)
+    , bDockingOrTradeLaneCaption(0)
 {
     // FUN_004da170: HUD_Target_Base FUN_004e6020, ButtonScaler FUN_0055e340 at +0x4e0, the
     // vectors at +0x58c (Weapons) / +0x5dc (HpRowCache) emptied and the caption at +0x5d0
     // zeroed (their default constructors), the vptrs, then 0x004da229:
-    // publish this in DAT_00674aa0. HomePosition, Field5a0 / Field5a4 and the HUDItem name are
+    // publish this in DAT_00674aa0. HomePosition, bShowWeaponList / bLastShowWeaponList and the HUDItem name are
     // written before the Create call; the rest after it (Create reads none of them).
     G_HudStatus = this;
 
@@ -662,11 +662,11 @@ HUD_Status::~HUD_Status()
     G_HudStatus = nullptr;
 }
 
-void HUD_Status::Slot13(bool bHide)
+void HUD_Status::HideExpandedControls(bool bHide)
 {
     // LAB_004db120: the byte is MOVZX'd into A of SetProperty(1, A, 0).
     uintptr_t const Hide = static_cast<uintptr_t>(bHide ? 1u : 0u);
-    if (Field5a0 != 0)
+    if (bShowWeaponList != 0)
     {
         // 0x004db135..0x004db173: +0x508, +0x530, +0x558 of each row.
         for (int Index = 0; Index < 10; ++Index)
@@ -782,7 +782,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     // 0x004daeda..0x004daf25: the scroll bar, then HUDItem slot 13 (through the vftable) with 1.
     float const ScrollPos[3] = {0.49f, -0.234f, -1.0f};
     WeaponListScroll = CreateUIScroll("WeaponListScroll", ScrollPos, 0.016f, 0.118f, 0, 5, 10, 0);
-    Slot13(true);
+    HideExpandedControls(true);
 
     // 0x004daf28..0x004dafdf: the special-mode captions, both with Flags &= 0xfc.
     float const SpecialPos[3] = {-0.513f, -0.29f, 0.0f};
@@ -1127,7 +1127,7 @@ void HUD_Status::SetTarget(IObjRW* NewTarget)
     G_WeaponGroups.SetShip(ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())));
 }
 
-void HUD_Status::Slot12()
+void HUD_Status::ToggleExpanded()
 {
     // LAB_004dccf0 (this = the HUDItem face). Nothing while either animation runs.
     if (ButtonMover::IsActive()) // FUN_0055e280 on +0x364
@@ -1161,14 +1161,14 @@ void HUD_Status::Slot12()
         float const BatteryCountStart[3] = {0.404f, -0.359f, 0.0f};
         float const BatteryCountEnd[3] = {0.404f, -0.4f, 0.0f};
         ButtonMover::AddButton(BatteryCountText, BatteryCountStart, BatteryCountEnd);
-        Field588 = 1.0f; // DAT_005d8484
+        RefreshTimer = 1.0f; // DAT_005d8484
         return;
     }
 
     // 0x004dceea..0x004dcf69: closing, stage 1 -- HUDItem slot 13 with 1 through the vftable,
     // the background shrinks 1.0 -> 0.1 over 0.3 s (OnScaleFinished continues), and the weapon
     // rows and the scroll bar are hidden.
-    Slot13(true);
+    HideExpandedControls(true);
     ButtonScaler::Start(0.3f); // FUN_0055e590
     ButtonScaler::AddButton(ViewPanel, 1.0f, 0.1f); // FUN_0055e360
     for (int Index = 0; Index < 10; ++Index)
@@ -1183,14 +1183,14 @@ void HUD_Status::Slot12()
 void HUD_Status::OnMoveFinished()
 {
     // LAB_004dcf80 (this = the ButtonMover face at +0x364).
-    Field588 = 1.0f; // DAT_005d8484
+    RefreshTimer = 1.0f; // DAT_005d8484
 
     if (bExpanded == 0)
     {
         // 0x004dcf9b..0x004dcff8: opening, stage 2 -- HUDItem slot 13 with 1, the toggle button
         // and the minimized frame lose Flags bits 0..1, and the background grows 0.1 -> 1.0
         // over 0.3 s; then a tail jump into the scaler's Update FUN_0055e5e0.
-        Slot13(true);
+        HideExpandedControls(true);
         ToggleButton->Flags &= 0xfc;
         MinimizedFrame->Flags &= 0xfc;
         ButtonScaler::Start(0.3f);
@@ -1218,11 +1218,11 @@ void HUD_Status::OnScaleFinished()
     {
         // 0x004dd092..0x004dd24c: opening, done -- expanded, session flag 2 set, HUDItem slot 13
         // with 0, the repair / battery controls placed on the panel (property 6), the weapon
-        // rows and the scroll bar shown when Field5a0 is set, the minimized frame hidden, and
+        // rows and the scroll bar shown when bShowWeaponList is set, the minimized frame hidden, and
         // the expanded hit box.
         bExpanded = 1;
         SetGameSessionFlags(2, true);
-        Slot13(false);
+        HideExpandedControls(false);
         float const RepairPos[3] = {0.3f, -0.171f, 0.0f};
         RepairButton->SetProperty(6, reinterpret_cast<uintptr_t>(RepairPos), 0);
         float const RepairCountPos[3] = {0.306f, -0.16f, 0.0f};
@@ -1231,7 +1231,7 @@ void HUD_Status::OnScaleFinished()
         UseBatteryButton->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryPos), 0);
         float const BatteryCountPos[3] = {0.365f, -0.16f, 0.0f};
         BatteryCountText->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryCountPos), 0);
-        if (Field5a0 != 0)
+        if (bShowWeaponList != 0)
         {
             for (int Index = 0; Index < 10; ++Index)
             {
@@ -1277,7 +1277,7 @@ void HUD_Status::OnScaleFinished()
     float const FrameLow[3] = {0.4101f, -0.4f, -1.0f};
     float const FrameHome[3] = {0.4101f, -0.37f, -1.0f};
     ButtonMover::AddButton(MinimizedFrame, FrameLow, FrameHome);
-    Field588 = 1.0f;
+    RefreshTimer = 1.0f;
 }
 
 void HUD_Status::ToggleLauncher(unsigned short SubId)
@@ -1353,13 +1353,13 @@ intptr_t HUD_Status::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // 0x004db204..0x004db21e: the close button -> HUDItem slot 12 through the vftable, 1.
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
-            Slot12();
+            ToggleExpanded();
             return 1;
         }
 
         // 0x004db221..0x004db296: a weapon row's text (name, number, ammo -- in that order);
         // a row inside Weapons (unsigned compare, the top row not added) toggles the launcher
-        // at WeaponTopRow + row and restarts Field588.
+        // at WeaponTopRow + row and restarts RefreshTimer.
         int Row = 0;
         for (; Row < 10; ++Row)
         {
@@ -1373,7 +1373,7 @@ intptr_t HUD_Status::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Row < 10 && static_cast<unsigned>(Row) < Weapons.size())
         {
             ToggleLauncher(Weapons[WeaponTopRow + Row].SubId);
-            Field588 = 1.0f; // DAT_005d8484
+            RefreshTimer = 1.0f; // DAT_005d8484
         }
     }
     else if (Msg == 0x3e)
@@ -1382,7 +1382,7 @@ intptr_t HUD_Status::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (!HudIsMousePickBlocked() && A == reinterpret_cast<uintptr_t>(WeaponListScroll))
         {
             WeaponTopRow = static_cast<int>(B);
-            Field588 = 1.0f;
+            RefreshTimer = 1.0f;
         }
     }
 
@@ -1411,13 +1411,13 @@ void HUD_Status::Update()
 
     // 0x004db347..0x004db384: once the view object is live, sync the panel with session flag 2
     // (HUDItem slot 12 through the vftable when they differ). FUN_004c8110 answers 0 or 1.
-    if (Byte5cc != 0 && ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())) != nullptr)
+    if (bPendingExpandedSync != 0 && ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())) != nullptr)
     {
-        Byte5cc = 0;
+        bPendingExpandedSync = 0;
         unsigned char const bFlag = TestGameSessionFlags(2) ? 1 : 0; // FUN_004c8110
         if (bFlag != bExpanded)
         {
-            Slot12();
+            ToggleExpanded();
         }
     }
 
@@ -1441,7 +1441,7 @@ void HUD_Status::Update()
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();
         if (Behavior != nullptr)
         {
-            if (Behavior->Opaque168[0] == 0 && !Ship->is_using_tradelane() &&
+            if (Behavior->bAllowUserSteering == 0 && !Ship->is_using_tradelane() &&
                 Behavior->DockingPortStatus != 0)
             {
                 // 0x004db43b..0x004db4e1: ids 0x63b shown, the cancel caption hidden; with a ship
@@ -1449,7 +1449,7 @@ void HUD_Status::Update()
                 SpecialModeText->SetProperty(0x1e, 0x63b, 0);
                 SpecialModeText->Flags |= 3;
                 SpecialModeTextCancel->Flags &= 0xfc;
-                Byte5cd = 1;
+                bDockingOrTradeLaneCaption = 1;
                 IObjRW* const ShipTarget = Ship->get_target();
                 if (ShipTarget != nullptr)
                 {
@@ -1476,18 +1476,18 @@ void HUD_Status::Update()
                     }
                 }
             }
-            else if (Byte5cd != 0 || Ship->is_using_tradelane())
+            else if (bDockingOrTradeLaneCaption != 0 || Ship->is_using_tradelane())
             {
                 // 0x004db4e3..0x004db551
                 if (Ship->is_using_tradelane())
                 {
                     SpecialModeTextCancel->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
                     SpecialModeTextCancel->Flags |= 3;
-                    Byte5cd = 1;
+                    bDockingOrTradeLaneCaption = 1;
                 }
                 else
                 {
-                    Byte5cd = 0;
+                    bDockingOrTradeLaneCaption = 0;
                     SpecialModeText->Flags &= 0xfc;
                     SpecialModeTextCancel->Flags &= 0xfc;
                     UpdateSpecialModeCaptions();
@@ -1502,12 +1502,12 @@ void HUD_Status::Update()
     ButtonScaler::Update();
     if (!ButtonMover::IsActive() && !ButtonScaler::IsActive())
     {
-        // 0x004db58c..0x004db666: Field5a0 changed -- the rows and the scroll bar follow it.
-        if (Field5a0 != Field5a4)
+        // 0x004db58c..0x004db666: bShowWeaponList changed -- the rows and the scroll bar follow it.
+        if (bShowWeaponList != bLastShowWeaponList)
         {
-            Field5a4 = Field5a0;
-            Field588 = 1.0f; // DAT_005d8484
-            if (Field5a0 == 0)
+            bLastShowWeaponList = bShowWeaponList;
+            RefreshTimer = 1.0f; // DAT_005d8484
+            if (bShowWeaponList == 0)
             {
                 for (int Index = 0; Index < 10; ++Index)
                 {
@@ -1516,7 +1516,7 @@ void HUD_Status::Update()
                     AmmoText[Index]->SetProperty(1, 1, 0);
                 }
                 WeaponListScroll->SetProperty(1, 1, 0);
-                Field588 = 1.0f;
+                RefreshTimer = 1.0f;
             }
             else
             {
@@ -1532,9 +1532,9 @@ void HUD_Status::Update()
 
         // 0x004db66c..0x004db6b9: the first update with a live view object selects weapon
         // group 0 -- stored from the active launchers when it does not exist yet.
-        if (Byte500 != 0 && ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())) != nullptr)
+        if (bPendingWeaponGroupInit != 0 && ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target())) != nullptr)
         {
-            Byte500 = 0;
+            bPendingWeaponGroupInit = 0;
             if (G_WeaponGroups.FindGroupIndex(0) == -1) // FUN_004f5540
             {
                 G_WeaponGroups.StoreActive(0);          // FUN_004f5580
@@ -1546,23 +1546,23 @@ void HUD_Status::Update()
             }
         }
 
-        // 0x004db6be..0x004db6f0: with a live HUDItem target, the rest runs once Field588 (plus
+        // 0x004db6be..0x004db6f0: with a live HUDItem target, the rest runs once RefreshTimer (plus
         // the frame time FUN_0042d680, kept on the FPU) passes 1.0 -- TEST AH,0x41 skips on
         // <= 1.0 and on NaN. The sum is stored before the test and 1.0 taken off after it.
         if (ObjRwFromWatchable(const_cast<Watchable*>(Target.target())) != nullptr)
         {
-            double const Sum = GetClientFrameTimeCapped() + static_cast<double>(Field588);
-            Field588 = static_cast<float>(Sum);
+            double const Sum = GetClientFrameTimeCapped() + static_cast<double>(RefreshTimer);
+            RefreshTimer = static_cast<float>(Sum);
             if (Sum > 1.0)
             {
-                Field588 = static_cast<float>(Sum - 1.0);
+                RefreshTimer = static_cast<float>(Sum - 1.0);
                 if (!ButtonMover::IsActive() && !ButtonScaler::IsActive())
                 {
                     // 0x004db724..0x004db736
-                    Byte584 = 0;
-                    Byte585 = 0;
-                    Byte5b8 = 0;
-                    Byte586 = 0;
+                    bThrustersOn = 0;
+                    bHasThruster = 0;
+                    bUsingTradeLane = 0;
+                    bCruiseActive = 0;
 
                     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
                     if (Player != nullptr)
@@ -1603,19 +1603,19 @@ void HUD_Status::Update()
                         CShip* const PlayerShip = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW()));
                         if (PlayerShip != nullptr)
                         {
-                            Byte584 = PlayerShip->any_thrusters_on() ? 1 : 0;
+                            bThrustersOn = PlayerShip->any_thrusters_on() ? 1 : 0;
                         }
                         if (PlayerShip->is_using_tradelane())
                         {
-                            Byte5b8 = 1;
+                            bUsingTradeLane = 1;
                         }
                         if (PlayerShip->is_cruise_active())
                         {
-                            Byte586 = 1;
+                            bCruiseActive = 1;
                         }
                         if (PlayerShip->EquipManager.FindFirst(EquipTypeThruster) != nullptr) // 0x400
                         {
-                            Byte585 = 1;
+                            bHasThruster = 1;
                         }
                     }
 
@@ -1805,7 +1805,7 @@ bool HUD_Status::IsLootInReach()
     {
         return false;
     }
-    if (Behavior->Opaque168[0] == 0)
+    if (Behavior->bAllowUserSteering == 0)
     {
         return false;
     }
@@ -2257,19 +2257,19 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     case 0x56:
     case 0x57:
         // 0x004dbe51 / 0x004dbe87: open the panel (HUDItem slot 12) when it is closed, then
-        // hide (0x56) or show (0x57) the weapon list -- Field5a0 and session flag 4.
+        // hide (0x56) or show (0x57) the weapon list -- bShowWeaponList and session flag 4.
         if (bExpanded == 0)
         {
-            Slot12();
+            ToggleExpanded();
         }
-        Field5a0 = (MsgId == 0x57) ? 1 : 0;
+        bShowWeaponList = (MsgId == 0x57) ? 1 : 0;
         SetGameSessionFlags(4, MsgId == 0x57); // FUN_004c8120
         return true;
 
     case 0x5e:
     case 0x6d:
         // 0x004dbc2d / 0x004dbc12: toggle the panel (HUDItem slot 12).
-        Slot12();
+        ToggleExpanded();
         return true;
 
     case 0x6f:
@@ -2333,7 +2333,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         G_WeaponGroups.SetCurrent(Group);                        // FUN_004f6180
         G_WeaponGroups.Activate(Group);                          // FUN_004f5920
         ActiveWeaponGroup = Group;
-        Field588 = 1.0f; // DAT_005d8484
+        RefreshTimer = 1.0f; // DAT_005d8484
         return true;
     }
 
@@ -2349,12 +2349,12 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     case 0xa0:
     {
         // 0x004dc252..0x004dc403: toggle launcher 0..9 of Weapons (FUN_005756d0 size test,
-        // no WeaponTopRow offset) and restart Field588.
+        // no WeaponTopRow offset) and restart RefreshTimer.
         unsigned const Row = MsgId - 0x97;
         if (Weapons.size() > Row)
         {
             ToggleLauncher(Weapons[Row].SubId); // FUN_004db930
-            Field588 = 1.0f;
+            RefreshTimer = 1.0f;
         }
         return true;
     }

@@ -100,7 +100,7 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
     // 0x00502c23..0x00502c76: +0 = 0; the solar's +0x200 id, or CreateID("jump_effect_default")
     // when it is empty, looked up in the DAT_00674fd8 list (payload at node +8).
     Desc = nullptr;
-    ID_String Wanted = Solar->Field_0x200;
+    ID_String Wanted = Solar->JumpEffectId;
     if (Wanted.IsEmpty())
         Wanted.Id = CreateID("jump_effect_default");
     for (std::list<FJumpEffectDesc>::iterator It = G_JumpEffectDescs.begin();
@@ -440,7 +440,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip)
     TunnelEffect.clear();
 
     // 0x0050391f..0x00503966: +0xa8 identity orientation, zero translation.
-    SetIdentityTransform(Field_0xa8);
+    SetIdentityTransform(GateHardpointFrame);
 
     // 0x0050396c..0x005039d7: DAT_00674fd0, lazily defaulted with the FUN_00411c50(0x10000, 2)
     // = 0x100002 warning -- FUN_00502b00 inlined.
@@ -459,9 +459,9 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip)
     JumpInTime = 0.5f;
     Tunnel = nullptr;
     Field_0x6c = 0;
-    Field_0x6d = 0;
-    Field_0x70 = 0.0f;
-    Field_0xd8 = 0;
+    bTunnelEffectKilled = 0;
+    Clock = 0.0f;
+    bSkipFirstJumpInTick = 0;
     JumpOutTime = 0.0f;
     Ambient = nullptr;
     Color = nullptr;
@@ -474,7 +474,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     // 0x00503461..0x00503496: ID_String::clear on +0x18; the companions zeroed (constructors).
     TunnelEffect.clear();
     // 0x005034a7..0x005034cb: FUN_004215b0 on +0xa8, zero translation.
-    SetIdentityTransform(Field_0xa8);
+    SetIdentityTransform(GateHardpointFrame);
 
     // 0x005034bc..0x005034db: a null gate solar or ship returns at once, everything else as
     // the member constructors left it.
@@ -493,9 +493,9 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     Ship = InShip;
     Tunnel = nullptr;
     Field_0x6c = 0;
-    Field_0x6d = 0;
-    Field_0x70 = 0.0f;
-    Field_0xd8 = 0;
+    bTunnelEffectKilled = 0;
+    Clock = 0.0f;
+    bSkipFirstJumpInTick = 0;
     JumpOutTime = 0.0f;
     JumpOutTunnelTime = 5.0f;
     JumpInTunnelTime = 5.0f;
@@ -507,7 +507,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     // 0x00503550..0x005035a3: the solar's +0x204 JumpGateEffect (FUN_00548890); without one a
     // temporary is built (operator new(0xe0) + FUN_00502ba0), and a failed new skips to the
     // hardpoint.
-    FJumpGateEffect* Gate = static_cast<FJumpGateEffect*>(GateSolar->Field_0x204);
+    FJumpGateEffect* Gate = static_cast<FJumpGateEffect*>(GateSolar->JumpGateEffect);
     FJumpGateEffect* Temp = nullptr;
     FJumpEffectDesc* GateDesc = nullptr;
     bool bHaveGate = true;
@@ -551,7 +551,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     CSolar const* const SolarObj = AsSolar(GateSolar->cobject());
     long const Instance = SolarObj->EngineInstanceId;
     Archetype::Solar const* const Arch = static_cast<Archetype::Solar const*>(SolarObj->Archetype);
-    SetIdentityTransform(Field_0xa8);
+    SetIdentityTransform(GateHardpointFrame);
     HardpointInfo Info;
     long HpHandle = 0;
     if (FindHardpoint_PS(Instance, Arch->JumpOutHp.Value, HpHandle, Info))
@@ -559,15 +559,15 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         // 0x005036bd..0x00503706: HardpointToWorld(instance, info), then +0xa8 = {orientation,
         // position} of the info.
         HardpointToWorld(Instance, Info);
-        Field_0xa8.Rotation = Info.Orient;
-        Field_0xa8.Translation = Info.Position;
+        GateHardpointFrame.Rotation = Info.Orient;
+        GateHardpointFrame.Translation = Info.Position;
     }
     else
     {
         // 0x00503708..0x00503758: FDUMP 0x100001 (line 0x196) and identity again.
         FDUMP(0x100001, "%s(%d) : *** ERROR: Hardpoint (%s) not found on jumpgate",
               kJumpEffectCpp, 0x196, Arch->JumpOutHp.Value);
-        SetIdentityTransform(Field_0xa8);
+        SetIdentityTransform(GateHardpointFrame);
     }
 
     // 0x0050375b..0x005037e7: for the player's ship, the gate descriptor's jump_tunnel
@@ -590,9 +590,9 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         if (Found != nullptr)
         {
             GateTunnelSetShip(Found, Ship);
-            Found->Frame = Field_0xa8;
+            Found->Frame = GateHardpointFrame;
         }
-        Field_0xa4 = SolarObj->DestSystem;
+        DestSystem = SolarObj->DestSystem;
     }
 
     // 0x005037ed..0x00503896: a temporary gate is destroyed (FUN_00502e40 inline) and freed.
@@ -623,13 +623,13 @@ double FJumpShipEffect::ShakeAmplitude() const
 {
     // FUN_00503e20: switch on the ship's +0x158 - 1 (JA past 3 -> the 0.0f already loaded
     // from DAT_005c7474).
-    switch (Ship->Field_0x158)
+    switch (Ship->JumpState)
     {
     case 1:
         // 0x00503e3c..0x00503e5a: JumpOutTime FCOMP 0.0f, TEST AH,0x41 / JNZ -- not above
         // (NaN included) returns the amplitude itself; otherwise amplitude / JumpOutTime * +0x70.
         if (JumpOutTime > 0.0f)
-            return static_cast<double>(kJumpShakeAmplitude) / JumpOutTime * Field_0x70;
+            return static_cast<double>(kJumpShakeAmplitude) / JumpOutTime * Clock;
         return kJumpShakeAmplitude;
     case 2:
     case 3:
@@ -639,7 +639,7 @@ double FJumpShipEffect::ShakeAmplitude() const
         // 0x00503e5b..0x00503e86: JumpInTime not above 0 (NaN included) -> 0.0f; otherwise
         // (1.0f (DAT_005c75dc) - +0x70 / JumpInTime) * amplitude.
         if (JumpInTime > 0.0f)
-            return (1.0 - static_cast<double>(Field_0x70) / JumpInTime) * kJumpShakeAmplitude;
+            return (1.0 - static_cast<double>(Clock) / JumpInTime) * kJumpShakeAmplitude;
         return 0.0;
     default:
         return 0.0;
@@ -698,7 +698,7 @@ void FJumpShipEffect::StartJumpOut()
     {
         bStarted = CliCreateEffectWorldOneShotOn(
                        &G_CliEffectFactoryJump, FindEffectArch(&TunnelEffect.Id),
-                       reinterpret_cast<FTransform const*>(&Field_0xa8), Velocity, &FxB) != 0;
+                       reinterpret_cast<FTransform const*>(&GateHardpointFrame), Velocity, &FxB) != 0;
     }
     if (!bStarted)
     {
@@ -707,7 +707,7 @@ void FJumpShipEffect::StartJumpOut()
     }
 
     // 0x00503f32.
-    Field_0x6d = 0;
+    bTunnelEffectKilled = 0;
 }
 
 void FJumpShipEffect::EnterTunnel()
@@ -777,7 +777,7 @@ void FJumpShipEffect::StartJumpIn()
     }
 
     // 0x005045ea / 0x00504624: on every path.
-    Field_0xd8 = 1;
+    bSkipFirstJumpInTick = 1;
 }
 
 void FJumpShipEffect::FinishJump()
@@ -823,20 +823,20 @@ void FJumpShipEffect::Update(float Dt)
     // FUN_00503cd0 (thiscall, RET 4). The effect's clock (+0x70) is not advanced here.
     // 0x00503cd7..0x00503cf8: in the tunnel states 2 and 3 the tunnel, when there is one,
     // advances (FUN_004ff3c0).
-    int const State = Ship->Field_0x158;
+    int const State = Ship->JumpState;
     if ((State == 2 || State == 3) && Tunnel != nullptr)
         Tunnel->Update(Dt);
 
     // 0x00503cfd..0x00503d07: everything else only in state 4 (jump in). The state is read
     // again from the ship; FGateTunnel::Update does not touch it.
-    if (Ship->Field_0x158 != 4)
+    if (Ship->JumpState != 4)
         return;
 
     // 0x00503d0d..0x00503d13 / 0x00503e11: the first update after StartJumpIn (which sets
     // +0xd8) only clears the flag.
-    if (Field_0xd8 != 0)
+    if (bSkipFirstJumpInTick != 0)
     {
-        Field_0xd8 = 0;
+        bSkipFirstJumpInTick = 0;
         return;
     }
 
@@ -844,10 +844,10 @@ void FJumpShipEffect::Update(float Dt)
     // FCOMP clock gives C0 = 1: TEST AH,0x5 / JP skips on greater, equal and unordered, so the
     // fall-through is "JumpInTime - KillTimeBeforeDone < clock". The difference stays on the
     // x87 stack (not stored as float), hence the double arithmetic.
-    if (Field_0x6d != 0)
+    if (bTunnelEffectKilled != 0)
         return;
     if (!(static_cast<double>(JumpInTime) - static_cast<double>(KillTimeBeforeDone) <
-          static_cast<double>(Field_0x70)))
+          static_cast<double>(Clock)))
         return;
 
     // 0x00503d36..0x00503dd1: the tunnel effect companion FxB is stopped -- particle vt+4,
@@ -858,5 +858,5 @@ void FJumpShipEffect::Update(float Dt)
     // light FUN_00537ad0, each zeroed, and slot 0 (+0x38) zeroed: FUN_00502d90's body.
     CliEffectCompanionClear(&FxB);
     // 0x00503e05.
-    Field_0x6d = 1;
+    bTunnelEffectKilled = 1;
 }

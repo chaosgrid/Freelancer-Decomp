@@ -129,7 +129,7 @@ public:
     FRmSpawnRecord();                               // FUN_06f866a0
     virtual ~FRmSpawnRecord();                      // FUN_06f86700 / FUN_06f87bf0
 
-    bool Field_0x04 = true;                         // +0x04 TODO: meaning (ctor 1)
+    bool bHostile = true;                           // +0x04 hostile to players (ctor 1)
     TString<0x30> Name;                             // +0x08 empty (Length 0, Data[0] 0)
     // +0x3c: 2 alive, 3 destroyed (message 0x39), 4 loot gone without a player (FUN_06f86fb0).
     int State = 2;
@@ -173,7 +173,7 @@ public:
     unsigned int ParentId = 0;
     int Units = 0;                                  // +0x64 the loot's units left (msg 0x18)
     int Kind = 0;                                   // +0x68 FRmLootSpawn::Kind (2 critical)
-    int Field_0x6c = 0;                             // +0x6c FRmLootSpawn::Field_0x100
+    int CriticalLootMode = 0;                       // +0x6c FRmLootSpawn::CriticalLootMode
     unsigned int HolderId = 0;                      // +0x70 the player holding it, 0 = none
     unsigned short CargoSlot = 0;                   // +0x74 SUBOBJ_ID_NONE / msg 0x18 word
     // +0x78: the good (msg 0x18 parms +0xc; GetArchetypeID turns it back into loot).
@@ -230,7 +230,7 @@ public:
 
     // LAB_06f86a00 (RET 8): state 0, message 0x39 (destroyed) of a record -> State 3 and
     // FRmSolarMessage(DAT_06fd3b9c) to the owner.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06f86ae0 (RET 0x10): the records with Kind (-1 = any) == SolarType, State (0 = any)
     // == State and Mask (0 = any) & Flags.
@@ -249,7 +249,7 @@ public:
 
     // LAB_06f87e90 (RET 8): state 0, message 0x39 of a record -> State 3, the group's
     // messages.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06f87a50 (RET 0x10): Kind (0 = any), State (0 = any), Mask (0 = any).
     FRmRecordList Query(int Kind, int InState, unsigned int Mask);
@@ -268,7 +268,7 @@ public:
     ~FRmLootMachine() override;                     // FUN_06f86ef0
 
     // LAB_06f86fb0 (RET 8): state 0; messages DAT_06fd3b6c, 0x39, 0x18, 0x27, 0x3d.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06f877c0 (RET 0x18): every argument 0 = any; compared in the retail order Field60
     // (+0x60), HolderId (+0x70), Field6c (+0x6c), Kind (+0x68), State (+0x3c).
@@ -422,7 +422,7 @@ public:
 
 protected:
     // StateMachine slot 2, LAB_06f8a5c0 (RET 8): states 0..2 -> slots 13..15; always false.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     // FUN_06f8ade0 (RET 8): Objective's mission objective appended (and the objective kept).
     void AddObjective(int Key, FRmObjective* Objective);
@@ -506,7 +506,7 @@ protected:
     // messages (State < 0), states 0..2 through slots 13..15 (false), then the vignette states
     // 3 start, 8 pre-battle, 9 target fight, 10 approach, 11 main battle, 12 critical loot,
     // 5 succeeded, 6 failed, 7 done.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
 private:
     // The pieces of FUN_06f8c460, one per state (RandomMissionVignette.cpp).

@@ -80,10 +80,10 @@ public:
     //   1  (0x04) LAB_062d76a0        ported for real: SetContext() -- `MOV AL,1; RET 0xc`,
     //                                 2 instructions, ignores all 3 incoming pointers entirely
     //   2  (0x08) CEquip::ConnectServerEquip      ICF fold, not NullBehavior-specific
-    //   3  (0x0c) Exclusion::AsteroidExclusionZon..  bare RET (.text:062a8920) -- Slot3() override
-    //   4  (0x10) Exclusion::AsteroidExclusionZon..  same bare RET -- Slot4() override
+    //   3  (0x0c) Exclusion::AsteroidExclusionZon..  bare RET (.text:062a8920) -- OnEngage() override
+    //   4  (0x10) Exclusion::AsteroidExclusionZon..  same bare RET -- OnDisengage() override
     //   5  (0x14) LAB_062d1730        `MOV EAX,1; RET 4`, ICF-shared with CruiseBehavior's and
-    //                                 FreeFlightBehavior's own slot 6 -- Slot5() override
+    //                                 FreeFlightBehavior's own slot 6 -- OnEvaluateReadiness() override
     //   6  (0x18) LAB_062cf5e0        trivial `MOV EAX,2; RET 4` stub, ICF-shared 14-way fold
     //                                 (same one documented in common_idlebehavior.h's own slot 6)
     //   7  (0x1c) Archetype::Solar::get_class_type  ported for real (as Update()): ICF-folded
@@ -130,11 +130,11 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // 2026-10-08 (claude-code:cmn-ai2). Slots 3 and 4 of .rdata:063a0244 are NOT Behavior's
     // FUN_062d20d0/FUN_062d20f0 (base vtable 063a02c4 slots 3/4) but the bare `RET` at
@@ -142,9 +142,9 @@ public:
     // made a NullBehavior reset +0x0c/+0x10/+0x1c/+0x28 and clear the PathfindManager's +0x64
     // when the manager engaged/disengaged it. Slot 5 is LAB_062d1730 `MOV EAX,1; RET 4`
     // (base slot 5 is _purecall).
-    void Slot3() override {}                                   // 3 .text:062a8920 RET
-    void Slot4() override {}                                   // 4 .text:062a8920 RET
-    int Slot5(float) override { return 1; }                    // 5 LAB_062d1730
+    void OnEngage() override {}                                   // 3 .text:062a8920 RET
+    void OnDisengage() override {}                                   // 4 .text:062a8920 RET
+    int OnEvaluateReadiness(float) override { return 1; }                    // 5 LAB_062d1730
 
     // ---- Behavior's own +0x04..+0x29 block, ADDED 2026-09-17 (claude:common-factory) -----
     // This class used to declare no storage at all, which made `sizeof(NullBehavior)` 4 while
@@ -167,7 +167,7 @@ public:
     int ModeSelector0xc;         // +0x0c, set to 2 by FUN_062d2020.
     int UpdateResult10;          // +0x10, set to 1 by FUN_062d2020.
     void* OwnerContext;          // +0x14, zeroed.
-    unsigned char Opaque18[0x1c - 0x18]; // +0x18, zeroed as a dword.
+    IObjDB* ObjectDb; // +0x18, zeroed as a dword.
     float DeltaTime;             // +0x1c, zeroed; the slot SetTickDelta writes.
     void* BehaviorMgrPtr;        // +0x20. NOT written by FUN_062d2020 -- the family's shared
                                  // context binder FUN_062d2090 is what fills it, and this

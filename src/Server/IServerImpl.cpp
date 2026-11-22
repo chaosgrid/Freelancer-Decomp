@@ -435,7 +435,7 @@ void IServerImpl::GoTradelane(unsigned int player_id, const XGoTradelane& info) 
         if (Sys == nullptr)
             return;
         Sys->notify_go_tradelane(info.ObjectId, info.TradelaneRing1, info.TradelaneRing2,
-                                 info.Field_0x0c, 0.0f);
+                                 info.bMidLane, 0.0f);
     }
     // Slot 7: StopTradelane -- retail .text:06cf0af0 .. 06cf0b43, RET 0x10.
     //   06cf0b05  arg1 != the raw slot's ship id -> out
@@ -596,8 +596,8 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
         // +0x04 is never written by retail (stack residue); zeroed here.
         FServerSetReputationInfo Info;
         Info.Attitude = 0.0f;
-        Info.Field_0x08 = 0;
-        Info.Field_0x0c = 0;
+        Info.Affiliation = 0;
+        Info.Rank = 0;
         Info.Relations = nullptr;
         Info.RelationCount = 0;
         Info.Pad_0x15[0] = 0;
@@ -608,7 +608,7 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
         Info.Relations = static_cast< ::Reputation::Relation*>(
             ::operator new(::Reputation::group_count() * 8));            // .text:06d454bd
         wchar_t const* VibeName = nullptr;                               // S+0xc, .text:06d454ea
-        ::Reputation::Vibe::Get(Info.VibeHandle, Info.Field_0x08, Info.Field_0x0c,
+        ::Reputation::Vibe::Get(Info.VibeHandle, Info.Affiliation, Info.Rank,
                                 Info.RelationCount, Info.Relations, Info.NameA,
                                 Info.NameB, VibeName);                   // .text:06d454ee
         if (VibeName == nullptr) {
@@ -1345,7 +1345,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         // .text:06cefc43 .. 06cefc54 -- FUN_06d4ed90: `MOV EAX,[ECX+0x264]`.
         Req.ArchetypeNickname = p->ship_archetype;
         // .text:06cefc4e .. 06cefc68 -- PlayerDB::GetGroupID(sid) -> +0xd8.
-        Req.Field_0xd8 = Players.GetGroupID(session_id);
+        Req.GroupId = Players.GetGroupID(session_id);
 
         // .text:06cefc6f .. 06cefc7e -- Archetype::GetShip, then its load (vt +0xc).
         Archetype::Ship* const ShipArch = Archetype::GetShip(Req.ArchetypeNickname);
@@ -1404,7 +1404,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         // GetAffiliation(copy of [slot+0x318], out = -1, false) and IClient +0x1d0
         // (SendServerMiscObjUpdateAffiliation)(sid, ship, affiliation).
         if (!SinglePlayer()) {
-            g_pClientInterface->SendServerMiscObjUpdateObjectGroup(session_id, ship_id, Req.Field_0xd8);
+            g_pClientInterface->SendServerMiscObjUpdateObjectGroup(session_id, ship_id, Req.GroupId);
             unsigned int Affiliation = 0xffffffffu;
             int AffiliationVibe = p->rep_vibe;
             ::Reputation::Vibe::GetAffiliation(AffiliationVibe, Affiliation, false);
@@ -1896,7 +1896,7 @@ void IServerImpl::SPScanCargo(const unsigned int& scanner_id, const unsigned int
     //   06cf158a .. 06cf15a9  CEqObj::get_behavior_interface(); non-null -> its slot 0
     //                         (Common LAB_062d3f90) with the event {2, &info}
     //   06cf15ab .. 06cf15d1  SinglePlayer() -> FUN_06d43650(0x2f, {session_id,
-    //                         info.ObjectId (06cf15be), info.Field_0x08 (06cf15c9)})
+    //                         info.ObjectId (06cf15be), info.SubObjId (06cf15c9)})
     // Every early out skips the single-player frame as well.
 void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info) {
         GameObject* Obj = nullptr;
@@ -1912,7 +1912,7 @@ void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info)
             FBehaviorManagerEvent Event;
             Event.Type = 2;                                                  // .text:06cf159d
             Event.Data = const_cast<XSetManeuver*>(&info);                   // .text:06cf15a5
-            Manager->Slot00(&Event);                                         // .text:06cf15a9
+            Manager->OnEvent(&Event);                                         // .text:06cf15a9
         }
         if (SinglePlayer()) {                                                // .text:06cf15b3
             unsigned int msg_data[3];

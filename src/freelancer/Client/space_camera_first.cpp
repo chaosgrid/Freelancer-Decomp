@@ -547,10 +547,10 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
         // both set.
         FClientShipGameobj* const Ship =
             static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
-        if (Ship != nullptr && (Ship->Field_0x158 == 2 || Ship->Field_0x158 == 3))
+        if (Ship != nullptr && (Ship->JumpState == 2 || Ship->JumpState == 3))
         {
             EngineLightClearRegisteredList();
-            FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(Ship->Field_0x188);
+            FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(Ship->JumpEffect);
             if (JumpFx != nullptr && JumpFx->Ambient != nullptr)
                 EngineLightSetAmbientRgbBytes(JumpFx->Ambient);
         }
@@ -567,7 +567,7 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
             if (SpaceEffectPerfOneMinus() < 0.999)
                 Flag = 0;
             unsigned DrawStateB = 0;
-            const unsigned DrawStateA = Ship->Slot18c(&DrawStateB);
+            const unsigned DrawStateA = Ship->GetNebula(&DrawStateB);
             SpaceApplyObjectLighting(Center, Radius, Space, DrawStateA, DrawStateB, Flag);
         }
 

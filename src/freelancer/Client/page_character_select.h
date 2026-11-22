@@ -12,7 +12,7 @@
 // ServerDetailsBox, Title, ServerDetails, MOTD). One static instance, DAT_0067b180 (static init
 // LAB_00567000 -> ctor FUN_00567020, atexit LAB_0056b020 -> dtor FUN_0056aeb0). vftables: main
 // 0x005e2934 (0 FUN_0056ae90 scalar deleting dtor, 9 LAB_005674a0 Create, 10 FUN_00567290
-// Destroy, 11 LAB_0056a360 Update, 23 FUN_00569670 Slot23), IUIPage face (+0x7c) 0x00575d10,
+// Destroy, 11 LAB_0056a360 Update, 23 FUN_00569670 ProcessMessage), IUIPage face (+0x7c) 0x00575d10,
 // Event::Handler face (+0x80) 0x0056a300.
 //
 // Call path: IntroFocus EnterState case 9 (0x00574f50) loads the descriptor (+0x28c,
@@ -81,7 +81,7 @@ public:
     // slot 11 LAB_0056a360.
     void Update() override;
     // slot 23 FUN_00569670 (RET 0xc).
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // Event::Handler face (+0x80) slot 0 LAB_0056a300 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
@@ -150,7 +150,7 @@ private:
     void UpdateButtons();
     // FUN_0056abb0 -- MOTD re-filled when the server's message of the day changed.
     void RefreshMotd();
-    // FUN_0056ad40 -- the leave sequence (no direction); Slot23 spells it inline four times.
+    // FUN_0056ad40 -- the leave sequence (no direction); ProcessMessage spells it inline four times.
     void BeginLeave();
 
     PageCharacterSelect(PageCharacterSelect const&) = delete;

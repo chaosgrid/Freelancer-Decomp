@@ -18,7 +18,7 @@
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
-#include "common_pathfind.h" // PathfindManager -- Behavior::Slot4 / Behavior::SetCruiseLock
+#include "common_pathfind.h" // PathfindManager -- Behavior::OnDisengage / Behavior::SetCruiseLock
 
 #include <cmath>
 #include <cstdint>
@@ -263,7 +263,7 @@ Transform const* Behavior_InvokeNodeSlotC(void* Node)
 //
 // The offset itself is retail's, from two independent places: the constructor FUN_062d2020
 // zeroes a dword at +0x1c (.text:062d2037), and IBehaviorManager::UpdateBehaviorTick stores a
-// float there through a bare Behavior* immediately before dispatching Slot7
+// float there through a bare Behavior* immediately before dispatching OnUpdate
 // (.text:062d335d-062d336a, `FLD [ESI+0xd4]` / `FSTP [EDI+0x1c]` / `CALL [EAX+0x1c]`).
 // ============================================================================
 
@@ -279,7 +279,7 @@ void Behavior::SetTickDelta(float Delta)
 
 // Vtable slot 2 (+0x08), 0x0629afd0: `MOV EAX,[ESP+4]; MOV [ECX+0x18],EAX; RET 4`. Same
 // raw-offset device as SetTickDelta -- +0x18 is declared on each subclass (see common_behavior.h).
-void Behavior::Slot2(IObjDB* ObjectDb)
+void Behavior::SetObjectDb(IObjDB* ObjectDb)
 {
     *reinterpret_cast<IObjDB**>(reinterpret_cast<char*>(this) + 0x18) = ObjectDb;
 }
@@ -311,7 +311,7 @@ void* Behavior::GetNavHelper() const
 // Vtable slot 3 (+0x0c), FUN_062d20d0 (Common.dll.txt 210738-210750), 6 instructions:
 // `MOV EAX,1; MOV [ECX+0xc],EAX; MOV [ECX+0x10],EAX; AND byte [ECX+0x28],0xfe;
 // MOV dword [ECX+0x1c],0; RET`.
-void Behavior::Slot3()
+void Behavior::OnEngage()
 {
     char* const Self = reinterpret_cast<char*>(this);
     *reinterpret_cast<int*>(Self + 0x0c) = 1;                        // 062d20d5
@@ -324,7 +324,7 @@ void Behavior::Slot3()
 // Vtable slot 4 (+0x10), FUN_062d20f0 (Common.dll.txt 210760-210776), 8 instructions:
 // `EAX = [[ECX+0x20]+0xc]; if (EAX) [EAX+0x64] = 0; byte [ECX+0x29] = 0; RET`. The manager
 // pointer itself is not null-tested.
-void Behavior::Slot4()
+void Behavior::OnDisengage()
 {
     char* const Self = reinterpret_cast<char*>(this);
     IBehaviorManager* const Manager = *reinterpret_cast<IBehaviorManager* const*>(Self + 0x20);
@@ -368,7 +368,7 @@ bool Behavior::BindContext(void* Owner, void* Manager, void* Sys)
 }
 
 // Vtable slot 9 (+0x24): `MOV EAX,[ECX+0x10]; RET`.
-int Behavior::Slot9()
+int Behavior::GetStatus()
 {
     return *reinterpret_cast<int const*>(reinterpret_cast<char const*>(this) + 0x10);
 }

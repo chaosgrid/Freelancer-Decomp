@@ -316,7 +316,7 @@ namespace
         {
             FContentPlayerState* State = It->second.get();
             FContentPlayerShip* Ship = State->ShipObject;
-            if (Ship == nullptr || Ship->HasField120())
+            if (Ship == nullptr || Ship->IsInTradeLane())
                 continue;
             FSystemInfo* System = State->GetSystemRecord();
             FSpaceObjPlacement Placement;

@@ -283,8 +283,8 @@ FMaterialBatcher::FMaterialBatcher()
       Bin1SortOrder(0),
       SelectedBin(nullptr),
       CachedInterface(nullptr),
-      Field78(nullptr),
-      Field7C(nullptr),
+      RecordTag(nullptr),
+      RecordTagContext(nullptr),
       FrameValue(0),
       PendingFrameValue(0),
       Controller(this),
@@ -586,7 +586,7 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
 
     IBatchedMaterial* Active = nullptr;
     void* PreviousContext = nullptr;
-    void* ActiveField78 = nullptr;
+    void* ActiveRecordTag = nullptr;
     for (unsigned long Index = 0; Index < Bin->RecordCount; ++Index)
     {
         FBatchDispatch& Item = Dispatch[Index];
@@ -654,16 +654,16 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
             Active = Item.Batched;
             Active->Bind(&Record.Context);
         }
-        if (CachedInterface != nullptr && (Record.Field78 == nullptr || ActiveField78 != Record.Field78))
+        if (CachedInterface != nullptr && (Record.RecordTag == nullptr || ActiveRecordTag != Record.RecordTag))
         {
-            CachedInterface->BeginRecord(Item.Material, Record.Field78, Record.Field7C);
-            ActiveField78 = Record.Field78;
+            CachedInterface->BeginRecord(Item.Material, Record.RecordTag, Record.RecordTagContext);
+            ActiveRecordTag = Record.RecordTag;
         }
         PreviousContext = &Record.Context;
         Active->Submit(PreviousContext, Record.PrimType, Record.Start, Record.Count,
                       Record.Zero, Record.Field, Record.Flags);
         if (CachedInterface != nullptr)
-            CachedInterface->EndRecord(Item.Material, Record.Field78, Record.Field7C);
+            CachedInterface->EndRecord(Item.Material, Record.RecordTag, Record.RecordTagContext);
     }
     if (PreviousContext != nullptr)
         Active->Teardown(PreviousContext);
@@ -819,10 +819,10 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     Record.InternalFlags = 0;
     Record.Start = Start;
     Record.Count = Count;
-    Record.Field7C = Field7C;
-    Record.Field78 = Field78;
+    Record.RecordTagContext = RecordTagContext;
+    Record.RecordTag = RecordTag;
     Record.Context.Inst = Source->Inst;
-    Record.Context.Field20 = Source->Field20;
+    Record.Context.MaterialContext = Source->MaterialContext;
     Record.Context.ReplacedMaterial = Source->ReplacedMaterial;
     const FTransform* MatrixA = (const FTransform*)Source->World;
     const FTransform* MatrixB = (const FTransform*)Source->View;
@@ -913,7 +913,7 @@ GENRESULT DACOM_API FMaterialBatcher::GetEvents(void* Arg)
 GENRESULT DACOM_API FMaterialBatcher::SetRecordTag(void* Value)
 {
     // LAB_06ec9a40: plain store into this+0x78, no refcount management.
-    Field78 = Value;
+    RecordTag = Value;
     return GR_OK;
 }
 
@@ -922,14 +922,14 @@ GENRESULT DACOM_API FMaterialBatcher::GetRecordTag(void* Arg)
     // LAB_06ec9a50: *out = this+0x78.
     if (Arg == nullptr)
         return GR_GENERIC;
-    *(void**)Arg = Field78;
+    *(void**)Arg = RecordTag;
     return GR_OK;
 }
 
 GENRESULT DACOM_API FMaterialBatcher::SetRecordTagContext(void* Value)
 {
     // LAB_06ec9a70: plain store into this+0x7C, no refcount management.
-    Field7C = Value;
+    RecordTagContext = Value;
     return GR_OK;
 }
 
@@ -938,6 +938,6 @@ GENRESULT DACOM_API FMaterialBatcher::GetRecordTagContext(void* Arg)
     // LAB_06ec9a80: *out = this+0x7C.
     if (Arg == nullptr)
         return GR_GENERIC;
-    *(void**)Arg = Field7C;
+    *(void**)Arg = RecordTagContext;
     return GR_OK;
 }

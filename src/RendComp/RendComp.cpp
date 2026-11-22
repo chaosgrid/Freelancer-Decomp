@@ -127,26 +127,26 @@ int FileOpenByName(void* File, const char* ChildName)
         const char* ComponentName;
         const char* BackendName;
         const char* DataPath;
-        unsigned long Field10;
-        unsigned long Field14;
-        unsigned long Field18;
-        unsigned long Field1C;
-        unsigned long Field20;
-        unsigned long Field24;
-        unsigned long Field28;
-        unsigned long Field2C;
-        unsigned long Field30;
+        unsigned long Access;
+        unsigned long ShareMode;
+        unsigned long Security;
+        unsigned long Creation;
+        unsigned long Flags;
+        unsigned long TemplateFile;
+        unsigned long Parent;
+        unsigned long Extra;
+        unsigned long FindHandle;
     };
     FOpenDesc Desc;
     std::memset(&Desc, 0, sizeof(Desc));
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.DataPath = ChildName;
-    Desc.Field10 = 0x80000000;
-    Desc.Field14 = 1;
-    Desc.Field1C = 3;
-    Desc.Field20 = 0x8000080;
-    Desc.Field30 = 0xFFFFFFFF;
+    Desc.Access = 0x80000000;
+    Desc.ShareMode = 1;
+    Desc.Creation = 3;
+    Desc.Flags = 0x8000080;
+    Desc.FindHandle = 0xFFFFFFFF;
     const int Handle =
         AsFileSystem(File)->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
     if (Handle != -1)
@@ -169,7 +169,7 @@ FFileSystemDesc* FileDescInit(FFileSystemDesc* Desc, const char* Path, const cha
     Desc->Flags = 0x8000080;
     Desc->Path = Path;
     Desc->Size = 0x34;
-    Desc->Field30 = 0xFFFFFFFF;
+    Desc->FindHandle = 0xFFFFFFFF;
     return Desc;
 }
 

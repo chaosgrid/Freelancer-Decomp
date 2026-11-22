@@ -55,8 +55,8 @@ struct FTriMeshGroup
     unsigned long Type;                // +0x00 D3D primitive type: 4 list, 5 strip
     unsigned long MaterialCrc;         // +0x04 CRC of the lower-cased "Material_name"
     IMaterial* Material;               // +0x08 bound by the hook-up (LAB_06c262a0)
-    void* Field_0x0C;                  // +0x0C IMesh Slot16 reads / Slot17 writes it; Draw puts it
-                                       //       in submit ctx+0x20. TODO: meaning (no reader here)
+    void* MaterialContext;             // +0x0C IMesh Get/SetFaceGroupMaterialContext; Draw passes
+                                       //       it into submit ctx+0x20.
     unsigned long MinIndex;            // +0x10 FUN_06c279a0: smallest raw index, subtracted out
     unsigned long MaxIndex;            // +0x14 FUN_06c279a0: largest raw index
     unsigned short* Indices;           // +0x18 "Face_indices" / "Tristrip_indices", rebased
@@ -144,8 +144,8 @@ public:
     float Box[6];                          // +0x1BC max x, min x, max y, min y, max z, min z
     float SphereCenter[3];                 // +0x1D4 FUN_06c258c0
     float SphereRadius;                    // +0x1E0 -1.0f after a reset
-    void* Field_0x1E4;                     // +0x1E4 FUN_06c265f0 hands it to Draw as a ready
-                                           //       vertex listing; only ever zeroed. TODO
+    void* PrebuiltVertexBuffer;            // +0x1E4 handed to Draw via GetPrebuiltListing as a
+                                           //       ready vertex listing; only ever zeroed in retail.
     // +0x1E8 the edit cursor, retail a Group** into the vector; the port keeps the index and
     // treats Cursor == Groups.size() as retail's "cursor == end".
     size_t Cursor;

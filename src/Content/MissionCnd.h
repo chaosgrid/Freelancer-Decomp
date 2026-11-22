@@ -50,7 +50,7 @@ public:
     // +0x0c: called by FUN_06eb82c0 on activation and by FUN_06ebb830 on re-arm.
     virtual void OnActivate();
     // +0x10: base FUN_06ebf720 (RET). Name unknown.
-    virtual void Slot10();
+    virtual void OnMissionEnd();
     // +0x14: writes the condition state into the save file (Cnd_Timer LAB_06ec16c0 fprintf).
     virtual void Save(FILE* File);
     // +0x18: reads it back (Cnd_Timer FUN_06ec16e0 walks the current section).
@@ -97,8 +97,8 @@ public:
 
     TString<0x30> ScannerLabel; // +0x0c
     TString<0x30> ScannedLabel; // +0x40
-    unsigned int Field_0x74;    // +0x74 (ctor 0) TODO: resolved id, written by OnActivate
-    unsigned int Field_0x78;    // +0x78 (ctor 0) TODO: resolved id, written by OnActivate
+    unsigned int ScannerId;    // +0x74 (ctor 0) TODO: resolved id, written by OnActivate
+    unsigned int ScannedId;    // +0x78 (ctor 0) TODO: resolved id, written by OnActivate
 };
 
 // Cnd_CharSelect: new(0x38), ctor inline (06ebba73), vtable 06fb56e4, event 0x1b.
@@ -644,14 +644,14 @@ public:
     TString<0x30> ShipB;      // +0x40 s1
     unsigned int ShipAId;     // +0x74 (ctor 0) FUN_06f15940(+0x0c)
     unsigned int ShipBId;     // +0x78 (ctor 0) FUN_06f15940(+0x40)
-    unsigned char Field_0x7c; // +0x7c (ctor 0) tethered: event parms (A, B, .., +0xc byte 0)
+    unsigned char bTethered; // +0x7c (ctor 0) tethered: event parms (A, B, .., +0xc byte 0)
     float DistanceSq;         // +0x80 (ctor 0) f2, squared when > 0: broken beyond this
-    float Field_0x84;         // +0x84 (ctor 0) optional f4, squared when not < 0: inside it
+    float InnerDistanceSq;         // +0x84 (ctor 0) optional f4, squared when not < 0: inside it
                               //       only a growing distance counts
-    float Field_0x88;         // +0x88 (OnActivate 0) squared distance of the last check
-    float Field_0x8c;         // +0x8c (ctor 0) f3: seconds beyond the tether that break it
-    float Field_0x90;         // +0x90 (ctor 0, OnActivate 0) seconds beyond so far
-    float Field_0x94;         // +0x94 (OnActivate 0) mission time (+0x30c) of the last check
+    float LastDistanceSq;         // +0x88 (OnActivate 0) squared distance of the last check
+    float BreakDuration;         // +0x8c (ctor 0) f3: seconds beyond the tether that break it
+    float ElapsedBeyond;         // +0x90 (ctor 0, OnActivate 0) seconds beyond so far
+    float LastCheckTime;         // +0x94 (OnActivate 0) mission time (+0x30c) of the last check
 };
 
 // FUN_06f242e0 (TU39; callers Cnd_TetherBroke 06ec13aa and TU60 06f82ae0): squared distance

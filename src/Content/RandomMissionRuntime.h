@@ -98,7 +98,7 @@ public:
 
 // TU57 -- trigger (retail 0x40 bytes; vtable 06fbbda4, 11 slots: [0] scalar deleting dtor
 // FUN_06f71720 (dtor FUN_06f713a0: ~MessageHandler, ~StateMachine), [1] process (import),
-// [2] Slot2 LAB_06f71090, [3] handle_state_change (import), [4]..[10] below; MessageHandler
+// [2] OnStateEvent LAB_06f71090, [3] handle_state_change (import), [4]..[10] below; MessageHandler
 // side 06fbbdd0 ([0] LAB_06f71fa0 = this - 0x10 -> FUN_06f71720, [1]..[4] imports)).
 // States: 0 idle, 1 armed (the subclass's condition, slot 6), 2 fired, 3 waiting to re-arm,
 // 4 done. Slot 6 is purecall here: TU57's three subclasses and TU61's (06fbca40, 06fbca84)
@@ -112,7 +112,7 @@ public:
                float InRearmDelay);
 
     // LAB_06f71090 (RET 8): State 0..4 -> slots 5..9 with (Event, State); always false.
-    bool Slot2(SMEventData const* Event, int const& State) override;
+    bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     virtual void SetActivator(unsigned int InActivator);            // [4] FUN_06f71080
     virtual bool OnIdle(SMEventData const* Event, int const& State);    // [5] LAB_06f71100

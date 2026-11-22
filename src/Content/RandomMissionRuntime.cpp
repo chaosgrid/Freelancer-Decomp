@@ -268,7 +268,7 @@ FRmLine::FRmLine()
     : FGcsPlayerListLine(nullptr)
     , SpeakerKind(0)
     , TargetKind(0)
-    , Field_0x8c(0)
+    , bPrepared(0)
 {
     Text.Length = 0;
     Text.Data[0] = '\0';
@@ -278,7 +278,7 @@ FRmLine::FRmLine()
 // -> 1, else 0.
 bool FRmLine::CanPlay()
 {
-    if (FGcsPlayerListLine::CanPlay() && Field_0x8c != 0)
+    if (FGcsPlayerListLine::CanPlay() && bPrepared != 0)
         return true;
     return false;
 }
@@ -491,7 +491,7 @@ void FRmVignetteOffer::ReleaseTargetName()
             {
                 if (Ship->TargetName != nullptr)
                 {
-                    bKeep = Group->Field_0x01;
+                    bKeep = Group->bSpawned;
                     bFound = true;
                     break;
                 }

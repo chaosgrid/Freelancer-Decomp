@@ -697,7 +697,7 @@ void FontStringConstruct(FFontString* Self)
     // FUN_004144b0
     Self->Text = nullptr;
     Self->Capacity = 0;
-    Self->Field08 = 0x7fff;
+    Self->MaxLines = 0x7fff;
     Self->Field0C = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Self) >> 24);
     Self->Pad0D[0] = 0;
     Self->Pad0D[1] = 0;
@@ -987,9 +987,9 @@ void FontStringRebuild(FFontString* Self)
     if (Self->bMultiLine != 0)
     {
         // 0x0041561c..0x00415672: 0x400 {line, capacity} elements zeroed (FUN_00415850 through
-        // the EH vector constructor), max lines = Field08 capped at 0x400 (unsigned, JC), the
+        // the EH vector constructor), max lines = MaxLines capped at 0x400 (unsigned, JC), the
         // width is the unsigned ScaleKey (+0x2c) through a qword FILD, FSTP float.
-        unsigned MaxLines = static_cast<unsigned>(Self->Field08);
+        unsigned MaxLines = static_cast<unsigned>(Self->MaxLines);
         if (MaxLines >= 0x400u)
         {
             MaxLines = 0x400u;
@@ -1135,7 +1135,7 @@ void DrawChildAligned(FFontStringDrawOrigin const* Origin, FontStringElement* Ch
     FFontStringDrawOrigin Local;
     // 00414307..0041434f: [+0x10] 1 -> (width - (unsigned)w) * 0.5 (DAT_005c75e0) + x;
     // 2 -> width + x - (int)w (FISUB); anything else copies x.
-    unsigned const HMode = Origin->Field10;
+    unsigned const HMode = Origin->HAlign;
     if (HMode == 1u)
     {
         double const Span =
@@ -1153,7 +1153,7 @@ void DrawChildAligned(FFontStringDrawOrigin const* Origin, FontStringElement* Ch
         Local.X = Origin->X;
     }
     // 00414353..00414399: the same on y with [+0x14] and the height at +0xc.
-    unsigned const VMode = Origin->Field14;
+    unsigned const VMode = Origin->VAlign;
     if (VMode == 1u)
     {
         double const Span =
@@ -1174,8 +1174,8 @@ void DrawChildAligned(FFontStringDrawOrigin const* Origin, FontStringElement* Ch
     // read only x and y.
     std::memcpy(&Local.Scale, &Size[0], sizeof(float));
     std::memcpy(&Local.Height, &Size[1], sizeof(float));
-    Local.Field10 = 0;
-    Local.Field14 = 0;
+    Local.HAlign = 0;
+    Local.VAlign = 0;
 
     // 0041439d..004143b0: vt+0x24(&local, DrawCtx, DrawArg).
     Child->Paint(&Local, DrawCtx, DrawArg);

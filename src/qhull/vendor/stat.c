@@ -426,7 +426,7 @@ void qh_initstatistics (void) {
   qh_allstatH();
   qh_allstatI();
   if (qhstat next > sizeof(qhstat id)) {
-    FUN_06356960 (/* retail 0637ce8e */ "qhull error (qh_initstatistics): increase size of qhstat.id[].\n\
+    ivp_message (/* retail 0637ce8e */ "qhull error (qh_initstatistics): increase size of qhstat.id[].\n\
       qhstat.next %d should be <= sizeof(qhstat id) %d\n", qhstat next, sizeof(qhstat id));
 #if 0 /* for locating error, Znumridges should be duplicated */
     for (i=0; i < ZEND; i++) {

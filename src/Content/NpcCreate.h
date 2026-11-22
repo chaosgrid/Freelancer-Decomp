@@ -60,7 +60,7 @@ public:
 
     // Slot 1, 06ed59f0 (bytes 8a 81 64 01 00 00 c3, not disassembled by Ghidra):
     // MOV AL,[ECX+0x164]; RET. TODO: slot name unknown (FContentSpaceObj +0x04).
-    bool Slot04() override;
+    virtual bool IsInCombat();
 
     // ContentCallback +0x1c, 06ed5a00 (RET 0xc).
     void combat_state_notification(CSNType Type, uint Param1, uint Param2) override;
@@ -72,7 +72,7 @@ public:
 
     // +0x164: 0 from the ctor; combat_state_notification stores (Type == 0).
     // TODO: meaning of the CSN type values unknown.
-    bool Field_0x164 = false;
+    bool bInCombat = false;
     int StateGraph;                          // +0x168
     pub::AI::Personality Personality;        // +0x16c
     bool bHasPersonality;                    // +0x544

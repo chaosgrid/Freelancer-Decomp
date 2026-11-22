@@ -445,14 +445,14 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
         AppendJustify(ServerDetails, TextJustifyLeft);
         AppendStyle(ServerDetails, 0x76ec);
         RenderDisplayList Description; // 0x00567f60
-        AppendTextAsRdl(Server.Field_0x54.c_str(), static_cast<unsigned>(Server.Field_0x54.size()),
+        AppendTextAsRdl(Server.Description.c_str(), static_cast<unsigned>(Server.Description.size()),
                         Description, false); // FUN_0057db50
         ServerDetails->AppendContent(Description);
         AppendParagraph(ServerDetails);
 
         // 0x00567fd6..0x005681fd: the restrictions -- shown unless +0x95 is set and there is no
         // password. Here the style comes before the left justification (0x005680b8 / 0x005680e5).
-        if (Server.Field_0x95 == 0 || Server.bPassword != 0)
+        if (Server.bAllowNewPlayers == 0 || Server.bPassword != 0)
         {
             AppendJustify(ServerDetails, TextJustifyCenter);
             AppendStyle(ServerDetails, 0x4433);
@@ -460,7 +460,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
             AppendParagraph(ServerDetails);
             AppendStyle(ServerDetails, 0x76ec);
             AppendJustify(ServerDetails, TextJustifyLeft);
-            if (Server.Field_0x95 == 0)
+            if (Server.bAllowNewPlayers == 0)
             {
                 AppendRef(ServerDetails, DetailsField95);
                 AppendParagraph(ServerDetails);
@@ -687,7 +687,7 @@ void PageCharacterSelect::FillRow(unsigned Row, CCharacterSet::CharacterInfo con
     Data->Release();
 }
 
-bool PageCharacterSelect::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00569670.
     if (Msg == 0x3004)
@@ -817,7 +817,7 @@ bool PageCharacterSelect::Slot23(unsigned Msg, unsigned A, unsigned B)
         // 0x00569d7f..0x00569e83: the delete confirm's answer.
         if (A == 0)
         {
-            Slot23(0x3004, 0xf003, 0); // slot 23 on itself (0x00569d96)
+            ProcessMessage(0x3004, 0xf003, 0); // slot 23 on itself (0x00569d96)
             return true;
         }
         if (A != 1)
@@ -1152,10 +1152,10 @@ void PageCharacterSelect::Update()
                 FNewCharFaction const& Faction =
                     G_LoginMgr.GetFactions()[static_cast<size_t>(
                         G_CharacterCreateSelection.FactionIndex)];
-                G_CharacterCreateSelection.Info.Field_0x30 = Faction.NicknameId; // DAT_0067bd28
-                G_CharacterCreateSelection.Info.Field_0x34 = *Faction.Bases.begin();    // bd2c
-                G_CharacterCreateSelection.Info.Field_0x38 = *Faction.Packages.begin(); // bd30
-                G_CharacterCreateSelection.Info.Field_0x3c = *Faction.Pilots.begin();   // bd34
+                G_CharacterCreateSelection.Info.FactionId = Faction.NicknameId; // DAT_0067bd28
+                G_CharacterCreateSelection.Info.BaseId = *Faction.Bases.begin();    // bd2c
+                G_CharacterCreateSelection.Info.PackageId = *Faction.Packages.begin(); // bd30
+                G_CharacterCreateSelection.Info.PilotId = *Faction.Pilots.begin();   // bd34
                 Result = 0xe; // 0x0056aae8
             }
             else if (LeaveDirection == -2)

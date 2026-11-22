@@ -1319,7 +1319,7 @@ public:
     // Event->Type selects one of eight cases; Event->Data is a per-case payload block whose
     // offsets are listed on the definition in common_behaviormanager.cpp. Types above 7, and any event
     // while CurrentBehaviorIndex == -1, are ignored.
-    virtual void Slot00(FBehaviorManagerEvent const* Event); // vftable 063a037c +0x00
+    virtual void OnEvent(FBehaviorManagerEvent const* Event); // vftable 063a037c +0x00
 
 private:
     void InitNotificationQueue();
@@ -1449,20 +1449,20 @@ public:
     unsigned ContentCbCreationType;     // +0x114
     // +0x118/+0x11C: the two-word "directive result" payload UpdateBehaviorTick's dispatch
     // tail hands to every registered DirectiveCallbacks[] entry (Common.dll.txt 212168-212180
-    // and 212570-212586: `PUSH [this+0x118]; PUSH [this+0x11C]; CALL [*Cb]`, so Field11c is
-    // the callback's FIRST parameter and Field118 its second).
+    // and 212570-212586: `PUSH [this+0x118]; PUSH [this+0x11C]; CALL [*Cb]`, so PendingCompletedBehavior is
+    // the callback's FIRST parameter and PendingDirectiveResult its second).
     //
-    // CORRECTED 2026-09-17: the previous claim here -- "Field118 is only ever written with the
+    // CORRECTED 2026-09-17: the previous claim here -- "PendingDirectiveResult is only ever written with the
     // literal 2" -- was false, and it had been used to argue that the value carried no
     // information. It came from the only two sites that do write a literal, .text:062d2ea9 and
     // .text:062d3244, both inside UpdateBehaviorTick's own dispatch. The pair is ALSO written
     // by a two-argument setter, FUN_062d29a0, which has fifteen callers:
     //     .text:062d29a0  MOV EAX,[ESP + param_2]
     //     .text:062d29a4  MOV EDX,[ESP + param_1]
-    //     .text:062d29a8  MOV [ECX + 0x118],EAX      ; Field118 <- SECOND argument
-    //     .text:062d29ae  MOV [ECX + 0x11c],EDX      ; Field11c <- FIRST argument
+    //     .text:062d29a8  MOV [ECX + 0x118],EAX      ; PendingDirectiveResult <- SECOND argument
+    //     .text:062d29ae  MOV [ECX + 0x11c],EDX      ; PendingCompletedBehavior <- FIRST argument
     //     .text:062d29b4  RET 0x8
-    // Three call sites read directly off the listing give Field118 = 0, 0 and 1 --
+    // Three call sites read directly off the listing give PendingDirectiveResult = 0, 0 and 1 --
     // .text:062d0b14 `PUSH 0x0; PUSH 0x14` (DelayBehavior), .text:062fddf2 `PUSH 0x0; PUSH 0x2`
     // (GotoBehavior), .text:062cf56a `PUSH 0x1; PUSH 0xe` (GuideBehavior) -- so the field is a
     // real caller-supplied value, not a constant.
@@ -1473,14 +1473,14 @@ public:
     // class's own method range (.text:062d2332 in FUN_062d2220, and .text:062d4193) are left
     // unclaimed here pending a per-site receiver check.
     //
-    // Field11c takes the behavior index the transition came from, the current directive's own
+    // PendingCompletedBehavior takes the behavior index the transition came from, the current directive's own
     // third dword, or -1 (the "nothing pending" reset the tail always leaves behind); the
     // matching first arguments at the three sites above are 0x14, 0x2 and 0xe.
     // Semantic names not recovered -- TODO: FUN_062d29a0 should be homed as a real member of
     // this class so the per-behavior copies of it collapse into one.
-    int Field118;                       // +0x118
-    int Field11c;                       // +0x11C
-    unsigned Field120;                  // +0x120
+    int PendingDirectiveResult;                       // +0x118
+    int PendingCompletedBehavior;                       // +0x11C
+    unsigned DefaultBehaviorIndex;                  // +0x120
     // Last direction vector passed to update_current_behavior_direction (or zeroed by
     // reset_current_behavior_direction) -- see Common.dll.c @ 0x73690 L106502-106504 and
     // @ 0x73B10 L106543-106545.
@@ -1503,7 +1503,7 @@ public:
     NotificationNode* NotificationQueueHead; // +0x15C  circular-list sentinel (self-referencing when empty)
     int NotificationCount;              // +0x160
     float TurnSensitivity;              // +0x164
-    unsigned char Opaque168[1];         // +0x168
+    unsigned char bAllowUserSteering;   // +0x168
     unsigned char DockingPortFlag;      // +0x169
     unsigned char Opaque16a[2];         // +0x16A .. +0x16B
     int DockingPortStatus;              // +0x16C
@@ -1571,10 +1571,10 @@ static_assert(offsetof(IBehaviorManager, BehaviorDispatchTable) == 0x174,
               "IBehaviorManager+0x174 BehaviorDispatchTable");
 static_assert(offsetof(IBehaviorManager, Flags1c8) == 0x1C8,
               "IBehaviorManager+0x1C8 Flags1c8 -- pins BehaviorDispatchTable[21]'s end");
-static_assert(offsetof(IBehaviorManager, Field118) == 0x118,
-              "IBehaviorManager+0x118 Field118");
-static_assert(offsetof(IBehaviorManager, Field11c) == 0x11C,
-              "IBehaviorManager+0x11C Field11c");
+static_assert(offsetof(IBehaviorManager, PendingDirectiveResult) == 0x118,
+              "IBehaviorManager+0x118 PendingDirectiveResult");
+static_assert(offsetof(IBehaviorManager, PendingCompletedBehavior) == 0x11C,
+              "IBehaviorManager+0x11C PendingCompletedBehavior");
 static_assert(offsetof(IBehaviorManager, ObjectDb) == 0xEC,
               "IBehaviorManager+0xEC ObjectDb");
 static_assert(sizeof(IBehaviorManager) == 0x1CC,
@@ -1625,9 +1625,9 @@ struct CharacterBehaviorDescription
     // again -- a no-op on a freshly constructed FmtStr. IdArray / StringArray (and the pad
     // bytes) are not written.
     CharacterBehaviorDescription()
-        : Field00(0), Field04(1), Field05(0), Field06(1), Field08(0), Field0c(0), Field10(1),
-          IdArrayCount(0), StringArray2Count(0), Field21c(0), Field220(0), Field224(0),
-          Field258(0), Filter(0)
+        : LocationId(0), bApplySpatial(1), bAutoplay(0), bGenericScript(1), RelocateLocationId(0), StartRoomLocationId(0), bBindSingleCharacter(1),
+          IdArrayCount(0), StringArray2Count(0), DialogType(0), OfferArg(0), OfferMissionId(0),
+          RtcId(0), Filter(0)
     {
         for (int Index = 0; Index < 32; ++Index)
         {
@@ -1643,14 +1643,14 @@ struct CharacterBehaviorDescription
         DescFmtStr.destroy();
     }
 
-    int Field00;                  // +0x00 → this+0x04
-    unsigned char Field04;        // +0x04 → this[8]
-    unsigned char Field05;        // +0x05 → this[9]
-    unsigned char Field06;        // +0x06 → this[10]
+    int LocationId;               // +0x00 → this+0x04
+    unsigned char bApplySpatial;  // +0x04 → this[8]
+    unsigned char bAutoplay;      // +0x05 → this[9]
+    unsigned char bGenericScript; // +0x06 → this[10]
     unsigned char Pad07;
-    unsigned Field08;             // +0x08 → this+0x0C
-    unsigned Field0c;             // +0x0C → this+0x10
-    unsigned char Field10;        // +0x10 → this[0x14]
+    unsigned RelocateLocationId;  // +0x08 → this+0x0C
+    unsigned StartRoomLocationId; // +0x0C → this+0x10
+    unsigned char bBindSingleCharacter; // +0x10 → this[0x14]
     unsigned char Pad11[3];
     unsigned IdArray[32];         // +0x14 .. +0x93
     char const* StringArray[32];  // +0x94 .. +0x113
@@ -1658,12 +1658,12 @@ struct CharacterBehaviorDescription
     char const* StringArray2[32]; // +0x118 .. +0x197
     unsigned StringArray2Dword[32]; // +0x198 .. +0x217
     int StringArray2Count;        // +0x218
-    unsigned Field21c;            // +0x21C
-    unsigned Field220;            // +0x220
-    unsigned Field224;            // +0x224
+    unsigned DialogType;          // +0x21C
+    unsigned OfferArg;            // +0x220
+    unsigned OfferMissionId;      // +0x224
     FmtStr NameFmtStr;            // +0x228
     FmtStr DescFmtStr;            // +0x240
-    unsigned Field258;            // +0x258  retail trailing dword, copied into ScriptBehavior::Field25c
+    unsigned RtcId;               // +0x258  retail trailing dword, copied into ScriptBehavior::Field25c
     // +0x25C. Added 2026-09-24: pub::GF::CharacterBehaviorCreate reads it
     // (Server.dll .text:06d18043 `MOV EAX,[ESI+0x25c]`) and passes it on as the
     // behaviour record's session filter (FUN_06d122f0 .text:06d12452). init()
@@ -1694,14 +1694,14 @@ public:
 
 public:
     int BehaviorId;               // +0x00  default -1
-    unsigned Field04;             // +0x04
-    unsigned char Flag08;         // +0x08  default 1
-    unsigned char Flag09;         // +0x09
-    unsigned char Flag0a;         // +0x0A  default 1
+    unsigned LocationId;          // +0x04
+    unsigned char bApplySpatial;  // +0x08  default 1
+    unsigned char bAutoplay;      // +0x09
+    unsigned char bGenericScript; // +0x0A  default 1
     unsigned char Pad0b;
-    unsigned Field0c;             // +0x0C
-    unsigned Field10;             // +0x10
-    unsigned char Flag14;         // +0x14  default 1
+    unsigned RelocateLocationId;  // +0x0C
+    unsigned StartRoomLocationId; // +0x10
+    unsigned char bBindSingleCharacter; // +0x14  default 1
     unsigned char Pad15[3];
     // Two parallel arrays of 0x20 entries each:
     //   ids at +0x18..+0x94 (32 * 4 = 0x80)
@@ -1717,12 +1717,12 @@ public:
     unsigned StringArray2Dword[32]; // +0x19C  per-entry value paired with StringArray2[i] -- retail
                                      // marshal/unmarshal round-trips this; it must not be dropped.
     int StringArray2Count;        // +0x21C
-    unsigned Field220;            // +0x220
-    unsigned Field224;            // +0x224
-    unsigned Field228;            // +0x228
+    unsigned DialogType;          // +0x220
+    unsigned OfferArg;            // +0x224
+    unsigned OfferMissionId;      // +0x228
     FmtStr NameFmtStr;            // +0x22C  (FmtStr is 0x18, common_text.h)
     FmtStr DescFmtStr;            // +0x244
-    unsigned Field25c;             // +0x25C retail trailing dword (source: CharacterBehaviorDescription's
+    unsigned RtcId;                // +0x25C retail trailing dword (source: CharacterBehaviorDescription's
                                     // own trailing dword right after DescFmtStr).
 };
 
@@ -1735,7 +1735,7 @@ static_assert(offsetof(ScriptBehavior, StringArray2Dword) == 0x19C, "ScriptBehav
 static_assert(offsetof(ScriptBehavior, StringArray2Count) == 0x21C, "ScriptBehavior+0x21C count 2");
 static_assert(offsetof(ScriptBehavior, NameFmtStr) == 0x22C, "ScriptBehavior+0x22C NameFmtStr");
 static_assert(offsetof(ScriptBehavior, DescFmtStr) == 0x244, "ScriptBehavior+0x244 DescFmtStr");
-static_assert(offsetof(ScriptBehavior, Field25c) == 0x25C, "ScriptBehavior+0x25C trailing dword");
+static_assert(offsetof(ScriptBehavior, RtcId) == 0x25C, "ScriptBehavior+0x25C trailing dword");
 static_assert(sizeof(ScriptBehavior) == 0x260, "ScriptBehavior must be 0x260");
 
 // ============================================================================

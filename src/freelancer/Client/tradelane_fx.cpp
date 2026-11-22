@@ -672,7 +672,7 @@ namespace
             CliEffectListRemove(reinterpret_cast<unsigned char*>(Ship) + 0x28, Lane);
         FClientSolarGameobj const* const ShipRingGo =
             static_cast<FClientSolarGameobj const*>(TlWatchedGameobj(TlShipRingPtr(Ship)));
-        if (ShipRingGo->Field_0x1f0 != 0)
+        if (ShipRingGo->bTradeLaneIdle != 0)
         {
             TlOneshot14bf0(Ring, Ship, false);
         }
@@ -996,7 +996,7 @@ namespace
         FBehaviorManagerEvent Event;
         Event.Type = 4;
         Event.Data = Block;
-        Behavior->Slot00(&Event);
+        Behavior->OnEvent(&Event);
     }
 
     // The CShip narrowing of the IClient handlers ((class & 0x503) == 0x503).
@@ -1476,7 +1476,7 @@ void TradeLaneIClientGoTradelane(XGoTradelane const* Info)
     FBehaviorTradelaneEvent Block;
     Block.bEnteringLane = 1;
     Block.bExitRequested = 0;
-    Block.bFastExit = static_cast<unsigned char>(Info->Field_0x0c);
+    Block.bFastExit = static_cast<unsigned char>(Info->bMidLane);
     Block.Pad03 = 0;
     Block.Speed = 0.0f;
     Block.Field_0x08 = 0;
@@ -1495,7 +1495,7 @@ void TradeLaneIClientGoTradelane(XGoTradelane const* Info)
     FClientGameobj* const Ring1 = ClientObjDb_FindObject(Info->TradelaneRing1, 2);
     FClientGameobj* const Ring2 = ClientObjDb_FindObject(Info->TradelaneRing2, 2);
     if (Ship != nullptr && Ring1 != nullptr && Ring2 != nullptr)
-        TradeLaneStartCommand(Ring1, Ring2, Ship, static_cast<unsigned char>(Info->Field_0x0c));
+        TradeLaneStartCommand(Ring1, Ring2, Ship, static_cast<unsigned char>(Info->bMidLane));
 }
 
 void TradeLaneIClientStopTradelane(unsigned ShipId, unsigned EntranceId)

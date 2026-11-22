@@ -7,7 +7,7 @@
 #include "ivp_contact_point.h"
 #include "ivp_environment.h"
 #include "ivp_material.h"
-#include "ivp_cluster_manager.h"   // fire_event_friction_slot2 (FUN_0634b0e0)
+#include "ivp_cluster_manager.h"   // fire_event_friction_created (FUN_0634b0e0)
 #include "ivp_simulation_unit.h"   // FUN_06348c60 / FUN_06348d80 (06356bc0's sim unit fusion)
 #include "ivp_mindist_settings.h"  // G_IVP_MindistSettings (06359560 / 063595c0)
 #include "ivp_impact.h"            // FUN_06358c00 (06359380)
@@ -1707,14 +1707,14 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
     Event.Environment = ObjEnvironment;
     Event.ContactSituation = Cp->Owner;
     Event.FrictionHandle = Cp;
-    IVP_Environment_Notify_Listeners_C8_Slot2(ObjEnvironment, &Event); // FUN_0634cfa0
+    IVP_Environment_Notify_Friction_Created(ObjEnvironment, &Event); // FUN_0634cfa0
     if ((Obj0->flags & 0x2000u) != 0)
     {
-        ObjEnvironment->cluster_manager->fire_event_friction_slot2(Obj0, &Event); // FUN_0634b0e0
+        ObjEnvironment->cluster_manager->fire_event_friction_created(Obj0, &Event); // FUN_0634b0e0
     }
     if ((Obj1->flags & 0x2000u) != 0)
     {
-        ObjEnvironment->cluster_manager->fire_event_friction_slot2(Obj1, &Event);
+        ObjEnvironment->cluster_manager->fire_event_friction_created(Obj1, &Event);
     }
     *OutHavingNew = 1;
 

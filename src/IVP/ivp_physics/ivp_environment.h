@@ -199,7 +199,7 @@ public:
     // store the pool's minimum key here right before removing that event
     // (063606d0 :0636072b, 063607c0 :0636086d); the PSI advance resets it to 0
     // (:06360bb5). Written as a float bit pattern, read by nothing traced yet.
-    float Field_0x10;               // +0x10
+    float LastEventRelTime;               // +0x10
     float TimeBaseHi;               // +0x14
     float TimeBaseLo;               // +0x18
 
@@ -260,7 +260,7 @@ static_assert(sizeof(IVP_Sim_Unit_Manager) == 0x1c, "IVP_Sim_Unit_Manager size m
 static_assert(offsetof(IVP_Sim_Unit_Manager, EventManager) == 0x04, "IVP_Sim_Unit_Manager+0x04");
 static_assert(offsetof(IVP_Sim_Unit_Manager, EventPool) == 0x08, "IVP_Sim_Unit_Manager+0x08");
 static_assert(offsetof(IVP_Sim_Unit_Manager, PsiEvent) == 0x0c, "IVP_Sim_Unit_Manager+0x0c");
-static_assert(offsetof(IVP_Sim_Unit_Manager, Field_0x10) == 0x10, "IVP_Sim_Unit_Manager+0x10");
+static_assert(offsetof(IVP_Sim_Unit_Manager, LastEventRelTime) == 0x10, "IVP_Sim_Unit_Manager+0x10");
 static_assert(offsetof(IVP_Sim_Unit_Manager, TimeBaseHi) == 0x14, "IVP_Sim_Unit_Manager+0x14");
 static_assert(offsetof(IVP_Sim_Unit_Manager, TimeBaseLo) == 0x18, "IVP_Sim_Unit_Manager+0x18");
 
@@ -358,11 +358,11 @@ static_assert(sizeof(IVP_Range_Manager) == 0x34, "operator_new(0x34) at .text:06
 // ctor when the create parms carry none (.text:0634c413-0634c44c:
 // operator_new(0xa8), FUN_063602a0). vtable 063a5714, 6 slots in
 // IVP_PerformanceCounter's order (ivp_listener.h):
-//   +0x00 06360350 Slot00 (start_pcount): current element = 0
-//   +0x04 063602e0 Slot01 (pcount(element))
+//   +0x00 06360350 start_pcount (start_pcount): current element = 0
+//   +0x04 063602e0 pcount (pcount(element))
 //   +0x08 062a8920 Slot02 (stop_pcount): `RET` (ICF-shared)
 //   +0x0c 06360280 environment_is_going_to_be_deleted: delete this
-//   +0x10 06360110 Slot04 (reset_and_print_performance_counters(IVP_Time))
+//   +0x10 06360110 reset_and_print_performance_counters (reset_and_print_performance_counters(IVP_Time))
 //   +0x14 063602c0 deleting destructor (FUN_06360290 re-stamps the base 0639bac8)
 // ============================================================================
 class IVP_PerformanceCounter_Simple : public IVP_PerformanceCounter
@@ -371,26 +371,26 @@ public:
     // FUN_063602a0: vptr, then 0x29 dwords zeroed from +0x04 (REP STOSD).
     IVP_PerformanceCounter_Simple();
 
-    void Slot00() override;
-    void Slot01(int32_t Element) override;
-    void Slot02() override {}
+    void start_pcount() override;
+    void pcount(int32_t Element) override;
+    void stop_pcount() override {}
     void environment_is_going_to_be_deleted(IVP_Environment* Env) override;
-    void Slot04(float TimeHi, float TimeLo) override;
+    void reset_and_print_performance_counters(float TimeHi, float TimeLo) override;
     ~IVP_PerformanceCounter_Simple() override {}
 
     struct FCounter
     {
-        int32_t Microseconds; // +0x00: accumulated by Slot01 (FIADD dword / ftol store)
-        int32_t Field_0x04;   // +0x04: zeroed by the ctor and Slot04 only. TODO: no reader traced.
+        int32_t Microseconds; // +0x00: accumulated by pcount (FIADD dword / ftol store)
+        int32_t Field_0x04;   // +0x04: zeroed by the ctor and reset_and_print_performance_counters only. TODO: no reader traced.
     };
 
     int32_t  Field_0x04;       // +0x04: zeroed only. TODO: no reader traced.
-    uint32_t LastCounterLow;   // +0x08: QueryPerformanceCounter low dword of the previous Slot01
+    uint32_t LastCounterLow;   // +0x08: QueryPerformanceCounter low dword of the previous pcount
     int32_t  LastCounterHigh;  // +0x0c: its high dword (written, never read back)
-    int32_t  CurrentElement;   // +0x10: element the next Slot01 charges the elapsed time to
-    int32_t  CountPSIs;        // +0x14: Slot01(1) calls since the last reset
+    int32_t  CurrentElement;   // +0x10: element the next pcount charges the elapsed time to
+    int32_t  CountPSIs;        // +0x14: pcount(1) calls since the last reset
     FCounter Counters[17];     // +0x18..+0x9f
-    IVP_Time TimeOfLastReset;  // +0xa0: Slot04's argument
+    IVP_Time TimeOfLastReset;  // +0xa0: reset_and_print_performance_counters's argument
 };
 static_assert(sizeof(IVP_PerformanceCounter_Simple) == 0xa8, "operator_new(0xa8) at .text:0634c41a");
 
@@ -948,8 +948,8 @@ void IVP_Environment_Notify_Object_Listeners_Slot1(IVP_Environment* env, void* a
 // Notify_Listeners_C8 above uses), calling each listener's own vtable
 // slot2 / slot3 respectively with `arg`. FULLPORT-DEFERRED[IVP]: no
 // Listener interface modeled.
-void IVP_Environment_Notify_Listeners_C8_Slot2(IVP_Environment* env, void* arg);
-void IVP_Environment_Notify_Listeners_C8_Slot3(IVP_Environment* env, void* arg);
+void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg);
+void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg);
 
 // FUN_0634d050 (decomp-tracker item 3060, Common.dll.txt:421754-421774, 15
 // insns). Growable-vector append onto env->vector_listeners_c8 (+0xC8/

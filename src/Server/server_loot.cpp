@@ -357,7 +357,7 @@ void Loot::split_stack()
         // dwords zero (so no player to mark, +0x18, and no name id, +0x1c), +0x68 = 1 and
         // +0x69 = 0; every other field is written below.
         FLootRecord Template = {};
-        Template.Field_0x68 = 1;
+        Template.bCanAiTractor = 1;
         Template.bMission = 0;
         Records.push_back(Template);
         FLootRecord& Record = Records.back();

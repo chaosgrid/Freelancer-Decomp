@@ -122,8 +122,8 @@ unsigned int RpcEncodeServerCreateLoot(FPacketBase& Packet, unsigned char** Buff
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06d928f4 FUN_06da1380
-    Stream.PutDword(Wire->Field_0x00);                         // 06d9293c  payload+0x00
-    Stream.PutByte(Wire->Field_0x04);                          // 06d92973  payload+0x04
+    Stream.PutDword(Wire->OwnerId);                         // 06d9293c  payload+0x00
+    Stream.PutByte(Wire->Kind);                          // 06d92973  payload+0x04
 
     // 06d9297a `MOV CL,byte ptr [EBP+0x30]` -- only the LOW BYTE of the list's Size
     // travels, and 06d929b0 `TEST CL,CL ; JBE` (CF is always clear after TEST, so the
@@ -136,22 +136,22 @@ unsigned int RpcEncodeServerCreateLoot(FPacketBase& Packet, unsigned char** Buff
         for (const FRpcLootWireNode* Node = Wire->Items.Head->Next;
              Node != Wire->Items.Head && !Stream.Failed(); Node = Node->Next) {
             const FRpcLootWireRecord& Record = Node->Value;
-            Stream.PutDword(Record.Field_0x00);                                   // 06d929f2
-            Stream.PutWord(Archetype::LargeIDToSmallID(Record.Field_0x04));       // 06d92a34
-            Stream.PutDword(Record.Field_0x08);                                   // 06d92a64 FSTP
-            Stream.PutWord(Record.Field_0x0c);                                    // 06d92a8f
-            Stream.PutWord(Archetype::LargeIDToSmallID(Record.Field_0x10));       // 06d92ac9
-            Stream.PutDword(Record.Field_0x14);                                   // 06d92af8 FSTP
-            Stream.PutDword(Record.Field_0x18);                                   // 06d92b26
+            Stream.PutDword(Record.LootId);                                   // 06d929f2
+            Stream.PutWord(Archetype::LargeIDToSmallID(Record.ContentsNickname));       // 06d92a34
+            Stream.PutDword(Record.ContentsHitPtsBits);                                   // 06d92a64 FSTP
+            Stream.PutWord(Record.Units);                                    // 06d92a8f
+            Stream.PutWord(Archetype::LargeIDToSmallID(Record.ContainerNickname));       // 06d92ac9
+            Stream.PutDword(Record.HitPtsBits);                                   // 06d92af8 FSTP
+            Stream.PutDword(Record.NameOverride);                                   // 06d92b26
             // 06d92b32 advances the cursor by 0xc, then 06d92b75 FUN_06d8f510 moves
             // the three dwords at record+0x1c..+0x24 and 06d92b7a bumps the pointer.
-            Stream.PutBytes(&Record.Field_0x1c, 12);
+            Stream.PutBytes(&Record.PosXBits, 12);
             if (SinglePlayer()) {                                                 // 06d92b7f / 06d92b87
-                Stream.PutBytes(&Record.Field_0x28, 12);                          // 06d92bd9
-                Stream.PutBytes(&Record.Field_0x34, 16);                          // 06d92c30
+                Stream.PutBytes(&Record.VelXBits, 12);                          // 06d92bd9
+                Stream.PutBytes(&Record.OrientWBits, 16);                          // 06d92c30
             }
-            Stream.PutByte(Record.Field_0x44);                                    // 06d92c5f
-            Stream.PutByte(Record.Field_0x45);                                    // 06d92c89
+            Stream.PutByte(Record.bMarkedBy);                                    // 06d92c5f
+            Stream.PutByte(Record.bTemporary);                                    // 06d92c89
         }
     }
     // 06d92ca9 FUN_06da13c0 -- `XOR EAX,EAX ; RET 0xc`, emits nothing.
@@ -179,12 +179,12 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Field_0x00 = Scratch;                                // 06d92d94
+    Wire->OwnerId = Scratch;                                // 06d92d94
     unsigned char Small8 = 0;
     if (!Stream.GetByte(Small8)) {
         return Stream.GetError();
     }
-    Wire->Field_0x04 = Small8;                                 // 06d92db8
+    Wire->Kind = Small8;                                 // 06d92db8
     unsigned char Count = 0;
     if (!Stream.GetByte(Count)) {                              // 06d92dd7
         return Stream.GetError();
@@ -201,7 +201,7 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
         for (unsigned int b = 0; b < (unsigned int)sizeof(FRpcLootWireRecord); ++b) {
             Raw[b] = 0;
         }
-        Fresh.Field_0x34 = 0x3f800000u;                        // 06d931c4
+        Fresh.OrientWBits = 0x3f800000u;                        // 06d931c4
 
         // 06d92e69 FUN_06d931f0 == std::list::insert(end(), record): the element is
         // linked in FIRST and filled in place afterwards, so a short buffer leaves a
@@ -213,29 +213,29 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
 
         unsigned short Small = 0;
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Record.Field_0x00 = Scratch;                                              // 06d92e9d
+        Record.LootId = Scratch;                                              // 06d92e9d
         if (!Stream.GetWord(Small)) { return Stream.GetError(); }
         // 06d92ec9 `XOR ECX,ECX ; MOV CX,[EAX]` -- zero-extended, then converted.
-        Record.Field_0x04 = Archetype::SmallIDToLargeID(Small);                   // 06d92eda
+        Record.ContentsNickname = Archetype::SmallIDToLargeID(Small);                   // 06d92eda
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Record.Field_0x08 = Scratch;                                              // 06d92f0a
+        Record.ContentsHitPtsBits = Scratch;                                              // 06d92f0a
         if (!Stream.GetWord(Small)) { return Stream.GetError(); }
-        Record.Field_0x0c = Small;                                                // 06d92f33
+        Record.Units = Small;                                                // 06d92f33
         if (!Stream.GetWord(Small)) { return Stream.GetError(); }
-        Record.Field_0x10 = Archetype::SmallIDToLargeID(Small);                   // 06d92f68
+        Record.ContainerNickname = Archetype::SmallIDToLargeID(Small);                   // 06d92f68
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Record.Field_0x14 = Scratch;                                              // 06d92f98
+        Record.HitPtsBits = Scratch;                                              // 06d92f98
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Record.Field_0x18 = Scratch;                                              // 06d92fc0
-        if (!Stream.GetBytes(&Record.Field_0x1c, 12)) { return Stream.GetError(); }// 06d92fe7
+        Record.NameOverride = Scratch;                                              // 06d92fc0
+        if (!Stream.GetBytes(&Record.PosXBits, 12)) { return Stream.GetError(); }// 06d92fe7
         if (SinglePlayer()) {                                                     // 06d92ff1 / 06d92ff9
-            if (!Stream.GetBytes(&Record.Field_0x28, 12)) { return Stream.GetError(); }
-            if (!Stream.GetBytes(&Record.Field_0x34, 16)) { return Stream.GetError(); }
+            if (!Stream.GetBytes(&Record.VelXBits, 12)) { return Stream.GetError(); }
+            if (!Stream.GetBytes(&Record.OrientWBits, 16)) { return Stream.GetError(); }
         }
         if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-        Record.Field_0x44 = Small8;                                               // 06d93099
+        Record.bMarkedBy = Small8;                                               // 06d93099
         if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-        Record.Field_0x45 = Small8;                                               // 06d930c0
+        Record.bTemporary = Small8;                                               // 06d930c0
     }
     // 06d930e6 FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {
@@ -317,14 +317,14 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06d91efc FUN_06da1380
 
-    const unsigned char Flag1 = (unsigned char)(Wire->Field_0x14 & 0xffu);
-    const unsigned char Flag2 = (unsigned char)(Wire->Field_0x18 & 0xffu);
-    const unsigned char Flag4 = (unsigned char)(Wire->Field_0x1c & 0xffu);
-    const unsigned char Flag8 = (unsigned char)(Wire->Field_0x20 & 0xffu);
-    const unsigned char Flag10 = (unsigned char)(Wire->Field_0x24 & 0xffu);
+    const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
+    const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
+    const unsigned char Flag4 = (unsigned char)(Wire->MaskDisplayName & 0xffu);
+    const unsigned char Flag8 = (unsigned char)(Wire->MaskRelationsByte & 0xffu);
+    const unsigned char Flag10 = (unsigned char)(Wire->MaskRelationsWord & 0xffu);
 
     unsigned char Mask = 0;                                    // 06d91f1c
-    if (Wire->Field_0x3c != 0xffffffffu) {                     // 06d91f14 CMP ...,-1
+    if (Wire->Affiliation != 0xffffffffu) {                     // 06d91f14 CMP ...,-1
         Mask = Flag1;                                          // 06d91f25
     }
     unsigned int RelCount = 0;                                 // 06d91f18
@@ -350,12 +350,12 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
             }
         }
     }
-    Wire->Field_0x34 = Mask;
+    Wire->Flags = Mask;
 
     Stream.PutByte(Mask);                                      // 06d91fb6
     Stream.PutDword(Wire->VibeHandle);                         // 06d91fe5  payload+0x38
     if ((Flag1 & Mask) != 0) {                                 // 06d91fef
-        Stream.PutDword(Wire->Field_0x3c);                     // 06d9201e
+        Stream.PutDword(Wire->Affiliation);                     // 06d9201e
     }
     if ((Flag4 & Mask) != 0) {                                 // 06d92028
         Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu));   // 06d92057
@@ -379,8 +379,8 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
             // 06d922a4 FLD [EDX+0x4] then 06d922d0 MOV EDX,[EDX] -- the value is
             // used untested, and the pair travels SECOND FIELD FIRST.
             const FRpcRelation* Relation = Node->Value;
-            Stream.PutDword(Relation->Field_0x04);
-            Stream.PutDword(Relation->Field_0x00);
+            Stream.PutDword(Relation->FeelingBits);
+            Stream.PutDword(Relation->GroupId);
         }
     }
     // 06d922ec FUN_06da13c0 -- emits nothing.
@@ -402,17 +402,17 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     // 06d9237f FUN_06da13c0 -- consumes nothing.
 
-    const unsigned char Flag1 = (unsigned char)(Wire->Field_0x14 & 0xffu);
-    const unsigned char Flag2 = (unsigned char)(Wire->Field_0x18 & 0xffu);
-    const unsigned char Flag4 = (unsigned char)(Wire->Field_0x1c & 0xffu);
-    const unsigned char Flag8 = (unsigned char)(Wire->Field_0x20 & 0xffu);
-    const unsigned char Flag10 = (unsigned char)(Wire->Field_0x24 & 0xffu);
+    const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
+    const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
+    const unsigned char Flag4 = (unsigned char)(Wire->MaskDisplayName & 0xffu);
+    const unsigned char Flag8 = (unsigned char)(Wire->MaskRelationsByte & 0xffu);
+    const unsigned char Flag10 = (unsigned char)(Wire->MaskRelationsWord & 0xffu);
 
     unsigned char Mask = 0;
     if (!Stream.GetByte(Mask)) {                               // 06d923bd
         return Stream.GetError();
     }
-    Wire->Field_0x34 = Mask;                                   // 06d923c0
+    Wire->Flags = Mask;                                   // 06d923c0
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
@@ -422,9 +422,9 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
         if (!Stream.GetDword(Scratch)) {
             return Stream.GetError();
         }
-        Wire->Field_0x3c = Scratch;                            // 06d9241c
+        Wire->Affiliation = Scratch;                            // 06d9241c
     } else {
-        Wire->Field_0x3c = 0xffffffffu;                        // 06d92423
+        Wire->Affiliation = 0xffffffffu;                        // 06d92423
     }
 
     if (SinglePlayer()) {                                      // 06d9242a / 06d92432
@@ -492,11 +492,11 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
                 if (!Stream.GetDword(Scratch)) {
                     return Stream.GetError();
                 }
-                Relation->Field_0x04 = Scratch;                             // 06d925d9
+                Relation->FeelingBits = Scratch;                             // 06d925d9
                 if (!Stream.GetDword(Scratch)) {
                     return Stream.GetError();
                 }
-                Relation->Field_0x00 = Scratch;                             // 06d92605
+                Relation->GroupId = Scratch;                             // 06d92605
                 // 06d92613 operator new(0xc) -- the node; 06d92648 bumps payload+0x30.
                 RpcRelationListLink(&Wire->Relations, Relation);
             }
@@ -569,17 +569,17 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
     const unsigned short Flags = Wire->Flags;
     Stream.PutWord(Flags);                                     // 06d98da7
     if ((Flags & kMiscObjUpdateFlagField_0x08) != 0) {         // 06d98daf TEST ...,0x8
-        Stream.PutDword(Wire->Field_0x08);                     // 06d98ddd
+        Stream.PutDword(Wire->ObjectId);                     // 06d98ddd
     }
     if ((Flags & kMiscObjUpdateFlagField_0x04) != 0) {         // 06d98de4
-        Stream.PutDword(Wire->Field_0x04);                     // 06d98e12
+        Stream.PutDword(Wire->PlayerId);                     // 06d98e12
     }
     if ((Flags & kMiscObjUpdateFlagField_0x14) != 0) {         // 06d98e19
-        Stream.PutDword(Wire->Field_0x14);                     // 06d98e47
+        Stream.PutDword(Wire->GroupId);                     // 06d98e47
     }
     if ((Flags & kMiscObjUpdateFlagPair) != 0) {               // 06d98e4e
-        Stream.PutDword(Wire->Field_0x18);                     // 06d98e7c
-        Stream.PutDword(Wire->Field_0x1c);                     // 06d98eab
+        Stream.PutDword(Wire->MissionId);                     // 06d98e7c
+        Stream.PutDword(Wire->MissionSetBy);                     // 06d98eab
     }
     if ((Flags & kMiscObjUpdateFlagText) != 0) {               // 06d98eb2
         // 06d98ec1 `MOV CX,word ptr [EBP+0x48]` -- only the LOW WORD of the character
@@ -592,16 +592,16 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
         Stream.PutBytes(Wire->Text.c_str(), (unsigned int)Chars * 2u);   // 06d98f2e
     }
     if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d98f45
-        Stream.PutDword(Wire->Field_0x34);                     // 06d98f74
+        Stream.PutDword(Wire->Affiliation);                     // 06d98f74
     }
     if ((Flags & kMiscObjUpdateFlagField_0x0c) != 0) {         // 06d98f7c
-        Stream.PutWord(Wire->Field_0x0c);                      // 06d98fac
+        Stream.PutWord(Wire->Rank);                      // 06d98fac
     }
     if ((Flags & kMiscObjUpdateFlagField_0x10) != 0) {         // 06d98fb5 TEST AL,AL / JNS
-        Stream.PutDword(Wire->Field_0x10);                     // 06d98fe5
+        Stream.PutDword(Wire->SystemId);                     // 06d98fe5
     }
     if ((Flags & kMiscObjUpdateFlagIds) != 0) {                // 06d98fed TEST [+0x21],1
-        Stream.PutByte(Wire->Field_0x48);                      // 06d9901a
+        Stream.PutByte(Wire->IdCount);                      // 06d9901a
         // 06d99023/06d99026: the walk is Begin..End, and it ships every element the
         // vector holds whether or not the count byte agrees.
         for (std::vector<unsigned int>::const_iterator Id = Wire->Ids.begin();
@@ -636,21 +636,21 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
     unsigned int Scratch = 0;
     if ((Flags & kMiscObjUpdateFlagField_0x08) != 0) {         // 06d99149 TEST AL,0x8
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x08 = Scratch;                            // 06d99176
+        Wire->ObjectId = Scratch;                            // 06d99176
     }
     if ((Flags & kMiscObjUpdateFlagField_0x04) != 0) {         // 06d9917b
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x04 = Scratch;                            // 06d991a6
+        Wire->PlayerId = Scratch;                            // 06d991a6
     }
     if ((Flags & kMiscObjUpdateFlagField_0x14) != 0) {         // 06d991ab
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x14 = Scratch;                            // 06d991d6
+        Wire->GroupId = Scratch;                            // 06d991d6
     }
     if ((Flags & kMiscObjUpdateFlagPair) != 0) {               // 06d991db
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x18 = Scratch;                            // 06d99206
+        Wire->MissionId = Scratch;                            // 06d99206
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x1c = Scratch;                            // 06d99230
+        Wire->MissionSetBy = Scratch;                            // 06d99230
     }
     if ((Flags & kMiscObjUpdateFlagText) != 0) {               // 06d99235
         unsigned short WireChars = 0;
@@ -681,23 +681,23 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
     }
     if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d9932e
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x34 = Scratch;                            // 06d9935c
+        Wire->Affiliation = Scratch;                            // 06d9935c
     }
     if ((Flags & kMiscObjUpdateFlagField_0x0c) != 0) {         // 06d99362
         unsigned short Word = 0;
         if (!Stream.GetWord(Word)) { return Stream.GetError(); }
-        Wire->Field_0x0c = Word;                               // 06d99391
+        Wire->Rank = Word;                               // 06d99391
     }
     if ((Flags & kMiscObjUpdateFlagField_0x10) != 0) {         // 06d99398 TEST AL,AL / JNS
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Field_0x10 = Scratch;                            // 06d993c7
+        Wire->SystemId = Scratch;                            // 06d993c7
     }
     if ((Flags & kMiscObjUpdateFlagIds) != 0) {                // 06d993cd TEST [+0x21],1
         unsigned char Count = 0;
         if (!Stream.GetByte(Count)) {                          // 06d993f8
             return Stream.GetError();
         }
-        Wire->Field_0x48 = Count;                              // 06d99402
+        Wire->IdCount = Count;                              // 06d99402
         // 06d99400 `TEST AL,AL ; JBE` -- a zero count skips the loop; 06d9960d compares
         // the running index against this same byte, zero-extended.
         for (unsigned int Index = 0; Index < (unsigned int)Count; ++Index) {
@@ -827,13 +827,13 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06dad031 FUN_06da1380
 
-    Stream.PutDword(Wire->Field_0x00);                         // 06dad069
-    Stream.PutDword(Wire->Field_0x04);                         // 06dad093
-    Stream.PutDword(Wire->Field_0x08);                         // 06dad0bd
-    Stream.PutByte(Wire->Field_0x54);                          // 06dad0e5
-    if (Wire->Field_0x54 != 0) {                               // 06dad0ea / 06dad0ef JZ
-        Stream.PutDword(Wire->Body.Field_0x00);                // 06dad115
-        Stream.PutDword(Wire->Body.Field_0x04);                // 06dad13f
+    Stream.PutDword(Wire->SenderId);                         // 06dad069
+    Stream.PutDword(Wire->ReceiverId);                         // 06dad093
+    Stream.PutDword(Wire->VoiceId);                         // 06dad0bd
+    Stream.PutByte(Wire->bReceiverIsOwnShip);                          // 06dad0e5
+    if (Wire->bReceiverIsOwnShip != 0) {                               // 06dad0ea / 06dad0ef JZ
+        Stream.PutDword(Wire->Body.Head);                // 06dad115
+        Stream.PutDword(Wire->Body.Body);                // 06dad13f
         // 06dad144 takes the LOW BYTE of the dword count; 06dad16d re-reads the whole
         // dword for the loop bound, signed.
         Stream.PutByte((unsigned char)((unsigned int)Wire->Body.Count & 0xffu));  // 06dad168
@@ -842,7 +842,7 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
             Stream.PutDword(IdSlots[Index]);                   // 06dad19f
         }
     }
-    Stream.PutDword(Wire->Field_0x40);                         // 06dad1d9
+    Stream.PutDword(Wire->CommType);                         // 06dad1d9
     Stream.PutByte(Wire->BufferCount);                         // 06dad201
     // 06dad206 `MOV CL,byte ptr [EDI+0x68]` / 06dad20b `TEST CL,CL` / 06dad20d `JLE`,
     // and 06dad23c `MOVSX ECX,byte ptr [EDI+0x68]` for the loop bound: a SIGNED byte.
@@ -854,9 +854,9 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
         }
     }
     // 06dad24a `MOV CX,word ptr [EDI+0x6c]` -- the dword's low half only.
-    Stream.PutWord((unsigned short)(Wire->Field_0x4c & 0xffffu));   // 06dad267
+    Stream.PutWord((unsigned short)(Wire->Mood & 0xffffu));   // 06dad267
     float Scaled = 0.0f;
-    RpcSendCommMoveFloatBits(&Scaled, &Wire->Field_0x50Bits);
+    RpcSendCommMoveFloatBits(&Scaled, &Wire->DurationBits);
     Stream.PutQuantizedTwoStage(Scaled, FRpcMarshalStream::kTenthScale,
                                 FRpcMarshalStream::kPercentScale);  // 06dad26a..06dad2ad
 
@@ -884,22 +884,22 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
     unsigned short Small16 = 0;
     unsigned char Small8 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x00 = Scratch;                                // 06dad38c
+    Wire->SenderId = Scratch;                                // 06dad38c
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x04 = Scratch;                                // 06dad3b6
+    Wire->ReceiverId = Scratch;                                // 06dad3b6
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x08 = Scratch;                                // 06dad3e0
+    Wire->VoiceId = Scratch;                                // 06dad3e0
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->Field_0x54 = Small8;                                 // 06dad40a
+    Wire->bReceiverIsOwnShip = Small8;                                 // 06dad40a
     if (Small8 != 0) {                                         // 06dad40d JZ
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Body.Field_0x00 = Scratch;                       // 06dad43a
+        Wire->Body.Head = Scratch;                       // 06dad43a
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Body.Field_0x04 = Scratch;                       // 06dad464
+        Wire->Body.Body = Scratch;                       // 06dad464
         // 06dad467 / 06dad46a clear these two from EBX, which 06dad336 zeroed. They are
         // not on the wire at all, and the decoder is what makes that visible.
-        Wire->Body.Field_0x08 = 0;
-        Wire->Body.Field_0x0c = 0;
+        Wire->Body.LeftHand = 0;
+        Wire->Body.RightHand = 0;
         if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
         // 06dad490 `XOR EAX,EAX` / 06dad492 `MOV AL,CL` -- zero-extended into the dword.
         Wire->Body.Count = (int)(unsigned int)Small8;          // 06dad498
@@ -911,14 +911,14 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
     } else {
         // LAB_06dad4dd: 06dad4dd..06dad4e9 clear payload+0x0c, +0x10, +0x14, +0x18 and
         // +0x3c, i.e. the whole id block except its Ids array.
-        Wire->Body.Field_0x00 = 0;
-        Wire->Body.Field_0x04 = 0;
-        Wire->Body.Field_0x08 = 0;
-        Wire->Body.Field_0x0c = 0;
+        Wire->Body.Head = 0;
+        Wire->Body.Body = 0;
+        Wire->Body.LeftHand = 0;
+        Wire->Body.RightHand = 0;
         Wire->Body.Count = 0;
     }
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x40 = Scratch;                                // 06dad513
+    Wire->CommType = Scratch;                                // 06dad513
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
     Wire->BufferCount = Small8;                                // 06dad53e
 
@@ -942,12 +942,12 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
     }
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
     // 06dad5cd `MOVZX ECX,CX` -- the word widens into the whole dword.
-    Wire->Field_0x4c = (unsigned int)Small16;                  // 06dad5d3
+    Wire->Mood = (unsigned int)Small16;                  // 06dad5d3
     float Scaled = 0.0f;
     if (!Stream.GetQuantizedUnsigned(Scaled, FRpcMarshalStream::kTenthInvScale)) {
         return Stream.GetError();                              // 06dad5f9..06dad61a
     }
-    RpcSendCommMoveFloatBits(&Wire->Field_0x50Bits, &Scaled);
+    RpcSendCommMoveFloatBits(&Wire->DurationBits, &Scaled);
 
     // 06dad61d FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {
@@ -1032,20 +1032,20 @@ unsigned int RpcEncodeServerCreateGuided(FPacketBase& Packet, unsigned char** Bu
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da8514 FUN_06da1380
-    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->Field_0x04));    // 06da8533 / 06da8564
-    Stream.PutDword(Wire->Field_0x08);                                // 06da8591
-    Stream.PutWord(Wire->Field_0x0c);                                 // 06da85be
-    Stream.PutDword(Wire->Field_0x10);                                // 06da85eb
-    Stream.PutWord(Wire->Field_0x14);                                 // 06da8618
-    Stream.PutDword(Wire->Field_0x18);                                // 06da8645
-    Stream.PutBytes(&Wire->Field_0x1c, 12);                           // 06da868a
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->Field_0x2c),
+    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // 06da8533 / 06da8564
+    Stream.PutDword(Wire->OwnerId);                                // 06da8591
+    Stream.PutWord(Wire->SubObjId);                                 // 06da85be
+    Stream.PutDword(Wire->TargetId);                                // 06da85eb
+    Stream.PutWord(Wire->TargetSubObjId);                                 // 06da8618
+    Stream.PutDword(Wire->ObjId);                                // 06da8645
+    Stream.PutBytes(&Wire->PosXBits, 12);                           // 06da868a
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientXBits),
                         FRpcMarshalStream::kOrientationScale);        // 06da868f -> 06da8709
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->Field_0x30),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientYBits),
                         FRpcMarshalStream::kOrientationScale);        // 06da86a3 -> 06da8738
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->Field_0x34),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientZBits),
                         FRpcMarshalStream::kOrientationScale);        // 06da86b5 -> 06da8767
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->Field_0x28),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientWBits),
                         FRpcMarshalStream::kOrientationScale);        // 06da86c7 -> 06da8792
 
     // 06da87a0 FUN_06da13c0 -- `XOR EAX,EAX ; RET 0xc`, emits nothing.
@@ -1066,23 +1066,23 @@ unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned cha
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     // 06da8837 FUN_06da13c0 -- consumes nothing.
 
-    Wire->Field_0x00 = 0;                                             // 06da8850
+    Wire->OwnerPlayer = 0;                                             // 06da8850
     unsigned short Small16 = 0;
     unsigned int Scratch = 0;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
     // 06da8877 `XOR ECX,ECX ; MOV CX,[EAX]` -- zero-extended before the call.
-    Wire->Field_0x04 = Archetype::SmallIDToLargeID(Small16);          // 06da8888
+    Wire->ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);          // 06da8888
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x08 = Scratch;                                       // 06da88ba
+    Wire->OwnerId = Scratch;                                       // 06da88ba
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->Field_0x0c = Small16;                                       // 06da88e3
+    Wire->SubObjId = Small16;                                       // 06da88e3
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x10 = Scratch;                                       // 06da890c
+    Wire->TargetId = Scratch;                                       // 06da890c
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->Field_0x14 = Small16;                                       // 06da8935
+    Wire->TargetSubObjId = Small16;                                       // 06da8935
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x18 = Scratch;                                       // 06da895e
-    if (!Stream.GetBytes(&Wire->Field_0x1c, 12)) {                    // 06da8983 FUN_06d8f510
+    Wire->ObjId = Scratch;                                       // 06da895e
+    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da8983 FUN_06d8f510
         return Stream.GetError();
     }
 
@@ -1092,19 +1092,19 @@ unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned cha
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->Field_0x2c = RpcCreateFloatToBits(Quantized);               // 06da8a46
+    Wire->OrientXBits = RpcCreateFloatToBits(Quantized);               // 06da8a46
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->Field_0x30 = RpcCreateFloatToBits(Quantized);               // 06da8a5e
+    Wire->OrientYBits = RpcCreateFloatToBits(Quantized);               // 06da8a5e
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->Field_0x34 = RpcCreateFloatToBits(Quantized);               // 06da8a71
+    Wire->OrientZBits = RpcCreateFloatToBits(Quantized);               // 06da8a71
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->Field_0x28 = RpcCreateFloatToBits(Quantized);               // 06da8a7e
+    Wire->OrientWBits = RpcCreateFloatToBits(Quantized);               // 06da8a7e
 
     // 06da8a81 FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {
@@ -1168,17 +1168,17 @@ unsigned int RpcEncodeServerCreateMine(FPacketBase& Packet, unsigned char** Buff
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da9604 FUN_06da1380
-    Stream.PutDword(Wire->Field_0x00);                                // 06da964f
-    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->Field_0x04));    // 06da965a / 06da9689
-    Stream.PutDword(Wire->Field_0x08);                                // 06da96bc
-    Stream.PutWord(Wire->Field_0x0c);                                 // 06da96ef
+    Stream.PutDword(Wire->ObjId);                                // 06da964f
+    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // 06da965a / 06da9689
+    Stream.PutDword(Wire->OwnerId);                                // 06da96bc
+    Stream.PutWord(Wire->SubObjId);                                 // 06da96ef
     // 06da971d..06da973b: the three dwords at packet+0x40 / +0x44 / +0x48, i.e.
     // payload+0x20..+0x2b -- NOT payload+0x10, which travels later and only in SP.
-    Stream.PutBytes(&Wire->Field_0x20, 12);                           // 06da973b
+    Stream.PutBytes(&Wire->PosXBits, 12);                           // 06da973b
     if (SinglePlayer()) {                                             // 06da9745 / 06da974d
-        Stream.PutBytes(&Wire->Field_0x10, 16);                       // 06da97a7 FUN_06d8f4f0
-        Stream.PutBytes(&Wire->Field_0x2c, 12);                       // 06da97fc FUN_06d8f510
-        Stream.PutBytes(&Wire->Field_0x38, 12);                       // 06da9851 FUN_06d8f510
+        Stream.PutBytes(&Wire->OrientWBits, 16);                       // 06da97a7 FUN_06d8f4f0
+        Stream.PutBytes(&Wire->VelXBits, 12);                       // 06da97fc FUN_06d8f510
+        Stream.PutBytes(&Wire->AngVelXBits, 12);                       // 06da9851 FUN_06d8f510
     }
 
     // 06da9863 FUN_06da13c0 -- emits nothing.
@@ -1201,28 +1201,28 @@ unsigned int RpcDecodeServerCreateMine(FPacketBase& Packet, const unsigned char*
     unsigned int Scratch = 0;
     unsigned short Small16 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x00 = Scratch;                                       // 06da993e
+    Wire->ObjId = Scratch;                                       // 06da993e
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->Field_0x04 = Archetype::SmallIDToLargeID(Small16);          // 06da996e / 06da9974
+    Wire->ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);          // 06da996e / 06da9974
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x08 = Scratch;                                       // 06da99a1
+    Wire->OwnerId = Scratch;                                       // 06da99a1
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->Field_0x0c = Small16;                                       // 06da99ca
-    if (!Stream.GetBytes(&Wire->Field_0x20, 12)) {                    // 06da99f4
+    Wire->SubObjId = Small16;                                       // 06da99ca
+    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da99f4
         return Stream.GetError();
     }
     if (SinglePlayer()) {                                             // 06da99fe / 06da9a06
-        if (!Stream.GetBytes(&Wire->Field_0x10, 16)) {                // 06da9a34
+        if (!Stream.GetBytes(&Wire->OrientWBits, 16)) {                // 06da9a34
             return Stream.GetError();
         }
-        if (!Stream.GetBytes(&Wire->Field_0x2c, 12)) {                // 06da9a66
+        if (!Stream.GetBytes(&Wire->VelXBits, 12)) {                // 06da9a66
             return Stream.GetError();
         }
-        if (!Stream.GetBytes(&Wire->Field_0x38, 12)) {                // 06da9a98
+        if (!Stream.GetBytes(&Wire->AngVelXBits, 12)) {                // 06da9a98
             return Stream.GetError();
         }
     }
-    Wire->Field_0x44 = 0;                                             // 06da9aab
+    Wire->OwnerPlayer = 0;                                             // 06da9aab
 
     // 06da9ab2 FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {
@@ -1240,15 +1240,15 @@ unsigned int RpcEncodeServerCreateCounter(FPacketBase& Packet, unsigned char** B
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da9b84 FUN_06da1380
-    Stream.PutDword(Wire->Field_0x00);                                // 06da9bc7
-    Stream.PutDword(Wire->Field_0x04);                                // 06da9bf1
-    Stream.PutDword(Wire->Field_0x08);                                // 06da9c1b
-    Stream.PutDword(Wire->Field_0x0c);                                // 06da9c45
-    Stream.PutWord(Wire->Field_0x10);                                 // 06da9c70
-    Stream.PutBytes(&Wire->Field_0x14, 16);                           // 06da9cbd FUN_06d8f4f0
-    Stream.PutBytes(&Wire->Field_0x24, 12);                           // 06da9d12 FUN_06d8f510
-    Stream.PutBytes(&Wire->Field_0x30, 12);                           // 06da9d67 FUN_06d8f510
-    Stream.PutBytes(&Wire->Field_0x3c, 12);                           // 06da9dbc FUN_06d8f510
+    Stream.PutDword(Wire->ArchetypeNickname);                                // 06da9bc7
+    Stream.PutDword(Wire->ObjId);                                // 06da9bf1
+    Stream.PutDword(Wire->OwnerPlayer);                                // 06da9c1b
+    Stream.PutDword(Wire->OwnerId);                                // 06da9c45
+    Stream.PutWord(Wire->SubObjId);                                 // 06da9c70
+    Stream.PutBytes(&Wire->OrientWBits, 16);                           // 06da9cbd FUN_06d8f4f0
+    Stream.PutBytes(&Wire->PosXBits, 12);                           // 06da9d12 FUN_06d8f510
+    Stream.PutBytes(&Wire->VelXBits, 12);                           // 06da9d67 FUN_06d8f510
+    Stream.PutBytes(&Wire->AngVelXBits, 12);                           // 06da9dbc FUN_06d8f510
 
     // 06da9dce FUN_06da13c0 -- emits nothing.
     if (Stream.Failed()) {
@@ -1270,25 +1270,25 @@ unsigned int RpcDecodeServerCreateCounter(FPacketBase& Packet, const unsigned ch
     unsigned int Scratch = 0;
     unsigned short Small16 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x00 = Scratch;                                       // 06da9eb0
+    Wire->ArchetypeNickname = Scratch;                                       // 06da9eb0
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x04 = Scratch;                                       // 06da9eda
+    Wire->ObjId = Scratch;                                       // 06da9eda
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x08 = Scratch;                                       // 06da9f04
+    Wire->OwnerPlayer = Scratch;                                       // 06da9f04
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x0c = Scratch;                                       // 06da9f2e
+    Wire->OwnerId = Scratch;                                       // 06da9f2e
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->Field_0x10 = Small16;                                       // 06da9f59
-    if (!Stream.GetBytes(&Wire->Field_0x14, 16)) {                    // 06da9f81
+    Wire->SubObjId = Small16;                                       // 06da9f59
+    if (!Stream.GetBytes(&Wire->OrientWBits, 16)) {                    // 06da9f81
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->Field_0x24, 12)) {                    // 06da9fb3
+    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da9fb3
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->Field_0x30, 12)) {                    // 06da9fe5
+    if (!Stream.GetBytes(&Wire->VelXBits, 12)) {                    // 06da9fe5
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->Field_0x3c, 12)) {                    // 06daa013
+    if (!Stream.GetBytes(&Wire->AngVelXBits, 12)) {                    // 06daa013
         return Stream.GetError();
     }
 
@@ -1356,7 +1356,7 @@ unsigned int RpcEncodeServerSetAddItem(FPacketBase& Packet, unsigned char** Buff
     Stream.PutFloat(Wire->Health);                                    // 06d97096
     Stream.PutByte(Wire->bEquipped);                                  // 06d970c1
     Stream.PutByte(Wire->bMission);                                   // 06d970ec
-    Stream.PutDword(Wire->Field_0x0c);                                // 06d97119
+    Stream.PutDword(Wire->AddResult);                                // 06d97119
     Stream.PutDword(Wire->HardpointSize);                             // 06d97148
     if (Wire->HardpointSize != 0) {                                   // 06d9714f / 06d97154
         Stream.PutBytes(Wire->Hardpoint, Wire->HardpointSize);        // 06d97178..06d97192
@@ -1393,7 +1393,7 @@ unsigned int RpcDecodeServerSetAddItem(FPacketBase& Packet, const unsigned char*
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
     Wire->bMission = Small8;                                          // 06d9733e
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x0c = Scratch;                                       // 06d97366
+    Wire->AddResult = Scratch;                                       // 06d97366
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
     Wire->HardpointSize = Scratch;                                    // 06d97392
     if (Wire->HardpointSize != 0) {                                   // 06d97390 / 06d97395
@@ -1473,9 +1473,9 @@ unsigned int RpcEncodeServerSetMissionObjectives(FPacketBase& Packet,
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06d8fcc8 FUN_06da1380
-    Stream.PutDword(Wire->Field_0x00);                                // 06d8fd0c
+    Stream.PutDword(Wire->MissionId);                                // 06d8fd0c
     Stream.PutDword(Wire->Count);                                     // 06d8fd38
-    Stream.PutDword(Wire->Field_0x04);                                // 06d8fd64
+    Stream.PutDword(Wire->MissionType);                                // 06d8fd64
     RpcPutSizedBlock(Stream, Wire->TextASize, Wire->TextABuffer);     // 06d8fd90 / 06d8fdcc
     RpcPutSizedBlock(Stream, Wire->TextBSize, Wire->TextBBuffer);     // 06d8fe15 / 06d8fe62
 
@@ -1515,11 +1515,11 @@ unsigned int RpcDecodeServerSetMissionObjectives(FPacketBase& Packet,
 
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x00 = Scratch;                                       // 06d90040
+    Wire->MissionId = Scratch;                                       // 06d90040
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
     Wire->Count = Scratch;                                            // 06d90068
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Field_0x04 = Scratch;                                       // 06d9008e
+    Wire->MissionType = Scratch;                                       // 06d9008e
     if (!RpcGetSizedBlock(Stream, Wire->TextASize, Wire->TextABuffer)) {
         return Stream.GetError();                                     // 06d90099 FUN_06da1620
     }
@@ -1620,25 +1620,25 @@ unsigned int RpcEncodeServerBurnFuse(FPacketBase& Packet, unsigned char** Buffer
     // 06dac3d1/06dac3d6: Limit = arg2, Ptr = *arg1.
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06dac3f1 FUN_06da1380
-    if (!Stream.PutDword(Wire->Field_0x00)) {                      // 06dac409..06dac43b
+    if (!Stream.PutDword(Wire->SourceId)) {                      // 06dac409..06dac43b
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->Field_0x04)) {                      // 06dac43d..06dac46a
+    if (!Stream.PutDword(Wire->ObjectId)) {                      // 06dac43d..06dac46a
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->Field_0x08)) {                      // 06dac46c..06dac499
+    if (!Stream.PutDword(Wire->FuseId)) {                      // 06dac46c..06dac499
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutWord(Wire->Field_0x0c)) {                       // 06dac49b..06dac4ca
+    if (!Stream.PutWord(Wire->SubObjId)) {                       // 06dac49b..06dac4ca
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->Field_0x10)) {                      // 06dac4ef FLD/FSTP
+    if (!Stream.PutDword(Wire->AtTBits)) {                      // 06dac4ef FLD/FSTP
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->Field_0x14)) {                      // 06dac51e FLD/FSTP
+    if (!Stream.PutDword(Wire->LifetimeBits)) {                      // 06dac51e FLD/FSTP
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutByte(Wire->Field_0x18)) {                       // 06dac54c..06dac55c
+    if (!Stream.PutByte(Wire->bLit)) {                       // 06dac54c..06dac55c
         return FRpcMarshalStream::kEncodeOverflow;
     }
     // 06dac55e FUN_06da13c0 -- nothing more to emit.
@@ -1656,25 +1656,25 @@ unsigned int RpcDecodeServerBurnFuse(FPacketBase& Packet, const unsigned char* B
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
     // 06dac5ea FUN_06da13c0 -- no header consumed.
 
-    if (!Stream.GetDword(Wire->Field_0x00)) {                      // 06dac602..06dac62e
+    if (!Stream.GetDword(Wire->SourceId)) {                      // 06dac602..06dac62e
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->Field_0x04)) {                      // 06dac631..06dac656
+    if (!Stream.GetDword(Wire->ObjectId)) {                      // 06dac631..06dac656
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->Field_0x08)) {                      // 06dac659..06dac67e
+    if (!Stream.GetDword(Wire->FuseId)) {                      // 06dac659..06dac67e
         return Stream.GetError();
     }
-    if (!Stream.GetWord(Wire->Field_0x0c)) {                       // 06dac681..06dac6a7
+    if (!Stream.GetWord(Wire->SubObjId)) {                       // 06dac681..06dac6a7
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->Field_0x10)) {                      // 06dac6ab..06dac6d0
+    if (!Stream.GetDword(Wire->AtTBits)) {                      // 06dac6ab..06dac6d0
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->Field_0x14)) {                      // 06dac6d3..06dac6f8
+    if (!Stream.GetDword(Wire->LifetimeBits)) {                      // 06dac6d3..06dac6f8
         return Stream.GetError();
     }
-    if (!Stream.GetByte(Wire->Field_0x18)) {                       // 06dac6fb..06dac717
+    if (!Stream.GetByte(Wire->bLit)) {                       // 06dac6fb..06dac717
         return Stream.GetError();
     }
     // 06dac720 FUN_06da13c0 -- nothing to consume.

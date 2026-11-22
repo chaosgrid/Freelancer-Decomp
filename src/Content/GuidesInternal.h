@@ -424,7 +424,7 @@ public:
     unsigned int TargetId = 0;                   // +0x168 FindObjectIdByName(TargetName)
     unsigned char bCruise = 0;                   // +0x16c desc +0x174 -> SetGuide bCruise
     unsigned char bNoCruise = 0;                 // +0x16d desc +0x175 -> SetGuide bNoCruise
-    unsigned char Field_0x16e = 1;               // +0x16e desc +0x176 -> SetGuide FieldA0
+    unsigned char bStartFollowing = 1;               // +0x16e desc +0x176 -> SetGuide FieldA0
     // +0x170: the last directive handed out; a ref-holding member (the ctor / Clone / dtor
     // unwind maps release it with FUN_06f28e10, after +0x180 and +0x1a0).
     TRefHandle<FObjListDirective> Directive;

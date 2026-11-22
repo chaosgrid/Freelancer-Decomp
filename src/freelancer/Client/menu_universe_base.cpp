@@ -803,7 +803,7 @@ void UpsertClientLocationRoomScriptBehavior(ScriptBehavior const& Behavior)
 {
     // FUN_0043ade0 (RET 4) -- the room of Behavior +0x04; with a state, its +0x18 bucket's
     // FUN_0043c870 (upsert).
-    FLocationRoomState* const State = FindClientLocationRoomState(Behavior.Field04);
+    FLocationRoomState* const State = FindClientLocationRoomState(Behavior.LocationId);
     if (State != nullptr)
         State->ScriptBehaviors.Upsert(Behavior);
 }

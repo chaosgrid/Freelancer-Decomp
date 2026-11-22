@@ -43,7 +43,7 @@ public:
     // RTTI .?AVServerRowData@PageServerSelect@@ : UIFastTable::RefCounter, vftable 0x005e2e64
     // (slot 0 the scalar deleting destructor FUN_00572370, dtor FUN_005725e0). 0xa4 bytes: the
     // RefCounter (+0x00 vftable, +0x04 count) and a copy of one server (+0x08). FillRow
-    // (FUN_00570040) makes one per row; Slot23 reads the copy back through the row payload.
+    // (FUN_00570040) makes one per row; ProcessMessage reads the copy back through the row payload.
     class ServerRowData : public UiFastTableRefCounter
     {
     public:
@@ -69,7 +69,7 @@ public:
     // slot 11 FUN_0056f6e0 -- the list pump, the slide in / out, then Win3D's child walk.
     void Update() override;
     // slot 23 FUN_005714d0 (RET 0xc).
-    bool Slot23(unsigned Msg, unsigned A, unsigned B) override;
+    bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
     // Event::Handler face (+0x80) slot 0 LAB_00572330 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
@@ -159,12 +159,12 @@ private:
     void ShowServerDetails(FServerInfo const* Server, bool bNewServer);
     // FUN_00571f50 (RET 4) -- the tool tips on or off (Legend's always off).
     void SetToolTipsEnabled(bool bEnabled);
-    // FUN_00571fc0 -- the leave sequence (no direction); Slot23 spells it inline twice more.
+    // FUN_00571fc0 -- the leave sequence (no direction); ProcessMessage spells it inline twice more.
     void BeginLeave();
     // FUN_00572100 (RET 4) -- the connect: current server, the password prompt, then
     // ConnectToServer (FUN_005a8770) on the ini path. False when any step fails.
     bool ConnectToServer(FServerInfo const* Server);
-    // The server Slot23's 0x3003 and 0xf002 act on: the selected row's payload, else the
+    // The server ProcessMessage's 0x3003 and 0xf002 act on: the selected row's payload, else the
     // remembered id through CLoginMgr::FindServer; null when there is neither.
     FServerInfo const* GetSelectedServer();
 

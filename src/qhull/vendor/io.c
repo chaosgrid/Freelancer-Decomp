@@ -69,7 +69,7 @@ void qh_produce_output(void) {
     d_1= sizeof(setT) + (qh hull_dim - 1) * SETelemsize;
     /* retail 063855bc: leading hashentry size is the literal 12 (the same 0xc that
        qh_initqhull_mem registers with qh_memsize); the struct sizes are the port's own */
-    FUN_06356960(/* retail 063855bc */ "\
+    ivp_message(/* retail 063855bc */ "\
     size in bytes: hashentry %d merge %d ridge %d vertex %d facet %d\n\
          normal %d ridge vertices %d facet vertices or neighbors %d\n",
 	    0xc, sizeof(mergeT), sizeof(ridgeT),
@@ -77,7 +77,7 @@ void qh_produce_output(void) {
 	    qh normal_size, d_1, d_1 + SETelemsize);
   }
   if (qh_setsize ((setT*)qhmem.tempstack) != tempsize) {
-    FUN_06356960 (/* retail 063855ec */ "qhull internal error (qh_produce_output): temporary sets not empty (%d)\n",
+    ivp_message (/* retail 063855ec */ "qhull internal error (qh_produce_output): temporary sets not empty (%d)\n",
 	     qh_setsize ((setT*)qhmem.tempstack));
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -319,7 +319,7 @@ pointT *qh_detvnorm (vertexT *vertex, vertexT *vertexA, setT *centers, realT *of
       qh_setappend (&points, midpoint);
     simplex= points; 
   }else {
-    FUN_06356960(/* retail 06385917 */ "qh_detvnorm: too few points (%d) to compute separating plane\n", numcenters);
+    ivp_message(/* retail 06385917 */ "qh_detvnorm: too few points (%d) to compute separating plane\n", numcenters);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
   i= 0;
@@ -987,7 +987,7 @@ void qh_order_vertexneighbors(vertexT *vertex) {
       }
     }
     if (!neighbor) {
-      FUN_06356960 (/* retail 06386aba */ "qhull internal error (qh_order_vertexneighbors): no neighbor of v%d for f%d\n",
+      ivp_message (/* retail 06386aba */ "qhull internal error (qh_order_vertexneighbors): no neighbor of v%d for f%d\n",
         vertex->id, facet->id);
       qh_errexit (qh_ERRqhull, facet, NULL);
     }
@@ -1259,14 +1259,14 @@ void qh_printbegin (FILE *fp, int format, facetT *facetlist, setT *facets, boolT
     if (qh VORONOI && qh hull_dim > 3)  /* PRINTdim == DROPdim == hull_dim-1 */
       goto LABELnoformat;
     if (qh hull_dim == 2 && (qh PRINTridges || qh DOintersections))
-      FUN_06356960 (/* retail 063873e8 */ "qhull warning: output for ridges and intersections not implemented in 2-d\n");
+      ivp_message (/* retail 063873e8 */ "qhull warning: output for ridges and intersections not implemented in 2-d\n");
     if (qh hull_dim == 4 && (qh PRINTinner || qh PRINTouter ||
 			     (qh PRINTdim == 4 && qh PRINTcentrums)))
-      FUN_06356960 (/* retail 06387421 */ "qhull warning: output for outer/inner planes and centrums not implemented in 4-d\n");
+      ivp_message (/* retail 06387421 */ "qhull warning: output for outer/inner planes and centrums not implemented in 4-d\n");
     if (qh PRINTdim == 4 && (qh PRINTspheres))
-      FUN_06356960 (/* retail 0638743f */ "qhull warning: output for vertices not implemented in 4-d\n");
+      ivp_message (/* retail 0638743f */ "qhull warning: output for vertices not implemented in 4-d\n");
     if (qh PRINTdim == 4 && qh DOintersections && qh PRINTnoplanes)
-      FUN_06356960 (/* retail 06387467 */ "qhull warning: 'Gnh' generates no output in 4-d\n");
+      ivp_message (/* retail 06387467 */ "qhull warning: 'Gnh' generates no output in 4-d\n");
     if (qh PRINTdim == 2) {
       fprintf(fp, "{appearance {linewidth 3} LIST # %s | %s\n",
 	      qh rbox_command, qh qhull_command);
@@ -1392,7 +1392,7 @@ void qh_printbegin (FILE *fp, int format, facetT *facetlist, setT *facets, boolT
     /* Retail 06387b74..06387b7b tests only qh VORONOI (b228) before the warning; upstream also
        required qh PRINTprecision. */
     if (qh VORONOI)
-      FUN_06356960 (/* retail 06387b82 */ "qhull warning: writing Delaunay.  Use 'p' or 'o' for Voronoi centers\n");
+      ivp_message (/* retail 06387b82 */ "qhull warning: writing Delaunay.  Use 'p' or 'o' for Voronoi centers\n");
     qh printoutvar= qh vertex_id;  /* centrum id for non-simplicial facets */
     if (qh hull_dim <= 3)
       fprintf(fp, "%d\n", numfacets);
@@ -1412,7 +1412,7 @@ void qh_printbegin (FILE *fp, int format, facetT *facetlist, setT *facets, boolT
     if (qh hull_dim > 3)  /* qh_initbuffers also checks */
       goto LABELnoformat;
     if (qh VORONOI)
-      FUN_06356960 (/* retail 06387c22 */ "qhull warning: output is the Delaunay triangulation\n");
+      ivp_message (/* retail 06387c22 */ "qhull warning: output is the Delaunay triangulation\n");
     fprintf(fp, "{\n");
     qh printoutvar= 0;   /* counts number of facets for notfirst */
     break;
@@ -1469,7 +1469,7 @@ void qh_printbegin (FILE *fp, int format, facetT *facetlist, setT *facets, boolT
   case qh_PRINTsummary:
   default:
   LABELnoformat:
-    FUN_06356960 (/* retail 06387e78 */ "qhull internal error (qh_printbegin): can not use this format for dimension %d\n",
+    ivp_message (/* retail 06387e78 */ "qhull internal error (qh_printbegin): can not use this format for dimension %d\n",
          qh hull_dim);
     qh_errexit (qh_ERRqhull, NULL, NULL);
   }
@@ -1613,7 +1613,7 @@ void qh_printend (FILE *fp, int format, facetT *facetlist, setT *facets, boolT p
   if (!fp)
     return;
   if (!qh printoutnum)
-    FUN_06356960 (/* retail 0638838b */ "qhull warning: no facets printed\n");
+    ivp_message (/* retail 0638838b */ "qhull warning: no facets printed\n");
   switch (format) {
   case qh_PRINTgeom:
     if (qh hull_dim == 4 && qh DROPdim < 0  && !qh PRINTnoplanes) {
@@ -1624,7 +1624,7 @@ void qh_printend (FILE *fp, int format, facetT *facetlist, setT *facets, boolT p
       FOREACHfacet_(facets) 
         qh_printend4geom (fp, facet, &num, printall);
       if (num != qh ridgeoutnum || qh printoutvar != qh ridgeoutnum) {
-	FUN_06356960 (/* retail 06388468 */ "qhull internal error (qh_printend): number of ridges %d != number printed %d and at end %d\n", qh ridgeoutnum, qh printoutvar, num);
+	ivp_message (/* retail 06388468 */ "qhull internal error (qh_printend): number of ridges %d != number printed %d and at end %d\n", qh ridgeoutnum, qh printoutvar, num);
 	qh_errexit (qh_ERRqhull, NULL, NULL);
       }
     }else
@@ -1794,7 +1794,7 @@ void qh_printextremes_2d (FILE *fp, facetT *facetlist, setT *facets, int printal
       nextfacet= SETsecondt_(facet->neighbors, facetT);
     }
     if (facet->visitid == qh visit_id) {
-      FUN_06356960(/* retail 0638890d */ "qh_printextremes_2d: loop in facet list.  facet %d nextfacet %d\n",
+      ivp_message(/* retail 0638890d */ "qh_printextremes_2d: loop in facet list.  facet %d nextfacet %d\n",
                  facet->id, nextfacet->id);
       qh_errexit2 (qh_ERRqhull, facet, nextfacet);
     }
@@ -2593,7 +2593,7 @@ void qh_printfacets(FILE *fp, int format, facetT *facetlist, setT *facets, boolT
   qh old_randomdist= qh RANDOMdist;
   qh RANDOMdist= False;
   if (qh CDDoutput && (format == qh_PRINTcentrums || format == qh_PRINTpointintersect || format == qh_PRINToff))
-    FUN_06356960 (/* retail 0638a4c8 */ "qhull warning: CDD format is not available for centrums, halfspace\nintersections, and OFF file format.\n");
+    ivp_message (/* retail 0638a4c8 */ "qhull warning: CDD format is not available for centrums, halfspace\nintersections, and OFF file format.\n");
   if (format == qh_PRINTnone)
     ; /* print nothing */
   else if (format == qh_PRINTaverage) {
@@ -3290,7 +3290,7 @@ void qh_printvdiagram (FILE *fp, int format, facetT *facetlist, setT *facets, bo
     innerouter= qh_RIDGEouter;
     printvridge= qh_printvnorm;
   }else {
-    FUN_06356960(/* retail 0638b98c */ "qh_printvdiagram: unknown print format %d.\n", format);
+    ivp_message(/* retail 0638b98c */ "qh_printvdiagram: unknown print format %d.\n", format);
     qh_errexit (qh_ERRinput, NULL, NULL);
   }
   vertices= qh_markvoronoi (facetlist, facets, printall, &islower, &numcenters);
@@ -4116,20 +4116,20 @@ void qh_setfeasible (int dim) {
   coordT *coords, value;
 
   if (!(s= qh feasible_string)) {
-    FUN_06356960(/* retail 0638c5c8 */ "\
+    ivp_message(/* retail 0638c5c8 */ "\
 qhull input error: halfspace intersection needs a feasible point.\n\
 Either prepend the input with 1 point or use 'Hn,n,n'.  See manual.\n");
     qh_errexit (qh_ERRinput, NULL, NULL);
   }
   if (!(qh feasible_point= (pointT*)malloc (dim* sizeof(coordT)))) {
-    FUN_06356960(/* retail 0638c5fb */ "qhull error: insufficient memory for 'Hn,n,n'\n");
+    ivp_message(/* retail 0638c5fb */ "qhull error: insufficient memory for 'Hn,n,n'\n");
     qh_errexit(qh_ERRmem, NULL, NULL);
   }
   coords= qh feasible_point;
   while (*s) {
     value= qh_strtod (s, &s);
     if (++tokcount > dim) {
-      FUN_06356960 (/* retail 0638c65b */ "qhull input warning: more coordinates for 'H%s' than dimension %d\n",
+      ivp_message (/* retail 0638c65b */ "qhull input warning: more coordinates for 'H%s' than dimension %d\n",
           qh feasible_string, dim);
       break;
     }

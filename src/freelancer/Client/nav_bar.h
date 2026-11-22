@@ -80,7 +80,7 @@ public:
     // slot 13 FUN_0043e6c0
     void Draw() override;
     // slot 29 LAB_0043efd0 (RET 4) -- the [NavBar] section of IniValues written to File.
-    void Slot29(FILE* File) override;
+    void SaveIni(FILE* File) override;
     // slot 42 LAB_0043ee80 (RET 0xc) -- only Msg 0x26 (a button clicked, A = the control).
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 

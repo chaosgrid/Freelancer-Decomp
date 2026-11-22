@@ -197,7 +197,7 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
     {
         FContentPlayerState* First = GetFirstContentPlayerState();
         if (First != nullptr && First->GetLiveMission() != 0 && First->ShipObject != nullptr
-            && First->ShipObject->Slot08())
+            && First->ShipObject->IsInCombat())
         {
             return;
         }
@@ -363,7 +363,7 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                     FContentNpcShip* Npc = static_cast<FContentNpcShip*>(Object);
                     if (!bMultiplayer && (Npc->CreationKind == 0 || Npc->CreationKind == 1))
                         bExcluded = true;
-                    if (Npc->HasField120())
+                    if (Npc->IsInTradeLane())
                         bExcluded = true;
                 }
                 // 06f7072d-06f70753: in single player the mission objects too.

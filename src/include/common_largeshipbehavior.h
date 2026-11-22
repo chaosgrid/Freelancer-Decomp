@@ -109,12 +109,12 @@ public:
     // the nav-helper's current AI target (an IObjRW*), and it is also the second argument
     // retail hands to the immediate-threat probe -- which is itself now real code, see below.
     //
-    // Field168/Field16c were RE-TYPED (2026-09-17) from a placeholder `int` to `float` -- they
-    // are genuine cooldown timers, not flags/counters. Field170 (a Vector at +0x170) is the
+    // AvoidanceScanCooldown/ThreatCooldown were RE-TYPED (2026-09-17) from a placeholder `int` to `float` -- they
+    // are genuine cooldown timers, not flags/counters. AvoidanceGoalPos (a Vector at +0x170) is the
     // collision-avoidance steering goal the scan block computes.
     //
     // THE DENSE INNER BODY IS NO LONGER DEFERRED (2026-09-17, claude:common-buzz-largeship).
-    // Common.dll.txt 207230-207831, gated by `Field168 < 0.0f`, had stood FULLPORT-DEFERRED "AS
+    // Common.dll.txt 207230-207831, gated by `AvoidanceScanCooldown < 0.0f`, had stood FULLPORT-DEFERRED "AS
     // A WHOLE -- NOT decomposed into C++" through four passes, on the grounds that "every single
     // value in the entire block (the collection's contents, the ship's own position, the
     // falloff weights) is either opaque or fabricatable-only". Every clause of that was checked
@@ -140,7 +140,7 @@ public:
     // derivation in the .cpp):
     //   Pass 1 (.text:062d0200-062d025d) averages the world positions of every candidate whose
     //     cached attitude is <= -0.6f (DAT_0639f540) -- the hostile contacts' centre of mass.
-    //   Pass 2 (.text:062d02a6-062d0553), which runs ONLY when Field16c has run down this tick,
+    //   Pass 2 (.text:062d02a6-062d0553), which runs ONLY when ThreatCooldown has run down this tick,
     //     averages the positions of every candidate of type 0x80000/0x100000/0x200000 within
     //     1500 units, and offsets the goal 500 units AWAY from that crowd's bearing.
     //   The goal is then clamped to within +/-50 units of our own altitude, abandoned if it is
@@ -149,11 +149,11 @@ public:
     //     candidate's (radius + 500) sphere via RaySphereIntersect (item 1712) and pulls the
     //     goal back to the nearest hit -- or latches "blocked" and commits both ideas instead
     //     if we are already inside somebody's envelope.
-    // So Field170 (+0x170, a Vector) is a COLLISION-AVOIDANCE STEERING GOAL, and the two
+    // So AvoidanceGoalPos (+0x170, a Vector) is a COLLISION-AVOIDANCE STEERING GOAL, and the two
     // sub-objects are pointed at it: SubObjectA.SetRange3c(250.0f)/SetMode(0)/SetScale40(0.6f)/
-    // SetPosition(Field170) and SubObjectB.SetPosition(Field170).
+    // SetPosition(AvoidanceGoalPos) and SubObjectB.SetPosition(AvoidanceGoalPos).
     //
-    // A LIVE CONTROL-FLOW BUG WAS FIXED HERE. The byte written by the Field16c clamp at
+    // A LIVE CONTROL-FLOW BUG WAS FIXED HERE. The byte written by the ThreatCooldown clamp at
     // .text:062d0098/062d00b6 (`[ESP+0x27]`) was recorded here as "confirmed, by re-reading the
     // complete raw disassembly range, never read again anywhere in this function". It is read,
     // at .text:062d0274, spelled `[ESP+0x2b]` -- `PUSH EBP` at .text:062d0177 shifts every later
@@ -168,7 +168,7 @@ public:
     // Update() casts once, against those asserts.
     //
     // Outer SHAPE (entry guard; the "immediate threat" early-return branch; the two independent
-    // Field16c/Field168 cooldown-timer gates; the shared tail) was already real, and every x87
+    // ThreatCooldown/AvoidanceScanCooldown cooldown-timer gates; the shared tail) was already real, and every x87
     // FCOM/FNSTSW/TEST-AH polarity in it was independently re-derived from the raw bytes
     // (DAT_0639c430 = 0.0 double, DAT_06399408 = 0.0f, DAT_0639f54c = 5.0f, DAT_0639f550 =
     // 30.0f, all bit-exact). The scan block's own constants were read the same way this pass:
@@ -190,10 +190,10 @@ public:
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
 
     // Slot 3, LAB_062cffa0.
-    void Slot3() override;
+    void OnEngage() override;
 
     // Slot 4, FUN_062d09e0.
-    void Slot4() override;
+    void OnDisengage() override;
 
     // Own vtable slot 5 (offset 0x14). Common.dll.txt 207091-207126 (LAB_062cfff0), 33
     // instructions. CLOSED 2026-09-17 (claude:common-largeship-itl) -- every instruction is
@@ -208,7 +208,7 @@ public:
     //   ModeSelector0xc = Mode; return Mode;
     // Note the 0x80000 test is on get_type's OUT-PARAMETER, not on its int return value --
     // retail discards the return entirely (`TEST dword ptr [ESP+8], 0x80000`).
-    int Slot5(float Value) override;
+    int OnEvaluateReadiness(float Value) override;
 
     // Own vtable slot 7 (offset 0x1c), Update/dispatch entry point. See the class comment
     // above for the full writeup.
@@ -218,11 +218,11 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
 private:
     // ------------------------------------------------------------------
@@ -285,9 +285,9 @@ private:
 public:
     // ------------------------------------------------------------------
     // Confirmed fields, ascending absolute-offset order. Everything else is Opaque padding.
-    // Struct sized to the largest confirmed field (Field170 @ +0x170, ends +0x17c) -- see
-    // Update()'s own class-comment writeup for how Field168/Field16c/Field170 were confirmed
-    // (and Field168/Field16c re-typed from a placeholder `int` to `float`) this pass.
+    // Struct sized to the largest confirmed field (AvoidanceGoalPos @ +0x170, ends +0x17c) -- see
+    // Update()'s own class-comment writeup for how AvoidanceScanCooldown/ThreatCooldown/AvoidanceGoalPos were confirmed
+    // (and AvoidanceScanCooldown/ThreatCooldown re-typed from a placeholder `int` to `float`) this pass.
     // ------------------------------------------------------------------
     int TypeId;  // +0x04. The type id retail's shared base ctor FUN_062d2020 parks here, taken
                  // from this class's own ctor argument -- see Behavior::GetTypeId() (common_behavior.h)
@@ -298,7 +298,7 @@ public:
     int UpdateResult10;         // +0x10. Update()'s own tri-state result (1/2/3-shaped, see Update()).
     void* ThreatSourcePtr14;    // +0x14. Set by SetContext() (Param1); vcall receiver for
                                  // SetModeFromFlags()'s own vtbl+0x88 query.
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime1c;           // +0x1c. Zeroed by the shared FUN_062d20d0 reset effect inside
                                   // Engage() (CONFIRMED: FUN_062d20d0 is the SAME shared routine
                                   // every other sibling's own ResetTickState()/Engage() calls,
@@ -355,13 +355,13 @@ public:
     // with FLD/FSUB/FST, not integer ops -- it's a cooldown timer, decremented by DeltaTime1c
     // every tick, gating the (FULLPORT-DEFERRED) avoidance-field scan: once it goes negative
     // the scan runs and resets it to 5.0f (DAT_0639f54c, bit-exact).
-    float Field168;
+    float AvoidanceScanCooldown;
     // +0x16c. Ctor-zeroed. RE-TYPED this pass from `int` to `float`, same reasoning as
-    // Field168: a SEPARATE cooldown timer, decremented by DeltaTime1c every tick and clamped
+    // AvoidanceScanCooldown: a SEPARATE cooldown timer, decremented by DeltaTime1c every tick and clamped
     // to 0.0f once it goes <= 0.0 (compared against DAT_0639c430, confirmed bit-exact 0.0
     // double); Update()'s "immediate threat" early-return branch also sets it to 30.0f
     // (DAT_0639f550, bit-exact).
-    float Field16c;
+    float ThreatCooldown;
     // +0x170 (ends +0x17c). Written by Update()'s avoidance-scan block (Common.dll.txt
     // 207230-207831), which is fully ported as of 2026-09-17. It is the COLLISION-AVOIDANCE
     // STEERING GOAL: the hostile contacts' centre of mass, pushed 500 units away from the
@@ -369,7 +369,7 @@ public:
     // finally pulled back to the first thing a ray from us to it actually hits. Both sub-objects
     // are aimed at it (SubObjectA.SetPosition / SubObjectB.SetPosition). Not read by any OTHER
     // method here (SetContext/Engage/Disengage/SetModeFromFlags never touch it).
-    Vector Field170;
+    Vector AvoidanceGoalPos;
 };
 
 static_assert(offsetof(LargeShipBehavior, CachedHandle08) == 0x08, "LargeShipBehavior::CachedHandle08 offset");
@@ -384,9 +384,9 @@ static_assert(offsetof(LargeShipBehavior, Flag29) == 0x29, "LargeShipBehavior::F
 static_assert(offsetof(LargeShipBehavior, Field2c) == 0x2c, "LargeShipBehavior::Field2c offset");
 static_assert(offsetof(LargeShipBehavior, SubObjectA) == 0x30, "LargeShipBehavior::SubObjectA offset");
 static_assert(offsetof(LargeShipBehavior, SubObjectB) == 0xa8, "LargeShipBehavior::SubObjectB offset");
-static_assert(offsetof(LargeShipBehavior, Field168) == 0x168, "LargeShipBehavior::Field168 offset");
-static_assert(offsetof(LargeShipBehavior, Field16c) == 0x16c, "LargeShipBehavior::Field16c offset");
-static_assert(offsetof(LargeShipBehavior, Field170) == 0x170, "LargeShipBehavior::Field170 offset");
+static_assert(offsetof(LargeShipBehavior, AvoidanceScanCooldown) == 0x168, "LargeShipBehavior::AvoidanceScanCooldown offset");
+static_assert(offsetof(LargeShipBehavior, ThreatCooldown) == 0x16c, "LargeShipBehavior::ThreatCooldown offset");
+static_assert(offsetof(LargeShipBehavior, AvoidanceGoalPos) == 0x170, "LargeShipBehavior::AvoidanceGoalPos offset");
 static_assert(sizeof(LargeShipBehavior) >= 0x17c, "LargeShipBehavior minimum size (largest field actually read/written)");
 
 // Retail object size, read off the factory body that allocates this class (`PUSH 0x180`

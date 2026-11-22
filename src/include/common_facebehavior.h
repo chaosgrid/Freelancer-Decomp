@@ -176,15 +176,15 @@ public:
     // Own vtable slot 3 (offset 0x0c). Common.dll.txt 196670-196695
     // (FUN_062c9320), 34 instructions, fully traced (two deferred shared
     // helper calls). Resets several per-approach fields:
-    // Flag1c5/Field1c8/Flag1b4/Field1b8/Field1bc/Field1c0/Field1d8 all -> 0,
+    // Flag1c5/EngineKillStateElapsed/Flag1b4/FaceAxisX/FaceAxisY/FaceAxisZ/AfterburnerElapsed all -> 0,
     // plus `SetCruiseLock(0, 3)` (FUN_062d21d0, FULLPORT-DEFERRED, shared
     // name/role with DockBehavior/FormationBehavior's own deferred
     // SetCruiseLock) and `Behavior_NotifyRegistrationFlag(NavHelperPtr24+0x18,
     // Flag1c4==0)` (FUN_062e91d0 -- already a documented FULLPORT-DEFERRED
     // no-op in common_behavior.cpp, reused directly here).
-    // CORRECTED 2026-10-08 (claude-code:cmn-ai4): retail starts with Behavior::Slot3
+    // CORRECTED 2026-10-08 (claude-code:cmn-ai4): retail starts with Behavior::OnEngage
     // (FUN_062d20d0) and calls the real Behavior::SetCruiseLock(0, 3); both were stubs.
-    void Slot3() override;
+    void OnEngage() override;
 
     // Own vtable slot 4 (offset 0x10). Common.dll.txt 196706-196727
     // (FUN_062c9380), 20 instructions, fully traced. If Flags28 bit 0x2 is
@@ -199,7 +199,7 @@ public:
     // see the .cpp. What is left there is only IBehaviorManager+0x0c's own POINTEE class,
     // whose +0x64 is therefore written as a plain dword at a confirmed offset. Same
     // shared tail DockBehavior::Disengage() calls).
-    void Slot4() override;
+    void OnDisengage() override;
 
     // Own vtable slot 5 (offset 0x14). Common.dll.txt 196016-196152
     // (LAB_062c8c10), 150+ instructions. Fast path (fully ported): if
@@ -226,7 +226,7 @@ public:
     // matching retail's own tail logic exactly).
     // PORTED IN FULL 2026-10-08 (claude-code:cmn-ai4) -- the paragraph above describes the
     // old gap; see the .cpp for the trace. RET 4, the argument is unread.
-    int Slot5(float Unused) override;
+    int OnEvaluateReadiness(float Unused) override;
 
     // Own vtable slot 6 (offset 0x18). Common.dll.txt 196164-196193
     // (LAB_062c8d80), 26 instructions, fully traced (one deferred helper
@@ -259,11 +259,11 @@ public:
     // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
     // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
     //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS Slot7
+    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
     // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::Slot7 is
+    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
     // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
-    int Slot7() override { return Update(); }
+    int OnUpdate() override { return Update(); }
 
     // Own vtable slot 10 (offset 0x28). Common.dll.txt 195918-196015
     // (LAB_062c8b30), ~100 instructions, fully traced (one deferred helper
@@ -280,7 +280,7 @@ public:
     // (retail's own shared default path).
     // CORRECTED 2026-10-08 (claude-code:cmn-ai4): kind 1 now calls FUN_062e74a0 and re-points
     // Watcher30 at the result, as retail does.
-    bool Slot10(void* DirectiveOp) override;
+    bool OnApplyDirective(void* DirectiveOp) override;
 
     // Own vtable slot 12 (offset 0x30). Common.dll.txt 196731-196841
     // (FUN_062c93c0), ~110 instructions. FULLY PORTED 2026-09-17
@@ -306,9 +306,9 @@ public:
     //      field below.
     //
     // Full retail body now reproduced: on the set path Flag1b4=1,
-    // Field1b8=-Offset.y, Field1bc=-Offset.x, Field1c0=Offset.z; then, when
+    // FaceAxisX=-Offset.y, FaceAxisY=-Offset.x, FaceAxisZ=Offset.z; then, when
     // get_turn_sensitivity_factor() is strictly greater than 0.0 (DAT_0639c430
-    // is an all-zero double), both Field1b8 and Field1bc are multiplied by
+    // is an all-zero double), both FaceAxisX and FaceAxisY are multiplied by
     // 1.0f/Sensitivity (DAT_0639a1d0 == 1.0f); then each is clamped into
     // [-1.0f, +1.0f] (DAT_06399404 == -1.0f, DAT_0639a1d0 == +1.0f).
     void set_direction(Vector const& Offset) override;
@@ -328,7 +328,7 @@ public:
     // -8 adjust both non-null) and the adjusted block's own vtbl[0x20]()
     // ("get id") result matches Id, and Watcher30 is still non-null, clears
     // Watcher30.
-    void Slot21(void* Arg) override;
+    void OnObjectLeftSystem(void* Arg) override;
 
     // Own vtable slot 24 (offset 0x60). Common.dll.txt 195781-195789
     // (LAB_062c8a00), fully traced: `EAX = Watcher30.target(); return EAX ?
@@ -362,9 +362,9 @@ public:
     int UpdateResult10;          // +0x10. Update()'s own tri-state result.
     void* ThreatSourcePtr14;     // +0x14. Set by SetContext() (Param1); read by
                                   // RefreshPlayerTrailState() and Update()'s GAP body.
-    unsigned char Opaque18[0x1c - 0x18];
+    IObjDB* ObjectDb;
     float DeltaTime1c;            // +0x1c. Per-tick delta time; read by Update()'s GAP body (feeds
-                                   // Field1d8 and the SubObjectB/SubObjectC per-tick vcalls, all now real). Not
+                                   // AfterburnerElapsed and the SubObjectB/SubObjectC per-tick vcalls, all now real). Not
                                    // written by anything this pass ported (set by the owning
                                    // behavior-manager tick call, same convention as every sibling).
     // +0x20. Set by SetContext() (Param2); read by SetModeFromFlags()'s GAP branch and by
@@ -483,11 +483,11 @@ public:
                                      // GotoDirectiveHandle::NavPilotPtr offset coincidence this byte
                                      // sits at).
     unsigned char Pad1b5[0x1b8 - 0x1b5];
-    float Field1b8;                  // +0x1b8. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
+    float FaceAxisX;                  // +0x1b8. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
                                       // writes -Offset.y (pre-clamp) on the "set" path.
-    float Field1bc;                  // +0x1bc. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
+    float FaceAxisY;                  // +0x1bc. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
                                       // writes -Offset.x (pre-clamp) on the "set" path.
-    float Field1c0;                  // +0x1c0. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
+    float FaceAxisZ;                  // +0x1c0. Zeroed by ctor/ResetApproachState(). SetTargetOffset()
                                       // writes Offset.z (raw, unclamped/unnegated) on the "set" path.
     unsigned char Flag1c4;           // +0x1c4. Set to 1 by ctor. ApplyTargetMessage() overwrites it
                                       // from Message->+0x44; ResetApproachState() reads it (feeds
@@ -503,7 +503,7 @@ public:
     // pattern is 0.0f either way, so nothing contradicted the old `int` until the FPU reads were
     // traced. It is a seconds-valued "how long has this state been held" accumulator, advanced by
     // DeltaTime1c and compared against Personality::EngineKillParams.EngineKillSearchTime/EngineKillFaceTime.
-    float Field1c8;                  // +0x1c8. Zeroed by ctor/ResetApproachState().
+    float EngineKillStateElapsed;                  // +0x1c8. Zeroed by ctor/ResetApproachState().
     float Field1cc;                  // +0x1cc. Zeroed by ctor. SetContext() computes it via the
                                       // FULLPORT-DEFERRED FUN_062e5b20(ThreatSourcePtr14, 0, 1.0f)
                                       // call (not reproduced -- field stays at its ctor default).
@@ -513,14 +513,14 @@ public:
                                        // clears it (early-out -> UpdateResult10=2); RequestAbort()
                                        // (slot 13) is the confirmed setter.
     unsigned char Pad1d5[0x1d8 - 0x1d5];
-    // RETYPED int -> float 2026-09-17 (claude:w18-behavior), same reasoning as Field1c8 above and
+    // RETYPED int -> float 2026-09-17 (claude:w18-behavior), same reasoning as EngineKillStateElapsed above and
     // for the same reason it was missed: the only integer-looking access is the zero store.
     // `.text:062c8ea6 FLD float ptr [EBP+0x1d8]; FADD float ptr [EBP+0x1c]; FSTP float ptr
     // [EBP+0x1d8]` and `.text:062c8e68 FLD float ptr [EBP+0x1d8]; FCOMP float ptr [ECX+0x16e0]`.
-    // A SECOND seconds accumulator, independent of Field1c8: this one measures how long the ship
+    // A SECOND seconds accumulator, independent of EngineKillStateElapsed: this one measures how long the ship
     // has been turning toward the target while the bearing is still wide, and is capped by
     // Personality::EngineKillParams.EngineKillAfterburnerTime.
-    float Field1d8;                   // +0x1d8. Zeroed by ctor/ResetApproachState().
+    float AfterburnerElapsed;                   // +0x1d8. Zeroed by ctor/ResetApproachState().
 };
 
 static_assert(offsetof(FaceBehavior, CachedHandle08) == 0x08, "FaceBehavior::CachedHandle08 offset");
@@ -540,16 +540,16 @@ static_assert(offsetof(FaceBehavior, SubObjectA) == 0x68, "FaceBehavior::SubObje
 static_assert(offsetof(FaceBehavior, SubObjectB) == 0xe0, "FaceBehavior::SubObjectB offset");
 static_assert(offsetof(FaceBehavior, SubObjectC) == 0x1a0, "FaceBehavior::SubObjectC offset");
 static_assert(offsetof(FaceBehavior, Flag1b4) == 0x1b4, "FaceBehavior::Flag1b4 offset");
-static_assert(offsetof(FaceBehavior, Field1b8) == 0x1b8, "FaceBehavior::Field1b8 offset");
-static_assert(offsetof(FaceBehavior, Field1bc) == 0x1bc, "FaceBehavior::Field1bc offset");
-static_assert(offsetof(FaceBehavior, Field1c0) == 0x1c0, "FaceBehavior::Field1c0 offset");
+static_assert(offsetof(FaceBehavior, FaceAxisX) == 0x1b8, "FaceBehavior::FaceAxisX offset");
+static_assert(offsetof(FaceBehavior, FaceAxisY) == 0x1bc, "FaceBehavior::FaceAxisY offset");
+static_assert(offsetof(FaceBehavior, FaceAxisZ) == 0x1c0, "FaceBehavior::FaceAxisZ offset");
 static_assert(offsetof(FaceBehavior, Flag1c4) == 0x1c4, "FaceBehavior::Flag1c4 offset");
 static_assert(offsetof(FaceBehavior, Flag1c5) == 0x1c5, "FaceBehavior::Flag1c5 offset");
-static_assert(offsetof(FaceBehavior, Field1c8) == 0x1c8, "FaceBehavior::Field1c8 offset");
+static_assert(offsetof(FaceBehavior, EngineKillStateElapsed) == 0x1c8, "FaceBehavior::EngineKillStateElapsed offset");
 static_assert(offsetof(FaceBehavior, Field1cc) == 0x1cc, "FaceBehavior::Field1cc offset");
 static_assert(offsetof(FaceBehavior, Field1d0) == 0x1d0, "FaceBehavior::Field1d0 offset");
 static_assert(offsetof(FaceBehavior, Flag1d4) == 0x1d4, "FaceBehavior::Flag1d4 offset");
-static_assert(offsetof(FaceBehavior, Field1d8) == 0x1d8, "FaceBehavior::Field1d8 offset");
+static_assert(offsetof(FaceBehavior, AfterburnerElapsed) == 0x1d8, "FaceBehavior::AfterburnerElapsed offset");
 static_assert(sizeof(FaceBehavior) >= 0x1dc, "FaceBehavior minimum size (largest field actually read/written this pass)");
 
 // Retail object size, read off the factory body that allocates this class (`PUSH 0x1dc`

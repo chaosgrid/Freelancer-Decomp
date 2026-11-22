@@ -43,7 +43,7 @@ SplineMoveIdea::SplineMoveIdea()
     , WideMode(0)
     , Pad151{}
     , BankBlendCap(1.0f)   // 0x3f800000
-    , Field158(0)
+    , StopStyle(0)
     , MaxSpeed15c(0.0f)
     , LookaheadScale(0.0f)
     , SpeedNorm(0.0f)
@@ -134,9 +134,9 @@ void SplineMoveIdea::SetThrottleScale(float Value)
 // `MOV EAX,[ESP+4]; MOV dword ptr [ECX+0x158],EAX; RET 4`. Ported 2026-09-17
 // (claude:w21-stubsweep); see the declaration in common_idea.h for the
 // receiver proof at both call sites.
-void SplineMoveIdea::SetField158(int Value)
+void SplineMoveIdea::SetStopStyle(int Value)
 {
-    Field158 = Value;
+    StopStyle = Value;
 }
 
 // FUN_062da410, Common.dll.txt 223630-223691, RET 4. Ported 2026-09-17
@@ -412,9 +412,9 @@ int SplineMoveIdea::Update(float Dt)
     if (!IsPointOutsideHeadingCone(ProbePos, ObjInspectOf(Object), 0.0f))
         return 0;
 
-    // 062da2c1-062da2dd: Move.StopStyle = Field158 (raw dword), then Commit() through this
+    // 062da2c1-062da2dd: Move.StopStyle = StopStyle (raw dword), then Commit() through this
     // object's own vtable slot 4 (`MOV ECX,ESI; CALL [EDX+0x10]`), return 1.
-    Move.StopStyle = Field158;
+    Move.StopStyle = StopStyle;
     Commit();
     return 1;
 }

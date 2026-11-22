@@ -21,7 +21,7 @@
 // FUN_062cfe20 (Common.dll.txt 206896-206931) -- constructor. Calls the shared base-init
 // field-initialising FUN_062d2020 (it writes +0x04..+0x29, see Behavior in common_behavior.h) first, then default-constructs a MoveIdea and a FaceIdea for real
 // (SubObjectA/SubObjectB, RTTI-identified, common_idea.h), sets Field2c, and zeroes
-// Field168/Field16c.
+// AvoidanceScanCooldown/ThreatCooldown.
 LargeShipBehavior::LargeShipBehavior(int InTypeId)
     : Behavior()
     , TypeId(InTypeId)
@@ -29,7 +29,7 @@ LargeShipBehavior::LargeShipBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , ThreatSourcePtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
     , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
@@ -39,9 +39,9 @@ LargeShipBehavior::LargeShipBehavior(int InTypeId)
     , Field2c(1500.0f)
     , SubObjectA()
     , SubObjectB()
-    , Field168(0.0f)
-    , Field16c(0.0f)
-    , Field170{}
+    , AvoidanceScanCooldown(0.0f)
+    , ThreatCooldown(0.0f)
+    , AvoidanceGoalPos{}
 {
     ConstructBase(InTypeId);   // FUN_062d2020 -- Behavior's own field initialisation
     // Retail default-constructs SubObjectA/SubObjectB here (FUN_062d4e60 @ SubObjectA,
@@ -93,9 +93,9 @@ bool LargeShipBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 }
 
 // Slot 3, LAB_062cffa0 (.text:062cffa0-062cffea).
-void LargeShipBehavior::Slot3()
+void LargeShipBehavior::OnEngage()
 {
-    Behavior::Slot3();                                              // 062cffa6 FUN_062d20d0
+    Behavior::OnEngage();                                              // 062cffa6 FUN_062d20d0
 
     // retail (.text:062cffab-062cffb3): `PUSH 0x40490fdb (pi); LEA ECX,[ESI+0x30];
     // CALL TextRenderContext::set_origin_h`. ESI+0x30 is SubObjectA, and .text:063275f0 is
@@ -124,7 +124,7 @@ void LargeShipBehavior::Slot3()
 // Own vtable slot 4 (offset 0x10). Common.dll.txt 207901-207912 (FUN_062d09e0), 13
 // instructions, fully self-contained aside from the two "release" sub-object vcalls and the
 // shared tail effect.
-void LargeShipBehavior::Slot4()
+void LargeShipBehavior::OnDisengage()
 {
     // retail: `CALL [SubObjectB_vtbl+0x10]()` then `CALL [SubObjectA_vtbl+0x10]()` (Common.dll.txt
     // 062d09e3-062d09f8) -- confirmed THISCALL, zero explicit args, vtable BYTE offset +0x10 ==
@@ -134,14 +134,14 @@ void LargeShipBehavior::Slot4()
     SubObjectB.Commit();
     SubObjectA.Commit();
 
-    // 062d09fe: JMP FUN_062d20f0 == Behavior::Slot4 (PathfindManager::Field_064 = 0, if any;
+    // 062d09fe: JMP FUN_062d20f0 == Behavior::OnDisengage (PathfindManager::Field_064 = 0, if any;
     // Flag29 = 0). The old port did only the Flag29 half.
-    Behavior::Slot4();
+    Behavior::OnDisengage();
 }
 
 // Own vtable slot 5 (offset 0x14). Common.dll.txt 207091-207126 (LAB_062cfff0), 36
 // instructions.
-int LargeShipBehavior::Slot5(float Value)
+int LargeShipBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;   // RET 4, argument unread
     int Mode = 2;
@@ -284,12 +284,12 @@ static double FastLengthFromSquared(double LengthSq)
 // cast is made here, once, against those two asserts.
 //
 // A LIVE CONTROL-FLOW BUG WAS FIXED. The byte at `[ESP+0x27]` written by the
-// Field16c clamp was dismissed here as "confirmed, by re-reading the complete
+// ThreatCooldown clamp was dismissed here as "confirmed, by re-reading the complete
 // raw disassembly range, never read again anywhere in this function". It IS
 // read -- at .text:062d0274, spelled `[ESP+0x2b]`, because `PUSH EBP` at
 // .text:062d0177 shifts every later ESP-relative displacement in the scan
 // branch by four. It gates the whole second half of the scan
-// (.text:062d02a0 `JZ LAB_062d095a`): when Field16c had not yet run down to
+// (.text:062d02a0 `JZ LAB_062d095a`): when ThreatCooldown had not yet run down to
 // zero this tick, retail averages the hostile-contact positions and stops,
 // committing both ideas instead of steering. Modelled for real below as
 // bField16cExpired.
@@ -314,15 +314,15 @@ int LargeShipBehavior::Update()
     FAiTarget Scratch = {};
     Scratch.Init(ObjInspectOf(ThreatSourcePtr14), ObjInspectOf(Handle));
 
-    // retail: .text:062d008f-062d00b9. Field16c is a cooldown timer decremented
+    // retail: .text:062d008f-062d00b9. ThreatCooldown is a cooldown timer decremented
     // every tick and clamped at zero (compared against DAT_0639c430, confirmed
     // bit-exact 0.0 double). The clamp also raises the local flag the scan
     // block below consumes -- see this function's header comment.
     bool bField16cExpired = false;
-    Field16c -= DeltaTime1c;
-    if (Field16c <= 0.0f)
+    ThreatCooldown -= DeltaTime1c;
+    if (ThreatCooldown <= 0.0f)
     {
-        Field16c = 0.0f;
+        ThreatCooldown = 0.0f;
         bField16cExpired = true;
     }
 
@@ -341,19 +341,19 @@ int LargeShipBehavior::Update()
         SubObjectB.SetPosition(ThreatPos);
         SubObjectA.SetPosition(ThreatPos);
 
-        Field16c = 30.0f;  // DAT_0639f550, bit-exact
+        ThreatCooldown = 30.0f;  // DAT_0639f550, bit-exact
         UpdateResult10 = 1;
         return 1;  // retail's own literal early RET at .text:062d0170 -- this
                    // path does NOT reach the shared tail's tick calls
     }
 
-    // retail: .text:062d0171-062d018c. Field168 is a SEPARATE cooldown gating
+    // retail: .text:062d0171-062d018c. AvoidanceScanCooldown is a SEPARATE cooldown gating
     // the avoidance scan (compared against DAT_06399408, bit-exact 0.0f).
-    Field168 -= DeltaTime1c;
-    if (Field168 < 0.0f)
+    AvoidanceScanCooldown -= DeltaTime1c;
+    if (AvoidanceScanCooldown < 0.0f)
     {
         // retail: .text:062d0192-062d019e.
-        Field168 = 5.0f;  // DAT_0639f54c, bit-exact
+        AvoidanceScanCooldown = 5.0f;  // DAT_0639f54c, bit-exact
 
         SystemManager* const Sys = NavHelperPtr24;
 
@@ -493,12 +493,12 @@ int LargeShipBehavior::Update()
                                static_cast<float>(HostileCentre.x - PushX),
                                static_cast<float>(HostileCentre.y - PushY),
                                static_cast<float>(HostileCentre.z - PushZ));
-                    Field170 = Goal;
+                    AvoidanceGoalPos = Goal;
                 }
                 else
                 {
                     // retail: .text:062d0558-062d056f.
-                    Field170 = HostileCentre;
+                    AvoidanceGoalPos = HostileCentre;
                 }
 
                 // retail: .text:062d0572-062d05b2. Hold the goal within +/-50
@@ -507,14 +507,14 @@ int LargeShipBehavior::Update()
                 // The sums stay on the FPU for the FCOM: 062d0584 TEST AH,0x5 + JP stores only on
                 // strictly-less, 062d05a5 TEST AH,0x41 + JNZ only on strictly-greater.
                 double const Ceiling = static_cast<double>(SelfPos.y) + 50.0;
-                if (Ceiling < Field170.y)
+                if (Ceiling < AvoidanceGoalPos.y)
                 {
-                    Field170.y = static_cast<float>(Ceiling);
+                    AvoidanceGoalPos.y = static_cast<float>(Ceiling);
                 }
                 double const Floor = static_cast<double>(SelfPos.y) - 50.0;
-                if (Floor > Field170.y)
+                if (Floor > AvoidanceGoalPos.y)
                 {
-                    Field170.y = static_cast<float>(Floor);
+                    AvoidanceGoalPos.y = static_cast<float>(Floor);
                 }
 
                 // retail: .text:062d05b4-062d0643. If the goal is already close
@@ -522,9 +522,9 @@ int LargeShipBehavior::Update()
                 // through to the shared tail.
                 Vector ToGoal = {};
                 Vec3Assign(&ToGoal,
-                           Field170.x - SelfPos.x,
-                           Field170.y - SelfPos.y,
-                           Field170.z - SelfPos.z);
+                           AvoidanceGoalPos.x - SelfPos.x,
+                           AvoidanceGoalPos.y - SelfPos.y,
+                           AvoidanceGoalPos.z - SelfPos.z);
                 // (x*x + z*z) + y*y on the FPU; TEST AH,0x5 + JNP leaves on strictly-less.
                 double const ToGoalSq = (static_cast<double>(ToGoal.x) * ToGoal.x
                                          + static_cast<double>(ToGoal.z) * ToGoal.z)
@@ -541,9 +541,9 @@ int LargeShipBehavior::Update()
                 // and reset the running best hit distance.
                 Vector RayDir = {};
                 Vec3Assign(&RayDir,
-                           Field170.x - SelfPos.x,
-                           Field170.y - SelfPos.y,
-                           Field170.z - SelfPos.z);
+                           AvoidanceGoalPos.x - SelfPos.x,
+                           AvoidanceGoalPos.y - SelfPos.y,
+                           AvoidanceGoalPos.z - SelfPos.z);
                 float BestHit = 0.0f;
 
                 // ---- Pass 3, .text:062d0692-062d0892: sweep the ray to the
@@ -633,10 +633,10 @@ int LargeShipBehavior::Update()
                 // FSTP'd first.
                 if (BestHit != 0.0f)
                 {
-                    Field170.x = static_cast<float>(static_cast<double>(RayDir.x) * BestHit + SelfPos.x);
-                    Field170.y = static_cast<float>(static_cast<double>(RayDir.y) * BestHit + SelfPos.y);
+                    AvoidanceGoalPos.x = static_cast<float>(static_cast<double>(RayDir.x) * BestHit + SelfPos.x);
+                    AvoidanceGoalPos.y = static_cast<float>(static_cast<double>(RayDir.y) * BestHit + SelfPos.y);
                     float const ScaledZ = static_cast<float>(static_cast<double>(RayDir.z) * BestHit);
-                    Field170.z = static_cast<float>(static_cast<double>(ScaledZ) + SelfPos.z);
+                    AvoidanceGoalPos.z = static_cast<float>(static_cast<double>(ScaledZ) + SelfPos.z);
                 }
 
                 // retail: .text:062d08fd-062d0958. LAB_062d0905 is also the
@@ -649,9 +649,9 @@ int LargeShipBehavior::Update()
                     SubObjectA.SetRange3c(250.0f);  // DAT_0639f558, bit-exact
                     SubObjectA.SetMode(0);
                     SubObjectA.SetScale40(0.6f);    // DAT_0639f554, bit-exact
-                    SubObjectB.SetPosition(Field170);
-                    SubObjectA.SetPosition(Field170);
-                    Field16c = 30.0f;               // DAT_0639f550, bit-exact
+                    SubObjectB.SetPosition(AvoidanceGoalPos);
+                    SubObjectA.SetPosition(AvoidanceGoalPos);
+                    ThreatCooldown = 30.0f;               // DAT_0639f550, bit-exact
                 }
 
                 if (bBlocked)

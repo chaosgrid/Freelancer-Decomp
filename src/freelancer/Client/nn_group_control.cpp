@@ -8,7 +8,7 @@
 //
 //   FUN_0045fd70 ctor            FUN_00460170 dtor (FUN_00460090 scalar deleting)
 //   FUN_00460520 SetChannelTable FUN_00460550 Create
-//   FUN_00462a30 ShowControl     FUN_00462a40 Slot23
+//   FUN_00462a30 ShowControl     FUN_00462a40 ProcessMessage
 //   LAB_00462ab0 UpdateInactive  FUN_00462ba0 Update
 //   LAB_00462bd0 SetProperty     FUN_00462e30 RefreshRequestDisplay
 //   FUN_004632f0 AddTradeRequest FUN_00463630 HandleInviteMessage
@@ -306,7 +306,7 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     return true;
 }
 
-bool NnGroupControl::Slot23(unsigned Msg, unsigned A, unsigned B)
+bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00462a40
     if (Msg == 0xef01)
@@ -326,7 +326,7 @@ bool NnGroupControl::Slot23(unsigned Msg, unsigned A, unsigned B)
         RefreshRequestDisplay();
         return true;
     }
-    return WinControl::Slot23(Msg, A, B);
+    return WinControl::ProcessMessage(Msg, A, B);
 }
 
 void NnGroupControl::UpdateInactive()

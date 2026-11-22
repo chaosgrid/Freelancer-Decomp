@@ -663,7 +663,7 @@ namespace
         } Spline;
         Component.Object->QueryInterface(Iids::CRSpline, reinterpret_cast<void**>(&Spline.Spline));
         if (Spline.Spline != nullptr)
-            Spline.Spline->Slot4LoadPoints(Packed, Count);
+            Spline.Spline->LoadPoints(Packed, Count);
         // Packed has only normal-path deletion; Spline then Component unwind.
         ::operator delete(Packed);
     }
@@ -1631,7 +1631,7 @@ namespace
                 CreateCurveFromLua(&Common.ParamCurve, Curve);
             const lua_Object Period = GetFieldOrNil(Props, "pcurve_period");
             if (lua_isnil(Period) == 0)
-                Common.Field28 = LuaNumberToRetailInt(Period);
+                Common.ParamCurvePeriod = LuaNumberToRetailInt(Period);
         }
         return Props;
     }
@@ -1655,7 +1655,7 @@ namespace
                 const char* String = lua_getstring(StringObject);
                 // Retail leaves this context null; retain the canonical callback
                 // for modern providers (see ForeachEvent in decomp-tracker).
-                G_LoadComContext->Slot3(Descriptor, String);
+                G_LoadComContext->SetUserEventString(Descriptor, String);
             }
         }
         // 27b54 normal temporary delete, then27b60..6b common curve Release.
@@ -2063,7 +2063,7 @@ namespace
         Common.UniqueId = -1;
         Common.PrimaryIndex = -1;
         Common.SecondaryIndex = -1;
-        Common.Field28 = -1;
+        Common.ParamCurvePeriod = -1;
         if (Type == 0)
         {
             lua_endblock();

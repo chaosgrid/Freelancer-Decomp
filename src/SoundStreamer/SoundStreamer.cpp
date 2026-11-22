@@ -177,15 +177,15 @@ namespace
         const char* ComponentName;
         const char* BackendName;
         const char* DataPath;
-        unsigned long Field10;
-        unsigned long Field14;
-        unsigned long Field18;
-        unsigned long Field1C;
-        unsigned long Field20;
-        unsigned long Field24;
-        unsigned long Field28;
-        unsigned long Field2C;
-        unsigned long Field30;
+        unsigned long Access;
+        unsigned long ShareMode;
+        unsigned long Security;
+        unsigned long Creation;
+        unsigned long Flags;
+        unsigned long TemplateFile;
+        unsigned long Parent;
+        unsigned long Extra;
+        unsigned long FindHandle;
     };
 
     // 06ef30af..3109: 0x34 desc {size, "FileSystem", 0, Path, 0x80000000, 1, 0, 3, 0x8000080,
@@ -197,12 +197,12 @@ namespace
         Desc.Size = 0x34;
         Desc.ComponentName = "FileSystem";
         Desc.DataPath = Path;
-        Desc.Field10 = 0x80000000;
-        Desc.Field14 = 1;
-        Desc.Field18 = 0;
-        Desc.Field1C = 3;
-        Desc.Field20 = 0x8000080;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.Access = 0x80000000;
+        Desc.ShareMode = 1;
+        Desc.Security = 0;
+        Desc.Creation = 3;
+        Desc.Flags = 0x8000080;
+        Desc.FindHandle = 0xFFFFFFFF;
         ICOManager* Dacom = DACOM_Acquire();
         return Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                      reinterpret_cast<void**>(Out));
@@ -347,11 +347,11 @@ namespace
         Desc.Size = 0x34;
         Desc.ComponentName = "FileSystem";
         Desc.DataPath = Stream->Path;
-        Desc.Field10 = 0x80000000;
-        Desc.Field14 = 1;
-        Desc.Field1C = 3;
-        Desc.Field20 = 0x8000080;
-        Desc.Field30 = 0xFFFFFFFF;
+        Desc.Access = 0x80000000;
+        Desc.ShareMode = 1;
+        Desc.Creation = 3;
+        Desc.Flags = 0x8000080;
+        Desc.FindHandle = 0xFFFFFFFF;
         Stream->FileHandle = static_cast<IFileSystem*>(Stream->FileSystem) // +0x7C
                                  ->OpenByDesc(reinterpret_cast<FFileSystemDesc*>(&Desc));
     }

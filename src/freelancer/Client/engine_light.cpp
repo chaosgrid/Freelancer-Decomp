@@ -81,7 +81,7 @@ namespace
     }
 
     // DAT_006164e0/e4/e8 — global intrusive list of registered lights (head/tail/count),
-    // linked through FEngineLight::Field04 (next) / Field08 (prev). Insert via
+    // linked through FEngineLight::RegListNext (next) / RegListPrev (prev). Insert via
     // LinkIntoRegisteredList (FUN_004104e0 bit4 arm).
     FEngineLight* G_LightListHead = nullptr;
     FEngineLight* G_LightListTail = nullptr;
@@ -90,10 +90,10 @@ namespace
     // DAT_006164ec — soft-light 3DMathEngine cache (FUN_005b73e0).
     I3DMathEngine* G_SoftLightMath = nullptr;
 
-    FEngineLight* ListNext(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->Field04)); }
-    FEngineLight* ListPrev(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->Field08)); }
-    void SetListNext(FEngineLight* L, FEngineLight* V) { L->Field04 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
-    void SetListPrev(FEngineLight* L, FEngineLight* V) { L->Field08 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
+    FEngineLight* ListNext(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->RegListNext)); }
+    FEngineLight* ListPrev(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->RegListPrev)); }
+    void SetListNext(FEngineLight* L, FEngineLight* V) { L->RegListNext = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
+    void SetListPrev(FEngineLight* L, FEngineLight* V) { L->RegListPrev = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
 
     I3DMathEngine* AcquireSoftLightMath()
     {
@@ -1340,9 +1340,9 @@ FGameLight::FGameLight() : FEngineLight(-1)
     this->LocalXform[4] = 1.0f;
     this->LocalXform[0] = 1.0f;
     // 0x00537579..0x0053758b: +0x120..+0x128 zeroed, then the GameLight vtable.
-    this->Field120 = 0.0f;
-    this->Field124 = 0.0f;
-    this->Field128 = 0.0f;
+    this->VelocityX = 0.0f;
+    this->VelocityY = 0.0f;
+    this->VelocityZ = 0.0f;
 }
 
 FGameLight* GameLightCreatePoint(float const* Pos3, unsigned char const Rgb[3], float Range)
@@ -1610,9 +1610,9 @@ void GameLightTick(FGameLight* Light, float Dt)
         // 0x005378d8..0x0053792e: the three products stay on the FPU; the z product is
         // spilled to a float local (FSTP 0x00537906) before its add, x and y are added from
         // the stack (FADD 0x0053790c / 0x00537916) and rounded once by their FSTP.
-        double const Xv = static_cast<double>(Dt) * static_cast<double>(Light->Field120);
-        double const Yv = static_cast<double>(Dt) * static_cast<double>(Light->Field124);
-        float const Zv = static_cast<float>(static_cast<double>(Dt) * static_cast<double>(Light->Field128));
+        double const Xv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityX);
+        double const Yv = static_cast<double>(Dt) * static_cast<double>(Light->VelocityY);
+        float const Zv = static_cast<float>(static_cast<double>(Dt) * static_cast<double>(Light->VelocityZ));
         float Pos[3];
         Pos[0] = static_cast<float>(Xv + static_cast<double>(Light->Position[0]));
         Pos[1] = static_cast<float>(Yv + static_cast<double>(Light->Position[1]));

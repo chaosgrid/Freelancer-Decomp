@@ -145,7 +145,7 @@ namespace
         unsigned long DACOM_API AddRef() override;
         unsigned long DACOM_API Release() override;
 
-        unsigned long DACOM_API Slot3() override;
+        unsigned long DACOM_API MarkStarted() override;
         unsigned long DACOM_API GetStartTick() override;
         unsigned char DACOM_API IsActive() override;
         unsigned char DACOM_API Is3d() override;
@@ -179,7 +179,7 @@ namespace
         void __thiscall Resume() override;
         unsigned long __thiscall IsPaused() override { return Field08 != 0 ? 1u : 0u; }
         unsigned char __thiscall IsFinished() override;
-        unsigned long __thiscall Slot30() override;
+        unsigned long __thiscall GetDurationMs() override;
         void __thiscall ComputeMixerScore(const float* Listener) override;
         void __thiscall SetAttenuation(float Attenuation) override;
         void __thiscall SetPan(float NewPan) override;
@@ -190,7 +190,7 @@ namespace
         // Slots 35..37 in the Sound::Source and Sound::StreamedSource tables are the imported
         // do-nothings IDPMsgHandler::OnAddHost (RET 4, slots 35 and 36) and
         // IDPMsgHandler::OnReceive (RET 8, slot 37); only Sound::Source3D has bodies.
-        unsigned long __thiscall Slot35(void* /*Arg*/) override { return 0; }
+        unsigned long __thiscall SetPosition(void* /*Arg*/) override { return 0; }
         void __thiscall SetVelocity(const float* /*Velocity*/) override {}
         void __thiscall SetPose(int /*AttachHandle*/, const float* /*Transform*/) override {}
         void __thiscall SetPitch(float NewPitch) override;
@@ -198,7 +198,7 @@ namespace
         int __thiscall GetAttachHandle() override { return -1; }
 
         // FUN_0044fd00 -- `XOR AL,AL; RET`.
-        unsigned char __thiscall Slot40() override { return 0; }
+        unsigned char __thiscall IsFadedOut() override { return 0; }
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
         // FUN_00429690 (RET 8): slot 31 with the listener, then the negation of slot 29. The
         // time step is not read.
@@ -286,7 +286,7 @@ namespace
         void __thiscall SetAttenuation(float Attenuation) override;
         void __thiscall SetPan(float NewPan) override;
         void __thiscall SetLooping(unsigned char bLooping) override;
-        unsigned char __thiscall Slot40() override;
+        unsigned char __thiscall IsFadedOut() override;
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
         unsigned char __thiscall Update(const float* Listener, float DeltaSeconds) override;
 
@@ -324,7 +324,7 @@ namespace
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override;
         GENRESULT DACOM_API GetVelocity(FVec3* Out) override;
         // Slot 35 (+0x8c), LAB_00429ca0: the world position setter (see the body).
-        unsigned long __thiscall Slot35(void* Arg) override;
+        unsigned long __thiscall SetPosition(void* Arg) override;
         void __thiscall SetVelocity(const float* Velocity) override;
         void __thiscall SetPose(int AttachHandle, const float* Transform) override;
         // LAB_00428810 -- slot 39: `MOV EAX,[ECX+0x60]; RET`.
@@ -673,7 +673,7 @@ namespace
     // hands back this+0x14, the tick the sound started on. The port used to install its
     // zero-returning stub in both, so every one-shot looked like it had started at tick 0 and
     // ISoundManager::OneShotAlreadyExpired treated it as already over.
-    unsigned long DACOM_API FSoundSource::Slot3()
+    unsigned long DACOM_API FSoundSource::MarkStarted()
     {
         SourceMarkStarted(this);
         return 0;
@@ -682,7 +682,7 @@ namespace
     unsigned long DACOM_API FSoundSource::GetStartTick()
     {
         if ((Flags & 0x10u) == 0)
-            Slot3();
+            MarkStarted();
         return static_cast<unsigned long>(StartTick);
     }
 
@@ -852,7 +852,7 @@ namespace
     // the point into the instance's frame, stored at +0x30; unattached, the point is stored as
     // it is. No null test on the argument, the engine or the transform, as in retail. The
     // non-3D tables fold this slot onto a `RET 0x4` no-op (the base Slot35).
-    unsigned long __thiscall FSpatialSource::Slot35(void* Arg)
+    unsigned long __thiscall FSpatialSource::SetPosition(void* Arg)
     {
         FVector const* const WorldPos = static_cast<FVector const*>(Arg);
         if (Source3dId != -1)
@@ -1265,7 +1265,7 @@ namespace
         return Result;
     }
 
-    unsigned long __thiscall FSoundSource::Slot30()
+    unsigned long __thiscall FSoundSource::GetDurationMs()
     {
         return SourceDurationMs(this);
     }
@@ -1288,7 +1288,7 @@ namespace
             if (Source->Arch->GetSmArchId() != -1)
             {
                 unsigned const Now = DALib::Sound->GetTickCountSlot();
-                unsigned const Duration = Source->Slot30();
+                unsigned const Duration = Source->GetDurationMs();
                 unsigned const End = static_cast<unsigned>(Source->StartTick) + Duration;
                 return End < Now ? 1u : 0u;
             }
@@ -2023,7 +2023,7 @@ namespace
     {
         if (!IsStreamHandle(StreamHandle))
             return 1;
-        if (Slot40() != 0)
+        if (IsFadedOut() != 0)
             return 1;
         unsigned long const Status = DALib::Streamer->QueryStatus(StreamHandle);
         if (Status == 4 || Status == 0)
@@ -2091,7 +2091,7 @@ namespace
 
     // LAB_0042a0a0 -- slot 40 (bare RET): faded out -- +0x3c set and the +0x1c dB at or below
     // the +0x34 target (FCOMP, `TEST AH,0x41 / JNP`: "less" or "equal"; a NaN is false).
-    unsigned char __thiscall FStreamedSource::Slot40()
+    unsigned char __thiscall FStreamedSource::IsFadedOut()
     {
         if (bFadeOut == 0)
             return 0;
@@ -2116,11 +2116,11 @@ namespace
         Desc.ComponentName = "FileSystem";
         Desc.BackendName = ParentFs != nullptr ? "UTF" : "DOS";
         Desc.DataPath = RelPath;
-        Desc.Field10 = 0x80000000u;
-        Desc.Field14 = 1;
-        Desc.Field1C = 3;
-        Desc.Field20 = 0x8000080u;
-        Desc.Field30 = 0xffffffffu;
+        Desc.Access = 0x80000000u;
+        Desc.ShareMode = 1;
+        Desc.Creation = 3;
+        Desc.Flags = 0x8000080u;
+        Desc.FindHandle = 0xffffffffu;
 
         return Factory->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), OutFs);
     }
@@ -3077,7 +3077,7 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
         Bits = static_cast<unsigned char>(((*KeyFlags ^ Bits) & 1u) ^ Bits);
         Source->Flags = Bits;
         memcpy(&Source->AttenuationDb, &PlayKey[5], sizeof(float));
-        Source->Slot35(&PlayKey[2]);
+        Source->SetPosition(&PlayKey[2]);
     }
     // 0x00428738..0x0042873f: slot 11 (+0x2c) into +0x10.
     Source->Pitch = SoundArch->GetRandomPitch();
@@ -3470,7 +3470,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
             }
             else if ((Flags & 8u) == 0)
             {
-                Source->Slot3();
+                Source->MarkStarted();
             }
         } while (Walk != G_PlayingSources.Head->Next);
     }
@@ -3488,7 +3488,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         {
             FSoundSource* const Source = G_MixerRanked[Index];
             if ((Source->Flags & 8u) == 0)
-                Source->Slot3();
+                Source->MarkStarted();
         }
         DALib::Sound->ReplaceAttachedList(reinterpret_cast<void**>(G_MixerRanked),
                                           G_MixerRankedCount);

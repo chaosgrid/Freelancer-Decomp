@@ -25,7 +25,8 @@ CruiseBehavior::CruiseBehavior(int InTypeId)
     , ModeSelector0xc(0)
     , UpdateResult10(0)
     , OwnerContextPtr14(nullptr)
-    , Opaque18{}
+    , ObjectDb(nullptr)
+    , DeltaTime1c(0.0f)
     , BehaviorMgrPtr20(nullptr)
     , NavHelperPtr24(nullptr)
     , Flags28(0)
@@ -57,7 +58,7 @@ bool CruiseBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 // (FUN_062ce380), 9 instructions.
 void CruiseBehavior::Engage()
 {
-    Behavior::Slot3();                                               // 062ce383 FUN_062d20d0
+    Behavior::OnEngage();                                               // 062ce383 FUN_062d20d0
     // 062ce388-062ce390: ThrustManager::engage_cruise(true) on NavHelperPtr24 + 0x18.
     NavHelperPtr24->Thrust.engage_cruise(true);
 }
@@ -68,7 +69,7 @@ void CruiseBehavior::Disengage()
 {
     // 062ce3a3-062ce3ab: ThrustManager::engage_cruise(false) on NavHelperPtr24 + 0x18.
     NavHelperPtr24->Thrust.engage_cruise(false);
-    Behavior::Slot4();                                               // 062ce3b3 JMP FUN_062d20f0
+    Behavior::OnDisengage();                                               // 062ce3b3 JMP FUN_062d20f0
 }
 
 // Own vtable slot 5 (offset 0x14). Common.dll.txt 204100-204108

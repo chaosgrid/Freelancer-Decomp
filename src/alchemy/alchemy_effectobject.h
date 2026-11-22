@@ -40,35 +40,35 @@ namespace AlchemyImpl
         // Slot3 never writes this+0x18. A is the node transform slot index (0 composed,
         // 1 raw -- FUN_062400f0), B the 12-float source; ScriptPsys Tick passes (1, Xform).
         // A prior port's TransformExtra_=B store was removed 2026-09-23.
-        GENRESULT DACOM_API Slot3(void* A, void* B) override;
+        GENRESULT DACOM_API SetTransform(void* A, void* B) override;
         // LAB_0621f6a0: this+0x18 (TransformExtra_) override target takes priority
         // (JMP straight to *TransformExtra_'s IFxNode+0x40 with (A,B)) — this half
         // was not previously ported (Slot4 always used Nodes_[0].Node). Else JMP
         // first list node IFxNode+0x40 (same stack, RET 0xC); no count or null test,
         // as in retail (the port-only "return a cached effect transform" fallback
         // was removed 2026-09-26).
-        GENRESULT DACOM_API Slot4(void* A, void* B) override;
-        GENRESULT DACOM_API Slot5(float Age) override;
-        GENRESULT DACOM_API Slot6(float OuterTime) override;
-        GENRESULT DACOM_API Slot7(void* Arg) override;
-        GENRESULT DACOM_API Slot8(void* Arg) override;
-        GENRESULT DACOM_API Slot9(void* Arg) override;
+        GENRESULT DACOM_API GetTransform(void* A, void* B) override;
+        GENRESULT DACOM_API SetAge(float Age) override;
+        GENRESULT DACOM_API SetOuterTime(float OuterTime) override;
+        GENRESULT DACOM_API ComposeTransforms(void* Arg) override;
+        GENRESULT DACOM_API Update(void* Arg) override;
+        GENRESULT DACOM_API Draw(void* Arg) override;
         // LAB_0621fa40: find list rec+8 == id, *out = rec[0]. Empty → -1.
-        GENRESULT DACOM_API Slot10(void* IdRaw, void* Out) override;
+        GENRESULT DACOM_API FindNodeById(void* IdRaw, void* Out) override;
         // LAB_0621fa80: empty list → AL=1 (kept). Non-empty: per-node flag
         // dispatch to +0x94/+0x98/+0x90, aborting (return 0) on flags==7 or
         // on any callback out-flag. See WalkNodesFlagged.
-        GENRESULT DACOM_API Slot11(void* Arg) override;
+        GENRESULT DACOM_API IsFinished(void* Arg) override;
         // LAB_0621fb50: per-node {Id,Node} enumeration callback. See WalkNodesEnumerate.
-        GENRESULT DACOM_API Slot12(void* A, void* B) override;
+        GENRESULT DACOM_API EnumerateNodes(void* A, void* B) override;
         // FUN_0621fba0 Ghidra thiscall (this, effect, flags) RET 8 (formerly Slot13).
         // Destroy/free effect nodes by bitmask (1=emitters, 2=fields, 4=appearances, 7=all).
         GENRESULT DACOM_API DestroyNodes(void* Arg) override;
         // LAB_0621f850: per-node call to node+0x88(node, Arg). See WalkNodes.
-        GENRESULT DACOM_API Slot14(float LodInput) override;
+        GENRESULT DACOM_API SetLodInput(float LodInput) override;
         // LAB_0621f880: combined bounding-sphere merge over node+0x8C
         // spheres (Ritter two-sphere merge). See MergeNodeBoundsSphere.
-        GENRESULT DACOM_API Slot15(void* Arg) override;
+        GENRESULT DACOM_API GetBoundingSphere(void* Arg) override;
         GENRESULT DACOM_API GetBoundComponent(void** Out) override;
         // FUN_06220d70 thiscall (this, flag): Release +0x1c; flag&1 → delete.
         // Port: unbind only. Lifetime stays on Release (factory fail path).
