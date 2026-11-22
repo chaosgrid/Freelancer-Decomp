@@ -8,9 +8,6 @@
 // functions it drives (0x00558850..0x005592aa). See gameflow.h.
 
 #include "gameflow.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "character_info.h"         // LoadCharacterInfo / PreloadCharacterScripts / ...
 #include "chat_init.h"              // ChatShowMsgWin (FUN_0046a4a0)
@@ -282,10 +279,6 @@ namespace
         // 0x00558b17..0x00558b21: FUN_00439540 on DAT_00668708.
         TickClientLocationController(Dt);
 
-#ifdef FREELANCER_WALK_MODE
-        BaseWalkTick(Dt);
-#endif
-
         // 0x00558b26..0x00558b59: every RoomObject whose +0x04 is clear gets slot 5 (Dt).
         std::list<FRoomObject*>& Objects = GetRoomObjectList();
         for (std::list<FRoomObject*>::iterator It = Objects.begin(); It != Objects.end(); ++It)
@@ -294,10 +287,6 @@ namespace
             if (Object->bNoUpdate == 0)
                 Object->Update(DeltaSeconds);
         }
-
-#ifdef FREELANCER_WALK_MODE
-        BaseWalkAfterWorldUpdate();
-#endif
 
         // 0x00558b5b..0x00558b66: FUN_0041a140(FUN_00438c90(), Dt) -- the letterbox update for
         // the room camera (the room-camera twin of FUN_0041a420, which the space camera uses).
@@ -326,10 +315,6 @@ namespace
             return;
         if (GetClientMouseCursorDrawFlag() != 0)
             return;
-#ifdef FREELANCER_WALK_MODE
-        if (BaseWalkIsLooking())
-            return;
-#endif
         SetClientMouseCursorDrawFlag(1);
     }
 
@@ -770,9 +755,6 @@ void RequestGameflowMissionBriefing()
 
 void LeaveGameflowBase()
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkLeaveBase();
-#endif
     // FUN_00558a50.
     SetClientFpsCap(RtcSlider::get_default_fps_cap()); // DAT_00610a0c
     LeaveClientLocationBase();                // FUN_0043b3e0 on DAT_00668708

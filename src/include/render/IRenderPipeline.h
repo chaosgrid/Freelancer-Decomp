@@ -157,7 +157,7 @@ struct IRenderPipeline : IDAComponent
     // DstLevel (roles confirmed the same way LockTexture/UnlockTexture's Extra==0/1
     // GetSurfaceLevel/GetCubeMapSurface branch was confirmed). The remaining 8 dwords
     // sit as two untouched 4-dword runs immediately after SrcLevel and after DstLevel
-    // -- exactly sizeof(RECT) passed by value each -- matching an earlier RE note's "Круг
+    // -- exactly sizeof(RECT) passed by value each -- matching an earlier RE note's "Round
     // 2/3" (Handle,Level,Rect) x2 hypothesis, but retail's own FUN_06d2fd77 blit call
     // is invoked unconditionally with NULL rect pointers/counts (0x06d0f649), so those
     // 8 dwords are provably dead code in this build regardless of what they represent.

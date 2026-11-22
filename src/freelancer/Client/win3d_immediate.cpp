@@ -11,9 +11,6 @@
 // file the fuzzy-line drawers FUN_00423be0 / FUN_004231f0 with their vector helpers.
 
 #include "win3d_immediate.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "game_options.h"
 #include "space_camera.h"
@@ -321,11 +318,7 @@ void Win3DVertex3f(float X, float Y, float Z)
     Vertex.X = X;
     Vertex.Y = Y;
     Vertex.Z = Z;
-#ifdef FREELANCER_WALK_MODE
-    Vertex.Diffuse = BaseWalkFadeInterfaceColor(G_CurrentColour);
-#else
     Vertex.Diffuse = G_CurrentColour;
-#endif
     Vertex.U = G_CurrentU;
     Vertex.V = G_CurrentV;
 }

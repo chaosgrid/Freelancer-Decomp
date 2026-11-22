@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "nn_main_button.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "client_mesh_load.h"    // ClientUiMeshHolderRelease (FUN_0059eee0), ClientMeshLoadFromPath (FUN_0059ec80)
 #include "globals.h"             // IsClientServerTickPaused (FUN_0042d730), GetClientFrameTimeCapped (FUN_0042d680)
@@ -359,11 +356,7 @@ void NN_MainButton::Draw()
     // LAB_0045ca00.
     // 0x0045ca03..0x0045ca46: the HUD stopped picking (and no NeuroNet screen holds it): close
     // the open panel unless the mover runs or DAT_0066d359 holds it, and draw nothing.
-#ifdef FREELANCER_WALK_MODE
-    if (HudIsMousePickBlocked() && !G_bNnScreenUp && !BaseWalkShouldDrawInterface())
-#else
     if (HudIsMousePickBlocked() && !G_bNnScreenUp)
-#endif
     {
         if (OpenButton != nullptr && !ButtonMover::IsActive() && G_bNnKeepPanelOpen == 0)
         {

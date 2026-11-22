@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "win3d_engine_submit.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "common_csys.h"
 #include "DALib.h"
@@ -177,9 +174,6 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor, unsi
     }
 
     // 0x0059f0b4..0x0059f0c6: IRenderer2 +0x1c (ArchAnchor, holder +0x04, 1.0f, flags, matrix, 0).
-#ifdef FREELANCER_WALK_MODE
-    FBaseWalkInterfaceAlpha InterfaceAlpha(Holder->UserFloats[4]);
-#endif
     DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Matrix, nullptr);
 }
 
@@ -231,9 +225,6 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
     Floats[1] = static_cast<float>(static_cast<double>(ColorRgba[1]) * ByteToUnit);
     Floats[2] = static_cast<float>(static_cast<double>(ColorRgba[2]) * ByteToUnit);
     Floats[3] = static_cast<float>(static_cast<double>(ColorRgba[3]) * ByteToUnit);
-#ifdef FREELANCER_WALK_MODE
-    Floats[3] *= BaseWalkGetInterfaceDrawOpacity();
-#endif
     Material->SetParameterValue(0, ValueBlob);
 
     // 0x004344b5..0x0043456b: Scale != 1 (FCOMP 1.0 / TEST AH,0x44 / JNP: equal skips) scales a
@@ -316,9 +307,6 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
     Colour[1] = static_cast<float>(static_cast<double>(ColorRgba[1]) * ByteToUnit);
     Colour[2] = static_cast<float>(static_cast<double>(ColorRgba[2]) * ByteToUnit);
     Colour[3] = static_cast<float>(static_cast<double>(ColorRgba[3]) * ByteToUnit);
-#ifdef FREELANCER_WALK_MODE
-    Colour[3] *= BaseWalkGetInterfaceDrawOpacity();
-#endif
     Material->SetParameterValue(0, ColourValue);
     alignas(4) unsigned char FlagValue[4 + 16];
     memset(FlagValue, 0, sizeof(FlagValue));

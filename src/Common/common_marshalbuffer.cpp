@@ -166,7 +166,7 @@ void MarshalBuffer::put_U8(unsigned char Value)
 // get_U8 / get_U16 / get_U32 / get_float (06263aa0 / 06263ad0 / 06263af0 / 06263b20) keep their
 // result in the stack slot made by PUSH ECX, so when get_void reads nothing (Count > Remaining)
 // they return the bytes of `this` that sit there: the high byte, the high word, the whole
-// pointer, the pointer's bits as a float. Very strange (очень странно), reproduced on purpose.
+// pointer, the pointer's bits as a float. Very strange, reproduced on purpose.
 unsigned char MarshalBuffer::get_U8()
 {
     unsigned char V = (unsigned char)((std::uintptr_t)this >> 24);
@@ -236,7 +236,7 @@ void MarshalBuffer::put_bool(bool Value)
 bool MarshalBuffer::get_bool()
 {
     // 06312970..0631299c. An empty buffer compares the high byte of the pushed `this`
-    // (06312990) with 1 -- очень странно, reproduced on purpose.
+    // (06312990) with 1 -- very strange, reproduced on purpose.
     if (Remaining >= 1)
     {
         unsigned char V = *Cursor;
@@ -277,7 +277,7 @@ void MarshalBuffer::put_string(const char* Str)
 char* MarshalBuffer::get_string()
 {
     // 06312b70..06312bed. With fewer than 4 bytes left the length is the PUSH ECX slot, i.e.
-    // (unsigned)this (06312b92) -- очень странно; any real object address is >= 0x4000, so
+    // (unsigned)this (06312b92) -- very strange; any real object address is >= 0x4000, so
     // that returns NULL. malloc is not tested (06312ba7).
     unsigned int Len = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
@@ -302,7 +302,7 @@ void MarshalBuffer::get_string_to_buffer(char* Buf, int MaxLen)
     unsigned int const Cap = (unsigned int)(MaxLen - 1);
 
     // With fewer than 4 bytes left the length is read from the Buf argument's own slot
-    // (06312c18), i.e. (unsigned)Buf -- очень странно; for a real pointer (>= 0x4000) that
+    // (06312c18), i.e. (unsigned)Buf -- very strange; for a real pointer (>= 0x4000) that
     // ends in Buf[0] = 0.
     unsigned int Len = (unsigned int)(std::uintptr_t)Buf;
     if (Remaining >= 4)
@@ -366,7 +366,7 @@ void MarshalBuffer::put_wstring(const wchar_t* Str)
 wchar_t* MarshalBuffer::get_wstring()
 {
     // 06312a40..06312ac3, the wide twin of get_string: fewer than 4 bytes left -> the length
-    // is (unsigned)this from the PUSH ECX slot (06312a62, очень странно) -> NULL for any real
+    // is (unsigned)this from the PUSH ECX slot (06312a62, very strange) -> NULL for any real
     // object; malloc(Len*2 + 2) is not tested; the inlined get_void of Len*2 bytes.
     unsigned int CharLen = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
@@ -411,7 +411,7 @@ void MarshalBuffer::put_FL_ID(unsigned int Id)
 unsigned int MarshalBuffer::get_FL_ID()
 {
     // 06313560..06313584. Fewer than 4 bytes left returns the pushed `this` (0631357e) --
-    // очень странно, reproduced on purpose.
+    // very strange, reproduced on purpose.
     if (Remaining >= 4)
     {
         unsigned int Id = *(unsigned int*)Cursor;

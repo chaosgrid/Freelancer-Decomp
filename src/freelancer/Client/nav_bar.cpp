@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "nav_bar.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "character_select_equip.h" // GetPlayerShipArchetypeIdRetail (FUN_004c3e10), visit flags
 #include "client_base_market.h"     // GetClientCurrentLocationBaseData (FUN_0043b630)
@@ -630,20 +627,11 @@ void NavBar::Draw()
 {
     // FUN_0043e6c0: WinControl::Draw (FUN_005a0760) only while the cursor shows, no fade runs
     // and the HUD does not block picking.
-#ifdef FREELANCER_WALK_MODE
-    bool const bWalkFade = BaseWalkShouldDrawInterface();
-    if (GetClientMouseCursorDrawFlag() == 0 && !bWalkFade)
-#else
     if (GetClientMouseCursorDrawFlag() == 0)
-#endif
         return;
     if (bFadingOut != 0 || bFadingIn != 0)
         return;
-#ifdef FREELANCER_WALK_MODE
-    if (HudIsMousePickBlocked() && !bWalkFade)
-#else
     if (HudIsMousePickBlocked())
-#endif
         return;
     WinControl::Draw();
 }
@@ -655,13 +643,8 @@ void NavBar::Update()
 
     // 0x0043e72b..0x0043e810: everything hidden unless the cursor shows, no fade runs and no
     // NeuroNet screen is up; the tab mesh also needs an enabled tab; disabled buttons re-greyed.
-#ifdef FREELANCER_WALK_MODE
-    bool const bShow = (GetClientMouseCursorDrawFlag() != 0 || BaseWalkShouldDrawInterface()) &&
-                       bFadingOut == 0 && bFadingIn == 0 && !G_bNnScreenUp;
-#else
     bool const bShow = GetClientMouseCursorDrawFlag() != 0 && bFadingOut == 0 &&
                        bFadingIn == 0 && !G_bNnScreenUp;
-#endif
     uintptr_t const Hide = bShow ? 0 : 1;
     ManeuverFrame->SetProperty(1, Hide, 0);
     int EnabledTabs = 0;

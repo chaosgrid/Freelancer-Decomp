@@ -512,7 +512,7 @@ void IBehaviorManager::reset_current_behavior_direction()
     BehaviorDirty = 1;
     // 062d3b16-062d3b2c: no -1 test here, unlike every sibling -- with no current behavior
     // retail reads the dword at +0x170 (TickSuppressedFlag and its padding) as the entry.
-    // Очень странно, but that is retail's read; only the loaded pointer is null-tested.
+    // Very strange, but that is retail's read; only the loaded pointer is null-tested.
     Behavior* const BehaviorObj = *(Behavior* const*)((char const*)BehaviorDispatchTable + CurrentBehaviorIndex * 4);
     if (BehaviorObj != nullptr)
     {

@@ -23,7 +23,7 @@
 #include <vector>
 #include <windows.h>
 
-// Playback: slots 19/22/23/26 + Start types 1РІР‚вЂњ19. docs/re/thorn.md.
+// Playback: slots 19/22/23/26 + Start types 1-19. docs/re/thorn.md.
 
 namespace
 {
@@ -576,7 +576,7 @@ namespace
         std::memcpy(Out3, &Result, sizeof(Result));
     }
 
-    // FUN_06f23090 РІР‚вЂќ negate vec3.
+    // FUN_06f23090 -- negate vec3.
     void Fun06f23090(float* Out3, const float* In3)
     {
         NegateVector3(Out3, In3);
@@ -916,7 +916,7 @@ namespace
         return bNotGreater != 0;
     }
 
-    // FUN_06f2e440 РІР‚вЂќ look-at frame from direction + Lua up/front axis IDs (0..5).
+    // FUN_06f2e440 -- look-at frame from direction + Lua up/front axis IDs (0..5).
     void BuildAxisFrame(float* Out9, const float* Direction, unsigned FrontAxis, unsigned UpAxis,
                         const unsigned int* SceneFrontAxis, const unsigned int* SceneUpAxis)
     {
@@ -2338,13 +2338,13 @@ namespace
         }
     }
 
-    // FUN_06f423d0: GET slot 10 РІвЂ вЂ™ entity+0xf0, copy 8 dword out.
+    // FUN_06f423d0: GET slot 10 -> entity+0xf0, copy 8 dword out.
     void CaptureAudioFromEntity(FThornEntity* Entity, float* Out8)
     {
         Entity->CaptureAudioProps(Out8);
     }
 
-    // FUN_06f423a0: copy 8 dword РІвЂ вЂ™ entity+0xf0, SET slot 9.
+    // FUN_06f423a0: copy 8 dword -> entity+0xf0, SET slot 9.
     void ApplyAudioProps(FThornEntity* Entity, const float* Props8)
     {
         // 423ae..423c9 retains the control before the forward eight-word copy.
@@ -5153,7 +5153,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
 
     if (Type == kThornTypeLightPropAnim)
     {
-        // LAB_06f456e0: GET into entity blob, REP MOVSD 0x24 РІвЂ вЂ™ event+0xE8.
+        // LAB_06f456e0: GET into entity blob, REP MOVSD 0x24 -> event+0xE8.
         if (Primary != nullptr && (Primary->Snap.Type == kThornEntityLight ||
                                    Primary->Snap.Type == kThornEntityScene))
         {
@@ -5212,7 +5212,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
 
     if (Type == kThornTypeReverbPropAnim)
     {
-        // LAB_06f491e0: type 9 GET slot 4; NULL control РІвЂ вЂ™ 0, 0, 1.0, 1.0.
+        // LAB_06f491e0: type 9 GET slot 4; NULL control -> 0, 0, 1.0, 1.0.
         if (Primary != nullptr && Primary->Snap.Type == kThornEntityScene)
         {
             if (Primary->ReverbControl != nullptr)
@@ -6563,7 +6563,7 @@ float* FThornEntity::InnerGetOrient()
 void FThornEntity::InnerSetPos(const float* Pos)
 {
     // FUN_06f40900 / LAB_06f49f00 thiscall vtable+0x0C RET 4.
-    // CAMERA: FUN_06f41490 РІР‚вЂќ after store, typeРІвЂ°В 4 fans out list +0x88 via child +0x0C.
+    // CAMERA: FUN_06f41490 -- after store, type!=4 fans out list +0x88 via child +0x0C.
     // 40914..40921 are raw forward word transfers, including overlap.
     for (int Index = 0; Index < 3; ++Index)
     {
@@ -6604,7 +6604,7 @@ void FThornEntity::InnerSetPos(const float* Pos)
 void FThornEntity::InnerSetOrient(const float* Mat9)
 {
     // FUN_06f40ab0 / LAB_06f49f20 thiscall vtable+0x10 RET 4.
-    // CAMERA: FUN_06f414d0 РІР‚вЂќ after store, the camera owner fans out its
+    // CAMERA: FUN_06f414d0 -- after store, the camera owner fans out its
     // linked list through child +0x10; type-4 monitor nodes are terminal.
     // 40acb REP MOVSD copies forward; do not collapse overlapping input.
     for (int Index = 0; Index < 9; ++Index)
@@ -6901,7 +6901,7 @@ void FThornScene::ApplyEntitySnap(FThornEntity* Entity, const FThornEntitySnap* 
 
 bool FThornScene::EventAllowsMissingSecondary(int Type)
 {
-    // Table 06f3a1e8 indexed by type-2: 0 РІвЂ вЂ™ fail, 1 РІвЂ вЂ™ continue.
+    // Table 06f3a1e8 indexed by type-2: 0 -> fail, 1 -> continue.
     // Types 2/6/8/9/11 fail when secondary < 0; others continue (incl. type 1 via JA).
     if (Type == kThornTypeSetCamera || Type == kThornTypePathAnim ||
         Type == kThornTypeAttachEntity || Type == kThornTypeConnectHardpoints ||
@@ -7044,7 +7044,7 @@ FThornEntitySnap* FThornScene::EntitySnapInorder(int Index)
 
 unsigned long FThornScene::UserPropCount(int Index) const
 {
-    // LAB_06f38ca0: lookup by key; *(inner+0x80). Miss РІвЂ вЂ™ 0.
+    // LAB_06f38ca0: lookup by key; *(inner+0x80). Miss -> 0.
     if (!EntityExists(Index))
         return 0;
     return static_cast<unsigned long>(EntityAt(Index)->UserProps->size());
@@ -7117,7 +7117,7 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
 GENRESULT FThornScene::Attach(int Index, void* EngineObj)
 {
     // Slot 12: lookup + inner thiscall vtable+0x20. Does not AddRef engineObj.
-    // Bind(NULL) AVs in retail QI РІР‚вЂќ callers must use Detach (slot 13 / +0x24).
+    // Bind(NULL) AVs in retail QI -- callers must use Detach (slot 13 / +0x24).
     FThornEntity* Entity = EntityAt(Index);
     if (Entity == nullptr)
         return GR_GENERIC;
@@ -7788,7 +7788,7 @@ void FThornScene::RebuildActiveGroups()
 void FThornScene::FrameUpdateEntities(int TimeMs)
 {
     // FUN_06f3b330: entity GetType; case 1|2 compound+0x18, case 10 IScriptControl+0x10,
-    // case 0xD psys+0x14. dt = time РІв‚¬вЂ™ clock, then clock := time.
+    // case 0xD psys+0x14. dt = time - clock, then clock := time.
     // 3b3bb loads the live next node AFTER its callback: appends stay visible.
     std::list<FThornEntity*>::iterator FrameIt = FrameEntities_->begin();
     while (FrameIt != FrameEntities_->end())
@@ -7886,7 +7886,7 @@ GENRESULT FThornScene::StopPlayback()
 
 GENRESULT FThornScene::PausePlayback()
 {
-    // LAB_06f397f0: if this+0x2c РІв‚¬в‚¬ {6, 7} РІвЂ вЂ™ 5, EAX=0; else РІв‚¬вЂ™1.
+    // LAB_06f397f0: if this+0x2c in {6, 7} -> 5, EAX=0; else -1.
     // Does not Stop, does not touch clock. Slot 26 still ticks state 5.
     if (PlaybackState_ == kThornPlaybackPlay || PlaybackState_ == kThornPlaybackLoop)
     {

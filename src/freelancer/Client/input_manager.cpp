@@ -13,9 +13,6 @@
 // rounds at the same stores; the two agree except in the last bits of a double.
 
 #include "input_manager.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "game_options.h"
 #include "globals.h"
@@ -981,9 +978,6 @@ void ClientInputOnFocusGained()
 
 void ClientInputOnFocusLost()
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkFocusLost();
-#endif
     // FUN_0041ecf0.
     EnsureDevice();
     SetActive(false);
@@ -1027,11 +1021,6 @@ void MouseDispatchEvents()
     {
         FMouseEvent Event = G_Mouse.Events.front();
         G_Mouse.Events.pop_front();
-
-#ifdef FREELANCER_WALK_MODE
-        if (BaseWalkConsumeMouseEvent(Event))
-            continue;
-#endif
 
         if (Event.bMove != 0)
         {
@@ -1092,12 +1081,7 @@ void MouseFrameUpdate()
         int const Dx = G_CursorX - StartX;
         int const Dy = G_CursorY - StartY;
         int Wheel = G_CursorZ - StartZ;
-#ifdef FREELANCER_WALK_MODE
-        bool const bWalkMouse = BaseWalkMouseFrame(bRead, Dx, Dy, StartX, StartY);
-        if (bWalkMouse || (Dx == 0 && Dy == 0))
-#else
         if (Dx == 0 && Dy == 0)
-#endif
         {
             G_Mouse.bMoved = false;
         }

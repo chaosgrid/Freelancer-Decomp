@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "win3d.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "client_cliobj.h"   // ResolveMaterialEntryFromFs (FUN_0041ade0) / ReleaseMaterialEntrySlot
 #include "client_mesh_load.h"
@@ -1151,53 +1148,48 @@ void Win3DDrawAll()
     if (G_DrawSuppressCount > 0)
         return;
 
+    Win3DBeginDraw();          // 0059e319..0059e3a9, the same sequence as FUN_0059e500
+    Win3DImmedBatchReset();    // FUN_005a29b0
+    ButtonMontageEnsure();     // FUN_00559c10
+
+    Win3D* Sorted[0x400];
+    unsigned Count = 0;
+    for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
     {
-#ifdef FREELANCER_WALK_MODE
-        FBaseWalkInterfaceDraw InterfaceDraw;
-#endif
-        Win3DBeginDraw();          // 0059e319..0059e3a9, the same sequence as FUN_0059e500
-        Win3DImmedBatchReset();    // FUN_005a29b0
-        ButtonMontageEnsure();     // FUN_00559c10
-
-        Win3D* Sorted[0x400];
-        unsigned Count = 0;
-        for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
+        Win3D* const Object = static_cast<Win3D*>(Node->Payload);
+        if (Object == nullptr || Object->Parent != nullptr)
+            continue;
+        if ((Object->Flags & kWin3DVisible) == 0)
+            continue;
+        if (Object->DrawLayer == 0)
         {
-            Win3D* const Object = static_cast<Win3D*>(Node->Payload);
-            if (Object == nullptr || Object->Parent != nullptr)
-                continue;
-            if ((Object->Flags & kWin3DVisible) == 0)
-                continue;
-            if (Object->DrawLayer == 0)
-            {
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
-                DrawWidescreen(Object);
+            DrawWidescreen(Object);
 #else
-                Object->Draw();
+            Object->Draw();
 #endif
-                continue;
-            }
-            InsertSorted(Sorted, &Count, Object);
+            continue;
         }
-
-        for (int SubLayer = 0; SubLayer < 8; ++SubLayer)
-        {
-            for (unsigned Index = 0; Index < Count; ++Index)
-            {
-                if (Sorted[Index]->DrawSubLayer == SubLayer)
-#ifdef FREELANCER_WIDESCREEN_SUPPORT
-                    DrawWidescreen(Sorted[Index]);
-#else
-                    Sorted[Index]->Draw();
-#endif
-            }
-        }
-
-        ButtonMontageFlushBatch(); // FUN_00559c20
-        Win3DImmedBatchFlushAll(); // FUN_005a2a20
-        UiOverlayPrepPipeline();   // FUN_00417f10
-        ImeFocusDrawPass();        // FUN_00563af0
+        InsertSorted(Sorted, &Count, Object);
     }
+
+    for (int SubLayer = 0; SubLayer < 8; ++SubLayer)
+    {
+        for (unsigned Index = 0; Index < Count; ++Index)
+        {
+            if (Sorted[Index]->DrawSubLayer == SubLayer)
+#ifdef FREELANCER_WIDESCREEN_SUPPORT
+                DrawWidescreen(Sorted[Index]);
+#else
+                Sorted[Index]->Draw();
+#endif
+        }
+    }
+
+    ButtonMontageFlushBatch(); // FUN_00559c20
+    Win3DImmedBatchFlushAll(); // FUN_005a2a20
+    UiOverlayPrepPipeline();   // FUN_00417f10
+    ImeFocusDrawPass();        // FUN_00563af0
     MouseFrameUpdate();        // FUN_0041f150
     DALib::MaterialBatcher->SetBinOrder(1, 1);
 }

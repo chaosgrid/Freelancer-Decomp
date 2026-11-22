@@ -19,7 +19,7 @@ namespace MemoryDiagnostics
 		wchar_t* Buffer = nullptr;
 		FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
 			FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, Code, 0, reinterpret_cast<wchar_t*>(&Buffer), 0, nullptr);
-		std::wstring Text = Buffer ? Buffer : L"Неизвестная ошибка Windows";
+		std::wstring Text = Buffer ? Buffer : L"Unknown Windows error";
 		if (Buffer) LocalFree(Buffer);
 		return Text + L" (" + std::to_wstring(Code) + L")";
 	}
@@ -126,22 +126,22 @@ namespace MemoryDiagnostics
 
 	bool EnsureDirectory(const std::wstring& Path, std::wstring& Error)
 	{
-		if (Path.empty()) { Error = L"Укажите папку для логов."; return false; }
+		if (Path.empty()) { Error = L"Specify a folder for logs."; return false; }
 		const std::wstring Absolute = FullPath(Path);
 		// Project scratch output must stay off the nearly-full C: drive.
 		if (Absolute.size() > 1 && (Absolute[0] == L'C' || Absolute[0] == L'c') && Absolute[1] == L':')
 		{
-			Error = L"Для логов и кэша символов выберите диск, отличный от C:."; return false;
+			Error = L"Choose a drive other than C: for logs and symbol cache."; return false;
 		}
 		const int Status = SHCreateDirectoryExW(nullptr, Absolute.c_str(), nullptr);
 		if (Status != ERROR_SUCCESS && Status != ERROR_ALREADY_EXISTS && Status != ERROR_FILE_EXISTS)
 		{
-			Error = L"Не удалось создать папку: " + Absolute + L"\r\n" + ErrorText(Status); return false;
+			Error = L"Failed to create folder: " + Absolute + L"\r\n" + ErrorText(Status); return false;
 		}
 		const DWORD Attributes = GetFileAttributesW(Absolute.c_str());
 		if (Attributes == INVALID_FILE_ATTRIBUTES || !(Attributes & FILE_ATTRIBUTE_DIRECTORY))
 		{
-			Error = L"Путь не является папкой: " + Absolute; return false;
+			Error = L"Path is not a folder: " + Absolute; return false;
 		}
 		return true;
 	}
@@ -168,9 +168,9 @@ namespace MemoryDiagnostics
 			const std::wstring Text(reinterpret_cast<const wchar_t*>(Buffer), Size / sizeof(wchar_t));
 			wchar_t* End = nullptr;
 			Flags = wcstoul(Text.c_str(), &End, 16);
-			if (End == Text.c_str()) { Error = L"Не удалось прочитать GlobalFlag."; return false; }
+			if (End == Text.c_str()) { Error = L"Failed to parse GlobalFlag."; return false; }
 		}
-		else { Error = L"Неожиданный тип GlobalFlag."; return false; }
+		else { Error = L"Unexpected GlobalFlag value type."; return false; }
 		bEnabled = (Flags & 0x1000) != 0;
 		return true;
 	}
@@ -305,7 +305,7 @@ namespace MemoryDiagnostics
 			Process = Info.hProcess;
 		}
 		FHandle OwnedProcess(Process);
-		if (!Process) { Result.Error = L"Инструмент не вернул дескриптор процесса."; return Result; }
+		if (!Process) { Result.Error = L"Tool did not return a process handle."; return Result; }
 		HANDLE WaitHandles[] = { Process, CancelEvent };
 		const DWORD Wait = WaitForMultipleObjects(CancelEvent ? 2 : 1, WaitHandles, FALSE, INFINITE);
 		if (Wait == WAIT_OBJECT_0 + 1)
@@ -316,7 +316,7 @@ namespace MemoryDiagnostics
 				Result.Error = ErrorText(GetLastError()); return Result;
 			}
 			WaitForSingleObject(Process, INFINITE);
-			Result.Error = L"Операция отменена. Незавершённые файлы сохранены для диагностики.";
+			Result.Error = L"Operation cancelled. Unfinished files were kept for diagnostics.";
 			Result.ExitCode = ERROR_CANCELLED;
 			return Result;
 		}
@@ -325,8 +325,8 @@ namespace MemoryDiagnostics
 			Result.Error = ErrorText(GetLastError()); return Result;
 		}
 		Result.bSuccess = Result.ExitCode == 0;
-		if (!Result.bSuccess) Result.Error = L"Инструмент завершился с кодом " + std::to_wstring(Result.ExitCode) +
-			(OutputPath.empty() ? L"." : L". Подробности: " + OutputPath);
+		if (!Result.bSuccess) Result.Error = L"Tool exited with code " + std::to_wstring(Result.ExitCode) +
+			(OutputPath.empty() ? L"." : L". Details: " + OutputPath);
 		return Result;
 	}
 
@@ -334,7 +334,7 @@ namespace MemoryDiagnostics
 	{
 		if (!IsX86Executable(Settings.GamePath))
 		{
-			Error = L"Выберите существующий Win32 EXE клиента."; return false;
+			Error = L"Select an existing Win32 client EXE."; return false;
 		}
 		if (!EnsureDirectory(Settings.LogsPath, Error)) return false;
 		std::vector<wchar_t> Environment = BuildEnvironment(Settings);
@@ -377,7 +377,7 @@ namespace MemoryDiagnostics
 				wchar_t Buffer[32768] = {};
 				DWORD Size = 32768;
 				if (!QueryFullProcessImageNameW(Candidate.Get(), 0, Buffer, &Size) || _wcsicmp(Buffer, Absolute.c_str())) continue;
-				if (MatchedId) { Error = L"Запущено несколько экземпляров. Укажите PID нужной игры."; return false; }
+				if (MatchedId) { Error = L"Multiple instances are running. Enter the PID of the target game."; return false; }
 				HANDLE Duplicate = nullptr;
 				if (!DuplicateHandle(GetCurrentProcess(), Candidate.Get(), GetCurrentProcess(), &Duplicate, 0, FALSE, DUPLICATE_SAME_ACCESS))
 				{
@@ -387,7 +387,7 @@ namespace MemoryDiagnostics
 				MatchedId = Entry.th32ProcessID;
 			} while (Process32NextW(Snapshot.Get(), &Entry));
 		}
-		if (!MatchedId) { Error = L"Запущенный процесс с выбранным путём не найден."; return false; }
+		if (!MatchedId) { Error = L"No running process found with the selected path."; return false; }
 		if (!DuplicateHandle(GetCurrentProcess(), Match.Get(), GetCurrentProcess(), &Process, 0, FALSE, DUPLICATE_SAME_ACCESS))
 		{
 			Error = ErrorText(GetLastError()); return false;

@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "win3d_renderables.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 #include "win3d.h"            // Win3DGetCamera (FUN_0059da60, &DAT_0067dbf8)
 #include "win3d_render.h"
 #include "win3d_immediate.h"
@@ -326,10 +323,6 @@ void Win3DImmedBatchFlushAll()
 void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
                        unsigned long Color, unsigned long EdgeColor, float Width)
 {
-#ifdef FREELANCER_WALK_MODE
-    Color = BaseWalkFadeInterfaceColor(Color);
-    EdgeColor = BaseWalkFadeInterfaceColor(EdgeColor);
-#endif
     // FUN_005a2a40 (.text:005a2a40-005a2de0). 0x005a2a48..0x005a2ad3: 12 more indices reaching
     // 0x1800 or 8 more vertices reaching 0xc00 (signed JGE / JL) flush A, then B, then run the
     // FUN_005a29b0 body inline.

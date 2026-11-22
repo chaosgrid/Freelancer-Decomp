@@ -34,10 +34,4 @@
     <EnumValue Name="0" DisplayName="Off" />
     <EnumValue Name="1" DisplayName="On" />
   </EnumProperty>
-  <EnumProperty Name="FreelancerWalkMode" DisplayName="Walk mode in bases"
-                Category="Features" Default="0"
-                Description="Not in the original game: walking through base rooms as Trent (FREELANCER_WALK_MODE, client only; docs/walk_mode.md). Off builds the retail base screens. After changing it, save this property sheet and rebuild the solution.">
-    <EnumValue Name="0" DisplayName="Off" />
-    <EnumValue Name="1" DisplayName="On" />
-  </EnumProperty>
 </Rule>

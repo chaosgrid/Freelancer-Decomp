@@ -222,8 +222,6 @@
     <ClInclude Include="Client\anim_script_set.h" />
     <ClInclude Include="Client\flash_light.h" />
     <ClInclude Include="Client\gameflow.h" />
-    <ClInclude Include="Client\base_walk.h" />
-    <ClInclude Include="Client\base_walk_math.h" />
     <ClInclude Include="Client\gf_hotspot.h" />
     <ClInclude Include="Client\object_prop.h" />
     <ClInclude Include="Client\room_camera.h" />
@@ -424,7 +422,6 @@
     <ClCompile Include="Client\anim_script_set.cpp" />
     <ClCompile Include="Client\flash_light.cpp" />
     <ClCompile Include="Client\gameflow.cpp" />
-    <ClCompile Include="Client\base_walk.cpp" />
     <ClCompile Include="Client\gf_hotspot.cpp" />
     <ClCompile Include="Client\object_prop.cpp" />
     <ClCompile Include="Client\room_camera.cpp" />

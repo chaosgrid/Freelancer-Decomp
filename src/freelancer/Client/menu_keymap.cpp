@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "menu_keymap_config.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
 #include "common_ini.h"
@@ -610,10 +607,6 @@ void UnregisterAcceleratorGroup(char const* GroupNickname)
 
 bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
 {
-#ifdef FREELANCER_WALK_MODE
-    if (BaseWalkHandleKey(Message, Wparam))
-        return true;
-#endif
     // FUN_00577850 (cdecl, 3 args) -- listing 00577850..00577b1c. Every message the pump reads
     // comes through here; true means consumed (the caller skips Translate/Dispatch).
     FHudCmdRecord* const Record = HudCommandRecord();

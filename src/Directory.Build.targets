@@ -39,12 +39,6 @@
       <PreprocessorDefinitions>FREELANCER_RP9;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
-  <!-- Port-only walk mode in base rooms: only the client (freelancer.exe) reads the define. -->
-  <ItemDefinitionGroup Condition="'$(FreelancerWalkMode)'=='1' and '$(MSBuildProjectName)'=='freelancer'">
-    <ClCompile>
-      <PreprocessorDefinitions>FREELANCER_WALK_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-  </ItemDefinitionGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)'=='Common' or '$(MSBuildProjectName)'=='freelancer'">
     <PropertyPageSchema Include="$(MSBuildThisFileDirectory)Freelancer.Diagnostics.xml">
       <Context>PropertySheet</Context>

@@ -1,7 +1,5 @@
 # Freelancer Decomp — documentation
 
-**English** · [Русский](ru/README.md)
-
 Freelancer Decomp is a from-source reimplementation of the **Freelancer** game client
 (Digital Anvil / Microsoft, 2003). Every module of the original client is rebuilt as C++ source
 that is checked against the retail disassembly. The goal is a working client whose behaviour
@@ -30,7 +28,7 @@ your own installation of Freelancer (see [Local layout](#local-layout)).
 | Audio | [audio](re/audio.md) |
 | Scripting | [thorn](re/thorn.md) (scene scripts, Lua 3.2) · [thorn_thn_format](re/thorn_thn_format.md) (`.thn` file format) |
 | Game data and logic | [common](re/common.md) · [common_archetype](re/common_archetype.md) · [common_physys](re/common_physys.md) · [content](re/content.md) · [mission script format](re/content_mission_script.md) · [mission opcodes](re/content_mission_opcodes.md) |
-| Client executable | [freelancer](re/freelancer.md) · [freelancer_cliobj](re/freelancer_cliobj.md) · [equip_fx_factory](re/equip_fx_factory.md) · [dealer_equip_stats](re/dealer_equip_stats.md) · [options_screen](re/options_screen.md) · [hd_edition](hd_edition.md) (widescreen) · [walk_mode](walk_mode.md) (port-only walking in bases; `FreelancerWalkMode`) |
+| Client executable | [freelancer](re/freelancer.md) · [freelancer_cliobj](re/freelancer_cliobj.md) · [equip_fx_factory](re/equip_fx_factory.md) · [dealer_equip_stats](re/dealer_equip_stats.md) · [options_screen](re/options_screen.md) · [hd_edition](hd_edition.md) (widescreen) |
 | Server / network | [server](re/server.md) (Server.dll, FLServer, SP connection, remote DLLs) · [rpclocal](re/rpclocal.md) (local RPC packet protocol) |
 | Build and CRT | [crt_compat](re/crt_compat.md) (modern CRT/STL vs. the retail VC6 runtime) · [refactoring](re/refactoring.md) (code rules) |
 

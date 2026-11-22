@@ -97,7 +97,7 @@ float ICRSplineSegment::get_spline_length()
     float Total = 0.0f;
     for (unsigned i = 1; i <= SampleCount; ++i)
     {
-        // очень странно: retail computes the parameter with an unsigned integer DIV
+        // Very strange: retail computes the parameter with an unsigned integer DIV
         // (06332d66), so T is 0 for every step but the last, which is 1.
         Vector const V = calculate_spline_vector((float)(i / SampleCount));
         double const Dx = (double)V.x - PrevX;

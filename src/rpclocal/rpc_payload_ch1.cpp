@@ -145,7 +145,7 @@ static bool DeliverFireWeapon(const FPacketBase* Packet, IClient* Client, IChatC
 // ===========================================================================
 // ch1 op 0x04 FLPACKET_COMMON_SETTARGET
 // Sender 0x06d8bd50 (IClient+0x010, RET 8), receiver caseD_4 at 0x06d838c9.
-// Argument struct = XSetTarget (В§3.5).
+// Argument struct = XSetTarget (§3.5).
 // ===========================================================================
 static bool MarshalSetTarget(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XSetTarget* Info = reinterpret_cast<const XSetTarget*>(Args[1]);
@@ -204,7 +204,7 @@ static bool DeliverChatMsg(const FPacketBase* Packet, IClient*, IChatClient* Cha
 
 // ===========================================================================
 // ch1 op 0x08 FLPACKET_COMMON_ACTIVATEEQUIP -- sender 0x06d8bbb0, receiver case 8.
-// Argument struct = XActivateEquip (В§3.2).
+// Argument struct = XActivateEquip (§3.2).
 // ===========================================================================
 static bool MarshalActivateEquip(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XActivateEquip* Info = reinterpret_cast<const XActivateEquip*>(Args[1]);
@@ -229,7 +229,7 @@ static bool DeliverActivateEquip(const FPacketBase* Packet, IClient* Client, ICh
 
 // ===========================================================================
 // ch1 op 0x0e FLPACKET_COMMON_ACTIVATECRUISE -- sender 0x06d8bc10, receiver case 0xe.
-// Argument struct = XActivateCruise (В§3.3).
+// Argument struct = XActivateCruise (§3.3).
 // ===========================================================================
 static bool MarshalActivateCruise(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XActivateCruise* Info = reinterpret_cast<const XActivateCruise*>(Args[1]);
@@ -256,7 +256,7 @@ static bool DeliverActivateCruise(const FPacketBase* Packet, IClient* Client, IC
 
 // ===========================================================================
 // ch1 op 0x0f FLPACKET_COMMON_GOTRADELANE -- sender 0x06d8bcb0, receiver case 0xf.
-// Argument struct = XGoTradelane (В§3.7).
+// Argument struct = XGoTradelane (§3.7).
 // ===========================================================================
 static bool MarshalGoTradelane(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XGoTradelane* Info = reinterpret_cast<const XGoTradelane*>(Args[1]);
@@ -531,7 +531,7 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
 
 // ===========================================================================
 // ch1 op 0x14 FLPACKET_COMMON_JETTISONCARGO -- sender 0x06d8bdb0, receiver caseD_14.
-// Argument struct = XJettisonCargo (В§3.8).
+// Argument struct = XJettisonCargo (§3.8).
 // ===========================================================================
 static bool MarshalJettisonCargo(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XJettisonCargo* Info = reinterpret_cast<const XJettisonCargo*>(Args[1]);
@@ -556,7 +556,7 @@ static bool DeliverJettisonCargo(const FPacketBase* Packet, IClient* Client, ICh
 
 // ===========================================================================
 // ch1 op 0x15 FLPACKET_COMMON_ACTIVATETHRUSTERS -- sender 0x06d8bc60, receiver caseD_15.
-// Argument struct = XActivateThrusters (В§3.4).
+// Argument struct = XActivateThrusters (§3.4).
 // ===========================================================================
 static bool MarshalActivateThrusters(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XActivateThrusters* Info = reinterpret_cast<const XActivateThrusters*>(Args[1]);
@@ -626,7 +626,7 @@ static bool DeliverPopUpDialog(const FPacketBase* Packet, IClient* Client, IChat
 
 // ===========================================================================
 // ch1 op 0x1d FLPACKET_COMMON_TRACTOROBJECTS -- sender 0x06d8be10, receiver caseD_1d.
-// Argument struct = XTractorObjects (В§3.6).
+// Argument struct = XTractorObjects (§3.6).
 // ===========================================================================
 static bool MarshalTractorObjects(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XTractorObjects* Info = reinterpret_cast<const XTractorObjects*>(Args[1]);

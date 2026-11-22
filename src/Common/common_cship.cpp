@@ -1846,7 +1846,7 @@ void CShip::enable_controllers()
 }
 
 // ============================================================================
-// CShip::update вЂ” main game loop update for ships
+// CShip::update -- main game loop update for ships
 // Listing 0x50e30: calls ActionDB::update, CSimple::update_zones, CEqObj::update,
 // then computes damping via engine drag and moment of inertia
 // ============================================================================
@@ -1987,7 +1987,7 @@ int CShip::update(float Dt, unsigned Flags)
 }
 
 // ============================================================================
-// CShip::open_bay вЂ” opens ship bay doors
+// CShip::open_bay -- opens ship bay doors
 // Listing 0x52aa0: increments BayDoorCounter, checks BayState, triggers animation
 // ============================================================================
 
@@ -2045,7 +2045,7 @@ double CShip::open_bay()
 }
 
 // ============================================================================
-// CShip::notify_set_target вЂ” notifies ship about target change
+// CShip::notify_set_target -- notifies ship about target change
 // Listing 0x524d0: checks TypeBits for ship type, updates target tracking
 // ============================================================================
 
@@ -2087,7 +2087,7 @@ void CShip::notify_set_target(CShip* TargetShip, bool bIsTarget)
 }
 
 // ============================================================================
-// CShip::launch вЂ” launches ship from dock/base
+// CShip::launch -- launches ship from dock/base
 // Listing 0x52a20: creates LaunchAction via Async::Action::operator_new(0x78)
 // ============================================================================
 
@@ -2121,7 +2121,7 @@ int CShip::get_status(char* p1, int p2) const
 }
 
 // ============================================================================
-// CShip::is_player вЂ” checks if this ship is player-controlled
+// CShip::is_player -- checks if this ship is player-controlled
 // ============================================================================
 
 bool CShip::is_player() const
@@ -2130,7 +2130,7 @@ bool CShip::is_player() const
 }
 
 // ============================================================================
-// CShip setter methods вЂ” physics and state setters
+// CShip setter methods -- physics and state setters
 // ============================================================================
 
 void CShip::set_throttle(float ThrottleValue)
@@ -2641,7 +2641,7 @@ Archetype::Ship const* CShip::shiparch() const
 float const CShip::JETTISON_CLEARANCE_TIME = 4.0f;
 
 // ============================================================================
-// CShip::get_renderable_subtarget вЂ” returns renderable subtarget index
+// CShip::get_renderable_subtarget -- returns renderable subtarget index
 // Listing 0x52310: reads Target at +0x220, then subtarget index at +0x228
 // ============================================================================
 

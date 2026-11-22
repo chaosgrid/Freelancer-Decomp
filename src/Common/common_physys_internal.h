@@ -124,7 +124,7 @@ namespace CmnPhySys
     extern std::map<unsigned, PhysicalSystem> G_PhysicalSystems;
 
     // The system a SystemId names, looked up the way retail's world-map readers do it.
-    // VERY STRANGE (очень странно), REPRODUCED ON PURPOSE. Retail runs find / lower_bound plus
+    // VERY STRANGE, REPRODUCED ON PURPOSE. Retail runs find / lower_bound plus
     // the key test (FUN_06301640, FUN_062fcfb0, FUN_062fd030) and then uses node+0x10 WITHOUT
     // testing for end(): on a miss that node is the VC6 tree's head node (DAT_063fc09c), whose
     // value storage was never constructed -- the head is allocated with links and colour only.

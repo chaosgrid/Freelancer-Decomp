@@ -390,7 +390,7 @@ Matrix __cdecl EulerMatrix(Vector const& AnglesDegrees)
 Matrix __cdecl RotateMatrix(Vector const& AnglesDegrees)
 {
     // Common.dll.txt:06303fe0-063041ab (2026-10-08, claude-code:cmn-phy3: re-ported onto
-    // the math engine, closing the "Мелкие экспорты Common" ledger item). Accum starts as
+    // the math engine, closing the "Minor Common exports" ledger item). Accum starts as
     // identity (06303ff5-0630403a) and one axis at a time is folded in, in the order Y
     // (06303fe8), X (06304091), Z (06304135):
     //     I3DMathEngine slot 8 (+0x20) MulMatrix(&Tmp, &Accum, &Rot); Accum = Tmp (REP MOVSD 9)

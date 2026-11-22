@@ -6,7 +6,7 @@
 
 #pragma once
 
-// imeui.dll public surface вЂ” IMEFocus crosses into freelancer.exe.
+// imeui.dll public surface -- IMEFocus crosses into freelancer.exe.
 // Declared once here; src/imeui/IMEFocus.h is a thin redirect.
 //
 // Retail layout (imeui.dll ctor 067112c0 + client FUN_00564060):
@@ -16,7 +16,7 @@
 //   +0x0c box count
 //   +0x10 active IMEInputBox*
 //   +0x14..+0x17 flags (available @ +0x17)
-//   +0x18 ConfirmPlayerText FontString* вЂ” CLIENT ONLY (alloc 0x1c)
+//   +0x18 ConfirmPlayerText FontString* -- CLIENT ONLY (alloc 0x1c)
 // Base sizeof = 0x18; client wrapper sizeof = 0x1c.
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -198,7 +198,7 @@ struct _IMEUI_APPEARANCE
 static_assert(sizeof(_IMEUI_APPEARANCE) == 0x3c, "IME appearance field contract");
 typedef struct _IMEUI_APPEARANCE IMEUI_APPEARANCE;
 
-// Intrusive list node вЂ” retail operator_new(0xc) in IMEFocus ctor.
+// Intrusive list node -- retail operator_new(0xc) in IMEFocus ctor.
 struct FIMEBoxNode
 {
     FIMEBoxNode* Next; // +0x00
@@ -219,7 +219,7 @@ public:
     // Client overwrites vtable PTR_FUN_005e2210:
     // +0x00 FUN_00564150 dtor, +0x04 LAB_00563e70 DrawRect, +0x08 LAB_00563cf0 DrawTextW.
     virtual void DrawRect(int X1, int Y1, int X2, int Y2, DWORD Color) = 0;
-    // LAB_06711150 push order в†’ (TextW, Color, LayoutBuf, EntryCount).
+    // LAB_06711150 push order -> (TextW, Color, LayoutBuf, EntryCount).
     // Layout entries are 0x20 bytes (float X/Y + RGB at +0x10); Count>1 draws underlines.
     virtual void DrawTextW(const wchar_t* Text, unsigned Color, void* Layout, unsigned Count) = 0;
 

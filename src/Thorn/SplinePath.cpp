@@ -17,12 +17,12 @@
 #include <optional>
 #include <vector>
 
-// CV_CRSplinePath / CV_CROrientationSplinePath Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ docs/re/thorn.md
-// Position: LAB_06f22dc0 Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ FUN_06f230b0 (two FUN_06f21000 + lerp).
-// Tangent: LAB_06f22d70 Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ FUN_06f23230 (two FUN_06f213d0 + lerp).
-// Orientation: LAB_06f22ec0 Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ FUN_06f233b0 (two FUN_06f21770 + I3DMathEngine+0x58).
+// CV_CRSplinePath / CV_CROrientationSplinePath -- docs/re/thorn.md
+// Position: LAB_06f22dc0 -> FUN_06f230b0 (two FUN_06f21000 + lerp).
+// Tangent: LAB_06f22d70 -> FUN_06f23230 (two FUN_06f213d0 + lerp).
+// Orientation: LAB_06f22ec0 -> FUN_06f233b0 (two FUN_06f21770 + I3DMathEngine+0x58).
 // Look-at LAB_06f34180: X = -tangent, Y from existing out Y column, no identity fill.
-// IMotionPath slot 5: position LAB_06f34420 (tangent Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ quat); orientation LAB_06f35530
+// IMotionPath slot 5: position LAB_06f34420 (tangent -> quat); orientation LAB_06f35530
 // (inner vtable+0x08). FSplinePath's IMotionPath overrides branch on bOrientation_ (retail: two
 // vptrs, one per class).
 
@@ -1740,7 +1740,7 @@ namespace
 
             unsigned long Offset = static_cast<unsigned long>(Used);
 
-            // FUN_06f22500(inner, 0) Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ force OPEN ghosts, then emit SavedCount points via slot 6.
+            // FUN_06f22500(inner, 0) -- force OPEN ghosts, then emit SavedCount points via slot 6.
             bClosed_ = false;
             ApplyPersistGhosts();
             RebuildSampleTables();

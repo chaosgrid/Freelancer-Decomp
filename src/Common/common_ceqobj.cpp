@@ -610,7 +610,7 @@ float CEqObj::attitude_towards(CEqObj const* Other) const
     //   PUSH ECX (IdA ptr)
     //   CALL Reputation::Vibe::AttitudeTowards
     //   TEST EAX, EAX; JZ success
-    //   FLD 0.0f; RET (failure в†’ return 0.0f)
+    //   FLD 0.0f; RET (failure -> return 0.0f)
     //   success: FLD [ESP+4]; RET (return OutAttitude)
     // No null test on Other (.text:062aa640..062aa670); retail's out slot is the reused
     // argument slot, read only on success.

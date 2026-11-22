@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "room_control.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "alchemy.h"
 #include "anim_script_set.h"
@@ -2176,9 +2173,6 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
 
 void DestroyRoomRuntime(FRoomRuntime* Runtime)
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkRoomDestroyed(Runtime);
-#endif
     // FUN_00449400 (the deleting destructor: FUN_00449420, then free). FUN_00449420 is the
     // member destructor (this = ESI, no null test); the three callers in menu_universe_base.cpp
     // (UnloadLocationBase, the shutdown walk, and UnloadClientLocationRoomState = FUN_0043a080)

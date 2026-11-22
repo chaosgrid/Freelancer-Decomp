@@ -274,7 +274,7 @@ NewsBroadcastProperties::NewsBroadcastProperties()
 }
 
 // .text:06308dd0: the compiler's memberwise copy -- LogoTexture is copied as a POINTER, not
-// duplicated, although destroy() frees it. Очень странно: destroying both the copy and the
+// duplicated, although destroy() frees it. Very strange: destroying both the copy and the
 // original frees the string twice, as in retail. No retail module calls this constructor.
 NewsBroadcastProperties::NewsBroadcastProperties(NewsBroadcastProperties const& Other)
     : Key(Other.Key)

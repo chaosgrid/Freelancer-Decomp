@@ -89,7 +89,7 @@ namespace
 	void ShowError(const std::wstring& Value)
 	{
 		SetText(ActivityText, Value);
-		MessageBoxW(GApplication.Window, Value.c_str(), L"Диагностика памяти", MB_OK | MB_ICONERROR);
+		MessageBoxW(GApplication.Window, Value.c_str(), L"Memory Diagnostics", MB_OK | MB_ICONERROR);
 	}
 
 	bool IsRunning()
@@ -100,7 +100,7 @@ namespace
 	void OpenPath(const std::wstring& Path)
 	{
 		const HINSTANCE Result = ShellExecuteW(GApplication.Window, L"open", Path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-		if (reinterpret_cast<INT_PTR>(Result) <= 32) ShowError(L"Не удалось открыть: " + Path);
+		if (reinterpret_cast<INT_PTR>(Result) <= 32) ShowError(L"Failed to open: " + Path);
 	}
 
 	void Browse(int Id, bool bFile)
@@ -113,7 +113,7 @@ namespace
 			Dialog.hwndOwner = GApplication.Window;
 			Dialog.lpstrFile = Buffer;
 			Dialog.nMaxFile = 32768;
-			Dialog.lpstrFilter = L"Приложения (*.exe)\0*.exe\0Все файлы\0*.*\0";
+			Dialog.lpstrFilter = L"Applications (*.exe)\0*.exe\0All files\0*.*\0";
 			Dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 			if (GetOpenFileNameW(&Dialog)) SetText(Id, Buffer);
 		}
@@ -121,7 +121,7 @@ namespace
 		{
 			BROWSEINFOW Dialog = {};
 			Dialog.hwndOwner = GApplication.Window;
-			Dialog.lpszTitle = L"Выберите папку";
+			Dialog.lpszTitle = L"Select folder";
 			Dialog.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
 			PIDLIST_ABSOLUTE Item = SHBrowseForFolderW(&Dialog);
 			if (Item)
@@ -170,10 +170,10 @@ namespace
 		bool bEnabled = false;
 		std::wstring Error;
 		const bool bRead = ReadUst(Filename(Settings().GamePath), bEnabled, Error);
-		SetText(StateText, bRead ? (bEnabled ? L"Сбор стеков: ВКЛЮЧЁН для новых запусков" : L"Сбор стеков: ВЫКЛЮЧЕН для новых запусков") :
-			L"Состояние сбора стеков неизвестно: " + Error);
+		SetText(StateText, bRead ? (bEnabled ? L"Stack tracing: ENABLED for new launches" : L"Stack tracing: DISABLED for new launches") :
+			L"Stack tracing state unknown: " + Error);
 		const bool bRunning = IsRunning();
-		std::wstring ProcessStatus = L"Игра не подключена.";
+		std::wstring ProcessStatus = L"Game not attached.";
 		if (GApplication.Process.Get())
 		{
 			ProcessStatus = L"PID " + std::to_wstring(GApplication.ProcessId);
@@ -183,12 +183,12 @@ namespace
 				Memory.cb = sizeof(Memory);
 				if (GetProcessMemoryInfo(GApplication.Process.Get(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&Memory), sizeof(Memory)))
 					ProcessStatus += L" | Private Bytes: " + std::to_wstring(Memory.PrivateUsage / (1024 * 1024)) +
-					L" МБ | Working Set: " + std::to_wstring(Memory.WorkingSetSize / (1024 * 1024)) + L" МБ";
+					L" MB | Working Set: " + std::to_wstring(Memory.WorkingSetSize / (1024 * 1024)) + L" MB";
 				ProcessStatus += GApplication.bUstKnownAtStart ?
-					(GApplication.bUstAtStart ? L" | запуск со сбором стеков" : L" | запуск БЕЗ сбора стеков") :
-					L" | режим при запуске неизвестен";
+					(GApplication.bUstAtStart ? L" | launched with stack tracing" : L" | launched WITHOUT stack tracing") :
+					L" | launch mode unknown";
 			}
-			else ProcessStatus += L" завершился; снимки сохранены.";
+			else ProcessStatus += L" exited; snapshots saved.";
 		}
 		SetText(ProcessText, ProcessStatus);
 		const int ConfigControls[] = { GameEdit, GameBrowse, ArgumentsEdit, LogsEdit, LogsBrowse,
@@ -239,7 +239,7 @@ namespace
 			std::wstring Error;
 			if (!ReadUst(Filename(Job->Settings.GamePath), bEnabled, Error) || bEnabled != (Job->Action == EAction::Enable))
 			{
-				Job->Result.bSuccess = false; Job->Result.Error = L"GFlags не изменил ожидаемый флаг. " + Error;
+				Job->Result.bSuccess = false; Job->Result.Error = L"GFlags did not change the expected flag. " + Error;
 			}
 		}
 		if (Job->Result.bSuccess && Job->Action == EAction::Snapshot)
@@ -247,12 +247,12 @@ namespace
 			WIN32_FILE_ATTRIBUTE_DATA Info = {};
 			if (WaitForSingleObject(Job->Process.Get(), 0) != WAIT_TIMEOUT)
 			{
-				Job->Result.bSuccess = false; Job->Result.Error = L"Игра завершилась во время снимка; файл не добавлен в список.";
+				Job->Result.bSuccess = false; Job->Result.Error = L"Game exited during snapshot; file not added to the list.";
 			}
 			else if (!GetFileAttributesExW((Job->Destination + L".pending").c_str(), GetFileExInfoStandard, &Info) ||
 				(Info.nFileSizeHigh == 0 && Info.nFileSizeLow == 0))
 			{
-				Job->Result.bSuccess = false; Job->Result.Error = L"UMDH не создал непустой снимок. Откройте файл .tool.txt в папке логов.";
+				Job->Result.bSuccess = false; Job->Result.Error = L"UMDH did not produce a non-empty snapshot. Check the .tool.txt file in the logs folder.";
 			}
 			else if (!MoveFileW((Job->Destination + L".pending").c_str(), Job->Destination.c_str()))
 			{
@@ -272,14 +272,14 @@ namespace
 		Job->Action = Action;
 		Job->Settings = Settings();
 		const bool bFlags = Action == EAction::Enable || Action == EAction::Disable;
-		if (Text(GameEdit).empty()) { ShowError(L"Выберите EXE игры."); return; }
+		if (Text(GameEdit).empty()) { ShowError(L"Select the game EXE."); return; }
 		if (bFlags && !IsX86Executable(Job->Settings.GamePath))
 		{
-			ShowError(L"Для настройки сбора стеков выберите существующий Win32 EXE клиента."); return;
+			ShowError(L"Select an existing Win32 client EXE to configure stack tracing."); return;
 		}
 		if (!IsX86Executable(Job->Settings.ToolsPath + (bFlags ? L"\\gflags.exe" : L"\\umdh.exe")))
 		{
-			ShowError(L"Не найден инструмент x86. Укажите папку Debugging Tools for Windows, содержащую umdh.exe и gflags.exe.");
+			ShowError(L"x86 tool not found. Specify the Debugging Tools for Windows folder containing umdh.exe and gflags.exe.");
 			return;
 		}
 		std::wstring Error;
@@ -287,7 +287,7 @@ namespace
 		{
 			if (GApplication.Session.empty() || !EnsureDirectory(SessionDirectory(), Error))
 			{
-				ShowError(Error.empty() ? L"Сначала запустите или подключите игру." : Error); return;
+				ShowError(Error.empty() ? L"Launch or attach to the game first." : Error); return;
 			}
 			const std::wstring Stem = SessionDirectory() + L"\\" + (Action == EAction::Snapshot ? L"snapshot-" : L"compare-") + Timestamp();
 			Job->Destination = Stem + L".txt";
@@ -296,10 +296,10 @@ namespace
 		}
 		if (Action == EAction::Snapshot)
 		{
-			if (!IsRunning()) { ShowError(L"Игра уже завершилась."); return; }
+			if (!IsRunning()) { ShowError(L"Game has already exited."); return; }
 			if (GApplication.bUstKnownAtStart && !GApplication.bUstAtStart)
 			{
-				ShowError(L"Игра запущена без сбора стеков. Включите сбор, закройте игру и запустите её снова."); return;
+				ShowError(L"Game was launched without stack tracing. Enable tracing, close the game and launch it again."); return;
 			}
 			HANDLE Duplicate = nullptr;
 			if (!DuplicateHandle(GetCurrentProcess(), GApplication.Process.Get(), GetCurrentProcess(), &Duplicate, 0, FALSE, DUPLICATE_SAME_ACCESS))
@@ -315,7 +315,7 @@ namespace
 			if (SendDlgItemMessageW(GApplication.Window, SnapshotList, LB_GETSELCOUNT, 0, 0) != 2 ||
 				SendDlgItemMessageW(GApplication.Window, SnapshotList, LB_GETSELITEMS, 2, reinterpret_cast<LPARAM>(Indices)) != 2)
 			{
-				ShowError(L"Выберите ровно два снимка с Ctrl или Shift."); return;
+				ShowError(L"Select exactly two snapshots using Ctrl or Shift."); return;
 			}
 			Job->First = GApplication.Snapshots[Indices[0]];
 			Job->Second = GApplication.Snapshots[Indices[1]];
@@ -328,14 +328,14 @@ namespace
 		{
 			GApplication.bBusy = false;
 			GApplication.Job = nullptr;
-			ShowError(L"Не удалось создать рабочий поток.");
+			ShowError(L"Failed to create worker thread.");
 			Refresh();
 			return;
 		}
 		CloseHandle(reinterpret_cast<HANDLE>(Thread));
 		Job.release();
-		SetText(ActivityText, bFlags ? L"Изменение флага через GFlags (Windows может запросить права администратора)..." :
-			L"UMDH работает. Первая загрузка символов может занять время; интерфейс доступен, операцию можно отменить.");
+		SetText(ActivityText, bFlags ? L"Updating flag via GFlags (Windows may prompt for administrator rights)..." :
+			L"UMDH is running. Initial symbol loading may take a while; the UI stays responsive and the operation can be cancelled.");
 		Refresh();
 	}
 
@@ -349,23 +349,23 @@ namespace
 		GApplication.LastReport.clear();
 		SetText(PidEdit, std::to_wstring(ProcessId));
 		LoadSnapshots();
-		SetText(ActivityText, bKnownUst ? L"Игра запущена. Прогрейте сценарий, затем снимайте память до и после повторений." :
-			L"Процесс подключён. Сбор стеков должен быть включён ДО его запуска; OANOCACHE=1 задаётся при запуске из этой утилиты.");
+		SetText(ActivityText, bKnownUst ? L"Game launched. Warm up the scenario, then take snapshots before and after repetitions." :
+			L"Process attached. Stack tracing must be enabled BEFORE launch; OANOCACHE=1 is set when launched from this utility.");
 		Refresh();
 	}
 
 	void Launch()
 	{
 		const FSettings Value = Settings();
-		if (Text(GameEdit).empty()) { ShowError(L"Выберите EXE игры."); return; }
+		if (Text(GameEdit).empty()) { ShowError(L"Select the game EXE."); return; }
 		if (!_wcsicmp(Filename(Directory(Value.GamePath)).c_str(), L"binasan"))
 		{
-			ShowError(L"Для поиска утечек выберите обычную Debug-сборку в bin. ASan удерживает память и искажает измерение."); return;
+			ShowError(L"Choose a regular Debug build in bin for leak hunting. ASan retains memory and distorts measurements."); return;
 		}
 		bool bEnabled = false;
 		std::wstring Error;
 		if (!ReadUst(Filename(Value.GamePath), bEnabled, Error)) { ShowError(Error); return; }
-		if (!bEnabled) { ShowError(L"Сначала нажмите «Включить сбор стеков», затем запускайте игру."); return; }
+		if (!bEnabled) { ShowError(L"Click \"Enable stack tracing\" first, then launch the game."); return; }
 		HANDLE Process = nullptr;
 		DWORD ProcessId = 0;
 		if (!StartGame(Value, Process, ProcessId, Error)) { ShowError(Error); return; }
@@ -379,7 +379,7 @@ namespace
 		const std::wstring Pid = Text(PidEdit);
 		wchar_t* End = nullptr;
 		const DWORD Requested = Pid.empty() ? 0 : wcstoul(Pid.c_str(), &End, 10);
-		if (!Pid.empty() && (!Requested || !End || *End)) { ShowError(L"Укажите числовой PID или очистите поле для автоматического поиска."); return; }
+		if (!Pid.empty() && (!Requested || !End || *End)) { ShowError(L"Enter a numeric PID or leave the field blank for automatic lookup."); return; }
 		std::wstring Error;
 		if (!EnsureDirectory(Value.LogsPath, Error)) { ShowError(Error); return; }
 		HANDLE Process = nullptr;
@@ -401,7 +401,7 @@ namespace
 	void CreateControls()
 	{
 		GApplication.Font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-		const wchar_t* Labels[] = { L"EXE игры", L"Аргументы запуска", L"Папка логов", L"Debugging Tools (x86)", L"Путь символов / PDB" };
+		const wchar_t* Labels[] = { L"Game EXE", L"Launch arguments", L"Logs folder", L"Debugging Tools (x86)", L"Symbols / PDB path" };
 		const int Edits[] = { GameEdit, ArgumentsEdit, LogsEdit, ToolsEdit, SymbolsEdit };
 		const int Browses[] = { GameBrowse, 0, LogsBrowse, ToolsBrowse, SymbolsBrowse };
 		for (int Index = 0; Index < 5; ++Index)
@@ -411,26 +411,26 @@ namespace
 			Control(L"EDIT", L"", WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, Edits[Index], 180, Y, 614, 26);
 			if (Browses[Index]) Control(L"BUTTON", L"...", WS_TABSTOP, Browses[Index], 804, Y, 40, 26);
 		}
-		Control(L"BUTTON", L"Символы Windows (скачивать и кэшировать)", WS_TABSTOP | BS_AUTOCHECKBOX, WindowsSymbols, 180, 195, 350, 23);
-		Control(L"STATIC", L"PDB из папки EXE — автоматически.", 0, 0, 538, 200, 306, 23);
-		Control(L"BUTTON", L"Включить сбор стеков", WS_TABSTOP, EnableUst, 14, 227, 194, 32);
-		Control(L"BUTTON", L"Отключить сбор стеков", WS_TABSTOP, DisableUst, 220, 227, 194, 32);
+		Control(L"BUTTON", L"Windows symbols (download and cache)", WS_TABSTOP | BS_AUTOCHECKBOX, WindowsSymbols, 180, 195, 350, 23);
+		Control(L"STATIC", L"PDBs next to the EXE are used automatically.", 0, 0, 538, 200, 306, 23);
+		Control(L"BUTTON", L"Enable stack tracing", WS_TABSTOP, EnableUst, 14, 227, 194, 32);
+		Control(L"BUTTON", L"Disable stack tracing", WS_TABSTOP, DisableUst, 220, 227, 194, 32);
 		Control(L"STATIC", L"", 0, StateText, 14, 270, 830, 25);
-		Control(L"BUTTON", L"Запустить игру", WS_TABSTOP, Start, 14, 306, 170, 32);
-		Control(L"STATIC", L"PID (пусто = поиск)", 0, 0, 206, 314, 140, 24);
+		Control(L"BUTTON", L"Launch game", WS_TABSTOP, Start, 14, 306, 170, 32);
+		Control(L"STATIC", L"PID (empty = auto)", 0, 0, 206, 314, 140, 24);
 		Control(L"EDIT", L"", WS_BORDER | WS_TABSTOP | ES_NUMBER | ES_AUTOHSCROLL, PidEdit, 350, 308, 100, 28);
-		Control(L"BUTTON", L"Подключить игру", WS_TABSTOP, Attach, 464, 306, 180, 32);
-		Control(L"BUTTON", L"Как пользоваться", WS_TABSTOP, Help, 660, 306, 184, 32);
+		Control(L"BUTTON", L"Attach to game", WS_TABSTOP, Attach, 464, 306, 180, 32);
+		Control(L"BUTTON", L"How to use", WS_TABSTOP, Help, 660, 306, 184, 32);
 		Control(L"STATIC", L"", 0, ProcessText, 14, 350, 830, 32);
-		Control(L"STATIC", L"Снимки этого запуска. Выберите пару с Ctrl/Shift; сравнение идёт от раннего к позднему.", 0, 0, 14, 389, 830, 25);
+		Control(L"STATIC", L"Snapshots for this session. Select a pair with Ctrl/Shift; comparison runs earlier to later.", 0, 0, 14, 389, 830, 25);
 		Control(L"LISTBOX", L"", WS_BORDER | WS_TABSTOP | WS_VSCROLL | LBS_EXTENDEDSEL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT,
 			SnapshotList, 14, 420, 630, 172);
-		Control(L"BUTTON", L"Снять память", WS_TABSTOP, Capture, 660, 420, 184, 28);
-		Control(L"BUTTON", L"Сравнить пару", WS_TABSTOP, Compare, 660, 452, 184, 28);
-		Control(L"BUTTON", L"Открыть снимок", WS_TABSTOP, OpenFile, 660, 484, 184, 28);
-		Control(L"BUTTON", L"Открыть отчёт", WS_TABSTOP, OpenReport, 660, 516, 184, 28);
-		Control(L"BUTTON", L"Открыть папку логов", WS_TABSTOP, OpenFolder, 660, 548, 184, 28);
-		Control(L"BUTTON", L"Отменить операцию", WS_TABSTOP, Cancel, 660, 580, 184, 28);
+		Control(L"BUTTON", L"Take snapshot", WS_TABSTOP, Capture, 660, 420, 184, 28);
+		Control(L"BUTTON", L"Compare pair", WS_TABSTOP, Compare, 660, 452, 184, 28);
+		Control(L"BUTTON", L"Open snapshot", WS_TABSTOP, OpenFile, 660, 484, 184, 28);
+		Control(L"BUTTON", L"Open report", WS_TABSTOP, OpenReport, 660, 516, 184, 28);
+		Control(L"BUTTON", L"Open logs folder", WS_TABSTOP, OpenFolder, 660, 548, 184, 28);
+		Control(L"BUTTON", L"Cancel operation", WS_TABSTOP, Cancel, 660, 580, 184, 28);
 		Control(L"EDIT", L"", WS_BORDER | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
 			ActivityText, 14, 626, 830, 76);
 		wchar_t Module[32768] = {};
@@ -442,8 +442,8 @@ namespace
 		SetText(ToolsEdit, Value.ToolsPath);
 		SetText(SymbolsEdit, Value.SymbolsPath);
 		SendDlgItemMessageW(GApplication.Window, WindowsSymbols, BM_SETCHECK, Value.bWindowsSymbols ? BST_CHECKED : BST_UNCHECKED, 0);
-		SetText(ActivityText, Value.ToolsPath.empty() ? L"Установите Debugging Tools for Windows из Windows SDK и укажите папку Debuggers\\x86." :
-			L"Готово. Включите сбор стеков, запустите игру и снимайте память после прогрева. Флаг сохраняется до явного отключения.");
+		SetText(ActivityText, Value.ToolsPath.empty() ? L"Install Debugging Tools for Windows from the Windows SDK and specify the Debuggers\\x86 folder." :
+			L"Ready. Enable stack tracing, launch the game and take snapshots after warming up. The flag persists until explicitly disabled.");
 		Refresh();
 		SetTimer(GApplication.Window, 1, 1000, nullptr);
 	}
@@ -475,13 +475,13 @@ namespace
 			{
 				if (Job->Action == EAction::Snapshot)
 				{
-					LoadSnapshots(); SetText(ActivityText, L"Снимок сохранён: " + Job->Destination);
+					LoadSnapshots(); SetText(ActivityText, L"Snapshot saved: " + Job->Destination);
 				}
 				else if (Job->Action == EAction::Comparison)
 				{
-					SetText(ActivityText, L"Сравнение сохранено: " + Job->Destination); OpenPath(Job->Destination);
+					SetText(ActivityText, L"Comparison saved: " + Job->Destination); OpenPath(Job->Destination);
 				}
-				else SetText(ActivityText, L"Флаг изменён. Он действует на новые запуски; уже запущенную игру нужно закрыть и запустить снова.");
+				else SetText(ActivityText, L"Flag updated. It applies to new launches; an already running game must be restarted.");
 			}
 			else if (!GApplication.bCloseAfterCancel) ShowError(Job->Result.Error);
 			Refresh();
@@ -533,21 +533,21 @@ namespace
 				break;
 			case Help:
 				MessageBoxW(Window,
-					L"1. Выберите обычный Debug-клиент (bin\\freelancer.exe) и папку логов.\r\n"
-					L"2. Включите сбор стеков. UAC запрашивается только для GFlags.\r\n"
-					L"3. Запустите игру кнопкой; прогрейте нужный сценарий.\r\n"
-					L"4. Снимите память, повторите действия, вернитесь в исходное состояние и снимите снова.\r\n"
-					L"5. Повторите цикл ещё раз. Сравните соседние пары: ищите повторяющийся рост одних стеков.\r\n\r\n"
-					L"Снимки — живые выделения Windows heap, а не полный дамп и не автоматический приговор об утечке. "
-					L"Пулы, VirtualAlloc и видеопамять требуют отдельного анализа.\r\n"
-					L"При подключении к уже запущенной игре режим на момент запуска неизвестен. "
-					L"Включение флага после запуска не добавляет стеки прошлым выделениям.\r\n"
-					L"Снимки каждого процесса лежат в отдельной папке; ошибки UMDH — в .tool.txt.\r\n"
-					L"Если скачивание символов Windows затягивается, отмените операцию и снимите соответствующую галочку. Локальные PDB продолжат использоваться.\r\n"
-					L"Поле символов принимает путь WinDbg: папки через точку с запятой, cache* и srv*. По умолчанию используется настроенный _NT_SYMBOL_PATH и кэш J:\\pdb_cache.\r\n"
-					L"Закрытие утилиты не закрывает игру и не отключает флаг. После работы нажмите «Отключить сбор стеков».\r\n"
+					L"1. Select a regular Debug client (bin\\freelancer.exe) and a logs folder.\r\n"
+					L"2. Enable stack tracing. UAC is requested only for GFlags.\r\n"
+					L"3. Launch the game with the button and warm up the target scenario.\r\n"
+					L"4. Take a snapshot, repeat the actions, return to the initial state and take another snapshot.\r\n"
+					L"5. Repeat the cycle once more. Compare adjacent pairs and look for stacks that keep growing.\r\n\r\n"
+					L"Snapshots show live Windows heap allocations, not a full dump or automatic proof of a leak. "
+					L"Private pools, VirtualAlloc and video memory require separate analysis.\r\n"
+					L"When attaching to an already running game, the tracing mode at launch is unknown. "
+					L"Enabling the flag after launch does not add stack traces to earlier allocations.\r\n"
+					L"Each process stores snapshots in its own subfolder; UMDH errors are written to .tool.txt.\r\n"
+					L"If downloading Windows symbols takes too long, cancel and uncheck the checkbox. Local PDBs will still be used.\r\n"
+					L"The symbol field accepts WinDbg syntax: semicolon-separated folders, cache* and srv*. By default it uses _NT_SYMBOL_PATH and cache J:\\pdb_cache.\r\n"
+					L"Closing this utility neither closes the game nor disables the flag. Click \"Disable stack tracing\" when done.\r\n"
 					L"https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/using-umdh-to-find-a-user-mode-memory-leak",
-					L"Поиск утечки памяти", MB_OK | MB_ICONINFORMATION);
+					L"Memory Leak Hunting", MB_OK | MB_ICONINFORMATION);
 				break;
 			}
 			Refresh();
@@ -558,9 +558,9 @@ namespace
 			{
 				if (GApplication.Job && GApplication.Job->CancelEvent.Get())
 				{
-					GApplication.bCloseAfterCancel = true; SetEvent(GApplication.Job->CancelEvent.Get()); SetText(ActivityText, L"Отмена UMDH перед закрытием...");
+					GApplication.bCloseAfterCancel = true; SetEvent(GApplication.Job->CancelEvent.Get()); SetText(ActivityText, L"Cancelling UMDH before closing...");
 				}
-				else SetText(ActivityText, L"Дождитесь завершения GFlags, затем закройте окно.");
+				else SetText(ActivityText, L"Wait for GFlags to finish, then close the window.");
 				return 0;
 			}
 			SaveSettings(Settings());
@@ -587,7 +587,7 @@ namespace
 		RECT Bounds = { 0, 0, 858, 718 };
 		const DWORD Style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 		AdjustWindowRectEx(&Bounds, Style, FALSE, 0);
-		return CreateWindowExW(WS_EX_CONTROLPARENT, Class.lpszClassName, L"Freelancer — диагностика утечек памяти",
+		return CreateWindowExW(WS_EX_CONTROLPARENT, Class.lpszClassName, L"Freelancer — Memory Leak Diagnostics",
 			Style, CW_USEDEFAULT, CW_USEDEFAULT, Bounds.right - Bounds.left, Bounds.bottom - Bounds.top,
 			nullptr, nullptr, Instance, nullptr);
 	}

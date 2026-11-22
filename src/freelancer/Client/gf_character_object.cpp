@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "gf_character_object.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "cargo_bar_control.h" // ToolTipHoverInit / ToolTipHoverSetCaption
 #include "client_cliobj.h"     // PushMaterialPathPair, ResolveMaterialEntry, ReleaseMaterialEntrySlot
@@ -369,9 +366,6 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
 
 FCharacterObject::~FCharacterObject()
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkCharacterChanged(this, true);
-#endif
     // FUN_004440c0. 0x004440e6..0x00444118: still taken over by a script.
     if (ScriptState == 1)
     {
@@ -427,9 +421,6 @@ FCharacterObject::~FCharacterObject()
 
 void FCharacterObject::Load(FCharacterDesc const& Desc)
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkCharacterChanged(this, false);
-#endif
     // FUN_00444290. 0x004442ae..0x004442fa: the record, placement and index; a "pc" record
     // (+0x1c == 1) shares the one body.
     RefreshLoadingProgress();
@@ -1049,9 +1040,6 @@ void FCharacterObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
 
 void FCharacterObject::Slot12(unsigned long Cookie, int const* Point)
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkBeforeInteraction();
-#endif
     // FUN_00445c10 (RET 8). Not while a window holds the mouse.
     if (Win3DAnyCaptured())
         return;
@@ -1092,9 +1080,6 @@ void FCharacterObject::Slot12(unsigned long Cookie, int const* Point)
 
 void FCharacterObject::TakeOverForScript(unsigned char bKeepOwnScript)
 {
-#ifdef FREELANCER_WALK_MODE
-    BaseWalkCharacterScriptStarting(this);
-#endif
     // FUN_004454e0. 0x004454e9 `JNZ` on a set argument goes straight to +0x04 = 1 (0x00445533).
     // Clear: a non-null +0x360 is handed to FUN_004568d0 on DAT_0066d2d0 (0x004454fb), +0x360 =
     // 0, +0x368 = 0, malloc_strfree(&+0x364) -- all inside the non-null branch; then +0x36c = 1

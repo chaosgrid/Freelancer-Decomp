@@ -5,9 +5,6 @@
 // Author: Giperion.
 
 #include "screen_quad_state.h"
-#ifdef FREELANCER_WALK_MODE
-#include "base_walk.h"
-#endif
 
 #include "common_csys.h"
 #include "DALib.h"
@@ -522,12 +519,7 @@ namespace
 
         // 0x004042dc..0x00404318: blend 1 -> SRCBLEND / DESTBLEND 2 / 2, blend 2 -> 5 / 6,
         // anything else leaves them alone. 0x0040431b..0x0040432b: ALPHABLENDENABLE = blend != 0.
-#ifdef FREELANCER_WALK_MODE
-        int const BlendMode = Node->BlendMode == 0 && BaseWalkGetInterfaceDrawOpacity() < 1.0f ?
-            2 : Node->BlendMode;
-#else
         int const BlendMode = Node->BlendMode;
-#endif
         if (BlendMode == 1)
         {
             Pipe->SetRenderState(D3DRS_SRCBLEND, 2);
@@ -568,15 +560,6 @@ namespace
                 // 0x0040447d..0x00404497: the rotated vertices copied after them (REP MOVSD/B).
                 memcpy(Dst, Node->RotatedVerts,
                        static_cast<size_t>(Node->RotVertCount) * sizeof(FScreenQuadGpuVert));
-
-#ifdef FREELANCER_WALK_MODE
-                // Fade the GPU copy only: cached font records and rotated atlas icons keep their colours.
-                FScreenQuadGpuVert* const Vertices =
-                    static_cast<FScreenQuadGpuVert*>(Lock.Vertices);
-                for (unsigned int Index = 0; Index < VertexCount; ++Index)
-                    Vertices[Index].Color = BaseWalkFadeInterfaceColor(Vertices[Index].Color,
-                                                                     BlendMode == 1);
-#endif
 
                 // 0x00404499..0x0040449d: slot 6 (+0x18).
                 Vbm->UnlockVertexMemory(&Lock);

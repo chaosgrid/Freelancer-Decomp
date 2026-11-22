@@ -29,7 +29,7 @@ namespace
 
 EngineObject::EngineObject()
 {
-    // Common.dll.c 0xa98a0 вЂ” identity diagonal, instance -1.
+    // Common.dll.c 0xa98a0 -- identity diagonal, instance -1.
     EngineInstanceId = -1;
     memset(&Orientation, 0, sizeof(Orientation));
     Orientation.E[0][0] = 1.0f;
@@ -184,7 +184,7 @@ void EngineObject::set_orientation(Matrix const& Orient)
 
 void EngineObject::set_transform(Transform const& Xform)
 {
-    // Listing 0x1cb50. 12 floats to this+8 (3Г—3 then pos).
+    // Listing 0x1cb50. 12 floats to this+8 (3x3 then pos).
     CopyMatrix9(Orientation, Xform.Rotation);
     WorldPosition = Xform.Translation;
 }
