@@ -882,7 +882,7 @@ void __cdecl PlayerData_ApplySavedCharacter(PlayerData& Slot,
     Slot.num_mission_failures = Record.NumMissionFailures;              // +0x33c
     Slot.save_failure_count = 0;                                        // +0x344
     Slot.current_location = 0;                                          // +0x3f8, after the copy above
-    Slot.Field_0x3FC = 0;
+    Slot.character_id = 0;
     Slot.ship_object_id = 0;                                            // +0x3e4
     Slot.created_ship_id = 0;                                           // +0x3e8
     Slot.exited_base_id = 0;                                            // +0x410

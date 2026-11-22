@@ -567,10 +567,10 @@ void Guided::on_collision(FCollisionEvent const& Hit)
     // the sub-object hit (Hit+8) -> StarSystem::munition_collision (FUN_06d0d500).
     // Retail never writes the record's +0x10..+0x1b (hit position); the port zeroes it.
     SSPMunitionCollisionInfo Info = {};
-    Info.Field_0x00 = Object->get_archetype()->Nickname.Id;
-    Info.Field_0x04 = Cg->OwnerId;
+    Info.ProjectileArchId = Object->get_archetype()->Nickname.Id;
+    Info.AttackerId = Cg->OwnerId;
     Info.ObjectId = Hit.Other->get_id();
-    Info.Field_0x0c = Hit.OtherSubObjId;
+    Info.SubObjId = Hit.OtherSubObjId;
     OwnerSystem->munition_collision(Info);
 }
 
@@ -799,10 +799,10 @@ void Bullet::on_collision(FCollisionEvent const& Hit)
     // +0x10..+0x1b (hit position); the port zeroes it.
     CBeam* const Cb = cbeam();
     SSPMunitionCollisionInfo Info = {};
-    Info.Field_0x00 = Object->get_archetype()->Nickname.Id;
-    Info.Field_0x04 = Cb->OwnerId;
+    Info.ProjectileArchId = Object->get_archetype()->Nickname.Id;
+    Info.AttackerId = Cb->OwnerId;
     Info.ObjectId = Hit.Other->get_id();
-    Info.Field_0x0c = Hit.OtherSubObjId;
+    Info.SubObjId = Hit.OtherSubObjId;
     OwnerSystem->munition_collision(Info);
 
     // .text:06cf4e9b-06cf4eaa: the round is spent -- destroy(1, the object hit).

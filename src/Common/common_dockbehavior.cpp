@@ -708,7 +708,7 @@ void DockBehavior::CancelOwnerRequest(int RequestType)
             : nullptr;
         Id = ObjInspectOf(Obj)->get_id();
     }
-    ObjAffectOf(ThreatSourcePtr14)->slot_60(RequestType, &Id, 0);
+    ObjAffectOf(ThreatSourcePtr14)->request_cancel(RequestType, &Id, 0);
 }
 
 // Own vtable slot 6 (offset 0x18). Common.dll.txt 188138-188244 (LAB_062c35f0).
@@ -1517,7 +1517,7 @@ int DockBehavior::UpdateApproachTail()
         // (RET 0x14; both id pointers are dereferenced as dwords) -- see common_iface.h.
         // The result in EAX is not read (062c4cef reloads EAX from the stack). No null
         // test on ThreatSourcePtr14 (the port's former guard is gone).
-        (void)ObjAffectOf(ThreatSourcePtr14)->slot_5c(
+        (void)ObjAffectOf(ThreatSourcePtr14)->request_event(
             SlotMode, reinterpret_cast<unsigned const*>(&EngineQuery),
             reinterpret_cast<unsigned const*>(&TargetQuery), 0,
             static_cast<IObjAffect::RequestCB*>(this));

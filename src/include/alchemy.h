@@ -191,7 +191,7 @@ struct IFxEffect : IDAComponent
     virtual GENRESULT DACOM_API Slot10(void* A, void* B) = 0;          // LAB_0621fa40 RET 0xC
     virtual GENRESULT DACOM_API Slot11(void* Arg) = 0;                 // LAB_0621fa80 RET 8
     virtual GENRESULT DACOM_API Slot12(void* A, void* B) = 0;          // LAB_0621fb50 RET 0xC
-    virtual GENRESULT DACOM_API Slot13(void* Arg) = 0;                 // FUN_0621fba0 RET 8 (Ghidra thiscall)
+    virtual GENRESULT DACOM_API DestroyNodes(void* Arg) = 0;           // formerly Slot13; FUN_0621fba0 RET 8 (destroy/free effect nodes by mask: 1=emitters, 2=fields, 4=appearances, 7=all)
     virtual GENRESULT DACOM_API Slot14(float LodInput) = 0;            // LAB_0621f850 RET 8: node +0x88
     virtual GENRESULT DACOM_API Slot15(void* Arg) = 0;                 // LAB_0621f880 RET 8
     virtual GENRESULT DACOM_API GetBoundComponent(void** Out) = 0;     // 16 LAB_0621fd00 RET 8

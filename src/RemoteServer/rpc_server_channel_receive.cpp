@@ -342,8 +342,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                     static_cast<const FRpcServerDestroyObjectPacket*>(Packet);
                 static FServerDestroyObjectInfo GDestroyObjectStatic;
                 GDestroyObjectStatic.ObjectId = Typed->ObjectId;
-                const unsigned int Widened = Typed->Field_0x04;
-                std::memcpy(&GDestroyObjectStatic.Field_0x04, &Widened, sizeof(Widened));
+                const unsigned int Widened = Typed->DestroyType;
+                std::memcpy(&GDestroyObjectStatic.DestroyType, &Widened, sizeof(Widened));
                 Client->SendServerDestroyObject(1u, GDestroyObjectStatic);
                 break;
             }
@@ -352,9 +352,9 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 // Stack struct, every dword copied by integer moves.
                 const FRpcServerLaunchPacket* Typed = static_cast<const FRpcServerLaunchPacket*>(Packet);
                 FServerLaunchInfo Info;
-                Info.Field_0x00 = Typed->Field_0x00;
-                Info.Field_0x04 = Typed->Field_0x04;
-                Info.Field_0x08 = Typed->Field_0x08;
+                Info.ShipId = Typed->ShipId;
+                Info.LaunchObjId = Typed->LaunchObjId;
+                Info.LaunchPosIndex = Typed->LaunchPosIndex;
                 std::memcpy(&Info.Orientation, &Typed->Orientation, sizeof(Info.Orientation));
                 std::memcpy(&Info.Position, &Typed->Position, sizeof(Info.Position));
                 Client->SendServerLaunch(1u, Info);

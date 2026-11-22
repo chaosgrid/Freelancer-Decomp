@@ -111,7 +111,7 @@ void CEThruster::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     double const Pool = Ship->ThrustPower;
     if (!(Cost <= Pool))
     {
-        Notify(INotify::Event_0xF, nullptr);
+        Notify(INotify::NotEnoughPower, nullptr);
         return;
     }
     Ship->ThrustPower = (float)(Pool - Cost);

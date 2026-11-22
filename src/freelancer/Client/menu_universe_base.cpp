@@ -30,7 +30,7 @@
 #include "DALib.h"
 #include "render/rendcomp.h"
 #include "common_archetype.h"
-#include "client_mesh_load.h" // ArchetypeLoadFromPath (exe-side port helper)
+#include "client_mesh_load.h"
 #include "common_csys.h"
 #include "common_goods.h"
 #include "common_id.h"

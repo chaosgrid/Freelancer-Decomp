@@ -71,7 +71,7 @@ void FLightsCameraParticles::Destroy()
 {
     if (Effect == nullptr)
         return;
-    Effect->Slot13(reinterpret_cast<void*>(7));
+    Effect->DestroyNodes(reinterpret_cast<void*>(7));
     static_cast<IDAComponent*>(Effect)->Release();
     Effect = nullptr;
     VisEffectArchRelease(Vis);

@@ -1093,9 +1093,9 @@ namespace AlchemyImpl
             FPoolComponentSlotOwner<IFxEffect> LifeOwner = {Life};
             FPoolComponentSlotOwner<IFxEffect> DeathOwner = {Death};
             if (*Life != nullptr)
-                (*Life)->Slot13(reinterpret_cast<void*>(7));
+                (*Life)->DestroyNodes(reinterpret_cast<void*>(7));
             if (*Death != nullptr)
-                (*Death)->Slot13(reinterpret_cast<void*>(7));
+                (*Death)->DestroyNodes(reinterpret_cast<void*>(7));
             DeathOwner.Release();
             LifeOwner.Release();
         }

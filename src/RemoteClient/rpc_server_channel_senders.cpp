@@ -230,7 +230,7 @@ void CClientImpl::SendServerDestroyObject(unsigned int ClientId, const FServerDe
     if (Serializer->Allocate(2, 6, &Packet) == 0) {
         FRpcServerDestroyObjectPacket* Typed = static_cast<FRpcServerDestroyObjectPacket*>(Packet);
         Typed->ObjectId = Info.ObjectId;
-        Typed->Field_0x04 = Info.Field_0x04;
+        Typed->DestroyType = Info.DestroyType;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -267,9 +267,9 @@ void CClientImpl::SendServerLaunch(unsigned int ClientId, const FServerLaunchInf
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 7, &Packet) == 0) {
         FRpcServerLaunchPacket* Typed = static_cast<FRpcServerLaunchPacket*>(Packet);
-        Typed->Field_0x00 = Info.Field_0x00;
-        Typed->Field_0x04 = Info.Field_0x04;
-        Typed->Field_0x08 = Info.Field_0x08;
+        Typed->ShipId = Info.ShipId;
+        Typed->LaunchObjId = Info.LaunchObjId;
+        Typed->LaunchPosIndex = Info.LaunchPosIndex;
         std::memcpy(&Typed->Position, &Info.Position, sizeof(Typed->Position));
         std::memcpy(&Typed->Orientation, &Info.Orientation, sizeof(Typed->Orientation));
         PushToClient(ClientId, Packet->AsRaw());

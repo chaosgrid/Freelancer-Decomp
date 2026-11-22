@@ -372,7 +372,7 @@ void CEEngine::NotifyArchGroupDestroyed(unsigned short SubObjId)
         if (It->SubObjId == SubObjId)
         {
             It = Nozzles.erase(It);
-            Notify(INotify::Event_0xD, (void*)(uintptr_t)SubObjId);
+            Notify(INotify::ArchGroupDestroyed, (void*)(uintptr_t)SubObjId);
         }
         else
         {

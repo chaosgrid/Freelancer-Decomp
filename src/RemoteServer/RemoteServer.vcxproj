@@ -15,7 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>17.0</VCProjectVersion>
+    <VCProjectVersion>18.0</VCProjectVersion>
     <ProjectGuid>{0B9A089A-5127-2C6A-4051-21826893A6A0}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>RemoteServer</RootNamespace>

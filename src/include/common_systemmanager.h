@@ -549,10 +549,24 @@ struct SystemManagerTimerTable
     float Level;
 
     // +0x28..+0xD8: 11 SustainedThresholdTimer records, each constructed to {Active=0,
-    // TriggerThreshold=100.0f, Duration=1.0f, Accumulator=0.0f}. Their thresholds come from
-    // RefreshSystemManagerTimerThresholdsFromPersonality (slot 6 = fire_guns_damage_trigger,
-    // 7 = drop_mines_damage_trigger, 8 = fire_missiles_damage_trigger, ...).
-    SustainedThresholdTimer Timers[11];
+    // TriggerThreshold=100.0f, Duration=1.0f, Accumulator=0.0f}. Thresholds and durations are
+    // loaded in RefreshSystemManagerTimerThresholdsFromPersonality (common_sysmgr_timertable.cpp).
+    enum ETimerChannel : int
+    {
+        TimerEvadeBreakDamage = 0,
+        TimerEvadeDodgeMoreDamage = 1,
+        TimerBrakeReverseDamage = 2,
+        TimerEngineKillFaceDamage = 3,
+        TimerAfterburnerDamage = 4,
+        TimerRollDamage = 5,
+        TimerFireGunsDamage = 6,
+        TimerDropMinesDamage = 7,
+        TimerFireMissilesDamage = 8,
+        TimerBreakFormationDamage = 9,
+        TimerBreakApartFormationDamage = 10,
+        TimerChannelCount = 11,
+    };
+    SustainedThresholdTimer Timers[TimerChannelCount];
 
     float UnknownScale_0xD8;       // +0xD8 = 0.5f, role not identified
     unsigned char Reserved0xDC;    // +0xDC uninitialized-in-retail artifact byte (Ghidra's `local_11`)

@@ -1868,9 +1868,9 @@ static_assert(offsetof(CEqObj, BehaviorIndex) == 0x1a0, "CEqObj+0x1a0 behaviour 
 // CEArmor::ArmorArch/CECounterMeasureDropper::CounterMeasureArch got /OPT:ICF-folded onto
 // the call site -- both are byte-identical "return this->Arch" accessors, so either name
 // resolves to the same Gun archetype pointer regardless of which one the disassembly names.
-// Guns whose archetype RefireDelay == 0 accumulate into ActiveGunCount/AvgMuzzleVelocity/
-// MaxMunitionRange below; guns with RefireDelay != 0 accumulate into CmDropperCount/
-// CmMaxMunitionRange instead.
+// Guns whose munition Seeker == 0 accumulate into ActiveGunCount / AvgMuzzleVelocity /
+// MaxMunitionRange below; seeker guns (missiles/torpedoes, Munition::Seeker != 0) accumulate
+// into ActiveMissileCount / MaxActiveMissileRange instead.
 struct COMMON_API ShipGunStats
 {
     // .text:06287ae0 (ordinal 439): stores 0 into all five dwords +0x00..+0x10. Retail
@@ -1880,8 +1880,8 @@ struct COMMON_API ShipGunStats
         : ActiveGunCount(0)
         , AvgMuzzleVelocity(0.0f)
         , MaxMunitionRange(0.0f)
-        , CmDropperCount(0)
-        , CmMaxMunitionRange(0.0f)
+        , ActiveMissileCount(0)
+        , MaxActiveMissileRange(0.0f)
     {
     }
 
@@ -1889,11 +1889,11 @@ struct COMMON_API ShipGunStats
     // VC6 had none, and retail exports exactly the copy assignment.
     ShipGunStats& operator=(ShipGunStats const&) = default;
 
-    int ActiveGunCount;        // +0x00
-    float AvgMuzzleVelocity;   // +0x04  sum of Launcher::MuzzleVelocity over active guns, averaged
-    float MaxMunitionRange;    // +0x08  farthest active gun's CEGun::GetMunitionRange()
-    int CmDropperCount;        // +0x0c
-    float CmMaxMunitionRange;  // +0x10  farthest CM-type gun's CEGun::GetMunitionRange()
+    int ActiveGunCount;           // +0x00
+    float AvgMuzzleVelocity;      // +0x04  sum of Launcher::MuzzleVelocity over active guns, averaged
+    float MaxMunitionRange;       // +0x08  farthest active non-seeker gun's CEGun::GetMunitionRange()
+    int ActiveMissileCount;       // +0x0c  active seeker (missile/torpedo) guns
+    float MaxActiveMissileRange;  // +0x10  farthest active seeker gun's CEGun::GetMunitionRange()
 
     // Listing 0x27b00: zeroes all five fields (identical body to the retail default ctor
     // at 0x27ae0). CShip::get_gun_stats() ports this inline by assigning every field
@@ -1904,8 +1904,8 @@ struct COMMON_API ShipGunStats
         ActiveGunCount = 0;
         AvgMuzzleVelocity = 0.0f;
         MaxMunitionRange = 0.0f;
-        CmDropperCount = 0;
-        CmMaxMunitionRange = 0.0f;
+        ActiveMissileCount = 0;
+        MaxActiveMissileRange = 0.0f;
     }
 };
 

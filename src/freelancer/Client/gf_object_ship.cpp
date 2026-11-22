@@ -270,7 +270,7 @@ void FObjectShipEngineFx::Update(float Delta)
             return;
         // 0x00446e6a..0x00446e7c: slot 13 (1) on the effect, +0x3c = 1, +0x40 = 0.
         if (Particles.Effect != nullptr)
-            Particles.Effect->Slot13(reinterpret_cast<void*>(1));
+            Particles.Effect->DestroyNodes(reinterpret_cast<void*>(1));
         bStopping = 1;
         Lifetime = 0.0f;
         return;
@@ -621,7 +621,7 @@ void FObjectShip::StopEngineEffects()
     {
         FObjectShipEngineFx& Fx = EngineFx[Index];
         if (Fx.Particles.Effect != nullptr)
-            Fx.Particles.Effect->Slot13(reinterpret_cast<void*>(1));
+            Fx.Particles.Effect->DestroyNodes(reinterpret_cast<void*>(1));
         Fx.bStopping = 1;
         Fx.Lifetime = 0.0f;
     }

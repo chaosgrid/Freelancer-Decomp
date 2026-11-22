@@ -317,7 +317,7 @@ void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info
         PlayerData_TerminateTrade(Players[player_id]);
         // data() is the vector's _First (+0x14) as retail pushes it, size() its
         // `_First ? (_Last - _First) >> 1 : 0`.
-        static_cast<IObjAffect*>(Obj)->slot_34(info.Hardpoints.data(),
+        static_cast<IObjAffect*>(Obj)->fire_weapons(info.Hardpoints.data(),
                                                static_cast<unsigned>(info.Hardpoints.size()),
                                                &info.TargetPos, static_cast<int>(player_id));
     }
@@ -331,7 +331,7 @@ void IServerImpl::ActivateEquip(unsigned int player_id, const XActivateEquip& in
             return;
         if (Obj->is_destroyed())
             return;
-        static_cast<IObjAffect*>(Obj)->slot_4c(&info.EquipId, info.bActivate,
+        static_cast<IObjAffect*>(Obj)->toggle_item(&info.EquipId, info.bActivate,
                                                static_cast<int>(player_id));
     }
     // Slot 2: ActivateCruise -- retail .text:06cf09e0 .. 06cf0a31, RET 8.
@@ -344,7 +344,7 @@ void IServerImpl::ActivateCruise(unsigned int player_id, const XActivateCruise& 
             return;
         if (Obj->is_destroyed())
             return;
-        static_cast<IObjAffect*>(Obj)->slot_50(info.bActivate, info.Field_0x05 != 0,
+        static_cast<IObjAffect*>(Obj)->toggle_cruise(info.bActivate, info.bDisruptCruise != 0,
                                                static_cast<int>(player_id));
     }
     // Slot 3: ActivateThrusters -- retail .text:06cf0a40 .. 06cf0a8b, RET 8.
@@ -357,7 +357,7 @@ void IServerImpl::ActivateThrusters(unsigned int player_id, const XActivateThrus
             return;
         if (Obj->is_destroyed())
             return;
-        static_cast<IObjAffect*>(Obj)->slot_54(info.bActivate, static_cast<int>(player_id));
+        static_cast<IObjAffect*>(Obj)->toggle_thrusters(info.bActivate, static_cast<int>(player_id));
     }
     // Slot 4: SetTarget -- retail .text:06cf0c70 .. 06cf0d4d, RET 8.
     //   06cf0c85  lookup of info.ObjectId; miss (06cf0c8f), obj == 0 (06cf0c9b),
@@ -384,7 +384,7 @@ void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info) {
             return;
         }
         IObjRW* const Target = Server_LookupGameObject(info.TargetObjectId);
-        Affect->slot_44(&info.SubObjId, Target, info.TargetSubObjId,
+        Affect->set_gun_target(&info.SubObjId, Target, info.TargetSubObjId,
                         static_cast<int>(player_id));
     }
     // Slot 5: TractorObjects -- retail .text:06cf0b50 .. 06cf0c68, RET 8, with an
@@ -414,7 +414,7 @@ void IServerImpl::TractorObjects(unsigned int player_id, const XTractorObjects& 
                 continue;
             Targets.push_back(Target);
         }
-        static_cast<IObjAffect*>(Obj)->slot_3c(&info.TractorEquipId, Targets,
+        static_cast<IObjAffect*>(Obj)->tractor_all(&info.TractorEquipId, Targets,
                                                static_cast<int>(player_id));
     }
     // Slot 6: GoTradelane -- retail .text:06cf0a90 .. 06cf0ae5, RET 8.
@@ -465,7 +465,7 @@ void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& in
         if (Obj->is_destroyed())
             return;
         PlayerData_TerminateTrade(Players[player_id]);
-        static_cast<IObjAffect*>(Obj)->slot_38(info.ItemId, static_cast<int>(info.Count),
+        static_cast<IObjAffect*>(Obj)->jettison_cargo(info.ItemId, static_cast<int>(info.Count),
                                                static_cast<int>(player_id));
     }
     // Slot 13: retail body is the shared bare RET at Server 0x06ce1050 / rpclocal
@@ -1144,8 +1144,8 @@ void IServerImpl::GFGoodBuy(const SGFGoodBuyInfo& info, unsigned int session_id)
         // .text:06d17bb0..06d17be9 has no branch -- no session test; the port's
         // `!p || !p->active` early-out is gone (w4-server-guards).
         // Retail 0x06d17bb0 copies all four dwords onto the stack, then FUN_06d43650(0x1c, &frame).
-        unsigned int msg_data[5] = { info.Field_0x00, info.Field_0x04, info.Field_0x08,
-                                     info.Field_0x0c, session_id };
+        unsigned int msg_data[5] = { info.BaseId, info.Null04, info.GoodId,
+                                     info.Count, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::GFGoodBuy, msg_data);
     }
     // GFGoodSell — retail sends message 0x1d
@@ -1153,7 +1153,7 @@ void IServerImpl::GFGoodSell(const SGFGoodSellInfo& info, unsigned int session_i
         // .text:06d17bf0..06d17c22 has no branch -- no session test; the port's
         // `!p || !p->active` early-out is gone (w4-server-guards).
         // Retail 0x06d17bf0 copies three dwords onto the stack, then FUN_06d43650(0x1d, &frame).
-        unsigned int msg_data[4] = { info.Field_0x00, info.Field_0x04, info.Field_0x08, session_id };
+        unsigned int msg_data[4] = { info.BaseId, info.GoodId, info.Count, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::GFGoodSell, msg_data);
     }
 
@@ -1392,9 +1392,9 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         // .text:06cefd1e .. 06cefdd7 -- IClient +0xf0 (SendServerLaunch) FLPACKET_SERVER_LAUNCH
         // with the record at [ESP+0x48].
         FServerLaunchInfo Launch;
-        Launch.Field_0x00 = ship_id;
-        Launch.Field_0x04 = LaunchObjId;
-        Launch.Field_0x08 = static_cast<unsigned int>(LaunchKind);
+        Launch.ShipId = ship_id;
+        Launch.LaunchObjId = LaunchObjId;
+        Launch.LaunchPosIndex = static_cast<unsigned int>(LaunchKind);
         Launch.Orientation = Req.Orientation;
         Launch.Position = Req.Position;
         g_pClientInterface->SendServerLaunch(session_id, Launch);
@@ -1642,7 +1642,7 @@ void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& info, unsigned int s
                       "+8 is the target FUN_06d006c0 resolves");
         static_assert(offsetof(SSPObjCollisionInfo, SubObjId) == offsetof(FCollisionDamage, TargetSubObjId),
                       "+0xc is the target's sub-object");
-        static_assert(offsetof(SSPObjCollisionInfo, Field_0x10) == offsetof(FCollisionDamage, Damage),
+        static_assert(offsetof(SSPObjCollisionInfo, DamageBits) == offsetof(FCollisionDamage, Damage),
                       "+0x10 is the damage");
         (void)session_id;
         GameObject* Obj = nullptr;
@@ -1668,7 +1668,7 @@ void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_
             return;
         if (Obj->is_destroyed())
             return;
-        if (static_cast<IObjAffect*>(Obj)->slot_58(info.ItemId, info.Count,
+        if (static_cast<IObjAffect*>(Obj)->use_item(info.ItemId, info.Count,
                                                    static_cast<int>(session_id)) != 0)
             return;
         PlayerData_TerminateTrade(Players[session_id]);
@@ -1786,7 +1786,7 @@ void IServerImpl::RequestEvent(int event_type, unsigned int p1, unsigned int p2,
         GameObject* const Obj = Server_LookupGameObject(p1);
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->slot_5c(event_type, &p2, &p3, static_cast<int>(p4),
+        static_cast<IObjAffect*>(Obj)->request_event(event_type, &p2, &p3, static_cast<int>(p4),
                                                nullptr);
     }
     // RequestCancel -- retail .text:06cf0930 .. 06cf0970, RET 0x14 (five stack
@@ -1800,7 +1800,7 @@ void IServerImpl::RequestCancel(int event_type, unsigned int p1, unsigned int p2
         GameObject* const Obj = Server_LookupGameObject(p1);
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->slot_60(event_type, &p2, static_cast<int>(p3));
+        static_cast<IObjAffect*>(Obj)->request_cancel(event_type, &p2, static_cast<int>(p3));
     }
     // MineAsteroid -- retail .text:06cf07d0 .. 06cf07f8, RET 0x18. Ported
     // 2026-09-24 (claude-code:w5-server-06d0):
@@ -1918,7 +1918,7 @@ void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info)
             unsigned int msg_data[3];
             msg_data[0] = session_id;                                        // .text:06cf15cd
             msg_data[1] = info.ObjectId;                                     // .text:06cf15be
-            msg_data[2] = info.Field_0x08;                                   // .text:06cf15c9
+            msg_data[2] = info.Flag;                                         // .text:06cf15c9
             Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerManeuver, msg_data); // .text:06cf15d1
         }
     }
@@ -3735,8 +3735,8 @@ static void StarSystem_ProcessCollisions(StarSystem* Sys)
         HitA.OtherSubObjId = SubB;
         HitA.Pad0a = 0;
         HitA.Point = Event->Point;                                   // event +0x10
-        HitA.Field_0x18 = Event->SurfaceNormal;                         // event +0x1c
-        HitA.Field_0x24 = Event->RelativeVelocity;                         // event +0x28
+        HitA.SurfaceNormal = Event->SurfaceNormal;                         // event +0x1c
+        HitA.RelativeVelocity = Event->RelativeVelocity;                   // event +0x28
         ObjA->on_collision(HitA);                                    // .text:06ce3610
 
         // .text:06ce3616 .. 06ce36cc -- side B's record at [ESP+0x70]: the
@@ -3749,12 +3749,12 @@ static void StarSystem_ProcessCollisions(StarSystem* Sys)
         HitB.OtherSubObjId = SubA;
         HitB.Pad0a = 0;
         HitB.Point = Event->Point;
-        HitB.Field_0x18.x = -Event->SurfaceNormal.x;
-        HitB.Field_0x18.y = -Event->SurfaceNormal.y;
-        HitB.Field_0x18.z = -Event->SurfaceNormal.z;
-        HitB.Field_0x24.x = -Event->RelativeVelocity.x;
-        HitB.Field_0x24.y = -Event->RelativeVelocity.y;
-        HitB.Field_0x24.z = -Event->RelativeVelocity.z;
+        HitB.SurfaceNormal.x = -Event->SurfaceNormal.x;
+        HitB.SurfaceNormal.y = -Event->SurfaceNormal.y;
+        HitB.SurfaceNormal.z = -Event->SurfaceNormal.z;
+        HitB.RelativeVelocity.x = -Event->RelativeVelocity.x;
+        HitB.RelativeVelocity.y = -Event->RelativeVelocity.y;
+        HitB.RelativeVelocity.z = -Event->RelativeVelocity.z;
         ObjB->on_collision(HitB);                                    // .text:06ce36cc
     }
 }

@@ -134,7 +134,7 @@ void PotionHelper::Update(float Dt, IObjRW* Object)
         // .text:062ecf04-062ecf15: MOV EDX,[EDI+4]; MOVZX EAX,[ESI+0xc]; PUSH -1; LEA ECX,[EDI+4];
         // PUSH 1; PUSH EAX; CALL [EDX+0x58] -- the IObjAffect sub-object's slot 22 with the
         // zero-extended equipment id, 1 and -1.
-        static_cast<IObjAffect*>(Object)->slot_58(EquipId, 1, -1);
+        static_cast<IObjAffect*>(Object)->use_item(EquipId, 1, -1);
         Timer = 0.0f;
         State = 2;
         return;

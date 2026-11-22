@@ -218,28 +218,28 @@ static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned in
 static bool MarshalMunCollision(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const SSPMunitionCollisionInfo* Info = reinterpret_cast<const SSPMunitionCollisionInfo*>(Args[0]);
     FPayloadClientMunCollision Wire;
-    Wire.Field_0x00 = Info->Field_0x00;
-    Wire.Field_0x04 = Info->Field_0x04;
+    Wire.Field_0x00 = Info->ProjectileArchId;
+    Wire.Field_0x04 = Info->AttackerId;
     Wire.ObjectId = Info->ObjectId;
-    Wire.Field_0x0c = Info->Field_0x0c;
+    Wire.Field_0x0c = Info->SubObjId;
     Wire.Pad_0x0e = 0;
-    Wire.Field_0x10 = Info->Field_0x10;
-    Wire.Field_0x14 = Info->Field_0x14;
-    Wire.Field_0x18 = Info->Field_0x18;
+    Wire.Field_0x10 = Info->HitPosX;
+    Wire.Field_0x14 = Info->HitPosY;
+    Wire.Field_0x18 = Info->HitPosZ;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverMunCollision(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientMunCollision Wire = RpcPayloadRead<FPayloadClientMunCollision>(Packet, 0);
     SSPMunitionCollisionInfo Info;
-    Info.Field_0x00 = Wire.Field_0x00;
-    Info.Field_0x04 = Wire.Field_0x04;
+    Info.ProjectileArchId = Wire.Field_0x00;
+    Info.AttackerId = Wire.Field_0x04;
     Info.ObjectId = Wire.ObjectId;
-    Info.Field_0x0c = Wire.Field_0x0c;
+    Info.SubObjId = Wire.Field_0x0c;
     Info.Pad_0x0e = 0;
-    Info.Field_0x10 = Wire.Field_0x10;
-    Info.Field_0x14 = Wire.Field_0x14;
-    Info.Field_0x18 = Wire.Field_0x18;
+    Info.HitPosX = Wire.Field_0x10;
+    Info.HitPosY = Wire.Field_0x14;
+    Info.HitPosZ = Wire.Field_0x18;
     Server->SPMunitionCollision(Info, SessionId);
     return true;
 }
@@ -410,7 +410,7 @@ static bool MarshalObjCollision(FPacketBase* Packet, const unsigned int* Args, u
     Wire.TargetObjectId = Info->TargetObjectId;
     Wire.TargetSubObjId = Info->TargetSubObjId;
     Wire.Pad_0x0e = 0;
-    Wire.Field_0x10 = Info->Field_0x10;
+    Wire.Field_0x10 = Info->DamageBits;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -423,7 +423,7 @@ static bool DeliverObjCollision(const FPacketBase* Packet, IServer* Server, unsi
     Info.ObjectId = Wire.ObjectId;
     Info.SubObjId = Wire.SubObjId;
     Info.Pad_0x0e = 0;
-    Info.Field_0x10 = Wire.Field_0x10;
+    Info.DamageBits = Wire.Field_0x10;
     Server->SPObjCollision(Info, SessionId);
     return true;
 }
@@ -465,9 +465,9 @@ static bool DeliverBadLandsObjCollision(const FPacketBase* Packet, IServer* Serv
 static bool DeliverGFGoodSell(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
     SGFGoodSellInfo Info;
-    Info.Field_0x00 = Wire.Field_0x00;
-    Info.Field_0x04 = Wire.Field_0x04;
-    Info.Field_0x08 = Wire.Field_0x08;
+    Info.BaseId = Wire.Field_0x00;
+    Info.GoodId = Wire.Field_0x04;
+    Info.Count = Wire.Field_0x08;
     Server->GFGoodSell(Info, SessionId);
     return true;
 }
@@ -485,10 +485,10 @@ static bool DeliverGFGoodVaporized(const FPacketBase* Packet, IServer* Server, u
 static bool DeliverGFGoodBuy(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientDwordQuad Wire = RpcPayloadRead<FPayloadClientDwordQuad>(Packet, 0);
     SGFGoodBuyInfo Info;
-    Info.Field_0x00 = Wire.Field_0x00;
-    Info.Field_0x04 = Wire.Field_0x04;
-    Info.Field_0x08 = Wire.Field_0x08;
-    Info.Field_0x0c = Wire.Field_0x0c;
+    Info.BaseId = Wire.Field_0x00;
+    Info.Null04 = Wire.Field_0x04;
+    Info.GoodId = Wire.Field_0x08;
+    Info.Count = Wire.Field_0x0c;
     Server->GFGoodBuy(Info, SessionId);
     return true;
 }
@@ -705,18 +705,18 @@ static bool DeliverSPScanCargo(const FPacketBase* Packet, IServer* Server, unsig
 static bool MarshalSetManeuver(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const XSetManeuver* Info = reinterpret_cast<const XSetManeuver*>(Args[1]);
     FPayloadClientDwordTriple Wire;
-    Wire.Field_0x00 = Info->Field_0x00;
+    Wire.Field_0x00 = Info->ShipFrom;
     Wire.Field_0x04 = Info->ObjectId;
-    Wire.Field_0x08 = Info->Field_0x08;
+    Wire.Field_0x08 = Info->Flag;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverSetManeuver(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
     XSetManeuver Info;
-    Info.Field_0x00 = Wire.Field_0x00;
+    Info.ShipFrom = Wire.Field_0x00;
     Info.ObjectId = Wire.Field_0x04;
-    Info.Field_0x08 = Wire.Field_0x08;
+    Info.Flag = Wire.Field_0x08;
     Server->SetManeuver(SessionId, Info);
     return true;
 }
@@ -1273,8 +1273,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         // Retail widens the wire float into the struct's double with FLD/FSTP.
         Info.Timestamp = (double)Wire.Field_0x24;
         // Retail copies packet+0x48 as a plain dword into the struct's +0x28.
-        Info.Field_0x28 = *reinterpret_cast<const unsigned int*>(&Wire.Field_0x28);
-        Info.Field_0x2c = Wire.Field_0x00;
+        Info.ThrottleBits = *reinterpret_cast<const unsigned int*>(&Wire.Field_0x28);
+        Info.State = Wire.Field_0x00;
         Info.Pad_0x2d[0] = 0;
         Info.Pad_0x2d[1] = 0;
         Info.Pad_0x2d[2] = 0;
@@ -1337,7 +1337,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         XActivateCruise Info;
         Info.ObjectId = Wire.ObjectId;
         Info.bActivate = (Wire.bActivate != 0);
-        Info.Field_0x05 = (unsigned char)(Wire.Field_0x05 != 0 ? 1 : 0);
+        Info.bDisruptCruise = (unsigned char)(Wire.Field_0x05 != 0 ? 1 : 0);
         Info.Pad_0x06[0] = 0;
         Info.Pad_0x06[1] = 0;
         Server->ActivateCruise(SessionId, Info);

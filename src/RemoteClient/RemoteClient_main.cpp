@@ -35,11 +35,11 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             Info.ObjectId = Wire->ObjectId;
             Info.Orientation = Wire->Orientation;
             Info.Position = Wire->Position;
-            Info.Field_0x2c = Wire->Field_0x00;
+            Info.State = Wire->Field_0x00;
             const float* TimeSource = &Wire->UpdateTime;
             const float* FieldSource = &Wire->Field_0x28;
             double* TimeDestination = &Info.Timestamp;
-            unsigned int* FieldDestination = &Info.Field_0x28;
+            unsigned int* FieldDestination = &Info.ThrottleBits;
             float StoredTime;
             float StoredField;
             // Preserve both FST float intermediates and the native x87 order.
@@ -104,7 +104,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             XActivateCruise Info;
             Info.ObjectId = Wire->ObjectId;
             Info.bActivate = (Wire->bActive != 0);
-            Info.Field_0x05 = (Wire->Field_0x05 != 0) ? 1u : 0u;
+            Info.bDisruptCruise = (Wire->Field_0x05 != 0) ? 1u : 0u;
             Server->ActivateCruise(ClientId, Info);
             break;
         }
@@ -283,13 +283,13 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             {
                 const FRpcMunitionCollisionPacket* Wire = static_cast<const FRpcMunitionCollisionPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
                 SSPMunitionCollisionInfo Info;
-                Info.Field_0x00 = Wire->Field_0x00;
-                Info.Field_0x04 = Wire->Field_0x04;
+                Info.ProjectileArchId = Wire->Field_0x00;
+                Info.AttackerId = Wire->Field_0x04;
                 Info.ObjectId = Wire->ObjectId;
-                Info.Field_0x0c = Wire->Field_0x0c;
-                std::memcpy(&Info.Field_0x10, &Wire->HitPosition.x, 4u);
-                std::memcpy(&Info.Field_0x14, &Wire->HitPosition.y, 4u);
-                std::memcpy(&Info.Field_0x18, &Wire->HitPosition.z, 4u);
+                Info.SubObjId = Wire->Field_0x0c;
+                std::memcpy(&Info.HitPosX, &Wire->HitPosition.x, 4u);
+                std::memcpy(&Info.HitPosY, &Wire->HitPosition.y, 4u);
+                std::memcpy(&Info.HitPosZ, &Wire->HitPosition.z, 4u);
                 Server->SPMunitionCollision(Info, ClientId);
             }
             break;
@@ -352,7 +352,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                 Info.Pad_0x06 = 0;
                 Info.ObjectId = Wire->ObjectId;
                 Info.SubObjId = Wire->SubObjId;
-                std::memcpy(&Info.Field_0x10, &Wire->Field_0x10, 4u);
+                std::memcpy(&Info.DamageBits, &Wire->Field_0x10, 4u);
                 Server->SPObjCollision(Info, ClientId);
             }
             break;
@@ -385,9 +385,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcGfGoodSellPacket* Wire = static_cast<const FRpcGfGoodSellPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             SGFGoodSellInfo Info;
-            Info.Field_0x00 = Wire->Field_0x00;
-            Info.Field_0x04 = Wire->Field_0x04;
-            Info.Field_0x08 = Wire->Field_0x08;
+            Info.BaseId = Wire->Field_0x00;
+            Info.GoodId = Wire->Field_0x04;
+            Info.Count = Wire->Field_0x08;
             Server->GFGoodSell(Info, ClientId);
             break;
         }
@@ -395,10 +395,10 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcGfGoodBuyPacket* Wire = static_cast<const FRpcGfGoodBuyPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             SGFGoodBuyInfo Info;
-            Info.Field_0x00 = Wire->Field_0x00;
-            Info.Field_0x04 = Wire->Field_0x04;
-            Info.Field_0x08 = Wire->Field_0x08;
-            Info.Field_0x0c = Wire->Field_0x0c;
+            Info.BaseId = Wire->Field_0x00;
+            Info.Null04 = Wire->Field_0x04;
+            Info.GoodId = Wire->Field_0x08;
+            Info.Count = Wire->Field_0x0c;
             Server->GFGoodBuy(Info, ClientId);
             break;
         }
@@ -588,9 +588,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         {
             const FRpcSetManeuverPacket* Wire = static_cast<const FRpcSetManeuverPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             XSetManeuver Info;
-            Info.Field_0x00 = Wire->Field_0x00;
+            Info.ShipFrom = Wire->Field_0x00;
             Info.ObjectId = Wire->ObjectId;
-            Info.Field_0x08 = Wire->Field_0x08;
+            Info.Flag = Wire->Field_0x08;
             Server->SetManeuver(ClientId, Info);
             break;
         }

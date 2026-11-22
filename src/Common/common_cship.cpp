@@ -424,8 +424,8 @@ ShipGunStats const& CShip::get_gun_stats() const
         GunStats.ActiveGunCount = 0;
         GunStats.AvgMuzzleVelocity = 0.0f;
         GunStats.MaxMunitionRange = 0.0f;
-        GunStats.CmDropperCount = 0;
-        GunStats.CmMaxMunitionRange = 0.0f;
+        GunStats.ActiveMissileCount = 0;
+        GunStats.MaxActiveMissileRange = 0.0f;
 
         bool const bPlayerShip = bIsPlayer != 0; // 062b152c..062b153b: snapshot before traversal.
         CEquipTraverser Walk(EquipTypeGun);
@@ -453,10 +453,10 @@ ShipGunStats const& CShip::get_gun_stats() const
                     }
                     else
                     {
-                        ++GunStats.CmDropperCount;
+                        ++GunStats.ActiveMissileCount;
                         float const Range = Gun->GetMunitionRange();
-                        if (GunStats.CmMaxMunitionRange < Range)
-                            GunStats.CmMaxMunitionRange = Range;
+                        if (GunStats.MaxActiveMissileRange < Range)
+                            GunStats.MaxActiveMissileRange = Range;
                     }
                 }
             }
@@ -482,9 +482,9 @@ bool CShip::get_farthest_active_gun_range(float& OutRange) const
         OutRange = Stats.MaxMunitionRange;
         return true;
     }
-    if (Stats.CmDropperCount != 0)
+    if (Stats.ActiveMissileCount != 0)
     {
-        OutRange = Stats.CmMaxMunitionRange;
+        OutRange = Stats.MaxActiveMissileRange;
         return true;
     }
     OutRange = 0.0f;
@@ -1736,10 +1736,10 @@ bool CShip::get_tgt_lead_fire_pos(IObjInspect const* TargetInspect, Vector& OutP
         // 062b13df..062b13e8: RangeSq = MaxMunitionRange squared, FSTP dword.
         RangeSq = (float)((double)(Stats.MaxMunitionRange) * Stats.MaxMunitionRange);
     }
-    else if (Stats.CmDropperCount > 0)
+    else if (Stats.ActiveMissileCount > 0)
     {
-        // 062b144a..062b1458: no active gun but countermeasure droppers: their range squared.
-        RangeSq = (float)((double)(Stats.CmMaxMunitionRange) * Stats.CmMaxMunitionRange);
+        // 062b144a..062b1458: no active non-seeker gun, fall back to active seeker (missile) range squared.
+        RangeSq = (float)((double)(Stats.MaxActiveMissileRange) * Stats.MaxActiveMissileRange);
     }
 
     // 062b13f0..062b1406: without a lead the aim point is the target's position (slot 0).

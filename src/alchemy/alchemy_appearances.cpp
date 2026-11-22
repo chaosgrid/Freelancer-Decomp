@@ -5757,7 +5757,7 @@ namespace AlchemyImpl
                     IntegrateRecord(Record, Dt);
                 else if (static_cast<unsigned char>(
                              R->LifeEffect->Slot11(reinterpret_cast<void*>(7))) == 0)
-                    R->LifeEffect->Slot13(reinterpret_cast<void*>(1));
+                    R->LifeEffect->DestroyNodes(reinterpret_cast<void*>(1));
                 Record = Record->Next;
                 continue;
             }

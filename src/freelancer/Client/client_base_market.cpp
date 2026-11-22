@@ -161,10 +161,10 @@ void ClientMarketRequestBuy(FClientMarket const* Market, unsigned BaseId, unsign
     // G_Server (DAT_0067ecd0, not null-tested) slot 45 (+0xb4) with it and DAT_00673344.
     (void)Market;
     SGFGoodBuyInfo Info;
-    Info.Field_0x00 = BaseId;
-    Info.Field_0x04 = 0;
-    Info.Field_0x08 = GoodId;
-    Info.Field_0x0c = static_cast<unsigned>(Count);
+    Info.BaseId = BaseId;
+    Info.Null04 = 0;
+    Info.GoodId = GoodId;
+    Info.Count = static_cast<unsigned>(Count);
     G_Server->GFGoodBuy(Info, GetPlayerConnectionId());
 }
 
@@ -174,8 +174,8 @@ void ClientMarketRequestSell(FClientMarket const* Market, unsigned BaseId, unsig
     // slot 46 (+0xb8) with it and DAT_00673344.
     (void)Market;
     SGFGoodSellInfo Info;
-    Info.Field_0x00 = BaseId;
-    Info.Field_0x04 = GoodId;
-    Info.Field_0x08 = static_cast<unsigned>(Count);
+    Info.BaseId = BaseId;
+    Info.GoodId = GoodId;
+    Info.Count = static_cast<unsigned>(Count);
     G_Server->GFGoodSell(Info, GetPlayerConnectionId());
 }

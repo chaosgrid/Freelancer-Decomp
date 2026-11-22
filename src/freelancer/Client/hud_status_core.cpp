@@ -1947,7 +1947,7 @@ namespace
             return false;
         }
         unsigned short TractorId = Tractor->Id;
-        static_cast<IObjAffect*>(Player)->slot_3c(&TractorId, Targets,
+        static_cast<IObjAffect*>(Player)->tractor_all(&TractorId, Targets,
                                                   static_cast<int>(GetPlayerConnectionId()));
         return true;
     }
@@ -2052,7 +2052,7 @@ void HUD_Status::FireSeekerGuns(int Mode)
     }
     Vector Aim;
     G_HudTargetableObjects->GetAimPoint(&Aim); // FUN_004f1da0
-    static_cast<IObjAffect*>(Player)->slot_34(Ids, static_cast<unsigned>(Count), &Aim,
+    static_cast<IObjAffect*>(Player)->fire_weapons(Ids, static_cast<unsigned>(Count), &Aim,
                                               static_cast<int>(GetPlayerConnectionId()));
 }
 
@@ -2069,7 +2069,7 @@ void HUD_Status::FireWeaponGroup(int Group)
     if (Group == ActiveWeaponGroup)
     {
         // 0x004dcc8e..0x004dcca3: the active group -- a null list fires every active launcher.
-        static_cast<IObjAffect*>(Player)->slot_34(nullptr, 0, &Aim,
+        static_cast<IObjAffect*>(Player)->fire_weapons(nullptr, 0, &Aim,
                                                   static_cast<int>(GetPlayerConnectionId()));
         return;
     }
@@ -2078,7 +2078,7 @@ void HUD_Status::FireWeaponGroup(int Group)
     int const Count = G_WeaponGroups.GetGroupEquipIds(Group, Ids, 0x10); // FUN_004f5790
     if (Count > 0)
     {
-        static_cast<IObjAffect*>(Player)->slot_34(Ids, static_cast<unsigned>(Count), &Aim,
+        static_cast<IObjAffect*>(Player)->fire_weapons(Ids, static_cast<unsigned>(Count), &Aim,
                                                   static_cast<int>(GetPlayerConnectionId()));
     }
 }
@@ -2284,7 +2284,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         EquipDesc const* const Repair = FindPlayerNonMissionEquipRetail(G_NanobotArchId);
         if (Repair != nullptr && !(Ship->get_relative_health() == 1.0f))
         {
-            static_cast<IObjAffect*>(Player)->slot_58(Repair->Id, static_cast<unsigned>(Repair->Count),
+            static_cast<IObjAffect*>(Player)->use_item(Repair->Id, static_cast<unsigned>(Repair->Count),
                                                       static_cast<int>(GetPlayerConnectionId()));
             PlayOrRewindUiSoundSlot(0x28); // FUN_005645c0
             return true;
@@ -2307,7 +2307,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
             {
                 if (Shield->GetRelativeHealth() < 1.0f && Shield->GetMaxHitPoints() > 0.0f)
                 {
-                    static_cast<IObjAffect*>(Player)->slot_58(
+                    static_cast<IObjAffect*>(Player)->use_item(
                         Battery->Id, static_cast<unsigned>(Battery->Count),
                         static_cast<int>(GetPlayerConnectionId()));
                     PlayOrRewindUiSoundSlot(0x29);
@@ -2382,7 +2382,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
             unsigned short SubId = Weapons[Row].SubId;
             Vector Aim;
             G_HudTargetableObjects->GetAimPoint(&Aim); // FUN_004f1da0
-            static_cast<IObjAffect*>(Shooter)->slot_34(&SubId, 1, &Aim,
+            static_cast<IObjAffect*>(Shooter)->fire_weapons(&SubId, 1, &Aim,
                                                        static_cast<int>(GetPlayerConnectionId()));
         }
         return true;
@@ -2400,7 +2400,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         G_HudTargetableObjects->GetAimPoint(&Aim);
         if (ActiveWeaponGroup == 0)
         {
-            static_cast<IObjAffect*>(Shooter)->slot_34(nullptr, 0, &Aim,
+            static_cast<IObjAffect*>(Shooter)->fire_weapons(nullptr, 0, &Aim,
                                                        static_cast<int>(GetPlayerConnectionId()));
             return true;
         }
@@ -2408,7 +2408,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         int const Count = G_WeaponGroups.GetGroupEquipIds(0, Ids, 0x10);
         if (Count > 0)
         {
-            static_cast<IObjAffect*>(Shooter)->slot_34(Ids, static_cast<unsigned>(Count), &Aim,
+            static_cast<IObjAffect*>(Shooter)->fire_weapons(Ids, static_cast<unsigned>(Count), &Aim,
                                                        static_cast<int>(GetPlayerConnectionId()));
         }
         return true;
@@ -2503,7 +2503,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         {
             return true;
         }
-        static_cast<IObjAffect*>(Dropper)->slot_34(Ids, static_cast<unsigned>(Count), nullptr,
+        static_cast<IObjAffect*>(Dropper)->fire_weapons(Ids, static_cast<unsigned>(Count), nullptr,
                                                    static_cast<int>(GetPlayerConnectionId()));
         return true;
     }

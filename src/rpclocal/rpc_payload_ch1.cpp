@@ -236,7 +236,7 @@ static bool MarshalActivateCruise(FPacketBase* Packet, const unsigned int* Args,
     FPayloadCommonActivateCruise Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.bActivate = Info->bActivate ? 1u : 0u;
-    Wire.Field_0x05 = Info->Field_0x05;
+    Wire.Field_0x05 = Info->bDisruptCruise;
     Wire.Pad_0x06[0] = 0;
     Wire.Pad_0x06[1] = 0;
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -247,7 +247,7 @@ static bool DeliverActivateCruise(const FPacketBase* Packet, IClient* Client, IC
     XActivateCruise Info;
     Info.ObjectId = Wire.ObjectId;
     Info.bActivate = (Wire.bActivate != 0);
-    Info.Field_0x05 = (Wire.Field_0x05 != 0) ? 1u : 0u;   // retail: `param_1[0x25] != 0`
+    Info.bDisruptCruise = (Wire.Field_0x05 != 0) ? 1u : 0u;   // retail: `param_1[0x25] != 0`
     Info.Pad_0x06[0] = 0;
     Info.Pad_0x06[1] = 0;
     Client->SendCommonActivateCruise(1u, Info);

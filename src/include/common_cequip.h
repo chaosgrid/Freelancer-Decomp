@@ -171,14 +171,14 @@ struct INotify
         EquipDestroying           = 0xa,  // CEquip::Destroy: Param = equipment Id (ushort, zero-extended)
         EquipActivating           = 0xb,  // CEquip::Activate(true) on a 0->1 edge: Param = nullptr
         EquipDeactivating         = 0xc,  // CEquip::Activate(false) on a 1->0 edge: Param = nullptr
-        Event_0xD                 = 0xd,
+        ArchGroupDestroyed        = 0xd,  // CEEngine::NotifyArchGroupDestroyed (06296120): nozzle arch group destroyed; Param = SubObjId
         EngineCruiseStateChanged  = 0xe,  // CEEngine::Update charge-threshold edge (Param =
                                            // &int, 2 while spooling up / 3 once fully charged)
                                            // and CEEngine::EngageCruise engage/disengage edges
                                            // (Param = &int, 0 normal disengage / 1 instant
                                            // disengage / 2 charge-already-elapsed instant-engage
                                            // / 3 zero-charge-time instant-engage)
-        Event_0xF                 = 0xf,
+        NotEnoughPower            = 0xf,  // CEThruster::Update (0629d384): power pool cannot cover thrust draw; Param = nullptr
         ShieldGeneratorSetChanged = 0x10, // CEShield::RemGen: dominant generator archetype changed; Param = nullptr
         ShieldOfflineStateChanged = 0x11, // CEShield Activate/Update/SetHitPoints/RemGen: Param = &(offline flag)
         ShieldWentOffline         = 0x12, // CEShield::SetHitPoints: relative health dropped to/below
@@ -848,7 +848,7 @@ enum FireResult
     FireMuzzleCone = 5,
     FireCruise = 6,
     FireTradelane = 7,
-    FireOwnerBlocked = 8,
+    FireCloakActive = 8,
     FireOk = 9
 };
 

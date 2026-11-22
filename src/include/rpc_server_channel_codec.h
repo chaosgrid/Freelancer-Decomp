@@ -647,7 +647,7 @@ public:
 // RS 06be5110 / 06be5150; both ctors zero the two fields. Wire: dword, byte.
 class FRpcServerDestroyObjectPacket : public FPacketBase {
 public:
-    FRpcServerDestroyObjectPacket() : FPacketBase(0x20006u), ObjectId(0), Field_0x04(0) {}
+    FRpcServerDestroyObjectPacket() : FPacketBase(0x20006u), ObjectId(0), DestroyType(0) {}
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
@@ -656,7 +656,7 @@ public:
         return RpcWirePacketFactory<FRpcServerDestroyObjectPacket>(OutPacket);
     }
     unsigned int ObjectId;
-    unsigned char Field_0x04; // TODO: semantics unproven; kept raw on both sides.
+    unsigned char DestroyType;  // 0 = vanish / out-of-range, 1 = destroyed
 };
 
 // 0x07 FLPACKET_SERVER_LAUNCH. RC 06b4b2a0 / ctor 06b4b2e0, RS 06be5dc0 / 06be5e00.
@@ -674,9 +674,9 @@ public:
     static int Factory(FPacketBase** OutPacket) {
         return RpcWirePacketFactory<FRpcServerLaunchPacket>(OutPacket);
     }
-    unsigned int Field_0x00; // TODO: ship id per rpc_iclient_args.h; not proven here.
-    unsigned int Field_0x04; // TODO: launch object id; not proven here.
-    unsigned int Field_0x08; // TODO: launch position index; not proven here.
+    unsigned int ShipId;
+    unsigned int LaunchObjId;
+    unsigned int LaunchPosIndex;
     Vector Position;
     Quaternion Orientation;
 };

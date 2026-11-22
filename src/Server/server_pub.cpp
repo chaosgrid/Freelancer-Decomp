@@ -2581,7 +2581,7 @@ SERVER_API int __cdecl CreateLoot(unsigned int& out_id, const SpaceObj::LootInfo
     Record.AngularVelocity = loot_info.AngularVelocity; // .text:06cf8587 record +0x5c
     Record.Field_0x68 = loot_info.bCanAiTractor;     // .text:06cf8596  record +0x68
     Record.bMission = loot_info.bMission;            // .text:06cf85a3  record +0x69
-    Record.Field_0x18 = loot_info.MarkForPlayer;     // .text:06cf85c0  record +0x18
+    Record.MarkForPlayer = loot_info.MarkForPlayer;     // .text:06cf85c0  record +0x18
 
     // .text:06cf859d-06cf85ca: create_loot(LootInfo+0x0c, 4, &Record, 1); always 0.
     Sys->create_loot(loot_info.OwnerObjId, 4, &Record, 1);
@@ -2730,7 +2730,7 @@ SERVER_API int __cdecl DockRequest(const unsigned int& obj_id, const unsigned in
     // (0, &target_id, &<zero dword>, 1, nullptr). The third argument is the address of
     // .rdata:06d66b04, four zero bytes.
     static unsigned const ZeroSecondId = 0;   // .rdata:06d66b04
-    return Obj->slot_5c(0, &target_id, &ZeroSecondId, 1, nullptr);
+    return Obj->request_event(0, &target_id, &ZeroSecondId, 1, nullptr);
 }
 
 // SpaceObj::Dock -- retail .text:06cfa6e0 .. .text:06cfa8cb (ordinal 0x1a6e0, cdecl).
@@ -2769,7 +2769,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
     GameObject* const Obj = Server_LookupLiveObject(ship_id);           // .text:06cfa707
     if (Obj != nullptr) {                                                // .text:06cfa717
         ::Ship* const ShipRw = dynamic_cast< ::Ship*>(Obj);             // .text:06cfa72c
-        if (ShipRw->Field_0x98 != 0) {                                   // .text:06cfa73c
+        if (ShipRw->bDockInUse != 0) {                                   // .text:06cfa73c
             ShipRw->request_returned(0, static_cast<int>(dock_host_response), dock_port); // .text:06cfa748
             Result = 0;                                                  // .text:06cfa74d
         }
@@ -3121,7 +3121,7 @@ SERVER_API int __cdecl JettisonEquipment(const unsigned int& obj_id,
     // .text:06cf93ba-06cf93dc: IObjAffect slot 14 (common_iface.h) with
     // (MOVZX *equip_id, *quantity, 0), then `(result != -2) - 1 & 0xfffffffd` -- 0 on
     // success, -3 when the handler reported -2. The previous port invented message id 0x1E.
-    int const Result = obj->slot_38(equip_id, quantity, 0);
+    int const Result = obj->jettison_cargo(equip_id, quantity, 0);
     return (Result != -2) ? 0 : -3;
 }
 
@@ -3253,7 +3253,7 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
     switch (eq_info->Type) {                                             // .text:06cf9441 (JA -> -1)
     case 0:
         if (eq_info->Count != 1) return EQUIPMENT_RTYPE_INVALID; // .text:06cf9452
-        return Obj->slot_50(true, true, 0) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
+        return Obj->toggle_cruise(true, true, 0) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
                                                  : EQUIPMENT_RTYPE_OK;                  // .text:06cf9464 .. 06cf946e
     case 1: {
         if (eq_info->Field_0x0c == 0) return EQUIPMENT_RTYPE_INVALID; // .text:06cf947b
@@ -3272,7 +3272,7 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
         CEquip const* const Launcher = Ceq->EquipManager.FindFirst(0x1000u); // .text:06cf94f0
         if (Launcher == nullptr) return EQUIPMENT_RTYPE_NOT_FOUND;  // .text:06cf94fb
         unsigned short const SubObjId = Launcher->Id;                    // .text:06cf950b
-        Obj->slot_4c(&SubObjId, static_cast<unsigned char>(eq_info->EquipId) != 0, 0); // .text:06cf9526
+        Obj->toggle_item(&SubObjId, static_cast<unsigned char>(eq_info->EquipId) != 0, 0); // .text:06cf9526
         return EQUIPMENT_RTYPE_OK;                          // .text:06cf952a
     }
     case 3: {
@@ -3286,7 +3286,7 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
         while (Light != nullptr) {                                       // .text:06cf9584 / 06cf95c9
             if (static_cast<CELightEquip*>(Light)->LightArch()->bDockingLight) { // .text:06cf9588 .. 06cf9593
                 unsigned short const SubObjId = Light->Id;               // .text:06cf959a
-                Obj->slot_4c(&SubObjId, static_cast<unsigned char>(eq_info->EquipId) != 0, 0); // .text:06cf95b5
+                Obj->toggle_item(&SubObjId, static_cast<unsigned char>(eq_info->EquipId) != 0, 0); // .text:06cf95b5
             }
             Light = Ceq->EquipManager.Traverse(Walk);                    // .text:06cf95bf
         }
@@ -4329,7 +4329,7 @@ SERVER_API int __cdecl GetLocation(const unsigned int& player_id, unsigned int& 
 // (the port used to read a separate `character_flid` copy that nothing wrote).
 SERVER_API int __cdecl GetCharacter(const unsigned int& player_id, unsigned int& out_char_id) {
     if (!IsValidPlayer(player_id)) return -2;
-    out_char_id = Players[player_id].Field_0x3FC;
+    out_char_id = Players[player_id].character_id;
     return 0;
 }
 

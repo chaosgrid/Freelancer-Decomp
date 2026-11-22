@@ -2391,7 +2391,7 @@ namespace
             }
             break;
         }
-        case Event_0xF:
+        case NotEnoughPower:
         {
             // 0x0052ef29..0x0052ef60: the host object's owner (class & 3 == 3 -> CSimple +0xb4,
             // else FUN_0054bb00 = DAT_00673344); the local player's -> the host's IObjAffect face
@@ -2402,7 +2402,7 @@ namespace
                     ? static_cast<CSimple const*>(Obj)->OwnerPlayer
                     : GetPlayerConnectionId();
             if (Owner == GetPlayerConnectionId())
-                static_cast<IObjAffect*>(Host)->slot_54(
+                static_cast<IObjAffect*>(Host)->toggle_thrusters(
                     false, static_cast<int>(GetPlayerConnectionId()));
             break;
         }
@@ -3030,7 +3030,7 @@ namespace
             // 0x00527e92: FUN_005288a0(1).
             CliEngineSetActiveSounds(this, 1);
             break;
-        case Event_0xD:
+        case ArchGroupDestroyed:
         {
             // 0x00527f7c..0x00527fcd: the slots whose sub-object id is the low word of Param
             // lose both effects (kill, release, clear); then FUN_005296d0.

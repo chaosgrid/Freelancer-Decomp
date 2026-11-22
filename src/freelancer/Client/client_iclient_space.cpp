@@ -210,7 +210,7 @@ void IClientImpl::SendCommonFireWeapon(unsigned int /*ClientId*/, const XFireWea
     {
         return;
     }
-    Go->slot_34(Info.Hardpoints.data(), static_cast<unsigned>(Info.Hardpoints.size()),
+    Go->fire_weapons(Info.Hardpoints.data(), static_cast<unsigned>(Info.Hardpoints.size()),
                 &Info.TargetPos, 0);
 }
 
@@ -222,7 +222,7 @@ void IClientImpl::SendCommonActivateEquip(unsigned int /*ClientId*/, const XActi
     {
         return;
     }
-    Go->slot_4c(&Info.EquipId, Info.bActivate, 0);
+    Go->toggle_item(&Info.EquipId, Info.bActivate, 0);
 }
 
 // FUN_0053c940 (RET 8) -- ch1 ACTIVATECRUISE: the ship (bucket 1), IObjAffect slot 20 (+0x50)
@@ -234,7 +234,7 @@ void IClientImpl::SendCommonActivateCruise(unsigned int /*ClientId*/, const XAct
     {
         return;
     }
-    Go->slot_50(Info.bActivate, Info.Field_0x05 != 0, 0);
+    Go->toggle_cruise(Info.bActivate, Info.bDisruptCruise != 0, 0);
 }
 
 // FUN_0053c980 (RET 8) -- ch1 ACTIVATETHRUSTERS: the ship (bucket 1), IObjAffect slot 21
@@ -246,7 +246,7 @@ void IClientImpl::SendCommonActivateThrusters(unsigned int /*ClientId*/, const X
     {
         return;
     }
-    Go->slot_54(Info.bActivate, 0);
+    Go->toggle_thrusters(Info.bActivate, 0);
 }
 
 // FUN_0053c9b0 (RET 8) -- ch1 SETTARGET. With the gameobj (any bucket): outside single player
@@ -272,7 +272,7 @@ void IClientImpl::SendCommonSetTarget(unsigned int /*ClientId*/, const XSetTarge
         Go->set_target(Target, Info.TargetSubObjId, 0);
         return;
     }
-    Go->slot_44(&Info.SubObjId, Target, Info.TargetSubObjId, 0);
+    Go->set_gun_target(&Info.SubObjId, Target, Info.TargetSubObjId, 0);
 }
 
 // FUN_0053c470 (RET 8) -- ch1 TRACTOROBJECTS: the gameobj (any bucket); every target id that
@@ -298,7 +298,7 @@ void IClientImpl::SendCommonTractorObjects(unsigned int /*ClientId*/, const XTra
     }
     if (!Targets.empty())
     {
-        Go->slot_3c(&Info.TractorEquipId, Targets, 0);
+        Go->tractor_all(&Info.TractorEquipId, Targets, 0);
     }
 }
 
@@ -325,7 +325,7 @@ void IClientImpl::SendCommonJettisonCargo(unsigned int /*ClientId*/, const XJett
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
     if (Go != nullptr)
     {
-        Go->slot_38(Info.ItemId, static_cast<int>(Info.Count), 0);
+        Go->jettison_cargo(Info.ItemId, static_cast<int>(Info.Count), 0);
     }
     if (IsPlayerShipId(Info.ObjectId))
     {
@@ -1245,18 +1245,18 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
     // 0x0053d7e5..0x0053d7fa / 0x0053d8e8..0x0053d906: the ship (bucket 1); none warns (line
     // 0x5c4) and returns.
     FClientShipGameobj* const Ship =
-        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.Field_0x00, 1));
+        static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
     if (Ship == nullptr)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: Launch (): launching object %d not found.",
-              kIClientSCpp, 0x5c4, Info.Field_0x00);
+              kIClientSCpp, 0x5c4, Info.ShipId);
         return;
     }
 
     // The orientation (+0x0c) to a matrix (vt+0x54), and the ship's object (class bit 0, no null
     // test) beamed to +0x1c, not attached (vt+0x7c) -- outside single player when launching
     // from a dock, always when not.
-    if (Info.Field_0x04 != 0)
+    if (Info.LaunchObjId != 0)
     {
         // 0x0053d80c..0x0053d85f.
         if (!SinglePlayer())
@@ -1268,8 +1268,8 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
             NarrowGameobj(Ship, 1)->beam_object(Info.Position, Orient, false);
         }
         // 0x0053d862..0x0053d877: the dock (any bucket) and the launch point to FUN_00543d50.
-        Ship->LaunchFromDock(ClientObjDb_FindObject(Info.Field_0x04, 0),
-                             static_cast<int>(Info.Field_0x08));
+        Ship->LaunchFromDock(ClientObjDb_FindObject(Info.LaunchObjId, 0),
+                             static_cast<int>(Info.LaunchPosIndex));
     }
     else
     {

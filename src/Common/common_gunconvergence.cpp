@@ -629,7 +629,7 @@ int FGunConvergenceStateBlock::RequestRelease()
     bReleaseRequested = 1;                                          // 062ecd37
     unsigned int const Id = Sys->SelfTarget.Iface->get_id();        // 062ecd4d
     IObjRW* const Self = WatchedObject(Sys->Watcher);
-    return ObjAffectOf(Self)->slot_60(1, &Id, -1);                  // 062ecd71 / 062ecd87
+    return ObjAffectOf(Self)->request_cancel(1, &Id, -1);                  // 062ecd71 / 062ecd87
 }
 
 // formerly CmnBehavior::FollowerDirectiveRecord_DefaultTarget.

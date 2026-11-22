@@ -457,7 +457,7 @@ intptr_t NeuroNetMissionMessage::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (Desc != nullptr && !Desc->bEquipped && Player != nullptr)
             {
                 IObjAffect* const Affect = Player;
-                Affect->slot_38(Desc->Id, Desc->Count, static_cast<int>(GetPlayerConnectionId()));
+                Affect->jettison_cargo(Desc->Id, Desc->Count, static_cast<int>(GetPlayerConnectionId()));
             }
         }
     }

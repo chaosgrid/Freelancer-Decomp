@@ -59,7 +59,7 @@ void CClientImpl::SendCommonActivateCruise(unsigned int ClientId, const XActivat
         FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->bActive = Info.bActivate;
-        TypedPacket->Field_0x05 = Info.Field_0x05;
+        TypedPacket->Field_0x05 = Info.bDisruptCruise;
         PushToClient(ClientId, Packet->AsRaw());
     }
 }

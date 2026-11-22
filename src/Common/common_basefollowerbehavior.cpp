@@ -717,5 +717,5 @@ void BaseFollowerBehavior::Slot22(void* Arg)
     if (Flag282 != 0)
         return;
     unsigned int Zero = 0;                                          // the argument slot, reused
-    (void)ObjAffectOf(OwnerContext)->slot_60(2, &Zero, 0);          // 062cbfab IObjAffect +0x60
+    (void)ObjAffectOf(OwnerContext)->request_cancel(2, &Zero, 0);          // 062cbfab IObjAffect +0x60
 }

@@ -11,12 +11,6 @@
 
 struct IEngine;
 
-// Client wrapper: Archetype::Load then optional IEngine+0x5C CreateInstance.
-// OutHandle null + OutInstance set -> the instance keeps the archetype handle (cockpit).
-// A port helper, defined in client_mesh_load.cpp (formerly an invented Common.dll export).
-bool ArchetypeLoadFromPath(IEngine* Engine, char const* RelPath, void** OutHandle,
-                           void** OutInstance);
-
 // -------------------------------------------------------------------------------------------
 // Client mesh holder + .3db load — retail FUN_00420d40 / FUN_0059ec80 / FUN_0059f0d0.
 //

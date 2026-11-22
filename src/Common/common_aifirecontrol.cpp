@@ -142,7 +142,7 @@ bool SystemManagerGunGroupManager::FireAutoTurrets()
         ComputeLeadFirePosition(&FirePos, Target, SUBOBJ_ID_NONE, 1, SpreadAngle, Slot.HardpointId);
 
         // 062ea1c1-062ea1e4: IObjAffect slot_34(&HardpointId, 1, &FirePos, -1) on the own ship.
-        OwnShip()->slot_34(&Slot.HardpointId, 1u, &FirePos, -1);
+        OwnShip()->fire_weapons(&Slot.HardpointId, 1u, &FirePos, -1);
 
         // 062ea1e7-062ea1f3: a classified munition restarts its phase at -FireInterval (FCHS).
         if (Slot.MunitionKind != FGunGroupSlot::KindPlain)
@@ -573,7 +573,7 @@ int SystemManagerGunGroupManager::UpdateGunFireState()
 
         // 062eae43-062eae77: own ship IObjAffect slot_44(&Id, Target, SUBOBJ_ID_NONE, -1) --
         // points the gun at the target.
-        OwnShip()->slot_44(&Slot.HardpointId, CurrentTarget(), SUBOBJ_ID_NONE, -1);
+        OwnShip()->set_gun_target(&Slot.HardpointId, CurrentTarget(), SUBOBJ_ID_NONE, -1);
 
         // 062eae7a-062eaebe: own ship is_pointing_at(+0x10c)(&bPointing [ESP+0x12], Id,
         // 0x3d567750 == 0.05235988f). A pointing gun, or ForceAll, adds the id to FireIds
@@ -621,7 +621,7 @@ int SystemManagerGunGroupManager::UpdateGunFireState()
     Vector const FirePos = World;
 
     // 062eafd7-062eaffa: own ship IObjAffect slot_34(FireIds, Count, &FirePos, -1).
-    OwnShip()->slot_34(FireIds, (unsigned)Count, &FirePos, -1);
+    OwnShip()->fire_weapons(FireIds, (unsigned)Count, &FirePos, -1);
     return Result;
 }
 
@@ -722,7 +722,7 @@ int SystemManagerGunGroupManager::UpdateMissileFireState()
             continue;
 
         // 062eb279-062eb2ad: own ship IObjAffect slot_44(&Id, Target, SUBOBJ_ID_NONE, -1).
-        OwnShip()->slot_44(&Slot.HardpointId, CurrentTarget(), SUBOBJ_ID_NONE, -1);
+        OwnShip()->set_gun_target(&Slot.HardpointId, CurrentTarget(), SUBOBJ_ID_NONE, -1);
 
         // 062eb2b0-062eb308: own ship is_pointing_at(+0x10c)(&bPointing [E-0x16], Id, bWide ?
         // WideConeAngle : MissileLaunchConeAngle); pointing or bForceFire fires.
@@ -734,7 +734,7 @@ int SystemManagerGunGroupManager::UpdateMissileFireState()
 
         // 062eb30a-062eb33c: IObjAffect slot_34(&Id, 1, null, -1); a classified munition then
         // restarts its phase at -FireInterval.
-        OwnShip()->slot_34(&Slot.HardpointId, 1u, nullptr, -1);
+        OwnShip()->fire_weapons(&Slot.HardpointId, 1u, nullptr, -1);
         if (Slot.MunitionKind != FGunGroupSlot::KindPlain)
             Slot.Phase = -Slot.FireInterval;
     }
@@ -899,7 +899,7 @@ unsigned SystemManagerGunGroupManager::UpdateMineDropState()
 
         // 062eb4f0-062eb51d: IObjAffect slot_34(&HardpointId, 1, null, -1) on the own ship,
         // then Phase = -FireInterval when the slot's MunitionKind is nonzero.
-        OwnShip()->slot_34(&Slot.HardpointId, 1u, nullptr, -1);
+        OwnShip()->fire_weapons(&Slot.HardpointId, 1u, nullptr, -1);
         if (Slot.MunitionKind != FGunGroupSlot::KindPlain)
             Slot.Phase = -Slot.FireInterval;
     }
@@ -920,7 +920,7 @@ void SystemManagerGunGroupManager::DropAllMines()
     unsigned Index = 0;
     do
     {
-        OwnShip()->slot_34(&MineDroppers[Index].HardpointId, 1u, nullptr, -1);
+        OwnShip()->fire_weapons(&MineDroppers[Index].HardpointId, 1u, nullptr, -1);
         ++Index;
     } while (Index < (unsigned)MineDropperCount);
 }
@@ -1185,7 +1185,7 @@ void FCmDropperWatcher::SetActive(unsigned char NewState)
         // 062ebb7e-062ebb9a: re-reads Owner and the watcher, then `LEA ECX,[obj+4]` -- the
         // IObjAffect sub-object -- and calls +0x4C with (Id, NewState, -1).
         IObjRW* const Obj2 = WatchedObject(Owner->Watcher);
-        Obj2->slot_4c(Id, NewState != 0, -1);
+        Obj2->toggle_item(Id, NewState != 0, -1);
     }
 
     // 062ebba9: the new state is stored after the loop (also when the count was <= 0).

@@ -273,7 +273,7 @@ void FWeaponGroups::Activate(int Id)
                     IObjAffect* const Affect = static_cast<IObjAffect*>(Rw);
                     unsigned short const SubTarget = ShipObject->get_sub_target();
                     IObjRW* const Target = ShipObject->get_target();
-                    Affect->slot_44(reinterpret_cast<unsigned short const*>(&EquipId), Target,
+                    Affect->set_gun_target(reinterpret_cast<unsigned short const*>(&EquipId), Target,
                                     SubTarget, static_cast<int>(GetPlayerConnectionId()));
                 }
             }

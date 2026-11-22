@@ -63,12 +63,6 @@ Status: OPEN, `simplified` (tracker `0x06391cf0`). Owner: Common.dll.
 
 The retail body (`0x06391cf0..0x06391d28`) does not cache: every call builds an AGGDESC, calls `DACOM_Acquire` and `CreateInstance`. In retail the cache lives at the call sites — 25 file-level statics in separate translation units. In the port none of the 114 call sites cached, so the cache is collapsed into one `static` variable inside `Acquire3DMathEngine` (`src/Common/common_csys.cpp:729`). Observable difference: retail may hold up to 25 references to the engine, the port holds one. Removal condition: restore the cache at the call sites and bring the body to retail if `CreateInstance` stops returning a shared instance.
 
-## `ArchetypeLoadFromPath`: port-only helper with no callers
-
-Status: OPEN, scaffold. Owner: freelancer.exe / `client_mesh_load`.
-
-This is not a retail function: it replaces code in `FUN_0059ec80` / `FUN_00420dd0` and the room spawners (`Archetype::Load`, then an optional `IEngine::CreateInstance`, fallback `.sph` → `.cmp`). Defined in `src/freelancer/Client/client_mesh_load.cpp:96`, declared in `client_mesh_load.h`; there are no callers in `src/` (it is only pulled in by `#include` in `menu_universe_base.cpp`). Removal condition: delete the function and the header; the retail paths already call `Archetype::Load` directly.
-
 ## Universe: uninitialised retail stack values reproduced as zeros
 
 Status: retail quirk, reproduced on purpose (the owner's decision on retail UB, 2026-10-08).

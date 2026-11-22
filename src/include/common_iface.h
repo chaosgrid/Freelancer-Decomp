@@ -149,6 +149,11 @@ unsigned char const EquipStatusFlagActive = 0x01;      // CEquip vtable +0x04
 unsigned char const EquipStatusFlagDestroyed = 0x02;   // CEquip vtable +0x08
 unsigned char const EquipStatusFlagDisabled = 0x04;    // CEquip vtable +0x10 IsDisabled (CEquip::GetStatus 0629ae80); formerly EquipStatusFlagBit2
 
+// CELauncher::GetStatus EquipFlags (+0x04) bits.
+unsigned const LauncherStatusRefireElapsed = 0x02;     // vtable +0xbc RefireDelayElapsed
+unsigned const LauncherStatusInsufficientAmmo = 0x04;  // vtable +0xa0 AmmoNeedsMet == false
+unsigned const LauncherStatusPowerNeedsMet = 0x08;     // vtable +0xb0 PowerNeedsMet
+
 // IObjInspect::get_equipment_val's selector, named from IObjInspectImpl::get_equipment_val's
 // switch (.text:062c0460-062c0837); the value it writes depends on the equipment type.
 enum EquipmentValType
@@ -690,25 +695,25 @@ struct IObjAffect
     virtual int remove_follow_follower(IObjRW* Follower) = 0;  // 12 +0x30
     // Ship .text:06d02ad0: JMP CShip::remove_follow_follower.
 
-    virtual int slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+    virtual int fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                         int SourceClient) = 0;  // 13 +0x34
     // Ship/EqObj/Solar .text:06ce68a0 (RET 0x10): for each of the Count equipment ids, finds
     // the equipment and fires it (CEGun / CELauncher; a null TargetPos takes the launcher
     // path), then notifies the system with the ids that fired. EquipIds is an ARRAY of ids.
 
-    virtual int slot_38(unsigned short EquipId, int Count, int SourceClient) = 0;  // 14 +0x38
+    virtual int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) = 0;  // 14 +0x38
     // Ship .text:06d020d0 (RET 0xc): jettisons Count of a cargo item (CECargo). Caller
     // pub::SpaceObj::JettisonEquipment (.text:06cf93c0) pushes (id by value, count, 0).
 
-    virtual int slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+    virtual int tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                         int SourceClient) = 0;  // 15 +0x3C
     // .text:06ce6d80: CETractor::AddTarget for each object in Targets (the callee walks the
     // vector's begin/end); returns -2 when EquipId is not a tractor, -4 when nothing took.
 
-    virtual int slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient) = 0;  // 16 +0x40
+    virtual int tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient) = 0;  // 16 +0x40
     // .text:06ce6ba0: the single-target form of slot 15 (CETractor::AddTarget once).
 
-    virtual int slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+    virtual int set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                         int SourceClient) = 0;  // 17 +0x44
     // .text:06ce6f60 (RET 0x10): CEGun::SetTarget(Target->cobject(), SubTarget) on EquipId.
 
@@ -718,24 +723,24 @@ struct IObjAffect
     // Paired getters IObjInspect::get_target / get_subtarget. Guided overrides it too
     // (.text:06cf4c10 in .rdata:06d664bc).
 
-    virtual int slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient) = 0;  // 19 +0x4C
+    virtual int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) = 0;  // 19 +0x4C
     // .text:06ce70b0: activates / deactivates one equipment (the byte is read as BL).
     // Caller pub::SpaceObj::ActivateEquipment (.text:06cf9526) pushes (&id, EQInfo byte, 0).
 
-    virtual int slot_50(bool bEngage, bool bArg2, int SourceClient) = 0;  // 20 +0x50
+    virtual int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) = 0;  // 20 +0x50
     // Ship .text:06d02410: CEEngine::EngageCruise(bEngage, bArg2) (?EngageCruise@CEEngine@@
     // QAE_N_N0@Z) on the ship's engine. pub::SpaceObj::ActivateEquipment case 0 pushes
     // (1, 1, 0) at .text:06cf9464.
 
-    virtual int slot_54(bool bActivate, int SourceClient) = 0;  // 21 +0x54
+    virtual int toggle_thrusters(bool bActivate, int SourceClient) = 0;  // 21 +0x54
     // Ship .text:06d02500 (RET 8): toggles the thrusters. Paired getter
     // IObjInspect::are_thrusters_active.
 
-    virtual int slot_58(unsigned short EquipId, unsigned Count, int SourceClient) = 0;  // 22 +0x58
+    virtual int use_item(unsigned short EquipId, unsigned Count, int SourceClient) = 0;  // 22 +0x58
     // .text:06ce7210 (RET 0xc): removes up to Count of a cargo item (CECargo::Remove...,
     // clamped to what is held) and notifies the system.
 
-    virtual int slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+    virtual int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                         int bFlag, RequestCB* Callback) = 0;  // 23 +0x5C
     // Ship .text:06d02670 (RET 0x14): unless a request is already pending (+0x94), stores
     // Callback at +0x98, latches +0x94 and raises controller event 0x12 / 0x19 / 0x14 for
@@ -743,7 +748,7 @@ struct IObjAffect
     // (0, &TargetId, &<zero dword .rdata:06d66b04>, 1, nullptr); DockBehavior passes itself
     // as the RequestCB.
 
-    virtual int slot_60(int RequestType, unsigned const* TargetId, int Arg3) = 0;  // 24 +0x60
+    virtual int request_cancel(int RequestType, unsigned const* TargetId, int Arg3) = 0;  // 24 +0x60
     // Ship .text:06d027a0 (RET 0xc): clears the pending request (+0x98 / +0x94) and raises
     // controller event 0x10 / 0x1a / 0x15 for RequestType 0 / 1 / 2.
 

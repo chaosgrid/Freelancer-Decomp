@@ -257,7 +257,7 @@ static bool MarshalDestroyObject(FPacketBase* Packet, const unsigned int* Args, 
         reinterpret_cast<const FServerDestroyObjectInfo*>(Args[1]);
     FPayloadServerDestroyObject* Wire = Ch2Payload<FPayloadServerDestroyObject>(Packet);
     Wire->ObjectId = Info->ObjectId;
-    Wire->Field_0x04 = Info->Field_0x04;
+    Wire->Field_0x04 = Info->DestroyType;
     return true;
 }
 
@@ -267,7 +267,7 @@ static bool DeliverDestroyObject(const FPacketBase* Packet, IClient* Client, ICh
     GDestroyObjectStatic.ObjectId = Wire.ObjectId;
     // Retail stores a zero-extended dword here, which is the same bytes as the byte plus
     // three cleared padding bytes.
-    GDestroyObjectStatic.Field_0x04 = Wire.Field_0x04;
+    GDestroyObjectStatic.DestroyType = Wire.Field_0x04;
     GDestroyObjectStatic.Pad_0x05[0] = 0;
     GDestroyObjectStatic.Pad_0x05[1] = 0;
     GDestroyObjectStatic.Pad_0x05[2] = 0;
@@ -282,9 +282,9 @@ static bool DeliverDestroyObject(const FPacketBase* Packet, IClient* Client, ICh
 static bool MarshalLaunch(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FServerLaunchInfo* Info = reinterpret_cast<const FServerLaunchInfo*>(Args[1]);
     FPayloadServerLaunch Wire;
-    Wire.Field_0x00 = Info->Field_0x00;
-    Wire.Field_0x04 = Info->Field_0x04;
-    Wire.Field_0x08 = Info->Field_0x08;
+    Wire.Field_0x00 = Info->ShipId;
+    Wire.Field_0x04 = Info->LaunchObjId;
+    Wire.Field_0x08 = Info->LaunchPosIndex;
     Wire.Position = Info->Position;
     Wire.Orientation = Info->Orientation;
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -293,9 +293,9 @@ static bool MarshalLaunch(FPacketBase* Packet, const unsigned int* Args, unsigne
 static bool DeliverLaunch(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerLaunch Wire = RpcPayloadRead<FPayloadServerLaunch>(Packet, 0);
     FServerLaunchInfo Info;
-    Info.Field_0x00 = Wire.Field_0x00;
-    Info.Field_0x04 = Wire.Field_0x04;
-    Info.Field_0x08 = Wire.Field_0x08;
+    Info.ShipId = Wire.Field_0x00;
+    Info.LaunchObjId = Wire.Field_0x04;
+    Info.LaunchPosIndex = Wire.Field_0x08;
     Info.Orientation = Wire.Orientation;
     Info.Position = Wire.Position;
     Client->SendServerLaunch(1u, Info);

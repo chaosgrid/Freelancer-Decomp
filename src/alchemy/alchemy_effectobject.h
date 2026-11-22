@@ -61,11 +61,9 @@ namespace AlchemyImpl
         GENRESULT DACOM_API Slot11(void* Arg) override;
         // LAB_0621fb50: per-node {Id,Node} enumeration callback. See WalkNodesEnumerate.
         GENRESULT DACOM_API Slot12(void* A, void* B) override;
-        // FUN_0621fba0 Ghidra thiscall (this, effect, flags) RET 8. No in-DLL
-        // caller of this vtable slot — keep stdcall Slot13(void*). flags!=7:
-        // same +0x94/+0x98/+0x90 shape as Slot11 but never aborts, and
-        // submits the node to IAlchemy on a set out-flag (DispatchFlagsToAlchemy).
-        GENRESULT DACOM_API Slot13(void* Arg) override;
+        // FUN_0621fba0 Ghidra thiscall (this, effect, flags) RET 8 (formerly Slot13).
+        // Destroy/free effect nodes by bitmask (1=emitters, 2=fields, 4=appearances, 7=all).
+        GENRESULT DACOM_API DestroyNodes(void* Arg) override;
         // LAB_0621f850: per-node call to node+0x88(node, Arg). See WalkNodes.
         GENRESULT DACOM_API Slot14(float LodInput) override;
         // LAB_0621f880: combined bounding-sphere merge over node+0x8C

@@ -260,14 +260,41 @@ static_assert(sizeof(Heap) == 0x10, "Heap sizeof 0x10");
 // .text:06d0ba93). 0x19 therefore cannot be a decode error and cannot be named
 // from these two binaries; it would have to come out of freelancer.exe or
 // Content.dll, and neither carries the symbol.
+// Retail DamageCause values verified across Server.dll, Common.dll, FLSDK, and FLHook:
+//   0    = Unknown (default)
+//   1    = Collision (StarSystem::collision_damage 0x06d0d730 & non-bullet/non-guided fallback)
+//   2    = Gun (ObjectType 0x2000000 BULLET munition hit, 0x06d0d604)
+//   3    = GuidedHit (ObjectType 0x1000000 GUIDED direct hit, 0x06d0d61d)
+//   4    = Explosion (countermeasure / fuse / loot blast)
+//   5    = MissileTorpedo (guided splash blast, bCruiseDisruptor == 0)
+//   6    = CruiseDisrupter (guided splash blast, bCruiseDisruptor != 0; drops cruise)
+//   7    = Mine (mine explosion blast)
+//   8    = ZoneDamage (Ship::tick_zone_damage 0x06d01250; FLHook: Suicide)
+//   0x14 = LootDecay (loot expiration / equipment removal notify, 0x062abb06)
+//   0x15 = Fuse (fuse damage / disruptor)
+//   0x16 = CargoPodJettison (cargo pod jettison destruction)
+//   0x17 = DrainShields (pub::SpaceObj::DrainShields, 0x06cf89d6)
+//   0x18 = Pending (GameObject::PendingDamage default / Admin, 0x06cee452)
+//   0x19 = InitialSync (StarSystem::add_player / initial damage-state sync, 0x06cf61d2, 0x06d07f8a)
+//   0xC0 = DummyDisrupter (FLSDK sentinel)
 enum class DamageCause : int
 {
     Unknown = 0,
-    Gun = 1,
-    Missile = 2,
-    Mine = 3,
-    Collision = 4,
-    Explosion = 5,
+    Collision = 1,
+    Gun = 2,
+    GuidedHit = 3,
+    Explosion = 4,
+    MissileTorpedo = 5,
+    CruiseDisrupter = 6,
+    Mine = 7,
+    ZoneDamage = 8,
+    LootDecay = 0x14,
+    Fuse = 0x15,
+    CargoPodJettison = 0x16,
+    DrainShields = 0x17,
+    Pending = 0x18,
+    InitialSync = 0x19,
+    DummyDisrupter = 0xC0,
 };
 
 // Retail is 0xC bytes: {ushort SubObjId; float HitPts; SubObjFate Fate;} -- confirmed via
@@ -285,6 +312,7 @@ struct COMMON_API DamageEntry
         Destroyed = 1,
         Separated = 2,
         HealthProxy = 3,
+        Loot = 4,
     };
 
     DamageEntry();

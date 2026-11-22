@@ -330,22 +330,22 @@ public:
     int set_follow_offset(Vector const& Offset) override;
     int add_follow_follower(IObjRW* Follower) override;
     int remove_follow_follower(IObjRW* Follower) override;
-    int slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+    int fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                 int SourceClient) override;
-    int slot_38(unsigned short EquipId, int Count, int SourceClient) override;
-    int slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+    int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) override;
+    int tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                 int SourceClient) override;
-    int slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
-    int slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+    int tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
+    int set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                 int SourceClient) override;
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override;
-    int slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
-    int slot_50(bool bEngage, bool bArg2, int SourceClient) override;
-    int slot_54(bool bActivate, int SourceClient) override;
-    int slot_58(unsigned short EquipId, unsigned Count, int SourceClient) override;
-    int slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+    int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
+    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;
+    int toggle_thrusters(bool bActivate, int SourceClient) override;
+    int use_item(unsigned short EquipId, unsigned Count, int SourceClient) override;
+    int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                 int bFlag, RequestCB* Callback) override;
-    int slot_60(int RequestType, unsigned const* TargetId, int Arg3) override;
+    int request_cancel(int RequestType, unsigned const* TargetId, int Arg3) override;
     int go_tradelane(IObjInspect const* EntranceRing, IObjInspect const* ExitRing,
                      bool bFastExit, float Speed) override;
     int stop_tradelane() override;
@@ -507,15 +507,15 @@ public:
                          ID_String const* Explosion);
 
     // IObjAffect overrides (.rdata:005de1bc): slots 13, 15, 16, 17, 19, 22.
-    int slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+    int fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                 int SourceClient) override;                                     // 00534870
-    int slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+    int tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                 int SourceClient) override;                                     // 00535010
-    int slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override; // 00534e60
-    int slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+    int tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override; // 00534e60
+    int set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                 int SourceClient) override;                                     // 005351d0
-    int slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient) override; // 00535330
-    int slot_58(unsigned short EquipId, unsigned Count, int SourceClient) override; // 00535470
+    int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) override; // 00535330
+    int use_item(unsigned short EquipId, unsigned Count, int SourceClient) override; // 00535470
 
     // ---- data -------------------------------------------------------------------------
     // (+0xac is INotify's vptr.)
@@ -655,13 +655,13 @@ public:
     int set_formation_offset(Vector const& Offset) override;                 // 005470f0
     int add_formation_follower(IObjRW* Follower) override;                   // 00547190
     int remove_formation_follower(IObjRW* Follower) override;                // 005471c0
-    int slot_38(unsigned short EquipId, int Count, int SourceClient) override; // 005467e0
+    int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) override; // 005467e0
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override; // 005468e0
-    int slot_50(bool bEngage, bool bArg2, int SourceClient) override;        // 00546a10
-    int slot_54(bool bActivate, int SourceClient) override;                  // 00546b50
-    int slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;        // 00546a10
+    int toggle_thrusters(bool bActivate, int SourceClient) override;                  // 00546b50
+    int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                 int bFlag, RequestCB* Callback) override;                   // 00546df0
-    int slot_60(int RequestType, unsigned const* TargetId, int Arg3) override; // 00546e40
+    int request_cancel(int RequestType, unsigned const* TargetId, int Arg3) override; // 00546e40
     int go_tradelane(IObjInspect const* EntranceRing, IObjInspect const* ExitRing,
                      bool bFastExit, float Speed) override;                  // 00546e90
     int stop_tradelane() override;                                           // 00546f80

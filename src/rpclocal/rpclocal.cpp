@@ -119,7 +119,7 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
     // 06d8dc87 `MOV EDX,dword ptr [EAX]`: the argument is dereferenced untested.
     const SSPObjUpdateInfo* Info = reinterpret_cast<const SSPObjUpdateInfo*>(Args[1]);
     FPayloadCommonUpdateObject Wire;
-    Wire.Field_0x00 = Info->Field_0x2c;
+    Wire.Field_0x00 = Info->State;
     Wire.Pad_0x01[0] = 0;
     Wire.Pad_0x01[1] = 0;
     Wire.Pad_0x01[2] = 0;
@@ -131,7 +131,7 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
     RpcPayloadWrite(Packet, 0, Wire);
     // payload+0x28 is a plain dword copy in retail, not a float conversion; the wire field
     // is typed float only because the RECEIVER of the other direction reads it with FLD.
-    const unsigned int RawField28 = Info->Field_0x28;
+    const unsigned int RawField28 = Info->ThrottleBits;
     return RpcPayloadWrite(Packet, 0x28, RawField28);
 }
 

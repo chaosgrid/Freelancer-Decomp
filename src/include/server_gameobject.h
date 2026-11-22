@@ -154,8 +154,8 @@ struct FCollisionEvent
     unsigned short OtherSubObjId;            // +0x08
     unsigned short Pad0a;
     Vector Point;                            // +0x0c  same for both sides
-    Vector Field_0x18;                       // +0x18  negated for side B
-    Vector Field_0x24;                       // +0x24  negated for side B
+    Vector SurfaceNormal;                    // +0x18  negated for side B
+    Vector RelativeVelocity;                 // +0x24  negated for side B
 };
 static_assert(sizeof(FCollisionEvent) == 0x30, "FCollisionEvent 0x30");
 
@@ -172,7 +172,7 @@ struct FLootRecord
     Archetype::Equipment const* ContentsArch;        // +0x0c  what it carries (itself unless a cargo pod)
     float ContentsHitPts;                            // +0x10
     int Count;                                       // +0x14
-    unsigned int Field_0x18;                         // +0x18  zeroed by build_loot; meaning not derived
+    unsigned int MarkForPlayer;                      // +0x18  optional player id to mark loot for (0 = none; 0x06cf85c0 / mark_for_player)
     unsigned int Field_0x1c;                         // +0x1c  zeroed by build_loot; meaning not derived
     Vector Velocity;                                 // +0x20
     Vector Position;                                 // +0x2c
@@ -607,22 +607,22 @@ public:
     int set_follow_offset(Vector const& Offset) override;
     int add_follow_follower(IObjRW* Follower) override;
     int remove_follow_follower(IObjRW* Follower) override;
-    int slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+    int fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                 int SourceClient) override;
-    int slot_38(unsigned short EquipId, int Count, int SourceClient) override;
-    int slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+    int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) override;
+    int tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                 int SourceClient) override;
-    int slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
-    int slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+    int tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
+    int set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                 int SourceClient) override;
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override;
-    int slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
-    int slot_50(bool bEngage, bool bArg2, int SourceClient) override;
-    int slot_54(bool bActivate, int SourceClient) override;
-    int slot_58(unsigned short EquipId, unsigned Count, int SourceClient) override;
-    int slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+    int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
+    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;
+    int toggle_thrusters(bool bActivate, int SourceClient) override;
+    int use_item(unsigned short EquipId, unsigned Count, int SourceClient) override;
+    int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                 int bFlag, RequestCB* Callback) override;
-    int slot_60(int RequestType, unsigned const* TargetId, int Arg3) override;
+    int request_cancel(int RequestType, unsigned const* TargetId, int Arg3) override;
     int go_tradelane(IObjInspect const* EntranceRing, IObjInspect const* ExitRing,
                      bool bFastExit, float Speed) override;
     int stop_tradelane() override;
@@ -676,21 +676,21 @@ public:
     //    and Solar keep these six entries). `this` is the +4 sub-object in
     //    retail; the listing's [this+N] are EqObj+N+4. ----------------------
     // slot 13 (+0x34) .text:06ce68a0 (RET 0x10): fire Count equips by id.
-    int slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+    int fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                 int SourceClient) override;
     // slot 15 (+0x3c) .text:06ce6d80 (RET 0xc): tractor every object of Targets.
-    int slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+    int tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                 int SourceClient) override;
     // slot 16 (+0x40) .text:06ce6ba0 (RET 0xc): tractor one object.
-    int slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
+    int tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient) override;
     // slot 17 (+0x44) .text:06ce6f60 (RET 0x10): CEGun::SetTarget on one gun.
-    int slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+    int set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                 int SourceClient) override;
     // slot 19 (+0x4c) .text:06ce70b0 (RET 0xc): (de)activate one equip.
-    int slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
+    int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
     // slot 22 (+0x58) .text:06ce7210 (RET 0xc): use Count of a repair kit /
     // shield battery cargo stack ("EqObj::use_item()" in its FDUMP).
-    int slot_58(unsigned short EquipId, unsigned Count, int SourceClient) override;
+    int use_item(unsigned short EquipId, unsigned Count, int SourceClient) override;
     // FUN_06ce7350 (RET 0xc, non-virtual): slot_58's repair-kit branch; mends
     // the hull and returns how many kits that took. EquipId is not read.
     int use_repair_kits(unsigned short EquipId, Archetype::RepairKit const* Kit, int Count);
@@ -1114,13 +1114,13 @@ public:
     int set_follow_offset(Vector const& Offset) override;                        // 10 .text:06d02a80
     int add_follow_follower(IObjRW* Follower) override;                          // 11 .text:06d02ac0
     int remove_follow_follower(IObjRW* Follower) override;                       // 12 .text:06d02ad0
-    int slot_38(unsigned short EquipId, int Count, int SourceClient) override;   // 14 .text:06d020d0
+    int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) override;   // 14 .text:06d020d0
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override; // 18 .text:06d02340
-    int slot_50(bool bEngage, bool bArg2, int SourceClient) override;            // 20 .text:06d02410
-    int slot_54(bool bActivate, int SourceClient) override;                      // 21 .text:06d02500
-    int slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;            // 20 .text:06d02410
+    int toggle_thrusters(bool bActivate, int SourceClient) override;                      // 21 .text:06d02500
+    int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                 int bFlag, RequestCB* Callback) override;                        // 23 .text:06d02670
-    int slot_60(int RequestType, unsigned const* TargetId, int Arg3) override;   // 24 .text:06d027a0
+    int request_cancel(int RequestType, unsigned const* TargetId, int Arg3) override;   // 24 .text:06d027a0
     int go_tradelane(IObjInspect const* EntranceRing, IObjInspect const* ExitRing,
                      bool bFastExit, float Speed) override;                      // 25 .text:06d028c0
     int stop_tradelane() override;                                               // 26 .text:06d02880
@@ -1284,18 +1284,11 @@ public:
     // anonymous are the port's own, as bShipGone is in server_sysdb.h.
     unsigned int DeathSequenceObjId;      // +0x90  an object id; 0 == the live path
     float DeathSequenceTimer;             // +0x94  seconds; armed to 12.0f or 0.0f
-    // +0x98 -- deliberately left anonymous. FUN_06d01e80 sets it to
-    // `(param_1 == 0 && param_2 == 3)`:
-    //   .text:06d01f0a  85ff          TEST EDI,EDI          ; EDI == param_1
-    //   .text:06d01f0c  c68698...00   MOV  byte [ESI+0x98],0
-    //   .text:06d01f14  750c          JNZ  LAB_06d01f22
-    //   .text:06d01f16  83fd03        CMP  EBP,0x3          ; EBP == param_2
-    //   .text:06d01f19  7507          JNZ  LAB_06d01f22
-    //   .text:06d01f1b  c68698...01   MOV  byte [ESI+0x98],1
-    // and .text:06cfa731 reads it back. So the CONDITION is known but not what
-    // the two literals mean. A Field_0xNN with a confirmed primitive type is
-    // what this port allows in that situation; do not name it on a guess.
-    unsigned char Field_0x98;
+    // +0x98 -- bDockInUse / bWaitingForDock. FUN_06d01e80 sets it to
+    // `(RequestType == 0 && Response == 3)` = `(EventRequestType::StationJumpDock &&
+    // DOCK_HOST_RESPONSE::DockInUse)` (.text:06d01f0a..06d01f1b), and .text:06cfa731
+    // reads it back. Set while an async dock/event request is in flight or queued.
+    unsigned char bDockInUse;
     IObjAffect::RequestCB* PendingRequest; // +0x9C  slot_5c stores it; request_returned calls its OnResult (vtable slot 0)
     // +0xA0..+0xA8 -- the jettison queue, a COMMON.DLL EquipDescList (a VC6
     // std::list<EquipDesc>: allocator +0xA0, head +0xA4, size +0xA8, 0x28-byte nodes

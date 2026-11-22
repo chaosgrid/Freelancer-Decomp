@@ -1055,7 +1055,7 @@ unsigned int FRpcServerDestroyObjectPacket::Encode(unsigned char** BufferHolder,
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;                      // 06b5cf85
-    if (!Stream.Put(&Field_0x04, 1u)) return 0x16u;                    // 06b5cfb8
+    if (!Stream.Put(&DestroyType, 1u)) return 0x16u;                   // 06b5cfb8
     return Stream.FinishEncodeSuccess(OutLength);
 }
 
@@ -1064,7 +1064,7 @@ unsigned int FRpcServerDestroyObjectPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&ObjectId, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 1u)) return MarshalError;
+    if (!Stream.Get(&DestroyType, 1u)) return MarshalError;
     return Stream.Finish(OutLength, false);
 }
 
@@ -1087,9 +1087,9 @@ unsigned int FRpcServerLaunchPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
-    if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x04, 4u)) return 0x16u;
-    if (!Stream.Put(&Field_0x08, 4u)) return 0x16u;
+    if (!Stream.Put(&ShipId, 4u)) return 0x16u;
+    if (!Stream.Put(&LaunchObjId, 4u)) return 0x16u;
+    if (!Stream.Put(&LaunchPosIndex, 4u)) return 0x16u;
     if (!Stream.Put(&Position, 12u)) return 0x16u;
     if (!Stream.Put(&Orientation, 16u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5e90e
@@ -1099,9 +1099,9 @@ unsigned int FRpcServerLaunchPacket::Encode(unsigned char** BufferHolder,
 unsigned int FRpcServerLaunchPacket::Decode(const unsigned char* Buffer,
     unsigned int Size, unsigned int* OutLength) {
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
-    if (!Stream.Get(&Field_0x00, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x04, 4u)) return MarshalError;
-    if (!Stream.Get(&Field_0x08, 4u)) return MarshalError;
+    if (!Stream.Get(&ShipId, 4u)) return MarshalError;
+    if (!Stream.Get(&LaunchObjId, 4u)) return MarshalError;
+    if (!Stream.Get(&LaunchPosIndex, 4u)) return MarshalError;
     if (!Stream.Get(&Position, 12u)) return MarshalError;
     if (!Stream.Get(&Orientation, 16u)) return MarshalError;
     return Stream.Finish(OutLength, false);

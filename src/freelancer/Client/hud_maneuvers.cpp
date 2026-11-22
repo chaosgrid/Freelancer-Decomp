@@ -963,7 +963,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         }
         unsigned const TargetId = WatchedObjRw(FormationTarget)->get_id();
         IObjRW* const Self = WatchedObjRw(HUDItem::Target);
-        static_cast<IObjAffect*>(Self)->slot_5c(1, &TargetId, &kFormationRequestSecondId, 0,
+        static_cast<IObjAffect*>(Self)->request_event(1, &TargetId, &kFormationRequestSecondId, 0,
                                                 static_cast<IObjAffect::RequestCB*>(this));
         return true;
     }
@@ -997,9 +997,9 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
     if (Target != nullptr)
     {
         XSetManeuver Maneuver;
-        Maneuver.Field_0x00 = WatchedObjRw(HUDItem::Target)->get_id();
+        Maneuver.ShipFrom = WatchedObjRw(HUDItem::Target)->get_id();
         Maneuver.ObjectId = Target->get_id();
-        Maneuver.Field_0x08 = static_cast<unsigned>(BehaviorId);
+        Maneuver.Flag = static_cast<unsigned>(BehaviorId);
         G_Server->SetManeuver(GetPlayerConnectionId(), Maneuver);
     }
     return bResult;

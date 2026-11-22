@@ -143,7 +143,7 @@ void IServerImpl::ActivateCruise(unsigned int PlayerId, const XActivateCruise& I
         FRpcActivateCruisePacket* TypedPacket = static_cast<FRpcActivateCruisePacket*>(Packet);
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->bActive = Info.bActivate;
-        TypedPacket->Field_0x05 = Info.Field_0x05;
+        TypedPacket->Field_0x05 = Info.bDisruptCruise;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -610,10 +610,10 @@ void IServerImpl::GFGoodBuy(const SGFGoodBuyInfo& Info, unsigned int SessionId) 
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_GFGOODBUY, &Packet) == 0) {
         FRpcGfGoodBuyPacket* TypedPacket = static_cast<FRpcGfGoodBuyPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x00;
-        TypedPacket->Field_0x04 = Info.Field_0x04;
-        TypedPacket->Field_0x08 = Info.Field_0x08;
-        TypedPacket->Field_0x0c = Info.Field_0x0c;
+        TypedPacket->Field_0x00 = Info.BaseId;
+        TypedPacket->Field_0x04 = Info.Null04;
+        TypedPacket->Field_0x08 = Info.GoodId;
+        TypedPacket->Field_0x0c = Info.Count;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -622,9 +622,9 @@ void IServerImpl::GFGoodSell(const SGFGoodSellInfo& Info, unsigned int SessionId
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_GFGOODSELL, &Packet) == 0) {
         FRpcGfGoodSellPacket* TypedPacket = static_cast<FRpcGfGoodSellPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x00;
-        TypedPacket->Field_0x04 = Info.Field_0x04;
-        TypedPacket->Field_0x08 = Info.Field_0x08;
+        TypedPacket->Field_0x00 = Info.BaseId;
+        TypedPacket->Field_0x04 = Info.GoodId;
+        TypedPacket->Field_0x08 = Info.Count;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -690,12 +690,12 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& Info, unsigned int Session
             fstp dword ptr NarrowedTime
         }
         FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x2c;
+        TypedPacket->Field_0x00 = Info.State;
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->Position = Info.Position;
         TypedPacket->Orientation = Info.Orientation;
         std::memcpy(&TypedPacket->UpdateTime, &NarrowedTime, sizeof(NarrowedTime));
-        std::memcpy(&TypedPacket->Field_0x28, &Info.Field_0x28, sizeof(Info.Field_0x28));
+        std::memcpy(&TypedPacket->Field_0x28, &Info.ThrottleBits, sizeof(Info.ThrottleBits));
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -704,13 +704,13 @@ void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& Info, unsi
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MUNCOLLISION, &Packet) == 0) {
         FRpcMunitionCollisionPacket* TypedPacket = static_cast<FRpcMunitionCollisionPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x00;
-        TypedPacket->Field_0x04 = Info.Field_0x04;
+        TypedPacket->Field_0x00 = Info.ProjectileArchId;
+        TypedPacket->Field_0x04 = Info.AttackerId;
         TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Field_0x0c = Info.Field_0x0c;
-        std::memcpy(&TypedPacket->HitPosition.x, &Info.Field_0x10, 4u);
-        std::memcpy(&TypedPacket->HitPosition.y, &Info.Field_0x14, 4u);
-        std::memcpy(&TypedPacket->HitPosition.z, &Info.Field_0x18, 4u);
+        TypedPacket->Field_0x0c = Info.SubObjId;
+        std::memcpy(&TypedPacket->HitPosition.x, &Info.HitPosX, 4u);
+        std::memcpy(&TypedPacket->HitPosition.y, &Info.HitPosY, 4u);
+        std::memcpy(&TypedPacket->HitPosition.z, &Info.HitPosZ, 4u);
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -734,7 +734,7 @@ void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& Info, unsigned int S
         TypedPacket->TargetSubObjId = Info.TargetSubObjId;
         TypedPacket->ObjectId = Info.ObjectId;
         TypedPacket->SubObjId = Info.SubObjId;
-        std::memcpy(&TypedPacket->Field_0x10, &Info.Field_0x10, 4u);
+        std::memcpy(&TypedPacket->Field_0x10, &Info.DamageBits, 4u);
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -854,9 +854,9 @@ void IServerImpl::SetManeuver(unsigned int SessionId, const XSetManeuver& Info) 
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_SETMANEUVER, &Packet) == 0) {
         FRpcSetManeuverPacket* TypedPacket = static_cast<FRpcSetManeuverPacket*>(Packet);
-        TypedPacket->Field_0x00 = Info.Field_0x00;
+        TypedPacket->Field_0x00 = Info.ShipFrom;
         TypedPacket->ObjectId = Info.ObjectId;
-        TypedPacket->Field_0x08 = Info.Field_0x08;
+        TypedPacket->Field_0x08 = Info.Flag;
         this->PushToServer(Packet->AsRaw());
     }
 }

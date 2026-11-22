@@ -295,7 +295,7 @@ int SystemManagerGunGroupManager::PopulateSlots(unsigned short const* SourceIds,
             !OwnShip()->is_player() &&
             (Status.Flags & 0x01) == 0)
         {
-            OwnShip()->slot_4c(SourceCursor, true, -1);
+            OwnShip()->toggle_item(SourceCursor, true, -1);
         }
 
         ++SourceCursor;
@@ -352,7 +352,7 @@ bool SystemManagerGunGroupManager::SetShieldActive(int Mode)
     int const Result = OwnShip()->find_equipment(&HardpointId, 1, EquipTypeShield);
     if (Result == 0)
     {
-        OwnShip()->slot_4c(&HardpointId, Mode != 0, -1);
+        OwnShip()->toggle_item(&HardpointId, Mode != 0, -1);
     }
 
     return true;
@@ -396,7 +396,7 @@ bool SystemManagerGunGroupManager::Retarget(IObjRW* NewTarget)
 
     // 062e9b9e-062e9be5: point every gun at NewTarget through IObjAffect +0x44.
     for (unsigned Index = 0; Index < (unsigned)GunCount; ++Index)
-        OwnShip()->slot_44(&Guns[Index].HardpointId, NewTarget, SUBOBJ_ID_NONE, -1);
+        OwnShip()->set_gun_target(&Guns[Index].HardpointId, NewTarget, SUBOBJ_ID_NONE, -1);
     return true;
 }
 
@@ -408,7 +408,7 @@ bool SystemManagerGunGroupManager::Retarget(IObjRW* NewTarget)
 void SystemManagerGunGroupManager::ClearGunTargets()
 {
     for (unsigned Index = 0; Index < (unsigned)GunCount; ++Index)
-        OwnShip()->slot_44(&Guns[Index].HardpointId, nullptr, SUBOBJ_ID_NONE, -1);
+        OwnShip()->set_gun_target(&Guns[Index].HardpointId, nullptr, SUBOBJ_ID_NONE, -1);
 }
 
 // FUN_062e9c50 (item 1835), Common.dll.txt 247743-248080, `RET 4`. The only caller is
@@ -563,7 +563,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
 
         // 062e9fa0-062e9fc6: our ship's IObjAffect slot 17 (+0x44) points this gun at the pick
         // (or at nothing), source client -1.
-        OwnShip()->slot_44(&Slot.HardpointId, (IObjRW*)BestIface, SubTarget, -1);
+        OwnShip()->set_gun_target(&Slot.HardpointId, (IObjRW*)BestIface, SubTarget, -1);
     }
 
     // 062e9feb-062ea010: the self record's type flags again (same lazy refresh).

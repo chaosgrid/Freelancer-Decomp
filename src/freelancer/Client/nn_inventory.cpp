@@ -2708,7 +2708,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
                     if (Player != nullptr)
                     {
-                        static_cast<IObjAffect*>(Player)->slot_38(Item->Id, Field93c,
+                        static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, Field93c,
                                                                   static_cast<int>(GetPlayerConnectionId()));
                         Field914 = 1.0f;
                         // 0047aa56..0047aa63: FUN_00489e80(G_NnVoiceCargoJettisonedId, 0).
@@ -2922,7 +2922,7 @@ void NnInventory::JettisonSelected()
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
     if (Player == nullptr)
         return;
-    static_cast<IObjAffect*>(Player)->slot_38(Item->Id, Field93c,
+    static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, Field93c,
                                               static_cast<int>(GetPlayerConnectionId()));
     Field914 = 1.0f;
     // 0047e706..0047e70e: FUN_00489e80(G_NnVoiceCargoJettisonedId, 0).

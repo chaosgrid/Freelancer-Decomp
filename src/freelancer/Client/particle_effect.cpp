@@ -151,7 +151,7 @@ void ParticleEffectCleanupAlchemy(FParticleEffect* This)
     // the node -- no test of DALib::Alchemy -- and the node's Release.
     if (This->FxEffect != nullptr)
     {
-        This->FxEffect->Slot13(reinterpret_cast<void*>(7));
+        This->FxEffect->DestroyNodes(reinterpret_cast<void*>(7));
         static_cast<IDAComponent*>(This->FxEffect)->Release();
         This->FxEffect = nullptr;
     }
@@ -372,7 +372,7 @@ void FParticleEffect::Kill()
         This->RunTime78 = 1.0f;
 
     // 0x004f86a7: IFxEffect vt+0x34 with 1 -- stop emitting, let the live particles finish.
-    This->FxEffect->Slot13(reinterpret_cast<void*>(1));
+    This->FxEffect->DestroyNodes(reinterpret_cast<void*>(1));
 }
 
 void ParticleEffectArmDeath(FParticleEffect* This)

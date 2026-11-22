@@ -921,18 +921,18 @@ int GameObject::set_follow_leader(IObjRW*) { return -8; }                       
 int GameObject::set_follow_offset(Vector const&) { return -8; }                      // 06cef340
 int GameObject::add_follow_follower(IObjRW*) { return -8; }                          // 06cef340
 int GameObject::remove_follow_follower(IObjRW*) { return -8; }                       // 06cef340
-int GameObject::slot_34(unsigned short const*, unsigned, Vector const*, int) { return -3; }  // 06cef380
-int GameObject::slot_38(unsigned short, int, int) { return -3; }                     // 06cef370
-int GameObject::slot_3c(unsigned short const*, std::vector<IObjRW*> const&, int) { return -3; }  // 06cef370
-int GameObject::slot_40(unsigned short const*, IObjRW*, int) { return -3; }          // 06cef370
-int GameObject::slot_44(unsigned short const*, IObjRW*, unsigned short, int) { return -3; }  // 06cef380
+int GameObject::fire_weapons(unsigned short const*, unsigned, Vector const*, int) { return -3; }  // 06cef380
+int GameObject::jettison_cargo(unsigned short, int, int) { return -3; }                     // 06cef370
+int GameObject::tractor_all(unsigned short const*, std::vector<IObjRW*> const&, int) { return -3; }  // 06cef370
+int GameObject::tractor_single(unsigned short const*, IObjRW*, int) { return -3; }          // 06cef370
+int GameObject::set_gun_target(unsigned short const*, IObjRW*, unsigned short, int) { return -3; }  // 06cef380
 int GameObject::set_target(IObjRW*, unsigned short, int) { return -3; }              // 06cef370
-int GameObject::slot_4c(unsigned short const*, bool, int) { return -3; }             // 06cef370
-int GameObject::slot_50(bool, bool, int) { return -3; }                              // 06cef370
-int GameObject::slot_54(bool, int) { return -3; }                                    // 06cef350
-int GameObject::slot_58(unsigned short, unsigned, int) { return -3; }                // 06cef370
-int GameObject::slot_5c(int, unsigned const*, unsigned const*, int, RequestCB*) { return -3; }  // 06cef360
-int GameObject::slot_60(int, unsigned const*, int) { return -3; }                    // 06cef370
+int GameObject::toggle_item(unsigned short const*, bool, int) { return -3; }             // 06cef370
+int GameObject::toggle_cruise(bool, bool, int) { return -3; }                              // 06cef370
+int GameObject::toggle_thrusters(bool, int) { return -3; }                                    // 06cef350
+int GameObject::use_item(unsigned short, unsigned, int) { return -3; }                // 06cef370
+int GameObject::request_event(int, unsigned const*, unsigned const*, int, RequestCB*) { return -3; }  // 06cef360
+int GameObject::request_cancel(int, unsigned const*, int) { return -3; }                    // 06cef370
 int GameObject::go_tradelane(IObjInspect const*, IObjInspect const*, bool, float) { return -3; }  // 06cef380
 int GameObject::stop_tradelane() { return -3; }                                      // 06cef390
 int GameObject::slot_6c(int, int) { return -3; }                                     // 06cef350
@@ -1828,7 +1828,7 @@ static bool EqObj_FindServerEquip(std::list<ServerEquip*>& ServerEquips, CEquip 
 // and handed to its ServerEquip, which retail calls as a SrvLauncher through
 // slots 3/4/5 whatever it really is. Unguided guns that fired are collected and
 // announced to the system in one StarSystem::notify_fire_weapon.
-int EqObj::slot_34(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
+int EqObj::fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector const* TargetPos,
                    int SourceClient)
 {
     // .text:06ce68b8 .. 06ce68db -- [this+0x24] (OwnerSystem) null or
@@ -1955,7 +1955,7 @@ static CLoot* EqObj_LootOf(IObjRW* Obj)
 }
 
 // IObjAffect slot 16 (+0x40) -- FUN_06ce6ba0 (.text:06ce6ba0, RET 0xc).
-int EqObj::slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient)
+int EqObj::tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient)
 {
     // .text:06ce6bb8 .. 06ce6bdc -- no system / destroyed: -5.
     if (OwnerSystem == nullptr)
@@ -2013,7 +2013,7 @@ int EqObj::slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClie
 }
 
 // IObjAffect slot 15 (+0x3c) -- FUN_06ce6d80 (.text:06ce6d80, RET 0xc).
-int EqObj::slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
+int EqObj::tractor_all(unsigned short const* EquipId, std::vector<IObjRW*> const& Targets,
                    int SourceClient)
 {
     // .text:06ce6d98 .. 06ce6dbb -- no system / destroyed: -5.
@@ -2074,7 +2074,7 @@ int EqObj::slot_3c(unsigned short const* EquipId, std::vector<IObjRW*> const& Ta
 }
 
 // IObjAffect slot 17 (+0x44) -- LAB_06ce6f60 (.text:06ce6f60, RET 0x10).
-int EqObj::slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
+int EqObj::set_gun_target(unsigned short const* EquipId, IObjRW* Target, unsigned short SubTarget,
                    int SourceClient)
 {
     // .text:06ce6f66 .. 06ce6f86 -- no system / destroyed: -5.
@@ -2134,7 +2134,7 @@ int EqObj::slot_44(unsigned short const* EquipId, IObjRW* Target, unsigned short
 }
 
 // IObjAffect slot 19 (+0x4c) -- LAB_06ce70b0 (.text:06ce70b0, RET 0xc).
-int EqObj::slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient)
+int EqObj::toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient)
 {
     // .text:06ce70b6 .. 06ce70d2 -- no system / destroyed: -5.
     if (OwnerSystem == nullptr)
@@ -2201,7 +2201,7 @@ int EqObj::slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClie
 
 // IObjAffect slot 22 (+0x58) -- LAB_06ce7210 (.text:06ce7210, RET 0xc).
 // SourceClient is not read.
-int EqObj::slot_58(unsigned short EquipId, unsigned Count, int SourceClient)
+int EqObj::use_item(unsigned short EquipId, unsigned Count, int SourceClient)
 {
     (void)SourceClient;
 
@@ -3280,7 +3280,7 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                     Record.ContentsArch = nullptr;
                     Record.ContentsHitPts = 0.0f;
                     Record.Count = 0;
-                    Record.Field_0x18 = 0;
+                    Record.MarkForPlayer = 0;
                     Record.Field_0x1c = 0;
                     Record.Field_0x68 = 1;
                     Record.bMission = 0;
@@ -3395,7 +3395,7 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                         Record.ContentsArch = nullptr;
                         Record.ContentsHitPts = 0.0f;
                         Record.Count = 0;
-                        Record.Field_0x18 = 0;
+                        Record.MarkForPlayer = 0;
                         Record.Field_0x1c = 0;
                         Record.Field_0x68 = 1;
                         Record.bMission = 0;
@@ -3890,7 +3890,7 @@ int EqObj::build_loot(EquipDesc const& Desc, std::vector<FLootRecord>& Out)
     Record.Arch = nullptr;
     Record.HitPts = 0.0f;
     Record.Count = 0;
-    Record.Field_0x18 = 0;
+    Record.MarkForPlayer = 0;
     Record.Field_0x1c = 0;
     Record.Field_0x68 = 1;
     Record.bMission = 0;
@@ -4219,14 +4219,14 @@ SrvThruster::SrvThruster(CEquip* InEquip, EqObj* InOwner)
 void SrvThruster::notify(Event Code, void* Param)
 {
     (void)Param;
-    if (Code == Event_0xF)
+    if (Code == NotEnoughPower)
     {
         // .text:06ced38c .. 06ced3c4 -- an AI-owned object (CSimple+0xb4 == 0,
         // read through the unguarded (ObjectClass & 3) narrowing) switches its
         // thrusters off: a tail jump into the owner's IObjAffect slot +0x54 with
         // both arguments rewritten to 0. A player's object ignores the event.
         if (Owner->csimple()->OwnerPlayer == 0)
-            Owner->slot_54(false, 0);
+            Owner->toggle_thrusters(false, 0);
         return;
     }
     if (Code == EquipDestroying)
@@ -4551,7 +4551,7 @@ void SrvCounterMeasureDropper::notify(Event Code, void* Param)
         if (Owner->csimple()->OwnerPlayer != 0)
             return;
         unsigned short const EquipId = Equip->Id;
-        Owner->slot_34(&EquipId, 1, nullptr, -1);
+        Owner->fire_weapons(&EquipId, 1, nullptr, -1);
         return;
     }
     if (Code == EquipDestroying)
@@ -4777,7 +4777,7 @@ Ship::Ship()
 {
     DeathSequenceObjId = 0;      // .text:06d00eab
     DeathSequenceTimer = 0.0f;   // .text:06d00eb1
-    Field_0x98 = 0;      // .text:06d00eb7
+    bDockInUse = 0;      // .text:06d00eb7
     PendingRequest = nullptr;    // .text:06d00ebd
     // .text:06d00ec3 .. .text:06d00ee2 (allocator byte +0xA0, operator new(0x28)
     // self-linked head +0xA4, size +0xA8 = 0): the Jettison member's
@@ -5128,7 +5128,7 @@ void Ship::tick_jettison(float Dt)
     Record.ContentsArch = nullptr;
     Record.ContentsHitPts = 0.0f;
     Record.Count = 0;
-    Record.Field_0x18 = 0u;
+    Record.MarkForPlayer = 0u;
     Record.Field_0x1c = 0u;
     Record.Field_0x68 = 1;
     Record.bMission = 0;
@@ -5365,7 +5365,7 @@ void Ship::enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms)
 void Ship::apply_damage_list(DamageList& Damage)
 {
     if (Damage.Cause == static_cast<DamageCause>(6) && csimple()->OwnerPlayer == 0u)
-        slot_50(false, true, 0);
+        toggle_cruise(false, true, 0);
     EqObj::apply_damage_list(Damage);
 }
 
@@ -5471,16 +5471,16 @@ void Ship::request_returned(int RequestType, int Response, int Arg3)
         if (!PendingRequest->OnResult(RequestType, Response, Arg3))
         {
             PendingRequest = nullptr;
-            Field_0x98 = 0;
+            bDockInUse = 0;
         }
         return;
     }
     unsigned int OwnerPlayer = csimple()->OwnerPlayer;
     unsigned int const Id = get_id();
     g_pClientInterface->SendServerRequestReturned(OwnerPlayer, Id, RequestType, Response, Arg3);
-    Field_0x98 = 0;
+    bDockInUse = 0;
     if (RequestType == 0 && Response == 3)
-        Field_0x98 = 1;
+        bDockInUse = 1;
 }
 
 // .text:06d01f30: CShip::set_throttle (IAT 06d645c4) on [ECX+0xc]; return 0.
@@ -5523,7 +5523,7 @@ int Ship::set_strafe_dir(StrafeDir Dir)
     if (!Engine->IsActive())
     {
         unsigned short const EngineId = Engine->GetID();
-        slot_4c(&EngineId, true, 0);
+        toggle_item(&EngineId, true, 0);
     }
     static_cast<CShip*>(Object)->set_strafe_dir(Dir);
     return 0;
@@ -5651,7 +5651,7 @@ int Ship::set_follow_offset(Vector const& Offset)
 //   .text:06d022e7 .. 06d022f8  outside single player CECargo::RemoveFromStack(Count)
 //   .text:06d022fe .. 06d0230c  OwnerSystem FUN_06d0f0c0(this, EquipId, Count)
 //   return 0
-int Ship::slot_38(unsigned short EquipId, int Count, int SourceClient)
+int Ship::jettison_cargo(unsigned short EquipId, int Count, int SourceClient)
 {
     (void)SourceClient;   // retail never reads the third argument
     if (OwnerSystem == nullptr)
@@ -5767,7 +5767,7 @@ int Ship::set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient)
 //   .text:06d024c4 .. 06d024e3  OwnerSystem FUN_06d0e580(&get_id(), bEngage,
 //                               bArg2, &SourceClient)
 // Returns 0.
-int Ship::slot_50(bool bEngage, bool bArg2, int SourceClient)
+int Ship::toggle_cruise(bool bEngage, bool bArg2, int SourceClient)
 {
     if (OwnerSystem == nullptr)
         return -5;
@@ -5785,7 +5785,7 @@ int Ship::slot_50(bool bEngage, bool bArg2, int SourceClient)
         {
             bChanged = true;
             if (bEngage && SourceClient == 0)
-                slot_54(false, 0);
+                toggle_thrusters(false, 0);
             Engine->EngageCruise(bEngage, bArg2);
         }
         if (SourceClient == 0 && !bChanged)
@@ -5812,7 +5812,7 @@ int Ship::slot_50(bool bEngage, bool bArg2, int SourceClient)
 //   .text:06d0261c .. 06d0262b  no SourceClient and nothing changed -> result
 //   .text:06d02633 .. 06d0264e  OwnerSystem FUN_06d0e600(&get_id(), bActivate,
 //                               &SourceClient)
-int Ship::slot_54(bool bActivate, int SourceClient)
+int Ship::toggle_thrusters(bool bActivate, int SourceClient)
 {
     if (OwnerSystem == nullptr)
         return -5;
@@ -5836,7 +5836,7 @@ int Ship::slot_54(bool bActivate, int SourceClient)
             if (!bEngineActive)
             {
                 unsigned short const EngineId = Engine->GetID();
-                slot_4c(&EngineId, true, 0);
+                toggle_item(&EngineId, true, 0);
             }
         }
 
@@ -5873,13 +5873,13 @@ int Ship::slot_54(bool bActivate, int SourceClient)
 //   anything else (.text:06d02782): Field_0x98 = 0 -- PendingRequest keeps
 //     the callback
 // Every path returns 0. The system id is FUN_06d06cd0, SystemInfo's slot 0.
-int Ship::slot_5c(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
+int Ship::request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                   int bFlag, RequestCB* Callback)
 {
-    if (Field_0x98 != 0)
+    if (bDockInUse != 0)
         return 0;
     PendingRequest = Callback;
-    Field_0x98 = 1;
+    bDockInUse = 1;
 
     if (RequestType == 0)
     {
@@ -5910,7 +5910,7 @@ int Ship::slot_5c(int RequestType, unsigned const* TargetId, unsigned const* Sec
         Server_ControllerDispatch(0, pub::Controller::EMessage::TradelaneRequest, Msg);
         return 0;
     }
-    Field_0x98 = 0;
+    bDockInUse = 0;
     return 0;
 }
 
@@ -5923,10 +5923,10 @@ int Ship::slot_5c(int RequestType, unsigned const* TargetId, unsigned const* Sec
 //   type 2 (.text:06d0281b .. 06d02843): 0x15 {get_id(), *TargetId, system id}
 //   then every path (.text:06d0284d .. 06d02870): set_invincible({2, 0, 0, 1.0f})
 // Returns 0.
-int Ship::slot_60(int RequestType, unsigned const* TargetId, int Arg3)
+int Ship::request_cancel(int RequestType, unsigned const* TargetId, int Arg3)
 {
     PendingRequest = nullptr;
-    Field_0x98 = 0;
+    bDockInUse = 0;
 
     if (RequestType == 0)
     {

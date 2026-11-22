@@ -164,9 +164,7 @@ static_assert(sizeof(XActivateEquip) == 0x8, "XActivateEquip sizeof 0x8");
 struct XActivateCruise {
     unsigned int ObjectId;      // +0x00
     bool bActivate;             // +0x04
-    // TODO: semantics unproven. Second byte; rpclocal writes it to packet+0x25 and
-    // Server.dll passes it as the 2nd argument of the sub-object's vtable+0x50.
-    unsigned char Field_0x05;   // +0x05
+    unsigned char bDisruptCruise; // +0x05  2nd arg of IObjAffect::slot_50 (toggle_cruise)
     unsigned char Pad_0x06[2];  // +0x06
 };
 static_assert(sizeof(XActivateCruise) == 0x8, "XActivateCruise sizeof 0x8");
@@ -227,23 +225,21 @@ struct SSPUseItem {
 };
 static_assert(sizeof(SSPUseItem) == 0x8, "SSPUseItem sizeof 0x8");
 
-// SGFGoodBuyInfo — 0x10 bytes; the SIZE is proven (rpclocal 0x06d8d5a0 and
-// Server 0x06d17bb0 both move exactly 4 dwords), the field semantics are not (§3.11).
+// SGFGoodBuyInfo — 0x10 bytes (rpclocal 0x06d8d5a0, Server 0x06d17bb0, ClientMarketRequestBuy).
 struct SGFGoodBuyInfo {
-    unsigned int Field_0x00;  // TODO: semantics unproven
-    unsigned int Field_0x04;  // TODO: semantics unproven
-    unsigned int Field_0x08;  // TODO: semantics unproven
-    unsigned int Field_0x0c;  // TODO: semantics unproven
+    unsigned int BaseId;   // +0x00
+    unsigned int Null04;   // +0x04  always 0 from client
+    unsigned int GoodId;   // +0x08
+    unsigned int Count;    // +0x0c
 };
 static_assert(sizeof(SGFGoodBuyInfo) == 0x10, "SGFGoodBuyInfo sizeof 0x10");
 
 // SGFGoodSellInfo — PARTIAL (§3.12). Three dwords are serialized (rpclocal
-// 0x06d8d600 / Server 0x06d17bf0); no reader touches anything past +0x08, so the
-// total size is NOT proven and deliberately carries no static_assert.
+// 0x06d8d600 / Server 0x06d17bf0 / ClientMarketRequestSell); no reader touches past +0x08.
 struct SGFGoodSellInfo {
-    unsigned int Field_0x00;  // TODO: semantics unproven
-    unsigned int Field_0x04;  // TODO: semantics unproven
-    unsigned int Field_0x08;  // TODO: semantics unproven
+    unsigned int BaseId;   // +0x00
+    unsigned int GoodId;   // +0x04
+    unsigned int Count;    // +0x08
 };
 
 // SGFGoodVaporizedInfo — PARTIAL (§3.13), identical situation to SGFGoodSellInfo
@@ -260,10 +256,8 @@ struct SSPObjUpdateInfo {
     Quaternion Orientation;      // +0x04  4 floats (rpclocal FUN_06d8f4f0)
     Vector Position;             // +0x14  3 floats (rpclocal FUN_06d8f510)
     double Timestamp;            // +0x20  read as an 8-byte double, narrowed to float on the wire
-    // TODO: semantics unproven (throttle?). Serialized to packet+0x48.
-    unsigned int Field_0x28;     // +0x28
-    // TODO: semantics unproven (flags/state?). One byte, serialized to packet+0x20.
-    unsigned char Field_0x2c;    // +0x2c
+    unsigned int ThrottleBits;   // +0x28  throttle float bits (serialized to packet+0x48)
+    unsigned char State;         // +0x2c  ship state/behavior byte (serialized to packet+0x20)
     unsigned char Pad_0x2d[3];   // +0x2d
 };
 static_assert(sizeof(SSPObjUpdateInfo) == 0x30, "SSPObjUpdateInfo sizeof 0x30");
@@ -276,14 +270,14 @@ static_assert(sizeof(SSPObjUpdateInfo) == 0x30, "SSPObjUpdateInfo sizeof 0x30");
 // FMunitionImpact::SubObjId, +0x10..+0x18 FMunitionImpact::HitPos (three floats). The
 // Field_0x names are kept because rpclocal's wire marshalling copies them dword for dword.
 struct SSPMunitionCollisionInfo {
-    unsigned int Field_0x00;   // +0x00  munition archetype id (GetEquipment, .text:06d0d5a4)
-    unsigned int Field_0x04;   // +0x04  shooter object id (find_object, .text:06d0d533)
-    unsigned int ObjectId;     // +0x08  Server.dll looks the object up by THIS field
-    unsigned short Field_0x0c; // +0x0c  sub-object hit (FMunitionImpact +0x08, .text:06d0d5aa)
-    unsigned short Pad_0x0e;   // +0x0e
-    unsigned int Field_0x10;   // +0x10  hit position x (float bits, FMunitionImpact +0x0c)
-    unsigned int Field_0x14;   // +0x14  hit position y (float bits)
-    unsigned int Field_0x18;   // +0x18  hit position z (float bits)
+    unsigned int ProjectileArchId; // +0x00  munition archetype id (GetEquipment, .text:06d0d5a4)
+    unsigned int AttackerId;       // +0x04  shooter object id (find_object, .text:06d0d533)
+    unsigned int ObjectId;         // +0x08  Server.dll looks the object up by THIS field
+    unsigned short SubObjId;       // +0x0c  sub-object hit (FMunitionImpact +0x08, .text:06d0d5aa)
+    unsigned short Pad_0x0e;       // +0x0e
+    unsigned int HitPosX;          // +0x10  hit position x (float bits, FMunitionImpact +0x0c)
+    unsigned int HitPosY;          // +0x14  hit position y (float bits)
+    unsigned int HitPosZ;          // +0x18  hit position z (float bits)
 };
 static_assert(sizeof(SSPMunitionCollisionInfo) == 0x1c, "SSPMunitionCollisionInfo sizeof 0x1c");
 
@@ -295,8 +289,7 @@ struct SSPObjCollisionInfo {
     unsigned int ObjectId;          // +0x08  Server.dll looks the object up by THIS field
     unsigned short SubObjId;        // +0x0c
     unsigned short Pad_0x0e;        // +0x0e
-    // TODO: semantics unproven (energy/damage — probably a float). Serialized to packet+0x30.
-    unsigned int Field_0x10;        // +0x10
+    unsigned int DamageBits;        // +0x10  collision damage float bits (FCollisionDamage::Damage; packet+0x30)
 };
 static_assert(sizeof(SSPObjCollisionInfo) == 0x14, "SSPObjCollisionInfo sizeof 0x14");
 
@@ -349,18 +342,12 @@ enum class EFLConnection : int {
     REMOTE = 2
 };
 
-// XSetManeuver — 0x0c bytes (§3.9). The size was already right; the field NAMES
-// were not. Server.dll's SetManeuver (0x11540) resolves the CEqObj from +0x04, so
-// +0x04 is the object id and the other two dwords are still unidentified.
-// The only client sender, HUD_Maneuvers::RequestManeuver (freelancer.exe 0x004d935a..0x004d93ac,
-// hud_maneuvers.cpp), fills +0x00 = the id of the HUD's watched object (the player ship),
-// +0x04 = the player ship's target id, +0x08 = the behaviour id it switched to.
+// XSetManeuver — 0x0c bytes (§3.9). HUD_Maneuvers::RequestManeuver fills
+// {ShipFrom (watched player ship), ObjectId (target), Flag (behavior id)}.
 struct XSetManeuver {
-    // TODO: semantics unproven (maneuver type?). rpclocal writes it to packet+0x20.
-    unsigned int Field_0x00;  // +0x00
-    unsigned int ObjectId;    // +0x04  FUN_06d006c0((uint*)(info + 4), ...)
-    // TODO: semantics unproven (target/parameter?). rpclocal writes it to packet+0x28.
-    unsigned int Field_0x08;  // +0x08
+    unsigned int ShipFrom;    // +0x00  player ship id (packet+0x20)
+    unsigned int ObjectId;    // +0x04  target object id (FUN_06d006c0)
+    unsigned int Flag;        // +0x08  behavior/maneuver id (packet+0x28)
 };
 static_assert(sizeof(XSetManeuver) == 0xc, "XSetManeuver sizeof 0xc");
 
@@ -388,10 +375,10 @@ public:
     unsigned int UsageCount;   // +0x04  ctor sets 1
     CDAPacket* QueueLink;      // +0x08  CDAConnection links queued packets here
     unsigned int PacketId;     // +0x0c  Channel << 16 | Opcode
-    unsigned int Field_0x10;   // +0x10  zeroed by the ctor; TODO: semantics unproven
-    unsigned int Field_0x14;   // +0x14  the ctor does not touch it
-    unsigned int Field_0x18;   // +0x18  the ctor does not touch it
-    unsigned int Field_0x1c;   // +0x1c  zeroed by the ctor; TODO: semantics unproven
+    unsigned int ProcessedBytes;      // +0x10  zeroed by ctor (FLSDK: processedBytes)
+    unsigned int BufferCapacity;      // +0x14  marshal buffer capacity (FLSDK: bufferCapacity)
+    unsigned char* BufferCursor;      // +0x18  marshal cursor pointer (FLSDK: bufferCursor)
+    unsigned int SerializationError;  // +0x1c  zeroed by ctor (FLSDK: serializationError)
     // Payload starts at +0x20 and belongs to the derived packet class.
 
     unsigned int GetChannel() const { return PacketId >> 16; }

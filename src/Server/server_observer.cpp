@@ -590,7 +590,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             // flag, so the next frame's phase 2 can create it again.
             FServerDestroyObjectInfo Msg;
             Msg.ObjectId = Obj->get_id();
-            Msg.Field_0x04 = 0u;                // the dword 0 at +0x04 (.text:06cf5cb5)
+            Msg.DestroyType = 0u;               // the dword 0 at +0x04 (.text:06cf5cb5)
             Msg.Pad_0x05[0] = 0u;
             Msg.Pad_0x05[1] = 0u;
             Msg.Pad_0x05[2] = 0u;

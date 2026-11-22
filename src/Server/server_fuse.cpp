@@ -1076,7 +1076,7 @@ void TumbleAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                         unsigned int EngineId = Cq->EquipManager.FindFirst(0x20000u)->Id;
                         unsigned short const* EngineIdPtr =
                             reinterpret_cast<unsigned short const*>(&EngineId);
-                        static_cast<IObjAffect*>(Owner)->slot_4c(EngineIdPtr, false, 0);
+                        static_cast<IObjAffect*>(Owner)->toggle_item(EngineIdPtr, false, 0);
                     }
                 }
             }

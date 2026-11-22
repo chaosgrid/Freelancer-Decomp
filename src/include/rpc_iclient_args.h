@@ -168,9 +168,9 @@ static_assert(sizeof(FPayloadServerUseItem) == 0x08, "USE_ITEM payload 0x08");
 // The field names stay offset names because rpclocal's codec reads them so.
 // ---------------------------------------------------------------------------
 struct FServerLaunchInfo {
-    unsigned int Field_0x00;    // +0x00  ship id
-    unsigned int Field_0x04;    // +0x04  launch object id
-    unsigned int Field_0x08;    // +0x08  launch_pos index (-1: none)
+    unsigned int ShipId;        // +0x00  ship id
+    unsigned int LaunchObjId;   // +0x04  launch object id
+    unsigned int LaunchPosIndex; // +0x08  launch_pos index (-1: none)
     Quaternion Orientation;     // +0x0c
     Vector Position;            // +0x1c
 };
@@ -502,7 +502,7 @@ static_assert(sizeof(FServerLandInfo) == 0x0c, "LAND argument struct 0x0c");
 // ---------------------------------------------------------------------------
 struct FServerDestroyObjectInfo {
     unsigned int ObjectId;      // +0x00
-    unsigned char Field_0x04;   // +0x04  TODO: semantics unproven
+    unsigned char DestroyType;  // +0x04  0 = vanish / out-of-range, 1 = destroyed (explosion/death camera)
     unsigned char Pad_0x05[3];
 };
 static_assert(sizeof(FServerDestroyObjectInfo) == 0x08, "DESTROYOBJECT arg struct 0x08");

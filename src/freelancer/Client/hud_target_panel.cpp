@@ -1585,7 +1585,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
     {
     case 0xbb:
         // IObjAffect slot 0x34 (0, 0, 0, connection) on the player.
-        static_cast<IObjAffect*>(Player)->slot_34(nullptr, 0, nullptr,
+        static_cast<IObjAffect*>(Player)->fire_weapons(nullptr, 0, nullptr,
                                                   static_cast<int>(GetPlayerConnectionId()));
         return true;
 

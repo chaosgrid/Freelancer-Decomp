@@ -922,8 +922,8 @@ void ClientObjDb_UpdateRemotePhysics(float Dt)
         Info.Orientation = Orientation;
         Info.Position = Ship->WorldPosition;
         Info.Timestamp = Block->ElapsedTime;
-        Info.Field_0x28 = 0;
-        Info.Field_0x2c = static_cast<unsigned char>(Ship->BehaviorIndex);
+        Info.ThrottleBits = 0;
+        Info.State = static_cast<unsigned char>(Ship->BehaviorIndex);
         Info.Pad_0x2d[0] = 0;
         Info.Pad_0x2d[1] = 0;
         Info.Pad_0x2d[2] = 0;

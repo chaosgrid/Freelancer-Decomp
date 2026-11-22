@@ -397,7 +397,7 @@ void InstantTradeLaneBehavior::HandleTargetEvent(void* Event)
     // Slot 24's signature is declared in common_iface.h since 2026-09-24 (Server.dll's Ship
     // body .text:06d027a0, RET 0xc).
     unsigned SavedId = SubObjPtr34->get_id();
-    (void)TargetPtr14->slot_60(2, &SavedId, 0);
+    (void)TargetPtr14->request_cancel(2, &SavedId, 0);
 }
 
 // IObjAffect::RequestCB override -- own single secondary-vtable slot.
@@ -440,7 +440,7 @@ bool InstantTradeLaneBehavior::OnResult(int /*Param1*/, int /*Param2*/, int Para
         //     (`MOV [ESP+0x14],EAX` at .text:062cf21a / .text:062cf19a-062cf1a2 here).
         // Both calls are unguarded in retail (.text:062cf185-062cf1a2).
         unsigned SavedId = SubObjPtr34->get_id();
-        (void)TargetPtr14->slot_60(2, &SavedId, 0);
+        (void)TargetPtr14->request_cancel(2, &SavedId, 0);
 
         // Retail then unconditionally clears Flag55/Flag56.
         Flag55 = 0;

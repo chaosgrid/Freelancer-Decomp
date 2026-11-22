@@ -318,9 +318,9 @@ FireResult CELauncher::CanFire(Vector const& Target) const
         return FireNoPower;
     if (!AmmoNeedsMet())
         return FireNoAmmo;
-    // 06299fd6: FCOMP 1.0, TEST AH,0x1 / JZ: not less (and ordered) -> FireOwnerBlocked.
+    // 06299fd6: FCOMP 1.0, TEST AH,0x1 / JZ: not less (and ordered) -> FireCloakActive.
     if (Owner->CloakPercent >= 1.0f)
-        return FireOwnerBlocked;
+        return FireCloakActive;
     if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
         CShip* Ship = (CShip*)(Owner);

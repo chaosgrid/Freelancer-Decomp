@@ -292,7 +292,7 @@ def write_resource_vcxproj(project_dir, target_name, rc_filename, guid):
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>17.0</VCProjectVersion>
+    <VCProjectVersion>18.0</VCProjectVersion>
     <ProjectGuid>%s</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>%s</RootNamespace>

@@ -106,7 +106,7 @@ void ThrustManager::engage_cruise(bool bEngage)
 
     // 062e90ef-062e910b: re-resolved the same way (`XOR EAX,EAX` arm at 062e90ff, no guard),
     // IObjAffect sub-object at +4, slot 0x50 (bEngage, 0, -1).
-    ObjAffectOf(OwnerShip())->slot_50(EngageByte != 0, false, -1);
+    ObjAffectOf(OwnerShip())->toggle_cruise(EngageByte != 0, false, -1);
 
     bCruiseEngaged = EngageByte;
 }
@@ -192,7 +192,7 @@ void ThrustManager::SetEngineActive(bool bActive)
             ((StatusByte & EquipStatusFlagActive) != 0) != bActive)
         {
             // 062e9299-062e92b9: IObjAffect (+4) slot_4c(&Id, bActive, -1), unguarded.
-            ObjAffectOf(OwnerShip())->slot_4c(&Id, bActive, -1);
+            ObjAffectOf(OwnerShip())->toggle_item(&Id, bActive, -1);
         }
     }
 
@@ -265,7 +265,7 @@ void ThrustManager::SetThrustersActive(bool bActive)
         return;
 
     // Re-resolved a third time, unguarded: IObjAffect (+4) slot_54(bActive, -1).
-    ObjAffectOf(OwnerShip())->slot_54(bActive, -1);
+    ObjAffectOf(OwnerShip())->toggle_thrusters(bActive, -1);
 }
 
 // FUN_062e89a0 (item 1819), RET 8.
@@ -310,7 +310,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
 
             if (!(bCruiseNow && bCruiseEngaged == 1))
             {
-                ObjAffectOf(OwnerShip())->slot_50(true, false, -1);         // 062e8b0c
+                ObjAffectOf(OwnerShip())->toggle_cruise(true, false, -1);         // 062e8b0c
                 bCruiseEngaged = 1;
             }
         }
@@ -333,7 +333,7 @@ bool ThrustManager::SetThrottle(float Throttle, int Mode)
 
     if (!(!bCruise && bCruiseEngaged == 0))
     {
-        ObjAffectOf(OwnerShip())->slot_50(false, false, -1);                // 062e8be7
+        ObjAffectOf(OwnerShip())->toggle_cruise(false, false, -1);                // 062e8be7
         bCruiseEngaged = 0;
     }
 

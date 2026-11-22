@@ -760,9 +760,9 @@ unsigned char FCliLauncherFx::TryFire(Vector const* Target)
         }
         return 0;
     }
-    if (Result > FireMuzzleCone && Result <= FireOwnerBlocked)
+    if (Result > FireMuzzleCone && Result <= FireCloakActive)
     {
-        // 0x0052d4ba..0x0052d4de: cruise / tradelane / owner-blocked (6..8) on the player's
+        // 0x0052d4ba..0x0052d4de: cruise / tradelane / cloak-active (6..8) on the player's
         // own host -> its vtable +0x1d0 (the ship's LAB_00545cc0).
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW())
             static_cast<FClientShipGameobj*>(Host)->Slot1d0();
@@ -2028,7 +2028,7 @@ void FCliCmDropperFx::notify(Event Code, void* Param)
         if (Owner == GetPlayerConnectionId())
         {
             unsigned short const EquipId = Equip->GetID();
-            static_cast<IObjAffect*>(Host)->slot_34(&EquipId, 1, nullptr,
+            static_cast<IObjAffect*>(Host)->fire_weapons(&EquipId, 1, nullptr,
                                                     static_cast<int>(GetPlayerConnectionId()));
         }
     }

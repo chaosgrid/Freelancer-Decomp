@@ -657,7 +657,7 @@ struct PlayerData {
     // clear (.text:06d49138), the slot teardown (.text:06d4947a), the initializer
     // (.text:06d496c5) and CharacterSelect (.text:06d4af86).
     unsigned int created_ship_id;      // +0x3E8: ship id reserved by RequestCreateShip
-    unsigned int Field_0x3FC;          // +0x3FC
+    unsigned int character_id;         // +0x3FC: returned by pub::Player::GetCharacter (FLSDK: characterId)
 
     // +0x410 (-0x8 from the slot end). NAMED 2026-09-24
     // (claude-code:w3-baseenter): the base the session last LEFT. BaseExit

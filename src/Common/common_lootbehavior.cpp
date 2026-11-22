@@ -89,7 +89,7 @@ namespace
             return false;
         Sys->Watcher149C.set(reinterpret_cast<Watchable const*>(reinterpret_cast<char*>(Target) + 8));   // 062ecdea
         IObjRW* const Owner = WatchedObject(Sys->Owner1498->Watcher);      // 062ece08-062ece1a
-        int const Result = static_cast<IObjAffect*>(Owner)->slot_40(Id, WatchedObject(Sys->Watcher149C), -1);
+        int const Result = static_cast<IObjAffect*>(Owner)->tractor_single(Id, WatchedObject(Sys->Watcher149C), -1);
         return Result == 0;                                         // 062ece26
     }
 
@@ -104,7 +104,7 @@ namespace
             return false;
         Sys->Watcher149C.set(nullptr);                              // 062ece6f-062ece76
         IObjRW* const Owner = WatchedObject(Sys->Owner1498->Watcher);
-        return static_cast<IObjAffect*>(Owner)->slot_4c(Id, false, -1) == 0;   // 062ece98
+        return static_cast<IObjAffect*>(Owner)->toggle_item(Id, false, -1) == 0;   // 062ece98
     }
 }
 

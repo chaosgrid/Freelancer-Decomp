@@ -344,7 +344,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 XActivateCruise Info;
                 Info.ObjectId = Wire->ObjectId;
                 Info.bActivate = (Wire->bActive != 0);
-                Info.Field_0x05 = (Wire->Field_0x05 != 0);
+                Info.bDisruptCruise = (Wire->Field_0x05 != 0);
                 Client->SendCommonActivateCruise(1, Info);
                 break;
             }

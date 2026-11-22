@@ -291,7 +291,7 @@ namespace AlchemyImpl
         return WalkNodesEnumerate(A, B);
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot13(void* Arg)
+    GENRESULT DACOM_API FFxEffectObject::DestroyNodes(void* Arg)
     {
         return DispatchFlagsToAlchemy(static_cast<unsigned long>(reinterpret_cast<unsigned int>(Arg)));
     }

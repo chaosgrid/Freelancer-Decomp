@@ -31,8 +31,8 @@ The output goes to `bin\`, which already holds the runtime configuration (`DACOM
 
 ### Requirements
 
-- Visual Studio 2022 (platform toolset v143) with the *Desktop development with C++* workload,
-  the *C++ MFC for latest v143 build tools (x86 & x64)* component (used by `FLServer`) and a
+- Visual Studio 2026 (platform toolset v145) with the *Desktop development with C++* workload,
+  the *C++ MFC for latest v145 build tools (x86 & x64)* component (used by `FLServer`) and a
   Windows 10/11 SDK. Everything builds as 32-bit (`Win32`).
 - Debug builds (`bin_debug\`) also need Python 3 on `PATH`: a post-build step copies the runtime
   configuration from `bin\`.

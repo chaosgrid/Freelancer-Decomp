@@ -120,7 +120,7 @@ void FormationBehavior::Slot4()
         return;
     (void)NavHelper->GunConvergenceStateBytes.RequestRelease();     // 062cc43e FUN_062ecd30
     unsigned int const Id = ObjInspectOf(OwnerContext)->get_id();   // 062cc448 slot 0x20
-    (void)ObjAffectOf(OwnerContext)->slot_60(1, &Id, -1);           // 062cc461 IObjAffect +0x60
+    (void)ObjAffectOf(OwnerContext)->request_cancel(1, &Id, -1);           // 062cc461 IObjAffect +0x60
 }
 
 // Slot 5, FUN_062cc030 (.text:062cc030-062cc0bf, RET 4, argument unread).

@@ -202,7 +202,7 @@ PlayerData::PlayerData()
       visit_map(), visited_states(), equip_id_maker(), trade_offer(nullptr),
       trade_request_partner(0), inbound_trade_requests(), ship_object_id(0),
       last_base_id(0), account_ptr(nullptr), saved_characters(), created_ship_id(0),
-      Field_0x3FC(0), exited_base_id(0) {
+      character_id(0), exited_base_id(0) {
     // +0x064: `MOV byte ptr [ESI+0x64],BL` -- the inlined CHARACTER_ID ctor;
     // selected_character() in the initializer list above is that call.
     // +0x28c..+0x2c4 and +0x2e4..+0x314: the part ids and the accessory count.
@@ -2503,7 +2503,7 @@ static void PlayerData_Teardown(PlayerData& Slot) {
     Slot.entered_base_id = 0;
     Slot.last_base_id = 0;
     Slot.current_location = 0;
-    Slot.Field_0x3FC = 0;
+    Slot.character_id = 0;
     Slot.exited_base_id = 0;
     // .text:06d49469 / 06d494a4 / 06d494aa -- +0x414 = CreateID("NO WHERE").
     Slot.starting_ring = CreateID("NO WHERE");
@@ -3887,7 +3887,7 @@ static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* Accou
     Slot.entered_base_id = 0;                                               // +0x3f4
     Slot.last_base_id = 0;                                                  // +0x3f0
     Slot.current_location = 0;                                              // +0x3f8
-    Slot.Field_0x3FC = 0;                                                   // +0x3fc
+    Slot.character_id = 0;                                                   // +0x3fc
     {
         CiWString LoginName(Info.AccountName, wcslen(Info.AccountName));   // .text:06d4917e
         Slot.account_ptr = Players.FindAccountFromName(LoginName);         // .text:06d491da
@@ -6257,7 +6257,7 @@ void StarSystem::spawn_mined_loot(Vector const& Pos, unsigned int ContainerArchI
     Rec.HitPts = 0.0f;
     Rec.ContentsHitPts = 0.0f;
     Rec.Count = 0;
-    Rec.Field_0x18 = 0u;
+    Rec.MarkForPlayer = 0u;
     Rec.Field_0x1c = 0u;
     Rec.Field_0x68 = 1;
     Rec.bMission = 0;
@@ -6578,8 +6578,8 @@ void StarSystem::sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int Sessio
     Rec.Orientation = Info.Orientation;
     Rec.Position = Info.Position;
     Rec.Field_0x20 = static_cast<float>(Info.Timestamp);
-    std::memcpy(&Rec.Field_0x24, &Info.Field_0x28, sizeof(Rec.Field_0x24));
-    Rec.Field_0x28 = Info.Field_0x2c;
+    std::memcpy(&Rec.Field_0x24, &Info.ThrottleBits, sizeof(Rec.Field_0x24));
+    Rec.Field_0x28 = Info.State;
 
     // .text:06d0bc69 .. 06d0bc99 -- every player node but the sender's
     // (node+0x40 == SessionId skipped): FUN_06cf65b0 on the view at node+8.
@@ -8309,7 +8309,7 @@ bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kin
     FServerDestroyObjectInfo Wire;
     Wire.ObjectId = Obj->get_id();
     unsigned int const KindDword = (unsigned int)Kind;
-    Wire.Field_0x04 = static_cast<unsigned char>(KindDword & 0xffu);
+    Wire.DestroyType = static_cast<unsigned char>(KindDword & 0xffu);
     Wire.Pad_0x05[0] = static_cast<unsigned char>((KindDword >> 8) & 0xffu);
     Wire.Pad_0x05[1] = static_cast<unsigned char>((KindDword >> 16) & 0xffu);
     Wire.Pad_0x05[2] = static_cast<unsigned char>((KindDword >> 24) & 0xffu);
@@ -9205,7 +9205,7 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
     // .text:06d0d51b .. 06d0d538  EDI = find_object(+0x08) (the object hit),
     // EBP = find_object(+0x04) (the shooter).
     GameObject* const Target = find_object(Info.ObjectId);
-    GameObject* const Shooter = find_object(Info.Field_0x04);
+    GameObject* const Shooter = find_object(Info.AttackerId);
 
     // .text:06d0d53a .. 06d0d56a  DAT_06d88a80 clear and a shooter that is a
     // player (vt +0xbc): a missing target or a player target ends it here.
@@ -9230,11 +9230,11 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
     Impact.ShooterId = 0u;
     Impact.Munition = nullptr;
     Impact.SubObjId = SUBOBJ_ID_NONE;
-    Archetype::Equipment* const MunitionArch = Archetype::GetEquipment(Info.Field_0x00);
+    Archetype::Equipment* const MunitionArch = Archetype::GetEquipment(Info.ProjectileArchId);
     Impact.Munition = static_cast<Archetype::Munition const*>(MunitionArch);
-    Impact.ShooterId = Info.Field_0x04;
-    Impact.SubObjId = Info.Field_0x0c;
-    std::memcpy(&Impact.HitPos, &Info.Field_0x10, sizeof(Vector));
+    Impact.ShooterId = Info.AttackerId;
+    Impact.SubObjId = Info.SubObjId;
+    std::memcpy(&Impact.HitPos, &Info.HitPosX, sizeof(Vector));
 
     // .text:06d0d5d0 .. 06d0d600  the DamageList at S+0x28, built inline
     // (std::list<DamageEntry> head from the Common import, count 0, bDestroyed
@@ -9371,8 +9371,8 @@ void StarSystem::create_loot(unsigned int SourceObjId, int Mode, FLootRecord con
 
             // .text:06d08cf8 .. 06d08d07  a player to mark the loot for
             // (FUN_06cef3b0 == GameObject::mark_for_player, mark type 1).
-            if ((Record->Field_0x18 & 0x3fffffffu) != 0u)
-                Obj->mark_for_player(Record->Field_0x18, 1);
+            if ((Record->MarkForPlayer & 0x3fffffffu) != 0u)
+                Obj->mark_for_player(Record->MarkForPlayer, 1);
 
             // .text:06d08d0c .. 06d08d17  CALL [EDX + 0x170] (enter_system)
             // with ESI = [S+0x14] and a null CreateParms.
@@ -10041,7 +10041,7 @@ void StarSystem::notify_cruise(unsigned int const& ObjId, bool bEngage, bool bAr
         XActivateCruise Record = {};
         Record.ObjectId = ObjId;
         Record.bActivate = bEngage;
-        Record.Field_0x05 = bArg2 ? 1u : 0u;
+        Record.bDisruptCruise = bArg2 ? 1u : 0u;
         g_pClientInterface->SendCommonActivateCruise(Node->View.PlayerId, Record);
     }
 }

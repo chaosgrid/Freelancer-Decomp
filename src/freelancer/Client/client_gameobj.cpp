@@ -621,7 +621,7 @@ void FClientGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* Other
     Info.ObjectId = Other->get_id();
     Info.SubObjId = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
     Info.Pad_0x0e = 0;
-    std::memcpy(&Info.Field_0x10, &Damage, sizeof(float));
+    std::memcpy(&Info.DamageBits, &Damage, sizeof(float));
     // 0x00539f58..0x00539f79: DAT_0067ecd0 slot 55 (+0xdc) SPObjCollision(Info, DAT_00673344),
     // no null test.
     LocalServer()->SPObjCollision(Info, GetPlayerConnectionId());
@@ -945,18 +945,18 @@ int FClientGameobj::set_follow_leader(IObjRW*) { return -8; }                   
 int FClientGameobj::set_follow_offset(Vector const&) { return -8; }                      // 0053a900
 int FClientGameobj::add_follow_follower(IObjRW*) { return -8; }                          // 0053a900
 int FClientGameobj::remove_follow_follower(IObjRW*) { return -8; }                       // 0053a900
-int FClientGameobj::slot_34(unsigned short const*, unsigned, Vector const*, int) { return -3; }  // 0053a920
-int FClientGameobj::slot_38(unsigned short, int, int) { return -3; }                     // 0053a910
-int FClientGameobj::slot_3c(unsigned short const*, std::vector<IObjRW*> const&, int) { return -3; }  // 0053a910
-int FClientGameobj::slot_40(unsigned short const*, IObjRW*, int) { return -3; }          // 0053a910
-int FClientGameobj::slot_44(unsigned short const*, IObjRW*, unsigned short, int) { return -3; }  // 0053a920
+int FClientGameobj::fire_weapons(unsigned short const*, unsigned, Vector const*, int) { return -3; }  // 0053a920
+int FClientGameobj::jettison_cargo(unsigned short, int, int) { return -3; }                     // 0053a910
+int FClientGameobj::tractor_all(unsigned short const*, std::vector<IObjRW*> const&, int) { return -3; }  // 0053a910
+int FClientGameobj::tractor_single(unsigned short const*, IObjRW*, int) { return -3; }          // 0053a910
+int FClientGameobj::set_gun_target(unsigned short const*, IObjRW*, unsigned short, int) { return -3; }  // 0053a920
 int FClientGameobj::set_target(IObjRW*, unsigned short, int) { return -3; }              // 0053a910
-int FClientGameobj::slot_4c(unsigned short const*, bool, int) { return -3; }             // 0053a910
-int FClientGameobj::slot_50(bool, bool, int) { return -3; }                              // 0053a910
-int FClientGameobj::slot_54(bool, int) { return -3; }                                    // 0053a940
-int FClientGameobj::slot_58(unsigned short, unsigned, int) { return -3; }                // 0053a910
-int FClientGameobj::slot_5c(int, unsigned const*, unsigned const*, int, RequestCB*) { return -3; }  // 0053a8f0
-int FClientGameobj::slot_60(int, unsigned const*, int) { return -3; }                    // 0053a910
+int FClientGameobj::toggle_item(unsigned short const*, bool, int) { return -3; }             // 0053a910
+int FClientGameobj::toggle_cruise(bool, bool, int) { return -3; }                              // 0053a910
+int FClientGameobj::toggle_thrusters(bool, int) { return -3; }                                    // 0053a940
+int FClientGameobj::use_item(unsigned short, unsigned, int) { return -3; }                // 0053a910
+int FClientGameobj::request_event(int, unsigned const*, unsigned const*, int, RequestCB*) { return -3; }  // 0053a8f0
+int FClientGameobj::request_cancel(int, unsigned const*, int) { return -3; }                    // 0053a910
 int FClientGameobj::go_tradelane(IObjInspect const*, IObjInspect const*, bool, float) { return -3; }  // 0053a920
 int FClientGameobj::stop_tradelane() { return -3; }                                      // 0053a930
 int FClientGameobj::slot_6c(int, int) { return -3; }                                     // 0053a940
@@ -1537,7 +1537,7 @@ void FClientEquippedObj::ApplySubTarget(unsigned short SubObj)
 
     // 0x005358b5..0x005358ca / 0x00535959..0x0053596d: IObjAffect (+4) slot 17 (vt+0x44) with
     // (&SubObj, the target Gameobj, the stored sub-object, 0).
-    static_cast<IObjAffect*>(this)->slot_44(&SubObj, static_cast<IObjRW*>(Target),
+    static_cast<IObjAffect*>(this)->set_gun_target(&SubObj, static_cast<IObjRW*>(Target),
                                             Entry.TargetSubObj, 0);
 }
 
@@ -1651,7 +1651,7 @@ unsigned char FClientEquippedObj::Slot1cc(FCliEquipFirePacket const* Packet)
     return EquippedObjHandleEquipMsg(this, Packet);
 }
 
-int FClientEquippedObj::slot_34(unsigned short const* EquipIds, unsigned Count,
+int FClientEquippedObj::fire_weapons(unsigned short const* EquipIds, unsigned Count,
                                 Vector const* TargetPos, int SourceClient)
 {
     // FUN_00534870 -- ported as CliShipFireWeapons (cli_projectile_fx.cpp), which takes the
@@ -1681,7 +1681,7 @@ namespace
     }
 }
 
-int FClientEquippedObj::slot_3c(unsigned short const* EquipId,
+int FClientEquippedObj::tractor_all(unsigned short const* EquipId,
                                 std::vector<IObjRW*> const& Targets, int SourceClient)
 {
     // LAB_00535010 (thiscall on the IObjAffect sub-object, RET 0xc) -- listing
@@ -1728,7 +1728,7 @@ int FClientEquippedObj::slot_3c(unsigned short const* EquipId,
     return 0;
 }
 
-int FClientEquippedObj::slot_40(unsigned short const* EquipId, IObjRW* Target, int SourceClient)
+int FClientEquippedObj::tractor_single(unsigned short const* EquipId, IObjRW* Target, int SourceClient)
 {
     // FUN_00534e60 (thiscall on the IObjAffect sub-object, RET 0xc) -- 0x00534e60..0x00534fe6,
     // raw decode (Ghidra left it undisassembled). The single-target form of slot 15.
@@ -1767,7 +1767,7 @@ int FClientEquippedObj::slot_40(unsigned short const* EquipId, IObjRW* Target, i
     return 0;
 }
 
-int FClientEquippedObj::slot_44(unsigned short const* EquipId, IObjRW* Target,
+int FClientEquippedObj::set_gun_target(unsigned short const* EquipId, IObjRW* Target,
                                 unsigned short SubTarget, int SourceClient)
 {
     // FUN_005351d0 -- ported as CliEquippedObjSetGunTarget (cli_projectile_fx.cpp).
@@ -1775,7 +1775,7 @@ int FClientEquippedObj::slot_44(unsigned short const* EquipId, IObjRW* Target,
                                       SourceClient);
 }
 
-int FClientEquippedObj::slot_4c(unsigned short const* EquipId, bool bActivate, int SourceClient)
+int FClientEquippedObj::toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient)
 {
     // LAB_00535330 -- ported as CliShipActivateEquip (cli_projectile_fx.cpp); its value is
     // retail's EAX (0 on every path, 0x00535459).
@@ -1783,7 +1783,7 @@ int FClientEquippedObj::slot_4c(unsigned short const* EquipId, bool bActivate, i
                                 static_cast<unsigned char>(bActivate), SourceClient);
 }
 
-int FClientEquippedObj::slot_58(unsigned short EquipId, unsigned Count, int SourceClient)
+int FClientEquippedObj::use_item(unsigned short EquipId, unsigned Count, int SourceClient)
 {
     // LAB_00535470 (thiscall on the IObjAffect sub-object, RET 0xc) -- listing
     // 0x00535470..0x00535646: use a repair kit / shield battery from the cargo hold.
@@ -2966,7 +2966,7 @@ void FClientShipGameobj::SetTargetWithGuns(IObjRW* Target, unsigned short SubTar
         if (Gun == nullptr)
             break;
         unsigned short const GunId = Gun->Id;
-        FClientEquippedObj::slot_44(&GunId, Target, SubTarget,
+        FClientEquippedObj::set_gun_target(&GunId, Target, SubTarget,
                                     static_cast<int>(GetPlayerConnectionId()));
     }
 }
@@ -2991,12 +2991,12 @@ bool FClientShipGameobj::RequestTractor(IObjRW* Target)
         if (TargetObj != nullptr &&
             (static_cast<unsigned>(TargetObj->ObjectClass) & 0x803u) == 0x803u)
         {
-            Affect->slot_40(&TractorId, Target, static_cast<int>(GetPlayerConnectionId()));
+            Affect->tractor_single(&TractorId, Target, static_cast<int>(GetPlayerConnectionId()));
         }
         return true;
     }
     // 0x00544ccf..0x00544cec: otherwise vt+0x4c (id, false, connection).
-    Affect->slot_4c(&TractorId, false, static_cast<int>(GetPlayerConnectionId()));
+    Affect->toggle_item(&TractorId, false, static_cast<int>(GetPlayerConnectionId()));
     return true;
 }
 
@@ -3375,7 +3375,7 @@ void FClientShipGameobj::Slot198(DamageList const& Damage)
     // narrowing), when there is one, IBehaviorManager::update_current_behavior_cruise(false).
     if (static_cast<int>(Damage.Cause) == 6 && this == GetPlayerObjRW())
     {
-        static_cast<IObjAffect*>(this)->slot_50(false, true,
+        static_cast<IObjAffect*>(this)->toggle_cruise(false, true,
                                                 static_cast<int>(GetPlayerConnectionId()));
         IBehaviorManager* const Behavior =
             static_cast<CEqObj*>(NarrowObject(this, 0x503u))->get_behavior_interface();
@@ -3683,7 +3683,7 @@ int FClientShipGameobj::set_strafe_dir(StrafeDir Dir)
     if (Engine != nullptr && !Engine->IsActive())
     {
         unsigned short EngineId = Engine->Id;
-        static_cast<IObjAffect*>(this)->slot_4c(&EngineId, true,
+        static_cast<IObjAffect*>(this)->toggle_item(&EngineId, true,
                                                 static_cast<int>(GetPlayerConnectionId()));
     }
 
@@ -3725,7 +3725,7 @@ int FClientShipGameobj::remove_formation_follower(IObjRW* Follower)
         static_cast<CShip*>(NarrowObject(this, 0x503u))->remove_formation_follower(Follower));
 }
 
-int FClientShipGameobj::slot_38(unsigned short EquipId, int Count, int SourceClient)
+int FClientShipGameobj::jettison_cargo(unsigned short EquipId, int Count, int SourceClient)
 {
     // FUN_005467e0 (IObjAffect slot 14, RET 0xc) -- cargo jettison.
     // 0x005467e4..0x00546836: from this client (-1 or DAT_00673344) the request goes to the
@@ -3764,7 +3764,7 @@ int FClientShipGameobj::set_target(IObjRW* Target, unsigned short SubTarget, int
     return CliShipSetTarget(static_cast<IObjAffect*>(this), Target, SubTarget, SourceClient);
 }
 
-int FClientShipGameobj::slot_50(bool bEngage, bool bArg2, int SourceClient)
+int FClientShipGameobj::toggle_cruise(bool bEngage, bool bArg2, int SourceClient)
 {
     // LAB_00546a10 (IObjAffect slot 20, RET 0xc) -- cruise.
     // 0x00546a16..0x00546a3e: this client's own request (-1 or DAT_00673344).
@@ -3788,7 +3788,7 @@ int FClientShipGameobj::slot_50(bool bEngage, bool bArg2, int SourceClient)
     {
         bChanged = true;
         if (bEngage && bLocal)
-            static_cast<IObjAffect*>(this)->slot_54(false,
+            static_cast<IObjAffect*>(this)->toggle_thrusters(false,
                                                     static_cast<int>(GetPlayerConnectionId()));
         Engine->EngageCruise(bEngage, bArg2);
     }
@@ -3799,14 +3799,14 @@ int FClientShipGameobj::slot_50(bool bEngage, bool bArg2, int SourceClient)
     {
         XActivateCruise Info;
         Info.ObjectId = get_id();
-        Info.Field_0x05 = static_cast<unsigned char>(bArg2);
+        Info.bDisruptCruise = static_cast<unsigned char>(bArg2);
         Info.bActivate = bEngage;
         LocalServer()->ActivateCruise(GetPlayerConnectionId(), Info);
     }
     return 0;
 }
 
-int FClientShipGameobj::slot_54(bool bActivate, int SourceClient)
+int FClientShipGameobj::toggle_thrusters(bool bActivate, int SourceClient)
 {
     // LAB_00546b50 (IObjAffect slot 21, RET 8) -- the thrusters.
     // 0x00546b54..0x00546b79: this client's own request (-1 or DAT_00673344).
@@ -3835,7 +3835,7 @@ int FClientShipGameobj::slot_54(bool bActivate, int SourceClient)
         if (bActivate && !bEngineActive)
         {
             unsigned short EngineId = Engine->Id;
-            static_cast<IObjAffect*>(this)->slot_4c(&EngineId, true, SourceClient);
+            static_cast<IObjAffect*>(this)->toggle_item(&EngineId, true, SourceClient);
         }
     }
 
@@ -3866,7 +3866,7 @@ int FClientShipGameobj::slot_54(bool bActivate, int SourceClient)
     return 0;
 }
 
-int FClientShipGameobj::slot_5c(int RequestType, unsigned const* TargetId,
+int FClientShipGameobj::request_event(int RequestType, unsigned const* TargetId,
                                 unsigned const* SecondId, int bFlag, RequestCB* Callback)
 {
     // LAB_00546df0: keep the callback at +0xec, then IServer::RequestEvent (vt+0xf0) with
@@ -3881,7 +3881,7 @@ int FClientShipGameobj::slot_5c(int RequestType, unsigned const* TargetId,
     return 0;
 }
 
-int FClientShipGameobj::slot_60(int RequestType, unsigned const* TargetId, int Arg3)
+int FClientShipGameobj::request_cancel(int RequestType, unsigned const* TargetId, int Arg3)
 {
     // LAB_00546e40: drop the callback, then IServer::RequestCancel (vt+0xf4) with
     // (RequestType, get_id(), *TargetId, Arg3, DAT_00673344).
@@ -4708,15 +4708,15 @@ void FClientBeamGameobj::Slot1ac(void const* A, void const* B, FClientGameobj* O
     CObject* const Obj = NarrowObject(this, 0x7u);
     Vector const* const HitPos = static_cast<Vector const*>(A);
     SSPMunitionCollisionInfo Info;
-    Info.Field_0x00 = Obj->Archetype->Nickname.Id;                             // 0x0053f7f9
-    Info.Field_0x04 = static_cast<CProjectile const*>(Obj)->OwnerId;           // 0x0053f7e0
+    Info.ProjectileArchId = Obj->Archetype->Nickname.Id;                       // 0x0053f7f9
+    Info.AttackerId = static_cast<CProjectile const*>(Obj)->OwnerId;           // 0x0053f7e0
     Info.ObjectId = Other->get_id();                                           // 0x0053f80c
     // 0x0053f819: the low word of D, the sub-object that was hit. +0x0e is never written.
-    Info.Field_0x0c = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
+    Info.SubObjId = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D));
     Info.Pad_0x0e = 0;
-    std::memcpy(&Info.Field_0x10, &HitPos->x, sizeof(float));
-    std::memcpy(&Info.Field_0x14, &HitPos->y, sizeof(float));
-    std::memcpy(&Info.Field_0x18, &HitPos->z, sizeof(float));
+    std::memcpy(&Info.HitPosX, &HitPos->x, sizeof(float));
+    std::memcpy(&Info.HitPosY, &HitPos->y, sizeof(float));
+    std::memcpy(&Info.HitPosZ, &HitPos->z, sizeof(float));
     // 0x0053f82d..0x0053f848: DAT_0067ecd0 slot 53 (+0xd4) SPMunitionCollision(Info,
     // DAT_00673344), no null test.
     LocalServer()->SPMunitionCollision(Info, GetPlayerConnectionId());
@@ -4969,14 +4969,14 @@ void FClientGuidedGameobj::Slot1ac(void const* A, void const* B, FClientGameobj*
     CObject* const Obj = NarrowObject(this, 0x7u);
     Vector const* const HitPos = static_cast<Vector const*>(A);
     SSPMunitionCollisionInfo Info;
-    Info.Field_0x04 = static_cast<CProjectile const*>(Obj)->OwnerId;           // 0x0053ee5a
-    Info.Field_0x00 = Obj->Archetype->Nickname.Id;                             // 0x0053ee79
+    Info.AttackerId = static_cast<CProjectile const*>(Obj)->OwnerId;           // 0x0053ee5a
+    Info.ProjectileArchId = Obj->Archetype->Nickname.Id;                       // 0x0053ee79
     Info.ObjectId = Other->get_id();                                           // 0x0053ee84
-    Info.Field_0x0c = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D)); // 0x0053ee96
+    Info.SubObjId = static_cast<unsigned short>(reinterpret_cast<uintptr_t>(D)); // 0x0053ee96
     Info.Pad_0x0e = 0; // +0x0e is never written
-    std::memcpy(&Info.Field_0x10, &HitPos->x, sizeof(float));
-    std::memcpy(&Info.Field_0x14, &HitPos->y, sizeof(float));
-    std::memcpy(&Info.Field_0x18, &HitPos->z, sizeof(float));
+    std::memcpy(&Info.HitPosX, &HitPos->x, sizeof(float));
+    std::memcpy(&Info.HitPosY, &HitPos->y, sizeof(float));
+    std::memcpy(&Info.HitPosZ, &HitPos->z, sizeof(float));
     // 0x0053eea5..0x0053eec0: DAT_0067ecd0 slot 53 (+0xd4) SPMunitionCollision(Info,
     // DAT_00673344), no null test.
     LocalServer()->SPMunitionCollision(Info, GetPlayerConnectionId());
