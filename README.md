@@ -13,13 +13,8 @@ Documentation: [docs/README.md](docs/README.md).
 1. **Clone** this repository.
 2. **Add the game data:** copy the `DATA` folder of an installed Freelancer (or of a mod) into
    the repository root, next to `src`, so that `DATA\` and `DATA_EXTRA\` sit side by side.
-3. **Add the DirectX 8.1 SDK:** download the
-   [DirectX 8.1 SDK (Final)](https://archive.org/details/dx81sdk_full), install or extract it, and
-   copy its `include` and `lib` folders into a `dx8` folder at the repository root (so that
-   `dx8\include\d3d8.h` and `dx8\lib\d3d8.lib` exist). Only the headers and libraries are used;
-   another location can be given with `/p:Dx8SdkDir=<path>`.
-4. **Build the Release configuration** of `src\Freelancer.sln` (`Release|Win32`) in Visual Studio,
-   or from a Developer Command Prompt:
+3. **Build the Release configuration** of `src\Freelancer.sln` (`Release|Win32`) in Visual Studio,
+   or from a Developer Command Prompt (no legacy DirectX 8/9 SDK required — uses the Windows SDK only):
 
    ```
    msbuild src\Freelancer.sln -t:Build -p:Configuration=Release -p:Platform=Win32
@@ -45,7 +40,7 @@ property page *Freelancer diagnostics*), or `/p:<Name>=0|1` on the MSBuild comma
 | Property | Default | What it does |
 |---|---|---|
 | `FreelancerWidescreenSupport` | 1 | Widescreen (Hor+) display modes and HUD layout |
-| `FreelancerRp9` | 0 | `RP9.dll`, a Direct3D 9 renderer with volumetric nebulae ([docs/re/rp9.md](docs/re/rp9.md)); needs the [DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) and `DirectX9` in `bin\DACOM.INI` |
+| `FreelancerRp9` | 1 | Client Direct3D 9 extension hooks such as volumetric nebulae (`RP9.dll` is always built using the Windows SDK only; [docs/re/rp9.md](docs/re/rp9.md)) |
 | `FreelancerBetaLabel` | 0 | The "Beta" label in the corner of the screen |
 | `FreelancerEnableTickProfile` | 0 | On-screen frame profiler |
 

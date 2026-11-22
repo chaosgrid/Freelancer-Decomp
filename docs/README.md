@@ -50,7 +50,7 @@ runtime: `bin\DACOM.INI` points every `[Libraries]` entry into `bin\`.
 
 ## Building
 
-Requires Visual Studio 2026 (MSVC v145, Win32 target) and the DirectX 8 SDK headers (`dx8\`).
+Requires Visual Studio 2026 (MSVC v145, Win32 target) and the Windows 10/11 SDK (no legacy DirectX SDK required).
 
 ```
 MSBuild.exe src\Freelancer.sln -t:Build -p:Configuration=Debug -v:minimal

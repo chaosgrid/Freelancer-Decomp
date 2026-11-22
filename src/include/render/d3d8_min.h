@@ -6,18 +6,11 @@
 
 #pragma once
 
-#if defined(RP_DIRECT3D9)
-
-// RP9.dll (src/RP9) only: the public render interfaces speak the Direct3D 8 "language"
-// (D3DLIGHT8, D3DMATERIAL8, D3DRENDERSTATETYPE, D3D8 texture-stage numbers, FVF codes), but
-// d3d8types.h and d3d9types.h cannot share one translation unit. RP9 therefore sees the
-// interface through Direct3D 9 types whose layout is identical to the D3D8 ones; it translates
-// everything else (state numbers, device blobs) itself. See docs/re/rp9.md.
-//
-// <d3d9.h> must resolve to the Windows SDK header: the DirectX SDK (June 2010) include
-// directory, which also ships an older d3d9.h, is appended after the Windows SDK in RP9.vcxproj.
-// Include this header before any d3dx9*.h -- d3dx9.h pulls "d3d9.h" by quoted path, and the
-// shared include guard (_D3D9_H_) then keeps the SDK copy.
+// Zero-SDK Direct3D 9 header bridge: uses <d3d9.h> from the Windows 10/11 SDK exclusively.
+// The public render interfaces (IRenderPipeline, Shading, flmaterials, Deformable2, alchemy,
+// RendComp, freelancer) keep Freelancer's D3D8-numbered render-state/texture-stage values
+// and identical-layout D3DLIGHT/D3DMATERIAL/D3DXIMAGE_INFO structs, which RP9 translates to
+// Direct3D 9 calls internally.
 
 #ifndef DIRECT3D_VERSION
 #define DIRECT3D_VERSION 0x0900
@@ -28,7 +21,7 @@
 
 #include <d3d9.h>
 
-// D3DLIGHT9 / D3DMATERIAL9 are field-for-field the D3D8 structures (d3d8types.h).
+// D3DLIGHT9 / D3DMATERIAL9 are field-for-field identical to D3D8's D3DLIGHT8 / D3DMATERIAL8.
 typedef D3DLIGHT9 D3DLIGHT8;
 typedef D3DMATERIAL9 D3DMATERIAL8;
 
@@ -36,35 +29,59 @@ static_assert(sizeof(D3DLIGHT8) == 0x68, "D3DLIGHT9 has the D3DLIGHT8 layout");
 static_assert(sizeof(D3DMATERIAL8) == 0x44, "D3DMATERIAL9 has the D3DMATERIAL8 layout");
 static_assert(sizeof(D3DRENDERSTATETYPE) == 4, "D3DRENDERSTATETYPE is one dword");
 
-#else
+// D3D8-numbered render states removed or renamed in d3d9types.h (RP9 translates them).
+static const D3DRENDERSTATETYPE D3DRS_LINEPATTERN = static_cast<D3DRENDERSTATETYPE>(10);
+static const D3DRENDERSTATETYPE D3DRS_ZVISIBLE = static_cast<D3DRENDERSTATETYPE>(30);
+static const D3DRENDERSTATETYPE D3DRS_EDGEANTIALIAS = static_cast<D3DRENDERSTATETYPE>(40);
+static const D3DRENDERSTATETYPE D3DRS_ZBIAS = static_cast<D3DRENDERSTATETYPE>(47);
+static const D3DRENDERSTATETYPE D3DRS_SOFTWAREVERTEXPROCESSING = static_cast<D3DRENDERSTATETYPE>(153);
+static const D3DRENDERSTATETYPE D3DRS_PATCHSEGMENTS = static_cast<D3DRENDERSTATETYPE>(164);
 
-// DirectX 8 SDK headers. Include the SDK file by quoted path so d3d8types.h /
-// d3d8caps.h resolve next to it. Do NOT add DX8\include to /I — that SDK ships
-// an old basetsd.h that breaks Windows 10 winnt.h (PVOID64).
-//
-// Default SDK: $(Dx8SdkDir) = repo-root dx8/ = DirectX 8.1 SDK (D3D_SDK_VERSION 220). Retail
-// rp8.dll statically links the 8.1 D3DX (D3DXSaveSurfaceToFile chain, FUN_06d2f880) but calls
-// Direct3DCreate8 with the literal 0x78 (120, rp8.dll.txt 06d05db7), so RP8 passes 0x78 too
-// and does not use D3D_SDK_VERSION.
+// D3D8-numbered texture-stage states moved to D3DSAMP_* in Direct3D 9 (RP9 translates them).
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_ADDRESSU = static_cast<D3DTEXTURESTAGESTATETYPE>(13);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_ADDRESSV = static_cast<D3DTEXTURESTAGESTATETYPE>(14);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_BORDERCOLOR = static_cast<D3DTEXTURESTAGESTATETYPE>(15);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MAGFILTER = static_cast<D3DTEXTURESTAGESTATETYPE>(16);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MINFILTER = static_cast<D3DTEXTURESTAGESTATETYPE>(17);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MIPFILTER = static_cast<D3DTEXTURESTAGESTATETYPE>(18);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MIPMAPLODBIAS = static_cast<D3DTEXTURESTAGESTATETYPE>(19);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MAXMIPLEVEL = static_cast<D3DTEXTURESTAGESTATETYPE>(20);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_MAXANISOTROPY = static_cast<D3DTEXTURESTAGESTATETYPE>(21);
+static const D3DTEXTURESTAGESTATETYPE D3DTSS_ADDRESSW = static_cast<D3DTEXTURESTAGESTATETYPE>(25);
 
-#ifndef DIRECT3D_VERSION
-#define DIRECT3D_VERSION 0x0800
+// D3DXIMAGE_FILEFORMAT & _D3DXIMAGE_INFO (identical 7-dword layout in D3DX8 and D3DX9).
+#ifndef D3DX_FILTER_NONE
+#define D3DX_FILTER_NONE     1u
+#define D3DX_FILTER_POINT    2u
+#define D3DX_FILTER_LINEAR   3u
+#define D3DX_FILTER_TRIANGLE 4u
+#define D3DX_FILTER_BOX      5u
 #endif
 
-#include <stddef.h>
-#include <windows.h>
+typedef enum _D3DXIMAGE_FILEFORMAT
+{
+    D3DXIFF_BMP = 0,
+    D3DXIFF_JPG = 1,
+    D3DXIFF_TGA = 2,
+    D3DXIFF_PNG = 3,
+    D3DXIFF_DDS = 4,
+    D3DXIFF_PPM = 5,
+    D3DXIFF_DIB = 6,
+    D3DXIFF_FORCE_DWORD = 0x7fffffff
+} D3DXIMAGE_FILEFORMAT;
 
-#include "d3d8.h"
+typedef struct _D3DXIMAGE_INFO
+{
+    UINT Width;
+    UINT Height;
+    UINT Depth;
+    UINT MipLevels;
+    D3DFORMAT Format;
+    D3DRESOURCETYPE ResourceType;
+    D3DXIMAGE_FILEFORMAT ImageFileFormat;
+} D3DXIMAGE_INFO;
 
-
-static_assert(sizeof(D3DPRESENT_PARAMETERS) == 0x34, "D3DPRESENT_PARAMETERS");
-static_assert(sizeof(D3DCAPS8) == 0xD4, "D3DCAPS8 DX8");
-static_assert(offsetof(D3DCAPS8, DevCaps) == 0x1C, "DevCaps");
-static_assert(offsetof(D3DCAPS8, RasterCaps) == 0x24, "RasterCaps");
-static_assert(offsetof(D3DCAPS8, TextureCaps) == 0x3C, "TextureCaps");
-static_assert(offsetof(D3DCAPS8, MaxTextureWidth) == 0x58, "MaxTextureWidth");
-static_assert(offsetof(D3DCAPS8, MaxTextureHeight) == 0x5C, "MaxTextureHeight");
-
-typedef IDirect3D8*(WINAPI* FnDirect3DCreate8)(UINT SdkVersion);
-
-#endif
+static_assert(sizeof(_D3DXIMAGE_INFO) == 0x1C, "D3DXIMAGE_INFO is 7 dwords");
+static_assert(offsetof(_D3DXIMAGE_INFO, Format) == 0x10, "D3DXIMAGE_INFO Format");
+static_assert(offsetof(_D3DXIMAGE_INFO, ResourceType) == 0x14, "D3DXIMAGE_INFO ResourceType");
+static_assert(offsetof(_D3DXIMAGE_INFO, ImageFileFormat) == 0x18, "D3DXIMAGE_INFO ImageFileFormat");

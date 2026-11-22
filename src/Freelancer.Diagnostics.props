@@ -5,6 +5,6 @@
     <FreelancerEnableTickProfile>0</FreelancerEnableTickProfile>
     <FreelancerBetaLabel>0</FreelancerBetaLabel>
     <FreelancerWidescreenSupport>1</FreelancerWidescreenSupport>
-    <FreelancerRp9>0</FreelancerRp9>
+    <FreelancerRp9>1</FreelancerRp9>
   </PropertyGroup>
 </Project>

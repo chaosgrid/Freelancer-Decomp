@@ -14,10 +14,8 @@
 
 #include <windows.h>
 
-// DirectPlay8 SDK (dx8\include, appended to the END of $(IncludePath) by each .vcxproj that
-// includes this header -- DALib and freelancer; see src/include/render/d3d8_min.h for why the
-// old SDK must not precede the Windows 10 SDK).
-#include <dplay8.h>
+// Self-contained minimal DirectPlay8 COM definitions (no legacy DX8 SDK required).
+#include "dplay8_min.h"
 
 #include <list>
 #include <cstddef>

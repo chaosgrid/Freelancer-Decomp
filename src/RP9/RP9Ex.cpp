@@ -27,8 +27,9 @@
 #include <string>
 #include <vector>
 
-// d3dx9.h after RP9.h (render/d3d8_min.h already pulled the Windows SDK d3d9.h).
-#include <d3dx9.h>
+// Windows SDK D3DCompiler (compiles vs_3_0 / ps_3_0 HLSL without legacy DX9 SDK).
+#include <d3dcompiler.h>
+#pragma comment(lib, "d3dcompiler.lib")
 
 namespace
 {
@@ -121,7 +122,7 @@ namespace
     }
 
     // #include "x" / <x>: first next to the top-level file, then from the FileSystem root.
-    class FRp9ExShaderInclude final : public ID3DXInclude
+    class FRp9ExShaderInclude final : public ID3DInclude
     {
     public:
         FRp9ExShaderInclude(IFileSystem* InFileSystem, const std::string& InDirectory)
@@ -130,7 +131,7 @@ namespace
         }
 
         // STDMETHOD keeps the base's COM_DECLSPEC_NOTHROW on the override.
-        STDMETHOD(Open)(D3DXINCLUDE_TYPE /*Type*/, LPCSTR FileName, LPCVOID /*ParentData*/,
+        STDMETHOD(Open)(D3D_INCLUDE_TYPE /*Type*/, LPCSTR FileName, LPCVOID /*ParentData*/,
                         LPCVOID* OutData, UINT* OutBytes) override
         {
             std::vector<char> Data;
@@ -165,17 +166,16 @@ namespace
         std::string Directory;
     };
 
-    // One D3DXCompileShader run. The compiler's text is logged: as ERROR on failure, as WARNING
+    // One D3DCompile run. The compiler's text is logged: as ERROR on failure, as WARNING
     // when it compiled with warnings.
-    bool CompileStage(const std::string& Source, const std::string& Path, ID3DXInclude* Include,
+    bool CompileStage(const std::string& Source, const std::string& Path, ID3DInclude* Include,
                       const std::string& Entry, const char* Profile,
                       std::vector<unsigned char>* OutCode)
     {
-        LPD3DXBUFFER Code = nullptr;
-        LPD3DXBUFFER Errors = nullptr;
-        const HRESULT Hr = D3DXCompileShader(Source.c_str(), (UINT)(Source.size()), nullptr,
-                                             Include, Entry.c_str(), Profile, 0, &Code,
-                                             &Errors, nullptr);
+        ID3DBlob* Code = nullptr;
+        ID3DBlob* Errors = nullptr;
+        const HRESULT Hr = D3DCompile(Source.c_str(), Source.size(), Path.c_str(), nullptr,
+                                      Include, Entry.c_str(), Profile, 0, 0, &Code, &Errors);
         const bool bOk = SUCCEEDED(Hr) && Code != nullptr;
         if (!bOk)
             ExLogf(kExFdumpError, "ERROR", __LINE__, "%s: %s %s failed to compile (hr 0x%08x)",

@@ -1,8 +1,4 @@
 <Project>
-  <!-- Public rendering interfaces use DX8 types; keep this SDK after the Windows SDK. -->
-  <PropertyGroup>
-    <IncludePath>$(IncludePath);$(Dx8SdkDir)\include</IncludePath>
-  </PropertyGroup>
   <!-- Evaluate after project/property-sheet values, rather than freezing the early default. -->
   <ItemDefinitionGroup>
     <ClCompile>

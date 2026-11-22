@@ -74,11 +74,8 @@ static bool ParserEnumLine(IProfileParser* Parser, void* Section, int Index, cha
 #pragma comment(lib, "d3d9.lib")
 #pragma comment(lib, "version.lib")
 
-// D3DX9 (DirectX SDK June 2010, runtime d3dx9_43.dll) and DxErr. The D3D9 shim (RP9.h ->
-// render/d3d8_min.h) is already in, so d3dx9.h's quoted "d3d9.h" finds the include guard set by
-// the Windows SDK copy.
-#include <d3dx9tex.h>
-#include <DxErr.h>
+// Zero-SDK D3D9 image, surface, texture, and HRESULT helpers (replaces D3DX9 / DxErr).
+#include "Rp9Image.h"
 
 // IRPTexture::GetImageInfo hands the caller's D3DX 8.1 D3DXIMAGE_INFO (d3dx8tex.h: Width, Height,
 // Depth, MipLevels, Format, ResourceType, ImageFileFormat) to D3DX9, whose record has the same
@@ -857,7 +854,7 @@ namespace
     const char* HrToText(HRESULT Hr)
     {
         G_HrText[0] = '\0';
-        const char* Name = DXGetErrorStringA(Hr);
+        const char* Name = Rp9HrToString(Hr);
         if (Name != nullptr)
         {
             strncpy(G_HrText, Name, sizeof(G_HrText) - 1);
@@ -3928,8 +3925,8 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
     if (RectCount == 0)
         Hr = Device_->GetRenderTargetData(Back, LockBufferSurf_);
     else
-        Hr = D3DXLoadSurfaceFromSurface(LockBufferSurf_, nullptr, nullptr, Back, nullptr,
-                                        SrcRects, D3DX_FILTER_NONE, 0);
+        Hr = Rp9LoadSurfaceFromSurface(LockBufferSurf_, nullptr, nullptr, Back, nullptr,
+                                       SrcRects, D3DX_FILTER_NONE, 0);
     if (Hr < 0)
         FdumpHr("lock_buffer_copy: %s", Hr, 2509);
 
@@ -4898,9 +4895,9 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
     // 06d0f0bc: D3DXLoadSurfaceFromMemory (FUN_06d2f6ee)(surface, NULL, NULL, Pixels,
     // FUN_06d5cbb0(*SrcFormat), Pitch, palette, &SrcRect, filter, 0); hr < 0 ->
     // 'set_texture_level_data: %s' 0xd7e. Release the surface, return hr.
-    Hr = D3DXLoadSurfaceFromMemory(Surface, nullptr, nullptr, Pixels,
-                                   (D3DFORMAT)(PfToD3d(*SrcFormat)), Pitch,
-                                   SrcPalette, &SrcRect, Filter, 0);
+    Hr = Rp9LoadSurfaceFromMemory(Surface, nullptr, nullptr, Pixels,
+                                  (D3DFORMAT)(PfToD3d(*SrcFormat)), Pitch,
+                                  SrcPalette, &SrcRect, Filter, 0);
     if (Hr < 0)
         FdumpHr("set_texture_level_data: %s", Hr, 3454);
     Surface->Release();
@@ -4961,8 +4958,8 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
     }
     // 06d0f62c: D3DXLoadSurfaceFromSurface (FUN_06d2fd77)(dst, NULL, NULL, src, NULL, NULL,
     // D3DX_FILTER_POINT 2, 0); no text on failure; release both; return hr.
-    Hr = D3DXLoadSurfaceFromSurface(DstSurf, nullptr, nullptr, SrcSurf, nullptr, nullptr,
-                                    D3DX_FILTER_POINT, 0);
+    Hr = Rp9LoadSurfaceFromSurface(DstSurf, nullptr, nullptr, SrcSurf, nullptr, nullptr,
+                                   D3DX_FILTER_POINT, 0);
     SrcSurf->Release();
     SrcSurf = nullptr;
     DstSurf->Release();
@@ -6952,9 +6949,9 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         GetClientRect(Window, SourceRect);
         MapWindowPoints(Window, nullptr, (POINT*)(SourceRect), 2);
     }
-    Hr = D3DXSaveSurfaceToFileA(FileName,
-                                (D3DXIMAGE_FILEFORMAT)(Formats[FormatIndex].Format),
-                                Surface, nullptr, SourceRect);
+    Hr = Rp9SaveSurfaceToFileA(FileName,
+                               (D3DXIMAGE_FILEFORMAT)(Formats[FormatIndex].Format),
+                               Surface, nullptr, SourceRect);
     if (Hr < 0)
     {
         FdumpHr("print_screen_save_surface: %s", Hr, 0x123b);
@@ -7091,10 +7088,10 @@ GENRESULT DACOM_API FDirectX9::LoadTexture(IFileSystem* FileSystem, const char* 
         // dx8\lib\d3dx8.lib, which RP8 links) on (device, view, size, &texture). RP9 calls the
         // D3DX9 function of the same name and arguments.
         IDirect3DTexture9* Texture = nullptr;
-        Hr = D3DXCreateTextureFromFileInMemory(Device_,
-                                               (const void*)(
-                                                   (uintptr_t)(Map.View)),
-                                               Map.Size, &Texture);
+        Hr = Rp9CreateTextureFromFileInMemory(Device_,
+                                              (const void*)(
+                                                  (uintptr_t)(Map.View)),
+                                              Map.Size, &Texture);
         if (Hr < 0)
             FdumpHr("load_texture: %s", Hr, 0x1278);
         if (Hr >= 0)
@@ -7154,8 +7151,8 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
     // 8.1 (surface, no palette, no dest rect, SrcData = param_5, SrcSize = param_4, no src
     // rect, filter 1 = D3DX_FILTER_NONE, colour key 0, no info); failure -> "load_surface_data:
     // %s" at 0x125e. The surface is released and hr returned either way.
-    const HRESULT Hr = D3DXLoadSurfaceFromFileInMemory(Surface, nullptr, nullptr, SrcData, SrcSize,
-                                                       nullptr, D3DX_FILTER_NONE, 0, nullptr);
+    const HRESULT Hr = Rp9LoadSurfaceFromFileInMemory(Surface, nullptr, nullptr, SrcData, SrcSize,
+                                                      nullptr, D3DX_FILTER_NONE, 0, nullptr);
     if (Hr < 0)
         FdumpHr("load_surface_data: %s", Hr, 0x125e);
     if (Surface != nullptr)
@@ -7178,7 +7175,7 @@ GENRESULT DACOM_API FDirectX9::GetImageInfo(_D3DXIMAGE_INFO* Info, unsigned int 
         Rp9Fdump(kFdumpWarning, 0x12ac, "WARNING", "load_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    return (GENRESULT)(D3DXGetImageInfoFromFileInMemory(SrcData, SrcSize, Info));
+    return (GENRESULT)(Rp9GetImageInfoFromMemory(SrcData, SrcSize, Info));
 }
 // RP8: FDirectX8::LoadCubemap (D3DX9 D3DXCreateCubeTextureFromFileInMemory)
 GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* FileName,
@@ -7214,10 +7211,10 @@ GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* 
         // linked D3DX 8.1 (instruction for instruction the library's
         // _D3DXCreateCubeTextureFromFileInMemory@16); failure -> "load_texture: %s" at 0x129d.
         IDirect3DCubeTexture9* CubeTexture = nullptr;
-        Hr = D3DXCreateCubeTextureFromFileInMemory(Device_,
-                                                   (const void*)(
-                                                       (uintptr_t)(Map.View)),
-                                                   Map.Size, &CubeTexture);
+        Hr = Rp9CreateCubeTextureFromFileInMemory(Device_,
+                                                  (const void*)(
+                                                      (uintptr_t)(Map.View)),
+                                                  Map.Size, &CubeTexture);
         if (Hr < 0)
             FdumpHr("load_texture: %s", Hr, 0x129d);
         if (Hr >= 0)

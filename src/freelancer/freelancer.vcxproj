@@ -39,11 +39,6 @@
   <ImportGroup Label="PropertySheets">
     <Import Project="..\Freelancer.Diagnostics.props" />
   </ImportGroup>
-  <!-- dalib_net.h (DirectPlay8 network classes freelancer.exe exports like retail) needs
-       dplay8.h from the DX8 SDK; appended last so the Windows SDK basetsd.h wins. -->
-  <PropertyGroup>
-    <IncludePath>$(IncludePath);$(Dx8SdkDir)\include</IncludePath>
-  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\Content;$(ProjectDir)..\imeui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

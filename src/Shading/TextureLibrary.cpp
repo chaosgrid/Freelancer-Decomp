@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
-#include <d3dx8tex.h>
+#include "render/d3d8_min.h"
 
 namespace
 {

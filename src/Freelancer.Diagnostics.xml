@@ -28,9 +28,9 @@
     <EnumValue Name="0" DisplayName="Off" />
     <EnumValue Name="1" DisplayName="On" />
   </EnumProperty>
-  <EnumProperty Name="FreelancerRp9" DisplayName="Direct3D 9 renderer (RP9)"
-                Category="Features" Default="0"
-                Description="Not in the original game: builds RP9.dll (the Direct3D 9 mirror of RP8, needs the DirectX SDK June 2010) and the client's Direct3D 9 extension hooks such as the volumetric nebula (FREELANCER_RP9). Select it at run time with DirectX9 in bin\DACOM.INI. Off builds neither. After changing it, save this property sheet and rebuild the solution.">
+  <EnumProperty Name="FreelancerRp9" DisplayName="Direct3D 9 extensions (RP9Ex)"
+                Category="Features" Default="1"
+                Description="Direct3D 9 renderer (RP9.dll, built with the Windows SDK only) and client Direct3D 9 extension hooks such as the volumetric nebula (FREELANCER_RP9). After changing it, save this property sheet and rebuild the solution.">
     <EnumValue Name="0" DisplayName="Off" />
     <EnumValue Name="1" DisplayName="On" />
   </EnumProperty>

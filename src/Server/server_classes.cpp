@@ -9250,7 +9250,7 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
         Damage.set_cause(static_cast<DamageCause>((ObjectType == 0x1000000u) ? 3 : 1));
 
     // .text:06d0d632 .. 06d0d637  inflictor = the shooter's id from the record.
-    Damage.set_inflictor_id(Info.Field_0x04);
+    Damage.set_inflictor_id(Info.AttackerId);
 
     // .text:06d0d63b .. 06d0d657  with a shooter: its CSimple OwnerPlayer
     // (+0xb4) under the (class & 3) == 3 narrowing, not null-tested.

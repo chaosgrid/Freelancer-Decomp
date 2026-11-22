@@ -38,7 +38,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <TargetName>Shading</TargetName>
-    <IncludePath>$(IncludePath);$(Dx8SdkDir)\include</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>

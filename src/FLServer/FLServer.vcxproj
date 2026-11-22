@@ -44,10 +44,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <!-- dalib_net.h (DirectPlay8 types) needs dplay8.h from the DX8 SDK; appended last so the
-       Windows SDK basetsd.h wins. -->
   <PropertyGroup>
-    <IncludePath>$(IncludePath);$(Dx8SdkDir)\include</IncludePath>
     <TargetName>FLServer</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
