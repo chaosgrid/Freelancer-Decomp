@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Bases">
+      <UniqueIdentifier>{E48AAB4E-B022-5089-AC7D-18975EB13B27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Comms">
+      <UniqueIdentifier>{689B00C6-A017-52F6-8EDA-764DFD904D11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{0481CDC7-327C-5B03-87C6-002777DE3C14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Encounters">
+      <UniqueIdentifier>{0664D677-ED36-5F54-9B1C-4D648A1B88CD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Guides">
+      <UniqueIdentifier>{59876E21-789A-5B88-A180-7CB512E092FC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Missions">
+      <UniqueIdentifier>{F017D1B5-5B2A-50D5-BE06-C0BAA8BCFC3F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NPCs">
+      <UniqueIdentifier>{C7575698-662E-5514-8120-BF2F50263762}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public Headers">
+      <UniqueIdentifier>{3000128F-ED3F-586E-B210-CD3386CC0F7A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RandomMissions">
+      <UniqueIdentifier>{46958CDF-CE90-590D-B2F0-364AE46C5EAE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Universe">
+      <UniqueIdentifier>{3D6D7F14-4E7E-5126-AAFC-9EE3EC709E84}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Core\Content.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\ContentDataPath.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\ContentMessageRouter.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Support.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\GameSupport.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\SpaceSupport.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\BaseSupport.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\GenericScripts.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Comms\Voices.cpp">
+      <Filter>Comms</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\PlayerState.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\BaseDB.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\BaseNpcRecords.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\LootProps.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\Populators.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\Story.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\StoryLauncher.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\StoryMissions.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionObject.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionScript.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionCnd.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionAct.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionDB.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\RandomEncounters.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionRuntime.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionTriggers.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionMachine.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionVignette.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="RandomMissions\RandomMissionGen.cpp">
+      <Filter>RandomMissions</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\Encounters.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\SystemInfo.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\Zones.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\PatrolPaths.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\EncounterParams.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="Guides\Guides.cpp">
+      <Filter>Guides</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\PilotPersonalities.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\NpcShips.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\NpcBase.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\BehaviorCmds.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\NpcCreate.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\NpcShip.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\SystemConnections.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\TradelaneRequests.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\CombatReputation.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\DestroyMission.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\FactionProps.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\DockQueues.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\Cargo.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionObjList.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Comms\Gcs.cpp">
+      <Filter>Comms</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\SpacePaths.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="NPCs\NpcNames.cpp">
+      <Filter>NPCs</Filter>
+    </ClCompile>
+    <ClCompile Include="Guides\GotoGuides.cpp">
+      <Filter>Guides</Filter>
+    </ClCompile>
+    <ClCompile Include="Bases\RtcScripts.cpp">
+      <Filter>Bases</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionDialogs.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Missions\MissionSave.cpp">
+      <Filter>Missions</Filter>
+    </ClCompile>
+    <ClCompile Include="Encounters\SpawnPlacement.cpp">
+      <Filter>Encounters</Filter>
+    </ClCompile>
+    <ClCompile Include="Guides\PatrolGuides.cpp">
+      <Filter>Guides</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\content.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentInternal.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentMessageRouter.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentPlayerState.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentRefObject.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\BaseDB.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\BaseSupport.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\GenericScripts.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Comms\Voices.h">
+      <Filter>Comms</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\LootProps.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentStageNames.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentStaticIds.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentDefaultId.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionDB.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\RandomEncounters.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionRuntime.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionMachine.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionGen.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\Encounters.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\Populators.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="Universe\SystemInfo.h">
+      <Filter>Universe</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\PatrolPaths.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\EncounterParams.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="Guides\Guides.h">
+      <Filter>Guides</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\PilotPersonalities.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\NpcShips.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\NpcBase.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\BehaviorCmds.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\ObjListDirective.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\NpcCreate.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\NpcShip.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionObject.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionScript.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionCnd.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionAct.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="Universe\SystemConnections.h">
+      <Filter>Universe</Filter>
+    </ClInclude>
+    <ClInclude Include="Universe\TradelaneRequests.h">
+      <Filter>Universe</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\FactionProps.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\DockQueues.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\Cargo.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionObjList.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ContentSort.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Comms\Gcs.h">
+      <Filter>Comms</Filter>
+    </ClInclude>
+    <ClInclude Include="Encounters\SpacePaths.h">
+      <Filter>Encounters</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\NpcNames.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="Guides\GuidesInternal.h">
+      <Filter>Guides</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RefHandle.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Bases\RtcScripts.h">
+      <Filter>Bases</Filter>
+    </ClInclude>
+    <ClInclude Include="Missions\MissionDialogs.h">
+      <Filter>Missions</Filter>
+    </ClInclude>
+    <ClInclude Include="NPCs\CombatReputation.h">
+      <Filter>NPCs</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\SpaceSupport.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMission.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionObject.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+    <ClInclude Include="RandomMissions\RandomMissionOffer.h">
+      <Filter>RandomMissions</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Content.def" />
+  </ItemGroup>
+</Project>

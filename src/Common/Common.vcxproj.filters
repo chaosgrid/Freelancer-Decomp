@@ -1,0 +1,1050 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="AI">
+      <UniqueIdentifier>{B3628DE0-F853-5A49-9701-6EFEEF236DE6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AI\Behaviors">
+      <UniqueIdentifier>{8A17C8C5-049F-5447-BE86-4A1ACEED94C6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AI\Ideas">
+      <UniqueIdentifier>{5A9466F2-0238-58D3-9A0E-18898569F1E1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Archetypes">
+      <UniqueIdentifier>{33A4DF10-1DF3-5458-B51D-A6C156E72E5D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{0481CDC7-327C-5B03-87C6-002777DE3C14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Equipment">
+      <UniqueIdentifier>{CBE38EEB-5A27-5343-8AC9-E4287D159B13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IVP">
+      <UniqueIdentifier>{8137AAC7-FDB3-5059-AB56-92DE66941AF7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IVP\ivp_collision">
+      <UniqueIdentifier>{22B80349-1749-56E2-BC72-55F79B2926BD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IVP\ivp_compact_builder">
+      <UniqueIdentifier>{335747B6-4EBA-5136-8DFF-9215D7A2E0C6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IVP\ivp_physics">
+      <UniqueIdentifier>{C792E7A1-62BE-599D-92DC-035A108B8578}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IVP\ivp_utility">
+      <UniqueIdentifier>{69EC765E-87D5-579E-B08E-F23F18F08FF5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Objects">
+      <UniqueIdentifier>{CDCFC658-BAF3-5B89-826D-E26695D19594}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Physics">
+      <UniqueIdentifier>{7A880E28-520B-5FE9-955A-22D98380CAE3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public Headers">
+      <UniqueIdentifier>{3000128F-ED3F-586E-B210-CD3386CC0F7A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Text">
+      <UniqueIdentifier>{31832DA0-5440-53F0-839F-5A957E3A66AB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Universe">
+      <UniqueIdentifier>{3D6D7F14-4E7E-5126-AAFC-9EE3EC709E84}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Equipment\common_tractorarm.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_flashlightsetinfo.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_tradeoffer.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_timing.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_async.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_errorhandler.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_dataconfig.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetypeloader.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_targetmanager.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_pathfind.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_sysmgr_timertable.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_gunconvergence.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_vhash.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_hash.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_malloc.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_message.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_u_bigvector.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_csys.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_physys.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_phycontroller.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_phycollisionstate.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_physicalsystem.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_controllergolem.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_physys_build.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_physys_query.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_phantom.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_remotephysics.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_sphereintruder.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_tick_profile.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_core.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_real_object.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_phantom.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_ov_element.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_sphere_query.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_impact_solver.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_impact.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_environment.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_simulation_unit.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_controller.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_material.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_contact_point.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_great_matrix.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_mindist_settings.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_friction_solver.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_active_value.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_listener.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_calc_next_psi_solver.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_cluster_manager.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_mindist_solve.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_mindist_limiter.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_listmanager_topology.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_ledge_sweep_solver.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_ray_solver.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_compact_ledge_solver.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_mindist_minimize.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_oo_watcher.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_collision\ivp_mindist_create.cpp">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_physics\ivp_surman_polygon.cpp">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_random.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_min_hash.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_utility\ivp_message_router.cpp">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cobject.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_engineobject.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_csimple.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cprojectile.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_carchgroup.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_ceqobj.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cship.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_csolar.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cmine.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cloot.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_casteroidobj.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_deadreckonedvector.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_subobjectid.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_hierarchy.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_casteroid.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_casteroidfield.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_phyarch.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_cobjdb.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cequip.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cattachment.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cattachedequip.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cecargo.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cepower.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_ceengine.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cegun.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_celauncher.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_ceshield.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cethruster.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cetractor.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cescanner.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cesmallequip.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cedroppers.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cefx.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_cecloak.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_csteering.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_laneaction.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_launchaction.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_id.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_stringcache.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_textfile.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_ini.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_dacom_stricmp.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\msvcrt_atof.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetype.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetype_ships.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetype_equipment.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetype_weapons.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_archetype_misc.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_universe.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_universe_system.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_universe_base.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_spatial.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_zone.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_equipdesc.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_constants.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_loadout.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_goodinfo.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_basedata.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_roomdata.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_hardpointsummary.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_roominfo.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_baseproperties.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_basewatcher.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_costume.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_reputation.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_vibe.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_fuses.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Archetypes\common_newchar.cpp">
+      <Filter>Archetypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_rtcslider.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_pubstategraph.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_rect.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_fmtstr.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_textrender.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_rdlnodes.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_renderdisplaylist.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_rdlio.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_watchable.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_mpcritsec.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_marshalbuffer.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_statemachine.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_playeraccount.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Universe\common_exclusionzone.cpp">
+      <Filter>Universe</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_iobjinspectimpl.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_behaviormanager.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_scriptbehavior.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_behaviortypes.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_actiondb.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_pub.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_aisteer.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_obstacleavoidance.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\common_crspline.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_aiintercept.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_aifirecontrol.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_airaycast.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_aitarget.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_iustategraph.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_idea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_moveidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_matchthrottleidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_faceidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_splinemoveidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_dodgeidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_breakawayidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Ideas\common_dodgemissileidea.cpp">
+      <Filter>AI\Ideas</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_systemmanager.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_sysmgr_gungroups.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_repairmanager.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_thrustmanager.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_misc.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\common_file.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\common_heap.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Equipment\common_damagelist.cpp">
+      <Filter>Equipment</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\common_behavior.cpp">
+      <Filter>AI</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_basefollowerbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_formationbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_dockbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_buzzbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_itlbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_idlebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_followbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_drasticevadebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_evadebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_trailbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_launchbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_cruisebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_lootbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_nullbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_strafebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_delaybehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_fleebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_gotobehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_freeflightbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_facebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_guidebehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="AI\Behaviors\common_largeshipbehavior.cpp">
+      <Filter>AI\Behaviors</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\common_animdb.cpp">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_surface_builder_pointsoup.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_surface_builder_ledge_soup.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_compact_ledge.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_template_polygon.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_object_polygon_tetra.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_compact_ledge_gen.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IVP\ivp_compact_builder\ivp_surface_builder_polygon_convex.cpp">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\common_exports.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_tradeoffer.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_timing.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_async.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_errorhandler.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_dataconfig.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\common_geometry_internal.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Objects\common_cobject_internal.h">
+      <Filter>Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="Equipment\common_cequip_internal.h">
+      <Filter>Equipment</Filter>
+    </ClInclude>
+    <ClInclude Include="Archetypes\common_goods_internal.h">
+      <Filter>Archetypes</Filter>
+    </ClInclude>
+    <ClInclude Include="Archetypes\common_archetype_internal.h">
+      <Filter>Archetypes</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\common_text_internal.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="AI\common_aisteer_internal.h">
+      <Filter>AI</Filter>
+    </ClInclude>
+    <ClInclude Include="AI\Ideas\common_idea_internal.h">
+      <Filter>AI\Ideas</Filter>
+    </ClInclude>
+    <ClInclude Include="Universe\common_reputation_internal.h">
+      <Filter>Universe</Filter>
+    </ClInclude>
+    <ClInclude Include="AI\common_behavior_internal.h">
+      <Filter>AI</Filter>
+    </ClInclude>
+    <ClInclude Include="AI\common_systemmanager_internal.h">
+      <Filter>AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Universe\common_universe_internal.h">
+      <Filter>Universe</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\common_physys_internal.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_id.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_ini.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_archetype.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_universe.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_spatial.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_zone.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_goods.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_reputation.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_fuses.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_newchar.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_cliobj.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_csys.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_physys.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_tick_profile.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\physics_tick_profile.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_cobject.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_cheapset.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_casteroid.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_phyarch.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_cequip.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_text.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_net.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_iface.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_systemmanager.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_pub.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_aisteer.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_iustategraph.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_idea.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_misc.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_behavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_dockbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_buzzbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_itlbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_idlebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_followbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_drasticevadebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_evadebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_trailbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_launchbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_cruisebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_lootbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_nullbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_strafebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_delaybehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_fleebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_gotobehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_freeflightbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_facebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_guidebehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\common_largeshipbehavior.h">
+      <Filter>Public Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_surface_builder_pointsoup.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_surface_builder_ledge_soup.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_point_hash.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_builder_math.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_template_polygon.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_object_polygon_tetra.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_compact_ledge_gen.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_surface_builder_polygon_convex.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_hash.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_vhash.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_crc32.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_malloc.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_core_trap.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_signed_byte.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_u_bigvector.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_random.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_min_hash.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_message_router.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_great_matrix.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_mindist_settings.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_friction_solver.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_listener.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_calc_next_psi_solver.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_cluster_manager.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_surman_polygon.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_phantom.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_u_set_active.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_ray_solver.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_compact_surface.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_compact_ledge_solver.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_oo_watcher.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_mindist_create.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_mindist_minimize.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_collision.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_ledge_sweep_solver.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_listmanager_topology.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_collision\ivp_sphere_query.h">
+      <Filter>IVP\ivp_collision</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_compact_builder\ivp_compact_ledge.h">
+      <Filter>IVP\ivp_compact_builder</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_active_value.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_anomaly_manager.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_contact_point.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_controller.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_core.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_environment.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_impact.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_material.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_mindist.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_ov_element.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_real_object.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_simulation_unit.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_surface_manager.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_physics\ivp_time_event.h">
+      <Filter>IVP\ivp_physics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_math.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_u_memory.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_u_vector.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_vector_math.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\msvcrt_atof.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Common.rc" />
+  </ItemGroup>
+</Project>

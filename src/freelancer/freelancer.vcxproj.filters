@@ -1,0 +1,1534 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Common">
+      <UniqueIdentifier>{69EE06FF-3A60-5B4D-BFAE-E8D16662B53A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Audio">
+      <UniqueIdentifier>{9162AD11-B862-541D-B290-58A41A4A3AA4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Fonts">
+      <UniqueIdentifier>{E31EEE00-3F5F-53B0-80C1-1BEA37F16C36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Graphics">
+      <UniqueIdentifier>{FD955AB0-B0E8-58DC-9002-C29C440DD61F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{0481CDC7-327C-5B03-87C6-002777DE3C14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GameFlow">
+      <UniqueIdentifier>{0074D42D-2EA7-5235-A62B-BAF1BCF2E987}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GameFlow\Thorn">
+      <UniqueIdentifier>{E3DDBB18-CC8D-51D9-8C45-0919DB2FB741}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interface">
+      <UniqueIdentifier>{3E14F4FC-B6E1-54F7-A01E-FC3832BD280D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interface\Pages">
+      <UniqueIdentifier>{FD43A7C4-2329-530B-9462-A4007CCF6B59}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{9639E74B-F98A-5279-AE9A-C77F9EC88325}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NeuroNet">
+      <UniqueIdentifier>{92D9C8C7-505E-540F-A495-70EAB7B7220C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NeuroNet\Chat">
+      <UniqueIdentifier>{8787F180-13CF-5D90-B650-5F76790C8B23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NeuroNet\Economy">
+      <UniqueIdentifier>{A6FCE131-1DD2-5FB0-A080-5C9041842AFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NeuroNet\NavMap">
+      <UniqueIdentifier>{F4C77B72-36CF-5058-B511-308EA8AC6A5C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{A6E5CA0B-BB3C-5861-89DA-F85AAEFB62B4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Space">
+      <UniqueIdentifier>{3E3AE37F-D11A-54D4-A241-D3B0F829A26D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Space\Cameras">
+      <UniqueIdentifier>{12DEEEB5-87BA-5869-B93B-2D2FDA37E9C9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Space\Effects">
+      <UniqueIdentifier>{1F91B4BB-41CE-56AF-8CF0-BA6BD3C08756}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Space\HUD">
+      <UniqueIdentifier>{C6C6FB97-F385-5B52-A636-E115FE879121}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Client\Core\client_state.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Audio\voice_profiles.cpp">
+      <Filter>Common\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Audio\sound_config.cpp">
+      <Filter>Common\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_preferences.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\wincontrol_base.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win3d.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\text_win.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\type_select.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_options.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_account_select.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win_object.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\list_box.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\rich_text_win.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_page_desc.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_page.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_rich_text_win.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win_factory.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_static_text.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_list_box.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_scroll.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_button_control.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_static_control.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_montage_draw.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_text_control.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\wire_controls.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_prompt.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_modal.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_main_button.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\nav_bar.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\infocard_map.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\knowledge_map.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_messaging.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_mission_message.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\character_info.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_exit.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_help.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_player_info.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_offer_dialog.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_pause.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_confirm.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_load_save.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_network_operation.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_error.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_blocking_dialog.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\wincontrol_children.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_ui_pulse.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_tooltip.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_rollover.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_group_control.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\menu_mp_session.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\font_string.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\font_imp.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\font_atlas.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\menu_enter_state.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_text_msg_button.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_text_edit.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_win_deform.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_ship_view_control.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_win_object.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_table.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ui_fast_table.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\mission_briefing.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\client_frame_tick.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\client_tick_profile.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\connect_handshake.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\connect_lists.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\login_mgr.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\cockpit_load.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\player_behavior.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\player_spawn.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\client_objdb.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\client_gameobj.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\client_debris.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\client_explosion.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\client_land_action.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\character_select_equip.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\client_equip_fx.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\client_fuse.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\tradelane_fx.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\effect_base.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\effect_vertex_batch.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\beam_effect.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\cli_projectile_fx.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\cli_tractor_beam.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\fl_fx_mesh.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\particle_effect.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\alchemy_float_forward.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\effect_type_info.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\effect_type_list.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\ship_camera_params.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_third.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_game.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_rear.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_turret.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_first.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_script.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_letterbox.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\fade_to_black.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_static.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_docking.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Cameras\space_camera_death.cpp">
+      <Filter>Space\Cameras</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win3d_immediate.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\cli_asteroid.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\cli_asteroid_dynamic.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\cli_asteroid_med.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\asteroid_billboard.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\cli_nebula.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\texture_panels.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\star_sphere.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\star_sys.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\part_cache.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_dust.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_scene_draw.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_scene_obj_draw.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\render_ex.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\nebula_volume.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_scene_load.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_solar_world.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\scene_render_registry.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\space_state.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win3d_render.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win3d_engine_submit.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\win3d_renderables.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\intro_connect.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\image.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\loading_screen.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\pixel_format.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\menu_universe_base.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\room_control.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\room_control_hotspot.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\anim_script_set.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\flash_light.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\gameflow.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\gf_hotspot.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\object_prop.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\room_camera.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_script.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_script_object.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_component.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_compound.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_deformable.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\gf_character_object.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_script_spawn.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_camera.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_light.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_marker.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_psys.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_scene.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\Thorn\gf_thorn_sound.cpp">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\GameFlow\gf_object_ship.cpp">
+      <Filter>GameFlow</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\lights_camera.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Audio\menu_sound_arch.cpp">
+      <Filter>Common\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\engine_light.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\graph_library.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\misc_util.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\texture_shapes.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_element_list.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_command_dispatch.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_comm.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_targetable_objects.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\button_mover.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_target.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_target_panel.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_status_core.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_weapon_groups.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_cruise_progress.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_contact_list.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_damage_indicator.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_maneuvers.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_waypoint.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_widescreen.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\jump_effect.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\best_path.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\client_cliobj.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\vis_effect_arch.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\client_mesh_load.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\engine_character.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\HUD\hud_button.cpp">
+      <Filter>Space\HUD</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\input_manager.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\client_ime_focus.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\fl_ime_input_box.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Chat\chat_text_input.cpp">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Chat\chat_control.cpp">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\perf_options.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\menu_ui_draw.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\menu_ui_widgets.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_repair.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_story_star.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_ship_trader.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_trade.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\cargo_bar_control.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\equip_visual_set.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\scroll_control.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\trade_equip_list.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\ship_view_control.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_inventory.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_dealer.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\commodity_by_base.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\client_base_market.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\swapped_material.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_mission_vendor.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_news.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_panels.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_update.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_build.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_view.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_draw.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\NavMap\nn_navmap_input.cpp">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\mission_created_solars.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_scanner.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\nn_text_scratch.cpp">
+      <Filter>NeuroNet</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\main_command_handler.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\menu_keymap.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Graphics\screen_quad_state.cpp">
+      <Filter>Common\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\connect_flow.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\client_exports.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\client_iclient.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\client_iclient_space.cpp">
+      <Filter>Space</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\main.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\window.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\message_pump.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\engine_init.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\menu_ui_init.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\dataconfig_progress.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\menu_fonts_load.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\ids_strings.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Common\Fonts\ids_rdl.cpp">
+      <Filter>Common\Fonts</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Economy\dealer_equip_stats.cpp">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\NeuroNet\Chat\chat_init.cpp">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\game_options.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Space\Effects\gate_tunnel.cpp">
+      <Filter>Space\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\client_timing.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Network\server_connect.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\server_filter.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\reg_key_stack.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_server_select.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\server_filter_dialog.cpp">
+      <Filter>Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\intro_page_util.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_character_create.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_character_select.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Interface\Pages\page_character_select_single.cpp">
+      <Filter>Interface\Pages</Filter>
+    </ClCompile>
+    <ClCompile Include="Client\Core\startup_config.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Client\Core\globals.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\fl_ime_input_box.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Chat\chat_text_input.h">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Chat\chat_control.h">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\game_options.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\gate_tunnel.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\client_environment.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\client_state.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_preferences.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\wincontrol_base.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win3d.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\text_win.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\event_handler.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\type_select.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_options.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_account_select.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win_object.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\list_box.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\rich_text_win.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\tooltip_hover.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_page_desc.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_page.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_rich_text_win.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win_factory.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_static_text.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_list_box.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_scroll.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_button_control.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_static_control.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_montage_draw.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_text_control.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\wire_controls.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_prompt.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_modal.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_main_button.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\nav_bar.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\infocard_map.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\knowledge_map.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_messaging.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_mission_message.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Audio\sound_archetype.h">
+      <Filter>Common\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\character_info.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_exit.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_help.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_player_info.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_offer_dialog.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_pause.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_confirm.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_load_save.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_network_operation.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_error.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_blocking_dialog.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_ui_pulse.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_text_msg_button.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_text_edit.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_win_deform.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_ship_view_control.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\vc6_sort.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_win_object.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_table.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ui_fast_table.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_wincontrol_base.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\mission_briefing.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\client_frame_tick.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\client_tick_profile.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\widescreen.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\connect_handshake.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\connect_lists.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\login_mgr.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\cockpit_load.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_ui_init.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\menu_fonts_load.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\font_atlas.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\font_imp.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\font_string.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\ids_strings.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\dealer_equip_stats.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\player_behavior.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\player_spawn.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\space_env_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\star_sphere.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\star_sys.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\effect_vertex_batch.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\effect_base.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\beam_effect.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\cli_projectile_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\cli_tractor_beam.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\fl_fx_mesh.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\client_debris.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\client_explosion.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\client_land_action.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\particle_effect.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\alchemy_float_forward.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\effect_type_info.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\effect_type_list.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\tradelane_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\cli_asteroid.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\cli_asteroid_dynamic.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\cli_asteroid_med.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\asteroid_billboard.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\part_cache.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\space_client_objects_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\ship_space_supt_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_keymap_config.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\screen_quad_state.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\character_select_equip.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_dust.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_scene_draw.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_scene_obj_draw.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\render_ex.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\nebula_volume.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_scene_load.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\scene_render_registry.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_state.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win3d_render.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win3d_renderables.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\intro_connect.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_ui_draw.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_ui_widgets.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_repair.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_story_star.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_ship_trader.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_trade.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\cargo_bar_control.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\equip_visual_set.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\scroll_control.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\trade_equip_list.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\ship_view_control.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_inventory.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_dealer.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\commodity_by_base.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\client_base_market.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\swapped_material.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\mirror_property_bucket.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_mission_vendor.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_news.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\NavMap\nn_navmap.h">
+      <Filter>NeuroNet\NavMap</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\mission_created_solars.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_scanner.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_text_scratch.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\main_command_handler.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\menu_enter_state.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\image.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\loading_screen.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\pixel_format.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\menu_universe_base.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\room_control.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\room_control_hotspot.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\anim_script_set.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\flash_light.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\gameflow.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\gf_hotspot.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\object_prop.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\room_camera.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_script.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_script_object.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_component.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_compound.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_deformable.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\gf_character_object.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_camera.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_light.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_marker.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_psys.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_scene.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\Thorn\gf_thorn_sound.h">
+      <Filter>GameFlow\Thorn</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\GameFlow\gf_object_ship.h">
+      <Filter>GameFlow</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\lights_camera.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Audio\menu_sound_arch.h">
+      <Filter>Common\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\engine_light.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\graph_library.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\misc_util.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\texture_shapes.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\texture_panels.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\vis_effect_arch.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_element_list.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_command_dispatch.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_comm.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_targetable_objects.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\button_mover.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_target.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_status_core.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_weapon_groups.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_cruise_progress.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_contact_list.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_damage_indicator.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_maneuvers.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_waypoint.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_widescreen.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\jump_effect.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Economy\best_path.h">
+      <Filter>NeuroNet\Economy</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\client_cliobj.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\client_mesh_load.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\engine_character.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\HUD\hud_button.h">
+      <Filter>Space\HUD</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\input_manager.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\perf_options.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Audio\voice_profiles.h">
+      <Filter>Common\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Audio\sound_config.h">
+      <Filter>Common\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\connect_flow.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\server_connect.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\server_filter.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\reg_key_stack.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_server_select.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\server_filter_dialog.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\intro_page_util.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_character_create.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_character_select.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\Pages\page_character_select_single.h">
+      <Filter>Interface\Pages</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Fonts\ids_rdl.h">
+      <Filter>Common\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Common\Graphics\fade_to_black.h">
+      <Filter>Common\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Core\dataconfig_progress.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\client_ime_focus.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win3d_engine_submit.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Interface\win3d_immediate.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Network\menu_mp_session.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Chat\chat_init.h">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\Chat\chat_msg_win.h">
+      <Filter>NeuroNet\Chat</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_arrival_text.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_group_control.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_rollover.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\NeuroNet\nn_tooltip.h">
+      <Filter>NeuroNet</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\ship_camera_params.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_death.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_docking.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_first.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_game.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_rear.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_script.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_static.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_third.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Cameras\space_camera_turret.h">
+      <Filter>Space\Cameras</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\client_equip_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\client_fuse.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\Effects\space_hud_comm_target_fx.h">
+      <Filter>Space\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\cli_nebula.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\client_gameobj.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\client_objdb.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_app.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_letterbox.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+    <ClInclude Include="Client\Space\space_solar_world.h">
+      <Filter>Space</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resources\freelancer.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\ICON103_1.ico">
+      <Filter>Resources</Filter>
+    </Image>
+  </ItemGroup>
+</Project>
