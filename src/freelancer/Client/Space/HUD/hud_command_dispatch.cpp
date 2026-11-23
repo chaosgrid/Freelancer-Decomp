@@ -77,7 +77,7 @@ namespace
 
     void EnsureHudCmdRegistry()
     {
-        // FUN_00575e00 00575e19..00575e9f: lazy header alloc.
+        // FUN_00575e00's lazy header allocation.
         if (G_HudCmdRegistryPtr == nullptr)
             G_HudCmdRegistryPtr = new std::vector<FHudCmdRegEntry>();
     }
@@ -86,7 +86,6 @@ namespace
     // +0x10 is Handler, then free the tree when it is empty.
     void EraseAllRegistrations(FHudCmdHandler* Handler)
     {
-        // 00576194..0057619c: no tree, nothing to do.
         if (G_HudCmdRegistryPtr == nullptr)
             return;
         std::vector<FHudCmdRegEntry>& Registry = *G_HudCmdRegistryPtr;
@@ -98,7 +97,7 @@ namespace
             else
                 ++It;
         }
-        // 0057620d..00576228: size (+0x10) zero -> FUN_00575f50 + free, DAT_0067c3a4 = 0.
+        // An empty tree is freed and DAT_0067c3a4 zeroed.
         if (Registry.empty())
         {
             delete G_HudCmdRegistryPtr;
@@ -109,11 +108,9 @@ namespace
 
 void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId)
 {
-    // FUN_005760d0 (thiscall on the handler, RET 4) → FUN_00575e00(handler, MsgId): multimap
-    // insert. The descent at 00575ec7 goes left only when MsgId < node key (SETL), so an equal
-    // key goes right -- the new entry lands after every existing entry with the same id. The
-    // _Multi byte (+0xc, set to 1 at 00575e4e) skips the duplicate check: the same handler may
-    // be registered twice for one id.
+    // FUN_005760d0 → FUN_00575e00: multimap insert. An equal key goes right, so the new entry
+    // lands after every existing entry with the same id. The _Multi byte skips the duplicate
+    // check: the same handler may be registered twice for one id.
     EnsureHudCmdRegistry();
 
     FHudCmdRegEntry Entry;
@@ -129,9 +126,8 @@ void HudRegisterCommandHandler(FHudCmdHandler* Handler, unsigned MsgId)
 
 void HudUnregisterCommand(FHudCmdHandler* Handler, unsigned MsgId)
 {
-    // FUN_005760f0 (thiscall on the handler, RET 4) — listing 005760f0..00576189: walk
-    // equal_range(MsgId) (FUN_00578950 / FUN_00578920) and erase (FUN_0046c8c0) the nodes whose
-    // +0x10 is this handler. The tree is not freed here even when it empties.
+    // FUN_005760f0: erase the nodes of equal_range(MsgId) whose +0x10 is this handler. The tree
+    // is not freed here even when it empties.
     if (G_HudCmdRegistryPtr == nullptr)
         return;
     std::vector<FHudCmdRegEntry>& Registry = *G_HudCmdRegistryPtr;
@@ -147,19 +143,18 @@ void HudUnregisterCommand(FHudCmdHandler* Handler, unsigned MsgId)
 
 void HudUnregisterCommandHandler(FHudCmdHandler* Handler)
 {
-    // FUN_00576190 (thiscall on the handler) — listing 00576190..00576234.
+    // FUN_00576190.
     EraseAllRegistrations(Handler);
 }
 
 void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip)
 {
-    // FUN_005762f0 (thiscall on the handler, RET 4) — listing 005762f0..00576350.
-    // 005762f0..00576306: empty count or empty list -> nothing.
+    // FUN_005762f0.
     if (G_HudCmdCancelCount == 0)
         return;
     if (G_HudCmdCancelNodes->empty())
         return;
-    // 00576310..0057634b: skip the first Skip nodes holding Handler, unlink every later one.
+    // Skip the first Skip nodes holding Handler, unlink every later one.
     std::list<FHudCmdHandler*>::iterator It = G_HudCmdCancelNodes->begin();
     while (It != G_HudCmdCancelNodes->end())
     {
@@ -181,8 +176,7 @@ void HudRemoveCancelHandler(FHudCmdHandler* Handler, int Skip)
 
 void HudPushCancelHandler(FHudCmdHandler* Handler, int Skip)
 {
-    // FUN_00576360 (thiscall on the handler, RET 4) — listing 00576360..005763ac:
-    // FUN_005762f0(Skip), then insert Handler before the sentinel (push_back) and count it.
+    // FUN_00576360.
     HudRemoveCancelHandler(Handler, Skip);
     G_HudCmdCancelNodes->push_back(Handler);
     G_HudCmdCancelCount = G_HudCmdCancelCount + 1;
@@ -190,9 +184,8 @@ void HudPushCancelHandler(FHudCmdHandler* Handler, int Skip)
 
 void HudDestroyEventHandler(FHudCmdHandler* Handler)
 {
-    // FUN_00576010 — the Event::Handler base destructor (vptr reset to 005cbed8 at 00576016):
-    // FUN_00577c30(this); the FUN_00576190 erase + free inlined (00576021..005760b8);
-    // FUN_005762f0(this, 0).
+    // FUN_00576010 — the Event::Handler base destructor (vptr 005cbed8); FUN_00576190's erase is
+    // inlined.
     HudPopInputFocus(Handler);
     EraseAllRegistrations(Handler);
     HudRemoveCancelHandler(Handler, 0);
@@ -200,18 +193,15 @@ void HudDestroyEventHandler(FHudCmdHandler* Handler)
 
 int HudDispatchCommand(unsigned MsgId, int Mode)
 {
-    // FUN_00576410 — listing 00576410..0057653c.
-    // 00576418..00576420: no tree -> false, before the record is touched.
+    // FUN_00576410. No tree -> false, before the record is touched.
     if (G_HudCmdRegistryPtr == nullptr)
         return 0;
     std::vector<FHudCmdRegEntry>& Registry = *G_HudCmdRegistryPtr;
 
     G_HudCmdRecord.MsgId = MsgId;
 
-    // 0057643d..005764b7: equal_range on MsgId (FUN_00578950 / FUN_00578920), Mode==1 filter
-    // via DAT_0067c3ac. The handlers go into the 0x80-byte frame buffer (SUB ESP,0x80 -> 32
-    // slots) with no bound check (00576476 `MOV [ESP+EDX*4+0xc],ECX; INC EDX`): retail never
-    // registers more than 32 handlers for one id, so the port writes unchecked as well.
+    // equal_range on MsgId, with the Mode 1 filter DAT_0067c3ac. The handlers go into a
+    // 32-slot stack buffer with no bound check, as in retail (never more than 32 per id).
     FHudCmdHandler* Collected[32];
     int Count = 0;
     for (size_t Index = 0; Index < Registry.size(); ++Index)
@@ -226,7 +216,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
         Count = Count + 1;
     }
 
-    // 005764b9..005764d6: call in reverse order — handler vt[0](MsgId); non-zero consumes.
+    // Called in reverse order; non-zero consumes.
     for (int Index = Count - 1; Index >= 0; --Index)
     {
         FHudCmdHandler* Handler = Collected[Index];
@@ -235,8 +225,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
             return 1;
     }
 
-    // 005764d8..005764f7: mode 1, USER_CANCEL (0xf), a key-down event and a non-empty cancel
-    // stack (DAT_0067c274 > 0).
+    // Mode 1, USER_CANCEL (0xf), a key-down event and a non-empty cancel stack (DAT_0067c274).
     if (Mode != 1 || MsgId != 0xfu)
         return 0;
     if (G_HudCmdRecord.Byte18 == 0)
@@ -244,8 +233,8 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
     if (G_HudCmdCancelCount <= 0)
         return 0;
 
-    // 005764f9..0057652f: unlink the last pushed handler (sentinel->prev), count it down and
-    // call its slot 0 with 0x10; the answer is ignored and the event counts as consumed.
+    // The last pushed handler is unlinked and called with 0x10; its answer is ignored and the
+    // event counts as consumed.
     FHudCmdHandler* const Cancelled = G_HudCmdCancelNodes->back();
     G_HudCmdCancelNodes->pop_back();
     G_HudCmdCancelCount = G_HudCmdCancelCount - 1;
@@ -255,7 +244,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
 
 int HudPostCommand(unsigned MsgId, int bSkipMods)
 {
-    // FUN_005763b0 — listing 005763b0..0057640a → JMP FUN_00576410(msgId, 0).
+    // FUN_005763b0, tail-jumping FUN_00576410(msgId, 0).
     if (bSkipMods == 0)
     {
         memset(&G_HudCmdRecord, 0, sizeof(G_HudCmdRecord));
@@ -272,45 +261,39 @@ int HudPostCommand(unsigned MsgId, int bSkipMods)
         G_HudCmdRecord.Byte18 = 1;
     }
 
-    // 0x0057640a: JMP FUN_00576410 -- its EAX is this function's result.
     return HudDispatchCommand(MsgId, 0);
 }
 
 void HudPushInputFocus(FHudCmdHandler* Handler)
 {
-    // FUN_00577b40 (cdecl, 1 arg) — listing 00577b40..00577c27.
+    // FUN_00577b40.
     if (G_HudCmdMode1Filter != nullptr)
     {
-        // 00577b63..00577bb8: allocate the stack object on first use.
+        // The stack object is allocated on first use.
         if (G_HudCmdFocusStack == nullptr)
             G_HudCmdFocusStack = new std::list<FHudCmdHandler*>();
-        // 00577bbd..00577bf1: insert the current filter before the sentinel (push_back).
         G_HudCmdFocusStack->push_back(G_HudCmdMode1Filter);
     }
-    // 00577bfa / 00577c13.
     G_HudCmdMode1Filter = Handler;
 }
 
 void HudPopInputFocus(FHudCmdHandler* Handler)
 {
-    // FUN_00577c30 (cdecl, 1 arg) — listing 00577c30..00577d4b.
+    // FUN_00577c30.
     if (G_HudCmdMode1Filter == Handler)
     {
-        // 00577c3f..00577c52: nothing stacked -> filter cleared.
         if (G_HudCmdFocusStack == nullptr)
         {
             G_HudCmdMode1Filter = nullptr;
             return;
         }
-        // 00577c53..00577c6d: the last pushed filter comes back and its node is erased
-        // (FUN_00516f70).
+        // The last pushed filter comes back.
         G_HudCmdMode1Filter = G_HudCmdFocusStack->back();
         G_HudCmdFocusStack->pop_back();
     }
     else
     {
-        // 00577c74..00577cb9: not the active filter -- unlink the first stacked node holding
-        // it, if any.
+        // Not the active filter: unlink the first stacked node holding it, if any.
         if (G_HudCmdFocusStack == nullptr)
             return;
         std::list<FHudCmdHandler*>::iterator It = G_HudCmdFocusStack->begin();
@@ -324,8 +307,7 @@ void HudPopInputFocus(FHudCmdHandler* Handler)
         }
     }
 
-    // 00577cbc..00577d3e: an empty stack is freed (nodes, sentinel, object) and the pointer
-    // cleared.
+    // An empty stack is freed and the pointer cleared.
     if (G_HudCmdFocusStack != nullptr && G_HudCmdFocusStack->empty())
     {
         delete G_HudCmdFocusStack;
@@ -335,38 +317,32 @@ void HudPopInputFocus(FHudCmdHandler* Handler)
 
 FHudCmdHandler* HudGetInputFocus()
 {
-    // FUN_00577d50: MOV EAX, [DAT_0067c3ac].
+    // FUN_00577d50.
     return G_HudCmdMode1Filter;
 }
 
 FHudCmdRecord* HudCommandRecord()
 {
-    // FUN_00576240: MOV EAX, &DAT_0067c278.
+    // FUN_00576240.
     return &G_HudCmdRecord;
 }
 
 bool SpaceSendCommand(FSpaceCommand* Command)
 {
-    // FUN_0054bcb0.
-    // 0x0054bcb0: DAT_00678ba0, the "controller exists" byte.
+    // FUN_0054bcb0. DAT_00678ba0 is the "controller exists" byte.
     if (!IsSpaceCameraControllerReady())
         return false;
-
-    // Slots 0x70 / 0x74 of the camera table. Retail calls them __thiscall with one stack
-    // argument; the port's camera tables are explicit-this throughout (space_camera_game.h,
-    // GameCamSlotRefuseCommand), so they are called that way here.
 
     // DAT_00679738 is re-read before every use, as retail does.
     FSpaceCamera* Camera = GetActiveSpaceCamera();
     if (Camera != nullptr)
     {
-        // 0x0054bcc8: slot 0x70; the result is ignored, but a record whose id it cleared to 0 is
-        // consumed.
+        // Slot 0x70; the result is ignored, but a record whose id it cleared to 0 is consumed.
         ((FGameCamera*)Camera)->HandleCommand70(Command);
         if (Command->Id == 0)
             return true;
 
-        // 0x0054bcd7: slot 0x74; non-zero consumes the record.
+        // Slot 0x74; non-zero consumes the record.
         Camera = GetActiveSpaceCamera();
         if (((FGameCamera*)Camera)->HandleCommand74(Command) != 0)
             return true;
@@ -374,15 +350,13 @@ bool SpaceSendCommand(FSpaceCommand* Command)
         Camera = GetActiveSpaceCamera();
     }
 
-    // 0x0054bcf1: ids up to 0xe stop here, unconsumed.
+    // Ids up to 0xe stop here, unconsumed.
     if (Command->Id <= 0xe)
         return false;
 
-    // 0x0054bcf6 .. 0x0054bd14: the camera's watched object (GameCamera +0xc0, a Watchable
-    // eight bytes into the client object); one whose +0x1c ManagerKind is 1 gets the record
-    // through its slot 115 (+0x1cc; the ship's override is FUN_00544d70 over EquippedObj's
-    // FUN_00534460), result ignored. The record is the same 0x28-byte command both headers
-    // describe (FSpaceCommand here, FCliEquipFirePacket on the object side).
+    // The camera's watched object, when it is a ship (ManagerKind 1), gets the record through
+    // its slot 115 (+0x1cc; the ship's FUN_00544d70 over EquippedObj's FUN_00534460), result
+    // ignored. FSpaceCommand here is FCliEquipFirePacket on the object side.
     if (Camera != nullptr)
     {
         FGameCamera* const GameCamera = reinterpret_cast<FGameCamera*>(Camera);
@@ -399,6 +373,6 @@ bool SpaceSendCommand(FSpaceCommand* Command)
         }
     }
 
-    // 0x0054bd1a: every path past the id test answers true.
+    // Every path past the id test answers true.
     return true;
 }

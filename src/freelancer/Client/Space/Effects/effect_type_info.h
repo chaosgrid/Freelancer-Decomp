@@ -62,14 +62,14 @@ bool LoadEffectLodSection(class INI_Reader* Reader);
 
 struct ICamera;
 
-// FUN_0042da00 (__thiscall on the row, RET 0x10) — screen size = Radius / Distance * ZNear *
+// FUN_0042da00 (on the row) — screen size = Radius / Distance * ZNear *
 // XScaleOverNear (camera slots +0x20 / +0x2c); at or below min_screen_size -> *Out = 0, false;
 // else the blend (size - min_lod) / (max_lod - min_lod) clamped to [0, 1], true. A distance
 // below 1e-5 (double DAT_005c75f0) gives 1.0 without asking the camera.
 bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance, float Radius,
                        float* OutBlend);
 
-// FUN_0042dcd0 (cdecl) — the type's lod_type 1..6 selects the G_EffectLodTable row for
+// FUN_0042dcd0 — the type's lod_type 1..6 selects the G_EffectLodTable row for
 // FUN_0042da00 with the type's radius; any other type (or no row) gives *Out = 1.0, true.
 // Caller: the particle visibility test FUN_004f86c0 (0x004f897f) under ALCHEMY_LOD.
 bool EffectTypeLodBlend(int TypeIndex, ICamera* Cam, float Distance, float* OutBlend);

@@ -4,28 +4,27 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CEPower -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
+// CEPower. Declared in common_cequip.h; helpers shared with the sibling TUs are in
 // common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
+#include "common_animdb.h"
 
 #include "common_cobject.h"
-#include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)
-#include "common_fuses.h"    // WeaponModDB_GetShieldMod (CEShield::GetWeaponModifier)
-#include "common_iface.h"    // EquipStatus, EquipStatusFlag* (CEquip::GetStatus)
+#include "common_csys.h"
+#include "common_fuses.h"
+#include "common_iface.h"
 #include "common_ini.h"
-#include "common_misc.h"     // ComputeExplosiveImpulses (CAttachedEquip::Disconnect)
+#include "common_misc.h"
 #include "common_physys.h"
-#include "common_spatial.h"  // ISpatialPartition (ScanList::add_in_range bucket query)
-#include "common_timing.h"   // Timing::GetGlobalTime (CEShieldGenerator / CEShield)
+#include "common_spatial.h"
+#include "common_timing.h"
 #include "common_universe.h"
 #include "DALib.h"
 #include "dacom.h"
 #include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
+#include "ivp_physics/ivp_controller.h"
 
 #include <cstdarg>
 #include <cstdint>
@@ -42,8 +41,7 @@ CEPower::CEPower(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Power cons
                  bool bMissionFlag)
     : CInternalEquip(EquipTypePower, OwnerObj, EquipId, ArchObj, bMissionFlag)
 {
-    // .text:0629f378..0629f38f: CEquip ctor (type 0x40000), CEPower table, then
-    // CEquip::Activate(true) called directly.
+    // The non-virtual CEquip::Activate (.text:0629f378).
     CEquip::Activate(true);
 }
 
@@ -54,35 +52,22 @@ CEPower::CEPower(CEPower const& Other)
 
 CEPower::~CEPower()
 {
-    // Common.dll.c 66840-66858 (listing 0x3f3b0): retail unconditionally force-calls the
-    // non-virtual CEquip::Destroy(this) here (bDestroyed=1 + EquipDestroying notify) as a
-    // safety net during unwind, regardless of whether game logic already called ->Destroy()
-    // on this equip before deleting it. CEquipManager::Clear()/CleanUp() (this file) delete
-    // CEquip* directly with no preceding ->Destroy() call, so without this the notification
-    // and bDestroyed flag would silently never fire for power equip destroyed this way.
+    // RVA 0x3f3b0: the non-virtual CEquip::Destroy(), so CEquipManager's plain deletes still
+    // notify.
     CEquip::Destroy();
 }
 
 bool CEPower::Update(float Dt, unsigned Flags)
 {
-    // Common.dll.c 66863-66907 (listing 0x3f410): recharge the owner's main power capacitor
-    // every tick while this power plant IsFunctioning(). Note this checks IsDestroyed()
-    // separately from (and nested inside) the outer IsFunctioning() gate, and reads
-    // Arch->ChargeRate directly rather than through GetChargeRate() -- retail's inline here
-    // skips GetChargeRate()'s extra Arch-null/class-type guards, so they are intentionally
-    // not reproduced (Arch is always a valid Archetype::Power for a constructed CEPower).
-    // x87 (.text:0629f43a..0629f460 / 0629f497..0629f4ba): rate * Dt + current stays on the FPU
-    // stack; FCOMPP against the cap, TEST AH,0x5 / JNP keeps the sum only when it is below the
-    // cap -- equal, above or unordered store the cap -- then one FSTP float.
+    // RVA 0x3f410: GetChargeRate inlined (IsDestroyed re-tested). The sums are compared
+    // unrounded; equal, above or NaN store the cap.
     if (IsFunctioning())
     {
         float const ChargeRate = IsDestroyed() ? 0.0f : PowerArch()->ChargeRate;
         double const NewPower = (double)(ChargeRate) * Dt + Owner->Power;
         Owner->Power = (NewPower < Owner->MaxPower) ? (float)(NewPower) : Owner->MaxPower;
 
-        // Second capacitor (CShip::ThrustPower/MaxThrustPower, the thrust/afterburner reserve) only
-        // exists on ships -- retail gates this half on Owner (null test at 0629f469) and
-        // Owner->ObjectClass matching ClassShip's bit pattern before reinterpreting Owner.
+        // The thrust capacitor exists only on ships (Owner is null-tested only here).
         if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         {
             float const ThrustChargeRate =
@@ -97,8 +82,7 @@ bool CEPower::Update(float Dt, unsigned Flags)
 
 float CEPower::GetChargeRate() const
 {
-    // .text:06294b40..06294b5b: IsDestroyed() (vtable +0x8) -> 0.0f, else Arch (+0xc, no
-    // null or class test)->ChargeRate (+0x74).
+    // FUN_06294b40; no Arch null or class test (likewise below).
     if (IsDestroyed())
         return 0.0f;
     return PowerArch()->ChargeRate;
@@ -106,7 +90,7 @@ float CEPower::GetChargeRate() const
 
 float CEPower::GetCapacity() const
 {
-    // .text:06294b60..06294b7b: IsDestroyed() -> 0.0f, else Arch->Capacity (+0x70).
+    // FUN_06294b60
     if (IsDestroyed())
         return 0.0f;
     return PowerArch()->Capacity;
@@ -114,7 +98,7 @@ float CEPower::GetCapacity() const
 
 float CEPower::GetThrustCapacity() const
 {
-    // .text:06294ba0..06294bbb: IsDestroyed() -> 0.0f, else Arch->ThrustCapacity (+0x78).
+    // FUN_06294ba0
     if (IsDestroyed())
         return 0.0f;
     return PowerArch()->ThrustCapacity;
@@ -122,7 +106,7 @@ float CEPower::GetThrustCapacity() const
 
 float CEPower::GetThrustChargeRate() const
 {
-    // .text:06294b80..06294b9b: IsDestroyed() -> 0.0f, else Arch->ThrustChargeRate (+0x7c).
+    // FUN_06294b80
     if (IsDestroyed())
         return 0.0f;
     return PowerArch()->ThrustChargeRate;

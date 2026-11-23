@@ -4,28 +4,27 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CELauncher (retail CELauncher.cpp) -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
-// common_cequip_internal.h (namespace CmnCequip).
+// CELauncher (retail CELauncher.cpp). Declared in common_cequip.h; helpers shared with the
+// sibling TUs are in common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
+#include "common_animdb.h"
 
 #include "common_cobject.h"
-#include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)
-#include "common_fuses.h"    // WeaponModDB_GetShieldMod (CEShield::GetWeaponModifier)
-#include "common_iface.h"    // EquipStatus, EquipStatusFlag* (CEquip::GetStatus)
+#include "common_csys.h"     // Acquire3DMathEngine
+#include "common_fuses.h"
+#include "common_iface.h"    // EquipStatus, EquipStatusFlag*
 #include "common_ini.h"
-#include "common_misc.h"     // ComputeExplosiveImpulses (CAttachedEquip::Disconnect), SUBOBJ_ID_NONE
+#include "common_misc.h"     // SUBOBJ_ID_NONE
 #include "common_physys.h"
-#include "common_spatial.h"  // ISpatialPartition (ScanList::add_in_range bucket query)
-#include "common_timing.h"   // Timing::GetGlobalTime (CEShieldGenerator / CEShield)
+#include "common_spatial.h"
+#include "common_timing.h"
 #include "common_universe.h"
 #include "DALib.h"
 #include "dacom.h"
 #include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
+#include "ivp_physics/ivp_controller.h"
 
 #include <cstdarg>
 #include <cstdint>
@@ -42,13 +41,9 @@ namespace
 {
     const char kCELauncherSource[] = "E:\\FL\\Scratch\\Source\\Common\\CELauncher.cpp";
 
-    // The barrel count every CELauncher member inlines (ComputeLaunchInfo 06299636..0629964f,
-    // GetPowerDrawPerFire 06299583..0629959d, ConsumeFireResources 062995f4..0629960b, the
-    // averages 06299c47 / 06299daa, GetProjectilesPerFire 06299f60, AmmoNeedsMet 0629a06f): the
-    // leading run of Barrels[] whose EngineIndex is not -1. Very strange: retail has no upper
-    // bound, so with all eight barrels bound it keeps reading 0x34-byte strides past Barrels[7]
-    // (CEGun's yaw joint, or whatever follows a plain launcher) until it meets a -1. That count
-    // depends on unrelated bytes and is not reproduced; the port stops at eight.
+    // The barrel count every CELauncher member inlines: the leading run of bound barrels.
+    // Deviation: retail has no upper bound, so with all eight bound it reads past Barrels[7]
+    // (CEGun's yaw joint, or whatever follows) until it meets a -1; the port stops at eight.
     unsigned CountLauncherBarrels(CELauncher const& Launcher)
     {
         unsigned Count = 0;
@@ -62,10 +57,8 @@ namespace
         return Count;
     }
 
-    // The world position of a barrel-local point: the 12-dword engine transform of the barrel
-    // instance (IEngine+0xa0) copied to the stack, then 3DMathEngine+0x28 TransformXform
-    // (GetBarrelPosWS 06299af7..06299b3b, ComputeProjectilePosAndVelocity_OneBarrel
-    // 06299907..0629994d, GetAvgBarrelPosWS 06299cb5..06299cfa). No guards.
+    // A barrel-local point through the barrel instance's engine transform (inlined in three
+    // members). No guards.
     Vector BarrelPointWS(long Instance, Vector const& Local)
     {
         Transform const Xform = *(Transform const*)DALib::Engine->GetInstanceTransform((void*)Instance);
@@ -75,9 +68,8 @@ namespace
         return Out;
     }
 
-    // The world firing direction of a barrel: the 9-dword engine orientation (IEngine+0x98) times
-    // the hardpoint orientation (3DMathEngine+0x20 MulMatrix), negated third column
-    // (GetBarrelDirWS 06299ba7..06299c13, GetAvgBarrelDirWS 06299e27..06299ecf). No guards.
+    // A barrel's world firing direction: -Z of (instance orientation * hardpoint orientation).
+    // No guards.
     Vector BarrelDirWS(long Instance, Matrix const& HpOrient)
     {
         Matrix const Ori = *(Matrix const*)DALib::Engine->GetInstanceOrientation((void*)Instance);
@@ -90,8 +82,8 @@ namespace
         return Out;
     }
 
-    // .data DAT_063eb6b0: CELauncher::Connect's hardpoint name. Initial bytes "HPFire0\0\0" (raw
-    // PE, capital P); the digit at +7 (DAT_063eb6b7) is patched per barrel.
+    // DAT_063eb6b0: Connect's hardpoint name ("HPFire0", capital P in the raw PE); the digit at
+    // +7 is patched per barrel.
     char GLauncherHpFireName[9] = { 'H', 'P', 'F', 'i', 'r', 'e', '0', '\0', '\0' };
 }
 
@@ -101,16 +93,15 @@ CELauncher::CELauncher(unsigned TypeBits, CEqObj* OwnerObj, unsigned short Equip
     , Projectile(nullptr)
     , RefireElapsed(0.0f)
 {
-    // Listing 0x062992b0..0x06299373. Retail only sets each barrel's EngineIndex (+0x54 + 0x34*i)
-    // to -1 and leaves the rest of the barrel records unwritten; the port zeroes them first so
-    // they are deterministic.
+    // FUN_062992b0. Deviation: retail only sets each barrel's EngineIndex; the port zeroes the
+    // rest of the records.
     memset(Barrels, 0, sizeof(Barrels));
     unsigned Barrel = 0;
     for (; Barrel < 8; ++Barrel)
         Barrels[Barrel].EngineIndex = -1;
 
     Archetype::Launcher* LauncherArch = (Archetype::Launcher*)(Arch);
-    Projectile = Archetype::GetEquipment(LauncherArch->ProjectileArchetype.Id);   // Arch+0x98
+    Projectile = Archetype::GetEquipment(LauncherArch->ProjectileArchetype.Id);
     if (Projectile == nullptr)
     {
         FDUMP(0x100001,
@@ -119,7 +110,7 @@ CELauncher::CELauncher(unsigned TypeBits, CEqObj* OwnerObj, unsigned short Equip
     }
     else
     {
-        Projectile->load();   // vt+0xc
+        Projectile->load();
     }
 }
 
@@ -133,9 +124,8 @@ CELauncher::CELauncher(CELauncher const& Other)
 
 CELauncher::~CELauncher()
 {
-    // .text:06299380..062993d6: CExternalEquip::Destroy (direct call), then Root::Release on the
-    // projectile archetype with no null test (the ctor already FDUMPed a missing one), then
-    // ~CAttachedEquip.
+    // FUN_06299380. The projectile is released with no null test (a missing one was only
+    // reported by the ctor).
     CExternalEquip::Destroy();
     Projectile->Release();
 }
@@ -166,9 +156,7 @@ bool CELauncher::Update(float Dt, unsigned Flags)
 
 bool CELauncher::IsDisabled() const
 {
-    // .text:06299470..0629949a: Owner+0x15c, then vt+0x44 GetRelativeHealth() FCOMP 0.0,
-    // TEST AH,0x41 / JP: true when health is less than or equal to 0, false when greater or
-    // unordered. No Owner null test.
+    // FUN_06299470. NaN health is not disabled. No Owner null test.
     if (Owner->bWeaponsOffline == 0)
         return false;
     return GetRelativeHealth() <= 0.0f;
@@ -176,11 +164,7 @@ bool CELauncher::IsDisabled() const
 
 void CELauncher::GetStatus(EquipStatus& OutStatus) const
 {
-    // Common.dll.c 0x39410: base fields first, then (only when neither Destroyed nor Bit2 is
-    // already set) GetAmmoCount()==0 -> EquipFlags|=4 and stop; else PowerNeedsMet() ->
-    // EquipFlags|=8; RefireDelayElapsed() -> EquipFlags|=2. Bit values match the
-    // "0x2 / 0x4 / 0x8 from CELauncher::GetStatus" comment already on EquipStatus::EquipFlags
-    // (common_iface.h:61).
+    // RVA 0x39410. EquipFlags: 4 out of ammo (and stop), 8 power met, 2 refire elapsed.
     CEquip::GetStatus(OutStatus);
     if ((OutStatus.Flags & (EquipStatusFlagDestroyed | EquipStatusFlagDisabled)) == 0)
     {
@@ -198,8 +182,7 @@ void CELauncher::GetStatus(EquipStatus& OutStatus) const
 
 bool CELauncher::Connect(char const* HpName)
 {
-    // Listing 0x062994a0..0x06299571. The name buffer is the .data string DAT_063eb6b0
-    // ("HpFire01"); retail patches its digit (DAT_063eb6b7) in place for every barrel.
+    // FUN_062994a0. Retail patches the shared .data name buffer in place for every barrel.
     if (!CAttachedEquip::Connect(HpName))
         return false;
 
@@ -209,7 +192,7 @@ bool CELauncher::Connect(char const* HpName)
         GLauncherHpFireName[7] = (char)('1' + Barrel);
         long Found = -1;   // retail reuses the HpName argument slot; read only after a hit
         HardpointInfo Info;
-        if (!FindHardpoint_OS(GetRootIndex(), GLauncherHpFireName, Found, Info))   // vt+0x84
+        if (!FindHardpoint_OS(GetRootIndex(), GLauncherHpFireName, Found, Info))
         {
             if (Barrel != 0)
                 return true;
@@ -226,7 +209,7 @@ bool CELauncher::Connect(char const* HpName)
 
 void CELauncher::Disconnect()
 {
-    // Common.dll.c 0x3a1f0 (?Disconnect@CELauncher@@MAEXXZ).
+    // RVA 0x3a1f0
     for (unsigned Barrel = 0; Barrel < 8; ++Barrel)
         Barrels[Barrel].EngineIndex = kInvalidEngineInstance;
     CAttachedEquip::Disconnect();
@@ -249,10 +232,8 @@ void CELauncher::ConsumeFireResources()
 
 void CELauncher::ComputeLaunchInfo(std::vector<ProjLaunchInfo>& Out, Vector const& Target) const
 {
-    // .text:06299630..062996d8. Per barrel: push_back a default record (FUN_0629a4c0 inserts one
-    // copy at the end) and fill the stored element through vt+0xa8 ComputeLaunchInfo_OneBarrel.
-    // The default (06299673..062996ab) zeroes Pos, Velocity and LockTarget and sets LockSubId to
-    // SUBOBJ_ID_NONE; Orient and the two pad bytes are left unwritten in retail (zeroed here).
+    // FUN_06299630 (push_back is FUN_0629a4c0). Deviation: the default record's Orient and pad
+    // bytes are unwritten in retail; zeroed here.
     unsigned Count = CountLauncherBarrels(*this);
     unsigned Barrel = 0;
     for (; Barrel < Count; ++Barrel)
@@ -267,16 +248,14 @@ void CELauncher::ComputeLaunchInfo(std::vector<ProjLaunchInfo>& Out, Vector cons
 
 double CELauncher::GetPowerDrawPerFire() const
 {
-    // .text:06299580..062995b9: FILD (qword) barrel count * Arch+0x8c, no Arch test, returned
-    // unrounded in ST0.
+    // FUN_06299580: returned unrounded in ST0. No Arch test.
     return (double)CountLauncherBarrels(*this) * LauncherArch()->PowerUsage;
 }
 
 int CELauncher::GetAmmoCount() const
 {
-    // .text:06299a10..06299a85. No Projectile / Owner / Arch tests: -1 when the projectile does
-    // not need ammo (+0x78); else the Count (+0x28) of the first cargo (traverser 0x10000) whose
-    // archetype nickname (+0xc -> +8) is the projectile's (+8), else 0.
+    // FUN_06299a10: -1 when no ammo is needed, else the first matching cargo's count, else 0.
+    // No Projectile / Owner / Arch tests.
     Archetype::Projectile const* Proj = (Archetype::Projectile const*)(Projectile);
     if (!Proj->bRequiresAmmo)
         return -1;
@@ -305,8 +284,8 @@ bool CELauncher::AmmoNeedsMet() const
 
 FireResult CELauncher::CanFire(Vector const& Target) const
 {
-    // .text:06299f80..0629a052. Owner+0x140 is read with no Owner test (06299fd0); the later
-    // `Owner && class == ship` test before is_using_tradelane is retail's own.
+    // FUN_06299f80. CloakPercent is read with no Owner test, yet the tradelane check tests
+    // Owner -- both as in retail.
     (void)Target;
     if (IsDestroyed())
         return FireDestroyed;
@@ -318,7 +297,6 @@ FireResult CELauncher::CanFire(Vector const& Target) const
         return FireNoPower;
     if (!AmmoNeedsMet())
         return FireNoAmmo;
-    // 06299fd6: FCOMP 1.0, TEST AH,0x1 / JZ: not less (and ordered) -> FireCloakActive.
     if (Owner->CloakPercent >= 1.0f)
         return FireCloakActive;
     if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
@@ -332,18 +310,14 @@ FireResult CELauncher::CanFire(Vector const& Target) const
 
 bool CELauncher::PowerNeedsMet() const
 {
-    // .text:0629a140..0629a171: Owner+0x198 - vt+0x9c GetPowerDrawPerFire() on the FPU stack,
-    // FCOMP 0.0, TEST AH,0x1 / JNZ: false when less or unordered. No Owner test.
+    // FUN_0629a140: unrounded; NaN fails. No Owner test.
     double const Left = (double)(Owner->Power) - GetPowerDrawPerFire();
     return Left >= 0.0;
 }
 
 void CELauncher::DrawPower(int BarrelCount)
 {
-    // .text:0629a180..0629a1c5. Cost = FILD count * Arch+0x8c kept on the FPU stack; FCOM 0.0,
-    // TEST AH,0x41 / JNZ returns when not greater (or unordered). Next = Power - Cost, still on
-    // the stack; 0.0 FCOMP Next, TEST AH,0x41 / JNZ keeps it unless 0 is greater; FSTP float.
-    // No Owner / Arch tests.
+    // FUN_0629a180: unrounded until the store, clamped at 0. No Owner / Arch tests.
     double const Cost = (double)(BarrelCount) *
                         LauncherArch()->PowerUsage;
     if (!(Cost > 0.0))
@@ -356,10 +330,9 @@ void CELauncher::DrawPower(int BarrelCount)
 
 void CELauncher::DrawAmmoFromCargo(int BarrelCount)
 {
-    // Listing 0x0629a0a0..0x0629a135. No null guards; the first cargo (traverser 0x10000) whose
-    // archetype nickname id (+0xc -> +8) equals the projectile's (+0x4c -> +8) gives up the ammo.
+    // FUN_0629a0a0: the first matching cargo gives up the ammo. No null guards.
     Archetype::Projectile* Proj = (Archetype::Projectile*)(Projectile);
-    if (!Proj->bRequiresAmmo)   // Proj+0x78
+    if (!Proj->bRequiresAmmo)
         return;
 
     CEquipTraverser Walk(EquipTypeCargo);
@@ -380,76 +353,61 @@ void CELauncher::DrawAmmoFromCargo(int BarrelCount)
 
 bool CELauncher::RefireDelayElapsed() const
 {
-    // .text:0629a1d0..0629a1eb: RefireElapsed FCOMP Arch+0x90, TEST AH,0x1 / JNZ: false when less
-    // or unordered. No Arch test.
+    // FUN_0629a1d0: NaN fails. No Arch test.
     return LauncherArch()->RefireDelay <= RefireElapsed;
 }
 
 void CELauncher::ComputeLaunchInfo_OneBarrel(ProjLaunchInfo& Out, int Barrel,
                                             Vector const& Target) const
 {
-    // .text:062996e0..06299873. Leaves LockTarget / LockSubId as the caller's default.
-    // 062996e7..062996f1: Owner vt+0x54 get_velocity, no Owner test.
+    // FUN_062996e0. Leaves LockTarget / LockSubId as the caller's default. No Owner test.
     Vector const OwnerVel = Owner->get_velocity();
-    // 062996f8..06299764: muzzle = 0; unless destroyed, Csys = engine transform of the barrel
-    // instance (Csys::operator=) and FUN_06299880 = 3DMathEngine+0x28 of the barrel position.
+    // FUN_06299880 for the barrel point.
     Vector Muzzle;
     Muzzle.x = 0.0f;
     Muzzle.y = 0.0f;
     Muzzle.z = 0.0f;
     if (!IsDestroyed())
         Muzzle = BarrelPointWS(Barrels[Barrel].EngineIndex, Barrels[Barrel].Position);
-    // 06299768..06299795: Delta = Vector(Target - Muzzle), each component FSTP'd to float.
     Vector Delta;
     Delta.x = Target.x - Muzzle.x;
     Delta.y = Target.y - Muzzle.y;
     Delta.z = Target.z - Muzzle.z;
-    // 0629979d..062997db: Scale = MuzzleVelocity / sqrt((dy*dy + dz*dz) + dx*dx), kept on the
-    // FPU stack. No zero-length guard.
+    // Unrounded; no zero-length guard.
     double const Scale = (double)(LauncherArch()->MuzzleVelocity) /
                          sqrt(((double)(Delta.y) * Delta.y +
                                (double)(Delta.z) * Delta.z) +
                               (double)(Delta.x) * Delta.x);
-    // 062997dd..06299816: the muzzle-velocity vector, each component FSTP'd to float.
     Vector DirVel;
     DirVel.x = (float)(Delta.x * Scale);
     DirVel.y = (float)(Delta.y * Scale);
     DirVel.z = (float)(Delta.z * Scale);
-    // 062997c1..062997d0: Out.Pos = muzzle.
     Out.Pos = Muzzle;
-    // 06299818..06299852: Out.Velocity = owner velocity + muzzle velocity (float sums).
     Out.Velocity.x = OwnerVel.x + DirVel.x;
     Out.Velocity.y = DirVel.y + OwnerVel.y;
     Out.Velocity.z = DirVel.z + OwnerVel.z;
-    // 06299845..0629986c: the orientation looks along the muzzle velocity alone, not along the
-    // velocity that includes the owner's.
+    // Oriented along the muzzle velocity alone, not the total.
     Out.Orient = LookMatrix(DirVel);
 }
 
 void CELauncher::ComputeProjectilePosAndVelocity_OneBarrel(Vector& Pos, Vector& Vel, int Barrel,
                                                           Vector const& Target) const
 {
-    // .text:062998d0..062999fe.
-    // 062998d9..06299966: muzzle = 0; unless destroyed (vt+8), the barrel instance's transform
-    // (IEngine+0xa0, 12 dwords) applied to the barrel position by 3DMathEngine+0x28.
+    // FUN_062998d0. Unlike ComputeLaunchInfo_OneBarrel, dx and dy stay unrounded, dz and the
+    // scale are rounded to float. No zero-length guard.
     Vector Muzzle;
     Muzzle.x = 0.0f;
     Muzzle.y = 0.0f;
     Muzzle.z = 0.0f;
     if (!IsDestroyed())
         Muzzle = BarrelPointWS(Barrels[Barrel].EngineIndex, Barrels[Barrel].Position);
-    // 0629996f..0629998f: dx and dy stay on the FPU stack; dz is FSTP'd to float.
     double const Dx = (double)(Target.x) - Muzzle.x;
     double const Dy = (double)(Target.y) - Muzzle.y;
     float const Dz = (float)((double)(Target.z) - Muzzle.z);
-    // 062999a5..062999b6: Pos = muzzle.
     Pos = Muzzle;
-    // 06299993..062999c5: Scale = MuzzleVelocity / sqrt((dz*dz + dy*dy) + dx*dx), FSTP'd to
-    // float. No zero-length guard.
     float const Scale = (float)(
         (double)(LauncherArch()->MuzzleVelocity) /
         sqrt(((double)(Dz) * Dz + Dy * Dy) + Dx * Dx));
-    // 062999c9..062999f8: each component times the float scale, FSTP'd to float.
     Vel.x = (float)(Dx * Scale);
     Vel.y = (float)(Dy * Scale);
     Vel.z = (float)((double)(Dz) * Scale);
@@ -462,7 +420,7 @@ unsigned CELauncher::GetProjectilesPerFire() const
 
 CELauncher::Barrel const* CELauncher::GetBarrelInfo(unsigned Index) const
 {
-    // .text:06299a90..06299abb: null when destroyed or when the barrel is unbound; no index test.
+    // FUN_06299a90; no index test.
     if (IsDestroyed())
         return nullptr;
     if (Barrels[Index].EngineIndex == -1)
@@ -472,8 +430,7 @@ CELauncher::Barrel const* CELauncher::GetBarrelInfo(unsigned Index) const
 
 Vector CELauncher::GetBarrelPosWS(unsigned Barrel) const
 {
-    // .text:06299ac0..06299b5e: zero when destroyed; otherwise the barrel position through the
-    // barrel instance's engine transform. No index or -1 test.
+    // FUN_06299ac0. No index or -1 test.
     Vector Out;
     Out.x = 0.0f;
     Out.y = 0.0f;
@@ -485,8 +442,7 @@ Vector CELauncher::GetBarrelPosWS(unsigned Barrel) const
 
 Vector CELauncher::GetBarrelDirWS(unsigned Barrel) const
 {
-    // .text:06299b70..06299c36: zero when destroyed; otherwise -Z of (engine orientation of the
-    // barrel instance * hardpoint orientation). No index or -1 test.
+    // FUN_06299b70. No index or -1 test.
     Vector Out;
     Out.x = 0.0f;
     Out.y = 0.0f;
@@ -498,9 +454,8 @@ Vector CELauncher::GetBarrelDirWS(unsigned Barrel) const
 
 Vector CELauncher::GetAvgBarrelPosWS() const
 {
-    // .text:06299c40..06299d92: GetBarrelPosWS inlined per counted barrel (IsDestroyed re-tested
-    // each time), float sums Pos + Sum; then FILD count, FDIVR 1.0 -- the reciprocal stays on
-    // the FPU stack -- and each sum times it FSTP'd to float. Not called inside Common.dll.
+    // FUN_06299c40: float sums times an unrounded reciprocal (no zero-count guard). Not called
+    // inside Common.dll.
     Vector Sum;
     Sum.x = 0.0f;
     Sum.y = 0.0f;
@@ -523,8 +478,7 @@ Vector CELauncher::GetAvgBarrelPosWS() const
 
 Vector CELauncher::GetAvgBarrelDirWS() const
 {
-    // .text:06299da0..06299f5a: GetBarrelDirWS inlined per counted barrel, the same float sums
-    // and the same unrounded reciprocal as GetAvgBarrelPosWS. Not called inside Common.dll.
+    // FUN_06299da0, as GetAvgBarrelPosWS. Not called inside Common.dll.
     Vector Sum;
     Sum.x = 0.0f;
     Sum.y = 0.0f;
@@ -552,6 +506,6 @@ Archetype::Launcher const* CELauncher::LauncherArch() const
 
 Archetype::Projectile const* CELauncher::ProjectileArch() const
 {
-    // Listing 0x369c0 (ICF-shared): MOV EAX,[ECX+0x4c]; RET.
+    // RVA 0x369c0 (ICF-shared).
     return (Archetype::Projectile const*)(Projectile);
 }

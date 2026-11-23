@@ -23,10 +23,8 @@
 
 namespace
 {
-    // DAT_0061649c -- this unit's lazily filled I3DMathEngine. Every use tests it and, while
-    // null, stores FUN_005b73e0's result (0x0040611e..0x0040612c in FUN_00405fb0,
-    // 0x00406412..0x00406423 in FUN_00406230, 0x0040678d..0x0040679b in FUN_00406510); those
-    // are its only references.
+    // DAT_0061649c -- this unit's lazily filled I3DMathEngine (FUN_00405fb0, FUN_00406230 and
+    // FUN_00406510 are its only users).
     I3DMathEngine* G_PartCacheMath = nullptr;
 
     I3DMathEngine* PartCacheMath()
@@ -172,8 +170,7 @@ void PartCacheClear(FPartCache* Cache)
     Cache->MergedIndices = nullptr;
 }
 
-// FUN_00405fb0 (thiscall on the entry, RET 8: Wire, Xform). The wire is used untested; the
-// only early returns are retail's own (0x00405fd4 / 0x00405fdc / 0x00405fea).
+// FUN_00405fb0 (thiscall on the entry, RET 8: Wire, Xform). The wire is used untested.
 void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, FTransform const* Xform)
 {
     unsigned char* HeaderBytes = static_cast<unsigned char*>(Wire->GetMeshData());
@@ -266,22 +263,18 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, FTransform
     operator delete(Remap);
 }
 
-// FUN_00406230 (thiscall on the entry, RET 8: Mesh, Xform). Stack cells named after the frame
-// base B (ESP after the four register PUSHes); every LEA below is corrected for the PUSHes
-// already made before it (LEA [ESP+n] after k PUSHes addresses B+n-4k).
-//   prologue Slot22(0x80,  &B20 Positions, &B4c, &B48, &B38 VertCap)   0x0040628b..0x004062a7
-//   group    Slot22(0x100, &B40 Weights,   &B58, &B54, &B50)           0x00406340..0x0040635c
-//            Slot24(0x100, &B3c WeightIndex, &B5c)                     0x0040635f..0x00406371
-//            Slot24(0x80,  &B44 RawIndex,  &B30 IndexCount)            0x00406374..0x00406386
+// FUN_00406230 (thiscall on the entry, RET 8: Mesh, Xform). Run twice: a counting pass (no
+// index buffer yet) and a filling pass. The Cell* locals are out-arguments the code never
+// reads.
 unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform const* Xform)
 {
-    unsigned short* Remap = nullptr;     // EDI / [B+0x10]
-    unsigned ReturnCursor = 0;           // [B+0x1c], the return value
-    unsigned Compacted = 0;              // [B+0x18]
-    unsigned WriteCursor = 0;            // [B+0x24]
-    float* Positions = nullptr;          // [B+0x20] -- written only by the prologue Slot22
+    unsigned short* Remap = nullptr;
+    unsigned ReturnCursor = 0;
+    unsigned Compacted = 0;
+    unsigned WriteCursor = 0;
+    float* Positions = nullptr;          // written only by the prologue
 
-    // 0x00406244..0x00406263: only while IndexCount is set and the index buffer is not.
+    // Only while IndexCount is set and the index buffer is not.
     if (Entry->IndexCount != 0 && Entry->Indices == nullptr)
     {
         Entry->Indices = static_cast<unsigned short*>(
@@ -291,7 +284,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
 
         void* CellB4c = nullptr;
         void* CellB48 = nullptr;
-        unsigned VertCap = 0;            // [B+0x38]
+        unsigned VertCap = 0;
         Mesh->GetFaceGroupData(0x80, reinterpret_cast<void**>(&Positions), &CellB4c, &CellB48,
                      reinterpret_cast<void**>(&VertCap));
 
@@ -303,19 +296,19 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
         FillUshortOnes(Remap, VertCap);
     }
 
-    // 0x004062ef: [B+0x14] = 0, then Slot8 fills it; JBE / JC make both tests unsigned.
+    // Both count tests are unsigned.
     int GroupCountCell = 0;
     Mesh->GetFaceGroupCount(&GroupCountCell);
     unsigned const GroupCount = static_cast<unsigned>(GroupCountCell);
 
     for (unsigned GroupIndex = 0; GroupIndex < GroupCount; ++GroupIndex)
     {
-        // 0x00406319: JL -- a negative select result skips the group (no Slot10).
+        // A negative select result skips the group (no close).
         if (Mesh->OpenFaceGroup(static_cast<int>(GroupIndex), 1) < 0)
             continue;
 
-        // 0x0040632c: -8 from Slot18 unlocks and returns 0 at once. Retail neither frees the
-        // remap table nor stores VertexCount on this path (0x004064f8..0x00406507).
+        // -8 closes and returns 0 at once. Retail neither frees the remap table nor stores
+        // VertexCount on this path.
         if (Mesh->OpenFaceGroupChannels(0x180U) == -8)
         {
             Mesh->CloseFaceGroup();
@@ -323,31 +316,29 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
         }
         Mesh->LockFaceGroupChannels(0x180U);
 
-        float* Weights = nullptr;        // [B+0x40]
+        float* Weights = nullptr;
         void* CellB58 = nullptr;
         void* CellB54 = nullptr;
         void* CellB50 = nullptr;
         Mesh->GetFaceGroupData(0x100, reinterpret_cast<void**>(&Weights), &CellB58, &CellB54, &CellB50);
 
-        unsigned short* WeightIndex = nullptr;   // [B+0x3c]
+        unsigned short* WeightIndex = nullptr;
         void* CellB5c = nullptr;
         Mesh->GetFaceGroupIndices(0x100, reinterpret_cast<void**>(&WeightIndex), &CellB5c);
 
-        unsigned short* RawIndices = nullptr;    // [B+0x44]
-        unsigned IndexCount = 0;                 // [B+0x30]
+        unsigned short* RawIndices = nullptr;
+        unsigned IndexCount = 0;
         Mesh->GetFaceGroupIndices(0x80, reinterpret_cast<void**>(&RawIndices),
                      reinterpret_cast<void**>(&IndexCount));
 
-        // 0x0040638f: TEST EAX,0xfffffffe / JBE -- fewer than two indices, no pairs.
+        // Fewer than two indices, no pairs.
         if ((IndexCount & 0xFFFFFFFEu) != 0)
         {
-            unsigned Pair = 0;           // ECX / [B+0x2c]
+            unsigned Pair = 0;
             do
             {
-                // 0x004063a0..0x004063c1: unless byte +0x1b is set, the pair's weight (float,
-                // indexed through WeightIndex[Pair]) against the .rdata DOUBLE 0.1 (DAT_005c7720):
-                // FCOMP / TEST AH,0x41 / JNP -- exactly one of C0/C3 set (less or equal, ordered)
-                // leaves the group; greater and unordered go on.
+                // Unless byte +0x1b is set, a pair weight at or below the DOUBLE 0.1
+                // (DAT_005c7720) leaves the group; greater and unordered go on.
                 if (Entry->bSkipWeightTest == 0)
                 {
                     double const Weight = static_cast<double>(Weights[WeightIndex[Pair]]);
@@ -355,10 +346,9 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
                         break;
                 }
 
-                // 0x004063c7: with no index buffer yet (the counting pass) only the cursor moves.
+                // The counting pass only moves the cursor.
                 if (Entry->Indices != nullptr)
                 {
-                    // [B+0x70] (param_1's slot reused): the byte offset of the pair.
                     unsigned PairOffset = Pair * 4U;
                     for (int PairLeft = 2; PairLeft != 0; --PairLeft)
                     {
@@ -367,9 +357,6 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
                         unsigned short Mapped = Remap[RawIndex];
                         if (Mapped == 0xFFFFu)
                         {
-                            // 0x004063fc..0x00406464: the next compacted slot, the position at
-                            // Positions + RawIndex*12 through the math engine's slot 0x28 with
-                            // the Xform argument, then the entry's tag at +0xc.
                             Mapped = static_cast<unsigned short>(Compacted);
                             Compacted += 1;
                             Remap[RawIndex] = Mapped;
@@ -397,11 +384,10 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
             } while (Pair < (IndexCount >> 1));
         }
 
-        // 0x004064b4: unlock after the pairs, including the weight break.
+        // Closed after the pairs, including the weight break.
         Mesh->CloseFaceGroup();
     }
 
-    // 0x004064cf..0x004064e7.
     if (Entry->Vertices != nullptr)
         Entry->VertexCount = Compacted;
     if (Remap != nullptr)
@@ -420,8 +406,7 @@ void PartCacheBuildFromMeshTwice(FPartCacheEntry* Entry, IMesh* Mesh, FTransform
 namespace
 {
     // The record search FUN_00405930 / FUN_00405a00 inline for the instance and for every
-    // child: the first record whose +0x10 matches, PartCount compared SIGNED (TEST/JLE, then
-    // CMP/JL) and re-read per pass; null when none matches.
+    // child: PartCount compared SIGNED and re-read per pass.
     FPartCacheEntry* PartCacheFindRecord(FPartCache* Cache, void* Instance)
     {
         int const PartCount = static_cast<int>(Cache->PartCount);
@@ -434,9 +419,8 @@ namespace
         return nullptr;
     }
 
-    // FUN_00405a00's per-record body (0x00405a32..0x00405a64 and its child copy at
-    // 0x00405aae..0x00405ae0): found, active; a different tag is stored and written into every
-    // vertex (+0xc), VertexCount compared signed and re-read per pass.
+    // FUN_00405a00's per-record body (inlined twice): VertexCount compared signed and re-read
+    // per pass.
     void PartCacheActivateRecord(FPartCacheEntry* Entry, unsigned Tag)
     {
         Entry->bActive = 1;
@@ -472,7 +456,7 @@ void PartCacheMarkHidden(FPartCache* Cache, void* Instance, bool bRecurseChildre
 }
 
 // FUN_004059d0 (thiscall): from the second record on, a hidden record loses its active flag.
-// PartCount (re-read each pass) compared signed: CMP/JLE against 1, then CMP/JL.
+// PartCount (re-read each pass) compared signed.
 void PartCacheClearHiddenActive(FPartCache* Cache)
 {
     for (int PartIndex = 1; PartIndex < static_cast<int>(Cache->PartCount); ++PartIndex)
@@ -484,7 +468,7 @@ void PartCacheClearHiddenActive(FPartCache* Cache)
 }
 
 // FUN_00405a00 (thiscall, RET 0xc: Instance, bRecurseChildren, Tag). Returns whether any
-// record matched ([ESP+0x13]). No test of the cache, of the vertex array or of DALib::Engine.
+// record matched. No test of the cache, of the vertex array or of DALib::Engine.
 bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChildren, unsigned Tag)
 {
     void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
@@ -519,13 +503,12 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
 {
     void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
 
-    // 0x00405b33: an unset instance returns false before anything is touched.
     if (Instance == kInvalid)
         return false;
 
     IEngine* Engine = DALib::Engine;
 
-    // 0x00405b42..0x00405b7f: FUN_004058e0's body inlined -- tear down any prior contents.
+    // FUN_004058e0's body inlined.
     if (Cache->Entries != nullptr)
     {
         unsigned* Prefix = reinterpret_cast<unsigned*>(Cache->Entries) - 1;
@@ -542,7 +525,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     Cache->TotalVertices = 0;
     Cache->MergedIndices = nullptr;
 
-    // Save current transform, force identity, UpdateInstance.
+    // The parts are cached in the instance's identity pose.
     FTransform SavedTransform;
     float* TransformPtr = Engine->GetInstanceTransform(Instance);
     CopyTransform12(&SavedTransform, reinterpret_cast<FTransform const*>(TransformPtr));
@@ -552,7 +535,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     Engine->SetInstanceMatrix(Instance, &Identity);
     Engine->UpdateInstance(Instance, 0, nullptr);
 
-    // Count related instances (root + children). First cursor is -1 (listing 00405c30).
+    // Root + children.
     Cache->PartCount = 1;
     void* Child = Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
@@ -574,13 +557,12 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
             PartCacheEntryConstruct(Entries + Index);
     }
 
-    // 0x00405cb6..0x00405cde: no test of the array -- retail writes the root record through it
-    // whatever operator new returned.
+    // No test of the array -- retail writes the root record through it whatever operator new
+    // returned.
     Cache->Entries = Entries;
     Cache->TotalVertices = 0;
     Cache->TotalIndices = 0;
 
-    // Root entry.
     Entries[0].Tag = Tag;
     Entries[0].InstanceId = Instance;
     Entries[0].bSkipWeightTest = 0;
@@ -590,8 +572,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     CopyTransform12(&WorldXform, reinterpret_cast<FTransform const*>(TransformPtr));
 
     {
-        // EH state 1 ([ESP+0x14]) and, inside the IMesh branch, state 2 ([ESP+0x10]): both are
-        // FUN_00526a20 release-and-clear holders, destroyed Mesh first, then Wire.
+        // EH states 1 and 2: FUN_00526a20 release-and-clear holders, destroyed Mesh first.
         FPartComHolder Wire;
         if (Engine->QueryInstance(Entries[0].InstanceId, Iids::VMeshWire,
                                   reinterpret_cast<void**>(&Wire.Ptr)) >= 0)
@@ -611,8 +592,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     Cache->TotalIndices += Entries[0].IndexCount;
     Cache->TotalVertices += Entries[0].VertexCount;
 
-    // 0x00405db6..0x00405ee2: the children, one record each, until GetRelatedInstance hands
-    // back -1. No bound against PartCount -- the counting walk above saw the same chain.
+    // No bound against PartCount -- the counting walk above saw the same chain.
     FPartCacheEntry* Entry = Entries + 1;
     Child = Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
@@ -625,7 +605,6 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
         CopyTransform12(&WorldXform, reinterpret_cast<FTransform const*>(TransformPtr));
 
         {
-            // EH states 3 / 4, the same two holders as the root's.
             FPartComHolder Wire;
             if (Engine->QueryInstance(Entry->InstanceId, Iids::VMeshWire,
                                       reinterpret_cast<void**>(&Wire.Ptr)) >= 0)
@@ -649,11 +628,10 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
         Child = Engine->GetRelatedInstance(Instance, 0, Child);
     }
 
-    // 0x00405eef..0x00405f17: restore the saved transform.
     Engine->SetInstanceMatrix(Instance, &SavedTransform);
     Engine->UpdateInstance(Instance, 0, nullptr);
 
-    // 0x00405f1a: CMP EAX,0x3e80 / JLE -- a SIGNED compare against 16000 indices.
+    // A SIGNED compare against 16000 indices.
     if (static_cast<int>(Cache->TotalIndices) > 0x3E80)
     {
         FDUMP(0x100004,
@@ -708,10 +686,8 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
         return;
     }
 
-    // 0x00406593: the constant part of the source block, then the lock. The result of the lock
-    // is not tested.
-    // The source block lives on retail's stack at [ESP+0x34]; only the fields below are ever
-    // written (the normal and texcoord streams stay as the stack left them).
+    // The result of the lock is not tested. Only the source-block fields below are ever written
+    // (retail's normal and texcoord streams stay as the stack left them).
     FRpVertexSrcDesc Source;
     Source.Flags = 2;
     Source.Position.ByteSize = 0xc;
@@ -725,8 +701,7 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
     FVertexMemoryLock LockOut; // vertex buffer, FVF, base vertex, memory
     DALib::VertexBuffer->LockVertexMemory(0x42, Cache->TotalVertices, &LockOut);
 
-    // 0x004065e6: the stride of the locked FVF -- position 0x1c / 0x10 / 0xc by bits 0xc, 4, 2,
-    // normal 0xc, diffuse 4, specular 4, then the texcoords (FUN_004061a0).
+    // The stride of the locked FVF.
     unsigned const Fvf = static_cast<unsigned>(LockOut.Listing.Fvf);
     int PositionBytes = 0;
     if ((Fvf & 0xcu) == 0xcu)
@@ -757,8 +732,7 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
     }
     int const Stride = FvfTexcoordBlockBytes(Fvf) + ColourBytes + NormalBytes + PositionBytes;
 
-    // 0x00406677: every active part -- its indices rebased by the vertices already placed (a
-    // 16-bit add) appended to MergedIndices, its vertices copied after them.
+    // Every active part's indices rebased by the vertices already placed (a 16-bit add).
     unsigned VertexTotal = 0;
     FPartCacheEntry* Entry = Cache->Entries;
     for (int PartIndex = 0; PartIndex < static_cast<int>(Cache->PartCount); ++PartIndex, ++Entry)
@@ -797,9 +771,8 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
         Stage += 2;
     }
 
-    // 0x0040675a: pipeline state 7 (seeded 1 before the query) picks one combined modelview --
-    // the camera's view (slot 0x40) times Xform through the math engine (DAT_0061649c, the
-    // TU's lazily acquired 3DMathEngine) -- or a separate world and view.
+    // Pipeline state 7 (seeded 1 before the query) picks one combined modelview or a separate
+    // world and view.
     int bCombined = 1;
     DALib::Pipeline->GetPipelineState(7, &bCombined);
     if (bCombined != 0)
@@ -827,11 +800,10 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
 // FUN_00402580
 int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved)
 {
-    int LargestMax = 0; // [ESP+0x10]
+    int LargestMax = 0;
     if (Instance == reinterpret_cast<void*>(-1))
         return 0;
 
-    // 004025a6..004025e4: Slot9 -> FUN_00402790 insert(Instance, 0), node value = the LOD.
     if (Saved != nullptr)
     {
         int Current = 0;
@@ -866,7 +838,7 @@ int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved)
         int ChildMax = 0;
         if (ChildCount > 0)
             ChildMax = ChildCount - 1;
-        // 004026c6..004026d1: the child clamp is max index + 1, not max index.
+        // Retail quirk: the child clamp is max index + 1, not max index.
         int ChildLod = PreferredLod;
         if (PreferredLod > ChildMax + 1)
             ChildLod = ChildMax + 1;

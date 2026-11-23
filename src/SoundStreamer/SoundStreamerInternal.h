@@ -22,12 +22,11 @@ static const unsigned int kFdumpError = 0x100001;
 static const unsigned int kFdumpWarning = 0x100002;
 static const unsigned int kFdumpNotice = 0x100003;
 
-// .data:06efe070: __FILE__ of the StreamingSound handle code (FDUMP sites 06ef101d, 17ec, 18f6,
-// 1b0c, 1b3d, 1bc7, 1c7f, 206d).
+// .data:06efe070: __FILE__ of the StreamingSound handle code.
 static const char kRetailSource[] =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\SoundStreamer\\NewStream.cpp";
-// .data:06efe320: __FILE__ of the streamer object code (device init 06ef2e00 and CreateStream
-// 06ef3060: FDUMP sites 06ef2e80/2e9a, 2efe/2f18, 2fc5, 2ff6, 303c, 31ae).
+// .data:06efe320: __FILE__ of the streamer object code (device init 06ef2e00, CreateStream
+// 06ef3060).
 static const char kStreamerSource[] =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\SoundStreamer\\SoundStreamer.cpp";
 static const char kFdumpErrorFmt[] = "%s(%d) : ERROR:General:%s";

@@ -21,8 +21,7 @@ CDPClientProxy::~CDPClientProxy()
     PlayerId = 0;
 }
 
-// Copy ctor @ 0x3f30 / operator= @ 0x4030 are the compiler's memberwise members -- implicit in
-// src/include/dalib_net.h, not defined here.
+// Copy ctor @ 0x3f30 / operator= @ 0x4030 are the compiler's memberwise members (implicit).
 
 // Retail DALib.dll.c CDPClientProxy::Send @ 0x3a00 -- queue a copy of Data for later coalesced
 // transmission by SendMsgs.
@@ -41,7 +40,7 @@ bool CDPClientProxy::Send(void* Data, unsigned long Size)
     SendQueue.Add(Message);
     SendQueue.Unlock();
 
-    // .text:065c3aa3..3aaf: SendMsgs' result is discarded; Send always returns true.
+    // Retail discards SendMsgs' result; Send always returns true.
     SendMsgs();
     return true;
 }
@@ -171,14 +170,14 @@ bool CDPClientProxy::GetConnectionStats(DPN_CONNECTION_INFO* Info)
     return Owner->GetConnectionStats(this, Info);
 }
 
-// Retail .text:065c3b00: FLD qword ptr [ECX+0x58]; RET.
+// Retail .text:065c3b00 (+0x58).
 double CDPClientProxy::GetLinkSaturation()
 {
     return LinkSaturation;
 }
 
-// Retail .text:065c3af0: RET 4 -- an empty body (ICF-shared with IDPMsgHandler::OnConnect /
-// OnAddHost). Called for DPN_MSGID_SEND_COMPLETE by CDPServer::HandleDPServerMsg.
+// Retail .text:065c3af0: empty (ICF-shared with IDPMsgHandler::OnConnect / OnAddHost). Called for
+// DPN_MSGID_SEND_COMPLETE by CDPServer::HandleDPServerMsg.
 void CDPClientProxy::OnMsgSent(unsigned long SendTime)
 {
     (void)SendTime;

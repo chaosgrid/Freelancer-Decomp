@@ -20,7 +20,7 @@ static_assert(SWP_NOZORDER == 4, "SetWindowPos flags");
 static_assert(WM_CREATE == 1 && WM_SIZE == 5 && WM_PAINT == 0x0F && WM_ERASEBKGND == 0x14, "window messages");
 static_assert(GWL_USERDATA == -21, "SetWindowLong index");
 
-// FUN_06acf3d0. movie.dll operator delete: push arg, call FUN_06ad07b3, pop, ret.
+// FUN_06acf3d0. movie.dll operator delete: forwards to free (FUN_06ad07b3).
 void __cdecl MovieOperatorDelete(void* Block);
 
 // 0x06acf3db. movie.dll operator new: __nh_malloc(size, 1). Returns the pointer; does not throw itself.
@@ -170,7 +170,8 @@ void __cdecl Approach2UnregisterParentClass()
 // 0x06ac10d0. Constructor of the 0x20-byte approach-2 player.
 FApproach2Player::FApproach2Player()
 {
-    // Listing pushes ECX and reads [ESP+3], the high byte of This, into the allocator byte.
+    // Retail quirk: the allocator byte is the high byte of This (read off the
+    // pushed ECX).
     uint8_t Allocator = (uint8_t)((uintptr_t)this >> 24);
     Path.Allocator = Allocator;
     Path.Ptr = nullptr;
@@ -439,15 +440,14 @@ bool FApproach2Player::IsPlaying()
     return Flag == 0;
 }
 
-// 0x06ac14e0. XOR AL, AL. No caller in movie.dll reads EAX: the only CALL [reg+0x1C]
-// is the COM object at 06ac236a. Slot +0x1C of PTR_FUN_06ada1e0 has no call site.
+// 0x06ac14e0. Returns false. Slot +0x1c of PTR_FUN_06ada1e0 has no call site in
+// movie.dll.
 bool FApproach2Player::ReturnFalse()
 {
     return false;
 }
 
-// 0x06ac14f0. AL = byte [this+0x0D]. UpdateMovie 06ac1755 is the only call of this
-// slot and it tests AL (06ac1758).
+// 0x06ac14f0. Returns bError (+0x0d). UpdateMovie is the only caller.
 uint8_t FApproach2Player::GetError()
 {
     FApproach2Player* This = this;
@@ -511,8 +511,8 @@ void __cdecl Approach2RegisterEmptyAtexit()
     MovieRegisterAtexit(&Movie_Nop);
 }
 
-// 0x06ac1a80. Identical to 0x06ac1660, including the JNZ that skips only the
-// OR/store (06ac1a8a -> 06ac1a94). Both always register FUN_06ac1ce0 (Movie_Nop).
+// 0x06ac1a80. Identical to 0x06ac1660: a set guard bit skips only the store;
+// both always register FUN_06ac1ce0 (Movie_Nop).
 void __cdecl Approach2RepeatEmptyAtexit()
 {
     uint8_t Guard = g_movieAtexitGuard;

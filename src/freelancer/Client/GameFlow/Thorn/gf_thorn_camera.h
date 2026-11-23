@@ -26,8 +26,8 @@ struct FThornCamera : FThornComponent
     FThornCamera(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc);
 
     // FUN_00450830 (thiscall, RET 0xc) -- G_GfCameraPool.Allocate(Priority, Camera,
-    // bCanBeActive) into +0x6c. Callers: the spawn factories FUN_0044d9b0 (0x0044da1f, 1),
-    // FUN_0044dba0 (0x0044dc02, 0), FUN_0044dc20 (0x0044dced, 0).
+    // bCanBeActive) into +0x6c. Callers: the spawn factories FUN_0044d9b0 (1), FUN_0044dba0 (0),
+    // FUN_0044dc20 (0).
     void Register(FRoomCamera* Camera, int Priority, unsigned char bCanBeActive);
 
     // ICompoundControl (0x005ccbe8 / 0x005ccbec)
@@ -58,7 +58,7 @@ struct FThornCamera : FThornComponent
 struct FThornCameraReference : FThornComponent
 {
     // FUN_00450c60 (thiscall, RET 0xc) -- base ctor, then +0x6c = 0. The spawn FUN_0044dc20
-    // writes the target afterwards (0x0044dc84 / 0x0044dd62).
+    // writes the target afterwards.
     FThornCameraReference(Csys const& ScriptFrame, FGfScript* InOwner,
                           FThornEntitySnap const* Desc);
 

@@ -6,13 +6,11 @@
 
 #pragma once
 
-// Retail Intro.cpp Image (`E:\FL\Scratch\Source\Client\Interface\Intro.cpp`, 0x00565010 ..
-// 0x00565d90): a full-screen picture held in an ximage.dll BigImage. Three users:
-//   - InitializeEngine's startup screen, a stack local (vptr at 0x005b1a1e, Load 0x005b1a5a,
-//     Draw 0x005b1a7d / 0x005b1aa6, Release 0x005b1ab9, dtor 0x005b1c07);
+// Retail Intro.cpp Image (`E:\FL\Scratch\Source\Client\Interface\Intro.cpp`): a full-screen
+// picture held in an ximage.dll BigImage. Three users:
+//   - InitializeEngine's startup screen, a stack local;
 //   - the loading screen DAT_0067c3b8 (+0x04, built by FUN_00579220 through FUN_00565d90);
-//   - IntroFocus +0x210, the menu logo (ctor 0x0057384d, Load 0x005738f6, Draw 0x005742dd,
-//     Release inlined at 0x00573e90, dtor FUN_005737c0).
+//   - IntroFocus +0x210, the menu logo (dtor FUN_005737c0).
 
 struct IBigImage2;
 
@@ -31,8 +29,7 @@ struct IImage
 // (operator new(0x18) in FUN_00565d90).
 struct Image : public IImage
 {
-    // Inlined at every construction (0x00565d9e, 0x00573847, 0x005b1a16): vptr, +0x14 = 0.
-    // +0x04..+0x13 are not written.
+    // Inlined at every construction. +0x04..+0x13 are not written.
     Image();
     // FUN_00565010 (FUN_005650b0 deleting).
     ~Image() override;
@@ -52,8 +49,8 @@ struct Image : public IImage
     // BigImage from the mapped pixels (32-bit formats only).
     bool LoadTga(char const* Path);
 
-    // +0x04..+0x13 -- no instruction in 0x00565010..0x00565d90 or at the three embedding sites
-    // reads or writes them. TODO(INTRO): identify (padding of a base or dead fields).
+    // +0x04..+0x13 -- nothing in Image's functions or at the three embedding sites reads or
+    // writes them (padding of a base or dead fields).
     unsigned char Field_0x04[0x10];
     IBigImage2* BigImage; // +0x14
 
@@ -64,7 +61,7 @@ private:
 
 static_assert(sizeof(void*) != 4 || sizeof(Image) == 0x18, "retail Image is 0x18 bytes");
 
-// FUN_00565d90 (cdecl): operator new(0x18); on success vptr + BigImage = 0. Caller FUN_00579220.
+// FUN_00565d90 (cdecl): operator new(0x18). Caller FUN_00579220.
 Image* CreateImage();
 
 #ifdef FREELANCER_WIDESCREEN_SUPPORT

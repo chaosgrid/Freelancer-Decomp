@@ -15,16 +15,8 @@
 //
 // FGenericFxObjectBase: shared COM/tree machinery and the property-set protocol
 // (each class's retail property set, see FFxNodePropertySet) for every
-// FxNode/emitter/field/appearance concrete type. Originally this was
-// ONE class (FGenericFxObject) dispatching on FactoryName_ string compares
-// with type-specific state (field magnitude/approach/attenuation/etc.) all
-// living on the same object regardless of which of the 19 retail types the
-// instance actually was. That shape was replaced (2026-09-10, user-directed
-// after wave 12 found kDefaultApproach had been silently mis-shared between
-// FxRadialField and FxTurbulenceField) with a real class hierarchy: each of
-// the 19 concrete types below is now its own C++ class with only the fields
-// it actually needs, so a bug like "type X's state accidentally leaks into
-// type Y's code path" is a compile error, not a silent runtime bug.
+// FxNode/emitter/field/appearance concrete type. Each of the 19 retail types is
+// its own C++ leaf class with only the state it needs.
 //
 // Concrete leaves (declared in their own family headers):
 //   FxNode                                            — this file (trivial)
@@ -37,50 +29,18 @@
 //     FxMeshAppearance/FxOrientedAppearance/
 //     FLDustAppearance/FLBeamAppearance                — alchemy_appearances.h
 //
-// Construction: alchemy_factory.cpp's CreateComponent constructs the exact
-// leaf class by retail component name (no more single parameterized class).
+// Construction: alchemy_factory.cpp's CreateComponent constructs the leaf class
+// by retail component name.
 //
-// Virtual hooks a leaf overrides (all default to a no-op in this base,
-// matching what a non-applicable type already did via its old FactoryName_
-// guard): BeginField/ApplyFieldToVel (IGenericFx interface methods — only
-// the 7 field leaves override; FLBeamField genuinely leaves both as the
-// inherited no-op, matching retail's own LAB_0620ed20/30 no-op),
-// OnAfterIntegrate (protected, not part of IGenericFx — only
-// FxMeshAppearance overrides, for the Extra2/PoseMeshExtra2 special case).
-// OnParticleEmitted (protected, not part of IGenericFx, added wave16-lane1
-// 2026-09-10 — only FxParticleAppearance overrides, as a documented no-op;
-// see its own doc comment).
-// The emitter machinery (FUN_06245bf0 and the shape samplers) lives on
-// FFxEmitterBase in alchemy_emitters.h since 2026-09-26; the invented
-// SampleShape / StoreEmitCountField hooks and the Pad25 emitter tick are gone.
+// Virtual hooks a leaf overrides (no-op by default): BeginField/ApplyFieldToVel
+// (IGenericFx; the 7 field leaves, though FLBeamField keeps the no-op like retail
+// LAB_0620ed20/30) and OnAfterIntegrate (protected; FxMeshAppearance only, for the
+// Extra2/PoseMeshExtra2 case). The emitter machinery (FUN_06245bf0 and the shape
+// samplers) lives on FFxEmitterBase in alchemy_emitters.h.
 //
-// Deliberately NOT modeled here (2026-09-10, alchemy-wave15-lane1): a real
-// retail per-instance particle-instance-tracking mechanism (private pool +
-// intrusive list + owner refcount for emitter-spawned instances; a second,
-// separate per-particle "child COM object" slot for FxParticleAppearance).
-// Fully traced byte-for-byte (see the large comment above EmitOne in
-// alchemy_genericfx.cpp) but concluded to belong on specific EMITTER and
-// FxParticleAppearance leaves (alchemy_emitters.*/alchemy_appearances.*),
-// not here — retail overloads the same base-class byte offset with two
-// different per-leaf-type meanings for this, which is exactly the
-// FactoryName_-gated god-class pattern this file's own split (above) was
-// written to eliminate. Open TODO for a future wave with those files in
-// scope (the emitter-side "Cluster A" list is still fully open; the
-// FxParticleAppearance-side "Cluster B" child-object slot got a new
-// port-only virtual hook this wave — OnParticleEmitted below — see its own
-// doc comment and EmitOne's doc comment in alchemy_genericfx.cpp for what
-// wave16-lane1 confirmed vs. left open).
-//
-// NOT virtual — called directly and non-virtually from the relevant leaf
-// constructors instead (a virtual call from a BASE class constructor can
-// never reach a derived override in C++, since the derived part of the
-// object does not exist yet during base construction — so these are plain
-// protected helpers a leaf ctor opts into after its own base subobject is
-// already fully constructed): BuildDefaultAppearanceRamps() (called by the
-// perp and dust ctors; basic, rect, oriented and beam have their own builders in
-// alchemy_appearances.cpp). FxRadialField's
-// old InitRadialFalloffRamp() is no longer here at all — it is a private
-// method directly on FxRadialField now, since only that one type needs it.
+// BuildDefaultAppearanceRamps() is a non-virtual helper the perp and dust ctors call
+// after base construction; basic, rect, oriented and beam have their own builders in
+// alchemy_appearances.cpp.
 namespace AlchemyImpl
 {
     // The lookup key ITextureLibrary +0x30 (Slot12) takes: name + CRC, as
@@ -131,17 +91,8 @@ namespace AlchemyImpl
 
     class FGenericFxObjectBase : public IGenericFx
     {
-        // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): IntegratePool and
-        // ApplyFieldsToPool (alchemy_common.h/.cpp — plain namespace
-        // functions, not members) need direct access to
-        // InstanceListHead_/InstanceListTail_ (and IntegratePool to
-        // LiveInstanceCount_, on particle expiry) below. Friending these two
-        // specific, already-shared, already-documented helpers is narrower
-        // than making the fields public, and keeps the list's invariants
-        // (only ever mutated via UnlinkParticleNode/AppendParticleNode)
-        // enforced at exactly two call sites instead of anywhere in the
-        // module. See decomp-tracker item 132111 for the full retail trace
-        // this pairing implements.
+        // IntegratePool and ApplyFieldsToPool (alchemy_common.cpp) walk the instance
+        // list and IntegratePool drops LiveInstanceCount_ on expiry.
         friend void IntegratePool(FGenericFxObjectBase* Owner, FAppearancePool* Pool, const float& Dt);
         friend void ApplyFieldsToPool(FGenericFxObjectBase* Owner, bool bLiveItemsOnly);
 
@@ -157,12 +108,12 @@ namespace AlchemyImpl
         // FUN_062401a0, the shared node-base compose (node vtable slot 2). The mesh
         // appearance overrides it with FUN_06225240 (compose, then pose its meshes).
         GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const float* Parent12) override;
-        // FUN_06240180 (node vtable slot 3): TickLifetime(Dt) through the object's own
-        // vtable, return 0. FLBeamAppearance and the three emitters override it
+        // Per-node update. FUN_06240180 (node vtable slot 3): TickLifetime(Dt) through the
+        // object's own vtable. FLBeamAppearance and the three emitters override it
         // (FUN_0620de30; LAB_0621b9d0 / LAB_0621d360 / LAB_0623bcf0).
         GENRESULT DACOM_API Pad5(float Dt) override;
-        // Outer +0x18, the per-node draw. FUN_062403f0 (node vtable slot 4 default):
-        // `XOR EAX,EAX; RET 4`. The appearances override it with their draw.
+        // Outer +0x18, the per-node draw. FUN_062403f0 (node vtable slot 4 default)
+        // returns 0. The appearances override it with their draw.
         GENRESULT DACOM_API DrawOrEnqueue() override { return GR_OK; }
         // Outer +0x1C (FxNode LAB_062026a0 and every sibling): `[node+4] >> 31`.
         GENRESULT DACOM_API IsNodeDead() override
@@ -184,15 +135,12 @@ namespace AlchemyImpl
         IDAComponent* DACOM_API GetFirstChild() override { return FirstChild_; }
         IDAComponent* DACOM_API GetPrevSibling() override { return PrevSibling_; }
         IDAComponent* DACOM_API GetNextSibling() override { return NextSibling_; }
-        // Outer +0x38, `MOV EAX,imm; RET 4`, one constant per family (all 19 outer
-        // vtables, located by their +0x44 thunk into FUN_0623ffb0): FxNode 0x190
-        // (LAB_06202740); every appearance 0x64 (beam 0620dfa0, dust 06212300, basic
-        // 06218e80, 06226f60, 0622ea90, 06231ea0, 062357c0, 0623ad10);
-        // every field 0xc8 (0620eaa0, 06213880, air 06214900, 0621a890, 06223ee0,
-        // 06236b10, 0623e0f0); every emitter 0x12c (cone 0621c220, cube 0621da00, sphere
-        // 0623c420). LinkNodeTree (FUN_06201e00) orders siblings by it. The port has no
-        // family base classes, so the family tag bytes (+0x94 / +0x95 / +0x96) select it.
-        // Until ALC-5 this returned 0 for every node, so sibling order was insertion order.
+        // Outer +0x38 returns one constant per family: FxNode 0x190 (LAB_06202740); every
+        // appearance 0x64 (beam 0620dfa0, dust 06212300, basic 06218e80, 06226f60, 0622ea90,
+        // 06231ea0, 062357c0, 0623ad10); every field 0xc8 (0620eaa0, 06213880, air 06214900,
+        // 0621a890, 06223ee0, 06236b10, 0623e0f0); every emitter 0x12c (cone 0621c220, cube
+        // 0621da00, sphere 0623c420). LinkNodeTree (FUN_06201e00) orders siblings by it. The
+        // port has no family base classes, so the family tag bytes (+0x94..+0x96) select it.
         int DACOM_API GetSortKey() override
         {
             if (bIsAppearanceNode_ != 0)
@@ -206,13 +154,7 @@ namespace AlchemyImpl
         // FUN_062400f0 / FUN_062400b0 (node vtable slots 6 / 5).
         GENRESULT DACOM_API SetNodeTransform(unsigned long Index, const float* Source12) override;
         GENRESULT DACOM_API GetNodeTransform(unsigned long Index, float** OutSlot) override;
-        // wave89 (sonnet:alchemy-wave89-lane1, 2026-09-15): see
-        // IGenericFx::TickLifetime's own doc comment (alchemy_types.h) for
-        // the full byte trace this corrects (was a no-op `Pad17()` stub
-        // through every prior wave). Real body: accumulate Dt into Age_,
-        // and once Age_ exceeds Duration_ (strictly), latch the expired bit into
-        // NodeFlags_ -- defined out-of-line in alchemy_genericfx.cpp since
-        // it now has real logic instead of a one-line stub.
+        // Age_ += Dt; latches the expired bit once Age_ > Duration_ (strictly).
         GENRESULT DACOM_API TickLifetime(float Dt) override;
         GENRESULT DACOM_API SetParent(IDAComponent* Parent) override
         {
@@ -257,19 +199,17 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // FUN_06215f40 / FUN_0620e430 / FUN_0620be90. Declared at the end of IGenericFx
-        // now: it used to occupy +0x68, which the retail call sites prove belongs to
-        // GetSubtreeDuration.
+        // FUN_06215f40 / FUN_0620e430 / FUN_0620be90. Not at +0x68 (that is
+        // GetSubtreeDuration); declared at the end of IGenericFx.
         GENRESULT DACOM_API EmitOne(const float* Six, unsigned long Extra,
                                     float Duration) override;
-        // Outer +0x68 (FxNode LAB_06202840): `*Out = [node+0x88]`. Reported 0 until
-        // 2026-09-26.
+        // Outer +0x68 (FxNode LAB_06202840): node+0x88.
         GENRESULT DACOM_API GetSubtreeDuration(float* OutSeconds) override
         {
             *OutSeconds = Duration_;
             return GR_OK;
         }
-        // Outer +0x6C (FxNode LAB_06202860): `FSTP [node+0x88]`. A stub until 2026-09-26.
+        // Outer +0x6C (FxNode LAB_06202860).
         GENRESULT DACOM_API SetNodeDuration(float Value) override
         {
             Duration_ = Value;
@@ -278,10 +218,9 @@ namespace AlchemyImpl
         // Outer +0x70 (beam LAB_0620def0, field LAB_0620e9f0): the factory name.
         const char* DACOM_API GetFxFactoryName() override { return PropertySet_->ClassName.Buffer; }
         // Outer +0x74 / +0x78 / +0x7C (FxNode LAB_062028b0 / LAB_062028d0 / FUN_062028f0):
-        // tail jumps into the property set's outer +0x14 / +0x10 / +0xC, i.e. the set's
-        // Node_Name hash (+0x2c), buffer (+0x38) and assign (FUN_06209c50 and the
-        // per-class copies FUN_06231900 / FUN_062318e0 / FUN_06231810, ...). The name
-        // belongs to the shared set, so a clone renames its archetype too.
+        // tail jumps into the property set's outer +0x14 / +0x10 / +0xC (Node_Name hash,
+        // buffer, assign). The name belongs to the shared set, so a clone renames its
+        // archetype too.
         GENRESULT DACOM_API GetInstanceNameHash(unsigned long* Out) override
         {
             return PropertySet_->GetInstanceNameHash(Out);
@@ -312,13 +251,10 @@ namespace AlchemyImpl
             LodInput_ = LodInput;
             return GR_OK;
         }
-        // Outer +0x8C for every node that has no sphere: FxNode FUN_06202950, cone
-        // emitter LAB_0621c430, field LAB_0620ecb0 are all `MOV EAX,0xfffffff9;
-        // RET 8`. Until 2026-09-26 this reported success without writing, so
-        // FFxEffectObject's union seeded itself from an unwritten buffer. Basic,
-        // rect and perp override it; oriented (FUN_0622bed0), dust (FUN_0620f830),
-        // beam (FUN_062050c0), particle (FUN_0622fa10) and mesh (FUN_06225000)
-        // compute one in retail and still land here -- not ported.
+        // Outer +0x8C for every node that has no sphere (FxNode FUN_06202950, cone emitter
+        // LAB_0621c430, field LAB_0620ecb0): 0xfffffff9, nothing written. Every appearance
+        // except dust overrides it; dust's FUN_0620f830 computes one in retail and is not
+        // ported, so dust lands here.
         GENRESULT DACOM_API GetBoundingSphere(float* /*OutSphere*/) override
         {
             return static_cast<GENRESULT>(0xfffffff9);
@@ -344,10 +280,9 @@ namespace AlchemyImpl
         GENRESULT DACOM_API FillBatchedGeometry() override { return GR_OK; }
         // Batch begin / end-and-draw (IGenericFx, retail appearance +0x9C / +0xA0). The four
         // batched appearance kinds override them. Every other appearance reaches the
-        // appearance node defaults (node vtable 0x0624fbd0 slots +0x4c / +0x50, entered by
-        // `ADD [ESP+4],0xc; JMP`, e.g. dust 0x06212580 / 0x06212590): FUN_06244690
-        // `XOR EAX,EAX; RET 0xC` and FUN_062446a0 `XOR EAX,EAX; RET 4` -- return 0, no
-        // side effect. (FillBatchedGeometry's default above is the third one, FUN_062446b0.)
+        // appearance node defaults (node vtable 0x0624fbd0 slots +0x4c / +0x50): FUN_06244690
+        // and FUN_062446a0 return 0, no side effect. (FillBatchedGeometry's default above is
+        // the third one, FUN_062446b0.)
         GENRESULT DACOM_API BeginBatchedDraw(unsigned long /*Verts*/,
                                              unsigned long /*Indices*/) override
         {
@@ -355,33 +290,27 @@ namespace AlchemyImpl
         }
         GENRESULT DACOM_API EndBatchedDraw() override { return GR_OK; }
         GENRESULT DACOM_API Pad42() override { return GR_OK; }
-        // FUN_06244430, inner +0x5c / appearance +0xB0: the unchecked iterator
-        // starts at the by-value argument itself. Out of line; this deliberately
-        // preserves that malformed algorithm, not a search by field or index.
+        // FUN_06244430, inner +0x5c / appearance +0xB0 (remove a field): the unchecked
+        // iterator starts at the by-value argument itself. Retail's malformed algorithm is
+        // kept, not a search by field or index.
         GENRESULT DACOM_API Pad44(IDAComponent* Value) override;
-        // Appearance +0xB4 (every appearance vtable: `ADD this,0xc; JMP FUN_06244580`,
-        // basic LAB_062195a0). Begins every associated field. Out of line.
+        // Appearance +0xB4 (FUN_06244580 via a this+0xc thunk, basic LAB_062195a0): begins
+        // every associated field.
         GENRESULT DACOM_API Pad45() override;
-        // Appearance +0xB8 (`ADD this,0xc; JMP FUN_062445c0` on all eight appearance
-        // vtables, basic LAB_062195b0): will a particle spawned with (Six, Age,
-        // Duration) survive this frame's fields? Out of line.
+        // Appearance +0xB8 (FUN_062445c0 via a this+0xc thunk, basic LAB_062195b0): will a
+        // particle spawned with (Six, Age, Duration) survive this frame's fields?
         GENRESULT DACOM_API Pad46(const float* Six, float Age, float Duration) override;
         // Appearance +0xBC: the spawn. Every appearance has its own body (basic
         // FUN_06215f40, rect FUN_0623b410, perp FUN_06235db0, oriented FUN_0622bd80,
         // beam FUN_0620e430, dust FUN_06212700, particle FUN_0622f6a0, mesh
-        // FUN_06224c20). The leaves that are ported override it; this default spawns
-        // nothing.
-        //
-        // Until 2026-09-26 this default carried the body of FUN_062445c0, which
-        // belongs to +0xB8 (Pad46) -- one slot off. Dust and Particle still have no
-        // spawn and fall through to here: they never emit.
+        // FUN_06224c20) and overrides it; this default spawns nothing.
         GENRESULT DACOM_API Pad47(const float* /*Six*/, float /*Age*/,
                                   float /*Duration*/) override
         {
             return GR_OK;
         }
-        // Appearance +0xC0 (`ADD this,0xc; JMP FUN_06244660`, basic LAB_062195d0):
-        // calls each associated field's +0xa0. Out of line.
+        // Appearance +0xC0 (FUN_06244660 via a this+0xc thunk, basic LAB_062195d0): ends
+        // every associated field (field +0xa0).
         GENRESULT DACOM_API Pad48() override;
         // Appearance +0xC4 / +0xC8 (basic LAB_062195e0 / LAB_06219600): INC / DEC of
         // node+0xb0. Only appearance vtables have these slots in retail.
@@ -437,35 +366,21 @@ namespace AlchemyImpl
         // Internal field-update loops borrow a vector entry directly in retail.
         unsigned long BorrowAssociatedFieldCount() const { return FieldCount_; }
         IDAComponent* BorrowAssociatedFieldAt(unsigned long Index);
-        // wave104 (sonnet:alchemy-wave104-lane2, 2026-09-15): retail's own
-        // field-array auto-compaction-on-expiry (FUN_06218780 else-branch,
-        // decomp-tracker item 132871 -- confirmed via FUN_0620d690/FUN_0620bd70,
-        // a smart-pointer-array shift-erase whose net effect is "release the
-        // expired slot, shift everything after it down by one, shrink the
-        // count"). Port-only helper (not part of IGenericFx, same category as
-        // BorrowAssociatedFieldAt above) -- public so the free
-        // function ApplyFieldsToPool (alchemy_common.cpp) can call it when a
-        // field's own +0x1C gate reports done/expired, instead of leaving the
-        // expired field attached forever.
+        // Retail's erase of an expired field (FUN_06218780 else-branch, FUN_0620d690 /
+        // FUN_0620bd70 shift-erase), called by ApplyFieldsToPool when a field's +0x1C
+        // reports it dead. Port-only helper, not part of IGenericFx.
         void RemoveAssociatedFieldAt(unsigned long Index);
         IDAComponent** EraseAssociatedField(IDAComponent** Position);
         // FUN_06244120 (the appearance archetype copy base, called by all eight
         // appearance clone ctors) after FUN_0623fc30: vector<ComPtr> operator= of the
-        // field list (node+0x98). Out of line.
+        // field list (node+0x98).
         void CopyAssociatedFieldsFrom(FGenericFxObjectBase* Source);
         const FAppearanceRampDescriptor* DACOM_API GetAppearanceRampDescriptor() override
         {
             return Descriptor_;
         }
 
-        // wave22 (sonnet:alchemy-wave22-lane1): see IGenericFx::
-        // GetAppearanceOuterTime/SetAppearanceOuterTime (alchemy_types.h)
-        // for the full retail [this+0x8c] trace and the exhaustive,
-        // module-wide write-site search that came up empty. Backed by a
-        // real field (AppearanceOuterTime_ below) rather than a hardcoded
-        // constant so a future wave that DOES locate a real producer can
-        // wire it up via SetAppearanceOuterTime without another interface
-        // change.
+        // node+0x8c, the same storage as Get/SetNodeOuterTime.
         float DACOM_API GetAppearanceOuterTime() override { return AppearanceOuterTime_; }
         GENRESULT DACOM_API SetAppearanceOuterTime(float Time) override
         {
@@ -473,11 +388,8 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // wave117 (sonnet:wave117:globals-final): see IGenericFx::
-        // GetDustPrevCameraDistance/SetDustPrevCameraDistance (alchemy_types.h)
-        // for the full retail [this+0x12C] trace (FLDustAppearance-only).
-        // Backed by a real field (DustPrevCameraDistance_ below) defaulting
-        // to 0.0f, same convention as AppearanceOuterTime_ above.
+        // Retail [this+0x12C] (FLDustAppearance only; the dust leaf keeps it as
+        // LastCameraStep_).
         float DACOM_API GetDustPrevCameraDistance() override { return DustPrevCameraDistance_; }
         GENRESULT DACOM_API SetDustPrevCameraDistance(float Distance) override
         {
@@ -485,166 +397,15 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // ALC-4 (2026-09-30): the appearance texture state (node+0xb4 in retail) is the
-        // FFxTextureWrapper Texture_ below. The old AtlasFrameCount_/AtlasFrameUV_/
-        // TextureHandle_ trio and their accessors were that wrapper's +0x1c/+0x08/+0x04
-        // split apart with no writer; the history that concluded "no writer exists" is
-        // wrong -- the descriptor's name property 0x1BA23359 stores GetCRC32(name) at
-        // descriptor +0x64 (LAB_062328c0 and eleven siblings), and every appearance
-        // update resolves it through FUN_06244b80 / FUN_06244df0.
+        // The billboard blend pair (descriptor +0x68/+0x6c) is the constant {5 SRCALPHA,
+        // 2 ONE} every retail descriptor builder writes; no property overrides it.
 
-        // wave54 (wave54-lane2, 2026-09-11): investigated item 134306's
-        // (FUN_06233170) own wave47 blocker (a) -- a believed-missing
-        // "per-appearance blend-factor field" that its
-        // SetRenderState(D3DRS_SRCBLEND/D3DRS_DESTBLEND) call site
-        // (alchemy.dll.c:32227-32231, DAT_06257bc0 vtable+0xf0 with
-        // render-state ids 0x13/0x14 = D3DRS_SRCBLEND/D3DRS_DESTBLEND)
-        // appeared to need, now that TextureHandle_ above (the OTHER named
-        // blocker) exists. Traced both values back to their real source:
-        //   *(int*)(Appearance+0xf0)+0x68 (SrcBlend arg) and
-        //   *(int*)(Appearance+0xf0)+0x6c (DestBlend arg)
-        // i.e. NOT appearance-INSTANCE state at all -- both live on the
-        // shared FAppearanceRampDescriptor object (alchemy_types.h,
-        // already modeled for Flags/SizeRamp/ColorRamp/etc, cached at
-        // Appearance+0xf0 by FUN_06232b00). The identical
-        // (Descriptor+0x68/+0x6c) pair, read by the identical
-        // (DAT_06257bc0 vtable+0xf0, ids 0x13/0x14) SetRenderState call
-        // shape, recurs in at least 4 OTHER appearance-kind fill functions
-        // too (alchemy.dll.c:4794-4805, 15464-15473, 28162-28165 -- this
-        // one spells out the render-state ids as literal call args, e.g.
-        // `(**(*DAT_06257bc0+0xf0))(DAT_06257bc0,0x13,*(int*)(*(int*)
-        // (param_1+0xf0)+0x68))`, removing any doubt about the SetRenderState
-        // identification -- and 35617-35626), confirming this is the whole
-        // shared billboard-appearance family's blend state, not
-        // FxPerpAppearance-specific.
-        //
-        // Then traced the VALUES to their write site: SIX independent
-        // per-appearance-kind descriptor constructors (siblings of
-        // FUN_062323a0, which is the one FUN_06233170's own Perp descriptor
-        // uses -- alchemy.dll.c:3569-3570, 10968-10969, 14136-14137,
-        // 27134-27135, 31705-31706 [FUN_062323a0 itself], 34491-34492) each
-        // hardcode the IDENTICAL literal pair `param_1[0x19] = 5;
-        // param_1[0x1a] = 2;` (local offsets 0x64/0x68 -> absolute
-        // Descriptor+0x68/+0x6c, i.e. the exact two dwords FUN_06233170
-        // reads) with ZERO variation between them. A full sweep of every
-        // `+ 0x68) =`, `+ 0x6c) =`, `[0x19] =`, `[0x1a] =` write in the
-        // whole decompiled module found no other writer and no
-        // property-driven/.ale-authored override path anywhere. 5 =
-        // D3DBLEND_SRCALPHA, 2 = D3DBLEND_ONE -- every
-        // FAppearanceRampDescriptor-based appearance in retail draws with a
-        // fixed additive-glow blend (SRCALPHA, ONE), not the plain alpha
-        // blend (SRCALPHA, INVSRCALPHA) one might otherwise guess.
-        //
-        // CONCLUSION: this is a compile-time constant baked identically
-        // into every retail descriptor build, not per-instance state.
-        // Per this project's "document, don't invent" rule, deliberately
-        // NOT adding SrcBlend_/DestBlend_ fields to this class -- there is
-        // no real per-instance value for them to hold. A future wave
-        // wiring FUN_06233170 (or any sibling fill function) should call
-        // RenderPipeline->SetRenderState(D3DRS_SRCBLEND, 5) and
-        // SetRenderState(D3DRS_DESTBLEND, 2) as plain literals, exactly as
-        // retail does, unless a future .ale-driven override is later found
-        // (in which case the right home is two new plain dword fields on
-        // FAppearanceRampDescriptor itself, alchemy_types.h -- out of this
-        // lane's file ownership this wave -- not on this class). See
-        // decomp-tracker items 134306/134307 for the full byte citations.
-        // This closes out blocker (a) from item 134306's wave47 note as
-        // "answered: no field needed" -- blockers (c) (persistent
-        // camera-rotation cache) and (d) (a new IGenericFx per-frame-driver
-        // slot) remain genuinely open and out of scope.
-        //
-        // wave67 (sonnet:alchemy-wave67-lane2, 2026-09-11): closed blocker
-        // (d) for real -- added the new port-only IGenericFx::DrawOrEnqueue
-        // slot (alchemy_types.h) plus a base implementation here
-        // (DrawOrEnqueue, declared below near GetQueuedIndexCount, defined
-        // in alchemy_genericfx.cpp) that wires the one piece of
-        // FUN_06233170's own dispatch that is genuinely generic across every
-        // leaf type -- the begin()/end() empty-instance-particle-list guard.
-        //
-        // Also RE-EXAMINED blocker (c) from scratch (this wave's own
-        // mandate) rather than taking "still open" on faith. Byte-traced
-        // FUN_06233170's own camera-related call sequence
-        // (alchemy.dll.txt:0x062332b3-0x06233311) end to end:
-        //   MOV EAX,[DAT_06257908]; ...; CALL [EAX_vtbl+0x40]
-        // is the EXACT same G_DrawCookie-vtable+0x40 call shape wave48
-        // already resolved into GetDrawCameraTransform() (alchemy_common.h/
-        // .cpp) -- confirmed by directly comparing this function's raw bytes
-        // against GetDrawCameraTransform's own documented retail trace, not
-        // by analogy. The result is passed straight into a math-engine
-        // MulTransform(CameraTransform, this+0x4c) call (vtable+0x1c on the
-        // DAT_06257b38 3DMathEngine singleton -- Acquire3DMath() in this
-        // port), whose OUTPUT is written to a STACK-local scratch buffer and
-        // handed directly to RenderPipeline::SetTransform (DAT_06257bc0
-        // vtable+0x7c) within the SAME function call -- never written back
-        // to the appearance object, never read again anywhere in this
-        // function's own body. Unlike the sibling Dust/Basic vertex-fill
-        // functions (alchemy_common.cpp's own AppearanceRestMatrix doc
-        // comment, ~line 2135), which DO persist a composed transform to a
-        // real object field (Appearance+0xec) for reuse across the
-        // per-particle loop, FUN_06233170 computes and consumes its own
-        // camera*rest composition ENTIRELY on the stack, once per dispatch,
-        // with zero cross-frame or cross-call persistence in retail's own
-        // bytes.
-        //
-        // CONCLUSION: like blocker (a), this is answered, not implemented as
-        // a new field -- no persistent camera-rotation cache exists in
-        // retail for THIS function, so adding one here would be exactly the
-        // "invent a field with no retail backing" this project's rules
-        // forbid. The two real, already-modeled pieces this function's own
-        // camera math needs are already present: the live view transform via
-        // GetDrawCameraTransform() (queried fresh every call, matching
-        // retail's own fresh-query-every-dispatch bytes) and the persistent
-        // per-instance rest transform via GetNodeTransform(0)/NodeWorldXform_
-        // (already on this class since the original port). No new field
-        // added. A future wave writing FxPerpAppearance::DrawOrEnqueue
-        // (alchemy_appearances.cpp) should call
-        // MulTransform(GetDrawCameraTransform(), GetNodeTransform())
-        // straight into a local buffer, exactly as retail does, rather than
-        // caching the result on the object.
-
-        // Field types (7 leaves in alchemy_fields.h) override these; every
-        // other leaf inherits the no-op below, matching what its old
-        // FactoryName_ guard already did (and matching retail's own
-        // FLBeamField, whose real Begin/Apply genuinely are XOR EAX,EAX RET
-        // no-ops — see alchemy_fields.h's FLBeamField for that citation).
+        // The field leaves (alchemy_fields.h) override these; FLBeamField keeps the
+        // no-op, as retail's does.
         void DACOM_API BeginField(IDAComponent* /*Appearance*/, float /*Dt*/) override {}
         void DACOM_API ApplyFieldToVel(float* /*PosVel6*/, float* /*Age*/, float /*Dt*/) override {}
 
-        // wave30 (sonnet:alchemy-wave30-lane2, 2026-09-11): read-only
-        // traversal entry point for THIS instance's own active-particle
-        // list (InstanceListHead_/Tail_ below, added wave23/24). Added so a
-        // future alchemy_common.cpp-owning wave can replace FillBeamRibbon's
-        // documented O(pool-size) workaround (it currently walks the
-        // entire shared FAppearancePool::UsedHead chain and filters by
-        // `Particle->Appearance == Appearance`, since alchemy_genericfx.h
-        // was out of wave28's file ownership) with a direct O(instance-
-        // size) walk of exactly this list — see decomp-tracker items
-        // 131849/131852 for that workaround's own documentation and this
-        // wave's comment there for the exact call-site swap.
-        //
-        // Deliberately read-only and additive:
-        //   - Returns a `const FPooledParticle*`, not the mutable
-        //     InstanceListHead_ itself, so a caller cannot reassign this
-        //     instance's own head pointer through the returned value.
-        //   - FPooledParticle::Next/Prev (alchemy_types.h) are already
-        //     plain public members with no accessor of their own — any
-        //     external code that already compiles against FPooledParticle*
-        //     (as FillBeamRibbon's current workaround already does, via
-        //     Pool->UsedHead) can already walk ->Next once it holds a
-        //     starting pointer, so this accessor does not expose anything
-        //     that was not already externally walkable; it only supplies a
-        //     narrower, correctly-scoped starting point than
-        //     Pool->UsedHead.
-        //   - Does not touch InstanceListHead_/InstanceListTail_'s existing
-        //     private-to-this-class mutation path (still only ever written
-        //     by AppendParticleNode/UnlinkParticleNode, called from EmitOne
-        //     above and from the two wave23-friended pool functions) — this
-        //     is a pure new getter, no existing behavior of EmitOne,
-        //     IntegratePool, ApplyFieldsToPool, or ~FGenericFxObjectBase
-        //     changes.
-        //   - Intentionally NOT wired into FillBeamRibbon by this wave —
-        //     alchemy_common.cpp is owned by a concurrent lane this wave
-        //     (see this wave's own task scope); left for that future wave.
+        // Read-only head of this instance's particle list (node+0xd8).
         const FPooledParticle* GetFirstInstanceParticle() const { return InstanceListHead_; }
 
         // Retail outer +4 / +8: the batch-list links FUN_06201c70 writes (prev, next) and
@@ -652,10 +413,7 @@ namespace AlchemyImpl
         IGenericFx* BatchPrev_ = nullptr;
         IGenericFx* BatchNext_ = nullptr;
 
-        // wave89 (sonnet:alchemy-wave89-lane1, 2026-09-15): read-only
-        // accessor for Age_/Duration_ below -- see TickLifetime's own doc
-        // comment above and Age_/Duration_'s own field comment for the full
-        // retail trace. Not part of IGenericFx -- a plain port-only helper.
+        // Port-only accessors for Age_/Duration_.
         float GetLifetimeAge() const { return Age_; }
         float GetLifetimeDuration() const { return Duration_; }
 
@@ -664,10 +422,10 @@ namespace AlchemyImpl
         // [[Archetype+0x80]+0x48] (Node_LifeSpan); the own +0x7c is Released, the
         // archetype's copied and AddRef'd, +0x80 copied: the clone shares the archetype's
         // property set. The billboard set cache (node+0xf0, dust +0xe8) follows it, as
-        // every appearance clone ctor copies it (basic FUN_06215d80 0x06215e4b).
+        // every appearance clone ctor copies it (basic FUN_06215d80).
         void InitNodeFromArchetype(FGenericFxObjectBase* Archetype);
 
-        // FUN_06244120 (RET 4), the appearance copy base all eight appearance clones call:
+        // FUN_06244120, the appearance copy base all eight appearance clones call:
         // FUN_0623fc30, the appearance set cache +0xa8 copied (PropertySet_ here), then the
         // field list (+0x98) assigned from the archetype's (CopyAssociatedFieldsFrom).
         void InitAppearanceFromArchetype(FGenericFxObjectBase* Archetype);
@@ -682,7 +440,7 @@ namespace AlchemyImpl
         // object (its +0x40 GetNodeTransform(0) is called). Not an IGenericFx slot here:
         // the outer vtables do forward +0x44 to it (FxNode LAB_06202770), but the port's
         // +0x44 is TickLifetime and every known caller reaches this through the node
-        // sub-object (emitter body FUN_06245bf0 0x06245c56, field Begin 0x06224219 ...).
+        // sub-object (emitter body FUN_06245bf0, gravity field Begin, ...).
         GENRESULT ComputeRelativeTransform(IDAComponent* Other, float* Out12);
 
         // [[this+0x80]+0x24]: the property set's Node_Transform IAnimatedTransform (the
@@ -695,9 +453,9 @@ namespace AlchemyImpl
         // FUN_06244fb0 (a base set under the field vtables 0x0624fda8 / 0x0624fcf0); every
         // other class, FxNode included (FUN_0623ff00), overrides it with its own creator.
         virtual void CreatePropertySet();
-        // Store a freshly created set the way every creator does (e.g. sphere 0x0623bc8f..
-        // 0x0623bcbb: Release the old +0x7c, store and AddRef the new, Release the
-        // creation reference) and cache it (+0x80 and the class caches).
+        // Store a freshly created set the way every creator does (Release the old +0x7c,
+        // store and AddRef the new, Release the creation reference) and cache it (+0x80
+        // and the class caches).
         void AdoptPropertySet(FFxNodePropertySet* Set);
         // Port-only: the class cache (retail +0x9c / +0xa8 / +0xf0) of a leaf that keeps a
         // typed pointer next to PropertySet_; called whenever PropertySet_ changes.
@@ -729,10 +487,6 @@ namespace AlchemyImpl
         void ReleaseRectPropertySet();
         unsigned long ResolveLiveInstanceCount() const;
 
-        // (UpdateInstanceBoundsSphere / InstanceBoundsSphere_, wave71, were removed
-        // 2026-09-26: FUN_062050c0 is FLBeamAppearance::GetBoundingSphere, reached through
-        // the beam's outer +0x8C thunk FUN_0620e1b0.)
-
         unsigned long RefCount_;
 
         // Node-base +0x4 (FUN_0623fb80 zeroes it), the node flags:
@@ -742,7 +496,7 @@ namespace AlchemyImpl
         //   0x8 -- the composed transform was set from outside (SetNodeTransform index
         //          0); the next compose clears it and keeps the value.
         // The sign bit means "dead" (IsNodeDead, outer +0x1C); the emitter body
-        // FUN_06245bf0 tests it on itself with `TEST EAX,EAX; JS` (0x06245c3d).
+        // FUN_06245bf0 tests it on itself.
         unsigned long NodeFlags_;
 
         const char* PrimaryIid_;
@@ -769,12 +523,12 @@ namespace AlchemyImpl
         // GetNodeTransform(0) and by every emitter / appearance / bounds consumer.
         float NodeWorldXform_[12];
 
-        // Node-base +0x90, 1.0f from FUN_0623fb80 (0x0623fc02); outer +0x84/+0x88.
+        // Node-base +0x90, 1.0f from FUN_0623fb80; outer +0x84/+0x88.
         float LodInput_;
         // Node-base +0x94 / +0x95 / +0x96, zero from FUN_0623fb80; the family
         // constructors set one of them (see IGenericFx::GetFlagBit4). The appearance
         // and field leaves set theirs in this class's constructor from PrimaryIid_
-        // (retail sets them in the shared appearance init 0x0624439f and in each field
+        // (retail sets them in the shared appearance init FUN_06244360 and in each field
         // constructor), FFxEmitterBase sets +0x95.
         unsigned char bIsAppearanceNode_;
         unsigned char bIsEmitterNode_;
@@ -784,74 +538,27 @@ namespace AlchemyImpl
         // appearance block.
         long EmitterRefCount_;
 
-        // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): this instance's
-        // OWN active-particle list — every FPooledParticle this instance has
-        // emitted that has not yet expired, threaded through the particle
-        // struct's own (previously unused) Next/Prev fields
-        // (alchemy_types.h). Rooted here, on the owning appearance instance,
-        // NOT on FAppearancePool (which stays a purely shared block arena —
-        // Items/FreeNodes/Capacity/FreeCount/UsedHead/UsedTail/FreeHead/
-        // FreeTail, alchemy_types.h — its own Used/Free bookkeeping is a
-        // physically separate FPoolLink*-typed list from this one and is
-        // untouched by this change).
-        //
-        // Matches retail's confirmed per-owner-instance sentinel list: five
-        // independently byte-verified call sites (FUN_06215f40 emit-and-link,
-        // FUN_062188c0 per-instance age/integrate, FUN_06217ae0 unlink+free,
-        // FUN_06219070 destructor erase-range, FUN_06218780 per-instance
-        // field-apply — decomp-tracker items 132827/132872/132839/132921/
-        // 132871 — plus FUN_06230370's independently-retraced parallel
-        // lineage on a different concrete leaf class) all root this same
-        // shape at a small fixed byte offset on the owning instance, not on
-        // the shared pool. See decomp-tracker item 132111's wave22 comment
-        // for the complete trace and staged plan this field pair implements
-        // (steps 1-7); EmitOne links a new particle in
-        // (alchemy_genericfx.cpp), IntegratePool ages/unlinks-and-frees
-        // expired ones, ApplyFieldsToPool walks it read/write per associated
-        // field (both alchemy_common.cpp, both friended above).
-        //
-        // wave24 (sonnet:alchemy-wave24-lane1, 2026-09-11): decomp-tracker
-        // item 132111 step 8 / item 132921 CLOSED — ~FGenericFxObjectBase()
-        // (alchemy_genericfx.cpp) now erase-ranges this list (unlink + free
-        // each remaining node back to PoolForAppearanceFactory(FactoryName_))
-        // before any other teardown, mirroring FUN_06219070/FUN_062184c0/
-        // FUN_06217ae0's confirmed retail order. See that destructor's own
-        // doc comment for the full byte-level trace.
+        // Node+0xd8 / +0xdc: this instance's own live-particle list, threaded through
+        // FPooledParticle::Next/Prev; separate from the pool's own used/free links.
+        // Retail: link FUN_06215f40, age FUN_062188c0, unlink+free FUN_06217ae0, field
+        // walk FUN_06218780, destructor erase FUN_06219070.
         FPooledParticle* InstanceListHead_;
         FPooledParticle* InstanceListTail_;
 
-        // wave89 (sonnet:alchemy-wave89-lane1, 2026-09-15): backing store for
-        // TickLifetime() above -- see IGenericFx::TickLifetime's own doc
-        // comment (alchemy_types.h) for the full LAB_06240150 byte trace.
-        // Retail this+0x84 (Age_) and this+0x88 (Duration_) sit immediately
-        // BEFORE AppearanceOuterTime_'s own confirmed this+0x8c below --
-        // i.e. all three are consecutive dwords in retail's real layout,
-        // additional (not the original) evidence that Age_/Duration_
-        // genuinely belong on this shared base class right next to it, not
-        // on some unrelated per-leaf object.
-        //
-        // FUN_0623fb80 seeds Age_ = 0 and Duration_ = 100.0f (0x42c80000);
-        // FUN_0623fc30 (InitNodeFromArchetype) then copies the archetype's
-        // Node_LifeSpan (hash 0xf27fde7d; descriptor default 3.0f from FUN_0623f7b0,
-        // FLT_MAX is only the table's max bound) into Duration_.
+        // Node +0x84 / +0x88. FUN_0623fb80 seeds Age_ = 0 and Duration_ = 100.0f;
+        // InitializeFromFactory / InitNodeFromArchetype then copy Node_LifeSpan (default
+        // 3.0f from FUN_0623f7b0) into Duration_.
         float Age_;
         float Duration_;
 
         // Node +0x8c: the ramp Eval "OuterTime" every property evaluation passes
         // (emitter props in FUN_06245bf0, the compose, the mesh pose). FUN_0623fb80
-        // zeroes it. CORRECTED 2026-09-26 (ALC-1): it does have a writer -- outer
-        // +0x5C SetNodeOuterTime (cone LAB_0621c2c0: FSTP [outer+0x90]), which
-        // IFxEffect Slot6 (LAB_0621f820) walks over every node.
+        // zeroes it; the writer is outer +0x5C SetNodeOuterTime (cone LAB_0621c2c0),
+        // which IFxEffect Slot6 (LAB_0621f820) walks over every node.
         float AppearanceOuterTime_;
 
-        // wave117 (sonnet:wave117:globals-final): backing store for
-        // GetDustPrevCameraDistance/SetDustPrevCameraDistance above --
-        // retail's FLDustAppearance-only [this+0x12C] previous-frame
-        // camera-distance field (see the accessor's doc comment in
-        // alchemy_types.h for the full FUN_0620fcb0 trace). Defaults to
-        // 0.0f, matching retail's own zero-initialized object memory (no
-        // explicit constructor write to this offset was found anywhere in
-        // the module).
+        // Retail FLDustAppearance-only [this+0x12C] previous-frame camera distance
+        // (FUN_0620fcb0); zero-initialised.
         float DustPrevCameraDistance_;
 
         // Retail node+0xb4 (the beam's +0xb8): the appearance's texture state,
@@ -868,8 +575,8 @@ namespace AlchemyImpl
 
     // RegisterComponent #15 (FxNode). A plain node has no field/emitter/appearance
     // behaviour, so every inherited hook is the retail one. (#14 "FxNodePropertySet" is
-    // not a node: its factory builds FxNode's own property set, FFxNodeOwnPropertySet --
-    // wave 3's "same underlying object" reading was wrong, see alchemy_factory.cpp.)
+    // not a node: its factory builds FxNode's own property set, FFxNodeOwnPropertySet;
+    // see alchemy_factory.cpp.)
     class FxNode final : public FGenericFxObjectBase
     {
     public:
@@ -881,8 +588,8 @@ namespace AlchemyImpl
         // LAB_06240840 (node +0x20), outer alias LAB_06202740: constant 0x190.
         int DACOM_API GetSortKey() override { return 0x190; }
 
-        // FUN_0623fc90 (outer thunk 062026b0): the node (0xa0 bytes) built inline, then the
-        // body of FUN_0623fc30 inline (0x0623fd77..0x0623fdbd); *Out = it, 0.
+        // FUN_0623fc90 (outer thunk 062026b0): the node (0xa0 bytes) and FUN_0623fc30
+        // both inlined.
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
 
     protected:

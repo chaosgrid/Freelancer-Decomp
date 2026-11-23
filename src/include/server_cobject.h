@@ -11,12 +11,10 @@
 #include "common_metalist.h" // OwnerList<CargoDesc> (ShipInfo +0x5c)
 #include "server_exports.h"
 
-// CObject — base game object in Server.dll
-// Layout derived from retail Server.dll.c decompilation
-// All offsets verified against GetAtmosphereRange (0x19800), GetType (0x18da0),
-// and constructor FUN_06cee360
+// CObject — base game object in Server.dll. Offsets from GetAtmosphereRange (0x19800),
+// GetType (0x18da0) and the constructor FUN_06cee360.
 
-// Confirmed CEquip::ClassType mask constants used by pub::SpaceObj::GetCargo / EnumerateCargo.
+// CEquip::ClassType masks used by pub::SpaceObj::GetCargo / EnumerateCargo.
 enum EEquipTypeMask {
     EQUIP_TYPE_CARGO   = 0x10000,
     EQUIP_TYPE_SCANNER = 0x80000,
@@ -24,7 +22,6 @@ enum EEquipTypeMask {
 
 // ===========================================================================
 // pub::SpaceObj info structures — input to Create / CreateSolar / CreateLoot
-// Layouts reconstructed from retail Server.dll.c decompilation access patterns
 // ===========================================================================
 
 // DestroyType -- a GLOBAL enum in retail, not pub::SpaceObj's:
@@ -119,10 +116,8 @@ struct ShipInfo {
 //
 // Placed from the loads in pub::SpaceObj::CreateSolar (ESI = &info, .text:06cf80ed)
 // into its CSolarCreateInfo request (server_createinfo.h) and from there by
-// FUN_06d0a200 into CSolar::CreateParms (FUN_06d0a770 ctor at ESP+0x28). The
-// earlier reconstruction split the matrix into two runs (+0x0c and +0x40) and
-// read +0x88 as a char pointer; the listing shows a Vector at +0x0c, one 3x3 at
-// +0x18 and an inline string at +0x88. Retail offsets; the last load is +0xcc.
+// FUN_06d0a200 into CSolar::CreateParms (FUN_06d0a770 ctor). Retail offsets; the last
+// load is +0xcc.
 struct SolarInfo {
     unsigned int Field_0x00;         // +0x00  not read by CreateSolar
     unsigned int SolarArchID;        // +0x04  request +0x08 (.text:06cf818c), Archetype::GetSolar (.text:06cf8254)
@@ -180,7 +175,7 @@ static_assert(sizeof(LootInfo) == 0x68, "LootInfo: last field read at +0x64");
 // namespace pub.
 
 // EQInfo — equipment activation descriptor passed to ActivateEquipment.
-// Offsets confirmed against pub::SpaceObj::ActivateEquipment (0x193f0) and
+// Offsets from pub::SpaceObj::ActivateEquipment (0x193f0) and
 // pub::SpaceObj::Dock (0x1a6e0), which between them read +0x00, +0x04 (a single BYTE,
 // the on/off flag Dock derives from DOCK_HOST_RESPONSE), +0x08, +0x0c and +0x10.
 // The struct is 0x20 bytes: +0x10 is an EquipDescVector-sized block (see CargoOut).
@@ -193,32 +188,27 @@ struct EQInfo {
                                     //        TODO: semantic name unknown
     // +0x10: case 1 hands &CargoOut to the object's IObjInspect::scan_cargo (+0x120,
     // `ADD ESI,0x10; PUSH ESI` at .text:06cf9490) as its EquipDescVector& out-parameter,
-    // so the field is 0x10 bytes (sizeof(EquipDescVector)), not the one dword declared
-    // here before. It is raw storage rather than an EquipDescVector member because
+    // so the field is 0x10 bytes (sizeof(EquipDescVector)). It is raw storage rather than
+    // an EquipDescVector member because
     // retail EQInfo is trivial: pub::SpaceObj::Dock builds one on its stack with no
     // constructor or destructor call (.text:06cfa755 .. 06cfa77b).
     unsigned int CargoOut[4];       // +0x10 .. +0x1f
 };
 static_assert(sizeof(EQInfo) == 0x20, "EQInfo: +0x10 carries a 0x10-byte EquipDescVector");
 
-// pub::SpaceObj::ActivateEquipment — Server.dll .text:06cf93f0. Body: server_pub.cpp.
-// Content.dll FUN_06f14780 at 06f148c0: Type=2, byte at +4 = 0.
+// Server.dll .text:06cf93f0.
 SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(unsigned int const& ObjId, EQInfo* Info);
 
-// TerminalInfo — output struct for GetTerminalInfo
-// Retail: 0x24 bytes, name at +0x00 (32 chars), value at +0x20
+// TerminalInfo — output struct for GetTerminalInfo; 0x24 bytes.
 struct TerminalInfo {
     char Name[0x20];                // +0x00: terminal name string (max 31 chars + null)
     unsigned int Value;             // +0x20: terminal value dword
 };
 
-// ?GetTerminalInfo@SpaceObj@pub@@YAHABIHAAUTerminalInfo@12@@Z -- Server.dll 0x19900, body
-// server_pub.cpp. Content.dll TU53 dock queues (FUN_06f6bdd0, FUN_06f6c580, FUN_06f6c920,
-// FUN_06f6e9d0, FUN_06f6ee40): Value is the docking sphere's type.
+// Server.dll 0x19900. Value is the docking sphere's type.
 SERVER_API int __cdecl GetTerminalInfo(const unsigned int& ObjId, int Index, TerminalInfo& OutInfo);
 
 // PosSelectionType — position selection algorithm for GetEmptyPos
-// Retail: ?GetEmptyPos@SpaceObj@pub@@YAHABIABVTransform@@ABM2ABW4PosSelectionType@12@AAVVector@@@Z
 enum PosSelectionType {
     POS_SEL_XY_PLANE = 0,
     POS_SEL_XZ_PLANE = 1,
@@ -226,36 +216,26 @@ enum PosSelectionType {
     POS_SEL_3D_VOLUME = 3,
 };
 
-// ?GetEmptyPos@SpaceObj@pub@@YAHABIABVTransform@@ABM2ABW4PosSelectionType@12@AAVVector@@@Z --
-// Server.dll .text:06cf9bd0, body server_pub.cpp:4005. Content.dll TU38 FUN_06f15e20 (06f16455),
-// FUN_06f169a0 (06f16b52).
+// Server.dll .text:06cf9bd0.
 SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Transform& base_transform,
                                    const float& start_radius, const float& clearance,
                                    const PosSelectionType& selection_type, Vector& out_pos);
 
-// ?IsPosEmpty@SpaceObj@pub@@YAHABIABVVector@@ABMAA_N@Z -- Server.dll .text:06cfa060, body
-// server_pub.cpp:4147. Content.dll TU38 FUN_06f15e20 (06f1641f), FUN_06f169a0 (06f16b1a).
+// Server.dll .text:06cfa060.
 SERVER_API int __cdecl IsPosEmpty(const unsigned int& system_id_ref, const Vector& pos,
                                   const float& radius, bool& out_empty);
 
-// ?Create@SpaceObj@pub@@YAHAAIABUShipInfo@12@@Z — Server.dll .text:06cf7c90. Body:
-// server_pub.cpp. Content.dll NPC ship ctor FUN_06f336a0 (06f33aaf): OutId = the ship's +4.
+// Server.dll .text:06cf7c90.
 SERVER_API int __cdecl Create(unsigned int& OutId, ShipInfo const& Info);
 
-// ?CreateSolar@SpaceObj@pub@@YAHAAIABUSolarInfo@12@@Z -- Server.dll .text:06cf80d0, body
-// server_pub.cpp:3482. Content.dll TU38 FUN_06f169a0 (06f16d2b).
+// Server.dll .text:06cf80d0.
 SERVER_API int __cdecl CreateSolar(unsigned int& OutId, SolarInfo const& Info);
 
-// ?CreateLoot@SpaceObj@pub@@YAHAAIABULootInfo@12@@Z -- Server.dll .text:06cf84a0, body
-// server_pub.cpp:2536. Content.dll TU38 FUN_06f16fa0 (06f170b4 / 06f170c8).
+// Server.dll .text:06cf84a0.
 SERVER_API int __cdecl CreateLoot(unsigned int& OutId, LootInfo const& Info);
 
-// ?GetHealth@SpaceObj@pub@@YAHABIAAM1@Z -- body server_pub.cpp:3397. Content.dll TU38 snapshot
-// FUN_06f130b0 (06f134b3, 06f137b1, 06f139c3, 06f13aa8, 06f13d27): the current hit points.
 SERVER_API int __cdecl GetHealth(const unsigned int& obj_id_ref, float& out_current, float& out_max);
 
-// ?Destroy@SpaceObj@pub@@YAHIW4DestroyType@@@Z — body server_pub.cpp. Content.dll
-// FUN_06f34670 (06f34676, DESTROY_NORMAL).
 SERVER_API int __cdecl Destroy(unsigned int ObjId, DestroyType Type);
 
 } // namespace SpaceObj

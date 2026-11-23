@@ -9,16 +9,12 @@
 // Live per-type effect instance lists — DAT_00674ce0/ce4/ce8 (Effect.cpp).
 // Walked by FUN_004f7810 / SpaceEffectsDrawFrame. Filled by FUN_004f7af0 / FUN_004fc920
 // when an effect instance activates (not by [EffectType] INI meta — that is FUN_004fd5a0).
-//
-// Neighbor contract (vis_effect_arch / Effect spawn):
- //   After constructing a live Effect* with EffectTypeId at +0x5C, call
- //   EffectTypeListLink(Effect) so SpaceEffectsDrawFrame's bucket walk sees it.
- //   Link fields live at Effect+0x60 (prev), +0x64 (next), +0x68 (self-when-linked).
- //   Type id at +0x5C must be in [0, 0x2f).
+// A live Effect* is linked with EffectTypeListLink so SpaceEffectsDrawFrame's bucket walk sees
+// it: link fields at Effect+0x60 (prev), +0x64 (next), +0x68 (self-when-linked); the type id at
+// +0x5C must be in [0, 0x2f).
 
 // 0x2f buckets: the static initializer LAB_004f6f60 zeroes exactly 0x2f {Count, Head, Tail}
-// triples from DAT_00674ce0, and the teardown walk FUN_004f7140 stops at 0x00674f18 (47 buckets);
-// 0x00674f14 is a different object.
+// triples from DAT_00674ce0, and the teardown walk FUN_004f7140 stops at 0x00674f18.
 constexpr int kEffectTypeBucketCount = 0x2f;
 
 // One retail bucket: count / head / tail (stride 3 dwords from DAT_00674ce0).
@@ -38,7 +34,7 @@ void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node);
 // and flag bit1 at Effect+0x8 clear. Increments Effect+0x58.
 void EffectTypeListLink(void* Effect);
 
-// The full retail unlink-and-release (0x004f7910 / 0x004f716a / 0x004f73ea): linked only;
+// The retail unlink-and-release, inlined at three sites: linked only;
 // +0x68 = 0, node out of the bucket, count--, then RefCount-- and, at <= 0, slot +0x20 (1).
 void EffectTypeListUnlinkAndRelease(void* Effect);
 

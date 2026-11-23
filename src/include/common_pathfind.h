@@ -33,12 +33,10 @@
 // EXPORTS: member-level. Retail exports clear_user_zone / get_user_zone / submit_user_zone and
 // nothing else of the class (no ctor, no operator=), so the class carries no export macro.
 //
-// Layout: every field below is placed from the ctor's own stores (Common.dll.txt
-// 225461-225695) and, where named, from the readers cited on the field. Offset-named members
-// are fields whose type the ctor or a reader confirms but whose meaning is not recovered.
-// Some per-tick methods of this class are still ported as free functions over a raw byte
-// pointer (common_obstacleavoidance.cpp: ClassifyShipObstaclePhase, UpdateShipHeadingBlend, ...) --
-// see their own comments. Definitions: common_pathfind.cpp.
+// Layout: every field below is placed from the ctor's own stores and, where named, from the
+// readers cited on the field. Offset-named members are fields whose type is confirmed but
+// whose meaning is not recovered. Definitions: common_pathfind.cpp and
+// common_obstacleavoidance.cpp.
 // ============================================================================
 class PathfindManager
 {
@@ -48,7 +46,7 @@ public:
     // (UUserZone@1@ in ?get_user_zone@PathfindManager@@QAE_NAAUUserZone@1@@Z).
     //
     // Field meanings come from the one reader of the zone, the volume probe FUN_062db830
-    // (UserZoneContainsPoint, item 1672), which reads it in place at PathfindManager+0x0C:
+    // (UserZoneContainsPoint), which reads it in place at PathfindManager+0x0C:
     //   Mode       0 = sphere at TargetPoint / Radius, 1 = oriented box, 2 = live target,
     //              anything else = no test;
     //   Invert     the probe's answer is flipped when non-zero (tested as a whole dword);
@@ -90,7 +88,7 @@ public:
         unsigned int TargetKey;  // +0x54  mode 2 object id (IObjDB::FindById(&TargetKey) via Owner+0xEC)
     };
 
-    // FUN_062db3b0 (item 1667). Not exported.
+    // FUN_062db3b0. Not exported.
     explicit PathfindManager(IBehaviorManager* NewOwner);
 
     // 0x062db820 ?clear_user_zone@PathfindManager@@QAEXXZ
@@ -100,8 +98,7 @@ public:
     // 0x062c5ac0 ?get_user_zone@PathfindManager@@QAE_NAAUUserZone@1@@Z (non-const: QAE)
     COMMON_API bool get_user_zone(UserZone& OutZone);
 
-    // FUN_062de160 (item 1689), not exported, fastcall on `this`, 16 instructions
-    // (Common.dll.txt 229612-229629):
+    // FUN_062de160, not exported, fastcall on `this`, 16 instructions:
     //   AL = (byte [ECX+0x574] == 1);                        // Avoidance.HasContact
     //   if ([ECX+0x16c] != 3 && byte [ECX+0x180] != 0) AL = 1; // Reaction.State / bInReaction
     //   return AL == 0;                                       // SETZ
@@ -116,8 +113,7 @@ public:
         return !bObstructed;
     }
 
-    // FUN_062dd3d0 (item 1682), not exported, thiscall, `RET 8`, 108 instructions
-    // (Common.dll.txt 228376-228515). Reached only through Behavior::SetCruiseLock
+    // FUN_062dd3d0, not exported, thiscall, `RET 8`, 108 instructions. Reached only through Behavior::SetCruiseLock
     // (FUN_062d21d0, 20 call sites across the Behavior family), which tail-jumps here with
     // this = Behavior+0x20 (IBehaviorManager) -> +0x0C. Only the low byte of Value is read
     // (`MOV CL,byte ptr [ESP+param_1]`). Mask bit 1 latches it into Field_254, bit 0 into
@@ -149,27 +145,24 @@ public:
     // obstacle it avoids (Field_255 = 1, Field_258 = its id), 2 otherwise.
     int SelectObstacleDirection(Vector* OutDirection, IObjRW** OutObstacle, unsigned ExcludeId);
 
-    // FUN_062db830 (item 1672), not exported, __thiscall, RET 8 (the second stack argument is
-    // a float* the body never reads; dropped). Is ProbePoint inside the user zone? A zone that
-    // is not active (bUserZoneActive clear) admits everything; Invert flips the answer.
-    // Formerly the file-static AiVolumeProbeContainsPoint in the (since dissolved) common_stubs.cpp.
+    // FUN_062db830, not exported, __thiscall, RET 8 (the second stack argument is a float*
+    // the body never reads; dropped). Is ProbePoint inside the user zone? A zone that is not
+    // active (bUserZoneActive clear) admits everything; Invert flips the answer.
     bool UserZoneContainsPoint(Vector const* ProbePoint);
 
-    // FUN_062ddcd0 (item 1686, also reached through the thunk 0x062de040), not exported,
-    // __thiscall, RET 4. 0 with the unit direction from the owner towards the user zone (away
-    // from it when Invert is set) in *OutDir, 2 when the zone is inactive or does not apply.
-    // Formerly the free function AiVolumeProbeApproachDirection(This, OutDir).
+    // FUN_062ddcd0 (also reached through the thunk 0x062de040), not exported, __thiscall,
+    // RET 4. 0 with the unit direction from the owner towards the user zone (away from it when
+    // Invert is set) in *OutDir, 2 when the zone is inactive or does not apply.
     int GetUserZoneApproachDirection(Vector* OutDir);
 
-    // formerly the free ClassifyShipObstaclePhase(Self) -- FUN_062dc840 (item 1681), not
-    // exported, __thiscall. Resets Reaction, then picks the obstacle whose deflection capsule
+    // FUN_062dc840, not exported, __thiscall. Resets Reaction, then picks the obstacle whose deflection capsule
     // (padded by 750 / 250 and Field_1FC) holds the ship and lies closest to the target from
     // the own scan list and a 20000-radius spatial query; commits a State 1 escape or asks
     // NudgeObstaclePathPoint for a deflection point (State 0). 4 = nothing reacts, 0 = a commit,
     // otherwise NudgeObstaclePathPoint's non-zero result. Definition: common_obstacleavoidance.cpp.
     int ClassifyObstaclePhase();
 
-    // formerly the free UpdateShipHeadingBlend(Self, Dt) -- FUN_062dc590 (item 1680), RET 4.
+    // FUN_062dc590, RET 4.
     // Phase 0 latches Reaction.Heading into BlendStart and restarts the 4 s BlendTimer; phase 1,
     // an expired timer or a clear bBlendEnabled reset Reaction (State 3, Heading 0); otherwise
     // Reaction.Heading turns from BlendStart towards TargetPosition by the elapsed fraction of
@@ -179,10 +172,9 @@ public:
 
     // The sub-record at +0x16C. Its ctor is inlined into PathfindManager's: the member at
     // record+0x1C gets the ICF-folded empty ctor 0x06261260 (`MOV EAX,ECX; RET`), then
-    // FUN_062db7a0 (ResetState, item 1670) runs on the record. FUN_062db7a0 is also called
-    // from .text:062dd87b. Field names follow common_aisteer.h's "Ship heading-blend
-    // classifier pair" table, whose readers (ClassifyShipObstaclePhase,
-    // UpdateShipHeadingBlend) address these bytes as PathfindManager+0x16C..+0x19F.
+    // FUN_062db7a0 (ResetState) runs on the record; it is also called from .text:062dd87b.
+    // Field names follow common_aisteer.h's heading-blend table (readers
+    // ClassifyObstaclePhase / UpdateHeadingBlend, PathfindManager+0x16C..+0x19F).
     struct ObstacleReaction
     {
         // FUN_062db7a0: State = 3, LastObstacleTag = 0, Heading = 0 (stored +0x10, +0x0C,

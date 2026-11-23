@@ -16,13 +16,10 @@ class IVP_Hull_Manager;
 
 // ============================================================================
 // IVP_Calc_Next_PSI_Solver -- the per-core PSI integrator, Common.dll
-// .text:06351310-0635212f. A one-member helper: every method's ECX points at a
-// stack slot that holds the core (`MOV EDI,ECX; MOV ESI,[EDI]` at :06351317,
-// `MOV EDI,[ECX]` at :06351707, `MOV EAX,[ECX]` at :06351a92, `MOV EAX,[ESI]`
-// at :06351b98), and the two drivers build it by storing the core into their
-// own argument slot and passing that slot's address as `this`
-// (`MOV [ESP+param_1],ECX; LEA ECX,[ESP+param_1]` at :06351f1a-:06351f1f).
-// The class and method names are the IVP SDK's; retail keeps no symbols here.
+// 06351310-0635212f. A one-member helper: every method's `this` points at a
+// stack slot holding the core; the drivers store the core into their own
+// argument slot and pass its address (06351f1a). The class and method names
+// are the IVP SDK's; retail keeps no symbols here.
 //
 // IVP_Core field names used below are the port's (ivp_core.h); where they
 // differ from the SDK roles these functions establish, the SDK role is given

@@ -36,7 +36,7 @@ namespace
     {
         unsigned Offset;   // +0x00
         unsigned Flags;    // +0x04 bit 0 loop, bit 1 spatial, bit 2 streamer
-        unsigned Pad[4];   // +0x08..+0x14 zeroed (0x00457533..0x00457557)
+        unsigned Pad[4];   // +0x08..+0x14 zeroed
     };
 
     void CopyDword(void* Dst, void const* Src)
@@ -49,9 +49,7 @@ namespace
 // Thorn_Sound
 // ---------------------------------------------------------------------------------------
 
-// FUN_00456d80. Base ctor; +0x90 / +0x94 = 0x4e6e6b28 (1e9f), +0x98 / +0x9c = integer 0x168;
-// +0x6c / +0x70 / +0x74..+0x78 / +0x7c / +0x80 / +0x84 / +0x88 / +0x8c / +0xa0 / +0xa4 = 0;
-// vptrs; +0xa8 position 0 and +0xb4 identity.
+// FUN_00456d80.
 FThornSound::FThornSound(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
       Template(nullptr),
@@ -85,9 +83,7 @@ FThornSound::FThornSound(Csys const& ScriptFrame, FGfScript* InOwner, FThornEnti
     MatrixSetIdentity(Local.Orient);
 }
 
-// FUN_00456ee0. Both strings freed; a foreground sound leaves the script's event list
-// (FUN_0044f5c0 with the handle, 0x00456f71) and its handle is stopped (slot 24) and released;
-// a background one only releases the source it borrowed. Then the base dtor (FUN_0044fd80).
+// FUN_00456ee0. A background sound only releases the source it borrowed.
 FThornSound::~FThornSound()
 {
     malloc_strfree(&Template);
@@ -109,10 +105,8 @@ FThornSound::~FThornSound()
     }
 }
 
-// FUN_00456ff0. 0x00456fff malloc_strcpy(+0x6c, Template); +0x74 = bVoice;
-// "BackgroundAmbient" -> +0x76 = 1 and FUN_00428bc0(&+0x80); "BackgroundMusic" -> +0x77 = 1
-// and FUN_00428ba0(&+0x80); otherwise, not a voice line and a non-empty template ->
-// +0x7c = FUN_0042ae40(&CreateID(+0x6c)). The archetype is not Acquired here.
+// FUN_00456ff0. BindClientBackgroundAmbient / Music are FUN_00428bc0 / FUN_00428ba0,
+// LookupClientSoundArch FUN_0042ae40. The archetype is not Acquired here.
 void FThornSound::BindTemplate(char const* InTemplate, unsigned char bInVoice)
 {
     malloc_strcpy(&Template, InTemplate);
@@ -150,8 +144,7 @@ void FThornSound::SetSpatial(unsigned char bInSpatial)
     bSpatial = bInSpatial;
 }
 
-// FUN_00457380. BL = 0; +0x80 and +0x78 both set -> the handle's slot 29 (+0x74); nonzero ->
-// 1, else 0.
+// FUN_00457380. ISoundSource slot 29 (+0x74).
 bool FThornSound::IsHoldingScript() const
 {
     if (Handle == nullptr || Field_0x78 == 0)
@@ -159,12 +152,10 @@ bool FThornSound::IsHoldingScript() const
     return Handle->IsFinished() != 0;
 }
 
-// FUN_004570a0. Only for a voice line (+0x74 == 1) with a non-empty template. The message name
-// starts as the template; the six "$BGCS_*" context tokens go through the speaking character
-// (FUN_00445720, 0x00457129 / 0x00457162), and a "$BGCS_Trent_<name>_<n>" template gets a
-// random index 0..n-1 written over its last underscore and loses the leading "$B". The voice
-// profile is the character's (VoiceId), the message CreateID(name) in it; either missing is an
-// FDUMP and +0x7c keeps its value.
+// FUN_004570a0. The six "$BGCS_*" context tokens go through the speaking character
+// (FUN_00445720), and a "$BGCS_Trent_<name>_<n>" template gets a random index 0..n-1 written
+// over its last underscore and loses the leading "$B". A missing profile or message is an FDUMP
+// and +0x7c keeps its value.
 //
 // The receiver of FUN_00445720 is Actor as it came back from the spawn table's FindActor (only
 // Thorn_Deformable answers with one: its CharacterObject); with no actor retail calls it on a
@@ -180,18 +171,17 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
         _stricmp(Template, "$BGCS_My_Faction_ML") == 0 ||
         _stricmp(Template, "$BGCS_My_Faction_FM") == 0)
     {
-        MessageName = Talker->ResolveBgcsContextToken(Template); // 0x00457129
+        MessageName = Talker->ResolveBgcsContextToken(Template);
         Field_0x78 = 0;
     }
     if (_stricmp(Template, "$BGCS_Faction_Rebuff_ML") == 0 ||
         _stricmp(Template, "$BGCS_Faction_Rebuff_FM") == 0)
     {
-        MessageName = Talker->ResolveBgcsContextToken(Template); // 0x00457162
+        MessageName = Talker->ResolveBgcsContextToken(Template);
         Field_0x78 = 1;
     }
 
-    // 0x0045716d..0x004571eb. The local is 0x100 bytes (SUB ESP,0x100); the copy is unbounded,
-    // as retail's.
+    // The local is 0x100 bytes; the copy is unbounded, as retail's.
     char Scratch[0x100];
     if (_strnicmp(Template, "$BGCS_Trent_", strlen("$BGCS_Trent_")) == 0)
     {
@@ -224,7 +214,7 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
           GScriptSoundFile, 0xe3, Profile->GetName(), Voice, MessageName);
 }
 
-// LAB_00457400 (identity, RET 8). +0xa8 = Transform+0x24, +0xb4 = the rotation, slot 21.
+// LAB_00457400.
 GENRESULT DACOM_API FThornSound::SetTransform(float const* Transform12)
 {
     Local.Pos.x = Transform12[9];
@@ -235,7 +225,7 @@ GENRESULT DACOM_API FThornSound::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_00457490 (identity, RET 8).
+// LAB_00457490.
 GENRESULT DACOM_API FThornSound::GetTransform(float* OutTransform12)
 {
     OutTransform12[9] = Local.Pos.x;
@@ -245,11 +235,9 @@ GENRESULT DACOM_API FThornSound::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_004574d0 (sound facet, RET 0xc). Slot 4 first, through the facet's vtable. Nothing more
-// while the owning script is held (+0x44). Offset = Desc+0x2c - StartMs + TimeMs, loop = Flags
-// bit 3. With an archetype: a streamer is started by the script's event list
-// (FUN_0044f610(UniqueId, Offset) -> +0x80), anything else through FUN_00428680 with the
-// offset and {streamer 0, spatial +0x75, loop} -> +0x80. Then slot 21, with or without one.
+// LAB_004574d0. StopSound first, through the facet's vtable; nothing more while the owning
+// script is paused. A streamer is started by the script's event list (FUN_0044f610), anything
+// else through FUN_00428680. RefreshSound runs with or without an archetype.
 GENRESULT DACOM_API FThornSound::StartSound(void* Desc, int TimeMs)
 {
     static_cast<ISoundControl*>(this)->StopSound(Desc);
@@ -287,8 +275,7 @@ GENRESULT DACOM_API FThornSound::StartSound(void* Desc, int TimeMs)
     return GR_OK;
 }
 
-// FUN_004575e0 (sound facet, RET 8). A foreground sound: out of the script's event list
-// (FUN_0044f5c0), and a handle stopped (slot 24), released and cleared. 0.
+// FUN_004575e0. A background sound is left alone.
 GENRESULT DACOM_API FThornSound::StopSound(void*)
 {
     if (bMusic == 0 && bAmbient == 0)
@@ -304,8 +291,7 @@ GENRESULT DACOM_API FThornSound::StopSound(void*)
     return GR_OK;
 }
 
-// LAB_004576c0 (sound facet, RET 8). +0x88 = Value; the ambience also snaps the Gf fade to it
-// (FUN_004569b0 on DAT_0066d2d0). Slot 21. 0.
+// LAB_004576c0. The ambience also snaps the Gf fade to it (FUN_004569b0 on DAT_0066d2d0).
 GENRESULT DACOM_API FThornSound::SetAttenuation(float Value)
 {
     Attenuation = Value;
@@ -315,7 +301,7 @@ GENRESULT DACOM_API FThornSound::SetAttenuation(float Value)
     return GR_OK;
 }
 
-// LAB_00457720 (sound facet, RET 8). +0x8c = Value, slot 21. 0.
+// LAB_00457720.
 GENRESULT DACOM_API FThornSound::SetPan(float Value)
 {
     Pan = Value;
@@ -323,22 +309,21 @@ GENRESULT DACOM_API FThornSound::SetPan(float Value)
     return GR_OK;
 }
 
-// LAB_00457700 (sound facet, RET 8).
+// LAB_00457700.
 GENRESULT DACOM_API FThornSound::GetAttenuation(float* OutAttenuation)
 {
     *OutAttenuation = Attenuation;
     return GR_OK;
 }
 
-// LAB_00457740 (sound facet, RET 8).
+// LAB_00457740.
 GENRESULT DACOM_API FThornSound::GetPan(float* OutPan)
 {
     *OutPan = Pan;
     return GR_OK;
 }
 
-// LAB_00457760 (sound facet, RET 0xc). Mask bit i copies Props[i] into the i-th dword from
-// +0x88; bit 0 (the attenuation) also snaps the Gf fade for the ambience. Slot 21. 0.
+// LAB_00457760. Mask bit i copies Props[i] into the i-th dword from +0x88.
 GENRESULT DACOM_API FThornSound::SetAudioProps(float const* Props8, int Mask)
 {
     if ((Mask & 0x1) != 0)
@@ -366,7 +351,7 @@ GENRESULT DACOM_API FThornSound::SetAudioProps(float const* Props8, int Mask)
     return GR_OK;
 }
 
-// LAB_00457810 (sound facet, RET 0xc). The same eight dwords out, by mask. 0.
+// LAB_00457810.
 GENRESULT DACOM_API FThornSound::GetAudioProps(float* Props8, int Mask)
 {
     if ((Mask & 0x1) != 0)
@@ -388,7 +373,7 @@ GENRESULT DACOM_API FThornSound::GetAudioProps(float* Props8, int Mask)
     return GR_OK;
 }
 
-// LAB_004573b0 (geo facet, RET 8). +0xa8 = Position, slot 21. 0.
+// LAB_004573b0.
 GENRESULT DACOM_API FThornSound::SetPosition(float* Position)
 {
     Local.Pos.x = Position[0];
@@ -398,14 +383,14 @@ GENRESULT DACOM_API FThornSound::SetPosition(float* Position)
     return GR_OK;
 }
 
-// LAB_004573e0 (geo facet, RET 8). +0xb4 = the nine floats; no slot 21.
+// LAB_004573e0. No RefreshSound here.
 GENRESULT DACOM_API FThornSound::SetOrientation(float* Orient9)
 {
     memcpy(&Local.Orient, Orient9, sizeof(Local.Orient));
     return GR_OK;
 }
 
-// LAB_00457440 (geo facet, RET 8).
+// LAB_00457440.
 GENRESULT DACOM_API FThornSound::GetPosition(float* OutPosition)
 {
     OutPosition[0] = Local.Pos.x;
@@ -414,16 +399,14 @@ GENRESULT DACOM_API FThornSound::GetPosition(float* OutPosition)
     return GR_OK;
 }
 
-// LAB_00457470 (geo facet, RET 8).
+// LAB_00457470.
 GENRESULT DACOM_API FThornSound::GetOrientation(float* OutOrient9)
 {
     memcpy(OutOrient9, &Local.Orient, sizeof(Local.Orient));
     return GR_OK;
 }
 
-// LAB_004572e0 (identity, RET 8). A voice line asks every spawned entity in turn for the actor
-// named by its speaker (slot 16) and stops at the first that answers; none is the "Speaker name"
-// FDUMP. Either way FUN_004570a0 runs, with the two outs still null on a miss.
+// LAB_004572e0. FUN_004570a0 runs even on a miss, with the two outs still null.
 void FThornSound::SetSpawnTable(FThornComponent** Table, int Count)
 {
     if (bVoice != 1)
@@ -457,10 +440,8 @@ void* FThornSound::GetEngineInstance()
     return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 }
 
-// LAB_00457630 (identity). Fade = FUN_0042adf0 (DAT_0066d2d0 +0x10), zero for a background
-// sound or one without +0x84. With a handle: slot 32 (+0x80) SetAttenuation(Fade + +0x88),
-// slot 33 (+0x84) SetPan(+0x8c * 100.0 (DAT_005ca320, double), stored as a float), slot 35
-// (+0x8c) with &+0xa8.
+// LAB_00457630. GetClientAudioFade is FUN_0042adf0 (DAT_0066d2d0 +0x10); 100.0 is the double
+// DAT_005ca320.
 void FThornSound::RefreshSound()
 {
     float Fade = GetClientAudioFade();
@@ -473,7 +454,7 @@ void FThornSound::RefreshSound()
     Handle->SetPosition(&Local.Pos);
 }
 
-// LAB_00456ea0 (identity). +0x77 or +0x76.
+// LAB_00456ea0.
 bool FThornSound::IsBackgroundSound()
 {
     return bMusic != 0 || bAmbient != 0;
@@ -491,7 +472,7 @@ FThornPlayerEngineSound::FThornPlayerEngineSound(Csys const& ScriptFrame, FGfScr
 {
 }
 
-// LAB_004579a0 (sound facet, RET 0xc). FUN_00446be0; non-null -> FUN_00447f90. 0.
+// LAB_004579a0. StartEngineSound is FUN_00447f90.
 GENRESULT DACOM_API FThornPlayerEngineSound::StartSound(void*, int)
 {
     FObjectShip* const Ship = GfObjectShip();
@@ -500,7 +481,7 @@ GENRESULT DACOM_API FThornPlayerEngineSound::StartSound(void*, int)
     return GR_OK;
 }
 
-// LAB_004579c0 (sound facet, RET 8). FUN_004481b0 on the ship. 0.
+// LAB_004579c0. StopEngineSound is FUN_004481b0.
 GENRESULT DACOM_API FThornPlayerEngineSound::StopSound(void*)
 {
     FObjectShip* const Ship = GfObjectShip();
@@ -509,8 +490,7 @@ GENRESULT DACOM_API FThornPlayerEngineSound::StopSound(void*)
     return GR_OK;
 }
 
-// LAB_004579e0 (sound facet, RET 8). Facet +0x68 (= +0x6c) = Value, then FUN_00448210(Value)
-// on the ship. 0.
+// LAB_004579e0. SetEngineSoundAttenuation is FUN_00448210.
 GENRESULT DACOM_API FThornPlayerEngineSound::SetAttenuation(float Value)
 {
     Attenuation = Value;
@@ -520,15 +500,14 @@ GENRESULT DACOM_API FThornPlayerEngineSound::SetAttenuation(float Value)
     return GR_OK;
 }
 
-// LAB_00457a10 (sound facet, RET 8).
+// LAB_00457a10.
 GENRESULT DACOM_API FThornPlayerEngineSound::GetAttenuation(float* OutAttenuation)
 {
     *OutAttenuation = Attenuation;
     return GR_OK;
 }
 
-// LAB_00457a30 (sound facet, RET 0xc). Mask bit 0 only: +0x6c = Props[0], then the ship's
-// FUN_00448210 with +0x6c. 0.
+// LAB_00457a30. Mask bit 0 only.
 GENRESULT DACOM_API FThornPlayerEngineSound::SetAudioProps(float const* Props8, int Mask)
 {
     if ((Mask & 1) == 0)
@@ -540,7 +519,7 @@ GENRESULT DACOM_API FThornPlayerEngineSound::SetAudioProps(float const* Props8, 
     return GR_OK;
 }
 
-// LAB_00457a60 (sound facet, RET 0xc). Mask bit 0 only.
+// LAB_00457a60. Mask bit 0 only.
 GENRESULT DACOM_API FThornPlayerEngineSound::GetAudioProps(float* Props8, int Mask)
 {
     if ((Mask & 1) != 0)
@@ -548,7 +527,7 @@ GENRESULT DACOM_API FThornPlayerEngineSound::GetAudioProps(float* Props8, int Ma
     return GR_OK;
 }
 
-// LAB_00457980 (identity) -- FUN_00446be0; non-null -> JMP FUN_004481b0.
+// LAB_00457980.
 void FThornPlayerEngineSound::Stop()
 {
     FObjectShip* const Ship = GfObjectShip();
@@ -566,7 +545,7 @@ void* FThornPlayerEngineSound::GetEngineInstance()
 // Thorn_SoundReference
 // ---------------------------------------------------------------------------------------
 
-// FUN_00457a80. +0x6c = FUN_00456790(DAT_0066d2d0, 6, Desc->Name); null is a WARNING FDUMP.
+// FUN_00457a80.
 FThornSoundReference::FThornSoundReference(Csys const& ScriptFrame, FGfScript* InOwner,
                                            FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -598,13 +577,13 @@ GENRESULT DACOM_API FThornSoundReference::GetTransform(float* OutTransform12)
     return ThornReferenceGetTransform(Target, OutTransform12);
 }
 
-// LAB_00457c40 (sound facet) -- XOR EAX,EAX; RET 0xc: a reference never starts its target.
+// LAB_00457c40 -- a reference never starts its target.
 GENRESULT DACOM_API FThornSoundReference::StartSound(void*, int)
 {
     return GR_OK;
 }
 
-// LAB_00451370 -- 0.
+// LAB_00451370.
 GENRESULT DACOM_API FThornSoundReference::StopSound(void*)
 {
     return GR_OK;
@@ -642,7 +621,7 @@ GENRESULT DACOM_API FThornSoundReference::GetPan(float* OutPan)
     return static_cast<ISoundControl*>(Target)->GetPan(OutPan);
 }
 
-// LAB_00457cf0 -- slot 9, or -1 (RET 0xc).
+// LAB_00457cf0 -- slot 9, or -1.
 GENRESULT DACOM_API FThornSoundReference::SetAudioProps(float const* Props8, int Mask)
 {
     if (Target == nullptr)
@@ -650,7 +629,7 @@ GENRESULT DACOM_API FThornSoundReference::SetAudioProps(float const* Props8, int
     return static_cast<ISoundControl*>(Target)->SetAudioProps(Props8, Mask);
 }
 
-// LAB_00457d10 -- slot 10, or -1 (RET 0xc).
+// LAB_00457d10 -- slot 10, or -1.
 GENRESULT DACOM_API FThornSoundReference::GetAudioProps(float* Props8, int Mask)
 {
     if (Target == nullptr)
@@ -682,7 +661,7 @@ GENRESULT DACOM_API FThornSoundReference::GetOrientation(float* OutOrient9)
     return ThornReferenceGetOrientation(Target, OutOrient9);
 }
 
-// FUN_00450cd0 -- +0x6c = 0.
+// LAB_00450cd0.
 void FThornSoundReference::Stop()
 {
     Target = nullptr;

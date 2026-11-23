@@ -4,13 +4,9 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// IVP_Mindist_Minimize_Solver -- see ivp_mindist_minimize.h. Traced against
-// EXE\Disasm\Common.dll.txt by cmn-ivp2c (2026-10-08) with retail's x87
-// rounding points: values kept on the FPU stack are double, every
-// `FSTP float ptr` is a float.
-//
-// All leaves are ported (cmn-ivp2c / cmn-ivp2d). This file joins
-// Common.vcxproj together with the switch-over of 06352cf0 / 06352b90.
+// IVP_Mindist_Minimize_Solver -- see ivp_mindist_minimize.h. Retail's x87
+// rounding points are kept: values held on the FPU stack are double, every
+// float store is a float.
 
 #include "ivp_mindist_minimize.h"
 
@@ -40,7 +36,7 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06353940 (.text:06353940-063539cd): REP STOSD fills all 16 slots of
+// FUN_06353940: REP STOSD fills all 16 slots of
 // DAT_0658ab4c with LAB_06353930, then [status0][status1]:
 //   row 0 (point):    default_poly_poly x3, swapped_B_POLY
 //   row 1 (edge):     swapped_poly_poly, default_poly_poly, illegal, swapped_B_POLY
@@ -74,10 +70,9 @@ void IVP_Mindist_Minimize_Solver::init_mms_function_table()
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06352a90 (.text:06352a90-06352b04, thiscall, RET 0x10).
-//   Key0 = a | b, Key1 = c | d; Key0 < Key1 (signed, JGE skips) -> swap.
-//   Scan entries n-1 .. 0 (this + 0x18 + 8i): equal pair -> return 1.
-//   n >= 0x100 -> return 1. Else store at entry n, ++n, return 0.
+// FUN_06352a90, thiscall, RET 0x10. Keys are status | edge pointer, larger
+// (signed) first. A known pair or a full table (0x100) returns 1; otherwise
+// the pair is recorded and 0 returned.
 // ---------------------------------------------------------------------------
 int32_t IVP_Mindist_Minimize_Solver::check_loop_hash(int32_t Status0, const IVP_Compact_Edge* Edge0, int32_t Status1,
                                                      const IVP_Compact_Edge* Edge1)
@@ -106,10 +101,8 @@ int32_t IVP_Mindist_Minimize_Solver::check_loop_hash(int32_t Status0, const IVP_
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06352b30 (.text:06352b30-06352b86, thiscall). The sorted synapse 0
-// ((flags >> 8) & 3) if its status is 5 (backside), else the other one
-// ((flags ^ 0x100) >> 8 & 3); edge = FUN_06353840(edge, &BacksidePosition)
-// (cdecl), status = 2.
+// FUN_06352b30, thiscall. Sorted synapse 0 if its status is 5 (backside),
+// else synapse 1: edge = FUN_06353840(edge, &BacksidePosition), status = 2.
 // ---------------------------------------------------------------------------
 void IVP_Mindist_Minimize_Solver::proove_polypoly()
 {
@@ -122,14 +115,9 @@ void IVP_Mindist_Minimize_Solver::proove_polypoly()
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06353370 (.text:06353370-063534ef, cdecl, one argument).
-//   Side 0 = sorted synapse 0 (ESI), side 1 = sorted synapse 1 (EDI).
-//   Cache0 at ESP+0xc: points, ledge(edge0), FUN_06353510(obj0), obj0, &syn0;
-//   Cache1 at ESP+0x20 likewise; the caches are resolved 0 then 1.
-//   index = status1 + status0 * 4 (MOVSX); JA above 5 -> FUN_06352e40:
-//     0 PP 06364890, 1 PK 063651c0, 2 PF 06363350, 5 KK 06363ab0,
-//     3 / 4 / everything else FF 06352e40; all thiscall (edge0, edge1, &cache0, &cache1).
-//   Then --cache0->refcount, --cache1->refcount; the leaf's EAX is returned.
+// FUN_06353370, cdecl. Caches for the sorted synapses (resolved 0 then 1),
+// then by status1 + status0 * 4: 0 PP 06364890, 1 PK 063651c0, 2 PF 06363350,
+// 5 KK 06363ab0, everything else FF 06352e40; both cache refcounts dropped.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_default_poly_poly(IVP_Mindist_Minimize_Solver* Solver)
 {
@@ -141,14 +129,14 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_default_poly_poly(IVP_Mindist
 
     IVP_Cache_Ledge_Point Cache0;
     Cache0.compact_ledge = Edge0->GetCompactLedge();
-    Cache0.cache_object = Synapse0->l_obj->ResolveNarrowPhaseCacheSlot(); // :063533e1
+    Cache0.cache_object = Synapse0->l_obj->ResolveNarrowPhaseCacheSlot(); // FUN_06353510
     Cache0.object = Synapse0->l_obj;
     Cache0.compact_poly_points = Cache0.compact_ledge->GetPointArray();
     Cache0.synapse = Synapse0;
 
     IVP_Cache_Ledge_Point Cache1;
     Cache1.compact_ledge = Edge1->GetCompactLedge();
-    Cache1.cache_object = Synapse1->l_obj->ResolveNarrowPhaseCacheSlot(); // :06353419
+    Cache1.cache_object = Synapse1->l_obj->ResolveNarrowPhaseCacheSlot();
     Cache1.object = Synapse1->l_obj;
     Cache1.compact_poly_points = Cache1.compact_ledge->GetPointArray();
     Cache1.synapse = Synapse1;
@@ -173,21 +161,15 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_default_poly_poly(IVP_Mindist
         break;
     }
 
-    --Cache0.cache_object->RefCount; // :063534da
-    --Cache1.cache_object->RefCount; // :063534e1-:063534e8
+    --Cache0.cache_object->RefCount;
+    --Cache1.cache_object->RefCount;
     return Result;
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06353560 (.text:06353560-06353674, cdecl). The ball is always physical
-// synapse 0 (+0x18, object +0x28), the polygon physical synapse 1 (+0x34).
-//   :06353577-:063535b9 FUN_06353510 inlined for the ball object; ball cache
-//     at ESP+0: {cache, obj0, &synapse[0]}.
-//   :063535bc-:063535ff polygon cache at ESP+0xc: points, ledge(edge1), cache
-//     (FUN_06353510), obj1, &synapse[1].
-//   switch synapse[1].status: 0 -> 063645d0, 1 -> 06364ce0, 2 -> 06363430, all
-//   thiscall (&ball, edge1, &cache); else XOR EAX,EAX + CORE (:06353612).
-//   Then --polygon cache refcount, --ball cache refcount.
+// FUN_06353560, cdecl. The ball is always PHYSICAL synapse 0, the polygon
+// physical synapse 1 (FUN_06353510 inlined for the ball). By the polygon
+// status: 0 BP 063645d0, 1 BK 06364ce0, 2 BF 06363430, else 0 + CORE trap.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_B_POLY(IVP_Mindist_Minimize_Solver* Solver)
 {
@@ -202,7 +184,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_B_POLY(IVP_Mindist_Minimize_S
     IVP_Compact_Edge* const Edge = SynapseP->edge;
     IVP_Cache_Ledge_Point CacheP;
     CacheP.compact_ledge = Edge->GetCompactLedge();
-    CacheP.cache_object = SynapseP->l_obj->ResolveNarrowPhaseCacheSlot(); // :063535ea
+    CacheP.cache_object = SynapseP->l_obj->ResolveNarrowPhaseCacheSlot();
     CacheP.object = SynapseP->l_obj;
     CacheP.compact_poly_points = CacheP.compact_ledge->GetPointArray();
     CacheP.synapse = SynapseP;
@@ -225,8 +207,8 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_B_POLY(IVP_Mindist_Minimize_S
         break;
     }
 
-    --CacheP.cache_object->RefCount; // :0635365f
-    --Ball.cache_object->RefCount;   // :06353662-:0635366d
+    --CacheP.cache_object->RefCount;
+    --Ball.cache_object->RefCount;
     return Result;
 }
 
@@ -253,17 +235,10 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_illegal(IVP_Mindist_Minimize_
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063536d0 (.text:063536d0-06353837, cdecl). FUN_06353510 inlined twice
-// (object 0 then object 1, physical order).
-//   :0635376b-:06353790 n = float(c0.vv - c1.vv) per component -> mindist+0x60.
-//   :06353793-:063537b2 q = (x*x + y*y) + z*z from the stored floats.
-//   :063537b4-:063537d7 FABS; FCOMP 1e-10f; TEST AH,0x41; JNZ -> |q| <= eps or
-//     unordered: k = 1.0f; else k = 1.0f / sqrt(q).
-//   :063537d7-:063537de +0x54 = float(k*q - (+0x50)).
-//   :063537e1-:063537f7 n.i = float(k * n.i).
-//   :063537fe-:06353823 +0x58 = float((dy*ny + dz*nz) + dx*nx), d = c0.+0x5c - c1.+0x5c
-//     kept on the stack.
-//   Releases both caches, returns 1.
+// FUN_063536d0, cdecl: ball vs ball. FUN_06353510 inlined twice (physical
+// order). The normal is the rounded centre difference, scaled by
+// 1/sqrt(q) unless |q| <= 1e-10f or unordered (then 1.0f); the gap is
+// k*q - CombinedRadius. Returns OK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_BB(IVP_Mindist_Minimize_Solver* Solver)
 {
@@ -294,20 +269,14 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::minimize_BB(IVP_Mindist_Minimize_Solve
     const double Dz = (double)(Cache0->Secondary.z) - Cache1->Secondary.z;
     Mindist->SecondaryNormalDot = (float)((Dy * Normal.y + Dz * Normal.z) + Dx * Normal.x);
 
-    --Cache0->RefCount; // :06353826
-    --Cache1->RefCount; // :06353829-:0635382e
+    --Cache0->RefCount;
+    --Cache1->RefCount;
     return IVP_MRC_OK;
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06363350 (.text:06363350-06363427, thiscall, RET 0x10) (P, F, &cacheP, &cacheF).
-//   :06363371 FUN_0635ae60(P, cacheP, cacheF, &pos) -- P in F's object space.
-//   :06363389 FUN_0635b210(cacheF->ledge, F, &pos, &qr).
-//   :0636338e-:063633a7 no sign bit in (qr1 | qr2 | qr0) -> 06363620(P, &pos, F, cacheP, cacheF).
-//   :063633c7-:06363409 else min = 1e20f, best = 0; three edges of F (next via
-//     DAT_063ee4e0): d = FUN_0635bd10(&pos, cacheF->ledge, e); FCOM min; TEST AH,1;
-//     C0 (less or unordered) -> min = float(d), best = e.
-//   :0636341b 063651c0(P, best, cacheP, cacheF).
+// FUN_06363350, thiscall, RET 0x10. P inside F (no QR sign bit) -> 06363620;
+// else the nearest of F's three edges (less or unordered replaces) -> PK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PF(IVP_Compact_Edge* P, IVP_Compact_Edge* F,
                                                         IVP_Cache_Ledge_Point* CacheP, IVP_Cache_Ledge_Point* CacheF)
@@ -338,37 +307,17 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PF(IVP_Compact_Edge* P, IVP
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06363620 (.text:06363620-06363aa4, thiscall, RET 0x14)
-// (P, &pos of P in F space, F, &cacheP, &cacheF).
-//   :06363627-:06363655 if (--P_Finish_Counter < 0) and check_loop_hash(0, P, 2, F)
-//     -> return 2.
-//   :06363671-:063636a5 h = FUN_0635b940(F, cacheF->ledge); normize (06347ef0);
-//     hw = cacheF->cache rotate (0634d9d0); hp = cacheP->cache inverse rotate (0634d970).
-//   :063636aa-:063636f5 +0x54 = float(((hz*pz + hx*px) + hy*py) - ((hy*Fy + hz*Fz) + hx*Fx)),
-//     F = start vertex of F in cacheF.
-//   :063636f8-:0636370f contact plane (+0x60) = hw.
-//   :06363716-:06363757 +0x54 < 0 (FCOMP 0, TEST AH,1; unordered too) -> hp = float(-1 * hp).
-//   :0636375b-:06363771 +0x54 = float(+0x54 - (+0x50)).
-//   :06363774-:063637ac +0x58 = float((dy*ny + dz*nz) + dx*nx), d = cacheP->cache.+0x5c -
-//     cacheF->cache.+0x5c on the stack.
-//   :063637af-:06363892 P's vertex fan: stop = prev(P); e = opposite(stop), then
-//     Q = prev(e) each round, e = opposite(Q). v = start(Q) - start(P): x, z on the stack,
-//     y spilled as float. dot = (hpz*vz + hpy*vy) + hpx*vx, FST float; dot < 0 (or
-//     unordered): val = 06347df0(float((vx*vx + vy*vy) + vz*vz)) * float(dot); val < min
-//     (or unordered) -> min = float(val), best = Q (min starts at 0.0f, best at 0).
-//     Q == stop ends the walk.
-//   :06363897-:06363922 no best: cacheP->synapse = {P, status 0}, cacheF->synapse =
-//     {F, status 2}; (+0x54 + +0x50) < 0 (or unordered): BacksidePosition = pos (x, y, z),
-//     cacheF->synapse = {F, status 5}, return 3; else return 1.
-//   :06363925-:06363981 best: FUN_0635ae60(best, cacheP, cacheF, &q); FUN_0635b210(ledge of
-//     F's own triangle, F, &q, &qr); no sign bit in (qr1 | qr2 | qr0) -> 06363620(best, &q,
-//     F, cacheP, cacheF).
-//   :063639a5-:063639f2 count qr[i] < 0 (TEST AH,1: or unordered); exactly one -> the
-//     first such edge of F (next per step) -> 06363ab0(best, edge, cacheP, cacheF).
-//   :063639f4-:06363a98 else min = 1e20f, k = 0; for the three edges of F whose qr[i] is
-//     not > 0 (FCOMP 0; TEST AH,0x41; JZ skips greater): d = FUN_0635bdd0(best, edge,
-//     cacheP, cacheF); d < min (or unordered) -> min = float(d), k = edge. Then
-//     06363ab0(best, k, cacheP, cacheF).
+// FUN_06363620, thiscall, RET 0x14. P projects inside F.
+//   Loop guard (P_Finish_Counter / check_loop_hash) -> ENDLESS_LOOP.
+//   Gap / normal from F's normized Hesse vector (world normal into +0x60); a
+//   negative (or unordered) gap flips P's copy of the normal.
+//   Walk P's vertex fan for the neighbour that descends most steeply against
+//   the normal (dot < 0, value = dot / |v|, smallest wins; unordered counts).
+//   None: settle on {P, point} / {F, poly}; a negative raw gap (or unordered)
+//   records BacksidePosition, marks F's synapse status 5 and returns BACKSIDE.
+//   Otherwise move to the best neighbour: still inside F -> recurse; exactly
+//   one negative QR check -> KK against that edge; else KK against the
+//   nearest non-positive edge (FUN_0635bdd0).
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PF(IVP_Compact_Edge* P, const IVP_U_Point* PosPInFSpace,
                                                               IVP_Compact_Edge* F, IVP_Cache_Ledge_Point* CacheP,
@@ -510,12 +459,8 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PF(IVP_Compact_Edge* 
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063651c0 (.text:063651c0-06365272, thiscall, RET 0x10) (P, K, &cacheP, &cacheK).
-//   :063651dd FUN_0635ae60(P, cacheP, cacheK, &pos).
-//   :063651f5 FUN_0635b150(cacheK->ledge, K, &pos, &s).
-//   :063651fa-:0636520c s0 < 0 (FCOMP 0, TEST AH,1; unordered too) -> 06364890(P, K, cacheP, cacheK).
-//   :06365227-:06365238 s1 < 0 (likewise) -> 06364890(P, next(K), cacheP, cacheK).
-//   :0636525e-:06365266 else 06365280(P, K, cacheP, cacheK).
+// FUN_063651c0, thiscall, RET 0x10. s0 < 0 -> PP with K's start, s1 < 0 ->
+// PP with its end (unordered counts as negative), else Leave_PK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PK(IVP_Compact_Edge* P, IVP_Compact_Edge* K,
                                                         IVP_Cache_Ledge_Point* CacheP, IVP_Cache_Ledge_Point* CacheK)
@@ -532,28 +477,16 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PK(IVP_Compact_Edge* P, IVP
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06364890 (.text:06364890-06364cd3, thiscall, RET 0x10) (P0, P1, &cache0, &cache1).
-//   :0636489b-:063648d5 if (--P_Finish_Counter < 0) and check_loop_hash(0, P0, 0, P1) -> return 2.
-//   :063648e6-:0636493c w0 / w1 = FUN_0635bda0(P0 / P1) (world); local_20 = w0 in cache1's
-//     space, local_10 = w1 in cache0's space (FUN_0634d860, ECX = the cache object).
-//   :06364941-:06364982 d = w0 - w1 (stack); q = float((dz*dz + dy*dy) + dx*dx); FCOMP 1e-6f
-//     (DAT_063a5610); TEST AH,0x41; JNZ -> q <= 1e-6 (or unordered): return 2.
-//   :06364988-:063649e9 inv = 1 / sqrt(q) (stack); +0x54 = float(inv*q - (+0x50));
-//     +0x60 = float(d * inv) per component.
-//   :063649ec-:06364a1f +0x58 = float((dy*ny + dz*nz) + dx*nx), d = cache0.+0x5c - cache1.+0x5c.
-//   :06364a22-:06364ba7 for side i = 0, 1 (the other point in side i's space, side i's
-//     vertex V): v = float(pos - V); vV = float((vx*Vx + vy*Vy) + vz*Vz); walk V's fan as in
-//     06363620 (Q = prev(opposite(...)), ending on prev(P)): p = ((vx*Qx + vy*Qy) + vz*Qz) - vV,
-//     FST float; p > 0 (TEST AH,0x41 on the extended value): val = 06347df0(float((wz*wz +
-//     wy*wy) + wx*wx), w = Q - V) * float(p); val > max (TEST AH,0x41; max starts at 0.0f):
-//     max = float(val), best = {Q, side i's cache, the other side's edge and cache, pos}.
-//   :06364bad-:06364be7 best: FUN_0635b150(best cache ledge, Q, pos, &s); s1 > 0 (TEST AH,0x41)
-//     continues, else (and with no best) :06364be9.
-//   :06364be9-:06364c28 cache0 synapse = {P0, 0}, cache1 synapse = {P1, 0}; return 1.
-//   :06364c2b-:06364c8c s0 < 0 (TEST AH,1; or unordered): sorted synapse 0 made best cache's
-//     (flags ^= 0x100 when it is not); 06364890(Q, other edge, best cache, other cache).
-//   :06364c8f-:06364cd3 else sorted synapse 0 made the other side's; 06365280(other edge, Q,
-//     other cache, best cache).
+// FUN_06364890, thiscall, RET 0x10.
+//   Loop guard -> ENDLESS_LOOP; a squared distance <= 1e-6f (DAT_063a5610) or
+//   unordered also returns ENDLESS_LOOP.
+//   Gap / normal from the world-space difference.
+//   For each side, walk its vertex fan for the neighbour edge the OTHER point
+//   projects onto most positively (value = p / |w|, largest wins).
+//   No such edge, or s1 <= 0 on it: settle on both points, OK. s0 < 0 (or
+//   unordered): recurse PP with the neighbour; else Leave_PK. In both cases
+//   StateFlags bit 0x100 is flipped so the sorted synapse 0 is the first
+//   argument's side.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PP(IVP_Compact_Edge* P0, IVP_Compact_Edge* P1,
                                                         IVP_Cache_Ledge_Point* Cache0, IVP_Cache_Ledge_Point* Cache1)
@@ -678,36 +611,21 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_PP(IVP_Compact_Edge* P0, IV
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06365280 (.text:06365280-063658e8, thiscall, RET 0x10) (P, K, &cacheP, &cacheK).
-//   :06365286-:063652c3 if (--P_Finish_Counter < 0) and check_loop_hash(0, P, 1, K) -> return 2.
-//   :063652c6-:063652dc pos = FUN_0635ae60(P, cacheP, cacheK) (P in K's space, local_d8).
-//   :063652e1-:063653fd in cacheK's points, K0 = start(K), K1 = start(next K), R = start(prev K),
-//     S = start(prev(opposite K)); e = float(K1 - K0), d = float(pos - K0), a = float(R - K0),
-//     b = float(S - K0) (each y, z, x).
-//   :063653ff-:06365418 nK = e x a, nO = b x e (FUN_0628bed0).
-//   :0636541d-:06365477 hK = float((dz*nKz + dy*nKy) + dx*nKx), hO = float((dz*nOz + dy*nOy) + nOx*dx).
-//   :0636547b-:0636549c qrK = FUN_0635b210(cacheK ledge, K, pos), qrO = FUN_0635b210(.., opposite K, ..).
-//   :063654a1-:0636553a qrK0 > 0: (qrO0 > 0 and hO > 0) ? PF(P, opposite K) : PF(P, K);
-//     else qrO0 > 0: PF(P, opposite K) (all TEST AH,0x41 = "greater").
-//   :0636553c-:063655ac hK < 0 and hO < 0 (TEST AH,1; unordered too): cacheP synapse = {P, 0},
-//     cacheK synapse = {K, 5}, BacksidePosition = pos, return 3.
-//   :063655af-:06365617 c = e x d; ie = float(1 / ((ex*ex + ez*ez) + ey*ey));
-//     q = ((cz*cz + cy*cy) + cx*cx) * ie, FST float; q > 1e-10 (DAT_063a53d8, TEST AH,0x41):
-//   :06365619-:06365694 i = float(06347df0(float q)); +0x54 = float(i*q - (+0x50)); c = e x c;
-//     c rotated to world in place (FUN_0634d9d0, cacheK); +0x60 = float(c * -(i*ie)).
-//   :06365696-:063656d7 else +0x54 = -(+0x50); n = perpendicular(e) (FUN_063485e0), normized
-//     (FUN_06347ef0); +0x60 = n -- left in K's object space, as retail.
-//   :063656da-:06365718 +0x58 = float((dy*ny + dz*nz) + dx*nx), d = cacheP.+0x5c - cacheK.+0x5c.
-//   :0636571b-:06365724 c rotated into P's space in place (FUN_0634d970, cacheP) -- in the
-//     degenerate case that is the unrotated e x d.
-//   :06365729-:06365834 t = float(float q * 1e-6f); P's vertex fan (as 06363620): w = Q - V
-//     (stack); p = (wz*cz + wy*cy) + wx*cx, FST float; p > 0: val = 06347df0(float((wy*wy +
-//     wz*wz) + wx*wx)) * float(p); val > t: t = float(val), best = Q.
-//   :06365836-:0636588e best: t >= 0.003f (DAT_063a545c, TEST AH,1) -> KK; else
-//     IVP_KK_Input(K, best, cacheK, cacheP) (0635b3b0) and FUN_0635b570: EAX != 0 and
-//     checks_L[0] >= 0 (TEST AH,1) -> KK; else :063658b5.
-//   :06365890-:063658b2 06363ab0(best, K, cacheP, cacheK).
-//   :063658b5-:063658e8 cacheP synapse = {P, 0}, cacheK synapse = {K, 1}; return 1.
+// FUN_06365280, thiscall, RET 0x10. P projects onto the inside of edge K.
+//   Loop guard -> ENDLESS_LOOP.
+//   The two triangles sharing K (K's and the opposite edge's): P inside
+//   either (QR check 0 > 0) -> PF, preferring the opposite face when both
+//   qualify and P is above it. Below both faces (or unordered) -> {P, point},
+//   {K, status 5}, BacksidePosition, BACKSIDE.
+//   Gap / normal from c = e x d: when |c|^2 / |e|^2 > 1e-10f (DAT_063a53d8)
+//   the normal is e x c rotated to world and scaled by -(i*ie); otherwise the
+//   gap is -CombinedRadius and the normal is a normized perpendicular of e
+//   (FUN_063485e0) LEFT IN K'S OBJECT SPACE, as retail.
+//   c is then rotated into P's space (in the degenerate case it is the
+//   unrotated e x d) and P's vertex fan searched for a neighbour above
+//   threshold t = q * 1e-6f. A best neighbour goes to KK when t >= 0.003f
+//   (DAT_063a545c), or when the KK values (FUN_0635b570) succeed with
+//   checks_L[0] >= 0; otherwise settle on {P, point} / {K, edge}, OK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* P, IVP_Compact_Edge* K,
                                                               IVP_Cache_Ledge_Point* CacheP, IVP_Cache_Ledge_Point* CacheK)
@@ -884,23 +802,13 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06363ab0 (.text:06363ab0-06363df2, thiscall, RET 0x10) (K, L, &cacheK, &cacheL).
-//   :06363ad6-:06363af1 IVP_KK_Input in(K, L, cacheK, cacheL) (0635b3b0); FUN_0635b570(&in, &r).
-//   :06363af6-:06363b8f no sign bit in (r.L0 | r.L1): r.K0 < 0 (TEST AH,1; unordered too) ->
-//     063651c0(K, L, cacheK, cacheL); r.K1 < 0 -> 063651c0(next K, L, ..);
-//     else 06363e00(K, L, &in, &r, cacheK, cacheL).
-//   :06363b92-:06363c16 else no sign bit in (r.K1 | r.K0): sorted synapse 0 := cacheL's
-//     (flags ^= 0x100 when not); r.L0 < 0 -> 063651c0(L, K, cacheL, cacheK), else
-//     063651c0(next L, K, cacheL, cacheK).
-//   :06363c19-:06363c8f both sides out: pk = r.K0 < r.K1 ? K : next K, pk' the other one;
-//     pl = r.L0 < r.L1 ? L : next L, pl' the other one (FCOMP; TEST AH,1).
-//   :06363c8f-:06363ce1 s = FUN_0635b150(cacheL ledge, L, FUN_0635ae60(pk, cacheK, cacheL));
-//     no sign bit in (s1 | s0) -> 063651c0(pk, L, cacheK, cacheL).
-//   :06363ce4-:06363d5a s' = FUN_0635b150(cacheK ledge, K, FUN_0635ae60(pl, cacheL, cacheK));
-//     no sign bit in (s'1 | s'0) -> sorted synapse 0 := cacheL's; 063651c0(pl, K, cacheL, cacheK).
-//   :06363d5d-:06363df2 s0 * r.L0 < 0 (TEST AH,1) -> 06364890(pk, pl', cacheK, cacheL);
-//     s'0 * r.K0 < 0 -> sorted synapse 0 := cacheL's, 06364890(pl, pk', cacheL, cacheK);
-//     else 06364890(pk, pl, cacheK, cacheL).
+// FUN_06363ab0, thiscall, RET 0x10. From the KK values (FUN_0635b570):
+//   L inside: K's start/end outside (negative or unordered) -> PK, else Leave_KK.
+//   K inside: PK with L's start or end (sorted synapse 0 made L's side).
+//   Both out: the nearer endpoint of each edge is tested against the other
+//   edge (PK when it projects inside), then the PP combinations by the sign
+//   of s0 * r. Whenever L's side becomes the first argument, StateFlags bit
+//   0x100 is flipped so it is the sorted synapse 0.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_KK(IVP_Compact_Edge* K, IVP_Compact_Edge* L,
                                                         IVP_Cache_Ledge_Point* CacheK, IVP_Cache_Ledge_Point* CacheL)
@@ -983,40 +891,21 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_KK(IVP_Compact_Edge* K, IVP
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06363e00 (.text:06363e00-063645c8, thiscall, RET 0x18) (K, L, &in, &r, &cacheK, &cacheL):
-// the closest points lie inside both edges.
-//   :06363e06-:06363e43 if (--P_Finish_Counter < 0) and check_loop_hash(1, K, 1, L) -> return 2.
-//   :06363e46-:06363e90 d = in.L_Los[0] - in.K_Los[0] (stack); dist = float((dy*cy + dz*cz) + dx*cx),
-//     c = in.cross_KL_Los; sign = sign bit of dist.
-//   :06363e94-:06363ec6 inv = float(1 / sqrt((cx*cx + cy*cy) + cz*cz)).
-//   :06363eca-:06363f04 n_world = FUN_0634d9d0(cacheL, float copy of c); n_K = FUN_0634d970(cacheK, n_world).
-//   :06363f09-:06363f24 +0x54 = float(|inv*dist|); +0x54 = float(+0x54 - (+0x50)).
-//   :06363f27-:06363f6d s = ((int)sign - 0.5f) * inv, doubled; +0x60 = float(n_world * s).
-//   :06363f67-:06363fa5 +0x58 = float((dy*ny + dz*nz) + dx*nx), d = cacheK.+0x5c - cacheL.+0x5c.
-//   :06363fa8-:06363fbe L0 / L1 carried into K's space (FUN_0635b030).
-//   :06363fc3-:063640ec four 0x28-byte records at local_a0:
-//     {triangle edge, point edge, point (in the triangle's space), point cache, triangle cache,
-//      normal (in the triangle's space), hesse}:
-//     0 {opposite K, L, L0 in K, cacheL, cacheK, n_K}, 1 {K, opposite L, L1 in K, cacheL, cacheK, n_K},
-//     2 {opposite L, K, K_Los[0], cacheK, cacheL, c}, 3 {L, opposite K, K_Los[1], cacheK, cacheL, c}.
-//   :063640f0-:06364158 hesse_i = FUN_0635b940(triangle_i, its ledge); flag_i = sign bit of
-//     float((hz*nz + ny*hy) + nx*hx) ^ (i >> 1) ^ sign.
-//   :0636415a-:06364317 max = -4e-6f (0xb68637bd); for j = 0..3: side = j ^ sign,
-//     moving = record[side ^ flag_j]; v = point[side] - point[side ^ 1] (x, y float, z kept
-//     extended for the dot); dot = (vz*hz + vx*hx) + vy*hy of hesse_j, FST float; dot < 0
-//     (TEST AH,1; unordered too): val = (06347df0(float((vx^2 + vz^2) + vy^2)) * dot) *
-//     float(06347df0(float((hx^2 + hz^2) + hy^2))), FST float; val < max (TEST AH,1):
-//     qr = FUN_0635b210(triangle cache_j ledge, triangle_j, moving point); qr0 > 0 (TEST AH,0x41):
-//     max = float(val), best = {moving point edge, moving point cache, triangle_j, its cache, qr}.
-//   :0636431d-:0636442f no best: synapses {K, 1} / {L, 1}; flag0 + flag1 == 2: {K, 5} / {L, 2},
-//     BacksidePosition = L0K (1 - t) + L1K t, t = float(r.L0 / (r.L0 + r.L1)), return 3;
-//     flag2 + flag3 == 2: {K, 2} / {L, 5}, BacksidePosition from K_Los with r.K0 / r.K1, return 3;
-//     else return 1.
-//   :06364432-:063645c8 best: sorted synapse 0 := the point cache's; no sign bit in qr1|qr2|qr0 ->
-//     06363620(P, FUN_0635ae60(P, ..), F, ..); qr2 >= 0 (TEST AH,1) -> 06363ab0(P, next F, ..);
-//     qr1 >= 0 -> 06363ab0(P, prev F, ..); else d1 = float(0635bdd0(P, next F)),
-//     d2 = 0635bdd0(P, opposite(prev F)); d2 < d1 (TEST AH,1; unordered too) -> 06363ab0(P, prev F),
-//     else 06363ab0(P, next F).
+// FUN_06363e00, thiscall, RET 0x18: the closest points lie inside both edges.
+//   Loop guard -> ENDLESS_LOOP. Gap = |dist| / |c| - CombinedRadius with
+//   c = cross_KL_Los; normal = c (L-local -> world) scaled by
+//   2 * (sign - 0.5f) / |c|.
+//   Four candidate records (each edge's two adjacent triangles, with the
+//   other edge's endpoint in that triangle's space); flag_i = which side of
+//   triangle i the normal points to, xor (i >> 1) xor sign.
+//   The steepest descending move (value < -4e-6f, 0xb68637bd) whose moved
+//   point lands inside the triangle (qr0 > 0) wins.
+//   None: settle on both edges; both flags of one edge set -> that edge goes
+//   status 5 (backside) with BacksidePosition interpolated along the other
+//   edge by the KK values, BACKSIDE; else OK.
+//   Best: sorted synapse 0 := the moving point's side; inside the triangle ->
+//   Leave_PF; else KK against the next or prev edge of the triangle by QR
+//   checks, ties broken by FUN_0635bdd0 distance (unordered -> prev).
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_KK(IVP_Compact_Edge* K, IVP_Compact_Edge* L,
                                                               const IVP_KK_Input* KKInput,
@@ -1209,28 +1098,13 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_KK(IVP_Compact_Edge* 
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06352e40 (.text:06352e40-06353366, thiscall, RET 0x10) (F0, F1, &cache0, &cache1): the
-// exhaustive feature search between two triangles; offsets re-read with capstone.
-//   :06352e55 min = 1e20f (0x60ad78ec).
-//   :06352e5d-:06352f24 vertex pairs (E0 over F0's triangle outer, E1 over F1's inner, next):
-//     q = (dz*dz + dy*dy) + dx*dx of 0635bda0(E0, cache0) - 0635bda0(E1, cache1); FCOM min;
-//     TEST AH,1 -> smaller (or unordered): min = float(q), synapses {E0, 0} / {E1, 0}.
-//   :06352f2a-:06353060 points vs triangle, side 0 = F0's points vs F1, side 1 = F1's vs F0:
-//     h = FUN_0635b8d0(tri edge, tri cache ledge); per point P: p = 0635ae60(P, point cache,
-//     tri cache); no sign bit in FUN_0635b210(tri ledge, tri edge, p): d = ((hz*pz + hy*py) +
-//     px*hx) + hw, q = d*d; q * 1.000001f (DAT_063a5650) < min (TEST AH,1): min = float(q),
-//     synapses {P, 0} / {tri edge, 2}.
-//   :06353066-:0635315c points vs edges, side 0 = F1's points vs F0's edges, side 1 the reverse:
-//     per point (outer) p = 0635ae60(point, its cache, edge cache); per edge (inner) no sign bit
-//     in FUN_0635b150(edge ledge, edge, p): q = FUN_0635ba10(edge ledge, edge, p); q * 1.000001f
-//     < min: min = float(q), synapses {edge, 1} / {point, 0}.
-//   :06353162-:0635323c edge pairs (K over F0 outer, L over F1 inner): IVP_KK_Input(K, L, cache0,
-//     cache1), FUN_0635b570 (EAX unused); no sign bit in (K1|K0) nor in (L0|L1): q = FUN_0635b4d0;
-//     q * 1.000001f < min: min = float(q), synapses {K, 1} / {L, 1}.
-//   :06353242-:06353366 first = cache0, second = cache1, swapped when cache1's synapse status is 0
-//     and cache0's is not; sorted synapse 0 := first's (flags ^= 0x100 when not); by first /
-//     second status: 0/0 PP, 0/1 PK, 0/2 PF, 1/1 KK (first edge, second edge, first cache,
-//     second cache); anything else CORE (`MOV [0]`) and return 0.
+// FUN_06352e40, thiscall, RET 0x10: the exhaustive feature search between two
+// triangles. In order, each candidate replacing the minimum when smaller (or
+// unordered): vertex pairs; points over the other triangle; points over the
+// other triangle's edges; edge pairs. All but the first compare
+// q * 1.000001f (DAT_063a5650), so a later feature type must win by a margin.
+// Then dispatch on the winning feature pair (a point side goes first, sorted
+// synapse 0 made first's): PP / PK / PF / KK, anything else CORE and 0.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_FF(IVP_Compact_Edge* F0, IVP_Compact_Edge* F1,
                                                         IVP_Cache_Ledge_Point* Cache0, IVP_Cache_Ledge_Point* Cache1)
@@ -1407,21 +1281,11 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_FF(IVP_Compact_Edge* F0, IV
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063645d0 (.text:063645d0-06364885, thiscall, RET 0xc) (&ball, P, &cacheP).
-//   :063645d7-:06364604 if (--P_Finish_Counter < 0) and check_loop_hash(3, 0, 0, P) -> return 2.
-//   :06364607-:0636462d w = FUN_0635bda0(P, cacheP) (world); b = ball centre (ball cache
-//     object +0x4c) in P's space (FUN_0634d860, cacheP).
-//   :06364632-:0636469d n = float(centre - w); len = FUN_06347e90(&n) (normalises, returns the
-//     length); +0x60 = n; +0x54 = float(len - (+0x50)).
-//   :063646a0-:063646d3 +0x58 = float((dy*ny + dz*nz) + dx*nx), d = ball.+0x5c - cacheP.+0x5c.
-//   :063646d6-:06364741 v = float(b - V) (V = start of P; z kept extended for the dot);
-//     vV = float((vz*Vz + vx*Vx) + vy*Vy).
-//   :06364745-:063647ea P's fan as 06363620; p = ((vx*Qx + vy*Qy) + vz*Qz) - vV, FST float;
-//     p > 0 (TEST AH,0x41): val = 06347df0(float((wz*wz + wy*wy) + wx*wx)) * float(p);
-//     val > max (from 0.0f): max = float(val), best = Q.
-//   :063647ef-:0636486c best and s1 > 0 (FUN_0635b150 of b on best): s0 < 0 (TEST AH,1) ->
-//     063645d0(ball, best, cacheP), else 06364ce0(ball, best, cacheP); otherwise
-//     cacheP synapse = {P, 0}, return 1.
+// FUN_063645d0, thiscall, RET 0xc. Loop guard -> ENDLESS_LOOP. Gap / normal
+// from the ball centre (cache object +0x4c) to P. Then P's vertex fan for
+// the edge the ball centre projects onto most positively: with s1 > 0 on
+// it, s0 < 0 (or unordered) recurses BP on the neighbour, else BK; otherwise
+// settle on {P, point}, OK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BP(IVP_Cache_Ball* Ball, IVP_Compact_Edge* P, IVP_Cache_Ledge_Point* CacheP)
 {
@@ -1512,10 +1376,8 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BP(IVP_Cache_Ball* Ball, IV
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06364ce0 (.text:06364ce0-06364d87, thiscall, RET 0xc) (&ball, K, &cacheK).
-//   b = ball centre in K's space (FUN_0634d860, cacheK); s = FUN_0635b150(cacheK ledge, K, b);
-//   s0 < 0 (TEST AH,1; unordered too) -> 063645d0(ball, K, cacheK); s1 < 0 -> 063645d0(ball,
-//   next K, cacheK); else 06364d90(ball, K, cacheK).
+// FUN_06364ce0, thiscall, RET 0xc. s0 < 0 -> BP with K's start, s1 < 0 -> BP
+// with its end (unordered counts as negative), else Leave_BK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BK(IVP_Cache_Ball* Ball, IVP_Compact_Edge* K, IVP_Cache_Ledge_Point* CacheK)
 {
@@ -1531,25 +1393,12 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BK(IVP_Cache_Ball* Ball, IV
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06364d90 (.text:06364d90-063651b4, thiscall, RET 0xc) (&ball, K, &cacheK): the ball
-// centre projects onto the inside of edge K. Offsets re-read with capstone.
-//   :06364d96-:06364dcb if (--P_Finish_Counter < 0) and check_loop_hash(3, 0, 1, K) -> return 2.
-//   :06364dce-:06364deb b = ball centre in K's space (FUN_0634d860, cacheK).
-//   :06364df0-:06364f0b K0 / K1 / R = start(prev K) / S = start(prev(opposite K)) from cacheK's
-//     points; e = float(K1 - K0), d = float(b - K0), a = float(R - K0), c = float(S - K0);
-//     nK = e x a, nO = c x e (FUN_0628bed0).
-//   :06364f26-:06364f7d hK = float((dz*nKz + dy*nKy) + dx*nKx), hO = float((dz*nOz + dy*nOy) + nOx*dx).
-//   :06364f81-:06365031 qrK / qrO = FUN_0635b210 for K / opposite K; qrK0 > 0: (qrO0 > 0 and
-//     hO > 0) ? 06363430(ball, opposite K) : 06363430(ball, K); else qrO0 > 0: 06363430(ball,
-//     opposite K) (TEST AH,0x41 = greater).
-//   :06365031-:06365086 hK < -1e-10f and hO < -1e-10f (DAT_063a589c, TEST AH,1; unordered too):
-//     BacksidePosition = b, cacheK synapse = {K, 5}, return 3.
-//   :06365089-:0636510c p = e x d; ie = float(1 / ((ez*ez + ey*ey) + ex*ex)); q = float(((pz*pz +
-//     py*py) + px*px) * ie); i = float(06347df0(q)); +0x54 = float(i*q - (+0x50)).
-//   :0636510f-:06365165 p = e x p, rotated to world in place (FUN_0634d9d0, cacheK);
-//     +0x60 = float(p * -(i*ie)).
-//   :06365168-:063651b4 +0x58 = float((dy*ny + dz*nz) + dx*nx), d = ball.+0x5c - cacheK.+0x5c;
-//     cacheK synapse = {K, 1}; return 1.
+// FUN_06364d90, thiscall, RET 0xc: the ball centre projects onto the inside of
+// edge K. As Leave_PK: inside either adjacent face -> BF (preferring the
+// opposite face when the ball is above it); below both faces by more than
+// 1e-10f (DAT_063a589c; unordered too) -> {K, status 5}, BacksidePosition,
+// BACKSIDE; otherwise gap / normal from e x (e x d), no degenerate branch,
+// and {K, edge}, OK.
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ball, IVP_Compact_Edge* K,
                                                               IVP_Cache_Ledge_Point* CacheK)
@@ -1659,19 +1508,10 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06363430 (.text:06363430-0636361d, thiscall, RET 0xc) (&ball, F, &cacheF).
-//   :06363438-:0636344f b = ball centre in F's space (FUN_0634d860, cacheF).
-//   :06363454-:06363484 qr = FUN_0635b210(cacheF ledge, F, b); any sign bit in qr1|qr2|qr0 -> outside.
-//   :0636348a-:063634e1 inside: h = FUN_0635b940(F, cacheF ledge), normized (06347ef0);
-//     +0x60 = FUN_0634d9d0(cacheF, h) (world).
-//   :063634e2-:06363526 dist = ((bz*hz + by*hy) + hx*bx) - ((hz*Vz + hy*Vy) + hx*Vx) (V = start F);
-//     cacheF synapse = {F, 2}.
-//   :06363528-:06363564 dist < 0 (TEST AH,1; unordered too): cacheF synapse = {F, 5},
-//     BacksidePosition = b, return 3.
-//   :06363567-:063635b3 +0x54 = float(dist - (+0x50)); +0x58 = float((dy*ny + dz*nz) + dx*nx),
-//     d = ball.+0x5c - cacheF.+0x5c; return 1.
-//   :063635b6-:0636361d outside: min = 1e20f over F's three edges of FUN_0635bd10(b, ledge, e)
-//     (FCOM; TEST AH,1 -> smaller or unordered: min = float, best = e); 06364ce0(ball, best, cacheF).
+// FUN_06363430, thiscall, RET 0xc. Ball centre over F: normal = F's normized
+// Hesse vector in world space, {F, poly}; a negative (or unordered) height ->
+// {F, status 5}, BacksidePosition, BACKSIDE; else gap, OK. Outside F: BK on
+// the nearest of F's edges (FUN_0635bd10; unordered replaces).
 // ---------------------------------------------------------------------------
 IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_BF(IVP_Cache_Ball* Ball, IVP_Compact_Edge* F, IVP_Cache_Ledge_Point* CacheF)
 {

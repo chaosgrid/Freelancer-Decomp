@@ -7,9 +7,8 @@
 #pragma once
 
 // Content.dll TU25 (06ed5a70-06eeea30): GCS, the radio chatter of NPCs in space.
-// Lane CNT-GCS (docs/re/content.md, TU map). Listing: DLLS\BIN\Content.dll.txt.
 //
-// Three parts are ported here:
+// Three parts:
 //  - the handler set (DAT_06fd1bf0, SpaceSupport forwards its messages to it) and the
 //    handler registry GetGcsHandler (FUN_06ee93f0, map DAT_06fcf0e0);
 //  - the conversation manager (DAT_06fd1c08) that turns GCS events into conversations
@@ -18,8 +17,7 @@
 //    a comm of a category may be spoken (FUN_06eebd10) and remember where one was
 //    (FUN_06eeb920).
 // Conversations 1 (06ee2000), 2 (06ee6e60), 3 (06ee8880), 5 (06ee4cd0), 6..0x10 (06ee2c20),
-// 0x11..0x18 (06ee55f0) and 0x19 (06ee7b00) and their lines are ported; see
-// QueueConversation.
+// 0x11..0x18 (06ee55f0) and 0x19 (06ee7b00); see QueueConversation.
 
 #include "common_ini.h"    // Vector
 #include "common_server_controller.h" // pub::Controller::EMessage
@@ -39,8 +37,8 @@ class FRmConversationBase;  // RandomMissionOffer.h (TU61)
 // Voice line names.
 // ---------------------------------------------------------------------------------------
 
-// FUN_06eec2b0 (cdecl, varargs): vsprintf into a 0x40-byte local, then the TString copy
-// clamped to 0x3f. The port bounds the local (retail's vsprintf would overrun it).
+// FUN_06eec2b0 (cdecl, varargs): vsprintf into a 0x40-byte local (unbounded, as retail),
+// then the TString copy clamped to 0x3f.
 void FormatTString64(TString<0x40>* Out, char const* Format, ...);
 
 // FUN_06eeb010 (cdecl): pick a voice line "<Name>_NN<Suffix>" of VoiceId. The index is
@@ -88,8 +86,8 @@ void __cdecl MakeNumberNames(int Number, char const* Suffix, std::vector<TString
 // flee reason: 0 "gcs_combat_fleereason_tough", 2 "..._damaged", 3 "..._noweapons", any other
 // "..._other".
 TString<0x40> __cdecl MakeFleeReasonName(int Reason, unsigned int VoiceId);
-// FUN_06eeb900 (cdecl): Object's space object id is a multiple of 5 (unsigned DIV, NEG / SBB /
-// INC). The combat conversation (06ee2c20) lets formation leaders with such ids give orders.
+// FUN_06eeb900 (cdecl): Object's space object id is a multiple of 5 (unsigned). The combat
+// conversation (06ee2c20) lets formation leaders with such ids give orders.
 bool __cdecl IsSpaceObjIdMultipleOf5(FContentSpaceObj* Object);
 // FUN_06eec0c0 (cdecl, the result through a hidden pointer): "gcs_dockrequest_todock%s"
 // (dock type 1), "..._tomoor%s" (3, 4, 5), "..._toland%s" (6) formatted with Suffix; empty
@@ -132,28 +130,27 @@ public:
     int CostumeId;                      // +0x10 0 = no costume (GetCostumeByID)
     std::vector<unsigned int> TextIds;  // +0x18 (allocator byte +0x14)
     FSystemInfo* System;                // +0x24 null makes the line unplayable
-    // +0x28: SendSpaceComm's ninth argument (the port calls it Mood); the ctors store
-    // 0x4a39 / 0x4a41 ... TODO: meaning of the values. CanPlay needs it non-zero.
+    // +0x28: SendSpaceComm's Mood argument; the ctors store 0x4a39 / 0x4a41 ...
+    // TODO: meaning of the values. CanPlay needs it non-zero.
     unsigned int PermutationIds;
-    // +0x2c: SendSpaceComm's seventh argument (the port calls it CommType). TODO: meaning.
+    // +0x2c: SendSpaceComm's CommType argument. TODO: meaning.
     unsigned int CaptionIds;
 
 protected:
-    // The inline base part of every line ctor (e.g. 06ed9363-06ed938f): +0x0c / +0x10 /
-    // +0x28 / +0x2c zero, no texts.
+    // The inline base part of every line ctor (e.g. 06ed9363): +0x0c / +0x10 / +0x28 / +0x2c
+    // zero, no texts.
     FGcsLine(FSystemInfo* InSystem, unsigned int InSpeaker, unsigned int InListener);
 
-    // The inline voice test of the line ctors (e.g. 06ed93a2-06ed93ca / 06ed97a3):
-    // GetVoiceID(speaker) into +0x0c; without voice properties (FUN_06fa6e50) or without
-    // every bit of Roles (FUN_06fa6e30) System = null and false.
+    // The inline voice test of the line ctors (e.g. 06ed93a2): GetVoiceID(speaker) into
+    // +0x0c; without voice properties (FUN_06fa6e50) or without every bit of Roles
+    // (FUN_06fa6e30) System = null and false.
     bool HasVoiceRoles(unsigned int Roles);
-    // The inline text appends of the line ctors (FUN_06eb5770 / FUN_06f937c0 insert(end, 1,
-    // GetNicknameId(Name))).
+    // The inline text appends of the line ctors (FUN_06eb5770 / FUN_06f937c0).
     void PushText(char const* Name);
-    // The one-name ctor body shared by twelve lines (06ee11c0, 06edc180, ...; their listings
-    // differ only in the vtable, the role mask and the name): HasVoiceRoles(Roles);
-    // rand() / 32768 == 0; +0x28 = 0x4a39; room for one text; the voice line of Name (copied
-    // into a TString clamped to 0x3f) with "-" (DAT_06fb6064).
+    // The one-name ctor body shared by the twelve lines whose listings differ only in the
+    // vtable, the role mask and the name (06ee11c0, 06edc180, ...): HasVoiceRoles(Roles);
+    // rand() / 32768 == 0; +0x28 = 0x4a39; room for one text; the voice line of Name with "-"
+    // (DAT_06fb6064).
     void BuildSingleVoiceLine(unsigned int Roles, char const* Name);
 };
 
@@ -969,15 +966,15 @@ public:
     FSystemInfo* System;                // +0x18 event +0x04
 
 private:
-    // The ctor's common tail (e.g. 06ee2d40-06ee2d64 / 06ee4356 / 06ee4538): a line that can
-    // play is appended (true); otherwise it is deleted and System = null (false).
+    // The ctor's common tail (e.g. 06ee2d40): a line that can play is appended (true);
+    // otherwise it is deleted and System = null (false).
     bool AddLineOrClear(FGcsLine* Line);
-    // The "the formation acknowledges" loop of cases 9, 0xa, 0xb, 0xe (e.g.
-    // 06ee3370-06ee347f): the formation of Ship is collected again (FUN_06f66220) and every
-    // member after the first that is no player's (FUN_06f49bc0) acknowledges Ship with
-    // FGcsLineAck; the first line that cannot play stops it (deleted, System = null).
+    // The "the formation acknowledges" loop of cases 9, 0xa, 0xb, 0xe (e.g. 06ee3370): the
+    // formation of Ship is collected again (FUN_06f66220) and every member after the first
+    // that is no player's (FUN_06f49bc0) acknowledges Ship with FGcsLineAck; the first line
+    // that cannot play stops it (deleted, System = null).
     void AddFormationAcks(FContentShipBase* Ship);
-    // Cases 9 / 0xb, leader with an id divisible by 5 (e.g. 06ee3103-06ee32b0): on the rand
+    // Cases 9 / 0xb, leader with an id divisible by 5 (e.g. 06ee3103): on the rand
     // pick the first member after the first that is no player's asks to engage, else (or
     // with none) Ship announces the enemy. False when that line could not play.
     bool AddEnemySightedLine(FContentShipBase* Ship);
@@ -1000,7 +997,7 @@ public:
     int Kind;                           // +0x20 event +0x0c
 
 private:
-    // The status query of Kind 1 with more than one member (e.g. 06ee7c72-06ee7d44): the
+    // The status query of Kind 1 with more than one member (e.g. 06ee7c72): the
     // leader's FGcsLineFidgetStatusQuery, then every member after the first answers
     // (FGcsLineFidgetStatusReport, listener the leader). The first line that cannot play is
     // deleted, System = null, and false is returned.
@@ -1009,7 +1006,7 @@ private:
 
 // ---------------------------------------------------------------------------------------
 // Events handed to the conversation manager. Every event class has a one-slot vtable
-// whose slot 0 returns its type (ICF-shared `MOV EAX,n; RET` bodies).
+// whose slot 0 returns its type (ICF-shared constant getters).
 // ---------------------------------------------------------------------------------------
 
 class FGcsEvent
@@ -1132,19 +1129,18 @@ struct FGcsDelayedMessage
     float Delay;                        // +0x14
 };
 
-// Message 0xb as FUN_06ee8c50 sends it (0x14 bytes). TODO: meaning of the words; retail
-// leaves the last one uninitialised.
+// Message 0xb ("line done") as FUN_06ee8c50 sends it (0x14 bytes): {listener, system id,
+// speaker, last text, ?}, the layout FGcsLine::IsDone reads. Retail leaves the last word
+// uninitialised.
 struct FGcsSentMessage
 {
     unsigned int Words[5];
 };
 
 // The empty base of FGcsConversationManager at +0x04 (sharing the address with bEnabled).
-// Its ctor is inlined at 06ee8a8b-06ee8a92 (DAT_06fcf1b0 = the derived object) before any
-// member is built; its dtor FUN_06eec4d0 (DAT_06fcf1b0 = 0) is inlined at 06ee8bbe after the
-// members are gone and is the unwind action of state 0 in both FUN_06ee8a70
-// (Unwind@06fabbe0, ECX = this+4) and FUN_06ee8af0 (Unwind@06fabc00). No RTTI in Content.dll,
-// so the retail name is unknown.
+// Its ctor sets DAT_06fcf1b0 = the derived object before any member is built; its dtor
+// FUN_06eec4d0 clears it after the members are gone and is the state-0 unwind action of both
+// FUN_06ee8a70 and FUN_06ee8af0. Retail name unknown (no RTTI).
 class FGcsConversationManagerInstance
 {
 public:
@@ -1158,9 +1154,8 @@ public:
     // FUN_06ee8a70: the base (DAT_06fcf1b0 = this), then enabled and empty.
     FGcsConversationManager();
     // FUN_06ee8af0: every conversation deleted, then the members, then the base
-    // (DAT_06fcf1b0 cleared). Not virtual: the
-    // vtable 06fb7484 has the single slot below (06fb7488 starts the next vtable) and the dtor
-    // is only called directly (atexit 06f5c9a0).
+    // (DAT_06fcf1b0 cleared). Not virtual: vtable 06fb7484 has the single slot below
+    // (06fb7488 starts the next vtable) and the dtor is only called directly (atexit 06f5c9a0).
     ~FGcsConversationManager();
 
     // Slot 0, LAB_06ee91b0 (RET 0x14): {*A, *B, *C, *D, 0, *Delay} appended to the delayed
@@ -1268,7 +1263,7 @@ extern float GGcsFidgetRangeSquared;
 class FGcsHandler2 : public FGcsHandler
 {
 public:
-    // LAB_06eea890 (06eea890-06eeaedb): on message 0x20 every player not yet handled this
+    // LAB_06eea890: on message 0x20 every player not yet handled this
     // tick may (rand) get a chattering formation leader within 2500 m (event type 0x19);
     // the players near that leader count as handled.
     void HandleMessage(pub::Controller::EMessage MessageId, void const* Parms) override;

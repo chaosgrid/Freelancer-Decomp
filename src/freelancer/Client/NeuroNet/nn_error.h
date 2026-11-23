@@ -14,10 +14,7 @@
 // WINFACTORY<NN_Error> DAT_0066db70 "NN_Error": static init LAB_004724d0 (FUN_00474880 +
 // atexit LAB_004724f0 -> FUN_00579380), Create FUN_004748f0 (operator_new(0x344)).
 //
-// vftable 0x005d0634 (45 slots) -- WinControl's with these overrides:
-//   0 FUN_00472500 (scalar deleting dtor around FUN_00472520), 9 FUN_004725b0 Create,
-//   13 FUN_00488960 Draw, 20 LAB_00472940 KeyEvent, 42 LAB_00472880 SetProperty.
-// Event::Handler face +0x32c vftable 0x005d0620 (LAB_004727f0).
+// vftable 0x005d0634 (45 slots), scalar deleting dtor FUN_00472500. Event::Handler face +0x32c vftable 0x005d0620 (LAB_004727f0).
 //
 // Layout:
 //   +0x000 WinControl (0x32c), +0x32c Event::Handler vptr
@@ -60,7 +57,7 @@ public:
     WinControl* Title;             // +0x340
 
 private:
-    // The dismiss sequence, inlined at 00472803, 004728d4 and 0047295a: DAT_0066dc04 = 0, the
+    // The dismiss sequence retail inlines three times: DAT_0066dc04 = 0, the
     // parent's slot 23 with (0x3006, 0, 0), FUN_004a7690(+0x330), slot 33 ReleaseMouse,
     // FUN_0043d2a0 on every child, slot 10 Destroy, delete.
     void Dismiss();

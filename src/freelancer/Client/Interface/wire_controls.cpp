@@ -31,8 +31,7 @@
 #include <windows.h>
 
 // Retail DAT_0067de10 / DAT_0067dde4 / DAT_0067ddb8 -- the three WINFACTORY<T> statics
-// (LAB_005a2830 / LAB_005a2860 / LAB_005a2890; their atexit halves LAB_005a2850 / 005a2880 /
-// 005a28b0 are WinFactory's destructor).
+// (initializers LAB_005a2830 / LAB_005a2860 / LAB_005a2890).
 WINFACTORY<WireStaticControl> G_WireStaticControlFactory("WireStaticControl");
 WINFACTORY<WireButtonControl> G_WireButtonControlFactory("WireButtonControl");
 WINFACTORY<RichTextWireButtonControl> G_RichTextWireButtonControlFactory(
@@ -40,8 +39,7 @@ WINFACTORY<RichTextWireButtonControl> G_RichTextWireButtonControlFactory(
 
 namespace
 {
-    // DAT_0067de48 -- the 3DMathEngine this file acquires on first use (FUN_005b73e0) and shares
-    // between SetOrientation (0x005a3a50) and MouseEvent (0x005a4425).
+    // DAT_0067de48 -- acquired on first use, shared by SetOrientation and MouseEvent.
     I3DMathEngine* G_WireMathEngine = nullptr;
 
     I3DMathEngine* WireMathEngine()
@@ -53,20 +51,16 @@ namespace
 
     // DAT_005c75dc
     float const kOne = 1.0f;
-    // 0x3b449ba6 -- the line width every Draw edge passes to FUN_005a2a40.
+    // 0x3b449ba6
     float const kWireLineWidth = 0.003f;
 
-    // FUN_005a2a40 (thiscall on the batcher DAT_0067dd90, RET 0x14): append one thick line
-    // From -> To with the ARGB colour and its alpha-less RGB to the batcher's vertex / index
-    // arrays, flushing both batchers first when either is full (0x1800 indices / 0xc00
-    // vertices) -- ImmedBatchAddLine (win3d_renderables.cpp).
+    // FUN_005a2a40 on the batcher DAT_0067dd90.
     void WireBatchAddLine(float const* From, float const* To, unsigned long Argb,
                           unsigned long Rgb, float Width)
     {
         ImmedBatchAddLine(&G_ImmedBatchA, From, To, Argb, Rgb, Width);
     }
 
-    // 0x3f800000 and 0 -- a 3x3 identity.
     void SetIdentity9(float* Out)
     {
         Out[0] = 1.0f;
@@ -80,9 +74,8 @@ namespace
         Out[8] = 1.0f;
     }
 
-    // The parent notification every WireButtonControl handler spells out: the parent as a
-    // WinControl (slot 2), and if it is one, its slot 42 with (Msg, this as a WinControl, 0).
-    // Returns the parent's answer, or 0 when there is no WinControl parent.
+    // The parent notification every WireButtonControl handler inlines. Returns the parent's
+    // answer, or 0 when there is no WinControl parent.
     intptr_t TellParent(WinControl* Self, int Msg)
     {
         Win3D* const Parent = Self->GetParent();
@@ -95,13 +88,11 @@ namespace
                                           0);
     }
 
-    // The ToolTip record FUN_005a3c30 / FUN_005a46c0 build: key -1 and no alt id first, the
-    // empty caption (FUN_00414280), then both ids from +0xcc, the aux dword, the wire centre,
-    // the half extents and the live byte; FUN_004be370; then the Font::String teardown that
-    // WinControl::ShowToolTip spells out too.
+    // The ToolTip record FUN_005a3c30 / FUN_005a46c0 build; retail writes the key and alt id
+    // twice.
     void FeedWireToolTip(WireStaticControl* Self, int Aux)
     {
-        FToolTipHoverInfo Info;           // caption +0x08 / +0x0c null, FUN_004144b0 on +0x10
+        FToolTipHoverInfo Info;
         Info.IdsAlt = 0;                  // +0x04
         Info.Ids = -1;                    // +0x00
         Info.AuxField = 0;                // +0x44
@@ -116,7 +107,6 @@ namespace
         Info.HalfExtents[2] = Self->HalfExtents[2];
         Info.bLive = 1;                   // +0x60
         NnToolTipFeedHover(&Info);
-        // The record's teardown: ~FToolTipHoverInfo.
     }
 
     // The sound-name store of FUN_005a3ee0 / FUN_005a4810: only a non-empty name replaces
@@ -147,8 +137,8 @@ WireStaticControl::WireStaticControl()
     Colour[3] = 0;
     SoundSlot = 0;
     bUseColour = 0;
-    // 005a329c / 005a32d7: only bit 0 of +0x35d is cleared; the other bits keep whatever the
-    // allocation held. Only bit 0 is ever read (Draw 005a38bc).
+    // Only bit 0 of +0x35d is cleared; the other bits keep whatever the allocation held. Only
+    // bit 0 is ever read.
     WireState2 = static_cast<unsigned char>(WireState2 & 0xfe);
     bBlink = 0;
     bBlinkPhase = 0;
@@ -159,7 +149,7 @@ WireStaticControl::WireStaticControl()
 
 WireStaticControl::~WireStaticControl()
 {
-    // FUN_005a3310: the +0x368 string is freed, then FUN_0059fa50 (WinControl's dtor).
+    // FUN_005a3310.
 }
 
 bool WireStaticControl::HitTest(float const* Ray)
@@ -209,9 +199,8 @@ void WireStaticControl::SetPosition(float const* NewPosition)
 
 void WireStaticControl::SetOrientation(float const* NewOrientation)
 {
-    // LAB_005a3a30 (RET 4): the new orientation times the attach orientation (slot 40) through
-    // the 3DMathEngine's MulMatrix (+0x20), copied to Win3D's +0x3c and to +0x32c. Unlike
-    // WinControl's FUN_005a0950 it neither moves an engine instance nor recurses into children.
+    // LAB_005a3a30. Unlike WinControl's FUN_005a0950 it neither moves an engine instance nor
+    // recurses into children.
     bAttached = 1;
     FMatrix Attach;
     GetAttachOrientation(&Attach.D[0][0]);
@@ -223,8 +212,7 @@ void WireStaticControl::SetOrientation(float const* NewOrientation)
 
 bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
 {
-    // FUN_005a3ea0 (RET 8): reparent, register, flags = (flags & 0xfb) | 3, then the parent is
-    // re-placed at its own position (its slot 5), which positions this control with it.
+    // FUN_005a3ea0: re-placing the parent at its own position positions this control with it.
     Win3DReparent(this, NewParent); // FUN_0059dd00
     Win3DRegister(this);            // FUN_0059dbf0
     Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
@@ -235,8 +223,8 @@ bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
 
 void WireStaticControl::UpdateBlink()
 {
-    // 0x005a3aa8..0x005a3afe: while +0x35e is set the timer runs; every whole second past 1.0
-    // flips +0x35f. The comparisons are FCOM against 1.0 with TEST AH,0x41: "not above" stops.
+    // Every whole second past 1.0 flips the phase. The compares are on the double sum; an
+    // unordered result stops.
     if (bBlink == 0)
         return;
     double Timer = GetClientFrameTimeCapped() + static_cast<double>(BlinkTimer); // FUN_0042d680
@@ -255,7 +243,7 @@ void WireStaticControl::UpdateBlink()
 
 void WireStaticControl::Update()
 {
-    // FUN_005a3aa0: Win3D's child walk (FUN_005a17b0), then the blink.
+    // FUN_005a3aa0.
     Win3D::Update();
     UpdateBlink();
 }
@@ -276,7 +264,6 @@ void WireStaticControl::Draw()
 
     Win3DDrawChildren(this); // FUN_0059e5c0
 
-    // 005a3489..005a354d: the colour.
     unsigned char const SavedLit = static_cast<unsigned char>((WireState >> 4) & 1);
     unsigned char Rgba[4];
     if ((Flags & kWin3DActive) == 0)
@@ -318,8 +305,6 @@ void WireStaticControl::Draw()
     if (bUseColour != 0)
         memcpy(Rgba, Colour, sizeof(Rgba));
 
-    // 005a354d..005a364c: the centre (position + offset) goes to +0x350; the corner vectors are
-    // (-hx, -hy, -hz) and (hx, -hy, -hz).
     float const Center[3] = {Position[0] + Offset[0], Position[1] + Offset[1],
                              Position[2] + Offset[2]};
     WireCenter[0] = Center[0];
@@ -335,7 +320,7 @@ void WireStaticControl::Draw()
                               (static_cast<unsigned long>(Rgba[1]) << 8) |
                               static_cast<unsigned long>(Rgba[2]);
 
-    // 005a364c: mask bit 2, the bottom edge, (-hx, -hy) -> (hx, -hy).
+    // Bit 2, the bottom edge, (-hx, -hy) -> (hx, -hy).
     if ((EdgeMask & 0x4) != 0)
     {
         float const To[3] = {Center[0] + CornerB[0], Center[1] + CornerB[1],
@@ -344,7 +329,7 @@ void WireStaticControl::Draw()
                                Center[2] + CornerA[2]};
         WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
     }
-    // 005a36ce: CornerA becomes (hx, hy, -hz). Bit 1, the right edge, (hx, -hy) -> (hx, hy).
+    // Bit 1, the right edge, (hx, -hy) -> (hx, hy).
     CornerA[0] = -CornerA[0];
     CornerA[1] = -CornerA[1];
     if ((EdgeMask & 0x2) != 0)
@@ -355,7 +340,7 @@ void WireStaticControl::Draw()
                                Center[2] + CornerB[2]};
         WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
     }
-    // 005a3765: CornerB becomes (-hx, hy, -hz). Bit 0, the top edge, (hx, hy) -> (-hx, hy).
+    // Bit 0, the top edge, (hx, hy) -> (-hx, hy).
     CornerB[0] = -CornerB[0];
     CornerB[1] = -CornerB[1];
     if ((EdgeMask & 0x1) != 0)
@@ -366,8 +351,7 @@ void WireStaticControl::Draw()
                                CornerA[2] + Center[2]};
         WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
     }
-    // 005a37f1: CornerA is rebuilt as (-hx, -hy, -hz). Bit 3, the left edge, (-hx, hy) ->
-    // (-hx, -hy).
+    // Bit 3, the left edge, (-hx, hy) -> (-hx, -hy).
     CornerA[0] = -HalfExtents[0];
     CornerA[1] = -HalfExtents[1];
     CornerA[2] = -HalfExtents[2];
@@ -380,12 +364,11 @@ void WireStaticControl::Draw()
         WireBatchAddLine(From, To, Argb, Rgb, kWireLineWidth);
     }
 
-    // 005a3899: bit 4 goes back to what it was before the inactive branch could clear it.
+    // Bit 4 goes back to what it was before the inactive branch could clear it.
     WireState = static_cast<unsigned char>((WireState & 0xef) | (SavedLit << 4));
     Slot39(); // vt+0x9c
 
-    // 005a38bc: with +0x35d bit 0, both batchers are flushed (FUN_005a2ee0 on DAT_0067dd90,
-    // then DAT_0067dd68) and their dirty state reset -- the FUN_005a29b0 body, inlined.
+    // FUN_005a29b0 inlined: flush both batchers (DAT_0067dd90, DAT_0067dd68).
     if ((WireState2 & 0x01) != 0)
     {
         Win3DImmedBatchFlushAll();
@@ -395,13 +378,13 @@ void WireStaticControl::Draw()
 
 void WireStaticControl::ShowToolTip()
 {
-    // FUN_005a3c30: the record's aux dword is +0x364.
+    // FUN_005a3c30.
     FeedWireToolTip(this, ToolTipAux);
 }
 
 intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_005a3b00 (RET 0xc): byte table 0x005a3be0 over Msg - 0xc; the rest is FUN_005a13c0.
+    // LAB_005a3b00.
     switch (Msg)
     {
     case 0x0c:
@@ -436,7 +419,7 @@ void WireStaticControl::Init(float const* NewOffset, float const* NewHalfExtents
                              unsigned char bAlwaysWhite, unsigned char bNewNoZEnable,
                              int NewToolTipIds, unsigned NewEdgeMask)
 {
-    // FUN_005a3360 (RET 0x18).
+    // FUN_005a3360.
     EdgeMask = (NewEdgeMask != 0) ? NewEdgeMask : 0xf;
     Offset[0] = NewOffset[0];
     Offset[1] = NewOffset[1];
@@ -458,23 +441,22 @@ void WireStaticControl::Init(float const* NewOffset, float const* NewHalfExtents
 
 WireButtonControl::WireButtonControl()
 {
-    // FUN_005a4e10 005a4e50..005a4e68: bit 0 cleared and bit 2 set; bits 1 and 3..7 keep what
-    // the allocation held (bit 1 is written by every press before it is read).
+    // Bits 1 and 3..7 keep what the allocation held (bit 1 is written by every press before it
+    // is read).
     ButtonState = static_cast<unsigned char>((ButtonState & 0xfe) | 0x04);
     CommandId = 0;
 }
 
 WireButtonControl::~WireButtonControl()
 {
-    // FUN_005a3db0: a button still holding the capture leaves the capture stack
-    // (FUN_0059d960) before the string and WinControl are torn down.
+    // FUN_005a3db0.
     if ((ButtonState & 0x01) != 0)
         Win3DRemoveCapture(this);
 }
 
 bool WireButtonControl::HitTest(float const* Ray)
 {
-    // LAB_005a42c0: JMP FUN_005a0340.
+    // LAB_005a42c0.
     return WinControl::HitTest(Ray);
 }
 
@@ -484,8 +466,7 @@ void WireButtonControl::Update()
     Win3D::Update(); // FUN_005a17b0
     UpdateBlink();
 
-    // 005a40e8: while the button holds the capture, follow the cursor and light / unlight as
-    // it moves on and off.
+    // While the button holds the capture, light / unlight as the cursor moves on and off.
     if ((ButtonState & 0x01) == 0)
         return;
 
@@ -533,7 +514,7 @@ void WireButtonControl::Update()
 
 void WireButtonControl::MouseEnter(float const* /*Ray*/)
 {
-    // FUN_005a42d0 (RET 4).
+    // FUN_005a42d0.
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
@@ -546,7 +527,7 @@ void WireButtonControl::MouseEnter(float const* /*Ray*/)
 
 void WireButtonControl::MouseLeave(float const* /*Ray*/)
 {
-    // FUN_005a4330 (RET 4).
+    // FUN_005a4330.
     if (ToolTipIds != 0)
         NnToolTipHideGlobal(); // FUN_004be390
     TellParent(this, 0x2d);
@@ -555,11 +536,11 @@ void WireButtonControl::MouseLeave(float const* /*Ray*/)
 
 bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // FUN_005a4380 (RET 4).
+    // FUN_005a4380.
     if ((ButtonState & 0x04) == 0)
         return false;
-    // 005a4395: while some control holds the mouse, a button whose WinControl parent does not
-    // hold it ignores the event.
+    // While some control holds the mouse, a button whose WinControl parent does not hold it
+    // ignores the event.
     if (Parent != nullptr && Win3DAnyCaptured())
     {
         WinControl* const ParentControl = Parent->AsWinControl();
@@ -569,15 +550,14 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
     if ((ButtonState & 0x01) != 0)
     {
-        // 005a43d3: the release of a press this button captured.
+        // The release of a press this button captured.
         if (Event->Field0 != -1 || Event->Field1 != 1)
             return false;
         WireState = static_cast<unsigned char>(WireState & 0xfb);
         ButtonState = static_cast<unsigned char>(ButtonState & 0xfe);
         Win3DRemoveCapture(this); // FUN_0059d960
 
-        // 005a4403..005a44c3: the cursor ray -- FUN_004bdd40 on DAT_0067dbf8, the engine's
-        // TransformMatrix (+0x2c) with a copy of the camera orientation, normalised inline.
+        // The cursor ray (FUN_004bdd40); unlike Update this goes through the math engine.
         FSpaceCamera* const Cam = Win3DGetCamera();
         int CursorX = 0;
         int CursorY = 0;
@@ -600,13 +580,13 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
         if (!HitTest(Ray)) // slot 4
         {
-            // 005a4590: released off the button.
+            // Released off the button.
             TellParent(this, 0x29);
             WireState = static_cast<unsigned char>(WireState & 0xfe);
             return true;
         }
 
-        // 005a44ce: the click sound -- the UI sound slot, else the sound archetype by name.
+        // The click sound: the UI sound slot, else the sound archetype by name.
         if (SoundSlot != -1)
         {
             PlayOrRewindUiSoundSlot(static_cast<unsigned>(SoundSlot)); // FUN_005645c0
@@ -621,7 +601,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
         if ((ButtonState & 0x02) != 0)
         {
-            // 005a4524: a right click asks the parent 0x27 first; a zero answer becomes 0x26.
+            // A right click asks the parent 0x27 first; a zero answer becomes 0x26.
             if (Parent == nullptr)
                 return true;
             WinControl* const ParentControl = Parent->AsWinControl();
@@ -637,7 +617,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // 005a45cb: a press, left (Field1 2) or right (3).
+    // A press, left (Field1 2) or right (3).
     if (Event->Field0 != -1)
         return false;
     if (Event->Field1 != 2 && Event->Field1 != 3)
@@ -660,19 +640,19 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
 void WireButtonControl::ShowToolTip()
 {
-    // FUN_005a46c0: the record's aux dword is the command id +0x38c.
+    // FUN_005a46c0: the record's aux dword is the command id.
     FeedWireToolTip(this, CommandId);
 }
 
 intptr_t WireButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_005a4690 (RET 0xc).
+    // LAB_005a4690.
     if (Msg == 0x2e)
     {
         *reinterpret_cast<int*>(A) = CommandId;
         return 0;
     }
-    return WireStaticControl::SetProperty(Msg, A, B); // JMP LAB_005a3b00
+    return WireStaticControl::SetProperty(Msg, A, B);
 }
 
 void WireButtonControl::Activate()
@@ -691,7 +671,7 @@ void WireButtonControl::Init(char const* NewSoundName, float const* NewOffset,
                              unsigned char bNewNoZEnable, int NewToolTipIds, int NewCommandId,
                              unsigned NewEdgeMask)
 {
-    // FUN_005a3ee0 (RET 0x20): FUN_005a3360's body inlined, the command id, then the sound.
+    // FUN_005a3ee0 (FUN_005a3360 inlined).
     WireStaticControl::Init(NewOffset, NewHalfExtents, bAlwaysWhite, bNewNoZEnable,
                             NewToolTipIds, NewEdgeMask);
     CommandId = NewCommandId;
@@ -704,7 +684,6 @@ void WireButtonControl::Init(char const* NewSoundName, float const* NewOffset,
 
 RichTextWireButtonControl::RichTextWireButtonControl()
 {
-    // FUN_005a4f40 005a4f90..005a4fb3.
     TextWinRef = &TextWin;
     TextWin = nullptr;
 }
@@ -719,13 +698,13 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
                                      unsigned CaptionIds, int NewCommandId,
                                      unsigned NewEdgeMask)
 {
-    // FUN_005a4810 (RET 0x24).
+    // FUN_005a4810.
     WireStaticControl::Init(NewOffset, NewHalfExtents, bAlwaysWhite, bNewNoZEnable,
                             NewToolTipIds, NewEdgeMask); // FUN_005a3360
     CommandId = NewCommandId;
     StoreSoundName(this, NewSoundName);
 
-    // 005a48a1..005a491d: a RichTextWin child named <this name> + "Text" (DAT_005d075c).
+    // "Text" is DAT_005d075c.
     std::string Nickname(Name);
     Nickname.append("Text");
     TextWin = static_cast<RichTextWin*>(
@@ -733,7 +712,7 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
     if (TextWin == nullptr)
         return;
 
-    // 005a4923..005a49a0: the caption box sits on the wire box's top-left corner.
+    // The caption box sits on the wire box's top-left corner.
     float AttachOffset[3];
     AttachOffset[0] = Offset[0] - HalfExtents[0];
     AttachOffset[1] = Offset[1] + HalfExtents[1];
@@ -748,8 +727,7 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
     if (CaptionIds == 0)
         return;
 
-    // 005a49b1..005a4af7: a local list of StyleNode(0x828b), JustifyNode(1) and the caption
-    // ids (FUN_0057da40, no trailing-paragraph trim), appended to the caption (FUN_0057b3e0).
+    // FUN_0057da40 loads the ids without the trailing-paragraph trim; FUN_0057b3e0 appends.
     RenderDisplayList Caption;
     StyleNode Style(0x828b);
     RdlAppendNode(Caption, Style.Clone());
@@ -761,8 +739,7 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
 
 void WireControlsJoinColumn(WinControl* const* Controls, int Count)
 {
-    // FUN_005a4b50. ESI = the previous control, ECX = this one, EDX = the next (null past the
-    // end).
+    // FUN_005a4b50.
     WireStaticControl* Prev = nullptr;
     for (int Index = 0; Index < Count; ++Index)
     {
@@ -771,8 +748,7 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
                                             ? static_cast<WireStaticControl*>(Controls[Index + 1])
                                             : nullptr;
 
-        // 005a4b78..005a4bab: highlighted (state bit 0 hovered or bit 1 focused) with no lit
-        // (bit 4) neighbour on either side.
+        // Highlighted (hovered or focused) with no lit (bit 4) neighbour on either side.
         unsigned char const State = Cur->WireState;
         unsigned char const bFocused = static_cast<unsigned char>((State >> 1) & 1);
         unsigned char bAlone = 0;
@@ -785,8 +761,8 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
                 bAlone = 0;
         }
 
-        // 005a4bad..005a4c2e: the full box unless the next control is shown (Flags bits 1 and
-        // 0), this one is not lit and not highlighted alone.
+        // The full box unless the next control is shown, this one is not lit and not
+        // highlighted alone.
         if (Next == nullptr || (Next->Flags & 2) == 0 || (Next->Flags & 1) == 0
             || (Cur->WireState & 0x10) != 0 || bAlone != 0)
         {
@@ -794,7 +770,6 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
         }
         else if (bFocused == 0 && (Cur->WireState & 1) == 0)
         {
-            // 005a4bd6..005a4bf9
             if (Prev != nullptr && (Prev->WireState & 0x13) != 0)
                 Cur->EdgeMask = 0xa;
             else
@@ -802,7 +777,6 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
         }
         else
         {
-            // 005a4bfb..005a4c2c
             Cur->EdgeMask = 0xa;
             if (Prev == nullptr || (Prev->WireState & 0x10) == 0)
                 Cur->EdgeMask = 0xb;
@@ -810,8 +784,8 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
                 Cur->EdgeMask |= 4;
         }
 
-        // 005a4c38..005a4c6c: a coloured control below an uncoloured one takes over the shared
-        // edge: the previous one gets its bottom edge, this one loses its top edge.
+        // A coloured control below an uncoloured one takes over the shared edge: the previous
+        // one gets its bottom edge, this one loses its top edge.
         if (Prev != nullptr && (Prev->EdgeMask & 4) == 0 && (Cur->EdgeMask & 1) != 0
             && Prev->bUseColour == 0 && Cur->bUseColour != 0)
         {

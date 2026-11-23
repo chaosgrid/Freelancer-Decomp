@@ -6,38 +6,32 @@
 
 #pragma once
 
-// PAGE_*.txt layout descriptor — the object retail embeds in every PAGE screen
+// PAGE_*.txt layout descriptor -- the object retail embeds in every PAGE screen
 // (PageServerSelect+0x8c, PageCharacterSelect+0x28c, ...) and loads with FUN_00592230.
 //
-// Retail layout (FUN_00592230 / FUN_00594540 / FUN_00594580 / FUN_00592080):
-//   +0x00  std::list<FUiWidgetEntry*>  entries in file order (FUN_005947a0 push_back,
-//                                      size at +0x08)
-//   +0x0c  FUiPageData { float Aspect; FUiWidgetEntry** Entries; } — the part FUN_00594580
-//          hands to UIPage::MasterWin (ctor FUN_00591ae0 stores it at MasterWin+0x84)
-//   +0x14  std::set<void*> of every operator-new block the loader made (FUN_0046d170 insert);
-//          FUN_00594540 deletes and erases them on reload, FUN_00592080 on destruction.
-//
-// No retail ABI: the port keeps the same three members with std containers.
+// Retail layout: +0x00 the entry list in file order, +0x0c FUiPageData (what MasterWin keeps at
+// +0x84), +0x14 the set of every operator-new block the loader made (deleted on reload and on
+// destruction). The port keeps the same three members with std containers.
 
 #include <list>
 #include <set>
 
-// Written to FUiPageData::Aspect on a successful load (float bits 0x3faaa993 = 1.33333).
-// Instantiation (FUN_00594590) copies it into UIPage::Page+0x18.
+// Written to FUiPageData::Aspect on a successful load (1.33333f). CreatePage copies it into
+// UIPage::Page+0x18.
 static unsigned const kUiPageLoadMagicBits = 0x3faaa993u;
 
-// One widget line — retail operator_new(0x20), FUN_00592230.
+// One widget line -- retail operator new(0x20).
 struct FUiWidgetEntry
 {
     char* TypeName;          // +0x00  "UIStaticText", ... (WINFACTORY class key)
     void* Payload;           // +0x04  type-specific blob (FUiPayload*)
     char* InstanceName;      // +0x08  nickname; key of the UIPage::Page name map
-    float Left;              // +0x0C  1st float — translation X at FUN_005916b0
-    float Top;               // +0x10  2nd float — translation Y at FUN_005916b0
-    float Right;             // +0x14  3rd float — also payload +0x00
-    float Bottom;            // +0x18  4th float — also payload +0x04
-    // +0x1C — child entry array (null-terminated) walked by FUN_005916b0's recursion.
-    // FUN_00592230 always writes 0 here.
+    float Left;              // +0x0C  1st float -- translation X in Page::Instantiate
+    float Top;               // +0x10  2nd float -- translation Y
+    float Right;             // +0x14  3rd float -- also payload +0x00
+    float Bottom;            // +0x18  4th float -- also payload +0x04
+    // +0x1C -- child entry array (null-terminated) walked by Instantiate's recursion. The
+    // loader always writes 0 here.
     FUiWidgetEntry** NestedChildren;
 };
 
@@ -84,8 +78,8 @@ struct FUiPayloadTable
 {
     float Right;             // +0x00
     float Bottom;            // +0x04
-    int Int5;                // +0x08 ftol(5th float) — UITable 00593c5e, UIFastTable 00593edc
-    int Int6;                // +0x0C ftol(6th float) — UITable 00593c52, UIFastTable 00593ed0
+    int Int5;                // +0x08 ftol(5th float) -- the row count
+    int Int6;                // +0x0C ftol(6th float) -- the column count
 };
 
 // UIScroll / UICycle payload — operator_new(0x1C)
@@ -101,7 +95,7 @@ struct FUiPayloadScrollCycle
     unsigned char Pad[3];
 };
 
-// What FUN_00594580 returns (&desc+0x0c) and UIPage::MasterWin keeps at +0x84.
+// What GetPageData returns (&desc+0x0c) and UIPage::MasterWin keeps at +0x84.
 struct FUiPageData
 {
     float Aspect;                   // +0x00 kUiPageLoadMagicBits after a successful load, else 0
@@ -115,22 +109,21 @@ class FUiPageDesc
 {
 public:
     FUiPageDesc();
-    // Retail teardown FUN_00592080 (set part) + list/set destructors: every tracked block is
-    // deleted, then the containers go.
+    // FUN_00592080 -- every tracked block is deleted, then the containers go.
     ~FUiPageDesc();
 
-    // FUN_00592230 — returns the retail success byte (cStack_8e9).
+    // FUN_00592230 -- returns the retail success byte.
     bool LoadFromFile(char const* FullPath);
 
-    // FUN_00594580 — LEA EAX,[ECX+0xc].
+    // FUN_00594580.
     FUiPageData* GetPageData() { return &Data; }
 
     unsigned GetEntryCount() const { return static_cast<unsigned>(EntryList.size()); }
 
 private:
-    // FUN_00594540 — delete every tracked block and erase it from the set.
+    // FUN_00594540 -- delete every tracked block and erase it from the set.
     void ClearAllocations();
-    // operator_new + FUN_0046d170 insert into Allocations.
+    // operator new, recorded in Allocations.
     void* TrackedNew(unsigned Size);
     char* TrackedDup(char const* Src);
     wchar_t* TrackedWiden(char const* Src);

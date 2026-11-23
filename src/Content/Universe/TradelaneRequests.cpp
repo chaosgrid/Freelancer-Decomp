@@ -4,11 +4,11 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Content.dll TU55 (06f6fa90-06f6fd90): trade lane request handlers. See TradelaneRequests.h.
+// Content.dll TU55: trade lane request handlers. See TradelaneRequests.h.
 
 #include "Universe/TradelaneRequests.h"
 
-#include "Core/ContentStaticIds.h"     // TU55 static IDs 06f6fa90..06f6fc70 (DAT_06fd1d4c..DAT_06fd1d10)
+#include "Core/ContentStaticIds.h"     // TU55 static IDs (DAT_06fd1d4c..DAT_06fd1d10)
 #include "Core/ContentPlayerState.h"   // FindContentPlayerStateByShip (FUN_06f49bc0)
 #include "NPCs/DockQueues.h"           // FGcsDockGrantedEvent (vtable 06fbbd70)
 #include "Comms/Gcs.h"                  // GGcsConversations (DAT_06fd1c08)
@@ -17,17 +17,13 @@
 
 #include <cstdint>
 
-// FUN_06f6fcb0. The response starts at 5 (06f6fcd5) and stays 5 unless the object asked for
-// is a trade lane ring (GetType's low byte has bit 7 set: TEST AL,AL / JNS 06f6fd65 jumps on
-// the sign bit clear; GetType's result is not tested and the type starts as the stack slot of
-// the argument). For a ring: a player ship (FUN_06f49bc0 non-null) asks TU46 FUN_06f47ee0
-// (ring, end ring); 1 or 2 -> response 1 (no event). Any other answer, and every non-player
-// ship, gets response 4: the GCS "granted" event (type 2; DockIndex -1, DockType 0,
-// bWaitedInQueue 0 - the stores at 06f6fd39-06f6fd5a) is queued (FUN_06ee8d70, its float
-// dropped). Then LaneResponse(ship, response), and on 4 Activate(ring, true, ship).
+// FUN_06f6fcb0. The response stays 5 unless the object asked for is a trade lane ring (bit 7
+// of GetType's low byte). A player ship whose route check (TU46 FUN_06f47ee0) answers 1 or 2
+// gets response 1 (no event); any other answer, and every non-player ship, gets response 4
+// with the GCS "granted" event (type 2) queued (FUN_06ee8d70, its float dropped).
 void HandleTradelaneRequest(FTradelaneRequest const* Request)
 {
-    // 06f6fcbd: the out slot is the argument's own stack slot, so a failed GetType (it writes
+    // Retail's out slot is the argument's own stack slot, so a failed GetType (it writes
     // nothing on -4/-2) leaves the parameter pointer there and its low byte is tested.
     unsigned int RingType = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Request));
     pub::SpaceObj::GetType(Request->RingId, RingType);
@@ -69,7 +65,7 @@ void HandleTradelaneRequest(FTradelaneRequest const* Request)
         pub::SpaceObj::Activate(Request->RingId, true, static_cast<int>(Request->ShipId));
 }
 
-// FUN_06f6fc90: Activate(ring, false, ship).
+// FUN_06f6fc90.
 void HandleTradelaneRelease(FTradelaneRequest const* Request)
 {
     pub::SpaceObj::Activate(Request->RingId, false, static_cast<int>(Request->ShipId));

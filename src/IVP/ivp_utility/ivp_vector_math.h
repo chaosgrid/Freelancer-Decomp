@@ -8,9 +8,8 @@
 
 #include "common_ini.h" // For Vector
 
-// Inline operator overloads for Freelancer's Vector class 
-// These are used heavily in IVP's original Havok physics math (impact solver, exact simplex, etc)
-// but Freelancer's Vector struct does not have them by default.
+// Port-only operator overloads for Freelancer's Vector, used by IVP code (impact solver,
+// exact simplex). Single-precision; not retail x87 evaluation order.
 
 inline Vector operator+(const Vector& a, const Vector& b)
 {

@@ -120,8 +120,7 @@ struct FGfScript
     void DrawEffects(ICamera* Camera);
     // FUN_0044f9a0 (thiscall, RET 8) -- the prop behind entity Index is (un)detached: its
     // engine instance (Thorn object slot 17) goes to the sequence's FUN_00455d20. Callers: the
-    // hardpoint connect / disconnect slots of Thorn_Compound (0x00451e7a / 0x00451eba) and
-    // Thorn_Deformable (0x00452d9a / 0x00452dda), with 1 / 0.
+    // hardpoint connect / disconnect slots of Thorn_Compound and Thorn_Deformable, with 1 / 0.
     void SetEntityPropDetached(int Index, unsigned char bDetached);
     // FUN_0044f9d0 -- +0x44 = 1: the next Update runs the script out.
     void Pause();
@@ -157,7 +156,7 @@ struct FGfScript
     Csys Frame;                       // +0x00 identity; every Thorn object's base ctor copies it
     FRoomRuntime* Room;               // +0x30 the room this script plays in
     FGfScriptSequence* Sequence;      // +0x34 the sequence that runs it
-    FGfMirrorDatabase* Mirror;        // +0x38 the sequence's +0x114 (FUN_00454fb0 0x00454ff6)
+    FGfMirrorDatabase* Mirror;        // +0x38 the sequence's +0x114 (FUN_00454fb0)
     IScriptEngine* Engine;            // +0x3c
     int Duration;                     // +0x40 IScriptEngine slot 17
     unsigned char bPaused;            // +0x44 FUN_0044f9d0; Thorn_Sound slot 3 skips while set
@@ -190,7 +189,7 @@ struct FGfScript
 };
 
 // Gf\MirrorDatabase (0xc bytes at ScriptSequence +0x114): character objects by name -- the
-// characters a sequence plays with (RoomControl FUN_0044a540 adds the room's, 0x0044aaf7).
+// characters a sequence plays with (RoomControl FUN_0044a540 adds the room's).
 // A list of {object, VC6 std::string}.
 class FGfMirrorDatabase
 {
@@ -270,9 +269,9 @@ struct FGfScriptSequence
     // LAB_00455b10 (cdecl) -- the info dialog (kind 4) closed: +0x10d = 1, the dialog deleted,
     // the script resumed.
     static void __cdecl OnInfoDialogClosed(void* Context, int Answer);
-    // FUN_00455b80 (thiscall, RET 8) -- append {Prop, Name}. Caller: FUN_0044e430 (0x0044e82e).
+    // FUN_00455b80 (thiscall, RET 8) -- append {Prop, Name}. Caller: FUN_0044e430.
     void AddProp(FObjectProp* Prop, char const* PropName);
-    // FUN_00455ca0 -- every prop deleted, the list emptied. Caller: FUN_0044ed00 (0x0044ed58).
+    // FUN_00455ca0 -- every prop deleted, the list emptied. Caller: FUN_0044ed00.
     void ClearProps();
     // FUN_00455d20 (thiscall, RET 8) -- the first prop of Props whose engine instance (RoomObject
     // slot 6) is Instance gets bDetached (ObjectProp +0x48); none, nothing.
@@ -321,7 +320,7 @@ struct FGfScriptSequence
     unsigned char bHoldTime;       // +0x0f 1: FUN_00558bf0 at each script start
     int Priority;                  // +0x10 -> FGfScript +0x58
     unsigned char bPropsToRoom;    // +0x14 -> FGfScript +0x5c
-    unsigned char Field_0x15;      // +0x15 1 TODO: gates +0x2e with +0x16 (0x00455085, 0x00456866)
+    unsigned char Field_0x15;      // +0x15 1 TODO: gates +0x2e with +0x16 (StartEntry, OnEvent)
     unsigned char Field_0x16;      // +0x16 TODO: see +0x15
     unsigned char Pad17;
     FStopCallback Callback;        // +0x18 called at the stop with (+0x1c, +0x20, bArg)
@@ -403,7 +402,7 @@ public:
     // spawned object of the current script of each sequence with +0x0d.
     void Update(int Ms);
     // FUN_00456740 (thiscall, RET 8) -- FUN_0044f970 on the current script of every playing
-    // sequence of Room. Caller: the room draw FUN_0044b570 (0x0044b8c8).
+    // sequence of Room. Caller: the room draw FUN_0044b570.
     void DrawEffects(FRoomRuntime* Room, ICamera* Camera);
     // FUN_00456790 (thiscall, RET 8) -- the first created (not reference) entity of Type named
     // EntityName among the current scripts of the findable sequences, or null.
@@ -415,13 +414,12 @@ public:
     bool CanSkipAll() const;
     // FUN_004568d0 (thiscall, RET 4) -- Sequence deleted and taken out, if listed.
     void DestroySequence(FGfScriptSequence* Sequence);
-    // FUN_00456930 -- every sequence deleted. Caller: RoomControl FUN_00449420 (0x0044945c).
+    // FUN_00456930 -- every sequence deleted. Caller: RoomControl FUN_00449420.
     void DestroyAll();
-    // FUN_004564d0 -- register id 0xf. Callers: the base enter FUN_005588a0 (0x0055893d) and
-    // the intro 0x00573990.
+    // FUN_004564d0 -- register id 0xf. Callers: the base enter FUN_005588a0 and the intro.
     void RegisterEvents();
     // FUN_004564e0 -- every sequence deleted, id 0xf unregistered. Callers: the base leave
-    // FUN_00558a50 (0x00558a6c) and the menu 0x0057405d / 0x005740ee / 0x00574a9a.
+    // FUN_00558a50 and the menu driver.
     void Shutdown();
 
     std::list<FGfScriptSequence*> Sequences; // +0x08 head, +0x0c size
@@ -430,12 +428,12 @@ public:
 extern FGfScriptManager G_GfScriptManager;
 
 // FUN_00454910 -- DAT_0066d304, set by the option callback LAB_004548f0 (value < 0.5). Read by
-// FUN_00454fb0 (0x00455075) for the skip latch.
+// FUN_00454fb0 for the skip latch.
 bool GfScriptSequenceSkipLatch();
-// LAB_004548f0 (cdecl, float) -- DAT_0066d304 = Value < 0.5 (`TEST AH,1` + JZ: not less keeps 0).
+// LAB_004548f0 (cdecl, float) -- DAT_0066d304 = Value < 0.5 (a NaN keeps 0).
 void GfScriptSequenceSetSkipOption(float Value);
 
 // FUN_0044fa60 (cdecl) -- Levels times DALib::Engine slot 53 (the parent instance) up from
 // Instance; Levels not positive returns Instance itself. Caller: Thorn_Deformable's IK start
-// (0x0045248f) with the descriptor's count_to_root.
+// with the descriptor's count_to_root.
 void* GfEngineInstanceAncestor(void* Instance, int Levels);

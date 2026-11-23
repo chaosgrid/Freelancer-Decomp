@@ -8,17 +8,13 @@
 
 namespace
 {
-    // Retail DAT_063ee4dc: the generator's sole persistent state, a plain
-    // 32-bit int (not thread-local, not reset anywhere in this cluster --
-    // matches retail, which never re-seeds it from any function reachable in
-    // this pass).
+    // DAT_063ee4dc: the generator's only state; never re-seeded.
     unsigned g_IVP_FastRandomSeed = 1;
 }
 
 float IVP_FastRandomFloat()
 {
-    // seed *= 75 (== seed*3, then *5, then *5 again -- exactly retail's three
-    // LEA-based multiplies, Common.dll.txt:443975-443977).
+    // seed *= 75 as retail's three LEA multiplies (3, 5, 5).
     g_IVP_FastRandomSeed = g_IVP_FastRandomSeed * 3u;
     g_IVP_FastRandomSeed = g_IVP_FastRandomSeed * 5u;
     g_IVP_FastRandomSeed = g_IVP_FastRandomSeed * 5u;

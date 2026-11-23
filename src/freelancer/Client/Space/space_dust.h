@@ -14,13 +14,13 @@
 #include "common_archetype.h" // CacheString
 #include "common_universe.h"
 
-// FUN_0054bde0 (cdecl) -- StarSysLoadIni's [Dust] section (00553d6d): remember the system dust
-// name (pointer copy into DAT_00679794) and reset the zone-dust bookkeeping. No effect is
-// created here; the first SpaceDustUpdate does that.
+// FUN_0054bde0 -- StarSysLoadIni's [Dust] section: remember the system dust name (pointer copy
+// into DAT_00679794) and reset the zone-dust bookkeeping. No effect is created here; the first
+// SpaceDustUpdate does that.
 void SpaceDustSetSystemDust(CacheString const* Dust);
 
-// FUN_0054be20 -- StarSysLeave (00554c0b): release all three effects, clear both names.
+// FUN_0054be20 -- StarSysLeave: release all three effects, clear both names.
 void SpaceDustShutdown();
 
-// FUN_0054beb0 (cdecl) -- StarSysUpdate (00554ecb) with DAT_00679954 and the active camera.
+// FUN_0054beb0 -- StarSysUpdate with DAT_00679954 and the active camera.
 void SpaceDustUpdate(Universe::ISystem const* System, void* Camera);

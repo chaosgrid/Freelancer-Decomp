@@ -8,8 +8,7 @@
 
 // LightsCamera particle holder (E:\FL\Scratch\Source\Client\supt\LightsCamera.cpp) -- the two
 // words an Alchemy particle effect is kept in by its owners: Thorn_Psys (+0x6c, ScriptPsys.cpp)
-// and the Gf ObjectShip's engine effects (callers 0x00446c83 / 0x00446ca5 / 0x00446e9d /
-// 0x00447609). The three functions below are its whole interface.
+// and the Gf ObjectShip's engine effects. The three functions below are its whole interface.
 
 struct FVisEffectArch;
 struct ICamera;

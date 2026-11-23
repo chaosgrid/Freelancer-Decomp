@@ -8,11 +8,8 @@
 
 #include "common_exports.h"
 
-// Common.dll PhySys — full PHYS batch port (Wave 2).
-// Listing RVAs from the Common.dll export table; RE from EXE/Disasm/Common.dll.c.
-// Retail physics is IVP (Innovative Physics); we port observable Common-layer behavior.
-// Deep IVP calls (ivp_* internals) are stubbed with FULLPORT-DEFERRED[IVP].
-// See docs/re/common_physys.md.
+// Common.dll PhySys. Listing RVAs from the Common.dll export table.
+// Retail physics is IVP (Innovative Physics). See docs/re/common_physys.md.
 
 #include "common_ini.h"
 #include "common_csys.h"
@@ -83,7 +80,7 @@ class FLControllerGolem;
 
 // IVP_Controller -- PhySys::Controller's base (retail CHD: PhySys::Controller,
 // IVP_Controller_Dependent, IVP_Controller) -- and the IVP_CONTROLLER_PRIORITY enum its
-// slot 5 returns (moved there 2026-09-25; the value 0x5dc is still retail's, 06285c80).
+// slot 5 returns (0x5dc, 06285c80).
 #include "common_ivp_controller.h"
 // IVP_Listener_Phantom -- PhyCollisionStateManager's base (RTTI COL 063a6948:
 // PhyCollisionStateManager, IVP_Listener_Phantom at 0).
@@ -136,7 +133,7 @@ namespace PhySys
     COMMON_API extern FCollisionFilter m_pCollisionFilter;
 
     // ---- CreateParms ----
-    // CShip::init_physics stack -> BuildIVP_Real. 13 dwords (Common.dll.c copy loop @ 0x28970).
+    // CShip::init_physics stack -> BuildIVP_Real. 13 dwords (copy loop at 0x06288970).
     struct CreateParms
     {
         float Mass;                  // +0x00  arch Root+0x20
@@ -169,8 +166,7 @@ namespace PhySys
 
     // ---- DetachParms ----
     // Detach (.text:06284910) passes Parms through unchanged to FUN_062847e0 (0x0628496b).
-    // CORRECTED 2026-09-25 (exe-w3a): the block is 0x2c bytes, not an empty placeholder. Both
-    // retail builders fill the same fields:
+    // 0x2c bytes. Both retail builders fill the same fields:
     //   Common FUN_06284690 (.text:06284732..06284784, the per-child default parms) and
     //   freelancer.exe FUN_00536c20 (.text:00536d93..00536dfd, the explosion's piece detach):
     //   +0x00 DEFAULT_LINEAR_DAMPING; +0x04 DEFAULT_ANGULAR_DAMPING; +0x10 byte 0; +0x18 1.0f
@@ -224,10 +220,8 @@ namespace PhySys
 
     // ---- PhantomParms ----
     // CreatePhantom @ 0x2aac0 / 0x2b0a0 / 0x2b200 all take PhantomParms const&.
-    // Fields extracted from ctor stores in Common.dll.c.
     //
-    // CORRECTED 2026-09-24 (w5-C, Server.dll MedMine): the block is 0x44 bytes, not 0x28, and
-    // +0x04 is two bytes, not a dword. Both stack builders fill every field:
+    // 0x44 bytes; +0x04 is two bytes. Both stack builders fill every field:
     //   Server FUN_06d04d60 (.text:06d04d6a .. 06d04de9) and Common FUN_0629cb70
     //   (.text:0629cbb3 .. 0629cc5f): +0x00 system id; +0x04/+0x05 bytes; +0x06 a
     //   NUL-terminated name (Common strcpy's PhySys::GetCollisionGroup into it at
@@ -292,10 +286,9 @@ namespace PhySys
         unsigned PartIdB;          // +0x0c
         Vector Point;              // +0x10
         // +0x1c: the IVP collision situation's surf_normal (GenerateCollisions) or the beam
-        // contact's world normal (0628c410) (formerly Field_0x1c).
+        // contact's world normal (0628c410).
         Vector SurfaceNormal;      // +0x1c
-        // +0x28: the situation's relative speed, or beam velocity minus surface speed
-        // (formerly Field_0x28).
+        // +0x28: the situation's relative speed, or beam velocity minus surface speed.
         Vector RelativeVelocity;   // +0x28
     };
 
@@ -325,14 +318,8 @@ namespace PhySys
     // overrides it (CShip, CEEngine, CEThruster, CSteering, CNudgeEngine, CStrafeEngine,
     // JumpInAction, LaunchAction, LaneAction).
     //
-    // DERIVES FROM IVP_Controller since 2026-09-25 (claude-code:g-vt1). Until then this struct
-    // declared its own virtuals -- destructor, core_is_going_to_be_deleted_event,
-    // do_simulation_controller, get_controller_priority, get_associated_controlled_cores --
-    // i.e. FIVE slots with the destructor first, against retail's seven in IVP order. Every
-    // controller subclass therefore had its overrides in the wrong slots (Server.dll's Mine /
-    // Guided tables .rdata:06d6622c / 06d66700 put do_simulation_controller at +0x10 and the
-    // deleting destructor at +0x18, exactly as .rdata:0639b60c here). The slot order now
-    // comes from IVP_Controller (common_ivp_controller.h):
+    // Slot order comes from IVP_Controller (common_ivp_controller.h); Server.dll's Mine /
+    // Guided tables (.rdata:06d6622c / 06d66700) match .rdata:0639b60c:
     //   +0x00 core_is_going_to_be_deleted_event  this class (06285c30)
     //   +0x04 get_minimum_simulation_frequency    IVP_Controller's default (0627cd20, 1.0f)
     //   +0x08 get_associated_controlled_cores     this class (0632e7a0 / ICF)
@@ -340,12 +327,9 @@ namespace PhySys
     //   +0x10 do_simulation_controller            pure (_purecall)
     //   +0x14 get_controller_priority             this class (06285c80)
     //   +0x18 destructor                          this class (0627cd50)
-    // DIRECT BASE IS IVP_Controller_Dependent since 2026-09-25 (claude-code:h-ivp), as retail's
-    // CHD 063a681c lists it (Controller, IVP_Controller_Dependent, IVP_Controller -- the same
-    // three BCDs sit inside Server.dll's Mine BCA 06d6c6b8 and Guided BCA 06d6c808). That class
-    // adds no slot and no field (ivp_controller.h has the destructor-chain proof), so the
-    // seven slots above and the +0x04 field offset are unchanged; what changes is the RTTI
-    // chain every Controller-derived class emits.
+    // Direct base IVP_Controller_Dependent, as retail's CHD 063a681c lists it (Controller,
+    // IVP_Controller_Dependent, IVP_Controller; the same three BCDs are in Server.dll's Mine
+    // BCA 06d6c6b8 and Guided BCA 06d6c808). It adds no slot and no field.
     // C4275: IVP_Controller_Dependent is not exported; retail Common.dll exports no IVP_*
     // symbol either, only PhySys::Controller's own members.
 #pragma warning(push)
@@ -381,8 +365,8 @@ namespace PhySys
         // IVP_Controller slot 4 (.rdata:0639b61c): _purecall in this class's own table, so
         // PhySys::Controller is abstract in retail and exports no body for it. Every
         // concrete controller overrides it (the six exported overrides are protected, CShip's
-        // private). Nothing in the port dispatches this slot yet -- retail's dispatcher is
-        // the per-PSI loop FUN_063496a0 (.text:063498fa-0634990d), not ported.
+        // private). Retail's dispatcher is the per-PSI loop FUN_063496a0
+        // (.text:063498fa-0634990d, ivp_simulation_unit.cpp).
         void do_simulation_controller(IVP_Event_Sim* EventSim,
                                       IVP_U_Vector<IVP_Core>* CoreList) override = 0;  // +0x10
         IVP_CONTROLLER_PRIORITY get_controller_priority() override;                    // +0x14
@@ -462,9 +446,7 @@ namespace PhySys
     // Retail class name is RTTI-confirmed, not a guess: the leaf vftable installed at
     // .text:06288fae is .rdata:0639c1c8, its Complete Object Locator sits at [0639c1c8-4] =
     // 0639c1c4 -> 063a70e0, whose +0xC type-descriptor pointer (.rdata:063a70ec) is
-    // .data:063eb0f8 = ".?AVFLControllerGolem@@". Earlier tracker notes on items 2729-2743
-    // called this cluster "PhySys::Golem" -- that name was invented before anyone read the
-    // COL, and is wrong.
+    // .data:063eb0f8 = ".?AVFLControllerGolem@@".
     //
     // The class is a genuine IVP_Controller: its constructor registers itself into the body's
     // core via IVP_Core::register_controller (FUN_06349020 -> FUN_06349180) and its destructor
@@ -494,8 +476,7 @@ namespace PhySys
                                                     float const* TargetRotQuatOrNull,
                                                     float DeltaTime);
 
-    // FUN_06343cc0 (.text:06343cc0-06343f63, __cdecl, 191 insns / 676 bytes; decomp-tracker
-    // Common.dll item 2746). "Beam this body onto an absolute world pose by re-seating its
+    // FUN_06343cc0 (.text:06343cc0-06343f63, __cdecl, 191 instructions). "Beam this body onto an absolute world pose by re-seating its
     // fixed offset inside its own IVP_Core" -- see the definition in common_controllergolem.cpp for the
     // full instruction-level derivation.
     //

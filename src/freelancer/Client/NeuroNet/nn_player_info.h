@@ -14,15 +14,12 @@
 // main button (panel 0x65, nn_main_button.cpp) through the "NN_PlayerInfo" factory.
 //
 // RTTI .?AVNN_PlayerInfo@@ : WinControl. operator_new(0x428) in the factory's Create
-// FUN_004a9100, which inlines the ctor: WinControl's FUN_0059f860, the payload's low byte at
-// +0x40c, the empty faction vector, vftable 0x005d4794, the IDataViewOwner face +0x7c its own
-// copy (0x005d4788) of WinControl's two slots, FirstRow = 0, the visit flags 0x41 of the
-// "li_p_grp" reputation group (FUN_004c4e00, told to the server) and DAT_006721bc = this.
+// FUN_004a9100, which inlines the ctor. IDataViewOwner face +0x7c: its own copy (0x005d4788) of
+// WinControl's two slots.
 // WINFACTORY<NN_PlayerInfo> DAT_00672180 "NN_PlayerInfo": static init LAB_004a7820 (ctor
-// FUN_004a9090 -- the WinFactory head, FUN_0059dab0, vftable 0x005d49dc -- then atexit
-// LAB_004a7840 -> FUN_00579380).
+// FUN_004a9090, vftable 0x005d49dc; atexit LAB_004a7840 -> FUN_00579380).
 //
-// vftable 0x005d4794 -- WinControl's (0x005e5e44) with these overrides (raw dword diff):
+// vftable 0x005d4794 -- WinControl's (0x005e5e44) with these overrides:
 //   0 FUN_004a7850 scalar deleting dtor (dtor FUN_004a7870), 9 FUN_004a78c0 Create,
 //   13 LAB_004a8200 Draw, 23 LAB_00475430 ProcessMessage (the body NN_Help's slot 23 shares by ICF),
 //   42 LAB_004a80e0 SetProperty.
@@ -43,9 +40,9 @@ class UiScroll;
 struct FNnPlayerStatsBlock
 {
     int TotalMissions;          // +0x00 -- ids 0x64b "Total Missions:"
-    int Field_0x04;             // +0x04 TODO: not read by NN_PlayerInfo or NN_Dealer
-    int Field_0x08;             // +0x08 TODO: not read by NN_PlayerInfo or NN_Dealer
-    int Field_0x0c;             // +0x0c TODO: not read by NN_PlayerInfo or NN_Dealer
+    int Field_0x04;             // +0x04 not read by NN_PlayerInfo or NN_Dealer
+    int Field_0x08;             // +0x08 not read by NN_PlayerInfo or NN_Dealer
+    int Field_0x0c;             // +0x0c not read by NN_PlayerInfo or NN_Dealer
     float TotalTimeSeconds;     // +0x10 -- ids 0x646 "Total Time:"
     int SystemsVisited;         // +0x14 -- ids 0x647
     int BasesVisited;           // +0x18 -- ids 0x648
@@ -78,18 +75,15 @@ struct FNnPlayerInfoFaction
 class NnPlayerInfo : public WinControl
 {
 public:
-    // The ctor FUN_004a9100 inlines (0x004a9143..0x004a91d6); PayloadByte is the factory
-    // payload's low byte.
+    // The ctor FUN_004a9100 inlines (0x004a9143): also the visit flags 0x41 of the "li_p_grp"
+    // group (FUN_004c4e00, told to the server) and DAT_006721bc = this. PayloadByte is the
+    // factory payload's low byte.
     explicit NnPlayerInfo(unsigned char PayloadByte);
-    // FUN_004a7870 -- DAT_006721bc = 0 (no test that it is this one), the vector freed, then
-    // WinControl's dtor FUN_0059fa50.
+    // FUN_004a7870 -- DAT_006721bc = 0 (no test that it is this one).
     ~NnPlayerInfo() override;
 
-    // slot 9 FUN_004a78c0 (RET 8) -- the mesh, the close button, the titles, the infocard (hidden)
-    // and its close button / text (hidden), six faction rows (frame, name, two bars), the scroll
-    // and the thirteen heading / value pairs; Worth and the next-level line hidden outside
-    // single player. Then Count = 0, SetOffset(0, 0, 0), SetPosition(Position), the stats timer
-    // 1.0 and Win3D's Create.
+    // slot 9 FUN_004a78c0 (RET 8) -- the controls (the infocard and its close pair hidden; Worth
+    // and the next-level line hidden outside single player), then Win3D's Create.
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 13 LAB_004a8200 -- with the HUD option on: fill the six rows from FirstRow, join the
     // frame column, WinControl's Draw, a darkening quad over each visible row's reputation bar,
@@ -128,7 +122,7 @@ public:
     RichTextWin* FactionInfoCard;            // +0x400 "FactionInfoCard"
     WinControl* CloseInfocardButton;         // +0x404 "NavMapCloseInfocardButton"
     WinControl* CloseInfocardText;           // +0x408 "NavMapCloseInfocardText"
-    unsigned char Field_0x40c;               // +0x40c TODO: the factory payload's low byte;
+    unsigned char Field_0x40c;               // +0x40c the factory payload's low byte;
                                              //        nothing in the PE reads a byte here
     std::vector<FNnPlayerInfoFaction> Factions; // +0x410 (retail begin / end / capacity)
     int FactionCount;                        // +0x41c -- kept next to the vector, as retail does
@@ -165,8 +159,7 @@ public:
     {
     }
 
-    // FUN_004a9100 (RET 8): operator_new(0x428), the ctor, +0x10 = the factory's name (+0xc),
-    // slot 9; on failure the scalar deleting dtor with 1 and null.
+    // FUN_004a9100 (RET 8).
     Win3D* Create(Win3D* Parent, void* Payload) override;
 };
 

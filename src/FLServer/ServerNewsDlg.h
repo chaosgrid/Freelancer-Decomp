@@ -26,5 +26,5 @@ protected:
 	DECLARE_MESSAGE_MAP()
 };
 
-// .text:00413780 — pushes GMotd into Players under the server lock (called by the app, 0040cc53).
+// Pushes GMotd into Players under the server lock (called by the server thread at start).
 void ApplyServerNews();

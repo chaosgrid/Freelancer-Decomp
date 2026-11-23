@@ -12,11 +12,11 @@
 
 #include <cstdio>   // std::sprintf -- the dead diagnostics retail formats into stack buffers
 
-// FleeBehavior -- see common_fleebehavior.h. Ported from EXE/Disasm/Common.dll.txt.
+// FleeBehavior; see common_fleebehavior.h.
 
-// FUN_062ecaf0 (item 1869) is FGunConvergenceStateBlock::GetCurrentLeader: the follow /
-// formation leader watched at SystemManager+0x1364 (an IObjRW*, already "-8"ed), or 0.
-// CopyGotoOp (item 2001, common_gotobehavior.cpp): GotoBehavior's own DirectiveGotoOp copy-out.
+// FUN_062ecaf0 is FGunConvergenceStateBlock::GetCurrentLeader: the follow / formation leader
+// watched at SystemManager+0x1364, or 0.
+// CopyGotoOp (common_gotobehavior.cpp): GotoBehavior's own DirectiveGotoOp copy-out.
 extern "C" bool __fastcall CopyGotoOp(unsigned char* This, void* OutBuffer);
 
 namespace
@@ -32,10 +32,9 @@ char const* const GPerformUninitialized =
 char const* const GDeactivateUninitialized =
     "FleeBehavior::deactivate() running uninitialized flee_type. Quitting behavior. Ship id: %d (decimal)";
 
-// OnEvaluateReadiness's hostile-power-ratio thresholds, indexed by JobParams.FleeSceneThreatStyle (0..4), default
-// 0.5f: DAT_0639e0e0 0.15f, DAT_0639e0dc 0.35f, DAT_0639e0d8 0.65f, DAT_0639e0d4 0.85f,
-// DAT_0639a1d0 1.0f, DAT_0639c13c 0.5f (raw .rdata bytes 9a99193e / 3333b33e / 6666263f /
-// 9a99593f / 0000803f / 0000003f).
+// OnEvaluateReadiness's hostile-power-ratio thresholds, indexed by
+// JobParams.FleeSceneThreatStyle (0..4), default 0.5f: DAT_0639e0e0, DAT_0639e0dc,
+// DAT_0639e0d8, DAT_0639e0d4, DAT_0639a1d0, DAT_0639c13c.
 float FleeHostileRatioThreshold(int Level)
 {
     switch (Level)
@@ -50,10 +49,9 @@ float FleeHostileRatioThreshold(int Level)
 }
 }
 
-// FUN_062c7020 (Common.dll.txt 193301-193339), all 31 instructions: FUN_062d2020(TypeId),
-// DirectiveGotoOp ctor on +0x4c, DirectiveDockOp ctor on +0xbc, byte +0x2c = 0, byte +0x38 = 0,
-// +0x34 = 0, vptr, +0x30 = 4. Retail leaves +0x3c..+0x48 unwritten (OnEngage/4/5/22 write the
-// three delegate pointers before anything reads them); the port zeroes them.
+// FUN_062c7020: FUN_062d2020(TypeId), DirectiveGotoOp ctor on +0x4c, DirectiveDockOp ctor on
+// +0xbc, +0x2c/+0x38/+0x34 = 0, +0x30 = 4. Retail leaves +0x3c..+0x48 unwritten (slots
+// 3/4/5/22 write the delegate pointers before anything reads them); the port zeroes them.
 FleeBehavior::FleeBehavior(int InTypeId)
     : Behavior()
     , TypeId(InTypeId)
@@ -82,24 +80,21 @@ FleeBehavior::FleeBehavior(int InTypeId)
     , GotoOp()
     , DockOp()
 {
-    ConstructBase(InTypeId);   // FUN_062d2020 -- Behavior's own field initialisation
+    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
-// Slot 0 is FUN_062c7090, the scalar-deleting dtor ICF-shared by seven behavior vtables:
-// thunk_FUN_062d2080 (~Behavior) plus the conditional free. Nothing FleeBehavior-specific.
+// Slot 0 is FUN_062c7090, the scalar-deleting dtor ICF-shared by seven behavior vtables.
 FleeBehavior::~FleeBehavior()
 {
 }
 
-// Slot 1, LAB_062cf3e0 (Common.dll.txt 205851-205852): `JMP FUN_062d2090`.
+// Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
 bool FleeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 {
     return BindContext(Owner, Manager, Sys);
 }
 
-// The three loads every one of slots 3/4/5/22 opens with, e.g. .text:062c7572-062c7598:
-// `MOV ECX,[EAX+0x20]; MOV EDX,[ECX+0x17c]; MOV [EAX+0x3c],EDX; MOV EDX,[ECX+0x190];
-// MOV [EAX+0x40],EDX; ... MOV ECX,[ECX+0x19c]; MOV [EAX+0x44],ECX`.
+// The three loads slots 3/4/5/22 each open with (inlined in retail).
 void FleeBehavior::RefreshDelegates()
 {
     GotoDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[2];    // +0x17c
@@ -108,7 +103,7 @@ void FleeBehavior::RefreshDelegates()
 }
 
 // ============================================================================
-// Slot 5 -- LAB_062c70b0 (Common.dll.txt 193365-193551), 161 instructions, `RET 4`.
+// Slot 5, LAB_062c70b0.
 // ============================================================================
 int FleeBehavior::OnEvaluateReadiness(float Unused)
 {
@@ -116,7 +111,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     SystemManager* const Sys = NavHelperPtr24;
     pub::AI::Personality::JobStruct const& Job = Sys->PersonalityData.JobParams;
 
-    // 062c70ba-062c70fc. EBP = 2 is the "do not flee" answer, also parked at [ESP+0x1c].
+    // 2 is the "do not flee" answer.
     bFollowFleeingTarget = 0;
     int Result = 2;
     if (Job.bFleeWhenLeaderFleesStyle != 0)                                  // Sys+0x1950
@@ -135,7 +130,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         }
     }
 
-    // 062c7103-062c712f: a flee already running answers 3 (with +0x29) or 0.
+    // A flee already running answers 3 (with +0x29) or 0.
     if (bFleeActive != 0)
     {
         if (Flag29 != 0)
@@ -147,12 +142,10 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         return 0;
     }
 
-    RefreshDelegates();                                                      // 062c7132-062c714d
+    RefreshDelegates();
 
-    // 062c7150-062c718a: the watched object's shield, IObjInspect slot 17
-    // get_shield_status(Cur, Max, bActive) into three zeroed locals. Sys+0x08 is the
-    // SystemManager's own watcher; the object is its Watchable minus 8, or a null receiver
-    // (retail calls through it either way).
+    // The own ship's shield (SystemManager's watcher at +0x08); retail calls through the
+    // receiver even when it is null.
     float ShieldCur = 0.0f;
     float ShieldMax = 0.0f;
     bool bShieldActive = false;
@@ -161,9 +154,8 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         (void)ObjInspectOf(Object)->get_shield_status(ShieldCur, ShieldMax, bShieldActive);
     }
 
-    // 062c718d-062c71c8: two get_status(HitPts, MaxHitPts) calls (slot 15) on
-    // Sys->ExternalIface. The ratio below reads HitPts from the first and MaxHitPts from the
-    // second ([ESP+0x18]/[ESP+0x1c] at the FLDs).
+    // Retail calls get_status twice; the ratio reads HitPts from the first call and MaxHitPts
+    // from the second.
     float HitPtsA = 0.0f;
     float MaxHitPtsA = 0.0f;
     float HitPtsB = 0.0f;
@@ -172,10 +164,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     (void)External->get_status(HitPtsA, MaxHitPtsA);
     (void)External->get_status(HitPtsB, MaxHitPtsB);
 
-    // 062c71cb-062c71ef: (HitPtsA + ShieldCur) / (MaxHitPtsB + ShieldMax) FCOMP
-    // Sys+0x194c (JobParams.FleeWhenHullDamagedPercent); `TEST AH,0x5; JP`
-    // jumps (bFlee = 0) when C0 and C2 are both clear, i.e. ratio >= threshold or unordered
-    // with C0==C2==1; fall-through (C0 alone, ratio < threshold) sets bFlee and FleeReason = 2.
+    // Strictly below FleeWhenHullDamagedPercent (Sys+0x194c); unordered does not flee.
     bool bFlee = false;
     {
         double const Ratio = (static_cast<double>(HitPtsA) + static_cast<double>(ShieldCur)) /
@@ -187,9 +176,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         }
     }
 
-    // 062c71f2-062c724b: Targeting.AggressionRatio (Sys+0x1438) FCOMP the per-level constant
-    // after FXCH, so ST0 is the ratio; `TEST AH,0x41; JNZ` skips when ratio < or ==
-    // constant; fall-through (ratio > constant) sets bFlee and FleeReason = 0.
+    // Targeting.AggressionRatio (Sys+0x1438) strictly above the per-level threshold.
     if (static_cast<double>(Sys->Targeting.AggressionRatio) >
         static_cast<double>(FleeHostileRatioThreshold(Job.FleeSceneThreatStyle)))   // Sys+0x1948
     {
@@ -197,9 +184,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
         FleeReason = 0;
     }
 
-    // 062c7252-062c727c: with JobParams.bFleeNoWeaponsStyle (Sys+0x1951), no ready weapon in
-    // GunGroups (Sys+0x12c) forces the flee with FleeReason = 3 (EBP = 0 directly); a ready
-    // weapon reloads EBP from [ESP+0x20] (the 2 parked above) and falls to the bFlee test.
+    // With bFleeNoWeaponsStyle (Sys+0x1951), no ready weapon (FUN_062eb910) forces the flee.
     if (Job.bFleeNoWeaponsStyle != 0 && !Sys->GunGroups.HasReadyWeaponSlot())
     {
         FleeReason = 3;
@@ -207,10 +192,9 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     }
     else if (bFlee)
     {
-        Result = 0;                                                          // 062c727c
+        Result = 0;
     }
 
-    // 062c727e-062c72a4.
     if (Flag29 != 0)
     {
         ModeSelector0xc = 3;
@@ -221,38 +205,35 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
 }
 
 // ============================================================================
-// Slot 7 -- FleeBehavior::Perform, LAB_062c72c0 (Common.dll.txt 193556-193784), 212
-// instructions. Re-traced 2026-10-08: the port's former null tests on NavHelper,
-// ExternalIface, its +0x84 sub-object and the three delegates were not retail's and are gone.
+// Slot 7, FleeBehavior::Perform, LAB_062c72c0. NavHelper, ExternalIface and the delegates are
+// not null-tested.
 // ============================================================================
 int FleeBehavior::Perform()
 {
     SystemManager* const Sys = NavHelperPtr24;
 
-    if (bFleeActive == 0)                                                        // 062c72ca
+    if (bFleeActive == 0)
     {
-        bFleeActive = 1;                                                         // 062c72dd
+        bFleeActive = 1;
 
-        // 062c72e0-062c7316. Radius [ESP+8] is seeded with 500.0f (0x43fa0000); the type,
-        // position and target-id out-params are uninitialised stack in retail.
+        // Retail seeds only Radius (500.0f); the other out-params are uninitialised stack.
         pub::AI::ContentCallback::FleeDestinationType Type =
             static_cast<pub::AI::ContentCallback::FleeDestinationType>(0);
         Vector Destination = { 0.0f, 0.0f, 0.0f };
         uint DestinationId = 0;
         float Radius = 500.0f;
-        uint const OwnerId = Sys->SelfTarget.Iface->get_id();    // 062c72f7
+        uint const OwnerId = Sys->SelfTarget.Iface->get_id();
         if (!BehaviorMgrPtr20->RequestFleeDestination(
                 OwnerId, static_cast<pub::AI::ContentCallback::FleeReason>(FleeReason),
                 Type, Destination, DestinationId, Radius))
         {
-            // 062c731f-062c7389: type 3, destination = the cached physical centre pushed
-            // 10000 along X only (one FADD at 062c7351), radius 500.
+            // Fallback: type 3, the cached physical centre pushed 10000 along X only.
             Type = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
-            if (Sys->SelfTarget.bPosValid == 0)                                      // [EDI+0x7e]
+            if (Sys->SelfTarget.bPosValid == 0)
             {
                 Sys->SelfTarget.bPosValid = 1;
                 (void)Sys->SelfTarget.Iface->get_physical_radius(
-                    Sys->SelfTarget.CachedRadius, Sys->SelfTarget.CachedPos);  // slot 11 (+0x2c)
+                    Sys->SelfTarget.CachedRadius, Sys->SelfTarget.CachedPos);
             }
             Destination.x = Sys->SelfTarget.CachedPos.x + GFleeDestinationOffsetX;
             Destination.y = Sys->SelfTarget.CachedPos.y;
@@ -260,10 +241,10 @@ int FleeBehavior::Perform()
             Radius = 500.0f;
         }
 
-        FleeDestType = static_cast<int>(Type);                                    // 062c738e
+        FleeDestType = static_cast<int>(Type);
         if (FleeDestType == 2)
         {
-            // 062c73cc-062c7427. A fresh DirectiveDockOp with DockObjectId = target id.
+            // Save the dock delegate's current op when it is the active directive (type 7).
             pub::AI::DirectiveDockOp Op;
             Op.DockObjectId = DestinationId;
             bHasSavedDirective = 0;
@@ -279,7 +260,6 @@ int FleeBehavior::Perform()
         }
         else if (FleeDestType == 1 || FleeDestType == 3)
         {
-            // 062c742c-062c74ad.
             pub::AI::DirectiveGotoOp Op;
             if (FleeDestType == 3)
             {
@@ -305,14 +285,11 @@ int FleeBehavior::Perform()
         }
         else
         {
-            // 062c73a2-062c73c7: FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
-            // "E:\FL\Scratch\Source\Common\Ai\BehaviorClasses.cpp", 0x453, ...).
             FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Common\\Ai\\BehaviorClasses.cpp", 0x453,
                   "FleeBehavior::perform() has uninitialized flee type from callback. Come get Joel W");
         }
 
-        // LAB_062c74b0.
         if (bFleeActive == 0)
         {
             UpdateResult10 = 1;
@@ -320,38 +297,34 @@ int FleeBehavior::Perform()
         }
     }
 
-    // LAB_062c74b7.
     if (bFollowFleeingTarget != 0)
     {
         FormationDelegate->OnEngage();
         FormationDelegate->SetTickDelta(GetTickDelta());
         (void)FormationDelegate->OnUpdate();
-        UpdateResult10 = 1;                                                  // LAB_062c74d7
+        UpdateResult10 = 1;
         return 1;
     }
 
-    // LAB_062c74e5: switch on +0x34 (DEC/JZ chain); types 1/3 drive GotoDelegate (062c752d),
-    // type 2 DockDelegate (062c751f), both called unguarded.
+    // Types 1/3 drive GotoDelegate, type 2 DockDelegate, unguarded.
     if (FleeDestType == 1 || FleeDestType == 2 || FleeDestType == 3)
     {
         Behavior* const Delegate = (FleeDestType == 2) ? DockDelegate : GotoDelegate;
         Delegate->SetTickDelta(GetTickDelta());
-        int const ChildResult = Delegate->OnUpdate();                           // 062c753b
+        int const ChildResult = Delegate->OnUpdate();
         if (ChildResult != 2 && ChildResult != 3)
         {
-            UpdateResult10 = 1;                                              // LAB_062c74d7
+            UpdateResult10 = 1;
             return 1;
         }
     }
     else
     {
-        // 062c74f1-062c751d: sprintf into a stack buffer that is never read, then the
-        // finish path.
+        // Retail formats into a stack buffer that is never read, then finishes.
         char Buffer[0xf4];
         std::sprintf(Buffer, GPerformUninitialized, Sys->SelfTarget.Iface->get_id());
     }
 
-    // LAB_062c7548.
     bFleeActive = 0;
     BehaviorMgrPtr20->SetDirectiveResult(4, 0);                              // FUN_062d29a0
     UpdateResult10 = 2;
@@ -359,49 +332,47 @@ int FleeBehavior::Perform()
 }
 
 // ============================================================================
-// Slot 3 -- LAB_062c7570 (Common.dll.txt 193788-193844), 52 instructions.
+// Slot 3, LAB_062c7570.
 // ============================================================================
 void FleeBehavior::OnEngage()
 {
     RefreshDelegates();
-    if (bFleeActive == 0)                                                        // 062c759b
+    if (bFleeActive == 0)
         return;
     if (bFollowFleeingTarget != 0)
     {
-        FormationDelegate->OnEngage();                                                    // 062c75a6
+        FormationDelegate->OnEngage();
         return;
     }
     if (FleeDestType == 1 || FleeDestType == 3)
     {
-        GotoDelegate->OnEngage();                                                    // 062c7604
+        GotoDelegate->OnEngage();
         return;
     }
     if (FleeDestType == 2)
     {
-        DockDelegate->OnEngage();                                                    // 062c75f3
+        DockDelegate->OnEngage();
         return;
     }
-    // 062c75bc-062c75e2: NavHelper+0x14fc+0x84 (ExternalIface) get_id, then the
-    // "deactivate() running uninitialized" sprintf into a stack buffer that is never read.
+    // Retail formats the "deactivate()" message into a stack buffer that is never read.
     SystemManager* const Sys = NavHelperPtr24;
     char Buffer[0x100];
     std::sprintf(Buffer, GDeactivateUninitialized, Sys->SelfTarget.Iface->get_id());
 }
 
 // ============================================================================
-// Slot 4 -- LAB_062c7610 (Common.dll.txt 193847-193938), 86 instructions.
+// Slot 4, LAB_062c7610. Restores the delegate's saved op when it is still the active directive.
 // ============================================================================
 void FleeBehavior::OnDisengage()
 {
     RefreshDelegates();
     if (bFollowFleeingTarget != 0)
     {
-        FormationDelegate->OnDisengage();                                                    // 062c7642
+        FormationDelegate->OnDisengage();
         return;
     }
     if (FleeDestType == 1 || FleeDestType == 3)
     {
-        // LAB_062c76cd.
         if (GotoDelegate == nullptr)
             return;
         GotoDelegate->OnDisengage();
@@ -410,34 +381,33 @@ void FleeBehavior::OnDisengage()
             *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 2 &&
             bHasSavedDirective != 0)
         {
-            GotoDelegate->OnApplyDirective(&GotoOp);                                        // 062c76fb
+            GotoDelegate->OnApplyDirective(&GotoOp);
         }
         return;
     }
     if (FleeDestType == 2)
     {
-        // LAB_062c7689.
         if (DockDelegate == nullptr)
             return;
         DockDelegate->OnDisengage();
-        Behavior_ReleaseDirectiveTarget(DockDelegate);                            // 062c7698 FUN_062d21c0
+        Behavior_ReleaseDirectiveTarget(DockDelegate);                            // FUN_062d21c0
         IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
         if (Current != nullptr &&
             *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 7 &&
             bHasSavedDirective != 0)
         {
-            DockDelegate->OnApplyDirective(&DockOp);                                        // 062c76c2
+            DockDelegate->OnApplyDirective(&DockOp);
         }
         return;
     }
-    // 062c7659-062c767e: ExternalIface (Sys+0x1580) get_id, sprintf into a never-read buffer.
+    // Formatted into a never-read buffer, as retail.
     SystemManager* const Sys = NavHelperPtr24;
     char Buffer[0x100];
     std::sprintf(Buffer, GDeactivateUninitialized, Sys->SelfTarget.Iface->get_id());
 }
 
 // ============================================================================
-// Slot 22 -- LAB_062c7710 (Common.dll.txt 193949-193997), 44 instructions, `RET 4`.
+// Slot 22, LAB_062c7710.
 // ============================================================================
 void FleeBehavior::OnEvent(void* Event)
 {
@@ -445,22 +415,21 @@ void FleeBehavior::OnEvent(void* Event)
     if (bFollowFleeingTarget != 0)
     {
         if (FormationDelegate != nullptr)
-            FormationDelegate->OnEvent(Event);                                          // 062c773d JMP [EAX+0x58]
+            FormationDelegate->OnEvent(Event);
         return;
     }
     if (FleeDestType == 1 || FleeDestType == 3)
     {
         if (GotoDelegate != nullptr)
-            GotoDelegate->OnEvent(Event);                                          // 062c778c
+            GotoDelegate->OnEvent(Event);
         return;
     }
     if (FleeDestType == 2)
     {
         if (DockDelegate != nullptr)
-            DockDelegate->OnEvent(Event);                                          // 062c777e
+            DockDelegate->OnEvent(Event);
         return;
     }
-    // 062c774c-062c776d.
     FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
           "E:\\FL\\Scratch\\Source\\Common\\Ai\\BehaviorClasses.cpp", 0x504,
           "FleeBehavior::event_handler() has failed because of uninitialized values. Come get Joel W");

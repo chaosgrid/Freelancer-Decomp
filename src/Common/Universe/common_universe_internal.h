@@ -25,9 +25,8 @@ namespace CmnUniverse
     //   +0x4c id  +0x50 nickname  +0x54..+0x60 connection vector  +0x64 visit
     //   +0x68 strid_name  +0x6c ids_info  +0x70 file  +0x74 pos
     //   +0x80 zone list  +0x8c ISpatialPartition* (lazy)  +0x90 NavMapScale  +0x94 [Music] space
-    // Retail builds one on the stack per [System] block of universe.ini (FUN_06337250
-    // .text:06337376-06337441), copies it into the system map (FUN_0633e020/FUN_0633dea0) and
-    // destroys the stack copy (FUN_0633aee0). The port keeps the records by value the same way.
+    // Retail builds one on the stack per [System] block of universe.ini (FUN_06337250) and
+    // copies it into the system map by value (FUN_0633e020 / FUN_0633dea0); so does the port.
     struct SYSTEM : public Universe::ISystem, public CommReferrable
     {
         std::vector<Universe::FSystemConnection> Connections; // +0x54 (begin +0x58)
@@ -62,8 +61,7 @@ namespace CmnUniverse
         unsigned GetSpaceMusic() const override;
 
     private:
-        // The lazy zone-tree build retail inlines at the head of slots 7-12
-        // (.text:0633b036-0633b0b4 in slot 7).
+        // The lazy zone-tree build retail inlines at the head of slots 7-12.
         ISpatialPartition* BuildZoneTree() const;
     };
 

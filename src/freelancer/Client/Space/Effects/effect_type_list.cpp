@@ -52,7 +52,7 @@ namespace
 
 void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node)
 {
-    // FUN_004fc920(this=Bucket, Node): only the node is tested (004fc924).
+    // FUN_004fc920 (on the bucket): only the node is tested.
     if (Node == nullptr)
         return;
 
@@ -72,7 +72,7 @@ void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node)
 
 void EffectTypeListLink(void* Effect)
 {
-    // FUN_004f7af0 (thiscall on the effect; no null test, no range test on the type id).
+    // FUN_004f7af0: no null test, no range test on the type id.
     if (*EffectLinkSelf(Effect) != nullptr)
         return;
     if ((*EffectFlags(Effect) & 2u) != 0)
@@ -88,11 +88,9 @@ void EffectTypeListLink(void* Effect)
 
 void EffectTypeListUnlinkAndRelease(void* Effect)
 {
-    // The sequence retail writes out at 0x004f7910 (bucket walk), 0x004f716a (FUN_004f7140) and
-    // 0x004f73ea (FUN_004f73c0): only a linked effect is touched; +0x68 is cleared FIRST, the
-    // +0x60 node is unlinked from bucket[+0x5c], the bucket count drops, then the reference the
-    // link held is released -- signed DEC, `JG` keeps it, otherwise the object's own slot +0x20
-    // runs with 1 (delete).
+    // Inlined in retail's bucket walk, FUN_004f7140 and FUN_004f73c0: only a linked effect is
+    // touched; +0x68 is cleared FIRST, the +0x60 node is unlinked from bucket[+0x5c], the bucket
+    // count drops, then the link's reference is released (signed; below 1 deletes).
     if (*EffectLinkSelf(Effect) == nullptr)
         return;
 

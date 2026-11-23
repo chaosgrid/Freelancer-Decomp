@@ -6,10 +6,10 @@
 
 #pragma once
 
-// Retail Client\cmn\SwappedMaterial.cpp (freelancer.exe 0x0042cc10..0x0042d612): a material
-// whose "Dt_name" parameter (the diffuse texture name) is swapped for a texture loaded from a
-// UTF file, and put back afterwards. Held by value in NN_MissionVendor (+0x35c, the video
-// window's "MV_vidmaterial") and at 0x004a4031 (+ FUN_004a41ea / 004a579c / 004a57d8).
+// Retail Client\cmn\SwappedMaterial.cpp (FUN_0042cc10..FUN_0042d4f0): a material whose
+// "Dt_name" parameter (the diffuse texture name) is swapped for a texture loaded from a UTF
+// file, and put back afterwards. Held by value in NN_MissionVendor (+0x35c, the video window's
+// "MV_vidmaterial") and used near 0x004a4031.
 //
 // Not polymorphic, 0x14 bytes, no RTTI. The strings are Common's malloc_strcpy copies and are
 // freed with malloc_strfree; the texture records are DALib::TextureLib slot 12 lookups and are
@@ -19,8 +19,8 @@ struct FSwappedMaterial
     // FUN_0042cc10 (thiscall, returns this) -- every field zero.
     FSwappedMaterial();
 
-    // FUN_0042cc50 is also the destructor: NN_MissionVendor's EH state 2 (FUN_0048b510
-    // 0x0048b67b) and its ctor's unwind run it on the member.
+    // FUN_0042cc50 is also the destructor: NN_MissionVendor's EH state 2 (FUN_0048b510) and its
+    // ctor's unwind run it on the member.
     ~FSwappedMaterial() { Release(); }
 
     FSwappedMaterial(FSwappedMaterial const&) = delete;
@@ -40,8 +40,8 @@ struct FSwappedMaterial
 
     // FUN_0042d4f0 (thiscall, RET 8) -- undo an earlier swap, open UtfFile as a "UTF" file
     // system, load TextureName from it and set it as the material's Dt_name. The texture name
-    // is the first argument ([ESP+0x18] at 0x0042d561), the file the second ([ESP+0x1c] at
-    // 0x0042d544): NN_MissionVendor passes (offer icon texture, "...MissionVendor.txm").
+    // is the first argument, the file the second: NN_MissionVendor passes (offer icon texture,
+    // "...MissionVendor.txm").
     void Swap(char const* TextureName, char const* UtfFile);
 
     // FUN_0042cd00 (thiscall) -- find the first material of MaterialLib group 0 whose name

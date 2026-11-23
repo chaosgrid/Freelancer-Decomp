@@ -339,22 +339,10 @@ namespace
         return true;
     }
 
-    // Retail FUN_06f36460 constructs a sentinel-backed ordered tree.  The
-    // parser uses it as an index -> point map; the VC6 node layout is not an
-    // ABI contract, so std::map preserves the observable ordering directly.
-    // FUN_06f34f30 (listing 41198-41287) and FUN_06f35b40 (listing
-    // 42454-42543) are this tree's own manual teardown -- confirmed
-    // byte-for-byte identical in shape (same two-mode "linear sentinel vs.
-    // generic node walk+delete" dispatch), each called from a different
-    // PersistSlot3Load-family cleanup path (FUN_06f34f30 from 06f58a23/
-    // 06f58ac3; FUN_06f35b40 from 06f58acb) with a different per-node
-    // release callback (FUN_06f36420/FUN_06f35cc0 vs FUN_06f36b00/
-    // FUN_06f35d80) -- consistent with one tree holding parsed points and a
-    // second, differently-typed tree holding parsed quaternions during
-    // orientation LoadPersist. This struct's std::map and LoadPersist's
-    // std::vector<FQuat> (below) are both stack-scoped RAII containers, so
-    // neither manual teardown routine has a modern counterpart to port --
-    // the compiler-generated destructor call is unconditional and automatic.
+    // Retail FUN_06f36460 constructs a sentinel-backed ordered tree used as an index -> point
+    // map; the VC6 node layout is not an ABI contract, so std::map preserves the ordering.
+    // FUN_06f34f30 / FUN_06f35b40 are the manual teardowns of the point tree and of the
+    // quaternion tree orientation LoadPersist builds; the port's RAII containers replace them.
     struct FPersistPointTree
     {
         std::map<unsigned int, FVec3> Entries;
@@ -783,7 +771,7 @@ namespace
         bool bFallback = false;
         // The intrinsic candidate spills Z before publishing X/Y: with a
         // denormal Z and unmasked DE, both builds trap before those stores.
-        // 241ce..241f0 publishes X/Y between the Z product and its float store.
+        // Retail publishes X/Y between the Z product and its float store.
         __asm
         {
             fld Angle
@@ -854,16 +842,15 @@ namespace
         QuatLogRetail(Dst, Q, false);
     }
 
-    // The first inline exp21970..219d2 differs from standalone24670:
-    // retain norm for FSIN, but publish a float scale before Scale3D.
+    // The first inline exp (06f21970) differs from standalone FUN_06f24670: it keeps the norm
+    // for FSIN, but publishes a float scale before Scale3D.
     void QuatFirstControlExp(FQuat& Dst, const FQuat& Q)
     {
         const float Epsilon = G_QuatSinEps;
         float Norm;
         float Scale;
         bool bScaleVector = false;
-        // Intrinsic C++ changes FSIN/FCOS results and drops the float scale
-        // boundary in Release; the root PC/RC probe confirms numeric cases.
+        // Intrinsic C++ changes FSIN/FCOS results and drops the float scale boundary in Release.
         __asm
         {
             mov edx, Q
@@ -986,10 +973,8 @@ namespace
         QuatExpRetail(Dst, Q, false);
     }
 
-    // Retail (thorn.dll.txt:10494-10530, FUN_06f249c0, inlined at 0x06f21826/
-    // 0x06f218a4) calls I3DMathEngine vtbl+0x18 and consumes the quaternion
-    // product unconditionally -- it never tests the returned GENRESULT before
-    // taking log() of it.
+    // Retail (FUN_06f249c0, inlined in FUN_06f21770) never tests the MulQuat result before
+    // taking its log.
     void QuatLogDiff(FQuat& Dst, const FQuat& InvCenter, const FQuat& Neighbor, bool bRoundScale)
     {
         FQuat Product;
@@ -1009,11 +994,8 @@ namespace
     }
 #pragma float_control(pop)
 
-    // Inner squad control: q * exp(-1/4 (log(q^{-1} q_prev) + log(q^{-1} q_next)))
-    // Retail never checks any of the three underlying GENRESULTs (see
-    // QuatLogDiff and the final vtbl+0x18 call at thorn.dll.txt:10494-10530,
-    // called from FUN_06f21770 at 0x06f21826/0x06f218a4) -- it always
-    // proceeds to the next step with whatever the math engine wrote.
+    // Inner squad control: q * exp(-1/4 (log(q^{-1} q_prev) + log(q^{-1} q_next))).
+    // Retail never checks any of the three math results.
     void QuatSquadControl(FQuat& Dst, const FQuat& Prev, const FQuat& Center,
                           const FQuat& Next, const FQuat& InvCenter, bool bFirstControl)
     {
@@ -1025,7 +1007,7 @@ namespace
         FQuat Sum;
         if (bFirstControl)
         {
-            // 21914..2194a inlines four rounded sums in Z/Y/X/W order.
+            // Retail inlines four rounded sums in Z/Y/X/W order.
             AddFirstControlComponent(&Sum.Z, &LogPrev.Z, &LogNext.Z);
             AddFirstControlComponent(&Sum.Y, &LogPrev.Y, &LogNext.Y);
             AddFirstControlComponent(&Sum.X, &LogPrev.X, &LogNext.X);
@@ -1045,10 +1027,7 @@ namespace
     }
 
     // FUN_06f248c0: squad(q1,a,b,q2,t) = slerp(slerp(q1,q2,t), slerp(a,b,t), 2t(1-t))
-    // Retail (thorn.dll.txt:10393-10488) calls I3DMathEngine vtbl+0x58 three
-    // times and never tests any of the three GENRESULTs -- the blend and
-    // final slerp always consume whatever the previous call wrote, and the
-    // four output dwords are always stored.
+    // None of the three slerp results is tested; the output is always stored.
     void QuatSquad(FQuat& Dst, const FQuat& Q1, const FQuat& A, const FQuat& B,
                    const FQuat& Q2, const float* T)
     {
@@ -1056,16 +1035,14 @@ namespace
         FQuat SlerpQ;
         CoreQuatSlerp(SlerpAb, A, B, T);
         CoreQuatSlerp(SlerpQ, Q1, Q2, T);
-        // 24952..24969 acquires the third cache BEFORE reading T for Blend.
+        // The math cache is acquired BEFORE T is read for Blend.
         I3DMathEngine* Math = AcquireSplineCoreMathEngine();
         const float Blend = SquadBlendRetail(T);
         CoreQuatSlerpWithMath(Math, Dst, SlerpQ, SlerpAb, &Blend);
     }
 
-    // FUN_06f21770: Catmull-Rom quaternion on Q0..Q3 at U. Retail
-    // (thorn.dll.txt:4396-4754) never tests the GENRESULT of any inner
-    // QuatMul/QuatSlerp vtbl call and unconditionally stores the result;
-    // it always falls through to `XOR EAX,EAX / RET`, i.e. forced success.
+    // FUN_06f21770: Catmull-Rom quaternion on Q0..Q3 at U. No inner math result is tested and
+    // the function always succeeds.
     bool EvalCrOrientation(const FQuat& Q0, const FQuat& Q1, const FQuat& Q2,
                            const FQuat& Q3, float U, FQuat& Out)
     {
@@ -1098,10 +1075,7 @@ namespace
     };
 
     // Three real bases, as retail: +0 ICRSpline, +4 IMotionPath, +8 IPersistString (the
-    // {IID, offset} table .rdata:06f5acd4 answers offsets 0 / 4 / 8). Until 2026-10-16 the
-    // two facets were hand-filled `void*[]` tables with `this - 4` / `this - 8` adjustors, so
-    // callers holding an IMotionPath* / IPersistString* (thorn_iface.h) reached an object
-    // that did not derive from either.
+    // {IID, offset} table .rdata:06f5acd4 answers offsets 0 / 4 / 8).
     class FSplinePath final : public ICRSpline, public IMotionPath, public IPersistString
     {
     public:
@@ -1136,10 +1110,8 @@ namespace
             return &Inner_;
         }
 
-        // FUN_06f378d0 / FUN_06f378e0 / FUN_06f378f0 (PTR_FUN_06f5ab88 slots
-        // 0-2, also reached from the IMotionPath / IPersistString facets via
-        // LAB_06f37a90.. / LAB_06f37ac0.. after the this-adjust): pure
-        // forwards to the controlling unknown at [this+0x70].
+        // FUN_06f378d0 / 8e0 / 8f0 (also reached from the other facets' thunks): forward to
+        // the controlling unknown at +0x70.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             return Outer_->QueryInterface(Iid, Out);
@@ -1149,15 +1121,9 @@ namespace
 
         unsigned long DACOM_API Release() override { return Outer_->Release(); }
 
-        // LAB_06f377c0 (thorn.dll.txt:46136-46227), the embedded inner
-        // unknown's NON-delegating QueryInterface: walks the {IID, facet
-        // offset} table at .rdata:06f5acd4 ({"1.11_ICRSpline",0},
-        // {"1.11_IMotionPath",4}, {"1.11_IPersistString",8}) with a plain
-        // byte-for-byte CMP loop -- no case-folding instruction anywhere in
-        // it, so strcmp, not ThornNameEqual.  On a hit it computes
-        // Owner+offset, calls that facet's OWN vtbl+4 (i.e. the delegating
-        // AddRef above, so an aggregated outer sees the AddRef), stores the
-        // facet and returns 0; otherwise *Out = 0 and -3.
+        // LAB_06f377c0, the inner unknown's NON-delegating QueryInterface over the table at
+        // .rdata:06f5acd4. Case-sensitive (strcmp, not ThornNameEqual). A hit AddRefs through
+        // the facet's own delegating AddRef, so an aggregating outer sees it.
         GENRESULT NonDelegatingQueryInterface(const char* Iid, void** Out)
         {
             void* SelectedInterface;
@@ -1309,33 +1275,11 @@ namespace
                 return static_cast<GENRESULT>(-1);
             return GetOrientationRetail(Index, OutOrientation);
         }
-        // Retail LAB_06f347f0 (the POSITION-ONLY "CV_CRSplinePath" class's
-        // own Slot13, vtable head PTR_LAB_06f5aa78) unconditionally returns
-        // 0xfffffff9 (-7); matched here via the !bOrientation_ branch below.
-        // The ORIENTATION variant ("CV_CROrientationSplinePath", vtable head
-        // PTR_LAB_06f5aaf0) has a COMPLETELY DIFFERENT, real implementation
-        // at LAB_06f35270 (listing 41574-41623, RET 0xc = this + 2 stack
-        // args). FULLY RETRACED 2026-09-10 (this pass, instruction-by-
-        // instruction, resolving the two follow-up indirect calls an
-        // earlier pass left open): signature is (Index, MatrixRecords),
-        // where MatrixRecords points to an array of 0x24-byte (9-float/3x3
-        // rotation matrix) records with that fixed stride. It lazy-inits the
-        // shared I3DMathEngine singleton (DAT_06f61e18, same pattern as
-        // ThornAcquire3DMathEngine) and converts MatrixRecords[0] (the
-        // record AT MatrixRecords, no offset) to a quaternion via the
-        // engine's slot+0x50 (ThornMatrixToQuat). It then steps to
-        // MatrixRecords+0x24 (record index 1, i.e. MatrixRecords+9 floats)
-        // and reads ONLY that record's first 3 floats as a position vector
-        // -- the remaining 6 floats of record 1 are never read. It calls
-        // this object's own vtable+0xc (Slot3, the position setter) with
-        // (Index, &Position); if that fails, retail returns -1.
-        // Only on success does it call this object's own vtable+0x28
-        // (Slot10 -- confirmed above to be the per-index ORIENTATION
-        // setter) with (Index, &Quat) to store the converted quaternion,
-        // and returns Slot10's result unchanged (352d0..352d8).
-        // No loop: one call
-        // processes exactly one Index using exactly 2 consecutive
-        // MatrixRecords entries.
+        // Slot 13. Position-only LAB_06f347f0 (vtable PTR_LAB_06f5aa78) returns -7. The
+        // orientation variant LAB_06f35270 (vtable PTR_LAB_06f5aaf0) converts the 3x3 matrix at
+        // MatrixRecords[0..8] to a quaternion (DAT_06f61e18 math, +0x50), takes the position from
+        // the next three floats, sets the point through vtable+0xc (failure -> -1) and then the
+        // orientation through vtable+0x28, returning that result.
         GENRESULT DACOM_API SetTransform(unsigned int Index, const float* MatrixRecords) override
         {
             if (!bOrientation_)
@@ -1357,10 +1301,8 @@ namespace
 
             return SetOrientation(Index, &Quat.W);
         }
-        // 352f0: raw position snapshot precedes math acquisition; the foreign
-        // converter writes directly into the allocated quaternion buffer.
-        // Dispatch both bulk setters, ignore results, then free in order.
-        // Position-only variant 34800 returns -7 independently.
+        // 06f352f0: the raw position copy precedes math acquisition; both bulk setters' results
+        // are ignored. Position-only 06f34800 returns -7.
         GENRESULT DACOM_API SetTransforms(unsigned int Count, const float* TransformRecords) override
         {
             if (!bOrientation_)
@@ -1390,25 +1332,10 @@ namespace
             delete[] QuatBuffer;
             return GR_OK;
         }
-        // Position-only variant: LAB_06f34820 (.rdata 06f5aab4 / 06f5abc4)
-        // unconditionally returns 0xfffffff9 (-7) -- the !bOrientation_
-        // branch below.
-        // Orientation variant: LAB_06f35410 (listing 41776-41827, .rdata
-        // 06f5ab2c / 06f5acc4 = slot 15 of both orientation ICRSpline
-        // tables; RET 0xc = (this, Index, OutTransform)).  Fully traced
-        // 2026-09-10: missing inner core -> -1; FUN_06f224f0(inner) < Index
-        // (JC, so Index == count is accepted, exactly like Slot12) -> -1;
-        // FUN_06f22b70(inner, Index, quat4) reads Quats_[Index+1]
-        // (16-byte stride, -8 when !orientation, -2 when Index+1 is past
-        // [inner+0x10] = PointCount_) and FUN_06f229b0(inner, Index, vec3)
-        // reads Points_[Index+1] (12-byte stride, same -2 bound) -- both
-        // return values are DISCARDED; the vec3 is stored at OutTransform
-        // +0x24 (floats 9..11), the shared I3DMathEngine (DAT_06f61e18,
-        // lazily created via FUN_06f57de0) converts the quat through
-        // vtbl+0x54 (ThornQuatToMatrix) into a 9-float scratch that is then
-        // REP MOVSD'd into OutTransform[0..8].  The common exit is
-        // `OR EAX,-1`, so the function returns -1 even after writing the
-        // record.  This is the exact inverse of Slot13's input record.
+        // Slot 15. Position-only LAB_06f34820 returns -7. Orientation LAB_06f35410: Index ==
+        // LastLive is accepted (as slot 12); the getter results (FUN_06f22b70 / FUN_06f229b0)
+        // are discarded; position goes to floats 9..11 and the matrix (math +0x54) to 0..8. The
+        // common exit returns -1 even after writing the record.
         GENRESULT DACOM_API GetTransform(unsigned int Index, float* OutTransform) override
         {
             if (!bOrientation_)
@@ -1417,7 +1344,7 @@ namespace
                 return static_cast<GENRESULT>(-1);
             FQuat Quat;
             FVec3 Position;
-            // 35436/35444 discard both getter results and consume their outputs.
+            // Both getter results are discarded and their outputs consumed.
             GetOrientationRetail(Index, &Quat.W);
             GetPointRetail(Index, &Position.X);
             std::memcpy(OutTransform + 9, &Position, sizeof(Position));
@@ -1431,11 +1358,9 @@ namespace
             return static_cast<GENRESULT>(-1);
         }
 
-        // LAB_06f34670 (IMotionPath slot 7) -> FUN_06f224e0: `FLD [inner+4]`.
-        // inner+0x4 is the un-normalised total arc length: FUN_06f22630
-        // zeroes it, accumulates every segment's sampled chord length into
-        // it (`FADD [ESI+4]; FST [ESI+4]`), and FUN_06f22600 then divides
-        // the +0x38 time table by it -- i.e. RebuildSampleTables' `Total`.
+        // LAB_06f34670 (IMotionPath slot 7) -> FUN_06f224e0: inner+0x4, the un-normalised total
+        // arc length that FUN_06f22630 accumulates and FUN_06f22600 divides the time table by
+        // (RebuildSampleTables' Total).
         GENRESULT PathLength(float* OutLength) const
         {
             if (!bInnerAllocated_)
@@ -1458,7 +1383,7 @@ namespace
             if (Index >= static_cast<unsigned int>(PointCount_))
                 return static_cast<GENRESULT>(-2);
             const FVec3& Point = Points_[Index + 1];
-            // 229c3..229d4 copies one DWORD at a time, preserving overlap.
+            // One dword at a time, preserving overlap.
             std::memcpy(Out, &Point.X, sizeof(float));
             std::memcpy(Out + 1, &Point.Y, sizeof(float));
             std::memcpy(Out + 2, &Point.Z, sizeof(float));
@@ -1487,20 +1412,11 @@ namespace
             return GR_OK;
         }
 
-        // Retail has TWO Slot4LoadPoints implementations: the position-only
-        // variant's (not separately addressed here) and the orientation
-        // variant's own FUN_06f350d0 (confirmed via vtable slot-index
-        // arithmetic: XREF .rdata:06f5ab00 == orientation ICRSpline vtable
-        // head 06f5aaf0 + 0x10 == slot 4). FUN_06f350d0's body (listing
-        // 41379-41477) frees the SAME four raw [ptr,end,cap] blocks at
-        // +0x48/+0x38/+0x28/+0x18 as FThornScene's teardown (this class's
-        // own FreePath() equivalent), then operator-news and constructs a
-        // fresh 0x60-byte inner spline-core object from the caller's
-        // (Pts, Count) via FUN_06f22d30, followed by a FUN_06f22ca0
-        // call on it -- matching this method's FreePath() + AllocStorage()
-        // + point copy + ApplyCtorGhosts() + FillIdentityQuats() sequence
-        // for normal nonempty input, with a separately allocated modern core.
-        // Empty/one-point producer paths still differ (tracker 22ec0/233b0).
+        // Slot 4. The orientation variant's FUN_06f350d0 frees the four core blocks
+        // (+0x48/+0x38/+0x28/+0x18), then builds a fresh 0x60-byte core from (Pts, Count)
+        // with FUN_06f22d30 and FUN_06f22ca0 -- this method's sequence for nonempty input.
+        // Empty / one-point producer paths still differ from retail (FUN_06f22ec0 /
+        // FUN_06f233b0).
         GENRESULT LoadPointsInternal(const float* Pts, int Count)
         {
             FreePath();
@@ -1720,9 +1636,8 @@ namespace
                 delete[] Packed;
                 delete[] PackedQuats;
             }
-            // Position34dc5/34e3e allocates/copies private XYZ input. Neither
-            // normal tree frees34eec/34f06 nor tree EH frees that allocation;
-            // its lifetime is retained here, with our modern allocator.
+            // Position variant: retail never frees its packed XYZ copy (06f34dc5), on either
+            // the normal or the EH path; the leak is kept.
             return GR_OK;
         }
 
@@ -1781,9 +1696,8 @@ namespace
             return GR_OK;
         }
 
-        // IMotionPath facet (+4; final table .rdata:06f5ab68 position / 06f5ac68 orientation).
-        // QueryInterface / AddRef / Release are the overrides above (LAB_06f37a90..06f37ab0
-        // and LAB_06f37af0..06f37b10: this -= 4, then the object's own slot). No facet slot
+        // IMotionPath facet (+4; tables .rdata:06f5ab68 position / 06f5ac68 orientation).
+        // QueryInterface / AddRef / Release are the forwarding overrides above. No facet slot
         // tests its `this`; the inner-core tests live in the helpers they call.
         // Slot 3, LAB_06f34180 (position) / LAB_06f354a0 (orientation).
         GENRESULT DACOM_API Slot3Transform(float T, float* OutXform) override
@@ -1791,7 +1705,7 @@ namespace
             return EvaluateTransform(&T, OutXform);
         }
 
-        // Slot 4, LAB_06f343f0: 343f0 checks the inner, not the still-live public facade.
+        // Slot 4, LAB_06f343f0: checks the inner core, not the public facade.
         GENRESULT DACOM_API Slot4Evaluate(float T, float* OutVec3) override
         {
             if (!HasInnerSpline())
@@ -1800,9 +1714,8 @@ namespace
             return GR_OK;
         }
 
-        // Slot 5: LAB_06f34420 (position) / LAB_06f35530 (orientation). 34420 owns the
-        // position-mode return; 35530 forces success only after its inner exists.
-        // EvaluateSlot5 preserves both contracts.
+        // Slot 5: LAB_06f34420 (position) / LAB_06f35530 (orientation, which forces success
+        // once its inner exists). EvaluateOrientation keeps both contracts.
         GENRESULT DACOM_API Slot5Orientation(float T, float* Out) override
         {
             return EvaluateOrientation(&T, Out);
@@ -1814,20 +1727,14 @@ namespace
             return EvaluateLookAt(&T, OutVec3);
         }
 
-        // Slot 7, LAB_06f34670 (retail motion vtable slot 7, .rdata:06f5aa74 / 06f5ab84 /
-        // 06f5ac84, listing 40164-40176; RET 0x8 = MotionThis + float* Out):
-        // `MOV ECX,[MotionThis+8]` is the inner spline core at object+0xc (the motion facet
-        // sits at object+4); when it is NULL -> -1, otherwise FUN_06f224e0
-        // (`FLD [inner+4]; RET`) is FSTP'd to *Out and 0 is returned. inner+0x4 is the
-        // total un-normalised arc length that FUN_06f22630 accumulates -- see PathLength.
+        // Slot 7, LAB_06f34670: the inner core at object+0xc, null -> -1; see PathLength.
         GENRESULT DACOM_API Slot7Length(float* OutLength) override
         {
             return PathLength(OutLength);
         }
 
-        // IPersistString facet (+8; final tables .rdata:06f5ab50 position / 06f5ac50
-        // orientation). QI / AddRef / Release: LAB_06f37ac0..06f37ae0 (this -= 8, then the
-        // object's own slot).
+        // IPersistString facet (+8; tables .rdata:06f5ab50 position / 06f5ac50 orientation).
+        // QI / AddRef / Release thunk to the object's own slots (LAB_06f37ac0..06f37ae0).
         // Slot 3, FUN_06f34cc0 (position).
         GENRESULT DACOM_API Slot3Load(const char* Text) override { return LoadPersist(Text); }
         // Slot 4, FUN_06f34bc0 (position) / FUN_06f35580 (orientation).
@@ -1835,8 +1742,7 @@ namespace
         {
             return SavePersist(Buffer, Size);
         }
-        // Slot 5, LAB_06f34ca0 (position: this -= 8, ICRSpline slot 5 count * 0x24 + 10,
-        // RET 4, no test) / LAB_06f356c0 (orientation).
+        // Slot 5, LAB_06f34ca0 (position, no test) / LAB_06f356c0 (orientation).
         unsigned long DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
 
     private:
@@ -1978,9 +1884,8 @@ namespace
             float X;
             float Y;
             float Z;
-            // Release reassociates the ordinary C++ additions and selects
-            // different NaN payloads (58 concrete probe mismatches).
-            // Keep only this arithmetic/publication sequence bounded here.
+            // Release reassociates the plain C++ additions and selects different NaN payloads,
+            // so this arithmetic/publication sequence stays in asm.
             __asm
             {
                 mov ecx, LastPoint
@@ -2235,10 +2140,7 @@ namespace
             const float U1 = ThornSplineMath::SampleParameter(SampleIndex + 1, G_CrStep);
             FQuat SampleA;
             FQuat SampleB;
-            // Retail (thorn.dll.txt:7594-7752) never tests either FUN_06f21770
-            // call's result nor the final vtbl+0x58 slerp's GENRESULT -- all
-            // three are consumed unconditionally before the four output
-            // dwords are stored.
+            // Retail tests neither FUN_06f21770 result nor the final slerp's.
             EvalCrOrientation(Q0, Q1, Q2, Q3, U0, SampleA);
             EvalCrOrientation(Q0, Q1, Q2, Q3, U1, SampleB);
             FQuat Result;
@@ -2250,9 +2152,8 @@ namespace
             return true;
         }
 
-        // Retail +0x70 controlling unknown and +0x74 embedded inner unknown
-        // {vtbl PTR_LAB_06f5abc8, RefCount, Owner}; the object's reference
-        // count lives in Inner_ exactly as in retail.
+        // Retail +0x70 controlling unknown and +0x74 embedded inner unknown (vtable
+        // PTR_LAB_06f5abc8), which holds the reference count.
         IDAComponent* Outer_;
         FThornInnerUnknown Inner_;
         FVec3* Points_;
@@ -2293,8 +2194,7 @@ namespace
         const unsigned int Last = static_cast<unsigned int>(LastLive_);
         while (TableIndex < Last)
         {
-            // TEST AH,41 / JZ stops only on ordered Times[Index] > T.
-            // Equality, less and unordered all increment both counters.
+            // Stops only on ordered Times[Index] > T; equal, less and unordered advance.
             if (Times_[TableIndex] > *T)
                 break;
             ++Segment;
@@ -2330,8 +2230,7 @@ namespace
                 break;
         } while (true);
 
-        // FCOM Table[Index],T; TEST AH,05; JP selects the preceding
-        // interval for equal, greater, and unordered comparisons.
+        // Equal, greater and unordered select the preceding interval.
         if (!(*T > Table[Index]))
             --Index;
         // Retail divides unconditionally and stores float before Index.

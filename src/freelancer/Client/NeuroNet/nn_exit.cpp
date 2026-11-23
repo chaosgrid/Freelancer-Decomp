@@ -38,59 +38,48 @@ NnExit::NnExit()
     , ResultArg(nullptr)
     , bImmediate(0)
 {
-    // FUN_00472020 00472058..0047208c: FUN_0059f860, the three vptrs, +0x330 = 0, +0x334 = 0,
-    // byte +0x338 = 0. Nothing else is written before Create.
+    // Inlined in FUN_00472020. Nothing else is written before Create.
 }
 
 NnExit::~NnExit()
 {
-    // FUN_00471790: vptrs back to NN_Exit's, FUN_00577c30(+0x32c); then the Event::Handler base
-    // dtor FUN_00576010 and WinControl's FUN_0059fa50 run as the base-class destructors.
+    // FUN_00471790.
     HudPopInputFocus(AsHudCmdHandler());
 }
 
 bool NnExit::Create(Win3D* NewParent, void* Data)
 {
-    // FUN_00471810 (RET 8).
+    // FUN_00471810.
     //
-    // 00471810..00471825: `if (!DAT_0066d359) FUN_0045a460()` -- close NN_MainButton's panel
-    // unless something holds it open (G_bNnKeepPanelOpen, nn_main_button.h).
+    // Close NN_MainButton's panel unless something holds it open (DAT_0066d359).
     if (G_bNnKeepPanelOpen == 0)
         NnMainButtonOnModalOpen();
-    // 0047182a: FUN_004424f0(1) -- the NavBar's open service tab closes.
-    NavBarCloseService(true);
+    NavBarCloseService(true); // FUN_004424f0(1)
 
-    // 00471831..00471844: FUN_0059da10("NN_Pause"), and FUN_004a7560 on it when found.
     NnPause* const Pause = static_cast<NnPause*>(Win3DFindByName("NN_Pause"));
     if (Pause != nullptr)
-        Pause->CloseNow();
+        Pause->CloseNow();   // FUN_004a7560
 
-    // 00471849: FUN_0041dde0("arrow", 0) -- the Mouse.cpp cursor shape (lower-case in retail;
-    // the lookup is stricmp).
+    // Lower-case in retail; the lookup is stricmp.
     MouseSetCursor("arrow", false);
 
-    float const Zero[3] = {0.0f, 0.0f, 0.0f}; // local_134 / local_128
+    float const Zero[3] = {0.0f, 0.0f, 0.0f};
 
-    // 00471858..004718cb: FUN_00422b80(&local_118, 0, 0, -1), then FUN_005a0db0.
     float FramePosition[3] = {0.0f, 0.0f, -1.0f};
     CreateStaticControl("ExitFrame", kExitFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
                         0, 1, 0, 0, 0, Zero);
 
-    // 004718d0..00471946: (0, 0x3cf5c288, -1).
     float TextFramePosition[3] = {0.0f, NnFloatBits(0x3cf5c288), -1.0f};
     CreateStaticControl("ExitTextFrame", kExitTextFrameMesh, TextFramePosition, nullptr, Zero, 0,
                         0, 1, 0, 1, 0, 1, 0, 0, 0, Zero);
 
-    // 0047194b..00471997: (0, 0x3d0b4394, -1) -> +0x33c.
     float TextPosition[3] = {0.0f, NnFloatBits(0x3d0b4394), -1.0f};
     ExitText = CreateTextControl("ExitText", "PageHeader", TextPosition, nullptr,
                                  NnFloatBits(0x3eb851ec), NnFloatBits(0x3cf5c28f),
                                  NnFloatBits(0x3fc00000), 0, 1, 0, 0);
 
-    // 004719a7..00471a93: two buttons side by side. The row coordinate is
-    // i * DAT_005d043c - DAT_005d0438 (FILD / FMUL / FSUB, FSTP float); the box sits at
-    // + DAT_005d0434 and the caption at + DAT_005d041c, both as the X component (the FSTP lands
-    // in the first dword of the position; Y is the immediate that follows).
+    // Two buttons side by side. The row coordinate i * step - origin is rounded to float; the
+    // box and the caption add their offsets to it as the X component.
     float const kRowStep = NnFloatBits(0x3e4ccccd);     // DAT_005d043c 0.2
     float const kRowOrigin = NnFloatBits(0x3e6b851e);   // DAT_005d0438 0.23
     float const kBoxOffset = NnFloatBits(0x3e051eb8);   // DAT_005d0434 0.13
@@ -98,7 +87,7 @@ bool NnExit::Create(Win3D* NewParent, void* Data)
     for (int Index = 0; Index < 2; ++Index)
     {
         float const Row = static_cast<float>(Index) * kRowStep - kRowOrigin;
-        char Name[0x100]; // local_100
+        char Name[0x100];
 
         sprintf(Name, "ExitButtonBox%d", Index);
         float BoxPosition[3] = {Row + kBoxOffset, NnFloatBits(0xbd99999a), -1.0f};
@@ -113,25 +102,21 @@ bool NnExit::Create(Win3D* NewParent, void* Data)
                                               NnFloatBits(0x3fc00000), 0, 1, 0, 0);
     }
 
-    // 00471a99..00471ad8: slot 42 (0x1e, ids, 0) on the three captions, no null test.
+    // No null test on the three captions.
     ExitText->SetProperty(0x1e, 0x726, 0);
     ButtonText[0]->SetProperty(0x1e, 0x727, 0);
     ButtonText[1]->SetProperty(0x1e, 0x728, 0);
 
-    // 00471ade / 00471ae5
     DrawLayer = 0x6e;
     DrawSubLayer = 6;
-    // 00471aec..00471afe
     bCursorDrawFlag = NnModalPauseGame();
     HudPushInputFocus(AsHudCmdHandler());
-    // 00471b06..00471b25
     RegisterEvent(0x13);
     RegisterEvent(0x12);
     RegisterEvent(0xf);
     RegisterEvent(0x11);
 
-    // 00471b3c: FUN_004b5060, SETNZ.
-    return Win3D::Create(NewParent, Data);
+    return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 
 void NnExit::Close(int Result)
@@ -154,7 +139,7 @@ void NnExit::Close(int Result)
 void NnExit::Update()
 {
     // FUN_00471e00 -- no WinControl Update call. With +0x338 set the dialog confirms at once:
-    // the same sequence as the confirm button, DestroyWindow included (00471e6a).
+    // the same sequence as the confirm button, DestroyWindow included.
     if (bImmediate == 0)
         return;
     Close(0);
@@ -167,16 +152,15 @@ void NnExit::Draw()
     if (GetClientMouseCursorDrawFlag() == 0)
         SetClientMouseCursorDrawFlag(1);
     Win3DFlushBeforeOverlayDraw(); // FUN_0045a9f0
-    WinControl::Draw();            // JMP FUN_005a0760
+    WinControl::Draw();            // FUN_005a0760
 }
 
 intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_00471cb0 (RET 0xc). Nothing reaches WinControl's switch: every path returns 0 here.
+    // LAB_00471cb0. Nothing reaches WinControl's switch: every path returns 0 here.
     (void)B;
     if (Msg == 0x26)
     {
-        // 00471cf8..00471d0f: which button box sent the click.
         int Index = 0;
         while (Index < 2)
         {
@@ -186,8 +170,7 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Index == 2)
             return 0;
-        // 00471d18 `CMP EAX,-1` cannot hold here; 00471d21: box 0 confirms and closes the game
-        // window, 00471d95: box 1 cancels.
+        // Box 0 confirms and closes the game window, box 1 cancels.
         if (Index == 0)
         {
             Close(0);
@@ -199,8 +182,6 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (Msg == 0x42)
     {
-        // 00471cc6..00471cee: slot 31 SetOffset with the three floats at A, then slot 5
-        // SetPosition(&+0x60).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
@@ -211,10 +192,7 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
 bool NnExit::OnEvent(unsigned MsgId)
 {
-    // LAB_00471b90 -- jump table over MsgId - 0xf (00471c94):
-    //   0xf / 0x12 -> caseD_0 00471c25: cancel (callback 1), no DestroyWindow
-    //   0x11 / 0x13 -> caseD_2 00471ba9: confirm (callback 0), DestroyWindow
-    //   0x10 and everything outside 0xf..0x13 -> false
+    // LAB_00471b90.
     switch (MsgId)
     {
     case 0xf:
@@ -233,8 +211,7 @@ bool NnExit::OnEvent(unsigned MsgId)
 
 void NnExitPostShipLostMessage()
 {
-    // FUN_00471e80. 0x00471e98..0x00471ed6: the FmtStr zeroed (+0, +4 and the fourteen index
-    // bytes); begin_mad_lib(0x723), end_mad_lib, FUN_004b9c60(&text, 5), ~FmtStr.
+    // FUN_00471e80.
     FmtStr Text;
     Text.begin_mad_lib(0x723);
     Text.end_mad_lib();

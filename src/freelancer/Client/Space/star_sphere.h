@@ -7,7 +7,7 @@
 #pragma once
 
 // Retail SunEffect / StarSphere — freelancer.exe PTR_FUN_005db658 (7 slots).
-// Source path (embedded): Client\space\StarSphere.h. Epic: star-sphere.
+// Source path (embedded): Client\space\StarSphere.h.
 // Distinct from TexturePanels (PTR_LAB_005db1b4) and from skybox "star_sphere" perf option.
 //
 // Layout from FUN_00510d10 ctor + LAB_00511020 Load stores. Child at +0x14 is 0x30c
@@ -18,10 +18,9 @@
 // FUN_004215b0 — write identity 3×3 into Out9 (nine floats, no translation).
 void Win3DIdentityRotation3x3(float* Out9);
 
-// FUN_00422690 (cdecl) — GWin3DModelview = ObjectOrNull ? view(vt+0x40, __stdcall) * Matrix12
-// : Matrix12; pipeline state 7 set -> SetModelview, else SetView(view or identity) +
-// SetWorld(Matrix12). ObjectOrNull is a camera (TexturePanelsDrawPiece 0050b6ba) or null
-// (DrawClouds 005518c6, the UI tables).
+// FUN_00422690 — GWin3DModelview = ObjectOrNull ? view(vt+0x40) * Matrix12 : Matrix12;
+// pipeline state 7 set -> SetModelview, else SetView(view or identity) + SetWorld(Matrix12).
+// ObjectOrNull is a camera (TexturePanelsDrawPiece) or null (DrawClouds, the UI tables).
 void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12);
 
 // Star-glow CacheString-ish record (0x50). Shape name: length@+0, chars@+4 (0x20).
@@ -84,9 +83,9 @@ struct FStarSphere
     float ZoneOcclusion;             // +0x34  approaches FUN_00511b90
     float Field38;                   // +0x38  1 − FUN_0050f2a0(SunBody)
     unsigned char Pad3C[0x24];       // +0x3c .. +0x5f
-    float Dt;                        // +0x60  UpdateIntensity stores Dt (RET 4)
+    float Dt;                        // +0x60  UpdateIntensity stores Dt
     float Intensity;                 // +0x64  default 1
-    float WorldPos[3];               // +0x68 .. +0x70  owner position in VIEW space (Draw 0x511dc0)
+    float WorldPos[3];               // +0x68 .. +0x70  owner position in VIEW space (Draw)
     float Pad74;                     // +0x74
     float ScreenDepth;               // +0x78  Project OutZ
     float ScreenX;                   // +0x7c  Project OutX
@@ -118,7 +117,7 @@ FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body);
 // FUN_00510f90 — solar\\StarArch.ini path + Pipeline block + shapes load.
 void LoadSolarStarArchIni();
 // FUN_00511010 — clear the StarArch ShapeDB (DAT_006750a0); called by the space teardown
-// FUN_0054aec0 (DestroySpaceState, 0x0054afb6).
+// FUN_0054aec0 (DestroySpaceState).
 void ClearSolarStarArchShapes();
 
 
@@ -142,17 +141,16 @@ struct FStarSphereList
 // FUN_0050c620 -- &DAT_0067517c. Walked by the cockpit env-fx passes (FUN_0051c970 / 0051c9e0)
 // and the field draw (space_scene_obj_draw.cpp), and by the SunEffect perf apply LAB_00510bf0.
 FStarSphereList* StarSphereList();
-// FUN_0050c630 (cdecl) -- new FStarSphere (0x8c, FUN_00510d10 with Owner), appended to the list;
+// FUN_0050c630 -- new FStarSphere (0x8c, FUN_00510d10 with Owner), appended to the list;
 // returns the list's last element. Caller: the solar ini reader FUN_005485c0 ("star").
 FStarSphere* StarSphereCreateListed(IObjInspect* Owner);
 // FUN_0050c6e0 -- slot 0 (deleting destructor, flag 1) on every non-null element, then every
-// node erased. Caller: StarSys leave FUN_00554ab0 at 0x00554c12.
+// node erased. Caller: StarSys leave FUN_00554ab0.
 void StarSphereDestroyAll();
-// FUN_005125f0 (thiscall on the sphere, RET 4) -- the owner's (+4) IObjInspect slot 0
-// get_position copied into *Out; returns Out. No tests. Callers: the Ship draw LAB_00546050
-// (0x00546206) and the Solar radius slot FUN_00548110 (0x00548125).
+// FUN_005125f0 -- the owner's (+4) IObjInspect slot 0 get_position copied into *Out; returns
+// Out. No tests. Callers: the Ship draw LAB_00546050 and the Solar radius slot FUN_00548110.
 class Vector;
 Vector* StarSphereGetOwnerPosition(FStarSphere const* Sphere, Vector* Out);
-// FUN_00512620 (thiscall on the sphere) -- max(glow scale, centre scale or 0) * Radius; the glow
-// is read with no test. Caller: the Solar radius slot FUN_00548110 (0x00548144).
+// FUN_00512620 -- max(glow scale, centre scale or 0) * Radius; the glow is read with no test.
+// Caller: the Solar radius slot FUN_00548110.
 float StarSphereMaxGlowScale(FStarSphere const* Sphere);

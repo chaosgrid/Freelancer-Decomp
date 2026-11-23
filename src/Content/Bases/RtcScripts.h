@@ -25,8 +25,7 @@ struct FCharacterEncounterAction
 };
 
 // The 0x54-byte RTC script object (operator new 0x54 at 06eb8a3e). Ctor FUN_06ed4420, loader
-// FUN_06ed44a0, member-wise teardown FUN_06eb8c40 (+0x44, +0x1c, the role strings, +0x0c --
-// reverse declaration order, the implicit destructor here).
+// FUN_06ed44a0, member-wise teardown FUN_06eb8c40 (the implicit destructor here).
 struct FCharacterEncounter
 {
     // +0x00 [CharacterEncounter] Location: pub::GF::FindLocation(BaseId, room). Not set by
@@ -47,7 +46,7 @@ struct FCharacterEncounter
     // FindLocation(base, room).
     unsigned int RelocateLocationId;
     unsigned int StartRoomLocationId;               // +0x3c start_room: FindLocation(base, room)
-    // +0x40 = FUN_06efeb00() (06eb8acc-06eb8ad5); Cnd_RTCDone compares it with parms[1].
+    // +0x40 = FUN_06efeb00(); Cnd_RTCDone compares it with parms[1].
     unsigned int SequenceId;
     std::vector<FCharacterEncounterAction> Actions; // +0x44 greet / walkup / action / ...
 

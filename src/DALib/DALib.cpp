@@ -85,8 +85,8 @@ IVMeshLibrary* DALib::VMeshLibrary = nullptr;
 
 namespace
 {
-    // One `if (p) { LastRelease = p->Release(); p = 0; }` block of DALib's teardown
-    // (.text:065c16d5.., e.g. Channel .text:065c16f1-1705). The count is stored even when 0.
+    // One release block of DALib's teardown, inlined per global in retail. The count is stored
+    // even when 0.
     template <typename T>
     void ReleaseGlobal(T*& Global)
     {
@@ -108,8 +108,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
         return false;
     }
 
-    // .text:065c117c-1218: an explicit path goes straight to SetINIConfig; else "DACOM.INI" if
-    // it is readable from the cwd; else DACOM.INI next to DALib.dll itself (GModule).
+    // An explicit path, else DACOM.INI in the cwd if readable, else DACOM.INI next to DALib.dll.
     GENRESULT IniResult;
     if (IniPath != nullptr)
     {
@@ -136,9 +135,9 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
         return false;
     }
 
-    // .text:065c1220-12ae. The SystemContainer instance is released only once ISystemContainer
-    // was obtained from it; retail leaks it on every earlier failure.
-    bool bResult = true; // .text:065c1253 byte [ESP+0x17] = 1
+    // The SystemContainer instance is released only once ISystemContainer was obtained from it;
+    // retail leaks it on every earlier failure.
+    bool bResult = true;
     ISystemContainer* Container = nullptr;
     {
         FNamedAggDesc Desc = {0x14, "SystemContainer", nullptr, nullptr, nullptr};
@@ -164,7 +163,6 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
 
     if (Container != nullptr)
     {
-        // .text:065c12bd-13a8: every result lands directly in the exported global.
         Container->LoadSystemComponents();
         Container->QueryInterface(Iids::SoundManager, (void**)(&Sound));
         Container->QueryInterface(Iids::Streamer2, (void**)(&Streamer));
@@ -184,7 +182,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
         Container->QueryInterface(Iids::MatAnimLibrary, (void**)(&MatAnimLibrary));
         Container->QueryInterface(Iids::VMeshLibrary, (void**)(&VMeshLibrary));
 
-        // .text:065c13aa-13f5: a sound device that fails to start is shut down and dropped.
+        // A sound device that fails to start is shut down and dropped.
         bool bAudioFailed = false;
         if (Sound != nullptr && Sound->StartupDevice(Hwnd, 0x113) != GR_OK)
         {
@@ -193,9 +191,8 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
             ReleaseGlobal(Sound);
         }
 
-        // .text:065c13fa-1489: the streamer gets the sound manager's DirectSound; a streamer
-        // whose InitializeDevice returns 0 is dropped. The DirectSound reference is released
-        // last, and its count too lands in GLastReleaseCount.
+        // The DirectSound reference is released last, and its count too lands in
+        // GLastReleaseCount.
         if (Streamer != nullptr)
         {
             IDirectSound* DirectSound = nullptr;
@@ -215,13 +212,11 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
                 GLastReleaseCount = DirectSound->Release();
         }
 
-        // .text:065c148c-14a0: the host's verdict becomes Startup's return value.
         if (bAudioFailed)
             bResult = CriticalWarningFn(0xd3, nullptr);
     }
 
-    // .text:065c14a4-1553: CreateInstance writes DALib::Engine itself; on success the engine
-    // loads its components from the container (NULL when the container failed) and is queried.
+    // Container is NULL here when the SystemContainer failed.
     {
         FNamedAggDesc Desc = {8, "Engine", nullptr, nullptr, nullptr};
         if (Dacom->CreateInstance((AGGDESC*)(&Desc), (void**)(&Engine)) ==
@@ -237,7 +232,7 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
         }
     }
 
-    // .text:065c1555-1590: no Alchemy check -- a NULL Alchemy is passed through.
+    // No Alchemy check -- a NULL Alchemy is passed through.
     {
         FNamedAggDesc Desc = {8, "FxEffectLibrary", nullptr, nullptr, nullptr};
         if (Dacom->CreateInstance((AGGDESC*)(&Desc),
@@ -284,7 +279,7 @@ void __cdecl DALib::Shutdown(HWND /*Hwnd*/)
 
     if (FxEffectLibrary != nullptr)
         FxEffectLibrary->ClearEffects(); // slot +0x24
-    IRenderPipeline* const SavedPipeline = Pipeline; // EBX, .text:065c16d8
+    IRenderPipeline* const SavedPipeline = Pipeline;
     ReleaseGlobal(FxEffectLibrary);
     ReleaseGlobal(Channel);
     ReleaseGlobal(Anim);
@@ -337,7 +332,7 @@ void __cdecl DALib::Shutdown(HWND /*Hwnd*/)
         ReleaseGlobal(Pipeline);
     }
 
-    // .text:065c1956-1991: drain the saved pipeline pointer until a Release returns 0.
+    // Retail drains the pipeline pointer saved before teardown until a Release returns 0.
     while (GLastReleaseCount != 0)
     {
         FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\DALib\\DALib.cpp",
@@ -354,8 +349,7 @@ void __cdecl DALib::Shutdown(HWND /*Hwnd*/)
     OutputDebugStringA("DALib::Shutdown () EXIT\n");
 }
 
-// Retail .text:065c5d40 DllMain: on DLL_PROCESS_ATTACH (reason 1) stash the module handle in
-// .data:065ca2ac and opt out of thread notifications; every reason returns 1.
+// Retail .text:065c5d40 DllMain.
 BOOL WINAPI DllMain(HMODULE Module, DWORD Reason, LPVOID)
 {
     if (Reason == DLL_PROCESS_ATTACH)

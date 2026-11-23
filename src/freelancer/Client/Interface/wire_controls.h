@@ -13,27 +13,15 @@
 // RTTI: .?AVRichTextWireButtonControl@@ : WireButtonControl : WireStaticControl : WinControl.
 // Every class keeps WinControl's IDataViewOwner face (LAB_0053aaa0 / FUN_0053e4a0).
 //
-// WireStaticControl -- vftable 0x005e6084 (45 slots, COL 0x005f1608). Overrides of WinControl:
-//   0 FUN_005a32f0 (scalar deleting around FUN_005a3310), 4 FUN_0053f330 (Win3D's: false),
-//   5 LAB_005a3950 SetPosition, 7 LAB_005a3a30 SetOrientation, 9 FUN_005a3ea0 Create,
-//   11 FUN_005a3aa0 Update, 13 LAB_005a3420 Draw, 34 FUN_005a3c30 ShowToolTip,
-//   42 LAB_005a3b00 SetProperty.
-// WINFACTORY<WireStaticControl> DAT_0067de10 "WireStaticControl": static init LAB_005a2830
-// (ctor FUN_005a4c90 + atexit LAB_005a2850), Create FUN_005a4d00 (operator_new(0x388)).
+// WireStaticControl -- vftable 0x005e6084 (45 slots), scalar deleting dtor FUN_005a32f0.
+// WINFACTORY<WireStaticControl> DAT_0067de10, Create FUN_005a4d00 (operator_new(0x388)).
 //
-// WireButtonControl -- vftable 0x005e614c (46 slots, COL 0x005f1670). Overrides of
-// WireStaticControl: 0 FUN_005a3d90 (scalar deleting around FUN_005a3db0), 4 LAB_005a42c0
-// (JMP FUN_005a0340, WinControl's HitTest), 11 LAB_005a4080 Update, 15 FUN_005a42d0 MouseEnter,
-// 16 FUN_005a4330 MouseLeave, 19 FUN_005a4380 MouseEvent, 34 FUN_005a46c0 ShowToolTip,
-// 42 LAB_005a4690 SetProperty; own slot 45 FUN_005a3e50 Activate.
-// WINFACTORY<WireButtonControl> DAT_0067dde4 "WireButtonControl": static init LAB_005a2860
-// (ctor FUN_005a4da0 + atexit LAB_005a2880), Create FUN_005a4e10 (operator_new(0x390)).
+// WireButtonControl -- vftable 0x005e614c (46 slots), scalar deleting dtor FUN_005a3d90.
+// WINFACTORY<WireButtonControl> DAT_0067dde4, Create FUN_005a4e10 (operator_new(0x390)).
 //
-// RichTextWireButtonControl -- vftable 0x005e622c (COL 0x005f17b4) is WireButtonControl's slot
-// for slot: no override of its own, not even the destructor (slot 0 is FUN_005a3d90).
-// WINFACTORY<RichTextWireButtonControl> DAT_0067ddb8 "RichTextWireButtonControl": static init
-// LAB_005a2890 (ctor FUN_005a4ed0 + atexit LAB_005a28b0), Create FUN_005a4f40
-// (operator_new(0x398)).
+// RichTextWireButtonControl -- vftable 0x005e622c is WireButtonControl's slot for slot: no
+// override of its own, not even the destructor.
+// WINFACTORY<RichTextWireButtonControl> DAT_0067ddb8, Create FUN_005a4f40 (operator_new(0x398)).
 //
 // Layout (FUN_005a3210 + the factory Creates):
 //   +0x000 WinControl (0x32c)
@@ -55,8 +43,8 @@
 // RichTextWireButtonControl adds +0x390 the caption RichTextWin (built by Init) and +0x394 a
 // pointer to +0x390; size 0x398.
 //
-// PORT: the sound name is the port's std::string, not the VC6 one (AGENTS.md: no retail ABI),
-// so every field from +0x368 on sits at a different offset than retail. Nothing outside these
+// PORT: the sound name is the port's std::string, not the VC6 one, so every field from +0x368
+// on sits at a different offset than retail. Nothing outside these
 // classes reaches those fields by offset; the static_asserts below stop at +0x364.
 
 #include "Interface/rich_text_win.h"
@@ -110,7 +98,7 @@ public:
     unsigned EdgeMask;             // retail +0x384
 
 protected:
-    // The blink half of slots 11 (0x005a3aa8..0x005a3afe, again at 0x005a408d..0x005a40e6).
+    // The blink half of both slot 11 overrides (inlined in each in retail).
     void UpdateBlink();
 
 private:
@@ -127,13 +115,12 @@ static_assert(offsetof(WireStaticControl, ToolTipAux) == 0x364, "WireStaticContr
 class WireButtonControl : public WireStaticControl
 {
 public:
-    // The WireButtonControl part of FUN_005a4e10 / FUN_005a4f40 (inlined there):
-    // +0x388 = (+0x388 & 0xfe) | 4, +0x38c = 0, then the vptrs.
+    // Inlined in the factory Creates FUN_005a4e10 / FUN_005a4f40.
     WireButtonControl();
     // FUN_005a3db0
     ~WireButtonControl() override;
 
-    // slot 4 LAB_005a42c0 -- JMP FUN_005a0340
+    // slot 4 LAB_005a42c0 -- WinControl's HitTest FUN_005a0340
     bool HitTest(float const* Ray) override;
     // slot 11 LAB_005a4080
     void Update() override;
@@ -167,8 +154,7 @@ private:
 class RichTextWireButtonControl : public WireButtonControl
 {
 public:
-    // The RichTextWireButtonControl part of FUN_005a4f40 (inlined there): +0x394 = &+0x390,
-    // +0x390 = 0.
+    // Inlined in the factory Create FUN_005a4f40.
     RichTextWireButtonControl();
     // No destructor of its own: slot 0 is WireButtonControl's FUN_005a3d90. The caption window
     // is a child and goes with the tree.

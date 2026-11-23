@@ -6,14 +6,9 @@
 
 #pragma once
 
-// Common-internal helpers shared by the TUs split out of common_cequip.cpp (CMN-B2, plan 3.3).
-// They were file-local (anonymous namespace) in common_cequip.cpp; the ones used by two or more
-// of the new TUs live here in namespace CmnCequip. The constants keep internal linkage (const at
-// namespace scope); the functions are defined in common_cequip.cpp. Not part of the public ABI.
-//
-// Retail calls the IEngine slots directly at every site (no validity / null wrappers); the former
-// IsValidInstance / GetInstanceUserData / GetEngineInstanceOrientation / OwnerVelocity wrappers
-// added guards retail does not have and were removed (cmn-s2-eqa, 2026-10-14).
+// Common-internal helpers shared by the Equipment TUs (namespace CmnCequip); the functions are
+// defined in common_cequip.cpp. Not part of the public ABI. Retail calls the IEngine slots
+// directly at every site, with no validity or null wrappers.
 
 #include "common_cequip.h"
 #include "common_cobject.h"   // CEqObj
@@ -31,10 +26,9 @@ namespace CmnCequip
 
     void* WatchedTarget(BaseWatcher const& Watcher);
 
-    // An engine joint block as Common reads and builds it: what IEngine::GetInstanceRelative
-    // (+0xc4) returns and IEngine::CreateJoint (+0xbc) copies (G_EngineJointPayloadDwords
-    // dwords; EngBase owns the storage). Layout from FUN_062940c0, which builds a revolute one
-    // (joint at ESP+0x30, the next local at ESP+0x8c), and from CEGun's readers.
+    // An engine joint block: what IEngine::GetInstanceRelative returns and CreateJoint copies
+    // (EngBase owns the storage). Layout from FUN_062940c0, which builds a revolute one, and
+    // from CEGun's readers.
     struct FJointRelative
     {
         unsigned long Type;   // +0x00  2 = revolute

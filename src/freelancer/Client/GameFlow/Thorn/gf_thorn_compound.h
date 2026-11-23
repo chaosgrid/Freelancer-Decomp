@@ -9,8 +9,8 @@
 // Thorn_Compound (RTTI .?AVThorn_Compound@@, E:\FL\Scratch\Source\Client\Gf\ScriptCompound.cpp)
 // -- the object a COMPOUND entity is bound to: one engine instance (a room prop's, or the
 // player's ship), motions played on it through DALib::Anim, hardpoint connections, and its
-// transform relative to the script frame with a fixed offset. operator new(0x190) at 0x0044de3b
-// (FUN_0044dd80); identity vtable 0x005ccf6c.
+// transform relative to the script frame with a fixed offset. operator new(0x190) in
+// FUN_0044dd80; identity vtable 0x005ccf6c.
 //
 // Built by FGfScript::SpawnCompound (FUN_0044dd80 -> FUN_0044e430, gf_script_spawn.cpp).
 
@@ -51,7 +51,7 @@ struct FThornCompound : FThornComponent
                   unsigned char bFlag14) override;                       // 20 LAB_00451ef0
 
     // FUN_00451330 (thiscall, RET 4) -- the instance, and its hardpoints re-analyzed. The spawn
-    // FUN_0044dd80 calls it (0x0044de67).
+    // FUN_0044dd80 calls it.
     void SetInstance(long InInstance);
 
     // FUN_00451380 -- every motion slot back to {-1, -1, 0}.

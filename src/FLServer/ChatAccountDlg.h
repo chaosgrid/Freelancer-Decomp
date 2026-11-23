@@ -8,8 +8,8 @@
 // registered while it exists in a global map keyed by account name (.data:0042957c). Text typed
 // into the input box is sent to the account's client as console chat; the account's private
 // chat to the server arrives through Server.dll's g_pPrivateChatHook.
-// Retail: TU .text:00413dd0..00415920. ctor 00413fd0 (0x130 bytes), dtor 004140a0, scalar
-// deleting dtor 00414080, vtable .rdata:0041e2e0, message map 0041e2d8 (entries 0041e290).
+// Retail: ctor .text:00413fd0 (0x130 bytes), dtor 004140a0, scalar deleting dtor 00414080,
+// vtable .rdata:0041e2e0, message map 0041e2d8 (entries 0041e290).
 // Created by CChoosePlayerDlg::OnOK (.text:004039a0), which sets AccountName before Create.
 #pragma once
 
@@ -23,7 +23,7 @@ public:
 	explicit CChatAccountDlg(CWnd* Parent = nullptr);
 	virtual ~CChatAccountDlg();
 
-	// .text:004141e0 — the open chat window of an account, or null.
+	// The open chat window of an account, or null.
 	static CChatAccountDlg* FindByName(CiWString& Name);
 
 	CiWString AccountName;       // +0x60
@@ -37,7 +37,7 @@ protected:
 	afx_msg void OnMsgFilterInput(NMHDR* Header, LRESULT* Result);
 	afx_msg void OnCloseButton();
 
-	// .text:004145a0 (cdecl) — Server.dll's g_pPrivateChatHook, installed by OnInitDialog:
+	// Server.dll's g_pPrivateChatHook, installed by OnInitDialog:
 	// appends a player's private chat to the log of that account's chat window, if open.
 	static void __cdecl OnPrivateChat(wchar_t* Text, int ClientId);
 

@@ -13,7 +13,7 @@ FInfocardMap* G_InfocardMap = nullptr; // DAT_0066d320
 
 void FInfocardMap::Load()
 {
-    // FUN_004583a0: GetFileSysPath of "interface\InfocardMap.ini", open, then every header.
+    // FUN_004583a0.
     char Path[0x100];
     GetFileSysPath(Path, "interface\\InfocardMap.ini", nullptr);
     INI_Reader Reader;
@@ -23,7 +23,6 @@ void FInfocardMap::Load()
     }
     do
     {
-        // 0x00458427..0x0045844c: only [InfocardMapTable], and only when it has a value.
         if (!Reader.is_header("InfocardMapTable") || !Reader.read_value())
         {
             continue;
@@ -34,8 +33,6 @@ void FInfocardMap::Load()
             {
                 continue;
             }
-            // 0x0045846c..0x0045851e: key = ftol(value 0), ExtraIds = ftol(value 1); values
-            // 2..4 are read only when not empty (INI_Reader::is_value_empty), else 1.
             unsigned const Key = static_cast<unsigned>(static_cast<int>(Reader.get_value_float(0)));
             FInfocardMapEntry Entry;
             Entry.ExtraIds = static_cast<int>(Reader.get_value_float(1));
@@ -54,17 +51,15 @@ void FInfocardMap::Load()
             {
                 Entry.bShowShips = static_cast<int>(Reader.get_value_float(4));
             }
-            // 0x00458520..0x00458615: the unique insert (FUN_00458d00) -- a key already in the
-            // tree keeps its first line (0x00458602).
+            // FUN_00458d00: a key already in the tree keeps its first line.
             Entries.insert(std::pair<unsigned const, FInfocardMapEntry>(Key, Entry));
         } while (Reader.read_value());
     } while (Reader.read_header());
-    // 0x00458649..: INI_Reader's FileMap / buffer teardown -- its destructor here.
 }
 
 void InfocardMapCreate()
 {
-    // FUN_00458790: operator_new(0x14), the empty map, FUN_004583a0, stored in DAT_0066d320.
+    // FUN_00458790.
     if (G_InfocardMap != nullptr)
     {
         return;
@@ -76,7 +71,7 @@ void InfocardMapCreate()
 
 void InfocardMapDestroy()
 {
-    // FUN_00458860: FUN_004582e0 (clear) + FUN_005b7e1d, then DAT_0066d320 = 0.
+    // FUN_00458860.
     FInfocardMap* const Map = G_InfocardMap;
     if (Map == nullptr)
     {
@@ -88,8 +83,7 @@ void InfocardMapDestroy()
 
 bool InfocardMapFind(unsigned Key, FInfocardMapEntry const** OutEntry)
 {
-    // FUN_00458890: no singleton -> false; lower_bound (FUN_0052c7a0), end or Key < node key is
-    // a miss; a hit writes &node +0x10.
+    // FUN_00458890.
     FInfocardMap const* const Map = G_InfocardMap;
     if (Map == nullptr)
     {

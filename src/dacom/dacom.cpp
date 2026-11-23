@@ -80,7 +80,7 @@ namespace
         return (unsigned int)Index;
     }
 
-    // One CRC step as retail 065b6105..6124: EBX = fold(ch) ^ (crc & 0xff); crc = table[EBX] ^ (crc >> 8).
+    // One CRC step (as in FUN_065b60f0): crc = table[fold(ch) ^ (crc & 0xff)] ^ (crc >> 8).
     unsigned int StepCrc(unsigned int Crc, char Ch)
     {
         const unsigned int Index = FoldCrcChar(Ch) ^ (Crc & 0xFFu);
@@ -644,7 +644,7 @@ namespace
             return Parse(Lexer, "(local buffer)");
         }
 
-        // "first tail" when the phrase after the first word is not empty (065b1941 / 19d7).
+        // "first tail" when the phrase after the first word is not empty.
         static void BuildKey(char* Out, const char* First, const char* Tail)
         {
             if (std::strlen(Tail) != 0)
@@ -653,9 +653,9 @@ namespace
                 std::strcpy(Out, First);
         }
 
-        // Retail FUN_065b17d0 (switch 065b1808, jump table 065b1abc). Unexpected input hits
+        // Retail FUN_065b17d0 (jump table 065b1abc). Unexpected input hits
         // INT3 exactly where retail has one. A key before the first section dereferences the
-        // null CurrentSection, as retail does (no check at 065b1981 / 19aa / 1a31).
+        // null CurrentSection, as retail does (no check).
         bool Parse(FIniLexer& Lexer, const char* SourceName)
         {
             char First[0x40c];
@@ -680,7 +680,7 @@ namespace
                     {
                         if (ReadPhrase(Lexer, IniTokenNewline, 0x400, Value) != IniTokenNewline)
                         {
-                            __debugbreak(); // 065b1aaa
+                            __debugbreak();
                             return false;
                         }
                         BuildKey(Line, First, Tail);
@@ -693,7 +693,7 @@ namespace
                     }
                     else
                     {
-                        __debugbreak(); // 065b1a9a
+                        __debugbreak();
                         return false;
                     }
                     break;
@@ -713,7 +713,7 @@ namespace
                     {
                         std::strcpy(Line, Lexer.Text);
                     }
-                    ParseFile(Line); // result ignored (065b18da)
+                    ParseFile(Line); // result ignored
                     Lexer.Advance();
                     break;
                 }
@@ -726,7 +726,7 @@ namespace
                     }
                     else if (NameResult != IniTokenNewline)
                     {
-                        __debugbreak(); // 065b1a6a
+                        __debugbreak();
                         return false;
                     }
                     break;
@@ -734,7 +734,7 @@ namespace
                 case IniTokenNewline:
                     break;
                 default:
-                    // Token 100 (065b180f) and 3..0x63 (065b1a7a): INT3, then keep going.
+                    // Token 100 and 3..0x63: INT3, then keep going.
                     __debugbreak();
                     break;
                 }
@@ -764,7 +764,7 @@ namespace
     // carry the same names so one override serves both faces.
     struct IProfileParser2 : IDAComponent
     {
-        virtual GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) = 0; // formerly UnnamedSlot3; +0x0C
+        virtual GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) = 0; // +0x0C
         virtual GENRESULT DACOM_API LoadFromMemory(const char* Buffer, unsigned int Size) = 0;      // +0x10 065b45a0
         virtual void* DACOM_API OpenSection(const char* Name, unsigned int Flags) = 0;              // +0x14 065b49a0
         virtual int DACOM_API CloseSection(void* Handle) = 0;                                       // +0x18 065b49b0
@@ -818,7 +818,6 @@ namespace
         unsigned long DACOM_API Release() override { return Outer->Release(); }
 
         // Retail FUN_065b4430: load an INI file. Flag 1 is refused.
-        // formerly UnnamedSlot3
         GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) override
         {
             if ((Flags & 1) != 0)
@@ -828,7 +827,6 @@ namespace
 
         // Retail LAB_065b4460: Callback(this, section name, Context) for every section, in
         // sorted order; a zero return stops the walk and returns 0.
-        // formerly UnnamedSlot4
         int DACOM_API EnumerateSections(FSectionEnumCallback Callback, void* Context) override
         {
             if (Callback == nullptr)
@@ -1205,7 +1203,7 @@ namespace
     }
 
     // Retail FUN_065b21e0. The link goes in front of the first one whose priority is <= the
-    // new one (unsigned compare, JNC at 065b2276), so among equal priorities the most recent
+    // new one (unsigned compare), so among equal priorities the most recent
     // registration wins.
     GENRESULT DACOM_API FCOManager::RegisterComponent(IDAComponent* Factory, const char* Name, void* Priority)
     {
@@ -1497,7 +1495,7 @@ namespace
                 {
                     // Relative to the exe directory: drop its trailing separator, climb one
                     // directory per leading "..\", skip ".\". A value like ".x" never advances
-                    // the cursor and loops forever, exactly as retail (065b2c26..2ca4).
+                    // the cursor and loops forever, as retail does.
                     char* Tail = BasePath + std::strlen(BasePath) - 1;
                     if (*Tail == '/' || *Tail == '\\')
                         *Tail = '\0';
@@ -1521,7 +1519,7 @@ namespace
                                 }
                                 if (Tail == nullptr)
                                 {
-                                    // Retail keeps this branch (065b2c57) although Tail always
+                                    // Retail keeps this branch although Tail always
                                     // points into BasePath.
                                     FDUMP(DumpError, GErrorFormat, GDacomSourceFile, 0x328,
                                           "DllPath key in ini file specifies invalid path");
@@ -1543,7 +1541,7 @@ namespace
                     }
                     std::strcat(BasePath, "\\");
                     std::strcat(BasePath, Cursor);
-                    // Retail does not free the previous DllPath here (065b2cf6).
+                    // Retail does not free the previous DllPath here.
                     DllPath = DuplicateString(BasePath);
                 }
             }
@@ -1618,7 +1616,7 @@ namespace
                 if (Ch == '"')
                 {
                     // Retail tests for the closing quote before advancing, so it stops on the
-                    // opening one and the name becomes the single character '"' (065b2f7a).
+                    // opening one and the name becomes the single character '"'.
                     for (;;)
                     {
                         if (Ch == '"')
@@ -2084,7 +2082,7 @@ namespace
                 return RegNode(RegOpWordStart);
             if (Escaped == '>')
                 return RegNode(RegOpWordEnd);
-            bLiteral = true; // the escaped char starts a literal run (065b50c1 -> 50e5)
+            bLiteral = true; // the escaped char starts a literal run
             break;
         }
         default:
@@ -2095,7 +2093,7 @@ namespace
         if (!bLiteral)
             return nullptr;
 
-        // Literal run (065b50e5): back up to the first char, then copy chars while the next
+        // Literal run: back up to the first char, then copy chars while the next
         // one is not special. Before a multiplier the last char is given back (unless it is
         // the only one) so the multiplier applies to it alone.
         --GRegParse;
@@ -2204,7 +2202,7 @@ namespace
 
     int RegMatch(char* Program);
 
-    // Retail FUN_065b5910 (switch on op - 3, table 065b59e4): how many times the simple node
+    // Retail FUN_065b5910: how many times the simple node
     // at Node matches from GRegInput; GRegInput is left after the run.
     int RegRepeat(char* Node)
     {
@@ -2250,7 +2248,7 @@ namespace
     // so the modern CRT's range assertion cannot fire. Same result for ASCII.
     bool RegIsWordChar(char Ch) { return isalnum((unsigned char)Ch) != 0 || Ch == '_'; }
 
-    // Retail FUN_065b55f0 (switch 065b5629, tables 058a8 / 058e4): the matcher proper.
+    // Retail FUN_065b55f0: the matcher proper.
     int RegMatch(char* Program)
     {
         char* Scan = Program;
@@ -2376,7 +2374,7 @@ namespace
             }
             else
             {
-                return 0; // OPEN+0, CLOSE+0 and unknown opcodes (065b589f)
+                return 0; // OPEN+0, CLOSE+0 and unknown opcodes
             }
             Scan = Next;
         }
@@ -2501,7 +2499,6 @@ namespace
         }
 
         // Retail FUN_065b5ac0.
-        // formerly Slot3
         bool DACOM_API CompilePattern(const char* Pattern) override
         {
             if (Program != nullptr)
@@ -2514,7 +2511,6 @@ namespace
         }
 
         // Retail LAB_065b5b00.
-        // formerly Slot4
         int DACOM_API Search(const char* SubjectIn) override
         {
             Subject = SubjectIn;
@@ -2525,7 +2521,6 @@ namespace
         }
 
         // Retail LAB_065b5b30.
-        // formerly Slot5
         char* DACOM_API CopyCapture(int Index, char* Buffer, int Size, int Skip, int bNullOnFail) override
         {
             if (Program != nullptr && MatchResult != 0 && Program->StartP[Index] != nullptr &&
@@ -2559,7 +2554,6 @@ namespace
         }
 
         // Retail LAB_065b5be0.
-        // formerly Slot6
         int DACOM_API GetCaptureOffsetFromMatch(int Index) override
         {
             if (Program == nullptr || MatchResult == 0 || Program->StartP[Index] == nullptr)
@@ -2568,7 +2562,6 @@ namespace
         }
 
         // Retail LAB_065b5c10.
-        // formerly Slot7
         int DACOM_API GetCaptureOffsetFromSubject(int Index) override
         {
             if (Program == nullptr || MatchResult == 0 || Program->StartP[Index] == nullptr)
@@ -2701,7 +2694,8 @@ unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Str)
 
 unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Begin, const char* End)
 {
-    // A nonempty range never terminates; volatile reads preserve the faulting access.
+    // Retail bug kept: a nonempty range never terminates (the loop has no end
+    // test) and runs until it faults; volatile keeps the faulting reads.
     if (Begin == End)
         return 0;
     volatile unsigned int Crc = 0xFFFFFFFFu;

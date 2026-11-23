@@ -32,11 +32,10 @@ namespace
 CEqObj::CEqObj(Class ObjectClass)
     : CSimple(ObjectClass)
 {
-    // Common.dll.c 0x49010. CEquipManager + CArchGroupManager::Init.
+    // FUN_062a9010
     EquipManager.Init(this);
     VibeId = -1;
-    // 062a9097..062a90b5: the four part ids, the accessory count and the voice; the accessory
-    // ids (+0x118..+0x134) are left unwritten, as retail does.
+    // The accessory ids (+0x118..+0x134) are left unwritten, as retail does.
     SpaceCostume.PartIds[0] = 0;
     SpaceCostume.PartIds[1] = 0;
     SpaceCostume.PartIds[2] = 0;
@@ -46,30 +45,26 @@ CEqObj::CEqObj(Class ObjectClass)
     CloakPercent = 0.0f;
     ArchGroups.Init(this);
     bWeaponsOffline = 0;
-    DockingBaseId = 0;                                           // 062a90e8
-    DockingPointBaseId = 0;                                      // 062a90ee
-    // 062a90f4: the INotify listener starts out null. Only the client connects one
-    // (Server.dll never calls CEqObj::connect(INotify*)), so a server-side CEqObj keeps
-    // this null for life and CEqObj::notify (062a92c0) is a no-op for it.
-    Notify = nullptr;                                            // 062a90f4
-    bExplosionDmgCached = false;                                 // 062a90fa (byte write)
-    ExplosionDmgRadius = 0.0f;                                   // 062a9100
-    ExplosionDmgCenter.x = 0.0f;                                 // 062a9106
-    ExplosionDmgCenter.y = 0.0f;                                 // 062a910c
-    ExplosionDmgCenter.z = 0.0f;                                 // 062a9112
-    // 062a9118..062a912a: DockingPoints (vector at +0x180) -- its default ctor.
-    ControlExclusion = 0;                                        // 062a9130
+    DockingBaseId = 0;
+    DockingPointBaseId = 0;
+    // Only the client connects an INotify listener (Server.dll never calls connect), so a
+    // server-side CEqObj keeps it null and notify() is a no-op.
+    Notify = nullptr;
+    bExplosionDmgCached = false;
+    ExplosionDmgRadius = 0.0f;
+    ExplosionDmgCenter.x = 0.0f;
+    ExplosionDmgCenter.y = 0.0f;
+    ExplosionDmgCenter.z = 0.0f;
+    ControlExclusion = 0;
     BehaviorMgr = nullptr;
     Power = 0.0f;
     MaxPower = 0.0f;
     BehaviorIndex = -1;
 }
 
-// Common.dll.c 0x272c0. Retail's version has zero callers anywhere in Common.dll,
-// freelancer.exe, or Server.dll (only exported because CEqObj is a dllexport class) --
-// ported as a plain member-wise copy of the base class plus every field below rather
-// than reverse-engineering its byte-exact shuffling of ArchGroups/EquipManager/etc.
-// through several other never-called helper functions.
+// FUN_062872c0. Deviation: a plain member-wise copy. Retail's version has no callers in
+// Common.dll, freelancer.exe or Server.dll (exported only because the class is), so its
+// exact ArchGroups/EquipManager copying was not reproduced.
 CEqObj::CEqObj(CEqObj const& Other)
     : CSimple(Other)
     , EquipManager(Other.EquipManager)
@@ -96,26 +91,21 @@ CEqObj::CEqObj(CEqObj const& Other)
 
 CEqObj::~CEqObj()
 {
-    // .text:062a9190-062a9294.
-    PhySys::SetCollisionState(this, false);                      // 062a91b8-062a91c4
+    // FUN_062a9190
+    PhySys::SetCollisionState(this, false);
 
-    // 062a91cc-062a9205: default CEquipTraverser over every equip, DisableController
-    // (CEquip vtable +0x50) on each.
     CEquipTraverser Trav;
     for (CEquip* Item = EquipManager.Traverse(Trav); Item != nullptr; Item = EquipManager.Traverse(Trav))
-        Item->DisableController();
+        Item->DisableController();   // CEquip vtable +0x50
 
-    // 062a9207-062a9221: ~IBehaviorManager (FUN_062d2530) + operator delete, then 0.
     if (BehaviorMgr != nullptr)
     {
-        delete BehaviorMgr;
+        delete BehaviorMgr;   // ~IBehaviorManager FUN_062d2530
         BehaviorMgr = nullptr;
     }
 
-    EquipManager.Clear();                                        // 062a9229
-    ArchGroups.Clear();                                          // 062a9236
-    // 062a923b-062a926e: DockingPoints' buffer freed, then ~CArchGroupManager,
-    // ~CEquipManager and ~CSimple -- the member / base destructors.
+    EquipManager.Clear();
+    ArchGroups.Clear();
 }
 
 void CEqObj::load_equip_and_cargo(EquipDescVector const& Items, bool bClear)
@@ -143,24 +133,21 @@ bool CEqObj::add_item(EquipDesc const& Desc)
 
 bool CEqObj::add_equipped_item(EquipDesc const& Desc)
 {
-    // .text:062a9700..062a981b.
+    // FUN_062a9700
     Archetype::Equipment* const Arch = Archetype::GetEquipment(Desc.ArchId);
     if (Arch == nullptr)
     {
-        // 062a97e0..062a9813: the object's archetype nickname (asteroidarch() is the ICF
-        // fold of `return [this+0x88]`, read without a null test) and the arch id.
+        // The object's archetype is read without a null test.
         FDUMP(0x100002,
               "%s(%d) : *** WARNING: Object(%s) missing equipment archetype(%X)\n",
               kCEqObjSource, 0x127, Archetype->Nickname.get_string(), Desc.ArchId);
         return false;
     }
 
-    // 062a971f..062a9743: virtual alloc_equip (vtable +0x104) with the raw mission byte.
-    CEquip* const Equip = alloc_equip(Desc.Id, Arch, Desc.bMission);
+    CEquip* const Equip = alloc_equip(Desc.Id, Arch, Desc.bMission);   // vtable +0x104
     if (Equip == nullptr)
         return false;
 
-    // 062a9749..062a9757: FLD Health; FMUL HitPts; FSTP dword -> SetHitPoints (+0x40).
     Equip->SetHitPoints(Desc.Health * Arch->HitPts);
     if (!Desc.is_internal())
     {
@@ -171,7 +158,6 @@ bool CEqObj::add_equipped_item(EquipDesc const& Desc)
         }
         else
         {
-            // 062a9783..062a97c0: object nickname, equipment nickname, hardpoint (raw).
             FDUMP(0x100002,
                   "%s(%d) : *** WARNING: Object(%s) tried to connect internal type(%s) to "
                   "hardpoint(%s). Ignorable.",
@@ -185,19 +171,17 @@ bool CEqObj::add_equipped_item(EquipDesc const& Desc)
 
 bool CEqObj::add_cargo_item(EquipDesc const& Desc)
 {
-    // .text:062a9820..062a9919.
+    // FUN_062a9820
     Archetype::Equipment* const Arch = Archetype::GetEquipment(Desc.ArchId);
     if (Arch == nullptr)
     {
-        // 062a98d0..062a9903: object nickname (no null test), arch id.
         FDUMP(0x100002,
               "%s(%d) : *** WARNING: Object(%s) missing equipment archetype(%X)\n",
               kCEqObjSource, 0x158, Archetype->Nickname.get_string(), Desc.ArchId);
         return false;
     }
 
-    // 062a9851..062a98b2: new CECargo (0x2c), Init (vtable +0x5c) with Health, Count and a
-    // reference to the descriptor's own hardpoint CacheString (+0x08), AddNewEquipment.
+    // CECargo is 0x2c bytes; Init is vtable +0x5c.
     CECargo* const Cargo = new CECargo(this, Desc.Id, Arch, Desc.bMission);
     Cargo->Init(Desc.Health, (unsigned)Desc.Count, Desc.get_hardpoint());
     EquipManager.AddNewEquipment(Cargo);
@@ -206,8 +190,8 @@ bool CEqObj::add_cargo_item(EquipDesc const& Desc)
 
 bool CEqObj::sync_cargo(EquipDescList const& List)
 {
-    // .text:062a9920..062a9a80. First pass: every existing cargo equip (traverser mask
-    // 0x10000) takes Count and HitPoints from the List entry with its Id, or Count 0.
+    // FUN_062a9920. First pass: every existing cargo equip takes Count and HitPoints from the
+    // List entry with its Id, or Count 0.
     CEquipTraverser Trav(EquipTypeCargo);
     CEquip* Item = EquipManager.Traverse(Trav);
     while (Item != nullptr)
@@ -217,8 +201,6 @@ bool CEqObj::sync_cargo(EquipDescList const& List)
         if (Desc != nullptr)
         {
             Cargo->SetCount((unsigned)Desc->Count);
-            // 062a9988..062a99a0: GetMaxHitPoints (+0x44) FMUL Health, FSTP dword ->
-            // SetHitPoints (+0x40).
             Item->SetHitPoints(Item->GetMaxHitPoints() * Desc->Health);
         }
         else
@@ -228,9 +210,8 @@ bool CEqObj::sync_cargo(EquipDescList const& List)
         Item = EquipManager.Traverse(Trav);
     }
 
-    // 062a99be..062a9a67: second pass over the List nodes: every non-equipped entry whose Id
-    // has no equip yet gets a new CECargo exactly as add_cargo_item builds one, except that
-    // the GetEquipment result is used without a null test.
+    // Second pass: a new CECargo for every non-equipped entry without an equip, as
+    // add_cargo_item builds one but with no null test on GetEquipment.
     for (std::list<EquipDesc>::const_iterator It = List.Items.begin(); It != List.Items.end(); ++It)
     {
         EquipDesc const& Desc = *It;
@@ -249,9 +230,7 @@ bool CEqObj::sync_cargo(EquipDescList const& List)
 CEquip* CEqObj::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
                             bool bMissionFlag)
 {
-    // .text:062a9a90..062a9e9f: switch on Arch->get_class_type() (vtable +0x10, no null
-    // test), byte table 062a9edc over 9..0x22. Each case news its CE* class (the
-    // CEAttachedFX case inlines that ctor: CExternalEquip(2, ...) + vtable stamp).
+    // FUN_062a9a90. No null test on Arch.
     int const ClassType = (int)Arch->get_class_type();
 
     switch (ClassType)
@@ -286,7 +265,6 @@ CEquip* CEqObj::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
         break;
     }
 
-    // 062a9e64..062a9e89: every other class -- warning with Arch's nickname, return 0.
     FDUMP(0x100002,
           "%s(%d) : *** WARNING: alloc_equip: Archetype[%s] not supported/equippable!",
           kCEqObjSource, 0x1cf, Arch->Nickname.get_string());
@@ -295,15 +273,13 @@ CEquip* CEqObj::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
 
 void CEqObj::link_shields()
 {
-    // .text:062abbe0..062abd43. Walks the archetype's shield links (retail vector begin/end
-    // at Archetype+0x68/+0x6c, the port's heap vector allocated by the EqObj ctor), each
-    // link's generator hardpoints in order; no null test on Archetype.
+    // FUN_062abbe0. Shield links at Archetype+0x68/+0x6c; no null test on Archetype.
     Archetype::EqObj const* const Eq = eqobjarch();
     std::vector<Archetype::ShieldLink> const& Links = *Eq->ShieldLinks;
     for (std::vector<Archetype::ShieldLink>::const_iterator LinkIt = Links.begin(); LinkIt != Links.end(); ++LinkIt)
     {
         Archetype::ShieldLink const& Link = *LinkIt;
-        CEShield* Shield = nullptr;                                    // 062abc1e XOR ESI,ESI
+        CEShield* Shield = nullptr;
         for (std::vector<CacheString>::const_iterator HpIt = Link.GeneratorHps.begin();
              HpIt != Link.GeneratorHps.end(); ++HpIt)
         {
@@ -315,8 +291,7 @@ void CEqObj::link_shields()
                 Archetype::Equipment* const ShieldArch = Archetype::GetEquipmentByName(Link.ShieldArch);
                 if (ShieldArch == nullptr)
                 {
-                    // 062abd06..062abd2e: shield arch nickname, hardpoint (raw); the whole
-                    // function returns.
+                    // The whole function returns.
                     FDUMP(0x100001,
                           "%s(%d) : *** ERROR: Failed to create shield(%s) on hardpoint(%s). "
                           "(Ignorable)",
@@ -334,11 +309,8 @@ void CEqObj::link_shields()
 
 void CEqObj::load_arch_groups(std::list<CollisionGroupDesc> const& Descs)
 {
-    // .text:062a9420..062a94e8. For every description: group archetype =
-    // Archetype(+0x88, no null test)->get_group_by_id(word Id +0x8) -- the result goes to the
-    // CArchGroup ctor untested; new CArchGroup(group, this) (0x34 bytes); SetRelativeHealth
-    // (Health +0xc); Health FCOMP 0.0 / TEST AH,0x44 / JP: only equal -> Kill(3); then
-    // ArchGroups (+0x144).AddNewArchGroup. Finally DestroyDeadGroups.
+    // FUN_062a9420. Neither the archetype nor get_group_by_id's result is tested. CArchGroup is
+    // 0x34 bytes; only an exact 0.0 health kills the group.
     Archetype::EqObj* const Eq = eqobjarch();
     for (std::list<CollisionGroupDesc>::const_iterator It = Descs.begin(); It != Descs.end(); ++It)
     {
@@ -354,14 +326,13 @@ void CEqObj::load_arch_groups(std::list<CollisionGroupDesc> const& Descs)
 
 void CEqObj::clear_arch_groups()
 {
-    // Common.dll.c 0x494f0: pure forwarding wrapper around ArchGroups.Clear().
+    // FUN_062a94f0
     ArchGroups.Clear();
 }
 
 void CEqObj::get_collision_group_description(std::list<CollisionGroupDesc>& OutDescs) const
 {
-    // Common.dll.c 0x49500: walk every live arch group (fresh CArchGrpTraverser) and
-    // append one CollisionGroupDesc per group to the caller's list.
+    // FUN_062a9500
     CArchGrpTraverser Traverser;
     for (CArchGroup const* Group = ArchGroups.Traverse(Traverser); Group != nullptr;
          Group = ArchGroups.Traverse(Traverser))
@@ -374,19 +345,18 @@ void CEqObj::get_collision_group_description(std::list<CollisionGroupDesc>& OutD
 
 void CEqObj::get_equip_desc_list(EquipDescVector& OutList) const
 {
-    // .text:062a9f00-062aa18a. One descriptor (062a9f09) is reused for every equip.
+    // FUN_062a9f00. One descriptor is reused for every equip.
     EquipDesc Desc;
 
-    // 062a9f12-062a9fcb: the inlined VC6 reserve(size() + ExternalCount (+0xf0) +
-    // InternalCount (+0xfc)). Capacity below that (unsigned JNC) -> new buffer of exactly
-    // that many elements, copy-construct the live ones (FUN_0626c1e0), free the old one.
+    // Inlined VC6 reserve(size() + ExternalCount (+0xf0) + InternalCount (+0xfc)), to exactly
+    // that many elements.
     unsigned const OldSize = (OutList.Begin != nullptr) ? (unsigned)(OutList.End - OutList.Begin) : 0;
     unsigned const Wanted = EquipManager.InternalCount + EquipManager.ExternalCount + OldSize;
     unsigned const Capacity = (OutList.Begin != nullptr) ? (unsigned)(OutList.Cap - OutList.Begin) : 0;
     if (Capacity < Wanted)
     {
         int AllocCount = (int)Wanted;
-        if (AllocCount < 0) // 062a9f58 JGE (the allocator's own clamp)
+        if (AllocCount < 0) // the allocator's own clamp
             AllocCount = 0;
         EquipDesc* const NewBuf = (EquipDesc*)::operator new(AllocCount * sizeof(EquipDesc));
         EquipDesc* Dst = NewBuf;
@@ -409,12 +379,11 @@ void CEqObj::get_equip_desc_list(EquipDescVector& OutList) const
             continue;
         if ((unsigned)(OutList.Cap - OutList.End) < 1)
         {
-            // 062aa018-062aa0ba: grow to size() + max(size(), 1), copy the old elements,
-            // construct Desc after them, free the old buffer.
+            // VC6 growth: size() + max(size(), 1).
             unsigned const Size = (OutList.Begin != nullptr) ? (unsigned)(OutList.End - OutList.Begin) : 0;
             unsigned const Grown = Size + (Size > 1 ? Size : 1);
             int AllocCount = (int)Grown;
-            if (AllocCount < 0) // 062aa041 JNS
+            if (AllocCount < 0)
                 AllocCount = 0;
             EquipDesc* const NewBuf = (EquipDesc*)::operator new(AllocCount * sizeof(EquipDesc));
             EquipDesc* Dst = NewBuf;
@@ -428,7 +397,6 @@ void CEqObj::get_equip_desc_list(EquipDescVector& OutList) const
         }
         else
         {
-            // 062aa0bf-062aa167: room left -- construct Desc at End, End + 1.
             new (OutList.End) EquipDesc(Desc);
             ++OutList.End;
         }
@@ -437,20 +405,15 @@ void CEqObj::get_equip_desc_list(EquipDescVector& OutList) const
 
 void CEqObj::init_docking_points(unsigned int BaseId)
 {
-    // .text:062aadc0..062ab0f4.
-    DockingPointBaseId = BaseId;                                       // 062aadcb [this+0x164]
+    // FUN_062aadc0
+    DockingPointBaseId = BaseId;                                       // +0x164
 
-    // 062aadd1..062aae70: reserve room for one DockAnimInfo per archetype docking sphere
-    // (reallocate to exactly that count when the capacity is smaller). The vector is NOT
-    // cleared: the entries are appended. No null test on the archetype.
+    // The vector is not cleared: entries are appended. No null test on the archetype.
     Archetype::EqObj const* const Arch = eqobjarch();
     DockingPoints.reserve(Arch->DockingSpheres.size());
 
-    // 062aae73..062ab0e6: per sphere (0x10-byte records, the end re-read every pass) a
-    // DockAnimInfo {bActive 0, channel, 0.0f, &sphere} is pushed at the end. A non-empty
-    // animation name (record +0x08) is started with DALib::Anim slot 9 (+0x24)
-    // PlayScript(Arch->AnimIndex (+0x44), this->EngineInstanceId, name, 0, 0); a -1 result
-    // is reported. An empty name gives channel -1 without a call.
+    // A non-empty animation name is started with IAnimation2 slot 9 PlayScript; an empty one
+    // gives channel -1.
     for (std::vector<Archetype::EqObj::DockingSphere>::const_iterator It = Arch->DockingSpheres.begin();
          It != Arch->DockingSpheres.end(); ++It)
     {
@@ -463,7 +426,6 @@ void CEqObj::init_docking_points(unsigned int BaseId)
                                                  Sphere.AnimName.c_str(), nullptr, nullptr);
             if (AnimChannel == -1)
             {
-                // 062aaedf..062aaf13: the name and the object archetype's nickname.
                 FDUMP(0x100001,
                       "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
                       "E:\\FL\\Scratch\\Source\\Common\\CEqObj.cpp",
@@ -473,7 +435,7 @@ void CEqObj::init_docking_points(unsigned int BaseId)
             }
         }
 
-        DockAnimInfo Entry;                                            // 062aae79..062aae91
+        DockAnimInfo Entry;
         Entry.bActive = false;
         Entry.AnimChannel = AnimChannel;
         Entry.LastDuration = 0.0f;
@@ -492,32 +454,26 @@ void CEqObj::init(CreateParms const& Parms)
     SpaceCostume.PartIds[2] = Parms.SpaceCostume.PartIds[2];
     SpaceCostume.PartIds[3] = Parms.SpaceCostume.PartIds[3];
 
-    // Listing does not Vibe::Alloc here. Player/NPC Alloc is a separate Common helper.
+    // No Vibe::Alloc here; player/NPC Alloc is a separate Common helper.
 
-    // .text:062a931b..062a9340: the accessory count (+0x138) = Parms+0x94 stored as is (no
-    // clamp); when > 0 (signed JLE), AccessoryIds[i] (+0x118) = Parms' (+0x74) while i < the
-    // stored count. Retail has no bound: a count of 9 or 10 rewrites +0x138 / +0x13c with the
-    // same values this function stores there anyway, anything larger copies the creation
-    // parameters' std containers over CEqObj fields (very strange; not reproducible over the
-    // port's types), so the copy stops at the 8-entry array.
+    // Deviation: retail stores the count (+0x138) unclamped and copies without a bound; a count
+    // of 9 or 10 rewrites +0x138 / +0x13c with the same values, anything larger copies the
+    // creation parameters' containers over CEqObj fields. The port stops at the 8-entry array.
     SpaceCostume.AccessoryCount = Parms.SpaceCostume.AccessoryCount;
     int const AccessoryCount = (int)SpaceCostume.AccessoryCount;
     for (int AccessoryIndex = 0; AccessoryIndex < AccessoryCount && AccessoryIndex < 8; ++AccessoryIndex)
         SpaceCostume.AccessoryIds[AccessoryIndex] = Parms.SpaceCostume.AccessoryIds[AccessoryIndex];
 
-    VoiceId = Parms.VoiceId;                          // 062a9341 (+0x98 -> +0x13c)
+    VoiceId = Parms.VoiceId;                          // Parms +0x98 -> +0x13c
 
-    load_arch_groups(Parms.ArchGroupDescs);           // 062a9356 (+0xac)
+    load_arch_groups(Parms.ArchGroupDescs);           // Parms +0xac
 
-    load_equip_and_cargo(Parms.Equipment, true);      // 062a9368 virtual +0xa4 (+0x9c, true)
+    load_equip_and_cargo(Parms.Equipment, true);      // virtual +0xa4
 
-    // 062a936e..062a9388: any shield generator (FindFirst 0x200) -> virtual link_shields.
     if (EquipManager.FindFirst(EquipTypeShieldGen) != nullptr)
         link_shields();
 
-    // 062a938e..062a9416: MaxPower (+0x19c) = 0, then for every equip of mask 0x40000:
-    // MaxPower = float((IsDestroyed() (vtable +0x8) ? 0.0f : Arch->Capacity (+0x70)) +
-    // MaxPower); finally Power (+0x198) = MaxPower. No cast and no class test.
+    // MaxPower +0x19c, Power +0x198. No cast and no class test on the power equips.
     MaxPower = 0.0f;
     CEquipTraverser PowerWalk(EquipTypePower);
     for (CEquip* PowerEquip = EquipManager.Traverse(PowerWalk); PowerEquip != nullptr;
@@ -533,7 +489,7 @@ void CEqObj::init(CreateParms const& Parms)
 
 CEqObj::DockAnimInfo::DockAnimInfo()
 {
-    // .text:06287270: byte +0 = 0, dword +4 = -1, +8 = 0, +0xc = 0. Bytes +1..+3 untouched.
+    // FUN_06287270. Padding bytes +1..+3 untouched.
     bActive = false;
     AnimChannel = -1;
     LastDuration = 0.0f;
@@ -542,9 +498,7 @@ CEqObj::DockAnimInfo::DockAnimInfo()
 
 bool CEqObj::is_targetable() const
 {
-    // .text:06287240: TEST [this+0xa0],1 / JZ false; FLD [this+0x140] / FCOMP 1.0f /
-    // FNSTSW / TEST AH,1 / JZ false. C0 is clear only for CloakPercent >= 1.0; less AND
-    // unordered (NaN) set C0 -> true.
+    // FUN_06287240. CloakPercent (+0x140) NaN counts as targetable.
     if ((FlagsA0 & 1) == 0)
         return false;
     return !(CloakPercent >= 1.0f);
@@ -552,31 +506,26 @@ bool CEqObj::is_targetable() const
 
 Archetype::EqObj* CEqObj::eqobjarch() const
 {
-    // 0x06262d50: `MOV EAX,[this+0x88]; RET` (ICF fold).
+    // FUN_06262d50 (ICF fold)
     return (Archetype::EqObj*)Archetype;
 }
 
 bool CEqObj::is_damaged_obj_attached(CacheString const& Name) const
 {
-    // .text:062a9590: lower_bound (FUN_062fcfb0) on the set at this+0xbc; the result is
-    // end() unless its key equals Name; returns result != end().
+    // FUN_062a9590. The set at +0xbc, keyed by the Value pointer.
     return AttachedDamageObjs.find(Name) != AttachedDamageObjs.end();
 }
 
 void CEqObj::attaching_damaged_obj(CacheString const& Name)
 {
-    // .text:062a95f0: the set's unique insert (descent comparing the Value pointer as
-    // unsigned, then _Insert FUN_0628fd80 unless an equal key is already present).
+    // FUN_062a95f0
     AttachedDamageObjs.insert(Name);
 }
 
 unsigned CEqObj::get_name() const
 {
-    // Common.dll.c 0x4a420: NOT an archetype lookup (that was a copy-paste of
-    // CSimple::get_name and wrong for CEqObj). Retail calls
-    // Reputation::Vibe::GetName(this+0x104 /*VibeId*/, &fmtA, &fmtB, &wideName) and
-    // returns fmtA's mad-lib id (FmtStr+0x04). Matches the identical pattern already
-    // used by CShip::get_pilot_name (common_cship.cpp) for the same Vibe::GetName call.
+    // FUN_062aa420. The Vibe name (VibeId +0x104), not an archetype lookup; returns the first
+    // FmtStr's mad-lib id. Same call as CShip::get_pilot_name.
     FmtStr NameFmtA;
     FmtStr NameFmtB;
     wchar_t const* WideName = nullptr;
@@ -591,29 +540,14 @@ float CEqObj::get_cloak_percentage() const
 
 int CEqObj::is_cloaked() const
 {
-    // Common.dll.c:45895-45903. Same threshold CELauncher::get_fire_error checks (common_celauncher.cpp,
-    // CloakPercent >= 1.0f -> FireOwnerBlocked): CloakPercent is a 0.0-1.0 cloak-fade fraction
-    // (see get_cloak_percentage above); >= 1.0 means fully cloaked.
+    // CloakPercent is a 0..1 fade fraction; 1.0 is fully cloaked (same threshold as
+    // CELauncher::get_fire_error).
     return (CloakPercent >= 1.0f) ? 1 : 0;
 }
 
-
 float CEqObj::attitude_towards(CEqObj const* Other) const
 {
-    // Common.dll.c 0x4a640. Reputation-based attitude towards another CEqObj.
-    // Disasm lines 140778-140793:
-    //   LEA EAX, [ESP+4] (local float)
-    //   PUSH EAX (OutAttitude ptr)
-    //   ADD EDX, 0x104 (Other->VibeId)
-    //   PUSH EDX (IdB ptr)
-    //   ADD ECX, 0x104 (this->VibeId)
-    //   PUSH ECX (IdA ptr)
-    //   CALL Reputation::Vibe::AttitudeTowards
-    //   TEST EAX, EAX; JZ success
-    //   FLD 0.0f; RET (failure -> return 0.0f)
-    //   success: FLD [ESP+4]; RET (return OutAttitude)
-    // No null test on Other (.text:062aa640..062aa670); retail's out slot is the reused
-    // argument slot, read only on success.
+    // FUN_062aa640. No null test on Other; 0.0f when the reputation call fails.
     float Attitude = 0.0f;
     int const Result = Reputation::Vibe::AttitudeTowards(this->VibeId, Other->VibeId, Attitude);
     if (Result != 0)
@@ -624,17 +558,7 @@ float CEqObj::attitude_towards(CEqObj const* Other) const
 void CEqObj::attitude_towards_symmetrical(float& OutAtt, CEqObj const* Other,
                                           float& OutReverse) const
 {
-    // Common.dll.c 0x4a600. Calls Reputation::Vibe::AttitudeTowardsSymmetrical.
-    // Disasm lines 140750-140763:
-    //   ADD EAX, 0x104 (this->VibeId ptr)
-    //   PUSH EAX
-    //   ADD ECX, 0x104 (Other->VibeId ptr)
-    //   PUSH ECX
-    //   CALL AttitudeTowardsSymmetrical(this+0x104, Other+0x104, &OutAtt, &OutReverse)
-    //   TEST EAX; JZ success
-    //   MOV [EDI], 0 (OutReverse = 0); MOV [ESI], 0 (OutAtt = 0)
-    // .text:062aa600..062aa637: no null test on Other and no pre-zeroing; both outputs are
-    // zeroed only when the call fails.
+    // FUN_062aa600. No null test on Other; both outputs are zeroed only when the call fails.
     int const Result = Reputation::Vibe::AttitudeTowardsSymmetrical(
         this->VibeId, Other->VibeId, OutAtt, OutReverse);
     if (Result != 0)
@@ -646,10 +570,7 @@ void CEqObj::attitude_towards_symmetrical(float& OutAtt, CEqObj const* Other,
 
 void CEqObj::disconnect(IObjRW* Watcher)
 {
-    // .text:062aa3d0-062aa415. When the behavior manager exists and the object its +0xF0
-    // watcher holds (Watchable - 8, or 0) is Watcher, destroy it (FUN_062d2530), free it and
-    // clear +0x194. The second `TEST ESI,ESI` at .text:062aa3f5 is the delete-expression's
-    // own null test on a pointer already known non-null.
+    // FUN_062aa3d0. Deletes the behavior manager (+0x194) when its +0xF0 watcher holds Watcher.
     if (BehaviorMgr == nullptr)
         return;
     if (ObjRwFromWatchable(BehaviorMgr->WatchablePtr) != Watcher)
@@ -660,40 +581,34 @@ void CEqObj::disconnect(IObjRW* Watcher)
 
 void CEqObj::unmake_physical()
 {
-    // .text:062aa2f0-062aa350. CEquipTraverser(0x100) (shields); the walk runs while
-    // CEShield::cast of the next equip is non-null, tearing each shield's intruder checker
-    // down; then the base.
+    // FUN_062aa2f0. The shield walk stops at the first non-shield (mask 0x100).
     CEquipTraverser Trav(0x100);
     for (CEShield* Shield = CEShield::cast(EquipManager.Traverse(Trav)); Shield != nullptr;
          Shield = CEShield::cast(EquipManager.Traverse(Trav)))
     {
-        Shield->DestroyIntruderChecker();                        // 062aa326
+        Shield->DestroyIntruderChecker();
     }
-    CSimple::unmake_physical();                                  // 062aa346
+    CSimple::unmake_physical();
 }
 
 void CEqObj::remake_physical(PhySys::CreateParms const& Parms, float Radius)
 {
-    // .text:062aa360-062aa3c8. The base first, then the same shield walk re-attaching each
-    // intruder checker.
-    CObject::remake_physical(Parms, Radius);                     // 062aa372
+    // FUN_062aa360
+    CObject::remake_physical(Parms, Radius);
     CEquipTraverser Trav(0x100);
     for (CEShield* Shield = CEShield::cast(EquipManager.Traverse(Trav)); Shield != nullptr;
          Shield = CEShield::cast(EquipManager.Traverse(Trav)))
     {
-        Shield->AttachIntruderChecker();                         // 062aa3a6
+        Shield->AttachIntruderChecker();
     }
 }
 
 int CEqObj::update(float Dt, unsigned Flags)
 {
-    // .text:062aa520-062aa5f1.
-    CObject::update(Dt, Flags);                                  // 062aa532
+    // FUN_062aa520
+    CObject::update(Dt, Flags);
 
-    // 062aa537-062aa55f: the flag byte (reusing the Flags stack slot) is set only when
-    // bWeaponsOffline and get_relative_health() <= 0.0 (FCOMP double 0.0 at 0639c430,
-    // TEST AH,0x41 + JNP: exactly one of C0 / C3 set -> less or equal keeps 1; greater or
-    // unordered -> 0).
+    // Unordered health does not count as destroyed.
     bool bWeaponsOfflineDestroyed = false;
     if (bWeaponsOffline != 0)
     {
@@ -701,7 +616,7 @@ int CEqObj::update(float Dt, unsigned Flags)
         bWeaponsOfflineDestroyed = (RelHealth <= 0.0);
     }
 
-    // 062aa55f-062aa59b: CEquipTraverser(0xff3efffc), Update(Dt, Flags) (vtable +0x24).
+    // Mask 0xff3efffc. Update is vtable +0x24.
     CEquipTraverser Trav(-0xc10004);
     CEquip* Item = EquipManager.Traverse(Trav);
     while (Item != nullptr)
@@ -710,25 +625,22 @@ int CEqObj::update(float Dt, unsigned Flags)
         Item = EquipManager.Traverse(Trav);
     }
 
-    // 062aa59d-062aa5de: BehaviorMgr present, not destroyed, Flags & 8 (dword 0639e530 = 8)
-    // clear and ControlExclusion bit 0 clear -> FUN_062d2b10(Dt) on the manager. The two
-    // calls around it (062aa5c3 / 062aa5d9, PUSH 1 / PUSH 0) go to 062a8920, a bare RET.
+    // FUN_062d2b10. Retail brackets it with two calls to 062a8920, a bare RET.
     if (BehaviorMgr != nullptr && !bWeaponsOfflineDestroyed && (Flags & 8) == 0 &&
         (ControlExclusion & 1) == 0)
     {
         BehaviorMgr->UpdateBehaviorTick(Dt);
     }
 
-    update_docking_animations(Dt);                               // 062aa5e4
+    update_docking_animations(Dt);
     return 0;
 }
 
 ObjActivateResult CEqObj::activate(bool bOn, unsigned DockIndex)
 {
-    // .text:062ab130. DockIndex -1 fails; so does an index outside the ARCHETYPE's docking
-    // spheres (Archetype+0x84 vector, 0x10-byte elements, begin == null counts as empty) --
-    // retail bounds against the archetype, not against this+0x184. DockingPoints is built 1:1
-    // from those spheres by init_docking_points. Then the byte at DockingPoints[i] is swapped.
+    // FUN_062ab130. Retail bounds DockIndex against the archetype's docking spheres
+    // (Archetype+0x84), not against DockingPoints (+0x184), which init_docking_points builds
+    // 1:1 from them.
     if (DockIndex == 0xffffffffu)
         return ObjActivateFailed;
     Archetype::EqObj const* Arch = eqobjarch();
@@ -741,11 +653,8 @@ ObjActivateResult CEqObj::activate(bool bOn, unsigned DockIndex)
 
 bool CEqObj::get_activate_state(std::vector<bool>& OutStates)
 {
-    // Common.dll.c 0x4b190 (78762-78843). Appends bActive for every DockingPoints entry
-    // (the byte CEqObj::activate writes) and returns true if any
-    // docking point is currently active. Retail hand-inlines std::vector<bool>'s
-    // bit-packed push_back/growth machinery; the port's std::vector<bool> does the
-    // same thing through its normal push_back.
+    // FUN_062ab190. Appends every docking point's bActive; true if any is active. Retail
+    // inlines vector<bool>'s push_back.
     bool bAnyActive = false;
     for (DockAnimInfo const& Entry : DockingPoints)
     {
@@ -759,50 +668,39 @@ bool CEqObj::get_activate_state(std::vector<bool>& OutStates)
 
 bool CEqObj::get_sub_obj_velocity(unsigned short SubObjId, Vector& Out) const
 {
-    // .text:062ab330-062ab3ea. Out is first set to this object's own velocity (vtable +0x54,
-    // 062ab33a-062ab35c) on every path; a sub-object query writes a temporary that is copied
-    // into Out only on success.
+    // FUN_062ab330. Out is the object's own velocity (vtable +0x54) on every path; a
+    // sub-object's velocity replaces it only on success.
     Out = get_velocity();
     Vector Local;
-    if (SubObjectID::IsEquipID(SubObjId))                        // 062ab35f
+    if (SubObjectID::IsEquipID(SubObjId))
     {
         CEquip const* Eq = EquipManager.FindByID(SubObjId);
         if (Eq == nullptr)
             return false;
-        CExternalEquip const* External = CExternalEquip::cast(Eq);  // 062ab37c
+        CExternalEquip const* External = CExternalEquip::cast(Eq);
         if (External == nullptr)
             return false;
-        if (!External->GetVelocity(Local))                       // vtable +0x6c, 062ab391
+        if (!External->GetVelocity(Local))                       // vtable +0x6c
             return false;
     }
     else
     {
-        if (!SubObjectID::IsArchGroupID(SubObjId))               // 062ab396
+        if (!SubObjectID::IsArchGroupID(SubObjId))
             return false;
         CArchGroup* Group = const_cast<CArchGroupManager&>(ArchGroups).FindByID(SubObjId);
         if (Group == nullptr)
             return false;
-        if (!Group->GetVelocity(Local))                          // 062ab3b9
+        if (!Group->GetVelocity(Local))
             return false;
     }
-    Out = Local;                                                 // 062ab3c2-062ab3d6
+    Out = Local;
     return true;
 }
 
 bool CEqObj::get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) const
 {
-    // Listing 0x4b3f0, re-read in full this pass: 062ab3f0 .. 062ab4b8.
-    //
-    // This body used to be a bare `return false;` on the strength of two claims that have
-    // both since gone stale: (a) "CExternalEquip vtable-slot ambiguity with no CAttachedEquip
-    // fallback" -- CExternalEquip::GetCenterOfMass IS the +0x70 virtual and is declared in
-    // common_cequip.h, with CAttachedEquip overriding it; and (b) "CArchGroup::GetCenterOfMass
-    // doesn't exist in this port" -- it does now (this file, listing 0x40360). Both branches
-    // are wired for real.
-    //
-    // Note retail leaves Out untouched on every failure path (BL is zeroed at 062ab3fd and
-    // LAB_062ab4b2 just returns AL=BL), so the unconditional zero-fill this used to do was
-    // itself a deviation and is gone.
+    // FUN_062ab3f0. CExternalEquip::GetCenterOfMass is vtable +0x70. Out is left untouched on
+    // every failure path.
     if (SubObjectID::IsEquipID(SubObjId))
     {
         CEquip const* Eq = EquipManager.FindByID(SubObjId);
@@ -833,7 +731,7 @@ bool CEqObj::get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) co
 
 bool CEqObj::get_sub_obj_max_hit_pts(unsigned short SubObjId, float& Out) const
 {
-    // Common.dll.c 0x4b820 (79147-79179).
+    // FUN_062ab820
     Out = 0.0f;
     if (SubObjectID::IsEquipID(SubObjId))
     {
@@ -848,7 +746,7 @@ bool CEqObj::get_sub_obj_max_hit_pts(unsigned short SubObjId, float& Out) const
         CArchGroup* Group = const_cast<CArchGroupManager&>(ArchGroups).FindByID(SubObjId);
         if (Group == nullptr)
             return false;
-        Out = (float)Group->GetMaxHitPoints();                        // 062ab886 FSTP float
+        Out = (float)Group->GetMaxHitPoints();
         return true;
     }
     return false;
@@ -856,14 +754,14 @@ bool CEqObj::get_sub_obj_max_hit_pts(unsigned short SubObjId, float& Out) const
 
 bool CEqObj::get_sub_obj_relative_health(unsigned short SubObjId, float& Out) const
 {
-    // Common.dll.c 0x4b8a0 (79185-79223).
+    // FUN_062ab8a0
     Out = 0.0f;
     if (SubObjectID::IsEquipID(SubObjId))
     {
         CEquip const* Eq = EquipManager.FindByID(SubObjId);
         if (Eq == nullptr)
             return false;
-        Out = (float)Eq->GetRelativeHealth();                         // 062ab8d4 FSTP float
+        Out = (float)Eq->GetRelativeHealth();
         return true;
     }
     if (SubObjectID::IsArchGroupID(SubObjId))
@@ -871,12 +769,12 @@ bool CEqObj::get_sub_obj_relative_health(unsigned short SubObjId, float& Out) co
         CArchGroup* Group = const_cast<CArchGroupManager&>(ArchGroups).FindByID(SubObjId);
         if (Group == nullptr)
             return false;
-        Out = (float)Group->GetRelativeHealth();                      // 062ab90a FSTP float
+        Out = (float)Group->GetRelativeHealth();
         return true;
     }
     if (SubObjId == 1)
     {
-        Out = (float)CSimple::get_relative_health();                  // 062ab924 FSTP float
+        Out = (float)CSimple::get_relative_health();
         return true;
     }
     return false;
@@ -884,8 +782,7 @@ bool CEqObj::get_sub_obj_relative_health(unsigned short SubObjId, float& Out) co
 
 long CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
 {
-    // Common.dll.c 0x4b990 (79252-79291). See class-comment on this override's declaration
-    // re: reusing CAttachedEquip::GetRootIndex() for the retail vtable+0x84 slot.
+    // FUN_062ab990
     if (SubObjectID::IsEquipID(SubObjId))
     {
         CEquip const* Eq = EquipManager.FindByID(SubObjId);
@@ -894,12 +791,11 @@ long CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
         CAttachedEquip* const Attached = CAttachedEquip::cast(const_cast<CEquip*>(Eq));
         if (Attached == nullptr)
         {
-            // 062ab9e0..062aba0a.
             FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCEqObjSource, 0x4ee,
                   "Tried to get inst for non-attached equipment.");
             return -1;
         }
-        // vtable +0x84 = ??_7CAttachedEquip slot 0639c6a0 = CAttachedEquip::GetRootIndex.
+        // vtable +0x84 (slot 0639c6a0)
         return Attached->GetRootIndex();
     }
     if (SubObjectID::IsArchGroupID(SubObjId))
@@ -916,10 +812,8 @@ long CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
 
 IBehaviorManager* CEqObj::create_behavior_interface(IObjRW* Owner, int GraphId)
 {
-    // Common.dll.c 0x4c240 (Common.dll.txt 143889-143932). .text:062ac259-062ac298: when
-    // +0x194 is null, operator_new(0x1cc) + FUN_062d2220(Owner) (IBehaviorManager's ctor
-    // takes the IObjRW* argument, .text:062ac280-062ac287). Both paths then run
-    // FUN_062d2830(this+0xAC) at .text:062ac29e-062ac2ab and set_state_graph at .text:062ac2bd.
+    // FUN_062ac240. operator_new(0x1cc) + ctor FUN_062d2220 when +0x194 is null; then
+    // FUN_062d2830(ObjectDb +0xAC) and set_state_graph on both paths.
     if (BehaviorMgr == nullptr)
         BehaviorMgr = new IBehaviorManager(Owner);
     ConnectBehaviorManagerObjectDb(BehaviorMgr, ObjectDb);
@@ -929,29 +823,16 @@ IBehaviorManager* CEqObj::create_behavior_interface(IObjRW* Owner, int GraphId)
 
 void CEqObj::enable_controllers()
 {
-    // Common.dll.c 0x4a250 / raw 062aa250-062aa290. Retail calls vtable+0x4c on every
-    // equip via CEquipManager::Traverse(all types). BUG FIX: this used to index *this
-    // port's own* freshly-built vtable by that raw retail byte offset (Vt[0x4c/4]), but
-    // CEquip's actual declared virtual order here puts EnableController/DisableController
-    // at slots 9/10 (byte 0x24/0x28) -- 0x4c/0x50 land on GetStatus/GetConnectionPosition
-    // instead (counted from the class body in common_cequip.h: ~CEquip, IsActive,
-    // IsDestroyed, IsFunctioning, Activate, Destroy, GetMaxHitPoints, SetHitPoints,
-    // IsDisabled, EnableController, DisableController, IsControllerEnabled, Update,
-    // GetHitPoints, GetRelativeHealth, IsTemporary, GetEquipDesc, CanDelete, IsLootable,
-    // GetStatus(0x4c), GetConnectionPosition(0x50)). Retail's own vtable order differs
-    // from this port's declaration order, so raw slot-offset dispatch on a locally
-    // compiled object is invalid here -- calling the named virtual directly is both
-    // correct and immune to future reordering.
-    CEquipTraverser Trav; // default ctor already sets TypeMask=0xFFFFFFFF (all types)
+    // FUN_062aa250. Retail calls vtable +0x4c (EnableController) on every equip. The port's
+    // CEquip declaration order differs from retail's vtable, so the named virtual is called.
+    CEquipTraverser Trav; // all types
     for (CEquip* Eq = EquipManager.Traverse(Trav); Eq != nullptr; Eq = EquipManager.Traverse(Trav))
         Eq->EnableController();
 }
 
 void CEqObj::disable_controllers()
 {
-    // Common.dll.c 0x4a2a0 / raw 062aa2a0-062aa2e0. See enable_controllers() above for why
-    // this calls the named virtual instead of indexing the port's own vtable by retail's
-    // 0x50 byte offset (which lands on GetConnectionPosition in this port's declared order).
+    // FUN_062aa2a0. Retail vtable +0x50; see enable_controllers.
     CEquipTraverser Trav;
     for (CEquip* Eq = EquipManager.Traverse(Trav); Eq != nullptr; Eq = EquipManager.Traverse(Trav))
         Eq->DisableController();
@@ -959,33 +840,18 @@ void CEqObj::disable_controllers()
 
 bool CEqObj::launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) const
 {
-    // Common.dll.c 0x4a980, traced from the raw asm (062aa980-062aab42) rather than the
-    // decompiled C, whose scratch-stack variable names for the quaternion/matrix buffers
-    // (local_70/local_64/local_54/local_48/afStack_30) overlap in memory in ways Ghidra
-    // named inconsistently -- the data flow below (build a quaternion, turn it into a
-    // matrix, compose it onto the hardpoint's orientation) is unambiguous regardless.
-    //
-    // Fast path: HardpointIndex selects one of the archetype's docking/launch points.
-    // Retail resolves it against the archetype's DockingSpheres array (this+0x88 ->
-    // Archetype::Root, +0x88/+0x8c begin/end of a 0x10-byte-stride vector, name at +4).
-    // STALE COMMENT FIXED (D50, 2026-09-09): EqObj::read() DOES populate DockingSpheres
-    // today (common_archetype_ships.cpp's "docking_sphere" case) -- this branch is
-    // live, not dormant. Also consumed by CEqObj::init_docking_points (DockingPoints,
-    // populated 1:1 from Arch->DockingSpheres) and CEqObj::dock_terminal_valid.
-    // 062aa98b-062aa9b6: index != -1, then the archetype (+0x88, no null test) DockingSpheres
-    // vector: an empty one (begin == null) or an index not below its size (unsigned JNC)
-    // takes the fallback.
+    // FUN_062aa980 (traced from the listing). HardpointIndex selects one of the archetype's
+    // docking spheres (Archetype+0x88/+0x8c, 0x10-byte stride, name at +4; no null test on the
+    // archetype); an invalid index takes the fallback below.
     Archetype::EqObj* Arch = eqobjarch();
     if (HardpointIndex != -1 && (unsigned)HardpointIndex < (unsigned)Arch->DockingSpheres.size())
     {
-        // 062aa9bc-062aa9de: HardpointPosition(instance, sphere+0x04 name, &OutPos, &OutOrient).
         char const* HpName = Arch->DockingSpheres[(unsigned)HardpointIndex].HardpointName.c_str();
         HardpointPosition(this->EngineInstanceId, HpName, &OutPos, &OutOrient);
 
-        // 062aa9e3-062aaa3b: Col1 = column 1 of the hardpoint orientation (float copies);
-        // W = (float)cos(A), A = DAT_0639e2d8 (double, float pi/2); the scale
-        // sin(A) / sqrt((z*z + x*x) + y*y) stays on the FPU (double) and is stored as the
-        // float argument of FUN_06288830 (Vector * float). No zero-length test.
+        // A quaternion about column 1 of the hardpoint orientation by A = DAT_0639e2d8 (float
+        // pi/2 as a double). The scale is rounded to float for FUN_06288830 (Vector * float).
+        // No zero-length test.
         double const kSpreadAngle = 1.5707963705062866;
         Vector const Col1{ OutOrient.E[0][1], OutOrient.E[1][1], OutOrient.E[2][1] };
         float const W = X87CosF(kSpreadAngle);
@@ -997,9 +863,7 @@ bool CEqObj::launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) c
         };
         FQuat const Quat{ W, Scale * Col1.x, Scale * Col1.y, Scale * Col1.z };
 
-        // 062aaa55-062aaac1: the cached 3DMathEngine (no null test): QuaternionToMatrix
-        // (+0x54) into a temporary, then MulMatrix (+0x20)(tmp, Spread, OutOrient) copied back
-        // into OutOrient.
+        // QuaternionToMatrix +0x54, MulMatrix +0x20; no null test on the engine.
         I3DMathEngine* Math = Acquire3DMathEngine();
         Matrix SpreadMatrix;
         Math->QuaternionToMatrix((FMatrix&)SpreadMatrix, (FQuaternion const&)Quat);
@@ -1009,10 +873,8 @@ bool CEqObj::launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) c
         return true;
     }
 
-    // 062aaace-062aab3c: OutPos = +0x2c, OutOrient = +0x08 (9 dwords), then rows 0 and 2 of
-    // every column rotated by A = DAT_0639e2d0 (double, float pi): c = cos(A), s = sin(A)
-    // stay on the FPU, each element is computed in double and rounded once at the FSTP:
-    // row0 = s*row2 + c*row0, row2 = c*row2 - s*row0 (row0 read before its store).
+    // Fallback: the object's own pose, rows 0 and 2 rotated by A = DAT_0639e2d0 (float pi as a
+    // double); each element is rounded once.
     OutPos = this->WorldPosition;
     OutOrient = this->Orientation;
 
@@ -1031,33 +893,28 @@ bool CEqObj::launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) c
 
 bool CEqObj::get_explosion_dmg_bounding_sphere(float& OutRadius, Vector& OutCenter) const
 {
-    // Common.dll.c 0x4bd50. Lazily computes and caches a LOCAL-space (instance-relative)
-    // bounding sphere the first time this is called, then re-transforms the cached local
-    // center into the object's CURRENT world transform on every call (only the shape is
-    // invariant; the object can move between calls). EngineObject's Orientation+WorldPosition
-    // overlay a Transform (see the static_assert in common_cobject.h), matching retail's use
-    // of this+8 as a Transform* here.
-    if (!bExplosionDmgCached)                                    // 062abd56 byte test
+    // FUN_062abd50. The sphere is cached in object space on first use; the centre is
+    // transformed by the current pose (this+8 as a Transform) on every call.
+    if (!bExplosionDmgCached)
     {
-        bExplosionDmgCached = true;                              // 062abd70
+        bExplosionDmgCached = true;
         compute_explosion_dmg_bounding_sphere(ExplosionDmgRadius, ExplosionDmgCenter);
     }
-    OutRadius = ExplosionDmgRadius;                              // 062abd7c-062abd86
+    OutRadius = ExplosionDmgRadius;
 
-    // 062abd88-062abdc6: the cached 3D math engine (lazily acquired, never null-tested),
-    // slot +0x28 transforms the local center by this+8 into a stack temporary, which is
-    // then copied to OutCenter.
+    // Math engine slot +0x28, never null-tested.
     Vector World;
     Acquire3DMathEngine()->TransformXform((FVector&)World, (FTransform const&)Orientation,
                                           (FVector const&)ExplosionDmgCenter);
     OutCenter = World;
-    return true;                                                 // 062abdc9
+    return true;
 }
 
 void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& OutCenter) const
 {
-    // .text:062abde0..062ac220. Everything is gathered in WORLD space and only the final
-    // centre goes back to object space. No null tests (DALib::Engine, the math engine).
+    // FUN_062abde0. Same scheme as CArchGroup::GetBoundingSphere, over the root group's
+    // instances. Gathered in world space; only the final centre goes back to object space.
+    // No null tests (DALib::Engine, the math engine).
     struct FChildSphere
     {
         Vector Center;   // +0x00 world centre of a root-group child
@@ -1068,9 +925,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     FTransform const& Xform = (FTransform const&)Orientation;   // this+0x08
     void* const Instance = (void*)EngineInstanceId;
 
-    // 062abe03..062abebe: root extent (IEngine +0x88, flags 1) -> radius R0 and local centre;
-    // TransformXform (+0x28) by this+0x08 -> world centre W0; the AABB starts as W0 +- R0
-    // (each bound FSTP dword).
+    // IEngine +0x88 extent; the AABB starts as the root sphere.
     float RootRadius;
     Vector RootLocal;
     DALib::Engine->GetInstanceExtent(Instance, 1, &RootRadius, (float*)&RootLocal);
@@ -1083,13 +938,8 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     float MinZ = RootWorld.z - RootRadius;
     float MaxZ = RootWorld.z + RootRadius;
 
-    // 062abec2..062ac051: every related instance (IEngine +0xd8 (instance, 0, cursor), from
-    // -1 until -1) whose inst_to_subobj_id (vtable +0xf4) is SUBOBJ_ID_ROOT: its extent and
-    // its own transform (IEngine +0xa0) give a world centre W and radius r; {W, r} is
-    // appended to a local vector (FUN_062a0ee0 insert-at-end); each bound takes W -+ r
-    // (unrounded) unless it already lies strictly beyond it -- TEST AH,0x5 / JNP keeps a
-    // min only when min < value, TEST AH,0x41 / JZ keeps a max only when max > value, NaN
-    // replaces.
+    // Every related instance (IEngine +0xd8) in the root group. Bounds fold on the unrounded
+    // value; equal or NaN replaces.
     std::vector<FChildSphere> Children;
     for (long Child = (long)DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle);
          Child != -1;
@@ -1128,8 +978,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
             MaxZ = (float)(HighZ);
     }
 
-    // 062ac057..062ac0b9: centre = AABB midpoint (x and y sums kept unrounded, the z sum
-    // FSTP dword first), each * 0.5f, written to OutCenter.
+    // The x and y sums stay unrounded, the z sum is rounded first.
     double const SumX = (double)(MaxX) + MinX;
     double const SumY = (double)(MaxY) + MinY;
     float const SumZ = (float)((double)(MaxZ) + MinZ);
@@ -1137,9 +986,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     OutCenter.y = (float)(SumY * 0.5f);
     OutCenter.z = (float)((double)(SumZ) * 0.5f);
 
-    // 062ac0ad..062ac129: widest span. wx unrounded, wy and wz FSTP dword; best = wx > wy ?
-    // wx : wy, then best > wz ? best : wz (TEST AH,0x41 compares, NaN takes the right-hand
-    // value); half = widest * 0.5f; OutRadius = float(half).
+    // Widest span: wx unrounded, wy and wz rounded; NaN takes the right-hand value.
     double const WidthX = (double)(MaxX) - MinX;
     float const WidthY = (float)((double)(MaxY) - MinY);
     float const WidthZ = (float)((double)(MaxZ) - MinZ);
@@ -1148,8 +995,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     double const Half = Widest * 0.5f;
     OutRadius = (float)(Half);
 
-    // 062ac12b..062ac174: reach = |centre - W0| + R0 (sqrt((dz^2 + dy^2) + dx^2) on the x87
-    // stack); reach > half (TEST AH,0x41 / JNZ not taken) -> OutRadius = float(reach).
+    // Grow to cover the root sphere, then every child sphere.
     {
         double const Dx = (double)(OutCenter.x) - RootWorld.x;
         double const Dy = (double)(OutCenter.y) - RootWorld.y;
@@ -1159,8 +1005,6 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
             OutRadius = (float)(Reach);
     }
 
-    // 062ac176..062ac1c7: each collected child: reach = |W - centre| + r; reach > OutRadius
-    // (FCOM dword / TEST AH,0x41 / JNZ not taken) -> OutRadius = float(reach).
     for (std::vector<FChildSphere>::const_iterator It = Children.begin(); It != Children.end(); ++It)
     {
         double const Dx = (double)(It->Center.x) - OutCenter.x;
@@ -1171,8 +1015,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
             OutRadius = (float)(Reach);
     }
 
-    // 062ac1c9..062ac203: OutCenter back to object space with InverseTransform (+0x3c) by
-    // this+0x08 (into a temporary, then copied); the vector's buffer is freed (FUN_06391d5a).
+    // InverseTransform (+0x3c) back to object space.
     Vector LocalCenter;
     Math->InverseTransform((FVector&)LocalCenter, Xform, (FVector const&)OutCenter);
     OutCenter = LocalCenter;
@@ -1180,13 +1023,13 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
 
 IBehaviorManager* CEqObj::get_behavior_interface()
 {
-    // Common.dll.c 0x4c230
+    // FUN_062ac230
     return BehaviorMgr;
 }
 
 void CEqObj::set_control_exclusion(unsigned int Flags)
 {
-    // Common.dll.c 0x4c2e0
+    // FUN_062ac2e0
     ControlExclusion = Flags;
 }
 
@@ -1202,7 +1045,7 @@ unsigned CEqObj::get_base() const
 
 bool CEqObj::is_base() const
 {
-    // Common.dll.c 0x27670: return *(int*)(this+0x160) != 0;
+    // FUN_06287670 (+0x160)
     return DockingBaseId != 0;
 }
 
@@ -1213,7 +1056,7 @@ unsigned int const& CEqObj::get_dock_target() const
 
 bool CEqObj::is_dock() const
 {
-    // Common.dll.c 0x27680: return *(int*)(this+0x164) != 0;
+    // FUN_06287680 (+0x164)
     return DockingPointBaseId != 0;
 }
 
@@ -1222,7 +1065,7 @@ float CEqObj::get_power() const
     return Power;
 }
 
-// Common.dll.c 0x276c0
+// FUN_062876c0
 void CEqObj::set_power(float NewPower)
 {
     Power = NewPower;
@@ -1235,9 +1078,7 @@ float CEqObj::get_max_power() const
 
 float CEqObj::get_power_ratio() const
 {
-    // Common.dll.c 0x276e0: `if (MaxPower<0.0 != MaxPower==0.0) return 0.0;` is the
-    // decompiler's split-flag rendering of `if (MaxPower <= 0.0f) return 0.0f;`
-    // (true when MaxPower<0 OR MaxPower==0, false only when MaxPower>0).
+    // FUN_062876e0
     if (MaxPower <= 0.0f)
         return 0.0f;
     return Power / MaxPower;
@@ -1250,18 +1091,15 @@ int CEqObj::get_vibe() const
 
 int CEqObj::enumerate_sub_objs() const
 {
-    // Common.dll.c 0x4ba80: return *(int*)(this+0x158) + *(int*)(this+0xfc) + *(int*)(this+0xf0);
-    // this+0xf0/this+0xfc land inside the embedded CEquipManager (starts at this+0xe4):
-    // EquipManager+0x0c == ExternalCount, EquipManager+0x18 == InternalCount. this+0x158 lands
-    // inside the embedded CArchGroupManager (starts at this+0x144): ArchGroups+0x14 == Count.
+    // FUN_062aba80. Reads +0x158 (ArchGroups.Count), +0xfc (InternalCount), +0xf0
+    // (ExternalCount).
     return (int)ArchGroups.Count + (int)EquipManager.InternalCount + (int)EquipManager.ExternalCount;
 }
 
 unsigned CEqObj::get_base_name() const
 {
-    // .text:062ab100..062ab120: (+0x160 & 0x3fffffff) == 0 -> 0; else tail jump to
-    // Universe::get_base(+0x160) (no null test) vtable +0x08 -- IBase slot 2, the base's
-    // strid_name (+0x0c), not its nickname id.
+    // FUN_062ab100. The base's strid_name (IBase slot 2), not its nickname id; no null test on
+    // get_base.
     if ((DockingBaseId & 0x3fffffff) == 0)
         return 0;
     return (unsigned)Universe::get_base(DockingBaseId)->GetStridName();
@@ -1269,8 +1107,7 @@ unsigned CEqObj::get_base_name() const
 
 float CEqObj::get_total_hit_pts() const
 {
-    // Common.dll.c 0x4b4c0: this object's own hit points plus every EquipTypeMask(0x1ee0)
-    // equip's GetHitPoints() plus every non-Killed/Destroyed arch group's GetHitPoints().
+    // FUN_062ab4c0. Own hit points + equips of mask 0x1ee0 + living arch groups.
     float Total = get_hit_pts();
 
     CEquipManager& MutableEquipManager = const_cast<CEquipManager&>(EquipManager);
@@ -1290,7 +1127,7 @@ float CEqObj::get_total_hit_pts() const
 
 float CEqObj::get_total_max_hit_pts() const
 {
-    // Common.dll.c 0x4b570: same shape as get_total_hit_pts() but with the Max variants.
+    // FUN_062ab570
     float Total = get_max_hit_pts();
 
     CEquipManager& MutableEquipManager = const_cast<CEquipManager&>(EquipManager);
@@ -1303,16 +1140,14 @@ float CEqObj::get_total_max_hit_pts() const
          Group = ArchGroups.Traverse(GroupTrav))
     {
         if (Group->State != 2 && Group->State != 3)
-            Total = (float)(Total + Group->GetMaxHitPoints()); // 062ab5f4 FADD float, FSTP float
+            Total = (float)(Total + Group->GetMaxHitPoints());
     }
     return Total;
 }
 
 float CEqObj::get_total_relative_health() const
 {
-    // .text:062ab620..062ab716: both totals accumulated in one pass (each FADD + FSTP dword);
-    // then Max FCOMP 0.0 / TEST AH,0x41 / JP: divide when neither C0 nor C3 (Max > 0) or both
-    // (NaN); Max < 0 or == 0 returns 0.0f. Hit / Max is returned in ST0.
+    // FUN_062ab620. A NaN Max still divides; the quotient is returned in ST0.
     float Hit = get_hit_pts();
     float Max = get_max_hit_pts();
 
@@ -1331,7 +1166,7 @@ float CEqObj::get_total_relative_health() const
         if (Group->State != 2 && Group->State != 3)
         {
             Hit += Group->GetHitPoints();
-            Max = (float)(Max + Group->GetMaxHitPoints()); // 062ab6d3 FADD float, FSTP float
+            Max = (float)(Max + Group->GetMaxHitPoints());
         }
     }
     if (Max < 0.0f || Max == 0.0f)
@@ -1341,7 +1176,7 @@ float CEqObj::get_total_relative_health() const
 
 bool CEqObj::get_sub_obj_hit_pts(unsigned short SubObjId, float& OutHitPts) const
 {
-    // Common.dll.c 0x4b720.
+    // FUN_062ab720
     OutHitPts = 0.0f;
     if (SubObjectID::IsEquipID(SubObjId))
     {
@@ -1366,7 +1201,7 @@ bool CEqObj::get_sub_obj_hit_pts(unsigned short SubObjId, float& OutHitPts) cons
 
 bool CEqObj::set_sub_obj_hit_pts(unsigned short SubObjId, float HitPts)
 {
-    // Common.dll.c 0x4b7a0.
+    // FUN_062ab7a0
     if (SubObjectID::IsEquipID(SubObjId))
     {
         CEquip* Eq = EquipManager.FindByID(SubObjId);
@@ -1390,9 +1225,7 @@ bool CEqObj::set_sub_obj_hit_pts(unsigned short SubObjId, float HitPts)
 
 unsigned short CEqObj::inst_to_subobj_id(long Instance) const
 {
-    // Common.dll.c 0x4b940: the root engine instance always maps to SubObjId 1; otherwise
-    // try the equip manager's then the arch-group manager's own InstToSubObjID, falling
-    // back to 1 if neither claims the instance.
+    // FUN_062ab940. Falls back to 1 (the root) when no equip or group claims the instance.
     if (Instance != EngineInstanceId)
     {
         unsigned short SubObjId = EquipManager.InstToSubObjID(Instance);
@@ -1407,15 +1240,8 @@ unsigned short CEqObj::inst_to_subobj_id(long Instance) const
 
 void CEqObj::flush_animations()
 {
-    // Common.dll.c 0x4ad30 (78559-78577). Walks DockingPoints (each entry is a 0x10-byte
-    // retail record: Flags/AnimChannel/LastDuration/ArchPoint -- AnimChannel is "-1 if none").
-    // For every live handle: AnimDB::Rem(handle) then Anim_exref's DestroyScript (vtable
-    // slot 10 / +0x28) -- NOT StopPlayback (+0x38); unlike CShip::flush_animations's
-    // BayAnim.Index release and FAnimScriptRef::Release, retail does not call
-    // StopPlayback here. Finally resets the vector to empty (retail sets end=begin,
-    // i.e. size 0 keeping capacity -- matches vector::clear()).
-    // .text:062aad30..062aad6f: no null test on DALib::Anim. 062aad71..: erase(begin, end)
-    // (the element copy loop over an empty tail, then end = begin).
+    // FUN_062aad30. DestroyScript (IAnimation2 slot 10), not StopPlayback as in
+    // CShip::flush_animations. No null test on DALib::Anim. The vector keeps its capacity.
     for (std::vector<DockAnimInfo>::iterator It = DockingPoints.begin(); It != DockingPoints.end(); ++It)
     {
         if (It->AnimChannel != -1)
@@ -1429,11 +1255,8 @@ void CEqObj::flush_animations()
 
 void CEqObj::update_docking_animations(float Dt)
 {
-    // .text:062aab50..062aad29. Dt (the stack argument) is never read. For every docking
-    // point (+0x184 .. +0x188, stride 0x10) whose channel (+0x4) is not -1: D = float(Anim
-    // slot 0x40 GetStoredDuration(channel)), P = Anim slot 0x14 (channel) -- the same id, see
-    // the note on slot 0x14 in CShip::open_bay. No null test on DALib::Anim. Every path that
-    // reaches a live entry ends with LastDuration (+0x8) = D.
+    // FUN_062aab50. Dt is never read. Anim slot 0x40 (GetStoredDuration) and slot 0x14 (see the
+    // note in CShip::open_bay). No null test on DALib::Anim.
     (void)Dt;
 
     for (std::vector<DockAnimInfo>::iterator It = DockingPoints.begin(); It != DockingPoints.end(); ++It)
@@ -1447,11 +1270,7 @@ void CEqObj::update_docking_animations(float Dt)
 
         if (Entry.bActive)
         {
-            // 062aabac..062aac5a: D < P (TEST AH,0x5 / JP: C0 alone; NaN skips). D == 0
-            // (TEST AH,0x44 / JP: C3 alone) -> notify(0, &flag = 1) (vtable +0xc8, no Notify
-            // test here), EvalPlayback(channel, 0, 0.0f, 1.0f, 0, 1.0f, 1.0f, 0), AnimDB::Add;
-            // otherwise D <= LastDuration (TEST AH,0x41 / JP: exactly one of C0/C3) ->
-            // EvalPlayback(channel, 0, -2.0f, ...).
+            // NaN skips. notify is vtable +0xc8.
             if (Duration < Position)
             {
                 if (Duration == 0.0f)
@@ -1471,10 +1290,6 @@ void CEqObj::update_docking_animations(float Dt)
         }
         else if (Duration > 0.0f)
         {
-            // 062aac5f..062aad08: D > 0 (TEST AH,0x41 / JNZ). D >= P (TEST AH,0x1 / JNZ not
-            // taken; NaN takes the other side) -> notify(0, &flag = 0), EvalPlayback(channel,
-            // 1, -1.0f, ...), AnimDB::Add; otherwise D >= LastDuration (TEST AH,0x1) ->
-            // EvalPlayback(channel, 1, -2.0f, ...).
             if (Duration >= Position)
             {
                 unsigned char Flag = 0;
@@ -1496,10 +1311,7 @@ void CEqObj::update_docking_animations(float Dt)
 
 void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
 {
-    // Common.dll.c 79321-79380 (raw asm 0x062abaa0-0x062abbc7). Walks Damage.Entries (retail's
-    // raw VC6 std::list, ported here as std::list<DamageEntry> -- see DamageList's class
-    // comment in common_misc.h). Skips entries whose Fate == SubObjFate::None, same idiom as
-    // CArchGroupManager::DestroyGroups.
+    // FUN_062abaa0
     for (DamageEntry const& Entry : Damage.Entries)
     {
         if (Entry.Fate == DamageEntry::SubObjFate::None)
@@ -1511,10 +1323,8 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
             if (Equip == nullptr)
                 continue;
 
-            // 062abafe-062abb22: DamageList+0x10 == 0x14 (a cause value the port's DamageCause
-            // enum does not name) -> this vt+0xc8 = CEqObj::notify (CEqObj vftable 0639be5c +
-            // 0xc8 = 0639bf24) with event 4 for a cargo equip (Type +0x14 == 0x10000), else 3,
-            // and the zero-extended SubObjId as the context.
+            // Cause 0x14 is not named by DamageCause. Event 4 for cargo, else 3, with the
+            // SubObjId as the context.
             if ((int)Damage.Cause == 0x14)
                 notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
 
@@ -1523,8 +1333,6 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
             {
                 if (Entry.Fate == DamageEntry::SubObjFate::Separated && !bParam2)
                 {
-                    // Raw asm 062abb54-062abb63: SetFate(HealthProxy) + Destroy(), then skips
-                    // the second (unconditional) Destroy() call below via a goto.
                     Attached->SetFate(DamageEntry::SubObjFate::HealthProxy);
                     Equip->Destroy();
                     continue;
@@ -1535,10 +1343,7 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
         }
         else if (SubObjectID::IsArchGroupID(Entry.SubObjId))
         {
-            // Retail vtable+0x1c call on every traversed equip is a confirmed empty no-op in
-            // the base CEquip implementation (see CEquip::NotifyArchGroupDestroyed's own
-            // comment for the ICF-fold trace) -- ported faithfully as a real (if currently
-            // inert) virtual call rather than skipped, so a future override still gets invoked.
+            // vtable +0x1c; empty in the base CEquip (see NotifyArchGroupDestroyed).
             CEquipTraverser Walk;
             CEquip* Item = EquipManager.Traverse(Walk);
             while (Item != nullptr)
@@ -1552,40 +1357,31 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
 
 void CEqObj::destroy_sub_objs(DamageList const& List, bool Param2)
 {
-    // Common.dll.c 143037-143062 (raw asm 0x062aba50-0x062aba74, not separately decompiled --
-    // thin enough to trace directly from the listing). Forwards to the private
-    // destroy_equipment() helper, then CArchGroupManager::DestroyGroups.
+    // FUN_062aba50
     destroy_equipment(List, Param2);
     ArchGroups.DestroyGroups(List, Param2);
 }
 
-// Common.dll.c/raw 0x4a190 (?connect@CEqObj@@UAEXPAUIObjDB@@@Z). A distinct override from
-// the INotify* connect() below (different retail address/vtable slot).
+// FUN_062aa190 (the IObjDB overload).
 void CEqObj::connect(IObjDB* ObjDb)
 {
     CSimple::connect(ObjDb);
-    // .text:062aa19d-062aa1b2: when +0x194 is set, tail-jump to FUN_062d2830(this+0xAC) on
-    // the behavior manager.
+    // Tail jump to FUN_062d2830 on the behavior manager.
     if (BehaviorMgr != nullptr)
         ConnectBehaviorManagerObjectDb(BehaviorMgr, ObjectDb);
 }
 
-// Common.dll.c/raw 0x4a1c0 (?disconnect@CEqObj@@UAEXPAUIObjDB@@@Z).
+// FUN_062aa1c0 (the IObjDB overload).
 void CEqObj::disconnect(IObjDB* ObjDb)
 {
     if (ObjectDb != nullptr && ObjectDb == ObjDb)
     {
-        // .text:062aa1d7-062aa1e3: FUN_062d2830(0) on the behavior manager, when set.
         if (BehaviorMgr != nullptr)
             ConnectBehaviorManagerObjectDb(BehaviorMgr, nullptr);
         CSimple::disconnect(ObjDb);
 
-        // Retail invalidates the first scanner's in-flight scan/cargo results once the
-        // object database link is gone (raw disasm 062aa1f0-062aa23c): reset Scans.Count to
-        // empty (capacity stays 256) and collapse the cargo-scan vector to empty without
-        // freeing its storage.
-        // FindFirst(0x80000) already yields only scanners; retail tests the result for null
-        // (.text:062aa202) and uses it directly, with no type re-check.
+        // The first scanner's scan and cargo results are emptied (storage kept). Retail uses
+        // the FindFirst result without a type re-check.
         CEquip* Eq = const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeScanner));
         if (Eq != nullptr)
         {
@@ -1596,7 +1392,7 @@ void CEqObj::disconnect(IObjDB* ObjDb)
     }
 }
 
-// Common.dll.c 0x492a0
+// FUN_062a92a0
 void CEqObj::connect(INotify* NotifyParam)
 {
     Notify = NotifyParam;
@@ -1609,13 +1405,7 @@ void CEqObj::disconnect(INotify* NotifyParam)
 
 void CEqObj::notify(INotify::Event EventParam, void* Context)
 {
-    // Common.dll.c 0x492c0: `if (Notify) Notify->vtbl[0](EventParam, Context);` -- the same
-    // INotify::notify vtable-slot-0 dispatch shape as CEquip::Notify (Common.dll.c 62500),
-    // just with a single listener instead of two. Ghidra's own decompilation of this
-    // particular call site couldn't recover the pushed arguments ("Could not recover
-    // jumptable" / "Treating indirect jump as call", showing a bare `()`), but the mangled
-    // signature (`?notify@CEqObj@@UAEXW4Event@INotify@@PAX@Z`) and every other INotify call
-    // site agree on (Event, void*) through slot 0.
+    // FUN_062a92c0. INotify slot 0, as in CEquip::Notify but with a single listener.
     if (Notify != nullptr)
         Notify->notify(EventParam, Context);
 }

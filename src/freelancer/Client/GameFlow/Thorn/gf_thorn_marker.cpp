@@ -15,8 +15,7 @@
 // Thorn_Marker
 // ---------------------------------------------------------------------------------------
 
-// FUN_00453690. Base ctor, vptrs, then +0x6c..+0x74 = 0 (0x004536ed..0x00453718) and +0x78 the
-// identity (0x0045371b..0x0045373a).
+// FUN_00453690.
 FThornMarker::FThornMarker(Csys const& ScriptFrame, FGfScript* InOwner,
                            FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc)
@@ -27,8 +26,7 @@ FThornMarker::FThornMarker(Csys const& ScriptFrame, FGfScript* InOwner,
     MatrixSetIdentity(World.Orient);
 }
 
-// LAB_004537d0 (identity, RET 8). trans_from_frame of Transform+0x24 into +0x6c, then of the
-// rotation into +0x78.
+// LAB_004537d0.
 GENRESULT DACOM_API FThornMarker::SetTransform(float const* Transform12)
 {
     World.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Transform12 + 9));
@@ -36,7 +34,7 @@ GENRESULT DACOM_API FThornMarker::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_004538b0 (identity, RET 8). trans_to_frame of +0x6c into Out+0x24, of +0x78 into Out+0.
+// LAB_004538b0.
 GENRESULT DACOM_API FThornMarker::GetTransform(float* OutTransform12)
 {
     Vector const LocalPos = Frame.trans_to_frame(World.Pos);
@@ -48,21 +46,21 @@ GENRESULT DACOM_API FThornMarker::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_00453750 (geo facet, RET 8). Facet +0x20 = the frame, +0x60 = +0x6c.
+// LAB_00453750.
 GENRESULT DACOM_API FThornMarker::SetPosition(float* Position)
 {
     World.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
     return GR_OK;
 }
 
-// LAB_00453790 (geo facet, RET 8). REP MOVSD 9 into facet +0x6c (= +0x78).
+// LAB_00453790.
 GENRESULT DACOM_API FThornMarker::SetOrientation(float* Orient9)
 {
     World.Orient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orient9));
     return GR_OK;
 }
 
-// LAB_00453830 (geo facet, RET 8).
+// LAB_00453830.
 GENRESULT DACOM_API FThornMarker::GetPosition(float* OutPosition)
 {
     Vector const Local = Frame.trans_to_frame(World.Pos);
@@ -72,7 +70,7 @@ GENRESULT DACOM_API FThornMarker::GetPosition(float* OutPosition)
     return GR_OK;
 }
 
-// LAB_00453870 (geo facet, RET 8).
+// LAB_00453870.
 GENRESULT DACOM_API FThornMarker::GetOrientation(float* OutOrient9)
 {
     Matrix const Local = Frame.trans_to_frame(World.Orient);
@@ -90,7 +88,7 @@ void* FThornMarker::GetEngineInstance()
 // Thorn_MarkerReference
 // ---------------------------------------------------------------------------------------
 
-// FUN_00453910. Base ctor, vptrs, 0x00453967 +0x6c = 0.
+// FUN_00453910.
 FThornMarkerReference::FThornMarkerReference(Csys const& ScriptFrame, FGfScript* InOwner,
                                              FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),

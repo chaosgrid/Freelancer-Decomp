@@ -31,13 +31,13 @@ namespace IntroPageUtil
     // The same behind a StyleNode.
     void LoadStyledIds(RenderDisplayList& Rdl, unsigned short Style, unsigned Ids);
 
-    // FUN_00571220 (RET 0x14) -- TextRenderAttributes' bit fields: +0x00 bit 0 = A, bit 1 = B,
+    // FUN_00571220 -- TextRenderAttributes' bit fields: +0x00 bit 0 = A, bit 1 = B,
     // bit 2 = C & 1, bits 3..7 = D; the low 24 bits of the dword at +0x01 = Rgb (the struct's
     // fifth byte is kept). The port's attribute bundle is the first dword.
     TextRenderAttributes PackTextAttributes(unsigned char A, unsigned char B, unsigned char C,
                                             unsigned char D, unsigned long Rgb);
 
-    // The inline `AND [obj+0x6c],0xfc` / `OR [obj+0x6c],3` pair.
+    // The low two bits of Win3D +0x6c cleared / set, inlined at every use.
     void HideWin3D(Win3D* Object);
     void ShowWin3D(Win3D* Object);
 

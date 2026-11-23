@@ -14,39 +14,34 @@
 
 class INI_Reader;
 
-// Random-mission static databases (docs/re/content.md, TU map, lane CNT-RM):
-//   TU47 06f4a780-06f4ed80  rank -> difficulty table (missions\RankDiff.ini)
-//   TU51 06f57cb0-06f5a2e0  ship classes (missions\shipclasses.ini), per-ship mission
-//                           properties (ships\shiparch.ini), solar formations
-//                           (RandomMissions\SolarFormations.ini)
-// Every loader takes an already opened INI_Reader, exactly as retail: the caller runs
+// Random-mission static databases:
+//   TU47  rank -> difficulty table (missions\RankDiff.ini)
+//   TU51  ship classes (missions\shipclasses.ini), per-ship mission properties
+//         (ships\shiparch.ini), solar formations (RandomMissions\SolarFormations.ini)
+// Every loader takes an already opened INI_Reader, as retail: the caller runs
 // OpenContentDataIni (FUN_06f24280) and closes the reader afterwards.
 
 // ---------------------------------------------------------------------------------------
 // The FUN_06fa0330 holder: retail's releasing-handle dtor for objects whose ref-counted
-// interface sits at +4 -- the random mission (FRmMissionDataBase) and the TU61 offer: if set,
-// (p + 4)->Release(), then null. Users: the TU47 mission object's +0x1f8 (Unwind@06faefe5 /
-// 06faf070), the DestroyMission +0x240 (Unwind@06fabe08 / 06fabe68), the offer local of
-// FUN_06ef09c0 (Unwind@06fac000). Holders released through FUN_06f28e10 (interface at +0,
-// e.g. an [ObjList] directive) use the shared TRefHandle (RefHandle.h) instead.
-// RmRefAddRef / RmRefRelease overloads next to each held type (RandomMission.h) pick its +4
-// interface (found by argument-dependent lookup at instantiation).
+// interface sits at +4 -- the random mission (FRmMissionDataBase) and the TU61 offer. Users:
+// the TU47 mission object's +0x1f8, the DestroyMission +0x240, the offer local of
+// FUN_06ef09c0. Holders released through FUN_06f28e10 (interface at +0, e.g. an [ObjList]
+// directive) use the shared TRefHandle (RefHandle.h) instead. RmRefAddRef / RmRefRelease
+// overloads next to each held type (RandomMission.h) pick its +4 interface (found by
+// argument-dependent lookup at instantiation).
 // ---------------------------------------------------------------------------------------
 template <typename T>
 class TRmRef
 {
 public:
     TRmRef() = default;
-    // Store, then AddRef when non-null (the member inits 06f4b144-06f4b152 and
-    // 06eef409-06eef417).
     explicit TRmRef(T* InObject)
         : Object(InObject)
     {
         if (Object != nullptr)
             RmRefAddRef(Object);
     }
-    // Copy + AddRef when set: the by-value holder argument of FUN_06f9e770 (06f9ec46-06f9ec61),
-    // released by the callee.
+    // The by-value holder argument of FUN_06f9e770, released by the callee.
     TRmRef(TRmRef const& Other)
         : Object(Other.Object)
     {
@@ -60,7 +55,7 @@ public:
         Reset();
     }
 
-    // FUN_06fa0330 called directly (e.g. FUN_06ef1c70 06ef1c85 on the loader's mission).
+    // FUN_06fa0330 called directly (e.g. by FUN_06ef1c70 on the loader's mission).
     void Reset()
     {
         if (Object != nullptr)
@@ -130,7 +125,7 @@ float __cdecl PickRmMissionDifficulty(FContentPlayerState const* Player, float M
 
 // ---------------------------------------------------------------------------------------
 // TU47 -- systems loaded for random missions. DAT_06fd0c2c/DAT_06fd0c30: std::list of
-// system ids (head, size), static init at 06f4d540, atexit at 06f4d570. Each listed system
+// system ids (head, size), static init 06f4d540, atexit 06f4d570. Each listed system
 // holds one FSystemInfo::Load(false) reference until ReleaseRmDestSystems.
 // ---------------------------------------------------------------------------------------
 extern std::list<unsigned int> GRmDestSystems;

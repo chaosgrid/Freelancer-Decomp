@@ -7,8 +7,8 @@
 // CUniverseChatDlg — the universe chat window (dialog 0x92), a single modeless instance
 // (GUniverseChatDlg). Text typed into the input box goes out as universe chat; universe chat
 // arrives through Server.dll's g_pUniverseChatHook while the window exists.
-// Retail: TU .text:00417fb0..004185c0. Global .data:0042a6a8 (CRT initializer 00418090, atexit
-// dtor 004180b0 -> 004180c0), ctor 00418120, scalar deleting dtor 004181a0, vtable
+// Retail: global .data:0042a6a8 (CRT initializer .text:00418090, atexit dtor 004180b0 ->
+// 004180c0), ctor 00418120, scalar deleting dtor 004181a0, vtable
 // .rdata:0041e8d8, message map 0041e8d0 (entries 0041e858). Opened by the app's universe chat
 // command (FLServer.cpp).
 #pragma once
@@ -31,7 +31,7 @@ protected:
 	afx_msg void OnClose();
 	afx_msg void OnDestroy();
 
-	// .text:00418270 (cdecl) — Server.dll's g_pUniverseChatHook, installed by OnInitDialog and
+	// Server.dll's g_pUniverseChatHook, installed by OnInitDialog and
 	// cleared by OnDestroy: appends universe chat to GUniverseChatDlg's log.
 	static void __cdecl OnUniverseChat(wchar_t* Text, int PlayerId);
 

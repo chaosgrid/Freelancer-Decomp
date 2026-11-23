@@ -10,13 +10,11 @@
 // "E:\FL\Scratch\Source\Client\nn\NN_NewsVendor.cpp").
 //
 // RTTI .?AVNN_News@@ : WinControl, Event::Handler. operator_new(0x674) (0x004a6038).
-// WINFACTORY<NN_News> DAT_006720cc "NN_News": static init LAB_004a3fc0 (ctor FUN_004a5fb0, atexit
-// LAB_004a3fe0 -> FUN_00579380); Create FUN_004a6020 (operator_new, the ctor FUN_004a3ff0, the
-// class-name pointer at +0x10, slot 9; a failed Create is followed by the scalar deleting
-// destructor). FUN_004a5fb0 is the WINFACTORY ctor inlined for this type (name clamped to 31,
-// FUN_0059dab0, vftable 0x005d4414).
+// WINFACTORY<NN_News> DAT_006720cc "NN_News": static init LAB_004a3fc0 (ctor FUN_004a5fb0, the
+// WINFACTORY ctor inlined, vftable 0x005d4414; atexit LAB_004a3fe0 -> FUN_00579380); Create
+// FUN_004a6020.
 //
-// vftable 0x005d3fdc -- WinControl's with these overrides (raw dword dump):
+// vftable 0x005d3fdc -- WinControl's with these overrides:
 //   0 FUN_004a40f0 scalar deleting dtor (FUN_004a4110), 9 LAB_004a4250 Create, 11 LAB_004a5e50
 //   Update, 13 FUN_004a5d80 Draw, 42 LAB_004a4d60 SetProperty.
 // IDataViewOwner face +0x7c: vftable 0x005d3fd0 (WinControl's).
@@ -83,7 +81,7 @@ public:
     char* VideoTexture;                  // +0x560 malloc_strcpy of the swapped-in texture name
     FSwappedMaterial VideoMaterial;      // +0x564 "MV_vidmaterial"
     int ScrollOffset;                    // +0x578 first item in row 0
-    int Field_0x57c;                     // +0x57c TODO: zeroed by the ctor, LoadNews, Create and
+    int Field_0x57c;                     // +0x57c zeroed by the ctor, LoadNews, Create and
                                          //        SetProperty 0x26, never read
     int Selected;                        // +0x580 item index, -1 none
     NewsBroadcastProperties* News;       // +0x584 new[] sorted copy of the bucket
@@ -91,7 +89,7 @@ public:
     char const** IconPaths;              // +0x58c 7 mesh paths (operator_new(0x1c))
     unsigned IconPathCount;              // +0x590 7
     int IconIds[7];                      // +0x594 the icons' tooltip ids
-    unsigned Field_0x5b0;                // +0x5b0 TODO: not written or read by this class
+    unsigned Field_0x5b0;                // +0x5b0 not written or read by this class
     WinControl* CloseButton;             // +0x5b4 "NewsCloseButton"
     WinControl* Ticker;                  // +0x5b8 "NewsTicker"
     WinControl* HeadlineIcons[5];        // +0x5bc "NewsHeadlineIcon%d"
@@ -102,9 +100,9 @@ public:
     UiScroll* Scroll;                    // +0x648 "NewsHeadlineScroll"
     WinControl* StoryHeadline;           // +0x64c "NewsStoryHeadline"
     RichTextWin* StoryText;              // +0x650 "NewsStoryText"
-    unsigned Field_0x654;                // +0x654 TODO: not written or read by this class
+    unsigned Field_0x654;                // +0x654 not written or read by this class
     WinControl* StoryIcon;               // +0x658 "NewsStoryIcon"
-    unsigned Field_0x65c;                // +0x65c TODO: not written or read by this class
+    unsigned Field_0x65c;                // +0x65c not written or read by this class
     int Hovered;                         // +0x660 item index under the mouse, -1 none
     int Clicked;                         // +0x664 row last clicked, -1 none
     ID_String OpenSound;                 // +0x668 "news_vendor_open"
@@ -113,8 +111,8 @@ public:
     WinControl* Background;              // +0x670 "NewsBackground"
 
 private:
-    // The tail every close shares (e.g. 0x004a4d90..0x004a4db6): FUN_0043d2a0 on every child
-    // (the next sibling read first), slot 10, then slot 0 with 1.
+    // Port-only helper for the tail every close shares (e.g. 0x004a4d90): delete the children,
+    // Destroy, delete this.
     void DeleteSelf();
     // FUN_004a4fd0 -- copy the current base's news: flag +9 first, then category 1, then flag
     // +8, then the rest; rows from the top, item 0 selected.

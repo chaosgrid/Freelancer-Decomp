@@ -8,8 +8,8 @@
 // registered while it exists in a global map keyed by system id (.data:00429e34). Text typed
 // into the input box goes out as system chat; the system's chat arrives through Server.dll's
 // g_pSystemChatHook.
-// Retail: TU .text:00415fe0..004172e0. ctor 004161d0 (0x124 bytes), dtor 00416290, scalar
-// deleting dtor 00416270, vtable .rdata:0041e760, message map 0041e758 (entries 0041e710).
+// Retail: ctor .text:004161d0 (0x124 bytes), dtor 00416290, scalar deleting dtor 00416270,
+// vtable .rdata:0041e760, message map 0041e758 (entries 0041e710).
 // Created by CSelectStarSystemDlg::OnOK (.text:00406370), which sets SystemId before Create.
 #pragma once
 
@@ -21,7 +21,7 @@ public:
 	explicit CChatSystemDlg(CWnd* Parent = nullptr);
 	virtual ~CChatSystemDlg();
 
-	// .text:00416620 — the open chat window of a system, or null.
+	// The open chat window of a system, or null.
 	static CChatSystemDlg* FindBySystem(unsigned int SystemId);
 
 	unsigned int SystemId;       // +0x60, 0xffffffff until the creator sets it
@@ -35,7 +35,7 @@ protected:
 	afx_msg void OnMsgFilterInput(NMHDR* Header, LRESULT* Result);
 	afx_msg void OnCloseButton();
 
-	// .text:00416670 (cdecl) — Server.dll's g_pSystemChatHook, installed by OnInitDialog:
+	// Server.dll's g_pSystemChatHook, installed by OnInitDialog:
 	// appends a system's chat to the log of that system's chat window, if open.
 	static void __cdecl OnSystemChat(wchar_t* Text, int SystemId);
 

@@ -8,8 +8,7 @@
 
 #include "common_exports.h"
 
-// Common.dll CObject / CSimple / CEqObj / CShip — layouts from Common.dll.c ctors.
-// NOT placeholder sizeof in Common.dll.h. Linked as Common.lib.
+// Common.dll CObject / CSimple / CEqObj / CShip — layouts from the retail ctors.
 // See docs/re/common_physys.md.
 
 #include "common_archetype.h"
@@ -108,11 +107,8 @@ private:
     virtual unsigned long DACOM_API get_instance_flags(long Inst) const;
     virtual bool DACOM_API joint_changed(long Inst);
     // Listing 0xa99b0 / 0xa99f0. Base-level defaults: always the zero vector (retail backs
-    // these with a lazily-constructed function-local static; a plain static works here since
-    // Vector is POD). Distinct overload from CObject::get_velocity()/get_angular_velocity()
-    // below (no Inst arg, real IVP-backed) -- that pair hides these two by name in CObject's
-    // scope, which matches how each is actually called (engine-style Inst dispatch vs. game
-    // logic's no-arg convenience call), so no functional collision.
+    // these with a lazily-constructed function-local static). CObject's no-arg
+    // get_velocity()/get_angular_velocity() hide them by name.
     // Retail vftable 0x0639b5bc: +0x38 deleting dtor, +0x3c get_velocity, +0x40 set_velocity,
     // +0x44 get_angular_velocity, +0x48 set_angular_velocity -- 19 slots, so CObject's own
     // first new virtual (open) lands at +0x4c. Both setters are the shared empty body
@@ -142,14 +138,12 @@ public:
     Matrix Orientation;   // +0x08  identity — IEngine+0xa0 / +0x98
     Vector WorldPosition; // +0x2c
     float Radius;         // +0x38
-    Vector RadiusCenter;  // +0x3c  get/set_centered_radius (formerly ExtentsMin)
-    unsigned long InstanceFlags; // +0x48  get/set_instance_flags 06309a90/06309aa0 (formerly Pad48)
+    Vector RadiusCenter;  // +0x3c  get/set_centered_radius
+    unsigned long InstanceFlags; // +0x48  get/set_instance_flags 06309a90/06309aa0
 
 private:
-    // Listing 0x1cb80. Retail dispatches through this object's own vtable slot +0x28
-    // (this->set_centered_radius(EngineInstanceId, NewRadius, Center)) rather than
-    // writing Radius/RadiusCenter directly -- reproduced here as a direct virtual call,
-    // which is exactly what that vtable-slot indirection resolves to at this level.
+    // Listing 0x1cb80. Dispatches through vtable slot +0x28
+    // (set_centered_radius(EngineInstanceId, NewRadius, Center)), not a direct store.
     void set_centered_radius(float NewRadius, Vector const& Center);
 };
 
@@ -165,7 +159,7 @@ static_assert(offsetof(EngineObject, Orientation) + sizeof(Matrix) ==
 struct COMMON_API CObject : public EngineObject
 {
 public:
-    // Alloc switch (Common.dll.c 0x4ee50). All 11 classes constructed.
+    // Alloc switch (0x062aee50). All 11 classes constructed.
     enum Class
     {
         ClassObject = 1,
@@ -186,14 +180,10 @@ public:
         ClassDynamicAsteroid = 0x4001
     };
 
-    // Flag bits for update(float, unsigned) below. Retail exports each one as its own
-    // `public: static unsigned int const CObject::<NAME>` in .rdata at 0x0639e524..0x0639e53c
-    // (ordinals 2068, 1853, 1854, 1851, 1850, 1852, 2069), so they are part of Common.dll's
-    // public surface and other modules link against them by name -- they are definitions,
-    // not just an enum. Values read straight off those .rdata dwords; UPDATE_DUMB == 0x3d is
-    // exactly NO_DYNAMICS|NO_SCANNER|NO_BEHAVIOR|NO_ACTIONS|NO_COUNTERMEASURE_AI, which is
-    // the arithmetic check that the individual bit values are right. Bit 0x02 has no named
-    // constant anywhere in this module (open TODO: find who owns it).
+    // Flag bits for update(float, unsigned) below, exported as `public: static unsigned int
+    // const CObject::<NAME>` in .rdata 0x0639e524..0x0639e53c (ordinals 2068, 1853, 1854, 1851,
+    // 1850, 1852, 2069). UPDATE_DUMB == 0x3d is NO_DYNAMICS|NO_SCANNER|NO_BEHAVIOR|NO_ACTIONS|
+    // NO_COUNTERMEASURE_AI. TODO: bit 0x02 has no named constant in this module.
     static unsigned int const UPDATE_DEFAULT;        // 0x0639e524 = 0x00
     static unsigned int const NO_DYNAMICS;           // 0x0639e528 = 0x01, read at 062960aa/062b0e75
     static unsigned int const NO_SCANNER;            // 0x0639e52c = 0x04, read at 0629f719
@@ -210,14 +200,9 @@ protected:
     explicit CObject(Class ObjectClass = ClassObject);
 
 public:
-    // Common.dll.c 40405-40505 (0x211b0): retail never emits a standalone CObject copy
-    // ctor symbol -- this field-copying prologue is inlined at the top of every non-trivial
-    // CSimple-family copy ctor (CSimple::CSimple(CSimple const&) itself, tracker id 10557,
-    // is the cleanest exemplar; CProjectile/CMunition/CBeam/CEqObj/CLoot/CCounterMeasure/
-    // CMine/CAsteroid's own copy ctors repeat the identical byte pattern). Given as a real
-    // out-of-line ctor here so CSimple(Other) below can delegate to it via the member-init
-    // list, matching the CArchGroupManager(CArchGroupManager const&) precedent (this file,
-    // "Groups(new std::map<...>(*Other.Groups))").
+    // Retail has no standalone CObject copy ctor symbol: this field copy (0x062811b0) is
+    // inlined at the top of every CSimple-family copy ctor. Out of line here so CSimple(Other)
+    // can delegate to it.
     CObject(CObject const& Other);
 
 protected:
@@ -235,8 +220,7 @@ public:
     static CObject* __cdecl Find(unsigned const& Id, Class ObjectClass);
     static CObject* __cdecl FindFirst(Class ObjectClass);
     static CObject* __cdecl FindNext();
-    // Listing 0x4ef00 (Common.dll.c 82115-82136). Retail never actually releases/deletes
-    // any live CObject here -- see the .cpp definition for why this is a documented no-op.
+    // Listing 0x4ef00. Retail never releases or deletes a live CObject here; see the .cpp.
     static void __cdecl ReleaseAll();
 
     virtual void open(Archetype::Root* Arch);
@@ -244,11 +228,7 @@ public:
     virtual int update(float Dt, unsigned Flags);
     // Listing 0x1d120. Vcall +0x54 from CELauncher::ComputeLaunchInfo. IVP body @ +0x54.
     virtual Vector get_velocity() const;
-    // Listing 0x1d150. Returns angular velocity from IVP body or zero. Retail vtable+0x58,
-    // immediately after get_velocity (+0x54) -- confirmed via this port's own named vtable
-    // dump (??_7CObject@@6B@, Common.dll.txt 557774+) and by common_iobjinspectimpl.cpp's
-    // IObjInspectImpl::get_angular_velocity comment ("vcall delegate vtable+0x58"). Previously
-    // mis-declared after get_mass/get_surface_extents below; moved here to match retail.
+    // Listing 0x1d150. Angular velocity from the IVP body, or zero. Vtable+0x58.
     virtual Vector get_angular_velocity() const;
     // Retail vtable+0x5c / +0x60 (??_7CObject@@6B@ 0x0639b6c8 / 0x0639b6cc). At this level
     // both slots are the single empty body at .text:062a8920 (`RET`) exported under both
@@ -270,22 +250,18 @@ public:
     virtual Vector get_center_of_mass() const;
     // Listing 0x4da60. Returns mass from IVP body or archetype.
     virtual float get_mass() const;
-    // Common.dll.c 80694-80714 (0x4d470). Retail vtable+0x70, immediately after get_mass
-    // (+0x6c) and before unmake_physical (+0x74) -- confirmed via this port's own named
-    // vtable dump (??_7CObject@@6B@, Common.dll.txt 557774+). Reads the two Vectors at
-    // PhyPart+8/+0x14 into OutMin/OutMax; false if PhyPart (+0x58) is null.
+    // 0x4d470, vtable+0x70. Reads the two Vectors at PhyPart+8/+0x14 into OutMin/OutMax;
+    // false if PhyPart (+0x58) is null.
     virtual bool get_surface_extents(Vector& OutMin, Vector& OutMax) const;
     virtual void unmake_physical();
-    // Listing 0x4d4f0 (Common.dll.c 80743-80750): PhySys::ReMakePhysicalR(this, Parms,
-    // Radius) then enable_controllers() (vtable +0x60).
+    // Listing 0x4d4f0: PhySys::ReMakePhysicalR(this, Parms, Radius) then
+    // enable_controllers() (vtable +0x60).
     virtual void remake_physical(PhySys::CreateParms const& Parms, float Radius);
-    // Listing 0x1cb70. Beam/attach object at position/orientation.
+    // Listing 0x1cb70, the last CObject vtable slot (+0x7c). Beam/attach object at
+    // position/orientation.
     virtual void beam_object(Vector const& Pos, Matrix const& Orient, bool bAttach);
-    // Listing 0x1d1e0. Map part index to engine instance. Retail mangled name
-    // ?part_to_inst@CObject@@QBEJI@Z uses access code 'Q' (public, non-virtual, thiscall) --
-    // NOT virtual in retail, matching the is_shield_part/inst_to_part/flag_part_as_shield
-    // style further below. It has no slot in CObject's own named vtable (??_7CObject@@6B@,
-    // Common.dll.txt 557774+), which ends at +0x7c (beam_object).
+    // Listing 0x1d1e0. Map part index to engine instance. Non-virtual
+    // (?part_to_inst@CObject@@QBEJI@Z).
     long part_to_inst(unsigned PartId) const;
     // Listing 0x1d0b0. IVP moment-of-inertia, or zero vector without a physics body.
     Vector get_moment_of_inertia() const;
@@ -297,7 +273,7 @@ public:
     unsigned inst_to_part(long EngineInst) const;
     // Listing 0x1d250. True if the PartMap entry for PartId has its shield-part byte set.
     bool is_shield_part(unsigned PartId) const;
-    // Common.dll.c 80718-80736 (0x4d4c0). Same PartMap scan as is_shield_part, but sets the
+    // 0x4d4c0. Same PartMap scan as is_shield_part, but sets the
     // shield-part byte to 1 on a match instead of reading it. False if PartId isn't found.
     bool flag_part_as_shield(unsigned PartId);
 
@@ -319,31 +295,13 @@ public:
     CObject& operator=(CObject const&) = delete;
 
     Class ObjectClass;                  // +0x4c
-    // +0x50: the PhySys system (star-system) id this object's physics body lives in. NOT
-    // padding and NOT a "material id" (PhySys::BuildIVP_Sphere's tracker note said material;
-    // the listing disproves it). Proof, all from Common.dll.txt:
-    //   * Written ONLY next to BodyPtr, from the PhySys system record's +0x14:
-    //       .text:06289471 (PhySys::BuildIVP_Sphere)  MOV EDX,[EBP+0x14] / MOV [EDI+0x50],EDX
-    //                                                 right after MOV [EDI+0x54],EAX
-    //       .text:0628a681 (PhySys::ReMakePhysicalR)  MOV ECX,[ESI+0x14] / MOV [EDI+0x50],ECX
-    //     EBP/ESI there is `mapnode+0x10`, i.e. the mapped value of PhySys's system map
-    //     DAT_063fc098 (VC6 _Rb_tree node: _Left/_Parent/_Right then _Value at +0xc, so the
-    //     unsigned key sits at node+0xc and the record at node+0x10).
-    //   * Cleared to 0 together with BodyPtr on teardown:
-    //       .text:0628a7e0 (PhySys::UnMakePhysicalR) and .text:0628a9a0 (FUN_0628a990).
-    //   * Consumed as the `unsigned` argument of PhySys::GetCurrentTime at .text:0627e261
-    //     (AnimDB::Update): MOV EAX,[ESI+0x50] / PUSH EAX / PUSH &sret / CALL
-    //     PhySys::GetCurrentTime / ADD ESP,8 -- retail's own mangled name there is
-    //     ?GetCurrentTime@PhySys@@YA?AVIVP_Time@@I@Z, i.e. (unsigned int), and that unsigned
-    //     is used as the DAT_063fc098 map key (.text:06289a8e `CMP EDX,[EAX+0xc]`, unsigned
-    //     JC), the same key PhySys::Startup(unsigned)/Update(unsigned,float) take.
-    //   * The record's own +0x14 is that key: PhySys::Startup pushes its `unsigned` parameter
-    //     into FUN_0628c1f0 (.text:062895ca), which stores it at this+0x14 (.text:0628c242).
-    // Fed in from PhySys::CreateParms+0x14 -- which common_physys.h still calls
-    // `CollisionGroupId`; that name is a misnomer for the same star-system id (common_cobject
-    // .cpp already fills it from IObjDB's get-system accessor and says so). Renaming the
-    // CreateParms member touches src/Common/common_casteroid.* which this lane does not own,
-    // so it is reported rather than changed here. Open TODO.
+    // +0x50: the PhySys system (star-system) id this object's physics body lives in -- the
+    // key of PhySys's system map DAT_063fc098 (the record's +0x14). Written next to BodyPtr
+    // by PhySys::BuildIVP_Sphere (.text:06289471) and ReMakePhysicalR (.text:0628a681),
+    // cleared with it on teardown, and passed to PhySys::GetCurrentTime(unsigned) by
+    // AnimDB::Update (.text:0627e261).
+    // TODO: PhySys::CreateParms+0x14, the source, is still named CollisionGroupId
+    // (common_physys.h), a misnomer for this id.
     unsigned PhysicsSystemId;           // +0x50
     IVP_Real_Object* BodyPtr;           // +0x54  IVP physics body, null if not physical
     // +0x58: the object's physics part (Archetype-owned, not freed by ~CObject), or null.
@@ -351,34 +309,20 @@ public:
     // (.text:0628a14d, Root::get_phy_part or PhyArch::GetDefaultPart); zeroed by the ctor
     // (.text:062af317). get_surface_extents reads its ExtentsMin/ExtentsMax (+0x08/+0x14),
     // CAttachedEquip::Connect its hardpoint id list.
-    PhyArch::Part const* PhyPart;       // +0x58 (formerly SurfaceExtentsPtr)
+    PhyArch::Part const* PhyPart;       // +0x58
     // +0x5c: the IVP surface manager of this object's compound (part-mapped) body, or null.
     // PhySys::BuildPartIVP_Real (FUN_06289100) stores it, FUN_0628c7b0 hands it to the IVP
     // polygon creation, and part_to_inst only tests it for 0 (.text:0627d1e0: no surface
     // manager -> EngineInstanceId).
     IVP_SurfaceManager* SurfaceManager;
-    // +0x60: the PhySys "golem" force controller for this object, or null. A heap object of
-    // 0xd0 bytes with vtable .rdata:0x0639c1c8, allocated lazily by FUN_06288e60 -- the tail
-    // of PhySys::BuildIVP_Real (called at .text:06288bee) -- and ONLY when the requested
-    // control mode is 1:
-    //   .text:06288edd  MOV dword ptr [ESI+0x74],0x1        ; mode 1 = golem
-    //   .text:06288f67  PUSH 0xd0 / CALL operator_new       ; EDI = the golem
-    //   .text:06288fa9  MOV ECX,EDI / CALL FUN_06343050     ; init from CObject::BodyPtr(+0x54)
-    //   .text:06288fae  MOV [EDI],.rdata:PTR_LAB_0639c1c8   ; its vftable
-    //   .text:06288fbd  MOV dword ptr [ESI+0x60],EDI        ; <- stored here (null on OOM)
-    // The surrounding code reads PhySys::GOLEM_FORCE_FACTOR / GOLEM_DAMP_FACTOR /
-    // GOLEM_TORQUE_FACTOR / GOLEM_ANGULAR_DAMP_FACTOR / GOLEM_MAX_TRANSLATION_FORCE into its
-    // init template (.text:06288ee9-06288f7a), which is where the "golem" name comes from.
-    // Consumed as a __thiscall receiver: AnimDB::Update null-tests it at .text:0627e1f9
-    // (`CMP dword ptr [ESI+0x60],EBX` with EBX==0, skip on zero), loads it at .text:0628e25a
-    // 0627e25a (`MOV EDI,[ESI+0x60]`) and drives it with MOV ECX,EDI / CALL FUN_06343580 (.text:
-    // 0627e2c3) then MOV ECX,EDI / CALL FUN_06343670 (.text:0627e2d9) -- the same two
-    // thiscalls FUN_06288e60 itself issues at .text:0628909c / .text:062890b1.
-    // Declared IVP_Controller* because that is the static type retail's own
-    // __RTDynamicCast calls name as the source (PhySys::GetVelocity .text:0628580f,
-    // CSimple::update_zones .text:062b5d38). It holds either a FLControllerGolem
-    // (AttachGolemController) or a CRemotePhysicsController (PhySys::RCBegin); both have
-    // IVP_Controller at offset 0 through IVP_Controller_Golem.
+    // +0x60: the PhySys "golem" force controller, or null. A 0xd0-byte heap object (vtable
+    // .rdata:0x0639c1c8) allocated by FUN_06288e60, the tail of PhySys::BuildIVP_Real, only
+    // for control mode 1, initialised from the GOLEM_* factors. AnimDB::Update drives it
+    // (FUN_06343580 / FUN_06343670, .text:0627e2c3 / 0627e2d9).
+    // Typed IVP_Controller* because retail's __RTDynamicCast calls name that source type
+    // (PhySys::GetVelocity .text:0628580f, CSimple::update_zones .text:062b5d38). It holds
+    // a FLControllerGolem (AttachGolemController) or a CRemotePhysicsController
+    // (PhySys::RCBegin), both IVP_Controller at offset 0.
     IVP_Controller* GolemController;    // +0x60
     // +0x64: std::vector<FPartMapEntry> (VC6 layout: allocator byte +0x64, _First +0x68,
     // _Last +0x6c, _End +0x70). The ctor zeroes the three pointers (.text:062af327..062af32d;
@@ -388,25 +332,10 @@ public:
     // (.text:062af5c9..062af5df). FUN_0628f700 (vector::_Insert_n) appends at _Last from the
     // non-physical attachment paths.
     std::vector<FPartMapEntry> PartMap; // +0x64 .. +0x73
-    // +0x74: which physics control mode this object's body was built with. A plain dword taking
-    // exactly the values 0 (never built / not physical), 1 (golem force controller) or 2 (plain
-    // IVP body). Mirrored verbatim out of PhySys::CreateParms+0x18 (`Type` in common_physys.h)
-    // by FUN_06288e60, the tail of PhySys::BuildIVP_Real:
-    //   .text:06288e83  MOV EAX,[EBX+0x18]                 ; EBX = the CreateParms
-    //   .text:06288e86  DEC EAX / JZ  06288ed1             ; ==1 -> golem branch
-    //   .text:06288e8a  DEC EAX / JNZ 062890b7             ; !=2 -> do nothing at all
-    //   .text:06288e99  MOV dword ptr [ESI+0x74],0x2       ; mode 2, the fallthrough
-    //   .text:06288edd  MOV dword ptr [ESI+0x74],0x1       ; mode 1, the golem branch
-    // BuildIVP_Real itself switches its own damping template on the same CreateParms+0x18 at
-    // .text:06288a08-06288a4a (==1 pulls PhySys::GOLEM_CHILD_MASS/GOLEM_CHILD_*, ==2 pulls
-    // PhySys::DEFAULT_*_DAMPING), which is the independent confirmation that 1 and 2 are the
-    // only defined modes.
-    // Read back as the dispatch for AnimDB::Update's transform push-down, at .text:0627e12a:
-    //   MOV EAX,[ESI+0x74] / DEC EAX / JZ 0627e1f9 / DEC EAX / JNZ 0627e2de
-    // mode 1 drives GolemController (+0x60) via FUN_06343580/FUN_06343670 using
-    // PhySys::GetCurrentTime(PhysicsSystemId); mode 2 drives BodyPtr (+0x54) via FUN_06343cc0.
-    // Nothing in this port writes it yet (PhySys::BuildIVP_Real here is `simplified`), so it
-    // stays 0 and both AnimDB::Update branches are inert. Open TODO, not an accepted gap.
+    // +0x74: the physics control mode the body was built with: 0 (not physical), 1 (golem
+    // force controller) or 2 (plain IVP body), copied from PhySys::CreateParms+0x18 by
+    // FUN_06288e60 (.text:06288e99 / 06288edd). AnimDB::Update dispatches on it
+    // (.text:0627e12a): mode 1 drives GolemController, mode 2 BodyPtr (FUN_06343cc0).
     int PhysicsControlMode;             // +0x74
     // +0x78: std::list<void*> of the PhySys phantoms attached to this object (VC6 layout:
     // allocator byte +0x78, _Myhead +0x7c, _Mysize +0x80). The ctor builds the empty head
@@ -427,9 +356,8 @@ public:
     // CBase::notify_of_destruction(this) on every element (.text:062af4d4..062af4f1). Retail
     // Common never calls advise itself (only the export entry references it).
     std::list<CBase*> Advisors;         // +0x8c .. +0x97
-    unsigned RefCount;                  // +0x98  copied verbatim (the source's live refcount
-                                         // value, not reset to 1) -- matches retail exactly,
-                                         // confirmed via Common.dll.c 40405-40505.
+    unsigned RefCount;                  // +0x98  the copy ctor copies the source's live
+                                         // refcount, not reset to 1 (retail quirk).
 };
 
 static_assert(sizeof(CObject) == 0x9c, "CObject sizeof 0x9c");
@@ -466,11 +394,8 @@ struct COMMON_API CSimple : public CObject
 {
 public:
     // CSimple::CreateParms — CSimple::init 0x55b60.
-    // Default member initializers reproduce retail's default ctor (Common.dll.c 0x265e0,
-    // flattened into CGuided::CreateParms::CreateParms — CSimple/CProjectile never got
-    // their own separate compiled ctor, but this is exactly the base-class portion of it):
-    // Id/ObjDb/OwnerPlayer=0, HitPts=-1.0f, Pos=(0,0,0), Orient=identity, Velocity=(0,0,0),
-    // AngularVelocity=(0,0,0).
+    // Default member initializers are the base portion of retail's only compiled ctor,
+    // CGuided::CreateParms::CreateParms (0x062865e0).
     struct CreateParms
     {
         unsigned Id = 0;                  // +0x00 → this+0xb0
@@ -492,10 +417,8 @@ public:
 
     // Default argument: CSimple::`default constructor closure' (.text:06281440) pushes 0x3.
     explicit CSimple(Class ObjectClass = ClassSimple);
-    // Common.dll.c 40405-40505 (0x211b0), tracker id 10557. Delegates the CObject-owned
-    // portion to CObject::CObject(CObject const&) then copies CSimple's own fields below,
-    // including the map/tree cluster at OpaqueBc -- see common_csimple.cpp for field-by-field
-    // detail and the parts left as an intentional documented gap (map key/value types).
+    // 0x062811b0. CObject(Other), then CSimple's own fields including AttachedDamageObjs;
+    // see common_csimple.cpp.
     CSimple(CSimple const& Other);
     virtual ~CSimple();
 
@@ -552,11 +475,8 @@ protected:
 
 public:
 
-    // +0x9c. Confirmed by TractorArm::GetTarget (Common.dll.c 65123-65131, `this+8 - 0x9c`)
-    // and TractorArm::SetTarget (65510-65532, `target + 0x9c`): every CSimple-derived object
-    // (CLoot in particular) can be watched through this embedded Watchable, the same
-    // "BaseWatcher stores a Watchable*, owner recovered by subtracting the sub-object offset"
-    // idiom as CGuided::TargetWatch above (IObjRW+8 there, CSimple+0x9c here).
+    // +0x9c. Every CSimple can be watched through this embedded Watchable; watchers recover
+    // the CSimple by subtracting 0x9c (TractorArm::GetTarget/SetTarget, CEGun's lock).
     Watchable SelfWatchable;    // +0x9c
     unsigned char FlagsA0;      // +0xa0  bit0 targetable (+0xa1..+0xa3: alignment, never written)
     Universe::IZone* ZoneAtA4;  // +0xa4  Common ZONE (vftable 063a5094), set by update_zones
@@ -574,8 +494,7 @@ public:
     //     [_Head+4] comparing `CMP EBP,[ESI+0xc] / SETC` (unsigned), then FUN_0628fd80 (_Insert).
     // The key is compared as the raw 32-bit CacheString::Value pointer (interned strings), so
     // the ordering is pointer order, not string order -- FCacheStringLess below. The CSimple
-    // copy ctor (Common.dll.c 40405-40505) deep-copies it node by node (items 673/2108), the
-    // dtor frees it -- both what std::set's own copy ctor/dtor do.
+    // copy ctor deep-copies it and the dtor frees it, as std::set's do.
     struct FCacheStringLess
     {
         bool operator()(CacheString const& Left, CacheString const& Right) const
@@ -586,16 +505,9 @@ public:
     };
     std::set<CacheString, FCacheStringLess> AttachedDamageObjs; // +0xbc
     unsigned char PadBcSet[0x14 - sizeof(std::set<CacheString, FCacheStringLess>)]; // keeps +0xd0
-    // +0xd0 / +0xdc: already identified and consumed elsewhere in this port (predates this
-    // pass) as the lazily-cached center-of-mass/radius pair -- CSimple::cache_physical_props
-    // (common_csimple.cpp, Common.dll.c 0x55ed0) writes both via raw `this+0xd0`/`this+0xdc`
-    // pointer arithmetic, CSimple::get_physical_radius_r (Common.dll.c 87507) reads them back
-    // and lazily recomputes when CachedRadius is still the ctor's -1.0f "uncached" sentinel.
-    // This pass's copy-ctor archaeology independently confirms the SAME 12-byte Vector shape
-    // at +0xd0 (copied via the identical LEA+3xMOV dword-triplet pattern used for
-    // WorldPosition/RadiusCenter above) and the same 4-byte scalar at +0xdc -- now given real
-    // names/types instead of raw byte blobs + reinterpret_cast (see common_csimple.cpp for the
-    // two call sites updated to use these fields directly instead of pointer arithmetic).
+    // +0xd0 / +0xdc: the lazily-cached center of mass and radius. cache_physical_props
+    // (0x062b5ed0) writes both; get_physical_radius_r reads them and recomputes while
+    // CachedRadius is the ctor's -1.0f sentinel.
     Vector CachedCenterOfMass;          // +0xd0 .. +0xdb
     float CachedRadius;                 // +0xdc .. +0xdf  -1.0f = not yet cached
     unsigned TypeBits;          // +0xe0  arch ObjectType after open
@@ -669,12 +581,9 @@ static_assert(offsetof(CProjectile, OwnerSafeTime) == 0xec, "CProjectile+0xec ow
 // other side: it copies +0x04..+0xec and stops (0xec is CProjectile::OwnerSafeTime, the
 // last CProjectile field), then re-stamps the vptr. So sizeof(CMunition)==sizeof(CProjectile).
 //
-// Vtable: 0x0639bbbc holds 43 slots (0x0639bbbc..0x0639bc64 = 172 bytes), NOT the 44/176
-// the tracker recorded -- the dword at 0x0639bc68 is CGuided's RTTICompleteObjectLocator
-// sitting at [CGuided_vftable-4], the same neighbour-COL overcount that bit 48 other items
-// in the 2026-09-17 vftable sweep. All 43 slots are byte-for-byte the same target addresses
-// as CProjectile::`vftable' (0x0639bb0c..0x0639bbb4): CMunition overrides NOTHING. It is a
-// pure taxonomy layer, which is why it has no method of its own beyond munitionarch().
+// Vtable: 0x0639bbbc holds 43 slots (0x0639bbbc..0x0639bc64; 0x0639bc68 is CGuided's COL).
+// All 43 match CProjectile::`vftable' (0x0639bb0c..0x0639bbb4): CMunition overrides
+// nothing and adds only munitionarch().
 //
 // Hierarchy (RTTI BaseClassArrays, the authority -- ctor CALLs are useless here because
 // MSVC elides the redundant intermediate vptr store):
@@ -682,9 +591,7 @@ static_assert(offsetof(CProjectile, OwnerSafeTime) == 0xec, "CProjectile+0xec ow
 //   CGuided   COL 0x063a6d08 -> 8 bases from array 0x063a6cd4: CGuided, CMunition, CProjectile, ...
 //   CBeam     COL ...        -> 8 bases from array 0x063a6d34: CBeam,   CMunition, CProjectile, ...
 //   CMine                    -> 7 bases from array 0x063a87f4: CMine,   CProjectile, ...  (NO CMunition)
-// So CGuided and CBeam derive from CMunition; CMine and CCounterMeasure do not, they stay
-// on CProjectile directly. (The 2026-09-06 tracker note claiming CGuided/CBeam derive
-// straight from CProjectile in retail was wrong on this point; RTTI settles it.)
+// So CGuided and CBeam derive from CMunition; CMine and CCounterMeasure stay on CProjectile.
 struct COMMON_API CMunition : public CProjectile
 {
 public:
@@ -762,9 +669,8 @@ static_assert(offsetof(CGuided, MotorArch) == 0xfc, "CGuided+0xfc motor");
 static_assert(offsetof(CGuided, SeekerElapsed) == 0x100, "CGuided+0x100 elapsed");
 
 // Listing Alloc(0x67) Heap 0x120. CMunition then colgroup / vel / trail.
-// CBeam::CBeam(CBeam const&) at 0x06286b?? stamps CSimple's vptr, copies +0xe4/+0xe8/+0xec,
-// then stamps CMunition::`vftable' at 0x06286bd8 before copying its own +0xf0.. fields --
-// direct evidence of the CMunition subobject, matching CBeam's 8-entry RTTI base array.
+// CBeam's copy ctor stamps CMunition::`vftable' (0x06286bd8) before copying its own
+// +0xf0.. fields, matching its 8-entry RTTI base array.
 struct COMMON_API CBeam : public CMunition
 {
 public:
@@ -870,8 +776,7 @@ static_assert(sizeof(CCounterMeasure) == 0xf0, "CCounterMeasure sizeof 0xf0");
 
 // CLoot: cargo container dropped by destroyed ships/solars.
 // CLoot::init 0x4c460 / CLoot::CLoot 0x4c400 / CLoot::update 0x4c680.
-// Real object size confirmed by the retail allocation site (operator_new(0x104)
-// before CLoot::CLoot at Common.dll.c ~82073), not the accessor offsets alone.
+// Size from the allocation site, operator_new(0x104) before CLoot::CLoot.
 struct COMMON_API CLoot : public CSimple
 {
 public:
@@ -956,24 +861,13 @@ namespace CmnAsteroid
     class CAsteroidField;
 }
 
-// CAsteroid: static asteroid rock spawned by CmnAsteroid::CAsteroidCube. A CSimple
-// subclass (ObjectClass 0x1003) -- NOT related to CLoot despite CLoot::set_hit_pts /
-// CLoot::set_contents_hit_pts appearing to call "CAsteroid::asteroidarch(this)" in the
-// decomp (Common.dll.c 0x4c700 / 0x3d4d0): that is retail identical-code-folding, not
-// inheritance. CAsteroid::asteroidarch, CMine::minearch, CShip::shiparch, CObject::get_archetype
-// and a dozen other unrelated classes' arch() accessors all compile to the exact same
-// "return *(T**)(this+0x88)" body and got linked into ONE physical function (Common.dll.c
-// 9341-9363); the caller's static type just picks which alias name Ghidra shows, so
-// CLoot::set_hit_pts landing on the "CAsteroid" alias says nothing about CLoot's hierarchy.
-// Proof CAsteroid : CSimple (not CLoot): CAsteroid::CAsteroid(void) calls
-// CSimple::CSimple(this, 0x1003) directly (Common.dll.c 0x42840), operator_new(0xfc) is used
-// for ObjectClass 0x1003 in the CObject factory (Common.dll.c ~82049), and CSimple's own
-// sizeof is 0xe4 -- exactly where CAsteroid's own fields (0xe4..0xfc) begin.
+// CAsteroid: static asteroid rock spawned by CmnAsteroid::CAsteroidCube. A CSimple subclass
+// (ObjectClass 0x1003): its ctor (0x062a2840) calls CSimple::CSimple(this, 0x1003) and the
+// factory allocates 0xfc. CLoot calls that Ghidra shows as "CAsteroid::asteroidarch" are the
+// shared ICF fold of every `MOV EAX,[this+0x88]` arch() accessor, not inheritance.
 //
-// CDynamicAsteroid (declared further below) looks like a sibling by name but is a totally
-// separate class: its ctor calls CObject::CObject(this, 0x4001) directly (skipping CSimple
-// entirely) and operator_new(0x9c) == sizeof(CObject) exactly, i.e. it adds no data members
-// of its own at all.
+// CDynamicAsteroid (below) is unrelated: its ctor calls CObject::CObject(this, 0x4001)
+// directly and operator_new(0x9c) == sizeof(CObject), so it adds no data members.
 struct COMMON_API CAsteroid : public CSimple
 {
 public:
@@ -985,7 +879,7 @@ public:
         unsigned long AsteroidId;    // +0x5c -> this+0xe8
         // The id of the owning asteroid cube: the cube's populate fills it (.text:062a6331)
         // and init() copies it to this+0xec (.text:062a290a).
-        unsigned CubeId;             // +0x60 -> this+0xec  formerly FieldE4Value
+        unsigned CubeId;             // +0x60 -> this+0xec
         bool bMine;                  // +0x64 -> this+0xf0 (CAsteroid::is_mine)
         bool bInstantKill;           // +0x65 -> this+0xf1 (CAsteroid::is_instant_kill) (+0x66/+0x67: alignment)
         CmnAsteroid::CAsteroidField const* OwnerField; // +0x68 -> this+0xf8 (get_owner_field)
@@ -1004,23 +898,20 @@ public:
 
     CAsteroid& operator=(CAsteroid const&) = delete;
 
-    // Common.dll.c 0x428f0. Non-virtual: hides (does not override) CSimple::init -- the
-    // retail vtable slot at +0x80 still resolves to CSimple::init (Common.dll.txt
-    // 0639dc14), and every call site invokes CAsteroid::init explicitly by name
-    // (e.g. Common.dll.c ~73766, the cube's per-asteroid spawn loop).
+    // 0x062a28f0. Non-virtual: hides CSimple::init (the +0x80 slot at 0639dc14 is still
+    // CSimple::init); the cube's spawn loop calls CAsteroid::init by name.
     void init(CreateParms const& Parms);
 
 protected:
-    // Common.dll.c 0x42930. Builds a near-immovable IVP body (Mass 1000, LinearDamping
-    // and AngularDamping all 1e6): retail never applies Velocity/AngularVelocity to it,
-    // so this port doesn't either -- asteroids are always physically motionless.
+    // 0x062a2930. Builds a near-immovable IVP body (Mass 1000, linear and angular damping
+    // 1e6); retail never applies Velocity/AngularVelocity, so asteroids never move.
     // Retail: ?init_physics@CAsteroid@@MAEXABVVector@@0@Z (M = protected virtual).
     virtual void init_physics(Vector const& Velocity, Vector const& AngularVelocity);
 
 public:
-    // Common.dll.c 0x428e0. Trivial passthrough (COMDAT-folded with CDynamicAsteroid::update).
+    // 0x062a28e0. Trivial passthrough (COMDAT-folded with CDynamicAsteroid::update).
     virtual int update(float Dt, unsigned Flags);
-    // Common.dll.c 0x1023d0. COMDAT-folded with CSolar::get_velocity: always the zero vector.
+    // 0x063623d0. COMDAT-folded with CSolar::get_velocity: always the zero vector.
     virtual Vector get_velocity() const;
 
     Archetype::Asteroid const* asteroidarch() const;
@@ -1036,13 +927,11 @@ public:
 
     unsigned char OpaqueE4[4];      // +0xe4 unidentified; only ever bulk-copied (copy ctor)
     unsigned long AsteroidId;       // +0xe8
-    unsigned CubeId;                // +0xec  owning cube's id (CreateParms::CubeId); formerly FieldECValue
+    unsigned CubeId;                // +0xec  owning cube's id (CreateParms::CubeId)
     bool bMine;                     // +0xf0
     bool bInstantKill;              // +0xf1
-    // Set directly by the owning CAsteroidCube right before init() is called (Common.dll.c
-    // ~73763: this_01+0xf4 = Cube+0x50, i.e. the cube's own CmnAsteroid::CAsteroidCube::SystemId),
-    // NOT populated through CreateParms. Fed into PhySys::CreateParms::CollisionGroupId by
-    // init_physics.
+    // Stored by the owning CAsteroidCube before init() (the cube's SystemId, cube+0x50), not
+    // through CreateParms. init_physics passes it as PhySys::CreateParms::CollisionGroupId.
     unsigned CollisionGroupId;      // +0xf4
     CmnAsteroid::CAsteroidField const* OwnerField;  // +0xf8
 };
@@ -1055,10 +944,8 @@ static_assert(offsetof(CAsteroid, bInstantKill) == 0xf1, "CAsteroid+0xf1 instant
 static_assert(offsetof(CAsteroid, CollisionGroupId) == 0xf4, "CAsteroid+0xf4 collision group");
 static_assert(offsetof(CAsteroid, OwnerField) == 0xf8, "CAsteroid+0xf8 owner field");
 
-// CDynamicAsteroid: animated/scripted asteroid-like scenery (ObjectClass 0x4001). Despite
-// the name, this is a direct CObject subclass -- see the block comment on CAsteroid above
-// for the ctor/sizeof evidence. It adds no data members of its own (sizeof == sizeof(CObject)),
-// only new/overridden virtuals.
+// CDynamicAsteroid: animated/scripted asteroid-like scenery (ObjectClass 0x4001). A direct
+// CObject subclass with no data members of its own (see CAsteroid above).
 struct COMMON_API CDynamicAsteroid : public CObject
 {
 public:
@@ -1085,9 +972,9 @@ public:
     // 0x06262d50 (ICF fold, `MOV EAX,[this+0x88]; RET`).
     Archetype::DynamicAsteroid const* dynamicAsteroidArch() const;
 
-    // Common.dll.c 0x42a70. Non-virtual; just forwards to the virtual init_physics below.
+    // 0x062a2a70. Non-virtual; just forwards to the virtual init_physics below.
     void init(CreateParms const& Parms);
-    // Common.dll.c 0x42a90. Mass 1.0, LinearDamping 1e-5, AngularDamping (0,0,0);
+    // 0x062a2a90. Mass 1.0, LinearDamping 1e-5, AngularDamping (0,0,0);
     // CollisionGroupId comes from CreateParms rather than a cube (unlike CAsteroid).
     // Retail never applies Velocity/AngularVelocity here either.
     // Retail: ?init_physics@CDynamicAsteroid@@MAEXABVVector@@0I@Z (M = protected virtual).
@@ -1095,8 +982,8 @@ protected:
     virtual void init_physics(Vector const& Velocity, Vector const& AngularVelocity, unsigned CollisionGroupId);
 
 public:
-    // Common.dll.txt 0639dc8c: vtable slot is COMDAT-folded with CAsteroid::update, i.e.
-    // this is the same trivial CObject::update passthrough.
+    // Vtable slot 0639dc8c is COMDAT-folded with CAsteroid::update (a CObject::update
+    // passthrough).
     virtual int update(float Dt, unsigned Flags);
 };
 
@@ -1109,13 +996,11 @@ static_assert(sizeof(CDynamicAsteroid) == 0x9c, "CDynamicAsteroid sizeof 0x9c (=
 // freshly-arrived sample doesn't make the visual position pop, blends from the
 // previously-rendered position/velocity into that new quadratic over a short
 // "converge" window via a second quadratic (Velocity2/Acceleration2) anchored
-// at BlendBasePosition. See Common.dll.c/.txt: AddSample @0x30af0,
-// ProjectVelocity @0x316e0, GetProjectedPosition @0x317b0, Doit @0x317c0.
+// at BlendBasePosition. AddSample 0x06290af0, ProjectVelocity 0x062916e0,
+// GetProjectedPosition 0x062917b0, Doit 0x062917c0.
 //
-// EXPORTS. Retail's header made this class dllexport in every module that
-// compiled it, so the members it defined INLINE were emitted into, and
-// exported from, each of those modules -- Common.dll, Server.dll (and the two
-// executables), all at their own addresses:
+// Exports: retail made this class dllexport in every module that compiled it, so its
+// inline members are emitted into and exported from each module at its own address:
 //
 //   member                        Common.dll            Server.dll
 //   CalcError                     .text:062830c0 ord 1252  .text:06ce1f40 ord 69
@@ -1126,21 +1011,11 @@ static_assert(sizeof(CDynamicAsteroid) == 0x9c, "CDynamicAsteroid sizeof 0x9c (=
 //   operator= (implicit)          .text:06283300 ord 731   .text:06ce2180 ord 25
 //   ??_7 (1 slot, deleting dtor)  .rdata:0639b98c ord 981  .rdata:06d64f10 ord 36
 //
-// The two instruction streams of each inline member are identical, byte for
-// byte apart from relocations. The copy constructor and operator= are the
-// compiler's own memberwise ones (arrays copied with REP MOVSD in the ctor,
-// with element loops in operator=, the vptr stored last), so they are left
-// implicit here too. Everything else -- default ctor, dtor, AddSample,
-// ConvergeTime, Doit, GetProjectedPosition, ProjectVelocity, Reset,
-// SetMaxCorrectiveConvergeTime -- has its only body in Common.dll; Server.dll
-// reaches the one it uses (the destructor, from its own deleting destructor)
-// through Common.lib's import thunk, exactly as retail's Server.dll imports
-// ??1CDeadReckonedVector@@UAE@XZ (ordinal 0x211) from COMMON.DLL.
-//
-// SHARED_INLINE_API at class level is what reproduces this: dllexport in
-// Common.dll and in Server.dll, dllimport everywhere else. Server.dll's own
-// ??_7 is emitted with its copy constructor and slot 0 is a locally generated
-// deleting destructor, the shape of retail's .text:06ce2320.
+// The copy constructor and operator= are the compiler's memberwise ones, left implicit.
+// Every other member has its only body in Common.dll; Server.dll imports the destructor
+// (??1CDeadReckonedVector@@UAE@XZ, ordinal 0x211). SHARED_INLINE_API reproduces this:
+// dllexport in Common.dll and Server.dll, dllimport elsewhere; Server.dll's own ??_7 slot 0
+// is a local deleting destructor (retail .text:06ce2320).
 //
 // Retail mangles every accessor QAE (non-const): ?CalcError@...@@QAENABVVector@@@Z,
 // ?GetSample@...@@QAEABVVector@@H@Z, ?ConvergeTime@...@@QAENXZ,
@@ -1153,11 +1028,9 @@ public:
 
     void AddSample(Vector const& Pos, double Timestamp);
 
-    // .text:062830c0 (Common) / .text:06ce1f40 (Server), RET 0x4. Everything
-    // stays on the x87 stack: each FLD float/FSUB float difference is unrounded,
-    // the squares are summed as (Dx^2 + Dz^2) + Dy^2 (FMULP ST3, then FMUL ST1 /
-    // FADDP ST3 for Dz, then FMUL ST2 / FADDP ST3 for Dy), and the FSQRT result is
-    // returned in ST0 without ever being stored.
+    // .text:062830c0 (Common) / .text:06ce1f40 (Server). Everything stays on the x87 stack:
+    // the differences are unrounded, summed as (Dx^2 + Dz^2) + Dy^2, and the FSQRT result is
+    // returned in ST0.
     double CalcError(Vector const& Pos)
     {
         double const Dx = (double)Pos.x - TrackedPosition.x;
@@ -1177,13 +1050,10 @@ public:
         return Samples[Index];
     }
 
-    // .text:06283100 / .text:06ce1f80 (+0x60/+0x64/+0x68) and .text:06283150 /
-    // .text:06ce1fd0 (+0x6c/+0x70/+0x74): the same 31 instructions on different
-    // fields. FLD z, FLD y, FLD x; x*x + y*y, + z*z (that association); FSQRT --
-    // Len stays on the x87 stack. FCOM float 1e-5f, TEST AH,0x41, JNZ past the
-    // divide: the divide runs only when Len is STRICTLY greater (not <=, not
-    // unordered). FDIVR double 1.0 keeps the reciprocal on the stack too; each
-    // component is FLD inv, FMUL float [c], FSTP float [c].
+    // .text:06283100 / 06ce1f80 and .text:06283150 / 06ce1fd0: the same body on different
+    // fields. Len = sqrt((x*x + y*y) + z*z) stays on the x87 stack; the divide runs only when
+    // Len is strictly greater than 1e-5f (not on unordered), and the reciprocal stays
+    // unrounded until each component's FSTP.
     void NormalizeProjectedPosition()
     {
         double const X = ProjectedPosition.x;
@@ -1253,18 +1123,8 @@ static_assert(offsetof(CDeadReckonedVector, ConvergeWindow) == 0xb8, "CDeadRecko
 static_assert(offsetof(CDeadReckonedVector, ElapsedTime) == 0xc0, "CDeadReckonedVector+0xc0 elapsed time");
 static_assert(offsetof(CDeadReckonedVector, MaxCorrectiveTime) == 0xc8, "CDeadReckonedVector+0xc8 max corrective time");
 
-// SubObjectID (the three id makers and the id classifiers) MOVED 2026-09-24 to
-// common_archetype.h, next to CollisionGroupDesc and for the same reason: PlayerData
-// holds a SubObjectID::EquipIdMaker by value at retail slot+0x3C8 (Server.dll imports
-// ?Reset@EquipIdMaker@SubObjectID@@QAEXXZ for it), and common_server_playerdb.h must
-// not include this whole header. This header still sees the classes through its own
-// #include "common_archetype.h".
-
-// CollisionGroupDesc itself now lives in common_archetype.h (included above). It was moved
-// there 2026-09-17 so PlayerData -- whose retail slot+0x26c is a std::list<CollisionGroupDesc>
-// -- can hold one by value without common_server_playerdb.h having to drag the whole object
-// layer into fourteen translation units. Nothing else changed: this header still sees the
-// complete type, because common_archetype.h is one of its own includes.
+// SubObjectID and CollisionGroupDesc are declared in common_archetype.h, so that PlayerData
+// (common_server_playerdb.h) can hold them by value without this header.
 
 class COMMON_API CArchGroup
 {
@@ -1288,21 +1148,21 @@ public:
     double GetRelativeHealth() const;
     void Kill(DamageEntry::SubObjFate FateValue);
     DamageEntry::SubObjFate GetFate() const;
-    // Common.dll.c 0x40130. True once State is 2 (killed) or 3 (destroyed).
+    // 0x062a0130. True once State is 2 (killed) or 3 (destroyed).
     bool IsDead() const;
     // .text:062a0150. True once State is 3 (destroyed).
     bool IsDestroyed() const;
-    // Common.dll.c 0x40280. Fills Out.Id from Arch->Id and Out.Health from
+    // 0x062a0280. Fills Out.Id from Arch->Id and Out.Health from
     // HitPts / Arch->HitPts (same ratio as GetRelativeHealth).
     void GetCollisionGroupDesc(CollisionGroupDesc& Out) const;
     CacheString const& Name() const;
     // .text:062a0120: Arch->Id (word at CollisionGroup+0x04), no null check.
     unsigned short GetID() const;
-    // Common.dll.c 0x402a0. -1 once State==3 (destroyed), else RootIndex.
+    // 0x062a02a0. -1 once State==3 (destroyed), else RootIndex.
     long GetRootIndex() const;
-    // Common.dll.c 0x402b0. False once State==3; else IsDescendant(RootIndex, InstIndex).
+    // 0x062a02b0. False once State==3; else IsDescendant(RootIndex, InstIndex).
     bool IsInstInGroup(long InstIndex) const;
-    // Common.dll.c 0x40300. Out=(0,0,0); false once State==3 or RootIndex==-1; else
+    // 0x062a0300. Out=(0,0,0); false once State==3 or RootIndex==-1; else
     // Out=PhySys::GetVelocity(Owner), true.
     bool GetVelocity(Vector& Out) const;
     // Listing 0x40360 (?GetCenterOfMass@CArchGroup@@QBE_NAAVVector@@@Z, export 1511).
@@ -1316,7 +1176,7 @@ public:
     // same one-shot cache fill, but hands back BoundRadius untransformed (retail never
     // re-scales it).
     bool GetRadius(float& Out) const;
-    // Common.dll.c 0x40690. -1 once State==3; else Hierarchy::GetDepth(RootIndex, InstIndex).
+    // 0x062a0690. -1 once State==3; else Hierarchy::GetDepth(RootIndex, InstIndex).
     int InstDepthInGroup(long InstIndex) const;
     float GetHitPoints() const;
     void SetHitPoints(float NewHitPts);
@@ -1336,11 +1196,11 @@ public:
     unsigned LinkedEquipmentType() const;
     float LinkedEquipmentDamage() const;
     float ExplosionResistance() const;
-    // Common.dll.c 0x40740/0x40770: reinterpret Arch+0x40 / Arch+0x4c directly as
-    // Archetype::DamageObjInfoList (no null-check on Arch in retail -- ports that as-is).
+    // 0x062a0740/0x062a0770: Arch+0x40 / Arch+0x4c as Archetype::DamageObjInfoList (no null
+    // check on Arch).
     Archetype::DamageObjInfoList const& ParentDamageObjs() const;
     Archetype::DamageObjInfoList const& GroupDamageObjs() const;
-    // Common.dll.c 0x40760: reinterpret Arch+0x58 as Archetype::FuseIgnitionList (no null-check).
+    // 0x062a0760: reinterpret Arch+0x58 as Archetype::FuseIgnitionList (no null-check).
     Archetype::FuseIgnitionList const& FuseIgnitions() const;
 
 protected:
@@ -1377,12 +1237,9 @@ public:
     int State;                                  // +0x14 1 alive / 2 killed / 3 destroyed
     int Fate;                                   // +0x18
     CObject* DestroyedObj;                      // +0x1c
-    // +0x20..+0x33 was `unsigned char Opaque20[0x14]`. The ctor (listing 062a0192-062a01ab)
-    // zeroes exactly the byte at +0x20 and the four dwords at +0x24/+0x28/+0x2c/+0x30 and
-    // leaves the padding +0x21..+0x23 untouched, which pins the split below; GetCenterOfMass
-    // (0x40360) and GetRadius (0x40400) then test the byte at +0x20 and call GetBoundingSphere
-    // with &(+0x24) and &(+0x28) as its two out-params. All three are declared const in
-    // retail, so the cache is mutable.
+    // +0x20..+0x33: bounds cache. The ctor zeroes the byte at +0x20 and the dwords at
+    // +0x24..+0x30; GetCenterOfMass and GetRadius test +0x20 and pass &(+0x24) / &(+0x28) to
+    // GetBoundingSphere. Mutable because all three are const in retail.
     mutable bool bBoundsValid;                  // +0x20
     mutable float BoundRadius;                  // +0x24
     mutable Vector BoundCenter;                 // +0x28 .. +0x33
@@ -1425,30 +1282,23 @@ public:
     CArchGroupManager();
     ~CArchGroupManager();
 
-    // Common.dll.c 0x20bd0 / 0x20d30. Retail's copy ctor/operator= both deep-copy the
-    // Groups tree structure but only shallow-copy each entry's CArchGroup* value (same
-    // semantics std::map<unsigned short, CArchGroup*>'s own copy ctor/operator= already
-    // give us) -- two CArchGroupManagers can end up pointing at the same CArchGroup
-    // instances after a copy, same as retail. No caller of CEqObj::CEqObj(CEqObj const&)
-    // (the only place that copy-constructs a CArchGroupManager) exists anywhere in
-    // Common.dll, freelancer.exe, or Server.dll -- this is exported (dllexport pulls in
-    // all special members) but dead in practice.
+    // 0x06280bd0 / 0x06280d30. Copy the tree but share each CArchGroup* (as std::map's copy
+    // does), so two managers can point at the same groups. Exported but unused: nothing
+    // copy-constructs a CEqObj.
     CArchGroupManager(CArchGroupManager const& Other);
     CArchGroupManager& operator=(CArchGroupManager const& Other);
 
     bool Init(CEqObj* OwnerObj);
     bool AddNewArchGroup(CArchGroup* Group);
     int Clear();
-    // Common.dll.c 69248-69266 (0x417a0). Walks every group via Traverse() (a fresh
+    // 0x062a17a0. Walks every group via Traverse() (a fresh
     // traverser), counting each whose State isn't Killed(2) or Destroyed(3).
     int NumLiving() const;
     bool DestroyDeadGroups();
-    // Common.dll.c 69316-69349 (0x418b0). Unlike DestroyDeadGroups/DestroyGroups (which
-    // Destroy() a group in place but leave its map entry around), this actually erases the
-    // entry: finds it by GroupId, explicitly destructs+frees the CArchGroup object (matching
-    // retail's explicit ~CArchGroup + free-list call), then removes the map entry entirely.
+    // 0x062a18b0. Unlike DestroyDeadGroups/DestroyGroups (which Destroy() a group in place
+    // and keep its map entry), destructs and frees the CArchGroup and erases the entry.
     bool DeleteArchGroup(unsigned short GroupId);
-    // Common.dll.c 0x62a1960. Kills groups named by List's ArchGroupID entries, then
+    // 0x062a1960. Kills groups named by List's ArchGroupID entries, then
     // sweeps Groups for anything left in the Killed state and destroys it (same tail as
     // DestroyDeadGroups, but this also runs DestroyLowerGroups first, see .cpp).
     bool DestroyGroups(DamageList const& List, bool Param2);
@@ -1456,26 +1306,26 @@ public:
     CArchGroup const* FindByID(unsigned short GroupId) const;  // retail QBE overload, same body .text:062a1540
     // .text:06263bb0 (ICF fold): Count at +0x14.
     int Size() const;
-    // Common.dll.c 0x62a1460 (69026-69053... actually 68995-69020). Looks a group up via the
+    // 0x062a1460. Looks a group up via the
     // same tree-find as FindByID/FindByName; if not found returns false, else returns
     // (Group->State == 3) when CheckDestroyed, else true.
     bool IsOnMap(unsigned short GroupId, bool CheckDestroyed) const;
-    // Common.dll.c 0x62a14e0. Linear scan (unlike FindByID, Groups isn't name-indexed);
+    // 0x062a14e0. Linear scan (unlike FindByID, Groups isn't name-indexed);
     // matches by CacheString pointer identity (interned strings, same as retail's raw
     // pointer compare) and skips groups already Killed/Destroyed (State 2 or 3).
     CArchGroup* FindByName(CacheString const& Name);
     CArchGroup const* FindByName(CacheString const& Name) const;  // retail QBE overload identical/ICF-folded into 0x62a14e0
-    CArchGroup* Traverse(CArchGrpTraverser& Traverser);              // Common.dll.c 0x62a15a0
+    CArchGroup* Traverse(CArchGrpTraverser& Traverser);              // 0x062a15a0
     CArchGroup const* Traverse(CArchGrpTraverser& Traverser) const;  // retail QBE overload identical/ICF-folded into 0x62a15a0
-    // Common.dll.c 0x62a1600. Finds the group whose InstDepthInGroup(InstIndex) is smallest
+    // 0x062a1600. Finds the group whose InstDepthInGroup(InstIndex) is smallest
     // (nearest ancestor) among all groups where it isn't -1, returns that group's GetID(), or 0
     // if InstIndex==-1 or no group contains it.
     unsigned short InstToSubObjID(long InstIndex) const;
 
 protected:
-    // Common.dll.c 0x62a1c10. Retail's DestroyDeadGroup(CArchGroup&) thunk: DestroyLowerGroups then Destroy.
+    // 0x062a1c10. DestroyLowerGroups then Destroy.
     void DestroyDeadGroup(CArchGroup& Group);
-    // Common.dll.c 0x62a1ac0. Force-destroys any OTHER group in Groups that both (a) sits
+    // 0x062a1ac0. Force-destroys any OTHER group in Groups that both (a) sits
     // under DeadGroup's instance (IsInstInGroup on DeadGroup, indexed by the entry's own
     // GetRootIndex()) and (b) isn't itself already Killed/Destroyed -- an inconsistent
     // "UnDead lower group" retail logs and force-deletes. An entry already Killed/Destroyed
@@ -1483,10 +1333,7 @@ protected:
     void DestroyLowerGroups(CArchGroup const& DeadGroup);
 
     // Retail `protected: static int const CArchGroupManager::MAX_GROUP_DEPTH`, export ordinal
-    // 1835, .rdata 0x0639d9dc = 0x7fff. No reader exists anywhere in Common.dll -- it is
-    // exported but dead in retail, ported here for symbol parity. Note the neighbouring
-    // .rdata string is "E:\FL\Scratch\Source\Common\CArchGroup...", which is what ties this
-    // otherwise anonymous dword to the DestroyLowerGroups recursion this class performs.
+    // 1835, .rdata 0x0639d9dc = 0x7fff. No reader in Common.dll.
     static int const MAX_GROUP_DEPTH;
 
 public:
@@ -1504,7 +1351,7 @@ static_assert(offsetof(CArchGroupManager, Groups) == 0x08, "CArchGroupManager+0x
 static_assert(offsetof(CArchGroupManager, bTreeMulti) == 0x10, "CArchGroupManager+0x10 _Multi");
 static_assert(offsetof(CArchGroupManager, Count) == 0x14, "CArchGroupManager+0x14 size");
 
-// Return type of CEqObj::activate (Common.dll.c 78735-78751, ?activate@CEqObj@@UAE?AW4...).
+// Return type of CEqObj::activate (?activate@CEqObj@@UAE?AW4...).
 // Retail never names these values; the names are ours. The numbers come from the success path
 // of CEqObj::activate (.text:062ab16e..062ab17d) and CSolar::activate (.text:062b7d0c..
 // 062b7d1f): `CMP new,old; SETNZ; TEST; SETZ AL; INC EAX`, i.e. 1 when the stored byte changed
@@ -1527,7 +1374,7 @@ public:
         unsigned DockingCount;    // +0x5c → CShip +0x160
         unsigned VibeId;          // +0x60 → this+0x104 (stored as int)
         Costume SpaceCostume;     // +0x64 → this+0x108 (13 dwords)
-        unsigned VoiceId;         // +0x98 → this+0x13c  // formerly VibeFields[5]/RankSrc/RankCount/Field98
+        unsigned VoiceId;         // +0x98 → this+0x13c
         EquipDescVector Equipment; // +0x9c load_equip_and_cargo
         // Retail +0xac: a std::list<CollisionGroupDesc> (VC6: allocator, head, size). The
         // export ?load_arch_groups@CEqObj@@QAEXABV?$list@UCollisionGroupDesc@@...@std@@@Z takes
@@ -1536,8 +1383,7 @@ public:
         // A modern std::list is smaller than VC6's, so every offset from here on is retail's,
         // given in the comments only; the fields are reached by name.
         std::list<CollisionGroupDesc> ArchGroupDescs; // retail +0xac load_arch_groups
-        // Retail +0xb8, an ID_String. Read by CSolar::init (0x57560, Common.dll.c 89077/89113)
-        // to seed CSolar+0x1a4 and to name the object in its "dockable but no destination"
+        // Retail +0xb8, an ID_String. Read by CSolar::init (0x57560) to seed CSolar+0x1a4 and to name the object in its "dockable but no destination"
         // warning. CEqObj/CShip themselves never read it -- only CSolar does.
         ID_String NicknameSrc;
         // Retail +0xbc..+0xe7: written by CSolar::ReadObj (0x57ff0) and read back by
@@ -1575,13 +1421,8 @@ protected:
     explicit CEqObj(Class ObjectClass = ClassEqObj);
 
 public:
-    // Common.dll.c 0x272c0. Retail's version is a real, non-trivial member-wise copy (it
-    // even re-copy-constructs ArchGroups' embedded map), but it has zero callers anywhere
-    // in Common.dll, freelancer.exe, or Server.dll -- CEqObj is a dllexport class, so MSVC
-    // emits and exports every special member whether or not the game ever uses it. Ported
-    // as a straightforward member-wise copy (base + every field) rather than reverse
-    // engineering retail's byte-exact shuffling, since that would require porting several
-    // more never-called helper functions purely to replicate dead code.
+    // 0x062872c0. Exported (dllexport class) but has no caller in any module. Deviation:
+    // ported as a plain memberwise copy, not retail's exact copy sequence.
     CEqObj(CEqObj const& Other);
 
 protected:
@@ -1597,7 +1438,7 @@ public:
     virtual void load_equip_and_cargo(EquipDescVector const& Items, bool bClear);
     virtual void clear_equip_and_cargo();
     virtual bool add_item(EquipDesc const& Desc);
-    // Common.dll.c 77809-77925 (0x49f00, ?get_equip_desc_list@CEqObj@@UBEXAAUEquipDescVector@@@Z).
+    // 0x062a9f00 (?get_equip_desc_list@CEqObj@@UBEXAAUEquipDescVector@@@Z).
     // Reserves OutList for (ExternalCount + InternalCount) more elements, then appends one
     // EquipDesc per equip whose GetEquipDesc (vtable+0x28) returns true -- the inlined VC6
     // reserve and insert(end(), 1, x) with their own growth.
@@ -1625,8 +1466,7 @@ public:
     virtual void connect(INotify* NotifyParam);
     virtual void disconnect(INotify* NotifyParam);
     virtual void notify(INotify::Event EventParam, void* Context);
-    // Common.dll.c 0x4a3d0 (140474-140510). A THIRD, distinct disconnect overload (different
-    // retail vtable slot from both the IObjDB* and INotify* pairs above). When the object
+    // 0x062aa3d0. A third disconnect overload, with its own vtable slot. When the object
     // BehaviorMgr's +0xF0 watcher holds is Watcher, the manager is destroyed (FUN_062d2530,
     // ~IBehaviorManager) and freed, and BehaviorMgr is cleared.
     virtual void disconnect(IObjRW* Watcher);
@@ -1639,51 +1479,40 @@ public:
     // .text:062aa520: base update, per-equip Update, the behavior manager's tick
     // (IBehaviorManager::UpdateBehaviorTick, FUN_062d2b10) when allowed, docking animations.
     virtual int update(float Dt, unsigned Flags) override;
-    // Common.dll.c 0x4b130 (78735-78751). Toggles DockingPoints[DockIndex]'s activation flag;
-    // DockingPoints is populated 1:1 with Archetype::EqObj::DockingSpheres by
-    // init_docking_points, so its own size() faithfully replaces retail's raw archetype
-    // begin/end pointer-count check.
+    // 0x062ab130. Toggles DockingPoints[DockIndex]'s activation flag. DockingPoints mirrors
+    // Archetype::EqObj::DockingSpheres 1:1, so its size() stands in for retail's archetype
+    // begin/end count.
     virtual ObjActivateResult activate(bool bOn, unsigned DockIndex);
-    // Common.dll.c 0x4b190 (78762-78843). Appends one bool per DockingPoints entry
-    // (bActive, the byte CEqObj::activate writes) and returns true
-    // if any docking point is active. Retail's own hand-inlined vector<bool> push_back
-    // growth machinery collapses to std::vector<bool>::push_back here.
+    // 0x062ab190. Appends one bool per DockingPoints entry (bActive) and returns true if
+    // any docking point is active.
     // ?get_activate_state@CEqObj@@UAE_NAAV?$vector@_N...@std@@@Z -- not const in retail.
     virtual bool get_activate_state(std::vector<bool>& OutStates);
     // .text:062ab330: Out = get_velocity() first; then CExternalEquip::GetVelocity (+0x6c) or
     // CArchGroup::GetVelocity into a temporary that overwrites Out on success.
     virtual bool get_sub_obj_velocity(unsigned short SubObjId, Vector& Out) const;
-    // Listing 0x4b3f0 (062ab3f0..062ab4b8). Now fully wired, both branches. The two reasons
-    // this was previously left as a bare `return false` were both stale by the time they were
-    // re-checked: the equip branch's +0x70 slot is CExternalEquip::GetCenterOfMass (declared
-    // in common_cequip.h, overridden by CAttachedEquip), and CArchGroup::GetCenterOfMass now
-    // exists (common_carchgroup.cpp, listing 0x40360). Retail leaves Out untouched on failure.
+    // 0x062ab3f0. Equip branch: CExternalEquip::GetCenterOfMass (+0x70); arch-group branch:
+    // CArchGroup::GetCenterOfMass. Retail leaves Out untouched on failure.
     virtual bool get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) const;
-    // Common.dll.c 0x4b820 (79147-79179). Fully faithful: both GetMaxHitPoints (CEquip base
-    // virtual) and CArchGroup::GetMaxHitPoints are real, unambiguous calls.
+    // 0x062ab820: CEquip::GetMaxHitPoints or CArchGroup::GetMaxHitPoints.
     virtual bool get_sub_obj_max_hit_pts(unsigned short SubObjId, float& Out) const;
-    // Common.dll.c 0x4b8a0 (79185-79223). Fully faithful: GetRelativeHealth (CEquip base
-    // virtual), CArchGroup::GetRelativeHealth, and the SubObjId==1 CSimple::get_relative_health
-    // fallback are all real, unambiguous calls.
+    // 0x062ab8a0: CEquip::GetRelativeHealth, CArchGroup::GetRelativeHealth, or for
+    // SubObjId 1 CSimple::get_relative_health.
     virtual bool get_sub_obj_relative_health(unsigned short SubObjId, float& Out) const;
-    // Common.dll.c 0x4b990 (79252-79291). Equip branch uses CAttachedEquip::cast then calls
-    // vtable+0x84 -- the same slot already identified as GetRootIndex()-equivalent by
-    // CAttachedEquip::IsInstOnEquip's own class comment (common_cequip.h), reused here rather
-    // than re-deriving it. ArchGroup and SubObjId==1 (EngineInstanceId) branches are direct.
+    // 0x062ab990. Equip branch: CAttachedEquip::cast then GetRootIndex (vtable+0x84);
+    // arch-group and SubObjId 1 (EngineInstanceId) branches are direct.
     virtual long sub_obj_id_to_inst(unsigned short SubObjId) const;
-    // Common.dll.c 0x4c240 (79688-79721). Retail allocates a 0x1cc-byte IBehaviorManager via
+    // 0x062ac240. Retail allocates a 0x1cc-byte IBehaviorManager via
     // FUN_062d2220(Owner), which binds Owner into the manager's +0xf0 watcher (the same
     // sub-object disconnect(IObjRW*) above refers to) and builds its PathfindManager; the
     // port's IBehaviorManager(IObjRW*) does both. Then, whether the manager was just built or
     // already existed, ConnectBehaviorManagerObjectDb(ObjectDb) (FUN_062d2830, .text:062ac2ab)
     // and set_state_graph(GraphId, false).
     IBehaviorManager* create_behavior_interface(IObjRW* Owner, int GraphId);
-    // Common.dll.c 0x49920 (139295-139435, ?sync_cargo@CEqObj@@QAE_NABVEquipDescList@@@Z).
+    // 0x062a9920 (?sync_cargo@CEqObj@@QAE_NABVEquipDescList@@@Z).
     // First pass: walk existing CECargo equips (CEquipTraverser filtered to EquipTypeCargo),
     // zeroing Count for anything missing from List, else syncing Count/HitPoints from it.
     // Second pass: for every non-equipped List entry with no existing equip of that Id, spawn
-    // a new CECargo (mirrors add_cargo_item). Server.dll (src/Server/IServerImpl.cpp) has
-    // call-site comments naming this exact method; not yet wired up there.
+    // a new CECargo (mirrors add_cargo_item).
     bool sync_cargo(EquipDescList const& List);
 
     // 0x06262d50 (ICF fold, `MOV EAX,[this+0x88]; RET`): ?eqobjarch@CEqObj@@QBEPAUEqObj@Archetype@@XZ
@@ -1702,13 +1531,11 @@ protected:
 
 public:
     void load_arch_groups(std::list<CollisionGroupDesc> const& Descs);
-    // Common.dll.c 0x494f0. Thin wrapper: ArchGroups.Clear().
+    // 0x062a94f0. Thin wrapper: ArchGroups.Clear().
     void clear_arch_groups();
-    // Common.dll.c 0x49500 (?get_collision_group_description@CEqObj@@QBEXAAV?$list@...).
+    // 0x062a9500 (?get_collision_group_description@CEqObj@@QBEXAAV?$list@...).
     // Appends one CollisionGroupDesc per live arch group (via ArchGroups.Traverse +
-    // CArchGroup::GetCollisionGroupDesc) to the caller-supplied list. Retail returns a
-    // real std::list<CollisionGroupDesc>&, ported as-is (see common_casteroid.h scope
-    // note on using real std::list/std::map where retail hand-rolled its own).
+    // CArchGroup::GetCollisionGroupDesc) to the caller-supplied list.
     void get_collision_group_description(std::list<CollisionGroupDesc>& OutDescs) const;
     // Listing 0x4a640. Reputation-based attitude towards another CEqObj.
     float attitude_towards(CEqObj const* Other) const;
@@ -1728,7 +1555,7 @@ public:
     void set_control_exclusion(unsigned int Flags);
     bool is_control_excluded(unsigned int Flags) const;
     float get_cloak_percentage() const;
-    // Common.dll.c 0x27210. CloakPercent >= 1.0f (fully cloaked). Retail returns int 1/0
+    // 0x06287210. CloakPercent >= 1.0f (fully cloaked). Retail returns int 1/0
     // (?is_cloaked@CEqObj@@QBEHXZ; .text:06287223 MOV EAX,1 / .text:06287229 XOR EAX,EAX).
     int is_cloaked() const;
     unsigned get_base() const;
@@ -1736,46 +1563,41 @@ public:
     unsigned int const& get_dock_target() const;
     bool is_dock() const;
     float get_power() const;
-    void set_power(float NewPower);  // Common.dll.c 0x276c0
+    void set_power(float NewPower);  // 0x062876c0
     float get_max_power() const;
-    // Common.dll.c 0x276e0. Power / MaxPower, or 0 if MaxPower <= 0.
+    // 0x062876e0. Power / MaxPower, or 0 if MaxPower <= 0.
     float get_power_ratio() const;
     int get_vibe() const;
-    // Common.dll.c 0x4ba50 (?destroy_sub_objs@CEqObj@@UAEXABUDamageList@@_N@Z, 143037-143062
-    // in the raw listing -- thin, not separately decompiled). Forwards to the private
+    // 0x062aba50 (?destroy_sub_objs@CEqObj@@UAEXABUDamageList@@_N@Z). Forwards to the private
     // destroy_equipment() helper below, then CArchGroupManager::DestroyGroups(List, Param2).
-    // The only caller found in this port's own tracker graph is destroy_equipment's raw-asm
-    // XREF back to this function; no other in-repo caller yet (likely invoked by an unported
-    // damage/death path elsewhere in Common.dll or by another module -- see this project's
-    // "no dead code by absence" rule).
     virtual void destroy_sub_objs(DamageList const& List, bool Param2);
-    // Common.dll.c 0x4ba80 (?enumerate_sub_objs@CEqObj@@UBEHXZ). Sum of external+internal
+    // 0x062aba80 (?enumerate_sub_objs@CEqObj@@UBEHXZ). Sum of external+internal
     // attached-equipment counts plus the live arch-group count -- the total number of
     // destructible sub-objects this CEqObj currently exposes.
     virtual int enumerate_sub_objs() const;
-    // Common.dll.c 0x4b100 (?get_base_name@CEqObj@@QBEIXZ). DockingBaseId's nickname ID
+    // 0x062ab100 (?get_base_name@CEqObj@@QBEIXZ). DockingBaseId's nickname ID
     // via Universe::get_base(), or 0 when not docked/DockingBaseId's low 30 bits are unset.
     unsigned get_base_name() const;
-    // Common.dll.c 0x4b4c0/0x4b570/0x4b620. Sum this object's own hit points/max hit points
+    // 0x062ab4c0/0x062ab570/0x062ab620. Sum this object's own hit points/max hit points
     // (or ratio) with every attached CAttachedEquip-mask (0x1ee0) equip's own
     // GetHitPoints()/GetMaxHitPoints(), plus every non-Killed/Destroyed arch group's
     // GetHitPoints()/GetMaxHitPoints().
     virtual float get_total_hit_pts() const;
     virtual float get_total_max_hit_pts() const;
     virtual float get_total_relative_health() const;
-    // Common.dll.c 0x4b720/0x4b7a0. SubObjId routes to either an equip (CEquipManager::
+    // 0x062ab720/0x062ab7a0. SubObjId routes to either an equip (CEquipManager::
     // FindByID + GetHitPoints/SetHitPoints) or an arch group (CArchGroupManager::FindByID +
     // CArchGroup::GetHitPoints/SetHitPoints); false if SubObjId matches neither category or
     // isn't found.
     virtual bool get_sub_obj_hit_pts(unsigned short SubObjId, float& OutHitPts) const;
     virtual bool set_sub_obj_hit_pts(unsigned short SubObjId, float HitPts);
-    // Common.dll.c 0x4b940 (?inst_to_subobj_id@CEqObj@@UBEGJ@Z). Engine instance handle ->
+    // 0x062ab940 (?inst_to_subobj_id@CEqObj@@UBEGJ@Z). Engine instance handle ->
     // SubObjId: the root instance (EngineInstanceId) always yields 1; otherwise tries
     // EquipManager.InstToSubObjID() then ArchGroups.InstToSubObjID(), falling back to 1.
     virtual unsigned short inst_to_subobj_id(long Instance) const;
 
 protected:
-    // Common.dll.c 0x4bbe0, ?link_shields@CEqObj@@MAEXXZ: protected VIRTUAL in retail, the
+    // 0x062abbe0, ?link_shields@CEqObj@@MAEXXZ: protected VIRTUAL in retail, the
     // last slot of ??_7CEqObj@@6B@ (.rdata:0639bf64, right after alloc_equip). CShip's and
     // CSolar's vtables keep CEqObj's entry (.rdata:0639c134 / 0639d4cc) -- no override.
     virtual void link_shields();
@@ -1785,11 +1607,9 @@ protected:
     void compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& OutCenter) const;
 
 private:
-    // Common.dll.c 78494-78550 (raw asm 0x062aab50-0x062aad29, private in retail). Called
-    // from update() every tick; see common_ceqobj.cpp for the full trace.
+    // 0x062aab50, private in retail. Called from update() every tick; see common_ceqobj.cpp.
     void update_docking_animations(float Dt);
-    // Common.dll.c 79321-79380 (raw asm 0x062abaa0-0x062abbc7, private in retail). Called by
-    // the public destroy_sub_objs() virtual above; see common_ceqobj.cpp for the full trace.
+    // 0x062abaa0, private in retail. Called by destroy_sub_objs(); see common_ceqobj.cpp.
     void destroy_equipment(DamageList const& Damage, bool bParam2);
 
 public:
@@ -1799,11 +1619,11 @@ public:
     // +0x108..+0x13b: the object's space costume (13 dwords: four part ids, eight accessory
     // ids, the accessory count). pub::SpaceObj::SendComm (Server.dll 06cf931a) takes
     // `LEA ESI,[EqObj+0x108]` as the default Costume const* and copies 0xd dwords; CEqObj::init
-    // stores the count unclamped.  // formerly Vibe108/Vibe10c/Vibe110/Vibe114/RankCopy/RankCount
+    // stores the count unclamped.
     Costume SpaceCostume;
-    unsigned VoiceId;             // +0x13c  SendComm's default voice (06cf930c)  // formerly Field13c
+    unsigned VoiceId;             // +0x13c  SendComm's default voice (06cf930c)
     // +0x140: the cloak fraction 0..1 (get_cloak_percentage 06287230 returns it; CECloakingDevice
-    // update 06294738 stores cloak_percent() here; >= 1.0 = fully cloaked).  // formerly Field140
+    // update 06294738 stores cloak_percent() here; >= 1.0 = fully cloaked).
     float CloakPercent;
     CArchGroupManager ArchGroups; // +0x144
     unsigned char bWeaponsOffline; // +0x15c  CELauncher::IsDisabled gate (+0x15d..: padding)
@@ -1819,16 +1639,15 @@ public:
 
         bool bActive;                                      // +0x00 (+0x01..+0x03: alignment, the ctor leaves them)
         int AnimChannel;                                   // +0x04 (-1 if none/failed)
-        // +0x08: NOT padding -- CEqObj::update_docking_animations (Common.dll.c 78494-78550)
-        // reads and rewrites this every call: it caches the previous frame's Anim
-        // GetStoredDuration() (vtable slot 16) result for its threshold comparisons.
+        // +0x08: update_docking_animations caches the previous frame's Anim
+        // GetStoredDuration() (vtable slot 16) here for its threshold comparisons.
         float LastDuration;                                // +0x08
         Archetype::EqObj::DockingSphere const* ArchPoint;  // +0x0C (pointer into Archetype)
     };
 
     unsigned DockingPointBaseId;  // +0x164
     struct INotify* Notify;       // +0x168
-    // get_explosion_dmg_bounding_sphere's lazy cache (Common.dll.c 0x4bd50/0x4bda0). Both
+    // get_explosion_dmg_bounding_sphere's lazy cache (0x062abd50/0x062abda0). Both
     // accessors are const in retail (QBE/IBE...const), so the cache fields are mutable.
     // +0x16c is a byte: ctor 062a90fa `MOV byte [ESI+0x16c],BL`, getter 062abd56 `MOV AL,byte`
     // / 062abd70 `MOV byte ..,1`, copy ctor 0628750f byte copy. The 3 bytes after it are
@@ -1841,7 +1660,7 @@ public:
     IBehaviorManager* BehaviorMgr; // +0x194
     float Power;                  // +0x198  set to MaxPower at init
     float MaxPower;               // +0x19c  CEPower arch+0x70 sum
-    int BehaviorIndex;            // +0x1a0  -1; the behaviour index set by the behaviour manager (062d35a9), read when no manager is attached  // formerly Field1a0
+    int BehaviorIndex;            // +0x1a0  -1; the behaviour index set by the behaviour manager (062d35a9), read when no manager is attached
 };
 
 static_assert(sizeof(CEqObj) == 0x1a4, "CEqObj sizeof 0x1a4: CShip's Controller starts there");
@@ -1863,12 +1682,9 @@ static_assert(offsetof(CEqObj, MaxPower) == 0x19c, "CEqObj+0x19c max power");
 static_assert(offsetof(CEqObj, BehaviorIndex) == 0x1a0, "CEqObj+0x1a0 behaviour index");
 
 // CShip::get_gun_stats return structure. From disasm at 0x514f0/0x514b0/0x51290.
-// Retail builds this by traversing EquipTypeGun equips and, per gun, reading its
-// Archetype::Gun (== Archetype::Launcher base) fields through whichever of
-// CEArmor::ArmorArch/CECounterMeasureDropper::CounterMeasureArch got /OPT:ICF-folded onto
-// the call site -- both are byte-identical "return this->Arch" accessors, so either name
-// resolves to the same Gun archetype pointer regardless of which one the disassembly names.
-// Guns whose munition Seeker == 0 accumulate into ActiveGunCount / AvgMuzzleVelocity /
+// Retail traverses EquipTypeGun equips and reads each Archetype::Gun through an ICF-folded
+// "return this->Arch" accessor (Ghidra names CEArmor::ArmorArch or
+// CECounterMeasureDropper::CounterMeasureArch). Guns whose munition Seeker == 0 accumulate into ActiveGunCount / AvgMuzzleVelocity /
 // MaxMunitionRange below; seeker guns (missiles/torpedoes, Munition::Seeker != 0) accumulate
 // into ActiveMissileCount / MaxActiveMissileRange instead.
 struct COMMON_API ShipGunStats
@@ -1895,10 +1711,7 @@ struct COMMON_API ShipGunStats
     int ActiveMissileCount;       // +0x0c  active seeker (missile/torpedo) guns
     float MaxActiveMissileRange;  // +0x10  farthest active seeker gun's CEGun::GetMunitionRange()
 
-    // Listing 0x27b00: zeroes all five fields (identical body to the retail default ctor
-    // at 0x27ae0). CShip::get_gun_stats() ports this inline by assigning every field
-    // unconditionally instead of calling clear() first; kept here too for callers that
-    // want a bare zeroed instance.
+    // Listing 0x27b00: zeroes all five fields (same body as the default ctor at 0x27ae0).
     void clear()
     {
         ActiveGunCount = 0;
@@ -1983,16 +1796,14 @@ public:
         // Retail offsets; the base's std::list makes the port's own offsets differ.
         // Retail +0xe4 is neither written by Server's create_ship nor read by CShip::init.
         unsigned FieldE8;        // retail +0xe8  zeroed by create_ship (.text:06d0aa50), read by nothing known
-        unsigned GroupNameId;    // retail +0xec → this+0x21c  // formerly FieldEc
+        unsigned GroupNameId;    // retail +0xec → this+0x21c
         unsigned Rank;           // retail +0xf0  Vibe::SetRank
-        unsigned char bUsingTradelane; // retail +0xf4 → this+0x2bc  // formerly FieldF4
+        unsigned char bUsingTradelane; // retail +0xf4 → this+0x2bc
     };
 
     CShip();
-    // Common.dll.c 46575 (retail 0x27bb0). Zero real callers anywhere in Common.dll/
-    // Server.dll/freelancer.exe (only exported because CShip is a dllexport class) --
-    // see common_cship.cpp for the port rationale (delegates to CEqObj/PhySys::Controller's
-    // own already-ported copy ctors rather than re-inlining their bodies).
+    // 0x06287bb0. Exported (dllexport class) but has no caller in any module; delegates to
+    // the CEqObj/PhySys::Controller copy ctors (see common_cship.cpp).
     CShip(CShip const& Other);
     virtual ~CShip();
 
@@ -2103,7 +1914,7 @@ public:
     enum BayState get_bay_state() const;
     // Listing 0x53220. Returns ammo capacity for given equipment type.
     int get_ammo_capacity_remaining(unsigned EquipClassType) const;
-    // Common.dll.c 0x53210: thin overload forwarding Arch->get_id() to the unsigned overload.
+    // 0x062b3210: thin overload forwarding Arch->get_id() to the unsigned overload.
     int get_ammo_capacity_remaining(Archetype::Equipment const* Arch) const;
     // Listing 0x532e0. Returns space available for cargo type.
     int get_space_for_cargo_type(Archetype::Equipment const* CargoArch) const;
@@ -2273,13 +2084,13 @@ public:
     // Common only zeroes (.text:062b0718) and copies it. freelancer.exe sets it to 1 when the
     // ship's "JumpOut" action completes (.text:00543978); Server.dll clears it on the single-
     // player jump path (.text:06d0cb27), and its death arm (.text:06d014d8) removes a ship with
-    // the flag set at once instead of running the death timer. (formerly Field_0x214)
+    // the flag set at once instead of running the death timer.
     unsigned char bJumpedOut;         // (+0x215 .. +0x217: padding)
     // +0x218: the CSolar whose atmosphere this ship is inside, or null; CShip::update rewrites
     // it every frame (.text:062b1005 / 062b10d1).
     CSolar* AtmosphereSolar;
     // +0x21c: the name id get_group_name returns when non-zero (else the vibe's affiliation
-    // name); set from CreateParms retail +0xec by init (.text:062b26a3). (formerly Field21c)
+    // name); set from CreateParms retail +0xec by init (.text:062b26a3).
     unsigned GroupNameId;
     FObjRWWatcher Target;             // +0x220  get_target / set_target
     unsigned short SubTargetIndex;    // +0x228  set_sub_target/get_renderable_subtarget (+0x22a: padding)
@@ -2288,8 +2099,8 @@ public:
     CNudgeEngine NudgeEngine;         // +0x258 (0x28 bytes, 0x258..0x27f)
     CStrafeEngine StrafeEngine;       // +0x280 (0x1c bytes, 0x280..0x29b)
     float Throttle;                   // +0x29c  get_throttle / airlock_in (=1.0f)
-    float ThrustPower;                // +0x2a0  get/set_thrust_power; drained by thrusters and strafe (formerly Field2a0)
-    float MaxThrustPower;             // +0x2a4  get_max_thrust_power: sum of power plants' ThrustCapacity (formerly Field2a4)
+    float ThrustPower;                // +0x2a0  get/set_thrust_power; drained by thrusters and strafe
+    float MaxThrustPower;             // +0x2a4  get_max_thrust_power: sum of power plants' ThrustCapacity
     int BayDoorCounter;               // +0x2a8  close_bay (DEC)
     int BayState;                     // +0x2ac  close_bay (CMP 2,3)
     ActionDB Actions;                 // +0x2b0  (0x08 bytes, 0x2b0..0x2b7)
@@ -2336,11 +2147,8 @@ struct COMMON_API CSolar : public CEqObj
 {
 public:
     explicit CSolar(Class ObjectClass = ClassSolar);
-    // Common.dll.c 61988-62093 (0x3a860). Confirmed via list_references to have zero callers
-    // anywhere in Common.dll, Server.dll, or freelancer.exe (dllexport-only), same situation as
-    // CShip::CShip(CShip const&). Delegates to CEqObj(CEqObj const&) for the shared base portion
-    // (matching retail's inlined-but-equivalent field-by-field base copy) then copies every
-    // CSolar-own field below in declaration order.
+    // 0x0629a860. Exported (dllexport class) but has no caller in any module. CEqObj(Other),
+    // then every CSolar field in declaration order.
     CSolar(CSolar const& Other);
     virtual ~CSolar();
 
@@ -2363,35 +2171,34 @@ public:
         std::list<char const*> ContinualAnims; // retail +0xe4 anim-name list
     };
 
-    // Common.dll.c 89065-89132 (0x57560), ?init@CSolar@@QAEXABUCreateParms@1@@Z: public and
-    // NOT virtual, on CSolar's own CreateParms. It hides CEqObj::init rather than overriding
+    // 0x062b7560, ?init@CSolar@@QAEXABUCreateParms@1@@Z: public and not virtual, on CSolar's
+    // own CreateParms. It hides CEqObj::init rather than overriding
     // it -- CSolar's vtable keeps CEqObj::init in that slot (.rdata:0639d464) -- and calls it
     // directly (.text:062b756b `CALL CEqObj::init`).
     void init(CreateParms const& Parms);
 
     virtual void cache_physical_props() override;
-    virtual float get_mass() const override;  // Common.dll.c 0x3ad00
-    // Common.dll.c 0x3ac70 (decompiled .c is corrupted here; ported from raw .txt
-    // 110205-110261 instead). Same object-space-to-world rotation as the base
-    // CObject::get_angular_velocity, additionally gated on TypeBits & 7.
+    virtual float get_mass() const override;  // 0x0629ad00
+    // 0x0629ac70 (Ghidra's decompile is corrupt; ported from the listing). Same
+    // object-space-to-world rotation as CObject::get_angular_velocity, gated on TypeBits & 7.
     virtual Vector get_angular_velocity() const override;
     // .text:063623d0 (ICF-folded with CAsteroid::get_velocity): always the zero vector.
     virtual Vector get_velocity() const override;
-    virtual void flush_animations() override;  // Common.dll.c 0x57fa0
+    virtual void flush_animations() override;  // 0x062b7fa0
 
-    // Common.dll.c 89296-89305 (0x57a70). Delegates to CEqObj::update, then drives the
+    // 0x062b7a70. Delegates to CEqObj::update, then drives the
     // system-gate open/close state machine when this solar is a gate (is_system_gate()).
     virtual int update(float Dt, unsigned Flags) override;
-    // Common.dll.c 89397-89421 (0x57cc0). System gates repurpose activate() as the
+    // 0x062b7cc0. System gates repurpose activate() as the
     // open/close command (bOn selects GateAnimDirection, DockIndex must be 0); lane rings
     // (is_lane_ring()) reject it outright; everything else falls back to CEqObj::activate.
     virtual ObjActivateResult activate(bool bOn, unsigned DockIndex) override;
-    // Common.dll.c 89428-89446 (0x57d50). System-gate counterpart of activate() above:
+    // 0x062b7d50. System-gate counterpart of activate() above:
     // reports GateAnimDirection as the single activation bit; lane rings report false;
     // everything else falls back to CEqObj::get_activate_state.
     virtual bool get_activate_state(std::vector<bool>& OutStates) override;
 
-    // Common.dll.c 89580-90093 (0x57ff0). Static per-object-class INI loader: parses one
+    // 0x062b7ff0. Static per-object-class INI loader: parses one
     // Solar-section's worth of keys (archetype/nickname/pos/rotate/spin/visit/parent/goto/
     // base/dock_with/loadout/atmosphere_range/anim/prev_ring/next_ring/
     // tradelane_space_name/destructible/space_costume/voice/comm_appr) into OutParms and
@@ -2420,34 +2227,23 @@ public:
     void SetVisitValue(unsigned char NewValue);
     unsigned int get_tradelane_space_name() const;
 
-    // CSolar::init (Common.dll.c 89077, 0x57560) copies CreateParms::NicknameSrc (+0xb8)
-    // straight into here, unconditionally, right after CEqObj::init returns. The ctor
-    // ID_String::clear()'s it (Common.dll.c 88970) and CSolar::CSolar(CSolar const&) copies
-    // it verbatim (Common.dll.c 62014). Consumed again by CSolar::init itself, via
-    // ID_String::get_string(), to name the object in the "dockable but no destination"
-    // diagnostic -- consistent with an object-instance nickname rather than an
-    // archetype-level name (CObject::get_name() already covers the archetype nickname).
+    // The object-instance nickname: CSolar::init copies CreateParms::NicknameSrc (+0xb8) here
+    // after CEqObj::init, and uses it to name the object in its "dockable but no destination"
+    // warning. The ctor clears it.
     ID_String Nickname;             // +0x1a4
-    bool bDestructible;             // +0x1a8  is_destructible() reads this[0x1a8] directly (Common.dll.c 0x3a840)
+    bool bDestructible;             // +0x1a8  is_destructible() (0x0629a840)
     bool bDynamic;                  // +0x1a9
                                     // +0x1aa .. +0x1ab: alignment
     float AtmosphereRange;          // +0x1ac
-    // is_planetary/is_system_gate/is_waypoint/is_lane_ring (Common.dll.c 0x3a7f0-0x3a830)
-    // read a bitflags dword at retail this+0xe0 -- that IS CSimple::TypeBits (see
-    // offsetof(CSimple, TypeBits) == 0xe0 static_assert above), inherited by CSolar through
-    // CEqObj, not a CSolar-owned field. A prior port revision fabricated a local `SolarFlags`
-    // field here that aliased this ID_String Loadout's own storage at +0x1b0 with wrong bit
-    // values besides; removed in favor of reading the inherited TypeBits directly.
+    // is_planetary/is_system_gate/is_waypoint/is_lane_ring (0x0629a7f0-0x0629a830) read
+    // CSimple::TypeBits (+0xe0), not a CSolar field.
     ID_String Loadout;              // +0x1b0  (retail get_loadout() returns this+0x1b0 directly)
     unsigned DestSystem;            // +0x1b4
     ID_String DestGate;             // +0x1b8
 
     // System-gate open/close animation state machine (configure_system_gate/update_system_gate,
-    // Common.dll.c 0x57a00/0x57ab0). GateAnimState cycles 0->2->3->4 as the gate opens then
-    // closes again; the constructor defaults it to 4 ("closed"). This replaces a raw
-    // PadSolar[0x1c] placeholder -- those 28 bytes are these real fields, not padding; see
-    // ~CSolar/init_continual_anim for the ContinualAnim list and update_system_gate for the
-    // anim fields.
+    // 0x062b7a00/0x062b7ab0). GateAnimState cycles 0->2->3->4 as the gate opens then
+    // closes again; the constructor defaults it to 4 ("closed").
     unsigned char GateAnimDirection; // +0x1bc  update_system_gate's this[0x1bc]==0 branch selector
                                      // +0x1bd .. +0x1bf: alignment
     // +0x1c0: the gate open/close animation script (-1 = none), a member with a destructor --
@@ -2463,32 +2259,29 @@ public:
 
     unsigned PrevRing;              // +0x1d8
     unsigned NextRing;              // +0x1dc
-    // get_tradelane_space_name() (Common.dll.c 0x58a70) returns this field directly -- it is
-    // NOT ParentNickname.Id despite the two looking related; CSolar::init (0x57560) loads them
-    // from separate CreateParms offsets (+0xd8 vs +0xc0) into this+0x1e0 and this+0x1e8.
+    // get_tradelane_space_name() (0x062b8a70) returns this field; it is not ParentNickname.Id
+    // (CSolar::init loads them from CreateParms +0xd8 and +0xc0).
     unsigned TradelaneSpaceNameId;  // +0x1e0
     unsigned char VisitValue;       // +0x1e4
                                     // +0x1e5 .. +0x1e7: alignment
-    ID_String ParentNickname;       // +0x1e8  GetParentNickname() (Common.dll.c 0x54f00)
+    ID_String ParentNickname;       // +0x1e8  GetParentNickname() (0x062b4f00)
 
 protected:
-    // Common.dll.c 89149-89222 (0x57780). Builds a PhySys::CreateParms (mass from the
+    // 0x062b7780. Builds a PhySys::CreateParms (mass from the
     // archetype, damping mode selected by whether AngularVelocity is ~zero) and calls
     // BuildIVP_Sphere for a ".sph" mesh or BuildIVP_Real otherwise, then adds
-    // AngularVelocity via PhySys::AddToAngularVelocityOS when it's non-zero. Velocity is
-    // read by retail as a parameter but never actually used anywhere in the function body
-    // (confirmed against the raw disassembly, not just the decompiled .c) -- a genuine
-    // retail dead parameter, not a porting gap.
+    // AngularVelocity via PhySys::AddToAngularVelocityOS when it's non-zero. Retail never
+    // uses Velocity.
     virtual void init_physics(Vector const& Velocity, Vector const& AngularVelocity) override;
     // Listing 0x57a00. Starts AnimName as the gate animation (PlayScript into GateAnim, the
     // same sequence CSolar::init inlines for the archetype's open_anim); a no-op when
     // AnimName is empty.
     void configure_system_gate(char const* AnimName);
-    // Common.dll.c 89311-89391 (0x57ab0). System-gate open/close animation state machine,
+    // 0x062b7ab0. System-gate open/close animation state machine,
     // driven each update() tick while is_system_gate() is true. See the .cpp for the full
     // GateAnimState/GateAnimDirection transition table.
     void update_system_gate(float Dt);
-    // Common.dll.c 89513-89549 (0x57f00). Special-cases AClassTradeLane archetypes (jump
+    // 0x062b7f00. Special-cases AClassTradeLane archetypes (jump
     // gates/holes) into a CETradeLaneEquip; everything else falls back to CEqObj::alloc_equip.
     virtual CEquip* alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
                                 bool bMissionFlag) override;
@@ -2517,7 +2310,7 @@ static_assert(offsetof(CSolar, VisitValue) == 0x1e4, "CSolar+0x1e4 VisitValue");
 static_assert(offsetof(CSolar, ParentNickname) == 0x1e8, "CSolar+0x1e8 ParentNickname");
 static_assert(sizeof(CSolar) == 0x1ec, "CSolar sizeof 0x1ec (CObject::Alloc takes it from Heap 063fc3c0)");
 
-// Common.dll.txt:0630e660, ?GetRoot@@YAPAUCObject@@PBU1@@Z. Walks the engine parent chain
+// 0x0630e660, ?GetRoot@@YAPAUCObject@@PBU1@@Z. Walks the engine parent chain
 // from the object's own instance up to the top, then hands back the CObject registered
 // against that root instance. An object with no instance (-1) is its own root.
 COMMON_API CObject* __cdecl GetRoot(CObject const* Obj);
@@ -2526,7 +2319,7 @@ COMMON_API bool __cdecl IsDescendant(long ParentInst, long ChildInst);
 
 namespace Hierarchy
 {
-    // Common.dll.c 0xae6d0. Walks ChildInst up the Engine parent chain (vtable+0xd4) counting
+    // 0x0630e6d0. Walks ChildInst up the Engine parent chain (vtable+0xd4) counting
     // hops until it reaches ParentInst (returns the hop count, 0 if already equal) or falls off
     // the chain at -1 (returns -1). Same parent-walk as IsDescendant, but counting instead of
     // just testing membership.
@@ -2537,21 +2330,21 @@ COMMON_API bool __cdecl HardpointPositionA(long Instance, char const* HpName, Ve
 COMMON_API void __cdecl CompoundInstanceAnalyze(long Instance, void (__cdecl* Callback)(long, void*), void* Context);
 COMMON_API int __cdecl CompoundInstanceCount(long Instance);
 
-// Common.dll.txt:063035c0, ?CompoundInstanceList@@YAXJPAHPAPAJ@Z. Writes the instance and
+// 0x063035c0, ?CompoundInstanceList@@YAXJPAHPAPAJ@Z. Writes the instance and
 // every descendant into a freshly allocated array (raw operator new, Count * sizeof(long)),
 // with the count in OutCount. The caller owns the array.
 COMMON_API void __cdecl CompoundInstanceList(long Instance, int* OutCount, long** OutArray);
 
-// Common.dll.txt:06303720, ?CompoundInstanceFindFirstName@@YAJJPBD@Z. First instance in the
+// 0x06303720, ?CompoundInstanceFindFirstName@@YAJJPBD@Z. First instance in the
 // compound (the root included) whose engine name matches Name case-insensitively, or -1.
 COMMON_API long __cdecl CompoundInstanceFindFirstName(long Instance, char const* Name);
 
-// Common.dll.txt:0630e750, ?FindChild@@YAJJPBD@Z. Depth-first search of Instance's engine
+// 0x0630e750, ?FindChild@@YAJJPBD@Z. Depth-first search of Instance's engine
 // children for the first one whose name matches Name (_stricmp, a null name reads as "");
 // -1 if none. Called by CArchGroup::CArchGroup for its RootIndex.
 COMMON_API long __cdecl FindChild(long Instance, char const* Name);
 
-// Common.dll.txt:062a8920, ?ToggleIceCap@@YAX_N@Z (ordinal 2058). The retail body is a bare
+// 0x062a8920, ?ToggleIceCap@@YAX_N@Z (ordinal 2058). The retail body is a bare
 // RET: the export survives, the feature it once toggled does not. Nothing in Common.dll,
 // Server.dll or freelancer.exe imports or calls it.
 COMMON_API void __cdecl ToggleIceCap(bool bOn);

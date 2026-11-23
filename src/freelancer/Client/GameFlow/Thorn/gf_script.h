@@ -67,7 +67,7 @@ int GfLightRegistryCount();
 // The wrapper is FUN_00556fd0's 8-byte { FEngineLight*, byte group }.
 FGfLightWrapper* GfLightRegistryGet(int Index);
 
-// FUN_00452fa0 tail (0x004530b4..0x004530d9): the first null slot takes the wrapper and the
+// FUN_00452fa0 tail: the first null slot takes the wrapper and the
 // enable byte bOn != 0; returns that index, or -1 when all 64 are taken.
 int GfLightRegistryAdd(FGfLightWrapper* Wrapper, bool bOn);
 
@@ -106,7 +106,7 @@ void GfLightWrapperDestroy(FGfLightWrapper** Field);
 // FUN_00556f20(r, g, b) (cdecl, three floats by value): the scene ambient. With the LIGHTING
 // game option off it is full white; otherwise each channel is floor(c * 255 + 0.5) truncated to
 // a byte. Either way the three bytes go to FUN_00410240 (D3DRS_AMBIENT). Callers are the
-// RoomControl draw passes at 0x0044af11 and 0x0044b7c3 (room_control.cpp).
+// RoomControl draw passes (room_control.cpp).
 void GfSetSceneAmbient(float R, float G, float B);
 
 // FUN_005586f0 (cdecl) -- how strongly a light reaches Pos3, for the nearest-light pick.
@@ -132,7 +132,7 @@ void GfLightsApplyNearest(FGfLightWrapper* const* List, int Count, void* Instanc
 // DAT_0066d2a8 -- the room fog state (ScriptFog unit). The Thorn fog facet (vtable
 // 0x005cdec0, LAB_00454450 .. LAB_00454600) writes it, FUN_00454250 applies it once per room
 // draw (FUN_00454760), FUN_00454700 tells the per-object draw whether fog is on, and the
-// RoomControl ctor clears it (FUN_004546d0 at 0x00449324).
+// RoomControl ctor clears it (FUN_004546d0).
 struct FGfFogState
 {
     unsigned char bOn;       // +0x00 DAT_0066d2a8
@@ -160,8 +160,7 @@ void GfFogApply();                                           // FUN_00454760 -> 
 
 // ---------------------------------------------------------------------------------------
 // Thorn script scans the Gf script sequence runs over a loaded script (callers: the
-// ScriptSequence setup FUN_00455290 at 0x00455322 / 0x00455332 / 0x0045533a, and 0x0045576c
-// / 0x00455764 -- neither is ported yet).
+// ScriptSequence setup FUN_00455290 and its teardown, gf_script_object.cpp).
 // ---------------------------------------------------------------------------------------
 struct IScriptEngine;
 
@@ -177,7 +176,6 @@ void GfScriptFindBackgroundAudio(IScriptEngine* Script, unsigned char* OutAmbien
                                  unsigned char* OutMusic);
 
 // FUN_0044fb80 (cdecl): IScriptEngine slot 9 on every entity, the results dropped. Both callers
-// pass a second byte -- 1 from the setup (0x0045531f..0x0045533a), 0 from the teardown
-// (0x00455761..0x00455764), the same flag they give FUN_0044fa90 -- and the body never reads it
-// (only [ESP+param_1+0xc] is loaded).
+// pass a second byte -- 1 from the setup, 0 from the teardown, the same flag they give
+// FUN_0044fa90 -- and the body never reads it.
 void GfScriptTouchEntities(IScriptEngine* Script, bool bAcquire);

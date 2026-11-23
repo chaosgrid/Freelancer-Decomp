@@ -7,41 +7,29 @@
 // rpc_payload_ch2.cpp -- the channel-2 packet types (server -> client), marshalled and
 // delivered the way retail does it.
 //
-// Channel 2 travels in ONE direction only: rpclocal's IClient (which retail Server.dll
-// calls) serializes, and IServerImpl::HandlePacket deserializes into the real IClient
-// inside freelancer.exe. So unlike channel 1 there is no IServer-side mirror to check a
-// layout against -- instead every type here is read from three places:
+// Channel 2 is one-way: rpclocal's IClient (called by Server.dll) serializes, and
+// IServerImpl::HandlePacket deserializes into the real IClient in freelancer.exe. Each layout
+// is read from the sender (the IClient slot body), the receiver (the channel-2 case of
+// IServerImpl::HandlePacket, jump table .text:0x06d83b44) and the registry size
+// (payload == operator new() size - 0x20). Where the sender permutes the argument struct
+// (LAUNCH, CREATEMINE, SETREMOVEITEM) the receiver's permutation is its strict inverse.
 //
-//   1. the sender, the body of the IClient slot in rpclocal.dll.txt;
-//   2. the receiver, the matching case of the channel-2 switch inside
-//      IServerImpl::HandlePacket (jump table .text:0x06d83b44, EBP = the packet);
-//   3. the registry size, payload == operator new() size - 0x20.
-//
-// Where the sender permutes the argument struct (LAUNCH, CREATEMINE, SETREMOVEITEM), the
-// receiver's own permutation is the strict inverse -- that agreement is what promotes the
-// layout from "read once" to "checked", and it is noted per codec.
-//
-// Two retail conventions that channel 1 does not use are reproduced verbatim here; both
-// are explained in the channel-2 section of rpc_payloads.h:
-//   * the "1" that replaces the session id is passed BY REFERENCE for one family of
-//     types, because those slots take uint const&;
+// Two retail conventions channel 1 does not use (see the channel-2 section of rpc_payloads.h):
+//   * the "1" that replaces the session id is passed by reference where the slot takes
+//     uint const&;
 //   * four types deliver out of file-static storage instead of a stack temporary.
 
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
 #include "rpc_iclient.h"
-// ch2 0x4d LOADHINT serializes a CostumeHint through its own virtuals, exactly as retail
-// does through COMMON.DLL::CostumeHint::{Serialize,UnSerialize,CleanUp}.
+// ch2 0x4d LOADHINT goes through COMMON.DLL CostumeHint::{Serialize,UnSerialize,CleanUp}.
 #include "common_goods.h"
-// CollisionGroupDesc's complete definition (ch2 0x48 SETCOLLISIONGROUPS).
+// CollisionGroupDesc (ch2 0x48 SETCOLLISIONGROUPS).
 #include "common_archetype.h"
-// ch2 0x04/0x42 run the reputation half of their tail through the same COMMON.DLL entry
-// points retail imports by name (.rdata:06db3050..06db30ec and 06db305c): EnsureExists,
-// SetName, SetAffiliation, SetAttitudeTowardsPlayer, GetName, GetAffiliation,
-// AttitudeTowards and SinglePlayer. common_goods.h already pulls common_reputation.h in;
+// ch2 0x04/0x42 use the COMMON.DLL reputation imports (.rdata:06db3050..06db30ec, 06db305c);
 // SinglePlayer comes from common_misc.h.
 #include "common_misc.h"
-// FMineExplosion, the EXPLODEASTEROIDMINE argument (IClient::SendServerExplodeAsteroidMine).
+// FMineExplosion (IClient::SendServerExplodeAsteroidMine).
 #include "server_sysdb.h"
 
 #include <cstdlib>
@@ -53,11 +41,10 @@
 // Shared helpers -- the two block writers retail uses on this channel.
 // ---------------------------------------------------------------------------
 
-// FUN_06d97b00 / FUN_06d90a00 (06d97b0b / 06d90a0b) and the body of FUN_06d97470 /
-// FUN_06d989b0: bare operator new(N) -- a size of 0 included -- and REP MOVSD/MOVSB the
-// caller's bytes in. The packet owns the block from then on and its destructor frees it.
-// FUN_06d97470 / FUN_06d989b0 add `if (len == 0 || src == 0) return` in front
-// (06d97474..06d97482, 06d989b4..06d989c2); their callers carry that test themselves.
+// FUN_06d97b00 / FUN_06d90a00 and the body of FUN_06d97470 / FUN_06d989b0: bare
+// operator new(N) -- a size of 0 included -- and copy the caller's bytes in; the packet's
+// destructor frees the block. FUN_06d97470 / FUN_06d989b0 add `if (len == 0 || src == 0)
+// return` in front; their callers here carry that test themselves.
 static void* RpcCh2CopyBlock(const void* Source, unsigned int InSize) {
     unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
     const unsigned char* Src = static_cast<const unsigned char*>(Source);
@@ -67,8 +54,7 @@ static void* RpcCh2CopyBlock(const void* Source, unsigned int InSize) {
     return Block;
 }
 
-// strlen, spelled out the way retail's SCASB.REPNE loop computes it (no null test --
-// REPNE SCASB would fault on one).
+// Inline strlen as retail computes it; no null test (retail faults on null).
 static unsigned int RpcCh2StringLength(const char* Text) {
     unsigned int Length = 0;
     while (Text[Length] != '\0') {
@@ -77,8 +63,7 @@ static unsigned int RpcCh2StringLength(const char* Text) {
     return Length;
 }
 
-// A float field moved as its bit pattern -- retail's senders and receivers copy these
-// with plain dword MOVs (no FLD/FSTP), so the port copies the bits, never the value.
+// Float fields are moved as bit patterns: retail copies them with dword MOVs, not FLD/FSTP.
 static unsigned int RpcCh2FloatBits(const float& Value) {
     unsigned int Bits = 0;
     std::memcpy(&Bits, &Value, sizeof(Bits));
@@ -89,10 +74,8 @@ static void RpcCh2SetFloatBits(float& Out, unsigned int Bits) {
     std::memcpy(&Out, &Bits, sizeof(Bits));
 }
 
-// The payload itself, packet+0x20 -- what every retail sender writes through, with no size
-// test (retail knows each class's size statically). Senders below store field by field, as
-// retail does, instead of going through RpcPayloadWrite: that helper writes the whole
-// struct, pad bytes included, which retail leaves untouched.
+// The payload at packet+0x20, written with no size test. Senders store field by field rather
+// than via RpcPayloadWrite, which would also write the pad bytes retail leaves untouched.
 template<typename T>
 static T* Ch2Payload(FPacketBase* Packet) {
     return reinterpret_cast<T*>(Packet->Payload());
@@ -105,7 +88,6 @@ static T* Ch2Payload(FPacketBase* Packet) {
 
 // payload+0x00 = the 2nd argument, by value.
 static bool MarshalCh2Dword(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // e.g. 06d883fd MOV EDX,[ESP+0x10] / 06d88401 MOV [ECX+0x20],EDX
     FPayloadServerDword* Wire = Ch2Payload<FPayloadServerDword>(Packet);
     Wire->Field_0x00 = Args[1];
     return true;
@@ -113,25 +95,20 @@ static bool MarshalCh2Dword(FPacketBase* Packet, const unsigned int* Args, unsig
 
 // payload+0x00 = *(dword*)the 2nd argument. Used where the slot takes a const reference.
 static bool MarshalCh2DwordByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8ae69 MOV ECX,[ESP+0x10] / 06d8ae6d MOV EDX,[ECX] / 06d8ae77 MOV [EAX+0x20],EDX
     FPayloadServerDword* Wire = Ch2Payload<FPayloadServerDword>(Packet);
     Wire->Field_0x00 = *reinterpret_cast<const unsigned int*>(Args[1]);
     return true;
 }
 
-// payload+0x00 = the low byte of the 2nd argument.
+// payload+0x00 = the low byte of the 2nd argument; the three bytes after it are not touched.
 static bool MarshalCh2Byte(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d88b0d MOV DL,byte ptr [ESP+0x10] / 06d88b11 MOV byte ptr [ECX+0x20],DL -- one byte,
-    // the three after it are not touched.
     FPayloadServerByte* Wire = Ch2Payload<FPayloadServerByte>(Packet);
     Wire->Field_0x00 = (unsigned char)(Args[1] & 0xffu);
     return true;
 }
 
-// payload+0x00 = *(byte*)the 2nd argument. Retail: MOV DL,byte ptr [ECX].
+// payload+0x00 = *(byte*)the 2nd argument; the three bytes after it are not touched.
 static bool MarshalCh2ByteByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d883b9 MOV ECX,[ESP+0x10] / 06d883bd MOV DL,byte ptr [ECX] / 06d883c7 MOV byte ptr
-    // [EAX+0x20],DL -- one byte, the three after it are not touched.
     FPayloadServerByte* Wire = Ch2Payload<FPayloadServerByte>(Packet);
     Wire->Field_0x00 = *reinterpret_cast<const unsigned char*>(Args[1]);
     return true;
@@ -139,8 +116,7 @@ static bool MarshalCh2ByteByRef(FPacketBase* Packet, const unsigned int* Args, u
 
 // payload+0x00 = 2nd argument, payload+0x04 = 3rd argument.
 static bool MarshalCh2DwordPair(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d886ed/06d886f1 [+0x20] = param_2 ; 06d886f8/06d886fc [+0x24] = param_3. Some senders
-    // (0x06d88930, 0x06d889c0) store the two in the other order; the bytes come out the same.
+    // Some senders (0x06d88930, 0x06d889c0) store the two in the other order; same bytes.
     FPayloadServerDwordPair* Wire = Ch2Payload<FPayloadServerDwordPair>(Packet);
     Wire->Field_0x00 = Args[1];
     Wire->Field_0x04 = Args[2];
@@ -150,8 +126,6 @@ static bool MarshalCh2DwordPair(FPacketBase* Packet, const unsigned int* Args, u
 // FUN_06d97b00: payload+0x00 = size (3rd argument), payload+0x04 = an owned copy of the
 // buffer at the 2nd argument.
 static bool MarshalCh2Blob(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // FUN_06d97b00(this = packet, src, size): 06d97b0b operator new(size) -> 06d97b14
-    // [+0x24]; REP MOVSD/MOVSB copy; 06d97b2e [+0x20] = size.
     FPayloadServerBlob* Wire = Ch2Payload<FPayloadServerBlob>(Packet);
     Wire->Buffer = RpcCh2CopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire->Size = Args[2];
@@ -160,17 +134,14 @@ static bool MarshalCh2Blob(FPacketBase* Packet, const unsigned int* Args, unsign
 
 // FUN_06d90a00: the same, fields the other way round.
 static bool MarshalCh2BlobReversed(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // FUN_06d90a00: 06d90a0b operator new(size) -> 06d90a14 [+0x20]; copy; 06d90a2e
-    // [+0x24] = size.
     FPayloadServerBlobReversed* Wire = Ch2Payload<FPayloadServerBlobReversed>(Packet);
     Wire->Buffer = RpcCh2CopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire->Size = Args[2];
     return true;
 }
 
-// Types whose payload is empty: the sender allocates the packet and pushes it straight at
-// slot 9 (FLPACKET_SERVER_REVERT_CAMERA 0x06d8af20, FLPACKET_SERVER_CANCEL_MUSIC
-// 0x06d8c6e0). Registry size 0x20, i.e. the bare CDAPacket base.
+// Empty payload (REVERT_CAMERA 0x06d8af20, CANCEL_MUSIC 0x06d8c6e0): registry size 0x20,
+// the bare CDAPacket base.
 static bool MarshalCh2Empty(FPacketBase*, const unsigned int*, unsigned int) {
     return true;
 }
@@ -178,15 +149,11 @@ static bool MarshalCh2Empty(FPacketBase*, const unsigned int*, unsigned int) {
 // ===========================================================================
 // Generic delivery shapes.
 //
-// Retail pushes the literal 1 in place of the session id on every channel-2 case. Where
-// the slot takes uint const& it instead builds a stack local holding 1 and pushes its
-// ADDRESS; those deliverers are named ...ByRef and keep the local alive across the call,
-// exactly as the retail frame does.
+// Retail passes the literal 1 in place of the session id on every channel-2 case; where the
+// slot takes uint const& it passes the address of a stack local holding 1 (...ByRef).
 // ===========================================================================
 
-// The dword is handed on unchanged; for the slots whose parameter is an int / unsigned long
-// that is the same 32 bits, converted explicitly. (SETHULLSTATUS's float is not in this
-// family -- DeliverSetHullStatus below moves its bits.)
+// int / unsigned long parameters get the same 32 bits, converted explicitly.
 #define RPC_CH2_DELIVER_DWORD(FnName, SlotCall, ParamType)                                 \
     static bool FnName(const FPacketBase* Packet, IClient* Client, IChatClient*) {          \
         const FPayloadServerDword Wire = RpcPayloadRead<FPayloadServerDword>(Packet, 0);    \
@@ -229,9 +196,8 @@ static bool MarshalCh2Empty(FPacketBase*, const unsigned int*, unsigned int) {
 
 // ===========================================================================
 // ch2 0x02 FLPACKET_SERVER_LOGINRESPONSE
-// Sender 0x06d883a0 (IClient+0x030, RET 8): MOV DL,byte ptr [A1]; MOV [pkt+0x20],DL.
-// Receiver caseD_2 at 0x06d816ec: copies the byte into .data:0x06dbb904 and calls
-// RealClient->vt[+0x30](1, &DAT_06dbb904) -- the address of a STATIC, not of a temporary.
+// Sender 0x06d883a0 (IClient+0x030). Receiver caseD_2 at 0x06d816ec copies the byte into
+// .data:0x06dbb904 and passes the address of that static, not of a temporary.
 // ===========================================================================
 static unsigned char GLoginResponseStatic = 0;   // retail .data:0x06dbb904
 
@@ -245,14 +211,12 @@ static bool DeliverLoginResponse(const FPacketBase* Packet, IClient* Client, ICh
 // ===========================================================================
 // ch2 0x06 FLPACKET_SERVER_DESTROYOBJECT
 // Sender 0x06d89140 (IClient+0x0dc): payload+0x00 = [A1+0x00], payload+0x04 = byte [A1+0x04].
-// Receiver caseD_6 at 0x06d81f6a: statics .data:0x06dbb824 / 0x06dbb828 (the one-shot
-// atexit registration around them is retail's lazy init of that static pair and has no
-// payload meaning), then vt[+0xdc](1, &DAT_06dbb824).
+// Receiver caseD_6 at 0x06d81f6a delivers through the static pair .data:0x06dbb824 /
+// 0x06dbb828 (lazily initialised, atexit-registered).
 // ===========================================================================
 static FServerDestroyObjectInfo GDestroyObjectStatic = { 0, 0, { 0, 0, 0 } };
 
 static bool MarshalDestroyObject(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d89159..06d8916d: dword [+0x20] = src[0] ; byte [+0x24] = byte src[4].
     const FServerDestroyObjectInfo* Info =
         reinterpret_cast<const FServerDestroyObjectInfo*>(Args[1]);
     FPayloadServerDestroyObject* Wire = Ch2Payload<FPayloadServerDestroyObject>(Packet);
@@ -265,8 +229,7 @@ static bool DeliverDestroyObject(const FPacketBase* Packet, IClient* Client, ICh
     const FPayloadServerDestroyObject Wire =
         RpcPayloadRead<FPayloadServerDestroyObject>(Packet, 0);
     GDestroyObjectStatic.ObjectId = Wire.ObjectId;
-    // Retail stores a zero-extended dword here, which is the same bytes as the byte plus
-    // three cleared padding bytes.
+    // Retail stores a zero-extended dword: the byte plus three cleared pad bytes.
     GDestroyObjectStatic.DestroyType = Wire.DestroyType;
     GDestroyObjectStatic.Pad_0x05[0] = 0;
     GDestroyObjectStatic.Pad_0x05[1] = 0;
@@ -309,8 +272,6 @@ static bool DeliverLaunch(const FPacketBase* Packet, IClient* Client, IChatClien
 static FPayloadServerActivateObject GActivateObjectStatic = { 0, 0, { 0, 0, 0 }, 0 };
 
 static bool MarshalActivateObject(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d89789..06d897a7: dword [+0x20] = src[0] ; dword [+0x28] = src[8] ; byte [+0x24] =
-    // byte src[4].
     const FPayloadServerActivateObject* Info =
         reinterpret_cast<const FPayloadServerActivateObject*>(Args[1]);
     FPayloadServerActivateObject* Wire = Ch2Payload<FPayloadServerActivateObject>(Packet);
@@ -337,10 +298,8 @@ static bool DeliverActivateObject(const FPacketBase* Packet, IClient* Client, IC
 // ch2 0x0b FLPACKET_SERVER_LAND
 // Sender 0x06d8a990 (IClient+0x0ec), receiver caseD_b at 0x06d8237c.
 // ===========================================================================
-// The argument is FServerLandInfo {ShipId, DockId, BaseId} (rpc_iclient_args.h); the wire
-// keeps the generic three-dword shape, order preserved.
+// The wire keeps the generic three-dword shape, in FServerLandInfo order.
 static bool MarshalThreeDwordsByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a9a9..06d8a9c7: [+0x20] = src[0], [+0x28] = src[8], [+0x24] = src[4].
     const FServerLandInfo* Info = reinterpret_cast<const FServerLandInfo*>(Args[1]);
     FPayloadServerThreeDwords* Wire = Ch2Payload<FPayloadServerThreeDwords>(Packet);
     Wire->Field_0x00 = Info->ShipId;
@@ -362,16 +321,12 @@ static bool DeliverLand(const FPacketBase* Packet, IClient* Client, IChatClient*
 
 // ===========================================================================
 // ch2 0x21 FLPACKET_SERVER_SYSTEM_SWITCH_OUT
-// Sender 0x06d8a860 (IClient+0x0e4): two dwords out of the struct at A1.
-// Receiver caseD_21 at 0x06d82351: statics .data:0x06dbb82c / 0x06dbb830, then
-// vt[+0xe4](1, &DAT_06dbb82c).
+// Sender 0x06d8a860 (IClient+0x0e4). Receiver caseD_21 at 0x06d82351 delivers through the
+// statics .data:0x06dbb82c / 0x06dbb830. The wire keeps the generic dword-pair shape.
 // ===========================================================================
-// The argument is FServerSystemSwitchOutInfo {ShipId, GateId} (rpc_iclient_args.h); the
-// wire keeps the generic dword-pair shape.
 static FServerSystemSwitchOutInfo GSystemSwitchOutStatic = { 0, 0 };
 
 static bool MarshalDwordPairByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a879..06d8a88d: two dwords of *param_2 into +0x20/+0x24.
     const FServerSystemSwitchOutInfo* Info =
         reinterpret_cast<const FServerSystemSwitchOutInfo*>(Args[1]);
     FPayloadServerDwordPair* Wire = Ch2Payload<FPayloadServerDwordPair>(Packet);
@@ -393,7 +348,6 @@ static bool DeliverSystemSwitchOut(const FPacketBase* Packet, IClient* Client, I
 // Sender 0x06d8a130 (IClient+0x0f4), receiver caseD_27 at 0x06d819b1.
 // ===========================================================================
 static bool MarshalRequestCreateShipResp(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a14d/06d8a151 [+0x24] = param_3 ; 06d8a158/06d8a15c byte [+0x20] = param_2.
     FPayloadServerRequestCreateShipResp* Wire = Ch2Payload<FPayloadServerRequestCreateShipResp>(Packet);
     Wire->ShipId = Args[2];
     Wire->bSuccess = (unsigned char)(Args[1] & 0xffu);
@@ -413,9 +367,8 @@ static bool DeliverRequestCreateShipResp(const FPacketBase* Packet, IClient* Cli
 // Sender 0x06d8a180 (IClient+0x0c4), receiver caseD_2c at 0x06d81ac1. The two field
 // groups swap places on the wire and swap back on arrival.
 // ===========================================================================
-// The argument is Server.dll's FServerCreateProjectileInfo (server_createinfo.h, built by
-// FUN_06d07c80 -- the same record CREATECOUNTER sends). Every float member moves as its
-// bits: the sender and receiver copy all eighteen fields with plain MOVs.
+// The argument is Server.dll's FServerCreateProjectileInfo (built by FUN_06d07c80, the same
+// record CREATECOUNTER sends); all eighteen fields are copied with plain MOVs.
 static bool MarshalCreateMine(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FServerCreateProjectileInfo* Info =
         reinterpret_cast<const FServerCreateProjectileInfo*>(Args[1]);
@@ -449,8 +402,8 @@ static bool DeliverCreateMine(const FPacketBase* Packet, IClient* Client, IChatC
     Info.ArchetypeNickname = Wire.ArchetypeNickname;
     Info.OwnerId = Wire.OwnerId;
     Info.SubObjId = Wire.SubObjId;
-    // Retail never writes this half of the local; we zero it rather than ship the stack
-    // garbage retail ships. Documented in docs/re/deviations.md.
+    // Deviation: retail leaves this half of the local as stack garbage; the port zeroes it
+    // (docs/re/deviations.md).
     Info.Pad0e = 0;
     RpcCh2SetFloatBits(Info.Position.x, Wire.PosXBits);
     RpcCh2SetFloatBits(Info.Position.y, Wire.PosYBits);
@@ -475,9 +428,6 @@ static bool DeliverCreateMine(const FPacketBase* Packet, IClient* Client, IChatC
 // Sender 0x06d885c0 (IClient+0x068), receiver caseD_2e at 0x06d819ed.
 // ===========================================================================
 static bool MarshalSetAddItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // Retail reads a real Common.dll EquipDesc through ESI (06d885e2). The port used a
-    // layout-identical local mirror only to avoid the include; this TU already includes
-    // common_goods.h, so use the real type and get its exported predicates with it.
     const EquipDesc* Desc = reinterpret_cast<const EquipDesc*>(Args[2]);
     FPayloadServerSetAddItem Wire;
     Wire.ArchId = Desc->ArchId;
@@ -492,54 +442,40 @@ static bool MarshalSetAddItem(FPacketBase* Packet, const unsigned int* Args, uns
     Wire.Pad_0x1a[1] = 0;
     Wire.Hardpoint = nullptr;
 
-    // 06d8862a: `MOV ECX,ESI ; CALL [->COMMON.DLL::EquipDesc::is_internal] ; TEST AL,AL ;
-    // JNZ 06d88652` -- the hardpoint travels only when the item is NOT in the internal
-    // cargo bay. This is NOT the same test as "the hardpoint string is empty": an internal
-    // item carries a non-empty, interned cargo-bay name, which retail still omits from the
-    // wire. The port used to substitute the string test and so would have sent the bay
-    // name for every internal item.
-    // rpclocal.vcxproj already links Common.lib -- retail rpclocal.dll imports this exact
-    // symbol (IAT .rdata:0003826c), so this is retail's own dependency, not a new one.
+    // The hardpoint travels only when EquipDesc::is_internal() is false (retail imports it,
+    // IAT .rdata:0003826c). Not the same as an empty-string test: an internal item carries a
+    // non-empty interned cargo-bay name that retail still omits.
     if (!Desc->is_internal()) {
-        // 06d88636..06d8864c: strlen via REPNE SCASB, then FUN_06d97470(packet, str, len),
-        // which itself no-ops when len == 0 (06d97474 TEST EAX,EAX / JBE).
+        // FUN_06d97470(packet, str, len), which no-ops when len == 0.
         const unsigned int Length = RpcCh2StringLength(Desc->Hardpoint);
-        if (Length != 0) {                                    // 06d97474 JBE
+        if (Length != 0) {
             Wire.Hardpoint = static_cast<char*>(RpcCh2CopyBlock(Desc->Hardpoint, Length + 1u));
-            Wire.HardpointSize = Length + 1u;                 // 06d974a8
+            Wire.HardpointSize = Length + 1u;
         }
     }
 
-    // RpcPayloadWrite cannot fail; the former free-and-return-false branch was dead and is
-    // not in retail (06d8864c FUN_06d97470, then 06d88652..06d88660 straight on to slot 9).
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverSetAddItem(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerSetAddItem Wire = RpcPayloadRead<FPayloadServerSetAddItem>(Packet, 0);
-    // caseD_2e at 0x06d819ed builds a real Common.dll EquipDesc on the stack and fills it
-    // through the exported setters, in exactly this order.
-    EquipDesc Desc;                                     // 06d819f1 EquipDesc::EquipDesc
-    Desc.set_arch_id(Wire.ArchId);                      // 06d819ff  <- payload+0x00
-    Desc.set_id((unsigned short)(Wire.Id & 0xffffu));   // 06d81a10  <- payload+0x10 as a word
-    Desc.set_count(Wire.Count);                         // 06d81a1e  <- payload+0x04
-    Desc.set_status(Wire.Health);                       // 06d81a2c  <- payload+0x14
-    Desc.set_equipped(Wire.bEquipped);             // 06d81a3c  <- payload+0x18
-    // 06d81a42/06d81a45: retail stores bMission straight into the struct at +0x18; there
-    // is no setter for it.
+    // Retail fills a Common.dll EquipDesc through the exported setters, in this order.
+    EquipDesc Desc;
+    Desc.set_arch_id(Wire.ArchId);                      // payload+0x00
+    Desc.set_id((unsigned short)(Wire.Id & 0xffffu));   // payload+0x10 as a word
+    Desc.set_count(Wire.Count);                         // payload+0x04
+    Desc.set_status(Wire.Health);                       // payload+0x14
+    Desc.set_equipped(Wire.bEquipped);             // payload+0x18
+    // No setter for bMission; retail stores it straight into the struct.
     Desc.bMission = (Wire.bMission != 0);
-    if (Wire.HardpointSize != 0) {                      // 06d81a4e CMP EAX,EBX / JBE
-        // 06d81a57: StringAlloc(payload+0x1c, 0) interns the name in Common.dll's string
-        // cache so the EquipDesc keeps a permanent pointer, then set_hardpoint takes a
-        // CacheString by reference (06d81a73).
-        // The `MOV [ESP+0x1cc],EAX` at 06d81a6c lands on the very slot whose address was
-        // pushed at 06d81a67 -- the PUSH in between moved ESP down by 4 -- so retail's
-        // CacheString really is one pointer, matching our 4-byte CacheString.
+    if (Wire.HardpointSize != 0) {
+        // StringAlloc interns the name in Common.dll's string cache so the EquipDesc keeps a
+        // permanent pointer; retail's CacheString temporary is one pointer wide.
         CacheString Interned;
         Interned.Value = StringAlloc(Wire.Hardpoint, false);
         Desc.set_hardpoint(Interned);
     } else {
-        Desc.make_internal();                           // 06d81a7f
+        Desc.make_internal();
     }
     Client->SendServerSetAddItem(1u, static_cast<int>(Wire.AddResult), Desc);
     return true;
@@ -550,8 +486,6 @@ static bool DeliverSetAddItem(const FPacketBase* Packet, IClient* Client, IChatC
 // Sender 0x06d88670 (IClient+0x06c), receiver caseD_2f at 0x06d81aa0.
 // ===========================================================================
 static bool MarshalSetRemoveItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8868d/06d88696 [+0x28] = param_2 ; 06d88691 MOVZX EAX,word param_3 -> 06d8869d
-    // [+0x20] ; 06d886a4/06d886ac [+0x24] = param_4.
     FPayloadServerSetRemoveItem* Wire = Ch2Payload<FPayloadServerSetRemoveItem>(Packet);
     Wire->RemoveResult = Args[1];
     Wire->ItemId = Args[2] & 0xffffu;
@@ -572,11 +506,9 @@ static bool DeliverSetRemoveItem(const FPacketBase* Packet, IClient* Client, ICh
 // ch2 0x31 FLPACKET_SERVER_EXPLODEASTEROIDMINE
 // Sender 0x06d8a360 (IClient+0x0d0), receiver caseD_31 at 0x06d81b6d.
 // ===========================================================================
-// The argument is Server.dll's FMineExplosion {MineId, Vector Offset} (server_sysdb.h,
-// built by MedMine::update); the wire keeps the generic four-dword shape and the three
-// floats move as their bits (plain dword MOVs on both sides).
+// The argument is Server.dll's FMineExplosion (built by MedMine::update); the wire keeps the
+// generic four-dword shape, floats as bits.
 static bool MarshalFourDwordsByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a379..06d8a3a1: four dwords of *param_2 into +0x20..+0x2c.
     const FMineExplosion* Info = reinterpret_cast<const FMineExplosion*>(Args[1]);
     FPayloadServerFourDwords* Wire = Ch2Payload<FPayloadServerFourDwords>(Packet);
     Wire->Field_0x00 = Info->MineId;
@@ -603,8 +535,7 @@ static bool DeliverExplodeAsteroidMine(const FPacketBase* Packet, IClient* Clien
 // reference here.
 // ===========================================================================
 static bool MarshalSetMissionObjectiveState(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8ac59..06d8ac79: dword [+0x20] = src[0] ; 06d8ac66 MOVZX ECX,byte [src+4] -> dword
-    // [+0x24] ; word [+0x28] = word [src+8]. +0x2a is not touched.
+    // The byte index widens to a dword; payload+0x0a is not touched.
     const FServerMissionObjectiveStateInfo* Info =
         reinterpret_cast<const FServerMissionObjectiveStateInfo*>(Args[1]);
     FPayloadServerSetMissionObjectiveState* Wire =
@@ -635,7 +566,6 @@ static bool DeliverSetMissionObjectiveState(const FPacketBase* Packet, IClient* 
 // Sender 0x06d88c60 (IClient+0x100), receiver caseD_38 at 0x06d81e3d.
 // ===========================================================================
 static bool MarshalItemTractored(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d88c79..06d88ca4: dword +0x00, dword +0x04, word +0x08, word +0x0a of *param_2.
     const FPayloadServerItemTractored* Info =
         reinterpret_cast<const FPayloadServerItemTractored*>(Args[1]);
     FPayloadServerItemTractored* Wire = Ch2Payload<FPayloadServerItemTractored>(Packet);
@@ -656,12 +586,10 @@ static bool DeliverItemTractored(const FPacketBase* Packet, IClient* Client, ICh
 
 // ===========================================================================
 // ch2 0x3c FLPACKET_SERVER_REPAIROBJECT
-// Sender 0x06d8bfe0 (IClient+0x150), receiver caseD_3c at 0x06d82b55. The literal 1 here
-// is passed by VALUE, unlike its neighbours in the same slot range.
+// Sender 0x06d8bfe0 (IClient+0x150), receiver caseD_3c at 0x06d82b55. The literal 1 is
+// passed by value here, unlike its neighbours in the same slot range.
 // ===========================================================================
 static bool MarshalRepairObject(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8bffd MOVZX ECX,word [src+4] -> 06d8c005 [+0x24] ; 06d8c008/06d8c00e [+0x20] =
-    // src[0] ; 06d8c011/06d8c018 [+0x28] = src[8].
     const FServerRepairObjectInfo* Info =
         reinterpret_cast<const FServerRepairObjectInfo*>(Args[1]);
     FPayloadServerRepairObject* Wire = Ch2Payload<FPayloadServerRepairObject>(Packet);
@@ -688,10 +616,8 @@ static bool DeliverRepairObject(const FPacketBase* Packet, IClient* Client, ICha
 // Sender 0x06d8c170 (IClient+0x15c), receiver caseD_41 at 0x06d82c04.
 // ===========================================================================
 static bool MarshalBurnFuse(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8c189..06d8c1d1: dwords +0x00/+0x04/+0x08, word +0x0c, dwords +0x10/+0x14, byte
-    // +0x18 of *param_2. The pad bytes are not touched.
-    // The argument is Server.dll's FServerBurnFuseInfo (src/include/rpc_iclient_args.h,
-    // built by EqObj::light_fuse / unlight_fuse); the two floats travel bit for bit.
+    // Built by EqObj::light_fuse / unlight_fuse. Floats travel as bits; pad bytes are not
+    // touched.
     const FServerBurnFuseInfo* Info = reinterpret_cast<const FServerBurnFuseInfo*>(Args[1]);
     FPayloadServerBurnFuse* Wire = Ch2Payload<FPayloadServerBurnFuse>(Packet);
     Wire->SourceId = Info->SourceId;
@@ -706,8 +632,7 @@ static bool MarshalBurnFuse(FPacketBase* Packet, const unsigned int* Args, unsig
 
 static bool DeliverBurnFuse(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerBurnFuse Wire = RpcPayloadRead<FPayloadServerBurnFuse>(Packet, 0);
-    // A straight copy back into the argument struct (caseD_41), the two floats as bits and
-    // the pads as the wire carried them.
+    // Pads are copied as the wire carried them.
     static_assert(sizeof(FServerBurnFuseInfo) == sizeof(FPayloadServerBurnFuse),
                   "BURNFUSE argument and payload are the same 0x1c bytes");
     FServerBurnFuseInfo Info;
@@ -771,7 +696,6 @@ static bool DeliverRequestReturned(const FPacketBase* Packet, IClient* Client, I
 // Sender 0x06d8ace0 (IClient+0x12c), receiver caseD_46 at 0x06d82420.
 // ===========================================================================
 static bool MarshalMarkObj(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8acfd/06d8ad01 [+0x20] = param_2 ; 06d8ad08/06d8ad0c byte [+0x24] = param_3.
     FPayloadServerDwordByte* Wire = Ch2Payload<FPayloadServerDwordByte>(Packet);
     Wire->Field_0x00 = Args[1];
     Wire->Field_0x04 = (unsigned char)(Args[2] & 0xffu);
@@ -790,7 +714,6 @@ static bool DeliverMarkObj(const FPacketBase* Packet, IClient* Client, IChatClie
 // Sender 0x06d8ad30 (IClient+0x130), receiver caseD_47 at 0x06d8244f.
 // ===========================================================================
 static bool MarshalCfgInterfaceNotification(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8ad49..06d8ad67: dword +0x00, dword +0x04, byte +0x08 of *param_2.
     const FPayloadServerCfgInterfaceNotification* Info =
         reinterpret_cast<const FPayloadServerCfgInterfaceNotification*>(Args[1]);
     FPayloadServerCfgInterfaceNotification* Wire =
@@ -818,13 +741,12 @@ static bool DeliverCfgInterfaceNotification(const FPacketBase* Packet, IClient* 
 
 // ===========================================================================
 // ch2 0x49 FLPACKET_SERVER_SETHULLSTATUS
-// Sender 0x06d88420 (IClient+0x058): FLD float ptr [ESP+0x10]; FSTP float ptr [pkt+0x20]
-// -- the 2nd argument slot IS the float, loaded by value, not through a pointer. Receiver
-// caseD_49 at 0x06d83032 pushes the raw dword straight back out.
+// Sender 0x06d88420 (IClient+0x058): the 2nd argument is the float itself, by value.
+// Receiver caseD_49 at 0x06d83032 pushes the raw dword straight back out.
 // ===========================================================================
 static bool MarshalSetHullStatus(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8843d FLD float ptr [ESP+0x10] / 06d88441 FSTP float ptr [ECX+0x20]. The port copies
-    // the float's bit pattern; x87 would additionally quiet a signalling NaN on the way.
+    // Retail moves it through FLD/FSTP, which would also quiet a signalling NaN; the port
+    // copies the bits.
     FPayloadServerDword* Wire = Ch2Payload<FPayloadServerDword>(Packet);
     Wire->Field_0x00 = Args[1];
     return true;
@@ -835,8 +757,6 @@ static bool MarshalSetHullStatus(FPacketBase* Packet, const unsigned int* Args, 
 // Sender 0x06d8a800 (IClient+0x0d4), receiver caseD_4a at 0x06d83048.
 // ===========================================================================
 static bool MarshalSetGuidedTarget(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a81d/06d8a821 [+0x20] = param_2 ; 06d8a828/06d8a82c [+0x24] = param_3 ;
-    // 06d8a833/06d8a83c word [+0x28] = param_4.
     FPayloadServerSetGuidedTarget* Wire = Ch2Payload<FPayloadServerSetGuidedTarget>(Packet);
     Wire->GuidedId = Args[1];
     Wire->TargetId = Args[2];
@@ -891,7 +811,6 @@ static bool DeliverCancelMusic(const FPacketBase*, IClient* Client, IChatClient*
 // Sender 0x06d88cc0 (IClient+0x104), receiver caseD_51 at 0x06d81e77.
 // ===========================================================================
 static bool MarshalUseItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d88cd9..06d88cfa: dword +0x00, word +0x04, word +0x06 of *param_2.
     const FPayloadServerUseItem* Info = reinterpret_cast<const FPayloadServerUseItem*>(Args[1]);
     FPayloadServerUseItem* Wire = Ch2Payload<FPayloadServerUseItem>(Packet);
     Wire->ObjectId = Info->ObjectId;
@@ -942,9 +861,7 @@ RPC_CH2_DELIVER_BLOB(DeliverGfUpdateNewsBroadcast, SendServerGFUpdateNewsBroadca
 
 RPC_CH2_DELIVER_BLOB_REVERSED(DeliverGfUpdateAmbientScript, SendServerGFUpdateAmbientScript) // 0x1f -> +0x08c
 
-// ch2 0x49 FLPACKET_SERVER_SETHULLSTATUS -> +0x058. Receiver caseD_49 at 0x06d83032 pushes
-// the payload dword straight back out as the float argument; the bits are moved, not the
-// value.
+// ch2 0x49 FLPACKET_SERVER_SETHULLSTATUS -> +0x058; the bits are moved, not the value.
 static bool DeliverSetHullStatus(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerDword Wire = RpcPayloadRead<FPayloadServerDword>(Packet, 0);
     float HullStatus = 0.0f;
@@ -954,7 +871,7 @@ static bool DeliverSetHullStatus(const FPacketBase* Packet, IClient* Client, ICh
 }
 
 // ch2 0x5a FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY, sender 0x06d88af0, receiver caseD_5a
-// at 0x06d829fa: MOVZX from the payload's first byte.
+// at 0x06d829fa: the payload byte, zero-extended.
 static bool DeliverGfMissionVendorWhyEmpty(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerByte Wire = RpcPayloadRead<FPayloadServerByte>(Packet, 0);
     Client->SendServerGFMissionVendorWhyEmpty(1u, (unsigned int)Wire.Field_0x00);
@@ -972,32 +889,21 @@ static bool DeliverGfMissionVendorWhyEmpty(const FPacketBase* Packet, IClient* C
 // 0x48 SETCOLLISIONGROUPS
 //                     sender 0x06d88460  receiver caseD_48 @0x06d83012  SendServerSetCollisionGroups (+0x05c)
 //
-// The first three share one marshaller, retail FUN_06d8c750: walk a
-// std::vector<EquipDesc>, build one 0x18 wire record per element, push it onto the
-// handle, then hang the handle off the payload with FUN_06d8fa90. They share one
-// demarshaller too, FUN_06d95d20 + FUN_06d84d60, which rebuilds the vector. Registry
-// agreement: SETEQUIPMENT and SETCARGO are 0x24 bytes (payload 0x04 = the handle
-// pointer), REMOTEOBJECTCARGOUPDATE is 0x2c (0x04 handle + a byte at +0x04 + a dword at
-// +0x08), SETCOLLISIONGROUPS is 0x2c (payload 0x0c = the list header itself).
+// The first three share one marshaller, FUN_06d8c750 (one 0x18 wire record per EquipDesc,
+// pushed onto a handle that FUN_06d8fa90 hangs off the payload), and one demarshaller,
+// FUN_06d95d20 + FUN_06d84d60. Registry sizes: SETEQUIPMENT and SETCARGO 0x24 (payload =
+// the handle pointer), REMOTEOBJECTCARGOUPDATE 0x2c (handle + byte +0x04 + dword +0x08),
+// SETCOLLISIONGROUPS 0x2c (payload 0x0c = the list header itself).
 //
-// The one real difference between the three equipment senders is FUN_06d8c750's third
-// argument. SETEQUIPMENT and SETCARGO both pass 1 (06d884d8, 06d88568), so both ship
-// the WHOLE vector; only REMOTEOBJECTCARGOUPDATE passes 0 (06d8c08a), which turns on
-// the filter at 06d8c770 and drops every element whose bEquipped byte is set. So on
-// this channel "cargo" is a matter of which vector the caller hands over, not of the
-// flag -- except for 0x3d, where retail does filter.
-//
-// The IClient slots these four end on take `const EquipDescVector&` (SendServerSetEquipment,
-// SendServerSetCargo, SendServerRemoteObjectCargoUpdate) and `const std::list<
-// CollisionGroupDesc>&` (SendServerSetCollisionGroups); the vector the port hands over is
-// Common's own EquipDescVector (retail std::vector<EquipDesc>, same allocator + three
-// pointers), and for 0x48 a std::list rebuilt from the payload's list.
+// FUN_06d8c750's third argument is the only difference: SETEQUIPMENT and SETCARGO pass 1
+// and ship the whole vector; REMOTEOBJECTCARGOUPDATE passes 0, which drops every element
+// whose bEquipped byte is set. So "cargo" is a matter of which vector the caller hands over,
+// except for 0x3d.
 // ===========================================================================
 
 // --- the shared equipment marshaller (retail FUN_06d8c750 + FUN_06d8fa90) ---
-// The stack handle is an object with a destructor in retail: the senders zero it, fill
-// it, deep-copy it into the packet and run FUN_06d91340 on it on the way out -- and from
-// Unwind@06db24f0 (06d884a0 / 06d88530) / Unwind@06db25d0 (06d8c040) on a throw.
+// The stack handle has a destructor in retail (FUN_06d91340), run on the way out and from
+// the unwind funclets on a throw.
 static bool MarshalEquipVectorCommon(FPacketBase* Packet, unsigned int VectorArg, bool bAll) {
     const EquipDescVector* Source = reinterpret_cast<const EquipDescVector*>(VectorArg);
     FRpcEquipWireHandle Handle;
@@ -1008,21 +914,15 @@ static bool MarshalEquipVectorCommon(FPacketBase* Packet, unsigned int VectorArg
 
 // --- the shared equipment demarshaller (retail FUN_06d95d20 + FUN_06d84d60) ---
 //
-// Both temporaries -- the wire handle and the rebuilt vector -- live on the receiver's
-// frame across the IClient call and are torn down after it, the HANDLE first: caseD_24/25
-// reach 06d81784 `LEA ECX,[ESP+0x14] ; CALL FUN_06d91340` (the handle at local_21c) before
-// the COMMON vector _Destroy + FUN_06db1dc2 on the vector at local_218 (06d817a6/06d817b1);
-// caseD_3d does the same at 06d82a9b then 06d82ab0. The rebuilt EquipDescs hold interned
-// StringAlloc hardpoints (06d84e8a), so nothing in the vector points into the handle.
-// Both are objects with destructors, in retail and here: on a throw, Unwind@06db2163 /
-// @06db217a / @06db21fe run FUN_06d91340 on the handle ([EBP-0x21c]). Declared vector
-// first, handle second, so the handle is destroyed first, as on the normal path.
+// The wire handle and the rebuilt vector live across the IClient call and are torn down
+// after it, the handle first, on the normal path and on a throw alike; hence vector declared
+// first, handle second. The rebuilt EquipDescs hold interned StringAlloc hardpoints, so
+// nothing in the vector points into the handle.
 namespace {
 
 struct FEquipVectorScope {
-    EquipDescVector Vector;         // ctor zeroes the four dwords (Common 0x06266310);
-                                    // ~EquipDescVector frees the buffer (06d817a6/06d817b1)
-    FRpcEquipWireHandle Handle;     // ~FRpcEquipWireHandle = FUN_06d91340 (06d81788)
+    EquipDescVector Vector;         // ctor zeroes the four dwords (Common 0x06266310)
+    FRpcEquipWireHandle Handle;     // ~FRpcEquipWireHandle = FUN_06d91340
 
     explicit FEquipVectorScope(const FPacketBase* Packet) {
         RpcPacketEquipExtract(Packet, &Handle);
@@ -1047,8 +947,7 @@ static bool DeliverSetEquipment(const FPacketBase* Packet, IClient* Client, ICha
     return true;
 }
 
-// ch2 0x25 SETCARGO -- byte for byte the same sender and receiver, one opcode and one
-// IClient slot apart.
+// ch2 0x25 SETCARGO -- same sender and receiver as SETEQUIPMENT, one IClient slot apart.
 static bool MarshalSetCargo(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     return MarshalEquipVectorCommon(Packet, Args[1], true);
 }
@@ -1059,27 +958,20 @@ static bool DeliverSetCargo(const FPacketBase* Packet, IClient* Client, IChatCli
     return true;
 }
 
-// ch2 0x3d REMOTEOBJECTCARGOUPDATE. Sender 0x06d8c040, RET 0x10 -- four arguments:
-//   Args[0] a POINTER whose first dword retail dereferences for the "1" slot
-//           (06d8c0ba `MOV EAX,[ECX]`), i.e. the by-reference session family;
-//   Args[1] -> payload+0x08 (06d8c081);
+// ch2 0x3d REMOTEOBJECTCARGOUPDATE. Sender 0x06d8c040, four arguments:
+//   Args[0] a pointer to the session id (the by-reference family);
+//   Args[1] -> payload+0x08;
 //   Args[2] the std::vector<EquipDesc>, filtered to the unequipped items;
-//   Args[3] -> payload+0x04 as a single byte (06d8c076).
-// Receiver caseD_3d pushes them back as SendServerRemoteObjectCargoUpdate(&one,
-// payload+0x08, &vector, byte).
+//   Args[3] -> payload+0x04 as a single byte.
 static bool MarshalRemoteObjectCargoUpdate(FPacketBase* Packet, const unsigned int* Args,
                                            unsigned int ArgCount) {
-    // In place, in retail's order: the byte (06d8c072/06d8c076 `MOV [pkt+0x24],DL`), the
-    // dword (06d8c07d/06d8c081 `MOV [pkt+0x28],ECX`), then the equipment handle. The three
-    // pad bytes at +0x25 are neither written here nor seeded by the constructor
-    // (FUN_06d9ece0 stores only the byte at 06d9ecf7), so they are left alone.
+    // The three pad bytes at +0x25 are written neither here nor by the constructor
+    // (FUN_06d9ece0).
     FPayloadServerRemoteObjectCargoUpdate* Wire =
         Ch2Payload<FPayloadServerRemoteObjectCargoUpdate>(Packet);
     Wire->Field_0x04 = (unsigned char)(Args[3] & 0xffu);
     Wire->ObjectId = Args[1];
-    // bAll is false here and only here: retail passes 0 as FUN_06d8c750's third
-    // argument (06d8c084 `XOR EAX,EAX` / 06d8c08a `PUSH EAX`), which keeps only the items
-    // whose bEquipped byte is clear.
+    // bAll is false only here: keeps the items whose bEquipped byte is clear.
     return MarshalEquipVectorCommon(Packet, Args[2], false);
 }
 
@@ -1087,43 +979,32 @@ static bool DeliverRemoteObjectCargoUpdate(const FPacketBase* Packet, IClient* C
     const FPayloadServerRemoteObjectCargoUpdate Wire =
         RpcPayloadRead<FPayloadServerRemoteObjectCargoUpdate>(Packet, 0);
     FEquipVectorScope Scope(Packet);
-    // retail 06d82a6a: `MOV dword ptr [ESP+local_94],1 ; LEA EAX,[local_94] ; PUSH EAX`
-    // -- this type is in the by-reference "1" family.
     unsigned int One = 1u;
     Client->SendServerRemoteObjectCargoUpdate(One, Wire.ObjectId, Scope.Vector, Wire.Field_0x04);
     return true;
 }
 
-// ch2 0x48 SETCOLLISIONGROUPS. Sender 0x06d88460 is three calls long; receiver caseD_48
-// is `FUN_06d8f7d0(packet)` -- i.e. `LEA EAX,[packet+0x20]` -- followed by
-// `SendServerSetCollisionGroups(1, that address)`. The payload IS the list, so nothing is
-// copied either way.
+// ch2 0x48 SETCOLLISIONGROUPS. Sender 0x06d88460; receiver caseD_48 passes packet+0x20
+// (FUN_06d8f7d0) to SendServerSetCollisionGroups: in retail the payload is the list itself.
 //
-// The caller's list is a std::list<CollisionGroupDesc> -- Server.dll's
-// PlayerData_SetCollisionGroups passes &PlayerData::collision_groups (06d4f400). Until
-// W4-C this sender read that address as the retail-layout FRpcCollisionGroupList and the
-// receiver handed the packet's mirror to the exe, which cannot read it as the std::list
-// FUN_004c3f30 takes. Both ends now follow the ch3 0x36 REQCOLLISIONGROUPS seam
-// (rpc_payload_ch3.cpp): the caller's own iterators into the packet list, and the packet
-// list back into a real std::list for the IClient call.
+// The caller's list is Server.dll's std::list<CollisionGroupDesc>
+// (&PlayerData::collision_groups, 06d4f400). As with ch3 0x36 REQCOLLISIONGROUPS
+// (rpc_payload_ch3.cpp), the caller's iterators fill the packet list and the packet list is
+// rebuilt into a real std::list for the IClient call.
 static bool MarshalSetCollisionGroups(FPacketBase* Packet, const unsigned int* Args,
                                       unsigned int ArgCount) {
     const std::list<CollisionGroupDesc>& Source =
         *reinterpret_cast<const std::list<CollisionGroupDesc>*>(Args[1]);
-    // FUN_06d8f710(packet, Source): the caller's node chain is walked directly, no
-    // intermediate array, into the list the packet constructor built (06d9e909) -- no
-    // re-initialisation here. 06d8f712..06d8f71d: `LEA EBP,[this+0x20] ; CMP EBP,param_1 ;
-    // JZ` -- self-assignment does nothing; the caller's list is a different type here, so
-    // the two can never be the same object (as in MarshalReqCollisionGroups).
+    // FUN_06d8f710(packet, Source): walks the caller's nodes into the list the packet
+    // constructor built. Its self-assignment test cannot fire here (different types).
     FRpcCollisionGroupList* List = RpcPacketCollisionGroups(Packet);
     RpcCollisionGroupListAssignRange(List, Source.begin(), Source.end());
     return true;
 }
 
 static bool DeliverSetCollisionGroups(const FPacketBase* Packet, IClient* Client, IChatClient*) {
-    // Retail caseD_48: `LEA EAX,[packet+0x20] ; PUSH EAX ; PUSH 1 ; CALL [ESI+0x5c]`. The
-    // packet's list is rebuilt into a real std::list first (RpcCollisionGroupListFromWire,
-    // retail's inline copy at 06d8505c), exactly as DeliverReqCollisionGroups does.
+    // Rebuilt into a real std::list first (retail's inline copy at 06d8505c), as
+    // DeliverReqCollisionGroups does.
     std::list<CollisionGroupDesc> Groups;
     RpcCollisionGroupListFromWire(Groups, RpcPacketCollisionGroups(Packet));
     Client->SendServerSetCollisionGroups(1u, Groups);
@@ -1136,7 +1017,7 @@ static bool DeliverSetCollisionGroups(const FPacketBase* Packet, IClient* Client
 // ===========================================================================
 static bool MarshalConnectResponse(FPacketBase* Packet, const unsigned int*, unsigned int) {
     FPayloadServerConnectResponse Wire;
-    Wire.ClientId = 1u;   // retail: `MOV dword ptr [ECX + 0x20],0x1`
+    Wire.ClientId = 1u;
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -1152,8 +1033,7 @@ static bool DeliverConnectResponse(const FPacketBase* Packet, IClient* Client, I
 // ch2 0x08 FLPACKET_SERVER_CHARSELECTVERIFIED.
 // ===========================================================================
 static bool MarshalCharSelectVerified(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8a049..06d8a067: [+0x20] = src[0], [+0x28] = src[2], [+0x2c] = src[3]; +0x24 is
-    // left alone, as retail leaves it.
+    // payload+0x04 is left alone, as retail leaves it.
     const unsigned int* Source = reinterpret_cast<const unsigned int*>(Args[1]);
     FPayloadServerCharSelectVerified* Wire = Ch2Payload<FPayloadServerCharSelectVerified>(Packet);
     Wire->VibeHandle = Source[0];
@@ -1165,8 +1045,7 @@ static bool MarshalCharSelectVerified(FPacketBase* Packet, const unsigned int* A
 static bool DeliverCharSelectVerified(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerCharSelectVerified Wire =
         RpcPayloadRead<FPayloadServerCharSelectVerified>(Packet, 0);
-    // The four dwords back into FServerCharSelectVerifiedInfo: +0x00, the hole at +0x04
-    // (zeroed, see FPayloadServerCharSelectVerified), and the two halves of the double.
+    // The hole at +0x04 is zeroed (see FPayloadServerCharSelectVerified).
     FServerCharSelectVerifiedInfo Info;
     Info.VibeHandle = static_cast<int>(Wire.VibeHandle);
     Info.Unused_0x04 = 0;
@@ -1178,8 +1057,8 @@ static bool DeliverCharSelectVerified(const FPacketBase* Packet, IClient* Client
 }
 
 // ===========================================================================
-// ch2 0x22 FLPACKET_SERVER_SYSTEM_SWITCH_IN. Delivered out of a file-static block, the
-// way retail does -- .data:0x06dbb91c, not re-entrant there either.
+// ch2 0x22 FLPACKET_SERVER_SYSTEM_SWITCH_IN. Delivered out of a file-static block,
+// .data:0x06dbb91c, not re-entrant in retail either.
 // ===========================================================================
 static FPayloadServerSystemSwitchIn GSystemSwitchInStatic_06dbb91c;
 
@@ -1199,8 +1078,8 @@ static bool DeliverSystemSwitchIn(const FPacketBase* Packet, IClient* Client, IC
 // ch2 0x2a FLPACKET_SERVER_ADJUSTATTITUDE.
 // ===========================================================================
 static bool MarshalAdjustAttitude(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d88f89..06d88f93 dword [+0x20] = src[0] ; 06d88f96 FLD float [src+4] / 06d88fa1 FSTP
-    // float [+0x24]. The float moves as its bit pattern here (x87 would quiet an sNaN).
+    // Retail moves the float through FLD/FSTP; the port copies the bits (x87 would quiet an
+    // sNaN).
     const FPayloadServerAdjustAttitude* Source =
         reinterpret_cast<const FPayloadServerAdjustAttitude*>(Args[1]);
     FPayloadServerAdjustAttitude* Wire = Ch2Payload<FPayloadServerAdjustAttitude>(Packet);
@@ -1219,8 +1098,7 @@ static bool DeliverAdjustAttitude(const FPacketBase* Packet, IClient* Client, IC
 // ch2 0x53 FLPACKET_SERVER_FORMATION_UPDATE.
 // ===========================================================================
 static bool MarshalFormationUpdate(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8c61d/06d8c625 [+0x20] = param_2 ; 06d8c628..06d8c642 three dwords of *param_3
-    // into +0x24/+0x28/+0x2c with integer moves -- a bit copy.
+    // The vector is copied with integer moves -- a bit copy.
     FPayloadServerFormationUpdate* Wire = Ch2Payload<FPayloadServerFormationUpdate>(Packet);
     Wire->LeaderId = Args[1];
     ::memcpy(&Wire->Offset, reinterpret_cast<const void*>(Args[2]), sizeof(Vector));
@@ -1239,10 +1117,8 @@ static bool DeliverFormationUpdate(const FPacketBase* Packet, IClient* Client, I
 // ch2 0x57 FLPACKET_SERVER_SET_MUSIC.
 // ===========================================================================
 static bool MarshalSetMusic(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // 06d8c67d..06d8c6b8: [+0x20..+0x2c] = param_2..param_5, byte [+0x30] = param_6, and
-    // FLD/FSTP float param_7 -> [+0x34]. The proxy hands Fade over as its argument slot's
-    // bits, so the float travels as its bit pattern (x87 would quiet an sNaN). Pad bytes
-    // untouched.
+    // Fade arrives as its argument slot's bits and travels as such (retail FLD/FSTP would
+    // quiet an sNaN). Pad bytes untouched.
     FPayloadServerSetMusic* Wire = Ch2Payload<FPayloadServerSetMusic>(Packet);
     Wire->SpaceMusic = Args[1];
     Wire->DangerMusic = Args[2];
@@ -1255,8 +1131,7 @@ static bool MarshalSetMusic(FPacketBase* Packet, const unsigned int* Args, unsig
 
 static bool DeliverSetMusic(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerSetMusic Wire = RpcPayloadRead<FPayloadServerSetMusic>(Packet, 0);
-    // The byte is pushed zero-extended (`XOR EAX,EAX; MOV AL,[EBP+0x30]`); the sender only
-    // ever stored a bool's 0/1 there. The float is handed on as the payload's bits.
+    // The byte is pushed zero-extended; the sender only ever stores 0/1 there.
     Client->SendServerSetMusic(1u, Wire.SpaceMusic, Wire.DangerMusic, Wire.BattleMusic, Wire.OverrideMusic,
                                Wire.bNoLoop != 0, Wire.Fade);
     return true;
@@ -1266,19 +1141,14 @@ static bool DeliverSetMusic(const FPacketBase* Packet, IClient* Client, IChatCli
 // ch2 0x52 FLPACKET_SERVER_PLAYERLIST -- three senders, three slots, one dword of
 // discriminator at payload+0x00.
 //
-// Sender addresses and their kind literal:
-//   0x06d8c5b0 (IClient+0x1c0)  `MOV [ECX+0x20],EAX` with EAX still zero  -> kind 0
-//   0x06d8c500 (IClient+0x1b8)  `MOV dword [ECX+0x20],1`                  -> kind 1
-//   0x06d8c560 (IClient+0x1bc)  `MOV dword [ECX+0x20],2`                  -> kind 2
-// All three then call the same setter FUN_06d99950(packet, Name, Value), which frees the
-// previous wide string, `_wcsdup`s the new one into packet+0x24 and stores Value into
-// packet+0x28. The receiver (.text:0x06d83102) reads the kind back and calls one slot.
+// Senders and their kind: 0x06d8c5b0 (IClient+0x1c0) kind 0, 0x06d8c500 (+0x1b8) kind 1,
+// 0x06d8c560 (+0x1bc) kind 2. All three call the setter FUN_06d99950(packet, Name, Value),
+// which frees the previous wide string, _wcsdup's the new one into payload+0x04 and stores
+// Value at payload+0x08. Receiver at .text:0x06d83102.
 // ===========================================================================
 
-// FUN_06d99950's copy half: `TEST EAX,EAX ; JZ` on the source (06d99976), then
-// MSVCRT _wcsdup (06d9997b), the result stored untested (06d99984). Retail's own pairing
-// is _wcsdup / free, so the copy comes from the same allocator the packet's destructor
-// hands back to.
+// FUN_06d99950's copy half: null test, then _wcsdup, result stored untested. The packet's
+// destructor frees with the matching allocator.
 static wchar_t* RpcCh2DupWide(const wchar_t* Text) {
     if (Text == nullptr) {
         return nullptr;
@@ -1325,8 +1195,7 @@ static bool DeliverPlayerList(const FPacketBase* Packet, IClient* Client, IChatC
         Client->SendServerPlayerListRemove(1u, Wire.PlayerId);
         return true;
     }
-    // Retail's own fallthrough: anything else (the constructor's 3 included) reaches
-    // caseD_9 and the packet is discarded without a call.
+    // Any other kind (the constructor's 3 included) falls to caseD_9: discarded, no call.
     return false;
 }
 
@@ -1335,8 +1204,8 @@ static bool DeliverPlayerList(const FPacketBase* Packet, IClient* Client, IChatC
 // bitmask at payload+0x00. See the flag/setter table in rpc_payloads.h.
 // ===========================================================================
 
-// Unchecked, as retail's member access is (the setters FUN_06d98ac0..FUN_06d98cf0 write
-// `[this + n]` straight away); the block is the class's own size (rpc_packet_registry.cpp).
+// Unchecked, as retail's setters FUN_06d98ac0..FUN_06d98cf0 are; the block is the class's
+// own size (rpc_packet_registry.cpp).
 static FPayloadServerMiscObjUpdate* Ch2MiscObjUpdate(FPacketBase* Packet) {
     return reinterpret_cast<FPayloadServerMiscObjUpdate*>(Packet->Payload());
 }
@@ -1345,35 +1214,26 @@ static const FPayloadServerMiscObjUpdate* Ch2MiscObjUpdate(const FPacketBase* Pa
     return reinterpret_cast<const FPayloadServerMiscObjUpdate*>(Packet->Payload());
 }
 
-// FUN_06d98b20: `basic_string<unsigned short>::assign(source, 0, npos)` into packet+0x40.
-// The packet owns the characters from then on.
-//
-// CORRECTED 2026-09-17: the string is WIDE, not narrow. FUN_06d98b20's three MSVCP60
-// imports are all `?$basic_string@GU?$char_traits@G@...` (06d98b52 _Split, 06d98b8a
-// _Grow, 06d98b97 _Eos) and both codec slots move two bytes per character.
+// FUN_06d98b20: basic_string<unsigned short>::assign(source, 0, npos) into packet+0x40.
+// The string is wide: the MSVCP60 imports are the basic_string<G> instantiation.
 static void Ch2MiscObjUpdateSetText(FPayloadServerMiscObjUpdate* Wire,
                                     const std::wstring& Source) {
-    Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagText);   // 06d98b20
-    Wire->Text.assign(Source, 0, std::wstring::npos);         // 06d98b31..06d98b97
+    Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagText);
+    Wire->Text.assign(Source, 0, std::wstring::npos);
 }
 
-// FUN_06d98cf0, called once per element by the sender's loop (06d8c34f..06d8c36b), which
-// runs zero times on an empty vector -- so an empty vector leaves the flag clear and the
+// FUN_06d98cf0, called once per element; an empty vector leaves the flag clear and the
 // receiver never calls slot 120.
 static void Ch2MiscObjUpdateAddId(FPayloadServerMiscObjUpdate* Wire, unsigned int Value) {
-    // 06d98cf4 `OR byte ptr [ESI + 0x21],0x1` -- the flag, once per element.
     Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagIds);
-    // vector::insert(_Last, 1, value), i.e. push_back.
     Wire->Ids.push_back(Value);
-    // 06d98d17..06d98d27: every push_back ends by recomputing `(End - Begin) >> 2` and
-    // storing its low byte at packet+0x68 -- the wire count both codec slots use.
+    // Every push_back stores the low byte of the new size at packet+0x68, the wire count.
     Wire->IdCount = (unsigned char)(Wire->Ids.size() & 0xffu);
 }
 
 // Args[0] is the sender variant; Args[1..] are that slot's arguments minus the session id.
 static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    // No re-initialisation: the class factory ran the ctor's work (0x06d9edc0) on this
-    // freshly allocated packet, and retail's senders go straight to the setters.
+    // No re-initialisation: the factory already ran the ctor (0x06d9edc0).
     FPayloadServerMiscObjUpdate* Wire = Ch2MiscObjUpdate(Packet);
 
     switch (Args[0]) {
@@ -1391,9 +1251,7 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
         return true;
 
     case kMiscObjUpdateVariant_Motd: { // 0x06d8c430: FUN_06d98b20
-        // The argument is the wide string's address -- retail's VC6 basic_string<G>,
-        // ours std::wstring (Server's PlayerDB::SetMOTD, 0x746e0, hands it &Message).
-        // FUN_06d98b20 reads the string (06d98b31 `MOV EAX,[EBX + 0x8]`) untested.
+        // The wide string's address (Server's PlayerDB::SetMOTD, 0x746e0), read untested.
         const std::wstring* Source = reinterpret_cast<const std::wstring*>(Args[1]);
         Ch2MiscObjUpdateSetText(Wire, *Source);
         return true;
@@ -1428,11 +1286,9 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
         return true;
 
     case kMiscObjUpdateVariant_Formation: { // 0x06d8c330: FUN_06d98cf0 per element
-        // The argument is the vector's address (retail const std::vector<uint>&).
+        // The vector's address, read untested.
         const std::vector<unsigned int>* Source =
             reinterpret_cast<const std::vector<unsigned int>*>(Args[1]);
-        // 06d8c34b..06d8c355: the vector's first/last read untested, `CMP ; JZ` on equal;
-        // then one FUN_06d98cf0 per element.
         for (std::vector<unsigned int>::const_iterator It = Source->begin();
              It != Source->end(); ++It) {
             Ch2MiscObjUpdateAddId(Wire, *It);
@@ -1445,8 +1301,7 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
     }
 }
 
-// The receiver's seven tests, in retail's order. More than one can fire from a single
-// packet -- the port keeps that property instead of turning the mask back into a switch.
+// The receiver's seven tests, in retail's order; more than one can fire from one packet.
 static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerMiscObjUpdate* Wire = Ch2MiscObjUpdate(Packet);
     bool bDelivered = false;
@@ -1468,13 +1323,12 @@ static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, ICh
         bDelivered = true;
     }
     if ((Wire->Flags & kMiscObjUpdateFlagText) != 0) {
-        // Retail: `LEA EDX,[EBP+0x40]` -- the string object inside the packet is passed
-        // by address, not copied out.
+        // The string inside the packet is passed by address, not copied out.
         Client->SendServerMiscObjUpdateMotd(1u, Wire->Text);
         bDelivered = true;
     }
     if ((Wire->Flags & kMiscObjUpdateFlagField_0x0c) != 0) {
-        // MOVZX: the word is delivered zero-extended.
+        // Zero-extended.
         Client->SendServerMiscObjUpdateRank(1u, Wire->PlayerId, static_cast<int>(Wire->Rank));
         bDelivered = true;
     }
@@ -1483,7 +1337,7 @@ static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, ICh
         bDelivered = true;
     }
     if ((Wire->Flags & kMiscObjUpdateFlagIds) != 0) {
-        // Retail: `LEA EDX,[EBP+0x58]`.
+        // Passed by address (packet+0x58).
         Client->SendServerMiscObjUpdateFormation(1u, Wire->Ids);
         bDelivered = true;
     }
@@ -1491,20 +1345,12 @@ static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, ICh
 }
 
 // ===========================================================================
-// Wave-3 types: the six channel-2 payloads that carry a container, a permutation or a
-// verbatim struct. Every one of them was read four ways -- sender body, receiver case,
-// the registry's operator new() size, and (where the sender permutes) the receiver's
-// permutation being the strict inverse. The per-type derivation lives next to the
-// structs in rpc_payloads.h; only the code is here.
+// The channel-2 payloads that carry a container, a permutation or a verbatim struct. The
+// per-type layout notes are next to the structs in rpc_payloads.h.
 // ===========================================================================
 
-// Typed views on a payload that holds a live container: the generic RpcPayloadWrite
-// would overwrite the list header, so these types address their fields in place, the
-// way retail's concrete packet classes do.
-//
-// No test in either: retail's concrete class addresses its own members at fixed offsets
-// (e.g. 06d88c35 `MOV [ECX+0x20],EDX`, 06d811ca FUN_06d931b0 `LEA EAX,[this+0x28]`), and
-// the block is always the class's own size (registry `PUSH n`, payload static_asserts).
+// Typed views on a payload that holds a live container (RpcPayloadWrite would overwrite
+// the list header). Unchecked: the block is always the class's own size.
 static FPayloadServerDamageObject* RpcDamageObjectPayload(FPacketBase* Packet) {
     return reinterpret_cast<FPayloadServerDamageObject*>(Packet->Payload());
 }
@@ -1523,68 +1369,54 @@ static const FPayloadServerCreateLoot* RpcCreateLootPayload(const FPacketBase* P
 
 // ===========================================================================
 // ch2 0x05 FLPACKET_SERVER_DAMAGEOBJECT
-// Sender 0x06d88c10 (IClient+0x0fc, RET 0xc), receiver caseD_5 at 0x06d81ed4.
-// Both sides pass the literal 1 by VALUE: the receiver pushes it at 06d81f1d
-// (`PUSH 0x1`), and the sender forwards its own first argument unchanged
-// (06d88c46 `MOV ECX,[ESP+0xc]` then 06d88c4d `PUSH ECX`, no dereference).
+// Sender 0x06d88c10 (IClient+0x0fc), receiver caseD_5 at 0x06d81ed4. The 1 travels by value
+// on both sides.
 //
-// IServerImpl::HandleDamageObject (0x06d84c60, the other caller of FUN_06d90290) is NOT
-// on the HandlePacket path: caseD_5 inlines the same logic, so this codec alone carries
-// the type end to end.
+// IServerImpl::HandleDamageObject (0x06d84c60, the other caller of FUN_06d90290) is not on
+// the HandlePacket path: caseD_5 inlines the same logic.
 // ===========================================================================
 static bool MarshalDamageObject(FPacketBase* Packet, const unsigned int* Args,
                                 unsigned int ArgCount) {
-    // The third argument is Common's DamageList -- what both Server.dll senders push
-    // (server_observer.cpp's stack DamageList, SystemPlayerView_DamageObject's two
-    // DamageList records) -- read through its named members, not a retail-shaped view.
+    // The third argument is Common's DamageList, as both Server.dll senders push it.
     const DamageList* Source = reinterpret_cast<const DamageList*>(Args[2]);
     FPayloadServerDamageObject* Wire = RpcDamageObjectPayload(Packet);
-    Wire->ObjectId = Args[1];                       // 06d88c35 MOV [ECX+0x20],EDX
-    // FUN_06d90290: the list assignment plus 06d90459..06d90474, the four tail fields,
-    // into the DamageList the packet ctor built -- i.e. DamageList::operator=.
+    Wire->ObjectId = Args[1];
+    // FUN_06d90290: list plus the four tail fields, i.e. DamageList::operator=.
     Wire->Damage = *Source;
     return true;
 }
 
 static bool DeliverDamageObject(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerDamageObject* Wire = RpcDamageObjectPayload(Packet);
-    // Retail builds the destination DamageList on its own stack (the COMMON.DLL
-    // std::list constructor imported at 06d81ee3), assigns into it, calls the slot and
-    // tears it down again at 06d81f27..06d81f5d. The receiver in freelancer.exe reads
-    // it as the same Common DamageList the server built.
+    // Retail builds the destination DamageList on its own stack and tears it down after
+    // the call.
     DamageList Local;
     Local = Wire->Damage;                             // FUN_06d90290(packet, &local)
     Client->SendServerDamageObject(1u, Wire->ObjectId, Local);
     return true;
 }
 
-// IServerImpl::HandleDamageObject (0x06d84c60), the exported member rpclocal.cpp
-// forwards to. Same body as caseD_5 above except that slot 63's first argument is the
-// member's third parameter (06d84cd7) instead of the literal 1:
-//   06d84c7a..06d84c82  a null packet returns false (06d84d41 XOR AL,AL)
-//   06d84c8d..06d84cc3  local DamageList, filled by FUN_06d90290(packet, &local)
-//   06d84cc8..06d84cdc  Client->vt[+0xfc](Arg, [packet+0x20], &local)
-//   06d84ce2..06d84d23  the local list is torn down; 06d84d28 MOV AL,1
+// IServerImpl::HandleDamageObject (0x06d84c60), the exported member rpclocal.cpp forwards
+// to. Same body as caseD_5 except the slot's first argument is the third parameter instead
+// of the literal 1, and a null packet returns false.
 __declspec(dllexport) bool RpcHandleDamageObject(const FPacketBase* Packet, IClient* Client, unsigned int Arg) {
     if (Packet == nullptr) {
         return false;
     }
     const FPayloadServerDamageObject* Wire = RpcDamageObjectPayload(Packet);
     DamageList Local;
-    Local = Wire->Damage;                             // 06d84c8d..06d84cc3
+    Local = Wire->Damage;
     Client->SendServerDamageObject(Arg, Wire->ObjectId, Local);
     return true;
 }
 
 // ===========================================================================
 // ch2 0x28 FLPACKET_SERVER_CREATELOOT
-// Sender 0x06d8aae0 (IClient+0x0c0, RET 8), receiver caseD_28 at 0x06d811c8. The
-// literal 1 travels by value on both sides (06d812fd `PUSH 0x1`, 06d8ac24/06d8ac2b).
+// Sender 0x06d8aae0 (IClient+0x0c0), receiver caseD_28 at 0x06d811c8. The literal 1
+// travels by value on both sides.
 // ===========================================================================
 // The argument is Server.dll's FServerCreateLootRequest with its array of FServerLootDesc
-// (server_createinfo.h); both are the records retail's two ends walk, so the old private
-// mirrors FServerCreateLootInfo / FRpcLootDescMirror are gone (2026-10-16). Every float
-// member moves as its bits: both directions copy the record with plain dword MOVs.
+// (server_createinfo.h). Floats move as bits: both directions use plain dword MOVs.
 static_assert(sizeof(FServerLootDesc) == 0x48, "CREATELOOT record is 0x48 (the array stride)");
 static_assert(offsetof(FServerLootDesc, Orientation) == 0x28, "CREATELOOT record +0x28");
 static_assert(offsetof(FServerLootDesc, Velocity) == 0x38, "CREATELOOT record +0x38");
@@ -1598,22 +1430,21 @@ static bool MarshalCreateLoot(FPacketBase* Packet, const unsigned int* Args,
         reinterpret_cast<const FServerCreateLootRequest*>(Args[1]);
     FPayloadServerCreateLoot* Wire = RpcCreateLootPayload(Packet);
     RpcPacketLootListInit(Packet);                                        // the packet ctor's dummy
-    Wire->OwnerId = Source->OwnerId;                                   // 06d8ab09
-    Wire->Kind = (unsigned char)(Source->Kind & 0xffu);             // 06d8ab0c/06d8ab13
+    Wire->OwnerId = Source->OwnerId;
+    Wire->Kind = (unsigned char)(Source->Kind & 0xffu);
     Wire->Pad_0x05[0] = 0;
     Wire->Pad_0x05[1] = 0;
     Wire->Pad_0x05[2] = 0;
 
-    const unsigned int Count = Source->Count;                             // 06d8ab19 MOV AL,[EAX+0x10]
+    const unsigned int Count = Source->Count;                             // a byte, +0x10
     if (Count == 0) {
-        return true;                                                      // 06d8ab71 JBE
+        return true;
     }
-    // 06d8ab79: the array at src+0x0c is walked with no test of its own.
+    // The array at src+0x0c is walked untested.
     for (unsigned int i = 0; i < Count; ++i) {
         const FServerLootDesc& In = Source->Items[i];
-        // Retail zeroes the whole temporary once before the loop and seeds wire+0x34
-        // with 1.0f (06d8ab55 `MOV [ESP+0x3c],0x3f800000`); every field including that
-        // one is then overwritten on every iteration, so the seed never ships.
+        // Retail zeroes the temporary once and seeds wire+0x34 with 1.0f; every field is
+        // overwritten on each iteration, so the seed never ships.
         FRpcLootWireRecord Out;
         Out.LootId = In.LootId;                                        // record +0x00
         Out.ContentsNickname = In.ContentsNickname;                              // record +0x04
@@ -1630,40 +1461,36 @@ static bool MarshalCreateLoot(FPacketBase* Packet, const unsigned int* Args,
         Out.VelYBits = RpcCh2FloatBits(In.Velocity.y);                   // record +0x3c
         Out.VelZBits = RpcCh2FloatBits(In.Velocity.z);                   // record +0x40
         Out.OrientWBits = RpcCh2FloatBits(In.Orientation.w);                // record +0x28
-        Out.OrientYBits = RpcCh2FloatBits(In.Orientation.y);   // record +0x30; 06d8abe3 -- the transposed pair, see the header
-        Out.OrientXBits = RpcCh2FloatBits(In.Orientation.x);   // record +0x2c; 06d8abea
+        Out.OrientYBits = RpcCh2FloatBits(In.Orientation.y);   // record +0x30 -- the transposed pair, see the header
+        Out.OrientXBits = RpcCh2FloatBits(In.Orientation.x);   // record +0x2c
         Out.OrientZBits = RpcCh2FloatBits(In.Orientation.z);                // record +0x34
         Out.bMarkedBy = In.bMarkedBy;                                     // record +0x46
         Out.bTemporary = In.bTemporary;                                    // record +0x45
         Out.Pad_0x46[0] = 0;
         Out.Pad_0x46[1] = 0;
-        RpcPacketLootPushBack(Packet, Out);                               // 06d8ac0f FUN_06d93160
+        RpcPacketLootPushBack(Packet, Out);                               // FUN_06d93160
     }
     return true;
 }
 
 static bool DeliverCreateLoot(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerCreateLoot* Wire = RpcCreateLootPayload(Packet);
-    // 06d811ca FUN_06d931b0: the list header's address, used untested.
+    // FUN_06d931b0: the list header's address, used untested.
     const FRpcLootWireList* List = RpcPacketLootList(Packet);
     if (List->Size == 0) {
-        // 06d811d6 `CMP EAX,EBX ; JBE caseD_9` -- an empty list drops the packet and the
-        // slot is never called.
+        // An empty list drops the packet; the slot is never called.
         return true;
     }
-    // 06d811e9 `MOVZX ESI,AL`: retail keeps only the LOW BYTE of the list size, both as
-    // the array length it allocates and as the count it hands on -- then walks the WHOLE
-    // list into that array (06d81267..06d812ea) with a BYTE index (06d8126c `MOV CL,BL`,
-    // 06d8126e `INC BL`). A list of 256 or more therefore allocates short and writes past
-    // the end; that is reproduced as it is.
+    // Retail quirk: only the low byte of the list size is kept, as array length and as the
+    // count handed on, yet the whole list is walked into the array with a byte index. A list
+    // of 256 or more allocates short and writes past the end; reproduced.
     const unsigned int Count = List->Size & 0xffu;
-    // 06d8120b operator new(Count * 0x48); the array new-expression's test (06d81224)
-    // only skips the element constructors -- the loop below writes through it anyway.
+    // The array new-expression's null test only skips the element constructors; the loop
+    // below writes through the pointer anyway.
     FServerLootDesc* Items = static_cast<FServerLootDesc*>(
         ::operator new(sizeof(FServerLootDesc) * Count, std::nothrow));
     if (Items != nullptr) {
-        // FUN_06d840d0, once per element (06d81230..06d8123b): zero, then +0x44 = 1,
-        // +0x45 = +0x46 = 0.
+        // FUN_06d840d0 per element: zero, then +0x44 = 1, +0x45 = +0x46 = 0.
         for (unsigned int i = 0; i < Count; ++i) {
             unsigned char* Raw = reinterpret_cast<unsigned char*>(&Items[i]);
             for (unsigned int b = 0; b < (unsigned int)sizeof(FServerLootDesc); ++b) {
@@ -1694,18 +1521,18 @@ static bool DeliverCreateLoot(const FPacketBase* Packet, IClient* Client, IChatC
         RpcCh2SetFloatBits(Out.Velocity.y, In.VelYBits);                 // record +0x3c
         RpcCh2SetFloatBits(Out.Velocity.z, In.VelZBits);                 // record +0x40
         RpcCh2SetFloatBits(Out.Orientation.w, In.OrientWBits);              // record +0x28
-        RpcCh2SetFloatBits(Out.Orientation.x, In.OrientYBits);   // record +0x2c; 06d812c7 -- the transposed pair
-        RpcCh2SetFloatBits(Out.Orientation.y, In.OrientXBits);   // record +0x30; 06d812cd
+        RpcCh2SetFloatBits(Out.Orientation.x, In.OrientYBits);   // record +0x2c -- the transposed pair
+        RpcCh2SetFloatBits(Out.Orientation.y, In.OrientXBits);   // record +0x30
         RpcCh2SetFloatBits(Out.Orientation.z, In.OrientZBits);              // record +0x34
-        Out.bMarkedBy = In.bMarkedBy;                                     // record +0x46, 06d812d9
-        Out.bTemporary = In.bTemporary;                                    // record +0x45, 06d812df
+        Out.bMarkedBy = In.bMarkedBy;                                     // record +0x46
+        Out.bTemporary = In.bTemporary;                                    // record +0x45
     }
 
     FServerCreateLootRequest Info;
     Info.OwnerId = Wire->OwnerId;
-    Info.Kind = Wire->Kind;                // 06d811e2 MOVZX, stored as a dword
-    Info.bMarkedBy = 0;                          // 06d811f7
-    Info.bTemporary = 0;                         // 06d811fb
+    Info.Kind = Wire->Kind;                // zero-extended to a dword
+    Info.bMarkedBy = 0;
+    Info.bTemporary = 0;
     Info.Pad0a[0] = 0;
     Info.Pad0a[1] = 0;
     Info.Items = Items;
@@ -1714,20 +1541,18 @@ static bool DeliverCreateLoot(const FPacketBase* Packet, IClient* Client, IChatC
     Info.Pad11[1] = 0;
     Info.Pad11[2] = 0;
     Client->SendServerCreateLoot(1u, Info);
-    ::operator delete(Items);                    // 06d81305..06d8130f
+    ::operator delete(Items);
     return true;
 }
 
 // ===========================================================================
 // ch2 0x2d FLPACKET_SERVER_CREATECOUNTER
 // Sender 0x06d8a270 (IClient+0x0cc), receiver caseD_2d at 0x06d81ce9. Eighteen fields,
-// permuted; the receiver is the strict inverse. The literal 1 is by REFERENCE.
+// permuted; the receiver is the strict inverse. The literal 1 is by reference.
 // ===========================================================================
 static bool MarshalCreateCounter(FPacketBase* Packet, const unsigned int* Args,
                                  unsigned int ArgCount) {
-    // The argument is Server.dll's FServerCreateProjectileInfo (server_createinfo.h), the
-    // record CREATEMINE sends too; the private mirror FServerCreateCounterInfo is gone
-    // (2026-10-16). Float members move as their bits (plain dword MOVs on both sides).
+    // Server.dll's FServerCreateProjectileInfo, the record CREATEMINE sends too.
     const FServerCreateProjectileInfo* Source =
         reinterpret_cast<const FServerCreateProjectileInfo*>(Args[1]);
     FPayloadServerCreateCounter Wire;
@@ -1776,7 +1601,6 @@ static bool DeliverCreateCounter(const FPacketBase* Packet, IClient* Client, ICh
     RpcCh2SetFloatBits(Info.AngularVelocity.y, Wire.AngVelYBits);
     RpcCh2SetFloatBits(Info.AngularVelocity.z, Wire.AngVelZBits);
     Info.OwnerPlayer = Wire.OwnerPlayer;
-    // 06d81d8d: `MOV dword ptr [ESP+0x1e4],0x1` then `LEA EDX,[ESP+0x1e4] ; PUSH EDX`.
     unsigned int One = 1u;
     Client->SendServerCreateCounter(One, Info);
     return true;
@@ -1785,23 +1609,22 @@ static bool DeliverCreateCounter(const FPacketBase* Packet, IClient* Client, ICh
 // ===========================================================================
 // ch2 0x37 FLPACKET_SERVER_CREATEGUIDED
 // Sender 0x06d8a730 (IClient+0x0c8), receiver caseD_37 at 0x06d81da6. Fourteen fields,
-// rotated; the receiver is the strict inverse. The literal 1 is by REFERENCE.
+// rotated; the receiver is the strict inverse. The literal 1 is by reference.
 // ===========================================================================
 static bool MarshalCreateGuided(FPacketBase* Packet, const unsigned int* Args,
                                 unsigned int ArgCount) {
     const FServerCreateGuidedInfo* Source =
         reinterpret_cast<const FServerCreateGuidedInfo*>(Args[1]);
-    // 06d8a791..06d8a7dd copy the argument's first eight dwords -- ObjId, Position and
-    // Orientation -- as plain dwords, so they are moved as bits here too.
+    // The first eight dwords (ObjId, Position, Orientation) are copied as plain dwords.
     const unsigned int* Head = reinterpret_cast<const unsigned int*>(Source);
     FPayloadServerCreateGuided Wire;
-    Wire.OwnerPlayer = Source->OwnerPlayer;             // 06d8a751
-    Wire.ArchetypeNickname = Source->ArchetypeNickname;      // 06d8a75b
-    Wire.OwnerId = Source->OwnerId;                // 06d8a765
-    Wire.SubObjId = Source->SubObjId;               // 06d8a76f, a word
+    Wire.OwnerPlayer = Source->OwnerPlayer;
+    Wire.ArchetypeNickname = Source->ArchetypeNickname;
+    Wire.OwnerId = Source->OwnerId;
+    Wire.SubObjId = Source->SubObjId;               // a word
     Wire.Pad_0x0e = 0;
-    Wire.TargetId = Source->TargetId;               // 06d8a77b
-    Wire.TargetSubObjId = Source->TargetSubObjId;         // 06d8a785, a word
+    Wire.TargetId = Source->TargetId;
+    Wire.TargetSubObjId = Source->TargetSubObjId;         // a word
     Wire.Pad_0x16 = 0;
     Wire.ObjId = Head[0];                        // ObjId
     Wire.PosXBits = Head[1];                        // Position
@@ -1817,8 +1640,7 @@ static bool MarshalCreateGuided(FPacketBase* Packet, const unsigned int* Args,
 static bool DeliverCreateGuided(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerCreateGuided Wire =
         RpcPayloadRead<FPayloadServerCreateGuided>(Packet, 0);
-    // caseD_37 (06d81da6..06d81e20) fills a stack local at ESP+0x50 field by field and
-    // never writes +0x26 / +0x36; the port zeroes those two pads.
+    // Deviation: retail never writes +0x26 / +0x36 of its stack local; the port zeroes them.
     FServerCreateGuidedInfo Info;
     unsigned int* Head = reinterpret_cast<unsigned int*>(&Info);
     Head[0] = Wire.ObjId;                        // ObjId
@@ -1837,7 +1659,6 @@ static bool DeliverCreateGuided(const FPacketBase* Packet, IClient* Client, ICha
     Info.OwnerId = Wire.OwnerId;
     Info.SubObjId = Wire.SubObjId;
     Info.Pad36 = 0;
-    // 06d81e24: `MOV dword ptr [ESP+0x1ec],0x1` then `LEA EAX,[ESP+0x1ec] ; PUSH EAX`.
     unsigned int One = 1u;
     Client->SendServerCreateGuided(One, Info);
     return true;
@@ -1846,7 +1667,7 @@ static bool DeliverCreateGuided(const FPacketBase* Packet, IClient* Client, ICha
 // ===========================================================================
 // ch2 0x32 FLPACKET_SERVER_REQUESTSPACESCRIPT
 // Sender 0x06d8aa40 (IClient+0x0f8), receiver caseD_32 at 0x06d81c7d. The literal 1 is
-// by VALUE here (06d81cdc `PUSH 0x1`).
+// by value here.
 // ===========================================================================
 static bool MarshalRequestSpaceScript(FPacketBase* Packet, const unsigned int* Args,
                                       unsigned int ArgCount) {
@@ -1857,9 +1678,8 @@ static bool MarshalRequestSpaceScript(FPacketBase* Packet, const unsigned int* A
     Wire.PosXBits = Source->PosXBits;
     Wire.PosYBits = Source->PosYBits;
     Wire.PosZBits = Source->PosZBits;
-    // 06d8aa84..06d8aaa1: only 1 and 2 are mapped (1 -> byte 1 at 06d8aa93, 2 -> byte 0
-    // at 06d8aaa1). Any other value leaves the byte as the packet constructor seeded it:
-    // FUN_06d9db10 06d9db31 stores byte 1 at packet+0x34 -- so it ships 1, not garbage.
+    // Only 1 and 2 are mapped; any other value keeps the constructor's seed (FUN_06d9db10
+    // stores byte 1 at packet+0x34), so it ships 1.
     if (Source->CameraMode == 1u) {
         Wire.CameraModeWire = 1;
     } else if (Source->CameraMode == 2u) {
@@ -1871,17 +1691,16 @@ static bool MarshalRequestSpaceScript(FPacketBase* Packet, const unsigned int* A
     Wire.Pad_0x15[1] = 0;
     Wire.Pad_0x15[2] = 0;
 
-    // FUN_06d989b0: operator new(strlen + 1), copy strlen + 1 bytes, store the pointer
-    // at payload+0x18 and the count at payload+0x04. A zero-length name ships nothing,
-    // exactly as the retail guard at 06d989b4 does (the name is an inline array at
-    // src+0x04, 06d8aaa5, so the null half of that guard never fires).
+    // FUN_06d989b0: pointer at payload+0x18, count at payload+0x04. A zero-length name
+    // ships nothing (the name is an inline array, so the null half of the guard never
+    // fires).
     const unsigned int Length = RpcCh2StringLength(Source->Name);
     if (Length == 0) {
         Wire.NameSize = 0;
         Wire.Name = nullptr;
     } else {
-        Wire.Name = static_cast<char*>(RpcCh2CopyBlock(Source->Name, Length + 1));  // 06d989cf
-        Wire.NameSize = Length + 1;                                              // 06d989e8
+        Wire.Name = static_cast<char*>(RpcCh2CopyBlock(Source->Name, Length + 1));
+        Wire.NameSize = Length + 1;
     }
     return RpcPayloadWrite(Packet, 0, Wire);
 }
@@ -1894,11 +1713,9 @@ static bool DeliverRequestSpaceScript(const FPacketBase* Packet, IClient* Client
     Info.PosXBits = Wire.PosXBits;
     Info.PosYBits = Wire.PosYBits;
     Info.PosZBits = Wire.PosZBits;
-    // 06d81ca0..06d81cb6: `XOR EDX,EDX ; CMP AL,BL ; SETZ DL ; INC EDX`.
     Info.CameraMode = (Wire.CameraModeWire == 0) ? 2u : 1u;
-    // 06d81cbd..06d81ccd: a byte loop that copies up to and including the NUL, with no
-    // bound, skipped when the pointer is null (06d81cbd JZ). The 0x104-byte field is
-    // otherwise the caller's stack; zeroed here per the uninitialised-memory rule.
+    // Retail copies up to and including the NUL with no bound, skipped on null. The rest of
+    // the 0x104-byte field is stack garbage in retail; the port zeroes it.
     for (unsigned int i = 0; i < kRequestSpaceScriptNameSize; ++i) {
         Info.Name[i] = '\0';
     }
@@ -1915,17 +1732,16 @@ static bool DeliverRequestSpaceScript(const FPacketBase* Packet, IClient* Client
 
 // ===========================================================================
 // ch2 0x4e FLPACKET_SERVER_SETDIRECTIVE
-// Sender 0x06d8a480 (IClient+0x190), receiver caseD_4e at 0x06d81c3b. The payload IS the
-// argument struct: the receiver is `MOV ECX,0x25 ; REP MOVSD` (0x94 bytes) and the
-// sender writes the same offsets one at a time. The literal 1 is by REFERENCE.
+// Sender 0x06d8a480 (IClient+0x190), receiver caseD_4e at 0x06d81c3b. The payload is the
+// argument struct: the receiver copies 0x94 bytes, the sender writes the same offsets one
+// at a time. The literal 1 is by reference.
 // ===========================================================================
 static bool MarshalSetDirective(FPacketBase* Packet, const unsigned int* Args,
                                 unsigned int ArgCount) {
     const FPayloadServerSetDirective* Source =
         reinterpret_cast<const FPayloadServerSetDirective*>(Args[1]);
     FPayloadServerSetDirective Wire = *Source;
-    // Retail never writes payload+0x09..+0x0b (06d8a4b4 moves a single byte); this port
-    // zeroes them so the packet carries no stack residue.
+    // Deviation: retail never writes the pads; the port zeroes them.
     Wire.Pad_0x09[0] = 0;
     Wire.Pad_0x09[1] = 0;
     Wire.Pad_0x09[2] = 0;
@@ -1939,7 +1755,6 @@ static bool DeliverSetDirective(const FPacketBase* Packet, IClient* Client, ICha
     const FPayloadServerSetDirective Wire =
         RpcPayloadRead<FPayloadServerSetDirective>(Packet, 0);
     FPayloadServerSetDirective Info = Wire;
-    // 06d81c64: `MOV dword ptr [ESP+0x1dc],0x1` then `LEA EDX,[ESP+0x1dc] ; PUSH EDX`.
     unsigned int One = 1u;
     Client->SendServerSetDirective(One, Info);
     return true;
@@ -1948,51 +1763,40 @@ static bool DeliverSetDirective(const FPacketBase* Packet, IClient* Client, ICha
 // ===========================================================================
 // The flattened-FmtStr family: ch2 0x29, 0x2b, 0x34, 0x35, 0x45.
 //
-// The four COMMON.DLL entry points retail rpclocal imports for this -- flatten,
-// unflatten, ~FmtStr and Val::get_flattened_size -- are all in src/include/common_text.h
-// with matching signatures, and this project now links Common.lib the way retail's own
-// import table does. The long form of that argument is at the head of the family section
-// in rpc_payloads.h.
+// The COMMON.DLL entry points retail imports for this (flatten, unflatten, ~FmtStr,
+// Val::get_flattened_size) are declared in common_text.h; see the family section in
+// rpc_payloads.h. RpcFlattenFmtStr / RpcUnflattenFmtStr live in rpc_containers.cpp (ch1
+// POP_UP_DIALOG uses the same pair).
 // ===========================================================================
-
-// RpcFlattenFmtStr / RpcUnflattenFmtStr live in rpc_containers.cpp -- channel 1's
-// POP_UP_DIALOG uses the same pair.
 
 // ===========================================================================
 // ch2 0x29 FLPACKET_SERVER_SETREPUTATION
-// Sender 0x06d88d70 (IClient+0x108, RET 8), receiver caseD_29 at 0x06d813cf, which calls
-// the very same slot (+0x108) on the real IClient -- so the argument struct is the same
-// object at both ends and the round trip is checkable field by field. It is: +0x00 ->
-// payload+0x38 -> +0x00, +0x04 -> payload+0x10 -> +0x04, +0x08 -> payload+0x3c -> +0x08,
-// the relation array -> the packet's list -> a fresh array, both FmtStrs, and the wide
-// name. The literal 1 replaces the session id BY VALUE (06d81518 `PUSH 0x1`).
+// Sender 0x06d88d70 (IClient+0x108), receiver caseD_29 at 0x06d813cf, which calls the same
+// slot on the real IClient, so the argument struct round-trips: +0x00 <-> payload+0x38,
+// +0x04 <-> payload+0x10, +0x08 <-> payload+0x3c, the relation array via the packet's list,
+// both FmtStrs and the wide name. The literal 1 is by value.
 //
-// Retail drops arg+0x0c on the floor: Reputation::Vibe::Get fills it (Server.dll.c:89958)
-// and no sender field ever reads it. Reproduced.
+// Retail drops arg+0x0c (filled by Reputation::Vibe::Get, read by no sender field).
+// Reproduced.
 // ===========================================================================
 static bool MarshalSetReputation(FPacketBase* Packet, const unsigned int* Args,
                                  unsigned int ArgCount) {
     const FServerSetReputationInfo* Source =
         reinterpret_cast<const FServerSetReputationInfo*>(Args[1]);
-    // Retail stores into the packet FUN_06d96300 just built (06d88da5 on), field by field.
-    // Everything it does not store keeps the constructor's seed (FUN_06d9d290): +0x14..+0x24
-    // = 1, 2, 4, 8, 0x10 (06d9d2dc..06d9d300 -- +0x18 IS seeded, with 2), the mask byte
-    // +0x34 = 0, the display name null, and the relation list's dummy node already built
-    // (06d9d30c..06d9d31a). So no whole-payload write here: that would put 0 over the 2 at
-    // +0x18 and a null over the constructor's dummy, leaking it.
+    // Retail stores field by field into the freshly built packet; everything else keeps the
+    // constructor's seed (FUN_06d9d290): +0x14..+0x24 = 1, 2, 4, 8, 0x10, mask byte +0x34 =
+    // 0, display name null, relation list dummy built. A whole-payload write would clobber
+    // those and leak the dummy.
     FPayloadServerSetReputation* Wire = Ch2Payload<FPayloadServerSetReputation>(Packet);
-    Wire->VibeHandle = (unsigned int)Source->VibeHandle;     // 06d88db0/06d88db2 <- arg+0x00
-    Wire->Affiliation = Source->Affiliation;                   // 06d88db5/06d88dbc <- arg+0x08
-    // 06d88dbf..06d88df9 / 06d88dff..06d88e39: size (6 + the Val sizes), bare operator new,
-    // FmtStr::flatten -- size at +0x00/+0x08, block at +0x04/+0x0c.
+    Wire->VibeHandle = (unsigned int)Source->VibeHandle;     // arg+0x00
+    Wire->Affiliation = Source->Affiliation;                   // arg+0x08
+    // Size (6 + the Val sizes), bare operator new, FmtStr::flatten.
     Wire->NameABuffer = RpcFlattenFmtStr(Source->NameA, Wire->NameASize);
     Wire->NameBBuffer = RpcFlattenFmtStr(Source->NameB, Wire->NameBSize);
 
-    // 06d88e3f..06d88e52 wcslen(src+0x48), unbounded, then FUN_06d92710(src+0x48, len):
-    // `if (src == 0 || len == 0) return` (06d92716 / 06d92720) -- an empty name ships no
-    // block and leaves the constructor's null -- else operator new((len+1)*4), bare
-    // (06d92731): retail allocates FOUR bytes per wchar_t and copies (len+1)*2 bytes,
-    // terminator included (06d92743), so the block is twice the size it needs. Reproduced.
+    // Unbounded wcslen, then FUN_06d92710: an empty name ships no block. Retail quirk: the
+    // block is operator new((len+1)*4) -- four bytes per wchar_t -- but only (len+1)*2 bytes
+    // are copied. Reproduced.
     const wchar_t* NameSource = Source->DisplayName;
     unsigned int NameChars = 0;
     while (NameSource[NameChars] != L'\0') {
@@ -2004,17 +1808,14 @@ static bool MarshalSetReputation(FPacketBase* Packet, const unsigned int* Args,
         for (unsigned int i = 0; i < Total; ++i) {
             NameBlock[i] = NameSource[i];
         }
-        Wire->DisplayName = NameBlock;                       // 06d9273e
-        Wire->DisplayNameLength = Total;                     // 06d92750
+        Wire->DisplayName = NameBlock;
+        Wire->DisplayNameLength = Total;
     }
 
-    // 06d88e57..06d88ece: a stack list (FUN_06d8cb20), one bare new(8) copy per relation
-    // pushed by FUN_06d8cad0 while the 16-bit index is below the byte at arg+0x14, re-read
-    // every pass (06d88ec5); the array at arg+0x10 is read untested (06d88e88 / 06d88e9f).
-    // FUN_06d92760 (06d88ed9) then appends a fresh new(8) copy of every value to the
-    // packet's list, and 06d88efb..06d88f4c frees the stack list, values and all. The two
-    // hops collapse into one push_back per element onto the constructor's list -- the
-    // packet ends up byte-identical (see the relation-list note in rpc_containers.h).
+    // Retail builds a stack list (16-bit index against the byte count at arg+0x14, array at
+    // arg+0x10 read untested), then FUN_06d92760 copies it into the packet's list and frees
+    // the stack list. The two hops collapse into one push_back per element; the packet ends
+    // up the same (see the relation-list note in rpc_containers.h).
     FRpcRelationList* List = &Wire->Relations;
     const unsigned int Count = Source->RelationCount;
     for (unsigned int i = 0; i < Count; ++i) {
@@ -2022,7 +1823,7 @@ static bool MarshalSetReputation(FPacketBase* Packet, const unsigned int* Args,
         RpcRelationListPushBack(List,
             reinterpret_cast<const FRpcRelation&>(Source->Relations[i]));
     }
-    Wire->Attitude = Source->Attitude;                       // 06d88ede..06d88ee9 <- arg+0x04
+    Wire->Attitude = Source->Attitude;                       // arg+0x04
     return true;
 }
 
@@ -2031,36 +1832,32 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
         RpcPayloadRead<FPayloadServerSetReputation>(Packet, 0);
 
     FServerSetReputationInfo Info;
-    Info.VibeHandle = (int)Wire.VibeHandle;                  // 06d8142b -> S+0x50
-    Info.Attitude = Wire.Attitude;                           // 06d8142e -> S+0x54
-    Info.Affiliation = Wire.Affiliation;                       // 06d8143e -> S+0x58
+    Info.VibeHandle = (int)Wire.VibeHandle;
+    Info.Attitude = Wire.Attitude;
+    Info.Affiliation = Wire.Affiliation;
     Info.Rank = 0;                                     // retail leaves it as garbage
-    Info.Relations = nullptr;                                // 06d813f1
-    Info.RelationCount = 0;                                  // 06d813f5
+    Info.Relations = nullptr;
+    Info.RelationCount = 0;
     Info.Pad_0x15[0] = 0;
     Info.Pad_0x15[1] = 0;
     Info.Pad_0x15[2] = 0;
     for (unsigned int i = 0; i < 24; ++i) {
-        Info.DisplayName[i] = L'\0';                         // 06d813f9 writes only [0]
+        Info.DisplayName[i] = L'\0';                         // retail writes only [0]
     }
 
-    RpcUnflattenFmtStr(Info.NameA, Wire.NameABuffer, Wire.NameASize);   // 06d8145a
-    RpcUnflattenFmtStr(Info.NameB, Wire.NameBBuffer, Wire.NameBSize);   // 06d8146b
+    RpcUnflattenFmtStr(Info.NameA, Wire.NameABuffer, Wire.NameASize);
+    RpcUnflattenFmtStr(Info.NameB, Wire.NameBBuffer, Wire.NameBSize);
 
-    // 06d8146d..06d81483 `if (packet+0x64) wcscpy(local, packet+0x64) else local[0]=0`,
-    // the wcscpy unbounded, as retail's.
+    // Unbounded wcscpy, as retail's.
     if (Wire.DisplayName != nullptr) {
         wcscpy(Info.DisplayName, Wire.DisplayName);
     }
 
     const FRpcRelationList* List =
         reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x28);
-    // 06d81490..06d81497 FUN_06d927e0(packet, &local): the packet's list is copied into a
-    // stack list -- its dummy read untested (06d927e1..06d927e5; the packet constructor
-    // always builds it, 06d9d30c..06d9d31a), a fresh new(8) per value, and NULL VALUES
-    // SKIPPED (06d927f5 JZ), so the local size counts only the non-null ones. The port
-    // reads the packet's list in place (see the relation-list note in rpc_containers.h),
-    // which makes that count explicit here.
+    // FUN_06d927e0 copies the packet's list into a stack list, skipping null values, so its
+    // size counts only the non-null ones. The port reads the packet's list in place and
+    // counts explicitly.
     unsigned int Size = 0;
     for (const FRpcRelationNode* Node = List->Head->Next; Node != List->Head;
          Node = Node->Next) {
@@ -2068,14 +1865,11 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
             ++Size;
         }
     }
-    // 06d8149c..06d814aa: that size is read as a dword for the >0 test and as a BYTE for
-    // the count that ships on, then the array is operator new(size * 8).
+    // The size is tested as a dword but ships as a byte count.
     Info.RelationCount = (unsigned char)(Size & 0xffu);
     FRpcRelation* Items = nullptr;
-    if (Size != 0) {                                         // 06d814aa JBE, on the dword
-        // 06d814b0: bare operator new(Size * 8). The walk (06d814c8..06d81503) covers the
-        // WHOLE list with a 16-bit index (06d814d7 `MOV AX,DI`), skipping null values
-        // (06d814cb) -- no bound against Size.
+    if (Size != 0) {
+        // The walk covers the whole list with a 16-bit index, no bound against Size.
         Items = static_cast<FRpcRelation*>(
             ::operator new(sizeof(FRpcRelation) * Size, std::nothrow));
         const FRpcRelationNode* Dummy = List->Head;
@@ -2092,10 +1886,8 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
 
     Client->SendServerSetReputation(1u, Info);
 
-    // 06d81520 `CMP byte [ESP+0x64],BL ; JBE`: the array is freed only when the BYTE
-    // count is non-zero, so a list of exactly 256*k relations leaks it, as in retail. Both
-    // the count and the pointer (06d81526 `MOV ECX,[ESP+0x60]`) are read back out of the
-    // local the slot was handed.
+    // Retail quirk: freed only when the byte count is non-zero, so a list of exactly 256*k
+    // relations leaks the array. Count and pointer are read back from the local.
     if (Info.RelationCount > 0) {
         ::operator delete(Info.Relations);
     }
@@ -2104,25 +1896,21 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
 
 // ===========================================================================
 // ch2 0x2b FLPACKET_SERVER_SETGROUPFEELINGS
-// Sender 0x06d8a5c0 (IClient+0x148, RET 8), receiver caseD_2b at 0x06d815bb -> the same
-// slot (+0x148). No FmtStr here: the name is a narrow string written by FUN_06d91850
-// (operator new(strlen+1) + strncpy, the count at packet+0x24) and read back by a plain
-// strncpy at 06d815f1. The relation list is the same std::list<Relation*> as 0x29.
+// Sender 0x06d8a5c0 (IClient+0x148), receiver caseD_2b at 0x06d815bb -> the same slot. No
+// FmtStr: the name is a narrow string written by FUN_06d91850 (operator new + strncpy,
+// count at packet+0x24) and read back by strncpy. The relation list is the same
+// std::list<Relation*> as 0x29.
 // ===========================================================================
 static bool MarshalSetGroupFeelings(FPacketBase* Packet, const unsigned int* Args,
                                     unsigned int ArgCount) {
     const FServerSetGroupFeelingsInfo* Source =
         reinterpret_cast<const FServerSetGroupFeelingsInfo*>(Args[1]);
-    // Retail stores into the packet FUN_06d96300 just built (06d8a5f4 on). Its constructor
-    // (FUN_06d9c540) zeroed the name pair and built the relation list's dummy node
-    // (06d9c59f), so there is no whole-payload write here: that would put a null over the
-    // constructor's dummy and leak it.
+    // The constructor (FUN_06d9c540) zeroed the name pair and built the relation list's
+    // dummy, so no whole-payload write (it would leak the dummy).
     FPayloadServerSetGroupFeelings* Wire = Ch2Payload<FPayloadServerSetGroupFeelings>(Packet);
 
-    // 06d8a5fa..06d8a609: `OR ECX,-1 ; REPNE SCASB ; NOT ECX` is strlen+1, unbounded, and
-    // that count -- the terminator included -- is both the block size and packet+0x24.
-    // FUN_06d91850: bare operator new(n) (06d91869), strncpy(block, src, n) (06d91878),
-    // count stored (06d91881). No zero-length test: an empty name still ships one byte.
+    // Unbounded strlen+1 is both block size and count; no zero-length test, so an empty
+    // name still ships one byte.
     unsigned int Length = 0;
     while (Source->Name[Length] != '\0') {
         ++Length;
@@ -2132,15 +1920,11 @@ static bool MarshalSetGroupFeelings(FPacketBase* Packet, const unsigned int* Arg
     for (unsigned int i = 0; i < Total; ++i) {
         Block[i] = Source->Name[i];
     }
-    Wire->Name = Block;                                      // 06d91875
-    Wire->NameSize = Total;                                  // 06d91881
+    Wire->Name = Block;
+    Wire->NameSize = Total;
 
-    // 06d8a612..06d8a68f: a stack list (dummy at 06d8a618), one bare new(8) copy per
-    // relation pushed by FUN_06d8cad0 while the 16-bit index is below the byte at
-    // src+0x14, re-read every pass (06d8a686); the array at src+0x10 is read untested
-    // (06d8a649). FUN_06d91ca0 (06d8a69a) then appends a fresh copy of every value to the
-    // packet's list, and 06d8a6b1.. frees the stack list. The two hops collapse into one
-    // push_back per element onto the constructor's list (rpc_containers.h, relation list).
+    // As in SETREPUTATION, retail's stack list plus FUN_06d91ca0 copy collapse into one
+    // push_back per element (rpc_containers.h, relation list).
     FRpcRelationList* List = &Wire->Relations;
     const unsigned int Count = Source->RelationCount;
     for (unsigned int i = 0; i < Count; ++i) {
@@ -2165,18 +1949,12 @@ static bool DeliverSetGroupFeelings(const FPacketBase* Packet, IClient* Client,
     Info.Pad_0x15[1] = 0;
     Info.Pad_0x15[2] = 0;
 
-    // 06d815d9..06d815f1 `strncpy(local, packet+0x20, packet+0x24)`: no null test, no
-    // bound -- retail trusts the count the sender wrote (strlen+1, so the copy always
-    // carries the terminator).
+    // No null test, no bound against the 0x10-byte field: retail trusts the sender's count.
     strncpy(Info.Name, Wire.Name, Wire.NameSize);
 
     const FRpcRelationList* List =
         reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x08);
-    // 06d815fa..06d81601 FUN_06d91d20(packet, &local): the packet's list is copied into a
-    // stack list -- its dummy read untested (06d91d21..06d91d25; the packet constructor
-    // always builds it, 06d9c59f), a fresh new(8) per value, NULL VALUES SKIPPED
-    // (06d91d37 JZ) -- so the local size counts only the non-null ones. The port reads the
-    // packet's list in place, which makes that count explicit here.
+    // FUN_06d91d20 copies the list skipping null values; the port counts explicitly.
     unsigned int Size = 0;
     for (const FRpcRelationNode* Node = List->Head->Next; Node != List->Head;
          Node = Node->Next) {
@@ -2184,13 +1962,10 @@ static bool DeliverSetGroupFeelings(const FPacketBase* Packet, IClient* Client,
             ++Size;
         }
     }
-    Info.RelationCount = (unsigned char)(Size & 0xffu);      // 06d8160c
+    Info.RelationCount = (unsigned char)(Size & 0xffu);
     FRpcRelation* Items = nullptr;
-    if (Size != 0) {                                         // 06d81614 JBE, on the dword
-        // 06d8161a: bare operator new(Size * 8). Retail copies the packet's list into a
-        // local one (FUN_06d91d20, 06d81601) and walks THAT (06d81632..06d8166d): the
-        // whole list, a 16-bit index (06d81641 `MOV AX,DI`), null values skipped
-        // (06d81637) -- no bound against Size.
+    if (Size != 0) {                                         // tested as a dword
+        // Whole list, 16-bit index, null values skipped, no bound against Size.
         Items = static_cast<FRpcRelation*>(
             ::operator new(sizeof(FRpcRelation) * Size, std::nothrow));
         const FRpcRelationNode* Dummy = List->Head;
@@ -2206,31 +1981,26 @@ static bool DeliverSetGroupFeelings(const FPacketBase* Packet, IClient* Client,
 
     Client->SendServerSetGroupFeelings(1u, Info);
 
-    // 06d81684..06d816d3: after the slot retail frees only its local list's nodes and
-    // dummy, then leaves the case. The relation array is never freed -- retail leaks it
-    // on every SETGROUPFEELINGS, and so does the port.
+    // Retail quirk: the relation array is never freed (only the local list is), so every
+    // SETGROUPFEELINGS leaks it; reproduced.
     return true;
 }
 
 // ===========================================================================
 // ch2 0x34 FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE
-// Sender 0x06d8ad90 (IClient+0x11c, RET 8), receiver caseD_34 at 0x06d82494 -> the same
-// slot (+0x11c). The state byte is MOVZX'd to a dword going out (06d8adbd) and read back
-// as a byte (06d824dc), which is why the payload field is a dword and the struct field a
-// byte. The literal 1 travels BY REFERENCE (06d8250c..06d82520 `MOV [ESP+0x1f0],1` then
-// `LEA EAX,[ESP+0x1f0] ; PUSH EAX`).
+// Sender 0x06d8ad90 (IClient+0x11c), receiver caseD_34 at 0x06d82494 -> the same slot.
+// The index byte is zero-extended to a dword going out and read back as a byte. The
+// literal 1 travels by reference.
 // ===========================================================================
 static bool MarshalReplaceMissionObjective(FPacketBase* Packet, const unsigned int* Args,
                                            unsigned int ArgCount) {
-    // In place, in retail's order; all four payload dwords are written, nothing is tested.
     const FServerReplaceMissionObjectiveInfo* Source =
         reinterpret_cast<const FServerReplaceMissionObjectiveInfo*>(Args[1]);
     FPayloadServerReplaceMissionObjective* Wire =
         Ch2Payload<FPayloadServerReplaceMissionObjective>(Packet);
-    Wire->MissionId = Source->MissionId;                   // 06d8adb4 / 06d8adba
-    Wire->State = Source->ObjectiveIndex;                             // 06d8adbd MOVZX / 06d8adcb
-    // 06d8adce..06d8ae25: size of the FmtStr at arg+0x04 into +0x08 (06d8ae12), bare
-    // operator new, pointer into +0x0c (06d8ae22), FmtStr::flatten.
+    Wire->MissionId = Source->MissionId;
+    Wire->State = Source->ObjectiveIndex;
+    // FmtStr at arg+0x04: size into +0x08, block into +0x0c.
     Wire->TextBuffer = RpcFlattenFmtStr(Source->Text, Wire->TextSize);
     return true;
 }
@@ -2241,13 +2011,13 @@ static bool DeliverReplaceMissionObjective(const FPacketBase* Packet, IClient* C
         RpcPayloadRead<FPayloadServerReplaceMissionObjective>(Packet, 0);
 
     FServerReplaceMissionObjectiveInfo Info;
-    Info.MissionId = Wire.MissionId;                       // 06d824df
+    Info.MissionId = Wire.MissionId;
     Info.ObjectiveType = 0;
-    Info.ObjectiveIndex = (unsigned char)(Wire.State & 0xffu);        // 06d824dc / 06d824f7
+    Info.ObjectiveIndex = (unsigned char)(Wire.State & 0xffu);
     Info.Pad_0x21[0] = 0;
     Info.Pad_0x21[1] = 0;
     Info.Pad_0x21[2] = 0;
-    RpcUnflattenFmtStr(Info.Text, Wire.TextBuffer, Wire.TextSize);   // 06d824fb
+    RpcUnflattenFmtStr(Info.Text, Wire.TextBuffer, Wire.TextSize);
 
     unsigned int One = 1u;
     Client->SendServerReplaceMissionObjective(One, Info);
@@ -2256,19 +2026,17 @@ static bool DeliverReplaceMissionObjective(const FPacketBase* Packet, IClient* C
 
 // ===========================================================================
 // ch2 0x45 FLPACKET_SERVER_SET_MISSION_MESSAGE
-// Sender 0x06d8af60 (IClient+0x118, RET 8), receiver caseD_45 at 0x06d82623 -> the same
-// slot (+0x118). One FmtStr and one dword. The literal 1 is BY REFERENCE (06d82694).
+// Sender 0x06d8af60 (IClient+0x118), receiver caseD_45 at 0x06d82623 -> the same slot. One
+// FmtStr and one dword. The literal 1 is by reference.
 // ===========================================================================
 static bool MarshalSetMissionMessage(FPacketBase* Packet, const unsigned int* Args,
                                      unsigned int ArgCount) {
-    // In place, in retail's order; all three payload dwords are written, nothing is tested.
     const FServerSetMissionMessageInfo* Source =
         reinterpret_cast<const FServerSetMissionMessageInfo*>(Args[1]);
     FPayloadServerSetMissionMessage* Wire = Ch2Payload<FPayloadServerSetMissionMessage>(Packet);
-    // 06d8af8b..06d8afe3: size of the FmtStr at arg+0x00 into +0x00 (06d8afd0), bare
-    // operator new, pointer into +0x04 (06d8afe0), FmtStr::flatten.
+    // FmtStr at arg+0x00: size into +0x00, block into +0x04.
     Wire->TextBuffer = RpcFlattenFmtStr(Source->Text, Wire->TextSize);
-    Wire->Type = Source->Type;                          // 06d8afe9 / 06d8aff4
+    Wire->Type = Source->Type;
     return true;
 }
 
@@ -2278,8 +2046,8 @@ static bool DeliverSetMissionMessage(const FPacketBase* Packet, IClient* Client,
         RpcPayloadRead<FPayloadServerSetMissionMessage>(Packet, 0);
 
     FServerSetMissionMessageInfo Info;
-    Info.Type = Wire.Type;                             // 06d82682 -> S+0x68
-    RpcUnflattenFmtStr(Info.Text, Wire.TextBuffer, Wire.TextSize);   // 06d8267c
+    Info.Type = Wire.Type;
+    RpcUnflattenFmtStr(Info.Text, Wire.TextBuffer, Wire.TextSize);
 
     unsigned int One = 1u;
     Client->SendServerSetMissionMessage(One, Info);
@@ -2288,51 +2056,44 @@ static bool DeliverSetMissionMessage(const FPacketBase* Packet, IClient* Client,
 
 // ===========================================================================
 // ch2 0x35 FLPACKET_SERVER_SETMISSIONOBJECTIVES
-// Sender 0x06d8b020 (IClient+0x120, RET 8), receiver caseD_35 at 0x06d826c9 -> the same
-// slot (+0x120). Two top-level FmtStrs, a count, and a list of per-objective records.
+// Sender 0x06d8b020 (IClient+0x120), receiver caseD_35 at 0x06d826c9 -> the same slot. Two
+// top-level FmtStrs, a count, and a list of per-objective records.
 //
-// The receiver rebuilds the element array with a VC6 vector-new (operator new(n*0x1c + 4),
-// count cookie in the first dword, FmtStr ctor per element) and walks the list with the
-// LINEAR accessor FUN_06d8fc60 -- so element i costs i list steps. Kept as-is: the
-// accessor returns null once the walk runs off the end, and that null path is real.
-// The literal 1 is BY REFERENCE (06d8284f..06d82863).
+// The receiver rebuilds the element array with a VC6 vector-new (count cookie, FmtStr ctor
+// per element) and walks the list with the linear accessor FUN_06d8fc60 (element i costs i
+// steps; null once the walk runs off the end). The literal 1 is by reference.
 // ===========================================================================
 static bool MarshalSetMissionObjectives(FPacketBase* Packet, const unsigned int* Args,
                                         unsigned int ArgCount) {
     const FServerSetMissionObjectivesInfo* Source =
         reinterpret_cast<const FServerSetMissionObjectivesInfo*>(Args[1]);
-    // Retail stores into the packet FUN_06d96300 just built (06d8b040 on). Its constructor
-    // (FUN_06d9da40) zeroed +0x08..+0x18 and built the record list's dummy node
-    // (06d9daad), so there is no whole-payload write here: that would put a null over the
-    // constructor's dummy and leak it.
+    // The constructor (FUN_06d9da40) zeroed +0x08..+0x18 and built the record list's dummy,
+    // so no whole-payload write (it would leak the dummy).
     FPayloadServerSetMissionObjectives* Live =
         reinterpret_cast<FPayloadServerSetMissionObjectives*>(Packet->Payload());
-    Live->MissionId = Source->MissionId;                   // 06d8b049/06d8b04b
-    Live->MissionType = Source->MissionType;                   // 06d8b04e/06d8b058 MOVZX
-    // 06d8b05b..06d8b0b6 / 06d8b0bc..06d8b114: size (6 + the per-Val sizes, inlined here),
-    // bare operator new, FmtStr::flatten -- size at +0x08/+0x10, block at +0x0c/+0x14.
+    Live->MissionId = Source->MissionId;
+    Live->MissionType = Source->MissionType;                   // zero-extended
+    // Size at +0x08/+0x10, block at +0x0c/+0x14.
     Live->TextABuffer = RpcFlattenFmtStr(Source->TextA, Live->TextASize);
     Live->TextBBuffer = RpcFlattenFmtStr(Source->TextB, Live->TextBSize);
-    // 06d8b11a `MOV EAX,[EBX+0x8] ; CMP EAX,EDI ; JBE` -- the dword count at arg+0x08 is
-    // the only bound; the entry array at arg+0x04 is read untested (06d8b156).
+    // The dword count at arg+0x08 is the only bound; the entry array is read untested.
     const unsigned int Count = Source->Count;
     for (unsigned int i = 0; i < Count; ++i) {
-        // 06d8b142 operator new(0xc); the new-expression's test (06d8b14a) skips only the
-        // zeroing of +0x04/+0x08 -- the stores below go through the pointer either way.
+        // The new-expression's null test skips only the zeroing; the stores below go
+        // through the pointer either way.
         FRpcMissionObjectiveRecord* Record =
             static_cast<FRpcMissionObjectiveRecord*>(
                 ::operator new(sizeof(FRpcMissionObjectiveRecord), std::nothrow));
         if (Record != nullptr) {
-            Record->TextSize = 0;                            // 06d8b14e
-            Record->TextBuffer = nullptr;                    // 06d8b151
+            Record->TextSize = 0;
+            Record->TextBuffer = nullptr;
         }
-        Record->State = (unsigned char)(Source->Entries[i].State & 0xffu);   // 06d8b15d
+        Record->State = (unsigned char)(Source->Entries[i].State & 0xffu);
         Record->Pad_0x01[0] = 0;
         Record->Pad_0x01[1] = 0;
         Record->Pad_0x01[2] = 0;
-        // 06d8b16f..06d8b1b5: size, bare operator new, flatten.
         Record->TextBuffer = RpcFlattenFmtStr(Source->Entries[i].Text, Record->TextSize);
-        // FUN_06d8fc10 (06d8b1c0) pushes and bumps packet+0x38 and packet+0x44 together.
+        // FUN_06d8fc10 pushes and bumps packet+0x38 and packet+0x44 together.
         RpcMissionObjectiveListPushBack(&Live->Objectives, Record);
         ++Live->Count;
     }
@@ -2345,30 +2106,29 @@ static bool DeliverSetMissionObjectives(const FPacketBase* Packet, IClient* Clie
         reinterpret_cast<const FPayloadServerSetMissionObjectives*>(Packet->Payload());
 
     FServerSetMissionObjectivesInfo Info;
-    Info.MissionId = Wire->MissionId;                      // 06d82779
-    Info.Entries = nullptr;                                  // 06d827ac
-    Info.Count = Wire->Count;                                // 06d827b0
-    Info.MissionType = (unsigned char)(Wire->MissionType & 0xffu);   // 06d827a2 / 06d827a5
+    Info.MissionId = Wire->MissionId;
+    Info.Entries = nullptr;
+    Info.Count = Wire->Count;
+    Info.MissionType = (unsigned char)(Wire->MissionType & 0xffu);
     Info.Pad_0x3d[0] = 0;
     Info.Pad_0x3d[1] = 0;
     Info.Pad_0x3d[2] = 0;
 
-    RpcUnflattenFmtStr(Info.TextA, Wire->TextABuffer, Wire->TextASize);  // 06d8278d
-    RpcUnflattenFmtStr(Info.TextB, Wire->TextBBuffer, Wire->TextBSize);  // 06d8279b
+    RpcUnflattenFmtStr(Info.TextA, Wire->TextABuffer, Wire->TextASize);
+    RpcUnflattenFmtStr(Info.TextB, Wire->TextBBuffer, Wire->TextBSize);
 
     FServerMissionObjectiveEntry* Entries = nullptr;
     const unsigned int Count = Wire->Count;
-    if (Count != 0) {                                        // 06d827b4 JBE
-        // 06d827c3 vector-new; its test (06d827cf) skips only the element constructors
-        // (06d827ee) -- the loop below writes through the result either way.
+    if (Count != 0) {
+        // The vector-new's null test skips only the element constructors; the loop writes
+        // through the result either way.
         Entries = new (std::nothrow) FServerMissionObjectiveEntry[Count];
         for (unsigned int i = 0; i < Count; ++i) {
-            // FUN_06d8fc60 (06d82813), used untested (06d82818): the count and the list
-            // size are bumped together by the sender (FUN_06d8fc10), so retail never
-            // walks past the end.
+            // Used untested: the sender bumps count and list size together, so retail
+            // never walks past the end.
             const FRpcMissionObjectiveRecord* Record =
                 RpcMissionObjectiveListAt(&Wire->Objectives, i);
-            Entries[i].State = Record->State;                // 06d82818 MOVZX
+            Entries[i].State = Record->State;
             RpcUnflattenFmtStr(Entries[i].Text, Record->TextBuffer, Record->TextSize);
         }
         Info.Entries = Entries;
@@ -2377,10 +2137,7 @@ static bool DeliverSetMissionObjectives(const FPacketBase* Packet, IClient* Clie
     unsigned int One = 1u;
     Client->SendServerSetMissionObjectives(One, Info);
 
-    // 06d8286a..06d82892 -- the vector-delete, guarded on both the count and the pointer,
-    // and both are RE-READ from the local the slot was handed (06d8286a `CMP [ESP+0x58]`,
-    // Info.Count; 06d82870 `MOV EAX,[ESP+0x54]`, Info.Entries), not from the registers
-    // that built it.
+    // Count and pointer are re-read from the local the slot was handed.
     if (Info.Count != 0 && Info.Entries != nullptr) {
         delete[] Info.Entries;
     }
@@ -2389,27 +2146,20 @@ static bool DeliverSetMissionObjectives(const FPacketBase* Packet, IClient* Clie
 
 // ===========================================================================
 // ch2 0x4d FLPACKET_SERVER_LOADHINT
-// Sender 0x06d8a3c0 (IClient+0x144, RET 8), receiver caseD_4d at 0x06d81ba3 -> the same
-// slot (+0x144). The serializable object is a CostumeHint; see the long note in
-// rpc_payloads.h for why the old "blocked on COMMON.DLL::CostumeHint" reading was stale.
+// Sender 0x06d8a3c0 (IClient+0x144), receiver caseD_4d at 0x06d81ba3 -> the same slot. The
+// object is a CostumeHint (see rpc_payloads.h).
 //
-// The sender dispatches Serialize (06d8a3ed `CALL [EDX+0x4]`) and CleanUp (06d8a412
-// `CALL [EDX+0xc]`) through the object's own vtable, so it takes any BaseHint: the three
-// virtuals are declared pure on BaseHint (??_7BaseHint@@6B@ .rdata:063a3700, slots 1..3
-// -> _purecall), and IServer::LoadHint passes a BaseHint* (server_pub.cpp).
+// The sender dispatches Serialize (vtable +0x4) and CleanUp (+0xc) through the object's own
+// vtable, so it takes any BaseHint (the three virtuals are pure on BaseHint,
+// .rdata:063a3700), and IServer::LoadHint passes a BaseHint*.
 // ===========================================================================
 
-// 06d81bce..06d81bd4: after COMMON's CostumeHint::CostumeHint() returns, the receiver
-// stores rpclocal's OWN vftable (.rdata:06db3740) over the one COMMON's ctor installed.
-// That table is the VC6 local copy emitted for a dllimport class: slot 0 is rpclocal's
-// scalar deleting dtor FUN_06d83dd0 (COMMON's ~CostumeHint, then rpclocal's operator
-// delete FUN_06db1dc2 when bit 0 is set), slots 1..3 are the import thunks 06db1dbc /
-// 06db1db6 / 06db1db0 to COMMON's Serialize / UnSerialize / CleanUp. A modern compiler
-// does not re-stamp a dllimport class's vptr, so the same object shape comes from a
-// derived class local to this module: its ctor runs COMMON's ctor and then stores this
-// module's vftable, its deleting dtor runs COMMON's dtor and frees with this module's
-// operator delete, and the three hint methods are inherited unchanged. No members are
-// added, so the object stays 0x3c bytes.
+// After COMMON's CostumeHint ctor, the receiver stores rpclocal's own vftable
+// (.rdata:06db3740), the VC6 local copy for a dllimport class: slot 0 is rpclocal's scalar
+// deleting dtor FUN_06d83dd0 (COMMON's dtor, then rpclocal's operator delete), slots 1..3
+// thunk to COMMON's Serialize / UnSerialize / CleanUp. A modern compiler does not re-stamp
+// a dllimport vptr, so a module-local derived class gives the same object shape; no members
+// are added, so it stays 0x3c bytes.
 struct FRpcLocalCostumeHint final : public CostumeHint
 {
 };
@@ -2421,26 +2171,22 @@ static bool MarshalLoadHint(FPacketBase* Packet, const unsigned int* Args,
     BaseHint* Source = reinterpret_cast<BaseHint*>(Args[1]);
     FPayloadServerLoadHint* Wire = Ch2Payload<FPayloadServerLoadHint>(Packet);
 
-    // 06d8a3e2 seeds the stack pointer with 0 before the virtual call, then
-    // 06d8a3ed `CALL [EDX+0x4]` -- Serialize(&OutBuf), returning the byte count.
+    // Serialize(&OutBuf) returns the byte count.
     unsigned char* Serialized = nullptr;
     const unsigned int Size = Source->Serialize(&Serialized);
-    // FUN_06d90a00 (06d8a3fa), called with no test of either value: bare operator
-    // new(Size) (06d90a0b), a dword-then-byte copy, the block at packet+0x20, Size at
-    // packet+0x24.
+    // FUN_06d90a00, with no test of either value.
     {
         void* Block = ::operator new(Size, std::nothrow);
         unsigned char* Dest = static_cast<unsigned char*>(Block);
         for (unsigned int i = 0; i < Size; ++i) {
             Dest[i] = Serialized[i];
         }
-        Wire->Buffer = Block;                                // 06d90a14 [+0x20]
-        Wire->Size = Size;                                   // 06d90a2e [+0x24]
+        Wire->Buffer = Block;
+        Wire->Size = Size;
     }
-    Wire->Kind = Source->Kind;                               // 06d8a3ff / 06d8a406 [+0x28]
+    Wire->Kind = Source->Kind;
 
-    // Retail stores straight into the packet and has no failure path, so neither does this.
-    Source->CleanUp(Serialized);                             // 06d8a412 `CALL [EDX+0xc]`
+    Source->CleanUp(Serialized);
     return true;
 }
 
@@ -2448,46 +2194,40 @@ static bool DeliverLoadHint(const FPacketBase* Packet, IClient* Client, IChatCli
     const FPayloadServerLoadHint Wire = RpcPayloadRead<FPayloadServerLoadHint>(Packet, 0);
 
     CostumeHint* Hint = nullptr;
-    if (Wire.Kind == 1) {                                    // 06d81baa `DEC EAX ; JNZ`
-        // 06d81bad operator new(0x3c); the new-expression's test (06d81bbd / 06d81bca)
-        // skips only the constructor (and the vftable store at 06d81bd4). UnSerialize is
-        // then called through the vtable with no test (06d81bde `MOV EDI,[ESI]`,
-        // 06d81c01 `CALL [EDI+0x8]`).
+    if (Wire.Kind == 1) {
+        // The new-expression's null test skips only the constructor; UnSerialize is then
+        // called through the vtable untested.
         Hint = new (std::nothrow) FRpcLocalCostumeHint;
         Hint->UnSerialize(static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
     }
 
-    // 06d81c0a..06d81c20: the hint pointer goes out even when it is null, and the literal
-    // 1 travels BY REFERENCE (`MOV [ESP+0x1d4],1 ; LEA EAX,[ESP+0x1d4] ; PUSH EAX`).
-    // No implementer null-tests it; the exe's LAB_0053de70 reads Kind (+4) through it first.
+    // Retail quirk: the hint pointer goes out even when null, and the exe's LAB_0053de70
+    // reads Kind (+4) through it untested. The literal 1 travels by reference.
     unsigned int One = 1u;
     Client->SendServerLoadHint(One, Hint);
 
     if (Hint != nullptr) {
-        delete Hint;                                         // 06d81c34 `CALL [EDX]`, arg 1
+        delete Hint;                                         // scalar deleting dtor, arg 1
     }
     return true;
 }
 
 // ===========================================================================
 // ch2 0x55 FLPACKET_SERVER_OBJECTCARGOUPDATE
-// Sender 0x06d8c0f0 (IClient+0x158, RET 0xc), receiver caseD_55 at 0x06d82abd -> the same
-// slot (+0x158). The receiver rebuilds a real EquipDesc through seven COMMON.DLL entry
-// points; see the note in rpc_payloads.h for why the old "blocked on five Common.dll
-// setters" reading was stale and which single method really was missing (set_count).
+// Sender 0x06d8c0f0 (IClient+0x158), receiver caseD_55 at 0x06d82abd -> the same slot. The
+// receiver rebuilds a real EquipDesc through seven COMMON.DLL entry points.
 // ===========================================================================
 static bool MarshalObjectCargoUpdate(FPacketBase* Packet, const unsigned int* Args,
                                      unsigned int ArgCount) {
-    // In place, in retail's order. The pad +0x11..+0x13 is neither written here nor seeded
-    // by the constructor FUN_06d9ee70 (06d9ee9a stores only the byte at +0x30).
+    // The pad +0x11..+0x13 is written neither here nor by the constructor FUN_06d9ee70.
     const EquipDesc* Source = reinterpret_cast<const EquipDesc*>(Args[2]);
     FPayloadServerObjectCargoUpdate* Wire = Ch2Payload<FPayloadServerObjectCargoUpdate>(Packet);
-    Wire->ObjectId = Args[1];                                // 06d8c111 / 06d8c115
-    Wire->EquipId = Source->Id;                              // 06d8c118 / 06d8c120, word
-    Wire->ArchId = Source->ArchId;                           // 06d8c124 / 06d8c12b
-    Wire->Count = (unsigned short)(Source->Count & 0xffff);  // 06d8c12e / 06d8c136, WORD-truncated
-    Wire->Status = Source->Health;                           // 06d8c13a FLD / 06d8c141 FSTP
-    // 06d8c144 / 06d8c14f: the byte at EquipDesc+0x18 moved as is, no normalisation.
+    Wire->ObjectId = Args[1];
+    Wire->EquipId = Source->Id;                              // word
+    Wire->ArchId = Source->ArchId;
+    Wire->Count = (unsigned short)(Source->Count & 0xffff);  // truncated to a word
+    Wire->Status = Source->Health;                           // FLD/FSTP in retail
+    // The byte at EquipDesc+0x18, not normalised.
     Wire->bMission = *reinterpret_cast<const unsigned char*>(&Source->bMission);
     return true;
 }
@@ -2497,15 +2237,14 @@ static bool DeliverObjectCargoUpdate(const FPacketBase* Packet, IClient* Client,
     const FPayloadServerObjectCargoUpdate Wire =
         RpcPayloadRead<FPayloadServerObjectCargoUpdate>(Packet, 0);
 
-    EquipDesc Desc;                                          // 06d82ac1, the real ctor
-    Desc.set_id(Wire.EquipId);                               // 06d82ad2
-    Desc.set_arch_id(Wire.ArchId);                           // 06d82ae0
-    Desc.set_count((int)Wire.Count);                         // 06d82aef
-    Desc.set_status(Wire.Status);                            // 06d82afd
-    Desc.make_internal();                                    // 06d82b07
-    Desc.set_equipped(false);                                // 06d82b14, the literal 0
-    // 06d82b1a `MOV AL,[EBP+0x30] ; CMP AL,BL ; SETNZ AL ; MOV [ESP+0x68],AL` -- retail
-    // writes EquipDesc+0x18 straight, without a setter, and normalises to 0/1 first.
+    EquipDesc Desc;
+    Desc.set_id(Wire.EquipId);
+    Desc.set_arch_id(Wire.ArchId);
+    Desc.set_count((int)Wire.Count);
+    Desc.set_status(Wire.Status);
+    Desc.make_internal();
+    Desc.set_equipped(false);
+    // No setter: retail writes EquipDesc+0x18 directly, normalised to 0/1.
     Desc.bMission = (Wire.bMission != 0);
 
     unsigned int One = 1u;
@@ -2515,22 +2254,18 @@ static bool DeliverObjectCargoUpdate(const FPacketBase* Packet, IClient* Client,
 
 // ===========================================================================
 // ch2 0x4f FLPACKET_SERVER_SENDCOMM
-// Sender 0x06d88fc0 (IClient+0x110, RET 0x5c == 23 args), receiver caseD_4f at
-// 0x06d8306c. Layout and the per-field accessor list are on FPayloadServerSendComm.
+// Sender 0x06d88fc0 (IClient+0x110, 23 args), receiver caseD_4f at 0x06d8306c. Layout and
+// the per-field accessor list are on FPayloadServerSendComm.
 // ===========================================================================
-// The dword the sender's Ids loop reads for index I -- `MOV ESI,[ESP + ECX*4 + 0x24]` at
-// 06d89047. With ESP0 the address of the return address on entry, the frame is:
-// 06d88fc0 SUB ESP,0x38 / 06d88fc3 PUSH EBP / 06d89004..06d89006 three PUSHes put ESP at
-// ESP0-0x48, and 06d89007..06d89014 copied thirteen dwords A4..A16 from ESP0+0x14 into
-// ESP0-0x34..ESP0-0x04. The load address is ESP0-0x24+4*I, so
-//   I 0..8   ESP0-0x24..ESP0-0x04  the scratch copy, A8..A16
-//   I 9      ESP0+0x00             the return address into the caller
-//   I 10..32 ESP0+0x04..ESP0+0x5c  the arguments themselves again, A0..A22
-//   I >= 33  ESP0+0x60 onward      the CALLER's frame -- not determinable from here.
-// Args carries the 23 arguments plus the return address at [23] (the proxy's SendServerSendComm puts
-// it there with _ReturnAddress()). For I >= 33 the port reads Args[23] and then past the
-// array, i.e. its own stack, where retail reads Server.dll's: garbage in both, and by then both have
-// already written past the 0x78-byte packet (Ids[15] is payload+0x58, the block's end).
+// The dword the sender's Ids loop reads for index I. Retail reads its own frame at
+// ESP0-0x24+4*I (ESP0 = the return-address slot on entry), so
+//   I 0..8   the scratch copy of A8..A16
+//   I 9      the return address into the caller
+//   I 10..32 the arguments themselves again, A0..A22
+//   I >= 33  the caller's frame -- not determinable.
+// Args carries the 23 arguments plus the return address at [23] (the proxy puts it there
+// with _ReturnAddress()). For I >= 33 the port reads past Args into its own stack where
+// retail reads Server.dll's; both have already written past the 0x78-byte packet by then.
 static unsigned int RpcSendCommFrameDword(const unsigned int* Args, int Index) {
     if (Index <= 8) {
         return Args[8 + Index];
@@ -2543,59 +2278,54 @@ static unsigned int RpcSendCommFrameDword(const unsigned int* Args, int Index) {
 
 static bool MarshalSendComm(FPacketBase* Packet, const unsigned int* Args,
                             unsigned int ArgCount) {
-    // Retail stores straight into the constructed packet (06d88fe7..06d890db), so the
-    // port does too -- the Ids loop below can run past the array into the fields after
-    // it, and the old-buffer test at 06d89071 reads whatever that left.
+    // Stores go straight into the constructed packet: the Ids loop below can run past the
+    // array into the fields after it, and the old-buffer test reads whatever that left.
     FPayloadServerSendComm* Wire =
         reinterpret_cast<FPayloadServerSendComm*>(Packet->Payload());
-    Wire->SenderId = Args[1];                              // 06d88fe7
-    Wire->ReceiverId = Args[2];                              // 06d88ff2
-    Wire->VoiceId = Args[3];                              // 06d88ffd
+    Wire->SenderId = Args[1];
+    Wire->ReceiverId = Args[2];
+    Wire->VoiceId = Args[3];
 
-    Wire->Body.Head = Args[4];                         // 06d89021
-    Wire->Body.Body = Args[5];                         // 06d89027
-    Wire->Body.LeftHand = Args[6];                         // 06d8902e
-    Wire->Body.RightHand = Args[7];                         // 06d89038
-    Wire->Body.Count = (int)Args[16];                        // 06d8903f
-    // 06d89007..06d89014 copies A4..A16 into a 13-dword scratch block; 06d89047..06d89056
-    // then stores scratch[4 + i] -- A8 onwards -- into Ids[i] while i < Count, the bound
-    // RE-READ from payload+0x3c every pass (06d8904d) and compared SIGNED (06d89056 JL).
-    // No clamp to the eight-entry array: Ids[8] is Count itself (it receives A16 again),
-    // Ids[9..14] are the fields stored below, and past that retail writes beyond the
-    // payload. For i > 8 retail reads past its scratch block into the rest of its frame;
-    // RpcSendCommFrameDword gives the same dword (see there).
+    Wire->Body.Head = Args[4];
+    Wire->Body.Body = Args[5];
+    Wire->Body.LeftHand = Args[6];
+    Wire->Body.RightHand = Args[7];
+    Wire->Body.Count = (int)Args[16];
+    // Retail quirk: Ids[i] = A8+i while i < Count, the bound re-read from payload+0x3c every
+    // pass and compared signed, with no clamp to the eight-entry array. Ids[8] is Count
+    // itself, Ids[9..14] are the fields stored below, and beyond that the writes leave the
+    // payload. Reads past i = 8 come from the rest of the frame (RpcSendCommFrameDword).
     unsigned int* const IdSlots = Wire->Body.Ids;
     for (int i = 0; i < Wire->Body.Count; ++i) {
         IdSlots[i] = RpcSendCommFrameDword(Args, i);
     }
 
-    Wire->CommType = Args[17];                             // 06d89063
-    // 06d8906f..06d8907b: the old pointer at payload+0x44 is tested and freed.
+    Wire->CommType = Args[17];
+    // The old pointer at payload+0x44 is tested and freed.
     if (Wire->Buffer != nullptr) {
-        ::operator delete(Wire->Buffer);                     // 06d89076
+        ::operator delete(Wire->Buffer);
     }
-    // 06d8907e..06d890b2: bare operator new(A19 << 2) whatever A19's sign (06d8908d),
-    // then A19 dwords copied out of A18, untested, while A19 > 0 (06d89099 JLE).
+    // operator new(A19 << 2) whatever A19's sign, then A19 dwords copied out of A18,
+    // untested, while A19 > 0.
     const int BufferCount = (int)Args[19];
     Wire->Buffer = static_cast<unsigned int*>(
-        ::operator new((unsigned int)BufferCount << 2, std::nothrow));      // 06d89092
-    // 06d8909b `MOV byte ptr [EDI+0x68],BL` -- the count is truncated to a byte here and
-    // sign-extended back by MOVSX at 06d84200. Both halves are reproduced verbatim.
+        ::operator new((unsigned int)BufferCount << 2, std::nothrow));
+    // Truncated to a byte here and sign-extended back by the receiver; both reproduced.
     Wire->BufferCount = (unsigned char)((unsigned int)BufferCount & 0xffu);
     const unsigned int* Source = reinterpret_cast<const unsigned int*>(Args[18]);
     for (int i = 0; i < BufferCount; ++i) {
-        Wire->Buffer[i] = Source[i];                         // 06d890ac
+        Wire->Buffer[i] = Source[i];
     }
 
-    Wire->Mood = Args[20];                             // 06d890c6
-    Wire->DurationBits = Args[21];                         // 06d890d4, FLD/FSTP
-    Wire->bReceiverIsOwnShip = (unsigned char)(Args[22] & 0xffu);    // 06d890db
+    Wire->Mood = Args[20];
+    Wire->DurationBits = Args[21];                         // FLD/FSTP in retail
+    Wire->bReceiverIsOwnShip = (unsigned char)(Args[22] & 0xffu);
     return true;
 }
 
 static bool DeliverSendComm(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerSendComm Wire = RpcPayloadRead<FPayloadServerSendComm>(Packet, 0);
-    // 06d84200 `MOVSX EAX,byte ptr [ECX+0x68]` -- SIGNED, so 0x80..0xff arrive negative.
+    // Signed (MOVSX at 06d84200), so 0x80..0xff arrive negative.
     const int BufferCount = (int)(signed char)Wire.BufferCount;
     // The thirteen Body dwords are the by-value Costume, in its own order: PartIds[4],
     // AccessoryIds[8], AccessoryCount.
@@ -2618,8 +2348,8 @@ static bool DeliverSendComm(const FPacketBase* Packet, IClient* Client, IChatCli
                                BufferCount,
                                Wire.Mood,
                                Duration,
-                               // 06d83083 `PUSH 0x0` -- the last argument is a literal,
-                               // NOT payload+0x54, which retail writes and never reads.
+                               // A literal 0, not payload+0x54, which retail writes and
+                               // never reads.
                                false);
     return true;
 }
@@ -2630,41 +2360,37 @@ static bool DeliverSendComm(const FPacketBase* Packet, IClient* Client, IChatCli
 // Both start with the 0x7c-byte create-object header (rpc_containers.h) and both gate
 // their reputation tail on SinglePlayer().
 // ===========================================================================
-// Both records are the ONE type Server.dll builds and sends -- CSolarCreateInfo /
-// CShipCreateInfo from src/include/server_createinfo.h -- read here through their named
-// members. Retail keeps each receiver's destination in a file static,
-// .data:0x06dbb838 (CREATESOLAR) and .data:0x06dbb940 (CREATESHIP), constructed on the
-// first packet behind a bit of .data:0x06dbb914 (bit 3 at 06d82c6f, bit 1 at 06d81fcf),
-// destroyed through an atexit thunk (06d84230 / 06d84250 -> 06d843b0), and CLEARED --
-// not rebuilt -- after every slot call. A function-local static is that same lazy
-// construction plus atexit destruction, so each receiver keeps one.
+// Both records are the types Server.dll builds (CSolarCreateInfo / CShipCreateInfo,
+// server_createinfo.h). Retail keeps each receiver's destination in a file static,
+// .data:0x06dbb838 (CREATESOLAR) and .data:0x06dbb940 (CREATESHIP), lazily constructed
+// behind bits of .data:0x06dbb914, destroyed via atexit, and cleared (not rebuilt) after
+// every slot call. A function-local static gives the same lifetime.
 
 static bool MarshalCreateSolar(FPacketBase* Packet, const unsigned int* Args,
                                unsigned int ArgCount) {
     const CSolarCreateInfo* Source = reinterpret_cast<const CSolarCreateInfo*>(Args[1]);
     FPayloadServerCreateSolar* Wire =
         reinterpret_cast<FPayloadServerCreateSolar*>(Packet->Payload());
-    RpcCreateObjectHeaderWrite(&Wire->Common, *Source);   // 06d891d3
-    Wire->bDestructible = Source->bDestructible;                   // 06d891d8
-    Wire->bMarkedBy = Source->bMarkedBy;                    // 06d891e8 / 06d891f5 (src+0xa8)
-    // Nothing else is stored before the SinglePlayer() test. The name block +0x80..+0x8c
-    // keeps the constructor's zeroes (FUN_06d9e630 06d9e6d2..06d9e6e4); the pad at +0x7e
-    // and Affiliation / Attitude (+0x90 / +0x94) are not seeded by it, so in single
-    // player they ship as the factory's operator new left them -- in retail and here
-    // alike (the receiver reads them only when !SinglePlayer(), 06d82dab).
-    if (SinglePlayer()) {                                    // 06d891fb
+    RpcCreateObjectHeaderWrite(&Wire->Common, *Source);
+    Wire->bDestructible = Source->bDestructible;
+    Wire->bMarkedBy = Source->bMarkedBy;                    // src+0xa8
+    // The name block +0x80..+0x8c keeps the constructor's zeroes (FUN_06d9e630); the pad
+    // at +0x7e and Affiliation / Attitude (+0x90 / +0x94) are not seeded, so in single
+    // player they ship uninitialised, in retail and here (the receiver reads them only when
+    // !SinglePlayer()).
+    if (SinglePlayer()) {
         return true;
     }
     Reputation::Vibe::GetAffiliation(Wire->Common.VibeGroupId,
-                                     Wire->Affiliation, false);          // 06d8921d
+                                     Wire->Affiliation, false);
     Reputation::Vibe::AttitudeTowards(Wire->Common.VibeGroupId,
                                       Source->VibeOtherGroupId,
-                                      Wire->Attitude);                   // 06d89239 (src+0xb0)
+                                      Wire->Attitude);                   // src+0xb0
     FmtStr NameA;
     FmtStr NameB;
     wchar_t const* DisplayName = nullptr;
     Reputation::Vibe::GetName(Wire->Common.VibeGroupId, NameA, NameB, DisplayName);
-    // 06d892e6. CREATESOLAR throws the wide name away -- only CREATESHIP ships it.
+    // CREATESOLAR drops the wide name; only CREATESHIP ships it.
     Wire->NameABuffer = RpcFlattenFmtStr(NameA, Wire->NameASize);
     Wire->NameBBuffer = RpcFlattenFmtStr(NameB, Wire->NameBSize);
     return true;
@@ -2673,31 +2399,26 @@ static bool MarshalCreateSolar(FPacketBase* Packet, const unsigned int* Args,
 static bool DeliverCreateSolar(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerCreateSolar* Wire =
         reinterpret_cast<const FPayloadServerCreateSolar*>(Packet->Payload());
-    // caseD_42's one-time init (06d82c68..06d82d7d) is CSolarCreateInfo's constructor:
-    // the base part (06d82c83..06d82d54, both list sentinels at 06d82cfa / 06d82d22)
-    // and then +0xac/+0xad = 0, +0xb0 = -1 (06d82d61..06d82d6d) and the vftable
-    // .rdata:06db3738 (06d82d73).
+    // caseD_42's one-time init is CSolarCreateInfo's constructor (+0xac/+0xad = 0,
+    // +0xb0 = -1, vftable .rdata:06db3738).
     static CSolarCreateInfo Static;
-    RpcCreateObjectHeaderRead(Static, &Wire->Common);   // 06d82d8b
-    Static.bDestructible = Wire->bDestructible;                    // 06d82d90 / 06d82d96
-    Static.bMarkedBy = Wire->bMarkedBy;                     // 06d82d9c / 06d82da5 (+0xa8)
-    if (!SinglePlayer()) {                                   // 06d82dab
+    RpcCreateObjectHeaderRead(Static, &Wire->Common);
+    Static.bDestructible = Wire->bDestructible;
+    Static.bMarkedBy = Wire->bMarkedBy;                     // +0xa8
+    if (!SinglePlayer()) {
         FmtStr NameA;
         FmtStr NameB;
-        RpcUnflattenFmtStr(NameA, Wire->NameABuffer, Wire->NameASize);   // 06d82ec7
-        RpcUnflattenFmtStr(NameB, Wire->NameBBuffer, Wire->NameBSize);   // 06d82ede
-        Reputation::Vibe::EnsureExists(Wire->Common.VibeGroupId);        // 06d82ee4
+        RpcUnflattenFmtStr(NameA, Wire->NameABuffer, Wire->NameASize);
+        RpcUnflattenFmtStr(NameB, Wire->NameBBuffer, Wire->NameBSize);
+        Reputation::Vibe::EnsureExists(Wire->Common.VibeGroupId);
         Reputation::Vibe::SetName(Wire->Common.VibeGroupId, NameA, NameB, nullptr);
         Reputation::Vibe::SetAffiliation(Wire->Common.VibeGroupId,
-                                         Wire->Affiliation, false);      // 06d82f0b
+                                         Wire->Affiliation, false);
         Reputation::Vibe::SetAttitudeTowardsPlayer(Wire->Common.VibeGroupId,
-                                                   Wire->Attitude);      // 06d82f1b
+                                                   Wire->Attitude);
     }
-    Client->SendServerCreateSolar(1u, Static);               // 06d82f5a
-    // 06d82f60..06d8300d is the base clear() inlined -- the static type has no override
-    // (its table's slot 0 is 06d83ed0): +0x10 = -1, +0x04/+0x08/+0x0c/+0x48/+0x6c = 0,
-    // +0xa8 = 0, the vector's _Last := _First, and both lists emptied down to their
-    // sentinels.
+    Client->SendServerCreateSolar(1u, Static);
+    // The base clear(), inlined in retail (no override for the solar type).
     Static.clear();
     return true;
 }
@@ -2707,36 +2428,33 @@ static bool MarshalCreateShip(FPacketBase* Packet, const unsigned int* Args,
     const CShipCreateInfo* Source = reinterpret_cast<const CShipCreateInfo*>(Args[1]);
     FPayloadServerCreateShip* Wire =
         reinterpret_cast<FPayloadServerCreateShip*>(Packet->Payload());
-    RpcCreateObjectHeaderWrite(&Wire->Common, *Source);   // 06d89453
-    Wire->bUsingTradelane = Source->bUsingTradelane;              // 06d8945c / 06d89462 (src+0xdc)
-    // src+0xb8..+0xcc, the two Vectors: all six dwords move with a plain MOV pair
-    // (06d894aa..06d89504), no FLD/FSTP, so all six are bit copies.
-    std::memcpy(&Wire->VelXBits, &Source->Velocity.x, sizeof(Wire->VelXBits));  // 06d894aa / 06d894b4
-    std::memcpy(&Wire->VelY, &Source->Velocity.y, sizeof(Wire->VelY));  // 06d894ba / 06d894c4
-    std::memcpy(&Wire->VelZ, &Source->Velocity.z, sizeof(Wire->VelZ));  // 06d894ca / 06d894d4
-    std::memcpy(&Wire->AngVelXBits, &Source->AngularVelocity.x, sizeof(Wire->AngVelXBits));  // 06d894da / 06d894e4
-    std::memcpy(&Wire->AngVelY, &Source->AngularVelocity.y, sizeof(Wire->AngVelY));  // 06d894ee / 06d894f4
-    std::memcpy(&Wire->AngVelZ, &Source->AngularVelocity.z, sizeof(Wire->AngVelZ));  // 06d894fa / 06d89504
-    std::memcpy(&Wire->Throttle, &Source->Throttle, sizeof(Wire->Throttle));   // 06d8949a / 06d894a4 (src+0xd0)
-    Wire->OwnerPlayer = Source->OwnerPlayer;                  // 06d8946c / 06d89472 (src+0xac)
-    Wire->GroupNameId = (unsigned short)(Source->GroupNameId & 0xffffu);        // 06d89478 / 06d89483
-    Wire->ReputationRank = (unsigned char)(Source->ReputationRank & 0xffu);       // 06d8948a / 06d89494
-    Wire->GroupId = (unsigned short)(Source->GroupId & 0xffffu);        // 06d8951a / 06d89528
-    Wire->bMarkedBy = Source->bMarkedBy;                    // 06d8950a / 06d89514 (src+0xa8)
-    // Nothing else is stored. The name block, the display name and Affiliation /
-    // Attitude (+0xa8..+0xc4) keep the constructor's zeroes (FUN_06d9cc60
-    // 06d9cd47..06d9cd71); the pads +0x7d, +0xa3, +0xa6 and +0xc9 are seeded by nobody,
-    // in retail or here.
-    if (SinglePlayer()) {                                    // 06d8952f
+    RpcCreateObjectHeaderWrite(&Wire->Common, *Source);
+    Wire->bUsingTradelane = Source->bUsingTradelane;              // src+0xdc
+    // src+0xb8..+0xcc, the two Vectors: plain MOV pairs, no FLD/FSTP, so bit copies.
+    std::memcpy(&Wire->VelXBits, &Source->Velocity.x, sizeof(Wire->VelXBits));
+    std::memcpy(&Wire->VelY, &Source->Velocity.y, sizeof(Wire->VelY));
+    std::memcpy(&Wire->VelZ, &Source->Velocity.z, sizeof(Wire->VelZ));
+    std::memcpy(&Wire->AngVelXBits, &Source->AngularVelocity.x, sizeof(Wire->AngVelXBits));
+    std::memcpy(&Wire->AngVelY, &Source->AngularVelocity.y, sizeof(Wire->AngVelY));
+    std::memcpy(&Wire->AngVelZ, &Source->AngularVelocity.z, sizeof(Wire->AngVelZ));
+    std::memcpy(&Wire->Throttle, &Source->Throttle, sizeof(Wire->Throttle));   // src+0xd0
+    Wire->OwnerPlayer = Source->OwnerPlayer;                  // src+0xac
+    Wire->GroupNameId = (unsigned short)(Source->GroupNameId & 0xffffu);
+    Wire->ReputationRank = (unsigned char)(Source->ReputationRank & 0xffu);
+    Wire->GroupId = (unsigned short)(Source->GroupId & 0xffffu);
+    Wire->bMarkedBy = Source->bMarkedBy;                    // src+0xa8
+    // The name block, display name and Affiliation / Attitude (+0xa8..+0xc4) keep the
+    // constructor's zeroes (FUN_06d9cc60); the pads +0x7d, +0xa3, +0xa6 and +0xc9 are
+    // seeded by nobody, in retail or here.
+    if (SinglePlayer()) {
         return true;
     }
     FmtStr NameA;
     FmtStr NameB;
     wchar_t const* DisplayName = nullptr;
     Reputation::Vibe::GetName(Wire->Common.VibeGroupId, NameA, NameB, DisplayName);
-    // 06d895f1 `CMP EAX,EBX` / 06d895f3 `JZ` then 06d895f6 wcslen: a non-empty
-    // display name is shipped INSTEAD of the two flattened FmtStrs, which then stay
-    // null/zero.
+    // A non-empty display name is shipped instead of the two flattened FmtStrs, which then
+    // stay null/zero.
     unsigned int DisplayLength = 0;
     if (DisplayName != nullptr) {
         while (DisplayName[DisplayLength] != L'\0') {
@@ -2749,7 +2467,7 @@ static bool MarshalCreateShip(FPacketBase* Packet, const unsigned int* Args,
     } else {
         // FUN_06d97ce0: pkt+0xd8 = wcslen, pkt+0xdc = operator new((len*2)+2) + wcscpy.
         wchar_t* Copy = static_cast<wchar_t*>(
-            ::operator new((DisplayLength * 2u) + 2u, std::nothrow));   // 06d97cfe, bare
+            ::operator new((DisplayLength * 2u) + 2u, std::nothrow));   // bare new in retail
         for (unsigned int i = 0; i <= DisplayLength; ++i) {
             Copy[i] = DisplayName[i];
         }
@@ -2757,53 +2475,50 @@ static bool MarshalCreateShip(FPacketBase* Packet, const unsigned int* Args,
         Wire->DisplayName = Copy;
     }
     Reputation::Vibe::GetAffiliation(Wire->Common.VibeGroupId,
-                                     Wire->Affiliation, false);          // 06d896fa
+                                     Wire->Affiliation, false);
     Reputation::Vibe::AttitudeTowards(Wire->Common.VibeGroupId,
                                       Source->VibeOtherGroupId,
-                                      Wire->Attitude);                   // 06d89716 (src+0xd4)
+                                      Wire->Attitude);                   // src+0xd4
     return true;
 }
 
 static bool DeliverCreateShip(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadServerCreateShip* Wire =
         reinterpret_cast<const FPayloadServerCreateShip*>(Packet->Payload());
-    // caseD_4's one-time init (06d81fcf..06d82021) is CShipCreateInfo's constructor:
-    // FUN_06d83df0 for the base (06d81fe3), then +0xac/+0xb0/+0xb4/+0xd0 = 0,
-    // +0xd4 = -1, +0xd8 = 0, +0xdc = 0 (06d81fed..06d82011) and the vftable
-    // .rdata:06db373c (06d82017).
+    // caseD_4's one-time init is CShipCreateInfo's constructor (vftable .rdata:06db373c).
     static CShipCreateInfo Static;
-    RpcCreateObjectHeaderRead(Static, &Wire->Common);   // 06d8202f
-    Static.bUsingTradelane = Wire->bUsingTradelane;               // 06d82034 / 06d8203a (+0xdc)
-    Static.OwnerPlayer = Wire->OwnerPlayer;                   // 06d8203f / 06d82045 (+0xac)
-    Static.GroupId = (unsigned int)Wire->GroupId;      // 06d8204b MOVZX (+0xd8)
-    Static.GroupNameId = (unsigned int)Wire->GroupNameId;      // 06d82058 MOVZX (+0xb0)
-    Static.ReputationRank = (unsigned int)Wire->ReputationRank;  // 06d82064 MOVZX (+0xb4)
-    Static.Throttle = Wire->Throttle;                      // 06d82071 / 06d82077 (+0xd0)
+    RpcCreateObjectHeaderRead(Static, &Wire->Common);
+    Static.bUsingTradelane = Wire->bUsingTradelane;               // +0xdc
+    Static.OwnerPlayer = Wire->OwnerPlayer;                   // +0xac
+    Static.GroupId = (unsigned int)Wire->GroupId;      // zero-extended, +0xd8
+    Static.GroupNameId = (unsigned int)Wire->GroupNameId;      // zero-extended, +0xb0
+    Static.ReputationRank = (unsigned int)Wire->ReputationRank;  // zero-extended, +0xb4
+    Static.Throttle = Wire->Throttle;                      // +0xd0
     std::memcpy(&Static.AngularVelocity.x, &Wire->AngVelXBits,
-                sizeof(Wire->AngVelXBits));                   // 06d8207d / 06d82092 (+0xc4)
-    Static.AngularVelocity.y = Wire->AngVelY;             // 06d8208c / 06d82097 (+0xc8)
-    Static.AngularVelocity.z = Wire->AngVelZ;             // 06d82083 / 06d8209d (+0xcc)
+                sizeof(Wire->AngVelXBits));                   // +0xc4
+    Static.AngularVelocity.y = Wire->AngVelY;             // +0xc8
+    Static.AngularVelocity.z = Wire->AngVelZ;             // +0xcc
     std::memcpy(&Static.Velocity.x, &Wire->VelXBits,
-                sizeof(Wire->VelXBits));                   // 06d820a3 / 06d820b5 (+0xb8)
-    Static.Velocity.y = Wire->VelY;                    // 06d820af / 06d820bb (+0xbc)
-    Static.Velocity.z = Wire->VelZ;                    // 06d820a9 / 06d820c1 (+0xc0)
-    Static.bMarkedBy = Wire->bMarkedBy;                     // 06d820c7 / 06d820cd (+0xa8)
-    if (!SinglePlayer()) {                                   // 06d820d3
+                sizeof(Wire->VelXBits));                   // +0xb8
+    Static.Velocity.y = Wire->VelY;                    // +0xbc
+    Static.Velocity.z = Wire->VelZ;                    // +0xc0
+    Static.bMarkedBy = Wire->bMarkedBy;                     // +0xa8
+    if (!SinglePlayer()) {
         FmtStr NameA;
         FmtStr NameB;
-        RpcUnflattenFmtStr(NameA, Wire->NameABuffer, Wire->NameASize);   // 06d8218c
-        RpcUnflattenFmtStr(NameB, Wire->NameBBuffer, Wire->NameBSize);   // 06d821a0
-        Reputation::Vibe::EnsureExists(Wire->Common.VibeGroupId);        // 06d821a6
-        // 06d821ac: unlike CREATESOLAR this one really does pass the wide name on.
+        RpcUnflattenFmtStr(NameA, Wire->NameABuffer, Wire->NameASize);
+        RpcUnflattenFmtStr(NameB, Wire->NameBBuffer, Wire->NameBSize);
+        Reputation::Vibe::EnsureExists(Wire->Common.VibeGroupId);
+        // Unlike CREATESOLAR, the wide name is passed on.
         Reputation::Vibe::SetName(Wire->Common.VibeGroupId, NameA, NameB,
                                   Wire->DisplayName);
         Reputation::Vibe::SetAffiliation(Wire->Common.VibeGroupId,
-                                         Wire->Affiliation, false);      // 06d821cd
+                                         Wire->Affiliation, false);
         Reputation::Vibe::SetAttitudeTowardsPlayer(Wire->Common.VibeGroupId,
-                                                   Wire->Attitude);      // 06d821dd
+                                                   Wire->Attitude);
     }
-    Client->SendServerCreateShip(1u, Static);                // 06d82216
-    // 06d8221c..06d822bb is CShipCreateInfo::clear() inlined (the body of 06d83fa0).
+    Client->SendServerCreateShip(1u, Static);
+    // CShipCreateInfo::clear() (06d83fa0), inlined in retail.
     Static.clear();
     return true;
 }
@@ -2815,27 +2530,19 @@ static bool DeliverCreateShip(const FPacketBase* Packet, IClient* Client, IChatC
 // ===========================================================================
 static bool MarshalCharacterInfo(FPacketBase* Packet, const unsigned int* Args,
                                  unsigned int ArgCount) {
-    // Slot 13's second argument is the caller's CCharacterSet (Server.dll's
-    // IServerImpl::CharacterInfoReq local, src/include/server_characterset.h).
+    // The caller's CCharacterSet (Server.dll's IServerImpl::CharacterInfoReq local).
     const CCharacterSet* Source = reinterpret_cast<const CCharacterSet*>(Args[1]);
-    // The list's dummy already stands: the packet ctor built it (06d9d52f..06d9d549 idiom,
-    // FPacket_FLPACKET_SERVER_CHARACTERINFO), exactly where retail's FUN_06d955c0 finds it.
+    // The packet ctor already built the list's dummy.
     FPayloadServerCharacterInfo* Wire =
         reinterpret_cast<FPayloadServerCharacterInfo*>(Packet->Payload());
-    // 06d898f0..06d89e8a: the NULL-terminated walk. Retail builds the copy twice (into a
-    // stack list, then again into the packet through FUN_06d955c0) and frees the first
-    // copy right after the send; every hop re-allocates, so one hop here puts exactly the
-    // same bytes in the packet.
+    // Retail copies twice (into a stack list, then into the packet via FUN_06d955c0); one
+    // hop here gives the same bytes.
     //
-    // 06d89914 `CMP ESI,EBX ; JZ LAB_06d89e4c`: a null source value jumps straight to the
-    // push-back tail (06d89e4c..06d89e71), which appends local_38 -- the copy made for the
-    // PREVIOUS entry -- to the stack list a second time. FUN_06d955c0 then deep-copies
-    // both nodes into the packet, so a null entry DUPLICATES the record before it on the
-    // wire. The port converts the previous source again, which yields the same bytes.
-    // Before any record local_38 is uninitialised stack; the port reads it as null, and
-    // FUN_06d955c0 skips a null value (06d95605), so a leading null ships nothing.
-    // (Retail's stack list then frees the shared copy twice at 06d89ed0..; the port has
-    // no stack list, so there is nothing to double-free.)
+    // Retail quirk: a null source value re-appends the copy made for the previous entry, so
+    // a null entry duplicates the record before it on the wire; the port converts the
+    // previous source again. Before any record retail's copy pointer is uninitialised; the
+    // port treats it as null, which FUN_06d955c0 skips. (Retail then double-frees the shared
+    // copy from its stack list; the port has no stack list.)
     const CCharacterSet::CharacterInfo* Previous = nullptr;
     for (const MetaNode<CCharacterSet::CharacterInfo>* Node = Source->Characters.get_head();
          Node != nullptr; Node = Node->Next) {
@@ -2846,46 +2553,43 @@ static bool MarshalCharacterInfo(FPacketBase* Packet, const unsigned int* Args,
                 continue;
             }
         }
-        // 06d8991f operator new(0x27c); the new-expression's test (06d8992d) skips only
-        // the constructor (06d899e1 `XOR EDI,EDI`) -- the conversion runs on the result
-        // either way (06d899ef).
+        // operator new(0x27c); the null test skips only the constructor, the conversion
+        // runs on the result either way.
         FRpcCharacterInfoWireRecord* Copy = new (std::nothrow) FRpcCharacterInfoWireRecord();
         RpcCharacterInfoRecordToWire(Copy, Record);
         RpcCharacterInfoWireListPushBack(&Wire->Records, Copy);
         Previous = Record;
     }
-    Wire->SaveFailureCount = Source->SaveFailureCount;              // 06d89e9d / 06d89ea8
+    Wire->SaveFailureCount = Source->SaveFailureCount;
     return true;
 }
 
 namespace {
 
-// HandleCharacterInfo's own stack std::list<record*> (local_50 allocator byte, local_4c
-// head, local_48 size). Built at 06d844c6..06d844e1 -- a bare operator new(0xc) dummy
-// linked to itself, size 0 -- and torn down after SendServerCharacterInfo at 06d84aea..06d84b39: every
-// node through FUN_06d901f0 (unlink, free, --Size), then the dummy. Nodes only: each
-// node's record was already freed inside the loop (06d849fe..06d84a73), right after its
-// conversion. Retail's unwind covers the list too (state 1 of FuncInfo_06db6a84).
+// HandleCharacterInfo's own stack std::list<record*>: a bare operator new(0xc) dummy linked
+// to itself; torn down after the slot call node by node (FUN_06d901f0), then the dummy.
+// Nodes only: each record was freed inside the loop right after its conversion. Retail's
+// unwind covers the list too.
 struct FCharacterInfoLocalList {
     FRpcCharacterInfoWireList List;
 
     FCharacterInfoLocalList() {
-        List.Allocator = 0;          // 06d844cc stores an uninitialised stack byte here
+        List.Allocator = 0;          // retail stores an uninitialised stack byte here
         List.Pad_0x01[0] = 0;
         List.Pad_0x01[1] = 0;
         List.Pad_0x01[2] = 0;
         FRpcCharacterInfoWireNode* Dummy = static_cast<FRpcCharacterInfoWireNode*>(
-            ::operator new(sizeof(FRpcCharacterInfoWireNode)));     // 06d844d0
-        Dummy->Next = Dummy;                                         // 06d844d5
-        Dummy->Prev = Dummy;                                         // 06d844d7
+            ::operator new(sizeof(FRpcCharacterInfoWireNode)));
+        Dummy->Next = Dummy;
+        Dummy->Prev = Dummy;
         Dummy->Value = nullptr;      // the dummy's value is never read
-        List.Head = Dummy;                                           // 06d844dd
-        List.Size = 0;                                               // 06d844e1
+        List.Head = Dummy;
+        List.Size = 0;
     }
 
     ~FCharacterInfoLocalList() {
-        FRpcCharacterInfoWireNode* Node = List.Head->Next;           // 06d84aea..06d84aee
-        while (Node != List.Head) {                                  // 06d84af0 / 06d84b2b
+        FRpcCharacterInfoWireNode* Node = List.Head->Next;
+        while (Node != List.Head) {
             FRpcCharacterInfoWireNode* Erased = Node;
             Node = Node->Next;
             Erased->Prev->Next = Erased->Next;                       // FUN_06d901f0
@@ -2893,9 +2597,9 @@ struct FCharacterInfoLocalList {
             ::operator delete(Erased);
             --List.Size;
         }
-        ::operator delete(List.Head);                                // 06d84b39
-        List.Head = nullptr;                                         // 06d84b41
-        List.Size = 0;                                               // 06d84b45
+        ::operator delete(List.Head);
+        List.Head = nullptr;
+        List.Size = 0;
     }
 
 private:
@@ -2905,59 +2609,46 @@ private:
 
 }  // namespace
 
-// IServerImpl::HandleCharacterInfo (0x06d84490) itself: rpclocal.cpp's exported member
-// forwards here. Arg is its third parameter, which 06d84a9b loads and 06d84aaf pushes as
-// slot 13's first argument; HandlePacket's caseD_3 passes 1 (06d81711 PUSH 0x1).
-// No packet test: 06d844ea loads the packet argument and dereferences it untested (unlike
-// HandleDamageObject, which does test at 06d84c7a).
+// IServerImpl::HandleCharacterInfo (0x06d84490); rpclocal.cpp's exported member forwards
+// here. Arg is slot 13's first argument (caseD_3 passes 1). Retail dereferences the packet
+// untested, unlike HandleDamageObject.
 __declspec(dllexport) bool RpcHandleCharacterInfo(const FPacketBase* Packet, IClient* Client, unsigned int Arg) {
     const FPayloadServerCharacterInfo* Wire =
         reinterpret_cast<const FPayloadServerCharacterInfo*>(Packet->Payload());
-    // 06d844ab..06d844bf: the local CCharacterSet (local_44). FUN_06d852c0 is
-    // MetaList(bool) with `PUSH EBP` = 0 (bUseHeap false), and the vtable stored at
-    // 06d844b7 is OwnerList<CCharacterSet::CharacterInfo>'s. The object dies at the end
-    // of this call -- its destructor (FUN_06d85340 then FUN_06d852e0) frees every
-    // record and node after the client has consumed it, as retail's does.
+    // The local CCharacterSet: MetaList(bUseHeap = false) with the
+    // OwnerList<CCharacterSet::CharacterInfo> vtable; its destructor frees every record and
+    // node after the client has consumed it.
     CCharacterSet Set;
 
-    // 06d844c6..06d844e1: the stack list; 06d844f6 FUN_06d94460(packet, &local) deep-copies
-    // the packet's records into it (the dummy at packet+0x28 is read untested -- the
-    // packet ctor built it). Everything below reads the COPY, not the packet.
+    // FUN_06d94460 deep-copies the packet's records into the stack list; everything below
+    // reads the copy, not the packet.
     FCharacterInfoLocalList Local;
     RpcCharacterInfoWireListCopy(&Local.List, &Wire->Records);
 
-    // 06d844fb..06d84514: the local list's dummy and first node.
     for (const FRpcCharacterInfoWireNode* Node = Local.List.Head->Next;
          Node != Local.List.Head; Node = Node->Next) {
+        // Used untested (FUN_06d94460 never appends a null value).
         const FRpcCharacterInfoWireRecord* Source = Node->Value;
-        // 06d84514 `MOV EDI,[EAX+0x8]`: the node's value is loaded and used untested
-        // (FUN_06d94460 never appends a null one).
-        //
-        // 06d84520 operator new(0x2dc). The test at 06d8452e / 06d84535 is on that
-        // RESULT: null skips both the constructor and the conversion (06d84618 `XOR
-        // EBX,EBX`, 06d84621 JZ LAB_06d849ad) and the node is still appended, with a
-        // NULL value (06d849d8).
+        // operator new(0x2dc): null skips the constructor and the conversion, and the node
+        // is still appended with a null value.
         CCharacterSet::CharacterInfo* Record =
             new (std::nothrow) CCharacterSet::CharacterInfo();
         if (Record != nullptr) {
-            RpcCharacterInfoRecordFromWire(Record, Source);    // 06d8462a..06d849a5
+            RpcCharacterInfoRecordFromWire(Record, Source);
         }
-        // 06d849ad..06d849eb: MetaList::append inlined -- alloc_node (the free-pool
-        // branch, then operator new(0xc)), Next = 0, Prev = the old tail, Data = the
-        // record; the head takes it when the list was empty.
+        // MetaList::append, inlined in retail.
         Set.Characters.append(Record);
-        // 06d849eb..06d84a78: the node's value re-read and, when non-null (06d849fc),
-        // the copied wire record torn down on the spot. The node keeps the pointer.
+        // The copied wire record is torn down on the spot; the node keeps the pointer.
         if (Node->Value != nullptr) {
             RpcCharacterInfoWireRecordFree(Node->Value);
         }
     }
-    Set.SaveFailureCount = Wire->SaveFailureCount;                  // 06d84a93 / 06d84aa2
-    Client->SendServerCharacterInfo(Arg, Set);                // 06d84ab0
+    Set.SaveFailureCount = Wire->SaveFailureCount;
+    Client->SendServerCharacterInfo(Arg, Set);
     return true;
 }
 
-// HandlePacket caseD_3 (06d8170c..06d81715): HandleCharacterInfo(packet, DAT_06dbbcd8, 1).
+// HandlePacket caseD_3: HandleCharacterInfo(packet, DAT_06dbbcd8, 1).
 static bool DeliverCharacterInfo(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     return RpcHandleCharacterInfo(Packet, Client, 1u);
 }
@@ -2965,10 +2656,8 @@ static bool DeliverCharacterInfo(const FPacketBase* Packet, IClient* Client, ICh
 // ===========================================================================
 // The table. Order follows the opcode.
 //
-// Every entry is self-contained: the payload holds scalars, or a block the packet owns and
-// its Destroy frees. Nothing on this channel stores a caller-owned pointer, so nothing here
-// needs synchronous delivery -- these types queue and are drained by IServerImpl::Update,
-// which is what retail does.
+// No payload here stores a caller-owned pointer, so all these types queue and are drained by
+// IServerImpl::Update, as in retail.
 // ===========================================================================
 const FRpcPayloadCodec GChannel2Codecs[] = {
     { 2, 0x01, "FLPACKET_SERVER_CONNECTRESPONSE",              0x04,

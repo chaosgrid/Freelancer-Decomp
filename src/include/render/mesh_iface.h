@@ -16,33 +16,33 @@ struct IMaterial;
 #define FREELANCER_IMESH
 struct IMesh : IDAComponent
 {
-    virtual int DACOM_API ResetMesh() = 0; // formerly Slot3
-    virtual int DACOM_API NoOp() = 0; // formerly Slot4
-    virtual int DACOM_API RefreshMaterials(unsigned long Flags) = 0; // formerly Slot5
-    virtual int DACOM_API RejectOperation(void* A) = 0; // formerly Slot6
-    virtual int DACOM_API RejectOperation() = 0; // formerly Slot7
-    virtual int DACOM_API GetFaceGroupCount(int* Out) = 0; // formerly Slot8
-    virtual int DACOM_API OpenFaceGroup(int Index, int Mode) = 0; // formerly Slot9
-    virtual int DACOM_API CloseFaceGroup() = 0; // formerly Slot10
-    virtual int DACOM_API AddFaceGroup(void* A) = 0; // formerly Slot11
-    virtual int DACOM_API RemoveFaceGroup(int Index) = 0; // formerly Slot12
-    virtual int DACOM_API GetFaceGroupPrimitiveType(unsigned int* Out) = 0; // formerly Slot13
-    virtual int DACOM_API GetFaceGroupMaterial(IMaterial** Out) = 0; // formerly Slot14
-    virtual int DACOM_API SetFaceGroupMaterial(IMaterial* Material) = 0; // formerly Slot15
-    virtual int DACOM_API GetFaceGroupMaterialContext(void** Out) = 0; // formerly Slot16
-    virtual int DACOM_API SetFaceGroupMaterialContext(void* A) = 0; // formerly Slot17
-    virtual int DACOM_API OpenFaceGroupChannels(unsigned long Flags) = 0; // formerly Slot18
-    virtual int DACOM_API CloseFaceGroupChannels() = 0; // formerly Slot19
-    virtual int DACOM_API LockFaceGroupChannels(unsigned long Mask) = 0; // formerly Slot20
-    virtual int DACOM_API UnlockFaceGroupChannels() = 0; // formerly Slot21
-    virtual int DACOM_API GetFaceGroupData(int Channel, void** A, void** B, void** C, void** D) = 0; // formerly Slot22
-    virtual int DACOM_API SetFaceGroupData(int Channel, void* A, void* B, void* C, void* D) = 0; // formerly Slot23
-    virtual int DACOM_API GetFaceGroupIndices(int Channel, void** A, void** B) = 0; // formerly Slot24
-    virtual int DACOM_API SetFaceGroupIndices(int Channel, void* Src, int Count) = 0; // formerly Slot25
-    virtual int DACOM_API GetFaceGroupIndexCount(int Selector, void** Out) = 0; // formerly Slot26
-    virtual int DACOM_API SetFaceGroupIndexCount(int Selector, int Count) = 0; // formerly Slot27
-    virtual int DACOM_API AddFaceGroupChannels(unsigned long Flags) = 0; // formerly Slot28
-    virtual int DACOM_API RemoveFaceGroupChannels(unsigned long Flags) = 0; // formerly Slot29
+    virtual int DACOM_API ResetMesh() = 0; // slot 3
+    virtual int DACOM_API NoOp() = 0; // slot 4
+    virtual int DACOM_API RefreshMaterials(unsigned long Flags) = 0; // slot 5
+    virtual int DACOM_API RejectOperation(void* A) = 0; // slot 6
+    virtual int DACOM_API RejectOperation() = 0; // slot 7
+    virtual int DACOM_API GetFaceGroupCount(int* Out) = 0; // slot 8
+    virtual int DACOM_API OpenFaceGroup(int Index, int Mode) = 0; // slot 9
+    virtual int DACOM_API CloseFaceGroup() = 0; // slot 10
+    virtual int DACOM_API AddFaceGroup(void* A) = 0; // slot 11
+    virtual int DACOM_API RemoveFaceGroup(int Index) = 0; // slot 12
+    virtual int DACOM_API GetFaceGroupPrimitiveType(unsigned int* Out) = 0; // slot 13
+    virtual int DACOM_API GetFaceGroupMaterial(IMaterial** Out) = 0; // slot 14
+    virtual int DACOM_API SetFaceGroupMaterial(IMaterial* Material) = 0; // slot 15
+    virtual int DACOM_API GetFaceGroupMaterialContext(void** Out) = 0; // slot 16
+    virtual int DACOM_API SetFaceGroupMaterialContext(void* A) = 0; // slot 17
+    virtual int DACOM_API OpenFaceGroupChannels(unsigned long Flags) = 0; // slot 18
+    virtual int DACOM_API CloseFaceGroupChannels() = 0; // slot 19
+    virtual int DACOM_API LockFaceGroupChannels(unsigned long Mask) = 0; // slot 20
+    virtual int DACOM_API UnlockFaceGroupChannels() = 0; // slot 21
+    virtual int DACOM_API GetFaceGroupData(int Channel, void** A, void** B, void** C, void** D) = 0; // slot 22
+    virtual int DACOM_API SetFaceGroupData(int Channel, void* A, void* B, void* C, void* D) = 0; // slot 23
+    virtual int DACOM_API GetFaceGroupIndices(int Channel, void** A, void** B) = 0; // slot 24
+    virtual int DACOM_API SetFaceGroupIndices(int Channel, void* Src, int Count) = 0; // slot 25
+    virtual int DACOM_API GetFaceGroupIndexCount(int Selector, void** Out) = 0; // slot 26
+    virtual int DACOM_API SetFaceGroupIndexCount(int Selector, int Count) = 0; // slot 27
+    virtual int DACOM_API AddFaceGroupChannels(unsigned long Flags) = 0; // slot 28
+    virtual int DACOM_API RemoveFaceGroupChannels(unsigned long Flags) = 0; // slot 29
 };
 #endif
 
@@ -51,8 +51,8 @@ struct IMesh : IDAComponent
 struct IVMeshWire : IDAComponent
 {
 
-    virtual void* DACOM_API GetWireData() = 0; // formerly Slot3
-    virtual int DACOM_API Draw() = 0; // formerly Slot4
-    virtual void* DACOM_API GetMeshData() = 0; // formerly Slot5
+    virtual void* DACOM_API GetWireData() = 0; // slot 3
+    virtual int DACOM_API Draw() = 0; // slot 4
+    virtual void* DACOM_API GetMeshData() = 0; // slot 5
 };
 #endif

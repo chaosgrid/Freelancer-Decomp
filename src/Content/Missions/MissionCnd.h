@@ -32,7 +32,7 @@ class INI_Reader;
 struct FMissionScript;
 
 // Base condition. Vtable 06fb565c: +0x00 LAB_06ebf6d0 (scalar deleting dtor),
-// +0x04/+0x08 purecall, +0x0c/+0x10 FUN_06ebf720 (RET), +0x14/+0x18 FUN_06ebf6f0 (RET 4).
+// +0x04/+0x08 purecall, +0x0c/+0x10 FUN_06ebf720 (no-op), +0x14/+0x18 FUN_06ebf6f0 (no-op).
 // Fields: +0x04 owning mission (trigger+0x14), +0x08 ID_String cleared by the ctor and set
 // to the owning trigger's id by the factory (trigger+0x2c).
 // Derived classes use the dtor FUN_06ec44a0 (FUN_06ec44c0 restores the base vptr).
@@ -49,7 +49,7 @@ public:
     virtual bool Matches(pub::Controller::EMessage EventId, void const* EventParms) = 0;
     // +0x0c: called by FUN_06eb82c0 on activation and by FUN_06ebb830 on re-arm.
     virtual void OnActivate();
-    // +0x10: base FUN_06ebf720 (RET). Name unknown.
+    // +0x10: base FUN_06ebf720 (no-op). The name is a guess.
     virtual void OnMissionEnd();
     // +0x14: writes the condition state into the save file (Cnd_Timer LAB_06ec16c0 fprintf).
     virtual void Save(FILE* File);
@@ -97,8 +97,8 @@ public:
 
     TString<0x30> ScannerLabel; // +0x0c
     TString<0x30> ScannedLabel; // +0x40
-    unsigned int ScannerId;    // +0x74 (ctor 0) TODO: resolved id, written by OnActivate
-    unsigned int ScannedId;    // +0x78 (ctor 0) TODO: resolved id, written by OnActivate
+    unsigned int ScannerId;    // +0x74 (ctor 0) resolved id, written by OnActivate
+    unsigned int ScannedId;    // +0x78 (ctor 0) resolved id, written by OnActivate
 };
 
 // Cnd_CharSelect: new(0x38), ctor inline (06ebba73), vtable 06fb56e4, event 0x1b.
@@ -712,7 +712,7 @@ public:
 };
 
 // Cnd_True: new(0xc), ctor FUN_06ec1bb0, vtable 06fb5908, event 0x20.
-// Parse FUN_06ebf6f0 (RET 4), Matches LAB_06ec1bd0 (MOV AL,1 / RET 8), other slots base.
+// Parse FUN_06ebf6f0, Matches LAB_06ec1bd0 (always true), other slots base.
 class CndTrue : public Cnd
 {
 public:

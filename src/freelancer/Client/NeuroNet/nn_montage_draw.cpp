@@ -42,18 +42,16 @@ void LoadButtonMontage()
         return;
     G_bButtonMontageLoaded = true;
 
-    // 0x00559ddc..0x00559df6: FUN_00425b30 on DAT_00679a2c.
-    G_ButtonShapeDB.Load("Interface\\ButtonTextures.ini", DALib::Data);
+    G_ButtonShapeDB.Load("Interface\\ButtonTextures.ini", DALib::Data); // FUN_00425b30
 
-    // 0x00559dfb..0x0055a003: four inlined ShapeDB finds (cmn\shapedb.h:0xf2 on a miss; the
-    // last one through FUN_00512660, the same cached find).
+    // Four inlined ShapeDB finds (cmn\shapedb.h:0xf2 on a miss; the last one through
+    // FUN_00512660, the same cached find).
     G_ButtonShapeMontage32 = G_ButtonShapeDB.Find("Montage32", kShapeDbHeaderLower);
     G_ButtonShapeMontage64 = G_ButtonShapeDB.Find("Montage64", kShapeDbHeaderLower);
     G_ButtonShapeTargetingElement =
         G_ButtonShapeDB.Find("HUD_targetingelement", kShapeDbHeaderLower);
     G_ButtonShapeTalkElement = G_ButtonShapeDB.Find("HUD_talkelement", kShapeDbHeaderLower);
 
-    // 0x0055a003..0x0055a062.
     char Path[0x100];
     GetFileSysPath(Path, "interface\\ButtonMontage.ini", DALib::Data);
     INI_Reader Reader;
@@ -62,7 +60,6 @@ void LoadButtonMontage()
 
     do
     {
-        // 0x0055a070..0x0055a098: per section.
         float Step = 0.0f;
         float U = 0.0f;
         float V = 0.0f;
@@ -75,7 +72,6 @@ void LoadButtonMontage()
         {
             if (Reader.is_value("size"))
             {
-                // 0x0055a0e4..0x0055a11c: 1 / (256 / size), 1 / 4 for a non-positive size.
                 Size = Reader.get_value_int(0);
                 int TilesPerRow = 4;
                 if (Size > 0)
@@ -94,7 +90,6 @@ void LoadButtonMontage()
             }
             else
             {
-                // 0x0055a163..0x0055a19f: the shape the tile sits on.
                 FTexShape* Shape = nullptr;
                 if (TextureIndex == 2)
                 {
@@ -114,12 +109,10 @@ void LoadButtonMontage()
                     Shape = G_ButtonShapeMontage64;
                 }
 
-                // 0x0055a19f..0x0055a1c9.
                 float Scale = 0.0f;
                 if (!Reader.is_value_empty(1))
                     Scale = Reader.get_value_float(1);
 
-                // 0x0055a1cd..0x0055a261: FUN_0055d870 -- insert one element at end().
                 FButtonMontageTile Tile;
                 Tile.Name = Reader.get_name_ptr();
                 Tile.U = U;
@@ -129,8 +122,8 @@ void LoadButtonMontage()
                 Tile.Scale = Scale;
                 G_ButtonMontageTiles.push_back(Tile);
 
-                // 0x0055a267..0x0055a2a1: FST stores the rounded sum, FCOMP tests the unrounded
-                // one against 0.99f (DAT_005e1518); only an ordered > moves to the next row.
+                // The rounded sum is stored, the unrounded one tested against 0.99f
+                // (DAT_005e1518); only an ordered > moves to the next row.
                 double const NextU = static_cast<double>(Step) + static_cast<double>(U);
                 U = static_cast<float>(NextU);
                 if (NextU > static_cast<double>(0.99f))
@@ -164,7 +157,7 @@ FButtonMontageTile* FindButtonMontageTile(std::string Name)
 
 void ClearButtonMontage()
 {
-    // FUN_00559d20: erase(begin, end), then JMP FUN_00425a20 on DAT_00679a2c.
+    // FUN_00559d20.
     G_ButtonMontageTiles.clear();
     G_ButtonShapeDB.Clear();
 }
@@ -172,17 +165,16 @@ void ClearButtonMontage()
 bool NnMontageDrawTileAt(FButtonMontageTile const* Tile, float const* Position,
                          unsigned char const* Rgba, float Size, int Mode, float Angle)
 {
-    // FUN_00559900. 0x00559904..0x0055991a: nothing without a tile or its shape.
+    // FUN_00559900.
     if (Tile == nullptr)
         return false;
     if (Tile->Shape == nullptr)
         return false;
 
-    // 0x00559921..0x0055994e: frame 0 of the shape's texture record (handle, u0, v0, u1, v1).
+    // Frame 0 of the shape's texture record (handle, u0, v0, u1, v1).
     unsigned long Frame[5];
     DALib::TextureLib->GetTextureFrame(Tile->Shape->Texture, 0, Frame);
 
-    // 0x00559952..0x00559a20: the tile's square, inset by 1/256, mirrored per Mode.
     double const Inset = static_cast<double>(0.00390625f);   // DAT_005d748c
     float const Low0 = static_cast<float>(static_cast<double>(Tile->U) + Inset);
     float const Low1 = static_cast<float>(static_cast<double>(Tile->V) + Inset);
@@ -219,14 +211,13 @@ bool NnMontageDrawTileAt(FButtonMontageTile const* Tile, float const* Position,
         Rect[3] = Low1;
         break;
     default:
-        bRect = false;   // JA caseD_4: the frame's own rect stays
+        bRect = false;   // the frame's own rect stays
         break;
     }
     if (bRect)
         memcpy(&Frame[1], Rect, sizeof(Rect));
 
-    // 0x00559a24..0x00559a72: the "buttons" key, the batch node, the icon (the RGBA bytes as a
-    // D3DCOLOR A:R:G:B).
+    // The RGBA bytes go in as a D3DCOLOR A:R:G:B.
     ScreenQuadSetMaterialKey(G_ButtonsMaterialKey);   // FUN_00402d30(DAT_00679a28)
     ScreenQuadBeginBatchFrame(Frame, 2, true);        // FUN_00402e30(&frame, 2, 1)
     unsigned long const Argb = (static_cast<unsigned long>(Rgba[3]) << 24) |
@@ -239,11 +230,8 @@ bool NnMontageDrawTileAt(FButtonMontageTile const* Tile, float const* Position,
 
 void NnMontageFlushButtons()
 {
-    // FUN_00559c20, listing-traced 0x00559c20..0x00559d13. Two stack savers on DALib::Pipeline
-    // (slot 61 read, slot 60 write; EH states 0 / 1): 0x17 -> 8, 0xe -> 0. FUN_00403ea0 on the
-    // "buttons" list DAT_00679a28 with DALib::Pipeline read again. Then 0xe restored, then 0x17
-    // (0x00559cc7..0x00559cff). No null check anywhere; no material-key call -- FUN_00403ea0
-    // finds the "buttons" container by its key.
+    // FUN_00559c20. Two render-state savers (EH-tracked in retail) around FUN_00403ea0, which
+    // finds the "buttons" container by its key; no null check anywhere.
     IRenderPipeline* const Pipe17 = DALib::Pipeline;
     int Saved17 = 0;
     Pipe17->GetRenderState(D3DRS_ZFUNC, &Saved17);

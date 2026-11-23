@@ -20,12 +20,10 @@
 // vftable 0x005d561c (NN_Inventory's 47 slots) overrides:
 //    0 FUN_004b6c60 scalar deleting dtor (dtor FUN_004b6c80)
 //    9 FUN_004b6d40 Create      11 LAB_004b6e30 Update      23 LAB_004b7180 ProcessMessage
-//   42 LAB_004b7050 SetProperty 46 FUN_004b6c50 IsScanner (`MOV AL,1 / RET`)
+//   42 LAB_004b7050 SetProperty 46 FUN_004b6c50 IsScanner
 // Event::Handler vftable 0x005d5604: slot 0 FUN_004b71c0 OnEvent.
 //
-// WINFACTORY<NN_Scanner> "NN_Scanner": DAT_00672294, static init LAB_004b6b30 (ctor
-// FUN_004b7200, atexit LAB_004b6b50 -> FUN_00579380), vftable 0x005d56dc (Create FUN_004b7270:
-// the NN_Inventory ctor FUN_00477cf0 inlined, the handler vptr, the empty list, then slot 9).
+// WINFACTORY<NN_Scanner> vftable 0x005d56dc, Create FUN_004b7270 (see nn_scanner.cpp).
 
 #include "Core/event_handler.h"
 #include "NeuroNet/nn_inventory.h"
@@ -35,10 +33,9 @@
 class NnScanner : public NnInventory, public EventHandler
 {
 public:
-    // Inlined in FUN_004b7270 (0x004b72af..0x004b7326): FUN_00477cf0, the handler vptr, an
-    // empty +0x978 list (the inlined clear walks no node), the NN_Scanner vptrs.
+    // Inlined in FUN_004b7270 (0x004b72af), after the NN_Inventory ctor FUN_00477cf0.
     NnScanner();
-    // FUN_004b6c80 -- the +0x978 list, the handler (FUN_00576010), then FUN_00477da0.
+    // FUN_004b6c80 -- the list, the handler (FUN_00576010), then FUN_00477da0.
     ~NnScanner() override;
 
     // slot 9 FUN_004b6d40 (RET 8) -- NN_Inventory's Create, then (on success) bind the

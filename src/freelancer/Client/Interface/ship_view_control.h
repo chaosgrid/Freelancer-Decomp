@@ -12,42 +12,16 @@
 // hardpoints (FEquipVisualSet) and a "mountpoint" marker mesh per hardpoint.
 //
 // WINFACTORY<ShipViewControl> "ShipViewControl": ctor FUN_005870f0 (vftable 0x005e4d60), Create
-// FUN_00587160 (operator_new(0x570), FUN_005836a0, slot 9). Built directly by
-// WinControl::CreateShipViewControl (FUN_005a1020 -> Init FUN_005842a0).
+// FUN_00587160 (operator new(0x570)). Also built directly by WinControl::CreateShipViewControl
+// (FUN_005a1020).
 //
-// vftable 0x005e4bcc (45 slots) -- WinControl's with these overrides:
-//    0 FUN_00583b70 scalar deleting dtor (FUN_00583c30)
-//    4 LAB_00584bd0 HitTest           5 LAB_004b5020 (Win3D's SetPosition, not WinControl's)
-//    6 LAB_005846b0 IsPositionInViewport             9 FUN_00583e30 Create        11 LAB_00584740 Update
-//   13 LAB_00584470 Draw             19 LAB_005846a0 (JMP FUN_005a0650, WinControl's MouseEvent)
-//   42 LAB_005864c0 SetProperty
-// UIShipViewControl (vftable 0x005e59a4) derives from this class and replaces slots 0 / 8 / 9
-// (ui_ship_view_control.h).
+// vftable 0x005e4bcc (45 slots) -- WinControl's with the overrides below; slot 0 is
+// FUN_00583b70 (scalar deleting dtor), slot 5 is Win3D's SetPosition (not WinControl's) and
+// slot 19 jumps to WinControl's MouseEvent. UIShipViewControl (vftable 0x005e59a4) derives from
+// this class and replaces slots 0 / 8 / 9 (ui_ship_view_control.h).
 //
-// Layout (ctor FUN_005836a0, size 0x570):
-//   +0x32c ID_String ship nickname          +0x330 FClientMeshHolder (the ship mesh)
-//   +0x358 object orientation[9]            +0x37c object_ypr[3] (degrees)
-//   +0x388 FSpaceCamera (0xc0)              +0x448 ambient RGBA bytes {0,0,0,0xff}
-//   +0x44c FEngineLight*[8] (three used)    +0x46c light count (3)
-//   +0x470 viewSize[3]                      +0x47c attach position[3] (hardpoint)
-//   +0x488 offset[3]                        +0x494 screen rect (left, top, right, bottom)
-//   +0x4a4 camera distance                  +0x4a8 bounds centre[3]
-//   +0x4b4 vertical FOV (25.0)              +0x4b8 framed engine instance (-1)
-//   +0x4bc wire_color, +0x4c0 rect_color, +0x4c4 {0xc3,0xb8,0x20,0xff} (RGBA bytes)
-//   +0x4c8 EquipDescList (retail VC6 std::list<EquipDesc>, 0xc bytes)
-//   +0x4d4 FEquipVisualSet*                 +0x4d8 accumulated rotation[3]
-//   +0x4e4 rot_speed[3]                     +0x4f0 -1, +0x4f4 0, +0x4f8 0 (Reset)
-//   +0x4fc selected hp class, +0x500 selected weapon, +0x504 selected shield generator
-//   +0x508 selected instance (-1), +0x50c selected radius, +0x510 selected extent radius
-//   +0x518 flags: bit2 show_rect, bit3 show_wireframe (also property 0x19), bit4 (FUN_00585bd0),
-//          bit5 (FUN_00585cd0 / 00585d20 / 00585d90)
-//   +0x51c mode (property 0x4c; ctor 2)     +0x520 drag ypr[3], +0x52c last drag angles[3]
-//   +0x538 std::vector<FClientMeshHolder*>  mountpoint marker per hardpoint
-//   +0x54c std::vector<int>                 hp types of one hardpoint (FUN_00586560)
-//   +0x55c byte (ctor 0)                    +0x560 std::vector<FShipViewHpEntry> (0x20 each)
-//
-// The port's EquipDescList and std::vector members are Common's / the current CRT's, so the
-// offsets from +0x4c8 on are retail's for reference only (no retail ABI, AGENTS.md).
+// Size 0x570. The port's EquipDescList and std::vector members are Common's / the current
+// CRT's, so the offsets from +0x4c8 on are retail's for reference only.
 
 #include "Interface/wincontrol_base.h"
 
@@ -70,15 +44,14 @@ namespace Archetype
     struct Equipment;
 }
 
-// One row of the hardpoint list FUN_00586b70 builds (retail element 0x20 bytes; element dtor
-// FUN_00455e90 / FUN_00587dc0 frees the VC6 string).
+// One row of the hardpoint list BuildHardpointList builds (retail element 0x20 bytes).
 struct FShipViewHpEntry
 {
     int Ids;          // +0x00 DAT_00615244[k] -- the hp-type caption IDS
     std::string Name; // +0x04 the hardpoint name (VC6 std::string, 0x10 bytes)
     int SortKey;      // +0x14 the DAT_00615240 row while sorting; 0 in the stored copy
-    int Group;        // +0x18 FUN_00586800's grouping of the hp type (0 / 1 / 2)
-    int Class;        // +0x1c FUN_00585b10's class of the hp type (0..9)
+    int Group;        // +0x18 HasHpTypeGroup's grouping of the hp type (0 / 1 / 2)
+    int Class;        // +0x1c ShipViewHpTypeClass of the hp type (0..9)
 };
 
 // FUN_005835f0 (cdecl) -- the hp class of an equipment archetype for the ship view: 0 when the
@@ -185,23 +158,23 @@ public:
     ID_String ShipId;                          // +0x32c
     FClientMeshHolder ShipHolder;              // +0x330
     float ObjectOrientation[9];                // +0x358
-    float ObjectYpr[3];                        // +0x37c
-    FSpaceCamera Camera;                       // +0x388
-    unsigned char Ambient[4];                  // +0x448
-    FEngineLight* Lights[8];                   // +0x44c
-    int LightCount;                            // +0x46c
+    float ObjectYpr[3];                        // +0x37c -- degrees
+    FSpaceCamera Camera;                       // +0x388 (0xc0)
+    unsigned char Ambient[4];                  // +0x448 -- RGBA {0,0,0,0xff}
+    FEngineLight* Lights[8];                   // +0x44c -- three used
+    int LightCount;                            // +0x46c -- 3
     float ViewSize[3];                         // +0x470
-    float AttachPos[3];                        // +0x47c
+    float AttachPos[3];                        // +0x47c -- the hardpoint position
     float ViewOffset[3];                       // +0x488
-    int ScreenRect[4];                         // +0x494
-    float Distance;                            // +0x4a4
-    float Center[3];                           // +0x4a8
-    float FovY;                                // +0x4b4
-    long Instance;                             // +0x4b8
+    int ScreenRect[4];                         // +0x494 -- left, top, right, bottom
+    float Distance;                            // +0x4a4 -- camera distance
+    float Center[3];                           // +0x4a8 -- bounds centre
+    float FovY;                                // +0x4b4 -- 25.0
+    long Instance;                             // +0x4b8 -- the framed engine instance (-1)
     unsigned char WireColor[4];                // +0x4bc
     unsigned char RectColor[4];                // +0x4c0
-    unsigned char Color4c4[4];                 // +0x4c4 -- no reader in this class
-    EquipDescList Equipment;                   // +0x4c8
+    unsigned char Color4c4[4];                 // +0x4c4 -- {0xc3,0xb8,0x20,0xff}; no reader here
+    EquipDescList Equipment;                   // +0x4c8 (retail VC6 list, 0xc bytes)
     FEquipVisualSet* Visuals;                  // +0x4d4
     float RotAccum[3];                         // +0x4d8
     float RotSpeed[3];                         // +0x4e4
@@ -215,14 +188,16 @@ public:
     float SelRadius;                           // +0x50c
     float SelExtent;                           // +0x510
     int Field514;                              // +0x514 -- never written here
-    unsigned char ViewFlags;                   // +0x518 (Win3D::Flags is +0x6c)
+    // +0x518 -- bit2 show_rect, bit3 show_wireframe (also property 0x19), bit4 (SelectInstance),
+    // bit5 (SelectHpClass / SelectEquipDesc / SelectGood). Win3D::Flags is +0x6c.
+    unsigned char ViewFlags;
     unsigned char Pad519[3];                   // +0x519
-    int Mode;                                  // +0x51c
+    int Mode;                                  // +0x51c -- property 0x4c; ctor 2
     float DragYpr[3];                          // +0x520
-    float DragLast[3];                         // +0x52c
-    std::vector<FClientMeshHolder*> MountHolders; // +0x538
+    float DragLast[3];                         // +0x52c -- the last drag angles
+    std::vector<FClientMeshHolder*> MountHolders; // +0x538 -- a marker per hardpoint
     int Field548;                              // +0x548 -- never written here
-    std::vector<int> HpTypes;                  // +0x54c
+    std::vector<int> HpTypes;                  // +0x54c -- the hp types of one hardpoint
     unsigned char Byte55c;                     // +0x55c -- ctor 0
     std::vector<FShipViewHpEntry> HpList;      // +0x560
 

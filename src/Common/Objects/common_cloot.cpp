@@ -24,7 +24,7 @@ using CmnCobject::RotateWorldToObjectSpace;
 CLoot::CLoot(Class ObjectClass)
     : CSimple(ObjectClass)
 {
-    // .text:062ac400-062ac459. The alignment bytes +0xfe/+0xff are not written by retail.
+    // FUN_062ac400. The alignment bytes +0xfe/+0xff are not written by retail.
     OwnerId = 0;
     NameId = 0;
     ContentsArch = nullptr;
@@ -34,24 +34,22 @@ CLoot::CLoot(Class ObjectClass)
     bTemporary = false;
     Reserved100 = 0;
     bCanAiTractor = true;
-    TypeBits = 0x10000000;                                       // 062ac44c
+    TypeBits = 0x10000000;
 }
 
-// .text:0629d530-0629d7de. 0629d54e-0629d752 is CSimple(CSimple const&) inlined (EngineObject,
-// CObject and CSimple layers with their vftable stamps); then the CLoot dwords +0xe4..+0xf8,
-// the bytes +0xfc / +0xfd and the dword +0x100, and the CLoot vftable. The alignment bytes
-// +0xfe/+0xff are not written by retail and are not written here either.
+// FUN_0629d530, with CSimple's copy ctor inlined. The alignment bytes +0xfe/+0xff are not
+// written by retail.
 CLoot::CLoot(CLoot const& Other)
     : CSimple(Other)
-    , OwnerId(Other.OwnerId)                                     // 0629d758
-    , NameId(Other.NameId)                                       // 0629d764
-    , ContentsArch(Other.ContentsArch)                           // 0629d770
-    , Units(Other.Units)                                         // 0629d77c
-    , ContentsHitPts(Other.ContentsHitPts)                       // 0629d788
-    , OwnerSafeTime(Other.OwnerSafeTime)                         // 0629d794
-    , bCanAiTractor(Other.bCanAiTractor)                         // 0629d7a0
-    , bTemporary(Other.bTemporary)                               // 0629d7ac
-    , Reserved100(Other.Reserved100)                             // 0629d7b9
+    , OwnerId(Other.OwnerId)
+    , NameId(Other.NameId)
+    , ContentsArch(Other.ContentsArch)
+    , Units(Other.Units)
+    , ContentsHitPts(Other.ContentsHitPts)
+    , OwnerSafeTime(Other.OwnerSafeTime)
+    , bCanAiTractor(Other.bCanAiTractor)
+    , bTemporary(Other.bTemporary)
+    , Reserved100(Other.Reserved100)
 {
 }
 
@@ -61,7 +59,7 @@ CLoot::~CLoot()
 
 void CLoot::init(CreateParms const& Parms)
 {
-    // Common.dll.c 0x4c460. Initialize loot container.
+    // FUN_062ac460
     OwnerId = Parms.OwnerId;
     if (OwnerId != 0)
         OwnerSafeTime = LOOT_OWNER_SAFE_TIME;
@@ -76,10 +74,8 @@ void CLoot::init(CreateParms const& Parms)
 
 void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
 {
-    // .text:062ac4c0..062ac677. Parms: PhySys default linear and angular damping, mass =
-    // container archetype Mass (+0x20, no null test), system id from IObjDB, Type 2, +0x1c =
-    // 0, bEnableCollisions 1, +0x26 / +0x28..+0x30 = 0, Name = _itoa(OwnerId (+0xe4) when
-    // non-zero, else Id (+0xb0), radix 24). The bytes retail leaves unwritten are zero here.
+    // FUN_062ac4c0. No null test on the container archetype. Name is _itoa(OwnerId, else Id,
+    // radix 24). The bytes retail leaves unwritten are zero here.
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
     Phy.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
@@ -93,9 +89,7 @@ void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     _itoa((int)((OwnerId != 0) ? OwnerId : Id), Phy.Name, 0x18);
     PhySys::BuildIVP_Real(this, Phy);
 
-    // 062ac57b / 062ac633: no body (+0x54) -> FDUMP the CLoot.cpp:0x53 error with the
-    // container (+0x88) and contents (+0xec) nicknames (contents string fetched first) and
-    // return without touching velocity.
+    // No body (+0x54): report and leave the velocity alone. The contents name is fetched first.
     if (BodyPtr == nullptr)
     {
         char const* const ContentsName = ContentsArch->Nickname.get_string();
@@ -107,15 +101,14 @@ void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     }
 
     PhySys::AddToVelocity(this, Velocity);
-    // Common.dll.c 0x4c4c0: rotate world-space AngularVelocity into object space
-    // via Orientation^T before adding it — see RotateWorldToObjectSpace above.
+    // World-space AngularVelocity rotated into object space.
     PhySys::AddToAngularVelocityOS(this, RotateWorldToObjectSpace(Orientation, AngularVelocity));
 }
 
 int CLoot::update(float Dt, unsigned Flags)
 {
-    // Common.dll.c 0x4c680. Countdown owner-safe-time; once it lapses, restore
-    // the normal (owner-inclusive) collision group.
+    // FUN_062ac680. When the owner-safe time lapses, the collision group becomes the loot's own
+    // id, so the owner can collide with it.
     update_zones(Dt, Flags);
     if (OwnerSafeTime > 0.0f)
     {
@@ -132,10 +125,7 @@ int CLoot::update(float Dt, unsigned Flags)
 
 void CLoot::set_hit_pts(float NewHitPts)
 {
-    // Common.dll.c 0x4c700. When the contents archetype equals the container
-    // archetype (the loot IS its cargo, e.g. a raw canister), mirror into
-    // ContentsHitPts too; the base HitPts is always updated. .text:062ac700-062ac72f: both
-    // archetype ids are read with no null test.
+    // FUN_062ac700. When the loot is its own cargo, ContentsHitPts mirrors HitPts. No null tests.
     if (contents_arch()->get_id() == container_arch()->get_id())
         ContentsHitPts = NewHitPts;
     CSimple::set_hit_pts(NewHitPts);
@@ -143,8 +133,7 @@ void CLoot::set_hit_pts(float NewHitPts)
 
 unsigned CLoot::get_name() const
 {
-    // .text:062ac740..062ac753: NameId (+0xe8) when non-zero, else ContentsArch(+0xec)->
-    // IdsName (+0x14) with no null test.
+    // FUN_062ac740. No null test on ContentsArch.
     if (NameId != 0)
         return (unsigned)NameId;
     return (unsigned)ContentsArch->IdsName;
@@ -152,7 +141,7 @@ unsigned CLoot::get_name() const
 
 unsigned CLoot::get_owner() const
 {
-    // Common.dll.c 0x3d470
+    // FUN_0629d470
     return OwnerId;
 }
 
@@ -163,8 +152,7 @@ unsigned CLoot::get_units() const
 
 float CLoot::get_volume() const
 {
-    // .text:0629d4e0..0629d505: FILD qword {Units (+0xf0), 0} FMUL contents arch (+0xec, no
-    // null test)->Volume (+0x5c), returned in ST0.
+    // FUN_0629d4e0. Units is widened as unsigned; no null test on the contents archetype.
     return (float)((double)Units * contents_arch()->Volume);
 }
 
@@ -190,18 +178,18 @@ bool CLoot::is_loot_temporary() const
 
 bool CLoot::can_ai_tractor() const
 {
-    // Common.dll.c 0x3d510
+    // FUN_0629d510
     return bCanAiTractor;
 }
 
 Archetype::Equipment* CLoot::contents_arch() const
 {
-    // Common.dll.c 0x3d490. Retail caches a resolved pointer directly.
+    // FUN_0629d490
     return const_cast<Archetype::Equipment*>(ContentsArch);
 }
 
 Archetype::Equipment* CLoot::container_arch() const
 {
-    // .text:0629d480: JMP CAsteroid::asteroidarch (ICF fold of `return [this+0x88]`).
+    // FUN_0629d480, a JMP to the ICF-folded CAsteroid::asteroidarch.
     return (Archetype::Equipment*)Archetype;
 }

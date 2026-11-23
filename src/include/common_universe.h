@@ -8,9 +8,8 @@
 
 #include "common_exports.h"
 
-// Common.dll Universe::Startup / Shutdown — Systems.cpp.
-// Linked into freelancer.exe. Maps are ours (std::map), not VC6.
-// See docs/re/common.md (Universe).
+// Common.dll Universe::Startup / Shutdown — Systems.cpp. Maps are the port's std::map, not
+// VC6's. See docs/re/common.md (Universe).
 
 #include "common_id.h"
 #include "common_ini.h"
@@ -38,7 +37,6 @@ namespace Archetype
     struct Solar;
 
     // listing 0x91250. All six share one body: return Name.Id (ID_String is a uint).
-    // ?GetAsteroidID@Archetype@@YAIABUID_String@@@Z
     COMMON_API unsigned __cdecl GetAsteroidID(ID_String const& Name);
     COMMON_API unsigned __cdecl GetDynamicAsteroidID(ID_String const& Name);
     COMMON_API unsigned __cdecl GetEquipmentID(ID_String const& Name);
@@ -55,25 +53,18 @@ namespace Archetype
     COMMON_API Asteroid* __cdecl GetAsteroidByName(ID_String const& Name);
 
     // listing 0x93cd0 / 0x93d40. ArchDB GSolarDb.Get.
-    // ?GetSolar@Archetype@@YAPAUSolar@1@I@Z
-    // ?GetSolarByName@Archetype@@YAPAUSolar@1@ABUID_String@@@Z
     COMMON_API Solar* __cdecl GetSolar(unsigned NicknameId);
     COMMON_API Solar* __cdecl GetSolarByName(ID_String const& Name);
 
     // listing 0x93220 / 0x93290. ArchDB GShipDb.Get.
-    // ?GetShip@Archetype@@YAPAUShip@1@I@Z
-    // ?GetShipByName@Archetype@@YAPAUShip@1@ABUID_String@@@Z
     COMMON_API Ship* __cdecl GetShip(unsigned NicknameId);
     COMMON_API Ship* __cdecl GetShipByName(ID_String const& Name);
 
     // listing 0x993f0 / 0x99460. ArchDB GEquipmentDb.Get.
-    // ?GetEquipment@Archetype@@YAPAUEquipment@1@I@Z
-    // ?GetEquipmentByName@Archetype@@YAPAUEquipment@1@ABUID_String@@@Z
     COMMON_API Equipment* __cdecl GetEquipment(unsigned NicknameId);
     COMMON_API Equipment* __cdecl GetEquipmentByName(ID_String const& Name);
 
     // listing 0xabd10. GExplosionDb map find — silent miss, no ArchDB::Get FDUMP.
-    // ?GetExplosion@Archetype@@YAPAUExplosion@1@ABUID_String@@@Z
     COMMON_API Explosion* __cdecl GetExplosion(ID_String const& Name);
 }
 
@@ -82,8 +73,8 @@ namespace Universe
     struct IZone;
 
     // One jump connection of a system: the 0x20-byte record the universe loader pushes onto
-    // SYSTEM+0x54's vector after every [Object] carrying a `goto` key (FUN_06337250
-    // .text:06338155-063381cb, push_back FUN_0633e770). ISystem slots 13/14 hand them out;
+    // SYSTEM+0x54's vector after every [Object] carrying a `goto` key (FUN_06337250). ISystem
+    // slots 13/14 hand them out;
     // Server.dll pub::System::EnumerateConnections is the only reader.
     struct FSystemConnection
     {
@@ -117,8 +108,8 @@ namespace Universe
     static_assert(sizeof(FSystemObject) == 0x118, "FSystemObject size is 0x118");
 
     // One entry of SYSTEM+0x80's zone list: the INI_Reader state captured at the zone's
-    // [Zone] header (.text:063375c8) and the zone as it sits in the zone map (list node
-    // +0x08 / +0xc10). FUN_0633e920 appends it only when the zone map insert succeeded.
+    // [Zone] header and the zone as it sits in the zone map. FUN_0633e920 appends it only
+    // when the zone map insert succeeded.
     struct FSystemZone
     {
         INI_Reader::State State;
@@ -135,49 +126,47 @@ namespace Universe
     // their retail body shows.
     struct ISystem
     {
-        virtual unsigned GetId() const = 0;                  // +0x00 062969c0  [+0x4c] id (formerly Slot00)
-        // +0x04 0633afa0: ADD ECX,4; JMP CommReferrable::GetMsgIdPrefix. The same name as
-        // CommReferrable's slot 1, so SYSTEM's one override fills both tables, as in retail
-        // (the CommReferrable-side thunk LAB_063415d0 subtracts 4 and lands here).
+        virtual unsigned GetId() const = 0;                  // +0x00 062969c0  [+0x4c] id
+        // +0x04 0633afa0: thunk to CommReferrable::GetMsgIdPrefix. The same name as
+        // CommReferrable's slot 1, so SYSTEM's one override fills both tables, as in retail.
         virtual TString<64> const& GetMsgIdPrefix() const = 0;
-        virtual char const* GetNickname() const = 0;         // +0x08 063390f0  [+0x50] nickname (formerly Slot02)
-        virtual int GetStridName() const = 0;                // +0x0c 0633aff0  [+0x68] strid_name (formerly Slot03)
-        virtual int GetIdsInfo() const = 0;                  // +0x10 0633b000  [+0x6c] ids_info (formerly Slot04)
-        virtual char const* GetFile() const = 0;             // +0x14 0629ba60  [+0x70] file (formerly Slot05)
-        // +0x18 0633b020: LEA +0x80, the zone list the loader filled (formerly Slot06).
+        virtual char const* GetNickname() const = 0;         // +0x08 063390f0  [+0x50] nickname
+        virtual int GetStridName() const = 0;                // +0x0c 0633aff0  [+0x68] strid_name
+        virtual int GetIdsInfo() const = 0;                  // +0x10 0633b000  [+0x6c] ids_info
+        virtual char const* GetFile() const = 0;             // +0x14 0629ba60  [+0x70] file
+        // +0x18 0633b020: the zone list the loader filled (+0x80).
         virtual std::list<FSystemZone> const* GetZones() const = 0;
-        // +0x1c 0633b030: the zone BSP, built from the zone list on first use (formerly Slot07).
+        // +0x1c 0633b030: the zone BSP, built from the zone list on first use.
         virtual ISpatialPartition* GetZoneTree() const = 0;
         // +0x20 0633b0c0: the property flags at a sphere -- the OR of every touched zone whose
         // flags carry none of 0x7fc0, plus the flags of the smallest-radius touched zone that
-        // carries some (formerly Slot08).
+        // carries some.
         virtual unsigned GetSphereProperties(Geometry::Sphere const* Query) const = 0;
         // +0x24 0633b230: the OR of the property flags of every zone the sphere touches;
-        // Server's pub::System::GetNestedProperties forwards to it (formerly Slot09).
+        // Server's pub::System::GetNestedProperties forwards to it.
         virtual unsigned GetNestedProperties(Geometry::Sphere const* Query) const = 0;
-        // +0x28 0633b350: the smallest-radius zone containing Point (formerly Slot10).
+        // +0x28 0633b350: the smallest-radius zone containing Point.
         virtual IZone const* GetSmallestZoneAt(Vector const* Point) const = 0;
-        // +0x2c 0633b4b0: as +0x28, among zones with a physical effect (formerly Slot11).
+        // +0x2c 0633b4b0: as +0x28, among zones with a physical effect.
         virtual IZone const* GetSmallestPhysicalZoneAt(Vector const* Point) const = 0;
-        // +0x30 0633b620: as +0x28, among zones whose property flags share a bit with Mask
-        // (formerly Slot12).
+        // +0x30 0633b620: as +0x28, among zones whose property flags share a bit with Mask.
         virtual IZone const* GetSmallestZoneWithPropertiesAt(Vector const* Point, unsigned Mask) const = 0;
-        // +0x34 0633b790: the number of FSystemConnection records (formerly Slot13).
+        // +0x34 0633b790: the number of FSystemConnection records.
         virtual int GetConnectionCount() const = 0;
         // +0x38 0633b7b0: copies connection [Index] when it exists; retail returns false on
-        // every path (formerly Slot14).
+        // every path.
         virtual bool GetConnection(unsigned Index, FSystemConnection* Out) const = 0;
         // +0x3c 0633b7f0: loads the shared object pool from this system's file (FUN_06336750)
-        // unless it already holds it, then the pool's 0x118-byte record count (formerly Slot15).
+        // unless it already holds it, then the pool's record count.
         virtual int GetObjectCount() const = 0;
-        // +0x40 0633b840 (RET 8): copies object [Index] of the pool; false past either count
-        // (formerly Slot16). Not "GetObject": <wingdi.h> defines that name as a macro.
+        // +0x40 0633b840: copies object [Index] of the pool; false past either count.
+        // Not "GetObject": <wingdi.h> defines that name as a macro.
         virtual bool GetSystemObject(unsigned Index, FSystemObject* Out) const = 0;
-        virtual Vector const* GetPos() const = 0;            // +0x44 0633b010  LEA +0x74 pos (formerly Slot17)
-        virtual unsigned char GetVisit() const = 0;          // +0x48 0633afb0  byte [+0x64] visit (formerly Slot18)
-        virtual void SetVisit(unsigned char NewVisit) = 0;   // +0x4c 0633afe0  set [+0x64] (formerly Slot19)
-        virtual float GetNavMapScale() const = 0;            // +0x50 0633afc0  [+0x90] NavMapScale (formerly Slot20)
-        virtual unsigned GetSpaceMusic() const = 0;          // +0x54 0633afd0  [+0x94] [Music] space (formerly Slot21)
+        virtual Vector const* GetPos() const = 0;            // +0x44 0633b010  +0x74 pos
+        virtual unsigned char GetVisit() const = 0;          // +0x48 0633afb0  byte [+0x64] visit
+        virtual void SetVisit(unsigned char NewVisit) = 0;   // +0x4c 0633afe0  set [+0x64]
+        virtual float GetNavMapScale() const = 0;            // +0x50 0633afc0  [+0x90] NavMapScale
+        virtual unsigned GetSpaceMusic() const = 0;          // +0x54 0633afd0  [+0x94] [Music] space
 
         unsigned NicknameId;
         char const* Nickname;
@@ -190,15 +179,15 @@ namespace Universe
     };
 
     // Universe::IBase -- the interface of Common.dll's BASE (vftable .rdata:063a4d5c, 27 slots,
-    // no destructor slot; the universe loader builds one per [Base] block of universe.ini,
-    // FUN_06337250 .text:063386d0-06338cc9). Every slot is a one-instruction getter/setter of
+    // no destructor slot; the universe loader FUN_06337250 builds one per [Base] block of
+    // universe.ini). Every slot is a one-instruction getter/setter of
     // a BASE field and is named after that field's universe.ini key.
     // As with ISystem and IZone, the data members stay on the interface in retail BASE's offset
     // order because readers across Common, Server and freelancer read them directly; the slots
     // return exactly these fields.
     struct IBase
     {
-        // Slots +0x00..+0x54 are the getters of the [Base] keys (formerly Slot00..Slot21).
+        // Slots +0x00..+0x54 are the getters of the [Base] keys.
         virtual unsigned GetId() const = 0;                 // +0x00 062d1ad0  [+0x04] nickname id
         virtual char const* GetNickname() const = 0;        // +0x04 062a66a0  [+0x08] nickname
         virtual int GetStridName() const = 0;               // +0x08 0629fb90  [+0x0c] strid_name
@@ -223,11 +212,11 @@ namespace Universe
         virtual unsigned GetTerrainDyna01() const = 0;      // +0x4c 0633bab0  [+0x64] terrain_dyna_01
         virtual unsigned GetTerrainDyna02() const = 0;      // +0x50 0633aff0  [+0x68] terrain_dyna_02
         virtual bool IsAutosaveForbidden() const = 0;       // +0x54 0633bac0  byte [+0x6c] autosave_forbidden
-        virtual void SetSystem(unsigned NewSystemId) = 0;   // +0x58 0633bad0  [+0x14] = arg (formerly Slot22)
-        virtual unsigned GetSpaceObjectId() const = 0;      // +0x5c 0633baf0  [+0x28] (formerly Slot23)
-        virtual unsigned char GetSpaceObjectVisit() const = 0; // +0x60 0633bb10  byte [+0x2c] (formerly Slot24)
-        virtual void SetSpaceObjectId(unsigned NewSpaceObjectId) = 0; // +0x64 0633bae0  [+0x28] = arg (formerly Slot25)
-        virtual void SetSpaceObjectVisit(unsigned char NewVisit) = 0; // +0x68 0633bb00  byte [+0x2c] = arg (formerly Slot26)
+        virtual void SetSystem(unsigned NewSystemId) = 0;   // +0x58 0633bad0  [+0x14] = arg
+        virtual unsigned GetSpaceObjectId() const = 0;      // +0x5c 0633baf0  [+0x28]
+        virtual unsigned char GetSpaceObjectVisit() const = 0; // +0x60 0633bb10  byte [+0x2c]
+        virtual void SetSpaceObjectId(unsigned NewSpaceObjectId) = 0; // +0x64 0633bae0  [+0x28] = arg
+        virtual void SetSpaceObjectVisit(unsigned char NewVisit) = 0; // +0x68 0633bb00  byte [+0x2c] = arg
 
         unsigned NicknameId;           // +0x04 ID_String "nickname"
         char const* Nickname;          // +0x08 CacheString (StringAlloc'd "nickname")
@@ -237,8 +226,7 @@ namespace Universe
         std::string BgcsBaseRunBy;     // +0x18 "BGCS_base_run_by" (a std::string in retail too)
         // +0x28 / +0x2c: the nickname and the visit byte of the system [Object] that carries
         // this base (base = this base, ids_name == strid_name), stored through slots 25/26 by
-        // FUN_06337250 .text:06338225 / .text:06338231. The [Base] reader zeroes both
-        // (.text:0633877c / .text:06338780).
+        // FUN_06337250. The [Base] reader zeroes both.
         unsigned SpaceObjectId;        // +0x28
         unsigned char SpaceObjectVisit;// +0x2c
         unsigned ShipSml[3];           // +0x30 ship_sml_01..03
@@ -253,15 +241,9 @@ namespace Universe
         bool bAutosaveForbidden;       // +0x6c
     };
 
-    // FUN_063362d0 table PTR_s_sphere_063edb80: name -> int (stricmp).
-    // 0 = invalid / miss. CONFIRMED (2026-09-10, d216:izone-shape-investigate lane,
-    // decomp-tracker items 2574/11429): the retail IZone-shape-base class's vtable slot
-    // 0x18 (PTR_LAB_063a5094+0x18, Common.dll.txt:568507) is ICF-folded byte-identical
-    // with Archetype::Root::GetRef, `MOV EAX,[this+0x3c]; RET` -- i.e. it just returns
-    // this enum's value directly, matching the field this port names `Shape` below
-    // exactly (populated by ParseZoneShape, common_universe.cpp). See
-    // CmnAsteroid::CAsteroidField::load's "exclude_dynamic_asteroids" key
-    // (src/Common/common_casteroidfield.cpp) for the one confirmed live consumer.
+    // FUN_063362d0 table PTR_s_sphere_063edb80: name -> int (stricmp); 0 = invalid / miss.
+    // IZone slot +0x18 returns it from Shape (+0x3c). Consumer:
+    // CmnAsteroid::CAsteroidField::load's "exclude_dynamic_asteroids" key.
     enum EZoneShape
     {
         ZoneShapeInvalid = 0,
@@ -276,8 +258,8 @@ namespace Universe
     // Universe::IZoneImmersion / Universe::IZone -- the interface of Common.dll's ZONE (RTTI
     // .?AUZONE@@ : .?AUIZone@Universe@@ : .?AUIZoneImmersion@Universe@@, single inheritance,
     // one vftable .rdata:063a5094 of 37 slots +0x00..+0x90). There is NO destructor slot:
-    // ZONE's destructor FUN_06339010 is non-virtual and is called directly (06337dee,
-    // 0639774d). The concrete class is ZONE (src/include/common_zone.h,
+    // ZONE's destructor FUN_06339010 is non-virtual and is called directly. The concrete class
+    // is ZONE (src/include/common_zone.h,
     // src/Common/common_zone.cpp); nothing outside Common.dll constructs one.
     //
     // Retail interfaces carry no data. The data members below are the port's storage for the
@@ -299,70 +281,65 @@ namespace Universe
         // Slots +0x00, +0x3c, +0x40 and +0x48 return double: retail leaves the result on the
         // x87 stack unrounded and its callers consume it there (for example the nebula
         // exclusion check FCOMPs slot +0x00 against 1.0 at .text:062bcce6).
-        virtual double GetImmersion(Vector const& Point) const = 0; // (formerly Slot00)
+        virtual double GetImmersion(Vector const& Point) const = 0;
     };
 
     struct IZone : IZoneImmersion
     {
         virtual unsigned GetId() const = 0;                     // +0x04 062d1ad0  [+0x04]
         virtual unsigned GetSystem() const = 0;                 // +0x08 062a66a0  [+0x08]
-        // +0x0c 062d1ae0: LEA +0x0c, the orientation and position as one transform (formerly Slot0C).
+        // +0x0c 062d1ae0: +0x0c, the orientation and position as one transform.
         virtual Transform const& GetTransform() const = 0;
         virtual Vector const& GetPos() const = 0;               // +0x10 063390a0  LEA +0x30
         virtual Matrix const& GetOrientation() const = 0;       // +0x14 062d1ae0  LEA +0x0c
         virtual unsigned GetShape() const = 0;                  // +0x18 0626c6b0  [+0x3c]
         virtual unsigned long GetProperties() const = 0;        // +0x1c 062a6690  [+0x40]
         virtual bool Slot20() const = 0;                        // +0x20 063390b0  flags & 0x18000
-        virtual Vector const& GetFogColor() const = 0;          // +0x24 063390c0  LEA +0x78 property_fog_color (formerly Slot24)
+        virtual Vector const& GetFogColor() const = 0;          // +0x24 063390c0  +0x78 property_fog_color
         virtual Vector GetSize() const = 0;                     // +0x28 063390d0  copy of +0x44
-        virtual long GetMeshHandle() const = 0;                 // +0x2c 063390f0  [+0x50] (formerly Slot2C)
+        virtual long GetMeshHandle() const = 0;                 // +0x2c 063390f0  [+0x50]
         virtual float GetRadius() const = 0;                    // +0x30 06339100  cached +0x68
 
-        // W6-ZONE: ready for pub::System::InZones
         // +0x34 06339220. true when Point is inside the zone grown by Margin.
         virtual bool InZone(Vector const& Point, float Margin) const = 0;
-        // +0x38 06339670. InZone's twin in the zone's XZ plane: the height is ignored
-        // (formerly Slot38).
+        // +0x38 06339670. InZone's twin in the zone's XZ plane: the height is ignored.
         virtual bool InZoneXZ(Vector const& Point, float Margin) const = 0;
         // +0x3c 06339b00. Signed distance to the surface (negative inside).
         virtual double GetDistance(Vector const& Point) const = 0;
-        // +0x40 06339ff0. Distance from the centre to the surface along a world direction
-        // (formerly Slot40).
+        // +0x40 06339ff0. Distance from the centre to the surface along a world direction.
         virtual double GetRadiusAlong(Vector const& Direction) const = 0;
-        // +0x44 0633a290. The surface point that belongs to Point (formerly Slot44).
+        // +0x44 0633a290. The surface point that belongs to Point.
         virtual Vector GetSurfacePoint(Vector const& Point) const = 0;
-        // W6-ZONE: ready for pub::System::InZones
         // +0x48 0633a6e0. 1.0 on the surface, below 1 inside, above 1 outside.
         virtual double ClassifyPoint(Vector const& Point) const = 0;
         // +0x4c 0633aa40. First point where Start->End enters the zone.
         virtual bool Intersect(Vector const& Start, Vector const& End, Vector& OutHit) const = 0;
 
-        virtual float GetEdgeFraction() const = 0;              // +0x50 0633ac20  [+0x54] (formerly Slot50)
-        virtual bool HasPhysicalEffect() const = 0;             // +0x54 0633ad10  lazy [+0x58] (formerly Slot54)
-        virtual float GetDragModifier() const = 0;              // +0x58 0633ad70  [+0x5c] (formerly Slot58)
-        virtual float GetDamage() const = 0;                    // +0x5c 0633ad80  [+0x60] (formerly Slot5C)
-        virtual float GetInterference() const = 0;             // +0x60 0633ad90  [+0x64] (formerly Slot60)
-        // +0x64 0633add0: the number of `faction` population entries (formerly Slot64).
+        virtual float GetEdgeFraction() const = 0;              // +0x50 0633ac20  [+0x54]
+        virtual bool HasPhysicalEffect() const = 0;             // +0x54 0633ad10  lazy [+0x58]
+        virtual float GetDragModifier() const = 0;              // +0x58 0633ad70  [+0x5c]
+        virtual float GetDamage() const = 0;                    // +0x5c 0633ad80  [+0x60]
+        virtual float GetInterference() const = 0;             // +0x60 0633ad90  [+0x64]
+        // +0x64 0633add0: the number of `faction` population entries.
         virtual int GetPopulationCount() const = 0;
         // +0x68 0633adf0: population entry [Index] -> {faction id, weight}; false when out of
-        // range (formerly Slot68).
+        // range.
         virtual bool GetPopulationEntry(int Index, unsigned& OutId, float& OutWeight) const = 0;
         virtual weighted_vector<unsigned int> const& GetPopulation() const = 0; // +0x6c 0633ae40
-        virtual bool HasPathLabel() const = 0;                  // +0x70 0633ae50  byte [+0x88] path_label (formerly Slot70)
-        // +0x74 0633ada0: *[ESP+4] = [+0x6c], EAX = that pointer, RET 4 -- the `music` id as an
-        // ID_String returned through the hidden result pointer, as slot +0x28 returns its
-        // Vector (formerly Slot74).
+        virtual bool HasPathLabel() const = 0;                  // +0x70 0633ae50  byte [+0x88] path_label
+        // +0x74 0633ada0: the `music` id (+0x6c) as an ID_String returned through the hidden
+        // result pointer, as slot +0x28 returns its Vector.
         virtual ID_String GetMusic() const = 0;
         // +0x78 0633adb0: the spacedust effect name and spacedust_maxparticles; returns whether
-        // the zone has spacedust (flag 0x200000) (formerly Slot78).
+        // the zone has spacedust (flag 0x200000).
         virtual bool GetSpacedust(char const*& OutSpacedust, int& OutMaxParticles) const = 0;
         virtual CmnAsteroid::LootableZoneEntry* GetLootableInfo() const = 0; // +0x7c 06262dd0 [+0x84]
-        virtual unsigned char GetVisit() const = 0;             // +0x80 0633ae60  byte [+0x9c] visit (formerly Slot80)
+        virtual unsigned char GetVisit() const = 0;             // +0x80 0633ae60  byte [+0x9c] visit
         virtual int GetName() const = 0;                        // +0x84 0633ae80  [+0xa0]
-        virtual int GetIdsInfo() const = 0;                     // +0x88 0633ae90  [+0xa4] ids_info (formerly Slot88)
-        // +0x8c 0633aea0: free the owned record, set +0x84 (formerly Slot8C).
+        virtual int GetIdsInfo() const = 0;                     // +0x88 0633ae90  [+0xa4] ids_info
+        // +0x8c 0633aea0: free the owned record, set +0x84.
         virtual void SetLootableInfo(CmnAsteroid::LootableZoneEntry* LootEntry) = 0;
-        virtual void SetVisit(unsigned char NewVisit) = 0;      // +0x90 0633ae70  +0x9c = v | 0x20 (formerly Slot90)
+        virtual void SetVisit(unsigned char NewVisit) = 0;      // +0x90 0633ae70  +0x9c = v | 0x20
 
         unsigned NicknameId;               // +0x04 ID_String "nickname"
         unsigned SystemId;                 // +0x08
@@ -385,7 +362,7 @@ namespace Universe
         CmnAsteroid::LootableZoneEntry* OwnedLootEntry = nullptr; // +0x84 slot +0x8c's record (malloc'd)
         bool bPathLabel;                   // +0x88
         // +0x8c the faction population: one {MakeId(faction), weight} pair per `faction =`
-        // line (FUN_06337250 .text:06337c38-06337cac). Freed by the destructor (.text:0633906a).
+        // line (FUN_06337250). Freed by the destructor.
         weighted_vector<unsigned int> Population;
         unsigned char Visit;               // +0x9c
         int IdsName;                       // +0xa0
@@ -404,12 +381,8 @@ namespace Universe
         SolarGateAirlock = 3,    // AIRLOCK_GATE 0x400
     };
 
-    // bool __cdecl Universe::Startup(char const *)
-    // ?Startup@Universe@@YA_NPBD@Z
     COMMON_API bool __cdecl Startup(char const* RelPath);
 
-    // void __cdecl Universe::Shutdown(void)
-    // ?Shutdown@Universe@@YAXXZ
     COMMON_API void __cdecl Shutdown();
 
     COMMON_API unsigned __cdecl num_systems();

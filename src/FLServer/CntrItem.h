@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // CFLServerCntrItem — the rich-edit container item of CFLServerDoc (FLServer.exe, retail
-// .text:00406610..004066ff, vtable .rdata:0041c620, CRuntimeClass .data:0042543c).
+// vtable .rdata:0041c620, CRuntimeClass .data:0042543c).
 #pragma once
 
 class CFLServerDoc;

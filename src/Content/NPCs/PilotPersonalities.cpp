@@ -4,13 +4,11 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Content.dll TU45 (06f36f10-06f46940): pilot personalities.
+// Content.dll TU45: pilot personalities.
 //
-// Listing: DLLS\BIN\Content.dll.txt. Every function below names the retail
-// address it ports. The std::map template instantiations retail emits for the
-// seventeen maps (_Insert/_Buynode/_Erase/_Lrotate/_Rrotate/iterator steps,
-// 06f3e550-06f46920) and the per-map construct/atexit-destroy thunks
-// (06f38f40-06f39f70) are the std::map objects themselves.
+// The std::map template instantiations retail emits for the seventeen maps
+// (_Insert/_Buynode/_Erase/_Lrotate/_Rrotate/iterator steps) and the per-map
+// construct/atexit-destroy thunks are the std::map objects themselves.
 
 #include "NPCs/PilotPersonalities.h"
 
@@ -52,7 +50,7 @@ namespace
     static_assert(sizeof(FPilotRefs) == 0x44, "FPilotRefs: 0x11 dwords (MOVSD 0x11)");
 
     // Retail construction order (_initterm 06fcdca0.., one construct/atexit
-    // thunk pair per map, 06f38f40..06f39f70): pilots first, Job last.
+    // thunk pair per map): pilots first, Job last.
     std::map<unsigned int, FPilotRefs> GPilots;                                             // DAT_06fd0aa0
     std::map<unsigned int, FPersonality::EvadeDodgeUseStruct> GEvadeDodgeBlocks;           // DAT_06fd0a8c
     std::map<unsigned int, FPersonality::EvadeBreakUseStruct> GEvadeBreakBlocks;           // DAT_06fd0a78
@@ -71,7 +69,7 @@ namespace
     std::map<unsigned int, FPersonality::FormationUseStruct> GFormationBlocks;             // DAT_06fd0974
     std::map<unsigned int, FPersonality::JobStruct> GJobBlocks;                            // DAT_06fd0960
 
-    // .rdata DAT_06fb6060: degrees -> radians (FMUL float ptr).
+    // .rdata DAT_06fb6060: degrees -> radians (a float multiply).
     float const GDegToRad = 0.017453292f;
 
     // DAT_06fd0ab8: FUN_06f3c9b0 copies the weapon-type parameter here and
@@ -105,8 +103,7 @@ namespace
     // stride 0xC, terminated by class 0xC.
     typedef FPersonality::JobStruct::FAttackPreference FAttackPreference;
 
-    // FUN_06f3c970. Also inlined verbatim at every other TRUE/FALSE key of the
-    // block loaders: "TRUE" -> true, otherwise "not FALSE".
+    // FUN_06f3c970, also inlined at every other TRUE/FALSE key of the block loaders.
     bool ParseTrueFalse(char const* Text)
     {
         if (_stricmp(Text, "TRUE") == 0)
@@ -114,7 +111,7 @@ namespace
         return _stricmp(Text, "FALSE") != 0;
     }
 
-    // JobBlock EASIEST..HARDEST keys (inlined at 06f3c190): unknown -> 2.
+    // JobBlock EASIEST..HARDEST keys (inlined in FUN_06f3c190).
     int ParseToughness(char const* Text)
     {
         if (_stricmp(Text, "EASIEST") == 0)
@@ -428,7 +425,7 @@ namespace
                 Out->EngineKillFaceTime = Reader->get_value_float(0);
             else if (Reader->is_value("engine_kill_use_afterburner"))
             {
-                // 06f3b2ee-06f3b31d: the bool goes through FILD into a float.
+                // The bool is stored as a float.
                 Out->EngineKillUseAfterburner = (float)(ParseTrueFalse(Reader->get_value_string()) ? 1 : 0);
             }
             else if (Reader->is_value("engine_kill_afterburner_time"))
@@ -503,8 +500,8 @@ namespace
                 Out->AutoTurretNoBurstIntervalTime = Reader->get_value_float(0);
             else if (Reader->is_value("fire_style"))
             {
-                // 06f3b677-06f3b6a8: "MULTIPLE" stores stricmp's 0; anything else
-                // (the "SINGLE" compare result is discarded) stores 1.
+                // Retail compares "SINGLE" and discards the result: anything but
+                // MULTIPLE stores 1.
                 char const* Style = Reader->get_value_string();
                 if (_stricmp(Style, "MULTIPLE") == 0)
                     Out->FireStyle = 0;
@@ -680,8 +677,7 @@ namespace
                 Out->bRegroupFormationOnEvadeBreak = ParseTrueFalse(Reader->get_value_string());
             else if (Reader->is_value("formation_exit_mode"))
             {
-                // 06f3c02a-06f3c0d8: get_value_string() is re-read for every compare;
-                // no match leaves the field as it was.
+                // No match leaves the field as it was.
                 if (_stricmp(Reader->get_value_string(), "BREAK_AWAY_FROM_CENTER") == 0)
                     Out->FormationExitMode = 0;
                 else if (_stricmp(Reader->get_value_string(), "BREAK_AWAY_FROM_CENTER_AFTERBURNER") == 0)
@@ -704,8 +700,8 @@ namespace
         } while (Reader->read_value());
     }
 
-    // FUN_06f3c9b0 (body continues at 06f3c9d8): one attack_preference line
-    // "<class>, <range>, <weapon types>" into record Index.
+    // FUN_06f3c9b0: one attack_preference line "<class>, <range>, <weapon types>"
+    // into record Index.
     void LoadAttackPreference(FPersonality::JobStruct* Job, INI_Reader* Reader, int Index)
     {
         if (Index == 0xC)
@@ -736,7 +732,7 @@ namespace
             }
         }
 
-        // LAB_06f3caaf: terminator after this record, matched or not.
+        // Terminator after this record, matched or not.
         Records[Index + 1].ShipClass = 0xC;
     }
 
@@ -822,7 +818,7 @@ namespace
                 Out->MaximumLeaderTargetDistance = Reader->get_value_float(0);
             else if (Reader->is_value("combat_drift_distance"))
             {
-                // 06f3c700: key recognised, nothing stored.
+                // Key recognised, nothing stored.
             }
             else if (Reader->is_value("attack_order"))
             {
@@ -835,7 +831,7 @@ namespace
                     if (_stricmp(Token, "ANYTHING") == 0)
                         Records[Count++].ShipClass = 0xB;
                     // The table also holds ANYTHING (11): an ANYTHING token takes
-                    // two records, exactly as in retail.
+                    // two records, as in retail.
                     for (int ClassIndex = 0; ClassIndex < 12; ++ClassIndex)
                     {
                         if (_stricmp(Token, GShipClassNames[ClassIndex].Name) == 0)
@@ -990,8 +986,7 @@ namespace
             } while (Reader->read_value());
         }
 
-        // 06f3d0a0..: unique insert; a pilot nickname seen before keeps its
-        // first definition.
+        // Unique insert: a pilot nickname seen before keeps its first definition.
         if (!Nickname.IsEmpty())
             GPilots.insert(std::make_pair(Nickname.Id, Refs));
     }
@@ -1126,7 +1121,7 @@ bool __cdecl LoadPilotPersonalities(INI_Reader* Reader)
             }
             else if (Reader->is_header("CountermeasureBlock"))
             {
-                // Values read inline (06f3dbc0..), no separate loader.
+                // Values read inline, no separate loader.
                 FPersonality::CountermeasureUseStruct Block;
                 ID_String Nickname;
                 Nickname.clear();
@@ -1202,8 +1197,8 @@ bool __cdecl ApplyPilotJob(ID_String* JobId, pub::AI::Personality* OutPersonalit
     if (Found == GJobBlocks.end())
         return false;
 
-    // 06f3df79-06f3dfad: force_attack_formation (+0x134) only replaces ours when
-    // the block set it (+0x135); after a copy with +0x135 set, +0x135 stays 1.
+    // force_attack_formation (+0x134) only replaces ours when the block set it
+    // (+0x135); after a copy with +0x135 set, +0x135 stays 1.
     FPersonality::JobStruct Job = Found->second;
     bool bForceAttackFormationSet = false;
     unsigned char ForceAttackFormation = Job.bForceAttackFormation;
@@ -1329,9 +1324,8 @@ bool __cdecl GetPilotPersonality(unsigned int* PilotId, pub::AI::Personality* Ou
             OutPersonality->FormationParams = Found->second;
     }
 
-    // 06f3e4ac-06f3e531: with a job_id, the inherited pilot's job is applied
-    // first, then our own. (Retail also default-constructs an unused local
-    // Personality at 06f3e508 on the inherit path; it is never read.)
+    // With a job_id, the inherited pilot's job is applied first, then our own.
+    // Retail also default-constructs an unused local Personality on the inherit path.
     if (!Refs.Job.IsEmpty())
     {
         if (!Refs.Inherit.IsEmpty())

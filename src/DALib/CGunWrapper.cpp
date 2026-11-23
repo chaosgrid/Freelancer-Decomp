@@ -30,9 +30,9 @@ namespace
 
     typedef HRESULT(__stdcall* FDllGetClassObject)(REFCLSID, REFIID, void**);
 
-    // The 0x14-byte block the destructor allocates (.text:065c5928 `PUSH 0x14`) and hands to the
-    // worker thread: the wrapper's module and its three references, plus an "empty" flag that the
-    // allocation sets to 1 and the hand-over clears.
+    // The 0x14-byte block the destructor allocates (.text:065c5928) and hands to the worker thread:
+    // the wrapper's module and its three references, plus an "empty" flag that the allocation sets
+    // to 1 and the hand-over clears.
     struct FGunReleaseContext
     {
         HMODULE Module;             // +0x00
@@ -132,7 +132,7 @@ CGunWrapper::CGunWrapper(const char* DllPath, GUID& Guid, const char* ServerName
     Connection->Connect(ServerNameIn, (unsigned short)PortIn);
 }
 
-// Retail .text:065c5b30: XOR EAX,EAX; RET 8.
+// Retail .text:065c5b30.
 long __stdcall CGunWrapper::Read(Gun2::GUNQueueMessage* Message)
 {
     (void)Message;
@@ -183,7 +183,7 @@ CGunWrapper::~CGunWrapper()
     Field_0x08 = 0;
 }
 
-// Retail .text:065c5b40: MOV EAX,[ECX+0x18]; RET.
+// Retail .text:065c5b40 (+0x18).
 IGunConnection::ConnectStatus CGunWrapper::GetStatus()
 {
     return Status;
@@ -209,10 +209,10 @@ void CGunWrapper::Update()
             Connection->QueryInterface(GIID_GunBrowser, (void**)(&Browser));
         return;
     }
-    // Signed compares (.text:065c5b8d JLE / 065c5b96 JG): only 3 and 4 reconnect.
+    // Signed compares: only 3 and 4 reconnect.
     if (CurrentValue < 2 || CurrentValue > 4)
         return;
-    // Unsigned compare (.text:065c5ba3 JBE).
+    // Unsigned compare.
     if (timeGetTime() <= RetryTime)
         return;
 
@@ -224,7 +224,7 @@ void CGunWrapper::Update()
         RetryTime = 0;
 }
 
-// Retail .text:065c57d0: join and close every worker thread, then empty the list.
+// Retail .text:065c57d0: joins and closes every worker thread.
 void CGunWrapper::Shutdown()
 {
     for (std::list<HANDLE>::iterator It = GGunThreads.begin(); It != GGunThreads.end(); ++It)

@@ -11,12 +11,8 @@
 // WINFACTORY<NN_GroupControl> DAT_0066d8f4 ("NN_GroupControl", create FUN_0046c000,
 // operator_new(0x4a4)) and keeps it in DAT_0066da84 (G_ChatGroupControl).
 //
-// vftable 0x005cf124 (45 slots, WinControl's except):
-//   0 FUN_00460090 (scalar deleting dtor around FUN_00460170)
-//   9 FUN_00460550 Create           10 LAB_00460540 (JMP FUN_0059fb60, WinControl::Destroy)
-//  11 FUN_00462ba0 Update           12 LAB_00462ab0 UpdateInactive
-//  23 FUN_00462a40 ProcessMessage           42 LAB_00462bd0 SetProperty
-// The IDataViewOwner face at +0x7c keeps WinControl's two entries.
+// vftable 0x005cf124 (45 slots), scalar deleting dtor FUN_00460090; slot 10 LAB_00460540 only
+// jumps to WinControl::Destroy. The IDataViewOwner face at +0x7c keeps WinControl's two entries.
 //
 // Layout (ctor FUN_0045fd70):
 //   +0x000 WinControl (0x32c)
@@ -133,6 +129,5 @@ private:
 
 // FUN_0045e360 (cdecl) -- one 8-byte group-channel record {Opcode, Player's low word} from this
 // player (G_ChatServer SubmitChat to G_ChatIdGroupInvite, system id -1); nothing without a chat
-// server. Caller: HUD_Target's invite command 0xc9 (0x004e2cb7, opcode 0 with the target's
-// owner). LAB_00462bd0 builds the same record inline for opcodes 1 and 2.
+// server. Caller: HUD_Target's invite command 0xc9 (opcode 0 with the target's owner). LAB_00462bd0 builds the same record inline for opcodes 1 and 2.
 void NnGroupSendWireMessage(unsigned Opcode, CHAT_ID Player);

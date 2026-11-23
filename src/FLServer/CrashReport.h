@@ -4,10 +4,10 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// FLServer.exe crash reporting (retail .text:00408b70..0040911c): an unhandled-exception
-// filter that closes a hosted DirectPlay session and hands the crash to Dr. Watson (dw15.exe).
-// Instruction-identical to freelancer.exe 005a5390 / 005a54e0 / 005a5910 (the client's copy
-// lives in src/freelancer/Client/main.cpp); retail links two copies, so does the port.
+// FLServer.exe crash reporting: an unhandled-exception filter that closes a hosted DirectPlay
+// session and hands the crash to Dr. Watson (dw15.exe). Same code as freelancer.exe 005a5390 /
+// 005a54e0 / 005a5910 (the client's copy lives in src/freelancer/Client/main.cpp); retail links
+// two copies, so does the port.
 // MFC-free header: CrashReport.cpp is a non-MFC TU (dalib_net.h, common_errorhandler.h).
 #pragma once
 

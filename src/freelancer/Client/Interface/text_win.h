@@ -17,19 +17,8 @@
 // -- and one slot of its own, 28 LAB_005a1cb0 SetText.
 //
 // The TextWin constructor has no body of its own in the exe: every derived constructor
-// inlines it (e.g. WINFACTORY<UIStaticText>::Create 0x0059c40c..0x0059c4a6): the Win3D part,
-// the Font::String at +0x7c (FUN_004144b0), then the five colours +0xcc..+0xdc zeroed. The
-// rest is left for Create's FUN_005a1c50.
-//
-// Layout:
-//   +0x07c Font::String (0x34)
-//   +0x0b0 text scale (FUN_005a1c50: 0.002f)
-//   +0x0b4 width, +0x0b8 height -- the text box, in world units at this object's depth
-//   +0x0bc..+0x0c8 bounds {0, 0, width, -height}, rebuilt by Draw
-//   +0x0cc idle colour (DAT_00679bb0), +0x0d0 pulse base colour (DAT_00679ba4),
-//   +0x0d4, +0x0d8 (zeroed, used by subclasses), +0x0dc inactive colour (DAT_00679b94)
-//   +0x0e0..+0x0e3 flag bytes, +0x0e6 use-palette byte, +0x0e8 draw-origin word
-//   size 0xec
+// inlines it (the Win3D part, the Font::String, the five colours zeroed); the rest is left for
+// Create's InitTextDefaults.
 
 #include "Common/Fonts/font_string.h"
 #include "Interface/win3d.h"
@@ -52,27 +41,26 @@ public:
     // slot 13 FUN_005a1d40
     void Draw() override;
 
-    // slot 28 (+0x70) LAB_005a1cb0 -- FUN_00415860 on the Font::String at +0x7c
+    // slot 28 (+0x70) LAB_005a1cb0
     virtual void SetText(wchar_t const* NewText);
 
     // FUN_005a1c50 (thiscall) -- the text defaults Create installs.
     void InitTextDefaults();
 
-    // FUN_005a1cc0 (thiscall, RET 8) -- FUN_004177b0(FontName); when it differs from the
-    // Font::String's +0x1c font: store it, hand it to every child's slot +8, zero the layout
-    // generation (+0xa4). TextScale (+0xb0) = Scale on both paths.
+    // FUN_005a1cc0 (thiscall, RET 8) -- a new font is handed to every child and resets the
+    // layout generation; TextScale = Scale on both paths.
     void SetFont(char const* FontName, float Scale);
 
-    FFontString Text;               // +0x07c
-    float TextScale;                // +0x0b0
-    float Width;                    // +0x0b4
+    FFontString Text;               // +0x07c (0x34)
+    float TextScale;                // +0x0b0 -- 0.002f
+    float Width;                    // +0x0b4 -- the text box, in world units at this depth
     float Height;                   // +0x0b8
-    float Bounds[4];                // +0x0bc
-    unsigned long ColorIdle;        // +0x0cc
-    unsigned long ColorPulse;       // +0x0d0
-    unsigned long ColorD4;          // +0x0d4
-    unsigned long ColorD8;          // +0x0d8
-    unsigned long ColorInactive;    // +0x0dc
+    float Bounds[4];                // +0x0bc -- {0, 0, width, -height}, rebuilt by Draw
+    unsigned long ColorIdle;        // +0x0cc -- DAT_00679bb0
+    unsigned long ColorPulse;       // +0x0d0 -- pulse base, DAT_00679ba4
+    unsigned long ColorD4;          // +0x0d4 -- zeroed, used by subclasses
+    unsigned long ColorD8;          // +0x0d8 -- zeroed, used by subclasses
+    unsigned long ColorInactive;    // +0x0dc -- DAT_00679b94
     unsigned char FlagE0;           // +0x0e0
     unsigned char FlagE1;           // +0x0e1
     unsigned char FlagE2;           // +0x0e2
@@ -100,10 +88,10 @@ static_assert(offsetof(TextWin, bUsePalette) == 0xe6, "TextWin +0xe6");
 static_assert(offsetof(TextWin, FieldE8) == 0xe8, "TextWin +0xe8");
 
 // FUN_004176c0 (cdecl, 8-byte return in EAX:EDX) -- a width/height at depth Z in world units
-// to screen units through the Win3D camera (+0x78 XScale, +0x7c YScale, +0xa4 ZNear).
+// to screen units through the Win3D camera.
 void TextWinProjectExtent(float Width, float Height, float Z, float* OutWidth,
                           float* OutHeight);
 
 // FUN_00417730 (cdecl, 8-byte return) -- a world point to its screen position through the
-// Win3D camera's Project slot (0x34); {0, 0} when it is behind the near plane.
+// Win3D camera; {0, 0} when it is behind the near plane.
 void TextWinProjectPoint(float const* World, float* OutX, float* OutY);

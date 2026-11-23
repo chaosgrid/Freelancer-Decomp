@@ -6,17 +6,13 @@
 
 #pragma once
 
-// TU41 system connections; CNT-POP extends with FUN_06f2a400.
-//
-// Content.dll TU41 (06f29160-06f2c3xx): the jump-gate / jump-hole connection helpers over
+// Content.dll TU41: the jump-gate / jump-hole connection helpers over
 // pub::System::EnumerateConnections, and the three system-path tables
 //   DAT_06fd07c4 -- every connection        (ConnectionType 0, CONN_TYPE_ALL)
 //   DAT_06fd07ac -- jump gates only         (ConnectionType 1, CONN_TYPE_JUMP_GATE)
 //   DAT_06fd0794 -- jump holes only         (ConnectionType 2, CONN_TYPE_JUMP_HOLE)
 // each a map<from system, map<to system, list<system id>>> holding the system path from
-// "from" to "to". The tables are filled only by FUN_06f2a400 (CNT-POP, not ported yet), so
-// until then every path lookup below finds nothing -- the retail readers are ported 1:1 and
-// the filler is the open gap.
+// "from" to "to". Filled by LoadSystemPathTables or BuildSystemPathTables.
 
 #include "common_ini.h"     // Vector, INI_Reader
 #include "common_server.h"  // ConnectionType
@@ -51,11 +47,11 @@ int GetConnectionPosition(unsigned int SystemId, unsigned int ObjectId, Vector* 
 int GetConnectionGotoSystem(unsigned int SystemId, unsigned int ObjectId, unsigned int* OutGotoSystemId);
 
 // ---------------------------------------------------------------------------------------
-// Filling the tables (lane CNT-POP).
+// Filling the tables.
 // ---------------------------------------------------------------------------------------
 
 // FUN_06f29a90 (cdecl): DATA\Universe\systems_shortest_path.ini exists -> LoadSystemPathTables,
-// else BuildSystemPathTables(true). Caller GameSupport msg 0x40 (06effe92).
+// else BuildSystemPathTables(true). Caller GameSupport msg 0x40.
 void __cdecl InitSystemPathTables();
 
 // FUN_06f29750 (cdecl): the three tables are emptied and read back from

@@ -4,11 +4,9 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Retail turret camera (in-flight controller + 0x3c8, vtable .rdata 0x005dbcc4).
-//
-// Ported in full: the constructor (0x0051a210), the name slot (0x0051a2a0), the ini loader
-// (0x0051a2b0), the Event::Handler face (0x0051ac20), and its own slots 0x58 (0x0051a6a0),
-// 0x64 (0x0051a640) and 0x6c (0x0051a730) with the view solver they share (FUN_0051a7d0).
+// Retail turret camera (in-flight controller + 0x3c8, vtable .rdata 0x005dbcc4): ctor
+// 0x0051a210, name 0x0051a2a0, ini loader 0x0051a2b0, Event::Handler face 0x0051ac20, slots
+// 0x58 (0x0051a6a0), 0x64 (0x0051a640), 0x6c (0x0051a730) and their view solver FUN_0051a7d0.
 
 #include "Space/Cameras/space_camera_turret.h"
 #include "Space/space_scene_obj_draw.h"
@@ -35,12 +33,7 @@ namespace
 {
     const char kCockpitCpp[] = "E:\\FL\\Scratch\\Source\\Client\\space\\Cockpit.cpp";
 
-
-    // The face's slot 0 is called __thiscall (face in ECX, id on the stack); __fastcall with an
-    // unused EDX has the same shape.
-
-
-    // .rdata 0x005dbcb8 (installed at 0x0051a283): one slot, FUN_0051ac20.
+    // Event::Handler face table .rdata 0x005dbcb8: one slot, FUN_0051ac20.
 
     // FUN_0051a7d0's constants.
     const float kTurretYawWrap = 6.2831854820251465f;        // .rdata 0x005da774 (2*pi)
@@ -67,8 +60,6 @@ namespace
         Space->WorldPos[1] = View12[10];
         Space->WorldPos[2] = View12[11];
     }
-
-
 }
 
 void TurretCameraConstruct(FTurretCamera* Cam)
@@ -90,17 +81,16 @@ void TurretCameraConstruct(FTurretCamera* Cam)
     Cam->KeyRotateRate = 0.75f;       // 0x3f400000 -- nothing in the ini can move this
     Cam->YawRotateSpeed = 2.0f;  // 0x40000000
     Cam->PitchRotateSpeed = 1.5f;// 0x3fc00000
-    Cam->AccelSpeed = 5.0f;      // 0x0051a277: ECX, still 0x40a00000 from 0x0051a22a
+    Cam->AccelSpeed = 5.0f;      // retail reuses the register still holding Tether[1]'s 5.0f
 
     // +0x134 (MouseAimTime) is not written by the retail ctor: the controller lives in zeroed
-    // static storage (G_SpaceApp), which is where the port's camera lives too.
-
+    // static storage (G_SpaceApp), as the port's camera does.
 }
 
 bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4)
 {
-    // FUN_0051a640 (thiscall, RET 4): the five turret ids {0x32..0x36} from a stack table, each
-    // through FUN_005760d0 on the face at +0xf8, then HUDCamera's FUN_0051cad0 -- its answer.
+    // FUN_0051a640: the five turret ids registered on the face at +0xf8, then HUDCamera's
+    // activate.
     static const unsigned kTurretEvents[5] = {0x32, 0x33, 0x34, 0x35, 0x36};
     FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
     for (unsigned Index = 0; Index < 5; ++Index)
@@ -110,12 +100,10 @@ bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4)
 
 bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSeconds, bool)
 {
-    // FUN_0051a7d0 (thiscall, RET 0xc). The third argument (1 from the attach, 0 from the
-    // update) is never read.
+    // FUN_0051a7d0. The third argument (1 from the attach, 0 from the update) is never read.
     FHudCamera* const Hud = (FHudCamera*)Cam;
 
-    // 0x0051a7d6..0x0051a82b: the watcher at +0xc0 and the object (watcher - 8), read twice,
-    // then its +0xc'd pointer's +0x4 and the ship mask 0x503 -- any miss answers true.
+    // Not a watched ship (CObject mask 0x503) -> true.
     {
         const unsigned char* const Held =
             reinterpret_cast<const unsigned char*>(Hud->Watched.target());
@@ -130,19 +118,17 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
             return true;
     }
 
-    // 0x0051a831..0x0051a84a: the ship's transform (slot 0xc); its rotation is read through this
-    // pointer below.
     IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
     const float* const ShipRot = &Object->get_transform().Rotation.E[0][0];
 
-    // 0x0051a84c..0x0051a943: this frame's yaw (stack float) and pitch (kept on the FPU).
+    // This frame's yaw (a float) and pitch (kept double).
     float Yaw = 0.0f;
     double Pitch = 0.0;
     bool bSteer = true;
     if ((GetClientMouseButtons() & 1u) != 1u && !IsMouseFlightLocked())
     {
-        // Keys: the clock resets; each non-zero key rate (TEST AH,0x44 / JNP skips only an
-        // ordered zero) times its speed and dt.
+        // Keys: the clock resets; each non-zero key rate (only an ordered zero skips) times its
+        // speed and dt.
         Cam->MouseAimTime = 0.0f;
         if (Cam->YawKeyRate != 0.0f)
             Yaw = static_cast<float>(static_cast<double>(Cam->YawRotateSpeed) * Cam->YawKeyRate *
@@ -152,9 +138,8 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     }
     else
     {
-        // 0x0051a8d1..0x0051a8ed: left button held or mouse flight locked -- the clock runs
-        // (FUN_0042d680 + +0x134, stored as a float, compared unrounded); under 0.25s nothing
-        // steers yet (TEST AH,1 / JNZ: below or unordered skips to the easing at 0x0051a9fa).
+        // Left button held or mouse flight locked: the clock runs (compared unrounded); under
+        // 0.25s (or unordered) nothing steers yet.
         const double Clock = GetClientFrameTimeCapped() + Cam->MouseAimTime;
         Cam->MouseAimTime = static_cast<float>(Clock);
         if (!(Clock >= kTurretMouseAimDelay))
@@ -163,8 +148,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         }
         else
         {
-            // 0x0051a8f3..0x0051a93f: the cursor's offset from the surface centre
-            // (DAT_00610850 / DAT_00610854 halves), normalised, times speed and dt.
+            // The cursor's offset from the surface centre, normalised, times speed and dt.
             const double HalfW = static_cast<double>(static_cast<int>(G_RenderSurfaceWidth)) * 0.5f;
             const double HalfH = static_cast<double>(static_cast<int>(G_RenderSurfaceHeight)) * 0.5f;
             int CursorX = 0;
@@ -178,7 +162,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         }
     }
 
-    // 0x0051a947..0x0051a9f8: unless both are an ordered zero, move the targets.
+    // Unless both are an ordered zero, move the targets.
     if (bSteer && (Yaw != 0.0f || Pitch != 0.0))
     {
         // Yaw target (+0x110), wrapped into [0, 2*pi] by moving the current yaw (+0x10c) along.
@@ -195,7 +179,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
             Cam->Yaw = static_cast<float>(static_cast<double>(Cam->Yaw) + kTurretYawWrap);
         }
 
-        // Pitch target (+0x118), clamped to +/- pi/3 (0x3f860a92 / 0xbf860a92).
+        // Pitch target (+0x118), clamped to +/- pi/3.
         const double PitchTarget = Pitch + Cam->TargetPitch;
         Cam->TargetPitch = static_cast<float>(PitchTarget);
         if (PitchTarget > kTurretPitchLimit)
@@ -204,8 +188,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
             Cam->TargetPitch = kTurretPitchLimitNeg;
     }
 
-    // 0x0051a9fa..0x0051aa7b: ease the current angles towards the targets by dt * accel_speed;
-    // over 1.0f they snap.
+    // Ease the current angles towards the targets by dt * accel_speed; over 1.0f they snap.
     {
         const double Ease = static_cast<double>(DeltaSeconds) * Cam->AccelSpeed;
         if (Ease > 1.0f)
@@ -222,8 +205,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         }
     }
 
-    // 0x0051aa7d..0x0051aacc: the ship's rotation turned by -yaw (columns 0 and 2; cos stored
-    // as a float, sin kept on the FPU).
+    // The ship's rotation turned by -yaw (columns 0 and 2; cos rounded to float, sin kept double).
     float M[9];
     memcpy(M, ShipRot, sizeof(M));
     {
@@ -238,7 +220,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
             M[Row * 3 + 2] = static_cast<float>(A * SinA + static_cast<double>(CosA) * C);
         }
     }
-    // 0x0051aace..0x0051ab19: then by -pitch (columns 1 and 2).
+    // Then by -pitch (columns 1 and 2).
     {
         const double Angle = -static_cast<double>(Cam->Pitch);
         const float CosB = static_cast<float>(cos(Angle));
@@ -252,31 +234,27 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
         }
     }
 
-    // 0x0051ab1b..0x0051ab44: FUN_00516fe0 into the stack block at +0x54 with the ship's up
-    // column (rotation +0x04 / +0x10 / +0x1c). That block is overwritten by the orientation copy
-    // at 0x0051abc1 before anything reads it, so the result is dead in retail too.
+    // FUN_00516fe0 with the ship's up column into a stack block that is overwritten before
+    // anything reads it -- dead in retail too.
     {
         const float Up[3] = {ShipRot[1], ShipRot[4], ShipRot[7]};
         float Discarded[9];
         CameraOrientFromForwardAndUp(Discarded, M, Up);
     }
 
-    // 0x0051ab47..0x0051ab4e: FUN_0051dbd0 shakes it.
     HudCameraApplyShake(Hud, M);
 
-    // 0x0051ab53..0x0051ab7a: DAT_00675220 (FUN_005b73e0 on first use), vt+0x2c -- the tether
-    // (+0x100) through the orientation.
+    // The tether (+0x100) through the orientation, using DAT_00675220.
     if (G_FirstPersonMathEngine == nullptr)
         G_FirstPersonMathEngine = Acquire3DMathEngine();
     FVector Offset;
     G_FirstPersonMathEngine->TransformMatrix(Offset, *reinterpret_cast<FMatrix const*>(M),
                                              *reinterpret_cast<FVector const*>(Cam->Tether));
 
-    // 0x0051ab7d..0x0051abd5: the watcher re-read, the object's position (slot 0) added.
+    // Retail re-reads the watcher.
     IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
     Vector const& ShipPos = Again->get_position();
 
-    // 0x0051abd9..0x0051ac04: {orientation, position} out; 0x0051ac09 answers false.
     memcpy(Out12, M, 9 * sizeof(float));
     Out12[9] = Offset.X + ShipPos.x;
     Out12[10] = Offset.Y + ShipPos.y;
@@ -286,9 +264,7 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
 
 void TurretCameraAttach(FTurretCamera* Cam, void* Object)
 {
-    // FUN_0051a6a0 (slot 0x58, thiscall RET 4): the four angles zeroed (+0x10c, +0x114, +0x110,
-    // +0x118, in that order), HUDCamera's attach (FUN_0051cbb0), FUN_0051a7d0(&view, 0, 1) on an
-    // identity 3x4 whatever it answers, view dirty, view copied to the world transform.
+    // FUN_0051a6a0 (slot 0x58). The view solve's answer is ignored.
     Cam->Yaw = 0.0f;
     Cam->Pitch = 0.0f;
     Cam->TargetYaw = 0.0f;
@@ -298,50 +274,47 @@ void TurretCameraAttach(FTurretCamera* Cam, void* Object)
     float View[12];
     MakeIdentityView(View);
     TurretCameraComputeView(Cam, View, 0.0f, true);
-    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;   // 0x0051a716
+    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
     StoreWorldView(Cam, View);
 }
 
 void TurretCameraUpdate(FTurretCamera* Cam, float DeltaSeconds)
 {
-    // FUN_0051a730 (slot 0x6c, thiscall RET 4): FUN_0051a7d0(&view, dt, 0) on an identity 3x4,
-    // copied to the world transform, view dirty, then HUDCamera's update (FUN_0051d070).
+    // FUN_0051a730 (slot 0x6c).
     float View[12];
     MakeIdentityView(View);
     TurretCameraComputeView(Cam, View, DeltaSeconds, false);
     StoreWorldView(Cam, View);
-    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;   // 0x0051a7bb
+    SpaceCameraOf((FHudCamera*)Cam)->bViewDirty = 1;
     HudCameraUpdate((FHudCamera*)Cam, DeltaSeconds);
 }
 
 bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
 {
-    // FUN_0051ac20 (thiscall on the face, RET 4). Blocked mouse pick (FUN_0045a740) -> false;
-    // HUDCamera's FUN_0051d7f0 taking it -> true.
+    // FUN_0051ac20 (slot 0 of the Event::Handler face).
     if (HudIsMousePickBlocked())
         return false;
     if (HudCameraOnEvent((FHudCamera*)Cam, MsgId))
         return true;
 
-    // 0x0051ac4b..0x0051ac5a: ids 0x32..0x36 through a five-entry table; anything else -> false.
-    // The key-down byte of the record decides between +/-KeyRotateRate (+0x124) and 0.
+    // The record's key-down byte decides between +/-KeyRotateRate and 0.
     const bool bDown = HudCommandRecord()->Byte18 != 0;
     switch (MsgId)
     {
     case 0x32:
-        Cam->YawKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;   // 0x0051ac61, face + 0x24
+        Cam->YawKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
         return true;
     case 0x33:
-        Cam->YawKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;    // 0x0051ac81
+        Cam->YawKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
         return true;
     case 0x34:
-        Cam->PitchKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;   // 0x0051ac9f, face + 0x28
+        Cam->PitchKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
         return true;
     case 0x35:
-        Cam->PitchKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;    // 0x0051acbf
+        Cam->PitchKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
         return true;
     case 0x36:
-        // 0x0051acdd: face + 0x14, + 0x1c, + 0x18, + 0x20.
+        // Recentre.
         Cam->Yaw = 0.0f;
         Cam->Pitch = 0.0f;
         Cam->TargetYaw = 0.0f;
@@ -365,7 +338,6 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
     INI_Reader Reader;
     if (!Reader.open(CockpitIniPath, false))
     {
-        // 0x0051a301..0x0051a320: FDUMP through the import with the raw path, no tests.
         FDUMP(0x100002, "%s(%d) : *** WARNING: turret camera file not found '%s'\n",
               kCockpitCpp, 0x5a0, CockpitIniPath);
         bOk = false;
@@ -373,12 +345,9 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
 
     while (Reader.read_header())
     {
-        // [Turret] is obsolete in exactly the same way [ThirdPerson] and [RearView] are: the
-        // loader recognises it only to warn, and reads nothing out of it. All three warnings
-        // come from the same source file, Client\space\Cockpit.cpp.
+        // [Turret] is recognised only to warn, like [ThirdPerson] and [RearView].
         if (Reader.is_header("Turret"))
         {
-            // 0x0051a353..: the same unguarded call.
             FDUMP(0x100002, "%s(%d) : *** WARNING: [Turret] is obsolete in file %s\n",
                   kCockpitCpp, 0x5a7, CockpitIniPath);
             continue;
@@ -389,8 +358,6 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
 
         while (Reader.read_value())
         {
-            // 0x0051a390: the four keys are tested in this order, and the chain stops at the
-            // first match -- so a line that somehow matched two would take the first.
             if (Reader.is_value("tether"))
             {
                 // Retail pulls the components 1, 0, 2 (FPU stack juggling) and stores 0, 1, 2.

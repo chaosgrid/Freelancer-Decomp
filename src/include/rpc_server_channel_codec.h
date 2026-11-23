@@ -15,8 +15,7 @@
 #include <vector>
 
 // Internal SERVER-channel seam, compiled separately into the two remote DLLs.
-// Legacy packet bodies remain module-specific until their native audit replaces
-// them. This extraction does not verify or repair their existing wire behavior.
+// Legacy packet bodies remain module-specific.
 int RpcRegisterRemoteClientServerPackets(FPacketSerializer* Serializer);
 int RpcRegisterRemoteServerServerPackets(FPacketSerializer* Serializer);
 
@@ -41,11 +40,11 @@ inline void RpcServerX87CopyFloat(float* Destination, const float* Source) {
 
 // Attitude component quantizer: FLD float, FMUL double 127.0, MSVCRT _ftol (truncating
 // 64-bit conversion), low byte. Expand is MOVSX byte, FILD dword, FMUL double 1/127,
-// FSTP float. Used by 0x37 CREATEGUIDED (RS-P2); same constants as COMMON UPDATEOBJECT.
+// FSTP float. Used by 0x37 CREATEGUIDED; same constants as COMMON UPDATEOBJECT.
 unsigned char RpcServerQuantize127(const float* Value);
 void RpcServerExpand127(unsigned char Encoded, float* Value);
 
-// --- create-object block: 0x04 CREATESHIP and 0x42 CREATESOLAR (RS-P10) ---
+// --- create-object block: 0x04 CREATESHIP and 0x42 CREATESOLAR ---
 // Both packets carry the same block at packet+0x20..+0x9b, built by the inlined base
 // constructor (RS 06be5340 for 0x04: +0x20..+0x2c, the +0x30 costume (06be5480), +0x48..
 // +0x54, the +0x58 quaternion (06bde8d0), +0x68/+0x6c/+0x70, then Common's
@@ -126,15 +125,15 @@ void RpcServerBuildHardpointDictionary();
 #if defined(REMOTECLIENT_EXPORTS)
 
 // These two aliases and their registered factories use exactly the types consumed
-// by OnConnect and CClientImpl::SendServerLoginResponse; the former lookalike classes were distinct.
+// by OnConnect and CClientImpl::SendServerLoginResponse.
 using FPacketServerConnectResponse = FRpcConnectResponsePacket;
 
 using FPacketServerLoginResponse = FRpcLoginResponsePacket;
 #endif
 
-// ===== SERVER 0x01..0x1f (RS-P1) =====
-// Native SERVER classes shared by both remote DLLs; RC and RS bodies are identical
-// (RS-S1 contracts 01..1f). Field names are payload-relative where the meaning is
+// ===== SERVER 0x01..0x1f =====
+// Native SERVER classes shared by both remote DLLs; RC and RS bodies are identical.
+// Field names are payload-relative where the meaning is
 // not proven. Constructors initialize exactly what the native constructors write.
 
 // 0x05 FLPACKET_SERVER_DAMAGEOBJECT. RC factory 06b4a350 / ctor 06b4a390 / dtor
@@ -374,11 +373,11 @@ public:
     unsigned char bMarkedBy;             // +0xe8 <- bMarkedBy (+0xa8)
 };
 
-// ===== end SERVER 0x01..0x1f (RS-P1) =====
+// ===== end SERVER 0x01..0x1f =====
 
-// ===== SERVER 0x40..0x5b (RS-P3) =====
+// ===== SERVER 0x40..0x5b =====
 // Native SERVER classes of 0x40..0x5b shared by both remote DLLs. RC and RS build the
-// same layouts, constructors and wire bodies for every ID here (RS-S2 contracts 40..5b);
+// same layouts, constructors and wire bodies for every ID here;
 // a body whose RC and RS listings differ says so at its definition. Constructors write
 // exactly what the native constructors write; the rest stays as retail leaves it.
 
@@ -616,7 +615,7 @@ public:
     float Fade;
 };
 
-// 0x4d FLPACKET_SERVER_LOADHINT (RS-P4). RC 06b4abf0 / ctor 06b4ac30 / deleting dtor
+// 0x4d FLPACKET_SERVER_LOADHINT. RC 06b4abf0 / ctor 06b4ac30 / deleting dtor
 // 06b43820 (body 06b42f00), RS 06be5710 / 06be5750 / 06bdc510 (body 06bdbc10). Carries
 // one serialized BaseHint: the ctor zeroes all three fields, the destructor frees a
 // non-null block and clears the pointer. Wire: Size, Kind, then Size bytes.
@@ -641,7 +640,7 @@ public:
 
 #include "rpc_iclient_args.h" // FPayloadServerSetDirective (0x4e)
 
-// 0x4e FLPACKET_SERVER_SETDIRECTIVE (RS-P4). RC 06b4ac60 / ctor 06b4aca0 / deleting dtor
+// 0x4e FLPACKET_SERVER_SETDIRECTIVE. RC 06b4ac60 / ctor 06b4aca0 / deleting dtor
 // 06b4ad70, RS 06be5780 / 06be57c0 / 06be5890. Carries one FPayloadServerSetDirective at
 // +0x20. The ctor seeds it as Server's default construction does (+0x18 = -1, +0x40 = 3,
 // every other field 0) and leaves +0x00 and the padding bytes. Wire: the 0x94-byte record
@@ -661,7 +660,7 @@ public:
     FPayloadServerSetDirective Directive; // +0x20
 };
 
-// 0x52 FLPACKET_SERVER_PLAYERLIST (RS-P4). RC 06b4cee0 / ctor 06b4cf20 / deleting dtor
+// 0x52 FLPACKET_SERVER_PLAYERLIST. RC 06b4cee0 / ctor 06b4cf20 / deleting dtor
 // 06b466d0 (body 06b466a0), RS 06be7ae0 / 06be7b20 / 06be7b60 (body 06bf9f40). One
 // packet type for IClient slots 110 (Kind 1), 111 (Kind 2) and 112 (Kind 0); the ctor
 // seeds Kind 3, which the receiver ignores. Name is a CRT heap string (_wcsdup by the
@@ -695,7 +694,7 @@ public:
 
 #include "common_archetype.h" // CollisionGroupDesc (0x48)
 
-// 0x48 FLPACKET_SERVER_SETCOLLISIONGROUPS (RS-P4). RC 06b4ca50 / ctor 06b4ca90 / deleting
+// 0x48 FLPACKET_SERVER_SETCOLLISIONGROUPS. RC 06b4ca50 / ctor 06b4ca90 / deleting
 // dtor 06b4cb10 (body 06b4cb30), RS 06be7650 / 06be7690 / 06be7710. Holds a
 // std::list<CollisionGroupDesc> at +0x20 (VC6: allocator byte +0x20, head +0x24, size
 // +0x28; the port's list has its own layout). Wire (helpers RC 06b3a180 / 06b3a230, RS
@@ -717,7 +716,7 @@ public:
 
 #include "common_reputation.h" // Costume (0x4f)
 
-// 0x4f FLPACKET_SERVER_SENDCOMM (RS-P9). RC factory 06b4ccd0 / ctor 06b4cd10 / deleting dtor
+// 0x4f FLPACKET_SERVER_SENDCOMM. RC factory 06b4ccd0 / ctor 06b4cd10 / deleting dtor
 // 06b4cd50 (body 06b4cd70), RS 06be78d0 / 06be7910 / 06be7950 (body 06be7970); RC and RS are
 // identical except where Decode says so. Size 0x78, every field at its retail offset: the
 // accessory loops of the sender and the decoder run past Body.AccessoryIds when the count
@@ -755,7 +754,7 @@ public:
 };
 static_assert(sizeof(FRpcServerSendCommPacket) == 0x78, "SERVER 0x4f size 0x78");
 
-// 0x54 FLPACKET_SERVER_MISCOBJUPDATE (RS-P9). RC factory 06b4d070 / ctor 06b4d0b0 / deleting
+// 0x54 FLPACKET_SERVER_MISCOBJUPDATE. RC factory 06b4d070 / ctor 06b4d0b0 / deleting
 // dtor 06b45810 (body 06b457a0), RS 06be7c90 / 06be7cd0 / 06be7d40 (body 06bfa600). One packet
 // type for the eight IClient slots 113..120; each sender sets one or two flag bits through the
 // setters below (RC 06b45830..06b45a60). The ctor zeroes Flags and every scalar, sets
@@ -802,10 +801,10 @@ public:
     unsigned char IdCount;        // VC6 +0x68, the low byte of the vector size
 };
 
-// 0x42 FLPACKET_SERVER_CREATESOLAR (RS-P9). RC factory 06b4c7d0 / ctor 06b4c810 / deleting
+// 0x42 FLPACKET_SERVER_CREATESOLAR. RC factory 06b4c7d0 / ctor 06b4c810 / deleting
 // dtor 06b4c900 (body 06b4c920), RS 06be73d0 / 06be7410 / 06be7500 (body 06be7520); RC and
 // RS are instruction-identical apart from helper and constant addresses. The create-object
-// block +0x20..+0x9b is shared with 0x04 CREATESHIP (RS-P10's FRpcServerCreateObjectFields).
+// block +0x20..+0x9b is shared with 0x04 CREATESHIP (FRpcServerCreateObjectFields).
 // The ctor builds the block, zeroes the two bytes and the two name blocks and leaves +0xb0 /
 // +0xb4; the destructor frees NameB, then NameA, then the block's members. Wire: the block,
 // the two bytes, and outside single player Affiliation, Attitude as one 127-scaled byte, and
@@ -835,12 +834,12 @@ public:
     float Attitude;               // +0xb4  Reputation::Vibe::AttitudeTowards out-parameter
 };
 
-// ===== end SERVER 0x40..0x5b (RS-P3) =====
+// ===== end SERVER 0x40..0x5b =====
 
-// ===== SERVER 0x20..0x3f (RS-P2) =====
+// ===== SERVER 0x20..0x3f =====
 // Native SERVER classes 0x20..0x3f, one class per id compiled into both remote DLLs.
 // The RC and RS constructors and codecs of every class below differ only in their
-// addresses (RS-S1/RS-S2 dossiers); comments name the RC address first, then RS.
+// addresses; comments name the RC address first, then RS.
 // Constructors write exactly the payload fields the native constructors write.
 
 #include "common_reputation.h" // Reputation::Relation (0x29, 0x2b)
@@ -1422,11 +1421,11 @@ public:
     unsigned int ObjectId; // +0x28 IClient::SendServerRemoteObjectCargoUpdate ObjectId
 };
 
-// ===== end SERVER 0x20..0x3f (RS-P2) =====
+// ===== end SERVER 0x20..0x3f =====
 
-// ===== SERVER 0x01..0x1f (RS-P1) part 2 =====
-// 0x03 CHARACTERINFO sits here, after RS-P2's block, because its wire record holds
-// RS-P2's FRpcServerEquipHandle by value.
+// ===== SERVER 0x01..0x1f part 2 =====
+// 0x03 CHARACTERINFO sits here because its wire record holds an FRpcServerEquipHandle by
+// value.
 #include "common_archetype.h" // CollisionGroupDesc
 
 // The id block a wire record points to: operator new(0x18), four dwords, a count and
@@ -1482,7 +1481,7 @@ struct FRpcServerCharacterRecord {
     unsigned int NumMissionFailures;        // +0x258 <- +0x240 NumMissionFailures
     unsigned int NumMissionSuccesses;        // +0x25c <- +0x23c NumMissionSuccesses
     unsigned char EquipmentCount;       // +0x260 equipment element count (low byte of size)
-    FRpcServerEquipHandle Equipment; // +0x264 RS-P2's 4-byte handle, inline
+    FRpcServerEquipHandle Equipment; // +0x264 the 4-byte handle, inline
     std::list<CollisionGroupDesc> CollisionGroups; // +0x268 Common.dll's list
     FRpcServerCharacterIdBlock* BlockA; // +0x274 <- CharacterInfo::ComCostume
     FRpcServerCharacterIdBlock* BlockB; // +0x278 <- CharacterInfo::BaseCostume
@@ -1512,4 +1511,4 @@ public:
     std::list<FRpcServerCharacterRecord*> Records;   // +0x24 retail VC6 list<record*>
 };
 
-// ===== end SERVER 0x01..0x1f (RS-P1) part 2 =====
+// ===== end SERVER 0x01..0x1f part 2 =====

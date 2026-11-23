@@ -10,10 +10,10 @@
 // root of every client GUI object: WinControl, TextWin, WinObject, ListBox, UIPage::MasterWin,
 // TypeSelect, UITable, UIWinDeform, HUD_Receiver.
 //
-// Layout (ctor FUN_004b6790, inlined into every derived ctor, e.g. 0059f87f..0059f8c4):
+// Layout (ctor FUN_004b6790, inlined into every derived ctor):
 //   +0x00 vftable 0x005d5544 (28 slots)
 //   +0x04 LinkTree<Win3D>: parent +0x04, next sibling +0x08, first child +0x0c
-//   +0x10 class name -- &WINFACTORY<T>::ClassName of the factory that built it (005a1a7d)
+//   +0x10 class name -- &WINFACTORY<T>::ClassName of the factory that built it
 //   +0x14 name length, +0x18 char name[32] (FUN_0059db20 copies <= 31 chars)
 //   +0x38 next link of the mouse-capture stack (DAT_0067dce0, FUN_0059d8d0 / FUN_0059d960)
 //   +0x3c 3x3 orientation (identity), +0x60 position[3]
@@ -43,7 +43,7 @@ struct LinkTree
 // The two dwords slot 19 receives (FUN_0059d140 cases 6..13 build it on the stack):
 //   Field0 -- -1 - (event - 6) for mouse button events 6..13, else 0
 //   Field1 -- 1, or 2 / 3 when the input record's +0x18 byte is set (3 when +0x1a is set too)
-// UITextMsgButton LAB_0059a3d0 treats Field0 == -1 && Field1 == 2 as a click.
+// UITextMsgButton::MouseEvent treats Field0 == -1 && Field1 == 2 as a click.
 struct FWin3DMouseEvent
 {
     int Field0;
@@ -57,17 +57,17 @@ struct Win3D : public LinkTree<Win3D>
     // slot 0 -- FUN_004b50f0 scalar deleting dtor around FUN_004b4fd0
     virtual ~Win3D();
 
-    // slot 1 (+0x04) LAB_0043d8a0 -- XOR AL,AL / RET 8
+    // slot 1 (+0x04) LAB_0043d8a0 -- false
     virtual bool Slot1(unsigned A, unsigned B);
     // slot 2 (+0x08) FUN_004b5010 -- returns 0; WinControl FUN_0043d950 returns this
     virtual WinControl* AsWinControl();
-    // slot 3 (+0x0c) LAB_0043d8b0 -- parent == Ancestor, else ask the parent (tail jump)
+    // slot 3 (+0x0c) LAB_0043d8b0 -- parent == Ancestor, else ask the parent
     virtual bool IsDescendantOf(Win3D* Ancestor);
     // slot 4 (+0x10) FUN_0053f330 -- ray pick; false
     virtual bool HitTest(float const* Ray);
     // slot 5 (+0x14) LAB_004b5020 -- copy three dwords to +0x60
     virtual void SetPosition(float const* NewPosition);
-    // slot 6 (+0x18) LAB_0043d8e0 -- MOV AL,1 / RET 4
+    // slot 6 (+0x18) LAB_0043d8e0 -- true
     virtual bool IsPositionInViewport(unsigned A);
     // slot 7 (+0x1c) FUN_004b5040 -- copy nine dwords to +0x3c
     virtual void SetOrientation(float const* NewOrientation);
@@ -83,34 +83,35 @@ struct Win3D : public LinkTree<Win3D>
     virtual void UpdateInactive();
     // slot 13 (+0x34) FUN_0059e5c0 -- draw the visible children, sorted
     virtual void Draw();
-    // slots 14 / 15 / 16 (+0x38 / +0x3c / +0x40) FUN_0053e4a0 -- RET 4. FUN_0059df80 calls
-    // 16 on the old hover object, 15 then 14 on the new one, each with DAT_0067dbcc.
+    // slots 14 / 15 / 16 (+0x38 / +0x3c / +0x40) FUN_0053e4a0 -- nothing. Win3DSetHover calls
+    // 16 on the old hover object, 15 then 14 on the new one, each with the mouse ray.
     virtual void MouseOver(float const* Ray);
     virtual void MouseEnter(float const* Ray);
     virtual void MouseLeave(float const* Ray);
-    // slot 17 (+0x44) FUN_00401e90 -- RET
+    // slot 17 (+0x44) FUN_00401e90 -- nothing
     virtual void Slot17();
-    // slot 18 (+0x48) FUN_0053f330 -- false. FUN_0059d140 case 4 passes DAT_0061684c.
+    // slot 18 (+0x48) FUN_0053f330 -- false. The input dispatch's case 4 passes DAT_0061684c.
     virtual bool MouseWheelEvent(int Value);
     // slot 19 (+0x4c) LAB_004b50c0 -- bubble to the parent's slot 19, false at the root
     virtual bool MouseEvent(FWin3DMouseEvent const* Event);
-    // slot 20 (+0x50) LAB_0043d8a0 -- false. FUN_0059dfd0 passes (key, &modifier byte).
+    // slot 20 (+0x50) LAB_0043d8a0 -- false. Win3DDispatchKey passes (key, &modifier byte).
     virtual bool KeyEvent(unsigned Key, unsigned char* Modifiers);
-    // slot 21 (+0x54) LAB_0043d8f0 -- XOR AL,AL / RET 0x10
+    // slot 21 (+0x54) LAB_0043d8f0 -- false
     virtual bool Slot21(unsigned A, unsigned B, unsigned C, unsigned D);
-    // slot 22 (+0x58) LAB_0043d8a0 -- false. FUN_0059d140 event 2 passes record +0x10/+0x14.
+    // slot 22 (+0x58) LAB_0043d8a0 -- false. The input dispatch's event 2 passes record
+    // +0x10/+0x14.
     virtual bool CharEvent(unsigned A, unsigned B);
-    // slot 23 (+0x5c) LAB_004b50e0 -- XOR AL,AL / RET 0xc. Broadcast by FUN_0059df40.
+    // slot 23 (+0x5c) LAB_004b50e0 -- false. Broadcast by Win3DBroadcast.
     virtual bool ProcessMessage(unsigned Msg, unsigned A, unsigned B);
     // slot 24 (+0x60) LAB_0043d900 -- slot 24 on every child
     virtual void Slot24(unsigned A);
-    // slots 25 / 26 (+0x64 / +0x68) LAB_0043d930 -- FLD 1.0f (DAT_005c75dc)
+    // slots 25 / 26 (+0x64 / +0x68) LAB_0043d930 -- 1.0f
     virtual float Slot25();
     virtual float Slot26();
-    // slot 27 (+0x6c) FUN_0043d940 -- MOV EAX,[ECX+0x74]
+    // slot 27 (+0x6c) FUN_0043d940 -- +0x74
     virtual int GetHitPriority();
 
-    // FUN_0059db20's inline name copy (0059dba5..0059dbe1): <= 31 chars + length, or empty.
+    // WinFactoryCreate's inline name copy: <= 31 chars + length, or empty.
     void SetName(char const* NewName);
     char const* GetName() const { return Name; }
     Win3D* GetParent() const { return Parent; }
@@ -158,7 +159,7 @@ enum EWin3DFlags : unsigned char
 };
 
 // ---------------------------------------------------------------------------------------
-// Win3D manager (the rest of Win3D.cpp, 0x0059d5a0..0x0059e8d0).
+// Win3D manager (the rest of Win3D.cpp).
 // ---------------------------------------------------------------------------------------
 
 // DAT_0067dcd4 -- live Win3D count.
@@ -229,7 +230,7 @@ extern int G_ModalCaptureCount;
 bool Win3DAnyCaptured();
 // FUN_0059d5a0 -- the Win3D camera's viewport / near-far / field of view, the cursors, both
 // line batchers, and interface\interface.generic.vms through the material cache
-// (FUN_0041ade0 -> DAT_0067dbc8). Caller: InitializeEngine 0x005b1d53.
+// (DAT_0067dbc8). Caller: InitializeEngine.
 void Win3DStartupManager(int Width, int Height);
 // FUN_0059d6d0 -- drop focus / capture, unregister everything, free both lists, give back the
 // interface material, release the cursors and the line batchers.
@@ -237,12 +238,11 @@ void Win3DShutdownManager();
 
 struct FVector;
 struct FMatrix;
-// FUN_00423b90 (cdecl Out, Matrix, Source) -- I3DMathEngine::TransformMatrix (+0x2c) through
-// the engine it caches in DAT_006679d8, into a local that is then copied to Out.
+// FUN_00423b90 (cdecl Out, Matrix, Source) -- TransformMatrix through the engine cached in
+// DAT_006679d8, into a local that is then copied to Out.
 void Win3DTransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source);
-// DAT_006679d8 itself, acquired (FUN_005b73e0) when still null -- the same test-and-fill every
-// OpenGL.cpp site repeats inline before calling the engine directly (the fuzzy arc FUN_004231f0
-// at 0x004234ff and 0x00423a06 / 0x00423a40).
+// DAT_006679d8 itself, acquired when still null -- the test-and-fill the OpenGL.cpp sites repeat
+// inline before calling the engine directly.
 struct I3DMathEngine;
 I3DMathEngine* Win3DTransformMathEngine();
 // FUN_004bdd40 (thiscall on the camera) -- the camera-space point on the near plane under a

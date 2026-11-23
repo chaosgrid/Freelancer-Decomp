@@ -4,13 +4,11 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Retail third-person camera (in-flight controller + 0x1b0, vtable .rdata 0x005dbb14).
-//
-// Ported here: the constructor (0x00518600), the class identity (slot 0x54), the cockpit-ini
-// loader FUN_005187d0 (almost entirely validation -- the [ThirdPerson] section is OBSOLETE in
-// the shipped game and no key is read from it), the Event::Handler face (FUN_0051a190), and
-// the class's own behavioural slots: activate 0x64 (FUN_00518ad0), attach 0x58 (0x00518af0) and
-// update 0x6c (0x00518e40), with the chase solver both of the last two call, FUN_00518f20.
+// Retail third-person camera (in-flight controller + 0x1b0, vtable .rdata 0x005dbb14): ctor
+// 0x00518600, name (slot 0x54), cockpit-ini loader FUN_005187d0 (almost entirely validation --
+// [ThirdPerson] is OBSOLETE and no key is read from it), Event::Handler face FUN_0051a190,
+// activate 0x64 (FUN_00518ad0), attach 0x58 (0x00518af0), update 0x6c (0x00518e40), and the
+// chase solver FUN_00518f20.
 
 #include "Space/Cameras/space_camera_third.h"
 #include "Space/space_scene_obj_draw.h"
@@ -47,7 +45,7 @@ namespace
     // A BaseWatcher holds the Watchable eight bytes into the client object.
     const int kWatchableOffset = 8;
 
-    // FUN_00518f20's constants, every one read out of the exe.
+    // FUN_00518f20's constants.
     const float  kMinDeltaTime = 9.999999747378752e-06f;   // .rdata 0x005d7e84
     const float  kSlackAccelScale = 0.019999999552965164f; // .rdata 0x005d1fe4
     const double kSlackThreshold = 0.01;                   // .rdata 0x005d5138 (double)
@@ -59,15 +57,10 @@ namespace
     const double kMinTurnAngle = 0.0001;                   // .rdata 0x005dbc98 (double)
     const float  kDownTurnYawScale = 0.800000011920929f;   // .data  0x006135c4 (read only)
 
+    // Event::Handler face table .rdata 0x005dbb0c: one slot, FUN_0051a190.
 
-    // The face's slot 0 is called __thiscall (face in ECX, id on the stack); __fastcall with an
-    // unused EDX has the same shape.
-
-
-    // .rdata 0x005dbb0c (installed at 0x00518612): one slot, FUN_0051a190.
-
-    // DAT_00675220, acquired through FUN_005b73e0 on first use -- retail repeats the test before
-    // every engine call in FUN_00518f20.
+    // DAT_00675220 (shared with Cockpit.cpp), acquired on first use -- retail repeats the test
+    // before every engine call in FUN_00518f20.
     I3DMathEngine* CockpitMathEngine()
     {
         if (G_FirstPersonMathEngine == nullptr)
@@ -90,7 +83,7 @@ namespace
         return *reinterpret_cast<FVector const*>(V3);
     }
 
-    // FUN_00423b30 (cdecl Out, A, B): Out = A + B, z summed first, each sum stored as a float.
+    // FUN_00423b30: Out = A + B, z summed first, each sum rounded to float.
     void Vec3AddStored(float* Out, const float* A, const float* B)
     {
         const float Z = static_cast<float>(static_cast<double>(A[2]) + B[2]);
@@ -101,7 +94,7 @@ namespace
         Out[2] = Z;
     }
 
-    // FUN_0051a0c0 (cdecl Out, A, B): Out = A x B, the three terms on the FPU, stored as floats.
+    // FUN_0051a0c0: Out = A x B, terms in double, rounded to float.
     void Vec3CrossStored(float* Out, const float* A, const float* B)
     {
         const double Z = static_cast<double>(A[0]) * B[1] - static_cast<double>(A[1]) * B[0];
@@ -112,7 +105,7 @@ namespace
         Out[2] = static_cast<float>(Z);
     }
 
-    // FUN_00410190 (thiscall): sqrt((x*x + y*y) + z*z), unrounded.
+    // FUN_00410190: sqrt((x*x + y*y) + z*z), unrounded.
     double Vec3Length(const float* V)
     {
         double SumSq = static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1];
@@ -120,7 +113,7 @@ namespace
         return sqrt(SumSq);
     }
 
-    // FUN_0041a390 (thiscall): scale by 1.0f / length (FDIVR, unrounded), each product stored.
+    // FUN_0041a390: scale by 1.0f / length (unrounded), each product rounded.
     void Vec3NormaliseInPlace(float* V)
     {
         const double Inv = 1.0f / Vec3Length(V);
@@ -129,7 +122,7 @@ namespace
         V[2] = static_cast<float>(Inv * V[2]);
     }
 
-    // FUN_004cbf40 (cdecl A, B): (a.z*b.z + a.y*b.y) + a.x*b.x, left on the FPU.
+    // FUN_004cbf40: (a.z*b.z + a.y*b.y) + a.x*b.x, unrounded.
     double Vec3DotZyx(const float* A, const float* B)
     {
         double Sum = static_cast<double>(A[2]) * B[2] + static_cast<double>(A[1]) * B[1];
@@ -144,7 +137,7 @@ namespace
         Out[2] = M9[Column + 6];
     }
 
-    // FUN_0051a100 / FUN_0051a120 / FUN_00411f70 (thiscall on the matrix): write column 0 / 1 / 2.
+    // FUN_0051a100 / FUN_0051a120 / FUN_00411f70: write column 0 / 1 / 2.
     void SetColumn(float* M9, int Column, const float* V)
     {
         M9[Column] = V[0];
@@ -152,8 +145,8 @@ namespace
         M9[Column + 6] = V[2];
     }
 
-    // The two rotation loops FUN_00518f20 runs over a 3x3 in place: cos is stored as a float
-    // first, sin stays on the FPU. Pitch works columns 1 and 2, yaw columns 0 and 2.
+    // The two rotation loops FUN_00518f20 runs over a 3x3 in place: cos rounded to float, sin
+    // kept double. Pitch works columns 1 and 2, yaw columns 0 and 2.
     void RotatePitchRows(float* M9, double Angle)
     {
         const float CosA = static_cast<float>(cos(Angle));
@@ -189,15 +182,13 @@ namespace
         View12[8] = 1.0f;
     }
 
-    // The watcher, and the object behind it (watcher - 8, null when there is none) -- retail
-    // re-reads +0xc0 each time it needs the object.
+    // Retail re-reads +0xc0 each time it needs the object.
     IObjRW* WatchedObject(FThirdPersonCamera* Cam)
     {
         return static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Cam));
     }
 
-    // The watcher chain every solver entry tests: watcher, watcher - 8, its +0xc'd pointer's
-    // +0x4 (ObjRW + 0x10) and the ship class mask 0x503 at CObject + 0x4c.
+    // The watched CEqObj (ObjRW + 0x10) when its class has ship mask 0x503, else null.
     CEqObj* WatchedShip(FThirdPersonCamera* Cam)
     {
         const unsigned char* const Held =
@@ -217,8 +208,7 @@ namespace
 
 float* CockpitMulMatrix(float* Out9, const float* A9, const float* B9)
 {
-    // FUN_0051a140 (cdecl): DAT_00675220 (FUN_005b73e0 on first use), MulMatrix (vt+0x20) into
-    // a stack local, the nine dwords copied to Out; EAX = Out.
+    // FUN_0051a140.
     float Product[9];
     CockpitMathEngine()->MulMatrix(AsMatrix(Product), AsMatrix(A9), AsMatrix(B9));
     memcpy(Out9, Product, sizeof(Product));
@@ -227,22 +217,18 @@ float* CockpitMulMatrix(float* Out9, const float* A9, const float* B9)
 
 bool ThirdPersonCameraOnEvent(FThirdPersonCamera* Cam, unsigned MsgId)
 {
-    // FUN_0051a190 (thiscall on the face, RET 4). Blocked mouse pick (FUN_0045a740) -> false;
-    // HUDCamera's FUN_0051d7f0 taking it -> true.
+    // FUN_0051a190 (slot 0 of the Event::Handler face).
     if (HudIsMousePickBlocked())
         return false;
     if (HudCameraOnEvent((FHudCamera*)Cam, MsgId))
         return true;
 
-    // 0x0051a1bb: only 0x3f is this class's own.
+    // Only 0x3f is this class's own: toggles auto-level.
     if (MsgId != 0x3f)
         return false;
 
-    // 0x0051a1cd..0x0051a1d5: flip +0x13c (face + 0x44).
     Cam->bCameraLevelEnabled = (Cam->bCameraLevelEnabled == 0) ? 1 : 0;
 
-    // 0x0051a1d8..0x0051a1fc: the watched object (face - 0x38 = +0xc0, minus eight, null when
-    // there is none) -> GetBehaviorManager -> update_level_camera(flag) when there is a manager.
     const unsigned char* const Held =
         reinterpret_cast<const unsigned char*>(Cam->Watched.target());
     IObjRW* const Target =
@@ -257,21 +243,19 @@ bool ThirdPersonCameraOnEvent(FThirdPersonCamera* Cam, unsigned MsgId)
 
 const char* ThirdPersonCameraGetName()
 {
-    // 0x005187c0: MOV EAX, .rdata "ThirdPerson" / RET. No `this`, no arguments.
+    // 0x005187c0.
     return "ThirdPerson";
 }
 
 void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
 {
-    // FUN_00518600: HUDCamera's ctor (FUN_0051ca80), then the two vptrs.
+    // FUN_00518600: HUDCamera's ctor, then the two vptrs, then the fields in retail's order.
     HudCameraConstruct((FHudCamera*)Cam);
 
-    // 0x0051861c..0x0051864b: the hardpoint position, three zero dwords through stack temps.
     Cam->HardpointPos[0] = 0.0f;
     Cam->HardpointPos[1] = 0.0f;
     Cam->HardpointPos[2] = 0.0f;
 
-    // 0x0051864e..0x00518685: the hardpoint orientation, identity.
     Cam->HardpointOrient[7] = 0.0f;   // +0x128
     Cam->HardpointOrient[6] = 0.0f;   // +0x124
     Cam->HardpointOrient[5] = 0.0f;   // +0x120
@@ -282,21 +266,21 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
     Cam->HardpointOrient[4] = 1.0f;   // +0x11c
     Cam->HardpointOrient[0] = 1.0f;   // +0x10c
 
-    // 0x0051868b..0x005186b0: the look offset {0, 7.0f (0x40e00000), 60.0f (0x42700000)}.
+    // The look offset {0, 7, 60}.
     Cam->Field140 = 0.0f;
     Cam->OffsetX = 7.0f;
     Cam->OffsetY = 60.0f;
 
-    // 0x005186b3..0x005186bf: the second offset vector.
+    // The second offset vector.
     Cam->Field14C = 0.0f;
     Cam->Field150 = 0.0f;
     Cam->Field154 = 0.0f;
 
-    // 0x005186c5..0x005186cb: HUDCamera's bytes +0xfc and +0xfd.
+    // HUDCamera's bytes +0xfc and +0xfd.
     Cam->bFlagFC = 0;
     Cam->bFlagFD = 0;
 
-    // 0x005186d1..0x005186f4: the speed tracker, auto-level on.
+    // The speed tracker, auto-level on.
     Cam->SpeedSlack = 0.0f;
     Cam->SmoothedSpeed = 0.0f;
     Cam->PrevSpeed = 0.0f;
@@ -304,7 +288,7 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
     Cam->LookAheadMultiplier = 0.05f;      // 0x3d4ccccd
     Cam->AccelerationLimit = 40.0f;        // 0x42200000
 
-    // 0x005186fe..0x0051872e: the orientation history, identity.
+    // The orientation history, identity.
     Cam->ResetOrient[8] = 1.0f;   // +0x178
     Cam->ResetOrient[4] = 1.0f;   // +0x168
     Cam->ResetOrient[0] = 1.0f;   // +0x158
@@ -315,19 +299,17 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
     Cam->ResetOrient[2] = 0.0f;   // +0x160
     Cam->ResetOrient[1] = 0.0f;   // +0x15c
 
-    // 0x00518734..0x00518753: the turn angles (radians) and the look-ahead slerp.
+    // The turn angles (radians) and the look-ahead slerp.
     Cam->VerticalTurnUpAngle = 0.1f;          // 0x3dcccccd
     Cam->TurnLookAheadSlerpAmount = 0.5f;     // 0x3f000000
     Cam->HorizontalTurnAngle = 0.2f;          // 0x3e4ccccd
     Cam->VerticalTurnDownAngle = 0.2f;        // 0x3e4ccccd
 
-    // 0x00518759..0x0051876b: up (0, 1, 0) and +0x210.
     Cam->UpAxis[1] = 1.0f;
     Cam->UpAxis[0] = 0.0f;
     Cam->UpAxis[2] = 0.0f;
     Cam->Field210 = 0.0f;
 
-    // 0x00518771..0x00518798.
     Cam->TurnRateScale = 2.0f;                // 0x40000000
     Cam->LevelAxis[0] = 0.0f;
     Cam->LevelAxis[1] = 0.0f;
@@ -335,7 +317,6 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
     Cam->PrevAngularRate = 0.0f;
     Cam->bInitialised = 0;
 
-    // 0x005187a3..0x005187a9: the angular limits.
     Cam->AngularSlerpMultiplier = 2.0f;       // 0x40000000
     Cam->AngularAcceleration = 0.049087385f;  // 0x3d490fdb (pi / 64)
 
@@ -345,8 +326,7 @@ void ThirdPersonCameraConstruct(FThirdPersonCamera* Cam)
 
 bool ThirdPersonCameraActivate(FThirdPersonCamera* Cam, const int* ViewRect4)
 {
-    // FUN_00518ad0 (thiscall, RET 4): event 0x3f through FUN_005760d0 on the face at +0xf8,
-    // then HUDCamera's FUN_0051cad0 -- its answer.
+    // FUN_00518ad0: event 0x3f registered on the face at +0xf8, then HUDCamera's activate.
     FHudCmdHandler* const Face = Cam->AsHudCmdHandler();
     HudRegisterCommandHandler(Face, 0x3f);
     return HudCameraActivate((FHudCamera*)Cam, ViewRect4);
@@ -354,10 +334,10 @@ bool ThirdPersonCameraActivate(FThirdPersonCamera* Cam, const int* ViewRect4)
 
 void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
 {
-    // LAB_00518af0 (slot 0x58, thiscall RET 4). 0x00518afe: HUDCamera's attach (FUN_0051cbb0).
+    // LAB_00518af0 (slot 0x58).
     HudCameraAttach((FHudCamera*)Cam, Object);
 
-    // 0x00518b03..0x00518b11: the second offset vector, on every attach.
+    // The second offset vector, on every attach.
     Cam->Field14C = 0.0f;
     Cam->Field150 = 0.0f;
     Cam->Field154 = 0.0f;
@@ -366,9 +346,8 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         reinterpret_cast<const unsigned char*>(Cam->Watched.target());
     if (Held != nullptr && Held - kWatchableOffset != nullptr)
     {
-        // 0x00518b30..0x00518bc3: with a client ship, the camera block of its archetype's
-        // companion (CObject::get_archetype, Root + 0x04, the block at + 0x68) -- retail reads
-        // it at fixed offsets; FShipCameraParams records them.
+        // With a client ship, the camera block (+0x68) of its archetype's companion (Root +
+        // 0x04), read at fixed offsets (FShipCameraParams).
         CEqObj* const Ship = WatchedShip(Cam);
         if (Ship != nullptr)
         {
@@ -390,8 +369,7 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
             }
         }
 
-        // 0x00518bc9..0x00518c41: two copies of the object's orientation (slot 0xc), and the
-        // up axis out of the first one's column 1.
+        // Two copies of the object's orientation; the up axis is the first one's column 1.
         IObjRW* const Target = WatchedObject(Cam);
         memcpy(Cam->TargetOrientA, &Target->get_transform().Rotation.E[0][0], 9 * sizeof(float));
         memcpy(Cam->TargetOrientB, &WatchedObject(Cam)->get_transform().Rotation.E[0][0],
@@ -400,8 +378,7 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         Cam->UpAxis[1] = Cam->TargetOrientA[4];
         Cam->UpAxis[2] = Cam->TargetOrientA[7];
 
-        // 0x00518c44..0x00518c6a: slot 0x10's transform -- twelve dwords -- to the world
-        // transform, view dirty first.
+        // Slot 0x10's transform (twelve dwords) to the world transform, view dirty first.
         FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
         const float* const Xform =
             reinterpret_cast<const float*>(&WatchedObject(Cam)->get_orientation());
@@ -411,8 +388,7 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         Space->WorldPos[1] = Xform[10];
         Space->WorldPos[2] = Xform[11];
 
-        // 0x00518c6c..0x00518d33: the "HpCockpit" hardpoint of the object's instance (slot 0x1c)
-        // in parent space; the fallback is (0, 0, -4) and identity.
+        // The "HpCockpit" hardpoint in parent space; the fallback is (0, 0, -4) and identity.
         long HardpointHandle = 0;
         HardpointInfo Info;
         if (FindHardpoint_PS(WatchedObject(Cam)->get_index(), "HpCockpit", HardpointHandle, Info))
@@ -439,20 +415,19 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         }
     }
 
-    // 0x00518d3b..0x00518d4e: the watcher tested again.
+    // Retail tests the watcher again.
     const unsigned char* const HeldAgain =
         reinterpret_cast<const unsigned char*>(Cam->Watched.target());
     if (HeldAgain == nullptr || HeldAgain - kWatchableOffset == nullptr)
     {
-        // 0x00518e00..0x00518e20: Cockpit.cpp line 0x3c9, through the import, unguarded.
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kCockpitCpp, 0x3c9,
               "no object linked to third person camera");
         Cam->bInitialised = 1;
         return;
     }
 
-    // 0x00518d54..0x00518dfd: a reset solve (dt 0) from an identity view, whatever it answers;
-    // the view to the world transform, its translation to +0x130, view dirty, initialised.
+    // A reset solve (dt 0) from an identity view, whatever it answers; its translation is also
+    // cached in +0x130.
     float View[12];
     MakeIdentityView(View);
     ThirdPersonCameraSolve(Cam, View, 0.0f, true);
@@ -470,16 +445,15 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
 
 void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
 {
-    // LAB_00518e40 (slot 0x6c, thiscall RET 4). The identity view is built on every call.
+    // LAB_00518e40 (slot 0x6c). The identity view is built on every call.
     float View[12];
     MakeIdentityView(View);
 
-    // 0x00518eb3: skipped for the frame right after an attach.
+    // Skipped for the frame right after an attach.
     if (Cam->bInitialised == 0)
     {
         if (ThirdPersonCameraSolve(Cam, View, DeltaSeconds, false))
         {
-            // 0x00518ec6..0x00518ed7: twelve dwords to +0x04, then view dirty.
             FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
             memcpy(Space->World, View, 9 * sizeof(float));
             Space->WorldPos[0] = View[9];
@@ -489,34 +463,31 @@ void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
         }
         else
         {
-            // 0x00518ee0..0x00518f00: Cockpit.cpp line 0x3e9, through the import, unguarded.
             FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCockpitCpp, 0x3e9,
                   "third person camera unable to calculate viewer transform, missin linked Ship*");
         }
     }
 
-    // 0x00518f05..0x00518f0e: HUDCamera's update, then the attach latch cleared.
+    // HUDCamera's update, then the attach latch cleared.
     HudCameraUpdate((FHudCamera*)Cam, DeltaSeconds);
     Cam->bInitialised = 0;
 }
 
 bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSeconds, bool bReset)
 {
-    // FUN_00518f20 (thiscall RET 0xc). 0x00518f29..0x00518f7e: no client ship -> false.
+    // FUN_00518f20.
     if (WatchedShip(Cam) == nullptr)
         return false;
 
-    // 0x00518f84..0x00518fb7: the ship's rotation (slot 0xc) -- the pointer is kept and read
-    // again further down -- and a working copy M.
+    // The rotation pointer is kept and read again further down; M is a working copy.
     const float* const ShipRot = &WatchedObject(Cam)->get_transform().Rotation.E[0][0];
     float M[9];
     memcpy(M, ShipRot, sizeof(M));
 
-    // 0x00518fc2..0x00518fde: its position (slot 0).
     const Vector ShipPosRef = WatchedObject(Cam)->get_position();
     float Pos[3] = {ShipPosRef.x, ShipPosRef.y, ShipPosRef.z};
 
-    // 0x00518feb..0x00519024: the speed, |velocity| (slot 4) with (x*x + y*y) + z*z, stored.
+    // The speed, rounded to float.
     const Vector Velocity = WatchedObject(Cam)->get_velocity();
     float Heading[3] = {Velocity.x, Velocity.y, Velocity.z};
     const double SpeedExact = Vec3Length(Heading);
@@ -527,9 +498,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     float V14[3];
     float V24[3];
 
-    // 0x0051902a..0x005190ab: over 1.0f (TEST AH,0x41: not for a NaN), the velocity again
-    // (slot 4), normalised (FUN_00410190, FDIVR 1.0f), and the heading replaced by minus the
-    // rotation's column 2 (FUN_00422b80 on FCHS'd floats).
+    // Over 1.0f (not for a NaN): the velocity again, normalised, and the heading replaced by
+    // minus the rotation's column 2.
     if (SpeedExact > 1.0f)
     {
         const Vector Again = WatchedObject(Cam)->get_velocity();
@@ -546,12 +516,11 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Heading[2] = -Rot[8];
     }
 
-    // 0x005190b0..0x005190c8: the behaviour manager (null allowed).
+    // Null allowed.
     IBehaviorManager* const Manager = GetBehaviorManager(WatchedObject(Cam));
 
-    // 0x005190cc..0x00519190: the reset -- tracker seeded with this speed, level axis (0,0,-1),
-    // the orientation history from the object's rotation, up = its column 1, and the manager put
-    // in level mode with that up.
+    // The reset: tracker seeded with this speed, level axis (0,0,-1), the orientation history
+    // from the object's rotation, up = its column 1, and the manager put in level mode.
     if (bReset)
     {
         Cam->SmoothedSpeed = Speed;
@@ -577,33 +546,32 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         }
     }
 
-    // 0x00519196..0x00519299: the speed tracker. Speed * look-ahead stays on the FPU until the
-    // (updated) slack is added at the end.
+    // The speed tracker. Speed * look-ahead stays unrounded until the (updated) slack is added
+    // at the end.
     const double LookAheadBase = static_cast<double>(Speed) * Cam->LookAheadMultiplier;
-    // 0x005191a0: TEST AH,0x41 -- "not above 1e-5" (and a NaN dt) gives the double 0.0.
+    // dt not above 1e-5 (or NaN) gives 0.0.
     double Accel = 0.0;
     if (DeltaSeconds > kMinDeltaTime)
         Accel = (static_cast<double>(Speed) - Cam->PrevSpeed) / DeltaSeconds;
-    // 0x005191cd..0x005191f7: the slack, stored with FST, zeroed when the unrounded sum is below
-    // zero (TEST AH,5 / JP).
+    // The slack, zeroed when the unrounded sum is below zero.
     const double SlackSum =
         (static_cast<double>(Speed) - Cam->SmoothedSpeed) * DeltaSeconds + Cam->SpeedSlack;
     Cam->SpeedSlack = static_cast<float>(SlackSum);
     if (SlackSum < 0.0f)
         Cam->SpeedSlack = 0.0f;
-    // 0x00519201..0x0051921d: the catch-up limit, stored.
+    // The catch-up limit, rounded to float.
     const double Slack = Cam->SpeedSlack;
     const float Limit = static_cast<float>(
         (Slack * Slack * kSlackAccelScale + 1.0f) * Cam->AccelerationLimit);
-    // 0x00519223..0x0051923f: ramp when the slack is over 0.01 (double) or the acceleration is
-    // above the limit (both TEST AH,0x41 / JZ: strictly greater); otherwise snap.
+    // Ramp when the slack is over 0.01 or the acceleration strictly above the limit; otherwise
+    // snap.
     bool bRamp = true;
     if (!(static_cast<double>(Cam->SpeedSlack) > kSlackThreshold))
         bRamp = Accel > Limit;
     if (bRamp)
     {
-        // 0x0051924f..0x00519293: limit * dt onto the smoothed speed (FST), capped by
-        // k*k*speed + speed with k = slack * 0.04f -- the cap stored, the ramp unrounded.
+        // limit * dt onto the smoothed speed, capped by k*k*speed + speed with k = slack * 0.04f
+        // -- the cap rounded, the ramp compared unrounded.
         const double Ramped = static_cast<double>(Limit) * DeltaSeconds + Cam->SmoothedSpeed;
         Cam->SmoothedSpeed = static_cast<float>(Ramped);
         const double K = static_cast<double>(Cam->SpeedSlack) * kSlackCapScale;
@@ -613,13 +581,12 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     }
     else
     {
-        Cam->SmoothedSpeed = Speed;   // 0x00519241
+        Cam->SmoothedSpeed = Speed;
     }
-    // 0x00519299..0x005192d1: the look-ahead, stored.
     const float LookAhead = static_cast<float>(LookAheadBase + Cam->SpeedSlack);
 
-    // 0x0051929f..0x0051933f: the camera offset V78 = hardpoint + ((+0x140 + +0x14c) +
-    // (0, 0, look-ahead)), each FUN_00423b30 sum stored, and the last one too.
+    // The camera offset V78 = hardpoint + ((+0x140 + +0x14c) + (0, 0, look-ahead)), each sum
+    // rounded to float.
     float V78[3] = {Cam->HardpointPos[0], Cam->HardpointPos[1], Cam->HardpointPos[2]};
     V24[0] = 0.0f;
     V24[1] = 0.0f;
@@ -638,36 +605,33 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     FQuaternion Q48;
     FQuaternion Q64;
 
-    // 0x00519313..0x00519362: auto-level only with +0x13c set, a manager, and the manager's
-    // camera-level status.
+    // Auto-level only with +0x13c set, a manager, and the manager's camera-level status.
     if (Cam->bCameraLevelEnabled != 0 && Manager != nullptr && Manager->get_camera_level_status())
     {
         if (Manager->get_user_turning_input_state())
         {
-            // 0x0051937e..0x005193a1: the player is steering -- tell the manager the reset
-            // orientation's up (column 1).
+            // The player is steering: tell the manager the reset orientation's up (column 1).
             Vector Up;
             Up.x = Cam->ResetOrient[1];
             Up.y = Cam->ResetOrient[4];
             Up.z = Cam->ResetOrient[7];
             Manager->submit_camera_up(Up);
 
-            // 0x005193a7..0x005193e7: q(M levelled to +0x204).
+            // q(M levelled to +0x204).
             CameraOrientFromForwardAndUp(M110, M, Cam->UpAxis);
             FQuaternion Qa8;
             CockpitMathEngine()->MatrixToQuaternion(Qa8, AsMatrix(M110));
 
-            // 0x005193ea..0x00519446: q(M levelled to the reset up).
+            // q(M levelled to the reset up).
             GetColumn(V24, Cam->ResetOrient, 1);
             CameraOrientFromForwardAndUp(M110, M, V24);
             FQuaternion Qdc;
             CockpitMathEngine()->MatrixToQuaternion(Qdc, AsMatrix(M110));
 
-            // 0x00519449..0x0051948a: slerp by dt * +0x200 (stored).
             const float T = static_cast<float>(static_cast<double>(DeltaSeconds) * Cam->TurnRateScale);
             CockpitMathEngine()->QuatSlerp(Q64, Qa8, Qdc, T);
 
-            // 0x0051948d..0x0051951d: back to a matrix; up = its column 1; M = it.
+            // Back to a matrix; up = its column 1; M = it.
             Q48 = Q64;
             CockpitMathEngine()->QuaternionToMatrix(AsMatrix(Mec), Q48);
             GetColumn(V14, Mec, 1);
@@ -678,15 +642,14 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         }
         else
         {
-            // 0x00519522..0x00519527: the ship's up direction.
             const Vector ShipUp = Manager->get_ship_up_direction();
             V14[0] = ShipUp.x;
             V14[1] = ShipUp.y;
             V14[2] = ShipUp.z;
 
-            // 0x0051952d..0x005195c0: in the Ship Gameobj's +0x158 states 2 or 3 (the object is
-            // tested but not its class), an up other than exactly (0, 1, 0) -- a NaN counts as
-            // other -- is replaced by it and pushed to the manager.
+            // In jump states 2 or 3 (+0x158; the object is tested but not its class), an up
+            // other than exactly (0, 1, 0) -- NaN included -- is replaced by it and pushed to the
+            // manager.
             const unsigned char* const Held =
                 reinterpret_cast<const unsigned char*>(Cam->Watched.target());
             if (Held != nullptr && Held - kWatchableOffset != nullptr)
@@ -709,8 +672,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                 }
             }
 
-            // 0x005195c6..0x0051963b: M levelled to that up; how far it is from +0x204 (stored),
-            // and how far the levelled up is from the ship's own (stored).
+            // M levelled to that up; how far it is from +0x204, and how far the levelled up is
+            // from the ship's own (both rounded).
             CameraOrientFromForwardAndUp(Mb8, M, V14);
             float Dot = static_cast<float>(
                 (static_cast<double>(V14[2]) * Cam->UpAxis[2] +
@@ -723,9 +686,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
             if (Dot > kLevelTurnMinDot)
             {
-                // 0x0051965a..0x005197d3: unless the two ups already agree (|dot| not under
-                // 0.9999f), turn from M levelled to +0x204 towards Mb8 at
-                // (max(dot, 0) + 1) * +0x200 * dt * 0.5f.
+                // Unless the two ups already agree (|dot| not under 0.9999f), turn from M
+                // levelled to +0x204 towards Mb8 at (max(dot, 0) + 1) * +0x200 * dt * 0.5f.
                 if (fabs(static_cast<double>(Dot)) < kLevelTurnMaxDot)
                 {
                     CameraOrientFromForwardAndUp(M110, M, Cam->UpAxis);
@@ -748,7 +710,6 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                     V14[2] = V3c[2];
                 }
 
-                // 0x005197d7..0x0051982a: +0x204 = V14, M = Mb8, and Mb8's up to the manager.
                 Cam->UpAxis[0] = V14[0];
                 Cam->UpAxis[1] = V14[1];
                 Cam->UpAxis[2] = V14[2];
@@ -761,8 +722,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             }
             else if (static_cast<double>(UpAgree) > kLevelUpAgreeDot)
             {
-                // 0x00519832..0x00519854: almost opposite, but the ship's own up agrees -- adopt
-                // it without turning.
+                // Almost opposite, but the ship's own up agrees: adopt it without turning.
                 Cam->UpAxis[0] = V14[0];
                 Cam->UpAxis[1] = V14[1];
                 Cam->UpAxis[2] = V14[2];
@@ -772,7 +732,6 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
     if (bReset)
     {
-        // 0x00519862..0x005198c5: the history = M; the offset through M onto the position.
         memcpy(Cam->ResetOrient, M, sizeof(M));
         FVector Offset;
         CockpitMathEngine()->TransformMatrix(Offset, AsMatrix(M), AsVector(V78));
@@ -782,13 +741,12 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     }
     else
     {
-        // 0x005198ca..0x005198f0: q(M) before the turn.
+        // q(M) before the turn.
         FQuaternion Q154;
         CockpitMathEngine()->MatrixToQuaternion(Q154, AsMatrix(M));
 
-        // 0x005198f3..0x0051993c: the object's axis throttle (IObjInspect slot 0x50, its answer
-        // ignored), into M's frame (TransposeTransform). Retail's out buffer is the stack slot
-        // that still holds Va8, so a getter that writes nothing leaves Va8 there.
+        // The object's axis throttle (answer ignored), into M's frame. Retail's out buffer is
+        // the stack slot that still holds Va8, so a getter that writes nothing leaves Va8 there.
         Vector Throttle;
         Throttle.x = Va8[0];
         Throttle.y = Va8[1];
@@ -801,7 +759,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         V14[1] = Local.Y;
         V14[2] = Local.Z;
 
-        // 0x00519973..0x005199cb: Mb8 = identity, turned by the throttle.
+        // Mb8 = identity, turned by the throttle.
         for (int Index = 0; Index < 9; ++Index)
             Mb8[Index] = 0.0f;
         Mb8[0] = 1.0f;
@@ -809,25 +767,21 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Mb8[8] = 1.0f;
         if (V14[0] > 0.0f)
         {
-            // 0x005199e8..0x00519a77: pitch by -(x * +0x1e0), yaw by -(y * +0x1dc).
             RotatePitchRows(Mb8, -(static_cast<double>(V14[0]) * Cam->VerticalTurnUpAngle));
             RotateYawRows(Mb8, -(static_cast<double>(V14[1]) * Cam->HorizontalTurnAngle));
         }
         else
         {
-            // 0x00519a7e..0x00519b18 (not above zero, or NaN): pitch by -(x * +0x1e4); yaw by
-            // -(y * +0x1dc) scaled by |x| * 0.8f + 1.0.
+            // Not above zero, or NaN: the down angle, and yaw scaled by |x| * 0.8f + 1.0.
             RotatePitchRows(Mb8, -(static_cast<double>(V14[0]) * Cam->VerticalTurnDownAngle));
             const double Scale = fabs(static_cast<double>(V14[0])) * kDownTurnYawScale + 1.0;
             RotateYawRows(Mb8, Scale * -(static_cast<double>(V14[1]) * Cam->HorizontalTurnAngle));
         }
 
-        // 0x00519b1a..0x00519b56: M110 = M * Mb8 (FUN_0051a140), then M = M110.
         CockpitMulMatrix(M110, M, Mb8);
         memcpy(M, M110, sizeof(M));
 
-        // 0x00519b64..0x00519bd3: the level axis through the ship's live rotation, against M's
-        // column 1.
+        // The level axis through the ship's live rotation, against M's column 1.
         FVector LevelWorld;
         CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(Cam->LevelAxis));
         GetColumn(V24, M, 1);
@@ -836,8 +790,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         V14[2] = LevelWorld.Z;
         const double AxisDot = Vec3DotZyx(V24, V14);
 
-        // 0x00519bd9..0x00519c8c: unless the two are (anti)parallel, the target frame is
-        // {normalise(V14 x V24), normalise(that x V14), -V14} by columns; otherwise M itself.
+        // Unless the two are (anti)parallel, the target frame is {normalise(V14 x V24),
+        // normalise(that x V14), -V14} by columns; otherwise M itself.
         if (fabs(AxisDot) < kLevelAxisMaxDot)
         {
             float Right[3];
@@ -856,15 +810,13 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             memcpy(Mec, M, sizeof(Mec));
         }
 
-        // 0x00519c8e..0x00519ce0: q(target), q(M).
         FQuaternion Q164;
         CockpitMathEngine()->MatrixToQuaternion(Q164, AsMatrix(Mec));
         FQuaternion Q134;
         CockpitMathEngine()->MatrixToQuaternion(Q134, AsMatrix(M));
 
-        // 0x00519ce0..0x00519d7b: the angle between their column 2s -- the cosine stored (FST),
-        // clamped to [0, 1] (the low test on the unrounded value, the high on the stored one),
-        // acos stored.
+        // The angle between their column 2s: the cosine clamped to [0, 1] (the low test on the
+        // unrounded value, the high on the rounded one).
         float Back3c[3];
         GetColumn(Back3c, M, 2);
         float Back24[3];
@@ -879,9 +831,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             Cos = 1.0f;
         const float Angle = static_cast<float>(acos(static_cast<double>(Cos)));
 
-        // 0x00519d7f..0x00519e0a: the turn rate W = angle / dt, its growth capped by +0x1d4; the
-        // slerp fraction dt / angle * W (1.0f for an angle not above 1e-4), capped by +0x1d8 --
-        // which then also recomputes W from the stored 1/dt. W is stored in +0x1ac.
+        // The turn rate W = angle / dt, its growth capped by +0x1d4; the slerp fraction
+        // dt / angle * W (1.0f for an angle not above 1e-4), capped by +0x1d8 -- which then also
+        // recomputes W from the rounded 1/dt. W is kept in +0x1ac.
         const double InvDt = 1.0f / static_cast<double>(DeltaSeconds);
         const float InvDtStored = static_cast<float>(InvDt);
         double Rate = InvDt * Angle;
@@ -897,21 +849,20 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         }
         Cam->PrevAngularRate = static_cast<float>(Rate);
 
-        // 0x00519e10..0x00519ea0: M = slerp(q(target), q(M), fraction).
         CockpitMathEngine()->QuatSlerp(Q64, Q164, Q134, Fraction);
         Q48 = Q64;
         CockpitMathEngine()->QuaternionToMatrix(AsMatrix(M110), Q48);
         memcpy(M, M110, sizeof(M));
 
-        // 0x00519ea2..0x00519edf: the offset through M (FUN_00423b90, the Win3D engine cache
-        // DAT_006679d8) onto the position.
+        // The offset through M onto the position -- via the Win3D engine cache DAT_006679d8,
+        // not the cockpit one.
         FVector Offset;
         Win3DTransformByMatrix(Offset, AsMatrix(M), AsVector(V78));
         Pos[0] = static_cast<float>(static_cast<double>(Offset.X) + Pos[0]);
         Pos[1] = static_cast<float>(static_cast<double>(Pos[1]) + Offset.Y);
         Pos[2] = static_cast<float>(static_cast<double>(Pos[2]) + Offset.Z);
 
-        // 0x00519ee3..0x00519f5c: the new level axis = -(ship rotation^T * M's column 2).
+        // The new level axis = -(ship rotation^T * M's column 2).
         GetColumn(V24, M, 2);
         FVector BackLocal;
         CockpitMathEngine()->TransposeTransform(BackLocal, AsMatrix(ShipRot), AsVector(V24));
@@ -919,7 +870,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Cam->LevelAxis[1] = -BackLocal.Y;
         Cam->LevelAxis[2] = -BackLocal.Z;
 
-        // 0x00519f5f..0x0051a035: the history = M, then M = slerp(q(M), q(before), +0x1e8).
+        // The history = M, then M = slerp(q(M), q(before), +0x1e8).
         memcpy(Cam->ResetOrient, M, sizeof(M));
         FQuaternion Q144;
         CockpitMathEngine()->MatrixToQuaternion(Q144, AsMatrix(M));
@@ -930,8 +881,6 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         memcpy(M, M110, sizeof(M));
     }
 
-    // 0x0051a037..0x0051a099: +0x130 = position, +0x1ec = this speed, the shake (FUN_0051dbd0),
-    // and {M, +0x130} out.
     Cam->TranslationCache[0] = Pos[0];
     Cam->TranslationCache[1] = Pos[1];
     Cam->TranslationCache[2] = Pos[2];
@@ -946,8 +895,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
 bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
 {
-    // FUN_005187d0, in retail's order. Each FDUMP goes through the import with the raw path;
-    // retail tests neither.
+    // FUN_005187d0, in retail's order.
     bool bOk = true;
 
     INI_Reader Reader;
@@ -959,10 +907,8 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
         bOk = false;
     }
 
-    // Retail walks every header purely to complain about one of them. No key is ever read
-    // from [ThirdPerson] -- the section is dead weight kept only so old cockpit files still
-    // parse, and the camera's real parameters come from the ship archetype instead (slot
-    // 0x58). Reproduced because the warning is the whole point of the loop.
+    // Retail walks every header only to warn about [ThirdPerson]; no key is read from it. The
+    // camera's real parameters come from the ship archetype (slot 0x58).
     while (Reader.read_header())
     {
         if (Reader.is_header("ThirdPerson"))
@@ -973,9 +919,7 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
         }
     }
 
-    // The aspect sanity check: the tangents of the two half-angles must be in 4:3.
-    // Retail reads them through the vtable (slots 0x18 and 0x1c) rather than the fields, so a
-    // derived class that overrode either getter would be checked on its own numbers.
+    // The 4:3 aspect sanity check, read through the vtable (slots 0x18 and 0x1c).
     ICamera* const Space = AsCamera(SpaceCameraOf((FHudCamera*)Cam));
 
     const double TanX = tan(static_cast<double>(Space->GetHalfFovXDeg() * kDegreesToRadians));

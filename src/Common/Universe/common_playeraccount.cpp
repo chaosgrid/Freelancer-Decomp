@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll CPlayerAccount: the MD5-hashed player account kept in the registry, and its text
-// key. Split out of common_net.cpp.
+// key.
 //
 // MD5Hash is in DALib (src/DALib/md5hash.cpp) -- not duplicated here.
 
@@ -60,8 +60,8 @@ namespace
         RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows NT\\CurrentVersion\\",
                       0, KEY_QUERY_VALUE, &KeyNT);
 
-        // One size variable for both queries: it is set to 0x400 once (06306776) and the NT
-        // query reuses whatever the 9x query left in it.
+        // One size variable for both queries: it is set to 0x400 once and the NT query reuses
+        // whatever the 9x query left in it.
         bool bGotProductId = false;
         unsigned char ProductId[0x400];
         DWORD ProductIdSize = sizeof(ProductId);
@@ -133,14 +133,13 @@ CPlayerAccount::~CPlayerAccount()
 
 void CPlayerAccount::SetAcctIndex(unsigned long Index)
 {
-    // 0x062a8920: a single RET. Retail ignores Index and leaves g_dwAccountIndex untouched.
+    // 0x062a8920 (empty): retail ignores Index and leaves g_dwAccountIndex untouched.
     (void)Index;
 }
 
 void CPlayerAccount::TossHashes()
 {
-    // 0x063065a0: each non-null hash goes through its scalar deleting destructor and the
-    // pointer is cleared.
+    // 0x063065a0
     if (HashName != nullptr)
     {
         delete HashName;
@@ -155,9 +154,7 @@ void CPlayerAccount::TossHashes()
 
 void CPlayerAccount::GenerateAccount(const char* Name)
 {
-    // 0x063065d0: fresh hashes; HashName = machine seed + Name (when non-null), and
-    // HashVerify = MD5 of HashName's text. AsString is called twice for the text (once for
-    // its length, once for the pointer), as retail does.
+    // 0x063065d0. AsString is called twice (length, then pointer), as retail does.
     TossHashes();
     HashName = new MD5Hash();
     HashVerify = new MD5Hash();
@@ -179,8 +176,7 @@ void CPlayerAccount::GenerateAccount(const char* Name)
 
 bool CPlayerAccount::LoadAccount()
 {
-    // 0x063063a0: fresh hashes, then MPAccountName / MPAccountNameSig from HKCU (0x400-byte
-    // reads); true once the key opened, whether or not the values were there.
+    // 0x063063a0: true once the key opened, whether or not the values were there.
     TossHashes();
     HashName = new MD5Hash();
     HashVerify = new MD5Hash();
@@ -217,7 +213,7 @@ bool CPlayerAccount::LoadAccountFromStrings(const char* NameHash, const char* Ve
 
 bool CPlayerAccount::VerifyAccount()
 {
-    // 0x06306870: with both hashes present, MD5 of HashName's text must equal HashVerify.
+    // 0x06306870
     if (HashName == nullptr || HashVerify == nullptr)
         return false;
 
@@ -249,7 +245,6 @@ bool CPlayerAccount::GenerateTextKey(char* OutKey)
     VerifyHash.AddData((void*)RawKey, (unsigned long)strlen(RawKey));
     VerifyHash.CalcValue();
 
-    // 06306f2a: the '-' goes on OutKey's terminator (word store 2D 00 at the NUL).
     strcpy(OutKey, RawKey);
     strcat(OutKey, "-");
 
@@ -348,7 +343,7 @@ const char* CPlayerAccount::GetAccountNameSigChar()
 
 std::wstring CPlayerAccount::GetAccountName()
 {
-    // Common.dll 0xa6940: starts as L"", widened from HashName's text when there is one.
+    // RVA 0xa6940
     std::wstring Result(L"");
     if (HashName != nullptr)
         AssignWidenedHash(Result, HashName->AsString());
@@ -357,7 +352,7 @@ std::wstring CPlayerAccount::GetAccountName()
 
 std::wstring CPlayerAccount::GetAccountNameSig()
 {
-    // Common.dll 0xa6ad0: the same shape over HashVerify (this+0x08).
+    // RVA 0xa6ad0
     std::wstring Result(L"");
     if (HashVerify != nullptr)
         AssignWidenedHash(Result, HashVerify->AsString());
@@ -366,9 +361,7 @@ std::wstring CPlayerAccount::GetAccountNameSig()
 
 std::wstring CPlayerAccount::GetServerSignature(const char* Text)
 {
-    // Common.dll 0xa6c40: a stack MD5Hash is loaded from Text (MD5Hash::FromString), and its
-    // 16 digest bytes (+0x04..+0x13) are XORed with HashVerify's digest taken backwards --
-    // byte i with HashVerify+0x13-i -- before the result's text is widened.
+    // RVA 0xa6c40. The digest of Text is XORed with HashVerify's digest taken backwards.
     std::wstring Result(L"");
     if (HashVerify != nullptr)
     {

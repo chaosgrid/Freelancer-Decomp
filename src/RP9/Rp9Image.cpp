@@ -1217,7 +1217,7 @@ HRESULT Rp9LoadSurfaceFromSurface(IDirect3DSurface9* DstSurface,
     if (FAILED(Hr))
         return Hr;
 
-    // Because we locked EffSrc directly, SrcLock.pBits starts at (0,0) of EffSrc.
+    // EffSrc is locked directly, so SrcLock.pBits starts at (0,0) of EffSrc.
     RECT LocalSrc = { 0, 0, EffSrc.right - EffSrc.left, EffSrc.bottom - EffSrc.top };
     Hr = Rp9LoadSurfaceFromMemory(DstSurface, DstPalette, DstRect,
                                   SrcLock.pBits, SrcDesc.Format, (UINT)SrcLock.Pitch,

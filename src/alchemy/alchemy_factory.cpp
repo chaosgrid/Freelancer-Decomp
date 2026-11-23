@@ -60,9 +60,8 @@ namespace AlchemyImpl
             // FFxAnimatedSingle backs exactly one interface (IAnimatedSingle).
             return new (std::nothrow) FFxAnimatedSingle();
         case KindFxAnimatedTransform:
-            // wave120 (sonnet:wave120:animatedtransform): FFxAnimatedTransform
-            // backs exactly one interface (IAnimatedTransform, vtable
-            // 0x0624bbb8).
+            // FFxAnimatedTransform backs exactly one interface (IAnimatedTransform,
+            // vtable 0x0624bbb8).
             return new (std::nothrow) FFxAnimatedTransform();
         case KindFxNodeLibrary:
             return new (std::nothrow) FFxNodeLibrary();
@@ -77,16 +76,9 @@ namespace AlchemyImpl
         }
     }
 
-    // The 20 RegisterComponent names still marked KindGeneric (2 node +
-    // 3 emitter + 7 field + 8 appearance — re-counted this wave; a prior
-    // wave's comment undercounted this as "19") each get their own concrete
-    // leaf class now (see alchemy_genericfx.h's file-header comment for the
-    // class-hierarchy-split rationale) instead of one parameterized
-    // FGenericFxObject. Matched by exact retail name (the same string
-    // G_Specs[] already carries), not by PrimaryIid, since two different
-    // leaves can share an IID string (all 3 emitters are "1.11_IFxEmitter",
-    // all 7 fields are "1.11_IFxField", all 8 appearances are
-    // "1.11_IFxAppearance").
+    // The KindGeneric names (FxNode, 3 emitters, 7 fields, 8 appearances) each have their
+    // own leaf class. Matched by name, not PrimaryIid: the emitters, fields and
+    // appearances each share one IID string.
     static IDAComponent* CreateGenericFxLeaf(const char* PrimaryIid, const char* Name)
     {
         if (NameEqual(Name, "FxNode"))
@@ -134,9 +126,8 @@ namespace AlchemyImpl
         return nullptr;
     }
 
-    // Every per-name factory QI (06243310, 06243d50 and their twins): *Out = 0, a REPE
-    // CMPSB against "1.11_IComponentFactory" (0x17 bytes) -- mismatch -3; match *Out =
-    // this and AddRef (+4), 0. No null test on Out.
+    // Every per-name factory QI (06243310, 06243d50 and their twins): exact 0x17-byte
+    // compare with "1.11_IComponentFactory". No null test on Out.
     GENRESULT DACOM_API FComponentFactory::QueryInterface(const char* Iid, void** Out)
     {
         *Out = nullptr;
@@ -149,17 +140,9 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FComponentFactory::Release()
     {
-        // Retail (FUN_06203ea0 / FUN_062040f0 / FUN_06222150 — byte-identical
-        // across every one of the 33 per-name factory Release slots, sampled
-        // and re-verified this wave) guards the decrement: "if (refcount != 0)
-        // refcount--", not an unconditional --RefCount_. A prior wave's port
-        // dropped that guard, so a stray extra Release() call (refcount
-        // already 0) would underflow to 0xFFFFFFFF here and never free the
-        // object, instead of retail's no-op. Retail also sets refcount back to
-        // 1 before deleting (defends its two-vtable object against a
-        // reentrant Release() from within its own teardown); harmless to
-        // mirror even though FComponentFactory's own destruction path has no
-        // such reentrancy risk.
+        // FUN_06203ea0 / FUN_062040f0 / FUN_06222150 (the same body in all 33 factory
+        // Release slots): the decrement saturates at 0, and the count is set back to 1
+        // before delete.
         if (RefCount_ != 0)
             --RefCount_;
         if (RefCount_ == 0)
@@ -303,7 +286,7 @@ namespace AlchemyImpl
         }
         else if (Spec_.Kind == KindFxAnimatedSingle)
         {
-            // 06243390 (bytes 0624341f..06243448, left undisassembled by Ghidra): the new
+            // 06243390 (0x0624341f): the new
             // FxAnimatedSingle's Initialize (+0x4C, 06242f20 -> Reset); a non-zero result
             // runs the scalar deleting destructor (+0x48 with 1), *Instance = 0 and
             // returns that result.

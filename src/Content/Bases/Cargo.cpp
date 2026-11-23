@@ -5,8 +5,6 @@
 // Author: Giperion.
 
 // Content.dll TU44 (06f34ef0-06f36f10): faction / NPC ship arch / cargo helpers.
-// Lane CNT-POP (docs/re/content.md, TU map).
-//
 
 #include "Bases/Cargo.h"
 
@@ -36,17 +34,16 @@ namespace
         return false;
     }
 
-    // The unique append of FUN_06f35310 / FUN_06f35540 (06f353b2-06f353f1): a linear find,
-    // FUN_06f937c0 insert(end, 1, id), then a re-find whose result is dropped.
+    // The unique append of FUN_06f35310 / FUN_06f35540 (retail re-finds after the insert and
+    // drops the result).
     void AddUniqueId(std::vector<unsigned int>* Ids, unsigned int Id)
     {
         if (!ContainsId(*Ids, Id))
             Ids->insert(Ids->end(), 1, Id);
     }
 
-    // The thresholds shared by FUN_06f350f0 / FUN_06f35140 / FUN_06f35190: FCOMP 0.2f
-    // (DAT_06fb95c0), TEST AH,1, JNZ -> friendly only with C0 clear (an ordered not-less; a
-    // NaN sets C0); FCOMP -0.2f (DAT_06fb95bc), TEST AH,0x41, JZ -> neutral only when greater.
+    // The thresholds shared by FUN_06f350f0 / FUN_06f35140 / FUN_06f35190: 0.2f
+    // (DAT_06fb95c0) and -0.2f (DAT_06fb95bc); both are ordered compares, so NaN is hostile.
     unsigned int FeelingMask(float Feeling)
     {
         if (Feeling >= 0.2f)
@@ -66,8 +63,7 @@ unsigned int __cdecl GetFactionFeelingMask(unsigned int FromGroup, unsigned int 
     return FeelingMask(Feeling);
 }
 
-// FUN_06f35140 (06f35140-06f3518d, cdecl): GetReputation(&arg2, &arg1, &out) -- the vibe is
-// the second argument. The local is unset in retail on a failed lookup; the port starts it
+// FUN_06f35140 (06f35140-06f3518d, cdecl): the vibe is the second argument. The local is unset in retail on a failed lookup; the port starts it
 // at 0.
 unsigned int __cdecl GetVibeFeelingMask(unsigned int Group, int VibeHandle)
 {
@@ -88,25 +84,23 @@ void __cdecl GetHostileFactionShares(weighted_vector<unsigned int> const* Factio
         *OutHostileTo = 0.0f;
         return;
     }
-    float HostileFrom = 0.0f;       // ESP+0x08 (local_14)
-    float HostileTo = 0.0f;         // ESP+0x0c (local_10)
+    float HostileFrom = 0.0f;
+    float HostileTo = 0.0f;
     float Total = 0.0f;             // the reused argument slot
     for (std::vector<std::pair<unsigned int, float>>::const_iterator It = Factions->Items.begin();
          It != Factions->Items.end(); ++It)
     {
-        // 06f351e2-06f35240: Group's feeling towards the faction.
         float Feeling = 0.0f;
         pub::Reputation::GetReputation(*Group, It->first, Feeling);
         if ((FeelingMask(Feeling) & 4) != 0)
             HostileFrom = HostileFrom + It->second;
-        // 06f35244-06f352a2: the faction's feeling towards Group.
         float Back = 0.0f;
         pub::Reputation::GetReputation(It->first, *Group, Back);
         if ((FeelingMask(Back) & 4) != 0)
             HostileTo = HostileTo + It->second;
         Total = Total + It->second;
     }
-    // 06f352c1-06f352e1: FLD 1.0f (DAT_06fb5810), FDIV Total.
+    // 1.0f = DAT_06fb5810.
     double const Scale = 1.0 / static_cast<double>(Total);
     *OutHostileFrom = static_cast<float>(static_cast<double>(HostileFrom) * Scale);
     *OutHostileTo = static_cast<float>(Scale * static_cast<double>(HostileTo));
@@ -117,13 +111,12 @@ void __cdecl GetNpcArchFactions(std::vector<unsigned int> const* NpcArchs,
                                 std::vector<unsigned int>* Out)
 {
     std::vector<unsigned int>* const Groups = GetFactionGroups();         // FUN_06f50760
-    Out->clear();                                                          // 06f3531d-06f35342
+    Out->clear();
     for (std::vector<unsigned int>::iterator Group = Groups->begin(); Group != Groups->end(); ++Group)
     {
         FFactionProps* const Props = GetFactionProps(&*Group);             // FUN_06f50650
         if (Props == nullptr)
             continue;
-        // 06f35363-06f353b0: every arch must be in the faction's npc_ship list.
         bool bAll = true;
         for (std::vector<unsigned int>::const_iterator Arch = NpcArchs->begin();
              Arch != NpcArchs->end(); ++Arch)
@@ -135,14 +128,12 @@ void __cdecl GetNpcArchFactions(std::vector<unsigned int> const* NpcArchs,
             }
         }
         if (bAll)
-            AddUniqueId(Out, *Group);                                      // 06f353b2-06f353f1
+            AddUniqueId(Out, *Group);
     }
 }
 
 // FUN_06f36d80 (06f36d80-06f36ecf, cdecl, returns the vector by value; caller 06f3547c):
-// the ids of First that are also in Second, each once, in First's order. The local result
-// takes a VC6 set-like insert (FUN_06eae440 on a miss, FUN_06fa6e80 pair{it, false} on a
-// hit); the returned copy is sized to the result.
+// the ids of First that are also in Second, each once, in First's order.
 static std::vector<unsigned int> IntersectIds(std::vector<unsigned int> const* First,
                                               std::vector<unsigned int> const* Second)
 {
@@ -162,7 +153,7 @@ void __cdecl GetNpcClassFactions(std::vector<unsigned int> const* ClassIds,
                                  std::vector<unsigned int>* Out)
 {
     std::vector<unsigned int>* const Groups = GetFactionGroups();         // FUN_06f50760
-    Out->clear();                                                          // 06f3540c-06f35435
+    Out->clear();
     for (std::vector<unsigned int>::iterator Group = Groups->begin(); Group != Groups->end(); ++Group)
     {
         FFactionProps* const Props = GetFactionProps(&*Group);             // FUN_06f50650
@@ -173,7 +164,7 @@ void __cdecl GetNpcClassFactions(std::vector<unsigned int> const* ClassIds,
             bool const bShared = !IntersectIds(ClassIds, &Arch->NpcClasses).empty();
             if (bShared)
             {
-                AddUniqueId(Out, *Group);                                  // 06f354cb-06f35519
+                AddUniqueId(Out, *Group);
                 break;
             }
         }
@@ -184,7 +175,7 @@ void __cdecl GetNpcClassFactions(std::vector<unsigned int> const* ClassIds,
 void __cdecl GetShipLineFactions(FEncounterShip const* Ship, std::vector<unsigned int>* Out)
 {
     std::vector<unsigned int>* const Groups = GetFactionGroups();
-    Out->clear();                                                          // 06f3554a-06f3557a
+    Out->clear();
     for (std::vector<unsigned int>::iterator Group = Groups->begin(); Group != Groups->end(); ++Group)
     {
         FFactionProps* const Props = GetFactionProps(&*Group);
@@ -210,8 +201,7 @@ bool __cdecl NpcArchFitsShipLine(FEncounterShip const* Ship, FNpcShipArch const*
         std::vector<unsigned int>* const Members = FindShipClass(&*Class);   // FUN_06f58080
         if (Members == nullptr)
         {
-            // 06f3566d-06f356d0: the arch's own npc classes, then the ship's mission
-            // properties (DAT_06fd0dc8 keyed by the arch's ship, FUN_06f7b0f0 find).
+            // The arch's own npc classes, then the ship's mission properties (DAT_06fd0dc8).
             if (ContainsId(Arch->NpcClasses, *Class))
                 continue;
             std::map<unsigned int, std::vector<unsigned int>>::const_iterator Properties =
@@ -221,7 +211,6 @@ bool __cdecl NpcArchFitsShipLine(FEncounterShip const* Ship, FNpcShipArch const*
                 continue;
             return false;
         }
-        // 06f356da-06f35717: one member of the ship class among the arch's npc classes.
         bool bMember = false;
         for (std::vector<unsigned int>::iterator Member = Members->begin();
              Member != Members->end(); ++Member)
@@ -267,14 +256,14 @@ bool __cdecl FactionHasNpcClass(unsigned int Group, std::vector<unsigned int> co
 void __cdecl GetFactionShipLineArchs(unsigned int Group, FEncounterShip const* Ship,
                                      std::list<FNpcShipArch*>* Out)
 {
-    Out->clear();                                                          // 06f357d8-06f357f4
+    Out->clear();
     FFactionProps* const Props = GetFactionProps(&Group);
     for (std::vector<unsigned int>::iterator Id = Props->NpcShips.begin();
          Id != Props->NpcShips.end(); ++Id)
     {
         FNpcShipArch* const Arch = FindNpcShipArch(&*Id, &GNpcShipArchs);
         if (NpcArchFitsShipLine(Ship, Arch))
-            Out->push_back(Arch);                                          // 06f35835-06f35869
+            Out->push_back(Arch);
     }
 }
 
@@ -283,10 +272,10 @@ FNpcShipArch* __cdecl PickFactionShipLineArch(unsigned int Group, FEncounterShip
                                               int Level)
 {
     std::list<FNpcShipArch*> Candidates;
-    FNpcShipArch* Closest = nullptr;                                       // ESP+0x14
+    FNpcShipArch* Closest = nullptr;
     if (GetFactionProps(&Group) != nullptr)
     {
-        // 06f358e9-06f3594a: the props are looked up a second time for the loop.
+        // Retail looks the props up a second time for the loop.
         Candidates.clear();
         FFactionProps* const Props = GetFactionProps(&Group);
         for (std::vector<unsigned int>::iterator Id = Props->NpcShips.begin();
@@ -297,8 +286,8 @@ FNpcShipArch* __cdecl PickFactionShipLineArch(unsigned int Group, FEncounterShip
                 Candidates.push_back(Arch);                                // FUN_06ecfc30
         }
 
-        // 06f35950-06f359df: with a level, drop archs more than one level off it and keep the
-        // closest one (strictly closer replaces it: CMP / JGE).
+        // With a level, drop archs more than one level off it and keep the closest one (only
+        // a strictly closer one replaces it).
         std::list<FNpcShipArch*>::iterator It = Candidates.begin();
         while (It != Candidates.end())
         {
@@ -317,13 +306,13 @@ FNpcShipArch* __cdecl PickFactionShipLineArch(unsigned int Group, FEncounterShip
                 It = Candidates.erase(It);
         }
 
-        // 06f359e6-06f35a07: nothing in range -> the closest one is the only candidate.
+        // Nothing in range -> the closest one is the only candidate.
         if (Closest != nullptr && Candidates.empty())
             Candidates.push_back(Closest);                                 // FUN_06f1e390
     }
 
-    // 06f35a0c-06f35a6c: a random candidate -- index 0 for a single one, else
-    // (rand() * count) / 0x8000 (signed, truncated).
+    // A random candidate: index 0 for a single one (no rand call), else
+    // (rand() * count) / 0x8000.
     int const Count = static_cast<int>(Candidates.size());
     if (Count == 0)
         return Closest;
@@ -331,7 +320,7 @@ FNpcShipArch* __cdecl PickFactionShipLineArch(unsigned int Group, FEncounterShip
     if (Count - 1 != 0)
         Index = (rand() * Count) / 0x8000;
     std::list<FNpcShipArch*>::iterator Picked = Candidates.begin();
-    for (int Step = Index; Step != 0; --Step)                              // unsigned JBE / DEC
+    for (int Step = Index; Step != 0; --Step)
         ++Picked;
     if (Picked == Candidates.end())
         return Closest;
@@ -358,19 +347,15 @@ namespace
         return static_cast<unsigned int>(static_cast<long long>(Value));
     }
 
-    // The unsigned count loaded with FILD qword {count, 0} (count 0 -> 1), stored as a float.
+    // The unsigned count (0 -> 1) as a float.
     float CargoWeightOf(unsigned int Count)
     {
         unsigned int const Weight = Count == 0 ? 1u : Count;
         return static_cast<float>(static_cast<double>(Weight));
     }
 
-    // The intersection GenerateCargo builds twice (06f3621a-06f362a5, 06f36450-06f364e6):
-    // copies of both lists (FUN_06f52f60 / FUN_06f55880, not written to), then for every
-    // market entry (outer) each pick of the same good (inner) is appended through
-    // FUN_06f38170 insert(end, pick). EH map 06fc3c88: the picks copy is built first
-    // (states 4/5, 10/11), the market copy second (states 6/12); both are RAII locals and the
-    // loops walk the copies.
+    // The intersection GenerateCargo builds twice (inlined): over copies of both lists, for
+    // every market entry (outer) each pick of the same good (inner) is appended.
     void MatchCargoPicks(std::vector<FBaseCommodity> const& Market,
                          std::vector<FCargoPick> const& Picks, std::vector<FCargoPick>* Out)
     {
@@ -393,53 +378,47 @@ namespace
 // of pub::GetGoodProperties is a stack slot the function never reads.
 void __cdecl FitCargoToHold(unsigned int ShipArchId, std::vector<FCargoPick>* Cargo)
 {
-    unsigned int HoldSize = 0;                                             // local_2c
-    pub::GetCargoHoldSize(ShipArchId, HoldSize);                           // 06f35c0d
-    // 06f35c13-06f35c30: FILD qword (unsigned), FMUL 0.8, ftol.
+    unsigned int HoldSize = 0;
+    pub::GetCargoHoldSize(ShipArchId, HoldSize);
     unsigned int FreeSpace = FtolLow(static_cast<double>(HoldSize) * 0.8);
 
-    // 06f35c41-06f35ca8: the summed weights (ftol after every float add) and the volume the
-    // listed counts already take.
+    // The summed weights (truncated after every float add) and the volume the listed counts
+    // already take.
     unsigned int TotalWeight = 0;
     for (std::vector<FCargoPick>::iterator It = Cargo->begin(); It != Cargo->end(); ++It)
     {
         TotalWeight = FtolLow(static_cast<double>(TotalWeight) + It->Weight);
-        if (It->Count == 0)                                                // CMP / JBE
+        if (It->Count == 0)
             continue;
         float Volume = 0.0f;
         float Mass;
-        pub::GetGoodProperties(It->GoodId, Volume, Mass);                  // 06f35c6f
+        pub::GetGoodProperties(It->GoodId, Volume, Mass);
         unsigned int const Used = FtolLow(static_cast<double>(It->Count) * Volume);
-        // 06f35c90-06f35c9c: CMP / JC -> subtract only when below the free space.
         if (Used < FreeSpace)
             FreeSpace -= Used;
         else
             FreeSpace = 0;
     }
 
-    // 06f35cae-06f35d94: each pick's share of the free space by weight becomes its count.
+    // Each pick's share of the free space by weight becomes its count.
     std::vector<FCargoPick>::iterator It = Cargo->begin();
     while (It != Cargo->end())
     {
-        // 06f35cc0-06f35cd2: FCOMP 0.0f, TEST AH,0x41, JNZ -> weight not greater than 0 (or
-        // unordered) keeps the count; so does a zero total.
+        // A weight not greater than 0 (or unordered) keeps the count; so does a zero total.
         if (It->Weight > 0.0f && TotalWeight != 0)
         {
-            // 06f35cd4-06f35d06: weight / total (FDIVR), FIMUL the free space as an int.
+            // The free space multiplies as a signed int (FIMUL).
             float const Share = static_cast<float>(static_cast<double>(It->Weight)
                                                    / static_cast<double>(TotalWeight)
                                                    * static_cast<int>(FreeSpace));
             float Volume = 0.0f;
             float Mass;
-            pub::GetGoodProperties(It->GoodId, Volume, Mass);              // 06f35d0a
-            // 06f35d10-06f35d45: volume > 0 (TEST AH,0x41, JNZ) and not greater than the share
-            // (TEST AH,0x41, JP) -> share / volume, else 0.
+            pub::GetGoodProperties(It->GoodId, Volume, Mass);
             if (Volume > 0.0f && Volume <= Share)
                 It->Count = FtolLow(static_cast<double>(Share) / Volume);
             else
                 It->Count = 0;
         }
-        // 06f35d48-06f35d8e: a pick without a count is erased in place (the tail moved down).
         if (It->Count != 0)
             ++It;
         else
@@ -447,8 +426,7 @@ void __cdecl FitCargoToHold(unsigned int ShipArchId, std::vector<FCargoPick>* Ca
     }
 }
 
-// FUN_06f35db0 (06f35db0-06f36048, cdecl): VC6 insert(end, 1, pick) with its inlined
-// reallocation for every match (FUN_06f36ef0 / FUN_06f6f720 / FUN_06f6f760).
+// FUN_06f35db0 (06f35db0-06f36048, cdecl).
 void __cdecl FilterCargoPicks(std::vector<unsigned int> const* Goods,
                               std::vector<FBaseCommodity> const* Market,
                               std::vector<FCargoPick>* Out)
@@ -468,13 +446,12 @@ void __cdecl FilterCargoPicks(std::vector<unsigned int> const* Goods,
 }
 
 // FUN_06f36c60 (06f36c60-06f36cea). DAT_06fb4448 = 1 / 32768 (float). The total is the x87
-// sum from 0.0f kept as a float; the roll is rand() * (1/32768) * total, kept as a float; the
-// first pick whose running sum reaches the roll (FCOMP, TEST AH,0x41, JNP: not greater) wins.
-// Retail returns end() for an empty list, a zero total (TEST AH,0x44, JNP) or a roll past
-// the last sum, and every caller reads the good at the result. Every caller passes a
-// non-empty list whose weights are at least 1 (CargoWeightOf; 1.0f for the pick), and the
-// roll stays below the total, so that end() is never reached; the port returns the last pick
-// there instead of reading past the buffer.
+// sum kept as a float; the roll is rand() * (1/32768) * total, kept as a float; the first
+// pick whose running sum reaches the roll wins.
+// Deviation: retail returns end() for an empty list, a zero total or a roll past the last
+// sum, and every caller reads the good at the result. Callers always pass a non-empty list
+// with weights >= 1, so end() is never reached; the port returns the last pick there instead
+// of reading past the buffer.
 FCargoPick const* __cdecl PickWeightedCargo(std::vector<FCargoPick> const* Picks)
 {
     double Sum = 0.0;
@@ -495,23 +472,21 @@ FCargoPick const* __cdecl PickWeightedCargo(std::vector<FCargoPick> const* Picks
     return &Picks->back();
 }
 
-// FUN_06f36050 (06f36050-06f36c5c, cdecl). The loop at 06f360c6 / 06f36c39 runs once (the
-// counter is incremented first and compared with 1). The weighted picks of 06f362e3,
-// 06f36524, 06f3669b, 06f36747 and 06f367ea are PickWeightedCargo inlined; the pick loops
-// 06f36141-06f361c5, 06f363b1-06f3643d and 06f36601-06f36685 are FilterCargoPicks inlined.
-// EH states 0..0x12 are the vectors below (RAII here).
+// FUN_06f36050 (06f36050-06f36c5c, cdecl). The retail loop runs once (the counter is
+// incremented first and compared with 1). Several PickWeightedCargo / FilterCargoPicks
+// calls are inlined in retail.
 void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
                            std::vector<FCargoPick>* Out)
 {
     (void)Unused;
     Out->clear();                                                          // FUN_06f36d30
-    // +0xfc taken as an FGuideDesc without a type check (06f3608c-06f360bd: MOV ECX,[EAX+0xfc];
-    // CALL FUN_06f062d0), as retail does: this path only runs for encounter ships.
+    // +0xfc taken as an FGuideDesc without a type check, as retail does: this path only runs
+    // for encounter ships.
     FGuideDesc* const Desc = static_cast<FGuideDesc*>(Params->GuideDesc.Pointer);  // +0xfc
     unsigned int Id54;
     unsigned int Id58;
-    FContentBase* FromBase = nullptr;                                      // local_188 (+0x5c)
-    FContentBase* ToBase = nullptr;                                        // local_190 (+0x60)
+    FContentBase* FromBase = nullptr;                                      // +0x5c
+    FContentBase* ToBase = nullptr;                                        // +0x60
     Desc->GetTargets(&Id54, &Id58, &FromBase, &ToBase);                    // FUN_06f062d0
 
     int Attempt = 0;
@@ -520,22 +495,22 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
         ++Attempt;
         unsigned int Faction = Params->ReputationHandle->GetAffiliation();  // FUN_06eb6bb0
         FFactionProps* const Props = GetFactionProps(&Faction);           // FUN_06f50650
-        bool bPicked = false;                                              // local_1a5
-        unsigned int Good = 0;                                             // local_1a0 -> +0x4c
-        unsigned int ReturnGood = 0;                                       // local_194 -> +0x50
+        bool bPicked = false;
+        unsigned int Good = 0;                                             // -> +0x4c
+        unsigned int ReturnGood = 0;                                       // -> +0x50
 
         if (FromBase != nullptr)
         {
-            // 06f3610e-06f361c5: the faction's goods FromBase sells.
+            // The faction's goods FromBase sells.
             std::vector<FBaseCommodity> FromSale;
-            FromBase->GetCommoditiesForSale(&FromSale);                    // 06f3612e
+            FromBase->GetCommoditiesForSale(&FromSale);
             std::vector<FCargoPick> FromSalePicks;
             FilterCargoPicks(&Props->MarketGoods, &FromSale, &FromSalePicks);
-            // 06f361c7-06f361f0: the goods ToBase asks for (empty without ToBase).
+            // The goods ToBase asks for (empty without ToBase).
             std::vector<FBaseCommodity> ToDemand;
             if (ToBase != nullptr)
-                ToBase->GetCommoditiesInDemand(&ToDemand);                 // 06f361f0
-            // 06f361f5-06f36371: bought here, wanted there.
+                ToBase->GetCommoditiesInDemand(&ToDemand);
+            // Bought here, wanted there.
             std::vector<FCargoPick> Trade;
             MatchCargoPicks(ToDemand, FromSalePicks, &Trade);
             if (!Trade.empty())
@@ -545,9 +520,9 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
             }
             else
             {
-                // 06f36376-06f365b1: the faction's goods FromBase asks for, wanted at ToBase.
+                // The faction's goods FromBase asks for, wanted at ToBase.
                 std::vector<FBaseCommodity> FromDemand;
-                FromBase->GetCommoditiesInDemand(&FromDemand);             // 06f3639b
+                FromBase->GetCommoditiesInDemand(&FromDemand);
                 std::vector<FCargoPick> FromDemandPicks;
                 FilterCargoPicks(&Props->MarketGoods, &FromDemand, &FromDemandPicks);
                 std::vector<FCargoPick> Resale;
@@ -559,13 +534,13 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
                 }
                 else
                 {
-                    // 06f365b6-06f36731: what ToBase sells -- the return load.
+                    // What ToBase sells -- the return load.
                     std::vector<FBaseCommodity> ToSale;
                     std::vector<FCargoPick> ToSalePicks;
                     bool bReturnPicked = false;
                     if (ToBase != nullptr)
                     {
-                        ToBase->GetCommoditiesForSale(&ToSale);           // 06f365fc
+                        ToBase->GetCommoditiesForSale(&ToSale);
                         FilterCargoPicks(&Props->MarketGoods, &ToSale, &ToSalePicks);
                         if (!ToSalePicks.empty())
                         {
@@ -574,8 +549,7 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
                             bReturnPicked = true;
                         }
                     }
-                    // 06f36736-06f36881: else anything FromBase sells, else anything it asks
-                    // for.
+                    // Else anything FromBase sells, else anything it asks for.
                     if (!bReturnPicked)
                     {
                         if (!FromSalePicks.empty())
@@ -594,50 +568,48 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
         }
         else if (ToBase != nullptr)
         {
-            // 06f369c5-06f36b39: only a destination -- its goods for sale, else its demand.
+            // Only a destination -- its goods for sale, else its demand.
             std::vector<FBaseCommodity> ToSale;
-            ToBase->GetCommoditiesForSale(&ToSale);                        // 06f369f8
+            ToBase->GetCommoditiesForSale(&ToSale);
             std::vector<FCargoPick> ToSalePicks;
-            FilterCargoPicks(&Props->MarketGoods, &ToSale, &ToSalePicks);  // 06f36a2a
+            FilterCargoPicks(&Props->MarketGoods, &ToSale, &ToSalePicks);
             if (!ToSalePicks.empty())
             {
                 bPicked = true;
-                ReturnGood = PickWeightedCargo(&ToSalePicks)->GoodId;      // 06f36a4e
+                ReturnGood = PickWeightedCargo(&ToSalePicks)->GoodId;
             }
             else
             {
                 std::vector<FBaseCommodity> ToDemand;
-                ToBase->GetCommoditiesInDemand(&ToDemand);                 // 06f36a92
+                ToBase->GetCommoditiesInDemand(&ToDemand);
                 std::vector<FCargoPick> ToDemandPicks;
-                FilterCargoPicks(&Props->MarketGoods, &ToDemand, &ToDemandPicks);  // 06f36abc
+                FilterCargoPicks(&Props->MarketGoods, &ToDemand, &ToDemandPicks);
                 if (!ToDemandPicks.empty())
                 {
                     bPicked = true;
-                    Good = PickWeightedCargo(&ToDemandPicks)->GoodId;      // 06f36ae0
+                    Good = PickWeightedCargo(&ToDemandPicks)->GoodId;
                 }
             }
         }
 
         if (!bPicked)
         {
-            // 06f36b44-06f36b84: a random good of the faction; none -> nothing is written.
+            // A random good of the faction; none -> nothing is written.
             if (Props->MarketGoods.empty())
                 continue;
             int const Count = static_cast<int>(Props->MarketGoods.size()); // FUN_06fa3db0
             Good = Props->MarketGoods[(rand() * Count) / 0x8000];
         }
 
-        // 06f36b88-06f36b9c: the guide description keeps both goods.
         Desc->TradeGood = Good;                                            // +0x4c
         Desc->ReturnGood = ReturnGood;                                     // +0x50
         if (Good == 0)
             continue;
 
-        // 06f36ba5-06f36c37: one unit of weight 1.0f, fitted to the hold, then appended to
-        // the ship's cargo (FUN_06f537a0 insert(end, {good, count})).
+        // One unit of weight 1.0f, fitted to the hold, then appended to the ship's cargo.
         FCargoPick const Pick(Good, 1, 1.0f);
         Out->insert(Out->end(), Pick);                                     // FUN_06f38170
-        FitCargoToHold(Params->ShipArchId, Out);                           // 06f36bfd
+        FitCargoToHold(Params->ShipArchId, Out);
         for (std::vector<FCargoPick>::const_iterator It = Out->begin(); It != Out->end(); ++It)
         {
             pub::SpaceObj::CargoDesc const Entry = {It->GoodId, It->Count};

@@ -49,9 +49,8 @@ namespace
     bool G_bGfScriptSequenceSkipLatch = false;
 }
 
-// LAB_004548f0 (the option callback registered at 0x005b58c7). 0x004548f4: cleared first, then
-// set when Value < 0.5 (DAT_005c75e8; `TEST AH,1` + JZ leaves it clear only for not-less: an
-// unordered compare sets C0, so a NaN sets it too).
+// LAB_004548f0 (the skip_transition_scripts option callback). Set when Value < 0.5
+// (DAT_005c75e8); the x87 compare treats a NaN as less, so a NaN sets it too.
 void GfScriptSequenceSetSkipOption(float Value)
 {
     G_bGfScriptSequenceSkipLatch = false;
@@ -101,8 +100,7 @@ namespace
     unsigned char MakeKeyFlags(unsigned char bStreamer, unsigned char bSpatial,
                                unsigned char bLoop)
     {
-        // 0x0044f48b..0x0044f4ab: the three XOR/AND inserts into a byte whose low three bits
-        // were cleared (AND AL,0xf8).
+        // Retail's three bit-field inserts into a byte whose low three bits were cleared.
         unsigned char Flags = 0;
         Flags = static_cast<unsigned char>(Flags ^ (((bStreamer << 2) ^ Flags) & 4));
         Flags = static_cast<unsigned char>(Flags ^ (((bSpatial << 1) ^ Flags) & 2));
@@ -115,9 +113,8 @@ namespace
 // FGfScript
 // =========================================================================================
 
-// FUN_0044eab0. 0x0044eab0..0x0044eaf7: the +0xa8 list's sentinel, size 0; 0x0044eafc
-// FUN_0044ebf0. +0x34, +0x5c and +0x60 are not written by either (FUN_0044ece0 / FUN_0044f720
-// write them before anything reads them); the port zeroes them here for C++ hygiene only.
+// FUN_0044eab0. +0x34, +0x5c and +0x60 are not written by retail here (FUN_0044ece0 /
+// FUN_0044f720 write them before anything reads them); the port zeroes them.
 FGfScript::FGfScript()
     : Sequence(nullptr),
       bPropsToRoom(0),
@@ -126,9 +123,7 @@ FGfScript::FGfScript()
     Init();
 }
 
-// FUN_0044eb20. 0x0044eb40..0x0044eb6d: every spawned object deleted through identity slot 13
-// (the scalar deleting dtor, flag 1) and its entry zeroed; 0x0044eb6f..0x0044eb78 the table
-// freed, +0x48 = 0; 0x0044eb7b..0x0044ebd7 every event node freed, the sentinel too.
+// FUN_0044eb20. Spawned objects are deleted through identity slot 13 (the scalar deleting dtor).
 FGfScript::~FGfScript()
 {
     int Index = 0;
@@ -143,9 +138,7 @@ FGfScript::~FGfScript()
     SoundEvents.clear();
 }
 
-// FUN_0044ebf0. Frame and PlayerCsys to identity; +0x30, +0x38..+0x40, +0x48, +0x4c, +0x50,
-// +0x58, +0x94, +0x98, +0x9c, +0xa0, +0xa4 = 0; bytes +0x44, +0x45, +0x54, +0x55, +0x5d, +0x5e,
-// +0x5f, +0x61 = 0 and +0x56 = 1. +0x34, +0x5c and +0x60 are not touched.
+// FUN_0044ebf0. +0x34, +0x5c and +0x60 are not touched.
 void FGfScript::Init()
 {
     SetIdentityCsys(Frame);
@@ -181,11 +174,8 @@ void FGfScript::SetRoom(FRoomRuntime* InRoom, FGfScriptSequence* InSequence)
     Sequence = InSequence;
 }
 
-// FUN_0044ed00. 0x0044ed03..0x0044ed08: once. 0x0044ed0b FUN_0044f550; 0x0044ed10..0x0044ed4c:
-// each non-null spawned object slot 19 (+0x4c) SetScene(0), slot 14 (+0x38) Stop, then
-// IScriptEngine slot 13 Detach(i) -- the engine is not tested for null. 0x0044ed4e..0x0044ed7f:
-// +0x3c = 0, the sequence's FUN_00455ca0, +0x38 = 0, both names freed, +0x45 = 1. The spawned
-// objects themselves stay (the dtor deletes them).
+// FUN_0044ed00. The engine is not tested for null. The spawned objects themselves stay (the
+// dtor deletes them).
 void FGfScript::Teardown()
 {
     if (bTornDown != 0)
@@ -209,12 +199,8 @@ void FGfScript::Teardown()
     bTornDown = 1;
 }
 
-// FUN_0044f270 (RET 8). No engine: false. 0x0044f284..0x0044f294: IScriptEngine slot 16 the
-// event; only START_SOUND (3). 0x0044f296..0x0044f2b4: Out +0x08 = StartMs, +0x0c = StartMs +
-// DurationMs, +0x10 = event Flags bit 3. 0x0044f2b7..0x0044f2d7: slot 9 the event's entity
-// (+0x1c); only a SOUND (6) that is not a reference; Out +0x11 = entity Flags bit 1.
-// 0x0044f2da..0x0044f304: not "PlayerShipSound" and spawned: Out +0x00 = its +0x7c archetype,
-// +0x04 = the object; true. Every early exit leaves the rest of Out as it was.
+// FUN_0044f270. Every early exit leaves the rest of Out as it was, including the fields
+// already written.
 bool FGfScript::CollectSoundEvent(int EventId, FGfScriptSoundEvent* Out)
 {
     if (Engine == nullptr)
@@ -245,10 +231,7 @@ bool FGfScript::CollectSoundEvent(int EventId, FGfScriptSoundEvent* Out)
     return true;
 }
 
-// FUN_0044f310. No engine: nothing. 0x0044f328..0x0044f3f6: for each of the slot 14 events,
-// slot 15 the event, a zeroed five-word local (+0x10 / +0x11 bytes cleared) filled by
-// FUN_0044f270 with the event's +0x14 id; accepted -> a new node {the five words, EventId,
-// Handle 0, bStarted 0} appended.
+// FUN_0044f310.
 void FGfScript::CollectSoundEvents()
 {
     if (Engine == nullptr)
@@ -270,9 +253,7 @@ void FGfScript::CollectSoundEvents()
     }
 }
 
-// FUN_0044f410. Every node not started: with an archetype, a non-streamer is acquired (slot 3,
-// +0x0c); a streamer is started through FUN_00428680 with offset 0 and {streamer, spatial,
-// loop} and bAltStart 1, the handle into the node. Started either way (also without one).
+// FUN_0044f410. A node is marked started even without an archetype.
 void FGfScript::StartScriptSounds()
 {
     std::list<FGfScriptSoundEvent>::iterator It = SoundEvents.begin();
@@ -302,8 +283,7 @@ void FGfScript::StartScriptSounds()
     }
 }
 
-// FUN_0044f500. The clock (IScriptEngine slot 19; the engine is not tested), then over the nodes
-// whose Thorn_Sound answers FUN_00457380: the largest EndMs - clock above 0.
+// FUN_0044f500. The engine is not tested; IsHoldingScript is FUN_00457380.
 int FGfScript::GetSoundTailMs()
 {
     int Tail = 0;
@@ -322,9 +302,7 @@ int FGfScript::GetSoundTailMs()
     return Tail;
 }
 
-// FUN_0044f550. Every started node: a non-streamer archetype released (slot 4, +0x10); a
-// streamer's handle, when held, stopped (slot 24, +0x60), released (+0x08) and cleared. Not
-// started any more (also without an archetype).
+// FUN_0044f550. A node is marked not started even without an archetype.
 void FGfScript::StopScriptSounds()
 {
     std::list<FGfScriptSoundEvent>::iterator It = SoundEvents.begin();
@@ -352,8 +330,7 @@ void FGfScript::StopScriptSounds()
     }
 }
 
-// FUN_0044f5c0 (RET 4). A null handle, nothing; otherwise the first node holding it is unlinked
-// and freed.
+// FUN_0044f5c0.
 void FGfScript::RemoveSoundEvent(void* Handle)
 {
     if (Handle == nullptr)
@@ -369,11 +346,8 @@ void FGfScript::RemoveSoundEvent(void* Handle)
     }
 }
 
-// FUN_0044f610 (RET 8). 0x0044f625..0x0044f642: the first node of EventId. 0x0044f6ea..
-// 0x0044f718: held handle -> FUN_0042a2a0(Arch, Offset) on it (result dropped), bStarted = 0,
-// the handle answered. Otherwise 0x0044f644..0x0044f6d9: FUN_0044f270 into a local and, when
-// accepted, FUN_00428680 with {Offset, streamer / spatial / loop} and bAltStart 0 -- the new
-// source is answered (null when FUN_0044f270 refused), not stored in any node.
+// FUN_0044f610. A held handle is restarted (FUN_0042a2a0, result dropped). Otherwise a new
+// source is started (FUN_00428680, bAltStart 0) and answered, not stored in any node.
 void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
 {
     void* Result = nullptr;
@@ -406,10 +380,8 @@ void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
     return Result;
 }
 
-// FUN_0044f720 (RET 0x2c). The arguments into +0x3c, +0x50, +0x54, +0x55, +0x56, +0x58, +0x5c,
-// +0x5d, +0x60; +0x5e = 0; malloc_strcpy of the name into +0xa0 (not freed first) and of the file
-// into +0xa4 (freed first). With an engine: +0x40 = slot 17, FUN_0044ed90, FUN_0044f310,
-// FUN_0044f410, then slot 20 (thiscall) SetLoop(+0x54), slot 22 Start(0), slot 26 Tick(0).
+// FUN_0044f720. The name is copied into +0xa0 without freeing the old one (retail); the file
+// is freed first.
 void FGfScript::Start(IScriptEngine* InEngine, char const* InScriptFile, int InBindMode,
                       unsigned char bInLoop, unsigned char bInField55,
                       unsigned char bInApplySpatial, int InPriority, unsigned char bInFade,
@@ -440,18 +412,9 @@ void FGfScript::Start(IScriptEngine* InEngine, char const* InScriptFile, int InB
     Engine->Slot26Tick(0);
 }
 
-// FUN_0044f7f0 (RET 4). No engine: finished. Not finished yet:
-//   running (+0x44 clear) -- 0x0044f817..0x0044f845: slot 26 Tick(FUN_0044f500() + Ms), the
-//     clock (slot 19); not looping and the clock at or past +0x40 (unsigned compare, JC)
-//     finishes. 0x0044f849..0x0044f8ce: with +0x5d and no fade yet, the remaining seconds
-//     (Duration - clock as an unsigned 64-bit FILD, * 0.001, stored as float): only when they
-//     are not above the fade duration DAT_0061650c (`TEST AH,0x41` + JP skips greater or
-//     unordered) -- at or below 0 (`TEST AH,0x41` + JNZ) FUN_00412070(1.0), else
-//     FUN_00412050(1.0, 1.0 / seconds); fade started.
-//   paused (+0x44 set) -- 0x0044f8d0..0x0044f901: slot 26 Tick(Duration - clock); with +0x5d
-//     FUN_00412070(1.0) and fade started; finished, +0x44 cleared.
-// 0x0044f905..0x0044f932: finished -> slot 26 Tick(100) and, with +0x5d, FUN_00412070(1.0) and
-// fade started. Answers +0x5f.
+// FUN_0044f7f0. The clock compare is unsigned; the remaining time is loaded as an unsigned
+// 64-bit integer. The fade starts once the remaining seconds are not above the fade duration
+// DAT_0061650c (FUN_00412070 / FUN_00412050).
 bool FGfScript::Update(int Ms)
 {
     if (Engine == nullptr)
@@ -471,8 +434,8 @@ bool FGfScript::Update(int Ms)
             {
                 unsigned const RemainingMs =
                     static_cast<unsigned>(Duration) - static_cast<unsigned>(Clock);
-                // FILD / FMUL 0.001 / FST float [ESP+0x10] / FCOMP: the first compare is on the
-                // unrounded product still on the FPU stack; the float copy feeds the rest.
+                // The first compare is on the unrounded product still on the x87 stack; the
+                // float copy feeds the rest.
                 double const SecondsExact = static_cast<double>(RemainingMs) * 0.001;
                 float const Seconds = static_cast<float>(SecondsExact);
                 if (!(SecondsExact > static_cast<double>(GetFadeDuration())))
@@ -509,7 +472,7 @@ bool FGfScript::Update(int Ms)
     return bFinished != 0;
 }
 
-// FUN_0044f950. With an engine: slot 23 Stop, slot 22 Start(0).
+// FUN_0044f950.
 void FGfScript::Restart()
 {
     if (Engine == nullptr)
@@ -518,7 +481,7 @@ void FGfScript::Restart()
     Engine->Slot22Start(0);
 }
 
-// FUN_0044f970 (RET 4). Identity slot 18 (+0x48) on every non-null spawned object.
+// FUN_0044f970.
 void FGfScript::DrawEffects(ICamera* Camera)
 {
     int Index = 0;
@@ -529,9 +492,8 @@ void FGfScript::DrawEffects(ICamera* Camera)
     }
 }
 
-// FUN_0044f9a0 (thiscall, RET 8). 0x0044f9a3..0x0044f9bb: Spawned[Index] slot 17 (+0x44), then
-// Sequence (+0x34) FUN_00455d20(instance, bDetached). No null check on the entity or the
-// sequence -- the callers only get here for an index FUN_0044fdd0 / FUN_0044ff30 just used.
+// FUN_0044f9a0. No null check on the entity or the sequence -- the callers only get here for an
+// index FUN_0044fdd0 / FUN_0044ff30 just used.
 void FGfScript::SetEntityPropDetached(int Index, unsigned char bDetached)
 {
     void* Instance = Spawned[Index]->GetEngineInstance();
@@ -544,9 +506,7 @@ void FGfScript::Pause()
     bPaused = 1;
 }
 
-// FUN_0044f9e0 (RET 4). 0x0044f9e6..0x0044f9f4: the remaining ms (Duration - slot 19); none,
-// nothing. 0x0044f9f6..0x0044fa37: ftol(floor(remaining (unsigned) * Scale + 0.5)), one more
-// unless Scale < 1.0 (`TEST AH,1` + JNZ: less or unordered keeps it); FUN_0044f7f0 with that.
+// FUN_0044f9e0. One more millisecond unless Scale < 1.0 (a NaN Scale counts as less).
 void FGfScript::Advance(float Scale)
 {
     unsigned const RemainingMs =
@@ -576,8 +536,7 @@ FGfMirrorDatabase::~FGfMirrorDatabase()
     Entries.clear();
 }
 
-// FUN_00453a40 (RET 8). A null name is "" (DAT_005c865c's empty tail); the node goes before the
-// sentinel.
+// FUN_00453a40. A null name is "" (DAT_005c865c).
 void FGfMirrorDatabase::Add(FCharacterObject* Object, char const* ObjName)
 {
     FEntry Entry;
@@ -586,7 +545,7 @@ void FGfMirrorDatabase::Add(FCharacterObject* Object, char const* ObjName)
     Entries.push_back(Entry);
 }
 
-// FUN_00453b50. head->next != head ? node +0x08 : 0.
+// FUN_00453b50.
 FCharacterObject* FGfMirrorDatabase::First() const
 {
     if (Entries.empty())
@@ -594,7 +553,7 @@ FCharacterObject* FGfMirrorDatabase::First() const
     return Entries.front().Object;
 }
 
-// FUN_00453b60 (RET 4). stricmp of each node's c_str (null storage reads as "") with ObjName.
+// FUN_00453b60. A node with null string storage reads as "".
 FCharacterObject* FGfMirrorDatabase::Find(char const* ObjName) const
 {
     std::list<FEntry>::const_iterator It = Entries.begin();
@@ -610,7 +569,7 @@ FCharacterObject* FGfMirrorDatabase::Find(char const* ObjName) const
 // FGfScriptEntry
 // =========================================================================================
 
-// LAB_00454e20. Script, Engine, File = 0; Frame = origin, identity; Kind = 0.
+// LAB_00454e20.
 FGfScriptEntry::FGfScriptEntry()
     : Script(nullptr),
       Engine(nullptr),
@@ -620,9 +579,7 @@ FGfScriptEntry::FGfScriptEntry()
     SetIdentityCsys(Frame);
 }
 
-// LAB_00454d70. A script is torn down (FUN_0044ed00) first; the file freed, the engine
-// destroyed (ThornScriptDestroy), the script deleted (FUN_0044eb20 + free); everything back to
-// the ctor's values.
+// LAB_00454d70. Everything goes back to the ctor's values.
 FGfScriptEntry::~FGfScriptEntry()
 {
     if (Script != nullptr)
@@ -638,10 +595,8 @@ FGfScriptEntry::~FGfScriptEntry()
     Kind = 0;
 }
 
-// FUN_00454820 (RET 8). 0x00454839..0x00454876: a script already there -> ThornScriptDestroy(
-// &Engine), the script deleted, Script = 0, Engine = ThornScriptLoad(ScriptFile). Then
-// 0x00454878..0x004548cc: operator new(0xb4) + FUN_0044eab0 into +0x00, FUN_0044ebf0,
-// FUN_0044ece0(Room, Seq), the entry's frame copied over the script's (REP MOVSD 0xc).
+// FUN_00454820. A second run reloads the engine from the file before the new script
+// (operator new(0xb4)).
 FGfScript* FGfScriptEntry::Create(FRoomRuntime* InRoom, FGfScriptSequence* InSeq)
 {
     if (Script != nullptr)
@@ -662,12 +617,7 @@ FGfScript* FGfScriptEntry::Create(FRoomRuntime* InRoom, FGfScriptSequence* InSeq
 // FGfScriptSequence
 // =========================================================================================
 
-// FUN_00454920. The two FmtStr blocks, the mirror database, the two lists (sentinels of 0x1c);
-// then 0x00454a19..0x00454b2d the scalar defaults: +0x00 = 0, +0x06 / +0x08 / +0x09 / +0x0e /
-// +0x0f / +0x15 / +0x2c = 1, the other flag bytes 0, +0x10 / +0x18..+0x28 = 0, the player frame
-// origin / identity (FUN_004215b0), +0x64 / +0x6c = 0 (+0x68 is not written), +0xb0..+0xbc = 0,
-// +0xc0 = -1, +0xc4 = 0, +0xc8..+0xd0 = 0, both FmtStr destroyed and zeroed, +0x104..+0x110 and
-// +0x120 = 0. 0x00454b33..0x00454b99: both lists emptied again (they are already empty).
+// FUN_00454920. Retail does not write +0x68 (PlayerDeformInstance) here; the port zeroes it.
 FGfScriptSequence::FGfScriptSequence()
     : BindMode(0),
       bLoop(0),
@@ -730,12 +680,7 @@ FGfScriptSequence::FGfScriptSequence()
         CameraOrient[Index] = 0.0f;
 }
 
-// FUN_00454bb0. 0x00454bd2..0x00454be5: not stopped -> FUN_004554c0(1). 0x00454bea..
-// 0x00454c1d: the entries (vector delete with LAB_00454d70), +0xb4 = 0. Both FmtStr destroyed;
-// +0x108 deleted through its slot 0 (flag 1) and zeroed; +0x120 freed. 0x00454c58..0x00454cb8:
-// every prop, then every character, deleted through RoomObject slot 0 (flag 1) and its node
-// value zeroed; both lists emptied and their sentinels freed; the mirror database cleared
-// (FUN_004539e0).
+// FUN_00454bb0. Only the offer dialog is deleted here; the info dialog is not.
 FGfScriptSequence::~FGfScriptSequence()
 {
     if (bStopped == 0)
@@ -744,7 +689,6 @@ FGfScriptSequence::~FGfScriptSequence()
     Entries = nullptr;
     DialogTextA.destroy();
     DialogTextB.destroy();
-    // 0x00454c35..0x00454c4c: the offer dialog through its slot 0 with 1, then +0x108 = 0.
     if (OfferDialog != nullptr)
         delete OfferDialog;
     OfferDialog = nullptr;
@@ -767,18 +711,16 @@ FGfScriptSequence::~FGfScriptSequence()
     Characters.clear();
 }
 
-// FUN_00454e80 (RET 4). malloc_strfree(+0x120), malloc_strcpy(+0x120, InName).
+// FUN_00454e80.
 void FGfScriptSequence::SetName(char const* InName)
 {
     malloc_strfree(&Name);
     malloc_strcpy(&Name, InName);
 }
 
-// FUN_00454eb0 (RET 0x10). Entry Count: malloc_strcpy of File into +0x08 (the old string is
-// not freed), +0x3c = Kind, the frame copied (REP MOVSD 0xc); Engine null -> ThornScriptLoad(
-// the copied file). +0x04 = the engine, DAT_006799e4 = its slot 17 (the Gameflow arrival
-// caption's delay), Count + 1. No check against +0xb8 (retail: a 0x21st script writes past
-// the 0x20 entries -- no caller adds that many).
+// FUN_00454eb0. The old file string is not freed. DAT_006799e4 (the Gameflow arrival caption's
+// delay) takes the script's duration. No check against +0xb8 (retail: a 0x21st script writes
+// past the 0x20 entries -- no caller adds that many).
 void FGfScriptSequence::AddScript(char const* File, int InKind, Csys const* InFrame,
                                   IScriptEngine* InEngine)
 {
@@ -794,7 +736,7 @@ void FGfScriptSequence::AddScript(char const* File, int InKind, Csys const* InFr
     ++Count;
 }
 
-// FUN_00454f30 (RET 0x14). +0xc8 / +0xcc / +0xd0, then FmtStr::operator= into +0xd4 and +0xec.
+// FUN_00454f30.
 void FGfScriptSequence::SetDialog(int A, int B, int C, FmtStr const& TextA, FmtStr const& TextB)
 {
     OfferType = A;
@@ -804,7 +746,7 @@ void FGfScriptSequence::SetDialog(int A, int B, int C, FmtStr const& TextA, FmtS
     DialogTextB = TextB;
 }
 
-// FUN_00454f80. RefreshLoadingProgress, +0x2d = 1, FUN_00455290, FUN_00454fb0(0), +0xc4 = 1.
+// FUN_00454f80.
 void FGfScriptSequence::Play()
 {
     RefreshLoadingProgress();
@@ -814,18 +756,8 @@ void FGfScriptSequence::Play()
     bActive = 1;
 }
 
-// FUN_00454fb0 (RET 4).
-//   0x00454fb6..0x00454ff6: RefreshLoadingProgress; +0xc0 = Index; entry Index's FUN_00454820(
-//     Room, this); the new script's +0x38 = &+0x114.
-//   0x00454ff9..0x00455069: the fade flag is +0x07, forced on when +0x28 (a location to move to)
-//     is set and FUN_00455fc0 runs past the last entry; FUN_0044f720 with the entry's engine and
-//     file and +0x00, +0x04, +0x05, +0x08, +0x10, that flag, +0x120, +0x14, +0x0d.
-//   0x0045506e..0x0045508c: +0x16 && DAT_0066d304 (LAB_004548f0's latch) && +0x2d && +0x15 ->
-//     +0x2e = 1.
-//   0x00455090..0x00455097: +0x0f -> FUN_00558bf0.
-//   0x0045509c..0x004550ef: the player not saved yet and the script bound one (+0x61): saved --
-//     its frame (+0x64 -> +0x34), +0x94 -> +0x64, +0x98 -> +0x68, +0x9c -> +0x6c.
-//   0x004550f2..0x00455286: kind 1 -- the offer dialog FUN_00455850; kind 4 -- the info box.
+// FUN_00454fb0. The fade is forced on when a location to move to is set and this is the last
+// entry. Kind 1 opens the offer dialog (FUN_00455850), kind 4 the info box.
 void FGfScriptSequence::StartEntry(int Index)
 {
     RefreshLoadingProgress();
@@ -858,12 +790,9 @@ void FGfScriptSequence::StartEntry(int Index)
         PlayerCharacter = Script->PlayerCharacter;
     }
 
-    // 0x004550f2..0x004551c2: a kind-1 entry (an offer). The entries after it are scanned while
-    // their kinds are 2, 3, 4 or 6 -- 2 and 4 mark an Accept branch, 3 a Decline branch, 6
-    // neither; any other kind ends the scan. No branch found (or no entry after it) counts as
-    // both. Unless the offer is already up (+0x104): FUN_00455850, then with +0x06 the
-    // letterbox out (FUN_0041a0f0(0, 3)) and the software cursor on (FUN_0041dda0(1));
-    // +0x104 = 1, +0x105 = +0x106 = 0.
+    // A kind-1 entry (an offer). The entries after it are scanned while their kinds are 2, 3, 4
+    // or 6 -- 2 and 4 mark an Accept branch, 3 a Decline branch, 6 neither. No branch found (or
+    // no entry after it) counts as both.
     if (Entries[Current].Kind == 1)
     {
         unsigned char bAcceptBranch = 0;
@@ -906,11 +835,8 @@ void FGfScriptSequence::StartEntry(int Index)
         }
     }
 
-    // 0x004551c9..0x00455286: a kind-4 entry (an info box), unless one is already up (+0x10c):
-    // the nav map focused on the place the info text names (FUN_00459ad0; FUN_004a2aa0 with
-    // bZone = flag bit 0x20), NN_OfferDialog "ScriptSequence_InfoDialog" into +0x110 opened
-    // with type 4, the +0xec text, a single button and LAB_00455b10; with +0x06 the letterbox
-    // out and the software cursor on; +0x10c = 1, +0x10d = 0.
+    // A kind-4 entry (an info box): the nav map is focused on the place the info text names
+    // (FUN_00459ad0; FUN_004a2aa0 with bZone = flag bit 0x20).
     if (Entries[Current].Kind == 4 && bInfoShown == 0)
     {
         unsigned Id = 0;
@@ -930,21 +856,8 @@ void FGfScriptSequence::StartEntry(int Index)
     }
 }
 
-// FUN_00455290.
-//   0x0045529f..0x004552f3: the room camera (+0xb0 -> +0x500): slot 4 (+0x10) the transform
-//     (orientation, then position at +0x24) -> +0x70 position, +0x7c orientation; slot 6
-//     (+0x18) -> +0xa0, slot 8 (+0x20) -> +0xa4, slot 9 (+0x24) -> +0xa8.
-//   0x004552f9..0x0045536c: +0xac = +0xad = 0; per entry FUN_0044fa90(engine, 1),
-//     FUN_0044faf0(engine, &ambient, &music), FUN_0044fb80(engine, 1); either found sets its
-//     byte.
-//   0x0045536e..0x0045537b: RefreshLoadingProgress; CharacterInfo FUN_004353a0.
-//   0x00455380..0x00455443: +0x0a without a script ambience -- the room ambience ducks: with
-//     +0x0c at the fixed rate (FUN_00428d00(3, -20, 2.5), Gf fade target -20 at 2.5 dB/s), else
-//     by the ducking config (FUN_00428d00(3, 1e10, 1e10), Gf fade to down_by over down_time).
-//   0x00455446..0x0045547e: +0x0b without a script music -- FUN_00428c50 the same way.
-//   0x00455481..0x004554a3: +0x06 -> letterbox in (FUN_0041a0f0(1.0, 3.0)), hotspots locked
-//     (FUN_00559290), software cursor off (FUN_0041dda0(0)).
-//   +0x2c = 0.
+// FUN_00455290. The room ambience / music duck unless a script plays its own: at the fixed rate
+// with bDuckSlow, else by the ducking config (FUN_00428d00 / FUN_00428c50).
 void FGfScriptSequence::Setup()
 {
     RefreshLoadingProgress();
@@ -992,8 +905,8 @@ void FGfScriptSequence::Setup()
             float DownTime = 0.0f;
             GetClientDuckingConfig(&DownBy, nullptr, nullptr);
             GetClientDuckingConfig(nullptr, &DownTime, nullptr);
-            // 0x00455406..0x0045543c: target down_by; rate |down_by - current| / down_time, or
-            // 1e6 when down_time is not above 0 -- FUN_004569d0's body with those seconds.
+            // Target down_by; rate |down_by - current| / down_time, or 1e6 when down_time is not
+            // above 0 -- FUN_004569d0's body.
             SetClientAudioFade(DownBy, DownTime > 0.0f ? DownTime : 0.0f);
         }
     }
@@ -1013,22 +926,8 @@ void FGfScriptSequence::Setup()
     bStopped = 0;
 }
 
-// FUN_004554c0 (RET 4). Once (+0x2c).
-//   0x004554da..0x00455552: a location to move to (+0x28): the spaceflight location ->
-//     FUN_00558a30; else the room loaded (FUN_0043a340) -> its audio (FUN_0043bab0) and a
-//     change queued without audio (FUN_0043ba90(loc, 0, 0)), otherwise queued with audio
-//     (FUN_0043ba90(loc, 0, 1)). Then FUN_00412070(1.0), FUN_00558bf0; "moved" is remembered.
-//   0x00455556..0x0045559c: +0x0e, not moved, the player saved -> DALib::Deform slot 19 (+0x4c)
-//     / slot 20 (+0x50) with +0x68 and the frame's position / orientation, the character's
-//     slot 3 (+0x0c) with +0x64.
-//   0x0045559f..0x004555cb: +0x06, not moved -> letterbox out (FUN_0041a0f0(0, 3)), hotspots
-//     unlocked (FUN_005592a0), software cursor on (FUN_0041dda0(1)), the room's FUN_0044ad70.
-//   0x004555d0..0x004556a7: not moved: +0x0a -> ambience back to 0 dB (fixed rate with +0x0c,
-//     else over down_time), Gf fade target 0; +0x0b -> music back to 0 dB.
-//   0x004556aa..0x00455746: +0x09, not moved -> the room camera restored (FUN_00556cd0 /
-//     FUN_00556ce0 / FUN_00556e00 / FUN_00556f10 with +0x7c/+0x70, +0xa0, +0xa4, +0xa8).
-//   0x00455749..0x00455780: per entry FUN_0044fb80(engine, 0), FUN_0044fa90(engine, 0).
-//   +0x2c = 1; +0x24 -> IServer slot 69 (+0x114)(session, +0x24); +0x18 -> the callback.
+// FUN_004554c0. Once. Moving to a location (FUN_00558a30 for spaceflight, else FUN_0043ba90
+// with audio unless the room is already loaded) skips every restore below it.
 void FGfScriptSequence::StopPlayback(unsigned char bArg)
 {
     if (bStopped != 0)
@@ -1058,9 +957,7 @@ void FGfScriptSequence::StopPlayback(unsigned char bArg)
 
     if (bRestorePlayer != 0 && !bMoved && bPlayerSaved != 0)
     {
-        // 0x00455568..0x0045559c: DALib::Deform slot 19 (+0x4c)(+0x68, &+0x34 position) and
-        // slot 20 (+0x50)(+0x68, &+0x40 orientation), then the character's (+0x6c) slot 3
-        // (+0x0c) with +0x64. Results unused; the character is not null-tested.
+        // Results unused; the character is not null-tested.
         DALib::Deform->SetPosePos(PlayerDeformInstance, &PlayerCsys.Pos.x);
         DALib::Deform->SetPoseOri(PlayerDeformInstance, &PlayerCsys.Orient);
         PlayerCharacter->SetFloat1C(PlayerField64);
@@ -1123,22 +1020,17 @@ void FGfScriptSequence::StopPlayback(unsigned char bArg)
     }
 
     bStopped = 1;
-    // 0x00455782..0x0045579f: +0x24 non-zero -> IServer slot 69 RTCDone(DAT_00673344, +0x24)
-    // on DAT_0067ecd0 (not null-tested).
+    // IServer slot 69; G_Server is not null-tested.
     if (RtcId != 0)
         G_Server->RTCDone(GetPlayerConnectionId(), RtcId);
     if (Callback != nullptr)
         Callback(CallbackA, CallbackB, bArg);
 }
 
-// FUN_004557d0 (thiscall). Caller: IClient slot 114 (LAB_0053e370, 0x0053e38d) on DAT_00673350.
+// FUN_004557d0. Caller: IClient slot 114 (LAB_0053e370) on DAT_00673350.
 void FGfScriptSequence::OnMissionOfferAnswered()
 {
-    // 0x004557d3: DAT_00673350 = 0.
-    SetMissionOfferSequenceRetail(nullptr);
-    // 0x004557dd..0x00455838: with the offer up (+0x104): +0x108 through its slot 0 with 1 and
-    // zeroed; +0x06 -> letterbox in (FUN_0041a0f0(1.0, 3.0)), software cursor off
-    // (FUN_0041dda0(0)); the current script run out (FUN_0044f9d0); +0x104 = 0.
+    SetMissionOfferSequenceRetail(nullptr); // DAT_00673350
     if (bOfferShown == 0)
         return;
     if (OfferDialog != nullptr)
@@ -1158,14 +1050,10 @@ void FGfScriptSequence::ShowOfferDialog(unsigned char bHasAcceptBranch,
                                         unsigned char bHasDeclineBranch)
 {
     (void)bHasAcceptBranch;
-    // 0x0045586b..0x00455883: FUN_0059db20("ScriptSequence_OfferDialog", "NN_OfferDialog", 0, 0)
-    // -> +0x108 (not null-tested).
+    // FUN_0059db20; the result is not null-tested.
     OfferDialog = static_cast<NnOfferDialog*>(
         WinFactoryCreate("ScriptSequence_OfferDialog", "NN_OfferDialog", nullptr, nullptr));
 
-    // 0x00455889..0x00455963: the dialog type and text by +0xc8: 1 -> type 1, +0xd4; 2 -> type
-    // 2, +0xec; 3 -> type 0, +0xd4; 4 -> type 3, +0xd4; anything else -> type 0, +0xd4 and a
-    // WARNING FDUMP (ScriptSequence.cpp line 0x38b).
     FmtStr Text;
     int Type = 0;
     if (OfferType == 1)
@@ -1195,10 +1083,9 @@ void FGfScriptSequence::ShowOfferDialog(unsigned char bHasAcceptBranch,
               0x38b, OfferType);
     }
 
-    // 0x00455966..0x00455980: FUN_004a6630(type, &text, no Decline branch, LAB_004559b0, this).
+    // FUN_004a6630.
     OfferDialog->Open(Type, &Text, bHasDeclineBranch == 0, &FGfScriptSequence::OnOfferAnswer,
                       this);
-    // 0x00455985..0x00455991: the local FmtStr destroyed.
 }
 
 // LAB_004559b0 (cdecl).
@@ -1207,10 +1094,9 @@ void __cdecl FGfScriptSequence::OnOfferAnswer(void* Context, int Answer)
     FGfScriptSequence* const Seq = static_cast<FGfScriptSequence*>(Context);
     if (Answer == 0)
     {
-        // 0x004559bd..0x00455a33: Accept, first answer (+0x105 clear): +0x105 = +0x106 = 1.
-        // Unless this is a multiplayer group offer (type 3) the server already answered:
-        // multiplayer type 3 -> DAT_00673350 = this; IServer slot 43 MissionResponse(+0xcc,
-        // +0xd0, +0x106, DAT_00673344) on DAT_0067ecd0 (not null-tested).
+        // Accept, first answer. A multiplayer group offer (type 3) the server already answered
+        // sends nothing; otherwise IServer slot 43 MissionResponse (G_Server not null-tested),
+        // and a multiplayer type 3 registers itself in DAT_00673350 first.
         if (Seq->bOfferAnswered == 0)
         {
             Seq->bOfferAnswered = 1;
@@ -1224,15 +1110,14 @@ void __cdecl FGfScriptSequence::OnOfferAnswer(void* Context, int Answer)
                                           Seq->bOfferAccepted != 0, GetPlayerConnectionId());
             }
         }
-        // 0x00455a39..0x00455a56: a multiplayer group offer the server has not answered yet
-        // stays open (FUN_004557d0 closes it later); otherwise on to the close.
+        // A multiplayer group offer the server has not answered yet stays open (FUN_004557d0
+        // closes it later).
         if (!SinglePlayer() && Seq->OfferType == 3 && GetMissionOfferAnsweredRetail() == 0)
             return;
     }
     else if (Answer == 1)
     {
-        // 0x00455a61..0x00455a9c: Decline / Close, first answer: +0x105 = 1, +0x106 = 0,
-        // MissionResponse(+0xcc, +0xd0, 0, DAT_00673344).
+        // Decline / Close, first answer.
         if (Seq->bOfferAnswered == 0)
         {
             Seq->bOfferAnswered = 1;
@@ -1247,9 +1132,6 @@ void __cdecl FGfScriptSequence::OnOfferAnswer(void* Context, int Answer)
         return;
     }
 
-    // 0x00455aa2..0x00455afd: with the offer up (+0x104): +0x108 through its slot 0 with 1 and
-    // zeroed; +0x06 -> letterbox in (FUN_0041a0f0(1.0, 3.0)), software cursor off
-    // (FUN_0041dda0(0)); the current script run out (FUN_0044f9d0); +0x104 = 0.
     if (Seq->bOfferShown == 0)
         return;
     if (Seq->OfferDialog != nullptr)
@@ -1269,9 +1151,6 @@ void __cdecl FGfScriptSequence::OnInfoDialogClosed(void* Context, int Answer)
 {
     (void)Answer;
     FGfScriptSequence* const Seq = static_cast<FGfScriptSequence*>(Context);
-    // 0x00455b15..0x00455b77: +0x10d = 1; with the info box up (+0x10c): +0x110 through its
-    // slot 0 with 1 and zeroed; +0x06 -> letterbox in, software cursor off; the current script
-    // run out (FUN_0044f9d0); +0x10c = 0.
     Seq->bInfoClosed = 1;
     if (Seq->bInfoShown == 0)
         return;
@@ -1287,7 +1166,7 @@ void __cdecl FGfScriptSequence::OnInfoDialogClosed(void* Context, int Answer)
     Seq->bInfoShown = 0;
 }
 
-// FUN_00455b80 (RET 8). A null name is ""; the node {Prop, std::string} before the sentinel.
+// FUN_00455b80. A null name is "".
 void FGfScriptSequence::AddProp(FObjectProp* Prop, char const* PropName)
 {
     FProp Entry;
@@ -1296,9 +1175,7 @@ void FGfScriptSequence::AddProp(FObjectProp* Prop, char const* PropName)
     Props.push_back(Entry);
 }
 
-// FUN_00455ca0. 0x00455ca4..0x00455ccc: every node's prop deleted through its slot 0 (flag 1)
-// and zeroed; 0x00455cce..0x00455d13: every node unlinked, its string freed (FUN_00455e90) and
-// the node freed.
+// FUN_00455ca0.
 void FGfScriptSequence::ClearProps()
 {
     std::list<FProp>::iterator It = Props.begin();
@@ -1311,9 +1188,7 @@ void FGfScriptSequence::ClearProps()
     Props.clear();
 }
 
-// FUN_00455d20 (thiscall, RET 8). 0x00455d25..0x00455d58: walk the list at +0x134 from its first
-// node; the first prop whose RoomObject slot 6 (+0x18) answers Instance gets the byte at +0x48;
-// the walk stops there. An empty list, or no match, writes nothing.
+// FUN_00455d20. The props are not null-tested.
 void FGfScriptSequence::SetPropDetached(void* Instance, unsigned char bDetached)
 {
     std::list<FProp>::iterator It = Props.begin();
@@ -1327,7 +1202,7 @@ void FGfScriptSequence::SetPropDetached(void* Instance, unsigned char bDetached)
     }
 }
 
-// FUN_00455d70 (RET 8). FUN_00455b80's body on the +0x124 list.
+// FUN_00455d70. FUN_00455b80's body on the +0x124 list.
 void FGfScriptSequence::AddCharacter(FCharacterObject* Character, char const* CharName)
 {
     FCharacter Entry;
@@ -1336,7 +1211,7 @@ void FGfScriptSequence::AddCharacter(FCharacterObject* Character, char const* Ch
     Characters.push_back(Entry);
 }
 
-// FUN_00455ed0 (RET 4). Null name: null. stricmp(node c_str (null storage -> ""), name) == 0.
+// FUN_00455ed0. A node with null string storage reads as "".
 FCharacterObject* FGfScriptSequence::FindCharacter(char const* CharName) const
 {
     if (CharName == nullptr)
@@ -1350,8 +1225,7 @@ FCharacterObject* FGfScriptSequence::FindCharacter(char const* CharName) const
     return nullptr;
 }
 
-// FUN_00455f50 (RET 8). Span = Count - Current - 1; the first offset 1..Span whose entry kind is
-// in Kinds, else Span + 1 (also when Span < 1).
+// FUN_00455f50.
 int FGfScriptSequence::FindNextOfKinds(int const* Kinds, int KindCount) const
 {
     int const Span = Count - Current - 1;
@@ -1371,13 +1245,7 @@ int FGfScriptSequence::FindNextOfKinds(int const* Kinds, int KindCount) const
     return Span + 1;
 }
 
-// FUN_00455fc0. By the current entry's kind: 0 -> +1; 5 -> +0 (the traffic script repeats);
-// 1 -> with +0x105: +0x106 set -> single player, or +0xc8 != 3 -> the next of {0, 2, 4}; else
-//   (multiplayer, +0xc8 == 3) DAT_00673348 set -> DAT_0067334c == DAT_00673344 ? the next of
-//   {0, 2, 4} : the next of {0, 6}, clear -> +0; +0x106 clear -> the next of {0, 3};
-//   +0x105 clear -> +0;
-// 2 -> the next of {0, 2, 4}; 3 -> the next of {0, 3}; 4 -> +0x10d ? the next of {0, 2, 4} : +0;
-// 6 -> the next of {0, 6}; anything else -> +0.
+// FUN_00455fc0. Kind 5 (the traffic script) and every unlisted kind repeat the current entry.
 int FGfScriptSequence::NextEntryIndex() const
 {
     int const Kind = Entries[Current].Kind;
@@ -1390,10 +1258,9 @@ int FGfScriptSequence::NextEntryIndex() const
         {
             if (bOfferAccepted != 0)
             {
-                // 0x00456014..0x0045606d: a multiplayer group offer (type 3) waits for the
-                // server's answer (DAT_00673348; +0 until then), then follows the Accept branch
-                // when this player is the acceptor (DAT_0067334c == DAT_00673344) and the kind-6
-                // branch otherwise. Every other offer takes the Accept branch.
+                // A multiplayer group offer (type 3) waits for the server's answer
+                // (DAT_00673348), then follows the Accept branch when this player is the acceptor
+                // (DAT_0067334c) and the kind-6 branch otherwise.
                 if (!SinglePlayer() && OfferType == 3)
                 {
                     if (GetMissionOfferAnsweredRetail() != 0)
@@ -1449,12 +1316,8 @@ int FGfScriptSequence::NextEntryIndex() const
     return Current + Step;
 }
 
-// FUN_00456150 (RET 4). Not playing: false. Not active: true. 0x00456170..0x0045622b: while
-// +0x2e (skip): the current script paused, updated by 0, torn down; the next entry (past the
-// end: +0xc0 = -1, done); else kinds 1 / 4 clear +0x2e, and the entry starts. Done -> the stop
-// below. 0x00456235..0x00456288: the current script updated by Ms; finished -> torn down, the
-// next entry started, or past the end the stop: FUN_004554c0(0), +0xc0 = -1, +0xc4 = 0. Answers
-// !+0xc4.
+// FUN_00456150. While skipping, each script is run out and the next started; an offer or info
+// entry (kinds 1 / 4) ends the skip.
 bool FGfScriptSequence::Update(int Ms)
 {
     if (bPlaying == 0)
@@ -1490,8 +1353,6 @@ bool FGfScriptSequence::Update(int Ms)
         }
         if (!bDone)
         {
-            // Fall through to the normal update (0x00456231 TEST BL,BL; JNZ taken only when
-            // done).
         }
     }
 
@@ -1517,14 +1378,14 @@ bool FGfScriptSequence::Update(int Ms)
     return bActive == 0;
 }
 
-// FUN_004562e0. FUN_0044f950 on the current script, +0x2d = 1. Caller: 0x0044529e.
+// FUN_004562e0.
 void FGfScriptSequence::RestartCurrent()
 {
     Entries[Current].Script->Restart();
     bPlaying = 1;
 }
 
-// FUN_00456300 (RET 4). While playing: a tail jump to FUN_0044f9e0 on the current script.
+// FUN_00456300.
 void FGfScriptSequence::AdvanceCurrent(float Scale)
 {
     if (bPlaying == 0)
@@ -1536,9 +1397,7 @@ void FGfScriptSequence::AdvanceCurrent(float Scale)
 // FGfScriptManager
 // =========================================================================================
 
-// FUN_00456540 (RET 8). operator new(0x13c) + FUN_00454920; 0x20 entries (operator new(0x804),
-// count 0x20 at [-4], LAB_00454e20 each) into +0xb4; +0xb8 = 0x20, +0xbc = 0, +0xb0 = Room,
-// +0x2f = bFindable; appended; size + 1.
+// FUN_00456540. operator new(0x13c); the entries are one operator new(0x804) array.
 FGfScriptSequence* FGfScriptManager::CreateSequence(FRoomRuntime* Room, unsigned char bFindable)
 {
     FGfScriptSequence* const Sequence = new FGfScriptSequence();
@@ -1551,10 +1410,8 @@ FGfScriptSequence* FGfScriptManager::CreateSequence(FRoomRuntime* Room, unsigned
     return Sequence;
 }
 
-// FUN_00456650 (RET 4). 0x00456655..0x004566bb: every sequence FUN_00456150(Ms); a finished one
-// is deleted (FUN_00454bb0 + free) and its node erased. 0x004566bd..0x004566d4: FUN_00456a40
-// (the Gf fade) with (float)(Ms * 0.001); when it moved, 0x004566d6..0x0045672c: every sequence
-// with +0x0d and a current script: identity slot 21 (+0x54) on each non-null spawned object.
+// FUN_00456650. TickClientAudioFade is FUN_00456a40 (the Gf fade); RefreshSound is identity
+// slot 21.
 void FGfScriptManager::Update(int Ms)
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1594,8 +1451,7 @@ void FGfScriptManager::Update(int Ms)
     }
 }
 
-// FUN_00456740 (RET 8). Every sequence of Room (+0xb0) that plays (+0x2d): FUN_0044f970(Camera)
-// on its current script (no -1 test: a playing sequence has one).
+// FUN_00456740. No -1 test on Current: a playing sequence has one.
 void FGfScriptManager::DrawEffects(FRoomRuntime* Room, ICamera* Camera)
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1610,8 +1466,7 @@ void FGfScriptManager::DrawEffects(FRoomRuntime* Room, ICamera* Camera)
     }
 }
 
-// FUN_00456790 (RET 8). The findable (+0x2f) sequences with a current script: each non-null
-// spawned object's FUN_00450070(Type, Name); the first match answers.
+// FUN_00456790. MatchesEntity is FUN_00450070.
 FThornComponent* FGfScriptManager::FindCreatedEntity(int Type, char const* EntityName)
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1638,9 +1493,7 @@ FThornComponent* FGfScriptManager::FindCreatedEntity(int Type, char const* Entit
     return nullptr;
 }
 
-// LAB_00456840 (RET 4). Id 0xf only: over the sequences (the list DAT_0066d2d8), each with +0x06
-// counts; when it also plays (+0x2d) and has +0x15, +0x2e = 1. Any counted -> FUN_0045b3c0,
-// true. Otherwise false.
+// LAB_00456840. NnArrivalTextHurry is FUN_0045b3c0.
 bool FGfScriptManager::OnEvent(unsigned MsgId)
 {
     if (MsgId != 0xf)
@@ -1662,7 +1515,7 @@ bool FGfScriptManager::OnEvent(unsigned MsgId)
     return true;
 }
 
-// FUN_004568a0. False at the first sequence with +0x06 and without +0x15; true otherwise.
+// FUN_004568a0.
 bool FGfScriptManager::CanSkipAll() const
 {
     std::list<FGfScriptSequence*>::const_iterator It = Sequences.begin();
@@ -1674,7 +1527,7 @@ bool FGfScriptManager::CanSkipAll() const
     return true;
 }
 
-// FUN_004568d0 (RET 4). The node holding Sequence: the sequence deleted, the node erased.
+// FUN_004568d0.
 void FGfScriptManager::DestroySequence(FGfScriptSequence* Sequence)
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1690,10 +1543,8 @@ void FGfScriptManager::DestroySequence(FGfScriptSequence* Sequence)
     }
 }
 
-// FUN_004563d0 (0x004563d0..0x004564cb). First pass: for each node, a non-null payload gets
-// FUN_00454bb0 + operator delete, then the node is unlinked and freed. A second erase pass over
-// whatever is left (nothing -- the first pass already took every node) and the head free are the
-// std::list destructor; FUN_00576010 is ~EventHandler.
+// FUN_004563d0. Retail's second erase pass and the head free are the std::list destructor;
+// FUN_00576010 is ~EventHandler.
 FGfScriptManager::~FGfScriptManager()
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1705,7 +1556,7 @@ FGfScriptManager::~FGfScriptManager()
     }
 }
 
-// FUN_00456930. Every sequence deleted, every node erased.
+// FUN_00456930.
 void FGfScriptManager::DestroyAll()
 {
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1732,9 +1583,8 @@ void FGfScriptManager::Shutdown()
 
 // =========================================================================================
 
-// FUN_0044fa60 (cdecl). 0x0044fa69 `TEST ESI,ESI; JLE` -- no step when Levels <= 0; otherwise
-// Levels times EAX = DALib::Engine slot 53 (+0xd4)(EAX). No check for a -1 instance on the way
-// (the one caller tests the result afterwards, 0x004524a4).
+// FUN_0044fa60. No check for a -1 instance on the way (the one caller tests the result
+// afterwards).
 void* GfEngineInstanceAncestor(void* Instance, int Levels)
 {
     void* Current = Instance;

@@ -39,23 +39,23 @@ static void* const kRoomObjectNoInstance = reinterpret_cast<void*>(static_cast<i
 // (0x005cbc0c), Character (0x005cb930), ObjectShip (0x005cbdf0), 0x005cb8d4.
 struct FRoomObject
 {
-    explicit FRoomObject(FRoomRuntime* InOwner);           // FUN_005593d0 (RET 4)
+    explicit FRoomObject(FRoomRuntime* InOwner);           // FUN_005593d0
     virtual ~FRoomObject();                                // 0  FUN_00559490 / FUN_005594b0
     virtual bool Slot1();                                  // 1  +0x04 FUN_0044fd00: false
     virtual bool IsVisible();                              // 2  +0x08 LAB_00444050: +0x10
     virtual void SetFloat1C(float Value);                  // 3  +0x0c LAB_00443850
     virtual float GetFloat1C();                            // 4  +0x10 LAB_00443860
-    virtual void Update(double DeltaSeconds) = 0;          // 5  +0x14 _purecall (RET 8)
+    virtual void Update(double DeltaSeconds) = 0;          // 5  +0x14 _purecall
     virtual void* GetEngineInstance();                     // 6  +0x18 FUN_00450870: -1
-    virtual void DrawOpaque(ICamera* Camera);              // 7  +0x1c no-op (RET 4)
-    virtual void DrawTranslucent(ICamera* Camera);         // 8  +0x20 no-op (RET 4)
-    virtual void DrawEffects(ICamera* Camera);             // 9  +0x24 no-op (RET 4)
+    virtual void DrawOpaque(ICamera* Camera);              // 7  +0x1c no-op
+    virtual void DrawTranslucent(ICamera* Camera);         // 8  +0x20 no-op
+    virtual void DrawEffects(ICamera* Camera);             // 9  +0x24 no-op
     // 10..12: the hotspot events FUN_00555f00 sends to a hotspot's owner (gf_hotspot.h) with
     // the hotspot's cookie (+0x08) and the cursor point: 1 enter, 2 leave, 3 click. Only
     // Character (0x005cb930: 0x00445a90 / 0x00445be0 / 0x00445c10) overrides them.
-    virtual void OnHotspotEnter(unsigned long Cookie, int const* Point); // 10 +0x28 no-op (RET 8)
-    virtual void OnHotspotLeave(unsigned long Cookie, int const* Point); // 11 +0x2c no-op (RET 8)
-    virtual void OnHotspotClick(unsigned long Cookie, int const* Point); // 12 +0x30 no-op (RET 8)
+    virtual void OnHotspotEnter(unsigned long Cookie, int const* Point); // 10 +0x28 no-op
+    virtual void OnHotspotLeave(unsigned long Cookie, int const* Point); // 11 +0x2c no-op
+    virtual void OnHotspotClick(unsigned long Cookie, int const* Point); // 12 +0x30 no-op
 
     // FUN_00559590 -- AmbientSource's +0x6c (three ints, 0..255 each), or null.
     int const* GetAmbientOverride() const;
@@ -81,22 +81,22 @@ struct FRoomObject
 // FUN_005593c0 -> DAT_00679a10: the list every RoomObject is appended to.
 std::list<FRoomObject*>& GetRoomObjectList();
 
-// FUN_0044af60 (thiscall on the room, RET 4) -- draw one object: FUN_0044ae80 lights, fog and
+// FUN_0044af60 (thiscall on the room) -- draw one object: FUN_0044ae80 lights, fog and
 // ambient; the "shadow_glare" glare light into the instance's appearance; then by render mode
 // the renderer (0, optionally "envmapbasic") or appearance slot 10 / 9 (1 / 2).
 void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object);
 
-// FUN_0044b370 (thiscall on the room, RET 0xc) -- the SHADOWS option and "shadow_glare" with
+// FUN_0044b370 (thiscall on the room) -- the SHADOWS option and "shadow_glare" with
 // the room's shadow light on: appearance slot 12 (bFlag) or 11 with the camera and {A, B}.
 void RoomControlDrawShadow(FRoomRuntime* Room, unsigned long A, unsigned long B,
                            unsigned char bFlag);
 
-// FUN_00449260 + camera install from RoomData (FUN_00449796 / FUN_00556be0).
-// Also FUN_005593d0(0) — inserts Runtime into DAT_00679a10.
+// operator new(0x13ac), the ctor FUN_00449260 (which appends the runtime to DAT_00679a10 through
+// FUN_005593d0), then the load FUN_004496b0.
 FRoomRuntime* CreateRoomRuntime(RoomData* Room);
 
-// FUN_00449420 Release path (camera FUN_00556ca0 + free).
-// Unlinks from DAT_00679a10 (FUN_005594b0) before free.
+// FUN_00449400, the deleting destructor (FUN_00449420; the RoomObject part FUN_005594b0 unlinks
+// it from DAT_00679a10).
 void DestroyRoomRuntime(FRoomRuntime* Runtime);
 
 // Runtime+0x500 — null until CreateRoomRuntime applied a camera.
@@ -113,12 +113,12 @@ unsigned GetRoomRuntimeByteSize();
 // indirections, FUN_00446280, read it through the prop's owner).
 unsigned GetRoomRuntimeBaseId(FRoomRuntime* Runtime);
 
-// Runtime+0x40 -- the room's RoomData. The Gf script spawn reads it directly (0x0044d737,
-// 0x0044d928, 0x0044dad7, 0x0044dc98) for the find_camera / find_setpoint lookups.
+// Runtime+0x40 -- the room's RoomData. The Gf script spawn reads it directly for the
+// find_camera / find_setpoint lookups.
 RoomData* GetRoomRuntimeRoomData(FRoomRuntime* Runtime);
 
-// Runtime+0x38 -- the room's id. CharacterObject reads it through its owner (0x00445ae8) and
-// FUN_00435dd0 through its room argument (0x00435de2) for the room state's buckets.
+// Runtime+0x38 -- the room's id. CharacterObject reads it through its owner and FUN_00435dd0
+// through its room argument for the room state's buckets.
 unsigned GetRoomRuntimeRoomId(FRoomRuntime* Runtime);
 
 // One element of the room's character placements (Runtime+0x504, a VC6 std::vector of 8-byte
@@ -133,65 +133,61 @@ struct FRoomCharPlacement
     FCharacterObject* Character;  // +0x04
 };
 
-// FUN_0044ae80 (thiscall on the room, RET 4) -- fog enable, scene ambient and the lights for
-// Object. CharacterObject's draw calls it directly (0x00445246).
+// FUN_0044ae80 (thiscall on the room) -- fog enable, scene ambient and the lights for Object.
+// CharacterObject's draw calls it directly.
 void RoomControlLightObject(FRoomRuntime* Room, FRoomObject* Object);
 
-// FUN_00449c90 (thiscall, RET 4) -- the +0x518 character whose record key (+0x154) is Key, or
-// null. Caller: FUN_00435dd0 (0x00435f22).
+// FUN_00449c90 -- the +0x518 character whose record key (+0x154) is Key, or null. Caller:
+// FUN_00435dd0.
 FCharacterObject* RoomControlFindCharacterByKey(FRoomRuntime* Runtime, unsigned Key);
-// FUN_00449cd0 (thiscall) -- the first +0x518 character on a placement of char type 1 (pc), or
-// null. Callers: FUN_00435cf0, the Gf script spawn (0x0044d793, 0x0044e913).
+// FUN_00449cd0 -- the first +0x518 character on a placement of char type 1 (pc), or null.
+// Callers: FUN_00435cf0, the Gf script spawn.
 FCharacterObject* RoomControlPlayerCharacter(FRoomRuntime* Runtime);
-// FUN_00449d10 (thiscall, RET 4) -- the first +0x518 character of Role (+0x300), or null.
-// Caller: 0x0043ef4c.
+// FUN_00449d10 -- the first +0x518 character of Role (+0x300), or null. Caller: NavBar's
+// SetProperty LAB_0043ee80.
 FCharacterObject* RoomControlFindCharacterByRole(FRoomRuntime* Runtime, int Role);
-// FUN_00449d50 (thiscall, RET 4) -- the first +0x518 character whose placement's setpoint
-// segment is Name (DACOM stricmp), or null. Caller: the Gf script spawn (0x0044e953).
+// FUN_00449d50 -- the first +0x518 character whose placement's setpoint segment is Name (DACOM
+// stricmp), or null. Caller: the Gf script spawn.
 FCharacterObject* RoomControlFindCharacterByName(FRoomRuntime* Runtime, char const* Name);
-// FUN_00449e60 (thiscall, RET 4) -- a character record of this room with a costume: the
-// character of its key updated in place (record, hotspot, idle script), or a new one on a
-// free placement. Caller: the LocationController's upsert FUN_0043abf0 (0x0043accd).
+// FUN_00449e60 -- a character record of this room with a costume: the character of its key
+// updated in place (record, hotspot, idle script), or a new one on a free placement. Caller:
+// the LocationController's upsert FUN_0043abf0.
 void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const& Props);
 
 class FObjectProp;
-// FUN_0044a2f0 (thiscall, RET 4) -- the first +0x618 prop named Name, or null.
+// FUN_0044a2f0 -- the first +0x618 prop named Name, or null.
 FObjectProp* RoomControlFindProp(FRoomRuntime* Runtime, char const* Name);
-// FUN_0044a380 (thiscall, RET 4) -- append Prop to +0x618 (no bound check).
+// FUN_0044a380 -- append Prop to +0x618 (no bound check).
 void RoomControlAddProp(FRoomRuntime* Runtime, FObjectProp* Prop);
 
-// FUN_0044c4a0 (thiscall, no arguments) -- the byte at Runtime+0x1338. Field_0x1338: meaning
-// not recovered (TODO); written by the ctor, 0x004499e9, 0x0044bad5, 0x0044bd29, 0x0044c297 and
-// FUN_0044c490. Callers: 0x0043eedb and the Gameflow tick FUN_00558ac0 (0x00558bcd), which
-// restores the software cursor only while it is clear.
+// FUN_0044c4a0 -- Runtime+0x1338 (bCameraMoving): a room camera move is running. Callers: the
+// NavBar and the Gameflow tick FUN_00558ac0, which restores the software cursor only while it
+// is clear.
 unsigned char RoomControlGetField1338(FRoomRuntime* Runtime);
 
-// FUN_0044c490 (thiscall, no arguments) -- +0x1338 = 0 and DAT_0066d359 (G_bNnKeepPanelOpen,
-// nn_main_button.h) = 0. Callers: NavBar 0x0043ff7a / 0x004419a9 (nav_bar.cpp).
+// FUN_0044c490 -- +0x1338 = 0 and DAT_0066d359 (G_bNnKeepPanelOpen, nn_main_button.h) = 0.
+// Callers: the NavBar (nav_bar.cpp).
 void RoomControlClearField1338(FRoomRuntime* Runtime);
 
-// Runtime+0x1340, a byte (Field_0x1340: meaning not recovered, TODO). Retail has no accessor:
-// NavBar's FUN_00441700 stores 1 (0x004417e1, 0x0044185c, 0x004419a2) or 0 (0x004419f4) into it
-// right before a camera track starts.
+// Runtime+0x1340 (bCameraMoveSkippable): the skip latch may end the camera move. Retail has no
+// accessor: NavBar's FUN_00441700 stores 1 or 0 into it right before a camera track starts.
 void RoomControlSetField1340(FRoomRuntime* Runtime, unsigned char Value);
 
-// FUN_0044d240 (thiscall, RET 0xc) -- with C != -1 and B == 3, slot 1 (+0x04, no arguments) on
-// every +0x1134 room controller whose +0x04 or +0x08 dword equals C (count +0x1334, re-read
-// each pass). A is not read. Callers: NavBar 0x004407b9 / 0x00440c68 / 0x004415d2.
+// FUN_0044d240 -- with C != -1 and B == 3, slot 1 on every +0x1134 room controller whose +0x04
+// or +0x08 dword equals C. A is not read. Callers: the NavBar.
 void RoomControlNotifyControllers(FRoomRuntime* Runtime, int A, int B, int C);
 
 // The room camera move (Runtime +0x1338..+0x13a0 and the +0x500 camera):
-//   FUN_0044c290 (RET 4)    -- snap the room camera to the named RoomData +0x138 camera
-//                              (any move stopped first); false when no camera has that name.
-//   FUN_0044ba60 (RET 0x10) -- with no move running and a camera of that name, a 2-second
-//                              cosine-eased move to it (+0x1338 = DAT_0066d359 = 1), dropped at
-//                              once when the camera is already there; answers +0x1338.
-//                              Done(A, B, 0) when the move ends (FUN_00449990).
-//   FUN_00449990 (RET 4)    -- the per-frame step, from the room update (LAB_0044ab70).
-//   FUN_0044bfd0 (RET 0x14) -- a step (Arg0's low byte: forward / backward) along the room's
-//                              "Camera_Track_%d" cameras, +0x13a4 the current number; with
-//                              bArg4 a camera already standing there repeats the step
-//                              (FUN_0044bd50). Answers FUN_0044ba60's result.
+//   FUN_0044c290 -- snap the room camera to the named RoomData +0x138 camera (any move
+//                   stopped first); false when no camera has that name.
+//   FUN_0044ba60 -- with no move running and a camera of that name, a 2-second cosine-eased
+//                   move to it (+0x1338 = DAT_0066d359 = 1), dropped at once when the camera
+//                   is already there; answers +0x1338. Done(A, B, 0) when the move ends.
+//   FUN_00449990 -- the per-frame step, from the room update (LAB_0044ab70).
+//   FUN_0044bfd0 -- a step (Arg0's low byte: forward / backward) along the room's
+//                   "Camera_Track_%d" cameras, +0x13a4 the current number; with bArg4 a
+//                   camera already standing there repeats the step (FUN_0044bd50). Answers
+//                   FUN_0044ba60's result.
 typedef void(__cdecl* FRoomCameraDoneCallback)(void* A, void* B, unsigned char bArg);
 bool RoomControlSnapCamera(FRoomRuntime* Runtime, char const* CameraName);
 bool RoomControlTrackCamera(FRoomRuntime* Runtime, char const* CameraName,
@@ -200,27 +196,26 @@ void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta);
 bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0, FRoomCameraDoneCallback Done,
                                   void* A, void* B, unsigned char bArg4);
 
-// Runtime+0x517, a byte (Field_0x517: meaning not recovered, TODO). FUN_005588a0 reads it
-// directly (0x005589c7) and skips the arrival text while it is set.
+// Runtime+0x517 (Flags514[3]), set when a room character's start script ran. FUN_005588a0
+// reads it directly and skips the arrival text while it is set.
 unsigned char RoomControlGetField517(FRoomRuntime* Runtime);
 
 // FUN_0044ad70 (thiscall) -- +0x516 = 1: the room update runs the room characters' start script
-// again. Caller: the Gf script sequence stop FUN_004554c0 (0x004555cb).
+// again. Caller: the Gf script sequence stop FUN_004554c0.
 void RoomControlRequestCharacterScripts(FRoomRuntime* Runtime);
 
 // FUN_0044aca0 (thiscall) -- the room's scene scripts started (FUN_0044a540) as Gf script
-// sequences, then the character start script latch. Caller: the room load FUN_00439d80
-// (0x0043a055).
+// sequences, then the character start script latch. Caller: the room load FUN_00439d80.
 void RoomControlPlayScenes(FRoomRuntime* Runtime);
 
 // FUN_0044ab60 (thiscall) -> FUN_00448a00 on the ship-pad table Runtime+0x1020: the room has a
 // player ship pad (+0x1034 != -1) and its ShipPlaceInfo has a landing script (+0x38).
-// Caller: FUN_005588a0 (0x005589d9).
+// Caller: FUN_005588a0.
 bool RoomControlHasLandingScript(FRoomRuntime* Runtime);
 
 // FUN_004489f0 (cdecl) -- DAT_00668ab0 = Value: the player's ship lands in the next room that
-// starts its scenes (read by FUN_00448a20 only). Callers: FUN_005588a0 (0x00558967) with
-// !bFromIntro; FUN_0044a540 clears it (0x0044ab47).
+// starts its scenes (read by FUN_00448a20 only). Callers: FUN_005588a0 with !bFromIntro;
+// FUN_0044a540 clears it.
 void RoomControlSetLandingPending(unsigned char Value);
 
 // FUN_00559380 (cdecl) -- free every node of the RoomObject list DAT_00679a10 and zero its size;

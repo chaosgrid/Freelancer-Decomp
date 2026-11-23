@@ -198,13 +198,9 @@ typedef MetaNode<GameObject> FSystemListNode;
 //          +0x1C (.text:06cf5231..06cf524f), _Head = operator new(0x14) at
 //          +0x18 with _Left = _Right = itself and _Parent = _Nil
 //          (.text:06cf5257..06cf5275), a byte at +0x20, _Size at +0x24, a byte
-//          at +0x28. CORRECTED 2026-09-17 (wave 13): FUN_06cf6950 does NOT run
-//          a lower_bound over it -- it runs MSVC6's `_Tree::insert(const
-//          value_type&)` descent, `_Ans = comp(_V, _Key(_X))` with `_Y`
-//          trailing (.text:06cf69f4 .. .text:06cf6a25), followed by the
-//          uniqueness check at .text:06cf6a4b .. .text:06cf6a8a and a call into
-//          `_Insert` (FUN_06cf7770). It is a std::set<unsigned int> of object
-//          ids; see the member's own comment below.
+//          at +0x28. FUN_06cf6950 runs MSVC6's _Tree::insert on it (descent,
+//          uniqueness check, _Insert FUN_06cf7770): a std::set<unsigned int> of
+//          object ids; see the member's own comment below.
 //   +0x30  two dwords, zeroed by the constructor and handed to the record's
 //   +0x34    CRemotePhysicsSimulation, slot 1 (.text:06cf7223 .. .text:06cf7237)
 //   +0x38  the player (session) id -- the constructor's only argument
@@ -333,94 +329,25 @@ public:
     // +0x00  vptr (.rdata:06d66988)
     unsigned int Field_0x04;          // +0x04  never written by either constructor
     FObserverTrackedList Tracked;     // +0x08 .. +0x13
-    // +0x14 .. +0x27 -- retail's _Tree. DECODED 2026-09-17 (wave 13). The
-    // wave-12 note here said the port "has no consumer for it yet (FUN_06cf6950
-    // is its only reader)". Both halves were wrong: FUN_06cf6950 is its only
-    // WRITER, and it has three readers.
-    //
-    // It is `std::set<unsigned int>`, and the key is an OBJECT ID. The layout
-    // reads straight off the constructor (.text:06cf5228 .. .text:06cf5275):
-    // allocator bytes at +0x14/+0x15, `_Nil` = operator new(0x14) at +0x1C with
-    // _Color = _Black and _Isnil = 1, `_Head` = operator new(0x14) at +0x18 with
-    // _Parent = _Nil and _Left = _Right = itself, `_Multi` at +0x20 and `_Size`
-    // at +0x24. Node = {_Left +0, _Parent +4, _Right +8, _Value +0xC,
-    // _Color +0x10, _Isnil +0x11} = 0x14 bytes, which is why every walk of it
-    // compares against `node + 0x0C`.
-    //
-    // The same 0x14-byte shape appears at a base of its own in FUN_06cf7440,
-    // which takes a SECOND set of the same type by pointer and reads it as
-    // {_Head +4, _Nil +8, _Multi +0xC, _Size +0x10} -- exactly this block
-    // rebased to +0x14. That is the independent confirmation.
-    //
-    // WHAT IT IS FOR. FUN_06cf6950 (.text:06cf6950) is the per-player
-    // FLPACKET_SERVER_DAMAGEOBJECT gate. When the player cannot see the object
-    // and nothing else forces the send, retail does not drop the update: it
-    // remembers the object id here and lets the per-frame observer update
-    // (FUN_06cf53e0) retry it. That retry is the reader:
-    //   .text:06cf6031  the loop opens on `[EBP+0x18]`'s _Lmost and walks with
-    //                   FUN_06ce5700 (operator++), resolving each id and keeping
-    //                   the ones FUN_06cf7260 now calls visible;
-    //   .text:06cf61dd  builds the damage record through the object's own
-    //                   vtable +0x1a8 with mask 0x40000000;
-    //   .text:06cf6208  CALL dword ptr [EDI + 0xfc]  -- IClient SendServerDamageObject;
-    //   .text:06cf6222  8d4d14        LEA  ECX,[EBP + 0x14]
-    //   .text:06cf6225  e8c6130000    CALL FUN_06cf75f0   ; set::erase(key)
-    // and FUN_06cf6e60 (system switch-out) clears the whole set.
-    // FUN_06cf52d0 destroys it.
-    //
-    // A real std::set, because retail has one: a member of Observer, built by
-    // its constructors and torn down by its destructor. Do not memcpy an
-    // Observer.
+    // +0x14 .. +0x27 -- retail's _Tree: a std::set<unsigned int> of object ids (0x14-byte
+    // nodes, value at +0x0C). FUN_06cf6950, the per-player FLPACKET_SERVER_DAMAGEOBJECT
+    // gate, is its only writer: when the player cannot see the object it remembers the id
+    // here instead of dropping the update. The per-frame observer update (FUN_06cf53e0)
+    // retries each id that FUN_06cf7260 now calls visible, sends SendServerDamageObject
+    // and erases it (FUN_06cf75f0); FUN_06cf6e60 (system switch-out) clears the set.
+    // A real member: do not memcpy an Observer.
     std::set<unsigned int> PendingDamageIds;   // +0x14 .. +0x27
-    // +0x28 -- CORRECTED 2026-09-17 (wave 12). This byte used to be labelled
-    // `SetMulti`, i.e. the last member of the _Tree above. It is not: the _Tree
-    // ends at +0x28, and this is a bool of Observer's own.
-    //
-    // Proof, on the raw bytes rather than on the constructor's zero-fill.
-    // FUN_06cf6e60 (.text:06cf6e60, the "an object left this system" notifier)
-    // takes the view in ECX:
-    //   .text:06cf6e69  8be9      MOV  EBP,this          ; EBP = the view
-    //   .text:06cf6e6b  8b450c    MOV  EAX,[EBP + 0xc]   ; ... its tracked list
-    // and, after dropping the object from the tracked list, does
-    //   .text:06cf6f66  8b4538    MOV  EAX,[EBP + 0x38]        ; this view's player id
-    //   .text:06cf6f69  8b35....  MOV  ESI,[.data:Players]
-    //   .text:06cf6f73  69c918040000  IMUL this,this,0x418
-    //   .text:06cf6f79  3b5431cc  CMP  EDX,[this + ESI*1 + -0x34]  ; slot+0x3E4,
-    //                                                 ; PlayerData::ship_object_id
-    //   .text:06cf6f7d  7504      JNZ  LAB_06cf6f83
-    //   .text:06cf6f7f  c6452801  MOV  byte ptr [EBP + 0x28],0x1
-    // i.e. it is LATCHED when the object that just left IS this player's own
-    // ship. MSVC never re-writes a live _Tree's `_Multi`, and turning a set into
-    // a multiset halfway through would be meaningless; this is a state flag.
-    //
-    // Every one of the five "create this object on the client" notifiers gates
-    // on it and returns silently when it is set -- .text:06cf665b
-    // (ship), .text:06cf66f3 (solar), .text:06cf6bc5 (countermeasure),
-    // .text:06cf6c55 (loot), .text:06cf6cf5 (guided), .text:06cf6d65 (mine) --
-    // and .text:06cf6f9b reads it back inside FUN_06cf6e60 itself. So: "this
-    // player no longer has a ship in this system; stop telling them about it".
-    // The name is the port's, retail names nothing here.
+    // +0x28 -- Observer's own bool (not the _Tree's _Multi). FUN_06cf6e60, the "an object
+    // left this system" notifier, latches it when the object that left is this player's
+    // own ship (PlayerData::ship_object_id). All the "create this object on the client"
+    // notifiers (ship, solar, countermeasure, loot, guided, mine) return silently while it
+    // is set. The name is the port's.
     unsigned char bShipGone;          // +0x28
     unsigned char Pad3[3];
     unsigned int Field_0x2C;          // +0x2C  never written by the constructor
-    // +0x30 .. +0x37 -- CORRECTED 2026-09-17 (wave 14). These were two
-    // `unsigned int` placeholders called Field_0x30/Field_0x34. They are ONE
-    // double, and the x87 opcodes say so outright. The per-frame observer
-    // update (FUN_06cf53e0) opens by accumulating its own `double` argument
-    // into it:
-    //   .text:06cf5475  dd8424c8020000  FLD   double ptr [ESP + 0x2c8]  ; the arg
-    //   .text:06cf547f  dc4530          FADD  double ptr [EBP + 0x30]
-    //   .text:06cf5488  dd5d30          FSTP  double ptr [EBP + 0x30]
-    // and reads it back narrowed to a float for the UPDATEOBJECT payload:
-    //   .text:06cf5f14  dd4530          FLD   double ptr [EBP + 0x30]
-    //   .text:06cf5f39  d99c248c000000  FSTP  float  ptr [ESP + 0x8c]
-    // The "two dwords" reading came from .text:06cf7223/.text:06cf722a, where
-    // SystemPlayerView_AddTrackedObject pushes the pair as two PUSHes -- which
-    // is simply how a double is passed on the stack. Checklist class: direction
-    // confused with type.
-    //
-    // It is the observer's own clock: the total time this view has been
-    // running, stamped into every UPDATEOBJECT so the client can order samples.
+    // +0x30 .. +0x37 -- one double: the observer's own clock. FUN_06cf53e0 accumulates its
+    // double argument into it and stamps it (narrowed to float) into every UPDATEOBJECT
+    // so the client can order samples.
     double ElapsedTime;               // +0x30 .. +0x37
     unsigned int PlayerId;            // +0x38
     Vector Position;                  // +0x3C
@@ -498,34 +425,19 @@ void SystemPlayerView_SendRemoteCargoUpdate(Observer* View, GameObject* Obj);
 bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kind);
 
 // FUN_06cf6950 (.text:06cf6950, `RET 0xc`) -- the per-player
-// FLPACKET_SERVER_DAMAGEOBJECT gate. Ported 2026-09-17 (wave 13).
+// FLPACKET_SERVER_DAMAGEOBJECT gate.
 //
-// Retail's three stack arguments are (object id, a record the caller already
-// built, a second record the caller built locally). Both records are MSVC6
-// std::lists -- the only thing this function does with either is test the
-// SECOND one's _Size at +0x08 (.text:06cf69e9 `MOV ECX,[EAX + 0x8]`) and hand
-// whichever it picked to IClient SendServerDamageObject as a bare pointer. The sole caller,
-// FUN_06d0b800 (.text:06d0bb43 .. .text:06d0bb58), passes its own `param_2`
-// and a std::list it filled on the stack at [ESP+0x10].
-//
-// Both records are Common's DamageList (the caller's param_2 and its stack
-// DamageList), and rpclocal's DAMAGEOBJECT marshaller reads the SendServerDamageObject pointer
-// as that same type (rpc_payload_ch2.cpp, MarshalDamageObject: DamageList::operator=).
-// The +0x08 _Size test reads DeferredRecord->Count (the port's mirror of it).
+// Both records are Common's DamageList: the sole caller, FUN_06d0b800, passes its own
+// param_2 and a list it filled on the stack. This function only tests the second one's
+// size (DeferredRecord->Count) and hands whichever it picked to IClient
+// SendServerDamageObject, whose rpclocal marshaller reads it as a DamageList.
 void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
                                    DamageList* PrimaryRecord,
                                    DamageList* DeferredRecord);
 
 // FUN_06cf53e0 (.text:06cf53e0, `RET 0x8` -- ONE stack argument, a `double`).
-// The per-frame observer update. Ported 2026-09-17 (wave 14) in
-// src/Server/server_observer.cpp.
-//
-// Ghidra types the argument as two `undefined4`s; it is one double. The
-// prologue leaves ESP at (entry - 0x2c4) and the very first thing the body does
-// with it is
-//   .text:06cf5475  dd8424c8020000  FLD   double ptr [ESP + 0x2c8]
-// which is exactly the first stack argument, and `RET 0x8` at .text:06cf6314
-// confirms the eight bytes.
+// The per-frame observer update (src/Server/server_observer.cpp). Ghidra types the
+// argument as two `undefined4`s; it is one double.
 //
 // Everything below the top-level `if (SinglePlayer()) return;`
 // (.text:06cf5405/.text:06cf540d) runs in five phases, each one re-checking the
@@ -558,30 +470,26 @@ void Observer_MatrixToQuat(Quaternion& Out, Matrix const& In);
 void StarSystem_TickObjectList(ObjectList* List, float Dt, ObjectList* Deferred);
 
 // FUN_06cf6e60 (.text:06cf6e60, `RET 0x8`) -- "this object has left the
-// system". Ported 2026-09-17 (wave 13). Drops the object from the tracked list,
+// system". Drops the object from the tracked list,
 // CLEARS the whole deferred-damage set, latches bShipGone when the departing
 // object is this player's own ship, and sends
 // FLPACKET_SERVER_SYSTEM_SWITCH_OUT (IClient +0x0e4 == SendServerSystemSwitchOut) when either the
 // record had been created on the client or bShipGone is now set.
 //
-// The wire payload is two dwords built on the stack at .text:06cf6f89 /
-// .text:06cf6f8f: `{ *param_1, *param_2 }`, i.e. the object id and the
-// destination the caller points at. Retail passes both by pointer.
+// The wire payload is the two dwords { *ObjId, *Destination }; retail passes both by
+// pointer.
 void SystemPlayerView_OnObjectLeftSystem(Observer* View,
                                          unsigned int const* ObjId,
                                          unsigned int const* Destination);
 
 // FUN_06cf6fc0 (.text:06cf6fc0, `RET 0xc`) -- "this object has landed".
-// Ported 2026-09-24. Drops the object from the tracked list, and when the
-// record had been created on the client or the object is this player's own
-// ship, sends FLPACKET_SERVER_LAND (IClient +0x0ec == SendServerLand) with the payload
-// {*ObjId, *Arg2, *Arg3}; outside single player the player's own ship landing
-// first autosaves the slot (FUN_06d4c430). Its only caller is the per-system
-// step FUN_06d0be50 at .text:06d0c280, inside the deferred-object block
-// .text:06d0c163 .. .text:06d0c3f3, ported 2026-09-24 in StarSystem_Update
-// (IServerImpl.cpp), which walks the dock queue (SystemDockNode below).
-// Arg2 is the caller's ESP+0x10 local (.text:06d0c273; zeroed at 06d0c20e and
-// set from a vtable +0x20 get_id at 06d0c248) and Arg3 is EBX+0x18.
+// Drops the object from the tracked list, and when the record had been created on the
+// client or the object is this player's own ship, sends FLPACKET_SERVER_LAND (IClient
+// +0x0ec == SendServerLand) with the payload {*ObjId, *Arg2, *Arg3}; outside single
+// player the player's own ship landing first autosaves the slot (FUN_06d4c430). Its only
+// caller is the per-system step FUN_06d0be50 (StarSystem_Update in IServerImpl.cpp),
+// walking the dock queue (SystemDockNode below). Arg2 is the id from a vtable +0x20
+// get_id (0 if none) and Arg3 is the dock node's +0x18.
 void SystemPlayerView_OnObjectLanded(Observer* View,
                                      unsigned int const* ObjId,
                                      unsigned int const* Arg2,
@@ -783,16 +691,10 @@ public:
     // type mask picks ONE block (-1 falls back to find_object).
     GameObject* find_object(unsigned int Id, unsigned int TypeMask);
 
-    // +0x04: the Universe system this entry stands for.
-    //
-    // CORRECTED 2026-09-17 (wave 6). This was "secondary vtable/data pointer"
-    // and the system's own id was believed to live at +0x10. Both were wrong.
-    // FUN_06d06ea0 -- the initializer SysDB's build loop runs on every freshly
-    // inserted entry, called as FUN_06d06ea0(node + 0x10, sysId) where node+0x10
-    // IS the mapped StarSystem -- stores Universe::get_system(sysId) here.
-    // So +0x04 is a Universe::ISystem*, and every "the system's own nickname id"
-    // read in the module is the virtual call `(**(code**)**(undefined4**)(this+4))()`
-    // on it -- FUN_06d087f0/FUN_06d08890 build their event payloads that way.
+    // +0x04: the Universe system this entry stands for. FUN_06d06ea0, the initializer
+    // SysDB's build loop runs on every new entry, stores Universe::get_system(sysId) here;
+    // every read of "the system's own nickname id" in the module is a virtual call (slot 0)
+    // on it.
     Universe::ISystem* SystemInfo;
 
     // +0x08..+0x13: std::list of the players currently in this system.
@@ -812,8 +714,8 @@ public:
     // It is the dock queue -- SystemDockNode / FSystemDockEntry above.
     // queue_dock (FUN_06d0d370) is its only producer, the landing block of the
     // system update (FUN_06d0be50, .text:06d0c1ae .. .text:06d0c3f3) its only
-    // consumer, and erase_docks (FUN_06d0f410) empties it. The field names
-    // predate that decoding.
+    // consumer, and erase_docks (FUN_06d0f410) empties it. The "ObjectList" field names
+    // below are misnomers for it.
     unsigned char ObjectListAlloc;     // +0x14
     unsigned char Pad2[3];
     void* ObjectListHead;              // +0x18  _Head
@@ -873,24 +775,13 @@ public:
     // both FUN_06d087f0 and FUN_06d08890 (the two "player left this system"
     // entry points). Two independent passes:
     //
-    //  (a) the player list at this+0x0C: walk it from `**(this+0xC)` until the
-    //      sentinel; on the first node whose dword at node+0x40 (node[0x10])
-    //      equals SessionId, unlink it (`[node[1]] = node[0]` /
-    //      `[node[0]+4] = node[1]`), call its own `(**(code**)node[2])(0)`
-    //      disposer, free the node, and decrement the count at this+0x10.
-    //      Retail breaks after the first match.
+    //  (a) the player list: unlink and dispose the first node whose player id
+    //      (node+0x40) equals SessionId, and decrement the count. Retail breaks
+    //      after the first match.
     //
-    //  (b) the Ships list (head at this+0x38): for every node,
-    //      take obj = node->Data (a real pointer -- .text:06d0879f is a MOV, not
-    //      a LEA), resolve its CBase::Object at +0x10 under the usual
-    //      `(ObjectClass & 3) == 3` guard, and if that CSimple's OwnerPlayer
-    //      (+0xb4) equals SessionId and `obj->is_destroyed()` (vtable +0x160) is
-    //      false, call `obj->destroy(0, obj->get_id())`
-    //      (vtable +0x158 with vtable +0x20's result as the second argument).
-    //
-    // PORTED 2026-09-17 (wave 8). The three vtable offsets are no longer opaque:
-    // +0x20 is IObjInspect::get_id (slot 8) and +0x158/+0x160 are two of the
-    // four GameObject extension slots, now named in server_gameobject.h.
+    //  (b) the Ships list: for every object whose CSimple OwnerPlayer (+0xb4)
+    //      equals SessionId and which is not is_destroyed() (+0x160), call
+    //      destroy(0, get_id()) (+0x158).
     void remove_player(unsigned int SessionId);
 
     // player_switched_out -- retail FUN_06d087f0 (.text:06d087f0, thiscall,
@@ -1066,10 +957,6 @@ public:
     // solar then gets SETREPUTATION (SendServerSetReputation), one SETTARGET per
     // functioning gun with a target (SendCommonSetTarget) and one ACTIVATEOBJECT per
     // active state (SendServerActivateObject).
-    //
-    // PORTED: the load call, the mask guard, the insert, SendSystemID, both
-    // multiplayer tracked-list passes (wave 12), both single-player create
-    // passes and the multiplayer solar walk (2026-09-24).
     // ------------------------------------------------------------------
     void add_player(unsigned int SessionId);
 
@@ -1077,20 +964,13 @@ public:
     // load -- retail FUN_06d06ed0 (.text:06d06ed0). add_player's first
     // statement, and the only thing that ever puts objects into a system.
     //
-    // ARITY CORRECTION. Ghidra declares it `void FUN_06d06ed0(void)` -- no
-    // `this` at all, which is why every earlier note called the system id
-    // unreachable from inside it. The listing says otherwise:
-    //   .text:06d06ef0  8bd9          MOV  EBX,ECX            ; ECX IS `this`
-    //   .text:06d06ef2  80bbfc000...  CMP  byte ptr [EBX + 0xfc],0x1
-    //   .text:06d07120  c3            RET                     ; no stack args
-    // so it is `void __thiscall StarSystem::load()`. Note also that the guard
-    // compares against 1, not against zero, while add_player's own guard
-    // (.text:06d07e49 `CMP AL,BL` with EBX = 0) compares against zero.
+    // Ghidra declares it `void FUN_06d06ed0(void)`, but it is a thiscall with no stack
+    // arguments. Its bLoaded guard compares against 1, while add_player's compares
+    // against zero.
     //
     // Body, in order:
     //   .text:06d06eff  sysId = SystemInfo->vtable[0]()
     //   .text:06d06f0b  COMMON.DLL::PhySys::Startup(sysId)   -- cdecl, one arg.
-    //                   (It is PhySys::Startup, not "PhySys::Start".)
     //   .text:06d06f1c  if SinglePlayer():
     //     .text:06d06f20    FUN_06d07170(this)  -- wrap every CObject the client
     //                       already built: CObject::FindFirst(0x303) / AddRef /
@@ -1113,19 +993,12 @@ public:
     //                   one 0x14-byte record per solar: {object, its position
     //                   (three dwords copied off vtable[0]'s result), its radius}
     //                   and hand it to the partition's vtable +0x14 as
-    //                   (array, count) -- .text:06d070d5 pushes the count first
-    //                   and the array second, so the array is the FIRST
-    //                   argument. Then free the array (.text:06d070df).
-    //                   The radius is a FLOAT, not the dword the decompilation
-    //                   shows: .text:06d070be is `FLD float ptr [EAX + 0x38]`
-    //                   against .text:06d070c5 `FSTP float ptr [EDI]`.
+    //                   (array, count), then free the array. The radius is a
+    //                   float, not the dword the decompilation shows.
     //   .text:06d070eb  bLoaded = 1
     //   .text:06d070ff  FUN_06d43650(0x3c, &sysId)   -- "system loaded" event.
-    //
-    // PORTED 2026-09-17 (wave 12) as this member; since 2026-09-24
-    // (claude-code:w5-server-06d0) the populate half is retail's too:
-    // load_solars (FUN_06d07170) and load_object (FUN_06d09d60) below. The
-    // port's former StarSystem_LoadObjects rewrite is gone.
+    // The populate half is load_solars (FUN_06d07170) and load_object (FUN_06d09d60)
+    // below.
     // ------------------------------------------------------------------
     void load();
 
@@ -1387,8 +1260,7 @@ public:
     void create_loot(unsigned int SourceObjId, int Mode, FLootRecord const* Records, int Count);
 
     // ------------------------------------------------------------------
-    // Four members EqObj/GameObject reach through OwnerSystem, ported
-    // 2026-09-24 (claude-code:w5-server-06ce). Names are the port's.
+    // Four members EqObj/GameObject reach through OwnerSystem. Names are the port's.
     //
     // notify_object_left -- FUN_06d0cfa0 (.text:06d0cfa0, RET 4). Walks the
     // ship block (+0x34, head +0x38) then the solar block (+0x5c, head +0x60)
@@ -1435,7 +1307,7 @@ public:
 
     // ------------------------------------------------------------------
     // The IObjAffect notifiers Ship/EqObj/Guided call after changing a ship's
-    // controls (2026-09-24, claude-code:w5-server-06d0). Names are the port's;
+    // controls. Names are the port's;
     // bodies and instruction maps in server_classes.cpp. Every one tells the
     // players of this system who can see the object (FUN_06cf7370 /
     // FUN_06cf73d0), and the ones with SourceClient skip the player whose id
@@ -1591,8 +1463,7 @@ public:
     bool remove_solar(GameObject* Obj);
 
     // ------------------------------------------------------------------
-    // The ServerEquip launch/notify entry points (declared 2026-09-24 by
-    // claude-code:w5-server-06ce for its callers; bodies are the 06d0* lane's).
+    // The ServerEquip launch/notify entry points.
     // create_mine -- FUN_06d08ef0 (RET 4). Caller SrvMineDropper::launch
     // (.text:06cedafc), one call per ProjLaunchInfo.
     void create_mine(FServerLaunchRecord const& Rec);
@@ -1655,7 +1526,7 @@ public:
     // server_gameobject.h's layout note), so that line destroys the whole
     // object through a secondary base -- `delete static_cast<CBase*>(Obj)`.
     //
-    // The whole body, in order (re-read 2026-09-24 against the listing):
+    // The whole body, in order:
     //   .text:06d072cd .. 06d072d7  erase the whole player list (FUN_06d0f390:
     //                               each view's own destructor, the node freed,
     //                               --size);
@@ -1750,7 +1621,7 @@ typedef StarSystem FStarSystem;
 //   ?SysMap@SysDB@@3V?$map@IVStarSystem@@U?$less@I@std@@V?$allocator@VStarSystem@@@3@@std@@A
 // VC6 spelled the default allocator with the MAPPED type (allocator<StarSystem>).
 // Ours is the same map as an ordinary modern std::map with its default allocator,
-// so its decorated name differs from retail's on purpose (project rule, 2026-09-24).
+// so its decorated name differs from retail's on purpose.
 namespace SysDB {
     typedef std::map<unsigned int, StarSystem> SysMapType;
     extern SERVER_API SysMapType SysMap;
@@ -1820,7 +1691,7 @@ void Server_LookupCacheForget(unsigned int const& ObjId);
 
 // ---------------------------------------------------------------------------
 // FUN_06d0b800 (.text:06d0b800, `RET 0x8`) -- "this object has just taken
-// damage". Ported 2026-09-17 (wave 14) in src/Server/server_observer.cpp.
+// damage". In src/Server/server_observer.cpp.
 //
 // Retail's three callers (.text:06ceb4bf, .text:06ceef18, .text:06cf28bb) all
 // reach it as a thiscall on a StarSystem with (IObjRW*, DamageList*). It does

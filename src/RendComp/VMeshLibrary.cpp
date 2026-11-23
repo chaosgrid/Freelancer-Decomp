@@ -13,7 +13,7 @@
 #include <map>
 #include <new>
 
-// VMeshData.cpp / VMeshLibrary.cpp of retail rendcomp.dll (06c2d330..06c2f4d3).
+// VMeshData.cpp / VMeshLibrary.cpp of retail rendcomp.dll.
 
 // Mesh data indexed by CRC.
 static std::map<unsigned long, FVmeshData*> G_VmeshDataMap;
@@ -235,7 +235,7 @@ static void VMeshGroupReleaseBuffers(FVmeshGroup* Group)
     VMeshGroupDestroyIb(Group);
 }
 
-// FUN_06c2d330 (thiscall group, RET 4) -> AL. Already a member -> true. The first member
+// FUN_06c2d330 (thiscall on the group). Already a member -> true. The first member
 // fixes the FVF; a different FVF -> false. Totals grow before the old group lets go.
 static bool VMeshGroupAdd(FVmeshGroup* Group, FVmeshData* Data)
 {
@@ -409,9 +409,7 @@ int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex)
 // VMeshData.
 // ---------------------------------------------------------------------------------------
 
-// FUN_06c2df60 (thiscall, RET 8): SizeKib = (int)Size * (double)1/1024 (DAT_06c36490) stored
-// as float; everything else zero, RefCount 1, Name duplicated and hashed, then the map entry
-// and the "Memory_VMeshData" event.
+// FUN_06c2df60 (thiscall): SizeKib = (int)Size * (double)1/1024 (DAT_06c36490) stored as float.
 static FVmeshData* VMeshDataConstruct(FVmeshData* This, const char* Name, unsigned long Size)
 {
     This->SizeKib = (float)((double)((int)Size) * 0.0009765625);
@@ -708,7 +706,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
         } while (File->FindNext((unsigned long)Find, &FindData) != 0);
     }
 
-    File->OpenNode(".."); // 06c2f12e: DAT_06c37250 = ".." (2E 2E 00)
+    File->OpenNode(".."); // DAT_06c37250
     if (List != nullptr && List->empty())
     {
         delete List;
@@ -722,7 +720,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
     return List;
 }
 
-// FUN_06c2f1c0 (thiscall, RET 4): release every entry, free the list.
+// FUN_06c2f1c0 (thiscall).
 void DACOM_API FVMeshLibrary::Unload(void* Handle)
 {
     FVmeshDataList* List = (FVmeshDataList*)Handle;
@@ -738,9 +736,7 @@ void DACOM_API FVMeshLibrary::Unload(void* Handle)
     delete List;
 }
 
-// LAB_06c2ed50 (factory vtable slot 3). Only a 0x14 AGGDESC whose name matches the factory's;
-// otherwise *Out = 0, -3. Allocation failure -> *Out = 0, -4. Outer = AGGDESC+8; when set the
-// inner is written to *(AGGDESC+0xC), otherwise the object is its own outer.
+// LAB_06c2ed50 (factory vtable slot 3).
 struct FVMeshAggDesc
 {
     unsigned long Size;

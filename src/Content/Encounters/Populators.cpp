@@ -6,12 +6,12 @@
 
 // Content.dll TU18 (06eb2670-06eb3ec0): the BasePop controller.
 // Content.dll TU52 (06f5a2e0-06f5c760): the SpacePop controller, population flags and
-// the exclusion spheres. StoryLauncher lives in StoryLauncher.cpp (CNT-MS-OBJ).
+// the exclusion spheres. StoryLauncher lives in StoryLauncher.cpp.
 
 #include "Encounters/Populators.h"
 
 #include "Bases/BaseDB.h"                    // FContentBase, FBarCharacterList (TU17)
-#include "Core/ContentStaticIds.h"          // TU52 06f5a2e0-06f5a4c0 (and TU18 06eb2670-06eb2850)
+#include "Core/ContentStaticIds.h"          // TU52 / TU18 static-init thunks
 #include "Core/ContentInternal.h"
 #include "Core/ContentPlayerState.h"        // FContentPlayerState, FContentPlayerShip (TU46)
 #include "NPCs/DockQueues.h"                // CountNpcShipsNear (TU53 FUN_06f67440)
@@ -49,11 +49,10 @@ namespace
     unsigned char GSpacePopHostileClamp = 1;
     // Retail DAT_06fce76b, initialized to 01h in .data (FUN_06f5a7c0 / FUN_06f5a7e0).
     unsigned char GSpacePopSolarDetection = 1;
-
 }
 
 // Retail DAT_06fd0e64: SpacePop's controller ID, written by the ctor and compared by
-// FUN_06f5a5d0 (06f5a697) and TU43 FUN_06f33e80.
+// FUN_06f5a5d0 and TU43 FUN_06f33e80.
 unsigned int GSpacePopControllerId = 0;
 
 // Retail DAT_06fd1c78 (.bss, 0): see Populators.h.
@@ -71,7 +70,6 @@ FSpawnRequest::FSpawnRequest(bool bInArrival, unsigned int InZoneList, unsigned 
     , Placement(InPlacement)
     , Velocity(InVelocity)
 {
-    // 06f63b0f-06f63ca9: the vector assignment (no self test needed: a fresh vector).
     ExclusionSpheres = *InExclusionSpheres;
 }
 
@@ -87,12 +85,12 @@ namespace
 
     unsigned int ZoneDensity(FSystemZone const* Zone)
     {
-        // FUN_06ef9dc0 on zone +0x18: MOV EAX,[ECX]; the callers compare it unsigned (JBE)
-        // and widen it with a zero high dword (FILD qword).
+        // FUN_06ef9dc0 on zone +0x18; the callers compare it unsigned and widen it to 64 bits
+        // before converting to floating point.
         return static_cast<unsigned int>(Zone->Population.Density);
     }
 
-    // FUN_06f5bb10: FLD float DAT_06fbbb68 (2500.0f).
+    // FUN_06f5bb10: DAT_06fbbb68.
     float GetSpacePopAheadStep()
     {
         return 2500.0f;
@@ -158,14 +156,14 @@ namespace
         for (std::vector<FSystemZone*>::const_iterator It = Near->begin(); It != Near->end(); ++It)
         {
             RepopSum = (*It)->Population.RepopTime + RepopSum;
-            // 06f5bbba-06f5bbd0: FILD qword * 0.6f (DAT_06fbbb38), ftol.
+            // 0.6f = DAT_06fbbb38.
             unsigned int const Density = static_cast<unsigned int>(static_cast<__int64>(
                 static_cast<double>(ZoneDensity(*It)) * static_cast<double>(0.6f)));
             if (Density > MaxDensity)
                 MaxDensity = Density;
         }
 
-        // 06f5bbe5-06f5bc4d: the average repop time (0 without zones).
+        // The average repop time (0 without zones).
         unsigned int const Count = static_cast<unsigned int>(AtShip->size() + Near->size());
         float Average = 0.0f;
         if (Count != 0)
@@ -190,7 +188,7 @@ namespace
             WeightSum = Weight + WeightSum;
         }
 
-        // 06f5bdc4-06f5be40: the shares go to OutAtShipShares until the AtShip zones run out.
+        // The shares go to OutAtShipShares until the AtShip zones run out.
         std::vector<float>* Out = OutAtShipShares;
         for (std::vector<float>::size_type Index = 0; Index < Weights.size(); ++Index)
         {
@@ -237,57 +235,52 @@ namespace
         unsigned int Field_0x4;
     };
 
-    // FUN_06f5a550 (06f5a550-06f5a5ab, RET 4).
+    // FUN_06f5a550.
     FSpacePop::FSpacePop(unsigned int const* ControllerId)
     {
         GSpacePopControllerId = *ControllerId;
         pub::Controller::SetHeartbeatInterval(GSpacePopControllerId, 3.0f);
     }
 
-    // FUN_06f5ac10 (06f5ac10-06f5aea5).
+    // FUN_06f5ac10.
     void FSpacePop::PopulateAround(FSystemInfo* System, FContentPlayerShip* Ship,
                                    Vector const* Position)
     {
-        // 06f5ac34-06f5ac40: an empty vector local (local_4c, EH state 0, unwind 06faf850)
-        // that nothing fills or reads; it outlives the early return and is destroyed last
-        // (FUN_06eec8d0 at 06f5ae88). Its element type is not recoverable -- FUN_06eec8d0 is
-        // the shared trivially-destructible vector dtor and no element is ever touched -- so
-        // it takes the element type of the function's other vectors; it has no effect.
+        // Retail has an empty vector local (EH state 0) that nothing fills or reads; its
+        // element type is not recoverable (shared trivial vector dtor FUN_06eec8d0). No effect.
         std::vector<FSystemZone*> Unused;
-        // 06f5ac4b-06f5accf: inside an exclusion sphere -> nothing.
         if (SpacePopPositionIsExcluded(&Position->x))
             return;
 
         std::vector<FSystemZone*> AtShip;
         std::vector<FSystemZone*> Near;
         std::vector<FSystemZone*> Ahead;
-        // 06f5ad0d-06f5ad9f: identity orientation at the position.
         FSpaceObjPlacement Placement;
         SetPlacementAt(&Placement, Position);
         bool bBlocked;
         CollectSpacePopZones(System, &Placement, &AtShip, &Near, &Ahead, &bBlocked);
-        Ahead.clear();                                                      // 06f5adac-06f5add4
+        Ahead.clear();
         if (!bBlocked)
             PopulateArrival(System, Ship, &Placement, &AtShip, &Near);
     }
 
-    // FUN_06f5aee0 (06f5aee0-06f5affb).
+    // FUN_06f5aee0.
     void FSpacePop::PopulateAtLaneEnd(FSystemInfo* System, FTradeLane* Lane, int const* RingIndex,
                                       FContentPlayerShip* Ship)
     {
         Vector RingPosition;
         Matrix RingOrientation;
         pub::SpaceObj::GetLocation(Lane->Rings[*RingIndex].ObjectId, RingPosition, RingOrientation);
-        // 06f5af15-06f5af45: the neighbour ring -- the second for ring 0, else the previous one.
+        // The neighbour ring -- the second for ring 0, else the previous one.
         unsigned int const OtherId = *RingIndex == 0 ? Lane->Rings[1].ObjectId
                                                      : Lane->Rings[*RingIndex - 1].ObjectId;
         Vector OtherPosition;
         Matrix OtherOrientation;
         pub::SpaceObj::GetLocation(OtherId, OtherPosition, OtherOrientation);
 
-        // 06f5af47-06f5afeb: RingPosition + (RingPosition - OtherPosition) / |.| * 1200
-        // (DAT_06fbbb58). dz is stored as a float (FST) and squared as dz * float(dz); the
-        // x and y components are stored after scaling, z is added unrounded.
+        // RingPosition + (RingPosition - OtherPosition) / |.| * 1200 (DAT_06fbbb58). dz is
+        // stored as a float and squared as dz * float(dz); the x and y components are stored
+        // after scaling, z is added unrounded.
         double const DeltaX = static_cast<double>(RingPosition.x) - static_cast<double>(OtherPosition.x);
         double const DeltaY = static_cast<double>(RingPosition.y) - static_cast<double>(OtherPosition.y);
         double const DeltaZ = static_cast<double>(RingPosition.z) - static_cast<double>(OtherPosition.z);
@@ -306,10 +299,10 @@ namespace
         PopulateAround(System, Ship, &Target);
     }
 
-    // FUN_06f5b4e0 (06f5b4e0-06f5b68e).
+    // FUN_06f5b4e0.
     void FSpacePop::PopulatePlayers()
     {
-        // 06f5b4ff-06f5b671: the player states of DAT_06fd0bbc in key order.
+        // The player states of DAT_06fd0bbc in key order.
         std::map<unsigned int, std::unique_ptr<FContentPlayerState>>& States = GetContentPlayerStates();
         for (std::map<unsigned int, std::unique_ptr<FContentPlayerState>>::iterator It = States.begin();
              It != States.end(); ++It)
@@ -331,22 +324,22 @@ namespace
             CollectSpacePopZones(System, &Placement, &AtShip, &Near, &Ahead, &bBlocked);
             if (bBlocked)
                 continue;
-            // 06f5b5d8-06f5b5e6: in multiplayer the zones ahead are dropped (last = first).
+            // In multiplayer the zones ahead are dropped.
             if (!pub::SinglePlayer())
                 Ahead.clear();
             PopulateZones(System, Ship, &Placement, &Linear, &AtShip, &Near, &Ahead);
         }
     }
 
-    // FUN_06f5b690 (06f5b690-06f5bb04).
+    // FUN_06f5b690.
     void FSpacePop::PopulateZones(FSystemInfo* System, FContentPlayerShip* Ship,
                                   FSpaceObjPlacement const* Placement, Vector const* Velocity,
                                   std::vector<FSystemZone*> const* AtShip,
                                   std::vector<FSystemZone*> const* Near,
                                   std::vector<FSystemZone*> const* Ahead)
     {
-        // 06f5b6af-06f5b737: the largest density of the zones at the ship; a near zone takes
-        // over with its own density when the maximum is below 0.6 of it (FILD qword compares).
+        // The largest density of the zones at the ship; a near zone takes over with its own
+        // density when the maximum is below 0.6 of it (compared in floating point).
         unsigned int MaxDensity = 0;
         for (std::vector<FSystemZone*>::const_iterator It = AtShip->begin(); It != AtShip->end(); ++It)
         {
@@ -363,7 +356,7 @@ namespace
         }
         float const Time = static_cast<float>(GetContentGameTime());          // FUN_06efec10
 
-        // 06f5b742-06f5b771: the position must be outside every exclusion sphere.
+        // The position must be outside every exclusion sphere.
         bool const bAll = true;
         bool const bInside = false;
         if (!TestExclusionSpheres(&Placement->Position.x, &GSpacePopExclusionSpheres, &bAll,
@@ -371,7 +364,7 @@ namespace
             return;
 
         int Spawned = 0;
-        // 06f5b777-06f5b859: the zones at the ship.
+        // The zones at the ship.
         for (std::vector<FSystemZone*>::const_iterator It = AtShip->begin();
              It != AtShip->end() && Spawned == 0; ++It)
         {
@@ -381,7 +374,7 @@ namespace
             unsigned int const Limit = MaxDensity;
             Spawned = (*It)->Population.Populate(&Request, &Time, &Scale, &Limit);   // FUN_06ef95d0
         }
-        // 06f5b85f-06f5b985: the near zones.
+        // The near zones.
         for (std::vector<FSystemZone*>::const_iterator It = Near->begin();
              It != Near->end() && Spawned == 0; ++It)
         {
@@ -391,8 +384,8 @@ namespace
             unsigned int const Limit = MaxDensity;
             Spawned = (*It)->Population.Populate(&Request, &Time, &Scale, &Limit);
         }
-        // 06f5b98b-06f5bae6: the zones ahead, with a request 5000 ahead of the ship (identity
-        // orientation, no velocity) and a third of each zone's own density.
+        // The zones ahead, with a request 5000 ahead of the ship (identity orientation, no
+        // velocity) and a third of each zone's own density.
         for (std::vector<FSystemZone*>::const_iterator It = Ahead->begin();
              It != Ahead->end() && Spawned == 0; ++It)
         {
@@ -409,7 +402,7 @@ namespace
             NoVelocity.z = 0.0f;
             FSpawnRequest Request(false, 2, GSpacePopControllerId, Ship, AheadPlacement, NoVelocity,
                                   &GSpacePopExclusionSpheres);
-            // 06f5ba66-06f5ba7d: FILD qword * 0.33f (DAT_06fbbb3c), ftol.
+            // 0.33f = DAT_06fbbb3c.
             unsigned int const Limit = static_cast<unsigned int>(static_cast<__int64>(
                 static_cast<double>(ZoneDensity(*It)) * static_cast<double>(0.33f)));
             float const Scale = 1.0f;
@@ -417,14 +410,14 @@ namespace
         }
     }
 
-    // FUN_06f5beb0 (06f5beb0-06f5c3eb).
+    // FUN_06f5beb0.
     void FSpacePop::PopulateArrival(FSystemInfo* System, FContentPlayerShip* Ship,
                                     FSpaceObjPlacement const* Placement,
                                     std::vector<FSystemZone*> const* AtShip,
                                     std::vector<FSystemZone*> const* Near)
     {
-        // 06f5becd-06f5bf43: the density budget -- the largest density at the ship or
-        // ftol(0.6 * density) of a near zone.
+        // The density budget -- the largest density at the ship or ftol(0.6 * density) of a
+        // near zone.
         unsigned int MaxDensity = 0;
         for (std::vector<FSystemZone*>::const_iterator It = AtShip->begin(); It != AtShip->end(); ++It)
         {
@@ -440,7 +433,7 @@ namespace
                 MaxDensity = Density;
         }
         int Budget = static_cast<int>(MaxDensity);
-        // 06f5bf49-06f5bf82: in multiplayer the NPC ships already within 9200 count against it.
+        // In multiplayer the NPC ships already within 9200 count against it.
         if (!pub::SinglePlayer())
         {
             float const NoCone = 0.0f;
@@ -453,7 +446,6 @@ namespace
         ComputeZoneShares(AtShip, Near, &AtShipShares, &NearShares);         // FUN_06f5bb40
         float const Time = static_cast<float>(GetContentGameTime());          // FUN_06efec10
 
-        // 06f5bfd7-06f5c009: the position must be outside every exclusion sphere.
         bool const bAll = true;
         bool const bInside = false;
         if (!TestExclusionSpheres(&Placement->Position.x, &GSpacePopExclusionSpheres, &bAll,
@@ -467,9 +459,9 @@ namespace
         int Spawned = 0;
         for (int Pass = 0; Pass < 2; ++Pass)
         {
-            // 06f5c00f-06f5c1eb (the zones at the ship), then 06f5c1f7-06f5c3a9 (the near
-            // zones): each zone gets Budget * its share (-1 for a zero share), at least 1,
-            // filled by FUN_06ef9a60 until a call creates nothing or the count reaches it.
+            // The zones at the ship, then the near zones (two unrolled loops in retail): each
+            // zone gets Budget * its share (-1 for a zero share), at least 1, filled by
+            // FUN_06ef9a60 until a call creates nothing or the count reaches it.
             std::vector<FSystemZone*> const* Zones = Pass == 0 ? AtShip : Near;
             std::vector<float> const* Shares = Pass == 0 ? &AtShipShares : &NearShares;
             for (std::vector<FSystemZone*>::size_type Index = 0;
@@ -478,7 +470,7 @@ namespace
                 FSpawnRequest Request(true, 0, GSpacePopControllerId, Ship, *Placement, NoVelocity,
                                       &GSpacePopExclusionSpheres);
                 float const Share = (*Shares)[Index];
-                // 06f5c0c9-06f5c0fe: FILD Budget * (share, or -1.0 DAT_06fb5e84 when it is 0).
+                // -1.0 = DAT_06fb5e84.
                 float Target = static_cast<float>(static_cast<double>(Budget) *
                     (Share == 0.0f ? -1.0 : static_cast<double>(Share)));
                 int Count = 0;
@@ -505,7 +497,7 @@ namespace
         }
     }
 
-    // LAB_06f5c3f0 (06f5c3f0-06f5c679): byte table 06f5c694 over MessageId - 0xf.
+    // LAB_06f5c3f0: byte table 06f5c694 over MessageId - 0xf.
     void FSpacePop::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
     {
         using pub::Controller::EMessage;
@@ -513,14 +505,13 @@ namespace
         switch (MessageId)
         {
         case EMessage::Heartbeat:
-            // 06f5c41b: the heartbeat.
             if (GSpacePopPopulationEnabled != 0)
                 PopulatePlayers();
             break;
         case EMessage::SystemEnter:
         {
-            // 06f5c439: system enter {system, ?, player, arrival object, position}; the
-            // player state is not null-tested.
+            // {system, ?, player, arrival object, position}; the player state is not
+            // null-tested.
             if (GSpacePopPopulationEnabled == 0)
                 break;
             FContentPlayerState* State = FindContentPlayerState(Msg[2]);    // FUN_06f49b00
@@ -533,8 +524,8 @@ namespace
         }
         case EMessage::SpaceEnter:
         {
-            // 06f5c4a2: player launch {system, player, dock target, terminal}; neither the
-            // state nor its ship is null-tested.
+            // Player launch {system, player, dock target, terminal}; neither the state nor its
+            // ship is null-tested.
             if (GSpacePopPopulationEnabled == 0)
                 break;
             FContentPlayerState* State = FindContentPlayerState(Msg[1]);
@@ -545,14 +536,14 @@ namespace
         }
         case EMessage::TradelaneEnter:
         {
-            // 06f5c4f0: a ship entered a trade lane {ship, entry ring, exit ring, system}.
+            // {ship, entry ring, exit ring, system}.
             FSystemInfo* System = FindSystemInfo(&Msg[3]);                    // not null-tested
             if (System->FindShip(Msg[0]) == nullptr)                         // FUN_06f73930
                 break;
             FTradeLane* Lane;
             System->FindTradeLaneByRing(&Msg[1], &Lane);                     // FUN_06f77e00
-            // 06f5c528-06f5c596: the indices of both rings (the loop stops once both are
-            // known); -1 when a ring is not on the lane.
+            // The indices of both rings (the loop stops once both are known); -1 when a ring
+            // is not on the lane.
             int EntryIndex = -1;
             int ExitIndex = -1;
             for (std::vector<FTradeLaneRing>::size_type Index = 0; Index < Lane->Rings.size(); ++Index)
@@ -577,7 +568,7 @@ namespace
             if (State == nullptr)
                 break;
             FContentPlayerShip* Ship = State->ShipObject;
-            // 06f5c5ba: JNC -- the indices compare unsigned.
+            // The indices compare unsigned (-1 is largest).
             if (static_cast<unsigned int>(EntryIndex) < static_cast<unsigned int>(ExitIndex))
             {
                 if (GSpacePopEncounterEnabled != 0)
@@ -606,11 +597,11 @@ namespace
     }
 }
 
-// FUN_06f5a5d0 (06f5a5d0-06f5a795).
+// FUN_06f5a5d0.
 void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
                                          FContentNpcShipParams const* Params)
 {
-    // 06f5a5d0-06f5a604: without the attack clamp only for a player whose flags have bit 2.
+    // Without the attack clamp only for a player whose flags have bit 2.
     if (GSpacePopAttackClamp == 0)
     {
         unsigned int const ShipId = PlayerShip->SpaceObjId;
@@ -619,8 +610,7 @@ void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
             return;
     }
 
-    // 06f5a60a-06f5a650: every ship / solar-ish object of the system (type mask 0x7f0000,
-    // radius -1 = no limit).
+    // Every ship / solar-ish object of the system (type mask 0x7f0000, radius -1 = no limit).
     unsigned int const SystemId = PlayerShip->GetSystem()->SystemId;
     unsigned int Objects[0x40];
     unsigned int ObjectCount = 0;
@@ -633,8 +623,8 @@ void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
 
     for (unsigned int Index = 0; Index < ObjectCount; ++Index)
     {
-        // 06f5a690-06f5a6e1: an NPC ship of the other side (SpacePop vs not), or -- for a
-        // SpacePop block -- a player ship.
+        // An NPC ship of the other side (SpacePop vs not), or -- for a SpacePop block -- a
+        // player ship.
         bool bOtherSide = Params->ControllerId == GSpacePopControllerId;
         FContentSpaceObj* Object = PlayerShip->GetSystem()->FindSpaceObj(Objects[Index]);
         if (Object != nullptr)
@@ -648,7 +638,7 @@ void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
         if (!bOtherSide)
             continue;
 
-        // 06f5a6e7-06f5a770: both attitudes raised to at least GSpacePopAttitudeFloor.
+        // Both attitudes raised to at least GSpacePopAttitudeFloor.
         int ObjectRep;
         pub::SpaceObj::GetRep(Objects[Index], ObjectRep);
         float Attitude;
@@ -661,7 +651,7 @@ void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
     }
 }
 
-// FUN_06f5b000 (06f5b000-06f5b4d1).
+// FUN_06f5b000.
 void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const* Placement,
                                   std::vector<FSystemZone*>* OutAtShip,
                                   std::vector<FSystemZone*>* OutNear,
@@ -672,7 +662,7 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
     OutAhead->clear();
     Vector const* Position = &Placement->Position;
 
-    // 06f5b04a-06f5b138: the zones within 10 of the position. Zones with a patrol path are
+    // The zones within 10 of the position. Zones with a patrol path are
     // taken; of the others only the one with the smallest radius (0 for a trade lane zone)
     // survives -- the ids of the rest are zeroed so the later lists do not skip them.
     unsigned int AtShipIds[0x14];
@@ -703,7 +693,7 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
             AtShipIds[Index] = 0;
         }
     }
-    // 06f5b13e-06f5b18f: the smallest zone goes to a random place of the list.
+    // The smallest zone goes to a random place of the list.
     if (Best != -1)
     {
         FSystemZone* BestZone = System->FindZone(AtShipIds[Best]);
@@ -712,7 +702,7 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
         OutAtShip->insert(OutAtShip->begin() + Slot, 1, BestZone);          // FUN_06f937c0
     }
 
-    // 06f5b194-06f5b1ba: a zone at the ship with density 0 blocks the population.
+    // A zone at the ship with density 0 blocks the population.
     *OutBlocked = false;
     for (std::vector<FSystemZone*>::iterator It = OutAtShip->begin(); It != OutAtShip->end(); ++It)
     {
@@ -723,7 +713,7 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
         }
     }
 
-    // 06f5b1bc-06f5b256: the population_additive zones within 2000 that were not seen above.
+    // The population_additive zones within 2000 that were not seen above.
     unsigned int NearIds[0x14];
     unsigned int NearCount = 0;
     pub::System::InZones(System->SystemId, *Position, 2000.0f, NearIds, 0x14, NearCount);
@@ -745,8 +735,8 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
             OutNear->insert(OutNear->end(), 1, Zone);                       // FUN_06f937c0
     }
 
-    // 06f5b258-06f5b4c1: the population_additive zones of the view frustum (70 x 55.4
-    // degrees, 4000 deep) whose surface is within 4000, not seen in either list above.
+    // The population_additive zones of the view frustum (70 x 55.4 degrees, 4000 deep) whose
+    // surface is within 4000, not seen in either list above.
     Transform View;
     View.Rotation = Placement->Orientation;
     View.Translation = Placement->Position;
@@ -781,12 +771,12 @@ void __cdecl CollectSpacePopZones(FSystemInfo* System, FSpaceObjPlacement const*
         FSystemZone* Zone = System->FindZone(AheadIds[Index]);
         if (Zone == nullptr)
             continue;
-        // 06f5b2fe-06f5b31f: TEST AH,0x41 + JP -- skipped when farther than 4000 (or NaN).
+        // Skipped when farther than 4000 (or NaN).
         if (!(pub::Zone::GetDistance(AheadIds[Index], *Position) <= 4000.0f))
             continue;
         if (Zone->bUnpopulated || !Zone->Population.bPopulationAdditive)
             continue;
-        OutAhead->push_back(Zone);                                          // 06f5b33f-06f5b4b3
+        OutAhead->push_back(Zone);
     }
 }
 
@@ -810,7 +800,7 @@ namespace
         std::map<unsigned int, std::vector<FBarCharacterList::iterator>> PlayerNpcs;
     };
 
-    // TU19 FUN_06eb4720 (cdecl; only caller BasePop 06eb3209): Out receives the index of every
+    // TU19 FUN_06eb4720 (cdecl; only caller BasePop): Out receives the index of every
     // character placement of the room whose name, split at '\' and '/' (strtok on a _strdup
     // copy, DAT_06fb4614), holds the tokens "zg", "npc", one starting with 'm' (tolower) and
     // "a" in this order (stricmp; other tokens are skipped); each placement is added once, at
@@ -825,7 +815,6 @@ namespace
             for (char* Token = std::strtok(Name, "\\/"); Token != nullptr;
                  Token = std::strtok(nullptr, "\\/"))
             {
-                // 06eb4790: jump table over states 0..3, state 4 and up does nothing.
                 switch (State)
                 {
                 case 0:
@@ -844,7 +833,7 @@ namespace
                     if (_stricmp(Token, "a") == 0)
                     {
                         State = 4;
-                        Out->push_back(Index);                  // insert(end, 1, Index) inlined
+                        Out->push_back(Index);
                     }
                     break;
                 default:
@@ -855,8 +844,8 @@ namespace
         }
     }
 
-    // 06eb2f63-06eb2fb2 / 06eb2fc7-06eb3007: an element uniformly -- none: the end (no rand);
-    // one: the first (no rand); otherwise (rand() * n) / 32768 (CDQ / AND 0x7fff / SAR 0xf).
+    // Inlined twice in FUN_06eb2ca0: an element uniformly -- none: the end (no rand); one: the
+    // first (no rand); otherwise (rand() * n) / 32768 (signed division).
     template <typename T>
     T* PickUniform(std::vector<T>* Values)
     {
@@ -868,7 +857,7 @@ namespace
         return Values->data() + (rand() * Count) / 32768;
     }
 
-    // FUN_06eb2b10 (cdecl; caller 06eb3026): a bar character of Npc for Player on Placement
+    // FUN_06eb2b10 (cdecl): a bar character of Npc for Player on Placement
     // of RoomId -- the description from the GF_NPC (its nickname's string as the role, no
     // fidget), created at the front of the room (FUN_06ea9340), given the GF_NPC's offer for
     // the player (FUN_06ea8370 / FUN_06ea7ef0) and its script (FUN_06f00b60).
@@ -891,7 +880,7 @@ namespace
         Desc.RoomId = RoomId;
         Desc.Placement = Placement;
         Desc.Nickname = Npc->Desc.Nickname;
-        // 06eb2bcd-06eb2c13: the nickname's string, clamped to 31 characters (null -> empty).
+        // The nickname's string, clamped to 31 characters (null -> empty).
         Desc.Role = Npc->Desc.Nickname.get_string();
 
         FBarCharacterList::iterator Character = Base->AddBarCharacter(&Desc);   // FUN_06ea9340
@@ -902,14 +891,13 @@ namespace
         return Character;                                                   // Offer: FUN_06ea7c30
     }
 
-    // FUN_06eb2ca0 (cdecl; caller 06eb32cd): fill the room up to its character_density (less
+    // FUN_06eb2ca0 (cdecl): fill the room up to its character_density (less
     // the player's characters already there) with GF_NPCs of the base's factions, each on a
     // placement of Placements (used placements are removed); the created characters go to Out.
     void SpawnBasePopCharacters(std::vector<int>* Placements, FContentPlayerState* Player,
                                 FContentBase* Base, unsigned int RoomId,
                                 std::vector<FBarCharacterList::iterator>* Out)
     {
-        // 06eb2cbb-06eb2d0b.
         int Present = 0;
         FBaseRoomState* RoomState = Base->FindRoomState(&RoomId);           // FUN_06eac110
         if (RoomState != nullptr)
@@ -917,11 +905,11 @@ namespace
         int Wanted = Base->GetRoomDensity(RoomId) - Present;                // FUN_06eac2c0
         if (Wanted <= 0 || Placements->empty())
             return;
-        Out->reserve(Wanted);                                               // 06eb2d16-06eb2d6c
+        Out->reserve(Wanted);
 
-        // 06eb2d6f-06eb2e95: a copy of the factions (FUN_06eb33f0) without the ones of weight
-        // <= 0 (FCOMP 0, TEST AH,0x41 JNP; NaN stays) or with no GF_NPC; each kept faction's
-        // GF_NPCs lose the ones whose room list is non-empty and lacks RoomId.
+        // A copy of the factions (FUN_06eb33f0) without the ones of weight <= 0 (NaN stays) or
+        // with no GF_NPC; each kept faction's GF_NPCs lose the ones whose room list is
+        // non-empty and lacks RoomId.
         std::vector<FBaseFaction> Factions = Base->Factions;
         std::vector<FBaseFaction>::iterator Faction = Factions.begin();
         while (Faction != Factions.end())
@@ -947,7 +935,7 @@ namespace
             Faction = Factions.erase(Faction);            // FUN_06eb3ae0 copy + FUN_06eb3580
         }
 
-        // 06eb2ea1-06eb3093: a faction by weight, one of its GF_NPCs and a placement uniformly;
+        // A faction by weight, one of its GF_NPCs and a placement uniformly;
         // the character is created, the placement and the GF_NPC are used up (an emptied
         // faction is dropped, FUN_06eb3470).
         while (!Factions.empty() && Wanted > 0 && !Placements->empty())
@@ -966,7 +954,7 @@ namespace
             if (Npcs->empty())
                 Factions.erase(Factions.begin() + (Picked - Factions.data()));
         }
-        // 06eb3098: only after the draw (the early returns above skip it).
+        // Only after the draw (the early returns above skip it).
         ReleaseRmDestSystems();                                             // FUN_06f4d650
     }
 
@@ -976,17 +964,17 @@ namespace
     {
         pub::Controller::SetHeartbeatInterval(ControllerId, -1.0f);
         if (GBasePopInstance != nullptr)
-            __debugbreak();                                         // 06eb2925: INT3
+            __debugbreak();                                         // retail INT3
         GBasePopInstance = this;
     }
 
-    // FUN_06eb30d0 (06eb30d0-06eb3383, RET 8).
+    // FUN_06eb30d0.
     void FBasePop::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
     {
         unsigned int const* Msg = static_cast<unsigned int const*>(Parms);
         if (MessageId == pub::Controller::EMessage::LocationEnter)
         {
-            // 06eb31b0: location enter {room, player}.
+            // {room, player}.
             FContentPlayerState* State = FindContentPlayerState(Msg[1]);    // FUN_06f49b00
             if (State == nullptr)
                 return;
@@ -996,8 +984,7 @@ namespace
             std::vector<int> Placements;
             CollectBasePopPlacements(Msg[0], &Placements);                  // FUN_06eb4720
 
-            // 06eb320e-06eb329e: placements the player already has a character or a lock on
-            // are dropped.
+            // Placements the player already has a character or a lock on are dropped.
             unsigned int RoomId = Msg[0];
             FBaseRoomState* RoomState = Base->FindRoomState(&RoomId);       // FUN_06eac110
             if (RoomState != nullptr)
@@ -1013,8 +1000,8 @@ namespace
                 }
             }
 
-            // 06eb32a2-06eb3350: the characters, kept per player when there are any (insert:
-            // an existing entry stays as it is).
+            // The characters, kept per player when there are any (insert: an existing entry
+            // stays as it is).
             std::vector<FBarCharacterList::iterator> Characters;
             SpawnBasePopCharacters(&Placements, State, Base, Msg[0], &Characters);   // FUN_06eb2ca0
             if (!Characters.empty())
@@ -1022,7 +1009,7 @@ namespace
         }
         else if (MessageId == pub::Controller::EMessage::LocationExit)
         {
-            // 06eb3104: location exit {room, player}.
+            // {room, player}.
             std::map<unsigned int, std::vector<FBarCharacterList::iterator>>::iterator Found =
                 PlayerNpcs.find(Msg[1]);                                    // FUN_06f7b0f0
             if (Found == PlayerNpcs.end())
@@ -1042,7 +1029,7 @@ namespace
     }
 }
 
-// FUN_06eb3390 (06eb3390-06eb33e5): true when the BasePop instance exists and tracks
+// FUN_06eb3390: true when the BasePop instance exists and tracks
 // room NPCs for this player.
 bool __cdecl BasePopHasPlayer(unsigned int PlayerId)
 {
@@ -1052,26 +1039,26 @@ bool __cdecl BasePopHasPlayer(unsigned int PlayerId)
     return Instance->PlayerNpcs.find(PlayerId) != Instance->PlayerNpcs.end();
 }
 
-// FUN_06f5a7a0 (06f5a7a0-06f5a7a5).
+// FUN_06f5a7a0.
 unsigned char __cdecl SpacePopGetHostileClamp()
 {
     return GSpacePopHostileClamp;
 }
 
-// FUN_06f5a7b0 (06f5a7b0-06f5a7b9): the byte as passed.
+// FUN_06f5a7b0: the byte as passed.
 void __cdecl SpacePopSetHostileClamp(unsigned char EnabledByte)
 {
     GSpacePopHostileClamp = EnabledByte;
 }
 
-// FUN_06f5a7c0 (06f5a7c0-06f5a7d3): stored only in single player.
+// FUN_06f5a7c0: stored only in single player.
 void __cdecl SpacePopSetSolarDetection(unsigned char EnabledByte)
 {
     if (pub::SinglePlayer())
         GSpacePopSolarDetection = EnabledByte;
 }
 
-// FUN_06f5a7e0 (06f5a7e0-06f5a7f1): the stored byte in single player, else 1.
+// FUN_06f5a7e0: the stored byte in single player, else 1.
 unsigned char __cdecl SpacePopGetSolarDetection()
 {
     if (!pub::SinglePlayer())
@@ -1087,7 +1074,7 @@ void __cdecl SpacePopSetPopulationEnabled(unsigned char EnabledByte)
 
 unsigned char __cdecl SpacePopGetPopulationEnabled()
 {
-    // FUN_06f5a810 returns the byte as stored.
+    // FUN_06f5a810.
     return GSpacePopPopulationEnabled;
 }
 
@@ -1099,7 +1086,7 @@ void __cdecl SpacePopSetEncounterEnabled(unsigned char EnabledByte)
 
 unsigned char __cdecl SpacePopGetEncounterEnabled()
 {
-    // FUN_06f5a830 returns the byte as stored.
+    // FUN_06f5a830.
     return GSpacePopEncounterEnabled;
 }
 
@@ -1108,8 +1095,8 @@ void __cdecl SpacePopSetAttackClamp(unsigned char EnabledByte)
     GSpacePopAttackClamp = EnabledByte;
 }
 
-// FUN_06eeaee0 (cdecl, 06eeaee0-06eeaf04; the COMDAT copy the linker kept is in TU25):
-// each component is subtracted on the x87 stack and stored as a float, z first.
+// FUN_06eeaee0 (cdecl; the COMDAT copy the linker kept is in TU25): each component stored
+// as a float, z first.
 Vector __cdecl SubtractVectors(Vector const& A, Vector const& B)
 {
     Vector Result;
@@ -1119,9 +1106,8 @@ Vector __cdecl SubtractVectors(Vector const& A, Vector const& B)
     return Result;
 }
 
-// FUN_06f5aeb0 (cdecl, 06f5aeb0-06f5aedf): y = bits 0x5f3759df - (bits(Value) SAR 1);
-// FLD y, FMUL y, FMUL Value, FMUL 0.5f (DAT_06fb605c), FSUBR 1.5f (DAT_06fb6058), FMUL y --
-// returned on the x87 stack, kept in double here.
+// FUN_06f5aeb0 (cdecl): the 0x5f3759df inverse square root with one Newton step
+// (0.5f DAT_06fb605c, 1.5f DAT_06fb6058); returned unrounded on the x87 stack, so double here.
 double __cdecl FastReciprocalSqrt(float Value)
 {
     int Bits;
@@ -1135,8 +1121,7 @@ double __cdecl FastReciprocalSqrt(float Value)
 
 bool __cdecl SpacePopPositionIsExcluded(float const* Position)
 {
-    // FUN_06f5ac10, 06f5ac4b-06f5accf: the sphere scan before any transform construction
-    // or encounter selection; the position is copied first (06f5ac51-06f5ac70).
+    // Inlined in FUN_06f5ac10 before any transform construction or encounter selection.
     Vector Point;
     Point.x = Position[0];
     Point.y = Position[1];
@@ -1148,14 +1133,13 @@ bool __cdecl SpacePopPositionIsExcluded(float const* Position)
         Center.x = Sphere->X;
         Center.y = Sphere->Y;
         Center.z = Sphere->Z;
-        Vector const Delta = SubtractVectors(Center, Point);                    // 06f5ac81
-        // 06f5ac86-06f5aca2: (z*z + y*y) + x*x, FSTP float.
+        Vector const Delta = SubtractVectors(Center, Point);
+        // (z*z + y*y) + x*x, stored as float.
         float const Square = static_cast<float>(
             (static_cast<double>(Delta.z) * Delta.z + static_cast<double>(Delta.y) * Delta.y) +
             static_cast<double>(Delta.x) * Delta.x);
-        double const Length = FastReciprocalSqrt(Square) * Square;              // 06f5acab
-        // 06f5acb7-06f5acbf: FCOMP Radius, TEST AH,5, JNP -- only C0 alone (less) takes the
-        // excluded exit; equal and unordered go on to the next sphere.
+        double const Length = FastReciprocalSqrt(Square) * Square;
+        // Only less excludes; equal and unordered go on to the next sphere.
         if (Length < static_cast<double>(Sphere->Radius))
             return true;
     }

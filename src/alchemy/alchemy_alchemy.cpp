@@ -25,11 +25,9 @@ namespace AlchemyImpl
 
     namespace
     {
-        // LAB_06201910 DrawNodes / LAB_062016c0 Slot15 / LAB_06201870 Slot16
-        // / FUN_06202180 FindNode all walk the node tree the same way:
-        // visit, then first child, else next sibling, else climb ancestors
-        // (stopping at StartNode) looking for an uncle sibling. Shared here
-        // so each gap only supplies its own per-node dispatch.
+        // Pre-order node walk shared by retail's tree walkers (LAB_06201910 DrawNodes,
+        // FUN_06202180 FindNode, ...): visit, then first child, else next sibling, else
+        // climb ancestors (stopping at StartNode) looking for an uncle sibling.
         template <typename VisitFn>
         void WalkNodePreOrder(IDAComponent* StartNode, VisitFn&& Visit)
         {
@@ -70,17 +68,14 @@ namespace AlchemyImpl
             }
         }
 
-        // DAT_06257880 (alchemy.dll.txt:180911): the 12-float parent transform the node
-        // walk hands to every node's compose. Seeded to identity by the static initializer
-        // LAB_06201060 (0x06255010 in the init table) and re-seeded by LAB_062016c0.
+        // DAT_06257880: the 12-float parent transform the node walk hands to every node's
+        // compose. Seeded to identity by the static initializer LAB_06201060 and re-seeded
+        // by LAB_062016c0.
         float G_NodeWalkXform[12] = {1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f};
 
-        // FUN_06201620 (alchemy.dll.txt:4499-4572, __thiscall this=IAlchemy, RET 8): for
-        // Node and each following sibling (vt+0x34): vt+0x10 ComposeNodeTransform(A,
-        // &G_NodeWalkXform). When the node has a first child (vt+0x2c): vt+0x40
-        // GetNodeTransform(0, &p), save G, G = *p (12 dwords, REP MOVSD), recurse on
-        // the child, restore G. The node's composed world transform REPLACES the parent
-        // accumulator for its subtree. Node == nullptr returns at once (06201628 JZ).
+        // FUN_06201620 (__thiscall on IAlchemy): for Node and each following sibling,
+        // compose against G_NodeWalkXform; a node with children replaces the accumulator
+        // with its own world transform for the subtree, then restores it.
         void PropagateNodeChainTransform(IDAComponent* Node, void* A)
         {
             while (Node != nullptr)
@@ -102,12 +97,9 @@ namespace AlchemyImpl
             }
         }
 
-        // FUN_06201810 (alchemy.dll.txt:4694-4748) / LAB_06201870 Slot16:
-        // per-node vtbl+0x14(A) then vtbl+0x20(&flag). When flag bit0 is set,
-        // retail calls **Alchemy+0x5C SubmitNode(node)** (EBX/this = Alchemy,
-        // PUSH node then Alchemy) — NOT A->+0x5C. A is the dt float* from
-        // IFxEffect Slot8; the prior port's CallVt0(A, 0x5C) followed a
-        // Ghidra misread and would dispatch on the float pointer.
+        // FUN_06201810 (used by UpdateNodes): per node, vt+0x14(A) then GetNodeFlags.
+        // Flag bit0 calls this Alchemy's SubmitNode(node) (vt+0x5C on the Alchemy, not
+        // on A); A carries the dt float bits.
         void WalkNodeChainFlagDispatch(FAlchemy* Alchemy, IDAComponent* Node, void* A)
         {
             while (Node != nullptr)
@@ -135,29 +127,9 @@ namespace AlchemyImpl
         }
     } // namespace
 
-    // FUN_0623f450: fixed particle-draw render-state and texture-stage
-    // block that retail applies on the render
-    // pipeline. Called from retail FAlchemy::BeginDraw at 0x06201b5e,
-    // right after the six CallGetRenderState saves and before the
-    // draw-counter reset (confirmed by walking the listing around that
-    // call site: the six GetRenderState reads at 0x06201ae4-0x06201b58
-    // save exactly SavedRsAlphaTest_/ColorWrite_/Cull_/AlphaBlend_/
-    // SrcBlend_/DestBlend_ in that order, then CALL FUN_0623f450, then
-    // the DAT_062578e4..06257904 nine-dword counter zeroing that matches
-    // BeginDraw's G_DrawCounters reset below). Two other XREFs
-    // (LAB_06203300, LAB_06203320) are FALBatchedMaterialFacet::Slot6 and
-    // FALMaterial::Slot8 (alchemy_material.cpp) -- real vtable methods on
-    // the separate FALMaterial component, not pad slots as an earlier pass
-    // assumed; they call this identical function with no other arguments,
-    // so it is exposed via alchemy_alchemy.h (declared, not anonymous-
-    // namespace-local) for that file to call directly instead of
-    // duplicating it.
-    //
-    // Literal state ids/values and texture-stage (stage, type, value)
-    // triples match the listing; retail never
-    // reverses any of this at EndDraw (its epilogue is only the six
-    // SetRenderState restores, already ported below), so no EndDraw
-    // change is needed.
+    // FUN_0623f450. BeginDraw calls it (0x06201b5e) after saving its six render
+    // states and before the counter reset; EndDraw restores only those six, so
+    // nothing set here is undone.
     void ApplyParticleDrawRenderState()
     {
         G_RenderPipeline->SetRenderState(D3DRS_LIGHTING, 0); // color write mask: off
@@ -400,14 +372,10 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::ComposeNodeTransforms(void* A, void* B)
     {
-        // LAB_062016c0 (alchemy.dll.txt:4581-4680, RET 0xC): Start = B, or DAT_062578b0
-        // (G_RootNode) when B is null -- no null test after that, retail dereferences it.
-        // G_NodeWalkXform = identity (1.0 at [0]/[4]/[8], zeros elsewhere, 062016d8..
-        // 06201746); Start vt+0x10 ComposeNodeTransform(A, G); Start vt+0x40
-        // GetNodeTransform(0, &p); G = *p (NOT restored afterwards). Then the loop at
-        // 06201786 over Start's children is FUN_06201620's body inlined, so it is the
-        // same PropagateNodeChainTransform on the first child. Start's own siblings are
-        // not visited. Returns 0.
+        // LAB_062016c0: Start = B, or G_RootNode (DAT_062578b0) when B is null, then
+        // dereferenced without a null test. Start's world transform replaces
+        // G_NodeWalkXform and is not restored; the child loop is FUN_06201620 inlined.
+        // Start's own siblings are not visited.
         IDAComponent* StartNode = static_cast<IDAComponent*>(B);
         if (StartNode == nullptr)
             StartNode = G_RootNode;
@@ -425,8 +393,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::UpdateNodes(void* A, void* B)
     {
-        // LAB_06201870: B (root when null) + descendants via FUN_06201810.
-        // Flag bit0 → SubmitNode(this, node), not A->+0x5C (see helper).
+        // LAB_06201870: B (root when null), then its descendants via FUN_06201810.
         IDAComponent* StartNode = static_cast<IDAComponent*>(B);
         if (StartNode == nullptr)
             StartNode = G_RootNode;
@@ -500,7 +467,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::AttachNode(void* ParentRaw, void* ChildRaw)
     {
-        // FUN_06201e90: [child+0x28]; then FUN_06201e00; AddRef parent+child.
+        // FUN_06201e90: fails when the child already has a parent; links through
+        // FUN_06201e00 and AddRefs parent and child.
         IDAComponent* Child = static_cast<IDAComponent*>(ChildRaw);
         if (Child == nullptr)
             return GR_GENERIC;
@@ -591,11 +559,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::SubmitNode(void* Node)
     {
-        // FUN_06202010: submit the node's children first (SubmitChildNodes),
-        // tag the node itself via its own +0x20/+0x24 pair (out-param read,
-        // OR 0x80000000 sentinel bit, dispatch back), fire the update
-        // callback if one is installed, then detach the node from the tree.
-        // Retail always returns 0.
+        // FUN_06202010: children first, then tag the node (flags | 0x80000000),
+        // fire the update callback and detach. Always returns 0.
         IDAComponent* NodePtr = static_cast<IDAComponent*>(Node);
         SubmitChildNodes(NodePtr);
         unsigned long Flag = 0;
@@ -610,8 +575,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::SubmitChildNodes(void* Node)
     {
-        // LAB_062020e0: submit every child of Node depth-first via the
-        // shared SubmitNodeChain walk (matches retail's FUN_06202070).
+        // LAB_062020e0: every child of Node, depth-first (FUN_06202070).
         IDAComponent* NodePtr = static_cast<IDAComponent*>(Node);
         IDAComponent* Child = AsFxNode(NodePtr)->GetFirstChild();
         if (Child != nullptr)
@@ -632,12 +596,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::FindNode(void* Out, void* SearchKey, void* StartNode)
     {
-        // FUN_06202180: pre-order search over the node tree (same
-        // child/sibling/parent-climb walk as DrawNodes/Slot15/16). Each
-        // visited node's own +0x74 getter (out-param form, not a 0-arg Pad)
-        // is compared against the caller-supplied key; the first match is
-        // written to *Out. StartNode selects the search root (G_RootNode
-        // when null).
+        // FUN_06202180: pre-order search; each node's instance-name hash (+0x74,
+        // out-parameter getter) is compared with SearchKey.
         IDAComponent** OutPtr = static_cast<IDAComponent**>(Out);
         IDAComponent* Start = static_cast<IDAComponent*>(StartNode);
         if (Start == nullptr)
@@ -840,9 +800,7 @@ namespace AlchemyImpl
         Desc.size = 8;
         Desc.interface_name = kFxNodeFactory;
         DACOM_Acquire()->CreateInstance(&Desc, reinterpret_cast<void**>(&InitNode_));
-        // kInitNodeBoundBits is 0x7F7FFFFF, the same FLT_MAX literal retail pushes at
-        // 0x0620156b. Slot +0x6C takes a float; the constant is kept in its bit form
-        // because that is how the retail listing spells it.
+        // kInitNodeBoundBits is 0x7F7FFFFF (FLT_MAX), pushed at 0x0620156b.
         float InitBound = 0.0f;
         std::memcpy(&InitBound, &kInitNodeBoundBits, sizeof(float));
         AsFxNode(InitNode_)->SetNodeDuration(InitBound);
@@ -854,21 +812,9 @@ namespace AlchemyImpl
             AsFxNode(InitNode_)->SetNextSibling(nullptr);
             return;
         }
-        // FUN_062013f0 (0x06201530-0x0620160a, cross-checked against the raw
-        // .txt listing byte-for-byte): when G_RootNode already exists, retail
-        // does NOT run this through the generic sort-key-ordered LinkNodeTree
-        // insertion (FUN_06201e00, used by AttachNode). It sets InitNode_'s
-        // parent to G_RootNode directly, then either becomes the root's first
-        // child (root has none yet) or is appended as the new LAST sibling of
-        // whatever child chain the root already has (walks +0x34
-        // GetNextSibling to the end, links after it) -- unconditionally, with
-        // no GetSortKey comparison. No AddRef anywhere in this internal
-        // bootstrap path (matches retail; this is not the AttachNode-tracked
-        // pairing so it isn't added to Attaches_ either). Previously this
-        // called the sort-key LinkNodeTree helper, which only matched retail
-        // when G_RootNode had no children yet -- wrong once a second/Nth
-        // Initialize() call re-bound InitNode_ under an already-populated
-        // root.
+        // FUN_062013f0: under an existing root, InitNode_ is appended as the root's
+        // last child directly -- no sort-key ordering (unlike LinkNodeTree /
+        // FUN_06201e00), no AddRef, and not tracked in Attaches_.
         AsFxNode(InitNode_)->SetParent(G_RootNode);
         if (AsFxNode(G_RootNode)->GetFirstChild() == nullptr)
         {
@@ -912,11 +858,8 @@ namespace AlchemyImpl
 
     void FAlchemy::SubmitNodeChain(IDAComponent* Node)
     {
-        // FUN_06202070: shared by SubmitNode/SubmitChildNodes. Depth-first —
-        // a node's own children are submitted before the node itself — over
-        // a sibling chain, caching each node's next sibling before tagging
-        // and detaching it (detach unlinks the node, which would otherwise
-        // invalidate the sibling pointer for continued iteration).
+        // FUN_06202070: depth-first over a sibling chain, children before the node.
+        // The next sibling is cached first because detaching unlinks the node.
         while (Node != nullptr)
         {
             IDAComponent* Next = CallGetNextSibling(Node); // GetNextSibling

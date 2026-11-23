@@ -7,11 +7,9 @@
 #include "StdAfx.h"
 #include "ChatRdl.h"
 
-// .text:004149a0 (list insert before the sentinel, RET 0xc): new cell; cell->next = sentinel;
-// cell->prev = old tail (the cell itself when the tail is null, VC6 _Buynode); sentinel->prev =
-// cell; cell->prev->next = cell; the value (004155e0: placement-new null test of the cell's
-// value slot, then (*Value)->Clone() through vtable +0x1c, no null test of Value's node);
-// ++count. Cells are malloc'd because Common's ~RenderDisplayList frees them with free().
+// .text:004149a0 (list insert before the sentinel; value construction 004155e0). A null tail
+// links the cell to itself (VC6 _Buynode); Value's node is not tested for null. Cells are
+// malloc'd because Common's ~RenderDisplayList frees them with free().
 void AppendChatRdlNode(RenderDisplayList& Rdl, const FChatRdlNodeHolder& Value)
 {
 	FRdlListNode* const Sentinel = Rdl.NodeList;

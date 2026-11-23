@@ -27,24 +27,14 @@ class INI_Reader;
 // Retail vtable is 15 thiscall slots; this port is not layout-compatible.
 //
 // Retail ctor is FUN_06313890 (stamps PTR_LAB_063a37bc, inits all 4
-// collections empty). Retail dtor is FUN_06313c80 (D92 2026-09-09,
-// decomp-tracker item 2164 -- previously misread by an earlier pass as a
-// *constructor* purely from the vtable-pointer store at this+0, without
-// noticing the function's body destroys every element of all 4 collections
-// before returning; MSVC destructors re-stamp their own vtable too, so that
-// store alone doesn't distinguish ctor from dtor). Confirmed dtor: iterates
-// and frees every node of Extras (this+0x40), Pilots (this+0x2c), Packages
-// (this+0x18) then Factions (this+0x4) via the same erase/free helpers Shutdown
-// uses (FUN_06318070/FUN_06317bd0/FUN_06317730 + FUN_06391d5a per node),
-// which is exactly this port's `~Database() { Shutdown(); }` (line ~138)
-// calling `Pilots.clear(); Packages.clear(); Factions.clear(); Extras.clear();`
-// -- a full functional rewrite (STL container dtors instead of manual RB-tree
-// walk), not a byte-for-byte match, so item 2164 is tracked `skipped` with
-// ported_name NewChar::Database::~Database rather than `ready_unverified`.
+// collections empty). Retail dtor is FUN_06313c80 (it also re-stamps the vptr):
+// frees every node of Extras (this+0x40), Pilots (this+0x2c), Packages (this+0x18)
+// then Factions (this+0x4) with Shutdown's erase helpers (FUN_06318070 /
+// FUN_06317bd0 / FUN_06317730 + FUN_06391d5a per node). The port's
+// `~Database() { Shutdown(); }` uses STL container clears instead.
 //
-// SLOT LABELS CORRECTED 2026-09-24 (claude:srv-pdb). Retail's tree at this+0x04
-// is the FACTION tree and the one at this+0x2c the PILOT tree, not the other way
-// round. Proof, Common.dll's own Load (.text:063149d0):
+// The tree at this+0x04 is the faction tree and this+0x2c the pilot tree. From
+// Common.dll's Load (.text:063149d0):
 //   [Faction] (.text:06314a40) -> CALL [EDX+0x18] (.text:06314d42, slot 6) and
 //             CALL [EAX+0x24] (.text:06314c3c, slot 9, the home-base table)
 //   [Package] (.text:06314d8d) -> CALL [EAX+0x1c] (.text:06314fb2, slot 7)
@@ -53,9 +43,8 @@ class INI_Reader;
 // LAB_063144c0 into `LEA ESI,[EDI+0x2c]`. The finds agree: slot 0
 // LAB_06313e10 reads EDI+0x4, slot 2 LAB_06313eb0 reads EDI+0x2c; so do the
 // removes (slot 10 LAB_06314850: EDI+0x4, slot 12 FUN_06314910: EDI+0x2c).
-// Server.dll's FUN_06d4b790 confirms it from outside: slot 0 gets the
-// request's faction id, slot 2 its pilot id. Every "Pilot"/"Faction" below
-// that names an offset or a slot has been swapped to match.
+// Server.dll's FUN_06d4b790 agrees: slot 0 gets the request's faction id, slot 2
+// its pilot id.
 //
 // Retail slots 0-3 (vcall +0x00../+0x0c, LAB_06313e10/e60/eb0/f00) are
 // FindFaction/FindPackage/FindPilot/FindExtra respectively -- identical
@@ -66,28 +55,13 @@ class INI_Reader;
 // classic in-order (ascending NicknameId) walk of the tree at this+0x04 --
 // `MOV EAX,[ECX+0x8]` is that tree's head -- invoking callback(NicknameId,
 // &Faction, Context) per node and stopping early if the callback returns
-// false in AL. (D95 2026-09-09 read the walk correctly but called the tree
-// "Pilots".) The previously-blocking "byte flag at [node+0x8+0x61]" is NOT
-// record data at all -- it is the tree's own internal nil/header-
-// sentinel marker: Common.dll.txt:319958 (inside the ctor, FUN_06313890)
-// forces it to 1 immediately after allocating the +0x04 tree's header node,
-// while every real-node allocator in this cluster (FUN_06319370:329670,
-// FUN_06319120:329423, FUN_063195e0's equivalent) zeroes it on construction.
-// LAB_06313f50 tests this bit purely to detect subtree boundaries while
-// computing the in-order successor (classic descend-right-then-leftmost /
-// ascend-via-parent algorithm) -- it never reads or writes anything belonging
-// to the record's own fields. Confirmed real external caller:
-// Freelancer.exe.txt 0x005aaebc (`NewChar::TheDB` vcall+0x10) with
-// callback = LAB_005aaee0 (Freelancer.exe.txt:662949+): that callback reads
-// only its 3rd argument (the context struct, ignoring the per-node args on
-// this pre-flight path) and grows a caller-owned output array (classic
-// operator_new-based vector growth, magic-number /5-ish divide at
-// Freelancer.exe.txt:662957-662963) -- i.e. Freelancer.exe's new-character-
-// creation UI uses ForEachFaction to build one output record per entry into
-// its own growable list -- one entry per FACTION (the tree this slot walks),
-// i.e. the multiplayer new-character faction picker. std::map already iterates in ascending
-// key order, matching the retail RB-tree walk exactly, so a plain range-for
-// is a faithful (not merely equivalent-effect) port of this method.
+// false in AL. The byte at [node+0x8+0x61] it tests is the tree's nil/header
+// marker (the ctor sets it to 1 on the header node; the node allocators
+// FUN_06319370 / FUN_06319120 / FUN_063195e0 zero it), used only to find the
+// in-order successor. Caller: freelancer.exe 0x005aaebc with callback
+// LAB_005aaee0, which reads only its context argument and grows a caller-owned
+// array -- the multiplayer new-character faction picker. std::map iterates in the
+// same ascending key order.
 //
 // Retail slots 6-13 (vcall +0x18.. +0x34, LAB_06314100.. FUN_06314970) are a
 // uniform Insert/Remove pair per collection, confirmed by reading each one
@@ -106,15 +80,11 @@ class INI_Reader;
 // a node "color" byte at +0x25, and by Shutdown (LAB_06313fd0) walking all
 // four collections through the same erase-in-a-loop pattern.
 //
-// The 4th collection (this+0x40, LAB_063146c0 / FUN_06314970) is a real,
-// lifecycle-managed member -- Shutdown clears it right after Factions.
-// CORRECTED 2026-09-24 (claude:srv-save-2): Load() DOES populate it -- every
-// [Faction] `base = X` inserts {CreateID(X), X} through slot 9 (Common.dll
-// .text:06314ba8 .. .text:06314c3c), so it is the home-base table and
-// Server.dll's FUN_06d4b790 reads it as %%Home_Base%% / %%Home_System%%.
-// The paragraph below that says otherwise is superseded. Its Insert record layout,
-// read directly off LAB_063146c0, is `{ ID_String Key; std::basic_string<char>
-// Value; }` -- the node constructor (FUN_06316330) default-inits the key via
+// The 4th collection (this+0x40, LAB_063146c0 / FUN_06314970) is the home-base
+// table: every [Faction] `base = X` inserts {CreateID(X), X} through slot 9
+// (.text:06314ba8 .. 06314c3c); Shutdown clears it after Factions. Its record,
+// read off LAB_063146c0, is `{ ID_String Key; std::basic_string<char> Value; }` --
+// the node constructor (FUN_06316330) default-inits the key via
 // `ID_String::clear` (see common_id.h: ID_String is Common's own 4-byte
 // nickname-id wrapper, sizeof 4), the comparator FUN_062fcfb0 does a plain
 // unsigned dword compare, and the insert path inlines std::basic_string::
@@ -123,10 +93,8 @@ class INI_Reader;
 // wins) on a duplicate key, matching the other three collections and this
 // port's ReadPilot/ReadPackage/ReadFaction semantics.
 //
-// What is NOT resolved: what the id/string actually represent. NewChar::TheDB
-// (DAT_063ed464) has zero CALL-through xrefs inside Common.dll.txt, but the
-// real caller has since been traced in Server.dll.txt: FUN_06d4b790, the
-// server-side CreateNewCharacter handler (builds NewCharacter.fl /
+// NewChar::TheDB (DAT_063ed464) has no call-through xrefs in Common.dll; its
+// Server.dll caller is FUN_06d4b790, the CreateNewCharacter handler (builds NewCharacter.fl /
 // MPNewCharacter.fl from a template, logs "LOG: Create character on account
 // ..."). It Finds all 4 collections (Pilot/Package/this 4th one/Faction) from
 // four consecutive dword ids in a request struct as an OR-gate before
@@ -197,29 +165,16 @@ struct FNewCharFaction
 namespace NewChar
 {
     // -----------------------------------------------------------------------
-    // Retail's IDatabase is pure-abstract with EXACTLY SIXTEEN virtuals, and
-    // the order below is retail's own slot order, not a convenience ordering.
-    // Evidence (2026-09-17, claude:common-vtable-id; decomp-tracker interface
-    // catalog "NewChar::IDatabase", id 66):
-    //   - the interface's vftable PTR_LAB_063a3804 (063a3804..063a3840) holds
-    //     sixteen slots that ALL point at the shared _purecall stub
-    //     LAB_06391fb0 -- that is what proves "pure-abstract, sixteen methods";
-    //   - the concrete vftable PTR_LAB_063a37bc (063a37bc..063a37f8)
-    //     independently has sixteen slots matching 1:1;
-    //   - this is NOT the usual "byte_size overcounted by one slot" case:
-    //     063a37fc..063a37ff is zero padding and 063a3800 is the COL belonging
-    //     to the 063a3804 vtable;
-    //   - RTTI: [063a3804-4] -> COL 063aa0d4 -> TypeDescriptor 063ed468 =
-    //     ".?AVIDatabase@NewChar@@"; the implementation's TypeDescriptor
-    //     063ed488 = ".?AVDatabase@NewChar@@".
+    // Retail's IDatabase is pure-abstract with sixteen virtuals, in retail slot order:
+    //   - the interface vftable PTR_LAB_063a3804 (063a3804..063a3840) is sixteen
+    //     _purecall (LAB_06391fb0) entries;
+    //   - the concrete vftable PTR_LAB_063a37bc (063a37bc..063a37f8) has sixteen
+    //     matching slots (063a37fc is padding, 063a3800 the interface's COL);
+    //   - RTTI: COL 063aa0d4 -> ".?AVIDatabase@NewChar@@" (063ed468); the
+    //     implementation is ".?AVDatabase@NewChar@@" (063ed488).
     //
-    // THERE IS NO VIRTUAL DESTRUCTOR. Slot 0 is FindFaction. The port used to
-    // declare one, which shifted every slot by one and demoted thirteen of the
-    // sixteen methods to non-virtual members of Database -- corrected here.
-    // Dropping it is safe for the same reason retail gets away with it: the
-    // sole instance is the static GNewCharDatabase singleton (retail
-    // .data:064012e0), published through TheDB and never deleted through the
-    // interface pointer.
+    // No virtual destructor: slot 0 is FindFaction. The sole instance is the static
+    // singleton (retail .data:064012e0), never deleted through the interface.
     // -----------------------------------------------------------------------
     class IDatabase
     {
@@ -247,12 +202,9 @@ namespace NewChar
         // Slot 15 (vcall +0x3c) -- a REAL slot, not the trailing-COL artifact:
         // 063a37f8 holds a live code pointer and the padding/COL only begins at
         // 063a37fc/063a3800. Its implementation address 0x0629ba10 carries the
-        // symbol CEShield::GetEquipDesc, which proves NOTHING about the
-        // receiver: the entire body is `XOR AL,AL ; RET 0x4` and /OPT:ICF has
-        // folded it into ~14 unrelated vtables. All that is provable: it is
-        // __thiscall, takes exactly 4 bytes of argument, and returns false in
-        // AL. Deliberately left under an offset name -- do NOT promote a
-        // guessed semantic name.
+        // symbol CEShield::GetEquipDesc only through ICF: the body is
+        // `XOR AL,AL ; RET 0x4`, folded into ~14 unrelated vtables. It is
+        // __thiscall, takes 4 bytes of argument and returns false.
         // TODO: identify slot 15's meaning from a caller outside Common.dll.
         virtual bool Slot15(void* Arg) = 0;                                         // slot 15, vcall +0x3c
     };
@@ -280,19 +232,14 @@ namespace NewChar
 
         // Retail slot 4 (vcall +0x10, LAB_06313f50): walk Factions in ascending
         // NicknameId order, invoking Callback(NicknameId, &Faction, Context) per
-        // entry and stopping early if Callback returns false. See the class
-        // comment above for the full evidence trail (D95 2026-09-09,
-        // decomp-tracker item 2169). Returns true if the walk completed
-        // without being stopped early (retail's own callers never inspect its
-        // return value, but this mirrors the early-stop semantics cleanly).
+        // entry and stopping early if Callback returns false (see the Database
+        // comment above). Returns true if the walk completed; retail's callers
+        // ignore it.
         bool ForEachFaction(bool(__cdecl* Callback)(unsigned, FNewCharFaction const*, void*), void* Context) const override;
 
         // Retail slot 10/11/12 (vcall +0x28/+0x2c/+0x30, LAB_06314850 /
         // FUN_063148b0 / FUN_06314910): per-key erase on Factions/Packages/
-        // Pilots, same find-then-erase-by-key shape as RemoveExtra below
-        // (confirmed by reading all three against the raw disasm, D92
-        // 2026-09-09). Shutdown() only bulk-clears, so per-key Remove was a
-        // genuine capability gap before these were filled in.
+        // Pilots, same find-then-erase-by-key shape as RemoveExtra below.
         bool RemoveFaction(unsigned NicknameId) override;
         bool RemovePackage(unsigned NicknameId) override;
         bool RemovePilot(unsigned NicknameId) override;

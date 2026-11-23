@@ -6,7 +6,7 @@
 
 #pragma once
 
-// Content.dll TU45 (06f36f10-06f46940): pilot personalities from
+// Content.dll TU45: pilot personalities from
 // missions\pilots_population.ini / missions\pilots_story.ini.
 //
 // Retail keeps seventeen file-static std::map objects (the pilot map
@@ -19,7 +19,7 @@
 class INI_Reader;
 
 // FUN_06f3d400: walk every header of an already opened pilots ini and file
-// each *Block section / [Pilot] into its map. Returns true (retail AL = 1).
+// each *Block section / [Pilot] into its map. Always returns true.
 bool __cdecl LoadPilotPersonalities(INI_Reader* Reader);
 
 // FUN_06f3a040: erase every entry of the seventeen maps.

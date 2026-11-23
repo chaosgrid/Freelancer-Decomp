@@ -12,16 +12,11 @@
 
 // alchemy.dll -- the keyed ramps (see "Keyed ramps" in alchemy_types.h for the five
 // retail classes and their interfaces), the IAnimatedSingle weight helper and the
-// IAnimatedTransform composer.
-//
-// ALC-2 (2026-09-26): the single FFxRampObject that used to stand in for FxRampSingle,
-// FxRampColor, FxRampSingleRamp and FxRampColorRamp (with a port-only ValueKind_ tag, a
-// hermite sampler none of the four has, and a SetKey that copied raw bytes) is gone. Each
-// retail vtable now has its own class below, ported from that vtable's own slot bodies.
+// IAnimatedTransform composer. Each retail vtable has its own class below.
 namespace AlchemyImpl
 {
-    // GetKeyFactoryName on the flat ramps: `MOV EAX,0xfffffff9; RET 8` (06209130 single,
-    // 062097b0 colour) -- a flat ramp has no key objects to create.
+    // GetKeyFactoryName on the flat ramps (06209130 single, 062097b0 colour): a flat ramp
+    // has no key objects to create.
     static const GENRESULT kRampNoKeyFactory = static_cast<GENRESULT>(0xFFFFFFF9);
 
     // The key container every ramp embeds at +8: {vptr, Data (+4), ?, LastIndex (+0xC,
@@ -62,9 +57,8 @@ namespace AlchemyImpl
         }
 
         // Insertion point of AddKey (06208c90, 062098e0, 06209310, 06207650, 06207e00,
-        // 06206ea0): the first key whose time is greater than Time. `FLD Time; FCOMP key;
-        // TEST AH,5; JNP` leaves the scan only on "less", so equal and unordered keep
-        // scanning and a new key lands after keys of the same time.
+        // 06206ea0): the first key whose time is greater than Time. Equal and unordered
+        // keep scanning, so a new key lands after keys of the same time.
         int UpperBound(float Time) const
         {
             int Index = 0;
@@ -116,16 +110,10 @@ namespace AlchemyImpl
 
         // SetKeyTime's reorder, one algorithm in all five classes (06208e40, 062094c0,
         // 062078c0, 06208130, 06207110). Returns the key's new index.
-        //   `FCOM Old; AND 0x4100; JNZ`: only NewTime > Old (ordered) goes forward.
-        //   Forward: last key, or NewTime <= next (TEST AH,0x41 / JNP; unordered moves) ->
-        //     write the time in place. Otherwise scan from Index + 1 while the key is not
-        //     greater than NewTime (TEST AH,5 / JNP leaves on "less"), counting up.
-        //   Backward: `TEST AH,5; JP` -- equal and unordered leave the array untouched.
-        //     First key, or NewTime >= previous (AND 0x100 / JZ; unordered moves) -> in
-        //     place. Otherwise scan down from Index - 1 while NewTime is not greater than
-        //     the key (AND 0x4100 / JZ leaves on "greater"), counting down.
-        //   Move: erase the key, insert {NewTime, value} at the new index (after equal
-        //     times going forward, before them going backward). The insert never grows.
+        //   Only NewTime > Old (ordered) goes forward; equal and unordered leave the array
+        //   untouched. A neighbour test that is unordered moves the key. A moved key lands
+        //   after equal times going forward, before them going backward. The insert never
+        //   grows.
         int Reposition(int Index, float NewTime)
         {
             const float OldTime = Data_[Index].Time;
@@ -168,9 +156,8 @@ namespace AlchemyImpl
 
     private:
         // FUN_0620c300's growth: when Count + 1 exceeds Capacity, the new capacity is
-        // Count + max(1, ftol(Count * 0.1f)) (`FILD count; FMUL DAT_0624bdc0 (0.1f)` on
-        // the x87 stack, hence the double product here), and the old buffer (Capacity
-        // keys) is copied over and freed (FUN_0620c3d0).
+        // Count + max(1, ftol(Count * 0.1f)) (DAT_0624bdc0, multiplied on the x87 stack),
+        // and the old buffer (Capacity keys) is copied over and freed (FUN_0620c3d0).
         void Grow()
         {
             const int CurrentCount = LastIndex_ + 1;
@@ -408,11 +395,11 @@ namespace AlchemyImpl
         typedef IRampSingleRamp FInterface;
         typedef IRampSingle FChild;
         static const char* Iid() { return Iids::RampSingleRamp; }
-        // 06209b40: *Out = "FxRampSingle".
+        // 06209b40.
         static const char* KeyFactoryName() { return "FxRampSingle"; }
-        // 06207740: `CALL [child_vtable + 0x1c]` with (child, InnerTime).
+        // Child slot +0x1c.
         static double EvalChild(IRampSingle* Child, float Time) { return Child->Eval(Time); }
-        // 06207530: `CALL [copy_vtable + 0x10]` with (copy, source).
+        // Child slot +0x10.
         static void CopyChild(IRampSingle* Dst, IRampSingle* Src) { Dst->CopyFrom(Src); }
     };
 
@@ -421,11 +408,11 @@ namespace AlchemyImpl
         typedef IAnimatedSingleRamp FInterface;
         typedef IFxAnimatedSingle FChild;
         static const char* Iid() { return Iids::AnimatedSingleRamp; }
-        // 06209b60: *Out = "FxAnimatedSingle".
+        // 06209b60.
         static const char* KeyFactoryName() { return "FxAnimatedSingle"; }
-        // 06206f90: `CALL [child_vtable + 0x28]` with (child, InnerTime).
+        // Child slot +0x28.
         static double EvalChild(IFxAnimatedSingle* Child, float Time) { return Child->Eval(Time); }
-        // 06206d80: `CALL [copy_vtable + 0x10]` with (copy, source).
+        // Child slot +0x10.
         static void CopyChild(IFxAnimatedSingle* Dst, IFxAnimatedSingle* Src) { Dst->CopyFrom(Src); }
     };
 
@@ -475,26 +462,21 @@ namespace AlchemyImpl
     // then ICOManager +0x0C CreateInstance({8, Name}, Out); its result is returned as-is.
     GENRESULT CreateRampKeyValue(const char* Name, IDAComponent** Out);
 
-    // The descriptor / property builders' ramp helpers:
-    //   FUN_06208bc0(Value, Out): new FxRampSingle, SetMode(4), AddKey(0, &Value).
-    //   FUN_06209240(Rgb, Out):   new FxRampColor,  SetMode(4), AddKey(0, Rgb).
-    //   FUN_06210900(Weight, Out): new FxAnimatedSingleRamp holding one FxAnimatedSingle
-    //     (SetWeight(Weight)) at time 0; the local child reference is released.
-    // Each hands its construction reference to *Out, as retail does.
+    // The descriptor / property builders' one-key ramp helpers (FUN_06208bc0,
+    // FUN_06209240, FUN_06210900). Each hands its construction reference to *Out, as
+    // retail does.
     void MakeRampSingle(float Value, IRampSingle** Out);
     void MakeRampColor(const float* Rgb, IRampColor** Out);
     void MakeAnimatedSingleRamp(float Weight, INestedSingleRamp** Out);
-    // FUN_06208bc0 + a fresh FxRampSingleRamp (FUN_06207490 / FUN_06210860 + vtable
-    // 0x0624bb18) + AddKey(0, child) + release of the local child: the one-key nested
-    // scalar ramp every descriptor builder repeats inline (062324a3..06232516 and twins).
+    // The one-key nested scalar ramp every descriptor builder repeats inline (e.g. at
+    // 062324a3).
     void MakeRampSingleRamp(float Value, INestedSingleRamp** Out);
-    // The same with FUN_06209240 under a fresh FxRampColorRamp (06232408..06232493).
+    // The colour twin (e.g. at 06232408).
     void MakeRampColorRamp(const float* Rgb, IRampColorRamp** Out);
 
-    // FFxAnimatedTransform: the IAnimatedTransform component (alchemy_types.h
-    // has the full disassembly trace for the interface shape/vtable
-    // 0x0624bbb8). Retail composes an animated Translate(3)+Rotate(3)+Scale(3)
-    // from 9 fixed per-channel FxAnimatedSingleRamp children.
+    // FFxAnimatedTransform (vtable 0x0624bbb8; interface in alchemy_types.h): composes an
+    // animated Translate(3)+Rotate(3)+Scale(3) from 9 fixed per-channel
+    // FxAnimatedSingleRamp children.
     class FFxAnimatedTransform final : public IAnimatedTransform
     {
     public:
@@ -535,31 +517,27 @@ namespace AlchemyImpl
         unsigned long DACOM_API AddRef() override { return ++RefCount_; }
         unsigned long DACOM_API Release() override;
 
-        // +0xC FUN_062436a0: see IAnimatedTransform's class comment for the
-        // full trace. Rebuilds every channel to a fresh single default key
-        // (Weight = kChannelDefaults[i]) and force-sets ChannelFlags=0x1FF.
+        // +0xC FUN_062436a0: rebuilds every channel to a single default key and sets
+        // ChannelFlags = 0x1FF.
         GENRESULT DACOM_API Reset() override;
 
-        // +0x10 LAB_06243770: see IAnimatedTransform's class comment for the
-        // full trace: per channel Children_[i]->CopyFrom(Other's child), then
-        // PackedModes/ChannelFlags.
+        // +0x10 LAB_06243770.
         GENRESULT DACOM_API CopyFrom(IAnimatedTransform* Other) override;
 
-        // +0x14 LAB_06243830: `*Out = Children_[Index]; (*Out)->AddRef();`
+        // +0x14 LAB_06243830.
         GENRESULT DACOM_API GetChild(unsigned long Index, IDAComponent** Out) override;
 
-        // +0x18 FUN_06243850: see IAnimatedTransform's class comment for the
-        // full byte trace of this genuinely subtle algorithm.
+        // +0x18 FUN_06243850.
         GENRESULT DACOM_API UpdateChannelFlags() override;
 
-        // +0x1C LAB_062439b0: *Out = [+8], returns 0.
+        // +0x1C LAB_062439b0.
         GENRESULT DACOM_API GetChannelFlags(unsigned long* Out) override
         {
             *Out = ChannelFlags_;
             return GR_OK;
         }
 
-        // +0x20 LAB_062439d0: `return ChannelFlags_ == 0x1FF;`
+        // +0x20 LAB_062439d0.
         unsigned char DACOM_API IsIdentity() override
         {
             return ChannelFlags_ == 0x1FFu ? 1 : 0;
@@ -585,18 +563,15 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // +0x2C LAB_06243a60: see the body in alchemy_ramp.cpp.
+        // +0x2C LAB_06243a60.
         void DACOM_API Evaluate(unsigned long TimeA, unsigned long TimeB, float* Out12) override;
 
-        // +0x30 LAB_06243690: always-success 1-arg stub, no observable
-        // retail behavior beyond returning GR_OK.
+        // +0x30 LAB_06243690: returns 0, no side effect.
         GENRESULT DACOM_API Slot0x30(unsigned long /*Arg*/) override { return GR_OK; }
 
     private:
         static const unsigned long kChannelCount = 9;
-        // Translate X/Y/Z, Rotate X/Y/Z (degrees), Scale X/Y/Z -- read
-        // directly from retail's DAT_062575e8 (alchemy.dll.txt:180638-180672,
-        // 9 dwords: 0,0,0,0,0,0,0x3f800000,0x3f800000,0x3f800000).
+        // Translate X/Y/Z, Rotate X/Y/Z (degrees), Scale X/Y/Z: DAT_062575e8.
         static const float kChannelDefaults[kChannelCount];
 
         // FUN_06243c50 (thiscall on the 3x3 block of Out12): the rotation from three

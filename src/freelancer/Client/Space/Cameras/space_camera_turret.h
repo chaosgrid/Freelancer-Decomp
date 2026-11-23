@@ -9,8 +9,7 @@
 // Retail turret camera: the object at in-flight-controller + 0x3c8, vtable .rdata 0x005dbcc4,
 // ctor 0x0051a210, size 0x138 (the gap to the rear-view camera at + 0x500).
 //
-// Like the rear-view camera this one is small enough to port end to end: the constructor plants
-// every default, and the ini loader reads four keys and nothing else. Its own vtable slots are
+// The ini loader reads four keys and nothing else. Its own vtable slots are
 // 0x54 (the name), 0x58 (0x0051a6a0, the attach), 0x64 (0x0051a640) and 0x6c (0x0051a730); the
 // rest it shares with the other cockpit cameras. Its secondary input vptr is 0x005dbcb8, whose
 // single method is 0x0051ac20 -- its own, unlike the rear-view camera which reuses HUDCamera's.
@@ -40,7 +39,7 @@ struct FTurretCamera : FHudCamera
     float KeyRotateRate;              // +0x124  0.75f, no ini key reaches it
     float YawRotateSpeed;        // +0x128  [TurretCamera] yaw_rotate_speed,   default 2.0
     float PitchRotateSpeed;      // +0x12c  [TurretCamera] pitch_rotate_speed, default 1.5
-    float AccelSpeed;            // +0x130  [TurretCamera] accel_speed,        default 5.0 (0x0051a277)
+    float AccelSpeed;            // +0x130  [TurretCamera] accel_speed,        default 5.0
     float MouseAimTime;          // +0x134  FUN_0051a7d0's mouse-aim clock (frame time summed while
                                  //         mouse flight steers; zeroed when it does not). The
                                  //         retail ctor never touches it.
@@ -54,9 +53,8 @@ static_assert(offsetof(FTurretCamera, YawRotateSpeed) == 0x128, "TC +0x128");
 static_assert(offsetof(FTurretCamera, PitchRotateSpeed) == 0x12c, "TC +0x12c");
 static_assert(offsetof(FTurretCamera, AccelSpeed) == 0x130, "TC +0x130");
 
-// FUN_0051a210. Chains to the HUDCamera ctor, then plants the defaults; note that it writes the
-// tether's Z first (0x41c80000) and only then X and Y, and that +0x124 gets 0.75f while no ini
-// key can ever change it.
+// FUN_0051a210. Chains to the HUDCamera ctor, then plants the defaults (+0x124 gets 0.75f, which
+// no ini key can change).
 void TurretCameraConstruct(FTurretCamera* Cam);
 
 // Slot 0x54 (0x0051a2a0): the class name, a plain .rdata literal.
@@ -71,7 +69,7 @@ bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId);
 // Slot 0x64 (FUN_0051a640): register the face for 0x32..0x36, then HUDCamera's activate.
 bool TurretCameraActivate(FTurretCamera* Cam, const int* ViewRect4);
 
-// FUN_0051a7d0 (thiscall RET 0xc): the turret view -- the watched ship's orientation turned by
+// FUN_0051a7d0: the turret view -- the watched ship's orientation turned by
 // the eased yaw (+0x10c) and pitch (+0x114), shaken, and the tether (+0x100) through it onto the
 // ship's position, into Out12 = {3x3, position}. The targets (+0x110/+0x118) move by the key
 // rates (+0x11c/+0x120) or, after 0.25s of left-button / locked mouse flight, by the cursor's
@@ -87,6 +85,6 @@ void TurretCameraAttach(FTurretCamera* Cam, void* Object);
 // HUDCamera's update.
 void TurretCameraUpdate(FTurretCamera* Cam, float DeltaSeconds);
 
-// FUN_0051a2b0, a __thiscall taking the cockpit ini path. Reads [TurretCamera] and warns about
+// FUN_0051a2b0, taking the cockpit ini path. Reads [TurretCamera] and warns about
 // the obsolete [Turret] section. Returns false when the file could not be opened.
 bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath);

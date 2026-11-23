@@ -21,8 +21,8 @@ struct FLootProps
 {
     ID_String Nickname;                                       // +0x00 CreateID(nickname)
     float DropChance;                                        // +0x04 drop_properties[0] * 0.01
-    // +0x08..+0x18: drop_properties[1..5] as read (get_value_int).
-    // TODO: meaning of each value is set by the readers (FUN_06f5d14f area, TU53).
+    // +0x08..+0x18: drop_properties[1..5] as read. TODO: meaning of each value (readers
+    // around FUN_06f5d14f, TU53).
     int DropProperties[5];
 };
 static_assert(sizeof(FLootProps) == 0x1c, "retail mLootProps record is 0x1c bytes");

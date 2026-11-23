@@ -34,8 +34,8 @@ struct FApproach2Base
     virtual bool IsPlaying();
     virtual bool ReturnFalse();
     virtual uint8_t GetError();
-    virtual void Nop24(); // formerly Slot24
-    virtual void Nop28(); // formerly Slot28
+    virtual void Nop24();
+    virtual void Nop28();
 
     FApproach2Base() {}
 };

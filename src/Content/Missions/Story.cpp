@@ -24,8 +24,7 @@
 namespace
 {
     // Retail DAT_06fced28, float[43] indexed by MissionNum. The Story ctor rewrites
-    // indices 5/9/12/15/18/21/24/27/30/33/36/39/42 (06ea5e59-06ea5ed1); the rest
-    // stay zero (.bss).
+    // indices 5/9/12/15/18/21/24/27/30/33/36/39/42; the rest stay zero (.bss).
     float GStoryRankThresholds[43] = {};
 
     // Retail DAT_06fcf388; Story save and load share this process-wide flag.
@@ -34,10 +33,9 @@ namespace
     // Retail DAT_06fcee14, last campaign controller created by Story.
     unsigned int GStoryMissionController = 0;
 
-    // FUN_06ea6900 builds its CreateParms at ESP+0x18 (vptr, PlayerId, StoryEvents) and
-    // copies GenericMission's second token into the adjacent local at ESP+0x24, which
-    // the GenericMission ctor reads as CreateParms+0xC. The adjacent buffer runs up to
-    // the INI_Reader::State local at ESP+0x60 (0x3c bytes).
+    // FUN_06ea6900 copies GenericMission's second token into the stack local right after its
+    // CreateParms, which the GenericMission ctor reads as CreateParms+0xC. That buffer runs
+    // up to the next local (0x3c bytes).
     struct FStoryOnLoadCreateParms final : pub::Controller::CreateParms
     {
         unsigned int PlayerId;
@@ -45,7 +43,7 @@ namespace
         char GenericMissionPath[0x3c];
     };
 
-    // Message 4 / 5 parameter blocks (HandleMessage 06ea6140 / 06ea6198).
+    // Message 4 / 5 parameter blocks.
     struct FStorySaveMessage
     {
         unsigned int PlayerId;
@@ -87,7 +85,7 @@ namespace
         char MissionName[0x20];
     };
 
-    // FUN_06ea5e10 (RET 8): (&ControllerId, CreateParms*).
+    // FUN_06ea5e10.
     FStory::FStory(unsigned int const* InControllerId,
                    pub::Controller::FStoryCreateParms const* Parms)
         : ControllerId(*InControllerId)
@@ -122,7 +120,7 @@ namespace
     // FUN_06ea5f60 / FUN_06ea5f80: vptr resets only, no members to release.
     FStory::~FStory() = default;
 
-    // FUN_06ea6d00 (RET 8).
+    // FUN_06ea6d00.
     void FStory::SetMissionChapter(unsigned int Chapter, unsigned int bAdvanceRank)
     {
         MissionNum = static_cast<int>(Chapter);
@@ -131,9 +129,8 @@ namespace
             SetContentPlayerMissionNumber(PlayerState, Chapter, bAdvanceRank);
     }
 
-    // Shared tail of FUN_06ea6c70 and the chapter 4/8/11/14/17 arms of LAB_06ea6280:
-    // FUN_06f48070 (FILD cash + FADD asset value) + FADD threshold, FST DeltaWorth,
-    // ftol of the unrounded sum -> SetMoneyNeededToNextRank.
+    // Shared tail of FUN_06ea6c70 and the chapter 4/8/11/14/17 arms of LAB_06ea6280
+    // (worth = FUN_06f48070). The x87 sum is truncated unrounded for the rank money.
     void FStory::SetNextRankWorth(FContentPlayerState* /*PlayerState*/, unsigned int Chapter)
     {
         int Cash = 0;
@@ -146,7 +143,7 @@ namespace
         pub::Player::SetMoneyNeededToNextRank(PlayerId, static_cast<int>(NewWorth));
     }
 
-    // Msg 0x35 body (06ea6237-06ea6278) and event 1 / chapter 23 (06ea6751-06ea6790).
+    // Inlined in message 0x35 and event 1 / chapter 23.
     void FStory::SetShipBoughtReputation()
     {
         bShipBought = true;
@@ -157,7 +154,7 @@ namespace
         pub::Reputation::SetReputation(VibeHandle, GroupId, -0.2f);
     }
 
-    // FUN_06ea6ba0 (RET 8).
+    // FUN_06ea6ba0.
     void FStory::StartMission(unsigned int Chapter, char const* NewMissionName)
     {
         strncpy(MissionName, NewMissionName, 0x20);
@@ -173,7 +170,7 @@ namespace
         pub::Controller::_SendMessage(GStoryMissionController, pub::Controller::EMessage::MissionStart, nullptr);
     }
 
-    // FUN_06ea6c70 (RET 8).
+    // FUN_06ea6c70.
     void FStory::FinishMission(unsigned int ControllerToDestroy, unsigned int NextChapter)
     {
         strcpy(MissionName, "No_Mission");
@@ -191,15 +188,14 @@ namespace
         SetNextRankWorth(PlayerState, NextChapter);
     }
 
-    // FUN_06ea5f90 (thiscall, no args).
+    // FUN_06ea5f90.
     void FStory::AdvanceMission()
     {
         FContentPlayerState* PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState == nullptr)
             return;
 
-        // FUN_06f48070 leaves cash + asset value on the FPU; FCOMP DeltaWorth,
-        // TEST AH,0x1 / JNZ: C0 set (worth below DeltaWorth) exits.
+        // Worth = FUN_06f48070 (x87); unordered does not exit.
         int Cash = 0;
         float AssetValue = 0.0f;
         pub::Player::InspectCash(PlayerId, Cash);
@@ -208,7 +204,7 @@ namespace
         if (CurrentWorth < static_cast<double>(DeltaWorth))
             return;
 
-        // FUN_06f487c0: [state+0xd8], the player's live mission controller.
+        // The player's live mission controller (FUN_06f487c0).
         if ((PlayerState->ValueD8 & 0x3fffffffu) != 0)
             return;
 
@@ -255,7 +251,7 @@ namespace
         }
     }
 
-    // LAB_06ea6280 (secondary vtable 06fb4270, RET 0xc).
+    // LAB_06ea6280 (secondary vtable 06fb4270).
     void FStory::OnMissionEvent(unsigned int EventKind, unsigned int Chapter,
                                 unsigned int ControllerToDestroy)
     {
@@ -333,7 +329,7 @@ namespace
         }
     }
 
-    // FUN_06ea6830 (RET 4).
+    // FUN_06ea6830.
     void FStory::OnSave(FILE* File)
     {
         fprintf(File, "[%s]\n", "StoryInfo");
@@ -347,7 +343,7 @@ namespace
         fprintf(File, "%s = %d\n", "debug", GStoryDebugFlag != 0 ? 1 : 0);
     }
 
-    // FUN_06ea6900 (RET 4).
+    // FUN_06ea6900.
     void FStory::OnLoad(INI_Reader* Reader)
     {
         INI_Reader::State SavedState;
@@ -415,13 +411,13 @@ namespace
         Reader->set_state(SavedState);
     }
 
-    // LAB_06ea6120 (vtable 06fb4274 slot 0, RET 8).
+    // LAB_06ea6120 (vtable 06fb4274 slot 0).
     void FStory::HandleMessage(pub::Controller::EMessage MessageId, void const* MessageParms)
     {
         switch (MessageId)
         {
         case pub::Controller::EMessage::PlayerWorthChanged:
-            // FCOMP -1.0 / TEST AH,0x44 / JNP: only the equal case exits.
+            // x87: unordered does not exit.
             if (DeltaWorth != -1.0f && MissionNum != 42 &&
                 *static_cast<unsigned int const*>(MessageParms) == PlayerId)
                 AdvanceMission();
@@ -454,7 +450,7 @@ namespace
 
 IDLL* CreateStory(char const* /*Name*/, unsigned int ControllerId, void const* Parms)
 {
-    // FUN_06eeec50: operator new(0x3c), then FUN_06ea5e10(&ControllerId, Parms).
+    // FUN_06eeec50.
     return new (std::nothrow) FStory(
         &ControllerId, static_cast<pub::Controller::FStoryCreateParms const*>(Parms));
 }

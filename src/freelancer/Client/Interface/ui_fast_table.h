@@ -9,8 +9,7 @@
 // Retail UIFastTable (RTTI .?AUUIFastTable@@ : BaseRichTextWin, vftable 0x005e511c + the
 // IDataViewOwner face 0x005e5110) and UIScrollTable (.?AUUIScrollTable@@ : UIFastTable, vftable
 // 0x005e524c + face 0x005e5240), plus the nested reference-counted row payload
-// UIFastTable::RefCounter. Source path in the listing: E:\FL\Scratch\Source\Client\Interface\
-// UIFastTable.cpp.
+// UIFastTable::RefCounter. Retail source: UIFastTable.cpp.
 //
 // A UIFastTable is ONE rich-text surface (the BaseRichTextWin image) laid out as a grid: every
 // cell keeps a source RenderDisplayList, and Relayout (slot 45) lays each cell's list into the
@@ -18,19 +17,13 @@
 // edges are draggable, rows can be selected / hovered, and tool tips can be keyed per column, row
 // or cell. UITable (ui_table.h) is the older sibling built from one BaseRichTextWin per cell.
 //
-// Factories: WINFACTORY<UIFastTable> DAT_0067d924 (static init LAB_0058f940 -> FUN_0058fac0
-// "UIFastTable", atexit LAB_0058f960; Create FUN_0058fb30 = operator_new(0x578) + FUN_0058c6e0 +
-// slot 9) and WINFACTORY<UIScrollTable> DAT_0067d8f8 (LAB_0058f970 -> FUN_0058fbd0
-// "UIScrollTable", atexit LAB_0058f990; Create FUN_0058fc40 = operator_new(0x58c) + FUN_0058c6e0
-// + the UIScrollTable vftables and five zeroed fields, then slot 9).
+// Factories: WINFACTORY<UIFastTable> DAT_0067d924 (static init LAB_0058f940; Create
+// FUN_0058fb30, operator new(0x578)) and WINFACTORY<UIScrollTable> DAT_0067d8f8 (static init
+// LAB_0058f970; Create FUN_0058fc40, operator new(0x58c)).
 //
-// UIFastTable vftable 0x005e511c overrides of BaseRichTextWin 0x005e459c:
-//   0 FUN_0058c9e0 (dtor FUN_0058ca00), 4 LAB_0058f3e0 HitTest, 5 LAB_0058e510 SetPosition,
-//   8 LAB_0058e470 SetTransform, 9 FUN_0058e000 Create, 11 FUN_0058e5a0 Update,
-//   13 LAB_0058eb30 Draw, 16 LAB_0058f210 MouseLeave, 19 LAB_0058f230 MouseEvent,
-//   45 FUN_0058d9d0 Relayout, 46 LAB_0058d8f0 GetToolTipHoverInfo.
-// UIScrollTable vftable 0x005e524c: 0 FUN_0058f4b0 (dtor FUN_0058f4d0 = the UIFastTable dtor
-//   inlined), 9 FUN_0058f7a0 Create, 23 LAB_0058f8b0 ProcessMessage; every other slot is UIFastTable's.
+// vftables: UIFastTable 0x005e511c overrides BaseRichTextWin's with the slots declared below
+// (slot 0 FUN_0058c9e0 scalar deleting dtor); UIScrollTable 0x005e524c overrides slots 0
+// (FUN_0058f4b0), 9 and 23, every other slot is UIFastTable's.
 //
 // Layout (after BaseRichTextWin's 0x488; the port keeps the members, not the VC6 containers):
 //   +0x488 Width, +0x48c Height (payload [0], [1])
@@ -66,8 +59,7 @@ class UiScroll;
 
 // Retail UIFastTable::RefCounter (RTTI .?AVRefCounter@UIFastTable@@). vftable 0x005cfd94 has one
 // slot, the scalar deleting destructor LAB_00467ef0; the destructor body FUN_00467ee0 only
-// restores the vftable. Layout: +0x00 vftable, +0x04 reference count. The constructor is always
-// inlined (0x005712a2: vftable, then +0x04 = 1).
+// restores the vftable. The constructor is always inlined.
 class UiFastTableRefCounter
 {
 public:
@@ -79,7 +71,7 @@ public:
     // slot 0 -- LAB_00467ef0 / FUN_00467ee0
     virtual ~UiFastTableRefCounter();
 
-    // Inlined in every pointer copy (0x0059043a, 0x00599a49): INC [obj+4].
+    // Inlined in every pointer copy.
     void AddRef()
     {
         ++RefCount;
@@ -119,8 +111,8 @@ public:
     UiFastTableRefPtr& operator=(UiFastTableRefPtr const& Other);
 
     // FUN_00575520 (RET 4) -- nothing when Raw is already held; otherwise the held object
-    // released (Release() inline, pointer = 0), Raw taken and AddRef'd when not null. Returns
-    // the held pointer. Callers: 0x00569648, 0x0056ecf6 (Raw = 0), 0x005711e1.
+    // released, Raw taken and AddRef'd when not null. Returns the held pointer. Callers: the
+    // intro pages.
     UiFastTableRefCounter* Assign(UiFastTableRefCounter* Raw);
 
     // FUN_00599a60 (thiscall): held object -> Release(), pointer = 0.
@@ -134,7 +126,7 @@ public:
 // exactly the implicit members over these three fields.
 struct FUiFastTableCell
 {
-    // Create's prototype cell (0x0058e120..0x0058e13c): two empty lists, byte 0.
+    // Create's prototype cell.
     FUiFastTableCell()
         : bSpanToEnd(0)
     {
@@ -148,7 +140,7 @@ struct FUiFastTableCell
 // One +0x4c0 element (12 bytes).
 struct FUiFastTableRow
 {
-    // Create's prototype row (0x0058e1c4..0x0058e1d9): {1, 1, 1, 0, null}.
+    // Create's prototype row.
     FUiFastTableRow()
         : bHoverable(1)
         , bSelectable(1)
@@ -158,8 +150,8 @@ struct FUiFastTableRow
     }
 
     // FUN_00590ab0 (construct-in-place): the three bytes and the handle are copied, GroupId is
-    // NOT -- it is written 0 (0x00590af2 MOV [ESI+4],EBX with EBX = 0). So every row a resize adds,
-    // and every row a reallocation moves, starts with GroupId 0.
+    // NOT -- it is written 0. So every row a resize adds, and every row a reallocation moves,
+    // starts with GroupId 0.
     FUiFastTableRow(FUiFastTableRow const& Other)
         : bHoverable(Other.bHoverable)
         , bSelectable(Other.bSelectable)
@@ -200,11 +192,11 @@ struct FUiFastTableEdges
 {
     // FUN_0058c370 (RET 4) -- the column edges as REG_BINARY "Columns" and the row edges as
     // "Rows" under Stack's top key (either skipped when its vector is empty). Always true.
-    // Callers: PageCharacterSelect (0x00567445), PageServerSelect FUN_0056daa0 (0x0056db95).
+    // Callers: PageCharacterSelect, PageServerSelect.
     bool SaveToRegistry(FRegKeyStack* Stack) const;
     // FUN_0058c470 (RET 4) -- read both values back when the second query returns the size the
     // first one reported (a failed query counts as size -1 both times); each vector is emptied,
-    // resized to size / 4 and filled. Always true. Callers: 0x00567b0b, 0x0056ea37.
+    // resized to size / 4 and filled. Always true.
     bool LoadFromRegistry(FRegKeyStack* Stack);
 
     std::vector<float> Rows;    // +0x00
@@ -215,28 +207,22 @@ struct FUiFastTableEdges
 // teardown the vector instantiation gives it.
 struct FUiFastTableTip
 {
-    // SetTipMode's prototype (0x0058d647..0x0058d677 and the two sibling blocks): caption buffer
-    // empty, the Font::String (FUN_004144b0), then FUN_004963a0 (key -1, IdsAlt 0, AuxField 0,
-    // live 0). Retail leaves +0x48..+0x5f (WorldPos, HalfExtents) as stack garbage and every
-    // copy inherits it; the port zeroes them.
+    // SetTipMode's prototype (three copies): then ToolTipHoverReset. Retail leaves +0x48..+0x5f
+    // (WorldPos, HalfExtents) as stack garbage and every copy inherits it; the port zeroes them.
     FUiFastTableTip();
 
-    // FUN_00590b40 (construct-in-place): key and IdsAlt, a deep copy of the caption (wcslen,
-    // malloc, wcsncpy), the Font::String copied member by member (its text deep-copied through
-    // FUN_004142a0, its child slots copied with an AddRef each through FUN_00591420 /
-    // FUN_00418f10), then AuxField, WorldPos, HalfExtents and the live byte.
+    // FUN_00590b40 (construct-in-place): a deep copy of the caption, the Font::String copied
+    // member by member (text deep-copied, child slots copied with an AddRef each), then the rest.
     FUiFastTableTip(FUiFastTableTip const& Other);
 
-    // FUN_00444ee0: the Font::String teardown (FUN_004144f0, the child releases, the child
-    // vector and text freed), then the caption freed.
+    // FUN_00444ee0.
     ~FUiFastTableTip();
 
     FToolTipHoverInfo Info;
 
 private:
-    // Retail's assignment (the inlined record copy around FUN_00590f30 in FUN_005908a0 /
-    // FUN_00590500) only runs when elements shift inside the vector; UIFastTable only ever
-    // erases the whole vector and grows it from empty (FUN_0058d5e0), so no shift happens.
+    // Retail's assignment only runs when elements shift inside the vector; UIFastTable only ever
+    // erases the whole vector and grows it from empty (SetTipMode), so no shift happens.
     FUiFastTableTip& operator=(FUiFastTableTip const&) = delete;
 };
 
@@ -361,9 +347,9 @@ public:
 
 protected:
     // The mouse ray scaled onto the table's z plane, then into table space through +0x504
-    // (0x0058e5d1..0x0058e61e, 0x0058e69f..0x0058e6ec, 0x0058f3ec..0x0058f448).
+    // (inlined three times in retail).
     FVector RayToLocal(float const* Ray) const;
-    // Draw's row highlight quad (0x0058ebf5..0x0058ecdf / 0x0058ecf2..0x0058eddc).
+    // Draw's row highlight quad (inlined twice in retail).
     void DrawRowQuad(unsigned long const* Rgba, unsigned Row) const;
 
 private:
@@ -372,17 +358,16 @@ private:
 };
 
 // +0x578: called (cdecl) with the context, ftol(scrollbar value) and the visible row count
-// (rows - fixed rows) whenever the scrollbar moves (ProcessMessage) and once when it is installed
-// (FUN_0058f740). The return value is not read.
+// (rows - fixed rows) whenever the scrollbar moves and once when it is installed. The return
+// value is not read.
 typedef void (*FUiScrollTableCallback)(void* Context, int FirstItem, unsigned VisibleRows);
 
 class UiScrollTable : public UiFastTable
 {
 public:
-    // FUN_0058fc40's inline construction after FUN_0058c6e0: +0x578, +0x584, +0x57c, +0x580,
-    // +0x588 = 0.
+    // Inlined into FUN_0058fc40.
     UiScrollTable();
-    // FUN_0058f4d0 -- nothing of its own; the UIFastTable teardown.
+    // FUN_0058f4d0 -- nothing of its own.
     ~UiScrollTable() override;
 
     // slot 9 FUN_0058f7a0 (RET 8)

@@ -48,22 +48,22 @@ namespace
 {
     char const kObjectDeformableCpp[] = "E:\\FL\\Scratch\\Source\\Client\\gf\\ObjectDeformable.cpp";
 
-    // DAT_00668848 (0x00668848..0x00668947, bss) -- FUN_00445720's result buffer; every exit
+    // DAT_00668848 (0x100 bytes, bss) -- FUN_00445720's result buffer; every exit
     // returns its address. That function is its only reader and writer.
     char G_BgcsContextBuffer[256];
 
     // DAT_00668948 (0x124 bytes) -- the body every "pc" character shares. The static
-    // initializer 0x00443e40 zeroes the instance and both four-entry arrays and registers an
-    // empty atexit (DAT_00443e80 is a bare RET); zero initialization here is that.
+    // initializer LAB_00443e40 zeroes the instance and both four-entry arrays and registers an
+    // empty atexit; zero initialization here is that.
     FCharacterLodSet G_SharedCharacterLod;
 
     void* const kNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 
-    // FUN_00443b60 (thiscall on Set, RET 4) -- build Set's deformable from the four bodyparts
+    // FUN_00443b60 (thiscall on Set) -- build Set's deformable from the four bodyparts
     // (0 body, 1 head, 2 left hand, 3 right hand) and read back its LOD switch table.
     void BuildCharacterDeformable(FCharacterLodSet* Set, bodypart const* const* BodyParts)
     {
-        // 0x00443b6e..0x00443b9d: "low_character_lod" sets Flags bit 1 (Deformable2 skips LOD 0)
+        // "low_character_lod" sets Flags bit 1 (Deformable2 skips LOD 0)
         // and raises the LOD limit of the non-first parts from 2 to 3.
         unsigned long PartFlags = 0;
         unsigned long ChildLodLimit = 2;
@@ -73,7 +73,6 @@ namespace
             ChildLodLimit = 3;
         }
 
-        // 0x00443b9f..0x00443bc1: the four entries {0, 0, 0, 0, 0, -1}.
         FDeformPartDesc Entries[4];
         int Index = 0;
         for (Index = 0; Index < 4; ++Index)
@@ -86,9 +85,8 @@ namespace
             Entries[Index].LodLimit = 0xFFFFFFFFu;
         }
 
-        // 0x00443bc3..0x00443c79: one entry per bodypart with a mesh: its full file name, the
-        // sixteen LOD slots with FileSystem and Name zeroed (Deformable2 then opens the part by
-        // Path), LodCount 16.
+        // One entry per bodypart with a mesh; with FileSystem and Name zeroed Deformable2 opens
+        // the part by Path.
         FDeformLodDesc LodSlots[4][16];
         char Paths[4][0x400];
         int Count = 0;
@@ -113,7 +111,6 @@ namespace
             ++Count;
         }
 
-        // 0x00443c7f..0x00443c95: the table header {Count, Entries}.
         struct FDeformPartTable
         {
             int Count;
@@ -124,8 +121,7 @@ namespace
         Table.Entries = Entries;
         RefreshLoadingProgress();
 
-        // 0x00443c97..0x00443ce5: a material-library reference per bodypart mesh
-        // (FUN_0041aa50(mesh, 1, -1)) while the body loads.
+        // A material-library reference per bodypart mesh (FUN_0041aa50) while the body loads.
         Archetype::FCliMaterialEntry* Materials[4];
         for (Index = 0; Index < 4; ++Index)
         {
@@ -137,12 +133,10 @@ namespace
         }
         RefreshLoadingProgress();
 
-        // 0x00443ce9..0x00443d04: IDeformable slot 3 into Set +0x00.
         DALib::Deform->Create(&Set->Instance, reinterpret_cast<int*>(&Table), nullptr, nullptr,
                               nullptr);
         RefreshLoadingProgress();
 
-        // 0x00443d09..0x00443d2d: the references released (FUN_0041b030).
         for (Index = 0; Index < 4; ++Index)
         {
             bodypart const* const Part = BodyParts[Index];
@@ -152,7 +146,7 @@ namespace
         }
         RefreshLoadingProgress();
 
-        // 0x00443d31..0x00443e25: per bodypart, the LOD count the part came back with and each
+        // Per bodypart, the LOD count the part came back with and each
         // LOD's switch distance (DetailSwitchTable::get_switch_distance(fraction * 100.0)); the
         // last one is the table's distance at 0. A part without a mesh gets 0 and no table.
         int EntryIndex = 0;
@@ -182,7 +176,7 @@ namespace
         }
     }
 
-    // The dealer screen a role opens (0x00445ce1..0x00445d1e and LAB_00445d30): 2 -> 5,
+    // The dealer screen a role opens (inlined in FUN_00445c10 and LAB_00445d30): 2 -> 5,
     // 3 -> 7, 4 -> 8 (NavBarOpenButton, FUN_00442200); the bartender (1) and no role open
     // nothing.
     void OpenRoleDealer(int Role)
@@ -204,7 +198,7 @@ namespace
         OpenRoleDealer(static_cast<FCharacterObject*>(A)->Role);
     }
 
-    // FUN_00437020 (thiscall on the bucket, RET 4) -- the first node whose behaviour has Key,
+    // FUN_00437020 (thiscall on the bucket) -- the first node whose behaviour has Key,
     // or null.
     MetaNode<ScriptBehavior>* FindBehaviorNode(TMirrorPropertyBucket<ScriptBehavior>* Bucket,
                                                 unsigned Key)
@@ -228,8 +222,7 @@ FCharacterDesc::FCharacterDesc()
     , PlacementIndex(-1)
     , bScriptSpatial(0)
 {
-    // FUN_00443a90: CharacterProperties constructed (the member), +0x64 = 0, +0x6c = 0,
-    // +0x68 = -1, +0x70..+0x78 = 0, +0x7c / +0x8c / +0x9c = 1.0 and the rest of the matrix 0.
+    // FUN_00443a90.
     Pos.x = 0.0f;
     Pos.y = 0.0f;
     Pos.z = 0.0f;
@@ -238,7 +231,7 @@ FCharacterDesc::FCharacterDesc()
 
 FCharacterDesc::~FCharacterDesc()
 {
-    // FUN_00443b10: CharacterProperties::destroy, then ~CharacterProperties (the member).
+    // FUN_00443b10.
     Props.destroy();
 }
 
@@ -254,26 +247,24 @@ FCharacterHotspot::FCharacterHotspot()
 
 FCharacterHotspot::~FCharacterHotspot()
 {
-    // FUN_00444960: vptr, then JMP FUN_00555ea0 (~FHotspot).
+    // FUN_00444960 (then ~FHotspot, FUN_00555ea0).
 }
 
 void FCharacterHotspot::UpdateScreenRect(ICamera* Camera)
 {
-    // FUN_00555f60. 0x00555f66..0x00555f96: the owner's engine instance position.
+    // FUN_00555f60.
     float const* const Where = DALib::Engine->GetInstancePosition(Character->GetEngineInstance());
     Vector Center;
     Center.x = Where[0];
     Center.y = Where[1];
     Center.z = Where[2];
 
-    // 0x00555f97..0x00555fc3: get_projected_bounding_sphere(Camera, Center, 1.0, x, y, r, z).
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
     float Radius = 0.0f;
     float Depth = 0.0f;
     if (get_projected_bounding_sphere(Camera, Center, 1.0f, ScreenX, ScreenY, Radius, Depth) == 0)
     {
-        // 0x0055606b..0x00556083.
         bOffscreen = 1;
         ScreenRect.Left = 0;
         ScreenRect.Top = 0;
@@ -282,8 +273,7 @@ void FCharacterHotspot::UpdateScreenRect(ICamera* Camera)
         return;
     }
 
-    // 0x00555fc9..0x0055605b: floor(v + 0.5) of x - 0.6r (the 0.6f constant widened, 0x005e1220),
-    // y - r, r * 1.2f (0x005c9800) and r + r.
+    // The float constants 0.6f (0x005e1220) and 1.2f (0x005c9800) are widened to double.
     bOffscreen = 0;
     int const Left = static_cast<int>(floor(static_cast<double>(ScreenX) -
                                             static_cast<double>(Radius) *
@@ -325,7 +315,7 @@ FCharacterObject::FPartCacheEntry::~FPartCacheEntry()
 FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& Desc)
     : FRoomObject(InOwner)
 {
-    // FUN_00443ed0. 0x00443f00..0x00443f1c: +0x30 = 0, the four counts and the four tables 0.
+    // FUN_00443ed0.
     Lod.Instance = nullptr;
     int Index = 0;
     for (Index = 0; Index < 4; ++Index)
@@ -333,21 +323,16 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
         Lod.Counts[Index] = 0;
         Lod.Tables[Index] = nullptr;
     }
-    // 0x00443f1e..0x00443f74: CharacterProperties, the eight HardpointSummaries, +0x304 and the
-    // five part slots (the members). 0x00443f7f..0x00443fab: +0x2f4 = +0x300 = +0x1b8 = 0,
-    // +0x1c0..+0x1cc = -1.
     Hotspot = nullptr;
     Role = 0;
     Placement = nullptr;
     for (Index = 0; Index < 4; ++Index)
         LodIds[Index] = -1;
-    // 0x00443fb1..0x00443fdd: each accessory -1 and its summary cleared.
     for (Index = 0; Index < kMaxAccessories; ++Index)
     {
         AccessoryInstances[Index] = -1;
         AccessoryHardpoints[Index].clear();
     }
-    // 0x00443fdf..0x0044402e.
     AccessoryCount = 0;
     bHovered = 0;
     DisplayName = nullptr;
@@ -360,27 +345,24 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
     ActiveAims = 0;
     bPoseDirty = 0;
     bHasLastPose = 0;
-    // 0x00444034.
     Load(Desc);
 }
 
 FCharacterObject::~FCharacterObject()
 {
-    // FUN_004440c0. 0x004440e6..0x00444118: still taken over by a script.
+    // FUN_004440c0.
     if (ScriptState == 1)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kObjectDeformableCpp, 0x175,
               "Character is being destroyed while still scripted, GAME IS ABOUT TO CRASH!!!\n");
     }
-    // 0x0044411b..0x00444141: the own script forgotten (not destroyed) and its name freed.
+    // The own script is forgotten, not destroyed.
     if (OwnScript != nullptr)
     {
         OwnScript = nullptr;
         bOwnScriptPlaying = 0;
         malloc_strfree(&OwnScriptName);
     }
-    // 0x00444144..0x00444196: every accessory instance destroyed (IEngine slot 24) and its
-    // summary destroyed.
     int Index = 0;
     for (Index = 0; Index < AccessoryCount; ++Index)
     {
@@ -392,12 +374,10 @@ FCharacterObject::~FCharacterObject()
         AccessoryHardpoints[Index].destroy();
     }
     AccessoryCount = 0;
-    // 0x0044418f..0x004441bb.
     malloc_wstrfree(&DisplayName);
     Hardpoints.destroy();
     Props.destroy();
-    // 0x004441c1..0x004441fc: an own body is destroyed (IDeformable slot 6); the shared one
-    // is left alone.
+    // An own body is destroyed; the shared one is left alone.
     if (bSharedDeform == 0)
     {
         if (Lod.Instance != nullptr)
@@ -409,20 +389,17 @@ FCharacterObject::~FCharacterObject()
             Lod.Tables[Index] = nullptr;
         }
     }
-    // 0x004441fe..0x0044420e: the hotspot through its deleting destructor.
     if (Hotspot != nullptr)
     {
         delete Hotspot;
         Hotspot = nullptr;
     }
-    // 0x00444214..0x0044426a: the members (FUN_00444080 x5, ~HardpointSummary, x8,
-    // ~CharacterProperties) and FUN_005594b0.
+    // The members' destructors and ~FRoomObject (FUN_005594b0) follow.
 }
 
 void FCharacterObject::Load(FCharacterDesc const& Desc)
 {
-    // FUN_00444290. 0x004442ae..0x004442fa: the record, placement and index; a "pc" record
-    // (+0x1c == 1) shares the one body.
+    // FUN_00444290. A "pc" record (+0x1c == 1) shares the one body.
     RefreshLoadingProgress();
     Props = Desc.Props;
     Placement = Desc.Placement;
@@ -430,7 +407,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     bSharedDeform = (Props.CharType == 1) ? 1 : 0;
     Role = 0;
 
-    // 0x00444300..0x004443af: the role from the placement's setpoint segment.
+    // The role from the placement's setpoint segment.
     if (Placement != nullptr)
     {
         SetpointProperties Setpoint;
@@ -445,8 +422,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
             Role = 4;
     }
 
-    // 0x004443b5..0x00444434: the four bodyparts (the head is costume part 0, the body part
-    // 1) and the accessories.
+    // The head is costume part 0, the body part 1.
     CostumeDescriptions const* const Descs = GetCostumeDescriptions();
     bodypart const* BodyParts[4];
     BodyParts[1] = Descs->find_bodypart(1, Props.Cost.PartIds[0]);
@@ -458,8 +434,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     for (Index = 0; Index < static_cast<int>(Props.Cost.AccessoryCount); ++Index)
         Accessories[Index] = Descs->find_accessory(Props.Cost.AccessoryIds[Index]);
 
-    // 0x00444436..0x004444c1: the body -- built for this character, or the shared one (built
-    // the first time) copied in.
+    // The body -- built for this character, or the shared one (built the first time) copied in.
     if (bSharedDeform == 0)
     {
         BuildCharacterDeformable(&Lod, BodyParts);
@@ -479,8 +454,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         }
     }
 
-    // 0x004444c3..0x00444527: with a root bone, the pose (IDeformable slots 19 / 20) and the
-    // height (slot 3, with the position's y).
+    // With a root bone, the pose and the height (RoomObject slot 3 with the position's y).
     int Bone = -1;
     DALib::Deform->GetFirstBone(Lod.Instance, &Bone);
     if (Bone != -1)
@@ -489,14 +463,12 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         SetFloat1C(Desc.Pos.y);
         DALib::Deform->SetPoseOri(Lod.Instance, const_cast<Matrix*>(&Desc.Orient));
     }
-    // 0x0044452a..0x0044453b.
     Hardpoints.analyze_instance(Bone);
     RefreshLoadingProgress();
 
-    // 0x00444541..0x0044474a: each accessory with a mesh: its material libraries as {name, -1}
-    // pairs, the mesh loaded (FUN_0041c540, the material entries into RoomObject +0x20), its
-    // hardpoints analysed, and its AccessoryHardpoint connected to the body's
-    // CharacterHardpoint (IHardpoint slot 6) when both exist.
+    // Each accessory with a mesh: loaded (FUN_0041c540, the material entries into RoomObject
+    // +0x20) and its AccessoryHardpoint connected to the body's CharacterHardpoint (IHardpoint
+    // slot 6) when both exist.
     for (Index = 0; Index < static_cast<int>(Props.Cost.AccessoryCount); ++Index)
     {
         accessory const* const Found = Accessories[Index];
@@ -546,16 +518,13 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
                                                     &AccessoryKey);
             }
         }
-        // 0x004446ff..0x00444723: the pair list's buffer.
         delete[] Paths.Begin;
     }
 
-    // 0x00444750..0x0044475c.
     AccessoryCount = static_cast<int>(Props.Cost.AccessoryCount);
     RefreshLoadingProgress();
 
-    // 0x00444762..0x004447e2: the hotspot, owned by and answering to this character; enabled
-    // only with a behaviour or a role (FUN_00445a60, inlined).
+    // The hotspot is enabled only with a behaviour or a role (FUN_00445a60, inlined).
     Hotspot = new FCharacterHotspot();
     Hotspot->Character = this;
     Hotspot->bEnabled = 1;
@@ -563,15 +532,15 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     Hotspot->Cookie = 0;
     UpdateHotspotEnabled();
 
-    // 0x004447e2..0x00444808: the name -- the record's ids (FUN_0041c770), else its wide name.
+    // The record's ids (FUN_0041c770), else its wide name.
     DisplayName = nullptr;
     if (Props.NameIds != 0)
         MiscUtilLoadIdsCopy(&DisplayName, Props.NameIds);
     else
         malloc_wstrcpy(&DisplayName, Props.NameWide);
 
-    // 0x0044480b..0x004448b2: no self-update until the room starts it; the idle script
-    // (+0x1ac) becomes the own script unless it already is.
+    // No self-update until the room starts it; the idle script (+0x1ac) becomes the own script
+    // unless it already is.
     bNoUpdate = 1;
     unsigned char const bSpatial = Desc.bScriptSpatial;
     char const* const IdleScript = Props.Script;
@@ -599,16 +568,13 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         }
     }
 
-    // 0x004448b9..0x00444919: the script run on by one full step, then by a random fraction
-    // (rand() / 32768, DAT_005caeec) when that is above 0 (`TEST AH,0x41` + JNZ: not greater
-    // skips).
+    // One full step, then a random fraction (rand() / 32768, DAT_005caeec) when it is above 0.
     if (OwnScript != nullptr)
         OwnScript->AdvanceCurrent(1.0f);
     float const Random = static_cast<float>(rand()) * 3.0517578125e-05f;
     if (OwnScript != nullptr && Random > 0.0f)
         OwnScript->AdvanceCurrent(Random);
 
-    // 0x0044491e..0x00444925.
     RenderMode = 0;
     LightGroup = 0;
     Layer = 0;
@@ -632,13 +598,13 @@ void FCharacterObject::SetFloat1C(float Value)
 
 void FCharacterObject::Update(double DeltaSeconds)
 {
-    // LAB_004449d0. 0x004449ef..0x00444a0f: the OBJECTS and CHARACTERS options.
+    // LAB_004449d0.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptCharacters) == 0)
         return;
 
-    // 0x00444a15..0x00444a2f: a script let go of the character -- its own script again, and
+    // A script let go of the character -- its own script again, and
     // no self-update.
     if (ScriptState == 2)
     {
@@ -647,8 +613,7 @@ void FCharacterObject::Update(double DeltaSeconds)
         bNoUpdate = 1;
     }
 
-    // 0x00444a33..0x00444b07: the instance's pose; a pose other than last frame's (compared
-    // dword by dword, CMPSD) marks the pose dirty.
+    // A pose other than last frame's (compared bitwise, dword by dword) marks the pose dirty.
     float Pos[3];
     memcpy(Pos, DALib::Engine->GetInstancePosition(GetEngineInstance()), sizeof(Pos));
     float Orient[9];
@@ -662,8 +627,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     memcpy(LastOrient, Orient, sizeof(Orient));
     bHasLastPose = 1;
 
-    // 0x00444b0e..0x00444b6a: with motions, aims or a dirty pose, the mixer walked
-    // (IAnimation2 slot 27) and the instance updated (IEngine slot 27) by the frame time.
+    // IAnimation2 slot 27 and IEngine slot 27.
     if (ActiveMotions != 0 || ActiveAims != 0 || bPoseDirty != 0)
     {
         float const Time = static_cast<float>(DeltaSeconds);
@@ -675,14 +639,14 @@ void FCharacterObject::Update(double DeltaSeconds)
         DALib::Engine->UpdateInstance(GetEngineInstance(), 0, TimeArg);
     }
 
-    // 0x00444b6d..0x00444b84: over a 3D window the arrow cursor, and no name.
+    // Over a 3D window: the arrow cursor, and no name.
     if (Win3DGetHover() != nullptr)
     {
         MouseSetCursor("arrow", false);
         bHovered = 0;
     }
 
-    // 0x00444b8a..0x00444dfa: hovered with a name -- the name as a tooltip keyed on this
+    // Hovered with a name -- the name as a tooltip keyed on this
     // object, pointing along the view ray through the hotspot's top-left corner 30 pixels up.
     if (bHovered == 0)
         return;
@@ -694,7 +658,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     ToolTipHoverSetCaption(&Info, DisplayName);
     Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this));
 
-    // 0x00444c09..0x00444cb2: the corner on the Win3D camera's near plane (DAT_0067dc60 /
+    // The corner on the Win3D camera's near plane (DAT_0067dc60 /
     // 0067dc64 centre, 0067dc70 / 0067dc74 scale, 0067dc9c znear), turned by its orientation
     // DAT_0067dbfc (FUN_00423b90).
     FSpaceCamera* const Cam = Win3DGetCamera();
@@ -706,8 +670,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     FVector World;
     Win3DTransformByMatrix(World, CamOrientation, Local);
 
-    // 0x00444cb7..0x00444d73: normalised ((z^2 + x^2) + y^2, 1 / sqrt, DAT_005c75dc) into the
-    // world position; zero half extents; live.
+    // Normalised with the sum order (z^2 + x^2) + y^2; 1.0 is DAT_005c75dc.
     double const X = World.X;
     double const Y = World.Y;
     double const Z = World.Z;
@@ -720,13 +683,11 @@ void FCharacterObject::Update(double DeltaSeconds)
     Info.HalfExtents[2] = 0.0f;
     Info.bLive = 1;
     NnToolTipFeedHover(&Info);
-
-    // 0x00444d82..0x00444dfa: the record torn down (~FToolTipHoverInfo).
 }
 
 void FCharacterObject::PickLods(ICamera* Camera)
 {
-    // FUN_00444f90. 0x00444f9b..0x0044501f: the camera distance, 1.0 without an instance.
+    // FUN_00444f90. The camera distance is 1.0 without an instance.
     float Distance = 1.0f;
     void* const Instance = GetEngineInstance();
     if (Instance != kNoInstance)
@@ -741,7 +702,6 @@ void FCharacterObject::PickLods(ICamera* Camera)
         double const Dz = static_cast<double>(Z) - Eye[2];
         Distance = static_cast<float>(sqrt(Dx * Dx + Dy * Dy + Dz * Dz));
     }
-    // 0x00445023..0x0044503f: the half field of view (ICamera slot 6) and the surface width.
     float const HalfFov = Camera->GetHalfFovXDeg();
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: slot 6 is the angle on a 4:3 surface, so the LOD pairs it with the width
@@ -751,11 +711,10 @@ void FCharacterObject::PickLods(ICamera* Camera)
     float const SurfaceWidth = static_cast<float>(static_cast<int>(G_RenderSurfaceWidth));
 #endif
 
-    // 0x00445043..0x0044511c: per part with LODs, the first LOD whose switch distance is not
-    // below the adjusted distance (`TEST AH,1` + JZ: not less is the hit); none -> -1. With
-    // "low_character_lod" and the adjusted distance beyond the 100% switch distance (`TEST
-    // AH,5` + JP: only C0 alone falls through), one LOD coarser, or past the last: the first
-    // part keeps its last LOD, the others none. The picks are packed.
+    // Per part, the first LOD whose switch distance is not below the adjusted distance (a NaN
+    // counts as a hit); none -> -1. With "low_character_lod" and the adjusted distance beyond the
+    // 100% switch distance, one LOD coarser, or past the last: the first part keeps its last LOD,
+    // the others none. The picks are packed.
     int Written = 0;
     int Part = 0;
     for (Part = 0; Part < 4; ++Part)
@@ -792,14 +751,13 @@ void FCharacterObject::PickLods(ICamera* Camera)
         LodIds[Written] = Pick;
         ++Written;
     }
-    // 0x00445122..0x00445138: the rest -1.
     for (; Written < 4; ++Written)
         LodIds[Written] = -1;
 }
 
 void FCharacterObject::DrawOpaque(ICamera* Camera)
 {
-    // LAB_00445150. 0x00445156..0x00445188: OBJECTS and CHARACTERS on, LIKE_PETAL off.
+    // LAB_00445150.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptCharacters) == 0)
@@ -807,8 +765,8 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     if (GetGameOption(kGameOptLikePetal) != 0)
         return;
 
-    // 0x0044518e..0x004451e0: the hotspot follows the room camera; the body's bounding sphere
-    // (IDeformable slot 38) must touch the room camera's view (FUN_0041c8d0).
+    // The hotspot follows the room camera; the body's bounding sphere must touch the room
+    // camera's view (FUN_0041c8d0).
     ICamera* const RoomCamera = GetRoomRuntimeCamera(Owner);
     Hotspot->UpdateScreenRect(RoomCamera);
     float Radius = 0.0f;
@@ -822,29 +780,25 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     if (Instance == kNoInstance)
         return;
 
-    // 0x004451fc..0x0044522c: the LODs, then IDeformable slot 15 with the frame time.
     PickLods(Camera);
     float const FrameTime = static_cast<float>(GetClientFrameTimeCapped());
     DALib::Deform->SetLod(Lod.Instance, FrameTime, LodIds);
 
-    // 0x0044522c..0x0044523d: the shadow (FUN_0044b370 with the instance, the height and 1).
+    // FUN_0044b370.
     float const Height = GetFloat1C();
     unsigned long HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
     RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
                           HeightBits, 1);
-    // 0x00445242..0x00445246: FUN_0044ae80.
-    RoomControlLightObject(Owner, this);
-    // 0x0044524b..0x00445264: IDeformable slot 16 (camera, LODs, 0, &out, 0). The out int is
-    // an uninitialised stack slot in retail.
+    RoomControlLightObject(Owner, this); // FUN_0044ae80
+    // The out int is an uninitialised stack slot in retail.
     int DrawnLod = 0;
     DALib::Deform->Draw(Lod.Instance, Camera, LodIds, nullptr, &DrawnLod, 0);
 }
 
 void FCharacterObject::RestartOwnScript()
 {
-    // FUN_00445280. 0x00445283..0x0044529e: a live sequence restarts (FUN_004562e0) when it
-    // played before, else plays.
+    // FUN_00445280.
     if (OwnScript != nullptr)
     {
         if (bOwnScriptPlaying != 0)
@@ -856,7 +810,7 @@ void FCharacterObject::RestartOwnScript()
         bOwnScriptPlaying = 1;
         return;
     }
-    // 0x004452a3..0x00445332: the idle script, unless it already is the own one.
+    // The idle script, unless it already is the own one.
     char const* const IdleScript = Props.Script;
     if (IdleScript != nullptr && OwnScriptName != nullptr &&
         _stricmp(IdleScript, OwnScriptName) == 0) // DACOM stricmp
@@ -882,22 +836,19 @@ void FCharacterObject::RestartOwnScript()
 
 FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, unsigned char bSpatial)
 {
-    // FUN_00445340. 0x0044535a..0x00445362: no name, no script.
+    // FUN_00445340.
     if (ScriptName == nullptr || ScriptName[0] == '\0')
         return nullptr;
 
-    // 0x00445368..0x0044537c: a sequence of the room's.
     FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Owner, 0);
     if (Sequence == nullptr)
     {
-        // 0x00445490..0x004454b1.
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kObjectDeformableCpp, 0x453,
               "Cannot allocate thorn script\n");
         return Sequence;
     }
 
-    // 0x00445382..0x004453c1: the script and its own frame; the play frame starts at the
-    // identity.
+    // The play frame starts at the identity.
     IScriptEngine* const Engine = ThornScriptLoad(ScriptName);
     Csys const ScriptFrame = ThornScriptGetCsys(Engine, nullptr);
     Csys Frame;
@@ -906,7 +857,7 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
     Frame.Pos.z = 0.0f;
     MatrixSetIdentity(Frame.Orient);
 
-    // 0x004453c6..0x0044541a: on a placement, the placement's frame taken back through the
+    // On a placement, the placement's frame taken back through the
     // script's own (FUN_00435c90: Placement * ScriptFrame^-1), and its name.
     char const* PlacementName = nullptr;
     if (Placement != nullptr)
@@ -916,8 +867,7 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
         Frame = PlacementFrame * ScriptFrame.get_inverse();
     }
 
-    // 0x0044541d..0x00445472: the script, this character in the mirror, and the sequence's
-    // flags: bind the mirror's first, loop, +0x05 set, no letterbox, spatial as asked.
+    // This character in the mirror; the sequence binds the mirror's first.
     Sequence->AddScript(ScriptName, 0, &Frame, Engine);
     Sequence->Mirror.Add(this, nullptr);
     Sequence->BindMode = 1;
@@ -931,7 +881,6 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
     Sequence->Callback = nullptr;
     Sequence->CallbackA = nullptr;
     Sequence->CallbackB = nullptr;
-    // 0x00445473..0x00445478: named after the placement.
     if (PlacementName != nullptr)
         Sequence->SetName(PlacementName);
     return Sequence;
@@ -939,13 +888,12 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
 
 void FCharacterObject::SetOwnScript(char const* ScriptName, unsigned char bSpatial)
 {
-    // FUN_00445580. 0x00445586..0x004455a3: already the own script.
+    // FUN_00445580.
     if (ScriptName != nullptr && OwnScriptName != nullptr &&
         _stricmp(ScriptName, OwnScriptName) == 0) // DACOM stricmp
     {
         return;
     }
-    // 0x004455a5..0x004455d8.
     if (OwnScript != nullptr)
     {
         G_GfScriptManager.DestroySequence(OwnScript);
@@ -953,7 +901,6 @@ void FCharacterObject::SetOwnScript(char const* ScriptName, unsigned char bSpati
         bOwnScriptPlaying = 0;
         malloc_strfree(&OwnScriptName);
     }
-    // 0x004455db..0x00445614.
     malloc_strcpy(&OwnScriptName, ScriptName);
     OwnScript = CreateOwnScript(ScriptName, bSpatial);
     if (ScriptState != 0)
@@ -977,10 +924,9 @@ void FCharacterObject::UpdateHotspotEnabled()
 
 void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Point*/)
 {
-    // FUN_00445a90 (RET 8). Not while a window holds the mouse.
+    // FUN_00445a90. Not while a window holds the mouse.
     if (Win3DAnyCaptured())
         return;
-    // 0x00445aa0..0x00445ad1: the name shows; the cursor by role.
     bHovered = 1;
     char const* Cursor = "talk_blowoff";
     if (Role == 2)
@@ -990,9 +936,8 @@ void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Poi
     else if (Role == 4)
         Cursor = "talk_equip_dealer";
 
-    // 0x00445ad6..0x00445bbf: with a behaviour the room knows, the cursor by its kind: none
-    // shown (+0x0a clear) "talk_story"; else by +0x220 blowoff / bribe / rumor / mission /
-    // info / story, another kind keeping the role's cursor.
+    // With a behaviour the room knows, the cursor by its kind; an unknown kind keeps the role's
+    // cursor.
     unsigned const BehaviorId = Props.BehaviorId;
     if (BehaviorId != 0xffffffffu)
     {
@@ -1029,8 +974,7 @@ void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Poi
 
 void FCharacterObject::OnHotspotLeave(unsigned long /*Cookie*/, int const* /*Point*/)
 {
-    // FUN_00445be0 (RET 8): unless a window holds the mouse, the arrow, no name, the tooltip
-    // hidden (FUN_004be390).
+    // FUN_00445be0. NnToolTipHideGlobal is FUN_004be390.
     if (Win3DAnyCaptured())
         return;
     MouseSetCursor("arrow", false);
@@ -1040,32 +984,30 @@ void FCharacterObject::OnHotspotLeave(unsigned long /*Cookie*/, int const* /*Poi
 
 void FCharacterObject::OnHotspotClick(unsigned long Cookie, int const* Point)
 {
-    // FUN_00445c10 (RET 8). Not while a window holds the mouse.
+    // FUN_00445c10. Not while a window holds the mouse.
     if (Win3DAnyCaptured())
         return;
-    // 0x00445c20..0x00445c2f: the leave handling first (slot 11).
-    OnHotspotLeave(Cookie, Point);
+    OnHotspotLeave(Cookie, Point); // slot 11
 
-    // 0x00445c32..0x00445c72: the character's faction (+0x164) marked met in the visit map
-    // (flags | 0x41, the server told) unless bit 0 is already set.
+    // The character's faction (+0x164) marked met in the visit map (flags | 0x41, the server
+    // told) unless bit 0 is already set.
     unsigned const Faction = Props.FactionId;
     if (Faction != 0xffffffffu)
     {
         unsigned char Flags = 0;
-        GetPlayerVisitFlagsRetail(Faction, &Flags, 0, 0); // 0x00445c4c
+        GetPlayerVisitFlagsRetail(Faction, &Flags, 0, 0);
         if ((Flags & 1) == 0)
             SetPlayerVisitFlagsRetail(Faction, static_cast<unsigned char>(Flags | 0x41), true);
     }
 
-    // 0x00445c75..0x00445c96: the NavBar may take the click; a character under a script's
-    // control does nothing.
+    // The NavBar may take the click; a character under a script's control does nothing.
     if (NavBarCharacterClicked(this, Role))
         return;
     if (ScriptState != 0)
         return;
 
-    // 0x00445c9c..0x00445cde: with a behaviour, its script (FUN_00435dd0, the dealer opened
-    // when it stops) and the server told (IServer slot 41 GFObjSelect).
+    // With a behaviour, its script (FUN_00435dd0, the dealer opened when it stops) and the
+    // server told (IServer slot 41).
     if (Props.BehaviorId != 0xffffffffu)
     {
         StartCharacterBehaviorScript(this, Owner, Placement, Props.BehaviorId,
@@ -1074,16 +1016,12 @@ void FCharacterObject::OnHotspotClick(unsigned long Cookie, int const* Point)
                                                                       GetPlayerConnectionId());
         return;
     }
-    // 0x00445ce1..0x00445d1e: else the role's dealer.
     OpenRoleDealer(Role);
 }
 
 void FCharacterObject::TakeOverForScript(unsigned char bKeepOwnScript)
 {
-    // FUN_004454e0. 0x004454e9 `JNZ` on a set argument goes straight to +0x04 = 1 (0x00445533).
-    // Clear: a non-null +0x360 is handed to FUN_004568d0 on DAT_0066d2d0 (0x004454fb), +0x360 =
-    // 0, +0x368 = 0, malloc_strfree(&+0x364) -- all inside the non-null branch; then +0x36c = 1
-    // and +0x04 = 1 (0x00445521..0x0044552c) either way.
+    // FUN_004454e0.
     if (bKeepOwnScript == 0)
     {
         if (OwnScript != nullptr)
@@ -1100,8 +1038,7 @@ void FCharacterObject::TakeOverForScript(unsigned char bKeepOwnScript)
 
 void FCharacterObject::ResetScriptState(unsigned char bRelease)
 {
-    // FUN_00445540. 0x00445548 writes +0x04 before the branch; 0x0044554b `JZ` on a zero
-    // argument takes the +0x36c = 2 side.
+    // FUN_00445540. +0x04 is written before the branch.
     bNoUpdate = 0;
     if (bRelease == 0)
     {
@@ -1115,11 +1052,8 @@ void FCharacterObject::ResetScriptState(unsigned char bRelease)
 
 long FCharacterObject::FindPart(char const* PartName)
 {
-    // FUN_00445620. The scan (0x00445631..0x0044566d) returns a used entry whose name matches
-    // (DACOM stricmp) and whose part is not -1; on the way it remembers the first unused entry
-    // (0x00445659 `TEST EBX,EBX; JGE`). None unused -> entry 0 (0x00445671). The lookup runs on
-    // slot 6's instance; a hit replaces the entry's part and name (CRT free / _strdup, not the
-    // malloc_str* pair) and marks it used. The result is returned either way.
+    // FUN_00445620. With no unused entry the hit goes to entry 0. The name is replaced with CRT
+    // free / _strdup, not the malloc_str* pair.
     int Unused = -1;
     int Index = 0;
     for (; Index < kPartCacheEntries; ++Index)
@@ -1181,14 +1115,11 @@ void FCharacterObject::RemoveAimHandle(void* Handle)
 
 char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) const
 {
-    // FUN_00445720. Every exit returns DAT_00668848 (0x00445a44 / 0x00445923 / 0x0044599a, and
-    // EAX loaded before the 0x00445871 branch). Retail's Universe::IBase calls go through its
-    // vtable (+0x04 nickname, +0x14 BGCS_base_run_by); the port's IBase publishes the same two
-    // strings as fields.
+    // FUN_00445720. Every exit returns DAT_00668848. Retail's Universe::IBase calls go through
+    // its vtable (+0x04 nickname, +0x14 BGCS_base_run_by); the port's IBase publishes the same
+    // two strings as fields.
 
-    // 0x00445728..0x004457a8: GetCostumeDescriptions()->get_costume_gender(this +0x178):
-    // 1 -> "gcs_ml_" (DAT_005cbb64), 2 -> "gcs_fm_" (DAT_005cbb5c), else "" (DAT_005c865c) and
-    // the FDUMP at ObjectDeformable.cpp:0x51f.
+    // DAT_005cbb64 / DAT_005cbb5c.
     int const Gender = GetCostumeDescriptions()->get_costume_gender(Props.Cost);
     if (Gender == 1)
         strcpy(G_BgcsContextBuffer, "gcs_ml_");
@@ -1205,8 +1136,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
 
     if (_stricmp(TemplateName, "$BGCS_Base_Name") == 0)
     {
-        // 0x004457ca..0x00445881: append "W02aF_" (DAT_005cbb08..0e), then the base nickname,
-        // then drop a trailing "_base" (s__base_005cbb00) when the whole buffer is longer.
+        // A trailing "_base" is dropped when the whole buffer is longer.
         strcat(G_BgcsContextBuffer, "W02aF_");
         strcat(G_BgcsContextBuffer, Universe::get_base(BaseId)->Nickname);
         int const Length = static_cast<int>(strlen(G_BgcsContextBuffer));
@@ -1222,9 +1152,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
 
     if (_stricmp(TemplateName, "$BGCS_Base_Run_By") == 0)
     {
-        // 0x00445898..0x0044592c: append the base's BGCS_base_run_by; an empty one is reported
-        // with a second get_base for the nickname (ObjectDeformable.cpp:0x54a).
-        // 0x0044589f..0x004458ac: get_base, then IBase vt+0x14 (the BGCS string's c_str).
+        // An empty BGCS_base_run_by is reported with a second get_base for the nickname.
         char const* const RunBy = Universe::get_base(BaseId)->GetBgcsBaseRunBy();
         strcat(G_BgcsContextBuffer, RunBy);
         if (RunBy[0] != '\0')
@@ -1236,8 +1164,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
         return G_BgcsContextBuffer;
     }
 
-    // 0x0044592f..0x004459a3: My_Faction ML/FM -> "D06aG_" (DAT_005cba3c..42), Faction_Rebuff
-    // ML/FM -> "A03aG_" (DAT_005cba44..4a); anything else is ObjectDeformable.cpp:0x571.
+    // DAT_005cba3c / DAT_005cba44.
     char const* Prefix = nullptr;
     if (_stricmp(TemplateName, "$BGCS_My_Faction_ML") == 0 ||
         _stricmp(TemplateName, "$BGCS_My_Faction_FM") == 0)
@@ -1256,8 +1183,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
         return G_BgcsContextBuffer;
     }
 
-    // 0x004459e4..0x00445a42: append the prefix, then Reputation::get_nickname of +0x164 into a
-    // zeroed TString<16> (0x00445a02 / 0x00445a07) and append its text.
+    // The faction nickname of +0x164.
     strcat(G_BgcsContextBuffer, Prefix);
     TString<16> Nickname;
     Nickname.Length = 0;
@@ -1273,8 +1199,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
 
 void ReleaseSharedCharacterLod()
 {
-    // FUN_00443e90: IDeformable slot 6 on a live instance, then the instance and both
-    // four-entry arrays zeroed.
+    // FUN_00443e90.
     if (G_SharedCharacterLod.Instance != nullptr)
         DALib::Deform->Destroy(G_SharedCharacterLod.Instance);
     G_SharedCharacterLod.Instance = nullptr;
@@ -1290,8 +1215,7 @@ FCharacterObject* CreateCharacterObject(CharacterProperties const& Props, CharPl
                                         int PlacementIndex, FRoomRuntime* Owner,
                                         unsigned char bScriptSpatial, Csys const& Frame)
 {
-    // FUN_00435b80. 0x00435b9d..0x00435c23: the description (FUN_00443a90) filled from the
-    // arguments.
+    // FUN_00435b80.
     FCharacterDesc Desc;
     Desc.Props = Props;
     Desc.Placement = Placement;
@@ -1299,8 +1223,7 @@ FCharacterObject* CreateCharacterObject(CharacterProperties const& Props, CharPl
     Desc.bScriptSpatial = bScriptSpatial;
     Desc.Pos = Frame.Pos;
     Desc.Orient = Frame.Orient;
-    // 0x00435c1e..0x00435c55: operator new(0x3b0) + FUN_00443ed0(Owner, &Desc); a failed
-    // allocation gives null. 0x00435c66: the description's destructor (FUN_00443b10).
+    // operator new(0x3b0); a failed allocation gives null.
     FCharacterObject* const Character = new (std::nothrow) FCharacterObject(Owner, Desc);
     return Character;
 }
@@ -1310,8 +1233,7 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
                                   void(__cdecl* Callback)(void*, void*, unsigned char),
                                   void* CallbackA)
 {
-    // FUN_00435dd0. 0x00435dd5..0x00435e1b: the room's behaviour of that key (FUN_0043ad50 +
-    // FUN_00437020); no node or no record, nothing.
+    // FUN_00435dd0. The lookup is FUN_0043ad50 + FUN_00437020.
     unsigned const RoomId = (Room != nullptr) ? GetRoomRuntimeRoomId(Room) : 0;
     char const* const PlacementName = (Placement != nullptr) ? Placement->Name : nullptr;
     MetaNode<ScriptBehavior>* const Node =
@@ -1322,12 +1244,11 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
     if (Behavior == nullptr)
         return;
 
-    // 0x00435e21..0x00435e31.
     FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Room, 0);
     if (Sequence == nullptr)
         return;
 
-    // 0x00435e37..0x00435eaa: each of the behaviour's scripts with a file, at the identity.
+    // Each of the behaviour's scripts with a file, at the identity.
     Csys Frame;
     Frame.Pos.x = 0.0f;
     Frame.Pos.y = 0.0f;
@@ -1343,12 +1264,11 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
                             nullptr);
     }
 
-    // 0x00435eac..0x00435ed1: the dialog (+0x220 / +0x224 / +0x228 and the two texts).
     Sequence->SetDialog(static_cast<int>(Behavior->DialogType), static_cast<int>(Behavior->OfferArg),
                         static_cast<int>(Behavior->OfferMissionId), Behavior->NameFmtStr,
                         Behavior->DescFmtStr);
 
-    // 0x00435ed6..0x00435f44: +0x14 set -- this character alone, bound as the mirror's first;
+    // +0x14 set -- this character alone, bound as the mirror's first;
     // clear -- the listed characters by key under their names, bound by name.
     int BindMode = 0;
     if (Behavior->bBindSingleCharacter != 0)
@@ -1368,9 +1288,7 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
         }
     }
 
-    // 0x00435f46..0x00435fb8: letterboxed, named after the placement, the stop callback, the
-    // ambience and music ducked, the behaviour's location / skip / server fields, +0x16 for a
-    // dealer role; then played.
+    // Field_0x16 marks a dealer role.
     Sequence->BindMode = BindMode;
     Sequence->bLetterbox = 1;
     Sequence->bApplySpatial = Behavior->bApplySpatial;
@@ -1391,13 +1309,12 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
 
 void PlacePlayerAtSetpoint(char const* SetpointName)
 {
-    // FUN_00435cf0. 0x00435cf7..0x00435d1b: the current room runtime (FUN_0043a460) and the
-    // current location's RoomData (FUN_0043a3d0 on DAT_00668740); neither is null-tested.
+    // FUN_00435cf0. The room runtime (FUN_0043a460) and the RoomData (FUN_0043a3d0) are not
+    // null-tested.
     FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
     RoomData* const Room = LookupClientLocationRoom(GetClientLocationCurrentRoom());
 
-    // 0x00435d23..0x00435d53: the first setpoint (+0x164, the size re-read every pass) whose
-    // name stricmp-equals SetpointName; none -> return.
+    // The setpoint vector (+0x164) size is re-read every pass.
     SetpointInfo const* Found = nullptr;
     size_t Index = 0;
     for (Index = 0; Index < Room->Setpoints.size(); ++Index)
@@ -1412,13 +1329,10 @@ void PlacePlayerAtSetpoint(char const* SetpointName)
     if (Found == nullptr)
         return;
 
-    // 0x00435d55..0x00435d78: the frame copied out (position, then the nine-float orientation).
     Vector Pos = Found->Frame.Pos;
     Matrix Orient = Found->Frame.Orient;
 
-    // 0x00435d7a..0x00435dbc: the room's player character (FUN_00449cd0); with one,
-    // IDeformable slot 19 (position) and slot 20 (orientation) on its +0x30 instance, then its
-    // slot 3 (+0x0c) with the position's Y.
+    // FUN_00449cd0.
     FCharacterObject* const Player = RoomControlPlayerCharacter(Runtime);
     if (Player == nullptr)
         return;

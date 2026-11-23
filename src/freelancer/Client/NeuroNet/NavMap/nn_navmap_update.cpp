@@ -58,7 +58,7 @@ namespace
 
     float NavMapByteToUnit(unsigned char Value)
     {
-        // FILD of the zero-extended byte, FMUL DAT_005c7f68, FSTP dword.
+        // Times DAT_005c7f68 (1/255), rounded to float once.
         return static_cast<float>(static_cast<double>(Value) * kNavMapInv255);
     }
 
@@ -91,7 +91,7 @@ namespace
     // DAT_005c9800 / DAT_005d3e4c -- PlaceItems' mesh scale terms.
     float const kNavMapSystemMeshScale = 1.2000000476837158f; // 0x3f99999a
     float const kNavMapMeshScale = 60.0f;
-    // FUN_00496600 0x00496bcc: the item's depth, an immediate 0xbf0ccccc -- one ulp short of
+    // FUN_00496600: the item's depth, an immediate 0xbf0ccccc -- one ulp short of
     // the nearest float to -0.55 (0xbf0ccccd), so it is spelled out.
     float const kNavMapItemDepth = -0.54999995231628418f; // 0xbf0ccccc
     // DAT_005c8a5c -- pi as a float.
@@ -107,7 +107,7 @@ namespace
     char const kNavMapSpaceObjectsMat[] =
         "Interface\\NeuroNet\\NavMap\\NewNavMap\\SpaceObjects\\spaceobjects.mat";
 
-    // The universe / system / waypoint markers' tint (FUN_00496e50 0x00496eed..0x00496f4f):
+    // The universe / system / waypoint markers' tint (FUN_00496e50):
     // the palette colour's four bytes scaled by DAT_005c7f68 into the holder's user floats.
     void NavMapTintFromPalette(FNavMapItem* Item, unsigned long Rgba)
     {
@@ -118,7 +118,7 @@ namespace
         Item->Mesh.UserFloats[4] = NavMapByteToUnit(Bytes[3]);
     }
 
-    // FUN_00496600 0x00496888..0x00496a06: a Kind 2 item's mesh swapped for Name (the holder
+    // FUN_00496600: a Kind 2 item's mesh swapped for Name (the holder
     // released through FUN_0059eee0, then "...\SpaceObjects\" Name ".3db" loaded when the file
     // exists).
     void NavMapReloadItemMesh(FNavMapItem* Item, char const* Name)
@@ -132,12 +132,10 @@ namespace
         GetFileSysPath(FullPath, Path, DALib::Data);
         if (_access(FullPath, 0) == -1)
             return;
-        // FUN_0059ec80(path, spaceobjects.mat, 1) (0x00496948..0x00496959 and
-        // 0x004969f4..0x00496a06).
         ClientMeshLoadFromPath(&Item->Mesh, Path, kNavMapSpaceObjectsMat, true);
     }
 
-    // The hover tip Update feeds (0x00494e7b..0x00494f95 and its three copies): the cursor's
+    // The hover tip Update feeds (inlined four times there): the cursor's
     // ray point 0.03 lower, no extents, live; the ToolTip's current tip (FUN_004be2f0, a
     // scratch record built with FUN_004144b0 / FUN_004963a0 and torn down by FUN_00444ee0)
     // keeps its position when it shows the same ids; then FUN_004be370.
@@ -169,8 +167,7 @@ namespace
         // FUN_00444ee0 on Current: ~FToolTipHoverInfo.
     }
 
-    // The system name the nav map shows (InitialShow 0x004911ec, Update 0x00494c8b /
-    // 0x00495f4b): FUN_004347e0 into DAT_0066fc60, CharUpperW, property 0x1d; the hidden
+    // The system name the nav map shows (InitialShow, Update twice): FUN_004347e0 into DAT_0066fc60, CharUpperW, property 0x1d; the hidden
     // systems (and none) show ids 0x62a.
     void NavMapShowSystemName(WinControl* Text, Universe::ISystem const* System,
                               unsigned const* SkipSystemIds)
@@ -210,7 +207,6 @@ float* NavMapBasePosition(float* Out, unsigned BaseId, unsigned SystemId)
     Universe::ISystem const* const System = Universe::get_system(SystemId);
     if (System != nullptr)
     {
-        // 0048d7a7..0048d7cf: the object record's four TStrings emptied.
         Universe::FSystemObject Object;
         Object.Nickname.Length = 0;
         Object.Nickname.Data[0] = '\0';
@@ -233,7 +229,7 @@ float* NavMapBasePosition(float* Out, unsigned BaseId, unsigned SystemId)
             return Out;
         }
 
-        // 0048d80d..0048d851: a base a mission created.
+        // A base a mission created.
         float Pos[3];
         int IdsInfo;
         if (FindMissionCreatedSolar(BaseId, Pos, &IdsInfo))
@@ -264,7 +260,6 @@ float* NeuroNetNavMap::CachedBasePosition(float* Out, unsigned BaseId,
 
     if (System != nullptr)
     {
-        // 00491e6a..00491e99: the object record's four TStrings emptied.
         Universe::FSystemObject Object;
         Object.Nickname.Length = 0;
         Object.Nickname.Data[0] = '\0';
@@ -281,7 +276,6 @@ float* NeuroNetNavMap::CachedBasePosition(float* Out, unsigned BaseId,
                 continue;
             if (Object.DockWith != BaseId)
                 continue;
-            // 00491f22..00491f56: cached, then returned.
             CachedObjectPosition[0] = Object.Pos.x;
             CachedObjectPosition[1] = Object.Pos.y;
             CachedObjectPosition[2] = Object.Pos.z;
@@ -292,7 +286,7 @@ float* NeuroNetNavMap::CachedBasePosition(float* Out, unsigned BaseId,
             return Out;
         }
 
-        // 00491eda..00491f1f: a base a mission created -- not cached.
+        // A base a mission created -- not cached.
         float Pos[3];
         int IdsInfo;
         if (FindMissionCreatedSolar(BaseId, Pos, &IdsInfo))
@@ -314,7 +308,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
     // FUN_00491be0.
     if (ViewMode == 0)
     {
-        // 00491bf7..00491cc8: the universe view -- the player's system's map position, not
+        // The universe view -- the player's system's map position, not
         // scaled by SystemScale.
         OutPos[0] = 0.0f;
         OutPos[1] = 0.0f;
@@ -343,7 +337,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
         return;
     }
 
-    // 00491ccb..00491cea: the system view -- the player's last position.
+    // The system view -- the player's last position.
     float const* const LastPos = GetPlayerLastPositionRetail();
     OutPos[0] = LastPos[0];
     OutPos[1] = LastPos[1];
@@ -352,7 +346,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
 
     if (IsPlayerDockedRetail())
     {
-        // 00491cf9..00491d49: docked -- the base's solar (FUN_00491e10). The base is read
+        // Docked -- the base's solar (FUN_00491e10). The base is read
         // through IBase slot 0 (its nickname id).
         Universe::IBase const* const Base = Universe::get_base(GetPlayerBaseIdRetail());
         if (Base != nullptr)
@@ -368,7 +362,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
     }
     else
     {
-        // 00491d4e..00491de5: in space -- the heading from the orientation's third column
+        // In space -- the heading from the orientation's third column
         // (m[0][2], m[2][2]) normalised, in degrees, wrapped into [0, 360).
         float const* const Orientation = GetPlayerLastOrientationRetail();
         double const A = static_cast<double>(Orientation[2]);
@@ -379,7 +373,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
         double Heading =
             -static_cast<double>(HudVectorAngle(X, Y)) * static_cast<double>(kNavMapRadToDeg);
         *OutHeading = static_cast<float>(Heading);
-        // TEST AH,5 + JP: only "less than 0" enters the loop (the compare runs on the
+        // x87: only "less than 0" enters the loop (the compare runs on the
         // unrounded value).
         if (Heading < 0.0)
         {
@@ -389,7 +383,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
             } while (Heading < 0.0);
             *OutHeading = static_cast<float>(Heading);
         }
-        // TEST AH,1 + JNE: C0 clear (greater or equal, not unordered) enters the loop.
+        // x87: greater or equal (not unordered) enters the loop.
         double Wrapped = static_cast<double>(*OutHeading);
         if (Wrapped >= static_cast<double>(kNavMapFullTurn))
         {
@@ -401,7 +395,7 @@ void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
         }
     }
 
-    // 00491de9..00491e00: scaled by the system's NavMapScale.
+    // Scaled by the system's NavMapScale.
     double const Scale = static_cast<double>(SystemScale);
     OutPos[0] = static_cast<float>(Scale * static_cast<double>(OutPos[0]));
     OutPos[1] = static_cast<float>(Scale * static_cast<double>(OutPos[1]));
@@ -417,7 +411,7 @@ void NeuroNetNavMap::AnimateItems()
     // FUN_004a1710.
     float const Dt = static_cast<float>(GetClientFrameTimeCapped());
 
-    // 004a1721..004a1797: the highlight timer. TEST AH,0x41 + JP skips the re-arm when the
+    // The highlight timer. x87: the re-arm is skipped when the
     // timer is still greater than 0 (or unordered); <= 0 re-arms it.
     double const Remaining = static_cast<double>(PulseTimer) - static_cast<double>(Dt);
     PulseTimer = static_cast<float>(Remaining);
@@ -438,7 +432,7 @@ void NeuroNetNavMap::AnimateItems()
         if (Item->bShown == 0 || Item->Kind != 0)
             continue;
 
-        // 004a17cd..004a17fd: the phase advances and wraps while it is above 1 (the compare
+        // The phase advances and wraps while it is above 1 (the compare
         // runs on the unrounded sum; only the final value is stored).
         double Phase = static_cast<double>(Dt) * static_cast<double>(Item->PulseRate) +
                        static_cast<double>(Item->PulsePhase);
@@ -452,7 +446,7 @@ void NeuroNetNavMap::AnimateItems()
             Item->PulsePhase = static_cast<float>(Phase);
         }
 
-        // 004a1801..004a181f: a triangle wave, 0 -> 1 -> 0 over one phase (TEST AH,5 + JP:
+        // A triangle wave, 0 -> 1 -> 0 over one phase (x87:
         // only "less than 0.5" keeps the phase itself).
         double Tri;
         if (Item->PulsePhase < 0.5f)
@@ -464,7 +458,7 @@ void NeuroNetNavMap::AnimateItems()
         Item->Size =
             static_cast<float>(kNavMapPulseSwing * Wave + static_cast<double>(Item->RestSize));
 
-        // 004a182f..004a1870: alpha = min(level * 4, 255), 255 for the highlighted item;
+        // Alpha = min(level * 4, 255), 255 for the highlighted item;
         // the tint = level + 191 (truncated to a byte).
         int const Level = static_cast<int>(Wave * static_cast<double>(kNavMapPulseAlphaScale));
         int Alpha = Level * 4;
@@ -481,28 +475,28 @@ void NeuroNetNavMap::AnimateItems()
         switch (Item->Variant)
         {
         case 0:
-            // 004a1885: red full, green / blue the tint.
+            // Red full, green / blue the tint.
             Colour[0] = 1.0f;
             Colour[1] = NavMapByteToUnit(TintByte);
             Colour[2] = Colour[1];
             Colour[4] = NavMapByteToUnit(AlphaByte);
             break;
         case 1:
-            // 004a18be: green full.
+            // Green full.
             Colour[1] = 1.0f;
             Colour[0] = NavMapByteToUnit(TintByte);
             Colour[2] = Colour[0];
             Colour[4] = NavMapByteToUnit(AlphaByte);
             break;
         case 2:
-            // 004a18f7: blue full.
+            // Blue full.
             Colour[2] = 1.0f;
             Colour[0] = NavMapByteToUnit(TintByte);
             Colour[1] = Colour[0];
             Colour[4] = NavMapByteToUnit(AlphaByte);
             break;
         case 3:
-            // 004a192f: green and blue full.
+            // Green and blue full.
             Colour[1] = 1.0f;
             Colour[2] = 1.0f;
             Colour[0] = NavMapByteToUnit(TintByte);
@@ -510,7 +504,7 @@ void NeuroNetNavMap::AnimateItems()
             break;
         case 4:
         {
-            // 004a1969: {0xff, tint, 0xff, alpha} packed (FUN_004a1ad0), then every byte
+            // {0xff, tint, 0xff, alpha} packed (FUN_004a1ad0), then every byte
             // scaled back (so red / blue are 255 * (1/255), not a literal 1.0).
             unsigned char const Rgba[4] = {0xff, TintByte, 0xff, AlphaByte};
             Colour[0] = NavMapByteToUnit(Rgba[0]);
@@ -521,7 +515,7 @@ void NeuroNetNavMap::AnimateItems()
         }
         case 5:
         {
-            // 004a19e0: {0xff, 0xff, tint, alpha} (FUN_004a1ad0).
+            // {0xff, 0xff, tint, alpha} (FUN_004a1ad0).
             unsigned char const Rgba[4] = {0xff, 0xff, TintByte, AlphaByte};
             Colour[0] = NavMapByteToUnit(Rgba[0]);
             Colour[1] = NavMapByteToUnit(Rgba[1]);
@@ -531,13 +525,13 @@ void NeuroNetNavMap::AnimateItems()
         }
         case 6:
         {
-            // 004a1a54: {tint, tint, tint, alpha} (FUN_004a1ab0) through FUN_004a1af0.
+            // {tint, tint, tint, alpha} (FUN_004a1ab0) through FUN_004a1af0.
             unsigned char const Rgba[4] = {TintByte, TintByte, TintByte, AlphaByte};
             ClientMeshHolderSetColor(&Item->Mesh, Rgba);
             break;
         }
         default:
-            // 004a1878: above 6 -- untouched.
+            // Above 6 -- untouched.
             break;
         }
     }
@@ -549,14 +543,13 @@ void NeuroNetNavMap::AnimateItems()
 
 void NavMapSetGroupPositions(void const* Data)
 {
-    // FUN_0048d8a0 (cdecl). 0x0048d8a0..0x0048d8d3: erase(first, last) inline.
+    // FUN_0048d8a0 (cdecl).
     G_NavMapGroupPositions.clear();
 
     int Count = 0;
     memcpy(&Count, Data, sizeof(Count));
-    // 0x0048d8d9..0x0048d8e1: EBP = Data + 4 and it is never advanced inside the loop (the
-    // only ADD EBP, 0x0048da9d, is on the grow path's scratch copy, and 0x0048dae8 reloads the
-    // original). Retail therefore stores the FIRST record Count times -- kept as retail does.
+    // Retail bug kept: the record pointer is never advanced inside the loop (only the grow
+    // path's scratch copy is), so the FIRST record is stored Count times.
     FNavMapGroupMember const* const Record = reinterpret_cast<FNavMapGroupMember const*>(
         static_cast<unsigned char const*>(Data) + sizeof(int));
     double const kNearOrigin = 128.0; // DAT_005d2ee0 (double)
@@ -565,9 +558,8 @@ void NavMapSetGroupPositions(void const* Data)
         FNavMapGroupMember Member;
         if (Record->BaseId != 0)
         {
-            // 0x0048d8f0..0x0048d986: docked -- the base's position (FUN_0048d780). Each |c|
-            // against 128.0 with TEST AH,5 + JP (taken when not less, or unordered): the member
-            // is kept unless all three components lie within 128 of the origin.
+            // Docked -- the base's position (FUN_0048d780). The member is kept unless all three
+            // components lie within 128 of the origin (an unordered compare keeps it).
             float Pos[3];
             NavMapBasePosition(Pos, Record->BaseId, Record->SystemId);
             if (!(fabs(static_cast<double>(Pos[0])) < kNearOrigin) ||
@@ -585,8 +577,7 @@ void NavMapSetGroupPositions(void const* Data)
             continue;
         }
 
-        // 0x0048d9a3..0x0048dc07: in space -- the record's own position under the same 128.0
-        // test, BaseId 0, pushed back (the vector growth inline).
+        // In space -- the record's own position under the same 128.0 test.
         if (!(fabs(static_cast<double>(Record->Pos[0])) < kNearOrigin) ||
             !(fabs(static_cast<double>(Record->Pos[1])) < kNearOrigin) ||
             !(fabs(static_cast<double>(Record->Pos[2])) < kNearOrigin))
@@ -609,8 +600,7 @@ int NeuroNetNavMap::GroupMemberAt(float const* MapPos)
         return -1;
     int const Count = static_cast<int>(G_NavMapGroupPositions.size());
 
-    // 004a2234..004a2273: the pick radius ShipMarkerSize / max(ZoomScale / 2, 1) * 1.05,
-    // squared (TEST AH,5 + JP: only "less than 1" is raised to 1).
+    // The pick radius ShipMarkerSize / max(ZoomScale / 2, 1) * 1.05, squared.
     double Half = static_cast<double>(ZoomScale) * 0.5;
     if (Half < 1.0)
         Half = 1.0;
@@ -626,7 +616,6 @@ int NeuroNetNavMap::GroupMemberAt(float const* MapPos)
         double const Dx = static_cast<double>(MapPos[0]) - static_cast<double>(Member.Pos[0]);
         double const Dy = static_cast<double>(MapPos[1]) - static_cast<double>(Member.Pos[1]);
         double const Dz = static_cast<double>(MapPos[2]) - static_cast<double>(Member.Pos[2]);
-        // TEST AH,0x41 + JNP: inside when less than or equal.
         if (Dx * Dx + Dz * Dz + Dy * Dy <= static_cast<double>(Radius2))
             return Member.RepId;
     }
@@ -646,7 +635,7 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
     if (Tree == nullptr)
         return nullptr;
 
-    // 004a1b76..004a1bb8: a 0.1 sphere at Pos into a 0x800-slot result.
+    // A 0.1 sphere at Pos into a 0x800-slot result.
     Geometry::Sphere Query;
     Query.Center.x = Pos[0];
     Query.Center.y = Pos[1];
@@ -660,7 +649,7 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
 
     Universe::IZone const* Best = nullptr;
     float BestRadius = 1.0e20f; // 0x60ad78ec
-    // 004a1c72: retail hands the caller's float[3] straight in as the Vector.
+    // Retail hands the caller's float[3] straight in as the Vector.
     Vector Point;
     Point.x = Pos[0];
     Point.y = Pos[1];
@@ -675,9 +664,9 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
             continue;
         if (bShowAll == 0)
         {
-            // 004a1c2f..004a1c70: the visit map's flags | the zone's own visit byte.
+            // The visit map's flags | the zone's own visit byte.
             unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Zone->GetId(), &VisitFlags, 1, 0); // FUN_004c4da0 0x004a1c45
+            GetPlayerVisitFlagsRetail(Zone->GetId(), &VisitFlags, 1, 0); // FUN_004c4da0
             unsigned char const Visit = static_cast<unsigned char>(VisitFlags | Zone->GetVisit());
             if ((Visit & 1) == 0)
                 continue;
@@ -686,7 +675,7 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
         }
         if (!Zone->InZoneXZ(Point, 0.0f))
             continue;
-        // TEST AH,5 + JP: only a strictly smaller radius wins.
+        // Only a strictly smaller radius wins.
         float const Radius = Zone->GetRadius();
         if (Radius < BestRadius)
         {
@@ -699,9 +688,9 @@ Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const
 
 bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
 {
-    // FUN_00492410. 00492413..00492480: the cursor inside ScreenRect (x kept in the FPU, y
-    // stored); TEST AH,1 + JNE rejects a negative (or unordered) offset, TEST AH,5 + JP (taken
-    // on greater, EQUAL or unordered) one at or past the size: the rect is [0, size).
+    // FUN_00492410. The cursor inside ScreenRect (x kept in double, y rounded to float). x87:
+    // a negative (or unordered) offset is rejected, as is one at or past the size: the rect is
+    // [0, size).
     int MouseX = 0;
     int MouseY = 0;
     GetClientSoftwareCursor(&MouseX, &MouseY, nullptr); // DAT_00616840 / DAT_00616844
@@ -717,7 +706,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
 
     if (ViewMode == 1 || ViewMode == 0)
     {
-        // 00492648..004926b5: the camera ray to the map plane, then the map-frame fractions to
+        // The camera ray to the map plane, then the map-frame fractions to
         // map units.
         float Ray[3];
         AsCamera(&Camera)->Unproject(Ray, ScreenX, ScreenY);
@@ -735,7 +724,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
     if (ViewMode != 2)
         return false;
 
-    // 004924a6..00492645: zoomed in -- the ray's point as fractions of the zoomed frame, less
+    // Zoomed in -- the ray's point as fractions of the zoomed frame, less
     // the pan, back to map units.
     float Ray[3];
     AsCamera(&Camera)->Unproject(Ray, ScreenX, ScreenY);
@@ -785,7 +774,7 @@ bool NeuroNetNavMap::CursorRayPoint(float* OutPoint)
     if (!(Dx < static_cast<double>(ScreenRectSize[0])) || !(Dy < ScreenRectSize[1]))
         return false;
 
-    // 0049e906..0049e97f: the cursor on the Win3D camera's near plane, turned by the camera
+    // The cursor on the Win3D camera's near plane, turned by the camera
     // (a copy of its orientation, FUN_00423b90).
     FSpaceCamera const* const Cam = Win3DGetCamera(); // DAT_0067dbf8
     FVector Local;
@@ -803,7 +792,7 @@ bool NeuroNetNavMap::CursorRayPoint(float* OutPoint)
     FVector Turned;
     Win3DTransformByMatrix(Turned, Orientation, Local);
 
-    // 0049e984..0049ea31: scaled onto this control's depth (Offset z + Position z), moved by
+    // Scaled onto this control's depth (Offset z + Position z), moved by
     // (0.0025, -0.001) and made relative to Offset + Position in x / y; z is the scaled ray's
     // own and then 0.
     double const K = (static_cast<double>(Offset[2]) + static_cast<double>(Position[2])) /
@@ -837,12 +826,12 @@ FNavMapItem* NeuroNetNavMap::ItemAt(float const* MapPos, unsigned char bSkipWayp
         if (Item->bShown == 0)
             continue;
 
-        // 00496d89..00496dc5: the distance in the XZ plane, squared.
+        // The distance in the XZ plane, squared.
         double const Dx = static_cast<double>(MapPos[0]) - static_cast<double>(Item->Position[0]);
         double const Dz = static_cast<double>(MapPos[2]) - static_cast<double>(Item->Position[2]);
         double const Dist2 = Dz * Dz + Dx * Dx;
 
-        // 00496dc2..00496e10: the pick radius -- a universe-view system's is 1.5 x; the markers
+        // The pick radius -- a universe-view system's is 1.5 x; the markers
         // (Kind 2 / 3 / 4) shrink with the zoom (over max(ZoomScale / 2, 1)), the rest follow
         // SystemScale; then the 1.05 margin.
         double Radius = static_cast<double>(Item->Size);
@@ -861,7 +850,6 @@ FNavMapItem* NeuroNetNavMap::ItemAt(float const* MapPos, unsigned char bSkipWayp
         }
         Radius *= static_cast<double>(kNavMapPickMargin);
 
-        // TEST AH,0x41 + JNP: inside when less than or equal.
         if (Dist2 <= Radius * Radius)
             return Item;
     }
@@ -874,7 +862,7 @@ FNavMapItem* NeuroNetNavMap::ItemAt(float const* MapPos, unsigned char bSkipWayp
 
 bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned* OutSystem)
 {
-    // FUN_004a0800. 004a0813..004a0866: the cached answer while the waypoint's hash matches.
+    // FUN_004a0800. The cached answer while the waypoint's hash matches.
     unsigned const Hash = BestPathWaypointHash(Index); // FUN_004c5530
     if (Hash == CachedWaypointHash)
     {
@@ -885,7 +873,7 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
         return true;
     }
 
-    // 004a0869..004a0880: the record is used without a null test, as in retail.
+    // The record is used without a null test, as in retail.
     FmtStr::Val const* Token = BestPathGetWaypoint(Index)->Marker.Head; // FUN_004c4ff0
     unsigned char bSystemKnown = 0;
     for (; Token != nullptr; Token = Token->Next)
@@ -893,14 +881,14 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
         unsigned short const Tag = Token->TypeTag;
         if (Tag == 0x53)
         {
-            // 004a08b0: 'S' -- the star system.
+            // 'S' -- the star system.
             *OutSystem = Token->Value;
             bSystemKnown = 1;
             continue;
         }
         if (Tag == 0x4e)
         {
-            // 004a099a..004a09f8: 'N' -- a nav marker: {system, ?, position}.
+            // 'N' -- a nav marker: {system, ?, position}.
             unsigned const* const Marker = Token->Marker->Data;
             *OutSystem = Marker[0];
             float const* const MarkerPos = reinterpret_cast<float const*>(Marker + 2);
@@ -917,7 +905,7 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
         if (Tag != 0x42)
             continue;
 
-        // 004a08c6..004a0973: 'B' -- the base: the system object docking with it, searched in
+        // 'B' -- the base: the system object docking with it, searched in
         // the 'S' system (when one came first) and then, as retail's iterator runs on, in every
         // system after the first.
         unsigned const BaseId = Token->Value;
@@ -942,7 +930,6 @@ bool NeuroNetNavMap::ResolveBestPathWaypoint(int Index, float* OutPos, unsigned*
                     continue;
                 if (Object.DockWith != BaseId)
                     continue;
-                // 004a09fb..004a0a5f
                 OutPos[0] = Object.Pos.x;
                 OutPos[1] = Object.Pos.y;
                 OutPos[2] = Object.Pos.z;
@@ -965,13 +952,13 @@ bool NeuroNetNavMap::RefreshWaypointItems()
     // FUN_00496e50.
     unsigned char bMoved = 0;
 
-    // 00496e5e..0049701a: one marker per player waypoint (created on first use).
+    // One marker per player waypoint (created on first use).
     int const WaypointCount = GetPlayerWaypointCountRetail(); // FUN_004c4690
     for (int Index = 0; Index < WaypointCount; ++Index)
     {
         if (WaypointItems[Index] == nullptr)
         {
-            // 00496e80..00496f4f: no null test of the new item, as in retail.
+            // No null test of the new item, as in retail.
             FNavMapItem* const Item =
                 AddItem(3, 0, 0.0f, 0.0f, 0.0f,
                         static_cast<float>(static_cast<double>(WaypointMarkerSize) +
@@ -986,14 +973,14 @@ bool NeuroNetNavMap::RefreshWaypointItems()
 
         FNavMapItem* const Item = WaypointItems[Index];
         FPlayerWaypointRecord const* const Record = GetPlayerWaypointRetail(Index); // FUN_004c46a0
-        // 00496f65..00496f72: the record's +0x0c is compared with the current system's id.
+        // The record's +0x0c is compared with the current system's id.
         if (Record == nullptr || Record->SystemId != CurrentSystem->GetId())
         {
             Item->bShown = 0;
             continue;
         }
 
-        // 00496f78..00497008: the first and the last waypoint show their id; the markers
+        // The first and the last waypoint show their id; the markers
         // between show none.
         int Number = Record->AutoId;
         if (Index > 0 && Index < WaypointCount - 1)
@@ -1004,7 +991,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         float const Pos[3] = {static_cast<float>(Scale * static_cast<double>(Record->Pos.x)),
                               static_cast<float>(Scale * static_cast<double>(Record->Pos.y)),
                               static_cast<float>(Scale * static_cast<double>(Record->Pos.z))};
-        // TEST AH,0x44 + JP: any component not equal (or unordered) moves the marker.
+        // x87: any component not equal (or unordered) moves the marker.
         if (!(Item->Position[0] == Pos[0]) || !(Item->Position[1] == Pos[1]) ||
             !(Item->Position[2] == Pos[2]) || Item->Variant != Number)
         {
@@ -1021,7 +1008,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
             WaypointItems[Index]->bShown = 0;
     }
 
-    // 00497043..0049724f: one marker per best-path waypoint.
+    // One marker per best-path waypoint.
     unsigned char bPathChanged = 0;
     int const PathCount = BestPathGetWaypointCount(); // FUN_004c4fb0
     int NextNumber = 1;
@@ -1041,7 +1028,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         }
 
         FNavMapItem* const Item = BestPathItems[Index];
-        // 00497143..00497180: the record's kind (low nibble of +0x18): 0xa numbered stops,
+        // The record's kind (low nibble of +0x18): 0xa numbered stops,
         // 9 no number, anything else -1. No null test of the record, as in retail.
         FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index); // FUN_004c4ff0
         unsigned const RecordKind = Waypoint->ObjectiveState & 0xf;
@@ -1052,7 +1039,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         else
             Item->Variant = -1;
 
-        // 00497180..004971a9: the record's own position (FUN_004c52d0), else FUN_004a0800.
+        // The record's own position (FUN_004c52d0), else FUN_004a0800.
         Vector Pos;
         unsigned SystemId = 0;
         bool bResolved = BestPathWaypointResolvePosition(Waypoint, &Pos, &SystemId);
@@ -1075,7 +1062,6 @@ bool NeuroNetNavMap::RefreshWaypointItems()
             continue;
         }
 
-        // 004971c1..00497237
         Item->bShown = 1;
         double const Scale = static_cast<double>(SystemScale);
         float const Scaled[3] = {static_cast<float>(static_cast<double>(Pos.x) * Scale),
@@ -1100,7 +1086,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
     if (bPathChanged != 0)
         RefreshMissionZones(); // FUN_004a0580
 
-    // 00497287..004972d6: the objectives follow the waypoints while there are some and no best
+    // The objectives follow the waypoints while there are some and no best
     // path with a text, else the best path.
     if (GetPlayerWaypointCountRetail() == 0 || !BestPathHasText())
     {
@@ -1116,14 +1102,13 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         }
     }
 
-    // 004972d6..004972e8
     if (G_bNavMapRouteChanged != 0)
     {
         RefreshObjectives();
         RefreshMissionInfo(); // FUN_0049a580
     }
 
-    // 004972ed..0049734e: the clear-all button with the waypoint count.
+    // The clear-all button with the waypoint count.
     if (GetPlayerWaypointCountRetail() != LastWaypointCount)
     {
         LastWaypointCount = GetPlayerWaypointCountRetail();
@@ -1143,7 +1128,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
 
 void NeuroNetNavMap::PlaceItems()
 {
-    // FUN_00496600. 00496609..00496797: the zoomed frame -- its size (MapSize * ZoomScale)
+    // FUN_00496600. The zoomed frame -- its size (MapSize * ZoomScale)
     // and its corner (the pan scaled, less the half size scaled), with retail's float stores.
     double const Zoom = static_cast<double>(ZoomScale);
     float const ZoomLess1 = static_cast<float>(Zoom - 1.0);
@@ -1176,14 +1161,13 @@ void NeuroNetNavMap::PlaceItems()
         FNavMapItem* const Item = *It;
         int const Kind = Item->Kind;
         int const Type = Item->Type;
-        // 004967b5..004967c2: stars and objects only with a type the mask lets through.
+        // Stars and objects only with a type the mask lets through.
         if ((Kind == 0 || Kind == 1) && (SolarTypeMask & static_cast<unsigned>(Type)) == 0)
             continue;
 
         if (Kind == 2)
         {
-            // 004967d1..00496872: the player marker pinned to the map's edge, pointing out.
-            // TEST AH,0x41 + JNE (greater) and TEST AH,5 + JP (less).
+            // The player marker pinned to the map's edge, pointing out.
             unsigned char const bWasClamped = bItemClamped;
             bItemClamped = 0;
             if (Item->Position[0] > kNavMapEdge)
@@ -1210,7 +1194,7 @@ void NeuroNetNavMap::PlaceItems()
                 bItemClamped = 1;
                 Item->Heading = 90.0f;
             }
-            // 00496872..00496a0b: the mesh follows the change -- the off-screen arrow, or the
+            // The mesh follows the change -- the off-screen arrow, or the
             // position marker back.
             if (bWasClamped != bItemClamped)
             {
@@ -1222,7 +1206,7 @@ void NeuroNetNavMap::PlaceItems()
         }
         else
         {
-            // 00496a0d..00496a6f: the rest clamped to the extents.
+            // The rest clamped to the extents.
             if (Item->Position[0] > MapExtentX)
                 Item->Position[0] = MapExtentX;
             if (-MapExtentX > Item->Position[0])
@@ -1233,7 +1217,7 @@ void NeuroNetNavMap::PlaceItems()
                 Item->Position[2] = -MapExtentZ;
         }
 
-        // 00496a71..00496b04: the item's place in the zoomed frame (z at the map plane).
+        // The item's place in the zoomed frame (z at the map plane).
         float const TwiceExtZ = static_cast<float>(static_cast<double>(MapExtentZ) +
                                                    static_cast<double>(MapExtentZ));
         double const U = (static_cast<double>(Item->Position[0]) + static_cast<double>(MapExtentX)) /
@@ -1246,7 +1230,7 @@ void NeuroNetNavMap::PlaceItems()
                                       (1.0 - V) * static_cast<double>(FrameY));
         Place[2] = static_cast<float>(static_cast<double>(OriginZ) + static_cast<double>(FrameZ));
 
-        // 00496b01..00496bc2: the size -- the markers (Kind 2 / 3 / 4) shrink with the zoom
+        // The size -- the markers (Kind 2 / 3 / 4) shrink with the zoom
         // (during a zoom from the start distance to the end one), the rest follow SystemScale.
         double Size = static_cast<double>(Item->Size);
         if (Kind == 2 || Kind == 3 || Kind == 4)
@@ -1284,7 +1268,7 @@ void NeuroNetNavMap::PlaceItems()
         float const MeshScale = static_cast<float>(Size * static_cast<double>(kNavMapMeshScale));
         Place[2] = kNavMapItemDepth; // overwrites the frame z computed above, as retail does
 
-        // 00496be0..00496cd2: the rotation about z by Heading (cos of the unrounded angle, sin
+        // The rotation about z by Heading (cos of the unrounded angle, sin
         // of the float one), scaled through I3DMathEngine::Scale, written back; then the
         // position and UpdateInstance.
         double const Radians = static_cast<double>(Item->Heading) *
@@ -1311,12 +1295,12 @@ void NeuroNetNavMap::PlaceItems()
         Engine->SetInstancePosition(Item->Mesh.EngineInstance, Place);
         Engine->UpdateInstance(Item->Mesh.EngineInstance, 0, nullptr);
 
-        // 00496cd5..00496d0e: an object with an id takes the visit map's flags; bit 0 shows it
+        // An object with an id takes the visit map's flags; bit 0 shows it
         // (or bDebugShowAll every one).
         if (Item->Id != 0)
         {
             unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0 0x00496ceb
+            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
             if (bDebugShowAll != 0)
@@ -1331,7 +1315,7 @@ void NeuroNetNavMap::PlaceItems()
 
 namespace
 {
-    // Update's text colour writes (0x00495cfd..0x00495dc9 and its copies): DAT_00679bb0 with
+    // Update's text colour writes (inlined several times): DAT_00679bb0 with
     // Alpha as its top byte, property 0x33 with bFlag, on the system name and the four faction
     // labels, then -- from a second copy of the same colour -- on the sixteen grid labels.
     void NavMapTintTexts(NeuroNetNavMap* Map, unsigned char Alpha, uintptr_t bFlag)
@@ -1358,7 +1342,7 @@ namespace
         return reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679bb0)[3];
     }
 
-    // The fade's alpha (0x00496075..0x004960a8): ftol((1 - Ease) * the palette's alpha byte).
+    // The fade's alpha: ftol((1 - Ease) * the palette's alpha byte).
     unsigned char NavMapFadeAlpha(float Ease)
     {
         int const PaletteAlpha = NavMapPaletteAlpha();
@@ -1369,13 +1353,13 @@ namespace
 
 void NeuroNetNavMap::Update()
 {
-    // LAB_00494920. Retail keeps the hover record(s) below in an SEH frame (0x005bca00); the
+    // LAB_00494920. Retail keeps the hover record(s) below in an SEH frame; the
     // port tears them down explicitly on its only (non-throwing) path.
     Win3D::Update();       // FUN_005a17b0
     ButtonMover::Update(); // FUN_0055e170 (+0x330)
     SyncSidePanels();      // FUN_004a1620
 
-    // 00494958..004949a8: the ship button shows unless the player's own system is open (not
+    // The ship button shows unless the player's own system is open (not
     // the universe) or a transition runs; SetProperty(1, hide) only on a change of the visible
     // bit.
     unsigned const ShownSystem = CurrentSystem->GetId();
@@ -1387,8 +1371,8 @@ void NeuroNetNavMap::Update()
     if (bShipButton != static_cast<unsigned char>((ShipButton->Flags >> 1) & 1))
         ShipButton->SetProperty(1, bShipButton == 0 ? 1u : 0u, 0);
 
-    // 004949ae..00494a17: the object tools close once the cursor moved away from where they
-    // opened (squared distance over 0.005, TEST AH,0x41 + JNE: only "greater" closes).
+    // The object tools close once the cursor moved away from where they opened (squared
+    // distance strictly over 0.005; unordered does not close).
     if (bObjectToolsShown != 0)
     {
         float Ray[3];
@@ -1410,7 +1394,7 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00494a1c..00494ae7: the map frame's corners from MapOrigin / MapSize.
+    // The map frame's corners from MapOrigin / MapSize.
     MapCorner0[0] = MapOrigin[0];
     MapCorner0[1] = MapOrigin[1];
     MapCorner0[2] = MapOrigin[2];
@@ -1440,7 +1424,7 @@ void NeuroNetNavMap::Update()
     MapCorner3[1] = static_cast<float>(static_cast<double>(MapSize[1]) +
                                        static_cast<double>(MapCorner3[1]));
 
-    // 00494ad8..00494b90: the first frame after Draw builds the system view; a requested focus
+    // The first frame after Draw builds the system view; a requested focus
     // point (FUN_004a2aa0) is scaled into the map and zoomed on.
     if (bSystemViewPending != 0 && bDrawnOnce != 0)
     {
@@ -1468,19 +1452,19 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00494b95..00494cf0: a pending system (set by MouseEvent / SetProperty) once no transition
+    // A pending system (set by MouseEvent / SetProperty) once no transition
     // runs.
     if (bTransition == 0 && PendingSystem != nullptr)
     {
         Universe::ISystem const* const Pending = PendingSystem;
         if (Pending == CurrentSystem && (ViewMode == 2 || ViewMode == 1))
         {
-            // 00494bc7: it is open -- done.
+            // It is open -- done.
             PendingSystem = nullptr;
         }
         else if (ViewMode != 1 && ViewMode != 2)
         {
-            // 00494be2..00494c42: the universe view zooms into its star first (sound 8); no
+            // The universe view zooms into its star first (sound 8); no
             // star, no switch.
             for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
             {
@@ -1499,7 +1483,7 @@ void NeuroNetNavMap::Update()
         }
         else
         {
-            // 00494c47..00494cf0: from a system straight to the other one.
+            // From a system straight to the other one.
             SetFilterMode(0); // FUN_004a0220
             CurrentSystem = PendingSystem;
             NavMapShowSystemName(SystemNameText, CurrentSystem, SkipSystemIds);
@@ -1514,7 +1498,7 @@ void NeuroNetNavMap::Update()
     unsigned char bRebuild = 0;
     float const FrameTime = static_cast<float>(GetClientFrameTimeCapped()); // FUN_0042d680
 
-    // 00494d06..004957e1: the hover tip -- skipped when the ToolTip was fed this frame or the
+    // The hover tip -- skipped when the ToolTip was fed this frame or the
     // info card / base list / known-objects filter mode (4 / 6 / 7) is up.
     if (!NnToolTipWasFedThisFrame() && G_NavMapFilterMode != 4 && G_NavMapFilterMode != 6 &&
         G_NavMapFilterMode != 7)
@@ -1529,7 +1513,7 @@ void NeuroNetNavMap::Update()
                 ToolTipHoverInit(&Record); // FUN_004144b0 + FUN_00413df0(0, -1), -1 / 0 / 0
                 if (Item->Kind == 4 && Item->TooltipText.c_str()[0] != L'\0')
                 {
-                    // 00494d5e..00494ff5: a best-path marker with its own text (wcscmp against
+                    // A best-path marker with its own text (wcscmp against
                     // L"" at DAT_005c8ce0) shows that text, always fed.
                     ToolTipHoverSetCaption(&Record, Item->TooltipText.c_str());
                     NavMapPlaceHoverAtCursor(&Record);
@@ -1537,7 +1521,7 @@ void NeuroNetNavMap::Update()
                 }
                 else
                 {
-                    // 00494ffa..004951c1: the item's name, keyed by the item; fed only with a
+                    // The item's name, keyed by the item; fed only with a
                     // name.
                     Record.IdsAlt = Item->StridName;
                     Record.Ids = static_cast<int>(reinterpret_cast<intptr_t>(Item));
@@ -1552,7 +1536,7 @@ void NeuroNetNavMap::Update()
                 int Rep = GroupMemberAt(MapPos); // FUN_004a21f0
                 if (Rep != -1)
                 {
-                    // 004951ed..00495587: a group member -- named (Reputation::Vibe::GetName's
+                    // A group member -- named (Reputation::Vibe::GetName's
                     // display name) unless it has an affiliation.
                     FToolTipHoverInfo Record;
                     ToolTipHoverInit(&Record);
@@ -1583,7 +1567,7 @@ void NeuroNetNavMap::Update()
                 }
                 else
                 {
-                    // 0049558c..004957b1: the smallest named, visited zone under the cursor
+                    // The smallest named, visited zone under the cursor
                     // (map units back to system units).
                     float const InvScale =
                         static_cast<float>(1.0 / static_cast<double>(SystemScale));
@@ -1611,7 +1595,7 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 004957e4..004959bf: the drag. A press (MouseEvent) arms it; with the left button still
+    // The drag. A press (MouseEvent) arms it; with the left button still
     // down and no transition it starts after more than 4 px (Manhattan) and pans the map by
     // twice the cursor's move over the frame's pixel size, clamped to half MapSize.
     if (bMouseDown != 0)
@@ -1646,7 +1630,7 @@ void NeuroNetNavMap::Update()
             PanOffset[1] = static_cast<float>(PanY + static_cast<double>(PanOffset[1]));
             PanOffset[2] = static_cast<float>(PanZ + static_cast<double>(PanOffset[2]));
 
-            // 004958e4..0049598e: TEST AH,0x41 + JNE -- each bound only when strictly passed;
+            // Each bound only when strictly passed;
             // the upper one is tested only when the lower one was not.
             float const HalfX = static_cast<float>(static_cast<double>(MapSize[0]) * 0.5);
             float const HalfY = static_cast<float>(static_cast<double>(MapSize[1]) * 0.5);
@@ -1667,7 +1651,7 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 004959c4..00495ba5: ScreenRect -- the frame's two corners (with G_NavMapScreenRectOffset's
+    // ScreenRect -- the frame's two corners (with G_NavMapScreenRectOffset's
     // offset, at z -1.25) through the Win3D camera, floored; then this map's own camera takes
     // the Win3D camera's near / far / half fov and ScreenRect as its viewport.
     FSpaceCamera* const SceneCamera = Win3DGetCamera(); // DAT_0067dbf8
@@ -1707,7 +1691,7 @@ void NeuroNetNavMap::Update()
     SpaceCameraSetHalfFovX(&Camera, SceneCamera->HalfFovXDeg); // FUN_0040f8c0
     SpaceCameraSetViewportEx(&Camera, Viewport, 1);           // FUN_0040fb80
 
-    // 00495baa..00495c4a: the system view follows the player (marker position / heading) and
+    // The system view follows the player (marker position / heading) and
     // the waypoints; the universe view pulses its stars.
     if (ViewMode != 0)
     {
@@ -1716,7 +1700,7 @@ void NeuroNetNavMap::Update()
             float Pos[3];
             float Heading = 0.0f;
             PlayerMapPosition(Pos, &Heading); // FUN_00491be0
-            // TEST AH,0x44 + JP: any difference (or unordered) moves the marker.
+            // x87: any difference (or unordered) moves the marker.
             if (!(Pos[0] == PlayerItem->Position[0]) || !(Pos[1] == PlayerItem->Position[1]) ||
                 !(Pos[2] == PlayerItem->Position[2]) || !(PlayerItem->Heading == Heading))
             {
@@ -1736,7 +1720,7 @@ void NeuroNetNavMap::Update()
         bRebuild = 1;
     }
 
-    // 00495c4f..00495c97: the blink flag toggles once per whole second.
+    // The blink flag toggles once per whole second.
     {
         double Blink = GetClientFrameTimeCapped() + static_cast<double>(BlinkTimer);
         BlinkTimer = static_cast<float>(Blink);
@@ -1753,15 +1737,15 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00495c9b..00496291: the transition.
+    // The transition.
     if (bTransition != 0)
     {
         double const Time = static_cast<double>(FrameTime) + static_cast<double>(TransitionTime);
         TransitionTime = static_cast<float>(Time);
-        // TEST AH,1 + JNE: still running while less (or unordered).
+        // x87: still running while less (or unordered).
         if (Time >= static_cast<double>(TransitionDuration))
         {
-            // 00495ccb..0049600e: it ended.
+            // It ended.
             int const View = TransitionView;
             TransitionTime = TransitionDuration;
             bTransition = 0;
@@ -1770,12 +1754,12 @@ void NeuroNetNavMap::Update()
                 bViewSwitch = 0;
                 if (ViewMode == 0)
                 {
-                    // 00495cfd..00495dd2: back on the universe -- the texts opaque again.
+                    // Back on the universe -- the texts opaque again.
                     NavMapTintTexts(this, NavMapPaletteAlpha(), 0);
                     RefreshMissionInfo(); // FUN_0049a580
                     return;
                 }
-                // 00495dd7..00495e0e: out of a system -- the universe view, faded back in.
+                // Out of a system -- the universe view, faded back in.
                 ZoomScale = 1.0f;
                 EnterUniverseView(); // FUN_0049e550
                 bViewSwitch = 1;
@@ -1790,12 +1774,11 @@ void NeuroNetNavMap::Update()
                 bViewSwitch = 0;
                 if (ViewMode == 1)
                 {
-                    // 00495e39..00495f07
                     NavMapTintTexts(this, NavMapPaletteAlpha(), 0);
                     RefreshMissionInfo();
                     return;
                 }
-                // 00495f0c..00495fb6: into the system -- its view, its name, faded back in.
+                // Into the system -- its view, its name, faded back in.
                 EnterSystemView(); // FUN_0049e1d0
                 NavMapShowSystemName(SystemNameText, CurrentSystem, SkipSystemIds);
                 bViewSwitch = 1;
@@ -1805,7 +1788,7 @@ void NeuroNetNavMap::Update()
                 TransitionDuration = kNavMapSwitchSeconds;
                 return;
             }
-            // 00495fd3..0049600e: a zoom ended -- the view is the target one; both zoomed map
+            // A zoom ended -- the view is the target one; both zoomed map
             // meshes opaque.
             ViewMode = View;
             ZoomedMapMesh.UserFloats[0] = 1.0f;
@@ -1818,7 +1801,7 @@ void NeuroNetNavMap::Update()
             ZoomedMapMesh2.UserFloats[4] = 1.0f;
         }
 
-        // 00496015..00496043: Ease = 1 - (cos(pi t / T) + 1) / 2.
+        // Ease = 1 - (cos(pi t / T) + 1) / 2.
         float const Ease = static_cast<float>(
             1.0 - (cos(static_cast<double>(TransitionTime) /
                        static_cast<double>(TransitionDuration) * static_cast<double>(kNavMapPi)) +
@@ -1827,7 +1810,7 @@ void NeuroNetNavMap::Update()
         TransitionEase = Ease;
         if (bViewSwitch != 0)
         {
-            // 00496057..00496199: a view switch fades the texts (out, then -- on the way into
+            // A view switch fades the texts (out, then -- on the way into
             // the target view -- back in); nothing moves.
             if (TransitionView == ViewMode)
                 TransitionEase = static_cast<float>(1.0 - static_cast<double>(Ease));
@@ -1835,7 +1818,7 @@ void NeuroNetNavMap::Update()
         }
         else
         {
-            // 0049619e..00496291: a zoom pans / scales towards the target.
+            // A zoom pans / scales towards the target.
             PanOffset[0] = static_cast<float>(static_cast<double>(Ease) *
                                               static_cast<double>(TransitionDelta[0]));
             PanOffset[1] = static_cast<float>(static_cast<double>(Ease) *
@@ -1870,7 +1853,7 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00496296..00496312: IClient slot 93's "no best path" answer shows NoBestPathText for 8 s.
+    // IClient slot 93's "no best path" answer shows NoBestPathText for 8 s.
     if (G_bNavMapNoBestPath != 0)
     {
         G_bNavMapNoBestPath = 0;
@@ -1881,7 +1864,7 @@ void NeuroNetNavMap::Update()
     {
         double const Left = static_cast<double>(NoBestPathTimer) - GetClientFrameTimeCapped();
         NoBestPathTimer = static_cast<float>(Left);
-        // TEST AH,0x41 + JP: hidden once less or equal (not while greater or unordered).
+        // x87: hidden once less or equal (not while greater or unordered).
         if (Left <= 0.0)
         {
             NoBestPathText->SetProperty(1, 1, 0);
@@ -1889,7 +1872,7 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00496318..00496371: in multiplayer the group's positions are asked for every 30 s
+    // In multiplayer the group's positions are asked for every 30 s
     // (IServer +0x12c with one zero dword).
     {
         double const Poll = GetClientFrameTimeCapped() + static_cast<double>(GroupPollTimer);
@@ -1907,7 +1890,6 @@ void NeuroNetNavMap::Update()
         }
     }
 
-    // 00496375..0049637d
     if (bRebuild != 0)
         PlaceItems();
 }

@@ -4,9 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll MarshalBuffer: the network message (de)serialiser. Both halves of the port live
-// here: the primitive / string / FmtStr / Costume members (formerly common_net.cpp) and the
-// EquipDescList / GoodDescList members (formerly common_goods.cpp).
+// Common.dll MarshalBuffer: the network message (de)serialiser -- the primitive / string /
+// FmtStr / Costume members and the EquipDescList / GoodDescList members.
 
 #include "common_net.h"
 #include "common_text.h"  // FmtStr -- complete type for put_FmtStr / get_FmtStr
@@ -35,9 +34,8 @@ MarshalBuffer::MarshalBuffer()
 
 MarshalBuffer& MarshalBuffer::operator=(const MarshalBuffer& Other)
 {
-    // Common.dll.c 10818-10833 (0x3b40, ICF-folded with Personality::RepairUseStruct::
-    // operator=): plain 6-dword raw copy of the whole 0x18-byte object, no self-assignment
-    // check.
+    // RVA 0x3b40 (ICF-folded with Personality::RepairUseStruct::operator=): a raw copy, no
+    // self-assignment check.
     BufferBase = Other.BufferBase;
     BufferSize = Other.BufferSize;
     Cursor = Other.Cursor;
@@ -59,7 +57,7 @@ void MarshalBuffer::clear()
 
 void MarshalBuffer::use_default()
 {
-    // Points to internal static buffer at DAT_063fd2c8 (0x4000 bytes in .data).
+    // The static 0x4000-byte buffer at DAT_063fd2c8.
     static unsigned char G_DefaultBuffer[0x4000];
     BufferBase = G_DefaultBuffer;
     BufferSize = 0x4000;
@@ -99,7 +97,7 @@ void MarshalBuffer::put_void(const void* Src, int Count)
     unsigned char* Dst = Cursor;
     const unsigned char* S = (const unsigned char*)Src;
 
-    // DWORD copy loop (matches retail's REP MOVSD), then the 0..3 tail bytes.
+    // Dwords, then the 0..3 tail bytes, as retail.
     unsigned int Dwords = (unsigned int)Count >> 2;
     for (unsigned int i = 0; i < Dwords; i++)
     {
@@ -108,7 +106,6 @@ void MarshalBuffer::put_void(const void* Src, int Count)
         Dst += 4;
     }
 
-    // Remaining bytes
     unsigned int Bytes = (unsigned int)Count & 3;
     for (unsigned int i = 0; i < Bytes; i++)
     {
@@ -164,9 +161,9 @@ void MarshalBuffer::put_U8(unsigned char Value)
 }
 
 // get_U8 / get_U16 / get_U32 / get_float (06263aa0 / 06263ad0 / 06263af0 / 06263b20) keep their
-// result in the stack slot made by PUSH ECX, so when get_void reads nothing (Count > Remaining)
-// they return the bytes of `this` that sit there: the high byte, the high word, the whole
-// pointer, the pointer's bits as a float. Very strange, reproduced on purpose.
+// result in the stack slot made by PUSH ECX, so when get_void reads nothing they return the
+// bytes of `this` that sit there: the high byte, the high word, the whole pointer, the
+// pointer's bits as a float. Retail quirk, reproduced on purpose.
 unsigned char MarshalBuffer::get_U8()
 {
     unsigned char V = (unsigned char)((std::uintptr_t)this >> 24);
@@ -226,7 +223,7 @@ float MarshalBuffer::get_float()
 
 void MarshalBuffer::put_bool(bool Value)
 {
-    // Retail writes a single byte directly (not via put_void)
+    // Retail writes the byte directly (not via put_void), with no bounds check.
     *Cursor = Value ? 1 : 0;
     Cursor++;
     Remaining--;
@@ -235,8 +232,8 @@ void MarshalBuffer::put_bool(bool Value)
 
 bool MarshalBuffer::get_bool()
 {
-    // 06312970..0631299c. An empty buffer compares the high byte of the pushed `this`
-    // (06312990) with 1 -- very strange, reproduced on purpose.
+    // FUN_06312970. An empty buffer compares the high byte of the pushed `this` with 1 -- a
+    // retail quirk, reproduced on purpose.
     if (Remaining >= 1)
     {
         unsigned char V = *Cursor;
@@ -253,7 +250,6 @@ void MarshalBuffer::put_string(const char* Str)
 {
     if (Str == nullptr)
     {
-        // Write sentinel -1
         int const Sentinel = -1;
         memcpy(Cursor, &Sentinel, 4);
         Cursor += 4;
@@ -276,9 +272,9 @@ void MarshalBuffer::put_string(const char* Str)
 
 char* MarshalBuffer::get_string()
 {
-    // 06312b70..06312bed. With fewer than 4 bytes left the length is the PUSH ECX slot, i.e.
-    // (unsigned)this (06312b92) -- very strange; any real object address is >= 0x4000, so
-    // that returns NULL. malloc is not tested (06312ba7).
+    // FUN_06312b70. With fewer than 4 bytes left the length is the PUSH ECX slot, i.e.
+    // (unsigned)this -- a retail quirk; a real object address is >= 0x4000, so that returns
+    // NULL. malloc is not tested.
     unsigned int Len = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
     {
@@ -298,12 +294,11 @@ char* MarshalBuffer::get_string()
 
 void MarshalBuffer::get_string_to_buffer(char* Buf, int MaxLen)
 {
-    // 06312bf0..06312cd3. EBX = MaxLen - 1, compared UNSIGNED with the length (JA).
+    // FUN_06312bf0. MaxLen - 1 is compared unsigned with the length.
     unsigned int const Cap = (unsigned int)(MaxLen - 1);
 
-    // With fewer than 4 bytes left the length is read from the Buf argument's own slot
-    // (06312c18), i.e. (unsigned)Buf -- very strange; for a real pointer (>= 0x4000) that
-    // ends in Buf[0] = 0.
+    // With fewer than 4 bytes left the length is read from the Buf argument's own slot, i.e.
+    // (unsigned)Buf -- a retail quirk; for a real pointer (>= 0x4000) that ends in Buf[0] = 0.
     unsigned int Len = (unsigned int)(std::uintptr_t)Buf;
     if (Remaining >= 4)
     {
@@ -320,11 +315,8 @@ void MarshalBuffer::get_string_to_buffer(char* Buf, int MaxLen)
 
     if (Len > Cap)
     {
-        // Truncating: only Cap bytes fit in Buf, but retail still consumes the FULL Len
-        // bytes from the wire so later reads stay cursor-aligned (Common.dll.c:155975-155996;
-        // a prior version of this port only advanced by Cap here, desyncing the cursor for
-        // every read after a too-small destination buffer truncated a string).
-        // 06312c76..06312cc5: the inlined get_void of Cap bytes, Buf[Cap] = 0, then the rest.
+        // Truncating: only Cap bytes fit in Buf, but retail still consumes the full Len bytes
+        // so later reads stay cursor-aligned.
         get_void(Buf, (int)Cap);
         Buf[Cap] = '\0';
         Cursor += (Len - Cap);
@@ -332,7 +324,6 @@ void MarshalBuffer::get_string_to_buffer(char* Buf, int MaxLen)
     }
     else
     {
-        // 06312c38..06312c6e: the inlined get_void of Len bytes, Buf[Len] = 0.
         get_void(Buf, (int)Len);
         Buf[Len] = '\0';
     }
@@ -365,9 +356,8 @@ void MarshalBuffer::put_wstring(const wchar_t* Str)
 
 wchar_t* MarshalBuffer::get_wstring()
 {
-    // 06312a40..06312ac3, the wide twin of get_string: fewer than 4 bytes left -> the length
-    // is (unsigned)this from the PUSH ECX slot (06312a62, very strange) -> NULL for any real
-    // object; malloc(Len*2 + 2) is not tested; the inlined get_void of Len*2 bytes.
+    // FUN_06312a40, the wide twin of get_string (same `this`-as-length quirk; malloc not
+    // tested).
     unsigned int CharLen = (unsigned int)(std::uintptr_t)this;
     if (Remaining >= 4)
     {
@@ -410,8 +400,8 @@ void MarshalBuffer::put_FL_ID(unsigned int Id)
 
 unsigned int MarshalBuffer::get_FL_ID()
 {
-    // 06313560..06313584. Fewer than 4 bytes left returns the pushed `this` (0631357e) --
-    // very strange, reproduced on purpose.
+    // FUN_06313560. Fewer than 4 bytes left returns the pushed `this` -- a retail quirk,
+    // reproduced on purpose.
     if (Remaining >= 4)
     {
         unsigned int Id = *(unsigned int*)Cursor;
@@ -422,30 +412,19 @@ unsigned int MarshalBuffer::get_FL_ID()
     return (unsigned int)(std::uintptr_t)this;
 }
 
-// --- Complex type marshalling (stubbed — depend on unported types) ---
+// --- Complex type marshalling ---
 
 void MarshalBuffer::put_FmtStr(const FmtStr& Fmt)
 {
-    // Common.dll.c 156025-156069 (0xb2ce0): compute an upper-bound size by walking the node
-    // list (FUN_06312d80, a per-node recursive sizer -- header 6 + each node's own
-    // contribution, +3 extra for a nested FmtStr on top of ITS OWN recursive total), malloc
-    // that much, flatten() into it, then copy out exactly what flatten() reports writing (its
-    // real return value, not the pre-computed bound -- matches retail's `uVar5 =
-    // FmtStr::flatten(...); if (uVar5 != 0) { ...copy uVar5 bytes... }`).
-    //
-    // FmtStr::Val::get_flattened_size() (common_fmtstr.cpp) already implements this exact
-    // per-node recursion (6 + children's sizes + 3 for a nested subtree, 0x17/7 for a leaf),
-    // so this just sums it over the top-level list instead of duplicating one hand-rolled
-    // level of nesting here (a prior version only unrolled one level manually, which
-    // under-counted a FmtStr nested more than one level deep).
+    // RVA 0xb2ce0: an upper-bound size from the recursive per-node sizer (FUN_06312d80, the
+    // same recursion as FmtStr::Val::get_flattened_size), flatten() into a temporary, then
+    // exactly what flatten() reports writing is copied out. The allocation is not tested.
     unsigned int TotalSize = 6;
     for (FmtStr::Val const* Node = Fmt.Head; Node != nullptr; Node = Node->Next)
         TotalSize += Node->get_flattened_size();
 
-    // 06312d25 operator new / 06312d6c operator delete (FUN_06391d5a); the block is not tested.
     unsigned char* TempBuf = new unsigned char[TotalSize];
     int const Written = Fmt.flatten(TempBuf, TotalSize);
-    // 06312d3a: TEST EAX,EAX / JZ, then the inlined put_void of Written bytes.
     if (Written != 0)
     {
         put_void(TempBuf, Written);
@@ -456,10 +435,9 @@ void MarshalBuffer::put_FmtStr(const FmtStr& Fmt)
 
 FmtStr MarshalBuffer::get_FmtStr()
 {
-    // 06312dd0..06312e8f: unflatten(Cursor, 0) into a local (the size argument is 0), then
-    // Remaining and Cursor move by unflatten's own return value. Retail then copy-constructs
-    // the result from the local and destroys the local; returning the local directly has the
-    // same effect.
+    // FUN_06312dd0: unflatten with a size argument of 0; the cursor moves by its result.
+    // Retail copy-constructs the result from the local; returning the local has the same
+    // effect.
     FmtStr Result;
     int const Consumed = Result.unflatten(Cursor, 0);
     Remaining -= Consumed;
@@ -468,34 +446,16 @@ FmtStr MarshalBuffer::get_FmtStr()
 }
 
 // ---------------------------------------------------------------------------
-// MarshalBuffer::put_EquipDescList / get_EquipDescList (Common.dll 0xb2ea0 /
-// 0xb2ff0). Declared in common_net.h; defined here since EquipDescList is an
-// EQUIP-batch type.
+// MarshalBuffer::put_EquipDescList / get_EquipDescList (0xb2ea0 / 0xb2ff0).
 //
-// The Ghidra .c decomp of get_EquipDescList mis-resolves several of the
-// per-field setter calls to unrelated classes (CPlayerTradeOffer::
-// SetSourcePlayerID, CNudgeEngine::SetOwner, DamageList::set_cause,
-// DamageList::set_destroyed) -- these are linker /OPT:ICF folds: the actual
-// call targets are one-line "store this-relative field" stubs byte-identical
-// to unrelated classes' setters, and Ghidra just labels the merged code with
-// whichever symbol it happened to keep. Field order/widths below were
-// recovered by computing each call's real target address from the raw .txt
-// disassembly and reading that address's own bytes directly (not trusting
-// the misleading names):
-//   0x06309b30 ("SetSourcePlayerID") -> MOV [this+0x4],param   (ArchId, u32)
-//   0x06309b40 ("set_hardpoint")     -> deref param, [this+0x8]=*param (Hardpoint)
-//   0x0633bad0 ("SetOwner")          -> MOV [this+0x14],param  (Count, u32)
-//   0x06332f50 ("set_cause")         -> MOV [this+0x10],param  (Health, u32/float)
-//   0x06309b20 ("set_id")            -> MOV word[this+0x2],param (Id, u16)
-//   0x06309b50 ("set_destroyed")     -> MOV byte[this+0xc],param (bEquipped, u8)
-// put_EquipDescList's own body (not ICF-folded, verified directly) confirms
-// the same seven fields in the same order via raw cursor writes.
-// Wire format: item count (int), then per item: ArchId (u32), Hardpoint
-// (length-prefixed string -- null encoded as length -1, same format as
-// PutString/GetString), Count (int), Health (float), Id (u16 widened to a
-// full 4-byte slot on both sides), bEquipped (byte, normalized 0/1),
-// bMission (byte, normalized 0/1). EquipDesc::Cached (+0x00) and Owner
-// (+0x1c) are never on the wire in this format.
+// Ghidra names several of get_EquipDescList's setter calls after unrelated classes
+// (SetSourcePlayerID, SetOwner, set_cause, set_destroyed): these are /OPT:ICF folds of
+// one-line field stores. The real targets: 0x06309b30 ArchId (+0x4), 0x06309b40 Hardpoint
+// (+0x8), 0x0633bad0 Count (+0x14), 0x06332f50 Health (+0x10), 0x06309b20 Id (+0x2, u16),
+// 0x06309b50 bEquipped (+0xc).
+// Wire format: item count (int), then per item: ArchId (u32), Hardpoint (length-prefixed,
+// null as -1), Count (int), Health (float), Id (u16 widened to 4 bytes), bEquipped (byte
+// 0/1), bMission (byte 0/1). EquipDesc::Cached (+0x00) and Owner (+0x1c) are not on the wire.
 // ---------------------------------------------------------------------------
 
 void MarshalBuffer::put_EquipDescList(const EquipDescList& List)
@@ -523,8 +483,7 @@ EquipDescList MarshalBuffer::get_EquipDescList()
         EquipDesc Item;
         Item.ArchId = get_U32();
 
-        // 063130a1-063130e9: the malloc'd text (null for length -1 or >= 0x4000) goes to
-        // StringAlloc(text, false) and is never freed -- retail leaks it on every item.
+        // The malloc'd text is never freed -- retail leaks it on every item.
         char* HpText = get_string();
         CacheString HpCache;
         HpCache.Value = StringAlloc(HpText, false);
@@ -542,11 +501,8 @@ EquipDescList MarshalBuffer::get_EquipDescList()
 }
 
 // ---------------------------------------------------------------------------
-// MarshalBuffer::put_GoodDescList / get_GoodDescList (Common.dll 0xb3250 /
-// 0xb3330). Declared in common_net.h; defined here since GoodDescList is a
-// GOODS-batch type. Wire format: item count (int) followed, per item, by
-// GoodId (u32), Count (int), Price (float), Field0C (float) -- the same four
-// raw dwords GoodDesc's own default ctor initializes.
+// MarshalBuffer::put_GoodDescList / get_GoodDescList (0xb3250 / 0xb3330). Wire format: item
+// count (int), then per item GoodId (u32), Count (int), Price (float), Field0C (float).
 // ---------------------------------------------------------------------------
 
 void MarshalBuffer::put_GoodDescList(const GoodDescList& List)
@@ -562,8 +518,7 @@ void MarshalBuffer::put_GoodDescList(const GoodDescList& List)
     }
 }
 
-// Retail allocates each element with ??2GoodDesc (0x063133a6) and reads the four
-// dwords straight into it before appending.
+// Retail allocates each element with ??2GoodDesc and reads straight into it.
 GoodDescList MarshalBuffer::get_GoodDescList()
 {
     GoodDescList Result;
@@ -582,9 +537,8 @@ GoodDescList MarshalBuffer::get_GoodDescList()
 
 void MarshalBuffer::put_Costume(const Costume& C)
 {
-    // 06313590..06313672. Wire format: the four part ids, the accessory count, then exactly
-    // that many accessory ids (signed loop, no clamp to 8). Every dword is stored raw at the
-    // cursor with no bounds check, as put_FL_ID does.
+    // FUN_06313590: the four part ids, the accessory count, then that many accessory ids
+    // (signed loop, no clamp to 8), with no bounds check.
     for (int Index = 0; Index < 4; ++Index)
         put_FL_ID(C.PartIds[Index]);
     put_FL_ID(C.AccessoryCount);
@@ -594,15 +548,11 @@ void MarshalBuffer::put_Costume(const Costume& C)
 
 Costume MarshalBuffer::get_Costume()
 {
-    // 06313680..0631377c. The inverse of put_Costume: four part ids, the count (stored into
-    // the local's +0x30), then count accessory ids into +0x10 + 4*i, the bound re-read each
-    // pass (a count above 8 runs into the count slot itself, as in retail). Every read is an
-    // inline `Remaining >= 4` read into one register. The local is then copied out whole
-    // (REP MOVSD, 13 dwords).
-    // Named gap (retail UB): a short read of the first five dwords stores the hidden return
-    // pointer (063136a0 ...), the loop starts from it too (0631373a) and then keeps the
-    // previous value; accessory slots past the count are never written (stack garbage). The
-    // port uses 0 for the return pointer and zeroes the local.
+    // FUN_06313680, the inverse of put_Costume. The loop bound is re-read each pass, so a count
+    // above 8 runs into the count slot itself, as in retail. A short read keeps the previous
+    // value. Deviation: retail's short read of the first five dwords stores the hidden return
+    // pointer and unwritten accessory slots are stack garbage; the port uses 0 and zeroes the
+    // local.
     Costume C;
     memset(&C, 0, sizeof(C));
     unsigned int Scratch = 0;
@@ -643,24 +593,24 @@ Costume MarshalBuffer::get_Costume()
 
 bool MarshalBuffer::is_empty() const
 {
-    // Common.dll.txt 0x06263a80: *(this+0xc) == 0, i.e. exactly Remaining == 0.
+    // 0x06263a80
     return Remaining == 0;
 }
 
 int MarshalBuffer::get_num_written() const
 {
-    // .text:06263a70: MOV EAX,[this+0x10]; RET.
+    // .text:06263a70
     return NumWritten;
 }
 
 unsigned char const* MarshalBuffer::get_buffer() const
 {
-    // .text:06261d90: MOV EAX,[this]; RET (shared ICF body).
+    // .text:06261d90 (shared ICF body).
     return BufferBase;
 }
 
 int MarshalBuffer::get_buffer_size() const
 {
-    // .text:062d1ad0: MOV EAX,[this+0x4]; RET (shared ICF body).
+    // .text:062d1ad0 (shared ICF body).
     return BufferSize;
 }

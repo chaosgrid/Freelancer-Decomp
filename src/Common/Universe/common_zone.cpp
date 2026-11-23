@@ -11,15 +11,12 @@
 // it stores a float (FSTP dword). The bodies below keep that split: a value retail keeps on
 // the stack is a double here, a value retail stores to a float local is a float here, and
 // the slots whose result other slots consume in-register (+0x00, +0x3c, +0x40, +0x48) return
-// double, so the caller sees the unrounded value, as in retail. A single
-// float operation followed by a float store is written as plain float arithmetic (the 53-bit
-// intermediate rounds to the same float).
+// double, so the caller sees the unrounded value, as in retail. A single float operation
+// followed by a float store is written as plain float arithmetic (the 53-bit intermediate
+// rounds to the same float).
 //
-// Comparison idioms (FCOM / FNSTSW AX / TEST AH,mask / Jcc), as used in the comments:
-//   TEST 5 / JP     taken when ST >= src or unordered      TEST 5 / JNP   taken when ST < src
-//   TEST 0x41 / JNZ taken when ST <= src or unordered      TEST 0x41 / JZ taken when ST > src
-//   TEST 0x41 / JP  taken when ST > src or unordered       TEST 1 / JNZ   taken when ST < src or unordered
-//   TEST 0x44 / JP  taken when ST != src or unordered
+// Comparisons are written (`!(a >= b)` and the like) so that an unordered (NaN) operand takes
+// the same branch as retail's FCOM / TEST AH / Jcc sequence.
 
 #include "common_zone.h"
 #include "common_archetype.h" // CacheString
@@ -183,9 +180,8 @@ namespace
         return ClampPointToBoxSurface((unsigned char*)&Frame, &Src, &Dst);
     }
 
-    // The frame every shape builds from the zone: retail first sets the matrix to identity
-    // (FUN_062748a0 / FUN_062db740) and then copies the zone's 12 dwords at +0x0c over it
-    // (REP MOVSD, ECX = 0xc), so only the copy survives.
+    // The frame every shape builds from the zone (its 12 dwords at +0x0c); retail's identity
+    // initialisation before the copy does not survive.
     FZoneFrame ZoneFrame(Universe::IZone const& Zone)
     {
         FZoneFrame Frame;
@@ -202,11 +198,8 @@ namespace
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kSystemsSource, Line, kZoneTypeNotSupported);
     }
 
-    // FUN_06339f20 (thiscall, RET 4). .text:06339f25-06339f31 copy the 9 matrix dwords to
-    // +0x3c, .text:06339f33-06339f49 copy Radii to +0x30, then each column of the copy is
-    // scaled by that axis's squared radius: column 0 (+0x3c/+0x48/+0x54) by r0*r0,
-    // column 1 (+0x40/+0x4c/+0x58) by r1*r1, column 2 (+0x44/+0x50/+0x5c) by r2*r2.
-    // Each product is FLD r / FLD ST0 / FMULP (r*r on the stack), FMUL [elem], FSTP [elem].
+    // FUN_06339f20 (thiscall). Each column of the matrix copy is scaled by that axis's squared
+    // radius (r*r kept on the x87 stack).
     void EllipsoidSetRadii(FZoneEllipsoid& Ellipsoid, Vector const& Radii)
     {
         Ellipsoid.Scaled = Ellipsoid.Orientation;
@@ -222,10 +215,7 @@ namespace
         }
     }
 
-    // FUN_06339fb0 (thiscall). The smallest radius:
-    //   FLD r0 / FCOMP r1 / TEST 5 / JP -> r0 >= r1 (or unordered): pick between r1 and r2;
-    //   otherwise FLD r0 / FCOMP r2 / TEST 5 / JP -> r2 when r0 >= r2, else r0.
-    //   LAB_06339fce: FLD r1 / FCOMP r2 / TEST 5 / JP -> r2 when r1 >= r2, else r1.
+    // FUN_06339fb0 (thiscall): the smallest radius.
     float EllipsoidMinRadius(FZoneEllipsoid const& Ellipsoid)
     {
         float const R0 = Ellipsoid.Radius[0];
@@ -242,11 +232,8 @@ namespace
         return R2;
     }
 
-    // FUN_0633dc90 (thiscall, RET 4). The ellipsoid's radius along a unit local direction:
-    //   A = r0*r0, B = r1*r1, C = r2*r2 (stack);
-    //   S = (x*x*C*B + z*z*B*A) + y*y*C*A (each product left to right, stored as a double);
-    //   P = (A * (C*B)) * S; FCOM 1e-4 (double .rdata:0639c2b8) / TEST 0x41 / JNZ -> 0.0f when
-    //   P <= 1e-4 or unordered; else sqrt(P) / S.
+    // FUN_0633dc90 (thiscall): the ellipsoid's radius along a unit local direction. 1e-4 is the
+    // double .rdata:0639c2b8.
     double EllipsoidRadiusAlong(FZoneEllipsoid const& Ellipsoid, Vector const& Dir)
     {
         double const A = (double)(Ellipsoid.Radius[0]) * Ellipsoid.Radius[0];
@@ -262,12 +249,7 @@ namespace
         return sqrt(Product) / Sum;
     }
 
-    // The ring's surface scale along a unit tube direction W -- inlined twice in retail, at
-    // .text:0633a49b-0633a4f6 (slot +0x44) and .text:0633a89b-0633a8f6 (slot +0x48):
-    //   HalfH = Size.z * 0.5 (double 0.5); Cutoff = HalfH / sqrt(Size.x^2 + HalfH^2);
-    //   FCOMPP |W.y| vs Cutoff / TEST 0x41 / JNZ -> the radial branch when |W.y| <= Cutoff or
-    //   unordered; otherwise HalfH / |W.y|. Radial: ((Size.x - Size.y) * 0.5) /
-    //   sqrt(W.z^2 + W.x^2).
+    // The ring's surface scale along a unit tube direction W, inlined in slots +0x44 and +0x48.
     double RingSurfaceScale(Vector const& Size, Vector const& W)
     {
         double const HalfH = (double)Size.z * 0.5;
@@ -279,10 +261,9 @@ namespace
                sqrt((double)(W.z) * W.z + (double)(W.x) * W.x);
     }
 
-    // The clip functions' shared tail (cylinder .text:063353cf, ring .text:06335a9a, box
-    // .text:0633625f): the hit point Start + (End - Start) * T. The x product is stored as a
-    // float before the add, y stays on the stack, and z's difference is stored as a float
-    // before the multiply.
+    // The clip functions' shared tail (cylinder, ring, box): Start + (End - Start) * T. The x
+    // product is stored as a float before the add, y stays on the stack, and z's difference is
+    // stored as a float before the multiply.
     void WriteClipPoint(FZoneSegment const& Segment, float T, Vector& Out)
     {
         double const DeltaX = (double)(Segment.End.x) - Segment.Start.x;
@@ -295,11 +276,6 @@ namespace
     }
 
     // FUN_06334ac0 (cdecl): where the segment enters the sphere.
-    //   D = End - Start, F = Start - Center (FUN_0628b030, float);
-    //   A = float((Dz^2 + Dy^2) + Dx^2); B = (Dz*Fz + Dy*Fy) + Fx*Dx (stack);
-    //   C0 = (Fz^2 + Fy^2) + Fx^2; Disc = float(B^2 - (C0 - R^2) * A).
-    //   Disc vs 0.0 (double .rdata:0639c430): TEST 1 / JNZ -> false when < 0 or unordered;
-    //   TEST 0x41 / JNZ -> the tangent case when <= 0 (so == 0 here).
     bool ClipSegmentSphere(FZoneSphere const& Sphere, FZoneSegment const& Segment, Vector& Out)
     {
         Vector const D = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
@@ -320,9 +296,8 @@ namespace
 
         if (!(Disc > 0.0f))
         {
-            // LAB_06334c7e: T = -(B / A); FST float; T vs 0.0 (TEST 1 / JNZ -> false when < 0
-            // or unordered); the float T vs 1.0 (TEST 0x41 / JP -> false when > 1 or
-            // unordered). x and y are Delta * T + Start on the stack, z's product is stored.
+            // Tangent. The 0 test uses the unrounded T, the 1 test the float; z's product is
+            // stored as a float.
             double const T = -(B / A);
             float const TF = (float)T;
             if (!(T >= 0.0))
@@ -336,13 +311,10 @@ namespace
             return true;
         }
 
-        // .text:06334bb7-06334bdf: T1 = float((-B - sqrt) * (1/A)), T2 = float((sqrt - B) * (1/A)).
         double const Root = sqrt((double)(Disc));
         double const InvA = 1.0 / A;
         float const T1 = (float)((-B - Root) * InvA);
         float const T2 = (float)((Root - B) * InvA);
-        // T1 vs 1.0: TEST 0x41 / JZ -> false when T1 > 1. T2 vs 0.0: TEST 5 / JNP -> false when
-        // T2 < 0. T1 vs 0.0f: TEST 1 / JNZ -> T2 when T1 < 0 or unordered, else T1.
         if (T1 > 1.0f)
             return false;
         if (T2 < 0.0f)
@@ -367,8 +339,7 @@ namespace
                                          Segment.End.z - Ellipsoid.Pos.z);
         Vector const LocalEnd = EngineTransposeTransform(Ellipsoid.Orientation, EndRel);
 
-        // .text:06334da2-06334e54: FLD 1.0f / FDIV radius stays on the stack; the start
-        // uses all three unrounded, the end's z uses the inverse after FST float.
+        // The inverses stay on the stack; only the end's z uses the float-rounded inverse.
         double const InvX = 1.0 / Ellipsoid.Dim[0];
         double const InvY = 1.0 / Ellipsoid.Dim[1];
         double const InvZ = 1.0 / Ellipsoid.Dim[2];
@@ -387,7 +358,6 @@ namespace
         bool const bHit = ClipSegmentSphere(UnitSphere, Unit, Out);
         if (bHit)
         {
-            // .text:06334e84-06334f1b.
             Out = MakeVector(Out.x * Ellipsoid.Dim[0], Ellipsoid.Dim[1] * Out.y, Out.z * Ellipsoid.Dim[2]);
             Out = EngineTransformMatrix(Ellipsoid.Orientation, Out);
             Out = MakeVector(Ellipsoid.Pos.x + Out.x, Ellipsoid.Pos.y + Out.y, Ellipsoid.Pos.z + Out.z);
@@ -397,17 +367,9 @@ namespace
 
     // One side-wall pass of the cylinder and ring clips: the roots of the circle equation in
     // the local XZ plane, kept only when inside the height band. TBest is the best parameter
-    // so far (2.0f on entry to the first pass) and is also the upper limit here -- the
-    // cylinder and the ring's outer pass compare against 2.0f (.rdata:063a0498) while TBest
-    // is still 2.0f, the ring's inner pass against TBest itself.
-    //   Disc > 0 (TEST 0x41 / JNZ not taken): T1 = float((-B - sqrt) / 2A),
-    //     T2 = float((sqrt - B) / 2A). T1 counts when T1 >= 0.0 (TEST 1 / JNZ), T1 <= limit
-    //     (TEST 0x41 / JP) and HalfH >= |Dy * T1 + LS.y| (TEST 1 / JNZ), Dy = LE.y - LS.y on
-    //     the stack (stored as a float for the T2 test). Then TBest = T2 if T2 >= 0.0,
-    //     T2 <= T1 and HalfH >= |DyF * T2 + LS.y|, else T1. When T1 does not count, T2 does
-    //     under T2 >= 0.0, T2 <= limit and the height test with Dy recomputed.
-    //   Disc == 0 (TEST 0x44 / JP not taken): T = -B / 2A, counts when T >= 0.0 (stack),
-    //     float T <= limit and the height test.
+    // so far (2.0f, .rdata:063a0498, on entry to the first pass) and is also the upper limit
+    // here. Dy is kept on the stack for the T1 height test and rounded to float for the
+    // following T2 test; when T1 does not count, the T2 test recomputes it unrounded.
     void ClipSideWall(float A, double B, double Disc, Vector const& LS, Vector const& LE, float HalfH,
                       float& TBest)
     {
@@ -447,11 +409,8 @@ namespace
         }
     }
 
-    // A cap plane of the cylinder / ring at local height where Num = +-HalfH - LS.y.
-    // The plane counts when (Dir.y > 0 and Num > 0) or (Dir.y < 0 and Num < 0) (each TEST
-    // 0x41 / JZ or TEST 5 / JP against 0.0f); then T = Num / Dir.y on the stack must be > 0
-    // (TEST 0x41 / JNZ) and its float below TBest (TEST 5 / JP). The crossing is
-    // X = LS.x + float(DxF * T), Z = LS.z + DzF * T (stack), S = Z^2 + X^2.
+    // A cap plane of the cylinder / ring at local height where Num = +-HalfH - LS.y. The > 0
+    // test uses the unrounded T, the TBest test its float.
     bool CapCrossing(float Num, float DirY, Vector const& LS, float DxF, float DzF, float TBest, float& OutT,
                      double& OutRadialSq)
     {
@@ -481,7 +440,6 @@ namespace
                                          Segment.End.z - Cylinder.Pos.z);
         Vector const LE = EngineTransposeTransform(Cylinder.Orientation, EndRel);
 
-        // .text:06334fd6-06335050.
         float const HalfH = (float)((double)(Cylinder.Dim[1]) * 0.5);
         float TBest = 2.0f;
         double const Dx = (double)(LE.x) - LS.x;
@@ -497,7 +455,7 @@ namespace
 
         ClipSideWall(A, B, Disc, LS, LE, HalfH, TBest);
 
-        // .text:063351da-063353ad: the two caps, with the segment direction in local space.
+        // The two caps, with the segment direction in local space.
         Vector const Along = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
                                         Segment.End.z - Segment.Start.z);
         Vector const LD = EngineTransposeTransform(Cylinder.Orientation, Along);
@@ -512,8 +470,6 @@ namespace
         if (CapCrossing(Num2, LD.y, LS, DxF, DzF, TBest, CapT, RadialSq) && RadiusSq > RadialSq)
             TBest = CapT;
 
-        // TBest vs 0.0f: TEST 1 / JNZ -> false when < 0 or unordered; vs 1.0: TEST 0x41 / JP ->
-        // false when > 1 or unordered.
         if (!(TBest >= 0.0f))
             return false;
         if (!(TBest <= 1.0f))
@@ -532,7 +488,7 @@ namespace
                                          Segment.End.z - Ring.Pos.z);
         Vector const LE = EngineTransposeTransform(Ring.Orientation, EndRel);
 
-        // .text:063354d0-0633554a: the outer wall, as in the cylinder.
+        // The outer wall, as in the cylinder.
         float const HalfH = (float)((double)(Ring.Dim[2]) * 0.5);
         float TBest = 2.0f;
         double const Dx = (double)(LE.x) - LS.x;
@@ -547,13 +503,12 @@ namespace
         double const OuterDisc = B * B - ((C0 - Outer * Outer) * A) * 4.0f;
         ClipSideWall(A, B, OuterDisc, LS, LE, HalfH, TBest);
 
-        // .text:063356ca-063356e1: the inner wall with the same B and C0, limited by TBest.
+        // The inner wall with the same B and C0, limited by TBest.
         double const Inner = Ring.Dim[1];
         double const InnerDisc = B * B - ((C0 - Inner * Inner) * A) * 4.0f;
         ClipSideWall(A, B, InnerDisc, LS, LE, HalfH, TBest);
 
-        // .text:06335865-06335a78: the caps count between the two radii: S < outer^2
-        // (TEST 5 / JP) and S > inner^2 (TEST 0x41 / JNZ).
+        // The caps count between the two radii.
         Vector const Along = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
                                         Segment.End.z - Segment.Start.z);
         Vector const LD = EngineTransposeTransform(Ring.Orientation, Along);
@@ -598,9 +553,8 @@ namespace
                                          Segment.End.z - Box.Pos.z);
         Vector const LE = EngineTransposeTransform(Box.Orientation, EndRel);
 
-        // .text:06335bb6-06335c33: a start inside the box (each FCOMPP / TEST 0x41 / JNZ,
-        // half extent > |coordinate|; x compares the unrounded half) returns the start in the
-        // box's LOCAL frame, not the world -- retail writes the local vector at [ESP+0x14].
+        // Retail quirk kept: a start inside the box returns the start in the box's LOCAL frame,
+        // not the world. x compares the unrounded half extent.
         double const HalfX = (double)(Box.Dim[0]) * 0.5;
         float const HalfXF = (float)(HalfX);
         float const HalfYF = (float)((double)(Box.Dim[1]) * 0.5);
@@ -616,9 +570,7 @@ namespace
         Vector const LD = EngineTransposeTransform(Box.Orientation, Along);
         float TBest = 2.0f;
 
-        // X faces (.text:06335c80-06335e7b): LD.x > 0 (TEST 0x41 / JNZ) uses Num = -HalfX - LS.x
-        // > 0, LD.x < 0 (TEST 5 / JP) uses Num = HalfX - LS.x < 0. T = float(Num / LD.x) is
-        // NOT compared with TBest.
+        // X faces. T is NOT compared with TBest.
         {
             double Num = 0.0;
             bool bFace = false;
@@ -641,8 +593,7 @@ namespace
             }
         }
 
-        // Y faces (.text:06335e7d-06336090): as X, but T on the stack must be below TBest
-        // (TEST 5 / JP).
+        // Y faces: as X, but the unrounded T must be below TBest.
         {
             double Num = 0.0;
             bool bFace = false;
@@ -669,8 +620,8 @@ namespace
             }
         }
 
-        // Z faces (.text:06336090-0633624e). The +Z face adds the Q * T products on the
-        // stack to LS and stores the point; the -Z face stores x and keeps y on the stack.
+        // Z faces. The +Z face adds the Q * T products on the stack to LS and stores the point;
+        // the -Z face stores x and keeps y on the stack.
         if (LD.z > 0.0f)
         {
             double const Num = -(double)(HalfZF) - LS.z;
@@ -707,8 +658,7 @@ namespace
             }
         }
 
-        // .text:0633624e: only the upper bound (TEST 0x41 / JP -> false when > 1.0 or
-        // unordered); there is no lower-bound test in the box clip.
+        // Only the upper bound: there is no lower-bound test in the box clip.
         if (!(TBest <= 1.0f))
             return false;
         WriteClipPoint(Segment, TBest, Out);
@@ -725,8 +675,8 @@ namespace
     float const kCullHalfPi = 1.5707964f;  // .rdata:0639f5d4 (float)
     float const kCullPi = 3.1415927f;      // .rdata:0639d208 (float)
 
-    // .data:DAT_063edc78 (int 5): the number of steps of FrustumCull's far-cap sweep. Retail
-    // reads it again on every iteration (MOV EAX / FIDIV).
+    // .data:DAT_063edc78: the number of steps of FrustumCull's far-cap sweep, re-read on every
+    // iteration.
     int GFrustumCapSteps = 5;
 
     // The plane FUN_0632f8b0 builds: unit normal, then the offset along it.
@@ -752,16 +702,14 @@ namespace
         return MakeVector(Rotation.E[0][Column], Rotation.E[1][Column], Rotation.E[2][Column]);
     }
 
-    // FUN_062c5a70 (thiscall, RET 4): each component negated.
+    // FUN_062c5a70
     Vector VecNegate(Vector const& V)
     {
         return MakeVector(-V.x, -V.y, -V.z);
     }
 
-    // FUN_0632f8b0 (thiscall, RET 8): Normal = N, then scaled by 1.0f / sqrt((x*x + y*y) + z*z)
-    // (FDIVR float 1.0); each scaled component is stored (FST) but stays on the stack, and
-    // D = (Nz'*Pz + Ny'*Py) + Nx'*Px from those unrounded values. No guard: a zero normal
-    // gives inf * 0, as in retail.
+    // FUN_0632f8b0 (thiscall). D is computed from the unrounded normalised components. No guard:
+    // a zero normal gives inf * 0, as in retail.
     void CullPlaneSet(FCullPlane& Plane, Vector const& Point, Vector const& N)
     {
         Plane.Normal = N;
@@ -777,8 +725,7 @@ namespace
         Plane.D = (float)((NZ * Point.z + NY * Point.y) + NX * Point.x);
     }
 
-    // FUN_0633d150 (thiscall, RET 8): h = Angle * 0.5f (on the stack);
-    // k = sin(h) / sqrt((x*x + y*y) + z*z) stored as float; W = cos(h); X/Y/Z = k * axis.
+    // FUN_0633d150 (thiscall).
     void CullQuatFromAxisAngle(FCullQuat& Quat, Vector const& Axis, float Angle)
     {
         double const Half = (double)(Angle) * kCullHalf;
@@ -825,11 +772,9 @@ namespace
                           (float)((double)(SumZ) - SpinZ));
     }
 
-    // FUN_0633d5d0 (cdecl, Out / V / Axis / Angle): FUN_0633d150 and FUN_0633d040 in one body,
-    // with its own float stores: the quaternion as above; the three 2W (V x q) terms, the three
-    // 2 (q . V) q terms and the three (2W^2 - 1) V terms are each built through the Vector ctor
-    // (FUN_0628b030, floats); the x / y sums stay on the stack, the z sum is a float. The dot
-    // is summed x, y, z here (FUN_0633d040 sums z, y, x).
+    // FUN_0633d5d0 (cdecl): FUN_0633d150 and FUN_0633d040 in one body but with its own float
+    // stores -- each term vector is rounded to float, and the dot is summed x, y, z
+    // (FUN_0633d040 sums z, y, x).
     Vector CullRotateAboutAxis(Vector const& V, Vector const& Axis, float Angle)
     {
         FCullQuat Quat;
@@ -859,14 +804,9 @@ namespace
                           (float)((double)(SumZ) - Spin.z));
     }
 
-    // FUN_0633cc20 (thiscall on the frustum, RET 8): side Index of the frustum as a plane.
-    //   0: through the apex, normal -column 2;
-    //   1: through apex - column 2 * Distance, normal column 2;
-    //   2 / 3: through the apex, normal -column 2 turned about column 1 by
-    //          AngleX * 0.5f - pi/2 / pi/2 - AngleX * 0.5f (FUN_0633d150 + FUN_0633d040);
-    //   4 / 5: the same about column 0 with AngleY;
-    //   above 5 (CMP 5 / JA, unsigned): point and normal zero.
-    // Every case ends in FUN_0632f8b0.
+    // FUN_0633cc20 (thiscall on the frustum): side Index of the frustum as a plane. 0 near,
+    // 1 far, 2 / 3 the sides turned about column 1 by AngleX, 4 / 5 about column 0 by AngleY;
+    // above 5 the point and normal are zero.
     FCullPlane FrustumPlane(Geometry::Frustum const& Frustum, unsigned Index)
     {
         Vector const& Apex = Frustum.Xform.Translation;
@@ -895,7 +835,6 @@ namespace
             Vector const Axis = FrustumColumn(Frustum, bHorizontal ? 1 : 0);
             Vector const Back = VecNegate(FrustumColumn(Frustum, 2));
             double const HalfAngle = (double)(bHorizontal ? Frustum.AngleX : Frustum.AngleY) * kCullHalf;
-            // Cases 2 / 4: FSUB pi/2; cases 3 / 5: FSUBR pi/2.
             float const Angle = (Index == 2 || Index == 4)
                 ? (float)(HalfAngle - kCullHalfPi)
                 : (float)(kCullHalfPi - HalfAngle);
@@ -915,12 +854,9 @@ namespace
         return Plane;
     }
 
-    // FUN_0633cb50 (thiscall on the ellipsoid, RET 4): which side of Plane the ellipsoid lies.
-    // The 3x3 built with FUN_06284f70 from the scaled matrix's columns is its transpose;
-    // V = that * Normal (engine vt+0x2c through DAT_0658a9b0); Dist = (Py*Ny + Pz*Nz) +
-    // Nx*Px - D; Q = (Vz*Nz + Vx*Nx) + Vy*Ny.
-    //   FCOMPP Q vs Dist^2 / TEST 0x41 / JP -> 0 when Q > Dist^2 or unordered (it straddles);
-    //   FCOMP Dist vs 0.0f / TEST 5 / JNP -> 2 when Dist < 0, otherwise 1.
+    // FUN_0633cb50 (thiscall on the ellipsoid): which side of Plane the ellipsoid lies -- 0 when
+    // it straddles (or unordered), 2 behind, 1 in front. The transpose is built with
+    // FUN_06284f70.
     int EllipsoidPlaneSide(FZoneEllipsoid const& Ellipsoid, FCullPlane const& Plane)
     {
         Matrix Transposed;
@@ -944,13 +880,10 @@ namespace
         return 1;
     }
 
-    // FUN_0633d1e0 (cdecl, Frustum / Sphere): true when the sphere lies wholly on the outer
-    // side of one of the six sides. The sides are built as FUN_0633cc20 builds them, except
-    // that cases 2 / 3 / 5 turn the normal with FUN_0633d5d0 (case 4 keeps FUN_0633d150 +
-    // FUN_0633d040). Per side: Dist = ((Nx*Cx + Nz*Cz) + Ny*Cy) - D;
-    //   FCOM Dist vs R / TEST 0x41 / JNZ -> 1 when Dist > R;
-    //   else FCOMPP Dist vs -R / TEST 5 / JP -> 2 when Dist < -R, else 0;
-    // the first 2 returns true. (Retail keeps the six results in a local array nobody reads.)
+    // FUN_0633d1e0 (cdecl): true when the sphere lies wholly on the outer side of one of the six
+    // sides. The sides are built as FUN_0633cc20 builds them, except that cases 2 / 3 / 5 turn
+    // the normal with FUN_0633d5d0 (case 4 keeps FUN_0633d150 + FUN_0633d040). Retail keeps the
+    // six results in a local array nobody reads.
     bool FrustumCullsSphere(Geometry::Frustum const& Frustum, FZoneSphere const& Sphere)
     {
         Vector const& Apex = Frustum.Xform.Translation;
@@ -1016,13 +949,9 @@ namespace
         return false;
     }
 
-    // FUN_0633daa0 (thiscall on a frame whose Dim holds half extents, RET 4): signed squared
-    // distance from Point to the box surface, negative inside. Delta = Point - Pos (floats),
-    // Local = engine vt+0x38 (DAT_0658a9b0) transpose(Orientation) * Delta. Per axis
-    // e = |L| - Dim (stored float); FCOMP 0.0f / TEST 1 / JNZ keeps L unless e >= 0, where the
-    // closest coordinate becomes _copysign(Dim, L) and the point counts as outside. Inside on
-    // all three axes, the axis with the largest e is snapped (each FCOMP / TEST 1 / JNZ moves
-    // on when the left side is smaller or unordered). The z coordinate stays on the stack.
+    // FUN_0633daa0 (thiscall on a frame whose Dim holds half extents): signed squared distance
+    // from Point to the box surface, negative inside. Inside on all three axes, the axis with
+    // the largest excess is snapped to the surface. The z coordinate stays on the stack.
     double BoxSignedDistanceSq(FZoneFrame const& Frame, Vector const& Point)
     {
         Vector const Delta = MakeVector(Point.x - Frame.Pos.x, Point.y - Frame.Pos.y, Point.z - Frame.Pos.z);
@@ -1083,12 +1012,9 @@ namespace
         return Value;
     }
 
-    // FUN_0633dd10 (thiscall on the ellipsoid, RET 4): Point's distance outside the surface.
-    // dx and dz stay on the stack, dy is stored as float; Length = sqrt((dx^2 + dz^2) + dy^2),
-    // stored as float. FCOMP 1e-4 (double .rdata:0639c2b8) / TEST 5 / JP -> continue when
-    // >= or unordered; below it the result is -(smallest radius) (the FUN_06339fb0 chain,
-    // inlined). Otherwise the unit direction (1.0 / float length, double .rdata:06399410) goes
-    // through engine vt+0x38 (DAT_0658a9b0) and the result is Length - FUN_0633dc90(local).
+    // FUN_0633dd10 (thiscall on the ellipsoid): Point's distance outside the surface. dy is
+    // rounded to float, dx / dz are not. Within 1e-4 of the centre the result is -(smallest
+    // radius).
     double EllipsoidSignedDistance(FZoneEllipsoid const& Ellipsoid, Vector const& Point)
     {
         double const DX = (double)(Point.x) - Ellipsoid.Pos.x;
@@ -1106,9 +1032,7 @@ namespace
         return LengthF - EllipsoidRadiusAlong(Ellipsoid, Local);
     }
 
-    // The ellipsoid FrustumCull and SphereCull build from a zone: identity / zero position
-    // (FUN_062748a0 and three zero stores), GetSize (vt+0x28), the zone's 12 transform dwords
-    // from vt+0x0c over it (REP MOVSD), then FUN_06339f20 with the size.
+    // The ellipsoid FrustumCull and SphereCull build from a zone.
     FZoneEllipsoid CullEllipsoid(Universe::IZone const& Zone)
     {
         FZoneEllipsoid Ellipsoid;
@@ -1120,13 +1044,12 @@ namespace
         return Ellipsoid;
     }
 
-    // One step of FrustumCull's far-cap sweep: a = Step * Sweep / steps (FILD / FMUL float /
-    // FIDIV int); the plane through Center with normal Dir(a) (FUN_0628b030 + FUN_0632f8b0);
-    // true when FUN_0633cb50 puts the ellipsoid on side 1.
+    // One step of FrustumCull's far-cap sweep: true when the ellipsoid lies in front of the
+    // step's plane.
     bool CapStepCulls(FZoneEllipsoid const& Ellipsoid, Vector const& Center, float Sweep, int Step, bool bHorizontal)
     {
         double const Angle = ((double)(Step) * Sweep) / GFrustumCapSteps;
-        // FCOS; FCHS; FSTP dword and FSIN; FSTP dword: one rounding each (negation is exact).
+        // One rounding each (negation is exact).
         float const Sin = X87SinF(Angle);
         float const NegCos = -X87CosF(Angle);
         Vector const Dir = bHorizontal ? MakeVector(Sin, 0.0f, NegCos) : MakeVector(0.0f, Sin, NegCos);
@@ -1136,12 +1059,7 @@ namespace
     }
 }
 
-// FUN_06337250 .text:063375cd-06337710 builds the zone it parses into on the stack with
-// these values before reading the [Zone] block: ID_String::clear at +0x04 / +0x08 / +0x6c,
-// identity at +0x0c, pos 0, size 0 (FUN_0628b030), CacheString::clear at +0x70, fog colour
-// (1, 1, 1), the population's default constructor, the vftable, shape 0, mesh -1, edge 0,
-// physical effect -1, drag 1.0, damage 0, interference 0, cached radius -1.0f, spacedust
-// particles 0, loot 0, path label 0, visit 0x20, ids name / info 0, property flags 0.
+// Inlined in FUN_06337250 (the stack ZONE, .text:063375cd).
 ZONE::ZONE()
 {
     NicknameId = 0;
@@ -1159,7 +1077,7 @@ ZONE::ZONE()
     Interference = 0.0f;
     CachedRadius = -1.0f;
     MusicId = 0;
-    ((CacheString*)&Spacedust)->clear(); // CacheString::clear (+0x70)
+    ((CacheString*)&Spacedust)->clear(); // +0x70
     SpacedustMaxParticles = 0;
     FogColor = MakeVector(1.0f, 1.0f, 1.0f);
     OwnedLootEntry = nullptr;
@@ -1167,37 +1085,30 @@ ZONE::ZONE()
     Visit = 0x20;
     IdsName = 0;
     IdsInfo = 0;
-    // (.text:06337662-06337676 also calls CreateID(0) and drops the result: no effect.)
+    // (Retail also calls CreateID(0) and drops the result: no effect.)
 }
 
-// FUN_0633e3f0 (thiscall, RET 4): the member-wise copy the universe loader makes of its stack
-// ZONE twice per inserted zone (into the {id, ZONE} pair at .text:06337db1, and the pair into
-// the zone map node by FUN_0633df60). +0x04..+0x8c copied as they are (mesh handle and loot
-// pointer included, so every copy's destructor releases them again, as in retail); the
-// population vector gets a new buffer of exactly its size; then the ZONE vftable.
+// FUN_0633e3f0: memberwise, the mesh handle and loot pointer included -- so every copy's
+// destructor releases them again, as in retail (see InsertZone).
 ZONE::ZONE(ZONE const& Other) = default;
 
 // FUN_06339010.
 ZONE::~ZONE()
 {
-    // .text:06339034-06339050: a loaded mesh goes back to the engine (DALib::Engine vt+0x3c,
-    // ReleaseHandle) and the handle is reset.
     if (MeshHandle != -1)
     {
         DALib::Engine->ReleaseHandle((void*)MeshHandle);
         MeshHandle = -1;
     }
-    // .text:06339057-06339067: the owned loot record (FUN_06391d5a is free()).
+    // FUN_06391d5a is free().
     if (OwnedLootEntry != nullptr)
         free(OwnedLootEntry);
-    // .text:0633906a-06339089: the population buffer -- IZone::Population's destructor.
 }
 
 // LAB_0633ac30.
 double ZONE::GetImmersion(Vector const& Point) const
 {
-    // .text:0633ac39-0633ac7d: outside the bounding sphere (FCOMPP radius^2 vs distance^2,
-    // TEST 5 / JP taken on >= or unordered) the answer is 0.0f.
+    // Outside the bounding sphere the answer is 0.
     float const Dx = Point.x - Pos.x;
     float const Dy = Point.y - Pos.y;
     float const Dz = Point.z - Pos.z;
@@ -1207,84 +1118,80 @@ double ZONE::GetImmersion(Vector const& Point) const
     if (Radius * Radius < DistSq)
         return 0.0;
 
-    // .text:0633ac96-0633acad: vt+0x48 on the point; FST float; vs 1.0 (double) with TEST 1 /
-    // JNZ -> the ramp when below 1.0 or unordered, else 0.0f.
+    // The 1.0 test uses the unrounded value, the ramp its float.
     double const Value = ClassifyPoint(Point);
     float const ValueF = (float)(Value);
     if (Value >= 1.0)
         return 0.0;
 
-    // .text:0633acbd-0633acf5: (1.0 - edge) vs the float value, TEST 0x41 / JZ -> 1.0f when
-    // greater; edge vs 1e-4 (double), TEST 5 / JNP -> 1.0f when below; else (1 - v) / edge.
     if ((1.0 - EdgeFraction) > ValueF)
         return 1.0;
     if (EdgeFraction < 1.0e-4)
         return 1.0;
-    return (1.0 - ValueF) / EdgeFraction; // left on the stack (.text:0633ace3-0633acee)
+    return (1.0 - ValueF) / EdgeFraction; // left on the stack
 }
 
-// 062d1ad0 (ICF): MOV EAX,[ECX+0x4].
+// 062d1ad0 (ICF) [+0x4]
 unsigned ZONE::GetId() const
 {
     return NicknameId;
 }
 
-// 062a66a0 (ICF): MOV EAX,[ECX+0x8].
+// 062a66a0 (ICF) [+0x8]
 unsigned ZONE::GetSystem() const
 {
     return SystemId;
 }
 
-// 062d1ae0 (ICF, also slot +0x14): LEA EAX,[ECX+0xc] -- the orientation and position as one
-// transform.
+// 062d1ae0 (ICF, also slot +0x14) [+0xc]: the orientation and position as one transform.
 Transform const& ZONE::GetTransform() const
 {
     return *(Transform const*)&Orientation;
 }
 
-// 063390a0: LEA EAX,[ECX+0x30].
+// 063390a0 [+0x30]
 Vector const& ZONE::GetPos() const
 {
     return Pos;
 }
 
-// 062d1ae0 (ICF with slot +0x0c): LEA EAX,[ECX+0xc].
+// 062d1ae0 (ICF with slot +0x0c)
 Matrix const& ZONE::GetOrientation() const
 {
     return Orientation;
 }
 
-// 0626c6b0 (ICF): MOV EAX,[ECX+0x3c].
+// 0626c6b0 (ICF) [+0x3c]
 unsigned ZONE::GetShape() const
 {
     return Shape;
 }
 
-// 062a6690 (ICF): MOV EAX,[ECX+0x40].
+// 062a6690 (ICF) [+0x40]
 unsigned long ZONE::GetProperties() const
 {
     return PropertyFlags;
 }
 
-// 063390b0: (flags & 0x18000) != 0 through NEG / SBB / NEG.
+// 063390b0
 bool ZONE::Slot20() const
 {
     return (PropertyFlags & 0x18000) != 0;
 }
 
-// 063390c0: LEA EAX,[ECX+0x78].
+// 063390c0 [+0x78]
 Vector const& ZONE::GetFogColor() const
 {
     return FogColor;
 }
 
-// 063390d0: copies +0x44 through the hidden result pointer (RET 4).
+// 063390d0 [+0x44]
 Vector ZONE::GetSize() const
 {
     return Size;
 }
 
-// 063390f0 (ICF): MOV EAX,[ECX+0x50].
+// 063390f0 (ICF) [+0x50]
 long ZONE::GetMeshHandle() const
 {
     return MeshHandle;
@@ -1293,27 +1200,22 @@ long ZONE::GetMeshHandle() const
 // LAB_06339100.
 float ZONE::GetRadius() const
 {
-    // .text:06339104-06339112: FLD [this+0x68]; FCOMP 0.0f (.rdata:06399408); TEST AH,5; JP ->
-    // the cached value is returned unless it is below 0.0f (a NaN is returned too).
+    // The cached value (+0x68) is returned unless it is below 0.0f (a NaN is returned too).
     if (!(CachedRadius < 0.0f))
         return CachedRadius;
 
-    // .text:06339118-0633912d: switch (Shape - 1), five cases. The sums and square roots stay
-    // on the stack and are rounded once when stored to +0x68.
+    // The sums and square roots stay on the stack and are rounded once when stored to +0x68.
     double const X = Size.x;
     double const Y = Size.y;
     double const Z = Size.z;
     switch (Shape)
     {
     case Universe::ZoneShapeSphere:
-        // caseD_1 .text:06339134.
         CachedRadius = Size.x;
         break;
 
     case Universe::ZoneShapeEllipsoid:
     {
-        // caseD_2 .text:06339140-0633916a: FLD x; FLD y; FCOMPP; TEST AH,5; JP -> y unless
-        // y < x; then FCOM z; JP -> keep it unless it is < z.
         float Largest = (Size.y < Size.x) ? Size.x : Size.y;
         if (Largest < Size.z)
             Largest = Size.z;
@@ -1322,37 +1224,33 @@ float ZONE::GetRadius() const
     }
 
     case Universe::ZoneShapeBox:
-        // caseD_3 .text:06339173-0633919a: sqrt((x*x + y*y) + z*z) * 0.5 (double .rdata:0639df88).
+        // 0.5 is the double .rdata:0639df88.
         CachedRadius = (float)(sqrt((X * X + Y * Y) + Z * Z) * 0.5);
         break;
 
     case Universe::ZoneShapeCylinder:
-        // caseD_4 .text:063391a3 -> LAB_063391ab: sqrt(x*x + (y*y) * 0.25) (double .rdata:063a0618).
+        // 0.25 is the double .rdata:063a0618.
         CachedRadius = (float)(sqrt(X * X + (Y * Y) * 0.25));
         break;
 
     case Universe::ZoneShapeRing:
-        // caseD_5 .text:063391a8 -> LAB_063391ab: the same with z (+0x4c).
         CachedRadius = (float)(sqrt(X * X + (Z * Z) * 0.25));
         break;
 
     default:
-        // .text:063391d0-063391f8: FDUMP line 0x35c, then retail caches FLD [ESP+0x18] -- the
-        // PUSH ECX slot, zeroed at .text:0633911f (C7 44 24 04 00000000) before the switch.
+        // Retail caches a stack slot zeroed before the switch.
         ZoneTypeNotSupported(0x35c);
         CachedRadius = 0.0f;
         break;
     }
-    // .text:063391fb: FLD [this+0x68].
     return CachedRadius;
 }
 
 // LAB_06339220.
 bool ZONE::InZone(Vector const& Point, float Margin) const
 {
-    // .text:0633922c-06339276: z's difference is FST'd to a float and multiplied on the stack
-    // by that float; the squared distance vs 1e-4f (.rdata:063a4ab4) with TEST 5 / JP -> the
-    // shape test when >= or unordered, else true.
+    // z's difference is multiplied unrounded by its own float rounding. 1e-4f is
+    // .rdata:063a4ab4.
     float const Dx = Point.x - Pos.x;
     float const Dy = Point.y - Pos.y;
     double const DzExact = (double)(Point.z) - Pos.z;
@@ -1362,24 +1260,18 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
     if (DistSq < 1.0e-4f)
         return true;
 
-    // .text:06339283-063392a2: vt+0x30 + Margin, squared; the stored distance vs it with
-    // TEST 5 / JP -> false when >= or unordered.
+    // The bounding-sphere test uses the float-rounded distance.
     double const Reach = (double)(GetRadius()) + Margin;
     if (!(DistSqF < Reach * Reach))
         return false;
 
-    // .text:063392a8-063392b5: switch (Shape - 1), table .text:06339650.
     switch (Shape)
     {
     case Universe::ZoneShapeSphere:
-        // .text:0633942a.
         return true;
 
     case Universe::ZoneShapeEllipsoid:
     {
-        // .text:063392bc-06339319: the unit direction (1.0f / float length on the stack),
-        // vt+0x40 on it plus Margin vs the float length, TEST 1 / JNZ -> false when below or
-        // unordered.
         float const Length = (float)(sqrt((double)(DistSqF)));
         double const Inv = 1.0 / Length;
         Vector const Dir = MakeVector((float)(Dx * Inv), (float)(Dy * Inv),
@@ -1391,10 +1283,7 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeBox:
     {
-        // .text:0633931f-06339424: the box frame with half extents Size * 0.5f, the point in
-        // its local frame (FUN_062dbb90), clamped to the surface (FUN_062dba00); the squared
-        // distance to the clamp, negated when the point was inside, vs Margin^2 with TEST 5 /
-        // JP -> false when >= or unordered.
+        // Signed squared distance to the surface (negative inside) against Margin^2.
         FZoneFrame Frame = ZoneFrame(*this);
         Frame.Dim[0] = Size.x * 0.5f;
         Frame.Dim[1] = Size.y * 0.5f;
@@ -1415,10 +1304,6 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeCylinder:
     {
-        // .text:06339437-063394f8: the point in the zone's frame (engine vt+0x38).
-        //   Size.y * 0.5 vs |L.y| - Margin: TEST 1 / JNZ -> false when below or unordered.
-        //   (L.x^2 + L.z^2) - ((2m + Size.x) * Size.x + m^2) vs 0.0f: TEST 5 / JP -> false
-        //   when >= 0 or unordered.
         Vector const Delta = MakeVector(Point.x - Pos.x, Point.y - Pos.y, Point.z - Pos.z);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         if (!((double)Size.y * 0.5 >= fabs((double)Local.y) - Margin))
@@ -1433,12 +1318,6 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeRing:
     {
-        // .text:063394fb-063395f4:
-        //   Inner = float(sqrt(Size.y^2 + Size.z^2 * 0.25));
-        //   Size.z * 0.5 vs |L.y| - Margin: TEST 1 / JNZ -> false when below or unordered;
-        //   S - ((2m + Size.x) * Size.x + m^2) vs 0.0f: TEST 0x41 / JP -> false when > 0 or
-        //   unordered; S - ((2 Inner + Size.y) * Size.y + Inner^2) vs 0.0f: TEST 1 / JNZ ->
-        //   false when < 0 or unordered.
         Vector const Delta = MakeVector(Point.x - Pos.x, Point.y - Pos.y, Point.z - Pos.z);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         float const Inner = (float)(sqrt((double)Size.y * Size.y +
@@ -1458,11 +1337,10 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
     }
 
     case Universe::ZoneShapeMesh:
-        // .text:063395f7-063395fc: both outcomes of the mesh-handle test return false.
+        // Both outcomes of retail's mesh-handle test return false.
         return false;
 
     default:
-        // .text:06339610-0633963d: FDUMP line 0x3bc, return false.
         ZoneTypeNotSupported(0x3bc);
         return false;
     }
@@ -1471,7 +1349,6 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
 // LAB_06339670: slot +0x34 in the zone's XZ plane -- the y difference is 0.0f throughout.
 bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
 {
-    // .text:0633967e-063396c2.
     float const Dx = Point.x - Pos.x;
     float const Dy = 0.0f;
     float const Dz = Point.z - Pos.z;
@@ -1480,7 +1357,6 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
     if (DistSq < 1.0e-4f)
         return true;
 
-    // .text:063396d1-063396f1.
     double const Reach = (double)(GetRadius()) + Margin;
     if (!(DistSqF < Reach * Reach))
         return false;
@@ -1488,12 +1364,10 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
     switch (Shape)
     {
     case Universe::ZoneShapeSphere:
-        // .text:0633989f.
         return true;
 
     case Universe::ZoneShapeEllipsoid:
     {
-        // .text:0633970b-0633976f.
         float const Length = (float)(sqrt((double)(DistSqF)));
         double const Inv = 1.0 / Length;
         Vector const Dir = MakeVector((float)(Dx * Inv), (float)(Dy * Inv),
@@ -1505,9 +1379,8 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeBox:
     {
-        // .text:06339772-06339899: as slot +0x34, but the frame's position has y = 0
-        // (.text:063397b4 stores 0 at the copied transform's +0x28) and the squared distance
-        // sums (dy^2 + dz^2) + dx^2.
+        // As slot +0x34, but the frame's position has y = 0 and the squared distance sums
+        // (dy^2 + dz^2) + dx^2.
         FZoneFrame Frame = ZoneFrame(*this);
         Frame.Pos.y = 0.0f;
         Frame.Dim[0] = Size.x * 0.5f;
@@ -1529,8 +1402,7 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeCylinder:
     {
-        // .text:063398b3-0633997c: the height test is |0.0| - Margin (FLD double 0.0 /
-        // FABS / FSUB) -- the height never excludes the point.
+        // The height test is |0.0| - Margin: the height never excludes the point.
         Vector const Delta = MakeVector(Point.x - Pos.x, Point.y - Pos.y, Point.z - Pos.z);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         if (!((double)Size.y * 0.5 >= fabs(0.0) - Margin))
@@ -1545,7 +1417,6 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
 
     case Universe::ZoneShapeRing:
     {
-        // .text:0633997f-06339a84.
         Vector const Delta = MakeVector(Point.x - Pos.x, Point.y - Pos.y, Point.z - Pos.z);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         float const Inner = (float)(sqrt((double)Size.y * Size.y +
@@ -1565,25 +1436,21 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
     }
 
     case Universe::ZoneShapeMesh:
-        // .text:06339a87-06339a8c: false either way.
         return false;
 
     default:
-        // .text:06339aa2-06339ad3: FDUMP line 0x421, return false.
         ZoneTypeNotSupported(0x421);
         return false;
     }
 }
 
-// LAB_06339b00: switch (Shape - 1) over four cases, table .text:06339f04; every other shape
-// (ring, mesh, invalid) takes the general path.
+// LAB_06339b00. Ring, mesh and invalid shapes take the general path.
 double ZONE::GetDistance(Vector const& Point) const
 {
     switch (Shape)
     {
     case Universe::ZoneShapeSphere:
     {
-        // .text:06339b1f-06339b62: sqrt((dz^2 + dy^2) + dx^2) - Size.x, left on the stack.
         Vector const Delta = Vec3Sub(Point, Pos);
         return sqrt(((double)Delta.z * Delta.z + (double)Delta.y * Delta.y) +
                     (double)Delta.x * Delta.x) -
@@ -1593,11 +1460,9 @@ double ZONE::GetDistance(Vector const& Point) const
     case Universe::ZoneShapeCylinder:
     case Universe::ZoneShapeBox:
     {
-        // Cylinder .text:06339b65-06339c76 and box .text:06339c7b-06339d88, joined at
-        // LAB_06339d8c. The cylinder is measured as a box of half extents
-        // {Size.x, float(Size.y * 0.5), Size.x}; the box uses Size * 0.5f (FUN_06288830).
-        // Retail runs the clamp twice: the first pass feeds engine vt+0x28 (TransformXform)
-        // whose result the second pass's Vec3Sub overwrites unread.
+        // The cylinder is measured as a box of half extents {Size.x, Size.y * 0.5, Size.x}.
+        // Retail runs the clamp twice: the first pass feeds TransformXform, whose result is
+        // overwritten unread.
         FZoneFrame Frame = ZoneFrame(*this);
         if (Shape == Universe::ZoneShapeCylinder)
         {
@@ -1625,8 +1490,6 @@ double ZONE::GetDistance(Vector const& Point) const
         bool const bOutside = ClampToBoxSurface(Frame, Local2, Clamped2);
         Vector const Diff = Vec3Sub(Local2, Clamped2);
 
-        // LAB_06339d8c: FUN_062c4780, negated when inside; FCOM 0.0f / TEST 5 / JP -> sqrt
-        // when >= 0 or unordered, else -sqrt(-value).
         double Value = VecLengthSq(Diff);
         if (!bOutside)
             Value = -Value;
@@ -1637,7 +1500,6 @@ double ZONE::GetDistance(Vector const& Point) const
 
     case Universe::ZoneShapeEllipsoid:
     {
-        // .text:06339dc7-06339e82.
         FZoneEllipsoid Ellipsoid;
         Ellipsoid.Orientation = Orientation;
         Ellipsoid.Pos = Pos;
@@ -1645,18 +1507,17 @@ double ZONE::GetDistance(Vector const& Point) const
         Vector Delta = Vec3Sub(Point, Ellipsoid.Pos);
         double const Length = VecLength(Delta);
         float const LengthF = (float)Length;
-        // FCOMP 1e-4 (double .rdata:0639c2b8) / TEST 5 / JP -> continue when >= or unordered.
         if (Length < 1.0e-4)
             return -EllipsoidMinRadius(Ellipsoid);
         VecScaleInPlace(Delta, (float)(1.0 / LengthF));
         Vector const Local = MathTransposeTransform(Ellipsoid.Orientation, Delta);
-        return LengthF - EllipsoidRadiusAlong(Ellipsoid, Local); // FSUBR, left on the stack
+        return LengthF - EllipsoidRadiusAlong(Ellipsoid, Local); // left on the stack
     }
 
     default:
     {
-        // .text:06339e85-06339efe: the distance to vt+0x44's surface point, negative when
-        // vt+0x34(point, 0.0f) says the point is inside.
+        // The length of vt+0x44's surface point relative to Pos, negative when vt+0x34 says
+        // the point is inside.
         Vector const Surface = GetSurfacePoint(Point);
         Vector const Delta = Vec3Sub(Surface, Pos);
         float const Length = (float)(sqrt(((double)(Delta.z) * Delta.z +
@@ -1669,20 +1530,17 @@ double ZONE::GetDistance(Vector const& Point) const
     }
 }
 
-// LAB_06339ff0: switch (Shape - 1), table .text:0633a27c. The radius along a world direction,
-// left on the x87 stack (callers inside ZONE consume it in-register through vt+0x40).
+// LAB_06339ff0. The radius along a world direction, left on the x87 stack (callers inside ZONE
+// consume it in-register through vt+0x40).
 double ZONE::GetRadiusAlong(Vector const& Direction) const
 {
     switch (Shape)
     {
     case Universe::ZoneShapeSphere:
-        // .text:0633a00a.
         return Size.x;
 
     case Universe::ZoneShapeEllipsoid:
     {
-        // .text:0633a014-0633a091: the ellipsoid from the zone (FUN_06339f20), the direction
-        // in the zone's frame (engine vt+0x38 on +0x0c), FUN_0633dc90.
         FZoneEllipsoid Ellipsoid;
         Ellipsoid.Orientation = Orientation;
         Ellipsoid.Pos = Pos;
@@ -1693,10 +1551,7 @@ double ZONE::GetRadiusAlong(Vector const& Direction) const
 
     case Universe::ZoneShapeBox:
     {
-        // .text:0633a094-0633a177: per axis, |L| > 1e-4f (FCOM / TEST 0x41 / JNZ -> 1e10f
-        // when <= or unordered) gives Size / |L| -- x and z stored as floats, y left on the
-        // stack. The smallest (A vs B: TEST 5 / JP keeps B when A >= B; then vs C: TEST 5 /
-        // JNP keeps it when below C) times 0.5.
+        // x and z are stored as floats, y stays on the stack.
         Vector const Local = EngineTransposeTransform(Orientation, Direction);
         double const AbsX = fabs((double)Local.x);
         float const AlongX = (AbsX > 1.0e-4f) ? (float)(Size.x / AbsX) : 1.0e10f;
@@ -1713,11 +1568,6 @@ double ZONE::GetRadiusAlong(Vector const& Direction) const
     case Universe::ZoneShapeCylinder:
     case Universe::ZoneShapeRing:
     {
-        // Cylinder .text:0633a17a-0633a1c0 (half height Size.y * 0.5), ring
-        // .text:0633a1c2-0633a206 (Size.z * 0.5), joined at LAB_0633a208:
-        //   Cutoff = HalfH / sqrt(Size.x^2 + HalfH^2); FCOMPP |L.y| vs Cutoff / TEST 0x41 /
-        //   JNZ -> Size.x / sqrt(L.x^2 + L.z^2) when |L.y| <= Cutoff or unordered, else
-        //   HalfH / |L.y|.
         Vector const Local = EngineTransposeTransform(Orientation, Direction);
         double const HalfH = (double)((Shape == Universe::ZoneShapeCylinder) ? Size.y : Size.z) * 0.5;
         double const AbsY = fabs((double)Local.y);
@@ -1728,18 +1578,16 @@ double ZONE::GetRadiusAlong(Vector const& Direction) const
     }
 
     default:
-        // .text:0633a246-0633a276: FDUMP line 0x4be, then vt+0x30.
         ZoneTypeNotSupported(0x4be);
         return GetRadius();
     }
 }
 
-// LAB_0633a290 (hidden result pointer, RET 8).
+// LAB_0633a290.
 Vector ZONE::GetSurfacePoint(Vector const& Point) const
 {
     if (Shape == Universe::ZoneShapeBox)
     {
-        // LAB_0633a5c5: the clamped local point back in the world (engine vt+0x28).
         FZoneFrame Frame = ZoneFrame(*this);
         Frame.Dim[0] = Size.x * 0.5f;
         Frame.Dim[1] = Size.y * 0.5f;
@@ -1753,8 +1601,8 @@ Vector ZONE::GetSurfacePoint(Vector const& Point) const
 
     if (Shape == Universe::ZoneShapeRing)
     {
-        // LAB_0633a398: the nearest point on the ring's middle circle (radius
-        // float((Size.y + Size.x) * 0.5)), plus the tube direction scaled to the surface.
+        // The nearest point on the ring's middle circle plus the tube direction scaled to the
+        // surface.
         Vector const Delta = Vec3Sub(Point, Pos);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         Vector Rim = MakeVector(Local.x, 0.0f, Local.z);
@@ -1764,7 +1612,6 @@ Vector ZONE::GetSurfacePoint(Vector const& Point) const
                          (float)(Rim.z * Scale));
         Vector Tube = Vec3Sub(Local, Rim);
         double const TubeLength = VecLength(Tube);
-        // FCOM 1e-4f / TEST 5 / JNP -> no normalisation when below.
         if (!(TubeLength < 1.0e-4f))
         {
             double const Inv = 1.0 / TubeLength;
@@ -1779,8 +1626,7 @@ Vector ZONE::GetSurfacePoint(Vector const& Point) const
         return Vec3Add(Pos, World);
     }
 
-    // .text:0633a2af-0633a393: every other shape -- the centre when the point is within
-    // 1e-4f of it (FCOM / TEST 5 / JNP), else centre + unit direction * float(vt+0x40).
+    // Every other shape: the centre when the point is within 1e-4f of it.
     Vector Delta = MakeVector(Point.x - Pos.x, Point.y - Pos.y, Point.z - Pos.z);
     double const Length = VecLength(Delta);
     if (Length < 1.0e-4f)
@@ -1793,10 +1639,8 @@ Vector ZONE::GetSurfacePoint(Vector const& Point) const
     return MakeVector(Offset.x + Pos.x, Offset.y + Pos.y, Offset.z + Pos.z);
 }
 
-// LAB_0633a6e0: the box goes to FUN_0633a917; the ring and every other shape end in
-// LAB_0633a8f8: Radius vs 1e-4f (FCOM / TEST 0x41 / JNZ -> LAB_0633aa25 when <= or
-// unordered), else float length / Radius. LAB_0633aa25 loads [ESP+0x4] after its POP EBP,
-// i.e. the local zeroed at .text:0633a6ef, not the float length: that tail returns 0.0.
+// LAB_0633a6e0. The small-radius tail (LAB_0633aa25) returns a local zeroed at entry, not the
+// float length: 0.0.
 double ZONE::ClassifyPoint(Vector const& Point) const
 {
     if (Shape == Universe::ZoneShapeBox)
@@ -1806,9 +1650,7 @@ double ZONE::ClassifyPoint(Vector const& Point) const
     double Radius = 0.0;
     if (Shape == Universe::ZoneShapeRing)
     {
-        // LAB_0633a79a: the offset from the ring's middle circle (radius (Size.y + Size.x) *
-        // 0.5 on the stack), its float length, normalised when not below 1e-4f, and the
-        // ring's surface scale along it.
+        // The offset from the ring's middle circle and the surface scale along it.
         Vector const Delta = Vec3Sub(Point, Pos);
         Vector const Local = EngineTransposeTransform(Orientation, Delta);
         double const MidRadius = ((double)Size.y + Size.x) * 0.5;
@@ -1819,8 +1661,8 @@ double ZONE::ClassifyPoint(Vector const& Point) const
         double const RimZ = Local.z * Scale;
         Vector Tube = MakeVector(Local.x - RimX, Local.y - RimY,
                                  (float)((double)Local.z - RimZ));
-        // .text:0633a847-0633a873 sum (y^2 + z^2) + x^2 twice (the second as (z^2 + y^2) +
-        // x^2, the same value): once stored as the float length, once kept for the test.
+        // Retail sums the length twice (same value): once stored as float, once kept for the
+        // test.
         double const TubeLength = sqrt(((double)(Tube.y) * Tube.y + (double)(Tube.z) * Tube.z) +
                                        (double)(Tube.x) * Tube.x);
         LengthF = (float)(TubeLength);
@@ -1830,8 +1672,6 @@ double ZONE::ClassifyPoint(Vector const& Point) const
     }
     else
     {
-        // .text:0633a706-0633a795: sqrt((dy^2 + dz^2) + dx^2) vs 1e-4f with TEST 5 / JP ->
-        // 0.0f when below; else the unit direction (1.0 / float length) and vt+0x40.
         Vector Delta = Vec3Sub(Point, Pos);
         double const Length = sqrt(((double)(Delta.y) * Delta.y + (double)(Delta.z) * Delta.z) +
                                    (double)(Delta.x) * Delta.x);
@@ -1845,7 +1685,7 @@ double ZONE::ClassifyPoint(Vector const& Point) const
     }
 
     if (!(Radius > 1.0e-4f))
-        return 0.0; // .text:0633aa25-0633aa28
+        return 0.0;
     return LengthF / Radius;
 }
 
@@ -1872,7 +1712,7 @@ double ZONE::ClassifyBox(Vector const& Point) const
     return (ValueF + RadiusSq) / RadiusSq;
 }
 
-// LAB_0633aa40 (RET 0xc): switch (Shape - 1), table .text:0633ac08.
+// LAB_0633aa40.
 bool ZONE::Intersect(Vector const& Start, Vector const& End, Vector& OutHit) const
 {
     FZoneSegment Segment;
@@ -1883,28 +1723,24 @@ bool ZONE::Intersect(Vector const& Start, Vector const& End, Vector& OutHit) con
     switch (Shape)
     {
     case Universe::ZoneShapeEllipsoid:
-        // .text:0633aa8c-0633aad7.
         Frame.Dim[0] = Size.x;
         Frame.Dim[1] = Size.y;
         Frame.Dim[2] = Size.z;
         return ClipSegmentEllipsoid(Frame, Segment, OutHit);
 
     case Universe::ZoneShapeBox:
-        // .text:0633ab16-0633ab58.
         Frame.Dim[0] = Size.x;
         Frame.Dim[1] = Size.y;
         Frame.Dim[2] = Size.z;
         return ClipSegmentBox(Frame, Segment, OutHit);
 
     case Universe::ZoneShapeCylinder:
-        // .text:0633aada-0633ab13: only the radius and the height are stored (the third
-        // dimension is left as it was; the cylinder clip does not read it).
+        // The third dimension is left as it was; the cylinder clip does not read it.
         Frame.Dim[0] = Size.x;
         Frame.Dim[1] = Size.y;
         return ClipSegmentCylinder(Frame, Segment, OutHit);
 
     case Universe::ZoneShapeRing:
-        // .text:0633ab5b-0633ab9b.
         Frame.Dim[0] = Size.x;
         Frame.Dim[1] = Size.y;
         Frame.Dim[2] = Size.z;
@@ -1914,26 +1750,24 @@ bool ZONE::Intersect(Vector const& Start, Vector const& End, Vector& OutHit) con
         break;
 
     default:
-        // .text:0633aba0-0633abc2: FDUMP line 0x55a, then the sphere case.
+        // Reported, then treated as the sphere case.
         ZoneTypeNotSupported(0x55a);
         break;
     }
 
-    // .text:0633abc5-0633ac04: the bounding sphere {Pos, vt+0x30}.
     FZoneSphere Sphere;
     Sphere.Radius = GetRadius();
     Sphere.Center = Pos;
     return ClipSegmentSphere(Sphere, Segment, OutHit);
 }
 
-// LAB_0633ac20: FLD [ECX+0x54].
+// LAB_0633ac20 [+0x54]
 float ZONE::GetEdgeFraction() const
 {
     return EdgeFraction;
 }
 
-// LAB_0633ad10: +0x58 is computed once -- 1 when drag < 1.0f (FCOMP / TEST 5 / JNP),
-// interference > 0.0f or damage > 0.0f (FCOMP / TEST 0x41 / JZ), else 0.
+// LAB_0633ad10: +0x58 is computed once and cached.
 bool ZONE::HasPhysicalEffect() const
 {
     if (PhysicalEffect < 0)
@@ -1949,25 +1783,25 @@ bool ZONE::HasPhysicalEffect() const
     return PhysicalEffect != 0;
 }
 
-// 0633ad70 (ICF with Archetype::Asteroid::get_detect_radius): FLD [ECX+0x5c].
+// 0633ad70 (ICF with Archetype::Asteroid::get_detect_radius) [+0x5c]
 float ZONE::GetDragModifier() const
 {
     return DragModifier;
 }
 
-// 0633ad80 (ICF with Archetype::Asteroid::get_offset_dist): FLD [ECX+0x60].
+// 0633ad80 (ICF with Archetype::Asteroid::get_offset_dist) [+0x60]
 float ZONE::GetDamage() const
 {
     return Damage;
 }
 
-// 0633ad90 (ICF with Archetype::Asteroid::get_recharge_time): FLD [ECX+0x64].
+// 0633ad90 (ICF with Archetype::Asteroid::get_recharge_time) [+0x64]
 float ZONE::GetInterference() const
 {
     return Interference;
 }
 
-// LAB_0633add0: 0 when the population buffer is null, else (last - first) >> 3.
+// LAB_0633add0
 int ZONE::GetPopulationCount() const
 {
     if (Population.Items.data() == nullptr)
@@ -1975,8 +1809,7 @@ int ZONE::GetPopulationCount() const
     return (int)Population.Items.size();
 }
 
-// FUN_0633adf0 (RET 0xc): Index < 0 (JL), a null buffer, or Index >= size (unsigned, JNC)
-// -> false; else the pair's id and weight.
+// FUN_0633adf0
 bool ZONE::GetPopulationEntry(int Index, unsigned& OutId, float& OutWeight) const
 {
     if (Index < 0)
@@ -1990,19 +1823,19 @@ bool ZONE::GetPopulationEntry(int Index, unsigned& OutId, float& OutWeight) cons
     return true;
 }
 
-// LAB_0633ae40: LEA EAX,[ECX+0x8c].
+// LAB_0633ae40 [+0x8c]
 weighted_vector<unsigned int> const& ZONE::GetPopulation() const
 {
     return Population;
 }
 
-// LAB_0633ae50: MOV AL,[ECX+0x88].
+// LAB_0633ae50 [+0x88]
 bool ZONE::HasPathLabel() const
 {
     return bPathLabel;
 }
 
-// LAB_0633ada0: *[ESP+4] = [ECX+0x6c], RET 4.
+// LAB_0633ada0 [+0x6c]
 ID_String ZONE::GetMusic() const
 {
     ID_String Result;
@@ -2010,7 +1843,7 @@ ID_String ZONE::GetMusic() const
     return Result;
 }
 
-// LAB_0633adb0 (RET 8): *arg0 = [+0x70], *arg1 = [+0x74], returns (flags >> 0x15) & 1.
+// LAB_0633adb0 [+0x70 / +0x74]
 bool ZONE::GetSpacedust(char const*& OutSpacedust, int& OutMaxParticles) const
 {
     OutSpacedust = Spacedust;
@@ -2018,32 +1851,31 @@ bool ZONE::GetSpacedust(char const*& OutSpacedust, int& OutMaxParticles) const
     return ((PropertyFlags >> 0x15) & 1) != 0;
 }
 
-// 06262dd0 (ICF with File::tell): MOV EAX,[ECX+0x84].
+// 06262dd0 (ICF with File::tell) [+0x84]
 CmnAsteroid::LootableZoneEntry* ZONE::GetLootableInfo() const
 {
     return OwnedLootEntry;
 }
 
-// LAB_0633ae60: MOV AL,[ECX+0x9c].
+// LAB_0633ae60 [+0x9c]
 unsigned char ZONE::GetVisit() const
 {
     return Visit;
 }
 
-// LAB_0633ae80: MOV EAX,[ECX+0xa0].
+// LAB_0633ae80 [+0xa0]
 int ZONE::GetName() const
 {
     return IdsName;
 }
 
-// 0633ae90: MOV EAX,[ECX+0xa4].
+// 0633ae90 [+0xa4]
 int ZONE::GetIdsInfo() const
 {
     return IdsInfo;
 }
 
-// FUN_0633aea0 (RET 4): free the owned record (FUN_06391d5a) when there is one, then store
-// the new one.
+// FUN_0633aea0
 void ZONE::SetLootableInfo(CmnAsteroid::LootableZoneEntry* LootEntry)
 {
     if (OwnedLootEntry != nullptr)
@@ -2054,21 +1886,17 @@ void ZONE::SetLootableInfo(CmnAsteroid::LootableZoneEntry* LootEntry)
     OwnedLootEntry = LootEntry;
 }
 
-// FUN_0633ae70 (RET 4): [+0x9c] = arg | 0x20.
+// FUN_0633ae70
 void ZONE::SetVisit(unsigned char NewVisit)
 {
     Visit = (unsigned char)(NewVisit | 0x20);
 }
 
-// ?FrustumCull@@YA_NABUFrustum@Geometry@@PBUIZone@Universe@@@Z, .text:0633c6d0-0633cb49.
-// true when the zone lies outside the frustum. No zone -> false.
-// Not an ellipsoid (vt+0x18 != 2): the sphere {vt+0x10 position, vt+0x30 radius} goes to
-// FUN_0633d1e0. An ellipsoid is tested against the six sides (FUN_0633cc20 + FUN_0633cb50):
-// side 2 on any of them culls; then, unless side 1 (the far side) straddles, it stays. When
-// exactly one of the left / right sides (2 / 3) straddles, planes turned step by step around
-// the far edge on that side are tried (a side-1 result culls); the same for the top / bottom
-// sides (4 / 5) afterwards. Center = apex + (-column 2) * Distance moved by
-// tan(Angle * 0.5) * Distance along column 0 / 1 (FPTAN, FMUL double 0.5).
+// .text:0633c6d0: true when the zone lies outside the frustum. A non-ellipsoid is culled as its
+// bounding sphere (FUN_0633d1e0). An ellipsoid behind any side culls; otherwise, unless it
+// straddles the far side, it stays. When exactly one of the left / right sides straddles,
+// planes turned step by step around the far edge on that side are tried; the same for top /
+// bottom afterwards.
 bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const* Zone)
 {
     if (Zone == nullptr)
@@ -2076,7 +1904,6 @@ bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const
 
     if (Zone->GetShape() != Universe::ZoneShapeEllipsoid)
     {
-        // LAB_0633caf6.
         FZoneSphere Sphere;
         float const Radius = Zone->GetRadius();
         Sphere.Center = Zone->GetPos();
@@ -2086,7 +1913,6 @@ bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const
 
     FZoneEllipsoid const Ellipsoid = CullEllipsoid(*Zone);
 
-    // .text:0633c761-0633c7ae: the six sides, results kept at [ESP+0x40 + i*4].
     int Sides[6];
     for (unsigned Index = 0; Index < 6; ++Index)
     {
@@ -2098,7 +1924,7 @@ bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const
     if (Sides[1] != 0)
         return false;
 
-    // .text:0633c7bc-0633c7f7: bit 0..3 = side 2..5 straddles (SETZ).
+    // Bit 0..3 = side 2..5 straddles.
     unsigned const Straddle = (Sides[2] == 0 ? 1u : 0u) | (Sides[3] == 0 ? 2u : 0u) |
                               (Sides[4] == 0 ? 4u : 0u) | (Sides[5] == 0 ? 8u : 0u);
     float const Distance = Frustum.Distance;
@@ -2158,9 +1984,8 @@ bool __cdecl FrustumCull(Geometry::Frustum const& Frustum, Universe::IZone const
     return false;
 }
 
-// ?SphereCull@@YA_NABUSphere@Geometry@@PBUIZone@Universe@@@Z, .text:0633d770-0633da96.
-// true when the sphere does not reach the zone. No zone -> false. The shape (vt+0x18) is
-// asked again before each test, as retail does.
+// .text:0633d770: true when the sphere does not reach the zone. The shape is asked again before
+// each test, as retail does.
 bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Zone)
 {
     if (Zone == nullptr)
@@ -2169,15 +1994,12 @@ bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Z
     double const Radius = Sphere.Radius;
     if (Zone->GetShape() == Universe::ZoneShapeEllipsoid)
     {
-        // FUN_0633dd10; FCOMP R / TEST 5 / JNP -> false when the distance is below R.
         FZoneEllipsoid const Ellipsoid = CullEllipsoid(*Zone);
         return !(EllipsoidSignedDistance(Ellipsoid, Sphere.Center) < Radius);
     }
 
     if (Zone->GetShape() == Universe::ZoneShapeBox)
     {
-        // Half extents Size * 0.5f (FUN_0628b030), the frame from vt+0x0c, FUN_0633daa0;
-        // FCOMPP value vs R*R / TEST 5 / JNP -> false when below.
         Vector const Size = Zone->GetSize();
         Vector const Half = MakeVector(Size.x * kCullHalf, Size.y * kCullHalf, Size.z * kCullHalf);
         Transform const& Xform = Zone->GetTransform();
@@ -2192,10 +2014,8 @@ bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Z
 
     if (Zone->GetShape() == Universe::ZoneShapeCylinder)
     {
-        // Three vt+0x28 calls: Dim = {Size.x, float(Size.y * 0.5 double), Size.x}. Local =
-        // FUN_062dbb90 transpose(Orientation) * (Centre - Pos), FUN_062dba00 clamps it to the
-        // box, FUN_062c4780 of the difference, negated when the clamp says inside; FCOMPP vs
-        // R*R / TEST 5 / JNP -> false when below.
+        // Measured as a box of half extents {Size.x, Size.y * 0.5, Size.x}; GetSize is called
+        // three times, as retail does.
         float const DimX = Zone->GetSize().x;
         float const DimZ = Zone->GetSize().x;
         float const DimY = (float)((double)(Zone->GetSize().y) * 0.5);
@@ -2217,9 +2037,7 @@ bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Z
         return !(Value < Radius * Radius);
     }
 
-    // LAB_0633da12: the zone's bounding sphere (vt+0x30 radius stored as float, vt+0x10
-    // position). Sum = (dx^2 + dz^2) + dy^2 on the stack; FCOMPP (r + R)^2 vs Sum /
-    // TEST 0x41 / JZ -> false when (r + R)^2 > Sum.
+    // Every other shape: the zone's bounding sphere.
     float const ZoneRadius = Zone->GetRadius();
     Vector const ZonePos = Zone->GetPos();
     double const DX = (double)(Sphere.Center.x) - ZonePos.x;

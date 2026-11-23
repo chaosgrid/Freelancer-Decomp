@@ -15,8 +15,8 @@
 // Digital Anvil I3DMathEngine — vtable order from EXE/Disasm/x86math.dll (PTR_FUN_06f73090).
 // Types are 3x3 row-major Matrix, Transform = Matrix + translation, Quaternion = (W,X,Y,Z).
 
-// GR_INVALID_PARMS / GR_INTERFACE_UNSUPPORTED are DACOM-wide result codes, not part of this
-// interface; thirteen modules still keep their own copy. TODO: one home in dacom.h.
+// GR_INVALID_PARMS / GR_INTERFACE_UNSUPPORTED are DACOM-wide result codes (dacom.h), not part
+// of this interface.
 
 struct FVector
 {

@@ -76,12 +76,11 @@ namespace
     const char kMainCppPath[] = "E:\\FL\\Scratch\\Source\\Client\\main.cpp";
     const char kRenderMgrCppPath[] = "E:\\FL\\Scratch\\Source\\Client\\cmn\\RenderMgr.cpp";
 
-    // The message loop FUN_005b1300 inlines after every stage (0x005b134a, 0x005b152d, ...):
-    // the body of FUN_005b0b60 except that WM_QUIT only makes InitializeEngine return 0 -- the
-    // exit code is not stored.
+    // The message loop FUN_005b1300 inlines after every stage: the body of FUN_005b0b60 except
+    // that WM_QUIT only makes InitializeEngine return 0 -- the exit code is not stored.
     bool PumpInitMessages()
     {
-        // FUN_0041ef20 drains the DirectInput mouse queue first (0x005b134a, 0x005b152d, ...).
+        // FUN_0041ef20 drains the DirectInput mouse queue first.
         MouseDispatchEvents();
         MSG Msg;
         while (PeekMessageA(&Msg, nullptr, 0, 0, PM_NOREMOVE))
@@ -104,10 +103,8 @@ namespace
     // No data members; InitializeEngine keeps one on the stack for DataConfig::startup.
     struct DataConfigPump : public DataConfig::ProgressCB
     {
-        // LAB_005b1fe0 (.text:005b1fe0-005b2096), thiscall, RET 4: the value string is not
-        // read. The same loop as PumpInitMessages (MouseDispatchEvents FUN_0041ef20, then
-        // Peek / Get / IMEFocus::IgnoreHotKey / FUN_00577850 / Translate / Dispatch); WM_QUIT
-        // returns 1 (0x005b208b), an empty queue 0 (0x005b2080).
+        // LAB_005b1fe0 (thiscall, RET 4): the value string is not read. The same loop as
+        // PumpInitMessages; WM_QUIT returns 1, an empty queue 0.
         int OnProgress(char const* ValueString) override
         {
             (void)ValueString;
@@ -115,9 +112,9 @@ namespace
         }
     };
 
-    // 0x005b15ce..0x005b1684 and 0x005b17be..0x005b1872: caption ids 0xd1, message ids 0xd7
-    // (pipeline startup) or 0xc9 (no display mode), both with built-in fallbacks; drop the
-    // render device, force the cursor visible, show the box and exit.
+    // Inlined twice in FUN_005b1300: message ids 0xd7 (pipeline startup) or 0xc9 (no display
+    // mode), with built-in fallbacks; drop the render device, force the cursor visible, show
+    // the box and exit.
     __declspec(noreturn) void ShowEngineFatalError(unsigned int MessageIds)
     {
         wchar_t Caption[0x100];
@@ -134,8 +131,7 @@ namespace
         exit(1);
     }
 
-    // FUN_004247a0 (.text:004247a0-004247bb): Pipeline->Startup(nullptr) >= 0, false without a
-    // pipeline.
+    // FUN_004247a0.
     bool StartupRenderPipeline()
     {
         IRenderPipeline* const Pipeline = DALib::Pipeline;
@@ -146,7 +142,7 @@ namespace
 
 }
 
-    // FUN_00424ce0 (.text:00424ce0-00424dc8), cdecl(hwnd, mode): try the mode; a windowed mode
+    // FUN_00424ce0 (cdecl): try the mode; a windowed mode
     // with a non-zero options size then retries with Format 32/24/16 (WantedZ any); after that
     // the options object itself; failing all of it, lay the window out at 640x480 windowed.
     bool SetRenderModeWithFallback(HWND Hwnd, const DisplaySettings* Mode)
@@ -178,7 +174,6 @@ namespace
             }
         }
 
-        // 0x00424d7f.
         if (g_display.width != 0 && g_display.height != 0)
             return RenderMgrCreateBuffers(Hwnd, &g_display, &g_display);
         ApplyGameWindowLayout(Hwnd, false, 0x280, 0x1e0);
@@ -187,7 +182,7 @@ namespace
 
 namespace
 {
-    // FUN_00424dd0 (.text:00424dd0-00424f2a), cdecl(hwnd, mode, fullscreen). With a sized mode
+    // FUN_00424dd0 (cdecl). With a sized mode
     // the ladder is {mode size and Format, 800x600 at that Format, 800x600x16}; without one the
     // first rung is 800x600x16, or 1024x768x32 on an adapter reporting more than 16 MB of video
     // memory (QueryDeviceAbility 3, >> 20) and ability 4. WantedZ is always "any".
@@ -213,7 +208,7 @@ namespace
         }
         else
         {
-            // 0x00424e2e. Local.width/height/color_bpp stay unset: every rung below writes them.
+            // Local.width/height/color_bpp stay unset: every rung below writes them.
             Local.fullscreen = bFullscreen;
             unsigned long VideoMemory = 0;
             DALib::Pipeline->QueryDeviceAbility(3, &VideoMemory);
@@ -267,8 +262,8 @@ namespace
         return bOk;
     }
 
-    // FUN_005b1300's three [Startup] movies (0x005b18c0..0x005b19bc).
-    // DEVIATION (existing): retail imports MOVIE.DLL statically; the port binds MediaPlayer by
+    // FUN_005b1300's three [Startup] movies.
+    // DEVIATION: retail imports MOVIE.DLL statically; the port binds MediaPlayer by
     // GetProcAddress because src/movie publishes no header in src/include. A missing movie.dll
     // skips the movies instead of failing to start the process.
     bool PlayStartupMovies()
@@ -325,7 +320,7 @@ namespace
                 {
                     if (!PumpInitMessages())
                     {
-                        // 0x005b19e5: stop the movie and fail; MediaPlayer is not shut down.
+                        // Stop the movie and fail; MediaPlayer is not shut down.
                         StopMovie();
                         return false;
                     }
@@ -342,8 +337,8 @@ namespace
 namespace
 {
     // The inlined "append a wide string" block FUN_005b0220 repeats after every string it
-    // fetches (e.g. 0x005b0294..0x005b02e1): nothing for an empty Source, else grow the text to
-    // old + len + 1 (FUN_004142a0), wcsncpy len chars after the old text, terminate.
+    // fetches: nothing for an empty Source, else grow the text to old + len + 1 (FUN_004142a0),
+    // wcsncpy len chars after the old text, terminate.
     void LowMachineWarningAppend(FHudWideText* Text, wchar_t const* Source)
     {
         int const Length = static_cast<int>(wcslen(Source));
@@ -356,8 +351,7 @@ namespace
         Text->Text[Total] = 0;
     }
 
-    // One warning line: the ids string (L"" -- DAT_005c8ce0 -- when the lookup returns 0),
-    // then L"\n\n" (DAT_005d0a08).
+    // One warning line: the ids string (L"" when the lookup returns 0), then L"\n\n".
     void LowMachineWarningAppendIds(FHudWideText* Text, unsigned Ids)
     {
         wchar_t Line[0x100];
@@ -367,12 +361,11 @@ namespace
         LowMachineWarningAppend(Text, L"\n\n");
     }
 
-    // FUN_005b0220 (.text:005b0220-005b0591), cdecl(&text): the low-machine warning text for
-    // InitializeEngine. True when the text is non-empty.
+    // FUN_005b0220 (cdecl): the low-machine warning text for InitializeEngine. True when the
+    // text is non-empty.
     bool BuildLowMachineWarning(FHudWideText* Text)
     {
-        // 0x005b022a..0x005b0247: GlobalMemoryStatus on a local whose dwLength is not set;
-        // total physical and available virtual memory in MB (SHR 0x14).
+        // Retail quirk: dwLength is never set before GlobalMemoryStatus.
         MEMORYSTATUS Status;
         GlobalMemoryStatus(&Status);
         int const TotalPhysMb = static_cast<int>(Status.dwTotalPhys >> 20);
@@ -380,19 +373,19 @@ namespace
 
         if (TotalPhysMb < 0x78)
         {
-            // 0x005b0253..0x005b033b: under 120 MB of RAM. DAT_0067a439 (skip) ends it here.
+            // Under 120 MB of RAM. The skip flag (DAT_0067a439) ends it here.
             if (GetSkipMachineWarnings())
                 goto Done;
             LowMachineWarningAppendIds(Text, 0xcb);
         }
         else if (AvailVirtualMb < 0x190)
         {
-            // 0x005b0340..0x005b0421: under 400 MB of free virtual memory.
+            // Under 400 MB of free virtual memory.
             LowMachineWarningAppendIds(Text, 0xd6);
         }
 
-        // 0x005b042a..0x005b0552: skip set -> done; else the pipeline's ability 0xf (vt+0x20)
-        // selects {none, 0xcd, 0xce, 0xcf} (a local table, indexed unchecked).
+        // The pipeline's ability 0xf selects {none, 0xcd, 0xce, 0xcf} (a local table, indexed
+        // unchecked, as in retail).
         if (GetSkipMachineWarnings())
             goto Done;
         {
@@ -406,20 +399,17 @@ namespace
         }
 
     Done:
-        // 0x005b0558..0x005b0588: non-null and non-empty.
         return Text->Text != nullptr && wcslen(Text->Text) != 0;
     }
 
-    // FUN_005b05a0 (.text:005b05a0-005b07f8) -- the DLGPROC of dialog 0x82.
+    // FUN_005b05a0 -- the DLGPROC of dialog 0x82.
     INT_PTR CALLBACK LowMachineWarningDialogProc(HWND Dialog, UINT Message, WPARAM WParam,
                                                  LPARAM LParam)
     {
         if (Message == WM_INITDIALOG)
         {
-            // 0x005b063d..0x005b07e7: the caption (ids 0xd2), the warning text (*lParam) in
-            // 0x83, the check box 0x84 (ids 0x86) checked and enabled while warnings are not
-            // skipped, the label 0x85 (ids 0x87) and the two buttons 6 / 7 (ids 0x4dc / 0x4dd).
-            // Each missing string becomes L"".
+            // The check box is checked and enabled while warnings are not skipped. Each missing
+            // string becomes L"".
             wchar_t Buffer[0x100];
             if (GetIdsStringWWithRawFallback(0xd2, Buffer, 0x100) == 0)
                 wcscpy(Buffer, L"");
@@ -451,8 +441,7 @@ namespace
         }
         if (Message == WM_COMMAND)
         {
-            // 0x005b05b9..0x005b05f0: BM_GETCHECK on 0x84 first, then the whole wParam:
-            // 1 / 6 -> DAT_0067a439 = unchecked, EndDialog 1; 2 / 7 -> EndDialog 2.
+            // BM_GETCHECK first, then the whole wParam is switched on.
             LRESULT const Checked = SendMessageA(GetDlgItem(Dialog, 0x84), BM_GETCHECK, 0, 0);
             switch (WParam)
             {
@@ -473,29 +462,25 @@ namespace
     }
 }
 
-float G_RenderGamma = 1.3f;  // DAT_00610858 (.data 0x3fa66666)
-int G_bRenderDither = 1;     // DAT_0061085c (.data 1)
-int G_RenderMipFilter = 1;   // DAT_00610860 (.data 1)
+float G_RenderGamma = 1.3f;  // DAT_00610858
+int G_bRenderDither = 1;     // DAT_0061085c
+int G_RenderMipFilter = 1;   // DAT_00610860
 
 bool RenderMgrApplyGamma()
 {
-    // FUN_00424510 (.text:00424510-004245b4). A null pipeline returns false.
+    // FUN_00424510. A null pipeline returns false.
     bool bOk = false;
     IRenderPipeline* const Pipe = DALib::Pipeline;
     if (Pipe != nullptr)
     {
-        // 0x00424534..0x00424557: QueryInterface (vt+0) for "1.11_IGammaControl" into a local
-        // (zeroed first); a failure skips straight to the release test.
+        // A failed QueryInterface skips straight to the release test.
         IGammaControl* Gamma = nullptr;
         if (Pipe->QueryInterface(Iids::GammaControl, reinterpret_cast<void**>(&Gamma)) == 0)
         {
-            // 0x00424559..0x00424569: slot 6 (+0x18) with the options object's fullscreen byte
-            // (DAT_00679be5), result unread.
+            // Result unread.
             Gamma->SetGammaEnable(static_cast<unsigned char>(g_display.fullscreen));
-            // 0x0042456c..0x0042458a: slot 3 (+0x0c) (7, DAT_00610858, 0, 1.0f, 0); SETGE.
             bOk = Gamma->SetGammaFunction(7, G_RenderGamma, 0.0f, 1.0f, 0.0f) >= 0;
         }
-        // 0x0042458d..0x004245a0: the local released (vt+8) when non-null.
         if (Gamma != nullptr)
             Gamma->Release();
     }
@@ -504,9 +489,7 @@ bool RenderMgrApplyGamma()
 
 void ApplyGammaRampOption(float Value)
 {
-    // LAB_004244e0 (RET 4): FCOMP 0.0f / TEST AH,1 / JNZ -- a value below 0 (or unordered)
-    // does nothing; otherwise DAT_00610858 = v + 1.0 (double DAT_005c89b8) as a float and
-    // FUN_00424510, its result dropped.
+    // LAB_004244e0: a value below 0 (or unordered) does nothing; the add is done in double.
     if (!(Value >= 0.0f))
         return;
     G_RenderGamma = static_cast<float>(static_cast<double>(Value) + 1.0);
@@ -515,8 +498,7 @@ void ApplyGammaRampOption(float Value)
 
 void ApplyDitherControlOption(float Value)
 {
-    // LAB_00424630 (RET 4): DAT_0061085c = 1, then FCOMP double 0.3 (DAT_005c9858) / TEST AH,1 /
-    // JZ -- below 0.3 (or unordered) stores 0.
+    // LAB_00424630: below 0.3 (or unordered) stores 0; the compare is in double.
     G_bRenderDither = 1;
     if (!(static_cast<double>(Value) >= 0.3))
         G_bRenderDither = 0;
@@ -524,12 +506,12 @@ void ApplyDitherControlOption(float Value)
 
 void ApplyMipFilterControlOption(float Value)
 {
-    // LAB_004246d0 (RET 4): DAT_00610860 = 1 whatever the value.
+    // LAB_004246d0: 1 whatever the value.
     (void)Value;
     G_RenderMipFilter = 1;
 }
 
-// FUN_004249c0 (.text:004249c0-00424c5c), cdecl(hwnd, mode, out): create the device buffers for
+// FUN_004249c0 (cdecl): create the device buffers for
 // a mode and bring everything that depends on the surface size up to date.
 bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySettings* Out)
 {
@@ -541,11 +523,11 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
 
     DisplaySettings Local;
     memcpy(&Local, Mode, 0x28);
-    G_bRenderPostCreate = false; // DAT_00610864 (0x00424a09)
+    G_bRenderPostCreate = false; // DAT_00610864
 
     if (Local.fullscreen == 0)
     {
-        // 0x00424a12: windowed -- adapter format and depth, and never larger than the desktop.
+        // Windowed -- adapter format and depth, and never larger than the desktop.
         Local.color_bpp = -1;
         Local.depth_bpp = -1;
         RECT Desktop;
@@ -578,8 +560,7 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
         return false;
     }
 
-    // 0x00424ad4: FUN_00424510, the gamma from DAT_00610858; result unread.
-    RenderMgrApplyGamma();
+    RenderMgrApplyGamma(); // result unread
 
     if (DALib::VertexBuffer->VbMgrInit(reinterpret_cast<void*>(1), reinterpret_cast<void*>(0x252),
                                        reinterpret_cast<void*>(0xfc00), nullptr) != 0)
@@ -593,7 +574,7 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
         ApplyGameWindowLayout(Hwnd, Out->fullscreen != 0, static_cast<unsigned>(Out->width),
                               static_cast<unsigned>(Out->height));
 
-    // 0x00424b41: restore the FPU precision the renderer wants if the device changed it.
+    // Restore the FPU precision the renderer wants if the device changed it.
     const unsigned int Control = _control87(0, 0);
     G_FpuPrecisionFound = ((Control & 0x30000) == 0x20000) ? 0x18 : 0x35;
     if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
@@ -606,17 +587,16 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
             _control87(0, 0);
     }
 
-    // 0x00424b9e..0x00424bba: FUN_00421620(0, 0, w, h, RenderMgr.cpp, 0x269), the full-surface
-    // viewport (DAT_00610850 width, DAT_00610854 height).
+    // FUN_00421620: the full-surface viewport.
     Win3DSetViewportRect(0, 0, static_cast<int>(G_RenderSurfaceWidth),
                          static_cast<int>(G_RenderSurfaceHeight),
                          "E:\\FL\\Scratch\\Source\\Client\\cmn\\RenderMgr.cpp", 0x269);
     InitializeRichText(static_cast<int>(G_RenderSurfaceHeight));
     ReinitializeRichTextFonts();
-    // 0x00424bd1..0x00424bdf: FUN_004213d0(w, h) -- both arguments unread: render-state defaults.
+    // FUN_004213d0(w, h), both arguments unread: render-state defaults.
     Win3DResetState();
-    // 0x00424bf1 FUN_004180c0(w, h) -- cdecl, both arguments unread: font device reset (layout
-    // generation bump, number-face glyphs dropped, GDI scratch rebuilt).
+    // FUN_004180c0(w, h), both arguments unread: font device reset (layout generation bump,
+    // number-face glyphs dropped, GDI scratch rebuilt).
     FontDeviceReset();
     // FUN_0059dcc0(w, h): the UI scene camera viewport {0, 0, w - 1, h - 1}.
     {
@@ -627,28 +607,25 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
         ViewRect[3] = static_cast<int>(G_RenderSurfaceHeight) - 1;
         SpaceCameraSetViewportEx(GetWin3DSceneCamera(), ViewRect, 1);
     }
-    // 0x00424c08..0x00424c23: the current client state (DAT_0067ecac) non-null -> its slot 11
-    // (+0x2c) Resize(DAT_00610850, DAT_00610854), thiscall RET 8: space LAB_0054a540
-    // (space_state.cpp), GF and IntroFocus LAB_00437400 (gameflow.cpp / client_state.cpp),
-    // MissionBriefing 0x0053aaa0 (mission_briefing.cpp).
+    // The current client state's slot 11 Resize: space_state.cpp, gameflow.cpp /
+    // client_state.cpp (shared LAB_00437400), mission_briefing.cpp.
     if (g_client.current_state != nullptr)
     {
         g_client.current_state->Resize(static_cast<int>(G_RenderSurfaceWidth),
                                        static_cast<int>(G_RenderSurfaceHeight));
     }
-    // 0x00424c26..0x00424c45: FUN_00420350(DAT_00610865, w, h, DAT_006679f0).
     MouseSetEnabled(ClientAppIsActive(), static_cast<int>(G_RenderSurfaceWidth),
                     static_cast<int>(G_RenderSurfaceHeight), G_bRenderSurfaceFullscreen);
-    G_bRenderPostCreate = true; // 0x00424c4f
+    G_bRenderPostCreate = true;
     return true;
 }
 
-// FUN_004247c0 (.text:004247c0-00424865).
+// FUN_004247c0.
 void ShutdownRenderMgr(bool bRestoreWindowedMode)
 {
     if (G_bRenderMgrShuttingDown)
     {
-        // 0x0042485a: a nested call only clears the latch.
+        // A nested call only clears the latch.
         G_bRenderMgrShuttingDown = false;
         return;
     }
@@ -680,7 +657,6 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     if (!PumpInitMessages())
         return false;
 
-    // 0x005b13e4..0x005b152d.
     if (DALib::Data == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: could not find DATA directory (%s)\n", kMainCppPath,
@@ -742,7 +718,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     RenderEx::Startup();
 #endif
 
-    // 0x005b1684: the local render mode PerfOptions.ini's [Display] may overwrite.
+    // The local render mode PerfOptions.ini's [Display] may overwrite.
     DisplaySettings Mode;
     Mode.mode_field00 = -1;
     Mode.refresh_rate = 0x3c;
@@ -762,12 +738,9 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     const bool bPerfOptionsCurrent =
         LoadPerfOptions("PerfOptions.ini", reinterpret_cast<FPerfDisplaySettings*>(&Mode.width));
 
-    // 0x005b16da..0x005b1780: FUN_005b0220(&text) builds the low-machine warning into a
-    // zeroed two-word text. False -> FUN_00444e20. True -> ShowCursor(TRUE) until the count is
-    // >= 0 (the extra calls counted), DialogBoxParamA(resources DAT_0067eca8, 0x82, window
-    // DAT_0067eca0, FUN_005b05a0, &text), ShowCursor(FALSE) extra + 1 times, free(text) (not
-    // zeroed), and anything but 1 from the dialog fails InitializeEngine (LAB_005b1413). The
-    // retail EH state around the text has no exception source between these calls.
+    // The low-machine warning. With text: show the cursor until visible (counting the extra
+    // calls), run dialog 0x82, hide it extra + 1 times, free the text (not zeroed); anything
+    // but 1 from the dialog fails InitializeEngine.
     {
         FHudWideText WarningText;
         WarningText.Text = nullptr;
@@ -813,44 +786,42 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
 
     if (!bPerfOptionsCurrent)
     {
-        NnPreferences::SeedGraphicsDefaults(); // FUN_004a9380 (result not read, 0x005b1876)
+        NnPreferences::SeedGraphicsDefaults(); // FUN_004a9380 (result not read)
         ApplyChangedPerfOptions(); // FUN_005b40f0
     }
-    // 0x005b1885: FUN_005b3ec0 writes [Display] from the options object (DAT_00679bc8..bd4).
+    // FUN_005b3ec0 writes [Display] from the options object.
     SavePerfOptions("PerfOptions.ini");
     DALib::Alchemy->CreateVertexBuffer(); // +0x34, no null check (retail)
 
     if (!PlayStartupMovies())
         return false;
 
-    // 0x005b19c8..0x005b1a06: the startup picture -- CMP [DAT_00679bc8],0x500 / JC (width,
-    // unsigned) and CMP [DAT_00679bd0],0x20 (colour bits) pick one of four .rdata strings.
+    // The startup picture: width (unsigned compare) and colour bits pick one of four.
     char const* SplashPath = nullptr;
     if (static_cast<unsigned>(g_display.width) >= 0x500u)
     {
         if (g_display.color_bpp == 0x20)
-            SplashPath = "../Data/Interface/Intro/images/startupscreen_1280.tga"; // 0x005e6b90
+            SplashPath = "../Data/Interface/Intro/images/startupscreen_1280.tga";
         else
-            SplashPath = "../Data/Interface/Intro/images/startupscreen_1280_16.bmp"; // 0x005e6b54
+            SplashPath = "../Data/Interface/Intro/images/startupscreen_1280_16.bmp";
     }
     else if (g_display.color_bpp == 0x20)
     {
-        SplashPath = "../Data/Interface/Intro/images/startupscreen.tga"; // 0x005e6b20
+        SplashPath = "../Data/Interface/Intro/images/startupscreen.tga";
     }
     else
     {
-        SplashPath = "../Data/Interface/Intro/images/startupscreen_16.bmp"; // 0x005e6aec
+        SplashPath = "../Data/Interface/Intro/images/startupscreen_16.bmp";
     }
 
-    // 0x005b1a06..0x005b1a11: the loading screen DAT_0067c3b8 is registered with Common.dll,
-    // gets the same picture as its Image, and runs once.
+    // The loading screen is registered with Common.dll, gets the same picture as its Image,
+    // and runs once.
     LoadingScreenRegister();              // FUN_00579180
     LoadingScreenSetImage(SplashPath);    // FUN_00579220
     LoadingScreenStart();                 // FUN_00579290
 
-    // 0x005b1a16..0x005b1ab9: a stack Image (vptr 0x005e2718, +0x14 = 0) shows the picture for
-    // two frames, then drops its BigImage. The object itself lives to the end of the function
-    // (dtor FUN_00565010 at 0x005b1c07 / 0x005b1fd1).
+    // A stack Image shows the picture for two frames, then drops its BigImage. The object
+    // itself lives to the end of the function.
     Image Splash;
     Win3DSetViewport(nullptr, kMainCppPath, 0x3a4);   // FUN_00422610(0, main.cpp, 0x3a4)
     Win3DSetPipelineClearColor(0.0f, 0.0f, 0.0f, 1.0f); // FUN_004214d0
@@ -886,8 +857,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     }
 
     RefreshLoadingProgress();
-    // 0x005b1baa..0x005b1bc1: a stack DataConfigPump (vptr 0x005e6ab8 stored at [ESP+0x2c])
-    // pumps messages for every [Data] value DataConfig::startup reads.
+    // A stack DataConfigPump pumps messages for every [Data] value DataConfig::startup reads.
     DataConfigPump Pump;
     const int ConfigResult = DataConfig::startup(g_display.ini_path.c_str(),
                                                  &Archetype::GCliObjFactory, &Pump);
@@ -904,59 +874,54 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     if (!PumpInitMessages())
         return false;
 
-    // 0x005b1ca0 FUN_00468c20: the compiled-in chat text styles.
+    // FUN_00468c20: the compiled-in chat text styles.
     ChatRegisterTextStyles();
-    // 0x005b1ca5..0x005b1caf: FUN_005b0c30(DAT_00679d04) -- freelancer.ini's client [Data]
-    // keys, its [Resources] DLLs and audio\SoundCFG.ini; the result is not read.
+    // FUN_005b0c30 -- freelancer.ini's client [Data] keys, its [Resources] DLLs and
+    // audio\SoundCFG.ini; the result is not read.
     LoadClientIniData(g_display.ini_path.c_str());
     if (!PumpInitMessages())
         return false;
 
     RefreshLoadingProgress();
-    // 0x005b1d46..0x005b1d53: FUN_0059d5a0(DAT_00679bc8, DAT_00679bcc).
     Win3DStartupManager(g_display.width, g_display.height);
-    InitUiSoundTable(); // 0x005b1d58: FUN_00564520
-    // 0x005b1d5d..0x005b1d73: DAT_0067ecb4 = FUN_0059db20("WinDebug", "WinDebug", 0, 0). No
-    // factory answers to "WinDebug", so this stores null (see globals.h).
+    InitUiSoundTable(); // FUN_00564520
+    // No factory answers to "WinDebug", so this stores null (see globals.h).
     G_WinDebugRoot = WinFactoryCreate("WinDebug", "WinDebug", nullptr, nullptr);
-    // 0x005b1d78: FUN_0041ef20 and the inlined pump follow the store directly.
     if (!PumpInitMessages())
         return false;
 
     // Slot 8 (+0x20, PreInit) of the four client state singletons, a message pump after the
     // first two. IntroFocus's and SpaceApp's are 0x00401e90, a bare RET.
-    GetIntroFocusState()->PreInit(); // 0x005b1e04..0x005b1e0d: FUN_00575430 slot 8
+    GetIntroFocusState()->PreInit();
     if (!PumpInitMessages())
         return false;
-    GetSpaceState()->PreInit();      // 0x005b1e9c..0x005b1ea5: FUN_0054bd30 slot 8
+    GetSpaceState()->PreInit();
     if (!PumpInitMessages())
         return false;
-    // 0x005b1f47..0x005b1f50: FUN_00437420 slot 8 (LAB_00437270) -> FUN_00558850: FUN_004393b0
-    // (the location maps), FUN_004354e0 (the gf\CharacterInfo.cpp script database), JMP
-    // FUN_004355e0 (the "preload =" scripts), then GF +0x04 = +0x05 = 0.
+    // LAB_00437270 -> FUN_00558850: the location maps, the gf\CharacterInfo.cpp script
+    // database, the "preload =" scripts.
     GetGameflowState()->PreInit();
-    GetMissionBriefingState()->PreInit(); // 0x005b1f53..0x005b1f5c: FUN_0043d560 slot 8 -> LAB_0043d170
+    GetMissionBriefingState()->PreInit(); // LAB_0043d170
 
     EnsureClientIMEFocus();                                   // FUN_00564060
-    InitializeRichText(static_cast<int>(G_RenderSurfaceHeight)); // 0x005b1f6a, DAT_00610854
+    InitializeRichText(static_cast<int>(G_RenderSurfaceHeight));
     ReinitializeRichTextFonts();
-    DeviceTRC::set_image_root(g_display.data_path.c_str());   // 0x005b1f7b, DAT_00679e0c
+    DeviceTRC::set_image_root(g_display.data_path.c_str());
     ChatInit();                                               // FUN_004690c0
     MenuUiInitToolTipAndRollover(); // FUN_0059db20("ToolTip") + FUN_0059db20("Rollover")
     RefreshLoadingProgress();
     WarmUpEffectShapes(); // FUN_004f70d0
     RefreshLoadingProgress();
 
-    // 0x005b1fb8: FUN_0042d770. Its Delta (DAT_00667cf8) is a CRT-constructed static (XC
-    // 0x0060f18c -> Timing::Delta::Delta) that the first stop() starts by itself, and
-    // DAT_00667d20 was seeded by the XC entry 0x0060f188 (timeGetTime) -- nothing to start here.
+    // Its Delta is a CRT-constructed static that the first stop() starts by itself, and its
+    // time base was seeded at CRT init -- nothing to start here.
     TickClientFrameTimer(); // FUN_0042d770
-    LoadingScreenReset(); // 0x005b1fbd: FUN_00579190
+    LoadingScreenReset(); // FUN_00579190
 
     return true;
 }
 
-// freelancer.exe FUN_005b73e0 (.text:005b73e0-005b7418), 21 callers. The exe's own copy of the
+// freelancer.exe FUN_005b73e0. The exe's own copy of the
 // 3DMathEngine acquire -- retail Common.dll has a separate, unexported one (FUN_06391cf0) and
 // does not export it, so each module defines the function common_csys.h declares. Builds a
 // 0xC-byte descriptor {size 0xC, "3DMathEngine", 0} on the stack and calls
@@ -981,12 +946,10 @@ I3DMathEngine* __cdecl Acquire3DMathEngine()
     return static_cast<I3DMathEngine*>(Instance);
 }
 
-// freelancer.exe's own port helper (Common.dll's former twin of it, declared in the dissolved
-// common_stubs.h, no longer exists; retail Common exports no such function). Same logic as Common's:
-// DAEngine_create_filesystem(RelPath); on a miss, resolve through GetFileSysPath against
-// DALib::Data and retry when the resolved path differs. NOT retail's exe mechanism: retail's
-// callers (e.g. texture_shapes' [Texture] file= at .text:00425d40-00425dbc) strncpy the path
-// (FUN_00417c50) and CreateInstance a "FileSystem" DACOMDESC under DALib::Data inline.
+// Port-only helper (retail has no such function): DAEngine_create_filesystem(RelPath); on a
+// miss, resolve through GetFileSysPath against DALib::Data and retry when the resolved path
+// differs. NOT retail's mechanism: retail's callers (e.g. texture_shapes' [Texture] file=)
+// strncpy the path (FUN_00417c50) and CreateInstance a "FileSystem" DACOMDESC inline.
 IFileSystem* DAEngine_open_filesystem(char const* RelPath)
 {
     IFileSystem* Filesys = nullptr;

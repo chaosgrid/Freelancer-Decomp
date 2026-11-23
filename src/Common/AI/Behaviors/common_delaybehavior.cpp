@@ -7,17 +7,9 @@
 #include "common_delaybehavior.h"
 #include "common_pathfind.h" // PathfindManager (IBehaviorManager+0x0C)
 
-// DelayBehavior -- see common_delaybehavior.h for the full RTTI/layout
-// writeup this pass relied on. Ported from EXE/Disasm/Common.dll.txt (raw
-// disassembly is authoritative in this module over Ghidra's Common.dll.c
-// decompilation -- see this marathon's "ground truth precedence" rule).
+// DelayBehavior; layout notes are in common_delaybehavior.h.
 
-// FUN_062d0a10 (Common.dll.txt 207935-207956) -- constructor. Calls the
-// shared base-init helper FUN_062d2020 first (item 1529 -- NOT the
-// "no-op stub" it was long recorded as: it writes +0x04..+0x29, see
-// Behavior in common_behavior.h), then default-constructs the still-unidentified
-// Watcher sub-object (FULLPORT-DEFERRED, see ConstructDelayWatcher), and
-// finally (implicitly, via C++ construction) installs the vtable.
+// FUN_062d0a10. FUN_062d2020 (ConstructBase), then the IdleIdea member.
 DelayBehavior::DelayBehavior(int InTypeId)
     : Behavior()
     , TypeId(InTypeId)
@@ -32,31 +24,22 @@ DelayBehavior::DelayBehavior(int InTypeId)
     , Flags28(0)
     , Flag29(0)
     , Pad2a{}
-    , Watcher2c()   // FUN_062d9b10 (IdleIdea's ctor), .text:062d0a42
+    , Watcher2c()   // FUN_062d9b10 (IdleIdea's ctor)
     , DelayDuration(0.0f)
     , DelayElapsed(0.0f)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020 -- Behavior's own field initialisation
+    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
-// Vtable slot 0 is FUN_062c7090, the scalar-deleting-dtor thunk shared
-// verbatim across 7 unrelated vtables (decomp-tracker item 1320) -- NO
-// DelayBehavior-specific field cleanup exists anywhere in it.
+// Slot 0 is FUN_062c7090, the scalar-deleting-dtor thunk shared by 7 vtables; no own cleanup.
 DelayBehavior::~DelayBehavior()
 {
 }
 
-// Own vtable slot 1 (offset 0x04). Common.dll.txt 207972-208004
-// (LAB_062d0a70), 31 instructions.
+// Slot 1, LAB_062d0a70.
 bool DelayBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 {
-    // retail: `CALL FUN_062d2090(this, Param1, Param2, Param3)` -- the shared
-    // Behavior-family context initializer (see common_cruisebehavior.cpp's
-    // SetContext for the fully-traced body).
-    // 2026-10-08: .text:062d0a86 FUN_062d2090 -> Behavior::BindContext. On success: the
-    // IdleIdea's slot 0 (owner, sys, Param2) at 062d0aa0, then +0x40 = +0x44 = 0. AL = the
-    // binder's result.
-    bool const bOk = BindContext(Param1, Param2, Param3);
+    bool const bOk = BindContext(Param1, Param2, Param3);   // FUN_062d2090
     if (bOk)
     {
         Watcher2c.SetContext(OwnerContextPtr14, NavHelperPtr24, Param2);
@@ -66,25 +49,21 @@ bool DelayBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     return bOk;
 }
 
-// Own vtable slot 3 (offset 0x0c). Common.dll.txt 208024-208029
-// (FUN_062d0ac0), 6 instructions.
+// Slot 3, FUN_062d0ac0.
 void DelayBehavior::ResetTickState()
 {
-    Behavior::OnEngage();      // 062d0ac3 FUN_062d20d0 (DeltaTime1c = 0 was missing before)
-    DelayElapsed = 0.0f;         // 062d0ac8
+    Behavior::OnEngage();      // FUN_062d20d0
+    DelayElapsed = 0.0f;
 }
 
-// Own vtable slot 4 (offset 0x10). ICF-shared, literal same retail address
-// as IdleBehavior::Disengage() (common_idlebehavior.cpp) -- reproduced here
-// with the identical body.
+// Slot 4, FUN_062cd5e0; ICF-shared with IdleBehavior::Disengage().
 void DelayBehavior::Disengage()
 {
-    Watcher2c.Commit();     // FUN_062cd5e0: `CALL [EAX+0x10]` on +0x2c (IdleIdea, bare RET)
-    Behavior::OnDisengage();      // tail JMP FUN_062d20f0 (Pathfind->Field_064 = 0 when present, +0x29 = 0)
+    Watcher2c.Commit();     // IdleIdea, bare RET
+    Behavior::OnDisengage();      // FUN_062d20f0
 }
 
-// Own vtable slot 5 (offset 0x14). ICF-shared, literal same retail address
-// as CruiseBehavior/IdleBehavior's own SetModeFromFlags().
+// Slot 5; ICF-shared with CruiseBehavior/IdleBehavior::SetModeFromFlags().
 int DelayBehavior::SetModeFromFlags()
 {
     int const Mode = (Flag29 != 0) ? 3 : 1;
@@ -92,8 +71,7 @@ int DelayBehavior::SetModeFromFlags()
     return Mode;
 }
 
-// Own vtable slot 7 (offset 0x1c). Common.dll.txt 208050-208081
-// (FUN_062d0ae0), 30 instructions.
+// Slot 7, FUN_062d0ae0.
 int DelayBehavior::Update()
 {
     if (OwnerContextPtr14 == nullptr)
@@ -102,10 +80,9 @@ int DelayBehavior::Update()
         return UpdateResult10;
     }
 
-    Watcher2c.Update(DeltaTime1c);   // 062d0afe, result discarded
+    Watcher2c.Update(DeltaTime1c);   // result discarded
 
-    // 062d0b01-062d0b12: FLD DelayElapsed; FADD DeltaTime1c; FST DelayElapsed (rounded); FCOMP DelayDuration
-    // compares the UNROUNDED sum; TEST AH,0x41 / JNZ skips on less, equal or unordered.
+    // Retail compares the unrounded x87 sum; strictly greater.
     double const Sum = static_cast<double>(DelayElapsed) + DeltaTime1c;
     DelayElapsed = static_cast<float>(Sum);
     if (Sum > DelayDuration)
@@ -114,11 +91,7 @@ int DelayBehavior::Update()
         unsigned int SentinelBits = 0xccbebc20u;
         DelayElapsed = *reinterpret_cast<float*>(&SentinelBits);
 
-        // retail: `MOV ECX,[ESI+0x20]; PUSH 0x0; PUSH 0x14; CALL FUN_062d29a0`
-        // (.text:062d0b14-062d0b22) -- i.e. Slot(param_1) = 0x14, Result(param_2) = 0.
-        // 0x14 == 20 is DelayBehavior's own index into IBehaviorManager's 21-entry
-        // BehaviorDispatchTable (+0x174, common_iface.h) -- the same "this behavior slot is
-        // done" convention GuideBehavior uses with its own index 0xe.
+        // 0x14 is DelayBehavior's own index in the BehaviorDispatchTable (GuideBehavior uses 0xe).
         BehaviorMgrPtr20->SetDirectiveResult(0x14, 0);   // FUN_062d29a0
     }
 
@@ -126,15 +99,14 @@ int DelayBehavior::Update()
     return UpdateResult10;
 }
 
-// Own vtable slot 10 (offset 0x28). Common.dll.txt 208098-208106
-// (LAB_062d0b40), 10 instructions.
+// Slot 10, LAB_062d0b40.
 bool DelayBehavior::ApplyDirective(void const* Param)
 {
     float Value = *reinterpret_cast<float const*>(static_cast<unsigned char const*>(Param) + 0x0c);
 
     DelayDuration = Value;
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
-    DelayElapsed = Value; // retail: same incoming value written to BOTH fields, see header comment.
+    DelayElapsed = Value; // retail writes the same value to both fields
 
     return true;
 }

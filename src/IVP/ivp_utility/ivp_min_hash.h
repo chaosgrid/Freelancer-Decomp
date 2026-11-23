@@ -64,7 +64,7 @@ public:
     // 0634d4f0 (thiscall): removes stadium[1]'s element when there is one.
     void remove_min();
 
-    // Inlined by every caller: `MOV EAX,[hash+4]; MOV EAX,[EAX+4]` then the element's +0xc.
+    // Inlined by every caller: stadium[1]'s element (+0xc).
     void* find_min_elem() const
     {
         IVP_U_Min_Hash_Elem* const Min = stadium[1];

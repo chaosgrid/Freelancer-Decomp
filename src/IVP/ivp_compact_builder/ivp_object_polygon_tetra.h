@@ -15,8 +15,7 @@
 // IVP_Object_Polygon_Tetra and its helpers -- the IVP SDK's triangulated
 // working copy of an IVP_Template_Polygon, built by
 // IVP_SurfaceBuilder_Polygon_Convex and consumed by
-// IVP_Compact_Ledge_Generator (Common.dll .text:06378a10-0637a2d9).
-// (2026-10-08, claude-code:cmn-ivp4b)
+// IVP_Compact_Ledge_Generator (Common.dll 06378a10-0637a2d9).
 //
 // Every field below is placed at the offset the listing reads or writes; the
 // ones no retail instruction in this chain reads keep a Field_0xNN name.

@@ -44,13 +44,11 @@ void FEquipVisualSet::ResetFields()
 
 void FEquipVisualSet::Clear()
 {
-    // FUN_00457e30. 0x00457e36..0x00457e58: FUN_0041b030 on every slot of the vector, then
-    // 0x00457e5a..0x00457e74 the erase of [begin, end).
+    // FUN_00457e30.
     for (size_t Index = 0; Index < MaterialEntries.size(); ++Index)
         Archetype::ReleaseMaterialEntrySlot(&MaterialEntries[Index]);
     MaterialEntries.clear();
 
-    // 0x00457e77..0x00457eb3: IEngine slot 24 (+0x60) on every live item instance.
     for (int Index = 0; Index < Count; ++Index)
     {
         if (Instances[Index] != -1)
@@ -61,11 +59,8 @@ void FEquipVisualSet::Clear()
         ArchIds[Index] = 0;
     }
 
-    // 0x00457eb5: FUN_005582a0.
     FlashLights.Clear();
 
-    // 0x00457ebd..0x00457edc: operator delete on both arrays, then the summary's deleting
-    // destructor (vftable slot 0 with 1) when there is one.
     operator delete(Instances);
     operator delete(ArchIds);
     if (Summary != nullptr)
@@ -85,8 +80,8 @@ long FEquipVisualSet::GetInstance(int Index) const
 
 void FEquipVisualSet::Populate(long RootInstance)
 {
-    // FUN_00457f10. operator new(0x20) + the Common ctor (0x00457f48); retail tests the
-    // allocation and stores 0 on failure, which the throwing new of the port never returns.
+    // FUN_00457f10. operator new(0x20); retail tests the allocation and stores 0 on failure,
+    // which the port's throwing new never returns.
     Summary = new HardpointSummary();
     Summary->analyze_instance(RootInstance);
     Count = Summary->get_count();
@@ -105,7 +100,7 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
     if (Instances[HpIndex] != -1)
         return false;
 
-    // 0x00457ff9..0x00458009: the archetype id is recorded before the good is even looked up.
+    // The archetype id is recorded before the good is even looked up.
     unsigned const ArchId = Equip->Nickname.Id;
     ArchIds[HpIndex] = ArchId;
     Archetype::ICliObj* const Companion = Equip->Companion;
@@ -116,8 +111,7 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
     if (!Good->has_visual_attachment())
         return false;
 
-    // 0x00458037..0x00458061: FUN_0041c540(attachment, DALib::Data, 0, 0, companion +0x20,
-    // &this+0x10, 0).
+    // FUN_0041c540.
     Instances[HpIndex] = static_cast<long>(reinterpret_cast<intptr_t>(MiscUtilLoadEngineInstance(
         Good->AttachmentArchetype.Value, DALib::Data, nullptr, nullptr,
         Archetype::CliObjMaterialPaths(Companion), &MaterialEntries, nullptr)));
@@ -125,9 +119,7 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
     char const* const HpChild = Good->HpChild.Value;
     if (HpChild != nullptr)
     {
-        // 0x00458071..0x004580c8: the attachment's HpChild hardpoint is connected to the
-        // ship's hardpoint -- DALib::Hardpoint slot 6 (parent instance, {name, crc},
-        // attachment instance, {HpChild, crc}).
+        // The attachment's HpChild hardpoint is connected to the ship's hardpoint.
         FHardpointKey ChildKey;
         ChildKey.Name = HpChild;
         ChildKey.Crc = DACOM_CRC::GetCRC32(HpChild);
@@ -140,12 +132,10 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
         return true;
     }
 
-    // 0x004580d6..0x0045813e: a fixed joint (type 0) at the hardpoint's position and
-    // orientation -- IEngine slot 47 (+0xbc) CreateJoint(parent, attachment, payload). The
-    // payload is retail's full 0x5C-byte joint block (ESP+0x20..0x7c, the top of the 0x6c frame;
-    // EngBase FUN_0661ec90 copies all 0x17 dwords): 0x004580e0 writes [0] = 0, then [4..6] and
-    // [7..15]. Dwords 1..3 and 16..22 are never written by retail (stack garbage); the port
-    // zeroes them.
+    // A fixed joint (type 0) at the hardpoint's position and orientation. The payload is
+    // retail's full 0x5C-byte joint block (EngBase FUN_0661ec90 copies all 0x17 dwords); retail
+    // writes only [0], [4..6] and [7..15]. Deviation: the port zeroes dwords 1..3 and 16..22,
+    // which retail leaves as stack garbage.
     unsigned long Payload[G_EngineJointPayloadDwords];
     memset(Payload, 0, sizeof(Payload));
     HardpointInfo const& PosInfo = Summary->get_info(HpIndex);
@@ -197,7 +187,7 @@ void FEquipVisualSet::AddFlashLights(EquipDescList const* List)
         int const HpIndex = Summary->find_name(Desc.Hardpoint);
         if (HpIndex == -1)
             continue;
-        // 0x00458276..0x00458299: slot 4 get_class_type == 0x15 (Light) and always_on (+0x70).
+        // Always-on lights only (class type 0x15).
         Archetype::ICliObj* const Companion = Equip->Companion;
         if (Equip->get_class_type() != Archetype::AClassLight)
             continue;

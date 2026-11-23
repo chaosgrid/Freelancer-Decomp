@@ -66,7 +66,7 @@ TMirrorPropertyBucket<ScriptBehavior>* GetClientLocationRoomScriptBehaviors(unsi
 TMirrorPropertyBucket<AmbientScriptProperties>* GetClientLocationRoomAmbientScripts(
     unsigned LocationId);
 // FUN_0043a340 (RET 4) -- the location's RoomData is loaded (RoomData +0x08). Caller: the Gf
-// script sequence stop FUN_004554c0 (0x004554f7).
+// script sequence stop FUN_004554c0.
 bool IsClientLocationRoomLoaded(unsigned LocationId);
 void* GetClientCurrentLocationRuntime();                      // FUN_0043a460
 void UnloadClientLocationRoomState(unsigned LocationId);      // FUN_0043a080
@@ -74,8 +74,8 @@ void UnloadClientLocationRoomState(unsigned LocationId);      // FUN_0043a080
 // LocationController (DAT_00668708) base and location changes. Every IServer notification
 // (BaseEnter / BaseExit / LocationEnter / LocationExit / *InfoRequest) goes to DAT_0067ecd0
 // with the session DAT_00673344 when both the server exists and this+0x5a is clear.
-// IntroFocus writes +0x5a = 1 before entering an intro base (0x00573919), then clears it
-// when leaving that base (0x0057409b / 0x0057412c / 0x00574ad8).
+// IntroFocus writes +0x5a = 1 before entering an intro base, then clears it when leaving that
+// base.
 void SetClientLocationNoServerNotify(bool bDisabled);
 //
 // FUN_00439200 -- +0x34..+0x44, +0x48, +0x4c, +0x50 and +0x59 zeroed.
@@ -99,36 +99,33 @@ void SetClientLocationBase(unsigned BaseId);
 // loaded at a zero count, count + 1. +0x59 is set for the length of the call.
 void ChangeClientLocation(unsigned Location);
 // FUN_0043bab0 (RET 4) -- the location's music and ambience (RoomData +0xcc..+0xd5) and the Gf
-// audio fade. Callers outside the controller: FUN_005588a0 (0x00558997, a location given).
+// audio fade. Callers outside the controller: FUN_005588a0 (a location given).
 void ApplyClientLocationAudio(unsigned LocationId);
-// FUN_005588a0 0x0055896f -- DAT_00668760 (the controller's this+0x58) = 1: the next
+// Inlined in FUN_005588a0 -- DAT_00668760 (the controller's this+0x58) = 1: the next
 // FUN_0043bab0 keeps a non-looping music / ambience, then clears the byte.
 void SetClientLocationKeepAudio();
 // FUN_0043b3e0 -- leave the current location and base (LocationExit / BaseExit, rooms and base
-// unloaded when their counts reach 0). Caller: FUN_00558a50 (and the menu 0x00574053 /
-// 0x005740e4 / 0x00574a90).
+// unloaded when their counts reach 0). Callers: FUN_00558a50 and the menu driver.
 void LeaveClientLocationBase();
 // FUN_0043bbc0 -- draw the current location: +0x40's runtime through FUN_0044b570. Caller: the
 // base frame FUN_00558c10.
 void DrawClientLocation();
 unsigned GetClientLocationCurrentBase();  // this+0x34
 // FUN_0043bc90 (thiscall on DAT_00668708) -- this+0x54, the loaded base's solar object id
-// (FUN_004397a0). Callers (unported): 0x00440819 / 0x0044103e / 0x004411f9.
+// (FUN_004397a0). Callers: the NavBar's dealer tabs (nav_bar.cpp).
 unsigned GetClientLocationBaseSolarId();
 // FUN_0043bbe0 (thiscall on DAT_00668708) -- the strid_name of the base the player is in: the
 // this+0x34 base looked up (FUN_00439590 inlined, FDUMP on a miss), its BaseData's id through
 // Universe::get_base, then IBase slot 2 (+0x08, [+0x0c] = strid_name). 0 when the entry has no
-// BaseData or the universe has no such base. Callers: NN_ArrivalText 0x0045aeb4, the dealer
-// 0x00481504.
+// BaseData or the universe has no such base. Callers: NN_ArrivalText, the dealer.
 int GetClientCurrentBaseStridName();
 unsigned GetClientLocationCurrentRoom();  // this+0x38
-// this+0x59 (DAT_00668761): zeroed by the ctor (0x00438eef) and FUN_00439200 (0x0043921a),
-// raised for the length of FUN_0043b6b0 (0x0043b6bf / 0x0043b963) and set by the base enter
-// FUN_005588a0 (0x005588bc) right after its FUN_00439200. Readers outside the controller
-// address it absolutely: FUN_0045a740 (0x0045a75b), NN_MainButton 0x0045cb09, NN_Pause
-// FUN_004a75c0 (0x004a75de).
+// this+0x59 (DAT_00668761): zeroed by the ctor and FUN_00439200, raised for the length of
+// FUN_0043b6b0 and set by the base enter FUN_005588a0 right after its FUN_00439200. Readers
+// outside the controller address it absolutely: FUN_0045a740, NN_MainButton, NN_Pause
+// FUN_004a75c0.
 bool IsClientLocationInTransition();
-// FUN_005588a0 0x005588bc -- MOV byte [DAT_00668761],1.
+// Inlined in FUN_005588a0 -- DAT_00668761 = 1.
 void SetClientLocationInTransition();
 
 // FUN_00438c90 — the current room's camera, or null when no room is entered. The object

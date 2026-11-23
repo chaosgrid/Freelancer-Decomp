@@ -91,7 +91,7 @@ struct FMaterialSubmitContext
     void* Inst;
     void* World;
     void* View;
-    const FRpVertexSrcDesc* SourceVertices; // formerly Field0C
+    const FRpVertexSrcDesc* SourceVertices; // +0x0C
     unsigned short* Indices;    // deformable2 0
     FVbListing* VbListing;
     FIbScratch* IbScratch;

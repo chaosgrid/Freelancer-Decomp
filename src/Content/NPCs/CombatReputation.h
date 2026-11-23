@@ -16,30 +16,25 @@
 //   - the heartbeat (message 0x20; SpaceSupport 06f5d6c6): NPCs near each player that like a
 //     second NPC turn hostile to whoever that NPC is hostile to (FUN_06f70580, message 0x1003
 //     to SpaceSupport).
-// The TU's data: the 16 static ids of ContentStaticIds.h (06f6fd90-06f6ff70,
-// DAT_06fd3a14..DAT_06fd39d8), the scan table DAT_06fd1d58 (initializer FUN_06f70530) and
-// DAT_06fd1d50 (initializer LAB_06f70570); all private to CombatReputation.cpp.
+// The TU's data (the scan table DAT_06fd1d58 and DAT_06fd1d50) is private to
+// CombatReputation.cpp.
 
 class FContentSpaceObj;          // NpcBase.h (TU20)
 struct FSubObjDamageEvent;       // server_gameobject.h (message 0xd)
 
-// FUN_06f6ff90 (cdecl): the damage event is copied (its ObjId is replaced by the solar parent
-// when there is one).
+// FUN_06f6ff90.
 void __cdecl HandleDamageReputation(FSubObjDamageEvent const* Event);
 
-// FUN_06f70490: retail is a thiscall member of the SpaceSupport controller (ECX = the
-// controller at 06f5d764, not read; RET 4) forwarding Event to FUN_06f6ff90. FSpaceSupport is
-// private to SpaceSupport.cpp, so the port has it as a free function.
+// FUN_06f70490: a thiscall member of the SpaceSupport controller in retail (this not read).
+// FSpaceSupport is private to SpaceSupport.cpp, so the port has it as a free function.
 void __cdecl OnDamageReputation(FSubObjDamageEvent const* Event);
 
-// FUN_06f704a0: retail is a thiscall member of the SpaceSupport controller (ECX = the
-// controller at 06f5da0b, not read; RET 8). Ship is the destroyed object, KillerId the killer
-// (or the top damaging player) chosen by the caller.
+// FUN_06f704a0: a thiscall member of the SpaceSupport controller in retail (this not read).
+// KillerId is the killer (or the top damaging player) chosen by the caller.
 void __cdecl ApplyKillReputation(FContentSpaceObj const* Ship, unsigned int const* KillerId);
 
-// FUN_06f70580 (cdecl, plain RET): the argument FUN_06f70480 forwards is not read.
+// FUN_06f70580: the argument is not read.
 void __cdecl UpdateNpcReputations(float Unused);
 
-// FUN_06f70480 (cdecl; caller SpaceSupport heartbeat 06f5d6c6 with the heartbeat period
-// DAT_06fce770): a tail jump to FUN_06f70580 with the same argument.
+// FUN_06f70480: a tail jump to FUN_06f70580 (called with the heartbeat period DAT_06fce770).
 void __cdecl OnHeartbeatReputation(float HeartbeatPeriod);

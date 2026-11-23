@@ -10,30 +10,12 @@
 // column edges the mouse can drag, one optional BaseRichTextWin per cell laid out on the grid,
 // a selectable / hoverable row highlight and a line frame.
 //
-// Built by WINFACTORY<UITable> DAT_0067da00 (static init LAB_00599220 -> FUN_00599250 "UITable",
-// atexit LAB_00599240 -> FUN_00579380; vftable 0x005e57b8, Create FUN_005992c0 =
-// operator_new(0x13c)). Constructor FUN_00597cd0 (Win3D ctor inlined), destructor FUN_00597ed0
-// (scalar deleting FUN_00597eb0).
+// WINFACTORY<UITable> DAT_0067da00, Create FUN_005992c0 (operator new(0x13c)). vftable
+// 0x005e5744 overrides Win3D's slots 0 (FUN_00597eb0), 4, 5, 8, 9, 11, 13 and 19.
 //
-// vftable 0x005e5744 overrides (the rest are Win3D's):
-//   0 FUN_00597eb0 dtor, 4 LAB_00599160 HitTest, 5 LAB_00598850 SetPosition,
-//   8 LAB_005987e0 SetTransform, 9 LAB_00598490 Create, 11 LAB_005988c0 Update,
-//   13 FUN_00598c40 Draw, 19 LAB_00599090 MouseEvent
-//
-// Retail layout (0x13c; the port keeps the members, not the VC6 vector layout):
-//   +0x07c Width, +0x080 Height (payload [0], [1])
-//   +0x084 vector<BaseRichTextWin*> cells, Rows * Columns, index Columns * Row + Col
-//   +0x094 vector<float> row edges (payload +0x08 entries; y, 0 at the top, going negative)
-//   +0x0a4 vector<float> column edges (payload +0x0c entries; x, 0 at the left)
-//   +0x0b4 vector<FUiTableRow> per-row flags + payload handle (payload +0x08 entries)
-//   +0x0c4 byte = 1 (never read by UITable), +0x0c8 / +0x0cc never written
-//   +0x0d0 bSelected, +0x0d4 selected row, +0x0d8 bHovered, +0x0dc hovered row
-//   +0x0e0 frame RGBA, +0x0e4 selected-row RGBA, +0x0e8 hovered-row RGBA
-//   +0x0ec edge grab distance 0.004f
-//   +0x0f0 bColumnsResizable, +0x0f1 bRowsResizable (ctor 1, nothing clears them)
-//   +0x0f4 inverse of the +0x3c transform (12 floats)
-//   +0x124 IDC_SIZENS cursor, +0x128 IDC_SIZEWE cursor, +0x12c the cursor at construction
-//   +0x130 bDragArmed, +0x131 bDragging, +0x132 bDragColumn, +0x134 drag edge, +0x138 drag offset
+// Retail layout is 0x13c; the port keeps the members (offsets below), not the VC6 vector
+// layout. Cells are Rows * Columns, index Columns * Row + Col; row edges are y, 0 at the top
+// going negative; column edges x, 0 at the left. +0x0c8 / +0x0cc are never written.
 
 #include "Interface/ui_fast_table.h"
 #include "Interface/win3d.h"
@@ -44,13 +26,13 @@
 
 class BaseRichTextWin;
 
-// One +0x0b4 element (8 bytes). The copy constructor is retail's FUN_005999d0: it copies byte 1
-// and the handle but NOT byte 0, so an element built by copy (every element vector::resize adds,
-// and every element moved by a reallocation) keeps whatever byte 0 the allocator returned. The
-// copy assignment (inlined in FUN_00599610 / FUN_005998f0) copies both bytes and the handle.
+// One +0x0b4 element (8 bytes). Retail quirk kept: the copy constructor (FUN_005999d0) copies
+// byte 1 and the handle but NOT byte 0, so an element built by copy (every element
+// vector::resize adds, and every element moved by a reallocation) keeps whatever byte 0 the
+// allocator returned. The copy assignment copies both bytes and the handle.
 struct FUiTableRow
 {
-    // Create's prototype row (0x00598625..0x0059862a): {1, 1, null}.
+    // Create's prototype row: {1, 1, null}.
     FUiTableRow(unsigned char InHoverable, unsigned char InSelectable)
         : bHoverable(InHoverable)
         , bSelectable(InSelectable)
@@ -61,8 +43,7 @@ struct FUiTableRow
         : bSelectable(Other.bSelectable)
         , Payload(Other.Payload)
     {
-        // FUN_005999d0: byte 0 is left untouched.
-    }
+        }
 
     FUiTableRow& operator=(FUiTableRow const& Other)
     {
@@ -114,8 +95,8 @@ public:
     // and columns [ColStart, ColStart + ColCount); a zero count means "to the end".
     void Layout(unsigned RowStart, unsigned RowCount, unsigned ColStart, unsigned ColCount);
 
-    float Width;                          // +0x07c
-    float Height;                         // +0x080
+    float Width;                          // +0x07c -- payload [0]
+    float Height;                         // +0x080 -- payload [1]
     std::vector<BaseRichTextWin*> Cells;  // +0x084
     std::vector<float> RowEdges;          // +0x094
     std::vector<float> ColumnEdges;       // +0x0a4
@@ -128,13 +109,13 @@ public:
     unsigned char FrameRgba[4];           // +0x0e0
     unsigned char SelectedRgba[4];        // +0x0e4
     unsigned char HoveredRgba[4];         // +0x0e8
-    float GrabDistance;                   // +0x0ec
-    unsigned char bColumnsResizable;      // +0x0f0
-    unsigned char bRowsResizable;         // +0x0f1
-    float InverseTransform[12];           // +0x0f4
-    HCURSOR RowResizeCursor;              // +0x124
-    HCURSOR ColumnResizeCursor;           // +0x128
-    HCURSOR DefaultCursor;                // +0x12c
+    float GrabDistance;                   // +0x0ec -- 0.004f
+    unsigned char bColumnsResizable;      // +0x0f0 -- ctor 1, nothing clears it
+    unsigned char bRowsResizable;         // +0x0f1 -- ctor 1, nothing clears it
+    float InverseTransform[12];           // +0x0f4 -- inverse of the +0x3c transform
+    HCURSOR RowResizeCursor;              // +0x124 -- IDC_SIZENS
+    HCURSOR ColumnResizeCursor;           // +0x128 -- IDC_SIZEWE
+    HCURSOR DefaultCursor;                // +0x12c -- the cursor at construction
     unsigned char bDragArmed;             // +0x130
     unsigned char bDragging;              // +0x131
     unsigned char bDragColumn;            // +0x132

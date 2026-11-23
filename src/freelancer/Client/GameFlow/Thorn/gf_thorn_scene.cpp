@@ -13,8 +13,8 @@
 #include <cstdint>
 #include <cstring>
 
-// FUN_00454390. Base ctor, vptrs, then REP MOVSD 0xf dwords from Desc+0x44 to a local and the
-// first three of them to +0x6c. The other twelve are never read.
+// FUN_00454390. Retail copies 0xf dwords from Desc+0x44 to a local and keeps the first three;
+// the other twelve are never read.
 FThorn_Scene::FThorn_Scene(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc)
 {
@@ -25,35 +25,35 @@ FThorn_Scene::FThorn_Scene(Csys const& ScriptFrame, FGfScript* InOwner, FThornEn
     memcpy(Ambient, Blob, sizeof(Ambient));
 }
 
-// LAB_00454450 (RET 8). FUN_00454450 -> GfFogSetOn: DAT_0066d2a8 = On && is_enabled("fog").
+// LAB_00454450.
 GENRESULT DACOM_API FThorn_Scene::SetOn(unsigned char On)
 {
     GfFogSetOn(On);
     return GR_OK;
 }
 
-// LAB_00454480 (RET 8). The FUN_00454700 answer (the fog really in effect), not the stored byte.
+// LAB_00454480. The FUN_00454700 answer (the fog really in effect), not the stored byte.
 GENRESULT DACOM_API FThorn_Scene::GetOn(unsigned char* OutOn)
 {
     *OutOn = GfFogIsActive() ? 1 : 0;
     return GR_OK;
 }
 
-// LAB_00454500 (RET 8). The low byte of each int.
+// LAB_00454500.
 GENRESULT DACOM_API FThorn_Scene::SetColor(int const* Rgb3)
 {
     GfFogSetColor(Rgb3);
     return GR_OK;
 }
 
-// LAB_00454530 (RET 8).
+// LAB_00454530.
 GENRESULT DACOM_API FThorn_Scene::GetColor(int* OutRgb3)
 {
     GfFogGetColor(OutRgb3);
     return GR_OK;
 }
 
-// LAB_00454570 (RET 0x10).
+// LAB_00454570.
 GENRESULT DACOM_API FThorn_Scene::SetRange(float Start, float End, float Density)
 {
     return SetRangeValue(&Start, &End, &Density);
@@ -65,29 +65,28 @@ GENRESULT DACOM_API FThorn_Scene::SetRangeValue(const float* Start, const float*
     return GR_OK;
 }
 
-// LAB_004545a0 (RET 0x10).
+// LAB_004545a0.
 GENRESULT DACOM_API FThorn_Scene::GetRange(float* OutStart, float* OutEnd, float* OutDensity)
 {
     GfFogGetRange(OutStart, OutEnd, OutDensity);
     return GR_OK;
 }
 
-// LAB_004545d0 (RET 0xc).
+// LAB_004545d0.
 GENRESULT DACOM_API FThorn_Scene::SetTableMode(unsigned char Table, unsigned int Mode)
 {
     GfFogSetMode(Table, Mode);
     return GR_OK;
 }
 
-// LAB_00454600 (RET 0xc).
+// LAB_00454600.
 GENRESULT DACOM_API FThorn_Scene::GetTableMode(unsigned char* OutTable, unsigned int* OutMode)
 {
     GfFogGetMode(OutTable, OutMode);
     return GR_OK;
 }
 
-// FUN_00454640 (RET 8). Through the facet's own vtable, in this order: slot 3 (byte +0),
-// slot 5 (+4), slot 7 (+0x14, +0x18, +0x1c), slot 9 (byte +1, +0x10). 0.
+// FUN_00454640. Through the facet's own vtable, in this order.
 GENRESULT DACOM_API FThorn_Scene::SetPacked(unsigned char const* Packed32)
 {
     IFogControl* const Fog = static_cast<IFogControl*>(this);
@@ -100,8 +99,7 @@ GENRESULT DACOM_API FThorn_Scene::SetPacked(unsigned char const* Packed32)
     return GR_OK;
 }
 
-// FUN_00454690 (RET 8). Slot 4 (+0), slot 6 (+4), slot 8 (+0x14, +0x18, +0x1c), slot 10
-// (+1, +0x10). 0.
+// FUN_00454690.
 GENRESULT DACOM_API FThorn_Scene::GetPacked(unsigned char* Out32)
 {
     IFogControl* const Fog = static_cast<IFogControl*>(this);
@@ -113,8 +111,7 @@ GENRESULT DACOM_API FThorn_Scene::GetPacked(unsigned char* Out32)
     return GR_OK;
 }
 
-// LAB_00454790 (RET 0x14). With DALib::Sound, its slot 11 (+0x2c) with the four dwords as
-// given. 0 either way.
+// LAB_00454790. DALib::Sound slot 11 with the four dwords as given.
 GENRESULT DACOM_API FThorn_Scene::SetReverb(unsigned int Environment, float Volume, float Decay,
                                            float Damping)
 {
@@ -123,7 +120,7 @@ GENRESULT DACOM_API FThorn_Scene::SetReverb(unsigned int Environment, float Volu
     return GR_OK;
 }
 
-// LAB_004547c0 (RET 0x14). Slot 12 (+0x30) with the four out-pointers. 0 either way.
+// LAB_004547c0. DALib::Sound slot 12.
 GENRESULT DACOM_API FThorn_Scene::GetReverb(float* OutEnvironment, float* OutVolume,
                                            float* OutDecay, float* OutDamping)
 {
@@ -141,7 +138,7 @@ void* FThorn_Scene::GetEngineInstance()
     return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 }
 
-// LAB_00453ec0 (RET 8; ICF-shared with Thorn_Psys geo slot 3). Three dwords into +0x6c.
+// LAB_00453ec0 (ICF-shared with Thorn_Psys geo slot 3).
 GENRESULT DACOM_API FThorn_Scene::SetAmbient(float const* Rgb3)
 {
     Ambient[0] = Rgb3[0];
@@ -150,7 +147,7 @@ GENRESULT DACOM_API FThorn_Scene::SetAmbient(float const* Rgb3)
     return GR_OK;
 }
 
-// LAB_00454770 (RET 8; ICF-shared with Thorn_Psys geo slot 5). +0x6c out.
+// LAB_00454770 (ICF-shared with Thorn_Psys geo slot 5).
 GENRESULT DACOM_API FThorn_Scene::GetAmbient(float* OutRgb3)
 {
     OutRgb3[0] = Ambient[0];

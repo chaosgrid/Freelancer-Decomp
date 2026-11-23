@@ -19,9 +19,8 @@
 // 0x00679be8 = 0x00679bc0 + 0x28. FUN_005621a0 (LoadStartupConfig) scatters the table below into
 // it before anything reads an option.
 
-// The descriptor table at .data 0x006143b8, transcribed row for row. Rows are in the order the
-// options menu would have listed them, which is NOT index order -- see the two comments below,
-// both of which are retail's own quirks and are reproduced deliberately.
+// The descriptor table at .data 0x006143b8, row for row. Rows are in menu order, not index
+// order; the quirks noted below are retail's and are reproduced deliberately.
 const FGameOptionDesc GGameOptionDescs[] =
 {
     {0x00, "[OUTLINES]",                        0, 0},
@@ -83,9 +82,8 @@ const FGameOptionDesc GGameOptionDescs[] =
 
     {0x2d, "[AUDIO]",                           1, 0},
 
-    // Retail really does list index 0x2f twice, here and three rows down, with 0x2e wedged
-    // between them. Whatever this row was meant to be, both copies write the same 0, so the
-    // duplicate is invisible at runtime -- but it is why the table has 71 rows for 70 options.
+    // Retail lists index 0x2f twice, with 0x2e between them. Both copies write the same 0, so
+    // the duplicate is invisible at runtime; it is why the table has 71 rows for 70 options.
     {0x2f, "VOL_VOICE",                         0, 1},
     {0x2e, "VOL_MUSIC",                         0, 1},
     {0x2f, "VOL_VOICE",                         0, 1},
@@ -119,14 +117,11 @@ const FGameOptionDesc GGameOptionDescs[] =
 
 const int GGameOptionDescCount = static_cast<int>(sizeof(GGameOptionDescs) / sizeof(GGameOptionDescs[0]));
 
-// Retail's loop bound is a byte count: `while (Off < 0x470)` over 0x10-byte records, so exactly
-// 0x470 / 0x10 = 71 rows. If this ever fires, a row was lost or gained in transcription.
+// Retail's loop bound is a byte count: 0x470 over 0x10-byte records, so exactly 71 rows.
 static_assert(sizeof(GGameOptionDescs) / sizeof(GGameOptionDescs[0]) == 0x470 / 0x10,
               "the option descriptor table must have 71 rows, as retail's 0x470 byte span does");
 
-// FUN_005792b0 (.text:005792b0-005792c3): `CMP EAX,0x46; JGE -> return 0; MOV EAX,[EAX*4 +
-// 0x00679be8]`. The compare is signed, so a negative index reads the options-object fields in
-// front of the array, exactly as retail does. No caller in the PE passes one.
+// FUN_005792b0 (signed compare, see the header).
 int GetGameOption(int Index)
 {
     if (Index >= kGameOptCount)
@@ -149,22 +144,21 @@ char const* GetGameOptionName(int Index)
 
 namespace
 {
-    // .data:00612274. See the header's "Session/game-mode flags word" section. Its initialised
-    // value in the PE is 3 (bits 1 and 2 set); the writers are FUN_004c8120 / FUN_004c8190 only.
+    // .data:00612274. Initialised to 3 in the PE; the writers are FUN_004c8120 / FUN_004c8190
+    // only.
     unsigned GSessionFlags = 3;
 }
 
 void SetGameSessionFlags(unsigned Mask, bool bSet)
 {
-    // 0x004c8120..0x004c8155: `if (param_2 == 0) flags &= ~Mask; else flags |= Mask;`
+    // FUN_004c8120.
     if (!bSet)
         GSessionFlags &= ~Mask;
     else
         GSessionFlags |= Mask;
 
-    // 0x004c815a..0x004c817e: the new word in the first dword of a 0x80-byte local, sent with
-    // IServer slot 77 (+0x134) SetInterfaceState(DAT_00673344, &local, 4) when DAT_0067ecd0 is
-    // set. The rest of the local is never written.
+    // The new word in the first dword of a 0x80-byte local, sent with IServer slot 77
+    // (+0x134). The rest of the local is never written.
     unsigned char Buffer[0x80];
     memcpy(Buffer, &GSessionFlags, sizeof(GSessionFlags));
     if (G_Server != nullptr)
@@ -173,12 +167,12 @@ void SetGameSessionFlags(unsigned Mask, bool bSet)
 
 void AssignGameSessionFlags(unsigned Value)
 {
-    // 0x004c8190: unconditional overwrite, no broadcast in retail either.
+    // FUN_004c8190.
     GSessionFlags = Value;
 }
 
 bool TestGameSessionFlags(unsigned Mask)
 {
-    // 0x004c8110: `(DAT_00612274 & Mask) != 0`.
+    // FUN_004c8110.
     return (GSessionFlags & Mask) != 0;
 }

@@ -41,7 +41,7 @@
 #include "common_iface.h"     // IObjRW, IObjInspectImpl, ObjRwFromWatchable
 #include "common_ini.h"       // INI_Reader, Vector
 #include "common_misc.h"      // ICamera
-#include "common_server.h"    // IServer (G_Server, CommComplete vt+0xfc)
+#include "common_server.h"    // IServer (G_Server, CommComplete)
 #include "soundmanager.h"     // ISoundSource
 
 #include "DALib.h"
@@ -93,15 +93,15 @@ namespace
 
     unsigned const kCommInboxCapacity = 16;
 
-    // Retail keeps the permutation in a 16-int stack array and writes it without a bound
-    // (0x004caf26 / 0x004caf90); more than 16 numbers run into the next locals. A 0x100-wchar
+    // Retail keeps the permutation in a 16-int stack array and writes it without a bound; more
+    // than 16 numbers run into the next locals. A 0x100-wchar
     // resource string holds at most 128 numbers, so the port's array holds that many: every
     // input retail survives behaves the same, and the overflow has nothing to corrupt.
     int const kCommPermutationSlots = 0x80;
 
-    float const kLineRetrySeconds = 3.0f;  // 0x40400000 at 0x004cb1b3 / 0x004cc04f
+    float const kLineRetrySeconds = 3.0f;  // immediate
     float const kAdvanceStep = 0.2f;       // DAT_005d043c
-    float const kAppearanceWarmUp = 0.1f;  // 0x3dcccccd at 0x004cb5a1
+    float const kAppearanceWarmUp = 0.1f;  // immediate
     float const kCornerOpenRate = 2.5f;    // DAT_005d74c8
     float const kHalf = 0.5f;              // DAT_005c75e0
     float const kFrameInset = 0.105f;      // DAT_005d2b1c
@@ -110,15 +110,15 @@ namespace
     float const kPortraitV1 = 1.0f;        // DAT_0061236c (read only)
     float const kPortraitZ = -30.0f;       // DAT_00612370 (read only)
 
-    // IDeformable::Play takes every trailing argument as a dword; the floats retail pushes as
-    // immediates (0x3f800000, 0xbf800000, 0x3e99999a) go through as their bit patterns.
+    // IDeformable::Play takes every trailing argument as a dword; float arguments go through as
+    // their bit patterns.
     void* FloatArg(float Value)
     {
         uintptr_t Bits = 0;
         memcpy(&Bits, &Value, sizeof(Value));
         return reinterpret_cast<void*>(Bits);
     }
-    float const kPortraitHalf = 3.0f;      // 0x40400000 / 0xc0400000 at 0x004cc6d5..0x004cc74a
+    float const kPortraitHalf = 3.0f;      // immediate (+/-)
     unsigned char const kStaticBrightness = 0xff; // DAT_00612378 (read only)
     float const kStaticUvStep = 0.00390625f;       // DAT_005d748c
     float const kPanPitchLimit = 0.1745329350233078f; // DAT_005d7478
@@ -140,9 +140,8 @@ namespace
         return static_cast<IObjRW*>(Player)->get_id() == ObjectId;
     }
 
-    // The inlined lookup every speaker site repeats (0x004cb0d9..0x004cb10d, 0x004ce081..0x004ce0b7,
-    // 0x004ce355..0x004ce3bf): FUN_005416c0(Id, 0), the gameobj's CBase face (+0xc) and its
-    // CObject (+4), kept only when the class has all of 0x103.
+    // The inlined lookup every speaker site repeats: the gameobj's CObject, kept only when the
+    // class has all of 0x103.
     CObject* CommObjectOf(unsigned ObjectId)
     {
         FClientGameobj* const Gameobj = ClientObjDb_FindObject(ObjectId, 0);
@@ -159,7 +158,7 @@ namespace
         return Object;
     }
 
-    // The watcher-to-object step (`MOV EAX,[watcher]; ADD EAX,-0x9c`, both null-tested).
+    // The watcher-to-object step (watchable - 0x9c, null-tested).
     CSimple* SimpleOfWatchable(Watchable const* Watched)
     {
         if (Watched == nullptr)
@@ -190,9 +189,8 @@ namespace
         return Value;
     }
 
-    // FUN_00428680 on a VoiceMsg archetype (0x004cb188 / 0x004cc01b): retail passes the
-    // VoiceMsg itself (vtable 0x005cabfc, an Archetype::ISound) as the sound archetype, with the
-    // alternate-start byte 0.
+    // FUN_00428680 on a VoiceMsg archetype: retail passes the VoiceMsg itself (an
+    // Archetype::ISound) as the sound archetype, with the alternate-start byte 0.
     unsigned char PlayVoiceMsgArch(FVoiceMsg* Msg, unsigned* PlayKey, ISoundSource** OutSource)
     {
         void* Handle = nullptr;
@@ -202,7 +200,7 @@ namespace
         return bOk;
     }
 
-    // The ducking push Play inlines (0x004cb1c5..0x004cb1eb).
+    // The ducking push Play inlines.
     void PushCommDuck()
     {
         PushClientSoundDucking(); // FUN_00428db0
@@ -254,7 +252,7 @@ void CommCopyCostume(Costume* To, Costume const* From)
     To->PartIds[2] = From->PartIds[2];
     To->PartIds[3] = From->PartIds[3];
     To->AccessoryCount = From->AccessoryCount;
-    // TEST / JLE, then CMP / JL against the count just stored: a signed loop with no bound.
+    // A signed loop against the count just stored, with no bound.
     for (int Index = 0; Index < static_cast<int>(To->AccessoryCount); ++Index)
     {
         To->AccessoryIds[Index] = From->AccessoryIds[Index];
@@ -282,7 +280,7 @@ void CommCopyMessage(FCommMessage* To, FCommMessage const* From)
 
 bool FCommInbox::Peek(FCommMessage* Out) const
 {
-    // FUN_004cde50: CMP [ECX],0 / JBE.
+    // FUN_004cde50.
     if (Count == 0)
     {
         return false;
@@ -311,7 +309,7 @@ void ClientSendComm(unsigned PlayerId, unsigned Sender, unsigned Receiver, unsig
                     Costume const& SenderCostume, unsigned CaptionIds, unsigned const* TextIds,
                     int TextCount, unsigned PermutationIds, float Linger, bool bUnused)
 {
-    // LAB_0053bfb0. The record is built in the frame first (0x0053bfb6..0x0053c071).
+    // LAB_0053bfb0. The record is built in the frame first.
     (void)PlayerId;
     (void)bUnused;
     FCommMessage Record;
@@ -338,9 +336,9 @@ void ClientSendComm(unsigned PlayerId, unsigned Sender, unsigned Receiver, unsig
     // +0x8c and +0x94 are never written here: retail queues whatever its frame held there. The
     // port's record carries 0 (attenuation 0 dB, result SUCCESS). Dispatch overwrites +0x8c
     // before any read; +0x94 reaches the server unchanged when Dispatch cancels the message
-    // (FUN_004cdfc0 from 0x004ce446).
+    // (FUN_004cdfc0).
 
-    // 0x0053c078..0x0053c09f: the player's inbox when the player's ship sends or receives it.
+    // The player's inbox when the player's ship sends or receives it.
     FCommInbox* Inbox = &G_CommInboxOther;
     void* const Player = GetPlayerObjRW();
     if (Player != nullptr && (static_cast<IObjRW*>(Player)->get_id() == Sender ||
@@ -394,8 +392,7 @@ void FCommDuck::Release()
 
 FCommVoice::FCommVoice() : Cursor(0)
 {
-    // FUN_004ca690 0x004ca6b4..0x004ca6e3: the watcher zeroed and set(0), the vector, then
-    // FUN_004ca910. Retail leaves +0x34 (the iterator) unset.
+    // The voice half of FUN_004ca690. Retail leaves +0x34 (the iterator) unset.
     Speaker.set(nullptr);
     Pad09[0] = Pad09[1] = Pad09[2] = 0;
     Pad16[0] = Pad16[1] = 0;
@@ -435,8 +432,8 @@ void FCommVoice::StopStatic()
 {
     if (Static != nullptr)
     {
-        Static->Stop();    // vt+0x60
-        Static->Release(); // vt+0x08
+        Static->Stop();
+        Static->Release();
         Static = nullptr;
     }
 }
@@ -449,7 +446,7 @@ void FCommVoice::StopLines()
         FCommLine& Line = Lines[Index];
         if (Line.Msg != nullptr && Line.bAcquired == 1)
         {
-            Line.Msg->Release(); // VoiceMsg vt+0x10
+            Line.Msg->Release();
             Line.bAcquired = 0;
         }
         if (Line.Source != nullptr)
@@ -495,7 +492,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
     FVoiceProfile* const Profile = LookupClientVoice(Msg->VoiceId);
     StopLines();
 
-    // 0x004caebf..0x004caf9f: the play order.
+    // The play order.
     int Permutation[kCommPermutationSlots];
     int PermutationCount = 0;
     if (Msg->PermutationIds != 0)
@@ -517,7 +514,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
                 }
                 wchar_t* End = nullptr;
                 long const Value = wcstol(Scan, &End, 10);
-                // CMP ECX,ESI / JBE: stop when nothing was consumed.
+                // Stop when nothing was consumed.
                 if (!(End > Scan))
                 {
                     break;
@@ -543,7 +540,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         PermutationCount = Msg->TextCount;
     }
 
-    // 0x004cafa3..0x004cb08c: queue the lines.
+    // Queue the lines.
     unsigned LastMsgId = 0;
     for (int Index = 0; Index < Msg->TextCount; ++Index)
     {
@@ -556,7 +553,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
             continue;
         }
         int const Part = Permutation[Index];
-        // CMP / JL: signed. A negative number from the resource string passes and indexes
+        // Signed: a negative number from the resource string passes and indexes
         // below TextIds, as in retail.
         if (Part >= Msg->TextCount)
         {
@@ -567,11 +564,11 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
             continue;
         }
         unsigned const MsgId = Msg->TextIds[Part];
-        FVoiceMsg* const VoiceMsg = Profile->FindMessage(MsgId); // VoiceProfile vt+0x14
+        FVoiceMsg* const VoiceMsg = Profile->FindMessage(MsgId);
         if (VoiceMsg == nullptr)
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: invalid MSG id (%u) for voice profile (%s)\n",
-                  kHudCommCpp, 0x318, MsgId, Profile->GetName()); // vt+0x10
+                  kHudCommCpp, 0x318, MsgId, Profile->GetName());
             continue;
         }
         FCommLine Line;
@@ -588,12 +585,11 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         return;
     }
 
-    // 0x004cb0af..0x004cb0d1.
     *OutSender = Msg->Sender;
     *OutReceiver = Msg->Receiver;
     *OutLastMsgId = LastMsgId;
 
-    // 0x004cb0d3..0x004cb12f: watch the sender.
+    // Watch the sender.
     if (Msg->Sender != 0)
     {
         Watchable const* const Watch = WatchableOf(CommObjectOf(Msg->Sender));
@@ -612,7 +608,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         bWatchSpeaker = 0;
     }
 
-    // 0x004cb133..0x004cb1b3: the first line, with the same body as FUN_004cbfc0.
+    // The first line (FUN_004cbfc0's body inlined).
     Timer = 0.0f;
     Cursor = 0;
     PlayLine(&Lines[0]);
@@ -625,7 +621,6 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
 
     if (bStaticSound)
     {
-        // 0x004cb200..0x004cb230.
         ID_String StaticId;
         StaticId.Id = CreateID("comm_static_1");
         void* const StaticArch = LookupClientSoundArch(&StaticId);
@@ -652,7 +647,7 @@ bool FCommVoice::PlayLine(FCommLine* Line)
     {
         SetClientSoundSourceType(Line->Source, 2);
         Line->Source->SetAttenuation(
-            static_cast<float>(static_cast<double>(Attenuation) + DuckDb)); // vt+0x80
+            static_cast<float>(static_cast<double>(Attenuation) + DuckDb));
         return true;
     }
     Timer = kLineRetrySeconds;
@@ -664,12 +659,12 @@ float FCommVoice::Pan(float X, float Y, float Z)
     // FUN_004cc060.
     double const PlanarLength = sqrt(static_cast<double>(X) * X + static_cast<double>(Y) * Y);
     float const Distance = static_cast<float>(PlanarLength);
-    // FCOMPP / TEST AH,0x41 / JNE: on unless the pitch term is strictly larger.
+    // On unless the pitch term is strictly larger.
     if (fabs(static_cast<double>(Z) * kPanPitchLimit) > PlanarLength)
     {
         return 0.0f;
     }
-    // TEST AH,0x41 / JP: on when above 0.1 (or NaN).
+    // On when above 0.1 (or NaN).
     if (static_cast<double>(Distance) <= kPanMinDistance)
     {
         return 0.0f;
@@ -677,7 +672,6 @@ float FCommVoice::Pan(float X, float Y, float Z)
     double const Inverse = 1.0 / static_cast<double>(Distance);
     float const NormalX = static_cast<float>(static_cast<double>(X) * Inverse);
     double NormalY = static_cast<double>(Y) * Inverse;
-    // TEST AH,5 / JP: negated only when below zero.
     if (NormalY < 0.0)
     {
         NormalY = -NormalY;
@@ -688,7 +682,6 @@ float FCommVoice::Pan(float X, float Y, float Z)
     float const NegSin = static_cast<float>(-sin(Angle));
     double Cosine = cos(Angle);
     float const Floor = static_cast<float>(static_cast<double>(Factor) * kPanFloorScale);
-    // TEST AH,5 / JP: the floor replaces a cosine below it.
     if (Cosine < static_cast<double>(Floor))
     {
         Cosine = Floor;
@@ -709,7 +702,7 @@ FCommWindow::FCommWindow()
       bStatic(1),
       Pad4f(0)
 {
-    // The window half of FUN_004ca690 (0x004ca6e8..0x004ca7b6).
+    // The window half of FUN_004ca690.
     Pad01[0] = Pad01[1] = Pad01[2] = 0;
     Rect[0] = 0;
     Rect[1] = 0;
@@ -751,8 +744,7 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
     if (Reader.is_value("corner"))
     {
         ClientMeshLoadFromPath(&Corner, Reader.get_value_string(), 0, false); // FUN_0059ec80(p, 0, 0)
-        // 0x004ccc0a..0x004ccc69: DAT_00679bb0's four bytes / 255 into +0x14/+0x18/+0x1c/+0x24,
-        // FUN_004a1af0's body inlined.
+        // The palette colour DAT_00679bb0 (FUN_004a1af0's body inlined).
         unsigned long const Palette = G_NnPaletteArgb_679bb0;
         unsigned char Colour[4];
         memcpy(Colour, &Palette, sizeof(Colour));
@@ -793,7 +785,7 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
     }
     if (Reader.is_value("static"))
     {
-        // FCOMP 0.0 / TEST AH,0x44 / JNP: 0 only when equal to zero.
+        // 0 only when equal to zero (NaN sets it).
         bStatic = (Reader.get_value_float(0) != 0.0f) ? 1 : 0;
         return true;
     }
@@ -822,7 +814,7 @@ void FCommWindow::Layout(ICamera* Cam)
         Size = 1.0f;
     }
 
-    // FUN_00423b60 / FUN_00422b80 / FUN_00423b30: P = BtnPos + (WinPos - BtnPos) * Grow.
+    // P = BtnPos + (WinPos - BtnPos) * Grow.
     FVector Delta;
     Delta.X = WinPos.X - BtnPos.X;
     Delta.Y = WinPos.Y - BtnPos.Y;
@@ -877,7 +869,7 @@ void FCommWindow::Layout(ICamera* Cam)
     CornerXform[3].Translation.Y = static_cast<float>(static_cast<double>(-HalfH) + Centre.Y);
     CornerXform[3].Translation.Z = Centre.Z;
 
-    // 0x004cd0ef..0x004cd149: ICamera slot 17 on corners 0 and 3, truncated (_ftol).
+    // Corners 0 and 3 projected, truncated.
     float Projected0[3];
     float Projected3[3];
     Cam->ProjectVec(Projected0, &CornerXform[0].Translation.X);
@@ -921,7 +913,7 @@ FCommChannel::FCommChannel()
       CompleteReceiver(0),
       CompleteMsgId(0)
 {
-    // FUN_004ca690 0x004ca7ba..0x004ca7ea. SpeakerRotate and the two offsets are left alone by
+    // The channel half of FUN_004ca690. SpeakerRotate and the two offsets are left alone by
     // retail until HUD_Receiver's ctor copies its own in; the port zeroes them.
     Pad175[0] = Pad175[1] = Pad175[2] = 0;
     memset(&SpeakerRotate, 0, sizeof(SpeakerRotate));
@@ -931,7 +923,7 @@ FCommChannel::FCommChannel()
 
 FCommChannel::~FCommChannel()
 {
-    // FUN_004ca940 0x004ca962..0x004caa0f; the window's and the voice's destructors follow.
+    // FUN_004ca940; the window's and the voice's destructors follow.
     if (CommText != nullptr)
     {
         Win3DDeleteTree(CommText); // FUN_0043d2a0, inlined
@@ -1020,7 +1012,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
     Window.bCloseRequest = 0;
     Window.bOpen = 1;
 
-    // 0x004cb2f2..0x004cb319: the head only above detail level 0 (NaN included goes without).
+    // The head only above detail level 0 (NaN included goes without).
     if (static_cast<double>(GetPerfOptionSlot(5)) > 0.0)
     {
         Body = G_EngineCharacterCache.FindOrCreate(SpeakerCostume); // FUN_004c9a80
@@ -1056,7 +1048,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             DALib::Deform->SetPosePos(Body->Deformable, &Pose.Translation.X);
             DALib::Deform->SetPoseOri(Body->Deformable, &Pose.Rotation);
 
-            // 0x004cb452..0x004cb591: one pass over the voice's scripts (VoiceProfile vt+0x18).
+            // One pass over the voice's scripts.
             std::list<std::string>& Scripts = Profile->GetScripts();
             for (std::list<std::string>::iterator It = Scripts.begin(); It != Scripts.end(); ++It)
             {
@@ -1078,10 +1070,8 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
                     // No free slot leaves -1 and retail writes the name one slot below the
                     // array; unreachable while nothing below fills a slot.
                     Body->AnimNames[PlaybackSlot] = ScriptName; // FUN_004cec20
-                    // 0x004cb50b..0x004cb57d: the script from gf\CharacterInfo.cpp's database
-                    // (FUN_004356c0, FUN_00434e90 on the stored name), then IDeformable slot 7
-                    // (instance, &AnimIds[slot], script, name, 0, 0, 1.0f, 1.0f, 0, -1.0f, 0);
-                    // non-zero -> FDUMP with FUN_00411c50(0x10000, 2) = 0x100002.
+                    // The script from gf\CharacterInfo.cpp's database (FUN_004356c0,
+                    // FUN_00434e90 on the stored name).
                     void* const AnimScript =
                         GetCharacterInfoDb()->AcquireScriptByName(Body->AnimNames[PlaybackSlot].Data);
                     if (DALib::Deform->Play(Body->Deformable, &Body->AnimIds[PlaybackSlot], AnimScript,
@@ -1097,7 +1087,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
                 }
             }
 
-            // 0x004cb597..0x004cb5f6: settle the pose.
+            // Settle the pose.
             float Remaining = kAppearanceWarmUp;
             double RemainingExact = 0.0;
             do
@@ -1110,7 +1100,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
 
             Body->StopAnimations(); // FUN_004c9a30, inlined
 
-            // 0x004cb644..0x004cb754: the second pass.
+            // The second pass.
             for (std::list<std::string>::iterator It = Scripts.begin(); It != Scripts.end(); ++It)
             {
                 char const* const ScriptName = It->c_str();
@@ -1129,8 +1119,6 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
                         }
                     }
                     Body->AnimNames[PlaybackSlot] = ScriptName;
-                    // 0x004cb6d8..0x004cb740: as above with (instance, &AnimIds[slot], script,
-                    // name, 0, 0.3f, 1.0f, 1.0f, 2, -1.0f, 0) and FDUMP 0x100002.
                     void* const AnimScript =
                         GetCharacterInfoDb()->AcquireScriptByName(Body->AnimNames[PlaybackSlot].Data);
                     if (DALib::Deform->Play(Body->Deformable, &Body->AnimIds[PlaybackSlot], AnimScript,
@@ -1152,7 +1140,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         bNoPortrait = 1;
     }
 
-    // 0x004cb769..0x004cb7a2: the caption control.
+    // The caption control.
     if (CommText == nullptr)
     {
         // "TextControl" is the WINFACTORY<NnTextControl> static (nn_text_control.cpp),
@@ -1173,9 +1161,9 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         Font->bMultiLine = 1;
         Font->LayoutGen = 0;
     }
-    CommText->SetProperty(0x33, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 1); // vt+0xa8
+    CommText->SetProperty(0x33, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 1);
 
-    // 0x004cb824..0x004cb9d5: pilot name, group name or object name, then NameIds.
+    // Pilot name, group name or object name, then NameIds.
     wchar_t IdsText[0x100];
     G_NnTextScratchB[0] = 0;
     int LineCount = 0;
@@ -1264,8 +1252,7 @@ bool FCommChannel::TickVoice(float Dt)
             CSimple const* const SpeakerSimple = SimpleOfWatchable(Speaker.target());
             if (SpeakerSimple != nullptr && Listener != nullptr)
             {
-                // 0x004cbcc8..0x004cbdbd: the speaker in the listener's frame (ICamera slot 4:
-                // nine rotation floats, then the position).
+                // The speaker in the listener's frame (nine rotation floats, then the position).
                 Vector const SpeakerPos = SpeakerSimple->WorldPosition;
                 float View[12];
                 memcpy(View, Listener->GetOrientation(), sizeof(View));
@@ -1288,11 +1275,11 @@ bool FCommChannel::TickVoice(float Dt)
         }
         if (Current->Source != nullptr)
         {
-            Current->Source->SetPan(PanValue); // vt+0x84
+            Current->Source->SetPan(PanValue);
             Current->Source->SetAttenuation(
-                static_cast<float>(static_cast<double>(DuckDb) + Attenuation)); // vt+0x80
+                static_cast<float>(static_cast<double>(DuckDb) + Attenuation));
         }
-        if (Current->Source != nullptr && Current->Source->IsFinished() != 0) // vt+0x74
+        if (Current->Source != nullptr && Current->Source->IsFinished() != 0)
         {
             ++Cursor;
             if (Cursor == Lines.size())
@@ -1314,7 +1301,6 @@ bool FCommChannel::TickVoice(float Dt)
         }
     }
 
-    // 0x004cbe49..0x004cbf2f.
     bool bBusy = Window.bOpen != 0 && Window.bCloseRequest == 0;
     if (bWatchSpeaker == 0 || SimpleOfWatchable(Speaker.target()) != nullptr)
     {
@@ -1337,7 +1323,7 @@ bool FCommChannel::TickVoice(float Dt)
             if (SinglePlayer())
             {
                 G_Server->CommComplete(CompleteSender, CompleteReceiver, CompleteMsgId,
-                                       CommResult::SUCCESS); // IServer vt+0xfc
+                                       CommResult::SUCCESS);
             }
         }
     }
@@ -1380,7 +1366,7 @@ void FCommChannel::WindowTick(float Dt, FGameCamera* Cam)
     }
     Window.Layout(AsCamera(Win3DGetCamera())); // &DAT_0067dbf8
 
-    // 0x004cc186..0x004cc1f7: Cam's viewport is the screen rect of corners 0 and 3.
+    // Cam's viewport is the screen rect of corners 0 and 3.
     FVector const Upper = Window.CornerXform[0].Translation;
     FVector const Lower = Window.CornerXform[3].Translation;
     int Projected[4];
@@ -1535,7 +1521,7 @@ void CommDrawStatic(int const* Rect)
     Win3DDisable(0xb44);
     Win3DEnable(0xbe2);
     Win3DColor3ub(kStaticBrightness, kStaticBrightness, kStaticBrightness);
-    switch (GetHudStaticBlend()) // DAT_00612374, jump table 0x004ccba8
+    switch (GetHudStaticBlend()) // DAT_00612374
     {
     case 1:
         Win3DSetBlendFunc(5, 6);
@@ -1659,7 +1645,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
         }
     }
 
-    // 0x004cd69a..0x004cd73a: the portrait key light.
+    // The portrait key light.
     FEngineLight* const NewLight = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
     EngineLightInit(NewLight, -1);          // FUN_00410ca0
     EngineLightSetType(NewLight, 1, false); // FUN_004110c0
@@ -1668,17 +1654,17 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     unsigned char const LightColour[3] = {0x80, 0x80, 0x80};
     EngineLightSetColorBytesAlt(NewLight, LightColour); // FUN_004115b0
     EngineLightSetRadius(NewLight, 1.0e9f);             // FUN_00411300
-    if (EngineLightRegister(NewLight))                  // vt+4
+    if (EngineLightRegister(NewLight))
     {
         Light = NewLight;
     }
     else
     {
-        EngineLightDelete(NewLight); // vt+0 (1)
+        EngineLightDelete(NewLight);
         Light = nullptr;
     }
 
-    // 0x004cd740..0x004cd791: channel A takes the receiver's pose, and its window a fixed spot.
+    // Channel A takes the receiver's pose, and its window a fixed spot.
     ChannelA.SpeakerRotate = SpeakerRotate;
     ChannelA.MaleOffset = MaleOffset;
     ChannelA.FemaleOffset = FemaleOffset;
@@ -1694,14 +1680,13 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     G_CommDuck.CurrentDb = 0.0f;
     G_CommDuck.FadeRemaining = -1.0f;
     G_CommDuck.RefCount = 0;
-    SetHudCommInstance(this); // 0x004cd813
+    SetHudCommInstance(this);
 
-    // 0x004cd819..0x004cd881: the low-detail comm button.
+    // The low-detail comm button.
     LowEndCommButton = WinFactoryCreate("LowEndCommButton", "ButtonControl", this, nullptr);
     if (LowEndCommButton != nullptr)
     {
-        // 0x004cd876: ButtonControl::Init FUN_0055ac30("interface\\HUD\\HUD_genericcomm.3db",
-        // 0, 0, 0, &{-0.1617, 0.0986, -0.362}, 0, &{0, 0, 0}, 0, 0, 0, 0, 0, 0, 0).
+        // ButtonControl::Init FUN_0055ac30.
         float const CommButtonOffset[3] = {-0.1617f, 0.0986f, -0.362f};
         float const CommButtonHalfExtents[3] = {0.0f, 0.0f, 0.0f};
         static_cast<NnButtonControl*>(LowEndCommButton)
@@ -1725,8 +1710,8 @@ HUD_Receiver::~HUD_Receiver()
         EngineLightDelete(Light);
     }
     Light = nullptr;
-    G_EngineCharacterCache.DeleteAll(); // 0x004ce99d..0x004ce9d1
-    SetHudCommInstance(nullptr);        // 0x004ce9d9
+    G_EngineCharacterCache.DeleteAll();
+    SetHudCommInstance(nullptr);
     Camera.Watched.set(nullptr);        // FUN_004ceb50, inlined
     // The members follow: Backdrop (nothing left to release), channel B (FUN_004cabd0,
     // FUN_004cab70, FUN_004cbb40, the vector, the watcher), channel A, then HUDItem's watcher and
@@ -1743,7 +1728,7 @@ bool HUD_Receiver::Init()
 
 void HUD_Receiver::UpdateInactive()
 {
-    // FUN_00406d10: JMP [EAX+0x2c].
+    // FUN_00406d10: a tail call of Update.
     Update();
 }
 
@@ -1763,7 +1748,7 @@ void HUD_Receiver::Update()
     {
         return;
     }
-    // 0x004cda38..0x004cda5b: Win3D's child walk, the next sibling read first.
+    // Win3D's child walk, the next sibling read first.
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
@@ -1780,7 +1765,7 @@ void HUD_Receiver::Update()
     }
 
     float const Dt = static_cast<float>(GetClientFrameTimeCapped()); // FUN_0042d680
-    // Slot A is FUN_004ce4c0 inlined (0x004cda6a..0x004cdbad), with FUN_004cdf40 called for the
+    // Slot A is FUN_004ce4c0 inlined, with FUN_004cdf40 called for the
     // head's priority where the out-of-line copy inlines it; the two bodies are the same.
     UpdateSlot(&SlotA, Dt);
     UpdateSlot(&SlotB, Dt);
@@ -1851,7 +1836,7 @@ int HUD_Receiver::MaxVoicePriority(FCommMessage const* Msg)
         FVoiceMsg* const VoiceMsg = Profile->FindMessage(Msg->TextIds[Index]);
         if (VoiceMsg != nullptr)
         {
-            int const Priority = VoiceMsg->GetPriority(); // VoiceMsg vt+0x38
+            int const Priority = VoiceMsg->GetPriority();
             if (Priority > Best)
             {
                 Best = Priority;
@@ -1886,7 +1871,7 @@ void HUD_Receiver::UpdateSlot(FCommSlot* Slot, float Dt)
     }
     int const Best = MaxVoicePriority(&Head); // inlined
 
-    // 0x004ce5b0..0x004ce689: a negative-priority head drops itself when something higher is
+    // A negative-priority head drops itself when something higher is
     // playing.
     bool bDropped = false;
     if (Best < 0 && Slot->bActive != 0 && Best < Slot->Priority)
@@ -1897,7 +1882,7 @@ void HUD_Receiver::UpdateSlot(FCommSlot* Slot, float Dt)
         Dropped.Result = CommResult::CANCELLED;
         CommCancelled(&Dropped); // inlined
     }
-    // 0x004ce68f..0x004ce70b: a negative-priority message playing is cut by anything above it.
+    // A negative-priority message playing is cut by anything above it.
     if (Slot->bActive != 0 && Slot->Priority < 0 && Best > Slot->Priority)
     {
         Slot->Channel->Cancel(); // inlined, FUN_004cbb40 at the end
@@ -1940,7 +1925,7 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
     }
     Msg->Attenuation = 0.0f;
 
-    // 0x004ce05d..0x004ce1fc: the distance attenuation against the HUD's target (the player).
+    // The distance attenuation against the HUD's target (the player).
     Watchable const* const TargetWatch = HUDItem::Target.target();
     IObjRW* const TargetRw = ObjRwFromWatchable(const_cast<Watchable*>(TargetWatch));
     if (TargetWatch != nullptr && TargetRw != nullptr && Msg->Sender != 0)
@@ -1964,7 +1949,7 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
             float const Distance = static_cast<float>(Length - SenderObject->Radius);
             if (IsPlayerObjRwId(Msg->Receiver)) // FUN_004ce490
             {
-                // FCOMP / TEST AH,0x41 / JNE: far from FAR_DIST on (NaN included).
+                // At or beyond FAR_DIST (NaN included).
                 if (!(COMM_PLAYER_FAR_DIST > Distance))
                 {
                     Msg->Attenuation = COMM_PLAYER_FAR_DIST_ATTEN;
@@ -2011,13 +1996,13 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
         }
     }
 
-    // 0x004ce1fe..0x004ce261: the priority of what is about to play.
+    // The priority of what is about to play.
     Slot->Priority = MaxVoicePriority(Msg); // inlined
     Slot->bActive = 1;
 
     if (!IsPlayerObjRwId(Msg->Receiver) && !IsPlayerObjRwId(Msg->Sender))
     {
-        // 0x004ce279..0x004ce2b9: someone else's chatter, positional, no window.
+        // Someone else's chatter, positional, no window.
         FCommChannel* const Channel = Slot->Channel;
         Channel->Reset();
         Channel->Play(Msg, false, false, true, &Channel->CompleteSender, &Channel->CompleteReceiver,
@@ -2036,7 +2021,7 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
     bool const bLetterbox = IsLetterboxVisible();
     if (bToPlayer && !bFromPlayer && !bNoCostume && !bLetterbox)
     {
-        // 0x004ce344..0x004ce421: the talking head.
+        // The talking head.
         FCommChannel* const Channel = Slot->Channel;
         Channel->Reset();
         PlayOrRewindUiSoundSlot(0x2c); // FUN_005645c0
@@ -2068,22 +2053,21 @@ void SetHudCommInstance(void* Instance)
 
 bool HudCommIsWatchedObjectId(unsigned ObjectId)
 {
-    // FUN_004cc880. 0x004cc880..0x004cc888: nothing without the element.
+    // FUN_004cc880.
     HUD_Receiver const* const Instance = static_cast<HUD_Receiver const*>(G_HudCommInstance);
     if (Instance == nullptr)
     {
         return false;
     }
 
-    // 0x004cc88a..0x004cc8ab: the watcher at +0x284 (MOV EAX,[ECX+0x284]; ADD EAX,-0x9c; both
-    // null-tested; CMP [EAX+0xb0],id).
+    // The watcher at +0x284 first.
     CSimple const* const First = SimpleOfWatchable(Instance->ChannelB.Speaker.target());
     if (First != nullptr && First->Id == ObjectId)
     {
         return true;
     }
 
-    // 0x004cc8ac..0x004cc8c9: the watcher at +0xb4, the same way.
+    // Then the watcher at +0xb4.
     CSimple const* const Second = SimpleOfWatchable(Instance->ChannelA.Speaker.target());
     if (Second != nullptr && Second->Id == ObjectId)
     {

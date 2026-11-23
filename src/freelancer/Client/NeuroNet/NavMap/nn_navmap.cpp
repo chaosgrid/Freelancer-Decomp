@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // NeuroNetNavMap -- lifecycle, Create and the WinControl overrides (see nn_navmap.h).
-// Retail Client\Interface\NeuroNet\NavMap.cpp, 0x0048d700..0x004a3f90.
+// Retail Client\Interface\NeuroNet\NavMap.cpp.
 
 #include "NeuroNet/NavMap/nn_navmap.h"
 #include "NeuroNet/Economy/best_path.h"               // BestPathGetWaypointCount (FUN_004c4fb0)
@@ -72,10 +72,7 @@ void* G_NavMapBufferHandles[3] = {nullptr, nullptr, nullptr};
 
 void NavMapScaleMeshRotation(FMeshHolder* Holder, float Factor)
 {
-    // Inlined in retail (e.g. 0x0048f5db..0x0048f644, 0x00491534..0x00491591): IEngine slot 40
-    // GetInstanceTransform copied (0x30 bytes, REP MOVSD 0xc), DAT_0067209c acquired on first
-    // use, I3DMathEngine slot 4 Scale(rotation, rotation, Factor), IEngine slot 39
-    // SetInstanceMatrix. No test of the instance handle.
+    // Inlined in retail. No test of the instance handle.
     IEngine* const Engine = DALib::Engine;
     FTransform Transform;
     memcpy(&Transform, Engine->GetInstanceTransform(Holder->EngineInstance), sizeof(Transform));
@@ -87,8 +84,7 @@ void NavMapScaleMeshRotation(FMeshHolder* Holder, float Factor)
 
 namespace
 {
-    // WINFACTORY<NeuroNetNavMap> "NeuroNetNavMap" (static initializer LAB_0048d700 ->
-    // FUN_004a2dd0, atexit LAB_0048d720; Create FUN_004a2e40).
+    // WINFACTORY<NeuroNetNavMap> (static initializer LAB_0048d700; Create FUN_004a2e40).
     WINFACTORY<NeuroNetNavMap> G_NeuroNetNavMapFactory("NeuroNetNavMap");
 
     // DAT_005d2ed4 / DAT_005d2ed8 -- the two bases Create adds its right-panel offsets to.
@@ -105,16 +101,15 @@ namespace
         "nav_terrain_mines",    "nav_terrain_badlands", "nav_terrain_ice",
         "nav_terrain_lava",     "nav_terrain_nomadast", "nav_terrain_ice"};
 
-    // 0x0048f5db..0x0048f644, repeated for the seven tool buttons: the button's instance
-    // transform, its rotation scaled by 1.7 through I3DMathEngine::Scale (slot 4), written
-    // back with SetInstanceMatrix. The button is not null-tested (neither is it in retail).
+    // Inlined for each of the seven tool buttons. The button is not null-tested (neither is it
+    // in retail).
     void ScaleToolButtonMesh(WinControl* Button)
     {
         NavMapScaleMeshRotation(&Button->MeshHolder, 1.7f);
     }
 
-    // 0x00490249..0x00490262 (and the two copies after it): the objective line's Font::String
-    // goes multi-line, dropping its layout when it changes.
+    // Inlined three times in Create: the objective line's Font::String goes multi-line,
+    // dropping its layout when it changes.
     void SetObjectiveTextMultiLine(WinControl* Text)
     {
         FFontString* const Font = static_cast<NnTextControl*>(Text)->GetFontString();
@@ -136,24 +131,19 @@ FNavMapItem::FNavMapItem()
     , bLabelStarred(0)
     , bLabelCrowded(0)
 {
-    // FUN_00491f90 00491fd3..0049200d: FUN_00420d40 + FUN_00492250 + vftable + anim -1 are the
-    // FClientMeshHolder member initialisers; +0x5c / +0x60 are the empty wide string. +0x64 is
-    // written by AddItem right after (0x0049209a); it is initialised here with it.
+    // Inlined in FUN_00491f90. +0x64 is written by AddItem right after; it is initialised here.
 }
 
 FNavMapItem::~FNavMapItem()
 {
-    // FUN_0048dd40: the label, the +0x5c wide string (member dtor), the holder (FUN_0059ef20).
+    // FUN_0048dd40.
     if (Label != nullptr)
     {
-        // 0x0048dd67..0x0048ddda: the Font::String at +0x78 -- its dtor inlined (FUN_004144f0,
-        // the child slots left, the child buffer, the text through msvcrt free), then the
-        // object freed: delete on the FFontString (EnsureItemLabel allocates it with new).
+        // EnsureItemLabel allocates it with new.
         delete Label;
         Label = nullptr;
     }
     TooltipText.clear();
-    // Then the member dtors: the +0x5c string, the holder (FUN_0059ef20, ~FClientMeshHolder).
 }
 
 // ----------------------------------------------------------------------------------------
@@ -162,18 +152,12 @@ FNavMapItem::~FNavMapItem()
 
 NeuroNetNavMap::NeuroNetNavMap()
 {
-    // FUN_0048de20. FUN_0059f860 (WinControl), the Event::Handler vptr, FUN_0055dec0
-    // (ButtonMover) are the base constructors. The mesh holders (+0x350 / +0x378 / +0x3a0 /
-    // +0x89c / +0xc1c, the ten at +0x930 via FUN_005b7fba(.., FUN_0048e600)) are
-    // FClientMeshHolder's member initialisers; the lists / vectors are default-constructed;
-    // +0x880 is FUN_004a2f10 (FShapeDB); +0xc80 is FUN_0040f150.
-    SpaceCameraConstruct(&Camera);
+    // FUN_0048de20. Retail stores are interleaved; the order here follows them roughly.
+    SpaceCameraConstruct(&Camera);   // FUN_0040f150
 
-    // 0048df36 / 0048df40
     ShipMarkerSize = 5000.0f;
     WaypointMarkerSize = 4500.0f;
 
-    // 0048e130..0048e172: +0x3c8 zero, +0x3d4 identity.
     MapLabelOrigin[0] = 0.0f;
     MapLabelOrigin[1] = 0.0f;
     MapLabelOrigin[2] = 0.0f;
@@ -187,8 +171,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     MapRotation[7] = 0.0f;
     MapRotation[8] = 1.0f;
 
-    // 0048e178..0048e193 -- the three map holders' instance slot (already -1), the object
-    // cache key and +0xaf0.
+    // Retail re-stores the holders' instance slot (already -1).
     ZoomedMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     ZoomedMapMesh2.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     PrettyMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
@@ -210,14 +193,12 @@ NeuroNetNavMap::NeuroNetNavMap()
     bObjectToolsShown = 0;
     ObjectiveFirstRow = 0;
 
-    // 0048e1f3..0048e20b: the two 0x63-dword arrays.
     for (int Index = 0; Index < 0x63; ++Index)
     {
         WaypointItems[Index] = nullptr;
         BestPathItems[Index] = nullptr;
     }
 
-    // 0048e225..0048e26e
     MeshPosition[0] = 0.0f;
     MeshPosition[1] = 0.0f;
     MeshPosition[2] = -0.71f;
@@ -226,7 +207,6 @@ NeuroNetNavMap::NeuroNetNavMap()
     ZoomedMeshPosition[2] = -0.55f;
     CachedWaypointHash = 0;
 
-    // 0048e277..0048e2f8
     ScreenRectSize[0] = 1.0f;
     ScreenRectSize[1] = 1.0f;
     ScreenRectSize[2] = 0.0f;
@@ -240,7 +220,6 @@ NeuroNetNavMap::NeuroNetNavMap()
     MapSize[1] = 0.468f;
     MapSize[2] = 0.0f;
 
-    // 0048e2fb..0048e37a
     MapExtentX = 112000.0f;
     MapExtentZ = 112000.0f;
     BlinkTimer = 0.0f;
@@ -261,10 +240,8 @@ NeuroNetNavMap::NeuroNetNavMap()
     LegendMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     bItemClamped = 0;
 
-    // 0048e380
     G_bNavMapNoBestPath = 0;
 
-    // 0048e30f / 0048e386..0048e439
     TradeLaneCachePan[0] = 0.0f;
     TradeLaneCachePan[1] = 0.0f;
     TradeLaneCachePan[2] = 0.0f;
@@ -290,8 +267,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     ShadeCacheFilterMode = -1;
     bBriefing = 0;
 
-    // 0048e43f..0048e463: in multiplayer ask the server for the group positions
-    // (IServer slot 75, one zero dword).
+    // In multiplayer ask the server for the group positions (IServer slot 75).
     if (!SinglePlayer())
     {
         unsigned Zero = 0;
@@ -299,7 +275,6 @@ NeuroNetNavMap::NeuroNetNavMap()
                                         reinterpret_cast<unsigned char*>(&Zero), 4);
     }
 
-    // 0048e469..0048e50a: the six scratch buffers and their counters.
     TradeLaneVertices = static_cast<unsigned char*>(operator new(0x6000));
     TradeLaneIndices = static_cast<unsigned short*>(operator new(0x1800));
     TradeLaneVertexCount = 0;
@@ -317,7 +292,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     ShadeIndexCount = 0;
     ShadeRecheckTimer = 1.0f; // DAT_005d2ed0
 
-    // 0048e510..0048e571: the pipeline interfaces, once per process.
+    // The pipeline interfaces, once per process.
     if (G_NavMapVertexBuffer == nullptr)
         DALib::Pipeline->QueryInterface(Iids::RPVertexBuffer,
                                         reinterpret_cast<void**>(&G_NavMapVertexBuffer));
@@ -327,13 +302,12 @@ NeuroNetNavMap::NeuroNetNavMap()
     if (G_NavMapDraw == nullptr)
         DALib::Pipeline->QueryInterface(Iids::RPDraw, reinterpret_cast<void**>(&G_NavMapDraw));
 
-    // 0048e571..0048e5af: the systems the nav map never shows a name for.
+    // The systems the nav map never shows a name for.
     SkipSystemIds[0] = Universe::get_system_id("St02");
     SkipSystemIds[1] = Universe::get_system_id("St03");
     SkipSystemIds[2] = Universe::get_system_id("St03b");
     SkipSystemIds[3] = Universe::get_system_id("St02c");
 
-    // 0048e5b5..0048e5d4
     FilterModeBeforeInfoCard = 0;
     SystemScale = 1.0f;
     G_bNavMapRouteChanged = 0;
@@ -345,7 +319,6 @@ NeuroNetNavMap::NeuroNetNavMap()
 NeuroNetNavMap::~NeuroNetNavMap()
 {
     // FUN_0048e650.
-    // 0048e693..0048e711: the six scratch buffers.
     operator delete(TerrainVertices);
     TerrainVertices = nullptr;
     operator delete(TerrainIndices);
@@ -359,7 +332,6 @@ NeuroNetNavMap::~NeuroNetNavMap()
     operator delete(TradeLaneIndices);
     TradeLaneIndices = nullptr;
 
-    // 0048e703..0048e76b: FUN_0059eee0 on the bound map / aux holders.
     if (ZoomedMapMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
         ClientUiMeshHolderRelease(&ZoomedMapMesh);
     if (ZoomedMapMesh2.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
@@ -371,11 +343,11 @@ NeuroNetNavMap::~NeuroNetNavMap()
     if (LegendMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
         ClientUiMeshHolderRelease(&LegendMesh);
 
-    // 0048e770..0048e78b: FUN_0059eee0 on all ten +0x930 holders, unconditionally.
+    // The digit holders are released unconditionally.
     for (int Index = 0; Index < 10; ++Index)
         ClientUiMeshHolderRelease(&DigitMeshes[Index]);
 
-    // 0048e78d..0048e7d3: the jump links -- here (and only here) their records are freed.
+    // Here (and only here) the jump link records are freed.
     while (!JumpLinks.empty())
     {
         FNavMapJumpLink* const Link = JumpLinks.front();
@@ -383,7 +355,6 @@ NeuroNetNavMap::~NeuroNetNavMap()
         JumpLinks.pop_front();
     }
 
-    // 0048e7d5..0048e81a: the items (scalar deleting dtor FUN_0048eb80 on each non-null one).
     while (!Items.empty())
     {
         FNavMapItem* const Item = Items.front();
@@ -392,17 +363,14 @@ NeuroNetNavMap::~NeuroNetNavMap()
         Items.pop_front();
     }
 
-    // 0048e81c..0048e836
     for (int Index = 0; Index < 0x63; ++Index)
     {
         WaypointItems[Index] = nullptr;
         BestPathItems[Index] = nullptr;
     }
 
-    // 0048e838: FUN_00425a20.
-    Shapes.Clear();
+    Shapes.Clear(); // FUN_00425a20
 
-    // 0048e843..0048e8d6: the three buffer handles through DestroyVb, then the interfaces.
     if (G_NavMapVertexBuffer != nullptr)
     {
         for (int Index = 0; Index < 3; ++Index)
@@ -426,16 +394,6 @@ NeuroNetNavMap::~NeuroNetNavMap()
         G_NavMapDraw->Release();
         G_NavMapDraw = nullptr;
     }
-
-    // 0048e8dc..0048eb11: the member destructors (the wide-string vectors, +0xfd8, the camera
-    // -- its dtor is the RET at 0x00401e90 --, the +0xc1c / +0x930 / +0x89c holders
-    // (FUN_0059ef20 each), FUN_004a2c70 on the ShapeDB, the three +0x848.. vectors, the jump
-    // link list erase (FUN_004a2f80, records not freed: the loop above emptied it), the item
-    // list erase, the three map holders). C++ runs them as member destructors in that order;
-    // the holders' FUN_0059ef20 is ~FClientMeshHolder (the +0x930 array through FUN_005b7ec6,
-    // last to first).
-    // 0048eb16..0048eb64: ButtonMover's list (member dtor), FUN_00576010 (~Event::Handler),
-    // FUN_0059fa50 (~WinControl) -- the base destructors.
 }
 
 // ----------------------------------------------------------------------------------------
@@ -450,13 +408,12 @@ bool NeuroNetNavMap::HitTest(float const* Ray)
     if (bSidePanelsOpen == 0)
         return false;
 
-    // 004922a9..0049233a: identity, or the bound background mesh's instance transform.
     float Transform[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
     if (ClientMeshHolderHasInstance(&MeshHolder))
         memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
                sizeof(Transform));
 
-    // 0049233c..004923b0: the 0.19 x 0.28 box 0.54 to the right.
+    // The side panels' boxes.
     float const HalfExtents[3] = {0.19f, 0.28f, 0.0f};
     float Box[12];
     memcpy(Box, Transform, sizeof(Box));
@@ -464,7 +421,7 @@ bool NeuroNetNavMap::HitTest(float const* Ray)
     if (Win3DRayHitsAabbHalfExtents(HalfExtents, Box, Ray))
         return true;
 
-    // 004923bd..004923fd: the same box 0.536 to the left (DAT_005d3dc0).
+    // DAT_005d3dc0.
     memcpy(Box, Transform, sizeof(Box));
     Box[9] = Transform[9] - 0.536f;
     return Win3DRayHitsAabbHalfExtents(HalfExtents, Box, Ray);
@@ -472,7 +429,7 @@ bool NeuroNetNavMap::HitTest(float const* Ray)
 
 void NeuroNetNavMap::SetPosition(float const* NewPosition)
 {
-    // LAB_004948a0: FUN_005a0880, then +0x3c8 = position + (0.2, -0.25, 0).
+    // LAB_004948a0.
     WinControl::SetPosition(NewPosition);
     MapLabelOrigin[0] = NewPosition[0] + 0.2f;
     MapLabelOrigin[1] = NewPosition[1] - 0.25f;
@@ -488,7 +445,6 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     float const Zero3[3] = {0.0f, 0.0f, 0.0f};
     float const Zero3b[3] = {0.0f, 0.0f, 0.0f};
 
-    // 0048ebc9..0048ecdd: the two side panels.
     {
         float const Position[3] = {0.19f, -0.23f, -0.22f};
         RightWindow = CreateStaticControl(
@@ -502,9 +458,8 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
             Position, nullptr, Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero3b);
     }
 
-    // 0048eccb..0048ed18: the map's own pick box -- LEA ECX,[EBP+0xb4]; 0x3eb33333 (0.35),
-    // 0x3ea8f5c3 (0.33), 0. Without it WinControl::HitTest (FUN_005a0340) never hits the map
-    // area, Win3DPick never returns the map and the click falls through to the space pick.
+    // The map's own pick box. Without it WinControl::HitTest never hits the map area, Win3DPick
+    // never returns the map and the click falls through to the space pick.
     HalfExtents[0] = 0.35f;
     HalfExtents[1] = 0.33f;
     HalfExtents[2] = 0.0f;
@@ -531,7 +486,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
             "ui_select_item", nullptr, Position, nullptr, SmallHalf, 0, 0, 0, 0, 0x409, 0, 0);
     }
 
-    // 0048ee4a..0048ef67: briefing only -- no close button, the briefing text and the
+    // Briefing only -- no close button, the briefing text and the
     // continue button, and the 0xf event.
     if (bBriefing != 0)
     {
@@ -580,7 +535,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     }
     NoBestPathText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba4), 1);
 
-    // 0048f0ec..0048f568: the filter toggles along the top edge.
+    // The filter toggles along the top edge.
     {
         float const Position[3] = {0.092f, 0.295f, 0.0f};
         LegendFilter = CreateButtonControl(
@@ -656,7 +611,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     }
     FriendlyFilter->SetProperty(1, 1, 0);
 
-    // 0048f56e..0048fc48: the object tools, each mesh scaled by 1.7.
+    // The object tools, each mesh scaled by 1.7.
     float const ToolHalf[3] = {0.02f, 0.02f, 0.0f};
     float const ZoomPosition[3] = {0.25f, 0.298f, 0.0f};
     float const WaypointPosition[3] = {-0.68f, 0.228f, 0.0f};
@@ -698,7 +653,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         "ui_select_item", nullptr, WaypointPosition, nullptr, ToolHalf, 0, 0, 0, 0, 0x4d8, 0, 0);
     ScaleToolButtonMesh(ClearWaypointButton);
 
-    // 0048fc4e..0048fcf2: the info text and the info card (both lose +0x6c bit 1).
+    // The info text and the info card (both lose +0x6c bit 1).
     {
         float const AttachOffset[3] = {kNavMapPanelBaseA + 0.93f, -0.06f, 0.0f};
         InfoText = CreateRichTextWin("NavMapInfoText", 0.27f, 0.33f, AttachOffset, true);
@@ -715,7 +670,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
                                       0.03f, 2.1f, 0, 1, 0, 1);
     }
 
-    // 0048fd32..0049004e: the waypoint / mission buttons under the info text.
+    // The waypoint / mission buttons under the info text.
     {
         float const HalfExtents[3] = {0.146f, 0.026f, 0.0f};
         float const Position[3] = {kNavMapPanelBaseB - 0.516f, -0.237f, 0.0f};
@@ -770,14 +725,13 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     AbortNoButton->SetProperty(1, 1, 0);
     AbortNoText->SetProperty(1, 1, 0);
 
-    // 00490054..004900b4
     OptionBridge = CreateStaticControl("NavMapOptionBridge",
                                        "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_selector.3db",
                                        Zero3, nullptr, Zero3, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
                                        Zero3b);
     OptionBridge->SetProperty(1, 1, 0);
 
-    // 004900ba..00490354: the three objective boxes, their scroll bar and texts.
+    // The three objective boxes, their scroll bar and texts.
     {
         float const HalfExtents[3] = {0.146f, 0.068f, 0.0f};
         float const X = kNavMapPanelBaseB - 0.547f;
@@ -815,7 +769,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         SetObjectiveTextMultiLine(ObjectiveText[2]);
     }
 
-    // 00490354..004904be: the four faction labels of the universe view, hidden.
+    // The four faction labels of the universe view, hidden.
     {
         float const Position[3] = {-0.055f, -0.09f, 0.0f};
         FactionLabels[0] = CreateTextControl("NavMapLibertyLabel", "SubHeader", Position,
@@ -841,14 +795,13 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     }
     FactionLabels[3]->SetProperty(1, 1, 0);
 
-    // 004904c4..00490503
     {
         float const Position[3] = {-0.274f, 0.266f, 0.0f};
         FilterTitle = CreateTextControl("NavMapFilterTitle", "Normal", Position, nullptr, 0.547f,
                                         0.03f, 1.5f, 0, 1, 0, 1);
     }
 
-    // 00490508..004905a8: the grid letters A..H (ids 0x506 + i), x = i * 0.07 - 0.279.
+    // The grid letters A..H (ids 0x506 + i), x = i * 0.07 - 0.279.
     char Name[0x40];
     for (int Index = 0; Index < 8; ++Index)
     {
@@ -859,7 +812,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
             CreateTextControl(Name, "Normal", Position, nullptr, 0.08f, 0.03f, 1.9f,
                               static_cast<unsigned>(Index + 0x506), 1, 0, 1);
     }
-    // 004905ae..00490646: the grid numbers 1..8 (ids 0x515 + i), y = 0.252 - i * 0.07.
+    // The grid numbers 1..8 (ids 0x515 + i), y = 0.252 - i * 0.07.
     for (int Index = 0; Index < 8; ++Index)
     {
         sprintf(Name, "NavMapGridNumber%d", Index + 1);
@@ -870,7 +823,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
                               static_cast<unsigned>(Index + 0x515), 1, 0, 1);
     }
 
-    // 0049064c..004908a3: the legend labels, hidden, in the idle palette colour (one stack
+    // The legend labels, hidden, in the idle palette colour (one stack
     // copy of DAT_00679bb0 handed to all five).
     unsigned long LegendColor = G_NnPaletteArgb_679bb0;
     static float const kLegendY[5] = {0.194f, 0.09f, 0.14f, -0.047f, -0.198f};
@@ -887,7 +840,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         LegendLabels[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&LegendColor), 1);
     }
 
-    // 004908a9..0049096f: the info card's close button and caption, hidden.
+    // The info card's close button and caption, hidden.
     {
         float const HalfExtents[3] = {0.133f, 0.026f, 0.0f};
         float const Position[3] = {0.0f, -0.254f, 0.0f};
@@ -903,7 +856,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
     CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
 
-    // 00490972..00490a54: the fifteen known-base rows, y = 0.171 - i * 0.03.
+    // The fifteen known-base rows, y = 0.171 - i * 0.03.
     for (int Index = 0; Index < 15; ++Index)
     {
         sprintf(Name, "NavMapBaseText%d", Index);
@@ -932,36 +885,33 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
                                             nullptr, 0.219f, 0.03f, 1.9f, 0x3cd, 0, 0, 1);
     }
 
-    // 00490b3b..00490b75: "clear all waypoints" is hidden with no waypoints or in best-path
-    // mode (NEG / SBB / INC = the count is zero).
+    // "Clear all waypoints" is hidden with no waypoints or in best-path mode.
     unsigned char bHideClearAll = GetPlayerWaypointCountRetail() == 0 ? 1 : 0;
     if (bBestPathObjectives != 0)
         bHideClearAll = 1;
     ClearAllWaypointsButton->SetProperty(1, bHideClearAll, 0);
     ClearAllWaypointsText->SetProperty(1, bHideClearAll, 0);
 
-    // 00490b7b..00490b99
     RefreshObjectives();
     BuildJumpLinks();
     HideObjectTools();
     RefreshMissionInfo();
     RefreshObjectives();
 
-    // 00490b9e..00490bc2: a best path forces the mission filter; the info-card modes do not
+    // A best path forces the mission filter; the info-card modes do not
     // survive a reopen.
     if (BestPathGetWaypointCount() > 0)
         G_NavMapFilterMode = 3;
     else if (G_NavMapFilterMode == 6 || G_NavMapFilterMode == 7)
         G_NavMapFilterMode = 0;
 
-    // 00490bcc..00490c50
     LabelButton->SetProperty(0xc, G_bNavMapShowLabels, 0);
     SetFilterMode(G_NavMapFilterMode);
     AllFilter->SetProperty(0xc, G_NavMapZoneFilter == 0 ? 1 : 0, 0);
     HostileFilter->SetProperty(0xc, G_NavMapZoneFilter == 1 ? 1 : 0, 0);
     FriendlyFilter->SetProperty(0xc, G_NavMapZoneFilter == 2 ? 1 : 0, 0);
 
-    // 00490c56..00490cb6: hidden until shown (0xef01), the frame offset, the position again
+    // Hidden until shown (0xef01), the frame offset, the position again
     // (through slot 5), then FUN_004b5060.
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     SetOffset(0.624f, -0.23f, -0.22f);
@@ -976,7 +926,6 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     (void)B;
     if (Msg == 0xef01)
     {
-        // 004945f2..00494627: follow the parent, first show, flags |= 3.
         if (GetParent() != nullptr)
             SetPosition(GetParent()->Position);
         InitialShow();
@@ -984,7 +933,7 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         Flags = static_cast<unsigned char>(Flags | 3);
         bDebugTeleportMode = 0;
 
-        // 0049462e..00494806: the system view's filter row.
+        // The system view's filter row.
         if (ViewMode != 0)
         {
             UniverseButton->SetProperty(1, 0, 0);
@@ -1019,7 +968,6 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
                 FactionLabels[Index]->SetProperty(1, 1, 0);
         }
 
-        // 0049480c..0049483c
         DebugText->SetProperty(1, bDebugTeleportMode == 0 ? 1 : 0, 0);
         NoBestPathText->SetProperty(1, 1, 0);
         return false;
@@ -1027,7 +975,6 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0xef02)
     {
-        // 00494850..00494895: hide, detach, delete the children, Destroy, delete this.
         Flags = static_cast<unsigned char>(Flags & 0xfc);
         Win3DReparent(this, nullptr);
         Win3D* Child = GetChildHead();
@@ -1068,7 +1015,6 @@ void NeuroNetNavMap::LoadMapResources()
         return;
     bResourcesLoaded = 1;
 
-    // 00490cea..00490d28 (FUN_0059ec80 x3, arguments (path, 0, 1)).
     ClientMeshLoadFromPath(&ZoomedMapMesh,
                            "Interface\\NeuroNet\\NavMap\\NewNavMap\\zoomedmap_liberty.3db", 0,
                            true);
@@ -1081,7 +1027,7 @@ void NeuroNetNavMap::LoadMapResources()
     IEngine* const Engine = DALib::Engine;
     float Transform[12];
 
-    // 00490d2d..00490e1e: the first zoomed map at MeshPosition, its rotation scaled by 1.5.
+    // The first zoomed map at MeshPosition, its rotation scaled by 1.5.
     Engine->SetInstancePosition(ZoomedMapMesh.EngineInstance, MeshPosition);
     memcpy(Transform, Engine->GetInstanceTransform(ZoomedMapMesh.EngineInstance),
            sizeof(Transform));
@@ -1090,11 +1036,11 @@ void NeuroNetNavMap::LoadMapResources()
     Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, Transform);
     Engine->UpdateInstance(ZoomedMapMesh.EngineInstance, 0, nullptr);
 
-    // 00490e24..00490e4e: the second one only positioned.
+    // The second one only positioned.
     Engine->SetInstancePosition(ZoomedMapMesh2.EngineInstance, MeshPosition);
     Engine->UpdateInstance(ZoomedMapMesh2.EngineInstance, 0, nullptr);
 
-    // 00490e54..00490eda: the pretty map, [0] * 1.175 and [4] * 1.5 (double constants
+    // The pretty map, [0] * 1.175 and [4] * 1.5 (double constants
     // DAT_005d3c50 / DAT_005d3c48).
     Engine->SetInstancePosition(PrettyMapMesh.EngineInstance, MeshPosition);
     memcpy(Transform, Engine->GetInstanceTransform(PrettyMapMesh.EngineInstance),
@@ -1104,7 +1050,7 @@ void NeuroNetNavMap::LoadMapResources()
     Engine->SetInstanceMatrix(PrettyMapMesh.EngineInstance, Transform);
     Engine->UpdateInstance(PrettyMapMesh.EngineInstance, 0, nullptr);
 
-    // 00490ee0..004910e0: the shapes (the inline ShapeDB.h:0xf2 find, "cmn\shapedb.h").
+    // The shapes (the inline ShapeDB.h:0xf2 find, "cmn\shapedb.h").
     Shapes.Load("Interface\\NeuroNet\\NavMap\\NewNavMap\\NavMapTextures.ini", DALib::Data);
     for (int Index = 0; Index < 9; ++Index)
         TerrainShapes[Index] = Shapes.Find(kNavMapTerrainShapeNames[Index], kShapeDbHeaderLower);
@@ -1131,7 +1077,7 @@ void NeuroNetNavMap::InitialShow()
 
     if (ViewMode != 0)
     {
-        // 00491162..00491190: the requested system (consumed), else the player's.
+        // The requested system (consumed), else the player's.
         if (G_NavMapRequestedSystem != 0)
         {
             CurrentSystem = Universe::get_system(G_NavMapRequestedSystem);
@@ -1144,7 +1090,7 @@ void NeuroNetNavMap::InitialShow()
         bDrawnOnce = 0;
         bSystemViewPending = 1;
 
-        // 004911af..00491233: the system name, unless there is no system or it is one of the
+        // The system name, unless there is no system or it is one of the
         // four hidden ones (then ids 0x62a).
         bool bNameHidden = CurrentSystem == nullptr;
         if (!bNameHidden)
@@ -1176,7 +1122,7 @@ void NeuroNetNavMap::InitialShow()
         BuildUniverseItems();
     }
 
-    // 0049123c..00491300: the map's four corners.
+    // The map's four corners.
     for (int Axis = 0; Axis < 3; ++Axis)
     {
         MapCorner0[Axis] = MapOrigin[Axis];
@@ -1190,7 +1136,7 @@ void NeuroNetNavMap::InitialShow()
         MapCorner3[Axis] = MapOrigin[Axis];
     MapCorner3[1] = MapSize[1] + MapCorner3[1];
 
-    // 00491306..004913f8: everything on the filter row hidden.
+    // Everything on the filter row hidden.
     UniverseButton->SetProperty(1, 1, 0);
     LabelButton->SetProperty(1, 1, 0);
     PhysicalFilter->SetProperty(1, 1, 0);
@@ -1205,7 +1151,7 @@ void NeuroNetNavMap::InitialShow()
     HostileFilter->SetProperty(1, 1, 0);
     FriendlyFilter->SetProperty(1, 1, 0);
 
-    // 004913fe..00491408: tail call through slot 11 (virtual; ButtonMover::Update shares the
+    // Tail call through slot 11 (virtual; ButtonMover::Update shares the
     // name, so the Win3D face is named explicitly).
     static_cast<Win3D*>(this)->Update();
 }
@@ -1224,11 +1170,11 @@ void NeuroNetNavMap::BuildUniverseItems()
     for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
          System = Universe::GetNextSystem())
     {
-        // 004915f0..0049161d: rand() * 2000 / 32768 + 3000, kept as a float.
+        // Kept as a float.
         int const Random = rand() * 0x7d0 / 0x8000 + 0xbb8;
         float const RandomRadius = static_cast<float>(Random);
 
-        // 00491621..00491684: the [system] pos scaled to the map (1/15 * 200000 - 100000; z
+        // The [system] pos scaled to the map (1/15 * 200000 - 100000; z
         // is rounded to float after the first product and shifted by 5000).
         Vector const* const Pos = System->GetPos();
         float const PosX = Pos->x;
@@ -1240,7 +1186,7 @@ void NeuroNetNavMap::BuildUniverseItems()
         float const Z = static_cast<float>(
             static_cast<double>(ScaledY) * 200000.0f - 100000.0f + 5000.0f);
 
-        // 00491688..004916dc: id (slot 0), visit (slot 18), ids_info (slot 4), strid (slot 3),
+        // Id (slot 0), visit (slot 18), ids_info (slot 4), strid (slot 3),
         // in retail's call order.
         unsigned const Id = System->GetId();
         unsigned char const Visit = System->GetVisit();
@@ -1249,7 +1195,7 @@ void NeuroNetNavMap::BuildUniverseItems()
         FNavMapItem* const Item = AddItem(0, 4, X, 0.0f, Z, RandomRadius, "NAV_star", StridName,
                                           IdsInfo, 0, Id, Visit);
 
-        // 004916e1..00491758 -- the item is used without a null test, as in retail.
+        // The item is used without a null test, as in retail.
         Item->System = System;
         Item->Variant = rand() * 7 / 0x8000;
         int const Twinkle = rand() * 0x384 / 0x8000 + 0x64;
@@ -1258,12 +1204,12 @@ void NeuroNetNavMap::BuildUniverseItems()
         Item->RestSize = RandomRadius;
         Item->PulseRate = static_cast<float>(static_cast<double>(Pulse) * 0.01f);
 
-        // 00491742..0049178f: the visit map's flags for the system join the item's; bit 0
+        // The visit map's flags for the system join the item's; bit 0
         // shows it (or +0x87e forces every one).
         if (Item->Id != 0)
         {
             unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0 0x0049176a
+            GetPlayerVisitFlagsRetail(Item->Id, &VisitFlags, 0, 0); // FUN_004c4da0
             Item->Visit = static_cast<unsigned char>(Item->Visit | VisitFlags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
             if (bDebugShowAll != 0)
@@ -1271,7 +1217,6 @@ void NeuroNetNavMap::BuildUniverseItems()
         }
     }
 
-    // 004917a3
     BuildJumpLinks();
 }
 
@@ -1282,7 +1227,6 @@ FNavMapItem* NeuroNetNavMap::AddItem(int Kind, int Type, float X, float Y, float
     // FUN_00491f90.
     FNavMapItem* const Item = new FNavMapItem();
 
-    // 00492017..004920a6
     Item->Position[0] = X;
     Item->Position[1] = Y;
     Item->Position[2] = Z;
@@ -1300,27 +1244,22 @@ FNavMapItem* NeuroNetNavMap::AddItem(int Kind, int Type, float X, float Y, float
     Item->RestSize = Arg6;
     Item->Visit = Visit;
 
-    // 004920a9..00492118: "...\SpaceObjects\" + name + ".3db".
-    char Path[0x104]; // [ESP+0x1c] (local_214..local_110)
+    char Path[0x104];
     strcpy(Path, kNavMapSpaceObjectsDir);
     strcat(Path, MeshName);
     strcat(Path, ".3db");
 
-    // 0049211b..00492146: GetFileSysPath against DALib::Data, then _access(.., 0).
     char FullPath[0x104];
     GetFileSysPath(FullPath, Path, DALib::Data);
     if (_access(FullPath, 0) == -1)
     {
-        // 004921b6..0049223d: the item's destructor inline, operator delete, null.
         delete Item;
         return nullptr;
     }
 
-    // 00492148..00492157: FUN_0059ec80(path, spaceobjects.mat, 1) -- the material path goes
-    // to FUN_00420f30 (holder +0x0c) on a FindArchetype miss.
+    // The material path goes to FUN_00420f30 (holder +0x0c) on a FindArchetype miss.
     ClientMeshLoadFromPath(&Item->Mesh, Path, kNavMapSpaceObjectsMat, true);
 
-    // 0049215c..00492193: push_back.
     Items.push_back(Item);
     return Item;
 }
@@ -1341,8 +1280,8 @@ void NavMapRequestFocus(unsigned Id, unsigned char bZone)
     // FUN_004a2aa0.
     if (bZone != 0)
     {
-        // 004a2ab6..004a2b4c: every system's zone list (slot 6). Retail copies each 0xc0c
-        // record to the stack (REP MOVSD) and reads only the zone pointer from the copy.
+        // Every system's zone list (slot 6). Retail copies each 0xc0c record to the stack and
+        // reads only the zone pointer from the copy.
         for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
              System = Universe::GetNextSystem())
         {
@@ -1369,18 +1308,18 @@ void NavMapRequestFocus(unsigned Id, unsigned char bZone)
         return;
     }
 
-    // 004a2b51..004a2bee: a system with that id; else one of its [Object]s by nickname hash.
+    // A system with that id; else one of its [Object]s by nickname hash.
     for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
          System = Universe::GetNextSystem())
     {
         if (System->GetId() == Id)
         {
-            // 004a2bff..004a2c06: slot 0 called again for the stored id; no position.
+            // Slot 0 called again for the stored id; no position.
             G_NavMapRequestedSystem = System->GetId();
             return;
         }
 
-        // 004a2b7a..004a2ba2: the record's four TStrings emptied (length 0, first char 0).
+        // The record's four TStrings emptied (length 0, first char 0).
         Universe::FSystemObject Object;
         Object.Nickname.Length = 0;
         Object.Nickname.Data[0] = '\0';
@@ -1397,7 +1336,6 @@ void NavMapRequestFocus(unsigned Id, unsigned char bZone)
                 continue;
             if (CreateID(Object.Nickname.Data) != Id)
                 continue;
-            // 004a2c13..004a2c3e.
             float const X = Object.Pos.x;
             float const Y = Object.Pos.y;
             float const Z = Object.Pos.z;

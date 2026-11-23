@@ -13,8 +13,7 @@
 // It lives in its own header rather than inside render/shading.h because flmaterials queries
 // for it too: every Candidate dance in flmaterials/MaterialImpl.cpp QIs the material out of
 // Context+0x1C for this IID and, on success, binds/tears down/draws through slots 6/7/8
-// instead of the material's own 8/9/10. Those sites used to call the slots through raw
-// vtable indices, which is how they came to pass one argument too few.
+// instead of the material's own 8/9/10.
 
 struct IBatchedMaterial : IDAComponent
 {

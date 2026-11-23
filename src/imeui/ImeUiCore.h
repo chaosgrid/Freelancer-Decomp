@@ -22,7 +22,7 @@ typedef void (*PFN_DRAWFAN)(void* Layout, unsigned Count);
 typedef void (*PFN_SENDCHAR)(unsigned Character);
 typedef void (*PFN_SENDKEY)(unsigned Key);
 
-// Global IME UI engine functions matching retail disassembly
+// Global IME UI engine functions
 bool ImeUi_Initialize(HWND Window, bool bDisabled = false);
 void ImeUi_Uninitialize();
 void ImeUi_SetState(bool bState);

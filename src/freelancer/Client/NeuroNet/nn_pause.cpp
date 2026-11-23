@@ -48,8 +48,8 @@ NnPause::NnPause()
     , bClosePending(0)
     , Title(nullptr)
 {
-    // FUN_004a7720 004a7759..004a7781: FUN_0059f860, the three vptrs, +0x331 = 0. The other
-    // members are written by Create before anything reads them; the port zeroes them here.
+    // Inlined into FUN_004a7720 (0x004a7759). Retail leaves the other members to Create, which
+    // writes them before anything reads them; the port zeroes them here.
     Pad332[0] = 0;
     Pad332[1] = 0;
     for (int Index = 0; Index < 5; ++Index)
@@ -62,18 +62,14 @@ NnPause::NnPause()
 
 NnPause::~NnPause()
 {
-    // FUN_004a6b20: vptrs back to NN_Pause's, FUN_00577c30(+0x32c); then the Event::Handler base
-    // dtor FUN_00576010 and WinControl's FUN_0059fa50 run as the base-class destructors.
+    // FUN_004a6b20.
     HudPopInputFocus(AsHudCmdHandler());
 }
 
 bool NnPause::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004a6ba0 (RET 8).
-    //
-    // 0x004a6bac..0x004a6bca: FUN_0045a460 (close NN_MainButton's panel -- no DAT_0066d359 test
-    // here, unlike NN_Exit), FUN_004424f0(1), FUN_004b65a0 (hide the rollover),
-    // FUN_0041dde0("arrow", 0).
+    // No DAT_0066d359 test before closing NN_MainButton's panel here, unlike NN_Exit.
     NnMainButtonOnModalOpen();
     NavBarCloseService(true); // FUN_004424f0(1)
     NnRolloverHideGlobal();
@@ -81,30 +77,25 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
 
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
 
-    // 0x004a6bcd..0x004a6c1e: FUN_005a0db0("Pause_BlackPlane", mesh, {0, 0, -1}, 0, {0, 0, 0},
-    // NoZEnable 0, ZClear 0, NoMeshRender 0, NoWireRender 1, NoColoring 1, RenderToWindow 0,
-    // NoClearRender 1, 0, 0, 0, {0, 0, 0}).
+    // Flags: NoZEnable 0, ZClear 0, NoMeshRender 0, NoWireRender 1, NoColoring 1,
+    // RenderToWindow 0, NoClearRender 1.
     float const PlanePosition[3] = {0.0f, 0.0f, -1.0f};
     CreateStaticControl("Pause_BlackPlane", kPauseBlackPlaneMesh, PlanePosition, nullptr, Zero, 0,
                         0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
 
-    // 0x004a6c23..0x004a6c78: the same flags, at {0, 0x3c1374c0 (0.009), -1}.
+    // {0, 0.009, -1}
     float const FramePosition[3] = {0.0f, NnFloatBits(0x3c1374c0), -1.0f};
     CreateStaticControl("PauseFrame", kPauseFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
                         0, 1, 0, 0, 0, Zero);
 
-    // 0x004a6c7d..0x004a6cc0: FUN_005a0e30("PauseTitle", "PageHeader", {0xb2800000, 0.22, -1},
-    // 0, 0.35, 0.03, 2.7, 0, 1, 0, 0) -> +0x334.
+    // {-1.49e-8 (0xb2800000), 0.22, -1}, 0.35 x 0.03, 2.7.
     float const TitlePosition[3] = {NnFloatBits(0xb2800000), NnFloatBits(0x3e6147af), -1.0f};
     Title = CreateTextControl("PauseTitle", "PageHeader", TitlePosition, nullptr,
                               NnFloatBits(0x3eb33333), NnFloatBits(0x3cf5c28f),
                               NnFloatBits(0x402ccccd), 0, 1, 0, 0);
 
-    // 0x004a6cc6..0x004a6d52: the button actions. +0x360 is always 1 (resume).
-    //   single player, docked (DAT_0066873c != 0) and FUN_004568a0 true: 1, 2, 3, 4, 5
-    //   single player otherwise:                                        1, 3, 4, 5
-    //   multiplayer:                                                    1, 6, 7, 4, 5
-    // FUN_004568a0 is asked before the docked byte is tested (0x004a6ce2).
+    // The button actions; the first is always 1 (resume). FUN_004568a0 (CanSkipAll) is asked
+    // before the docked byte is tested (0x004a6ce2).
     int Count = 0;
     if (SinglePlayer())
     {
@@ -136,8 +127,7 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
     }
     ButtonAction[0] = 1;
 
-    // 0x004a6d5c..0x004a6d76: row origin / step -- 0.149 / 0.0825, or 0.128375 / 0.09625 for
-    // four rows.
+    // Row origin / step: 0.149 / 0.0825, or 0.128375 / 0.09625 for four rows.
     float RowOrigin = NnFloatBits(0x3e189375);
     float RowStep = NnFloatBits(0x3da8f5c3);
     if (Count == 4)
@@ -146,8 +136,7 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         RowStep = NnFloatBits(0x3dc51eb9);
     }
 
-    // 0x004a6d7e..0x004a6e8b: one row per action. Y = origin - i * step (FILD / FMUL / FSUB in
-    // the x87 registers, FSTP float).
+    // Y = origin - i * step, kept in the x87 registers and stored once as float.
     for (int Index = 0; Index < Count; ++Index)
     {
         float const RowY = static_cast<float>(static_cast<double>(RowOrigin) -
@@ -155,21 +144,20 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
                                                   static_cast<double>(RowStep));
         char Name[0x100];
 
-        // FUN_005a0d00(name, 0, {0, Y, -1}, {0.175, 0.028, 0}, 0, 0, 0, 0, 0) -> +0x338[i].
+        // Half extents {0.175, 0.028, 0}.
         sprintf(Name, "PauseButtonBox%d", Index);
         float const BoxPosition[3] = {0.0f, RowY, -1.0f};
         float const BoxExtents[3] = {NnFloatBits(0x3e333333), NnFloatBits(0x3ce56042), 0.0f};
         ButtonBox[Index] = CreateWireButtonControl(Name, nullptr, BoxPosition, BoxExtents, 0, 0, 0,
                                                    0, 0);
-        // 0x004a6e0c..0x004a6e16: the last box gets +0x35d |= 1 (no null test).
+        // The last box gets +0x35d |= 1 (no null test).
         if (Index == Count - 1)
         {
             unsigned char* const Wire = reinterpret_cast<unsigned char*>(ButtonBox[Index]);
             Wire[0x35d] = static_cast<unsigned char>(Wire[0x35d] | 1);
         }
 
-        // FUN_005a0e30(name, "ButtonText", {0x32300000, Y + 0.005, -1}, 0, 0.27, 0.03, 1.5, 0,
-        // 1, 0, 0) -> +0x34c[i]. The 0.005 is DAT_005d3e44 (FADD float).
+        // The 0.005 is DAT_005d3e44.
         sprintf(Name, "PauseButtonText%d", Index);
         float const TextY = static_cast<float>(static_cast<double>(RowY) +
                                                static_cast<double>(NnFloatBits(0x3ba3d70a)));
@@ -179,7 +167,6 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
                                               NnFloatBits(0x3fc00000), 0, 1, 0, 0);
     }
 
-    // 0x004a6e93..0x004a6eb2: the unused rows are zeroed (box, text, action).
     for (int Index = Count; Index < 5; ++Index)
     {
         ButtonBox[Index] = nullptr;
@@ -187,15 +174,13 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         ButtonAction[Index] = 0;
     }
 
-    // 0x004a6eb4..0x004a6ee5: the title -- 0x71c in single player, 0x724 in multiplayer (slot 42
-    // (0x1e, ids, 0), no null test).
+    // No null test on the title.
     if (SinglePlayer())
         Title->SetProperty(0x1e, 0x71c, 0);
     else
         Title->SetProperty(0x1e, 0x724, 0);
 
-    // 0x004a6ee5..0x004a6fe7: each row's caption (text slot 42 (0x1e, ids, 0)) and tooltip (box
-    // slot 42 (3, ids, 0)) by its action; an action outside 1..7 gets neither.
+    // Each row's caption and tooltip by its action.
     for (int Index = 0; Index < Count; ++Index)
     {
         unsigned CaptionIds = 0;
@@ -215,27 +200,21 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         ButtonBox[Index]->SetProperty(3, ToolTipIds, 0);
     }
 
-    // 0x004a6fed..0x004a6ff6
     DrawLayer = 0x64;
     DrawSubLayer = 6;
-    // 0x004a6ffd..0x004a7017: FUN_004a7670's body inline -- hold the server tick, keep the cursor
-    // flag, force the cursor on.
+    // FUN_004a7670's body, inlined in retail.
     bCursorDrawFlag = NnModalPauseGame();
-    // 0x004a701d: FUN_00577b40(+0x32c).
-    HudPushInputFocus(AsHudCmdHandler());
-    // 0x004a7025..0x004a703b
+    HudPushInputFocus(AsHudCmdHandler()); // FUN_00577b40
     RegisterEvent(0x11);
     RegisterEvent(0xf);
     RegisterEvent(0x14);
 
-    // 0x004a7052: FUN_004b5060, SETNZ.
-    return Win3D::Create(NewParent, Data);
+    return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 
 void NnPause::Update()
 {
-    // LAB_004a70d0: WinControl's Update (FUN_005a17b0), the software cursor forced on, then a
-    // pending close deletes the window (FUN_0043d2a0 per child, slot 10, deleting dtor).
+    // LAB_004a70d0: the software cursor is forced on, then a pending close deletes the window.
     WinControl::Update();
     if (GetClientMouseCursorDrawFlag() == 0)
         SetClientMouseCursorDrawFlag(1);
@@ -256,13 +235,12 @@ void NnPause::Draw()
 {
     // FUN_00488960.
     Win3DFlushBeforeOverlayDraw(); // FUN_0045a9f0
-    WinControl::Draw();            // JMP FUN_005a0760
+    WinControl::Draw();            // tail call FUN_005a0760
 }
 
 bool NnPause::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
-    // LAB_004a70a0 (RET 0xc): 0x3006 (NN_Confirm's answer) goes on to slot 42 with A and B;
-    // always false.
+    // LAB_004a70a0 (RET 0xc): NN_Confirm's answer (0x3006) goes on to slot 42.
     if (Msg == 0x3006)
         SetProperty(0x3006, A, B);
     return false;
@@ -274,7 +252,6 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     (void)B;
     if (Msg == 0x26)
     {
-        // 0x004a71d0..0x004a7203: which button box sent the click; its action.
         int Index = 0;
         while (Index < 5)
         {
@@ -284,14 +261,12 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Index == 5)
             return 0;
-        // 0x004a71f4 `CMP EAX,-1` cannot hold here.
+        // Retail's -1 test (0x004a71f4) cannot hold here.
         DoAction(ButtonAction[Index]);
         return 0;
     }
     if (Msg == 0x42)
     {
-        // 0x004a719e..0x004a71c6: slot 31 SetOffset with the three floats at A (by value), then
-        // slot 5 SetPosition(&+0x60).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
@@ -299,9 +274,7 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (Msg == 0x3006 && A == 1)
     {
-        // 0x004a715c..0x004a7190: NN_Confirm said yes -- FUN_005763b0(0xc5, 0) (USER_EXIT_GAME),
-        // FUN_004a7690(+0x330) inline, slot 33 ReleaseMouse, and the window goes at the next
-        // Update (+0x331 = 1).
+        // NN_Confirm said yes: USER_EXIT_GAME (0xc5); the window goes at the next Update.
         HudPostCommand(0xc5, 0);
         NnModalResumeGame(bCursorDrawFlag);
         ReleaseMouse();
@@ -313,8 +286,7 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
 bool NnPause::OnEvent(unsigned MsgId)
 {
-    // LAB_004a7070 (RET 4): 0xf, 0x11 and 0x14 resume (FUN_004a7210(1) on this - 0x32c); true.
-    // Anything else is not consumed.
+    // LAB_004a7070 (RET 4).
     if (MsgId == 0xf || MsgId == 0x11 || MsgId == 0x14)
     {
         DoAction(1);
@@ -340,21 +312,18 @@ void NnPause::ResumeAndDelete()
 
 void NnPause::DoAction(int Action)
 {
-    // FUN_004a7210 (thiscall, RET 4, a 0x800-byte wchar_t buffer on the stack).
+    // FUN_004a7210 (thiscall, RET 4).
     wchar_t Text[0x400];
     switch (Action)
     {
     case 0:
     case 1:
-        // 0x004a7222..0x004a727a / 0x004a7282..0x004a72da: resume -- close the window.
         ResumeAndDelete();
         return;
     case 2:
     case 3:
     {
-        // 0x004a72e2..0x004a734c / 0x004a735a..0x004a73c4: FUN_0042d6f0(1), close, then
-        // FUN_00488970 (NN_LoadSave) with mode 2 (save) for action 2 and 1 (load) for action 3,
-        // and FUN_0042d6f0(0). The window is deleted before the load/save one opens.
+        // Save / load. The window is deleted before the load/save one opens.
         SetClientServerTickPause(true);
         ResumeAndDelete();
         OpenNnLoadSave(Action == 2 ? 2 : 1);
@@ -363,8 +332,6 @@ void NnPause::DoAction(int Action)
     }
     case 4:
     {
-        // 0x004a73d6..0x004a7467: FUN_0042d6f0(1), close, FUN_0059db20("NN_Preferences",
-        // "NN_Preferences", 0, 0) and slot 32 CaptureMouse on it, FUN_0042d6f0(0).
         SetClientServerTickPause(true);
         ResumeAndDelete();
         Win3D* const Preferences = WinFactoryCreate("NN_Preferences", "NN_Preferences", nullptr,
@@ -375,21 +342,16 @@ void NnPause::DoAction(int Action)
         return;
     }
     case 5:
-        // 0x004a746f..0x004a7497: FUN_004347e0(DAT_0067eca8, 0x75b, buffer, 0x400) and
-        // FUN_004889e0(this, buffer, 0) -- the "quit?" NN_Confirm under this window; its answer
-        // comes back through slot 23 (0x3006).
+        // "Quit?"; the answer comes back through slot 23 (0x3006).
         GetIdsStringWWithRawFallback(0x75b, Text, 0x400);
         NnConfirmOpen(this, Text, nullptr);
         return;
     case 6:
-        // 0x004a74aa..0x004a7519: FUN_00564b10(2) (DAT_0067c200 = 2), FUN_005763b0(0xc5, 0),
-        // close.
-        MenuNavSetIntroModeRequest(2);
+        MenuNavSetIntroModeRequest(2); // DAT_0067c200
         HudPostCommand(0xc5, 0);
         ResumeAndDelete();
         return;
     case 7:
-        // 0x004a7521..0x004a7550: FUN_00564b10(3), then the NN_Confirm with ids 0x76b.
         MenuNavSetIntroModeRequest(3);
         GetIdsStringWWithRawFallback(0x76b, Text, 0x400);
         NnConfirmOpen(this, Text, nullptr);
@@ -408,26 +370,19 @@ void NnPause::CloseNow()
 void NnPauseOpen()
 {
     // FUN_004a75c0.
-    // 0x004a75c0..0x004a75e5: not with a NeuroNet screen up (DAT_0067dcc8), the server tick held
-    // (FUN_0042d730) or DAT_00668761.
     if (G_bNnScreenUp)
         return;
     if (IsClientServerTickPaused())
         return;
-    if (IsClientLocationInTransition()) // DAT_00668761 (0x004a75de)
+    if (IsClientLocationInTransition()) // DAT_00668761
         return;
-    // 0x004a75e7..0x004a7600: with the software cursor shown, only when docked (FUN_004c4810) or
-    // with a player object (FUN_0054baf0).
     if (GetClientMouseCursorDrawFlag() != 0)
     {
         if (!IsPlayerDockedRetail() && GetPlayerObjRW() == nullptr)
             return;
     }
-    // 0x004a7602..0x004a7611: one NN_Pause at most (FUN_0059d9c0).
     if (Win3DFindByClassName("NN_Pause") != nullptr)
         return;
-    // 0x004a7613..0x004a765c: FUN_0059db20("NN_Pause", "NN_Pause", 0, 0); slot 42 (0x42,
-    // &{0, 0, 0}, 0) and slot 32 CaptureMouse on it.
     Win3D* const Created = WinFactoryCreate("NN_Pause", "NN_Pause", nullptr, nullptr);
     if (Created == nullptr)
         return;

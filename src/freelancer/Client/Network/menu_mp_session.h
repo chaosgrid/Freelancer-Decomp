@@ -8,7 +8,6 @@
 
 struct FServerInfo;
 
-// FUN_005accb0 (cdecl, one argument): true when the server record's +0x28 and +0x98 are both
-// non-zero. Sole caller: FUN_005b20a0 0x005b210e with &DAT_0067e84c, the login manager's
-// current server (CLoginMgr +0x94, login_mgr.h).
+// FUN_005accb0 (cdecl): true when the server record's +0x28 and +0x98 are both non-zero. Sole
+// caller: FUN_005b20a0 with &DAT_0067e84c, the login manager's current server.
 bool MenuMpSessionIsReady(FServerInfo const* Server);

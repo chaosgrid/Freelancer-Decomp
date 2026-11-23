@@ -13,9 +13,7 @@
 #include <cstring>
 
 // alchemy.dll — DACOM particle FX scaffolding.
-// Out-of-line method bodies for FAleChunk (the only alchemy_types.h struct
-// with non-trivial logic — everything else in that header is pure data or
-// abstract-interface declarations with no bodies to place here).
+// Out-of-line method bodies for FAleChunk.
 namespace AlchemyImpl
 {
     int FAleChunk::OpenNode(const char* Name)
@@ -24,9 +22,7 @@ namespace AlchemyImpl
     }
 
     // OpenByDesc opens the same-named data leaf inside the entered directory
-    // (UTF layout: \AlchemyNodeLibrary\AlchemyNodeLibrary). This helper supplies
-    // the node loaders' current open-failure handling; their full failure and
-    // reference-order contract remains pending in FUN_06228b90.
+    // (UTF layout: \AlchemyNodeLibrary\AlchemyNodeLibrary).
     bool FAleChunk::OpenNamedChunk(IFileSystem* Fs, const char* Name, unsigned char bWrite)
     {
         bEntered_ = 0;
@@ -110,7 +106,7 @@ namespace AlchemyImpl
         return Bytes == Size ? 0 : -1;
     }
 
-    // FUN_06223070: uint16 length + bytes; odd length gets 1 pad byte. RET <0 fail.
+    // FUN_06223070: uint16 length + bytes; odd length gets 1 pad byte. < 0 on failure.
     int FAleChunk::ReadString(char* Buffer, unsigned long MaxChars)
     {
         unsigned short Length = 0;

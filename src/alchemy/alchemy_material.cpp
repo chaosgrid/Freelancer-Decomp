@@ -10,8 +10,8 @@
 #include "alchemy_common.h"
 
 // alchemy.dll — DACOM particle FX scaffolding.
-// Out-of-line method bodies for FALMaterial / FALBatchedMaterialFacet.
-// See alchemy_material.h for the full byte-verified retail trace.
+// Out-of-line method bodies for FALMaterial / FALBatchedMaterialFacet
+// (see alchemy_material.h).
 namespace AlchemyImpl
 {
     FALMaterial G_DefaultALMaterial;
@@ -20,52 +20,50 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::QueryInterface(const char* Iid, void** Out)
     {
-        // LAB_06203440: `this -= 4` then tail-jump into LAB_06203350, i.e.
-        // the outer object's own QueryInterface handles both IIDs.
+        // LAB_06203440: this -= 4, then the outer QI (LAB_06203350).
         return Outer_->QueryInterface(Iid, Out);
     }
 
     unsigned long DACOM_API FALBatchedMaterialFacet::AddRef()
     {
-        // LAB_06203450: `this -= 4` then tail-jump into LAB_06203400.
+        // LAB_06203450 -> LAB_06203400.
         return Outer_->AddRef();
     }
 
     unsigned long DACOM_API FALBatchedMaterialFacet::Release()
     {
-        // LAB_06203460: `this -= 4` then tail-jump into LAB_06203410.
+        // LAB_06203460 -> LAB_06203410.
         return Outer_->Release();
     }
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::CreateInnerMaterial(void* /*A*/)
     {
-        // LAB_062032a0: OR EAX,0xFFFFFFFF; RET 8.
+        // LAB_062032a0.
         return -1;
     }
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::SetBatchBin(void* /*A*/)
     {
-        // LAB_062032b0: OR EAX,0xFFFFFFFF; RET 8.
+        // LAB_062032b0.
         return -1;
     }
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::GetBatchBin(unsigned long* Out)
     {
-        // LAB_062032c0: MOV EAX,[ESP+8]; MOV dword ptr [EAX],1; XOR EAX,EAX; RET 8.
+        // LAB_062032c0.
         *Out = 1;
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::Bind(void* /*A*/)
     {
-        // LAB_06203300: CALL FUN_0623f450 (see
-        // FALMaterial::ApplyDefaultRenderPipelineState); XOR EAX,EAX; RET 8.
+        // LAB_06203300.
         return FALMaterial::ApplyDefaultRenderPipelineState();
     }
 
     GENRESULT DACOM_API FALBatchedMaterialFacet::Teardown(void* /*A*/)
     {
-        // LAB_06203310: XOR EAX,EAX; RET 8.
+        // LAB_06203310.
         return GR_OK;
     }
 
@@ -73,7 +71,7 @@ namespace AlchemyImpl
                                                         void* /*D*/, void* /*E*/, void* /*F*/,
                                                         void* /*G*/)
     {
-        // LAB_062032f0: XOR EAX,EAX; RET 0x20 (7 args).
+        // LAB_062032f0.
         return GR_OK;
     }
 
@@ -81,12 +79,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FALMaterial::QueryInterface(const char* Iid, void** Out)
     {
-        // LAB_06203350: retail's real QI is a generic byte-compared 2-entry
-        // IID table ("1.11_IBatchedMaterial" -> offset 4, "1.11_IMaterial"
-        // -> offset 0); expressed here the same way this port expresses
-        // every other multi-IID QueryInterface (see FFxRuntime::
-        // QueryInterface). Falls through to GR_INTERFACE_UNSUPPORTED
-        // (-3, *Out=0) exactly like retail's table-exhausted path.
+        // LAB_06203350: a 2-entry IID table walk ("1.11_IBatchedMaterial" -> offset 4,
+        // "1.11_IMaterial" -> offset 0).
         if (IidEqual(Iid, Iids::BatchedMaterial))
         {
             Facet_.AddRef();
@@ -105,10 +99,7 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FALMaterial::Release()
     {
-        // LAB_06203410: guards the decrement against underflow, then on
-        // hitting 0 re-arms the refcount to 1 (retail's re-entrancy guard,
-        // already fixed the same way across a dozen other alchemy classes)
-        // before freeing via FUN_062460e0 (this port's `delete this`).
+        // LAB_06203410: re-arms the count to 1 at zero before freeing (FUN_062460e0).
         if (RefCount_ != 0)
             --RefCount_;
         const unsigned long Next = RefCount_;
@@ -123,107 +114,107 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FALMaterial::Initialize(void* /*A*/)
     {
-        // LAB_062031d0: XOR EAX,EAX; RET 8.
+        // LAB_062031d0.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::LoadFromFileSystem(void* /*A*/)
     {
-        // LAB_062031e0: XOR EAX,EAX; RET 8.
+        // LAB_062031e0.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::SaveProperties(void* /*A*/)
     {
-        // LAB_062031f0: XOR EAX,EAX; RET 8.
+        // LAB_062031f0.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::ApplyVerify(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203200: XOR EAX,EAX; RET 0xC.
+        // LAB_06203200.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::ResolveTextures(void* /*A*/)
     {
-        // LAB_06203210: XOR EAX,EAX; RET 8.
+        // LAB_06203210.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::Bind(void* /*A*/)
     {
-        // LAB_06203320: CALL FUN_0623f450; XOR EAX,EAX; RET 8.
+        // LAB_06203320.
         return ApplyDefaultRenderPipelineState();
     }
 
     GENRESULT DACOM_API FALMaterial::Teardown(void* /*A*/)
     {
-        // LAB_06203330: XOR EAX,EAX; RET 8.
+        // LAB_06203330.
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::Submit(void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/,
                                             void* /*E*/, void* /*F*/, void* /*G*/)
     {
-        // LAB_062032e0: OR EAX,0xFFFFFFFF; RET 0x20 (7 args).
+        // LAB_062032e0.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::SetName(void* /*A*/)
     {
-        // LAB_06203220: OR EAX,0xFFFFFFFF; RET 8.
+        // LAB_06203220.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::GetName(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203230: OR EAX,0xFFFFFFFF; RET 0xC.
+        // LAB_06203230.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::CopyClassName(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203240: OR EAX,0xFFFFFFFF; RET 0xC.
+        // LAB_06203240.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::GetPassCount(unsigned long* Out)
     {
-        // LAB_06203250: MOV EAX,[ESP+8]; MOV dword ptr [EAX],1; XOR EAX,EAX; RET 8.
+        // LAB_06203250.
         *Out = 1;
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::GetRenderFlags(unsigned long* Out)
     {
-        // LAB_062032d0: MOV EAX,[ESP+8]; MOV dword ptr [EAX],2; XOR EAX,EAX; RET 8.
+        // LAB_062032d0.
         *Out = 2;
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::GetParameterCount(unsigned long* Out)
     {
-        // LAB_06203260: MOV EAX,[ESP+8]; MOV dword ptr [EAX],0; XOR EAX,EAX; RET 8.
+        // LAB_06203260.
         *Out = 0;
         return GR_OK;
     }
 
     GENRESULT DACOM_API FALMaterial::GetParameterDescriptor(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203270: OR EAX,0xFFFFFFFF; RET 0xC.
+        // LAB_06203270.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::GetParameterValue(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203280: OR EAX,0xFFFFFFFF; RET 0xC.
+        // LAB_06203280.
         return -1;
     }
 
     GENRESULT DACOM_API FALMaterial::SetParameterValue(void* /*A*/, void* /*B*/)
     {
-        // LAB_06203290: OR EAX,0xFFFFFFFF; RET 0xC.
+        // LAB_06203290.
         return -1;
     }
 
@@ -235,14 +226,8 @@ namespace AlchemyImpl
 
     GENRESULT FALMaterial::ApplyDefaultRenderPipelineState()
     {
-        // FUN_0623f450 == AlchemyImpl::ApplyParticleDrawRenderState, already
-        // ported (alchemy_alchemy.cpp) against G_RenderPipeline (this
-        // port's name for DAT_06257bc0, see alchemy_common.h/.cpp) -- the
-        // same global FAlchemy::BeginDraw drives at its own call site
-        // (0x06201b5e). Both retail call sites of THIS slot (LAB_06203300,
-        // LAB_06203320) discard the return value and unconditionally return
-        // 0 regardless of what the callee did, so this wrapper does the
-        // same after invoking the real routine.
+        // FUN_0623f450 = ApplyParticleDrawRenderState (alchemy_alchemy.cpp). Both retail
+        // callers (LAB_06203300, LAB_06203320) discard its result and return 0.
         ApplyParticleDrawRenderState();
         return GR_OK;
     }

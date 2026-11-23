@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll MPCritSec: a lazily initialised Win32 critical section. Split out of common_net.cpp.
+// Common.dll MPCritSec: a lazily initialised Win32 critical section.
 
 #include "common_net.h"
 #include "common_misc.h" // GbSinglePlayer
@@ -20,14 +20,14 @@
 MPCritSec::MPCritSec()
     : bInitialized(false)
 {
-    // 06304750: retail stores only the byte flag; the section bytes stay indeterminate
-    // until lock() initialises them. The port zeroes them (owner's over-initialisation rule).
+    // FUN_06304750. Deviation: retail stores only the flag and leaves the section bytes
+    // indeterminate until lock(); the port zeroes them.
     memset(&CriticalSection, 0, sizeof(CriticalSection));
 }
 
 MPCritSec::~MPCritSec()
 {
-    // 06304760: flag set -> clear it, then DeleteCriticalSection.
+    // FUN_06304760
     if (bInitialized)
     {
         bInitialized = false;
@@ -37,8 +37,7 @@ MPCritSec::~MPCritSec()
 
 MPCritSec& MPCritSec::operator=(MPCritSec const& Other)
 {
-    // Retail (0x06261d70): REP MOVSD of all 7 dwords (CriticalSection, the flag and its
-    // padding), no self-assignment test (a self-copy is the identity, hence memmove). See
+    // FUN_06261d70: a raw copy of all 7 dwords, no self-assignment test (hence memmove). See
     // the header comment for the aliasing caveat this reproduces.
     memmove((void*)this, &Other, sizeof(MPCritSec));
     return *this;
@@ -46,8 +45,7 @@ MPCritSec& MPCritSec::operator=(MPCritSec const& Other)
 
 void MPCritSec::lock()
 {
-    // 0x06304780: single-player (DAT_063ed17c != 0) -> return without touching the section.
-    // Otherwise lazily InitializeCriticalSection on first use (byte flag +0x18), then Enter.
+    // FUN_06304780: a no-op in single-player.
     if (GbSinglePlayer)
         return;
     if (!bInitialized)
@@ -60,7 +58,7 @@ void MPCritSec::lock()
 
 void MPCritSec::unlock()
 {
-    // 0x063047b0: single-player -> return; otherwise Leave (no bInitialized check).
+    // FUN_063047b0: no bInitialized check.
     if (GbSinglePlayer)
         return;
     LeaveCriticalSection(&CriticalSection);

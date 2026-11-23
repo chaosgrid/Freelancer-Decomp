@@ -48,7 +48,7 @@ CServerConfigDlg::CServerConfigDlg(CWnd* Parent)
 	// assigns them before anything reads them.
 }
 
-// .text:00407040 — empty (shared, ICF-folded `RET 4`).
+// .text:00407040 — empty (shared, ICF-folded).
 void CServerConfigDlg::DoDataExchange(CDataExchange* DX)
 {
 	CDialog::DoDataExchange(DX);
@@ -117,7 +117,7 @@ BOOL CServerConfigDlg::OnInitDialog()
 		LegalNotice->SetWindowText(LegalText);
 	}
 
-	// Command-line /C switch (FServerControl+0x9ae, .text:00406b3b): with a saved configuration,
+	// Command-line /C switch: with a saved configuration,
 	// accept it without showing the dialog. Retail tests the (already closed) FILE pointer for
 	// non-null.
 	if (GApp->ServerControl.bAutoAcceptConfig && File != nullptr)
@@ -160,10 +160,10 @@ void CServerConfigDlg::OnOK()
 	Control.SetMaxPlayers(Config.MaxPlayers);
 	Control.SetServerDescription(Config.Description);
 	Control.SetServerName(Config.ServerName);
-	Control.SetAllowNewPlayers(Config.bAllowNewPlayers);    // SStartupInfo byte, .text:00402370
+	Control.SetAllowNewPlayers(Config.bAllowNewPlayers);    // SStartupInfo byte
 	Control.bListServerReporting = Config.bInternetAccessible;
 	Control.ServerPassword.assign(Config.Password, wcslen(Config.Password));
-	Control.SetAllowPvp(Config.bAllowPvp);                  // SStartupInfo byte, .text:00402390
+	Control.SetAllowPvp(Config.bAllowPvp);                  // SStartupInfo byte
 
 	Players.BuildLocalUserDir();
 	char Path[0x400] = "";

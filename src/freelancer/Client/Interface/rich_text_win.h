@@ -30,8 +30,8 @@
 //
 // BaseRichTextWin layout (after WinControl's 0x32c):
 //   +0x32c DebugWindow* -- only the ctor (0) and the dtor/Create null tests touch it; the
-//          DebugWindow vftable 0x005e465c is installed nowhere but in the dtor (0x00579664),
-//          so no DebugWindow is ever built and every branch on it is dead
+//          DebugWindow vftable 0x005e465c is installed nowhere but in the dtor, so no
+//          DebugWindow is ever built and every branch on it is dead
 //   +0x330 / +0x334 width / height in the control's local units (Create: 0.4 / 0.3)
 //   +0x338..+0x344 the two corners (0,0,0) and (w,-h,0) in world space (FUN_00579e90)
 //   +0x348..+0x354 their screen rectangle left, top, right, bottom
@@ -196,7 +196,7 @@ public:
     float AttachOffset[3];              // +0x47c
 
 protected:
-    // The ToolTip half of slots 11 / 12 (0x0057b0e6..0x0057b122).
+    // The ToolTip half of Update / UpdateInactive.
     void FeedToolTipIfHovered();
 
 private:
@@ -282,8 +282,8 @@ static_assert(offsetof(RichTextWin, LayoutFlag) == 0x494, "RichTextWin +0x494");
 // the input focus (Activate FUN_0057c750); an IME box (FLImeInputBox, +0x52c) exists only while
 // an IMEFocus singleton does.
 //
-// The retail layout is kept in the comments; the port holds the containers as STL members (no
-// retail ABI), so the object is larger than retail's 0x530.
+// The retail layout is kept in the comments; the port holds the containers as STL members, so
+// the object is larger than retail's 0x530.
 //   +0x498 Event::Handler, +0x49c caret, +0x4a0 / +0x4a4 (see below), +0x4a8 4,
 //   +0x4ac caret shown, +0x4b0 caret timer, +0x4b4 caret period (0.5f), +0x4b8 caret RGBA,
 //   +0x4bc caret height scale (1.0f), +0x4c0 editable, +0x4c4 cells, +0x4d4 current attributes

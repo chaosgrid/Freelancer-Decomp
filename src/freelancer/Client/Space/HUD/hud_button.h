@@ -13,7 +13,7 @@
 // WinButton is a WinObject whose mesh spins about its Y axis while the cursor is over it and
 // eases back to rest afterwards; its hit test is the mesh's projected screen rectangle. It has
 // no constructor or destructor of its own in the PE: HUD_Button's factory FUN_004c8d40 inlines
-// the constructor (0x004c8d84 .. 0x004c8dc4), and slot 0 is WinObject's FUN_004c9210.
+// the constructor, and slot 0 is WinObject's FUN_004c9210.
 //
 // WinButton layout (after WinObject's 0xac):
 //   +0xac  FTransform rest pose (FUN_004b5150: identity rotation, zero translation). Slot 7
@@ -41,7 +41,7 @@
 
 struct WinButton : public WinObject
 {
-    // 0x004c8d84 .. 0x004c8dc4 (inlined into FUN_004c8d40)
+    // Inlined into FUN_004c8d40.
     WinButton();
 
     // slot 4 FUN_0059f2e0 -- the cursor (DAT_00616840 / DAT_00616844) inside the mesh's
@@ -62,7 +62,7 @@ struct WinButton : public WinObject
     // slot 16 LAB_004c93a0 -- bHover = 0
     void MouseLeave(float const* Ray) override;
 
-    // FUN_004c92b0 (thiscall, RET 4) -- the twelve dwords into +0x3c, then the holder's
+    // FUN_004c92b0 -- the twelve dwords into +0x3c, then the holder's
     // instance matrix (FUN_00421050) and FUN_00421070. The rest pose is left alone.
     void SetTransform(FTransform const* NewTransform);
 
@@ -82,7 +82,7 @@ static_assert(offsetof(WinButton, RestPose) == 0xac, "WinButton +0xac rest pose"
 static_assert(offsetof(WinButton, bHover) == 0xdc, "WinButton +0xdc hover");
 static_assert(offsetof(WinButton, SpinSpeed) == 0xe4, "WinButton +0xe4 spin speed");
 
-// FUN_0059f200 (cdecl Holder, Out) -- the instance's projected screen rectangle as four floats
+// FUN_0059f200 -- the instance's projected screen rectangle as four floats
 // (left, top, right, bottom): IEngine::GetInstanceExtent (+0x88) gives the bounding sphere
 // centre and radius, GetInstancePosition (+0x90) moves the centre, and
 // get_projected_bounding_box through the Win3D camera (DAT_0067dbf8) projects it. False without

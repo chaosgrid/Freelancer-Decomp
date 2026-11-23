@@ -6,7 +6,7 @@
 
 // CMainFrame — FLServer.exe's main frame window (retail CreateObject .text:00411ea0, ctor
 // 00411f40, vtable .rdata:0041dda8, CRuntimeClass .rdata:0041dd0c, message map
-// .rdata:0041dda0; TU 00411ea0..00412a80). Owns the status bar with the uptime pane, a 1 s
+// .rdata:0041dda0). Owns the status bar with the uptime pane, a 1 s
 // timer that samples RemoteClient's per-client traffic counters and the optional bandwidth CSV
 // log (+0x20c).
 #pragma once
@@ -16,36 +16,34 @@
 class CMainFrame : public CFrameWnd
 {
 protected:
-	CMainFrame();                                         // .text:00411f40
+	CMainFrame();
 	DECLARE_DYNCREATE(CMainFrame)
 
 public:
-	virtual ~CMainFrame();                                // .text:00412020
+	virtual ~CMainFrame();
 
-	// .text:004120b0 — clears WS_THICKFRAME (0x40000) from the default style, then the base.
+	// Clears WS_THICKFRAME from the default style, then the base.
 	virtual BOOL LoadFrame(UINT IdResource, DWORD DefaultStyle = WS_OVERLAPPEDWINDOW | FWS_ADDTOTITLE,
 		CWnd* ParentWnd = NULL, CCreateContext* Context = NULL) override;
-	// .text:00412180
 	virtual BOOL PreCreateWindow(CREATESTRUCT& Cs) override;
 
-	// .text:004128b0 — (re)opens the bandwidth CSV log; called by
-	// CFLServerApp::OnServerStartupFinished (.text:0040c0e1).
+	// (Re)opens the bandwidth CSV log; called by CFLServerApp::OnServerStartupFinished.
 	void OpenBandwidthLog(const char* Path);
-	// .text:00412950 — closes the bandwidth log. No caller in retail (no call/jmp/abs ref).
+	// Closes the bandwidth log. No caller in retail.
 	void CloseBandwidthLog();
 
 	// CCmdUI handlers with no message-map entry and no caller in retail (strings 0xf028..0xf02c).
-	void OnUpdateTraffic(CCmdUI* CmdUI);                  // .text:004121a0
-	void OnUpdateConnects(CCmdUI* CmdUI);                 // .text:00412270
-	void OnUpdateThroughput(CCmdUI* CmdUI);               // .text:00412300
-	void OnUpdatePacketsOut(CCmdUI* CmdUI);               // .text:004123a0
-	void OnUpdatePacketsIn(CCmdUI* CmdUI);                // .text:00412430
+	void OnUpdateTraffic(CCmdUI* CmdUI);
+	void OnUpdateConnects(CCmdUI* CmdUI);
+	void OnUpdateThroughput(CCmdUI* CmdUI);
+	void OnUpdatePacketsOut(CCmdUI* CmdUI);
+	void OnUpdatePacketsIn(CCmdUI* CmdUI);
 
 protected:
-	afx_msg int OnCreate(LPCREATESTRUCT CreateStruct);    // .text:004120d0
-	afx_msg void OnUpdateUptime(CCmdUI* CmdUI);           // .text:004124c0
-	afx_msg void OnTimer(UINT_PTR IdEvent);               // .text:00412670
-	afx_msg void OnClose();                               // .text:00412980
+	afx_msg int OnCreate(LPCREATESTRUCT CreateStruct);
+	afx_msg void OnUpdateUptime(CCmdUI* CmdUI);
+	afx_msg void OnTimer(UINT_PTR IdEvent);
+	afx_msg void OnClose();
 
 	DECLARE_MESSAGE_MAP()
 

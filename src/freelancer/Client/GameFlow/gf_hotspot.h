@@ -7,9 +7,8 @@
 #pragma once
 
 // Hotspot -- a screen rectangle a room object answers the mouse through. Retail
-// E:\FL\Scratch\Source\Client\supt\Hotspot.cpp (the leak warning at line 0x161 names it),
-// freelancer.exe 0x00555d00..0x0055624f. Vftable 0x005e1218 has one slot, the deleting
-// destructor FUN_00555e30.
+// E:\FL\Scratch\Source\Client\supt\Hotspot.cpp (the leak warning at line 0x161 names it).
+// Vftable 0x005e1218 has one slot, the deleting destructor FUN_00555e30.
 //
 // Every hotspot lives in one global list (DAT_00679998 allocator byte, DAT_0067999c head,
 // DAT_006799a0 size): the constructor appends it, the destructor takes it out again. The mouse
@@ -18,9 +17,9 @@
 // leave (2) and click (3).
 //
 // The only class derived from it is the Character's hotspot (vftable 0x005cb9ec, operator
-// new(0x28) at 0x00444764, +0x20 the owning Character, +0x24 a byte), built at 0x00444783; its
-// screen rectangle is refreshed by FUN_00555f60 from the Character's bounding sphere. Both are
-// FCharacterObject / FCharacterHotspot in gf_character_object.h.
+// new(0x28) in FUN_00444290, +0x20 the owning Character, +0x24 a byte); its screen rectangle is
+// refreshed by FUN_00555f60 from the Character's bounding sphere. Both are FCharacterObject /
+// FCharacterHotspot in gf_character_object.h.
 
 #include "common_text.h" // Rect
 

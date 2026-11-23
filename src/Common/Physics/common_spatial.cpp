@@ -4,9 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll spatial partitions (.text:0632e830-06331a00 plus the node pool at
-// .text:06332140): NewSpatial / FreeSpatial, BspPartition, LinearPartition and the process-wide
-// pool every BSP node comes from (DAT_0640a728).
+// Common.dll spatial partitions: NewSpatial / FreeSpatial, BspPartition, LinearPartition and
+// the process-wide pool every BSP node comes from (DAT_0640a728).
 //
 // Floating point: retail evaluates on the x87 stack with 53-bit precision control. A value that
 // stays on the stack is kept as double here; a value retail stores with FSTP float is rounded to
@@ -21,9 +20,9 @@
 #include <list>
 #include <vector>
 
-#include "x87_trig.h" // X87Tan (BspPartition::QueryFrustum, 063314eb FPTAN)
+#include "x87_trig.h" // X87Tan (BspPartition::QueryFrustum's FPTAN)
 
-// DACOM.DLL!stricmp (Common IAT 0639902c), src/Common/common_dacom_stricmp.cpp.
+// DACOM.DLL!stricmp, src/Common/common_dacom_stricmp.cpp.
 int CallDacomStricmp(const char* Left, const char* Right);
 
 namespace
@@ -151,8 +150,7 @@ namespace
         }
 
         // FUN_0632f3f0: 1 when the sphere lies beyond the plane, 2 when it lies behind it,
-        // 0 when it touches it. `TEST AH,0x41 / JNZ` then `TEST AH,5 / JP`: an unordered
-        // distance lands on 0.
+        // 0 when it touches it. An unordered distance lands on 0.
         int Classify(Vector const& P, float Radius) const
         {
             double const S = SignedDistance(P);
@@ -308,7 +306,7 @@ namespace
             {
                 Vector const Delta = Subtract(Entries[Index].Position, Centroid);
                 double const Len = Length(Delta);
-                if (Len > 0.01) // FCOM 0.01 / TEST AH,0x41 / JNZ skips not-greater
+                if (Len > 0.01) // strictly greater
                 {
                     Accumulate(Sum, Scale(Delta, (float)(1.0 / Len)));
                 }
@@ -375,7 +373,7 @@ namespace
                     BestScore = Score;
                     if (Score == 0)
                     {
-                        break; // leaves this row only; the outer loop runs on (.text:0632f862)
+                        break; // leaves this row only; the outer loop runs on
                     }
                 }
             }
@@ -432,7 +430,7 @@ namespace
             }
             Len = std::sqrt(((double)(Sum.z) * Sum.z + (double)(Sum.y) * Sum.y) +
                             (double)(Sum.x) * Sum.x);
-            bUseSum = Len > 0.25; // TEST AH,0x41 / JZ: strictly greater
+            bUseSum = Len > 0.25; // strictly greater
         }
         if (!bUseSum)
         {
@@ -462,7 +460,7 @@ namespace
 
         bool IsSplit() const
         {
-            // FSUBR 1.0 / FABS / FCOMP 0.05 / TEST AH,5: JP (not below, or unordered) = leaf.
+            // Not below 0.05, or unordered, is a leaf.
             return std::fabs(1.0 - LengthSquared(Plane.Normal)) < 0.05;
         }
 
@@ -686,7 +684,7 @@ struct LinearPartition : public ISpatialPartition
     // FUN_0632ee10 / body FUN_0632ee30: the array is released.
     virtual ~LinearPartition() override {}
 
-    // CShip::get_status-shaped `XOR EAX,EAX; RET` at 06325390.
+    // FUN_06325390, an ICF-shared `return 0`.
     virtual int Slot04() override { return 0; }
 
     // LAB_0632ea80: erase(begin, end). The object count is not touched.
@@ -717,7 +715,7 @@ struct LinearPartition : public ISpatialPartition
         }
     }
 
-    // CShip::get_status (`XOR EAX,EAX; RET 8`).
+    // ICF-shared `return 0` (CShip::get_status).
     virtual int QueryFrustum(Geometry::Frustum const*, FSpatialQueryResult*) override { return 0; }
 
     // LAB_0632ed50: every entry whose sphere overlaps the query sphere (strictly), in array
@@ -743,7 +741,7 @@ struct LinearPartition : public ISpatialPartition
         return (int)Result->Count;
     }
 
-    // CShip::get_status (`XOR EAX,EAX; RET 8`).
+    // ICF-shared `return 0` (CShip::get_status).
     virtual int QueryRay(FSpatialRay const*, FSpatialQueryResult*) override { return 0; }
 
     // FUN_0632edf0: zero six dwords.
@@ -838,7 +836,7 @@ namespace
             Num = -S;
             Den = Dn;
         }
-        if (Den < 0.001) // FCOM 0.001 / TEST AH,5 / JP continues on not-below
+        if (Den < 0.001) // strictly below (NaN continues)
         {
             return false;
         }
@@ -863,7 +861,7 @@ namespace
     bool RayHitsEntry(FSpatialRay const* Ray, FSpatialEntry const& Entry, Vector Delta, double DistExact)
     {
         float const Dist = (float)(DistExact);
-        if (DistExact < Entry.Radius) // FCOMP radius / TEST AH,5 / JNP: below
+        if (DistExact < Entry.Radius) // strictly below
         {
             return true;
         }
@@ -916,8 +914,8 @@ void BspPartition::FreeNode(FSpatialNode* Node)
 
 void BspPartition::Remove(void* Object)
 {
-    // Retail reads the root's slots without testing the root (.text:0632f062-0632f070): on an
-    // empty partition that is a null dereference, reproduced here.
+    // Retail quirk kept: the root is not tested, so on an empty partition this is a null
+    // dereference.
     FSpatialNode* Node = nullptr;
     unsigned const RootUsed = Root->CountUsed();
     for (unsigned Index = 0; Index < RootUsed; ++Index)
@@ -1000,8 +998,8 @@ void BspPartition::Add(FSpatialEntry const* Entry)
         return;
     }
 
-    // .text:0632f275: the first root is a split node on the plane x = 0 (normal (1,0,0)
-    // normalised in place, distance (z + y + x) * 0).
+    // The first root is a split node on the plane x = 0 (normal (1,0,0) normalised in place,
+    // distance (z + y + x) * 0).
     Node = GSpatialNodes.PushBack();
     Root = Node;
     Node->Plane.Normal.x = 1.0f;
@@ -1112,7 +1110,7 @@ void BspPartition::InsertSplit(FSpatialNode* Node, FSpatialEntry const* Entry)
                             BestScore = Score;
                             if (Score == 0)
                             {
-                                break; // leaves this row only (.text:0632fce1 -> 0632fcf4)
+                                break; // leaves this row only
                             }
                         }
                     }
@@ -1180,7 +1178,7 @@ FSpatialPlane BspPartition::SplitEntries(std::vector<FSpatialEntry> const& Entri
         Vector const Delta = Subtract(Entries[Index].Position, Centroid);
         double const DistSq = ((double)Delta.y * Delta.y + (double)Delta.z * Delta.z) +
                               (double)Delta.x * Delta.x;
-        if (DistSq < 0.05) // FCOMP 0.05 / TEST AH,5 / JNP: below
+        if (DistSq < 0.05) // strictly below
         {
             continue;
         }
@@ -1386,12 +1384,12 @@ void BspPartition::Build(FSpatialNode* Node, std::vector<FSpatialEntry> const& E
 int BspPartition::QueryFrustum(Geometry::Frustum const* Frustum, FSpatialQueryResult* Result)
 {
     // The frustum's bounding sphere, then this object's own sphere query (vtbl+0x1c).
-    // FCOMPP AngleY / AngleX, TEST AH,5 / JP: AngleY unless it is (ordered) below AngleX.
+    // AngleY unless it is (ordered) below AngleX.
     float const Angle = !(Frustum->AngleY < Frustum->AngleX) ? Frustum->AngleY : Frustum->AngleX;
     double const Half = X87Tan((double)(Angle) * 0.5) * Frustum->Distance;
     float Radius;
     double Offset;
-    // FCOMP / TEST AH,1 / JNZ: C0 is set for below and for unordered.
+    // Below or unordered takes this arm.
     if (!((double)(Frustum->Distance) >= Half))
     {
         Radius = (float)(Half);
@@ -1667,7 +1665,7 @@ void BspPartition::QueryRayNode(FSpatialNode* Node, FSpatialRay const* Ray, FSpa
 
 void __cdecl FreeSpatial(ISpatialPartition* Spatial)
 {
-    // .text:06331940: the scalar deleting destructor with flag 1 when the pointer is set.
+    // FUN_06331940
     if (Spatial != nullptr)
     {
         delete Spatial;
@@ -1676,8 +1674,8 @@ void __cdecl FreeSpatial(ISpatialPartition* Spatial)
 
 ISpatialPartition* __cdecl NewSpatial(char const* Type)
 {
-    // .text:0632e9f0: DACOM stricmp against "BSP", "Linear" and "QuadTree"; the last match has
-    // no partition behind it and returns 0 like an unknown name.
+    // FUN_0632e9f0. "QuadTree" is compared but has no partition behind it: it returns 0 like
+    // an unknown name (retail).
     if (CallDacomStricmp(Type, "BSP") == 0)
     {
         return new BspPartition();

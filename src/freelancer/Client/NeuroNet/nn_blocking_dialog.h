@@ -11,14 +11,11 @@
 // (FUN_00474520 before the loop, FUN_00474590 after it). It draws nothing of its own; while it is
 // up it holds the key focus, the mouse capture and the client timing pause.
 //
-// WINFACTORY<BlockingDialog> DAT_0066db9c "BlockingDialog": static init LAB_00472150
-// (FUN_00474750 + atexit LAB_00472170 -> FUN_00579380), Create FUN_004747c0
+// WINFACTORY<BlockingDialog> DAT_0066db9c: static init LAB_00472150, Create FUN_004747c0
 // (operator_new(0x330)).
 //
-// vftable 0x005d08e4 (45 slots) -- WinControl's with these overrides:
-//   0 FUN_00474400 (scalar deleting dtor around FUN_00474420), 9 FUN_00474490 Create,
-//   13 FUN_00488960 Draw (FUN_0045a9f0, then WinControl::Draw).
-// No Event::Handler face; slot 42 stays WinControl's FUN_005a13c0.
+// vftable 0x005d08e4 (45 slots), scalar deleting dtor FUN_00474400. No Event::Handler face;
+// slot 42 stays WinControl's FUN_005a13c0.
 //
 // Layout:
 //   +0x000 WinControl (0x32c)
@@ -32,7 +29,7 @@
 class BlockingDialog : public WinControl
 {
 public:
-    // Inlined into FUN_004747c0: WinControl ctor, byte +0x32c = 1, FUN_0042d6c0, ++DAT_0067dccc.
+    // Inlined into FUN_004747c0.
     BlockingDialog();
     // FUN_00474420
     ~BlockingDialog() override;

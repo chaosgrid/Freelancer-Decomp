@@ -9,8 +9,8 @@
 // The equipment-visual set: the engine instances that show the equipment mounted on a ship's
 // hardpoints (guns, thrusters, lights), plus the blinking lights of the light items. Retail
 // freelancer.exe 0x00457d60..0x004582c0, no vtable and no RTTI, so the retail class name is
-// unknown; the name here is descriptive. operator new(0x2c) at 0x00585173 (ShipViewControl)
-// and inside the other two owners (callers 0x004438xx / 0x004470xx .. 0x004478xx).
+// unknown; the name here is descriptive. operator new(0x2c) in ShipViewControl (0x00585173)
+// and in two other owners.
 //
 // Layout (ctor FUN_00457d60):
 //   +0x00 HardpointSummary* (operator new(0x20) in FUN_00457f10; the exe's own copy of the
@@ -49,28 +49,28 @@ struct FEquipVisualSet
     // FUN_00457e30 -- release every material entry and empty the vector, destroy every item
     // instance, empty the flashlight set, free both arrays and delete the summary.
     void Clear();
-    // FUN_00457f00 (RET 4) -- Instances[Index], no range check.
+    // FUN_00457f00 -- Instances[Index], no range check.
     long GetInstance(int Index) const;
-    // FUN_00457f10 (RET 4) -- a new HardpointSummary analysed on RootInstance, and both
+    // FUN_00457f10 -- a new HardpointSummary analysed on RootInstance, and both
     // per-hardpoint arrays sized to its count (-1 / 0).
     void Populate(long RootInstance);
-    // FUN_00457fe0 (RET 8) -- put Equip's visual attachment on hardpoint HpIndex: either
+    // FUN_00457fe0 -- put Equip's visual attachment on hardpoint HpIndex: either
     // connect the attachment's HpChild hardpoint to it (DALib::Hardpoint slot 6) or join it to
     // the hardpoint's frame (IEngine::CreateJoint). False when the hardpoint is taken, the good
     // is unknown or has no visual attachment.
     bool Attach(int HpIndex, Archetype::Equipment const* Equip);
-    // FUN_00458160 (RET 4) -- destroy the instance on HpIndex (when there is one) and clear
+    // FUN_00458160 -- destroy the instance on HpIndex (when there is one) and clear
     // its archetype id.
     void Detach(int HpIndex);
-    // FUN_004581b0 (RET 4) -- Attach every non-internal item of List whose hardpoint the
+    // FUN_004581b0 -- Attach every non-internal item of List whose hardpoint the
     // summary knows.
     void AttachAll(EquipDescList const* List);
-    // FUN_00458220 (RET 4) -- a flashlight for every non-internal always-on light item of List
+    // FUN_00458220 -- a flashlight for every non-internal always-on light item of List
     // whose hardpoint the summary knows.
     void AddFlashLights(EquipDescList const* List);
-    // FUN_004582b0 -- JMP FUN_00558580 on +0x20.
+    // FUN_004582b0 -- FUN_00558580 on +0x20.
     void DrawFlashLights(ICamera* Camera);
-    // FUN_004582c0 (RET 4) -- FUN_00558470 on +0x20 with the summary.
+    // FUN_004582c0 -- FUN_00558470 on +0x20 with the summary.
     void UpdateFlashLights(float Delta);
 
     HardpointSummary* Summary;                                  // +0x00

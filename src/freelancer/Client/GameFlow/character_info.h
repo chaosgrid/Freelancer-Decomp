@@ -81,14 +81,14 @@ private:
 
 // FUN_004356c0: &DAT_00668660.
 FCharacterInfoDb* GetCharacterInfoDb();
-// FUN_004354e0: Load(GetCostumeDescriptions()). Caller: FUN_00558850 (0x0055885f).
+// FUN_004354e0: Load(GetCostumeDescriptions()). Caller: FUN_00558850.
 void LoadCharacterInfo();
-// FUN_00435500: the three containers emptied and AnimScript closed. Callers: 0x00558870 and
-// WinMain's teardown (0x005b2202).
+// FUN_00435500: the three containers emptied and AnimScript closed. Callers: FUN_00558870 and
+// WinMain's teardown.
 void ShutdownCharacterInfo();
 // FUN_004355e0: AcquireScript for every "preload =" name (CostumeDescriptions +0x0c). Caller:
-// FUN_00558850's tail (0x00558864).
+// FUN_00558850's tail.
 void PreloadCharacterScripts();
 // FUN_00435630: every reference count back to 0 and, with an IAnimation2, AnimScript replaced by
-// a new empty script. Callers: FUN_0054aec0 (0x0054aee4) and FUN_00558a50 (0x00558a76).
+// a new empty script. Callers: FUN_0054aec0 and FUN_00558a50.
 void ResetCharacterScripts();

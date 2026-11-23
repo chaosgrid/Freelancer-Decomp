@@ -37,12 +37,10 @@
 
 namespace
 {
-    // DAT_00668a9c -- the ObjectShip singleton. Written by RebuildModel (0x00447219), cleared by
-    // the destructor (0x004470e4).
+    // DAT_00668a9c -- the ObjectShip singleton. Written by RebuildModel, cleared by the destructor.
     FObjectShip* G_GfObjectShip = nullptr;
 
-    // DAT_00668a98 -- ObjectShip.cpp's 3DMathEngine, FUN_005b73e0 on first use (FUN_00447be0,
-    // FUN_00446d90, FUN_004478c0).
+    // DAT_00668a98 -- ObjectShip.cpp's 3DMathEngine, FUN_005b73e0 on first use.
     I3DMathEngine* G_ObjectShipMath = nullptr;
     // DAT_00668aac -- the second one, FUN_00448c40's.
     I3DMathEngine* G_ObjectShipMountMath = nullptr;
@@ -64,7 +62,7 @@ namespace
         return G_ObjectShipMountMath;
     }
 
-    // IFxEffect slots 7 / 8 still use the existing Dt argument adapter.
+    // IFxEffect slots 7 / 8 take the float Delta as a pointer-sized argument.
     void* FloatArg(float Value)
     {
         void* Out = nullptr;
@@ -135,8 +133,7 @@ namespace
     };
 }
 
-// FUN_00447be0 (cdecl Out, M, V) -- 0x00447be0..0x00447bf1 DAT_00668a98 tested and filled
-// (FUN_005b73e0), TransposeTransform (slot +0x38) into a scratch, copied to *Out.
+// FUN_00447be0.
 void ShipTransposeRotate(FVector& Out, FMatrix const& M, FVector const& V)
 {
     FVector Scratch;
@@ -151,8 +148,7 @@ void ShipTransposeRotate(FVector& Out, FMatrix const& M, FVector const& V)
 FObjectShipDesc::FObjectShipDesc()
     : Ship(nullptr), LaunchScript(nullptr), bShadow(0), Float1C(0.0f), Equipment(nullptr)
 {
-    // FUN_00446bf0: +0x00 = 0, +0x04..+0x0c = 0, the orientation identity (+0x10 / +0x20 /
-    // +0x30 = 1.0f), +0x34 = 0, +0x38 = 0, +0x3c = 0, +0x40 = 0.
+    // FUN_00446bf0.
     Pos.x = 0.0f;
     Pos.y = 0.0f;
     Pos.z = 0.0f;
@@ -161,7 +157,7 @@ FObjectShipDesc::FObjectShipDesc()
 
 FObjectShipDesc::~FObjectShipDesc()
 {
-    // FUN_00446c50: malloc_strfree(&+0x34).
+    // FUN_00446c50.
     malloc_strfree(&LaunchScript);
 }
 
@@ -172,15 +168,14 @@ FObjectShipDesc::~FObjectShipDesc()
 FObjectShipEngineFx::FObjectShipEngineFx()
     : Instance(kRoomObjectNoInstance), bStopping(0), Lifetime(0.0f)
 {
-    // LAB_00446c60: +0x00 = +0x04 = 0, +0x08 = -1, +0x3c = 0, +0x40 = 0. The frame (+0x0c..
-    // +0x3b) is not written.
+    // LAB_00446c60. The frame (+0x0c..+0x3b) is not written.
     Particles.Effect = nullptr;
     Particles.Vis = nullptr;
 }
 
 FObjectShipEngineFx::~FObjectShipEngineFx()
 {
-    // FUN_00446c80: FUN_005574a0, +0x08 = -1, +0x3c = 0, +0x40 = 0.
+    // FUN_00446c80.
     Particles.Destroy();
     Instance = kRoomObjectNoInstance;
     bStopping = 0;
@@ -190,30 +185,25 @@ FObjectShipEngineFx::~FObjectShipEngineFx()
 void FObjectShipEngineFx::Start(unsigned ArchId, float InLifetime, void* InInstance,
                                 Vector const& InPos, Matrix const& InOrient)
 {
-    // FUN_00446ca0. 0x00446ca5: FUN_005574a0.
+    // FUN_00446ca0.
     Particles.Destroy();
-    // 0x00446caa..0x00446ce3: +0x18 = the orientation, +0x08 = the instance, +0x0c = the
-    // position, +0x3c = 0, +0x40 = 0.
     Orient = InOrient;
     Instance = InInstance;
     Pos = InPos;
     bStopping = 0;
     Lifetime = 0.0f;
 
-    // 0x00446ce6..0x00446cfb: the archetype's class through slot 4 (no null test).
+    // Retail does not test the archetype for null.
     Archetype::Equipment* const Equip = Archetype::GetEquipment(ArchId);
     if (Equip->get_class_type() == Archetype::AClassEngine)
     {
-        // 0x00446cfd..0x00446d10: the companion's +0x9c flame_effect, unless empty.
+        // The companion's +0x9c flame_effect.
         ID_String const* const Flame = Archetype::CliEngineFlameEffect(Equip->Companion);
         if (!Flame->IsEmpty())
         {
-            // 0x00446d12..0x00446d1d: FUN_0040f080 on it.
             FEffectArch* const Arch = FindEffectArch(&Flame->Id);
             if (Arch != nullptr)
             {
-                // 0x00446d1f..0x00446d45: FUN_00557360 with EffectArch +0x08; on success
-                // +0x3c = 0, +0x40 = InLifetime and FUN_00446d90(0).
                 if (Particles.Create(Arch->VisEffect))
                 {
                     bStopping = 0;
@@ -224,25 +214,22 @@ void FObjectShipEngineFx::Start(unsigned ArchId, float InLifetime, void* InInsta
             }
             else
             {
-                // 0x00446d48..0x00446d71.
                 FDUMP(0x100001,
                       "%s(%d) : *** ERROR: Cannot load engine flame effect ID=%u, name=%s\n",
                       kObjectShipCpp, 0x84, Flame->Id, Flame->get_string());
             }
         }
     }
-    // 0x00446d74..0x00446d78.
     Update(0.0f);
 }
 
 void FObjectShipEngineFx::Update(float Delta)
 {
-    // FUN_00446d90. 0x00446d99..0x00446d9c.
+    // FUN_00446d90.
     if (Particles.Effect == nullptr)
         return;
 
-    // 0x00446da2..0x00446e0a: the effect's frame = the instance's transform (Engine slot 40)
-    // times the local frame (DAT_00668a98 MulTransform, slot +0x1c), copied (FUN_00406880).
+    // The effect's frame = the instance's transform times the local frame.
     FTransform Local;
     ToFMatrix(Local.Rotation, Orient);
     ToFVector(Local.Translation, Pos);
@@ -252,23 +239,20 @@ void FObjectShipEngineFx::Update(float Delta)
     ObjectShipMath()->MulTransform(Product, *InstanceXform, Local);
     FTransform Xform = Product;
 
-    // 0x00446e0f..0x00446e34: slot 3 (0, &frame), slot 7 (Delta), slot 8 (Delta).
     Particles.Effect->SetTransform(nullptr, &Xform);
     Particles.Effect->ComposeTransforms(FloatArg(Delta));
     Particles.Effect->Update(FloatArg(Delta));
 
     if (bStopping == 0)
     {
-        // 0x00446e40..0x00446e4e: FCOMP 0.0; TEST AH,1; JNZ -> less (or unordered): endless.
+        // x87 compare: a negative or NaN Lifetime is endless.
         if (!(static_cast<double>(Lifetime) >= 0.0))
             return;
-        // 0x00446e50..0x00446e68: FSUB, FST (the float stored, the extended value compared);
-        // TEST AH,0x41; JP -> greater or unordered: still counting.
+        // The float is stored, the unrounded difference compared; a NaN keeps counting.
         double const Remaining = static_cast<double>(Lifetime) - static_cast<double>(Delta);
         Lifetime = static_cast<float>(Remaining);
         if (Remaining > 0.0 || Remaining != Remaining)
             return;
-        // 0x00446e6a..0x00446e7c: slot 13 (1) on the effect, +0x3c = 1, +0x40 = 0.
         if (Particles.Effect != nullptr)
             Particles.Effect->DestroyNodes(reinterpret_cast<void*>(1));
         bStopping = 1;
@@ -276,7 +260,7 @@ void FObjectShipEngineFx::Update(float Delta)
         return;
     }
 
-    // 0x00446e8d..0x00446e9d: stopping -- slot 11 (4); AL set -> FUN_005574a0.
+    // Stopping: only the low byte of the result is tested.
     GENRESULT const Done = Particles.Effect->IsFinished(reinterpret_cast<void*>(4));
     if ((static_cast<unsigned>(Done) & 0xffu) != 0)
         Particles.Destroy();
@@ -294,7 +278,7 @@ FObjectShipEngineSound::FObjectShipEngineSound()
 
 FObjectShipEngineSound::~FObjectShipEngineSound()
 {
-    // FUN_00446ec0: slot 34 (+0x88) with 0 on a source, then -1 / 0.
+    // FUN_00446ec0.
     if (Source != nullptr)
         Source->SetLooping(0);
     Instance = kRoomObjectNoInstance;
@@ -307,7 +291,7 @@ FObjectShipEngineSound::~FObjectShipEngineSound()
 
 FObjectShip* GfObjectShip()
 {
-    // FUN_00446be0. MOV EAX,[DAT_00668a9c]; RET.
+    // FUN_00446be0.
     return G_GfObjectShip;
 }
 
@@ -323,71 +307,53 @@ FObjectShip::FObjectShip(FRoomRuntime* InOwner, FObjectShipDesc const& Desc)
       RumbleSounds(nullptr),
       ScriptState(0)
 {
-    // FUN_00446ef0. 0x00446f14: FUN_005593d0 (the base); 0x00446f24: FUN_00457d60 on +0x74 (the
-    // member); 0x00446f36..0x00446f42: +0x30 / +0x64 / +0x68 / +0x6c = 0, +0x70 = -1.
-    // 0x00446f49: FUN_00457e20 on +0x74.
+    // FUN_00446ef0.
     Visuals.ResetFields();
-    // 0x00446f55..0x00446f67: +0xa0..+0xac = 0 (above); 0x00446f6d: FUN_00447120, which writes
-    // +0x34 / +0x40 (the ctor leaves them).
     Load(Desc);
 }
 
 FObjectShip::~FObjectShip()
 {
-    // FUN_00446fb0. 0x00446fd8..0x0044701d: the +0x6c list's nodes erased, its head node and
-    // the list itself freed.
+    // FUN_00446fb0.
     if (Equipment != nullptr)
         delete Equipment;
-    // 0x00447020..0x0044702a.
     malloc_strfree(&LaunchScript);
-    // 0x0044702a..0x0044704e: FUN_00458160 on every hardpoint of +0x74.
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
         Visuals.Detach(Index);
-    // 0x00447050..0x004470a6: the three arrays (FUN_00446c80 / FUN_00446ec0 per element).
     delete[] EngineFx;
     delete[] LoopSounds;
     delete[] RumbleSounds;
-    // 0x004470af..0x004470c6: the three pointers cleared, FUN_00457e30 on +0x74.
     EngineFx = nullptr;
     LoopSounds = nullptr;
     RumbleSounds = nullptr;
     Visuals.Clear();
-    // 0x004470cb..0x004470df: Engine slot 24 on a live model (+0x70 keeps its value).
+    // +0x70 keeps its value after the model is destroyed.
     if (Instance != kRoomObjectNoInstance)
         DALib::Engine->DestroyInstance(Instance);
-    // 0x004470e4: DAT_00668a9c = 0, whichever ship this is.
+    // Cleared whichever ship this is.
     G_GfObjectShip = nullptr;
-    // 0x004470ef / 0x004470fe: FUN_00457dc0 on +0x74 and FUN_005594b0 -- the member and base
-    // destructors.
 }
 
 bool FObjectShip::IsVisible()
 {
-    // FUN_0044fd00: XOR AL,AL.
+    // FUN_0044fd00.
     return false;
 }
 
 void FObjectShip::Load(FObjectShipDesc const& Desc)
 {
-    // FUN_00447120. 0x0044713a..0x00447165: +0x30 = the archetype, +0x34 the position, +0x40
-    // the orientation.
+    // FUN_00447120.
     Ship = Desc.Ship;
     Pos = Desc.Pos;
     Orient = Desc.Orient;
-    // 0x00447167..0x0044717b: malloc_strcpy into +0x64, +0x68 = the byte.
     malloc_strcpy(&LaunchScript, Desc.LaunchScript);
     bShadow = Desc.bShadow;
-    // 0x0044717e..0x00447187: slot 3 with the float.
     SetFloat1C(Desc.Float1C);
-    // 0x0044718a..0x004471d4: operator new(0xc) with a fresh head, then the Common list
-    // operator= from the description's list.
     Equipment = new EquipDescList();
     Equipment->Items = Desc.Equipment->Items;
-    // 0x004471dc..0x004471e2: +0xac = 0, FUN_00447210.
     ScriptState = 0;
     RebuildModel();
-    // 0x004471eb..0x004471f8.
     RenderMode = 0;
     LightGroup = 3;
     Layer = 0;
@@ -396,31 +362,25 @@ void FObjectShip::Load(FObjectShipDesc const& Desc)
 
 void FObjectShip::RebuildModel()
 {
-    // FUN_00447210. 0x00447219.
+    // FUN_00447210.
     G_GfObjectShip = this;
-    // 0x0044721f..0x0044723e: FUN_00458160 on every hardpoint of +0x74.
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
         Visuals.Detach(Index);
-    // 0x00447240..0x00447298: the three arrays deleted and cleared.
     delete[] EngineFx;
     delete[] LoopSounds;
     delete[] RumbleSounds;
     EngineFx = nullptr;
     LoopSounds = nullptr;
     RumbleSounds = nullptr;
-    // 0x00447289..0x0044729e: FUN_00457e30 on +0x74.
     Visuals.Clear();
-    // 0x004472a3..0x004472bc: Engine slot 24 on a live model, +0x70 = -1.
     if (Instance != kRoomObjectNoInstance)
     {
         DALib::Engine->DestroyInstance(Instance);
         Instance = kRoomObjectNoInstance;
     }
 
-    // 0x004472bf..0x004472ef: FUN_0041c540 on the archetype's mesh with the companion's
-    // material list, the material entries into RoomObject +0x20 and the handle into a local
-    // (-1 first).
+    // The material entries go into RoomObject +0x20.
     Archetype::ICliObj* const Companion = Ship->Companion;
     long Handle = -1;
     Instance = MiscUtilLoadEngineInstance(Ship->DaArchetype.Value, DALib::Data, nullptr, nullptr,
@@ -428,41 +388,33 @@ void FObjectShip::RebuildModel()
                                           &MaterialEntries, &Handle);
     if (Instance != kRoomObjectNoInstance)
     {
-        // 0x004472f8: FUN_004482b0.
         GfShipApplyCollisionDamage(Instance);
-        // 0x004472fe..0x0044732c: FUN_00448c40 with {+0x34, +0x40} as a Csys.
         Csys Frame;
         Frame.Pos = Pos;
         Frame.Orient = Orient;
         GfShipPlaceOnMount(Instance, &Frame);
-        // 0x00447331..0x00447347: +0x13 = the companion's envmap material is not empty.
+        // +0x13.
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
-        // 0x0044734a: FUN_00457f10 on +0x74 with the model.
         Visuals.Populate(static_cast<long>(reinterpret_cast<intptr_t>(Instance)));
-        // 0x0044734f..0x00447372: with "ship_loadouts", FUN_004581b0 and FUN_00458220 on +0x74
-        // with the +0x6c list.
         if (RtcSlider::is_enabled("ship_loadouts"))
         {
             Visuals.AttachAll(Equipment);
             Visuals.AddFlashLights(Equipment);
         }
-        // 0x00447379: FUN_00447690.
         BuildHardpointArrays();
     }
-    // 0x0044737e..0x00447384: FUN_005595a0 (companion, handle) on both paths.
+    // On both paths.
     RecomputeShipCompanionLod(Companion, Handle);
 }
 
 void FObjectShip::BuildHardpointArrays()
 {
-    // FUN_00447690. 0x004476ac..0x004476fd: operator new(count * 0x44 + 4), the count stored,
-    // LAB_00446c60 on each (FUN_005b7fba) -> +0xa0.
+    // FUN_00447690.
     int const HpCount = Visuals.Count;
     EngineFx = new FObjectShipEngineFx[HpCount];
-    // 0x004476ee..0x0044777b: the same with 8-byte LAB_00446eb0 elements -> +0xa4, +0xa8.
     LoopSounds = new FObjectShipEngineSound[HpCount];
     RumbleSounds = new FObjectShipEngineSound[HpCount];
-    // 0x00447781..0x004477b2: each sound bound to its hardpoint's instance (get_instance twice).
+    // get_instance is called once per array.
     int Index = 0;
     for (Index = 0; Index < HpCount; ++Index)
     {
@@ -475,7 +427,7 @@ void FObjectShip::BuildHardpointArrays()
 
 void FObjectShip::Update(double DeltaSeconds)
 {
-    // LAB_004473a0. 0x004473a5..0x004473c5: the [OBJECTS] group and SHIPS options.
+    // LAB_004473a0.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptShips) == 0)
@@ -485,8 +437,7 @@ void FObjectShip::Update(double DeltaSeconds)
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
     {
-        // 0x004473e6..0x00447433: a bound loop sound follows its instance (Engine slot 36 into
-        // a local, source slot 35).
+        // A bound sound follows its instance.
         FObjectShipEngineSound& Loop = LoopSounds[Index];
         if (Loop.Instance != kRoomObjectNoInstance && Loop.Source != nullptr)
         {
@@ -494,7 +445,6 @@ void FObjectShip::Update(double DeltaSeconds)
             float Where[3] = {At[0], At[1], At[2]};
             Loop.Source->SetPosition(Where);
         }
-        // 0x00447439..0x0044747e: the same for the rumble.
         FObjectShipEngineSound& Rumble = RumbleSounds[Index];
         if (Rumble.Instance != kRoomObjectNoInstance && Rumble.Source != nullptr)
         {
@@ -502,40 +452,34 @@ void FObjectShip::Update(double DeltaSeconds)
             float Where[3] = {At[0], At[1], At[2]};
             Rumble.Source->SetPosition(Where);
         }
-        // 0x00447484..0x00447495: FUN_00446d90 on the flame effect.
         EngineFx[Index].Update(Delta);
     }
 
-    // 0x004474b0..0x004474cc: Anim +0x6c (model, Delta).
     DALib::Anim->MixerWalk(static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)), Delta);
-    // 0x004474cf..0x004474e0: Engine +0x6c (model, 0, Delta).
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(Delta));
-    // 0x004474e3..0x004474ef: FUN_004582c0 on +0x74 while +0x14.
     if (Flag14 != 0)
         Visuals.UpdateFlashLights(Delta);
 }
 
 void* FObjectShip::GetEngineInstance()
 {
-    // LAB_00451360: MOV EAX,[ECX+0x70].
+    // LAB_00451360.
     return Instance;
 }
 
 void FObjectShip::DrawOpaque(ICamera* Camera)
 {
-    // LAB_00447500. 0x00447501..0x0044752b: [OBJECTS], SHIPS, and not LIKE_PETAL.
+    // LAB_00447500.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptShips) == 0)
         return;
     if (GetGameOption(kGameOptLikePetal) != 0)
         return;
-    // 0x0044752d..0x00447539.
     if (Instance == kRoomObjectNoInstance)
         return;
     if (Camera == nullptr)
         return;
-    // 0x0044753b..0x00447556: with +0x68, FUN_0044b370 (model, slot 4's float, 0).
     if (bShadow != 0)
     {
         float const Height = GetFloat1C();
@@ -544,13 +488,12 @@ void FObjectShip::DrawOpaque(ICamera* Camera)
         RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
                               HeightBits, 0);
     }
-    // 0x0044755b..0x0044755f: FUN_0044af60.
     RoomControlDrawObject(Owner, this);
 }
 
 void FObjectShip::DrawTranslucent(ICamera* Camera)
 {
-    // LAB_00447570: [OBJECTS], SHIPS, +0x14 -> FUN_004582b0 on +0x74.
+    // LAB_00447570.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptShips) == 0)
@@ -562,7 +505,7 @@ void FObjectShip::DrawTranslucent(ICamera* Camera)
 
 void FObjectShip::DrawEffects(ICamera* Camera)
 {
-    // LAB_004475b0: [OBJECTS], SHIPS, [EFFECTS], PARTICLES -> FUN_005574d0 on every flame.
+    // LAB_004475b0.
     if (GetGameOption(kGameOptObjectsGroup) == 0)
         return;
     if (GetGameOption(kGameOptShips) == 0)
@@ -578,8 +521,7 @@ void FObjectShip::DrawEffects(ICamera* Camera)
 
 void FObjectShip::StartEngineEffects()
 {
-    // FUN_00447d70. 0x00447d7d..0x00447dc8: the first item of the player's list (FUN_004c4060)
-    // whose archetype is an engine.
+    // FUN_00447d70. Only the first engine in the player's list is used.
     EquipDescList& List = GetPlayerEquipDescListRetail();
     std::list<EquipDesc>::iterator It = List.Items.begin();
     for (; It != List.Items.end(); ++It)
@@ -591,21 +533,17 @@ void FObjectShip::StartEngineEffects()
     if (It == List.Items.end())
         return;
 
-    // 0x00447dd2..0x00447df4: the ship's NumExhaustNozzles (+0xfc), a cleared CacheString.
     unsigned const ArchId = It->get_arch_id();
-    int const Nozzles = Ship->NumExhaustNozzles;
+    int const Nozzles = Ship->NumExhaustNozzles; // +0xfc
     CacheString HpName;
     HpName.clear();
     int Number = 0;
     for (Number = 1; Number <= Nozzles; ++Number)
     {
-        // 0x00447e00..0x00447e26: "HpEngine0<n>" (FUN_00447ec0), found on the summary.
         FormatHardpointName(&HpName, "HpEngine0%d", Number);
         int const Index = Visuals.Summary->find_name(HpName.Value);
         if (Index == -1)
             continue;
-        // 0x00447e28..0x00447e92: FUN_00446ca0 on +0xa0[index] with the item, -1.0f, the
-        // hardpoint's instance, position and orientation.
         HardpointInfo const& Info = Visuals.Summary->get_info(Index);
         void* const HpInstance =
             reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
@@ -615,7 +553,7 @@ void FObjectShip::StartEngineEffects()
 
 void FObjectShip::StopEngineEffects()
 {
-    // FUN_00447f00: slot 13 (1) on each live effect; +0x3c = 1, +0x40 = 0 on every element.
+    // FUN_00447f00.
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
     {
@@ -629,21 +567,18 @@ void FObjectShip::StopEngineEffects()
 
 void FObjectShip::StartEngineSound()
 {
-    // FUN_00447f90. Unlike StartEngineEffects, EVERY engine of the player's list is walked
-    // (0x00448188..0x00448196 continues with the next node); a later engine overwrites the
-    // sources of an earlier one without releasing them.
+    // FUN_00447f90. Unlike StartEngineEffects, every engine of the player's list is walked; a
+    // later engine overwrites the sources of an earlier one without releasing them (retail).
     EquipDescList& List = GetPlayerEquipDescListRetail();
     std::list<EquipDesc>::iterator It = List.Items.begin();
     for (; It != List.Items.end(); ++It)
     {
-        // 0x00447fc0..0x00447fe5.
         Archetype::Equipment* const Equip = Archetype::GetEquipment(It->get_arch_id());
         if (Equip == nullptr)
             continue;
         if (Equip->get_class_type() != Archetype::AClassEngine)
             continue;
 
-        // 0x00447feb..0x00448014: the companion, the ship's NumExhaustNozzles.
         Archetype::ICliObj* const Companion = Equip->Companion;
         int const Nozzles = Ship->NumExhaustNozzles;
         CacheString HpName;
@@ -651,16 +586,13 @@ void FObjectShip::StartEngineSound()
         int Number = 0;
         for (Number = 1; Number <= Nozzles; ++Number)
         {
-            // 0x00448020..0x00448044.
             FormatHardpointName(&HpName, "HpEngine0%d", Number);
             int const Index = Visuals.Summary->find_name(HpName.Value);
             if (Index == -1)
                 continue;
 
-            // 0x0044804a..0x004480db: character_loop_sound (+0x78) on +0xa4[index] --
-            // FUN_00428680 with the key {0, loop | spatial, the instance's position (Engine
-            // slot 36), 0} and the element's source as the handle. Retail keeps bits 3..7 of
-            // the flag byte from an unwritten stack slot (AND CL,0xf8); the port writes 0.
+            // character_loop_sound (+0x78), the element's source as the handle. Retail keeps
+            // bits 3..7 of the flag byte from an unwritten stack slot; the port writes 0.
             FObjectShipEngineSound& Loop = LoopSounds[Index];
             float const* const LoopAt = DALib::Engine->GetInstancePosition(Loop.Instance);
             FEngineSoundKey LoopKey;
@@ -674,7 +606,7 @@ void FObjectShip::StartEngineSound()
                                 reinterpret_cast<unsigned*>(&LoopKey),
                                 reinterpret_cast<void**>(&Loop.Source), 0);
 
-            // 0x004480e0..0x00448167: rumble_sound (+0x60) on +0xa8[index], the same way.
+            // rumble_sound (+0x60), the same way.
             FObjectShipEngineSound& Rumble = RumbleSounds[Index];
             float const* const RumbleAt = DALib::Engine->GetInstancePosition(Rumble.Instance);
             FEngineSoundKey RumbleKey;
@@ -693,7 +625,7 @@ void FObjectShip::StartEngineSound()
 
 void FObjectShip::StopEngineSound()
 {
-    // FUN_004481b0: slot 34 (+0x88) with 0 on each source of +0xa4 and +0xa8.
+    // FUN_004481b0.
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
     {
@@ -706,7 +638,7 @@ void FObjectShip::StopEngineSound()
 
 void FObjectShip::SetEngineSoundAttenuation(float Attenuation)
 {
-    // FUN_00448210: slot 32 (+0x80) with the value on each source of +0xa4 and +0xa8.
+    // FUN_00448210.
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
     {
@@ -719,30 +651,25 @@ void FObjectShip::SetEngineSoundAttenuation(float Attenuation)
 
 void FObjectShip::SetEquipment(EquipDescList const* List)
 {
-    // FUN_00448540. 0x0044855c..0x0044859d: the old list's nodes erased, its head and the
-    // list freed.
+    // FUN_00448540.
     if (Equipment != nullptr)
         delete Equipment;
-    // 0x004485a0..0x00448668: operator new(0xc) with a fresh head (+0x6c), then the VC6
-    // element-wise assign from List (existing nodes overwritten, surplus erased, the rest
-    // inserted) -- std::list assignment.
     Equipment = new EquipDescList();
     Equipment->Items = List->Items;
 }
 
 void FObjectShip::SetShipArchetype(unsigned ArchId)
 {
-    // FUN_00448680: +0x30 = Archetype::GetShip(ArchId).
+    // FUN_00448680.
     Ship = Archetype::GetShip(ArchId);
 }
 
 void FObjectShip::MountEquipment(int bCombined, unsigned ArchId, unsigned short /*Id*/,
                                  CacheString const* Hardpoint, int /*Count*/, float /*Health*/)
 {
-    // FUN_004477d0. 0x004477d0..0x004477e1: the cargo bay, by pointer.
+    // FUN_004477d0. The cargo bay is compared by pointer.
     if (Hardpoint->Value == EquipDesc::CARGO_BAY_HP_NAME.Value)
         return;
-    // 0x004477e3..0x0044781c.
     int const Index = Visuals.Summary->find_name(Hardpoint->Value);
     if (Index == -1)
     {
@@ -750,7 +677,7 @@ void FObjectShip::MountEquipment(int bCombined, unsigned ArchId, unsigned short 
               Hardpoint->Value);
         return;
     }
-    // 0x0044781f..0x00447839: an item that was not folded into an existing one.
+    // Only an item that was not folded into an existing one.
     if (bCombined == 0)
         Visuals.Attach(Index, Archetype::GetEquipment(ArchId));
 }
@@ -758,10 +685,9 @@ void FObjectShip::MountEquipment(int bCombined, unsigned ArchId, unsigned short 
 void FObjectShip::UnmountEquipment(int RemoveResult, unsigned /*Arg2*/, unsigned /*Arg3*/,
                                    CacheString const* Hardpoint, unsigned /*Arg5*/)
 {
-    // FUN_00447850. 0x00447850..0x00447862.
+    // FUN_00447850.
     if (Hardpoint->Value == EquipDesc::CARGO_BAY_HP_NAME.Value)
         return;
-    // 0x00447864..0x0044789a.
     int const Index = Visuals.Summary->find_name(Hardpoint->Value);
     if (Index == -1)
     {
@@ -769,27 +695,23 @@ void FObjectShip::UnmountEquipment(int RemoveResult, unsigned /*Arg2*/, unsigned
               Hardpoint->Value);
         return;
     }
-    // 0x0044789d..0x004478a8: only when the item was erased.
+    // Only when the item was erased.
     if (RemoveResult == 0)
         Visuals.Detach(Index);
 }
 
 void FObjectShip::PlayLaunchScript()
 {
-    // FUN_00447cd0. 0x00447cd7..0x00447cdc, 0x00447d5d..0x00447d62: no launch script -> JMP
-    // FUN_00558a30.
+    // FUN_00447cd0.
     if (LaunchScript == nullptr)
     {
         RequestGameflowMissionBriefing();
         return;
     }
-    // 0x00447cde..0x00447d11: a sequence for the room (FUN_00456540(owner, 0)), the script
-    // added with an identity frame (Csys ctor + set_identity) and no engine (FUN_00454eb0).
     FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Owner, 0);
     Csys Frame;
     Frame.set_identity();
     Sequence->AddScript(LaunchScript, 0, &Frame, nullptr);
-    // 0x00447d16..0x00447d40.
     Sequence->BindMode = 0;
     Sequence->bLetterbox = 1;
     Sequence->bFade = 1;
@@ -800,26 +722,21 @@ void FObjectShip::PlayLaunchScript()
     Sequence->Callback = &FObjectShip::OnScriptStopped;
     Sequence->CallbackA = this;
     Sequence->CallbackB = nullptr;
-    // 0x00447d47: FUN_00454f80.
     Sequence->Play();
-    // 0x00447d4d..0x00447d58: +0xac = 1, JMP FUN_00558c00.
     ScriptState = 1;
     RequestGameflowStateFive();
 }
 
 void FObjectShip::PlayLandingScript(char const* Script)
 {
-    // FUN_00447c30. 0x00447c35..0x00447c3c: FUN_00412070(1.0f).
+    // FUN_00447c30.
     SetFadeImmediate(1.0f);
-    // 0x00447c41..0x00447c52: FUN_00412050(0, 1.0 / DAT_0061650c) -- FDIVR in double, stored
-    // as a float over the argument slot.
+    // 1.0 / DAT_0061650c divided in double, then rounded to float.
     SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
-    // 0x00447c57..0x00447c86: the sequence, the script with an identity frame.
     FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Owner, 0);
     Csys Frame;
     Frame.set_identity();
     Sequence->AddScript(Script, 0, &Frame, nullptr);
-    // 0x00447c8b..0x00447cb5.
     Sequence->BindMode = 0;
     Sequence->bLetterbox = 1;
     Sequence->bApplySpatial = 1;
@@ -829,7 +746,6 @@ void FObjectShip::PlayLandingScript(char const* Script)
     Sequence->CallbackA = this;
     Sequence->CallbackB = nullptr;
     Sequence->bPropsToRoom = 1;
-    // 0x00447cb8..0x00447cbd: FUN_00454f80, +0xac = 2.
     Sequence->Play();
     ScriptState = 2;
 }
@@ -842,7 +758,7 @@ void __cdecl FObjectShip::OnScriptStopped(void* ShipPtr, void* /*Unused*/, unsig
         return;
     if (Ship->ScriptState == 1)
     {
-        // 0x00448283: JMP FUN_00558a30 (+0xac is left at 1).
+        // +0xac is left at 1.
         RequestGameflowMissionBriefing();
         return;
     }
@@ -857,8 +773,7 @@ void __cdecl FObjectShip::OnScriptStopped(void* ShipPtr, void* /*Unused*/, unsig
 FDealerShipDesc::FDealerShipDesc()
     : Ship(nullptr), bShadow(0), Height(0.0f), Loadout(nullptr)
 {
-    // FUN_00443770: +0x00 = 0, +0x04..+0x0c = 0, the orientation identity (+0x10 / +0x20 /
-    // +0x30 = 1.0f), +0x34 = 0, +0x38 = 0, +0x3c = 0 (the three stack stores are dead).
+    // FUN_00443770.
     Pos.x = 0.0f;
     Pos.y = 0.0f;
     Pos.z = 0.0f;
@@ -868,38 +783,33 @@ FDealerShipDesc::FDealerShipDesc()
 FDealerShipObject::FDealerShipObject(FRoomRuntime* InOwner, FDealerShipDesc const& Desc)
     : FRoomObject(InOwner), Instance(kRoomObjectNoInstance), bShadow(0)
 {
-    // FUN_004437d0. 0x004437f3: FUN_005593d0 (the base); 0x00443805: FUN_00457d60 on +0x38 (the
-    // member); 0x00443817..0x0044381e: +0x30 = -1, +0x34 = 0; 0x00443822: FUN_00457e20.
+    // FUN_004437d0.
     Visuals.ResetFields();
-    // 0x0044382e: FUN_00443920.
     Load(Desc);
 }
 
 FDealerShipObject::~FDealerShipObject()
 {
-    // FUN_004438a0. 0x004438d1: FUN_00457e30 on +0x38.
+    // FUN_004438a0.
     Visuals.Clear();
-    // 0x004438d6..0x004438ea: Engine slot 24 on a live model.
     if (Instance != kRoomObjectNoInstance)
         DALib::Engine->DestroyInstance(Instance);
-    // 0x004438f4 / 0x00443903: FUN_00457dc0 and FUN_005594b0 -- the member and base dtors.
 }
 
 bool FDealerShipObject::IsVisible()
 {
-    // FUN_0044fd00: XOR AL,AL.
+    // FUN_0044fd00.
     return false;
 }
 
 void FDealerShipObject::Load(FDealerShipDesc const& Desc)
 {
-    // FUN_00443920. 0x00443928..0x00443931: +0x34 = the byte.
+    // FUN_00443920.
     bShadow = Desc.bShadow;
-    // 0x00443934..0x00443942: slot 3 with Height - 1.6f (FSUB float DAT_005cb908, FSTP float).
+    // 1.6f is the float DAT_005cb908.
     SetFloat1C(static_cast<float>(static_cast<double>(Desc.Height) - static_cast<double>(1.6f)));
 
-    // 0x00443945..0x00443982: FUN_0041c540 on the ship's mesh with the companion's material
-    // list, the material entries into RoomObject +0x20 and the handle into a local (-1 first).
+    // The material entries go into RoomObject +0x20.
     Archetype::ICliObj* const Companion = Desc.Ship->Companion;
     long Handle = -1;
     Instance = MiscUtilLoadEngineInstance(Desc.Ship->DaArchetype.Value, DALib::Data, nullptr,
@@ -907,20 +817,16 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
                                           &MaterialEntries, &Handle);
     if (Instance != kRoomObjectNoInstance)
     {
-        // 0x00443984..0x004439b0: FUN_00448c40 with {Pos, Orient} as a Csys.
         Csys Frame;
         Frame.Pos = Desc.Pos;
         Frame.Orient = Desc.Orient;
         GfShipPlaceOnMount(Instance, &Frame);
-        // 0x004439b5..0x004439c9: +0x13 = the companion's envmap material is not empty.
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
-        // 0x004439cc..0x004439dd: FUN_00457f10 with the model, FUN_004581b0 with the loadout
-        // (no "ship_loadouts" test and no flashlights here, unlike the player's ship).
+        // No "ship_loadouts" test and no flashlights here, unlike the player's ship.
         Visuals.Populate(static_cast<long>(reinterpret_cast<intptr_t>(Instance)));
         Visuals.AttachAll(Desc.Loadout);
     }
-    // 0x004439e7..0x004439fc: +0x15 = 3, +0x16 = 0, +0x18 = 0, FUN_005595a0 (companion,
-    // handle) on both paths.
+    // On both paths.
     LightGroup = 3;
     Layer = 0;
     RenderMode = 0;
@@ -929,20 +835,19 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
 
 void FDealerShipObject::Update(double DeltaSeconds)
 {
-    // LAB_00443a10: Engine slot 27 (+0x30, 0, (float)dt). No option test.
+    // LAB_00443a10. No option test.
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(static_cast<float>(DeltaSeconds)));
 }
 
 void* FDealerShipObject::GetEngineInstance()
 {
-    // LAB_00443870: MOV EAX,[ECX+0x30].
+    // LAB_00443870.
     return Instance;
 }
 
 void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
 {
-    // FUN_00443a30. No option, model or camera test. +0x34 -> FUN_0044b370 (model, slot 4's
-    // float, 0).
+    // FUN_00443a30. No option, model or camera test.
     if (bShadow != 0)
     {
         float const Height = GetFloat1C();
@@ -951,7 +856,6 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
         RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
                               HeightBits, 0);
     }
-    // 0x00443a51..0x00443a55: FUN_0044af60.
     RoomControlDrawObject(Owner, this);
 }
 
@@ -961,19 +865,16 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
 
 void GfShipApplyCollisionDamage(void* InstancePtr)
 {
-    // FUN_004482b0. 0x004482cc..0x004482da: the player's ship archetype (FUN_004c3e10).
+    // FUN_004482b0. Always the player's ship archetype and collision groups.
     long const Instance = static_cast<long>(reinterpret_cast<intptr_t>(InstancePtr));
     Archetype::Ship* const Ship = Archetype::GetShip(GetPlayerShipArchetypeIdRetail());
-    // 0x004482de..0x00448309: the player's collision groups (FUN_004c3f00) and every instance
-    // of the compound.
     std::list<CollisionGroupDesc>& Groups = GetPlayerCollisionGroupListRetail();
     int PartCount = 0;
     long* Parts = nullptr;
     CompoundInstanceList(Instance, &PartCount, &Parts);
 
-    // 0x00448320..0x004483c1: a destroyed group (health == 0.0f: TEST AH,0x44 + JP skips the
-    // not-equal and unordered cases) removes every part whose engine name (Engine slot 26, ""
-    // for none) is the group's obj (DACOM stricmp) -- Engine slot 24, the slot set to -1.
+    // A destroyed group (health exactly 0; a NaN does not count) removes every part whose
+    // engine name is the group's obj.
     std::list<CollisionGroupDesc>::iterator It = Groups.begin();
     for (; It != Groups.end(); ++It)
     {
@@ -997,13 +898,10 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
         }
     }
 
-    // 0x004483cb..0x004483e6: a HardpointSummary of the model.
     HardpointSummary Summary;
     Summary.analyze_instance(Instance);
-    // 0x00448406..0x004484e5: each destroyed group's dmg_obj meshes: the archetype
-    // (GetSimple) loaded through FUN_0041c540 (no scripts, entries released), its
-    // "DpConnect" connected to the dmg_hp hardpoint (Hardpoint slot 6 on the summary's
-    // instance of that name, unchecked).
+    // Each destroyed group's dmg_obj meshes hang by "DpConnect" on the dmg_hp hardpoint; the
+    // parent instance is not checked (retail).
     for (It = Groups.begin(); It != Groups.end(); ++It)
     {
         if (!(It->Health == 0.0f))
@@ -1029,15 +927,13 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
         }
     }
 
-    // 0x004484eb..0x00448518: destroy, the instance array freed, ~HardpointSummary.
     Summary.destroy();
     ::operator delete(Parts);
 }
 
 void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
 {
-    // FUN_00448c40. 0x00448c46..0x00448c90: the model's archetype (Engine slot 25) asked for
-    // "HpMount" (Hardpoint slot 3); AL clear -> position 0, orientation identity.
+    // FUN_00448c40. Only the low byte of GetHardpoint's result is tested.
     void* const ArchHandle = DALib::Engine->GetInstanceArchetype(Instance);
     FHardpointKey Key;
     Key.Name = "HpMount";
@@ -1050,10 +946,8 @@ void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
         Mount.Position.z = 0.0f;
         MatrixSetIdentity(Mount.Orient);
     }
-    // 0x00448d0f..0x00448d1a: Engine slot 15 on the archetype handle.
     DALib::Engine->ReleaseHandle(ArchHandle);
 
-    // 0x00448d1d..0x00448dd1: the mount's inverse frame.
     FMatrix MountRotation;
     ToFMatrix(MountRotation, Mount.Orient);
     FVector MountPos;
@@ -1061,14 +955,13 @@ void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
     FTransform Inverse;
     ShipInverseFrame(Inverse, MountRotation, MountPos);
 
-    // 0x00448dd6..0x00448e39: DAT_00668aac MulTransform (Frame as a transform, the inverse).
+    // DAT_00668aac, this function's own math engine.
     FTransform FrameXform;
     ToFMatrix(FrameXform.Rotation, Frame->Orient);
     ToFVector(FrameXform.Translation, Frame->Pos);
     FTransform Placed;
     ObjectShipMountMath()->MulTransform(Placed, FrameXform, Inverse);
 
-    // 0x00448e3c..0x00448e79: Engine slot 39 with a copy, then slot 27 (model, 0, 0).
     FTransform Copy = Placed;
     DALib::Engine->SetInstanceMatrix(Instance, &Copy);
     DALib::Engine->UpdateInstance(Instance, 0, nullptr);
@@ -1076,7 +969,7 @@ void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
 
 Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void* RootInstance)
 {
-    // FUN_004478c0. 0x004478c0..0x0044791c: unknown hardpoint -> {0, identity (FUN_004215b0)}.
+    // FUN_004478c0.
     Csys Out;
     int const Index = Summary->find_name(HpName);
     if (Index == -1)
@@ -1088,8 +981,7 @@ Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void
         return Out;
     }
 
-    // 0x00447921..0x0044797b: the hardpoint's instance and its 0x48-byte record; its local
-    // frame {orientation, position} kept.
+    // The hardpoint record is 0x48 bytes.
     void* const HpInstance =
         reinterpret_cast<void*>(static_cast<intptr_t>(Summary->get_instance(Index)));
     HardpointInfo const Info = Summary->get_info(Index);
@@ -1098,27 +990,22 @@ Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void
     FVector LocalPos;
     ToFVector(LocalPos, Info.Position);
 
-    // 0x0044797f..0x004479a5: Engine slot 40 on the hardpoint's instance, then on the root.
     FTransform const* const HpXform =
         reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(HpInstance));
     FTransform const* const RootXform =
         reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(RootInstance));
 
-    // 0x004479a7..0x00447a4f: the instance transform's inverse, times the root's
-    // (DAT_00668a98 MulTransform(Out, inverse, root)), copied (FUN_00406880).
     FTransform HpInverse;
     ShipInverseFrame(HpInverse, HpXform->Rotation, HpXform->Translation);
     FTransform Relative;
     ObjectShipMath()->MulTransform(Relative, HpInverse, *RootXform);
     FTransform RelativeCopy = Relative;
 
-    // 0x00447a54..0x00447aff: the local frame's inverse, times that.
     FTransform LocalInverse;
     ShipInverseFrame(LocalInverse, LocalRotation, LocalPos);
     FTransform Result;
     ObjectShipMath()->MulTransform(Result, LocalInverse, RelativeCopy);
 
-    // 0x00447b02..0x00447b47: {translation, rotation} out as a Csys.
     Out.Pos.x = Result.Translation.X;
     Out.Pos.y = Result.Translation.Y;
     Out.Pos.z = Result.Translation.Z;

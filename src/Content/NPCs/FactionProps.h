@@ -10,11 +10,8 @@
 // [FactionProps]), the per-faction name tables read from the same sections, the goods a
 // faction trades (equipment\commodities_per_faction.ini [FactionGood]) and the reputation
 // empathy tables (missions\empathy.ini [RepChangeEffects]).
-// Lane CNT-GCS (docs/re/content.md, TU map).
-//
-// Listing: DLLS\BIN\Content.dll.txt. Every declaration names the retail address it ports.
-// The std::map / std::vector template instantiations retail emits for these tables
-// (06f526a0-06f55cd0) are the std containers below.
+// Retail's std::map / std::vector instantiations for these tables are the std containers
+// below.
 
 #include "common_net.h"         // CommReferrable
 #include "common_reputation.h"  // Costume
@@ -57,9 +54,8 @@ enum EFactionLegality
 };
 
 // One [FactionProps] section, retail 0xd4 bytes: ctor FUN_06f4f060, copy ctor FUN_06f52a20,
-// dtor FUN_06f501c0 (the map node value dtor FUN_06f502f0 is the same body). The vtable
-// 06fbb798 holds only the three CommReferrable slots (import thunks 06fa8f0c / 06fa8f06 /
-// 06fa8f00), so nothing is overridden.
+// dtor FUN_06f501c0 (also FUN_06f502f0). The vtable 06fbb798 holds only the three
+// CommReferrable import thunks, so nothing is overridden.
 struct FFactionProps : public CommReferrable
 {
     FFactionProps();                                            // FUN_06f4f060
@@ -80,22 +76,19 @@ struct FFactionProps : public CommReferrable
     std::vector<unsigned int> Voices;               // +0xc0 voice, pub::GetVoiceID
     int McCostume;                                  // +0xd0 mc_costume, pub::GetCostumeID; 0
 
-    // FUN_06f4f3d0 (thiscall, RET 8): Formations.find(*Key); on a hit *Out = value, true.
+    // FUN_06f4f3d0.
     bool GetFormation(unsigned int const* Key, unsigned int* Out) const;
 
-    // FUN_06f4f430 (thiscall, RET 8): a random space costume whose skeleton gender
-    // (pub::GF::GetCostumeSkeletonGender) is Gender, copied into *Out (head, body, both
-    // hands, the accessory count and that many accessories); false when none matches.
+    // FUN_06f4f430: a random space costume whose skeleton gender is Gender; false when none
+    // matches.
     bool PickSpaceCostume(int Gender, Costume* Out) const;
 
-    // FUN_06f4f620 (thiscall, RET 8): a random voice whose voice_properties record exists
-    // and supports every bit of Roles (FVoiceProperties::SupportsRoles); candidates that
-    // fail are removed and the draw repeats. false when none is left.
+    // FUN_06f4f620: a random voice whose voice_properties record exists and supports every
+    // bit of Roles; candidates that fail are removed and the draw repeats.
     bool PickVoice(unsigned int Roles, unsigned int* Out) const;
 
-    // FUN_06f4f7c0 (thiscall, RET 4): false when there is no voice; else *Out = 1 when
-    // rand() * VoiceCount >> 15 is below the number of voices supporting role 1 (male),
-    // else 2.
+    // FUN_06f4f7c0: false when there is no voice; else *Out = 1 (male) with the probability
+    // of the voices supporting role 1, else 2.
     bool PickGender(int* Out) const;
 };
 
@@ -111,17 +104,13 @@ struct FFactionNameList
 {
     FFactionNameList();
 
-    // The shared body of the five range keys of FUN_06f52230: value 0, value 1 (value 0
-    // again when value 1 is empty); the range is appended (FUN_06f96770) and Count grows
-    // by Last - First + 1.
+    // Inlined five times in FUN_06f52230: value 1 defaults to value 0 when empty.
     void AddRange(INI_Reader* Reader);
 
-    // FUN_06f4f020 (thiscall, RET 4): the Index-th name over the ranges in order (no
-    // bounds check).
+    // FUN_06f4f020: no bounds check.
     int GetName(unsigned int Index) const;
 
-    // FUN_06f4f050 (thiscall; ICF body `[ECX] == 0`): Count == 0. Caller TU63 06f9b89e
-    // on the male first names.
+    // FUN_06f4f050 (ICF-shared body).
     bool IsEmpty() const;
 
     int Count;                                  // +0x00
@@ -153,51 +142,44 @@ struct FFactionNamePair
 
 // The name tables of one [FactionProps] section, retail 0xf8 bytes, keyed by the
 // section's affiliation in GFactionNames (DAT_06fd0ca4): ctor FUN_06f50ff0, copy ctor
-// FUN_06f52c70, dtor FUN_06f51160 (map node value dtor FUN_06f502e0 = +4, then it).
+// FUN_06f52c70, dtor FUN_06f51160.
 struct FFactionNames
 {
     FFactionNames();                                            // FUN_06f50ff0
 
-    // FUN_06f52230 (thiscall, RET 4): the name keys of a [FactionProps] line. true only
-    // for firstname_male / firstname_female / lastname / formation_desig /
-    // large_ship_names; "affiliation", "large_ship_desig" and "rank_desig" are read but
-    // answer false, as does "firstname" (ignored) and every other key.
+    // FUN_06f52230: true only for firstname_male / firstname_female / lastname /
+    // formation_desig / large_ship_names; "affiliation", "large_ship_desig" and
+    // "rank_desig" are read but answer false, "firstname" is ignored.
     bool ReadIniValue(INI_Reader* Reader);
 
-    // FUN_06f521d0 (thiscall): LargeShipDesig.
+    // FUN_06f521d0.
     int GetLargeShipDesig() const;
-    // FUN_06f521e0 (thiscall): ShortGroupName.
+    // FUN_06f521e0.
     unsigned int GetShortGroupName() const;
-    // FUN_06f521f0 (thiscall, RET 4): NameIds[Index].
+    // FUN_06f521f0.
     unsigned int GetNameId(int Index) const;
-    // FUN_06f52200 (thiscall, RET 4): RankDesig[0] below RankThreshold[0], RankDesig[1]
-    // below RankThreshold[1], else RankDesig[2].
+    // FUN_06f52200.
     unsigned int GetRankDesig(int const* Level) const;
 
-    // FUN_06f51520 (thiscall, RET 0x10): a pilot name, first name from the male list when
-    // Gender is 1, else the female list. While some first/last pair is still unused the
-    // search starts at a random first name and a random last name and walks forward;
-    // true when it ended on a free pair (retail quirks kept: with OutFirst null the key
-    // is {1, last}, with OutLast null {first, 1} and the walk uses the last-name count;
-    // once every pair is used the draw is random, false, and a null OutLast sets the
-    // first name to 1). bReserve counts the pair as used. OutFirst / OutLast may be null.
+    // FUN_06f51520: first name from the male list when Gender is 1, else the female list.
+    // True when the walk from a random start ended on a free pair. Retail quirks kept: with
+    // OutFirst null the key is {1, last}, with OutLast null {first, 1} and the walk uses the
+    // last-name count; once every pair is used the draw is random, false, and a null OutLast
+    // sets the first name to 1.
     bool PickPilotName(int* OutFirst, int* OutLast, int Gender, bool bReserve);
 
-    // FUN_06f51920 (thiscall, RET 0xc): a formation designation and a number 0..19;
-    // true while unused pairs remain (then the first free number of the random
-    // designation, from a random start), else a random pair and false.
+    // FUN_06f51920: a designation and a number 0..19; false (and a random pair) once every
+    // pair is used.
     bool PickFormationDesig(int* OutDesig, int* OutNumber, bool bReserve);
 
-    // FUN_06f51b80 (thiscall, RET 8): a large ship name; true while unused names remain
-    // (the first free one from a random start), else a random name and false.
+    // FUN_06f51b80: false (and a random name) once every name is used.
     bool PickLargeShipName(int* OutName, bool bReserve);
 
-    // FUN_06f51db0 (thiscall, RET 8): counts the designation pair as used once more.
+    // FUN_06f51db0.
     void AddFormationDesigUse(int Desig, int Number);
 
-    // FUN_06f51ee0 / FUN_06f51fe0 / FUN_06f520d0 (thiscall): bImmediate drops one use now
-    // (the entry goes at zero); otherwise the name is queued and a SpaceSupport timer
-    // {message id, Group} fires in 30 s (HandleFactionNameTimer).
+    // FUN_06f51ee0 / FUN_06f51fe0 / FUN_06f520d0: bImmediate drops one use now; otherwise the
+    // name is queued and a SpaceSupport timer fires in 30 s (HandleFactionNameTimer).
     void ReleasePilotName(int First, int Last, bool bImmediate);
     void ReleaseLargeShipName(int Name, bool bImmediate);
     void ReleaseFormationDesig(int Desig, int Number, bool bImmediate);
@@ -256,48 +238,44 @@ extern FFactionNamesMap GFactionNames;              // DAT_06fd0ca4
 extern FFactionEmpathyMap GFactionEmpathy;          // DAT_06fd0c90
 extern std::vector<unsigned int> GFactionGroups;    // DAT_06fd0cdc
 
-// FUN_06f4f870 (cdecl): every [FactionProps] section of the reader; after the last one
-// every reputation group is appended to GFactionGroups (once each).
+// FUN_06f4f870: after the last section every reputation group is appended to GFactionGroups
+// (once each).
 void __cdecl LoadFactionProps(INI_Reader* Reader);
 
-// FUN_06f503d0 (cdecl): [FactionGood] faction / MarketGood lines into the
-// MarketGoods of the named faction's props (no null check, as retail).
+// FUN_06f503d0: the named faction's props are not null-checked (as retail).
 void __cdecl LoadFactionGoods(INI_Reader* Reader);
 
-// FUN_06f50880 (cdecl): opens RelativePath itself; [RepChangeEffects] sections into
-// GFactionEmpathy.
+// FUN_06f50880: opens RelativePath itself.
 void __cdecl LoadFactionEmpathy(char const* RelativePath);
 
-// FUN_06f506a0 (cdecl): GFactionProps.clear().
+// FUN_06f506a0.
 void __cdecl UnloadFactionProps();
 
-// FUN_06f50ed0 (cdecl): GFactionEmpathy.clear().
+// FUN_06f50ed0.
 void __cdecl UnloadFactionEmpathy();
 
-// FUN_06f50650 (cdecl): &GFactionProps[*Group], or null when absent.
+// FUN_06f50650: null when absent.
 FFactionProps* __cdecl GetFactionProps(unsigned int const* Group);
 
-// FUN_06f51370 (cdecl): &GFactionNames[*Group], or null when absent.
+// FUN_06f51370: null when absent.
 FFactionNames* __cdecl GetFactionNames(unsigned int const* Group);
 
-// FUN_06f513c0 (cdecl, called by the SpaceSupport controller's timer case 06f5d74a before
-// the message router): Timer = {message id, group}. For the pilot / large ship /
-// formation id, the group's oldest queued name is released now and dequeued. The group
-// lookup is not null-checked (as retail); other ids do nothing.
+// FUN_06f513c0 (SpaceSupport timer case, before the message router): the group's oldest
+// queued name of that kind is released now. The group lookup is not null-checked (as
+// retail).
 void __cdecl HandleFactionNameTimer(pub::Controller::TimerExpired const* Timer);
 
-// FUN_06f50760 (cdecl): &GFactionGroups.
+// FUN_06f50760.
 std::vector<unsigned int>* __cdecl GetFactionGroups();
 
-// FUN_06f50c50 (cdecl): adds Delta to the vibe's reputation with Group, clamped to
-// [-0.9, 0.9]; when bEmpathy, also Delta * rate to every group of Group's empathy list.
-// Nothing when Delta is 0 or Group is -1.
+// FUN_06f50c50: clamped to [-0.9, 0.9]; with bEmpathy also Delta * rate to every group of
+// Group's empathy list. Nothing when Delta is 0 or Group is -1.
 void __cdecl ApplyFactionReputationChange(int VibeHandle, float Delta, unsigned int Group,
                                           bool bEmpathy);
 
-// FUN_06f50e10 (cdecl): the leading groups of Group's empathy list whose rate is below
-// zero, -1 for the rest of the Count slots; Out untouched when Group has no list.
+// FUN_06f50e10: the leading groups of Group's empathy list whose rate is below zero, -1 for
+// the rest of the Count slots; Out untouched when Group has no list.
 void __cdecl GetFactionHostileGroups(unsigned int Group, unsigned int* Out, unsigned int Count);
 
-// FUN_06f50f90 (cdecl): Group's EventRates[Event], or 0.0f when Group has no list.
+// FUN_06f50f90: 0.0f when Group has no list.
 float __cdecl GetFactionEventRate(unsigned int Group, int Event);

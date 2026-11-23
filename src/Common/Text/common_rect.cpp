@@ -4,14 +4,9 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Rect and the Rect / ViewRect / RECT conversions -- split out of common_text.cpp in CMN-SPLIT
-// phase B.
+// Rect and the Rect / ViewRect / RECT conversions.
 
 #include "common_text.h"
-
-// ============================================================================
-// Rect — all methods from Ghidra, straightforward arithmetic.
-// ============================================================================
 
 Rect::Rect()
 {
@@ -47,7 +42,7 @@ void Rect::init(int InLeft, int InTop, int InWidth, int InHeight)
 
 void Rect::init_from_ltrb(int InLeft, int InTop, int InRight, int InBottom)
 {
-    // RVA 0x81590: left=top, width=(right-left)+1, top=top, height=(bottom-top)+1
+    // RVA 0x81590
     Left = InLeft;
     Top = InTop;
     Width = (InRight - InLeft) + 1;
@@ -56,25 +51,25 @@ void Rect::init_from_ltrb(int InLeft, int InTop, int InRight, int InBottom)
 
 int Rect::rightmost() const
 {
-    // RVA 0x815C0: left + width - 1
+    // RVA 0x815C0
     return Left + Width - 1;
 }
 
 int Rect::bottommost() const
 {
-    // RVA 0x815D0: top + height - 1
+    // RVA 0x815D0
     return Top + Height - 1;
 }
 
 int Rect::area() const
 {
-    // RVA 0x815E0: width * height
+    // RVA 0x815E0
     return Width * Height;
 }
 
 bool Rect::null() const
 {
-    // RVA 0x815F0: true if width==0 OR height==0
+    // RVA 0x815F0
     if (Width != 0 && Height != 0)
     {
         return false;
@@ -84,7 +79,7 @@ bool Rect::null() const
 
 bool Rect::nonnull() const
 {
-    // RVA 0x81610: true if width>0 AND height>0
+    // RVA 0x81610
     if (Width > 0 && Height > 0)
     {
         return true;
@@ -94,37 +89,32 @@ bool Rect::nonnull() const
 
 int Rect::leftmost() const
 {
-    // RVA 0x01D90 — returns Left field directly
+    // RVA 0x01D90
     return Left;
 }
 
 int Rect::topmost() const
 {
-    // RVA 0x71AD0 — returns Top field directly
+    // RVA 0x71AD0
     return Top;
 }
 
 int Rect::width() const
 {
-    // RVA 0x466A0 — returns Width field directly
+    // RVA 0x466A0
     return Width;
 }
 
 int Rect::height() const
 {
-    // RVA 0x3FB90 — returns Height field directly
+    // RVA 0x3FB90
     return Height;
 }
 
 void Rect::get_center(int* OutX, int* OutY) const
 {
-    // RVA 0xBE2A0. BUG FIX (2026-09-06, batch10a): this previously read
-    // `Left + Width / 2` / `Top + Height / 2`, which is off by one from retail for
-    // even Width/Height. Retail computes `(2*Left + Width - 1)` (resp. Height) via
-    // LEA then divides by 2 with a CDQ/SUB/SAR sequence that reproduces C's
-    // truncating signed division exactly -- i.e. `(2*Left + Width - 1) / 2`, NOT
-    // `Left + Width / 2`. These differ by 1 whenever Width/Height is even (e.g.
-    // Left=0, Width=4: retail center.x = (0+4-1)/2 = 1, the old code gave 2).
+    // RVA 0xBE2A0. Truncating signed division of (2*Left + Width - 1), NOT Left + Width / 2:
+    // they differ by 1 for even sizes.
     if (OutX)
     {
         *OutX = (2 * Left + Width - 1) / 2;
@@ -147,8 +137,7 @@ bool Rect::point_is_inside(int X, int Y) const
 
 bool operator==(Rect const& A, Rect const& B)
 {
-    // RVA 0xBE320. Fields-equal OR both-null (Width==0 or Height==0 counts as "null",
-    // and two null rects compare equal regardless of their other field values).
+    // RVA 0xBE320. Two null rects compare equal regardless of their other fields.
     bool const FieldsEqual = (A.Left == B.Left) && (A.Top == B.Top) &&
                               (A.Width == B.Width) && (A.Height == B.Height);
     bool const BothNull = A.null() && B.null();
@@ -157,11 +146,8 @@ bool operator==(Rect const& A, Rect const& B)
 
 bool operator!=(Rect const& A, Rect const& B)
 {
-    // RVA 0xBE390. Independently inlined by the compiler from operator==: fields-differ
-    // check is the same, but the "at least one side non-empty" check here compares
-    // Width/Height against >0 (signed JLE/JG) rather than !=0 (JZ/JNZ) like operator==
-    // does via Rect::null(). Reproduced exactly rather than written as !(A==B), since
-    // that would change behavior for a Rect with a negative Width or Height.
+    // RVA 0xBE390. Not !(A==B): the "non-empty" test here is > 0 where operator== uses != 0,
+    // which differs for a negative Width or Height.
     bool const FieldsDiffer = (A.Left != B.Left) || (A.Top != B.Top) ||
                                (A.Width != B.Width) || (A.Height != B.Height);
     bool const ANonEmpty = (A.Width > 0) && (A.Height > 0);
@@ -171,7 +157,7 @@ bool operator!=(Rect const& A, Rect const& B)
 
 ViewRect __cdecl Rect_to_ViewRect(Rect const& In)
 {
-    // Common.dll.txt:0631e5f0. Right/Bottom are inclusive, hence the -1.
+    // 0631e5f0. Right/Bottom are inclusive.
     ViewRect Out;
     Out.Left = In.Left;
     Out.Top = In.Top;
@@ -182,7 +168,7 @@ ViewRect __cdecl Rect_to_ViewRect(Rect const& In)
 
 Rect __cdecl ViewRect_to_Rect(ViewRect const& In)
 {
-    // Common.dll.txt:0631e620, the exact inverse.
+    // 0631e620, the exact inverse.
     Rect Out;
     Out.Left = In.Left;
     Out.Top = In.Top;

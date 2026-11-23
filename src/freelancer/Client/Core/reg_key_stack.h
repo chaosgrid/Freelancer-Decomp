@@ -11,18 +11,18 @@
 // Every user starts it with one entry, HKEY_CURRENT_USER, and opens (or creates) each path
 // component on top of the previous one, so closing the stack closes the whole chain.
 //
-// Users: PageCharacterSelect's CharacterTable (0x00567350.., 0x00567ab0..), PageServerSelect's
-// ServerTable (FUN_0056daa0, Create 0x0056e9d2..), the login history (FUN_005b62a0..), and the
-// UIFastTable edge persistence it is handed to (FUN_0058c370 / FUN_0058c470).
+// Users: PageCharacterSelect's CharacterTable (FUN_00567350), PageServerSelect's ServerTable
+// (FUN_0056daa0), the login history (FUN_005b62a0), and the UIFastTable edge persistence it is
+// handed to (FUN_0058c370 / FUN_0058c470).
 
 #include <windows.h>
 
 struct FRegKeyStack
 {
-    // The inline start every user spells (0x0056e9d2..0x0056e9f8): depth 0, FUN_005687e0 (a
-    // no-op on the empty stack), then HKEY_CURRENT_USER pushed.
+    // The inline start every user spells: depth 0, FUN_005687e0 (a no-op on the empty stack),
+    // then HKEY_CURRENT_USER pushed.
     FRegKeyStack();
-    // CloseAll -- the EH-protected teardown at every exit (0x0056ea7d, 0x0056dbbc loop).
+    // CloseAll -- the EH-protected teardown at every exit.
     ~FRegKeyStack();
 
     // FUN_005687c0 -- the top key, removed without closing it; 0 when the stack is empty.
@@ -48,8 +48,6 @@ struct FRegKeyStack
     HKEY Keys[32];   // +0x04
 };
 
-// DAT_006143b0 -- the .data pointer to s_ 0x005e1f64 "Software\Microsoft\Microsoft Games\
-// Freelancer\1.0" that every user above passes as its first key. Never written; the listing's
-// only references are its six reads: 0x00567373 / 0x00567ad0 (PageCharacterSelect),
-// 0x0056dac3 / 0x0056e9fc (PageServerSelect), 0x005b62e4 / 0x005b6823 (login history).
+// DAT_006143b0 -- the .data pointer to the string at 0x005e1f64 that every user above passes as
+// its first key. Never written.
 extern char const* G_FreelancerRegKey;

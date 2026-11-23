@@ -25,20 +25,19 @@ CSelectStarSystemDlg::CSelectStarSystemDlg(CWnd* Parent)
 {
 }
 
-// .text:004062e0 — retail's null test on the list pointer is the compiler's adjustment from
-// the CFLListBox (+0x60) to its CWnd part (+0x64).
+// .text:004062e0
 void CSelectStarSystemDlg::DoDataExchange(CDataExchange* DX)
 {
 	DDX_Control(DX, SystemListId, SystemList);
 }
 
-// Message map .rdata:0041c4e8: LBN_DBLCLK 1040 -> 00406450, WM_MEASUREITEM -> 00406460.
+// Message map .rdata:0041c4e8.
 BEGIN_MESSAGE_MAP(CSelectStarSystemDlg, CDialog)
 	ON_LBN_DBLCLK(SystemListId, &CSelectStarSystemDlg::OnDblClkSystemList)
 	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
-// .text:00406450 — a double click is the virtual OnOK (vtable +0xcc).
+// .text:00406450 — a double click is the virtual OnOK.
 void CSelectStarSystemDlg::OnDblClkSystemList()
 {
 	OnOK();
@@ -52,7 +51,7 @@ BOOL CSelectStarSystemDlg::OnInitDialog()
 	return TRUE;
 }
 
-// .text:00406360 — the dialog is modeless: Cancel destroys the window (vtable +0x60).
+// .text:00406360 — the dialog is modeless: Cancel destroys the window.
 void CSelectStarSystemDlg::OnCancel()
 {
 	DestroyWindow();

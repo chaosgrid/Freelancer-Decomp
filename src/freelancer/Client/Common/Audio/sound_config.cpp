@@ -52,10 +52,8 @@ namespace
 
 void LoadClientSoundCfgIni(char const* FullPath)
 {
-    // FUN_00427a70 (cdecl path). 0x00427a93..0x00427ad5: an INI_Reader on the stack, open(path,
-    // 0) and read_header -- either failing skips straight to the reader's destructor (inlined
-    // at 0x00427d6d, which closes the file). The path itself is not tested. Only the "CFG"
-    // header (0x005c9e78) is read; `[reverb]` blocks in the same file are not.
+    // FUN_00427a70 (cdecl path). The path itself is not tested. Only the "CFG" header is read;
+    // `[reverb]` blocks in the same file are not.
     INI_Reader Reader;
     if (!Reader.open(FullPath, false) || !Reader.read_header())
     {
@@ -100,20 +98,17 @@ void LoadClientSoundCfgIni(char const* FullPath)
                 GDialoguePanFactor = Reader.get_value_float(0);
             else if (Reader.is_value("ear_doppler_factor"))
             {
-                // 0x00427cea..0x00427cf4: retail's own DALib::Sound null test comes before
-                // the value is read.
+                // Retail's own null test comes before the value is read.
                 if (DALib::Sound != nullptr)
                     DALib::Sound->SetDopplerFactor(Reader.get_value_float(0)); // +0x48
             }
             else if (Reader.is_value("ear_rolloff_factor"))
             {
-                // 0x00427d24..0x00427d2e: the same test.
                 if (DALib::Sound != nullptr)
                     DALib::Sound->SetRolloffFactor(Reader.get_value_float(0)); // +0x4c
             }
         } while (Reader.read_value());
     } while (Reader.read_header());
-    // 0x00427d6d: the reader's destructor closes the file.
 }
 
 void SetClientAudioMode(int Mode)
@@ -205,16 +200,14 @@ void SnapClientAudioFade(float Value)
 
 void SetClientAudioFade(float Target, float Seconds)
 {
-    // FUN_004569d0 (thiscall on DAT_0066d2d0, RET 8).
-    // 0x004569d1..0x004569fa: FCOMP 0.0, `TEST AH,5` + JP -- not below 0 (or unordered) keeps
-    // Seconds; below 0 takes the ducking down_time (FUN_00428be0(0, &Seconds, 0)).
+    // FUN_004569d0 (thiscall on DAT_0066d2d0, RET 8). A negative Seconds takes the ducking
+    // down_time; NaN keeps Seconds.
     if (Seconds < 0.f)
         GetClientDuckingConfig(nullptr, &Seconds, nullptr);
 
     GAudioFade.Target = Target;
-    // 0x00456a06..0x00456a2b: FCOMP 0.0, `TEST AH,0x41` + JNZ -- at or below 0, or unordered,
-    // the rate is 1e6 (0x49742400); above 0 |Target - Current| / Seconds on the FPU (FSUB,
-    // FABS, FDIV), stored as a float once.
+    // At or below 0, or unordered, the rate is 1e6; otherwise computed on the x87 and stored
+    // as a float once.
     if (!(Seconds > 0.f))
         GAudioFade.Rate = 1000000.f;
     else
@@ -231,16 +224,13 @@ void SetClientAudioFadeTargetRate(float Target, float Rate)
 
 bool TickClientAudioFade(float DeltaSeconds)
 {
-    // FUN_00456a40 (thiscall on DAT_0066d2d0, RET 4). 0x00456a40..0x00456a5b: nothing to do
-    // when Current equals Target or the rate equals 0 (`TEST AH,0x44` + JNP each; unordered
-    // goes on). The step Dt * Rate +/- Current stays on the FPU: FST stores it as a float and
-    // the extended value is compared with Target -- the same outcome as comparing the stored
-    // float, since Target is a float itself.
+    // FUN_00456a40 (thiscall on DAT_0066d2d0, RET 4). Unordered compares go on. Retail compares
+    // the extended step with Target -- the same outcome as comparing the stored float, since
+    // Target is a float itself.
     if (GAudioFade.Current != GAudioFade.Target && GAudioFade.Rate != 0.f)
     {
         if (GAudioFade.Target < GAudioFade.Current)
         {
-            // 0x00456a89..0x00456ab0: above the target -- Current - Dt * Rate (FSUBR), clamped.
             GAudioFade.Current = static_cast<float>(
                 static_cast<double>(GAudioFade.Current) -
                 static_cast<double>(DeltaSeconds) * static_cast<double>(GAudioFade.Rate));
@@ -249,7 +239,6 @@ bool TickClientAudioFade(float DeltaSeconds)
         }
         else if (GAudioFade.Target > GAudioFade.Current)
         {
-            // 0x00456a6a..0x00456a87: below the target -- Dt * Rate + Current, clamped.
             GAudioFade.Current = static_cast<float>(
                 static_cast<double>(DeltaSeconds) * static_cast<double>(GAudioFade.Rate) +
                 static_cast<double>(GAudioFade.Current));

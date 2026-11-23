@@ -16,15 +16,12 @@
 #include <stdio.h>
 #include <string.h>
 
-// CFLSummaryForm TU, retail .text:0040e8b0..0040f9e9.
-
 namespace
 {
-	// The banner's text colour (.text:0040f820, 0040f9b0).
+	// The banner's text colour.
 	const COLORREF GBannerTextColor = 0xe0c387;
 
-	// Inlined twice in retail (.text:0040ef56..0040efb7 and 0040f103..0040f164): puts Text
-	// into the banner, then invalidates the banner's rectangle in the form and the banner
+	// Inlined twice in retail (ScrollMarquee and Refresh): puts Text into the banner, then invalidates the banner's rectangle in the form and the banner
 	// itself and updates both.
 	void ShowBannerText(CWnd* Form, CRichEditCtrl& Banner, const wchar_t* Text)
 	{
@@ -39,10 +36,9 @@ namespace
 	}
 }
 
-// IMPLEMENT_DYNCREATE(CFLSummaryForm, CFormView) spelled out (MFC 14 afx.h IMPLEMENT_DYNCREATE
-// -> IMPLEMENT_RUNTIMECLASS, _AFXDLL branch) with the one difference that the runtime class name
-// is "FLSummaryForm": retail's CRuntimeClass .rdata:0041d69c points at .data:00425944
-// "FLSummaryForm" (no C), schema 0xFFFF, CreateObject .text:0040e8b0, _GetBaseClass .text:0040e910.
+// IMPLEMENT_DYNCREATE(CFLSummaryForm, CFormView) spelled out, because retail's runtime class
+// name is "FLSummaryForm" (no C): CRuntimeClass .rdata:0041d69c, name .data:00425944, schema
+// 0xFFFF, CreateObject .text:0040e8b0, _GetBaseClass .text:0040e910.
 CObject* PASCAL CFLSummaryForm::CreateObject()
 {
 	return new CFLSummaryForm;

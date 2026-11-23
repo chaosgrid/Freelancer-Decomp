@@ -6,7 +6,7 @@
 
 // Common.dll text-file layer: FileMap (a file mapped, or a buffer copied, into memory),
 // LineParser32 (one line and its read cursor) and TextFile32 (FileMap + line counter).
-// Split out of common_ini.cpp; INI_Reader (common_ini.cpp) reads text INIs through these.
+// INI_Reader (common_ini.cpp) reads text INIs through these.
 
 #include "common_ini.h"
 
@@ -21,12 +21,12 @@ FileMap::FileMap()
     , Size(0)
     , Cursor(0)
 {
-    // .text:06263040: empty string, +0x10 = -1, +0x14..+0x20 = 0.
+    // .text:06263040
 }
 
 FileMap::~FileMap()
 {
-    // .text:06263310: the same body as close() inlined, then the string dtor.
+    // .text:06263310
     close();
 }
 
@@ -38,13 +38,12 @@ FileMap::FileMap(FileMap const& Other)
     , Size(Other.Size)
     , Cursor(Other.Cursor)
 {
-    // .text:06262ac0: string copy, then +0x10..+0x20 copied verbatim (.text:06262bd5-06262bf1).
+    // .text:06262ac0: the handles are copied verbatim (shared, not duplicated).
 }
 
 FileMap& FileMap::operator=(FileMap const& Other)
 {
-    // .text:06262c00: string assign, then +0x10..+0x20 copied verbatim
-    // (.text:06262d29-06262d45). Nothing previously held by `this` is closed.
+    // .text:06262c00. Nothing previously held by `this` is closed.
     FileName = Other.FileName;
     FileHandle = Other.FileHandle;
     MappingHandle = Other.MappingHandle;
@@ -85,7 +84,7 @@ void FileMap::close()
 
 bool FileMap::open(char const* Path)
 {
-    // .text:06262750: close() inlined, remember the name, then map the whole file read-only.
+    // .text:06262750
     close();
     FileName = Path;
 
@@ -105,15 +104,13 @@ bool FileMap::open(char const* Path)
         }
     }
 
-    // .text:0626289c: any failure drops the name and runs close() inlined again.
     close();
     return false;
 }
 
 bool FileMap::open_memory(void const* Buffer, unsigned int Bytes)
 {
-    // .text:06262980: no close() first; a null buffer or zero length fails without touching
-    // anything. The malloc result is not checked.
+    // .text:06262980. No close() first; the malloc result is not checked.
     if (Buffer == nullptr || Bytes == 0)
         return false;
 
@@ -142,19 +139,19 @@ unsigned int FileMap::tell() const
 
 bool FileMap::eof() const
 {
-    // .text:062629f0: !(Cursor < Size), no View check.
+    // .text:062629f0: no View check.
     return !(Cursor < Size);
 }
 
 unsigned int FileMap::get_file_length() const
 {
-    // .text:062629e0: MOV EAX,[this+0x1c].
+    // .text:062629e0
     return Size;
 }
 
 char const* FileMap::get_file_name() const
 {
-    // .text:062629d0: the string's buffer, or the library's empty string when it has none.
+    // .text:062629d0
     return FileName.c_str();
 }
 
@@ -176,8 +173,7 @@ void* FileMap::request_pointer(unsigned int& Bytes)
 
 unsigned int FileMap::read(void* Dest, unsigned int Bytes)
 {
-    // .text:06262a70: clamp to what is left, advance Cursor, then copy. The copy is skipped
-    // only when the source pointer View+Cursor is null; Dest is not checked.
+    // .text:06262a70. Dest is not checked.
     if (View == nullptr || Cursor >= Size)
         return 0;
 
@@ -194,8 +190,7 @@ unsigned int FileMap::read(void* Dest, unsigned int Bytes)
 
 namespace
 {
-    // The three read_ptr bodies (.text:0626c010/0626c060/0626c0b0) are one template: an
-    // inlined request_pointer for sizeof(T) bytes; on a short read the out pointer is nulled.
+    // The three read_ptr bodies: an inlined request_pointer; a short read nulls the out pointer.
     template <typename T>
     bool ReadBiniPtr(FileMap& Map, T*& Out, unsigned int Want)
     {
@@ -212,27 +207,26 @@ namespace
 
 bool FileMap::read_ptr(BINI_Header*& Out)
 {
-    // .text:0626c010: 0x0c bytes.
+    // .text:0626c010
     return ReadBiniPtr(*this, Out, 0x0c);
 }
 
 bool FileMap::read_ptr(BINI_Block*& Out)
 {
-    // .text:0626c060: 4 bytes.
+    // .text:0626c060
     return ReadBiniPtr(*this, Out, 4);
 }
 
 bool FileMap::read_ptr(BINI_Value*& Out)
 {
-    // .text:0626c0b0: 3 bytes.
+    // .text:0626c0b0
     return ReadBiniPtr(*this, Out, 3);
 }
 
 void FileMap::handoff_to(FileMap& Other)
 {
-    // .text:062624c0: Other takes the name and all five handle/view/size/cursor dwords; what
-    // Other held before is NOT closed. `this` then forgets its view and handles but keeps its
-    // name, Size and Cursor. There is no self-check: handing off to itself drops the handles.
+    // .text:062624c0. What Other held before is NOT closed; `this` keeps its name, Size and
+    // Cursor. No self-check: handing off to itself drops the handles.
     Other.FileName = FileName;
     Other.FileHandle = FileHandle;
     Other.MappingHandle = MappingHandle;
@@ -246,13 +240,12 @@ void FileMap::handoff_to(FileMap& Other)
 }
 
 // ---------------------------------------------------------------------------------------------
-// LineParser32 (.text:06262e30..06263010, 0630f170..0630f250)
+// LineParser32
 // ---------------------------------------------------------------------------------------------
 
 LineParser32::LineParser32()
 {
-    // .text:06262e50: Buffer[0] = 0, Position (+0x404) = 0, Length (+0x400) = 0. The rest of
-    // the buffer is not touched.
+    // .text:06262e50. Length +0x400, Position +0x404.
     Buffer[0] = '\0';
     Position = 0;
     Length = 0;
@@ -260,7 +253,7 @@ LineParser32::LineParser32()
 
 void LineParser32::clear()
 {
-    // .text:06262e30: the same three stores as the ctor.
+    // .text:06262e30
     Buffer[0] = '\0';
     Position = 0;
     Length = 0;
@@ -268,8 +261,7 @@ void LineParser32::clear()
 
 void LineParser32::set(char const* Text, unsigned int Count)
 {
-    // .text:06262e70: Count bytes copied unclamped (REP MOVSD / MOVSB), Buffer[Count] = 0,
-    // Length = Count, Position = 0. A Count past 0x3ff overruns the buffer as in retail.
+    // .text:06262e70. Unclamped: a Count past 0x3ff overruns the buffer as in retail.
     memcpy(Buffer, Text, Count);
     Buffer[Count] = '\0';
     Length = Count;
@@ -278,21 +270,20 @@ void LineParser32::set(char const* Text, unsigned int Count)
 
 bool LineParser32::whitespace(char Ch) const
 {
-    // .text:06262eb0: ' ' or '\t'.
+    // .text:06262eb0
     return Ch == ' ' || Ch == '\t';
 }
 
 void LineParser32::skip_white()
 {
-    // .text:06262ed0: steps over ' ' / '\t' at Position with no Length bound; the NUL at
-    // Buffer[Length] stops it.
+    // .text:06262ed0. No Length bound; the NUL at Buffer[Length] stops it.
     while (Buffer[Position] == ' ' || Buffer[Position] == '\t')
         Position += 1;
 }
 
 char LineParser32::get_char() const
 {
-    // .text:06262ef0: Position < Length (unsigned JNC) -> MOVSX the char, else 0.
+    // .text:06262ef0
     if (Position < Length)
         return Buffer[Position];
     return '\0';
@@ -311,7 +302,7 @@ bool LineParser32::skip_char(char Ch)
 
 int LineParser32::find_char(char Ch) const
 {
-    // .text:06262f40: the index of the first Ch in [Position, Length), else -1.
+    // .text:06262f40
     for (unsigned int Index = Position; Index < Length; Index += 1)
     {
         if (Buffer[Index] == Ch)
@@ -322,9 +313,8 @@ int LineParser32::find_char(char Ch) const
 
 unsigned int LineParser32::read_string(char* Dest, char const* Terminators)
 {
-    // .text:06262f70: N = strcspn(Buffer + Position, Terminators); N bytes copied to Dest and
-    // terminated; Position += N + 1 (over the terminator, or past the NUL when there was
-    // none). No Length bound and no null checks.
+    // .text:06262f70. Position moves over the terminator, or past the NUL when there was none.
+    // No Length bound and no null checks.
     char const* const Start = Buffer + Position;
     unsigned int const Count = (unsigned int)strcspn(Start, Terminators);
     memcpy(Dest, Start, Count);
@@ -335,8 +325,7 @@ unsigned int LineParser32::read_string(char* Dest, char const* Terminators)
 
 bool LineParser32::terminate_line(char Ch)
 {
-    // .text:06262fd0: the first Ch in [Position, Length) becomes the new Length; Position is
-    // not touched.
+    // .text:06262fd0
     for (unsigned int Index = Position; Index < Length; Index += 1)
     {
         if (Buffer[Index] == Ch)
@@ -350,10 +339,8 @@ bool LineParser32::terminate_line(char Ch)
 
 unsigned int LineParser32::fetch_string(char* Dest, unsigned int EndPos)
 {
-    // .text:0630f170: Count = EndPos - Position (signed); while Count > 0 trailing ' ' / '\t'
-    // of [Position, Position + Count) are dropped; Count bytes copied from Buffer + Position,
-    // Dest[Count] = 0. Position is not advanced. A negative Count copies (unsigned)Count bytes
-    // as retail's REP MOVSD does.
+    // .text:0630f170. Position is not advanced. A negative Count copies (unsigned)Count bytes
+    // as retail does.
     int Count = (int)(EndPos - Position);
     if (Count > 0)
     {
@@ -373,9 +360,8 @@ unsigned int LineParser32::fetch_string(char* Dest, unsigned int EndPos)
 
 unsigned int LineParser32::read_terminator(char* Dest, char Term)
 {
-    // .text:0630f1d0: Count = the run before Term in [Position, Length); Position += Count
-    // (left ON the terminator); trailing ' ' / '\t' dropped from the copy only; Count bytes
-    // copied and terminated.
+    // .text:0630f1d0. Position is left ON the terminator; trailing white space is dropped from
+    // the copy only.
     unsigned int const Remain = Length - Position;
     unsigned int Count = 0;
     if (Remain != 0)
@@ -422,7 +408,7 @@ unsigned int LineParser32::read_terminator2(char* Dest, char TermA, char TermB)
 
 LineParser32& LineParser32::operator=(LineParser32 const& Other)
 {
-    // .text:06263010: 0x102 dwords copied (REP MOVSD), no self check.
+    // .text:06263010: no self check.
     memmove(Buffer, Other.Buffer, sizeof(Buffer));
     Length = Other.Length;
     Position = Other.Position;
@@ -442,7 +428,7 @@ TextFile32::TextFile32(TextFile32 const& Other)
     : FileMap(Other)
     , LineNum(Other.LineNum)
 {
-    // .text:06263070: the FileMap copy inlined (string, +0x10..+0x20), then +0x24.
+    // .text:06263070
 }
 
 TextFile32::~TextFile32()
@@ -452,7 +438,7 @@ TextFile32::~TextFile32()
 
 TextFile32& TextFile32::operator=(TextFile32 const& Other)
 {
-    // .text:062631b0: the FileMap assignment inlined, then +0x24.
+    // .text:062631b0
     FileMap::operator=(Other);
     LineNum = Other.LineNum;
     return *this;
@@ -460,19 +446,15 @@ TextFile32& TextFile32::operator=(TextFile32 const& Other)
 
 unsigned int TextFile32::get_line_num() const
 {
-    // .text:06263030: MOV EAX,[this+0x24].
+    // .text:06263030
     return LineNum;
 }
 
 bool TextFile32::read_line(LineParser32& Line)
 {
-    // .text:0630f2c0. Start = tell(); LineNum += 1 on every call. A window of up to 0x3ff
-    // bytes is taken at Cursor (request_pointer inlined: Cursor += window). The first '\r' or
-    // '\n' ends the text; the terminator is consumed, plus the next byte when it is the
-    // partner of the pair (byte ^ 7: "\r\n" or "\n\r") and inside the window. The text is
-    // copied into the parser, terminated, Length = text length, Position = 0, and Cursor is
-    // set back to min(Start + consumed, Size). No line ending in the window: the whole window
-    // is the text. Failure (no view, at the end) empties the parser and returns false.
+    // .text:0630f2c0. LineNum is bumped on every call, failures included. A line is at most a
+    // 0x3ff-byte window; a longer one is split there. The pair partner (byte ^ 7: "\r\n" or
+    // "\n\r") is consumed only when inside the window.
     unsigned int const Start = (View != nullptr) ? Cursor : 0u;
     LineNum += 1;
 

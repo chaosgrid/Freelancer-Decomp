@@ -6,13 +6,8 @@
 
 #pragma once
 
-// Server.dll's character-file entry points. RENAMED AND DE-EXPORTED 2026-09-17
-// (wave 17): this used to be common_server_savegame.h and these functions used
-// to be COMMON_API, i.e. Common.dll exports, even though every caller is in
-// Server.dll. Nothing here crosses a DLL boundary, so nothing here is exported.
-//
-// REWRITTEN 2026-09-24 (claude:srv-save). The save/load family is now the
-// retail functions themselves, one port per listing function:
+// Server.dll's character-file entry points. Server-internal, not exported. One port per
+// retail function:
 //
 //   FUN_06d47120  PlayerData_LoadSaveRecord       the character-file parser
 //   FUN_06d48d50  PlayerData_LoadSavedCharacter   login scan: one file -> record

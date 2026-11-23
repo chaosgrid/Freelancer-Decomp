@@ -15,7 +15,7 @@
 // Retail object: operator_new(0x14) -- a VC6 std::map (allocator byte, head node +0x04, own nil
 // node +0x08, +0x0c byte, size +0x10) of key -> {Id, Flags byte, Next}. The first entry of a
 // key lives in the tree node (+0x10 Id, +0x14 Flags, +0x18 Next); every further line with the
-// same key is a 0xc-byte {Id, Flags, Next} node linked in right after it (0x0045963a..).
+// same key is a 0xc-byte {Id, Flags, Next} node linked in right after it.
 
 #include <forward_list>
 #include <map>
@@ -59,12 +59,12 @@ extern FKnowledgeMap* G_KnowledgeMap;
 void KnowledgeMapCreate();
 // FUN_00459900 (cdecl) -- free the singleton (FUN_00459060 + delete). Caller: FUN_0045a140.
 void KnowledgeMapDestroy();
-// FUN_00459930 (cdecl) -- MarkKnown(Key) when the singleton exists. Callers 0x004b5f48,
-// 0x004b611e, 0x004b624e (the ToolTip / NN caption code, not ported yet).
+// FUN_00459930 (cdecl) -- MarkKnown(Key) when the singleton exists. Callers: the rollover /
+// ToolTip code (nn_rollover.cpp).
 void KnowledgeMapReveal(unsigned Key);
 // FUN_00459950 (cdecl) -- with the singleton: MarkKnown on Text's mad-lib ids, then on every
 // value: 's' the raw ids, 'S' the system's strid_name, 'B' the base's strid_name, 'F' the
 // faction's name, 'Z' a found zone's name; a nested FmtStr ('!') recurses.
 void KnowledgeMapRevealFmtStr(FmtStr const* Text);
-// FUN_00459ad0 (cdecl) -- Resolve on the singleton; false without one. Caller 0x00455202.
+// FUN_00459ad0 (cdecl) -- Resolve on the singleton; false without one. Caller: gf_script_object.
 bool KnowledgeMapLookupFmtStr(FmtStr const* Text, unsigned* OutId, unsigned char* OutFlags);

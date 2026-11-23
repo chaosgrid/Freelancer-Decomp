@@ -17,9 +17,7 @@ struct IFileSystem;
 struct _D3DXIMAGE_INFO;
 
 
-// RP8-only names. Every IID is Iids::* from dacom_iids.h and IAggregateComponent itself is
-// declared in dacom.h, so nothing here is shared with render/shading.h any more.
-
+// RP8-only names. IIDs are Iids::* (dacom_iids.h); IAggregateComponent is in dacom.h.
 
 static const char kRp8ComponentName[] = "DirectX8";
 static const char kRp8DefaultSection[] = "RenderPipeline";
@@ -27,14 +25,9 @@ static const char kRp8DefaultSection[] = "RenderPipeline";
 static const char kRp9ComponentName[] = "DirectX9";
 
 
-// The C++ type is IRenderPipeline; its IID string is "1.11_IRenderPipeline8B" (Iids::RenderPipeline8B).
-// Retail evidence: DALib.dll exports ?Pipeline@DALib@@3PAUIRenderPipeline@@A (freelancer.exe
-// imports the same name), so the pointee of DALib::Pipeline is a struct named IRenderPipeline,
-// and that pointer is filled by QueryInterface for "1.11_IRenderPipeline8B" (DALib 065c12e8).
-// No retail binary carries "IRenderPipeline8B" anywhere except that IID string (alchemy,
-// deformable2, flmaterials, rendcomp, rp8, shading, DALib); their error texts name the IID macro
-// "IID_IRenderPipeline" ("Alchemy: init: unable to acquire IID_IRenderPipeline"). "8B" is the
-// IID's version suffix, not part of the type name.
+// The C++ type is IRenderPipeline (DALib exports ?Pipeline@DALib@@3PAUIRenderPipeline@@A);
+// its IID string is "1.11_IRenderPipeline8B" (Iids::RenderPipeline8B), queried at DALib
+// 065c12e8. "8B" is the IID's version suffix, not part of the type name.
 struct IRenderPipeline : IDAComponent
 {
     // slot 3
@@ -151,25 +144,13 @@ struct IRenderPipeline : IDAComponent
     virtual GENRESULT DACOM_API SetTextureLevelData(void* Handle, int Level, int SrcW, int SrcH,
                                                     unsigned int Pitch, unsigned int* SrcFormat,
                                                     const void* Pixels, void* A, void* B) = 0;
-    // slot 54 FUN_06d0f1bc. RET 0x34 = 13 stdcall stack dwords (this + 12 explicit),
-    // confirmed by instruction-level trace of rp8.dll.txt @ 22029-22437. Only 4 of the
-    // 12 explicit dwords are ever read by retail: SrcHandle, SrcLevel, DstHandle,
-    // DstLevel (roles confirmed the same way LockTexture/UnlockTexture's Extra==0/1
-    // GetSurfaceLevel/GetCubeMapSurface branch was confirmed). The remaining 8 dwords
-    // sit as two untouched 4-dword runs immediately after SrcLevel and after DstLevel
-    // -- exactly sizeof(RECT) passed by value each -- matching an earlier RE note's "Round
-    // 2/3" (Handle,Level,Rect) x2 hypothesis, but retail's own FUN_06d2fd77 blit call
-    // is invoked unconditionally with NULL rect pointers/counts (0x06d0f649), so those
-    // 8 dwords are provably dead code in this build regardless of what they represent.
-    // No caller of this vtable slot was found in any available disasm (rp8/shading/
-    // rendcomp/ximage/freelancer.exe), so the two RECT-by-value slots are intentionally
-    // NOT added to this signature (would be unfalsifiable ABI cosplay for parameters
-    // that are read by nobody, on either side). If a caller ever surfaces requiring
-    // partial-rect blit, extend this signature then -- do not guess it now.
+    // slot 54 FUN_06d0f1bc. Deviation: retail is RET 0x34 (this + 12 dwords), but only the
+    // two (Handle, Level) pairs are read; the two untouched 4-dword runs after each pair
+    // (RECTs by value) go unused because FUN_06d2fd77 =
+    // D3DXLoadSurfaceFromSurface(pDest, 0, 0, pSrc, 0, 0, D3DX_FILTER_POINT, 0) is always
+    // called with null rects. No caller of this slot exists in any module, so the RECT
+    // parameters are not declared. The first pair is the destination.
     // arity-ok: decl width 0x14 vs retail RET 0x34 is intentional (see above).
-    // Direction (RC-3 2026-09-30): FUN_06d2fd77 = D3DXLoadSurfaceFromSurface(pDest, 0, 0,
-    // pSrc, 0, 0, D3DX_FILTER_POINT, 0) with pDest = the FIRST handle's surface (EBP+0xC/+0x10)
-    // and pSrc = the SECOND's (EBP+0x24/+0x28): the first pair is the destination.
     virtual GENRESULT DACOM_API BlitTexture(void* DstHandle, int DstLevel, void* SrcHandle, int SrcLevel) = 0;
     // slot 55 FUN_06d0f698 RET 0x10 — this + Handle + two unread stack dwords.
     virtual GENRESULT DACOM_API SetRenderTarget(void* Handle, void* UnusedA,
@@ -203,10 +184,8 @@ struct IRenderPipeline : IDAComponent
     // slot 69 FUN_06d1067f RET 0x18
     virtual GENRESULT DACOM_API DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
                                               unsigned int Count, void* Unused) = 0;
-    // slot 70 FUN_06d1097d RET 0x20 -- eight dwords, so this plus SEVEN arguments, the last
-    // one unread by the callee just like slot 72's. Freelancer.exe 0x004217b6 and 0x00421973
-    // both push eight: PUSH EBX (the trailing dword), index count, indices, vertex count,
-    // vertices, PUSH 0x142 (an FVF: XYZ|DIFFUSE|TEX1), PUSH 2 or 4 (the primitive type), this.
+    // slot 70 FUN_06d1097d RET 0x20: this plus seven arguments, the last unread by the callee
+    // (as slot 72's). Freelancer.exe pushes all eight.
     virtual GENRESULT DACOM_API DrawIndexedPrimitiveUp(unsigned long Prim, unsigned int Fvf,
                                                        const void* Verts, unsigned int VertCount,
                                                        const void* Indices,
@@ -215,11 +194,8 @@ struct IRenderPipeline : IDAComponent
     // slot 71 FUN_06d10c89 RET 0x18
     virtual GENRESULT DACOM_API DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
                                                 unsigned int Count, void* Unused) = 0;
-    // slot 72 FUN_06d10e4b RET 0x20 -- eight dwords, so this plus SEVEN arguments. Ghidra
-    // lists only param_1..param_7 because the last one is never read, but the callee pops it
-    // all the same and every retail caller pushes it: shading.dll 0x06eb328a, 0x06eb3c0f,
-    // 0x06eb5915 and 0x06eba8ff each open with PUSH 0x0 and push eight dwords in total.
-    // Declaring six here made ShadingInternal.h's PipeDrawIndexedVb underfill the stack.
+    // slot 72 FUN_06d10e4b RET 0x20: this plus seven arguments. The last is never read but
+    // the callee pops it and every retail caller (shading.dll) pushes it.
     virtual GENRESULT DACOM_API DrawIndexedPrimitiveVb(unsigned long Prim, void* Vb,
                                                        unsigned int BaseVertex, unsigned int NumVerts,
                                                        const void* Indices,
@@ -229,20 +205,9 @@ struct IRenderPipeline : IDAComponent
     virtual GENRESULT DACOM_API AddLight(void* Handle) = 0;
     // slot 74 FUN_06d0cd32
     virtual GENRESULT DACOM_API RemoveLight(void* Handle) = 0;
-    // slot 75 FUN_06d0cddb
-    // FUN_06d0cddb(int,uint) forwards its uint arg unchanged into FUN_06d2ca43,
-    // which passes it straight through to FUN_06d2e9f0's tree lookup on
-    // DAT_06d728cc -- the SAME tree that FUN_06d2c487/FUN_06d2c7cf (called from
-    // AddLight/SetLightEnable/DestroyLight/RemoveLight) exclusively insert/erase
-    // keyed by the raw Handle pointer value (rp8.dll.c:21709/21828/22012/22037-39;
-    // confirmed by tracing FUN_06d2cb6f/FUN_06d2c487's own key locals, which copy
-    // the incoming `int*` Handle param by value -- never dereference it -- before
-    // taking its address as the generic comparison key). Since that tree is never
-    // populated with plain D3D indices, a genuine index key here would make
-    // UpdateLight permanently fail to find anything; Ghidra's `uint` typing of
-    // this parameter is a decompiler artifact (no dereference inside FUN_06d2ca43
-    // gave it a pointer cue), not evidence of a second key domain. Handle
-    // confirmed correct 2026-09-10 (rp8.dll module, item 0x06d2ca43 notes).
+    // slot 75 FUN_06d0cddb. Handle is the light handle: it keys the same light tree
+    // (DAT_06d728cc) that AddLight / RemoveLight / SetLightEnable / DestroyLight insert into
+    // and erase from by the raw handle value (Ghidra's `uint` typing is an artifact).
     virtual GENRESULT DACOM_API UpdateLight(void* Handle) = 0;
     // slot 76 FUN_06d0af55
     virtual GENRESULT DACOM_API SetWorldN(int WorldIndex, const float* M12) = 0;
@@ -302,8 +267,7 @@ static_assert(sizeof(FVertexMemoryLock) == 0x10, "vertex memory lock four words"
 
 struct IVertexBufferManager : IDAComponent
 {
-    // slot 3 FUN_06d11354 RET 0x14 -- four explicit dwords, and the body reads NONE of them:
-    // it is `return 0`. Declared to the width anyway, because the width is the contract.
+    // slot 3 FUN_06d11354 RET 0x14: four dwords, none read (`return 0`); declared to width.
     virtual GENRESULT DACOM_API VbMgrInit(void* A, void* B, void* C, void* D) = 0;
     // slot 4 FUN_06d1135d
     virtual GENRESULT DACOM_API VbMgrReleaseAll() = 0;
@@ -312,7 +276,7 @@ struct IVertexBufferManager : IDAComponent
     // slot 6 FUN_06d11877 RET 0x8
     virtual GENRESULT DACOM_API UnlockVertexMemory(FVertexMemoryLock* Out) = 0;
     // slot 7 FUN_06d118bc return 0xFFFFFFF9
-    virtual GENRESULT DACOM_API UnsupportedManagerOperation() = 0; // formerly VbMgrSlot7
+    virtual GENRESULT DACOM_API UnsupportedManagerOperation() = 0;
     // slot 8 FUN_06d114c5 RET 0x18
     virtual GENRESULT DACOM_API CopyVertexData(void* Dest, unsigned int Fvf,
                                               const FRpVertexSrcDesc* Source,
@@ -330,16 +294,12 @@ struct IRPDraw : IDAComponent
 
 struct IRPIndexBuffer : IDAComponent
 {
-    // slot 3 FUN_06d12d4e RET 0x10 -- THREE explicit dwords, not two. The body reads only
-    // the first two; the trailing one mirrors CreateVb's Flags and is ignored on the index
-    // path. Every caller in this tree used to push two and leave the callee popping four.
+    // slot 3 FUN_06d12d4e RET 0x10: three dwords. The body reads only the first two; the
+    // trailing one mirrors CreateVb's Flags and is ignored on the index path.
     virtual GENRESULT DACOM_API CreateIb(unsigned int Count, unsigned int** Out,
                                          unsigned int Flags) = 0;
-    // slot 4 FUN_06d13002 RET 0x8 (the vtable entry is 06d13002; 06d13070 is an instruction
-    // inside it, not the function start). The argument is a POINTER TO the caller's handle:
-    // 06d13070 reads [Handle] and compares it against -1, 06d13087 writes 0 back through it.
-    // Passing the handle by value makes the callee read the wrapper's first field as the
-    // handle and then zero it.
+    // slot 4 FUN_06d13002. The argument is a pointer to the caller's handle: the body compares
+    // [Handle] against -1 and writes 0 back through it.
     virtual GENRESULT DACOM_API DestroyIb(void** Handle) = 0;
     // slot 5 FUN_06d131b2
     virtual GENRESULT DACOM_API ResizeIb(void* Handle, unsigned int Count) = 0;
@@ -349,19 +309,16 @@ struct IRPIndexBuffer : IDAComponent
     // FRp8Ib at object+0x14C created in create_buffers), not a dereference of *(this+0x140).
     virtual GENRESULT DACOM_API LockIb(void* Handle, unsigned int* Offset, void** Out,
                                        unsigned int Count) = 0;
-    // slot 8 FUN_06d13794 RET 0x8 (again, the vtable entry, not the inner address 06d136e0)
+    // slot 8 FUN_06d13794
     virtual GENRESULT DACOM_API UnlockIb(void* Handle) = 0;
-    // slot 9 FUN_06d13bce RET 0x14 -- FOUR explicit dwords. The FDUMP string in the body
-    // names it select_ib(). It reads the first two: the handle, and a scalar it caches next to
-    // the handle at this+0x12C (+8 = buffer, +0xC = this value, bit 1 of +0x10 = dirty). The
-    // D3D8 shape of that pair is SetIndices(pIndexData, BaseVertexIndex), which is what the
-    // port's own RP8::SelectIb writes -- it just had no argument to put there and hardcoded 0.
-    // Arguments 3 and 4 are never read; Deformable2 0x065f6a55 pushes literal zeros for them.
+    // slot 9 FUN_06d13bce RET 0x14, select_ib() by its FDUMP text. Reads the handle and a
+    // scalar it caches at this+0x12C (+8 buffer, +0xC this value, bit 1 of +0x10 dirty):
+    // D3D8 SetIndices(pIndexData, BaseVertexIndex). Arguments 3 and 4 are never read;
+    // Deformable2 pushes zeros for them.
     virtual GENRESULT DACOM_API SelectIb(void* Handle, unsigned int BaseVertexIndex,
                                          unsigned int Unused3, unsigned int Unused4) = 0;
-    // slot 10 FUN_06d13d23 RET 0xC -- TWO explicit dwords, and the second is an out-param:
-    // the body writes [buffer+0x18] through it and returns GR_OK, or 0x80004005 when it cannot.
-    // The port declared one argument and returned the capacity AS the result code.
+    // slot 10 FUN_06d13d23 RET 0xC: the second dword is an out-param ([buffer+0x18]);
+    // returns GR_OK, or 0x80004005 when it cannot.
     virtual GENRESULT DACOM_API GetIbCapacity(void* Handle, unsigned int* OutCapacity) = 0;
     // slot 11 FUN_06d13b69
     virtual GENRESULT DACOM_API IsIbValid(void* Handle) = 0;
@@ -372,8 +329,7 @@ struct IRPVertexBuffer : IDAComponent
     // slot 3 FUN_06d118c8 RET 0x14
     virtual GENRESULT DACOM_API CreateVb(unsigned int Fvf, unsigned int Count, unsigned int** Out,
                                          unsigned int Flags) = 0;
-    // slot 4 FUN_06d11db3 -- same shape as DestroyIb: a POINTER TO the caller's handle.
-    // 06d11e24 reads [Handle], 06d11e38 writes 0 back through it.
+    // slot 4 FUN_06d11db3 -- as DestroyIb: a pointer to the caller's handle, zeroed.
     virtual GENRESULT DACOM_API DestroyVb(void** Handle) = 0;
     // slot 5 FUN_06d11f78
     virtual GENRESULT DACOM_API ResizeVb(void* Handle, unsigned int Fvf, unsigned int Count) = 0;
@@ -386,7 +342,7 @@ struct IRPVertexBuffer : IDAComponent
     virtual GENRESULT DACOM_API UnlockVb(void* Handle) = 0;
     // slot 9 FUN_06d12b30 RET 0x8 -- one explicit dword, unread; the body is
     // `return 0xFFFFFFF9` ("unsupported"). Nothing in the tree calls it.
-    virtual GENRESULT DACOM_API UnsupportedVertexBufferOperation(void* Handle) = 0; // formerly VbSlot9
+    virtual GENRESULT DACOM_API UnsupportedVertexBufferOperation(void* Handle) = 0;
     // slot 10 FUN_06d12b9d RET 0x8
     virtual GENRESULT DACOM_API SelectVb(void* Handle) = 0;
     // slot 11 FUN_06d12cdc RET 0x10
@@ -396,17 +352,13 @@ struct IRPVertexBuffer : IDAComponent
 };
 
 // Slot order from rp8.dll's IGammaControl vtables (.rdata:06d5e200 and 06d5e540, identical
-// from slot 3 on): 06d153e6, 06d1560c, 06d15757, 06d1535d, 06d153a4. Confirmed by the only exe
-// caller FUN_00424510: +0x18 (slot 6) with one byte argument, +0x0c (slot 3) with five
-// (7, gamma, 0, 1.0f, 0). The earlier declaration order (enable/get-enable first) was wrong.
+// from slot 3 on). The only exe caller FUN_00424510 calls slot 6 with one byte and slot 3 with
+// (7, gamma, 0, 1.0f, 0).
 struct IGammaControl : IDAComponent
 {
-    // slot 3 FUN_06d153e6. Retail RET 0x18 pops 6 stack dwords (this + 5 explicit args): a
-    // channel bitmask (bit0=red/bit1=green/bit2=blue) plus 4 floats consumed straight off the
-    // caller's stack (Ghidra never recovered named parameters for them, only "Stack[...]"
-    // slots) that drive a per-channel curve: value = clamp(Brightness + pow(Contrast*x + Bias,
-    // 1/Gamma), 0, 1) for x = i/255, i in [0,256). The previous single `void* Channels`
-    // placeholder didn't carry the 4 floats retail actually reads and has been replaced.
+    // slot 3 FUN_06d153e6, RET 0x18: a channel bitmask (bit0 red, bit1 green, bit2 blue) and
+    // four floats driving value = clamp(Brightness + pow(Contrast*x + Bias, 1/Gamma), 0, 1)
+    // for x = i/255, i in [0,256).
     virtual GENRESULT DACOM_API SetGammaFunction(unsigned int ChannelMask, float Gamma,
                                                  float Brightness, float Contrast,
                                                  float Bias) = 0;
@@ -417,14 +369,10 @@ struct IGammaControl : IDAComponent
     // slot 5 FUN_06d15757. Channel selects exactly one channel (1/2/4); OutRamp receives that
     // channel's 256 WORD values.
     virtual GENRESULT DACOM_API GetGammaRamp(unsigned int Channel, unsigned short* OutRamp) = 0;
-    // slot 6 FUN_06d1535d. Retail param_2 is a byte (only bit0 is read); RET pops one stack
-    // dword beyond the implicit this, i.e. exactly one explicit argument -- no hidden out-param.
+    // slot 6 FUN_06d1535d. One byte argument (only bit0 is read).
     virtual GENRESULT DACOM_API SetGammaEnable(unsigned char Enable) = 0;
-    // slot 7 FUN_06d153a4. Retail takes ZERO explicit stack arguments (RET pops only the
-    // implicit this) -- the enabled/disabled state is communicated purely via the return code
-    // (GR_OK enabled, GR_GENERIC not-enabled, 0xFFFFFFFD unsupported), nothing is written
-    // through an out-pointer. The previous `void* OutEnable` placeholder param didn't exist
-    // in retail and has been removed.
+    // slot 7 FUN_06d153a4. No arguments: the state is the return code (GR_OK enabled,
+    // GR_GENERIC not enabled, 0xFFFFFFFD unsupported).
     virtual GENRESULT DACOM_API GetGammaEnable() = 0;
 };
 

@@ -18,20 +18,17 @@
 
 TextWin::TextWin()
 {
-    // The inlined TextWin part of every derived ctor (0x0059c448..0x0059c4a6): the Font::String
-    // at +0x7c (FUN_004144b0) is the member's own ctor, then the colours.
+    // Inlined into every derived ctor in retail.
     ColorIdle = 0;
     ColorPulse = 0;
-    ColorD4 = 0;       // FUN_004b5140
-    ColorD8 = 0;       // FUN_004b5140
-    ColorInactive = 0; // FUN_004b5140
+    ColorD4 = 0;
+    ColorD8 = 0;
+    ColorInactive = 0;
 }
 
 TextWin::~TextWin()
 {
-    // FUN_005a1af0: clear the text, the Win3D Destroy body (flags, children, unregister),
-    // then the Font::String member dtor (inlined at 0x005a1b58..0x005a1bb3, ~FFontString); the
-    // Win3D dtor runs as the base.
+    // FUN_005a1af0: the text cleared and the Win3D Destroy body inlined.
     FontStringClearContents(&Text);
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
@@ -41,8 +38,8 @@ TextWin::~TextWin()
 
 bool TextWin::HitTest(float const* Ray)
 {
-    // FUN_004b51d0: the ray's point at this object's depth (t = z / ray.z) must sit inside
-    // [x, x + width] and [y - height, y]. DAT_005c7474 is 0.0f.
+    // FUN_004b51d0: the ray's point at this object's depth must sit inside [x, x + width] and
+    // [y - height, y]. The y product is rounded to float; the x difference stays double.
     double const T = static_cast<double>(Position[2]) / Ray[2];
     float const PointY = static_cast<float>(T * Ray[1]);
     double const DeltaX = T * Ray[0] - Position[0];
@@ -65,7 +62,7 @@ bool TextWin::Create(Win3D* NewParent, void* /*Data*/)
     Win3DRegister(this);
     Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
     InitTextDefaults();
-    Width = 0.1f;  // 0x3dcccccd
+    Width = 0.1f;
     Height = 0.1f;
     return true;
 }
@@ -93,15 +90,15 @@ void TextWin::Draw()
     Bounds[2] = Width;
     Bounds[1] = 0.0f;
 
-    // 0x005a1d8d: under the mouse the pulse built around +0xd0 is used; otherwise the idle
-    // colour, or the inactive colour when +0xe6 is clear.
+    // Under the mouse the pulse built around ColorPulse; otherwise the idle colour, or the
+    // inactive colour when +0xe6 is clear. The pulse is computed either way.
     bool const bHover = Win3DGetHover() == this;
     unsigned long Pulsed = 0;
     NnUiPulseBlendFromArgb(&Pulsed, ColorPulse);
     unsigned long const* Color = &ColorInactive;
     if (bUsePalette != 0)
         Color = bHover ? &Pulsed : &ColorIdle;
-    FontAtlasSetDrawColor(static_cast<unsigned>(*Color)); // FUN_00417780
+    FontAtlasSetDrawColor(static_cast<unsigned>(*Color));
 
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
@@ -110,7 +107,6 @@ void TextWin::Draw()
     float ScreenY = 0.0f;
     TextWinProjectPoint(Position, &ScreenX, &ScreenY);
 
-    // 0x005a1e33: the draw origin {x, y, width, height, +0xe8, 0} into FUN_004143c0.
     FFontStringDrawOrigin Origin;
     Origin.X = ScreenX;
     Origin.Y = ScreenY;
@@ -123,7 +119,7 @@ void TextWin::Draw()
 
 void TextWin::SetText(wchar_t const* NewText)
 {
-    // LAB_005a1cb0: ADD ECX,0x7c / JMP FUN_00415860.
+    // LAB_005a1cb0.
     FontStringSetText(&Text, NewText);
 }
 
@@ -136,22 +132,21 @@ void TextWin::InitTextDefaults()
     FlagE2 = 1;
     bUsePalette = 1;
     FieldE8 = 0;
-    TextScale = 0.002f; // DAT_005e5f88 = 0x3b03126f
-    ColorIdle = G_NnPaletteArgb_679bb0;     // DAT_00679bb0
-    ColorPulse = G_NnPaletteArgb_679ba4;    // DAT_00679ba4
-    ColorInactive = G_NnPaletteArgb_679b94; // DAT_00679b94
+    TextScale = 0.002f; // DAT_005e5f88
+    ColorIdle = G_NnPaletteArgb_679bb0;
+    ColorPulse = G_NnPaletteArgb_679ba4;
+    ColorInactive = G_NnPaletteArgb_679b94;
 }
 
 void TextWin::SetFont(char const* FontName, float Scale)
 {
     // FUN_005a1cc0.
-    IFont* const Font = FindMenuFontImp(FontName); // FUN_004177b0
+    IFont* const Font = FindMenuFontImp(FontName);
     if (Text.FontIface != Font)
     {
-        // 005a1cdb..005a1d0c: store at +0x98, then slot +8 on every child of the vector at
-        // +0x8c..+0x90 (8-byte slots, the child pointer first). The call does not look at the
-        // slot's kind byte: a FontString child binds the font (LAB_004148b0), a NumberString
-        // child takes it as its face key (FUN_00414fb0) -- both are slot +8.
+        // The call does not look at the child slot's kind byte: a FontString child binds the
+        // font (LAB_004148b0), a NumberString child takes it as its face key (FUN_00414fb0);
+        // both are slot +8.
         Text.FontIface = Font;
         for (unsigned Index = 0;
              Text.ChildBegin != nullptr &&
@@ -160,9 +155,9 @@ void TextWin::SetFont(char const* FontName, float Scale)
         {
             Text.ChildBegin[Index].Child->BindFont(Text.FontIface);
         }
-        Text.LayoutGen = 0; // +0xa4
+        Text.LayoutGen = 0;
     }
-    TextScale = Scale; // +0xb0
+    TextScale = Scale;
 }
 
 void TextWinProjectExtent(float Width, float Height, float Z, float* OutWidth,

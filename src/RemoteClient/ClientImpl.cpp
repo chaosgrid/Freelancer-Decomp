@@ -27,7 +27,6 @@ IClient::IClient() {}
 IClient::IClient(const IClient& Other) {}
 IClient& IClient::operator=(const IClient& Other) { return *this; }
 
-
 void CClientImpl::SendCommonFireWeapon(unsigned int ClientId, const XFireWeaponInfo& Info) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 2, &Packet) == 0)
@@ -379,7 +378,7 @@ void CClientImpl::SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, unsigned
         }
         TypedPacket->TargetId = TargetId.Id;
         TypedPacket->SenderId = SenderId.Id;
-        // The client id is the CHAT_ID's low word (06d8c4ed MOVZX).
+        // The client id is the CHAT_ID's low word (.text:06d8c4ed).
         PushToClient(static_cast<unsigned short>(TargetId.Id), Packet->AsRaw());
     }
 }

@@ -8,9 +8,9 @@
 
 #include "Common/Graphics/client_mesh_load.h"
 #include "Common/Fonts/ids_rdl.h"
-#include "Interface/menu_ui_init.h"   // PlayUiRolloverSound (FUN_00564700)
+#include "Interface/menu_ui_init.h"
 #include "NeuroNet/nn_ui_pulse.h"
-#include "Interface/ui_page.h"      // UiWidgetMathEngine (DAT_0067dbc0)
+#include "Interface/ui_page.h"
 #include "Interface/ui_page_desc.h"
 #include "Interface/win_factory.h"
 
@@ -23,12 +23,11 @@
 
 namespace
 {
-    // DAT_0067dbac, built by the static initializer LAB_00599da0: byte +0 = 8, the dword at +1 =
-    // (old & 0xff000000) | 0x00e0c387 over zeroed .bss -- bytes 08 87 C3 E0. The idle caption
-    // attributes (the hover colour is computed per frame).
+    // DAT_0067dbac (static init LAB_00599da0) -- the idle caption attributes (the hover colour
+    // is computed per frame).
     TextRenderAttributes const G_UiTextMsgButtonIdleAttrs = {0xe0c38708ul};
 
-    // DAT_0067dba4, LAB_00599dc0: bytes 08 80 80 80 -- the caption of a non-interactive button.
+    // DAT_0067dba4 (LAB_00599dc0) -- the caption of a non-interactive button.
     TextRenderAttributes const G_UiTextMsgButtonInactiveAttrs = {0x80808008ul};
 
     // .rdata 0x005d4f58, the "<default>" style mesh.
@@ -43,9 +42,7 @@ UiTextMsgButton::UiTextMsgButton()
     , MessageArg(0)
     , Field4c4(0)
 {
-    // FUN_0059c580 inline: RichTextWin ctor FUN_0057b1b0, then the empty RDLs at +0x4a8 and
-    // +0x4b4 and the two vftables. +0x498..+0x4a4 and +0x4c0 are left to Create; the zeros here
-    // are only C++ initialisation.
+    // Inlined into FUN_0059c580. Retail leaves +0x498..+0x4a4 and +0x4c0 to Create.
     CaptionAttrs.Packed = 0;
     Pad499[0] = 0;
     Pad499[1] = 0;
@@ -54,18 +51,14 @@ UiTextMsgButton::UiTextMsgButton()
 
 UiTextMsgButton::~UiTextMsgButton()
 {
-    // FUN_0059ce50: the +0x4b4 and +0x4a8 lists (the members' own destructors), then
-    // RichTextWin's (FUN_0057b260).
+    // FUN_0059ce50.
 }
 
 void UiTextMsgButton::SetPosition(float const* NewPosition)
 {
     // LAB_00599eb0 (RET 4). The style mesh sits at the button's centre: half the payload size
-    // along the control's axes (DAT_005c75e0 = 0.5f, DAT_005cef60 = -0.5f), scaled onto the
-    // z = -1 plane (DAT_005c7500 = -1.0f) and written straight into the WinControl offset
-    // +0xa8..+0xb0. Then BaseRichTextWin::SetPosition (FUN_0057b0a0).
-    // 0x00599eb3..0x00599eec: DAT_0067dbc0 -- the UI_PAGE widgets' shared cache
-    // (UiWidgetMathEngine), tested and filled from FUN_005b73e0.
+    // along the control's axes, scaled onto the z = -1 plane and written straight into the
+    // WinControl offset +0xa8..+0xb0.
     I3DMathEngine* const Math = UiWidgetMathEngine();
     FVector Half;
     Half.X = LocalWidth * 0.5f;
@@ -84,9 +77,8 @@ void UiTextMsgButton::SetPosition(float const* NewPosition)
 
 void UiTextMsgButton::SetOrientation(float const* NewOrientation)
 {
-    // LAB_00599e00 (RET 4): WinControl's SetOrientation (FUN_005a0950), then, with a style mesh
-    // bound (FUN_00420d60), the instance is reset to the identity orientation (Engine +0x94) and
-    // updated (Engine +0x6c).
+    // LAB_00599e00 (RET 4): with a style mesh bound, the instance is reset to the identity
+    // orientation and updated.
     WinControl::SetOrientation(NewOrientation);
     if (!ClientMeshHolderHasInstance(&MeshHolder))
         return;
@@ -106,78 +98,76 @@ void UiTextMsgButton::SetOrientation(float const* NewOrientation)
 
 void UiTextMsgButton::ApplyCaptionLayout()
 {
-    // FUN_0059a110: FUN_0057b370 clear, then FUN_0057b470 (clone + push) of each node.
+    // FUN_0059a110.
     ClearContent();
 
-    JustifyNode Justify(TextJustifyCenter);                          // 1
+    JustifyNode Justify(TextJustifyCenter);
     AppendNode(Justify);
 
-    RDLRefNode CaptionRef(CaptionBodyList);                          // +0x4a8
+    RDLRefNode CaptionRef(CaptionBodyList);
     AppendNode(CaptionRef);
 
     StyleNode Style(0x828b);
     AppendNode(Style);
 
-    TRANode Tra(CaptionAttrs, 0xffffff00u, 0u);                      // +0x4c0
+    TRANode Tra(CaptionAttrs, 0xffffff00u, 0u);
     AppendNode(Tra);
 
-    RDLRefNode TextRef(TextBodyList);                                // +0x4b4
+    RDLRefNode TextRef(TextBodyList);
     AppendNode(TextRef);
 }
 
 bool UiTextMsgButton::Create(Win3D* NewParent, void* Data)
 {
     // FUN_00599f60 (RET 8).
-    bool const bResult = RichTextWin::Create(NewParent, nullptr);   // FUN_0057b5a0
-    bInteractive = 1;                                                 // +0x498
-    CaptionAttrs = G_UiTextMsgButtonIdleAttrs;                        // +0x4c0
+    bool const bResult = RichTextWin::Create(NewParent, nullptr);
+    bInteractive = 1;
+    CaptionAttrs = G_UiTextMsgButtonIdleAttrs;
 
     FUiPayloadTextMsgButton const* const Payload =
         static_cast<FUiPayloadTextMsgButton const*>(Data);
     if (Payload != nullptr)
     {
-        LocalWidth = Payload->Right;                                  // +0x49c
-        NormWidth = Payload->Right;                                   // +0x330
-        LocalHeight = Payload->Bottom;                                // +0x4a0
-        NormHeight = Payload->Bottom;                                 // +0x334
+        LocalWidth = Payload->Right;
+        NormWidth = Payload->Right;
+        LocalHeight = Payload->Bottom;
+        NormHeight = Payload->Bottom;
 
         if (Payload->ExtraId != 0)
         {
-            // FUN_0057da40(id, this+0x4b4) -- appends, no trailing-paragraph trim here.
+            // Appends, with no trailing-paragraph trim here.
             LoadIdsIntoRdl(static_cast<unsigned>(Payload->ExtraId), TextBodyList);
         }
         else
         {
-            // TextNode(caption, -1) (import 0x005c62b0); its vt+0x1c clone goes into the list.
             TextNode Text(Payload->CaptionUtf16, -1);
             RdlAppendNode(TextBodyList, Text.Clone());
         }
-        MessageArg = Payload->ExtraInt;                               // +0x4a4
+        MessageArg = Payload->ExtraInt;
     }
 
-    SetAlignMode(2);                                                  // FUN_00579a60
+    SetAlignMode(2);
 
-    // 0x0059a098: MOV EAX,[EDI+0x14] runs on both paths -- retail reads the payload here even
-    // when it was null above.
+    // Retail reads the payload here on both paths, even when it was null above.
     char const* const StyleName = Payload->StyleName;
     if (StyleName != nullptr && strcmp(StyleName, "<none>") != 0)
     {
         if (strcmp(StyleName, "<default>") == 0)
-            SetMesh(kUiTextMsgButtonDefaultStyle, 0);                 // vt+0x98
+            SetMesh(kUiTextMsgButtonDefaultStyle, 0);
         else
             SetMesh(StyleName, 0);
-        Field2d2 = 1;                                                 // +0x2d2
+        Field2d2 = 1;
     }
 
-    ApplyCaptionLayout();                                             // FUN_0059a110
+    ApplyCaptionLayout();
     return bResult;
 }
 
 void UiTextMsgButton::Draw()
 {
-    // LAB_0059a260. The caption follows three states: hovered (the pulse around the amber
-    // DAT_00679ba4, FUN_00561f20), idle (DAT_0067dbac) and non-interactive (DAT_0067dba4). Only
-    // the colour bytes +0x4c1..+0x4c3 are compared; a change rebuilds the content.
+    // LAB_0059a260. The caption follows three states: hovered (the pulse around the amber),
+    // idle and non-interactive. Only the colour bytes +0x4c1..+0x4c3 are compared; a change
+    // rebuilds the content.
     bool const bHovered = Win3DGetHover() == this;
     unsigned long PulseArgb = 0;
     NnUiPulseBlendFromArgb(&PulseArgb, G_NnPaletteArgb_679ba4);
@@ -213,23 +203,23 @@ void UiTextMsgButton::Draw()
     if (bRelayout)
         ApplyCaptionLayout();
 
-    // 0x0059a310..0x0059a3b5: a red debug outline gated on DAT_0067dbc4, which has four readers
-    // and no writer anywhere in the PE -- never drawn.
+    // Retail's red debug outline here is gated on DAT_0067dbc4, which has no writer in the PE:
+    // never drawn, not ported.
 
-    BaseRichTextWin::Draw();                                          // FUN_0057ab10
+    BaseRichTextWin::Draw();
 }
 
 void UiTextMsgButton::MouseEnter(float const* /*Ray*/)
 {
-    // LAB_0059a240 (RET 4): 0059a240..0059a24a -- byte +0x498 set -> FUN_00564700.
+    // LAB_0059a240 (RET 4).
     if (bInteractive != 0)
         PlayUiRolloverSound();
 }
 
 bool UiTextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_0059a3d0 (RET 4): a release (Field1 == 2) of button -1 on an interactive button tells
-    // the parent (slot 23: 0x3004, +0x4a4, 0) and is consumed.
+    // LAB_0059a3d0 (RET 4): Field1 == 2 of button -1 on an interactive button tells the parent
+    // and is consumed.
     if (Event->Field1 != 2)
         return false;
     if (Event->Field0 != -1)
@@ -241,6 +231,5 @@ bool UiTextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
     return true;
 }
 
-// Retail DAT_0067db44 -- WINFACTORY<UITextMsgButton> static (LAB_0059c210 -> FUN_0059c510;
-// Create FUN_0059c580); atexit dtor FUN_00579380.
+// DAT_0067db44.
 WINFACTORY<UiTextMsgButton> G_UITextMsgButtonFactory("UITextMsgButton");

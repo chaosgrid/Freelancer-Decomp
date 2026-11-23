@@ -23,13 +23,13 @@ static const char* const G_FdumpFmtError = "%s(%d) : ERROR:General:%s";
 static const char* const G_FdumpFmtWarning = "%s(%d) : WARNING:General:%s";
 static const char* const G_FdumpFmtNotice = "%s(%d) : NOTICE:General:%s";
 // Retail __FILE__ strings, each passed as FDUMP's file argument by the functions of its source file.
-// .data 06c37048: the TriMesh plugin dtor FUN_06c21080 (PUSH @ 06c210bb).
+// .data 06c37048: the TriMesh plugin dtor FUN_06c21080.
 static const char* const G_FileTriMesh =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\RendComp\\TriMesh\\TriMesh.cpp";
-// .data 06c371b8: the TriMesh loader FUN_06c23fd0 (PUSH @ 06c247d1).
+// .data 06c371b8: the TriMesh loader FUN_06c23fd0.
 static const char* const G_FileTriMeshArchetype =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\RendComp\\TriMesh\\TriMeshArchetype.cpp";
-// .data 06c37a38: every RenderManager FDUMP (06c32185, 06c323b6, 06c32474, 06c324ac, 06c33a64, 06c33aa6).
+// .data 06c37a38: every RenderManager FDUMP.
 static const char* const G_FileRenderMgr =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\RendComp\\RenderMgr.cpp";
 // .data 06c37550 / 06c37650 / 06c376c8 / 06c37778:
@@ -54,12 +54,8 @@ typedef GENRESULT (DACOM_API* FDacomFactoryCreateFn)(FDacomFactory* This, AGGDES
 
 // The 0xC-byte factory every RendComp DllMain registrar allocates: {vptr, RefCount, Name}.
 // Retail gives each factory its own four-slot vtable sharing slots 0-2 (LAB_06c221d0 QI,
-// LAB_06c306b0 AddRef, FUN_06c2a3a0 Release) and differing only in slot 3 CreateInstance.
-// DACOM (ICOManager::RegisterComponent) holds and calls it as an IComponentFactory
-// (src/include/dacom.h). Until 2026-10-16 this was a plain struct with a `void** Vtable`
-// field pointed at hand-filled `void*[4]` arrays and C-cast to IDAComponent*, i.e. DACOM
-// reached it through an interface it did not derive from. The per-factory slot 3 is now the
-// Create member, which CreateInstance forwards to.
+// LAB_06c306b0 AddRef, FUN_06c2a3a0 Release) and differing only in slot 3 CreateInstance --
+// here the Create member, which CreateInstance forwards to.
 struct FDacomFactory final : IComponentFactory
 {
     explicit FDacomFactory(FDacomFactoryCreateFn CreateIn)
@@ -77,8 +73,8 @@ struct FDacomFactory final : IComponentFactory
     FDacomFactoryCreateFn Create;
 };
 
-// The 0x10 descriptor RenderManager's plugin loader (FUN_06c33a10 @ 06c33a39 / 06c33b28..
-// 06c33b38) hands DACOM CreateInstance for every [RenderManager] name. The VMesh factory
+// The 0x10 descriptor RenderManager's plugin loader (FUN_06c33a10) hands DACOM CreateInstance
+// for every [RenderManager] name. The VMesh factory
 // (LAB_06c2db50) requires exactly this size, and FUN_06c2d720 requires +8 and +0xC non-null.
 struct FRenderPluginDesc
 {
@@ -114,8 +110,8 @@ struct FLodSet
     std::vector<FLodEntry> Entries; // +0x00
     int LodCount;                   // +0x04
     int CurrentLod;                 // +0x08
-    unsigned char bFlag;            // +0x0C IRenderer Slot19 / Slot21 bit 0
-    std::vector<float> Switch;      // +0x10 IRenderer Slot14 / Slot15, FUN_06c32040
+    unsigned char bFlag;            // +0x0C bit 0 of Set/GetArchetypeRootLodSelection
+    std::vector<float> Switch;      // +0x10 Get/SetArchetypeLodRange, FUN_06c32040
 
     FLodSet() : LodCount(0), CurrentLod(0), bFlag(0) {}
 };
@@ -151,8 +147,8 @@ struct FVmeshGroup
     unsigned long VertexTotal;  // +0x00 sum of member Header->Vertices
     unsigned long IndexTotal;   // +0x04 sum of member Header->Indices
     unsigned long Fvf;          // +0x08 0 until the first member is added
-    unsigned long Field0C;      // +0x0C TODO: zeroed at construction, no reader in 06c2d330..06c2f480
-    unsigned long Field10;      // +0x10 TODO: zeroed at construction, no reader in 06c2d330..06c2f480
+    unsigned long Field0C;      // +0x0C TODO: zeroed at construction, no reader in the VMesh code
+    unsigned long Field10;      // +0x10 TODO: zeroed at construction, no reader in the VMesh code
     void* VertexBuffer;         // +0x14
     void* IndexBuffer;          // +0x18
     FVmeshData* First;          // +0x1C
@@ -196,9 +192,9 @@ I3DMathEngine* AcquireMathEngine();
 
 // The four per-caller caches (.data, zero-initialised).
 extern I3DMathEngine* G_MathTriMeshDraw; // DAT_06c37cc0: TriMesh draw FUN_06c294f0 (4 sites)
-extern I3DMathEngine* G_MathSphere;      // DAT_06c37cc8: sphere draw 06c2b4ff..06c2c145 (9 sites)
+extern I3DMathEngine* G_MathSphere;      // DAT_06c37cc8: sphere draw (9 sites)
 extern I3DMathEngine* G_MathVMesh;       // DAT_06c37d44: VMesh draw LAB_06c319e0 (4 sites)
-extern I3DMathEngine* G_MathRenderMgr;   // DAT_06c37d48: RenderManager 06c32ba0..06c33111 (6 sites)
+extern I3DMathEngine* G_MathRenderMgr;   // DAT_06c37d48: RenderManager (6 sites)
 
 // The inline pattern at every call site: `if (Cache == 0) Cache = FUN_06c34e60(); use Cache`.
 inline I3DMathEngine* MathEngineCached(I3DMathEngine*& Cache)

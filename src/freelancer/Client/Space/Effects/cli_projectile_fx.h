@@ -27,8 +27,8 @@ struct ISoundSource;      // soundmanager.h
 // CliLauncher fire host — retail CliLauncher.cpp (FUN_0052c830 / FUN_0052d880).
 // A ClientEquip (client_equip_fx.h): Equip +0x04 is the CELauncher, Host +0x08 the ship's
 // gameobj, SeparationExplosion +0x0c. sizeof 0x40 for the launcher / mine / CM (operator
-// new(0x40) at 0x005331ea / 0x005332e6; FUN_0052c830 zeroes through +0x3c) and 0x44 for the
-// gun (operator new(0x44) at 0x005333ea; its +0x40 lives in FCliGunFx). Retail never builds a
+// new(0x40); FUN_0052c830 zeroes through +0x3c) and 0x44 for the gun (its +0x40 lives in
+// FCliGunFx). Retail never builds a
 // plain launcher: FUN_0052c830's only callers are the mine / CM / gun constructors.
 //
 // Retail vtables (six slots each; slots 3..5 are the fire hooks TryFire / FireBarrelAim /
@@ -78,44 +78,44 @@ struct FCliLauncherFx : FClientEquip
     void* MuzzleEffect;                        // +0x28  live particle (PlayMuzzleFx)
     FEffectArch* DefaultEffectArch;            // +0x2c  "multi_sparks02" (DAT_00675448)
     // +0x30 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} the
-    // Update fills with "multi_sparks02" (FUN_00503070, 0x0052ce6b).
+    // Update fills with "multi_sparks02" (FUN_00503070).
     FLauncherEffectCompanion Companion;
 
     FCliLauncherFx();
     // FUN_0052caa0 (the body of the scalar deleting FUN_0052ca80 / FUN_0052d590).
     ~FCliLauncherFx() override;
 
-    // LAB_0052ccb0 (RET 8): code 0xa -- the use-animation dropped, the companion out of the
-    // host's effect list, the muzzle effect killed and released -- then FUN_00531b20.
+    // LAB_0052ccb0: code 0xa -- the use-animation dropped, the companion out of the host's
+    // effect list, the muzzle effect killed and released -- then FUN_00531b20.
     void notify(Event Code, void* Param) override;
-    // FUN_0052cd40 (RET 4).
+    // FUN_0052cd40.
     bool Update(float Dt) override;
 
     // The three fire slots every launcher-family table adds after Update (see the tables
     // above). Retail names are unknown; these names say what each does.
-    // Slot 3 -- FUN_0052d410 (RET 4): CELauncher::Fire (vtable +0x90) at Target; FireOk plays
+    // Slot 3 -- FUN_0052d410: CELauncher::Fire at Target; FireOk plays
     // the muzzle, consumes, updates the player's ammo and battle music (true); the refusals
     // play the dry-fire sound or notify the player's ship (false). Gun: FUN_0052dd00.
     virtual unsigned char TryFire(Vector const* Target);
     // Slot 4 -- FUN_0052d280 (no args): aim 1e10 along the averaged barrel direction, slot 3
     // on it, and on success IServer::FireWeapon (DAT_0067ecd0 slot 0). Shared by every table.
     virtual unsigned char FireBarrelAim();
-    // Slot 5 -- FUN_0052d510 (RET 4, Target unread): with an equipment, the muzzle, the
+    // Slot 5 -- FUN_0052d510 (Target unread): with an equipment, the muzzle, the
     // multiplayer resource consumption and the battle-music note. Gun: FUN_0052dd40.
     virtual void FireDirect(Vector const* Target);
 
-    // FUN_0052cf80 (RET 4, returns through a hidden ID_String): the one-shot sound's linked
+    // FUN_0052cf80 (returns through a hidden ID_String): the one-shot sound's linked
     // archetype (slot 12) nickname id (+0x04), or a cleared id -- the key FUN_00534870 groups
     // the launchers that fired together by.
     ID_String OneShotSoundId() const;
-    // FUN_0052ced0 (RET 8): with a one-shot sound (+0x18), the fire voice (+0x1c, made on first
+    // FUN_0052ced0: with a one-shot sound (+0x18), the fire voice (+0x1c, made on first
     // use) goes to Pos, attenuated by the archetype's attenuation times (ShotCount - 1),
     // negated, pitched by its random pitch, and started (idle) or rewound (playing).
     void PlayFireSound(Vector const* Pos, int ShotCount);
 
 protected:
     // The code-0xa body LAB_0052ccb0 shares with the mine / CM / gun notifies (each inlines it
-    // after its own player voice line): 0x0052ccbd..0x0052cd1c.
+    // after its own player voice line).
     void DropOnDestroying();
 };
 static_assert(sizeof(FCliLauncherFx) == 0x40, "CliLauncherFx 0x40");
@@ -128,28 +128,28 @@ static_assert(offsetof(FCliLauncherFx, Companion) == 0x30, "companion @ +0x30");
 // FUN_0052d570: the mine dropper -- the launcher with vtable PTR_FUN_005dd564.
 struct FCliMineDropperFx : FCliLauncherFx
 {
-    // FUN_0052d5c0 (RET 8).
+    // FUN_0052d5c0.
     void notify(Event Code, void* Param) override;
 };
 
 // FUN_0052d6e0: the countermeasure dropper -- vtable PTR_FUN_005dd598.
 struct FCliCmDropperFx : FCliLauncherFx
 {
-    // FUN_0052d700 (RET 8).
+    // FUN_0052d700.
     void notify(Event Code, void* Param) override;
 };
 
 // FUN_0052d880: the gun -- vtable PTR_LAB_005dd5d8, +0x40 its turret-motion voice.
 struct FCliGunFx : FCliLauncherFx
 {
-    // LAB_0052da00 (RET 8).
+    // LAB_0052da00.
     void notify(Event Code, void* Param) override;
-    // FUN_0052dbf0 (RET 4).
+    // FUN_0052dbf0.
     bool Update(float Dt) override;
-    // Slot 3 -- FUN_0052dd00 (RET 4): FUN_0052d410 (non-virtual), then an unguided munition
+    // Slot 3 -- FUN_0052dd00: FUN_0052d410 (non-virtual), then an unguided munition
     // (Seeker +0x90 == 0) launches its projectiles (FUN_0052dde0).
     unsigned char TryFire(Vector const* Target) override;
-    // Slot 5 -- FUN_0052dd40 (RET 4): FUN_0052d510's body, then the target point for an owned
+    // Slot 5 -- FUN_0052dd40: FUN_0052d510's body, then the target point for an owned
     // host and the projectiles of an unguided munition.
     void FireDirect(Vector const* Target) override;
 
@@ -202,11 +202,11 @@ static_assert(sizeof(FCliEquipFirePacket) == 0x28, "fire pkt 0x28 (10 dwords)");
 
 // FUN_004fc8b0
 void BeamEffectSetProgressFromSpeed(FBeamEffect* This, float Speed);
-// FUN_004fc8f0 (thiscall, RET 8) -- Flags70 bit 1 = bHit, bit 2 = bHitPlayer (the other bits
-// kept). Caller: Beam slot 101 LAB_0053f690 (0x0053f738) with (1, Other == player).
+// FUN_004fc8f0 -- Flags70 bit 1 = bHit, bit 2 = bHitPlayer (the other bits kept). Caller: Beam
+// slot 101 LAB_0053f690 with (1, Other == player).
 void BeamEffectSetHitFlags(FBeamEffect* This, bool bHit, bool bHitPlayer);
 
-// FUN_005154a0 (thiscall on the 0x10 companion, RET 0x10) -- +0x00 Arch, +0x04 Sound,
+// FUN_005154a0 (on the 0x10 companion) -- +0x00 Arch, +0x04 Sound,
 // +0x08 Particle, +0x0c Light (retail argument order: Arch, Particle, Sound, Light), AddRef
 // each non-null one. Callers: Beam activate FUN_0053f340 (Beam +0xc0) and the effect paths.
 void CliEffectCompanionInit(void* Companion16, void* Arch, FEffectBase* Particle,
@@ -224,21 +224,20 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16);
 void CliEffectCompanionClear(void* Companion16);
 
 // The inline stop sequence that precedes a companion clear (FUN_004fcef0, FUN_005139d0,
-// FUN_005137c0, FUN_00503a80): particle vt+4 (ArmDeath), sound vt+0x94(-1, identity pose) and
-// vt+0x60 (Stop), light FUN_005379b0 then vt+8 (disable).
+// FUN_005137c0, FUN_00503a80): particle ArmDeath, sound SetPose(-1, identity) and Stop, light
+// FUN_005379b0 then disable.
 void CliEffectCompanionArmStop(void* Companion16);
 
-// FUN_004fd0d0 (thiscall on the list at ListOwner+0x28, RET 4) — stop and release every
-// node's companion (or, with a non-null ArchFilter, only the nodes whose slot 0 is non-null and
-// holds ArchFilter in its first dword), then erase EVERY node. Callers: GameObject's dtor
-// (0x00539565, 0x0053961e), the list's own dtor FUN_005393e0 (0x00539407) and slot 108
-// (0x0053a892).
+// FUN_004fd0d0 (on the list at ListOwner+0x28) — stop and release every node's companion (or,
+// with a non-null ArchFilter, only the nodes whose slot 0 is non-null and holds ArchFilter in its
+// first dword), then erase EVERY node. Callers: GameObject's dtor, the list's own dtor
+// FUN_005393e0 and slot 108.
 void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter);
 
-// FUN_004fd230 (thiscall on the list at ListOwner+0x28, RET 8) — every node whose engine
+// FUN_004fd230 (on the list at ListOwner+0x28) — every node whose engine
 // instance is PartIndex or a descendant leaves the list: with NewOwner, a still-alive one is
 // moved to the end of NewOwner's list (FUN_004fd420 + FUN_004f7d80); the rest are stopped and
-// released. Callers: EquippedObj notify 5/6/7/8 (0x005347c7, 0x00534842), FUN_00533d10.
+// released. Callers: EquippedObj notify 5/6/7/8, FUN_00533d10.
 void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameobj* NewOwner);
 
 // FUN_004fd480 — copy 4 pointers + AddRef particle(+8) / sound(+4) / light(+0xc).
@@ -250,7 +249,7 @@ void GameLightSetFreeMotionOffset(FGameLight* Light, float const* Offset3);
 // FUN_005377c0 — explosion FX local transform (when SlotExplosionFx non-null).
 void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform const* LocalXform);
 
-// FUN_0053f340 (thiscall on the Beam, RET 8, non-virtual) -- the Beam's activate: beam effect
+// FUN_0053f340 (on the Beam, non-virtual) -- the Beam's activate: beam effect
 // + light into the +0xc0 companion, insert it into the effect list, then Projectile slot 92
 // FUN_005426e0 called directly. Caller: CliLauncher fire FUN_0052dde0.
 void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
@@ -273,8 +272,8 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher);
 unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointIds,
                             unsigned HardpointCount, Vector const* TargetPos, int PlayerId);
 
-// LAB_00535330 — EquippedObj adjustor vt+0x4c ActivateEquip(id*, bOn, playerId). Returns
-// retail's EAX: 0 on every path (0x00535459).
+// LAB_00535330 — EquippedObj adjustor vt+0x4c ActivateEquip(id*, bOn, playerId). Returns 0 on
+// every path.
 int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
                          unsigned char bOn, int PlayerId);
 
@@ -294,15 +293,11 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
 // FUN_00544880 — lead-aim → Host+4 vt+0x34 (CliShipFireWeapons).
 void CliShipLeadAimFire(FClientEquippedObj* Host);
 
-// LAB_005468e0 — CShip IObjAffect vt+0x48 set_target(target, sub, player), RET 0xc.
+// LAB_005468e0 — CShip IObjAffect vt+0x48 set_target(target, sub, player).
 // AdjustorThis = Host+4.
 int CliShipSetTarget(void* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId);
 
-// FUN_005351d0 — EquippedObj IObjAffect vt+0x44 (hp*, target, sub, player), RET 0x10.
+// FUN_005351d0 — EquippedObj IObjAffect vt+0x44 (hp*, target, sub, player).
 // AdjustorThis = Host+4.
 int CliEquippedObjSetGunTarget(void* AdjustorThis, unsigned short const* HardpointId,
                                IObjRW* Target, unsigned short SubId, int PlayerId);
-
-// FUN_005416c0 — ClientObjDb_FindObject (client_objdb.h).
-// FUN_005351d0 — per-gun SetTarget + IServer::SetTarget (wired in 0x1c walk).
-// LAB_005468e0 — CShip Host+4 vt+0x48 set_target/sub + IServer::SetTarget.

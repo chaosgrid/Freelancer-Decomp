@@ -6,7 +6,7 @@
 
 #include "Interface/win3d.h"
 
-#include "Common/client_cliobj.h"   // ResolveMaterialEntryFromFs (FUN_0041ade0) / ReleaseMaterialEntrySlot
+#include "Common/client_cliobj.h"
 #include "Common/Graphics/client_mesh_load.h"
 #include "Common/engine_light.h"
 #include "Space/HUD/hud_command_dispatch.h"
@@ -17,7 +17,7 @@
 #include "NeuroNet/nn_tooltip.h"
 #include "NeuroNet/nn_ui_pulse.h"
 #include "Space/Cameras/space_camera.h"
-#include "Space/space_scene_obj_draw.h" // SpaceCameraSetNearFar (FUN_0040fb60)
+#include "Space/space_scene_obj_draw.h"
 #include "Interface/win3d_engine_submit.h"
 #include "Interface/win3d_immediate.h"
 #include "Interface/win3d_render.h"
@@ -26,7 +26,7 @@
 
 #include "common_csys.h"
 #include "DALib.h"
-#include "readfile.h"             // IFileSystem::CreateInstance (the "FileSystem" instance)
+#include "readfile.h"
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"
 #include "x86math.h"
@@ -56,9 +56,7 @@ namespace
         FWin3DListNode* Head; // +4
         FWin3DListNode* Tail; // +8
 
-        // The atexit bodies LAB_0059d480 (registry) and LAB_0059d4f0 (pending list), one code
-        // shape: walk from Head freeing each node (FUN_005b7e1d, the next link read first),
-        // then Count = 0, Tail = 0, Head = 0 in that order. The payloads are not touched.
+        // The atexit bodies LAB_0059d480 / LAB_0059d4f0. The payloads are not touched.
         ~FWin3DList()
         {
             FWin3DListNode* Node = Head;
@@ -74,11 +72,9 @@ namespace
         }
     };
 
-    // DAT_0067dbe4 / dbe8 / dbec -- the registry, payload = Win3D*. Static init LAB_0059d460
-    // zeroes it; atexit LAB_0059d480 frees the nodes (~FWin3DList).
+    // DAT_0067dbe4 -- the registry, payload = Win3D*.
     FWin3DList G_Registry = {0, nullptr, nullptr};
-    // DAT_0067dbd8 / dbdc / dbe0 -- nodes queued for removal, payload = registry node.
-    // Static init LAB_0059d4d0, atexit LAB_0059d4f0 (~FWin3DList).
+    // DAT_0067dbd8 -- nodes queued for removal, payload = registry node.
     FWin3DList G_PendingRemove = {0, nullptr, nullptr};
 
     // DAT_0067dcdc keyboard focus, DAT_0067dce0 capture stack head (link at +0x38),
@@ -87,18 +83,18 @@ namespace
     Win3D* G_CaptureHead = nullptr;
     Win3D* G_Hover = nullptr;
 
-    // DAT_0067dbcc / d0 / d4 -- the mouse ray. LAB_0059d540 seeds (0, 0, -1); the producer is
-    // the Win3D input handler FUN_0059d140 case 2.
+    // DAT_0067dbcc -- the mouse ray, seeded (0, 0, -1); written by the Win3D input handler
+    // FUN_0059d140 case 2.
     float G_MouseRay[3] = {0.0f, 0.0f, -1.0f};
 
-    // DAT_0067dcd0 -- how many registry nodes the last FUN_0059e080 walked.
+    // DAT_0067dcd0 -- how many registry nodes the last Win3DUpdateAll walked.
     int G_UpdateNodeCount = 0;
-    // DAT_0067dcf0 -- read by FUN_0059e300 (JG skips the whole draw). No writer exists in
-    // the binary (XREF[1]: 0059e30a R), so it stays zero.
+    // DAT_0067dcf0 -- read by Win3DDrawAll (positive skips the whole draw). No writer exists in
+    // the binary, so it stays zero.
     int G_DrawSuppressCount = 0;
 
-    // FUN_0059e810 (thiscall on the list, RET 4): operator_new(0xc); a null allocation still
-    // runs the tail with node 0, as retail does.
+    // FUN_0059e810 (thiscall on the list, RET 4). A null allocation still runs the tail with
+    // node 0, as retail does.
     bool ListPushBack(FWin3DList* List, void* Payload)
     {
         FWin3DListNode* Node = static_cast<FWin3DListNode*>(operator new(sizeof(FWin3DListNode)));
@@ -140,8 +136,7 @@ namespace
             *ChildHeadField = Walk->NextSibling;
     }
 
-    // The unlink-and-free of one registry node, repeated inline four times in retail
-    // (0059d6f0.., 0059d808.., 0059e1f0.., 0059e280..).
+    // The unlink-and-free of one registry node, repeated inline four times in retail.
     void RegistryEraseNode(FWin3DListNode* Node)
     {
         FWin3DListNode* const Prev = Node->Prev;
@@ -159,8 +154,8 @@ namespace
         G_Registry.Count = G_Registry.Count - 1;
     }
 
-    // 0059e1e1..0059e257 / 0059e272..0059e2ef: erase every registry node the pending list
-    // names, free the pending nodes, then clear the pending list header.
+    // Erase every registry node the pending list names, free the pending nodes, then clear the
+    // pending list header (inlined twice in Win3DUpdateAll).
     void DrainPendingRemove()
     {
         for (FWin3DListNode* Pending = G_PendingRemove.Head; Pending != nullptr;
@@ -182,12 +177,9 @@ namespace
         G_PendingRemove.Head = nullptr;
     }
 
-    // The sorted draw used by FUN_0059e300 (roots) and FUN_0059e5c0 / FUN_0059e6e0 (children):
-    // zero layer draws at once, the rest go into a 0x400-entry stack array ordered by the
-    // unsigned layer, then by +0x68 with an ordered-less compare (TEST AH,5 / JNP), equal keys
-    // keeping insertion order. Retail checks the capacity only on the append path
-    // (0059e656 / 0059e479 / 0059e781); the insertion path writes past the array when it is
-    // full, and so does the port (the extra bound it used to have was removed 2026-09-30).
+    // The sorted draw used for roots and children: zero layer draws at once, the rest go into a
+    // 0x400-entry stack array ordered by the unsigned layer, then by +0x68 with an ordered-less
+    // compare, equal keys keeping insertion order.
     void InsertSorted(Win3D** Sorted, unsigned* Count, Win3D* Object)
     {
         unsigned const Layer = Object->DrawLayer;
@@ -211,16 +203,14 @@ namespace
                 break;
             InsertAt = InsertAt + 1;
         }
-        // 0x0059e635..0x0059e662: no capacity check on the insertion path (retail bounds only
-        // the append at 0x0059e656); more than 0x400 visible layered children of one parent
-        // would overrun the stack array in retail too.
+        // Retail bug kept: no capacity check on the insertion path (only the append is
+        // bounded), so more than 0x400 visible layered objects overrun the stack array.
         if (Size - InsertAt != 0)
             memmove(&Sorted[InsertAt + 1], &Sorted[InsertAt], (Size - InsertAt) * sizeof(Win3D*));
         Sorted[InsertAt] = Object;
         *Count = Size + 1;
     }
 
-    // Body shared by FUN_0059e5c0 and FUN_0059e6e0.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only (hud_widescreen.h): every draw, update, hit test and mouse call on an object
     // runs with the Win3D camera shifted for that object's HUD corner window (no-op for
@@ -240,8 +230,8 @@ namespace
             Object->UpdateInactive();
     }
 
-    // Ray is the frame's mouse ray (DAT_0067dbcc); a shifted object is tested against the
-    // cursor's ray through the shifted camera instead.
+    // Ray is the frame's mouse ray; a shifted object is tested against the cursor's ray through
+    // the shifted camera instead.
     bool HitTestWidescreen(Win3D* Object, float const* Ray)
     {
         float const Shift = WidescreenHudShiftPixelsFor(Object);
@@ -285,6 +275,7 @@ namespace
     }
 #endif
 
+    // Body shared by FUN_0059e5c0 and FUN_0059e6e0.
     void DrawChildrenSorted(Win3D* Parent)
     {
         Win3D* Sorted[0x400];
@@ -317,9 +308,7 @@ namespace
 
 int G_Win3DLiveCount = 0;
 
-// DAT_0067dccc -- nesting count raised by the modal NN dialogs' ctors (004746db, 00474956,
-// 0047481e) and lowered by their dtors (004721ea, 0047256a); while it is non-zero
-// FUN_0059e080 updates only the WinControl holding the mouse.
+// DAT_0067dccc (win3d.h).
 int G_ModalCaptureCount = 0;
 
 // ---------------------------------------------------------------------------------------
@@ -357,8 +346,7 @@ Win3D::Win3D()
 
 Win3D::~Win3D()
 {
-    // FUN_004b4fd0: --DAT_0067dcd4, flags &= 0xfc, slot 10 on every child (children are not
-    // deleted here), FUN_0059dc00(this).
+    // FUN_004b4fd0. Children are destroyed, not deleted.
     G_Win3DLiveCount = G_Win3DLiveCount - 1;
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
@@ -368,19 +356,19 @@ Win3D::~Win3D()
 
 bool Win3D::Slot1(unsigned /*A*/, unsigned /*B*/)
 {
-    // LAB_0043d8a0: XOR AL,AL / RET 8.
+    // LAB_0043d8a0.
     return false;
 }
 
 WinControl* Win3D::AsWinControl()
 {
-    // FUN_004b5010: XOR EAX,EAX / RET.
+    // FUN_004b5010.
     return nullptr;
 }
 
 bool Win3D::IsDescendantOf(Win3D* Ancestor)
 {
-    // LAB_0043d8b0: parent == Ancestor → true; parent → tail-jump to parent's slot 3.
+    // LAB_0043d8b0.
     Win3D* const Up = Parent;
     if (Up == Ancestor)
         return true;
@@ -391,13 +379,13 @@ bool Win3D::IsDescendantOf(Win3D* Ancestor)
 
 bool Win3D::HitTest(float const* /*Ray*/)
 {
-    // FUN_0053f330: XOR AL,AL / RET 4.
+    // FUN_0053f330.
     return false;
 }
 
 void Win3D::SetPosition(float const* NewPosition)
 {
-    // LAB_004b5020: three dword copies to +0x60.
+    // LAB_004b5020.
     Position[0] = NewPosition[0];
     Position[1] = NewPosition[1];
     Position[2] = NewPosition[2];
@@ -405,27 +393,26 @@ void Win3D::SetPosition(float const* NewPosition)
 
 bool Win3D::IsPositionInViewport(unsigned /*A*/)
 {
-    // LAB_0043d8e0: MOV AL,1 / RET 4.
+    // LAB_0043d8e0.
     return true;
 }
 
 void Win3D::SetOrientation(float const* NewOrientation)
 {
-    // FUN_004b5040: REP MOVSD, nine dwords to +0x3c.
+    // FUN_004b5040.
     memmove(Orientation, NewOrientation, sizeof(Orientation));
 }
 
 void Win3D::SetTransform(float const* Transform)
 {
-    // LAB_00595f70: virtual slot 7 (Transform), then virtual slot 5 (Transform + 9 floats).
+    // LAB_00595f70: both virtual calls.
     SetOrientation(Transform);
     SetPosition(Transform + 9);
 }
 
 bool Win3D::Create(Win3D* NewParent, void* /*Data*/)
 {
-    // FUN_004b5060 (RET 8): FUN_0059dd00(this, NewParent), FUN_0059dbf0(this),
-    // flags = (flags & 0xfb) | 3, return 1.
+    // FUN_004b5060 (RET 8).
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
     Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
@@ -484,33 +471,33 @@ void Win3D::Draw()
 
 void Win3D::MouseOver(float const* /*Ray*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void Win3D::MouseEnter(float const* /*Ray*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void Win3D::MouseLeave(float const* /*Ray*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void Win3D::Slot17()
 {
-    // FUN_00401e90: RET.
+    // FUN_00401e90.
 }
 
 bool Win3D::MouseWheelEvent(int /*Value*/)
 {
-    // FUN_0053f330: XOR AL,AL / RET 4.
+    // FUN_0053f330.
     return false;
 }
 
 bool Win3D::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_004b50c0: parent → tail-jump to its slot 19 with the same argument; else false.
+    // LAB_004b50c0.
     Win3D* const Up = Parent;
     if (Up != nullptr)
         return Up->MouseEvent(Event);
@@ -519,38 +506,38 @@ bool Win3D::MouseEvent(FWin3DMouseEvent const* Event)
 
 bool Win3D::KeyEvent(unsigned /*Key*/, unsigned char* /*Modifiers*/)
 {
-    // LAB_0043d8a0: XOR AL,AL / RET 8.
+    // LAB_0043d8a0.
     return false;
 }
 
 bool Win3D::Slot21(unsigned /*A*/, unsigned /*B*/, unsigned /*C*/, unsigned /*D*/)
 {
-    // LAB_0043d8f0: XOR AL,AL / RET 0x10.
+    // LAB_0043d8f0.
     return false;
 }
 
 bool Win3D::CharEvent(unsigned /*A*/, unsigned /*B*/)
 {
-    // LAB_0043d8a0: XOR AL,AL / RET 8.
+    // LAB_0043d8a0.
     return false;
 }
 
 bool Win3D::ProcessMessage(unsigned /*Msg*/, unsigned /*A*/, unsigned /*B*/)
 {
-    // LAB_004b50e0: XOR AL,AL / RET 0xc.
+    // LAB_004b50e0.
     return false;
 }
 
 void Win3D::Slot24(unsigned A)
 {
-    // LAB_0043d900: slot 24(A) on every child.
+    // LAB_0043d900.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Slot24(A);
 }
 
 float Win3D::Slot25()
 {
-    // LAB_0043d930: FLD DAT_005c75dc (1.0f).
+    // LAB_0043d930.
     return 1.0f;
 }
 
@@ -568,7 +555,7 @@ int Win3D::GetHitPriority()
 
 void Win3D::SetName(char const* NewName)
 {
-    // 0059dba3..0059dbe1.
+    // Inlined in WinFactoryCreate.
     if (NewName == nullptr)
     {
         NameLength = 0;
@@ -595,9 +582,9 @@ void Win3DSetKeyFocus(Win3D* Focus)
 
 void Win3DPushCapture(Win3D* Object)
 {
-    // FUN_0059d8d0. A non-zero +0x38 means the object may already be on the stack: find it
-    // (keeping the previous entry) and move it to the head. A zero +0x38 means it is either
-    // the tail or absent -- either way it is pushed without a search, as retail does.
+    // FUN_0059d8d0. A non-zero +0x38 means the object may already be on the stack: it is moved
+    // to the head. A zero +0x38 means it is the tail or absent -- either way it is pushed
+    // without a search, as retail does.
     Win3D* const OldNext = Object->CaptureNext;
     if (OldNext == nullptr)
     {
@@ -672,7 +659,7 @@ Win3D* Win3DFindByClassName(char const* ClassName)
         Win3D* const Object = static_cast<Win3D*>(Node->Payload);
         if (Object == nullptr || Object->ClassName == nullptr)
             continue;
-        if (_stricmp(Object->ClassName, ClassName) == 0)   // DACOM.DLL::stricmp
+        if (_stricmp(Object->ClassName, ClassName) == 0)
             return Object;
     }
     return nullptr;
@@ -686,7 +673,7 @@ Win3D* Win3DFindByName(char const* Name)
         Win3D* const Object = static_cast<Win3D*>(Node->Payload);
         if (Object == nullptr)
             continue;
-        if (_stricmp(Object->Name, Name) == 0)             // DACOM.DLL::stricmp
+        if (_stricmp(Object->Name, Name) == 0)
             return Object;
     }
     return nullptr;
@@ -724,15 +711,13 @@ float* Win3DMouseRayStorage()
 
 FSpaceCamera* Win3DGetCamera()
 {
-    // FUN_0059da60: MOV EAX, &DAT_0067dbf8. The port's DAT_0067dbf8 is G_Win3DSceneCamera, built
-    // at static init as LAB_0059d020 builds it (win3d_engine_submit.cpp).
+    // FUN_0059da60 (G_Win3DSceneCamera, win3d_engine_submit.cpp).
     return GetWin3DSceneCamera();
 }
 
 void Win3DSetViewportSize(int Width, int Height)
 {
-    // FUN_0059dcc0 (cdecl w, h): {0, 0, w - 1, h - 1} into FUN_0040fb80 on DAT_0067dbf8 with a
-    // second argument of 1 (dead in the callee).
+    // FUN_0059dcc0 (cdecl). The second argument of 1 is dead in the callee.
     int ViewRect[4];
     ViewRect[0] = 0;
     ViewRect[1] = 0;
@@ -772,7 +757,6 @@ bool Win3DUnregister(Win3D* Object)
     if (Node == nullptr || Node->Payload == nullptr)
         return false;
 
-    // 0059dc65..0059dc96: FUN_0059e7d0 inlined on the parent's child list, then +4 = 0.
     Win3D* const Up = Object->Parent;
     if (Up != nullptr)
     {
@@ -812,11 +796,9 @@ void Win3DReparent(Win3D* Child, Win3D* NewParent)
 
 bool Win3DDispatchKey(FHudCmdRecord const* Record)
 {
-    // FUN_0059dfd0 (cdecl, one argument). The modifier byte is built in the argument's own stack
-    // slot, so bits 5..7 are whatever the low byte of the Record pointer holds
-    // (0059dfd3 MOV AL,[ESP+param_1] / AND AL,0xe0); only bits 0..4 are written:
-    //   bit0 = (+0x18 == 0), bit1 = +0x18 bit0, bit2 = (+0x08 & 3) != 0,
-    //   bit3 = (+0x08 & 0xc) != 0, bit4 = (+0x08 & 0x30) != 0.
+    // FUN_0059dfd0 (cdecl). Retail quirk kept: the modifier byte is built in the argument's own
+    // stack slot, so bits 5..7 are the low byte of the Record pointer; only bits 0..4 are
+    // written.
     unsigned char Modifiers =
         static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Record) & 0xe0);
     unsigned char const Byte18 = Record->Byte18;
@@ -832,11 +814,11 @@ bool Win3DDispatchKey(FHudCmdRecord const* Record)
         Modifiers = static_cast<unsigned char>(Modifiers | 0x10);
     unsigned const Key = Record->Key;
 
-    // 0059e02f: the focus object alone gets the key, and its answer is returned.
+    // The focus object alone gets the key, and its answer is returned.
     if (G_KeyFocus != nullptr)
         return G_KeyFocus->KeyEvent(Key, &Modifiers);
 
-    // 0059e04c..0059e071: otherwise every registered object in order until one takes it.
+    // Otherwise every registered object in order until one takes it.
     bool bHandled = false;
     for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
     {
@@ -899,7 +881,7 @@ Win3D* Win3DPick(float const* Ray)
         }
         if (Depth != BestDepth)
             continue;
-        // 0059ddfc: FCOMP / TEST AH,0x41 / JNZ -- only a strictly greater +0x68 competes.
+        // Only a strictly greater +0x68 competes (unordered does not).
         if (!(Object->Position[2] > Best->Position[2]))
             continue;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -917,8 +899,8 @@ Win3D* Win3DPick(float const* Ray)
 
 Win3D* Win3DPickWithin(Win3D* Capture, float const* Ray)
 {
-    // FUN_0059de50 (cdecl Capture, Ray). Unlike FUN_0059dd80 the ancestor-visibility walk runs
-    // only after the depth comparison, and only on the "deeper" branch.
+    // FUN_0059de50 (cdecl). Unlike Win3DPick the ancestor-visibility walk runs only after the
+    // depth comparison, and only on the "deeper" branch.
     Win3D* Best = nullptr;
     int BestDepth = -1;
     for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
@@ -1028,11 +1010,11 @@ void Win3DSetHover(Win3D* Object)
 void Win3DUpdateAll(double DeltaSeconds)
 {
     // FUN_0059e080 (cdecl, double dt).
-    NnUiPulseAdvance(DeltaSeconds);                           // 0059e080..0059e0c9
-    NnToolTipTickGlobal(DeltaSeconds);                        // FUN_004be2b0
-    NnRolloverTickGlobal(DeltaSeconds);                       // FUN_004b6290
+    NnUiPulseAdvance(DeltaSeconds);
+    NnToolTipTickGlobal(DeltaSeconds);
+    NnRolloverTickGlobal(DeltaSeconds);
 
-    // 0059e0eb: FUN_0041dd90 -- the software cursor is drawn.
+    // Picking only while the software cursor is drawn.
     Win3D* Picked = nullptr;
     if (GetClientMouseCursorDrawFlag() != 0)
     {
@@ -1048,7 +1030,7 @@ void Win3DUpdateAll(double DeltaSeconds)
         }
     }
 
-    // 0059e123..0059e15a: FUN_0059df80's body inlined, but slot 14 runs only on a change.
+    // Win3DSetHover inlined, but MouseOver runs only on a change.
     if (G_Hover != Picked)
     {
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -1075,8 +1057,8 @@ void Win3DUpdateAll(double DeltaSeconds)
     G_UpdateNodeCount = 0;
     if (G_ModalCaptureCount != 0)
     {
-        // 0059e16b..0059e194: the first registered WinControl holding the mouse gets the only
-        // update of the frame, then the pending list is drained.
+        // The first registered WinControl holding the mouse gets the only update of the frame,
+        // then the pending list is drained.
         for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
         {
             Win3D* const Object = static_cast<Win3D*>(Node->Payload);
@@ -1098,7 +1080,7 @@ void Win3DUpdateAll(double DeltaSeconds)
         }
     }
 
-    // 0059e196..0059e26c: every registered root (+4 == 0), counting every node walked.
+    // Every registered root, counting every node walked.
     for (FWin3DListNode* Node = G_Registry.Head; Node != nullptr; Node = Node->Next)
     {
         Win3D* const Object = static_cast<Win3D*>(Node->Payload);
@@ -1121,18 +1103,18 @@ void Win3DUpdateAll(double DeltaSeconds)
 void Win3DBeginDraw()
 {
     // FUN_0059e500.
-    Win3DDisable(kWin3DLightingCap);   // 0xb50
-    Win3DDisable(kWin3DTexture2D);     // 0xde1
-    Win3DDisable(kWin3DCullFace);      // 0xb44
-    Win3DDisable(kWin3DDepthTest);     // 0xb71
-    Win3DDisable(kWin3DFog);           // 0xb60
+    Win3DDisable(kWin3DLightingCap);
+    Win3DDisable(kWin3DTexture2D);
+    Win3DDisable(kWin3DCullFace);
+    Win3DDisable(kWin3DDepthTest);
+    Win3DDisable(kWin3DFog);
     ICamera* const Camera = AsCamera(Win3DGetCamera());
-    Win3DSetViewport(Camera, kWin3DSourceFile, 0x487);   // FUN_00422610
-    Win3DApplyCamera(Camera);                            // FUN_00422950(&DAT_0067dbf8)
-    DALib::MaterialBatcher->SetBinOrder(1, -1);                // +0x20
-    EngineLightClearRegisteredList();                    // FUN_004101e0
+    Win3DSetViewport(Camera, kWin3DSourceFile, 0x487);
+    Win3DApplyCamera(Camera);
+    DALib::MaterialBatcher->SetBinOrder(1, -1);
+    EngineLightClearRegisteredList();
     IRenderPipeline* const Pipe = DALib::Pipeline;
-    Pipe->SetRenderState(D3DRS_AMBIENT, -1);                      // +0xf0
+    Pipe->SetRenderState(D3DRS_AMBIENT, -1);
     Pipe->SetRenderState(D3DRS_DITHERENABLE, 0);
 }
 
@@ -1148,9 +1130,9 @@ void Win3DDrawAll()
     if (G_DrawSuppressCount > 0)
         return;
 
-    Win3DBeginDraw();          // 0059e319..0059e3a9, the same sequence as FUN_0059e500
-    Win3DImmedBatchReset();    // FUN_005a29b0
-    ButtonMontageEnsure();     // FUN_00559c10
+    Win3DBeginDraw();          // inlined in retail
+    Win3DImmedBatchReset();
+    ButtonMontageEnsure();
 
     Win3D* Sorted[0x400];
     unsigned Count = 0;
@@ -1186,11 +1168,11 @@ void Win3DDrawAll()
         }
     }
 
-    ButtonMontageFlushBatch(); // FUN_00559c20
-    Win3DImmedBatchFlushAll(); // FUN_005a2a20
-    UiOverlayPrepPipeline();   // FUN_00417f10
-    ImeFocusDrawPass();        // FUN_00563af0
-    MouseFrameUpdate();        // FUN_0041f150
+    ButtonMontageFlushBatch();
+    Win3DImmedBatchFlushAll();
+    UiOverlayPrepPipeline();
+    ImeFocusDrawPass();
+    MouseFrameUpdate();
     DALib::MaterialBatcher->SetBinOrder(1, 1);
 }
 
@@ -1208,9 +1190,7 @@ void Win3DDrawChildrenOf(Win3D* Parent)
 
 void Win3DDeleteTree(Win3D* Root)
 {
-    // FUN_0043d2a0 (cdecl). 0043d2a5 TEST EDI,EDI / JZ: a null root does nothing. Post-order:
-    // the next sibling is read (0043d2b1) before the child's subtree goes, then slot 10
-    // Destroy (0043d2c8) and the scalar deleting dtor with 1 (0043d2d1).
+    // FUN_0043d2a0 (cdecl). The next sibling is read before the child's subtree goes.
     if (Root == nullptr)
         return;
     Win3D* Child = Root->ChildHead;
@@ -1239,40 +1219,33 @@ bool Win3DAnyCaptured()
     return false;
 }
 
-// DAT_0067dbc8 -- the material-cache entry of interface\interface.generic.vms (FUN_0059d5a0
-// fills it through FUN_0041ade0, FUN_0059d6d0 gives it back through FUN_0041b030).
+// DAT_0067dbc8 -- the material-cache entry of interface\interface.generic.vms.
 Archetype::FCliMaterialEntry* G_InterfaceGenericMaterial = nullptr;
 
 void Win3DStartupManager(int Width, int Height)
 {
-    // FUN_0059d5a0 (.text:0059d5a0-0059d6c1), cdecl(width, height); sole caller InitializeEngine
-    // 0x005b1d53 with the options object's size (DAT_00679bc8 / DAT_00679bcc).
-    FSpaceCamera* const WinCamera = Win3DGetCamera(); // &DAT_0067dbf8
+    // FUN_0059d5a0 (cdecl), with the options object's size (DAT_00679bc8 / DAT_00679bcc).
+    FSpaceCamera* const WinCamera = Win3DGetCamera();
 
-    // 0x0059d5b8..0x0059d5e0: FUN_0040fd60 with the stack rect {0, 0, width - 1, height - 1}.
     int ViewRect[4];
     ViewRect[0] = 0;
     ViewRect[1] = 0;
     ViewRect[2] = Width - 1;
     ViewRect[3] = Height - 1;
     SpaceCameraSetViewport(WinCamera, ViewRect);
-    // 0x0059d5e5..0x0059d5f7: FUN_0040fb60(0.1f, 1000.0f) -- DAT_005c891c / DAT_005c8920.
     SpaceCameraSetNearFar(WinCamera, 0.1f, 1000.0f);
-    // 0x0059d5fc..0x0059d606: FUN_0040f8c0 with the float bits 0x41d9ba5e.
     {
         unsigned int const kHalfFovBits = 0x41d9ba5eu;
         float HalfFovX;
         memcpy(&HalfFovX, &kHalfFovBits, sizeof(HalfFovX));
         SpaceCameraSetHalfFovX(WinCamera, HalfFovX);
     }
-    // 0x0059d60b: FUN_0041e5c0 -- mouse.ini shapes and cursors.
+    // mouse.ini shapes and cursors.
     MouseInitCursors();
-    // 0x0059d610: FUN_005a2970 -- both line batchers.
     Win3DImmedBatchCreateAll();
 
-    // 0x0059d615..0x0059d67e: a "FileSystem" for interface\interface.generic.vms under
-    // DALib::Data (slot 3), the 0x34-byte description zeroed by REP STOSD and filled like every
-    // other client call site.
+    // A "FileSystem" for interface\interface.generic.vms under DALib::Data, the description
+    // filled like every other client call site.
     FFileSystemAggDesc Desc;
     memset(&Desc, 0, sizeof(Desc));
     Desc.Size = 0x34;
@@ -1287,23 +1260,21 @@ void Win3DStartupManager(int Width, int Height)
     if (static_cast<IFileSystem*>(DALib::Data)->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                                                &FsOut) >= 0)
     {
-        // 0x0059d685..0x0059d69a: FUN_0041ade0(fs, path, 1, -1) -> DAT_0067dbc8.
         G_InterfaceGenericMaterial = Archetype::ResolveMaterialEntryFromFs(
             static_cast<IFileSystem*>(FsOut), Desc.DataPath, true, 0xffffffffu);
     }
-    // 0x0059d69f..0x0059d6b0: the file system is released (slot 2) whenever the out pointer is
-    // non-null, whatever the create returned.
+    // Released whenever the out pointer is non-null, whatever the create returned.
     if (FsOut != nullptr)
         static_cast<IFileSystem*>(FsOut)->Release();
 }
 
 void Win3DShutdownManager()
 {
-    // FUN_0059d6d0, 0059d6d0..0059d8ae.
+    // FUN_0059d6d0.
     G_KeyFocus = nullptr;
     G_CaptureHead = nullptr;
 
-    // 0059d6ec..0059d730: erase whatever is already pending.
+    // Erase whatever is already pending.
     for (FWin3DListNode* Pending = G_PendingRemove.Head; Pending != nullptr;
          Pending = Pending->Next)
     {
@@ -1322,8 +1293,7 @@ void Win3DShutdownManager()
     G_PendingRemove.Tail = nullptr;
     G_PendingRemove.Head = nullptr;
 
-    // 0059d752..0059d7f8: FUN_0059dc00 inlined on every registered object (the next node is
-    // read before the object is processed).
+    // Win3DUnregister inlined on every registered object (the next node is read first).
     FWin3DListNode* Node = G_Registry.Head;
     while (Node != nullptr)
     {
@@ -1356,8 +1326,7 @@ void Win3DShutdownManager()
         Node = Next;
     }
 
-    // 0059d7fe..0059d84f: erase the pending registry nodes, then FUN_0059e860 frees the
-    // pending list itself.
+    // Erase the pending registry nodes, then free the pending list itself.
     for (FWin3DListNode* Drain = G_PendingRemove.Head; Drain != nullptr; Drain = Drain->Next)
     {
         FWin3DListNode* const Erase = static_cast<FWin3DListNode*>(Drain->Payload);
@@ -1375,7 +1344,7 @@ void Win3DShutdownManager()
     G_PendingRemove.Tail = nullptr;
     G_PendingRemove.Head = nullptr;
 
-    // 0059d854..0059d883: free whatever registry nodes remain and clear the header.
+    // Free whatever registry nodes remain and clear the header.
     FWin3DListNode* Rest = G_Registry.Head;
     while (Rest != nullptr)
     {
@@ -1387,12 +1356,10 @@ void Win3DShutdownManager()
     G_Registry.Tail = nullptr;
     G_Registry.Head = nullptr;
 
-    // 0x0059d872..0x0059d889: FUN_0059e8d0 on the model cache DAT_0067dcf4.
+    // The model cache DAT_0067dcf4.
     Win3DModelCacheClear();
 
-    // 0x0059d88e..0x0059d8a0: FUN_0041b030(&DAT_0067dbc8) gives back the interface material
-    // entry, FUN_0041e610 releases the mouse device and the cursors, FUN_005a2990 destroys both
-    // line batchers. The tail jump to the camera's LAB_00401e90 (a bare RET) does nothing.
+    // Retail's tail jump to the camera's empty LAB_00401e90 does nothing.
     Archetype::ReleaseMaterialEntrySlot(&G_InterfaceGenericMaterial);
     MouseShutdown();
     Win3DImmedBatchDestroyAll();
@@ -1404,10 +1371,10 @@ void Win3DShutdownManager()
 
 namespace
 {
-    // DAT_006679d8 -- FUN_00423b90's lazily acquired 3DMathEngine (FUN_005b73e0 on first use).
+    // DAT_006679d8 -- FUN_00423b90's lazily acquired 3DMathEngine.
     I3DMathEngine* G_TransformMathEngine = nullptr;
 
-    // FUN_00423b90 (cdecl Out, Matrix, Source): I3DMathEngine slot 0x2c into a local, copied out.
+    // FUN_00423b90
     void TransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source)
     {
         if (G_TransformMathEngine == nullptr)
@@ -1417,8 +1384,7 @@ namespace
         Out = Result;
     }
 
-    // FUN_004bdd40 (thiscall on the camera; Out, ScreenX, ScreenY): the camera-space point on
-    // the near plane under a screen pixel. Each product is rounded to float on its FSTP.
+    // FUN_004bdd40 (thiscall on the camera). Each product is rounded to float.
     void ScreenToNearPlane(FSpaceCamera const* Cam, FVector& Out, float ScreenX, float ScreenY)
     {
         double const ZNear = static_cast<double>(Cam->ZNear);
@@ -1442,8 +1408,8 @@ namespace
         V.Z = static_cast<float>(Inv * V.Z);
     }
 
-    // The handler object at DAT_0067dbf0 (vftable 0x005e5dcc, one slot). Its only virtual is
-    // slot 0, so its vptr is exactly the FHudCmdHandler shape FUN_00576410 calls through.
+    // The handler object at DAT_0067dbf0 (vftable 0x005e5dcc, one slot: the FHudCmdHandler
+    // shape the event dispatch calls through).
     class FWin3DInputHandler : public EventHandler
     {
     public:
@@ -1457,8 +1423,7 @@ namespace
 
     FWin3DInputHandler::FWin3DInputHandler()
     {
-        // FUN_0059d080, run from the static initializer LAB_0059d060: the twelve ids are laid
-        // out on the stack in this order and registered one by one through FUN_005760d0.
+        // FUN_0059d080: the twelve ids registered in this order.
         static unsigned const kIds[12] = {5, 4, 6, 7, 8, 9, 10, 11, 12, 13, 1, 2};
         for (unsigned Index = 0; Index < 12; ++Index)
             RegisterEvent(kIds[Index]);
@@ -1466,31 +1431,25 @@ namespace
 
     FWin3DInputHandler::~FWin3DInputHandler()
     {
-        // FUN_0059d410, reached from the atexit thunk LAB_0059d400: FUN_00576190 erases every
-        // registration of this handler; the Event::Handler base dtor FUN_00576010 then repeats
-        // the same erase (after FUN_00577c30 on the handler), which finds nothing left.
+        // FUN_0059d410. The EventHandler base dtor repeats the erase, which finds nothing left.
         UnregisterAllEvents();
-        // FUN_00576010 follows through the EventHandler base destructor.
     }
 
     bool FWin3DInputHandler::OnEvent(unsigned MsgId)
     {
-        // 0059d148: LEA EAX,[ECX-1] / CMP EAX,0xc / JA -> the false arm; the byte table at
-        // 0x0059d3ec sends 1, 2, 4, 5 to their own arms, 3 to the false arm and 6..13 to the
-        // mouse-button arm.
+        // FUN_0059d140. Ids outside 1..13, and 3, are not handled.
         if (MsgId - 1 > 12 || MsgId == 3)
             return false;
 
         if (MsgId == 1)
         {
-            // 0059d34d: the key goes to FUN_0059dfd0 with the event record.
             return Win3DDispatchKey(HudCommandRecord());
         }
 
         if (MsgId == 2)
         {
-            // 0059d364: slot 22 (record +0x10, record +0x14) to the focus object and its answer
-            // returned; without a focus, to every registered object until one returns true.
+            // CharEvent to the focus object and its answer returned; without a focus, to every
+            // registered object until one returns true.
             unsigned const B = HudCommandRecord()->Arg14;
             unsigned const A = HudCommandRecord()->Arg10;
             if (G_KeyFocus != nullptr)
@@ -1510,8 +1469,7 @@ namespace
 
         if (MsgId == 4)
         {
-            // 0059d2fe: the wheel. The capture head alone gets slot 18 with DAT_0061684c;
-            // otherwise the picked object does.
+            // The wheel (DAT_0061684c): the capture head alone, otherwise the picked object.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
             if (G_CaptureHead != nullptr)
                 return WheelWidescreen(G_CaptureHead, GetClientMouseWheel());
@@ -1531,10 +1489,9 @@ namespace
 
         if (MsgId == 5)
         {
-            // 0059d22c: mouse move. The cursor pixel (DAT_00616840 / DAT_00616844) goes to the
-            // near plane of DAT_0067dbf8 (FUN_004bdd40), into world space through a copy of
-            // the camera's orientation DAT_0067dbfc (FUN_00423b90), and is normalised
-            // (FUN_0041a390) into the stored ray DAT_0067dbcc.
+            // Mouse move: the cursor pixel (DAT_00616840 / DAT_00616844) to the Win3D camera's
+            // near plane, into world space through a copy of the camera's orientation, and
+            // normalised into the stored ray.
             int CursorX = 0;
             int CursorY = 0;
             GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
@@ -1551,9 +1508,8 @@ namespace
             G_MouseRay[1] = World.Y;
             G_MouseRay[2] = World.Z;
 
-            // 0059d2aa: with a capture, the pick inside it, falling back to the capture head
-            // itself; without one, the global pick. The result becomes the hover object and
-            // the event counts as consumed when there is one.
+            // With a capture, the pick inside it, falling back to the capture head itself;
+            // without one, the global pick. Consumed when there is a hover object.
             Win3D* Picked = nullptr;
             if (G_CaptureHead == nullptr)
             {
@@ -1569,8 +1525,7 @@ namespace
             return Picked != nullptr;
         }
 
-        // 0059d164: mouse buttons 6..13. Field0 is -1 - (id - 6); the listing's "else 0" arm
-        // (0059d177) is unreachable from these ids.
+        // Mouse buttons 6..13. The "else 0" arm is unreachable from these ids.
         FWin3DMouseEvent Event;
         unsigned const ButtonIndex = MsgId - 6;
         if (ButtonIndex < 8)
@@ -1583,8 +1538,8 @@ namespace
         else
             Event.Field1 = 1;
 
-        // 0059d1ab..0059d1fb: walk the capture chain. For each capture object the pick inside it
-        // gets the event first; the capture object itself gets it when the pick missed or
+        // Walk the capture chain. For each capture object the pick inside it gets the event
+        // first; the capture object itself gets it when the pick missed or
         // declined, unless the pick WAS the capture object. The walk stops once handled.
         bool bHandled = false;
         Win3D* Capture = G_CaptureHead;
@@ -1613,7 +1568,7 @@ namespace
                 return bHandled;
         }
 
-        // 0059d201: nothing in the capture chain took it; the global pick gets it.
+        // Nothing in the capture chain took it; the global pick gets it.
         Win3D* const Picked = Win3DPick(G_MouseRay);
         if (Picked == nullptr)
             return bHandled;
@@ -1624,20 +1579,18 @@ namespace
 #endif
     }
 
-    // DAT_0067dbf0. Constructed by the static initializer LAB_0059d060, destroyed through the
-    // atexit thunk LAB_0059d400.
+    // DAT_0067dbf0 (static init LAB_0059d060).
     FWin3DInputHandler G_Win3DInputHandler;
 }
 
 void Win3DTransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source)
 {
-    // FUN_00423b90 -- the same body the input router uses; one engine cache (DAT_006679d8).
+    // FUN_00423b90
     TransformByMatrix(Out, Matrix, Source);
 }
 
 I3DMathEngine* Win3DTransformMathEngine()
 {
-    // DAT_006679d8: `MOV EAX,[DAT_006679d8]; TEST EAX,EAX; JNZ; CALL FUN_005b73e0; MOV [..],EAX`.
     if (G_TransformMathEngine == nullptr)
         G_TransformMathEngine = Acquire3DMathEngine();
     return G_TransformMathEngine;

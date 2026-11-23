@@ -25,13 +25,13 @@ void __stdcall MultiplyThreeLimbPairs(unsigned int* Left, unsigned int* Right, u
 void __stdcall MultiplyFourLimbPairs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int Count);
 
 // 0x06acde50. RET 0x10. Six limbs -> twelve limbs.
-// IMUL EAX,EAX,0x30 / TEST EAX,EAX / JE returns when that byte count wraps to 0.
+// Returns without writing when the byte count Count*0x30 wraps to 0.
 void __stdcall MultiplySixLimbPairs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int Count);
 
 // 0x06ace120. RET 0x10. Eight limbs -> sixteen limbs.
-// IMUL EAX,EAX,0x40 / TEST EAX,EAX / JE returns when that byte count wraps to 0.
+// Returns without writing when the byte count Count*0x40 wraps to 0.
 void __stdcall MultiplyEightLimbPairs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int Count);
 
 // 0x06ace440. RET 0x10. Twelve limbs -> twenty-four limbs.
-// IMUL EAX,EAX,0x60 / TEST EAX,EAX / JE returns when that byte count wraps to 0.
+// Returns without writing when the byte count Count*0x60 wraps to 0.
 void __stdcall MultiplyTwelveLimbPairs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int Count);

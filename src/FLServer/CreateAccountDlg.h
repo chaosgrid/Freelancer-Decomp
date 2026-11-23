@@ -8,8 +8,7 @@
 // with a password through Players.CreateAccount / SetAccountPassword.
 // Retail: ctor .text:00406fb0, dtor 00407090, scalar deleting dtor 00407070, vtable
 // .rdata:0041c748, empty message map .rdata:0041c740 (entries 0041c728).
-// Retail never constructs it: no CALL/JMP reaches the ctor (raw scan of .text), and neither
-// the ctor nor the vtable address appears anywhere else in the image; the class is compiled
+// Retail never constructs it (nothing in the image references the ctor or the vtable): compiled
 // in but unused. Ported for structure; nothing creates it here either.
 // No RTTI or string names the class; the name follows the dialog caption.
 #pragma once
@@ -21,15 +20,15 @@ class CCreateAccountDlg : public CDialog
 public:
 	enum { IDD = 0x8a };
 
-	explicit CCreateAccountDlg(CWnd* Parent = nullptr);   // .text:00406fb0
+	explicit CCreateAccountDlg(CWnd* Parent = nullptr);
 
 	CRichEditCtrl NameEdit;       // +0x60, control 1037
 	CRichEditCtrl PasswordEdit;   // +0xa0, control 1038
 	CAccount* CreatedAccount;     // +0xe0, the new account after a successful OnOK
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);   // .text:004070f0
-	virtual void OnOK();                              // .text:00407140
+	virtual void DoDataExchange(CDataExchange* DX);
+	virtual void OnOK();
 
 	DECLARE_MESSAGE_MAP()
 };

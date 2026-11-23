@@ -15,28 +15,17 @@
 #include <new>
 
 // alchemy.dll — typed field property sets and field behaviors.
-// Retail branch, arithmetic and ownership evidence lives in each tracker item.
 namespace AlchemyImpl
 {
     namespace
     {
-        // DAT_0624d160 (alchemy.dll .rdata bytes 00 00 A0 40 = 0x40A00000):
-        // confirmed byte-for-byte wave 15 (sonnet:alchemy-wave15-lane2) as
-        // exactly 5.0f. Used only by FxCollideField::BeginField below to scale
-        // the confirmed-normalized plane normal into ScaledNormal_ (retail raw
-        // listing lines 54862-54876).
+        // DAT_0624d160 (0x40A00000 = 5.0f): FxCollideField::BeginField's scale of the
+        // unit plane normal into ScaledNormal_.
         const float kCollideNormalScale = 5.0f;
 
-        // DAT_0624d168 (alchemy.dll .rdata bytes fc a9 f1 d2 4d 62 50 3f, an
-        // 8-byte double): confirmed byte-for-byte wave 63
-        // (sonnet:alchemy-wave63-lane2) as the IEEE-754 double bit pattern for
-        // exactly decimal 0.001 -- distinct from the 1.0f (DAT_0624bac4) and
-        // 1e-6f constants used elsewhere in this file. Used only by
-        // FxCollideField::ApplyFieldToVel below as the post-impact velocity-
-        // magnitude gate (retail raw listing lines 53716-53720): below this
-        // speed, retail leaves the velocity untouched (only the impact
-        // position is written) rather than attempting to reflect a
-        // near-stationary particle.
+        // DAT_0624d168 (double 0.001): FxCollideField::ApplyFieldToVel's post-impact
+        // speed gate -- below it only the impact position is written, the velocity is
+        // not reflected.
         const double kCollideSpeedEpsilon = 0.001;
 
         // DAT_062579d4 (.data, 0 at load): read once, by the dust field's Apply
@@ -136,9 +125,7 @@ namespace AlchemyImpl
 
     // ---- Field property sets ------------------------------------------------
 
-    // Gravity create FUN_06223340 (0x062233ba..0x06223427): +0x4c an FxAnimatedSingleRamp
-    // (FUN_06212db0, vtable 0624bac8) whose key 0 is an FxAnimatedSingle of 9.8
-    // (0x411ccccd, FUN_06209ad0; +0x14 AddKey(0, key)).
+    // Gravity create FUN_06223340: +0x4c a one-key FxAnimatedSingleRamp of 9.8 (0x411ccccd).
     FFxGravityFieldPropertySet::FFxGravityFieldPropertySet() : GravityRamp(nullptr)
     {
         FCollideRampCleanup Cleanup = {{&GravityRamp, nullptr, nullptr, nullptr}, 1};
@@ -151,8 +138,7 @@ namespace AlchemyImpl
         ReleaseDescriptorSlot(GravityRamp);
     }
 
-    // Air create FUN_06214010 (0x06214064..0x062140fb): +0x4c an FxAnimatedSingleRamp
-    // (FUN_06206ce0) with an FxAnimatedSingle key of 1.0; +0x50 FUN_06210900(1.0).
+    // Air create FUN_06214010: +0x4c and +0x50 one-key FxAnimatedSingleRamps.
     FFxAirFieldPropertySet::FFxAirFieldPropertySet() : ApproachRamp(nullptr), MagnitudeRamp(nullptr)
     {
         FCollideRampCleanup Cleanup = {{&ApproachRamp, &MagnitudeRamp, nullptr, nullptr}, 2};
@@ -167,13 +153,8 @@ namespace AlchemyImpl
         ReleaseDescriptorSlot(MagnitudeRamp);
     }
 
-    // FUN_06235f50 (0x06235f50..0x062361cb): +0x4c / +0x50 / +0x54 zeroed, then each gets
-    // an FxAnimatedSingleRamp (FUN_06206ce0) whose key 0 is an FxAnimatedSingle of weight
-    // 10.0 (0x41200000), 0.3 (0x3e99999a) and 50.0 (0x42480000) (FUN_06209ad0, +0x14
-    // AddKey). Last, +0x58 (0x062360fa..0x062361b4): FUN_0620a0d0 releases the slot; a new
-    // FxRampSingleRamp (FUN_06207490) gets FUN_06208bc0(1.0) as its key 0 and is stored;
-    // then GetKeyValue(0, &Child) (+0x24), Child->AddKey(1.0, &0.001f) (+0x14,
-    // 0x3a83126f), Child->SetMode(3) (+0x34), Child->Release().
+    // FUN_06235f50: +0x4c / +0x50 / +0x54 one-key FxAnimatedSingleRamps; +0x58 an
+    // FxRampSingleRamp whose child ramp runs 1.0 -> 0.001 in mode 3 (ease-out).
     FFxRadialFieldPropertySet::FFxRadialFieldPropertySet()
         : MagnitudeRamp(nullptr), ApproachRamp(nullptr), RadiusRamp(nullptr), FalloffRamp(nullptr)
     {
@@ -210,7 +191,7 @@ namespace AlchemyImpl
         Cleanup.Remaining = 0;
     }
 
-    // FUN_062373c0: a plain +8 Release of each ramp.
+    // FUN_062373c0.
     FFxRadialFieldPropertySet::~FFxRadialFieldPropertySet()
     {
         ReleaseDescriptorSlot(MagnitudeRamp);
@@ -219,9 +200,7 @@ namespace AlchemyImpl
         ReleaseDescriptorSlot(FalloffRamp);
     }
 
-    // Turbulence create FUN_0623d4b0 (0x0623d504..0x0623d59b): +0x4c an
-    // FxAnimatedSingleRamp (FUN_06206ce0) with an FxAnimatedSingle key of 1.0; +0x50
-    // FUN_06210900(10.0).
+    // Turbulence create FUN_0623d4b0: +0x4c and +0x50 one-key FxAnimatedSingleRamps.
     FFxTurbulenceFieldPropertySet::FFxTurbulenceFieldPropertySet()
         : ApproachRamp(nullptr), MagnitudeRamp(nullptr)
     {
@@ -237,9 +216,7 @@ namespace AlchemyImpl
         Cleanup.ReleaseRemaining();
     }
 
-    // FUN_06219a30 (0x06219a5d..0x06219c57): +0x4c/+0x50/+0x54 zeroed, then each gets an
-    // FxAnimatedSingleRamp (FUN_06212db0, vtable 0624bac8) whose key 0 is an
-    // FxAnimatedSingle (FUN_062144a0, +0x18 set) of 0.7 (0x3f333333), 10.0, 10.0.
+    // FUN_06219a30: +0x4c / +0x50 / +0x54 one-key FxAnimatedSingleRamps.
     FFxCollideFieldPropertySet::FFxCollideFieldPropertySet()
         : ReflectRamp(nullptr), WidthRamp(nullptr), HeightRamp(nullptr)
     {
@@ -256,9 +233,7 @@ namespace AlchemyImpl
         Cleanup.ReleaseRemaining();
     }
 
-    // FUN_06212810: +0x4c an FxAnimatedSingleRamp (FUN_06212e00, vtable 0624bac8) whose
-    // key 0 is an FxAnimatedSingle (operator_new(0x10), vtable 0624bca0) given weight
-    // 60.1 (0x42706666, +0x18 SetWeight) and added at time 0 (+0x14 AddKey).
+    // FUN_06212810: +0x4c a one-key FxAnimatedSingleRamp of 60.1 (0x42706666).
     FFxDustFieldPropertySet::FFxDustFieldPropertySet() : RadiusRamp(nullptr)
     {
         FCollideRampCleanup Cleanup = {{&RadiusRamp, nullptr, nullptr}, 1};
@@ -293,10 +268,9 @@ namespace AlchemyImpl
         AdoptPropertySet(Set);
     }
 
-    // FUN_062234e0 (RET 8; this = the prototype's node): operator_new and the gravity
-    // constructor inline (the stores of its factory 0x062237a6..), FUN_06244f90 (0x06223586:
-    // FUN_0623fc30 and the +0x98 set cache), the +0x9c set cache (0x0622358b..0x06223595);
-    // *Out = the new outer, 0. The borrowed cache is copied after base initialization.
+    // FUN_062234e0: the gravity constructor inline, FUN_06244f90 (FUN_0623fc30 and the
+    // +0x98 set cache), then the +0x9c set cache. The borrowed cache is copied after base
+    // initialization.
     GENRESULT DACOM_API FxGravityField::CloneNode(IDAComponent** Out)
     {
         FxGravityField* const Node = new FxGravityField(PrimaryIid_, FactoryName_);
@@ -306,7 +280,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Set getter LAB_06223310 (RET 0xc): 0xE02B8BD4 -> [+0x4c], AddRef, 0; else -8.
+    // Set getter LAB_06223310.
     GENRESULT DACOM_API FFxGravityFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -325,9 +299,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kGravityPropertyRows, Callback, Context);
     }
 
-    // LAB_06223dd0 (outer +0x14, RET 8; node = arg + 4): [[node]+0x44](Dt) TickLifetime;
-    // node+0xa0 = D+0x50 (inner +0x4c) ->Eval(node+0x8c, node+0x84) * Dt (FMUL
-    // [ESP+0xc], FSTP float); XOR EAX,EAX.
+    // LAB_06223dd0 (outer +0x14): node+0xa0 = Gravity * Dt.
     GENRESULT DACOM_API FxGravityField::Pad5(float Dt)
     {
         TickLifetime(Dt);
@@ -338,9 +310,7 @@ namespace AlchemyImpl
 
     void DACOM_API FxGravityField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
-        // LAB_062241a0 0x06224219: node slot 7 (FUN_0623ffb0) -> the field in the
-        // appearance's space; (0, -[node+0xa0], 0) (FCHS, FSTP float) is rotated by it
-        // (math engine +0x30) into node+0xa4..+0xac.
+        // LAB_062241a0: the down vector in the appearance's space, cached at node+0xa4.
         float Xform12[12];
         ComputeRelativeTransform(Appearance, Xform12);
         const FVector Source = { 0.0f, -Gravity_, 0.0f };
@@ -355,7 +325,7 @@ namespace AlchemyImpl
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
-    // LAB_06224160: vel[i] += node+0xa4.. (FLD vel, FADD cache, FSTP).
+    // LAB_06224160.
     void DACOM_API FxGravityField::ApplyFieldToVel(float* PosVel6, float* /*Age*/, float /*Dt*/)
     {
         float* Vel = PosVel6 + 3;
@@ -388,10 +358,8 @@ namespace AlchemyImpl
         AdoptPropertySet(Set);
     }
 
-    // FUN_062141c0 (RET 8): the air constructor inline (as its factory 0x06214d76..),
-    // FUN_06244f90 (0x06214272), the +0x9c set cache, then -- the only clone that copies
-    // node state -- the three dwords +0xac..+0xb4, the Begin-time Cache_
-    // (0x0621427d..0x062142a0); *Out, 0.
+    // FUN_062141c0: as gravity's, plus -- the only clone that copies node state -- the
+    // Begin-time Cache_ (+0xac..+0xb4).
     GENRESULT DACOM_API FxAirField::CloneNode(IDAComponent** Out)
     {
         FxAirField* const Node = new FxAirField(PrimaryIid_, FactoryName_);
@@ -402,8 +370,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Set getter LAB_06213fd0 (RET 0xc): 0x10423CEB (AirField_Approach) -> [+0x4c],
-    // 0xE5E3524C (AirField_Magnitude) -> [+0x50]; AddRef, 0; else -8.
+    // Set getter LAB_06213fd0: 0x10423CEB AirField_Approach, 0xE5E3524C AirField_Magnitude.
     GENRESULT DACOM_API FFxAirFieldPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                           INestedSingleRamp** Out)
     {
@@ -424,10 +391,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kAirPropertyRows, Callback, Context);
     }
 
-    // LAB_062147b0 (outer +0x14, RET 8; node = arg + 4): TickLifetime(Dt); node+0xa0 =
-    // inner +0x4c ->Eval(node+0x8c, node+0x84); node+0xa4 = inner +0x50 ->Eval; node+0xa8
-    // = Dt * [+0xa0] * 4.0 (DAT_0624ca50) FST, FCOMP 1.0 (DAT_0624bac4), AND AX,0x4100,
-    // JNZ keeps it (C0|C3: <= 1 or unordered), else 1.0; XOR EAX,EAX.
+    // LAB_062147b0 (outer +0x14): Blend (4.0 = DAT_0624ca50) is kept when <= 1 or unordered.
     GENRESULT DACOM_API FxAirField::Pad5(float Dt)
     {
         TickLifetime(Dt);
@@ -442,9 +406,7 @@ namespace AlchemyImpl
 
     void DACOM_API FxAirField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
-        // LAB_06214bf0 0x06214c69: node slot 7 (FUN_0623ffb0), as Gravity; then
-        // 0x06214c6c..0x06214c85 `MOV [esp+4],0; FSTP [esp+8]; MOV [esp+0xc],0` -- the
-        // vector (0, [node+0xa4], 0), Y axis -- rotated (+0x30) into node+0xac..+0xb4.
+        // LAB_06214bf0: as Gravity, with (0, Magnitude, 0) cached at node+0xac.
         float Xform12[12];
         ComputeRelativeTransform(Appearance, Xform12);
         const FVector Source = { 0.0f, Magnitude_, 0.0f };
@@ -459,7 +421,7 @@ namespace AlchemyImpl
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
-    // LAB_06214b80: vel[i] = (cache[i] - vel[i]) * [node+0xa8] + vel[i].
+    // LAB_06214b80.
     void DACOM_API FxAirField::ApplyFieldToVel(float* PosVel6, float* /*Age*/, float /*Dt*/)
     {
         float* Vel = PosVel6 + 3;
@@ -482,7 +444,7 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_06236280 (node slot +0x48): operator_new(0x64), FUN_06235f50 on +4.
+    // FUN_06236280 (node slot +0x48): operator_new(0x64).
     void FxRadialField::CreatePropertySet()
     {
         FFxRadialFieldPropertySet* const Set = new FFxRadialFieldPropertySet();
@@ -490,8 +452,7 @@ namespace AlchemyImpl
         RadialPropertySet_ = Set;
     }
 
-    // FUN_06236360 (RET 8): the radial constructor inline (as its factory 0x06237016..),
-    // FUN_06244f90 (0x0623641e), the +0x9c set cache (0x06236423..0x0623642d); *Out, 0.
+    // FUN_06236360: as gravity's.
     GENRESULT DACOM_API FxRadialField::CloneNode(IDAComponent** Out)
     {
         FxRadialField* const Node = new FxRadialField(PrimaryIid_, FactoryName_);
@@ -501,7 +462,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Set getter +0x3c LAB_06236250 (kind 0x200): 0x1A433168 -> [+0x58], AddRef, 0; else -8.
+    // Set getter +0x3c LAB_06236250 (kind 0x200).
     GENRESULT DACOM_API FFxRadialFieldPropertySet::GetPropSingleRampRamp(unsigned long Hash,
                                                                          INestedSingleRamp** Out)
     {
@@ -510,8 +471,7 @@ namespace AlchemyImpl
         return HandOutFieldRamp(FalloffRamp, Out);
     }
 
-    // Set getter +0x40 LAB_06236200 (kind 0x202): 0xFF28F620 -> [+0x54], 0x0064B3B9 ->
-    // [+0x4c], 0xF3CF5EA5 -> [+0x50]; AddRef, 0; else -8.
+    // Set getter +0x40 LAB_06236200 (kind 0x202).
     GENRESULT DACOM_API FFxRadialFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -534,25 +494,12 @@ namespace AlchemyImpl
         return WalkPropertyRows(kRadialPropertyRows, Callback, Context);
     }
 
-    // LAB_06236450 (0x06236450..0x06236527, RET 8): the radial field's own per-frame
-    // node update (VT_B slot 3 = outer +0x14, the shared default FUN_06240180 on the
-    // other fields; VT_A reaches it through the ECX+=4 thunk LAB_06236a30). The
-    // descriptor D = [node+0x9c] is the outer, so D+0x58 / +0x54 / +0x50 are the inner
-    // +0x54 / +0x50 / +0x4c ramps, each evaluated with +0x1C Eval(node+0x8c, node+0x84):
-    //   0x0623645e: [[node]+0x44](Dt) -- TickLifetime (LAB_06240150) first.
-    //   0x0623647b: R = Radius->Eval; FCOM double 0.001 (DAT_0624d168); TEST AH,5;
-    //     JP skips the clamp when C0 = C2 (R >= 0.001, or unordered); fall-through
-    //     (C0 set: R < 0.001) replaces R with float 0.001 (DAT_0624ee18).
-    //     1.0f (DAT_0624bac4) / R -> node+0xac (FDIV in the FPU, FSTP float).
-    //   0x062364bd: Approach->Eval -> node+0xa0 (float).
-    //   0x062364e0: Magnitude->Eval, FCHS -> node+0xa4 (the port keeps it positive
-    //     and negates at the one use in ApplyFieldToVel; negation is exact).
-    //   0x062364eb: Dt * [+0xa0] * 4.0f (DAT_0624ca50) -> node+0xa8 (FST), then FCOMP
-    //     1.0; AND AX,0x4100; JNZ keeps it (C0 or C3: <= 1.0, or unordered), else
-    //     node+0xa8 = 1.0.
-    //   0x062364f5: Dt raw -> node+0xb0 (no reader in Apply or anywhere in the radial
-    //     vtables' bodies; not kept).
-    //   XOR EAX,EAX -> 0.
+    // LAB_06236450: the radial field's own per-node update (outer +0x14; the other fields
+    // use the shared FUN_06240180; the inner vtable reaches it through LAB_06236a30).
+    // An ordered Radius < 0.001 (double DAT_0624d168) becomes float 0.001 (DAT_0624ee18)
+    // before 1 / R. Retail stores the magnitude negated (FCHS); the port negates at its one
+    // use in ApplyFieldToVel (exact). Retail also stores Dt at node+0xb0, which nothing
+    // reads (not kept).
     GENRESULT DACOM_API FxRadialField::Pad5(float Dt)
     {
         TickLifetime(Dt);
@@ -570,10 +517,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06236ea0 (RET 8, one stack argument: the appearance): node slot 7
-    // (FUN_0623ffb0, 0x06236f19) -> the field-in-appearance transform, then the math
-    // engine's +0x28 transforms (0,0,0) into node+0xb4..+0xbc. Returns 0. The port's
-    // trailing Dt is unused here, as in retail.
+    // LAB_06236ea0: the field origin in the appearance's space, cached at node+0xb4.
     void DACOM_API FxRadialField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
         float Xform12[12] = {
@@ -597,28 +541,24 @@ namespace AlchemyImpl
     void DACOM_API FxRadialField::ApplyFieldToVel(float* PosVel6, float* /*Age*/, float /*Dt*/)
     {
         float* Vel = PosVel6 + 3;
-        // 0x0623661d..0x06236632: dx, dy FSTP float; dz is FST float at 0x0623663f but
-        // ST0 keeps the unrounded difference, which multiplies the stored float.
+        // dx, dy are stored as float; dz is stored too, but the unrounded difference stays
+        // in ST0 and multiplies the stored float.
         const float Dx = Cache_[0] - PosVel6[0];
         const float Dy = Cache_[1] - PosVel6[1];
         const double DzExt = static_cast<double>(Cache_[2]) - PosVel6[2];
         const float Dz = static_cast<float>(DzExt);
-        // 0x06236643..0x0623665d: dz*dz + dx*dx + dy*dy in that order, FSQRT, times
-        // node+0xac (1 / Radius, DistScale_), all in the FPU.
+        // Summed in the order z, x, y, all in the FPU.
         const double DistExt =
             std::sqrt(DzExt * Dz + static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy) *
             DistScale_;
-        // 0x06236663: FST float [ESP+0x24]; FCOMP 1.0; AND AX,0x4100; JNZ keeps the stored
-        // float when C0|C3 (<= 1 or unordered); fall-through (> 1) stores 1.0.
+        // Kept when <= 1 or unordered.
         float Dist = static_cast<float>(DistExt);
         if (DistExt > 1.0)
             Dist = 1.0f;
-        // 0x06236696: the falloff ramp's +0x1C Eval(node+0x8c, Dist), unchecked, FMUL
-        // node+0xa4 (retail stores the magnitude negated in the update; the port negates
-        // here -- exact).
+        // The falloff ramp is not null-checked.
         const double Scale =
             RadialProps()->FalloffRamp->Eval(AppearanceOuterTime_, Dist) * -Magnitude_;
-        // 0x0623669f..0x062366c4: Tx = dx * k stays in ST0; Ty and Tz are FSTP float.
+        // Tx stays in ST0; Ty and Tz are stored as float.
         const double TargetX = static_cast<double>(Dx) * Scale;
         const float TargetY = static_cast<float>(static_cast<double>(Dy) * Scale);
         const float TargetZ = static_cast<float>(static_cast<double>(Dz) * Scale);
@@ -647,8 +587,7 @@ namespace AlchemyImpl
         AdoptPropertySet(Set);
     }
 
-    // FUN_0623d640 (RET 8): the turbulence constructor inline (as its factory 0x0623d966..),
-    // FUN_06244f90 (0x0623d6da), the +0x9c set cache (0x0623d6df..0x0623d6e9); *Out, 0.
+    // FUN_0623d640: as gravity's.
     GENRESULT DACOM_API FxTurbulenceField::CloneNode(IDAComponent** Out)
     {
         FxTurbulenceField* const Node = new FxTurbulenceField(PrimaryIid_, FactoryName_);
@@ -658,8 +597,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Set getter LAB_0623d470 (RET 0xc): 0x1B970B9A (TurbulenceField_Approach) -> [+0x4c],
-    // 0x1CEAC6D1 (TurbulenceField_Magnitude) -> [+0x50]; AddRef, 0; else -8.
+    // Set getter LAB_0623d470: 0x1B970B9A TurbulenceField_Approach, 0x1CEAC6D1
+    // TurbulenceField_Magnitude.
     GENRESULT DACOM_API FFxTurbulenceFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -680,10 +619,8 @@ namespace AlchemyImpl
         return WalkPropertyRows(kTurbulencePropertyRows, Callback, Context);
     }
 
-    // LAB_0623dfa0 (outer +0x14, RET 8; node = arg + 4): TickLifetime(Dt); node+0xa0 =
-    // inner +0x4c ->Eval(node+0x8c, node+0x84); node+0xa8 = inner +0x50 ->Eval; node+0xa4
-    // = Dt * [+0xa0] * 4.0 (DAT_0624ca50) FST, FCOMP 1.0, AND AX,0x4100, JNZ keeps it
-    // (C0|C3: <= 1 or unordered), else 1.0; XOR EAX,EAX.
+    // LAB_0623dfa0 (outer +0x14): Blend (4.0 = DAT_0624ca50) is computed in double and
+    // kept when <= 1 or unordered.
     GENRESULT DACOM_API FxTurbulenceField::Pad5(float Dt)
     {
         TickLifetime(Dt);
@@ -699,25 +636,19 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0623e4a0: XOR EAX,EAX; RET 8.
+    // LAB_0623e4a0: no-op.
     void DACOM_API FxTurbulenceField::BeginField(IDAComponent* /*Appearance*/, float /*Dt*/)
     {
     }
 
-    // LAB_0623e370 (object frame = node + 4, RET 0xc: this, PosVel, unused):
-    //   R1 = (rand - 0.5) doubled -> [ESP+8]; R2 likewise -> [ESP+4]; R3 stays in ST0
-    //   (FUN_0623f1f0, DAT_0624bab8 = 0.5, FADD ST0,ST0).
-    //   L = R3*R3 + R2*R2 + R1*R1 (FSTP float); y = bits 0x5f3759df - (bits(L) SAR 1);
-    //   s = (1.5 - y*y*L*0.5) * y (DAT_0624bac0 = 1.5).
-    //   The direction is (R2*s, R1*s, R3*s) -- the second draw is x, the first is y.
-    //   k = rand * [node+0xa8] (Magnitude); Target = direction * k;
-    //   vel[i] = (Target[i] - vel[i]) * [node+0xa4] (Blend) + vel[i].
-    // There is no zero-length guard: L = 0 gives s = finite and a zero direction.
+    // LAB_0623e370: a random unit direction (fast inverse square root, DAT_0624bab8 = 0.5,
+    // DAT_0624bac0 = 1.5) -- the second draw is x, the first is y -- scaled by
+    // rand * Magnitude and blended into the velocity. No zero-length guard.
     void DACOM_API FxTurbulenceField::ApplyFieldToVel(float* PosVel6, float* /*Age*/, float /*Dt*/)
     {
         float* Vel = PosVel6 + 3;
-        // FUN_0623f1f0 leaves its product in ST0 (AlchemyRand01 returns it as double);
-        // FSUB 0.5f, FADD ST0,ST0, then R1/R2 are FSTP float and R3 stays in the FPU.
+        // FUN_0623f1f0 leaves its product in ST0; R1/R2 are stored as float and R3 stays in
+        // the FPU.
         const float R1 = static_cast<float>((AlchemyRand01() - 0.5) * 2.0);
         const float R2 = static_cast<float>((AlchemyRand01() - 0.5) * 2.0);
         const double R3 = (AlchemyRand01() - 0.5) * 2.0;
@@ -734,8 +665,7 @@ namespace AlchemyImpl
         Dir[0] = static_cast<float>(R2 * Scale);
         Dir[1] = static_cast<float>(R1 * Scale);
         Dir[2] = static_cast<float>(R3 * Scale);
-        // 0x0623e40e..0x0623e440: k = rand * [+0xac] (Magnitude) stays in the FPU; the x
-        // product (FMUL ST1 at 0x0623e427) is never stored, y and z are FSTP float.
+        // The push and the x product stay in the FPU; y and z are stored as float.
         const double Push = AlchemyRand01() * Magnitude_;
         const double TargetX = static_cast<double>(Dir[0]) * Push;
         const float TargetY = static_cast<float>(static_cast<double>(Dir[1]) * Push);
@@ -758,7 +688,7 @@ namespace AlchemyImpl
         }
         for (Index = 0; Index < 12; ++Index)
             BeginXform_[Index] = 0.0f;
-        // 06219e82 calls the 3x3 identity constructor, then clears translation.
+        // Retail calls the 3x3 identity constructor, then clears translation.
         BeginXform_[0] = BeginXform_[4] = BeginXform_[8] = 1.0f;
     }
 
@@ -766,7 +696,7 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_06219d30 (node slot +0x48): operator_new(0x60), FUN_06219a30 on +4.
+    // FUN_06219d30 (node slot +0x48): operator_new(0x60).
     void FxCollideField::CreatePropertySet()
     {
         FFxCollideFieldPropertySet* const Set = new FFxCollideFieldPropertySet();
@@ -774,20 +704,18 @@ namespace AlchemyImpl
         AdoptPropertySet(Set);
     }
 
-    // FUN_06219e10 (RET 8): the collide constructor inline (as its factory 0x0621ad16..),
-    // FUN_06244f90 (0x06219f10), the +0x9c set cache (0x06219f15..0x06219f20); *Out, 0.
+    // FUN_06219e10: as gravity's.
     GENRESULT DACOM_API FxCollideField::CloneNode(IDAComponent** Out)
     {
         FxCollideField* const Node = new FxCollideField(PrimaryIid_, FactoryName_);
         Node->InitNodeFromArchetype(this);
-        // 06219f15 reloads the source's non-owning cache after the helper returns.
+        // Retail reloads the source's non-owning cache after the helper returns.
         Node->CollidePropertySet_ = CollidePropertySet_;
         *Out = Node;
         return GR_OK;
     }
 
-    // FUN_0620e510 (RET 8): the beam field constructor inline (as its factory
-    // 0x0620e6c6..), FUN_06244f90 (0x0620e59c) and nothing else; *Out, 0.
+    // FUN_0620e510: the constructor inline and FUN_06244f90, nothing else.
     GENRESULT DACOM_API FLBeamField::CloneNode(IDAComponent** Out)
     {
         FLBeamField* const Node = new (std::nothrow) FLBeamField(PrimaryIid_, FactoryName_);
@@ -796,9 +724,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Set getter LAB_06219cb0 (RET 0xc; also reached by the +4 thunk 0x0621a6f0):
-    // 0xF2468210 or 0xE462B789 -> [+0x4c]; 0x138BDB51 or 0x061AAF28 -> [+0x50];
-    // 0x11336C98 or 0x16FF3474 -> [+0x54]; AddRef, 0; else -8.
+    // Set getter LAB_06219cb0 (also reached by the +4 thunk 0x0621a6f0); two hashes per
+    // ramp.
     GENRESULT DACOM_API FFxCollideFieldPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -821,9 +748,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kCollidePropertyRows, Callback, Context);
     }
 
-    // LAB_0621a780 (outer +0x14, RET 8; node = arg + 4): [[node]+0x44](Dt) TickLifetime;
-    // node+0xa0 = D+0x50 (inner +0x4c) ->Eval(node+0x8c, node+0x84) (FSTP float);
-    // node+0xa4 = Dt (raw MOV); XOR EAX,EAX.
+    // LAB_0621a780 (outer +0x14): node+0xa0 Reflect, node+0xa4 Dt.
     GENRESULT DACOM_API FxCollideField::Pad5(float Dt)
     {
         TickLifetime(Dt);
@@ -834,11 +759,9 @@ namespace AlchemyImpl
 
     void DACOM_API FxCollideField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
-        // LAB_0621ab20 (RET 8; EDI = arg + 4 = the node): 0x0621ab3d node slot 7
-        // (FUN_0623ffb0) with the appearance into node+0xcc -- the field in the
-        // appearance's space.
+        // LAB_0621ab20: the field in the appearance's space (node+0xcc); the plane normal
+        // (node+0xa8), corner (node+0xb4) and scaled normal (node+0xc0) follow.
         ComputeRelativeTransform(Appearance, BeginXform_);
-        // 0x0621ab79: math +0x30 Rotate(out, +0xcc, (0, 1, 0)) -> node+0xa8.
         const FVector NormalSource = { 0.0f, 1.0f, 0.0f };
         I3DMathEngine* Math = G_CollideField3DMath;
         if (Math == nullptr)
@@ -850,8 +773,7 @@ namespace AlchemyImpl
         Math->Rotate(RotatedNormal, *reinterpret_cast<const FTransform*>(BeginXform_),
                      NormalSource);
         std::memcpy(Normal_, &RotatedNormal, sizeof(RotatedNormal));
-        // 0x0621abb0..0x0621abe7: len = sqrt((x*x + y*y) + z*z) (FSQRT, kept in the FPU),
-        // FDIVR 1.0f -> inv; each component = (float)(inv * c). No zero-length guard.
+        // The length stays in the FPU. No zero-length guard.
         const double LengthSq = static_cast<double>(Normal_[0]) * Normal_[0] +
                                 static_cast<double>(Normal_[1]) * Normal_[1] +
                                 static_cast<double>(Normal_[2]) * Normal_[2];
@@ -859,7 +781,6 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Normal_[0], InvLength * Normal_[0]);
         StoreAlchemyFpuFloat(Normal_[1], InvLength * Normal_[1]);
         StoreAlchemyFpuFloat(Normal_[2], InvLength * Normal_[2]);
-        // 0x0621ac0b: math +0x28 TransformXform(out, +0xcc, (1, 0, 1)) -> node+0xb4.
         const FVector CornerSource = { 1.0f, 0.0f, 1.0f };
         Math = G_CollideField3DMath;
         if (Math == nullptr)
@@ -871,7 +792,6 @@ namespace AlchemyImpl
         Math->TransformXform(TransformedCorner, *reinterpret_cast<const FTransform*>(BeginXform_),
                              CornerSource);
         std::memcpy(Corner_, &TransformedCorner, sizeof(TransformedCorner));
-        // 0x0621ac2e..0x0621ac65: node+0xc0 = normal * 5.0f (DAT_0624d160), FSTP float each.
         ScaledNormal_[0] = Normal_[0] * kCollideNormalScale;
         ScaledNormal_[1] = Normal_[1] * kCollideNormalScale;
         ScaledNormal_[2] = Normal_[2] * kCollideNormalScale;
@@ -879,75 +799,60 @@ namespace AlchemyImpl
 
     void DACOM_API FxCollideField::ApplyFieldToVel(float* PosVel6, float* /*Age*/, float /*Dt*/)
     {
-        // LAB_0621a0e0 (RET 0xc: node, PosVel, unused; ALC-5 2026-09-30 term-by-term
-        // trace). Every 3-vector temporary goes through FUN_06206be0 / FUN_06206c10 /
-        // FUN_06206ab0 (FSTP float per component); dot products and scalars stay in the
-        // FPU (double here). N = node+0xa8, C = node+0xb4, SN = node+0xc0, S = node+0xa4
-        // (the update's Dt), R = node+0xa0 (Reflectivity).
+        // LAB_0621a0e0. Every 3-vector temporary goes through FUN_06206be0 / FUN_06206c10 /
+        // FUN_06206ab0 (float per component); dot products and scalars stay in the FPU
+        // (double here) and are summed in z, y, x order.
         float* Pos = PosVel6;
         float* Vel = PosVel6 + 3;
         const float* N = Normal_;
 
-        // 0x0621a0fc / 0x0621a112: T0 = Pos + SN; T1 = T0 - C.
         const float T0[3] = { Pos[0] + ScaledNormal_[0], Pos[1] + ScaledNormal_[1],
                               Pos[2] + ScaledNormal_[2] };
         const float T1[3] = { T0[0] - Corner_[0], T0[1] - Corner_[1], T0[2] - Corner_[2] };
-        // 0x0621a117..0x0621a14d: D0 = (T1z*Nz + T1y*Ny) + T1x*Nx; FST float, FCOMP 0.0
-        // (DAT_0624bc38); TEST AH,5; JNP exits when only C0 is set (D0 < 0); equal and
-        // unordered go on.
+        // An ordered D0 < 0 exits; equal and unordered go on.
         const double D0Ext = (static_cast<double>(T1[2]) * N[2] + static_cast<double>(T1[1]) * N[1]) +
                              static_cast<double>(T1[0]) * N[0];
         if (D0Ext < 0.0)
             return;
         const float D0 = static_cast<float>(D0Ext);
 
-        // 0x0621a153..0x0621a17a: V1 = S * Vel (FSTP float each).
         const float S = UpdateDt_;
         const float V1[3] = { S * Vel[0], S * Vel[1], S * Vel[2] };
-        // 0x0621a17f..0x0621a1a2: dot(V1, N) in the same z, y, x order; exits when < 0.
         const double VnExt = (static_cast<double>(V1[2]) * N[2] + static_cast<double>(V1[1]) * N[1]) +
                              static_cast<double>(V1[0]) * N[0];
         if (VnExt < 0.0)
             return;
 
-        // 0x0621a1a8..0x0621a23c: V2 = V1 - SN; V3 = V2 + T0; V4 = V3 - C.
         const float V2[3] = { V1[0] - ScaledNormal_[0], V1[1] - ScaledNormal_[1],
                               V1[2] - ScaledNormal_[2] };
         const float V3[3] = { V2[0] + T0[0], V2[1] + T0[1], V2[2] + T0[2] };
         const float V4[3] = { V3[0] - Corner_[0], V3[1] - Corner_[1], V3[2] - Corner_[2] };
-        // 0x0621a241..0x0621a266: D1 = dot(V4, N); FCOM 0.0; AND EAX,0x4100; JNZ goes on
-        // when C0|C3 (D1 <= 0 or unordered); the fall-through (D1 > 0) pops and returns.
+        // <= 0 or unordered goes on.
         const double D1 = (static_cast<double>(V4[2]) * N[2] + static_cast<double>(V4[1]) * N[1]) +
                           static_cast<double>(V4[0]) * N[0];
         if (D1 > 0.0)
             return;
 
-        // 0x0621a276..0x0621a287: T = D0 / (D0 - D1) (FSUB ST0,ST1 with the stored float
-        // D0, FDIVR), FSTP float.
+        // Uses the float-stored D0.
         const float T = static_cast<float>(static_cast<double>(D0) /
                                            (static_cast<double>(D0) - D1));
-        // 0x0621a28d..0x0621a2f7: V5 = V2 * T; V6 = V5 + T0; Pos = V6.
         const float V5[3] = { V2[0] * T, V2[1] * T, V2[2] * T };
         Pos[0] = V5[0] + T0[0];
         Pos[1] = V5[1] + T0[1];
         Pos[2] = V5[2] + T0[2];
 
-        // 0x0621a2fa..0x0621a32f: Speed = sqrt((x*x + y*y) + z*z) FSTP float; FCOMP double
-        // 0.001 (DAT_0624d168); AND EAX,0x4100; JNZ returns when C0|C3 (Speed <= 0.001 or
-        // unordered) -- position already written.
+        // Speed <= 0.001 or unordered returns with the position already written.
         const float Speed = static_cast<float>(
             std::sqrt(static_cast<double>(Vel[0]) * Vel[0] + static_cast<double>(Vel[1]) * Vel[1] +
                       static_cast<double>(Vel[2]) * Vel[2]));
         if (!(static_cast<double>(Speed) > kCollideSpeedEpsilon))
             return;
 
-        // 0x0621a335..0x0621a35d: Dir = (1.0f / Speed) * Vel, FSTP float each.
         const double InvSpeed = 1.0 / static_cast<double>(Speed);
         const float Dir[3] = { static_cast<float>(InvSpeed * Vel[0]),
                                static_cast<float>(InvSpeed * Vel[1]),
                                static_cast<float>(InvSpeed * Vel[2]) };
-        // 0x0621a362..0x0621a397: K = (float)(2 * dot(Dir, N)) (z, y, x order, FADD
-        // ST0,ST0); FUN_0621a490 scales a copy of N by K; FUN_0621a460 subtracts Dir.
+        // Reflection: FUN_0621a490 scales a copy of N by K; FUN_0621a460 subtracts Dir.
         const double DotDirN =
             (static_cast<double>(Dir[2]) * N[2] + static_cast<double>(Dir[1]) * N[1]) +
             static_cast<double>(Dir[0]) * N[0];
@@ -956,14 +861,12 @@ namespace AlchemyImpl
         Reflected[0] = Reflected[0] - Dir[0];
         Reflected[1] = Reflected[1] - Dir[1];
         Reflected[2] = Reflected[2] - Dir[2];
-        // 0x0621a3ad..0x0621a3e3: Vel = Reflected, then Vel[i] = -(Speed * R) * Vel[i].
         const double VelScale = -(static_cast<double>(Speed) * Reflect_);
         Vel[0] = static_cast<float>(VelScale * Reflected[0]);
         Vel[1] = static_cast<float>(VelScale * Reflected[1]);
         Vel[2] = static_cast<float>(VelScale * Reflected[2]);
 
-        // 0x0621a3e6..0x0621a443: W = ((1.0f - T) * S) * Vel (FSTP float each);
-        // Pos = Pos - W.
+        // The rest of the step, along the reflected velocity.
         const double Residual = (1.0 - static_cast<double>(T)) * S;
         const float W[3] = { static_cast<float>(Residual * Vel[0]),
                              static_cast<float>(Residual * Vel[1]),
@@ -974,9 +877,7 @@ namespace AlchemyImpl
     }
 
     // ---- FLBeamField --------------------------------------------------------
-    // No overrides: retail's real Begin/Apply (LAB_0620ed20/LAB_0620ed30) are
-    // genuinely no-ops, and the inherited base no-op is already byte-correct
-    // - see alchemy_fields.h's FLBeamField doc comment.
+    // No overrides: retail's Begin/Apply (LAB_0620ed20 / LAB_0620ed30) are no-ops.
 
     // ---- FLDustField --------------------------------------------------------
 
@@ -994,7 +895,7 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_06212960 (node slot +0x48): operator_new(0x58), FUN_06212810 on +4.
+    // FUN_06212960 (node slot +0x48): operator_new(0x58).
     void FLDustField::CreatePropertySet()
     {
         FFxDustFieldPropertySet* const Set = new FFxDustFieldPropertySet();
@@ -1002,9 +903,7 @@ namespace AlchemyImpl
         AdoptPropertySet(Set);
     }
 
-    // FUN_06212b00 (RET 8): the dust field constructor inline (as its factory
-    // 0x06212fe6..), FUN_06244f90 (0x06212bf1), the +0x9c set cache (0x06212bf6..
-    // 0x06212c00); *Out, 0.
+    // FUN_06212b00: as gravity's.
     GENRESULT DACOM_API FLDustField::CloneNode(IDAComponent** Out)
     {
         FLDustField* const Node = new FLDustField(PrimaryIid_, FactoryName_);
@@ -1014,7 +913,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06212930 (RET 0xc): hash 0x1874DE74 -> *out = [+0x4c], AddRef, 0; else -8.
+    // LAB_06212930.
     GENRESULT DACOM_API FFxDustFieldPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                            INestedSingleRamp** Out)
     {
@@ -1033,9 +932,8 @@ namespace AlchemyImpl
         return WalkPropertyRows(kDustFieldPropertyRows, Callback, Context);
     }
 
-    // LAB_06212c20 (RET 8: node, Dt): FLD Dt FSTP [+0xd8]; [[node]+0x44](Dt) TickLifetime;
-    // R = D+0x50 (inner +0x4c) ->Eval([+0x8c], [+0x84]); FST float [+0xa0]; R*R (the
-    // unrounded R) FSTP float [+0xa4]; XOR EAX,EAX.
+    // LAB_06212c20: Dt (+0xd8) is stored before TickLifetime; R^2 (+0xa4) uses the
+    // unrounded R.
     GENRESULT DACOM_API FLDustField::Pad5(float Dt)
     {
         UpdateDt_ = Dt;
@@ -1046,28 +944,18 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06212c70 (RET 8: node, appearance): [[node]+0x1c](node, appearance, node+0xa8)
-    // -- slot 7 (FUN_0623ffb0) into node+0xa8; XOR EAX,EAX. Apply does not read it.
+    // LAB_06212c70: node slot 7 (FUN_0623ffb0) into node+0xa8. Apply does not read it.
     void DACOM_API FLDustField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
         ComputeRelativeTransform(Appearance, BeginXform_);
     }
 
-    // LAB_06212c90 (RET 0xc: node, particle position, particle age slot; the outer table
-    // reaches it through LAB_06213b00, arg1 += 4):
-    //   0x06212cbc: L = math +0x3c InverseTransform(node+0x4c, pos).
-    //   D2 = (Ly*Ly + Lx*Lx) + Lz*Lz, FST float; FCOMP [+0xa4] (R^2); AND 0x4100; JNZ goes
-    //     on when C0|C3 (<= R^2 or unordered); the fall-through stores 0x7f7fffff to the
-    //     age and returns -1.
-    //   A = 1.0 (double DAT_0624c370) - (R - Lz) / (R + R), in the FPU.
-    //   F = 1.0f; FCOMP Lz with 0.0, TEST AH,5, JP skips when C0 is clear (Lz >= 0 or
-    //     unordered); for Lz < 0: Band = (float)(R^2 * 0.8f) (DAT_0624c6fc); D2 (the
-    //     stored float) FCOMP Band, AND 0x4100, JNZ skips when <= / unordered; else
-    //     F = 1.0f - (D2 - Band) / (R^2 - Band).
-    //   age = (float)(A * F * 10.0f) (DAT_0624c6f8); if byte DAT_062579d4 != 0 the age is
-    //     rewritten as (float)(that - [+0xd8]). DAT_062579d4 has no writer anywhere in the
-    //     image (one reference, the read at 0x06212d80; .data value 0), so that branch is
-    //     never taken; G_DustAgeMinusUpdateDt mirrors it. Returns 0.
+    // LAB_06212c90 (the outer table reaches it through LAB_06213b00): the particle position
+    // in the field's space; outside the radius the age becomes FLT_MAX (0x7f7fffff) and
+    // retail returns -1 (<= or unordered goes on). Otherwise the age is rewritten from the
+    // height and a bottom fade band (DAT_0624c370 1.0, DAT_0624c6fc 0.8, DAT_0624c6f8
+    // 10.0). The DAT_062579d4 branch is never taken (no writer); G_DustAgeMinusUpdateDt
+    // mirrors it.
     void DACOM_API FLDustField::ApplyFieldToVel(float* PosVel6, float* Age, float /*Dt*/)
     {
         I3DMathEngine* Math = G_DustField3DMath;

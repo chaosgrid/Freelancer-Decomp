@@ -6,10 +6,9 @@
 
 #pragma once
 
-// Retail TexturePanels / planet-ring — freelancer.exe PTR_LAB_005db1b4 (14 slots).
-// Epic: texture-panels. NOT StarGlow (that is StarSphere PTR_FUN_005db658).
+// Retail TexturePanels / planet-ring — vtable PTR_LAB_005db1b4 (14 slots). Not StarGlow (that
+// is StarSphere PTR_FUN_005db658).
 //
-// Layout recovered from FUN_0050a040 ctor + LAB_0050a240 Exterior stores + Clear/GetPiece.
 // Load creates FNebulaClouds (0x12c) via FUN_00550180/00550240 and links them at +0x68.
 // DrawPanels / Nebula slot 005091a0 both call FUN_00551500 on those clouds objects.
 
@@ -19,7 +18,7 @@
 
 #include <cstddef>
 
-// Piece record, stride 0x18, eight per ring, built by Load (LAB_0050a240, 0050aa4f..0050ac5d):
+// Piece record, stride 0x18, eight per ring, built by Load (LAB_0050a240):
 // a run of ring segments plus the bounding sphere of their vertices.
 struct FTexturePanelPiece
 {
@@ -60,7 +59,7 @@ public:
 struct FTexturePanels : IPlanetRing
 {
     FTexturePanels();
-    double GetImmersion(Vector const& Point) const override;       // formerly ComputeFactor
+    double GetImmersion(Vector const& Point) const override;
     void Load(char const* IniPath, char const* Nickname) override;
     void Clear() override;
     void Update(void* Camera, float Dt) override;
@@ -77,9 +76,7 @@ struct FTexturePanels : IPlanetRing
 
     FShapeDB Shapes;                     // +0x04, destroyed automatically on constructor failure
     unsigned char ShapePadding[0x18 - sizeof(FShapeDB)];
-    // Retail Load: Universe::get_zone(sysId, nickname) — IZone*, not ISystem.
-    // Universe::IZone (common_universe.h); retail calls its vt +0xc/+0x28/+0x34/+0x44.
-    Universe::IZone const* Zone;          // +0x1c
+    Universe::IZone const* Zone;          // +0x1c  Load: Universe::get_zone(sysId, nickname)
     int NumSegments;                      // +0x20  default 0x20
     float ThicknessEdge;                  // +0x24  Exterior thickness_edge= (ctor 0.1)
     float InnerEdge;                      // +0x28
@@ -97,7 +94,7 @@ struct FTexturePanels : IPlanetRing
     FTexShape const* DetailShape;         // +0x58  detail_shape=
     float DetailTileU;                    // +0x5c  detail_tile[0] (ctor default 10.0)
     int DetailTileV;                      // +0x60  ftol(detail_tile[1]) (ctor default 2)
-    unsigned char TreeFlag;               // +0x64  allocator byte of the +0x68 list (50a093)
+    unsigned char TreeFlag;               // +0x64  allocator byte of the +0x68 list
     unsigned char Pad65[3];
     FTexturePanelsListNode* ListSentinel; // +0x68
     int ListCount;                        // +0x6c

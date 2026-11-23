@@ -104,19 +104,17 @@ namespace AlchemyImpl
             const double InverseLength = (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
             const double Distance = InverseLength * LengthSquared;
             const float RoundedDistance = static_cast<float>(Distance);
-            // TEST AH,5 + JP branches away unless the first sum is ordered less.
+            // Each test below takes its branch only for an ordered result.
             if (Distance + Sphere[3] < 0.0)
             {
                 std::memcpy(Sphere, Center, sizeof(float) * 3);
                 Sphere[3] = 0.0f;
                 return;
             }
-            // TEST AH,5 + JNP skips the merge only for ordered less.
             if (static_cast<double>(RoundedDistance) + 0.0 < Sphere[3])
                 return;
             const float NewRadius = static_cast<float>(
                 ((0.0 + static_cast<double>(Sphere[3])) + RoundedDistance) * 0.5);
-            // TEST AH,0x41 + JNP skips normalization on ordered less or equal.
             if (!(static_cast<double>(RoundedDistance) <= 1e-6))
             {
                 const double InverseDistance = 1.0 / RoundedDistance;
@@ -143,8 +141,8 @@ namespace AlchemyImpl
             RectRoundedYzx
         };
 
-        // The two callers have independently traced distance terms: Perp's 06206ad0
-        // retains the XYZ sum on ST, while Rect stores its inlined YZX sum as float.
+        // Perp's distance (FUN_06206ad0) keeps the XYZ sum in double; Rect's inline
+        // YZX sum is rounded to float.
         __declspec(noinline) void MergePerpRectBoundsSphere(float* Sphere, const float* Center,
             const float& Radius, EPerpRectBoundsDistance DistanceKind)
         {
@@ -185,19 +183,17 @@ namespace AlchemyImpl
             const double InverseLength = (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
             const double Distance = InverseLength * LengthSquared;
             const float RoundedDistance = static_cast<float>(Distance);
-            // TEST AH,5 + JP branches away unless the first sum is ordered less.
+            // Each test below takes its branch only for an ordered result.
             if (Distance + Sphere[3] < Radius)
             {
                 std::memcpy(Sphere, Center, sizeof(float) * 3);
                 std::memcpy(Sphere + 3, &Radius, sizeof(Radius));
                 return;
             }
-            // TEST AH,5 + JNP skips the merge only for ordered less.
             if (static_cast<double>(Radius) + RoundedDistance < Sphere[3])
                 return;
             const float NewRadius = static_cast<float>(
                 ((static_cast<double>(Radius) + Sphere[3]) + RoundedDistance) * 0.5);
-            // TEST AH,0x41 + JNP skips normalization for ordered less or equal.
             if (!(static_cast<double>(RoundedDistance) <= 1e-6))
             {
                 const double InverseDistance = 1.0 / RoundedDistance;
@@ -221,11 +217,10 @@ namespace AlchemyImpl
 #pragma float_control(pop)
 #pragma optimize("", on)
 
-        // Perp's spawn tail (FUN_06235db0, 0x06235e15..0x06235e9b): the squared
+        // Perp's spawn tail (FUN_06235db0): the squared
         // distance of the spawn velocity from +X, and its Y and Z squares, are each
         // compared against DAT_0624eb68, whose bytes BE 37 86 35 are 0x358637BE,
-        // about 1.0e-6. Written from the bits; the previous copy of this test used
-        // 1e-8.
+        // about 1.0e-6.
         float PerpAxisParallelEpsilon()
         {
             const unsigned long Bits = 0x358637BEu;
@@ -234,19 +229,8 @@ namespace AlchemyImpl
             return Value;
         }
 
-        // wave68 (sonnet:alchemy-wave68-lane1, 2026-09-11): two small raw-
-        // vtable helpers for FxPerpAppearance::DrawOrEnqueue below, local to
-        // this file rather than new shared entry points in
-        // alchemy_common.h/.cpp (out of this lane's file ownership this
-        // wave) — same "Vtable[N]" raw-pointer-cast idiom already
-        // established throughout this module (e.g. alchemy_common.cpp's
-        // CallSetRenderState/CallTextureLibraryFrameLookup). Both call
-        // shapes are byte-confirmed against FUN_06233170's own raw listing
-        // (alchemy.dll.txt 0x062332cc-0x062332ea, decomp-tracker item
-        // 134306): RenderPipeline::SetTexture(stage, handle) at vtable+0x108
-        // (the SAME slot GetTextureHandle's own doc comment, alchemy_
-        // genericfx.h, already cites for this exact call) and
-        // RenderPipeline::SetTransform(const float*) at vtable+0x7c.
+        // Pipeline calls FxPerpAppearance::DrawOrEnqueue makes (FUN_06233170): SetTexture at
+        // vtable+0x108 and SetTransform at vtable+0x7c.
         void CallRenderPipelineSetTexture(IRenderPipeline* Pipeline, int Stage, int Handle)
         {
             if (Pipeline == nullptr)
@@ -263,9 +247,8 @@ namespace AlchemyImpl
         }
 
         // {Pipeline, State, Saved} render-state saver of FUN_06206850 (stack +0x8/+0xc/+0x10):
-        // the constructor is inlined there (GetRenderState, vt+0xf4); the destructor is
-        // FUN_06208a20 (`SetRenderState(State, Saved)`, vt+0xf0), reached both from the
-        // normal exit and from the EH unwind Unwind@06247460.
+        // the constructor is inlined there; the destructor is FUN_06208a20, reached both from
+        // the normal exit and from the EH unwind.
         struct FScopedRenderState
         {
             IRenderPipeline* Pipeline;
@@ -286,9 +269,6 @@ namespace AlchemyImpl
             FScopedRenderState(const FScopedRenderState&) = delete;
             FScopedRenderState& operator=(const FScopedRenderState&) = delete;
         };
-
-        // (MergeBoundingSphere, the wave70 sqrt/float lookalike of the bounds merge, was
-        // replaced 2026-09-26 by MergeListBoundsSphere below.)
 
         // ---- FxBasicAppearance fill helpers (FUN_06216550 / FUN_06216f20) ----
 
@@ -312,8 +292,7 @@ namespace AlchemyImpl
             return FloatFromBits(0x3f5db3d7u);
         }
 
-        // The streak's inline reciprocal square root (0x06216931..0x06216955): SAR the bits,
-        // subtract from 0x5f3759df, then y * (1.5 - y*y*x*0.5) in that operand order.
+        // The streak's inline reciprocal square root; single precision, in this operand order.
         float RetailInverseSqrt(float Value)
         {
             long Bits = 0;
@@ -338,17 +317,11 @@ namespace AlchemyImpl
         // only where FListBoundsShape says ----
 
         // How a copy computes the per-particle radius.
-        //   Primary (basic, perp; 0x0621610f / 0x06232d7a): P+0x78 @ (node+0x8c, t) * Scale.
-        //   Side lengths (rect 0x06238316..0x0623838c, oriented 0x0622bf55..0x0622bfd1):
-        //     A = P+0x78 @ (node+0x8c, t) * Scale, B = P+0x7c @ (node+0x8c, t), C = P+0x80 @
-        //     (node+0x8c, t), in that order; radius = max * A, the max picked differently
-        //     (the two differ only for NaN):
-        //       rect 0x0623836c: FLD B; FCOMP (B against C in ST1); AND 0x4100 / JNZ keeps
-        //         C unless B > C -> B > C ? B : C.
-        //       oriented 0x0622bfb1: FCOM [B] with C in ST0; AND 0x4100 / JZ keeps C only
-        //         when C > B, otherwise B is reloaded -> C > B ? C : B.
-        //   Beam (0x0620512f..0x06205183): no scale ramp at all; A = P+0x78 @ (node+0x8c,
-        //     t), B = P+0x7c @ (node+0x8c, t); radius = (B * A) * 0.5f (DAT_0624bab8).
+        //   Primary (basic, perp): P+0x78 * Scale.
+        //   Side lengths (rect, oriented): evaluated in the order +0x78, +0x7c, +0x80; the max
+        //     is picked differently (the two differ only for NaN): rect B > C ? B : C,
+        //     oriented C > B ? C : B.
+        //   Beam: no scale ramp at all; radius = (B * A) * 0.5f (DAT_0624bab8).
         const unsigned long kBoundsRadiusPrimary = 0;
         const unsigned long kBoundsRadiusRectSides = 1;
         const unsigned long kBoundsRadiusOrientedSides = 2;
@@ -393,22 +366,12 @@ namespace AlchemyImpl
             return Side * Primary;
         }
 
-        // The merge each copy inlines (oriented 0x0622c07b..0x0622c183, rect
-        // 0x06238432..0x06238537, basic 0x0621619b..0x0621627e, perp 0x06232dce..0x06232ead,
-        // beam 0x062051ed..0x062052d5):
-        //   D = C - S (FUN_06206c10).
-        //   Dist: inline LenSq = (D.y*D.y + D.z*D.z) + D.x*D.x and FUN_06206b30(LenSq) *
-        //     LenSq, or FUN_06206ad0, the same thing with LenSq = (D.x*D.x + D.y*D.y) +
-        //     D.z*D.z (bLengthXyz): basic and perp use FUN_06206ad0 in both places, rect and
-        //     oriented inline in both, beam FUN_06206ad0 in the peeled pass (0x06205229) and
-        //     inline in the loop (0x06205358).
-        //   Dist + S.r < C.r (TEST AH,5 / JP: only "less" falls through) -> S = C, done.
-        //   C.r + Dist < S.r (TEST AH,5 / JNP skips on "less") -> done.
-        //   NewR = ((C.r + S.r) + Dist) * 0.5 (double DAT_0624bab0).
-        //   Dist > 1e-06 (double DAT_0624baa8; TEST AH,0x41 / JNP skips on less or equal,
-        //     so greater and unordered shift): D *= 1 / Dist (FUN_06206bb0),
-        //     S.center += D * (NewR - S.r) (FUN_06206c40, FUN_06206b80).
-        //   S.r = NewR.
+        // The merge each copy inlines. The length is the inline (y*y + z*z) + x*x times
+        // FUN_06206b30's rsqrt, or FUN_06206ad0 with (x*x + y*y) + z*z (bLengthXyz): basic
+        // and perp use FUN_06206ad0 in both places, rect and oriented inline in both, beam
+        // FUN_06206ad0 in the peeled pass and inline in the loop. Both containment tests are
+        // ordered only; Dist > 1e-06 (DAT_0624baa8) and unordered both shift the centre
+        // (0.5 = DAT_0624bab0).
         void MergeListBoundsSphere(float* Sphere, const float* Center, float Radius,
                                    bool bLengthXyz)
         {
@@ -448,22 +411,12 @@ namespace AlchemyImpl
             Sphere[3] = NewRadius;
         }
 
-        // The shared body. Retail's list walk, read off all five listings:
-        //   begin == end (null head) -> return -1, Out untouched.
-        //   Scale = P+0x5c @ (node+0x8c, node+0x90 = LodInput) -- not evaluated by beam.
-        //   t0 = first->InvLife * first->Age; Out = {first.pos, Radius(t0)}.
-        //   Tail = [list+4] (FUN_06217be0 / FUN_06234040 / FUN_06239860 / FUN_0622d2a0 /
-        //   FUN_062085f0). first == Tail -> done.
-        //   One peeled pass merges the TAIL's centre. Its radius: basic reads the tail's
-        //     own t (0x06216176 FLD [EAX+0x2c] with EAX = tail, bTailOwnAge); perp, rect,
-        //     oriented and beam read the iterator, which still points at the first
-        //     particle, so the tail is merged with t0 (0x06232da9 / 0x062383bb /
-        //     0x0622c006 / 0x062051a9).
-        //   Then cur = first->next while cur != Tail: Radius(cur's t) at cur's centre.
-        //   So the tail is merged second and every particle in between follows in list
-        //   order.
-        //   Out.center = node+0x4c transform of Out.center (math vt+0x28), radius
-        //   copied through (FUN_06208a70); return 0.
+        // The shared body. An empty list returns -1 with Out untouched; beam does not
+        // evaluate Scale. One peeled pass merges the TAIL's centre second; its radius: basic
+        // reads the tail's own t (bTailOwnAge), the others read the iterator, which still
+        // points at the first particle, so the tail is merged with t0 (retail quirk kept).
+        // The particles in between follow in list order; the centre is then transformed
+        // by node+0x4c.
         GENRESULT ListBoundsSphere(const FPooledParticle* Head, const FPooledParticle* Tail,
                                    const FAppearanceRampDescriptor* Descriptor, float OuterTime,
                                    float LodInput, const float* NodeXform12,
@@ -516,8 +469,7 @@ namespace AlchemyImpl
         }
 
         // Frame block {texture, U0, V0, U1, V1}: descriptor flag 0x1000 swaps U0/U1, 0x2000
-        // swaps V0/V1 (0x06216645 / 0x06216825 in the quad, 0x06217003 / 0x06217319 in the
-        // triangle).
+        // swaps V0/V1 (in both the quad and the triangle fill).
         void FlipBasicAppearanceFrame(unsigned long Flags, float* FrameBlock)
         {
             if ((Flags & 0x1000u) != 0)
@@ -552,7 +504,7 @@ namespace AlchemyImpl
             }
         }
 
-        // FUN_06216f20's per-corner UV table (0x06217042 / 0x06217371): flag 1 selects
+        // FUN_06216f20's per-corner UV table: flag 1 selects
         // DAT_06255cc4.. (U 0,0,1  V 1,0,1), otherwise DAT_06255cdc.. (U 0.5,0,1  V 0,1,1).
         void LoadTriangleUvTable(unsigned long Flags, float* TriU, float* TriV)
         {
@@ -576,13 +528,13 @@ namespace AlchemyImpl
             }
         }
 
-        // Table into the frame rect: U*(U1-U0)+U0, V*(V1-V0)+V0 (0x062170d7..0x06217153).
+        // Table into the frame rect.
         void MapTriangleUvTable(const float* FrameBlock, float* TriU, float* TriV,
                                 bool bInitial, bool bMap = true)
         {
             const volatile double SpanU = static_cast<double>(FrameBlock[3]) - FrameBlock[1];
             const double SpanVUnrounded = static_cast<double>(FrameBlock[4]) - FrameBlock[2];
-            // 062170f5 stores the initial V span; 0621736d retains the new frame's span.
+            // The initial pass stores the V span as float; the per-frame pass keeps it wide.
             const volatile float InitialSpanV = bInitial ? static_cast<float>(SpanVUnrounded) : 0.0f;
             const double SpanV = bInitial ?
                 static_cast<double>(InitialSpanV) : SpanVUnrounded;
@@ -602,7 +554,7 @@ namespace AlchemyImpl
         // DAT_0625792c). The beam calls FUN_06208aa0 / FUN_06208b00 / FUN_06208b50 with ECX =
         // its context; the other classes inline the same stores against their context's
         // globals. The vertex store is written only while the counter is not past the
-        // requested count (`CMP count,[+0x18]; JG skip`), and the index the caller keeps is
+        // requested count, and the index the caller keeps is
         // the counter before the increment -- or the requested count when the store was
         // skipped (AlSubmitVertex = FUN_06208aa0).
         unsigned short StoreDrawVertex(FAlDrawContext& Context, float X, float Y, float Z,
@@ -611,27 +563,24 @@ namespace AlchemyImpl
             return AlSubmitVertex(Context, X, Y, Z, Diffuse, U, V);
         }
 
-        // Quad indices as the list classes inline them (basic 0x06216e7c / 0x06216bfb):
-        // (I3,I2,I1) (I1,I2,I0), skipped when IndexCount + 5 > requested; the context's
-        // +0xc primitive counter += 2 (basic 0x06216edf, dust 0x06210578, oriented
-        // 0x0622cfd2, perp 0x06233d8a, rect 0x062395ab) -- FUN_06208b50 with the order
-        // reversed.
+        // Quad indices as the list classes inline them: (I3,I2,I1) (I1,I2,I0), skipped when
+        // IndexCount + 5 > requested; the primitive counter (+0xc) += 2 -- FUN_06208b50 with
+        // the order reversed.
         void StoreQuadIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,
                               unsigned short I2, unsigned short I3)
         {
             AlSubmitQuadIndices(Context, I3, I2, I1, I0);
         }
 
-        // Triangle indices (basic 0x062175be): (I2,I1,I0), skipped when IndexCount + 2 >
-        // requested; +0xc += 1 (0x06217601) -- FUN_06208b00 with the order reversed.
+        // Triangle indices: (I2,I1,I0), skipped when IndexCount + 2 > requested; +0xc += 1 --
+        // FUN_06208b00 with the order reversed.
         void StoreTriangleIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,
                                   unsigned short I2)
         {
             AlSubmitTriangleIndices(Context, I2, I1, I0);
         }
 
-        // FUN_06208b00 / the beam's inline triangle stores (INC [0x06257938] at 0x06206586
-        // ...): indices (A, B, C) in that order.
+        // FUN_06208b00 / the beam's inline triangle stores: indices (A, B, C) in that order.
         void StoreBeamTriangle(unsigned short A, unsigned short B, unsigned short C)
         {
             AlSubmitTriangleIndices(G_BeamDrawContext, A, B, C);
@@ -644,7 +593,7 @@ namespace AlchemyImpl
         }
     } // namespace
 
-    // ---- The property sets' tables (ALC-6) ----
+    // ---- The property sets' tables ----
     namespace
     {
         typedef FAppearanceRampDescriptor FSet;
@@ -678,8 +627,8 @@ namespace AlchemyImpl
             {0xF3D52EE4u, 0x1000},
             {0xE8DC7F5Eu, 0x2000},
         };
-        // 0x03503B61 / 0xE2F60EEB / 0x0ABE0402 share the tail that stores 0 (getter
-        // 0x06204b8c) or leaves Flags alone (setter 0x06204bc0) and returns 0.
+        // 0x03503B61 / 0xE2F60EEB / 0x0ABE0402 share the tail that reads 0 or leaves Flags
+        // alone and returns 0.
         const FDescriptorFlagBit kBeamFlags[] = {
             {0x08508C35u, 0x200}, {0xE8B8CDE7u, 0x100}, {0x1C65B7B9u, 0x400},
             {0xF87B5FD5u, 0x2},   {0x03503B61u, 0x0},   {0xE2F60EEBu, 0x0},
@@ -907,10 +856,8 @@ namespace AlchemyImpl
 
     // Bool get / set (basic FUN_06215930 / FUN_06215a00, beam FUN_06204af0 / FUN_06204ba0,
     // dust 06211e10 / 06211e70, oriented 0622e680 / 0622b8a0, perp 06235320 / 06232730,
-    // rect 06237c00 / 06237cd0): the first row with the hash reads its Flags (+0x60) bit
-    // into the byte (`SHR; AND CL,1`) or sets / clears it on the value's low byte (`TEST
-    // AL,AL`), returning 0; no row -8. A row with mask 0 (the beam's 0x03503B61 /
-    // 0xE2F60EEB / 0x0ABE0402) reads 0 and ignores a set.
+    // rect 06237c00 / 06237cd0): the first row with the hash wins; the setter tests the
+    // value's low byte. A row with mask 0 reads 0 and ignores a set.
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropBool(unsigned long Hash, unsigned char* Out)
     {
         for (unsigned long Index = 0; Index < PropertyClass_->FlagCount; ++Index)
@@ -942,7 +889,7 @@ namespace AlchemyImpl
 
     // Basic FUN_06218b60 / FUN_06218b90 (beam 0620dc00 / 0620dc30, dust 06211f50 /
     // 06211f80, oriented 0622e770 / 0622e7a0, perp 06235410 / 06235440, rect 0623a9d0 /
-    // 0623aa00): BlendInfo -> copy the two dwords, 0; else -8.
+    // 0623aa00).
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropPair(unsigned long Hash, unsigned long* Out2)
     {
         if (Hash != kBillboardBlendInfoHash)
@@ -962,9 +909,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Basic FUN_06218c60 (0x06218c60..0x06218c89; beam 0620dd00, dust 062120c0, oriented
-    // 0622e870, perp 06235580, rect 0623aad0): TexName -> *Out = "???", 0; else
-    // FUN_0623f9a0.
+    // Basic FUN_06218c60 (beam 0620dd00, dust 062120c0, oriented 0622e870, perp 06235580,
+    // rect 0623aad0): only the CRC is kept, so TexName reads back as "???".
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropName(unsigned long Hash, const char** Out)
     {
         if (Hash == kBillboardTexNameHash)
@@ -975,8 +921,7 @@ namespace AlchemyImpl
         return FFxNodePropertySet::GetPropName(Hash, Out);
     }
 
-    // Basic FUN_06218c90 (and 0x06204da4, 0x0620f454, 0x0622ba84, 0x062328c4, 0x06237f14):
-    // TexName -> [+0x64] = DACOM_CRC::GetCRC32(Name), 0; else FUN_0623f9e0.
+    // Basic FUN_06218c90 and its five twins.
     GENRESULT DACOM_API FFxBillboardPropertySet::SetPropName(unsigned long Hash, const char* Text)
     {
         if (Hash == kBillboardTexNameHash)
@@ -987,8 +932,8 @@ namespace AlchemyImpl
         return FFxNodePropertySet::SetPropName(Hash, Text);
     }
 
-    // Basic FUN_06218bf0 (0x06218bf0..0x06218c17; beam 0620dc90, dust 06211fe0, oriented
-    // 0622e800, perp 062354a0, rect 0623aa60): Color -> *Out = [+0x74], AddRef, 0; else -8.
+    // Basic FUN_06218bf0 (beam 0620dc90, dust 06211fe0, oriented 0622e800, perp 062354a0,
+    // rect 0623aa60).
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropColorRampRamp(unsigned long Hash,
                                                                       IRampColorRamp** Out)
     {
@@ -999,9 +944,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // The class's 0x200 getter: `CMP EAX,hash; JNZ next` per case, the hit copies the
-    // field to *Out and AddRefs it (+4), returns 0; past the last case it jumps to
-    // FUN_06244330.
+    // The class's 0x200 getter; past the last case it jumps to FUN_06244330.
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropSingleRampRamp(unsigned long Hash,
                                                                        INestedSingleRamp** Out)
     {
@@ -1017,8 +960,7 @@ namespace AlchemyImpl
         return FFxAppearancePropertySet::GetPropSingleRampRamp(Hash, Out);
     }
 
-    // The class's 0x202 getter (basic FUN_06215900): the one hash -> field AddRef'd, 0;
-    // else -8.
+    // The class's 0x202 getter (basic FUN_06215900).
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                            INestedSingleRamp** Out)
     {
@@ -1034,8 +976,8 @@ namespace AlchemyImpl
         return GR_ALE_CREATE_FAIL;
     }
 
-    // Beam FUN_0620db40 (0x0620db40..0x0620db72; oriented FUN_0622e640): the class hash ->
-    // [inner+0x88] (LocalTransform) AddRef'd, 0; any other hash JMPs FUN_0623fb50.
+    // Beam FUN_0620db40 (oriented FUN_0622e640): LocalTransform (inner +0x88) first, then
+    // FUN_0623fb50.
     GENRESULT DACOM_API FFxBillboardPropertySet::GetPropTransform(unsigned long Hash,
                                                                   IAnimatedTransform** Out)
     {
@@ -1085,8 +1027,8 @@ namespace AlchemyImpl
     // The six billboard creators (basic FUN_06215e80, rect FUN_06238150, perp FUN_06232b00,
     // oriented FUN_0622bcc0, dust FUN_0620f6b0, beam FUN_06205000): operator_new, the
     // class's builder, the outer vtable and count 1, then the shared adoption tail (Release
-    // the old +0x7c, store and AddRef, Release the creation reference; basic 0x06215f1f..
-    // 0x06215f2b caches the set at +0xf0 and its inner at +0xa8 and +0x80).
+    // the old +0x7c, store and AddRef, Release the creation reference; basic caches the set
+    // at +0xf0 and its inner at +0xa8 and +0x80).
     void FFxBillboardAppearance::AdoptBillboardSet(void (*Build)(FAppearanceRampDescriptor&))
     {
         FFxBillboardPropertySet* const Set = new FFxBillboardPropertySet(PropertyClass_);
@@ -1104,15 +1046,13 @@ namespace AlchemyImpl
         AdoptBillboardSet(&BuildBasicDescriptorRamps);
     }
 
-    // FUN_06215d80 (RET 8; this = the prototype's node): operator_new and the basic
-    // constructor inline (the stores of its factory 0x06218246..), FUN_06244120
-    // (0x06215e46), the +0xf0 set cache (0x06215e4b..0x06215e55, Descriptor_ here); *Out =
-    // the new outer, 0.
+    // FUN_06215d80: the basic constructor inline, FUN_06244120, then the +0xf0 set cache
+    // (Descriptor_ here).
     GENRESULT DACOM_API FxBasicAppearance::CloneNode(IDAComponent** Out)
     {
         FxBasicAppearance* const Node = new (std::nothrow) FxBasicAppearance(PrimaryIid_, FactoryName_);
         Node->InitAppearanceFromArchetype(this);
-        // 06215e4b..5e55 reloads the prototype cache after initialization callbacks.
+        // Retail reloads the prototype cache after initialization callbacks.
         Node->Descriptor_ = Descriptor_;
         *Out = Node;
         return GR_OK;
@@ -1153,25 +1093,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06216090, the basic appearance's outer +0x8C (FUN_06219320: `ADD this,0xc;
-    // JMP`), RET 8 -- GetBoundingSphere(Out). CORRECTED 2026-09-26; the history
-    // below this paragraph is superseded where it disagrees.
-    //   0x062160bb: empty list (begin == end) -> return -1, Out untouched.
-    //   0x062160e9: Scale = P+0x5c (EffectScaleRamp) @ (node+0x8c, node+0x90), kept
-    //     in [ESP+0x14] -- NOT discarded. node+0x90 is LodInput_, not a constant.
-    //   0x0621610f: first particle: radius = P+0x78 (PrimarySizeRamp) @ (node+0x8c,
-    //     Age * InvLife) * Scale; Out = {pos, radius}.
-    //   0x06216158..: every further particle, same radius, merged into Out.
-    //   0x062163b8: Out.center = node+0x4c transform of Out.center (FUN_06208690);
-    //     radius copied through (FUN_06208a70); return 0.
-    // It used to run as UpdateCachedBoundsSphere after every integrate, over the
-    // private list nothing drew, into a cache nothing read, with Scale replaced by a
-    // constant 1.0 (EffectOuterScale_) -- wrong on each count.
-    //
-    // The list TAIL ([list+4], FUN_06217be0) is merged
-    // right after the first particle (0x06216164..0x0621627e, with the tail's own t), and
-    // only then first->next .. tail-1 in order; and the merge is the listing's (FUN_06206ad0
-    // rsqrt length, strict compares, double 0.5 / 1e-06), not MergeBoundingSphere.
+    // FUN_06216090 (outer +0x8C via the FUN_06219320 thunk). The list tail (with its own
+    // t) is merged right after the first particle, then the rest in order; the merge uses
+    // FUN_06206ad0's rsqrt length. The centre is finally transformed by node+0x4c.
     GENRESULT DACOM_API FxBasicAppearance::GetBoundingSphere(float* OutSphere)
     {
         const FPooledParticle* const Head = InstanceListHead_;
@@ -1221,31 +1145,18 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Outer +0xBC -> FUN_06215f40 (LAB_06219640 is the `ADD this,0xc; JMP`). The
-    // body is FGenericFxObjectBase::SpawnListParticle; basic adds nothing to it.
+    // Outer +0xBC -> FUN_06215f40 (thunk LAB_06219640): SpawnListParticle unchanged.
     GENRESULT DACOM_API FxBasicAppearance::Pad47(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolBasic, Six, Age, Duration);
         return GR_OK;
     }
 
-    // FUN_06217640 (node vtable 0x0624cb30), RET 4, always returns 0. Rewritten 2026-09-26
-    // from the listing; the previous version filled through FillPoolParticles (a world-space
-    // lookalike walking the whole pool), hardcoded the blend pair and bound TextureHandle_
-    // (+0xb8) instead of the dword at +0xbc.
-    //   0x0621766b: begin/end of the list at node+0xd8; equal -> return.
-    //   0x06217699: DAT_06257919 (G_Defaults.bUseMaterialBatcher) set ->
-    //     FUN_06201c70(0, [node+0xac]) = EnqueueAppearanceToList(0, this), result ignored.
-    //   0x062176d0: counts from [node+0xac] vt+0xd0/+0xd4, then FUN_06240f50(DAT_062579dc,
-    //     4, verts, indices); false -> return.
-    //   0x06217708: ++DAT_062578f0 (G_DrawCounters[3]).
-    //   0x0621771d: descriptor flag 2 -> FUN_06216550, else FUN_06216f20.
-    //   0x06217738: FUN_06241070 (end) == 0 -> return; else ++DAT_062578e8
-    //     (G_DrawCounters[1]).
-    //   0x06217750: render states 0x13/0x14 from descriptor +0x68/+0x6c (the set's
-    //     BlendInfo), SetTexture(0, [node+0xbc]), SetModelview with an identity
-    //     12-float transform (1.0 at [ESP+0x14]/+0x24/+0x34 = dwords 0/4/8: the fills already
-    //     produced camera-space vertices), FUN_06241180 (draw).
+    // FUN_06217640 (node vtable 0x0624cb30), always returns 0. With the batcher on
+    // (DAT_06257919) the node is queued on batch list 0 (FUN_06201c70) instead of drawn.
+    // Counts come from vt+0xd0/+0xd4, the context is DAT_062579dc (FUN_06240f50), and
+    // descriptor flag 2 selects FUN_06216550 over FUN_06216f20. The fills produce
+    // camera-space vertices, so the modelview is identity.
     GENRESULT DACOM_API FxBasicAppearance::DrawOrEnqueue()
     {
         if (InstanceListHead_ == nullptr)
@@ -1270,29 +1181,20 @@ namespace AlchemyImpl
         else
             FillTriangleGeometry();
 
-        // 0x06217738 onward is the same sequence as the outer +0xA0 body FUN_062193b0.
+        // The rest is the same sequence as the outer +0xA0 body FUN_062193b0.
         EndBatchedDraw();
         return GR_OK;
     }
 
-    // LAB_06217940 (inner) / FUN_06219390 (outer +0x9C), RET 0xc:
-    // FUN_06240f50(DAT_062579dc, 4, Verts, Indices),
-    // true -> 0, false -> -1 (`NEG AL; SBB EAX,EAX; NEG EAX; DEC EAX`).
+    // LAB_06217940 (inner) / FUN_06219390 (outer +0x9C).
     GENRESULT DACOM_API FxBasicAppearance::BeginBatchedDraw(unsigned long Verts,
                                                            unsigned long Indices)
     {
         return AlDrawContextBegin(G_BasicDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
 
-    // FUN_062193b0 (outer +0xA0, RET 4), traced 2026-09-26 against 0x062193b0-0x062194a0.
-    // ESI = outer, so [ESI+0xfc] = node+0xf0 (descriptor) and [ESI+0xc8] = node+0xbc:
-    //   FUN_06241070 (end) == 0 -> return 0;
-    //   ++DAT_062578e8 (G_DrawCounters[1]);
-    //   SetRenderState(0x13, [desc+0x68]), SetRenderState(0x14, [desc+0x6c]) (vt+0xf0);
-    //   SetTexture(0, [node+0xbc]) (vt+0x108);
-    //   SetModelview (vt+0x7c) with the 12-float identity built at [ESP+4] (1.0 at dwords
-    //     0/4/8, everything else 0);
-    //   FUN_06241180 (draw); return 0.
+    // FUN_062193b0 (outer +0xA0): blend from the set's BlendInfo (desc+0x68/+0x6c),
+    // texture from node+0xbc, identity modelview, FUN_06241180 draw.
     GENRESULT DACOM_API FxBasicAppearance::EndBatchedDraw()
     {
         if (AlDrawContextEnd(G_BasicDrawContext) == 0)
@@ -1319,8 +1221,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Outer +0xA4 = LAB_062194b0 (`LEA ECX,[this+0xc]`), node body LAB_06217a60
-    // (0x0624cb74): ++DAT_062578f0, then the same flag-2 dispatch as the immediate draw.
+    // Outer +0xA4 = LAB_062194b0, node body LAB_06217a60: ++DAT_062578f0, then the same
+    // flag-2 dispatch as the immediate draw.
     // The batch flush FUN_06201cc0 calls it between its +0x9C begin and +0xA0 draw.
     GENRESULT DACOM_API FxBasicAppearance::FillBatchedGeometry()
     {
@@ -1332,37 +1234,13 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06216550, __thiscall on the node, no stack arguments. Traced 2026-09-26 against
-    // alchemy.dll.txt 0x06216550-0x06216f1b. Offsets below are ESP-relative after the
-    // prologue.
-    //   Scale = descriptor+0x5c ramp (OuterTime node+0x8c, LodInput node+0x90); exactly 0
-    //     -> return (0x062165d5: TEST AH,0x44 / JNP taken only for C3 alone).
-    //   bFrameLookup [0x17] = node+0xd0 != 1 && (flags & 8) == 0.
-    //   bStreak [0x3f] = flags & 4.
-    //   ViewWorld [0xc0] = FUN_06208640(camera vt+0x40, node+0x4c).
-    //   Frame block [0x44..0x57] = the 5 dwords at node+0xbc {texture, U0, V0, U1, V1};
-    //     flag 0x1000 swaps U0/U1, flag 0x2000 swaps V0/V1. LastFrame [0x74] = -1.
-    //   Per particle (list order):
-    //     C = TransformXform(ViewWorld, pos) (math vt+0x28); C.z > 0 -> next (0x062166dc:
-    //       AND 0x4100 / JZ = strictly greater).
-    //     t = InvLife * Age. Alpha = +0x70 ramp, Size = +0x78 ramp * Scale; Alpha < 0.01
-    //       -> next (TEST AH,5 / JNP).
-    //     Diffuse = +0x74 ramp vt+0x20 | ftol(Alpha * 255) << 24.
-    //     Angle = +0x7c ramp; Aspect = +0x88 ramp; (cos, sin) = FUN_0623f6b0(Angle).
-    //     bFrameLookup: frame = ftol(+0x80 ramp * (node+0xd0 - 1)); when it differs from
-    //       LastFrame, remember it, FUN_06244f30(node+0xb4, frame, frame block) and redo
-    //       the two flips.
-    //     Streak (0x06216876): V = TransformMatrix(ViewWorld, vel) (vt+0x2c); N = C x V;
-    //       U = N x C normalized with one Newton step (0x5f3759df); D = (V . U) *
-    //       0x3d088880; B = C - D*U (x, y); Ux/Uy = U*Size; P = (-Uy, Ux)*Aspect.
-    //       Corners (B-U-P, C+U-P, B-U+P, C+U+P) with UVs (U1,V0) (U1,V1) (U0,V0) (U0,V1).
-    //     Plain (0x06216c4e): W = Size*(sin, cos), H = Size*Aspect*(cos, -sin); corners
-    //       C+W+H, C+W-H, C-W+H, C-W-H with UVs (U1,V0) (U0,V0) (U1,V1) (U0,V1). z = C.z.
-    //     Each vertex store is skipped while the vertex counter is past the requested
-    //     count (JG), the skipped index being that count; the six indices (I3,I2,I1)
-    //     (I1,I2,I0) are skipped when IndexCount + 5 > requested indices.
-    // Every ramp is called through its +0x1C Eval(Outer, Inner) and the colour ramp through
-    // +0x20 EvalPacked (0x0621675a), unchecked as in retail: FUN_06215570 builds them all.
+    // FUN_06216550, __thiscall on the node. A Scale of exactly 0 returns (NaN does not).
+    // Particles with C.z > 0 (strictly) or an ordered Alpha < 0.01 are skipped.
+    //   Streak (flag 4): V = the velocity in camera space; U = (C x V) x C normalized with
+    //     one Newton step; the base point is shifted back by (V . U) * 0x3d088880;
+    //     corners (B-U-P, C+U-P, B-U+P, C+U+P), UVs (U1,V0) (U1,V1) (U0,V0) (U0,V1).
+    //   Plain: corners C+W+H, C+W-H, C-W+H, C-W-H, UVs (U1,V0) (U0,V0) (U1,V1) (U0,V1).
+    // The ramps are not null-checked, as in retail: FUN_06215570 builds them all.
     void FxBasicAppearance::FillQuadGeometry()
     {
         const FPooledParticle* Particle = InstanceListHead_;
@@ -1534,27 +1412,11 @@ namespace AlchemyImpl
             StoreQuadIndices(G_BasicDrawContext, Indices[0], Indices[1], Indices[2], Indices[3]);
         }
     }
-    // FUN_06216f20, __thiscall on the node. Traced 2026-09-26 against alchemy.dll.txt
-    // 0x06216f20-0x0621763c.
-    //   bFrameLookup [0x13] as in the quad. ViewWorld = MulTransform(camera vt+0x40,
-    //     node+0x4c) (math vt+0x1c into [0x88], copied to [0xb8] by FUN_06217ab0).
-    //   Frame block [0x38..0x4b] from node+0xbc with the 0x1000/0x2000 flips.
-    //   UV table by flag 1 (0x06217042): set -> U {0,0,1}, V {1,0,1} (DAT_06255cc4..);
-    //     clear -> U {0.5,0,1}, V {0,1,1} (DAT_06255cdc..). A fourth U/V dword is loaded
-    //     too and never read -- for flag 1 clear it is the first four bytes of the string
-    //     "BasicApp_Rotate" at 0x06255cf4.
-    //   Without bFrameLookup the table is mapped into the frame rect once:
-    //     U = U*(U1-U0) + U0, V = V*(V1-V0) + V0.
-    //   Scale = +0x5c ramp (no zero test here). LastFrame = -1.
-    //   Per particle: t, Alpha (+0x70), Size (+0x78 * Scale); Alpha < 0.01 -> next;
-    //     C = TransformXform(ViewWorld, pos) (no depth test here); Diffuse as in the quad;
-    //     Size2 = Size + Size; the stored Size2*0x3f5db3d7 is overwritten by trig output.
-    //     Angle (+0x7c), (cos, sin); Xa = cos*Size2, Ya = sin*Size2,
-    //     Xb = cos*Size, Yb = sin*Size (actual stack reuse at 0x06217280..0x062172b5).
-    //     bFrameLookup and a new frame: lookup, flips, reload the table by flag 1 and map it.
-    //     Corners (C.x+Xa-Yb, C.y-Ya-Xb) UV[2], (C.x-Xa-Yb, C.y+Ya-Xb) UV[1],
-    //     (C.x+sin*Alpha, C.y+cos*Alpha) UV[0]; indices (I2,I1,I0) unless
-    //     IndexCount + 2 > requested.
+    // FUN_06216f20, __thiscall on the node. Unlike the quad: no Scale zero test and no
+    // depth test. Retail loads a fourth, never-read UV dword (for flag 1 clear, the first
+    // bytes of "BasicApp_Rotate"). Retail quirk kept: the third corner is offset by
+    // (sin, cos) * Alpha, not by the size, and the stored Size2 * sqrt(3)/2 is overwritten
+    // by the trig output before it is used.
     void FxBasicAppearance::FillTriangleGeometry()
     {
         const FPooledParticle* Particle = InstanceListHead_;
@@ -1663,28 +1525,14 @@ namespace AlchemyImpl
             StoreTriangleIndices(G_BasicDrawContext, Indices[0], Indices[1], Indices[2]);
         }
     }
-    // ---- The six billboard set builders (ALC-6, re-traced 2026-09-30) ----
+    // ---- The six billboard set builders ----
     // Each runs FUN_06243ff0 first (FFxAppearancePropertySet's constructor: the
     // Appearance_LODCurve ramp at +0x58), zeroes Flags, TextureCrc and its ramp slots,
     // seeds BlendInfo {5, 2} (FAppearanceRampDescriptor's constructor), then builds the
     // ColorRamp (FxRampColorRamp{FUN_06209240({0.8, 0.8, 0.8})}) and its own list; each
     // step first releases what its slot holds (the set is new: nothing). Nested scalar
-    // ramps are FxRampSingleRamp{FUN_06208bc0(value)} unless noted. Inner offsets (+4 for
-    // the draw fills):
-    //   basic    FUN_06215570: +0x6c 1, +0x74 1, +0x78 0, +0x7c 0, +0x80
-    //            FxAnimatedSingleRamp{FUN_06209ad0(0)} (0x0621584e), +0x84 FUN_06217c20(1)
-    //            (the same one-key FxRampSingleRamp inline), Flags 0 (0x062158b5).
-    //   rect     FUN_06237840: +0x6c 1, +0x74 1, +0x78 1, +0x7c 1, +0x80 0, +0x84
-    //            FUN_06210900(0), Flags 0 (0x06237b89).
-    //   perp / dust FUN_062323a0 / FUN_0620ef80: +0x6c 1, +0x74 1, +0x78 0, +0x7c
-    //            FUN_06210900(0), Flags 0 (0x06232622 / 0x0620f202).
-    //   oriented FUN_0622b3e0: the rect list, then +0x88 a fresh FxAnimatedTransform
-    //            (0x0622b721) stored through FUN_062084f0, Flags 0 (0x0622b768).
-    //   beam     FUN_06204670: +0x6c 1, +0x74 1, +0x84 1, +0x78 1, +0x80 0, +0x7c
-    //            FxAnimatedSingleRamp{FUN_06209ad0(0)}, +0x88 FUN_06208620 (a fresh
-    //            FxAnimatedTransform) stored through FUN_062084f0 and then released
-    //            (0x06204a3b), Flags 2 (0x06204a47).
-    // The colour ramp comes first in all six.
+    // ramps are one-key FxRampSingleRamps unless noted. The colour ramp comes first in all
+    // six.
     static void BuildDescriptorHead(FAppearanceRampDescriptor& Descriptor)
     {
         const float Grey[3] = {0.8f, 0.8f, 0.8f};
@@ -1728,10 +1576,9 @@ namespace AlchemyImpl
         Descriptor.Flags = 0;
     }
 
-    // FUN_0622b3e0: the rect list, then at 0x0622b721 operator_new(0x34) + FUN_062434c0 +
-    // vtable 0x0624bbb8 + RefCount 1, stored through FUN_062084f0 (Release old, store,
-    // AddRef). The builder keeps its construction reference, so the transform's count
-    // ends at 2 in retail as well; one of the two is never released.
+    // FUN_0622b3e0: the rect list, then a fresh FxAnimatedTransform stored through
+    // FUN_062084f0 (AddRef). Retail leak kept: the builder keeps its construction
+    // reference, so the count ends at 2 and one is never released.
     static void BuildOrientedDescriptorRamps(FAppearanceRampDescriptor& Descriptor)
     {
         BuildRectDescriptorRamps(Descriptor);
@@ -1741,9 +1588,8 @@ namespace AlchemyImpl
         Transform->AddRef();
     }
 
-    // FUN_06204670. The transform (FUN_06208620: FUN_062434c0 + vtable 0x0624bbb8 +
-    // RefCount 1) goes through FUN_062084f0 and is then released once (0x06204a3b), so
-    // the descriptor holds the only reference. Flags = 2 (0x06204a47).
+    // FUN_06204670. Unlike oriented, the transform (FUN_06208620) is released once after
+    // the store, so the descriptor holds the only reference.
     static void BuildBeamDescriptorRamps(FAppearanceRampDescriptor& Descriptor)
     {
         BuildDescriptorHead(Descriptor);
@@ -1771,8 +1617,7 @@ namespace AlchemyImpl
         AdoptBillboardSet(&BuildRectDescriptorRamps);
     }
 
-    // FUN_06238050 (RET 8): the rect constructor inline (as its factory 0x06239c76..),
-    // FUN_06244120 (0x06238116), the +0xf0 set cache (0x0623811b..0x06238125); *Out, 0.
+    // FUN_06238050: as basic's clone.
     GENRESULT DACOM_API FxRectAppearance::CloneNode(IDAComponent** Out)
     {
         FxRectAppearance* const Node = new (std::nothrow) FxRectAppearance(PrimaryIid_, FactoryName_);
@@ -1899,14 +1744,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_062388b0 (node vtable 0x0624eee8 +0x10; outer +0x18 thunk LAB_0623ac50), traced
-    // 2026-09-26 against 0x062388b0-0x06238a68: the same shape as the perp draw --
-    //   node+0xd8 list empty -> return 0;
-    //   DAT_06257919 -> FUN_06201c70(1, [node+0xac]), return 0;
-    //   counts from [node+0xac] vt+0xd0 / +0xd4; FUN_06240f50(DAT_06257b40, 4, v, i) false ->
-    //     return 0;
-    //   FUN_06238a70 (fill); then from 0x06238990 the end-and-draw sequence of the outer
-    //     +0xA0 body FUN_0623b1a0 (EndBatchedDraw). Return 0 on every path.
+    // FUN_062388b0 (node vtable 0x0624eee8 +0x10; outer +0x18 thunk LAB_0623ac50): the
+    // same shape as the basic and perp draws; with the batcher on (DAT_06257919) the node
+    // goes on batch list 1. Returns 0 on every path.
     GENRESULT DACOM_API FxRectAppearance::DrawOrEnqueue()
     {
         if (InstanceListHead_ == nullptr)
@@ -1930,19 +1770,16 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0623b140 (outer +0x9C, RET 0xc): FUN_06240f50(DAT_06257b40, 4, Verts, Indices)
-    // folded to 0 / -1 (see FxPerpAppearance::BeginBatchedDraw on the single context).
+    // LAB_0623b140 (outer +0x9C): FUN_06240f50 on context DAT_06257b40 (see
+    // FxPerpAppearance::BeginBatchedDraw on the single context).
     GENRESULT DACOM_API FxRectAppearance::BeginBatchedDraw(unsigned long Verts,
                                                           unsigned long Indices)
     {
         return AlDrawContextBegin(G_RectDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
 
-    // FUN_0623b1a0 (outer +0xA0, RET 4), traced 2026-09-26 against 0x0623b1a0-0x0623b271;
-    // byte-for-byte the perp body FUN_06235a60 on context DAT_06257b40 (math engine cache
-    // DAT_06257b8c): end == 0 -> return 0; ++DAT_062578e8; blend 0x13/0x14 from
-    // [desc+0x68]/[desc+0x6c]; SetTexture(0, [node+0xbc]); SetModelview(MulTransform(camera
-    // vt+0x40, node+0x4c)); draw; return 0.
+    // FUN_0623b1a0 (outer +0xA0): the perp body FUN_06235a60 on context DAT_06257b40 (math
+    // engine cache DAT_06257b8c).
     GENRESULT DACOM_API FxRectAppearance::EndBatchedDraw()
     {
         if (AlDrawContextEnd(G_RectDrawContext) == 0)
@@ -1965,7 +1802,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0623b2a0 (outer +0xA4): `LEA ECX,[this+0xc]; CALL FUN_06238a70; XOR EAX,EAX`.
+    // FUN_0623b2a0 (outer +0xA4).
     GENRESULT DACOM_API FxRectAppearance::FillBatchedGeometry()
     {
         FillGeometry();
@@ -2029,7 +1866,7 @@ namespace AlchemyImpl
                 Descriptor_->TexFrameRamp, AppearanceOuterTime_, InnerTime) * SizeScale);
             const float HalfWidth = static_cast<float>((ForwardAppearanceSingleEval(
                 Descriptor_->AxisOverrideRamp, AppearanceOuterTime_, InnerTime) * SizeScale) * 0.5);
-            // TEST AH,0x41 + JNP skips only ordered less/equal; unordered continues.
+            // Only an ordered less-or-equal skips; unordered continues.
             if (Length <= TinyLength || HalfWidth <= TinyLength || Alpha <= TinyAlpha)
                 continue;
             FVector Position;
@@ -2047,7 +1884,7 @@ namespace AlchemyImpl
             const double VelocityInverse = (1.5 - (((static_cast<double>(VelocityGuess) * VelocityGuess) *
                 VelocitySquared) * 0.5)) * VelocityGuess;
             const float Speed = static_cast<float>(VelocityInverse * VelocitySquared);
-            // TEST AH,0x41 + JP takes greater/unordered normalization.
+            // Greater and unordered both normalize.
             if (!(Speed <= TinyLength))
             {
                 const double InverseSpeed = 1.0 / Speed;
@@ -2094,7 +1931,7 @@ namespace AlchemyImpl
                 const double UnroundedFacing = std::fabs(((static_cast<double>(Direction.Z) * Velocity.Z) +
                     (static_cast<double>(Velocity.Y) * Direction.Y)) + (static_cast<double>(Direction.X) * Velocity.X));
                 const float Facing = static_cast<float>(UnroundedFacing);
-                // AND EAX,4100 + JZ skips ordered greater using the still-unrounded ST value.
+                // Only an ordered greater skips, tested on the unrounded value.
                 if (UnroundedFacing > FacingCull)
                     continue;
                 if (Facing > FacingFade)
@@ -2289,8 +2126,7 @@ namespace AlchemyImpl
         AdoptBillboardSet(&BuildPerpDescriptorRamps);
     }
 
-    // FUN_06232a00 (RET 8): the perp constructor inline (as its factory 0x06234446..),
-    // FUN_06244120 (0x06232ac6), the +0xf0 set cache (0x06232acb..0x06232ad5); *Out, 0.
+    // FUN_06232a00: as basic's clone.
     GENRESULT DACOM_API FxPerpAppearance::CloneNode(IDAComponent** Out)
     {
         FxPerpAppearance* const Node = new (std::nothrow) FxPerpAppearance(PrimaryIid_, FactoryName_);
@@ -2390,13 +2226,8 @@ namespace AlchemyImpl
 
     // Outer +0xBC -> FUN_06235db0: FUN_06234ab0 (FGenericFxObjectBase::
     // SpawnListParticle), then seed the new tail's axis at +0x30.
-    //   0x06235e15: (Six[3] - 1)^2, Six[4]^2 and Six[5]^2 are each compared against
-    //     DAT_0624eb68 (~1.0e-6): FCOMP; TEST AH,0x41; JP -> LAB_06235e84. Parity is
-    //     even when neither C0 nor C3 is set, i.e. the square is greater than the
-    //     epsilon, and that jump is taken.
-    //   All three within the epsilon (velocity ~ +X): axis = (0, 0, 1) (0x06235e5d).
-    //   Any one outside it: axis = (1, 0, 0) (LAB_06235e84).
-    // Returns 0.
+    // A velocity within DAT_0624eb68 (~1.0e-6, per squared component) of +X gets axis
+    // (0, 0, 1); any other gets (1, 0, 0).
     GENRESULT DACOM_API FxPerpAppearance::Pad47(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolPerp, Six, Age, Duration);
@@ -2422,14 +2253,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06233170 (node vtable 0x0624e8b0 +0x10; outer +0x18 thunk FUN_06235700 / 0x06235010),
-    // traced 2026-09-26 against 0x06233170-0x06233328:
-    //   node+0xd8 list empty (begin == end) -> return 0;
-    //   DAT_06257919 (batcher) -> FUN_06201c70(2, [node+0xac]) and return 0;
-    //   counts from [node+0xac] vt+0xd0 / +0xd4 (locals zeroed first); FUN_06240f50(
-    //     DAT_06257aec, 4, verts, indices) false -> return 0;
-    //   FUN_06233330 (fill); then the end-and-draw tail FUN_06235a60 also runs (see
-    //   EndBatchedDraw). Return 0 on every path.
+    // FUN_06233170 (node vtable 0x0624e8b0 +0x10; outer +0x18 thunk FUN_06235700): the
+    // basic draw's shape, batch list 2, context DAT_06257aec, fill FUN_06233330. Returns 0
+    // on every path.
     GENRESULT DACOM_API FxPerpAppearance::DrawOrEnqueue()
     {
         if (InstanceListHead_ == nullptr)
@@ -2450,32 +2276,20 @@ namespace AlchemyImpl
 
         FillGeometry();
 
-        // 0x06233250 onward is the same sequence as the outer +0xA0 body FUN_06235a60.
+        // The rest is the same sequence as the outer +0xA0 body FUN_06235a60.
         EndBatchedDraw();
         return GR_OK;
     }
 
-    // FUN_06235a40 (outer +0x9C, RET 0xc): FUN_06240f50(DAT_06257aec, 4, Verts, Indices)
-    // folded to 0 / -1. The perp appearance has its own draw context DAT_06257aec; the
-    // port keeps one context, which is equivalent because no two draw contexts are ever
-    // open at once (each Begin is closed by its End before the next list or appearance).
+    // FUN_06235a40 (outer +0x9C): FUN_06240f50 on DAT_06257aec.
     GENRESULT DACOM_API FxPerpAppearance::BeginBatchedDraw(unsigned long Verts,
                                                           unsigned long Indices)
     {
         return AlDrawContextBegin(G_PerpDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
 
-    // FUN_06235a60 (outer +0xA0, RET 4), traced 2026-09-26 against 0x06235a60-0x06235b31.
-    // ESI = outer: [ESI+0xfc] = node+0xf0 (descriptor), [ESI+0xc8] = node+0xbc,
-    // ESI+0x58 = node+0x4c.
-    //   FUN_06241070 (end) == 0 -> return 0;
-    //   ++DAT_062578e8 (G_DrawCounters[1]);
-    //   SetRenderState(0x13, [desc+0x68]), SetRenderState(0x14, [desc+0x6c]);
-    //   SetTexture(0, [node+0xbc]);
-    //   math vt+0x1c MulTransform(local, camera vt+0x40, node+0x4c), copied (REP MOVSD 0xc)
-    //     and handed to SetModelview (vt+0x7c) -- the fill wrote node-local vertices;
-    //   FUN_06241180 (draw); return 0.
-    // The immediate draw FUN_06233170 runs the same sequence inline from 0x06233250.
+    // FUN_06235a60 (outer +0xA0): the fill wrote node-local vertices, so the modelview is
+    // camera * node. The immediate draw FUN_06233170 runs the same sequence inline.
     GENRESULT DACOM_API FxPerpAppearance::EndBatchedDraw()
     {
         if (AlDrawContextEnd(G_PerpDrawContext) == 0)
@@ -2504,7 +2318,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06235b40 (outer +0xA4): `LEA ECX,[this+0xc]; CALL FUN_06233330; XOR EAX,EAX`.
+    // FUN_06235b40 (outer +0xA4).
     GENRESULT DACOM_API FxPerpAppearance::FillBatchedGeometry()
     {
         FillGeometry();
@@ -2560,7 +2374,7 @@ namespace AlchemyImpl
             const double UnroundedHalfSize = (ForwardAppearanceSingleEval(
                 Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, InnerTime) * Scale) * 0.5;
             const float HalfSize = static_cast<float>(UnroundedHalfSize);
-            // TEST AH,41 / JNP skips ordered less/equal, but permits unordered.
+            // Only an ordered less-or-equal skips; unordered continues.
             if (UnroundedHalfSize <= TinyLength || Alpha <= TinyLength)
                 continue;
 
@@ -2643,7 +2457,7 @@ namespace AlchemyImpl
                     (static_cast<double>(ToCamera.Z) * Velocity.Z)) + (static_cast<double>(ToCamera.Y) * Velocity.Y);
                 const double UnroundedFacing = 1.0 - std::fabs(Dot);
                 const float Facing = static_cast<float>(UnroundedFacing);
-                // TEST AX,4100 / JZ skips only ordered greater, using the unrounded value.
+                // Only an ordered greater skips, tested on the unrounded value.
                 if (UnroundedFacing > FacingCull)
                     continue;
                 if (Facing > FacingFade)
@@ -2828,13 +2642,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0622bbc0 (RET 8): the oriented constructor inline (as its factory 0x0622d7c6..),
-    // FUN_06244120 (0x0622bc86), the +0xf0 set cache (0x0622bc8b..0x0622bc95); *Out, 0.
+    // FUN_0622bbc0: as basic's clone.
     GENRESULT DACOM_API FxOrientedAppearance::CloneNode(IDAComponent** Out)
     {
         FxOrientedAppearance* const Node = new (std::nothrow) FxOrientedAppearance(PrimaryIid_, FactoryName_);
         Node->InitAppearanceFromArchetype(this);
-        // 0622bc8b..bc95 reloads the prototype cache after initialization callbacks.
+        // Retail reloads the prototype cache after initialization callbacks.
         Node->Descriptor_ = Descriptor_;
         *Out = Node;
         return GR_OK;
@@ -2875,13 +2688,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // Outer +0x8C -> FUN_0622eca0 (`ADD [ESP+4],0xc; JMP`) -> FUN_0622bed0, RET 8 --
-    // GetBoundingSphere(Out), listing 90288-90700. Same body as rect's FUN_06238280:
-    // list at node+0xd8 (FUN_0622d220 begin = head, FUN_0622d240 end = null,
-    // FUN_0622d2a0 = [list+4] tail), Scale P+0x5c @ (node+0x8c, node+0x90), radius per
-    // ListBoundsRadius (oriented max), the peeled tail pass at t0, the inlined merge,
-    // and the node+0x4c transform through the cached math engine DAT_06257ac0 vt+0x28 +
-    // FUN_06208a70. See ListBoundsSphere for the term-by-term reading.
+    // Outer +0x8C -> FUN_0622eca0 -> FUN_0622bed0: rect's FUN_06238280 with the oriented
+    // max (see ListBoundsRadius), the peeled tail pass at t0 and math engine DAT_06257ac0.
     GENRESULT DACOM_API FxOrientedAppearance::GetBoundingSphere(float* OutSphere)
     {
         const FPooledParticle* const Head = InstanceListHead_;
@@ -2959,44 +2767,14 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0622c500, __stdcall on the node. Traced 2026-09-26 against alchemy.dll.txt
-    // 0x0622c500-0x0622d0a9; offsets are ESP-relative after the four register pushes, with
-    // every pending PUSH / SUB ESP taken off.
-    //   ++DAT_062578fc (G_DrawCounters[6]) first, then node+0xd8 empty -> return 0.
-    //   bFrameLookup [0x17] = node+0xd0 != 1 && (flags & 8) == 0.
-    //   [node+0xac] vt+0xd0 / +0xd4 counts (4 and 6 per particle, LAB_0622e950 / e970);
-    //   FUN_06240f50(&DAT_06257a74, 4, V, I) false -> return 0. No batcher branch.
-    //   bCameraFade [0x1f] = flags & 0x40: InvNode [0x164] = FUN_0622d2e0(node+0x4c)
-    //     (GeneralInverse), CameraPos [0x134] = camera vt+0xc.
-    //   Frame block [0x40] = node+0xbc (5 dwords) with the 0x1000 / 0x2000 flips;
-    //   LastFrame [0x80] = -1; Scale [0xa4] = +0x5c ramp (node+0x8c, node+0x90).
-    //   Per particle (node+0xd8 order), t = [+0x2c] * [+0x24] (kept in ESI):
-    //     Alpha [0x3c] = +0x70; SS [0x10] = +0x78 * Scale; H [0x18] = +0x7c * SS (it
-    //     overwrites t's spill); W [0x70] = +0x80 * SS.
-    //     Alpha == 0 -> next (TEST AH,0x44 / JNP); SS < 1e-11 (0x2d2febff) -> next
-    //     (TEST AH,0x05 / JNP).
-    //     P [0x20] = [+0xc]. +0x8c IAnimatedTransform: vt+0x20 IsIdentity false ->
-    //     vt+0x2c Evaluate(node+0x8c, t, &M [0xb4]) and P += M[9..11]; true -> M =
-    //     FUN_06206c70 identity with M[9..11] = 0.
-    //     bCameraFade: N [0xa8] = col0(M) x col1(M) = (M3*M7 - M4*M6, M6*M1 - M7*M0,
-    //       M0*M4 - M3*M1); D [0x2c] = TransformXform(InvNode, CameraPos) - P, length over
-    //       (x*x + z*z) + y*y with the 0x5f3759df step; |D| > 1e-6 or unordered -> D /= |D|
-    //       (FDIVR 1.0), else (0,1,0). F [0x10] = 1.0 (double) - |(Nx*Dx + Dz*Nz) + Dy*Ny|;
-    //       F > 0.98481 -> next; F > 0.866025 -> Alpha = (Alpha * g) * g with
-    //       g = (0.98481 - F) * 8.41883; Alpha == 0 -> next.
-    //     Diffuse [EDI] = +0x74 vt+0x20 | ftol(Alpha * 255) << 24.
-    //     bFrameLookup: frame = ftol(+0x84 ramp * (node+0xd0 - 1)); a new frame ->
-    //       FUN_06244f30(node+0xb4, frame, block) and the flips again.
-    //     A [0x60] = col0(M) * W; B [0x54] = col1(M) * H.
-    //     Vertices (A + P) + B (U1,V0), (P - A) + B (U0,V0), (A + P) - B (U1,V1),
-    //       (P - A) - B (U0,V1) -- the last through FUN_06208a40 -- each skipped past the
-    //       requested count (JG); indices (D, C, B, B, C, A) unless IndexCount + 5 >
-    //       requested; the context's +0xc primitive counter += 2 (never read).
-    //   End == 0 -> return 0; ++DAT_062578e8; blend 0x13 / 0x14 from [desc+0x68] /
-    //   [desc+0x6c]; SetTexture(0, [node+0xbc]); SetModelview(FUN_06208640(camera vt+0x40,
-    //   node+0x4c)); Draw; return 0.
-    // The +0x8c transform is called unchecked, as in retail (the constructor always builds
-    // it). Ramps and colour go through Eval / EvalPacked like the other fills.
+    // FUN_0622c500, __stdcall on the node: the draw and fill in one, with no batcher
+    // branch; G_DrawCounters[6] is bumped before the empty test. Particles with Alpha == 0
+    // or an ordered size < 1e-11 (0x2d2febff) are skipped. The per-particle frame comes
+    // from LocalTransform (+0x8c, unchecked as in retail). Camera fade (flag 0x40):
+    // F = 1 - |N . D| with N = col0 x col1 of the frame and D the unit vector to the
+    // camera (length summed x, z, y; |D| <= 1e-6 gives (0,1,0)); F > 0.98481 skips,
+    // F > 0.866025 scales Alpha by ((0.98481 - F) * 8.41883)^2. The last vertex goes
+    // through FUN_06208a40.
     #pragma float_control(except, on, push)
     GENRESULT DACOM_API FxOrientedAppearance::DrawOrEnqueue()
     {
@@ -3303,8 +3081,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0620f600 (RET 8): the dust constructor inline (as its factory 0x06210e26..),
-    // FUN_06244120 (0x0620f67d), the +0xe8 set cache (0x0620f682..0x0620f68c); *Out, 0.
+    // FUN_0620f600: as basic's clone, with the set cache at +0xe8.
     GENRESULT DACOM_API FLDustAppearance::CloneNode(IDAComponent** Out)
     {
         FLDustAppearance* const Node = new (std::nothrow) FLDustAppearance(PrimaryIid_, FactoryName_);
@@ -3314,13 +3091,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0620fb70 (node, RET 8), reached through outer +0x14 FUN_06212220 (`ADD this,0xc`):
-    //   zero the dust context's two u16 counters DAT_06257986 / DAT_06257988;
-    //   [node+0x11c] = Dt; Age += Dt;
-    //   node+0xb0 == 0 && node+0xd8 == 0 -> flags |= 1; texture frame via the wrapper at
-    //   node+0xb4 with the descriptor at node+0xe8 (frame ramp +0x80); FUN_062114c0([node+0x18],
-    //   &node+0xd8, &node+0x98) -- the field walk; FUN_06211600(&node+0xd8, Dt) -- Age += Dt,
-    //   erase past Duration (AND 0x4100 / JNZ keeps Age <= Duration), else pos += vel * Dt.
+    // FUN_0620fb70, reached through outer +0x14 FUN_06212220: the basic update with Dt also
+    // stored at node+0x11c; field walk FUN_062114c0, integrate FUN_06211600 (Age <= Duration
+    // or NaN keeps a particle).
 #pragma float_control(except, on, push)
     GENRESULT DACOM_API FLDustAppearance::Pad5(float Dt)
     {
@@ -3378,14 +3151,10 @@ namespace AlchemyImpl
     }
 #pragma float_control(pop)
 
-    // FUN_06212700 (outer, RET 0x10):
-    //   DAT_062579b4 == 0 -> FUN_062121d0 evicts the oldest used particle through its owner;
-    //   FUN_06211440(&node+0xd8, node, Six[6], Age, Duration): item from the pool [list+8]
-    //     (FUN_0623ec90, no eviction), +0xc Six, +8 node, +0x24 Age, +0x28 Duration,
-    //     +0x2c 1.0 / Duration, ++[node+0xe4], appended at the tail;
-    //   math engine vt+0x28 TransformXform(&P, node+0xec, Six) and the tail's +0x30 = P.
-    // A failed allocation stores through null in retail (EAX = 0 at 0x0621148f) and does
-    // here too.
+    // FUN_06212700: a full pool (DAT_062579b4 == 0) first evicts the oldest particle
+    // (FUN_062121d0); then FUN_06211440 spawns, and the tail's +0x30 gets the spawn point
+    // in camera space (node+0xec). A failed allocation stores through null in retail and
+    // does here too.
     GENRESULT DACOM_API FLDustAppearance::Pad47(const float* Six, float Age, float Duration)
     {
         if (G_PoolDust.FreeCount == 0)
@@ -3414,49 +3183,15 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0620fcb0 (node, RET 4), reached through outer +0x18 FUN_06212240. Offsets are
-    // ESP-relative after the four register pushes.
-    //   ++DAT_06257904 (G_DrawCounters[8]) first; empty node+0xd8 -> return 0.
-    //   ViewWorld = FUN_06208640(camera vt+0x40, node+0x4c), copied to node+0xec.
-    //   [node+0xac] vt+0xd0 / +0xd4 counts (count * 4 / count * 6).
-    //   CamPos [0x70] = camera vt+0xc; Step [0x10] = TransformMatrix(camera vt+0x40,
-    //     CamPos - node+0x120) (vt+0x2c); Len [0x44] = sqrt((x*x + y*y) + z*z);
-    //     v = Len / [node+0x11c]:
-    //     v < 100 (TEST AH,5 / JP not taken)        Fade = 1 - (1 - v / 100)^2   (double 1.0)
-    //     100 <= v < 1200                           Fade = 1 - ((v - 100) / 1100)^2
-    //     v >= 1200 or unordered                    Fade = 0.
-    //     D = |[node+0x12c] - Len|: D > 20 (AND 0x4100 / JNZ skips otherwise): D >= 35 ->
-    //     Fade = 0, else Fade *= 1 - (D - 20) / 15 (double 1.0). The constants are the
-    //     .data floats DAT_062559fc / 06255a00 / 06255a04 / 06255a08 (100, 1200, 20, 35),
-    //     read-only.
-    //   FUN_06240f50(&DAT_0625797c, 4, V, I) false -> skip to the tail stores.
-    //   Frame block [0x50] = node+0xbc with the 0x1000 / 0x2000 flips.
-    //   Per particle P (node+0xd8 order):
-    //     C [0x1c] = TransformXform(node+0xec, P.pos) (vt+0x28).
-    //     C.z > -1.0 or P+0x38 > -1.0 (AND 0x4100 / JZ) -> no quad.
-    //     t = [P+0x2c] * [P+0x24]; Alpha [0x30] = desc+0x70 (node+0x8c, t) * Fade;
-    //     H [0x48] = desc+0x78 (node+0x8c, t) * 0.5 (double).
-    //     M [0x38] = C - P+0x30 (DAT_062579cc, the switch to the camera step instead, is a
-    //       .data byte 0 with one reader).
-    //     N = C x M; U = N x C (the 0x062100b7..0x062100eb stack order: Ux = Cz*Ny - Cy*Nz,
-    //       Uy = Cx*Nz - Cz*Nx, Uz = Nx*Cy - Cx*Ny); L2 = (Uy*Uy + Ux*Ux) + Uz*Uz; U *= the
-    //       0x5f3759df step on L2 (one Newton pass).
-    //     W = (M * 0.035) * (1 / [node+0x11c]) (DAT_062559f4); Proj = ((Wy*Uy + Wx*Ux) +
-    //       Wz*Uz) * 0.5 (double); Proj < 0.025 (double) -> U = (0, 1, 0); Proj > 100
-    //       (DAT_062559f8) -> Proj = 100; A = U * (Proj + H); B = A * 0.65; D = A * 1.53846;
-    //       Side = (-Uy * H, Ux * H).
-    //     Alpha <= 0.01 -> no quad. Colour = desc+0x74 vt+0x20 (node+0x8c, t) |
-    //       ftol(Alpha * 255) << 24.
-    //     Vertices C - D (U1, V0); (C.x + Side.x, C.y + Side.y, C.z) (U1, V1);
-    //       (C.x - Side.x, C.y - Side.y, C.z) (U0, V0); C + B (U0, V1); each skipped past
-    //       the requested count; indices (I3, I2, I1, I1, I2, I0) unless IndexCount + 5 >
-    //       requested.
-    //     P+0x30 = C for every particle, drawn or not.
-    //   End == 0 -> tail stores; else ++DAT_062578e8, blend 0x13 / 0x14 from desc+0x68 /
-    //   +0x6c, SetTexture(0, [node+0xbc]), identity (FUN_06206c70, zero translation) as the
-    //   transform, Draw.
-    //   Tail: node+0x120 = CamPos, node+0x12c = Len.
-    // The ramps go through Eval / EvalPacked like the other fills.
+    // FUN_0620fcb0, reached through outer +0x18 FUN_06212240: draw and fill in one; the
+    // camera-space ViewWorld is kept at node+0xec. Fade by how far the camera moved since
+    // the last draw, per unit of Dt (node+0x11c): v < 100 (ordered) 1 - (1 - v/100)^2,
+    // v < 1200 1 - ((v - 100)/1100)^2, else or unordered 0; a change of more than 20
+    // against the last step (node+0x12c) fades out by 35 (.data DAT_062559fc / 06255a00 /
+    // 06255a04 / 06255a08, read-only). Streaks run from the particle's previous camera
+    // position (P+0x30, updated for every particle, drawn or not); DAT_062579cc, a .data
+    // byte 0 with one reader, would switch to the camera step. The tail stores the camera
+    // position (node+0x120) and step length (node+0x12c) even when nothing was drawn.
     namespace
     {
         I3DMathEngine* G_Dust3DMath = nullptr; // DAT_062579c8
@@ -3512,8 +3247,8 @@ namespace AlchemyImpl
         const double Length = ComputeAlchemyFpuSquareRoot(LengthSquared);
         float StepLen;
         StoreAlchemyFpuFloat(StepLen, (Length));
-        // Kept on the FPU stack in retail (FST [0x44] stores the length, the quotient is
-        // never spilled), hence double here.
+        // Kept on the FPU stack in retail (the length is stored, the quotient never
+        // spilled), hence double here.
         const double Speed = Length / LastDt_;
         float Fade = 0.0f;
         if (Speed < kFadeNear)
@@ -3775,8 +3510,7 @@ namespace AlchemyImpl
         AdoptBillboardSet(&BuildBeamDescriptorRamps);
     }
 
-    // FUN_06204ef0 (RET 8): the beam constructor inline (as its factory 0x0620b486..),
-    // FUN_06244120 (0x06204fc5), the +0xf0 set cache (0x06204fca..0x06204fd4); *Out, 0.
+    // FUN_06204ef0: as basic's clone.
     GENRESULT DACOM_API FLBeamAppearance::CloneNode(IDAComponent** Out)
     {
         FLBeamAppearance* const Node = new (std::nothrow) FLBeamAppearance(PrimaryIid_, FactoryName_);
@@ -3786,22 +3520,13 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0620e080 (outer +0x64, FSTP [outer+0x90]) is the node Age setter:
-    // the appearance node sits at outer+0xC, so outer+0x90 = node+0x84 = Age.
-    // It is the shared inline FGenericFxObjectBase::SetNodeAge; the former
-    // Beam-only Pad25 override (and its EffectOuterScale_ field) was that same
-    // store under a guessed name, removed 2026-09-26.
+    // LAB_0620e080 (outer +0x64) is the shared FGenericFxObjectBase::SetNodeAge.
 
-    // FUN_0620e430 (outer +0xBC, RET 0x10; node-vtable twin LAB_062055a0 at 0x0624b718):
-    //   DAT_06257964 == 0 -> FUN_0620dde0 erases the oldest used pool item from its owner;
-    //   FUN_0620be90(&node+0xe4, node, Six[6], Age, Duration, [node+0xdc]):
-    //     item from the pool [list+8] (FUN_0623ec90); item+0xc = Six, +8 = node,
-    //     +0x24 = Age, +0x28 = Duration, +0x2c = 1.0 / Duration, +0x30 = [node+0xdc];
-    //     ++[node+0xb4]; then PREPENDED (Prev = 0, Next = head, head = item, tail = item
-    //     when empty);
-    //   [node+0xe1] = ([node+0xe1] == 0); return 0.
-    // The node ctors (0x06204e6e / 0x06204f56) seed node+0xdc with zero. Allocation
-    // fills only a non-null item; the subsequent prepend is unconditional in retail.
+    // FUN_0620e430 (outer +0xBC; node-vtable twin LAB_062055a0): a full pool
+    // (DAT_06257964 == 0) evicts its oldest item (FUN_0620dde0); FUN_0620be90 then PREPENDS
+    // the new item (unlike the billboards) with +0x30 = node+0xdc (zero from the node
+    // ctors), and node+0xe1 toggles. The prepend is unconditional in retail even when the
+    // allocation failed.
     GENRESULT DACOM_API FLBeamAppearance::Pad47(const float* Six, float Age, float Duration)
     {
         if (G_PoolBeam.FreeCount == 0)
@@ -3829,91 +3554,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // wave124 (sonnet:wave124:beampool, 2026-09-15): real override of the
-    // IGenericFx::Pad5 slot, reproducing retail FUN_0620de30 (decomp-tracker
-    // item 132227, alchemy.dll.txt 29507-29563 / alchemy.dll.c 10418-10439).
-    //
-    // BACKGROUND -- why this is a real fix, not a cosmetic one: waves 86/99/
-    // 108/110/111 (2026-09-15, all same day) traced this function extensively
-    // and left it `simplified`, converging on the idea that it is Beam's own
-    // "private pool" per-tick driver, filling the exact role the shared
-    // Pad25-based ApplyFieldsToPool/IntegratePool/OnAfterIntegrate pipeline
-    // (FGenericFxObjectBase::Pad25, alchemy_genericfx.cpp) fills for the
-    // other 7 appearance leaves. This wave confirmed that role concretely:
-    // FLBeamAppearance::Pad25 (above) is byte-confirmed (wave111) to be a
-    // PLAIN FIELD SETTER, not the shared dispatcher -- so nothing anywhere in
-    // this port currently ages, moves, expires, or applies fields to a Beam
-    // appearance's own particles once EmitOne (Pad47) puts them into the
-    // shared G_PoolBeam arena and this instance's own InstanceListHead_.
-    // Without a Pad5 override, Beam particles would sit frozen forever. This
-    // is exactly the gap FUN_0620de30 exists to close in retail.
-    //
-    // BYTE TRACE (alchemy.dll.txt 29515-29563), confirmed fresh from raw
-    // disassembly this wave (not trusted from prior waves' paraphrase, per
-    // this project's own "Ghidra .c decompile can garble/omit arguments"
-    // rule):
-    //   - `*(this+0x90) += Dt` -- accumulate onto EffectOuterScale_ (see this
-    //     override's own header doc comment for the open naming/semantics
-    //     doubt this raised, not resolved this wave).
-    //   - `if (*(this+0xbc)==0 && *(this+0xf0)==0) *(this+0x10) |= 1` -- a
-    //     completion/idle flag with NO confirmed port-side field or consumer
-    //     (wave86/99's own conclusion, re-checked this wave, still holds: no
-    //     FGenericFxObjectBase member corresponds to retail's this+0x10, and
-    //     no reader of such a flag was found in alchemy_common.cpp/
-    //     alchemy_effectobject.cpp). NOT reproduced -- fabricating a new,
-    //     unconsumed member would add dead API surface, not close a gap.
-    //   - `FUN_06244b80(this+0xc4, &stack)` / conditional `FUN_06244df0` --
-    //     cached texture-frame-index refresh. Already classified `skipped`
-    //     module-wide: this whole function family is superseded by the
-    //     port's single G_TextureLibrary cache (original gap-fill wave's own
-    //     finding, reconfirmed every wave since). NOT reproduced, per that
-    //     established precedent.
-    //   - `FUN_0620bc30(*(this+0x24), this+0xf0, this+0xa4)` then
-    //     `FUN_0620bda0(this+0xf0, Dt)` -- confirmed (items 132109/132111,
-    //     both `ready_unverified`) to be retail's own per-instance
-    //     "apply associated fields, then integrate own particle list" pair --
-    //     the EXACT retail operation the port's shared
-    //     ApplyFieldsToPool(Pool, Owner, Dt) / IntegratePool(Owner, Pool, Dt)
-    //     free functions already implement generically (see
-    //     FGenericFxObjectBase's own Pad25 body, a few functions above in
-    //     this same call shape, for the identical pairing). Reproduced here
-    //     via those same two already-verified primitives rather than
-    //     re-deriving FUN_0620bc30/FUN_0620bda0's raw pointer-walk a second
-    //     time -- Owner=this and Pool=PoolForAppearanceFactory(FactoryName_)
-    //     resolve to G_PoolBeam for a "FLBeamAppearance"-factory instance
-    //     (alchemy_common.cpp), matching retail's own per-factory pool
-    //     selection exactly.
-    //
-    // ALC-4 (2026-09-30): the "texture-frame refresh ... superseded" claim above is
-    // wrong -- the descriptor's name property 0x1BA23359 writes the texture CRC at
-    // descriptor +0x64 (LAB_06204da0 at 0x06204dbd on this class), so
-    // 0x0620de6f..0x0620dea3 run for real: FUN_06244b80(outer+0xc4 = node+0xb8,
-    // &{"???", [[outer+0xfc]+0x64]}), then FUN_06244df0 while the handle is -1. The beam
-    // has no frame step. Ported below as Texture_.SetTexture / Resolve.
-    // 0x0620de37..0x0620de3f (and the node twin LAB_062054d0 at 0x062054d9..0x062054df):
-    // zero the beam draw context's +0xa / +0xc counters (DAT_06257936 / DAT_06257938).
-    //
-    // Dt is passed through UNCLAMPED, matching FUN_0620de30's own raw body
-    // exactly -- the `Dt > 0.0f && Dt < 1.0f` clamp seen in
-    // FGenericFxObjectBase::Pad25's shared body belongs to THAT function's
-    // own caller (FFxEffectObject::WalkNodesCallOff), not to this slot; this
-    // slot's own real external trigger is still unconfirmed (see this
-    // override's own decomp-tracker comment on item 132227 for the full
-    // "no XREF anywhere, direct or indirect, to this vtable slot" search
-    // this wave re-ran and re-confirmed) -- same class of external-driver
-    // gap already accepted elsewhere in this port (AppearanceOuterTime_,
-    // the former ComposeAppearanceWorldTransform). Field walking ignores Dt;
-    // integration receives the original Dt word, including zero and unordered values.
-    //
-    // CORRECTED 2026-09-26: FUN_0620de30 runs on the OUTER object (node at
-    // outer+0xC), so `*(this+0x90) += Dt` is node+0x84 = Age_, and this+0x10 is
-    // node+4 = NodeFlags_ (bit0 = done); this+0xbc = node+0xb0 = the emitter
-    // reference count (EmitterRefCount_).
-    // ALC-1 2026-09-26: 0x0620de51..0x0620de6c -- EmitterRefCount_ == 0 and the
-    // particle list head [outer+0xf0] (node+0xe4, the list FUN_0620bc30/FUN_0620bda0
-    // walk and the draw FUN_06205620 tests) null -> NodeFlags_ |= 1. That list is the
-    // port's InstanceListHead_ (FLBeamAppearance::Pad47 links every beam particle into
-    // it), so the store is ported below, after the Age_ update as in retail.
+    // FUN_0620de30 (node twin LAB_062054d0), the beam's per-node update: the basic update
+    // without a frame step; fields FUN_0620bc30, integrate FUN_0620bda0. Dt is not clamped
+    // here. No caller of this slot is known in alchemy.dll.
     #pragma float_control(except, on, push)
     GENRESULT DACOM_API FLBeamAppearance::Pad5(float Dt)
     {
@@ -3937,8 +3580,8 @@ namespace AlchemyImpl
 
     namespace
     {
-        // The peeled Beam pass loads Z/Y/X before any 06206ad0 products. Its
-        // loop instead rounds the inline YZ + X squared distance before 06206b30.
+        // The peeled pass loads Z/Y/X before any FUN_06206ad0 products; the loop rounds
+        // the inline YZ + X squared distance before FUN_06206b30.
         #pragma optimize("", off)
         #pragma float_control(except, on, push)
         __declspec(noinline) void StoreBeamBoundsSphere(float* Sphere,
@@ -4000,19 +3643,17 @@ namespace AlchemyImpl
             const double Distance = InverseLength * LengthSquared;
             float RoundedDistance;
             StoreAlchemyFpuFloat(RoundedDistance, Distance);
-            // TEST AH,5 + JP skips the copy unless the first sum is ordered less.
+            // Each test below takes its branch only for an ordered result.
             if (Distance + Sphere[3] < Radius)
             {
                 std::memcpy(Sphere, Center, sizeof(float) * 3);
                 std::memcpy(Sphere + 3, &Radius, sizeof(Radius));
                 return;
             }
-            // TEST AH,5 + JNP skips the merge only for ordered less.
             if (static_cast<double>(Radius) + RoundedDistance < Sphere[3])
                 return;
             const float NewRadius = static_cast<float>(
                 ((static_cast<double>(Radius) + Sphere[3]) + RoundedDistance) * 0.5);
-            // TEST AH,0x41 + JNP skips normalization for ordered less/equal.
             if (!(static_cast<double>(RoundedDistance) <= 1e-6))
             {
                 const double InverseDistance = 1.0 / RoundedDistance;
@@ -4037,16 +3678,9 @@ namespace AlchemyImpl
         #pragma optimize("", on)
     }
 
-    // FUN_062050c0 (node vtable 0x0624b6e4; outer +0x8C through FUN_0620e1b0), RET 8,
-    // listing 11951-12292: the beam's GetBoundingSphere over the node+0xe4 particle list
-    // (FUN_06208570 head, FUN_06208590 null end, FUN_062085f0 = [list+4] tail). Same
-    // walk as the billboards -- see ListBoundsSphere -- with the beam radius
-    // (P+0x7c * P+0x78 * 0.5, no scale ramp), the peeled tail pass at the first
-    // particle's t, FUN_06206ad0 in the peeled merge and the inline length in the loop;
-    // the tail transform goes through the beam's cached math engine DAT_06257978.
-    // Empty -> -1 (0x062054ae), else 0.
-    // Replaces FGenericFxObjectBase::UpdateInstanceBoundsSphere (wave71), which had no
-    // caller, discarded P+0x78 and multiplied by node+0x8c instead.
+    // FUN_062050c0 (outer +0x8C through FUN_0620e1b0): the billboard walk (see
+    // ListBoundsSphere) over node+0xe4 with the beam radius, the peeled tail pass at the
+    // first particle's t, and math engine DAT_06257978.
     #pragma float_control(except, on, push)
     GENRESULT DACOM_API FLBeamAppearance::GetBoundingSphere(float* OutSphere)
     {
@@ -4099,13 +3733,8 @@ namespace AlchemyImpl
     }
     #pragma float_control(pop)
 
-    // FUN_06205620, __stdcall on the node (listing 0x06205620-0x0620571b):
-    //   node+0xe4 list empty (FUN_062085b0 head vs FUN_062085d0 null end) -> return 0;
-    //   DAT_06257919 -> FUN_06201c70(3, [node+0xac]), return 0;
-    //   [node+0xac] vt+0xd0/+0xd4 counts; FUN_06240f50(&DAT_0625792c, 4, V, I) false -> 0;
-    //   FUN_06205720(node); FUN_06241070 == 0 -> 0; ++DAT_062578e8; FUN_06206850(node);
-    //   FUN_06241180; return 0.
-    // The tail from FUN_06241070 on is the same sequence as LAB_062069e0.
+    // FUN_06205620, __stdcall on the node: the basic draw's shape, batch list 3, context
+    // DAT_0625792c, fill FUN_06205720; the tail is the same sequence as LAB_062069e0.
     GENRESULT DACOM_API FLBeamAppearance::DrawOrEnqueue()
     {
         if (GetFirstInstanceParticle() == nullptr)
@@ -4134,16 +3763,14 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_062069c0 (node vtable +0x4c, outer +0x9C): FUN_06240f50(&DAT_0625792c, 4, V, I),
-    // folded to 0 / -1 by NEG/SBB/NEG/DEC.
+    // LAB_062069c0 (node vtable +0x4c, outer +0x9C): FUN_06240f50 on DAT_0625792c.
     GENRESULT DACOM_API FLBeamAppearance::BeginBatchedDraw(unsigned long Verts,
                                                            unsigned long Indices)
     {
         return AlDrawContextBegin(G_BeamDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
 
-    // LAB_062069e0 (node vtable +0x50, outer +0xA0): End == 0 -> return 0; ++DAT_062578e8;
-    // FUN_06206850(node); FUN_06241180; return 0.
+    // LAB_062069e0 (node vtable +0x50, outer +0xA0).
     GENRESULT DACOM_API FLBeamAppearance::EndBatchedDraw()
     {
         if (AlDrawContextEnd(G_BeamDrawContext) == 0)
@@ -4154,15 +3781,15 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06206a20 (node vtable +0x54, outer +0xA4): `CALL FUN_06205720; XOR EAX,EAX`.
+    // LAB_06206a20 (node vtable +0x54, outer +0xA4).
     GENRESULT DACOM_API FLBeamAppearance::FillBatchedGeometry()
     {
         FillRibbon();
         return GR_OK;
     }
 
-    // LAB_06206a30 (node vtable +0x7c, outer +0xD0): *Out = [node+0xb4] * 5, then
-    // *Out += 5 when (desc+0x60 & 0x100) == 0x100. No null check on Out.
+    // LAB_06206a30 (node vtable +0x7c, outer +0xD0): 5 per particle plus 5 for the cap
+    // (flag 0x100). No null check on Out.
     GENRESULT DACOM_API FLBeamAppearance::GetQueuedVertCount(unsigned long* Out)
     {
         unsigned long Count = ResolveLiveInstanceCount() * 5;
@@ -4172,8 +3799,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06206a70 (node vtable +0x80, outer +0xD4): *Out = [node+0xb4] * 0x18, then
-    // *Out += 0x18 when (desc+0x60 & 0x100) == 0x100.
+    // LAB_06206a70 (node vtable +0x80, outer +0xD4): 0x18 per particle plus 0x18 for the
+    // cap.
     GENRESULT DACOM_API FLBeamAppearance::GetQueuedIndexCount(unsigned long* Out)
     {
         unsigned long Count = ResolveLiveInstanceCount() * 0x18;
@@ -4183,20 +3810,11 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06206850, __thiscall on the node (listing 0x06206850-0x062069a0):
-    //   SetRenderState(0x13, [desc+0x68]); SetRenderState(0x14, [desc+0x6c]);
-    //   (desc+0x60 & 0x400) == 0x400 ? (Texture = 0, FillMode = 2) :
-    //                                  (Texture = [node+0xc0], FillMode = 3);
-    //   SetTexture(0, Texture)                                   (vt+0x108)
-    //   saver {Pipeline, 8, GetRenderState(8)}                   (vt+0xf4)
-    //   SetRenderState(8, FillMode)                              (vt+0xf0)
-    //   SetModelview(MulTransform(camera vt+0x40, node+0x4c))    (vt+0x7c)
-    //   ~saver: SetRenderState(8, saved)                         (FUN_06208a20, also the
-    //                                                             EH unwind Unwind@06247460)
-    // The fill mode is therefore restored before the caller's Draw, exactly as in retail.
-    // [node+0xc0] is the beam's frame-block texture (the block starts 4 bytes later than
-    // on the other kinds: node+0xb4 is the beam's segment count), Texture_.Frame[0] here as
-    // on the siblings.
+    // FUN_06206850, __thiscall on the node: flag 0x400 (line appearance) draws untextured
+    // in wireframe (fill mode 2), else textured solid (3). Retail quirk kept: the fill-mode
+    // saver is destroyed at the end of this function, so the fill mode is restored before
+    // the caller's Draw. The beam's frame block sits 4 bytes later (node+0xc0) than on the
+    // other kinds.
     void FLBeamAppearance::ApplyDrawState()
     {
         G_RenderPipeline->SetRenderState(D3DRS_SRCBLEND, static_cast<int>(Descriptor_->BlendInfo[0]));
@@ -4239,41 +3857,21 @@ namespace AlchemyImpl
         G_RenderPipeline->SetModelview(ViewWorld);
     }
 
-    // FUN_06205720, __thiscall on the node (listing 0x06205720-0x06205eef). Offsets are
-    // ESP-relative after the four register pushes.
-    //   ++DAT_06257900 (G_DrawCounters[7]); Head [0x20] = begin of node+0xe4 (FUN_062085b0).
-    //   Field walk over node+0x9c..+0xa0, the count taken once: field +0x70 (factory
-    //     name) REPE CMPSB against "FLBeamField", 12 bytes. The first match: field +0x40
-    //     GetNodeTransform(0, &T); Tip [0x40] = FUN_06208690(T, FUN_06206b60(node+0x70)),
-    //     i.e. T applied to minus the translation of node+0x4c; D = Head.pos - Tip;
-    //     (x*x + y*y) + z*z > 0.01 (AND 0x4100 / JNZ skips on not-greater) -> bHaveTip
-    //     and straight to the state setup (LAB_062058d0); otherwise out of the walk to the
-    //     count check.
-    //   [node+0xb4] < 2 -> return. Flag 0x200 clear: D = Next.pos - Head.pos, the same
-    //     length test -> k = Head.Age / (Next.Age - Head.Age) (FSTP float), Tip =
-    //     Head.pos - D * k, bHaveTip.
-    //   State [0x6c]: Counter 0, Node, Xform = FUN_06206c70 identity with a zero
-    //     translation, then overwritten with FUN_06208640(camera vt+0x10, node+0x4c);
-    //     Idx[0] = 0xffff (the other three and PrevPos stay uninitialised; zeroed here).
-    //     LeadPos [0x30] = Head.pos, bTipNoCap [0x2b] = 0.
-    //   bHaveTip: flag 0x100 -> the cap ring at Tip; else bTipNoCap = 1, LeadPos = Tip.
-    //   Cap: FUN_06205f00(state, Head, &HW, &RGBA, &V); colour = ftol(A * 255) << 24 over
-    //     the three masked RGB bytes; rail A = FUN_06206ca0 (M0, M3, M6) * HW: Tip - A
-    //     (U0, V), Tip + A (U1, V); rail B the same with FUN_06206cc0 (M1, M4, M7); all
-    //     four through FUN_06208aa0. Idx[0] != 0xffff (impossible here, the state was just
-    //     set up) joins exactly as FUN_06206020 does. PrevPos = Tip, Idx = {A0, A1, B0,
-    //     B1}, ++Counter.
-    //   FUN_06206020(state, Head, LeadPos).
-    //   Lead [0x20] = Head->Next; Lag [0x24] = bTipNoCap ? Head : Head->Next; Last (EBX) =
-    //     LeadPos. While Lead != end (FUN_062085d0, null): D = Lag.pos - Last;
-    //     (x*x + z*z) + y*y > 0.01 -> FUN_06206020(state, Lead, Lag.pos), Last = Lag.pos;
-    //     Lead = Lead->Next, Lag = Lag->Next. Lead supplies the ramp time, Lag the
-    //     position -- one particle apart after an uncapped tip, as in retail.
-    // DAT_0625580c / DAT_06255808 (rail A / rail B switches) are .data bytes = 1 with six
-    // readers each and no writer, so both rails are always built. U0 / V0 / U1 / V1 are
-    // node+0xc4 / +0xc8 / +0xcc / +0xd0 = Texture_.Frame[1..4], read without the 0x1000 /
-    // 0x2000 flips. The colour is the ramp's +0x1C EvalRgb, packed per channel here
-    // (PackRingColor).
+    // FUN_06205720, __thiscall on the node: the beam ribbon.
+    //   Tip: the first associated field whose factory name is "FLBeamField" pins the tip
+    //     (its transform applied to minus node+0x4c's translation) when it is more than
+    //     0.1 (ordered, squared 0.01) from the head; otherwise, with two or more particles
+    //     and flag 0x200 clear, the tip is extrapolated back from the first segment by
+    //     Head.Age / (Next.Age - Head.Age).
+    //   Flag 0x100 draws a cap ring at the tip; without it the tip replaces the lead
+    //     position.
+    //   Rings follow every particle further than 0.1 from the last ring (length summed
+    //     x, z, y). Retail quirk kept: Lead supplies the ramp time and Lag the position,
+    //     one particle apart after an uncapped tip.
+    // DAT_0625580c / DAT_06255808 (rail A / rail B switches) are .data bytes = 1 with no
+    // writer, so both rails are always built. The UVs are Texture_.Frame[1..4], read
+    // without the 0x1000 / 0x2000 flips. Retail leaves three ring indices and PrevPos
+    // uninitialised; the port zeroes them.
     namespace
     {
         // Beam's vector helpers keep Z/Y/X calculations before X/Y/Z float stores.
@@ -4345,8 +3943,8 @@ namespace AlchemyImpl
             const double Y = static_cast<double>(Value[1]) * Value[1];
             return Xz + Y > 0.01f;
         }
-        // 08aa0's cap arguments are raw words. 06020's inline writer converts them
-        // through x87 only after its capacity gate (V, U, Z, Y, X, in that order).
+        // FUN_06208aa0's cap arguments are raw words. FUN_06206020's inline writer converts
+        // them through x87 only after its capacity gate (V, U, Z, Y, X, in that order).
         __declspec(noinline) unsigned short StoreBeamRawVertex(const float* Pos,
             unsigned long Diffuse, const float& U, const float& V)
         {
@@ -4537,13 +4135,9 @@ namespace AlchemyImpl
     }
     #pragma float_control(pop)
 
-    // FUN_06205f00, __thiscall on the ring state, RET 0x10 (P, OutHW, OutRGBA, OutV):
-    //   t = [P+0x2c] * [P+0x24] (InvDuration * Age);
-    //   Scale = +0x5c ramp (node+0x8c, node+0x90); SS = +0x78 ramp (node+0x8c, t) * Scale;
-    //   *OutHW = (+0x7c ramp (node+0x8c, t) * SS) * 0.5; Alpha = +0x70 ramp (node+0x8c, t);
-    //   +0x74 vt+0x1c(&RGB, node+0x8c, t); OutRGBA = {R, G, B, Alpha};
-    //   *OutV = ((Counter & 1) == [node+0xe1]) ? [node+0xc8] : [node+0xd0].
-    // FUN_06206020 opens with the same sequence inline.
+    // FUN_06205f00, __thiscall on the ring state: half width, colour and V for one ring
+    // (V alternates by ring parity against node+0xe1). FUN_06206020 opens with the same
+    // sequence inline.
     #pragma float_control(except, on, push)
     void FLBeamAppearance::EvalRingParams(const FBeamRingState& State, const FPooledParticle* P,
                                           float* OutHalfWidth, float* OutRgba, float* OutV)
@@ -4561,7 +4155,7 @@ namespace AlchemyImpl
         float Rgb[3];
         ForwardAppearanceRgbEval(State.Node->Descriptor_->ColorRamp, Rgb,
             State.Node->AppearanceOuterTime_, T);
-        // 06205fce loads only red through x87; green, blue and alpha are raw words.
+        // Only red is loaded through x87; green, blue and alpha are raw words.
         const double Red = LoadAppearanceScalar(Rgb[0]);
         std::memcpy(&OutRgba[1], &Rgb[1], sizeof(float));
         std::memcpy(&OutRgba[2], &Rgb[2], sizeof(float));
@@ -4575,9 +4169,8 @@ namespace AlchemyImpl
     }
     #pragma float_control(pop)
 
-    // The callers' packing of FUN_06205f00's {R, G, B, A} (0x06205a62..0x06205ac8, and
-    // inline in FUN_06206020): ftol(A * 255), then for R, G, B in turn `<< 8 | ftol(x *
-    // 255) & 0xff`. Alpha is not masked; its high bits shift out.
+    // The callers' packing of FUN_06205f00's {R, G, B, A} (also inline in FUN_06206020).
+    // Alpha is not masked; its high bits shift out.
     #pragma optimize("", off)
     #pragma float_control(except, on, push)
     __declspec(noinline) unsigned long FLBeamAppearance::PackRingColor(const float* Rgba)
@@ -4594,20 +4187,9 @@ namespace AlchemyImpl
     #pragma float_control(pop)
     #pragma optimize("", on)
 
-    // FUN_06206020, __thiscall on the ring state, RET 8 (P, Pos) (listing
-    // 0x06206020-0x0620683e):
-    //   HW / Alpha / RGB / V exactly as FUN_06205f00; colour EDI = ftol(A * 255) << 24
-    //   over the three masked RGB bytes.
-    //   Rail A: A = (Xform[0], Xform[3], Xform[6]) * HW; Pos - A (U0 = node+0xc4, V) ->
-    //     [0x18], Pos + A (U1 = node+0xcc, V) -> BX / [0x1a]. Rail B: B = (Xform[1],
-    //     Xform[4], Xform[7]) * HW; Pos - B (U0) -> [0x1c], Pos + B (U1) -> BP / [0x1e].
-    //     Every store inline: past the requested count (JG) the index is the requested
-    //     count and nothing is written.
-    //   Idx[0] != 0xffff: flag 2 -> centre vertex ((Pos + PrevPos) * 0.5, U = V = 0.5) and
-    //     the triangles (Idx0, Idx1, M) (Idx1, A1, M) (A1, A0, M) (A0, Idx0, M) (Idx2,
-    //     Idx3, M) (Idx3, B1, M) (B1, B0, M) (B0, Idx2, M), each skipped when IndexCount + 2
-    //     > requested; otherwise FUN_06208b50(Idx0, Idx1, A0, A1) and (Idx2, Idx3, B0, B1).
-    //   Idx = {A0, A1, B0, B1}; PrevPos = *Pos; ++Counter.
+    // FUN_06206020, __thiscall on the ring state: one ring of two rails (rail A along the
+    // view's first column, rail B along its second), joined to the previous ring by two
+    // quads, or with flag 2 by eight triangles around a centre vertex.
     #pragma float_control(except, on, push)
     void FLBeamAppearance::EmitRing(FBeamRingState& State, const FPooledParticle* P,
                                     const float* Pos)
@@ -4671,8 +4253,7 @@ namespace AlchemyImpl
     }
     #pragma float_control(pop)
 
-    // Inline in FUN_06205720 (0x06205c4a-0x06205db7) and FUN_06206020 (0x0620644b-
-    // 0x06206807), identical in both: flag 2 (desc+0x60 & 2) -> centre vertex
+    // Inline in FUN_06205720 and FUN_06206020, identical in both: flag 2 -> centre vertex
     // ((Pos + PrevPos) * 0.5, colour, U = V = 0.5) and eight triangles; else two quads.
     #pragma float_control(except, on, push)
     void FLBeamAppearance::JoinRing(const FBeamRingState& State, const float* Pos,
@@ -4716,10 +4297,8 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_06224b60: operator_new(0x90), FUN_06224710 (FUN_06243ff0, then MeshId 0, MeshName
-    // "", the byte 0, a fresh FxAnimatedTransform), outer vtable 0x0624df90, count 1, then
-    // the adoption tail (the set is cached at node+0xc0 in retail; the port reads it
-    // through MeshPropertySet_).
+    // FUN_06224b60: operator_new(0x90), outer vtable 0x0624df90 (cached at node+0xc0 in
+    // retail; the port reads it through MeshPropertySet_).
     void FxMeshAppearance::CreatePropertySet()
     {
         FFxMeshAppearancePropertySet* const Set = new FFxMeshAppearancePropertySet();
@@ -4727,8 +4306,7 @@ namespace AlchemyImpl
         MeshPropertySet_ = Set;
     }
 
-    // FUN_06224a90 (RET 8): the mesh constructor inline (as its factory 0x06225ed6..),
-    // FUN_06244120 (0x06224b2d), the +0xc0 set cache (0x06224b32..0x06224b3c); *Out, 0.
+    // FUN_06224a90: as basic's clone, with the set cache at +0xc0.
     GENRESULT DACOM_API FxMeshAppearance::CloneNode(IDAComponent** Out)
     {
         FxMeshAppearance* const Node = new FxMeshAppearance(PrimaryIid_, FactoryName_);
@@ -4747,7 +4325,7 @@ namespace AlchemyImpl
         {
             if (Count == 0)
             {
-                // 06225221..06225233: radius is written before the Z word is read.
+                // The radius is written before the Z word is read.
                 std::memcpy(&OutSphere[0], &Particle->PosX, sizeof(float));
                 std::memcpy(&OutSphere[1], &Particle->PosY, sizeof(float));
                 OutSphere[3] = 0.0f;
@@ -4774,7 +4352,7 @@ namespace AlchemyImpl
     // ---- FFxMeshAppearancePropertySet's slots (inner 0x0624dff0; +0x3c is FUN_06244330
     // itself, inherited from FFxAppearancePropertySet) ----
 
-    // FUN_06226b80: *Out = the byte +0x80 as stored, 0; else -8.
+    // FUN_06226b80: the byte as stored.
     GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropBool(unsigned long Hash,
                                                                   unsigned char* Out)
     {
@@ -4784,7 +4362,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06226bb0: the byte stored as passed, 0; else -8.
+    // FUN_06226bb0: stored as passed (not normalised to 0/1).
     GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropBool(unsigned long Hash,
                                                                   unsigned char Value)
     {
@@ -4813,7 +4391,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06226cf0: MeshName -> its buffer, 0; else FUN_0623f9a0.
+    // FUN_06226cf0; else FUN_0623f9a0.
     GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropName(unsigned long Hash,
                                                                   const char** Out)
     {
@@ -4823,8 +4401,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06226d20 (0x06226d20..0x06226e00): MeshName -> the hashed-string assignment
-    // (FFxHashedName::Assign), 0; else FUN_0623f9e0.
+    // FUN_06226d20; else FUN_0623f9e0.
     GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropName(unsigned long Hash,
                                                                   const char* Text)
     {
@@ -4834,7 +4411,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06226b40: MeshApp_ParticleTransform -> [+0x84] AddRef'd, 0; else FUN_0623fb50.
+    // FUN_06226b40; else FUN_0623fb50.
     GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropTransform(unsigned long Hash,
                                                                        IAnimatedTransform** Out)
     {
@@ -4855,7 +4432,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kMeshPropertyRows, Callback, Context);
     }
 
-    // FUN_06224c20 (alchemy.dll.txt 75997-76268), RET 0x10: (this, Six, Age, Duration),
+    // FUN_06224c20: (this, Six, Age, Duration),
     // always returns 0. Reached through vtable 0x0624dd90 +0x68 and the this+0xc adjustor
     // thunk FUN_06227330.
     GENRESULT DACOM_API FxMeshAppearance::EmitOne(const float* Six, unsigned long Extra,
@@ -4864,11 +4441,9 @@ namespace AlchemyImpl
         float Age = 0.0f;
         std::memcpy(&Age, &Extra, 4);
 
-        // 06224c2e..06224c6e: a full mesh pool (FreeCount, DAT_06257a58 == 0) first gives up
-        // its oldest particle. The UsedHead item's owner (+0x08; only mesh appearances
-        // allocate from this pool) erases it through FUN_06224fd0 -> FUN_062257f0: unlink
-        // from the owner's +0xb4 list, IFxMesh slot 7 + Release on +0x30, FUN_0623ecf0 back
-        // to the pool (the last two are FreePoolItem's mesh branch).
+        // A full mesh pool (DAT_06257a58 == 0) first gives up its oldest particle through
+        // its owner (FUN_06224fd0 -> FUN_062257f0; the mesh cleanup is FreePoolItem's mesh
+        // branch).
         if (G_PoolMesh.FreeCount == 0)
         {
             FPooledParticle* const Oldest = ParticleFromUsedLink(&G_PoolMesh, G_PoolMesh.UsedHead);
@@ -4880,20 +4455,18 @@ namespace AlchemyImpl
             ReleaseAppearancePoolItem(&G_PoolMesh, Oldest);
         }
 
-        // [ESP+0x10]: the factory's out-param, released on every exit at 06224f90.
+        // The factory's out-param, released on every exit.
         IFxMesh* Mesh = nullptr;
 
-        // 06224c79..06224c88: no bound factory (DAT_06257b9c) -> return 0, nothing emitted.
+        // No bound factory (DAT_06257b9c): nothing emitted.
         if (G_FxMeshFactory == nullptr)
             return GR_OK;
 
-        // 06224c95..06224c9e: this->vt+0x14 (FUN_062400b0, index 0) hands out the
-        // appearance's composed world transform, node+0x4c.
         float* World12 = nullptr;
         GetNodeTransform(0, &World12);
 
-        // 06224ca1..06224d25: both halves of Six go through I3DMathEngine +0x28 (DAT_06257a6c,
-        // FUN_0623e830) as points -- the velocity picks up the translation too, as in retail.
+        // Both halves of Six are transformed as points (math engine DAT_06257a6c) -- the
+        // velocity picks up the translation too, as in retail.
         I3DMathEngine* const Math = Acquire3DMath();
         float WorldSix[6];
         Math->TransformXform(*reinterpret_cast<FVector*>(&WorldSix[0]),
@@ -4903,14 +4476,9 @@ namespace AlchemyImpl
                              *reinterpret_cast<const FTransform*>(World12),
                              *reinterpret_cast<const FVector*>(&Six[3])); // +0x28
 
-        // 06224d35..06224d5b: IFxMeshFactory slot 3 with the property set's +0x60 (MeshId)
-        // and +0x74 (MeshName) dwords, the transformed pos+vel, &Mesh. Nonzero -> 06224f90.
-        // The property set is the 0x90 object FUN_06224b60 builds (vtable 0x0624df90, the
-        // FUN_06224710 body at +4): +0x60 the MeshId dword (body[0x17], 0 by default); +0x6c
-        // the MeshName string (body[0x1a], vtable 0x0624bd80) whose buffer pointer is +0x74
-        // (body[0x1c]) -- FUN_06225a50 assigns it "" (DAT_06257a70) at construction, which
-        // allocates a one-byte buffer, so the pointer is never null. The only callee,
-        // freelancer.exe FUN_004f6810, reads neither argument.
+        // IFxMeshFactory slot 3 with the set's MeshId (+0x60) and MeshName buffer (+0x74,
+        // never null: assigned "" at construction). The only callee, freelancer.exe
+        // FUN_004f6810, reads neither argument.
         FFxMeshAppearancePropertySet* const Set = MeshProps();
         void* const MeshIdArg = reinterpret_cast<void*>(static_cast<std::uintptr_t>(Set->MeshId));
         void* const MeshNameArg = Set->MeshName.Buffer;
@@ -4922,15 +4490,10 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // 06224d61..06224ed9: MeshApp_UseParticleTransform ([this+0xc0]+0x84) set ->
-        // Anim = {FUN_06206c70 identity rotation, zero translation (0x94..0x9c)}, then
-        // [[this+0xc0]+0x88]->Evaluate(this+0x8c, Age / Duration, &Anim) (IAnimatedTransform
-        // +0x2c); T = {identity, the caller's LOCAL Six[0..2]} (ESP+0x20..0x4c);
-        // A = MulTransform(World, T) (0x06224e63), B = MulTransform(A, Anim) (0x06224eb3),
-        // both I3DMathEngine +0x1c with FUN_06217ab0 copies; IFxMesh slot 3 (&B). The
-        // property set's +0x88 is always a FxAnimatedTransform (FUN_06224710 builds a
-        // default one; the .ale reader fills it in place, FUN_062280a0), so the call is
-        // unconditional (0x06224d61..0x06224d6f test only the byte).
+        // MeshApp_UseParticleTransform: World * (the caller's LOCAL position) * the
+        // animated transform at Age / Duration, into IFxMesh slot 3. The transform is always
+        // present (built by FUN_06224710, filled in place by the .ale reader), so retail
+        // tests only the byte.
         if (Set->bUseParticleTransform != 0)
         {
             float Anim[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
@@ -4956,19 +4519,16 @@ namespace AlchemyImpl
             Mesh->SetTransform(B);
         }
 
-        // 06224edc..06224eeb: a counted local copy ([ESP+0x18]), released by FUN_06225940 at
-        // 06224f8b.
+        // A counted local copy, released by FUN_06225940.
         IFxMesh* const LocalMesh = Mesh;
         if (LocalMesh != nullptr)
             LocalMesh->AddRef();
 
-        // 06224eee..06224f27: FUN_0623ec90 on this+0xbc (the mesh pool).
         FPooledParticle* const Particle = static_cast<FPooledParticle*>(AllocPoolItem(&G_PoolMesh));
         if (Particle != nullptr)
         {
-            // 06224f29..06224f68: the caller's Six (not the transformed copy), owner, Age,
-            // Duration, the mesh through FUN_062257b0 (AddRef, no Release of the old), then
-            // 1.0f (DAT_0624bac4) / Duration.
+            // The caller's Six (not the transformed copy); the mesh through FUN_062257b0
+            // (AddRef, no Release of the old).
             Particle->PosX = Six[0];
             Particle->PosY = Six[1];
             Particle->PosZ = Six[2];
@@ -4984,39 +4544,24 @@ namespace AlchemyImpl
             Particle->InvDuration = 1.0f / Particle->Duration;
         }
 
-        // 06224f6f..06224f7a: FUN_06226690 appends the item to this+0xb4 -- a null item
-        // included, which faults on its first store exactly as retail does.
-        // LiveInstanceCount_ is the port's count of that list.
+        // FUN_06226690 appends the item to this+0xb4 -- a null item included, which faults
+        // on its first store as retail does. LiveInstanceCount_ is the port's count.
         AppendParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
         ++LiveInstanceCount_;
 
-        // 06224f7f..06224f8b: FUN_06225940 on the local copy.
         if (LocalMesh != nullptr)
             LocalMesh->Release();
 
-        // 06224f90..06224fc3: the out-param reference, then return 0.
         if (Mesh != nullptr)
             Mesh->Release();
         return GR_OK;
     }
 
-    // FUN_06225470 (mesh node vtable 0x0624dd90 +0xC; outer +0x14), RET 8.
-    //   0x06225488: Age (node+0x84) += Dt; node+0xb0 (emitter refs) == 0 and the list
-    //     head node+0xb4 null -> node flags |= 1.
-    //   0x062254bc..0x0622559d: the field walk over node+0x9c..+0xa0 -- a dead field
-    //     (+0x1c) is erased from the array (FUN_06226600), a live one gets +0x9c
-    //     ([node+0x18]), +0xa4(item+0xc, item+0x24) per particle and +0xa0.
-    //   0x062255e2: per particle Age += Dt; FCOMP Age vs Life, AND 0x4100, JNZ ->
-    //     alive (Age <= Life or unordered): pos += FUN_06206c40(vel, Dt) = vel * Dt, then the
-    //     item's IFxMesh (+0x30) slot 5 with Dt (0x0622563c pushes it, 0x0622565d
-    //     calls +0x14). Otherwise FUN_062257f0: unlink, IFxMesh slot 7, Release,
-    //     FUN_0623ecf0 -- unlink, mesh cleanup, then return the pool item. Retail
-    //     keeps no count on this list; LiveInstanceCount_ is the port's and is
-    //     decremented to stay equal to the list length.
-    //   0x06225676: node vt+0x34 (FUN_06225000, the bounds) into an unused stack local.
-    //     The call still has observable math factory/interface side effects. Mesh's
-    //     bounds implementation preserves those calls even for an empty list.
-    //   Returns 0.
+    // FUN_06225470 (mesh node vtable 0x0624dd90 +0xC; outer +0x14). Dead fields are erased
+    // from the array (FUN_06226600). Live particles (Age <= Life or unordered) move and
+    // tick their IFxMesh (slot 5, Dt); dead ones go through FUN_062257f0. Retail keeps no
+    // count on this list; LiveInstanceCount_ is the port's. Last, the bounds (FUN_06225000)
+    // are computed into an unused local, kept for their math-engine side effects.
     GENRESULT DACOM_API FxMeshAppearance::Pad5(float Dt)
     {
         Age_ += Dt;
@@ -5075,25 +4620,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06225240 (alchemy.dll.txt 76537-76691), RET 0xC. Reached from the outer
+    // FUN_06225240. Reached from the outer
     // +0x10 thunk FUN_06226e60 (this+0xc, both stack arguments passed through).
-    //   0x06225276: r = FUN_062401a0(this, Unused, Parent12); nonzero -> return r.
-    //   0x06225292: this->vt+0x14 (FUN_062400b0, index 0) -> World = &node+0x4c.
-    //   0x062252a2..0x06225449: walk the this+0xb4 instance list (FUN_06225890 begin,
-    //   FUN_062258b0 end, next = [item]); an item whose +0x30 IFxMesh is null is skipped.
-    //     [[this+0xc0]+0x84] (MeshApp_UseParticleTransform) set, 0x062252ff..0x062253c3:
-    //       Anim = {FUN_06206c70 identity, zero translation};
-    //       [[this+0xc0]+0x88]->Evaluate(this+0x8c, item.Age / item.Duration, &Anim);
-    //       T = {FUN_06206c70 identity, item+0xc..+0x14};
-    //       X = FUN_06208640(World, T) = MulTransform(World, T);
-    //       Y = FUN_06208640(X, Anim); mesh slot 3 (&Y).
-    //     clear, LAB_062253c5..0x06225436: M = copy of the 12 floats mesh slot 4 returns;
-    //       M translation = I3DMathEngine +0x28 TransformXform(World, item+0xc); mesh
-    //       slot 3 (&M).
-    //   0x0622544f: return r (always 0).
-    // Until 2026-09-26 the port posed these meshes from the per-tick Pad25
-    // (OnAfterIntegrate) and again from FlushAppearanceBatches (PoseAllMeshExtra2), with
-    // an identity node transform and without the particle-transform branch.
+    //   The shared compose FUN_062401a0 first; then per instance with a mesh: with
+    //   MeshApp_UseParticleTransform the spawn's World * T * Anim, else the mesh's own
+    //   transform (slot 4) with the translation replaced by the world position; both into
+    //   mesh slot 3.
     GENRESULT DACOM_API FxMeshAppearance::ComposeNodeTransform(void* Unused, const float* Parent12)
     {
         const GENRESULT Result = FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent12);
@@ -5155,11 +4687,10 @@ namespace AlchemyImpl
         return Result;
     }
 
-    // FUN_062256a0 (alchemy.dll.txt 76899-76949), RET 4, reached through the outer +0x18
-    // thunk FUN_06226ea0 (this+0xc). Walks the +0xb4 instance list (FUN_062258f0 begin,
-    // FUN_062258d0 null end, next = [item]) and calls [item+0x30] IFxMesh slot 6 with
-    // DAT_06257908, the draw walk's camera cookie; no null check on the mesh (EmitOne links
-    // an item only after the factory handed one out). Returns 0.
+    // FUN_062256a0, reached through the outer +0x18
+    // thunk FUN_06226ea0: IFxMesh slot 6 per instance with DAT_06257908, the draw walk's
+    // camera cookie; no null check on the mesh (an item is linked only after the factory
+    // handed one out).
     GENRESULT DACOM_API FxMeshAppearance::DrawOrEnqueue()
     {
         FPooledParticle* Item = InstanceListHead_;
@@ -5182,8 +4713,7 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_0622f550: operator_new(0xa8), FUN_06243ff0, both names "" and hashed, Flags 0,
-    // outer vtable and count 1, then the adoption tail (cached at node+0xc0).
+    // FUN_0622f550: operator_new(0xa8) (cached at node+0xc0).
     void FxParticleAppearance::CreatePropertySet()
     {
         AdoptPropertySet(new FFxParticleAppearancePropertySet());
@@ -5194,8 +4724,7 @@ namespace AlchemyImpl
         ParticlePropertySet_ = static_cast<FFxParticleAppearancePropertySet*>(PropertySet_);
     }
 
-    // FUN_0622f480 (RET 8): the particle constructor inline (as its factory 0x06230ce6..),
-    // FUN_06244120 (0x0622f51d), the +0xc0 set cache (0x0622f522..0x0622f52c); *Out, 0.
+    // FUN_0622f480: as basic's clone, with the set cache at +0xc0.
     GENRESULT DACOM_API FxParticleAppearance::CloneNode(IDAComponent** Out)
     {
         FxParticleAppearance* const Node = new (std::nothrow) FxParticleAppearance(PrimaryIid_, FactoryName_);
@@ -5205,8 +4734,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06231930: UseDynamicRotation -> the low bit of the byte +0xa0 (`AND AL,1`),
-    // SmoothRotation -> bit 1 (`SHR EDX,1; AND DL,1`), 0; else -8.
+    // FUN_06231930: UseDynamicRotation bit 0, SmoothRotation bit 1 of +0xa0.
     GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropBool(unsigned long Hash,
                                                                       unsigned char* Out)
     {
@@ -5223,8 +4751,7 @@ namespace AlchemyImpl
         return GR_ALE_CREATE_FAIL;
     }
 
-    // FUN_06231980: the bit set (`OR 1` / `OR 2`) when the byte is non-zero (`TEST CL,CL`),
-    // cleared otherwise, 0; else -8.
+    // FUN_06231980.
     GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropBool(unsigned long Hash,
                                                                       unsigned char Value)
     {
@@ -5242,7 +4769,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06231ad0: LifeName / DeathName -> the buffer, 0; else FUN_0623f9a0.
+    // FUN_06231ad0; else FUN_0623f9a0.
     GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropName(unsigned long Hash,
                                                                       const char** Out)
     {
@@ -5259,8 +4786,7 @@ namespace AlchemyImpl
         return FFxNodePropertySet::GetPropName(Hash, Out);
     }
 
-    // FUN_06231b20 (0x06231b20..0x06231cdf): the hashed-string assignment on either name,
-    // 0; else FUN_0623f9e0.
+    // FUN_06231b20; else FUN_0623f9e0.
     GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropName(unsigned long Hash,
                                                                       const char* Text)
     {
@@ -5289,17 +4815,15 @@ namespace AlchemyImpl
         return WalkPropertyRows(kParticlePropertyRows, Callback, Context);
     }
 
-    // ---- FxParticleAppearance (ALC-1, 2026-09-26) ----
+    // ---- FxParticleAppearance ----
     //
-    // The two open questions wave16 left here are answered by the listing:
-    //   - [node+0xc0] is the class's own property set (the 0xa8 object FUN_0622f550
-    //     builds and FUN_0622f480 copies into every clone). Its +0x70/+0x74 are the
-    //     ParticleApp_LifeName buffer/length (hash 0x0ec7a290, setter LAB_0622f270 /
-    //     FUN_06231b20), +0x90/+0x94 ParticleApp_DeathName (0x03b76e6c), +0xa0 the
-    //     UseDynamicRotation / SmoothRotation bits: FFxParticleAppearancePropertySet.
-    //   - the "arity mismatch" is two interleaved calls: 0x0622f725 pushes &child first,
-    //     then IAlchemy::HashNodeName(name) (RET 8) leaves it on the stack for
-    //     IFxEffectLibrary::CreateEffect([node+0x18], hash, &child) (RET 0x10).
+    // [node+0xc0] is the class's own property set (the 0xa8 object FUN_0622f550 builds and
+    // FUN_0622f480 copies into every clone): +0x70/+0x74 the ParticleApp_LifeName
+    // buffer/length (hash 0x0ec7a290, setter LAB_0622f270 / FUN_06231b20), +0x90/+0x94
+    // ParticleApp_DeathName (0x03b76e6c), +0xa0 the UseDynamicRotation / SmoothRotation
+    // bits. In the spawn two calls interleave: &child is pushed first, then
+    // IAlchemy::HashNodeName(name) leaves the hash on the stack for
+    // IFxEffectLibrary::CreateEffect([node+0x18], hash, &child).
     namespace
     {
         FParticleAppRecord* AsParticleRecord(FPooledParticle* Record)
@@ -5418,9 +4942,9 @@ namespace AlchemyImpl
         }
 
         // One sphere of FUN_0622fa10's merge, after the first: Out grows to hold Child.
-        // bInlineLength selects the second child's shape (0x0622fbe0..0x0622fc0f: inline
-        // (y*y + z*z) + x*x, FUN_06206b30 * LenSq, FUN_06206b80 add) over the first's
-        // (FUN_06206ad0 length, component FADDs); the arithmetic is otherwise the same.
+        // bInlineLength selects the second child's shape (inline (y*y + z*z) + x*x,
+        // FUN_06206b30 * LenSq, FUN_06206b80 add) over the first's (FUN_06206ad0 length,
+        // component adds); the arithmetic is otherwise the same.
 #pragma optimize("", off)
 #pragma float_control(except, on, push)
         __declspec(noinline) void MergeParticleSphere(float* Out, const float* Child,
@@ -5457,18 +4981,18 @@ namespace AlchemyImpl
             }
             const double Dist = ParticleInverseSqrt(LenSq) * LenSq;
             const volatile float RoundedDist = static_cast<float>(Dist);
-            // TEST AH,5 + JP skips containment unless the unrounded sum is ordered less.
+            // Containment only for an ordered less on the unrounded sum.
             if (Dist + Out[3] < Child[3])
             {
                 std::memcpy(Out, Child, 4 * sizeof(float));
                 return;
             }
-            // TEST AH,5 + JNP returns only for ordered less, using the stored distance.
+            // Returns only for an ordered less, using the stored distance.
             if (static_cast<double>(Child[3]) + RoundedDist < Out[3])
                 return;
             const float NewRadius = static_cast<float>(
                 ((static_cast<double>(Child[3]) + RoundedDist) + Out[3]) * 0.5);
-            // TEST AH,0x41 + JNP skips the shift for ordered less/equal; unordered shifts.
+            // An ordered less-or-equal skips the shift; unordered shifts.
             if (!(static_cast<double>(RoundedDist) <= 1e-06))
             {
                 const double Inv = 1.0 / RoundedDist;
@@ -5493,20 +5017,12 @@ namespace AlchemyImpl
 #pragma optimize("", on)
     } // namespace
 
-    // FUN_0622ff00 (node this, RET 8), alchemy.dll.txt 0x0622ff00-0x0623035f:
-    //   0x0622ff06..0x0622ff6d: Pos += Dt * Vel.
-    //   0x0622ff70..0x0622ff92: M = {FUN_06206c70 identity, Pos}.
-    //   [propset+0xa0] & 1 (UseDynamicRotation), 0x0622ffab..0x06230236: N = Vel * rsqrt
-    //     ((z*z + x*x) + y*y), Speed = rsqrt((x*x + y*y) + z*z) * that sum, both through the
-    //     inline 0x5f3759df step. |N.y| < 0.99f (DAT_0624e7f8): axis (N.z, 0, -N.x), angle
-    //     acos(N.y); otherwise axis (0, -N.z, N.y), angle acos(N.x), then MulQuat by the
-    //     -pi/4 twist about (0, 0, 1) (FUN_062307f0 -> I3DMathEngine +0x18). Half-angle quat
-    //     w = cos, xyz = axis * sin / FUN_06230690(axis) -> +0x58.
-    //   0x06230239: +0x68 = 0. [propset+0xa0] & 2 (SmoothRotation): Speed < 0.5f -> +0x58 =
-    //     identity and Blend = (Dt + [+0x68]) + 0.01f, else Blend = Speed * Dt; Blend > 1 ->
-    //     1; +0x3c = QuatSlerp(+0x3c, +0x58, Blend) (+0x58) and the matrix from +0x3c,
-    //     otherwise the matrix from +0x58 (QuaternionToMatrix +0x54) -> M's rotation.
-    //   0x06230345: life effect (+0x6c) IFxEffect slot 3 (1, &M), no null test.
+    // FUN_0622ff00: moves the record and poses its life effect (+0x6c, IFxEffect slot 3,
+    // no null test).
+    //   UseDynamicRotation: orient along the velocity (fast rsqrt; |N.y| < 0.99f,
+    //     DAT_0624e7f8, picks the axis, otherwise a -pi/4 twist about z is applied).
+    //   SmoothRotation: Speed < 0.5f slerps towards identity by (Dt + [+0x68]) + 0.01f,
+    //     else by Speed * Dt, clamped to 1; +0x68 is zeroed first.
 #pragma float_control(except, on, push)
     __declspec(noinline) void FxParticleAppearance::IntegrateRecord(FPooledParticle* Record,
                                                                  const float& Dt)
@@ -5547,7 +5063,7 @@ namespace AlchemyImpl
             const float Speed = static_cast<float>(ParticleInverseSqrt(LenSqB) * LenSqB);
 
             FQuaternion Q;
-            // TEST AH,5 + JP takes the other axis for >=0.99 or unordered.
+            // >= 0.99 or unordered takes the other axis.
             if (std::fabs(static_cast<double>(N[1])) < 0.9900000095367432)
             {
                 const float Axis[3] = {static_cast<float>(Nz), 0.0f, -N[0]};
@@ -5587,10 +5103,10 @@ namespace AlchemyImpl
             R->Blend = 0.0f;
 
             FMatrix Rotation;
-            // 0623023e reloads the class cache after the MulQuat callback.
+            // Retail reloads the class cache after the MulQuat callback.
             if ((ParticleProps()->Flags & 2) != 0)
             {
-                // TEST AH,5 / JP: Speed >= 0.5 (or unordered) takes Speed * Dt.
+                // Speed >= 0.5 (or unordered) takes Speed * Dt.
                 if (Speed < 0.5f)
                 {
                     R->VelQuat[0] = 1.0f;
@@ -5606,7 +5122,7 @@ namespace AlchemyImpl
                 }
                 if (R->Blend > 1.0f)
                     R->Blend = 1.0f;
-                // 062302af: capture the raw interpolation word before lazy creation.
+                // Capture the raw interpolation word before lazy creation.
                 float SlerpWeight;
                 std::memcpy(&SlerpWeight, &R->Blend, sizeof(SlerpWeight));
                 FQuaternion Slerped;
@@ -5640,20 +5156,11 @@ namespace AlchemyImpl
         return Next;
     }
 
-    // FUN_0622f6a0 (node this, Six, Age, Duration; RET 0x10), always returns 0.
-    //   0x0622f6ae..0x0622f6ea: pool full (DAT_06257ad4 FreeCount == 0) -> the oldest used
-    //     record's owner ([item+8]) erases it (FUN_0622f880 -> FUN_062306e0).
-    //   0x0622f6ef..0x0622f6fc: LifeName length ([propset+0x74]) == 0 -> return.
-    //   0x0622f709..0x0622f714: DAT_06257b98 (IAlchemy) null -> return. DAT_06257b90 is
-    //     not tested.
-    //   0x0622f71a..0x0622f742: CreateEffect([node+0x18] = this, HashNodeName(LifeName),
-    //     &Child); non-zero -> release Child, return.
-    //   0x0622f748..0x0622f7c5: AddRef a local copy; AllocPoolItem([node+0xbc]); non-null ->
-    //     FUN_06231d30(item, node, Six, Age, Duration, Child); FUN_06231470 appends the
-    //     result (null included); release the local copy.
-    //   0x0622f7c8..0x0622f801: the tail record's +0x30..+0x68 seeds; FUN_0622ff00(tail, 0).
-    //   0x0622f809..0x0622f84e: [node+0x8c] != 0.0 -> Child slot 6; [node+0x90] != 1.0 ->
-    //     Child slot 14. 0x0622f851: release Child.
+    // FUN_0622f6a0, always returns 0. A full pool (DAT_06257ad4 == 0) evicts the oldest
+    // record through its owner (FUN_0622f880 -> FUN_062306e0). An empty LifeName or no
+    // IAlchemy (DAT_06257b98) spawns nothing; DAT_06257b90 (the effect library) is not
+    // tested. FUN_06231470 appends the record even when the allocation failed. The child
+    // gets slot 6 / slot 14 only when node+0x8c != 0 / node+0x90 != 1.
     GENRESULT DACOM_API FxParticleAppearance::Pad47(const float* Six, float Age, float Duration)
     {
         if (G_PoolParticle.FreeCount == 0)
@@ -5728,17 +5235,10 @@ namespace AlchemyImpl
         }
         return GR_OK;
     }
-    // FUN_06230370 (node this, Dt; RET 8), always returns 0.
-    //   0x06230394..0x062303b9: Age += Dt; no emitter reference ([node+0xb0]) and no record
-    //     ([node+0xb4]) -> node flags |= 1.
-    //   0x062303bc..0x062304bb: the associated-field walk (erase dead fields; Begin with
-    //     [node+0x18]; per record with Age < Duration field +0xa4; End) = ApplyFieldsToPool.
-    //   0x062304c1..0x062305c7, per record:
-    //     Age <= Duration (TEST AH,0x41 / JP): Age += Dt; still not past Duration (AND
-    //       0x4100 / JNZ) -> FUN_0622ff00(record, Dt); past it -> life slot 11(7) false ->
-    //       life slot 13(1). Next record.
-    //     past Duration (or unordered): life slot 11(7) false -> next; a death effect whose
-    //       slot 11(7) is false -> next; otherwise FUN_062306e0 erases the record.
+    // FUN_06230370, always returns 0. Fields apply only to records with Age < Duration.
+    // A record that just ran out stops its life effect (slot 13(1)) unless slot 11(7)
+    // reports it finished; an expired record is erased (FUN_062306e0) only once both its
+    // life and death effects report finished.
     GENRESULT DACOM_API FxParticleAppearance::Pad5(float Dt)
     {
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
@@ -5777,13 +5277,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0622fcf0 (node this, Unused, Parent12; RET 0xc):
-    //   DeathName length ([propset+0x94]) != 0 -> per record with no death effect, Age
-    //   strictly past Duration (AND 0x4100 / JNZ skips <, = and unordered), DAT_06257b90
-    //   and DAT_06257b98 both bound: (release the null +0x70) CreateEffect([node+0x18],
-    //   HashNodeName(DeathName), &record+0x70); on success slot 3(1, {identity, Pos}),
-    //   [node+0x8c] != 0.0 -> slot 6, [node+0x90] != 1.0 -> slot 14.
-    //   Then FUN_062401a0, the shared node compose.
+    // FUN_0622fcf0: spawns the death effect (+0x70) of each record strictly past its
+    // Duration (ordered) that has none yet, when DeathName is set and both DAT_06257b90 and
+    // DAT_06257b98 are bound; then the shared compose FUN_062401a0.
     GENRESULT DACOM_API FxParticleAppearance::ComposeNodeTransform(void* Unused,
                                                                    const float* Parent12)
     {
@@ -5807,7 +5303,7 @@ namespace AlchemyImpl
                     {
                         float M[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                                        0.0f, 0.0f, 0.0f};
-                        // 0622fe42..fe53 copies position DWORDs without conversion.
+                        // Position dwords copied without conversion.
                         std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
                         R->DeathEffect->SetTransform(reinterpret_cast<void*>(1), M);
                         if (IsNonzeroParticleField(AppearanceOuterTime_))
@@ -5822,8 +5318,8 @@ namespace AlchemyImpl
         }
         return FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent12);
     }
-    // FUN_0622f8b0 (node, float; RET 8): FLD/FSTP to node+0x8c, then forward the
-    // original argument to each non-null life/death effect through IFxEffect slot 6.
+    // FUN_0622f8b0: node+0x8c, then the original argument to each life/death effect
+    // (IFxEffect slot 6).
     GENRESULT DACOM_API FxParticleAppearance::SetNodeOuterTime(float OuterTime)
     {
         AppearanceOuterTime_ = OuterTime;
@@ -5831,8 +5327,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0622f960 (node, float; RET 8): FLD/FSTP to node+0x90, then slot 14 on
-    // each non-null child with the original argument.
+    // FUN_0622f960: node+0x90, then slot 14 on each child with the original argument.
     GENRESULT DACOM_API FxParticleAppearance::SetNodeLodInput(float LodInput)
     {
         LodInput_ = LodInput;
@@ -5840,9 +5335,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0622fa10 (node, Out; RET 8): every child effect's IFxEffect slot 15 sphere that
-    // answers 0 goes into Out -- the first copied, the rest merged (MergeParticleSphere).
-    // No sphere at all -> -1, otherwise 0.
+    // FUN_0622fa10: every child effect's sphere (IFxEffect slot 15) that answers 0 is
+    // merged (MergeParticleSphere); none at all -> -1.
     GENRESULT DACOM_API FxParticleAppearance::GetBoundingSphere(float* OutSphere)
     {
         unsigned long Merged = 0;

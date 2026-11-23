@@ -11,11 +11,9 @@
 //
 // WINFACTORY<NN_Preferences> DAT_006721d0 "NN_Preferences": static init LAB_004a9270 (factory
 // ctor FUN_004b28e0, atexit LAB_004a9290 -> FUN_00579380), Create FUN_004b2950
-// (operator_new(0x980), WinControl ctor FUN_0059f860, the two vptrs, the nine vectors empty,
-// slot 9 with the payload; on failure the scalar deleting dtor).
+// (operator_new(0x980), the ctor inlined).
 //
-// vftable 0x005d4a5c (one table; the old docs/re/options_screen.md claim of a second one at
-// 0x5d4a80 was wrong) -- WinControl's with these overrides:
+// vftable 0x005d4a5c (one table only) -- WinControl's with these overrides:
 //   0 FUN_004a95e0 (scalar deleting dtor around FUN_004a9600), 9 FUN_004a9790 Create,
 //   11 FUN_004ab6e0 Update, 13 FUN_004abdb0 Draw, 19 FUN_004ada40 MouseEvent,
 //   20 FUN_004adac0 KeyEvent, 23 FUN_004ada30 (OutputDebugString "OnMessage\n", false),
@@ -28,8 +26,8 @@
 // Pages (+0x7f4 CurPage / +0x7f8 ReqPage): 0 key map, 1 "interface" (OptionsA, the video mode
 // cycle lives here), 2 "video" (OptionsC), 3 "audio" (OptionsB), 4 credits, 5 close, 6 escape.
 //
-// PORT: retail std::vector is 16 bytes (allocator byte + three pointers); the port's is not, so
-// the layout is asserted only up to +0x504. Retail offsets past it are in the comments.
+// Retail std::vector is 16 bytes (allocator byte + three pointers); the port's is not, so the
+// layout is asserted only up to +0x504. Retail offsets past it are in the comments.
 
 #include "Interface/wincontrol_base.h"
 
@@ -283,11 +281,9 @@ private:
     void ShowConfirmDialog(bool bShow);
     // FUN_004b2700
     void CancelChanges();
-    // The eight-widget hide + row restore sequence inlined at 0x004ac3d0 / 0x004ac649 /
-    // 0x004ac85e / 0x004ac90b / 0x004ad834 / 0x004adb40.
+    // Port-only: the dialog hide + row restore sequence retail inlines (see the .cpp).
     void CloseKeyDialogRestoreRows();
-    // The "+0x848 = 1, cancel enabled, reload keylist, refill" block inlined at 0x004ac6e7 /
-    // 0x004ac801 / 0x004acc1d / 0x004ad7ac.
+    // Port-only: the "dirty, cancel enabled, reload keylist, refill" block retail inlines.
     void MarkKeyMapDirtyAndReload();
 };
 

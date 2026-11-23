@@ -84,7 +84,7 @@ namespace ThornSplineMath
         }
     }
 
-    // Inlined operations in 21000 evaluate/store Z, Y, X in that order.
+    // Inlined operations in FUN_06f21000 evaluate/store Z, Y, X in that order.
     inline void Subtract(float* Dst, const float* A, const float* B)
     {
         __asm
@@ -193,26 +193,28 @@ namespace ThornSplineMath
         float TwiceP1[3], MinusP0[3], Delta[3], Linear[3];
         float FourP2[3], FiveP1[3], TwiceP0[3], Quadratic[3];
         float ThreeP2[3], ThreeP1[3], Cubic[3], Sum[3];
-        Scale(TwiceP1, P1, 2.0f);             // 21039 / 235a0
-        Negate(MinusP0, P0);                 // 21052 / 23090
-        Add(Delta, MinusP0, P2);             // 2106f / 23540
-        Scale(Linear, Delta, U);             // 21089 / 235a0
-        Scale(FourP2, P2, 4.0f);             // 2109c
-        Scale(FiveP1, P1, 5.0f);             // 210af
-        DoubleStored(TwiceP0, P0);           // 210b4..210d4
-        SubtractVector(Quadratic, TwiceP0, FiveP1); // 210f4 / 23570
-        Add(Quadratic, Quadratic, FourP2);   // 2110e / 23540
-        Subtract(Quadratic, Quadratic, P3);  // 21113..21140
-        ScaleStored(Quadratic, Quadratic, U2); // 21148..21178
-        ScaleStored(ThreeP2, P2, 3.0f);      // 21180..211aa
-        ScaleStored(ThreeP1, P1, 3.0f);      // 211b2..211de
-        NegateStored(MinusP0, P0);           // 211e6..21203
-        AddStored(Cubic, ThreeP1, MinusP0);  // 2120b..2123e
-        Subtract(Cubic, Cubic, ThreeP2);     // 21246..21279
-        AddStored(Cubic, Cubic, P3);         // 21281..212b0
-        ScaleStored(Cubic, Cubic, U3);       // 212b8..212eb
-        AddStored(Sum, Quadratic, Cubic);    // 212f3..21323
-        AddStored(Sum, Linear, Sum);         // 2132b..21352
+        // Steps in retail order (06f21039..06f21352); helper calls are FUN_06f235a0 (scale),
+        // FUN_06f23090 (negate), FUN_06f23540 (add), FUN_06f23570 (subtract), the rest inline.
+        Scale(TwiceP1, P1, 2.0f);
+        Negate(MinusP0, P0);
+        Add(Delta, MinusP0, P2);
+        Scale(Linear, Delta, U);
+        Scale(FourP2, P2, 4.0f);
+        Scale(FiveP1, P1, 5.0f);
+        DoubleStored(TwiceP0, P0);
+        SubtractVector(Quadratic, TwiceP0, FiveP1);
+        Add(Quadratic, Quadratic, FourP2);
+        Subtract(Quadratic, Quadratic, P3);
+        ScaleStored(Quadratic, Quadratic, U2);
+        ScaleStored(ThreeP2, P2, 3.0f);
+        ScaleStored(ThreeP1, P1, 3.0f);
+        NegateStored(MinusP0, P0);
+        AddStored(Cubic, ThreeP1, MinusP0);
+        Subtract(Cubic, Cubic, ThreeP2);
+        AddStored(Cubic, Cubic, P3);
+        ScaleStored(Cubic, Cubic, U3);
+        AddStored(Sum, Quadratic, Cubic);
+        AddStored(Sum, Linear, Sum);
         const float Half = 0.5f;
         float RoundedZ;
         __asm
@@ -237,8 +239,8 @@ namespace ThornSplineMath
             fstp dword ptr [eax + 8]
         }
     }
-    // 23145/23181, 232c5/23301, and 2347c/234b8 zero-extend the
-    // sample-index dword before FILD qword, then store the float product.
+    // Six retail sites zero-extend the sample index to a qword before the multiply, then
+    // store the float product.
     inline float SampleParameter(int Index, float Step)
     {
         const unsigned long long UnsignedIndex = static_cast<unsigned int>(Index);
@@ -252,7 +254,7 @@ namespace ThornSplineMath
         return Result;
     }
 
-    // Identical interpolation tails at 231ac..2321b and 2332c..2339b.
+    // The identical interpolation tails of FUN_06f230b0 and FUN_06f23230.
     inline void Lerp3D(const float* A, const float* B, float Fraction, float* ResultVector)
     {
         float ZDifference;
@@ -303,15 +305,16 @@ namespace ThornSplineMath
     {
         float MinusP0[3], Delta[3], FourP2[3], FiveP1[3], TwiceP0[3];
         float Quadratic[3], ThreeP2[3], ThreeP1[3], Cubic[3], Sum[3];
-        Negate(MinusP0, P0);                 // 213eb
-        Add(Delta, MinusP0, P2);             // 21405
-        Scale(FourP2, P2, 4.0f);             // 21418
-        Scale(FiveP1, P1, 5.0f);             // 21432
-        DoubleStored(TwiceP0, P0);           // 21437..21457
-        SubtractVector(Quadratic, TwiceP0, FiveP1); // 21477
-        Add(Quadratic, Quadratic, FourP2);   // 21491
-        Subtract(Quadratic, Quadratic, P3);  // 21496..214c3
-        // 214cb..21501 keeps 2U extended across all three products.
+        // Steps in FUN_06f213d0's order (06f213eb..06f216d8).
+        Negate(MinusP0, P0);
+        Add(Delta, MinusP0, P2);
+        Scale(FourP2, P2, 4.0f);
+        Scale(FiveP1, P1, 5.0f);
+        DoubleStored(TwiceP0, P0);
+        SubtractVector(Quadratic, TwiceP0, FiveP1);
+        Add(Quadratic, Quadratic, FourP2);
+        Subtract(Quadratic, Quadratic, P3);
+        // 2U stays extended across all three products.
         __asm
         {
             lea eax, Quadratic
@@ -328,14 +331,14 @@ namespace ThornSplineMath
             fstp dword ptr [eax]
             fstp st(0)
         }
-        ScaleStored(ThreeP2, P2, 3.0f);      // 21508..21531
-        ScaleStored(ThreeP1, P1, 3.0f);      // 21539..21566
-        NegateStored(MinusP0, P0);           // 2156e..2158b
-        AddStored(Cubic, ThreeP1, MinusP0);  // 21593..215c6
-        Subtract(Cubic, Cubic, ThreeP2);     // 215ce..21601
-        AddStored(Cubic, Cubic, P3);         // 21609..21635
+        ScaleStored(ThreeP2, P2, 3.0f);
+        ScaleStored(ThreeP1, P1, 3.0f);
+        NegateStored(MinusP0, P0);
+        AddStored(Cubic, ThreeP1, MinusP0);
+        Subtract(Cubic, Cubic, ThreeP2);
+        AddStored(Cubic, Cubic, P3);
         const float Three = 3.0f;
-        // 2163d..2167b never stores U^2 or 3U^2 before multiplication.
+        // U^2 and 3U^2 are never stored before the multiplications.
         __asm
         {
             lea eax, Cubic
@@ -353,8 +356,8 @@ namespace ThornSplineMath
             fstp dword ptr [eax]
             fstp st(0)
         }
-        AddStored(Sum, Quadratic, Cubic);    // 21682..216a9
-        AddStored(Sum, Delta, Sum);          // 216b1..216d8
+        AddStored(Sum, Quadratic, Cubic);
+        AddStored(Sum, Delta, Sum);
         const float Half = 0.5f;
         const float One = 1.0f;
         __asm
@@ -370,7 +373,7 @@ namespace ThornSplineMath
             fld dword ptr [ecx + 8]
             fmul Half
             fstp dword ptr [eax + 8]
-            // 2172b..21749: extended (X^2+Y^2)+Z^2, extended sqrt.
+            // Extended (X^2+Y^2)+Z^2 and extended sqrt.
             fld dword ptr [eax + 8]
             fld dword ptr [eax + 4]
             fld dword ptr [eax]

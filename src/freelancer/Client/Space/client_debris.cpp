@@ -40,11 +40,11 @@ namespace
     // DAT_006754d0 -- the record FUN_00530a10 hands out when a name is unknown (LAB_00530960).
     FDebrisArch G_DefaultDebrisArch;
 
-    // DAT_00675514 -- Debris.cpp's lazily acquired 3DMathEngine (0x00530372..0x00530381).
+    // DAT_00675514 -- Debris.cpp's lazily acquired 3DMathEngine.
     I3DMathEngine* G_DebrisMathEngine = nullptr;
 
-    // The object narrowed by (ObjectClass & Mask) == Mask, null otherwise -- the `this`,
-    // `this + 0xc` and object tests 0x0053077c..0x00530799 inlines.
+    // The object narrowed by (ObjectClass & Mask) == Mask, null otherwise (inlined by
+    // FUN_005306e0).
     CObject* NarrowDebrisObject(FClientGameobj* Gameobj, unsigned Mask)
     {
         if (Gameobj == nullptr)
@@ -75,7 +75,7 @@ FDebrisArch::FDebrisArch()
 
 bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
 {
-    // FUN_00530a20 (cdecl).
+    // FUN_00530a20
     FDebrisArch Arch;
     ID_String Nickname;
     Nickname.clear();
@@ -92,9 +92,7 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
         }
         else if (Reader->is_value("lifetime"))
         {
-            // 0x00530aec..0x00530b43: one value -> min = max; with a second, max is that value
-            // unless it is below min (TEST AH,0x5 / JP), then max = min. The second value is
-            // read again for the store.
+            // The second value is read again for the store.
             Arch.LifetimeMin = Reader->get_value_float(0);
             if (Reader->is_value_empty(1))
                 Arch.LifetimeMax = Arch.LifetimeMin;
@@ -109,10 +107,9 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
         }
         else if (Reader->is_value("death_method"))
         {
-            // 0x00530b7f..0x00530c0d: the value copied into a 16-byte buffer (at most 15
-            // characters; none when the string is null) and compared without case. The cut
-            // cannot turn a longer value into either name, so comparing the value itself
-            // decides the same; any other value leaves the method as it was.
+            // Retail compares a 15-character copy; the cut cannot turn a longer value into
+            // either name, so comparing the value itself decides the same. Any other value
+            // leaves the method as it was.
             char const* const Method = Reader->get_value_string();
             if (Method != nullptr)
             {
@@ -128,7 +125,7 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
         }
         else if (Reader->is_value("angular_drag"))
         {
-            // 0x00530c35..0x00530c7b: read as values 2, 1, 0.
+            // Read as values 2, 1, 0.
             float const Z = Reader->get_value_float(2);
             float const Y = Reader->get_value_float(1);
             float const X = Reader->get_value_float(0);
@@ -138,8 +135,8 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
         }
     }
 
-    // 0x00530c90..0x00530d0c: a section without a nickname is dropped; an existing nickname
-    // keeps its first record (FUN_005310c0 does not replace) and warns unless bQuiet.
+    // An existing nickname keeps its first record (FUN_005310c0 does not replace), despite
+    // what the warning text says.
     if (Nickname.IsEmpty())
         return false;
     std::pair<std::map<unsigned, FDebrisArch>::iterator, bool> const Inserted =
@@ -157,7 +154,7 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
 
 int LoadDebrisArchFile(char const* Path, bool bQuiet)
 {
-    // FUN_00530d20 (cdecl).
+    // FUN_00530d20
     size_t const SizeBefore = G_DebrisArchDb.size();
     INI_Reader Reader;
     if (Reader.open(Path, false))
@@ -178,13 +175,13 @@ int LoadDebrisArchFile(char const* Path, bool bQuiet)
 
 void ShutdownDebrisArchDb()
 {
-    // FUN_00530fa0: the table's erase(begin, end).
+    // FUN_00530fa0
     G_DebrisArchDb.clear();
 }
 
 FDebrisArch* FindDebrisArch(ID_String const* Nickname)
 {
-    // FUN_005309c0: lower_bound (FUN_0052c7a0) and the key test; the record is node + 0x10.
+    // FUN_005309c0
     std::map<unsigned, FDebrisArch>::iterator const It = G_DebrisArchDb.find(Nickname->Id);
     if (It == G_DebrisArchDb.end())
         return nullptr;
@@ -193,7 +190,7 @@ FDebrisArch* FindDebrisArch(ID_String const* Nickname)
 
 FDebrisArch* GetDefaultDebrisArch()
 {
-    // FUN_00530a10.
+    // FUN_00530a10
     return &G_DefaultDebrisArch;
 }
 
@@ -204,8 +201,7 @@ FDebrisArch* GetDefaultDebrisArch()
 FClientDebrisGameobj::FClientDebrisGameobj()
     : FClientGameobj(EClientGameobjKind::Debris)
 {
-    // 0x0053065f..0x00530673: +0xb4 = 0, +0xb8 = 0, +0xbc = 1. The death method and the two
-    // lifetimes are left for FUN_005301d0.
+    // The death method and the two lifetimes are left for Init.
     Explosion = nullptr;
     Remaining = 0.0f;
     Field_0xbc = 1;
@@ -213,48 +209,44 @@ FClientDebrisGameobj::FClientDebrisGameobj()
 
 FClientDebrisGameobj::~FClientDebrisGameobj()
 {
-    // FUN_00530160: the explosion's references dropped (FUN_00536170), then GameObject's
-    // destructor FUN_005394b0.
+    // FUN_00530160, then GameObject's destructor FUN_005394b0.
     if (Explosion != nullptr)
         ExplosionArchRelease(Explosion);
 }
 
 int FClientDebrisGameobj::get_type(uint& OutType) const
 {
-    // LAB_00530610.
+    // LAB_00530610
     OutType = 0x80000000u;
     return 0;
 }
 
 void FClientDebrisGameobj::create(Archetype::Root* Arch)
 {
-    // FUN_005304b0 (RET 4): no narrowing, no null test on the new object.
+    // FUN_005304b0: no narrowing, no null test on the new object.
     GameobjCreateOfClass(this, CObject::ClassObject, Arch);
     Object->open(Arch);
 }
 
 bool FClientDebrisGameobj::find(unsigned const& Id)
 {
-    // FUN_0053f330: XOR AL,AL / RET 4.
+    // FUN_0053f330
     (void)Id;
     return false;
 }
 
 void FClientDebrisGameobj::update(float Dt)
 {
-    // LAB_005304d0 (RET 4).
-    // 0x005304d0..0x005304f2: the object's update with CObject::UPDATE_DEFAULT (vt+0x50), then
-    // GameObject's update FUN_00539c60.
+    // LAB_005304d0
     Object->update(Dt, CObject::UPDATE_DEFAULT);
     FClientGameobj::update(Dt);
 
-    // 0x005304f2..0x00530503: TEST AH,0x41 / JNZ -- nothing once the countdown is not above 0.
     if (!(Remaining > 0.0f))
         return;
     Remaining = Remaining - Dt;
 
-    // 0x0053050f..0x0053054d: a vanishing piece (method 1) with Field_0xbc clear goes at once
-    // when it has lived longer than lifetime min (max - remaining > min, TEST AH,0x41 / JNZ).
+    // A vanishing piece (method 1) with Field_0xbc clear goes at once when it has lived
+    // longer than lifetime min.
     int const Method = DeathMethod;
     if (Method == 1 && Field_0xbc == 0)
     {
@@ -262,8 +254,8 @@ void FClientDebrisGameobj::update(float Dt)
             Remaining = 0.0f;
     }
 
-    // 0x00530557..0x00530588: TEST AH,0x41 / JP -- at 0 or below (ordered): exploding (0) goes
-    // through slot 108 with no position, vanishing (1) finishes the Gameobj (slot 87).
+    // At 0 or below (ordered): exploding (0) goes through slot 108 with no position,
+    // vanishing (1) finishes the Gameobj (slot 87).
     if (Remaining <= 0.0f)
     {
         if (Method == 0)
@@ -279,12 +271,10 @@ void FClientDebrisGameobj::update(float Dt)
 unsigned* FClientDebrisGameobj::PickLod(unsigned* OutLod, void* Camera,
                                         unsigned const* CachedLod)
 {
-    // FUN_005300f0 (RET 0xc): GameObject's pick FUN_00539820 into a local (retail reuses the
-    // third argument's stack slot), its return value ignored.
+    // FUN_005300f0: GameObject's pick FUN_00539820 into a local, its return value ignored.
     unsigned Lod = 0;
     FClientGameobj::PickLod(&Lod, Camera, CachedLod);
-    // 0x00530109..0x0053011b: CMP CX,3 / JC (unsigned low word < 3), CMP word,2 / JL (the
-    // signed high word below 2 keeps the flag).
+    // Unsigned low word, signed high word.
     unsigned short const LowWord = static_cast<unsigned short>(Lod & 0xffffu);
     short const HighWord = static_cast<short>(static_cast<unsigned short>(Lod >> 16));
     if (LowWord < 3u || HighWord >= 2)
@@ -295,16 +285,13 @@ unsigned* FClientDebrisGameobj::PickLod(unsigned* OutLod, void* Camera,
 
 void FClientDebrisGameobj::Explode(Vector const* Pos)
 {
-    // LAB_005305a0 (RET 4).
+    // LAB_005305a0
     if (Explosion == nullptr)
     {
-        // 0x005305f6..0x005305f9: GameObject's slot 108 FUN_0053a880.
-        FClientGameobj::Explode(Pos);
+        FClientGameobj::Explode(Pos); // FUN_0053a880
         return;
     }
-    // 0x005305b4..0x005305e9: Pos, or get_position() (vt+0) when it is null, copied to the
-    // stack; FUN_005361e0(Explosion, this, &Copy) into the action list. Unlike GameObject's
-    // slot 108 the effect list is not cleared.
+    // Unlike GameObject's slot 108 the effect list is not cleared.
     Vector const* const Where = (Pos != nullptr) ? Pos : &get_position();
     Vector const Copy = *Where;
     Actions.add(Action_Explode::Create(Explosion, this, &Copy));
@@ -312,19 +299,17 @@ void FClientDebrisGameobj::Explode(Vector const* Pos)
 
 void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
 {
-    // FUN_005301d0 (RET 4).
-    // 0x005301db: GameObject's slot 92 FUN_00539740, called directly. It reads bWatchListed
-    // only after get_type, and Debris's get_type (0x80000000) has none of the bits it tests.
+    // FUN_005301d0
+    // GameObject's slot 92 FUN_00539740, called directly. It reads bWatchListed only after
+    // get_type, and Debris's get_type (0x80000000) has none of the bits it tests.
     FClientGameobj::PostCreateInit();
 
-    // 0x005301e7..0x00530200: +0xa8 = the death method (the retail dword store overwrites the
-    // bWatchListed byte too), +0xac = lifetime min, +0xb0 = lifetime max.
+    // The retail dword store at +0xa8 overwrites the bWatchListed byte too.
     DeathMethod = Arch->DeathMethod;
     bWatchListed = static_cast<unsigned char>(DeathMethod & 0xff);
     LifetimeMin = Arch->LifetimeMin;
     LifetimeMax = Arch->LifetimeMax;
 
-    // 0x005301fb..0x00530239: the explosion, with its references taken (FUN_00536100).
     if (!Arch->Explosion.IsEmpty())
     {
         Explosion = Archetype::GetExplosion(Arch->Explosion);
@@ -336,14 +321,12 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
         Explosion = nullptr;
     }
 
-    // 0x00530239..0x00530272: the countdown, lifetime min + rand()/32768 * (max - min).
     float const Min = LifetimeMin;
     float const Max = LifetimeMax;
     Remaining = static_cast<float>(rand()) * kRandScale * (Max - Min) + Min;
 
-    // 0x00530278..0x005303ea: the trail -- a one-shot on this Gameobj, pointing along the
-    // velocity (LookMatrix) at the centre of mass (the object's vt+0x68 when it has a body,
-    // else get_position()), expressed in the object's frame.
+    // The trail -- a one-shot on this Gameobj, pointing along the velocity at the centre of
+    // mass (get_position() without a body), expressed in the object's frame.
     if (!Arch->Trail.IsEmpty())
     {
         Vector Where;
@@ -359,10 +342,8 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
         World.Translation.Y = Where.y;
         World.Translation.Z = Where.z;
 
-        // 0x005302eb..0x0053036d: the inverse of the object's frame -- get_orientation (vt+0x10)
-        // and the position that follows it: rotation transposed (FUN_00447b60), translation
-        // -(M^T * P) (FUN_00447be0, then FUN_00422b80 on the negated floats; FUN_00447bb0
-        // packs the two).
+        // The inverse of the object's frame: rotation transposed (FUN_00447b60), translation
+        // -(M^T * P) (FUN_00447be0); FUN_00447bb0 packs the two.
         Transform const& ObjectFrame = reinterpret_cast<Transform const&>(get_orientation());
         FMatrix const& Rotation = reinterpret_cast<FMatrix const&>(ObjectFrame.Rotation);
         FVector ObjectPos;
@@ -370,7 +351,7 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
         ObjectPos.Y = ObjectFrame.Translation.y;
         ObjectPos.Z = ObjectFrame.Translation.z;
         FVector Rotated;
-        ShipTransposeRotate(Rotated, Rotation, ObjectPos); // FUN_00447be0 (0x00530302)
+        ShipTransposeRotate(Rotated, Rotation, ObjectPos);
         FTransform Inverse;
         int Row = 0;
         for (Row = 0; Row < 3; ++Row)
@@ -383,23 +364,19 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
         Inverse.Translation.Y = -Rotated.Y;
         Inverse.Translation.Z = -Rotated.Z;
 
-        // 0x00530372..0x005303b3: Local = Inverse * World through DAT_00675514's MulTransform
-        // (vt+0x1c).
         if (G_DebrisMathEngine == nullptr)
             G_DebrisMathEngine = Acquire3DMathEngine();
         FTransform Local;
         G_DebrisMathEngine->MulTransform(Local, Inverse, World);
 
-        // 0x005303b5..0x005303ea: get_index (vt+0x1c), then -- the trail id tested again --
-        // FUN_0040f080 and FUN_00503070 on DAT_00674c60 (EffectArch, this, index, &Local, no
-        // companion).
+        // The trail id is tested again (retail).
         int const Index = static_cast<int>(get_index());
         if (!Arch->Trail.IsEmpty())
             CliCreateEffectOneShot(FindEffectArch(&Arch->Trail.Id), this, Index, &Local, nullptr);
     }
 
-    // 0x005303f6..0x0053047c: with a physics body, the drag divided by the mass (vt+0x6c) and
-    // by the moment of inertia (zero when the body is gone by the second test).
+    // Drag divided by the mass and by the moment of inertia (zero when the body is gone by the
+    // second test).
     if (Object->BodyPtr != nullptr)
     {
         float const Linear = Arch->LinearDrag / Object->get_mass();
@@ -421,8 +398,7 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
         PhySys::SetDamping(Object, Linear, Angular);
     }
 
-    // 0x0053047f..0x00530496: the nebula at get_position() into +0x38, its fog factor into
-    // +0x3c (FUN_005553b0, no hint).
+    // The nebula at get_position() into +0x38, its fog factor into +0x3c (FUN_005553b0).
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
     DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
@@ -430,12 +406,12 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
 
 FClientDebrisGameobj* CreateDebrisGameobjForObject(CObject* Object, FDebrisArch const* Arch)
 {
-    // FUN_00530620 (cdecl).
+    // FUN_00530620
     FClientDebrisGameobj* const Debris = new FClientDebrisGameobj();
-    Debris->Object = Object;                                               // +0x10
-    Debris->advise(true);                                                  // CBase::advise
-    Debris->Init(Arch);                                                    // FUN_005301d0
-    ClientObjDb_RegisterGameobj(Debris, false);                            // FUN_00540c30(, 0)
+    Debris->Object = Object;
+    Debris->advise(true);
+    Debris->Init(Arch);
+    ClientObjDb_RegisterGameobj(Debris, false);
     return Debris;
 }
 
@@ -443,22 +419,18 @@ FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
                                                   FDebrisArch const* DebrisArch,
                                                   Vector const* Pos)
 {
-    // FUN_005306e0 (cdecl).
+    // FUN_005306e0
     FClientDebrisGameobj* const Debris = new FClientDebrisGameobj();
-    // 0x0053074c..0x00530779: Arch->load (vt+0xc), its companion's Load(1) (vt+0x20), the
-    // Gameobj's create (vt+0x168), Arch->Release.
     Arch->load();
     Arch->Companion->Load(1);
     Debris->create(Arch);
     Arch->Release();
 
-    // 0x0053077c..0x005307af: the object (class & 1, no null test on the result) placed at Pos
-    // (+0x2c).
+    // No null test on the narrowed object.
     CObject* const Simple = NarrowDebrisObject(Debris, 1u);
     Simple->WorldPosition = *Pos;
 
-    // 0x005307b2..0x0053082b: a body -- mass 1, the default damping, type 2 with collisions
-    // on, no inertia, no name, the current system (FUN_00554e90, read last).
+    // The current system (FUN_00554e90) is read last.
     PhySys::CreateParms Parms;
     std::memset(&Parms, 0, sizeof(Parms));
     Parms.Mass = 1.0f;
@@ -478,7 +450,6 @@ FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
     Parms.CollisionGroupId = StarSysGetActiveSystemId();
     PhySys::BuildIVP_Real(Simple, Parms);
 
-    // 0x00530831..0x00530842: FUN_005301d0(DebrisArch), FUN_00540c30(Debris, 0).
     Debris->Init(DebrisArch);
     ClientObjDb_RegisterGameobj(Debris, false);
     return Debris;

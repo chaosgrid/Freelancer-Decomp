@@ -15,7 +15,7 @@ extern int GMovieGraphCode;
 // DAT_06ae0980. Allocation counter. Only 0x06ac4f80 and 0x06ac4fb0 touch it.
 int GMovieAllocCount = 0;
 
-// Callees outside this file. Names stay Movie_<addr> until those lanes name them.
+// Callees outside this file.
 // 0x06ac45a0. Defined in MovieExp.cpp. RET 0x18.
 long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch);
 
@@ -100,7 +100,7 @@ static int Movie_CompareDescending(unsigned int* Left, unsigned int* Right, unsi
     return 0;
 }
 
-// SAR / NOT / AND 1, then the slot plus that bit. Listing 06ac419d and 06ac4272.
+// SAR / NOT / AND 1, then the slot plus that bit (at 06ac419d and 06ac4272).
 static unsigned int* Movie_AlignDword(unsigned int* Slot, unsigned char* Reference)
 {
     int Delta = (int)(Reference - (unsigned char*)Slot);
@@ -462,7 +462,6 @@ void __stdcall Movie_FreeBlock(void* Block)
 }
 
 // 0x06ac4fd0
-// The unread store of 0 at [ESP+0x14] has no later read.
 unsigned int __stdcall Movie_EstimateQuotient(unsigned int Carry, unsigned int Top, unsigned int Second, unsigned int* Reciprocal)
 {
     return Movie_ReciprocalHigh(Carry, Top, Second, Reciprocal);

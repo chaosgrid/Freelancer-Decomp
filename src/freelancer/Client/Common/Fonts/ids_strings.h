@@ -14,8 +14,7 @@
 // High word of Ids selects the registered HMODULE; low word is the STRINGTABLE id.
 
 // FUN_0057d800: push the module (null included) onto the ids module list; returns the old
-// element count << 16. Callers: WinMain 0x005b3127 (resources.dll), FUN_005b0c30 0x005b0f7f
-// (each [Resources] DLL).
+// element count << 16. Callers: WinMain (resources.dll), FUN_005b0c30 (each [Resources] DLL).
 unsigned int RegisterIdsResourceModule(HMODULE Module);
 // FUN_0057d980 without the write-back: the module the high word of Ids names, null when the
 // index is past the list.

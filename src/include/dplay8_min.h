@@ -17,7 +17,7 @@
 #endif
 
 // ===========================================================================
-// DirectPlay 8 GUIDs (verified byte-for-byte against retail DALib.dll .rdata)
+// DirectPlay 8 GUIDs (as in retail DALib.dll .rdata)
 // ===========================================================================
 
 // {743F1DC6-5ABA-429F-8BDF-C54D03253DC2}
@@ -74,7 +74,7 @@ typedef HRESULT (WINAPI* PFNDPNMESSAGEHANDLER)(PVOID pvUserContext, DWORD dwMess
 #define DPNSESSION_REQUIREPASSWORD  0x00000080UL
 #endif
 
-// Message IDs (verified against retail DALib.dll jump tables at 0x065C1D58 / 0x065C4904)
+// Message IDs (retail DALib.dll jump tables at 0x065C1D58 / 0x065C4904)
 #define DPN_MSGID_OFFSET                    0xFFFF0000UL
 #define DPN_MSGID_ADD_PLAYER_TO_GROUP       (DPN_MSGID_OFFSET | 0x0001UL)
 #define DPN_MSGID_APPLICATION_DESC          (DPN_MSGID_OFFSET | 0x0002UL)
@@ -106,7 +106,7 @@ struct IDirectPlay8Server;
 struct IDirectPlay8LobbiedApplication;
 
 // ===========================================================================
-// DirectPlay 8 structures (layouts verified against retail DALib.dll)
+// DirectPlay 8 structures (layouts as retail DALib.dll uses them)
 // ===========================================================================
 
 typedef struct _DPN_APPLICATION_DESC
@@ -232,7 +232,7 @@ typedef struct _DPN_SECURITY_CREDENTIALS
 } DPN_SECURITY_CREDENTIALS, *PDPN_SECURITY_CREDENTIALS;
 
 // ===========================================================================
-// Callback message structures (offsets verified against DALib.dll disassembly)
+// Callback message structures
 // ===========================================================================
 
 typedef struct _DPNMSG_ASYNC_OP_COMPLETE
@@ -356,7 +356,7 @@ typedef struct _DPNMSG_TERMINATE_SESSION
 } DPNMSG_TERMINATE_SESSION, *PDPNMSG_TERMINATE_SESSION;
 
 // ===========================================================================
-// COM Interfaces (exact vtable slot order verified against Microsoft dpnet.dll)
+// COM Interfaces (vtable slot order of Microsoft dpnet.dll)
 // ===========================================================================
 
 struct IDirectPlay8Address : public IUnknown

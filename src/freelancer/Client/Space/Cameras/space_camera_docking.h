@@ -9,16 +9,15 @@
 // The docking camera -- the fixed exterior shot that watches the player's ship fly into a dock
 // ring or a base mooring point. Vtable .rdata 0x005dc2d4, ctor FUN_0051ea20, controller + 0xa9c.
 //
-// It is the only camera in the hierarchy that never moves and yet updates every frame: it holds
-// its position and re-aims at the player's ship, which is exactly what a docking shot looks
-// like. Four slots are its own:
+// It never moves yet updates every frame: it holds its position and re-aims at the player's
+// ship. Four slots are its own:
 //
-//   0x58  FUN_0051eaa0  attach:     runs two subsystem calls first, then the usual watcher swap
+//   0x58  FUN_0051eaa0  attach:     stops the player ship's steering, then the watcher swap
 //   0x64  LAB_0051ea50  activate:   base activate, bars in, clear the fade countdown
 //   0x68  FUN_0051ea80  deactivate: bars out, clear the countdown
 //   0x6c  LAB_0051eae0  update:     re-aim at the ship, and run the fade countdown
 //
-// Its own fields, all three written by the ctor at 0x0051ea2a..0x0051ea36:
+// Its own fields, all zeroed by the ctor:
 //
 //   +0xf8   bFadePending   whether the docking fade-out has been armed
 //   +0xfc   TotalSeconds   how long the docking sequence lasts
@@ -65,8 +64,7 @@ void DockingCameraDeactivate(FDockingCamera* Cam);
 void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds);
 
 // FUN_0051ebd0 -- a non-virtual method, called from FUN_0054bc0a. Arms the countdown: the
-// sequence is Seconds long, and the elapsed counter starts at 0.1 rather than at zero (the
-// literal 0x3dcccccd), so the first tenth of a second is spent before the camera ever runs.
+// sequence is Seconds long, and the elapsed counter starts at 0.1 (0x3dcccccd) rather than zero.
 void DockingCameraBeginSequence(FDockingCamera* Cam, float Seconds);
 
 inline FSpaceCamera* SpaceCameraOf(FDockingCamera* Cam) { return Cam; }

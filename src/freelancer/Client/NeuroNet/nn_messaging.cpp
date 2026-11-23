@@ -55,7 +55,7 @@ namespace
     unsigned G_NnVoiceId = 0;                  // DAT_00671f5c
     FVoiceProfile* G_NnVoiceProfile = nullptr; // DAT_00671f70
 
-    // NN_Messaging.cpp's overflow limit (CMP EBP,0x4 / JGE at 0x00489b70).
+    // NN_Messaging.cpp's overflow limit (0x00489b70).
     int const kNnVoiceQueueCapacity = 4;
 
     // FUN_00489a80 (thiscall on the entry): start the entry's line through the NNVoice profile.
@@ -69,8 +69,7 @@ namespace
         {
             return;
         }
-        // 0x00489aa0..0x00489acd: with a player ship, make sure the line is on the system's
-        // preload list.
+        // With a player ship, make sure the line is on the system's preload list.
         if (GetPlayerObjRW() != nullptr)
         {
             if (!StarSysHasVoiceMessage(G_NnVoiceId, Entry->MsgId)) // FUN_00553660
@@ -83,9 +82,8 @@ namespace
         {
             return;
         }
-        // 0x00489ae2..0x00489b24: the play key. Dword 1's low byte keeps its stale bits 3..7 and
-        // takes the entry's flag in bit 2 (bits 0/1 cleared); the upper three bytes are stale.
-        // The port has 0 where retail has stack garbage. Dwords 0, 2..5 are 0.
+        // The play key: dword 1 takes the entry's flag in bit 2. Deviation: retail leaves bits
+        // 3..31 of dword 1 as stack garbage; the port has 0. Dwords 0, 2..5 are 0.
         unsigned PlayKey[6] = {};
         PlayKey[1] = static_cast<unsigned>((Entry->bKeyBit2 << 2) & 4);
         void* Handle = nullptr;
@@ -95,7 +93,7 @@ namespace
         {
             Entry->Source = static_cast<ISoundSource*>(Handle);
         }
-        // 0x00489b31..0x00489b3a: the source's category = 5 (voice).
+        // Category 5: voice.
         if (Entry->Source != nullptr)
         {
             SetClientSoundSourceType(Entry->Source, 5);
@@ -113,7 +111,6 @@ namespace
                   "NN Message inbox overflow!");
             return;
         }
-        // 0x00489b79..0x00489b93: a message already queued is not queued twice.
         for (std::list<FNnVoiceMessage>::iterator It = G_NnVoiceQueue.begin();
              It != G_NnVoiceQueue.end(); ++It)
         {
@@ -122,10 +119,8 @@ namespace
                 return;
             }
         }
-        // 0x00489b95..0x00489bda: push_back of {MsgId, flag, null} (FUN_00489f40 + FUN_0059f7e0);
-        // the stack temporary's destructor at 0x00489bdd has no source to release.
         G_NnVoiceQueue.emplace_back(MsgId, bKeyBit2);
-        // 0x00489c04..0x00489c10: the queue was empty -- start the new head now.
+        // The queue was empty: start the new head now.
         if (CountBefore == 0)
         {
             NnVoicePlay(&G_NnVoiceQueue.front());
@@ -148,16 +143,13 @@ void NnVoiceTick(float Unused)
     {
         return;
     }
-    // 0x00489e09..0x00489e29: a head that is still playing stays (vt+0x74 IsFinished; NEG/SBB/
-    // INC turns "not finished" into the early return).
+    // IsFinished is vt+0x74.
     ISoundSource* const HeadSource = G_NnVoiceQueue.front().Source;
     if (HeadSource != nullptr && HeadSource->IsFinished() == 0)
     {
         return;
     }
-    // 0x00489e2b..0x00489e5c: unlink the head, FUN_00489f70(0) on it, free the node.
     G_NnVoiceQueue.pop_front();
-    // 0x00489e61..0x00489e6e: tail jump into FUN_00489a80 on the new head.
     if (!G_NnVoiceQueue.empty())
     {
         NnVoicePlay(&G_NnVoiceQueue.front());
@@ -166,7 +158,7 @@ void NnVoiceTick(float Unused)
 
 void NnVoiceEnqueue(unsigned MsgId, unsigned char bKeyBit2)
 {
-    // FUN_00489e80: MOV ECX,DAT_00671f50; CALL FUN_00489b50.
+    // FUN_00489e80.
     NnVoiceQueuePush(MsgId, bKeyBit2);
 }
 

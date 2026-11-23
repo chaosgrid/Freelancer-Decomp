@@ -33,14 +33,14 @@ namespace
         memcpy(Destination, &Value, sizeof(float));
     }
 
-    // The ships in SystemInfo::SpaceObjs are NPC ships (adders TU43 06f348c5 and TU53
-    // 06f60b05, both after FUN_06f336a0); TU40 reads their ship fields at raw offsets.
+    // The ships in SystemInfo::SpaceObjs are NPC ships (added by TU43 and TU53, both after
+    // FUN_06f336a0); TU40 reads their ship fields at raw offsets.
     FContentNpcShip* AsNpcShip(FContentSpaceObj* Object)
     {
         return static_cast<FContentNpcShip*>(Object);
     }
 
-    // The inlined `FUN_06eea860; null ? 0 : FUN_06f73ac0(Name, ship +0x170)` of every Execute.
+    // Inlined in every Execute (FUN_06eea860, FUN_06f73ac0 with ship +0x170).
     unsigned int FindTargetId(FContentShipBase* Ship, TString<0x30> const* Name)
     {
         FSystemInfo* System = Ship->GetSystem();
@@ -49,15 +49,16 @@ namespace
         return System->FindObjectIdByName(Name, Ship->ControllerId);
     }
 
-    // The inlined priority default: `op +8 == 0 -> op +8 = FUN_06f57c80(ship)`.
+    // The inlined priority default (FUN_06f57c80).
     void DefaultPriority(pub::AI::BaseOp* Op, FContentShipBase* Ship)
     {
         if (Op->Priority == 0)
             Op->Priority = (uint32_t)Ship->GetPriority();
     }
 
-    // The inlined mute before a goto / guide / follow: `ship vtbl[+4]() && !FUN_06f33e80 &&
-    // !FUN_06f33ff0 -> FUN_06f68630(&DAT_06fd1bd8, ship, 10.0f)` (DAT_06fb8e24).
+    // The inlined mute before a goto / guide / follow (IsSpacePopShip = FUN_06f33e80,
+    // IsCommMuted = FUN_06f33ff0, StartTimer = FUN_06f68630 on DAT_06fd1bd8; 10.0f is
+    // DAT_06fb8e24).
     void MuteNpcShip(FContentShipBase* Ship)
     {
         if (!Ship->IsNpcShip())
@@ -70,9 +71,9 @@ namespace
         GNpcShipEvents.StartTimer(NpcShip, 10.0f);
     }
 
-    // The inlined SubmitState to the ship's formation mates (06f25f89-06f25fc9 and the zone
-    // directives): every other object of the ship's system with the same +0x154 (skipped
-    // when the ship's is -1).
+    // The inlined SubmitState to the ship's formation mates (Avoidance and the zone
+    // directives): every other object of the ship's system with the same +0x154 (none when
+    // the ship's is -1).
     void SubmitStateToFormation(FContentShipBase* Ship, pub::AI::BaseOp* Op)
     {
         FSystemInfo* System = Ship->GetSystem();
@@ -93,7 +94,7 @@ namespace
     }
 
     // Value 0 of the goto keys: "goto" leaves both flags, "goto_no_cruise" sets Field_5B,
-    // "goto_cruise" Field_5A (stricmp, 06f261b2-06f261f4).
+    // "goto_cruise" Field_5A.
     void ParseGotoKind(char const* Kind, uint8_t* NoCruise, uint8_t* Cruise)
     {
         if (_stricmp(Kind, "goto") == 0)
@@ -118,13 +119,8 @@ namespace
 // Factory and loader
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f24870 (06f24870-06f24fe5). Every case: operator new(size), base part (+4 RefCount 1,
-// +8 Name.Length 0, +0xc Name[0] 0, vtable 06fb8314; FUN_06f25050 in cases 3-6, 0xa-0x10,
-// 0x15), the op's default ctor at +0x10c, the class's own members, its vtable. Sizes: 0 0x120,
-// 1 0x11c, 2 0x118, 3 0x1e8, 4/5 0x1b4, 6 0x15c, 7 0x168, 8 0x200, 9 0x234, 0xa 0x188,
-// 0xb/0xc 0x110, 0xd/0xe 0x180, 0xf 0x124, 0x10 0x120, 0x11/0x12 0x10c, 0x13 0x16c, 0x14 0x124,
-// 0x15 0x124, 0x16 0x13c (FUN_06f25140), 0x19 0x120 (FUN_06f251b0); 0x17, 0x18 and > 0x19 ->
-// null. *Out = the object; returns it != null.
+// FUN_06f24870. The base part is FUN_06f25050 in cases 3-6, 0xa-0x10 and 0x15, inline
+// elsewhere; the sizes are on the classes in the header.
 bool __cdecl CreateObjListDirective(int Type, FObjListDirective** Out)
 {
     FObjListDirective* Directive = nullptr;
@@ -197,12 +193,8 @@ namespace
     };
 }
 
-// FUN_06f25260 (06f25260-06f25f29). *OutNickname = CreateID("") (DAT_06fb572c), then per
-// value: "nickname" -> CreateID(value); "system" -> ignored; a directive key -> factory,
-// Name = the whole line (FUN_06f0dfa0 / the inlined TString copy: null -> empty, clamped to
-// 0xff), vtbl[+0x10] Parse(Reader), then the list takes it: retail inserts at the end
-// (FUN_06ecfc30 / FUN_06f1e390 / inline), AddRefs it for the list and releases the creation
-// reference, so the list holds the one reference. Unknown keys are skipped.
+// FUN_06f25260. "system" and unknown keys are skipped. Name is clamped to 0xff. The list
+// holds the one reference left once the creation reference is released.
 void __cdecl LoadObjList(INI_Reader* Reader, std::list<FObjListDirective*>* List,
                          unsigned int* OutNickname)
 {
@@ -230,8 +222,8 @@ void __cdecl LoadObjList(INI_Reader* Reader, std::list<FObjListDirective*>* List
         if (Type < 0)
             continue;
 
-        // The creation reference lives in a local handle (FUN_06f28e10 in the 23 unwind
-        // states of 06f25260); the list takes its own reference.
+        // The creation reference lives in a local handle (FUN_06f28e10); the list takes its
+        // own reference.
         TRefHandle<FObjListDirective> Directive;
         CreateObjListDirective(Type, &Directive.Pointer);
         Directive->Name = Reader->get_line_ptr();
@@ -245,8 +237,7 @@ void __cdecl LoadObjList(INI_Reader* Reader, std::list<FObjListDirective*>* List
 // 0 Avoidance
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f25f60 (06f25f60-06f25fd8): SubmitState(ship, op) (result ignored), the same to the
-// formation mates, FUN_06f57b00; true.
+// FUN_06f25f60 (AdvanceDirective = FUN_06f57b00).
 bool FObjListAvoidance::Execute(FContentShipBase* Ship)
 {
     pub::AI::SubmitState(Ship->SpaceObjId, &Op);
@@ -255,20 +246,20 @@ bool FObjListAvoidance::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// FUN_06f25fe0 (06f25fe0-06f26015): FlagId = 0; bValue = stricmp(value 0, "true") == 0.
+// FUN_06f25fe0.
 void FObjListAvoidance::Parse(INI_Reader* Reader)
 {
     Op.FlagId = 0;
     Op.bValue = _stricmp(Reader->get_value_string(0), "true") == 0 ? 1 : 0;
 }
 
-// 06ea1450: XOR EAX,EAX.
+// 06ea1450.
 int FObjListAvoidance::GetType()
 {
     return 0;
 }
 
-// FUN_06f26020 (06f26020-06f26034).
+// FUN_06f26020.
 void FObjListAvoidance::SetAvoidance(bool bAvoid)
 {
     Op.FlagId = 0;
@@ -279,26 +270,26 @@ void FObjListAvoidance::SetAvoidance(bool bAvoid)
 // 1 Delay, 2 Idle
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f27900 (06f27900-06f2792f): priority default, FUN_06f57c60.
+// FUN_06f27900 (SubmitDirective = FUN_06f57c60).
 bool FObjListDelay::Execute(FContentShipBase* Ship)
 {
     DefaultPriority(&Op, Ship);
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f27950 (06f27950-06f27966): DelaySeconds = float value 0.
+// FUN_06f27950.
 void FObjListDelay::Parse(INI_Reader* Reader)
 {
     Op.DelaySeconds = Reader->get_value_float(0);
 }
 
-// 06ee9e10: MOV EAX,1.
+// 06ee9e10.
 int FObjListDelay::GetType()
 {
     return 1;
 }
 
-// FUN_06f27940 (06f27940-06f2794a).
+// FUN_06f27940.
 void FObjListDelay::SetDelay(float Seconds)
 {
     Op.DelaySeconds = Seconds;
@@ -311,7 +302,7 @@ bool FObjListIdle::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// 06ee9660: MOV EAX,2.
+// 06ee9660.
 int FObjListIdle::GetType()
 {
     return 2;
@@ -323,9 +314,8 @@ int FObjListIdle::GetType()
 
 namespace
 {
-    // FUN_06f263a0 (06f263a0-06f26451), the Execute of GotoSpline and GotoVec: the object
-    // name, when set, gives Field_5C (a miss finishes the directive: FUN_06f57b00, true);
-    // priority default, mute, FUN_06f57c60.
+    // FUN_06f263a0, the Execute of GotoSpline and GotoVec. An object name that does not
+    // resolve finishes the directive.
     bool ExecuteGotoToObject(FContentShipBase* Ship, pub::AI::DirectiveGotoOp* Op,
                              TString<0x30> const* ObjectName)
     {
@@ -345,15 +335,14 @@ namespace
     }
 }
 
-// Factory case 3 (06f24bd2-06f24c2b): +0x180 / +0x1b4 names emptied.
+// Inlined in factory case 3.
 FObjListGotoShip::FObjListGotoShip()
 {
     ClearName(&TargetName);
     ClearName(&ObjectName);
 }
 
-// FUN_06f26040 (06f26040-06f2613e): TargetName -> Field_1C, ObjectName -> Field_5C (each
-// only when set; a miss finishes the directive), priority default, mute, FUN_06f57c60.
+// FUN_06f26040. A name that does not resolve finishes the directive.
 bool FObjListGotoShip::Execute(FContentShipBase* Ship)
 {
     if (TargetName.Length != 0)
@@ -381,7 +370,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f26190 (06f26190-06f2638e).
+// FUN_06f26190.
 void FObjListGotoShip::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
@@ -403,13 +392,13 @@ void FObjListGotoShip::Parse(INI_Reader* Reader)
         bNoFailOnTimeout = Reader->get_value_int(9);
 }
 
-// 06f5e540: MOV EAX,3.
+// 06f5e540.
 int FObjListGotoShip::GetType()
 {
     return 3;
 }
 
-// FUN_06f26150 (06f26150-06f2617e).
+// FUN_06f26150.
 void FObjListGotoShip::SetTarget(unsigned int const* TargetId, float Range, float Param3)
 {
     Op.Field_0C = 0;
@@ -419,7 +408,7 @@ void FObjListGotoShip::SetTarget(unsigned int const* TargetId, float Range, floa
     Op.Field_54 = Param3;
 }
 
-// Factory case 4 (06f24c32-06f24c7f): +0x180 name emptied.
+// Inlined in factory case 4.
 FObjListGotoSpline::FObjListGotoSpline()
 {
     ClearName(&ObjectName);
@@ -430,7 +419,7 @@ bool FObjListGotoSpline::Execute(FContentShipBase* Ship)
     return ExecuteGotoToObject(Ship, &Op, &ObjectName);
 }
 
-// FUN_06f26e60 (06f26e60-06f27141). Field_0C = 2 (a spline); the four points come in the
+// FUN_06f26e60. Field_0C = 2 (a spline); the four points come in the
 // value order 2, 0, 1, 3 (values 1-3 -> +0x144, 4-6 -> +0x12c, 7-9 -> +0x138, 10-12 ->
 // +0x150); Field_50 is a float here.
 void FObjListGotoSpline::Parse(INI_Reader* Reader)
@@ -467,13 +456,13 @@ void FObjListGotoSpline::Parse(INI_Reader* Reader)
         bNoFailOnTimeout = Reader->get_value_int(20);
 }
 
-// 06f25080: MOV EAX,4.
+// 06f25080.
 int FObjListGotoSpline::GetType()
 {
     return 4;
 }
 
-// Factory case 5 (06f24c86-06f24cd3): +0x180 name emptied.
+// Inlined in factory case 5.
 FObjListGotoVec::FObjListGotoVec()
 {
     ClearName(&ObjectName);
@@ -484,7 +473,7 @@ bool FObjListGotoVec::Execute(FContentShipBase* Ship)
     return ExecuteGotoToObject(Ship, &Op, &ObjectName);
 }
 
-// FUN_06f264d0 (06f264d0-06f2669d). Field_0C = 1 (a point); the point and Field_50 are ints.
+// FUN_06f264d0. Field_0C = 1 (a point); the point and Field_50 are read as ints.
 void FObjListGotoVec::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
@@ -508,13 +497,13 @@ void FObjListGotoVec::Parse(INI_Reader* Reader)
         bNoFailOnTimeout = Reader->get_value_int(11);
 }
 
-// 06ee99a0: MOV EAX,5.
+// 06ee99a0.
 int FObjListGotoVec::GetType()
 {
     return 5;
 }
 
-// FUN_06f26460 (06f26460-06f264c6).
+// FUN_06f26460.
 void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                                      unsigned int ObjectId, bool bNoCruise, bool bCruise)
 {
@@ -533,14 +522,14 @@ void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, flo
 // 6 Trail, 7 Follow
 // ---------------------------------------------------------------------------------------
 
-// Factory case 6 (06f24f2b-06f24f74): +0x128 name emptied.
+// Inlined in factory case 6.
 FObjListTrail::FObjListTrail()
 {
     ClearName(&TargetName);
 }
 
-// LAB_06f27520 (06f27520-06f275a5): vtbl[+4] (result unused), TargetName -> TargetId (a miss
-// finishes the directive), priority default, FUN_06f57c60.
+// LAB_06f27520. Retail calls vtbl +4 (IsNpcShip) and drops the result. A name that does not
+// resolve finishes the directive.
 bool FObjListTrail::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -558,34 +547,33 @@ bool FObjListTrail::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f275d0 (06f275d0-06f2764f).
+// FUN_06f275d0.
 void FObjListTrail::Parse(INI_Reader* Reader)
 {
     TargetName = Reader->get_value_string(0);
     Op.TrailDistance = static_cast<float>(Reader->get_value_int(1));
 }
 
-// 06f250c0: MOV EAX,6.
+// 06f250c0.
 int FObjListTrail::GetType()
 {
     return 6;
 }
 
-// FUN_06f275b0 (06f275b0-06f275c6).
+// FUN_06f275b0.
 void FObjListTrail::SetTarget(unsigned int const* TargetId, float Distance)
 {
     Op.TargetId = *TargetId;
     Op.TrailDistance = Distance;
 }
 
-// Factory case 7 (06f24aa6-06f24aff): +0x110 name emptied.
+// Inlined in factory case 7.
 FObjListFollow::FObjListFollow()
 {
     ClearName(&TargetName);
 }
 
-// LAB_06f27340 (06f27340-06f273f1): TargetName -> TargetId (a miss finishes the directive),
-// priority default, mute, FUN_06f57c60.
+// LAB_06f27340. A name that does not resolve finishes the directive.
 bool FObjListFollow::Execute(FContentShipBase* Ship)
 {
     if (TargetName.Length != 0)
@@ -603,8 +591,7 @@ bool FObjListFollow::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f27400 (06f27400-06f27512). FollowDistance = int value 1; exactly -1.0 becomes
-// 2500.0 (DAT_06fb8e2c; `FCOMP -1.0; TEST AH,0x44; JP` skips unless equal).
+// FUN_06f27400. FollowDistance is read as an int; exactly -1.0 becomes 2500.0 (DAT_06fb8e2c).
 void FObjListFollow::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
@@ -622,7 +609,7 @@ void FObjListFollow::Parse(INI_Reader* Reader)
         Op.Field_20 = static_cast<float>(Reader->get_value_int(5));
 }
 
-// 06f250d0: MOV EAX,7.
+// 06f250d0.
 int FObjListFollow::GetType()
 {
     return 7;
@@ -632,15 +619,14 @@ int FObjListFollow::GetType()
 // 8 Guide, 9 GuideShip
 // ---------------------------------------------------------------------------------------
 
-// Factory case 8 (06f24b06-06f24b5f): +0x1cc name emptied.
+// Inlined in factory case 8.
 FObjListGuide::FObjListGuide()
 {
     ClearName(&TargetName);
 }
 
-// LAB_06f266a0 (06f266a0-06f26763): vtbl[+4] (result unused); TargetName -> GotoParams
-// Field_5C (a miss finishes the directive); FollowParams.TargetId = Field_5C; priority
-// default, mute, FUN_06f57c60.
+// LAB_06f266a0. Retail calls vtbl +4 and drops the result. A name that does not resolve
+// finishes the directive.
 bool FObjListGuide::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -660,7 +646,7 @@ bool FObjListGuide::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f26810 (06f26810-06f26a8b).
+// FUN_06f26810.
 void FObjListGuide::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
@@ -694,15 +680,13 @@ void FObjListGuide::Parse(INI_Reader* Reader)
         bNoFailOnTimeout = Reader->get_value_int(19);
 }
 
-// 06ee99a0: MOV EAX,5.
+// 06ee99a0.
 int FObjListGuide::GetType()
 {
     return 5;
 }
 
-// FUN_06f26770 (06f26770-06f2680a): Field_0C = 1, the destination, Field_50, Field_58,
-// Field_5C, the cruise flags, Field_60 = 200.0, Field_64 = 500.0; FollowParams target and
-// offset; Field_A0.
+// FUN_06f26770.
 void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowOffset,
                              Vector const* Destination, float Range, bool bNoCruise,
                              bool bCruise, bool bStartFollowing, bool Field58)
@@ -723,18 +707,15 @@ void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowO
     Op.Field_A0 = bStartFollowing ? 1 : 0;
 }
 
-// Factory case 9 (06f24b66-06f24bcb): +0x1cc and +0x200 names emptied.
+// Inlined in factory case 9.
 FObjListGuideShip::FObjListGuideShip()
 {
     ClearName(&ObjectName);
     ClearName(&TargetName);
 }
 
-// LAB_06f26a90 (06f26a90-06f26ba9): vtbl[+4] (result unused); TargetName (+0x200) ->
-// GotoParams.Field_5C, ObjectName (+0x1cc) -> GotoParams.Field_1C, no Length test (an empty
-// name resolves to 0); either miss finishes the directive (true). FollowParams.TargetId =
-// Field_5C; priority default; GetLocation of Field_1C into locals that nothing reads;
-// mute; FUN_06f57c60.
+// LAB_06f26a90. Retail calls vtbl +4 and drops the result. No Length test here: an empty name
+// resolves to 0 and finishes the directive. The GetLocation result is never read.
 bool FObjListGuideShip::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -762,7 +743,7 @@ bool FObjListGuideShip::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f26bb0 (06f26bb0-06f26e51). Field_0C = 0 (the goto target is an object).
+// FUN_06f26bb0. Field_0C = 0 (the goto target is an object).
 void FObjListGuideShip::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
@@ -794,7 +775,7 @@ void FObjListGuideShip::Parse(INI_Reader* Reader)
         bNoFailOnTimeout = Reader->get_value_int(17);
 }
 
-// 06ee99a0: MOV EAX,5.
+// 06ee99a0.
 int FObjListGuideShip::GetType()
 {
     return 5;
@@ -804,15 +785,14 @@ int FObjListGuideShip::GetType()
 // 0xa Face
 // ---------------------------------------------------------------------------------------
 
-// Factory case 0xa (06f24cda-06f24d27): +0x154 name emptied.
+// Inlined in factory case 0xa.
 FObjListFace::FObjListFace()
 {
     ClearName(&TargetName);
 }
 
-// LAB_06f27150 (06f27150-06f271de): vtbl[+4] (result unused); an object face (Mode 1)
-// with a name resolves TargetId (a miss finishes the directive); priority default,
-// FUN_06f57c60.
+// LAB_06f27150. Retail calls vtbl +4 and drops the result. A name that does not resolve
+// finishes the directive.
 bool FObjListFace::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -830,9 +810,7 @@ bool FObjListFace::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// LAB_06f271f0 (06f271f0-06f2733b): value 0 "OBJECT" -> Mode 1, "POINT" -> 2 (stricmp,
-// otherwise unchanged); OBJECT: name = value 1, Field_44 = bool value 2 when present;
-// POINT: FacePoint = float values 1-3, Field_44 = bool value 4 when present.
+// LAB_06f271f0. Any other mode name leaves Mode.
 void FObjListFace::Parse(INI_Reader* Reader)
 {
     if (_stricmp(Reader->get_value_string(0), "OBJECT") == 0)
@@ -856,7 +834,7 @@ void FObjListFace::Parse(INI_Reader* Reader)
         Op.Field_44 = Reader->get_value_bool(4) ? 1 : 0;
 }
 
-// 06f25070: MOV EAX,0xa.
+// 06f25070.
 int FObjListFace::GetType()
 {
     return 0xa;
@@ -866,8 +844,8 @@ int FObjListFace::GetType()
 // 0xb SetLifeTime, 0xc SetPriority
 // ---------------------------------------------------------------------------------------
 
-// LAB_06f282e0 (06f282e0-06f2837f): vtbl[+4] twice (the first result unused); an NPC ship
-// gets +0x1bc = +0x1c8 = (float)LifeTime, and so do its formation mates; FUN_06f57b00; true.
+// LAB_06f282e0: NPC +0x1bc / +0x1c8, also on the formation mates. Retail calls vtbl +4 twice
+// and drops the first result.
 bool FObjListSetLifeTime::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -898,19 +876,19 @@ bool FObjListSetLifeTime::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// FUN_06f28390 (06f28390-06f283a6).
+// FUN_06f28390.
 void FObjListSetLifeTime::Parse(INI_Reader* Reader)
 {
     LifeTime = Reader->get_value_int(0);
 }
 
-// 06f250e0: MOV EAX,0xb.
+// 06f250e0.
 int FObjListSetLifeTime::GetType()
 {
     return 0xb;
 }
 
-// FUN_06f28260 (06f28260-06f2827d): FUN_06f57c90(&Priority), FUN_06f57b00, true.
+// FUN_06f28260 (SetPriority = FUN_06f57c90).
 bool FObjListSetPriority::Execute(FContentShipBase* Ship)
 {
     Ship->SetPriority(&Priority);
@@ -918,7 +896,7 @@ bool FObjListSetPriority::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// FUN_06f28280 (06f28280-06f282db): "NORMAL" -> 1, "ALWAYS_EXECUTE" -> 0, else unchanged.
+// FUN_06f28280.
 void FObjListSetPriority::Parse(INI_Reader* Reader)
 {
     if (_stricmp(Reader->get_value_string(0), "NORMAL") == 0)
@@ -930,7 +908,7 @@ void FObjListSetPriority::Parse(INI_Reader* Reader)
         Priority = 0;
 }
 
-// 06f250b0: MOV EAX,0xc.
+// 06f250b0.
 int FObjListSetPriority::GetType()
 {
     return 0xc;
@@ -942,11 +920,9 @@ int FObjListSetPriority::GetType()
 
 namespace
 {
-    // LAB_06f27cb0 / LAB_06f27fa0 (identical bodies). Mode == 1 calls FUN_06eeaee0
-    // (06f27cdb / 06f27fcb) on the op's two box corners (BoxMax minus BoxMin, i.e.
-    // directive +0x13c - +0x130) into a local nothing reads. The object name, when set, gives
-    // TargetId; a miss finishes the directive. Priority default; SubmitState on the ship and
-    // its formation mates; FUN_06f57b00; true.
+    // LAB_06f27cb0 / LAB_06f27fa0 (identical bodies). Mode 1 computes BoxMax - BoxMin
+    // (FUN_06eeaee0) into a local nothing reads. A name that does not resolve finishes the
+    // directive.
     bool ExecuteZone(FContentShipBase* Ship, pub::AI::SetZoneBehaviorParams* Op,
                      TString<0x30> const* ObjectName)
     {
@@ -972,10 +948,8 @@ namespace
         return true;
     }
 
-    // LAB_06f27df0 / LAB_06f280a0 after their first store (InvertMode = 0 / 1). Six values
-    // (value 5 present): Mode = 1 and six floats at op +0x24..+0x38 (BoxMin, BoxMax). Then
-    // value 3 present: Mode = 0, three ints -> TargetPoint and one -> Radius;
-    // absent: Mode = 2, a name -> ObjectName and an int -> Radius. The value after
+    // LAB_06f27df0 / LAB_06f280a0 after their first store (InvertMode = 0 / 1): a box (Mode
+    // 1, op +0x24..+0x38), then a sphere (Mode 0) or a named object (Mode 2). The value after
     // them, when present and false, sets InvertMode = 2.
     void ParseZone(INI_Reader* Reader, pub::AI::SetZoneBehaviorParams* Op,
                    TString<0x30>* ObjectName)
@@ -992,8 +966,8 @@ namespace
             Op->BoxMax.z = Reader->get_value_float(5);
             Index = 6;
         }
-        // Retail quirk (content.dll 0x06F27E7E): retail falls directly into is_value_empty(3)
-        // without an else branch. Preserved verbatim.
+        // Retail quirk (06f27e7e): the box is followed by the is_value_empty(3) test, not
+        // an else branch, so slot 3 decides the mode even after a box.
         if (!Reader->is_value_empty(3))
         {
             Op->Mode = 0;
@@ -1015,7 +989,7 @@ namespace
     }
 }
 
-// Factory case 0xd (06f24e83-06f24ed0): +0x14c name emptied.
+// Inlined in factory case 0xd.
 FObjListStayInRange::FObjListStayInRange()
 {
     ClearName(&ObjectName);
@@ -1032,13 +1006,13 @@ void FObjListStayInRange::Parse(INI_Reader* Reader)
     ParseZone(Reader, &Op, &ObjectName);
 }
 
-// 06f250f0: MOV EAX,0xd.
+// 06f250f0.
 int FObjListStayInRange::GetType()
 {
     return 0xd;
 }
 
-// FUN_06f27db0 (06f27db0-06f27de4).
+// FUN_06f27db0.
 void FObjListStayInRange::SetSphere(Vector const* Center, float Radius)
 {
     Op.TargetPoint.x = Center->x;
@@ -1049,7 +1023,7 @@ void FObjListStayInRange::SetSphere(Vector const* Center, float Radius)
     Op.InvertMode = 0;
 }
 
-// Factory case 0xe (06f24ed7-06f24f24): +0x14c name emptied.
+// Inlined in factory case 0xe.
 FObjListStayOutOfRange::FObjListStayOutOfRange()
 {
     ClearName(&ObjectName);
@@ -1066,7 +1040,7 @@ void FObjListStayOutOfRange::Parse(INI_Reader* Reader)
     ParseZone(Reader, &Op, &ObjectName);
 }
 
-// 06f25100: MOV EAX,0xe.
+// 06f25100.
 int FObjListStayOutOfRange::GetType()
 {
     return 0xe;
@@ -1076,10 +1050,8 @@ int FObjListStayOutOfRange::GetType()
 // 0xf MakeNewFormation, 0x10 FollowPlayer, 0x11 BreakFormation, 0x12 CancelObjective
 // ---------------------------------------------------------------------------------------
 
-// LAB_06f283b0 (06f283b0-06f28555): vtbl[+4] (result unused); a local list of ships; with
-// a system: the ship, then every named object found by nickname (FUN_06f739c0) that is not
-// the ship, after FUN_06f57740 on it; FUN_06f66ec0(&list, Formation, bAddFollowers).
-// FUN_06f57b00 either way; true.
+// LAB_06f283b0 (FindSpaceObjByNickname = FUN_06f739c0, FormFormation = FUN_06f66ec0). Retail
+// calls vtbl +4 and drops the result.
 bool FObjListMakeNewFormation::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -1106,10 +1078,8 @@ bool FObjListMakeNewFormation::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// LAB_06f28560 (06f28560-06f28831): the formation by CreateID(value 0) (FUN_06efd1a0); none
-// -> stop. FUN_06efcaf0 / FUN_06efcac0 are called and their counts dropped. Then from value 1
-// until an empty value: "ADD_FOLLOWERS" sets the flag, anything else (also "Player") is
-// appended to the names.
+// LAB_06f28560 (FindFormation = FUN_06efd1a0). The two slot counts (FUN_06efcaf0 /
+// FUN_06efcac0) are dropped. "Player" is appended to the names like any other.
 void FObjListMakeNewFormation::Parse(INI_Reader* Reader)
 {
     bAddFollowers = false;
@@ -1133,30 +1103,25 @@ void FObjListMakeNewFormation::Parse(INI_Reader* Reader)
     }
 }
 
-// 06f25110: MOV EAX,0xf.
+// 06f25110.
 int FObjListMakeNewFormation::GetType()
 {
     return 0xf;
 }
 
-// FUN_06f28840 (06f28840-06f28ad2). vtbl[+4] (result unused); retail also builds a local list
-// (head 06f2887f) holding only the ship (FUN_06f1e390 at 06f288b6) that nothing reads, freed
-// after FUN_06f57b00 (06f28a57-06f28ab4; unwind state 0, funclet 06fae450): the port holds it
-// as the same local (RE rule 13). The leader slot is the last
+// FUN_06f28840. Retail calls vtbl +4 and drops the result, and builds a local list holding
+// only the ship that nothing reads; the port keeps that local. The leader slot is the last
 // slot when FUN_06efccd0 says it is the player's (no range check: an empty formation reads
-// slot -1), else -1. Each named object (FUN_06f739c0 on the ship's system, not null-checked)
-// that is not the ship: out of its old formation first (slot +0x14c != 0 and group +0x154
-// != -1 -> FUN_06f67090); a DirectiveFollowOp on the ship at 1000.0 with the offset
-// slot(n) - slot(leader) (FUN_06efcb20; n counts the members found); FUN_06f57740, priority
-// default, FUN_06f57c60 -> the result. FUN_06f57b00; returns the last SubmitDirective result
-// (true without members).
+// slot -1), else -1. Neither Formation nor the ship's system is null-checked. Each member
+// follows the ship at 1000.0 with the offset slot(n) - slot(leader) (FUN_06efcb20). Returns
+// the last SubmitDirective result (true without members).
 bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
     bool bResult = true;
-    std::list<FContentShipBase*> UnusedShips;                           // 06f2887f
+    std::list<FContentShipBase*> UnusedShips;
     FSystemInfo* System = Ship->GetSystem();
-    UnusedShips.push_back(Ship);                                        // 06f288b6
+    UnusedShips.push_back(Ship);
 
     int SlotCount = static_cast<int>(Formation->Slots.size());
     int LeaderSlot = -1;
@@ -1194,8 +1159,7 @@ bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
     return bResult;
 }
 
-// LAB_06f28ae0 (06f28ae0-06f28d68): the formation by CreateID(value 0); none, or no slots ->
-// stop. Values 1 .. slot count + 1 that are present are appended to the names.
+// LAB_06f28ae0: values 1 .. slot count + 1 that are present are appended to the names.
 void FObjListFollowPlayer::Parse(INI_Reader* Reader)
 {
     unsigned int FormationId = CreateID(Reader->get_value_string(0));
@@ -1213,13 +1177,13 @@ void FObjListFollowPlayer::Parse(INI_Reader* Reader)
     }
 }
 
-// 06f25110: MOV EAX,0xf.
+// 06f25110 (shared with MakeNewFormation, so FollowPlayer reports 0xf).
 int FObjListFollowPlayer::GetType()
 {
     return 0xf;
 }
 
-// FUN_06f28d70 (06f28d70-06f28d88): FUN_06f67090(ship), FUN_06f57b00, true.
+// FUN_06f28d70 (RemoveFromFormation = FUN_06f67090).
 bool FObjListBreakFormation::Execute(FContentShipBase* Ship)
 {
     RemoveFromFormation(Ship);
@@ -1227,14 +1191,13 @@ bool FObjListBreakFormation::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// 06f25120: MOV EAX,0x11.
+// 06f25120.
 int FObjListBreakFormation::GetType()
 {
     return 0x11;
 }
 
-// FUN_06f28d90 (06f28d90-06f28dc5): outside a formation (+0x154 == -1) FUN_06f57740, else
-// FUN_06f67090(ship); FUN_06f57b00; true.
+// FUN_06f28d90 (CancelDirectives = FUN_06f57740).
 bool FObjListCancelObjective::Execute(FContentShipBase* Ship)
 {
     if (Ship->FormationId == 0xffffffffu)
@@ -1245,7 +1208,7 @@ bool FObjListCancelObjective::Execute(FContentShipBase* Ship)
     return true;
 }
 
-// 06f25130: MOV EAX,0x12.
+// 06f25130.
 int FObjListCancelObjective::GetType()
 {
     return 0x12;
@@ -1255,14 +1218,13 @@ int FObjListCancelObjective::GetType()
 // 0x13 Dock, 0x14 InstantTradelane, 0x15 Launch
 // ---------------------------------------------------------------------------------------
 
-// Factory case 0x13 (06f249f2-06f24a4b): +0x138 name emptied.
+// Inlined in factory case 0x13.
 FObjListDock::FObjListDock()
 {
     ClearName(&ObjectName);
 }
 
-// FUN_06f27660 (06f27660-06f276de): ObjectName -> Field_1C (a miss finishes the directive);
-// priority default; FUN_06f57c60.
+// FUN_06f27660. A name that does not resolve finishes the directive.
 bool FObjListDock::Execute(FContentShipBase* Ship)
 {
     if (ObjectName.Length != 0)
@@ -1279,9 +1241,7 @@ bool FObjListDock::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// LAB_06f27710 (06f27710-06f27823): DockObjectId = GetNicknameId(value 0); no value 1 ->
-// Field_10 = 0; "NONE" -> 0 (the stricmp result), else GetNicknameId(value 1); no value 2 ->
-// stop; ObjectName = value 2, Field_20 / Field_24 = int values 3 / 4.
+// LAB_06f27710.
 void FObjListDock::Parse(INI_Reader* Reader)
 {
     Op.DockObjectId = pub::GetNicknameId(Reader->get_value_string(0));
@@ -1301,21 +1261,20 @@ void FObjListDock::Parse(INI_Reader* Reader)
     Op.Field_24 = static_cast<float>(Reader->get_value_int(4));
 }
 
-// 06f250a0: MOV EAX,0x13.
+// 06f250a0.
 int FObjListDock::GetType()
 {
     return 0x13;
 }
 
-// FUN_06f276f0 (06f276f0-06f27708).
+// FUN_06f276f0.
 void FObjListDock::SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId)
 {
     Op.DockObjectId = *DockObjectId;
     Op.Field_10 = static_cast<int32_t>(*NextRingId);
 }
 
-// LAB_06f27830 (06f27830-06f27866): vtbl[+4] (result unused), priority default,
-// FUN_06f57c60.
+// LAB_06f27830. Retail calls vtbl +4 and drops the result.
 bool FObjListInstantTradelane::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -1323,7 +1282,7 @@ bool FObjListInstantTradelane::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// LAB_06f278a0 (06f278a0-06f278fc).
+// LAB_06f278a0.
 void FObjListInstantTradelane::Parse(INI_Reader* Reader)
 {
     Op.TradeLaneId = pub::GetNicknameId(Reader->get_value_string(0));
@@ -1335,13 +1294,13 @@ void FObjListInstantTradelane::Parse(INI_Reader* Reader)
     Op.Field_10 = static_cast<int32_t>(pub::GetNicknameId(Reader->get_value_string(1)));
 }
 
-// 06f250a0: MOV EAX,0x13.
+// 06f250a0 (Dock's body, so InstantTradelane reports 0x13).
 int FObjListInstantTradelane::GetType()
 {
     return 0x13;
 }
 
-// FUN_06f27870 (06f27870-06f27892).
+// FUN_06f27870.
 void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned int OffsetBits,
                                        unsigned int const* NextRingId)
 {
@@ -1350,10 +1309,8 @@ void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned
     Op.Field_14 = static_cast<int32_t>(OffsetBits);
 }
 
-// LAB_06f27970 (06f27970-06f279ff): vtbl[+4] (result unused); without a launch object or
-// with Field_10 == -1, FUN_06f6eca0(&ship id, &LaunchObjectId, &Field_10, &Field_14) picks
-// one (false -> return false); priority default; FUN_06f6dff0(ship id, 0, 0, 0);
-// FUN_06f57c60.
+// LAB_06f27970. Retail calls vtbl +4 and drops the result. Without a launch object (or dock
+// index -1) GetShipDockingTarget (FUN_06f6eca0) picks one. SetDockEquipment = FUN_06f6dff0.
 bool FObjListLaunch::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -1370,9 +1327,7 @@ bool FObjListLaunch::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// LAB_06f27a40 (06f27a40-06f27b74): LaunchObjectId = GetNicknameId(value 0), Field_10 = int
-// value 1, Field_14 from value 2: NONE 0, BERTH 1, PAD 2, MOOR_SMALL 3, MOOR_MEDIUM 4,
-// MOOR_LARGE 5, RING 6, JUMP_GATE 7, else unchanged.
+// LAB_06f27a40. An unknown terminal type leaves Field_14.
 void FObjListLaunch::Parse(INI_Reader* Reader)
 {
     Op.LaunchObjectId = pub::GetNicknameId(Reader->get_value_string(0));
@@ -1396,13 +1351,13 @@ void FObjListLaunch::Parse(INI_Reader* Reader)
         Op.Field_14 = 7;
 }
 
-// 06f25090: MOV EAX,0x15.
+// 06f25090.
 int FObjListLaunch::GetType()
 {
     return 0x15;
 }
 
-// FUN_06f27a10 (06f27a10-06f27a30).
+// FUN_06f27a10.
 void FObjListLaunch::SetLaunch(unsigned int const* LaunchObjectId, int DockIndex, int TerminalType)
 {
     Op.LaunchObjectId = *LaunchObjectId;
@@ -1414,17 +1369,15 @@ void FObjListLaunch::SetLaunch(unsigned int const* LaunchObjectId, int DockIndex
 // 0x16 WaitForPlayerManeuver, 0x19 TractorBeam
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f25140 (06f25140-06f25199).
+// FUN_06f25140.
 FObjListWaitForPlayerManeuver::FObjListWaitForPlayerManeuver()
 {
     BehaviorName[0] = '\0';
 }
 
-// LAB_06f27b80 (06f27b80-06f27c7d): vtbl[+4] (result unused); the id of "Player" (a local
-// TString, FUN_06f73ac0 on the ship's system, 0 without one); 0 -> true (the directive stays
-// current). A player in behavior 10 (pub::AI::get_behavior_id) whose ship (FUN_06f49bc0 ->
-// +0x10, the state is not null-checked) shares the ship's +0x154 finishes the directive
-// (FUN_06f57b00, true). Else priority default and FUN_06f57c60.
+// LAB_06f27b80. Retail calls vtbl +4 and drops the result. No player: the directive stays
+// current. A player in formation behaviour (10) in the ship's formation (+0x154) finishes it;
+// the player state (FUN_06f49bc0) is not null-checked.
 bool FObjListWaitForPlayerManeuver::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
@@ -1446,33 +1399,32 @@ bool FObjListWaitForPlayerManeuver::Execute(FContentShipBase* Ship)
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f27c80 (06f27c80-06f27caa): strcpy(+0x11c, value 0) (unbounded, as retail), then
-// the op's name pointer at it.
+// FUN_06f27c80. The strcpy is unbounded, as retail.
 void FObjListWaitForPlayerManeuver::Parse(INI_Reader* Reader)
 {
     strcpy(BehaviorName, Reader->get_value_string(0));
     Op.BehaviorName = BehaviorName;
 }
 
-// 06f251a0: MOV EAX,0x16.
+// 06f251a0.
 int FObjListWaitForPlayerManeuver::GetType()
 {
     return 0x16;
 }
 
-// LAB_06f28dd0 (06f28dd0-06f28de0): FUN_06f57c60 without the priority default.
+// LAB_06f28dd0: no priority default here.
 bool FObjListTractorBeam::Execute(FContentShipBase* Ship)
 {
     return Ship->SubmitDirective(&Op);
 }
 
-// 06eea870: MOV EAX,0x19.
+// 06eea870.
 int FObjListTractorBeam::GetType()
 {
     return 0x19;
 }
 
-// FUN_06f28df0 (06f28df0-06f28e04).
+// FUN_06f28df0.
 void FObjListTractorBeam::SetTarget(unsigned int TargetId, bool Field10)
 {
     Op.TargetId = TargetId;

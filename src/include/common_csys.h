@@ -8,7 +8,7 @@
 
 #include "common_exports.h"
 
-// Common.dll Csys — listing RVA 0x1170 / 0xa7490 (Common.dll.txt).
+// Common.dll Csys — listing RVA 0x1170 / 0xa7490.
 // Layout: Vector @ +0, Matrix @ +0xC, sizeof 0x30. Transform is Matrix then Vector.
 // trans_from_frame / trans_to_frame / get_inverse / operator* go through I3DMathEngine
 // (Acquire3DMathEngine), as retail does.
@@ -101,21 +101,21 @@ inline void MatrixSetIdentity(Matrix& Out)
 }
 void CsysFromPosOrient(Csys& Out, float const* Pos3, float const* Orient9);
 
-// Common.dll.c 0xa38b0. Orthonormal 3x3: column 2 = -normalize(Dir).
+// 0x063038b0. Orthonormal 3x3: column 2 = -normalize(Dir).
 COMMON_API Matrix __cdecl LookMatrix(Vector const& Direction);
 
-// Common.dll.c 0xa3a60, ?LookMatrixYup@@YA?AVMatrix@@ABVVector@@@Z. The Y-up sibling of
+// 0x06303a60, ?LookMatrixYup@@YA?AVMatrix@@ABVVector@@@Z. The Y-up sibling of
 // LookMatrix: column 2 is -normalize(Direction), column 1 is the perpendicular that keeps Y
 // up, column 0 closes the right-handed basis. Retail picks its reference axis from X and Z
 // (LookMatrix uses X and Y) and compares the SQUARED length against 1e-4 before the sqrt.
 COMMON_API Matrix __cdecl LookMatrixYup(Vector const& Direction);
 
-// Common.dll.txt:06307900, ?DALib_Engine_get_csys@@YA?AVCsys@@J@Z. The engine instance's
+// 0x06307900, ?DALib_Engine_get_csys@@YA?AVCsys@@J@Z. The engine instance's
 // transform (slot 40, +0xa0) repackaged as a Csys. Retail dereferences the returned
 // transform without a null check.
 COMMON_API Csys __cdecl DALib_Engine_get_csys(long Handle);
 
-// Common.dll.txt:06303c10, ?GetDirectionMatrix@@YA?AVMatrix@@ABVTransform@@ABVVector@@@Z.
+// 0x06303c10, ?GetDirectionMatrix@@YA?AVMatrix@@ABVTransform@@ABVVector@@@Z.
 // Orthonormal basis whose column 2 points from Target back to the transform. Column 1 is
 // normally the transform's own column 1 orthogonalised against that direction; when the
 // two are (exactly) parallel retail falls back to column 0 -- see docs/re/deviations.md
@@ -123,63 +123,23 @@ COMMON_API Csys __cdecl DALib_Engine_get_csys(long Handle);
 // when the two positions coincide.
 COMMON_API Matrix __cdecl GetDirectionMatrix(Transform const& Xform, Vector const& Target);
 
-// Common.dll.c 0x62d3af0 (unnamed static helper, no decorated export -- Ghidra
-// recovered no symbol; called from 12 sites across IBehaviorManager and other
-// steering/physics code, e.g. IBehaviorManager::update_current_behavior_direction).
-// Retail signature is thiscall `void(Matrix const* this, Vector* Out)`, writing
-// Out->x/y/z = this->E[0][2]/E[1][2]/E[2][2] -- the RAW column 2 of an orthonormal
-// 3x3, with NO sign flip. Contrast with the many already-inlined "Forward =
-// -E[*][2]" sites elsewhere in this port (common_cobject.cpp, common_cequip.cpp,
-// common_aisteer.cpp), which negate column 2 for a forward-facing convention;
-// this helper does not negate. Ported as a plain by-value accessor.
-// Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
-Vector __cdecl MatrixColumn2(Matrix const& M);
-
-// Common.dll.c 0x62e0480 (FUN_062e0480, another unnamed static helper of the same
-// family as MatrixColumn2, distinct compiled instance -- 6 call sites near
-// FUN_062dffd0/IBehaviorManager steering code). Retail: thiscall
-// `void(Matrix const* this, Vector* Out)`, MSVC hidden-return-pointer convention
-// (EAX = Out on exit). Writes Out->x/y/z = this->E[0][0]/E[1][0]/E[2][0] -- raw
-// column 0, no sign flip. Ported as a plain by-value accessor, same style as
-// MatrixColumn2.
-// Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
-Vector __cdecl MatrixColumn0(Matrix const& M);
-
-// Common.dll.c 0x62e04a0 (FUN_062e04a0), raw disasm Common.dll.txt:232875-232888.
-// Third member of the MatrixColumn0/1/2 accessor family -- same thiscall/hidden-
-// return-pointer convention, this one reading raw column 1 (E[0][1]/E[1][1]/
-// E[2][1], no sign flip). Previously left `simplified` (decomp-tracker item
-// 1717) for lack of a concrete caller to attach it to; resolved while porting
-// FUN_062e1f40/FUN_062e0a60 (src/Common/common_aisteer.cpp), which both call it
-// via the already-ported MatrixColumn0/MatrixColumn2 pattern.
-// Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
-Vector __cdecl MatrixColumn1(Matrix const& M);
-
-// Common.dll.c 0x62e3710 (FUN_062e3710). Tiny __thiscall thunk (8 instructions,
-// verified directly against the raw disassembly -- no decompiler corruption):
-//   MOV EAX,[ESP+4]; MOV EDX,[EAX]; MOV [ECX+8],EDX;
-//   MOV EDX,[EAX+4]; MOV [ECX+0x14],EDX; MOV EAX,[EAX+8]; MOV [ECX+0x20],EAX; RET 4
-// i.e. `this` (ECX) = Matrix*, stack arg = a 3-float source vector; writes
-// Src.x/y/z into E[0][2]/E[1][2]/E[2][2] -- the setter counterpart of
-// MatrixColumn2 above (offsets +8/+0x14/+0x20 are exactly that column, row
-// stride 0xC). Sole caller is FUN_062e3460, an unported "build a heading-
-// constrained orientation matrix" helper in the AISTEER cluster
-// (src/include/common_aisteer.h, 0x062d6000-0x062e3000 header note) that
-// fills columns 0/1 of the same Matrix from two other basis vectors and then
-// calls this to fill in column 2; also reachable transitively from
-// FUN_062e3730 and the large, currently-blocked FUN_062e37e0 steering
-// function. Ported standalone since its own behavior is unambiguous
-// regardless of the caller's still-unresolved surrounding math.
-// Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
+// The MatrixColumn0/1/2 accessors and MatrixSetColumn2 are unexported Common.dll-internal
+// helpers (retail thiscall on the Matrix with a hidden return pointer). They read or write
+// a raw column with no sign flip -- unlike the many inlined "Forward = -E[*][2]" sites.
+Vector __cdecl MatrixColumn2(Matrix const& M);  // FUN_062d3af0, ~12 callers
+Vector __cdecl MatrixColumn0(Matrix const& M);  // FUN_062e0480
+Vector __cdecl MatrixColumn1(Matrix const& M);  // FUN_062e04a0
+// FUN_062e3710 (RET 4): writes Src into E[0][2]/E[1][2]/E[2][2]. Caller
+// BuildPerpendicularFrame (FUN_062e3460).
 void __cdecl MatrixSetColumn2(Matrix& M, Vector const& Src);
 
-// Common.dll.txt:06303fe0, ?RotateMatrix@@YA?AVMatrix@@ABVVector@@@Z. Euler angles in
+// 0x06303fe0, ?RotateMatrix@@YA?AVMatrix@@ABVVector@@@Z. Euler angles in
 // DEGREES, but composed in a different order from EulerMatrix: Ry * Rx * Rz, and each
 // axis whose angle is within 0.01 degrees of zero is skipped entirely (its multiply does
 // not run at all, so no rounding creeps in).
 COMMON_API Matrix __cdecl RotateMatrix(Vector const& AnglesDegrees);
 
-// Common.dll.c 0xa4230, ?EulerMatrix@@YA?AVMatrix@@ABVVector@@@Z. Euler angles in DEGREES
+// 0x06304230, ?EulerMatrix@@YA?AVMatrix@@ABVVector@@@Z. Euler angles in DEGREES
 // (pitch = x, yaw = y, roll = z), converted with 0.017453292f.
 COMMON_API Matrix __cdecl EulerMatrix(Vector const& AnglesDegrees);
 
@@ -190,10 +150,7 @@ COMMON_API Csys __cdecl Csys_interpolate(Csys A, Csys B, float T);
 COMMON_API void __cdecl DALib_Engine_set_csys(long Handle, Csys const& InCsys);
 
 // Returns x86math.dll's 3DMathEngine singleton (DACOM CreateInstance by component name).
-// The return type used to be void*, so all 113 call sites in the tree had to cast it
-// back; the interface itself has been public in src/include/x86math.h since the x86math
-// port closed. Forward-declared rather than included so this header keeps its own
-// include set.
+// The interface is in x86math.h, forward-declared here.
 //
 // Not exported: retail Common.dll's copy is the unexported FUN_06391cf0, and freelancer.exe
 // carries its own (FUN_005b73e0, defined in src/freelancer/Client/engine_init.cpp). This

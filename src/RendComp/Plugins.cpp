@@ -29,8 +29,7 @@ static int IrcHandleOk(void* Handle)
     return 1;
 }
 
-// LAB_06c215a0 after PUSH ESI: switch [ESP+0x14] = 3rd stdcall arg after this (A),
-// flags [ESP+0x18] = B, Out [ESP+0x20] = D. Header names 2nd arg Mode; that slot is Lod.
+// LAB_06c215a0's QueryGeometry test: the mode is argument A, the flags B, the out pointer D.
 static int IrcSlot12CanWrite(int QueryMode, unsigned long Flags, void* Out)
 {
     if (QueryMode != 0 && QueryMode != 2 && QueryMode != 3)
@@ -46,7 +45,7 @@ static int IrcSlot12CanWrite(int QueryMode, unsigned long Flags, void* Out)
 
 class FTriMeshAnim;
 
-// DAT_06c37cac (five dwords, written at 06c2967b / read back at 06c29805): the archetype's
+// DAT_06c37cac (five dwords): the archetype's
 // texcoord-0 stream (+0x5C) saved while a TriMesh instance with a UV0 track draws.
 static FRpVertexStream G_TriMeshSavedUv0;
 
@@ -114,13 +113,11 @@ public:
         return Count;
     }
 
-    // formerly Slot4
     int DACOM_API CloneHandle(void* /*Handle*/) override
     {
         return (int)G_HandleFail;
     }
 
-    // formerly Slot6
     int DACOM_API QueryHandle(void* Handle, const char* Iid, void** Out) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -129,7 +126,6 @@ public:
         return Object->QueryInterface(Iid, Out);
     }
 
-    // formerly Slot7
     int DACOM_API CreateMeshInstance(void* /*InstId*/, void* Handle) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -137,20 +133,17 @@ public:
         return 1;
     }
 
-    // formerly Slot8
     int DACOM_API DestroyMeshInstance(void* InstId, void* /*Handle*/) override
     {
         DropInstance(InstId);
         return 0;
     }
 
-    // formerly Slot9
     int DACOM_API UpdateMeshInstance(void* /*InstId*/, void* /*Arg*/) override
     {
         return 0;
     }
 
-    // formerly Slot10
     int DACOM_API QueryMeshInstance(void* InstId, void* /*Handle*/, const char* Iid, void** Out) override
     {
         LookupCount += 1;
@@ -160,13 +153,11 @@ public:
         return (TriMeshAnimQueryInterface(Anim, Iid, Out) >= 0) ? 0 : -1;
     }
 
-    // formerly Slot11
     int DACOM_API UpdateMeshInstances(void* /*InstId*/) override
     {
         return 0;
     }
 
-    // formerly Slot12
     int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
                          void* /*E*/) override
     {
@@ -179,7 +170,6 @@ public:
         return 1;
     }
 
-    // formerly Slot13
     int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* /*Out*/) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -187,7 +177,6 @@ public:
         return 1;
     }
 
-    // formerly Slot14
     int DACOM_API GetCentroid(void* Handle, float /*Lod*/, void* /*Out*/) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -195,8 +184,7 @@ public:
         return 1;
     }
 
-    // SphereMesh LAB_06c29bc0: invalid handle → AL=0; else FUN_06c2aef0 (always -1) → AL=0.
-    // formerly Slot15
+    // As SphereMesh LAB_06c29bc0, whose FUN_06c2aef0 always fails: 0 either way.
     int DACOM_API SplitByPlane(void* Handle, void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/, void* /*E*/,
                          void* /*F*/) override
     {
@@ -207,7 +195,7 @@ public:
 
     // FUN_06c21a00 (TriMesh table 06c36114; SphereMesh overrides it). Defined after
     // FTriMeshAnim.
-    int DACOM_API BindMeshInstance(void* InstId, void* Handle) override; // formerly Slot17
+    int DACOM_API BindMeshInstance(void* InstId, void* Handle) override;
 };
 
 // DAT_06c37d80: the 0x400-byte buffer FUN_06c211a0 reads the "Tristrips" value into.
@@ -289,13 +277,13 @@ public:
         {
         }
 
-        // LAB_06c29ac0: this - 4, then LAB_06c29a00.
+        // LAB_06c29ac0 (this - 4, then LAB_06c29a00).
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             return Owner->QueryInterface(Iid, Out);
         }
 
-        // LAB_06c27670: this - 4, then FUN_06c2b100 (MOV EAX,1).
+        // LAB_06c27670 -> FUN_06c2b100, which returns 1.
         unsigned long DACOM_API AddRef() override
         {
             return 1;
@@ -306,9 +294,7 @@ public:
             return 1;
         }
 
-        // LAB_06c29830: EAX = [this+0xC] (instance +0x10, the live archetype); the stack `this`
-        // becomes archetype+4 (its IMatHookUp facet) and the call jumps to that facet's slot 3.
-        // formerly Slot3
+        // LAB_06c29830: tail-jumps to the live archetype's (+0x10) IMatHookUp facet, slot 3.
         int DACOM_API HookUpMaterials() override
         {
             return Owner->MeshLive->HookFacet.HookUpMaterials();
@@ -325,13 +311,13 @@ public:
         {
         }
 
-        // LAB_06c29ad0: this - 8, then LAB_06c29a00.
+        // LAB_06c29ad0 (this - 8, then LAB_06c29a00).
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             return Owner->QueryInterface(Iid, Out);
         }
 
-        // LAB_06c27690: this - 8, then FUN_06c2b100 (MOV EAX,1).
+        // LAB_06c27690 -> FUN_06c2b100, which returns 1.
         unsigned long DACOM_API AddRef() override
         {
             return 1;
@@ -342,7 +328,6 @@ public:
             return 1;
         }
 
-        // formerly Slot3
         void AdvanceUvAnimation(float Dt) override
         {
             FTriMeshAnim* Anim = Owner;
@@ -402,7 +387,7 @@ public:
     float Clock;                  // +0x18 UV0_anim clock (LAB_06c293a0)
     void* InstId;                 // +0x1C
 
-    // FUN_06c292b0: +0x10, +0xC, +0x14, +0x18 = 0, +0x1C = -1.
+    // FUN_06c292b0.
     FTriMeshAnim()
         : HookFacet(this)
         , AnimFacet(this)
@@ -414,9 +399,8 @@ public:
     {
     }
 
-    // FUN_06c29310 (RET 8; archetype, InstId): +0x10 = +0xC = archetype, +0x1C = InstId; an
-    // archetype with UV0_anim lookup entries (+0x8C, unsigned > 0) also gets a 0x14 track copied
-    // from its texcoord-0 stream (+0x5C) with SrcCount (+0x88) indices (FUN_06c24c60). Returns 0.
+    // FUN_06c29310: an archetype with UV0_anim lookup entries (+0x8C) also gets a 0x14 track
+    // copied from its texcoord-0 stream (+0x5C) with SrcCount (+0x88) indices (FUN_06c24c60).
     int Init(FTriMeshArch* InMesh, void* InInstId)
     {
         MeshLive = InMesh;
@@ -430,8 +414,7 @@ public:
         return 0;
     }
 
-    // FUN_06c29360: +0x10 = +0xC = 0, +0x1C = -1; a track is freed (FUN_06c23dc0), deleted and
-    // cleared. Returns 0.
+    // FUN_06c29360; a track is freed with FUN_06c23dc0.
     int Reset()
     {
         MeshLive = nullptr;
@@ -547,7 +530,7 @@ public:
         return (GENRESULT)-1;
     }
 
-    // FUN_06c2b100 (06c36224 / 06c36228): MOV EAX,1.
+    // FUN_06c2b100: returns 1.
     unsigned long DACOM_API AddRef() override
     {
         return 1;
@@ -558,141 +541,114 @@ public:
         return 1;
     }
 
-    // LAB_06c29850..LAB_06c299f0: `this` on the stack replaced by [this+0x10] (the live
-    // archetype), then a jump to the same slot of its IMesh table.
-    // formerly Slot3
+    // LAB_06c29850..LAB_06c299f0: each tail-jumps to the same IMesh slot of the live archetype
+    // (+0x10).
     int DACOM_API ResetMesh() override
     {
         return MeshLive->ResetMesh();
     }
-    // formerly Slot4
     int DACOM_API NoOp() override
     {
         return MeshLive->NoOp();
     }
-    // formerly Slot5
     int DACOM_API RefreshMaterials(unsigned long Flags) override
     {
         return MeshLive->RefreshMaterials(Flags);
     }
-    // LAB_06c29880: MOV EAX,0xFFFFFFF9; RET 8.
-    // formerly Slot6
+    // LAB_06c29880.
     int DACOM_API RejectOperation(void*) override
     {
         return -7;
     }
-    // LAB_06c29890: MOV EAX,0xFFFFFFF9; RET 4.
-    // formerly Slot7
+    // LAB_06c29890.
     int DACOM_API RejectOperation() override
     {
         return -7;
     }
-    // formerly Slot8
     int DACOM_API GetFaceGroupCount(int* Out) override
     {
         return MeshLive->GetFaceGroupCount(Out);
     }
-    // formerly Slot9
     int DACOM_API OpenFaceGroup(int Index, int Mode) override
     {
         return MeshLive->OpenFaceGroup(Index, Mode);
     }
-    // formerly Slot10
     int DACOM_API CloseFaceGroup() override
     {
         return MeshLive->CloseFaceGroup();
     }
-    // formerly Slot11
     int DACOM_API AddFaceGroup(void* A) override
     {
         return MeshLive->AddFaceGroup(A);
     }
-    // formerly Slot12
     int DACOM_API RemoveFaceGroup(int Index) override
     {
         return MeshLive->RemoveFaceGroup(Index);
     }
-    // formerly Slot13
     int DACOM_API GetFaceGroupPrimitiveType(unsigned int* Out) override
     {
         return MeshLive->GetFaceGroupPrimitiveType(Out);
     }
-    // formerly Slot14
     int DACOM_API GetFaceGroupMaterial(IMaterial** Out) override
     {
         return MeshLive->GetFaceGroupMaterial(Out);
     }
-    // formerly Slot15
     int DACOM_API SetFaceGroupMaterial(IMaterial* Material) override
     {
         return MeshLive->SetFaceGroupMaterial(Material);
     }
-    // formerly Slot16
     int DACOM_API GetFaceGroupMaterialContext(void** Out) override
     {
         return MeshLive->GetFaceGroupMaterialContext(Out);
     }
-    // formerly Slot17
     int DACOM_API SetFaceGroupMaterialContext(void* A) override
     {
         return MeshLive->SetFaceGroupMaterialContext(A);
     }
-    // formerly Slot18
     int DACOM_API OpenFaceGroupChannels(unsigned long Flags) override
     {
         return MeshLive->OpenFaceGroupChannels(Flags);
     }
-    // formerly Slot19
     int DACOM_API CloseFaceGroupChannels() override
     {
         return MeshLive->CloseFaceGroupChannels();
     }
-    // formerly Slot20
     int DACOM_API LockFaceGroupChannels(unsigned long Mask) override
     {
         return MeshLive->LockFaceGroupChannels(Mask);
     }
-    // formerly Slot21
     int DACOM_API UnlockFaceGroupChannels() override
     {
         return MeshLive->UnlockFaceGroupChannels();
     }
-    // formerly Slot22
     int DACOM_API GetFaceGroupData(int Channel, void** A, void** B, void** C, void** D) override
     {
         return MeshLive->GetFaceGroupData(Channel, A, B, C, D);
     }
-    // formerly Slot23
     int DACOM_API SetFaceGroupData(int Channel, void* A, void* B, void* C, void* D) override
     {
         return MeshLive->SetFaceGroupData(Channel, A, B, C, D);
     }
-    // formerly Slot24
     int DACOM_API GetFaceGroupIndices(int Channel, void** A, void** B) override
     {
         return MeshLive->GetFaceGroupIndices(Channel, A, B);
     }
-    // formerly Slot25
     int DACOM_API SetFaceGroupIndices(int Channel, void* Src, int Count) override
     {
         return MeshLive->SetFaceGroupIndices(Channel, Src, Count);
     }
-    // formerly Slot26
     int DACOM_API GetFaceGroupIndexCount(int Selector, void** Out) override
     {
         return MeshLive->GetFaceGroupIndexCount(Selector, Out);
     }
-    // formerly Slot27
     int DACOM_API SetFaceGroupIndexCount(int Selector, int Count) override
     {
         return MeshLive->SetFaceGroupIndexCount(Selector, Count);
     }
-    // formerly Slot28
     int DACOM_API AddFaceGroupChannels(unsigned long Flags) override
     {
         return MeshLive->AddFaceGroupChannels(Flags);
     }
-    // formerly Slot29
     int DACOM_API RemoveFaceGroupChannels(unsigned long Flags) override
     {
         return MeshLive->RemoveFaceGroupChannels(Flags);
@@ -714,9 +670,8 @@ static float TickArgAsFloat(void* Arg)
     return Value;
 }
 
-// FUN_06c25730 (thiscall on the archetype, RET 8; InstId, out): *Out = 0; operator new(0x20) +
-// FUN_06c292b0, FUN_06c29310(archetype, InstId); a negative init -> -1 (the instance is not
-// freed); else *Out = the instance, 0.
+// FUN_06c25730 (thiscall on the archetype): operator new(0x20). A failed init returns -1
+// without freeing the instance.
 static int TriMeshCreateInstance(FTriMeshArch* Arch, void* InstId, FTriMeshAnim** Out)
 {
     *Out = nullptr;
@@ -771,7 +726,7 @@ void FRenderPlugin::TickInstance(void* InstId, void* Arg)
     FTriMeshAnim* Anim = FindInstance(InstId);
     if (Anim == nullptr)
         return;
-    // FUN_06c21940 @ 06c2199a: thiscall on the instance's ITriMeshAnim facet (+8), vt+0xC.
+    // FUN_06c21940: the instance's ITriMeshAnim facet (+8), slot 3.
     Anim->AnimFacet.AdvanceUvAnimation(TickArgAsFloat(Arg));
 }
 
@@ -796,7 +751,6 @@ FRenderPlugin::~FRenderPlugin()
     DestroyInstanceMap();
 }
 
-// formerly Slot17
 int DACOM_API FRenderPlugin::BindMeshInstance(void* InstId, void* Handle)
 {
     if (Handle == (void*)((intptr_t)-1) || Handle == nullptr)
@@ -830,7 +784,7 @@ public:
             char Line[0x2000];
             _snprintf(Line, sizeof(Line), "TriMesh: dtor: instance %d dangling\n",
                       (int)((intptr_t)Walk->first));
-            RendCompFdumpAt(kFdumpNotice, G_FileTriMesh, 0x86, Line); // file = 06c37048
+            RendCompFdumpAt(kFdumpNotice, G_FileTriMesh, 0x86, Line);
         }
     }
 
@@ -840,9 +794,7 @@ public:
         return TriMeshPluginReadProfile(&Tristrips, Desc);
     }
 
-    // LAB_06c214d0 (RET 8): handle -1 or 0 -> -1. The clone (FUN_06c24aa0) writes into the
-    // cleared argument slot; a negative result or a null clone -> -1, else the clone.
-    // formerly Slot4
+    // LAB_06c214d0; the clone is FUN_06c24aa0.
     int DACOM_API CloneHandle(void* Handle) override
     {
         if (Handle == (void*)G_HandleFail || Handle == nullptr)
@@ -853,7 +805,6 @@ public:
         return (int)((intptr_t)Clone);
     }
 
-    // formerly Slot7
     int DACOM_API CreateMeshInstance(void* InstId, void* Handle) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -879,14 +830,12 @@ public:
         return 1;
     }
 
-    // formerly Slot9
     int DACOM_API UpdateMeshInstance(void* InstId, void* Arg) override
     {
         TickInstance(InstId, Arg);
         return 0;
     }
 
-    // formerly Slot11
     int DACOM_API UpdateMeshInstances(void* InstId) override
     {
         TickAllInstances(InstId);
@@ -904,8 +853,8 @@ public:
         return (int)G_HandleFail;
     }
 
-    // FUN_06c21510 (RET 8): a handle other than -1 and 0 gets the dtor FUN_06c22550 and free --
-    // no reference count. EAX is not set on the way out; the port returns 0.
+    // FUN_06c21510: the dtor FUN_06c22550 and free -- no reference count. Retail leaves EAX
+    // unset; the port returns 0.
     int DACOM_API DestroyHandle(void* Handle) override
     {
         if (Handle == (void*)G_HandleFail || Handle == nullptr)
@@ -914,9 +863,7 @@ public:
         return 0;
     }
 
-    // LAB_06c215a0 (RET 0x20): mode in A (0 / 2 triangle count FUN_06c26220, 3 vertex count
-    // FUN_06c26260), flags in B (low 12 bits 3 and bit 0x4000), Out in D; AL 1 when written.
-    // formerly Slot12
+    // LAB_06c215a0: mode 0 / 2 = triangle count (FUN_06c26220), 3 = vertex count (FUN_06c26260).
     int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
                          void* /*E*/) override
     {
@@ -935,9 +882,7 @@ public:
         return 1;
     }
 
-    // LAB_06c21620 (RET 0x10): handle -1 or 0 -> 0; else the box (FUN_06c25790, result not
-    // checked) and 1.
-    // formerly Slot13
+    // LAB_06c21620; the FUN_06c25790 result is not checked.
     int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -946,9 +891,7 @@ public:
         return 1;
     }
 
-    // LAB_06c219a0 (RET 0x10): handle -1 or 0 -> 0; else the centroid (FUN_06c25d40, result
-    // not checked) and 1.
-    // formerly Slot14
+    // LAB_06c219a0; the FUN_06c25d40 result is not checked.
     int DACOM_API GetCentroid(void* Handle, float /*Lod*/, void* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -957,7 +900,6 @@ public:
         return 1;
     }
 
-    // formerly Slot15
     int DACOM_API SplitByPlane(void* Handle, void* A, void* B, void* C, void* D, void* E, void* /*F*/) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -981,7 +923,6 @@ public:
         return 1;
     }
 
-    // formerly Slot16
     int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, void* Inst, unsigned long Flags,
                          void* Transform, void* Extra) override
     {
@@ -1008,7 +949,7 @@ public:
 class FSphereHandle : public IMatHookUp
 {
 public:
-    IMaterial** Materials;        // +0x04 operator new(Sides * 4), zeroed; filled by Slot3
+    IMaterial** Materials;        // +0x04 operator new(Sides * 4), zeroed; filled by HookUpMaterials
     unsigned long Sides;          // +0x08 "Sides": the number of materials
     float Radius;                 // +0x0C "Radius"; -1.0f after a reset
     float Scale;                  // +0x10 not written by the ctor; the load seeds 1.0f and an
@@ -1017,7 +958,7 @@ public:
                                   //       names, 0 where the name did not load
     IMaterialLibrary* Library;    // +0x18 the load's library argument, AddRef'd
 
-    // FUN_06c2a950: +0x18/+4/+0x14/+8 = 0, then the reset FUN_06c2a9a0.
+    // FUN_06c2a950, then the reset FUN_06c2a9a0.
     FSphereHandle()
         : Materials(nullptr)
         , Sides(0)
@@ -1038,9 +979,7 @@ public:
         }
     }
 
-    // FUN_06c2a9b0: Radius = -1.0f; with a name array every name is freed and the array
-    // deleted; every set material Released and cleared; the material array deleted; Sides = 0.
-    // Returns 0.
+    // FUN_06c2a9b0.
     int Reset()
     {
         Radius = -1.0f;
@@ -1211,12 +1150,11 @@ public:
                 }
             }
         }
-        File->OpenNode(".."); // 06c2aeb3: PUSH DAT_06c37250 = ".." (2E 2E 00)
+        File->OpenNode(".."); // DAT_06c37250
         return 0;
     }
 
-    // FUN_06c2b020: "1.11_IMatHookUp" -> *Out = the archetype, 0; anything else -> -1 with
-    // *Out untouched. No AddRef.
+    // FUN_06c2b020: no AddRef; *Out is left untouched on a miss.
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
     {
         if (RendCompIidEqual(Iid, Iids::MatHookUp))
@@ -1227,7 +1165,7 @@ public:
         return (GENRESULT)-1;
     }
 
-    // FUN_06c2b100: MOV EAX,1.
+    // FUN_06c2b100: returns 1.
     unsigned long DACOM_API AddRef() override
     {
         return 1;
@@ -1238,7 +1176,6 @@ public:
         return 1;
     }
 
-    // formerly Slot3
     int DACOM_API HookUpMaterials() override
     {
         struct FMaterialQuery
@@ -1269,7 +1206,7 @@ public:
     }
 };
 
-// DAT_06c37ccc: a byte the sphere draw reads (06c2bf60) to skip the atmosphere pass. Nothing in
+// DAT_06c37ccc: a byte the sphere draw reads to skip the atmosphere pass. Nothing in
 // rendcomp.dll writes it (one XREF, the read) and it is not exported, so it stays 0.
 static unsigned char G_SphereNoAtmosphere = 0;
 
@@ -1321,7 +1258,7 @@ static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
     const float S = (float)Sin;
     if (!bAboutX)
     {
-        // 06c2bd27: [c 0 s; 0 1 0; -s 0 c], translation untouched (it stays 0).
+        // [c 0 s; 0 1 0; -s 0 c], translation untouched (it stays 0).
         Out.Rotation.D[0][0] = C;
         Out.Rotation.D[0][1] = 0.0f;
         Out.Rotation.D[0][2] = S;
@@ -1333,7 +1270,7 @@ static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
         Out.Rotation.D[2][2] = C;
         return;
     }
-    // 06c2bd6f: [1 0 0; 0 c -s; 0 s c], translation zeroed.
+    // [1 0 0; 0 c -s; 0 s c], translation zeroed.
     Out.Translation.X = 0.0f;
     Out.Translation.Y = 0.0f;
     Out.Translation.Z = 0.0f;
@@ -1367,7 +1304,7 @@ struct FSphereMaterialSlot
     {
     }
 
-    // FUN_06c2c660: Release +0 (vt+8) and clear it if set, then free(+0xC) and clear it.
+    // FUN_06c2c660.
     void ReleaseContents()
     {
         if (Material != nullptr)
@@ -1417,7 +1354,6 @@ struct FSphereMaterialSlot
         VertexCount = 0;
         IndexCount = 0;
 
-        // ESP+0x18 / +0x3C / +0x60 / +0x70.
         float Corner[4][3];
         for (int Row = 0; Row < 4; ++Row)
         {
@@ -1427,19 +1363,19 @@ struct FSphereMaterialSlot
         }
         switch (Face)
         {
-        case 0: // 06c2c70f
+        case 0:
             Corner[0][0] *= -1.0f;
             Corner[0][1] *= -1.0f;
             Corner[1][1] *= -1.0f;
             Corner[2][0] *= -1.0f;
             break;
-        case 1: // 06c2c74c
+        case 1:
             Corner[0][1] *= -1.0f;
             Corner[1][1] *= -1.0f;
             Corner[1][2] *= -1.0f;
             Corner[3][2] *= -1.0f;
             break;
-        case 2: // 06c2c789
+        case 2:
             Corner[0][1] *= -1.0f;
             Corner[0][2] *= -1.0f;
             Corner[1][0] *= -1.0f;
@@ -1449,7 +1385,7 @@ struct FSphereMaterialSlot
             Corner[3][0] *= -1.0f;
             Corner[3][2] *= -1.0f;
             break;
-        case 3: // 06c2c7fe
+        case 3:
             Corner[0][0] *= -1.0f;
             Corner[0][1] *= -1.0f;
             Corner[0][2] *= -1.0f;
@@ -1459,13 +1395,13 @@ struct FSphereMaterialSlot
             Corner[2][2] *= -1.0f;
             Corner[3][0] *= -1.0f;
             break;
-        case 4: // 06c2c873
+        case 4:
             Corner[0][0] *= -1.0f;
             Corner[2][2] *= -1.0f;
             Corner[2][0] *= -1.0f;
             Corner[3][2] *= -1.0f;
             break;
-        case 5: // 06c2c8ad
+        case 5:
             Corner[0][0] *= -1.0f;
             Corner[0][1] *= -1.0f;
             Corner[0][2] *= -1.0f;
@@ -1482,15 +1418,15 @@ struct FSphereMaterialSlot
         Indices = (unsigned short*)(
             std::realloc(Indices, (size_t)((1u << Level) * 0xCu)));
         const int Half = (int)((float)Level * 0.5f);
-        const int N = 1 << Half;                                          // ESP+0x7C
-        const float Step = (float)(1.0 / (double)N); // ESP+0x38
-        const int Width = N + 1;                                          // ESP+0x6C
+        const int N = 1 << Half;
+        const float Step = (float)(1.0 / (double)N);
+        const int Width = N + 1;
         double T = 0.0;
 
         if ((Level % 2) != 0)
         {
-            const float HalfStep = (float)((double)Step * 0.5); // ESP+0x14
-            const int Rows = Width + Width - 1;                                          // ESP+0x34
+            const float HalfStep = (float)((double)Step * 0.5);
+            const int Rows = Width + Width - 1;
             for (int Row = 0; Row < Rows; ++Row)
             {
                 const double OneMinusT = 1.0 - T;
@@ -1559,7 +1495,7 @@ struct FSphereMaterialSlot
 
             if (N <= 0)
                 return;
-            // 06c2cd10: per cell of the even rows, four triangles round the odd-row centre M:
+            // Per cell of the even rows, four triangles round the odd-row centre M:
             // (A0, A1, M), (A1, C+1, M), (C+1, C, M), (C, A0, M).
             int Base = 0;
             for (int Outer = N; Outer != 0; --Outer)
@@ -1610,7 +1546,7 @@ struct FSphereMaterialSlot
             float Bz = (float)((double)C1z + C3z);
 
             // The even branch sums the squares z, y, x and keeps the normalised A.x on the
-            // x87 stack (06c2cf82..06c2cfc0).
+            // x87 stack.
             const float InvA = (float)(
                 1.0 / std::sqrt((double)Az * Az + (double)Ay * Ay +
                                 Ax * Ax));
@@ -1652,7 +1588,7 @@ struct FSphereMaterialSlot
 
         if (N <= 0)
             return;
-        // 06c2d1a2: per cell P (row, column) with Q = P + Width below it, two triangles:
+        // Per cell P (row, column) with Q = P + Width below it, two triangles:
         // odd (row + column) -> (P, P+1, Q), (P+1, Q+1, Q); even -> (P, Q+1, Q), (P, P+1, Q+1).
         int Base = 0;
         for (int Row = 0; Row < N; ++Row)
@@ -1699,7 +1635,7 @@ public:
         {
         }
 
-        // LAB_06c2c600: SUB [ESP+4],4; JMP FUN_06c2c230.
+        // LAB_06c2c600 (this - 4, then FUN_06c2c230).
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             return Owner->QueryInterface(Iid, Out);
@@ -1717,7 +1653,6 @@ public:
         }
 
         // FUN_06c2b350.
-        // formerly Slot3
         int DACOM_API HookUpMaterials() override
         {
             return Owner->HookUpMaterials();
@@ -1725,30 +1660,29 @@ public:
     };
 
     FHook Hook;                   // +0x04
-    unsigned long Flags;          // +0x08 bit 1: rebuild requested (Slot07/09/11); FUN_06c2c430
-                                  //       clears it and sets bit 0 after a rebuild
-    float Radius;                 // +0x0C archetype radius; ISphereMesh Slot09/10; the
-                                  //       tessellation radius and the level formula's scale
+    unsigned long Flags;          // +0x08 bit 1: rebuild requested (SetMaxTessellationLevel /
+                                  //       SetRadius / RequestRebuild); FUN_06c2c430 clears it
+                                  //       and sets bit 0 after a rebuild
+    float Radius;                 // +0x0C archetype radius (Set/GetRadius); the tessellation
+                                  //       radius and the level formula's scale
     FSphereHandle* Arch;          // +0x10
     void* InstId;                 // +0x14
-    float LodDistanceScale;             // +0x18 1.5f; ISphereMesh Slot03/04. The draw multiplies the
-                                  //       camera distance by it before the level update.
-                                  //       TODO: a name (a detail bias; the exe's level_of_detail
-                                  //       option writes it through Slot03)
+    float LodDistanceScale;             // +0x18 1.5f (Set/GetLodDistanceScale). The draw multiplies
+                                  //       the camera distance by it before the level update; the
+                                  //       exe's level_of_detail option writes it
     int LevelMin;                 // +0x1C 3, lower clamp of FUN_06c2c430
-    int LevelMax;                 // +0x20 9, upper clamp of FUN_06c2c430; ISphereMesh Slot07/08
+    int LevelMax;                 // +0x20 9, upper clamp of FUN_06c2c430 (Set/GetMaxTessellationLevel)
     int Field_0x24;               // +0x24 0. TODO: meaning (FUN_06c2b230 writes 0; no other
-                                  //       access in 06c29ae0..06c2d330)
+                                  //       access in the sphere code)
     int CachedLevel;              // +0x28 -1, level of the current tessellation (FUN_06c2c430)
     std::list<FSphereMaterialSlot*> MaterialSlots; // +0x2C..+0x34 (VC6 list: allocator, head, size)
     std::list<void*> List_0x38;   // +0x38..+0x40: built by the ctor and freed by the dtor; no
-                                  //       other access in the sphere code (06c2af00..06c2c690)
-    FRpVertexSrcDesc Desc;        // +0x44..+0xB3: 0x1C dwords zeroed by FUN_06c2b110 and
+                                  //       other access in the sphere code
+    FRpVertexSrcDesc Desc;        // +0x44..+0xB3: 0x1C dwords zeroed by FUN_06c2b110
     unsigned long VertexCount;    // +0xB4 vertices the streams are sized for (FUN_06c2c430)
     unsigned char bHasAtmosphere; // +0xB8 more than 6 archetype materials
 
-    // FUN_06c2b110: vtables, both lists empty, 0x1C dwords at +0x44 zeroed, then
-    // FUN_06c2b230(0, -1).
+    // FUN_06c2b110, then FUN_06c2b230(0, -1).
     FSphereAnim()
         : Hook(this)
         , Flags(0)
@@ -1773,9 +1707,7 @@ public:
         Reset();
     }
 
-    // FUN_06c2b3c0: +8 = 0, +0x10 = 0, +0x14 = -1; every material record gets FUN_06c2c660 and
-    // is freed, the list is emptied; +0xB4 = 0; the three +0x48/+0x5C/+0x84 streams are freed
-    // and cleared. Returns 0.
+    // FUN_06c2b3c0.
     int Reset()
     {
         Flags = 0;
@@ -1919,33 +1851,33 @@ public:
         const FTransform* World =
             (const FTransform*)(G_Engine->GetInstanceTransform(InstId));
 
-        FTransform Modelview; // ESP+0x1DC
+        FTransform Modelview;
         if (Matrix != nullptr)
         {
-            FTransform Product; // ESP+0x23C
+            FTransform Product;
             MathEngineCached(G_MathSphere)->MulTransform(Product, *Matrix, *World);
-            const FTransform Local = Product; // ESP+0x26C, FUN_06c2c610
+            const FTransform Local = Product; // FUN_06c2c610
             MathEngineCached(G_MathSphere)->MulTransform(Modelview, *View, Local);
         }
         else
             MathEngineCached(G_MathSphere)->MulTransform(Modelview, *View, *World);
-        FTransform Oriented = Modelview;  // ESP+0x20C, FUN_06c2c610
-        FTransform Pipelined = Oriented;  // ESP+0x29C
-        const float ScaledRadius = Arch->Scale * Arch->Radius; // ESP+0x98
-        const float ArchRadius = Arch->Radius;                 // ESP+0x50
+        FTransform Oriented = Modelview;  // FUN_06c2c610
+        FTransform Pipelined = Oriented;
+        const float ScaledRadius = Arch->Scale * Arch->Radius;
+        const float ArchRadius = Arch->Radius;
 
-        // ESP+0xD4: the corner indices of each cube face.
+        // The corner indices of each cube face.
         const int FaceCorners[6][4] = {
             {0, 3, 4, 7}, {0, 1, 4, 5}, {1, 2, 5, 6}, {2, 3, 6, 7}, {0, 1, 2, 3}, {4, 5, 6, 7}};
-        // ESP+0x134: the face normals.
+        // The face normals.
         FVector Normals[6] = {{0.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f},
                               {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
-        // ESP+0x17C: the cube corners, +-k with k = 0x3f13cd3a.
+        // The cube corners, +-k with k = 0x3f13cd3a.
         const float K = 0.57735026f;
         FVector Corners[8] = {{K, K, K},   {K, K, -K},   {-K, K, -K},  {-K, K, K},
                               {K, -K, K},  {K, -K, -K},  {-K, -K, -K}, {-K, -K, K}};
-        const FMatrix WorldRotation = World->Rotation; // ESP+0x2CC
-        unsigned char bVisible[8] = {0, 0, 0, 0, 0, 0, 0, 0}; // ESP+0x64
+        const FMatrix WorldRotation = World->Rotation;
+        unsigned char bVisible[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         for (int Face = 0; Face < 6; ++Face)
         {
             FVector Turned;
@@ -1954,16 +1886,16 @@ public:
         }
 
         const float* CameraPos = Camera->GetPosition();
-        FVector ToCamera; // ESP+0x54, FUN_06c25cc0
+        FVector ToCamera; // FUN_06c25cc0
         ToCamera.X = CameraPos[0] - World->Translation.X;
         ToCamera.Y = CameraPos[1] - World->Translation.Y;
         ToCamera.Z = CameraPos[2] - World->Translation.Z;
-        float Best = -1.0f; // ESP+0x48
-        int BestFace = -1;  // ESP+0x6C
+        float Best = -1.0f;
+        int BestFace = -1;
         const float Distance = (float)(std::sqrt(
             (double)ToCamera.X * ToCamera.X + (double)ToCamera.Z * ToCamera.Z +
-            (double)ToCamera.Y * ToCamera.Y)); // ESP+0x60
-        const float InvDistance = 1.0f / Distance;           // ESP+0x7C
+            (double)ToCamera.Y * ToCamera.Y));
+        const float InvDistance = 1.0f / Distance;
         ToCamera.X *= InvDistance;
         ToCamera.Y *= InvDistance;
         ToCamera.Z *= InvDistance;
@@ -1978,10 +1910,10 @@ public:
             }
         }
         const double Limit = (double)InvDistance * ArchRadius;
-        float Threshold = (float)Limit; // ESP+0x48
+        float Threshold = (float)Limit;
         if (Limit > 0.57735026918962573)
             Threshold = K;
-        const int* BestCorners = FaceCorners[BestFace]; // ESP+0x78
+        const int* BestCorners = FaceCorners[BestFace];
         for (int Index = 0; Index < 4; ++Index)
         {
             const int Corner = BestCorners[Index];
@@ -1993,16 +1925,16 @@ public:
             bVisible[Corner] = (Dot > Threshold) ? 1 : 0;
         }
 
-        // 06c2bab0: the modelview origin into a local nothing reads afterwards (as retail).
+        // The modelview origin into a local nothing reads afterwards (as retail).
         FVector Origin;
         Origin.X = 0.0f;
         Origin.Y = 0.0f;
         Origin.Z = 0.0f;
-        FVector ViewCentre; // ESP+0x2F0
+        FVector ViewCentre;
         MathEngineCached(G_MathSphere)->TransformXform(ViewCentre, Pipelined, Origin);
 
-        const float Biased = Distance * LodDistanceScale; // ESP+0x70
-        const float XScale = (float)(Camera->GetXScaleOverNear()); // FSTP float
+        const float Biased = Distance * LodDistanceScale;
+        const float XScale = (float)(Camera->GetXScaleOverNear()); // rounded to float
         UpdateLevel(Biased / (Camera->GetZNear() * XScale));
 
         IVertexBufferManager* VbManager = G_VbManager;
@@ -2015,8 +1947,8 @@ public:
         else
             Lock.Listing.VertexBuffer = nullptr;
 
-        const float HalfPi = (float)(3.141592653589793 * 0.5); // ESP+0x10
-        // ESP+0x9C. +0x18 is never written by retail (a stack leftover); the port passes 0.
+        const float HalfPi = (float)(3.141592653589793 * 0.5);
+        // Context +0x18 is never written by retail (a stack leftover); the port passes 0.
         FMaterialSubmitContext Context;
         Context.Inst = InstId;
         Context.World = nullptr;
@@ -2028,9 +1960,9 @@ public:
         Context.ReplacedMaterial = nullptr;
         Context.MaterialContext = nullptr;
 
-        FTransform Rotation; // ESP+0x18
+        FTransform Rotation;
         SphereFaceRotation(Rotation, 0, HalfPi);
-        FTransform FaceWorld; // ESP+0x23C
+        FTransform FaceWorld;
         const std::list<FSphereMaterialSlot*>::iterator First = MaterialSlots.begin();
         std::list<FSphereMaterialSlot*>::iterator Walk = First;
         for (int Face = 0; Face < 6; ++Face)
@@ -2064,7 +1996,7 @@ public:
                 G_Pipeline->GetPipelineState(7, &State);
                 if (State != 0)
                 {
-                    FTransform Product; // ESP+0x26C
+                    FTransform Product;
                     MathEngineCached(G_MathSphere)->MulTransform(Product, *View, FaceWorld);
                     Modelview = Product;
                     Pipelined = Modelview;
@@ -2108,8 +2040,8 @@ public:
                                (double)ToCamera.X * Corners[Corner].X;
             bVisible[Corner] = (Dot > AtmosphereThreshold) ? 1 : 0;
         }
-        Context.MaterialContext = G_Engine; // 06c2bff2: DAT_06c37d4c
-        FTransform AtmosphereWorld; // ESP+0x26C
+        Context.MaterialContext = G_Engine; // DAT_06c37d4c
+        FTransform AtmosphereWorld;
         for (int Face = 0; Face < 6; ++Face)
         {
             FSphereMaterialSlot* Geometry = *First;
@@ -2139,8 +2071,7 @@ public:
         return true;
     }
 
-    // FUN_06c2c230: "1.11_ISphereMesh" -> *Out = this, 0. "1.11_IMatHookUp" -> this+4 (a null
-    // this gives *Out = 0), 0. Anything else -> -1 with *Out untouched. No AddRef.
+    // FUN_06c2c230: no AddRef; *Out is left untouched on a miss.
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
     {
         if (RendCompIidEqual(Iid, Iids::SphereMesh))
@@ -2156,7 +2087,7 @@ public:
         return (GENRESULT)-1;
     }
 
-    // FUN_06c2b100: MOV EAX,1 -- the plugin's instance map owns the object.
+    // FUN_06c2b100: returns 1 -- the plugin's instance map owns the object.
     unsigned long DACOM_API AddRef() override
     {
         return 1;
@@ -2167,38 +2098,33 @@ public:
         return 1;
     }
 
-    // LAB_06c2c2a0: +0x18 = Value; 0.
-    // formerly Slot03
+    // LAB_06c2c2a0.
     int DACOM_API SetLodDistanceScale(float Value) override
     {
         LodDistanceScale = Value;
         return 0;
     }
 
-    // LAB_06c2c2b0: *Out = +0x18; 0.
-    // formerly Slot04
+    // LAB_06c2c2b0.
     int DACOM_API GetLodDistanceScale(float* Out) override
     {
         *Out = LodDistanceScale;
         return 0;
     }
 
-    // LAB_06c2c2d0: XOR EAX,EAX; RET 8.
-    // formerly Slot05
+    // LAB_06c2c2d0.
     int DACOM_API NoOp05(void* /*Arg*/) override
     {
         return 0;
     }
 
     // LAB_06c2c2d0 again (06c36360).
-    // formerly Slot06
     int DACOM_API NoOp06(void* /*Arg*/) override
     {
         return 0;
     }
 
-    // LAB_06c2c2e0: +0x20 = Value; +8 |= 2; 0.
-    // formerly Slot07
+    // LAB_06c2c2e0.
     int DACOM_API SetMaxTessellationLevel(int Value) override
     {
         LevelMax = Value;
@@ -2206,16 +2132,14 @@ public:
         return 0;
     }
 
-    // LAB_06c2c300: *Out = +0x20; 0.
-    // formerly Slot08
+    // LAB_06c2c300.
     int DACOM_API GetMaxTessellationLevel(int* Out) override
     {
         *Out = LevelMax;
         return 0;
     }
 
-    // LAB_06c2c320: +0x0C = Value; +8 |= 2; 0.
-    // formerly Slot09
+    // LAB_06c2c320.
     int DACOM_API SetRadius(float Value) override
     {
         Radius = Value;
@@ -2223,33 +2147,28 @@ public:
         return 0;
     }
 
-    // LAB_06c2c340: *Out = +0x0C; 0.
-    // formerly Slot10
+    // LAB_06c2c340.
     int DACOM_API GetRadius(float* Out) override
     {
         *Out = Radius;
         return 0;
     }
 
-    // LAB_06c2c360: +8 |= 2; returns -1; the argument is not read.
-    // formerly Slot11
+    // LAB_06c2c360: returns -1; the argument is not read.
     int DACOM_API RequestRebuild(void* /*Arg*/) override
     {
         Flags |= 2;
         return -1;
     }
 
-    // LAB_06c2c370: *Out = +0x34 (record count); 0.
-    // formerly Slot12
+    // LAB_06c2c370.
     int DACOM_API GetMaterialCount(int* OutCount) override
     {
         *OutCount = (int)(MaterialSlots.size());
         return 0;
     }
 
-    // LAB_06c2c390: walk +0x30 to the Index-th record (list end first -> -1). The record takes
-    // Material; the new one is AddRef'd if set, the old one Released if set. 0.
-    // formerly Slot13
+    // LAB_06c2c390.
     int DACOM_API SetMaterial(int Index, IMaterial* Material) override
     {
         int Position = 0;
@@ -2272,9 +2191,7 @@ public:
         return -1;
     }
 
-    // LAB_06c2c3e0: *Out = 0 first; walk +0x30 to the Index-th record (list end first -> -1);
-    // *Out = its material, AddRef'd if set; 0.
-    // formerly Slot14
+    // LAB_06c2c3e0.
     int DACOM_API GetMaterial(int Index, IMaterial** Out) override
     {
         *Out = nullptr;
@@ -2328,8 +2245,7 @@ public:
         return LastHitSphere;
     }
 
-    // FUN_06c29f70 (the SphereMesh table entry 06c362e8); see FRenderPlugin::Slot10.
-    // formerly Slot10
+    // FUN_06c29f70 (the SphereMesh table entry 06c362e8).
     int DACOM_API QueryMeshInstance(void* InstId, void* /*Handle*/, const char* Iid, void** Out) override
     {
         LookupCount += 1;
@@ -2354,7 +2270,6 @@ public:
         return Found->second;
     }
 
-    // formerly Slot7
     int DACOM_API CreateMeshInstance(void* InstId, void* Handle) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -2367,8 +2282,8 @@ public:
             return 0;
         if (Anim->Init(Sphere, InstId) < 0)
             return 0;
-        // FUN_06c2afb0: centre zeroed; radius < 0.0f (TEST AH,1 / JNZ, unordered included) ->
-        // extent = radius, else Scale * Radius.
+        // FUN_06c2afb0: radius < 0.0f (unordered included) -> extent = radius, else
+        // Scale * Radius.
         float Center[3];
         Center[0] = 0.0f;
         Center[1] = 0.0f;
@@ -2388,7 +2303,6 @@ public:
         return 1;
     }
 
-    // formerly Slot8
     int DACOM_API DestroyMeshInstance(void* InstId, void* /*Handle*/) override
     {
         LookupCount += 1;
@@ -2416,8 +2330,8 @@ public:
         return -1;
     }
 
-    // FUN_06c29b90 (RET 8): a handle other than -1 and 0 gets the archetype dtor FUN_06c2a970
-    // and free -- no reference count. EAX is not set on the way out; the port returns 0.
+    // FUN_06c29b90: the archetype dtor FUN_06c2a970 and free -- no reference count. Retail
+    // leaves EAX unset; the port returns 0.
     int DACOM_API DestroyHandle(void* Handle) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
@@ -2426,7 +2340,6 @@ public:
         return 0;
     }
 
-    // formerly Slot12
     int DACOM_API QueryGeometry(void* Handle, int /*Lod*/, void* A, void* B, void* /*C*/, void* Out,
                          void* /*E*/) override
     {
@@ -2440,7 +2353,6 @@ public:
         return 1;
     }
 
-    // formerly Slot13
     int DACOM_API GetBounds(void* Handle, float /*Lod*/, void* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -2466,9 +2378,7 @@ public:
         return 1;
     }
 
-    // LAB_06c29f40 (RET 0x10) -> AL: handle -1/0 -> 0; else FUN_06c2aff0 zeroes the three
-    // floats at Out, and 1.
-    // formerly Slot14
+    // LAB_06c29f40; FUN_06c2aff0 zeroes the three floats.
     int DACOM_API GetCentroid(void* Handle, float /*Lod*/, void* Out) override
     {
         if (IrcHandleOk(Handle) == 0)
@@ -2480,7 +2390,6 @@ public:
         return 1;
     }
 
-    // formerly Slot16
     int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, void* Inst, unsigned long /*Flags*/,
                          void* Matrix, void* Extra) override
     {
@@ -2494,17 +2403,15 @@ public:
                    : 0;
     }
 
-    // LAB_06c29ff0: OR EAX,-1; RET 0xC. The sphere plugin binds nothing.
-    // formerly Slot17
+    // LAB_06c29ff0. The sphere plugin binds nothing.
     int DACOM_API BindMeshInstance(void* /*Inst*/, void* /*Handle*/) override
     {
         return -1;
     }
 };
 
-// LAB_06c22210 after its AGGDESC checks: calloc(1, 0x38) failure -> *Out = 0, -4; ctor, then
-// FUN_06c211a0; a non-zero result runs the dtor FUN_06c21080, frees the plugin, *Out = 0 and is
-// returned; otherwise *Out = the plugin and that (zero) result is returned.
+// LAB_06c22210 after its AGGDESC checks: calloc(1, 0x38), the ctor, then FUN_06c211a0; a
+// failure runs the dtor FUN_06c21080 and frees the plugin.
 GENRESULT CreateTriMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
 {
     FTriMeshPlugin* Plugin = new (std::nothrow) FTriMeshPlugin();
@@ -2524,9 +2431,8 @@ GENRESULT CreateTriMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
     return Result;
 }
 
-// LAB_06c2a3d0 after its AGGDESC checks: calloc(1, 0x34) failure -> *Out = 0, -4; ctor, then
-// FUN_06c2d720 (AGGDESC +8 and +0xC must be set, else -2); a non-zero result clears the
-// instance map, frees the plugin, *Out = 0 and is returned; otherwise *Out = the plugin, 0.
+// LAB_06c2a3d0 after its AGGDESC checks: calloc(1, 0x34), the ctor, then FUN_06c2d720 (AGGDESC
+// +8 and +0xC must be set, else -2).
 GENRESULT CreateSphereMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
 {
     FSphereMeshPlugin* Plugin = new (std::nothrow) FSphereMeshPlugin();

@@ -11,21 +11,19 @@
 // LoadCharacter, NewCharacter, DeleteCharacter, Back, MainMenu, CharacterBox, MOTDBox,
 // ServerDetailsBox, Title, ServerDetails, MOTD). One static instance, DAT_0067b180 (static init
 // LAB_00567000 -> ctor FUN_00567020, atexit LAB_0056b020 -> dtor FUN_0056aeb0). vftables: main
-// 0x005e2934 (0 FUN_0056ae90 scalar deleting dtor, 9 LAB_005674a0 Create, 10 FUN_00567290
-// Destroy, 11 LAB_0056a360 Update, 23 FUN_00569670 ProcessMessage), IUIPage face (+0x7c) 0x00575d10,
+// 0x005e2934 (slot 0 FUN_0056ae90 scalar deleting dtor), IUIPage face (+0x7c) 0x00575d10,
 // Event::Handler face (+0x80) 0x0056a300.
 //
-// Call path: IntroFocus EnterState case 9 (0x00574f50) loads the descriptor (+0x28c,
-// DAT_0067b40c), calls slot 9 Create(0, 0) and makes this the active page. IntroFocus::Update
-// poll index 3 (0x0057403c) watches +0x5f8 / +0x5f9 and moves to the state in +0x2b4 with the
-// CHARACTER_ID at +0x399. EnterState cases 1 and 5 reset +0x8c from DAT_0067bd40.
+// IntroFocus EnterState case 9 loads the descriptor (+0x28c), calls Create(0, 0) and makes this
+// the active page. IntroFocus::Update watches +0x5f8 / +0x5f9 and moves to the state in +0x2b4
+// with the CHARACTER_ID at +0x399. EnterState cases 1 and 5 reset +0x8c from DAT_0067bd40.
 //
 // The rows are CLoginMgr's character roster (FUN_005aaca0 by index, DAT_0067e96c), sorted with
 // qsort by one of ten column comparators (.data:00614b84 descending / 00614b98 ascending); each
 // row keeps a CharacterRowData (the character's CHARACTER_ID) as the UIFastTable payload.
 //
-// Retail layout past MasterWin (+0x00..+0x8b) is listed member by member below. The port's
-// MasterWin has no retail byte layout (see page_options.h), so the members keep only the order.
+// Member offsets are retail's (MasterWin is +0x00..+0x8b). The port's MasterWin has no retail
+// byte layout (see page_options.h), so the members keep only the order.
 
 #include "common_text.h"   // RenderDisplayList, TextRenderContext::Image, TextRenderAttributes
 #include "server_characterset.h" // CHARACTER_ID, CCharacterSet::CharacterInfo
@@ -38,15 +36,15 @@ class UiRichTextWin;
 class UiScroll;
 class UiTextMsgButton;
 
-// DAT_0067bd40 -- a static CHARACTER_ID only its static initializer writes (0x00564af0: the
-// first byte 0): the "no character" value the page compares and resets against.
+// DAT_0067bd40 -- a static CHARACTER_ID only its static initializer writes (first byte 0): the
+// "no character" value the page compares and resets against.
 extern CHARACTER_ID G_NoCharacterId;
 
 // DAT_0067bcf8 (0x44 bytes) -- the new character's pick: the SCreateCharacterInfo IServer's
 // CreateNewCharacter takes, then the index of the faction record it came from (DAT_0067bd38).
-// Writer: PageCharacterSelect's leave toward character creation (0x0056aa89..0x0056aae3).
-// PageCharacterCreate (DAT_0067a890, page_character_create.h) gets its address at static init
-// (LAB_00573580 -> FUN_0055fea0), shows it and writes the typed name into Info.Name.
+// Written by PageCharacterSelect's leave toward character creation; PageCharacterCreate
+// (page_character_create.h) gets its address at static init, shows it and writes the typed name
+// into Info.Name.
 struct FCharacterCreateSelection
 {
     SCreateCharacterInfo Info; // +0x00 .. +0x3f
@@ -58,8 +56,7 @@ class PageCharacterSelect : public UIPage::MasterWin
 {
 public:
     // RTTI row record at vftable 0x005e2a48 : UIFastTable::RefCounter (slot 0 the scalar
-    // deleting destructor FUN_0056ae70 around FUN_00467ee0). 0x208 bytes: the RefCounter and the
-    // character's CHARACTER_ID at +0x08. Built inline by FillRow (0x005695ea..0x0056962f).
+    // deleting destructor FUN_0056ae70). 0x208 bytes. Built inline by FillRow.
     class CharacterRowData : public UiFastTableRefCounter
     {
     public:
@@ -110,8 +107,8 @@ public:
     RenderDisplayList DetailsField95;        // +0x35c -- IDS 0x74f (server +0x95 clear)
     RenderDisplayList DetailsRestricted;     // +0x368 -- IDS 0x6007c, trailing paragraph cut
     RenderDisplayList MotdHeader;            // +0x374 -- IDS 0x60007, trailing paragraph cut
-    // +0x380 (5 bytes): the constructor writes flags 0 and colour 0x52eaf5 (0x005671bd..
-    // 0x005671dd); nothing in the page reads it. TODO: its reader is not identified.
+    // +0x380 (5 bytes): the constructor writes flags 0 and colour 0x52eaf5; nothing in the page
+    // reads it. TODO: its reader is not identified.
     TextRenderAttributes Field_0x380;
     TextRenderContext::Image* UpPip;         // +0x388 -- interface\intro\images\uppip.bmp
     TextRenderContext::Image* DownPip;       // +0x38c -- DownPip.bmp

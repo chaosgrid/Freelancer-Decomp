@@ -139,7 +139,7 @@ static_assert(offsetof(FRp9Adapter, CanRenderWindowed) == 0x514, "adapter record
 // A vertex-buffer node: create_vb's list buffers and the values of the VB pool map.
 struct FRp9Vb
 {
-    void ReleaseGpu(); // formerly ReleaseVbGpu
+    void ReleaseGpu();
 
     unsigned long Flags;
     unsigned long Fvf;
@@ -155,7 +155,7 @@ struct FRp9Vb
 struct FRp9Ib
 {
     HRESULT LockRange(unsigned int Start, unsigned int Count, void** OutBits,
-                      unsigned int* OutStart, unsigned char bSysLock); // formerly LockIbRange
+                      unsigned int* OutStart, unsigned char bSysLock);
 
     unsigned long Flags;
     IDirect3DIndexBuffer9* Gpu;
@@ -195,9 +195,9 @@ struct FRp9StreamDirtyFlags
 
 struct FRp9StreamCache
 {
-    void Reset(); // formerly ResetStreamCache
-    void SelectVertexStream(FRp9Vb* Buffer, unsigned long Fvf); // formerly MarkStreamVb / MarkStreamFvf
-    void SelectIndices(FRp9Ib* Buffer, unsigned int BaseVertex); // formerly MarkStreamScratchIb / SelectIb cache stores
+    void Reset();
+    void SelectVertexStream(FRp9Vb* Buffer, unsigned long Fvf);
+    void SelectIndices(FRp9Ib* Buffer, unsigned int BaseVertex);
 
     unsigned long Fvf;
     FRp9Vb* VertexBuffer;
@@ -222,11 +222,11 @@ struct FRp9TextureBinding
 
 struct FRp9TransformCache
 {
-    void Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE Type); // formerly Rp8CommitTransform
-    void StoreAffine(const float* Matrix); // formerly StoreMatrix12
-    void LoadAffine(float* Matrix) const; // formerly LoadMatrix12
-    void StoreTransposed(const float* Matrix); // formerly StoreMatrix16
-    void LoadTransposed(float* Matrix) const; // formerly LoadMatrix16
+    void Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE Type);
+    void StoreAffine(const float* Matrix);
+    void LoadAffine(float* Matrix) const;
+    void StoreTransposed(const float* Matrix);
+    void LoadTransposed(float* Matrix) const;
 
     float Values[16];
     unsigned char bCommitted;
@@ -242,7 +242,7 @@ struct FRp9DeviceStateCaches
     // Type is a D3D8 D3DTSS_* number (the cache is indexed in D3D8 numbering); sampler states
     // are read back with GetSamplerState.
     unsigned long ReadTextureStageState(IDirect3DDevice9* Device, unsigned long Stage,
-                                        unsigned long Type); // formerly ReadTssCache
+                                        unsigned long Type);
 
     FRp9TextureStageState TextureStates[StageCount][StateCount];
     FRp9TextureBinding TextureBindings[StageCount];
@@ -281,14 +281,14 @@ struct FormatClassNode
 // StateCache globals (RP9.cpp).
 struct FRp9LightManager
 {
-    void Initialize(); // formerly LightManagerConstruct
-    int FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data); // formerly LightFindOrCreate
-    bool Remove(unsigned long Handle); // formerly LightRemove
-    unsigned char GetEnable(unsigned long Handle); // formerly LightGetEnable
-    bool Update(unsigned long Handle); // formerly LightUpdate
-    bool SetEnable(unsigned long Handle, int Enable); // formerly LightSetEnable
-    void Reset(); // formerly LightReset
-    HRESULT Flush(IDirect3DDevice9* Device); // formerly LightFlush
+    void Initialize();
+    int FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data);
+    bool Remove(unsigned long Handle);
+    unsigned char GetEnable(unsigned long Handle);
+    bool Update(unsigned long Handle);
+    bool SetEnable(unsigned long Handle, int Enable);
+    void Reset();
+    HRESULT Flush(IDirect3DDevice9* Device);
 
     long EnabledCount; // lights whose LightEnable state on the device is on
     long Generation;   // flush counter
@@ -311,12 +311,12 @@ struct FRp9RenderStateCache
 {
     static const unsigned int StateCount = 256;
 
-    void Initialize(); // formerly InitRsQueue
-    void ResetGeneration(); // formerly RsQueueResetGeneration
-    unsigned long GetPending(unsigned int StateId) const; // formerly RsQueueReadPending
-    HRESULT Apply(IDirect3DDevice9* Device, unsigned int StateId, unsigned long Value); // formerly RsQueueApply
-    bool MarkDirty(unsigned int StateId, unsigned long Value); // formerly RsQueueMarkDirty
-    void Flush(IDirect3DDevice9* Device); // formerly RsQueueFlush
+    void Initialize();
+    void ResetGeneration();
+    unsigned long GetPending(unsigned int StateId) const;
+    HRESULT Apply(IDirect3DDevice9* Device, unsigned int StateId, unsigned long Value);
+    bool MarkDirty(unsigned int StateId, unsigned long Value);
+    void Flush(IDirect3DDevice9* Device);
     // RP9 Ex only: queue every state whose requested value differs from Snapshot (a copy of
     // the Pending column taken by BeginExPass) back to the snapshot value, so the next flush
     // re-sends what the pass changed. Disabled states are untouched, as MarkDirty does.
@@ -472,7 +472,7 @@ public:
     GENRESULT DACOM_API VbMgrReleaseAll() override;
     GENRESULT DACOM_API LockVertexMemory(unsigned int Fvf, unsigned int Count, FVertexMemoryLock* Out) override;
     GENRESULT DACOM_API UnlockVertexMemory(FVertexMemoryLock* Out) override;
-    GENRESULT DACOM_API UnsupportedManagerOperation() override; // formerly VbMgrSlot7
+    GENRESULT DACOM_API UnsupportedManagerOperation() override;
     GENRESULT DACOM_API CopyVertexData(void* Dest, unsigned int Fvf,
                                       const FRpVertexSrcDesc* Source,
                                       unsigned int StartVertex, unsigned int Count) override;
@@ -502,7 +502,7 @@ public:
     GENRESULT DACOM_API LockVb(void* Handle, unsigned int* Offset, void** Out,
                                unsigned int Count) override;
     GENRESULT DACOM_API UnlockVb(void* A) override;
-    GENRESULT DACOM_API UnsupportedVertexBufferOperation(void* Handle) override; // formerly VbSlot9
+    GENRESULT DACOM_API UnsupportedVertexBufferOperation(void* Handle) override;
     GENRESULT DACOM_API SelectVb(void* A) override;
     GENRESULT DACOM_API GetVbInfo(void* Handle, unsigned int* OutFvf, unsigned int* OutCount) override;
     GENRESULT DACOM_API IsVbValid(void* A) override;
@@ -584,7 +584,7 @@ public:
     void ExRestoreStage(unsigned long Stage, const FRp9ExStageSave* Saved);
 
     GENRESULT QueryLocal(const char* Iid, void** Out);
-    void FlushDrawState(IDirect3DDevice9* Device); // formerly static FlushDrawState
+    void FlushDrawState(IDirect3DDevice9* Device);
     GENRESULT ApplySectionName(const FRp9AggDesc* Desc);
     // RP8 FUN_06d020ab (startup and create_buffers call it with the device caps, in D3D8 shape).
     // The flag part runs only after the MGSDB database loaded; the ability-map overrides run on
@@ -614,7 +614,7 @@ public:
     void ReadAdapterIdentifier8(UINT Adapter, FRp9Identifier8* Out);
     UINT AdapterModeCount(UINT Adapter);
     HRESULT EnumAdapterMode(UINT Adapter, UINT Index, D3DDISPLAYMODE* Out);
-    // FUN_06d0b607 / FUN_06d0bb58: MulTransform(diag(1,1,-1), M12) — negate row2 + Tz.
+    // FUN_06d0b607 / FUN_06d0bb58: MulTransform(diag(1,1,-1), M12).
     void MulZFlip12(float* Out12, const float* In12);
     void ApplyIdentityTransforms();
     void ApplyDeviceViewport();

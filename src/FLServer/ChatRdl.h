@@ -12,12 +12,10 @@
 
 #include "common_text.h"
 
-// The list's value type: owns one node. The send handlers keep one on the stack ([esp+8] /
-// [esp+0xc]) for the first clone of their stack node. Destructor .text:004144f0: when the
-// node is non-null, its scalar deleting destructor (vtable +0x00, flag 1), then the pointer
-// is nulled. Retail inlines it on the normal path (e.g. 0041432a..00414340) and calls 004144f0
-// from the unwind funclets (account 0041ab48 / 0041ab5f, system 0041acc8 / 0041acdf, universe
-// 0041ad58 / 0041ad6f), so the port holds the first clone in this RAII object.
+// The list's value type: owns one node. The send handlers keep one on the stack for the first
+// clone of their stack node. Destructor .text:004144f0 deletes a non-null node and nulls the
+// pointer; retail inlines it on the normal path and calls it from the unwind funclets, so the
+// port holds the first clone in this RAII object.
 struct FChatRdlNodeHolder
 {
 	explicit FChatRdlNodeHolder(RDLNode* InNode)

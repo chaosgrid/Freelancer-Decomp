@@ -20,10 +20,7 @@
 // DAT_0067ecbc.
 bool G_bFpExceptionTrap = false;
 
-// FUN_00417c50 (.text:00417c50-00417c91).
-//   ESI = Src; EAX = 0; if Src == 0 return 0 (Dest untouched).
-//   EAX = strlen(Src) (REPNE SCASB); if EAX >= Capacity: EAX = Capacity - 1 (JC skips when below).
-//   copy EAX bytes (MOVSD/MOVSB), Dest[EAX] = 0, return EAX.
+// FUN_00417c50.
 unsigned CopyBoundedString(char* Dest, unsigned Capacity, const char* Src)
 {
     if (Src == nullptr)
@@ -37,20 +34,18 @@ unsigned CopyBoundedString(char* Dest, unsigned Capacity, const char* Src)
     return Length;
 }
 
-// FUN_005621a0 (.text:005621a0-005626aa), __thiscall(this = &DAT_00679bc0, FClientCommandLine*),
-// called once from WinMain at 0x005b31dd.
+// FUN_005621a0, __thiscall(this = &DAT_00679bc0, FClientCommandLine*), called once from WinMain.
 void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* CommandLine)
 {
-    // 0x005621c8..0x005621e0: scatter the 71 descriptors at .data:006143b8 into this+0x28.
-    // No bound check: every Index in the constant table is in range.
+    // Scatter the 71 descriptors at .data:006143b8 into this+0x28. No bound check: every Index
+    // in the constant table is in range.
     for (int Row = 0; Row < GGameOptionDescCount; ++Row)
         Options->options[GGameOptionDescs[Row].Index] = GGameOptionDescs[Row].DefaultValue;
 
-    // 0x005621e2..0x00562215.
     Options->ini_path.Length = CopyBoundedString(Options->ini_path.Text, 0x104, "Freelancer.ini");
     Options->data_path.Length = CopyBoundedString(Options->data_path.Text, 0x104, "..\\Data");
 
-    // 0x00562225..0x00562265, in retail's store order.
+    // In retail's store order.
     Options->field_878 = 0;
     Options->quick_flag = 0;
     Options->color_bpp = -1;
@@ -65,8 +60,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     Options->mode_field00 = -1;
     Options->fullscreen = 1;
 
-    // [ESP+0x14]: the movie_file counter, zeroed at 0x00562269 and kept across every [Startup]
-    // section in the file.
+    // The movie_file counter is kept across every [Startup] section in the file.
     int MovieCount = 0;
 
     INI_Reader Reader;
@@ -105,7 +99,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
                     {
                         do
                         {
-                            // 0x00562378: the count is tested after the name, and bumped before the
+                            // The count is tested after the name, and bumped before the
                             // null check, so a null value still uses up a slot.
                             if (Reader.is_value("movie_file") && MovieCount < 3)
                             {
@@ -167,12 +161,11 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     }
     else
     {
-        // 0x005624a0.
         FDUMP(0x100001, "%s(%d) : *** ERROR: Unable to read Freelancer config file (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\config.cpp", 0x17f, Options->ini_path.Text);
     }
 
-    // 0x005624c1..0x0056252b: "+Q"/"-Q" and "+X"/"-X". A token that does not start with '+' or
+    // "+Q"/"-Q" and "+X"/"-X". A token that does not start with '+' or
     // '-' clears both the sign and the letter, so it matches nothing. The sign is '+'
     // (anything but '-'); "Q" ignores it.
     for (unsigned Index = 0; Index < CommandLine->Count; ++Index)
@@ -191,22 +184,19 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
         else if (Letter == 'X')
             G_bFpExceptionTrap = bPlus;
     }
-
-    // 0x0056252f..0x005626a3 is the inlined INI_Reader destructor.
 }
 
-// FUN_004242e0 (.text:004242e0-00424434), __thiscall(this = render mode block,
-// FClientCommandLine*), RET 4. The only caller is InitializeEngine (0x005b1799), on its local mode
-// block after PerfOptions.ini has filled it.
+// FUN_004242e0, __thiscall(this = render mode block, FClientCommandLine*). The only caller is
+// InitializeEngine, on its local mode block after PerfOptions.ini has filled it.
 bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLine* CommandLine)
 {
-    bool bFound = false; // [ESP+local_6]
+    bool bFound = false;
 
     for (unsigned Index = 0; Index < CommandLine->Count; ++Index)
     {
         const char* Token = CommandLine->Argv[Index];
-        bool bPlus = false; // BL: '+' sets it, '-' clears it (SETNZ after CMP AL,'-')
-        char Letter = 0;    // [ESP+local_5]; zero for a token without a sign
+        bool bPlus = false;
+        char Letter = 0;    // zero for a token without a sign
         const char* Tail = Token;
         if (Token[0] == '+' || Token[0] == '-')
         {
@@ -215,7 +205,6 @@ bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLin
             Tail = Token + 2;
         }
 
-        // switchD_00424358: Letter - 'B' in [0, 0x15], table at 0x00424438 / 0x0042444c.
         switch (Letter)
         {
         case 'B':

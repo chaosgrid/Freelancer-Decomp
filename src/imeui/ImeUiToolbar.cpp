@@ -30,14 +30,13 @@ void ImeUi_RenderToolbar(const _IMEUI_APPEARANCE& Appearance, const RECT& Boundi
     const float Diameter = static_cast<float>(Appearance.SymbolHeight);
     const double Radius = static_cast<double>(Diameter) * 0.5;
     FIMEToolbarVertex Vertices[16] = {};
-    // Screen dimensions are loaded as zero-extended qwords by retail FILD.
+    // Retail loads the screen dimensions as unsigned (zero-extended qword FILD).
     const double Width = static_cast<unsigned>(ScreenWidth);
     const double Height = static_cast<unsigned>(ScreenHeight);
     switch (Appearance.SymbolPosition)
     {
     case 0:
-        // FCOMPP Width vs Diameter+right+4; TEST AH,05 + JP selects
-        // the right side on greater/equal (both masked bits zero).
+        // Right side on greater/equal; less or unordered takes the left.
         if (Width >= static_cast<double>(Diameter) + Bounding.right + 4.0)
             Vertices[0].X = static_cast<float>((static_cast<double>(Bounding.right) - Radius) + Diameter + 4.0);
         else
@@ -65,8 +64,7 @@ void ImeUi_RenderToolbar(const _IMEUI_APPEARANCE& Appearance, const RECT& Boundi
 
     if (bActive)
     {
-        // FCOMP 250; AND EAX,4100 + JNZ skips update for <= or unordered.
-        // Fall-through (greater) advances exactly once, without catch-up.
+        // <= or unordered skips; greater advances exactly once, without catch-up.
         if (static_cast<double>(GetTickCount()) - GToolbarLastTick > 250.0)
         {
             ++GToolbarPhase;

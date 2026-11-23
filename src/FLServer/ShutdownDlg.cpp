@@ -10,7 +10,7 @@
 
 namespace
 {
-	// SetTimer id used by OnInitDialog (.text:00415ef6) and tested by OnTimer (.text:00415f90).
+	// SetTimer id used by OnInitDialog and tested by OnTimer.
 	const UINT_PTR ShutdownPollTimerId = 0x3001;
 }
 
@@ -21,13 +21,13 @@ CShutdownDlg::CShutdownDlg(CWnd* Parent)
 {
 }
 
-// .text:00415ea0 — retail body is empty (CWnd::DoDataExchange is an empty inline).
+// .text:00415ea0 — empty in retail.
 void CShutdownDlg::DoDataExchange(CDataExchange* DX)
 {
 	CDialog::DoDataExchange(DX);
 }
 
-// Message map .rdata:0041e5d8: WM_TCARD -> 00415f80, WM_TIMER -> 00415f90.
+// Message map .rdata:0041e5d8.
 BEGIN_MESSAGE_MAP(CShutdownDlg, CDialog)
 	ON_WM_TCARD()
 	ON_WM_TIMER()
@@ -49,7 +49,7 @@ BOOL CShutdownDlg::OnInitDialog()
 	return TRUE;
 }
 
-// .text:00415f80 — swallows WM_TCARD (retail body is a bare RET 8).
+// .text:00415f80 — swallows WM_TCARD.
 void CShutdownDlg::OnTCard(UINT Action, DWORD ActionData)
 {
 }

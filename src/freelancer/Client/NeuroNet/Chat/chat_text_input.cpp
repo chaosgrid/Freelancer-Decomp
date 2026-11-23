@@ -27,7 +27,7 @@
 #include <string.h>
 
 // Retail DAT_0066d920 -- WINFACTORY<ChatTextInputDisplay> static (LAB_0045e270; Create
-// FUN_0046be00: operator_new(0x5a8), FUN_0046be40, slot 9, delete on failure).
+// FUN_0046be00).
 WINFACTORY<ChatTextInputDisplay> G_ChatTextInputDisplayFactory("ChatTextInputDisplay");
 
 namespace
@@ -67,8 +67,7 @@ namespace
 // FChatBackground
 
 FChatBackground::FChatBackground()
-    // FUN_0046be40 0x0046be45..0x0046be7d: the string, vftable 0x005cef80, +0x15 = 0,
-    // +0x24 / +0x20 / +0x1c = 0, +0x18 = -1.
+    // Inlined in FUN_0046be40.
     : bLoaded(0)
     , LibraryHandle(-1)
     , TextureId(nullptr)
@@ -102,14 +101,10 @@ namespace
     FChatBgStageState const kChatBgStage0[] = {{1, 4}, {2, 2}, {3, 0}, {4, 4}, {5, 2}, {6, 0}, {0, 0}};
     FChatBgStageState const kChatBgStage1[] = {{1, 1}, {2, 2}, {3, 1}, {4, 1}, {5, 2}, {6, 1}, {0, 0}};
 
-    // DAT_00611578 -- the quad's vertex colour, copied byte by byte into the batch's +0x30..+0x33
-    // (0x0045e67b..0x0045e69f): bytes 00 00 80 b0.
+    // DAT_00611578 -- the quad's vertex colour, copied byte by byte into the batch.
     unsigned char const kChatBgColor[4] = {0x00, 0x00, 0x80, 0xb0};
 
-    // The vertex batch FUN_0045e470 builds on its stack (0x0045e61a..0x0045e69f): Type 1, empty
-    // buffers, FVF 0x142, the current pipeline AddRef'd (vt+4), growth 0x80, strip state and UV
-    // zero, colour DAT_00611578. Its destructor is FUN_0046e9c0 -- the unwind funclet at
-    // 0x005ba383 and, inlined, the normal path 0x0045e798..0x0045e7c3.
+    // The vertex batch FUN_0045e470 builds on its stack; its destructor is FUN_0046e9c0.
     struct FChatBgBatch
     {
         FChatBgBatch()
@@ -150,9 +145,8 @@ namespace
 
 bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
 {
-    // FUN_0045e470 (thiscall, RET 0xc). Both tile sizes are compared with 0.0f (DAT_005c7474,
-    // FCOMP / TEST AH,0x44 / JNP: only an equal compare leaves, unordered goes on); nothing
-    // without a loaded texture either. Returns 0 on those exits and 1 after drawing.
+    // FUN_0045e470. x87: only an equal compare with 0.0f (DAT_005c7474) leaves; unordered goes
+    // on.
     if (TileWidth == 0.0f)
         return false;
     if (TileHeight == 0.0f)
@@ -160,9 +154,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     if (bLoaded == 0)
         return false;
 
-    // 0x0045e4c1..0x0045e554: render states (Pipeline slot 60, re-read from DALib::Pipeline for
-    // every call): lighting off, z-write off, alpha blend on, 0x89 off, src/dest blend
-    // SRCALPHA / INVSRCALPHA, 0x1b on.
+    // Retail re-reads DALib::Pipeline for every call.
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
@@ -171,8 +163,8 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 6);
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
 
-    // 0x0045e555..0x0045e5a9: the two stage tables (slot 62), the first type read as the
-    // constant 1, each next type from the table until a zero one.
+    // The two stage tables; the first type is the constant 1, each next type from the table
+    // until a zero one.
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
         FChatBgStageState const* Entry = kChatBgStage0;
@@ -199,27 +191,22 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
                 break;
         }
     }
-    // 0x0045e5ab..0x0045e5d0: stage 0 ADDRESSU / ADDRESSV = WRAP.
+    // Stage 0 ADDRESSU / ADDRESSV = WRAP.
     DALib::Pipeline->SetTextureStageState(0, 0xd, 1);
     DALib::Pipeline->SetTextureStageState(0, 0xe, 1);
 
-    // 0x0045e5d6..0x0045e602: TextureLib slot 22 (texture, frame 0, 5-dword out); on success
-    // the handle (out[0]) goes to stage 0 (Pipeline slot 66).
     unsigned long Frame[5];
     if (DALib::TextureLib->GetTextureFrame(TextureId, 0, Frame) == 0)
         DALib::Pipeline->SetTextureStageTexture(0, reinterpret_cast<void*>(Frame[0]));
 
-    // 0x0045e608..0x0045e617: Pipeline slot 31 with the control's orientation.
     DALib::Pipeline->SetModelview(Orientation);
 
-    // 0x0045e61a..0x0045e6a3: the stack batch, then FUN_0046ebc0.
     FChatBgBatch Local;
     FEffectVertexBatch* const Batch = &Local.Batch;
-    EffectVertexBatchReset(Batch);
+    EffectVertexBatchReset(Batch);                                  // FUN_0046ebc0
 
-    // 0x0045e6a8..0x0045e749: a triangle list (type 4) in quad mode -- FUN_0046eab0 turns the
-    // fourth vertex into two triangles. UV repeats the tile over the box: U = x / +0x20,
-    // V = y / +0x24, the box running from (0, 0) to (Width, -Height).
+    // A triangle list (type 4) in quad mode -- FUN_0046eab0 turns the fourth vertex into two
+    // triangles. UV repeats the tile over the box from (0, 0) to (Width, -Height).
     float const V1 = Height / TileHeight;
     Batch->Type = 4;
     Batch->Flag28 = 0;
@@ -241,8 +228,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     Batch->V = 0.0f;
     EffectVertexBatchAppend(Batch, 0.0f, Bottom, 0.0f);
 
-    // 0x0045e74a..0x0045e78e: with vertices -- a closed batch (+0x28) repeats its first vertex
-    // at the end; then Pipeline slot 69 (the batch's own AddRef'd pipeline, when it has one).
+    // A closed batch (+0x28) repeats its first vertex at the end.
     int Count = Batch->VertCount;
     if (Count != 0)
     {
@@ -258,7 +244,6 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
                                            static_cast<unsigned>(Count), nullptr);
         }
     }
-    // 0x0045e798..0x0045e7c3: the batch's destructor (FUN_0046e9c0 inlined) -- ~FChatBgBatch.
     return true;
 }
 
@@ -266,11 +251,8 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
 // ChatTextInputDisplay
 
 ChatTextInputDisplay::ChatTextInputDisplay()
-    // FUN_0046be40: RichTextEditWin's ctor (FUN_0057b8d0), the background, the BinaryRDLWriter
-    // (+0x564), Target = 0 (+0x568..+0x56b), the five prefix lists (FUN_0046ba60 / the Common
-    // RenderDisplayList ctor), then the three vftables. Retail does NOT initialise +0x530..+0x539
-    // (Create sets +0x538 / +0x539 and, with a table, +0x530); the port zeroes them -- see
-    // Update for what that changes.
+    // FUN_0046be40. Retail does NOT initialise +0x530..+0x539 (Create sets +0x538 / +0x539 and,
+    // with a table, +0x530); the port zeroes them (see Update).
     : Table(nullptr)
     , TableGeneration(0)
     , bDrawBackground(0)
@@ -281,16 +263,14 @@ ChatTextInputDisplay::ChatTextInputDisplay()
 
 ChatTextInputDisplay::~ChatTextInputDisplay()
 {
-    // FUN_0046c640: the five prefix lists (+0x59c first), the background (FUN_0045e3e0 inline),
-    // then RichTextEditWin's dtor (FUN_0057bbf0) -- member and base destructors.
+    // FUN_0046c640.
 }
 
 bool ChatTextInputDisplay::Create(Win3D* NewParent, void* /*Data*/)
 {
-    // FUN_0045eee0 (RET 8): RichTextWin's Create (FUN_0057b5a0) with (Parent, 0).
-    bool const bResult = RichTextWin::Create(NewParent, nullptr);
+    // FUN_0045eee0.
+    bool const bResult = RichTextWin::Create(NewParent, nullptr);   // FUN_0057b5a0
 
-    // 0x0045ef0e..0x0045ef52
     bDrawFrame = 1;                              // +0x402
     bDrawBackground = 1;                         // +0x538
     bCloseAfterSend = 0;                         // +0x539
@@ -298,28 +278,24 @@ bool ChatTextInputDisplay::Create(Win3D* NewParent, void* /*Data*/)
     Background.TileHeight = 0.0533f;             // +0x560 = 0x3d5a740d
     Background.Name.assign("ChatBackground");    // +0x540 (s_ChatBackground_005cf030)
 
-    // 0x0045ef58..0x0045ef76: DAT_005ceedc / DAT_005ceee0.
-    NormWidth = 0.46f;                           // 0x3eeb851f
-    NormHeight = 0.065f;                         // 0x3d851eb8
+    NormWidth = 0.46f;                           // DAT_005ceedc
+    NormHeight = 0.065f;                         // DAT_005ceee0
 
-    // 0x0045ef5e..0x0045f423: the five target prefixes -- the IDS text with its last paragraph
-    // stripped, or JustifyNode(1) + the English debug text.
+    // The five target prefixes -- the IDS text with its last paragraph stripped, or
+    // JustifyNode(1) + the English debug text.
     LoadIdsTextIntoRdl(0x6003b, PrefixSystem, L"DEBUG - system");       // +0x56c
     LoadIdsTextIntoRdl(0x6003a, PrefixLocal, L"DEBUG - local");         // +0x578
     LoadIdsTextIntoRdl(0x60039, PrefixGroup, L"DEBUG - group");         // +0x584
     LoadIdsTextIntoRdl(0x60038, PrefixConsole, L"DEBUG - console");     // +0x590
     LoadIdsTextIntoRdl(0x6003c, PrefixUniverse, L"DEBUG - universe");   // +0x59c
 
-    // 0x0045f429..0x0045f44f: the channel table when it exists; fixed style; the system channel;
-    // the display.
     if (G_ChatChannelTable != nullptr)
         Table = G_ChatChannelTable;
     SetFixedStyle(true);                 // FUN_0057bdd0(1)
     SetTarget(G_ChatIdChannel1);         // FUN_0045eaf0(&DAT_0066da40)
     RebuildDisplay();                    // FUN_0057d330
 
-    // 0x0045f454..0x0045f4c4: the half extents (+0xb4) and hit offset (+0xc0) both
-    // {W * 0.5, H * 0.5, 0} (DAT_005c75e0 = 0.5f), draw layer and sub-layer 7.
+    // DAT_005c75e0 = 0.5f.
     float const HalfW = NormWidth * 0.5f;
     float const HalfH = NormHeight * 0.5f;
     HalfExtents[0] = HalfW;
@@ -335,8 +311,8 @@ bool ChatTextInputDisplay::Create(Win3D* NewParent, void* /*Data*/)
 
 void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
 {
-    // FUN_0045eaf0 (RET 4). The style, the prefix list and the frame colour by target; a player
-    // target uses its name from the channel table ("????" text when there is no table).
+    // FUN_0045eaf0. A player target uses its name from the channel table ("????" text when
+    // there is no table).
     wchar_t const* Text = kTargetSpace;
     unsigned short Style = 0;
     RenderDisplayList const* Name = nullptr;
@@ -373,7 +349,6 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
     }
     else
     {
-        // 0x0045ebb7..0x0045ebf2: FUN_0046cd50 find; the node's list or null.
         Style = 0x8283;
         if (Table != nullptr)
             Name = Table->FindName(Id);
@@ -382,14 +357,11 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
         Color = kColorPlayer;
     }
 
-    // 0x0045ebf7..0x0045ec00: FUN_00579870(colour), +0x568 = *Id.
     unsigned long ColorWord = 0;
     memcpy(&ColorWord, Color, 4);
     SetFrameColor(&ColorWord);
     Target = Id;
 
-    // 0x0045ec06..0x0045ecd6: the edit prefix list (+0x4dc) emptied (FUN_0046c860), then the
-    // style and the leading text.
     RdlClear(Prefix);
     {
         StyleNode const Node(Style);
@@ -400,18 +372,14 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
         AppendNodeClone(Prefix, Node);
     }
 
-    // 0x0045ecdc..0x0045ed4f: a clone of every node of the name list.
     if (Name != nullptr)
         ChatAppendRdlCopy(Prefix, *Name);
 
-    // 0x0045ed51..0x0045edd2: TextNode(L"->", -1).
     {
         TextNode const Node(kTargetArrow, -1);
         AppendNodeClone(Prefix, Node);
     }
 
-    // 0x0045edd8..0x0045ee92: the fixed-style list (+0x4fc) emptied node by node
-    // (FUN_0046d680), then StyleNode(style).
     RdlClear(FixedStyle);
     {
         StyleNode const Node(Style);
@@ -421,14 +389,14 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
 
 void ChatTextInputDisplay::NextTarget()
 {
-    // FUN_0045e800. Own = {connection id word, 0, 0}; the result starts as {0, 0, 0}.
+    // FUN_0045e800. Retail does not test Table for null.
     CHAT_ID const Own(GetPlayerConnectionId() & 0xffffu);
     CHAT_ID Result(0u);
 
     if (Target.Id == G_ChatIdChannel1.Id)
     {
-        // 0x0045e840..0x0045e88e: from the first entry, the first player (byte 2 clear) that is
-        // not us; the system channel when there is none.
+        // From the first entry, the first player that is not us; the system channel when there
+        // is none.
         Result = G_ChatIdChannel1;
         for (FChatChannelTable::FNameMap::iterator It = Table->Names.begin();
              It != Table->Names.end(); ++It)
@@ -444,14 +412,12 @@ void ChatTextInputDisplay::NextTarget()
     }
     else if (Target.Id == G_ChatIdChannel3.Id)
     {
-        // 0x0045e8cf..0x0045e8db
         Result = G_ChatIdChannel1;
     }
     else
     {
-        // 0x0045e8dd..0x0045e93a: from the current target onwards, the next entry that is not
-        // us (a channel counts); past the last one, the group channel. An unknown target
-        // leaves {0, 0, 0}.
+        // From the current target onwards, the next entry that is not us (a channel counts);
+        // past the last one, the group channel. An unknown target leaves {0, 0, 0}.
         FChatChannelTable::FNameMap::iterator It = Table->Names.find(Target.Id);
         if (It != Table->Names.end())
         {
@@ -471,7 +437,7 @@ void ChatTextInputDisplay::NextTarget()
         }
     }
 
-    // 0x0045e890..0x0045e8bd: the group channel only with a non-empty group.
+    // The group channel only with a non-empty group.
     if (Result.Id == G_ChatIdChannel3.Id && ChatGroupIsEmpty())
         Result = G_ChatIdChannel1;
     SetTarget(Result);
@@ -485,13 +451,12 @@ void ChatTextInputDisplay::PrevTarget()
 
     if (Target.Id == G_ChatIdChannel1.Id && !ChatGroupIsEmpty())
     {
-        // 0x0045e983..0x0045e998
         Result = G_ChatIdChannel3;
     }
     else if (Target.Id == G_ChatIdChannel3.Id || Target.Id == G_ChatIdChannel1.Id)
     {
-        // 0x0045ea2c..0x0045eaa1: from the last entry backwards; a channel stops the walk, the
-        // first player that is not us wins; the system channel otherwise.
+        // From the last entry backwards; a channel stops the walk, the first player that is
+        // not us wins; the system channel otherwise.
         Result = G_ChatIdChannel1;
         FChatChannelTable::FNameMap::iterator It = Table->Names.end();
         while (It != Table->Names.begin())
@@ -509,8 +474,8 @@ void ChatTextInputDisplay::PrevTarget()
     }
     else
     {
-        // 0x0045e9b9..0x0045ea27: from the current target backwards, the same rules. Stepping
-        // back from the first entry lands on the head (end) and stops.
+        // From the current target backwards, the same rules. Stepping back from the first
+        // entry lands on the head (end) and stops.
         Result = G_ChatIdChannel1;
         FChatChannelTable::FNameMap::iterator It = Table->Names.find(Target.Id);
         if (It != Table->Names.end())
@@ -530,7 +495,6 @@ void ChatTextInputDisplay::PrevTarget()
         }
     }
 
-    // 0x0045eaa7..0x0045ead6
     if (Result.Id == G_ChatIdChannel3.Id && ChatGroupIsEmpty())
         Result = G_ChatIdChannel1;
     SetTarget(Result);
@@ -544,7 +508,6 @@ void ChatTextInputDisplay::Update()
     FChatChannelTable* const Current = Table;
     if (Current != nullptr && TableGeneration != Current->Generation)
     {
-        // 0x0045f60f..0x0045f642: FUN_0046d920 lower_bound, key test (JA = not found).
         if (Current->Names.find(Target.Id) == Current->Names.end())
         {
             CHAT_ID const Fallback = G_ChatIdChannel1;
@@ -571,9 +534,8 @@ void ChatTextInputDisplay::Draw()
     {
         if (Background.bLoaded == 0)
         {
-            // 0x0045f521..0x0045f5af: "<image root>chat.txm" loaded as a texture library
-            // (FUN_0041c7e0) into +0x18; the texture named by the CRC of the background's
-            // name looked up (TextureLib slot 12 with {name, crc}) into +0x1c; loaded on S_OK.
+            // FUN_0041c7e0 loads the library; the texture is looked up by the CRC of the
+            // background's name.
             std::string Path = G_ChatImageRoot;
             Path.append("chat.txm");
             Background.LibraryHandle = MiscUtilLoadTextureLibrary(Path.c_str());
@@ -587,7 +549,7 @@ void ChatTextInputDisplay::Draw()
             if (DALib::TextureLib->FindTextureByCrc(&Query, &Background.TextureId) == 0)
                 Background.bLoaded = 1;
         }
-        // 0x0045f5b3..0x0045f5c7: drawn whether or not the load succeeded.
+        // Drawn whether or not the load succeeded.
         Background.Draw(Orientation, NormWidth, NormHeight);   // FUN_0045e470
     }
     RichTextEditWin::Draw();   // FUN_0057c440
@@ -595,17 +557,15 @@ void ChatTextInputDisplay::Draw()
 
 bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
 {
-    // FUN_0045f700 (RET 4): key-downs of an active line only; Enter, Escape, Up and Down through
-    // the byte table at 0x0045f83c (Key - 0xd); everything else to RichTextEditWin.
+    // FUN_0045f700: key-downs of an active line only.
     if (Record->Byte18 != 0 && (Flags & 1) != 0)
     {
         switch (Record->Key)
         {
         case 0x0d:
         {
-            // 0x0045f73a..0x0045f7d3: a non-empty line is serialised from the text list (+0x4e8)
-            // and submitted from us to the target; the line is cleared either way, and a line
-            // opened for one message closes.
+            // A non-empty line is serialised and submitted; the line is cleared either way, and
+            // a line opened for one message closes.
             if (GetText(nullptr, 0) > 0)
             {
                 unsigned OutSize = 0;
@@ -628,17 +588,14 @@ bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
             return true;
         }
         case 0x1b:
-            // 0x0045f7d6
             ClearText();
             ChatSetInputOpen(false);
             return true;
         case 0x26:
-            // 0x0045f7ee
             PrevTarget();
             RebuildDisplay();
             return true;
         case 0x28:
-            // 0x0045f803
             NextTarget();
             RebuildDisplay();
             return true;
@@ -646,25 +603,24 @@ bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
             break;
         }
     }
-    return RichTextEditWin::OnKeyDown(Record);   // 0x0045f818
+    return RichTextEditWin::OnKeyDown(Record);
 }
 
 void ChatTextInputDisplay::OnActivated()
 {
-    // LAB_0045f6a0: FUN_005760d0(0x14) on the +0x498 face.
+    // LAB_0045f6a0 (on the +0x498 face).
     RegisterEvent(0x14);
 }
 
 void ChatTextInputDisplay::OnDeactivating()
 {
-    // LAB_0045f6b0: FUN_005760f0(0x14).
+    // LAB_0045f6b0.
     UnregisterEvent(0x14);
 }
 
 bool ChatTextInputDisplay::OnEvent(unsigned MsgId)
 {
-    // FUN_0045f6c0 (RET 4, this = the face): 0x14 clears and closes the line and posts 0x14 on;
-    // anything else goes to FUN_0057c930.
+    // FUN_0045f6c0 (this = the face): 0x14 clears and closes the line and posts 0x14 on.
     if (MsgId != 0x14)
         return RichTextEditWin::OnEvent(MsgId);
     ClearText();

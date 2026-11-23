@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll hardpoint lookups: FindHardpoint / FindHardpoint_OS / FindHardpoint_PS,
-// HardpointToWorld and HardpointSummary. Split out of common_goods.cpp.
+// HardpointToWorld and HardpointSummary.
 
 #include "common_goods.h"
 #include "common_cobject.h" // CompoundInstanceAnalyze
@@ -28,11 +28,7 @@ namespace
     // handle it matched on, which for a child hit is the child's, not the caller's.
     bool FindHardpointCore(long Handle, char const* Name, long* OutHandle, HardpointInfo* OutInfo)
     {
-        // Retail FUN_0630e870 (Common.dll.txt 310643+): loads DALib::Engine and immediately
-        // dereferences — no null checks on Engine, Hardpoint, Name, or the out pointers.
-        // Callers in src/ (CEEngine nozzles, CETractor HpTractorSource) always pass stack
-        // OutHandle/OutInfo and a non-null Name (CacheString / null-checked HpTractorSource);
-        // Engine/Hardpoint are live once any CObject has an EngineInstanceId.
+        // No null checks on Engine, Hardpoint, Name or the out pointers, as in retail.
         IEngine* const Engine = DALib::Engine;
 
         // The archetype (part) handle of the instance; -1 when there is none.
@@ -40,14 +36,13 @@ namespace
         if ((long)Part == kNoEngineHandle)
             return false;
 
-        // 0630e89e writes the name, 0630e8b0 the CRC just above it -- FHardpointKey.
         FHardpointKey Query;
         Query.Name = Name;
         Query.Crc = DACOM_CRC::GetCRC32(Name);
 
         bool const bFound = DALib::Hardpoint->GetHardpoint(Part, &Query, OutInfo) != 0;
 
-        // 0630e8d4: the part is released whether or not the name matched.
+        // The part is released whether or not the name matched.
         Engine->ReleaseHandle(Part);
 
         if (bFound)
@@ -71,13 +66,12 @@ namespace
     // which is exactly the port's Transform.
     Transform const* EngineGetTransform(long Handle)
     {
-        // Retail FindHardpoint_PS (0630e9c6) loads Engine and calls +0xa0 with no null gate.
+        // No null gate, as in retail.
         IEngine* const Engine = DALib::Engine;
         return (Transform const*)Engine->GetInstanceTransform((void*)Handle);
     }
 
-    // 3DMathEngine slot 7 (+0x1c, MulTransform): Out = Parent * Local - what retail's
-    // hardpoint functions call (0630e9fe, 0630eb19, 0630ec0c). Transform and FTransform have
+    // Out = Parent * Local via the 3DMathEngine's MulTransform. Transform and FTransform have
     // the same layout.
     void ComposeTransform(Transform& Out, Transform const& Parent, Transform const& Local)
     {
@@ -88,8 +82,7 @@ namespace
 
 bool __cdecl FindHardpoint(long Handle, char const* Name, long& OutHandle)
 {
-    // 0630e940-0630e95f: FUN_0630e870 with a 0x48-byte uninitialised stack scratch for the
-    // info, which is thrown away.
+    // FUN_0630e940; the info goes to an uninitialised scratch that is thrown away.
     HardpointInfo Scratch;
     return FindHardpointCore(Handle, Name, &OutHandle, &Scratch);
 }
@@ -104,14 +97,11 @@ bool __cdecl FindHardpoint_OS(long Handle, char const* Name, long& OutHandle,
 bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
                               HardpointInfo& OutInfo)
 {
-    // 0630e960-0630eb61. FUN_0630e870 finds the hardpoint (a miss is false); when it sits on
-    // Handle itself the object-space info is returned as is. Otherwise the hardpoint frame L
-    // is lifted to world through the found instance's transform (Engine +0xa0, MulTransform:
-    // W = T_found * L, written back into OutInfo and into L), then brought into Handle's
-    // space with the inverse of Handle's transform, built by hand: v = TransposeTransform
-    // (+0x38) of T_handle's rotation applied to its translation, Inv = {transpose of the
-    // rotation (FUN_06284f70 fed column-wise), -v (FUN_0628b030)} (FUN_0630f140), and
-    // OutInfo = Inv * W (MulTransform). No null checks of either engine transform.
+    // FUN_0630e960. A hardpoint on Handle itself is returned in object space. Otherwise its
+    // frame is lifted to world through the found instance's transform, then brought into
+    // Handle's space with the inverse of Handle's transform built by hand (FUN_0630f140:
+    // transposed rotation, minus the transposed-rotated translation). No null checks of either
+    // engine transform.
     if (!FindHardpointCore(Handle, Name, &OutHandle, &OutInfo))
         return false;
     if (OutHandle == Handle)
@@ -151,8 +141,7 @@ bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
 
 void __cdecl HardpointToWorld(long Handle, HardpointInfo& Info)
 {
-    // 0630eba0-0630ec36: L = {Info.Orient, Info.Position}; T = Engine +0xa0 (no null check);
-    // W = T * L (3DMathEngine +0x1c); Info.Position = W.Translation, Info.Orient = W.Rotation.
+    // FUN_0630eba0. No null check on the engine transform.
     Transform const* const Parent = EngineGetTransform(Handle);
 
     Transform Local;
@@ -169,7 +158,7 @@ void __cdecl HardpointToWorld(long Handle, HardpointInfo& Info)
 // HardpointSummary
 // ---------------------------------------------------------------------------
 
-// 063345c0: vftable, +4..+0x10 = 0, +0x14/+0x18 = -1, +0x1c = 0.
+// 063345c0
 HardpointSummary::HardpointSummary()
     : Count(0)
     , Names(nullptr)
@@ -181,8 +170,8 @@ HardpointSummary::HardpointSummary()
 {
 }
 
-// 06273150: dwords +4..+0x1c copied as they are (the three array pointers are shared, so
-// destroying both copies frees them twice -- retail's own hazard), then the vftable.
+// 06273150: a shallow copy -- the three array pointers are shared, so destroying both copies
+// frees them twice (retail's own hazard).
 HardpointSummary::HardpointSummary(HardpointSummary const& Other)
     : Count(Other.Count)
     , Names(Other.Names)
@@ -194,13 +183,13 @@ HardpointSummary::HardpointSummary(HardpointSummary const& Other)
 {
 }
 
-// 063345f0: vftable store, then destroy()'s body inlined.
+// 063345f0: destroy() inlined.
 HardpointSummary::~HardpointSummary()
 {
     destroy();
 }
 
-// 06273190: dwords +4..+0x1c copied (no vftable store, no self test, nothing freed).
+// 06273190: shallow; no self test, nothing freed.
 HardpointSummary& HardpointSummary::operator=(HardpointSummary const& Other)
 {
     Count = Other.Count;
@@ -213,7 +202,7 @@ HardpointSummary& HardpointSummary::operator=(HardpointSummary const& Other)
     return *this;
 }
 
-// 06334660: +4..+0x10 = 0, +0x14/+0x18 = -1, +0x1c = 0 (nothing freed).
+// 06334660 (nothing freed).
 void HardpointSummary::clear()
 {
     Count = 0;
@@ -225,9 +214,7 @@ void HardpointSummary::clear()
     FillCursor = 0;
 }
 
-// 06334680: malloc_strfree on each of the Count names, operator delete on the three arrays
-// (no null tests -- delete of null is a no-op, and Count > 0 implies the name array exists),
-// then the clear() stores.
+// 06334680. No null tests (Count > 0 implies the name array exists).
 void HardpointSummary::destroy()
 {
     int Index = 0;
@@ -305,7 +292,7 @@ HardpointInfo const* HardpointSummary::get_info_by_name(char const* Name) const
     return Result;
 }
 
-// 06334810: ++Context->Count.
+// 06334810
 void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
 {
     (void)Name;
@@ -313,9 +300,7 @@ void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
     Self->Count++;
 }
 
-// 06334820: Part = DALib::Engine slot 25 (+0x64) on the instance; DALib::Hardpoint slot 5
-// (+0x14) enumerates the part's names into hardpoint_callback1; Engine slot 15 (+0x3c)
-// releases the part. No null tests.
+// 06334820. No null tests.
 void HardpointSummary::count_hardpoints_callback(long Instance, void* Context)
 {
     void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
@@ -323,17 +308,15 @@ void HardpointSummary::count_hardpoints_callback(long Instance, void* Context)
     DALib::Engine->ReleaseHandle(Part);
 }
 
-// 06334860: Count = 0, then CompoundInstanceAnalyze with count_hardpoints_callback.
+// 06334860
 void HardpointSummary::count_hardpoints(long Instance)
 {
     Count = 0;
     CompoundInstanceAnalyze(Instance, count_hardpoints_callback, this);
 }
 
-// 06334880: malloc_strcpy(&Names[FillCursor], Name); {Name, CRC32(Name)} looked up with
-// DALib::Hardpoint slot 3 (+0x0c) on FillPart into a local 0x48-byte blob, which is copied
-// (0x12 dwords) into Infos[FillCursor] only when the low byte of the result is non-zero
-// (TEST AL,AL); Instances[FillCursor] = FillInstance; ++FillCursor. No bounds or null tests.
+// 06334880. The info is copied only when the low byte of the lookup result is non-zero. No
+// bounds or null tests.
 void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 {
     HardpointSummary* const Self = (HardpointSummary*)Context;
@@ -351,9 +334,7 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
     Self->FillCursor++;
 }
 
-// 06334900: Part = Engine slot 25 on the instance; FillInstance = instance, FillPart = part;
-// Hardpoint slot 5 enumerates the part's names into hardpoint_callback2; Engine slot 15
-// releases the part. No null tests.
+// 06334900. No null tests.
 void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
 {
     void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
@@ -364,18 +345,15 @@ void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
     DALib::Engine->ReleaseHandle(Part);
 }
 
-// 06334950: FillCursor = 0, then CompoundInstanceAnalyze with fill_hardpoints_callback.
+// 06334950
 void HardpointSummary::fill_hardpoints(long Instance)
 {
     FillCursor = 0;
     CompoundInstanceAnalyze(Instance, fill_hardpoints_callback, this);
 }
 
-// 06334970: destroy() inlined; Instance == -1 stops there. Otherwise count_hardpoints and
-// fill_hardpoints inlined around three operator new arrays (Count*4, Count*0x48, Count*4;
-// Infos left uninitialised), Names[i] = 0 and Instances[i] = -1 for every slot. Both paths end
-// with FillCursor = 0, FillInstance = FillPart = -1 and return Count. The Infos block stays
-// a raw allocation: retail leaves it uninitialised.
+// 06334970 (destroy, count and fill inlined). The Infos block stays a raw allocation: retail
+// leaves it uninitialised.
 int HardpointSummary::analyze_instance(long Instance)
 {
     destroy();
@@ -404,7 +382,7 @@ int HardpointSummary::analyze_instance(long Instance)
     return Count;
 }
 
-// 06334a60: Instances[i] = -1 for every slot.
+// 06334a60
 void HardpointSummary::expire_instance()
 {
     int Index = 0;

@@ -69,11 +69,10 @@ namespace
     unsigned G_ContactTargetId = 0;
     // DAT_00674904 / 08 / 0c -- the player's position at the start of the rebuild.
     Vector G_ContactPlayerPos = {0.0f, 0.0f, 0.0f};
-    // DAT_00674948 -- the 3DMathEngine the relayout's cursor ray uses, FUN_005b73e0 on first use
-    // (0x004d3b57).
+    // DAT_00674948 -- the 3DMathEngine the relayout's cursor ray uses, FUN_005b73e0 on first use.
     I3DMathEngine* G_ContactListMath = nullptr;
     // .data DAT_006124b8 (initial 0xffffffff) -- the scroll position the rows were last laid out
-    // for. Only Draw reads (0x004d26ef) and writes (0x004d2b59) it.
+    // for. Only Draw uses it.
     int G_ContactListLastScroll = -1;
 
     // .data DAT_00612438 -- the icon mesh of each row kind (kinds 3 and 4 share one string).
@@ -189,8 +188,8 @@ namespace
         return Value;
     }
 
-    // The player ship through the inline chain (0x004d401a..0x004d403b, 0x004d02a4..,
-    // 0x004d095f..): a non-ship gives null, which the caller then reads +0x1b4 of.
+    // The player ship through the inline chain: a non-ship gives null, which the caller then
+    // reads +0x1b4 of.
     CObject const* PlayerShipForGroup(IObjRW* Player)
     {
         CObject* const Object = InlineCObjectOf(Player);
@@ -223,8 +222,8 @@ namespace
                ShortName != 0x303b8u;
     }
 
-    // FUN_004347e0 into Buf; a zero result leaves an empty string (the callers' own
-    // `MOV word ptr [Buf], 0`).
+    // FUN_004347e0 into Buf; a zero result leaves an empty string (retail clears it at each
+    // call site).
     void IdsInto(unsigned Ids, wchar_t* Buf, int Chars)
     {
         if (GetIdsStringWWithRawFallback(Ids, Buf, Chars) == 0)
@@ -278,10 +277,8 @@ namespace
         return false;
     }
 
-    // FUN_00540990 (cdecl; retail Client\...\ObjDB, only caller 0x004d1792) -- a Gameobj that
-    // belongs in the large-solar vector: radius (+0x38 of its CObject, slot +0x150) above
-    // DAT_00613ec4 = 200 (TEST AH,0x41 / JNZ: not above, or NaN, is false) and bit 7 of its
-    // get_type (slot +0x88) clear.
+    // FUN_00540990 (retail Client\...\ObjDB) -- a Gameobj that belongs in the large-solar
+    // vector: CObject radius above DAT_00613ec4 = 200 (NaN is false) and get_type bit 7 clear.
     bool IsLargeSolarCandidate(FClientGameobj* Gameobj)
     {
         if (!(Gameobj->cobject()->Radius > 200.0f))
@@ -293,8 +290,7 @@ namespace
         return (Type & 0x80u) == 0;
     }
 
-    // The zeroed command record, id 0x1c "select target", sent through FUN_0054bcb0
-    // (0x004d012c..0x004d015e).
+    // The zeroed command record, id 0x1c "select target", sent through FUN_0054bcb0.
     void SendSelectTarget(unsigned ObjectId)
     {
         FSpaceCommand Command = {};
@@ -305,11 +301,10 @@ namespace
         SpaceSendCommand(&Command);
     }
 
-    // The cursor ray Draw builds for the hover test (0x004d292d..0x004d2a1d and
-    // 0x004d3ac4..0x004d3bde): the cursor pixel (DAT_00616840 / 44) onto the near plane of the
-    // Win3D camera DAT_0067dbf8, turned by a copy of its orientation DAT_0067dbfc -- through
-    // FUN_00423b90 in the refresh pass, through this TU's lazy 3DMathEngine (slot +0x2c) in the
-    // layout pass -- then scaled by 1 / length.
+    // The cursor ray Draw builds for the hover test: the cursor pixel (DAT_00616840 / 44) onto
+    // the near plane of the Win3D camera DAT_0067dbf8, turned by a copy of its orientation
+    // DAT_0067dbfc -- through FUN_00423b90 in the refresh pass, through this TU's lazy
+    // 3DMathEngine in the layout pass -- then normalised.
     void ContactCursorRay(float* OutRay, bool bThroughEngine)
     {
         FSpaceCamera* const Cam = Win3DGetCamera();
@@ -345,11 +340,9 @@ namespace
         OutRay[2] = static_cast<float>(World.Z * Inv);
     }
 
-    // The label both name paths of the layout pass build (0x004d3431..0x004d3888 for a ship,
-    // 0x004d375b..0x004d3888 otherwise): the client object's Font::String (+0x48) flagged
-    // (FUN_0053aa10(1)), given Font (FUN_004ea670 inlined), scaled (FUN_004145d0(0.16, -1)),
-    // Name cut from the end until its measured width (IFont slot +0x20) is at most
-    // surface width * 125 * 0.00125, then set (FUN_00415860).
+    // The label both name paths of the layout pass build: the client object's Font::String
+    // (+0x48) flagged, given Font, scaled, Name cut from the end until its measured width is at
+    // most surface width * 125 * 0.00125, then set.
     FFontString* ApplyRowLabel(FClientGameobj* Gameobj, IFont* Font, wchar_t* Name)
     {
         Gameobj->SetFlag3(true);
@@ -369,8 +362,8 @@ namespace
             static_cast<double>(static_cast<int>(G_RenderSurfaceWidth)) * kLabelWidthScale *
             kLabelWidthFactor);
 #endif
-        // FILD qword {W, 0} / FCOMP Limit / TEST AH,0x41 / JNZ: the loop leaves once the width
-        // is not above the limit (or the compare is unordered).
+        // Width is loaded as unsigned (FILD qword {W, 0}); the loop leaves once it is not above
+        // the limit or the compare is unordered.
         while (static_cast<double>(static_cast<unsigned>(Size[0])) > Limit)
         {
             int const Last = static_cast<int>(wcslen(Name)) - 1;
@@ -385,9 +378,8 @@ namespace
         return Label;
     }
 
-    // The swap Draw inlines around WinControl::Draw (0x004d2ad6.., 0x004d3d16..): every row with
-    // a label lends it to its name text (FUN_0058a5d0 / FUN_0058a5e0), the second pass puts the
-    // text's own Font::String back.
+    // The swap Draw inlines around WinControl::Draw: every row with a label lends it to its name
+    // text (FUN_0058a5d0 / FUN_0058a5e0), the second pass puts the text's own Font::String back.
     void SwapRowLabels(HUD_ContactList* Self)
     {
         for (int Row = 0; Row < 8; ++Row)
@@ -422,14 +414,13 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
     IObjRW* const Watched = Object();
     if (Watched != nullptr)
     {
-        // 0x004cf0b2..0x004cf0cf: the id, and the "target is listed" latch.
         Id = Watched->get_id();
         if (G_ContactTargetId == Id)
         {
             G_bContactTargetListed = 1;
         }
-        // 0x004cf0e4..0x004cf162: not the player -- distance from the player to the surface of
-        // the physical sphere (slot +0x64), z / y / x squared in that order, clamped at 0.
+        // Not the player -- distance from the player to the surface of the physical sphere,
+        // z / y / x squared in that order, clamped at 0.
         if (Watched != static_cast<IObjRW*>(GetPlayerObjRW()))
         {
             Vector Center;
@@ -446,7 +437,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
     }
     else if (Kind == 4)
     {
-        // 0x004cf172..0x004cf255: a player waypoint.
+        // A player waypoint.
         if (Index >= GetPlayerWaypointCountRetail())
         {
             Distance = 0.0f;
@@ -460,8 +451,8 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             Distance = static_cast<float>(sqrt(Dz * Dz + Dy * Dy + Dx * Dx));
             if (Record->ObjectId != 0)
             {
-                // 0x004cf1e5..0x004cf226: on an object -- the distance truncated (ftol) and the
-                // object's physical radius taken off.
+                // On an object -- the distance truncated (ftol) and the object's physical radius
+                // taken off.
                 FClientGameobj* const Gameobj = ClientObjDb_FindObject(Record->ObjectId, 0);
                 if (Gameobj != nullptr)
                 {
@@ -479,7 +470,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
     }
     else if (Kind == 3)
     {
-        // 0x004cf25a..0x004cf363: a best-path waypoint; the latch first.
+        // A best-path waypoint; the latch first.
         if (G_bContactTargetListed == 0 && IsEntryTarget(this, G_ContactTargetId, true))
         {
             G_bContactTargetListed = 1;
@@ -493,8 +484,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Index);
             Vector Pos;
             unsigned System = 0;
-            // 0x004cf2b9 / 0x004cf2d8: no position, or not in the player's system -- 0, and the
-            // final clamp is skipped (LAB_004cf375).
+            // No position, or not in the player's system -- 0, and the final clamp is skipped.
             if (!BestPathWaypointResolvePosition(Waypoint, &Pos, &System))
             {
                 Distance = 0.0f;
@@ -505,8 +495,8 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
                 Distance = 0.0f;
                 return;
             }
-            // 0x004cf2de..0x004cf324: the differences stored as floats; z times its unrounded
-            // self, then y and x squared as floats.
+            // Retail stores the differences as floats; z is multiplied by its unrounded self,
+            // y and x are squared as floats.
             double const Dx = static_cast<double>(Pos.x) - G_ContactPlayerPos.x;
             double const Dy = static_cast<double>(Pos.y) - G_ContactPlayerPos.y;
             double const Dz = static_cast<double>(Pos.z) - G_ContactPlayerPos.z;
@@ -526,7 +516,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
         }
     }
 
-    // 0x004cf365..0x004cf375: TEST AH,5 / JP -- only an ordered "below zero" is clamped.
+    // Only an ordered "below zero" is clamped (NaN stays).
     if (Distance < 0.0f)
     {
         Distance = 0.0f;
@@ -560,16 +550,13 @@ static_assert(sizeof(FHudContactEntry) == 0x1c, "retail contact entry is 0x1c by
 
 HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
 {
-    // FUN_004cf390: HUDItem inlined, WinControl FUN_0059f860, the list head (operator new 0x24),
-    // the three vptrs, HUDItem's name, then Create(0, 0) through the direct call at 0x004cf4a5,
-    // the Win3D name and class name. RowLabels is not written by the ctor (Draw zeroes it
-    // before any read).
+    // FUN_004cf390. Create(0, 0) is a direct (non-virtual) call. RowLabels is not written by
+    // the ctor (Draw zeroes it before any read).
     HUDItem::Name = "ContactList";
     HUD_ContactList::Create(nullptr, nullptr);
     Win3D::SetName("HUD_ContactList");
     ClassName = "HUD_ContactList";
 
-    // 0x004cf4e6..0x004cf517.
     ScrollPos = 0;
     RebuildTimer = kRebuildSeconds;
     FilterMode = 0;
@@ -577,8 +564,8 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
     LastPanelMode = -1;
     Scanner = nullptr;
 
-    // 0x004cf51d..0x004cf559: the player ship's scanner. Retail runs FindFirst on
-    // `EAX + 0xe4` with EAX null for a player that is not a ship.
+    // The player ship's scanner. Retail runs FindFirst on `EAX + 0xe4` with EAX null for a
+    // player that is not a ship (faults here too).
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
     if (Player != nullptr)
     {
@@ -586,7 +573,6 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
         Scanner = const_cast<CEquip*>(Ship->EquipManager.FindFirst(0x80000));
     }
 
-    // 0x004cf55f..0x004cf590.
     HudSmallFont = FindMenuFontImp("HudSmall");
     PlayerNameFont = FindMenuFontImp("PlayerName");
     NameRefreshTimer = 0.0f;
@@ -595,34 +581,29 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
 
 HUD_ContactList::~HUD_ContactList()
 {
-    // FUN_004cf5d0: the list is emptied (FUN_004d47a0) and its head freed, then Event::Handler
-    // FUN_00576010 on +0x364, ~WinControl FUN_0059fa50 on +0x38 and HUDItem's watcher -- the
-    // member and the base destructors, in that order.
+    // FUN_004cf5d0: only the member and base destructors.
 }
 
 bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004cf6a0 (this = the WinControl face).
 
-    // 0x004cf6ac..0x004cf6c9: FUN_0059e980(path, 0) on the Win3D model cache DAT_0067dcf4 for
-    // each of the 16 icon meshes (DAT_00612438 up to DAT_00612478, a preload); the result is
-    // not looked at.
+    // Preload the 16 icon meshes into the Win3D model cache; the result is not looked at.
     for (int Index = 0; Index < 16; ++Index)
         Win3DModelCachePreload(kContactIconPaths[Index], nullptr);
 
-    // 0x004cf6cb..0x004cf72c: the formation-list title, hidden.
+    // The formation-list title, hidden.
     float const TitlePos[3] = {-0.189f, 0.043f, 0.0f};   // 0xbe418937, 0x3d3020c5
     FormationTitle = CreateTextControl("FormationTitle", "PageHeader", TitlePos, nullptr, 0.269f,
                                        0.015f, 1.7f, 0x60d, 1, 0, 1);
     FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags & 0xfc);
 
-    // 0x004cf730..0x004cf860: the range and name text of each row.
     for (int Index = 0; Index < 8; ++Index)
     {
         char ControlName[0x100];
         _snprintf(ControlName, 0x100, "ContactListRangeText%d", Index);
-        // FILD / FMUL 0.018 / FSUBR -0.002: the row's top, kept unrounded for the range text
-        // and stored as a float (FST) for the name text.
+        // The row's top stays unrounded for the range text and is rounded to float for the
+        // name text.
         double const RowTop = static_cast<double>(kRowTop) -
                               static_cast<double>(Index) * static_cast<double>(kRowStep);
         float const RowTopF = static_cast<float>(RowTop);
@@ -644,7 +625,6 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         static_cast<NnTextControl*>(NameTexts[Index])->SetMaxLines(1); // FUN_0058b770
     }
 
-    // 0x004cf866..0x004cf904: the row icons.
     float const IconHalf[3] = {0.006f, 0.006f, 0.0f};    // 0x3bc49ba6
     for (int Index = 0; Index < 8; ++Index)
     {
@@ -660,7 +640,6 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
                                            IconHalf, 0, 1, 0, 0, 1, 0, 0);
     }
 
-    // 0x004cf90a..0x004cfb25: the five filter buttons.
     float const FilterHalf[3] = {0.014f, 0.014f, 0.0f};  // 0x3c656042
     float const ImportantPos[3] = {-0.128f, 0.024f, 0.0f};
     ImportantButton = CreateButtonControl("ImportantFilterButton",
@@ -685,30 +664,27 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
                                     nullptr, "ui_filter_select", nullptr, AllPos, nullptr,
                                     FilterHalf, 0, 1, 0, 0, 0x624, 0, 0);
 
-    // 0x004cfb2b..0x004cfb41: the "all" button is hidden in single player.
+    // The "all" button is hidden in single player.
     AllButton->SetProperty(1, SinglePlayer() ? 1u : 0u, 0);
 
-    // 0x004cfb47..0x004cfb85: the scroll bar (range 0..5, page 8, vertical).
+    // The scroll bar (range 0..5, page 8, vertical).
     float const ScrollPos3[3] = {-0.267f, -0.234f, -1.0f};
     Scroll = CreateUIScroll("ContactListScroll", ScrollPos3, 0.016f, 0.118f, 0, 5, 8, 0);
 
-    // 0x004cfb8b..0x004cfbd1.
-    SetOffset(-0.323f, -0.241f, -1.0f);                    // slot 31
-    SetPosition(Position);                                 // slot 5 with +0x60
-    SetHiddenWithChildren(true);                           // FUN_005a0c30(1)
+    SetOffset(-0.323f, -0.241f, -1.0f);
+    SetPosition(Position);
+    SetHiddenWithChildren(true);
 
-    // 0x004cfbd6..0x004cfc00: previous / next contact.
+    // Previous / next contact.
     RegisterEvent(0x1d);
     RegisterEvent(0x1e);
 
-    // 0x004cfc02..0x004cfdbe: the montage tile of each icon mesh and of the chat icon.
     for (int Kind = 0; Kind < 16; ++Kind)
     {
         Tiles[Kind] = FindButtonMontageTile(std::string(kContactIconPaths[Kind]));
     }
     ChatTile = FindButtonMontageTile(std::string(kContactChatIconPath));
 
-    // 0x004cfdcf: Win3D::Create FUN_004b5060, its result folded to a bool.
     return Win3D::Create(NewParent, Data);
 }
 
@@ -731,7 +707,7 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
     bDirty = 1;
     if (Mode == 2)
     {
-        // 0x004d01d4..0x004d0208: the formation list -- no filter buttons, the title shown.
+        // The formation list -- no filter buttons, the title shown.
         ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags & 0xfc);
         ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags & 0xfc);
         SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags & 0xfc);
@@ -740,7 +716,6 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
         FormationTitle->Flags = static_cast<unsigned char>(FormationTitle->Flags | 3);
         return;
     }
-    // 0x004d0210..0x004d023d.
     ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags | 3);
     ShipsButton->Flags = static_cast<unsigned char>(ShipsButton->Flags | 3);
     SolarButton->Flags = static_cast<unsigned char>(SolarButton->Flags | 3);
@@ -751,7 +726,7 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
 
 void HUD_ContactList::Update()
 {
-    // LAB_004d3db0 (this = the WinControl face): tail jump FUN_005a17b0.
+    // LAB_004d3db0 (this = the WinControl face).
     if (!HudIsMousePickBlocked())                // FUN_0045a740
     {
         Win3D::Update();
@@ -765,10 +740,8 @@ void HUD_ContactList::UpdateInactive()
     if ((Mode == 0 || Mode == 2) && GetClientMouseCursorDrawFlag() != 0 &&
         GetPlayerObjRW() != nullptr && !IsLetterboxVisible())
     {
-        SetHiddenWithChildren(false);            // FUN_005a0c30(0)
+        SetHiddenWithChildren(false);
     }
-    // 0x004d3e0d..0x004d3e26: LAB_004682f0 inlined -- slot 12 on every child whose bit0 is
-    // clear.
     Win3D::UpdateInactive();
 }
 
@@ -777,7 +750,7 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_004cfdf0 (this = the WinControl face). Nothing goes on to WinControl's handler.
     if (Msg == 0x26)
     {
-        // 0x004cfe8e..0x004cff8e: a click -- a filter button, or a row.
+        // A click -- a filter button, or a row.
         if (HudIsMousePickBlocked())
         {
             return 0;
@@ -827,8 +800,8 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (Msg == 0x27)
     {
-        // 0x004cfe2d..0x004cfe8b: a double click on a row -- select it and open the target
-        // view (HUD_Target mode 1). No pick test here.
+        // A double click on a row -- select it and open the target view (HUD_Target mode 1).
+        // No pick test here.
         for (int Row = 0; Row < 8; ++Row)
         {
             if (A == reinterpret_cast<uintptr_t>(Icons[Row]) ||
@@ -845,7 +818,6 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (Msg == 0x3e)
     {
-        // 0x004cfe08..0x004cfe21: the scroll bar moved.
         if (!HudIsMousePickBlocked() && A == reinterpret_cast<uintptr_t>(Scroll))
         {
             ScrollPos = static_cast<unsigned>(B);
@@ -876,17 +848,17 @@ void HUD_ContactList::SelectEntry(int Index)
     FHudContactEntry& Entry = *It;
     if (Entry.Kind == 4)
     {
-        // 0x004cfff5..0x004d006c: the body of FUN_004ceeb0 inlined, on the entry's index.
+        // FUN_004ceeb0 inlined.
         HudWaypointSelectPlayerWaypoint(Entry.Index);
         return;
     }
     if (Entry.Kind == 3)
     {
-        // 0x004d0078..0x004d0114: the body of FUN_004cef30 inlined.
+        // FUN_004cef30 inlined.
         HudWaypointSelectBestPath(Entry.Index);
         return;
     }
-    // 0x004d0117..0x004d0163: target the object, unless it is the player.
+    // Target the object, unless it is the player.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player != nullptr && Player->get_id() == Entry.Id)
     {
@@ -918,7 +890,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
         return false;
     }
 
-    // 0x004d3ea0..0x004d3ee5: the row the player's target is on.
+    // The row the player's target is on.
     IObjRW* const Target = Ship->get_target();
     if (Target != nullptr)
     {
@@ -936,8 +908,8 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
         {
             if (MsgId == 0x1e)
             {
-                // 0x004d3f16..0x004d3f69: the previous row, wrapping; a row that is the player
-                // is stepped over once more.
+                // The previous row, wrapping; a row that is the player is stepped over once
+                // more.
                 int Row = Found - 1;
                 if (Row < 0)
                 {
@@ -961,7 +933,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
             }
             if (MsgId == 0x1d)
             {
-                // 0x004d3f71..0x004d3fc4: the next row, the same way.
+                // The next row, the same way.
                 int Row = Found + 1;
                 if (Row >= Count)
                 {
@@ -987,7 +959,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
         }
     }
 
-    // 0x004d3ee7..0x004d3efc: no target, or not listed -- the first row.
+    // No target, or not listed -- the first row.
     SelectEntry(0);
     return true;
 }
@@ -1087,9 +1059,8 @@ void HUD_ContactList::RebuildContacts()
     {
         return;
     }
-    Contacts.clear();                                // FUN_004d47a0(begin, end)
+    Contacts.clear();
 
-    // 0x004d04e5..0x004d051f: a player ship is needed.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player == nullptr)
     {
@@ -1101,15 +1072,14 @@ void HUD_ContactList::RebuildContacts()
         return;
     }
 
-    // 0x004d0525..0x004d0566.
-    G_ContactPlayerPos = Player->get_position();     // slot 0
+    G_ContactPlayerPos = Player->get_position();
     Vector const PlayerPos = G_ContactPlayerPos;
     G_ContactTargetId = 0;
     G_bContactTargetListed = 0;
     unsigned ExcludeId = 0;
 
-    // 0x004d056a..0x004d05cd: with the "important" / "all" filter, the target's id and the id of
-    // the first best-path point's object (which is left out of the list).
+    // With the "important" / "all" filter, the target's id and the id of the first best-path
+    // point's object (which is left out of the list).
     if (FilterMode == 0 || FilterMode == 4)
     {
         IObjRW* const Target = PlayerShip->get_target();
@@ -1132,7 +1102,7 @@ void HUD_ContactList::RebuildContacts()
         }
     }
 
-    // 0x004d05d1..0x004d061c: the scanner's range; under 2500 it limits the search.
+    // The scanner's range; under 2500 it limits the search.
     float Range = kDefaultRadarRange;
     if (Scanner != nullptr)
     {
@@ -1140,7 +1110,7 @@ void HUD_ContactList::RebuildContacts()
     }
     bool bLimited = false;
     float RangeLimit = kUnlimitedRange;
-    if (Range < kDefaultRadarRange)                  // TEST AH,5 / JP
+    if (Range < kDefaultRadarRange)                  // ordered compare
     {
         RangeLimit = Range;
         bLimited = true;
@@ -1150,7 +1120,7 @@ void HUD_ContactList::RebuildContacts()
     int const PanelMode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false);
     if (PanelMode == 2)
     {
-        // 0x004d062c..0x004d07dd: the formation list.
+        // The formation list.
         if (SinglePlayer())
         {
             // The ship's formation leader, then the leader's followers.
@@ -1162,7 +1132,6 @@ void HUD_ContactList::RebuildContacts()
                 if (LeaderShip != nullptr)
                 {
                     AddShipEntry(LeaderShip, ClientObjDb_FindObject(Leader->get_id(), 1));
-                    // VC6 size(): _First == 0 ? 0 : (_Last - _First) / 8.
                     int const FollowerCount = static_cast<int>(LeaderShip->FormationFollowers.size());
                     for (int Follower = 0; Follower < FollowerCount; ++Follower)
                     {
@@ -1223,7 +1192,7 @@ void HUD_ContactList::RebuildContacts()
     }
     else
     {
-        // 0x004d07e2..0x004d0e80: ships (filters important, ships, all).
+        // Ships (filters important, ships, all).
         if (FilterMode == 0 || FilterMode == 1 || FilterMode == 4)
         {
             int const ShipKind = 1;
@@ -1235,7 +1204,7 @@ void HUD_ContactList::RebuildContacts()
                 {
                     continue;
                 }
-                // TEST AH,1 / JZ: only a cloak factor at or above 1 (ordered) is skipped.
+                // Only a cloak factor at or above 1 (ordered) is skipped.
                 if (Ship->CloakPercent >= 1.0f)
                 {
                     continue;
@@ -1244,8 +1213,8 @@ void HUD_ContactList::RebuildContacts()
                 {
                     continue;
                 }
-                // 0x004d0870..0x004d08db: within scanner range (y, z, x squared, FUN_00422b80's
-                // float differences), or else another player's ship at any range.
+                // Within scanner range (y, z, x squared, FUN_00422b80's float differences), or
+                // else another player's ship at any range.
                 float const Dx = static_cast<float>(static_cast<double>(Ship->WorldPosition.x) - PlayerPos.x);
                 float const Dy = static_cast<float>(static_cast<double>(Ship->WorldPosition.y) - PlayerPos.y);
                 float const Dz = static_cast<float>(static_cast<double>(Ship->WorldPosition.z) - PlayerPos.z);
@@ -1265,7 +1234,7 @@ void HUD_ContactList::RebuildContacts()
                 int const Attitude = Gameobj->GetCachedAttitude();   // FUN_0053a960
                 if (Ship->bIsPlayer == 0)
                 {
-                    // 0x004d08f4..0x004d0920: an NPC needs a faction.
+                    // An NPC needs a faction.
                     int const Vibe = static_cast<int>(Ship->VibeId);
                     unsigned Group = 0;
                     if (Reputation::Vibe::GetAffiliation(Vibe, Group, false) != 0 ||
@@ -1277,7 +1246,7 @@ void HUD_ContactList::RebuildContacts()
                 unsigned const TypeBits = Ship->TypeBits;
                 if (Ship->bIsPlayer != 0)
                 {
-                    // 0x004d093a..0x004d0a3b: other players, with "important" / "all" only.
+                    // Other players, with "important" / "all" only.
                     if (FilterMode != 0 && FilterMode != 4)
                     {
                         continue;
@@ -1302,8 +1271,7 @@ void HUD_ContactList::RebuildContacts()
                 {
                     Kind = 0xa;
                 }
-                // 0x004d0a4b / 0x004d0aa6 (and the same pair per kind): a hostile always, any
-                // other attitude with the "ships" or "all" filter.
+                // A hostile always, any other attitude with the "ships" or "all" filter.
                 if (Attitude == -1 || FilterMode == 1 || FilterMode == 4)
                 {
                     Contacts.push_back(FHudContactEntry(Kind, GameobjRw, 0.0f, 0, 0));
@@ -1311,7 +1279,7 @@ void HUD_ContactList::RebuildContacts()
             }
         }
 
-        // 0x004d0e86..0x004d0ffc: loot (filters loot, all).
+        // Loot (filters loot, all).
         if (FilterMode == 3 || FilterMode == 4)
         {
             int const LootKind = 7;
@@ -1332,7 +1300,7 @@ void HUD_ContactList::RebuildContacts()
                     float const Dz = static_cast<float>(static_cast<double>(Center.z) - PlayerPos.z);
                     double const Gap = fabs(sqrt(static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy +
                                                  static_cast<double>(Dz) * Dz) - Radius);
-                    if (Gap > RangeLimit)            // TEST AH,0x41 / JZ
+                    if (Gap > RangeLimit)
                     {
                         continue;
                     }
@@ -1354,12 +1322,12 @@ void HUD_ContactList::RebuildContacts()
             }
         }
 
-        // 0x004d1002..0x004d1ee0: solars and everything else near (every filter but "ships").
+        // Solars and everything else near (every filter but "ships").
         if (FilterMode == 0 || FilterMode == 2 || FilterMode == 4 || FilterMode == 3)
         {
             bool const bSolarsShown = FilterMode == 2 || FilterMode == 4;
 
-            // 0x004d1023..0x004d16e8: the large solars (FUN_00540a00 / FUN_00540a20).
+            // The large solars.
             size_t LargeIt = 0;
             for (FClientGameobj* Gameobj = ClientObjDb_LargeSolarFirst(&LargeIt); Gameobj != nullptr;
                  Gameobj = ClientObjDb_LargeSolarNext(&LargeIt))
@@ -1383,8 +1351,8 @@ void HUD_ContactList::RebuildContacts()
                         }
                     }
                 }
-                // 0x004d10a2: the id is read through the solar pointer, null for a large entry
-                // that is not a solar (retail faults there too).
+                // The id is read through the solar pointer, null for a large entry that is not
+                // a solar (retail faults there too).
                 if (Solar->Id == ExcludeId)
                 {
                     continue;
@@ -1410,7 +1378,7 @@ void HUD_ContactList::RebuildContacts()
                 float const Dz = static_cast<float>(static_cast<double>(EqObj->WorldPosition.z) - PlayerPos.z);
                 double const DistSq = static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy +
                                       static_cast<double>(Dz) * Dz;
-                // 0x004d115b..0x004d11be: a hostile close by is shown under "important".
+                // A hostile close by is shown under "important".
                 if (Attitude == -1 && FilterMode == 0 && DistSq < kNearRangeSq)
                 {
                     bNear = 1;
@@ -1484,8 +1452,8 @@ void HUD_ContactList::RebuildContacts()
                 }
             }
 
-            // 0x004d16ee..0x004d1eda: everything within 14000 of the player in the object DB's
-            // spatial bucket (slot 0xc, mask 0xfdff), large solars left out.
+            // Everything within 14000 of the player in the object DB's spatial bucket (mask
+            // 0xfdff), large solars left out.
             ISpatialPartition* const Spatial =
                 static_cast<ISpatialPartition*>(GetClientObjDb()->GetBucket(0xfdff));
             Geometry::Sphere Query;
@@ -1613,8 +1581,8 @@ void HUD_ContactList::RebuildContacts()
                     }
                     if ((TypeBits & 0x2000u) != 0)
                     {
-                        // 0x004d1e33..0x004d1e49: here the loot and "all" filters show it (the
-                        // large-solar pass above uses solars / all).
+                        // Here the loot and "all" filters show it (the large-solar pass above
+                        // uses solars / all).
                         if (!HudIsUnvisitedSolar(Simple) &&
                             (FilterMode == 3 || FilterMode == 4 || bNear != 0))
                         {
@@ -1625,7 +1593,7 @@ void HUD_ContactList::RebuildContacts()
             }
         }
 
-        // 0x004d1ee0..0x004d20fc: the waypoints (filters important, all).
+        // The waypoints (filters important, all).
         if (FilterMode == 0 || FilterMode == 4)
         {
             // The first player waypoint in the current system.
@@ -1666,8 +1634,8 @@ void HUD_ContactList::RebuildContacts()
         }
     }
 
-    // 0x004d2102..0x004d22f2: the client watch list (DAT_0066d33c) -- rows the filter allows;
-    // one already listed only gets its watch-list byte.
+    // The client watch list (DAT_0066d33c) -- rows the filter allows; one already listed only
+    // gets its watch-list byte.
     unsigned char bDeadWatcher = 0;
     std::list<BaseWatcher> const& WatchList = GameobjWatchList();
     for (std::list<BaseWatcher>::const_iterator WatchIt = WatchList.begin(); WatchIt != WatchList.end();
@@ -1728,7 +1696,7 @@ void HUD_ContactList::RebuildContacts()
         GameobjWatchListRemove(nullptr);             // FUN_0045a990(0)
     }
 
-    // 0x004d22f5..0x004d2470: the player's target when nothing above listed it.
+    // The player's target when nothing above listed it.
     if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != 2 &&
         (FilterMode == 0 || FilterMode == 4))
     {
@@ -1748,9 +1716,8 @@ void HUD_ContactList::RebuildContacts()
         }
     }
 
-    // 0x004d2475..0x004d2489: outside the formation list, nearest first. FUN_004d4340 is VC6
-    // list::sort (merge through 0x10 bins, FUN_004d4820 moving a right element ahead only when
-    // it is strictly nearer): a stable ascending sort, as std::list::sort is.
+    // Outside the formation list, nearest first. FUN_004d4340 is VC6 list::sort: stable
+    // ascending, as std::list::sort is.
     if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != 2)
     {
         Contacts.sort([](FHudContactEntry const& Left, FHudContactEntry const& Right)
@@ -1772,23 +1739,21 @@ void HUD_ContactList::Draw()
         G_bHudContactListRefreshRequested = 0;
     }
 
-    // 0x004d2539..0x004d2557.
     NameRefreshTimer = static_cast<float>(GetClientFrameTimeCapped() + NameRefreshTimer);
     for (int Row = 0; Row < 8; ++Row)
     {
         RowLabels[Row] = nullptr;
     }
 
-    // 0x004d2559..0x004d25f2: the selected filter button is highlighted.
+    // The selected filter button is highlighted.
     ImportantButton->SetProperty(0xc, FilterMode == 0 ? 1 : 0, 0);
     ShipsButton->SetProperty(0xc, FilterMode == 1 ? 1 : 0, 0);
     SolarButton->SetProperty(0xc, FilterMode == 2 ? 1 : 0, 0);
     AllButton->SetProperty(0xc, FilterMode == 4 ? 1 : 0, 0);
     LootButton->SetProperty(0xc, FilterMode == 3 ? 1 : 0, 0);
 
-    // 0x004d25f8..0x004d2654: rebuild every 3 s (the sum kept unrounded for the compare and the
-    // subtraction; TEST AH,1 / JZ rebuilds at or above 3, a NaN falls to the dirty test), or
-    // when dirty.
+    // Rebuild every 3 s, or when dirty. The sum stays unrounded for the compare and the
+    // subtraction; a NaN falls to the dirty test.
     bool bRebuilt = false;
     double const Timer = GetClientFrameTimeCapped() + RebuildTimer;
     RebuildTimer = static_cast<float>(Timer);
@@ -1805,7 +1770,6 @@ void HUD_ContactList::Draw()
         bRebuilt = true;
     }
 
-    // 0x004d2656..0x004d2699: the player ship's target.
     unsigned PlayerTargetId = 0;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player != nullptr)
@@ -1821,7 +1785,7 @@ void HUD_ContactList::Draw()
         }
     }
 
-    // 0x004d269d..0x004d26eb: the first visible row, clamped (unsigned) to Count - 8.
+    // The first visible row, clamped (unsigned) to Count - 8.
     unsigned const Count = static_cast<unsigned>(Contacts.size());
     unsigned MaxTop = 0;
     if (Count > 8)
@@ -1844,7 +1808,7 @@ void HUD_ContactList::Draw()
 
     if (G_ContactListLastScroll == static_cast<int>(ScrollPos) && !bRebuilt)
     {
-        // 0x004d2703..0x004d2ad0: the same rows as last time -- labels, icons and colours only.
+        // The same rows as last time -- labels, icons and colours only.
         int Row = 0;
         while (It != Contacts.end())
         {
@@ -1885,8 +1849,8 @@ void HUD_ContactList::Draw()
                 static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
             }
 
-            // 0x004d2838..0x004d290b: waypoints violet, the rest by reputation; a white NPC
-            // ship with no faction marks the list dirty and is not shown.
+            // Waypoints violet, the rest by reputation; a white NPC ship with no faction marks
+            // the list dirty and is not shown.
             unsigned long Colour = G_NnPaletteArgb_679bb0;
             if (Entry.Kind == 4 || Entry.Kind == 3)
             {
@@ -1949,10 +1913,10 @@ void HUD_ContactList::Draw()
         return;
     }
 
-    // 0x004d2b59..0x004d3cfa: lay the rows out again.
+    // Lay the rows out again.
     G_ContactListLastScroll = static_cast<int>(ScrollPos);
     bool bRefreshNames = false;
-    if (NameRefreshTimer > kNameRefreshSeconds)      // TEST AH,0x41 / JNZ
+    if (NameRefreshTimer > kNameRefreshSeconds)
     {
         NameRefreshTimer = 0.0f;
         bRefreshNames = true;
@@ -1975,43 +1939,43 @@ void HUD_ContactList::Draw()
         }
         FClientGameobj* const Gameobj = static_cast<FClientGameobj*>(Obj);
 
-        // 0x004d2bf6..0x004d2cd5: the range text -- metres under 2000, "N.NK" under 10000,
-        // "NK" under 99999, else ids 0x3ce. FUN_00402180 is _vsnprintf into 0x2000 chars.
+        // The range text -- metres under 2000, "N.NK" under 10000, "NK" under 99999, else
+        // ids 0x3ce. FUN_00402180 is _vsnprintf into 0x2000 chars.
         int const Metres = static_cast<int>(Entry.Distance);
         char RangeText[0x2000];
         NnTextControl* const RangeControl = static_cast<NnTextControl*>(RangeTexts[Row]);
         if (Metres < 2000)
         {
             _snprintf(RangeText, 0x2000, "%d", Metres);
-            RangeControl->SetNumberText(RangeText);      // FUN_0058a580 (0x004d2c26)
+            RangeControl->SetNumberText(RangeText);      // FUN_0058a580
         }
         else if (Metres < 10000)
         {
             _snprintf(RangeText, 0x2000, "%d.%dK", Metres / 1000, (Metres % 1000) / 100);
-            RangeControl->SetNumberText(RangeText);      // FUN_0058a580 (0x004d2c87)
+            RangeControl->SetNumberText(RangeText);
         }
         else if (Metres < 99999)
         {
             _snprintf(RangeText, 0x2000, "%dK", Metres / 1000);
-            RangeControl->SetNumberText(RangeText);      // FUN_0058a580 (0x004d2c26)
+            RangeControl->SetNumberText(RangeText);
         }
         else
         {
             RangeTexts[Row]->SetProperty(0x1e, 0x3ce, 0);
         }
 
-        // 0x004d2cd5..0x004d38b3: the name.
+        // The name.
         wchar_t Name[0x100];
         Name[0] = 0;
-        unsigned char bNamed = 0;          // [ESP + 0x12]
+        unsigned char bNamed = 0;
         bool bSkipRow = false;
-        CShip const* LabelShip = nullptr;  // the ship label path (0x004d3431)
-        bool bSimpleLabel = false;         // the HudSmall label path (0x004d375b)
+        CShip const* LabelShip = nullptr;  // the ship label path
+        bool bSimpleLabel = false;         // the HudSmall label path
         if (Obj == nullptr)
         {
             if (Entry.Kind == 4)
             {
-                // 0x004d2cf3..0x004d2d64: "waypoint N" (ids 0x444 as the format), or ids 0x442.
+                // "waypoint N" (ids 0x444 as the format), or ids 0x442.
                 if (Entry.Index < GetPlayerWaypointCountRetail())
                 {
                     FPlayerWaypointRecord* const Record = GetPlayerWaypointRetail(Entry.Index);
@@ -2030,14 +1994,14 @@ void HUD_ContactList::Draw()
             }
             else
             {
-                wcscat(Name, L"???");                    // LAB_004d389d: DAT_005d0214
+                wcscat(Name, L"???");                    // DAT_005d0214
             }
         }
         else if (Gameobj->GetFlag3IfSurfaceWidthUnchanged() && !(bRefreshNames && Entry.Kind == 7))
         {
-            // 0x004d2d98..0x004d2dc0: the object's label is still good.
+            // The object's label is still good (retail still appends "???").
             RowLabels[Row] = Gameobj->GetFontString48();
-            wcscat(Name, L"???"); // 0x004d2dc0 -> LAB_004d389d
+            wcscat(Name, L"???");
         }
         else
         {
@@ -2045,15 +2009,14 @@ void HUD_ContactList::Draw()
             CShip const* const Ship = AsShip(Object);
             if (Ship != nullptr)
             {
-                // 0x004d2df4..0x004d3427: a ship. The second slot +0x150 call narrows the same
-                // object to a CSimple.
+                // A ship. Retail calls cobject() a second time to narrow it to a CSimple.
                 CSimple const* const Simple = AsSimple(Obj->cobject());
                 int const Vibe = static_cast<int>(Ship->VibeId);
                 bool bOwnPlayer = false;
                 if (Ship->bIsPlayer == 0 && Entry.bWatchListed == 0)
                 {
-                    // 0x004d2e34..0x004d3170: an NPC -- faction short name, then the pilot's
-                    // FmtStr name, or else the ship type's name.
+                    // An NPC -- faction short name, then the pilot's FmtStr name, or else the
+                    // ship type's name.
                     unsigned ShortName = 0;
                     unsigned Group = 0;
                     if (Reputation::Vibe::GetAffiliation(Vibe, Group, false) == 0)
@@ -2071,7 +2034,7 @@ void HUD_ContactList::Draw()
                             wchar_t Faction[0x80];
                             IdsInto(ShortName, Faction, 0x80);
                             wcscat(Name, Faction);
-                            wcscat(Name, L" - "); // 0x004d301c: DAT_005d01f4
+                            wcscat(Name, L" - "); // DAT_005d01f4
                         }
                         wchar_t Pilot[0xff];
                         FmtStrSprintf(&NameB, Pilot, 0xff);
@@ -2098,7 +2061,7 @@ void HUD_ContactList::Draw()
                         {
                             if (bNamed != 0)
                             {
-                                wcscat(Name, L" - "); // 0x004d30ff: DAT_005d01f4
+                                wcscat(Name, L" - ");
                             }
                             wchar_t TypeName[0x80];
                             IdsInto(GetObjectIdsName(Simple), TypeName, 0x80); // FUN_005472a0
@@ -2108,7 +2071,7 @@ void HUD_ContactList::Draw()
                 }
                 else
                 {
-                    // 0x004d3175..0x004d3414: a player (or a watched NPC).
+                    // A player (or a watched NPC).
                     if (Entry.bWatchListed != 0)
                     {
                         unsigned Group = 0;
@@ -2126,7 +2089,7 @@ void HUD_ContactList::Draw()
                                 }
                                 else
                                 {
-                                    wcscat(Name, L" - "); // 0x004d3258: DAT_005d01f4
+                                    wcscat(Name, L" - ");
                                     bNamed = 1;
                                 }
                             }
@@ -2134,7 +2097,6 @@ void HUD_ContactList::Draw()
                     }
                     if (Player != nullptr && Entry.Id == Player->get_id())
                     {
-                        // 0x004d3286..0x004d3298: the player's own character name.
                         wcscat(Name, GetPlayerCharacterNameRetail());   // DAT_006732f0
                         bOwnPlayer = true;
                     }
@@ -2158,7 +2120,7 @@ void HUD_ContactList::Draw()
 
             if (LabelShip == nullptr)
             {
-                // 0x004d35af..0x004d3758: not a ship, or a ship without a name.
+                // Not a ship, or a ship without a name.
                 int const Kind = Entry.Kind;
                 if (Kind == 0 || Kind == 8 || Kind == 9)
                 {
@@ -2169,10 +2131,9 @@ void HUD_ContactList::Draw()
                     CSimple const* const Simple = AsSimple(Obj->cobject());
                     if (Simple == nullptr)
                     {
-                        // LAB_004d3895.
                         if (bNamed == 0)
                         {
-                            wcscat(Name, L"???"); // 0x004d389d: DAT_005d0214
+                            wcscat(Name, L"???");
                         }
                     }
                     else if (Kind == 0xa && (Simple->TypeBits & 0x7f0000u) != 0)
@@ -2181,7 +2142,7 @@ void HUD_ContactList::Draw()
                     }
                     else if (HudIsUnvisitedSolar(Simple))
                     {
-                        // 0x004d3616..0x004d3655: an unvisited solar shows its type only.
+                        // An unvisited solar shows its type only.
                         wchar_t TypeName[0x80];
                         IdsInto(HudObjectTypeIds(Simple), TypeName, 0x80); // FUN_004d4d50
                         wcscat(Name, TypeName);
@@ -2190,7 +2151,7 @@ void HUD_ContactList::Draw()
                     {
                         if ((Simple->TypeBits & 0x80u) != 0)
                         {
-                            // 0x004d3668..0x004d3711: a trade lane ring -- the location caption.
+                            // A trade lane ring -- the location caption.
                             FHudWideText Caption;
                             Caption.Text = nullptr;
                             Caption.Capacity = 0;
@@ -2238,8 +2199,8 @@ void HUD_ContactList::Draw()
             RowLabels[Row] = ApplyRowLabel(Gameobj, HudSmallFont, Name);
         }
 
-        // 0x004d38b7..0x004d3985: the name text -- other players' names in PlayerName, dropped
-        // a little; everything else in HudSmall at the rest offset.
+        // The name text -- other players' names in PlayerName, dropped a little; everything
+        // else in HudSmall at the rest offset.
         NnTextControl* const NameText = static_cast<NnTextControl*>(NameTexts[Row]);
         if (Entry.Kind == 0xe || Entry.Kind == 0xf)
         {
@@ -2269,7 +2230,6 @@ void HUD_ContactList::Draw()
             NameTexts[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Name), 0);
         }
 
-        // 0x004d3985..0x004d3a62: the icon.
         unsigned char const bTarget = IsEntryTarget(&Entry, PlayerTargetId, FilterMode != 4) ? 1 : 0;
         FButtonMontageTile* Tile = Tiles[Entry.Kind];
         char const* Path = kContactIconPaths[Entry.Kind];
@@ -2286,7 +2246,7 @@ void HUD_ContactList::Draw()
             static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
         }
 
-        // 0x004d3a62..0x004d3c7d: the colour (no faction test in this pass).
+        // The colour (no faction test in this pass).
         unsigned long Colour = G_NnPaletteArgb_679bb0;
         if (Entry.Kind == 4 || Entry.Kind == 3)
         {
@@ -2327,7 +2287,7 @@ void HUD_ContactList::Draw()
         ++It;
     }
 
-    // 0x004d3cd5..0x004d3cfa: the rows past the end are hidden.
+    // The rows past the end are hidden.
     for (int Hidden = Row; Hidden < 8; ++Hidden)
     {
         RangeTexts[Hidden]->Flags = static_cast<unsigned char>(RangeTexts[Hidden]->Flags & 0xfc);
@@ -2335,7 +2295,6 @@ void HUD_ContactList::Draw()
         Icons[Hidden]->Flags = static_cast<unsigned char>(Icons[Hidden]->Flags & 0xfc);
     }
 
-    // 0x004d3cfc..0x004d3d10: the scroll range.
     Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(static_cast<int>(Contacts.size()) - 1));
 
     SwapRowLabels(this);
@@ -2346,9 +2305,6 @@ void HUD_ContactList::Draw()
 
 namespace
 {
-    // The static HUDFACTORY<HUD_ContactList> DAT_00674910: XC entry LAB_004cefe0 runs the ctor
-    // FUN_004d4630 ("ContactList", appended to the factory chain by FUN_004c72b0) and registers
-    // LAB_004cf000 with atexit (-> FUN_004cf010, the unlink). Its Create FUN_004d46a0 is
-    // operator new(0x478) + FUN_004cf390, null when the allocation fails.
+    // DAT_00674910; see the header for the factory's retail functions.
     HUDFACTORY<HUD_ContactList> G_HudContactListFactory("ContactList");
 }

@@ -50,35 +50,35 @@ namespace
 
     char const kServerTableKey[] = "ServerTable"; // s_ 0x005e2c4c (also the widget name)
 
-    // .rdata:005e2604 -- the column captions, loaded by Create (0x0056e853).
+    // .rdata:005e2604 -- the column captions.
     unsigned const kColumnHeaderIds[8] = {0x747, 0x745, 0x746, 0x748,
                                           0x749, 0x74a, 0x74b, 0x74c};
-    // .rdata:005e2624 -- the header cells' tool tips (0x0056e876).
+    // .rdata:005e2624 -- the header cells' tool tips.
     unsigned const kColumnHeaderTipIds[8] = {0xac0, 0xabe, 0xabf, 0xac1,
                                              0xac2, 0xac3, 0xac4, 0xac5};
-    // .rdata:005e2644 -- the column edges Create writes when the registry has none (0x0056eaa0).
+    // .rdata:005e2644 -- the column edges Create writes when the registry has none.
     float const kDefaultColumnEdges[8] = {0.0f,         0.371596009f, 0.553894997f,
                                           0.664525986f, 0.756824017f, 0.875788987f,
                                           0.992121994f, 1.06441998f};
 
     // -----------------------------------------------------------------------------------------
     // The sixteen column comparators (cdecl, "A before B"). CLoginMgr::GetFilteredServers sorts
-    // with one of them. Unsigned compares throughout (SBB/NEG, SETA, SETC).
+    // with one of them. Unsigned compares throughout.
 
-    // LAB_00565e50 -- column 0: _wcsicoll(A name, B name) < 0.
+    // LAB_00565e50 -- column 0.
     bool CompareNameAsc(FServerInfo const* A, FServerInfo const* B)
     {
         return _wcsicoll(A->Name.c_str(), B->Name.c_str()) < 0;
     }
 
-    // FUN_00565db0 -- column 1: A +0x10 < B +0x10.
+    // FUN_00565db0 -- column 1, the address (+0x10).
     bool CompareField10Asc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(A->IpAddress) < static_cast<unsigned>(B->IpAddress);
     }
 
-    // FUN_00565dd0 -- column 2: known logins first (FUN_005a9950); two known -> the later login
-    // time (FUN_005a9970, SETA) first; two unknown -> std::operator< on the names.
+    // FUN_00565dd0 -- column 2: known logins first; two known -> the later login time first;
+    // two unknown -> by name.
     bool CompareKnownAsc(FServerInfo const* A, FServerInfo const* B)
     {
         bool const bKnownA = G_LoginMgr.IsKnownLogin(*A);
@@ -96,13 +96,13 @@ namespace
         return A->Name < B->Name;
     }
 
-    // FUN_00565e90 -- column 3: A ping < B ping (so -1 / -2 sort last).
+    // FUN_00565e90 -- column 3 (unsigned, so pings -1 / -2 sort last).
     bool ComparePingAsc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(A->Ping) < static_cast<unsigned>(B->Ping);
     }
 
-    // FUN_00565eb0 -- column 4: players (+0x84), then the maximum (+0x88).
+    // FUN_00565eb0 -- column 4: players, then the maximum.
     bool ComparePlayersAsc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->PlayerCount != B->PlayerCount)
@@ -110,13 +110,13 @@ namespace
         return static_cast<unsigned>(A->MaxPlayers) < static_cast<unsigned>(B->MaxPlayers);
     }
 
-    // FUN_00565ee0 -- column 5: A version < B version.
+    // FUN_00565ee0 -- column 5.
     bool CompareVersionAsc(FServerInfo const* A, FServerInfo const* B)
     {
         return A->Version < B->Version;
     }
 
-    // FUN_00565f00 -- column 6: +0x3e set first; otherwise the pointers (A < B).
+    // FUN_00565f00 -- column 6: LAN (+0x3e) first; ties fall back to the pointers.
     bool CompareField3eAsc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bLan != 0)
@@ -131,7 +131,7 @@ namespace
         return std::less<FServerInfo const*>()(A, B);
     }
 
-    // FUN_00565f30 -- column 7: password (+0x94) first, then +0x96 first, then the pointers.
+    // FUN_00565f30 -- column 7: password first, then PvP, then the pointers.
     bool CompareLockAsc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bPassword != 0)
@@ -155,20 +155,19 @@ namespace
         return std::less<FServerInfo const*>()(A, B);
     }
 
-    // LAB_00566030 -- column 0 descending: _wcsicoll(A name, B name) > 0.
+    // LAB_00566030 -- the descending comparators mirror the ascending ones.
     bool CompareNameDesc(FServerInfo const* A, FServerInfo const* B)
     {
         return _wcsicoll(A->Name.c_str(), B->Name.c_str()) > 0;
     }
 
-    // FUN_00565fa0 -- B +0x10 < A +0x10.
+    // FUN_00565fa0.
     bool CompareField10Desc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(B->IpAddress) < static_cast<unsigned>(A->IpAddress);
     }
 
-    // FUN_00565fc0 -- unknown logins first; two known -> the earlier time first (SETC); two
-    // unknown -> std::operator> on the names.
+    // FUN_00565fc0.
     bool CompareKnownDesc(FServerInfo const* A, FServerInfo const* B)
     {
         bool const bKnownA = G_LoginMgr.IsKnownLogin(*A);
@@ -186,13 +185,13 @@ namespace
         return A->Name > B->Name;
     }
 
-    // FUN_00566070 -- B ping < A ping.
+    // FUN_00566070.
     bool ComparePingDesc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(B->Ping) < static_cast<unsigned>(A->Ping);
     }
 
-    // FUN_00566090 -- B players < A players, then the maxima the same way.
+    // FUN_00566090.
     bool ComparePlayersDesc(FServerInfo const* A, FServerInfo const* B)
     {
         if (B->PlayerCount != A->PlayerCount)
@@ -200,13 +199,13 @@ namespace
         return static_cast<unsigned>(B->MaxPlayers) < static_cast<unsigned>(A->MaxPlayers);
     }
 
-    // FUN_005660c0 -- B version < A version.
+    // FUN_005660c0.
     bool CompareVersionDesc(FServerInfo const* A, FServerInfo const* B)
     {
         return B->Version < A->Version;
     }
 
-    // FUN_005660e0 -- +0x3e clear first; otherwise the pointers (B < A).
+    // FUN_005660e0.
     bool CompareField3eDesc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bLan != 0)
@@ -221,7 +220,7 @@ namespace
         return std::less<FServerInfo const*>()(B, A);
     }
 
-    // FUN_00566110 -- no password first, then +0x96 clear first, then the pointers (B < A).
+    // FUN_00566110.
     bool CompareLockDesc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bPassword != 0)
@@ -255,8 +254,6 @@ namespace
 
 }
 
-// AppendNodeClone, LoadIds, LoadIdsCut, LoadStyledIds, PackTextAttributes, HideWin3D,
-// ShowWin3D, ChromeColor, EdgeCount -- shared with PageCharacterSelect.
 using namespace IntroPageUtil;
 
 // ---------------------------------------------------------------------------------------------
@@ -264,15 +261,12 @@ using namespace IntroPageUtil;
 
 PageServerSelect::ServerRowData::ServerRowData(FServerInfo const& Source)
 {
-    // FUN_00571280: FServerInfo's defaults (the port's FServerInfo() writes the same values),
-    // then the members assigned one by one from Source (FUN_005595c0 for the port vector).
+    // Retail default-constructs Info inline, then assigns it memberwise.
     Info = Source;
 }
 
 PageServerSelect::ServerRowData::~ServerRowData()
 {
-    // FUN_005725e0: the strings at +0x7c / +0x6c / +0x5c / +0x4c, the vector at +0x20, the
-    // address at +0x08, then the RefCounter vftable -- Info's own destructor.
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -316,27 +310,19 @@ PageServerSelect::PageServerSelect()
     , SelectedServerId(0xffffffffu)
     , ListStatus(3)
 {
-    // FUN_0056d510: FUN_00591ae0(FUN_00594580(+0x8c)), FUN_00591e30 on +0x8c, +0xb8..+0xe8 = 0,
-    // the eight header lists (FUN_005b7fba, 8 x 0xc), the RenderDisplayLists +0x17c..+0x260,
-    // ServerFilter (FUN_005628e0), the two edge vectors (FUN_005a6900), +0xb4 = +0x118 = 0,
-    // +0x294 = 0, the vftables, +0x2cc = 3, +0x298 = 2, +0x2c8 = -1, +0x29c..+0x2a3 = 1,
-    // +0xec = 0. +0xf0..+0x114 and the images are not written; the static object starts zeroed,
-    // which is what the initialisers above reproduce.
+    // FUN_0056d510. Retail leaves +0xf0..+0x114 and the images unwritten; the static object
+    // starts zeroed, which is what the initialisers above reproduce.
 }
 
 PageServerSelect::~PageServerSelect()
 {
-    // FUN_005723b0: vftables back, the edge vectors (FUN_004de730), the lists +0x260..+0x17c,
-    // the header array (FUN_005b7ec6), +0xb8..+0xe8 = 0, FUN_00591ef0 on +0x8c, FUN_00591ba0 --
-    // the member destructors in reverse declaration order, then the base. The ServerFilter at
-    // +0x2a4 has no destructor.
+    // FUN_005723b0. The ServerFilter at +0x2a4 has no destructor.
 }
 
 bool PageServerSelect::SaveEdges()
 {
-    // FUN_0056daa0: HKCU (the stack's root), "...\\Freelancer\\1.0" and "ServerTable" created
-    // with KEY_ALL_ACCESS (0x2001f), the edges written under the top key, the top popped and
-    // closed, then every key left on the stack closed (HKCU included, as retail).
+    // FUN_0056daa0: keys created with KEY_ALL_ACCESS (0x2001f); every key left on the stack is
+    // closed at the end, HKCU included, as retail.
     bool bSaved = false;
     FRegKeyStack Keys;
     if (Keys.Create(G_FreelancerRegKey, 0x2001f) == nullptr)
@@ -351,13 +337,12 @@ bool PageServerSelect::SaveEdges()
 
 void PageServerSelect::Destroy()
 {
-    // FUN_0056d8f0: FUN_005760f0(0xf) on the Event::Handler face.
+    // FUN_0056d8f0.
     UnregisterEvent(0xf);
     if (ServerTable != nullptr)
     {
-        // 0x0056d911..0x0056da1b: the table's edges saved, then the images destroyed on the
-        // TRC they were made on (DeviceTRC slot 11, the TRC fetched each time).
-        ServerTable->GetEdges(&Edges); // FUN_0058d0f0
+        // The images are destroyed on the TRC they were made on, fetched each time.
+        ServerTable->GetEdges(&Edges);
         SaveEdges();
         ServerTable->GetDeviceTRC()->destroy_image(UpPip);
         ServerTable->GetDeviceTRC()->destroy_image(DownPip);
@@ -370,10 +355,8 @@ void PageServerSelect::Destroy()
         Refresh->GetDeviceTRC()->destroy_image(ServerConnectImage);
         Refresh->GetDeviceTRC()->destroy_image(ServerNoConnectImage);
     }
-    UIPage::MasterWin::Destroy(); // FUN_00591de0
+    UIPage::MasterWin::Destroy();
 
-    // 0x0056da25..0x0056da90: the Version control deleted (slot 0 with 1), the widget
-    // pointers cleared, the "Arrow" cursor.
     if (Version != nullptr)
     {
         delete Version;
@@ -397,20 +380,17 @@ void PageServerSelect::Destroy()
 
 bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
 {
-    // FUN_0056dbf0. MasterWin::Create (FUN_00591cd0) with no payload; false goes straight back.
+    // FUN_0056dbf0. Unlike the other intro pages, a failed MasterWin::Create returns at once.
     if (!UIPage::MasterWin::Create(NewParent, nullptr))
         return false;
 
-    // 0x0056dc24..0x0056dc5b: the list not yet requested, status 3, the filter's version range
-    // the client's own version, no server remembered, no result.
     bListRequested = 0;
     ListStatus = 3;
-    Filter.VersionMin = static_cast<unsigned>(g_client.packed_version); // +0x2bc
-    Filter.VersionMax = static_cast<unsigned>(g_client.packed_version); // +0x2c0
+    Filter.VersionMin = static_cast<unsigned>(g_client.packed_version);
+    Filter.VersionMax = static_cast<unsigned>(g_client.packed_version);
     SelectedServerId = 0xffffffffu;
     Result = 0;
 
-    // 0x0056dc61..0x0056dd4c: the widgets through the IUIPage face (slot 4).
     Connect = static_cast<UiTextMsgButton*>(FindWidget("Connect"));
     MainMenu = static_cast<UiTextMsgButton*>(FindWidget("MainMenu"));
     SetFilter = static_cast<UiTextMsgButton*>(FindWidget("SetFilter"));
@@ -425,10 +405,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     SubTitle = static_cast<UiRichTextWin*>(FindWidget("SubTitle"));
     Legend = static_cast<UiRichTextWin*>(FindWidget("Legend"));
 
-    // 0x0056dd45..0x0056de44: the "Version" TextControl -- the "Normal" style at
-    // (0.32, -0.35, -1), 0.25 wide, the font's line height (slot 6, unsigned) * 0.002 high;
-    // the IDS 0x4f7 format with the version word's high then low byte (DAT_0067ecba) as its
-    // text (slot 42, property 0x1d); hidden.
+    // The "Version" TextControl: the IDS 0x4f7 format with the version word's (DAT_0067ecba)
+    // high then low byte as its text (property 0x1d); hidden.
     Version = WinFactoryCreate("Version", "TextControl", this, nullptr);
     if (Version != nullptr)
     {
@@ -448,10 +426,9 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         HideWin3D(Version);
     }
 
-    // 0x0056de48..0x0056de50: FUN_005760d0(0xf) on the Event::Handler face.
     RegisterEvent(0xf);
 
-    // 0x0056de55..0x0056df77: the images, on the table's TRC and (the last two) on Refresh's.
+    // The last two images are made on Refresh's TRC.
     UpPip = ServerTable->GetDeviceTRC()->create_image("interface\\intro\\images\\uppip.bmp");
     DownPip = ServerTable->GetDeviceTRC()->create_image("interface\\intro\\images\\DownPip.bmp");
     Locked = ServerTable->GetDeviceTRC()->create_image("interface\\intro\\images\\Locked.bmp");
@@ -469,7 +446,6 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     ServerNoConnectImage = Refresh->GetDeviceTRC()->create_image(
         "interface\\intro\\images\\MULTI_ServerNoConnect.bmp");
 
-    // 0x0056df71..0x0056dfee: slot 46 (+0xb8) on each, +4 of the record it returns.
     Connect->GetToolTipHoverInfo()->IdsAlt = 0xac7;
     MainMenu->GetToolTipHoverInfo()->IdsAlt = 0xac6;
     SetFilter->GetToolTipHoverInfo()->IdsAlt = 0xaf0;
@@ -477,14 +453,14 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     ListServerStatus->GetToolTipHoverInfo()->IdsAlt = 0xade;
     Refresh->GetToolTipHoverInfo()->IdsAlt = 0xac9;
 
-    ServerTable->SetTipMode(3); // FUN_0058d5e0(3): one tip per cell
+    ServerTable->SetTipMode(3); // one tip per cell
 
-    // 0x0056e002..0x0056e831: the lists, in retail's order.
+    // In retail's order.
     LoadIds(TextYes, 0x727);
     LoadIds(TextNo, 0x728);
     RdlClear(PingUnknown);
     {
-        TextNode const Node(L"????", -1); // u_ 0x005e2c84
+        TextNode const Node(L"????", -1); // .rdata 0x005e2c84
         AppendNodeClone(PingUnknown, Node);
     }
     RdlClear(PingNone);
@@ -509,29 +485,26 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     LoadStyledIds(SubTitleLan, 0xc9b7, 0x601ef);
     LoadStyledIds(SubTitleInternet, 0xc9b7, 0x601ee);
 
-    // 0x0056e834..0x0056e887: the column captions and the header cells' tool tips.
     for (unsigned Column = 0; Column < 8; ++Column)
     {
         LoadIds(ColumnHeaders[Column], kColumnHeaderIds[Column]);
-        FToolTipHoverInfo* const Tip = ServerTable->GetCellTip(0, Column); // FUN_0058d960
+        FToolTipHoverInfo* const Tip = ServerTable->GetCellTip(0, Column);
         if (Tip != nullptr)
             Tip->IdsAlt = kColumnHeaderTipIds[Column];
     }
 
-    // 0x0056e889..0x0056e8f9: the table's look.
-    ServerTable->SetFrameColor(ChromeColor());            // FUN_0058d560(&DAT_00679bb4)
-    ServerTable->SetGrabDistance(0.00400000019f);         // FUN_0058d570(0x3b83126f)
-    ServerTable->SetResizable(false, true);               // FUN_0058d590(0, 1)
-    ServerTable->SetLayoutFlag(true);                     // FUN_0058d5d0(1)
-    ServerTable->SetHeaderRows(1);                        // FUN_0058cbb0(1)
-    ServerTable->SetBorders(false, false, false, true);   // FUN_0058cb80(0, 0, 0, 1)
-    ServerTable->SetRowHighlights(false);                 // FUN_0058cbe0(0)
-    ServerTable->SetCellMargins(2, 2);                    // FUN_0058d5b0(2, 2)
+    ServerTable->SetFrameColor(ChromeColor());
+    ServerTable->SetGrabDistance(0.00400000019f);
+    ServerTable->SetResizable(false, true);
+    ServerTable->SetLayoutFlag(true);
+    ServerTable->SetHeaderRows(1);
+    ServerTable->SetBorders(false, false, false, true);
+    ServerTable->SetRowHighlights(false);
+    ServerTable->SetCellMargins(2, 2);
 
-    // 0x0056e8fe..0x0056e9c1: the scroll bar -- chrome colours, range 0..rows - 1, page
-    // rows - 1 (both through FILD of a zero-extended dword), step 1, value 0, hidden.
-    ServerScroll->SetArrowColors(ChromeColor(), ChromeColor()); // FUN_00595f30
-    ServerScroll->SetBarColors(ChromeColor(), ChromeColor());   // FUN_00595f50
+    // Range and page convert the row count as an unsigned dword.
+    ServerScroll->SetArrowColors(ChromeColor(), ChromeColor());
+    ServerScroll->SetBarColors(ChromeColor(), ChromeColor());
     ServerScroll->SetRange(
         0.0f, static_cast<float>(static_cast<unsigned>(EdgeCount(ServerTable->RowEdges) - 1)));
     ServerScroll->SetPage(
@@ -539,10 +512,9 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     ServerScroll->SetStep(1.0f);
     ServerScroll->SetValue(0.0f);
     HideWin3D(ServerScroll);
-    ServerDetails->SetAutoScrollbar(true); // FUN_005799f0(1)
+    ServerDetails->SetAutoScrollbar(true);
 
-    // 0x0056e9d2..0x0056ea7d: the saved edges from HKCU\...\ServerTable (KEY_READ); on success
-    // two keys popped and closed, on failure one, then the rest closed.
+    // The saved edges from HKCU\...\ServerTable (KEY_READ).
     bool bLoaded = false;
     {
         FRegKeyStack Keys;
@@ -555,8 +527,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         }
         Keys.PopClose();
     }
-    // 0x0056ea82..0x0056eab5: nothing saved -> the table's own edges with the default column
-    // edges written over the first eight (no size check, as retail).
+    // Nothing saved: the table's own edges with the default column edges written over the first
+    // eight (no size check, as retail).
     if (!bLoaded)
     {
         ServerTable->GetEdges(&Edges);
@@ -564,10 +536,9 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         for (int Index = 0; Index < 8; ++Index)
             Cols[Index] = kDefaultColumnEdges[Index];
     }
-    ServerTable->SetEdges(&Edges); // FUN_0058d250
+    ServerTable->SetEdges(&Edges);
 
-    // 0x0056eac9..0x0056eb15: with eight column edges the header row gets its captions and
-    // stops hovering.
+    // With eight column edges the header row gets its captions and stops hovering.
     if (ServerTable->ColEdges.size() == 8)
     {
         for (unsigned Column = 0; Column < 8; ++Column)
@@ -575,7 +546,6 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         ServerTable->GetRow(0)->bHoverable = 0;
     }
 
-    // 0x0056eb18..0x0056eb99: the title.
     Title->ClearContent();
     {
         JustifyNode const Justify(TextJustifyCenter);
@@ -585,7 +555,6 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         RDLRefNode const Ref(TitleText);
         Title->AppendNode(Ref);
     }
-    // 0x0056eb9b..0x0056ec58: the subtitle -- the LAN or internet line after the caption.
     SubTitle->ClearContent();
     {
         JustifyNode const Justify(TextJustifyLeft);
@@ -600,10 +569,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         SubTitle->AppendNode(Paragraph);
     }
     SubTitle->AppendContent(G_bInternetServerList != 0 ? SubTitleInternet : SubTitleLan);
-    Refresh->bInteractive = 1; // 0x0056ec63
+    Refresh->bInteractive = 1;
 
-    // 0x0056ec6a..0x0056ed21: every row below the header emptied, its payload dropped, neither
-    // selectable nor hoverable.
     int const RowCount = EdgeCount(ServerTable->RowEdges);
     for (int Row = 1; Row < RowCount; ++Row)
     {
@@ -611,19 +578,16 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
             ServerTable->ClearCell(static_cast<unsigned>(Row), Column);
         FUiFastTableRow* const RowRecord = ServerTable->GetRow(static_cast<unsigned>(Row));
         if (RowRecord != nullptr)
-            RowRecord->Payload.Assign(nullptr); // FUN_00575520(0)
+            RowRecord->Payload.Assign(nullptr);
         ServerTable->GetRow(static_cast<unsigned>(Row))->bSelectable = 0;
         ServerTable->GetRow(static_cast<unsigned>(Row))->bHoverable = 0;
     }
 
-    RefreshDetailsText(); // 0x0056ed29
+    RefreshDetailsText();
 
-    // 0x0056ed2e..0x0056ee50: the status line, right aligned; FUN_0056fc90's body inline.
-    ListServerStatus->SetAlignMode(2); // FUN_00579a60(2)
-    RefreshListStatus();
+    ListServerStatus->SetAlignMode(2);
+    RefreshListStatus(); // inlined in retail
 
-    // 0x0056ee52..0x0056efe2: the legend -- blue lock, its caption, a space, blue skull, its
-    // caption.
     Legend->ClearContent();
     {
         StyleNode const Style(0x76ec);
@@ -642,7 +606,7 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         Legend->AppendNode(Ref);
     }
     {
-        TextNode const Space(L" ", -1); // u_ 0x005e2c58
+        TextNode const Space(L" ", -1); // .rdata 0x005e2c58
         Legend->AppendNode(Space);
     }
     {
@@ -654,8 +618,6 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         Legend->AppendNode(Ref);
     }
 
-    // 0x0056efe4..0x0056f0b7: the slide starts at -1.5; the table, scroll bar, legend, details,
-    // title, subtitle and status hidden; the buttons' surfaces frozen; the boxes' homes kept.
     SlideT = -1.5;
     bLeaving = 0;
     LeaveDirection = 0;
@@ -666,7 +628,7 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     HideWin3D(Title);
     HideWin3D(SubTitle);
     HideWin3D(ListServerStatus);
-    Connect->SetSkipUpload(true); // FUN_00579a90(1)
+    Connect->SetSkipUpload(true);
     MainMenu->SetSkipUpload(true);
     SetFilter->SetSkipUpload(true);
     Refresh->SetSkipUpload(true);
@@ -676,7 +638,7 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         SelectBoxHome[Axis] = ServerSelectBox->Position[Axis];
     }
 
-    // 0x0056f0ba..0x0056f157: FUN_0056f610's body inline once more.
+    // Retail inlines RefreshDetailsText a second time here.
     RefreshDetailsText();
     return true;
 }
@@ -684,17 +646,15 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
 void PageServerSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayList const* Content,
                                bool bVersionMatch, bool bSelected)
 {
-    // FUN_0056f180. FUN_0058cd00; false -> nothing.
+    // FUN_0056f180.
     FUiFastTableCell* Cell = nullptr;
     if (!ServerTable->GetCell(Row, Column, &Cell))
         return;
-    RdlClear(Cell->Source); // FUN_0046c860 over the cell's list
+    RdlClear(Cell->Source);
 
     bool bSortArrow = false;
     if (Row == 0)
     {
-        // 0x0056f1ec..0x0056f2f4: the header -- the sort column's style (and its arrow below),
-        // centred.
         if (Column == SortColumn)
         {
             StyleNode const Style(0xd190);
@@ -711,8 +671,6 @@ void PageServerSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayList 
     }
     else
     {
-        // 0x0056f2f9..0x0056f46d: grey for another version, else selected / normal; column 0
-        // left, the rest centred.
         unsigned short const StyleId =
             !bVersionMatch ? static_cast<unsigned short>(0xbb80)
                            : (bSelected ? static_cast<unsigned short>(0x3343)
@@ -725,16 +683,15 @@ void PageServerSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayList 
         AppendNodeClone(Cell->Source, Justify);
     }
 
-    // 0x0056f483..0x0056f4ac: a clone of every Content node (FUN_0046c800 per node).
     ChatAppendRdlCopy(Cell->Source, *Content);
 
-    // 0x0056f4ae..0x0056f5e0: the arrow -- DownPip ascending, UpPip descending.
+    // DownPip while ascending, UpPip while descending.
     if (bSortArrow)
     {
         ImageNode const Arrow(bAscending[Column] != 0 ? DownPip : UpPip);
         AppendNodeClone(Cell->Source, Arrow);
     }
-    ServerTable->InvalidateCell(Row, Column); // FUN_0058cdb0
+    ServerTable->InvalidateCell(Row, Column);
 }
 
 void PageServerSelect::RefreshDetailsText()
@@ -755,7 +712,7 @@ void PageServerSelect::RefreshDetailsText()
 
 void PageServerSelect::RefreshListStatus()
 {
-    // FUN_0056fc90: Refresh stays interactive; the status text right-justified.
+    // FUN_0056fc90.
     Refresh->bInteractive = 1;
     ListServerStatus->ClearContent();
     {
@@ -771,7 +728,7 @@ void PageServerSelect::RefreshListStatus()
     {
         RDLRefNode const Ref(StatusText60055);
         ListServerStatus->AppendNode(Ref);
-        Refresh->bInteractive = 1; // 0x0056fd84
+        Refresh->bInteractive = 1; // redundant store, as retail
     }
     else
     {
@@ -788,25 +745,22 @@ void PageServerSelect::RebuildTable()
         Compare = bAscending[SortColumn] != 0 ? kAscendingCompare[SortColumn]
                                               : kDescendingCompare[SortColumn];
     std::vector<FServerInfo*> Servers;
-    G_LoginMgr.GetFilteredServers(Servers, Compare, &Filter); // FUN_005aca40
-    ServerTable->ClearSelection();                            // FUN_0058d4a0
+    G_LoginMgr.GetFilteredServers(Servers, Compare, &Filter);
+    ServerTable->ClearSelection();
 
-    // 0x0056fe72..0x0056ff37: the scroll range over the server count, a page of rows - 1;
-    // FirstVisible from the scroll value; the bar shown (unless leaving) only when the list
-    // does not fit.
+    // The bar is shown (unless leaving) only when the list does not fit.
     int const ServerCount = static_cast<int>(Servers.size());
     int const RowCount = EdgeCount(ServerTable->RowEdges);
     ServerScroll->SetRange(0.0f, static_cast<float>(ServerCount));
     int const VisibleRows = RowCount - 1;
     ServerScroll->SetPage(static_cast<float>(VisibleRows));
     ServerScroll->SetStep(1.0f);
-    FirstVisible = static_cast<int>(ServerScroll->GetValue()); // ftol
+    FirstVisible = static_cast<int>(ServerScroll->GetValue());
     if (ServerCount > VisibleRows && bLeaving == 0)
         ShowWin3D(ServerScroll);
     else
         HideWin3D(ServerScroll);
 
-    // 0x0056ff3a..0x0056ff83: the visible servers from row 1; the remembered one selected.
     int Row = 1;
     for (int Index = FirstVisible; Index < ServerCount; ++Index, ++Row)
     {
@@ -814,17 +768,17 @@ void PageServerSelect::RebuildTable()
             return;
         FillRow(static_cast<unsigned>(Row), Servers[static_cast<size_t>(Index)]);
         if (Servers[static_cast<size_t>(Index)]->Id == SelectedServerId)
-            ServerTable->SelectRow(static_cast<unsigned>(Row)); // FUN_0058d4b0
+            ServerTable->SelectRow(static_cast<unsigned>(Row));
     }
 
-    // 0x0056ff85..0x00570012: the rows left over emptied (their payload released inline).
+    // The rows left over are emptied (retail inlines ClearRow).
     for (; Row < RowCount; ++Row)
     {
         for (unsigned Column = 0; Column < ServerTable->ColEdges.size(); ++Column)
             ServerTable->ClearCell(static_cast<unsigned>(Row), Column);
         FUiFastTableRow* const RowRecord = ServerTable->GetRow(static_cast<unsigned>(Row));
         if (RowRecord != nullptr && RowRecord->Payload.Object != nullptr)
-            RowRecord->Payload.Reset(); // FUN_00599980, then +8 = 0
+            RowRecord->Payload.Reset();
         ServerTable->GetRow(static_cast<unsigned>(Row))->bSelectable = 0;
         ServerTable->GetRow(static_cast<unsigned>(Row))->bHoverable = 0;
     }
@@ -832,12 +786,12 @@ void PageServerSelect::RebuildTable()
 
 void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
 {
-    // FUN_00570040. A server of another version is greyed and inert.
+    // FUN_00570040. A server of another version is greyed and inert. Retail fills the columns
+    // in the order 1, 3, 2, 0, 4, 5, 6, 7.
     bool const bVersionMatch =
         Server->Version == static_cast<unsigned>(g_client.packed_version);
     bool const bSelected = Server->Id == SelectedServerId;
 
-    // 0x005700a1..0x0057013f: column 1, the address.
     {
         RenderDisplayList Text;
         TextNode const Node(Server->Address.c_str(), -1);
@@ -845,9 +799,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         SetCell(Row, 1, &Text, bVersionMatch, bSelected);
     }
 
-    // 0x00570144..0x00570a7e: column 3, the ping -- "????" for -2, "-" for -1 (both SetCell
-    // inlined, FUN_005754b0 inserting the clones), else the number through a wide
-    // stringstream (operator<<(unsigned), ends).
+    // The ping: "????" for -2, "-" for -1 (retail inlines SetCell for both).
     {
         int const Ping = Server->Ping;
         if (Ping == -2 || Ping == -1)
@@ -869,11 +821,9 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         }
     }
 
-    // 0x00570a83..0x00570aae: column 2, a known login (FUN_005a9950).
     SetCell(Row, 2, G_LoginMgr.IsKnownLogin(*Server) ? &TextYes : &TextNo, bVersionMatch,
             bSelected);
 
-    // 0x00570ab3..0x00570b58: column 0, the name.
     {
         RenderDisplayList Text;
         TextNode const Node(Server->Name.c_str(), -1);
@@ -881,7 +831,6 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         SetCell(Row, 0, &Text, bVersionMatch, bSelected);
     }
 
-    // 0x00570b5d..0x00570cf9: column 4, "players/max".
     {
         std::wstringstream Stream;
         Stream << static_cast<unsigned>(Server->PlayerCount) << L"/"
@@ -893,8 +842,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         SetCell(Row, 4, &Text, bVersionMatch, bSelected);
     }
 
-    // 0x00570cff..0x00570f3c: column 5, "major.minor" (bytes +0x8f, +0x8e as unsigned long),
-    // behind a TRANode (colour 0x1d1dbf, mask 0xffffff00) when it is not the client's.
+    // "major.minor", recoloured when it is not the client's version.
     {
         std::wstringstream Stream;
         Stream << static_cast<unsigned long>((Server->Version >> 24) & 0xffu) << L"."
@@ -912,11 +860,9 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         SetCell(Row, 5, &Text, bVersionMatch, bSelected);
     }
 
-    // 0x00570f42..0x00570f61: column 6, +0x3e.
     SetCell(Row, 6, Server->bLan != 0 ? &TextYes : &TextNo, bVersionMatch, bSelected);
 
-    // 0x00570f66..0x00571180: column 7, the lock (+0x94) and the skull (+0x96) -- plain when
-    // selected, blue for this version, grey otherwise.
+    // The lock and the skull: plain when selected, blue for this version, grey otherwise.
     {
         RenderDisplayList Icons;
         if (Server->bPassword != 0)
@@ -932,9 +878,8 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
         SetCell(Row, 7, &Icons, bVersionMatch, bSelected);
     }
 
-    // 0x00571191..0x005711e8: the row selectable and hoverable for this version only; its
-    // payload a fresh ServerRowData (FUN_00571280) taken by FUN_00575520, the creation
-    // reference dropped (FUN_00599980). No null test on the row, as retail.
+    // Assign takes a reference; the creation reference is dropped. No null test on the row, as
+    // retail.
     FUiFastTableRow* const RowRecord = ServerTable->GetRow(Row);
     RowRecord->bSelectable = bVersionMatch ? 1 : 0;
     RowRecord->bHoverable = bVersionMatch ? 1 : 0;
@@ -949,18 +894,17 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     unsigned const TableId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(ServerTable));
     if (Msg == 0x3004)
     {
-        PlayOrRewindUiSoundSlot(0); // FUN_005645c0(0)
+        PlayOrRewindUiSoundSlot(0);
         if (A == 0x3e9)
         {
-            // 0x00571609..0x005716f1: "MainMenu" -- leave back.
+            // "MainMenu".
             BeginLeave();
             LeaveDirection = -1;
             return false;
         }
         if (A == 0x3ea)
         {
-            // 0x00571517..0x00571606: "SetFilter" -- the tool tips off while the filter dialog
-            // runs (FUN_005637b0 on +0x2a4); a WM_QUIT there quits the process (exit(0)).
+            // "SetFilter": a WM_QUIT inside the modal filter dialog quits the process.
             SetToolTipsEnabled(false);
             if (!ServerFilterDialogRun(this, &Filter))
                 exit(0);
@@ -970,9 +914,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         }
         if (A == 0x3eb)
         {
-            // 0x005716f4..0x00571770: "Refresh" -- only before the first list request
-            // (CLoginMgr +0x23c, DAT_0067e9f4); the rows emptied, the details reset, the lists
-            // reset and requested again.
+            // "Refresh": only before the first list request (CLoginMgr +0x23c).
             if (G_LoginMgr.ServerListPage != 0)
                 return false;
             int const RowCount = EdgeCount(ServerTable->RowEdges);
@@ -983,15 +925,15 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
                 ServerTable->GetRow(static_cast<unsigned>(Row))->bHoverable = 0;
             }
             RefreshDetailsText();
-            ServerDetails->SetScrollOrigin(0, 0); // FUN_005798b0(0, 0)
-            G_LoginMgr.ResetServerLists();        // FUN_005abc80
-            G_LoginMgr.RequestServerList();       // FUN_005ac240
+            ServerDetails->SetScrollOrigin(0, 0);
+            G_LoginMgr.ResetServerLists();
+            G_LoginMgr.RequestServerList();
             return false;
         }
         if (A != 0x3003)
             return false;
 
-        // 0x00571783..0x005718d1: "Connect".
+        // "Connect".
         FServerInfo const* const Server = GetSelectedServer();
         if (Server == nullptr)
             return true;
@@ -1004,8 +946,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0xf001)
     {
-        // 0x005718fb..0x00571988: a header click on the table -- the same column flips its
-        // direction, another becomes the sort column; the captions redrawn, the list rebuilt.
+        // A header click: the same column flips its direction, another becomes the sort column.
         if (A != TableId || (B & 0xffff0000u) != 0)
             return false;
         unsigned const Column = B & 0xffffu;
@@ -1024,9 +965,8 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0x300d)
     {
-        // 0x0057198b..0x00571a90: a row selected -- its details (the vertical scroll reset
-        // for another server), the new row redrawn as selected, the row of the server selected
-        // before redrawn as not.
+        // A row selected: its details (the vertical scroll reset for another server), the new
+        // and the previous row redrawn.
         if (A != TableId)
             return false;
         RefreshDetailsText();
@@ -1057,7 +997,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0xf002)
     {
-        // 0x00571a93..0x00571b0a: a double click on the table -- connect and leave.
+        // A double click on the table: connect and leave.
         if (A != TableId)
             return false;
         FServerInfo const* const Server = GetSelectedServer();
@@ -1065,14 +1005,14 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             return true;
         if (!ConnectToServer(Server))
             return true;
-        BeginLeave(); // FUN_00571fc0
+        BeginLeave();
         LeaveDirection = 1;
         return true;
     }
 
     if (Msg == 0xf003)
     {
-        // 0x00571b26..0x00571b3c: back to the main menu at once.
+        // Back to the main menu at once.
         Result = 1;
         MouseSetCursor("Arrow", true);
         return true;
@@ -1080,7 +1020,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0xf005)
     {
-        // 0x0057197b: the scroll bar moved.
+        // The scroll bar moved.
         RebuildTable();
         return true;
     }
@@ -1089,8 +1029,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
 FServerInfo const* PageServerSelect::GetSelectedServer()
 {
-    // 0x00571783..0x005717d3 / 0x00571a9f..0x00571ae5: the selected row's payload (a row with
-    // none gives nothing), else the remembered id through FUN_005abdb0.
+    // Inlined twice in retail's ProcessMessage. A selected row without a payload gives nothing.
     unsigned SelectedRow = 0;
     if (ServerTable->GetSelectedRow(&SelectedRow))
     {
@@ -1107,8 +1046,7 @@ FServerInfo const* PageServerSelect::GetSelectedServer()
 
 void PageServerSelect::ClearRow(unsigned Row)
 {
-    // FUN_00571b50: every cell (the column count read again each pass), then the payload
-    // released inline (FUN_00599980's body) and cleared.
+    // FUN_00571b50. The column count is read again each pass.
     for (unsigned Column = 0; Column < ServerTable->ColEdges.size(); ++Column)
         ServerTable->ClearCell(Row, Column);
     FUiFastTableRow* const RowRecord = ServerTable->GetRow(Row);
@@ -1122,15 +1060,13 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
     ServerDetails->ClearContent();
     if (bNewServer)
     {
-        // 0x00571c01..0x00571c23: back to the top, the horizontal scroll kept.
+        // Back to the top, the horizontal scroll kept.
         int ScrollX = 0;
         int ScrollY = 0;
-        ServerDetails->GetScrollOrigin(&ScrollX, &ScrollY); // FUN_00579970
-        ServerDetails->SetScrollOrigin(ScrollX, 0);         // FUN_005798b0
+        ServerDetails->GetScrollOrigin(&ScrollX, &ScrollY);
+        ServerDetails->SetScrollOrigin(ScrollX, 0);
     }
 
-    // 0x00571c28..0x00571d4d: the caption, then the server's description (+0x54) as text
-    // (FUN_0057db50, TextNode form).
     {
         StyleNode const Style(0x4433);
         ServerDetails->AppendNode(Style);
@@ -1156,8 +1092,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
         ServerDetails->AppendNode(Paragraph);
     }
 
-    // 0x00571d52..0x00571ed5: the restrictions -- shown unless +0x95 is set and there is no
-    // password: +0x95 clear adds 0x74f, a password adds 0x750.
+    // The restrictions.
     if (Server->bAllowNewPlayers != 0 && Server->bPassword == 0)
         return;
     {
@@ -1199,7 +1134,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
 void PageServerSelect::SetToolTipsEnabled(bool bEnabled)
 {
     // FUN_00571f50: the Legend's tip is always switched off.
-    ServerTable->SetToolTipEnabled(bEnabled); // FUN_00579890
+    ServerTable->SetToolTipEnabled(bEnabled);
     Connect->SetToolTipEnabled(bEnabled);
     MainMenu->SetToolTipEnabled(bEnabled);
     SetFilter->SetToolTipEnabled(bEnabled);
@@ -1211,9 +1146,7 @@ void PageServerSelect::SetToolTipsEnabled(bool bEnabled)
 
 void PageServerSelect::BeginLeave()
 {
-    // FUN_00571fc0 (and its inline copies at 0x00571609 / 0x005717e9): leaving from SlideT 0,
-    // the table side hidden, the four buttons inert and frozen, the slide sound, the tool tips
-    // off (FUN_00571f50(0)'s body inline).
+    // FUN_00571fc0.
     bLeaving = 1;
     SlideT = 0.0;
     HideWin3D(ServerTable);
@@ -1224,30 +1157,29 @@ void PageServerSelect::BeginLeave()
     HideWin3D(SubTitle);
     HideWin3D(ListServerStatus);
     HideWin3D(Version);
-    Connect->bInteractive = 0; // +0x498
+    Connect->bInteractive = 0;
     MainMenu->bInteractive = 0;
     SetFilter->bInteractive = 0;
     Refresh->bInteractive = 0;
-    Connect->SetSkipUpload(true); // FUN_00579a90(1)
+    Connect->SetSkipUpload(true);
     MainMenu->SetSkipUpload(true);
     SetFilter->SetSkipUpload(true);
     Refresh->SetSkipUpload(true);
-    PlayUiSoundSlot(0x1b); // FUN_00564570(0x1b)
-    SetToolTipsEnabled(false);
+    PlayUiSoundSlot(0x1b);
+    SetToolTipsEnabled(false); // inlined in retail
 }
 
 bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
 {
     // FUN_00572100.
-    if (!G_LoginMgr.SetCurrentServer(*Server)) // FUN_005a9c30
+    if (!G_LoginMgr.SetCurrentServer(*Server))
     {
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x14cb,
               "Internal error: invalid server data.\n");
         return false;
     }
 
-    // 0x00572130..0x005721fd: an empty password (DAT_005c8ce0); a locked server asks for one
-    // (IDS 0x60071, OK tool tip 0xd48); cancelling ends the connect.
+    // A locked server asks for a password (OK tool tip 0xd48); cancelling ends the connect.
     std::wstring Password(L"");
     if (Server->bPassword != 0 && !NnPromptRunTextEntry(0x60071, &Password, false, 0xd48))
     {
@@ -1256,12 +1188,11 @@ bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
         return false;
     }
 
-    // 0x00572200..0x005722a3: CLoginMgr +0x130 = the password, then ConnectToServer on the ini
-    // path (DAT_00679d04); a failure recreates the Gun.
+    // A failed connect recreates the Gun.
     G_LoginMgr.ServerPassword = Password;
     if (::ConnectToServer(g_display.ini_path.c_str()))
         return true;
-    G_LoginMgr.CreateGun(); // FUN_005ab4c0
+    G_LoginMgr.CreateGun();
     FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kIntroCpp, 0x14c5,
           "Failed to connect to the server.\n");
     return false;
@@ -1269,18 +1200,17 @@ bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
 
 void PageServerSelect::Update()
 {
-    // FUN_0056f6e0. 0x0056f6e6..0x0056f6fa: the list asked for until CLoginMgr takes it.
+    // FUN_0056f6e0. The list is asked for until CLoginMgr takes the request.
     if (bListRequested == 0)
         bListRequested = G_LoginMgr.RequestServerList() ? 1 : 0;
 
-    // 0x0056f700..0x0056f7b3: once in (FCOMP 1.0, TEST AH,0x41 / JP -- past 1.0 or unordered)
-    // or leaving, and not while a leave with a direction runs: the list pumped (a change
-    // rebuilds the table), the status line kept current, Connect live only with a server.
+    // Once in (past 1.0 or unordered) or leaving, and not while a leave with a direction runs:
+    // the list pumped, the status line kept current, Connect live only with a server.
     if ((!(SlideT <= 1.0) || bLeaving != 0) && (bLeaving == 0 || LeaveDirection == 0))
     {
-        if (G_LoginMgr.PumpServerList()) // FUN_005ac9d0
+        if (G_LoginMgr.PumpServerList())
             RebuildTable();
-        int const Status = G_LoginMgr.GetGunStatus(); // FUN_005abc40
+        int const Status = G_LoginMgr.GetGunStatus();
         if (Status != ListStatus)
         {
             ListStatus = Status;
@@ -1299,22 +1229,18 @@ void PageServerSelect::Update()
         }
     }
 
-    // 0x0056f7ba..0x0056faa0: the slide in, unless past 1.0 (or unordered) or leaving.
+    // The slide in, unless past 1.0 (or unordered) or leaving.
     if (SlideT <= 1.0 && bLeaving == 0)
     {
-        // 0x0056f7df..0x0056f823: the frame time, capped at 0.5 (FCOM 0.5, TEST AH,0x41 / JNZ
-        // keeps it when not greater), 1.5 per second.
+        // Frame time capped at 0.5, 1.5 per second.
         double Dt = GetClientFrameTimeCapped();
         if (Dt > 0.5)
             Dt = 0.5;
         SlideT = Dt * 1.5 + SlideT;
 
-        // 0x0056f81d..0x0056f82e: FCOM 0.0, TEST AH,0x41 / JP -- in place once past 0.
+        // In place once past 0; an unordered SlideT also arrives.
         if (SlideT <= 0.0)
         {
-            // 0x0056f834..0x0056f8f6: MainMenu / SetFilter offset (t, 0, 0), Connect /
-            // Refresh (-t, 0, 0) through slot 42 property 6; the info box at home - t, the
-            // select box at home + t (FUN_00423b30, slot 5).
             float Right[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float Left[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
             MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(Right), 0);
@@ -1329,8 +1255,7 @@ void PageServerSelect::Update()
         }
         else
         {
-            // 0x0056f8fb..0x0056fa69: everything in place, shown and live; SlideT parked at
-            // 2.0.
+            // Everything in place, shown and live; SlideT parked at 2.0.
             float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
             MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
             SetFilter->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
@@ -1345,11 +1270,11 @@ void PageServerSelect::Update()
             ShowWin3D(SubTitle);
             ShowWin3D(ListServerStatus);
             ShowWin3D(Version);
-            Connect->SetSkipUpload(false); // FUN_00579a90(0)
+            Connect->SetSkipUpload(false);
             MainMenu->SetSkipUpload(false);
             SetFilter->SetSkipUpload(false);
             Refresh->SetSkipUpload(false);
-            ServerTable->SetToolTipEnabled(true); // FUN_00579890
+            ServerTable->SetToolTipEnabled(true);
             Connect->SetToolTipEnabled(true);
             MainMenu->SetToolTipEnabled(true);
             SetFilter->SetToolTipEnabled(true);
@@ -1360,14 +1285,11 @@ void PageServerSelect::Update()
             SlideT = 2.0;
         }
 
-        // 0x0056fa73..0x0056faa0: the slide sound while -0.8 < SlideT < -0.1 (FCOMP -0.8,
-        // TEST AH,0x41 / JNZ; FCOMP -0.1, TEST AH,5 / JP).
         if (SlideT > -0.8 && SlideT < -0.1)
-            PlayUiSoundSlot(0x1b); // FUN_00564570(0x1b)
+            PlayUiSoundSlot(0x1b);
     }
 
-    // 0x0056faa3..0x0056fc56: leaving with a direction -- SlideT runs down at 1.5 per second
-    // (no cap), the buttons and boxes slide out the other way.
+    // Leaving with a direction: 1.5 per second, no frame-time cap.
     if (bLeaving != 0 && LeaveDirection != 0)
     {
         SlideT = SlideT - GetClientFrameTimeCapped() * 1.5;
@@ -1383,8 +1305,7 @@ void PageServerSelect::Update()
         Win3DVec3Add(BoxPosition, SelectBoxHome, Right);
         ServerSelectBox->SetPosition(BoxPosition);
 
-        // 0x0056fbd2..0x0056fbe3: FCOMP -1.5 (DAT_005e2bb0), TEST AH,0x41 / JP -- done once
-        // SlideT <= -1.5.
+        // -1.5 is DAT_005e2bb0.
         if (SlideT <= -1.5)
         {
             HideWin3D(MainMenu);
@@ -1397,7 +1318,7 @@ void PageServerSelect::Update()
             if (LeaveDirection == 1)
             {
                 Result = 2;
-                LoadingScreenStart(); // FUN_00579290
+                LoadingScreenStart();
             }
             else if (LeaveDirection == -1)
             {
@@ -1407,14 +1328,13 @@ void PageServerSelect::Update()
         }
     }
 
-    // 0x0056fc5d..0x0056fc7d: Win3D's child walk (FUN_005a17b0 inlined).
     Win3D::Update();
 }
 
 bool PageServerSelect::OnEvent(unsigned MsgId)
 {
     // LAB_00572330 (this = the +0x80 face): event 0xf goes back to the main menu unless a leave
-    // runs; anything else is FUN_0053f330 (false).
+    // runs.
     if (MsgId != 0xf)
         return UIPage::MasterWin::OnEvent(MsgId);
     if (bLeaving == 0)

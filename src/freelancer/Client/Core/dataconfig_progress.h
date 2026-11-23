@@ -17,8 +17,8 @@
 
 // One intro.ini string field: {length, text}, stride 0x48 in retail. FUN_00564b30 hands
 // FUN_00417c50 a capacity of 0x40 and stores the returned length in front of the text; a null
-// value stores length 0 and a zero first byte. Each field's {length, text[0]} pair is zeroed by
-// its own static initializer (LAB_00564a60 .. LAB_00564ae0).
+// value stores length 0 and a zero first byte. Each field is zeroed by its own static
+// initializer (LAB_00564a60 on).
 struct FIntroPathString
 {
     unsigned Length;  // +0x00
@@ -37,18 +37,17 @@ struct FIntroConfigState
     FIntroPathString ScreenExit;  // DAT_0067c0f8 / DAT_0067c0fc  "ScreenExit"
     FIntroPathString ScreenReset; // DAT_0067c0b0 / DAT_0067c0b4  "ScreenReset"
     FIntroPathString Screen[4];   // DAT_0067c068 / c020 / bfd8 / bf90  "Screen1".."Screen4"
-    // DAT_0067bf48 / DAT_0067bf4c -- after a successful parse 00564e5c copies
-    // "FRONT_freelancerlogo.tga" (bounded at 0x3f chars) here; the title screen pushes it at
-    // 005738eb.
+    // DAT_0067bf48 / DAT_0067bf4c -- after a successful parse "FRONT_freelancerlogo.tga"
+    // (bounded at 0x3f chars) is copied here; the title screen loads it.
     FIntroPathString Logo;
-    // DAT_0067bf40 -- (rand() * 3) >> 15 after a successful parse (00564e9c); 005738xx picks
+    // DAT_0067bf40 -- (rand() * 3) >> 15 after a successful parse; IntroFocus::Init picks
     // Intro1_Base / Intro2_Base / Intro3_Base from it.
     int IntroBasePick;
-    // DAT_00614a9c -- PE init 1; only a "bDrawScripts" key rewrites it (00564e20).
+    // DAT_00614a9c -- PE init 1; only a "bDrawScripts" key rewrites it.
     bool bDrawScripts;
 };
 
 FIntroConfigState const* GetIntroConfigState();
 
-// FUN_005b0c30, cdecl(ini path); InitializeEngine 0x005b1caa passes DAT_00679d04. Always true.
+// FUN_005b0c30, cdecl(ini path); InitializeEngine passes DAT_00679d04. Always true.
 bool LoadClientIniData(char const* IniPath);

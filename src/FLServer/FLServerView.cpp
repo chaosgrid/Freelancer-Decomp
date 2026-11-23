@@ -17,8 +17,8 @@
 #include <cstdio>
 
 // .data:00427900 — guards the console view pointer, the FDUMP swap and the log buffer.
-// Retail creates it from the static initializer at .text:0040ddc0 (the tail of the document
-// TU's initializers); it is defined here next to its only users.
+// Retail creates it from the document TU's static initializer .text:0040ddc0; it is defined
+// here next to its only users.
 HANDLE GLogMutex = CreateMutexA(NULL, FALSE, NULL);
 
 // .data:00427d2c — the view ServerLogf writes to (set by the view ctor, cleared by its dtor).
@@ -32,7 +32,7 @@ static char GLogBuffer[0x400 + 1];
 // .data:004258d4 — running line number of c:\fl-server-errors.log (starts at 1).
 static int GErrorLogLine = 1;
 
-// Text colours (.data:004258b8..004258d0, COLORREF 0x00bbggrr).
+// Text colours (COLORREF 0x00bbggrr).
 static const COLORREF GColorError = 0x000000ff;     // .data:004258b8 levels 0 and 1
 static const COLORREF GColorDefault = 0x0000ff00;   // .data:004258bc
 static const COLORREF GColorWarning = 0x0000ffff;   // .data:004258c0 level 2
@@ -115,13 +115,11 @@ BOOL CFLServerView::OnPreparePrinting(CPrintInfo* Info)
 }
 
 // .text:0040e170 — deactivate an in-place item that belongs to this view.
-// Retail order: base OnDestroy first, then the document query (vtbl+0xb8). CRichEditView::
-// OnDestroy Release()s m_lpRichEditOle without clearing it, and CRichEditDoc::
-// GetInPlaceActiveItem then calls IRichEditOle::GetObject through that pointer. Under MFC 4.2
-// with the 2003 riched20 the control still held the object, so the call was harmless; the
-// MFC 14 / msftedit control frees it on that Release and the query jumped through a dead
-// vtable. One extra reference across the retail-order query keeps the object alive exactly as
-// the old control did (deviations.md: "FLServer: IRichEditOle reference across OnDestroy").
+// Deviation: retail runs the base OnDestroy first, which Release()s m_lpRichEditOle without
+// clearing it, then GetInPlaceActiveItem calls IRichEditOle::GetObject through that pointer.
+// The 2003 riched20 still held the object; the MFC 14 / msftedit control frees it on that
+// Release. One extra reference across the retail-order query keeps it alive (deviations.md:
+// "FLServer: IRichEditOle reference across OnDestroy").
 void CFLServerView::OnDestroy()
 {
 	IRichEditOle* const RichEditOle = m_lpRichEditOle;

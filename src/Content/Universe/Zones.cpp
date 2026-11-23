@@ -4,15 +4,14 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Content.dll TU64 (06fa75c0-06fa9000): the zone enumerator that fills SystemInfo's zones.
-// The rest of TU64 is shared STL instantiations (ported as std containers at their use
-// site) and the import thunks 06fa8f00.. (CommReferrable slots of the SystemInfo vtable).
-// Lane CNT-POP (docs/re/content.md, TU map).
+// Content.dll TU64: the zone enumerator that fills SystemInfo's zones. The rest of TU64 is
+// shared STL instantiations (ported as std containers at their use site) and import thunks
+// (CommReferrable slots of the SystemInfo vtable).
 
 #include "Universe/SystemInfo.h"
 
 #include "Core/ContentInternal.h"
-#include "Core/ContentStaticIds.h"   // TU64 static-init thunks 06fa75c0-06fa77a0
+#include "Core/ContentStaticIds.h"   // TU64 static-init thunks
 #include "common_ini.h"
 #include "common_server.h"
 
@@ -31,7 +30,7 @@ namespace
     }
 }
 
-// FUN_06fa7ff0 (06fa7ff0-06fa810f, RET 8).
+// FUN_06fa7ff0.
 bool FSystemZone::GetPathEnds(Vector* OutFirst, Vector* OutSecond)
 {
     Vector Size;
@@ -40,8 +39,7 @@ bool FSystemZone::GetPathEnds(Vector* OutFirst, Vector* OutSecond)
     Matrix Orientation;
     pub::Zone::GetOrientation(ZoneId, Orientation);
 
-    // 06fa801f-06fa806f: the zone transform (REP MOVSD x9 + position) and (0, y/2, 0);
-    // 0.5f = DAT_06fb605c.
+    // The zone transform and (0, y/2, 0); 0.5f = DAT_06fb605c.
     FTransform Placement;
     for (int Row = 0; Row < 3; ++Row)
     {
@@ -62,7 +60,7 @@ bool FSystemZone::GetPathEnds(Vector* OutFirst, Vector* OutSecond)
     OutFirst->y = Transformed.Y;
     OutFirst->z = Transformed.Z;
 
-    // 06fa8091-06fa8107: (0, y * -0.5f, 0), DAT_06fbd6c4.
+    // (0, y * -0.5f, 0), DAT_06fbd6c4.
     Offset.X = 0.0f;
     Offset.Y = Size.y * -0.5f;
     Offset.Z = 0.0f;
@@ -73,19 +71,19 @@ bool FSystemZone::GetPathEnds(Vector* OutFirst, Vector* OutSecond)
     return true;
 }
 
-// FUN_06fa8120 (06fa8120-06fa8127, RET 4).
+// FUN_06fa8120.
 void FSystemZone::SetPath(FPatrolPath* InPath)
 {
     Path = InPath;
 }
 
-// FUN_06fa8130 (06fa8130-06fa8133).
+// FUN_06fa8130.
 FPatrolPath* FSystemZone::GetPath()
 {
     return Path;
 }
 
-// FUN_06fa7fb0 (06fa7fb0-06fa7fc6): the result code of GetPopulation is not read.
+// FUN_06fa7fb0: the result code of GetPopulation is not read.
 weighted_vector<unsigned int> const* FSystemZone::GetPopulationFactions()
 {
     weighted_vector<unsigned int> const* Factions;
@@ -93,7 +91,7 @@ weighted_vector<unsigned int> const* FSystemZone::GetPopulationFactions()
     return Factions;
 }
 
-// FUN_06fa7fd0 (06fa7fd0-06fa7fe1).
+// FUN_06fa7fd0.
 float FSystemZone::GetTradelaneAttack() const
 {
     if (bUnpopulated)
@@ -101,10 +99,7 @@ float FSystemZone::GetTradelaneAttack() const
     return Population.TradelaneAttack;
 }
 
-// FUN_06fa7e40 (06fa7e40-06fa7faa, RET 4). 06fa7e49-06fa7e79: +0x00..+0x0c, then the bytes
-// +0x11, +0x10, +0x12, +0x13; +0x14 (VignetteType) is skipped. 06fa7e7c-06fa7f9e: the
-// population block -- scalars, the list assign (node reuse, FUN_06f305b0 element copy), the
-// encounter vector assign (FUN_06fa8140) and the scalars after it.
+// FUN_06fa7e40. VignetteType (+0x14) is not copied, as retail.
 FSystemZone& FSystemZone::operator=(FSystemZone const& Other)
 {
     ZoneId = Other.ZoneId;
@@ -119,7 +114,7 @@ FSystemZone& FSystemZone::operator=(FSystemZone const& Other)
     return *this;
 }
 
-// FUN_06fa77c0 (06fa77c0-06fa797a, RET 8).
+// FUN_06fa77c0.
 void FSystemZoneEnumerator::OnZone(unsigned int const* ZoneId, INI_Reader* Reader)
 {
     FSystemZone Zone;
@@ -132,15 +127,15 @@ void FSystemZoneEnumerator::OnZone(unsigned int const* ZoneId, INI_Reader* Reade
 
     if (ParseSystemZone(&Zone, Reader, &PathLabel, bLoadEncounters))
     {
-        Zones->insert(Zones->end(), 1, Zone);                             // FUN_06fa8750
+        Zones->insert(Zones->end(), 1, Zone);
         if (PathLabels != nullptr && PathLabel.ZoneId != 0)
-            PathLabels->insert(PathLabels->end(), 1, PathLabel);          // FUN_06fa83f0
+            PathLabels->insert(PathLabels->end(), 1, PathLabel);
     }
 }
 
 namespace
 {
-    // FUN_06eb5770 after a linear find: append Value unless Indices already holds it.
+    // Append Value unless Indices already holds it.
     void AddUniqueIndex(std::vector<int>* Indices, int Value)
     {
         for (std::vector<int>::iterator It = Indices->begin(); It != Indices->end(); ++It)
@@ -152,7 +147,7 @@ namespace
     }
 }
 
-// FUN_06fa7980 (06fa7980-06fa7e2f, RET 0xc).
+// FUN_06fa7980.
 bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* PathLabel,
                      bool bLoadEncounters)
 {
@@ -160,7 +155,6 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
     {
         if (Reader->is_value("nickname"))
         {
-            // 06fa79ba-06fa7a6d
             Zone->Nickname.Id = CreateID(Reader->get_value_string());
             if (strstr(Reader->get_value_string(), "Tradelane") != nullptr)
             {
@@ -170,8 +164,8 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
                 {
                     Vector Size;
                     pub::Zone::GetSize(Zone->ZoneId, Size);
-                    // DAT_06fb4438 = 10.0f; TEST AH,5 + JP: taken (skip) unless less.
-                    // The product stays on the x87 stack (not rounded to float).
+                    // DAT_06fb4438 = 10.0f; unordered skips. The product stays on the x87
+                    // stack (not rounded to float).
                     if (static_cast<double>(Size.x) * 10.0 < static_cast<double>(Size.z) &&
                         static_cast<double>(Size.y) * 10.0 < static_cast<double>(Size.z))
                         Zone->bTradelane = true;
@@ -184,7 +178,7 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (Reader->is_value("path_label"))
         {
-            // 06fa7a81-06fa7b94: label, then unique path indices from value 1 on.
+            // Label, then unique path indices from value 1 on.
             PathLabel->ZoneId = Zone->ZoneId;
             PathLabel->Label.Id = CreateID(Reader->get_value_string(0));
             AddUniqueIndex(&PathLabel->Indices, Reader->get_value_int(1));
@@ -197,7 +191,6 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (Reader->is_value("usage"))
         {
-            // 06fa7bf0-06fa7c5a
             unsigned int Index = 0;
             while (!Reader->is_value_empty(Index))
             {
@@ -215,7 +208,7 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (Reader->is_value("faction"))
         {
-            // 06fa7c89: recognised and ignored.
+            // Recognised and ignored.
         }
         else if (Reader->is_value("density"))
         {
@@ -223,14 +216,14 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (Reader->is_value("repop_time"))
         {
-            // 06fa7cc3-06fa7cdd: TEST AH,0x41 + JP -- a value <= 0 becomes 1.0 (NaN stays).
+            // A value <= 0 becomes 1.0 (NaN stays).
             Zone->Population.RepopTime = Reader->get_value_float(0);
             if (Zone->Population.RepopTime <= 0.0f)
                 Zone->Population.RepopTime = 1.0f;
         }
         else if (Reader->is_value("mission_type"))
         {
-            // 06fa7cf6-06fa7d6f: bUnlawful is not reset first.
+            // bUnlawful is not reset first.
             Zone->bLawful = false;
             unsigned int Index = 0;
             while (!Reader->is_value_empty(Index))
@@ -255,16 +248,14 @@ bool ParseSystemZone(FSystemZone* Zone, INI_Reader* Reader, FZonePathLabel* Path
         }
         else if (bLoadEncounters)
         {
-            // 06fa7dde-06fa7dee: the return value is not used.
+            // The return value is not used.
             Zone->Population.ParseValue(Reader, Zone->System, Zone);
         }
     }
 
-    // 06fa7bb0-06fa7dfa
     if (bLoadEncounters)
         Zone->bUnpopulated = !Zone->Population.bHasPopulationKeys && PathLabel->ZoneId == 0;
 
-    // 06fa7dfd-06fa7e2f
     if (Zone->bUnpopulated && PathLabel->ZoneId == 0 && !Zone->bLawful && !Zone->bUnlawful)
         return false;
     return true;

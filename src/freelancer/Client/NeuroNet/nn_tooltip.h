@@ -23,7 +23,6 @@
 
 #include <stddef.h>
 
-// DAT_0067244c — set by ToolTip factory (LAB_004be280 / FUN_004be3b0 path).
 class NnToolTipControl : public TextWin
 {
 public:
@@ -63,18 +62,18 @@ public:
     unsigned char bFedThisFrame() const { return bFedThisFrame_; }
 
 private:
-    // FUN_004bda70 (0x004bda70..0x004bdd1d): re-anchors the tooltip under the cursor ray cached
-    // by the Win3D input handler (Win3DGetMouseRay, FUN_0059da70) and clamps it to the viewport.
+    // FUN_004bda70: re-anchors the tooltip under the cursor ray cached by the Win3D input
+    // handler (FUN_0059da70) and clamps it to the viewport.
     void RepositionAfterCaption(FToolTipHoverInfo const* Info);
 
-    // +0xf4..+0x158: an embedded hover record, built by FUN_004be420 (0x004be4cc..0x004be507)
-    // and torn down by FUN_004bd690 (0x004bd6ca..0x004bd747). FUN_004bd880 copies only Ids,
-    // IdsAlt, WorldPos, HalfExtents and bLive into it; its caption (+0xfc), Font::String
-    // (+0x104) and AuxField (+0x138) are never written after construction.
+    // +0xf4..+0x158: an embedded hover record, built by FUN_004be420 and torn down by
+    // FUN_004bd690. FUN_004bd880 copies only Ids, IdsAlt, WorldPos, HalfExtents and bLive into
+    // it; its caption (+0xfc), Font::String (+0x104) and AuxField (+0x138) are never written
+    // after construction.
     FToolTipHoverInfo Hover_;
     unsigned char bBuilt_;       // +0x158  FUN_004bdda0: the +0x6c bit 1 of the last tick
-    // +0x159: set to 1 only by FUN_004bdda0 while a mouse button is down (DAT_00616850 & 3,
-    // 0x004bde87); FUN_004bdea0 then hides a repeated hover and clears it on a new one.
+    // +0x159: set to 1 only by FUN_004bdda0 while a mouse button is down (DAT_00616850 & 3);
+    // FUN_004bdea0 then hides a repeated hover and clears it on a new one.
     unsigned char bHasText_;
     unsigned char bFedThisFrame_; // +0x164
     float DelayRemain_;          // +0x15c
@@ -85,7 +84,7 @@ private:
 };
 
 // FUN_004be2b0 — guarded TickToolTip on singleton. Retail forwards the double dt of
-// FUN_0059e080 as two dwords (0059e0d6..0059e0d8).
+// FUN_0059e080 as two dwords.
 void NnToolTipTickGlobal(double DeltaSeconds);
 
 // FUN_004be390.

@@ -20,36 +20,31 @@
 #include <string.h>
 #include <windows.h>
 
-// ============================================================================
-// ErrorHandler — retail FDUMP backend (Common.dll.c 0xaad30-0xab680 cluster).
-// ============================================================================
-
 // DACOM.DLL!stricmp through the isolated TU common_dacom_stricmp.cpp.
 int CallDacomStricmp(const char* Left, const char* Right);
 
 namespace
 {
-    // Common.dll.c ErrorHandler log-channel node, sizeof 0xA0 (operator_new(0xa0) at
-    // every allocation site: new_log @ 0xab320, activate's ini loop @ 0xaad30).
+    // The log-channel node, sizeof 0xA0 (operator new(0xa0) in new_log and activate).
     struct LogEntry
     {
         LogEntry* Next;   // +0x00
         bool bEnabled;    // +0x04
         int LogId;         // +0x08  FdumpHook matches it against (Flags >> 4) unless -1
         int SeverityLimit; // +0x0C  FdumpHook drops a call whose severity nibble is
-                           //        above it (unsigned compare, .text:0630ac35); 100 by
-                           //        default, the exe passes 7 (new_log(path, -1, 7, ..))
+                           //        above it (unsigned compare); 100 by default, the exe
+                           //        passes 7 (new_log(path, -1, 7, ..))
         bool bActive;      // +0x10  cached bEnabled && (bText||bWindow||File.Handle);
-                           //        the gate FdumpHook reads (.text:0630ac18)
+                           //        the gate FdumpHook reads
         bool bText;        // +0x11  "$Text" virtual sink; FdumpHook upper-cases the line
-                           //        for such a channel when severity <= 2 (.text:0630ac58)
+                           //        for such a channel when severity <= 2
         bool bWindow;      // +0x12  "$Window" virtual sink
         ::File File;       // +0x14  the exported File class (common_misc.h);
                            //        File.Handle is node +0x94
     };
     static_assert(sizeof(LogEntry) == 0xA0, "ErrorHandler LogEntry sizeof 0xA0");
 
-    // Common.dll.c FUN_0630b0d0 @ 0xab0d0 -- default-reset a freshly allocated node.
+    // FUN_0630b0d0: default-reset a freshly allocated node.
     void LogEntryResetDefaults(LogEntry* E)
     {
         E->LogId = -1;
@@ -60,11 +55,9 @@ namespace
         E->bEnabled = true;
     }
 
-    // Common.dll.c FUN_0630b0f0 @ 0xab0f0 -- (re)configure a node's name/routing.
-    // Name[0]=='$' selects a virtual sink (DACOM stricmp, .text:0630b12d-0630b15e)
-    // instead of opening a real file ("wb", .rdata:063a3494). Retail copies Name into
-    // the 0x80-byte embedded buffer with an unbounded byte loop (.text:0630b188); a
-    // longer name is undefined behaviour there, the port stops at the buffer.
+    // FUN_0630b0f0: (re)configure a node's name/routing. Name[0]=='$' selects a virtual sink
+    // (DACOM stricmp) instead of opening a real file ("wb"). Deviation: retail copies Name into
+    // the 0x80-byte buffer with an unbounded loop; the port stops at the buffer.
     void LogEntryConfigure(LogEntry* E, char const* Name, int LogId, int SeverityLimit,
                             bool bFlagText, bool bFlagWindow)
     {
@@ -102,9 +95,7 @@ namespace
         E->bActive = E->bEnabled && (E->bText || E->bWindow || E->File.Handle != nullptr);
     }
 
-    // Common.dll.txt 0630b220-0630b26b: the node destructor - File::close from the body,
-    // then the member File::~File (= close again, a no-op on the nulled handle) - followed
-    // by operator delete at both call sites.
+    // FUN_0630b220, the node destructor, plus operator delete at both call sites.
     void LogEntryDestroy(LogEntry* E)
     {
         E->File.close();
@@ -114,22 +105,13 @@ namespace
     LogEntry* g_ErrorLogListHead = nullptr;  // DAT_063fcf28
     LogEntry* g_ErrorLogListTail = nullptr;  // DAT_063fcf2c
     void(__cdecl* g_PreviousFdump)(int, char const*, ...) = nullptr;  // DAT_063fcf38
-    // DAT_063fcf30 / DAT_063fcf34: FdumpHook counts severity-2 (warning) and severity-1
-    // (error) calls; activate zeroes both (.text:0630ad7e/0630ad84). Retail never reads
-    // them back (XREFs: those writes and the two INCs only).
+    // DAT_063fcf30 / DAT_063fcf34: FdumpHook counts warnings and errors; activate zeroes both.
+    // Retail never reads them back.
     int g_FdumpWarningCount = 0;
     int g_FdumpErrorCount = 0;
 
-    // Common.dll.txt 303346-303361 (0x0630ab90, LAB_0630ab90). Retail statically initializes
-    // PTR_LAB_063ed214 (g_ErrorAssertHandler below) to point directly at this MessageBoxA
-    // wrapper -- it IS the real default AssertHandler, not merely a documentation placeholder,
-    // and stays installed whenever ErrorHandler::activate() is called with AssertHandler==null
-    // (retail's activate leaves the pointer untouched in that case; see activate() below).
-    // Traced push order at the call site (0630aba9-0630abb2): MessageBoxA(hWnd=0, lpText=Text,
-    // lpCaption=Caption, uType). uType = bIgnoreIcon ? MB_ABORTRETRYIGNORE (2)
-    // : MB_ICONHAND|MB_ABORTRETRYIGNORE (0x12) -- derived from the 3rd (bool) argument at
-    // [ESP+0xc] read into CL, matching the AssertHandler callback's own (char const*, char
-    // const*, bool) signature.
+    // LAB_0630ab90, the default AssertHandler: PTR_LAB_063ed214 is statically initialised to it
+    // and activate() leaves it installed when given a null handler.
     int __cdecl AssertHandlerDefault(char const* Text, char const* Caption, bool bIgnoreIcon)
     {
         UINT Style = bIgnoreIcon ? MB_ABORTRETRYIGNORE : (MB_ICONHAND | MB_ABORTRETRYIGNORE);
@@ -151,11 +133,8 @@ namespace ErrorHandler
 {
     void* __cdecl new_log(char const* Name, int LogId, int SeverityLimit, bool bText, bool bWindow)
     {
-        // Common.dll.c ErrorHandler::new_log @ 0xab320. Retail's operator new returns
-        // null on failure and the next read ([ESI+4], .text:0630b3a3) faults; the port's
-        // throws, so there is no null branch.
-        // operator new(0xa0), then File::File on the embedded File (.text:0630b35a); the
-        // other fields stay indeterminate until the stores below.
+        // 0xab320. Retail's operator new returns null on failure and the next read faults; the
+        // port's throws, so there is no null branch.
         LogEntry* E = new LogEntry;
         E->Next = nullptr;
         LogEntryResetDefaults(E);
@@ -191,7 +170,7 @@ namespace ErrorHandler
 
     void __cdecl log_enable(int LogId)
     {
-        // Common.dll.c ErrorHandler::log_enable @ 0xab460
+        // 0xab460
         for (LogEntry* E = g_ErrorLogListHead; E != nullptr; E = E->Next)
         {
             if (LogId == -1 || E->LogId == LogId)
@@ -204,7 +183,7 @@ namespace ErrorHandler
 
     void __cdecl log_disable(int LogId)
     {
-        // Common.dll.c ErrorHandler::log_disable @ 0xab4b0
+        // 0xab4b0
         for (LogEntry* E = g_ErrorLogListHead; E != nullptr; E = E->Next)
         {
             if (LogId == -1 || E->LogId == LogId)
@@ -217,8 +196,7 @@ namespace ErrorHandler
 
     bool __cdecl is_log_enabled(int LogId)
     {
-        // Common.dll.c ErrorHandler::is_log_enabled @ 0xab4e0. No -1 wildcard here,
-        // unlike log_enable/log_disable -- only an exact LogId match is checked.
+        // 0xab4e0. No -1 wildcard here, unlike log_enable/log_disable.
         for (LogEntry* E = g_ErrorLogListHead; E != nullptr; E = E->Next)
         {
             if (E->LogId == LogId)
@@ -229,17 +207,11 @@ namespace ErrorHandler
 
     void __cdecl log_comment(int LogId, char const* Format, ...)
     {
-        // Common.dll.txt:0630b540-0630b67d. Per node (LogId -1 matches every node,
-        // else [+8] must equal it): recompute [+0x10] (bEnabled && any sink); skip an
-        // inactive node; format with vsprintf only while the buffer's first byte is
-        // still 0 (.text:0630b5a7 - the "formatted" flag is Buffer[0]); if the text is
-        // non-empty, does not end in '\n' and len+1 < 0x200, copy it into the second
-        // buffer (0x200 bytes, [ESP+0x10c]) and append "\n"; then, only if the node has
-        // a FILE* (+0x94), fwrite + fflush. Retail's format buffer is 0x100 bytes
-        // ([ESP+0xc]) and vsprintf is unbounded: a line of 0x100 or more characters runs
-        // into the second buffer and past it - undefined behaviour. The port formats
-        // into 0x400 bytes (_vsnprintf, truncated), so every line shorter than 0x100
-        // is written exactly as retail writes it.
+        // FUN_0630b540. Retail formats only while Buffer[0] is still 0 (an empty result is
+        // re-formatted for the next node), appends "\n" through a 0x200-byte buffer, and writes
+        // only to nodes with a FILE*. Deviation: retail's format buffer is 0x100 bytes with an
+        // unbounded vsprintf; the port formats into 0x400 bytes, truncated, identical for lines
+        // shorter than 0x100.
         char Buffer[0x400];
         Buffer[0] = '\0';
 
@@ -280,10 +252,7 @@ namespace ErrorHandler
 
     void __cdecl deactivate()
     {
-        // Common.dll.txt:0630b2a0-0630b317. Restores whatever FDUMP was installed before
-        // activate(), zeroes bEnabled/bActive of every node with LogId 0x52
-        // (.text:0630b2d1-0630b2d9), then frees every node (FUN_0630b220 + delete) and
-        // clears head and tail.
+        // FUN_0630b2a0. Retail disables the LogId 0x52 nodes before freeing every node.
         FDUMP = g_PreviousFdump;
         g_PreviousFdump = nullptr;
 
@@ -309,9 +278,8 @@ namespace ErrorHandler
 
     namespace
     {
-        // LAB_0630abd0 (.text:0630abd0-0630ad2b), installed as FDUMP by activate
-        // (.text:0630ad5f). Retail returns 0 in EAX; the port's FDUMP pointer type
-        // (dacom.h) is void.
+        // LAB_0630abd0, installed as FDUMP by activate. Retail returns 0 in EAX; the port's
+        // FDUMP pointer type (dacom.h) is void.
         void __cdecl FdumpHook(int Flags, char const* Format, ...)
         {
             // Port-only debugger echo (owner's lines, kept on purpose): format once and
@@ -325,8 +293,7 @@ namespace ErrorHandler
             OutputDebugStringA(Buffer); /// PORT ONLY, DEVIATION, FOR DEBUGGING
             OutputDebugStringA("\n"); /// PORT ONLY, DEVIATION, FOR DEBUGGING
 
-            // Severity = the signed low nibble of Flags (SHL 0x1c / SAR 0x1c,
-            // .text:0630abde-0630abe2). Unsigned <= 2: 2 counts a warning, 1 an error.
+            // Severity is the signed low nibble of Flags; 2 counts a warning, 1 an error.
             int const Severity = (int)((unsigned)Flags << 28) >> 28;
             unsigned const SeverityBits = (unsigned)Severity;
             if (SeverityBits <= 2)
@@ -339,9 +306,7 @@ namespace ErrorHandler
 
             for (LogEntry* E = g_ErrorLogListHead; E != nullptr; E = E->Next)
             {
-                // .text:0630ac18-0630ac38: the cached active flag, the LogId route
-                // (Flags SAR 4 against [+8] unless [+8] is -1) and the severity limit
-                // (unsigned JA against [+0xc]).
+                // The LogId route (Flags >> 4, unless -1) and the unsigned severity limit.
                 if (!E->bActive)
                     continue;
                 if (E->LogId != -1 && (Flags >> 4) != E->LogId)
@@ -349,9 +314,8 @@ namespace ErrorHandler
                 if (SeverityBits > (unsigned)E->SeverityLimit)
                     continue;
 
-                // vsprintf per node into 0x400 bytes at [ESP+0x210] (.text:0630ac52).
-                // Retail's vsprintf is unbounded (a longer line is undefined behaviour);
-                // the port truncates at the buffer.
+                // Formatted per node into 0x400 bytes. Deviation: retail's vsprintf is
+                // unbounded; the port truncates.
                 char Line[0x400];
                 va_start(Args, Format);
                 _vsnprintf(Line, sizeof(Line), Format, Args);
@@ -361,8 +325,7 @@ namespace ErrorHandler
                 if (E->bText && SeverityBits <= 2)
                     _strupr(Line);
 
-                // .text:0630ac78-0630acd0: append "\n" through the 0x200-byte buffer at
-                // [ESP+0x10] when the text is non-empty, lacks it and len+1 < 0x200.
+                // "\n" appended through a 0x200-byte buffer when it fits.
                 char const* Out = Line;
                 char LineWithNewline[0x200];
                 int const Len = (int)strlen(Line);
@@ -375,7 +338,7 @@ namespace ErrorHandler
                     Out = LineWithNewline;
                 }
 
-                // .text:0630acd4-0630ad1a: only a node with a FILE* (+0x94) is written.
+                // Only a node with a FILE* is written.
                 if (E->File.Handle == nullptr)
                     continue;
                 fwrite(Out, 1, strlen(Out), E->File.Handle);
@@ -387,10 +350,7 @@ namespace ErrorHandler
     void __cdecl activate(char const* IniPath,
                            int (__cdecl* AssertHandler)(char const*, char const*, bool))
     {
-        // Common.dll.txt:0630ad30-0630b0c8. Saves FDUMP, installs FdumpHook, stores a
-        // non-null AssertHandler into PTR_LAB_063ed214, zeroes the two severity
-        // counters, then reads [Error] "log" lines from IniPath (open(IniPath, false)
-        // with no null check of its own).
+        // FUN_0630ad30. No null check of IniPath of its own.
         g_PreviousFdump = FDUMP;
         FDUMP = &FdumpHook;
         if (AssertHandler != nullptr)
@@ -409,12 +369,9 @@ namespace ErrorHandler
                 {
                     if (Reader.is_value("log"))
                     {
-                        // Common.dll.txt:0630ae1e-0630ae70. get_value_string(0) returns
-                        // StringIndex's shared static buffer (DAT_06401350), which the
-                        // get_value_float(1/2) calls below overwrite, so retail copies the
-                        // name into a local 128-byte buffer first: length = strlen capped
-                        // at 0x7f, REP MOVS, NUL at [len]; a null result leaves it empty.
-                        // new_log receives this local copy (0630af00 LEA EAX,[ESP+0x28]).
+                        // get_value_string(0) returns a shared static buffer (DAT_06401350)
+                        // that the get_value_float calls below overwrite, so retail copies
+                        // the name into a local 128-byte buffer first.
                         char Name[0x80];
                         Name[0] = '\0';
                         char const* NameSource = Reader.get_value_string(0);
@@ -426,14 +383,8 @@ namespace ErrorHandler
                             memcpy(Name, NameSource, NameLen);
                             Name[NameLen] = '\0';
                         }
-                        // Common.dll.txt:0630ae76-0630af85. LogId defaults to -1 and the
-                        // severity limit to 100; the optional 2nd/3rd fields override
-                        // them (ftol). Retail then builds the node inline: operator
-                        // new(0xa0), File::File, FUN_0630b0d0, FUN_0630b0f0(Name, LogId,
-                        // Limit, false, false), the active test, FUN_0630b220 + delete
-                        // when inactive, else FUN_0630b6e0 (append) for $Window or a
-                        // push to the front - the same steps new_log takes, so the port
-                        // calls new_log.
+                        // Retail builds the node inline with the same steps new_log takes
+                        // (FUN_0630b6e0 is the $Window append), so the port calls new_log.
                         int LogId = -1;
                         int SeverityLimit = 100;
                         if (!Reader.is_value_empty(1))
@@ -450,13 +401,7 @@ namespace ErrorHandler
     void __cdecl log_last_error(char const* Source, int Line, SeverityLevel Severity,
                                  char* Format, unsigned long ErrorCode)
     {
-        // Common.dll.txt:0630b680. Full trace: ECX=ErrorCode captured up front (the
-        // caller's stack slot for it is then reused as the local `char* MsgBuf` that
-        // receives FormatMessageA's allocated pointer, since ALLOCATE_BUFFER treats
-        // lpBuffer as an LPSTR* out-param). FDUMP's arg order (verified via push
-        // order/stack offsets, not the missing decompilation) is
-        // FDUMP(flags, Format, Source, Line, MsgBuf) -- Format is param_4, not a
-        // hardcoded literal; Source/Line/MsgBuf are its %s/%d/%s substitutions.
+        // FUN_0630b680. Format is the caller's; Source / Line / MsgBuf are its substitutions.
         char* MsgBuf = nullptr;
         FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
                             FORMAT_MESSAGE_IGNORE_INSERTS,

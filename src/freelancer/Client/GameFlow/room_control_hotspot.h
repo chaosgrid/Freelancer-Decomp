@@ -14,7 +14,7 @@
 // destructor deletes them (FUN_0044d1c0).
 //
 // RTTI (COL at vftable[-1]), every vftable three slots
-//   0 scalar deleting dtor, 1 Activate (thiscall, no arguments), 2 Update (thiscall, float, RET 4):
+//   0 scalar deleting dtor, 1 Activate (no arguments), 2 Update (float):
 //   RoomButton          vftable 0x005cc084 (COL 0x005e8df8): LAB_0044d2e0, 0x00401e90, 0x0053e4a0
 //   ExitDoorButton      vftable 0x005cc068 (COL 0x005e8d50) : RoomButton
 //                       FUN_0044d1a0, FUN_0044d330, FUN_0044d380
@@ -24,8 +24,8 @@
 //                       FUN_0044d430, LAB_0044d4e0, 0x0053e4a0
 //   MissionVendorButton vftable 0x005cc0a4 (COL 0x005e8e88) : RoomButton
 //                       FUN_0044d560, LAB_0044d5e0, 0x0053e4a0
-// 0x00401e90 (a bare RET) and 0x0053e4a0 (RET 4) are ICF-folded empty bodies shared with
-// IDPMsgHandler; here they are RoomButton's own empty Activate / Update.
+// 0x00401e90 and 0x0053e4a0 are ICF-folded empty bodies shared with IDPMsgHandler; here they
+// are RoomButton's own empty Activate / Update.
 //
 // The RoomButtonInfo "behavior=" value (Common.dll RoomData::read_Hotspot_block option table)
 // picks the class in FUN_0044ced0: 1 ExitDoor -> ExitDoorButton, 2 NewsVendor ->
@@ -42,10 +42,10 @@ public:
     virtual ~RoomButton();
     // Slot 1 -- 0x00401e90: nothing.
     virtual void Activate();
-    // Slot 2 -- 0x0053e4a0 (RET 4): nothing.
+    // Slot 2 -- 0x0053e4a0: nothing.
     virtual void Update(float Delta);
 
-    // FUN_0044d310 (thiscall, RET 8) -- +0x04 = InLocation, +0x08 = InBehavior.
+    // FUN_0044d310 -- +0x04 = InLocation, +0x08 = InBehavior.
     void Set(unsigned InLocation, int InBehavior);
 
     // +0x04 -- MakeLocationID(RoomControl +0x34 base, hotspot room_switch) through FUN_0043a4f0,
@@ -65,13 +65,13 @@ private:
 class ExitDoorButton : public RoomButton
 {
 public:
-    // Inlined at 0x0044cf62..0x0044cf74: FUN_0044d2c0, vftable 0x005cc068, +0x10 = +0x0c = 0.
+    // Inlined in FUN_0044ced0: FUN_0044d2c0, vftable 0x005cc068, +0x10 = +0x0c = 0.
     ExitDoorButton();
-    // FUN_0044d1a0 -- thunk_FUN_0044d300, then the conditional delete.
+    // FUN_0044d1a0 -- ~RoomButton, then the conditional delete.
     ~ExitDoorButton() override;
     // FUN_0044d330.
     void Activate() override;
-    // FUN_0044d380 (RET 4).
+    // FUN_0044d380.
     void Update(float Delta) override;
 
     int State;     // +0x0c 0 idle, 1 fading, 2 faded
@@ -82,7 +82,7 @@ public:
 class LaunchButton : public ExitDoorButton
 {
 public:
-    // Inlined at 0x0044d029..0x0044d03d: FUN_0044d2c0, +0x0c = 0, vftable 0x005cc058, +0x10 = 1.
+    // Inlined in FUN_0044ced0: FUN_0044d2c0, +0x0c = 0, vftable 0x005cc058, +0x10 = 1.
     LaunchButton();
 };
 

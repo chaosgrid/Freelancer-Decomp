@@ -230,7 +230,7 @@ namespace
         float ReplaceObjectFog;
         float ReplaceFogOverlay;
         float ReplaceClouds;
-        // Phase 3: from outside, several nebulae, level of detail, asteroid spawn.
+        // From outside, several nebulae, level of detail, asteroid spawn.
         float Exterior;
         float ExteriorMaxDistance;
         float ExteriorFadeDistance;
@@ -1389,7 +1389,7 @@ namespace
 
     // The camera's distance to the zone surface scaled by Scale (1 = the surface itself; the
     // drawn bound is larger, the shell's half-density surface smaller) along the line to its
-    // centre, as retail measures the immersion (FNebulaEffect::Update 0x0050706b..: length -
+    // centre, as retail measures the immersion (FNebulaEffect::Update: length -
     // GetRadiusAlong); 0 inside.
     double SurfaceDistance(Universe::IZone const* Zone, double const* CamPos, double Scale)
     {
@@ -1417,7 +1417,7 @@ namespace
     }
 
     // Inside an exclusion zone retail pushes the fog end out to its fog_far
-    // (FNebulaEffect::Update, 0x00507230..0x00507272); the same visibility means the haze
+    // (FNebulaEffect::Update); the same visibility means the haze
     // density times distance / span, times exclusion_density_scale.
     float ExclusionInsideScale(Exclusion::NebulaExclusionZone const* Excl,
                                FMediumParams const& Medium, FNebulaVolumeSettings const& S)

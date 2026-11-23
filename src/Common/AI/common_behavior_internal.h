@@ -7,11 +7,7 @@
 #pragma once
 
 // Common.dll-internal helpers shared by common_behavior.cpp, common_basefollowerbehavior.cpp,
-// common_formationbehavior.cpp and common_gunconvergence.cpp. CMN-SPLIT stage 1 (2026-10-14):
-// these were file-static in the one common_behavior.cpp; the split made them shared, so they are
-// declared here in a named namespace and defined in common_behavior.cpp. The SystemManager+0x1364
-// accessors once declared here (FollowerDirectiveRecord_*, FollowerDirectiveGateB) are
-// FGunConvergenceStateBlock members now (common_systemmanager.h, common_gunconvergence.cpp).
+// common_formationbehavior.cpp and common_gunconvergence.cpp; defined in common_behavior.cpp.
 
 #include "common_systemmanager.h" // SystemManager, IObjRW, CObject
 

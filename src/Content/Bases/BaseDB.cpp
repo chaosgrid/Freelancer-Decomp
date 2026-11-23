@@ -39,11 +39,9 @@ namespace
     // DAT_06fcee70: static init / atexit thunks at the head of TU17.
     std::map<unsigned int, FContentBase> GContentBases;
 
-    // FUN_06ea7f60 06ea7fed-06ea80a4 (and the same code for value 2): x87 clamp of a
-    // "misn" difficulty to [0, 100] (DAT_06fb43d0 = 0.0, DAT_06fb43d4 = 100.0).
-    // FCOMP 0 vs value, TEST AH,0x41 / JNZ: 0 <= value (or unordered) keeps the value,
-    // otherwise 0; that result FCOMP 100, TEST AH,5 / JP: not below 100 (or unordered)
-    // -> 100; else the value again, clamped below at 0 the same way.
+    // FUN_06ea7f60 (values 1 and 2): clamp of a "misn" difficulty to [0, 100]
+    // (DAT_06fb43d0 = 0.0, DAT_06fb43d4 = 100.0) in retail's x87 compare order: an
+    // unordered value passes the low test and becomes 100 at the high one.
     float ClampMissionDifficulty(float Value)
     {
         float Low = (Value < 0.0f) ? 0.0f : Value;
@@ -239,10 +237,8 @@ void FContentBase::LoadFactions(INI_Reader* Reader)
                         Faction.Npcs.push_back(NpcId);
                 }
             }
-            // 06eab61c-06eab6fe: a temporary element {group, npcs copy (EH state 1), mission
-            // types copy (state 2), Weight} -- the local's own +0x24 is never written -- goes
-            // to FUN_06eaf080 insert(end, 1, &temp) (state 3), then the temporary (states 3,
-            // 0) and the local (state 4) are destroyed.
+            // Retail inserts a temporary copy carrying Weight (FUN_06eaf080); the local's own
+            // +0x24 is never written.
             FBaseFaction Element(Faction);
             Element.Weight = Weight;
             Factions.push_back(Element);
@@ -376,9 +372,8 @@ void FContentBase::Load(INI_Reader* Reader)
     }
 }
 
-// FUN_06eab1c0 (06eab1c0-06eab34f). Each container goes through VC6 erase(begin, end)
-// (the whole-tree fast path or node by node; for the vector a self-copy of nothing and the
-// element dtors FUN_06eab100) -- clear() here.
+// FUN_06eab1c0 (06eab1c0-06eab34f). Retail's VC6 erase(begin, end) per container is
+// clear() here.
 void FContentBase::Unload()
 {
     if (--LoadCount != 0)
@@ -406,7 +401,7 @@ FContentBase* FindContentBaseInfo(unsigned int const* BaseId)
     return &It->second;
 }
 
-// FUN_06eab770 (06eab770-06eab78d, RET 4): linear search of +0x58 (0x28 stride) by +0.
+// FUN_06eab770 (06eab770-06eab78d, RET 4).
 FBaseFaction* FContentBase::FindFaction(unsigned int Group)
 {
     for (std::vector<FBaseFaction>::iterator It = Factions.begin(); It != Factions.end(); ++It)
@@ -497,8 +492,8 @@ std::map<int, FContentBase*> GBarSceneBases;    // DAT_06fcee5c
 
 namespace
 {
-    // DAT_06fce2f8 (.data, 1; XREF[2] 06ea965b R / 06ea9667 W): the next bar scene id,
-    // post-incremented by FContentBase::CreateBarScene only.
+    // DAT_06fce2f8 (.data, 1): the next bar scene id, post-incremented by
+    // FContentBase::CreateBarScene only.
     int GBarSceneNextId = 1;
 
     // {kind, weight} of FUN_06ea8370's local choice vector (8 bytes, reserve 5).
@@ -515,13 +510,12 @@ namespace
         float Weight;
     };
 
-    // FUN_06eace60 (and its inlined copy at 06ea85a8-06ea863e). The weights are summed on
-    // the x87 stack (extended; double here), and TEST AH,0x44 / JNP returns end() only for
-    // a sum equal to 0. The pick is float(rand() * 2^-15 (DAT_06fb4448) * float(sum)); the
-    // first element whose running sum is not below it (TEST AH,0x41 / JNP: pick < sum or
-    // equal) is taken, end() when none is.
-    // OutSlot, when given, receives the float the inlined copy leaves in its stack slot
-    // [ESP+0x1c] (the sum, then the pick): FUN_06ea8370 reuses that slot as the ship id of
+    // FUN_06eace60 (also inlined at 06ea85a8). The weights are summed in x87 extended
+    // precision (double here); only a sum equal to 0 returns end(). The pick is
+    // float(rand() * 2^-15 (DAT_06fb4448) * float(sum)); the first element whose running sum
+    // is >= the pick is taken, end() when none is.
+    // OutSlot, when given, receives what the inlined copy leaves in its stack slot (the sum,
+    // then the pick): FUN_06ea8370 reuses that slot as the ship id of
     // pub::Player::GetShipID without clearing it.
     template <typename TChoice>
     typename std::vector<TChoice>::const_iterator PickWeighted(std::vector<TChoice> const& Choices,
@@ -535,14 +529,14 @@ namespace
         }
         float const SumF = static_cast<float>(Sum);
         if (OutSlot != nullptr)
-            *OutSlot = SumF;                    // 06ea85ea FST
+            *OutSlot = SumF;
         if (Sum == 0.0)
             return Choices.end();
 
         float const Pick = static_cast<float>(static_cast<double>(rand()) *
                                               static_cast<double>(1.0f / 32768.0f) * SumF);
         if (OutSlot != nullptr)
-            *OutSlot = Pick;                    // 06ea8617 FSTP
+            *OutSlot = Pick;
         double Running = 0.0;
         for (typename std::vector<TChoice>::const_iterator It = Choices.begin();
              It != Choices.end(); ++It)
@@ -554,9 +548,8 @@ namespace
         return Choices.end();
     }
 
-    // The random-element idiom of FUN_06ea8370 (06ea8655-06ea86b3, 06ea8814-06ea8860,
-    // 06ea8a74-06ea8aa5): an empty vector gives end(); a vector of one is taken without
-    // calling rand; otherwise index rand() * size / 0x8000 (CDQ, AND 0x7fff, SAR 15).
+    // The random-element idiom of FUN_06ea8370 (inlined three times): a vector of one is
+    // taken without calling rand; otherwise index rand() * size / 0x8000.
     template <typename T>
     typename std::vector<T>::const_iterator PickRandom(std::vector<T> const& Values)
     {
@@ -570,7 +563,7 @@ namespace
 
     // TU48 FUN_06f50ea0 (06f50ea0-06f50ec9, cdecl): Base minus the feeling of Reputation
     // towards Group; pub::Reputation::GetReputation (IAT 06fb35e8) leaves 0 on failure.
-    // Kept here until TU48 (CNT-GCS, wave 2) gets its own file.
+    // A TU48 function kept local to this file.
     float GetFeelingShortfall(int Reputation, unsigned int Group, float Base)
     {
         float Feeling = 0.0f;
@@ -677,8 +670,7 @@ FBarCharacter::FBarCharacter()
     ++GBarCharacterCount;
 }
 
-// FUN_06eb15b0 (06eb15b0-06eb16ea; the list node construct, a null node skips it): the
-// members copied, then 06eb16e4 INC DAT_06fceec4 -- the copy counts like the ctor.
+// FUN_06eb15b0 (the list node construct): member-wise; the copy counts like the ctor.
 FBarCharacter::FBarCharacter(FBarCharacter const& Other)
     : UseCount(Other.UseCount), Behavior(Other.Behavior), Field_0x08(Other.Field_0x08),
       CharacterId(Other.CharacterId), RoomId(Other.RoomId), Affiliation(Other.Affiliation),
@@ -698,9 +690,8 @@ FBarCharacter::~FBarCharacter()
 // FUN_06ea7d20 (06ea7d20-06ea7ed4).
 void FBarCharacter::Create(FBarCharacterDesc const* Desc)
 {
-    // Local CharacterDescription at [ESP+0x10]: +0x38 0, +0x3c -1, +0x40 0, +0x44 -1,
-    // +0x48 0, +0x4c 0, +0x50 0; the accessory slots past the count are not written in
-    // retail (stack garbage), zero here.
+    // The accessory slots past the count are not written in retail (stack garbage), zero
+    // here.
     CharacterDescription Character = {};
     Character.RoomId = Desc->RoomId;
     Character.Cost.PartIds[0] = Desc->Appearance.PartIds[0];
@@ -715,14 +706,13 @@ void FBarCharacter::Create(FBarCharacterDesc const* Desc)
 
     pub::GF::GetCostumeSkeletonGender(Character.Cost, Gender);
 
-    // 06ea7dc4-06ea7dd6: +0x38 takes the individual name, +0x3c the affiliation.
     Character.NameIds = static_cast<unsigned int>(Desc->IndividualName);
     Character.FactionId = Desc->Affiliation;
 
     if (Desc->Fidget.Length == 0)
     {
-        // 06ea7ddc-06ea7e02: the posture goes to the stack slot of the Desc argument and
-        // the call's result is ignored -- a failed lookup leaves the pointer bits.
+        // Retail puts the posture in the Desc argument's stack slot and ignores the call's
+        // result: a failed lookup leaves the pointer bits.
         unsigned long Posture = static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Desc));
         pub::GF::GetCharacterPlacementPosture(Desc->RoomId, Desc->Placement, Posture);
         Character.Script = PickFidgetScript(Gender, static_cast<int>(Posture));
@@ -737,7 +727,6 @@ void FBarCharacter::Create(FBarCharacterDesc const* Desc)
         Character.Location = pub::GF::GetCharacterPlacementName(Desc->RoomId, Desc->Placement);
     else
         Character.Location = nullptr;
-    // 06ea7e37-06ea7e46: +0x4c takes the voice, +0x50 (session filter) the player.
     Character.VoiceId = Desc->Voice;
     Character.Filter = Desc->PlayerId;
     CharacterId = pub::GF::CharacterCreate(Character);
@@ -773,7 +762,7 @@ bool FBarOffer::Accept(FContentPlayerState* State, FBarCharacter* Character)
     {
     case BAR_OFFER_KNOW:
     {
-        // 06ea8d80-06ea8dcf: the cash goes into the State argument slot; unsigned JB.
+        // Retail reads the cash into the State argument slot; the compare is unsigned.
         int Cash = static_cast<int>(reinterpret_cast<intptr_t>(State));
         pub::Player::InspectCash(State->PlayerId, Cash);
         if (static_cast<unsigned int>(Cash) < static_cast<unsigned int>(Know->Price))
@@ -785,7 +774,7 @@ bool FBarOffer::Accept(FContentPlayerState* State, FBarCharacter* Character)
 
     case BAR_OFFER_MISSION:
     {
-        // 06ea8dea-06ea8ecb. EH state 0 is the zeroed FmtStr local, never used.
+        // Retail builds a zeroed FmtStr local and never uses it.
         FBarMissionOffer* MissionOffer = static_cast<FBarMissionOffer*>(Object);
         FBarMissionOfferData* Data = &MissionOffer->Data;
         FmtStr Unused;
@@ -808,7 +797,7 @@ bool FBarOffer::Accept(FContentPlayerState* State, FBarCharacter* Character)
 
     case BAR_OFFER_BRIBE:
     {
-        // 06ea8ef3-06ea8f5d: the cash goes into the Character argument slot.
+        // Retail reads the cash into the Character argument slot.
         FBarBribeOffer* Bribe = static_cast<FBarBribeOffer*>(Object);
         int Cash = static_cast<int>(reinterpret_cast<intptr_t>(Character));
         pub::Player::InspectCash(State->PlayerId, Cash);
@@ -898,12 +887,9 @@ FBarCharacterList::iterator FContentBase::AddBarCharacter(FBarCharacterDesc cons
 {
     FBarCharacter Character;
     Character.Create(Desc);                                             // FUN_06ea7d20
-    // 06ea93cd-06ea941d: insert {room, empty state} (FUN_06eacef0 / FUN_06eae320 /
-    // FUN_06ead830); an existing entry is kept.
     std::map<unsigned int, FBaseRoomState>::iterator State =
         RoomStates.insert(std::pair<unsigned int const, FBaseRoomState>(Desc->RoomId,
                                                                         FBaseRoomState())).first;
-    // 06ea9435-06ea9448: FUN_06ead780 inserts before begin().
     State->second.Characters.push_front(Character);
     return State->second.Characters.begin();
 }
@@ -917,8 +903,7 @@ void FContentBase::RemoveBarCharacter(int /*Unused*/, FBarCharacterList::iterato
 
     if (KeepRoles != nullptr)
     {
-        // 06ea94f3-06ea953f: inline strcmp (case-sensitive) of each element's Role.Data
-        // (+4, stride 0x3c) with the character's Role.
+        // Case-sensitive (inline strcmp in retail).
         for (std::vector<FRtcScriptRole>::const_iterator Keep = KeepRoles->begin();
              Keep != KeepRoles->end(); ++Keep)
         {
@@ -927,7 +912,7 @@ void FContentBase::RemoveBarCharacter(int /*Unused*/, FBarCharacterList::iterato
         }
     }
 
-    // 06ea9541-06ea9559: the room's state; retail does not test the find.
+    // Retail does not test the find.
     FBaseRoomState& State = RoomStates.find(Character->RoomId)->second;
     if (Character->Offer.Kind != BAR_OFFER_NONE)
     {
@@ -947,9 +932,8 @@ void FBarScene::Release(std::vector<FRtcScriptRole> const* KeepRoles)
     bool bKeepFirst = false;
     if (KeepRoles != nullptr && KeepRoles->begin() != KeepRoles->end())
     {
-        // 06eac317-06eac373: the first character is read without an empty test (retail
-        // dereferences Characters' begin), then an inline strcmp of its Role with each
-        // Role.Data (+4, stride 0x3c) until one matches.
+        // Retail dereferences Characters' begin without an empty test; the compare is a
+        // case-sensitive inline strcmp.
         FBarCharacterList::iterator First = *Characters.begin();
         for (std::vector<FRtcScriptRole>::const_iterator Keep = KeepRoles->begin();
              Keep != KeepRoles->end(); ++Keep)
@@ -962,7 +946,7 @@ void FBarScene::Release(std::vector<FRtcScriptRole> const* KeepRoles)
         }
     }
 
-    // 06eac378-06eac3b1: the first character loses the scene's behavior.
+    // The first character loses the scene's behavior.
     if (Characters.begin() != Characters.end() && !bKeepFirst)
     {
         FBarCharacter& First = **Characters.begin();
@@ -972,18 +956,16 @@ void FBarScene::Release(std::vector<FRtcScriptRole> const* KeepRoles)
         First.Behavior = 0xffffffff;
     }
 
-    // 06eac3b7-06eac3d8: FUN_06ea94c0(SceneId, character, KeepRoles) for each.
     for (std::vector<FBarCharacterList::iterator>::iterator It = Characters.begin();
          It != Characters.end(); ++It)
         Base->RemoveBarCharacter(SceneId, *It, KeepRoles);
     Characters.clear();
 
-    // 06eac40a-06eac42f: inline find of the room (FUN_06f7b0f0); a missing room gives null,
-    // which the lock loop below dereferences without a test.
+    // A missing room gives null, which the lock loop below dereferences without a test
+    // (as retail).
     std::map<unsigned int, FBaseRoomState>::iterator Room = Base->RoomStates.find(RoomId);
     FBaseRoomState* State = Room != Base->RoomStates.end() ? &Room->second : nullptr;
 
-    // 06eac431-06eac4a4: one count off the lock {PlayerId, placement}; erased at zero.
     for (std::vector<int>::iterator Placement = Placements.begin();
          Placement != Placements.end(); ++Placement)
     {
@@ -1001,20 +983,17 @@ void FBarScene::Release(std::vector<FRtcScriptRole> const* KeepRoles)
     Placements.clear();
 }
 
-// FUN_06ea9640 (06ea9640-06ea9f35). EH FuncInfo at LAB_06fa9adc: the scene's two vectors,
-// the behavior description's two FmtStr, the room-state temporaries, the character and the
-// offer temporaries -- all RAII locals here.
+// FUN_06ea9640 (06ea9640-06ea9f35).
 int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int PlayerId,
                                  unsigned int ControllerId)
 {
     int const SceneId = GBarSceneNextId++;                                  // DAT_06fce2f8
 
-    FBarScene Scene;                                                        // [ESP+0x30]
+    FBarScene Scene;
     Scene.Base = this;
     Scene.SceneId = SceneId;
     Scene.PlayerId = PlayerId;
     Scene.RoomId = Script->LocationId;
-    // 06ea96b9: {SceneId, this} (FUN_06eadeb0, unique insert; the result is dropped).
     GBarSceneBases.insert(std::pair<int const, FContentBase*>(SceneId, this));
 
     CharacterBehaviorDescription Behavior;                                  // FUN_06eac990
@@ -1025,8 +1004,8 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     Behavior.bBindSingleCharacter = 0;
     Behavior.bApplySpatial = 1;
 
-    // 06ea9738-06ea98d4: greet..offer (1, 0, 2, 3) paired with 0, then decision 1,
-    // accept 2, decline 3 -- seven inlined copies of FUN_06f01ab0.
+    // greet..offer (1, 0, 2, 3) paired with 0, then decision 1, accept 2, decline 3 --
+    // seven inlined copies of FUN_06f01ab0 in retail.
     AppendBehaviorText(&Behavior, Script->FindActionText(1), 0);            // FUN_06ed4470
     AppendBehaviorText(&Behavior, Script->FindActionText(0), 0);
     AppendBehaviorText(&Behavior, Script->FindActionText(2), 0);
@@ -1040,20 +1019,17 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     Behavior.RelocateLocationId = Script->RelocateLocationId;
     Behavior.NameFmtStr.begin_mad_lib(static_cast<unsigned int>(Script->MissionTextId));
     Behavior.NameFmtStr.end_mad_lib();
-    // 06ea9914-06ea992e: 3 with an offer text (pointer test only), 5 without.
+    // Only the offer text pointer is tested.
     Behavior.DialogType = Script->FindActionText(3) != nullptr ? 3 : 5;
     Behavior.Filter = PlayerId;
     Behavior.OfferArg = ControllerId;
     Behavior.OfferMissionId = 0;
 
-    // 06ea9943-06ea99b1: insert {room, empty state} (FUN_06eacef0 / FUN_06ead9b0 /
-    // FUN_06ead830); an existing entry is kept.
     FBaseRoomState* RoomState =
         &RoomStates.insert(std::pair<unsigned int const, FBaseRoomState>(Script->LocationId,
                                                                          FBaseRoomState()))
              .first->second;
 
-    // 06ea99b6-06ea9a44: capacity test (FUN_06eb6b30) and reallocation.
     Scene.Placements.reserve(Script->ReservedSpots.size());
     for (std::vector<int>::const_iterator Spot = Script->ReservedSpots.begin();
          Spot != Script->ReservedSpots.end(); ++Spot)
@@ -1062,27 +1038,25 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
         Scene.Placements.push_back(*Spot);                                  // FUN_06eb5770
     }
 
-    // 06ea9a7b-06ea9e60: the roles from the last to the first.
     int const RoleCount = static_cast<int>(Script->Roles.size());
     for (int Index = RoleCount - 1; Index >= 0; --Index)
     {
         FRtcScriptRole const* Role = &Script->Roles[Index];
         FBarCharacterList::iterator Character;
         bool bFound = false;
-        // 06ea9aba-06ea9b25: FBaseRoomState::FindCharacter (FUN_06eac240) inlined.
+        // FindCharacter is inlined in retail.
         if (Role->Role.Length != 0)
             bFound = RoomState->FindCharacter(&Role->Role, PlayerId, &Character);
 
         if (bFound)
         {
-            // 06ea9bed-06ea9c05.
             ++Character->UseCount;
             Behavior.StringArray[Index] = Character->Role.Data;
             Behavior.IdArray[Index] = Character->CharacterId;
         }
         else
         {
-            // 06ea9b27-06ea9cf7: the description from the role's specific NPC record.
+            // The description from the role's specific NPC record.
             FBarCharacterDesc Desc;                                         // FUN_06ea7bf0 inlined
             FNpcCharacterDesc const* Npc = Role->Character;
             Desc.PlayerId = PlayerId;
@@ -1104,8 +1078,7 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
             Desc.Role = Role->Role.Data;                                    // FUN_06ead6c0
             Desc.Fidget = Role->Fidget.c_str();                             // FUN_06ead640
 
-            // 06ea9cfc-06ea9e03: FUN_06ea9340's body inlined -- create, then put it at the
-            // front of the room's list (FUN_06eac6c0 operator[], FUN_06eac5d0).
+            // AddBarCharacter (FUN_06ea9340) inlined, via operator[] here.
             FBarCharacter NewCharacter;
             NewCharacter.Create(&Desc);                                     // FUN_06ea7d20
             Behavior.StringArray[Index] = Role->Role.Data;
@@ -1118,22 +1091,19 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
         ++Behavior.IdArrayCount;
         if (Index == 0)
         {
-            // 06ea9c23-06ea9c97: the scene's behavior goes to the first role's character,
-            // whose offer is dropped (FUN_06ea8cd0 from a kind-0 temporary).
+            // The scene's behavior goes to the first role's character, whose offer is
+            // dropped.
             unsigned long const Handle = pub::GF::CharacterBehaviorCreate(Behavior);
             Character->Offer = FBarOffer();
             Character->SetBehavior(Handle);                                 // FUN_06ea7ce0 inlined
         }
         else if (Character->Offer.Kind == BAR_OFFER_NONE)
         {
-            // 06ea9e10-06ea9e39.
             Character->SetBehavior(0xffffffff);                             // FUN_06ea7ce0 inlined
         }
-        // 06ea9e46-06ea9e56: FUN_06f937c0 insert(begin, 1, &Character).
         Scene.Characters.insert(Scene.Characters.begin(), Character);
     }
 
-    // 06ea9e66-06ea9e81: FUN_06eade20 insert(end) with the FUN_06eb1700 copy.
     BarScenes.push_back(Scene);
     return SceneId;
 }
@@ -1147,12 +1117,10 @@ void FContentBase::RemoveBarScene(int SceneId, std::vector<FRtcScriptRole> const
         if (Scene->SceneId == SceneId)
         {
             Scene->Release(KeepRoles);          // FUN_06eac2f0
-            BarScenes.erase(Scene);             // unlink, FUN_06ea9f90, free, --size
+            BarScenes.erase(Scene);
             break;
         }
     }
-    // 06eaa020-06eaa0e1: equal_range of the key; clear() when the range is the whole map,
-    // else erase element by element -- std::map::erase(key).
     GBarSceneBases.erase(SceneId);
 }
 
@@ -1197,7 +1165,7 @@ namespace
         Vector* OutPosition = nullptr;
         unsigned int* OutNickname = nullptr;
 
-        // LAB_06eac560 (06eac560-06eac5a3): dock_with (+0x58) != base -> go on; else
+        // LAB_06eac560: dock_with (+0x58) != base -> go on; else
         // nickname id (pub::GetNicknameId of the record's name), ids name (+0x30),
         // position (+0x20), stop.
         bool OnObject(pub::System::FSysObj const* Object) override
@@ -1223,8 +1191,8 @@ unsigned int FContentBase::FindDockObject(Vector* OutPosition) const
     Finder.OutPosition = OutPosition;
     Finder.OutNickname = &Nickname;
 
-    // 06eac4f0-06eac530: pub::GetSystem into the argument slot, then FUN_06f75f30; a failed
-    // lookup gives a null SystemInfo whose +0x48 is read anyway (retail does not test it).
+    // A failed lookup gives a null SystemInfo whose +0x48 is read anyway (retail does not
+    // test it).
     unsigned int SystemId;
     FSystemInfo* System = nullptr;
     if (pub::GetSystem(SystemId, BaseId) == 0)
@@ -1245,20 +1213,18 @@ int FContentBase::GetRoomDensity(unsigned int RoomId) const
 }
 
 // FUN_06eaa0f0 (06eaa0f0-06eaa24c, RET 4). The count local is unset in retail when the
-// first Market call fails; the port starts it at 0. Count > 0: a temporary id buffer
-// (operator new(count * 4)), the out vector reserved to count (06eaa15c-06eaa1d7), one
-// FUN_06f96770 insert(end, 1, {id, 1}) per id, the buffer freed.
+// first Market call fails; the port starts it at 0.
 void FContentBase::GetCommoditiesForSale(std::vector<FBaseCommodity>* Out) const
 {
     int Count = 0;
-    pub::Market::GetNumCommoditiesForSale(BaseId, &Count);                // 06eaa100
+    pub::Market::GetNumCommoditiesForSale(BaseId, &Count);
     if (Count == 0)
     {
-        Out->clear();                                                     // 06eaa21d-06eaa245
+        Out->clear();
         return;
     }
     std::vector<unsigned int> Goods(static_cast<size_t>(Count));
-    pub::Market::GetCommoditiesForSale(BaseId, Goods.data(), &Count);     // 06eaa134
+    pub::Market::GetCommoditiesForSale(BaseId, Goods.data(), &Count);
     if (Out->capacity() < static_cast<size_t>(Count))
         Out->reserve(static_cast<size_t>(Count));
     for (int Index = 0; Index < Count; ++Index)
@@ -1274,20 +1240,20 @@ void FContentBase::GetCommoditiesForSale(std::vector<FBaseCommodity>* Out) const
 void FContentBase::GetCommoditiesInDemand(std::vector<FBaseCommodity>* Out) const
 {
     int Count = 0;
-    pub::Market::GetNumCommoditiesInDemand(BaseId, &Count);               // 06eaa265
+    pub::Market::GetNumCommoditiesInDemand(BaseId, &Count);
     if (Count == 0)
     {
-        Out->clear();                                                     // 06eaa3a3-06eaa3c7
+        Out->clear();
         return;
     }
     std::vector<unsigned int> Goods(static_cast<size_t>(Count));
-    pub::Market::GetCommoditiesInDemand(BaseId, Goods.data(), &Count);    // 06eaa298
+    pub::Market::GetCommoditiesInDemand(BaseId, Goods.data(), &Count);
     if (Out->capacity() < static_cast<size_t>(Count))
         Out->reserve(static_cast<size_t>(Count));
     for (int Index = 0; Index < Count; ++Index)
     {
         int MinInventory = 0;
-        pub::Market::GetMinInventory(BaseId, Goods[Index], MinInventory);  // 06eaa35d
+        pub::Market::GetMinInventory(BaseId, Goods[Index], MinInventory);
         FBaseCommodity const Entry = {Goods[Index], static_cast<unsigned int>(MinInventory)};
         Out->insert(Out->end(), 1, Entry);
     }
@@ -1302,9 +1268,7 @@ void FContentBase::OnPlayerEnter(unsigned int PlayerId)
         for (std::list<FBaseFixture*>::iterator Node = Fixtures.begin(); Node != Fixtures.end();
              ++Node)
         {
-            // 06eaa440-06eaa44d: a counted local reference, EH state 0 of FuncInfo 06fbde58
-            // (FUN_06f28e10 on [esp+0x10]); released at the end of the iteration by
-            // FUN_06f28e10 (06eaa69d, skip paths) or vtbl[+4] (06eaa723-06eaa73b).
+            // A counted local reference (FUN_06f28e10), released at the end of the iteration.
             TRefHandle<FBaseFixture> Fixture;
             Fixture = *Node;
             if (Fixture != nullptr)
@@ -1316,15 +1280,14 @@ void FContentBase::OnPlayerEnter(unsigned int PlayerId)
             if (StateIt != RoomStates.end())
             {
                 FBaseRoomState& State = StateIt->second;
-                // 06eaa48c-06eaa4c9: a lock on (player, placement) -> nothing.
                 if (State.HasLock(PlayerId, Fixture->Placement))
                 {
                     bSkip = true;
                 }
                 else
                 {
-                    // 06eaa4cb-06eaa52b, 06eaa671-06eaa689: the player's character in this
-                    // role is reused: one more use, one more visit reference.
+                    // The player's character in this role is reused: one more use, one more
+                    // visit reference.
                     for (FBarCharacterList::iterator It = State.Characters.begin();
                          It != State.Characters.end(); ++It)
                     {
@@ -1342,7 +1305,6 @@ void FContentBase::OnPlayerEnter(unsigned int PlayerId)
 
             if (!bSkip)
             {
-                // 06eaa535-06eaa647: the character description from the fixture's GF_NPC.
                 FBaseNpc const* Npc = Fixture->Npc;
                 FBarCharacterDesc Desc;
                 Desc.PlayerId = PlayerId;
@@ -1366,8 +1328,7 @@ void FContentBase::OnPlayerEnter(unsigned int PlayerId)
                 Desc.Nickname = Npc->Desc.Nickname;
 
                 FBarCharacterList::iterator Character = AddBarCharacter(&Desc);   // FUN_06ea9340
-                // 06eaa653-06eaa6c2: the state is looked up again; retail does not test the
-                // result (AddBarCharacter has just created it).
+                // Retail does not test this find (AddBarCharacter has just created the state).
                 RoomStates.find(Room->RoomId)->second.CharacterRefs.push_back(Character);
 
                 FBarOffer Offer;
@@ -1410,8 +1371,8 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
     std::vector<FBarOfferChoice> Choices;
     Choices.reserve(5);
 
-    // 06ea840b-06ea8474: a mission when the game mode allows mission_type (the MP flag is
-    // tested outside single player, the SP flag inside it).
+    // A mission when the game mode allows mission_type (the MP flag is tested outside
+    // single player, the SP flag inside it).
     bool bMissionsEnabled;
     if (!pub::SinglePlayer() && GBaseMissionTypesInMultiplayer)
         bMissionsEnabled = true;
@@ -1425,7 +1386,6 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
         Choices.push_back(Choice);
     }
 
-    // 06ea8479-06ea84a5: the player's feeling towards this character's affiliation.
     float Feeling = 0.0f;
     int Reputation = Player->GetReputation();
     pub::Reputation::GetReputation(Reputation, Desc.Affiliation, Feeling);
@@ -1454,7 +1414,6 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
         }
     }
 
-    // 06ea8547-06ea85a3: the best rumor weight (unsigned JBE), FILD as int.
     unsigned int BestRumor = 0;
     for (std::vector<FBaseNpcRumor>::const_iterator It = Rumors.begin(); It != Rumors.end(); ++It)
     {
@@ -1473,8 +1432,8 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
     if (Choices.empty())
         return;
 
-    // 06ea85c7-06ea8640: the weights are all positive and the pick is below their sum, so
-    // an element is always found; retail would read *end() otherwise.
+    // The weights are all positive and the pick is below their sum, so an element is always
+    // found; retail would read *end() otherwise.
     float PickSlot = 0.0f;
     std::vector<FBarOfferChoice>::const_iterator Chosen = PickWeighted(Choices, &PickSlot);
     if (Chosen == Choices.end())
@@ -1484,17 +1443,15 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
     {
     case BAR_OFFER_MISSION:
     {
-        // 06ea8655-06ea86e9.
         std::vector<FBaseNpcMission>::const_iterator Mission = PickRandom(Missions);
         unsigned int PlayerId = Player->PlayerId;
-        // 06ea86c3: the ship id lives in the pick's slot; a failed query leaves its bits.
+        // The ship id lives in the pick's slot; a failed query leaves its bits.
         unsigned int ShipId;
         memcpy(&ShipId, &PickSlot, sizeof(ShipId));
         pub::Player::GetShipID(PlayerId, ShipId);
         if (Mission == Missions.end() || ShipId == 0)
             break;
 
-        // 06ea86ef-06ea879c.
         FBarMissionOfferData OfferData;
         if (CreateBarMissionOffer(&*Mission, Player, Player->GetBaseRecord()->BaseId,
                                   Desc.Affiliation, &OfferData))                 // FUN_06f041c0
@@ -1512,8 +1469,8 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
     }
     case BAR_OFFER_BRIBE:
     {
-        // 06ea87a1-06ea8a13: a random offered bribe of a local copy (not offered ones are
-        // erased and the pick repeats).
+        // A random offered bribe of a local copy (not offered ones are erased and the pick
+        // repeats).
         std::vector<FBaseNpcBribe> Candidates(Bribes);
         std::vector<FBaseNpcBribe>::const_iterator Pick = PickRandom(Candidates);
         while (!Pick->IsOffered(Player))
@@ -1525,21 +1482,20 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
         FBarBribeOffer* Bribe = new FBarBribeOffer;
         Out->Object = Bribe;
         Bribe->Discount = GetFeelingShortfall(Player->GetReputation(), Pick->Group, 0.6f);
-        // 06ea8986-06ea89a9: FILD qword {cost, 0} * discount * 10.0 (DAT_06fb4438), ftol.
+        // 10.0 = DAT_06fb4438.
         double const Cost = static_cast<double>(static_cast<unsigned int>(Pick->Cost));
         Bribe->Price = static_cast<int>(Cost * Bribe->Discount * 10.0);
         Bribe->Price = static_cast<int>(RoundRmMoney(static_cast<unsigned int>(Bribe->Price))); // FUN_06f35b50
         Bribe->Group = Pick->Group;
         Bribe->TextIds = Pick->TextIds;
-        // 06ea89d0-06ea89dd: FUN_06f50e10(object +0xc, object +0x10, 3).
         GetFactionHostileGroups(Bribe->Group, Bribe->Ids, 3);
         Out->Kind = BAR_OFFER_BRIBE;
         break;
     }
     case BAR_OFFER_KNOW:
     {
-        // 06ea8a18-06ea8bbe: the same repeat-until-offered pick over a copy of Knows, then
-        // the first element of Knows equal to it (REPE CMPSD, 4 dwords).
+        // The same repeat-until-offered pick over a copy of Knows, then the first element of
+        // Knows bitwise equal to it.
         std::vector<FBaseNpcKnow> Candidates(Knows);
         std::vector<FBaseNpcKnow>::const_iterator Pick = PickRandom(Candidates);
         while (!Pick->IsOffered(Player, Feeling))
@@ -1553,15 +1509,14 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
             if (memcmp(&*Match, &*Pick, sizeof(FBaseNpcKnow)) == 0)
                 break;
         }
-        // 06ea8b86: the scan's pointer as is (end() when nothing matched; the pick is a copy
-        // of a Knows element, so a match always exists).
+        // The scan's pointer as is (end() when nothing matched; the pick is a copy of a
+        // Knows element, so a match always exists).
         Out->Know = Knows.data() + (Match - Knows.begin());
         Out->Kind = BAR_OFFER_KNOW;
         break;
     }
     case BAR_OFFER_RUMOR:
     {
-        // 06ea8bc3-06ea8c7e: every rumor with a weight, then FUN_06eace60.
         std::vector<FBarRumorChoice> RumorChoices;
         RumorChoices.reserve(Rumors.size());                         // FUN_06ef7860
         for (std::vector<FBaseNpcRumor>::const_iterator It = Rumors.begin(); It != Rumors.end();
@@ -1572,7 +1527,6 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
             {
                 FBarRumorChoice Choice;
                 Choice.Rumor = &*It;
-                // FILD qword {weight, 0}.
                 Choice.Weight = static_cast<float>(static_cast<double>(static_cast<unsigned int>(Weight)));
                 RumorChoices.insert(RumorChoices.end(), Choice);    // FUN_06f537a0
             }

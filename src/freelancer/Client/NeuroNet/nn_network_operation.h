@@ -37,8 +37,7 @@
 class NnNetworkOperation : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_00474670: WinControl ctor, FUN_0042d6c0, ++DAT_0067dccc, +0x330 and
-    // +0x334 = 0.
+    // Inlined into FUN_00474670: also FUN_0042d6c0 and ++DAT_0067dccc.
     NnNetworkOperation();
     // FUN_004721a0
     ~NnNetworkOperation() override;
@@ -61,9 +60,8 @@ public:
     unsigned char Pad339[3];       // +0x339
     WinControl* ExitText;          // +0x33c
 
-    // FUN_004a7690(+0x338), the callback with 0, slot 33 ReleaseMouse, FUN_0043d2a0 on every
-    // child, slot 10 Destroy, delete -- inlined identically at 004723e3, 00472463 and in
-    // FUN_00473b60 (00473b74..00473bd0).
+    // Port-only helper for the close retail inlines at 0x004723e3, 0x00472463 and in
+    // FUN_00473b60: resume, the callback with 0, release the mouse, delete the window.
     void Close();
 };
 

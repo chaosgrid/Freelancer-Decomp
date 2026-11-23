@@ -20,33 +20,27 @@
 
 int ComputeInitialEnvironment()
 {
-    // FUN_005b20a0 (0x005b20a0..0x005b218d). Default result 6 (menu, IntroFocus). The port-only
-    // -spquickstart prefix that used to run here is gone: the retail [Login] auto-login below is
-    // the same quick start (it needs [Login] char just as the shortcut did).
+    // FUN_005b20a0. Default result 6 (menu, IntroFocus).
     int Result = 6;
-    // 0x005b20a5..0x005b20ce: the [Login] auto-login is on when the login name (+0x188, the
-    // copy FUN_005a96b0 returns) is not empty and the character name (DAT_0067e9a0, +0x1e8) is
-    // not empty. CLoginMgr::LoadConfig (FUN_005a82d0, main.cpp) fills both from [Login].
+    // The [Login] auto-login: CLoginMgr::LoadConfig (FUN_005a82d0) fills both names from
+    // [Login]; the character name is DAT_0067e9a0.
     bool const bAutoLogin =
         !G_LoginMgr.LoginName.empty() && G_LoginMgr.SelectCharacterName[0] != 0;
     if (bAutoLogin)
     {
-        // 0x005b20ff..0x005b2118: SinglePlayer() || FUN_005accb0(&DAT_0067e84c) -- the
-        // current server (+0x94) has its +0x28 and +0x98 fields set.
+        // FUN_005accb0 on DAT_0067e84c.
         if (SinglePlayer() || MenuMpSessionIsReady(&G_LoginMgr.CurrentServer))
         {
             Result = 1;
-            // 0x005b211a..0x005b215a.
             if (ConnectAndLogin(g_display.ini_path.Text) &&        // FUN_005a8960
                 G_LoginMgr.RequestCharacterInfo() != 0 &&          // FUN_005aa680
                 G_LoginMgr.SelectAutoCharacter())                  // FUN_005ab0f0
             {
-                // FUN_004c4810: the player's base (DAT_00673358 & 0x3fffffff) is set.
+                // FUN_004c4810: the player's base (DAT_00673358) is set.
                 Result = (GetPlayerBaseIdRetail() & 0x3fffffffu) != 0 ? 3 : 2;
             }
             if (Result == 1)
             {
-                // 0x005b2161..0x005b2181.
                 FDUMP(0x100001, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\main.cpp",
                       0x476, "ComputeInitialEnvironment() failed - exiting Freelancer");
             }

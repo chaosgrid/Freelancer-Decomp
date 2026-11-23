@@ -30,7 +30,7 @@ enum SeverityLevel
 
 namespace ErrorHandler
 {
-    // Common.dll.c ErrorHandler::activate @ 0xaad30. Installs the FDUMP hook
+    // 0x0630ad30. Installs the FDUMP hook
     // (LAB_0630abd0, common_errorhandler.cpp FdumpHook): each FDUMP call goes to every
     // active channel whose LogId is -1 or equals flags >> 4 and whose severity limit
     // is not below the flags' low nibble. A non-null AssertHandler is stored into
@@ -40,7 +40,7 @@ namespace ErrorHandler
                                       int (__cdecl* AssertHandler)(char const*, char const*, bool));
     COMMON_API void __cdecl deactivate();
 
-    // Common.dll.c ErrorHandler::new_log @ 0xab320. Name[0]=='$' selects a virtual sink
+    // 0x0630b320. Name[0]=='$' selects a virtual sink
     // ("$Text"/"$Window") instead of opening a real file for write ("wb"). Returns an
     // opaque handle (nullptr when the channel ends up with no sink); there is no
     // by-handle free, only deactivate(). SeverityLimit: the FDUMP hook drops calls whose
@@ -50,17 +50,17 @@ namespace ErrorHandler
     COMMON_API void* __cdecl new_log(char const* Name, int LogId, int SeverityLimit,
                                       bool bText, bool bWindow);
 
-    // Common.dll.c @ 0xab460 / 0xab4b0. LogId == -1 means "all channels".
+    // 0x0630b460 / 0x0630b4b0. LogId == -1 means "all channels".
     COMMON_API void __cdecl log_enable(int LogId);
     COMMON_API void __cdecl log_disable(int LogId);
-    // Common.dll.c @ 0xab4e0. Unlike log_enable/log_disable, -1 is NOT special here --
+    // 0x0630b4e0. Unlike log_enable/log_disable, -1 is NOT special here --
     // it only matches a channel literally registered with LogId == -1.
     COMMON_API bool __cdecl is_log_enabled(int LogId);
-    // Common.dll.c @ 0xab540. Formats once, writes the (newline-terminated) result to
+    // 0x0630b540. Formats once, writes the (newline-terminated) result to
     // the file of every active channel whose LogId equals LogId (LogId -1: every channel).
     COMMON_API void __cdecl log_comment(int LogId, char const* Format, ...);
 
-    // Common.dll.txt:0630b680 (0xab680). Win32 GetLastError()-style helper: formats
+    // 0x0630b680. Win32 GetLastError()-style helper: formats
     // ErrorCode via FormatMessageA (FORMAT_MESSAGE_ALLOCATE_BUFFER|FROM_SYSTEM|
     // IGNORE_INSERTS, neutral/default language), then calls
     // FDUMP((Severity & 0xf) | 0x100000, Format, Source, Line, <formatted message>)

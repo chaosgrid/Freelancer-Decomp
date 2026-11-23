@@ -50,10 +50,9 @@
 class NN_MainButton : public WinControl, public EventHandler, public ButtonMover, public ButtonScaler
 {
 public:
-    // FUN_0045b700 -- the bases, the zeroed state (+0x3a8, +0x3ac, +0x508..+0x510, +0x518[3],
-    // +0x524, the four bytes) and DAT_0066d3f0 = this.
+    // FUN_0045b700 -- also DAT_0066d3f0 = this.
     NN_MainButton();
-    // FUN_0045b820 -- DAT_0066d3f0 = 0 when it is this, then the bases.
+    // FUN_0045b820 -- DAT_0066d3f0 = 0 when it is this.
     ~NN_MainButton() override;
 
     // --- WinControl / Win3D overrides ---
@@ -148,9 +147,9 @@ public:
     unsigned char bForceMissionLog;
 
 private:
-    // The seven-root loop written out at 0x0045ce7d, 0x0045d15c, 0x0045d3a1, 0x0045d4c4 and
-    // 0x0045d5d3: Roots[i]->SetProperty(0xc, Buttons[i] is the open or the closing button, 0)
-    // for every non-null root.
+    // Port-only helper for the seven-root loop retail writes out at 0x0045ce7d, 0x0045d15c,
+    // 0x0045d3a1, 0x0045d4c4 and 0x0045d5d3: a root is lit while its button is the open or the
+    // closing one.
     void UpdateRootHighlights();
 
     NN_MainButton(NN_MainButton const&) = delete;
@@ -160,6 +159,6 @@ private:
 // DAT_0066d359 -- while set, NN_MainButton's Draw does not auto-close the open panel when the
 // HUD stops picking (0x0045ca36) and NN_Exit's Create does not close it (0x00471810). Written 0
 // at 0x004499f7 / 0x0044adaf / 0x0044bd30 / 0x0044c29e, from the base room state's +0x1338 at
-// 0x0044badb / 0x0044c498, 0 at 0x004bb7b3 and 1 at 0x004bb9df (the story star). None of those
-// writers is ported yet, so the byte stays at its load-time 0.
+// 0x0044badb / 0x0044c498 (room_control.cpp), 0 at 0x004bb7b3 and 1 at 0x004bb9df (the story
+// star).
 extern unsigned char G_bNnKeepPanelOpen;

@@ -27,9 +27,8 @@ namespace
     // which frees the buffer, through atexit. An ids value's high word indexes it.
     std::vector<HMODULE> GIdsModules;
 
-    // FUN_0057d980, cdecl(&ids): the module the high word of *Ids names. In range (unsigned
-    // JNC against the element count; an unallocated vector is out of range) the high word is
-    // cleared and the element returned -- a registered null handle included; otherwise null
+    // FUN_0057d980, cdecl(&ids): the module the high word of *Ids names. In range the high word
+    // is cleared and the element returned -- a registered null handle included; otherwise null
     // and *Ids untouched.
     HMODULE TakeIdsModule(unsigned int* Ids)
     {
@@ -40,10 +39,8 @@ namespace
         return GIdsModules[Index];
     }
 
-    // FUN_0057d9c0 (.text:0057d9c0-0057da3a), cdecl(module, id, &data, &words): both outputs
-    // zeroed first, then the resource of type 0x17 named by the numeric id. False on a missing
-    // resource or a failed load / lock; otherwise the word count (SizeofResource >> 1) and the
-    // locked pointer.
+    // FUN_0057d9c0, cdecl(module, id, &data, &words): the resource of type 0x17 named by the
+    // numeric id.
     bool LoadRawTextResource(HMODULE Module, unsigned int Id, wchar_t const** OutData,
                               unsigned int* OutWordCount)
     {
@@ -71,9 +68,8 @@ namespace
 
 unsigned int RegisterIdsResourceModule(HMODULE Module)
 {
-    // FUN_0057d800 (.text:0057d800-0057d97d), cdecl(module): the element count before the
-    // insert, shifted into the high word (the ids base of this DLL), then push_back -- no
-    // null test and no duplicate test (0x0057d925 in-place path, 0x0057d86c grow path).
+    // FUN_0057d800, cdecl(module): returns the ids base of this DLL. No null test and no
+    // duplicate test.
     unsigned int const Base = static_cast<unsigned int>(GIdsModules.size()) << 16;
     GIdsModules.push_back(Module);
     return Base;
@@ -86,7 +82,7 @@ HMODULE GetIdsResourceModule(unsigned int Ids)
 
 unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
 {
-    // FUN_00434720 (.text:00434720-004347d2), cdecl(unused, ids, dest, count); the first
+    // FUN_00434720, cdecl(unused, ids, dest, count); the first
     // argument is never read. FUN_0057d980 runs on the ids copy first, so the block and entry
     // below come from the low word only when the high word named a registered module; a null
     // module (out of range, or a registered null handle) goes to FindResourceExA as is, which
@@ -95,7 +91,7 @@ unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
     if (Dest != nullptr && DestChars < 1)
         return 0;
 
-    // 0x0043474b..0x00434765: RT_STRING block (ids >> 4) + 1 as a WORD, entry ids & 0xf.
+    // The block is a WORD.
     unsigned short const Block = static_cast<unsigned short>((Ids >> 4) + 1);
     unsigned int Entry = Ids & 0xfu;
     HRSRC const ResourceInfo =
@@ -106,13 +102,11 @@ unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
             LockResource(LoadResource(Module, ResourceInfo)));
     if (Cursor == nullptr)
     {
-        // 0x00434782.
         if (Dest != nullptr)
             Dest[0] = L'\0';
         return 0;
     }
 
-    // 0x00434792..0x0043479e: step over the entries before this one.
     while (Entry != 0)
     {
         --Entry;
@@ -123,7 +117,7 @@ unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
     if (Dest == nullptr)
         return Length;
 
-    // 0x004347ae..0x004347cd: min(count - 1, length), unsigned (JC keeps count - 1).
+    // Unsigned min.
     unsigned int Count = static_cast<unsigned int>(DestChars - 1);
     if (!(Count < Length))
         Count = Length;
@@ -161,23 +155,21 @@ unsigned int GetIdsStringA(unsigned int Ids, char* Dest, int DestChars)
 
 unsigned int GetIdsStringWWithRawFallback(unsigned int Ids, wchar_t* Dest, int DestChars)
 {
-    // FUN_004347e0 (.text:004347e0-00434872), cdecl(unused, ids, dest, count). The STRINGTABLE
-    // lookup FUN_00434720 first; only a zero result falls back to the raw resource.
+    // FUN_004347e0, cdecl(unused, ids, dest, count). Only a zero STRINGTABLE result falls back to
+    // the raw resource.
     unsigned int const Copied = GetIdsStringW(Ids, Dest, DestChars);
     if (Copied != 0)
         return Copied;
 
-    // 0x00434808..0x00434835: FUN_0057d980 on the ids copy, then FUN_0057d9c0 with its low
-    // word -- the module is not tested (a null one searches the process image).
+    // The module is not tested (a null one searches the process image).
     HMODULE const Module = TakeIdsModule(&Ids);
     wchar_t const* RawData = nullptr;
     unsigned int RawWordCount = 0;
     if (!LoadRawTextResource(Module, Ids & 0xffffu, &RawData, &RawWordCount))
         return 0;
 
-    // 0x00434837..0x00434864: min(words - 1, count - 1), unsigned (JC keeps words - 1); the text
-    // starts one word into the resource (ADD ESI,2); REP MOVS, then the terminator. Dest is
-    // written without a null test.
+    // Unsigned min; the text starts one word into the resource. Dest is written without a null
+    // test.
     unsigned int Count = RawWordCount - 1;
     unsigned int const Room = static_cast<unsigned int>(DestChars - 1);
     if (!(Count < Room))
@@ -201,8 +193,7 @@ FmtStr::Val const* FmtStrFindValue(FmtStr const* Fmt, unsigned char Index, unsig
 
 namespace
 {
-    // The escape switch's "Override" term, max(Override, 0): SETLE / DEC / AND (0x004baf99..
-    // 0x004bafa1 for 'I', 0x004bafe5..0x004bafed for 'L').
+    // The escape switch's "Override" term for 'I' and 'L'.
     inline unsigned int PositiveOverride(int Override)
     {
         return Override > 0 ? static_cast<unsigned int>(Override) : 0u;
@@ -216,8 +207,6 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
     // Every ids load below is FUN_004347e0 into the cursor with the room left, the FDUMP
     // "Failed to load ids" at line 0x2b3 on a zero result, and the end-of-buffer rewrite --
     // FUN_004bb140's body (AppendIdsStringOrWarn), written out inline at most sites.
-    //
-    // 0x004ba86a..0x004ba8a1: End = Dest + DestChars; no template id -> *Dest = 0, return 0.
     wchar_t* const End = Dest + DestChars;
     if (Fmt->MadLibId == 0)
     {
@@ -225,30 +214,27 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
         return 0;
     }
 
-    // 0x004ba8a2..0x004ba8c0: the template into the 0x1000-character frame buffer. The result
-    // is not tested.
+    // The result is not tested.
     wchar_t Template[0x1000];
     GetIdsStringWWithRawFallback(Fmt->MadLibId, Template, 0x1000);
 
-    wchar_t* Cursor = Dest;              // [ESP+0x20f4]
-    wchar_t const* Src = Template;       // EBP
-    bool bEscape = false;                // CL
-    wchar_t Ch = *Src;                   // DI
+    wchar_t* Cursor = Dest;
+    wchar_t const* Src = Template;
+    bool bEscape = false;
+    wchar_t Ch = *Src;
     while (Ch != L'\0')
     {
-        // 0x004ba8e0: step past the character.
         ++Src;
         if (Ch == L'%')
         {
-            // 0x004ba8ed: the next character is an escape code; "%%" sets the flag again.
+            // The next character is an escape code; "%%" sets the flag again.
             bEscape = true;
             Ch = *Src;
             continue;
         }
         if (!bEscape)
         {
-            // 0x004bb05d..0x004bb078: a literal, re-terminated after every character; no room
-            // test.
+            // A literal, re-terminated after every character; no room test.
             *Cursor = Ch;
             ++Cursor;
             *Cursor = L'\0';
@@ -256,8 +242,7 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             continue;
         }
 
-        // 0x004ba8fc..0x004ba92c: up to 64 decimal digits after the code, _wtoi'd into the
-        // byte index.
+        // Up to 64 decimal digits after the code, _wtoi'd into the byte index.
         wchar_t Digits[0x41];
         int DigitCount = 0;
         while (*Src >= L'0' && *Src <= L'9' && DigitCount < 0x40)
@@ -269,8 +254,7 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
         Digits[DigitCount] = L'\0';
         unsigned char const Index = static_cast<unsigned char>(MsvcrtWtoi(Digits));
 
-        // 0x004ba941..0x004ba966: "v<digit>" -- the digit is the LOW BYTE of the next wchar
-        // (MOV CL,[EBP+2], signed JL / JG against '0' / '9').
+        // "v<digit>" -- the digit is the LOW BYTE of the next wchar, compared signed.
         int Override = -1;
         if (*Src == L'v')
         {
@@ -282,13 +266,12 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             }
         }
 
-        // 0x004ba969..0x004ba981: switch (Code - 0x21) through the byte table 0x004bb0ec.
+        // Switch byte table 0x004bb0ec.
         FmtStr::Val const* Found = nullptr;
         switch (Ch)
         {
         case L'!':
-            // caseD_21 0x004bb00d: FUN_004ba830, then the nested FmtStr into the rest of the
-            // buffer with the same flag.
+            // The nested FmtStr into the rest of the buffer with the same flag.
             Found = FmtStrFindValue(Fmt, Index, L'!');
             if (Found != nullptr)
             {
@@ -298,7 +281,7 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         case L'M':
-            // caseD_4d 0x004ba988: only with the flag, then the generic path below.
+            // Only with the flag, then the generic path below.
             if (!bIncludeMission)
                 break;
             // fall through
@@ -307,15 +290,14 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
         case L'R':
         case L'S':
         case L's':
-            // caseD_47 0x004ba997: the value's ids, skipped when it is 2.
+            // The value's ids, skipped when it is 2.
             Found = FmtStrFindValue(Fmt, Index, static_cast<unsigned short>(Ch));
             if (Found != nullptr && Found->Value != 2)
                 AppendIdsStringOrWarn(&Cursor, End, Found->Value);
             break;
 
         case L'F':
-            // caseD_46 0x004baa44: the faction's ids, or with an override the faction's
-            // Override-th alternative name (Data + Override * 100 + 0x202fa).
+            // With an override, the faction's Override-th alternative name.
             Found = FmtStrFindValue(Fmt, Index, L'F');
             if (Found != nullptr)
             {
@@ -328,8 +310,7 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         case L'd':
-            // caseD_64 0x004baa8c: FUN_004779a0(Number, Data, 0x1f) and wcscat when the text
-            // fits before End.
+            // FUN_004779a0.
             Found = FmtStrFindValue(Fmt, Index, L'd');
             if (Found != nullptr)
             {
@@ -345,10 +326,8 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         case L'Z':
-            // caseD_5a 0x004bab0d: a zone id below 0x40 is a sector -- ids 0x331b ("sector"),
-            // ids 1, the column letter (Data & 7) + 0x514 and the row digit ((Data >> 3) & 7) +
-            // 0x506; anything else is the zone's own ids. With an override the sector head is
-            // Override * 200 + 0x50fa0 and a named zone Data + Override * 200 + 0x11349.
+            // A zone id below 0x40 is a sector -- "sector" (0x331b), a space (ids 1), the column
+            // letter and the row digit; anything else is the zone's own ids.
             Found = FmtStrFindValue(Fmt, Index, L'Z');
             if (Found != nullptr)
             {
@@ -385,7 +364,6 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         case L'I':
-            // caseD_49 0x004baf6d: FUN_004bb140 with Data + max(Override, 0) * 100 + 0x507d0.
             Found = FmtStrFindValue(Fmt, Index, L'I');
             if (Found != nullptr)
             {
@@ -396,8 +374,6 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         case L'L':
-            // caseD_4c 0x004bafc4: FUN_004ba830, then FUN_004bb140 with Data + max(Override, 0)
-            // * 100 + 0x50bb8.
             Found = FmtStrFindValue(Fmt, Index, L'L');
             if (Found != nullptr)
             {
@@ -408,17 +384,13 @@ int FormatFmtStrMadLib(FmtStr const* Fmt, wchar_t* Dest, int DestChars, bool bIn
             break;
 
         default:
-            // caseD_22: every other code emits nothing.
+            // Every other code emits nothing.
             break;
         }
 
-        // caseD_23 0x004bb07d: back to plain characters.
         bEscape = false;
         Ch = *Src;
     }
-
-    // 0x004bb094..0x004bb0bd: a cursor on End is pulled back one and terminated; the count is
-    // the cursor's distance from Dest.
     if (Cursor == End)
     {
         --Cursor;

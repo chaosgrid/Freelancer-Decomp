@@ -6,11 +6,7 @@
 
 #pragma once
 
-// The helpers FUN_0059e300 (Win3DDrawAll, win3d.cpp) calls around its draw loop.
-//
-// The raw-offset renderable registry that used to live here (RegisterRenderable /
-// DrawRenderables on void*) is gone: the registry is Win3D's own list DAT_0067dbe4, typed as
-// Win3D* in win3d.cpp.
+// The helpers Win3DDrawAll (FUN_0059e300, win3d.cpp) calls around its draw loop.
 
 struct IRPVertexBuffer;
 struct IRPIndexBuffer;
@@ -26,22 +22,21 @@ struct FImmedVertex
 };
 
 // The immediate line batchers DAT_0067dd90 (A, the wire controls' lines, drawn through the
-// Win3D camera's perspective) and DAT_0067dd68 (B, the HUD's 2D lines -- FUN_005a2970 sets its
-// +0x25 byte, so it draws through the camera's ortho box). 0x28 bytes. Static initializers
-// LAB_005a28c0 / LAB_005a2900 zero +0x00..+0x18, set Dirty 1 and +0x25 0.
+// Win3D camera's perspective) and DAT_0067dd68 (B, the HUD's 2D lines, drawn through the
+// camera's ortho box). 0x28 bytes. The static initializers set Dirty 1.
 struct FImmedBatcher
 {
-    IRPVertexBuffer* Vb;         // +0x00  QI "1.11_IRPVertexBuffer" (FUN_005a2df0)
+    IRPVertexBuffer* Vb;         // +0x00  QI "1.11_IRPVertexBuffer"
     IRPIndexBuffer* Ib;          // +0x04  QI "1.11_IRPIndexBuffer"
     IRPDraw* Draw;               // +0x08  QI "1.11_IRPDraw"
-    FImmedVertex* VertBase;      // +0x0c  operator new(0xc000): 0xc00 vertices
-    unsigned short* IndexBase;   // +0x10  operator new(0x3000): 0x1800 indices
+    FImmedVertex* VertBase;      // +0x0c  0xc00 vertices
+    unsigned short* IndexBase;   // +0x10  0x1800 indices
     FImmedVertex* VertCursor;    // +0x14
     unsigned short* IndexCursor; // +0x18
     int VertCount;               // +0x1c
     int IndexCount;              // +0x20
-    unsigned char Dirty;         // +0x24  set by every flush; FUN_005a29b0 rewinds on it
-    unsigned char bOrtho;        // +0x25  flush through FUN_004227d0 instead of FUN_00422950
+    unsigned char Dirty;         // +0x24  set by every flush; Win3DImmedBatchReset rewinds on it
+    unsigned char bOrtho;        // +0x25  flush through the ortho box instead of the perspective
     unsigned char Pad26[2];
 };
 
@@ -55,28 +50,23 @@ extern FImmedBatcher G_ImmedBatchB; // DAT_0067dd68
 void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
                        unsigned long Color, unsigned long EdgeColor, float Width);
 
-// FUN_005a2970 -- FUN_005a2df0 on both batchers, then B's +0x25 = 1. Caller: FUN_0059d5a0.
+// FUN_005a2970 -- create both batchers, then B's bOrtho = 1.
 void Win3DImmedBatchCreateAll();
-// FUN_005a2990 -- FUN_005a2e80 on both batchers. Caller: FUN_0059d6d0.
+// FUN_005a2990
 void Win3DImmedBatchDestroyAll();
 
-// FUN_005a29b0 -- reset both immediate batchers (DAT_0067dd90 / DAT_0067dd68) whose dirty
-// byte is set.
+// FUN_005a29b0 -- reset both immediate batchers whose dirty byte is set.
 void Win3DImmedBatchReset();
 
-// FUN_005a2a20 -- FUN_005a2ee0 on DAT_0067dd90, then on DAT_0067dd68.
+// FUN_005a2a20 -- flush A, then B.
 void Win3DImmedBatchFlushAll();
 
-// FUN_005a2940 (cdecl) -- a 2D line from A to B (x, y, z each) into the second immediate batcher
-// (DAT_0067dd68) through FUN_005a2a40 (RET 0x14): both batchers are flushed first when 12 more
-// indices or 8 more vertices would not fit; then eight vertices -- A and B in Color, each also
-// offset Width to either side along the perpendicular (atan2 of B - A plus DAT_005d3e88) in
-// EdgeColor -- and twelve indices. Callers: HUD_Targetable_Objects' bracket drawer
-// (0x004eb06a..0x004ebc8a) and lead-marker cross (FUN_004f2070).
+// FUN_005a2940 (cdecl) -- ImmedBatchAddLine on B. Callers: HUD_Targetable_Objects' bracket
+// drawer and lead-marker cross.
 void Win3DImmedDrawLine(float const* A, float const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width);
 
-// FUN_00559c10 -- ButtonMontage.ini loaded once (FUN_00559db0).
+// FUN_00559c10 -- ButtonMontage.ini loaded once.
 void ButtonMontageEnsure();
 
 // FUN_00559c20 -- flush the "buttons" material batch with RS 0x17 / 0xe saved around it.
@@ -90,8 +80,8 @@ void UiOverlayPrepPipeline();
 // no depth write and no culling, then the "IMEbkground" and "IMEtext" screen-quad lists flushed.
 void ImeFocusDrawPass();
 
-// FUN_0045a9f0 -- Tip Draw and other overlay callers: flush particle batch, reset
-// camera dirty, end/begin sorted pass, then UI overlay pipeline prep.
+// FUN_0045a9f0 -- Tip Draw and other overlay callers: flush and reset the immediate batchers,
+// flush the montage buttons, make sure ButtonMontage.ini is loaded, then the UI overlay prep.
 void Win3DFlushBeforeOverlayDraw();
 
 // Incremented by scene-object draw stubs (smoke verification).

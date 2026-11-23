@@ -18,7 +18,7 @@
 #include <cstring>
 #include <list>
 #include <string>
-#include "common_universe.h" // Universe::IZone (FULLPORT-MOVE[OBJ] from here)
+#include "common_universe.h" // Universe::IZone
 #include "common_reputation.h" // TString<N> (used by CommReferrable::GetMsgIdPrefix)
 #include <windows.h>           // CRITICAL_SECTION (MPCritSec); already reached via common_text.h
 
@@ -100,7 +100,7 @@ public:
     MPCritSec();
     ~MPCritSec();
 
-    // Common.dll.txt 0x06261d70 -- retail's operator= is a raw 7-dword memberwise copy of
+    // 0x06261d70 -- retail's operator= is a raw 7-dword memberwise copy of
     // the whole object (CRITICAL_SECTION bytes and the bInitialized flag included). That
     // aliases the OS critical section between the two objects; retail carries the same
     // footgun (whichever copy is destroyed first invalidates the other). No caller in the
@@ -327,7 +327,7 @@ class StateMachineMessage
 public:
     COMMON_API StateMachineMessage();                                   // 0x06333290
     COMMON_API StateMachineMessage(unsigned int Type);                  // 0x063332c0
-    // Common.dll.txt 0xd32f0 (??0StateMachineMessage@@QAE@MIIIH@Z -- float,uint,uint,uint,int).
+    // 0x063332f0 (??0StateMachineMessage@@QAE@MIIIH@Z -- float,uint,uint,uint,int).
     // +0x04 = Type, +0x08 = Sender, +0x0C = Receiver, +0x10 = State, +0x14 = Time, and
     // bDelivered = 0 unconditionally.
     COMMON_API StateMachineMessage(float DeliveryTime, unsigned int Type, unsigned int Sender,
@@ -496,8 +496,8 @@ static_assert(sizeof(StateMachine) == 0x10, "StateMachine size");
 // ---------------------------------------------------------------------------
 // StateMachineMessageHandler — receives messages, extends MessageHandler
 //
-// Confirmed via retail's vtable dump (Common.dll.txt @0x63a49a0/0x63a49b4) and
-// the ctor (Common.dll.c @0xd3080, 0x186640): this is MULTIPLE inheritance,
+// From retail's vtables (0x063a49a0 / 0x063a49b4) and the ctor (0x06333080): this is
+// multiple inheritance,
 // StateMachine first (offset 0x00, its vtable) then MessageHandler second
 // (offset 0x10, its own vtable) — sizeof 0x10 + 0x0C == 0x1C matches exactly,
 // and no other fields are needed. The destructor is implicit (not exported).
@@ -659,24 +659,18 @@ struct COMMON_API AsteroidExclusionZone
     // 10000000.0f (0x4b189680) is a "far away" sentinel before the first update_dist call.
     float         MaxDistSq;          // +0x04
     unsigned char bExcludeBillboards; // +0x08 — read by is_billboard_excluded (common_exclusionzone.cpp)
-    // +0x09 — a SECOND, separate per-zone bool flag, distinct from bExcludeBillboards. Confirmed
-    // by direct disasm cross-check (Common.dll.txt is_dynamic_asteroid_excluded @0x5c370 and the
-    // inlined AsteroidExclusionZoneMgr::is_excluded case-3 body @0x5be70 both read byte[Zone+0x9]
-    // to gate the InZone() test; the ctor @0x5c480 and the manual raw-alloc path inside
-    // AsteroidExclusionZoneMgr::push_back @0x5bde0 both explicitly zero-init it right alongside
-    // bExcludeBillboards). This field was previously undiscovered and mis-documented as padding.
-    // Like bExcludeBillboards, nothing in the recovered call graph ever sets it to true -- it's
-    // presumably populated by the still-BLOCKED ~500-line [AsteroidField]/exclusion-zone INI
-    // parser (Common.dll.c 0x44940), so it is always false in this port until that loader exists.
+    // +0x09 — a second per-zone flag: is_dynamic_asteroid_excluded (0x062bc370) and the inlined
+    // AsteroidExclusionZoneMgr::is_excluded case 3 (0x062bbe70) read byte[Zone+0x9] to gate the
+    // InZone() test; the ctor (0x062bc480) and push_back's raw-alloc path (0x062bbde0) zero it.
+    // Set by CAsteroidField::load's exclusion-zone parsing.
     unsigned char bExcludeDynamicAsteroids; // +0x09 — read by is_dynamic_asteroid_excluded
     // padding +0x0A..+0x0B
     // "empty_cube_frequency" of the [Exclusion Zones] entry (CAsteroidField::load 062a4fc0 stores
     // it when >= 0). is_cliasteroid_excluded / is_cmnasteroid_excluded hand it out when it is
-    // >= 0 (formerly DistSqCache).
+    // >= 0.
     float         EmptyCubeFrequency; // +0x0C — default -1.0f
     // "billboard_count" (CAsteroidField::load 062a4f40 stores float(ftol(value)) when > 0);
-    // normalize_billboard_density rescales it, is_billboard_excluded hands it out (formerly
-    // Field_0x10).
+    // normalize_billboard_density rescales it, is_billboard_excluded hands it out.
     float         BillboardCount;     // +0x10 — default -1.0f
 
     AsteroidExclusionZone();
@@ -800,9 +794,8 @@ private:
     AsteroidExclusionZone** End;                  // +0x0C
     AsteroidExclusionZone** CapacityEnd;          // +0x10
     // Both hold SQUARED distances (compared directly against AsteroidExclusionZone::MaxDistSq,
-    // itself squared). Ctor defaults confirmed from Common.dll.c 93536-93553: this+0x14 =
-    // 0x4a742400 = 4000000.0f (2000^2), this+0x18 = 0x48742400 = 250000.0f (500^2). The setters
-    // (Common.dll.txt 126483-126506) square their float argument before storing here.
+    // itself squared). Ctor defaults: this+0x14 = 0x4a742400 = 4000000.0f (2000^2), this+0x18 =
+    // 0x48742400 = 250000.0f (500^2). The setters square their argument before storing.
     float                   MaxCliDist;           // +0x14 — default 4000000.0f (2000^2)
     float                   MaxDynDist;           // +0x18 — default 250000.0f (500^2)
 };
@@ -844,7 +837,7 @@ private:
     NebulaExclusionZone** End;                    // +0x0C
     NebulaExclusionZone** CapacityEnd;            // +0x10
     // SQUARED distance (set_max_distance squares its argument, confirmed ICF-shared code with
-    // AsteroidExclusionZoneMgr's setters, Common.dll.txt 126483-126506). Retail's default ctor
+    // AsteroidExclusionZoneMgr's setters). Retail's default ctor
     // (.text:062bc660) never writes it: indeterminate until set_max_distance (named UB; the
     // port starts it at 0.0f). Nothing in Common reads it.
     float                 MaxDist;                // +0x14

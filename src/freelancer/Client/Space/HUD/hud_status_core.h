@@ -19,8 +19,8 @@ class CEqObj;
 class INI_Reader;
 
 // -------------------------------------------------------------------------------------------
-// FUN_004d4b50 (cdecl) -- the shield hit points of a CEqObj, shared by HUD_Core (0x004d57fb),
-// HUD_Status (0x004d97f7), the targetable-objects list (0x004ef74c, 0x004f134d) and 0x004758c7.
+// FUN_004d4b50 (cdecl) -- the shield hit points of a CEqObj, shared by HUD_Core, HUD_Maneuvers,
+// the targetable-objects list and 0x004758c7.
 //
 // *OutMax = *OutCur = 0. An object whose id is DAT_00674950 (CreateID("Ku07_02"), static
 // initializer LAB_004d4b30) has no shield read at all. Otherwise, for every CEShield of the
@@ -35,19 +35,18 @@ void HudSampleShieldHitPoints(CEqObj* Object, float* OutMax, float* OutCur, bool
 
 class HUD_Status;
 
-// DAT_00674aa0 -- the one HUD_Status, written by its ctor (0x004da229) and cleared by its dtor
-// (0x004da799). Readers do not test it for null.
+// DAT_00674aa0 -- the one HUD_Status, set by its ctor and cleared by its dtor. Readers do not
+// test it for null.
 HUD_Status* GetHudStatus();
 
-// 0x004c870f / 0x004c8722 (HUD_Steer::Render) and the camera code at 0x00549e30..: the bytes
-// +0x5b9 / +0x5ba of DAT_00674aa0, read without a null test, as retail does.
+// The bytes +0x5b9 / +0x5ba of DAT_00674aa0 (HUD_Steer::Render, the camera code at
+// 0x00549e30..), read without a null test, as retail does.
 bool HudStatusIsTurretView();
 bool HudStatusIsRearView();
 
-// DAT_00674b04 -- the one HUD_Target (the target panel, W3-C). Its ctor FUN_004e08b0 writes it
-// (0x004e0983) and its dtor clears it (0x004e0d29); HUD_Core::OnEvent, 0x004c19bf and nine other
-// sites read it without a null test. Defined in hud_status_core.cpp; the HUD_Target ctor / dtor
-// in hud_target_panel.cpp set and clear it.
+// DAT_00674b04 -- the one HUD_Target (the target panel). Its ctor FUN_004e08b0 / dtor in
+// hud_target_panel.cpp set and clear it; HUD_Core::OnEvent and about ten other sites read it
+// without a null test.
 extern HudTargetBase* G_HudTargetPanel;
 
 // -------------------------------------------------------------------------------------------
@@ -109,22 +108,19 @@ private:
 // IDataViewOwner 0x005d84f4, ButtonMover 0x005d84e8, Handler 0x005d84e0, ButtonScaler
 // 0x005d84d4.
 //
-// Retail overrides, and where the port stands on each:
-//   HUDItem   0 FUN_004da610 dtor (ported, FUN_004da740), 5 LAB_004db0d0 SetTarget,
-//             12 LAB_004dccf0, 13 LAB_004db120 (ported)
-//   WinControl 9 FUN_004da930 Create, 13 FUN_004db2c0 Draw, 19 LAB_004db8f0 MouseEvent,
-//             42 FUN_004db1c0 SetProperty (ported)
-//             11 LAB_004db340 Update (ported; the caption builder FUN_004e8100 is HudBuildObjectCaption)
+// Retail overrides:
+//   HUDItem   0 FUN_004da610 dtor (FUN_004da740), 5 LAB_004db0d0 SetTarget, 12 LAB_004dccf0,
+//             13 LAB_004db120
+//   WinControl 9 FUN_004da930 Create, 11 LAB_004db340 Update, 13 FUN_004db2c0 Draw,
+//             19 LAB_004db8f0 MouseEvent, 42 FUN_004db1c0 SetProperty
 //             (4 HitTest is HUD_Target_Base's LAB_004e7d20, inherited)
-//   ButtonMover  0 LAB_004dcf80, ButtonScaler 0 LAB_004dd080 (ported)
-//   Handler   0 LAB_004dba50 OnEvent (ported)
+//   ButtonMover  0 LAB_004dcf80, ButtonScaler 0 LAB_004dd080
+//   Handler   0 LAB_004dba50 OnEvent
 // -------------------------------------------------------------------------------------------
 
-// The heap caption at HUD_Status +0x5d0: text and capacity in wide chars, grown by FUN_004142a0
-// (the same two-word head Font::String has). ctor 0x004da1cf / 0x004da1d5 zero both words;
-// the dtor 0x004da7e6..0x004da803 frees the text when there is one and zeroes both again.
-// The two words are FHudWideText (hud_target.h) -- the one type HudBuildObjectCaption fills;
-// this adds only the owner's ctor / dtor.
+// The heap caption at HUD_Status +0x5d0 (FHudWideText, the type HudBuildObjectCaption fills),
+// grown by FUN_004142a0. The ctor zeroes both words; the dtor frees the text and zeroes them
+// again.
 struct FHudStatusCaption : FHudWideText
 {
     FHudStatusCaption();
@@ -192,7 +188,7 @@ public:
     void Draw() override;
 
     // FUN_004de0a0 (thiscall) -- rebuild Weapons, clamp WeaponTopRow and colour the visible
-    // rows (the active launcher's colour, pulsed under the cursor). Callers: Draw 0x004db326.
+    // rows (the active launcher's colour, pulsed under the cursor). Called by Draw.
     void RefreshWeaponRows();
 
     // WinControl slot 11 LAB_004db340 (this = the WinControl face) -- the session-flag and
@@ -201,22 +197,21 @@ public:
     void Update() override;
 
     // FUN_004dca20 (thiscall) -- show / hide and word the two special-mode captions for the
-    // turret view, the rear view, mouse flight and the tradelane. Callers: Update 0x004db397 /
-    // 0x004db3b6 / 0x004db54f, OnEvent.
+    // turret view, the rear view, mouse flight and the tradelane. Callers: Update, OnEvent.
     void UpdateSpecialModeCaptions();
 
     // FUN_004de2f0 (thiscall) -- the nanobot and shield-battery counts of the player's
     // DAT_00672960 list, capped at 999, into RepairCountText / BatteryCountText. Callers:
-    // Update 0x004db85b, OnEvent.
+    // Update, OnEvent.
     void UpdateRepairBatteryCounts();
 
     // FUN_004de3a0 (thiscall; this is not read) -- true when the player ship, out of cruise
     // and of a tradelane with behaviour byte +0x168 set, has loot (bucket 7) within 1000 m
-    // that it has cargo room for. Caller: Update 0x004db862.
+    // that it has cargo room for. Called by Update.
     bool IsLootInReach();
 
     // FUN_004ddeb0 (thiscall) -- RebuildWeaponList, clamp WeaponTopRow, fill and show up to 10
-    // rows from it, size the scroll bar, hide the rest. Callers: Update 0x004db88f, OnEvent.
+    // rows from it, size the scroll bar, hide the rest. Callers: Update, OnEvent.
     void ShowWeaponRows();
 
     // Event::Handler slot 0 LAB_004dba50 (this = the handler face at +0x384) -- the status
@@ -244,8 +239,8 @@ public:
     void TractorInAllLoot();
 
     // FUN_004dd9e0 (thiscall) -- rebuild Weapons from the player ship's launchers (mask 0xe0),
-    // ordered by SortKey, then by hardpoint name (DACOM stricmp). Callers: Create 0x004dafe2,
-    // 0x004ddeb8, FUN_004de0a0 0x004de0ad.
+    // ordered by SortKey, then by hardpoint name (DACOM stricmp). Callers: Create,
+    // ShowWeaponRows, RefreshWeaponRows.
     void RebuildWeaponList();
 
     // FUN_004dd730 (thiscall, RET 4) -- the DAT_00615240 row of the highest hp type the player
@@ -276,11 +271,11 @@ public:
     WinControl* BatteryCountText;  // +0x5b4 "BatteryCountText"
     unsigned char bUsingTradeLane;         // +0x5b8 ctor 0
     // +0x5b9: the turret view is up. Flipped by the space state's command switch (0x0054a655),
-    // not by OnEvent (its switch stops at 0xc1). Read by HUD_Steer::Render 0x004c870f,
-    // client_gameobj, UpdateSpecialModeCaptions and OnEvent 0xb7..0xba.
+    // not by OnEvent. Read by HUD_Steer::Render, client_gameobj, UpdateSpecialModeCaptions and
+    // OnEvent 0xb7..0xba.
     unsigned char bTurretView;
-    // +0x5ba: the rear view is up -- the key-down byte of the command record at 0x0054a70b,
-    // cleared by command 0x39 at 0x0054a752 (the same switch).
+    // +0x5ba: the rear view is up -- the key-down byte of the command record, cleared by
+    // command 0x39 (the same switch).
     unsigned char bRearView;
     unsigned char Pad5bb;
     WinControl* SpecialModeText;       // +0x5bc "SpecialModeText"
@@ -290,7 +285,7 @@ public:
     unsigned char bPendingExpandedSync;         // +0x5cc ctor 1
     unsigned char bDockingOrTradeLaneCaption;         // +0x5cd ctor 0
     unsigned char Pad5ce[2];
-    FHudStatusCaption Caption;     // +0x5d0 filled by FUN_004e8100 (Update 0x004db4b2)
+    FHudStatusCaption Caption;     // +0x5d0 filled by HudBuildObjectCaption (Update)
     WinControl* LootButton;        // +0x5d8 "LootButton"
     std::vector<FHudStatusHpRow> HpRowCache; // +0x5dc (retail VC6 vector)
 

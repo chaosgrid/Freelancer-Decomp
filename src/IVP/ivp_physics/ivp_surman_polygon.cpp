@@ -4,9 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// IVP_SurfaceManager_Polygon (ivp_surman_polygon.h). Traced against EXE\Disasm\Common.dll.txt
-// .text:0634a9b0-0634ad66 with retail's x87 rounding points (stack values double, every
-// `FSTP float ptr` a float).
+// IVP_SurfaceManager_Polygon (ivp_surman_polygon.h), retail 0634a9b0-0634ad66. x87 stack
+// values are double; each float store rounds.
 
 #include "ivp_surman_polygon.h"
 
@@ -21,7 +20,7 @@ namespace
 {
     void IVP_SurManPolygonAppendLedge(IVP_SurfaceManager_OutList* OutList, const IVP_Compact_Ledge* Ledge)
     {
-        // CMP [list+4],[list]; JL -> grow only when Count >= Capacity.
+        // Grow only when Count >= Capacity (signed).
         if (!(OutList->Count < OutList->Capacity))
             IVP_U_BigVector_Grow(OutList); // FUN_0635d3e0
         OutList->Elems[OutList->Count] = const_cast<IVP_Compact_Ledge*>(Ledge);
@@ -41,15 +40,12 @@ namespace
                                        IVP_SurfaceManager_OutList* OutList) const;
     };
 
-    // FUN_0634a9b0 (thiscall, RET 0x10).
-    //   d = node.center - observer (dx on the stack, dy/dz floats);
-    //   reach = r + node.radius; FCOMPP(reach^2, (dz*dz + dy*dy) + dx*dx); TEST AH,0x1; JNZ miss;
-    //   s = float(node.radius * 0.004f); per axis FCOMPP(box_sizes[k] * s + r, |d_k|);
-    //   TEST AH,0x41; JNZ miss -> the box must strictly exceed |d_k|.
-    //   A node with a ledge (terminal ledge or inner hull ledge) appends it and stops;
-    //   otherwise recurse left, continue right. A terminal node without a ledge offset
-    //   (:0634aafa) uses node + 0 as the ledge: two-triangle ledges must also pass
-    //   r^2 >= calc_qlen_PF_F_space(...) (TEST AH,0x1; JNZ miss), then it is appended.
+    // FUN_0634a9b0. d = node.center - observer (dx unrounded, dy/dz floats). Misses when
+    // reach^2 < |d|^2 or unordered, or when any box_sizes[k] * float(radius * 0.004f) + r
+    // does not strictly exceed |d_k|. A node with a ledge (terminal or inner hull ledge)
+    // appends it and stops; otherwise recurse left, continue right. A terminal node
+    // without a ledge offset (0634aafa) uses node + 0 as the ledge; a two-triangle ledge
+    // must also pass r^2 >= calc_qlen_PF_F_space(...).
     void FIVP_LedgeRadiusQuery::CollectLedgesWithinRadius(const IVP_Compact_Ledgetree_Node* Node, const float* Center,
                                                           float Radius, IVP_SurfaceManager_OutList* OutList) const
     {
@@ -106,7 +102,7 @@ IVP_SurfaceManager_Polygon::IVP_SurfaceManager_Polygon(const IVP_Compact_Surface
 {
 }
 
-// 0634ad60: `MOV [ECX],0639c2dc; JMP 0635d440` -- nothing but the vptr restores.
+// 0634ad60: only the vptr restores.
 IVP_SurfaceManager_Polygon::~IVP_SurfaceManager_Polygon()
 {
 }
@@ -135,7 +131,7 @@ float* IVP_SurfaceManager_Polygon::get_mass_center(float* OutVec3)
 // 0634acb0: d = sqrt((dz*dz + dy*dy) + dx*dx) with d = mass_center - center (stack);
 // *radius = float(d + upper_limit_radius);
 // *radius_dev = float(d + max_factor_surface_deviation * upper_limit_radius * 0.004f), the
-// deviation byte loaded through FILD qword (high dword zeroed at :0634acd0).
+// deviation byte loaded as a 64-bit integer.
 void IVP_SurfaceManager_Polygon::get_radius_and_radius_dev_to_given_center(void* Param1, void* Param2, void* Param3)
 {
     const IVP_U_Point* Center = static_cast<const IVP_U_Point*>(Param1);
@@ -207,7 +203,7 @@ void IVP_SurfaceManager_Polygon::insert_all_ledges_hitting_ray(void* Param1, voi
     RaySolverOs.check_ray_against_compact_surface(compact_surface);
 }
 
-// 06325390: XOR EAX,EAX; RET (IVP_SURMAN_POLYGON).
+// 06325390 (IVP_SURMAN_POLYGON).
 int32_t IVP_SurfaceManager_Polygon::get_type()
 {
     return 0;

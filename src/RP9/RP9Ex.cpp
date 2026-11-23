@@ -636,7 +636,7 @@ FRp9ExState::FRp9ExState()
 bool FDirectX9::ExWantsIntzDepth(D3DFORMAT AdapterFormat, D3DFORMAT DepthFormat)
 {
     // Only where INTZ keeps the picked bit depth: INTZ is 24-bit depth + 8-bit stencil. A D16
-    // or D32 choice keeps today's auto depth-stencil (and reports no scene depth).
+    // or D32 choice keeps the auto depth-stencil (and reports no scene depth).
     if (D3d_ == nullptr)
         return false;
     if (DepthFormat != D3DFMT_D24S8 && DepthFormat != D3DFMT_D24X8 &&

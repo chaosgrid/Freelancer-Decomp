@@ -94,11 +94,11 @@ struct FLoginHistory
 {
     FLoginHistory();
 
-    // FUN_005b62a0 (thiscall, returns AL = 1 on every path): the map cleared, then
+    // FUN_005b62a0 (true on every path): the map cleared, then
     // HKCU\<Freelancer>\MP\Logins\Login1, Login2, ... read until one fails to open.
     bool Load();
-    // FUN_005b67e0 (thiscall, returns AL = 1 on every path): every record written back as
-    // Login1..LoginN, then Login(N+1).. deleted until a delete fails.
+    // FUN_005b67e0 (true on every path): every record written back as Login1..LoginN, then
+    // Login(N+1).. deleted until a delete fails.
     bool Save();
     // FUN_005b6be0: lower_bound(Id); true when that node exists and its key is not greater.
     bool Contains(unsigned int Id) const;
@@ -106,10 +106,9 @@ struct FLoginHistory
     FLoginRecord& GetRecord(unsigned int Id);
     // FUN_005b6c40 (RET 4): operator[](CurrentId).Time = Time.
     void SetTime(unsigned int Time);
-    // FUN_005b6c60 (RET 4): operator[](CurrentId).Time. The argument is not read: retail
-    // pushes the history object itself (`PUSH ECX`, 0x005b6c60) as operator[]'s key pointer,
-    // so the key is the dword at +0x00, whatever Id the caller passed (005a9970 passes the
-    // server's Id).
+    // FUN_005b6c60 (RET 4): operator[](CurrentId).Time. Retail quirk: the argument is not read;
+    // the history object itself is pushed as operator[]'s key pointer, so the key is the dword
+    // at +0x00 whatever Id the caller passed.
     unsigned int GetTime(unsigned int IgnoredId);
 
     unsigned int CurrentId;         // +0x00 the last login's server Id (FUN_005a9440, 005a95c5)
@@ -256,8 +255,7 @@ public:
     unsigned char bCharacterInfoArrived;            // +0x1d4
     // +0x1d8 -- a copy of every NewChar [Faction] record (0x50 bytes each, FNewCharFaction,
     // common_newchar.h), rebuilt by ReloadFactions (FUN_005aade0); element copy FUN_005af120,
-    // destructor FUN_005af7f0. (Earlier notes called these list-server records; the GUN
-    // reader FUN_005ab590 never writes +0x1d8.)
+    // destructor FUN_005af7f0.
     std::vector<FNewCharFaction> Factions;          // +0x1d8
     wchar_t SelectCharacterName[24];                // +0x1e8 [Login] char (FUN_005ab3e0)
     float CharacterSelectTimeout;                              // +0x218 3000.0f (DAT_005e64cc)
@@ -285,10 +283,9 @@ extern long G_ConnectResult;         // DAT_0067ea50 (HandleConnectError)
 extern bool G_bWaitingForServer;     // DAT_0067ea54
 extern char G_LocalServerDll[32];    // .data:00615aec "Server.dll", [Freelancer] local_server
 
-// The LAN / INTERNET pick of TypeSelect's multiplayer prompt (0x00566d6b..0x00566d7a): the
-// first is set to 1, the second to (choice == INTERNET). Readers, none ported yet:
-// FUN_005ac2b0 (DAT_00615b18 set and no +0x7c -> CDPClient::EnumerateHosts),
-// FUN_005ab4c0 and 0x0056ec35 (DAT_00615b10).
+// The LAN / INTERNET pick of TypeSelect's multiplayer prompt: the first is set to 1, the second
+// to (choice == INTERNET). Read by PingServers (LAN enumeration), CreateGun and
+// PageServerSelect.
 extern unsigned char G_bEnumerateLanHosts;  // DAT_00615b18, initially 1
 extern unsigned char G_bInternetServerList; // DAT_00615b10, initially 1
 

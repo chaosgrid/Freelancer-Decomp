@@ -4,8 +4,6 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Retail CargoBarControl -- see cargo_bar_control.h for the class, its vftable and layout.
-
 #include "Interface/cargo_bar_control.h"
 
 #include "Common/Fonts/ids_strings.h"      // GetIdsStringWWithRawFallback (FUN_004347e0)
@@ -25,13 +23,11 @@
 #include <string.h>
 #include <wchar.h>
 
-// Retail WINFACTORY<CargoBarControl> "CargoBarControl" (ctor FUN_0055fcb0 from the static
-// initializer at 0x0055e90a; Create FUN_0055fd20).
 WINFACTORY<CargoBarControl> G_CargoBarControlFactory("CargoBarControl");
 
 namespace
 {
-    // DAT_00679b4c -- SetOrientation's lazily acquired 3DMathEngine (FUN_005b73e0, 0x0055f612).
+    // DAT_00679b4c -- SetOrientation's lazily acquired 3DMathEngine.
     I3DMathEngine* G_CargoBarMath = nullptr;
 
     void SetIdentity9(float* M)
@@ -48,12 +44,8 @@ namespace
     }
 } // namespace
 
-// The hover record Update builds on its stack (0x0055f703..0x0055f738 and the two
-// siblings): caption empty and Font::String constructed (FUN_004144b0) -- both done by the
-// FToolTipHoverInfo constructor -- then key -1, IdsAlt 0, FUN_00413df0(null, -1) on the
-// caption (a no-op on an empty caption), +0x44 = 0, +0x60 = 0. Retail leaves +0x48..+0x5f as
+// The start values after the FToolTipHoverInfo constructor. Retail leaves +0x48..+0x5f as
 // stack garbage; the port's constructor zeroes them.
-// NN_Inventory's SetProperty 0x4f builds the same record (0x00479dc4..0x00479dfd).
 void ToolTipHoverInit(FToolTipHoverInfo* Info)
 {
     Info->Ids = -1;
@@ -62,8 +54,7 @@ void ToolTipHoverInit(FToolTipHoverInfo* Info)
     Info->bLive = 0;
 }
 
-// FUN_004142a0(Length + 1) then wcsncpy + NUL (0x0055f75f..0x0055f788), the same as
-// FUN_00413df0(Text, -1) (0x0055f943) on the empty caption.
+// FUN_004142a0(Length + 1) then wcsncpy + NUL.
 void ToolTipHoverSetCaption(FToolTipHoverInfo* Info, wchar_t const* Text)
 {
     unsigned const Length = static_cast<unsigned>(wcslen(Text));
@@ -85,11 +76,8 @@ void ToolTipHoverSetCaption(FToolTipHoverInfo* Info, wchar_t const* Text)
     Info->CaptionW[Length] = L'\0';
 }
 
-// FUN_00444ee0 (the record's destructor, 0x00444ee0..0x00444f8f; inlined at
-// 0x0055f7bd..0x0055f7ee / 0x0055f985..0x0055f9d5): members in reverse -- the Font::String at
-// +0x10 (FUN_00444e50 inlined: FUN_004144f0, the child vector, the text buffer), then the
-// caption buffer at +0x08 (FUN_00444e20 inlined: free, +0x08 / +0x0c zeroed). Runs as
-// ~FToolTipHoverInfo (tooltip_hover.h), so the stack records below need no teardown call.
+// FUN_00444ee0, the record's destructor: the Font::String at +0x10, then the caption buffer at
+// +0x08. Runs as ~FToolTipHoverInfo, so the stack records below need no teardown call.
 void ToolTipHoverDestroy(FToolTipHoverInfo* Info)
 {
     FontStringDestroy(&Info->Text);
@@ -104,8 +92,7 @@ void ToolTipHoverDestroy(FToolTipHoverInfo* Info)
 namespace
 {
 
-    // One filled quad in the current colour: (X0, Y0) .. (X0 + Width, Y0 + Height), z = 0, the
-    // vertex order of every quad in Draw (FUN_00421670(8), four FUN_00421cc0, FUN_00421690).
+    // One filled quad in the current colour, z = 0, in the vertex order of every quad in Draw.
     void DrawBarQuad(float X0, float Y0, float Width, float Height)
     {
         Win3DBegin(kWin3DQuads);
@@ -141,7 +128,7 @@ CargoBarControl::CargoBarControl()
     ToolTip2Ids = 0;
     bBorder = 1;
     bShow = 1;
-    // 0055e9bb..0055e9cf: after the vptrs, the segment colour becomes 0xff,0xff,0,0xff.
+    // After the vptrs the segment colour becomes 0xff,0xff,0,0xff.
     HighlightColor[2] = 0;
     HighlightColor[0] = 0xff;
     HighlightColor[1] = 0xff;
@@ -152,19 +139,18 @@ CargoBarControl::CargoBarControl()
 
 int CargoBarControl::GetHitPriority()
 {
-    // LAB_0055e9e0: MOV EAX,0x64 / RET.
+    // LAB_0055e9e0.
     return 0x64;
 }
 
 void CargoBarControl::RefreshAttachment()
 {
-    // Slot 35 is FUN_00401e90 (RET): the bar does not re-attach to a hardpoint.
+    // FUN_00401e90 (empty): the bar does not re-attach to a hardpoint.
 }
 
 void CargoBarControl::GetAttachOrientation(float* OutOrientation9)
 {
-    // LAB_0055ea20 (RET 4): the attach orientation +0x2f8 while the parent is a WinControl,
-    // else identity. The out pointer is also the return value (EAX); the port's slot is void.
+    // LAB_0055ea20 (RET 4). Retail also returns the out pointer; the port's slot is void.
     float Identity[9];
     SetIdentity9(Identity);
     float const* Source = Identity;
@@ -175,7 +161,7 @@ void CargoBarControl::GetAttachOrientation(float* OutOrientation9)
 
 void CargoBarControl::GetAttachPosition(float* OutPosition3)
 {
-    // FUN_0055eaf0 (RET 4): +0x31c while the parent is a WinControl, else zero.
+    // FUN_0055eaf0 (RET 4).
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
     {
         OutPosition3[0] = AttachPosition[0];
@@ -190,21 +176,19 @@ void CargoBarControl::GetAttachPosition(float* OutPosition3)
 
 bool CargoBarControl::Create(Win3D* NewParent, void* Data)
 {
-    // LAB_0055eb40 (RET 8): Win3D's Create (FUN_004b5060(NewParent, 0)), then the INI keys.
+    // LAB_0055eb40 (RET 8): Win3D's Create, then the INI keys.
     bool const bResult = Win3D::Create(NewParent, nullptr);
     INI_Reader* const Ini = static_cast<INI_Reader*>(Data);
     if (Ini == nullptr || !bResult)
         return bResult;
 
-    // 0055eb6e / 0055ee54: read_value at the top and at the bottom of the loop.
     while (Ini->read_value())
     {
         if (Ini->is_value("mesh"))
         {
-            // 0055eb93: slot 38 (get_value_string(), 0).
             SetMesh(Ini->get_value_string(), 0);
         }
-        // 0055eba9: "offset" is tested even after "mesh" matched.
+        // "offset" is tested even after "mesh" matched.
         if (Ini->is_value("offset"))
         {
             float const Y = static_cast<float>(Ini->get_value_float(1));
@@ -217,9 +201,7 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
         }
         if (Ini->is_value("hardpoint"))
         {
-            // 0055ec12..0055ec5b: identity attach orientation (FUN_004215b0), zero attach
-            // position, then the NEW parent's slot 36 (value, &+0x2f8). Neither +0x1d0 nor
-            // +0x328 is written.
+            // The NEW parent's hardpoint; neither +0x1d0 nor +0x328 is written.
             SetIdentity9(AttachOrientation);
             AttachPosition[2] = 0.0f;
             AttachPosition[1] = 0.0f;
@@ -244,7 +226,6 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
         }
         if (Ini->is_value("horizontal"))
         {
-            // 0055ecd9: FCOMP 0.0 (DAT_005c8ba8), TEST AH,0x44 / JNP -> equal gives 0.
             bHorizontal = (Ini->get_value_float(0) != 0.0) ? 1 : 0;
             continue;
         }
@@ -255,14 +236,13 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
         }
         if (Ini->is_value("tooltip2"))
         {
-            ToolTip2Ids = static_cast<int>(Ini->get_value_float(0)); // ftol
+            ToolTip2Ids = static_cast<int>(Ini->get_value_float(0));
             bToolTip = 1;
             continue;
         }
         if (Ini->is_value("color"))
         {
-            // 0055ed7b..0055eddf: components 2, 1, 0 are read first, then 3; each is ftol'd to
-            // a byte of the dword stored at +0x340.
+            // Components 2, 1, 0 are read first, then 3.
             double const V2 = Ini->get_value_float(2);
             double const V1 = Ini->get_value_float(1);
             double const V0 = Ini->get_value_float(0);
@@ -276,7 +256,6 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
         }
         if (Ini->is_value("color_highlight"))
         {
-            // 0055ede1..0055ee4c: the same into +0x344.
             double const V2 = Ini->get_value_float(2);
             double const V1 = Ini->get_value_float(1);
             double const V0 = Ini->get_value_float(0);
@@ -296,13 +275,12 @@ void CargoBarControl::Init(char const* MeshPath, float const* NewOffset, char co
                            int NewToolTip2Ids, unsigned NewColor, unsigned NewHighlightColor)
 {
     // FUN_0055ee80 (RET 0x20).
-    SetMesh(MeshPath, 0);               // slot 38 (MeshPath, 0)
-    Offset[0] = NewOffset[0];           // +0xa8
+    SetMesh(MeshPath, 0);
+    Offset[0] = NewOffset[0];
     Offset[1] = NewOffset[1];
     Offset[2] = NewOffset[2];
     if (Hardpoint != nullptr)
     {
-        // 0055eeba..0055eefe: identity + zero attach, then the parent's slot 36.
         SetIdentity9(AttachOrientation);
         AttachPosition[2] = 0.0f;
         AttachPosition[1] = 0.0f;
@@ -314,14 +292,14 @@ void CargoBarControl::Init(char const* MeshPath, float const* NewOffset, char co
                 ParentControl->GetHardpointTransform(Hardpoint, AttachOrientation);
         }
     }
-    HalfExtents[0] = NewHalfExtents[0]; // +0xb4
+    HalfExtents[0] = NewHalfExtents[0];
     HalfExtents[1] = NewHalfExtents[1];
     HalfExtents[2] = NewHalfExtents[2];
-    bHorizontal = bNewHorizontal;       // +0x348
-    ToolTip2Ids = NewToolTip2Ids;       // +0x32c
-    bToolTip = (NewToolTip2Ids != 0) ? 1 : 0; // +0x34a
-    memcpy(Color, &NewColor, sizeof(Color));                    // +0x340
-    memcpy(HighlightColor, &NewHighlightColor, sizeof(HighlightColor)); // +0x344
+    bHorizontal = bNewHorizontal;
+    ToolTip2Ids = NewToolTip2Ids;
+    bToolTip = (NewToolTip2Ids != 0) ? 1 : 0;
+    memcpy(Color, &NewColor, sizeof(Color));
+    memcpy(HighlightColor, &NewHighlightColor, sizeof(HighlightColor));
 }
 
 void CargoBarControl::Draw()
@@ -330,34 +308,33 @@ void CargoBarControl::Draw()
     if (bShow == 0)
         return;
 
-    WinControl::Draw(); // FUN_005a0760
+    WinControl::Draw();
 
-    // 0055ef7c..0055efd0: model-view = orientation with position + offset.
     float Matrix[12];
     memcpy(Matrix, Orientation, 9 * sizeof(float));
     Matrix[9] = Position[0] + Offset[0];
     Matrix[10] = Position[1] + Offset[1];
     Matrix[11] = Position[2] + Offset[2];
     Win3DBindModelview(nullptr, Matrix);
-    Win3DDisable(kWin3DTexture2D); // FUN_00421ed0(0xde1)
-    Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
+    Win3DDisable(kWin3DTexture2D);
+    Win3DDisable(kWin3DDepthTest);
 
     unsigned char Chrome[4];
-    memcpy(Chrome, G_HudChromeColorRgba, sizeof(Chrome)); // DAT_00679bb4
+    memcpy(Chrome, G_HudChromeColorRgba, sizeof(Chrome));
     unsigned char Segment[4];
     memcpy(Segment, HighlightColor, sizeof(Segment));
 
-    // 0055efe9: FCOMP 0.0, TEST AH,0x44 / JNP -> nothing but the border when Capacity == 0.
+    // Nothing but the border when Capacity == 0.
     if (Capacity != 0.0f)
     {
-        float const Width2 = HalfExtents[0] + HalfExtents[0];  // +0xb4 doubled
-        float const Height2 = HalfExtents[1] + HalfExtents[1]; // +0xb8 doubled
+        float const Width2 = HalfExtents[0] + HalfExtents[0];
+        float const Height2 = HalfExtents[1] + HalfExtents[1];
 
         if (bHorizontal != 0)
         {
             if (Width2 != 0.0f)
             {
-                // 0055f052..0055f10c: the head segment from the left edge.
+                // The head segment from the left edge.
                 float HeadLength = 0.0f;
                 if (HeadSegment != 0.0f)
                 {
@@ -366,7 +343,8 @@ void CargoBarControl::Draw()
                     DrawBarQuad(-HalfExtents[0], -HalfExtents[1], HeadLength, Height2);
                 }
 
-                // 0055f111..0055f1e3: Used and the tail segment, which ends at Used.
+                // The tail segment ends at Used. Unlike the head, it scales through a double
+                // reciprocal, as retail.
                 double const Inverse = 1.0 / Capacity;
                 float const UsedLength = static_cast<float>(Inverse * Used * Width2);
                 float TailLength = 0.0f;
@@ -378,7 +356,6 @@ void CargoBarControl::Draw()
                     DrawBarQuad(TailStart, -HalfExtents[1], TailLength, Height2);
                 }
 
-                // 0055f1ec..0055f4d1: the fill between the two segments in +0x340.
                 float const FillLength = UsedLength - HeadLength - TailLength;
                 Win3DColor4ub(Color[0], Color[1], Color[2], Color[3]);
                 DrawBarQuad(HeadLength - HalfExtents[0], -HalfExtents[1], FillLength, Height2);
@@ -386,7 +363,7 @@ void CargoBarControl::Draw()
         }
         else if (Height2 != 0.0f)
         {
-            // 0055f283..0055f4d1: the same bottom-up along y, full width across.
+            // The same bottom-up along y, full width across.
             float HeadLength = 0.0f;
             if (HeadSegment != 0.0f)
             {
@@ -412,7 +389,6 @@ void CargoBarControl::Draw()
         }
     }
 
-    // 0055f4d6..0055f57d: the border, a line loop in the HUD chrome colour.
     if (bBorder != 0)
     {
         Win3DColor4ub(Chrome[0], Chrome[1], Chrome[2], Chrome[3]);
@@ -424,14 +400,14 @@ void CargoBarControl::Draw()
         Win3DEnd();
     }
 
-    Slot39(); // 0055f586 CALL [EDX + 0x9c]
+    Slot39();
 }
 
 void CargoBarControl::SetPosition(float const* NewPosition)
 {
-    // LAB_0055f5a0 (RET 4): WinControl's FUN_005a0880 with the attach position added.
+    // LAB_0055f5a0 (RET 4): WinControl's with the attach position added.
     float Attach[3];
-    GetAttachPosition(Attach); // slot 41
+    GetAttachPosition(Attach);
     float Placed[3];
     Placed[0] = Attach[0] + NewPosition[0];
     Placed[1] = Attach[1] + NewPosition[1];
@@ -441,10 +417,9 @@ void CargoBarControl::SetPosition(float const* NewPosition)
 
 void CargoBarControl::SetOrientation(float const* NewOrientation)
 {
-    // LAB_0055f5f0 (RET 4): MulMatrix(&Local, NewOrientation, attach orientation) through the
-    // cached 3DMathEngine, then WinControl's FUN_005a0950 on a copy.
+    // LAB_0055f5f0 (RET 4): WinControl's on NewOrientation * the attach orientation.
     float Attach[9];
-    GetAttachOrientation(Attach); // slot 40
+    GetAttachOrientation(Attach);
     if (G_CargoBarMath == nullptr)
         G_CargoBarMath = Acquire3DMathEngine();
     FMatrix Product;
@@ -462,9 +437,9 @@ void CargoBarControl::Update()
     {
         if (ToolTip2Ids != 0)
         {
-            // 0055f6a9..0055f7c2: "<IDS> used/capacity", keyed by this control.
-            int const UsedCount = static_cast<int>(Used);      // ftol +0x334
-            int const CapacityCount = static_cast<int>(Capacity); // ftol +0x330
+            // "<IDS> used/capacity", keyed by this control.
+            int const UsedCount = static_cast<int>(Used);
+            int const CapacityCount = static_cast<int>(Capacity);
             wchar_t Name[0x100];
             GetIdsStringWWithRawFallback(static_cast<unsigned>(ToolTip2Ids), Name, 0xff);
             wchar_t Text[0x100];
@@ -478,7 +453,7 @@ void CargoBarControl::Update()
         }
         else if (ToolTipIds != 0)
         {
-            // 0055f7f8..0055f891: the plain tooltip id, which is also the record's key.
+            // The plain tooltip id, which is also the record's key.
             FToolTipHoverInfo Info;
             ToolTipHoverInit(&Info);
             Info.IdsAlt = ToolTipIds;
@@ -487,7 +462,7 @@ void CargoBarControl::Update()
         }
         else
         {
-            // 0055f89e..0055f9d5: "used/capacity", keyed by this control.
+            // "used/capacity", keyed by this control.
             int const UsedCount = static_cast<int>(Used);
             int const CapacityCount = static_cast<int>(Capacity);
             wchar_t Text[0x100];
@@ -501,12 +476,12 @@ void CargoBarControl::Update()
         }
     }
 
-    Win3D::Update(); // FUN_005a17b0
+    Win3D::Update();
 }
 
 void CargoBarControl::MouseEnter(float const* Ray)
 {
-    // FUN_0055fa00 (RET 4): +0x349 = 1, then the parent WinControl hears 0x2c with this.
+    // FUN_0055fa00 (RET 4): the parent WinControl hears 0x2c with this.
     (void)Ray;
     bHovered = 1;
     if (Parent == nullptr)
@@ -519,7 +494,7 @@ void CargoBarControl::MouseEnter(float const* Ray)
 
 void CargoBarControl::MouseLeave(float const* Ray)
 {
-    // FUN_0055fa40 (RET 4): +0x349 = 0, then 0x2d to the parent.
+    // FUN_0055fa40 (RET 4).
     (void)Ray;
     bHovered = 0;
     if (Parent == nullptr)
@@ -532,9 +507,8 @@ void CargoBarControl::MouseLeave(float const* Ray)
 
 bool CargoBarControl::HitTest(float const* Ray)
 {
-    // LAB_0055fa80 (RET 4): the +0xb4 box at orientation / position + offset (FUN_005a1130).
-    // Unlike WinControl's FUN_005a0340 there is no instance transform, no hit offset and no
-    // parent notification.
+    // LAB_0055fa80 (RET 4). Unlike WinControl's there is no instance transform, no hit offset
+    // and no parent notification.
     float Matrix[12];
     memcpy(Matrix, Orientation, 9 * sizeof(float));
     Matrix[9] = Position[0] + Offset[0];
@@ -549,7 +523,6 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     switch (Msg)
     {
     case 1:
-        // caseD_1: A ? hide : show.
         if (A != 0)
             Flags = static_cast<unsigned char>(Flags & 0xfc);
         else
@@ -575,7 +548,7 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         memcpy(Color, &A, sizeof(Color));
         break;
     case 0x40:
-        // FILD qword with a zero high dword: the arguments are unsigned.
+        // The arguments convert as unsigned.
         Capacity = static_cast<float>(static_cast<unsigned>(A));
         Used = static_cast<float>(static_cast<unsigned>(B));
         break;
@@ -595,7 +568,7 @@ WinControl* WinControl::CreateCargoBarControl(char const* Name, char const* Mesh
                                               unsigned char bHorizontal, int ToolTip2Ids,
                                               unsigned Color, unsigned HighlightColor)
 {
-    // FUN_005a1080 (RET 0x24): FUN_0059db20(Name, "CargoBarControl", this, 0), then Init.
+    // FUN_005a1080 (RET 0x24).
     Win3D* const Created = WinFactoryCreate(Name, "CargoBarControl", this, nullptr);
     if (Created != nullptr)
     {

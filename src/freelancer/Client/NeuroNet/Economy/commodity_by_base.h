@@ -22,7 +22,7 @@
 // + wcsncpy) and freed with free() (FUN_0046fa50); the port keeps std::wstring.
 //
 // NN_Inventory opens the window with the selected commodity's archetype (its "trade routes"
-// button, 0x0047a9bb); a row click closes it and hands the row's space object to the nav map
+// button); a row click closes it and hands the row's space object to the nav map
 // (FUN_004a2aa0).
 
 #include "common_text.h" // RenderDisplayList
@@ -76,21 +76,15 @@ struct FCommodityByBaseRowControls
 
 // Retail NN_CommodityByBase (RTTI .?AVNN_CommodityByBase@@ : WinControl, Event::Handler).
 //
-// WINFACTORY<NN_CommodityByBase> DAT_0066dacc "NN_CommodityByBase": static init LAB_0046ed70
-// (FUN_00470720 + atexit LAB_0046ed90 -> FUN_00579380), Create FUN_00470790
-// (operator_new(0x424), WinControl ctor FUN_0059f860, the vptrs, no field written, slot 9).
+// WINFACTORY<NN_CommodityByBase> DAT_0066dacc: static init LAB_0046ed70, Create FUN_00470790
+// (operator_new(0x424)).
 //
-// vftable 0x005d027c (45 slots) -- WinControl's with these overrides:
-//   0 FUN_00470850 (scalar deleting dtor around FUN_00470870: FUN_00576010 on +0x32c, then
-//     FUN_0059fa50 -- the two base destructors), 9 FUN_0046ef80 Create, 11 LAB_0046fd20 Update,
-//   42 LAB_0046f550 SetProperty.
-// IDataViewOwner face +0x7c vftable 0x005d026c; Event::Handler face +0x32c vftable 0x005d0264
-// (FUN_0046ffe0).
+// vftable 0x005d027c (45 slots), scalar deleting dtor FUN_00470850. IDataViewOwner face +0x7c
+// vftable 0x005d026c; Event::Handler face +0x32c vftable 0x005d0264.
 class NnCommodityByBase : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_00470790: WinControl's ctor and the vptrs; no member is written before
-    // Create, so none is here.
+    // Inlined into FUN_00470790; no member is written before Create.
     NnCommodityByBase();
     // FUN_00470870 -- only the base destructors.
     ~NnCommodityByBase() override;

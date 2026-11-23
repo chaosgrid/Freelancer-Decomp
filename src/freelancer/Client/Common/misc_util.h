@@ -46,19 +46,18 @@ void FormatGroupedNumber(wchar_t* Out, int Value, int PrefixIds);
 wchar_t const* MiscUtilLoadIdsCopy(wchar_t** Out, unsigned Ids);
 
 // FUN_0041c7e0 (cdecl) -- open File as a "UTF" file system, load every texture below its
-// "Texture library" node (DALib::TextureLib slot 5) and return the texture group id. Callers:
-// FUN_00557550 (fx\efx.txm), 0x0045f56a.
+// "Texture library" node (DALib::TextureLib slot 5) and return the texture group id. Used by
+// FUN_00557550 for fx\efx.txm.
 int MiscUtilLoadTextureLibrary(char const* File);
 
 // FUN_0041c830 (cdecl) -- DALib::TextureLib slot 7 on Group: release a group
-// MiscUtilLoadTextureLibrary loaded. Callers: 0x0045e426, 0x0046c7b6.
+// MiscUtilLoadTextureLibrary loaded.
 void MiscUtilReleaseTextureLibrary(int Group);
 
 // FUN_0041c850 (cdecl) -- open File as a file system (implementation 0), load its material
 // library into a new group (DALib::MaterialLib slot 8), apply-verify it at 1.0 (slot 11) and
 // resolve its textures (slot 12); returns the group id (-1 when the load wrote none). Released
-// with MaterialLib slot 10 (DeleteGroup). Callers: NN_MissionVendor::Create 0x0048bb7f,
-// 0x004a4597.
+// with MaterialLib slot 10 (DeleteGroup). Used by NN_MissionVendor::Create.
 int MiscUtilLoadMaterialLibrary(char const* File);
 
 // FUN_0041c540 (cdecl, 7 arguments) -- create an engine instance of the .cmp/.3db File.
@@ -81,6 +80,6 @@ struct ICamera;
 // FUN_0041c8d0 (cdecl) -- the sphere (Center, Radius) through the camera's view transform
 // (ICamera slot 16) with 3DMathEngine TransformXform (the file's DAT_00616720, acquired on
 // first use), then ICamera slot 15 ClassifySphere; true when it answers 3 or more (straddle or
-// inside). Callers: CharacterObject::DrawOpaque (0x004451d6) and the LightsCamera particle draw
-// FUN_005574d0 (0x00557527).
+// inside). Callers: CharacterObject::DrawOpaque and the LightsCamera particle draw
+// FUN_005574d0.
 bool MiscUtilSphereInView(ICamera* Camera, float const* Center, float Radius);

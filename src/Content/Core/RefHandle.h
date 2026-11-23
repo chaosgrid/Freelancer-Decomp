@@ -10,10 +10,9 @@
 // guides, guide descriptions: slot 0 AddRef, slot 1 Release). Retail inlines it as a member
 // or local whose copy AddRefs (e.g. FUN_06f21fd0) and whose destructor / unwind step Releases
 // when set (FUN_06f28e10, FUN_06fa0330). The port holds such members and locals in this type
-// so the release runs in the same member / local order and on the exception path (AGENTS.md
-// RE rule 13). A raw-pointer assignment does not touch the count: retail's inlined code around
-// the handle does its own AddRef / Release, and the port's callers keep doing the same.
-// Lane CNT-AI added it; any lane may use it.
+// so the release runs in the same member / local order and on the exception path. A
+// raw-pointer assignment does not touch the count: retail's inlined code around the handle
+// does its own AddRef / Release, and the port's callers keep doing the same.
 
 template <typename T>
 class TRefHandle

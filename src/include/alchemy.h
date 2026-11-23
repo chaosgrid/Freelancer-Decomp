@@ -8,15 +8,12 @@
 
 #include "dacom.h"
 
-// alchemy.dll public ABI. Source: EXE/Disasm/alchemy.dll, docs/re/alchemy.md.
-// Internal node implementations, particle pools and .ale chunks stay in src/alchemy/.
-// The shared node-library contract is declared here and inherited by IAlchemy.
+// alchemy.dll public ABI (docs/re/alchemy.md). Internal node implementations, particle pools
+// and .ale chunks stay in src/alchemy/.
 //
-// These are declared at GLOBAL scope on purpose. DALib exports ::IAlchemy* / ::IFxRuntime* /
-// ::IFxEffectLibrary* (the mangled names retail uses, see src/include/DALib.h), while alchemy
-// declared the same interfaces inside namespace AlchemyImpl -- two unrelated types with one
-// name, which is why consumers could only ever call them by raw slot number. alchemy_types.h
-// now pulls these into AlchemyImpl with using-declarations, so both sides mean one type.
+// Declared at global scope on purpose: DALib exports ::IAlchemy* / ::IFxRuntime* /
+// ::IFxEffectLibrary* under the retail mangled names; alchemy_types.h pulls these into
+// AlchemyImpl with using-declarations so both sides mean one type.
 
 struct IFxEffect;
 struct IFileSystem;
@@ -48,9 +45,8 @@ struct IFxEffectArchetype : IDAComponent
     virtual GENRESULT DACOM_API SetRec16Parent(unsigned long Id, unsigned long Value) = 0; // 8  +0x20 LAB_0621e950 RET 0xC
     virtual GENRESULT DACOM_API AddRec8(const FAleRec8* Rec) = 0;                // 9  +0x24 FUN_0621e990 RET 8
     virtual GENRESULT DACOM_API RemoveRec8(const FAleRec8* Rec) = 0;             // 10 +0x28 FUN_0621eb70 RET 8
-    // 11/12: retail LAB_06220e40 / LAB_06220e60 are thiscall (RET 0). No retail DLL is loaded,
-    // so the convention only has to agree between our caller and callee: DACOM_API like every
-    // other interface method (AGENTS.md), as done for IMatAnimLibrary 3-6.
+    // 11/12: retail is thiscall (RET 0). No retail DLL is loaded, so the port uses DACOM_API
+    // like every other interface method (as for IMatAnimLibrary 3-6).
     virtual unsigned long DACOM_API GetRec16Count() = 0;               // 11 +0x2C LAB_06220e40
     virtual unsigned long DACOM_API GetRec8Count() = 0;                // 12 +0x30 LAB_06220e60
     virtual GENRESULT DACOM_API GetRec16(unsigned long Index, FAleRec16* Out) = 0; // 13 +0x34 LAB_0621ec80 RET 0xC
@@ -66,7 +62,6 @@ struct IFxEffectArchetype : IDAComponent
 };
 
 // Node-library contract shared by the standalone component and IAlchemy.
-// The port keeps its existing COM prefix and method indices; all DLLs use this declaration.
 using FNodeLibraryEnumCallback = int(__cdecl*)(IDAComponent* Node, void* Context);
 
 struct IFxNodeLibrary : IDAComponent
@@ -85,7 +80,7 @@ struct IFxNodeLibrary : IDAComponent
     virtual GENRESULT DACOM_API FindNodeByHash(unsigned long Hash, IDAComponent** Out) = 0; // 12 RET 0xC
 };
 
-// IAlchemy retains the same slots 0–40; slots 3–12 are inherited unchanged.
+// IAlchemy slots 0-40; slots 3-12 come from IFxNodeLibrary.
 struct IAlchemy : IFxNodeLibrary
 {
     virtual GENRESULT DACOM_API CreateVertexBuffer() = 0;                       // 13 RET 4
@@ -120,7 +115,7 @@ struct IAlchemy : IFxNodeLibrary
 
 // The mesh appearance's instance object. Retail's only implementation is freelancer.exe's
 // FLFxMesh (RTTI `FLFxMesh : IFxMesh`, vtable 005d98ec); alchemy.dll consumes it. Slot names are
-// not recovered -- each comment says what FLFxMesh does in that slot. Arity from RET imm16.
+// inferred from what FLFxMesh does in each slot; arity from RET imm16.
 struct IFxMesh : IDAComponent
 {
     virtual GENRESULT DACOM_API SetTransform(void* Transform) = 0; // +0x0C LAB_004f6910 RET 8: IEngine::SetInstanceMatrix
@@ -191,7 +186,7 @@ struct IFxEffect : IDAComponent
     virtual GENRESULT DACOM_API FindNodeById(void* A, void* B) = 0;    // LAB_0621fa40 RET 0xC
     virtual GENRESULT DACOM_API IsFinished(void* Arg) = 0;             // LAB_0621fa80 RET 8
     virtual GENRESULT DACOM_API EnumerateNodes(void* A, void* B) = 0;  // LAB_0621fb50 RET 0xC
-    virtual GENRESULT DACOM_API DestroyNodes(void* Arg) = 0;           // formerly Slot13; FUN_0621fba0 RET 8 (destroy/free effect nodes by mask: 1=emitters, 2=fields, 4=appearances, 7=all)
+    virtual GENRESULT DACOM_API DestroyNodes(void* Arg) = 0;           // FUN_0621fba0 RET 8: free nodes by mask 1=emitters, 2=fields, 4=appearances, 7=all
     virtual GENRESULT DACOM_API SetLodInput(float LodInput) = 0;            // LAB_0621f850 RET 8: node +0x88
     virtual GENRESULT DACOM_API GetBoundingSphere(void* Arg) = 0;      // LAB_0621f880 RET 8
     virtual GENRESULT DACOM_API GetBoundComponent(void** Out) = 0;     // 16 LAB_0621fd00 RET 8

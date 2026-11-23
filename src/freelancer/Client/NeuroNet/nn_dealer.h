@@ -10,12 +10,10 @@
 // equipment / commodity / ship dealer window. It is opened next to an NN_Inventory (its +0x974),
 // which points back at it through its own +0x360.
 //
-// WINFACTORY<NN_Dealer> "NN_Dealer": static init FUN_004857f0 (WinFactory head) with vftable
-// 0x005d1d28; Create FUN_00485860 (operator_new(0xa00), FUN_0047fbe0, then slot 9).
+// WINFACTORY<NN_Dealer> "NN_Dealer": static init FUN_004857f0, Create FUN_00485860.
 //
-// vftable 0x005d192c (47 slots) -- NN_Inventory's with these overrides:
-//   11 FUN_0047fef0 Update     42 FUN_004822a0 SetProperty     45 FUN_00480d10 build the controls
-// Slot 0 is NN_Inventory's FUN_0047fd30: NN_Dealer adds no destructor of its own.
+// vftable 0x005d192c (47 slots), NN_Inventory's with slots 11, 42 and 45 overridden; scalar
+// deleting dtor NN_Inventory's FUN_0047fd30 (NN_Dealer adds no destructor of its own).
 //
 // Retail layout (size 0xa00): NN_Inventory's 0x974 bytes, then the members below.
 
@@ -55,9 +53,8 @@ public:
     // purchase controls from the two windows' selections.
     void Update() override;
 
-    // slot 42 FUN_004822a0 (RET 0xc) -- a switch over 0x15..0x45 (byte table 0x00482a5c):
-    // hardpoint picks and drops, the sliders, the quantity edit and the clicks; 0x2c / 0x2d go
-    // to NN_Inventory's SetProperty, every other message returns 0 (WinControl's slot 42 is
+    // slot 42 FUN_004822a0 -- a switch over 0x15..0x45: hardpoint picks and drops, the sliders,
+    // the quantity edit and the clicks; 0x2c / 0x2d go to NN_Inventory's SetProperty, every other message returns 0 (WinControl's slot 42 is
     // never called).
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
@@ -140,7 +137,7 @@ public:
     WinControl* WelcomeLine;         // +0x998 "WelcomeLine"
     WinControl* WelcomeHelp;         // +0x99c "WelcomeHelp"
     // +0x994..+0x9f0: the controls CreateControls (FUN_00480d10) creates; the names are the retail
-    // control names it passes to the factory (stores at 0x00481339..0x00481ffa).
+    // control names it passes to the factory.
     WinControl* BuyText;             // +0x9a0 "BuyText"
     WinControl* BuyArrow;            // +0x9a4 "BuyArrow"
     WinControl* SellText;            // +0x9a8 "SellText"

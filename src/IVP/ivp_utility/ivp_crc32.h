@@ -9,15 +9,13 @@
 // ============================================================================
 // The IVP hash containers' CRC-32 table (retail .data:DAT_063edcdc, the
 // reflected IEEE 802.3 table, polynomial 0xEDB88320). Retail keeps it as
-// initialised data; the port fills it once at load time from a dynamic
-// initializer in ivp_vhash.cpp (g_Crc32Table_063edcdc_init). Nothing reads it
-// during static initialisation, so its load-time order is irrelevant; the
-// TU still sits where common_stubs.cpp used to (first in Common.vcxproj).
+// initialised data; the port fills it at load time from a dynamic initializer
+// in ivp_vhash.cpp (g_Crc32Table_063edcdc_init). Nothing reads it during
+// static initialisation, so the order does not matter.
 //
 // Users: IVP_VHash_Store and IVP_VHash_HashPointer (ivp_vhash.cpp), IVP_Hash
 // (ivp_hash.cpp), IVP_U_Active_Value_Hash::GetHashIndex (ivp_active_value.cpp).
-// ivp_ov_element.cpp still builds its own identical copy (g_OvCrc32Table);
-// merging the two is a separate, behaviour-neutral cleanup.
+// ivp_ov_element.cpp builds its own identical copy (g_OvCrc32Table).
 // ============================================================================
 
 extern unsigned g_Crc32Table_063edcdc[256];

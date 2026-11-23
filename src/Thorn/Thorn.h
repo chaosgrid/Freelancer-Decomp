@@ -23,7 +23,6 @@ static const unsigned long G_FactoryIidCompareBytes = 0x17; // "1.11_IComponentF
 static const unsigned long G_AggDescSizeThorn = 0x14;
 static const unsigned long G_AggDescSizeMath = 0xC;
 
-// x86math.h's FVector, which Thorn and SoundManager each used to redeclare.
 typedef FVector FVec3;
 
 struct FQuat
@@ -58,18 +57,15 @@ static_assert(sizeof(FThornAggDesc14) == 0x14, "Thorn creation descriptor size")
 // IScriptEngine object (+0x108 / +0x10c), built by the factories
 // LAB_06f37400 / LAB_06f3f4c0:
 //   * every public facet's QueryInterface/AddRef/Release is a pure forward to
-//     the controlling unknown (FUN_06f378d0/e0/f0, FUN_06f3f7a0/c0/e0:
-//     `MOV EAX,[this+0x70]; JMP [[EAX]+slot]`);
+//     the controlling unknown (FUN_06f378d0/e0/f0, FUN_06f3f7a0/c0/e0);
 //   * the controlling unknown is Desc->Outer when the caller aggregates,
 //     otherwise the object's own embedded {vtbl, RefCount=1, Owner} triple;
 //   * that triple's vtable (PTR_LAB_06f5abc8 / PTR_LAB_06f5b004) is the
 //     NON-delegating implementation: QI (LAB_06f377c0 / LAB_06f3f690) walks
 //     the IID table and AddRefs the facet through the facet's own
-//     (delegating) vtbl+4; AddRef (LAB_06f37880 / LAB_06f3f750) is
-//     `return ++RefCount`; Release (LAB_06f37890 / LAB_06f3f760) is a
-//     saturating decrement that, on reaching zero, parks RefCount at 1,
-//     runs the owner's destructor + free through the Owner back-pointer
-//     and returns 0.
+//     (delegating) AddRef; AddRef is LAB_06f37880 / LAB_06f3f750; Release
+//     (LAB_06f37890 / LAB_06f3f760) is a saturating decrement that, on
+//     reaching zero, parks RefCount at 1 and destroys the owner.
 // FThornInnerUnknown is that embedded triple, a member rather than a base
 // class (retail keeps it at +0x10c / +0x74, after the data); the owner
 // supplies the two callbacks. The owners' facets (+4/+8) are real bases.
@@ -93,7 +89,6 @@ public:
 
     unsigned long DACOM_API Release() override
     {
-        // LAB_06f37890: `if (count) --count; if (count) return count;`
         if (RefCount_ != 0)
             --RefCount_;
         if (RefCount_ != 0)
@@ -153,7 +148,6 @@ bool ThornLuaOpen();
 void ThornLuaClose();
 IThornLoadParser* ThornCreateLuaLoadParser(FThornScene* Scene);
 
-
 // 16-slot ICRSpline (PTR_LAB_06f5ab88). Slot 4 = load points FUN_06f346a0.
 struct ICRSpline : IDAComponent
 {
@@ -167,26 +161,19 @@ struct ICRSpline : IDAComponent
     virtual GENRESULT DACOM_API SetClosed(unsigned char bClosed) = 0;
     virtual GENRESULT DACOM_API IsClosed() = 0;
     // Orientation-spline extension slots (present on the orientation vtable).
-    // Slot10/Slot11 are per-index / bulk ORIENTATION SETTERS (confirmed
-    // 2026-09-10 via FUN_06f22a20's instruction-level trace: the [this+0x5d]
-    // orientation-gate + -8 return and the 16-byte/4-float record stride
-    // only match a Quats_ writer, never Points_ -- the earlier "indexed
-    // point"/"OutRecords" names and getter framing were misattributions).
+    // Slots 10/11 are per-index / bulk orientation SETTERS: FUN_06f22a20's [this+0x5d]
+    // orientation gate, -8 return and 16-byte record stride only fit a Quats_ writer.
     virtual GENRESULT DACOM_API SetOrientation(unsigned int Index, float* Orientation) = 0;
     virtual GENRESULT DACOM_API SetOrientations(unsigned int Count, float* Orientations) = 0;
     virtual GENRESULT DACOM_API GetOrientation(unsigned int Index, float* OutOrientation) = 0;
-    // Slot13/Slot14 widened 2026-09-10 from the 0-argument position-only
-    // stub shape to the orientation variant's real, distinct implementations
-    // (LAB_06f35270 / LAB_06f352f0, retraced against thorn.dll.txt). Neither
-    // is called anywhere outside SplinePath.cpp (grepped across src/Thorn/),
-    // so widening is safe.
+    // Slots 13/14: the orientation variant's LAB_06f35270 / LAB_06f352f0; the position-only
+    // variant stubs them.
     virtual GENRESULT DACOM_API SetTransform(unsigned int Index, const float* MatrixRecords) = 0;
     virtual GENRESULT DACOM_API SetTransforms(unsigned int Count, const float* TransformRecords) = 0;
-    // Slot15 (RET 0xc on both variants): position-only LAB_06f34820 is a
-    // constant -7 stub; the orientation variant LAB_06f35410 (.rdata
-    // 06f5ab2c / 06f5acc4 = vtable head + 0x3c) is the inverse of Slot13 --
-    // it writes the indexed point's [3x3 rotation | position] 12-float
-    // transform record into OutTransform and always returns -1.
+    // Slot 15: position-only LAB_06f34820 is a constant -7 stub; the orientation variant
+    // LAB_06f35410 (vtable head + 0x3c) is the inverse of slot 13 -- it writes the indexed
+    // point's [3x3 rotation | position] 12-float record into OutTransform and always
+    // returns -1.
     virtual GENRESULT DACOM_API GetTransform(unsigned int Index, float* OutTransform) = 0;
 };
 

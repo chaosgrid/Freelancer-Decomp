@@ -40,10 +40,9 @@
 struct IFileSystem;
 
 // Retail's texture reference, 8 bytes: the ITextureLibrary2 record Slot12 hands out plus the
-// alpha-probe cache FUN_00552420 fills. Its default constructor is the static initializer
-// LAB_004cc950 (`[+4] = -1`, `[+0] = 0`), its destructor FUN_00426de0 / LAB_004cc970 (release
-// through slot +0x38), and its copy constructor FUN_00426f80 (copy the record, take a
-// reference with slot +0x34, copy +4). Retail declares no assignment.
+// alpha-probe cache FUN_00552420 fills. Default constructor: the static initializer
+// LAB_004cc950; destructor FUN_00426de0 / LAB_004cc970; copy constructor FUN_00426f80 (takes a
+// reference). Retail declares no assignment.
 struct FTextureRef
 {
     void* Texture; // +0x00 ITextureLibrary2 texture record* (Slot12 OutTex)
@@ -55,9 +54,8 @@ struct FTextureRef
     FTextureRef& operator=(FTextureRef const& Other) = delete;
 };
 
-// The shape record, 0x30 bytes: the texture reference at +0, then what FUN_004256c0 stores
-// (`ESI + 0x08 ... 0x2c`). Its copy is FTextureRef's copy plus a member-wise copy of the rest
-// (the MOV chain at 00426e76).
+// The shape record, 0x30 bytes: the texture reference at +0, then what FUN_004256c0 stores. Its
+// copy is FTextureRef's copy plus a member-wise copy of the rest.
 struct FTexShape : FTextureRef
 {
     float U0;      // +0x08
@@ -159,7 +157,7 @@ extern FShapeDB G_UiShapeDB;         // DAT_0067d9c8
 
 // FUN_004f7230 -- queue a `[Data] effect_shapes =` path (Common StringAlloc'd) for the drain.
 void AddEffectShapesFile(char const* Path);
-// FUN_004f73b0 -- empty that queue (client teardown 0x005b2290), strings not freed.
+// FUN_004f73b0 -- empty that queue (WinMain teardown), strings not freed.
 void ClearEffectShapesFiles();
 // FUN_004f70d0 -- load every queued file into G_EffectShapeDB, then create the FLFxMeshFactory
 // (fl_fx_mesh.h, DAT_00674cdc) and hand it to IFxRuntime::BindMeshFactory. Returns the last

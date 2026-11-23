@@ -5,12 +5,11 @@
 // Author: Giperion.
 
 // Common.dll ReadConstants and the constants it fills (EngineEquipConsts, ShieldEquipConsts,
-// ThrusterEquipConsts, PhySys, the [Constants] TestValue / TestString). Split out of
-// common_goods.cpp.
+// ThrusterEquipConsts, PhySys, the [Constants] TestValue / TestString).
 //
 // Static-initialisation order: GTestString and ThrusterEquipConsts::INTERIOR/EXTERIOR_SOUND_NAME
 // are dynamically initialised; this TU follows common_equipdesc.cpp and precedes
-// common_loadout.cpp and common_goodinfo.cpp, as in the former common_goods.cpp.
+// common_loadout.cpp and common_goodinfo.cpp.
 
 #include "common_goods.h"
 #include "Archetypes/common_goods_internal.h" // kPathChars
@@ -91,8 +90,7 @@ namespace
             if (Reader.is_value(Keys[Index].Name))
             {
                 if (Keys[Index].Dest != nullptr)
-                    // ReadConstants: get_value_float then MSVCRT ftol on the unrounded x87 value
-                    // (value_num = the same read without the float rounding).
+                    // MSVCRT ftol on the unrounded value.
                     *Keys[Index].Dest = (int)Reader.value_num(0);
                 return true;
             }
@@ -108,7 +106,7 @@ namespace
             if (Reader.is_value(Keys[Index].Name))
             {
                 if (Keys[Index].Dest != nullptr)
-                    // ReadConstants: FSTP double of the unrounded x87 value.
+                    // The unrounded value stored as a double.
                     *Keys[Index].Dest = Reader.value_num(0);
                 return true;
             }
@@ -156,8 +154,7 @@ extern int WALLA_PRIORITY_CUTOFF;
 
 namespace
 {
-    // [Constants] TestValue: .data:063ed180, compiled-in 0x40490e56 (3.1415f). Written by
-    // ReadConstants (06304a53), read by nothing.
+    // [Constants] TestValue: .data:063ed180. Written by ReadConstants, read by nothing.
     float GTestValue = 3.1415f;
 
     // [Constants] TestString: a fixed 0x80-byte string -- length at .data:063fce20, text at
@@ -198,14 +195,8 @@ namespace
 
 namespace EngineEquipConsts
 {
-    // Common.dll.txt 0x63eb5cc-0x63eb5dc: these 5 constants live in .data with real nonzero
-    // compiled-in defaults (verified from Ghidra's own float annotations), unlike the rest of
-    // this namespace's fields below which are genuinely zero-initialized .bss. Found while
-    // porting CEEngine::GetCruiseDrag (Common.dll.c 0x363e0, which FADDs this global directly)
-    // -- a prior port revision had all of these defaulted to 0.0f and, worse, some call sites
-    // (GetCruiseDrag, GetCruiseThrust) had hardcoded the retail constant as a literal instead
-    // of reading the (wrongly-zeroed) global, masking the bug for those two call sites only.
-    // Each is still INI-overridable via the values-loader around Common.dll.c line ~142193.
+    // .data 0x063eb5cc-0x063eb5dc: the first five have compiled-in nonzero defaults; the rest
+    // are zero-initialized .bss. All are INI-overridable by ReadConstants.
     float CRUISING_SPEED = 300.0f;
     float CRUISE_ACCEL_TIME = 5.0f;
     float CRUISE_DRAG = 3.0f;
@@ -228,9 +219,8 @@ namespace ShieldEquipConsts
 
 namespace ThrusterEquipConsts
 {
-    // Common.dll.c LAB_0629d3c0/LAB_0629d3e0: retail's static initializers set these to
-    // CreateID("interior_thruster_sound")/CreateID("exterior_thruster_sound") as hardcoded
-    // defaults *before* ReadConstants() applies any ini override below, not zero.
+    // Retail's static initializers LAB_0629d3c0 / LAB_0629d3e0 set these before ReadConstants
+    // applies any ini override.
     ID_String INTERIOR_SOUND_NAME = {CreateID("interior_thruster_sound")};
     ID_String EXTERIOR_SOUND_NAME = {CreateID("exterior_thruster_sound")};
     float MAX_VOLUME_FORCE = 20000.0f;
@@ -242,9 +232,7 @@ namespace ThrusterEquipConsts
 
 namespace PhySys
 {
-    // Retail defaults re-derived by reading the raw .data bytes at each DAT_ address in
-    // Common.dll.txt (0x063eb318-0x063eb35c) - a prior pass had left every one of these
-    // zero-initialized, which did not match the compiled-in retail values.
+    // Compiled-in retail defaults from .data 0x063eb318-0x063eb35c.
     float PHYSICAL_SIM_RATE = 16.0f;
     int MAX_SPAWNED_MINDIST_COUNT = 100;
     float ANOM_LIMITS_MAX_VELOCITY = 1000.0f;
@@ -256,8 +244,8 @@ namespace PhySys
     float RMGR_LOOK_AHEAD_MAX_RADIUS_WORLD = 5.0f;
     float RMGR_LOOK_AHEAD_MIN_DISTANCE_WORLD = 100.0f;
     float RMGR_LOOK_AHEAD_MAX_DISTANCE_WORLD = 1000.0f;
-    // CRT initializer LAB_06290890: DAT_0639c418 (2.1f) / PHYSICAL_SIM_RATE,
-    // rounded by FSTP into DAT_063fc0f8. The PE's zero-filled storage is not the runtime default.
+    // CRT initializer LAB_06290890: DAT_0639c418 (2.1f) / PHYSICAL_SIM_RATE into DAT_063fc0f8.
+    // The PE's zero-filled storage is not the runtime default.
     float RMGR_LOOK_AHEAD_MIN_SECONDS_WORLD = (float)((double)2.1f / PHYSICAL_SIM_RATE);
     float RMGR_LOOK_AHEAD_TIME_INTRA = 0.5f;
     float RMGR_LOOK_AHEAD_MAX_RADIUS_INTRA = 0.89999998f;
@@ -395,8 +383,7 @@ bool __cdecl ReadConstants(char const* RelPath)
             {
                 if (Reader.is_value("TestString"))
                 {
-                    // 06304a70-06304a9e: a null value empties the string (length 0, first
-                    // byte 0); otherwise the bounded copy into the 0x80 buffer.
+                    // A null value empties the string.
                     char const* const Text = Reader.get_value_string();
                     if (Text == nullptr)
                     {

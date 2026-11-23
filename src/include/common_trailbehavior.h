@@ -18,23 +18,17 @@ class SystemManager;
 struct IObjRW;
 
 // ============================================================================
-// TrailBehavior -- behavior type 3 ("Trail", GDescTrail in common_behaviortypes.cpp). RTTI: COL
-// .rdata:063a8f24 at vftable-4 names ".?AVTrailBehavior@@"; its ClassHierarchyDescriptor
-// (063a8f14, numBaseClasses 2) is [TrailBehavior, Behavior], single inheritance at offset 0.
+// TrailBehavior -- behavior type 3 ("Trail", GDescTrail in common_behaviortypes.cpp). Single-
+// inheritance child of Behavior (RTTI).
 //
-// Re-ported from the listing 2026-10-08 (claude-code:cmn-ai5). Until then the slot-4 body
-// lived in the destructor, slots 3/5/6/8/10/12/14 were unbound members or missing, the
-// +0x2c sub-object was the invented FormationMoveFx, the +0x1c0 AfterburnerIdea was a byte
-// buffer, and Update ran on no-op stand-ins.
-//
-// Constructor FUN_062ca350 builds, in this order (EH states 0..4):
+// Constructor FUN_062ca350 builds, in this order:
 //   +0x02c  MatchThrottle2Idea  FUN_062d5aa0
 //   +0x088  FaceIdea            FUN_062d6750
 //   +0x148  MoveIdea            FUN_062d4e60
 //   +0x1c0  AfterburnerIdea     FUN_062da500
-// then the bare BaseWatcher at +0x1d4 (EH state 5), the vptr 0639fa6c and its scalars.
+// then the bare BaseWatcher at +0x1d4, the vptr 0639fa6c and its scalars.
 //
-// Vtable .rdata:0639fa6c, 27 slots. Overrides of Behavior's table (vtd.py, raw .rdata):
+// Vtable .rdata:0639fa6c, 27 slots. Overrides of Behavior's table:
 //    0  FUN_062ca4a0  scalar-deleting dtor around FUN_062ca4c0
 //    1  LAB_062ca570  SetContext
 //    3  LAB_062ca640  OnEngage
@@ -51,7 +45,7 @@ struct IObjRW;
 class TrailBehavior : public Behavior
 {
 public:
-    // FUN_062ca350 (.text:062ca350-062ca496).
+    // FUN_062ca350.
     explicit TrailBehavior(int InTypeId);
     // FUN_062ca4c0: set_pointer(0) on +0x1d4, +0x15c (MoveIdea's watcher), +0x9c (FaceIdea's)
     // and +0x40 (MatchThrottle2Idea's) -- the members' own destructors in reverse order --
@@ -72,7 +66,7 @@ public:
     // Slot 6, LAB_062ca940 (RET 4, argument unread): retarget the owner's target for the
     // player trail.
     EvaluateResult evaluate(unsigned int Context) override;
-    // Slot 7, LAB_062caa60 (516 instructions). Result stored at +0x10.
+    // Slot 7, LAB_062caa60. Result stored at +0x10.
     int OnUpdate() override;
     // Slot 8, LAB_062caa40 (RET 0): MatchThrottle2Idea::SetObjectDb(DeltaTime) while it drives.
     void PostUpdate() override;

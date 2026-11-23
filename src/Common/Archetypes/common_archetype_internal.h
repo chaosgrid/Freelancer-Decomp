@@ -9,8 +9,7 @@
 // Common.dll-internal helpers shared by the Archetype translation units: common_archetype.cpp
 // (where they are defined), common_archetype_ships.cpp, common_archetype_equipment.cpp,
 // common_archetype_weapons.cpp and common_archetype_misc.cpp. Retail keeps all of this in one
-// TU (E:\FL\Scratch\Source\Common\Archetype.cpp); none of these helpers is exported. Split out
-// of common_archetype.cpp's anonymous namespaces (CMN-SPLIT phase B, 2026-10-14).
+// TU (E:\FL\Scratch\Source\Common\Archetype.cpp); none of these helpers is exported.
 
 #include "common_archetype.h"
 #include "common_ini.h"     // INI_Reader
@@ -23,8 +22,7 @@ namespace Archetype
 {
     namespace CmnArchetype
     {
-        // FEngineArchetypeName was a field-for-field copy of engbase.h's FEngineName; the two
-        // are the same 8-byte {const char*, CRC32} record IEngine takes at slots 11/12/17.
+        // The 8-byte {const char*, CRC32} record IEngine takes at slots 11/12/17.
         typedef FEngineName FEngineArchetypeName;
 
         // Retail __FILE__ of Archetype.cpp, the first argument of every FDUMP here.

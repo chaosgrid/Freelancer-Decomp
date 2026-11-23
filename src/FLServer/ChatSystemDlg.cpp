@@ -27,7 +27,7 @@ namespace
 
 	// .data:0042961c — the shared chat-id header's "system" id: word 1 and byte 2 set to 1 by
 	// the CRT initializer .text:00416040, byte 3 left at its .data zero. The target of every
-	// message this dialog submits; the sender is a zero id built on the stack (004168fc).
+	// message this dialog submits; the sender is a zero id built on the stack.
 	const CHAT_ID GChatIdSystem(0x00010001u);
 
 	// Style id of the outgoing message's StyleNode (.text:004167e4).
@@ -44,8 +44,7 @@ CChatSystemDlg::CChatSystemDlg(CWnd* Parent)
 {
 }
 
-// .text:00416290 — while SystemId is set, erases its map entry (equal_range 004171c0 /
-// 00417170 and erase of that range); members are then destroyed.
+// .text:00416290 — while SystemId is set, erases its map entry.
 CChatSystemDlg::~CChatSystemDlg()
 {
 	if (SystemId != 0xffffffffu)
@@ -68,7 +67,7 @@ BEGIN_MESSAGE_MAP(CChatSystemDlg, CDialog)
 	ON_BN_CLICKED(1053, &CChatSystemDlg::OnCloseButton)             // 004169e0
 END_MESSAGE_MAP()
 
-// .text:00416620 — map find (lower_bound 00417170 plus the key test).
+// .text:00416620
 CChatSystemDlg* CChatSystemDlg::FindBySystem(unsigned int SystemId)
 {
 	std::map<int, CChatSystemDlg*>::iterator It = GChatSystemDialogs.find((int)SystemId);
@@ -79,8 +78,7 @@ CChatSystemDlg* CChatSystemDlg::FindBySystem(unsigned int SystemId)
 	return It->second;
 }
 
-// .text:00416480 — the map entry is created by an inlined insert of {SystemId, null} whose
-// value is then set to this (operator[] semantics).
+// .text:00416480
 BOOL CChatSystemDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
@@ -101,14 +99,14 @@ void CChatSystemDlg::OnOK()
 {
 }
 
-// .text:00416730 — DestroyWindow (vtable +0x60), then the scalar deleting destructor.
+// .text:00416730 — modeless and self-owned.
 void CChatSystemDlg::OnCancel()
 {
 	DestroyWindow();
 	delete this;
 }
 
-// .text:004169e0 — JMP [vtable +0xd0], the OnCancel slot.
+// .text:004169e0 — calls OnCancel through the vtable.
 void CChatSystemDlg::OnCloseButton()
 {
 	OnCancel();
@@ -132,9 +130,7 @@ void CChatSystemDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 		LockServer();
 		{
 			RenderDisplayList Rdl;
-			// Double clone as in CChatAccountDlg::OnMsgFilterInput: holder of the first clone
-			// (004167fa..00416809), list insert 004149a0 (second clone), holder delete
-			// (0041682d..00416843), ~StyleNode (00416852); the text at 00416858..004168c1.
+			// Double clone as in CChatAccountDlg::OnMsgFilterInput.
 			{
 				StyleNode Style(ChatSystemStyleId);
 				{
@@ -157,7 +153,7 @@ void CChatSystemDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 				const CHAT_ID Sender(0u);
 				Server.SubmitChat(Sender, Size, GChatSystemBuffer, GChatIdSystem, (int)SystemId);
 			}
-			// Retail releases the server lock before the list is destroyed (00416928).
+			// Retail releases the server lock before the list is destroyed.
 			UnlockServer();
 		}
 	}

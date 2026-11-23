@@ -41,9 +41,9 @@
 #include <vector>
 #include <windows.h>
 
-// FUN_00524880's inlined AsteroidExclusionZoneMgr::set_max_cliasteroid_exclusion_distance
-// (0x00524932..0x00524936): FLD ST0 / FMUL ST1 squares the distance still on the x87 stack,
-// FSTP float [mgr+0x14] rounds once. Befriended by the class (common_net.h).
+// FUN_00524880's inlined AsteroidExclusionZoneMgr::set_max_cliasteroid_exclusion_distance:
+// the unrounded distance is squared and rounded to float once. Befriended by the class
+// (common_net.h).
 struct FCliAsteroidExclusionInline
 {
     static void SetMaxCliDist(Exclusion::AsteroidExclusionZoneMgr* Mgr, double Dist)
@@ -78,16 +78,14 @@ namespace
     // DAT_006753c0 / c4 / c8 — a VC6 std::list<CliAsteroid*> (allocator byte, head node, size):
     // XC LAB_0051fe10 (initializer slot .data:0060fa74) builds the self-linked head
     // (operator new(0xc)) with size 0 and registers LAB_0051fe50 with atexit to free the nodes.
-    // Fields are appended at the tail and walked head->next forward (FUN_00520130 /
-    // FUN_005200b0), as this std::list is.
+    // Fields are appended at the tail and walked head->next forward.
     //
     // LIFETIME. The list is a namespace-scope static on purpose, not a function-local one: it
     // is constructed during CRT start-up, like the XC initializer, so its destructor is
-    // registered with atexit before WinMain registers ClientAtExitTeardown (LAB_005b2190,
-    // 0x005b3101). atexit runs in reverse order, so the teardown's ShutdownSpaceState ->
-    // StarSysLeave -> CliAsteroidDestroyAll (0x00554b7e) still sees a live list. A function-local
-    // static was first constructed in game, after that registration, and was therefore already
-    // destroyed when the teardown walked it.
+    // registered with atexit before WinMain registers ClientAtExitTeardown (LAB_005b2190).
+    // atexit runs in reverse order, so the teardown's ShutdownSpaceState -> StarSysLeave ->
+    // CliAsteroidDestroyAll still sees a live list. A function-local static would be
+    // constructed in game, after that registration, and so destroyed before the teardown.
     std::list<FCliAsteroid*> GCliAsteroidFields;
 
     std::list<FCliAsteroid*>& Registry()
@@ -98,9 +96,8 @@ namespace
     void CliAsteroidFillMeshDesc(FRpVertexSrcDesc* Desc, void* Verts, unsigned short VertCount);
     void CliAsteroidMergeCubeMesh(FCliAsteroid* Field, int Lod, char const* FieldIniRel);
 
-    // The tint clamp FUN_0054d970 / FUN_0054fee0 inline six times: FCOMP 1.0f (DAT_005c75dc),
-    // TEST AH,5 / JP. Only "less" (C0 alone, odd parity) keeps V; greater, equal and unordered
-    // (even parity) store 1.0. There is no lower bound.
+    // The tint clamp FUN_0054d970 / FUN_0054fee0 inline six times (1.0f at DAT_005c75dc): only
+    // "less" keeps V; greater, equal and NaN store 1.0. There is no lower bound.
     float ClampTintUpper(float V)
     {
         if (V < 1.0f)
@@ -125,12 +122,12 @@ namespace
         return reinterpret_cast<unsigned*>(Blob) + DwordIndex;
     }
 
-    // FUN_0054c580 (__thiscall on the 0x84 blob), in listing order. It writes nothing else:
+    // FUN_0054c580 (thiscall on the 0x84 blob), in retail store order. It writes nothing else:
     // +0x08, +0x7c, +0x80 and the pad bytes +0x75..+0x77 keep whatever the storage held --
-    // BandParseIni (FUN_0054c630) sets +0x08 / +0x58 / +0x7c / +0x80 when a section is read.
+    // BandParseIni sets +0x08 / +0x58 / +0x7c / +0x80 when a section is read.
     void InitBandBlob(unsigned char* Blob)
     {
-        *BandF(Blob, 3) = 1.0f;         // +0x0c..+0x2c = 0x3f800000
+        *BandF(Blob, 3) = 1.0f;         // +0x0c..+0x2c
         *BandF(Blob, 4) = 1.0f;
         *BandF(Blob, 5) = 1.0f;
         *BandF(Blob, 6) = 1.0f;
@@ -146,11 +143,11 @@ namespace
         *BandU(Blob, 1) = 0;            // +0x04
         *BandU(Blob, 0xf) = 0;          // +0x3c
         *BandU(Blob, 0x11) = 0;         // +0x44
-        *BandF(Blob, 0x12) = 1000.0f;   // +0x48 0x447a0000
-        *BandF(Blob, 0x19) = 1500.0f;   // +0x64 0x44bb8000
-        *BandF(Blob, 0x1a) = 2500.0f;   // +0x68 0x451c4000
-        *BandF(Blob, 0x1b) = 100000.0f; // +0x6c 0x47c35000
-        *BandF(Blob, 0x1c) = 130000.0f; // +0x70 0x47fde800
+        *BandF(Blob, 0x12) = 1000.0f;   // +0x48
+        *BandF(Blob, 0x19) = 1500.0f;   // +0x64
+        *BandF(Blob, 0x1a) = 2500.0f;   // +0x68
+        *BandF(Blob, 0x1b) = 100000.0f; // +0x6c
+        *BandF(Blob, 0x1c) = 130000.0f; // +0x70
         *BandU(Blob, 0x1e) = 0;         // +0x78
         Blob[0x1d * 4] = 0;             // byte +0x74
         *BandF(Blob, 0x10) = 1.0f;      // +0x40
@@ -191,7 +188,7 @@ namespace
     // the field's own ShapeDB through FUN_00512660 (cmn\ShapeDB.h:0xf2 on a miss).
     void BandParseIni(unsigned char* Blob, INI_Reader& Reader, FShapeDB* Shapes)
     {
-        Blob[0x7c] = 0;                 // 0x0054c63d: BYTE +0x7c (the bytes after it untouched)
+        Blob[0x7c] = 0;                 // byte +0x7c (the bytes after it untouched)
         *BandU(Blob, 0x20) = 0;         // +0x80
         *BandF(Blob, 2) = 1.0f;         // +0x08
         *BandU(Blob, 0x16) = 1;         // +0x58
@@ -209,7 +206,7 @@ namespace
             }
             else if (Reader.is_value("texture_aspect"))
             {
-                // 0x0054c6fc: FMUL qword DAT_005e0ac0 (1.15 as a double), FSTP float +0x40.
+                // 1.15 as a double (DAT_005e0ac0), rounded to float once.
                 *BandF(Blob, 0x10) =
                     static_cast<float>(static_cast<double>(Reader.get_value_float(0)) * 1.15);
             }
@@ -265,10 +262,10 @@ namespace
         } while (Reader.read_value());
     }
 
-    // FUN_0054c600 (thiscall) -- free the ring particle (+0x3c) and spoke (+0x60) buffers of a
-    // band blob; +0x3c/+0x44 and +0x60/+0x58 = 0. No test of the blob: its callers
-    // (0x0052067a / 0x00520938 after a null test, 0x005207b0 on the embedded +0xfc band) never
-    // pass null. operator delete (FUN_005b7e1d) takes null.
+    // FUN_0054c600 -- free the ring particle (+0x3c) and spoke (+0x60) buffers of a band blob;
+    // +0x3c/+0x44 and +0x60/+0x58 = 0. No null test of the blob, as retail: the callers (the
+    // field destructor and BandVectorClear after a null test, and the embedded +0xfc band) never
+    // pass null.
     void BandFreeRingMesh(unsigned char* Blob)
     {
         operator delete(*reinterpret_cast<void**>(Blob + 0x3c));
@@ -279,10 +276,8 @@ namespace
         *BandU(Blob, 0x16) = 0;
     }
 
-    // FUN_00520850 0x00520904..0x00520978: with a non-empty exclusion band vector (+0x184),
-    // every non-null band gets FUN_0054c600 and operator delete, then the vector is erased
-    // (FUN_00527820 copy + IDPMsgHandler::OnReceive range destroy, end = begin). The storage
-    // is kept.
+    // Inlined in FUN_00520850: every non-null exclusion band freed, then the vector erased
+    // (end = begin). The storage is kept.
     void BandVectorClear(FCliAsteroid* This)
     {
         if (This->BandBegin != nullptr && This->BandEnd - This->BandBegin > 0)
@@ -325,7 +320,7 @@ namespace
         ++This->BandEnd;
     }
 
-    // ---- FCliDynamicAsteroid 0xE8 (FUN_005256a0 / 00525760 / 00525800 keys) ----
+    // ---- FCliDynamicAsteroid vector (the manager itself is in cli_asteroid_dynamic.cpp) ----
 
     void DynVectorPush(FCliAsteroid* This, FCliDynamicAsteroid* Dyn)
     {
@@ -351,12 +346,8 @@ namespace
         ++This->DynEnd;
     }
 
-    // The manager functions (FUN_005256a0 / 00525760 / 00525800 / 005267b0) live in
-    // cli_asteroid_dynamic.cpp.
-
-    // FUN_00520850 0x0052097b..0x005209e8: with a non-empty dynamic asteroid vector (+0x220),
-    // every non-null manager gets FUN_00525760 and operator delete, then the vector is erased
-    // (end = begin). The storage is kept.
+    // Inlined in FUN_00520850: every non-null dynamic asteroid manager destroyed and freed,
+    // then the vector erased (end = begin). The storage is kept.
     void DynVectorClear(FCliAsteroid* This)
     {
         if (This->DynBegin != nullptr && This->DynEnd - This->DynBegin > 0)
@@ -374,10 +365,9 @@ namespace
         }
     }
 
-    // FUN_00520850 0x005211e1..0x0052126d -- a new manager's tints from the field's:
-    // diffuse (+0xbc) = color_shift * the field's diffuse (+0xb4) through FUN_00422b80,
-    // ambient (+0xc8) = FUN_00522000(color_shift, the field's ambient +0xc0), then
-    // FUN_00521fa0 on the diffuse and on the ambient (clamped to 1.0 from above only).
+    // Inlined in FUN_00520850: a new manager's tints from the field's -- diffuse (+0xbc) =
+    // color_shift * the field's diffuse (+0xb4), ambient (+0xc8) = color_shift * the field's
+    // ambient (+0xc0), both clamped to 1.0 from above only.
     void CliDynamicAsteroidApplyParentTints(FCliDynamicAsteroid* Dyn, FCliAsteroid* Parent)
     {
         float Diffuse[3];
@@ -398,28 +388,26 @@ namespace
         CliAsteroidClampColorToOne(&Dyn->TintedAmbient0);
     }
 
-    // ---- Billboard block (FUN_00550000 / 0054dbe0 / 0054fee0 / 0054de10) ----
+    // ---- Billboard block ----
 
     void BillboardEnsureRocks(FAsteroidBillboardBlock* Bb);
 
-    // FUN_00550000 (thiscall, RET 4) — the two quality scalars, then FUN_0054de10 (0x00550034),
-    // which rebuilds the rock array at the new QualityA / QualityB. From the [AsteroidBillboards]
-    // header (before FUN_0054dbe0, Flag7C still 0, so the rebuild only frees) and from the detail
-    // slider FUN_00524880.
+    // FUN_00550000 — the two quality scalars, then BillboardEnsureRocks, which rebuilds the rock
+    // array at the new QualityA / QualityB. Called from the [AsteroidBillboards] header (before
+    // BillboardParseIni, Flag7C still 0, so the rebuild only frees) and from the detail slider
+    // (CliAsteroidApplyDetail).
     void BillboardSetQuality(FAsteroidBillboardBlock* Bb, float Detail)
     {
-        // 0x00550000..00550014: (1 - d) * 0.25 (DAT_005c94f8) + d.
+        // 0.25 at DAT_005c94f8.
         Bb->QualityA = (1.0f - Detail) * 0.25f + Detail;
-        // 0x00550017..0055002f: d*d kept on the FPU, (1 - d*d) * 0.75 (DAT_005c8930) + d*d.
+        // d*d stays unrounded; 0.75 at DAT_005c8930.
         double const DetailSq = static_cast<double>(Detail) * Detail;
         Bb->QualityB = static_cast<float>((1.0 - DetailSq) * 0.75 + DetailSq);
         BillboardEnsureRocks(Bb);
     }
 
-    // FUN_0054feb0(this=Billboard, a, b) — order (min,max) into Float44/Float40.
-    // Call sites 005214e2 / 00524908: a = FillDist*Scale230,
-    // b = CubeSize*1.25 + FillDist*Scale230. Listing: FCOM; if a < b then
-    // +0x44=a, +0x40=b else +0x40=a, +0x44=b → Float40=max, Float44=min.
+    // FUN_0054feb0 — Float40 = max(A, B), Float44 = min(A, B). Both callers (the field-ini load
+    // and CliAsteroidApplyDetail) pass A = FillDist*Scale230, B = CubeSize*1.25 + A.
     void BillboardSetFadePlanes(FAsteroidBillboardBlock* Bb, float A, float B)
     {
         if (A < B)
@@ -434,7 +422,7 @@ namespace
         }
     }
 
-    // FUN_0054fee0(bb, &TintB4, &TintC0)
+    // FUN_0054fee0(bb, &TintB4, &TintC0).
     void BillboardApplyTints(FAsteroidBillboardBlock* Bb, float const* Diffuse, float const* Ambient)
     {
         Bb->TintedDiffuse0 = ClampTintUpper(Bb->ColorShift0 * Diffuse[0]);
@@ -445,8 +433,8 @@ namespace
         Bb->TintedAmbient2 = ClampTintUpper(Ambient[2]);
     }
 
-    // FUN_0054dbe0 — [AsteroidBillboards] values into +0x19C block; `shape` is found in the
-    // field's ShapeDB passed as the second argument (00521041, inline find at 0054dc38).
+    // FUN_0054dbe0 — [AsteroidBillboards] values into the +0x19C block; `shape` is found in the
+    // field's ShapeDB passed as the second argument (retail inlines the find).
     void BillboardParseIni(FAsteroidBillboardBlock* Bb, INI_Reader& Reader, FShapeDB* Shapes)
     {
         Bb->FadeDistPercent = 0.3f;
@@ -506,39 +494,35 @@ namespace
         } while (Reader.read_value());
     }
 
-    // Retail rand() returns 0..0x7fff; DAT_005caeec is 1/32768.
+    // Retail rand() returns 0..0x7fff; DAT_005caeec is 1/32768. 1 only when strictly above 0.5.
     unsigned char BillboardRandomBool()
     {
-        // FILD rand / FMUL DAT_005caeec / FCOMP 0.5 / TEST AH,0x41 / JNZ -> 0; above 0.5 -> 1.
         double const Unit = static_cast<double>(rand()) * 3.0517578125e-05;
         return Unit > 0.5 ? 1 : 0;
     }
 
-    // FUN_0054de10 (thiscall on the billboard block, no arguments) — rebuild the rock array.
+    // FUN_0054de10 (thiscall on the billboard block) — rebuild the rock array.
     void BillboardEnsureRocks(FAsteroidBillboardBlock* Bb)
     {
-        // 0x0054de16..0054de24: the old array freed; the pointer is not cleared (it is
-        // overwritten below, or left alone when the block is not initialised).
+        // The pointer is not cleared, as retail (it is overwritten below, or left alone when
+        // Flag7C is clear).
         if (Bb->Rocks != nullptr)
             operator delete(Bb->Rocks);
 
-        // 0x0054de27: Flag7C clear -> nothing else.
         if (Bb->Flag7C == 0)
             return;
 
-        // 0x0054de32..0054de3f: FILD Count / FMUL QualityA / ftol.
         Bb->RockCount = static_cast<int>(static_cast<double>(Bb->Count) * Bb->QualityA);
         if (Bb->RockCount <= 0)
         {
-            // 0x0054de44..0054de65: an error, not a return -- the allocation still happens.
+            // An error, not a return -- the allocation still happens.
             FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp", 0x297,
                   "Billboard rock count is not > 0  If we have no rocks to draw, this instance "
                   "should not exist");
         }
 
-        // 0x0054de68..0054de9e: operator new(RockCount << 5); Range = SizeMax - SizeMin and
-        // InvCount = (float)(1.0 / RockCount) (DAT_005c89b8, a double).
+        // 1.0 at DAT_005c89b8 is a double.
         Bb->Rocks = static_cast<FAsteroidBillboardRock*>(
             operator new(static_cast<unsigned>(Bb->RockCount) << 5));
         float const Range = Bb->SizeMax - Bb->SizeMin;
@@ -551,23 +535,20 @@ namespace
             Rock->Pos[0] = 0.0f;
             Rock->Pos[1] = 0.0f;
             Rock->Pos[2] = 0.0f;
-            // 0x0054dec0..0054dee0: (rand * Range * 1/32768 + SizeMin) * 0.5, one FPU chain.
+            // One unrounded chain, rounded to float once.
             Rock->HalfSize = static_cast<float>(
                 (static_cast<double>(rand()) * Range * 3.0517578125e-05 + Bb->SizeMin) * 0.5);
             Rock->Alpha = 1.0f;
             Rock->bVisible = 1;
-            // 0x0054def7..0054df9f: four rand() > 0.5 tests, in field order.
+            // Four rand() draws, in field order.
             Rock->bFlipU = BillboardRandomBool();
             Rock->bFlipV = BillboardRandomBool();
             Rock->bSwapAxes = BillboardRandomBool();
             Rock->bNegateApex = BillboardRandomBool();
-            // 0x0054df98..0054dfb2: FILD Index / FMUL InvCount.
             Rock->Phase = static_cast<float>(static_cast<double>(Index) * InvCount);
         }
 
-        // 0x0054dfc2..0054e002: only for start_dist > 0 (TEST AH,0x41 / JNZ skips <= 0 and
-        // unordered). A = QualityB * start_dist, T = tan(DAT_005e0b00 = 35 degrees),
-        // R = A*T / (1 - T): Float00 = R, Float04 = R + A, Float2C = R * FadeDistPercent.
+        // Only for start_dist > 0 (NaN skips). T = tan(35 degrees, DAT_005e0b00).
         if (Bb->StartDist > 0.0f)
         {
             double const A = static_cast<double>(Bb->QualityB) * Bb->StartDist;
@@ -578,8 +559,7 @@ namespace
             Bb->Float2C = static_cast<float>(R * Bb->FadeDistPercent);
         }
 
-        // 0x0054e004..0054e030: a shape whose FUN_00425640 frame-0 handle the pipeline does not
-        // recognise (IsTexture, slot 47, non-zero) is dropped.
+        // A shape whose frame-0 handle IsTexture rejects (non-zero) is dropped.
         if (Bb->Shape != nullptr)
         {
             void* const Handle = TexShapeGetGpuHandle(Bb->Shape, 0);
@@ -595,12 +575,12 @@ namespace
         Out[2] = B * (1.0f / 255.0f);
     }
 
-    // FUN_00524880(this, detail) — always writes Scale230; Flag2C body is detail-slider recall.
-    // No test of `this` (ECX is used as is).
+    // FUN_00524880 — always writes Scale230; the rest only for a loaded field (Flag2C). No null
+    // test of `This`, as retail.
     void CliAsteroidApplyDetail(FCliAsteroid* This, float Detail)
     {
-        // 0x00524883..0x005248a7: FLD 1.0 / FSUB d; FST float keeps (1 - d) for the dyn block
-        // below while the stack value goes on: * 0.65f (DAT_005db53c) + d, FSTP float.
+        // (1 - d) is kept as a float for the dynamic block below, while Scale230 uses the
+        // unrounded value; 0.65f at DAT_005db53c.
         double const OneMinusDetail = 1.0 - static_cast<double>(Detail);
         float const OneMinusDetailF = static_cast<float>(OneMinusDetail);
         This->Scale230 = static_cast<float>(
@@ -608,16 +588,13 @@ namespace
         if (This->Flag2C == 0 || This->CmnField == nullptr)
             return;
 
-        // 0x005248c4..0x005248d0: FILD +0x24, FMUL float Scale230, ftol -> field +0x48.
         int const SyncedFill = static_cast<int>(
             static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230));
         This->CmnField->set_fill_dist(SyncedFill);
 
         if (This->Flag198 != 0)
         {
-            // 0x005248dd..0x00524914: FUN_0054feb0(FillScaled, FadeFar) then FUN_00550000(d).
-            // FillScaled is FSTP float; FadeFar = CubeSize * 1.25f (DAT_005c9804) + FillScaled
-            // on the stack, FSTP float.
+            // FillScaled is rounded to float before the add; 1.25f at DAT_005c9804.
             float const FillScaled = static_cast<float>(
                 static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230));
             float const FadeFar = static_cast<float>(
@@ -629,24 +606,19 @@ namespace
 
         if (This->ExclusionMgr != nullptr)
         {
-            // 0x00524919..0x00524939: retail inlines the setter -- FILD +0x24 * Scale230 * 1.25f,
-            // squared on the stack (FLD ST0 / FMUL ST1), FSTP float into the manager's +0x14,
-            // FSTP ST0 drops the unsquared value.
+            // Retail inlines the setter; the distance is squared unrounded.
             double const CliDist = static_cast<double>(This->FillDistAt24) *
                                    static_cast<double>(This->Scale230) *
                                    static_cast<double>(1.25f);
             FCliAsteroidExclusionInline::SetMaxCliDist(This->ExclusionMgr, CliDist);
         }
 
-        // 0x0052493b..0x00524a1b: every dynamic asteroid manager -- DetailScale =
-        // (1 - d) * 0.5 + d and 1 / DetailScale (no guard), computed once for a non-empty
-        // vector; then per manager the slots released (FUN_005267b0's loop, inlined), the
-        // array freed, SlotCount = ftol(CountIni * DetailScale + 0.5) and a new zeroed array
-        // (operator new even for 0 slots).
+        // Every dynamic asteroid manager: DetailScale and its inverse (no zero guard) computed
+        // once, then per manager the slots released (FUN_005267b0's loop, inlined), the array
+        // freed and a new zeroed one allocated (operator new even for 0 slots).
         if (This->DynBegin == This->DynEnd)
             return;
-        // 0x00524953..0x0052496f: the stored float (1 - d) * 0.5f + d, FSTP float; then
-        // 1.0 / that float, FSTP float.
+        // Each rounded to float before the next step.
         float const DynDetail = static_cast<float>(
             static_cast<double>(OneMinusDetailF) * static_cast<double>(0.5f) +
             static_cast<double>(Detail));
@@ -668,19 +640,16 @@ namespace
         }
     }
 
-    // FUN_005201e0 (thiscall, no arguments). No test of `this`: its one caller (FUN_0051ff50)
-    // tests operator new's result.
-    // Stores in listing order. Retail writes no byte of +0x00 (Flag00), +0x30..+0x9f
-    // (MeshDesc), +0xb0 (FieldB0) or the pads here; each is written before it is read:
-    // Flag00 by FUN_00520850 (the field-ini load, = 0 before the section loop), MeshDesc by
-    // FUN_0051feb0 and FieldB0 by the mesh build, both inside the same load.
+    // FUN_005201e0. No null test of `this`: its one caller (CliAsteroidCreateAndLoad) tests
+    // operator new's result. Stores in retail order. Retail writes no byte of +0x00 (Flag00),
+    // +0x30..+0x9f (MeshDesc), +0xb0 (FieldB0) or the pads here; each is written before it is
+    // read: Flag00 by the field-ini load (= 0 before the section loop), MeshDesc and FieldB0 by
+    // the mesh build inside the same load.
     FCliAsteroid* CliAsteroidConstructRetail(FCliAsteroid* This)
     {
-        // 0x005201f8..0x0052021a: the allocator bytes (+0x08, +0x09), byte +0x14 and
-        // FUN_005274a0 -- the cube map at +0x08.
+        // The cube map at +0x08 (allocator bytes +0x08 / +0x09, byte +0x14, FUN_005274a0).
         CliAsteroidCubeMapConstruct(This);
 
-        // 0x0052021f..0x00520256: +0xb4..+0xc8 = 1.0.
         This->TintB4 = 1.0f;
         This->TintB8 = 1.0f;
         This->TintBC = 1.0f;
@@ -688,25 +657,21 @@ namespace
         This->TintC4 = 1.0f;
         This->TintC8 = 1.0f;
 
-        // 0x0052025c..0x00520267: FUN_004a2f10 -- the field's ShapeDB at +0xE0 (its tail store
-        // +0xf4 = +0xe4 is part of the container's own construction).
+        // FUN_004a2f10 -- the field's ShapeDB at +0xE0 (its tail store +0xf4 = +0xe4 is part
+        // of the container's own construction).
         ShapeDBConstructAt(This->ShapeDbE0);
 
-        // 0x00520278: FUN_0054c580 on +0xfc.
         InitBandBlob(This->BandBlob);
 
-        // 0x0052027d..0x00520293: the band vector at +0x184 (allocator byte, begin/end/cap = 0).
         This->BandBegin = nullptr;
         This->BandEnd = nullptr;
         This->BandCap = nullptr;
 
-        // 0x0052029b..0x005202b9: Up = (0, 1, 0), MaxLights (+0x1e4) = 4.
         This->Billboard.Up[0] = 0.0f;
         This->Billboard.Up[1] = 1.0f;
         This->Billboard.Up[2] = 0.0f;
         This->Billboard.MaxLights = 4;
 
-        // 0x005202ae..0x005202df: FUN_00422b80(1, 1, 1) on +0x1e8, +0x1f4, +0x200.
         This->Billboard.TintedDiffuse0 = 1.0f;
         This->Billboard.TintedDiffuse1 = 1.0f;
         This->Billboard.TintedDiffuse2 = 1.0f;
@@ -717,34 +682,30 @@ namespace
         This->Billboard.ColorShift1 = 1.0f;
         This->Billboard.ColorShift2 = 1.0f;
 
-        // 0x005202e4..0x00520376: the billboard block's scalars.
-        This->Billboard.Float00 = 2500.0f;   // +0x19c 0x451c4000
-        This->Billboard.StartDist = 1500.0f; // +0x1a4 0x44bb8000
-        This->Billboard.Float04 = 4000.0f;   // +0x1a0 0x457a0000
-        This->Billboard.Rocks = nullptr;     // +0x1a8
-        This->Billboard.Count = 100;         // +0x1ac
-        This->Billboard.RockCount = 100;     // +0x1b0
-        This->Billboard.ZoneRef = nullptr;   // +0x1b4
-        This->Billboard.DensityScale = 1.0f; // +0x1b8
-        This->Billboard.Shape = nullptr;     // +0x1bc
-        This->Billboard.SizeMin = 500.0f;    // +0x1c0 0x43fa0000
-        This->Billboard.SizeMax = 100.0f;    // +0x1c4 0x42c80000
-        This->Billboard.Float2C = 700.0f;    // +0x1c8 0x442f0000
-        This->Billboard.FadeDistPercent = 0.3f; // +0x1cc 0x3e99999a
-        This->Billboard.Float40 = 2000.0f;   // +0x1dc 0x44fa0000
-        This->Billboard.Float44 = 1500.0f;   // +0x1e0
-        This->Billboard.AmbientIntensity = 1.0f; // +0x20c
-        This->Billboard.QualityA = 1.0f;     // +0x210
-        This->Billboard.QualityB = 1.0f;     // +0x214
-        This->Billboard.Flag7C = 0;          // +0x218
+        This->Billboard.Float00 = 2500.0f;
+        This->Billboard.StartDist = 1500.0f;
+        This->Billboard.Float04 = 4000.0f;
+        This->Billboard.Rocks = nullptr;
+        This->Billboard.Count = 100;
+        This->Billboard.RockCount = 100;
+        This->Billboard.ZoneRef = nullptr;
+        This->Billboard.DensityScale = 1.0f;
+        This->Billboard.Shape = nullptr;
+        This->Billboard.SizeMin = 500.0f;
+        This->Billboard.SizeMax = 100.0f;
+        This->Billboard.Float2C = 700.0f;
+        This->Billboard.FadeDistPercent = 0.3f;
+        This->Billboard.Float40 = 2000.0f;
+        This->Billboard.Float44 = 1500.0f;
+        This->Billboard.AmbientIntensity = 1.0f;
+        This->Billboard.QualityA = 1.0f;
+        This->Billboard.QualityB = 1.0f;
+        This->Billboard.Flag7C = 0;
 
-        // 0x0052037c..0x0052038e: the dynamic-asteroid vector at +0x220 (begin/end/cap = 0).
         This->DynBegin = nullptr;
         This->DynEnd = nullptr;
         This->DynCap = nullptr;
 
-        // 0x00520396..0x005203d7: CreateAsteroidField(FUN_00554e90()) into +4; AddRef when
-        // made, otherwise FDUMP 0x100001 (line 0x11e).
         CmnAsteroid::CAsteroidField* Field =
             CmnAsteroid::CreateAsteroidField(StarSysGetActiveSystemId());
         This->CmnField = Field;
@@ -759,7 +720,6 @@ namespace
                   "NO cmn field created for client asteroid field");
         }
 
-        // 0x005203da..0x00520411.
         This->CubeSize = 0x190;
         This->FillDistAt24 = 0x4b0;
         This->ScaleCC = 1.0f;
@@ -771,9 +731,7 @@ namespace
         This->FlagD1 = 0;
         This->FlagD2 = 0;
 
-        // 0x00520417..0x00520439: FUN_00527310 erase(begin, end) on the just-built cube map --
-        // nothing to erase.
-        // 0x00520444..0x00520468.
+        // Retail then erases the just-built (empty) cube map; nothing to port.
         This->ExclusionMgr = nullptr;
         This->Material = nullptr;
         This->MeshVerts = nullptr;
@@ -782,12 +740,9 @@ namespace
         This->ZeroD4 = 0;
         This->FloatD8 = 100.0f;
 
-        // 0x0052047a: FUN_005995c0 destroys the (empty) band range; 0x0052047f: +0x194 = 0.
+        // Retail also clears the (empty) band and dynamic vectors here.
         This->BandVertSum = 0;
-        // 0x00520485..0x005204a8: FUN_00527820 + the range destroy on the (empty) dynamic
-        // vector, end = begin.
 
-        // 0x005204ac..0x005204c8.
         This->Zone = nullptr;
         This->FlagF8 = 0;
         This->Flag180 = 0;
@@ -798,7 +753,7 @@ namespace
         return This;
     }
 
-    // FUN_00520850 [Field] (0x00520ad2..0x00520e3e). Lod is the caller's local [ESP+0x30].
+    // FUN_00520850's [Field] section. Lod is a local of the caller.
     void ParseFieldSection(FCliAsteroid* This, INI_Reader& Reader, int& Lod)
     {
         if (!Reader.read_value())
@@ -818,8 +773,7 @@ namespace
             }
             else if (Reader.is_value("LOD"))
             {
-                // 0x00520b49..0x00520b56: ftol into the local [ESP+0x30], which the mesh merge
-                // clamps and hands to the renderer (0x00521641..0x00521670).
+                // The mesh merge clamps it and hands it to the renderer.
                 Lod = FloatToIntTrunc(Reader.get_value_float(0));
             }
             else if (Reader.is_value("tint_field"))
@@ -874,21 +828,17 @@ namespace
 
 FCliAsteroid* CliAsteroidConstruct(FCliAsteroid* This)
 {
-    // FUN_005201e0.
     return CliAsteroidConstructRetail(This);
 }
 
 void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
 {
-    // FUN_00520850. No entry test of `This` or the file name.
-    // 0x00520875..0x0052087c: the INI_Reader is constructed first.
+    // No entry null test of `This` or the file name, as retail.
     INI_Reader Reader;
 
-    // 0x00520882..0x005208a3: GetFileSysPath(buf, file, DALib::Data).
     char FieldIniPath[MAX_PATH] = {};
     GetFileSysPath(FieldIniPath, FieldIniRel, DALib::Data);
 
-    // 0x005208a9..0x005208de; [ESP+0x30] is the LOD local ([Field] "LOD", read by the merge).
     This->CubeSize = 0xfa;
     This->EmptyCubeFreq = 0.0f;
     int Lod = 0;
@@ -898,19 +848,17 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     This->Flag180 = 0;
     This->Flag00 = 0;
 
-    // 0x005208e2..0x00520901: a field with no zone (+0x1c) is reported and loading goes on.
+    // A field with no zone is reported and loading goes on.
     if (This->Zone == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: Asteroid field (%s) must be hooked up to a zone",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x187, FieldIniRel);
     }
 
-    // 0x00520904..0x005209e8: the exclusion bands and the dynamic asteroid managers dropped.
     BandVectorClear(This);
     DynVectorClear(This);
 
-    // 0x005209eb..0x00520a04: INI_Reader::open(path, false); a failure goes to the FDUMP at
-    // 0x00521371 and then on to the band/billboard/mesh tail at 0x00521399.
+    // An open failure is reported and still runs the band/billboard/mesh tail.
     if (!Reader.open(FieldIniPath, false))
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: asteroid field ini file (%s) could not be opened",
@@ -918,19 +866,16 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     }
     else
     {
-        // 0x00520a0a..0x00520a1d: +0x2c = 1, the reader's state saved for the common field.
+        // The reader's state is saved for the common field.
         This->Flag2C = 1;
 
         INI_Reader::State Saved;
         Reader.get_state(Saved);
 
-        // 0x00520a23..0x00521285: every header.
         while (Reader.read_header())
         {
             if (Reader.is_header("TexturePanels"))
             {
-                // 0x00520a5f..0x00520ab7: every "file" -> FUN_00425b30(GetFullFilename(value),
-                // no base filesystem) on the ShapeDB (+0xe0).
                 while (Reader.read_value())
                 {
                     if (!Reader.is_value("file"))
@@ -946,8 +891,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             }
             else if (Reader.is_header("Band"))
             {
-                // 0x00520e52..0x00520ee1: +0xf8 = 1, FUN_0054c630 / FUN_0054d970 /
-                // FUN_0054dab0 on the field's own band (+0xfc).
+                // The field's own band (+0xfc).
                 This->FlagF8 = 1;
                 BandParseIni(This->BandBlob, Reader, ShapeDBAt(This->ShapeDbE0));
                 float Diffuse[3] = {This->TintB4, This->TintB8, This->TintBC};
@@ -960,24 +904,19 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             }
             else if (Reader.is_header("ExclusionBand"))
             {
-                // 0x00520efc..0x00520f0b: the section's state saved.
                 INI_Reader::State ExState;
                 Reader.get_state(ExState);
 
-                // 0x00520f11..0x00520f56: operator new(0x84) + FUN_0054c580 (only on a
-                // non-null block), pushed onto the +0x184 vector (FUN_00537260).
                 unsigned char* Blob = static_cast<unsigned char*>(operator new(0x84));
                 if (Blob != nullptr)
                     InitBandBlob(Blob);
                 BandVectorPush(This, Blob);
 
-                // 0x00520f5b..0x00520f75: the vector's last element (no test) gets
-                // FUN_0054c630.
+                // The vector's last element, no null test, as retail.
                 unsigned char* const Last = This->BandEnd[-1];
                 BandParseIni(Last, Reader, ShapeDBAt(This->ShapeDbE0));
 
-                // 0x00520f7a..0x0052100f: the section again; every "zone" resolved with
-                // Universe::get_zone on FUN_00554e90's system into +4, FDUMP when missing.
+                // The section again: every "zone" into +4.
                 Reader.set_state(ExState);
                 while (Reader.read_value())
                 {
@@ -1002,8 +941,6 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             }
             else if (Reader.is_header("AsteroidBillboards"))
             {
-                // 0x00521026..0x00521067: +0x198 = 1, FUN_00550000(DAT_00613844),
-                // FUN_0054dbe0, FUN_0054fee0 on the billboards (+0x19c).
                 This->Flag198 = 1;
                 BillboardSetQuality(&This->Billboard, AsteroidDetailScalar());
                 BillboardParseIni(&This->Billboard, Reader, ShapeDBAt(This->ShapeDbE0));
@@ -1013,32 +950,24 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             }
             else if (Reader.is_header("DynamicAsteroids"))
             {
-                // FUN_00520850 [DynamicAsteroids] (0x00521087..0x0052126d).
                 INI_Reader::State SavedDyn;
                 Reader.get_state(SavedDyn);
 
-                // 0x0052109c..0x005210e5: operator new(0xe8), FUN_005256a0(CmnField), pushed
-                // onto the +0x220 vector (FUN_00537260); the record is read back as the
-                // vector's last.
                 FCliDynamicAsteroid* const Dyn = CliDynamicAsteroidConstruct(
                     static_cast<FCliDynamicAsteroid*>(operator new(sizeof(FCliDynamicAsteroid))),
                     This->CmnField);
                 DynVectorPush(This, Dyn);
 
-                // 0x005210ea..0x00521129: DetailScale = (1 - d) * 0.5 + d (d = DAT_00613844),
-                // stored with FST; InvDetailScale = 1 / the unrounded x87 value (FDIV ST0,ST1),
-                // no guard.
+                // InvDetailScale divides by the unrounded value; no zero guard.
                 double const Detail = AsteroidDetailScalar();
                 double const DetailScale = (1.0 - Detail) * 0.5 + Detail;
                 Dyn->DetailScale = static_cast<float>(DetailScale);
                 Dyn->InvDetailScale = static_cast<float>(1.0 / DetailScale);
 
-                // 0x0052112b: FUN_00525800.
                 CliDynamicAsteroidParseIni(Dyn, Reader);
 
-                // 0x00521130..0x005211df: the section again; every "zone" resolved with
-                // Universe::get_zone on FUN_00554e90's system into +0 (FDUMP ERROR 0x212 when
-                // missing); no zone found -> the field's zone, when it has one.
+                // The section again: every "zone" into +0; no zone found -> the field's zone,
+                // when it has one.
                 Reader.set_state(SavedDyn);
                 unsigned char bZoneSet = 0;
                 if (Reader.read_value())
@@ -1069,14 +998,12 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                 if (bZoneSet == 0 && This->Zone != nullptr)
                     Dyn->Zone = This->Zone;
 
-                // 0x005211e1..0x0052126d.
                 CliDynamicAsteroidApplyParentTints(Dyn, This);
             }
         }
 
-        // 0x0052128b..0x0052130b: the common field (+4) loads from the saved state, then gets
-        // its fill distance (+0x48 = ftol(fill * +0x230), x87 product) and empty frequency
-        // (+0x4c); +0xdc = its exclusion manager (+0x30). Without one: FDUMP.
+        // The common field loads from the saved state; the fill distance is truncated from the
+        // unrounded product.
         if (This->CmnField != nullptr)
         {
             Reader.set_state(Saved);
@@ -1094,9 +1021,8 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x22f, FieldIniRel);
         }
 
-        // 0x0052130e..0x0052136f: with billboards, the count (+0x1ac) raised to the exclusion
-        // manager's maximum, DensityScale (+0x1b8) = old count / new count (FIDIV, no zero
-        // test) and the manager normalized; without a manager DensityScale = 1.
+        // With billboards, the count raised to the exclusion manager's maximum and
+        // DensityScale = old count / new count (no zero test).
         if (This->Flag198 != 0)
         {
             int Use = This->Billboard.Count;
@@ -1118,8 +1044,8 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         }
     }
 
-    // 0x00521399..0x005213b9: the field's own band gets the zone (+0x100) and its rings
-    // (FUN_0054c8b0); the spoke cursor starts at its spoke count (+0x154).
+    // The field's own band gets the zone (+0x100) and its rings; the spoke cursor starts at its
+    // spoke count (+0x154).
     int BandSpokeCursor = 0;
     if (This->FlagF8 != 0)
     {
@@ -1127,9 +1053,9 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         BandBuildExclusionRings(This->BandBlob);
         BandSpokeCursor = static_cast<int>(*BandU(This->BandBlob, 0x16));
     }
-    // 0x005213bf..0x00521497: +0x194 = 0; with exclusion bands, +0x180 = 1 and every band gets
-    // the tints, the ambient increase and its rings, its spoke base (+0x5c) and adds its spoke
-    // count (+0x58) to +0x194. No test of the band pointer.
+    // Every exclusion band gets the tints, the ambient increase, its rings and its spoke base
+    // (+0x5c), and adds its spoke count (+0x58) to BandVertSum. No null test of the band, as
+    // retail.
     This->BandVertSum = 0;
     if (This->BandBegin != nullptr && This->BandEnd != This->BandBegin)
     {
@@ -1152,8 +1078,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         }
     }
 
-    // 0x0052149d..0x005214e2: with billboards, ZoneRef (+0x1b4) = the zone, FUN_0054de10, then
-    // FUN_0054feb0(fill * +0x230 stored as float, cube * 1.25 + that float).
+    // FillScaled is rounded to float before the add.
     if (This->Flag198 != 0)
     {
         This->Billboard.ZoneRef = This->Zone;
@@ -1165,9 +1090,8 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         BillboardSetFadePlanes(&This->Billboard, FillScaled, FadeFar);
     }
 
-    // 0x005214e7..0x00521516: the exclusion manager's CliAsteroid distance (fill * +0x230 *
-    // 1.25, squared into +0x14) and its DynamicAsteroid distance (+0x18 = 10000 = 100^2) --
-    // the two setters inlined.
+    // Retail inlines the two setters (CliAsteroid distance squared into +0x14, DynamicAsteroid
+    // distance 100^2 into +0x18).
     if (This->ExclusionMgr != nullptr)
     {
         This->ExclusionMgr->set_max_cliasteroid_exclusion_distance(static_cast<float>(
@@ -1175,24 +1099,19 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         This->ExclusionMgr->set_max_dynamicasteroid_exclusion_distance(100.0f);
     }
 
-    // 0x00521518..0x00521b01: the archetype mesh merge into +0xa0..+0xac and the vertex source.
+    // The archetype mesh merge into +0xa0..+0xac and the vertex source.
     CliAsteroidMergeCubeMesh(This, Lod, FieldIniRel);
-
-    // 0x00521b0c..0x00521f96: the INI_Reader's destructor (Reader goes out of scope).
 }
 
 bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
 {
-    // FUN_0051ff50(file, zone) (cdecl).
-    // 0x0051ff68..0x0051ffdf: operator new(0x238) + FUN_005201e0 (only on a non-null block),
-    // pushed onto DAT_006753c0 (FUN_0042a7e0 / FUN_005999b0, count DAT_006753c8) before
-    // anything can fail -- a field whose zone is missing stays on the list.
+    // Pushed onto the registry before anything can fail -- a field whose zone is missing stays
+    // on the list.
     FCliAsteroid* Obj = static_cast<FCliAsteroid*>(operator new(sizeof(FCliAsteroid)));
     if (Obj != nullptr)
         CliAsteroidConstruct(Obj);
     Registry().push_back(Obj);
 
-    // 0x0051ffeb..0x0051fff2: Universe::get_non_const_zone(FUN_00554e90(), zone).
     Universe::IZone* Zone = Universe::get_non_const_zone(StarSysGetActiveSystemId(), ZoneNickname);
     if (Zone == nullptr)
     {
@@ -1202,8 +1121,7 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
         return false;
     }
 
-    // 00520040: zone vt+0x18 (shape) must be 1 (sphere) or 2 (ellipsoid); anything else only
-    // warns.
+    // Any other zone shape only warns.
     unsigned const Shape = Zone->GetShape();
     if (Shape != Universe::ZoneShapeSphere && Shape != Universe::ZoneShapeEllipsoid)
     {
@@ -1214,13 +1132,10 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
               ZoneNickname);
     }
 
-    // 0x00520073..0x0052007e: +0x1c = zone; the common field (+4), when there is one, gets
-    // CmnAsteroid::CAsteroidField::set_zone.
     Obj->Zone = Zone;
     if (Obj->CmnField != nullptr)
         Obj->CmnField->set_zone(Zone);
 
-    // 0x00520084..0x00520095: FUN_00524880(DAT_00613844), then FUN_00520850(file); AL = 1.
     CliAsteroidApplyDetail(Obj, AsteroidDetailScalar());
     CliAsteroidLoadFieldIni(Obj, FieldIniRel);
     return true;
@@ -1228,14 +1143,13 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
 
 unsigned CliAsteroidRegistryCount()
 {
-    // FUN_005201c0: MOV EAX,[DAT_006753c8] (the list count).
+    // FUN_005201c0: the list count (DAT_006753c8).
     return static_cast<unsigned>(Registry().size());
 }
 
 void CliAsteroidUpdateFields(void* Camera, float Dt)
 {
-    // FUN_00520130(cam, dt): with ASTEROIDS (option 0x21) on, every field on DAT_006753c4 gets
-    // FUN_00522070(cam, dt) (0x0052015b), in list order. No null test of the field.
+    // No null test of the field, as retail.
     if (GetGameOption(kGameOptAsteroids) == 0)
         return;
     std::list<FCliAsteroid*>& List = Registry();
@@ -1245,11 +1159,7 @@ void CliAsteroidUpdateFields(void* Camera, float Dt)
 
 void CliAsteroidDestroyAll()
 {
-    // FUN_005200b0. 0x005200c0..0x005200e0: every non-null field gets FUN_005205d0 and
-    // operator delete; 0x005200e2..0x0052011b: every node unlinked and freed (the count at
-    // DAT_006753c8 decremented per node); AL = 1 (no caller reads it). An empty list (first node
-    // == sentinel, 0x005200b7..0x005200be) goes straight to the node loop at 0x005200e2, which
-    // has nothing to free -- no early return.
+    // Retail returns 1, which no caller reads.
     std::list<FCliAsteroid*>& List = Registry();
     for (std::list<FCliAsteroid*>::iterator It = List.begin(); It != List.end(); ++It)
     {
@@ -1265,28 +1175,22 @@ void CliAsteroidDestroyAll()
 
 void CliAsteroidDestruct(FCliAsteroid* This)
 {
-    // FUN_005205d0 (thiscall).
-    // 0x005205f2..0x00520609: the common field released (import), +4 = 0.
+    // Explicit releases in retail order, then the inlined member destructors.
     if (This->CmnField != nullptr)
     {
         This->CmnField->Release();
         This->CmnField = nullptr;
     }
-    // 0x0052060c..0x0052061c: the material (+0xa0) released through vt+8, +0xa0 = 0.
     if (This->Material != nullptr)
     {
         static_cast<IDAComponent*>(This->Material)->Release();
         This->Material = nullptr;
     }
-    // 0x00520622..0x0052064b: the merged vertices (+0xa4) and indices (+0xa8) freed and zeroed.
     operator delete(This->MeshVerts);
     This->MeshVerts = nullptr;
     operator delete(This->MeshIndices);
     This->MeshIndices = nullptr;
-    // 0x00520651: FUN_00425a20 -- the ShapeDB (+0xe0) cleared.
     ShapeDBAt(This->ShapeDbE0)->Clear();
-    // 0x00520656..0x00520695: every non-null exclusion band gets FUN_0054c600 and operator
-    // delete; 0x00520697..0x005206c8: the band vector erased (FUN_00527820 / FUN_0051a5a0).
     for (unsigned char** It = This->BandBegin; It != This->BandEnd; ++It)
     {
         unsigned char* const Blob = *It;
@@ -1297,8 +1201,6 @@ void CliAsteroidDestruct(FCliAsteroid* This)
         }
     }
     This->BandEnd = This->BandBegin;
-    // 0x005206cb..0x00520751: every non-null dynamic asteroid manager gets FUN_00525760 and
-    // operator delete, then the vector is erased.
     for (void** It = This->DynBegin; It != This->DynEnd; ++It)
     {
         FCliDynamicAsteroid* const Dyn = static_cast<FCliDynamicAsteroid*>(*It);
@@ -1309,36 +1211,26 @@ void CliAsteroidDestruct(FCliAsteroid* This)
         }
     }
     This->DynEnd = This->DynBegin;
-    // 0x00520754: the exclusion manager pointer (+0xdc) dropped.
     This->ExclusionMgr = nullptr;
-    // 0x0052075a..0x00520769: the dynamic asteroid vector's storage freed, its three words 0.
     operator delete(This->DynBegin);
     This->DynBegin = nullptr;
     This->DynEnd = nullptr;
     This->DynCap = nullptr;
-    // 0x0052076c..0x0052077e: the billboard rocks (+0x1a8) freed; Count (+0x1ac) and ZoneRef
-    // (+0x1b4) 0. The Rocks pointer itself is left as it was.
+    // The Rocks pointer itself is left as it was.
     operator delete(This->Billboard.Rocks);
     This->Billboard.Count = 0;
     This->Billboard.ZoneRef = nullptr;
-    // 0x00520784..0x005207a5: the band vector's storage freed, its three words 0.
     operator delete(This->BandBegin);
     This->BandBegin = nullptr;
     This->BandEnd = nullptr;
     This->BandCap = nullptr;
-    // 0x005207b0: FUN_0054c600 on the field's own band (+0xfc).
     BandFreeRingMesh(This->BandBlob);
-    // 0x005207b5..0x005207f3: the ShapeDB's destructor (erase all, head and storage freed).
     ShapeDBDestructAt(This->ShapeDbE0);
-    // 0x005207f6..0x00520834: the cube map's destructor (FUN_00527310 and the head freed).
     CliAsteroidCubeMapDestruct(This);
 }
 
 void CliAsteroidClampColorToOne(float* Rgb)
 {
-    // FUN_00521fa0 (cdecl). Each component: FCOMP 1.0, TEST AH,5 / JP -- taken when the value
-    // is >= 1.0 or unordered, which stores 1.0; otherwise the value is stored back unchanged.
-    // Nothing is clamped from below.
     for (int Index = 0; Index < 3; ++Index)
     {
         if (!(Rgb[Index] < 1.0f))
@@ -1348,7 +1240,7 @@ void CliAsteroidClampColorToOne(float* Rgb)
 
 float* CliAsteroidMulColor(float* Out, float const* A, float const* B)
 {
-    // FUN_00522000 (cdecl): the products on the FPU (z, y, x), stored x, y, z; returns Out.
+    // Products computed z, y, x, stored x, y, z.
     float const Z = A[2] * B[2];
     float const Y = A[1] * B[1];
     float const X = A[0] * B[0];
@@ -1360,8 +1252,7 @@ float* CliAsteroidMulColor(float* Out, float const* A, float const* B)
 
 I3DMathEngine* CliAsteroidMathEngine()
 {
-    // DAT_006753d8: tested and, when null, filled from FUN_005b73e0 at each use (0x0052183a,
-    // 0x00521881, 0x00523fab, 0x005244f7, 0x0052643c).
+    // Retail tests DAT_006753d8 and fills it at each of its five use sites.
     static I3DMathEngine* s_Math = nullptr;
     if (s_Math == nullptr)
         s_Math = Acquire3DMathEngine();
@@ -1370,18 +1261,15 @@ I3DMathEngine* CliAsteroidMathEngine()
 
 void CliAsteroidApplyGlobalDetail(float Detail)
 {
-    // LAB_005267f0 -- the Asteroids perf option (IDS 0x57c): DAT_00613844 = Detail,
-    // FUN_0054bd50 (the active camera's cut flag, +0xbc), then FUN_00524880(Detail) on every
-    // field.
     AsteroidDetailScalar() = Detail;
-    RaiseActiveSpaceCameraCut(); // 0x005267fb
+    RaiseActiveSpaceCameraCut(); // the camera's +0xbc flag re-scatters the billboards
     for (std::list<FCliAsteroid*>::iterator It = Registry().begin(); It != Registry().end(); ++It)
         CliAsteroidApplyDetail(*It, Detail);
 }
 
 int CliAsteroidPieceCount(FCliAsteroid* Field)
 {
-    // FUN_00524730: *(this+0x194) + *(this+0x154), no null test.
+    // No null test, as retail.
     int const Primary =
         static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58)); // dword 0x16
     return Primary + static_cast<int>(Field->BandVertSum);
@@ -1389,9 +1277,9 @@ int CliAsteroidPieceCount(FCliAsteroid* Field)
 
 namespace
 {
-    // FUN_0054d920 (thiscall on the band, RET 8: out, piece) — piece XYZ from the band's spoke
-    // table (+0x60, stride 0x18, XYZ at +8). Index - base (+0x5c), a negative result (JNS)
-    // clamped to 0; nothing is tested for null. Returns the out pointer.
+    // FUN_0054d920 (thiscall on the band) — piece XYZ from the band's spoke table (+0x60,
+    // stride 0x18, XYZ at +8). Index - base (+0x5c), a negative result clamped to 0; nothing is
+    // tested for null.
     float* BandGetPiecePos(unsigned char* Blob, int PieceIndex, float* OutXYZ)
     {
         int Rel = PieceIndex - static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
@@ -1405,7 +1293,7 @@ namespace
         return OutXYZ;
     }
 
-    // FUN_0054d950 (thiscall on the band, RET 4) — the radius float at spoke entry +0x14, same
+    // FUN_0054d950 (thiscall on the band) — the radius float at spoke entry +0x14, same
     // index clamp, no null test.
     float BandGetPieceRadius(unsigned char* Blob, int PieceIndex)
     {
@@ -1422,8 +1310,7 @@ namespace
     // DAT_006140a4 — two-sided band light soft threshold.
     constexpr float kBandLightSoft = 0.75f;
 
-    // FUN_00410960 lives in engine_light.cpp (EngineLightSample); this keeps the band bake's
-    // call site readable.
+    // FUN_00410960 (EngineLightSample) as an int.
     int BandSampleDirectionalLight(FEngineLight* Light, float const* ZonePos, float* OutDir3,
                                    float* InOutAmbient3, float* OutColor3)
     {
@@ -1447,7 +1334,7 @@ namespace
         if (LightCount <= 0)
             return;
 
-        unsigned char const* AmbientBytes = StarSysAmbientColor(); // FUN_00555470
+        unsigned char const* AmbientBytes = StarSysAmbientColor();
         float const AmbScale = *reinterpret_cast<float*>(Blob + 0x08);
         float AmbR =
             (static_cast<float>(AmbientBytes[0]) * 0.003921569f +
@@ -1547,8 +1434,8 @@ namespace
         Blob[0x7c] = 1;
     }
 
-    // FUN_0054c420 (thiscall on one 0x3c-byte spoke, RET 0x14: camera position and the band's
-    // four squared distances) -- the spoke's fade (+0x34) and facing flag (+0x38). Spoke:
+    // FUN_0054c420 (thiscall on one 0x3c-byte spoke) -- the spoke's fade (+0x34) and facing
+    // flag (+0x38) from the camera position and the band's four squared distances. Spoke:
     // position +0x00, axis +0x10. No null tests.
     void BandUpdateSpokeFade(unsigned char* Spoke, Vector const* CamPos, float InnerSq,
                              float NearSq, float FarSq, float OuterSq)
@@ -1557,24 +1444,24 @@ namespace
         float* const Axis = reinterpret_cast<float*>(Spoke + 0x10);
         float* const Fade = reinterpret_cast<float*>(Spoke + 0x34);
 
-        // 0x0054c427..0x0054c45f: the offset to the camera (stored as floats), its squared
-        // length summed x*x + z*z, then + y*y.
+        // Only the offsets are rounded to float; the squared length (x*x + z*z, then + y*y)
+        // stays unrounded.
         float const Dx = CamPos->x - Pos[0];
         float const Dy = CamPos->y - Pos[1];
         float const Dz = CamPos->z - Pos[2];
-        // The products and sums stay on the FPU (double here), only the offsets are floats.
         double const DistSq = (static_cast<double>(Dx) * Dx + static_cast<double>(Dz) * Dz) +
                               static_cast<double>(Dy) * Dy;
 
-        // 0x0054c461..0x0054c4ca. DL (bInside) is set only by the inner branch.
+        // bInside is set only by the inner branch. Each compare is ordered (NaN takes the
+        // "else" way).
         bool bInside = false;
-        if (DistSq > NearSq) // FCOM p3, TEST AH,0x41 / JNZ: not greater -> 0x0054c4a4
+        if (DistSq > NearSq)
         {
-            if (DistSq < FarSq) // FCOM p4, TEST AH,5 / JP: greater, equal or unordered -> 480
+            if (DistSq < FarSq)
             {
                 *Fade = 1.0f;
             }
-            else if (DistSq > OuterSq) // FCOM p5, TEST AH,0x41 / JNZ -> 494
+            else if (DistSq > OuterSq)
             {
                 *Fade = 0.0f;
             }
@@ -1583,7 +1470,7 @@ namespace
                 *Fade = static_cast<float>((OuterSq - DistSq) / (OuterSq - FarSq));
             }
         }
-        else if (DistSq < InnerSq) // FCOM p2, TEST AH,5 / JP -> 0x0054c4ba
+        else if (DistSq < InnerSq)
         {
             *Fade = 0.0f;
             bInside = true;
@@ -1593,19 +1480,14 @@ namespace
             *Fade = static_cast<float>((DistSq - InnerSq) / (NearSq - InnerSq));
         }
 
-        // 0x0054c4cd..0x0054c4df: FCOMP 0.0, TEST AH,0x41 / JZ -- a fade above 0, or the inner
-        // case, goes on; otherwise nothing more.
         if (!(*Fade > 0.0f) && !bInside)
             return;
 
-        // 0x0054c4e5..0x0054c50e: the unit offset (1.0 / sqrt) dotted with the axis, summed
-        // z, y, then x.
+        // The unit offset dotted with the axis, summed z, y, then x.
         double const Inv = 1.0 / sqrt(DistSq);
         double const Dot = (Dz * Inv * Axis[2] + Dy * Inv * Axis[1]) + Dx * Inv * Axis[0];
-        // 0x0054c510..0x0054c528: +0x38 = Dot > 0 (TEST AH,0x41 / JNZ -> 0).
         Spoke[0x38] = (Dot > 0.0) ? 1 : 0;
-        // 0x0054c526..0x0054c573: |Dot| stored as a float; below 0.3 (DAT_005d3e08) the spoke
-        // is hidden, below 0.5 (DAT_005c75e0) it fades by (|Dot| - 0.3) * 5 (DAT_005e0a60).
+        // |Dot| rounded to float; 0.3 at DAT_005d3e08, 0.5 at DAT_005c75e0, 5 at DAT_005e0a60.
         float const AbsDot = static_cast<float>(fabs(Dot));
         if (AbsDot < 0.3f)
         {
@@ -1616,17 +1498,17 @@ namespace
             *Fade = (AbsDot - 0.3f) * *Fade * 5.0f;
     }
 
-    // FUN_0054d410 (thiscall on the band, RET 4: camera position) -- the band's per-frame
-    // update from FUN_00522070: the lighting baked on the second call (+0x80 counts up while
-    // +0x7c is clear), then, unless the fraction (+0x54) is below 0.001 (DAT_005c75f8, TEST
-    // AH,5 / JNP), every spoke's fade against the squares of the four distances +0x64..+0x70.
+    // FUN_0054d410 (thiscall on the band) -- the band's per-frame update from CliAsteroidUpdate:
+    // the lighting baked on the second call (+0x80 counts up while +0x7c is clear), then, unless
+    // the fraction (+0x54) is below 0.001 (DAT_005c75f8), every spoke's fade against the squares
+    // of the four distances +0x64..+0x70.
     void BandUpdate(unsigned char* Blob, Vector const* CamPos)
     {
         if (Blob[0x7c] == 0)
         {
             int* const Calls = reinterpret_cast<int*>(Blob + 0x80);
             *Calls = *Calls + 1;
-            if (*Calls > 1) // JLE skips
+            if (*Calls > 1)
                 BandBakeLighting(Blob);
         }
 
@@ -1647,28 +1529,25 @@ namespace
             BandUpdateSpokeFade(Spokes + Index * 0x3c, CamPos, ASq, BSq, CSq, DSq);
     }
 
-    // FUN_0054d4e0 (thiscall on the band, RET 8) — Win3D triangle-pair quads for one spoke
-    // piece index. Retail's first stack argument (the camera position FUN_00522850 passes) is
+    // FUN_0054d4e0 (thiscall on the band) — Win3D triangle-pair quads for one spoke piece index.
+    // Retail's first stack argument (the camera position CliAsteroidDrawFarPiece passes) is
     // never read, so the port drops it. Nothing is tested for null.
     void BandDrawPiece(unsigned char* Blob, int PieceIndex)
     {
-        // 0x0054d4ea..0x0054d4f5: bake the lighting once (+0x7c).
         if (Blob[0x7c] == 0)
             BandBakeLighting(Blob);
 
-        // 0x0054d4fa..0x0054d511: Rel = piece - base (+0x5c); >= count (+0x58) or < 0 -> 0.
+        // Rel = piece - base (+0x5c); >= count (+0x58) or < 0 -> 0.
         int Rel = PieceIndex - static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
         int const RenderParts = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x58));
         if (Rel >= RenderParts || Rel < 0)
             Rel = 0;
 
-        // 0x0054d513..0x0054d521: FCOMP 0.01f (DAT_005c99c8), TEST AH,5 / JNP -- strictly below
-        // leaves; >= and unordered go on.
+        // 0.01f at DAT_005c99c8; NaN goes on.
         float const MaxAlpha = *reinterpret_cast<float*>(Blob + 0x54);
         if (MaxAlpha < 0.01f)
             return;
 
-        // 0x0054d527..0x0054d538: 1.0f / float(+0x4c), stored float.
         int const VertInc = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x4c));
         float const InvVertInc = static_cast<float>(1.0 / static_cast<double>(VertInc));
         int const PointCount = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x44));
@@ -1676,13 +1555,11 @@ namespace
         float* Particles = *reinterpret_cast<float**>(Blob + 0x3c);
         unsigned char* Spokes = *reinterpret_cast<unsigned char**>(Blob + 0x60);
 
-        // 0x0054d53c..0x0054d54a: a shape at +0 binds FUN_00425640(shape, 0) -- whatever that
-        // returns, null included.
+        // A shape at +0 binds its frame-0 handle, null included.
         FTexShape const* Shape = *reinterpret_cast<FTexShape const**>(Blob);
         if (Shape != nullptr)
             Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0));
 
-        // 0x0054d54d..0x0054d578: spoke end (+4), texture cursor 0 / 1, Begin(4).
         int const EndIdx = *reinterpret_cast<int*>(Spokes + Rel * 0x18 + 4);
         int const StartIdx = *reinterpret_cast<int*>(Spokes + Rel * 0x18);
         int UCursor = 0;
@@ -1691,8 +1568,7 @@ namespace
 
         for (int Pass = 0; Pass < 2; ++Pass)
         {
-            // 0x0054d580..0x0054d59e: the pass whose number + 1 equals the cull mode (+0x50) is
-            // skipped (mode 1 drops pass 0, mode 2 drops pass 1); an empty spoke skips too.
+            // Cull mode 1 drops pass 0, mode 2 drops pass 1.
             if (Pass + 1 == CullMode)
                 continue;
             if (StartIdx >= EndIdx)
@@ -1761,18 +1637,14 @@ namespace
                         ColorB = PartB + 7;
                     }
 
-                    // 0x0054d6ad..0x0054d6de: TEST AH,5 / JP on each -- the quad is skipped only
-                    // when both alphas are strictly below 0.01f (unordered draws).
+                    // Skipped only when both alphas are strictly below 0.01f (NaN draws).
                     if (!(AlphaA < 0.01f) || !(AlphaB < 0.01f))
                     {
-                        // 0x0054d6e4..0x0054d70e: TEST AH,0x41 / JNZ -- only an alpha strictly
-                        // above +0x54 is clamped to it.
                         if (MaxAlpha < AlphaA)
                             AlphaA = MaxAlpha;
                         if (MaxAlpha < AlphaB)
                             AlphaB = MaxAlpha;
 
-                        // 0x0054d712..0x0054d72a: FILD cursor * the stored reciprocal.
                         float const U0 = static_cast<float>(UCursor) * InvVertInc;
                         float const U1 = static_cast<float>(UNext) * InvVertInc;
                         float const HalfH = PartA[3];
@@ -1815,11 +1687,8 @@ namespace
 
 void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 {
-    // FUN_00522070 (thiscall, RET 8: camera, dt).
-
-    // 0x0052208e..0x005220c3: once (+0x21c, set by the constructor), with a zone: the nebula
-    // at the zone's position (IZone vt+0x10, FUN_005553b0(pos, 0, 0)) into +0xd4. The flag is
-    // cleared either way.
+    // Once (Flag21C, set by the constructor), with a zone: the nebula at the zone's position
+    // into +0xd4. The flag is cleared either way.
     if (This->Flag21C != 0 && This->Zone != nullptr)
     {
         This->ZeroD4 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
@@ -1827,21 +1696,17 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
     }
     This->Flag21C = 0;
 
-    // 0x005220ca..0x005220e2: the camera position (vt+0xc) copied.
     float const* const Pos3 = AsCamera(Cam)->GetPosition();
     Vector CamPos;
     CamPos.x = Pos3[0];
     CamPos.y = Pos3[1];
     CamPos.z = Pos3[2];
 
-    // 0x005220e0..0x005220f0: nothing more without ASTEROIDS.
     if (GetGameOption(kGameOptAsteroids) == 0)
         return;
 
-    // 0x005220f6..0x0052213b: the exclusion timer (+0xd8) advanced by dt. Above 0.5
-    // (DAT_00613848; FCOMP, TEST AH,0x41 / JZ taken when greater) or on a camera cut (the
-    // camera's +0xbc byte), the timer is reset and the exclusion manager, when there is one,
-    // re-sorted around the camera (vt+8).
+    // The exclusion timer (+0xd8): above 0.5 (DAT_00613848) or on a camera cut (the camera's
+    // +0xbc byte), the exclusion manager is re-sorted around the camera.
     This->FloatD8 += Dt;
     if (This->FloatD8 > 0.5f || Cam->FlagBC != 0)
     {
@@ -1850,28 +1715,22 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
             This->ExclusionMgr->sort(&CamPos);
     }
 
-    // 0x00522140..0x00522157: [OBJECTS] and the common field.
     if (GetGameOption(kGameOptObjectsGroup) != 0 && This->CmnField != nullptr)
     {
         FCliAsteroidCubeMap& Cubes = CliAsteroidCubeMap(This);
 
-        // 0x0052215d..0x00522305: every change event of the common field, in list order.
+        // Every change event of the common field, in list order.
         for (CmnAsteroid::asteroid_marker* Event = This->CmnField->get_changes();
              Event != nullptr; Event = Event->Next)
         {
-            // 0x00522177..0x00522195: FUN_00432240 -- find the event's cube (+0).
             FCliAsteroidCubeMap::iterator It = Cubes.find(Event->CubeId);
             if (It == Cubes.end())
             {
-                // 0x0052219a..0x00522273: a default value inserted under the cube id
-                // (FUN_00526a40 / FUN_00526d20), the temporaries destroyed.
                 It = Cubes.insert(std::pair<unsigned long const, FCliAsteroidCube>(
                                       Event->CubeId, FCliAsteroidCube()))
                          .first;
                 FCliAsteroidCube& Value = It->second;
-                // 0x00522273..0x005222f1: the common cube (find_cube, by value) copied in --
-                // the pointer, get_id, its +0x0c orientation and +0x30 position, and the
-                // field's cube size (+0x20) -- or FDUMP warning 0x31d when it is missing.
+                // The common cube copied in (looked up by value).
                 CmnAsteroid::CAsteroidCube* const Cube = This->CmnField->find_cube(Event->CubeId);
                 if (Cube != nullptr)
                 {
@@ -1888,12 +1747,10 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
                           "no cmn cube found");
                 }
             }
-            // 0x005222f4..0x005222f7: FUN_00524cb0(event) on the value.
             It->second.ApplyEvent(Event);
         }
 
-        // 0x0052230b..0x0052237b: every cube with no asteroid left (the inner map's size,
-        // node +0x5c) erased (FUN_00526f30); the others kept.
+        // Cubes with no asteroid left are erased.
         FCliAsteroidCubeMap::iterator CubeIt = Cubes.begin();
         while (CubeIt != Cubes.end())
         {
@@ -1903,8 +1760,7 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
                 ++CubeIt;
         }
 
-        // 0x0052237d..0x005223b0: every dynamic asteroid manager gets FUN_00525c80(camera, dt,
-        // the exclusion manager, re-read per manager).
+        // The exclusion manager is re-read per manager.
         for (void** DynIt = This->DynBegin; DynIt != This->DynEnd; ++DynIt)
         {
             CliDynamicAsteroidUpdate(static_cast<FCliDynamicAsteroid*>(*DynIt), Cam, Dt,
@@ -1912,8 +1768,7 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
         }
     }
 
-    // 0x005223b2..0x005223ec: [EFFECTS], the common field, ASTEROID_EXT in (0, 3) (signed:
-    // JLE / JGE).
+    // [EFFECTS], the common field, ASTEROID_EXT in (0, 3) (signed compares).
     if (GetGameOption(kGameOptEffectsGroup) == 0 || This->CmnField == nullptr)
         return;
     if (GetGameOption(kGameOptAsteroidExt) <= 0)
@@ -1921,12 +1776,10 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
     if (GetGameOption(kGameOptAsteroidExt) >= 3)
         return;
 
-    // 0x005223ee..0x00522403: the field's own band (+0xfc) when [Band] was read (+0xf8).
     if (This->FlagF8 != 0)
         BandUpdate(This->BandBlob, &CamPos);
 
-    // 0x00522408..0x0052245a: with exclusion bands (+0x180): near_field_fraction(camera,
-    // 1000.0f) once, then per band +0x54 = that fraction and FUN_0054d410.
+    // Exclusion bands: one near-field fraction into every band's +0x54.
     if (This->Flag180 == 0)
         return;
     float const Fraction = This->CmnField->near_field_fraction(CamPos, 1000.0f);
@@ -1939,14 +1792,13 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 
 float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ)
 {
-    // FUN_00524740 (thiscall, RET 8: out, piece; returns out). 0x00524740..0x00524767: a
-    // piece in [0, band count +0x154) comes from the field's own band (+0xfc, FUN_0054d920).
+    // A piece in [0, band count +0x154) comes from the field's own band.
     int const Primary = static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
     if (PieceIndex < Primary && PieceIndex >= 0)
         return BandGetPiecePos(Field->BandBlob, PieceIndex, OutXYZ);
 
-    // 0x0052476a..0x00524795: otherwise the exclusion-band vector [+0x188, +0x18c) -- the first
-    // band with base (+0x5c) <= piece < base + count (+0x58); entries are read unchecked.
+    // Otherwise the first exclusion band with base (+0x5c) <= piece < base + count (+0x58);
+    // entries are read unchecked.
     for (unsigned char** It = Field->BandBegin; It != Field->BandEnd; ++It)
     {
         unsigned char* const Blob = *It;
@@ -1956,8 +1808,6 @@ float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ
             return BandGetPiecePos(Blob, PieceIndex, OutXYZ);
     }
 
-    // 0x00524797..0x005247d5: no band holds it -- warn (CliAsteroid.cpp line 0x699) and zero
-    // the out vector.
     FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x699,
           "bad piece number supplied to get_piece_pos in asteroid field");
@@ -1969,13 +1819,11 @@ float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ
 
 float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex)
 {
-    // FUN_005247f0 (thiscall, RET 4). 0x005247f0..0x0052480e: own band (+0xfc) tail-jumps
-    // into FUN_0054d950.
+    // Same band lookup as CliAsteroidGetPiecePos.
     int const Primary = static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
     if (PieceIndex < Primary && PieceIndex >= 0)
         return BandGetPieceRadius(Field->BandBlob, PieceIndex);
 
-    // 0x00524813..0x00524838 / 0x0052486f: the exclusion-band vector, read unchecked.
     for (unsigned char** It = Field->BandBegin; It != Field->BandEnd; ++It)
     {
         unsigned char* const Blob = *It;
@@ -1985,18 +1833,16 @@ float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex)
             return BandGetPieceRadius(Blob, PieceIndex);
     }
 
-    // 0x00524840..0x0052486c: warn (line 0x6ad) and return 1.0f (DAT_005c75dc).
     FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x6ad,
           "bad piece number supplied to get_piece_radius in asteroid field");
-    return 1.0f;
+    return 1.0f; // DAT_005c75dc
 }
 
 void CliAsteroidForEach(FCliAsteroidVisitFn Fn, void* Ctx)
 {
-    // The head->next walk of FUN_005201d0's list that FUN_0051ba20 (0x0051ba79..0x0051ba93)
-    // and FUN_00511b90 (0x00511c52..0x00511c90) inline; both read [node+8] unchecked. Entries
-    // come only from FUN_0051ff50's operator new (CliAsteroidCreateAndLoad), never null.
+    // The list walk FUN_0051ba20 and FUN_00511b90 inline; both read the entry unchecked.
+    // Entries come only from CliAsteroidCreateAndLoad's operator new.
     std::list<FCliAsteroid*>& List = Registry();
     for (std::list<FCliAsteroid*>::iterator It = List.begin(); It != List.end(); ++It)
         Fn(*It, Ctx);
@@ -2004,8 +1850,7 @@ void CliAsteroidForEach(FCliAsteroidVisitFn Fn, void* Ctx)
 
 void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIndex)
 {
-    // FUN_00522850 (thiscall on the field, RET 8: cam, piece) — FAR band draw for one piece
-    // index. 0x00522856..0x005228ad: the gates; nothing is tested for null.
+    // Nothing is tested for null.
     if (Field->FlagF8 == 0 && Field->Flag180 == 0)
         return;
     if (GetGameOption(kGameOptAsteroidExt) == 0)
@@ -2017,40 +1862,34 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
     if (Field->Flag234 == 0)
         return;
 
-    // 0x005228b4..0x005228f0: the camera's orientation (vt+0x10) and position (vt+0x0c) are
-    // copied to locals and the zone's position (+0x1c, vt+0x10) fetched; all three are const
-    // getters whose results nothing reads -- the position copy is only handed to FUN_0054d4e0 as
-    // its unread first argument -- so the port does not make the calls.
-    // 0x005228f3..0x0052291a: near / far (vt+0x20 / +0x24), then FUN_0040fb60(near, 250000.0f
-    // DAT_00610534) -- the two stores at camera +0xa4 / +0xa8.
+    // Retail also fetches the camera orientation and position and the zone position; they are
+    // const getters whose results nothing reads (the position is only BandDrawPiece's unread
+    // first argument), so the port does not make the calls.
+    // FUN_0040fb60(near, 250000.0f DAT_00610534): the two stores at camera +0xa4 / +0xa8.
     ICamera* const Camera = AsCamera(Cam);
     float const SavedNear = Camera->GetZNear();
     float const SavedFar = Camera->GetZFar();
     Cam->ZNear = SavedNear;
     Cam->ZFar = 250000.0f;
 
-    // DAT_00613850: .data 1, read here only (XREF[1] 0x0052291a), no writer.
+    // DAT_00613850: .data 1, read here only, no writer.
     static unsigned long s_BandDrawEnable = 1;
     if (s_BandDrawEnable != 0)
     {
-        // 0x00522927..0x00522960: FUN_00421ed0 disables, FUN_00421dd0 enables.
-        Win3DDisable(kWin3DLightingCap); // 0xb50
-        Win3DDisable(kWin3DCullFace);    // 0xb44
-        Win3DSetDepthWrite(0);           // FUN_00422190(0)
-        Win3DDisable(kWin3DDepthTest);   // 0xb71
-        Win3DEnable(kWin3DBlend);        // 0xbe2
-        Win3DApplyCamera(Camera);        // FUN_00422950(cam)
-        Win3DSetBlendFunc(5, 6);         // FUN_004220c0(5, 6)
+        Win3DDisable(kWin3DLightingCap);
+        Win3DDisable(kWin3DCullFace);
+        Win3DSetDepthWrite(0);
+        Win3DDisable(kWin3DDepthTest);
+        Win3DEnable(kWin3DBlend);
+        Win3DApplyCamera(Camera);
+        Win3DSetBlendFunc(5, 6);
 
-        // 0x00522965..0x0052299b: pipeline state 0x18 saved (slot +0xf4, zero-initialised
-        // out), then set to 5 (slot +0xf0).
         int SavedRs18 = 0;
         DALib::Pipeline->GetRenderState(D3DRS_ALPHAREF, &SavedRs18);
         DALib::Pipeline->SetRenderState(D3DRS_ALPHAREF, 5);
 
-        // 0x0052299b..0x005229f1: the own band (+0xfc) when piece < count (+0x154) + base
-        // (+0x158); otherwise the first exclusion band (vector +0x188..+0x18c, read unchecked)
-        // with base <= piece < base + count. No band -- nothing drawn.
+        // The own band when piece < count (+0x154) + base (+0x158); otherwise the first
+        // exclusion band that holds it, read unchecked. No band -- nothing drawn.
         int const PrimaryCount =
             static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
         int const PrimaryBase =
@@ -2075,15 +1914,13 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
             }
         }
 
-        // 0x005229f6..0x00522a30: states back, then state 0x18.
-        Win3DDisable(kWin3DBlend);     // 0xbe2
-        Win3DEnable(kWin3DDepthTest);  // 0xb71
-        Win3DSetDepthWrite(1);         // FUN_00422190(1)
-        Win3DEnable(kWin3DCullFace);   // 0xb44
+        Win3DDisable(kWin3DBlend);
+        Win3DEnable(kWin3DDepthTest);
+        Win3DSetDepthWrite(1);
+        Win3DEnable(kWin3DCullFace);
         DALib::Pipeline->SetRenderState(D3DRS_ALPHAREF, SavedRs18);
     }
 
-    // 0x00522a36..0x00522a44: FUN_0040fb60(near, far) and the camera applied again.
     Cam->ZNear = SavedNear;
     Cam->ZFar = SavedFar;
     Win3DApplyCamera(Camera);
@@ -2091,31 +1928,27 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
 
 namespace
 {
-    // .rdata DAT_005c9804 — Ghidra (fVar1+fVar2)*1.25; DAT_005c75dc = 1.0f.
-    constexpr float kBillboardMarginScale = 1.25f;
-    constexpr float kAmbientScaleArg = 100.0f; // 0x42c80000 pushed into FUN_00522700
+    constexpr float kBillboardMarginScale = 1.25f; // DAT_005c9804
+    constexpr float kAmbientScaleArg = 100.0f;     // pushed into FUN_00522700
 
-    // FUN_0054e040(Billboard*, CamPos) — zone-proximity gate for billboard draw.
+    // FUN_0054e040 — zone-proximity gate for the billboard draw. The block is never tested.
     bool BillboardNearCamera(FAsteroidBillboardBlock* Bb, Vector const& CamPos)
     {
-        // .text:0054e046-0054e053: no zone -> true. (ESI = the billboard block, never tested.)
         Universe::IZone* Zone = Bb->ZoneRef;
         if (Zone == nullptr)
             return true;
 
-        // .text:0054e056-0054e063: (F04 + F00) * 1.25f, stored as a float.
+        // Stored as a float.
         float const Margin = (Bb->Float04 + Bb->Float00) * kBillboardMarginScale;
 
-        // .text:0054e067-0054e089: the offset from the zone's vt+0x10 position, as floats.
         Vector const& ZonePos = Zone->GetPos();
         Vector Dir;
         Dir.x = CamPos.x - ZonePos.x;
         Dir.y = CamPos.y - ZonePos.y;
         Dir.z = CamPos.z - ZonePos.z;
 
-        // .text:0054e08f-0054e0c5: vt+0x30 + Margin on the stack; (dx^2 + dz^2) + dy^2 is
-        // stored as a float and compared on the stack with Reach^2: TEST 0x41 / JZ -> false
-        // when the distance is greater.
+        // Reach and the squared distance are compared unrounded; the float copy of the
+        // distance feeds the sqrt below.
         double const Reach = static_cast<double>(Zone->GetRadius()) + Margin;
         double const DistSq = (static_cast<double>(Dir.x) * Dir.x + static_cast<double>(Dir.z) * Dir.z) +
                               static_cast<double>(Dir.y) * Dir.y;
@@ -2123,38 +1956,34 @@ namespace
         if (DistSq > Reach * Reach)
             return false;
 
-        // .text:0054e0c7-0054e105: the float distance, the direction scaled by 1.0f / it (no
-        // zero test), then vt+0x40 on it.
+        // No zero test.
         float const Dist = static_cast<float>(sqrt(static_cast<double>(DistSqF)));
         double const Inv = 1.0f / static_cast<double>(Dist);
         Dir.x = static_cast<float>(Dir.x * Inv);
         Dir.y = static_cast<float>(Dir.y * Inv);
         Dir.z = static_cast<float>(Dir.z * Inv);
 
-        // .text:0054e108-0054e115: Dist - vt+0x40 vs Margin, TEST 0x41 / JP -> false when
-        // greater or unordered.
+        // NaN -> false.
         return (static_cast<double>(Dist) - Zone->GetRadiusAlong(Dir)) <= Margin;
     }
 
-    // FUN_00522700 (thiscall on the field, RET 8) -- light the field around a point Scale
-    // along the camera's view axis: StarSys object lighting (FUN_005554d0) at that point with
-    // radius 250, then the ambient read back (FUN_00410280), raised by ambient_increase
-    // (+0xd0..+0xd2, each channel capped at 0xff) and written again (FUN_00410240).
+    // FUN_00522700 (thiscall on the field) -- light the field around a point Scale along the
+    // camera's view axis: StarSys object lighting at that point with radius 250, then the
+    // ambient read back, raised by ambient_increase (+0xd0..+0xd2, each channel capped at 0xff)
+    // and written again.
     void CliAsteroidAmbientPass(FCliAsteroid* Field, FSpaceCamera* Cam, float Scale)
     {
         ICamera* const Camera = AsCamera(Cam);
 
-        // 0x0052270b..0x00522748: the orientation's third column (+0x8 / +0x14 / +0x20) times
-        // Scale, each product stored as a float.
+        // The orientation's third column times Scale, each product stored as a float.
         float const* const Orient = Camera->GetOrientation();
         float const AxisX = Orient[2] * Scale;
         float const AxisY = Orient[5] * Scale;
         float const AxisZ = Orient[8] * Scale;
 
-        // 0x00522740..0x00522778: the fog factor starts at 1.0f. With contains_fog_zone (+0xd3):
-        // a field controller (DAT_00675244) with the camera inside it (DAT_0067524c) becomes
-        // +0xd4 and its vt+0x24 value (FSTP float) the factor; otherwise +0xd4 = 0. Without
-        // the flag +0xd4 is left as it is.
+        // With contains_fog_zone (+0xd3): a field controller (DAT_00675244) with the camera
+        // inside it (DAT_0067524c) becomes +0xd4 and its value the fog factor; otherwise
+        // +0xd4 = 0. Without the flag +0xd4 is left as it is.
         float FogFactor = 1.0f;
         if (Field->FlagD3 != 0)
         {
@@ -2171,10 +2000,9 @@ namespace
             }
         }
 
-        // 0x00522782..0x005227c1: that offset plus the camera position (vt+0xc), then
-        // FUN_005554d0(point, 250.0f, camera, +0xd4, factor bits, 1). (Port-only, FREELANCER_RP9:
-        // while the Direct3D 9 volumetric nebula draws the controller, StarSysApplyObjectLighting
-        // skips its fog block -- NebulaVolume::ReplacesObjectFog -- the ambient lerp stays.)
+        // Port-only, FREELANCER_RP9: while the Direct3D 9 volumetric nebula draws the
+        // controller, StarSysApplyObjectLighting skips its fog block
+        // (NebulaVolume::ReplacesObjectFog); the ambient lerp stays.
         float const* const CamPos = Camera->GetPosition();
         float Point[3];
         Point[0] = AxisX + CamPos[0];
@@ -2184,7 +2012,6 @@ namespace
         memcpy(&FogBits, &FogFactor, sizeof(FogBits));
         SpaceApplyObjectLighting(Point, 250.0f, Cam, Field->ZeroD4, FogBits, 1);
 
-        // 0x005227c6..0x00522836: D3DRS_AMBIENT back as bytes, plus ambient_increase, capped.
         unsigned char Ambient[3];
         EngineLightGetAmbientRgbBytes(Ambient);
         int R = static_cast<int>(Field->FlagD0) + static_cast<int>(Ambient[0]);
@@ -2203,10 +2030,7 @@ namespace
         EngineLightSetAmbientRgbBytes(Raised);
     }
 
-    // FUN_0051feb0 — fill the FRpVertexSrcDesc / Dyn MeshRegion (listing 444776-444830).
-    // cdecl (desc*, verts*, ushort vertCount). Stride 0x2C attribute table for VB upload.
-    // Listing 0051feb0..0051ff41 is straight-line: no test of Desc or Verts, the attribute
-    // bases are Verts + 0xc / 0x18 / 0x1c / 0x24 unconditionally.
+    // FUN_0051feb0 — no null test of Desc or Verts, as retail.
     void CliAsteroidFillMeshDesc(FRpVertexSrcDesc* Desc, void* Verts, unsigned short VertCount)
     {
         unsigned char* const Base = static_cast<unsigned char*>(Verts);
@@ -2245,10 +2069,9 @@ namespace
     static unsigned const kCubeVertStride = 0x2C;
 
     // FUN_00520850's local std::list element (node+0x08..+0x14, node 0x18 bytes): the
-    // vertices and indices of one asteroid archetype. The temporary pushed at 0x005216c7 is
-    // all zero and copied with FUN_0045a080 (four dwords); both the temporary (0x0052171f /
-    // 0x00521731) and every node at the end (0x00521ac7 / 0x00521ad6) free the two buffers,
-    // so the element owns them. Built in place here, never copied.
+    // vertices and indices of one asteroid archetype. Retail pushes an all-zero temporary
+    // (copied with FUN_0045a080, four dwords); both the temporary and every node at the end
+    // free the two buffers, so the element owns them. Built in place here, never copied.
     struct FAsteroidMergeChunk
     {
         unsigned char* Verts;    // node+0x08
@@ -2272,29 +2095,25 @@ namespace
         }
     };
 
-    // FUN_00520850 0x00521518..0x00521a90 (inline in retail; split out here as a helper of the
-    // same function). Lod is FUN_00520850's local [ESP+0x30] (the [Field] "LOD" key, 0 when
-    // absent); FieldIniRel is its file argument ([ESP+0x3b4c]), named by the WARNING FDUMP.
+    // The tail of FUN_00520850 (inline in retail, split out here). Lod is the caller's local
+    // (the [Field] "LOD" key, 0 when absent); FieldIniRel is its file argument, named by the
+    // WARNING FDUMP.
     void CliAsteroidMergeCubeMesh(FCliAsteroid* Field, int Lod, char const* FieldIniRel)
     {
-        // 0x00521518..0x00521548: the chunk list (head node operator new(0x18)); the two
-        // totals [ESP+0x34] / [ESP+0x18].
         std::list<FAsteroidMergeChunk> Chunks;
         int TotalVerts = 0;
         int TotalIdx = 0;
 
-        // 0x00521537..0x0052154c: nothing is walked without the common field.
         if (Field->CmnField != nullptr)
         {
             std::list<CmnAsteroid::AsteroidCubeArchEntry> const& ArchList =
                 Field->CmnField->ArchList;
 
-            // 0x00521555..0x0052156e: a material from an earlier load is released through
-            // vt+8 and the pointer is left as it was (so it is not queried again below).
+            // A material from an earlier load is released and the pointer is left as it was
+            // (so it is not queried again below).
             if (Field->Material != nullptr)
                 static_cast<IDAComponent*>(Field->Material)->Release();
 
-            // 0x00521571 / 0x00521580..0x0052194b: every archetype node of the common field.
             for (std::list<CmnAsteroid::AsteroidCubeArchEntry>::const_iterator EntryIt = ArchList.begin();
                  EntryIt != ArchList.end(); ++EntryIt)
             {
@@ -2303,7 +2122,6 @@ namespace
                 IMesh* Mesh = nullptr;
                 IRenderableMesh* RMesh = nullptr;
 
-                // 0x00521588..0x005215e0: IMesh for the archetype's engine index (+0x40).
                 int const EngineIndex = static_cast<int>(Arch->EngineIndex);
                 if (DALib::Engine->QueryEngineComponent(EngineIndex, const_cast<char*>(Iids::Mesh),
                                                         reinterpret_cast<void**>(&Mesh)) < 0)
@@ -2313,19 +2131,16 @@ namespace
                           Arch->Nickname.get_string());
                 }
 
-                // 0x005215e2..0x005215e8: no mesh -> straight to the releases.
+                // No mesh -> straight to the releases.
                 if (Mesh != nullptr)
                 {
-                    // 0x005215ee..0x0052162a: slot 9 (0, 1); slot 14 into +0xa0 while it is
-                    // null; slot 13 into +0xb0; slot 10.
                     Mesh->OpenFaceGroup(0, 1);
                     if (Field->Material == nullptr)
                         Mesh->GetFaceGroupMaterial(&Field->Material);
                     Mesh->GetFaceGroupPrimitiveType(&Field->FieldB0);
                     Mesh->CloseFaceGroup();
 
-                    // 0x0052162d..0x00521670: the LOD count (renderer vt+0x2c), the LOD clamped
-                    // to [0, count - 1] and kept for the next archetype, then set (vt+0x34).
+                    // The LOD clamped to [0, count - 1] and kept for the next archetype.
                     int LodCount = 0;
                     DALib::Renderer->GetArchetypeLodCount(
                         reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), &LodCount);
@@ -2336,7 +2151,6 @@ namespace
                     DALib::Renderer->SetArchetypeLod(
                         reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), Lod);
 
-                    // 0x00521673..0x005216b8: IRenderableMesh for the same index.
                     if (DALib::Engine->QueryEngineComponent(
                             EngineIndex, const_cast<char*>(Iids::RenderableMesh),
                             reinterpret_cast<void**>(&RMesh)) < 0)
@@ -2348,32 +2162,26 @@ namespace
                               Arch->Nickname.get_string());
                     }
 
-                    // 0x005216bb..0x00521907: with a renderable mesh, a new chunk at the back.
                     if (RMesh != nullptr)
                     {
                         Chunks.emplace_back();
                         FAsteroidMergeChunk& Chunk = Chunks.back();
 
-                        // 0x00521746..0x005217dc: vertex count (slot 3), operator new(count *
-                        // 0x2c) -- the per-vertex texcoord constructors FUN_0043d950 write
-                        // nothing --, the total, then the vertices in FVF 0x252 (slot 4).
+                        // Retail's per-vertex texcoord constructors (FUN_0043d950) write nothing.
                         RMesh->GetVertexCount(&Chunk.VertCount);
                         Chunk.Verts = static_cast<unsigned char*>(
                             operator new(static_cast<unsigned>(Chunk.VertCount) * kCubeVertStride));
                         TotalVerts += Chunk.VertCount;
                         RMesh->CopyVertexData(Chunk.Verts, 0x252u, 0, Chunk.VertCount);
 
-                        // 0x005217df..0x0052181d: index count (slot 5), operator new(count * 2),
-                        // the indices (slot 6), the total.
                         RMesh->GetIndexCount(&Chunk.IndexCount);
                         Chunk.Indices = static_cast<unsigned short*>(
                             operator new(static_cast<unsigned>(Chunk.IndexCount) * 2));
                         RMesh->CopyIndices(&Chunk.Indices, Chunk.IndexCount);
                         TotalIdx += Chunk.IndexCount;
 
-                        // 0x00521821..0x00521901: every vertex's position and normal through the
-                        // math engine's TransformMatrix (vt+0x2c) with the node's orientation
-                        // (node+0x18), then the node's offset (node+0x0c) added to the position.
+                        // Position and normal rotated by the node's orientation (node+0x18),
+                        // then the node's offset (node+0x0c) added to the position.
                         for (unsigned Vi = 0; Vi < static_cast<unsigned>(Chunk.VertCount); ++Vi)
                         {
                             float* const Vert =
@@ -2399,7 +2207,6 @@ namespace
                     }
                 }
 
-                // 0x0052190d..0x0052193e: the renderable mesh, then the mesh, released.
                 if (RMesh != nullptr)
                     RMesh->Release();
                 if (Mesh != nullptr)
@@ -2407,20 +2214,17 @@ namespace
             }
         }
 
-        // 0x00521951..0x0052197d: no material at all is only a warning.
         if (Field->Material == nullptr)
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: no material found for asteroids in field (%s)",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x2ca, FieldIniRel);
         }
 
-        // 0x00521980..0x005219ed: the merged vertices (+0xa4, texcoord constructors again
-        // empty) and indices (+0xa8). Whatever the two pointers held before is not freed.
+        // Whatever the two pointers held before is not freed, as retail.
         Field->MeshVerts = operator new(static_cast<unsigned>(TotalVerts) * kCubeVertStride);
         Field->MeshIndices = operator new(static_cast<unsigned>(TotalIdx) * 2);
 
-        // 0x005219f3..0x00521a79: every chunk copied in list order; its indices rebased by the
-        // vertices before it (16-bit add).
+        // Each chunk's indices rebased by the vertices before it (16-bit add).
         int VertBase = 0;
         int IdxBase = 0;
         for (std::list<FAsteroidMergeChunk>::const_iterator It = Chunks.begin(); It != Chunks.end();
@@ -2440,26 +2244,23 @@ namespace
             VertBase += Chunk.VertCount;
         }
 
-        // 0x00521a7b..0x00521a98: FUN_0051feb0(&+0x30, +0xa4, total vertices), +0xac = total
-        // indices. The chunk list is destroyed on return (0x00521aa3..0x00521b01).
         CliAsteroidFillMeshDesc(&Field->MeshDesc, Field->MeshVerts,
                                 static_cast<unsigned short>(TotalVerts));
         Field->MeshIndexCount = static_cast<unsigned>(TotalIdx);
     }
 
-    // DAT_00613854 / DAT_00613855 -- .data bytes, initial 1 (PE bytes), read only by FUN_00522a60
-    // (0x00523a93; 0x005240b8 and 0x0052458b) and written nowhere in the image: the per-cube
-    // plane test and the per-cube blend switch both always run.
+    // DAT_00613854 / DAT_00613855 -- .data bytes, initial 1, read only by the near-field draw
+    // and written nowhere in the image: the per-cube plane test and the per-cube blend switch
+    // both always run.
     unsigned char G_AsteroidPlaneTest = 1;
     unsigned char G_AsteroidAlphaSwitch = 1;
-    // DAT_006753e0 / DAT_006753e4 -- .bss dwords read only by FUN_00522a60 (0x00522b83; 0x0052418a
-    // and 0x00524645) and written nowhere: the orientation cache is filled but never read back, and
-    // no draw is skipped.
+    // DAT_006753e0 / DAT_006753e4 -- .bss dwords read only by the near-field draw and written
+    // nowhere: the orientation cache is filled but never read back, and no draw is skipped.
     int G_AsteroidUseOrientCache = 0;
     int G_AsteroidSkipDraw = 0;
-    // DAT_006753b4 / DAT_006753b8 / DAT_006753bc -- zeroed by FUN_00520170 (0x0052017f..0x0052018b)
-    // and accumulated at the end of FUN_00522a60 (0x005246c4..0x005246fd): triangles drawn, cubes
-    // visited, cubes drawn. Those are their only references; nothing reads the totals.
+    // DAT_006753b4 / DAT_006753b8 / DAT_006753bc -- zeroed by CliAsteroidTickFields and
+    // accumulated at the end of the near-field draw: triangles drawn, cubes visited, cubes
+    // drawn. Nothing reads the totals.
     unsigned G_AsteroidTrianglesDrawn = 0;
     unsigned G_AsteroidCubesVisited = 0;
     unsigned G_AsteroidCubesDrawn = 0;
@@ -2469,22 +2270,21 @@ namespace
     unsigned long const kRsAsteroidBlend[] = {0x89, 1, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
     unsigned long const kRsAsteroidOpaque[] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0};
 
-    // The inline {state, value} walk (first state loaded as a constant, next state tested for 0).
+    // The inlined {state, value} walk.
     void AsteroidApplyRs(IRenderPipeline* Pipe, unsigned long const* Table)
     {
         for (unsigned long const* Pair = Table; Pair[0] != 0; Pair += 2)
             Pipe->SetRenderState((D3DRENDERSTATETYPE)Pair[0], static_cast<int>(Pair[1]));
     }
 
-    // MSVCRT _ftol (FUN_005b7ec0): truncation toward zero; the callers keep EAX.
+    // MSVCRT _ftol (FUN_005b7ec0): truncation toward zero; the callers keep the low dword.
     int AsteroidFtol(double X)
     {
         return static_cast<int>(static_cast<long long>(X));
     }
 
-    // 0x00523064..0x0052308d (and the fourteen copies after it): a snapped coordinate strictly
-    // greater than 0 (TEST AH,0x41 / JNE) gets + 0.1f (DAT_005d3ee0), anything else - 0.1f, on the
-    // FPU, then _ftol.
+    // Inlined fifteen times: a snapped coordinate strictly greater than 0 gets + 0.1f
+    // (DAT_005d3ee0), anything else (NaN included) - 0.1f, unrounded, then _ftol.
     int AsteroidCubeCoord(float V)
     {
         if (V > 0.0f)
@@ -2492,8 +2292,7 @@ namespace
         return AsteroidFtol(static_cast<double>(V) - 0.1f);
     }
 
-    // The bound update after every later seed: below the minimum (JGE not taken) replaces it,
-    // otherwise above the maximum (JLE not taken) replaces that.
+    // The bound update after every later seed: else-if, as retail.
     void AsteroidExtend(int V, int* Min, int* Max)
     {
         if (V < *Min)
@@ -2511,7 +2310,7 @@ namespace
         return V;
     }
 
-    // FUN_00422b80 fed with three FSTP'd products: each component float(component * S).
+    // FUN_00422b80 fed with three products, each rounded to float.
     Vector AsteroidScale(Vector const& V, double S)
     {
         return AsteroidVec(static_cast<float>(V.x * S), static_cast<float>(V.y * S),
@@ -2529,21 +2328,17 @@ namespace
         return AsteroidVec(A.x - B.x, A.y - B.y, A.z - B.z);
     }
 
-    // The side-plane dot product in the listing's order: (d.x*v.x + d.z*v.z) + d.y*v.y.
+    // The side-plane dot product in retail's order: (d.x*v.x + d.z*v.z) + d.y*v.y.
     double AsteroidPlaneDot(Vector const& D, Vector const& V)
     {
         return (static_cast<double>(D.x) * V.x + static_cast<double>(D.z) * V.z) +
                static_cast<double>(D.y) * V.y;
     }
 
-    // 0x00523e08..0x00523f38 (first cube) and 0x0052434b..0x00524496 (the camera's own cube): the
-    // one upload of the field mesh. VertexBuffer +0x14 locks +0x98 (FVF) x +0x9c vertices into
-    // Desc; a negative result FDUMPs the warning with the caller's line (0x524 / 0x580) and the
-    // caller returns out of FUN_00522a60 without the render-state restore. Otherwise +0x20 copies
-    // the field's source descriptor (+0x30) into the lock at the lock's FVF, +0x18 unlocks, the
-    // material (+0xa0) gets its slot 8 (+0x20) with 0, DAT_005dc3c4 is applied, and max_alpha
-    // (+0xcc) below 1.0 (TEST AH,5 / JP) picks DAT_005dc394 + RS 0x18 = 5, else DAT_005dc374 +
-    // RS 0x18 = 0x7f.
+    // The one upload of the field mesh, inlined twice in the near-field draw (first cube, and the
+    // camera's own cube). A lock failure FDUMPs with the caller's line (0x524 / 0x580) and the
+    // caller returns without the render-state restore. max_alpha (+0xcc) below 1.0 (NaN not)
+    // picks the blend states.
     bool AsteroidUploadMesh(FCliAsteroid* Field, FVertexMemoryLock* Desc, int Line)
     {
         IVertexBufferManager* const VbMgr = DALib::VertexBuffer;
@@ -2575,10 +2370,9 @@ namespace
         return true;
     }
 
-    // 0x00523f3e..0x0052402f / 0x0052449c..0x0052457b: pipeline state 7, read into a local seeded
-    // with 1 (GetPipelineState, +0x18), picks the combined transform: MulTransform (DAT_006753d8
-    // slot 7, +0x1c) of the view and the cube, copied, through SetModelview (+0x7c). Otherwise
-    // SetWorld (+0x6c) with the cube, then SetView (+0x74) with the view.
+    // Inlined twice in the near-field draw: pipeline state 7 (read into a local seeded with 1)
+    // picks the combined view * cube transform through SetModelview; otherwise SetWorld then
+    // SetView.
     void AsteroidBindCubeTransform(FTransform const& CubeXform, FTransform const& ViewXform)
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
@@ -2598,11 +2392,9 @@ namespace
         }
     }
 
-    // 0x005240b8..0x005241cb / 0x0052458b..0x00524686: with DAT_00613855 set, a material alpha
-    // below 1.0 (TEST AH,5 / JP) applies DAT_005dc394 + RS 0x18 = 5 once (the state byte), anything
-    // else applies DAT_005dc374 + RS 0x18 = 0x7f every time and clears the byte. Then SetMaterial
-    // (+0xac) and, unless DAT_006753e4, DrawIndexedPrimitiveVb (+0x120): the primitive +0xb0, the
-    // lock's buffer and start vertex, +0x9c vertices, the indices +0xa8, +0xac of them, 0.
+    // Inlined twice in the near-field draw: a material alpha below 1.0 (NaN not) applies the
+    // blend states once (the state byte); anything else applies the opaque states every time
+    // and clears the byte.
     void AsteroidDrawCube(FCliAsteroid* Field, float const* Material, unsigned char* bBlendState,
                           const FVertexMemoryLock* Desc)
     {
@@ -2635,9 +2427,8 @@ namespace
         }
     }
 
-    // .text:00522a60..0052470b (__thiscall on the field, RET 4: the camera). Two tests only -- the
-    // common field (+0x04) and the byte +0x00; nothing on the camera, the zone, the pipeline or
-    // the vertex-buffer manager.
+    // FUN_00522a60 (thiscall on the field). Two tests only -- the common field (+0x04) and the
+    // byte +0x00; nothing on the camera, the zone, the pipeline or the vertex-buffer manager.
 #ifdef FREELANCER_RP9
     // Port-only parameters (CliAsteroidTickOne, the volumetric nebula's extended spawn
     // distance): FillOverride > 0 replaces the fill distance (fill_dist * detail) of the cube
@@ -2656,18 +2447,17 @@ namespace
         ICamera* const Camera = AsCamera(Cam);
         CmnAsteroid::CAsteroidField* const Cmn = Field->CmnField;
 
-        // 0x00522a89..0x00522aa7: camera slot 16 (+0x40), the view transform, twelve dwords.
         FTransform ViewXform;
         memcpy(&ViewXform, Camera->GetViewTransform(), sizeof(ViewXform));
 
-        // 0x00522a94..0x00522ae3: DAT_006753b0 bits 0 and 1 guard two function-local statics
-        // whose atexit destructors (LAB_00524720 / LAB_00524710) are bare RETs: the cached eye
-        // position DAT_00675380 and orientation DAT_0067538c.
+        // DAT_006753b0 bits 0 and 1 guard two function-local statics whose atexit destructors
+        // (LAB_00524720 / LAB_00524710) are empty: the cached eye position DAT_00675380 and
+        // orientation DAT_0067538c.
         static float s_CachedPos[3];
         static float s_CachedOrient[9];
 
-        // 0x00522ae6..0x00522b40: slots 6 and 7 (+0x18, +0x1c) in radians (DAT_005c77f4), stored
-        // as floats; sine and cosine of pi/2 (DAT_005dc88c) minus each.
+        // The two angles in radians (DAT_005c77f4), stored as floats; sine and cosine of pi/2
+        // (DAT_005dc88c) minus each.
         float const FovY =
             static_cast<float>(static_cast<double>(Camera->GetFovYDeg()) * 0.017453292f);
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -2686,16 +2476,15 @@ namespace
         float const SinY = static_cast<float>(sin(AngleY));
         float const CosY = static_cast<float>(cos(AngleY));
 
-        // 0x00522b44..0x00522b88: slot 4 (+0x10) nine floats, slot 3 (+0x0c) the position, then
-        // slot 6 once more with its result popped.
+        // Retail calls GetHalfFovXDeg once more and discards the result.
         float Orient9[9];
         memcpy(Orient9, Camera->GetOrientation(), sizeof(Orient9));
         float const* const Pos3 = Camera->GetPosition();
         Vector const CamPos = AsteroidVec(Pos3[0], Pos3[1], Pos3[2]);
         Camera->GetHalfFovXDeg();
 
-        // 0x00522b83..0x00522d63: the orientation's three columns and the eye position, from the
-        // cache while DAT_006753e0 is set, otherwise from the camera, refilling the cache.
+        // From the cache while DAT_006753e0 is set (never), otherwise from the camera, refilling
+        // the cache.
         Vector Col0;
         Vector Col1;
         Vector Col2;
@@ -2719,9 +2508,7 @@ namespace
             Eye = CamPos;
         }
 
-        // 0x00522d6a..0x00522f3d: the four side-plane directions --
-        //   D0 = Col0 * -SinX - Col2 * CosX, D1 = Col0 * SinX - Col2 * CosX,
-        //   D2 = Col1 * -SinY - Col2 * CosY, D3 = Col1 * SinY - Col2 * CosY.
+        // The four side-plane directions.
         Vector const BackX = AsteroidScale(Col2, CosX);
         Vector const D0 = AsteroidSub(AsteroidScale(Col0, -SinX), BackX);
         Vector const D1 = AsteroidSub(AsteroidScale(Col0, SinX), BackX);
@@ -2729,13 +2516,11 @@ namespace
         Vector const D2 = AsteroidSub(AsteroidScale(Col1, -SinY), BackY);
         Vector const D3 = AsteroidSub(AsteroidScale(Col1, SinY), BackY);
 
-        // 0x00522f42..0x00522f93: margin = float(cube size * 1.25f) (DAT_005c9804); the near point
-        // is the eye plus Col2 * margin.
+        // 1.25f at DAT_005c9804.
         float const Margin = static_cast<float>(static_cast<double>(Field->CubeSize) * 1.25f);
         Vector const NearPt = AsteroidAdd(Eye, AsteroidScale(Col2, Margin));
 
-        // 0x00522f98..0x00522fe2: the FOV tangents as floats; fill = FILD +0x24 * +0x230 on the
-        // FPU; the two lateral extents _ftol(tan * fill).
+        // The tangents are rounded to float, the fill stays unrounded.
         float const TanX = static_cast<float>(tan(static_cast<double>(HalfFovX)));
         float const TanY = static_cast<float>(tan(static_cast<double>(FovY)));
 #ifdef FREELANCER_RP9
@@ -2748,8 +2533,7 @@ namespace
         int const ExtX = AsteroidFtol(TanX * Fill);
         int const ExtY = AsteroidFtol(TanY * Fill);
 
-        // 0x00522fe4..0x005230f9: the first seed, eye + Col2 * cube size, snapped
-        // (closest_cube_pos) and set as both bounds on every axis.
+        // The first seed sets both bounds on every axis.
         int MinX = 0;
         int MaxX = 0;
         int MinY = 0;
@@ -2764,15 +2548,13 @@ namespace
             MinZ = MaxZ = AsteroidCubeCoord(Seed.z);
         }
 
-        // 0x005230fe..0x005232a9: NegZ = -Col2 (kept for the depth test); the far centre
-        // eye + NegZ * fill; the lateral offsets Col0 * ExtX and Col1 * ExtY.
+        // NegZ is kept for the depth test.
         Vector const NegZ = AsteroidVec(-Col2.x, -Col2.y, -Col2.z);
         Vector const FarCentre = AsteroidAdd(AsteroidScale(NegZ, Fill), Eye);
         Vector const LatX = AsteroidScale(Col0, ExtX);
         Vector const LatY = AsteroidScale(Col1, ExtY);
 
-        // 0x005232ae..0x0052378a: four more seeds, (far + X) + Y, (far + X) - Y, (far - X) - Y and
-        // (far - X) + Y, each snapped and folded into the bounds.
+        // Four more seeds at the far corners, in retail order.
         {
             Vector const FarXp = AsteroidAdd(FarCentre, LatX);
             Vector const FarXm = AsteroidSub(FarCentre, LatX);
@@ -2790,20 +2572,18 @@ namespace
             }
         }
 
-        // 0x0052378e..0x005237b4: RS 0x18 saved (zeroed local); the drawn and visited counters.
         IRenderPipeline* const Pipe = DALib::Pipeline;
         int Saved18 = 0;
         Pipe->GetRenderState(D3DRS_ALPHAREF, &Saved18);
         unsigned Drawn = 0;
         unsigned Visited = 0;
 
-        // 0x005237ba..0x005237ef: max_alpha (+0xcc) below 1.0f (TEST AH,5 / JNP keeps the 1) sets
-        // both the blend-state byte and the fade byte.
+        // max_alpha (+0xcc) below 1.0f (NaN not) sets both bytes.
         unsigned char bBlendState = Field->ScaleCC < 1.0f ? 1 : 0;
         unsigned char bFading = Field->ScaleCC < 1.0f ? 1 : 0;
 
-        // 0x005237f4..0x0052385a: RS 0xe saved; a fading field turns RS 0xe off, clears the
-        // registered lights (FUN_004101e0) and sets a white ambient (FUN_00410240).
+        // A fading field turns z-writes off, clears the registered lights and sets a white
+        // ambient.
         int SavedE = 0;
         Pipe->GetRenderState(D3DRS_ZWRITEENABLE, &SavedE);
         if (bFading != 0)
@@ -2814,9 +2594,8 @@ namespace
             EngineLightSetAmbientRgbBytes(White);
         }
 
-        // 0x0052385d..0x00523934: the 0x44-byte material, zeroed. Diffuse rgb = +0xb4..+0xbc.
-        // With LIGHTING (option 0x18) on and no fade, ambient rgb = +0xc0..+0xc8; otherwise the
-        // ambient is the diffuse, alpha included (still 0 here).
+        // The 0x44-byte material. Without LIGHTING, or when fading, the ambient is the diffuse,
+        // alpha included (still 0 here).
         float Material[17];
         memset(Material, 0, sizeof(Material));
         Material[0] = Field->TintB4;
@@ -2836,11 +2615,11 @@ namespace
             Material[7] = Material[3];
         }
 
-        // 0x0052393b..0x00523970: half a cube (DAT_005c75e0); the reach = fill + margin on the FPU,
-        // stored as a float; the fade start float(reach - half cube).
+        // 0.5f at DAT_005c75e0. The reach sum is unrounded until stored; the fade start is taken
+        // from the unrounded reach.
         float const HalfCube = static_cast<float>(static_cast<double>(Field->CubeSize) * 0.5f);
 #ifdef FREELANCER_RP9
-        double const ReachD = Fill + Margin; // retail: FILD +0x24 * +0x230 + margin, = Fill
+        double const ReachD = Fill + Margin; // retail: fill_dist * detail + margin
         float const Reach = static_cast<float>(ReachD);
         // Port-only: the fade band of the extended spawn distance (retail: half a cube).
         double const FadeWidth =
@@ -2853,27 +2632,23 @@ namespace
         float const FadeStart = static_cast<float>(ReachD - HalfCube);
 #endif
 
-        // 0x00523977..0x0052399a: the camera's own cube id (from the camera position, not the
-        // cached eye); the seen byte cleared; the first-draw byte set.
+        // The camera's own cube id (from the camera position, not the cached eye).
         unsigned long const PlayerCubeId =
             CmnAsteroid::compute_cube_id(Cmn->closest_cube_pos(CamPos));
         unsigned char bPlayerCubeSeen = 0;
         unsigned char bFirst = 1;
-        FVertexMemoryLock Desc = {}; // [ESP+0x154]: buffer, FVF, start vertex, bits
-        // [ESP+0x60]: the plane test's depth, read by the fade. DAT_00613854 is never cleared, so
-        // the test always writes it first.
+        FVertexMemoryLock Desc = {};
+        // The plane test's depth, read by the fade. DAT_00613854 is never cleared, so the test
+        // always writes it first.
         double Depth = 0.0;
 
-        // 0x0052399f..0x00523bdd: X, Y, Z from the minimum to the maximum in steps of +0x20 (re-read
-        // at every step), signed compares.
+        // Steps of CubeSize, re-read at every step; signed compares.
         for (int X = MinX; X <= MaxX; X += Field->CubeSize)
         {
             for (int Y = MinY; Y <= MaxY; Y += Field->CubeSize)
             {
                 for (int Z = MinZ; Z <= MaxZ; Z += Field->CubeSize)
                 {
-                    // 0x005239f3..0x00523a9b: the snapped cube position; its offset from the near
-                    // point; visited += 1.
                     Vector const CubePos = Cmn->closest_cube_pos(AsteroidVec(
                         static_cast<float>(X), static_cast<float>(Y), static_cast<float>(Z)));
                     Vector const Delta = AsteroidSub(CubePos, NearPt);
@@ -2881,16 +2656,14 @@ namespace
 
                     if (G_AsteroidPlaneTest != 0)
                     {
-                        // 0x00523aa5..0x00523aea: depth = |(n.x*d.x + n.z*d.z) + n.y*d.y| with
-                        // n = NegZ, kept as a double; beyond the reach (strictly) -> next cube.
+                        // Kept unrounded; beyond the reach (strictly) -> next cube.
                         Depth = fabs(AsteroidPlaneDot(NegZ, Delta));
                         if (Depth > Reach)
                             continue;
                         double const Inv = 1.0 / Depth;
 
-                        // 0x00523af6..0x00523c18: sideways along Col0. Only a slope not within
-                        // TanX (TEST AH,1 / JE passes TanX >= |slope|) tests a side plane: D0 for a
-                        // positive slope, D1 otherwise; a dot ordered-less than 0 -> next cube.
+                        // Only a slope not within TanX (NaN included) tests a side plane: D0 for
+                        // a positive slope, D1 otherwise; a dot ordered-less than 0 -> next cube.
                         double const SlopeX = AsteroidPlaneDot(Delta, Col0) * Inv;
                         if (!(TanX >= fabs(SlopeX)))
                         {
@@ -2903,7 +2676,6 @@ namespace
                                 continue;
                         }
 
-                        // 0x00523c1c..0x00523cca: the same along Col1 with TanY, D2 and D3.
                         double const SlopeY = AsteroidPlaneDot(Delta, Col1) * Inv;
                         if (!(TanY >= fabs(SlopeY)))
                         {
@@ -2917,14 +2689,11 @@ namespace
                         }
                     }
 
-                    // 0x00523ccc..0x00523ce6: zone slot 0 (+0x00) strictly above 0.001f
-                    // (DAT_005d1494), otherwise next cube.
-                    if (!(Field->Zone->GetImmersion(CubePos) > 0.001f))
+                    if (!(Field->Zone->GetImmersion(CubePos) > 0.001f)) // DAT_005d1494
                         continue;
 
-                    // 0x00523cec..0x00523d44: the frequency +0x28; with an exclusion manager
-                    // (+0xdc), is_excluded (+0x04, type 0) with a -1.0f distance out; a distance
-                    // not below 0 (TEST AH,1 / JNE) replaces the frequency when not excluded.
+                    // An exclusion distance not below 0 replaces the frequency when not
+                    // excluded.
                     float Freq = Field->EmptyCubeFreq;
                     unsigned char bNotExcluded = 1;
                     if (Field->ExclusionMgr != nullptr)
@@ -2938,8 +2707,6 @@ namespace
                             Freq = Dist;
                     }
 
-                    // 0x00523d44..0x00523d6b: compute_cube_id; id 0 or excluded -> next cube; the
-                    // camera's own id marks it seen.
                     unsigned long const CubeId = CmnAsteroid::compute_cube_id(CubePos);
                     if (CubeId == 0)
                         continue;
@@ -2948,16 +2715,13 @@ namespace
                     if (CubeId == PlayerCubeId)
                         bPlayerCubeSeen = 1;
 
-                    // 0x00523d70..0x00523df6: an identity orientation through
-                    // compute_cube_orientation(id, &m, common field +0x50, frequency); false ->
-                    // next cube.
                     Matrix Orient(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
                     if (!CmnAsteroid::compute_cube_orientation(CubeId, &Orient, Cmn->Rotations,
                                                                Freq))
                         continue;
 
-                    // 0x00523dfc..0x00523e37: the first cube uploads the mesh (byte cleared before
-                    // the lock); a failed lock returns (0x005241e0..0x0052420b).
+                    // The first cube uploads the mesh (byte cleared before the lock); a failed
+                    // lock returns.
                     if (bFirst != 0)
                     {
                         bFirst = 0;
@@ -2972,10 +2736,8 @@ namespace
                     CubeXform.Translation.Z = CubePos.z;
                     AsteroidBindCubeTransform(CubeXform, ViewXform);
 
-                    // 0x00524032..0x005240b1: past the fade start (ordered less, TEST AH,5 / JP)
-                    // the alpha is ((reach - depth) / half cube) * max_alpha, clamped to max_alpha
-                    // above and to 0.0f below, stored in the material; at or under 0.001f (TEST
-                    // AH,0x41 / JNP) -> next cube. Otherwise the alpha is max_alpha.
+                    // Past the fade start (ordered less) the alpha fades over half a cube; at or
+                    // under 0.001f -> next cube.
                     if (FadeStart < Depth)
                     {
 #ifdef FREELANCER_RP9
@@ -2998,18 +2760,14 @@ namespace
                         Material[3] = Field->ScaleCC;
                     }
 
-                    // 0x005240b8..0x005241d1: blend switch, material, draw; drawn += 1.
                     AsteroidDrawCube(Field, Material, &bBlendState, &Desc);
                     ++Drawn;
                 }
             }
         }
 
-        // 0x0052420e..0x0052468c: when the walk never met the camera's own (non-zero) cube, that
-        // cube is drawn on its own: snapped camera position, zone slot 0 above 0.001f, the same
-        // exclusion and frequency rule, compute_cube_orientation, the upload if nothing was drawn
-        // yet (line 0x580), the transform, the full max_alpha (no fade), blend switch, material,
-        // draw.
+        // When the walk never met the camera's own (non-zero) cube, that cube is drawn on its own
+        // with the same tests and the full max_alpha (no fade).
         if (bPlayerCubeSeen == 0 && PlayerCubeId != 0)
         {
             Vector const PlayerPos = Cmn->closest_cube_pos(CamPos);
@@ -3047,8 +2805,6 @@ namespace
             }
         }
 
-        // 0x00524690..0x005246fd: RS 0x18 and RS 0xe restored; the frame counters accumulate
-        // (triangles = (+0xac / 3) * drawn, unsigned).
         Pipe->SetRenderState(D3DRS_ALPHAREF, Saved18);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, SavedE);
         G_AsteroidCubesDrawn += Drawn;
@@ -3086,11 +2842,9 @@ namespace
     }
 #endif
 
-    // FUN_005225d0 (thiscall on the field, RET 4: camera). No test of the field or the camera.
+    // FUN_005225d0 (thiscall on the field). No null test of the field or the camera.
     void CliAsteroidTickOne(FCliAsteroid* Field, FSpaceCamera* Cam)
     {
-        // 0x005225d9..0x005225f9: the ambient-done byte cleared; the camera position (vt+0xc)
-        // copied.
         unsigned char bAmbientDone = 0;
         float const* const Pos3 = AsCamera(Cam)->GetPosition();
         Vector CamPos;
@@ -3126,10 +2880,7 @@ namespace
         }
 #endif
 
-        // 0x005225fd..0x00522658: [AsteroidBillboards] (+0x198), ASTEROID_EXT above 1 (signed
-        // JLE), [EFFECTS], each read only when the one before passed, and FUN_0054e040 on the
-        // billboard block: FUN_00522700(camera, 100.0f), the byte set, then
-        // FUN_0054e900(camera, +0xdc, 2).
+        // Each gate is read only when the one before passed; ASTEROID_EXT is a signed compare.
         if (Field->Flag198 != 0 && GetGameOption(kGameOptAsteroidExt) > 1 &&
             GetGameOption(kGameOptEffectsGroup) != 0 &&
             BillboardNearCamera(&Field->Billboard, CamPos))
@@ -3140,7 +2891,8 @@ namespace
             if (ExtFill > 0.0)
             {
                 // Port-only: the billboards fade in over the cubes' extended fade band (retail:
-                // from the fill distance to the reach, FUN_0054feb0), then the planes go back.
+                // from the fill distance to the reach, BillboardSetFadePlanes), then the planes
+                // go back.
                 float const SavedFar = Field->Billboard.Float40;
                 float const SavedNear = Field->Billboard.Float44;
                 Field->Billboard.Float40 = SpawnReach;
@@ -3154,10 +2906,8 @@ namespace
                 BillboardDraw(&Field->Billboard, Cam, Field->ExclusionMgr, 2);
         }
 
-        // 0x0052265d..0x005226c4: ASTEROIDS, [OBJECTS], the common field (+4) and its
-        // near_field(camera position): the ambient pass unless already done (the byte set
-        // after it), FUN_00522a60, then the byte cleared again when max_alpha (+0xcc) is below
-        // 1.0f (FCOMP DAT_005c75dc, TEST AH,5 / JP: only strictly less clears).
+        // After the near-field draw the ambient byte is cleared again when max_alpha (+0xcc) is
+        // strictly below 1.0f (DAT_005c75dc; NaN does not clear).
         if (GetGameOption(kGameOptAsteroids) != 0 && GetGameOption(kGameOptObjectsGroup) != 0 &&
             Field->CmnField != nullptr &&
 #ifdef FREELANCER_RP9
@@ -3183,7 +2933,8 @@ namespace
             if (ExtFill > 0.0 && Field->ExclusionMgr != nullptr)
             {
                 // Port-only: the exclusion zones are cut off at fill * 1.25 from the camera
-                // (FUN_00524880, MaxCliDist); the extended walk needs them as far as it goes.
+                // (CliAsteroidApplyDetail, MaxCliDist); the extended walk needs them as far as it
+                // goes.
                 float const SavedDistSq =
                     FCliAsteroidExclusionInline::GetMaxCliDistSq(Field->ExclusionMgr);
                 double const ExtDist = ExtFill * 1.25;
@@ -3202,8 +2953,6 @@ namespace
                 bAmbientDone = 0;
         }
 
-        // 0x005226c9..0x005226f3: every DynamicAsteroids record (+0x224..+0x228) gets
-        // FUN_005261b0(camera, &byte, field) (cli_asteroid_dynamic.cpp).
         for (void** It = Field->DynBegin; It != Field->DynEnd; ++It)
             CliDynamicAsteroidDraw(static_cast<FCliDynamicAsteroid*>(*It), Cam, &bAmbientDone,
                                    Field);
@@ -3212,21 +2961,17 @@ namespace
 
 void CliAsteroidLightAround(FCliAsteroid* Field, FSpaceCamera* Cam, float Scale)
 {
-    // FUN_00522700 -- the body is CliAsteroidAmbientPass above.
     CliAsteroidAmbientPass(Field, Cam, Scale);
 }
 
 void CliAsteroidFillVertexSource(FRpVertexSrcDesc* Desc, void* Verts, unsigned short VertCount)
 {
-    // FUN_0051feb0 -- the body is CliAsteroidFillMeshDesc above.
     CliAsteroidFillMeshDesc(Desc, Verts, VertCount);
 }
 
 void CliAsteroidTickFields(FSpaceCamera* Cam)
 {
-    // .text:00520170..005201b5 (cdecl, the camera). ASTEROIDS (option 0x21) off -> return; the
-    // three frame counters DAT_006753b4/b8/bc zeroed; every registered field (DAT_006753c4 list)
-    // -> FUN_005225d0(camera). No test of the camera.
+    // No null test of the camera.
     if (GetGameOption(kGameOptAsteroids) == 0)
         return;
     G_AsteroidTrianglesDrawn = 0;
@@ -3240,7 +2985,7 @@ void CliAsteroidTickFields(FSpaceCamera* Cam)
 
 namespace
 {
-    // FUN_00422b80 — write three floats at This.
+    // FUN_00422b80.
     void BandSetVec3(float* Dst, float X, float Y, float Z)
     {
         Dst[0] = X;
@@ -3248,7 +2993,7 @@ namespace
         Dst[2] = Z;
     }
 
-    // MSVC `n & 1` / even test used at 0054ce17..0054ce24 (0x80000001 idiom).
+    // MSVC's signed `n % 2 == 0` idiom (mask 0x80000001), as in FUN_0054c8b0.
     bool BandDiffIsEven(int Diff)
     {
         unsigned U = static_cast<unsigned>(Diff) & 0x80000001u;
@@ -3257,10 +3002,10 @@ namespace
         return U == 0;
     }
 
-    // FUN_0054c8b0 — thiscall on Band/ExclusionBand 0x84 blob.
-    // Builds an elliptical particle ring around IZone (+4): count from zone size × π /
-    // (texture_aspect × height), positions via cos/sin in zone XZ, TransformMatrix by
-    // zone orientation + Pos, per-particle XZ normals, then render_parts spokes (+0x60).
+    // FUN_0054c8b0 (thiscall on the 0x84 band blob) — builds an elliptical particle ring around
+    // the zone (+4): count from zone size * pi / (texture_aspect * height), positions in the
+    // zone's XZ plane rotated by its orientation, per-particle normals, then render_parts
+    // spokes (+0x60).
     void BandBuildExclusionRings(unsigned char* Blob)
     {
         if (Blob == nullptr)
@@ -3277,7 +3022,7 @@ namespace
         if (Zone == nullptr)
             return;
 
-        // Retail IZone vtbl +0x28 GetSize → three floats (Size.x/y/z).
+        // Retail calls GetSize (IZone vt+0x28).
         float SizeX = Zone->Size.x;
         float SizeY = Zone->Size.y;
         float SizeZ = Zone->Size.z;
@@ -3288,7 +3033,6 @@ namespace
         float Height = *BandF(Blob, 0x12);       // +0x48 height
         int VertInc = static_cast<int>(*BandU(Blob, 0x13)); // +0x4c vert_increase
 
-        // count = ftol(((sx+sz)*π) / (aspect*height) + 0.5) * vert_increase
         float const CountF =
             ((SizeX + SizeZ) * 3.14159274f) / (Aspect * Height) + 0.5f;
         int PointCount = FloatToIntTrunc(CountF) * VertInc;
@@ -3308,13 +3052,12 @@ namespace
                     Cursor[13] = 1.0f;                                   // +0x34
                     Cursor[3] = 1000.0f;                                 // +0x0C
                     *reinterpret_cast<unsigned char*>(Cursor + 14) = 1; // +0x38
-                    Cursor += 15; // 0x3C / 4
+                    Cursor += 15; // 0x3c-byte particle
                 }
             }
         }
         *reinterpret_cast<float**>(Blob + 0x3c) = Particles;
 
-        // Fade distances × height, then height *= 0.5.
         *BandF(Blob, 0x19) = *BandF(Blob, 0x19) * Height;
         *BandF(Blob, 0x1a) = *BandF(Blob, 0x1a) * Height;
         *BandF(Blob, 0x1b) = *BandF(Blob, 0x1b) * Height;
@@ -3322,7 +3065,7 @@ namespace
         Height = Height * 0.5f;
         *BandF(Blob, 0x12) = Height;
 
-        // Second GetSize + GetOrientation (+0x14) + GetPosition (+0x10).
+        // Retail calls GetSize a second time.
         SizeX = Zone->Size.x;
         SizeY = Zone->Size.y;
         SizeZ = Zone->Size.z;
@@ -3346,14 +3089,14 @@ namespace
         float RadiusZ = 0.0f;
         if (Blob[0x74] == 0)
         {
-            // offset_dist: radii = size - offset
+            // offset_dist
             RadiusX = SizeX - Offset;
             RadiusY = SizeY - Offset;
             RadiusZ = SizeZ - Offset;
         }
         else
         {
-            // offset_percent: radii = size * offset
+            // offset_percent
             RadiusX = SizeX * Offset;
             RadiusY = SizeY * Offset;
             RadiusZ = SizeZ * Offset;
@@ -3374,8 +3117,7 @@ namespace
                 Local.Y = 0.0f;
                 Local.Z = LocalZ;
                 FVector World;
-                // 0x0054cb06..0x0054cb27: DAT_00679860 tested inside the loop, FUN_005b73e0
-                // when still null, then vt+0x2c TransformMatrix. No fallback in retail.
+                // Retail tests DAT_00679860 inside the loop and acquires it when still null.
                 if (G_CloudsMath == nullptr)
                     G_CloudsMath = Acquire3DMathEngine();
                 G_CloudsMath->TransformMatrix(World, MathOrient, Local);
@@ -3387,8 +3129,8 @@ namespace
             }
         }
 
-        // Per-particle normals from neighbour tangents (0054cb81..0054cd43).
-        // Retail multiplies several terms by DAT_005c7474 (0.0); kept verbatim.
+        // Per-particle normals from neighbour tangents. Retail multiplies several terms by
+        // DAT_005c7474 (0.0); kept verbatim.
         PointCount = static_cast<int>(*BandU(Blob, 0x11));
         unsigned char* Base = *reinterpret_cast<unsigned char**>(Blob + 0x3c);
         if (Base != nullptr && PointCount > 0)
@@ -3443,7 +3185,6 @@ namespace
             }
         }
 
-        // Clamp render_parts to pointCount/2 when larger (0054cd43).
         int RenderParts = static_cast<int>(*BandU(Blob, 0x16)); // +0x58
         float const HalfCount = static_cast<float>(PointCount) * 0.5f;
         if (static_cast<float>(RenderParts) > HalfCount)

@@ -6,8 +6,7 @@
 
 #pragma once
 
-// Public since 2026-10-14 (claude-code:cmn-s2-phy8; formerly src/IVP/ivp_physics/
-// ivp_controller.h, which now only includes this file): Common exports classes built on these
+// Public header (src/IVP/ivp_physics/ivp_controller.h only includes it): Common exports classes built on these
 // bases (CRemotePhysicsController : IVP_Controller_Golem, PhySys::Controller, the engine
 // controllers) and Server.dll dynamic_casts CObject::GolemController (IVP_Controller*) at
 // .text:06d4d672, so the hierarchy is a cross-DLL contract.
@@ -27,31 +26,14 @@
 //   CRemotePhysicsController     CHD 063a6af8: the same chain + CRemotePhysicsSimulation @0xd0
 // So there are TWO branches under IVP_Controller: Dependent (PhySys::Controller and every
 // Freelancer controller built on it -- CShip, the equipment controllers, Server's Mine and
-// Guided) and Independent -> Motion -> Golem (the golem controllers). Until 2026-09-25 the port
-// had neither intermediate class: PhySys::Controller derived from IVP_Controller directly and
-// IVP_Controller_Golem folded Motion in and skipped Independent (claude-code:h-ivp restored all
-// three; see each class below for its evidence).
+// Guided) and Independent -> Motion -> Golem (the golem controllers).
 //
-// IVP_Core::~IVP_Core() (IVP_Core_Remove_Object in ivp_core.cpp) dispatches slot 0,
-// core_is_going_to_be_deleted_event(IVP_Core*), on every attached controller when a
-// core is torn down and (Flags & 0xC) != 4. Confirmed by the
-// real destructor's raw dispatch (FUN_063477e0, Common.dll.txt:411293-411300:
-// `MOV ECX,[array+i*4]; MOV EDX,[ECX]; PUSH Core; CALL [EDX]` -- i.e.
-// controller->vtbl[0](Core), thiscall) matched 1:1 against common_physys.h's
-// own confirmed slot-0 name/signature for the same base class.
+// IVP_Core's destructor (IVP_Core_Remove_Object, FUN_063477e0) dispatches slot 0,
+// core_is_going_to_be_deleted_event(IVP_Core*), on every attached controller when
+// (Flags & 0xC) != 4: `MOV ECX,[array+i*4]; MOV EDX,[ECX]; PUSH Core; CALL [EDX]`.
 //
-// IVP_Controller has NO virtual destructor ahead of this slot (common_physys.h:
-// "Retail's vftable has 7 slots, not 3+dtor") -- do not add one here, it would
-// shift slot 0 and desync this class from retail's slot order.
-//
-// UPDATED 2026-09-17: all seven slots are now declared, at their real indices,
-// after PhySys::Controller's vftable was dumped from .rdata:0639b60c (the dump
-// is quoted at get_controller_priority below). The sentence that used to stand
-// here -- "this port has no concrete IVP_Controller subclass yet, so
-// Core->Controllers is always empty and nothing calls through them" -- is no
-// longer true: FLControllerGolem (src/Common/common_physys.cpp, RTTI name from
-// the COL trail at .rdata:0639c1c4) is a real one, and its constructor calls
-// IVP_Core::register_controller(this) exactly as retail does.
+// The destructor is slot 6, not ahead of slot 0; declaring it earlier would shift every
+// slot.
 class IVP_Core;
 class IVP_Environment;
 
@@ -59,9 +41,6 @@ class IVP_Environment;
 // do_simulation_controller (slot 4 below). A class in retail: the exported
 // overrides mangle it as PAVIVP_Event_Sim@@ (e.g.
 // ?do_simulation_controller@CEEngine@@MAEXPAVIVP_Event_Sim@@PAV?$IVP_U_Vector@VIVP_Core@@@@@Z).
-// Recovered 2026-09-17 (lane claude:w19-integrator, while porting LAB_06343150) and moved
-// here from common_physys.cpp once slot 4 got its real signature.
-//
 // Layout proven from the one retail site that BUILDS one, FUN_063499c0
 // (.text:063499c0-06349a57), which fills a 3-dword stack local from the environment and then
 // hands its address to FUN_063496a0:
@@ -75,7 +54,7 @@ class IVP_Environment;
 // .text:062964c5, CEThruster .text:0629d315, CStrafeEngine .text:062bb985), and
 // FLControllerGolem's integrator uses +0x00/+0x04 as reciprocals (.text:0634333e-0634336a).
 //
-// +0x0c (2026-10-08, claude-code:cmn-phy3): the simulation unit whose controllers are being
+// +0x0c: the simulation unit whose controllers are being
 // run. FUN_063499c0 reserves FOUR dwords (`SUB ESP,0x10`, .text:063499c0) and fills the first
 // three; the fourth is written per unit by the dispatch loop itself, FUN_063496a0
 // `MOV [ECX+0xc],EDI` (.text:063496b0, ECX = the event, EDI = the IVP_Simulation_Unit `this`).
@@ -96,24 +75,17 @@ static_assert(sizeof(IVP_Event_Sim) == 0x10, "IVP_Event_Sim sizeof 0x10 (FUN_063
 
 // IVP's controller-priority enum, the return type of slot 5 below. Retail spells it in
 // ?get_controller_priority@Controller@PhySys@@MAE?AW4IVP_CONTROLLER_PRIORITY@@XZ, so it is a
-// global-scope enum. MOVED HERE 2026-09-25 (claude-code:g-vt1) from common_physys.h, because
-// PhySys::Controller now derives from IVP_Controller and its override must return the same
-// type as the base slot. The only value recoverable from the binary is 0x5dc: PhySys::
-// Controller's slot 5 (06285c80) is literally MOV EAX,0x5dc / RET. 1500 is IVP_CP_MOTION in
-// the published IVP headers, so that name is the SDK's; IVP_CP_NONE is there to keep the enum
-// from having a single enumerator. The VALUE is retail's and the NAMES are IVP convention.
-//
-// 2026-10-08 (claude-code:cmn-phy3): three more retail values, from the friction system's
-// controllers (see IVP_ListManager in ivp_mindist.h): 0 for the static friction handle
+// global-scope enum. Values are retail's, names the IVP SDK's: PhySys::Controller's slot 5
+// (06285c80) is `MOV EAX,0x5dc; RET` (1500, IVP_CP_MOTION); the friction system's
+// controllers (IVP_ListManager in ivp_mindist.h) give 0 for the static friction handle
 // (06325390 `XOR EAX,EAX; RET`), 600 for the friction system itself (0634b6e0 `MOV EAX,0x258`)
-// and 2000 for the energy handle (0634b690 `MOV EAX,0x7d0`). Values are retail's, names are
-// the IVP SDK's for those roles.
+// and 2000 for the energy handle (0634b690 `MOV EAX,0x7d0`).
 enum IVP_CONTROLLER_PRIORITY
 {
     IVP_CP_NONE = 0,
     IVP_CP_STATIC_FRICTION = 0,
     IVP_CP_DYNAMIC_FRICTION = 600,
-    IVP_CP_GRAVITY = 1000,          // 0634c6c0 `MOV EAX,0x3e8` (IVP_Standard_Gravity_Controller, cmn-phy5)
+    IVP_CP_GRAVITY = 1000,          // 0634c6c0 `MOV EAX,0x3e8` (IVP_Standard_Gravity_Controller)
     IVP_CP_MOTION = 1500,
     IVP_CP_ENERGY_FRICTION = 2000
 };
@@ -134,13 +106,12 @@ enum IVP_CONTROLLER_PRIORITY
 class IVP_Controller
 {
 public:
-    // Slot 0. NOT pure: 0639b64c[0] is .text:062ed730, a bare `RET 0x4` -- an empty inline
-    // default (it was declared `= 0` here until 2026-09-25; a pure slot would be _purecall
-    // 06391fb0, as slots 2/4/5 are). IVP_Core's teardown FUN_063477e0 dispatches it.
+    // Slot 0. Not pure: 0639b64c[0] is .text:062ed730, a bare `RET 0x4` (an empty inline
+    // default; pure slots hold _purecall 06391fb0). IVP_Core's teardown FUN_063477e0
+    // dispatches it.
     virtual void core_is_going_to_be_deleted_event(IVP_Core* Core) { (void)Core; }
 
-    // Slot 1. NOT get_controller_priority -- that claim is RETRACTED, see below.
-    // Retail's slot 1 is .rdata:0639b610 -> LAB_0627cd20, `FLD float ptr [1.0f]; RET` --
+    // Slot 1: .rdata:0639b610 -> LAB_0627cd20, `FLD float ptr [1.0f]; RET` --
     // an inline default of this base: every table that does not override it carries a copy
     // of that body (Common: PhySys::Controller 0639b610, the golem tables 0639c1cc /
     // 0639ba3c; Server.dll: its own copy .text:06cf33f0, `FLD [.rdata:06d65520 = 1.0f]`,
@@ -148,15 +119,11 @@ public:
     // returns a float and is not pure. Named after Ipion's IVP_Controller, whose second
     // virtual is get_minimum_simulation_frequency (default 1.0); its other six slots line up
     // with retail's table one for one (slot 3 = reset_time, below).
-    virtual float get_minimum_simulation_frequency() { return 1.0f; } // formerly slot_01
+    virtual float get_minimum_simulation_frequency() { return 1.0f; }
 
-    // Slot 2: FUN_06348f60/FUN_06348fe0/FUN_06349040 (decomp-tracker items
-    // 2926/2927/2930, D-cluster-06348f60 pass, 2026-09-10) all dispatch
-    // `CALL dword ptr[vtbl+8]` (slot index 2) on an IVP_Controller* and use
-    // the return value exactly as an `IVP_U_Vector<IVP_Core>*` (word count at
-    // +2, elems array at +4) -- i.e. this class's OWN associated-cores list,
-    // not a value borrowed from elsewhere. CONFIRMED, and now corroborated by
-    // the raw table dump below rather than standing alone against it.
+    // Slot 2: FUN_06348f60 / FUN_06348fe0 / FUN_06349040 call `[vtbl+8]` on an
+    // IVP_Controller* and use the result as an `IVP_U_Vector<IVP_Core>*` (word count at +2,
+    // elems at +4).
     virtual IVP_U_Vector<IVP_Core>* get_associated_controlled_cores() = 0;
 
     // Slot 3: .rdata:0639b618, reset_time. Named after Ipion's IVP_Controller::reset_time(
@@ -166,13 +133,12 @@ public:
     // shared bare `RET 0x8` body (labelled JustifyNode::Execute by ICF), and Server.dll's
     // Mine/Guided PhySys::Controller tables carry the same `RET 0x8` (.text:06d28880 at
     // .rdata:06d66238 / 06d6670c) -- an inline empty default of this base, not a pure slot.
-    // ARGUMENT RECOVERED 2026-09-25 (claude-code:h-ivp) from the one retail override,
-    // IVP_Controller_Golem's LAB_063435f0 (.text:063435f0-0634366b, RET 0x8): it reads
+    // Argument from the one retail override, IVP_Controller_Golem's LAB_063435f0 (.text:063435f0-0634366b, RET 0x8): it reads
     // [ESP+4] and [ESP+8] as FLOATS and subtracts them from the two halves of its stored
     // IVP_Time (+0x64 time_base, +0x68 time_offset), then re-normalises the pair. The 8 bytes
     // are therefore one IVP_Time passed by value (two floats, same order as ivp_core.h's
-    // IVP_Time) -- which is also what makes the port's default pop 8 bytes like retail's.
-    virtual void reset_time(IVP_Time Delta) { (void)Delta; } // formerly slot_03
+    // IVP_Time), so the port's default pops 8 bytes like retail's.
+    virtual void reset_time(IVP_Time Delta) { (void)Delta; }
 
     // Slot 4: .rdata:0639b61c, do_simulation_controller -- named by the six
     // retail exports that override it (CEEngine 06296430, CEThruster 0629d2d0,
@@ -183,19 +149,11 @@ public:
     // integrator LAB_06343150 is its override (common_physys.cpp).
     // Retail's only dispatcher is the per-PSI controller loop FUN_063496a0
     // (.text:063498fa-0634990d: `PUSH element+4; PUSH EBX(event); CALL [EDX+0x10]`),
-    // which this port has not ported -- nothing in src/IVP calls this slot yet.
+    // ported in ivp_simulation_unit.cpp.
     virtual void do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList) = 0;
 
-    // Slot 5: get_controller_priority. RESOLVED 2026-09-17, and it resolves the
-    // conflict this header used to carry unreconciled between its own slot-2
-    // call-site evidence and common_physys.h's RTTI-derived ordering. BOTH were
-    // partly right: slot 2 is get_associated_controlled_cores (call sites win),
-    // and get_controller_priority is at slot 5 -- NOT slot 1, where this header
-    // put it purely as a spacer.
-    //
-    // Settled by dumping the table rather than by argument. PhySys::Controller's
-    // vftable starts at .rdata:0639b60c (its RTTI COL sits at 0639b608) and ends
-    // before 0639b628, which is the next class's COL -- seven slots:
+    // Slot 5: get_controller_priority. PhySys::Controller's vftable (.rdata:0639b60c, COL
+    // 0639b608, ends before the next COL at 0639b628) has seven slots:
     //   +0x00 0639b60c  PhySys::Controller::core_is_going_to_be_deleted_event
     //   +0x04 0639b610  LAB_0627cd20
     //   +0x08 0639b614  CommReferrable::GetMsgIdPrefix      <- /OPT:ICF artifact
@@ -203,29 +161,18 @@ public:
     //   +0x10 0639b61c  LAB_06391fb0 == _purecall
     //   +0x14 0639b620  PhySys::Controller::get_controller_priority
     //   +0x18 0639b624  LAB_0627cd50
-    // The two folded names are worthless as identification: JustifyNode::Execute
-    // is a bare `RET 0x8` with hundreds of unrelated callers and is this module's
-    // single biggest ICF magnet. Only the two names that carry PhySys::Controller's
-    // own qualification mean anything, and one of them is at +0x14.
-    //
-    // Returns IVP_CONTROLLER_PRIORITY (above), the type retail's PhySys::Controller
-    // override mangles with. PhySys::Controller's body is literally `MOV EAX,0x5dc / RET`
-    // at .text:06285c80.
+    // The two folded names identify nothing (JustifyNode::Execute is a bare `RET 0x8`).
+    // PhySys::Controller's override (.text:06285c80) is `MOV EAX,0x5dc; RET`.
     virtual IVP_CONTROLLER_PRIORITY get_controller_priority() = 0;
 
     // Slot 6: .rdata:0639b624 -> LAB_0627cd50. That body is PhySys::Controller's
     // vector deleting destructor (flag test 2, `eh vector destructor iterator` with
     // PhySys::Controller::~Controller, then operator delete on flag 1), i.e. the
-    // virtual destructor's slot.
-    //
-    // DECLARED AS THE REAL VIRTUAL DESTRUCTOR 2026-09-24 (claude-code:w6-rpc), replacing the
-    // `slot_06()` placeholder. MSVC gives a virtual destructor ONE vftable entry (the
-    // deleting destructor) at its declaration position, so declaring it here -- after the
-    // six slots above and nowhere earlier -- keeps it at +0x18 exactly where retail has it.
+    // virtual destructor's slot (MSVC gives it one entry at its declaration position).
     // Two retail sites dispatch it as `vtbl[6](1)` on an IVP_Controller*, i.e. `delete`:
     // the golem family's slot 0 (LAB_06342fc0: `MOV EAX,[ECX]; PUSH 1; CALL [EAX+0x18]`)
     // and PhySys::RCEnd (.text:06285b3c-06285b40, same three instructions on the
-    // CRemotePhysicsController it owns). Both are `delete` through this base now.
+    // CRemotePhysicsController it owns).
     virtual ~IVP_Controller() {}
 };
 
@@ -437,7 +384,7 @@ public:
 
     // ---- IVP_Controller ----
     // Slot 3, LAB_063435f0 (.text:063435f0-0634366b, RET 0x8).
-    virtual void reset_time(IVP_Time Delta) override; // formerly slot_03
+    virtual void reset_time(IVP_Time Delta) override;
     virtual void do_simulation_controller(IVP_Event_Sim* EventSim,
                                           IVP_U_Vector<IVP_Core>* AffectedCores) override;
 
@@ -470,23 +417,18 @@ static_assert(sizeof(IVP_Controller_Golem) == 0xd0,
               "CRemotePhysicsController (.text:062859ce)");
 
 // ============================================================================
-// D-cluster-06348f60 pass (2026-09-10): free functions driving an
-// IVP_Controller's own associated-cores list to keep the affected
-// IVP_Simulation_Unit(s) in sync. Implemented in ivp_controller.cpp -- see
-// each function's own header comment there for the full evidence trail.
-// Ported from Common.dll.txt:414165-415002 (decomp-tracker items 2926/2927/
-// 2930/2945). Callers of these 4 functions (Common.dll.txt:06285bc7-1f,
-// 06285ca6-cff, 06285cf0, 063a5580) all sit outside this cluster's own
-// assigned address range and were not traced this pass.
+// Free functions keeping an IVP_Controller's associated-cores list and the affected
+// IVP_Simulation_Unit(s) in sync (ivp_controller.cpp). Callers at .text:06285bc7..,
+// 06285ca6.., 06285cf0 and .rdata:063a5580.
 // ============================================================================
 
-// FUN_06348f60 (item 2926, 48 insns).
+// FUN_06348f60.
 void IVP_Controller_Detach_From_All_Cores(IVP_Controller* Controller, int SkipFinalWakeCheck);
 
-// FUN_06348fe0 (item 2927, 20 insns).
+// FUN_06348fe0.
 void IVP_Controller_Wake_Or_Refresh_Associated_Sim_Unit(IVP_Controller* Controller);
 
-// FUN_06349040 (item 2930, 71 insns). See ivp_controller.cpp for the full
+// FUN_06349040. See ivp_controller.cpp for the full
 // discussion of EnvironmentPtrHolder's unconfirmed provenance.
 void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* EnvironmentPtrHolder, IVP_Controller* Controller);
 
@@ -496,6 +438,5 @@ void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* Environme
 void IVP_Controller_Manager_Add_Controller_To_Core(IVP_Controller* Controller, IVP_Core* Core);
 void IVP_Controller_Manager_Remove_Controller_From_Core(IVP_Controller* Controller, IVP_Core* Core);
 
-// LAB_06349530 (item 2945) is IVP_Standard_Gravity_Controller::do_simulation_controller
-// (ported by CMN-PHY5 next to the environment); the raw free-function copy that stood here
-// had no callers and was removed 2026-10-08 (cmn-ivp3).
+// LAB_06349530 is IVP_Standard_Gravity_Controller::do_simulation_controller (ported next to
+// the environment).

@@ -11,25 +11,8 @@ struct IDAComponent;
 // Modern owners for a handful of retail Thorn helpers whose original
 // implementation was coupled to raw VC6 register/stack conventions.  The
 // public API preserves the observed operations while keeping ownership in
-// ordinary C++.
-//
-// NOTE (2026-09-10 cleanup): this class used to declare many more methods
-// (SwapRecordValues, FinalizeParameterStream, PrependRecordBlock,
-// EnsureRecordCapacity, CloseCapture, MatchCapture, ReturnDispatchValue,
-// VisitDescending[WithCleanup], VisitStepped, RepeatWithCleanup,
-// CleanupRepeated, plus their supporting FThornModernRecordStorage /
-// FThornModernParameterStream / FThornModernCaptureState /
-// FThornModernRepeatState structs).  Two independent audit passes (SONNET-L3
-// and SONNET-L4, 2026-09-10) found these were fabricated "modern owner"
-// explanations for FUN_ addresses that are actually plain vendored Lua 3.2.2
-// internals (luaM_growaux, luaV_closure, lbuiltin.c's swap/auxsort,
-// lstrlib.c's end_capt/match_capture/match) or compiler-generated
-// EH-vector construct/destruct thunks used only by RB-tree helper arrays
-// that the port already replaces with contiguous/value-owned containers
-// (FParamCurve::Slot13Rebuild, FThornScene::RebuildPending).  None of those
-// methods had a single real caller anywhere in src/Thorn, so they were
-// deleted after the decomp-tracker items pointing at them were re-attributed
-// to their real owners. See docs/re/thorn.md, SONNET-CLEANUP (2026-09-10).
+// ordinary C++. Many other FUN_ addresses near these are vendored Lua 3.2.2
+// internals or compiler-generated EH-vector thunks and have no counterpart here.
 class FThornModernAdapters final
 {
 public:

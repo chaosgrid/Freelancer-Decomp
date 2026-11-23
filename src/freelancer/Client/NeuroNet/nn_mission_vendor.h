@@ -11,12 +11,10 @@
 //
 // RTTI .?AVNN_MissionVendor@@ : WinControl, Event::Handler. operator_new(0x45c) (0x0048d638).
 // WINFACTORY<NN_MissionVendor> DAT_00671ffc "NN_MissionVendor": static init LAB_0048b2b0 (ctor
-// FUN_0048d5b0, atexit LAB_0048b2d0 -> FUN_00579380); Create FUN_0048d620 (operator_new, the
-// ctor FUN_0048b2e0, the class-name pointer, slot 9; a failed Create is followed by the scalar
-// deleting destructor). FUN_0048d5b0 is the WINFACTORY ctor inlined for this type (name clamped
-// to 31, FUN_0059dab0, vftable 0x005d2d90).
+// FUN_0048d5b0, the WINFACTORY ctor inlined, vftable 0x005d2d90; atexit LAB_0048b2d0 ->
+// FUN_00579380); Create FUN_0048d620.
 //
-// vftable 0x005d26bc -- WinControl's with these overrides (raw dword dump):
+// vftable 0x005d26bc -- WinControl's with these overrides:
 //   0 FUN_0048b4f0 scalar deleting dtor (FUN_0048b510), 9 LAB_0048b6e0 Create, 11 LAB_0048d440
 //   Update, 13 FUN_0048d360 Draw, 42 LAB_0048c460 SetProperty.
 // IDataViewOwner face +0x7c: vftable 0x005d26ac (WinControl's).
@@ -83,8 +81,8 @@ public:
     void CloseWindow();
 
     // FUN_0048d4a0 (cdecl) -- the server's answer to an accept: bAccepted closes the window at
-    // the next Update, otherwise the selection is cleared and the reason is shown. Caller: the
-    // MirrorDatabase listener 0x004379b0 (unported, HOLE).
+    // the next Update, otherwise the selection is cleared and the reason is shown. Caller:
+    // FUN_004379b0, ch2 0x20 GFMISSIONVENDORACCEPTANCE (client_iclient.cpp).
     static void OnAcceptResult(MissionVendorAcceptance const& Result);
 
     float BasePosition[3];               // +0x330 {0, -0.1, -1.498}, set by Create
@@ -97,7 +95,7 @@ public:
     std::string VideoTexture;            // +0x34c the swapped-in texture name
     FSwappedMaterial VideoMaterial;      // +0x35c "MV_vidmaterial"
     int ScrollOffset;                    // +0x370 first offer in row 0
-    int Field_0x374;                     // +0x374 TODO: zeroed by the ctor and LoadOffers, never read
+    int Field_0x374;                     // +0x374 zeroed by the ctor and LoadOffers, never read
     int Selected;                        // +0x378 offer index, -1 none
     FmtStr StatusText;                   // +0x37c the full text without a selection
     MissionVendorProperties* Offers;     // +0x394 new[] copy of the bucket
@@ -118,9 +116,9 @@ public:
     WinControl* MissionTitle;            // +0x430 "MissionVendorMissionTitle"
     WinControl* MissionReward;           // +0x434 "MissionVendorMissionReward"
     RichTextWin* FullText;               // +0x438 "MissionVendorMissionFullText"
-    unsigned Field_0x43c;                // +0x43c TODO: not written or read by this class
+    unsigned Field_0x43c;                // +0x43c not written or read by this class
     WinControl* MissionReject;           // +0x440 "MissionVendorMissionReject"
-    unsigned Field_0x444;                // +0x444 TODO: not written or read by this class
+    unsigned Field_0x444;                // +0x444 not written or read by this class
     int Hovered;                         // +0x448 offer index under the mouse, -1 none
     int Clicked;                         // +0x44c row last clicked, -1 none
     WinControl* MissionIcon;             // +0x450 "MissionVendorIcon"
@@ -129,8 +127,8 @@ public:
     unsigned char Pad459[3];
 
 private:
-    // The tail every close shares (e.g. 0x0048c4a5..0x0048c4b2): FUN_0043d2a0 on every child
-    // (the next sibling read first), slot 10, then slot 0 with 1.
+    // Port-only helper for the tail every close shares (e.g. 0x0048c4a5): delete the children,
+    // Destroy, delete this.
     void DeleteSelf();
     // FUN_0048c770 -- copy the current base's offers, rows from the top, select offer 0.
     void LoadOffers();
@@ -140,8 +138,8 @@ private:
     void ShowSelected();
     // FUN_0048d140 -- the selected offer's texture in the video window and its icon.
     void UpdateVideo();
-    // 0x0048b593..0x0048b644 / 0x0048d17c..0x0048d236: the string cleared, the swap released,
-    // the string cleared again, the swap's fields zeroed.
+    // Port-only helper for the sequence inlined at 0x0048b593 and 0x0048d17c: the string
+    // cleared, the swap released, the string cleared again, the swap's fields zeroed.
     void ResetVideo();
     // The three FUN_00459950 calls on the selected offer (Create, SetProperty 0x26,
     // OnAcceptResult).

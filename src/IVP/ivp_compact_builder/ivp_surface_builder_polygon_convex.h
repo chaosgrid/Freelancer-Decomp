@@ -14,8 +14,7 @@
 // ============================================================================
 // IVP_SurfaceBuilder_Polygon_Convex -- builds one IVP_Compact_Ledge from an
 // IVP_Template_Polygon (through IVP_Object_Polygon_Tetra) or from a single
-// triangle (Common.dll .text:0636da30-0636e0f5).
-// (2026-10-08, claude-code:cmn-ivp4b)
+// triangle (Common.dll 0636da30-0636e0f5).
 // ============================================================================
 
 class IVP_Object_Polygon_Tetra;

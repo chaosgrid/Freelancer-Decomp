@@ -51,7 +51,7 @@ static_assert(sizeof(FBigImageDesc) == 0x2C, "BigImage descriptor extent");
 
 struct IBigImage2 : IDAComponent
 {
-    // formerly Slot3; TODO: original purpose and return contract.
+    // +0x0C (slot 3). TODO: original purpose and return contract.
     virtual GENRESULT DACOM_API NoOp(void* A, void* B) = 0;
 
     virtual GENRESULT DACOM_API Draw(const RECT* Src, const RECT* Dest) = 0; // +0x10
@@ -63,7 +63,7 @@ struct IBigImage2 : IDAComponent
     virtual GENRESULT DACOM_API SetFromBuffer(const void* Pixels, unsigned long* Format,
                                               unsigned long Width, unsigned long Height,
                                               unsigned long Pitch) = 0; // +0x28 RET 0x18; fail parms −2
-    // formerly Slot11; TODO: original operation purpose.
+    // +0x2C (slot 11). TODO: original operation purpose.
     virtual GENRESULT DACOM_API ReturnMinusSeven(void* Unused) = 0;
 };
 

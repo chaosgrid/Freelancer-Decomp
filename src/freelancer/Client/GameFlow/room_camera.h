@@ -15,9 +15,10 @@
 //   .rdata 0x005e1304  intermediate class: QI/AddRef/Release filled in, slots 3/4 still pure,
 //                      slot 17 FUN_005585e0;
 //   .rdata 0x005e12a4  this class, 22 slots.
-// The common ICamera prefix has 20 methods. Retail Room's tail differs after slot16;
-// its position/orientation/transform operations use the named typed members below.
-// This derived class's appended virtual methods do not reproduce the retail tail indices.
+// DEVIATION: the common ICamera prefix has 20 methods; retail's room camera tail differs after
+// slot 16 (17 deleting dtor, 18 GetOrientation again, 19..21 SetPosition / SetOrientation /
+// SetTransform). The port calls those through the non-virtual members below, and the appended
+// virtuals do not reproduce the retail tail indices.
 
 #include "common_misc.h"
 
@@ -58,7 +59,7 @@ public:
                                  float Radius) override;    // LAB_00556780
     float const* DACOM_API GetViewTransform() override;     // LAB_00556aa0
 
-    // Complete the common prefix; the two legacy placeholders are local extensions.
+    // The common prefix's remaining slots, plus two port-only placeholders.
     int DACOM_API ProjectVec(float* Out3, float const* World) override;
     void GetVelocity(float* Out3) override;
     int SetProperty(char const* Key, char const* Value) override;
@@ -100,7 +101,7 @@ public:
 };
 
 // FUN_00556280 -- cdecl (Transform12, Rect by value, HalfFovX, ZNear, ZFar). Transform12 is
-// position (3) then orientation (9), as 556be0 lays it out on its stack.
+// position (3) then orientation (9), as FUN_00556be0 lays it out on its stack.
 FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
                                  float HalfFovXDeg, float ZNear, float ZFar);
 
@@ -132,10 +133,9 @@ void RoomCameraSetZFarValue(FRoomCamera* Camera, const float* ZFar);
 // FUN_0041a390 (thiscall on a float[3]) -- scale by 1 / |v|, no zero test.
 void RoomVec3Normalize(float* V);
 
-// DAT_006799bc -- the lazily acquired 3DMathEngine this TU (0x00556xxx) shares: every use
-// tests it and fills it from FUN_005b73e0 when null -- FRoomCamera::Project LAB_005568b0
-// (0x005568c1), FRoomCamera::GetViewTransform LAB_00556aa0 (0x00556aa0) and the light factory
-// FUN_00556fd0 (0x00557094). A raw scan finds no other reference; nothing releases it.
+// DAT_006799bc -- the lazily acquired 3DMathEngine this retail TU shares: every use tests it and
+// fills it from FUN_005b73e0 when null -- FRoomCamera::Project, FRoomCamera::GetViewTransform and
+// the light factory FUN_00556fd0. Nothing releases it.
 struct I3DMathEngine;
 extern I3DMathEngine* G_LightsCameraMath;
 I3DMathEngine* LightsCameraMath();

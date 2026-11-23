@@ -358,7 +358,7 @@ int __stdcall Movie_ExponentiateLimb(unsigned int* Base, unsigned int Exponent, 
             Shift = Shift - 1u;
             unsigned int Bit = (Exponent >> Shift) & 1u;
             Window = Bit + Window * 2u;
-            // 06ac9ba0. Above 3 the switch is skipped and the shift is tested again.
+            // Above 3 the switch is skipped and the shift is tested again.
             if (Window > 3u)
             {
             }
@@ -613,8 +613,9 @@ void __stdcall Movie_EvaluateWindow(unsigned int* Source, unsigned int Count, un
     }
 }
 
-// 0x06aca920. Each statement is one listing instruction. Labels are the
-// listing addresses. Groups == 0 returns before the limb work.
+// 0x06aca920. Instruction-level emulation: each statement is one retail
+// instruction and labels are retail addresses. Groups == 0 returns before the
+// limb work.
 void __stdcall Movie_FoldPartialProducts(unsigned int* Base, unsigned int Count, unsigned int Groups, unsigned int Step, unsigned char* SignLeft, unsigned char* SignRight)
 {
     unsigned int SpaceWords[40];
@@ -1095,7 +1096,7 @@ Lab_06acae05:
     return; // 06acae08 RET         0x18
 }
 
-// 0x06acb0a0. Each statement is one listing instruction.
+// 0x06acb0a0. Instruction-level emulation, as above.
 void __stdcall Movie_SubtractHalves(unsigned int* Limbs, unsigned int Count, unsigned int Repeats, unsigned int Step, unsigned char* Signs)
 {
     unsigned int SpaceWords[40];

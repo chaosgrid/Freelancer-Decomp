@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <windows.h>
 
-// movie.dll CRT helpers. Addresses are EXE/Disasm/movie.dll.txt.
+// movie.dll's statically linked CRT helpers.
 
 static const int GMovieLockCount = 0x30;
 static CRITICAL_SECTION* GMovieLockTable[GMovieLockCount];
@@ -723,7 +723,7 @@ static int MovieSbhCommit(FMovieSbhGroup* Group)
     return Region;
 }
 
-// FUN_06ad442d. V6 small-block allocate. Prologue checked at 06ad442d-06ad44a2.
+// FUN_06ad442d. V6 small-block allocate.
 static void* MovieSbhAlloc(unsigned int Size)
 {
     FMovieSbhGroup* End = GMovieSbhGroups + GMovieSbhCount;
@@ -881,7 +881,7 @@ static FMovieSbhGroup* MovieSbhFind(void* Block)
     return nullptr;
 }
 
-// FUN_06ad4104. Return a V6 block to its size class. Body from the decompile.
+// FUN_06ad4104. Return a V6 block to its size class.
 static void MovieSbhFree(FMovieSbhGroup* Group, void* Block)
 {
     uint8_t* Header = Group->Header;
@@ -2382,8 +2382,8 @@ static int MovieRaise(int Signal)
     return 0;
 }
 
-// FUN_06ad089c. Frame 06ad089f-06ad08b8. Filter 06ad08e4 returns 1; 06ad08e8 restores ESP and falls into 06ad08ef.
-// Level 0's handler is 06ad08f8, which jumps to FUN_06ad52a5.
+// FUN_06ad089c. SEH frame whose filter always handles; the level-0 handler
+// jumps to FUN_06ad52a5.
 static void MovieCppTerminate()
 {
     __try
@@ -2458,8 +2458,8 @@ static void MovieAmsgExit(int RuntimeError)
 }
 
 // LAB_06acf888. malloc(0x80). Failure is __amsg_exit(0x18).
-// .CRT$XI initializers are int(*)(). The pointer stored in GMovieOnexitEnd is nonzero,
-// and the UCRT treats that leftover as a failed initializer.
+// Deviation: returns 0 explicitly. Retail leaves the nonzero GMovieOnexitEnd in
+// EAX, which the UCRT would treat as a failed .CRT$XI initializer.
 static int __cdecl MovieInitOnexitTable()
 {
     MovieInitStaticLocks();
@@ -2876,33 +2876,33 @@ static void (__cdecl* MovieOnexitRegister(void (__cdecl* Callback)()))()
     return Result;
 }
 
-// FUN_06acf3d0. PUSH arg; CALL FUN_06ad07b3; POP ECX; RET.
-void __cdecl MovieOperatorDelete(void* Block) // formerly Movie_06acf3d0
+// FUN_06acf3d0. operator delete -> free (FUN_06ad07b3).
+void __cdecl MovieOperatorDelete(void* Block)
 {
     MovieHeapFree(Block);
 }
 
-// 06acf3db. PUSH 1; PUSH size; CALL __nh_malloc; POP; POP; RET.
-void* __cdecl MovieOperatorNew(unsigned int Size) // formerly Movie_06acf3db
+// 0x06acf3db. operator new -> __nh_malloc(size, 1).
+void* __cdecl MovieOperatorNew(unsigned int Size)
 {
     return MovieNhMalloc(Size, 1);
 }
 
 // FUN_06ad970e. Throw of length_error("string too long"). No in-DLL typed catch.
-void __cdecl MovieThrowStringTooLong() // formerly Movie_06ad970e
+void __cdecl MovieThrowStringTooLong()
 {
     throw std::length_error("string too long");
 }
 
-// FUN_06acf876. PUSH callback; CALL FUN_06acf7f8; (result != 0) - 1.
-int __cdecl MovieRegisterAtexit(void (__cdecl* Callback)()) // formerly Movie_06acf876
+// FUN_06acf876. Registers through FUN_06acf7f8; 0 on success, -1 on failure.
+int __cdecl MovieRegisterAtexit(void (__cdecl* Callback)())
 {
     void (__cdecl* Stored)() = MovieOnexitRegister(Callback);
     return (Stored != nullptr) - 1;
 }
 
-// LAB_06acf7ef. PUSH 0x19; CALL __amsg_exit; POP ECX; RET. RET is not reached.
-void __cdecl MovieAbortRuntime() // formerly Movie_06acf7ef
+// LAB_06acf7ef. __amsg_exit(0x19); does not return.
+void __cdecl MovieAbortRuntime()
 {
     MovieAmsgExit(0x19);
 }

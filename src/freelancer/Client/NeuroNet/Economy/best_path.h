@@ -48,13 +48,12 @@ struct FBestPath
 {
     std::vector<FBestPathWaypoint> Waypoints; // node +0x10 (vector: +0x14 first, +0x18 last)
     // node +0x20 / +0x38 -- the mission title and text the nav map's info panel formats with
-    // FUN_0041c970 (FUN_0049a580 0x0049a714 / 0x0049a73f). Slot 72 copies them from its
-    // message's +0x0c / +0x24.
+    // FUN_0041c970 (in FUN_0049a580). Slot 72 copies them from its message's +0x0c / +0x24.
     FmtStr Title;
     FmtStr Text;
     // node +0x50 -- read as a byte through FUN_004c5040 (+0x40): 7 and 8 hide the nav map's
-    // abort-mission button (0x0049a866); any other value is the mission id NeuroNetNavMap's
-    // abort sends (IServer::AbortMission, 0x0049f70e). Slot 72 copies it from +0x3c.
+    // abort-mission button; any other value is the mission id NeuroNetNavMap's abort sends
+    // (IServer::AbortMission). Slot 72 copies it from +0x3c.
     unsigned char MissionType;
 };
 
@@ -76,11 +75,11 @@ FBestPath* BestPathGetFirst();
 
 // FUN_004c5490 (cdecl) -- the index of the first route's first waypoint whose +0x18 dword is
 // not 3; -1 with no route, an unallocated or empty vector, or when every one is 3. Only
-// caller: NeuroNetNavMap::Draw (0x00492bc1), which drops the answer.
+// caller: NeuroNetNavMap::Draw, which drops the answer.
 int BestPathFirstWaypointNotKind3();
 
 // FUN_004c58e0 (cdecl) -- the first route has waypoints and its Text's MadLibId (node +0x3c)
-// is neither 0 nor 1. Callers: NeuroNetNavMap FUN_00496e50 (0x00497290, 0x004972b5).
+// is neither 0 nor 1. Caller: NeuroNetNavMap FUN_00496e50.
 bool BestPathHasText();
 
 // FUN_004c5530 (cdecl) -- a hash of waypoint Index's tokens (0 without the record): from its

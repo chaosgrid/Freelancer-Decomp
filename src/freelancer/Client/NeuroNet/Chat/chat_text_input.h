@@ -11,11 +11,8 @@
 //
 // Retail:
 //   WINFACTORY<ChatTextInputDisplay> DAT_0066d920, static init LAB_0045e270; Create
-//   FUN_0046be00: operator_new(0x5a8), ctor FUN_0046be40; vftable 0x005cfec4 (53 slots).
-//   Overrides: 0 FUN_0046c620 (scalar deleting, dtor FUN_0046c640), 9 FUN_0045eee0 Create,
-//   11 FUN_0045f5e0 Update, 13 FUN_0045f4f0 Draw, 49 FUN_0045f700 OnKeyDown,
-//   51 LAB_0045f6a0 OnActivated (RegisterEvent(0x14)), 52 LAB_0045f6b0 OnDeactivating
-//   (UnregisterEvent(0x14)); the Event::Handler face's OnEvent is FUN_0045f6c0.
+//   FUN_0046be00: operator_new(0x5a8); vftable 0x005cfec4 (53 slots), scalar deleting dtor
+//   FUN_0046c620.
 //
 // Layout past RichTextEditWin (retail offsets, kept for reference only -- the port's
 // RichTextEditWin holds current-STL containers):
@@ -78,7 +75,7 @@ public:
     void Draw() override;
     // slot 49 FUN_0045f700 (RET 4)
     bool OnKeyDown(FHudCmdRecord const* Record) override;
-    // slot 51 LAB_0045f6a0 / slot 52 LAB_0045f6b0
+    // slot 51 LAB_0045f6a0 / slot 52 LAB_0045f6b0 -- (un)register event 0x14
     void OnActivated() override;
     void OnDeactivating() override;
     // Event::Handler face FUN_0045f6c0 (RET 4)

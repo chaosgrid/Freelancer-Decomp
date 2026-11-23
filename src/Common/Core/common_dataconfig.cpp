@@ -23,7 +23,7 @@ namespace
     const char kDataConfigSource[] = "E:\\FL\\Scratch\\Source\\Common\\DataConfig.cpp";
     const unsigned long kPathChars = 0x104;
 
-    // DAT_063fcee8 — DataConfig startup refcount. BSS 0 until first successful startup.
+    // DAT_063fcee8, the startup refcount.
     int GDataConfigRefCount = 0;
 
     const char kFmtEquipmentEmpty[] =
@@ -41,7 +41,7 @@ namespace
 
     int CallProgressCb(DataConfig::ProgressCB* Progress, char const* ValueString)
     {
-        // listing 06308f3c: thiscall vtable[0], arg = get_value_string().
+        // Vtable slot 0.
         return Progress->OnProgress(ValueString);
     }
 
@@ -95,7 +95,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Loadout::Load(FullPath, false) == 0)
             {
-                // 0630918e-063091ad: called through the FDUMP pointer with no test.
+                // Called through the FDUMP pointer with no test.
                 FDUMP(0x100002, kFmtLoadoutsEmpty, kDataConfigSource, 0x8e, FullPath);
             }
         }
@@ -151,7 +151,7 @@ namespace
         else if (Reader.is_value("NewCharDB"))
         {
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
-            // 063093e9-063093f9: TheDB->Load (+0x38), no null test.
+            // No null test.
             NewChar::TheDB->Load(FullPath);
         }
         else if (Reader.is_value("RtcSlider"))
@@ -165,15 +165,14 @@ namespace
 int __cdecl DataConfig::startup(char const* IniPath, Archetype::ICliObjFactory* Factory,
                                 ProgressCB* Progress)
 {
-    // Retail: if DAT_063fcee8 != 0, increment and return 0 (no Data check).
+    // FUN_06308e60. No DALib::Data test.
     if (GDataConfigRefCount != 0)
     {
         GDataConfigRefCount += 1;
         return 0;
     }
 
-    // 06308e7f-06308e95: the refcount is incremented before the test (open fail still
-    // counts). No DALib::Data test -- the former guard was invented (CMN-S2 AIS 2026-10-14).
+    // Incremented before the open (a failed open still counts).
     GDataConfigRefCount = 1;
 
     INI_Reader Reader;
@@ -184,7 +183,7 @@ int __cdecl DataConfig::startup(char const* IniPath, Archetype::ICliObjFactory* 
         {
             do
             {
-                // 06308ef5: the abort byte is tested before each section.
+                // The abort byte is tested before each section.
                 if (bAbort)
                     break;
 
@@ -192,12 +191,11 @@ int __cdecl DataConfig::startup(char const* IniPath, Archetype::ICliObjFactory* 
                 {
                     do
                     {
-                        // 06308f30: and before each value.
+                        // And before each value.
                         if (bAbort)
                             break;
 
-                        // 06308f38-06308f5d: a non-zero callback answer sets the abort byte and
-                        // jumps to the read_value at 06309432 -- the value is not dispatched, but
+                        // A non-zero callback answer aborts: the value is not dispatched, but
                         // the reader still advances once more before the loops leave.
                         if (Progress != nullptr &&
                             CallProgressCb(Progress, Reader.get_value_string()) != 0)
@@ -223,7 +221,7 @@ int __cdecl DataConfig::startup(char const* IniPath, Archetype::ICliObjFactory* 
 
 void __cdecl DataConfig::shutdown()
 {
-    // listing 06309850. DEC then JNZ. shutdown without startup: 0 → -1, skip teardown.
+    // FUN_06309850. Shutdown without startup goes to -1 and skips the teardown.
     GDataConfigRefCount -= 1;
     if (GDataConfigRefCount != 0)
         return;
@@ -240,6 +238,6 @@ void __cdecl DataConfig::shutdown()
     Reputation::Shutdown();
     FuseDB::Shutdown();
     WeaponModDB_destroy();
-    // 06309894-0630989c: tail jump to TheDB->Shutdown (+0x14), no null test.
+    // No null test.
     NewChar::TheDB->Shutdown();
 }

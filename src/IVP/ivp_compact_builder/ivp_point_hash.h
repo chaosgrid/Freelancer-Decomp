@@ -10,7 +10,7 @@
 // pointsoup / polygon-convex chain). Bodies live in
 // ivp_surface_builder_ledge_soup.cpp.
 
-// Retail FUN_0636cfa0 (.text:0636cfa0-0636cfcf, stdcall, RET 4): CRC-32 of
+// Retail FUN_0636cfa0 (stdcall, RET 4): CRC-32 of
 // the first 12 bytes (x, y, z) of a point with the reflected table
 // .data:DAT_063edcdc (polynomial 0xEDB88320), seed 0xffffffff, no final
 // inversion, then OR 0x80000000 (the IVP_VHash "occupied" bit).

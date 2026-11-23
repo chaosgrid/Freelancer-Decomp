@@ -20,16 +20,16 @@ class CChoosePlayerDlg : public CDialog
 public:
 	enum { IDD = 0x97 };
 
-	explicit CChoosePlayerDlg(CWnd* Parent = nullptr);   // .text:00403850
+	explicit CChoosePlayerDlg(CWnd* Parent = nullptr);
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);      // .text:004038d0
-	virtual BOOL OnInitDialog();                         // .text:00403940
-	virtual void OnOK();                                 // .text:004039a0
-	virtual void OnCancel();                             // .text:00403990
+	virtual void DoDataExchange(CDataExchange* DX);
+	virtual BOOL OnInitDialog();
+	virtual void OnOK();
+	virtual void OnCancel();
 
-	afx_msg void OnDblClkPlayerList();                                        // .text:00403930
-	afx_msg void OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo);   // .text:00403b00
+	afx_msg void OnDblClkPlayerList();
+	afx_msg void OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo);
 
 	DECLARE_MESSAGE_MAP()
 

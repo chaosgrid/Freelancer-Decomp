@@ -43,12 +43,11 @@
 #include <utility>
 #include <string.h>
 
-// TU38 mission object base (see MissionObject.h). Content.dll.txt addresses.
+// TU38 mission object base (see MissionObject.h).
 
 namespace
 {
-    // LAB_06f0e240: DAT_06fd0694 = 0, then the TString<0x30> assignment of "Player"
-    // (length clamp 0x2f, MOVSD/MOVSB copy, terminator, length into DAT_06fd0690).
+    // LAB_06f0e240.
     TString<0x30> MakePlayerLabel()
     {
         TString<0x30> Label;
@@ -58,18 +57,14 @@ namespace
     }
 }
 
-// LAB_06f0e220: DAT_06fd06c4 = CreateID("LOCAL_OBJECTIVE"). Read by 06f10a3a, 06f10ab0,
-// 06f13b1f, 06f13f12.
+// LAB_06f0e220: DAT_06fd06c4.
 extern unsigned int const GIdLocalObjective = CreateID("LOCAL_OBJECTIVE");
-// LAB_06f0e240: DAT_06fd0690/DAT_06fd0694 TString<0x30> "Player". Read by 06f12169, 06f125a7,
-// 06f129cb, 06f12a08.
+// LAB_06f0e240: DAT_06fd0690.
 extern TString<0x30> const GPlayerLabel = MakePlayerLabel();
-// LAB_06f0e290: DAT_06fd068c = CreateID("Mission_Random_Encounter"). Read by 06f120a3,
-// 06f121e3, 06f12616, 06f131f4, 06f13c9b, 06f18149.
+// LAB_06f0e290: DAT_06fd068c.
 extern unsigned int const GIdMissionRandomEncounter = CreateID("Mission_Random_Encounter");
 
-// FUN_06f683b0 (06f683b0-06f683d9, cdecl): GetType writes into the first argument's stack
-// slot; zero result and a type outside 0x200 -> 1, else 0. Param 2 is never read.
+// FUN_06f683b0: GetType writes into the first argument's stack slot, hence the seeded Type.
 bool __cdecl IsSpaceObjTypeSet(unsigned int ObjId, FSystemInfo* Unused)
 {
     (void)Unused;
@@ -79,11 +74,7 @@ bool __cdecl IsSpaceObjTypeSet(unsigned int ObjId, FSystemInfo* Unused)
     return (Type & 0xfdff) != 0;
 }
 
-// FUN_06f0e3e0 (06f0e3e0-06f0e769, RET 8). Retail order: +4 = *param_1, +8/+0xc/+0x10 = 0,
-// +0x18/+0x19 = 0, the +0x1c list, +0x30 = 0, +0x34 = -1.0f, +0x38 ID_String::clear, the +0x3c
-// map, the +0x50/+0x68 FmtStr, +0x80 later, +0x84/+0x88 = 0, the containers +0x8c..+0x198, then
-// vtable 06fb85d8, +0x14 = 0.0333f (0x3d088889), +0x84 = 0, +0x1ac = 3,
-// pub::Controller::SetHeartbeatInterval(+4, 0.0333f), +0x81 = 0, +0x80 = 7.
+// FUN_06f0e3e0. The heartbeat interval is 0x3d088889 (1/30 s).
 FMissionObject::FMissionObject(unsigned int const* InControllerId, void const* Parms)
     : ControllerId(*InControllerId)
     , PlayerState(nullptr)
@@ -106,17 +97,13 @@ FMissionObject::FMissionObject(unsigned int const* InControllerId, void const* P
 }
 
 // FUN_06f0e770 -> FUN_06f0ed00. The vtable is reset to 06fb85d8 first, so the slot calls below
-// are this class's bodies. The container and FmtStr teardown that follows (06f0ede3-) is done
-// by the members' destructors.
+// are this class's bodies; the members' destructors do the rest of the teardown.
 FMissionObject::~FMissionObject()
 {
-    // 06f0ed28-06f0ed53: +0x98 erased (FUN_06ed0470 begin..end).
     RandEncs.clear();
-    // 06f0ed58-06f0edaf: while the first +0x3c record is non-null, slot 4 of slot 3 of its id.
     while (!Players.empty() && Players.begin()->second != nullptr)
         FMissionObject::RemovePlayer(FMissionObject::FindPlayer(Players.begin()->second->PlayerId));
-    // 06f0edb1-06f0ede1: a jumper with an NPC and a state other than 0 (out of every system)
-    // is deleted (vslot 0 with 1) and both dwords cleared.
+    // A jumper out of every system (state not 0) is owned by nobody else.
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
     for (; It != Jumpers.end(); ++It)
     {
@@ -128,9 +115,7 @@ FMissionObject::~FMissionObject()
     }
 }
 
-// FUN_06f0f100 (06f0f100-06f0f141, RET 8): a destroyed mission (+0x81) ignores every
-// message; otherwise, unless +0x19 is already set, slot 21 (vtbl[+0x54]) handles it.
-// If +0x19 is set before or after that, pub::Controller::Destroy(+4) and +0x81 = 1.
+// FUN_06f0f100. Slot 21 is vtbl +0x54.
 void FMissionObject::HandleMessage(pub::Controller::EMessage MessageId, void const* MessageParms)
 {
     if (bDestroyed != 0)
@@ -145,7 +130,7 @@ void FMissionObject::HandleMessage(pub::Controller::EMessage MessageId, void con
     bDestroyed = 1;
 }
 
-// LAB_06ea1450: XOR EAX,EAX; RET.
+// LAB_06ea1450.
 int FMissionObject::Slot07() { return 0; }
 int FMissionObject::GetTargetSystemId() { return 0; }
 int FMissionObject::GetJumpPreference() { return 0; }
@@ -163,9 +148,8 @@ namespace
         return Position;
     }
 
-    // The type 5 objective fields slot 11 writes (06f1bc89-06f1bcb0 / 06f1bd4d-06f1bd77 /
-    // 06f1bdc1-06f1bde8): +0x38 reputation, +0x3c the connection's system, marker +0x40 the
-    // current system, +0x44 = 1, +0x48 the point.
+    // The type 5 objective fields slot 11 writes: +0x38 reputation, +0x3c the connection's
+    // system, marker +0x40 the current system, +0x44 = 1, +0x48 the point.
     void FillPathObjective(FNNObjectiveType5* Objective, int RepInstance, unsigned int GotoSystemId,
                            unsigned int CurrentSystemId, Vector const& Point)
     {
@@ -178,9 +162,8 @@ namespace
         Objective->Marker.Data[0] = CurrentSystemId;
     }
 
-    // One axis of the slot 11 "leg unchanged" test (06f1bada-06f1bb3a): (Point - Marker)^2 against
-    // 1.0f (DAT_06fb5810) in x87 precision; FCOMP + TEST AH,0x41 + JP goes on (greater or
-    // unordered), so only "<=" counts as close.
+    // One axis of the slot 11 "leg unchanged" test against 1.0f (DAT_06fb5810) in x87
+    // precision; only "<=" counts as close (unordered does not).
     bool IsAxisClose(float Point, float Marker)
     {
         double const Delta = static_cast<double>(Point) - static_cast<double>(Marker);
@@ -188,22 +171,10 @@ namespace
     }
 }
 
-// LAB_06f1b9f0 (06f1b9f0-06f1be13, thiscall RET 0x2c, returns AL).
-// 06f1b9fd-06f1ba22: First = the first List node whose slot 4 is 5, or end.
-// Legs empty (06f1ba30): First == end -> false (06f1ba34, AL = BL = 0); else the run of type 5
-// nodes from First is deleted (FUN_06f1a610 + List vslot 3 per node, 06f1ba40-06f1ba9d; the null
-// test on the run end at 06f1ba54 cannot fire, the end is the list head) -> true.
-// Legs non-empty: when First is a type 5 node, the first leg's point (kind 1 -> PointB, else
-// PointA; 06f1bac4-06f1bad7) is compared with First's marker position; all three axes close ->
-// false with the list untouched (06f1bb3a). Otherwise the type 5 run is deleted (06f1bb40-
-// 06f1bb8b). Ins = *Where, or List's first node (06f1bb91-06f1bba6), read after the erase.
-// GotoSystemId = System->SystemId, replaced by FUN_06f2a240(System, Target) when Target is set
-// and that succeeds (06f1bbaa-06f1bbd8). Per leg (06f1bbf0-06f1bdf8): a new type 5 objective of
-// this mission inserted before Ins (FUN_06f19cd0 + FUN_06f1e390); kind 0 -> Type/Ids = the
-// first leg ? FirstType/FirstIds : LegType/LegIds, rep of ObjectA (GetRep, -1 default), PointA,
-// then a second type 5 objective inserted before Ins (FUN_06f93790 + FUN_06eb6740 inline) with
-// LegType/LegIds, rep of ObjectB, PointB; kind 1 -> TargetType/TargetIds, rep of Target (only
-// when Target is set), PointB; any other kind keeps the default objective. -> true.
+// LAB_06f1b9f0. Ins is read after the erase. GotoSystemId is the far side of Target's
+// connection (FUN_06f2a240) when Target is set and that succeeds. A kind 0 leg's first
+// objective takes FirstType/FirstIds on the first leg, LegType/LegIds after; a leg of any
+// other kind keeps the default objective.
 bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathLeg>* Legs,
                                          FMissionObjectiveList* List, int FirstIds, int LegIds,
                                          int TargetIds, unsigned int TargetObjectId, int FirstType,
@@ -302,12 +273,12 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
     return true;
 }
 
-// LAB_06ea1460: MOV AL,1; RET.
+// LAB_06ea1460.
 bool FMissionObject::FailOnPlayerDeath() { return true; }
-// LAB_06ea1470: XOR AL,AL; RET 4.
+// LAB_06ea1470.
 bool FMissionObject::FailOnGroupMemberDeath(unsigned int Arg) { (void)Arg; return false; }
 bool FMissionObject::FailOnSoloPlayerDeath() { return true; }
-// LAB_06ea1480: XOR AL,AL; RET.
+// LAB_06ea1480.
 bool FMissionObject::FailOnPlayerLeave() { return false; }
 bool FMissionObject::FailOnGroupMemberLeave(unsigned int Arg) { (void)Arg; return false; }
 bool FMissionObject::Slot17() { return true; }
@@ -316,7 +287,7 @@ bool FMissionObject::Slot17() { return true; }
 // FMissionObjective (base, vtable 06fb8ccc)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19f90 (base part, 06f19f90-06f1a00e).
+// FUN_06f19f90 (base part).
 FMissionObjective::FMissionObjective(FMissionObject* InMission)
     : bHidden(0)
     , Ids(0)
@@ -325,15 +296,13 @@ FMissionObjective::FMissionObjective(FMissionObject* InMission)
     , PlayerState(nullptr)
 {
     Nickname.clear();
-    // The inline MissionObjective ctor (FUN_06f1a5d0 shape, 06f19fb6-06f19fea) sets Type 1 and
-    // zeroes the FmtStr; after the vtable store Type = 4.
+    // The inline MissionObjective ctor sets Type 1; after the vtable store Type = 4.
     Objective.Type = 4;
     if (Mission != nullptr)
         PlayerState = Mission->PlayerState;
 }
 
-// Base part of the slot 5 clones (06f1a044-06f1a07b in FUN_06f1a010, identical in the other
-// seven): byte +4, dwords +8..+0x1c, then FmtStr::FmtStr(const FmtStr&) on +0x20.
+// Base part of the slot 5 clones (inlined in all eight).
 FMissionObjective::FMissionObjective(FMissionObjective const& Other)
     : bHidden(Other.bHidden)
     , Nickname(Other.Nickname)
@@ -345,12 +314,12 @@ FMissionObjective::FMissionObjective(FMissionObjective const& Other)
 {
 }
 
-// FUN_06f1a5c0: vtable reset, ~FmtStr at +0x20 (member destructor).
+// FUN_06f1a5c0.
 FMissionObjective::~FMissionObjective()
 {
 }
 
-// FUN_06f1a980 (06f1a980-06f1a9ba, RET 4).
+// FUN_06f1a980.
 bool FMissionObjective::IsSame(FMissionObjective* Other)
 {
     int OtherType = Other->GetType();
@@ -359,9 +328,7 @@ bool FMissionObjective::IsSame(FMissionObjective* Other)
     return Objective.Description == Other->Objective.Description;
 }
 
-// FUN_06f1d430 (06f1d430-06f1d451, cdecl): null or empty -> 0; CMP '0' / JL -> '-' test;
-// CMP '9' / JLE -> 1; else '-' -> 1. Every objective parser inlines the same test (e.g.
-// 06f1aa4a-06f1aa5e) on its TString copy.
+// FUN_06f1d430. Every objective parser inlines the same test on its TString copy.
 bool __cdecl IsNumberText(char const* Text)
 {
     if (Text == nullptr)
@@ -386,16 +353,16 @@ namespace
         Out = Reader->get_value_string(ValueIndex);
     }
 
-    // FmtStr::destroy followed by REP STOSD of the six dwords (e.g. 06f1aac0-06f1aacf).
+    // FmtStr::destroy followed by zeroing its six dwords.
     void DestroyAndZero(FmtStr& Text)
     {
         Text.destroy();
         std::memset(&Text, 0, sizeof(Text));
     }
 
-    // Slot 1 of types 5 and 6 (LAB_06f1b030, RET 4). The position is read 7, 8, 6 and stored
-    // +0x48 = value 8, +0x4c = value 7, +0x50 = value 6 (06f1b06c-06f1b0b5, raw bytes checked),
-    // the reverse of the x, y, z order slot 2 writes; retail reloads such a save swapped.
+    // Slot 1 of types 5 and 6 (LAB_06f1b030). Retail quirk: the position is stored +0x48 =
+    // value 8, +0x4c = value 7, +0x50 = value 6, the reverse of the x, y, z order slot 2
+    // writes, so retail reloads such a save swapped.
     void ParseType56(FMissionObjective& Objective, INI_Reader* Reader, int& RepInstance,
                      unsigned int& SystemId, FmtStr::NavMarker& Marker)
     {
@@ -412,7 +379,7 @@ namespace
         std::memcpy(&Marker.Data[4], &Value6, sizeof(float));
     }
 
-    // Slot 2 of types 5 and 6 (LAB_06f1b0d0, RET 4).
+    // Slot 2 of types 5 and 6 (LAB_06f1b0d0).
     void SaveType56(FMissionObjective const& Objective, FILE* File, int RepInstance,
                     unsigned int SystemId, FmtStr::NavMarker const& Marker)
     {
@@ -432,9 +399,8 @@ namespace
         fprintf(File, "END");
     }
 
-    // Slot 3 of types 5 and 6 (LAB_06f1b150): system, then the rep instance when the mission's
-    // player state exists, this objective's cached state has a ship and +0x38 != -1, then the
-    // nav marker.
+    // Slot 3 of types 5 and 6 (LAB_06f1b150). The objective's cached player state is not
+    // null-tested.
     void BuildType56(FMissionObjective& Objective, int const& RepInstance,
                      unsigned int const& SystemId, FmtStr::NavMarker const& Marker)
     {
@@ -450,8 +416,7 @@ namespace
         Text.end_mad_lib();
     }
 
-    // Slots 1 of navmarker/rep_inst (06f1ab0d-06f1abe3 / 06f1ad43-06f1ae2b): value 1 is a
-    // system id number or a system nickname (pub::GetSystemID on the copied text).
+    // Slots 1 of navmarker / rep_inst: value 1 is a system id number or a system nickname.
     void ParseSystemValue(unsigned int& SystemId, INI_Reader* Reader)
     {
         TString<0x40> Text;
@@ -462,7 +427,7 @@ namespace
             pub::GetSystemID(SystemId, Text.Data);
     }
 
-    // Values 4, 5, 6 read 5, 4, 6 and stored x = 4, y = 5, z = 6 (06f1ab52-06f1ab9d).
+    // Values 4, 5, 6 are read in the order 5, 4, 6.
     void ParsePosition(unsigned int* Out, INI_Reader* Reader)
     {
         float const Value5 = Reader->get_value_float(5);
@@ -490,14 +455,13 @@ namespace
 // Type 1 "base" (vtable 06fb8d20)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 1 (06f19d04-06f19d32).
+// FUN_06f19cd0 case 1.
 FNNObjectiveBase::FNNObjectiveBase(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
 }
 
-// LAB_06f1a9c0 (RET 4): value 1 is a base id number or a base nickname (pub::GetBaseID on the
-// copied text); value 2 is the ids.
+// LAB_06f1a9c0: value 1 is a base id number or a base nickname.
 void FNNObjectiveBase::Parse(INI_Reader* Reader)
 {
     TString<0x40> Text;
@@ -509,14 +473,14 @@ void FNNObjectiveBase::Parse(INI_Reader* Reader)
     Ids = Reader->get_value_int(2);
 }
 
-// LAB_06f1aa80 (RET 4): "%u, " (06fb872c) base, "%d" (06fb8dc0) ids.
+// LAB_06f1aa80.
 void FNNObjectiveBase::Save(FILE* File)
 {
     fprintf(File, "%u, ", BaseId);
     fprintf(File, "%d", Ids);
 }
 
-// FUN_06f1aab0: destroy twice, zero, begin_mad_lib(ids), append_base(+0x38), end_mad_lib.
+// FUN_06f1aab0. Retail destroys the FmtStr twice.
 bool FNNObjectiveBase::BuildDescription()
 {
     FmtStr& Text = Objective.Description;
@@ -528,23 +492,23 @@ bool FNNObjectiveBase::BuildDescription()
     return true;
 }
 
-// LAB_06ee9e10: MOV EAX,1.
+// LAB_06ee9e10.
 int FNNObjectiveBase::GetType() { return 1; }
 
-// FUN_06f1a010: new(0x3c), base copy, +0x38.
+// FUN_06f1a010: new(0x3c).
 FMissionObjective* FNNObjectiveBase::Clone() { return new FNNObjectiveBase(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Type 2 "navmarker" (vtable 06fb8d04)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 2 (06f19d37-06f19d69).
+// FUN_06f19cd0 case 2.
 FNNObjectiveNavMarker::FNNObjectiveNavMarker(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
 }
 
-// LAB_06f1ab00 (RET 4): system +0x38, ids (2), +0x3c (3), position +0x40 (4, 5, 6).
+// LAB_06f1ab00.
 void FNNObjectiveNavMarker::Parse(INI_Reader* Reader)
 {
     ParseSystemValue(Marker.Data[0], Reader);
@@ -553,7 +517,7 @@ void FNNObjectiveNavMarker::Parse(INI_Reader* Reader)
     ParsePosition(&Marker.Data[2], Reader);
 }
 
-// LAB_06f1abf0 (RET 4): "%u, " system, "%d, " ids, "%d, " +0x3c, "%f, %f, %f".
+// LAB_06f1abf0.
 void FNNObjectiveNavMarker::Save(FILE* File)
 {
     fprintf(File, "%u, ", Marker.Data[0]);
@@ -562,7 +526,7 @@ void FNNObjectiveNavMarker::Save(FILE* File)
     SavePosition(File, &Marker.Data[2], "%f, %f, %f");
 }
 
-// LAB_06f1ac50: destroy twice, zero, begin_mad_lib(ids), append_nav_marker(+0x38), end.
+// LAB_06f1ac50.
 bool FNNObjectiveNavMarker::BuildDescription()
 {
     FmtStr& Text = Objective.Description;
@@ -574,35 +538,35 @@ bool FNNObjectiveNavMarker::BuildDescription()
     return true;
 }
 
-// LAB_06ee9660: MOV EAX,2.
+// LAB_06ee9660.
 int FNNObjectiveNavMarker::GetType() { return 2; }
 
-// FUN_06f1a0a0: new(0x4c), base copy, 5 dwords from +0x38.
+// FUN_06f1a0a0: new(0x4c).
 FMissionObjective* FNNObjectiveNavMarker::Clone() { return new FNNObjectiveNavMarker(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Type 3 "ids" (vtable 06fb8ce8)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 3 (06f19d6e-06f19da0).
+// FUN_06f19cd0 case 3.
 FNNObjectiveIds::FNNObjectiveIds(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
 }
 
-// FUN_06f1aca0 (RET 4): ids = value 1.
+// FUN_06f1aca0.
 void FNNObjectiveIds::Parse(INI_Reader* Reader)
 {
     Ids = Reader->get_value_int(1);
 }
 
-// LAB_06f1acc0 (RET 4): "%d" ids.
+// LAB_06f1acc0.
 void FNNObjectiveIds::Save(FILE* File)
 {
     fprintf(File, "%d", Ids);
 }
 
-// LAB_06f1ace0: destroy twice, zero, begin_mad_lib(ids), append_string(ids), end.
+// LAB_06f1ace0.
 bool FNNObjectiveIds::BuildDescription()
 {
     FmtStr& Text = Objective.Description;
@@ -614,18 +578,17 @@ bool FNNObjectiveIds::BuildDescription()
     return true;
 }
 
-// LAB_06f5e540: MOV EAX,3.
+// LAB_06f5e540.
 int FNNObjectiveIds::GetType() { return 3; }
 
-// FUN_06f1a140: new(0x38), base copy.
+// FUN_06f1a140: new(0x38).
 FMissionObjective* FNNObjectiveIds::Clone() { return new FNNObjectiveIds(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Type 4 "rep_inst" (vtable 06fb8cb0)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 4 (06f19da5-06f19e17): the base ctor inlined, then +0x38 = 0 and
-// byte +0x3c = 0.
+// FUN_06f19cd0 case 4 (base ctor inlined).
 FNNObjectiveRepInst::FNNObjectiveRepInst(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
@@ -633,8 +596,7 @@ FNNObjectiveRepInst::FNNObjectiveRepInst(FMissionObject* InMission)
     Label.Data[0] = '\0';
 }
 
-// LAB_06f1ad30 (RET 4): system +0x6c, ids (2), +0x70 (3), position +0x74 (4, 5, 6), then the
-// label (7): null -> empty, else strlen clamped to 0x2f, copied, terminated (06f1add6-06f1ae63).
+// LAB_06f1ad30.
 void FNNObjectiveRepInst::Parse(INI_Reader* Reader)
 {
     ParseSystemValue(Marker.Data[0], Reader);
@@ -644,7 +606,7 @@ void FNNObjectiveRepInst::Parse(INI_Reader* Reader)
     Label = Reader->get_value_string(7);
 }
 
-// LAB_06f1ae70 (RET 4): "%u, " system, "%d, " ids, "%d, " +0x70, "%f, %f, %f, ", "%s" label.
+// LAB_06f1ae70.
 void FNNObjectiveRepInst::Save(FILE* File)
 {
     fprintf(File, "%u, ", Marker.Data[0]);
@@ -654,10 +616,8 @@ void FNNObjectiveRepInst::Save(FILE* File)
     fprintf(File, "%s", Label.Data);
 }
 
-// LAB_06f1aee0: the label's object id (06f1aee7-06f1afac is FUN_06f15b90 inlined: ship, the
-// +0xd0 loot loop of FUN_06f15b10, solar), its reputation (-1 when there is no object or
-// pub::SpaceObj::GetRep fails), then destroy twice, zero, begin_mad_lib(ids),
-// append_rep_instance, append_nav_marker(+0x6c), end.
+// LAB_06f1aee0 (GetLabelObjectId inlined). The reputation is -1 when there is no object or
+// GetRep fails.
 bool FNNObjectiveRepInst::BuildDescription()
 {
     unsigned int ObjId = Mission->GetLabelObjectId(&Label);
@@ -674,17 +634,17 @@ bool FNNObjectiveRepInst::BuildDescription()
     return true;
 }
 
-// LAB_06f25080: MOV EAX,4.
+// LAB_06f25080.
 int FNNObjectiveRepInst::GetType() { return 4; }
 
-// FUN_06f1a1d0: new(0x80), base copy, 0xd dwords from +0x38, 5 dwords from +0x6c.
+// FUN_06f1a1d0: new(0x80).
 FMissionObjective* FNNObjectiveRepInst::Clone() { return new FNNObjectiveRepInst(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Types 5 and 6 (vtables 06fb8c94 / 06fb8c78)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 5 (06f19e1c-06f19e58).
+// FUN_06f19cd0 case 5.
 FNNObjectiveType5::FNNObjectiveType5(FMissionObject* InMission)
     : FMissionObjective(InMission)
     , RepInstance(-1)
@@ -695,12 +655,12 @@ FNNObjectiveType5::FNNObjectiveType5(FMissionObject* InMission)
 void FNNObjectiveType5::Parse(INI_Reader* Reader) { ParseType56(*this, Reader, RepInstance, SystemId, Marker); }
 void FNNObjectiveType5::Save(FILE* File) { SaveType56(*this, File, RepInstance, SystemId, Marker); }
 bool FNNObjectiveType5::BuildDescription() { BuildType56(*this, RepInstance, SystemId, Marker); return true; }
-// LAB_06ee99a0: MOV EAX,5.
+// LAB_06ee99a0.
 int FNNObjectiveType5::GetType() { return 5; }
-// FUN_06f1a280: new(0x54), base copy, +0x38, +0x3c, 5 dwords from +0x40.
+// FUN_06f1a280: new(0x54).
 FMissionObjective* FNNObjectiveType5::Clone() { return new FNNObjectiveType5(*this); }
 
-// FUN_06f19cd0 case 6 (06f19e5d-06f19e99).
+// FUN_06f19cd0 case 6.
 FNNObjectiveType6::FNNObjectiveType6(FMissionObject* InMission)
     : FMissionObjective(InMission)
     , RepInstance(-1)
@@ -711,32 +671,31 @@ FNNObjectiveType6::FNNObjectiveType6(FMissionObject* InMission)
 void FNNObjectiveType6::Parse(INI_Reader* Reader) { ParseType56(*this, Reader, RepInstance, SystemId, Marker); }
 void FNNObjectiveType6::Save(FILE* File) { SaveType56(*this, File, RepInstance, SystemId, Marker); }
 bool FNNObjectiveType6::BuildDescription() { BuildType56(*this, RepInstance, SystemId, Marker); return true; }
-// LAB_06f250c0: MOV EAX,6.
+// LAB_06f250c0.
 int FNNObjectiveType6::GetType() { return 6; }
-// FUN_06f1a330: new(0x54), base copy, +0x38, +0x3c, 5 dwords from +0x40.
+// FUN_06f1a330: new(0x54).
 FMissionObjective* FNNObjectiveType6::Clone() { return new FNNObjectiveType6(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Type 7 (vtable 06fb8c5c)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 7 (06f19e9e-06f19f0f): base ctor inlined, FmtStr inline ctor (FUN_06eac680)
-// at +0x38.
+// FUN_06f19cd0 case 7 (base ctor inlined).
 FNNObjectiveType7::FNNObjectiveType7(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
 }
 
-// FUN_06f1a560 (deleting form 06f1a540): ~FmtStr +0x38, vtable reset, ~FmtStr +0x20.
+// FUN_06f1a560 (deleting form 06f1a540).
 FNNObjectiveType7::~FNNObjectiveType7()
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void FNNObjectiveType7::Parse(INI_Reader* Reader) { (void)Reader; }
 void FNNObjectiveType7::Save(FILE* File) { (void)File; }
 
-// LAB_06f1b1e0: destroy once, zero, FmtStr::operator=(+0x38).
+// LAB_06f1b1e0.
 bool FNNObjectiveType7::BuildDescription()
 {
     DestroyAndZero(Objective.Description);
@@ -744,27 +703,27 @@ bool FNNObjectiveType7::BuildDescription()
     return true;
 }
 
-// LAB_06f250d0: MOV EAX,7.
+// LAB_06f250d0.
 int FNNObjectiveType7::GetType() { return 7; }
 
-// FUN_06f1a3e0: new(0x50), base copy, FmtStr copy ctor on +0x38.
+// FUN_06f1a3e0: new(0x50).
 FMissionObjective* FNNObjectiveType7::Clone() { return new FNNObjectiveType7(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Type 8 (vtable 06fb8c40)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 case 8 (06f19f11-06f19f3f).
+// FUN_06f19cd0 case 8.
 FNNObjectiveType8::FNNObjectiveType8(FMissionObject* InMission)
     : FMissionObjective(InMission)
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void FNNObjectiveType8::Parse(INI_Reader* Reader) { (void)Reader; }
 void FNNObjectiveType8::Save(FILE* File) { (void)File; }
 
-// LAB_06f1b210: destroy once, zero, begin_mad_lib(ids), append_int(+0x38), end.
+// LAB_06f1b210.
 bool FNNObjectiveType8::BuildDescription()
 {
     FmtStr& Description = Objective.Description;
@@ -775,18 +734,17 @@ bool FNNObjectiveType8::BuildDescription()
     return true;
 }
 
-// LAB_06f1a480: MOV EAX,8.
+// LAB_06f1a480.
 int FNNObjectiveType8::GetType() { return 8; }
 
-// FUN_06f1a490: new(0x3c), base copy, +0x38.
+// FUN_06f1a490: new(0x3c).
 FMissionObjective* FNNObjectiveType8::Clone() { return new FNNObjectiveType8(*this); }
 
 // ---------------------------------------------------------------------------------------
 // Factory, [NNObjective] load/save
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f19cd0 (06f19cd0-06f19f62, cdecl). The jump table covers 1..8; any other type skips
-// the store (caseD_8 at 06f19f46) and returns whether *Out is already set.
+// FUN_06f19cd0. Any other type skips the store and returns whether *Out is already set.
 bool __cdecl CreateMissionObjective(int Type, FMissionObject* Mission, FMissionObjective** Out)
 {
     switch (Type)
@@ -821,7 +779,7 @@ bool __cdecl CreateMissionObjective(int Type, FMissionObject* Mission, FMissionO
     return *Out != nullptr;
 }
 
-// FUN_06f1a610 (06f1a610-06f1a62a, cdecl).
+// FUN_06f1a610.
 bool __cdecl DeleteMissionObjective(FMissionObjective** Objective)
 {
     if (*Objective != nullptr)
@@ -832,32 +790,24 @@ bool __cdecl DeleteMissionObjective(FMissionObjective** Objective)
     return true;
 }
 
-// FUN_06f1a630 (06f1a630-06f1a8de, cdecl). Keys:
-//   nickname: atoi of value 0, or CreateID of it when that is 0;
-//   type: value 0 a number (digit or '-' first) -> that type, 0 skips; else "navmarker" 2,
-//         "base" 1, "ids" 3, "rep_inst" 4, anything else skips. The factory result is not
-//         tested: slot 1 is called on it (a type outside 1..8 before any valid one calls
-//         through null, as retail does);
-//   state: a number -> that value; else 10, and "ACTIVE" clears / "HIDDEN" sets hidden;
-//   hidden: get_value_bool.
-// After the section an objective gets nickname (+8), state (+0x1c) and hidden (+4) and is
-// appended to List (inline push_back 06f1a8a5-06f1a8d1).
+// FUN_06f1a630. The factory result of "type" is not tested: a type outside 1..8 before any
+// valid one calls Parse through null, as retail does.
 void __cdecl LoadNNObjective(INI_Reader* Reader, FMissionObject* Mission, FMissionObjectiveList* List)
 {
     ID_String NicknameId;
     NicknameId.clear();
     unsigned char bHiddenValue = 0;
     FMissionObjective* Objective = nullptr;
-    // Retail never initialises this local ([ESP+0x1c]); every [NNObjective] in the shipped
-    // DATA (353 sections) has a state key, so the port's 0 is never observed.
+    // Retail never initialises this local; every [NNObjective] in the shipped DATA has a state
+    // key, so the port's 0 is never observed.
     int State = 0;
 
     while (Reader->read_value())
     {
         if (Reader->is_value("nickname"))
         {
-            // 06f1a689 imports MSVCRT atoi: saved unsigned hash IDs keep all 32 bits.
-            // UCRT atoi saturates IDs above INT_MAX and breaks later Act_SetNNObj lookup.
+            // Retail uses MSVCRT atoi, which keeps all 32 bits of a saved hash id; UCRT atoi
+            // saturates above INT_MAX and would break the later Act_SetNNObj lookup.
             NicknameId.Id = static_cast<unsigned int>(MsvcrtAtoi(Reader->get_value_string(0)));
             if (NicknameId.Id == 0)
                 NicknameId.Id = CreateID(Reader->get_value_string(0));
@@ -917,7 +867,7 @@ void __cdecl LoadNNObjective(INI_Reader* Reader, FMissionObject* Mission, FMissi
     List->Objectives.push_back(Objective);
 }
 
-// FUN_06f1a8e0 (06f1a8e0-06f1a97c, cdecl).
+// FUN_06f1a8e0.
 void __cdecl SaveNNObjectives(FILE* File, FMissionObjectiveList* List)
 {
     std::list<FMissionObjective*>::iterator It = List->Objectives.begin();
@@ -939,25 +889,24 @@ void __cdecl SaveNNObjectives(FILE* File, FMissionObjectiveList* List)
 // FMissionObjectiveList (vtables 06fb479c / 06fb478c)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f1ca70: empty list (then the derived vtable store by FMissionOwnedObjectiveList's ctor).
+// FUN_06f1ca70.
 FMissionObjectiveList::FMissionObjectiveList()
 {
 }
 
-// 06f1cf09-06f1cf23 (inside FUN_06f1cee0): FUN_06f1ca70, then FUN_06f1caa0(Other).
+// Inlined in FUN_06f1cee0.
 FMissionObjectiveList::FMissionObjectiveList(FMissionObjectiveList const& Other)
 {
     *this = Other;
 }
 
-// 06eb7900: FUN_06f1cb40 (every element deleted), then the nodes and the head freed.
+// 06eb7900.
 FMissionObjectiveList::~FMissionObjectiveList()
 {
     Clear();
 }
 
-// FUN_06f1cb40: for every node, delete the element when non-null (vslot 0 with 1), then erase
-// the node (vslot 3 = 06eb7850).
+// FUN_06f1cb40 (the erase is vslot 3 = 06eb7850).
 void FMissionObjectiveList::Clear()
 {
     std::list<FMissionObjective*>::iterator It = Objectives.begin();
@@ -969,8 +918,7 @@ void FMissionObjectiveList::Clear()
     }
 }
 
-// FUN_06f1caa0 (06f1caa0-06f1cb36, RET 4): the FUN_06f1cb40 loop inlined, then an inline
-// push_back of Other's elements' slot 5 in order. Returns this.
+// FUN_06f1caa0 (Clear inlined).
 FMissionObjectiveList& FMissionObjectiveList::operator=(FMissionObjectiveList const& Other)
 {
     Clear();
@@ -980,8 +928,7 @@ FMissionObjectiveList& FMissionObjectiveList::operator=(FMissionObjectiveList co
     return *this;
 }
 
-// FUN_06f1cb80 (06f1cb80-06f1cbba, RET 8): per node delete when non-null (vslot 0 with 1),
-// erase (vslot 3), until Last.
+// FUN_06f1cb80.
 void FMissionObjectiveList::EraseRange(std::list<FMissionObjective*>::iterator First,
                                        std::list<FMissionObjective*>::iterator Last)
 {
@@ -993,8 +940,7 @@ void FMissionObjectiveList::EraseRange(std::list<FMissionObjective*>::iterator F
     }
 }
 
-// FUN_06f1cbc0 (06f1cbc0-06f1cc35, RET 0xc): for each of Source, slot 5, clone +0x14 =
-// InMission, inline insert before Where and ++size.
+// FUN_06f1cbc0.
 void FMissionObjectiveList::InsertClones(std::list<FMissionObjective*>::iterator Where,
                                          FMissionObjectiveList const* Source,
                                          FMissionObject* InMission)
@@ -1008,7 +954,7 @@ void FMissionObjectiveList::InsertClones(std::list<FMissionObjective*>::iterator
     }
 }
 
-// FUN_06f1cc40 (06f1cc40-06f1cca4, RET 8).
+// FUN_06f1cc40.
 FMissionObjective* FMissionObjectiveList::Add(int Type, FMissionObject* InMission)
 {
     FMissionObjective* Created = nullptr;
@@ -1018,8 +964,7 @@ FMissionObjective* FMissionObjectiveList::Add(int Type, FMissionObject* InMissio
     return Created;
 }
 
-// FUN_06f1ccb0 (06f1ccb0-06f1ccfc): size 0 -> nothing; else the front value deleted (vslot 0
-// with 1) and cleared, the node unlinked and freed, --size.
+// FUN_06f1ccb0.
 void FMissionObjectiveList::PopFront()
 {
     if (Objectives.empty())
@@ -1032,7 +977,7 @@ void FMissionObjectiveList::PopFront()
     Objectives.pop_front();
 }
 
-// FUN_06f1cd00: size 0 -> 0, else tail call of the front value's slot 4.
+// FUN_06f1cd00.
 int FMissionObjectiveList::GetFrontType()
 {
     if (Objectives.empty())
@@ -1052,7 +997,7 @@ FMissionObjective* FMissionObjectiveList::GetFront()
 // FMissionPlayer (vtable 06fb85b8)
 // ---------------------------------------------------------------------------------------
 
-// 06f1b77f-06f1b7d8 (inlined in FUN_06f1b6d0).
+// Inlined in FUN_06f1b6d0.
 FMissionPlayer::FMissionPlayer(unsigned int InPlayerId, FMissionObject* InMission)
     : PlayerId(InPlayerId)
     , Mission(InMission)
@@ -1060,19 +1005,17 @@ FMissionPlayer::FMissionPlayer(unsigned int InPlayerId, FMissionObject* InMissio
     , bTradelanePathChecked(0)
     , bForceResendObjectives(0)
 {
-    // 06f1b7d8, after the vtable store.
+    // After the vtable store.
     Objectives.Owner = this;
 }
 
-// 06f0e2b0 -> FUN_06f1cd40 (EH state 1): the +0x28 objectives deleted (06f1cd69-06f1cd9f, the
-// FUN_06f1cb40 loop through the list's vslot 3), then the member dtors: +0x28 (state 2), +8
-// (state 3).
+// 06f0e2b0 -> FUN_06f1cd40.
 FMissionPlayer::~FMissionPlayer()
 {
     SentObjectives.Clear();
 }
 
-// FUN_06f1d3d0 (06f1d3d0-06f1d413, RET 4).
+// FUN_06f1d3d0.
 void FMissionPlayer::SetForceResendObjectives(bool bValue)
 {
     bForceResendObjectives = bValue ? 1 : 0;
@@ -1087,11 +1030,10 @@ bool FMissionPlayer::GetForceResendObjectives()
     return bForceResendObjectives != 0;
 }
 
-// FUN_06f1d110 (06f1d110-06f1d3c0).
+// FUN_06f1d110.
 void FMissionPlayer::SendObjectives()
 {
-    // 06f1d12d-06f1d169: a mission, its player state, and the player's live mission either
-    // this one or none.
+    // The player's live mission must be this one or none.
     if (Mission == nullptr)
         return;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
@@ -1100,10 +1042,9 @@ void FMissionPlayer::SendObjectives()
     if (LiveMission != Mission->ControllerId && LiveMission != 0)
         return;
 
-    // 06f1d16f: mission +0x84 = 0.
     Mission->ObjectiveResendTimer = 0.0f;
 
-    // 06f1d178-06f1d1a9: objectives with +4 == 0 whose slot 3 is true.
+    // Visible objectives whose BuildDescription succeeds.
     unsigned int Count = 0;
     std::list<FMissionObjective*>::iterator It = Objectives.Objectives.begin();
     for (; It != Objectives.Objectives.end(); ++It)
@@ -1116,17 +1057,15 @@ void FMissionPlayer::SendObjectives()
 
     if (Count == 0)
     {
-        // LAB_06f1d38d: no array.
         pub::Player::SetMissionObjectives(PlayerId, Mission->ControllerId, nullptr, 0,
                                           Mission->MissionTitle, Mission->MissionType,
                                           Mission->MissionOffer);
         return;
     }
 
-    // 06f1d1b9-06f1d1ee: new[] of Count MissionObjective (0x1c, ctor FUN_06f1a5d0: Type 1, empty
-    // FmtStr; EH state 0 only while the elements are built, the array is a raw pointer after
-    // that). The fill loop below writes one entry per objective with +4 == 0 without the slot 3
-    // test, so retail writes past the array when a visible objective's slot 3 failed above.
+    // Element ctor FUN_06f1a5d0 (Type 1). Retail quirk: the fill loop below writes one entry
+    // per visible objective without the BuildDescription test, so it would write past the
+    // array if a BuildDescription failed above (every override returns true).
     pub::Player::MissionObjective* Sent = new pub::Player::MissionObjective[Count];
     for (unsigned int Slot = 0; Slot < Count; ++Slot)
         Sent[Slot].Type = 1;
@@ -1137,13 +1076,12 @@ void FMissionPlayer::SendObjectives()
         FMissionObjective* Objective = *It;
         if (Objective->bHidden != 0)
         {
-            // LAB_06f1d320.
             Objective->Index = -1;
             continue;
         }
         if (bForceResendObjectives == 0 && (Objective->Objective.Type & 0x10) != 0)
         {
-            // 06f1d230-06f1d259: already sent (slot 6 of a kept clone)?
+            // Already sent (IsSame on a kept clone)?
             bool bKnown = false;
             std::list<FMissionObjective*>::iterator KeptIt = SentObjectives.Objectives.begin();
             for (; KeptIt != SentObjectives.Objectives.end(); ++KeptIt)
@@ -1156,8 +1094,7 @@ void FMissionPlayer::SendObjectives()
             }
             if (bKnown)
             {
-                // LAB_06f1d2e1-06f1d31b: clear the first set flag of 0x100, then 0x20 with
-                // 0x40, else 0x10.
+                // Clear 0x100 if set; else 0x20, and then 0x40 if set, otherwise 0x10.
                 unsigned int Type = Objective->Objective.Type;
                 if ((Type & 0x100) != 0)
                 {
@@ -1176,43 +1113,35 @@ void FMissionPlayer::SendObjectives()
             }
             else
             {
-                // 06f1d25b-06f1d288: clear 0x40, keep slot 5's object in +0x28.
+                // Keep a clone in +0x28.
                 if ((Objective->Objective.Type & 0x40) != 0)
                     Objective->Objective.Type = Objective->Objective.Type & ~0x40u;
                 FMissionObjective* Kept = Objective->Clone();
                 SentObjectives.Objectives.push_back(Kept);
             }
         }
-        // LAB_06f1d28d-06f1d2cf.
         if (Objective->Ids == 1)
             Objective->Objective.Type = (Objective->Objective.Type & 0x80) | 9;
-        // 06f1d2a5-06f1d2cf: +0x10 = index, the entry's Type and FmtStr::operator=.
         Objective->Index = static_cast<int>(Index);
         Sent[Index].Type = Objective->Objective.Type;
         Sent[Index].Description = Objective->Objective.Description;
         ++Index;
     }
 
-    // 06f1d332-06f1d372: send with Count (EBX is reloaded from the count after every write,
-    // 06f1d2d3), then delete[] the array (FUN_06fa9036 with the element dtor LAB_06f1c980).
     pub::Player::SetMissionObjectives(PlayerId, Mission->ControllerId, Sent, Count,
                                       Mission->MissionTitle, Mission->MissionType,
                                       Mission->MissionOffer);
     delete[] Sent;
 }
 
-// FUN_06f1cea0 (06f1cea0-06f1ced4).
+// FUN_06f1cea0.
 void FMissionPlayer::ClearObjectives()
 {
     Objectives.Clear();
 }
 
-// FUN_06f1cee0 (06f1cee0-06f1d109). Backup (EH state 1) = a copy of the +8 list: base copy
-// (FUN_06f1ca70 + FUN_06f1caa0 clones) then its Owner; Temp (state 2) = a new derived list
-// (Owner 0); a type 7 objective of the record's mission (FUN_06f19cd0) goes to Temp's end when
-// created (FUN_06f1e390) and gets Type 0x89 with no null test. The +8 list = Temp (FUN_06f1cb40,
-// clones appended through FUN_06ecfc30, Owner = 0), FUN_06f1d110, the +8 list = Backup (the
-// same, Owner restored). Temp is destroyed before Backup; both delete their elements.
+// FUN_06f1cee0. The placeholder gets Type 0x89 with no null test. Temp is destroyed before
+// Backup; both delete their elements.
 void FMissionPlayer::SendPlaceholderObjective()
 {
     FMissionOwnedObjectiveList Backup(Objectives);
@@ -1233,27 +1162,25 @@ void FMissionPlayer::SendPlaceholderObjective()
 // FMissionObject player slots
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f1b6d0 (06f1b6d0-06f1b821, RET 4).
+// FUN_06f1b6d0.
 FMissionPlayer* FMissionObject::GetOrCreatePlayer(unsigned int InPlayerId)
 {
-    // 06f1b6ee-06f1b72d: FUN_06f2e220 find; a hit returns the node value (LAB_06f1b808).
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.find(InPlayerId);
     if (It != Players.end())
         return It->second;
-    // 06f1b733-06f1b746: no player state -> 0.
     FContentPlayerState* State = FindContentPlayerState(InPlayerId);
     if (State == nullptr)
         return nullptr;
-    // 06f1b74c-06f1b761: in multiplayer the player must be in a system (FUN_06f478c0).
+    // In multiplayer the player must be in a system.
     if (!pub::SinglePlayer() && State->GetSystemRecord() == nullptr)
         return nullptr;
-    // 06f1b767-06f1b7ff: new(0x3c), inline ctor, FUN_06f003e0 insert {id, player}.
+    // new(0x3c).
     FMissionPlayer* Player = new FMissionPlayer(InPlayerId, this);
     Players.insert(std::make_pair(InPlayerId, Player));
     return Player;
 }
 
-// FUN_06f1b830 (06f1b830-06f1b881, RET 4).
+// FUN_06f1b830.
 FMissionPlayer* FMissionObject::FindPlayer(unsigned int InPlayerId)
 {
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.find(InPlayerId);
@@ -1262,10 +1189,7 @@ FMissionPlayer* FMissionObject::FindPlayer(unsigned int InPlayerId)
     return It->second;
 }
 
-// FUN_06f1b8c0 (06f1b8c0-06f1b9e2, RET 4). Null -> nothing. Delete the objectives (+8), resend
-// the now empty list (FUN_06f1d110), erase every +0x3c entry keyed by the player id (the
-// equal_range walk 06f1b909-06f1b9d0; whole-tree clear when the range spans the tree), then
-// delete the record (vslot 0 with 1).
+// FUN_06f1b8c0: the now empty list is resent before the record goes.
 void FMissionObject::RemovePlayer(FMissionPlayer* Player)
 {
     if (Player == nullptr)
@@ -1276,13 +1200,13 @@ void FMissionObject::RemovePlayer(FMissionPlayer* Player)
     delete Player;
 }
 
-// FUN_06f1b8a0 (06f1b8a0-06f1b8b8, RET 4): vslot 4 of vslot 3.
+// FUN_06f1b8a0.
 void FMissionObject::RemovePlayerById(unsigned int InPlayerId)
 {
     RemovePlayer(FindPlayer(InPlayerId));
 }
 
-// LAB_06f1b890: head->left == head -> 0, else its value.
+// LAB_06f1b890.
 FMissionPlayer* FMissionObject::GetFirstPlayer()
 {
     if (Players.empty())
@@ -1290,42 +1214,30 @@ FMissionPlayer* FMissionObject::GetFirstPlayer()
     return Players.begin()->second;
 }
 
-// FUN_06f0fc40 (06f0fc40-06f0fd90). The +0xd0 loot records are not touched.
-// TODO(CNT-AI): the +0x114 clear (FUN_06f1ecc0, 06f0fd17-06f0fd2c) - the [MetaBehavior] map is
-// not declared yet.
+// FUN_06f0fc40. The +0xd0 loot records are not touched.
 void FMissionObject::EndMission()
 {
-    // 06f0fc48-06f0fc66: while slot 6 returns a record, slot 5 with its id.
     FMissionPlayer* Player = GetFirstPlayer();
     while (Player != nullptr)
     {
         RemovePlayerById(Player->PlayerId);
         Player = GetFirstPlayer();
     }
-    // 06f0fc68-06f0fc8c: FmtStr::destroy and zero both FmtStr (6 dwords each).
     MissionTitle.destroy();
     std::memset(&MissionTitle, 0, sizeof(MissionTitle));
     MissionOffer.destroy();
     std::memset(&MissionOffer, 0, sizeof(MissionOffer));
-    // 06f0fc8e-06f0fca3: +0x184 erase(begin, end) (FUN_06f1f130).
     MissionNpcs.clear();
-    // 06f0fca8-06f0fcbd: +0xa4 cleared.
     NpcObjects.clear();
-    // 06f0fcc2-06f0fcfb: +0xb8 erased node by node (FUN_06f1de90).
     MissionShips.clear();
-    // 06f0fcfd-06f0fd12: +0x100 erase(begin, end) (FUN_06f1ec00).
     ObjLists.clear();
-    // 06f0fd17-06f0fd2c: +0x114 erase(begin, end) (FUN_06f1ecc0).
     MetaBehaviors.clear();
-    // 06f0fd31-06f0fd56: +0xc4 erased node by node.
     MissionSolars.clear();
-    // 06f0fd58-06f0fd83: +0x98 erased node by node.
     RandEncs.clear();
-    // 06f0fd86.
     bPendingDestroy = 1;
 }
 
-// FUN_06f1ca50 (06f1ca50-06f1ca6b, RET 4).
+// FUN_06f1ca50.
 void FMissionObject::SetPlayer(unsigned int InPlayerId)
 {
     PlayerId = InPlayerId;
@@ -1335,11 +1247,9 @@ void FMissionObject::SetPlayer(unsigned int InPlayerId)
 // DAT_06fce594 (.data, initial 1): the objective resend timer runs (msg 2 clears, 0x36 sets).
 static bool GObjectiveTimerRunning = true;
 
-// FUN_06f1b4f0 (06f1b4f0-06f1b600, RET 8). Messages 2 / 0x36 whose parms+4 is this mission's
-// player (a real id) stop / restart the timer. Message 0x20 while running: +0x84 += *parms
-// (FLD/FADD/FST), and once it is >= 180.0 (DAT_06fb8df8; FCOMP, TEST AH,0x01 + JNZ skips on
-// less or unordered) every player record is resent through slot 3 / slot 1 (1) /
-// FUN_06f1d110 / slot 1 (0). FUN_06f1d110 zeroes +0x84.
+// FUN_06f1b4f0. Messages 2 / 0x36 for this mission's player stop / restart the timer. Every
+// 180 s (DAT_06fb8df8; unordered skips) the objectives are force-resent; SendObjectives
+// zeroes the timer.
 void FMissionObject::UpdateObjectiveTimer(pub::Controller::EMessage MessageId,
                                           void const* MessageParms)
 {
@@ -1380,7 +1290,7 @@ void FMissionObject::UpdateObjectiveTimer(pub::Controller::EMessage MessageId,
     }
 }
 
-// FUN_06f1b260 (06f1b260-06f1b2ff, RET 8).
+// FUN_06f1b260.
 bool FMissionObject::SetObjectiveVisible(unsigned int const* NicknameId, bool bVisible)
 {
     bool bFound = false;
@@ -1403,7 +1313,7 @@ bool FMissionObject::SetObjectiveVisible(unsigned int const* NicknameId, bool bV
     return bFound;
 }
 
-// FUN_06f1b310 (06f1b310-06f1b3c6, RET 8): no early exit, every match of every player.
+// FUN_06f1b310: no early exit, every match of every player.
 void FMissionObject::SetObjectiveState(unsigned int const* NicknameId, int State)
 {
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.begin();
@@ -1419,7 +1329,6 @@ void FMissionObject::SetObjectiveState(unsigned int const* NicknameId, int State
             if (*NicknameId != Objective->Nickname.Id)
                 continue;
             Objective->Objective.Type = static_cast<unsigned int>(State);
-            // 06f1b351-06f1b35a: CMP index,-1 / JLE skips.
             if (Objective->Index > -1)
                 pub::Player::SetMissionObjectiveState(Player->PlayerId, ControllerId,
                                                       Objective->Index,
@@ -1428,8 +1337,7 @@ void FMissionObject::SetObjectiveState(unsigned int const* NicknameId, int State
     }
 }
 
-// FUN_06f1b3d0 (06f1b3d0-06f1b475): no null test on the records; per player the objectives are
-// deleted and their nodes erased (vslot 3), then FUN_06f1d110.
+// FUN_06f1b3d0: no null test on the records.
 void FMissionObject::ClearObjectives()
 {
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.begin();
@@ -1441,7 +1349,7 @@ void FMissionObject::ClearObjectives()
     }
 }
 
-// FUN_06f1b480 (06f1b480-06f1b4ed): null records skipped.
+// FUN_06f1b480: null records skipped.
 void FMissionObject::HideAllObjectives()
 {
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.begin();
@@ -1456,7 +1364,7 @@ void FMissionObject::HideAllObjectives()
     }
 }
 
-// FUN_06f1b610 (06f1b610-06f1b66d).
+// FUN_06f1b610.
 void FMissionObject::RenumberAllObjectives()
 {
     std::map<unsigned int, FMissionPlayer*>::iterator It = Players.begin();
@@ -1464,7 +1372,7 @@ void FMissionObject::RenumberAllObjectives()
         RenumberObjectives(It->first);
 }
 
-// FUN_06f1b670 (06f1b670-06f1b6c0, RET 4): slot 3, no null test.
+// FUN_06f1b670: the record is not null-tested.
 void FMissionObject::RenumberObjectives(unsigned int InPlayerId)
 {
     FMissionPlayer* Player = FindPlayer(InPlayerId);
@@ -1486,25 +1394,22 @@ void FMissionObject::RenumberObjectives(unsigned int InPlayerId)
     Player->SendObjectives();
 }
 
-// FUN_06ea1490: RET 8.
+// FUN_06ea1490.
 void FMissionObject::Slot20(unsigned int Arg0, unsigned int Arg1)
 {
     (void)Arg0;
     (void)Arg1;
 }
 
-// FUN_06f0f150 (06f0f150-06f0fbf3, RET 8). Two switches (raw PE tables: 06f0fbf8 for ids 4..0xa,
-// the byte table 06f0fc2c + 06f0fc14 for 0x24..0x36) plus compares; every case ends at the
-// common tail 06f0fbb5 (caseD_7), which forwards the message to slot 19 while this is the
-// player's live mission.
+// FUN_06f0f150. Every case ends at the common tail, which forwards the message to slot 19
+// while this is the player's live mission.
 void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                                           void const* MessageParms)
 {
     using pub::Controller::EMessage;
-    // 06f0f159-06f0f167: FUN_06f49b00(this+0xc); null -> return (no tail).
+    // No player state: return without the tail.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
-    // 06f0f17e-06f0f18c: ids other than 8 and 9 go to FUN_06f148f0.
     if (MessageId != EMessage::PlayerLogout && MessageId != EMessage::GroupMemberLeft)
         NotifyRandEncs(MessageId, MessageParms);
 
@@ -1512,9 +1417,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     switch (MessageId)
     {
     case EMessage::PlayerSave:
-        // 06f0f2f5-06f0f362 (save, parms = {player id, FILE*}): the mission's player in single
-        // player with +0x18 clear -> the snapshot when the player has a ship (state +0x10), then
-        // FUN_06f0ff90 and FUN_06f11f70 on the file.
+        // Parms = {player id, FILE*}; single player only, skipped while a trigger save is
+        // pending.
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
         if (Parms[0] != PlayerId)
@@ -1534,8 +1438,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
 
     case EMessage::PlayerLoad:
     {
-        // 06f0f367-06f0f3c4 (load, parms = {player id, INI_Reader*}): the reader's state kept
-        // around FUN_06f106e0 (get_state, reset, load, set_state).
+        // Parms = {player id, INI_Reader*}; the reader's state is kept around the load.
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
         if (Parms[0] != PlayerId)
@@ -1550,8 +1453,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     }
 
     case EMessage::PlayerLaunch:
-        // 06f0f3c9-06f0f44d: single player and parms[0] is the player -> every +0x134 name
-        // spawned (FUN_06f171e0, no placement), then the list emptied.
+        // Single player only: every +0x134 name is spawned again, then the list is emptied.
         if (!pub::SinglePlayer())
             break;
         if (Parms[0] != PlayerId)
@@ -1567,7 +1469,6 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     case EMessage::PlayerLogout:
     case EMessage::GroupMemberLeft:
     {
-        // 06f0f209-06f0f2f0 (player gone): slot 5 on the id, the id out of +0xdc.
         RemovePlayerById(Parms[0]);
         std::vector<unsigned int>::iterator Dead =
             std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[0]);
@@ -1576,8 +1477,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         bool bFail = false;
         if (PlayerId == Parms[0])
         {
-            // 06f0f27d-06f0f2a5: the mission's own player: slot 15 set -> fail; else slot 18
-            // with the first remaining record's player (0 without one).
+            // The mission's own player: fail, or hand the mission to the first remaining
+            // record's player.
             if (FailOnPlayerLeave())
             {
                 bFail = true;
@@ -1594,24 +1495,21 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         else if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->IsGroupMember(Parms[0]) &&
                  FailOnGroupMemberLeave(Parms[0]))
         {
-            // 06f0f2a7-06f0f2cf: a group member left and slot 16 says so -> fail.
             bFail = true;
         }
         if (bFail)
         {
-            // 06f0f2d5-06f0f2de: slot 24, then slot 18 with 0.
             OnMissionFail();
             SetPlayer(0);
         }
-        // 06f0f2e1-06f0f2ec: no player state any more -> +0x19 = 1.
         if (PlayerState == nullptr)
             bPendingDestroy = 1;
         break;
     }
 
     case EMessage::GroupMemberJoined:
-        // 06f0f1b3-06f0f204: a group member of the player joins the mission (FUN_06f48ba0 on
-        // the member's state, which retail does not null-test).
+        // A group member of the player joins the mission (FUN_06f48ba0); retail does not
+        // null-test the member's state.
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
         if (!PlayerState->IsGroupMember(Parms[0]))
@@ -1620,40 +1518,35 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         break;
 
     case EMessage::Heartbeat:
-        // 06f0f452-06f0f45d: FUN_06f14b40(*parms) (the frame time).
         UpdateJumpers(*static_cast<float const*>(MessageParms));
         break;
 
     case EMessage::AbortMission:
     {
-        // 06f0f5b3-06f0f5bf: *parms == +0xc, else the tail (no null test in retail).
         if (Parms[0] != PlayerId)
             break;
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
-        // 06f0f5d9-06f0f5e4: FUN_06f487c0([this+8]) = cached state +0xd8 == +4.
+        // GetLiveMission = FUN_06f487c0 (cached state +0xd8).
         if (PlayerState->GetLiveMission() != ControllerId)
             break;
-        // 06f0f5ea-06f0f5ee: CALL [EDX+0x60] = slot 24.
         OnMissionFail();
         break;
     }
 
     case EMessage::Msg0x25:
-        // 06f0f48b-06f0f49a: FUN_06f149f0(parms).
         OnShipJump(Parms);
         break;
 
     case EMessage::JumpInComplete:
-        // 06f0f49f-06f0f4b1: a pending jump starts its timer.
+        // A pending jump starts its timer.
         if (bJumpPending != 0)
             JumpTimer = 0.0f;
         break;
 
     case EMessage::Msg0x27:
     {
-        // 06f0f4b6-06f0f4eb: the player whose ship is *parms (FUN_06f49bc0) is appended to +0xdc
-        // (FUN_06f937c0 insert at the end).
+        // The player whose ship is *parms (FUN_06f49bc0) is appended to +0xdc.
         FContentPlayerState* Dead = FindContentPlayerStateByShip(Parms);
         if (Dead == nullptr)
             break;
@@ -1664,9 +1557,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
 
     case EMessage::SpaceEnter:
     {
-        // 06f0f4f0-06f0f5ae: parms[1] leaves +0xdc; for the mission's player in single player,
-        // the respawn keeps the hit points unless parms[2] (low 30 bits set) is an object of type
-        // 0x20 or 0x100, then FUN_06f145d0 and FUN_06f12c10.
+        // Single player: the respawn keeps the hit points unless the player launched from a
+        // base (type 0x20 or 0x100).
         std::vector<unsigned int>::iterator Dead =
             std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[1]);
         if (Dead != DeadPlayerIds.end())
@@ -1684,13 +1576,11 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                 bKeepHitPoints = false;
         }
         RespawnMissionObjects(bKeepHitPoints);
-        // 06f0f5a7-06f0f5a9.
         ApplyVibeInfos();
         break;
     }
 
     case EMessage::SpaceExit:
-        // 06f0f5f6-06f0f61e: single player and parms[1] is the mission's player -> the snapshot.
         if (!pub::SinglePlayer())
             break;
         if (Parms[1] != PlayerId)
@@ -1700,9 +1590,9 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
 
     case EMessage::ObjectDestroyed:
     {
-        // 06f0f657-06f0f924 (a SpaceObj left space; parms[0] its id, parms[2] the other object
-        // of the event, parms[3] a player id).
-        // 06f0f657-06f0f691: a live mission NPC's ship slot gets its jumper flag back.
+        // A SpaceObj left space; parms[0] its id, parms[2] the other object of the event,
+        // parms[3] a player id.
+        // A live mission NPC's ship slot gets its jumper flag back.
         std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.find(Parms[0]);
         if (NpcIt != NpcObjects.end() && NpcIt->second != nullptr)
         {
@@ -1710,7 +1600,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             if (Ship != nullptr)
                 Ship->bJumper = Ship->bOriginalJumpFlag;
         }
-        // 06f0f694-06f0f6b9: the first jumper entry of that SpaceObj is unlinked.
+        // The first jumper entry of that SpaceObj is unlinked (its NPC is not null-tested).
         {
             std::list<FMissionJumper>::iterator It = Jumpers.begin();
             for (; It != Jumpers.end(); ++It)
@@ -1722,9 +1612,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                 }
             }
         }
-        // 06f0f6be-06f0f6c1: out of its random-encounter formation arm.
         RemoveRandEncMember(Parms);
-        // 06f0f6c6-06f0f6f4: single player with a system record -> FUN_06f74620.
+        // RemoveMissionObject = FUN_06f74620, single player only.
         {
             FContentPlayerState* State = FindContentPlayerState(PlayerId);
             if (pub::SinglePlayer() && State != nullptr)
@@ -1734,9 +1623,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                     System->RemoveMissionObject(Parms[0]);
             }
         }
-        // 06f0f6f9-06f0f7ef: an NPC leaves +0xa4 (deleted when parms[2] & 0x3fffffff is 0);
-        // otherwise a [MsnSolar] / [MsnLoot] record with that id gets +4 / +0x38 = 2 and its id
-        // cleared (the loot walk only when no solar matched).
+        // An NPC leaves +0xa4 (deleted when there is no other object); otherwise a [MsnSolar] /
+        // [MsnLoot] record with that id is marked 2 (the loot walk only when no solar matched).
         bool const bNoOther = (Parms[2] & 0x3fffffff) == 0;
         NpcIt = NpcObjects.find(Parms[0]);
         if (NpcIt != NpcObjects.end())
@@ -1773,7 +1661,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                 }
             }
         }
-        // 06f0f7f2-06f0f842: every label entry of that SpaceObj leaves +0xec.
+        // Every label entry of that SpaceObj leaves +0xec.
         {
             std::multimap<unsigned int, unsigned int>::iterator It = FormationMembers.begin();
             while (It != FormationMembers.end())
@@ -1784,13 +1672,12 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                     ++It;
             }
         }
-        // 06f0f844-06f0f864: nothing more for a player in +0xdc.
+        // Nothing more for a player in +0xdc.
         if (std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[3]) != DeadPlayerIds.end())
             break;
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
-        // 06f0f87e-06f0f924: the player's own ship (slot 12), a group member (FUN_06f48190 +
-        // slot 13) or the player's ship alone in its group (FUN_06f480c0 == 1 + slot 14) -> slot 24.
+        // IsGroupMember = FUN_06f48190, GetGroupSize = FUN_06f480c0.
         unsigned int ShipId = 0;
         if (PlayerState->ShipObject != nullptr)
             ShipId = PlayerState->ShipObject->SpaceObjId;
@@ -1810,23 +1697,19 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     }
 
     case EMessage::SystemEnter:
-        // 06f0f643-06f0f652: FUN_06f14c10(parms).
         PlaceJumpersAtLaunch(Parms);
         break;
 
     case EMessage::Msg0x1006:
-        // 06f0f929-06f0f93b: parms[1] == 0 -> slot 24.
         if (Parms[1] == 0)
             OnMissionFail();
         break;
 
     case EMessage::FormationLeaderChanged:
     {
-        // 06f0faa1-06f0fbaf: parms[1] is an NPC of this mission (+0x170); every player record
-        // with a visible rep_inst objective (slot 4 == 4) whose label resolves (FUN_06f15940,
-        // else FUN_06f15b10, else FUN_06f159f0; only with a player ship) to parms[0]'s SpaceObj
-        // id renumbers every player (FUN_06f1b670 per +0x3c key) and goes on with the next
-        // record.
+        // Parms[1] is an NPC of this mission (+0x170). A player record with a visible rep_inst
+        // objective whose label resolves (only with a player ship) to parms[0]'s SpaceObj id
+        // renumbers every player, then the walk goes on with the next record.
         FContentSpaceObj const* Object = *static_cast<FContentSpaceObj* const*>(MessageParms);
         FContentNpcShip const* Npc = static_cast<FContentNpcShip* const*>(MessageParms)[1];
         if (Npc->ControllerId != ControllerId)
@@ -1873,13 +1756,12 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     case EMessage::NpcShipCreated:
     {
         FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
-        // 06f0f955-06f0f967: npc +0x170 == +4.
+        // NPC +0x170 is its controller.
         if (Npc->ControllerId != ControllerId)
             break;
-        // 06f0f96d-06f0f97b.
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
-        // 06f0f981-06f0f9eb: strcmp of each [MarkObj] name with the npc nickname.
+        // A [MarkObj] name (strcmp) marks the new NPC.
         bool bMarkObjHit = false;
         std::list<TString<0x30>>::iterator It = MarkObjNames.begin();
         for (; It != MarkObjNames.end(); ++It)
@@ -1890,26 +1772,20 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                 break;
             }
         }
-        // 06f0f9ed-06f0f9ff: pub::Player::MarkObj(+0xc, npc+4, 1).
         if (bMarkObjHit)
             pub::Player::MarkObj(PlayerId, Npc->SpaceObjId, 1);
-        // 06f0fa02-06f0fa0d: FUN_06f15560(this, npc+0xd4).
         FMissionShip* Ship = FindMissionShip(&Npc->Nickname);
-        // 06f0fa12-06f0fa45: ship != 0 && byte [ship+0x48] (jumper) != 0 -> FUN_06f1e440(+0x1c,
-        // npc).
         if (Ship != nullptr && Ship->bJumper != 0)
         {
-            // 06f0fa1f-06f0fa45: {0, 0} appended, then the new node's npc = the npc.
+            // FUN_06f1e440 appends {0, 0}, then the new node's npc is set.
             FMissionJumper Jumper;
             Jumper.Npc = nullptr;
             Jumper.State = 0;
             Jumpers.push_back(Jumper);
             Jumpers.back().Npc = Npc;
         }
-        // 06f0fa48-06f0fa4b: FUN_06f14e80(this, parms).
         AttachRandEncNpc(MessageParms);
-        // 06f0fa50-06f0fa9a: every formation id on the npc (+0x17c) -> FUN_06f003e0 insert
-        // {id, npc+4} into the +0xec multimap.
+        // Every label id on the NPC (+0x17c) goes into the +0xec multimap.
         std::list<unsigned int>::iterator FormIt = Npc->LabelIds.begin();
         for (; FormIt != Npc->LabelIds.end(); ++FormIt)
             FormationMembers.insert(std::make_pair(*FormIt, Npc->SpaceObjId));
@@ -1920,8 +1796,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         break;
     }
 
-    // 06f0fbb5-06f0fbe9 (caseD_7, every case): the player's state exists and its live mission
-    // (FUN_06f487c0) is this controller -> slot 19 (vtbl[+0x4c]) with the message.
+    // The common tail: slot 19 (vtbl +0x4c) while this is the player's live mission.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
     if (PlayerState->GetLiveMission() != ControllerId)
@@ -1929,10 +1804,8 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     UpdateObjectiveTimer(MessageId, MessageParms);
 }
 
-// FUN_06f0fda0 (06f0fda0-06f0fe9f). No player state -> slot 22 only. Else the reward (+0x10)
-// is split by the group size (unsigned DIV) and paid through FUN_06f48050, every record's
-// objectives are deleted and resent (FUN_06f1b3d0's loop inlined, no null test), slot 22 runs,
-// and FUN_06f48a20(+4, 2, 1) ends the mission for the whole group.
+// FUN_06f0fda0. The reward is split by the group size (unsigned division) and paid through
+// FUN_06f48050; FUN_06f48a20 ends the mission for the whole group.
 void FMissionObject::OnMissionSucceed()
 {
     FContentPlayerState* State = FindContentPlayerState(PlayerId);
@@ -1948,9 +1821,7 @@ void FMissionObject::OnMissionSucceed()
     State->EndLiveMission(ControllerId, 2, true);
 }
 
-// FUN_06f0fea0 (06f0fea0-06f0ff89): every record's objectives deleted and resent (inlined
-// FUN_06f1b3d0 loop), then slot 22; when the player state exists and its live mission
-// (FUN_06f487c0) is this controller, FUN_06f48a20(+4, 3, 1) after it.
+// FUN_06f0fea0 (ClearObjectives inlined).
 void FMissionObject::OnMissionFail()
 {
     ClearObjectives();
@@ -1964,34 +1835,34 @@ void FMissionObject::OnMissionFail()
     EndMission();
 }
 
-// FUN_06eef520: OR EAX,-1; RET 4.
+// FUN_06eef520.
 int FMissionObject::MissionStateFromName(char const* Name)
 {
     (void)Name;
     return -1;
 }
 
-// LAB_06ea14a0: MOV EAX,"NOT_IMPLEMENTED" (.rdata:06fb384c); RET 4.
+// LAB_06ea14a0 (.rdata:06fb384c).
 char const* FMissionObject::MissionStateToName(int State)
 {
     (void)State;
     return "NOT_IMPLEMENTED";
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void FMissionObject::OnNpcSystemEnter(void const* Parms)
 {
     (void)Parms;
 }
 
-// FUN_06f15940 (06f15940-06f159b9, RET 4).
+// FUN_06f15940.
 unsigned int FMissionObject::GetLabelShipId(TString<0x30> const* Label)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
         return 0;
     if (PlayerState->ShipObject == nullptr)
         return 0;
-    // 06f15969: stricmp(label chars, "Player") (.rdata:06fb4708).
+    // "Player" is .rdata:06fb4708.
     if (_stricmp(Label->Data, "Player") == 0)
     {
         if (FindContentPlayerState(PlayerId) == nullptr)
@@ -2006,9 +1877,8 @@ unsigned int FMissionObject::GetLabelShipId(TString<0x30> const* Label)
     return Npc->SpaceObjId;
 }
 
-// FUN_06f15710 (06f15710-06f15789, RET 4): with a live player ship, the first +0xa4 entry
-// (in key order) whose nickname matches (stricmp); a null value or no match falls back to
-// FUN_06f15840. Without a player ship straight to FUN_06f15840.
+// FUN_06f15710: with a live player ship, the first +0xa4 entry (in key order) whose nickname
+// matches (stricmp); a null value or no match falls back to FUN_06f15840.
 FContentNpcShip* FMissionObject::FindNpcByName(TString<0x30> const* Label)
 {
     if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr)
@@ -2026,10 +1896,8 @@ FContentNpcShip* FMissionObject::FindNpcByName(TString<0x30> const* Label)
     return FindFormationNpc(Label);
 }
 
-// FUN_06f15840 (06f15840-06f1592e, RET 4): +0xb8 records named Label (stricmp of the record
-// chars, node+0xc); for each ship slot the first +0xa4 NPC with that nickname (stricmp of npc
-// +0xd8 and slot +8); it is returned when +0x14c is null or +0x154 is -1, else the next slot is
-// tried. Nothing found -> FUN_06f15490.
+// FUN_06f15840: in the +0xb8 records named Label, the first slot's NPC that is a formation
+// leader (slot 0) or alone (formation -1); else FUN_06f15490.
 FContentNpcShip* FMissionObject::FindFormationNpc(TString<0x30> const* Label)
 {
     std::list<FMissionShipGroup>::iterator GroupIt = MissionShips.begin();
@@ -2051,7 +1919,6 @@ FContentNpcShip* FMissionObject::FindFormationNpc(TString<0x30> const* Label)
             FContentNpcShip* Npc = It->second;
             if (Npc == nullptr)
                 continue;
-            // 06f158dd-06f158ee: +0x14c zero or +0x154 == -1 returns the ship.
             if (Npc->FormationSlot == 0 || Npc->FormationId == 0xffffffffu)
                 return Npc;
         }
@@ -2059,9 +1926,7 @@ FContentNpcShip* FMissionObject::FindFormationNpc(TString<0x30> const* Label)
     return FindRandEncFormationNpc(Label);
 }
 
-// FUN_06f15490 (06f15490-06f15554, RET 4): every random-encounter formation arm whose
-// ID_String names Label (stricmp); for each NPC id in the arm the first +0xa4 NPC with that
-// +4 (walk in key order), returned under the same +0x14c/+0x154 test. Else 0.
+// FUN_06f15490: the same leader test over the random-encounter formation arms named Label.
 FContentNpcShip* FMissionObject::FindRandEncFormationNpc(TString<0x30> const* Label)
 {
     std::list<FMissionRandEnc>::iterator EncIt = RandEncs.begin();
@@ -2086,7 +1951,6 @@ FContentNpcShip* FMissionObject::FindRandEncFormationNpc(TString<0x30> const* La
                 FContentNpcShip* Npc = It->second;
                 if (Npc == nullptr)
                     continue;
-                // 06f15519-06f1552a.
                 if (Npc->FormationSlot == 0 || Npc->FormationId == 0xffffffffu)
                     return Npc;
             }
@@ -2095,8 +1959,7 @@ FContentNpcShip* FMissionObject::FindRandEncFormationNpc(TString<0x30> const* La
     return nullptr;
 }
 
-// FUN_06f15b90 (06f15b90-06f15c6a, RET 4). The loot loop at 06f15bd7-06f15c45 is
-// FUN_06f15b10 inlined.
+// FUN_06f15b90 (GetLootId inlined).
 unsigned int FMissionObject::GetLabelObjectId(TString<0x30> const* Label)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
@@ -2112,8 +1975,7 @@ unsigned int FMissionObject::GetLabelObjectId(TString<0x30> const* Label)
     return GetSolarId(Label);
 }
 
-// FUN_06f15b10 (06f15b10-06f15b88, RET 4): inline strcmp of each +0xd0 record's nickname chars
-// (node+0xc) with the label chars; the first match returns its +0x34 (node+0x3c).
+// FUN_06f15b10 (case-sensitive).
 unsigned int FMissionObject::GetLootId(TString<0x30> const* Label)
 {
     std::list<FMissionLoot>::iterator It = MissionLoots.begin();
@@ -2125,14 +1987,13 @@ unsigned int FMissionObject::GetLootId(TString<0x30> const* Label)
     return 0;
 }
 
-// FUN_06f159f0 (06f159f0-06f15ad9, RET 4).
+// FUN_06f159f0.
 unsigned int FMissionObject::GetSolarId(TString<0x30> const* Label)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
         return 0;
     if (PlayerState->ShipObject == nullptr)
         return 0;
-    // 06f15a23-06f15a95: inline strcmp against each +0xc4 solar nickname (node+0x3f4).
     unsigned int SolarId = 0;
     std::list<FMissionSolar>::iterator It = MissionSolars.begin();
     for (; It != MissionSolars.end(); ++It)
@@ -2145,15 +2006,14 @@ unsigned int FMissionObject::GetSolarId(TString<0x30> const* Label)
     }
     if ((SolarId & 0x3fffffff) != 0)
         return SolarId;
-    // 06f15a9f-06f15ac6: a universe object of that nickname in the player's system.
+    // Else a universe object of that nickname.
     unsigned int NicknameId = pub::GetNicknameId(Label->Data);
     if (IsSpaceObjTypeSet(NicknameId, PlayerState->GetSystemRecord()))
         return NicknameId;
     return 0;
 }
 
-// FUN_06f156b0 (06f156b0-06f15701, RET 4): FUN_06fa7200 lower_bound on +0xa4 by *Id; end or
-// a greater key -> 0, else the node value (+0x10).
+// FUN_06f156b0.
 FContentNpcShip* FMissionObject::FindNpcById(unsigned int const* Id)
 {
     std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.lower_bound(*Id);
@@ -2162,8 +2022,7 @@ FContentNpcShip* FMissionObject::FindNpcById(unsigned int const* Id)
     return It->second;
 }
 
-// FUN_06f15ae0 (06f15ae0-06f15b0a, RET 4): the first +0xd0 record whose +0x34 (node+0x3c)
-// equals *SpaceObjId, as the value pointer (node+8); null at the end.
+// FUN_06f15ae0.
 FMissionLoot* FMissionObject::FindLootById(unsigned int const* SpaceObjId)
 {
     unsigned int const Id = *SpaceObjId;
@@ -2176,9 +2035,7 @@ FMissionLoot* FMissionObject::FindLootById(unsigned int const* SpaceObjId)
     return nullptr;
 }
 
-// FUN_06f15560 (06f15560-06f155e5, RET 4): each +0xb8 record's ship slots [node+0xf4,
-// node+0xf8) (stride 0x88), DACOM stricmp(slot+8, nickname chars); the first match is returned
-// (06f155b8 re-tests the slot pointer, never null).
+// FUN_06f15560.
 FMissionShip* FMissionObject::FindMissionShip(TString<0x30> const* Nickname)
 {
     std::list<FMissionShipGroup>::iterator GroupIt = MissionShips.begin();
@@ -2194,10 +2051,7 @@ FMissionShip* FMissionObject::FindMissionShip(TString<0x30> const* Nickname)
     return nullptr;
 }
 
-// FUN_06f155f0 (06f155f0-06f156a2, RET 4). A ship slot found by FUN_06f15560: lower_bound of
-// its +0x38 id in +0x184 (FUN_06fa7200; end or a greater key -> 0), else the node's value +0x10
-// (node+0x20, the [NPC] space_costume). No ship: the +0xc4 solars in order, DACOM stricmp of
-// the record nickname chars (node+0x3f4) with the nickname chars; a match returns record +0x478.
+// FUN_06f155f0: a ship slot's [NPC] space_costume, else a [MsnSolar]'s costume (+0x478).
 Costume* FMissionObject::GetMissionCostume(TString<0x30> const* Nickname)
 {
     FMissionShip* Ship = FindMissionShip(Nickname);
@@ -2217,8 +2071,7 @@ Costume* FMissionObject::GetMissionCostume(TString<0x30> const* Nickname)
     return nullptr;
 }
 
-// FUN_06f159c0 (06f159c0-06f159e8, RET 4): the first +0xc4 node whose value+0 equals *ObjId,
-// as the value pointer; end -> 0.
+// FUN_06f159c0.
 FMissionSolar* FMissionObject::FindSolarById(unsigned int const* ObjId)
 {
     unsigned int const Id = *ObjId;
@@ -2231,21 +2084,18 @@ FMissionSolar* FMissionObject::FindSolarById(unsigned int const* ObjId)
     return nullptr;
 }
 
-// FUN_06f15c70 (06f15c70-06f15de1, RET 8). The local TString starts empty; each source is
-// copied with FUN_06ea9f40 (clamp 0x2f) or the same inline copy for "Player".
+// FUN_06f15c70: NPC, solar, "Player", then loot.
 TString<0x30> FMissionObject::GetMissionObjectName(unsigned int const* ObjId)
 {
     TString<0x30> Name;
     Name.Length = 0;
     Name.Data[0] = '\0';
-    // 06f15c7c-06f15cd2: FUN_06f7b0f0 find on +0xa4; a non-null NPC gives its nickname (+0xd8).
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.find(*ObjId);
     if (NpcIt != NpcObjects.end() && NpcIt->second != nullptr)
     {
         Name = NpcIt->second->Nickname.Data;
         return Name;
     }
-    // 06f15cd7-06f15cee / 06f15d37-06f15d61: the first +0xc4 record with SpaceObjId == id.
     std::list<FMissionSolar>::iterator SolarIt = MissionSolars.begin();
     for (; SolarIt != MissionSolars.end(); ++SolarIt)
     {
@@ -2255,8 +2105,7 @@ TString<0x30> FMissionObject::GetMissionObjectName(unsigned int const* ObjId)
             return Name;
         }
     }
-    // 06f15cf0-06f15d35: no player state -> empty; the player's ship (cached state +0x10,
-    // ship +4) -> "Player".
+    // No player state: empty, even for a loot.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return Name;
     if (PlayerState->ShipObject != nullptr && *ObjId == PlayerState->ShipObject->SpaceObjId)
@@ -2264,7 +2113,6 @@ TString<0x30> FMissionObject::GetMissionObjectName(unsigned int const* ObjId)
         Name = "Player";
         return Name;
     }
-    // 06f15d63-06f15d94: the first +0xd0 record with SpaceObjId (node+0x3c) == id.
     std::list<FMissionLoot>::iterator LootIt = MissionLoots.begin();
     for (; LootIt != MissionLoots.end(); ++LootIt)
     {
@@ -2277,19 +2125,16 @@ TString<0x30> FMissionObject::GetMissionObjectName(unsigned int const* ObjId)
     return Name;
 }
 
-// FUN_06f199f0 (06f199f0-06f19b74, RET 0x3c).
+// FUN_06f199f0.
 bool FMissionObject::MarkMissionObject(unsigned int ObjId, int Mode, TString<0x30> Name)
 {
     bool bResult = true;
-    // 06f199f6-06f19a0a: FUN_06f49b00(+0xc) null -> 1.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return bResult;
-    // 06f19a10-06f19a2e: MarkObj(cached state +0xc, id, mode); a nonzero result -> 0.
     if (pub::Player::MarkObj(PlayerState->PlayerId, ObjId, Mode) != 0)
         bResult = false;
     if (Mode == 0)
     {
-        // 06f19a3b-06f19aab: the first +0x140 name equal to Name (strcmp) is unlinked.
         std::list<TString<0x30>>::iterator It = MarkObjNames.begin();
         for (; It != MarkObjNames.end(); ++It)
         {
@@ -2302,7 +2147,6 @@ bool FMissionObject::MarkMissionObject(unsigned int ObjId, int Mode, TString<0x3
     }
     if (Mode == 1)
     {
-        // 06f19ac6-06f19b5d: absent -> the name (0xd dwords) appended.
         std::list<TString<0x30>>::iterator It = MarkObjNames.begin();
         for (; It != MarkObjNames.end(); ++It)
         {
@@ -2313,12 +2157,10 @@ bool FMissionObject::MarkMissionObject(unsigned int ObjId, int Mode, TString<0x3
             MarkObjNames.push_back(Name);
         return bResult;
     }
-    // LAB_06f19b6d.
     return false;
 }
 
-// FUN_06f14980 (06f14980-06f149ec, RET 4): inline strcmp of Nickname's chars with each entry's
-// npc +0xd8; the node value address is returned.
+// FUN_06f14980.
 FMissionJumper* FMissionObject::FindJumperNpc(TString<0x30> const* Nickname)
 {
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
@@ -2330,8 +2172,7 @@ FMissionJumper* FMissionObject::FindJumperNpc(TString<0x30> const* Nickname)
     return nullptr;
 }
 
-// FUN_06f14e30 (06f14e30-06f14e77, RET 4): unlink and free the first entry whose npc +4 equals
-// *ObjId, size - 1.
+// FUN_06f14e30.
 void FMissionObject::RemoveJumperNpc(unsigned int const* ObjId)
 {
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
@@ -2345,7 +2186,7 @@ void FMissionObject::RemoveJumperNpc(unsigned int const* ObjId)
     }
 }
 
-// FUN_06f149f0 (06f149f0-06f14b2f, RET 4).
+// FUN_06f149f0.
 void FMissionObject::OnShipJump(unsigned int const* ShipId)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
@@ -2355,9 +2196,7 @@ void FMissionObject::OnShipJump(unsigned int const* ShipId)
         return;
     if (*ShipId == PlayerShip->SpaceObjId)
     {
-        // 06f14a23-06f14a71: the player's target gate (+0x174) gives the destination; a failed
-        // query does nothing. Every state-0 jumper: state 2, then out of its system
-        // (FUN_06f34800(0, 0, 0)).
+        // The player's target gate (+0x174) gives the destination. Relocate = FUN_06f34800.
         if (pub::SpaceObj::GetJumpTarget(PlayerShip->TargetId, JumpSystemId, JumpGateId) != 0)
             return;
         std::list<FMissionJumper>::iterator It = Jumpers.begin();
@@ -2370,8 +2209,7 @@ void FMissionObject::OnShipJump(unsigned int const* ShipId)
         }
         return;
     }
-    // 06f14a7a-06f14b26: a live mission NPC (FUN_06f7b0f0 on +0xa4, null value -> nothing): the
-    // first jumper with its nickname (strcmp) gets state 1 and leaves its system.
+    // A live mission NPC: the first jumper with its nickname (strcmp) leaves its system.
     std::map<unsigned int, FContentNpcShip*>::iterator Found = NpcObjects.find(*ShipId);
     if (Found == NpcObjects.end() || Found->second == nullptr)
         return;
@@ -2386,9 +2224,7 @@ void FMissionObject::OnShipJump(unsigned int const* ShipId)
     }
 }
 
-// FUN_06f14b40 (06f14b40-06f14c06, RET 4). The x87 test at 06f14b5e-06f14b6c: FILD JumpDelay,
-// FCOMP JumpTimer, TEST AH,0x41 + JP taken when neither C0 nor C3 is set = JumpDelay >
-// JumpTimer -> add the frame time; otherwise (not greater) the jumpers come in.
+// FUN_06f14b40. JumpDelay is an int loaded onto the x87 stack.
 void FMissionObject::UpdateJumpers(float DeltaTime)
 {
     if (bJumpPending == 0)
@@ -2400,9 +2236,7 @@ void FMissionObject::UpdateJumpers(float DeltaTime)
         JumpTimer = JumpTimer + DeltaTime;
         return;
     }
-    // 06f14b72-06f14be2: every state-2 jumper jumps in at JumpGateId of JumpSystemId
-    // (FUN_06f738c0), loses its directives (FUN_06f57740) and guide (FUN_06f34b70(0, 0, 0)),
-    // slot 28 gets {npc id, system id}, state 0.
+    // AddJumpingInSpaceObj = FUN_06f738c0. The system record is not null-tested.
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
     for (; It != Jumpers.end(); ++It)
     {
@@ -2418,13 +2252,11 @@ void FMissionObject::UpdateJumpers(float DeltaTime)
         OnNpcSystemEnter(Arrival);
         It->State = 0;
     }
-    // 06f14be6-06f14bea.
     bJumpPending = 0;
     JumpTimer = -1.0f;
 }
 
-// FUN_06f14c10 (06f14c10-06f14e2d, RET 4). The placement starts as the identity (FUN_06efc7a0,
-// translation 0). Without a player state retail leaves the selection kind and the orientation
+// FUN_06f14c10. Without a player state retail leaves the selection kind and the orientation
 // unset (stack garbage); the port starts them at 0 / identity.
 void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
 {
@@ -2433,13 +2265,12 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
     {
         if (It->State != 1)
         {
-            // 06f14e0f-06f14e14.
             if (It->State == 2)
                 bJumpPending = 1;
             continue;
         }
-        // 06f14c3c-06f14d3f: the anchor by the launching object's type (0x40 jump gate / hole:
-        // 700 (DAT_06fb8ac8) above it; 0x800: at it) or the player's ship (selection 3).
+        // The anchor by the launching object's type (0x40 jump gate / hole: 700 (DAT_06fb8ac8)
+        // above it; 0x800: at it) or the player's ship (selection 3).
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Parms[3], Type);
         Transform Placement;
@@ -2479,10 +2310,9 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
             Placement.Translation = Position;
             Placement.Rotation = Orientation;
         }
-        // 06f14d42-06f14dbd: GetEmptyPos from the placement, the object's radius x1.25
-        // (DAT_06fb8ac4) as the start, the NPC's radius as the clearance; the radius calls'
-        // centres are written into the position / a scratch vector. A failure leaves the
-        // jumper in state 1.
+        // GetEmptyPos with the object's radius x1.25 (DAT_06fb8ac4) as the start and the NPC's
+        // radius as the clearance; GetRadius overwrites the position with the centre. A failure
+        // leaves the jumper in state 1.
         float LaunchRadius = 0.0f;
         pub::SpaceObj::GetRadius(Parms[3], LaunchRadius, Position);
         float NpcRadius = 0.0f;
@@ -2495,8 +2325,6 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
         if (pub::SpaceObj::GetEmptyPos(Parms[0], Placement, StartRadius, NpcRadius, Selection,
                                        Position) != 0)
             continue;
-        // 06f14dbf-06f14e06: into the system (FUN_06f75f30 / FUN_06f34800), directives cancelled
-        // (FUN_06f57740), slot 28 (+0x70) with {npc id, system id, object id}, state 0.
         It->Npc->Relocate(FindSystemInfo(&Parms[0]), &Position, &Orientation);
         It->Npc->CancelDirectives();
         unsigned int Arrival[3];
@@ -2508,11 +2336,9 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
     }
 }
 
-// FUN_06f145d0 (06f145d0-06f1476f, RET 4).
+// FUN_06f145d0.
 void FMissionObject::RespawnMissionObjects(bool bKeepHitPoints)
 {
-    // 06f145d6-06f14627: every +0x128 record, its slots' hit points -1 unless kept, then
-    // FUN_06f15e20.
     std::list<FMissionShipGroup>::iterator GroupIt = RespawnShips.begin();
     for (; GroupIt != RespawnShips.end(); ++GroupIt)
     {
@@ -2524,8 +2350,7 @@ void FMissionObject::RespawnMissionObjects(bool bKeepHitPoints)
         }
         SpawnMissionShipGroup(&*GroupIt);
     }
-    // 06f14629-06f1467b: every +0x8c formation through the first [MsnRandEnc] (+0x98) whose
-    // NicknameId matches: its Params' FUN_06efba30 (dock target 0).
+    // Through the first matching [MsnRandEnc]: SpawnFormation (FUN_06efba30, dock target 0).
     std::list<FMissionRandEncRespawn>::iterator RespawnIt = RandEncRespawns.begin();
     for (; RespawnIt != RandEncRespawns.end(); ++RespawnIt)
     {
@@ -2540,9 +2365,7 @@ void FMissionObject::RespawnMissionObjects(bool bKeepHitPoints)
             break;
         }
     }
-    // 06f1467d-06f146de: the first slot of every +0x128 record, when its NPC exists
-    // (FUN_06f15710 on the slot nickname): its guide (FUN_06f34b70(guide, 1, 1)) or else its
-    // directives at the NPC's priority (FUN_06f57840(&slot +0x58, FUN_06f57c80)).
+    // The first slot's NPC gets its guide, or else its directives at the NPC's priority.
     for (GroupIt = RespawnShips.begin(); GroupIt != RespawnShips.end(); ++GroupIt)
     {
         if (GroupIt->Ships.empty())
@@ -2556,14 +2379,11 @@ void FMissionObject::RespawnMissionObjects(bool bKeepHitPoints)
         else
             Npc->SetDirectives(&First.Directives.Items, Npc->GetPriority());
     }
-    // 06f146e0-06f14769: both lists emptied (value dtors FUN_06f227e0 / FUN_06f229c0).
     RespawnShips.clear();
     RandEncRespawns.clear();
 }
 
-// FUN_06f148f0 (06f148f0-06f14971, RET 8): with the player's ship, every enabled encounter
-// whose populator accepts the message (slot 3 +0xc on (Params, MessageId, parms)) has NpcCount
-// zeroed, its Params spawned (slot 4 +0x10 with 1) and is disabled.
+// FUN_06f148f0 (Accept = populator vtbl +0xc, Spawn = params vtbl +0x10).
 void FMissionObject::NotifyRandEncs(pub::Controller::EMessage MessageId, void const* MessageParms)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
@@ -2583,10 +2403,8 @@ void FMissionObject::NotifyRandEncs(pub::Controller::EMessage MessageId, void co
     }
 }
 
-// FUN_06f153a0 (06f153a0-06f1548a, RET 4). Per record the arm walk stops at the first arm that
-// held the id (erased member; an arm left without members unlinked and destroyed,
-// FUN_06f227c0); then a record whose arm list is empty is cleared again (FUN_06f1dcd0) and its
-// "%s_frm%d" counter (+0x2c) reset.
+// FUN_06f153a0. A record whose arm list is empty is cleared again (FUN_06f1dcd0) and its
+// "%s_frm%d" counter reset.
 void FMissionObject::RemoveRandEncMember(unsigned int const* ObjId)
 {
     std::list<FMissionRandEnc>::iterator EncIt = RandEncs.begin();
@@ -2612,7 +2430,7 @@ void FMissionObject::RemoveRandEncMember(unsigned int const* ObjId)
     }
 }
 
-// 06f17ee9-06f17f55. Params / Populator: the handles start null.
+// The stack template in FUN_06f172f0. The handles start null.
 FMissionRandEnc::FMissionRandEnc()
     : bEnabled(0)
     , FormationIndex(0)
@@ -2623,17 +2441,13 @@ FMissionRandEnc::FMissionRandEnc()
     NicknameId.clear();
 }
 
-// FUN_06f21c50 (06f21c50-06f21d3b) and FUN_06ed3710 (06ed3710-06ed37c6) are the implicit copy
-// constructor and destructor (MissionObject.h): the TRefHandle members AddRef on copy and
-// Release on destruction in retail's member order.
+// FUN_06f21c50 and FUN_06ed3710 are the implicit copy constructor and destructor
+// (MissionObject.h).
 
-// FUN_06f14e80 (06f14e80-06f15327, RET 4). Ported through LAB_06f15020: the encounter whose
-// nickname id (+0x28) is in the npc's formation-id list (+0x17c) gets it; npc +0x1bc = 24.0f
-// (DAT_06fb8588); an arm with the same +0x154 takes the npc id, else a new arm "%s_frm%d" is
-// appended and the encounter's formation counter (+0x2c) grows; then the npc counter (+0x44)
-// grows. Once it equals the Params' ShipsSpawned (+0x34) the encounter is complete: with an
-// arrival object (Params +0x8c) its ships form a new formation picked by weight (the tail
-// 06f15027-06f15324 below), then message 0x100c (Cnd_EncLaunched) and +0x44 = 0.
+// FUN_06f14e80: the encounter whose nickname id is in the NPC's label list (+0x17c) takes it
+// (NPC +0x1bc = 24.0f, DAT_06fb8588). Once all of the encounter's ships exist, an encounter
+// with an arrival object (Params +0x8c) regroups them into a formation picked by weight, then
+// message 0x100c (Cnd_EncLaunched) goes out.
 void FMissionObject::AttachRandEncNpc(void const* MessageParms)
 {
     FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
@@ -2656,7 +2470,6 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
     if (EncIt == RandEncs.end())
         return;
 
-    // LAB_06f14f15.
     Npc->Longevity = 24.0f;
     std::list<FMissionRandEncArm>::iterator ArmIt = EncIt->Arms.begin();
     for (; ArmIt != EncIt->Arms.end(); ++ArmIt)
@@ -2666,13 +2479,11 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
     }
     if (ArmIt != EncIt->Arms.end())
     {
-        // LAB_06f1507d: the arm's id onto the npc list, the npc id into the arm.
         Npc->LabelIds.push_back(ArmIt->Id);
         ArmIt->MemberIds.push_back(Npc->SpaceObjId);
     }
     else
     {
-        // 06f14f45-06f1501b.
         char FormationName[0x40];
         sprintf(FormationName, "%s_frm%d", EncIt->Nickname.Data, EncIt->FormationIndex);
         ID_String NameA;
@@ -2690,48 +2501,42 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
         EncIt->Arms.push_back(Arm);
         EncIt->FormationIndex = EncIt->FormationIndex + 1;
     }
-    // LAB_06f15020-06f15031: one more ship; not all of the encounter's ships yet -> done.
     EncIt->NpcCount = EncIt->NpcCount + 1;
     if (static_cast<unsigned int>(EncIt->Params->ShipsSpawned) != EncIt->NpcCount)
         return;
 
-    // 06f15037-06f15041: only with an arrival object the ships regroup.
     if ((EncIt->Params->DockTarget & 0x3fffffff) != 0)
     {
-        // 06f15047-06f15162: every arm's ships (+0xec equal_range on the arm id; each looked
-        // up in +0xa4, a miss giving null) into a local list.
-        std::list<FContentShipBase*> Members;                              // FUN_06f93460
+        // Every arm's ships; a ship missing from +0xa4 is appended as null.
+        std::list<FContentShipBase*> Members;
         std::list<FMissionRandEncArm>::iterator Arm = EncIt->Arms.begin();
         for (; Arm != EncIt->Arms.end(); ++Arm)
         {
             std::multimap<unsigned int, unsigned int>::iterator Member =
-                FormationMembers.lower_bound(Arm->Id);                     // FUN_06fa7200
-            for (; Member != FormationMembers.upper_bound(Arm->Id); ++Member)  // FUN_06ed1670
+                FormationMembers.lower_bound(Arm->Id);
+            for (; Member != FormationMembers.upper_bound(Arm->Id); ++Member)
             {
                 std::map<unsigned int, FContentNpcShip*>::iterator Object =
-                    NpcObjects.find(Member->second);                       // FUN_06f7b0f0
+                    NpcObjects.find(Member->second);
                 FContentNpcShip* Ship = Object == NpcObjects.end() ? nullptr : Object->second;
-                Members.push_back(Ship);                                   // FUN_06f1e390
+                Members.push_back(Ship);
             }
         }
 
         if (Members.empty())
         {
-            // LAB_06f15261: FUN_06f67090 on the new NPC.
             RemoveFromFormation(Npc);
         }
         else
         {
-            // 06f15174-06f151b7: the weights (value +0x24) summed as floats.
+            // The weights (value +0x24) summed as floats.
             std::list<FRandEncFormation>& Formations = EncIt->Params->Formations;
             float Total = 0.0f;
             std::list<FRandEncFormation>::iterator Pack = Formations.begin();
             for (; Pack != Formations.end(); ++Pack)
                 Total = static_cast<float>(static_cast<double>(Total) + Pack->Weight);
-            // 06f151b9-06f151c8: FCOMP 0.0f, TEST AH,0x44 / JNP taken on equal -> nothing
-            // picked. 06f151ce-06f15243: Roll = (float)(rand() * 2^-15 (DAT_06fb4448) * total);
-            // the first pack whose running (float) sum reaches the roll (TEST AH,0x41 / JNP
-            // taken on Roll <= sum). Nothing picked -> retail reads the list head's value slot.
+            // A zero total picks nothing. Otherwise the first pack whose running float sum
+            // reaches the roll (rand() * 2^-15, DAT_06fb4448, times the total).
             FRandEncFormation* Picked = nullptr;
             if (Total != 0.0f)
             {
@@ -2748,23 +2553,20 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
                     }
                 }
             }
-            // 06f15245-06f15258: FUN_06f66ec0(&list, pack value +0, 0).
-            // TODO(CNT-MS-OBJ): with nothing picked retail passes the list sentinel's value slot
-            // (an indeterminate FFormation*); the port passes null.
+            // Deviation: with nothing picked retail passes the list sentinel's value slot (an
+            // indeterminate FFormation*); the port passes null.
             FormFormation(&Members, Picked != nullptr ? Picked->Formation : nullptr, false);
         }
-        // 06f1526d-06f1527c: the local list freed.
     }
 
-    // LAB_06f15281-06f15324: {the encounter's nickname id} as message 0x100c (Cnd_EncLaunched)
-    // to this controller, then the ship count starts again.
+    // Message 0x100c (Cnd_EncLaunched) to this controller; the ship count starts again.
     std::list<unsigned int> Launched;
     Launched.push_back(EncIt->NicknameId.Id);
     pub::Controller::_SendMessage(ControllerId, pub::Controller::EMessage::EncounterLaunched, &Launched);
     EncIt->NpcCount = 0;
 }
 
-// FUN_06f19c70 (06f19c70-06f19c97, RET 4): walk the +0x46c list for node+8 == *LabelId.
+// FUN_06f19c70.
 bool FMissionSolar::HasLabel(unsigned int const* LabelId) const
 {
     std::list<unsigned int>::const_iterator It = LabelIds.begin();
@@ -2776,7 +2578,7 @@ bool FMissionSolar::HasLabel(unsigned int const* LabelId) const
     return false;
 }
 
-// FUN_06f19ca0 (06f19ca0-06f19cc7, RET 4): walk the +0xec list for node+8 == *LabelId.
+// FUN_06f19ca0.
 bool FMissionLoot::HasLabel(unsigned int const* LabelId) const
 {
     std::list<unsigned int>::const_iterator It = LabelIds.begin();
@@ -2788,11 +2590,8 @@ bool FMissionLoot::HasLabel(unsigned int const* LabelId) const
     return false;
 }
 
-// FUN_06f19b80 (06f19b80-06f19c6a, RET 8). All three lookups run first: FUN_06f7b0f0 find on
-// +0xa4 (end -> no NPC, else the node value), the first +0xc4 solar with value+0 == ObjId, the
-// first +0xd0 loot with value+0x34 == ObjId. Then, in order: the NPC's +0x17c id list
-// (06f19bf9-06f19c10), the solar's +0x46c list (06f19c16-06f19c47, FUN_06f19c70 inlined with
-// FUN_06f68e30 as the iterator step), the loot row through FUN_06f19ca0 (06f19c4d).
+// FUN_06f19b80. All three lookups run first; then the NPC's, the solar's and the loot's label
+// lists are tested in that order.
 bool FMissionObject::HasObjectLabel(unsigned int ObjId, unsigned int const* LabelId)
 {
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.find(ObjId);
@@ -2836,7 +2635,7 @@ bool FMissionObject::HasObjectLabel(unsigned int ObjId, unsigned int const* Labe
     return false;
 }
 
-// FUN_06f15df0 (06f15df0-06f15e19, RET 4): linear search of [+0xe0, +0xe4).
+// FUN_06f15df0.
 bool FMissionObject::IsPlayerDead(unsigned int InPlayerId)
 {
     std::vector<unsigned int>::iterator It = DeadPlayerIds.begin();
@@ -2849,59 +2648,54 @@ bool FMissionObject::IsPlayerDead(unsigned int InPlayerId)
 }
 
 // DAT_06fd070c: TU38's 3DMathEngine, created on first use (FUN_06fa8fa0) by the orientation
-// keys of FUN_06f172f0 / FUN_06f18eb0 and by FUN_06f15e20 (06f16346-06f16383).
+// keys of FUN_06f172f0 / FUN_06f18eb0 and by FUN_06f15e20.
 static I3DMathEngine* GMissionMathEngine = nullptr;
 
 namespace
 {
-    // The 9 dwords of a rotation copied as one block (REP MOVSD 9).
+    // The 9 dwords of a rotation copied as one block.
     void CopyRotation(FMatrix* Dest, Matrix const* Source)
     {
         std::memcpy(Dest, Source, sizeof(FMatrix));
     }
 }
 
-// FUN_06f15e20 (06f15e20-06f1698f, RET 4). EH states 1..0xa: the parameter list (RAII), the
-// block template (inlined dtor 06f15ecd-06f15f40), the two FmtStr of the name.
+// FUN_06f15e20.
 void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
 {
-    // 06f15e50-06f15e60: the placement starts as the record's orientation and position.
     FTransform Placement;
     Placement.Rotation = Group->Orientation;
     Placement.Translation.X = Group->Position.x;
     Placement.Translation.Y = Group->Position.y;
     Placement.Translation.Z = Group->Position.z;
-    // [ESP+0x12]: set when the record's formation is unknown; nothing is created then.
+    // Set when the record's formation is unknown; nothing is created then.
     bool bNoFormation = false;
-    std::list<FContentNpcShipParams> Blocks;                              // FUN_06ef6b80
+    std::list<FContentNpcShipParams> Blocks;
 
     std::vector<FMissionShip>::iterator Ship = Group->Ships.begin();
     for (; Ship != Group->Ships.end(); ++Ship)
     {
-        // 06f15ea2-06f15f40: a default block (FUN_06f33500) appended (FUN_06efc860).
+        // A default block (FUN_06f33500).
         Blocks.push_back(FContentNpcShipParams());
         FContentNpcShipParams* Params = &Blocks.back();
 
-        // 06f15f45-06f15f7a: the name block (two inline FmtStr ctors, Gender 0, Affiliation -1).
         FNpcNameParams Name;
 
-        // 06f15f85-06f15fb5: the ship's "npc" block (+0x184, FUN_06f7b0f0 find).
         std::map<unsigned int, FMsnNpc>::iterator NpcIt = MissionNpcs.find(Ship->NpcId.Id);
         if (NpcIt == MissionNpcs.end())
         {
-            // 06f167e4-06f16818: no such [NPC]: the new block is dropped again (the size test
-            // is retail's).
+            // No such [NPC]: the new block is dropped again (the size test is retail's).
             if (!Blocks.empty())
                 Blocks.pop_back();
             continue;
         }
         FMsnNpc* Npc = &NpcIt->second;
 
-        // 06f15fbb-06f160ab: the reputation handle of the block.
+        // The reputation handle of the block.
         if (Ship->bRandomName != 0)
         {
-            // 06f15fd1-06f16048: the gender from the [NPC] voice's roles (1, then 2), else
-            // from the faction (FUN_06f319b0).
+            // The gender from the [NPC] voice's roles (1, then 2), else from the faction
+            // (FUN_06f319b0).
             if (Npc->Voice == 0)
             {
                 PickNpcNameGender(Npc->Affiliation, &Name);
@@ -2918,8 +2712,7 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
                 else
                     PickNpcNameGender(Npc->Affiliation, &Name);
             }
-            // 06f1604b-06f16089: a default request (FUN_06f31650), the name (FUN_06f319d0 with
-            // bNamedLeader 0), the old handle released, a new one from the name (FUN_06f31910).
+            // BuildNpcName = FUN_06f319d0, CreateNpcNameReputation = FUN_06f31910.
             FNpcNameRequest Request;
             BuildNpcName(Npc->Affiliation, &Request, &Name, false);
             if (Params->ReputationHandle != nullptr)
@@ -2931,8 +2724,7 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         }
         else
         {
-            // 06f16096-06f160ab: the old handle released, a new one from the [NPC] block
-            // (FUN_06f31d40).
+            // From the [NPC] block (FUN_06f31d40).
             if (Params->ReputationHandle != nullptr)
             {
                 Params->ReputationHandle->Release();
@@ -2941,11 +2733,10 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             CreateMsnNpcReputation(Npc, &Params->ReputationHandle);
         }
 
-        // 06f160b0-06f160d5: the block's nickname (FUN_06ea9f40, max 0x30).
         Params->Nickname = Ship->Nickname.Data;
 
-        // 06f160d8-06f16203: the npc_ship_arch from the mission's own table (+0x198,
-        // FUN_06f32480 + FUN_06f348f0), else from npcships.ini (FUN_06f34a40).
+        // The npc_ship_arch from the mission's own table (+0x198, FUN_06f32480 +
+        // FUN_06f348f0), else from npcships.ini (FUN_06f34a40).
         FNpcShipArch* Arch = FindNpcShipArch(&Npc->NpcShipArch.Id, &NpcShipArchs);
         if (Arch != nullptr)
         {
@@ -2953,14 +2744,11 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         }
         else if (!ApplyNpcShipArchById(Params, &Npc->NpcShipArch.Id, nullptr, nullptr))
         {
-            // 06f16209-06f1622a: unknown arch - the block is erased (FUN_06f1f4b0) and the
-            // ship skipped.
+            // Unknown arch: the block is erased and the ship skipped.
             Blocks.pop_back();
             continue;
         }
 
-        // 06f16105-06f16155: voice and space costume of the [NPC] block (the costume's four
-        // parts, the count, and that many accessories).
         Params->Voice = Npc->Voice;
         Params->CommCostume.PartIds[0] = Npc->Appearance.PartIds[0];
         Params->CommCostume.PartIds[1] = Npc->Appearance.PartIds[1];
@@ -2970,8 +2758,8 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         for (int Index = 0; Index < static_cast<int>(Params->CommCostume.AccessoryCount); ++Index)
             Params->CommCostume.AccessoryIds[Index] = Npc->Appearance.AccessoryIds[Index];
 
-        // 06f16155-06f161ad: no head or no voice -> the faction's picks (FUN_06f50650; costume
-        // FUN_06f4f430, voice FUN_06f4f620) with the name's gender.
+        // No head or no voice: the faction's picks (costume FUN_06f4f430, voice FUN_06f4f620)
+        // with the name's gender.
         if ((Npc->Appearance.PartIds[0] & 0x3fffffff) == 0 || (Npc->Voice & 0x3fffffff) == 0)
         {
             FFactionProps* Faction = GetFactionProps(&Npc->Affiliation);
@@ -2984,15 +2772,13 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             }
         }
 
-        // 06f161b2-06f161da: the ship's placement, identity and zero.
         FTransform Local;
         std::memset(&Local, 0, sizeof(Local));
-        Local.Rotation.D[0][0] = 1.0f;                                    // FUN_06efc7a0
+        Local.Rotation.D[0][0] = 1.0f;
         Local.Rotation.D[1][1] = 1.0f;
         Local.Rotation.D[2][2] = 1.0f;
         if (Group->bRelPos == 0)
         {
-            // 06f161e4-06f161f2: the record's orientation and position.
             Local.Rotation = Group->Orientation;
             Local.Translation.X = Group->Position.x;
             Local.Translation.Y = Group->Position.y;
@@ -3000,8 +2786,8 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         }
         else
         {
-            // 06f1622f-06f16315: the anchor - the player's ship ("Player", stricmp) or the NPC
-            // named by rel_pos (FUN_06f15710); identity and zero when there is none.
+            // The anchor: the player's ship or the NPC named by rel_pos; identity and zero when
+            // there is none.
             FTransform Anchor;
             std::memset(&Anchor, 0, sizeof(Anchor));
             Anchor.Rotation.D[0][0] = 1.0f;
@@ -3032,14 +2818,13 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
 
             if (Group->bOrientation == 0)
             {
-                // 06f16321-06f16341: FUN_06f243d0 - placed at the heading / range and facing
-                // away from the anchor.
+                // FUN_06f243d0: placed at the heading / range, facing away from the anchor.
                 PlaceFacingAnchor(&Anchor, &Group->RelPosHeading, &Group->RelPosRange, &Local);
             }
             else
             {
-                // 06f16343-06f163bc: the position only (DAT_06fd070c slot +0x28 on
-                // (cos h * r, 0, -(sin h * r))); the rotation stays identity.
+                // The position only (TransformXform is slot +0x28); the rotation stays
+                // identity.
                 FVector Offset;
                 Offset.X = static_cast<float>(std::cos(static_cast<double>(Group->RelPosHeading)) *
                                               Group->RelPosRange);
@@ -3054,10 +2839,8 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             }
         }
 
-        // 06f163c0-06f1645b: in the player's system, a ship with a positive radius (FCOMP
-        // 0.0f DAT_06fb444c, TEST AH,0x41 / JNZ: fall-through is greater) is moved to an empty
-        // spot when its position is taken (IsPosEmpty; GetEmptyPos 3D volume, the radius as
-        // start and clearance).
+        // A ship with a positive radius (DAT_06fb444c) is moved to an empty spot when its
+        // position is taken.
         if (FindContentPlayerState(PlayerId) != nullptr)
         {
             FSystemInfo* PlayerSystem = PlayerState->GetSystemRecord();
@@ -3085,22 +2868,19 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             }
         }
 
-        // 06f1645e-06f1649d: the first ship's placement becomes the formation's.
+        // The first ship's placement becomes the formation's.
         if (Ship == Group->Ships.begin())
             Placement = Local;
 
-        // 06f1649f-06f164de: position, orientation, creation type 0, the mission's controller.
         Params->Position.x = Local.Translation.X;
         Params->Position.y = Local.Translation.Y;
         Params->Position.z = Local.Translation.Z;
         std::memcpy(&Params->Orientation, &Local.Rotation, sizeof(FMatrix));
         Params->CreationType = 0;
         Params->ControllerId = ControllerId;
-        // 06f164d6-06f16521: the labels (list assignment FUN_06fa8370 / FUN_06ed0230).
         Params->LabelIds = Ship->LabelIds;
-        // 06f16526-06f16542: the record's +0xe0.
         Params->DockIndex = Group->ArrivalDockIndex;
-        // 06f16548-06f16639: the cargo (the vector assignment inlined; same 8-byte pairs).
+        // Retail assigns the vector inline (same 8-byte pairs).
         Params->Cargo.clear();
         std::vector<FMissionShipCargo>::iterator Cargo = Ship->Cargo.begin();
         for (; Cargo != Ship->Cargo.end(); ++Cargo)
@@ -3110,28 +2890,23 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             Desc.Count = static_cast<unsigned int>(Cargo->Count);
             Params->Cargo.push_back(Desc);
         }
-        // 06f1663c-06f16650.
         Params->Priority = Ship->Priority;
         Params->HitPoints = Ship->HitPoints;
 
-        // 06f16653-06f16662: the first mission ship slot of that nickname takes this slot's
-        // jumper flag (FUN_06f15560).
+        // The first mission ship slot of that nickname takes this slot's jumper flag.
         FMissionShip* Named = FindMissionShip(&Params->Nickname);
         if (Named != nullptr)
             Named->bJumper = Ship->bJumper;
 
-        // 06f16665-06f16719: "init_objectives" -> the [ObjList]'s directives (+0x100): the old
-        // ones released and erased, the list assigned (FUN_06f93490), each AddRef'ed -- the
-        // FMissionDirectiveList assignment (FUN_06f20230) inlined.
+        // "init_objectives": the [ObjList]'s directives (+0x100; FUN_06f20230 inlined).
         std::map<unsigned int, FMissionDirectiveList>::iterator ObjList =
             ObjLists.find(Ship->InitObjectives.Id);
         if (ObjList != ObjLists.end())
             Params->Directives = ObjList->second;
 
-        // 06f1671d-06f167e2: "init_metabehavior" -> the [MetaBehavior] (+0x114, lower_bound +
-        // key test): the directives released and erased, and the list's first object becomes
-        // the block's guide description (the old one released, the new one AddRef'ed). Retail
-        // reads the first node's value without an empty test.
+        // "init_metabehavior": the directives are dropped and the [MetaBehavior]'s first
+        // object becomes the block's guide description. Retail reads the first node's value
+        // without an empty test.
         std::map<unsigned int, FMissionMetaBehaviorList>::iterator Meta =
             MetaBehaviors.find(Ship->InitMetaBehavior.Id);
         if (Meta != MetaBehaviors.end())
@@ -3150,11 +2925,10 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
                     Desc->AddRef();
             }
         }
-        // 06f1681c-06f16842: ~FmtStr x2 (Name).
     }
 
-    // 06f16866-06f168ad: a named formation lays the blocks out around the placement
-    // (FUN_06efd1a0 twice, FUN_06f66c80); an unknown one stops the creation.
+    // A named formation lays the blocks out around the placement (FUN_06f66c80; retail looks
+    // the formation up twice); an unknown one stops the creation.
     if (!Group->Formation.IsEmpty())
     {
         if (FindFormation(&Group->Formation.Id) != nullptr)
@@ -3163,13 +2937,12 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             bNoFormation = true;
     }
 
-    // 06f168b2-06f168d4: the dock target - the record's +0xdc, or the "arrival_obj" solar
-    // (FUN_06f159f0).
+    // The dock target: the record's +0xdc, or the "arrival_obj" solar.
     unsigned int DockTarget = Group->ArrivalObjId;
     if (Group->ArrivalObj.Length != 0)
         DockTarget = GetSolarId(&Group->ArrivalObj);
 
-    // 06f168d6-06f1691d: TU58 FUN_06f73810 in the record's system, else in the player's.
+    // CreateNpcShips (TU58 FUN_06f73810) in the record's system, else in the player's.
     if (Group->System != nullptr)
     {
         if (!bNoFormation)
@@ -3181,22 +2954,18 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         if (PlayerSystem != nullptr && !bNoFormation)
             PlayerSystem->CreateNpcShips(&Blocks, DockTarget, nullptr);
     }
-    // 06f16922-06f1696f: the blocks destroyed (FUN_06ef8790 per node) and the head freed.
 }
 
-// FUN_06f169a0 (06f169a0-06f16f93, RET 4). EH state 0: the empty FmtStr of the reputation name.
+// FUN_06f169a0.
 bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
 {
-    // 06f169c3-06f169ed.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return false;
     FSystemInfo* System = PlayerState->GetSystemRecord();
     if (System == nullptr)
         return false;
 
-    // 06f169f3-06f16a5e: the SolarInfo template - ids and position 0, identity orientation
-    // (FUN_06efc7a0), loadout 0, costume ctor FUN_06eac5b0, vibe -1, voice and base 0, +0x80 = 1,
-    // hit points -1, empty nickname, +0xc8 / +0xcc = 0.
+    // The SolarInfo template.
     pub::SpaceObj::SolarInfo Info;
     std::memset(&Info, 0, sizeof(Info));
     Info.Orientation.E[0][0] = 1.0f;
@@ -3206,8 +2975,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     Info.VisitValue = 1;
     Info.HitPts = -1;
 
-    // 06f16a63-06f16aa5: the nickname copied (strcpy loop), the record's id = its nickname id
-    // (pub::GetNicknameId), the mission's controller, the archetype, the player's system.
+    // The record's id is its nickname id.
     FSystemInfo* PlayerSystem = PlayerState->GetSystemRecord();
     std::strcpy(Info.Nickname, Solar->Nickname.Data);
     Solar->SpaceObjId = pub::GetNicknameId(Info.Nickname);
@@ -3215,15 +2983,11 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     Info.SolarArchID = Solar->ArchetypeId;
     Info.SystemID = PlayerSystem != nullptr ? PlayerSystem->SystemId : 0;
 
-    // 06f16ac7-06f16b58: a solar with a positive radius (FCOMP 0.0f, TEST AH,0x41 / JNZ:
-    // fall-through is greater) whose record position is taken moves to an empty spot (IsPosEmpty
-    // on the record's position; GetEmptyPos 3D volume from the record's transform, the radius as
-    // start and clearance).
-    // Retail's gender slot below (the argument of FUN_06f4f7c0 at 06f16cdd) is the stack dword
-    // [ESP+0x14] that holds System (06f169e9); the GetEmptyPos branch stores its
-    // PosSelectionType 3 into the same dword (06f16b4a). FUN_06f4f7c0 overwrites it only when the
-    // faction has voices, so otherwise FUN_06f4f430 compares this leftover (a heap pointer or 3)
-    // with the costume genders (0/1/2) and never matches.
+    // A solar with a positive radius whose record position is taken moves to an empty spot.
+    // Retail quirk: the gender slot below shares its stack dword with System, and the
+    // GetEmptyPos branch stores its PosSelectionType 3 there. PickGender (FUN_06f4f7c0)
+    // overwrites it only when the faction has voices, so otherwise PickSpaceCostume compares
+    // this leftover (a heap pointer or 3) with the costume genders (0/1/2) and never matches.
     int GenderSlot = static_cast<int>(reinterpret_cast<uintptr_t>(System));
     Vector Position = Solar->Position;
     if (PlayerSystem != nullptr && Solar->Radius > 0.0f)
@@ -3243,7 +3007,6 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         }
     }
 
-    // 06f16b5b-06f16c26: the record's values.
     Info.Position = Position;
     Info.LoadoutID = Solar->LoadoutId;
     Info.VibeGroupId = static_cast<int>(Solar->VibeGroupId);
@@ -3259,17 +3022,13 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         Info.CostumeAccessory[Index] = Solar->SpaceCostume.AccessoryIds[Index];
     Info.VoiceId = Solar->VoiceId;
 
-    // 06f16c28-06f16cb0: the reputation - Alloc(vibe, the record's name, an empty FmtStr), then
-    // its affiliation is the record's faction.
     {
         FmtStr Empty;
         pub::Reputation::Alloc(Info.VibeGroupId, Solar->Name, Empty);
     }
     pub::Reputation::SetAffiliation(Info.VibeGroupId, Solar->Faction);
 
-    // 06f16cb6-06f16d20: no head or no voice -> the faction's picks (FUN_06f50650, gender
-    // FUN_06f4f7c0, costume FUN_06f4f430, voice FUN_06f4f620). The gender starts as GenderSlot
-    // (see above); PickGender writes it whenever the faction has voices.
+    // No head or no voice: the faction's picks, starting from GenderSlot (see above).
     if ((Solar->SpaceCostume.PartIds[0] & 0x3fffffff) == 0 || (Solar->VoiceId & 0x3fffffff) == 0)
     {
         FFactionProps* Faction = GetFactionProps(&Solar->Faction);
@@ -3303,12 +3062,9 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         }
     }
 
-    // 06f16d25-06f16d36.
     if (pub::SpaceObj::CreateSolar(Solar->SpaceObjId, Info) != 0)
         return false;
 
-    // 06f16d3c-06f16da2: SetPersonalityParams with the "NOTHING" state graph, +0x10 / +0x14 = 0,
-    // the record's pilot when it has one; SubmitState.
     pub::AI::SetPersonalityParams Op;
     Op.StateGraphId = pub::StateGraph::get_state_graph("NOTHING", pub::StateGraph::LEADER);
     Op.DirectiveCallbackObject = nullptr;
@@ -3319,15 +3075,13 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         Op.Value = Solar->Personality;
     }
     pub::AI::SubmitState(Solar->SpaceObjId, &Op);
-    // 06f16da2-06f16da8.
     Solar->bSpawned = 1;
 
-    // 06f16daf-06f16de9: every label -> {label, id} into +0xec (FUN_06f003e0).
     std::list<unsigned int>::iterator Label = Solar->LabelIds.begin();
     for (; Label != Solar->LabelIds.end(); ++Label)
         FormationMembers.insert(std::make_pair(*Label, Solar->SpaceObjId));
 
-    // 06f16deb-06f16e6c: [Invulnerables] rows of this nickname (strcmp).
+    // [Invulnerables] rows of this nickname (strcmp).
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
     for (; InvIt != Invulnerables.end(); ++InvIt)
     {
@@ -3336,7 +3090,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         pub::SpaceObj::SetInvincible(Solar->SpaceObjId, true, InvIt->bPlayerCanDamage != 0, InvIt->MaxHpLoss);
     }
 
-    // 06f16e6e-06f16eee: [Decloaked] rows of this nickname -> ActivateEquipment {Type 2, 0}.
+    // [Decloaked] rows of this nickname.
     std::list<TString<0x30>>::iterator DecIt = DecloakedNames.begin();
     for (; DecIt != DecloakedNames.end(); ++DecIt)
     {
@@ -3349,8 +3103,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         pub::SpaceObj::ActivateEquipment(Solar->SpaceObjId, &EquipInfo);
     }
 
-    // 06f16ef0-06f16f65: the first [MarkObj] name equal to the nickname -> pub::Player::MarkObj
-    // (player, id, 1).
+    // A [MarkObj] name equal to the nickname.
     std::list<TString<0x30>>::iterator MarkIt = MarkObjNames.begin();
     for (; MarkIt != MarkObjNames.end(); ++MarkIt)
     {
@@ -3360,21 +3113,19 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     if (MarkIt != MarkObjNames.end())
         pub::Player::MarkObj(PlayerId, Solar->SpaceObjId, 1);
 
-    // 06f16f68-06f16f75: the system record keeps the id (FUN_06f743e0).
+    // AddMissionObject = FUN_06f743e0.
     PlayerSystem->AddMissionObject(Solar->SpaceObjId);
     return true;
 }
 
-// FUN_06f16fa0 (06f16fa0-06f1719d, RET 4).
+// FUN_06f16fa0.
 void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
 {
-    // 06f16fa9-06f16fcb.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
     if (PlayerState->GetSystemRecord() == nullptr)
         return;
 
-    // 06f16fd1-06f16ffa: the player's system, +0x60 = 0, +0x61 = the record's +0xfa.
     Loot->Info.SystemID = PlayerState->GetSystemRecord()->SystemId;
     Loot->Info.bCanAiTractor = 0;
     Loot->Info.bMission = Loot->bCannotJettison;
@@ -3382,8 +3133,7 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
     int Result;
     if (Loot->bRelPos != 0)
     {
-        // 06f17006-06f1705d: the anchor - with a player ship, a ship label (FUN_06f15940), a
-        // loot (FUN_06f15b10) or a solar (FUN_06f159f0); none -> nothing.
+        // The anchor (GetLabelObjectId inlined); none: nothing is created.
         unsigned int Anchor = 0;
         if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr)
         {
@@ -3397,8 +3147,6 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
         }
         if ((Anchor & 0x3fffffff) == 0)
             return;
-        // 06f17063-06f170ab: GetLocation fails -> nothing; else the position is the anchor's
-        // plus the offset (FUN_06f0bb80, float adds).
         Vector AnchorPosition;
         Matrix AnchorOrientation;
         if (pub::SpaceObj::GetLocation(Anchor, AnchorPosition, AnchorOrientation) != 0)
@@ -3410,19 +3158,16 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
     }
     else
     {
-        // 06f170c3-06f170ce.
         Result = pub::SpaceObj::CreateLoot(Loot->SpaceObjId, Loot->Info);
     }
     if (Result != 0)
         return;
 
-    // 06f170d9-06f1711f: created; every label -> {label, id} into +0xec (FUN_06f003e0).
     Loot->bSpawned = 1;
     std::list<unsigned int>::iterator Label = Loot->LabelIds.begin();
     for (; Label != Loot->LabelIds.end(); ++Label)
         FormationMembers.insert(std::make_pair(*Label, Loot->SpaceObjId));
 
-    // 06f1711f-06f17194: [Invulnerables] rows of this nickname (strcmp).
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
     for (; InvIt != Invulnerables.end(); ++InvIt)
     {
@@ -3432,17 +3177,17 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
     }
 }
 
-// FUN_06f171e0 (06f171e0-06f172df, RET 8).
+// FUN_06f171e0.
 bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, FTransform const* Placement)
 {
     bool bResult = false;
     std::list<FMissionSolar>::iterator Solar = MissionSolars.begin();
     for (; Solar != MissionSolars.end(); ++Solar)
     {
-        // 06f17210-06f17227: every record of that nickname (stricmp), not only the first.
+        // Every record of that nickname, not only the first.
         if (_stricmp(Solar->Nickname.Data, Name->Data) != 0)
             continue;
-        // 06f1722d-06f17289: the record's transform kept; a given placement replaces it.
+        // A given placement replaces the record's transform for the spawn only.
         Vector const SavedPosition = Solar->Position;
         FMatrix const SavedOrientation = Solar->Orientation;
         if (Placement != nullptr)
@@ -3452,7 +3197,6 @@ bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, FTransform con
             Solar->Position.z = Placement->Translation.Z;
             Solar->Orientation = Placement->Rotation;
         }
-        // 06f1728b-06f172c0: FUN_06f169a0, then the record's transform restored.
         bResult = SpawnMissionSolarRecord(&*Solar);
         Solar->Position = SavedPosition;
         Solar->Orientation = SavedOrientation;
@@ -3460,8 +3204,7 @@ bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, FTransform con
     return bResult;
 }
 
-// FUN_06f171a0 (06f171a0-06f171d4): node+0xc (record +4) = 0 for every +0xc4 node, then
-// FUN_06f478c0 on +8; a record -> JMP FUN_06f746f0 on it.
+// FUN_06f171a0 (TU58 FUN_06f746f0). The cached player state is not null-tested.
 void FMissionObject::DestroyMissionObjects()
 {
     std::list<FMissionSolar>::iterator It = MissionSolars.begin();
@@ -3472,9 +3215,7 @@ void FMissionObject::DestroyMissionObjects()
         System->DestroyMissionObjects();
 }
 
-// FUN_06f14780 prefix (06f14780-06f148e0): FUN_06f003e0 insert {npc+4, npc} into +0xa4,
-// then [Invulnerables] matches -> SetInvincible(npc+4, true, bool, float), then
-// [Decloaked] matches -> ActivateEquipment(npc+4, {Type 2, flag 0}).
+// The prefix of FUN_06f14780.
 void FMissionObject::RegisterNpc(void const* MessageParms)
 {
     FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
@@ -3510,7 +3251,7 @@ void FMissionObject::RegisterNpc(void const* MessageParms)
 
 namespace
 {
-    // FmtStr::destroy then REP STOSD of the 6 dwords (06f1732a-06f17350).
+    // FmtStr::destroy, then its six dwords zeroed.
     void ResetMissionFmtStr(FmtStr& Text)
     {
         Text.destroy();
@@ -3520,10 +3261,9 @@ namespace
             Text.ValueIndex[Index] = 0;
     }
 
-    // The orientation keys of FUN_06f172f0 (06f1764e-06f17728, 06f17b00-06f17bf6) and of
-    // FUN_06f18eb0: values 2, 1, 0, 3 are read, the quaternion (W v0, X v1, Y v2, Z v3) is scaled
-    // by 1.0f / FUN_06f18be0 (the length, x87 sum W^2 + X^2 + Y^2 + Z^2 then FSQRT) with each
-    // product stored as float, and turned into a matrix by DAT_06fd070c's QuaternionToMatrix.
+    // The orientation keys of FUN_06f172f0 and FUN_06f18eb0: values read in the order 2, 1,
+    // 0, 3 (W v0, X v1, Y v2, Z v3), scaled by 1 / FUN_06f18be0 (x87 sum W^2 + X^2 + Y^2 + Z^2)
+    // with each product stored as float.
     void ReadMissionOrientation(INI_Reader* Reader, FMatrix* OutMatrix)
     {
         float const Y = Reader->get_value_float(2);
@@ -3543,22 +3283,18 @@ namespace
         GMissionMathEngine->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
-    // [MsnLoot] values (06f17461-06f17872), written into the list's new last record.
+    // [MsnLoot] values, written into the list's new last record.
     void LoadMissionLootValues(INI_Reader* Reader, FMissionLoot* Loot)
     {
         while (Reader->read_value())
         {
             if (Reader->is_value("nickname"))
             {
-                // 06f17483-06f174c4: FUN_06ed0160 (TString assignment), CreateID of the copy,
-                // FUN_06f1e390 push_back into +0xec.
                 Loot->Nickname = Reader->get_value_string(0);
                 Loot->LabelIds.push_back(CreateID(Loot->Nickname.Data));
             }
             else if (Reader->is_value("archetype"))
             {
-                // 06f174df-06f17532: a TString<0x40> copy (FUN_06ea9f40, null -> empty), then
-                // pub::GetEquipmentID(+0x40, chars).
                 TString<0x40> Name;
                 Name = Reader->get_value_string(0);
                 pub::GetEquipmentID(Loot->Info.EquipArchID, Name.Data);
@@ -3575,7 +3311,6 @@ namespace
             }
             else if (Reader->is_value("rel_pos_obj"))
             {
-                // 06f175ad-06f175f0: null -> empty; FUN_06ea9f40 max 0x30; +0xe4 = 1 either way.
                 Loot->RelPosObj = Reader->get_value_string(0);
                 Loot->bRelPos = 1;
             }
@@ -3587,7 +3322,6 @@ namespace
             }
             else if (Reader->is_value("orientation"))
             {
-                // 06f1764e-06f17728: the matrix is copied to +0x64 (REP MOVSD 9).
                 FMatrix Rotation;
                 ReadMissionOrientation(Reader, &Rotation);
                 std::memcpy(&Loot->Info.Orientation, &Rotation, sizeof(Rotation));
@@ -3623,11 +3357,9 @@ namespace
         }
     }
 
-    // The [MsnSolar] orientation key (06f17afe-06f17bf9) inlines its own normalisation: values
-    // 2, 1, 0, 3; value 2 is rounded to float first (FSTP float [ESP+0x10c]); the x87 sum runs
-    // W^2 + Z^2 + Y^2 + X^2, FSQRT, 1.0f / length stored as float, and each component times that
-    // float is stored as float (W v0, X v1, Y v2, Z v3). QuaternionToMatrix into a local, copied
-    // to +0x41c.
+    // The [MsnSolar] orientation key inlines its own normalisation, which differs in x87
+    // order: the sum runs W^2 + Z^2 + Y^2 + X^2 and 1 / length is stored as float before the
+    // products.
     void ReadMissionSolarOrientation(INI_Reader* Reader, FMatrix* OutMatrix)
     {
         float const Y = Reader->get_value_float(2);
@@ -3647,22 +3379,20 @@ namespace
         GMissionMathEngine->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
-    // [MsnSolar] values (06f179fa-06f17e9f). The nickname, faction, archetype, loadout, base and
-    // label keys read the value with the no-index get_value_string (IAT 06fb3054).
+    // [MsnSolar] values. The nickname, faction, archetype, loadout, base and label keys read the
+    // value with the no-index get_value_string (IAT 06fb3054).
     void LoadMissionSolarValues(INI_Reader* Reader, FMissionSolar* Solar)
     {
         while (Reader->read_value())
         {
             if (Reader->is_value("nickname"))
             {
-                // 06f17a1b-06f17a7f: null -> empty, FUN_06ea9f40 max 0x30; CreateID of the
-                // copy pushed onto +0x46c.
                 Solar->Nickname = Reader->get_value_string();
                 Solar->LabelIds.push_back(CreateID(Solar->Nickname.Data));
             }
             else if (Reader->is_value("position"))
             {
-                // 06f17a9a-06f17ade: values 1, 0, 2 read; stored x = v0, y = v1, z = v2.
+                // Read in the order 1, 0, 2.
                 float const Y = Reader->get_value_float(1);
                 float const X = Reader->get_value_float(0);
                 float const Z = Reader->get_value_float(2);
@@ -3685,7 +3415,7 @@ namespace
             }
             else if (Reader->is_value("pilot"))
             {
-                // 06f17c73-06f17ca5: +0x3e0 = 1 only when FUN_06f3e020 returns exactly 1.
+                // Only when FUN_06f3e020 returns exactly 1.
                 unsigned int PilotId = CreateID(Reader->get_value_string(0));
                 if (GetPilotPersonality(&PilotId, &Solar->Personality))
                     Solar->bPilot = 1;
@@ -3724,14 +3454,13 @@ namespace
             }
             else if (Reader->is_value("visit"))
             {
-                // 06f17e39-06f17e8e: DACOM stricmp against a stack copy of "unknowable".
                 if (_stricmp(Reader->get_value_string(0), "unknowable") == 0)
                     Solar->Visit = 0x80;
             }
         }
     }
 
-    // [Mission] values (06f18832-06f18aff).
+    // [Mission] values.
     void LoadMissionHeaderValues(INI_Reader* Reader, FMissionObject* Mission)
     {
         while (Reader->read_value())
@@ -3752,8 +3481,8 @@ namespace
             }
             else if (Reader->is_value("npc_ship_file"))
             {
-                // 06f188cf-06f18aee: a local INI_Reader (EH state 0x13), FUN_06f24280 (result
-                // not tested), FUN_06f32510 into +0x198, close, then the reader's destructor.
+                // OpenContentDataIni (FUN_06f24280) is not tested; LoadNpcShipArchs =
+                // FUN_06f32510.
                 INI_Reader NpcShipReader;
                 OpenContentDataIni(Reader->get_value_string(0), &NpcShipReader);
                 LoadNpcShipArchs(&NpcShipReader, &Mission->NpcShipArchs);
@@ -3762,11 +3491,10 @@ namespace
         }
     }
 
-    // FUN_06f18eb0 (06f18eb0-06f199e0, RET 0xc): the values of one [MsnShip]/[MsnFormation]
-    // section into Group, the new last record of Groups (+0xb8). The template ship slot goes to
-    // the end of Group->Ships first (FUN_06f1da40, 06f18f9a-06f18fc1) and Current (local +0x10)
-    // is that last slot; "formation" and "ship" drop it (Current = null). The keys that write
-    // through Current have no null test (retail neither).
+    // FUN_06f18eb0: the values of one [MsnShip]/[MsnFormation] section into Group, the new last
+    // record of Groups (+0xb8). The template ship slot is appended first and Current is that
+    // slot; "formation" and "ship" drop it (Current = null). The keys that write through Current
+    // have no null test (retail neither).
     void LoadMissionShipValues(INI_Reader* Reader, FMissionShipGroup* Group,
                                std::list<FMissionShipGroup>* Groups)
     {
@@ -3776,9 +3504,6 @@ namespace
         {
             if (Reader->is_value("nickname"))
             {
-                // 06f1908d-06f190d3: FUN_06ed0160 of the no-index value into the record, then of
-                // the record chars into the slot; CreateID of the value pushed onto slot +0x3c
-                // (FUN_06f1e390).
                 Group->Nickname = Reader->get_value_string();
                 Current->Nickname = Group->Nickname.Data;
                 unsigned int const NicknameId = CreateID(Reader->get_value_string());
@@ -3798,13 +3523,13 @@ namespace
             }
             else if (Reader->is_value("init_objectives"))
             {
-                // 06f19175-06f191a2: only while +0x64 is empty.
+                // Only while +0x64 is empty.
                 if (Current->InitMetaBehavior.IsEmpty())
                     Current->InitObjectives.Id = CreateID(Reader->get_value_string(0));
             }
             else if (Reader->is_value("init_metabehavior"))
             {
-                // 06f191b7-06f191e4: only while +0x54 is empty.
+                // Only while +0x54 is empty.
                 if (Current->InitObjectives.IsEmpty())
                     Current->InitMetaBehavior.Id = CreateID(Reader->get_value_string(0));
             }
@@ -3816,8 +3541,7 @@ namespace
             }
             else if (Reader->is_value("cargo"))
             {
-                // 06f1921f-06f1926b: a failed pub::GetGoodID skips the key; the count is
-                // ftol(value 1); FUN_06f96770 inserts one element at the end.
+                // A failed GetGoodID skips the key; the count is read as a float.
                 unsigned int GoodId;
                 if (pub::GetGoodID(GoodId, Reader->get_value_string(0)) == 0)
                 {
@@ -3839,8 +3563,7 @@ namespace
             }
             else if (Reader->is_value("system"))
             {
-                // 06f192cd-06f19301: pub::GetSystemID, then FUN_06f75f30; only a found record is
-                // stored.
+                // Only a found record is stored.
                 unsigned int SystemId;
                 if (pub::GetSystemID(SystemId, Reader->get_value_string(0)) == 0)
                 {
@@ -3851,7 +3574,7 @@ namespace
             }
             else if (Reader->is_value("position"))
             {
-                // 06f19316-06f19348: values 1, 0, 2 read; x = v0, y = v1, z = v2.
+                // Read in the order 1, 0, 2.
                 float const Y = Reader->get_value_float(1);
                 float const X = Reader->get_value_float(0);
                 float const Z = Reader->get_value_float(2);
@@ -3861,9 +3584,7 @@ namespace
             }
             else if (Reader->is_value("rel_pos"))
             {
-                // 06f1935d-06f193b9: +0xa4 = 1; value 0 times DAT_06fb6060 (0x3c8efa35, pi/180)
-                // into +0x68; value 1 into +0x6c (null -> empty, FUN_06ea9f40 max 0x30); value 2
-                // into +0xa0 unless it is empty.
+                // The heading is in degrees (DAT_06fb6060 = pi/180).
                 Group->bRelPos = 1;
                 Group->RelPosHeading = Reader->get_value_float(0) * 0.0174532925f;
                 Group->RelPosObj = Reader->get_value_string(1);
@@ -3872,9 +3593,7 @@ namespace
             }
             else if (Reader->is_value("orientation"))
             {
-                // 06f193d5-06f194a9: +0xa5 = 1; the normalisation is the [MsnSolar] one (values
-                // 2, 1, 0, 3; value 2 rounded to float; W^2 + Z^2 + Y^2 + X^2); the matrix is
-                // copied to +0x38 (REP MOVSD 9).
+                // The [MsnSolar] normalisation, not the [MsnLoot] one.
                 Group->bOrientation = 1;
                 FMatrix Rotation;
                 ReadMissionSolarOrientation(Reader, &Rotation);
@@ -3882,8 +3601,7 @@ namespace
             }
             else if (Reader->is_value("arrival_obj"))
             {
-                // 06f194bf-06f19539: every slot's +0x84 = 0 (dword store), value 0 into +0xa8
-                // (null -> empty, max 0x30), value 1 into +0xe0 unless it is empty.
+                // Every slot's radius is zeroed.
                 std::vector<FMissionShip>::iterator ShipIt = Group->Ships.begin();
                 for (; ShipIt != Group->Ships.end(); ++ShipIt)
                     ShipIt->Radius = 0.0f;
@@ -3893,8 +3611,6 @@ namespace
             }
             else if (Reader->is_value("formation"))
             {
-                // 06f19551-06f195b0: with a Current slot the last slot is erased (FUN_06ed2860
-                // copies nothing, FUN_06ed03d0 destroys it) and Current = null; then +0xe4.
                 if (Current != nullptr)
                 {
                     Group->Ships.pop_back();
@@ -3904,18 +3620,15 @@ namespace
             }
             else if (Reader->is_value("ship"))
             {
-                // 06f195cc-06f1962b: with a Current slot the last slot is erased (FUN_06ed34e0
-                // copy-down loop, FUN_06ed03d0) and Current = null.
                 if (Current != nullptr)
                 {
                     Group->Ships.pop_back();
                     Current = nullptr;
                 }
-                // 06f19633-06f1967b: value 0 into a local TString<0x30> (null -> empty).
                 TString<0x30> ShipName;
                 ShipName = Reader->get_value_string(0);
-                // 06f1967b-06f196f7: the first record of Groups whose chars (node+0xc) equal the
-                // name (inline strcmp) ...
+                // The first record of Groups with that name (strcmp) gives a copy of its first
+                // slot, then leaves the list.
                 std::list<FMissionShipGroup>::iterator It = Groups->begin();
                 for (; It != Groups->end(); ++It)
                 {
@@ -3924,11 +3637,6 @@ namespace
                 }
                 if (It == Groups->end())
                     continue;
-                // 06f196fc-06f19911: ... gives a copy of its first slot (node+0xf4) to the end of
-                // Group->Ships: a local copy (inline copy ctor, EH states 9-0xd), inserted with
-                // FUN_06ed12c0 (count 1) and destroyed (states 0x11/0xf/0x12/0xe) before the
-                // record goes; 06f1994d-06f199b5: that record is unlinked, its slots destroyed
-                // (FUN_06ed03d0), the node freed, size - 1.
                 {
                     FMissionShip const Copy(It->Ships.front());
                     Group->Ships.insert(Group->Ships.end(), 1, Copy);
@@ -3939,7 +3647,7 @@ namespace
     }
 }
 
-// 06f17379-06f17403.
+// The stack template in FUN_06f172f0.
 FMissionLoot::FMissionLoot()
     : SpaceObjId(0)
     , bSpawned(0)
@@ -3950,8 +3658,7 @@ FMissionLoot::FMissionLoot()
 {
     Nickname.Length = 0;
     Nickname.Data[0] = '\0';
-    // FUN_06f18c10: every dword 0 except the matrix diagonal (1.0f at +0x28/+0x38/+0x48 of the
-    // LootInfo) and +0x60 = 1; +0x62/+0x63 are not written.
+    // FUN_06f18c10. Retail does not write LootInfo +0x62/+0x63.
     std::memset(&Info, 0, sizeof(Info));
     Info.Orientation.E[0][0] = 1.0f;
     Info.Orientation.E[1][1] = 1.0f;
@@ -3965,7 +3672,7 @@ FMissionLoot::FMissionLoot()
     RelPosOffset.z = 0.0f;
 }
 
-// 06f178b6-06f17984 (offsets after the PUSH at 06f17906 are one dword lower in the listing).
+// The stack template in FUN_06f172f0.
 FMissionSolar::FMissionSolar()
     : SpaceObjId(0)
     , bSpawned(0)
@@ -3983,7 +3690,6 @@ FMissionSolar::FMissionSolar()
 {
     Nickname.Length = 0;
     Nickname.Data[0] = '\0';
-    // FUN_06efc7a0: identity 3x3.
     std::memset(&Orientation, 0, sizeof(Orientation));
     Orientation.D[0][0] = 1.0f;
     Orientation.D[1][1] = 1.0f;
@@ -3991,7 +3697,7 @@ FMissionSolar::FMissionSolar()
     Position.x = 0.0f;
     Position.y = 0.0f;
     Position.z = 0.0f;
-    // FUN_06eac5b0: the four part ids and the accessory count (the accessories stay as they are).
+    // FUN_06eac5b0 leaves the accessories as they are.
     SpaceCostume.PartIds[0] = 0;
     SpaceCostume.PartIds[1] = 0;
     SpaceCostume.PartIds[2] = 0;
@@ -4002,7 +3708,7 @@ FMissionSolar::FMissionSolar()
 // FMissionDirectiveList's bodies (FUN_06f20230 copy, FUN_06ed2a00 Clear) are in
 // ObjListDirective.h.
 
-// FUN_06f20230 (the same body as the directive list copy): copy the nodes, AddRef each.
+// FUN_06f20230 (the same body as the directive list copy).
 FMissionMetaBehaviorList::FMissionMetaBehaviorList(FMissionMetaBehaviorList const& Other)
     : Items(Other.Items)
 {
@@ -4011,8 +3717,7 @@ FMissionMetaBehaviorList::FMissionMetaBehaviorList(FMissionMetaBehaviorList cons
         (*It)->AddRef();
 }
 
-// 06f18560-06f1859b (and the +0x114 node value dtor in FUN_06f1e120): Release (slot 1) on
-// every element, erase (FUN_06ecfec0), free the head (FUN_06f15350).
+// Inlined in FUN_06f172f0 and the +0x114 node value dtor (FUN_06f1e120).
 FMissionMetaBehaviorList::~FMissionMetaBehaviorList()
 {
     std::list<FMetaBehavior*>::iterator It = Items.begin();
@@ -4021,7 +3726,7 @@ FMissionMetaBehaviorList::~FMissionMetaBehaviorList()
     Items.clear();
 }
 
-// FUN_06f18eb0 06f18ed5-06f18f93.
+// The template in FUN_06f18eb0.
 FMissionShip::FMissionShip()
     : bJumper(0)
     , bOriginalJumpFlag(0)
@@ -4038,11 +3743,7 @@ FMissionShip::FMissionShip()
     InitMetaBehavior.clear();
 }
 
-// FUN_06ed2a60 (06ed2a60-06ed2bf7): +4 (0xd dwords), +0x38, the +0x3c list (FUN_06ed0230 insert
-// of Other's range), +0x48/+0x49/+0x4c/+0x50/+0x54, the +0x58 list (FUN_06f20230), +0x64, +0x68
-// handle with AddRef (slot 0) when set, the +0x6c vector (new of the size, element copy),
-// +0x7c/+0x80/+0x84, vtable 06fb60a8. Unwind states (FuncInfo 06fbf610): 1 +0x3c, 3 +0x58,
-// 4 +0x68 (FUN_06f28e10) - the member order below.
+// FUN_06ed2a60. The unwind states follow the member order.
 FMissionShip::FMissionShip(FMissionShip const& Other)
     : Nickname(Other.Nickname)
     , NpcId(Other.NpcId)
@@ -4062,9 +3763,7 @@ FMissionShip::FMissionShip(FMissionShip const& Other)
 {
 }
 
-// FUN_06ed34e0 (06ed34e0-, RET 4): the nickname (TString assignment of Other's chars), +0x38,
-// the +0x3c list assigned (skipped on self), +0x48..+0x54, the +0x58 directives, +0x64, the +0x68
-// guide (old Release, new AddRef), the +0x6c vector, +0x7c..+0x84.
+// FUN_06ed34e0.
 FMissionShip& FMissionShip::operator=(FMissionShip const& Other)
 {
     Nickname = Other.Nickname.Data;
@@ -4078,8 +3777,7 @@ FMissionShip& FMissionShip::operator=(FMissionShip const& Other)
     InitObjectives = Other.InitObjectives;
     Directives = Other.Directives;
     InitMetaBehavior = Other.InitMetaBehavior;
-    // 06ed3656-06ed3675: the old guide released (slot 1) and cleared, then Other's stored and
-    // AddRef'ed (slot 0); no same-pointer test. The handle's raw stores do not touch the count.
+    // No same-pointer test. The handle's raw stores do not touch the count.
     if (Guide.Pointer != nullptr)
     {
         Guide.Pointer->Release();
@@ -4088,7 +3786,6 @@ FMissionShip& FMissionShip::operator=(FMissionShip const& Other)
     Guide = Other.Guide.Pointer;
     if (Guide.Pointer != nullptr)
         Guide.Pointer->AddRef();
-    // 06ed3677: FUN_06ef8910 (vector assignment).
     Cargo = Other.Cargo;
     HitPoints = Other.HitPoints;
     OriginalHitPoints = Other.OriginalHitPoints;
@@ -4096,10 +3793,8 @@ FMissionShip& FMissionShip::operator=(FMissionShip const& Other)
     return *this;
 }
 
-// FUN_06ed2c20: vtable 06fb60a8, the body releases +0x68 (slot 1) when set and clears it
-// (06ed2c48-06ed2c5e); then the members (FuncInfo 06fbf654): the +0x6c buffer freed, the +0x68
-// handle (FUN_06f28e10 inlined 06ed2c73-06ed2c87, null by now), the +0x58 directives released
-// and erased, the +0x3c nodes erased and freed.
+// FUN_06ed2c20: the body releases and clears the guide; the member handle is null by the time
+// it is destroyed.
 FMissionShip::~FMissionShip()
 {
     if (Guide.Pointer != nullptr)
@@ -4109,8 +3804,7 @@ FMissionShip::~FMissionShip()
     }
 }
 
-// FUN_06f0e2d0 (06f0e2d0-06f0e3d6). The matrix and the position are written twice by the ctor
-// (06f0e2ef-06f0e31a and 06f0e383-06f0e3a4), with the same values.
+// FUN_06f0e2d0. Retail writes the matrix and the position twice, with the same values.
 FMissionShipGroup::FMissionShipGroup()
     : System(nullptr)
     , RelPosHeading(0.0f)
@@ -4137,11 +3831,7 @@ FMissionShipGroup::FMissionShipGroup()
     Formation.Id = CreateID("transport_liberty");
 }
 
-// FUN_06f172f0 (06f172f0-06f1789e, RET 4). reset, both FmtStr (+0x50, +0x68) destroyed and
-// zeroed, then every header in order: MsnLoot (06f17364), MsnSolar (06f178a1), MsnShip and
-// MsnFormation (06f17eaa/06f17ebf -> LAB_06f18b3b), MsnRandEnc (06f17ed4), ObjList (06f18230),
-// MetaBehavior (06f183ef), Dialog (06f185a5), Mission (06f1881d), NNObjective (06f18b0a); any
-// other header is skipped.
+// FUN_06f172f0. Any other header is skipped.
 void FMissionObject::LoadMission(INI_Reader* Reader)
 {
     Reader->reset();
@@ -4152,44 +3842,36 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
     {
         if (Reader->is_header("MsnLoot"))
         {
-            // 06f17379-06f1744f: the template goes to the end of +0xd0 (FUN_06f1e910), the keys
-            // write that last record.
+            // The keys write the new last record.
             MissionLoots.push_back(FMissionLoot());
             LoadMissionLootValues(Reader, &MissionLoots.back());
         }
         else if (Reader->is_header("MsnSolar"))
         {
-            // 06f178b6-06f179f6: the template goes to the end of +0xc4 (FUN_06f1e830), the keys
-            // write that last record.
             MissionSolars.push_back(FMissionSolar());
             LoadMissionSolarValues(Reader, &MissionSolars.back());
         }
         else if (Reader->is_header("MsnShip") || Reader->is_header("MsnFormation"))
         {
-            // LAB_06f18b3b-06f18bcf: the FUN_06f0e2d0 template goes to the end of +0xb8
-            // (FUN_06f1e750), then FUN_06f18eb0(Reader, &last record, &list).
             MissionShips.push_back(FMissionShipGroup());
             LoadMissionShipValues(Reader, &MissionShips.back(), &MissionShips);
         }
         else if (Reader->is_header("MsnRandEnc"))
         {
-            // 06f17ee9-06f1822b: the stack record, filled by the section's values, copied to
-            // the end of +0x98 (FUN_06f1e670 + FUN_06f21c50); the record's own references are
-            // then released (06f181d3-06f1820d) and its arms freed (FUN_06ed37d0).
+            // A stack record, copied to the end of +0x98 when the section is done.
             FMissionRandEnc Record;
             while (Reader->read_value())
             {
                 if (Reader->is_value("nickname"))
                 {
-                    // 06f17f83-06f17fca: FUN_06ea9f40 (max 0x20), CreateID of the value.
                     Record.Nickname = Reader->get_value_string(0);
                     Record.NicknameId.Id = CreateID(Reader->get_value_string(0));
                 }
                 else if (Reader->is_value("encounter_type"))
                 {
-                    // 06f17fe9-06f180d6: "TL_Attack" / "SP_Attack" (stricmp) replace both objects
-                    // (the old ones Released) and the populator reads the rest of the section
-                    // into the parameters (slot 4 +0x10). Any other type keeps the objects.
+                    // "TL_Attack" / "SP_Attack" replace both objects and the populator reads the
+                    // rest of the section into the parameters (slot 4 +0x10). Any other type
+                    // keeps the objects.
                     char const* Type = Reader->get_value_string(0);
                     char const* ParamsName = nullptr;
                     char const* PopulatorName = nullptr;
@@ -4219,10 +3901,7 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
                         CreateRandEncPopulator(PopulatorName, &Record.Populator.Pointer);  // FUN_06efb980
                         Record.Populator->Parse(Reader, Record.Params);
                     }
-                    // 06f180d9-06f18179: the parameters' labels get the encounter's id and
-                    // "Mission_Random_Encounter" (DAT_06fd068c); the mission's controller and
-                    // player state go to +0xc / +0x10. Retail does this for every type and
-                    // does not test the object.
+                    // Retail does this for every type and does not test the object.
                     Record.Params->Labels.push_back(Record.NicknameId.Id);
                     Record.Params->Labels.push_back(GIdMissionRandomEncounter);
                     Record.Params->ControllerId = ControllerId;
@@ -4233,9 +3912,7 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
         }
         else if (Reader->is_header("ObjList"))
         {
-            // 06f18245-06f183ea: a local list and ID_String (cleared), FUN_06f25260 fills them,
-            // the pair {id, list copy} goes into +0x100 (FUN_06f1e9f0, unique: a duplicate id
-            // keeps the first list); the pair and the local list then release their references.
+            // A duplicate id keeps the first list.
             FMissionDirectiveList Directives;
             ID_String Nickname;
             Nickname.clear();
@@ -4245,9 +3922,7 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
         }
         else if (Reader->is_header("MetaBehavior"))
         {
-            // 06f18404-06f185a0: a local list and ID_String (cleared), FUN_06f065e0 fills them,
-            // the pair {id, list copy} goes into +0x114 (FUN_06f1e9f0, unique: a duplicate id
-            // keeps the first list); the pair and the local list then release their references.
+            // LoadMetaBehavior = FUN_06f065e0. A duplicate id keeps the first list.
             FMissionMetaBehaviorList Objects;
             ID_String Nickname;
             Nickname.clear();
@@ -4257,11 +3932,8 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
         }
         else if (Reader->is_header("Dialog"))
         {
-            // 06f185bc-06f18818: the first value is read without a test and must be "nickname"
-            // (else the section is skipped); a local dialog (the mission's controller, empty
-            // speakers, no system) is filled by FUN_06ef2380 and a copy inserted into
-            // DAT_06fcf260 under CreateID(nickname) (FUN_06f1f2a0, unique: a duplicate id keeps
-            // the first dialog); the pair and the local are then destroyed.
+            // The first value is read without a test and must be "nickname", else the section
+            // is skipped. A duplicate id keeps the first dialog.
             Reader->read_value();
             if (Reader->is_value("nickname"))
             {
@@ -4280,7 +3952,7 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
         }
         else if (Reader->is_header("NNObjective"))
         {
-            // 06f18b1d-06f18b33: slot 6 (+0x18), its +8 list, FUN_06f1a630.
+            // The first player record is not null-tested.
             LoadNNObjective(Reader, this, &GetFirstPlayer()->Objectives);
         }
     }
@@ -4292,9 +3964,7 @@ void FMissionObject::LoadMission(INI_Reader* Reader)
 
 namespace
 {
-    // The timer block FUN_06f1be20 inlines five times (06f1be6b-06f1be9d, 06f1bfb0-06f1bfe2,
-    // 06f1c026-06f1c058, 06f1c270-06f1c29a, 06f1c357-06f1c389): TimerId = DAT_06fce76c++, then
-    // pub::SetTimer(&mission +4, {TimerId, 0}, 1.0f).
+    // The timer block FUN_06f1be20 inlines five times (ids from DAT_06fce76c).
     void StartNnPathTimer(FMissionNnPath* Path)
     {
         unsigned int const Id = GContentNextUniqueId;
@@ -4307,11 +3977,8 @@ namespace
     }
 }
 
-// FUN_06f1be20 (06f1be20-06f1c39c, RET 8): returns +0x78 on every path. Inactive (+0x74 == 0)
-// -> nothing. The two resolution blocks (06f1c07f-06f1c120 and 06f1c1d1-06f1c25b) are
-// FUN_06f15b90 inlined (player state, ship, FUN_06f15940, the loot walk, FUN_06f159f0).
-// T1 (06f1c25e) = Rebuild, SendObjectives(false, true), new timer; T2 (06f1c345) = Rebuild,
-// SendObjectives(false, false), new timer.
+// FUN_06f1be20 (GetLabelObjectId inlined twice). The cases that fall through rebuild, resend
+// and restart the timer.
 int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void const* MessageParms)
 {
     using pub::Controller::EMessage;
@@ -4324,13 +3991,11 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     switch (MessageId)
     {
     case EMessage::BaseExit:
-        // 06f1bf25-06f1bf58.
         if (State == 3 && Owner->PlayerId == Parms[1] && (Owner->PlayerId & 0x3fffffff) != 0)
             State = 4;
         return State;
 
     case EMessage::TradelaneEnter:
-        // 06f1beba-06f1bf18: docked with the player's ship.
         if (State != 3 || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
         if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & 0x3fffffff) == 0)
@@ -4340,7 +4005,6 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         return State;
 
     case EMessage::TradelaneExit:
-        // 06f1bf64-06f1bff3: undocked.
         if (State != 4 || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
         if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & 0x3fffffff) == 0)
@@ -4350,7 +4014,6 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         return State;
 
     case EMessage::Heartbeat:
-        // 06f1be61-06f1beae: first heartbeat.
         if (State != 1)
             return State;
         StartNnPathTimer(this);
@@ -4358,7 +4021,6 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         return State;
 
     case EMessage::SpaceEnter:
-        // 06f1bfff-06f1c123.
         if (Owner->PlayerId != Parms[1] || (Owner->PlayerId & 0x3fffffff) == 0)
             return State;
         if (State == 4)
@@ -4372,20 +4034,17 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         break;
 
     case EMessage::SpaceExit:
-        // 06f1c128-06f1c15a.
         if (Owner->PlayerId == Parms[1] && (Owner->PlayerId & 0x3fffffff) != 0)
             TargetObjectId = 0;
         return State;
 
     case EMessage::SystemExit:
-        // 06f1c29f-06f1c307: FUN_06f1cb40 loop inlined, the legs erased, objectives resent.
         Objectives.Clear();
         Legs.clear();
         SendObjectives(false, false);
         return State;
 
     case EMessage::SystemEnter:
-        // 06f1c17c-06f1c25b: system entered.
         if (Parms[2] != Owner->PlayerId || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
         if (Parms[0] != SystemId)
@@ -4399,13 +4058,12 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         break;
 
     case EMessage::TimerExpired:
-        // 06f1c30a-06f1c31b: this path's timer, not while docked.
+        // This path's timer, not while docked.
         if (Parms[0] != TimerId || State == 4)
             return State;
         break;
 
     case EMessage::PlayerMissionChanged:
-        // 06f1c31d-06f1c343.
         if (Parms[1] != Owner->PlayerId)
             return State;
         if (Parms[0] != Owner->ControllerId && (Parms[0] & 0x3fffffff) != 0)
@@ -4422,7 +4080,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     return State;
 }
 
-// FUN_06f1c3f0 (06f1c3f0-06f1c42a, RET 4): the float fields go out as doubles (FLD/FSTP double).
+// FUN_06f1c3f0.
 void FMissionNnPath::Save(FILE* File)
 {
     fprintf(File, "nnpath = %u, %u, %f, %f, %f, %s, %u\n", TravelIds, TargetIds,
@@ -4430,9 +4088,7 @@ void FMissionNnPath::Save(FILE* File)
             static_cast<double>(Position.z), Label.Data, SystemId);
 }
 
-// FUN_06f1c430 (06f1c430-06f1c52c, RET 8): values 0/1 ints, floats read in the order 4, 3, 2
-// into z, y, x; value 5 (when not empty) is the label (TString assignment, null -> empty);
-// value 6 the system; then State = 1, bActive = 1, Mission = InMission.
+// FUN_06f1c430. The position is read in the order 4, 3, 2.
 void FMissionNnPath::Load(INI_Reader* Reader, FMissionObject* InMission)
 {
     TravelIds = Reader->get_value_int(0);
@@ -4451,17 +4107,11 @@ void FMissionNnPath::Load(INI_Reader* Reader, FMissionObject* InMission)
     Mission = InMission;
 }
 
-// FUN_06f1c530 (06f1c530-06f1c7b7). No player state or no system record -> nothing.
-// Target (EBP) = 0. With a ship in the path's system: a label resolves TargetObjectId once
-// (06f1c5ab-06f1c5f6 = FUN_06f15b90 inlined, GetRadius into +0x24 when found), then Target =
-// TargetObjectId and GetLocation(Target) into +0x14 (called even for 0); Destination = +0x14.
-// With a ship elsewhere, or without a ship outside the path's system: Target = FUN_06f29c10
-// (gate path, then any path) and Destination = FUN_06f2a190 of it. Without a ship in the path's
-// system: Destination = +0x14. Then the objectives are deleted (FUN_06f1cb40 inlined), the legs
-// erased, and TU53 FUN_06f5ea40(System, &player position, &Destination, &Legs, 0x19,
-// &(+0x24 + 200.0f), 0) builds the legs. Ids = TravelIds; one leg or none in the path's system
-// -> Ids = TargetIds and, the first time, bArrived = 1 and State = 5. Mission slot 11 with
-// (System, &Legs, this, TravelIds, Ids, Ids, Target, 8, 9, 8, null).
+// FUN_06f1c530. In the path's system with a ship, the target is the label's object (resolved
+// once; GetLocation runs even for 0); elsewhere it is the next gate (FUN_06f29c10) and the
+// destination its far side (FUN_06f2a190). BuildNnPath (TU53 FUN_06f5ea40) gets the radius
+// plus 200. One leg or none left in the path's system switches to TargetIds and, the first
+// time, State 5. Mission slot 11 builds the objectives (types 8, 9, 8).
 void FMissionNnPath::Rebuild()
 {
     FMissionObject* Owner = Mission;
@@ -4505,8 +4155,7 @@ void FMissionNnPath::Rebuild()
     Objectives.Clear();
     Legs.clear();
     float const Radius = TargetRadius + 200.0f;
-    // 06f1c721-06f1c756: FUN_06f47af0 (the player's position, its returned pointer passed on),
-    // then TU53 FUN_06f5ea40 (result not read).
+    // GetPosition = FUN_06f47af0; the BuildNnPath result is not read.
     Vector PlayerPosition;
     BuildNnPath(System, Owner->PlayerState->GetPosition(&PlayerPosition), &Destination, &Legs,
                 0x19, &Radius, 0);
@@ -4525,12 +4174,8 @@ void FMissionNnPath::Rebuild()
                                nullptr);
 }
 
-// FUN_06f1c7c0 (06f1c7c0-06f1c979, RET 8). Count = size, less one with bSkipFirst; Count <= 0
-// sends nothing. new[] Count MissionObjective (FUN_06f1a5d0: Type 1, empty FmtStr). Every
-// objective (the first skipped with bSkipFirst) whose slot 3 succeeds gets a Type - the first
-// one sent 0x3a when State is 2 or 5, 0x1a when bLaunched, else 0xa (both of the first two set
-// State = 3), the later ones 9 - and is copied into the next array slot. The array goes to
-// pub::Player::SetMissionObjectives with Count (not the number filled), then delete[].
+// FUN_06f1c7c0. The array is sent with Count, not the number filled (unfilled entries stay
+// Type 1 with an empty text).
 void FMissionNnPath::SendObjectives(bool bSkipFirst, bool bLaunched)
 {
     int const Count = static_cast<int>(Objectives.Objectives.size()) - (bSkipFirst ? 1 : 0);
@@ -4574,11 +4219,7 @@ void FMissionNnPath::SendObjectives(bool bSkipFirst, bool bLaunched)
                                       Mission->MissionType, Mission->MissionOffer);
 }
 
-// FUN_06f1c990 (06f1c990-06f1ca49): +0x74 = 0; every objective deleted (FUN_06f1a610 on a copy
-// of the node value) and its node erased through vslot 3 (the FUN_06f1cb40 body, inlined); the
-// +0x5c list emptied (FUN_06fa8370 begin..end); +0x20, +0x24 and the label cleared (the label
-// twice: 06f1c9e5 and 06f1c9ee); +0x68 = +0x6c = 1; the position zeroed; +0x70, +0x78, +0x84,
-// +0x7c, +0x80 = 0. +0x10 is not touched.
+// FUN_06f1c990. Retail clears the label twice and does not touch the list's +0x10 Owner.
 void FMissionNnPath::Reset()
 {
     bActive = 0;

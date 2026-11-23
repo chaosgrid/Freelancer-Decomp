@@ -15,10 +15,10 @@ public:
     CDPNetCodec();
     ~CDPNetCodec();
 
-    // Retail FUN_065c10b0: single-shot deflate(Z_FINISH) + deflateReset. Rejects InputSize < 0x20
-    // (retail: too small to bother compressing) by returning false.
+    // Retail FUN_065c10b0: single-shot deflate. Returns false for InputSize < 0x20 (too small to
+    // bother compressing).
     bool Compress(const void* Input, unsigned int InputSize, void* Output, unsigned int OutputCapacity);
-    // Retail FUN_065c1110: single-shot inflate(Z_FINISH) + inflateReset.
+    // Retail FUN_065c1110: single-shot inflate.
     bool Decompress(const void* Input, unsigned int InputSize, void* Output, unsigned int OutputCapacity);
 
     unsigned long GetLastCompressedSize() const { return LastCompressedSize; }

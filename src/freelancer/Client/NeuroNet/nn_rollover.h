@@ -33,14 +33,12 @@
 class NnRolloverControl : public TextWin
 {
 public:
-    // FUN_004b6630's inlined part: the TextWin part (TextWin()), the +0xec record
-    // (+0xf4 / +0xf8 zeroed, FUN_004144b0 on +0xfc, FUN_004963a0), the map (FUN_004b6800),
-    // then FUN_004b4f10.
+    // FUN_004b6630's inlined part, ending in FUN_004b4f10.
     NnRolloverControl();
     // FUN_004b5340.
     ~NnRolloverControl() override;
 
-    // slot 4 FUN_0053f330 -- XOR AL,AL / RET 4.
+    // slot 4 FUN_0053f330 -- always false.
     bool HitTest(float const* Ray) override;
     // slot 9 FUN_004b54d0.
     bool Create(Win3D* NewParent, void* Data) override;
@@ -67,7 +65,7 @@ public:
     // FUN_004b6130 (RET 0xc) -- the same with an explicit anchor X.
     void ShowHoverAt(FToolTipHoverInfo const* Info, float HoldSeconds, float AnchorX);
 
-    // FUN_004b65a0's body on the singleton: +0x164 = 0, +0x6c &= 0xfd (hidden).
+    // FUN_004b65a0's body on the singleton.
     void HideRollover();
 
 private:

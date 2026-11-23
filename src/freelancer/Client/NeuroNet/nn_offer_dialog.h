@@ -12,8 +12,7 @@
 //
 // WINFACTORY<NN_OfferDialog> DAT_00672108 "NN_OfferDialog": static init LAB_004a60f0 (ctor
 // FUN_004a6960, atexit LAB_004a6110 -> FUN_00579380), Create FUN_004a69d0 (operator_new(0x364),
-// WinControl ctor FUN_0059f860, the vptrs, DAT_0067dcc8 = 1, +0x338 = 0, +0x10 = the factory
-// name, slot 9; on failure the scalar deleting dtor).
+// the ctor inlined).
 //
 // vftable 0x005d443c (45 slots) -- WinControl's with these overrides:
 //   0 FUN_004a6120 (scalar deleting dtor around FUN_004a6140), 9 FUN_004a61b0 Create,
@@ -47,10 +46,9 @@ typedef void(__cdecl* FNnOfferDialogCallback)(void* Context, int Answer);
 class NnOfferDialog : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_004a69d0: WinControl ctor, DAT_0067dcc8 = 1, +0x338 = 0.
+    // Inlined into FUN_004a69d0: DAT_0067dcc8 = 1.
     NnOfferDialog();
-    // FUN_004a6140: DAT_0067dcc8 = 0, then the Event::Handler (FUN_00576010) and WinControl
-    // (FUN_0059fa50) base dtors.
+    // FUN_004a6140: DAT_0067dcc8 = 0.
     ~NnOfferDialog() override;
 
     // slot 9 FUN_004a61b0 (RET 8)
@@ -77,7 +75,7 @@ public:
     WinControl* CloseButton;         // +0x344
     WinControl* Title;               // +0x348
     RichTextWin* OfferText;          // +0x34c
-    unsigned Field_0x350;            // +0x350 TODO: never written by the class; meaning unknown
+    unsigned Field_0x350;            // +0x350 never written by the class; meaning unknown
     WinControl* DeclineButton;       // +0x354
     WinControl* DeclineText;         // +0x358
     WinControl* Close2Button;        // +0x35c

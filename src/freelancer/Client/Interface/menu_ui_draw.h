@@ -8,9 +8,8 @@
 
 #include "render/IBigImage2.h"
 
-// Minimal 2D UI draw helpers (pipeline slot 69 / 70). The big-image tile callback FUN_00404720
-// is ScreenQuadDrawBigImageTile in screen_quad_state.h.
-// FVF 0x1C4: XYZRHW + DIFFUSE + SPECULAR + TEX1 (stride 32).
+// Port-only 2D UI draw helpers (pipeline slot 69 / 70), FVF 0x1C4 (stride 32). The big-image
+// tile callback FUN_00404720 is ScreenQuadDrawBigImageTile in screen_quad_state.h.
 
 void MenuSetup2DRenderState();
 void MenuRestore3DRenderState();
@@ -24,8 +23,8 @@ void MenuDrawTexturedRect(int Left, int Top, int Right, int Bottom, void* Textur
 void MenuDrawAdditiveTexturedRect(int Left, int Top, int Right, int Bottom, void* TextureHandle,
                                   unsigned long PackedArgb, float U0, float V0, float U1, float V1);
 
-// front_button-style bezel: indexed XYZRHW rings (114/108/60/36/96 idx) + 128² body + caption.
-// 12-idx frame+text stays as the caption pass. Hover uses additive outer ring.
+// front_button-style bezel: indexed XYZRHW rings + a 128x128 body + the caption; hover uses an
+// additive outer ring.
 void MenuDrawNeuroNetButtonOverlay(int Left, int Top, int Right, int Bottom, void* BodyHandle,
                                    float BodyU0, float BodyV0, float BodyU1, float BodyV1,
                                    unsigned long BodyTint, void* LabelHandle, int LabelLeft,

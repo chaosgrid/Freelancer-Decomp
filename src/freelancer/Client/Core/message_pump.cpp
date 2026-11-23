@@ -12,13 +12,13 @@
 
 #include <windows.h>
 
-// FUN_005b0b60 (.text:005b0b60-005b0c20), cdecl(int* ExitCode): drain the queue with
-// PeekMessage(PM_NOREMOVE) + GetMessage. A hot key IMEFocus claims, or a message the menu
-// accelerator router (FUN_00577850) consumes, skips Translate/Dispatch. WM_QUIT stores its
-// wParam through ExitCode (no null check, 0x005b0c18) and returns false.
+// FUN_005b0b60, cdecl(int* ExitCode): drain the queue with PeekMessage(PM_NOREMOVE) +
+// GetMessage. A hot key IMEFocus claims, or a message the menu accelerator router
+// (FUN_00577850) consumes, skips Translate/Dispatch. WM_QUIT stores its wParam through ExitCode
+// (no null check) and returns false.
 bool PumpMessages(int* exit_code)
 {
-    // 0x005b0b69: FUN_0041ef20 drains the DirectInput mouse queue first.
+    // FUN_0041ef20 drains the DirectInput mouse queue first.
     MouseDispatchEvents();
     MSG Msg;
     while (PeekMessageA(&Msg, nullptr, 0, 0, PM_NOREMOVE))

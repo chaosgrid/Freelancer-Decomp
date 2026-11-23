@@ -21,9 +21,9 @@ namespace
 
     GENRESULT const kThornReferenceMissing = static_cast<GENRESULT>(-1);
 
-    // The pool slot is indexed without a range check by every body below (`SHL reg,6;
-    // ADD reg,DAT_00668b00`). A slot of -1 -- Allocate found the 256 slots full -- would reach
-    // the 0x40 bytes before the pool, exactly as retail does.
+    // The pool slot is indexed without a range check by every body below. A slot of -1 --
+    // Allocate found the 256 slots full -- would reach the 0x40 bytes before the pool, exactly
+    // as retail does.
     FGfCameraSlot& PoolSlotAt(int Slot)
     {
         return G_GfCameraPool.Slots[Slot];
@@ -42,8 +42,7 @@ namespace
             RoomCameraSetPosition(Target.Camera, Target.Pos);
     }
 
-    // LAB_004508e0 / the tail of LAB_00450940: the same for the orientation (REP MOVSD 9),
-    // FUN_00556cc0.
+    // LAB_004508e0 / the tail of LAB_00450940: the same for the orientation, FUN_00556cc0.
     void StorePoolOrientation(Csys const& Frame, int Slot, float const* Local9)
     {
         Matrix const World = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Local9));
@@ -80,8 +79,7 @@ namespace
 // Thorn_Camera
 // ---------------------------------------------------------------------------------------
 
-// FUN_004507a0. 0x004507b4 base ctor, 0x004507b9..0x004507f0 the nine vptrs (the compiler's),
-// 0x004507f7 +0x6c = -1.
+// FUN_004507a0.
 FThornCamera::FThornCamera(Csys const& ScriptFrame, FGfScript* InOwner,
                            FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -89,16 +87,13 @@ FThornCamera::FThornCamera(Csys const& ScriptFrame, FGfScript* InOwner,
 {
 }
 
-// FUN_00450830. 0x0045083f..0x00450847: PUSH bCanBeActive, PUSH Camera, PUSH Priority, ECX =
-// the pool; 0x0045084c the answer into +0x6c.
+// FUN_00450830.
 void FThornCamera::Register(FRoomCamera* Camera, int Priority, unsigned char bCanBeActive)
 {
     PoolSlot = G_GfCameraPool.Allocate(Priority, Camera, bCanBeActive);
 }
 
-// LAB_00450940 (identity, RET 8). The position (Transform + 0x24) first -- trans_from_frame,
-// slot +0x04, FUN_00556cb0 when active (0x0045094f..0x00450998) -- then the rotation
-// (Transform + 0), slot +0x10, FUN_00556cc0 when active (0x0045099b..0x004509da). 0.
+// LAB_00450940. The position first, then the rotation.
 GENRESULT DACOM_API FThornCamera::SetTransform(float const* Transform12)
 {
     StorePoolPosition(Frame, PoolSlot, Transform12 + 9);
@@ -106,8 +101,7 @@ GENRESULT DACOM_API FThornCamera::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_00450aa0 (identity, RET 8). trans_to_frame of the slot position into Out + 0x24
-// (0x00450aaa..0x00450af3), then of the slot orientation into Out + 0 (0x00450af6..0x00450b28).
+// LAB_00450aa0.
 GENRESULT DACOM_API FThornCamera::GetTransform(float* OutTransform12)
 {
     LoadPoolPosition(Frame, PoolSlot, OutTransform12 + 9);
@@ -115,36 +109,35 @@ GENRESULT DACOM_API FThornCamera::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_00450880 (geo facet, RET 8). Facet +0x20 = the frame, +0x60 = the slot.
+// LAB_00450880.
 GENRESULT DACOM_API FThornCamera::SetPosition(float* Position)
 {
     StorePoolPosition(Frame, PoolSlot, Position);
     return GR_OK;
 }
 
-// LAB_004508e0 (geo facet, RET 8).
+// LAB_004508e0.
 GENRESULT DACOM_API FThornCamera::SetOrientation(float* Orient9)
 {
     StorePoolOrientation(Frame, PoolSlot, Orient9);
     return GR_OK;
 }
 
-// LAB_004509f0 (geo facet, RET 8). The slot position copied to the stack, trans_to_frame, out.
+// LAB_004509f0.
 GENRESULT DACOM_API FThornCamera::GetPosition(float* OutPosition)
 {
     LoadPoolPosition(Frame, PoolSlot, OutPosition);
     return GR_OK;
 }
 
-// LAB_00450a50 (geo facet, RET 8).
+// LAB_00450a50.
 GENRESULT DACOM_API FThornCamera::GetOrientation(float* OutOrient9)
 {
     LoadPoolOrientation(Frame, PoolSlot, OutOrient9);
     return GR_OK;
 }
 
-// LAB_00450b40 (camera facet, RET 8). Facet +0x5c = the slot. Slot +0x34, then FUN_00556ce0
-// with the value when the slot is DAT_0066d100.
+// LAB_00450b40. FUN_00556ce0 only when the slot is the active one (DAT_0066d100).
 GENRESULT DACOM_API FThornCamera::SetFov(const float* Fov)
 {
     FGfCameraSlot& Slot = PoolSlotAt(PoolSlot);
@@ -180,7 +173,7 @@ GENRESULT DACOM_API FThornCamera::SetFar(const float* Far)
     return GR_OK;
 }
 
-// LAB_00450c00 / LAB_00450c20 / LAB_00450c40 -- FLD slot +0x34 / +0x38 / +0x3c, FSTP [Out], 0.
+// LAB_00450c00 / LAB_00450c20 / LAB_00450c40.
 GENRESULT DACOM_API FThornCamera::GetFov(float* OutFov)
 {
     *OutFov = PoolSlotAt(PoolSlot).HalfFovXDeg;
@@ -205,19 +198,18 @@ void FThornCamera::Stop()
     G_GfCameraPool.Free(PoolSlot);
 }
 
-// FUN_00450870 -- OR EAX,-1 (shared by /OPT:ICF with every "-1" getter of the exe).
+// FUN_00450870 (ICF-folded with every "-1" getter of the exe).
 void* FThornCamera::GetEngineInstance()
 {
     return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 }
 
 // ---------------------------------------------------------------------------------------
-// Thorn_CameraReference -- every forwarder: +0x6c null -> FDUMP(0x100001, "Using invalid
-// camera reference", ScriptCamera.cpp, line, Name) and -1; otherwise a tail JMP into the
-// target's same facet slot with the target's facet as `this`.
+// Thorn_CameraReference -- every forwarder: no target -> the "Using invalid camera reference"
+// FDUMP and -1; otherwise the target's same facet slot.
 // ---------------------------------------------------------------------------------------
 
-// FUN_00450c60. Base ctor, vptrs, 0x00450cb7 +0x6c = 0.
+// FUN_00450c60.
 FThornCameraReference::FThornCameraReference(Csys const& ScriptFrame, FGfScript* InOwner,
                                              FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -225,7 +217,7 @@ FThornCameraReference::FThornCameraReference(Csys const& ScriptFrame, FGfScript*
 {
 }
 
-// LAB_00450dc0 -- identity slot 11 (+0x2c), line 0x226.
+// LAB_00450dc0.
 GENRESULT DACOM_API FThornCameraReference::SetTransform(float const* Transform12)
 {
     if (Target == nullptr)
@@ -233,7 +225,7 @@ GENRESULT DACOM_API FThornCameraReference::SetTransform(float const* Transform12
     return Target->SetTransform(Transform12);
 }
 
-// LAB_00450ea0 -- identity slot 12 (+0x30), line 0x24d.
+// LAB_00450ea0.
 GENRESULT DACOM_API FThornCameraReference::GetTransform(float* OutTransform12)
 {
     if (Target == nullptr)
@@ -241,7 +233,7 @@ GENRESULT DACOM_API FThornCameraReference::GetTransform(float* OutTransform12)
     return Target->GetTransform(OutTransform12);
 }
 
-// LAB_00450d20 -- geo slot 3 (target + 0xc, +0xc), line 0x20c.
+// LAB_00450d20.
 GENRESULT DACOM_API FThornCameraReference::SetPosition(float* Position)
 {
     if (Target == nullptr)
@@ -249,7 +241,7 @@ GENRESULT DACOM_API FThornCameraReference::SetPosition(float* Position)
     return Target->SetPosition(Position);
 }
 
-// LAB_00450d70 -- geo slot 4, line 0x219.
+// LAB_00450d70.
 GENRESULT DACOM_API FThornCameraReference::SetOrientation(float* Orient9)
 {
     if (Target == nullptr)
@@ -257,7 +249,7 @@ GENRESULT DACOM_API FThornCameraReference::SetOrientation(float* Orient9)
     return Target->SetOrientation(Orient9);
 }
 
-// LAB_00450e00 -- geo slot 5, line 0x233.
+// LAB_00450e00.
 GENRESULT DACOM_API FThornCameraReference::GetPosition(float* OutPosition)
 {
     if (Target == nullptr)
@@ -265,7 +257,7 @@ GENRESULT DACOM_API FThornCameraReference::GetPosition(float* OutPosition)
     return Target->GetPosition(OutPosition);
 }
 
-// LAB_00450e50 -- geo slot 6, line 0x240.
+// LAB_00450e50.
 GENRESULT DACOM_API FThornCameraReference::GetOrientation(float* OutOrient9)
 {
     if (Target == nullptr)
@@ -273,7 +265,7 @@ GENRESULT DACOM_API FThornCameraReference::GetOrientation(float* OutOrient9)
     return Target->GetOrientation(OutOrient9);
 }
 
-// LAB_00450ee0 -- camera slot 3 (target + 0x10, +0xc), line 0x25a.
+// LAB_00450ee0.
 GENRESULT DACOM_API FThornCameraReference::SetFov(const float* Fov)
 {
     if (Target == nullptr)
@@ -281,7 +273,7 @@ GENRESULT DACOM_API FThornCameraReference::SetFov(const float* Fov)
     return Target->SetFov(Fov);
 }
 
-// LAB_00450f30 -- camera slot 6, line 0x267.
+// LAB_00450f30.
 GENRESULT DACOM_API FThornCameraReference::SetNear(const float* Near)
 {
     if (Target == nullptr)
@@ -289,7 +281,7 @@ GENRESULT DACOM_API FThornCameraReference::SetNear(const float* Near)
     return Target->SetNear(Near);
 }
 
-// LAB_00450f80 -- camera slot 7, line 0x274.
+// LAB_00450f80.
 GENRESULT DACOM_API FThornCameraReference::SetFar(const float* Far)
 {
     if (Target == nullptr)
@@ -297,7 +289,7 @@ GENRESULT DACOM_API FThornCameraReference::SetFar(const float* Far)
     return Target->SetFar(Far);
 }
 
-// LAB_00450fd0 -- camera slot 8, line 0x281.
+// LAB_00450fd0.
 GENRESULT DACOM_API FThornCameraReference::GetFov(float* OutFov)
 {
     if (Target == nullptr)
@@ -305,7 +297,7 @@ GENRESULT DACOM_API FThornCameraReference::GetFov(float* OutFov)
     return Target->GetFov(OutFov);
 }
 
-// LAB_00451020 -- camera slot 11, line 0x28e.
+// LAB_00451020.
 GENRESULT DACOM_API FThornCameraReference::GetNear(float* OutNear)
 {
     if (Target == nullptr)
@@ -313,7 +305,7 @@ GENRESULT DACOM_API FThornCameraReference::GetNear(float* OutNear)
     return Target->GetNear(OutNear);
 }
 
-// LAB_00451070 -- camera slot 12, line 0x29b.
+// LAB_00451070.
 GENRESULT DACOM_API FThornCameraReference::GetFar(float* OutFar)
 {
     if (Target == nullptr)
@@ -327,7 +319,7 @@ void FThornCameraReference::Stop()
     Target = nullptr;
 }
 
-// LAB_00450ce0 -- the target's identity slot 17, or FDUMP line 0x1ff and -1.
+// LAB_00450ce0.
 void* FThornCameraReference::GetEngineInstance()
 {
     if (Target == nullptr)

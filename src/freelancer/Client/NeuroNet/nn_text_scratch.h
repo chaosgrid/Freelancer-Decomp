@@ -9,9 +9,9 @@
 // Retail's two shared wide-text scratch buffers and their capacity global. Many text builders
 // fill one of them with an IDS string (FUN_004347e0 with the capacity DAT_006119f8), format or
 // concatenate into it, and hand it to a control or a tooltip record in the same call:
-// NN_Inventory's SetProperty 0x4f (0x00479fec..0x0047a046), the dealer's stat text
-// FUN_00484090, the HUD status / target panels, NN_MainButton (0x0045af16..) and the rollover
-// (0x004ba08b..). Nothing keeps a pointer into them across calls.
+// NN_Inventory's SetProperty 0x4f (0x00479fec), the dealer's stat text FUN_00484090, the HUD
+// status / target panels, NN_MainButton (0x0045af16) and the rollover (0x004ba08b). Nothing
+// keeps a pointer into them across calls.
 //
 //   DAT_0066dc60  .bss  0x1000 wchar_t (ends at 0x0066fc60)
 //   DAT_0066fc60  .bss  0x1000 wchar_t (ends at 0x00671c60)

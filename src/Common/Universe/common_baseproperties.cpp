@@ -6,7 +6,7 @@
 
 // Common.dll base-side records: MissionVendorProperties / MissionVendorAcceptance,
 // NewsBroadcastProperties, CharacterProperties, AmbientScriptInfo / AmbientScriptProperties,
-// CostumeHint / BaseHint and CBase. Split out of common_goods.cpp.
+// CostumeHint / BaseHint and CBase.
 //
 // The property bags share one shape in retail: the constructor zero-constructs the FmtStr
 // members inline and then runs clear() inlined; destroy() releases what the record owns and
@@ -28,8 +28,8 @@ using CmnGoods::AssignCostume;
 
 namespace
 {
-    // The per-member reset retail inlines into every clear(): FmtStr::destroy, then REP STOSD
-    // over the six dwords (e.g. .text:0631a98e-0631a99a).
+    // The per-member reset retail inlines into every clear(): FmtStr::destroy, then all six
+    // dwords zeroed.
     void DestroyAndZero(FmtStr& Text)
     {
         Text.destroy();
@@ -41,14 +41,13 @@ namespace
 // MissionVendorProperties
 // ---------------------------------------------------------------------------
 
-// .text:0631a770: the three FmtStr members zero-constructed inline, then clear() inlined.
+// .text:0631a770
 MissionVendorProperties::MissionVendorProperties()
 {
     clear();
 }
 
-// .text:06308d10: memberwise -- the five scalars, FmtStr's copy constructor for each text,
-// then IconTextureId.
+// .text:06308d10: memberwise.
 MissionVendorProperties::MissionVendorProperties(MissionVendorProperties const& Other)
     : Key(Other.Key)
     , BaseId(Other.BaseId)
@@ -62,13 +61,13 @@ MissionVendorProperties::MissionVendorProperties(MissionVendorProperties const& 
 {
 }
 
-// .text:0631a890: destroy() inlined, then the three ~FmtStr.
+// .text:0631a890
 MissionVendorProperties::~MissionVendorProperties()
 {
     destroy();
 }
 
-// .text:0631ac40: destroy() inlined, then a memberwise copy; no self test.
+// .text:0631ac40: no self test.
 MissionVendorProperties& MissionVendorProperties::operator=(MissionVendorProperties const& Other)
 {
     destroy();
@@ -98,8 +97,7 @@ void MissionVendorProperties::clear()
     IconTextureId = 0;
 }
 
-// .text:0631a9d0: the three texts released, then clear() inlined (which releases them again,
-// a no-op on an empty chain).
+// .text:0631a9d0. clear() releases the texts again, a no-op on an empty chain.
 void MissionVendorProperties::destroy()
 {
     Title.destroy();
@@ -113,7 +111,7 @@ unsigned long MissionVendorProperties::get_key() const
     return (unsigned long)Key;
 }
 
-// .text:0631add0: a jump table on MissionClass - 1 (0..5); anything else is null.
+// .text:0631add0
 char const* MissionVendorProperties::get_icon_texture() const
 {
     switch (MissionClass)
@@ -128,7 +126,7 @@ char const* MissionVendorProperties::get_icon_texture() const
     }
 }
 
-// .text:0631ad10: destroy() inlined, Key = -1, then the description copied over.
+// .text:0631ad10
 void MissionVendorProperties::init(MissionVendorOfferDescription const& Desc)
 {
     destroy();
@@ -157,11 +155,10 @@ void MissionVendorProperties::marshal(MarshalBuffer* Buf) const
     Buf->put_void(&IconTextureId, 4);
 }
 
-// .text:0631ab00. Every dword before the texts goes through retail's own `param_1` stack cell
-// (initially the MarshalBuffer pointer) and is then stored, so when get_void has too few bytes
-// left and writes nothing the field receives the cell's previous content. IconTextureId goes
-// through a different, never-initialised cell (local_28, .text:0631ac14); the port starts that
-// one at 0 -- the only point where it differs from retail, and only on a truncated buffer.
+// .text:0631ab00. Every dword before the texts goes through retail's own parameter stack cell
+// (initially the MarshalBuffer pointer), so when get_void has too few bytes left the field
+// receives the cell's previous content. IconTextureId goes through a never-initialised cell;
+// the port starts that one at 0 (differs from retail only on a truncated buffer).
 void MissionVendorProperties::unmarshal(MarshalBuffer* Buf)
 {
     unsigned int Scratch = (unsigned int)(std::uintptr_t)Buf;
@@ -187,7 +184,7 @@ void MissionVendorProperties::unmarshal(MarshalBuffer* Buf)
 // MissionVendorAcceptance
 // ---------------------------------------------------------------------------
 
-// .text:0631ae20: Reason zero-constructed inline, then clear() inlined.
+// .text:0631ae20
 MissionVendorAcceptance::MissionVendorAcceptance()
 {
     clear();
@@ -202,13 +199,13 @@ MissionVendorAcceptance::MissionVendorAcceptance(MissionVendorAcceptance const& 
 {
 }
 
-// .text:0631aeb0: destroy() inlined, then ~FmtStr.
+// .text:0631aeb0
 MissionVendorAcceptance::~MissionVendorAcceptance()
 {
     destroy();
 }
 
-// .text:0631b080: destroy() inlined, then a memberwise copy; no self test.
+// .text:0631b080: no self test.
 MissionVendorAcceptance& MissionVendorAcceptance::operator=(MissionVendorAcceptance const& Other)
 {
     destroy();
@@ -228,7 +225,7 @@ void MissionVendorAcceptance::clear()
     DestroyAndZero(Reason);
 }
 
-// .text:0631af60: Reason released, then clear() inlined.
+// .text:0631af60
 void MissionVendorAcceptance::destroy()
 {
     Reason.destroy();
@@ -244,8 +241,7 @@ void MissionVendorAcceptance::marshal(MarshalBuffer* Buf) const
     Buf->put_FmtStr(Reason);
 }
 
-// .text:0631afe0. Both dwords go through retail's `param_1` stack cell, initially the
-// MarshalBuffer pointer (see MissionVendorProperties::unmarshal).
+// .text:0631afe0. The same stack-cell quirk as MissionVendorProperties::unmarshal.
 void MissionVendorAcceptance::unmarshal(MarshalBuffer* Buf)
 {
     unsigned int Scratch = (unsigned int)(std::uintptr_t)Buf;
@@ -257,7 +253,7 @@ void MissionVendorAcceptance::unmarshal(MarshalBuffer* Buf)
     Reason = Buf->get_FmtStr();
 }
 
-// 0x06261d90: MOV EAX,dword ptr [ECX] / RET.
+// 0x06261d90
 unsigned long MissionVendorAcceptance::get_key() const
 {
     return (unsigned long)Key;
@@ -267,15 +263,15 @@ unsigned long MissionVendorAcceptance::get_key() const
 // NewsBroadcastProperties
 // ---------------------------------------------------------------------------
 
-// .text:0631b0e0: the three FmtStr members zero-constructed inline, then clear() inlined.
+// .text:0631b0e0
 NewsBroadcastProperties::NewsBroadcastProperties()
 {
     clear();
 }
 
 // .text:06308dd0: the compiler's memberwise copy -- LogoTexture is copied as a POINTER, not
-// duplicated, although destroy() frees it. Very strange: destroying both the copy and the
-// original frees the string twice, as in retail. No retail module calls this constructor.
+// duplicated, although destroy() frees it: destroying both the copy and the original frees the
+// string twice, as in retail. No retail module calls this constructor.
 NewsBroadcastProperties::NewsBroadcastProperties(NewsBroadcastProperties const& Other)
     : Key(Other.Key)
     , BaseId(Other.BaseId)
@@ -290,14 +286,13 @@ NewsBroadcastProperties::NewsBroadcastProperties(NewsBroadcastProperties const& 
 {
 }
 
-// .text:0631b210: destroy() inlined, then the three ~FmtStr.
+// .text:0631b210
 NewsBroadcastProperties::~NewsBroadcastProperties()
 {
     destroy();
 }
 
-// .text:0631b5c0: destroy() inlined, then a memberwise copy with LogoTexture duplicated
-// (malloc_strcpy); no self test.
+// .text:0631b5c0: LogoTexture is duplicated here (unlike the copy ctor); no self test.
 NewsBroadcastProperties& NewsBroadcastProperties::operator=(NewsBroadcastProperties const& Other)
 {
     destroy();
@@ -330,7 +325,7 @@ void NewsBroadcastProperties::clear()
     LogoTextureId = 0;
 }
 
-// .text:0631b360: the three texts and LogoTexture released, then clear() inlined.
+// .text:0631b360
 void NewsBroadcastProperties::destroy()
 {
     Headline.destroy();
@@ -351,8 +346,7 @@ char const* NewsBroadcastProperties::get_logo_texture() const
     return (LogoTexture != nullptr) ? LogoTexture : "genericnews";
 }
 
-// .text:0631b6a0: destroy() inlined, Key = -1, then the description copied over.
-// LogoTextureId is CreateID(AudioName) with no test of AudioName (CreateID maps null to 0).
+// .text:0631b6a0. No test of AudioName (CreateID maps null to 0).
 void NewsBroadcastProperties::init(NewsBroadcastDescription const& Desc)
 {
     destroy();
@@ -383,9 +377,8 @@ void NewsBroadcastProperties::marshal(MarshalBuffer* Buf) const
     Buf->put_FL_ID(LogoTextureId);
 }
 
-// .text:0631b490. The dwords go through retail's `param_1` stack cell, initially the
-// MarshalBuffer pointer (see MissionVendorProperties::unmarshal). LogoTexture is overwritten
-// without freeing a previous string.
+// .text:0631b490. The same stack-cell quirk as MissionVendorProperties::unmarshal. LogoTexture
+// is overwritten without freeing a previous string.
 void NewsBroadcastProperties::unmarshal(MarshalBuffer* Buf)
 {
     unsigned int Scratch = (unsigned int)(std::uintptr_t)Buf;
@@ -454,9 +447,8 @@ CharacterProperties& CharacterProperties::operator=(CharacterProperties const& O
     return *this;
 }
 
-// 0632d8d0 (ICF-shared with ~CharacterProperties): malloc_strfree on +0x14 (the wide name;
-// malloc_wstrfree is the same VA), +0x18 and +0x58, then those three are stored 0. No other
-// field is touched.
+// 0632d8d0 (ICF-shared with ~CharacterProperties). Frees +0x14 (malloc_wstrfree is the same VA
+// as malloc_strfree), +0x18 and +0x58; no other field is touched.
 void CharacterProperties::destroy()
 {
     malloc_wstrfree(&NameWide);
@@ -509,10 +501,8 @@ void CharacterProperties::marshal(MarshalBuffer* Buf) const
     Buf->put_void(&VoiceId, 4);
 }
 
-// .text:0632da10. Every dword goes through retail's `param_1` stack cell, initially the
-// MarshalBuffer pointer (see MissionVendorProperties::unmarshal). The strings are overwritten
-// without freeing previous ones; the Costume goes through its inline operator= from the
-// get_Costume temporary.
+// .text:0632da10. The same stack-cell quirk as MissionVendorProperties::unmarshal. The strings
+// are overwritten without freeing previous ones.
 void CharacterProperties::unmarshal(MarshalBuffer* Buf)
 {
     unsigned int Scratch = (unsigned int)(std::uintptr_t)Buf;
@@ -544,8 +534,7 @@ void CharacterProperties::unmarshal(MarshalBuffer* Buf)
 // AmbientScriptInfo
 // ---------------------------------------------------------------------------
 
-// 0x06274130: MOV EAX,this / XOR ECX,ECX / MOV [EAX],ECX / MOV [EAX+4],ECX /
-// MOV [EAX+8],ECX / RET.
+// 0x06274130
 AmbientScriptInfo::AmbientScriptInfo()
     : Type(0)
     , Path(nullptr)
@@ -553,15 +542,13 @@ AmbientScriptInfo::AmbientScriptInfo()
 {
 }
 
-// 0x06274140 (??1 and ?destroy share the body): ADD ECX,4 / PUSH ECX /
-// CALL malloc_strfree / POP ECX / RET -- nothing else is touched.
+// 0x06274140 (shared with destroy): nothing but Path is touched.
 AmbientScriptInfo::~AmbientScriptInfo()
 {
     malloc_strfree(&Path);
 }
 
-// 0x062ee230: XOR EAX,EAX / MOV [this],EAX / MOV [this+4],EAX / MOV [this+8],EAX /
-// RET -- the string pointer is dropped, not freed.
+// 0x062ee230: the string pointer is dropped, not freed.
 void AmbientScriptInfo::clear()
 {
     Type = 0;
@@ -579,7 +566,7 @@ void AmbientScriptInfo::destroy()
 // AmbientScriptProperties
 // ---------------------------------------------------------------------------
 
-// .text:0631b7a0: the clear() stores.
+// .text:0631b7a0
 AmbientScriptProperties::AmbientScriptProperties()
     : Key(-1)
     , RoomId(0)
@@ -605,7 +592,7 @@ void AmbientScriptProperties::clear()
     Name = nullptr;
 }
 
-// .text:0631b7c0: Name released, then the clear() stores.
+// .text:0631b7c0
 void AmbientScriptProperties::destroy()
 {
     malloc_strfree(&Name);
@@ -618,8 +605,8 @@ unsigned long AmbientScriptProperties::get_key() const
     return (unsigned long)Key;
 }
 
-// .text:0631b8e0: destroy() inlined, then a memberwise copy with Name duplicated. With no self
-// test, self-assignment frees Name before reading Other.Name, which is then null.
+// .text:0631b8e0. With no self test, self-assignment frees Name before reading Other.Name,
+// which is then null.
 AmbientScriptProperties& AmbientScriptProperties::operator=(AmbientScriptProperties const& Other)
 {
     destroy();
@@ -633,8 +620,8 @@ AmbientScriptProperties& AmbientScriptProperties::operator=(AmbientScriptPropert
 
 // .text:0631b930. Key becomes 0 here (clear() makes it -1); Server's
 // FRoomEntry::create_ambient_script (FUN_06d12520) stores the real handle afterwards. The
-// flag is the low byte of Desc.Flags (`MOV CL,[EAX+8]`); the port's bool normalises a byte
-// other than 0/1 to 1 -- every producer (Content's ambient-scene actions) passes 0.
+// flag is the low byte of Desc.Flags; the port's bool normalises a byte other than 0/1 to 1
+// -- every producer (Content's ambient-scene actions) passes 0.
 void AmbientScriptProperties::init(AmbientScriptDescription const& Desc)
 {
     malloc_strfree(&Name);
@@ -658,9 +645,8 @@ void AmbientScriptProperties::marshal(MarshalBuffer* Buf) const
     Buf->put_string(Name);
 }
 
-// .text:0631b880. The dwords go through retail's `param_1` stack cell, initially the
-// MarshalBuffer pointer (see MissionVendorProperties::unmarshal). Name is overwritten without
-// freeing a previous string.
+// .text:0631b880. The same stack-cell quirk as MissionVendorProperties::unmarshal. Name is
+// overwritten without freeing a previous string.
 void AmbientScriptProperties::unmarshal(MarshalBuffer* Buf)
 {
     unsigned int Scratch = (unsigned int)(std::uintptr_t)Buf;
@@ -678,15 +664,14 @@ void AmbientScriptProperties::unmarshal(MarshalBuffer* Buf)
 // CostumeHint / BaseHint
 // ---------------------------------------------------------------------------
 
-// .text:06311370: Kind = 1, and the inline Costume constructor zeroes the four part ids and
-// the accessory count. Retail leaves Cost.AccessoryIds uninitialised; the port zeroes them.
+// .text:06311370. Retail leaves Cost.AccessoryIds uninitialised; the port zeroes them.
 CostumeHint::CostumeHint()
 {
     memset(&Cost, 0, sizeof(Cost));
     Kind = 1;
 }
 
-// .text:06311280: BaseHint's copy (Kind), then all thirteen Costume dwords (REP MOVSD 0xd).
+// .text:06311280: all thirteen Costume dwords are copied (not count-bounded).
 CostumeHint::CostumeHint(CostumeHint const& Other)
     : BaseHint(Other)
     , Cost(Other.Cost)
@@ -697,8 +682,7 @@ CostumeHint::~CostumeHint()
 {
 }
 
-// .text:063112b0: Kind, then the Costume's inline operator= -- the four part ids and the
-// count always, and only `count` accessory ids. No self test, no bound on the count.
+// .text:063112b0: the Costume's count-bounded operator=. No self test, no bound on the count.
 CostumeHint& CostumeHint::operator=(CostumeHint const& Other)
 {
     Kind = Other.Kind;
@@ -706,8 +690,7 @@ CostumeHint& CostumeHint::operator=(CostumeHint const& Other)
     return *this;
 }
 
-// 063113a0-063113c7: operator new(0x34), the 13 dwords at +0x08 copied (MOVSD x0xd), the
-// block stored through OutBuf, 0x34 returned. Neither pointer is tested. CleanUp frees it.
+// 063113a0. Neither pointer is tested. CleanUp frees the block.
 unsigned CostumeHint::Serialize(unsigned char** OutBuf)
 {
     unsigned char* Buf = new unsigned char[sizeof(Costume)];
@@ -716,28 +699,26 @@ unsigned CostumeHint::Serialize(unsigned char** OutBuf)
     return sizeof(Costume);
 }
 
-// 063113d0-063113ef: Size >> 2 dwords then Size & 3 bytes from Buf into +0x08 (MOVSD /
-// MOVSB); no test of Buf or of Size. Size above 0x34 runs past the Costume into the next
-// object, as in retail.
+// 063113d0. No test of Buf or of Size: Size above 0x34 runs past the Costume, as in retail.
 void CostumeHint::UnSerialize(unsigned char* Buf, unsigned Size)
 {
     memcpy(&Cost, Buf, Size);
 }
 
-// 06311400-0631140f: operator delete of a non-null block (Serialize's operator new).
+// 06311400
 void CostumeHint::CleanUp(unsigned char* Buf)
 {
     if (Buf != nullptr)
         delete[] Buf;
 }
 
-// .text:063111e0: only the vptr. Retail leaves Kind uninitialised; the port zeroes it.
+// .text:063111e0. Retail leaves Kind uninitialised; the port zeroes it.
 BaseHint::BaseHint()
     : Kind(0)
 {
 }
 
-// .text:063111f0: Kind copied, then the vptr.
+// .text:063111f0
 BaseHint::BaseHint(BaseHint const& Other)
     : Kind(Other.Kind)
 {
@@ -747,8 +728,7 @@ BaseHint::~BaseHint()
 {
 }
 
-// .text:06325980 (ICF-shared with CBase / ImageNode / ... operator=): the dword at +0x04
-// copied, no self test.
+// .text:06325980 (ICF-shared with CBase / ImageNode / ... operator=), no self test.
 BaseHint& BaseHint::operator=(BaseHint const& Other)
 {
     Kind = Other.Kind;
@@ -759,13 +739,13 @@ BaseHint& BaseHint::operator=(BaseHint const& Other)
 // CBase
 // ---------------------------------------------------------------------------
 
-// .text:062a8250: Object = 0, then the vptr.
+// .text:062a8250
 CBase::CBase()
     : Object(nullptr)
 {
 }
 
-// .text:062a8260: Object copied, then the vptr.
+// .text:062a8260
 CBase::CBase(CBase const& Other)
     : Object(Other.Object)
 {
@@ -784,7 +764,7 @@ CBase& CBase::operator=(CBase const& Other)
 
 void CBase::advise(bool bFlag)
 {
-    // ICF-folded with CostumeDescriptions::warn — no-op in retail
+    // ICF-folded with CostumeDescriptions::warn: no-op in retail.
     (void)bFlag;
 }
 
@@ -800,13 +780,13 @@ CObject* CBase::cobject() const
 
 long CBase::get_index() const
 {
-    // .text:062a82e0-062a82e6 `MOV EAX,[ECX+4]; MOV EAX,[EAX+4]; RET`: Object's
-    // EngineInstanceId (EngineObject+0x04), not a field of CBase itself; no null test.
+    // .text:062a82e0: Object's EngineInstanceId (EngineObject+0x04), not a field of CBase
+    // itself; no null test.
     return Object->EngineInstanceId;
 }
 
 void CBase::notify_of_destruction(void* Ptr)
 {
-    // ICF-folded with CostumeDescriptions::warn — no-op in retail
+    // ICF-folded with CostumeDescriptions::warn: no-op in retail.
     (void)Ptr;
 }

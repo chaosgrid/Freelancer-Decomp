@@ -21,9 +21,9 @@ public:
 
 	explicit CAccountsDlg(CWnd* Parent = nullptr);
 
-	// .text:00412d90 — refills the list from Players' account map.
+	// Refills the list from Players' account map.
 	void RefreshAccountList();
-	// .text:00412d20 — colour (banned red / admin green), bold and italic (logged in) of a row.
+	// Colour (banned red / admin green), bold and italic (logged in) of a row.
 	void UpdateAccountStyle(CAccount* Account);
 
 protected:

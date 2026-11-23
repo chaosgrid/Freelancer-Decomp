@@ -7,7 +7,6 @@
 // Common.dll -- IObjInspectImpl (the CObject-backed IObjInspect implementation), its file-local
 // class-mask helpers and ResolveLaneStart, the exported std::vector<IObjInspect*> instantiation,
 // and InitEquipStatusBits.
-// CMN-SPLIT stage 1 (2026-10-14): split out of common_iface.cpp unchanged.
 
 #include "common_iface.h"
 #include "common_behavior.h"
@@ -31,15 +30,6 @@
 #include <cstdlib>
 #include <new>
 
-// ============================================================================
-// Helpers for CSimple / CShip method access
-// ============================================================================
-
-// These inline helpers access CObject/CSimple/CShip fields directly by offset,
-// matching the Ghidra disasm. Where a proper method exists on the class we call it;
-// where it does not yet exist (OBJ batch, wave 3) we either read the field directly
-// or defer with FULLPORT-DEFERRED[OBJ].
-
 static const char* kIfaceSource = "common_iface.cpp";
 
 // ObjectClass bitmask checks from retail code:
@@ -55,35 +45,26 @@ static const char* kIfaceSource = "common_iface.cpp";
 
 IObjInspectImpl::IObjInspectImpl()
 {
-    // Ghidra @ 0x5EFA0. The two vtable stores and the Watchable/CBase field zeroing that used
-    // to be written out here are now what the base constructors do.
+    // FUN_062befa0. The base constructors do the vtable stores and field zeroing.
 }
 
 IObjInspectImpl::IObjInspectImpl(IObjInspectImpl const& Other)
 {
-    // Ghidra @ 0x5EFD0 / raw asm 0x062befd0-0x062bf01f (Common.dll.c is corrupted here,
-    // raw disasm is ground truth): EDX = (&Other != null) ? &Other+8 : 0, then
-    // Field08 = *EDX (reads Other.Field08); separately EDX = (&Other != null) ? &Other+0xc : 0,
-    // then Object = *(EDX+4) = Other's field at +0x10, i.e. Other.Object IS copied here.
-    // (Retail's null-guard reads through the computed-zero pointer in the &Other==null case,
-    // an unreachable-in-practice retail quirk not worth replicating as a crash.)
+    // FUN_062befd0 (from the listing). Copies the Watchable head (+0x08) and Object (+0x10)
+    // raw. Retail's base adjustments would read through null for a null &Other; not reproduced.
     Head = Other.Head;
     Object = Other.Object;
 }
 
 IObjInspectImpl::~IObjInspectImpl()
 {
-    // .text:062bf070-062bf0df: the body is empty. Retail runs the base destructors only:
-    // ~CBase (062bf09e) first, then the IObjRW base's ~Watchable (062bf0b6; ~Watchable is
-    // `JMP unwatch`, 06280b30), which unlinks every watcher of this inspect instance.
+    // FUN_062bf070: only the base destructors (~CBase, then ~Watchable, which unlinks every
+    // watcher of this instance).
 }
 
 IObjInspectImpl& IObjInspectImpl::operator=(IObjInspectImpl const& Other)
 {
-    // Ghidra @ 0x5F030 / raw asm 0x062bf030-0x062bf060 (Common.dll.c corrupted, raw disasm
-    // authoritative): same shape as the copy ctor above -- Field08 = Other.Field08 and
-    // Object = Other.Object (its field at +0x10) are both copied unconditionally.
-    // Retail does not special-case self-assignment here; harmless to copy-onto-self.
+    // FUN_062bf030. As the copy ctor; no self-assignment test.
     Head = Other.Head;
     Object = Other.Object;
     return *this;
@@ -123,12 +104,12 @@ namespace
 }
 
 // ============================================================================
-// IObjInspectImpl — core identity (all real, simple field reads)
+// IObjInspectImpl — core identity
 // ============================================================================
 
 int IObjInspectImpl::get_toughness() const
 {
-    // Ghidra @ 0x5F160: Reputation::Vibe::GetRank(this+0x104) if CEqObj
+    // FUN_062bf160
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         unsigned Rank = 0;
@@ -140,61 +121,51 @@ int IObjInspectImpl::get_toughness() const
 
 Vector const& IObjInspectImpl::get_position() const
 {
-    // .text:062bf1a0-062bf1a6: `MOV EAX,[this+0x10]; ADD EAX,0x2c; RET` -- Object is not
-    // null-tested.
+    // FUN_062bf1a0. Object (+0x10) is not null-tested, here or in the accessors below.
     return Object->WorldPosition;
 }
 
 Vector IObjInspectImpl::get_velocity() const
 {
-    // .text:062bf1b0-062bf1c1: Object (no null test) -> virtual +0x54, CObject::get_velocity.
+    // FUN_062bf1b0 (virtual +0x54)
     return Object->get_velocity();
 }
 
 Vector IObjInspectImpl::get_angular_velocity() const
 {
-    // .text:062bf1d0-062bf1e1: Object (no null test) -> virtual +0x58,
-    // CObject::get_angular_velocity.
+    // FUN_062bf1d0 (virtual +0x58)
     return Object->get_angular_velocity();
 }
 
 Transform const& IObjInspectImpl::get_transform() const
 {
-    // .text:062bf1f0-062bf1f6 (ICF-folded with get_orientation): `MOV EAX,[this+0x10];
-    // ADD EAX,8; RET` -- no null test. The Transform is EngineObject::Orientation (+0x08)
-    // followed by WorldPosition (+0x2c), the same 0x30 bytes as Transform's Rotation /
-    // Translation.
+    // FUN_062bf1f0, ICF-folded with get_orientation: Orientation (+0x08) followed by
+    // WorldPosition (+0x2c) is one Transform.
     return *(Transform const*)&Object->Orientation;
 }
 
 Matrix const& IObjInspectImpl::get_orientation() const
 {
-    // .text:062bf1f0 (ICF-folded with get_transform): Object + 8, no null test.
+    // FUN_062bf1f0 (shared with get_transform)
     return Object->Orientation;
 }
 
 long IObjInspectImpl::get_index() const
 {
-    // .text:062bf200-062bf206: `MOV EAX,[this+0x10]; MOV EAX,[EAX+4]; RET` -- no null test.
+    // FUN_062bf200
     return Object->EngineInstanceId;
 }
 
 unsigned int const IObjInspectImpl::get_id() const
 {
-    // .text:062bf210 .. 062bf22a: the (ObjectClass & 3) == 3 guard yields the CSimple or
-    // null (XOR EAX,EAX at 062bf222), and 062bf224 `MOV EAX,[EAX+0xb0]` reads Id through it
-    // UNCONDITIONALLY -- there is no `return 0` path. Server.dll's local copy (.text:06ce61d0,
-    // GameObject's IObjInspect slot 8) is byte-identical. The port's old `if (S) ... return 0`
-    // was a guard retail does not have; removed 2026-09-25 (claude-code:g-vt1).
+    // FUN_062bf210. Retail reads Id (+0xb0) through the CSimple narrowing with no null test
+    // (Server.dll's copy at 06ce61d0 is identical).
     return InspectSimple(Object)->Id;
 }
 
 int IObjInspectImpl::get_good_id(unsigned& OutId) const
 {
-    // .text:062bf230-062bf26a, RET 0x4: Object null or (class & 0x803) != 0x803 (not a
-    // CLoot) -> -3, OutId untouched. Otherwise 062bf248-062bf25e: CLoot::ContentsArch (+0xec,
-    // no null test), its id (+0x08) through Arch2Good into OutId, 0. This is the loot's
-    // CONTENTS archetype, not CObject::Archetype (+0x88, the crate).
+    // FUN_062bf230. The loot's contents archetype (+0xec, no null test), not the crate's.
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassLoot) == CObject::ClassLoot)
     {
         OutId = Arch2Good(((CLoot const*)Object)->ContentsArch->Nickname.Id);
@@ -205,9 +176,7 @@ int IObjInspectImpl::get_good_id(unsigned& OutId) const
 
 int IObjInspectImpl::get_archetype_extents(Vector& Min, Vector& Max) const
 {
-    // .text:062bf270-062bf2a8, RET 0x8: Object (no null test) -> virtual +0x70,
-    // CObject::get_surface_extents(Min, Max). True -> 0; false -> both vectors zeroed
-    // (062bf28f-062bf29f) and -5.
+    // FUN_062bf270 (virtual +0x70)
     if (Object->get_surface_extents(Min, Max))
     {
         return 0;
@@ -219,14 +188,13 @@ int IObjInspectImpl::get_archetype_extents(Vector& Min, Vector& Max) const
 
 float IObjInspectImpl::get_mass() const
 {
-    // .text:062bf2d0-062bf2d5: Object (no null test) -> `JMP [EAX+0x6c]`, CObject::get_mass.
+    // FUN_062bf2d0 (virtual +0x6c)
     return Object->get_mass();
 }
 
 int IObjInspectImpl::get_physical_radius(float& Radius, Vector& Center) const
 {
-    // .text:062bf2b0..062bf2c5: Object (+0x10, no null test) -> virtual +0x64
-    // (CObject::get_physical_radius_r(Center)), FSTP dword into Radius; returns 0.
+    // FUN_062bf2b0 (virtual +0x64)
     Radius = Object->get_physical_radius_r(Center);
     return 0;
 }
@@ -237,28 +205,12 @@ int IObjInspectImpl::get_physical_radius(float& Radius, Vector& Center) const
 
 int IObjInspectImpl::get_status(float& Health) const
 {
-    // Ghidra @ 0x5F2E0 / raw asm 0x062bf2e0-0x062bf3c8 (ground truth -- the decompiled .c
-    // dereferences a possibly-null pointer at this offset, unreliable). Two real bugs fixed
-    // here vs. the previous port:
-    //  1) the TypeBits==0x80 (asteroid/field) branch walks CEquipTraverser(0x100) calling
-    //     vtable+0xc on each piece, which the port's own CEquip vtable dump (Common.dll.txt
-    //     558303+) confirms is IsFunctioning(), NOT IsDestroyed() -- and retail OVERWRITES
-    //     Health=0/return 0 as soon as it finds ONE non-functioning piece (pessimistic:
-    //     any failure kills the field), only reaching Health=1/return 0 if every piece is
-    //     functioning. The prior port inverted this (returned 1.0 on the first NON-destroyed
-    //     piece) and used the wrong predicate entirely.
-    //  2) if Traverse() finds nothing at all on the very first call, retail returns -3, not
-    //     0/0.0 (see the EDI=-3 preload used verbatim as the return value on that path).
-    //  3) the non-shield get_relative_health() path clamps a negative result to 0.0
-    //     (FCOMP against 0.0 + conditional zero-store in the raw asm), which the port dropped.
-    // 062bf2f0-062bf303: the CSimple narrowing yields 0 for a null / non-CSimple Object and
-    // TypeBits (+0xe0) is read through it unconditionally; 062bf313-062bf349 likewise walks
-    // the CEqObj narrowing's EquipManager (+0xe4) with no null test. -3 (EDI) is returned only
-    // when the first Traverse finds nothing (062bf3c0).
+    // FUN_062bf2e0 (from the listing). TypeBits (+0xe0) and EquipManager (+0xe4) are read
+    // through the narrowed pointers with no null test. For TypeBits 0x80 the health is 0 as
+    // soon as one shield (mask 0x100, IsFunctioning = vtable +0xc) is down, else 1; -3 only
+    // when there is none at all. Otherwise the relative health, negative clamped to 0.
     CSimple* S = InspectSimple(Object);
     if (S->TypeBits == 0x80) {
-        // Asteroid/field type: EqObj is re-derived from the raw Object here (as retail does),
-        // not from S, though in practice they coincide whenever this branch is reachable.
         CEqObj* Eq = InspectEqObj(Object);
         CEquipTraverser Walk(0x100);
         CEquip* E = Eq->EquipManager.Traverse(Walk);
@@ -275,8 +227,7 @@ int IObjInspectImpl::get_status(float& Health) const
         } while (E != nullptr);
         return 0;
     }
-    // 062bf395..062bf3af: FLD ST0 / FSTP float Health, then FCOMP 0.0f on the unrounded value
-    // (TEST AH,0x5 / JP: only "less" falls through to the zero store).
+    // The unrounded value is tested; NaN is stored as is.
     double const Relative = S->get_relative_health();
     Health = (float)Relative;
     if (Relative < 0.0) {
@@ -287,7 +238,7 @@ int IObjInspectImpl::get_status(float& Health) const
 
 int IObjInspectImpl::get_status(float& HitPts, float& MaxHitPts) const
 {
-    // Ghidra @ 0x5F3D0: CSimple::get_hit_pts / get_max_hit_pts
+    // FUN_062bf3d0
     CSimple* S = InspectSimple(Object);
     if (S == nullptr) {
         return -3;
@@ -299,7 +250,7 @@ int IObjInspectImpl::get_status(float& HitPts, float& MaxHitPts) const
 
 int IObjInspectImpl::get_shield_status(float& Health, bool& bActive) const
 {
-    // Ghidra @ 0x5F410: calls self vtable+0x44 (3-arg get_shield_status), then computes ratio
+    // FUN_062bf410. The 3-argument overload is vtable +0x44.
     float CurHealth = 0.0f;
     float MaxHealth = 0.0f;
     int Ret = get_shield_status(CurHealth, MaxHealth, bActive);
@@ -316,13 +267,9 @@ int IObjInspectImpl::get_shield_status(float& Health, bool& bActive) const
 
 int IObjInspectImpl::get_shield_status(float& CurHealth, float& MaxHealth, bool& bActive) const
 {
-    // Ghidra @ 0x5F480 / raw asm 0x062bf480-0x062bf52e (ground truth): iterate shields via
-    // CEquipTraverser(0x100), accumulating GetHitPoints() (vtbl+0x3c) into CurHealth and
-    // GetMaxHitPoints() (vtbl+0x38) into MaxHealth -- but bActive is a plain OVERWRITE each
-    // iteration with IsFunctioning() (vtbl+0xc, confirmed via the port's own CEquip vtable
-    // dump, Common.dll.txt 558303+), ending as the LAST traversed piece's functioning state.
-    // The prior port instead OR-accumulated "!IsDestroyed()" across all pieces -- a different
-    // predicate (destroyed vs. functioning) combined a different way (any vs. last).
+    // FUN_062bf480 (from the listing). Sums GetHitPoints (vtable +0x3c) and GetMaxHitPoints
+    // (+0x38) over the shields; bActive is overwritten per shield, so it ends as the last one's
+    // IsFunctioning (+0xc).
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq == nullptr) {
         return -3;
@@ -343,7 +290,7 @@ int IObjInspectImpl::get_shield_status(float& CurHealth, float& MaxHealth, bool&
 
 int IObjInspectImpl::get_data(void const*& OutData) const
 {
-    // Ghidra @ 0x5F540: always returns null/-3
+    // FUN_062bf540
     OutData = nullptr;
     return -3;
 }
@@ -355,7 +302,7 @@ int IObjInspectImpl::get_data(void const*& OutData) const
 float IObjInspectImpl::get_time_to_accelerate(float From, float To, float Dt,
                                                ThrustEquipType Type) const
 {
-    // Ghidra @ 0x5F560: tail-call CShip::get_time_to_accelerate if CShip
+    // FUN_062bf560. The CShip forwarders below return -1.0f (DAT_06399404) for a non-ship.
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_time_to_accelerate(From, To, Dt, Type);
@@ -366,8 +313,7 @@ float IObjInspectImpl::get_time_to_accelerate(float From, float To, float Dt,
 float IObjInspectImpl::get_distance_travelled(float Speed, float Dt, float Accel,
                                                ThrustEquipType Type) const
 {
-    // Ghidra @ 0x5F5A0: tail-call CShip::get_distance_travelled if CShip, else -1.0f
-    // (Common.dll.c 97383 -- BUG FIX: was 0.0f).
+    // FUN_062bf5a0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_distance_travelled(Speed, Dt, Accel, Type);
@@ -377,8 +323,7 @@ float IObjInspectImpl::get_distance_travelled(float Speed, float Dt, float Accel
 
 float IObjInspectImpl::get_initial_speed_to_coast_distance(float Speed, bool bStop) const
 {
-    // Ghidra @ 0x5F5E0: tail-call CShip::get_initial_speed_to_coast_distance if CShip, else
-    // -1.0f (Common.dll.c 97406 -- BUG FIX: was 0.0f).
+    // FUN_062bf5e0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_initial_speed_to_coast_distance(Speed, bStop);
@@ -388,8 +333,7 @@ float IObjInspectImpl::get_initial_speed_to_coast_distance(float Speed, bool bSt
 
 float IObjInspectImpl::get_speed(float Throttle, ThrustEquipType Type) const
 {
-    // Ghidra @ 0x5F650: tail-call CShip::get_speed if CShip, else -1.0f (Common.dll.c 97449 --
-    // BUG FIX: was 0.0f).
+    // FUN_062bf650
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_speed(Throttle, Type);
@@ -399,8 +343,7 @@ float IObjInspectImpl::get_speed(float Throttle, ThrustEquipType Type) const
 
 float IObjInspectImpl::get_projected_throttle(float Speed, ThrustEquipType Type) const
 {
-    // Ghidra @ 0x5F620: tail-call CShip::get_projected_throttle if CShip, else -1.0f
-    // (Common.dll.c 97427 -- BUG FIX: was 0.0f).
+    // FUN_062bf620
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_projected_throttle(Speed, Type);
@@ -410,8 +353,7 @@ float IObjInspectImpl::get_projected_throttle(float Speed, ThrustEquipType Type)
 
 float IObjInspectImpl::get_time_to_accelerate_angularly(float From, float To, float Dt) const
 {
-    // Ghidra @ 0x5F720: tail-call CShip::get_time_to_accelerate_angularly(3) if CShip, else
-    // DAT_06399404 = -1.0f (raw asm 0x062bf753 -- BUG FIX: was 0.0f).
+    // FUN_062bf720
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_time_to_accelerate_angularly(From, To, Dt);
@@ -422,8 +364,7 @@ float IObjInspectImpl::get_time_to_accelerate_angularly(float From, float To, fl
 float IObjInspectImpl::get_time_to_accelerate_angularly(float From, float To, float Dt,
                                                          float MaxSpeed) const
 {
-    // Ghidra @ 0x5F680: tail-call CShip::get_time_to_accelerate_angularly(4) if CShip, else
-    // DAT_06399404 = -1.0f (raw asm 0x062bf6bb -- BUG FIX: was 0.0f).
+    // FUN_062bf680
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_time_to_accelerate_angularly(From, To, Dt, MaxSpeed);
@@ -433,8 +374,7 @@ float IObjInspectImpl::get_time_to_accelerate_angularly(float From, float To, fl
 
 float IObjInspectImpl::get_angular_distance_travelled(float From, float To, float Dt) const
 {
-    // Ghidra @ 0x5F760: tail-call CShip::get_angular_distance_travelled(3) if CShip, else
-    // DAT_06399404 = -1.0f (raw asm 0x062bf793 -- BUG FIX: was 0.0f).
+    // FUN_062bf760
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_angular_distance_travelled(From, To, Dt);
@@ -445,8 +385,7 @@ float IObjInspectImpl::get_angular_distance_travelled(float From, float To, floa
 float IObjInspectImpl::get_angular_distance_travelled(float From, float To, float Dt,
                                                        float MaxSpeed) const
 {
-    // Ghidra @ 0x5F6D0: tail-call CShip::get_angular_distance_travelled(4) if CShip, else
-    // DAT_06399404 = -1.0f (raw asm 0x062bf70b -- BUG FIX: was 0.0f).
+    // FUN_062bf6d0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_angular_distance_travelled(From, To, Dt, MaxSpeed);
@@ -456,8 +395,7 @@ float IObjInspectImpl::get_angular_distance_travelled(float From, float To, floa
 
 float IObjInspectImpl::get_angular_speed_XY(float Speed, float MaxSpeed) const
 {
-    // Ghidra @ 0x5F800: tail-call CShip::get_angular_speed_XY if CShip, else -1.0f
-    // (Common.dll.c 97596 -- BUG FIX: was 0.0f).
+    // FUN_062bf800
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_angular_speed_XY(Speed, MaxSpeed);
@@ -467,8 +405,7 @@ float IObjInspectImpl::get_angular_speed_XY(float Speed, float MaxSpeed) const
 
 float IObjInspectImpl::get_projected_axis_throttle_XY(float Speed) const
 {
-    // Ghidra @ 0x5F7A0: tail-call CShip::get_projected_axis_throttle_XY if CShip, else -1.0f
-    // (Common.dll.c 97557 -- BUG FIX: was 0.0f).
+    // FUN_062bf7a0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_projected_axis_throttle_XY(Speed);
@@ -478,8 +415,7 @@ float IObjInspectImpl::get_projected_axis_throttle_XY(float Speed) const
 
 float IObjInspectImpl::get_projected_axis_throttle_Z(float Speed) const
 {
-    // Ghidra @ 0x5F7D0: tail-call CShip::get_projected_axis_throttle_Z if CShip, else -1.0f
-    // (Common.dll.c 97576 -- BUG FIX: was 0.0f).
+    // FUN_062bf7d0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_projected_axis_throttle_Z(Speed);
@@ -489,8 +425,7 @@ float IObjInspectImpl::get_projected_axis_throttle_Z(float Speed) const
 
 float IObjInspectImpl::get_angular_speed_Z(float Speed) const
 {
-    // Ghidra @ 0x5F840: tail-call CShip::get_angular_speed_Z if CShip, else -1.0f
-    // (Common.dll.c 97615 -- BUG FIX: was 0.0f).
+    // FUN_062bf840
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_angular_speed_Z(Speed);
@@ -500,7 +435,7 @@ float IObjInspectImpl::get_angular_speed_Z(float Speed) const
 
 float IObjInspectImpl::get_max_bank_angle() const
 {
-    // Ghidra @ 0x5F870: tail-call CShip::get_max_bank_angle if CShip
+    // FUN_062bf870
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_max_bank_angle();
@@ -510,9 +445,7 @@ float IObjInspectImpl::get_max_bank_angle() const
 
 int IObjInspectImpl::get_throttle(float& OutThrottle) const
 {
-    // Ghidra @ 0x5F8A0: if CShip, read *(float*)(delegate + 0x29c) -- CShip::Throttle
-    // (common_cobject.h:1572, static_assert'd at +0x29c). Read via the named field instead of
-    // a raw offset cast now that it exists.
+    // FUN_062bf8a0 (CShip +0x29c). The accessors below leave the output untouched on -3.
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutThrottle = Sh->Throttle;
@@ -523,8 +456,7 @@ int IObjInspectImpl::get_throttle(float& OutThrottle) const
 
 int IObjInspectImpl::get_axis_throttle(Vector& OutThrottle) const
 {
-    // .text:062bf8d0-062bf90b, RET 0x4: a CShip copies the three floats at +0x24c
-    // (CShip::get_axis_throttle) into OutThrottle, 0; otherwise -3 with OutThrottle untouched.
+    // FUN_062bf8d0 (+0x24c)
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutThrottle = Sh->get_axis_throttle();
@@ -535,8 +467,7 @@ int IObjInspectImpl::get_axis_throttle(Vector& OutThrottle) const
 
 int IObjInspectImpl::get_nudge_vec(Vector& OutVec) const
 {
-    // .text:062bf910-062bf957, RET 0x4: a CShip copies CShip::get_nudge_vec() (+0x274) into
-    // OutVec, 0; otherwise -3 with OutVec untouched.
+    // FUN_062bf910 (+0x274)
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutVec = Sh->get_nudge_vec();
@@ -547,8 +478,7 @@ int IObjInspectImpl::get_nudge_vec(Vector& OutVec) const
 
 int IObjInspectImpl::get_strafe_dir(StrafeDir& OutDir) const
 {
-    // .text:062bf960-062bf98e, RET 0x4: a CShip writes CShip::get_strafe_dir() (+0x298) into
-    // OutDir, 0; otherwise -3 with OutDir untouched.
+    // FUN_062bf960 (+0x298)
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutDir = static_cast<StrafeDir>(Sh->get_strafe_dir());
@@ -563,7 +493,7 @@ int IObjInspectImpl::get_strafe_dir(StrafeDir& OutDir) const
 
 int IObjInspectImpl::are_thrusters_active(bool& OutActive) const
 {
-    // Ghidra @ 0x5FA80: CShip::any_thrusters_on
+    // FUN_062bfa80
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutActive = Sh->any_thrusters_on();
@@ -574,7 +504,7 @@ int IObjInspectImpl::are_thrusters_active(bool& OutActive) const
 
 int IObjInspectImpl::is_cruise_active(bool& OutActive) const
 {
-    // Ghidra @ 0x5F9A0: CShip::is_cruise_active
+    // FUN_062bf9a0
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutActive = Sh->is_cruise_active();
@@ -585,18 +515,10 @@ int IObjInspectImpl::is_cruise_active(bool& OutActive) const
 
 int IObjInspectImpl::is_cruise_active(bool& OutCruise, bool& OutTradLane) const
 {
-    // BUG FIX: Ghidra @ 0x5F9E0 / raw asm 0x062bf9e0-0x062bfa78 (ground truth -- the decompiled
-    // .c scales a CEEngine* by sizeof(CEEngine) here, unreliable) is NOT CShip::is_cruise_active()
-    // + is_using_tradelane() as previously assumed. Retail finds the ship's first EquipTypeEngine
-    // equipment, casts to CEEngine, and: OutCruise = Engine->bCruiseActive; if false, OutTradLane
-    // = false; else OutTradLane = (Engine's CruiseChargeTime > CruiseChargeTimeElapsed), i.e.
-    // true while the cruise engine is still spooling up, false once fully charged. Retail reaches
-    // that field via CEArmor::ArmorArch() on the CEEngine (a same-offset archetype-pointer
-    // reinterpret trick, since CEEngine and CEArmor are sibling CInternalEquip subclasses sharing
-    // the Arch field) -- this port's own CEEngine::GetCruiseChargeTime() already reads the
-    // identical Archetype::Engine+0x80 field directly, so that's used here instead of
-    // replicating the cross-cast. Despite the interface parameter's SDK name "OutTradLane",
-    // retail's actual computation is charge-in-progress, not tradelane use.
+    // FUN_062bf9e0 (from the listing). Despite the SDK name, OutTradLane is "cruise still
+    // charging": CruiseChargeTime > elapsed on the first engine. Retail reads the charge time
+    // through CEArmor::ArmorArch on the CEEngine (same Arch field, Archetype::Engine+0x80); the
+    // port calls CEEngine::GetCruiseChargeTime.
     CShip* Sh = InspectShip(Object);
     if (Sh == nullptr) {
         return -3;
@@ -617,10 +539,7 @@ int IObjInspectImpl::is_cruise_active(bool& OutCruise, bool& OutTradLane) const
 
 int IObjInspectImpl::get_target(IObjRW*& OutTarget) const
 {
-    // .text:062bfc00-062bfc4b, RET 0x4. Object (+0x10) is read with no null test and its
-    // class compared EXACTLY (CMP, no mask): 0xa7 (CGuided) -> the watched target (+0xf0)
-    // minus 8, or 0, and 0; 0x503 (CShip) -> CShip::get_target(), 0; any other class -> -3,
-    // OutTarget untouched.
+    // FUN_062bfc00. No null test on Object; the class is compared exactly, not masked.
     if (Object->ObjectClass == CObject::ClassGuided) {
         CGuided const* G = (CGuided const*)Object;
         OutTarget = G->get_target();
@@ -636,9 +555,7 @@ int IObjInspectImpl::get_target(IObjRW*& OutTarget) const
 
 int IObjInspectImpl::get_rank(uint& OutRank) const
 {
-    // .text:062bfc50-062bfcaa, RET 0x4: not a CEqObj -> -3. Vibe::GetRank gets a stack copy
-    // of VibeId (+0x104) and a stack out-word; only when it returns 0 is the word copied into
-    // OutRank (062bfc90-062bfc98), else -2 with OutRank untouched.
+    // FUN_062bfc50. OutRank is written only on success.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         int VibeId = static_cast<int>(Eq->VibeId);
@@ -654,9 +571,7 @@ int IObjInspectImpl::get_rank(uint& OutRank) const
 
 int IObjInspectImpl::get_affiliation(uint& OutAffil) const
 {
-    // .text:062bfcb0-062bfd0c, RET 0x4: same shape as get_rank -- Vibe::GetAffiliation(copy of
-    // VibeId, stack out-word, false); the word reaches OutAffil only on 0 (062bfcf2-062bfcfa),
-    // else -2 with OutAffil untouched; not a CEqObj -> -3.
+    // FUN_062bfcb0, as get_rank.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         int VibeId = static_cast<int>(Eq->VibeId);
@@ -672,8 +587,7 @@ int IObjInspectImpl::get_affiliation(uint& OutAffil) const
 
 int IObjInspectImpl::get_type(uint& OutType) const
 {
-    // Ghidra @ 0x5FD10 (Common.dll.c 97982-97995): CSimple::TypeBits at +0xe0. Retail zeroes
-    // *param_1 unconditionally up front, even on the -3 failure path.
+    // FUN_062bfd10. OutType is zeroed even on the -3 path.
     OutType = 0;
     CSimple* S = InspectSimple(Object);
     if (S != nullptr) {
@@ -685,8 +599,7 @@ int IObjInspectImpl::get_type(uint& OutType) const
 
 int IObjInspectImpl::get_base(uint& OutBase) const
 {
-    // .text:062bfd50-062bfd7b, RET 0x4: Object null or (class & 0x303) != 0x303 -> -3 with
-    // OutBase untouched; else dword +0x160 (CEqObj::DockingBaseId) into OutBase, 0.
+    // FUN_062bfd50. Solars only (+0x160).
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassSolar) == CObject::ClassSolar) {
         OutBase = static_cast<CEqObj const*>(Object)->DockingBaseId;
         return 0;
@@ -696,11 +609,7 @@ int IObjInspectImpl::get_base(uint& OutBase) const
 
 int IObjInspectImpl::get_dock_target(uint& OutDock) const
 {
-    // BUG FIX: Ghidra @ 0x5FD80 (Common.dll.c 98021-98035) gates on the SAME CSolar-only 0x303
-    // bitmask as get_base() above (not the generic CEqObj 0x103 mask the port used), and reads
-    // DockingPointBaseId at +0x164 (the field right after get_base's DockingBaseId at +0x160,
-    // common_cobject.h:1248) -- i.e. this only succeeds for a CSolar-family object, not any
-    // CEqObj.
+    // FUN_062bfd80. Solars only, as get_base (+0x164).
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassSolar) == CObject::ClassSolar) {
         CEqObj* Eq = static_cast<CEqObj*>(const_cast<CObject*>(Object));
         OutDock = Eq->DockingPointBaseId;
@@ -711,13 +620,13 @@ int IObjInspectImpl::get_dock_target(uint& OutDock) const
 
 int IObjInspectImpl::get_zone_props(unsigned long& OutProps) const
 {
-    // Common.dll.c 0x5fdb0
+    // FUN_062bfdb0
     CSimple* S = InspectSimple(Object);
     if (S != nullptr)
     {
         if (S->ZoneAtA4 != nullptr)
         {
-            // Zone slot +0x1c (Common 062a6690, ZONE::GetProperties).
+            // Zone slot +0x1c (062a6690).
             OutProps = S->ZoneAtA4->GetProperties();
             return 0;
         }
@@ -729,8 +638,7 @@ int IObjInspectImpl::get_zone_props(unsigned long& OutProps) const
 
 float IObjInspectImpl::get_scanner_interference() const
 {
-    // .text:062bfe00..062bfe1c: narrow the delegate, then tail-call its actual
-    // zone-adjusted accessor. The raw +0xa8 field is only the zone falloff.
+    // FUN_062bfe00. The zone-adjusted accessor, not the raw +0xa8 falloff.
     CSimple const* const Simple = InspectSimple(Object);
     if (Simple != nullptr)
         return Simple->get_scanner_interference();
@@ -739,7 +647,7 @@ float IObjInspectImpl::get_scanner_interference() const
 
 int IObjInspectImpl::get_power(float& OutPower) const
 {
-    // Ghidra @ 0x5FE20: CEqObj Power at +0x198
+    // FUN_062bfe20 (+0x198)
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         OutPower = Eq->Power;
@@ -750,14 +658,11 @@ int IObjInspectImpl::get_power(float& OutPower) const
 
 int IObjInspectImpl::get_reputation(float& OutRep, uint const& GroupId) const
 {
-    // Ghidra @ 0x5FBC0: Reputation::Vibe::GetGroupFeelingsTowards(this+0x104, group, out)
-    // Returns 0 on success, -4 on any Vibe error (NEG/SBB/AND pattern).
+    // FUN_062bfbc0. Any Vibe error becomes -4.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         int VibeId = static_cast<int>(Eq->VibeId);
         int Result = Reputation::Vibe::GetGroupFeelingsTowards(VibeId, GroupId, OutRep);
-        // Retail: NEG EAX; SBB EAX,EAX; AND EAX,0xfffffffc
-        // Maps 0→0, any nonzero→-4
         if (Result != 0)
             return -4;
         return 0;
@@ -767,11 +672,10 @@ int IObjInspectImpl::get_reputation(float& OutRep, uint const& GroupId) const
 
 int IObjInspectImpl::get_attitude_towards(float& OutAtt, IObjInspect const* Other) const
 {
-    // Ghidra @ 0x5FAC0: get CEqObj from both, call CEqObj::attitude_towards
+    // FUN_062bfac0
     if (Other == nullptr) {
         return -4;
     }
-    // Get CEqObj from Other via cobject()
     CObject const* OtherObj = Other->cobject();
     if (OtherObj == nullptr || (OtherObj->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj) {
         return -3;
@@ -788,7 +692,7 @@ int IObjInspectImpl::get_attitude_towards(float& OutAtt, IObjInspect const* Othe
 int IObjInspectImpl::get_attitude_towards_symmetrical(float& OutAtt, IObjInspect const* Other,
                                                        float& OutReverse) const
 {
-    // Ghidra @ 0x5FB40: bidirectional attitude via CEqObj::attitude_towards_symmetrical
+    // FUN_062bfb40
     if (Other == nullptr) {
         return -4;
     }
@@ -807,7 +711,7 @@ int IObjInspectImpl::get_attitude_towards_symmetrical(float& OutAtt, IObjInspect
 
 bool IObjInspectImpl::is_player() const
 {
-    // Ghidra @ 0x5FE60: CShip+0x2bd
+    // FUN_062bfe60 (+0x2bd)
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->bIsPlayer != 0;
@@ -817,15 +721,14 @@ bool IObjInspectImpl::is_player() const
 
 int IObjInspectImpl::get_hardpoint(char const* Name, Vector* Pos, Matrix* Orient) const
 {
-    // .text:062bfe90-062bfec1, RET 0xc: HardpointPosition(Object->EngineInstanceId (+0x04, no
-    // null test on Object), Name, Pos, Orient); true -> 0, false -> -2.
+    // FUN_062bfe90. No null test on Object.
     bool bSuccess = HardpointPosition(Object->EngineInstanceId, Name, Pos, Orient);
     return bSuccess ? 0 : -2;
 }
 
 int IObjInspectImpl::find_equipment(CEquip const*& OutEquip, unsigned short const& EquipId) const
 {
-    // Common.dll.c 0x5fed0
+    // FUN_062bfed0. OutEquip is written even for a destroyed equip.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr)
     {
@@ -843,10 +746,8 @@ int IObjInspectImpl::find_equipment(CEquip const*& OutEquip, unsigned short cons
 int IObjInspectImpl::find_equipment(unsigned short* const Buf, uint MaxCount,
                                     uint TypeMask) const
 {
-    // 062bff30. Returns 0, not the buffer: the tail is SBB EAX,EAX / AND EAX,ESI reached only
-    // when MaxCount <= Index, where the borrow is always clear, so the result is always zero.
-    // The buffer is never null-checked in retail either -- the parameter is ushort* const, and
-    // the caller is expected to pass a real array.
+    // FUN_062bff30. Always 0 for a CEqObj (retail's SBB/AND tail cannot produce anything
+    // else). No null test on Buf.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq == nullptr)
         return -3;
@@ -866,7 +767,7 @@ int IObjInspectImpl::find_equipment(unsigned short* const Buf, uint MaxCount,
     }
     if (Index < MaxCount)
     {
-        // 062bffac reads the SUBOBJ_ID_NONE word out of .rdata as the terminator.
+        // Retail reads the terminator from the .rdata SUBOBJ_ID_NONE word.
         Buf[Index] = 0;
     }
     return 0;
@@ -875,18 +776,15 @@ int IObjInspectImpl::find_equipment(unsigned short* const Buf, uint MaxCount,
 int IObjInspectImpl::get_equipment_status(EquipStatus& OutStatus,
                                            unsigned short const& Id) const
 {
-    // Common.dll.c 0x5ffe0
+    // FUN_062bffe0
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr)
     {
         CEquip* Found = Eq->EquipManager.FindByID(Id);
         if (Found != nullptr && !Found->IsDestroyed())
         {
-            // Common.dll.c 0x5ffe0 (FIXED). Retail calls CEquip's own virtual GetStatus()
-            // (0629ae80) directly, modifying only 3 specific bits of OutStatus.Flags in place
-            // (it does not zero the struct first -- see CEquip::GetStatus in common_cequip.cpp,
-            // which is now a real, correctly-ordered virtual override). The stale comment this
-            // replaced predates that fix and claimed the vtable slot didn't exist yet.
+            // The virtual GetStatus (0629ae80) sets three flag bits in place; OutStatus is not
+            // zeroed first.
             Found->GetStatus(OutStatus);
             return 0;
         }
@@ -898,13 +796,11 @@ int IObjInspectImpl::get_equipment_status(EquipStatus& OutStatus,
 int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short const& Id,
                                         EquipmentValType Type, float Param) const
 {
-    // .text:062c0460-062c0837, RET 0x10. Re-ported 2026-10-08 (cmn-ai8) from the listing.
-    // Retail writes ONE dword (or one byte, types 9 / 0xa of a gun) at &OutVal; nothing else.
+    // FUN_062c0460 (from the listing). Writes one dword (one byte for gun types 9 / 0xa) at
+    // &OutVal, nothing else.
     unsigned char* const Out = reinterpret_cast<unsigned char*>(&OutVal);
     int const Kind = static_cast<int>(Type);
 
-    // 062c0460-062c04b8: Object (+0x10) must be a CEqObj, else -3; FindByID(Id) null or
-    // vtable slot 2 (IsDestroyed) true -> -2.
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         return -3;
     CEquip* const Found = static_cast<CEqObj*>(Object)->EquipManager.FindByID(Id);
@@ -915,7 +811,7 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
     int IntVal;
     switch (Found->Type)
     {
-    case EquipTypePower:                                                       // 0x40000, 062c0755
+    case EquipTypePower:                                                       // 0x40000
     {
         // Type 0 -> ChargeRate (+0x74), type 4 -> Capacity (+0x70); 0.0f once destroyed.
         Archetype::Power const* const Arch = static_cast<Archetype::Power const*>(Found->Arch);
@@ -928,12 +824,11 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
     }
-    case 0x20000:                                                              // CEEngine, 062c04fc
+    case 0x20000:                                                              // CEEngine
     {
         if (Kind != 0)
             return -3;
-        // 062c0508-062c0568: Param clamped to [-1, 1] (NaN passes through); unless the clamp
-        // left it bit-for-bit equal (TEST AH,0x44 + JNP), -4.
+        // An out-of-range Param gives -4; NaN passes the clamp but fails the equality, so -4.
         float Throttle;
         if (1.0f < Param)
             Throttle = 1.0f;
@@ -947,28 +842,27 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
     }
-    case 0x400:                                                                // CEThruster, 062c0585
+    case 0x400:                                                                // CEThruster
         if (Kind != 0)
             return -3;
         FloatVal = static_cast<CEThruster*>(Found)->GetPowerDraw();
         std::memcpy(Out, &FloatVal, sizeof(FloatVal));
         return 0;
-    case 0x80:                                                                 // CEGun, 062c05a7
+    case 0x80:                                                                 // CEGun
     {
         CEGun* const Gun = static_cast<CEGun*>(Found);
-        // FUN_062969c0 (`MOV EAX,[ECX+0x4c]`) is the loaded projectile (munition) archetype;
-        // FUN_0629fb90 (`MOV EAX,[ECX+0xc]`) the gun's own archetype.
+        // FUN_062969c0 (+0x4c) is the munition archetype, FUN_0629fb90 (+0x0c) the gun's.
         Archetype::Munition const* const Ammo = static_cast<Archetype::Munition const*>(Gun->ProjectileArch());
         Archetype::Gun const* const GunArch = static_cast<Archetype::Gun const*>(Found->Arch);
         switch (Kind)
         {
         case 0:                                                                // vtable +0x9c
-            FloatVal = (float)Gun->GetPowerDrawPerFire();   // 062c0606 FSTP float [Out]
+            FloatVal = (float)Gun->GetPowerDrawPerFire();
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
             return 0;
         case 1:
         {
-            // FILD qword {ProjectilesPerFire, 0} * HullDamage (+0x80), FSTP float.
+            // Unsigned widening; HullDamage +0x80.
             unsigned const PerFire = Gun->GetProjectilesPerFire();
             FloatVal = static_cast<float>(static_cast<double>(PerFire) * Ammo->HullDamage);
             std::memcpy(Out, &FloatVal, sizeof(FloatVal));
@@ -1006,7 +900,7 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
             return 0;
         case 0xb:
         {
-            // 062c05bb-062c05f5: CEGun::GetTarget; the target's Id (+0xb0), or 0.
+            // The gun target's Id, or 0.
             CSimple* Target = nullptr;
             unsigned short SubId = 0;
             Gun->GetTarget(Target, SubId);
@@ -1018,7 +912,7 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
             return -3;
         }
     }
-    case 0x80000:                                                              // CEScanner, 062c07fd
+    case 0x80000:                                                              // CEScanner
         if (Kind == 5)
         {
             FloatVal = static_cast<CEScanner*>(Found)->GetRadarRange();
@@ -1031,7 +925,7 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
             return 0;
         }
         return -3;
-    case 0x100000:                                                             // CETractor, 062c07e0
+    case 0x100000:                                                             // CETractor
         if (Kind != 5)
             return -3;
         FloatVal = static_cast<CETractor*>(Found)->GetRange();
@@ -1045,7 +939,7 @@ int IObjInspectImpl::get_equipment_val(EquipmentVal& OutVal, unsigned short cons
 int IObjInspectImpl::can_point_at(bool& OutCanPoint, unsigned short const& EquipId,
                                     Vector const& Point, float Angle) const
 {
-    // Common.dll.c 0x60170
+    // FUN_062c0170
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr)
     {
@@ -1064,7 +958,7 @@ int IObjInspectImpl::can_point_at(bool& OutCanPoint, unsigned short const& Equip
 int IObjInspectImpl::is_pointing_at(bool& OutIsPointing, unsigned short const& EquipId,
                                      float Angle) const
 {
-    // Common.dll.c 0x600e0
+    // FUN_062c00e0
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr)
     {
@@ -1082,7 +976,7 @@ int IObjInspectImpl::is_pointing_at(bool& OutIsPointing, unsigned short const& E
 
 int IObjInspectImpl::get_tgt_lead_fire_pos(unsigned short const& EquipId, Vector& OutPos) const
 {
-    // Common.dll.c 0x60050
+    // FUN_062c0050
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr)
     {
@@ -1100,9 +994,7 @@ int IObjInspectImpl::get_tgt_lead_fire_pos(unsigned short const& EquipId, Vector
 
 int IObjInspectImpl::get_subtarget(unsigned short& OutSub) const
 {
-    // .text:062c0200-062c023c, RET 0x4. Object (+0x10) is read with no null test and its
-    // class compared EXACTLY (CMP, no mask): 0xa7 (CGuided) -> word +0xf8; 0x503 (CShip) ->
-    // CShip::get_sub_target(); any other class -> -3, OutSub untouched.
+    // FUN_062c0200. As get_target: no null test, exact class compare.
     if (Object->ObjectClass == CObject::ClassGuided)
     {
         CGuided const* G = (CGuided const*)Object;
@@ -1120,51 +1012,36 @@ int IObjInspectImpl::get_subtarget(unsigned short& OutSub) const
 
 int IObjInspectImpl::get_subtarget_center_of_mass(Vector& OutCenter) const
 {
-    // .text:062c0240-062c02a9, RET 0x4.
-    // 062c0242-062c025c: Object (+0x10) null, or (ObjectClass & 0x503) != 0x503 -> -3.
+    // FUN_062c0240
     CShip const* Ship = InspectShip(Object);
     if (Ship == nullptr)
         return -3;
 
-    // 062c025e-062c026a: this->get_subtarget (own vtable +0x78) into a stack word; nonzero ->
-    // -3. 062c026c-062c027b: SUBOBJ_ID_NONE -> -1.
     unsigned short SubId = 0;
-    if (get_subtarget(SubId) != 0)
+    if (get_subtarget(SubId) != 0)   // own vtable +0x78
         return -3;
     if (SubId == SUBOBJ_ID_NONE)
         return -1;
 
-    // 062c027d-062c028b: CShip::get_target(); none -> -5.
     IObjRW* TargetRW = Ship->get_target();
     if (TargetRW == nullptr)
         return -5;
 
-    // 062c028d-062c029b: the TARGET's own IObjInspect::get_sub_obj_center_of_mass (vtable
-    // +0x18) with (SubId, OutCenter); its status is returned as-is.
+    // The target's own get_sub_obj_center_of_mass (vtable +0x18).
     return TargetRW->get_sub_obj_center_of_mass(SubId, OutCenter);
 }
 
 Vector IObjInspectImpl::get_center_of_mass() const
 {
-    // 062c0360 -- straight tail call into CObject vtable +0x68, which the CObject vtable at
-    // .rdata 0639b66c resolves to CObject::get_center_of_mass. No null check in retail.
+    // FUN_062c0360, a tail call to vtable +0x68 (CObject vtable 0639b66c). No null check.
     return Object->get_center_of_mass();
 }
 
 int IObjInspectImpl::get_sub_obj_center_of_mass(unsigned short SubId, Vector& OutCenter) const
 {
-    // Common.dll.c 0x60380 (FIXED). Retail checks (Object->ObjectClass & 0x103) == 0x103
-    // (CEqObj-derived) and forwards SubId to Object's own vtable+0xe0 virtual --
-    // CObject::get_sub_obj_center_of_mass(SubId, Out), mapping its bool result to 0/-2 -- it
-    // never ignores SubId and returns the object's flat WorldPosition unconditionally like the
-    // previous port did. (CEqObj::get_sub_obj_center_of_mass itself is a separately documented,
-    // already-flagged stub that always returns false -- see common_ceqobj.cpp -- so this now
-    // faithfully reproduces retail's dispatch structure even though the underlying query is a
-    // known gap.)
+    // FUN_062c0380. Forwards to the CEqObj virtual (vtable +0xe0).
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
-        // get_sub_obj_center_of_mass is a CEqObj virtual, not declared on CObject itself
-        // (common_cobject.h) -- the ObjectClass check above guarantees this cast is safe.
         return static_cast<CEqObj*>(Object)->get_sub_obj_center_of_mass(SubId, OutCenter)
                ? 0 : -2;
     }
@@ -1173,8 +1050,7 @@ int IObjInspectImpl::get_sub_obj_center_of_mass(unsigned short SubId, Vector& Ou
 
 bool IObjInspectImpl::is_targetable() const
 {
-    // .text:062c03c0: Object null or (ObjectClass & 3) != 3 -> false; otherwise
-    // `JMP [EAX+0x8c]`, the virtual CSimple::is_targetable (CEqObj overrides it).
+    // FUN_062c03c0. The virtual is_targetable (vtable +0x8c; CEqObj overrides it).
     CSimple* S = InspectSimple(Object);
     if (S == nullptr)
         return false;
@@ -1183,11 +1059,8 @@ bool IObjInspectImpl::is_targetable() const
 
 int IObjInspectImpl::get_scanlist(ScanList const*& OutList, uint Type, bool bFlag) const
 {
-    // .text:062c03e0-062c044f, RET 0xc. 062c03e7: OutList = 0 first. 062c03ed-062c0417: the
-    // CEqObj narrowing (0 for a null / non-CEqObj Object) and FindFirst(0x80000) on its
-    // EquipManager (+0xe4) with no null test -- there is no -3 path. No scanner -> -2.
-    // Otherwise bFlag false -> clear_cache; scan_for_types(Type); OutList = scanner + 0x24
-    // (CEScanner::Scans); 0.
+    // FUN_062c03e0. No null test on the CEqObj narrowing, so there is no -3 path. Scans is
+    // scanner +0x24.
     OutList = nullptr;
     CEqObj* Eq = InspectEqObj(Object);
     CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(0x80000));
@@ -1207,12 +1080,11 @@ int IObjInspectImpl::get_scanlist(ScanList const*& OutList, uint Type, bool bFla
 
 int IObjInspectImpl::get_hold_left(float& OutHold) const
 {
-    // .text:062c0330-062c035b, RET 0x4: Object null or (class & 0x503) != 0x503 -> -3 with
-    // OutHold untouched; else FSTP float CShip::get_cargo_hold_remaining() into OutHold, 0.
+    // FUN_062c0330
     CShip* Ship = InspectShip(Object);
     if (Ship != nullptr)
     {
-        OutHold = (float)Ship->get_cargo_hold_remaining();          // 062c034f FSTP float
+        OutHold = (float)Ship->get_cargo_hold_remaining();
         return 0;
     }
     return -3;
@@ -1220,7 +1092,7 @@ int IObjInspectImpl::get_hold_left(float& OutHold) const
 
 CObject const* IObjInspectImpl::cobject() const
 {
-    // ICF-folded @ 0x3A70: return *(CObject**)(this + 0x10)
+    // FUN_06263a70 (ICF fold), +0x10
     return Object;
 }
 
@@ -1230,19 +1102,14 @@ CObject const* IObjInspectImpl::cobject() const
 
 bool IObjInspectImpl::has_dock_hardpoints() const
 {
-    // .text:062c0870-062c08be. 062c0870-062c0886: Object (+0x10) null, or
-    // (ObjectClass & 0x103) != 0x103 -> false.
+    // FUN_062c0870. No null test on the archetype. Dock types 1 (berth), 6 (ring/pad) and
+    // 7 (jump) count.
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         return false;
 
-    // 062c0888-062c089c: Archetype (CObject+0x88, loaded with no null test), then the
-    // archetype's DockingSpheres first/last (Archetype::EqObj +0x88 / +0x8c loaded as values);
-    // first == last -> false.
     std::vector<Archetype::EqObj::DockingSphere> const& Spheres =
         static_cast<Archetype::EqObj const*>(Object->Archetype)->DockingSpheres;
 
-    // 062c08a0-062c08b7: walk the 0x10-byte records; Type (+0x0c) == 1 (berth), 6 (ring/pad)
-    // or 7 (jump) -> true (062c08bc); end of the list -> false (062c08b9).
     for (std::vector<Archetype::EqObj::DockingSphere>::const_iterator It = Spheres.begin();
          It != Spheres.end(); ++It)
     {
@@ -1257,27 +1124,22 @@ int IObjInspectImpl::get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transfo
                                           Transform* XformB, Transform* XformC,
                                           float* Distance) const
 {
-    // .text:062c08c0-062c0a9a, RET 0x18. Re-ported 2026-10-08 (cmn-ai8).
-    // 062c08c6-062c08eb: Object (+0x10) must be a CEqObj ((class & 0x103) == 0x103), else -5.
+    // FUN_062c08c0
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         return -5;
 
-    // 062c08ee-062c0921: the archetype's docking spheres (+0x88 begin / +0x8c end, 0x10-byte
-    // records): Index -1, no buffer, or Index >= count (unsigned) -> -4.
     std::vector<Archetype::EqObj::DockingSphere> const& Spheres =
         static_cast<Archetype::EqObj const*>(Object->Archetype)->DockingSpheres;
     if (Index == -1 || Spheres.data() == nullptr || static_cast<unsigned>(Index) >= Spheres.size())
         return -4;
     Archetype::EqObj::DockingSphere const& Sphere = Spheres[static_cast<unsigned>(Index)];
 
-    // 062c0931-062c0948: the optional type (+0x0c) and radius (+0x00) outputs.
     if (Type != nullptr)
         *Type = static_cast<TERMINAL_TYPE>(Sphere.Type);
     if (Distance != nullptr)
         *Distance = Sphere.Radius;
 
-    // 062c094a-062c0995: XformA from the mount hardpoint (get_hardpoint +0xc0 with
-    // &XformA->Translation and XformA as the Matrix); failure -> FDUMP warning, -5.
+    // XformA from the mount hardpoint (get_hardpoint, vtable +0xc0). No null test on XformA.
     char const* const MountName = Sphere.HardpointName.c_str();
     if (get_hardpoint(MountName, &XformA->Translation, &XformA->Rotation) != 0)
     {
@@ -1286,8 +1148,6 @@ int IObjInspectImpl::get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transfo
         return -5;
     }
 
-    // 062c0998-062c09dd: the name must contain "hpdockmount", else the same warning (line
-    // 0x4fc) and -5.
     if (std::strstr(MountName, "hpdockmount") == nullptr)
     {
         FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\Common\\IObjImpl.cpp", 0x4fc,
@@ -1295,9 +1155,8 @@ int IObjInspectImpl::get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transfo
         return -5;
     }
 
-    // 062c09e0-062c0a8e: the mount's last character picks "hpdockpoint<c>01" for XformB and
-    // "hpdockpoint<c>02" for XformC; a missing point copies XformA (12 dwords) and makes the
-    // result -2 (it starts at 0 in the reused Index slot).
+    // The mount's last character picks "hpdockpoint<c>01" / "<c>02"; a missing point copies
+    // XformA and makes the result -2.
     char const Suffix = MountName[std::strlen(MountName) - 1];
     char PointName[0x40];
     int Result = 0;
@@ -1318,17 +1177,8 @@ int IObjInspectImpl::get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transfo
 
 int IObjInspectImpl::enumerate_subtargets(SubtargetEnumerator* Enum) const
 {
-    // Common.dll.c 0x60aa0 (FIXED). Retail runs TWO independent loops, not one: first the
-    // equipment traversal (mask 0x1fe0) calling Enum->enumerate_equip(), THEN -- unconditionally,
-    // even if the equip loop's callback returned false and broke out early -- a SEPARATE
-    // CArchGroupManager traversal calling Enum->enumerate_subpart(Group->GetID(),
-    // Group->GetCollisionGroupType()) for every physical sub-object/collision group, stopping
-    // only if that second callback itself returns false. The previous port only ran the first
-    // loop, so callers never learned about a ship's physical subtargets (turrets, engines,
-    // etc.), only its equipment.
-    // .text:062c0aa0-062c0b66, RET 0x4: Object null / not CEqObj -> -3; Enum is not tested.
-    // Equip callback slot +0x00 (Id word +0x08, Type +0x14); subpart callback slot +0x04
-    // (inlined GetID = [[Group+4]+4] word, GetCollisionGroupType); 0.
+    // FUN_062c0aa0. Two independent walks: equipment (mask 0x1fe0, callback slot +0x00), then
+    // collision groups (slot +0x04) even if the first stopped early. Enum is not tested.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq == nullptr)
         return -3;
@@ -1356,10 +1206,8 @@ int IObjInspectImpl::enumerate_subtargets(SubtargetEnumerator* Enum) const
 
 int IObjInspectImpl::enumerate_cargo(CargoEnumerator* Enum) const
 {
-    // .text:062c0b70-062c0bf8. Object (+0x10) must be a CEqObj ((ObjectClass & 0x103) ==
-    // 0x103), otherwise -3. Enum is not tested. The 0x10000 traverser yields cargo only, and
-    // retail reads CEquip+0x28 (CECargo::Count) without a cast check; the id is passed by
-    // reference to a stack copy of CEquip+0x08, the archetype as the raw +0x0C pointer.
+    // FUN_062c0b70. Enum is not tested; the 0x10000 traverser yields cargo only, so Count
+    // (+0x28) is read without a cast check. The id is passed by reference to a copy.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq == nullptr)
         return -3;
@@ -1378,38 +1226,27 @@ int IObjInspectImpl::enumerate_cargo(CargoEnumerator* Enum) const
 
 int IObjInspectImpl::scan_cargo(IObjRW* Target, EquipDescVector& OutCargo) const
 {
-    // .text:062c0c00-062c0e2a, RET 0x8. The IObjRW parameter is the scanned TARGET; the
-    // payload is the copy of this ship's scanner results (CEScanner+0x82c vector) into
-    // OutCargo once ScanCargo reports ScanComplete.
-    // 062c0c00-062c0c21: Object (+0x10) null or not a CEqObj -> -3.
+    // FUN_062c0c00. Target is the scanned object; once ScanCargo completes, OutCargo receives
+    // a copy of this ship's scanner results (CEScanner +0x82c). No null test on Target.
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq == nullptr)
         return -3;
 
-    // 062c0c27-062c0c3d: own scanner = EquipManager.FindFirst(0x80000).
     CEquip* Equip = const_cast<CEquip*>(Eq->EquipManager.FindFirst(0x80000));
     CEScanner* Sc = reinterpret_cast<CEScanner*>(Equip);
 
-    // 062c0c37-062c0c5a: the target's CObject through its own cobject() (vtable +0x150; no
-    // null test on the IObjRW itself), kept only when (ObjectClass & 0x103) == 0x103.
     CObject const* TargetObj = Target->cobject();
     CEqObj* TargetEq = InspectEqObj(TargetObj);
 
-    // 062c0c5c-062c0c66: no scanner or no CEqObj target -> -3.
     if (Sc == nullptr || TargetEq == nullptr)
         return -3;
 
-    // 062c0c6c-062c0c77: ScanCargo(target) != 2 (ScanComplete) -> -3.
     CEScanner::ScanResult Res = Sc->ScanCargo(TargetEq);
     if (Res != CEScanner::ScanComplete)
         return -3;
 
-    // 062c0c7d-062c0e23: OutCargo = scanner vector (retail skips the copy when &OutCargo is
-    // the scanner's own vector, which a separate EquipDescVector cannot be here), then 0.
-    // Shallow, non-owning view of the scanner's own buffer; operator= performs the real deep
-    // copy into OutCargo, matching retail's inlined vector assignment (.text:062c0c83..).
-    // The view must drop the scanner's pointers before it goes out of scope, because
-    // ~EquipDescVector (0x06269110) frees Begin.
+    // A non-owning view of the scanner's buffer, so operator= does retail's inlined deep copy.
+    // The view drops the pointers before ~EquipDescVector (which frees Begin) runs.
     EquipDescVector ScannerCargoView;
     ScannerCargoView.Begin = Sc->CargoVecBegin;
     ScannerCargoView.End = Sc->CargoVecEnd;
@@ -1423,8 +1260,7 @@ int IObjInspectImpl::scan_cargo(IObjRW* Target, EquipDescVector& OutCargo) const
 
 int IObjInspectImpl::get_formation_offset(Vector& OutOffset) const
 {
-    // 062c02b0 -- copies the three floats out of CShip+0x1c0 and returns 0; -3 when the
-    // delegate is absent or is not a ship. OutOffset is left alone on the failure path.
+    // FUN_062c02b0 (+0x1c0)
     CShip* Sh = InspectShip(Object);
     if (Sh == nullptr)
         return -3;
@@ -1434,8 +1270,7 @@ int IObjInspectImpl::get_formation_offset(Vector& OutOffset) const
 
 int IObjInspectImpl::get_formation_leader(IObjRW*& OutLeader) const
 {
-    // .text:062c02f0..062c032d: CShip's +0x1b8 BaseWatcher; Watched != 0 -> Watched - 8
-    // (the leader's IObjRW), else 0.
+    // FUN_062c02f0 (+0x1b8 watcher)
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutLeader = Sh->FormationLeader.get();
@@ -1446,9 +1281,7 @@ int IObjInspectImpl::get_formation_leader(IObjRW*& OutLeader) const
 
 int IObjInspectImpl::get_follow_offset(Vector& OutOffset) const
 {
-    // .text:062c10c0-062c10f1, RET 0x4: a CShip ((class & 0x503) == 0x503) copies the three
-    // floats of CShip::get_follow_offset() (062b4f00, LEA [this+0x1e8]) into OutOffset. Retail
-    // returns 0 on BOTH paths and leaves OutOffset untouched when there is no ship.
+    // FUN_062c10c0. Returns 0 on both paths; OutOffset is untouched without a ship.
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutOffset = Sh->get_follow_offset();
@@ -1458,8 +1291,7 @@ int IObjInspectImpl::get_follow_offset(Vector& OutOffset) const
 
 int IObjInspectImpl::get_follow_leader(IObjRW*& OutLeader) const
 {
-    // .text:062c1100-062c1123, RET 0x4: a CShip writes CShip::get_follow_leader() into
-    // OutLeader. Retail returns 0 on BOTH paths and leaves OutLeader untouched otherwise.
+    // FUN_062c1100. Returns 0 on both paths, as get_follow_offset.
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         OutLeader = Sh->get_follow_leader();
@@ -1469,8 +1301,7 @@ int IObjInspectImpl::get_follow_leader(IObjRW*& OutLeader) const
 
 bool IObjInspectImpl::generate_follow_offset(IObjInspect const* Leader, Transform& OutXform) const
 {
-    // .text:062c1130-062c114d, RET 0x8: a CShip tail-jumps into CShip::generate_follow_offset
-    // with both arguments; otherwise false with OutXform untouched.
+    // FUN_062c1130
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->generate_follow_offset(Leader, OutXform);
@@ -1480,9 +1311,8 @@ bool IObjInspectImpl::generate_follow_offset(IObjInspect const* Leader, Transfor
 
 int IObjInspectImpl::get_behavior_id() const
 {
-    // .text:062c1150-062c1186: a CEqObj ((class & 0x103) == 0x103) answers with its behavior
-    // manager's CurrentBehaviorIndex (+0xc0) when CEqObj::get_behavior_interface() is set,
-    // else with its own dword +0x1a0; no CEqObj -> -1.
+    // FUN_062c1150. The manager's CurrentBehaviorIndex (+0xc0) when there is one, else the
+    // CEqObj's own BehaviorIndex (+0x1a0).
     CEqObj* Eq = InspectEqObj(Object);
     if (Eq != nullptr) {
         IBehaviorManager* Mgr = Eq->get_behavior_interface();
@@ -1496,7 +1326,7 @@ int IObjInspectImpl::get_behavior_id() const
 
 int IObjInspectImpl::get_formation_followers(IObjRW** const OutFollowers, uint MaxCount) const
 {
-    // 062c1190 -- tail call into CShip::get_formation_followers; 0 when there is no ship.
+    // FUN_062c1190
     CShip* Sh = InspectShip(Object);
     if (Sh != nullptr) {
         return Sh->get_formation_followers(OutFollowers, MaxCount);
@@ -1506,8 +1336,7 @@ int IObjInspectImpl::get_formation_followers(IObjRW** const OutFollowers, uint M
 
 int IObjInspectImpl::get_atmosphere_range(float& OutRange) const
 {
-    // 062c11b0 -- the range is a float at CSolar+0x1ac; the status code is the return value,
-    // and OutRange is untouched when the object is not a solar.
+    // FUN_062c11b0 (CSolar +0x1ac)
     if (Object != nullptr && (Object->ObjectClass & CObject::ClassSolar) == CObject::ClassSolar) {
         OutRange = static_cast<CSolar const*>(Object)->AtmosphereRange;
         return 0;
@@ -1517,8 +1346,7 @@ int IObjInspectImpl::get_atmosphere_range(float& OutRange) const
 
 int IObjInspectImpl::is_using_tradelane(bool* OutUsing) const
 {
-    // 062c1040 -- always returns 0 and always writes through the pointer, with no null check:
-    // false when the delegate is not a ship, otherwise CShip::is_using_tradelane.
+    // FUN_062c1040. Always writes, with no null check, and returns 0.
     CShip* Sh = InspectShip(Object);
     *OutUsing = (Sh != nullptr) ? Sh->is_using_tradelane() : false;
     return 0;
@@ -1526,24 +1354,19 @@ int IObjInspectImpl::is_using_tradelane(bool* OutUsing) const
 
 namespace
 {
-    // FUN_062c2430 (item 1243), cdecl, plain RET, Common.dll.txt 062c2430-062c25bd. Its only
-    // caller is IObjInspectImpl::get_lane_start, which forwards (this, its four arguments,
-    // its CSimple's ObjectDb). Self is the asking object, Ship the lane-entering one;
-    // InOutLane, when set, is the ring already chosen.
+    // FUN_062c2430 (cdecl), called only by get_lane_start. Self is the asking object, Ship the
+    // lane-entering one; InOutLane, when set, is the ring already chosen.
     int ResolveLaneStart(IObjInspect const* Self, IObjInspect const* Ship, IObjInspect const*& InOutLane,
                          Vector& OutStart, Vector& OutDir, IObjDB* ObjectDb)
     {
-        // 062c2434-062c244b: either object missing -> -4.
         if (Self == nullptr || Ship == nullptr)
             return -4;
 
-        // 062c2451-062c2455: Ship->get_orientation() (+0x10), the result unused.
+        // Retail calls get_orientation (+0x10) and drops the result.
         (void)Ship->get_orientation();
 
-        // 062c2458-062c2497: the lane direction into the reused first-argument slot -- from
-        // the given ring against the ship's frame, else from the ship against Self's frame
-        // (get_lane_direction +0x128; the frame is the folded get_orientation/get_transform
-        // pointer). Nonzero -> -4.
+        // get_lane_direction is +0x128: from the given ring against the ship's frame, else from
+        // the ship against Self's frame.
         bool bForward = false;
         int Status;
         if (InOutLane != nullptr)
@@ -1553,8 +1376,7 @@ namespace
         if (Status != 0)
             return -4;
 
-        // 062c249d-062c24f8: the next ring through traverse_rings (+0x130) and ObjectDb
-        // FindById (+0x04); none -> the other way round, once.
+        // traverse_rings (+0x130), ObjectDb FindById (+0x04); none -> the other way, once.
         unsigned RingId = 0;
         Ship->traverse_rings(RingId, bForward);
         InOutLane = ObjectDb->FindById(&RingId);
@@ -1565,15 +1387,12 @@ namespace
             InOutLane = ObjectDb->FindById(&RingId);
         }
 
-        // 062c24fa-062c2532: the ship's HpRightLane (forward) or HpLeftLane hardpoint
-        // (get_hardpoint +0xc0); failure -> -5.
         Vector HardpointPos;
         Matrix HardpointOrient;
         if (Ship->get_hardpoint(bForward ? "HpRightLane" : "HpLeftLane", &HardpointPos, &HardpointOrient) != 0)
             return -5;
 
-        // 062c2533-062c25a4: OutStart = that point; OutDir = FUN_062e1680(ring position - ship
-        // position), each difference FSTP'd to float.
+        // OutDir is VecNormalize3 (FUN_062e1680) of the float differences.
         OutStart = HardpointPos;
         Vector const& ShipPos = Ship->get_position();
         Vector const& LanePos = InOutLane->get_position();
@@ -1588,9 +1407,7 @@ namespace
 int IObjInspectImpl::get_lane_start(IObjInspect const* Self, IObjInspect const*& OutLane,
                                      Vector& OutStart, Vector& OutEnd) const
 {
-    // .text:062c1080-062c10b8, RET 0x10. Object (+0x10) is kept when (class & 3) == 3 (a
-    // CSimple), else 0, and its ObjectDb (+0xac) is read with no null test (a null Object
-    // faults in retail as here). Everything else is FUN_062c2430.
+    // FUN_062c1080. ObjectDb (+0xac) is read through the CSimple narrowing with no null test.
     CSimple const* Simple = nullptr;
     if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3) == 3)
         Simple = static_cast<CSimple const*>(Object);
@@ -1599,25 +1416,19 @@ int IObjInspectImpl::get_lane_start(IObjInspect const* Self, IObjInspect const*&
 
 int IObjInspectImpl::get_lane_direction(Transform const& Xform, bool* OutDir) const
 {
-    // .text:062c0e30..062c0f19. -4 unless Object (+0x10) is set, is a CSolar ((ObjectClass &
-    // 0x303) == 0x303) and is a lane ring (signed byte +0xe0 < 0, CSolar::is_lane_ring).
+    // FUN_062c0e30. Lane rings only. The ring centre is the physical-radius centre (slot
+    // +0x2c), or the position when that fails. Float differences, column 2 of the ring's
+    // transform; NaN writes false. No null test on OutDir.
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassSolar) != CObject::ClassSolar)
         return -4;
     if (!static_cast<CSolar const*>(Object)->is_lane_ring())
         return -4;
 
-    // 062c0e64..062c0e8f: the ring centre is the physical-radius centre (virtual slot +0x2c);
-    // only when that call returns non-zero is get_position() (slot +0x0) used instead.
     float Radius;
     Vector Center;
     if (get_physical_radius(Radius, Center) != 0)
         Center = get_position();
 
-    // 062c0e93..062c0eb8: diff = centre - Xform.Translation (+0x24), each component FSTP
-    // dword. 062c0ebc..062c0ef6: get_transform() (slot +0xc) column 2 (+0x08/+0x14/+0x20);
-    // dot = (dz * m22 + m12 * dy) + m02 * dx on the x87 stack; FCOMP 0.0 / TEST AH,0x5 / JP:
-    // only "less than" writes 1, everything else (>= 0, NaN) writes 0. *OutDir has no null
-    // test.
     float const Dx = Center.x - Xform.Translation.x;
     float const Dy = Center.y - Xform.Translation.y;
     float const Dz = Center.z - Xform.Translation.z;
@@ -1630,18 +1441,13 @@ int IObjInspectImpl::get_lane_direction(Transform const& Xform, bool* OutDir) co
 
 int IObjInspectImpl::get_ring_side(Transform const& Xform, bool* OutSide) const
 {
-    // .text:062c0f20..062c0fd8. Same -4 preconditions as get_lane_direction (Object set,
-    // CSolar, lane ring).
+    // FUN_062c0f20. As get_lane_direction, but the differences stay unrounded and the sign
+    // test is "greater than". No null test on OutSide.
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassSolar) != CObject::ClassSolar)
         return -4;
     if (!static_cast<CSolar const*>(Object)->is_lane_ring())
         return -4;
 
-    // 062c0f50..062c0f6c: get_transform() (slot +0xc) column 2 copied as floats;
-    // 062c0f70..062c0fa7: get_position() (slot +0x0); diff = Xform.Translation - position kept
-    // unrounded; dot = (dz * m22 + dy * m12) + dx * m02; FCOMP 0.0 / TEST AH,0x41 / JNZ:
-    // only "greater than" writes 1, everything else (<= 0, NaN) writes 0. *OutSide has no
-    // null test.
     Matrix const& Rot = get_transform().Rotation;
     float const M02 = Rot.E[0][2];
     float const M12 = Rot.E[1][2];
@@ -1657,14 +1463,8 @@ int IObjInspectImpl::get_ring_side(Transform const& Xform, bool* OutSide) const
 
 int IObjInspectImpl::traverse_rings(uint& OutRing, bool bForward) const
 {
-    // Common.dll.c 0x60fe0. FIXED: retail also requires is_lane_ring() (a signed-byte-negative
-    // test on the low byte of CSimple::TypeBits at +0xe0, i.e. bit 7 of TypeBits -- see
-    // CSolar::is_lane_ring()) before it will read Next/PrevRing at all; a previous version of
-    // this port skipped that guard, so it would happily "traverse" rings on any solar/simple
-    // object, lane ring or not. Also matches retail's exact return-code computation: the
-    // top 2 bits of the ring id are masked off before the zero-check (`*param_1 & 0x3fffffff`)
-    // -- likely tag/type bits packed into the high bits of a ring identifier -- so an id with
-    // only those bits set is treated the same as "no ring" (-2).
+    // FUN_062c0fe0. Lane rings only. The top two bits of the ring id are masked off before the
+    // zero test.
     if (Object == nullptr || (Object->ObjectClass & CObject::ClassSolar) != CObject::ClassSolar)
         return -4;
 
@@ -1678,27 +1478,23 @@ int IObjInspectImpl::traverse_rings(uint& OutRing, bool bForward) const
 
 bool IObjInspectImpl::is_dying() const
 {
-    // ICF-folded @ 0x3BA00: always returns false
+    // FUN_0629ba00 (ICF fold)
     return false;
 }
 
 // ===========================================================================
-// Explicit STL instantiation exported like retail's. Retail Common.dll exports all 47
-// members of its VC6 std::vector<IObjInspect*>. The port exports the modern
-// instantiation; the importing declaration is in common_iface.h.
+// Retail Common.dll exports all 47 members of its VC6 std::vector<IObjInspect*>; the port
+// exports the modern instantiation. The importing declaration is in common_iface.h.
 // ===========================================================================
 template class COMMON_API std::vector<IObjInspect*>;
 
 // ---------------------------------------------------------------------------
-// InitEquipStatusBits -- formerly FUN_062e8270 (the dissolved common_stubs.cpp), Common.dll.c 0x62e8270
-// (decomp line 118349): EquipStatus's default constructor as retail emits it out of line --
-// `Flags &= 0xF8; EquipFlags &= 0xE0000000` (the low 3 bits of the flag byte and the low 29
-// bits of the following dword cleared, the top bits kept). The same pair is inlined at
-// .text:062eb96f-062eb989 (HasReadyWeaponSlot) and .text:062ebb24-062ebb41 (SetWatcherActive),
-// where the port zero-initialises the local instead (a defined superset; documented there).
-// No port caller: its one retail call (.text:062e7c2c) is in FUN_062e7a30, ported as
-// FindClosestObstacleToAvoid (common_obstacleavoidance.cpp), which does not call it. Kept as a free
-// function (not a ctor) in CMN-SPLIT stage 1 so those two zero-init sites stay unchanged.
+// InitEquipStatusBits -- FUN_062e8270, EquipStatus's out-of-line default constructor: clears
+// the low 3 bits of the flag byte and the low 29 bits of the next dword. Inlined in
+// HasReadyWeaponSlot and SetWatcherActive, where the port zero-initialises instead. No port
+// caller: its one retail caller, FUN_062e7a30 (FindClosestObstacleToAvoid,
+// common_obstacleavoidance.cpp), does not call it in the port. A free function, not a ctor, so
+// those zero-init sites stay unchanged.
 // ---------------------------------------------------------------------------
 void InitEquipStatusBits(EquipStatus* Status)
 {

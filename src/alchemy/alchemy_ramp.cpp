@@ -17,9 +17,8 @@
 #include <cstring>
 #include <new>
 
-// alchemy.dll -- the keyed ramps. Every body below names the retail address it was
-// ported from; the class layouts and the shared key container are described in
-// alchemy_ramp.h, the interface slots in alchemy_types.h ("Keyed ramps").
+// alchemy.dll -- the keyed ramps. The class layouts and the shared key container are
+// described in alchemy_ramp.h, the interface slots in alchemy_types.h ("Keyed ramps").
 namespace AlchemyImpl
 {
     namespace
@@ -38,8 +37,8 @@ namespace AlchemyImpl
         return static_cast<long>(static_cast<long long>(Value));
     }
 
-    // SetMode's CPUID test (06242930 / 06241c0a): `MOV EAX,1; CPUID; TEST EDX,0x2000000`
-    // -- bit 25, SSE. Executed on every SetMode call, as retail does.
+    // SetMode's CPUID test (06242930 / 06241c0a): EDX bit 25, SSE. Executed on every
+    // SetMode call, as retail does.
     static bool RampCpuHasSse()
     {
         int Registers[4] = {0, 0, 0, 0};
@@ -59,26 +58,25 @@ namespace AlchemyImpl
     // x87 body keeps its intermediates on the FPU stack and returns ST0 unrounded, so the
     // port computes in double and returns double.
 
-    // [0] 06242970: `FLD A` -- step.
+    // [0] 06242970: step.
     static double RampSingleStep(float A, float /*B*/, float /*T*/)
     {
         return A;
     }
 
-    // [1] 06242980: (B - A) * T + A.
+    // [1] 06242980.
     static double RampSingleLinear(float A, float B, float T)
     {
         return (static_cast<double>(B) - A) * T + A;
     }
 
-    // [2] 062429a0: `FLD B; FSUB A; FLD T; FMUL T; FMULP; FADD A` -- (B - A) * (T * T) + A.
+    // [2] 062429a0.
     static double RampSingleEaseIn(float A, float B, float T)
     {
         return (static_cast<double>(B) - A) * (static_cast<double>(T) * T) + A;
     }
 
-    // [3] 062429c0: `FLD 1; FSUB T; FLD ST0; FMULP; FSUBR 1` -- W = 1 - (1 - T)^2;
-    // then (B - A) * W + A.
+    // [3] 062429c0.
     static double RampSingleEaseOut(float A, float B, float T)
     {
         const double OneMinusT = static_cast<double>(kRampOne) - T;
@@ -86,16 +84,14 @@ namespace AlchemyImpl
         return (static_cast<double>(B) - A) * W + A;
     }
 
-    // [4] 062429f0: `FLD T; FADD ST0,ST0; FSUBR 3; FMUL T; FMUL T` -- W = (3 - (T + T)) * T
-    // * T; then (B - A) * W + A.
+    // [4] 062429f0.
     static double RampSingleSmooth(float A, float B, float T)
     {
         const double W = (static_cast<double>(kRampThree) - (static_cast<double>(T) + T)) * T * T;
         return (static_cast<double>(B) - A) * W + A;
     }
 
-    // [5] 06242a20: `FLD A; FCOMP B; TEST AH,5; JP` -- A < B takes the ease-in body, every
-    // other outcome (greater, equal, unordered) the ease-out body.
+    // [5] 06242a20: equal and unordered take the ease-out body.
     static double RampSingleEaseByRise(float A, float B, float T)
     {
         if (A < B)
@@ -103,7 +99,7 @@ namespace AlchemyImpl
         return RampSingleEaseOut(A, B, T);
     }
 
-    // [6] 06242a70: the same with the operands swapped -- B < A takes ease-in.
+    // [6] 06242a70: the same with the operands swapped.
     static double RampSingleEaseByFall(float A, float B, float T)
     {
         if (B < A)
@@ -111,9 +107,8 @@ namespace AlchemyImpl
         return RampSingleEaseOut(A, B, T);
     }
 
-    // SSE [4] 06242ac0: xmm0 = (T * -2 + 3) * T * T (DAT_0624fa84 = -2.0f,
-    // DAT_0624fa88 = 3.0f); (B - A) * xmm0 + A, all single precision, stored to a float
-    // and reloaded with FLD -- so this one returns a float-rounded value.
+    // SSE [4] 06242ac0 (DAT_0624fa84 = -2.0f, DAT_0624fa88 = 3.0f): all single precision,
+    // so this one returns a float-rounded value.
     static double RampSingleSmoothSse(float A, float B, float T)
     {
         const float W = (T * -2.0f + 3.0f) * T * T;
@@ -159,7 +154,7 @@ namespace AlchemyImpl
                (static_cast<unsigned long>(Blue) & 0xFF);
     }
 
-    // [0] 06241cc0 / 06242070: `MOV EAX,A` -- step, the whole dword including its top byte.
+    // [0] 06241cc0 / 06242070: step, the whole dword including its top byte.
     static unsigned long RampColorStep(unsigned long A, unsigned long /*B*/, float /*T*/)
     {
         return A;
@@ -177,23 +172,21 @@ namespace AlchemyImpl
         return RampColorBlend(A, B, static_cast<double>(T) * T);
     }
 
-    // [3] 06241de0 / 06242190: `FLD 1; FSUB T; FLD ST0; FMUL ST1; FSUBR 1` --
-    // W = 1 - (1 - T)^2.
+    // [3] 06241de0 / 06242190: W = 1 - (1 - T)^2.
     static unsigned long RampColorEaseOut(unsigned long A, unsigned long B, float T)
     {
         const double OneMinusT = static_cast<double>(kRampOne) - T;
         return RampColorBlend(A, B, static_cast<double>(kRampOne) - OneMinusT * OneMinusT);
     }
 
-    // [4] 06241e80: `FLD T; FADD ST0,ST0; FSUBR 3; FMUL T; FMUL T` -- W = (3 - (T + T)) * T * T.
+    // [4] 06241e80: W = (3 - (T + T)) * T * T.
     static unsigned long RampColorSmooth(unsigned long A, unsigned long B, float T)
     {
         return RampColorBlend(
             A, B, (static_cast<double>(kRampThree) - (static_cast<double>(T) + T)) * T * T);
     }
 
-    // [5] 06241f10 / 062422b0: `CMP A,B; JAE` on the packed dwords (unsigned) -- A < B
-    // takes ease-in, otherwise ease-out.
+    // [5] 06241f10 / 062422b0: unsigned compare of the packed dwords.
     static unsigned long RampColorEaseByRise(unsigned long A, unsigned long B, float T)
     {
         if (A < B)
@@ -201,7 +194,7 @@ namespace AlchemyImpl
         return RampColorEaseOut(A, B, T);
     }
 
-    // [6] 06241fc0 / 06242360: `CMP B,A; JAE` -- B < A takes ease-in.
+    // [6] 06241fc0 / 06242360.
     static unsigned long RampColorEaseByFall(unsigned long A, unsigned long B, float T)
     {
         if (B < A)
@@ -287,7 +280,7 @@ namespace AlchemyImpl
     }
 
     // 0620a950: interface table 0x0624bcf0 {"1.11_IRampSingle", 0},
-    // {"1.11_IDAComponent", 0}; hit -> AddRef, *Out = this, 0; miss -> *Out = 0, -3.
+    // {"1.11_IDAComponent", 0}.
     GENRESULT DACOM_API FRampSingle::QueryInterface(const char* Iid, void** Out)
     {
         if (IidEqual(Iid, Iids::RampSingle) || IidEqual(Iid, Iids::DAComponent))
@@ -300,15 +293,15 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // 0620aa00: ++[+0x28], returns it.
+    // 0620aa00 (count at +0x28).
     unsigned long DACOM_API FRampSingle::AddRef()
     {
         ++RefCount_;
         return RefCount_;
     }
 
-    // 0620aa10: guarded decrement; at zero RefCount = 1, the key container's destructor
-    // (FUN_0620cce0) and the free, return 0.
+    // 0620aa10: guarded decrement; at zero RefCount = 1, then the key container's
+    // destructor (FUN_0620cce0) and the free.
     unsigned long DACOM_API FRampSingle::Release()
     {
         if (RefCount_ != 0)
@@ -330,8 +323,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06242810: Reset(); SetMode(Other->GetMode()) through the vtable; then for every key
-    // of Other: GetKeyTime, GetKeyValue, AddKey. Returns 0.
+    // 06242810.
     GENRESULT DACOM_API FRampSingle::CopyFrom(IRampSingle* Other)
     {
         Reset();
@@ -350,8 +342,7 @@ namespace AlchemyImpl
 
     void FRampSingle::ResetEvalCache()
     {
-        // `MOV [+0x20],0; MOV [+0x1c],0`; count > 1 -> span = t1 - t0; `FCOM 0.0;
-        // TEST AH,0x44; JNP` skips only an exactly-zero span (unordered divides).
+        // Only an exactly-zero span skips the divide (unordered divides).
         Cache_ = 0;
         InvSpan_ = 0.0f;
         if (Keys_.Count() > 1)
@@ -363,9 +354,7 @@ namespace AlchemyImpl
         }
     }
 
-    // 06208c90: insertion point after keys of equal time (see UpperBound), append
-    // (FUN_0620bf10) or insert (FUN_06209b80 + FUN_0620bfa0), eval-cache reset; returns
-    // the index.
+    // 06208c90: inserts after keys of equal time (see UpperBound); returns the index.
     int DACOM_API FRampSingle::AddKey(float Time, const float* Value)
     {
         const int Index = Keys_.UpperBound(Time);
@@ -374,8 +363,7 @@ namespace AlchemyImpl
         return Index;
     }
 
-    // 06208d80: memmove the tail down one key, LastIndex - 1, eval-cache reset; 0. No
-    // bounds check.
+    // 06208d80. No bounds check.
     GENRESULT DACOM_API FRampSingle::RemoveKey(int Index)
     {
         Keys_.EraseAt(Index);
@@ -383,17 +371,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06242b10. No guard for an empty ramp: retail reads key 0 unconditionally.
-    //   `FLD t; FCOMP e0; TEST AH,0x41; JP` -- t <= e0 returns e0's value (unordered
-    //     goes on).
-    //   `FLD t; FCOMP last; AND 0x100; JNZ` -- ordered t >= last returns last's value.
-    //   c = cached segment. `FLD t; FCOMP e[c]; TEST AH,5; JP`: t < e[c] walks down
-    //     (i = c - 1, cached; while t < e[i]: --i, cached) and recomputes InvSpan.
-    //   Otherwise `FLD e[c+1]; FCOMP t; TEST AH,5; JP`: e[c+1] < t walks up (i = c + 1,
-    //     cached; while e[i+1] < t: ++i, cached) and recomputes; any other outcome keeps
-    //     the cached segment and InvSpan.
-    //   Recompute: span = e[i+1] - e[i]; exactly zero stores 0, anything else 1 / span.
-    //   U = float((t - e[i]) * InvSpan); return interpolator(v[i], v[i+1], U).
+    // 06242b10. No guard for an empty ramp: retail reads key 0 unconditionally. Every
+    // compare is ordered: an unordered time falls through to the cached segment.
     double DACOM_API FRampSingle::Eval(float Time)
     {
         if (Time <= Keys_.At(0).Time)
@@ -428,7 +407,7 @@ namespace AlchemyImpl
         }
         if (bRecompute)
         {
-            // `FLD e[i+1]; FSUB e[i]` stays on the x87 stack; `FDIV`, then `FSTP float`.
+            // The span stays on the x87 stack; only the quotient is stored as a float.
             const double Span =
                 static_cast<double>(Keys_.At(Index + 1).Time) - Keys_.At(Index).Time;
             if (Span == 0.0)
@@ -436,29 +415,27 @@ namespace AlchemyImpl
             else
                 InvSpan_ = static_cast<float>(static_cast<double>(kRampOne) / Span);
         }
-        // `FLD t; FSUB e[i]; FMUL InvSpan; FSTP float`.
         const float U =
             static_cast<float>((static_cast<double>(Time) - Keys_.At(Index).Time) * InvSpan_);
         // The interpolator's ST0 is returned as it is.
         return Interpolator_(Keys_.At(Index).Value, Keys_.At(Index + 1).Value, U);
     }
 
-    // 06208e00: *Out = keys[Index].Time; 0.
+    // 06208e00.
     GENRESULT DACOM_API FRampSingle::GetKeyTime(int Index, float* Out)
     {
         *Out = Keys_.At(Index).Time;
         return GR_OK;
     }
 
-    // 06208e20: *Out = keys[Index].Value; 0.
+    // 06208e20.
     GENRESULT DACOM_API FRampSingle::GetKeyValue(int Index, float* Out)
     {
         *Out = Keys_.At(Index).Value;
         return GR_OK;
     }
 
-    // 06208e40: the shared reorder (TRampKeyVector::Reposition), then on every path the
-    // eval-cache reset (0620906f) and *OutNewIndex; 0.
+    // 06208e40.
     GENRESULT DACOM_API FRampSingle::SetKeyTime(int Index, float Time, int* OutNewIndex)
     {
         const int NewIndex = Keys_.Reposition(Index, Time);
@@ -467,7 +444,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062090f0: keys[Index].Value = *Value; 0.
+    // 062090f0. No eval-cache reset.
     GENRESULT DACOM_API FRampSingle::SetKeyValue(int Index, const float* Value)
     {
         Keys_.At(Index).Value = *Value;
@@ -480,8 +457,7 @@ namespace AlchemyImpl
         return Mode_;
     }
 
-    // 06242880: [+4] = Mode, then the interpolator from the x87 or SSE table (see
-    // G_RampSingleInterpolators); 0.
+    // 06242880 (see G_RampSingleInterpolators).
     GENRESULT DACOM_API FRampSingle::SetMode(unsigned long Mode)
     {
         Mode_ = Mode;
@@ -496,14 +472,13 @@ namespace AlchemyImpl
         return Keys_.Count();
     }
 
-    // 06209130: `MOV EAX,0xfffffff9; RET 8` -- Out is not written.
+    // 06209130: Out is not written.
     GENRESULT DACOM_API FRampSingle::GetKeyFactoryName(const char** /*Out*/)
     {
         return kRampNoKeyFactory;
     }
 
-    // 06209210 (called only by the factory, 06242d67): Reset(); SetMode(4);
-    // AddKey(0, &0.0f); 0.
+    // 06209210, called only by the factory.
     GENRESULT DACOM_API FRampSingle::Initialize(AGGDESC* /*Desc*/)
     {
         Reset();
@@ -563,9 +538,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06241ae0: Reset(); SetMode(Other->GetMode()); per key GetKeyTime and GetKeyRgb
-    // into floats, then AddKey from those floats (the packed value round-trips through
-    // RGB floats, as in retail). Returns 0.
+    // 06241ae0: the packed value round-trips through RGB floats, as in retail.
     GENRESULT DACOM_API FRampColor::CopyFrom(IRampColor* Other)
     {
         Reset();
@@ -613,8 +586,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06242410: packed = this->EvalPacked(Time) through the vtable, unpacked into Out;
-    // returns Out.
+    // 06242410: EvalPacked through the vtable.
     float* DACOM_API FRampColor::EvalRgb(float* Out, float Time)
     {
         const unsigned long Packed = EvalPacked(Time);
@@ -657,7 +629,7 @@ namespace AlchemyImpl
         }
         if (bRecompute)
         {
-            // `FLD e[i+1]; FSUB e[i]` stays on the x87 stack; `FDIV`, then `FSTP float`.
+            // The span stays on the x87 stack; only the quotient is stored as a float.
             const double Span =
                 static_cast<double>(Keys_.At(Index + 1).Time) - Keys_.At(Index).Time;
             if (Span == 0.0)
@@ -665,7 +637,6 @@ namespace AlchemyImpl
             else
                 InvSpan_ = static_cast<float>(static_cast<double>(kRampOne) / Span);
         }
-        // `FLD t; FSUB e[i]; FMUL InvSpan; FSTP float`.
         const float U =
             static_cast<float>((static_cast<double>(Time) - Keys_.At(Index).Time) * InvSpan_);
         return Interpolator_(Keys_.At(Index).Value, Keys_.At(Index + 1).Value, U);
@@ -694,7 +665,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06209a70: keys[Index].Value = RampPackRgb(Rgb); 0.
+    // 06209a70.
     GENRESULT DACOM_API FRampColor::SetKeyRgb(int Index, const float* Rgb)
     {
         Keys_.At(Index).Value = RampPackRgb(Rgb);
@@ -722,7 +693,7 @@ namespace AlchemyImpl
         return Keys_.Count();
     }
 
-    // 062097b0: `MOV EAX,0xfffffff9; RET 8`.
+    // 062097b0: Out is not written.
     GENRESULT DACOM_API FRampColor::GetKeyFactoryName(const char** /*Out*/)
     {
         return kRampNoKeyFactory;
@@ -751,8 +722,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06209890 (factory 06242630 only): Reset(); SetMode(4); AddKey(0, {0.8, 0.8, 0.8})
-    // (0x3f4ccccd x3); 0.
+    // 06209890, called only by the factory 06242630.
     GENRESULT DACOM_API FRampColor::Initialize(AGGDESC* /*Desc*/)
     {
         Reset();
@@ -798,7 +768,7 @@ namespace AlchemyImpl
     }
 
     // 0620ad40 / 0620ac40: "1.11_IRampSingleRamp" / "1.11_IAnimatedSingleRamp", then
-    // "1.11_IDAComponent"; hit -> AddRef, *Out = this, 0; miss -> *Out = 0, -3.
+    // "1.11_IDAComponent".
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::QueryInterface(const char* Iid, void** Out)
     {
@@ -812,7 +782,7 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // 0620adf0 / 0620acf0: ++[+0x1C].
+    // 0620adf0 / 0620acf0 (count at +0x1C).
     template <typename TTraits>
     unsigned long DACOM_API TNestedSingleRamp<TTraits>::AddRef()
     {
@@ -820,7 +790,7 @@ namespace AlchemyImpl
         return RefCount_;
     }
 
-    // 0620ae00 / 0620ad00: guarded decrement; at zero RefCount = 1, teardown, free, 0.
+    // 0620ae00 / 0620ad00: the FxRampSingle Release shape.
     template <typename TTraits>
     unsigned long DACOM_API TNestedSingleRamp<TTraits>::Release()
     {
@@ -835,8 +805,8 @@ namespace AlchemyImpl
         return RefCount_;
     }
 
-    // 062074f0 / 06206d40: resize to 0 (FUN_0620a4c0(0) releases every child), free the
-    // buffer when Capacity is non-zero; 0. Mode is untouched.
+    // 062074f0 / 06206d40: releases every child (FUN_0620a4c0(0)) and frees the buffer.
+    // Mode is untouched.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::Reset()
     {
@@ -845,15 +815,10 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06207530 / 06206d80: Reset() through the vtable; Mode = Other->GetMode() written
-    // straight into +4 (not SetMode); Count = Other->GetKeyCount(); per key:
-    // Other->GetKeyTime(i, &Time), Other->GetKeyValue(i, &Source) (AddRef'd),
-    // this->CreateKeyValue(&Copy) (a fresh child by factory name), Copy->CopyFrom(Source)
-    // (child +0x10), this->AddKey(Time, Copy), then Copy and Source released. The two
-    // smart-pointer locals are the EH unwind state (06247520 / 062474c0); nothing in the
-    // loop can throw here, so they are plain pointers released in the same order. No
-    // check on CreateKeyValue's result: retail calls through the new pointer
-    // unconditionally. Returns 0.
+    // 06207530 / 06206d80: Mode is written straight into +4 (not SetMode); each key is
+    // deep-copied through a fresh child from CreateKeyValue. Retail's two smart-pointer
+    // locals (EH state 06247520 / 062474c0) are plain pointers here, released in the same
+    // order. CreateKeyValue's result is not checked, as in retail.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::CopyFrom(INestedSingleRamp* Other)
     {
@@ -878,10 +843,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06207650 / 06206ea0: insertion point after keys of equal time, append
-    // (FUN_0620c300 / FUN_0620c980) or insert (FUN_06209dc0 + FUN_0620c420 /
-    // FUN_0620caa0); the stored copy AddRefs a non-null child. Returns the index. No
-    // eval cache in the nested ramps.
+    // 06207650 / 06206ea0: inserts after keys of equal time; the stored copy AddRefs a
+    // non-null child. No eval cache in the nested ramps.
     template <typename TTraits>
     int DACOM_API TNestedSingleRamp<TTraits>::AddKey(float Time, IDAComponent* Child)
     {
@@ -893,8 +856,7 @@ namespace AlchemyImpl
         return Index;
     }
 
-    // 062076f0 / 06206f40: release the key's child (FUN_062086e0), memmove the tail,
-    // LastIndex - 1; 0.
+    // 062076f0 / 06206f40.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::RemoveKey(int Index)
     {
@@ -909,22 +871,9 @@ namespace AlchemyImpl
     }
 
     // 06207740 / 06206f90 (child evaluation: IRampSingle::Eval at child +0x1C /
-    // IFxAnimatedSingle::Eval at child +0x28). No eval cache and no empty-ramp guard.
-    //   `FLD Outer; FCOMP e0; TEST AH,0x41; JNP` -- Outer <= e0 (ordered) -> child 0.
-    //   One key -> child 0.
-    //   `FLD Outer; FCOMP last; AND 0x100; JNZ` -- ordered Outer >= last -> last child.
-    //   Scan i from 0 while i < last and not Outer < e[i+1] (`TEST AH,5; JNP` leaves on
-    //   less).
-    //   Mode 0 -> child i.
-    //   Next = child(i+1)(Inner) first, then Floor = child(i)(Inner);
-    //   U = (Outer - e[i]) / (e[i+1] - e[i]) (`DE F9` = FDIVP ST1,ST0, no zero guard).
-    //   Mode - 2 as an unsigned switch index (JA -> W = U):
-    //     2: W = U * U
-    //     3: W = 1 - (1 - U)^2
-    //     4: W = U * ((3 - (U + U)) * U)
-    //     5: `FLD Next; FCOMP Floor; TEST AH,5; JP` -- Next < Floor -> U * U, else mode 3
-    //     6: `FLD Floor; FCOMP Next` -- Floor < Next -> U * U, else mode 3
-    //   Result = Floor * (1 - W) + Next * W.
+    // IFxAnimatedSingle::Eval at child +0x28). No eval cache and no empty-ramp guard; all
+    // compares are ordered. Next is evaluated before Floor. The segment divide has no
+    // zero guard. Modes other than 2..6 (and 1) blend linearly.
     template <typename TTraits>
     double DACOM_API TNestedSingleRamp<TTraits>::Eval(float OuterTime, float InnerTime)
     {
@@ -943,8 +892,8 @@ namespace AlchemyImpl
         if (Mode_ == 0)
             return TTraits::EvalChild(Keys_.At(Index).Value, InnerTime);
 
-        // Next is stored to the Inner argument slot as a float (FSTP dword, 0x062077d6);
-        // Floor, U and W stay on the x87 stack, hence double here.
+        // Next is stored to the Inner argument slot as a float; Floor, U and W stay on the
+        // x87 stack, hence double here.
         const float NextValue =
             static_cast<float>(TTraits::EvalChild(Keys_.At(Index + 1).Value, InnerTime));
         const double FloorValue = TTraits::EvalChild(Keys_.At(Index).Value, InnerTime);
@@ -991,7 +940,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062078a0 / 062070f0: *Out = child, then child->AddRef() with no null check; 0.
+    // 062078a0 / 062070f0: AddRef with no null check.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::GetKeyValue(int Index, IDAComponent** Out)
     {
@@ -1001,11 +950,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062078c0 / 06207110: TRampKeyVector::Reposition, *OutNewIndex on every path; 0.
-    // Retail holds the moved child in a refcounted temporary across the erase and the
-    // insert (AddRef, slot released by FUN_0620a1d0(0), re-AddRef'd by the insert,
-    // temporary released); the count ends where it started with no child code in
-    // between, so the port moves the pointer.
+    // 062078c0 / 06207110. Retail holds the moved child in a refcounted temporary across
+    // the erase and the insert; the count ends where it started, so the port moves the
+    // pointer.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::SetKeyTime(int Index, float Time,
                                                                int* OutNewIndex)
@@ -1014,8 +961,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06207b70 / 062073c0: a different child releases the old one (slot nulled), stores
-    // the new one and AddRefs it when non-null; the same child is left alone. 0.
+    // 06207b70 / 062073c0.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::SetKeyValue(int Index, IDAComponent* Child)
     {
@@ -1042,7 +988,7 @@ namespace AlchemyImpl
         return Mode_;
     }
 
-    // 06207bc0 / 06207410: a plain store; 0.
+    // 06207bc0 / 06207410: a plain store, no interpolator table.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::SetMode(unsigned long Mode)
     {
@@ -1057,7 +1003,7 @@ namespace AlchemyImpl
         return Keys_.Count();
     }
 
-    // 06209b40 / 06209b60: *Out = the child's factory name; 0.
+    // 06209b40 / 06209b60.
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::GetKeyFactoryName(const char** Out)
     {
@@ -1065,7 +1011,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062074e0 / 06206d30 (factories 062414e0 / 06241900): Reset(); 0.
+    // 062074e0 / 06206d30 (factories 062414e0 / 06241900).
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::Initialize(AGGDESC* /*Desc*/)
     {
@@ -1147,7 +1093,7 @@ namespace AlchemyImpl
         return RefCount_;
     }
 
-    // 06207ca0: FUN_0620a630(0) releases every child, then the buffer is freed; 0.
+    // 06207ca0.
     GENRESULT DACOM_API FRampColorRamp::Reset()
     {
         ReleaseChildren();
@@ -1181,8 +1127,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06207e00: insertion after keys of equal time (FUN_0620c640 / FUN_06209f00 +
-    // FUN_0620c760), a non-null child AddRef'd; returns the index.
+    // 06207e00: the 06207650 body over colour children.
     int DACOM_API FRampColorRamp::AddKey(float Time, IRampColor* Child)
     {
         const int Index = Keys_.UpperBound(Time);
@@ -1192,7 +1137,7 @@ namespace AlchemyImpl
         return Index;
     }
 
-    // 06207ea0: FUN_06208800 on the key, memmove, LastIndex - 1; 0.
+    // 06207ea0.
     GENRESULT DACOM_API FRampColorRamp::RemoveKey(int Index)
     {
         IRampColor* Child = Keys_.At(Index).Value;
@@ -1205,14 +1150,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06207ef0: the 06207740 search with child->EvalRgb(Out, Inner) (child +0x1C) on the
-    // edge and mode-0 paths, returning Out. Otherwise Next = child(i+1)->EvalRgb(local,
-    // Inner) first, then Floor = child(i)->EvalRgb(local, Inner); U as in 06207740; the
-    // weight switch compares channel sums ((r + g) + b):
-    //   5: `FLD sumNext; FLD sumFloor; FCOMPP; AND 0x4100; JNZ` -- ease-in only when
-    //      sumFloor > sumNext.
-    //   6: operands pushed the other way -- ease-in only when sumNext > sumFloor.
-    // Out[c] = Next[c] * W + Floor[c] * (1 - W); returns Out.
+    // 06207ef0: the 06207740 search over colour children (EvalRgb, child +0x1C). Modes 5
+    // and 6 compare channel sums ((r + g) + b).
     float* DACOM_API FRampColorRamp::EvalRgb(float* Out, float OuterTime, float InnerTime)
     {
         if (OuterTime <= Keys_.At(0).Time)
@@ -1246,14 +1185,13 @@ namespace AlchemyImpl
         float Floor[3];
         Keys_.At(Index + 1).Value->EvalRgb(Next, InnerTime);
         Keys_.At(Index).Value->EvalRgb(Floor, InnerTime);
-        // `FLD Outer; FSUB e[i]; FLD e[i+1]; FSUB e[i]; FDIVP` -- U stays on the x87 stack
-        // for the whole switch, and so do W and 1 - W.
+        // U, W and 1 - W stay on the x87 stack.
         const double FloorTime = Keys_.At(Index).Time;
         const double U = (static_cast<double>(OuterTime) - FloorTime) /
                          (static_cast<double>(Keys_.At(Index + 1).Time) - FloorTime);
         const double One = kRampOne;
 
-        // `ADD EAX,-2; CMP EAX,4; JA` -- Mode 1 and every Mode above 6 blend with W = U.
+        // Mode 1 and every Mode above 6 blend with W = U.
         double W = U;
         switch (Mode_)
         {
@@ -1268,8 +1206,7 @@ namespace AlchemyImpl
             break;
         case 5:
         {
-            // `FLD n0; FADD n1; FADD n2; FLD f0; FADD f1; FADD f2; FCOMPP; AND 0x4100; JNZ`
-            // -- ST0 is the floor sum: ease-in only when SumFloor > SumNext.
+            // Ease-in only when SumFloor > SumNext (unordered takes ease-out).
             const double SumNext = (static_cast<double>(Next[0]) + Next[1]) + Next[2];
             const double SumFloor = (static_cast<double>(Floor[0]) + Floor[1]) + Floor[2];
             if (SumFloor > SumNext)
@@ -1293,8 +1230,8 @@ namespace AlchemyImpl
             break;
         }
 
-        // 06208031..062080ab: the three Floor * (1 - W) and the first two Next * W products
-        // are stored as floats; Next[2] * W stays on the stack until its add.
+        // The three Floor * (1 - W) and the first two Next * W products are stored as
+        // floats; Next[2] * W stays on the stack until its add.
         const double OneMinusW = One - W;
         const float FloorPart0 = static_cast<float>(Floor[0] * OneMinusW);
         const float FloorPart1 = static_cast<float>(Floor[1] * OneMinusW);
@@ -1308,11 +1245,9 @@ namespace AlchemyImpl
         return Out;
     }
 
-    // 06241320: the same search with child->EvalPacked(Inner) (child +0x20) on the edge
-    // and mode-0 paths. Otherwise Next = child(i+1)->EvalPacked(Inner), stored over the
-    // OuterTime argument slot, then Floor = child(i)->EvalPacked(Inner); the weight is
-    // W = ftol(InnerTime * 255) -- retail never computes U here and has no mode switch
-    // -- and per channel ((floor - next) * W >> 8) + next, masked into 0x00RRGGBB.
+    // 06241320: the same search with child->EvalPacked(Inner) (child +0x20). Retail quirk
+    // kept: the weight is ftol(InnerTime * 255), not the segment's U, there is no mode
+    // switch, and the blend runs from next towards floor.
     unsigned long DACOM_API FRampColorRamp::EvalPacked(float OuterTime, float InnerTime)
     {
         if (OuterTime <= Keys_.At(0).Time)
@@ -1354,7 +1289,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06208110: *Out = child; child->AddRef() unchecked; 0.
+    // 06208110: AddRef unchecked.
     GENRESULT DACOM_API FRampColorRamp::GetKeyValue(int Index, IRampColor** Out)
     {
         IRampColor* Child = Keys_.At(Index).Value;
@@ -1363,7 +1298,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06208130: TRampKeyVector::Reposition; *OutNewIndex; 0.
+    // 06208130.
     GENRESULT DACOM_API FRampColorRamp::SetKeyTime(int Index, float Time, int* OutNewIndex)
     {
         *OutNewIndex = Keys_.Reposition(Index, Time);
@@ -1394,7 +1329,7 @@ namespace AlchemyImpl
         return Mode_;
     }
 
-    // 06208430: plain store; 0.
+    // 06208430.
     GENRESULT DACOM_API FRampColorRamp::SetMode(unsigned long Mode)
     {
         Mode_ = Mode;
@@ -1407,21 +1342,21 @@ namespace AlchemyImpl
         return Keys_.Count();
     }
 
-    // 06209b50: *Out = "FxRampColor"; 0.
+    // 06209b50.
     GENRESULT DACOM_API FRampColorRamp::GetKeyFactoryName(const char** Out)
     {
         *Out = "FxRampColor";
         return GR_OK;
     }
 
-    // 06207c90: Reset(); 0.
+    // 06207c90.
     GENRESULT DACOM_API FRampColorRamp::Initialize(AGGDESC* /*Desc*/)
     {
         Reset();
         return GR_OK;
     }
 
-    // 06208450: GetKeyFactoryName(&Name) (+0x40), then CreateRampKeyValue.
+    // 06208450.
     GENRESULT DACOM_API FRampColorRamp::CreateKeyValue(IDAComponent** Out)
     {
         const char* Name = nullptr;
@@ -1440,8 +1375,7 @@ namespace AlchemyImpl
         return Manager->CreateInstance(&Desc, reinterpret_cast<void**>(Out));
     }
 
-    // FUN_06208bc0: operator_new(0x2C) + inline ctor (no null check after it: retail
-    // calls through the pointer either way), SetMode(4), AddKey(0, &Value), *Out = ramp.
+    // FUN_06208bc0: operator_new(0x2C), not null-checked.
     void MakeRampSingle(float Value, IRampSingle** Out)
     {
         FRampSingle* Ramp = new FRampSingle();
@@ -1450,7 +1384,7 @@ namespace AlchemyImpl
         *Out = Ramp;
     }
 
-    // FUN_06209240: the same over FxRampColor, AddKey(0, Rgb).
+    // FUN_06209240: the same over FxRampColor.
     void MakeRampColor(const float* Rgb, IRampColor** Out)
     {
         FRampColor* Ramp = new FRampColor();
@@ -1459,10 +1393,8 @@ namespace AlchemyImpl
         *Out = Ramp;
     }
 
-    // FUN_06210900: a fresh FxAnimatedSingleRamp (0x20, vtable 0x0624bac8, Mode 4,
-    // RefCount 1) and a fresh FxAnimatedSingle (0x10, Weight 1.0, RefCount 1);
-    // child->SetWeight(Weight) (+0x18); ramp->AddKey(0, child); *Out = ramp;
-    // child->Release().
+    // FUN_06210900: a fresh FxAnimatedSingleRamp (0x20, vtable 0x0624bac8) holding one
+    // fresh FxAnimatedSingle (0x10) at time 0.
     void MakeAnimatedSingleRamp(float Weight, INestedSingleRamp** Out)
     {
         FAnimatedSingleRamp* const Ramp = new FAnimatedSingleRamp();
@@ -1483,8 +1415,7 @@ namespace AlchemyImpl
         *Out = Ramp;
     }
 
-    // FUN_06208bc0(Value, &child); new FxRampSingleRamp; AddKey(0, child); *Out = ramp;
-    // child released (the inline sequence at 062324a3..06232516 and its twins).
+    // Inlined in the descriptor builders (e.g. at 062324a3) and their twins.
     void MakeRampSingleRamp(float Value, INestedSingleRamp** Out)
     {
         IRampSingle* Child = nullptr;
@@ -1495,8 +1426,7 @@ namespace AlchemyImpl
         Child->Release();
     }
 
-    // FUN_06209240(Rgb, &child); new FxRampColorRamp; AddKey(0, child); *Out = ramp;
-    // child released (062324.. colour twin at 06232408..06232493).
+    // The colour twin (e.g. at 06232408).
     void MakeRampColorRamp(const float* Rgb, IRampColorRamp** Out)
     {
         IRampColor* Child = nullptr;
@@ -1522,8 +1452,7 @@ namespace AlchemyImpl
         }
     }
 
-    // 0620ab50: the module's QI table walk over {"1.11_IAnimatedSingle",
-    // "1.11_IDAComponent"}; a hit AddRefs, a miss stores 0 and returns -3.
+    // 0620ab50: {"1.11_IAnimatedSingle", "1.11_IDAComponent"}.
     GENRESULT DACOM_API FFxAnimatedSingle::QueryInterface(const char* Iid, void** Out)
     {
         if (IidEqual(Iid, Iids::AnimatedSingle) || IidEqual(Iid, Iids::DAComponent))
@@ -1536,15 +1465,14 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // 0620ac00: ++[+0xC], returns it.
+    // 0620ac00 (count at +0xC).
     unsigned long DACOM_API FFxAnimatedSingle::AddRef()
     {
         ++RefCount_;
         return RefCount_;
     }
 
-    // 0620ac10: guarded decrement; at zero RefCount = 1, the scalar deleting destructor
-    // (+0x48, 06209b10) with 1, return 0.
+    // 0620ac10: the FxRampSingle Release shape (scalar deleting destructor 06209b10).
     unsigned long DACOM_API FFxAnimatedSingle::Release()
     {
         if (RefCount_ != 0)
@@ -1567,10 +1495,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06242f30: Reset (+0xC), then for every key of Other: a zeroed triple, Other
-    // GetKeyTime (+0x2C) into a scratch slot that is not re-zeroed, Other GetKeyValue
-    // (+0x30), this AddKey (+0x20); then Other GetLoopType -> this SetLoopType (its
-    // failure ignored) and Other GetWeight -> this SetWeight. Returns 0.
+    // 06242f30: the time scratch slot is not re-zeroed per key; SetLoopType's failure
+    // is ignored.
     GENRESULT DACOM_API FFxAnimatedSingle::CopyFrom(IFxAnimatedSingle* Other)
     {
         Reset();
@@ -1602,14 +1528,14 @@ namespace AlchemyImpl
         return static_cast<int>(Track_->Keys.size());
     }
 
-    // 06242fd0: `FLD Weight; FSTP [this+4]`, returns 0.
+    // 06242fd0 (Weight at +4).
     GENRESULT DACOM_API FFxAnimatedSingle::SetWeight(float Weight)
     {
         Weight_ = Weight;
         return GR_OK;
     }
 
-    // 06242fe0: *Out = [this+4], returns 0.
+    // 06242fe0.
     GENRESULT DACOM_API FFxAnimatedSingle::GetWeight(float* Out)
     {
         *Out = Weight_;
@@ -1626,8 +1552,7 @@ namespace AlchemyImpl
         }
     }
 
-    // 06243030: EnsureTrack, then the key {Value[0], Time, Value[1], Value[2]} goes to
-    // FUN_06246780; its index is returned.
+    // 06243030.
     int DACOM_API FFxAnimatedSingle::AddKey(float Time, const float* Value)
     {
         EnsureTrack();
@@ -1640,9 +1565,8 @@ namespace AlchemyImpl
     }
 
     // FUN_06246780: the insertion index is the first key with NewTime <= key time
-    // (`FLD new; FCOMP key; TEST AH,0x41; JNP` leaves on less or equal; greater and
-    // unordered keep scanning), so a new key lands before keys of the same time. The
-    // rest of the body is the VC6 vector insert-one (grow to size + max(size, 1)).
+    // (unordered keeps scanning), so a new key lands before keys of the same time. The
+    // rest is the VC6 vector insert-one (grow to size + max(size, 1)).
     int FFxAnimatedSingle::InsertTrackKey(FTrack* Track, const FKey& Key)
     {
         const int Count = static_cast<int>(Track->Keys.size());
@@ -1653,14 +1577,14 @@ namespace AlchemyImpl
         return Index;
     }
 
-    // 06243080: erase(begin + Index) -- no track check and no bounds check. Returns 0.
+    // 06243080: no track check and no bounds check.
     GENRESULT DACOM_API FFxAnimatedSingle::RemoveKey(int Index)
     {
         Track_->Keys.erase(Track_->Keys.begin() + Index);
         return GR_OK;
     }
 
-    // 062430e0: without a track `FLD [this+4]` (Weight), else FUN_062469f0 on the track.
+    // 062430e0.
     double DACOM_API FFxAnimatedSingle::Eval(float Time)
     {
         if (Track_ == nullptr)
@@ -1668,8 +1592,7 @@ namespace AlchemyImpl
         return EvalTrack(Track_, Time);
     }
 
-    // 06243100: without a track *Out = 0 (the dword 0); else *Out = begin[Index].Time.
-    // Returns 0 on both paths; no bounds check.
+    // 06243100: no bounds check.
     GENRESULT DACOM_API FFxAnimatedSingle::GetKeyTime(int Index, float* Out)
     {
         if (Track_ == nullptr)
@@ -1681,8 +1604,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06243130: a zeroed local triple, filled with {Value, InSlope, OutSlope} of
-    // begin[Index] when a track exists, then copied to Out. Returns 0.
+    // 06243130.
     GENRESULT DACOM_API FFxAnimatedSingle::GetKeyValue(int Index, float* Out)
     {
         float Triple[3] = {0.0f, 0.0f, 0.0f};
@@ -1699,7 +1621,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062431a0: -1 without a track; else *OutNewIndex = FUN_06246660(Index, Time), 0.
+    // 062431a0.
     GENRESULT DACOM_API FFxAnimatedSingle::SetKeyTime(int Index, float Time, int* OutNewIndex)
     {
         if (Track_ == nullptr)
@@ -1708,8 +1630,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 062431d0: -1 without a track; else begin[Index] gets InSlope = Value[1],
-    // OutSlope = Value[2], Value = Value[0] (in that order). Returns 0.
+    // 062431d0.
     GENRESULT DACOM_API FFxAnimatedSingle::SetKeyValue(int Index, const float* Value)
     {
         if (Track_ == nullptr)
@@ -1721,7 +1642,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06243210: -1 without a track; else track +0 = LoopType, 0.
+    // 06243210.
     GENRESULT DACOM_API FFxAnimatedSingle::SetLoopType(unsigned long LoopType)
     {
         if (Track_ == nullptr)
@@ -1730,7 +1651,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06243230: *Out = 0 without a track, else track +0. Returns 0.
+    // 06243230.
     GENRESULT DACOM_API FFxAnimatedSingle::GetLoopType(unsigned long* Out)
     {
         if (Track_ == nullptr)
@@ -1742,7 +1663,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06243260: -1 without a track; else FUN_06246550(Mode), 0.
+    // 06243260.
     GENRESULT DACOM_API FFxAnimatedSingle::ComputeSlopes(unsigned long Mode)
     {
         if (Track_ == nullptr)
@@ -1751,22 +1672,16 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // 06242f20: `CALL [vtable + 0xC]` (Reset) on this, returns 0. The factory 06243390
-    // runs it right after construction.
+    // 06242f20. The factory 06243390 runs it right after construction.
     GENRESULT DACOM_API FFxAnimatedSingle::Initialize(AGGDESC* /*Desc*/)
     {
         Reset();
         return GR_OK;
     }
 
-    // FUN_06246660(Index, NewTime):
-    //   Scan j from 0 while j < count: `FCOM key[j]; AND 0x100; JNZ` continues while
-    //   NewTime < key (or unordered); otherwise the scan stops unless j == Index.
-    //   j == Index + 1 -> key[Index].Time = NewTime in place, return Index.
-    //   Otherwise the key {Value, NewTime, InSlope, OutSlope} is saved, key[Index] erased,
-    //   and it is re-inserted before the first key with NewTime <= key (`TEST AH,0x41;
-    //   JNP`, as in FUN_06246780) through FUN_06246d50 (insert n = 1); that index is
-    //   returned. No bounds check.
+    // FUN_06246660: the scan continues while NewTime < key or unordered. A stop right
+    // after Index updates the time in place; otherwise the key is erased and re-inserted
+    // as in FUN_06246780 (insert FUN_06246d50). No bounds check.
     int FFxAnimatedSingle::SetTrackKeyTime(FTrack* Track, int Index, float NewTime)
     {
         const int Count = static_cast<int>(Track->Keys.size());
@@ -1800,18 +1715,14 @@ namespace AlchemyImpl
     }
 
     // FUN_06246550(Mode): LoopType = 0; then for every adjacent pair (Prev, Cur):
-    //   Dt = Cur.Time - Prev.Time, Dv = Cur.Value - Prev.Value (both stored as float);
-    //   `FCOMP 1e-4f (DAT_0624f1a4); TEST AH,5; JP` -- only Dt < 1e-4 (ordered) is
-    //   replaced by 0x38d1b717 (1e-4f).
-    //   H = Dv / (Dt * 0.5) (DAT_0624bab8), computed on the x87 stack.
+    //   Dt and Dv are stored as float; only Dt < 1e-4 (ordered, DAT_0624f1a4) is clamped
+    //   to 1e-4f. H = Dv / (Dt * 0.5) (DAT_0624bab8) stays on the x87 stack.
     //   0: Prev.OutSlope = 0xFFFFFFFF (step)      1: both = Dv / Dt
     //   2: Prev.Out = 0, Cur.In = H               3: Prev.Out = H, Cur.In = 0
     //   4: both 0
-    //   5: `FCOMP; AND 0x4100; JNZ` -- Prev.Value <= Cur.Value (or unordered) -> as 3,
-    //      greater -> as 2.
-    //   6: `FCOMP; TEST AH,5; JP` -- Prev.Value >= Cur.Value (or unordered) -> as 3,
-    //      less -> as 2.
-    //   Other modes leave the pair alone. Fewer than two keys: only LoopType changes.
+    //   5: Prev.Value <= Cur.Value (or unordered) -> as 3, greater -> as 2.
+    //   6: Prev.Value >= Cur.Value (or unordered) -> as 3, less -> as 2.
+    //   Other modes leave the pair alone.
     void FFxAnimatedSingle::ComputeTrackSlopes(FTrack* Track, unsigned long Mode)
     {
         Track->LoopType = 0;
@@ -1884,13 +1795,8 @@ namespace AlchemyImpl
         }
     }
 
-    // FUN_06246950(A, B, T), cdecl, result in ST0:
-    //   `FLD A.Time; FCOMP T; TEST AH,0x44; JP` -- equal -> A.Value; the same against
-    //   B.Time -> B.Value. Span = B.Time - A.Time stays on the stack (double); U =
-    //   (T - A.Time) / Span is stored as float (FSTP [T]). A.OutSlope == 0xFFFFFFFF ->
-    //   A.Value (step). Otherwise, with U2 = U*U and U3 = U*U2 in double:
-    //   (((U3 - 2*U2 + U) * A.Out * Span + (U3 - U2) * B.In * Span)
-    //     + (2*U3 - 3*U2 + 1) * A.Value) + (3*U2 - 2*U3) * B.Value.
+    // FUN_06246950 (cdecl, result in ST0): Hermite segment. Span stays on the x87 stack;
+    // U is stored as float. A.OutSlope bits 0xFFFFFFFF mean step.
     double FFxAnimatedSingle::EvalSegment(const FKey* A, const FKey* B, float Time)
     {
         if (A->Time == Time)
@@ -1916,25 +1822,11 @@ namespace AlchemyImpl
     // FUN_062469f0(Time) on the track (low nibble of LoopType: before the first key,
     // high nibble: after the last; 0 holds the end value, 1 / 0x10 cycle, 2 / 0x20 cycle
     // with a value offset, 3 / 0x30 ping-pong, 4 / 0x40 extrapolate along the end slope).
-    //   One key: `TEST AH,0x44; JNP` equal -> Value. Before it (`TEST AH,5; JP` not taken)
-    //   only LoopType bit 0x4 goes on; after it (`AND 0x4100; JNZ` not taken) only bit
-    //   0x40. Everything else returns key 0's Value.
-    //   General path (also taken with no key at all: it then reads begin[0] and
-    //   begin[-1] exactly as retail does): Last = count - 1, T0/V0 from key 0, Tl/Vl
-    //   from key Last, Span = Tl - T0 (float), Offset = 0.
-    //   T < T0 (`TEST AH,5; JP` not taken): mode = LoopType & 0xF; 0 -> V0. Else
-    //   Rel = T - T0 (FST float, ST0 kept), Fm = fmod(Rel, Span) (_CIfmod, float),
-    //   Q = Rel(float) / Span, minus 1.0 when Q < 0 (`FCOM 0.0; TEST AH,5; JP`),
-    //   N = (float)ftol(Q). Mode 1: T = Fm + Tl. 2: the same and Offset = (Vl - V0) * N.
-    //   3: ftol(N) odd -> T = T0 - Fm, even -> as 1. 4: V0 - (T0 - T) * key0.InSlope.
-    //   Other modes keep T.
-    //   T > Tl (`AND 0x4100; JNZ` not taken): mode = LoopType & 0xF0 the same way with
-    //   0x10: T = Fm + T0, 0x20: + Offset, 0x30: odd -> T = Tl - Fm, 0x40: Vl - (Tl - T)
-    //   * keyLast.OutSlope.
-    //   Lookup: P = begin + ftol((T - T0) / Span * Last). P.Time > T (`AND 0x4100; JNZ`
-    //   not taken): step back while P > begin and not P.Time < T, segment (P, P + 1).
-    //   Otherwise step forward while P <= last and not P.Time > T, segment (P - 1, P).
-    //   Result = FUN_06246950(segment, T) + Offset.
+    //   One key: only LoopType bit 0x4 (before) or 0x40 (after) goes on to the general
+    //   path. The general path is also taken with no key at all and then reads begin[0]
+    //   and begin[-1], as retail does. Rel = T - T0 is kept on the stack for fmod
+    //   (_CIfmod) but rounded to float for Q. The lookup guesses
+    //   ftol((T - T0) / Span * Last) and steps from there.
     double FFxAnimatedSingle::EvalTrack(FTrack* Track, float Time)
     {
         const int Count = static_cast<int>(Track->Keys.size());
@@ -2049,23 +1941,16 @@ namespace AlchemyImpl
 
     // ---- FFxAnimatedTransform (vtable 0x0624bbb8) ------------------------------------------
 
-    // wave120 (sonnet:wave120:animatedtransform): out-of-line method bodies
-    // for FFxAnimatedTransform. See IAnimatedTransform's class comment
-    // (alchemy_types.h) and FFxAnimatedTransform's own class comment
-    // (alchemy_ramp.h) for the full retail trace this reproduces.
+    // DAT_062575e8.
     const float FFxAnimatedTransform::kChannelDefaults[FFxAnimatedTransform::kChannelCount] = {
         0.0f, 0.0f, 0.0f, // Translate X/Y/Z
         0.0f, 0.0f, 0.0f, // Rotate X/Y/Z (degrees)
         1.0f, 1.0f, 1.0f, // Scale X/Y/Z
     };
 
-    // FUN_062434c0 (reached through FUN_06208620, which then stores vtable 0x0624bbb8 and
-    // RefCount 1): PackedModes 0x435; the eh vector constructor (FUN_062463e2 with
-    // LAB_06243c40) nulls the nine children. First pass per channel: a non-null child is
-    // released and nulled; a new FxAnimatedSingleRamp (FUN_06212e00 + vtable 0x0624bac8,
-    // RefCount 1) and a new FxAnimatedSingle (FUN_062144a0); key SetWeight(DAT_062575e8[i])
-    // (+0x18); ramp AddKey(0, key) (+0x14); the ramp is stored; the key released. Second
-    // pass (062435ce..0624365f) is FUN_062436a0's body inlined; then ChannelFlags 0x1FF.
+    // FUN_062434c0 (via FUN_06208620, which then stores vtable 0x0624bbb8): each channel
+    // gets an FxAnimatedSingleRamp holding one default key, then Reset (FUN_062436a0,
+    // inlined) rebuilds them all again, as retail does.
     FFxAnimatedTransform::FFxAnimatedTransform() : RefCount_(1), PackedModes_(0x435), ChannelFlags_(0)
     {
         unsigned long Index = 0;
@@ -2102,8 +1987,6 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // This module's Release() convention (guard the decrement, store
-    // RefCount_=1 before destruction, free object storage only after success).
     unsigned long DACOM_API FFxAnimatedTransform::Release()
     {
         if (RefCount_ != 0)
@@ -2118,9 +2001,7 @@ namespace AlchemyImpl
         return RefCount_;
     }
 
-    // +0xC FUN_062436a0: per channel the child's Reset (+0xC), a new FxAnimatedSingle
-    // (inline: Weight 1.0, no track, RefCount 1), SetWeight(DAT_062575e8[i]), child
-    // AddKey(0, key) (+0x14), key Release; then ChannelFlags = 0x1FF. Returns 0.
+    // +0xC FUN_062436a0.
     GENRESULT DACOM_API FFxAnimatedTransform::Reset()
     {
         unsigned long Index = 0;
@@ -2136,10 +2017,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // +0x10 LAB_06243770: per channel a zeroed local, Other GetChild(+0x14, i, &local),
-    // this child's CopyFrom(+0x10, local), the local released when non-null. Then Other
-    // GetPackedModes(+0x28, &A, &B, &C) -> this SetPackedModes(+0x24, A, B, C) and Other
-    // GetChannelFlags(+0x1C, &this->ChannelFlags). Returns 0; no null test on Other.
+    // +0x10 LAB_06243770. No null test on Other.
     GENRESULT DACOM_API FFxAnimatedTransform::CopyFrom(IAnimatedTransform* Other)
     {
         unsigned long Index = 0;
@@ -2160,8 +2038,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // +0x14 LAB_06243830: *Out = Children[Index]; (*Out)->AddRef() (+4); returns 0. No
-    // bounds or null tests.
+    // +0x14 LAB_06243830. No bounds or null tests.
     GENRESULT DACOM_API FFxAnimatedTransform::GetChild(unsigned long Index, IDAComponent** Out)
     {
         *Out = Children_[Index];
@@ -2169,19 +2046,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // +0x18 FUN_06243850 (alchemy.dll.txt:138824-138952): see
-    // IAnimatedTransform's class comment (alchemy_types.h) for the full
-    // byte trace of this genuinely subtle algorithm, including the
-    // "always re-reads entry index 0" quirk and the float-equality-test
-    // idiom (JP taken == NOT equal-or-unordered) this reproduces.
-    //   ChannelFlags = 0, Bit = 1. Per channel: Count = child GetKeyCount (+0x38); for
-    //   j < Count the child's key value at index 0 (+0x24, always 0 -- ESI stays 0) is
-    //   fetched; its key count (+0x14): 0 -> GetWeight (+0x1C), 1 -> a zeroed triple and
-    //   GetKeyValue(0) (+0x30), value = triple[0]; 2 or more -> released and the channel
-    //   ends without its bit. `FLD value; FCOMP DAT_062575e8[i]; TEST AH,0x44; JP` -- not
-    //   equal (or unordered) releases and ends the channel without its bit; equal
-    //   releases and continues. A loop that runs out (or Count <= 0) ORs Bit in. Bit <<= 1.
-    //   Returns 0. The key object is released only when non-null (CMP EAX,ESI).
+    // +0x18 FUN_06243850: a channel's bit is set when every key still equals its default
+    // (DAT_062575e8[i]; unordered counts as different). Retail quirk kept: the loop
+    // re-reads key 0 on every iteration instead of key j.
     GENRESULT DACOM_API FFxAnimatedTransform::UpdateChannelFlags()
     {
         ChannelFlags_ = 0;
@@ -2235,13 +2102,10 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06243c50(Out9; A, B, C), thiscall, RET 0xC. DAT_0624d4c4 = 0x3c8efa35 (pi/180f).
-    //   c = C * k on the stack, FST float into the C slot; cos from the unrounded c,
-    //   sin from the float c. Out = {cos c, 0, sin c; 0, 1, 0; -sin c, 0, cos c}.
-    //   a = A * k: cos a stored as float, sin a kept on the stack; for each column j:
-    //   row1 = cos a * row1 - sin a * row2, row2 = cos a * row2 + row1(old) * sin a.
-    //   b = B * k the same over rows 0 and 1. Every product is on the x87 stack (double)
-    //   and each element is stored as float through the native x87 kernels.
+    // FUN_06243c50 (thiscall). DAT_0624d4c4 = 0x3c8efa35 (pi/180f). cos c uses the
+    // unrounded angle, sin c the float-rounded one; cos a / cos b are stored as float,
+    // sin a / sin b stay on the x87 stack. Each element is stored as float through the
+    // native x87 kernels.
 #pragma float_control(except, on, push)
     void FFxAnimatedTransform::BuildEulerRotation3x3(float* Out9, const float& AngleA,
                                                      const float& AngleB, const float& AngleC)
@@ -2293,12 +2157,8 @@ namespace AlchemyImpl
         }
     }
 
-    // +0x2C LAB_06243a60 (RET 0x10: this, TimeA, TimeB, Out):
-    //   FUN_06206c70 (identity 3x3) on Out, then Out[11], Out[10], Out[9] = 0.
-    //   ChannelFlags == 0x1FF -> return. Every child call is Eval(+0x1C, TimeA, TimeB):
-    //   the pushes are arg3 then arg2, so the ramp's outer time is TimeA.
-    //   Rotation (flags & 0x38 != 0x38): children 4, 5, 3 evaluated in that order (each
-    //   result FSTP float), then FUN_06243c50(Out; child3, child5, child4).
+    // +0x2C LAB_06243a60. The ramp's outer time is TimeA. Rotation children are
+    // evaluated in the order 4, 5, 3, then FUN_06243c50(Out; child3, child5, child4).
     void DACOM_API FFxAnimatedTransform::Evaluate(unsigned long TimeA, unsigned long TimeB,
                                                   float* Out12)
     {
@@ -2330,10 +2190,8 @@ namespace AlchemyImpl
             BuildEulerRotation3x3(Out12, Rotate3, Rotate5, Rotate4);
         }
 
-        // 06243b00..06243bd7: a local FUN_06206c70 identity with its translation zeroed,
-        // children 6, 7, 8 stored on its diagonal (the off-diagonal dwords rewritten 0),
-        // the 3DMathEngine singleton (DAT_06257c58, FUN_0623e830 on first use) +0x1C
-        // MulTransform(R, Scale, Out), then R copied over Out (FUN_06217ab0 + REP MOVSD).
+        // Scale on a local identity's diagonal; the 3DMathEngine (DAT_06257c58, created
+        // on first use) composes Scale * Out.
         if ((ChannelFlags_ & 0x1C0u) != 0x1C0u)
         {
             float ScaleXform12[12];
@@ -2359,8 +2217,7 @@ namespace AlchemyImpl
             std::memcpy(Out12, Composed, sizeof(Composed));
         }
 
-        // 06243bde..06243c27: children 2, 1, 0 evaluated in that order into Out[11],
-        // Out[10], Out[9].
+        // Translation children are evaluated in the order 2, 1, 0.
         if ((ChannelFlags_ & 0x7u) != 0x7u)
         {
             FAnimatedSingleRamp* const Child2 = Children_[2];

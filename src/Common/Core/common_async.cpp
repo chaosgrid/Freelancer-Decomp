@@ -20,7 +20,7 @@ namespace Async
 {
     void __cdecl Startup()
     {
-        // Common.dll.c Async::Startup @ 0x9d5d0
+        // 0x9d5d0
         ++g_async_refcount;
     }
 
@@ -31,7 +31,7 @@ namespace Async
 
     Action::Action(bool bInDeleteWhenDone)
     {
-        // 0x062fd400: +0x04 = argument, +0x08 = 0.
+        // 0x062fd400
         bDeleteWhenDone = bInDeleteWhenDone;
         hEvent = nullptr;
     }
@@ -52,13 +52,13 @@ namespace Async
 
     void* Action::operator new(size_t Size)
     {
-        // 0x062fd560: JMP msvcrt malloc
+        // 0x062fd560: msvcrt malloc
         return malloc(Size);
     }
 
     void Action::operator delete(void* Ptr)
     {
-        // 0x062fd570: JMP msvcrt free
+        // 0x062fd570: msvcrt free
         free(Ptr);
     }
 
@@ -72,7 +72,6 @@ namespace Async
 
         if (Work->bDeleteWhenDone)
         {
-            // 062fd5aa: vtable+4 with flag 1 -- the scalar deleting destructor.
             delete Work;
             return true;
         }
@@ -83,12 +82,12 @@ namespace Async
 
     void __cdecl DumpWorkQueue()
     {
-        // 0x062a8920: RET
+        // 0x062a8920 (empty)
     }
 
     int __cdecl WorkQueueSize()
     {
-        // 0x06325390: XOR EAX,EAX; RET
+        // 0x06325390
         return 0;
     }
 }

@@ -9,7 +9,7 @@
 // The death camera -- the shot that takes over when the player's ship is destroyed: it shakes,
 // then drifts away from the wreck while the shake decays. Vtable .rdata 0x005e061c, controller
 // + 0x60c, and no constructor of its own: the controller calls the FGameCamera ctor, writes four
-// floats and swaps the vptr (0x00549371 .. 0x0054939e).
+// floats and swaps the vptr (0x00549371).
 //
 // Three slots are its own; the other twelve are FGameCamera's:
 //
@@ -34,7 +34,7 @@ struct FDeathCamera : FGameCamera
 
 
     // +0x0f8  the watched object's world position at the moment of attach. Written by the attach
-    // slot and, as far as the exe goes, never read again -- kept because retail keeps it.
+    // slot and never read again in the exe.
     float BasePosition[3];
 
     // +0x104  the direction the camera drifts in: the watched object's velocity, clamped to
@@ -62,20 +62,16 @@ static_assert(offsetof(FDeathCamera, DriftDamping) == 0x14c, "DthC +0x14c");
 static_assert(offsetof(FDeathCamera, MaxDriftSpeed) == 0x150, "DthC +0x150");
 
 // The controller's step for this slot: FUN_0051b2f0, then the four literals, then the vptr.
-//
-// Note what is NOT initialised: the shake matrix at +0x110, the drift accumulator at +0x134 and
-// the shake timer at +0x144. The attach slot does not write them either (except on its
-// no-object path, and not even then for the matrix). Retail relies on whatever set the death
-// sequence up having written them; the port zeroes nothing extra, so an unstarted death camera
-// reports itself finished (a zero timer) and stays put.
+// NOT initialised: the shake matrix (+0x110), the drift accumulator (+0x134) and the shake timer
+// (+0x144); the attach slot does not write them either. Retail relies on whoever set up the death
+// sequence; the port zeroes nothing extra.
 void DeathCameraConstruct(FDeathCamera* Cam);
 
 // Slot 0x58 (LAB_00549470). Points the watcher at Object and seeds the drift from it.
 void DeathCameraAttach(FDeathCamera* Cam, void* Object);
 
-// Slot 0x60 (LAB_00549450). True when the shake timer is EXACTLY zero -- retail's test is an
-// equality against 0.0f, not a "<= 0", so a negative timer would report unfinished. The update
-// clamps the timer at zero, which is what keeps that from happening.
+// Slot 0x60 (LAB_00549450). True when the shake timer is EXACTLY zero (equality, not "<= 0");
+// the update clamps the timer at zero so a negative one never occurs.
 bool DeathCameraIsFinished(const FDeathCamera* Cam);
 
 // Slot 0x6c (LAB_00549620). Shake, then drift. Does nothing at all once finished.

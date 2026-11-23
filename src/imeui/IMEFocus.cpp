@@ -64,7 +64,7 @@ struct FIMEListConstructionGuard
     bool bComplete;
 };
 
-// FUN_067121e0: invalid hex characters repeat the preceding digit (ESI).
+// FUN_067121e0: invalid hex characters repeat the preceding digit.
 static unsigned ParseAppearanceNumber(const wchar_t* Text)
 {
     unsigned Value = 0;
@@ -112,8 +112,8 @@ static void StaticDrawRect(int X1, int Y1, int X2, int Y2, DWORD Color)
         GIMEFocusSingleton->DrawRect(X1, Y1, X2, Y2, Color);
 }
 
-// ImeUiCore still emits (x,y,text,Color); bridge to retail DrawTextW arity.
-// Count==1 skips the underline loop in LAB_00563cf0 — degenerate layout entry.
+// Bridges ImeUiCore's fan callback to retail DrawTextW's arity. Count == 1
+// skips the underline loop in the client's LAB_00563cf0.
 static void StaticDrawFan(void* Layout, unsigned Count)
 {
     if (GIMEFocusSingleton != nullptr)

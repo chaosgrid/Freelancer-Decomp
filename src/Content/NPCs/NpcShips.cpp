@@ -4,13 +4,13 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Content.dll TU42 (06f31190-06f33300): NPC ship archetypes, NPC character
-// descriptions, mission [NPC] blocks, space_costume.
+// Content.dll TU42: NPC ship archetypes, NPC character descriptions, mission [NPC] blocks,
+// space_costume.
 //
-// Listing: DLLS\BIN\Content.dll.txt. The std::map template instantiations
-// retail emits for the two tables (insert FUN_06f32d50, _Insert FUN_06f32f60,
-// _Buynode FUN_06f331b0, iterator step FUN_06f331d0, pair copy FUN_06f33230,
-// map ctor FUN_06f32ce0, _Tidy LAB_06f32c20) are the std::map objects below.
+// The std::map template instantiations retail emits for the two tables (insert
+// FUN_06f32d50, _Insert FUN_06f32f60, _Buynode FUN_06f331b0, iterator step FUN_06f331d0,
+// pair copy FUN_06f33230, map ctor FUN_06f32ce0, _Tidy LAB_06f32c20) are the std::map
+// objects below.
 
 #include "NPCs/NpcShips.h"
 
@@ -52,7 +52,6 @@ void __cdecl LoadNpcShipArchs(INI_Reader* Reader, FNpcShipArchMap* Map)
         if (!Reader->is_header("NPCShipArch"))
             continue;
 
-        // 06f32565-06f325a4: locals [ESP+0x30..0x54] and the key [ESP+0x18].
         FNpcShipArch Arch;
         ID_String Key;
         Key.clear();
@@ -83,7 +82,6 @@ void __cdecl LoadNpcShipArchs(INI_Reader* Reader, FNpcShipArchMap* Map)
             }
             else if (Reader->is_value("npc_class"))
             {
-                // 06f32697-06f32728: every value, unique ids appended at the end.
                 for (unsigned int Index = 0; !Reader->is_value_empty(Index); ++Index)
                 {
                     unsigned int ClassId = CreateID(Reader->get_value_string(Index));
@@ -95,7 +93,6 @@ void __cdecl LoadNpcShipArchs(INI_Reader* Reader, FNpcShipArchMap* Map)
             }
             else if (Reader->is_value("level"))
             {
-                // 06f32820-06f32842: skip to the first digit (or the end), atoi.
                 char const* Text = Reader->get_value_string(0);
                 while ((*Text < '0' || *Text > '9') && *Text != '\0')
                     ++Text;
@@ -103,7 +100,6 @@ void __cdecl LoadNpcShipArchs(INI_Reader* Reader, FNpcShipArchMap* Map)
             }
         }
 
-        // 06f32740-06f327a2: pair{Key, Arch} built, Map->insert(pair).
         Map->insert(FNpcShipArchMap::value_type(Key.Id, Arch));
     }
 }
@@ -167,7 +163,6 @@ bool FNpcCharacterDesc::ParseValue(INI_Reader* Reader, ID_String* OutNickname)
 {
     if (Reader->is_value("base_appr"))
     {
-        // 06f32974-06f329a8: the costume is copied only when the id resolved.
         int CostumeId;
         if (pub::GetCostumeID(CostumeId, Reader->get_value_string()) == 0)
             pub::GF::GetCostumeByID(CostumeId, Appearance);
@@ -236,7 +231,7 @@ bool __cdecl LoadNpcCharacterDesc(ID_String* OutNickname, FNpcCharacterDesc* Des
     while (Reader->read_value())
         Desc->ParseValue(Reader, OutNickname);
 
-    // 06f32ba5-06f32bc6: FUN_06f32b50 inlined.
+    // FUN_06f32b50 inlined.
     return !OutNickname->IsEmpty() && Desc->IsComplete();
 }
 
@@ -260,7 +255,6 @@ bool __cdecl GetSecondNameValues(FmtStr const* /*First*/, FmtStr const* Second, 
     case 0x3f21:
     case 0x3f22:
     {
-        // 06f322d5: node2, node3.
         FmtStr::Val const* Node = Second->Head->Next;
         *OutA = NameValue(Node);
         *OutB = NameValue(Node->Next);
@@ -268,14 +262,12 @@ bool __cdecl GetSecondNameValues(FmtStr const* /*First*/, FmtStr const* Second, 
     }
     case 0x3f23:
     {
-        // 06f322d7: node1, node2.
         FmtStr::Val const* Node = Second->Head;
         *OutA = NameValue(Node);
         *OutB = NameValue(Node->Next);
         return true;
     }
     case 0x3f1e:
-        // 06f322e9: node4.
         *OutB = NameValue(Second->Head->Next->Next->Next);
         return true;
     default:
@@ -363,8 +355,7 @@ bool __cdecl LoadMsnNpc(ID_String* OutNickname, FMsnNpc* Npc, INI_Reader* Reader
 {
     Npc->Voice = 0;
 
-    // [ESP+0x10]/[ESP+0x14]: a length + char[0x50] stack string; the voice
-    // name is copied into it truncated to 0x4f characters.
+    // A length + char[0x50] stack string in retail; the voice name is truncated to 0x4f.
     char VoiceName[0x50];
     VoiceName[0] = '\0';
 
@@ -378,7 +369,7 @@ bool __cdecl LoadMsnNpc(ID_String* OutNickname, FMsnNpc* Npc, INI_Reader* Reader
         }
         else if (Reader->is_value("space_costume"))
         {
-            // 06f314e3-06f31556: FUN_06f31390 inlined without its result.
+            // FUN_06f31390 inlined without its result.
             Npc->Appearance.PartIds[0] = pub::GF::GetBodyPart(Reader->get_value_string(0), 1);
             Npc->Appearance.PartIds[1] = pub::GF::GetBodyPart(Reader->get_value_string(1), 0);
             for (unsigned int Index = 2; !Reader->is_value_empty(Index); ++Index)

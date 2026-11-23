@@ -232,7 +232,7 @@ IChatServer* RemoteClientGetChatServer()
 
 CDPClientProxy* CClientImpl::FindProxy(unsigned int ClientId) const
 {
-    // Raw PE 06b39630: JBE/JA reject 0 and IDs above 128.
+    // Retail 06b39630.
     return ClientId != 0 && ClientId <= 128 ? ClientProxies[ClientId - 1] : nullptr;
 }
 
@@ -323,8 +323,8 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, unsigned long Size)
 
         HandleClientPacket(ClientId, Packet->AsRaw());
         Remaining -= static_cast<int>(DecodedSize);
-        // 06b3932d subtracts DecodedSize from ESI only. Unlike remoteserver's
-        // decoder loop, retail does not advance EDI past the decoded body.
+        // Retail quirk (06b3932d): unlike remoteserver's decoder loop, Cursor is not advanced
+        // past the decoded body.
     } while (Remaining > 0);
 }
 

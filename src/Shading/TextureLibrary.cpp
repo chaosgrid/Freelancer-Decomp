@@ -132,7 +132,7 @@ namespace
 
     int ParseFormatMapField(char*& Cursor, const char* Whitespace, bool bAdvance)
     {
-        // ec10's six inlined scans retain token start before skipping whitespace.
+        // FUN_06ebec10: the token start is taken before whitespace is skipped.
         char* Start = Cursor;
         SkipFormatMapCharacters(Cursor, Whitespace);
         SkipFormatMapCharacters(Cursor, "1234567890*");
@@ -261,7 +261,7 @@ namespace
 
     const FTextureFormatDescriptor* TextureFormatDescriptor(int FormatId)
     {
-        // FUN_06ed0ba0: signed JLE keeps all indices <=14; no lower guard.
+        // FUN_06ed0ba0: signed upper bound only; negative ids are not guarded.
         return &GTextureFormatDescriptors[FormatId > 14 ? 0 : FormatId];
     }
 
@@ -716,8 +716,7 @@ unsigned long DACOM_API FTextureLibraryController::AddRef()
 
 unsigned long DACOM_API FTextureLibraryController::Release()
 {
-    // LAB_06ec6940 is this non-delegating face, not public Release.
-    // This embedded controller is constructed with its mandatory owner.
+    // LAB_06ec6940 (the non-delegating face).
     if (Owner->RefCount != 0)
         --Owner->RefCount;
     const unsigned long Next = Owner->RefCount;
@@ -741,7 +740,6 @@ GENRESULT DACOM_API FTexLibAggregate::Initialize()
         Iids::RenderPipeline8B, (void**)&Owner->Pipeline);
     if (PipelineResult < 0)
     {
-        // .text:06ec071a .. 06ec073c: FDUMP(0x100001, "%s(%d) : ERROR:General:%s", __FILE__, 0x308, msg).
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\TextureLibrary.cpp", 0x308,
               "TextureLibrary: init: unable to acquire IID_IRenderPipeline");
@@ -852,8 +850,6 @@ bool FTextureLibrary::CreateTextureRecord(unsigned long GpuHandle, const char* N
     FTextureFrame Frame = {};
     Frame.Uv[2] = 1.0f;
     Frame.Uv[3] = 1.0f;
-    // Both 06ec38e0 call sites are here: fresh empty Frames resize to 1;
-    // the second size<1 check is false after the first succeeds.
     Entry->Frames.push_back(Frame);
     Entry->Children.push_back(Entry);
     StoreByNameCrc(Entry);
@@ -1164,7 +1160,7 @@ GENRESULT FTextureLibrary::SelectTextureDimensions(unsigned long Width, unsigned
 
 GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* Name, void** OutHandle)
 {
-    // FUN_06ebfd20. Keep the original source format and native mapped DDS mip cursor.
+    // FUN_06ebfd20: uploads in the DDS source format, walking the mapped file's mips.
     FTextureFileMap Map(FileSystem, "MIPS");
     if (Map.File == -1 || Map.Mapping == -1 || Map.View == nullptr)
         return -8;
@@ -1670,8 +1666,7 @@ GENRESULT DACOM_API FTextureLibrary::GetTextureFrame(void* Tex, int Frame, unsig
 
 GENRESULT DACOM_API FTextureLibrary::FindTextureByCrc(void* Query, void** OutTex)
 {
-    // LAB_06ec2810 RET 0xC: CRC at Query+4 → map this+0x54 (FUN_06ecaa00).
-    // Hit: FUN_06ebe560(tex) then *OutTex = node+0x10. Miss: EAX=-1.
+    // LAB_06ec2810: CRC at Query+4, looked up in the name tree (+0x54, FUN_06ecaa00).
     const unsigned long Crc = static_cast<const FTextureQuery*>(Query)->Crc;
     FTextureEntry* Entry = FindEntryByCrc(Crc);
     if (Entry == nullptr)
@@ -1704,8 +1699,6 @@ GENRESULT DACOM_API FTextureLibrary::PickGpuFormat(const unsigned long* Src, uns
     }
     return GR_GENERIC; // Empty/miss leaves mandatory output unchanged.
 }
-
-// --- Cycle 6 high-confidence accessors -----------------
 
 GENRESULT DACOM_API FTextureLibrary::SetGenericSlot(int Index, unsigned long Value)
 {
@@ -1845,8 +1838,7 @@ GENRESULT DACOM_API FTextureLibrary::CreatePlaybackGroup(void* SourceRecord, int
 
 GENRESULT DACOM_API FTextureLibrary::ReleaseTextureRecord(void* Record)
 {
-    // LAB_06ec2870: Record==0 → −1; else FUN_06ec0bd0(Record, flag=1) and return 0.
-    // Arg is the texture record pointer (Slot12 OutTex), not an integer id.
+    // LAB_06ec2870. Record is a pointer from FindTextureByCrc, not an id.
     if (Record == nullptr)
         return GR_GENERIC;
     ReleaseEntryReference((FTextureEntry*)Record);
@@ -1939,7 +1931,7 @@ GENRESULT DACOM_API FTextureLibrary::SetFrameRect(void* Record, int Index, float
 
 GENRESULT DACOM_API FTextureLibrary::SetTileRate(void* Record, float Value)
 {
-    // LAB_06ec2fc0: record+0xc = value.
+    // LAB_06ec2fc0 (retail record +0xC).
     FTextureEntry* Entry = (FTextureEntry*)Record;
     if (Entry == nullptr)
         return GR_GENERIC;
@@ -1949,7 +1941,7 @@ GENRESULT DACOM_API FTextureLibrary::SetTileRate(void* Record, float Value)
 
 GENRESULT DACOM_API FTextureLibrary::GetTileRate(void* Record, float* Out)
 {
-    // LAB_06ec2fe0: *out=record+0xc.
+    // LAB_06ec2fe0.
     *Out = 0.0f;
     FTextureEntry* Entry = (FTextureEntry*)Record;
     if (Entry == nullptr)
@@ -1960,7 +1952,7 @@ GENRESULT DACOM_API FTextureLibrary::GetTileRate(void* Record, float* Out)
 
 GENRESULT DACOM_API FTextureLibrary::GetFrameCount(void* Record, int* Out)
 {
-    // LAB_06ec3000: *out=(end-begin)/0x14.
+    // LAB_06ec3000.
     *Out = 0;
     FTextureEntry* Entry = (FTextureEntry*)Record;
     if (Entry == nullptr)
@@ -2112,7 +2104,6 @@ GENRESULT DACOM_API FTextureLibrary::EnumTexture(int Id, int Index, void** OutRe
             AddRefEntryRecursive(It->second);
             *OutRecord = It->second;
         }
-        // 06ec23ee resets ESI before returning, independent of the ordinal.
         return GR_OK;
     }
     FTextureGroup* Group = FindGroup(Id);
@@ -2158,7 +2149,7 @@ GENRESULT DACOM_API FTextureLibrary::RemoveSubTexture(int GroupId, void* Record)
             }
             ++Index;
         }
-        // 06ec26f0 jumps to the end comparison without increment on failure.
+        // Retail (06ec26f0) does not advance past a member that fails to resolve.
     }
     return GR_GENERIC;
 }
@@ -2174,8 +2165,6 @@ GENRESULT DACOM_API FTextureLibrary::AllocateNewTextureId(int* OutId)
     return GR_OK;
 }
 
-// --- TextureLibrary slots recovered from the retail vtable/listing ---
-
 GENRESULT DACOM_API FTextureLibrary::SetRecordName(void* Record, const char* Name)
 {
     // LAB_06ec28e0 probes the incoming name, then erases that node before renaming Record.
@@ -2189,6 +2178,7 @@ GENRESULT DACOM_API FTextureLibrary::SetRecordName(void* Record, const char* Nam
     StoreByNameCrc(Entry);
     return GR_OK;
 }
+
 GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int TextureId)
 {
     FTextureEntry* Parent = (FTextureEntry*)Record;
@@ -2211,7 +2201,7 @@ GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int 
     {
         if (ChildIndex < Parent->Children.size())
             ReleaseEntryReference(Parent->Children[ChildIndex], true);
-        // 2a5c sets ECX=EBP: retail retains the parent, not the replacement child.
+        // Retail (06ec2a5c) retains the parent, not the replacement child.
         if (Parent != Child)
             AddRefEntryRecursive(Parent);
         if (Parent->Children.size() < RequiredCount)
@@ -2230,6 +2220,7 @@ GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int 
     }
     return GR_OK;
 }
+
 GENRESULT DACOM_API FTextureLibrary::ResolveTextureRecord(int Id, void** Out)
 {
     // FUN_06ec3290 retains Source before proving it is indexed by name.
@@ -2249,6 +2240,7 @@ GENRESULT DACOM_API FTextureLibrary::ResolveTextureRecord(int Id, void** Out)
     }
     return GR_GENERIC;
 }
+
 GENRESULT DACOM_API FTextureLibrary::EnumGroup(int Index, int* OutId)
 {
     if ((unsigned int)Index >= (unsigned int)GroupRecords.size() + 1u)

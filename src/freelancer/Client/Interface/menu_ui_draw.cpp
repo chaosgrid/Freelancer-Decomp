@@ -59,8 +59,7 @@ namespace
         if (Pipe == nullptr)
             return;
 
-        // Seven arguments: slot 70 pops 0x20, and both retail call sites in Freelancer.exe
-        // (0x004217b6, 0x00421973) push a trailing dword this one used to leave off.
+        // Seven arguments: slot 70 pops 0x20, and both retail call sites push a trailing dword.
         Pipe->DrawIndexedPrimitiveUp(Prim, static_cast<unsigned int>(Fvf), Verts, VertexCount,
                                      Indices, IndexCount, 0);
     }
@@ -235,7 +234,7 @@ namespace
 
 void MenuSetup2DRenderState()
 {
-    // Retail FUN_00403ea0 state-apply half (cached). Geometry batch flush deferred.
+    // The state-apply half of FUN_00403ea0 only; no geometry flush.
     ApplyScreenQuadRenderStates(GetPipeline());
 }
 

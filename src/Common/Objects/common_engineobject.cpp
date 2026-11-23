@@ -18,9 +18,7 @@ using CmnCobject::CopyMatrix9;
 
 namespace
 {
-
-    // EngineObject::update_tree .text:0627caf0..0627cb05: IEngine +0x6c UpdateInstance(
-    // instance, 0, 0) -- no test on DALib::Engine.
+    // IEngine +0x6c, as update_tree calls it: no test on DALib::Engine.
     void UpdateEngineInstance(long Instance)
     {
         DALib::Engine->UpdateInstance((void*)Instance, 0, nullptr);
@@ -29,7 +27,7 @@ namespace
 
 EngineObject::EngineObject()
 {
-    // Common.dll.c 0xa98a0 -- identity diagonal, instance -1.
+    // FUN_063098a0
     EngineInstanceId = -1;
     memset(&Orientation, 0, sizeof(Orientation));
     Orientation.E[0][0] = 1.0f;
@@ -51,19 +49,19 @@ EngineObject::~EngineObject()
 
 void DACOM_API EngineObject::initialize_instance(long Inst)
 {
-    // Listing 0xa9910. this+4 = FEngineInstance*.
+    // FUN_06309910 (+0x04)
     EngineInstanceId = (int)Inst;
 }
 
 void DACOM_API EngineObject::create_instance(long Inst)
 {
-    // Listing 0x2f050 RET. EngBase slot 1 = AddRef stub.
+    // FUN_0628f050, an empty body (EngBase slot 1).
     (void)Inst;
 }
 
 void DACOM_API EngineObject::destroy_instance(long Inst)
 {
-    // Listing 0xa9920. Clears this+4 only.
+    // FUN_06309920
     (void)Inst;
     EngineInstanceId = -1;
 }
@@ -107,8 +105,7 @@ Transform const& DACOM_API EngineObject::get_transform(long Inst) const
 void DACOM_API EngineObject::get_centered_radius(long Inst, float* OutRadius,
                                                  Vector* OutCenter) const
 {
-    // .text:06309a30..06309a54: *OutRadius = [this+0x38], *OutCenter = [this+0x3c..+0x44];
-    // Inst unused, no null tests on the outputs.
+    // FUN_06309a30 (+0x38, +0x3c). No null tests on the outputs.
     (void)Inst;
     *OutRadius = Radius;
     *OutCenter = RadiusCenter;
@@ -142,7 +139,7 @@ bool DACOM_API EngineObject::joint_changed(long Inst)
 
 Vector const& DACOM_API EngineObject::get_velocity(long Inst) const
 {
-    // Listing 0xa99b0. Always the zero vector at this level.
+    // FUN_063099b0
     (void)Inst;
     static const Vector Zero = {0.0f, 0.0f, 0.0f};
     return Zero;
@@ -150,14 +147,14 @@ Vector const& DACOM_API EngineObject::get_velocity(long Inst) const
 
 void DACOM_API EngineObject::set_velocity(long Inst, Vector const& Vel)
 {
-    // .text:062a8910: RET 0xc.
+    // FUN_062a8910, an empty body.
     (void)Inst;
     (void)Vel;
 }
 
 Vector const& DACOM_API EngineObject::get_angular_velocity(long Inst) const
 {
-    // Listing 0xa99f0. Always the zero vector at this level.
+    // FUN_063099f0
     (void)Inst;
     static const Vector Zero = {0.0f, 0.0f, 0.0f};
     return Zero;
@@ -165,26 +162,26 @@ Vector const& DACOM_API EngineObject::get_angular_velocity(long Inst) const
 
 void DACOM_API EngineObject::set_angular_velocity(long Inst, Vector const& AngVel)
 {
-    // .text:062a8910: RET 0xc (the same body as set_velocity).
+    // FUN_062a8910 (shared with set_velocity)
     (void)Inst;
     (void)AngVel;
 }
 
 void EngineObject::set_position(Vector const& Pos)
 {
-    // Listing 0x1cb10.
+    // FUN_0627cb10
     WorldPosition = Pos;
 }
 
 void EngineObject::set_orientation(Matrix const& Orient)
 {
-    // Listing 0x1cb30. 9 floats to this+8.
+    // FUN_0627cb30 (+0x08)
     CopyMatrix9(Orientation, Orient);
 }
 
 void EngineObject::set_transform(Transform const& Xform)
 {
-    // Listing 0x1cb50. 12 floats to this+8 (3x3 then pos).
+    // FUN_0627cb50
     CopyMatrix9(Orientation, Xform.Rotation);
     WorldPosition = Xform.Translation;
 }
@@ -197,19 +194,19 @@ Transform const& EngineObject::get_transform() const
 
 Matrix const& EngineObject::get_orientation() const
 {
-    // .text:06263b80: LEA EAX,[this+0x8]; RET.
+    // FUN_06263b80 (+0x08)
     return Orientation;
 }
 
 Vector const& EngineObject::get_position() const
 {
-    // .text:06356500: LEA EAX,[this+0x2c]; RET.
+    // FUN_06356500 (+0x2c)
     return WorldPosition;
 }
 
 long EngineObject::get_index() const
 {
-    // .text:062d1ad0: MOV EAX,[this+0x4]; RET.
+    // FUN_062d1ad0 (+0x04)
     return EngineInstanceId;
 }
 
@@ -220,14 +217,12 @@ float const EngineObject::get_radius() const
 
 void EngineObject::update_tree() const
 {
-    // Listing 0x1caf0. IEngine+0x6c(this+4, 0, 0).
+    // FUN_0627caf0
     UpdateEngineInstance(EngineInstanceId);
 }
 
 void EngineObject::set_centered_radius(float NewRadius, Vector const& Center)
 {
-    // Listing 0x1cb80: (**(this->vtbl + 0x28))(this, EngineInstanceId, NewRadius, Center).
-    // Vtable slot 0x28 is IEngineInstance::set_centered_radius(Inst, Radius, Center),
-    // so this is exactly a polymorphic call to that overload with EngineInstanceId.
+    // FUN_0627cb80. A virtual call (vtable +0x28) to the IEngineInstance overload.
     set_centered_radius(EngineInstanceId, NewRadius, Center);
 }

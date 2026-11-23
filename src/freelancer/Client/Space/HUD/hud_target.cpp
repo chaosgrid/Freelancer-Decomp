@@ -47,7 +47,7 @@
 namespace
 {
     // DAT_00674b1c -- the 3DMathEngine HUD_Target_Base.cpp acquires lazily (FUN_005b73e0) in
-    // FUN_004e65d0 / FUN_004e6880 / FUN_004e68d0 / FUN_004e69c0 / FUN_004e79f0.
+    // the FHudInstanceBounds helpers and PickSubTarget.
     I3DMathEngine* G_HudTargetMath = nullptr;
 
     // DAT_006649c0 -- FUN_00422c70's own lazily acquired 3DMathEngine.
@@ -102,9 +102,8 @@ namespace
         {0x00020000u, 0x719u}, {0x00040000u, 0x71au}, {0x00080000u, 0x71bu},
     };
 
-    // The inlined chain retail spells out at every use (0x004e6166.., 0x004e7a20.., 0x004e7e2e..):
-    // watched -> -8 (IObjRW) -> +0xc (IObjInspectImpl's CBase) -> +4 (CBase::Object), null
-    // anywhere along it -> null.
+    // The inlined chain retail spells out at every use: watched -> -8 (IObjRW) -> +0xc
+    // (IObjInspectImpl's CBase) -> +4 (CBase::Object), null anywhere along it -> null.
     CObject* CObjectOfWatcher(BaseWatcher const& Watcher)
     {
         Watchable const* const Watched = Watcher.target();
@@ -136,8 +135,7 @@ namespace
         return Value;
     }
 
-    // FILD byte / FMUL 0.7f / ftol: the product of an 8-bit integer and a float is exact in
-    // double, and ftol truncates.
+    // The product of an 8-bit integer and a float is exact in double, and ftol truncates.
     int DimChromeByte(unsigned char Byte)
     {
         return static_cast<int>(static_cast<double>(Byte) * static_cast<double>(kViewWireDim));
@@ -150,7 +148,7 @@ namespace
 
 FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In)
 {
-    // FUN_004e6880: InverseTransform into a local, then copied to Out.
+    // FUN_004e6880.
     FVector Local;
     HudTargetMath()->InverseTransform(Local, *Xform, *In);
     *Out = Local;
@@ -160,7 +158,7 @@ FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector
 FHudInstanceBounds::FHudInstanceBounds(void* Instance, FTransform const* Xform,
                                        bool bIncludeShieldParts)
 {
-    // FUN_004e65d0: the root part's sphere (extent flag 0, radius pre-zeroed).
+    // FUN_004e65d0: the root part's sphere.
     float Radius = 0.0f;
     FVector Center;
     DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &Center.X);
@@ -169,7 +167,7 @@ FHudInstanceBounds::FHudInstanceBounds(void* Instance, FTransform const* Xform,
     HudTargetMath()->TransformXform(World, *Transform, Center);
     Center = World;
 
-    // Two separate InverseTransform calls, one for Min and one for Max (0x004e6676 / 0x004e66d5).
+    // Retail calls InverseTransform twice, once for Min and once for Max.
     FVector Local;
     HudTargetMath()->InverseTransform(Local, *Xform, Center);
     Min.X = Local.X - Radius;
@@ -181,7 +179,6 @@ FHudInstanceBounds::FHudInstanceBounds(void* Instance, FTransform const* Xform,
     Max.Y = Local.Y + Radius;
     Max.Z = Local.Z + Radius;
 
-    // 0x004e6717..0x004e686d: the child loop -- the same body as FUN_004e69c0.
     ExpandChildren(Instance, Xform, bIncludeShieldParts);
 }
 
@@ -197,7 +194,7 @@ FVector* FHudInstanceBounds::GetCenter(FVector* Out) const
 void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
                                         bool bIncludeShieldParts)
 {
-    // FUN_004e69c0: GetRelatedInstance(Instance, 1, cursor) from -1 until it returns -1.
+    // FUN_004e69c0.
     void* Child = DALib::Engine->GetRelatedInstance(Instance, 1, NoInstance());
     while (Child != NoInstance())
     {
@@ -206,8 +203,7 @@ void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
             FVector Center;
             float const Radius = GetPartSphere(Child, &Center);
 
-            // Min: v - (r, r, r), component-wise minimum (FCOMP / TEST AH,5 / JP: taken only
-            // when strictly below).
+            // Min: a component moves only when strictly below.
             FVector Local;
             HudInverseTransformPoint(Xform, &Local, &Center);
             FVector Low;
@@ -227,8 +223,7 @@ void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
                 Min.Z = Low.Z;
             }
 
-            // Max: the transform again, v + (r, r, r), component-wise maximum (TEST AH,0x41 /
-            // JNZ: taken only when strictly above).
+            // Max: the transform again; a component moves only when strictly above.
             HudInverseTransformPoint(Xform, &Local, &Center);
             FVector High;
             High.X = Local.X + Radius;
@@ -255,8 +250,7 @@ void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
 
 float FHudInstanceBounds::GetPartSphere(void* Instance, FVector* OutCenter) const
 {
-    // FUN_004e68d0: radius pre-zeroed, extent flag 0 straight into OutCenter, then OutCenter is
-    // moved through the instance transform.
+    // FUN_004e68d0.
     float Radius = 0.0f;
     DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &OutCenter->X);
     FTransform const* const Transform = InstanceTransform(Instance);
@@ -291,7 +285,7 @@ FHudSpherePick::FHudSpherePick(unsigned char Flag)
 
 void FHudSpherePick::Setup(FVector const* From, FVector const* To)
 {
-    // FUN_00422bc0: FDIVR 1.0 by the FSQRT of the squared length, then each component scaled.
+    // FUN_00422bc0: one reciprocal of the double-precision length, then each component scaled.
     Origin = *From;
     Dir.X = To->X - Origin.X;
     Dir.Y = To->Y - Origin.Y;
@@ -325,7 +319,7 @@ float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector con
     ToCenter.Y = World.Y - Origin->Y;
     ToCenter.Z = World.Z - Origin->Z;
 
-    // t = V.D summed x, z, y; the branch is taken on t < 0 (FCOM 0.0 / TEST AH,5 / JP).
+    // t = V.D summed x, z, y, in retail's order.
     float const Along = ToCenter.X * Dir->X + ToCenter.Z * Dir->Z + ToCenter.Y * Dir->Y;
     float Cosine = 1.0f;
     if (Along < 0.0f)
@@ -351,7 +345,7 @@ float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector con
     OutSurface->Y = World.Y + Gap.Y * Scale;
     OutSurface->Z = World.Z + Gap.Z * Scale;
 
-    // FCOMP Radius / TEST AH,5 / JP: the ray point snaps to the surface only when inside.
+    // The ray point snaps to the surface only when inside.
     if (Distance < Radius)
     {
         *OutRay = *OutSurface;
@@ -383,7 +377,7 @@ bool FHudSpherePick::Test(void* Instance, float Slack)
     float const Cosine = HudRaySphereClosest(&Origin, &Dir, &Center, Radius, &RayPoint,
                                              &SurfacePoint, Transform);
 
-    // FCOM double 0.5 / TEST AH,0x41 / JNZ: only a cosine strictly above 0.5 goes on.
+    // Compared against a double 0.5; only a cosine strictly above goes on (NaN stops).
     if (!(Cosine > 0.5))
     {
         return bHit;
@@ -393,12 +387,12 @@ bool FHudSpherePick::Test(void* Instance, float Slack)
     float const Dy = RayPoint.Y - SurfacePoint.Y;
     float const Dz = RayPoint.Z - SurfacePoint.Z;
     float const Gap = sqrtf(Dx * Dx + Dz * Dz + Dy * Dy);
-    // FCOMP Slack / TEST AH,0x41 / JP: on when the gap is below or equal to the slack.
+    // NaN stops here too.
     if (!(Gap <= Slack))
     {
         return bHit;
     }
-    // FCOMP BestKey / TEST AH,5 / JP: a later hit must be strictly better.
+    // A later hit must be strictly better.
     if (HitCount != 0 && !(Key < BestKey))
     {
         return bHit;
@@ -429,16 +423,15 @@ bool HudIsMousePickBlocked()
     {
         return true;
     }
-    if (IsClientLocationInTransition()) // DAT_00668761 (0x0045a75b)
+    if (IsClientLocationInTransition()) // DAT_00668761
     {
         return true;
     }
-    // FUN_004c4810 -- docked: XOR AL,AL / RET.
+    // Docked (FUN_004c4810).
     if ((GetPlayerBaseIdRetail() & 0x3fffffffu) != 0)
     {
         return false;
     }
-    // NEG / SBB / INC over FUN_0054baf0.
     return GetPlayerObjRW() == nullptr;
 }
 
@@ -457,8 +450,7 @@ unsigned HudCollisionGroupTypeIds(unsigned CollisionGroupType)
 
 unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
 {
-    // FUN_0045a1a0. The first two bands: FCOMP / TEST AH,5 / JP leaves a band on "not below"
-    // (unordered included), so each is taken only for Damage strictly below its bound.
+    // FUN_0045a1a0. A NaN Damage skips the first two bands and takes the third.
     if (Damage < 0.25f)
     {
         memcpy(OutArgb, G_HudChromeColorRgba, sizeof(G_HudChromeColorRgba)); // DAT_00679bb4
@@ -469,15 +461,14 @@ unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
         *OutArgb = 0xff4080ffu; // bytes ff, 80, 40, ff
         return OutArgb;
     }
-    // TEST AH,0x41 / JNZ: "below, equal or unordered" takes the third band.
     if (!(Damage > 0.75f))
     {
         *OutArgb = 0xff4040ffu; // bytes ff, 40, 40, ff
         return OutArgb;
     }
 
-    // 0x0045a1f7: the pulse phase stored as a float over the argument, flipped by the
-    // direction byte; FLD 255.0 / FMUL ST1 / ftol, then FILD of that byte / FMUL ST1 / ftol.
+    // The pulse phase is rounded to float, then flipped by the direction byte; R = ftol(255 * t)
+    // and G = ftol(R * t) are computed in double.
     float const Phase = NnUiPulsePhaseNorm();
     double const Level = (NnUiPulseDirection() != 0) ? 1.0 - static_cast<double>(Phase)
                                                       : static_cast<double>(Phase);
@@ -492,7 +483,7 @@ unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
 int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
 {
     // FUN_004c71b0. Retail's Project outputs x / y / z and the rectangle's fallback values share
-    // the four stack dwords [ESP+0xc..0x18]. Project writes nothing when it fails, and the pair
+    // four stack dwords. Project writes nothing when it fails, and the pair
     // of a failed projection takes the raw bits left there: left / top from the x / y slots,
     // right / bottom from the z slot and a fourth dword nothing writes. The port keeps the same
     // overlay; what it holds on a failure is as undefined as in retail.
@@ -540,7 +531,7 @@ int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
 
 FVector* HudTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In)
 {
-    // FUN_004e7090: TransformXform into a stack vector through DAT_00674b1c, copied to Out.
+    // FUN_004e7090.
     FVector Result;
     HudTargetMath()->TransformXform(Result, *Xform, *In);
     *Out = Result;
@@ -549,8 +540,7 @@ FVector* HudTransformPoint(FTransform const* Xform, FVector* Out, FVector const*
 
 CShip* HudShipOfObjRw(IObjRW* ObjRw)
 {
-    // FUN_00543320: ECX null -> 0; LEA ECX+0xc (the IObjInspectImpl CBase) null -> 0; its +4
-    // Object null -> 0; (Object+0x4c & 0x503) == 0x503 -> Object, else 0.
+    // FUN_00543320.
     if (ObjRw == nullptr)
     {
         return nullptr;
@@ -591,8 +581,8 @@ namespace
         return Base->cobject();
     }
 
-    // CShip +0x1b4 -- the multiplayer group id (common_basefollowerbehavior.cpp .text:062cb7a2 compares the
-    // same field between two player ships) -- CShip::GroupId, read by offset from a CObject.
+    // CShip +0x1b4 -- CShip::GroupId, the multiplayer group id (common_basefollowerbehavior.cpp
+    // compares the same field between two player ships), read by offset from a CObject.
     unsigned HudShipGroupId(CObject const* Ship)
     {
         unsigned Value = 0;
@@ -603,8 +593,7 @@ namespace
 
 bool HudIsUnvisitedSolar(CSimple const* Object)
 {
-    // FUN_004d4c70.
-    // 0x004d4c75..0x004d4cae: a watch-listed client object of a matching type is known.
+    // FUN_004d4c70. A watch-listed client object of a matching type is known.
     FClientGameobj* const Gameobj = ClientObjDb_FindObject(Object->Id, 0); // FUN_005416c0
     if (Gameobj != nullptr)
     {
@@ -613,14 +602,13 @@ bool HudIsUnvisitedSolar(CSimple const* Object)
         if ((Type & 0x107ffdffu) != 0 && Gameobj->bWatchListed != 0)
             return false;
     }
-    // 0x004d4cb0..0x004d4cbf: only a solar can be unvisited.
     if ((static_cast<unsigned>(Object->ObjectClass) & 0x303u) != 0x303u)
         return false;
-    // 0x004d4cc4..0x004d4cf3: the solar's own visit byte OR the visit-map flags (zero when the
-    // id has no entry: FUN_004c4da0 leaves the pre-cleared byte alone); bit 0 means visited.
+    // The solar's own visit byte OR the visit-map flags (zero when the id has no entry:
+    // FUN_004c4da0 leaves the pre-cleared byte alone); bit 0 means visited.
     unsigned char const OwnVisit = static_cast<CSolar const*>(Object)->GetVisitValue();
     unsigned char MapFlags = 0;
-    GetPlayerVisitFlagsRetail(Object->Id, &MapFlags, 0, 0); // 0x004d4ce1
+    GetPlayerVisitFlagsRetail(Object->Id, &MapFlags, 0, 0);
     return ((MapFlags | OwnVisit) & 1u) == 0;
 }
 
@@ -634,7 +622,7 @@ unsigned char HudObjectVisitFlags(CObject const* Object)
     CSolar const* const Solar = static_cast<CSolar const*>(Object);
     unsigned char const OwnVisit = Solar->GetVisitValue();
     unsigned char MapFlags = 0;
-    GetPlayerVisitFlagsRetail(Solar->Id, &MapFlags, 0, 0); // 0x004d4d38
+    GetPlayerVisitFlagsRetail(Solar->Id, &MapFlags, 0, 0);
     return static_cast<unsigned char>(MapFlags | OwnVisit);
 }
 
@@ -668,9 +656,8 @@ namespace
     unsigned G_CaptionOwnerBaseId = 0;
     unsigned G_CaptionOwnerIdsName = 0;
 
-    // The copy every FUN_004e8100 / FUN_005472d0 exit ends with: reserve Length + 1, wcsncpy
-    // Length chars, terminate. The reserve is FUN_004142a0's body, which retail inlines at
-    // 0x004e84db, 0x004e8657, 0x004e88be and 0x005472e5 -- WideTextReserve (font_string.cpp).
+    // The copy every FUN_004e8100 / FUN_005472d0 exit ends with. The reserve is FUN_004142a0
+    // (WideTextReserve, font_string.cpp), which retail inlines.
     void HudWideTextAssign(FHudWideText* Out, wchar_t const* Source, size_t Length)
     {
         WideTextReserve(Out, static_cast<unsigned>(Length + 1));
@@ -685,9 +672,9 @@ namespace
         return true;
     }
 
-    // 0x004e8c3e..0x004e8cce (and 0x004e8916..0x004e89a1): the system's strid_name (ISystem
-    // slot 3) and ids 0x561 when the player's system resolves, then the nav-map sector of the
-    // object. Retail passes the capacity to FUN_0048dc10 as a third argument it never reads.
+    // The system's strid_name (ISystem slot 3) and ids 0x561 when the player's system resolves,
+    // then the nav-map sector of the object. Retail passes the capacity to FUN_0048dc10 as a
+    // third argument it never reads.
     void HudCaptionAppendLocation(CSimple const* Object)
     {
         Universe::ISystem const* const System =
@@ -704,8 +691,7 @@ namespace
         wcscat(G_NnTextScratchB, G_NnTextScratchA);
     }
 
-    // 0x004e823f..0x004e8284 (also 0x004e87d1.., 0x004e8b92..): " (%d)" (u" (%d)" 0x005cfb88)
-    // for a loot object ((class & 0x803) == 0x803) of more than one unit (CLoot +0xf0).
+    // " (%d)" (u" (%d)" 0x005cfb88) for a loot object ((class & 0x803) == 0x803) of more than one unit (CLoot +0xf0).
     void HudCaptionAppendLootCount(CSimple const* Object)
     {
         if ((static_cast<unsigned>(Object->ObjectClass) & 0x803u) != 0x803u)
@@ -722,8 +708,7 @@ namespace
         wcscat(G_NnTextScratchB, Count);
     }
 
-    // 0x004e8c19..0x004e8c3e: Mode 2 puts "\n" (0x005d0254) and the location after the name
-    // line, Mode 1 the location alone, any other mode nothing; then the exit copy.
+    // "\n" is 0x005d0254.
     bool HudCaptionLocationTail(CSimple const* Object, FHudWideText* Out, int Mode)
     {
         if (Mode == 2)
@@ -738,10 +723,9 @@ namespace
         return HudCaptionFinish(Out);
     }
 
-    // 0x004e81f6..0x004e8284 for an object that is not a CEqObj, and its copy 0x004e8b4a..
-    // 0x004e8be1 for a CEqObj without a faction: the ids_name as the name line; a loot-type
-    // object (TypeBits == 0x10000000) answers only in Mode 0 / 2 and takes the unit count
-    // instead of a location.
+    // An object that is not a CEqObj, and (a second retail copy) a CEqObj without a faction:
+    // the ids_name as the name line; a loot-type object (TypeBits == 0x10000000) answers only
+    // in Mode 0 / 2 and takes the unit count instead of a location.
     bool HudCaptionPlain(CSimple const* Object, unsigned Name, unsigned TypeBits,
                          FHudWideText* Out, int Mode)
     {
@@ -771,17 +755,15 @@ unsigned GetObjectIdsName(CObject const* Object)
     }
     if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
     {
-        // 0x005472b9: Archetype (+0x88) -> ids_name (+0x14), no null test.
+        // No null test on Archetype, as retail.
         return static_cast<unsigned>(Object->Archetype->IdsName);
     }
-    // 0x005472c3: JMP [vtable + 0x88] -- CSimple::get_name.
     return static_cast<CSimple const*>(Object)->get_name();
 }
 
 unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out)
 {
-    // FUN_005472d0 (cdecl).
-    // 0x005472d4..0x00547336: Out = "" (DAT_005c8ce0).
+    // FUN_005472d0. Out = "" (DAT_005c8ce0) first.
     wchar_t const* const Empty = L"";
     HudWideTextAssign(Out, Empty, wcslen(Empty));
     if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
@@ -793,7 +775,6 @@ unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out)
         }
         else
         {
-            // 0x005473c1..0x005473cd
             if (Out->Text == nullptr)
             {
                 return 0;
@@ -804,7 +785,6 @@ unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out)
             }
         }
     }
-    // 0x005473d2..0x005473ed
     if (Out->Text == nullptr)
     {
         return 0;
@@ -814,8 +794,7 @@ unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out)
 
 void NavMapSectorName(Vector const* Pos, wchar_t* Out)
 {
-    // FUN_0048dc10 (cdecl).
-    // 0x0048dc16..0x0048dc3a: the system's NavMapScale (slot 20, +0x50), 1.0 without a system.
+    // FUN_0048dc10.
     float Scale = 1.0f;
     Universe::ISystem const* const System =
         Universe::get_system(GetPlayerStarSystemIdRetail()); // FUN_004c4830
@@ -823,16 +802,13 @@ void NavMapSectorName(Vector const* Pos, wchar_t* Out)
     {
         Scale = System->GetNavMapScale();
     }
-    // 0x0048dc45..0x0048dc69: the row coordinate z * scale + 2700 (DAT_005d2ef4), the column
-    // coordinate x * scale, and the format ids 0x54d into a 0x40-char buffer.
-    float const RowCoord = Scale * Pos->z + 2700.0f;
+    float const RowCoord = Scale * Pos->z + 2700.0f; // DAT_005d2ef4
     float const ColumnCoord = Scale * Pos->x;
     wchar_t Format[0x40];
     GetIdsStringWWithRawFallback(0x54d, Format, 0x40);
 
-    // 0x0048dc72..0x0048dcbb: the first band (from -99999, DAT_005d2ef0, step 33333,
-    // DAT_005d2eec) the coordinate lies below, capped at 8. TEST AH,5 / JNP leaves on "below"
-    // only; equal and unordered step on.
+    // The first band (from -99999, DAT_005d2ef0, step 33333, DAT_005d2eec) the coordinate lies
+    // below, capped at 8; equal and NaN step on.
     int Row = 0;
     float Bound = -99999.0f;
     for (Row = 0; Row < 8; ++Row)
@@ -854,8 +830,7 @@ void NavMapSectorName(Vector const* Pos, wchar_t* Out)
         Bound += 33333.0f;
     }
 
-    // 0x0048dcbd..0x0048dd09: the row and column captions (0x10 chars each), then the legacy
-    // two-argument swprintf of msvcrt (no bound on Out) -- Format(RowText, ColumnText).
+    // The legacy unbounded swprintf of msvcrt, as retail (no bound on Out).
     wchar_t RowText[0x10];
     wchar_t ColumnText[0x10];
     GetIdsStringWWithRawFallback(0x515 + Row, RowText, 0x10);
@@ -865,7 +840,7 @@ void NavMapSectorName(Vector const* Pos, wchar_t* Out)
 
 unsigned HudObjectKindIds(unsigned TypeBits)
 {
-    // FUN_004e8060 (cdecl).
+    // FUN_004e8060.
     if ((TypeBits & 0x1u) != 0)
         return 0x563;
     if ((TypeBits & 0x2u) != 0)
@@ -892,13 +867,12 @@ unsigned HudObjectKindIds(unsigned TypeBits)
         return 0x56b;
     if ((TypeBits & 0x1000u) != 0)
         return 0x56c;
-    // 0x004e80ee: AND 0x2000 / NEG / SBB / AND 0x56d.
     return (TypeBits & 0x2000u) != 0 ? 0x56du : 0u;
 }
 
 bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
 {
-    // FUN_004e8d30 (cdecl).
+    // FUN_004e8d30.
     CSolar const* Ring = nullptr;
     if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x303u) == 0x303u)
     {
@@ -910,8 +884,8 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
         return false;
     }
 
-    // 0x004e8d7b..0x004e8e3d: the ring's -z axis (its orientation, +0x08, copied with REP
-    // MOVSD, times (0, 0, -1)), normalised, and the plane offset -(n . ring position).
+    // The ring's -z axis (its orientation, +0x08, times (0, 0, -1)), normalised, and the plane
+    // offset -(n . ring position).
     FMatrix const Orientation = reinterpret_cast<FMatrix const&>(Object->Orientation);
     FVector const Back = {0.0f, 0.0f, -1.0f};
     if (G_HudObjectsMath == nullptr)
@@ -920,9 +894,8 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
     }
     FVector Axis;
     G_HudObjectsMath->TransformMatrix(Axis, Orientation, Back); // vt+0x2c
-    // 0x004e8dc9..0x004e8e04: (x*x + y*y) + z*z, FSQRT, FDIVR 1.0f -- inline, not FUN_00410190;
-    // the reciprocal stays on the FPU (double here). X and Y are stored as float; Z is FST'd
-    // to float but the unrounded product feeds the plane offset straight away (0x004e8e22).
+    // Inline, not FUN_00410190: the reciprocal stays in double. X and Y are rounded to float;
+    // Z is too, but the unrounded product feeds the plane offset.
     double const Inverse = 1.0 / sqrt(static_cast<double>(Axis.X) * Axis.X +
                                       static_cast<double>(Axis.Y) * Axis.Y +
                                       static_cast<double>(Axis.Z) * Axis.Z);
@@ -935,14 +908,13 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
         -(NormalZExact * RingPos.z + static_cast<double>(NormalY) * RingPos.y +
           static_cast<double>(NormalX) * RingPos.x));
 
-    // 0x004e8e41..0x004e8e86: the player's side of that plane (IObjInspect slot 0,
-    // get_position); TEST AH,0x41 takes only "greater than 0".
+    // The player's side of that plane.
     Vector const PlayerPos = Player->get_position();
     bool const bSwap =
         (PlayerPos.z * NormalZ + PlayerPos.y * NormalY + PlayerPos.x * NormalX) + PlaneOffset >
         0.0f;
 
-    // 0x004e8e88..0x004e8ec6: follow PrevRing (+0x1d8) to the first ring of the lane.
+    // Follow PrevRing (+0x1d8) to the first ring of the lane.
     CSolar const* Head = Ring;
     while (Head->PrevRing != 0)
     {
@@ -955,7 +927,7 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
     }
     unsigned First = Head->get_tradelane_space_name();
 
-    // 0x004e8ee1..0x004e8f1b: and NextRing (+0x1dc) to the last.
+    // And NextRing (+0x1dc) to the last.
     CSolar const* Tail = Ring;
     while (Tail->NextRing != 0)
     {
@@ -978,8 +950,8 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
         Second = Swap;
     }
 
-    // 0x004e8f35..0x004e8fc7: First "->" Second, each through a 0x100-char buffer (0xff read),
-    // refused when the running length (+2 for the arrow) reaches Capacity (signed JGE).
+    // First "->" Second, refused when the running length (+2 for the arrow) reaches Capacity
+    // (signed compare).
     wchar_t Text[0x100];
     GetIdsStringWWithRawFallback(First, Text, 0xff);
     int const FirstLength = static_cast<int>(wcslen(Text)) + 2;
@@ -1001,12 +973,10 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
 bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                            bool bFactionShortName)
 {
-    // FUN_004e8100 (cdecl).
+    // FUN_004e8100.
     wchar_t* const Line = G_NnTextScratchB;    // DAT_0066fc60
     wchar_t* const Scratch = G_NnTextScratchA; // DAT_0066dc60
 
-    // 0x004e811f..0x004e8165: the type bits, the ids_name, an empty line, and the watch-list
-    // byte (+0xa8) of the object's client gameobj when TypeBits & 0xfdff.
     unsigned const TypeBits = Object->TypeBits;
     unsigned const Name = GetObjectIdsName(Object); // FUN_005472a0
     Line[0] = 0;
@@ -1017,8 +987,6 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         bWatched = Gameobj->bWatchListed;
     }
 
-    // 0x004e816b..0x004e81d1: TypeBits bit 15 or a watched object, with a name: the name line
-    // (Mode 0 / 2) and the location tail.
     if (((TypeBits & 0x8000u) != 0 || bWatched != 0) && Name != 0)
     {
         if (Mode == 0 || Mode == 2)
@@ -1028,7 +996,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionLocationTail(Object, Out, Mode);
     }
 
-    // 0x004e81d6..0x004e81f1: anything but a CEqObj.
+    // Anything but a CEqObj.
     if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
     {
         if (Name == 0)
@@ -1038,14 +1006,13 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionPlain(Object, Name, TypeBits, Out, Mode);
     }
 
-    // 0x004e8289..0x004e82b6: the faction of the object's reputation instance (+0x104).
+    // The faction of the object's reputation instance (+0x104).
     CEqObj const* const EqObj = static_cast<CEqObj const*>(Object);
-    int const VibeId = static_cast<int>(EqObj->VibeId); // local_118
-    unsigned Affiliation = 0;                          // local_114, written by GetAffiliation
+    int const VibeId = static_cast<int>(EqObj->VibeId);
+    unsigned Affiliation = 0;
     if (Reputation::Vibe::GetAffiliation(VibeId, Affiliation, false) != 0 ||
         Affiliation == 0xffffffffu)
     {
-        // 0x004e89a9..0x004e8b45
         if (Name == 0)
         {
             return false;
@@ -1073,14 +1040,13 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return false;
     }
 
-    // 0x004e82bc..0x004e82d4
-    unsigned const ShortName = Reputation::get_short_name(Affiliation); // [ESP+0x14]
+    unsigned const ShortName = Reputation::get_short_name(Affiliation);
     if ((TypeBits & 0x7f0000u) != 0)
     {
-        // 0x004e82da..0x004e8558: the instance's two FmtStr names (ctors inlined, trylevel 2/3).
+        // The instance's two FmtStr names.
         FmtStr Name1;
         FmtStr Name2;
-        wchar_t const* DisplayName = nullptr; // [ESP+0x48]; GetName writes it on success
+        wchar_t const* DisplayName = nullptr; // GetName writes it on success
         if (Reputation::Vibe::GetName(VibeId, Name1, Name2, DisplayName) == 0)
         {
             bool const bNoName1 = Name1.MadLibId == 0;
@@ -1097,7 +1063,6 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
             }
             if (Mode == 1 || Mode == 2)
             {
-                // 0x004e8417..0x004e84c8
                 if (EqObj->OwnerPlayer != 0 && DisplayName != nullptr)
                 {
                     wcscat(Line, DisplayName);
@@ -1112,7 +1077,6 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                         {
                             Short[0] = 0;
                         }
-                        // JA on length > 1, else a first char other than ' '.
                         if (wcslen(Short) > 1 || Short[0] != L' ')
                         {
                             wcscat(Line, Short);
@@ -1123,14 +1087,12 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                     wcscat(Line, Scratch);
                 }
             }
-            // 0x004e84cb..0x004e8558: the exit copy, then both FmtStr dtors (Name2 first).
             return HudCaptionFinish(Out);
         }
-        // 0x004e855d..0x004e8582: both dtors, then on to the base captions.
     }
 
-    // 0x004e8584..0x004e863d: docked at a base (+0x160) with a faction short name: the short
-    // name + ids 0x562 as the name line, the ids_name as the location line.
+    // Docked at a base (+0x160) with a faction short name: the short name + ids 0x562 as the
+    // name line, the ids_name as the location line.
     if (EqObj->DockingBaseId != 0 && ShortName != 0)
     {
         if (Mode == 0 || Mode == 2)
@@ -1151,12 +1113,12 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionFinish(Out);
     }
 
-    // 0x004e8684..0x004e8699: the object-kind ids, else the ids_name, as the second word.
-    unsigned const KindIds = HudObjectKindIds(TypeBits); // FUN_004e8060
+    // The object-kind ids, else the ids_name, as the second word.
+    unsigned const KindIds = HudObjectKindIds(TypeBits);
     unsigned const SecondIds = KindIds != 0 ? KindIds : Name;
     if (Mode == 0 || Mode == 2)
     {
-        // 0x004e86b3..0x004e8758: the first word is the faction short name, or for TypeBits
+        // The first word is the faction short name, or for TypeBits
         // 0x20 the ids_name of the solar whose client gameobj owns the base at +0x164 (bucket 2
         // walked through get_base, slot 35; the owner through cobject, slot 84), cached.
         unsigned FirstIds = ShortName;
@@ -1174,14 +1136,14 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                     FClientGameobj* Scan = nullptr;
                     for (;;)
                     {
-                        int Kind = 2; // [ESP+0x58], re-stored every pass
+                        int Kind = 2; // re-stored every pass, as retail
                         Scan = Scan != nullptr ? Scan->ListNext : ClientObjDb_GetKindHead(&Kind);
                         if (Scan == nullptr)
                         {
                             break;
                         }
-                        // Retail uses the short-name slot [ESP+0x14] for this; the short
-                        // name is already in EBP and the slot is not read again.
+                        // Retail reuses the short-name stack slot for this; the short name
+                        // is already held elsewhere and the slot is not read again.
                         unsigned Base = 0;
                         Scan->get_base(Base);
                         if (Base != OwnerBase)
@@ -1192,7 +1154,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                         if (Owner != nullptr &&
                             (static_cast<unsigned>(Owner->ObjectClass) & 3u) == 3u)
                         {
-                            FirstIds = GetObjectIdsName(Owner); // FUN_005472a0
+                            FirstIds = GetObjectIdsName(Owner);
                             G_CaptionOwnerBaseId = OwnerBase;
                             G_CaptionOwnerIdsName = FirstIds;
                         }
@@ -1201,14 +1163,13 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                 }
             }
         }
-        // 0x004e875c..0x004e87a6
         GetIdsStringWWithRawFallback(FirstIds, Line, G_NnTextScratchCapacity);
         GetIdsStringWWithRawFallback(SecondIds, Scratch, G_NnTextScratchCapacity);
         wcscat(Line, L" "); // DAT_005cef90
         wcscat(Line, Scratch);
     }
 
-    // 0x004e87b2..0x004e8815: a loot-type object answers only in Mode 0 / 2, with its count.
+    // A loot-type object answers only in Mode 0 / 2, with its count.
     if (TypeBits == 0x10000000u)
     {
         if (Mode != 0 && Mode != 2)
@@ -1219,7 +1180,6 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionFinish(Out);
     }
 
-    // 0x004e881a..0x004e8839
     if (Mode == 2)
     {
         wcscat(Line, L"\n");
@@ -1229,28 +1189,26 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionFinish(Out);
     }
 
-    // 0x004e8839..0x004e8870: a trade-lane ring (TypeBits bit 7) with an "A->B" caption.
+    // A trade-lane ring (TypeBits bit 7) with an "A->B" caption.
     if ((TypeBits & 0x80u) != 0 &&
-        HudTradelaneCaption(Object, Scratch, G_NnTextScratchCapacity)) // FUN_004e8d30
+        HudTradelaneCaption(Object, Scratch, G_NnTextScratchCapacity))
     {
         wcscat(Line, Scratch);
         return HudCaptionFinish(Out);
     }
-    // 0x004e8875..0x004e8911: TypeBits & 0x8c0 -- the ids_name.
     if ((TypeBits & 0x8c0u) != 0)
     {
         GetIdsStringWWithRawFallback(Name, Scratch, G_NnTextScratchCapacity);
         wcscat(Line, Scratch);
         return HudCaptionFinish(Out);
     }
-    // 0x004e8916..0x004e89a4: system name and sector.
     HudCaptionAppendLocation(Object);
     return HudCaptionFinish(Out);
 }
 
 void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
 {
-    // FUN_0045a4e0 (cdecl).
+    // FUN_0045a4e0.
     if (Other == nullptr || Player == nullptr)
     {
         *OutArgb = G_NnPaletteArgb_679b84;
@@ -1260,16 +1218,14 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
     FClientGameobj* const Gameobj = ClientObjDb_FindObject(Other->get_id(), 1);
     if (Gameobj != nullptr)
     {
-        // Ship gameobj byte +0x18c bit 2 (0x0045a517; bucket 1 holds ships only). No instruction
-        // in freelancer.exe sets bit 2 (writers: ctor 0x005434a5 zeroes the dword, 0x00543b71
-        // sets bit 3, 0x00545f07 bits 0/1, 0x005447c6 / 0x0051db60 / 0x0051db8d clear 0/1).
+        // Ship gameobj byte +0x18c bit 2 (bucket 1 holds ships only). No instruction in
+        // freelancer.exe sets bit 2 (the other writers touch bits 0, 1 and 3 only).
         if ((static_cast<FClientShipGameobj*>(Gameobj)->ShipFlags & 4) != 0)
         {
             *OutArgb = G_NnPaletteArgb_679b9c;
             return;
         }
-        // IObjInspect slot 47 (+0xbc) is_player, then a ship with a non-zero group id that the
-        // player's ship shares (0x0045a530..0x0045a59b).
+        // A player ship with a non-zero group id that the player's ship shares.
         if (Gameobj->is_player())
         {
             CObject* const Object = HudCObjectOf(Gameobj);
@@ -1279,9 +1235,9 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
                 IObjRW* const PlayerRw = static_cast<IObjRW*>(GetPlayerObjRW());
                 if (PlayerRw != nullptr)
                 {
-                    // 0x0045a56e..0x0045a58f: a player object that is not a ship leaves EAX = 0
-                    // and retail reads [0 + 0x1b4] -- the player in space is always a ship, and
-                    // the port keeps that read unguarded, as retail does.
+                    // A player object that is not a ship gives null and retail reads
+                    // [0 + 0x1b4]; the player in space is always a ship, and the port keeps
+                    // that read unguarded, as retail does.
                     CObject* PlayerShip = HudCObjectOf(static_cast<IObjInspectImpl*>(PlayerRw));
                     if (PlayerShip != nullptr &&
                         (static_cast<unsigned>(PlayerShip->ObjectClass) & 0x503u) != 0x503u)
@@ -1305,15 +1261,12 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
         *OutArgb = G_NnPaletteArgb_679b84;
         return;
     }
-    // FCOMP -0.6f / TEST AH,0x41 / JP: hostile when at or below -0.6.
     if (Attitude <= -0.6f)
     {
         *OutArgb = G_NnPaletteArgb_679ba8;
         return;
     }
-    // FCOMP -0.2f (DAT_005ce7f0 = 0xbe4ccccd) / TEST AH,0x41 / JNP: white when at or below
-    // -0.2; then FCOMP 0.6f / TEST AH,1 / JNZ: white below 0.6 (or unordered), green at or
-    // above it. Both white exits are kept as retail spells them.
+    // -0.2f is DAT_005ce7f0. NaN ends white; both white exits are kept as retail spells them.
     if (Attitude <= -0.2f)
     {
         *OutArgb = G_NnPaletteArgb_679b84;
@@ -1329,19 +1282,14 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
 
 int HudReputationBand(float Attitude)
 {
-    // FUN_0045a6e0. FCOMP DAT_005ce7ec (-0.6f), TEST AH,0x41 + JP: below or equal returns 0,
-    // greater (and unordered) goes on.
+    // FUN_0045a6e0. Bounds DAT_005ce7ec / DAT_005ce7f0 / DAT_005ce7f8 / DAT_005ce7f4; NaN
+    // falls through to 2.
     if (Attitude <= -0.6f)
         return 0;
-    // 0x0045a6f4..0x0045a70a: the same against DAT_005ce7f0 (-0.2f) -- 1.
     if (Attitude <= -0.2f)
         return 1;
-    // 0x0045a70b..0x0045a721: FCOMP DAT_005ce7f8 (0.6f), TEST AH,0x01 + JNZ jumps when less (or
-    // unordered); not less returns 4.
     if (Attitude >= 0.6f)
         return 4;
-    // 0x0045a722..0x0045a73d: FCOMP DAT_005ce7f4 (0.2f), TEST AH,0x41, EAX = 3 and JZ keeps it
-    // when greater; less, equal or unordered falls to 2.
     if (Attitude > 0.2f)
         return 3;
     return 2;
@@ -1358,25 +1306,17 @@ HudTargetBase::HudTargetBase()
     , ViewPanel(nullptr)
     , bExpanded(0)
 {
-    // FUN_004e6020: bases (HUDItem inlined with an empty name, WinControl FUN_0059f860,
-    // ButtonMover FUN_0055dec0, the handler vptr), +0x398 zeroed, FUN_00405890 (the part cache
-    // zeroed), then the GameCamera ctor FUN_0051b2f0 at +0x3b8.
+    // FUN_004e6020; the GameCamera ctor is FUN_0051b2f0.
     GameCameraConstruct(&ViewCamera);
     SubTargetId = SUBOBJ_ID_NONE;
 }
 
 HudTargetBase::~HudTargetBase()
 {
-    // FUN_004da630, in retail's order: the camera's watcher (+0x3b8 + 0xc0) cleared (the
-    // camera vptr put back and its empty base dtor run), PartCacheClear FUN_004058e0 on +0x3a0;
-    // the member dtors then clear the +0x398 watcher, and the base dtors run Event::Handler
-    // FUN_00576010, free the mover's list, ~WinControl FUN_0059fa50 and HUDItem's watcher.
-    //
-    // 0x004da662: `if (watched != 0) BaseWatcher::set_pointer(0)`. set_pointer is protected in
-    // Common (?set_pointer@BaseWatcher@@IAE...), so retail's inlined test-and-call comes from a
-    // header-only BaseWatcher subclass that left no symbol, vtable or RTTI in either PE; its body
-    // is exactly Common's public BaseWatcher::set (`if (Target != Watched) set_pointer(Target)`,
-    // .text import 0x005c645c), which the port calls.
+    // FUN_004da630: the camera's watcher cleared, then the part cache; the rest is member and
+    // base destructors. Retail inlines `if (watched != 0) set_pointer(0)`; set_pointer is
+    // protected in Common, and the same test-and-call is the body of Common's public
+    // BaseWatcher::set, which the port calls.
     ViewCamera.Watched.set(nullptr);
     PartCacheClear(&PartCache);
 }
@@ -1405,8 +1345,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     {
         return;
     }
-    // 0x004e62ef: `if (Found+8 != watched) set_pointer(Found+8)` -- BaseWatcher::set's body (see
-    // the destructor for why the port calls set).
+    // Retail's inlined test-and-set_pointer; see the destructor for why the port calls set.
     Watchable const* const NewWatched = (Found != nullptr) ? static_cast<Watchable*>(Found) : nullptr;
     ViewObject.set(NewWatched);
     OnViewObjectChanged();
@@ -1414,12 +1353,11 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     IObjRW* const Viewed = ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target()));
     if (Viewed == nullptr)
     {
-        // 0x004e655f
         PartCacheClear(&PartCache);
         return;
     }
 
-    // 0x004e633b: slot 4 (+0x10) get_orientation, whose retail body is ICF-folded with slot 3
+    // Retail calls slot 4 (+0x10) get_orientation, whose body is ICF-folded with slot 3
     // get_transform -- the pointer is the object's whole Transform, and FUN_004e65d0 uses it as
     // one. The port asks for the transform by its own name.
     FTransform const* const Xform = reinterpret_cast<FTransform const*>(&Viewed->get_transform());
@@ -1429,22 +1367,21 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     FVector Center;
     ViewCenter = *Bounds.GetCenter(&Center);
 
-    // 0x004e6390..0x004e63a1: FUN_00423b60 (Max - Center into a stack vector), FUN_00410190 on
-    // it (the length left on the FPU), FSTP float to +0x388 -- stored, then overwritten below.
+    // Retail stores |Max - Center| (FUN_00423b60, FUN_00410190) to ViewRadius and then
+    // overwrites it below.
     float Reach[3];
     Reach[0] = Bounds.Max.X - ViewCenter.X;
     Reach[1] = Bounds.Max.Y - ViewCenter.Y;
     Reach[2] = Bounds.Max.Z - ViewCenter.Z;
     ViewRadius = static_cast<float>(Vec3Length(Reach));
 
-    // FCOM / TEST AH,0x41 / JZ: the X span is kept only when strictly larger than the Z span,
-    // then * 0.5 (DAT_005c75e8, double).
+    // The X span wins only when strictly larger (NaN takes Z); * 0.5 is DAT_005c75e8, double.
     float const SpanX = Bounds.Max.X - Bounds.Min.X;
     float const SpanZ = Bounds.Max.Z - Bounds.Min.Z;
     float const Span = (SpanX > SpanZ) ? SpanX : SpanZ;
     ViewRadius = static_cast<float>(static_cast<double>(Span) * 0.5);
 
-    // 0x004e63d8: the chrome colour DAT_00679bb4 dimmed to 70 % per byte (byte 0 clamped inline,
+    // The chrome colour DAT_00679bb4 dimmed to 70 % per byte (byte 0 clamped inline,
     // bytes 1..3 through FUN_004104c0), packed as byte3 << 24 | byte0 << 16 | byte1 << 8 | byte2.
     unsigned char const* const Chrome = G_HudChromeColorRgba;
     unsigned const Byte0 = static_cast<unsigned>(ClampByte(DimChromeByte(Chrome[0])));
@@ -1453,8 +1390,8 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     unsigned const Byte3 = static_cast<unsigned>(ClampByte(DimChromeByte(Chrome[3])));
     unsigned const Tag = (Byte3 << 24) | (Byte0 << 16) | (Byte1 << 8) | Byte2;
 
-    // 0x004e6492: get_index again; the renderer LODs pinned to 3 while the cache is built, then
-    // put back (FUN_00402580 / FUN_00405b10 / FUN_00402720), then the parts hidden.
+    // get_index again; the renderer LODs pinned to 3 while the cache is built, then put back
+    // (FUN_00402580 / FUN_00405b10 / FUN_00402720).
     void* const BuildInstance = InstanceFromIndex(Viewed->get_index());
     FRendererLodMap SavedLods;
     BindRendererLods(BuildInstance, 3, &SavedLods);
@@ -1465,27 +1402,27 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
 
 void HudTargetBase::ToggleExpanded()
 {
-    // FUN_00401e90 -- RET.
+    // FUN_00401e90.
 }
 
 void HudTargetBase::HideExpandedControls(bool /*bHide*/)
 {
-    // FUN_0053e4a0 -- RET 4.
+    // FUN_0053e4a0.
 }
 
 void HudTargetBase::DrawViewObject()
 {
-    // FUN_00401e90 -- RET.
+    // FUN_00401e90.
 }
 
 void HudTargetBase::UpdateLabels()
 {
-    // FUN_00401e90 -- RET.
+    // FUN_00401e90.
 }
 
 void HudTargetBase::OnViewObjectChanged()
 {
-    // FUN_00401e90 -- RET.
+    // FUN_00401e90.
 }
 
 CObject* HudTargetBase::GetViewCObject() const
@@ -1536,8 +1473,7 @@ namespace
     // DAT_006127b4 -- the view camera's half fov x (0x420c0000, read-only in the PE).
     float const kViewHalfFovX = 35.0f;
 
-    // The part tag both colouring passes build from a colour's four memory bytes (0x004e6e60,
-    // 0x004e701a): byte3 << 24 | byte0 << 16 | byte1 << 8 | byte2.
+    // The part tag both colouring passes build from a colour's four memory bytes.
     unsigned PackPartTag(unsigned long Colour)
     {
         unsigned const Byte0 = static_cast<unsigned>(Colour & 0xffu);
@@ -1573,11 +1509,11 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
     int const Right = Projected[2];
     int const Bottom = Projected[3];
 
-    // 0x004e717a: moved ScreenShift Win3D-camera widths sideways (DAT_0067dca4 / DAT_0067dcac,
-    // the left and right of that camera's viewport), then inset by an eighth of the box: its
-    // width on the left and the right, its height at the top -- and its WIDTH again at the
-    // bottom, because 0x004e7228 subtracts the width term still on the FPU stack. The products
-    // and sums are exact in double, as they are on the x87 stack.
+    // Moved ScreenShift Win3D-camera widths sideways (DAT_0067dca4 / DAT_0067dcac, the left and
+    // right of that camera's viewport), then inset by an eighth of the box: its width on the
+    // left and the right, its height at the top -- and its WIDTH again at the bottom (retail
+    // quirk: it subtracts the width term still on the FPU stack). The products and sums stay in
+    // double, as on the x87 stack.
     int const* const Screen = Win3DGetCamera()->Viewport;
     double const ScreenWidth = static_cast<double>(Screen[2] - Screen[0] + 1);
     double const WidthInset = static_cast<double>(Right - Left) * 0.125;
@@ -1593,8 +1529,8 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
     Viewport[3] = static_cast<int>(static_cast<double>(Bottom) - WidthInset);
     SpaceCameraSetViewportEx(&ViewCamera, Viewport, 1);
 
-    // DAT_00674b08 -- 1 / tan(35 degrees), computed once (bit 0 of DAT_00674b0c): FLD 35.0f,
-    // FMUL 0.0174533f (DAT_005c77f4), FPTAN, FDIVR 1.0.
+    // DAT_00674b08 -- 1 / tan(35 degrees), computed once (bit 0 of DAT_00674b0c); the degree
+    // factor 0.0174533f is DAT_005c77f4.
     static float const InvTanHalfFov = static_cast<float>(
         1.0 / tan(static_cast<double>(kViewHalfFovX) * static_cast<double>(0.0174533f)));
     SpaceCameraSetHalfFovX(&ViewCamera, kViewHalfFovX);
@@ -1603,7 +1539,7 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
     FTransform Xform;
     if (!bFixedOrbit)
     {
-        // 0x004e729a: ViewRadius * 1.1 (DAT_005d8468) / tan(35) away from the object's centre.
+        // ViewRadius * 1.1 (DAT_005d8468) / tan(35) away from the object's centre.
         float const Distance = static_cast<float>(static_cast<double>(InvTanHalfFov) *
                                                   static_cast<double>(ViewRadius) *
                                                   static_cast<double>(1.1f));
@@ -1640,14 +1576,13 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
             Offset[1] = Offset[1] * 4.0f;
             Offset[2] = Offset[2] * 4.0f;
         }
-        // FUN_00423b30.
         Xform.Translation.X = Center.X + Offset[0];
         Xform.Translation.Y = Center.Y + Offset[1];
         Xform.Translation.Z = Center.Z + Offset[2];
     }
     else
     {
-        // 0x004e7420: the object's own orientation (slot 3, +0xc) with its y / z columns turned
+        // The object's own orientation (slot 3, +0xc) with its y / z columns turned
         // by -90 degrees (the double DAT_005d8ec0 = (double)-1.57079637f): per row,
         // m1' = m1 cos + sin m2 and m2' = cos m2 - m1 sin.
         FTransform const* const ObjectXform =
@@ -1670,7 +1605,7 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
         float const Distance = static_cast<float>(static_cast<double>(InvTanHalfFov) *
                                                   static_cast<double>(ViewRadius) *
                                                   static_cast<double>(1.1f));
-        // Slot 4 (+0x10) through DAT_00674b1c directly (FUN_004e7090's body, inlined).
+        // Slot 4 (+0x10) through DAT_00674b1c directly (FUN_004e7090 inlined).
         FTransform const* const ViewXform =
             reinterpret_cast<FTransform const*>(&Viewed->get_transform());
         FVector Center;
@@ -1683,8 +1618,6 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
         Xform.Translation.Z = Center.Z + OffsetZ;
     }
 
-    // 0x004e7567: the twelve floats into the camera's world orientation and position, the view
-    // marked dirty, then the viewport and the perspective of this camera.
     ViewCamera.bViewDirty = 1;
     memcpy(ViewCamera.World, &Xform.Rotation, sizeof(ViewCamera.World));
     memcpy(ViewCamera.WorldPos, &Xform.Translation, sizeof(ViewCamera.WorldPos));
@@ -1720,7 +1653,7 @@ void HudTargetBase::ColourGroupParts()
     CArchGroup* Group = EqObj->ArchGroups.Traverse(GroupWalk);
     while (Group != nullptr)
     {
-        // The chrome colour, or the damage colour while 1 - relative health > 0 (TEST AH,0x41).
+        // The chrome colour, or the damage colour while damaged.
         unsigned long Colour = ChromeColourArgb();
         float const Damage = 1.0f - Group->GetRelativeHealth();
         if (Damage > 0.0f)
@@ -1729,7 +1662,6 @@ void HudTargetBase::ColourGroupParts()
             Colour = *HudDamageColorArgb(&Damaged, Damage);
         }
 
-        // 0x004e6d66: each byte * 0.7f, ftol, clamped to 0..255 inline.
         unsigned long const Dim0 = static_cast<unsigned long>(
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour))));
         unsigned long const Dim1 = static_cast<unsigned long>(
@@ -1740,8 +1672,7 @@ void HudTargetBase::ColourGroupParts()
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour >> 24))));
         Colour = Dim0 | (Dim1 << 8) | (Dim2 << 16) | (Dim3 << 24);
 
-        // The sub-target pulses (FUN_00561f20 round the dimmed colour) unless the mouse may not
-        // pick (FUN_0045a740).
+        // The sub-target pulses (FUN_00561f20) unless the mouse may not pick.
         if (SubTargetId == Group->GetID() && !HudIsMousePickBlocked())
         {
             unsigned long Pulsed = 0;
@@ -1770,7 +1701,7 @@ void HudTargetBase::ColourEquipParts()
     }
     CEqObj* const EqObj = static_cast<CEqObj*>(Object);
 
-    // 0x004e6f15: FUN_00548eb0 on the object's id; its result is not used.
+    // Retail calls FUN_00548eb0 here and ignores the result.
     IsPlayerShipId(EqObj->Id);
 
     CEquipTraverser EquipWalk(0x1fe0);
@@ -1807,7 +1738,7 @@ void HudTargetBase::ColourEquipParts()
             Colour = Pulsed;
         }
 
-        // vt+0x84 CAttachedEquip::GetRootIndex; re-activated with recursion.
+        // Re-activated with recursion.
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
@@ -1842,7 +1773,6 @@ void HudTargetBase::UpdateSubTargetToolTip()
 
     if (PickedCount > 1)
     {
-        // "(%d) %s" with the part's name (FUN_004347e0, 0x40 chars; empty when it fails).
         wchar_t Name[0x40];
         if (GetIdsStringWWithRawFallback(Ids, Name, 0x40) == 0)
         {
@@ -1851,10 +1781,9 @@ void HudTargetBase::UpdateSubTargetToolTip()
         wchar_t Text[0x80];
         swprintf(Text, 0x80, L"(%d) %s", PickedCount, Name);
 
-        // The hover record: key = SubTargetId, no tooltip id, caption = Text (FUN_004142a0
-        // grows the buffer to len + 1, wcsncpy, terminator). Retail leaves +0x48..+0x5f as
-        // stack garbage; the port zeroes them (same as WinControl::ShowToolTip). The caption
-        // zeroing and FUN_004144b0 are the record's constructor.
+        // The hover record: key = SubTargetId, no tooltip id, caption = Text. Retail leaves
+        // +0x48..+0x5f as stack garbage; the port zeroes them (same as WinControl::ShowToolTip).
+        // The caption zeroing and FUN_004144b0 are the record's constructor.
         FToolTipHoverInfo Info;
         Info.IdsAlt = 0;
         Info.Ids = -1;
@@ -1886,14 +1815,10 @@ void HudTargetBase::UpdateSubTargetToolTip()
         wcsncpy(Info.CaptionW, Text, Length);
         Info.CaptionW[Length] = 0;
         NnToolTipFeedHover(&Info);
-
-        // Teardown (~FToolTipHoverInfo): FUN_004144f0, the children (FUN_00445d70 /
-        // FUN_00444e20), the caption.
         return;
     }
 
-    // One part: key = SubTargetId, tooltip id = the part's ids_name, no caption
-    // (FUN_00413df0(0, -1) on the null caption does nothing).
+    // One part: key = SubTargetId, tooltip id = the part's ids_name, no caption.
     FToolTipHoverInfo Info;
     Info.IdsAlt = 0;
     Info.Ids = -1;
@@ -1902,7 +1827,6 @@ void HudTargetBase::UpdateSubTargetToolTip()
     Info.Ids = static_cast<int>(SubTargetId);
     Info.IdsAlt = static_cast<int>(Ids);
     NnToolTipFeedHover(&Info);
-    // Teardown: ~FToolTipHoverInfo.
 }
 
 unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, int* OutCount)
@@ -1961,7 +1885,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
 
     unsigned Result = 0;
 
-    // Attached equipment (mask 0x1ee0): IsConnected (vt+0x58), then the root (vt+0x84).
+    // Attached equipment (mask 0x1ee0).
     CEquipTraverser EquipWalk(0x1ee0);
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
@@ -2032,8 +1956,7 @@ bool HudTargetBase::HitTest(float const* Ray)
 
 void HudTargetBase::Update()
 {
-    // FUN_004e7980: Win3D::Update FUN_005a17b0, the slide FUN_0055e170, then (expanded) the
-    // sub-target tool tip (tail jump to FUN_004e75b0).
+    // FUN_004e7980.
     Win3D::Update();
     ButtonMover::Update();
     if (bExpanded != 0)
@@ -2060,8 +1983,7 @@ void HudTargetBase::Draw()
 
     if (bExpanded != 0 && !ButtonMover::IsActive())
     {
-        // Visible children (flag bit 1): AsWinControl (slot 2), Draw (slot 13); right after the
-        // view panel, HUDItem slot 14.
+        // Visible children (flag bit 1); DrawViewObject right after the view panel.
         for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         {
             if ((Child->Flags & 2) == 0)
@@ -2094,8 +2016,7 @@ void HudTargetBase::Draw()
 
 intptr_t HudTargetBase::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
 {
-    // FUN_004e7950: message 0x26 from the toggle button -> HUDItem slot 12; always 0, the base
-    // is not called.
+    // FUN_004e7950: always 0; the base is not called.
     if (Msg == 0x26 && A == reinterpret_cast<uintptr_t>(ToggleButton))
     {
         ToggleExpanded();
@@ -2105,8 +2026,8 @@ intptr_t HudTargetBase::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
 
 void HudTargetBase::OnMoveFinished()
 {
-    // FUN_004e79b0: still collapsed (the opening slide just ended) -> HUDItem slot 13(0), i.e.
-    // un-hide the panel controls; then the flag re-read and inverted.
+    // FUN_004e79b0: still collapsed means the opening slide just ended, so un-hide the panel
+    // controls.
     if (bExpanded == 0)
     {
         HideExpandedControls(false);

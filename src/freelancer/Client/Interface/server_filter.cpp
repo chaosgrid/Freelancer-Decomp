@@ -51,14 +51,12 @@ ServerFilter& ServerFilter::operator=(ServerFilter const& Other)
 // FUN_00562990.
 bool ServerFilter::Match(FServerInfo const& Server) const
 {
-    // 0x0056299f..0x005629aa: JA past the maximum, JNC from the minimum up.
     if (bFilterPing)
     {
         unsigned const Ping = static_cast<unsigned>(Server.Ping);
         if (Ping > PingMax || Ping < PingMin)
             return false;
     }
-    // 0x005629ba..0x005629c8: the known-login byte compared with +0x14.
     if (bFilterKnown)
     {
         unsigned char const bKnown = G_LoginMgr.IsKnownLogin(Server) ? 1 : 0;

@@ -91,11 +91,10 @@ namespace
 
     int JoinRoot(const char* Root, const char* Rel, char* Out, long OutChars)
     {
-        // 06b75427: CMP EBP,2 / JG.
         if (OutChars <= 2)
             return 0;
 
-        // 06b75434..06b75469: absolute (leading separator or drive colon) -> strncpy.
+        // Absolute (leading separator or drive colon) -> strncpy.
         if (Rel[0] != '\0' && (IsJoinSeparator(Rel[0]) || Rel[1] == ':'))
         {
             std::strncpy(Out, Rel, (size_t)(OutChars));
@@ -103,7 +102,7 @@ namespace
             return 1;
         }
 
-        // 06b7546b..06b75490: copy Root, failing once OutChars - 1 characters are used.
+        // Copy Root, failing once OutChars - 1 characters are used.
         long Length = 0;
         char Value = Root[0];
         while (Value != '\0')
@@ -115,7 +114,7 @@ namespace
             Length = Length + 1;
         }
 
-        // 06b75494..06b754ab: ensure one separator after the root (even for an empty root).
+        // Ensure one separator after the root (even for an empty root).
         char* Cursor = Out + Length;
         if (Cursor == Out || !IsJoinSeparator(Cursor[-1]))
         {
@@ -123,7 +122,7 @@ namespace
             Cursor = Cursor + 1;
         }
 
-        // 06b754ac..06b75516: drop one leading ".\"; every leading ".." pops one directory.
+        // Drop one leading ".\"; every leading ".." pops one directory.
         if (Rel[0] == '.')
         {
             if (IsJoinSeparator(Rel[1]))
@@ -143,14 +142,14 @@ namespace
             }
         }
 
-        // 06b75518..06b7552c: ensure the separator again (the pop lands ON one).
+        // Ensure the separator again (the pop lands ON one).
         if (Cursor == Out || !IsJoinSeparator(Cursor[-1]))
         {
             *Cursor = '\\';
             Cursor = Cursor + 1;
         }
 
-        // 06b7552d..06b7555f: strncpy the tail into what is left, or terminate here.
+        // strncpy the tail into what is left, or terminate here.
         const long Remaining = (long)((Out + OutChars) - Cursor);
         if (Remaining > 1)
         {
@@ -273,8 +272,8 @@ namespace
     const unsigned long kUtfNode12 = 0x0C;
     const unsigned long kUtfNode2C = 0x2C;
 
-    // On-disk UTF header (FUN_06b71190 / FUN_06b714f0 / LAB_06b71f50).
-    // Only named fields have Ghidra evidence. Others stay unnamed.
+    // On-disk UTF header (FUN_06b71190 / FUN_06b714f0 / LAB_06b71f50). The Unk fields are
+    // unidentified.
     struct FUtfHeader
     {
         unsigned long Magic;          // +0x00  0x20465455
@@ -293,8 +292,8 @@ namespace
         unsigned long Unk34;
     };
 
-    // The UTF archive map: the local at [ESP+0x14..0x24] of LAB_06b72990 and the object's
-    // +4..+0x14 (FUN_06b71420 default {-1, 0, 0, 0, 0}).
+    // The UTF archive map: a local of LAB_06b72990 and the object's +4..+0x14 (FUN_06b71420
+    // default {-1, 0, 0, 0, 0}).
     struct FUtfArchiveMap
     {
         HANDLE File;           // +0x00  -1 when none
@@ -451,7 +450,6 @@ namespace
             return LastError;
         }
 
-        // formerly Init
         bool InitializeArchiveView(HANDLE File, const void* MapView, unsigned long MapSize)
         {
             if (!bNode2C &&
@@ -592,7 +590,7 @@ namespace
                 First = Root + ReadUtfDword(Node, 0x10);
             else
             {
-                // 06b725d4..06b725e3: ADD sets ZF on a zero sum -> -1, no LastError.
+                // A zero pointer sum returns -1 without setting LastError.
                 if ((unsigned long)(Root) + ReadUtfDword(Node, 0x04) == 0)
                     return -1;
                 First = Root + ReadUtfDword(Node, 0x04);
@@ -1109,7 +1107,6 @@ namespace
         }
 
         // DOS LAB_06b75e70 / UTF LAB_06b73d50: LastError=5, return 0.
-        // formerly Slot18
         int DACOM_API Write(unsigned long, const void*, unsigned long, unsigned long*,
                              const void*) override
         {
@@ -1117,13 +1114,11 @@ namespace
             return 0;
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
-        // formerly Slot1C
         int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
-        // formerly Slot20
         int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
                              unsigned long Origin) override
         {
@@ -1177,7 +1172,6 @@ namespace
             return (int)(NewLow);
         }
         // DOS LAB_06b75e50: LastError=5, return 0 (UTF and MEM override).
-        // formerly Slot24
         int DACOM_API SetEndOfFile(unsigned long) override
         {
             LastError = 5;
@@ -1196,22 +1190,18 @@ namespace
                 CopyNestedLastError();
             return Result;
         }
-
-        // formerly Slot2C
         int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             LastError = 5;
             return 1;
         }
-        // formerly Slot30
         int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             LastError = 5;
             return 1;
         }
-        // formerly Slot34
         int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
                              FILETIME* WriteOut) override
         {
@@ -1228,13 +1218,11 @@ namespace
             return Result;
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
-        // formerly Slot38
         int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
-        // formerly Slot3C
         int DACOM_API CreateMapping(unsigned long FileKey, unsigned long A2, unsigned long A3, unsigned long A4,
                              unsigned long A5, unsigned long A6) override
         {
@@ -1261,8 +1249,6 @@ namespace
             MapTokens.push_back(Token);
             return (int)(Token);
         }
-
-        // formerly Slot40
         int DACOM_API MapFileView(unsigned long Token, unsigned long Access, unsigned long A3,
                              unsigned long OffLow, unsigned long ByteCount) override
         {
@@ -1313,35 +1299,29 @@ namespace
         }
 
         // DOS LAB_06b75350: always 1. Does not UnmapViewOfFile.
-        // formerly Slot44
         int DACOM_API UnmapFileView(unsigned long) override
         {
             return 1;
         }
-        // formerly Slot48
         int DACOM_API FindFirst(const char*, WIN32_FIND_DATAA*) override
         {
             return -1;
         }
-        // formerly Slot4C
         int DACOM_API FindNext(unsigned long, WIN32_FIND_DATAA*) override
         {
             return 0;
         }
-        // formerly Slot50
         int DACOM_API FindClose(unsigned long) override
         {
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        // formerly Slot54
         int DACOM_API RejectOperation54(const char*, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
-        // formerly Slot58
         int DACOM_API RejectOperation58(unsigned long) override
         {
             LastError = 5;
@@ -1386,8 +1366,7 @@ namespace
                 LastError = 0xa1;
                 return 0;
             }
-            // 06b757fd..06b7583d: strlen + REP MOVS of len+1 bytes into +0xd, then the
-            // separator check on +0xd[len-1] (len >= 1: a successful join always holds one).
+            // Len >= 1: a successful join always holds one character.
             const size_t Len = std::strlen(Resolved);
             std::memcpy(RootPath, Resolved, Len + 1);
             if (!IsJoinSeparator(RootPath[Len - 1]))
@@ -1399,27 +1378,23 @@ namespace
         }
 
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
-        // formerly Slot64
         int DACOM_API RejectOperation64(unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ed0 / UTF LAB_06b73d30: LastError=5, return 0.
-        // formerly Slot68
         int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        // formerly Slot6C
         int DACOM_API RejectOperation6C(unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
-        // formerly Slot70
         int DACOM_API GetPathAttributes(const char* RelPath) override
         {
             const char* Name = RelPath;
@@ -1440,13 +1415,11 @@ namespace
             return (int)(Attr);
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        // formerly Slot74
         int DACOM_API RejectOperation74(unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
-        // formerly Slot78
         int DACOM_API GetFileSystemError() override
         {
             return (int)(LastError);
@@ -1481,7 +1454,6 @@ namespace
             }
             return (int)((unsigned long)(Opened));
         }
-        // formerly Slot80
         int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
         {
             if (NestedChild != nullptr)
@@ -1512,14 +1484,11 @@ namespace
             }
             Out[Count - 1] = '\0';
         }
-
-        // formerly Slot88
         int DACOM_API GetAccessFlags() override
         {
             return (int)(AccessFlags);
         }
         // DOS LAB_06b75e20: *Out = +0x120 (no Out check), AddRef it when set, return 0.
-        // formerly Slot8C
         int DACOM_API GetParentFileSystem(IFileSystem** Out) override
         {
             *Out = NestedChild;
@@ -1527,33 +1496,28 @@ namespace
                 NestedChild->AddRef();
             return 0;
         }
-        // formerly Slot90
         int DACOM_API FailOperation90(unsigned long, unsigned long) override
         {
-            // Retail LAB_06b776a0: `OR EAX,0xffffffff; RET 0xc` — always fails.
+            // LAB_06b776a0: always fails.
             return (int)(0xFFFFFFFF);
         }
-        // formerly Slot94
         int DACOM_API FailOperation94(unsigned long, unsigned long) override
         {
-            // Retail LAB_06b776a0 (shared with Slot90): always fails.
+            // LAB_06b776a0 (shared with FailOperation90).
             return (int)(0xFFFFFFFF);
         }
-        // formerly Slot98
         int DACOM_API FailOperation98(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
-            // Retail LAB_06b776b0: `OR EAX,0xffffffff; RET 0x18` — always fails.
+            // LAB_06b776b0: always fails.
             return (int)(0xFFFFFFFF);
         }
-        // formerly Slot9C
         int DACOM_API FailOperation9C(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
-            // Retail LAB_06b776b0 (shared with Slot98): always fails.
+            // LAB_06b776b0 (shared with FailOperation98).
             return (int)(0xFFFFFFFF);
         }
-        // formerly SlotA0
         int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
         {
             if (NestedChild != nullptr)
@@ -1564,7 +1528,6 @@ namespace
             LeaveCriticalSection(&Lock);
             return Result;
         }
-        // formerly SlotA4
         int DACOM_API ResolvePath(char* Dest, const char* Src, unsigned long DestChars) override
         {
             return JoinRoot(RootPath + PathPrefix, Src,
@@ -1724,7 +1687,7 @@ namespace
             }
         }
 
-        // The hit path of FUN_06b74bf0 (06b74c87..06b74d36). CloseFile has already rejected
+        // The hit path of FUN_06b74bf0. CloseFile has already rejected
         // the current handle +0x130, so the entry is never the current file.
         void CloseOneOpenFile(unsigned long Handle)
         {
@@ -1781,24 +1744,23 @@ namespace
             RootPath[1] = '\0';
         }
 
-        // LAB_06b74470 (stdcall RET 0xC). Single exit: *Instance = Created, return Result
-        // (06b749e3). Every early failure leaves Created = 0.
+        // LAB_06b74470. Single exit: *Instance = Created; every early failure leaves Created = 0.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
             GENRESULT Result = GR_OK;
             void* Created = nullptr;
 
-            // 06b74483..06b744ad: size 0x34 / 0x30, CMPSB 0xB bytes vs "FileSystem" (== strcmp).
+            // Retail compares 0xB bytes, which equals strcmp.
             if ((FsDesc->Size != 0x34 && FsDesc->Size != 0x30) ||
                 std::strcmp(FsDesc->ComponentName, "FileSystem") != 0)
                 Result = GR_INTERFACE_UNSUPPORTED;
-            // 06b744b3: only a null Path pointer is refused; "" resolves against the root.
+            // Only a null Path pointer is refused; "" resolves against the root.
             else if (FsDesc->Path == nullptr)
                 Result = GR_GENERIC;
             else if (FsDesc->Access != kGenericRead || FsDesc->Creation != kOpenExisting)
                 Result = GR_GENERIC;
-            // 06b744dd: an instance already bound to a file cannot create.
+            // An instance already bound to a file cannot create.
             else if (bFileInstance != 0)
                 Result = GR_GENERIC;
             else if (this == G_DosFactory)
@@ -1854,7 +1816,7 @@ namespace
                 }
             }
 
-            // 06b749a8: destroy the child, report GetLastError on THIS, -6.
+            // GetLastError is reported on THIS, not the child.
             if (Child != nullptr)
                 delete Child;
             *Created = nullptr;
@@ -1883,7 +1845,7 @@ namespace
                 return GR_OK;
             }
 
-            // 06b7470a: CMPSB 4 bytes vs "DOS\0" (DAT_06b7a1d8) == case-sensitive strcmp.
+            // DAT_06b7a1d8; retail's 4-byte compare equals a case-sensitive strcmp.
             if (FsDesc->Implementation != nullptr && std::strcmp(FsDesc->Implementation, "DOS") == 0)
             {
                 FDosFileSystem* Child = new (std::nothrow) FDosFileSystem();
@@ -1893,7 +1855,7 @@ namespace
                     LastError = GetLastError();
                     return (GENRESULT)(0xFFFFFFFA);
                 }
-                // 06b7477a: the root keeps Desc->Path as given, not the resolved path.
+                // The root keeps Desc->Path as given, not the resolved path.
                 std::strncpy(Child->RootPath, FsDesc->Path, 0x108);
                 Child->PathPrefix = 0;
                 Child->AccessFlags = FsDesc->Access;
@@ -1902,15 +1864,13 @@ namespace
                 return GR_OK;
             }
 
-            // 06b747e8..06b74803: not a "DOS" file — DACOM picks another "FileSystem"
-            // factory with desc+0x28 = this; the field is cleared again afterwards.
+            // Not a "DOS" file: DACOM picks another "FileSystem" factory with desc+0x28 = this;
+            // the field is cleared again afterwards.
             FsDesc->Parent = (IFileSystem*)(this);
             const GENRESULT Result = G_Dacom->CreateInstance(Desc, Created);
             FsDesc->Parent = nullptr;
             return Result;
         }
-
-    // formerly Slot48
     public:
         // OpenNode (+0x60) is FFileSystemBase::OpenNode = LAB_06b756b0.
 
@@ -1936,8 +1896,6 @@ namespace
             }
             return (int)((unsigned long)(Found));
         }
-
-        // formerly Slot4C
         int DACOM_API FindNext(unsigned long Handle, WIN32_FIND_DATAA* FindData) override
         {
             const BOOL Result = FindNextFileA((HANDLE)(Handle),
@@ -1946,8 +1904,6 @@ namespace
                 CopyNestedLastError();
             return Result;
         }
-
-        // formerly Slot50
         int DACOM_API FindClose(unsigned long Handle) override
         {
             const BOOL Result = ::FindClose((HANDLE)(Handle));
@@ -2047,14 +2003,14 @@ namespace
             if (FsDesc->Access != kGenericRead || FsDesc->Creation != kOpenExisting)
                 return GR_GENERIC;
 
-            // 06b72a37..06b72d92: one exit stores *Out = Created and Releases the
-            // IDataBuffer the parent may have handed out.
+            // One exit stores *Out = Created and Releases the IDataBuffer the parent may have
+            // handed out.
             GENRESULT Result = GR_OK;
             void* Created = nullptr;
             IDataBuffer* DataBuffer = nullptr;
             const char* OpenPath = FsDesc->Path;
-            // 06b72a4c / 06b72ad5: the root test is on the own path +0x20 == "\" (the
-            // registered factory; an archive or a clone holds the Desc->Path it was made from).
+            // The root test is on the own path +0x20 == "\" (the registered factory; an
+            // archive or a clone holds the Desc->Path it was made from).
             const bool bAtRoot = OwnPath[0] == '\\' && OwnPath[1] == '\0';
             // Named UB: _fullpath's result is not checked; on failure retail hands
             // uninitialised stack bytes to _access/CreateFileA. Zero-filled here.
@@ -2274,8 +2230,7 @@ namespace
             return CopyClampedPathSuffix(Out, MaxChars, OwnPath + OwnPathPrefix);
         }
 
-        // UTF LAB_06b73c70: n = strlen(+0x20) + 1, clamped to MaxChars (signed); n > 0 and
-        // Out -> memcpy n bytes. No terminator fix-up when MaxChars cuts the path.
+        // UTF LAB_06b73c70: signed clamp. No terminator fix-up when MaxChars cuts the path.
         void DACOM_API GetFileSysPath(char* Out, unsigned long MaxChars) override
         {
             long Count = (long)(std::strlen(OwnPath)) + 1;
@@ -2286,7 +2241,6 @@ namespace
         }
 
         // UTF LAB_06b73130: FUN_06b75420's body with the root = the current path +0x128.
-        // formerly SlotA4
         int DACOM_API ResolvePath(char* Dest, const char* Src, unsigned long DestChars) override
         {
             return JoinRoot(CurrentPath, Src,
@@ -2322,8 +2276,7 @@ namespace
             if (OpenNodeHandle != nullptr)
                 ActiveW->CloseHandle(OpenNodeHandle);
             OpenNodeHandle = Opened;
-            // 06b735d4..06b73618: strlen + REP MOVS len+1 into +0x128, then '\' + NUL at
-            // [len] when +0x128[len-1] is not a separator (len >= 1 after a join).
+            // CurrentPath is +0x128; Len >= 1 after a successful join.
             const size_t Len = std::strlen(Dest);
             std::memcpy(CurrentPath, Dest, Len + 1);
             if (!IsJoinSeparator(CurrentPath[Len - 1]))
@@ -2352,8 +2305,6 @@ namespace
             }
             return UtfHandle->Size();
         }
-
-        // formerly Slot20
         int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long*,
                              unsigned long Origin) override
         {
@@ -2374,8 +2325,6 @@ namespace
             UtfHandle->Position = NewPos;
             return (int)(NewPos);
         }
-
-        // formerly Slot34
         int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
                              FILETIME* WriteOut) override
         {
@@ -2397,8 +2346,6 @@ namespace
                                   WriteOut);
             return 1;
         }
-
-        // formerly Slot70
         int DACOM_API GetPathAttributes(const char* Path) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
@@ -2422,8 +2369,6 @@ namespace
             }
             return Attributes;
         }
-
-        // formerly Slot80
         int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
         {
             if (ParentFileSystem == nullptr || Handle == 0)
@@ -2461,8 +2406,8 @@ namespace
                 UtfHandle = FUtfWalker::HandleFromValue(Handle);
             if (UtfHandle == nullptr)
             {
-                // 06b7372b..06b73769: FUN_06b737a0 (_vsnprintf into a 0x2000 stack buffer) with
-                // the owner's (+0x230) or own +0x20 path, then FDUMP as a WARNING, line 0x29b.
+                // FUN_06b737a0 formats into a 0x2000 stack buffer with the owner's (+0x230) or
+                // own +0x20 path.
                 char Message[0x2000];
                 const char* Path = ArchiveOwner != nullptr ? ArchiveOwner->OwnPath : OwnPath;
                 _snprintf(Message, sizeof(Message), "attempting to close invalid handle (%s)", Path);
@@ -2528,8 +2473,6 @@ namespace
             *BytesRead = Count;
             return 1;
         }
-
-        // formerly Slot3C
         int DACOM_API CreateMapping(unsigned long FileKey, unsigned long, unsigned long Protect,
                              unsigned long, unsigned long, unsigned long) override
         {
@@ -2552,8 +2495,6 @@ namespace
             MapTokens.push_back(UtfHandle);
             return (int)((unsigned long)(&MapTokens.back()));
         }
-
-        // formerly Slot40
         int DACOM_API MapFileView(unsigned long Token, unsigned long Access, unsigned long,
                              unsigned long OffLow, unsigned long ByteCount) override
         {
@@ -2597,7 +2538,7 @@ namespace
                 FileOff + OffLow);
         }
 
-        // The +0x240 token whose payload address is Value (06b736a7 / 06b738db scans).
+        // The +0x240 token whose payload address is Value.
         std::list<FUtfHandle*>::iterator FindMapToken(unsigned long Value)
         {
             std::list<FUtfHandle*>::iterator It = MapTokens.begin();
@@ -2611,7 +2552,6 @@ namespace
         }
 
         // UTF LAB_06b739e0: 1 if parent UTF at +0x230, else error 5 / 0.
-        // formerly Slot44
         int DACOM_API UnmapFileView(unsigned long) override
         {
             if (ArchiveOwner != nullptr)
@@ -2656,7 +2596,6 @@ namespace
         }
 
         // UTF LAB_06b73cc0: *Out = +0x234 (no Out check), AddRef it when set, return 0.
-        // formerly Slot8C
         int DACOM_API GetParentFileSystem(IFileSystem** Out) override
         {
             *Out = ParentFileSystem;
@@ -2664,21 +2603,15 @@ namespace
                 ParentFileSystem->AddRef();
             return 0;
         }
-
-        // formerly SlotA0
         int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
         {
             return ParentFileSystem->InvokeLockedCallback(Arg0, Callback, Arg1);
         }
-
-        // formerly Slot24
         int DACOM_API SetEndOfFile(unsigned long) override
         {
             LastError = 5;
             return 0;
         }
-
-        // formerly Slot48
         int DACOM_API FindFirst(const char* Pattern, WIN32_FIND_DATAA* FindData) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
@@ -2706,8 +2639,6 @@ namespace
                 LastError = ActiveW->GetLastError();
             return Result;
         }
-
-        // formerly Slot4C
         int DACOM_API FindNext(unsigned long Handle, WIN32_FIND_DATAA* FindData) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
@@ -2722,8 +2653,6 @@ namespace
                 LastError = ActiveW->GetLastError();
             return Result;
         }
-
-        // formerly Slot50
         int DACOM_API FindClose(unsigned long Handle) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
@@ -2765,8 +2694,8 @@ namespace
             }
             unsigned long DACOM_API AddRef() override { return Owner->AddRef(); }
             unsigned long DACOM_API Release() override { return Owner->Release(); }
-            // LAB_06b772a0 (slot 3 of the inner vtable 06b792e0, this = MEM+4): *OutPtr = [MEM+8]
-            // (buffer), *OutSize = [MEM+0xC] (size), return 0. No argument checks.
+            // LAB_06b772a0 (slot 3 of the inner vtable 06b792e0, this = MEM+4): buffer [MEM+8],
+            // size [MEM+0xC]. No argument checks.
             GENRESULT DACOM_API GetBuffer(void** OutPtr, unsigned long* OutSize) override
             {
                 *OutPtr = Owner->MappedView;
@@ -2791,7 +2720,6 @@ namespace
         }
 
         // LAB_06b77a50, table 06b79398: {"1.11_IFileSystem", 0}, {"1.11_IDataBuffer", 4}, null.
-        // Walked in order; hit -> AddRef on the resolved face, *Out = face, 0; miss -> *Out = 0, -3.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             if (std::strcmp(Iids::FileSystem, Iid) == 0)
@@ -2812,26 +2740,21 @@ namespace
             return GR_INTERFACE_UNSUPPORTED;
         }
 
-        // LAB_06b77290 (RET 0xc): *Instance = 0 with no null check, return -1.
+        // LAB_06b77290: no null check of Instance.
         GENRESULT DACOM_API CreateInstance(AGGDESC*, void** Instance) override
         {
             *Instance = nullptr;
             return GR_GENERIC;
         }
-
-        // formerly Slot88
         int DACOM_API GetAccessFlags() override
         {
             return (int)(Access);
         }
-
-        // formerly InitFromDesc
         GENRESULT InitializeFromDescriptor(FFileSystemDesc* Desc)
         {
             if (Desc->Parent != nullptr)
                 return (GENRESULT)(0xFFFFFFFE);
-            // FUN_06b777f0: null Implementation or CMPSB.REPE over "MEM\0" (DAT_06b7a1f0,
-            // case-sensitive) mismatch -> -1.
+            // FUN_06b777f0; "MEM" is DAT_06b7a1f0, compared case-sensitively.
             if (Desc->Implementation == nullptr || std::strcmp(Desc->Implementation, "MEM") != 0)
                 return GR_GENERIC;
 
@@ -2892,47 +2815,27 @@ namespace
             MappedView = nullptr;
         }
 
-        // MEM LAB_06b775b0 (`XOR EAX,EAX; RET 8`): +0x10 / +0x44 / +0x50 / +0x58 / +0x60 /
+        // MEM LAB_06b775b0: +0x10 / +0x44 / +0x50 / +0x58 / +0x60 /
         // +0x64 / +0x70 return 0 and leave LastError alone (+0x50 comes from the base).
         int DACOM_API CloseFile(unsigned long) override { return 0; }
-
-        // formerly Slot44
         int DACOM_API UnmapFileView(unsigned long) override { return 0; }
-
-        // formerly Slot58
         int DACOM_API RejectOperation58(unsigned long) override { return 0; }
 
         int DACOM_API OpenNode(const char*) override { return 0; }
-
-        // formerly Slot64
         int DACOM_API RejectOperation64(unsigned long) override { return 0; }
-
-        // formerly Slot70
         int DACOM_API GetPathAttributes(const char*) override { return 0; }
-
-        // formerly Slot54
         int DACOM_API RejectOperation54(const char*, unsigned long) override { return 0; }
 
         int DACOM_API GetCurrentPath(unsigned long, char*) override { return 0; }
-
-        // formerly Slot6C
         int DACOM_API RejectOperation6C(unsigned long, unsigned long) override { return 0; }
-
-        // formerly Slot74
         int DACOM_API RejectOperation74(unsigned long, unsigned long) override { return 0; }
-
-        // formerly Slot78
         int DACOM_API GetFileSystemError() override { return 0; }
 
         int DACOM_API OpenByDesc(FFileSystemDesc*) override { return -1; }
-
-        // formerly SlotA0
         int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
         {
             return InvokeDosRootLockedCall(Arg0, Callback, Arg1);
         }
-
-        // formerly SlotA4
         int DACOM_API ResolvePath(char* DestArg, const char* SrcArg,
                              unsigned long DestCharsArg) override
         {
@@ -2985,14 +2888,11 @@ namespace
         }
 
         // MEM LAB_06b77690: *Out = 0 (no Out check), return -1.
-        // formerly Slot8C
         int DACOM_API GetParentFileSystem(IFileSystem** Out) override
         {
             *Out = nullptr;
             return -1;
         }
-
-        // formerly Slot80
         int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
         {
             if (Handle != 0)
@@ -3002,8 +2902,7 @@ namespace
             return (int)(MappedPos);
         }
 
-        // MEM vtable06b792f0+0x18 = LAB_06b77330, not the DOS failure stub.
-        // formerly Slot18
+        // MEM vtable 06b792f0 +0x18 = LAB_06b77330, not the DOS failure stub.
         int DACOM_API Write(unsigned long Handle, const void* Buffer, unsigned long Size,
                              unsigned long* BytesWritten, const void* PositionOverride) override
         {
@@ -3025,7 +2924,7 @@ namespace
                 }
                 else
                 {
-                    // 77392..773f7: unsigned wrapping round-up, no clamp.
+                    // Retail's round-up (+0xFFFF, 4 KB mask): unsigned, wraps, no clamp.
                     const unsigned long NewSize = (End + 0xFFFFu) & 0xFFFFF000u;
                     void* NewView = VirtualAlloc(nullptr, NewSize, MEM_COMMIT, PAGE_READWRITE);
                     if (NewView == nullptr)
@@ -3053,8 +2952,6 @@ namespace
                 LogicalSize = MappedPos;
             return 1;
         }
-
-        // formerly Slot24
         int DACOM_API SetEndOfFile(unsigned long) override
         {
             if ((Access & kGenericWrite) == 0)
@@ -3081,47 +2978,38 @@ namespace
             LogicalSize = MappedPos;
             return 1;
         }
-
-        // formerly Slot1C
         int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             return 0;
         }
-        // formerly Slot2C
         int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             return 1;
         }
-        // formerly Slot30
         int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             return 1;
         }
-        // formerly Slot34
         int DACOM_API GetFileTimes(unsigned long, FILETIME*, FILETIME*, FILETIME*) override
         {
             return 0;
         }
-        // formerly Slot38
         int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             return 0;
         }
-        // formerly Slot3C
         int DACOM_API CreateMapping(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long, unsigned long) override
         {
             return 0;
         }
-        // formerly Slot40
         int DACOM_API MapFileView(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             return 0;
         }
-        // formerly Slot68
         int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
         {
             return 0;
@@ -3142,8 +3030,7 @@ namespace
             unsigned long Got = Size;
             if (Got > Remain)
                 Got = Remain;
-            // 06b772fb..06b7731b: REP MOVS from +8 + position and *BytesRead store, both
-            // without checks (a zero count copies nothing).
+            // No checks on Buffer or BytesRead.
             std::memcpy(Buffer, (char*)(MappedView) + MappedPos, Got);
             *BytesRead = Got;
             MappedPos = MappedPos + Got;
@@ -3158,13 +3045,11 @@ namespace
                 *HighOut = 0;
             return LogicalSize;
         }
-
-        // formerly Slot20
         int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
                              unsigned long Origin) override
         {
-            // MEM LAB_06b77460: handle != 0 -> -1; origin 1 = pos + off, 2 = alloc (+0xc) - off
-            // (unsigned, no clamp), anything else = off; pos = it; high out (if any) = 0.
+            // MEM LAB_06b77460: FILE_END is relative to the allocation size (+0xC), unsigned, no
+            // clamp.
             if (Handle != 0)
                 return -1;
             unsigned long NewPos = OffLow;
@@ -3273,7 +3158,7 @@ namespace
                 *Cursor = '\0';
                 Rest = Cursor + 1;
             }
-            // 06b77f43: retail releases Created here when set; it is always null at this point.
+            // Retail releases Created here when set; it is always null at this point.
         }
 
         if (Factory->CreateInstance((AGGDESC*)(Desc), (void**)(&Created)) == GR_OK)
@@ -3301,8 +3186,7 @@ namespace
             std::memset(PathText, 0, sizeof(PathText));
         }
 
-        // FUN_06b78210 zero path: children released (ReleaseChildren), count = 0, path[0] = 0,
-        // free(this). The vector frees itself here.
+        // FUN_06b78210. The vector frees itself here.
         ~FSearchPathInstance()
         {
             ReleaseChildren();
@@ -3311,7 +3195,7 @@ namespace
         }
 
         // LAB_06b78140, table 06b793d8: {"1.11_ISearchPath", 0}, {"1.11_IComponentFactory", 0},
-        // null. Both entries resolve to this; miss -> *Out = 0, -3.
+        // null. Both entries resolve to this.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             if (std::strcmp(Iids::SearchPath, Iid) != 0 && std::strcmp(Iids::ComponentFactory, Iid) != 0)
@@ -3412,8 +3296,7 @@ namespace
             OpenSearchPathEntry(G_Dacom, Segment, &Children[Slot]);
         }
 
-        // LAB_06b77fc0: copy this+4 path string to dest, max chars. RET 0xC.
-        // formerly Slot14
+        // LAB_06b77fc0: copy the path at +4.
         int DACOM_API GetPath(char* Dest, unsigned long MaxChars) override
         {
             char* Out = Dest;
@@ -3428,8 +3311,7 @@ namespace
             return (int)(CopyLen);
         }
 
-        // 06b77c32..06b77c6a / 06b7823a..06b78279: every allocated slot from the last to the
-        // first is released and cleared, then the array block is freed.
+        // Inlined twice in retail: slots are released from the last to the first.
         void ReleaseChildren()
         {
             for (size_t Index = Children.size(); Index > 0; --Index)
@@ -3454,8 +3336,7 @@ namespace
     public:
         FSearchPathFactory() : FNamedFactory("SearchPath") {}
 
-        // LAB_06b78090: size != 8 or case-sensitive name mismatch -> *Out = 0, -3;
-        // calloc(0x118) failure -> *Out = 0, -4; success -> refcount 1, *Out = object, 0.
+        // LAB_06b78090: case-sensitive name compare; the object is calloc(0x118) in retail.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             if (Desc->size != 0x8 || std::strcmp(Desc->interface_name, Name) != 0)

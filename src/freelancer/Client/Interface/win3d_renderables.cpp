@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 #include "Interface/win3d_renderables.h"
-#include "Interface/win3d.h"            // Win3DGetCamera (FUN_0059da60, &DAT_0067dbf8)
+#include "Interface/win3d.h"
 #include "Interface/win3d_render.h"
 #include "Interface/win3d_immediate.h"
 #include "dacom.h"
@@ -31,8 +31,7 @@ static_assert(offsetof(FImmedBatcher, VertCount) == 0x1c, "immed VertCount");
 static_assert(offsetof(FImmedBatcher, Dirty) == 0x24, "immed Dirty");
 static_assert(sizeof(FImmedBatcher) == 0x28, "FImmedBatcher is 0x28 bytes");
 
-// Static initializers LAB_005a28c0 / LAB_005a2900: +0x00..+0x18 = 0, Dirty (+0x24) = 1,
-// +0x25 = 0; +0x1c / +0x20 are not written (zero .bss).
+// Static initializers LAB_005a28c0 / LAB_005a2900.
 FImmedBatcher G_ImmedBatchA = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                nullptr, 0, 0, 1, 0, {0, 0}}; // DAT_0067dd90
 FImmedBatcher G_ImmedBatchB = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -40,7 +39,7 @@ FImmedBatcher G_ImmedBatchB = {nullptr, nullptr, nullptr, nullptr, nullptr, null
 
 namespace
 {
-    // DAT_006105b5 — XC default 1; forces TSS COLOROP/ALPHAOP on in FUN_00417f10.
+    // DAT_006105b5 — default 1; forces texture stage states 0x10 / 0x11 on in the overlay prep.
     unsigned char G_UiOverlayForceTss = 1;
 
     IRenderPipeline* GetPipe()
@@ -52,7 +51,7 @@ namespace
 
     void ResetImmedBatchDirty()
     {
-        // FUN_005a29b0 — listing 005a29b0..005a2a10.
+        // FUN_005a29b0
         if (G_ImmedBatchA.Dirty != 0)
         {
             G_ImmedBatchA.Dirty = 0;
@@ -73,7 +72,7 @@ namespace
 
     // {state, value} tables the flush walks until a zero state: DAT_005e6014 (render states
     // on), DAT_005e602c (render states off), DAT_005e603c (texture stage states, applied to
-    // stage 0 and then stage 1). Values read from the PE .rdata.
+    // stage 0 and then stage 1).
     struct FImmedStatePair
     {
         int State;
@@ -86,9 +85,8 @@ namespace
     // The handle the flush passes for "the pipeline's current buffer".
     void* const kImmedCurrentBuffer = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 
-    // 0x005a3068..0x005a30a9 and 0x005a31ce..0x005a31ea: a stack object {pipeline, state,
-    // saved value} (EH state 0, unwind LAB_005c503b) -- the state is read into it and set to 0,
-    // and written back when it goes out of scope.
+    // Retail's EH-guarded stack object: the state is read into it and set to 0, and written
+    // back when it goes out of scope.
     struct FImmedStateSaver
     {
         IRenderPipeline* Pipe;
@@ -97,8 +95,8 @@ namespace
 
         explicit FImmedStateSaver(int InState) : Pipe(DALib::Pipeline), State(InState), Saved(0)
         {
-            Pipe->GetRenderState((D3DRENDERSTATETYPE)State, &Saved); // +0xf4
-            Pipe->SetRenderState((D3DRENDERSTATETYPE)State, 0);      // +0xf0
+            Pipe->GetRenderState((D3DRENDERSTATETYPE)State, &Saved);
+            Pipe->SetRenderState((D3DRENDERSTATETYPE)State, 0);
         }
 
         ~FImmedStateSaver()
@@ -107,45 +105,39 @@ namespace
         }
     };
 
-    // FUN_005a2ee0 (.text:005a2ee0-005a3205), thiscall on a batcher.
+    // FUN_005a2ee0 (thiscall on a batcher).
     void FlushImmedBatch(FImmedBatcher* Batch)
     {
-        // 0x005a2efe..0x005a2f07: the dirty byte is raised before the empty test.
+        // The dirty byte is raised before the empty test.
         Batch->Dirty = 1;
         if (Batch->VertCount == 0)
             return;
 
-        FSpaceCamera* const WinCamera = Win3DGetCamera(); // &DAT_0067dbf8
+        FSpaceCamera* const WinCamera = Win3DGetCamera();
         if (Batch->bOrtho == 0)
         {
-            // 0x005a2f14..0x005a2f5c: the camera's perspective (FUN_00422950), then lighting,
-            // depth, culling and texturing off, blending on with SRCALPHA / INVSRCALPHA.
             Win3DApplyCamera(AsCamera(WinCamera));
-            Win3DDisable(kWin3DLightingCap); // 0xb50
-            Win3DDisable(kWin3DDepthTest);   // 0xb71
-            Win3DDisable(kWin3DCullFace);    // 0xb44
-            Win3DDisable(kWin3DTexture2D);   // 0xde1
-            Win3DEnable(kWin3DBlend);        // 0xbe2
+            Win3DDisable(kWin3DLightingCap);
+            Win3DDisable(kWin3DDepthTest);
+            Win3DDisable(kWin3DCullFace);
+            Win3DDisable(kWin3DTexture2D);
+            Win3DEnable(kWin3DBlend);
             Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
         }
         else
         {
-            // 0x005a2f61..0x005a2fe2: lighting, texturing, culling, depth and fog off, RS 0x16 =
-            // 1, the camera's 2D box (FUN_004227d0), RS 0x8b = -1, blending on.
-            Win3DDisable(kWin3DLightingCap); // 0xb50
-            Win3DDisable(kWin3DTexture2D);   // 0xde1
-            Win3DDisable(kWin3DCullFace);    // 0xb44
-            Win3DDisable(kWin3DDepthTest);   // 0xb71
-            Win3DDisable(kWin3DFog);         // 0xb60
-            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);  // +0xf0
-            Win3DSetOrtho2DForCamera(WinCamera);       // FUN_004227d0
-            DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1); // +0xf0
-            Win3DEnable(kWin3DBlend);                  // 0xbe2
+            Win3DDisable(kWin3DLightingCap);
+            Win3DDisable(kWin3DTexture2D);
+            Win3DDisable(kWin3DCullFace);
+            Win3DDisable(kWin3DDepthTest);
+            Win3DDisable(kWin3DFog);
+            DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
+            Win3DSetOrtho2DForCamera(WinCamera);
+            DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);
+            Win3DEnable(kWin3DBlend);
             Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
         }
 
-        // 0x005a2fe5..0x005a303a: the source descriptor -- every dword zeroed, Flags 2, the
-        // position and diffuse streams of the 0x10-byte vertices, FVF 0x42 and the count.
         FRpVertexSrcDesc Desc;
         memset(&Desc, 0, sizeof(Desc));
         Desc.Flags = 2;
@@ -158,36 +150,32 @@ namespace
         Desc.SrcFvf = 0x42;
         Desc.SrcCount = static_cast<unsigned int>(Batch->VertCount);
 
-        // 0x005a3041..0x005a3066.
         for (FImmedStatePair const* Pair = kImmedRsOn; Pair->State != 0; ++Pair)
             DALib::Pipeline->SetRenderState((D3DRENDERSTATETYPE)Pair->State, Pair->Value);
         {
             FImmedStateSaver LightingSaver(0x89);
             for (FImmedStatePair const* Pair = kImmedTss; Pair->State != 0; ++Pair)
-                DALib::Pipeline->SetTextureStageState(0, Pair->State, Pair->Value); // +0xf8
+                DALib::Pipeline->SetTextureStageState(0, Pair->State, Pair->Value);
             for (FImmedStatePair const* Pair = kImmedTss; Pair->State != 0; ++Pair)
                 DALib::Pipeline->SetTextureStageState(1, Pair->State, Pair->Value);
 
-            // 0x005a310a..0x005a318b: vertices and indices into the pipeline's current
-            // buffers (handle -1), both selected, one indexed triangle-list draw. The first
-            // non-zero result skips the rest; the draw's own result is not read.
+            // The first non-zero result skips the rest; the draw's own result is not read.
             unsigned int VbOffset = 0;
             unsigned int IbOffset = 0;
             if (Batch->Vb->CopyVertices(kImmedCurrentBuffer, &VbOffset, &Desc, 0,
-                                        (unsigned int)Batch->VertCount) == 0 &&           // +0x18
+                                        (unsigned int)Batch->VertCount) == 0 &&
                 Batch->Ib->CopyIndices(kImmedCurrentBuffer, &IbOffset, Batch->IndexBase,
-                                       static_cast<unsigned int>(Batch->IndexCount)) == 0 && // +0x18
-                Batch->Vb->SelectVb(kImmedCurrentBuffer) == 0 &&                  // +0x28
-                Batch->Ib->SelectIb(kImmedCurrentBuffer, VbOffset, 0, 0) == 0)    // +0x24
+                                       static_cast<unsigned int>(Batch->IndexCount)) == 0 &&
+                Batch->Vb->SelectVb(kImmedCurrentBuffer) == 0 &&
+                Batch->Ib->SelectIb(kImmedCurrentBuffer, VbOffset, 0, 0) == 0)
             {
                 Batch->Draw->DrawIndexedPrimitive(4, 0,
                                                   static_cast<unsigned int>(Batch->VertCount),
                                                   IbOffset,
-                                                  static_cast<unsigned int>(Batch->IndexCount)); // +0xc
+                                                  static_cast<unsigned int>(Batch->IndexCount));
             }
 
-            // 0x005a318e..0x005a31cb: render states off, then the perspective again after an
-            // ortho flush (FUN_00422950); the saver restores RS 0x89 last.
+            // The perspective again after an ortho flush; the saver restores RS 0x89 last.
             for (FImmedStatePair const* Pair = kImmedRsOff; Pair->State != 0; ++Pair)
                 DALib::Pipeline->SetRenderState((D3DRENDERSTATETYPE)Pair->State, Pair->Value);
             if (Batch->bOrtho != 0)
@@ -195,9 +183,8 @@ namespace
         }
     }
 
-    // FUN_005a2df0 (.text:005a2df0-005a2e71), thiscall: both arrays allocated and both counts
-    // zeroed (the cursors are left to FUN_005a29b0), then each pipeline interface that is still
-    // null is queried from DALib::Pipeline (slot 0). The query results are not read.
+    // FUN_005a2df0 (thiscall). The cursors are left to the reset; the query results are not
+    // read.
     void CreateImmedBatch(FImmedBatcher* Batch)
     {
         Batch->VertBase = static_cast<FImmedVertex*>(operator new(0xc000));
@@ -214,8 +201,7 @@ namespace
             DALib::Pipeline->QueryInterface(Iids::RPDraw, reinterpret_cast<void**>(&Batch->Draw));
     }
 
-    // FUN_005a2e80 (.text:005a2e80-005a2edc), thiscall: each array freed (FUN_005b7e1d) and
-    // each interface released (slot 2); every non-null field is nulled after it goes.
+    // FUN_005a2e80 (thiscall).
     void DestroyImmedBatch(FImmedBatcher* Batch)
     {
         if (Batch->VertBase != nullptr)
@@ -247,31 +233,29 @@ namespace
 
     void FlushImmedBatchers()
     {
-        // FUN_005a2a20: ECX=DAT_0067dd90; CALL; ECX=DAT_0067dd68; JMP.
+        // FUN_005a2a20
         FlushImmedBatch(&G_ImmedBatchA);
         FlushImmedBatch(&G_ImmedBatchB);
     }
 
     void EnsureButtonMontage()
     {
-        // FUN_00559c10 — if not loaded (DAT_00679af0), FUN_00559db0.
+        // FUN_00559c10
         if (!G_bButtonMontageLoaded)
             LoadButtonMontage();
     }
 
     void FlushMontageButtons()
     {
-        // FUN_00559c20 -- the whole body (both savers and the "buttons" flush) lives in
-        // NnMontageFlushButtons (nn_montage_draw.cpp).
+        // FUN_00559c20 -- the body lives in NnMontageFlushButtons (nn_montage_draw.cpp).
         NnMontageFlushButtons();
     }
 
     void PrepUiOverlayPipeline()
     {
-        // FUN_00417f10 — listing 00417f10..004180ba.
-        // PUSH 0x1701; CALL empty OnDisconnect — no-op (00401e90).
-        Win3DPushProjection(); // FUN_00422a70
-        Win3DSetOrtho2D();     // FUN_004225e0
+        // FUN_00417f10. Retail first calls an empty function (0x00401e90) with 0x1701.
+        Win3DPushProjection();
+        Win3DSetOrtho2D();
 
         IRenderPipeline* Pipe = GetPipe();
         if (Pipe != nullptr)
@@ -293,13 +277,13 @@ namespace
             Pipe->GetRenderState(D3DRS_ZWRITEENABLE, &Saved0E);
             Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
 
-            // 0x00418032: FUN_00403ea0(Pipeline, DAT_00616670) -- the font atlas list, found in
-            // the container map by its key (no material-key call before it).
+            // The font atlas list (DAT_00616670), found by its key with no material-key call
+            // before it.
             ScreenQuadFlush(Pipe, FontAtlasMaterialKey());
 
             Pipe->SetTextureStageState(0, 0x10, SavedTss10);
             Pipe->SetTextureStageState(0, 0x11, SavedTss11);
-            Win3DPopProjection(); // FUN_00422ab0
+            Win3DPopProjection();
             Pipe->SetRenderState(D3DRS_ZWRITEENABLE, Saved0E);
             Pipe->SetRenderState(D3DRS_ZFUNC, Saved17);
         }
@@ -323,9 +307,7 @@ void Win3DImmedBatchFlushAll()
 void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
                        unsigned long Color, unsigned long EdgeColor, float Width)
 {
-    // FUN_005a2a40 (.text:005a2a40-005a2de0). 0x005a2a48..0x005a2ad3: 12 more indices reaching
-    // 0x1800 or 8 more vertices reaching 0xc00 (signed JGE / JL) flush A, then B, then run the
-    // FUN_005a29b0 body inline.
+    // FUN_005a2a40. Signed compares; the reset is inlined.
     if (Batch->IndexCount + 12 >= 0x1800 || Batch->VertCount + 8 >= 0xc00)
     {
         FlushImmedBatch(&G_ImmedBatchA);
@@ -333,8 +315,8 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
         ResetImmedBatchDirty();
     }
 
-    // 0x005a2ad8..0x005a2bd9: the index count first, then twelve WORD indices on the current
-    // vertex count (16-bit adds), then the vertex count.
+    // The index count first, then twelve indices on the current vertex count (16-bit adds),
+    // then the vertex count.
     Batch->IndexCount += 12;
     static unsigned short const kLineIndexOffsets[12] = {0, 1, 2, 2, 3, 1, 4, 5, 6, 6, 7, 5};
     for (int Index = 0; Index < 12; ++Index)
@@ -345,9 +327,8 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
     }
     Batch->VertCount += 8;
 
-    // 0x005a2bdc..0x005a2c4c: FPATAN with ST1 = B.x - A.x and ST0 = B.y - A.y, i.e.
-    // atan2(dx, dy), plus the double DAT_005d3e88 (1.57079632675). The cosine is stored as a
-    // float first and multiplied by Width from there; the sine * Width stays on the FPU stack.
+    // atan2(dx, dy) -- the arguments in that order -- plus DAT_005d3e88. x87: the cosine is
+    // rounded to float before the multiply; the sine * Width stays double.
     double const Dx = static_cast<double>(B[0]) - static_cast<double>(A[0]);
     double const Dy = static_cast<double>(B[1]) - static_cast<double>(A[1]);
     double const Angle = atan2(Dx, Dy) + 1.57079632675;
@@ -355,8 +336,7 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
     double const SinW = sin(Angle) * static_cast<double>(Width);
     double const CosW = static_cast<double>(CosAngle) * static_cast<double>(Width);
 
-    // 0x005a2c10..0x005a2dd7: eight vertices -- A, A + off, B, B + off, A, A - off, B, B - off,
-    // off = (SinW, CosW, 0); the ends in Color, the offset ones in EdgeColor.
+    // A, A + off, B, B + off, A, A - off, B, B - off with off = (SinW, CosW, 0).
     FImmedVertex Vertices[8];
     Vertices[0] = {A[0], A[1], A[2], Color};
     Vertices[1] = {static_cast<float>(static_cast<double>(A[0]) + SinW),
@@ -379,15 +359,15 @@ void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
 
 void Win3DImmedBatchCreateAll()
 {
-    // FUN_005a2970 (.text:005a2970-005a298b).
+    // FUN_005a2970
     CreateImmedBatch(&G_ImmedBatchA);
     CreateImmedBatch(&G_ImmedBatchB);
-    G_ImmedBatchB.bOrtho = 1; // DAT_0067dd8d
+    G_ImmedBatchB.bOrtho = 1;
 }
 
 void Win3DImmedBatchDestroyAll()
 {
-    // FUN_005a2990 (.text:005a2990-005a29a4): A, then a tail jump for B.
+    // FUN_005a2990
     DestroyImmedBatch(&G_ImmedBatchA);
     DestroyImmedBatch(&G_ImmedBatchB);
 }
@@ -395,8 +375,7 @@ void Win3DImmedBatchDestroyAll()
 void Win3DImmedDrawLine(float const* A, float const* B, unsigned long Color,
                         unsigned long EdgeColor, float Width)
 {
-    // FUN_005a2940 (.text:005a2940-005a2963), cdecl: the five arguments passed on unchanged to
-    // FUN_005a2a40 on DAT_0067dd68.
+    // FUN_005a2940
     ImmedBatchAddLine(&G_ImmedBatchB, A, B, Color, EdgeColor, Width);
 }
 
@@ -417,7 +396,7 @@ void UiOverlayPrepPipeline()
 
 void Win3DFlushBeforeOverlayDraw()
 {
-    // FUN_0045a9f0 listing order: 005a2a20, 005a29b0, 00559c20, 00559c10, 00417f10.
+    // FUN_0045a9f0, in retail's call order.
     FlushImmedBatchers();
     ResetImmedBatchDirty();
     FlushMontageButtons();

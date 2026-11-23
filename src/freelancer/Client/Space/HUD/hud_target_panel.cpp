@@ -7,10 +7,6 @@
 // Retail Client\Space\HUD_Target.cpp -- HUD_Target (the [Target] section of hud.ini) and the
 // sub-target flash bracket it draws on its 3D view. Declarations and the retail layout are in
 // hud_target.h; HUD_Target_Base is in hud_target.cpp.
-//
-// Holes are marked "HOLE:" with the retail callee. Where a hole sits on a command path (a key or
-// a button press that does nothing in the port) it also FDUMPs "HUD_Target: HOLE ..." so a smoke
-// run shows the press arriving.
 
 #include "Space/HUD/hud_target.h"
 
@@ -57,7 +53,7 @@
 #include "common_text.h"            // StyleNode
 
 #include "DALib.h"
-#include "dacom.h"                  // FDUMP
+#include "dacom.h"
 #include "engine/engbase.h"
 
 #include <math.h>
@@ -71,16 +67,15 @@ unsigned char G_bTradeRequested = 0;
 
 namespace
 {
-    // DAT_00674ad4 -- static initializer LAB_004e0860: CreateID("scanning_cargo"). Only reader:
-    // FUN_004e54c0 (0x004e552a), the voice line of a cargo scan.
+    // DAT_00674ad4 -- static initializer LAB_004e0860. Only reader: OpenScanner, the voice line
+    // of a cargo scan.
     unsigned const G_ScanningCargoVoiceId = CreateID("scanning_cargo");
 
-    // DAT_00674afc -- the 3DMathEngine FUN_004e4f70 acquires lazily (FUN_005b73e0).
+    // DAT_00674afc -- the 3DMathEngine NextHardpointScreenPos acquires lazily (FUN_005b73e0).
     I3DMathEngine* G_HudTargetHardpointMath = nullptr;
 
-    // Retail's shared scratch buffers (nn_text_scratch.h): the rank line is DAT_0066fc60
-    // (0x004e254f, capacity the DAT_006119f8 read) and its " %d" suffix DAT_0066dc60
-    // (0x004e2570).
+    // Retail's shared scratch buffers (nn_text_scratch.h): the rank line (capacity read from
+    // DAT_006119f8) and its " %d" suffix.
     wchar_t* const G_RankLine = G_NnTextScratchB;   // DAT_0066fc60
     wchar_t* const G_RankSuffix = G_NnTextScratchA; // DAT_0066dc60
 
@@ -97,8 +92,8 @@ namespace
     float const kSweepRound = 0.49999f;        // DAT_005d1910
     float const kFlashExponent = 7.0f;         // DAT_005d8850
 
-    // The slide targets (0x004e3042.., 0x004e37ec..): the toggle button's expanded spot and the
-    // y every bottom-row button drops to while the panel animates.
+    // The slide targets: the toggle button's expanded spot and the y every bottom-row button
+    // drops to while the panel animates.
     float const kToggleOpen[3] = {-0.375f, -0.27f, 0.0f};
     float const kRowY = -0.37f;
     float const kRowLoweredY = -0.4f;
@@ -168,16 +163,14 @@ namespace
         Control->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
     }
 
-    // IObjAffect::set_target(0, SUBOBJ_ID_NONE, connection) on an object (0x004e1d42..,
-    // 0x004e2ebc.., 0x004e3c5b..).
+    // Inlined by retail at three sites.
     void ClearTargetOf(IObjRW* Rw)
     {
         static_cast<IObjAffect*>(Rw)->set_target(nullptr, SUBOBJ_ID_NONE,
                                                  static_cast<int>(GetPlayerConnectionId()));
     }
 
-    // The withdrawn trade (0x004e28c5.., 0x004e4973..): IServer::StopTradeRequest(connection),
-    // IServer::TerminateTrade(connection, 0), DAT_00674b00 = 0.
+    // The withdrawn trade, inlined by retail in UpdateTradeButton and OnEvent.
     void WithdrawTrade()
     {
         G_Server->StopTradeRequest(GetPlayerConnectionId());
@@ -185,7 +178,7 @@ namespace
         G_bTradeRequested = 0;
     }
 
-    // |A - B| in the retail order: (dz^2 + dy^2 + dx^2), FSQRT (0x004e263a.., 0x004e286c..).
+    // |A - B| summed in the retail order.
     float PositionDistance(Vector const& A, Vector const& B)
     {
         float const Dx = A.x - B.x;
@@ -194,16 +187,13 @@ namespace
         return sqrtf(Dz * Dz + Dy * Dy + Dx * Dx);
     }
 
-    // FUN_004e45b0 (cdecl, the IHardpoint::EnumerateHardpoints callback of OnViewObjectChanged): push a copy
-    // of the hardpoint name onto HUD_Target +0x57c (FUN_004e5ab0 insert at end).
+    // FUN_004e45b0 -- the IHardpoint::EnumerateHardpoints callback of OnViewObjectChanged.
     void __cdecl CollectHardpointName(char const* Name, void* Context)
     {
         static_cast<HudTarget*>(Context)->HardpointNames.push_back(std::string(Name));
     }
 
-    // Retail's static HUDFACTORY<HUD_Target> DAT_00674aa8 ("Target"): XC LAB_004e0880 runs the
-    // ctor FUN_004e5680, atexit LAB_004e08a0 the dtor; Create FUN_004e56f0 = operator new(0x670)
-    // + FUN_004e08b0.
+    // DAT_00674aa8; see the header for the factory's retail functions.
     HUDFACTORY<HudTarget> G_HudTargetFactory("Target");
 }
 
@@ -213,8 +203,7 @@ namespace
 
 FHudSubTargetFlash::FHudSubTargetFlash()
 {
-    // FUN_004dfbd0: the colour bytes zeroed first, then SubId, Timer, the constants and the
-    // packed colour {0xff, 0, 0, 0xff}.
+    // FUN_004dfbd0: the colour bytes are zeroed first, as retail.
     Color[0] = 0;
     Color[1] = 0;
     Color[2] = 0;
@@ -246,11 +235,9 @@ void FHudSubTargetFlash::Update(float DeltaSeconds, unsigned short NewSubId)
             PlayOrRewindUiSoundSlot(0x18);
         }
     }
-    // FCOMP 0 / TEST AH,0x41 / JNZ: only a Timer strictly above 0 runs down.
     if (Timer > 0.0f)
     {
         Timer = Timer - DeltaSeconds;
-        // FCOMP 0 / TEST AH,5 / JP: clamped only when strictly below 0.
         if (Timer < 0.0f)
         {
             Timer = 0.0f;
@@ -262,12 +249,12 @@ void FHudSubTargetFlash::DrawBracket(float const* ScreenPos, float HalfSize) con
 {
     // FUN_004dfca0: one GL_LINES batch (mode 2) of 56 vertices at z = 0 -- four corner squares
     // of side A, four inward ticks (a vee of half-width B and depth C) at the edge midpoints.
-    // Term order follows the x87 sequence; retail parks -B in its own argument slot
-    // (0x004e0219 FCHS) and subtracts it, so "Px - (-B)" is written as Px + B.
+    // Term order follows retail's; retail negates B into its own slot and subtracts it, so
+    // "Px - (-B)" is written as Px + B.
     float const S = HalfSize;
-    float const A = (S * CornerFrac) + (S * CornerFrac);    // local_c: FMUL, FADD ST0,ST0
-    float const B = S * TickFrac;                          // local_4
-    float const C = (S * TickLenFrac) + (S * TickLenFrac); // local_8
+    float const A = (S * CornerFrac) + (S * CornerFrac);
+    float const B = S * TickFrac;
+    float const C = (S * TickLenFrac) + (S * TickLenFrac);
     float const Px = ScreenPos[0];
     float const Py = ScreenPos[1];
 
@@ -319,7 +306,7 @@ void FHudSubTargetFlash::DrawBracket(float const* ScreenPos, float HalfSize) con
     Win3DVertex3f(S + Px, (Py - A) + S, 0.0f);
     Win3DVertex3f(S + Px, S + Py, 0.0f);
 
-    // Bottom tick (0x004e0214..0x004e02e3).
+    // Bottom tick.
     Win3DVertex3f(Px, (S + Py) - C, 0.0f);
     Win3DVertex3f(Px + B, ((S + Py) - C) + C, 0.0f);
     Win3DVertex3f(Px + B, ((S + Py) - C) + C, 0.0f);
@@ -337,7 +324,7 @@ void FHudSubTargetFlash::DrawBracket(float const* ScreenPos, float HalfSize) con
     Win3DVertex3f(Px - S, (Py - A) + S, 0.0f);
     Win3DVertex3f(Px - S, S + Py, 0.0f);
 
-    // Left tick (0x004e042c..0x004e04d1).
+    // Left tick.
     Win3DVertex3f((Px - S) + C, Py, 0.0f);
     Win3DVertex3f(Px - S, Py + B, 0.0f);
     Win3DVertex3f(Px - S, Py + B, 0.0f);
@@ -366,12 +353,11 @@ void FHudSubTargetFlash::Draw(FSpaceCamera* Camera, float* ScreenPos) const
         pow(2.0, static_cast<double>((kFlashExponent / Duration) * Timer)) *
         static_cast<double>(BaseSize));
 
-    // FCOMP 0 / TEST AH,0x41 / JNZ: the two wide brackets only while Timer is strictly above 0.
+    // The two wide brackets only while flashing.
     if (Timer > 0.0f)
     {
-        // Colour * 0.25 (DAT_005c94f8) per byte, clamped (inline for bytes 0 and 1, FUN_004104c0
-        // for 2 and 3). FUN_00421aa0 is the three-byte form: the alpha byte retail computes is
-        // never read.
+        // Colour * 0.25 (DAT_005c94f8) per byte, clamped. FUN_00421aa0 is the three-byte form:
+        // the alpha byte retail computes is never read.
         unsigned char Dim[3];
         for (int Index = 0; Index < 3; ++Index)
         {
@@ -407,7 +393,7 @@ void FHudSubTargetFlash::Draw(FSpaceCamera* Camera, float* ScreenPos) const
         DrawBracket(ScreenPos, static_cast<float>(static_cast<double>(Size) * 1.2)); // DAT_005d3ed0
     }
 
-    // The full colour (FUN_00421aa0(&Color): three bytes, alpha 0xff).
+    // The full colour (FUN_00421aa0: three bytes, alpha 0xff).
     Win3DColor3ub(Color[0], Color[1], Color[2]);
     DrawBracket(ScreenPos, Size);
 
@@ -456,21 +442,19 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     , PlayerNameFont(nullptr)
     , bFirstUpdate(0)
 {
-    // FUN_004e08b0: bases (HUD_Target_Base FUN_004e6020, ButtonScaler FUN_0055e340), the +0x528
-    // list, the flash (FUN_004dfbd0), the map and the vector, the vptrs, then 0x004e0983:
-    // publish this in DAT_00674b04.
+    // FUN_004e08b0; publishes this in DAT_00674b04.
     G_HudTargetPanel = this;
 
     HomePosition.X = -0.296f;  // 0xbe978d50
     HomePosition.Y = -0.367f;  // 0xbebbe76d
     HomePosition.Z = 0.0f;
-    // +0x500..+0x520, +0x648 and +0x64c are zeroed here (the init list); +0x524 is left alone
-    // (Create below sets it). Retail never writes +0x58c/+0x590, the sweep block, the trail
-    // count or +0x634..+0x644 in the ctor; the init list zeroes them for determinism --
-    // Create, OnViewObjectChanged and DrawScanSweep write each before it is read.
+    // +0x524 is left alone (Create below sets it). Port-only: retail never writes +0x58c/+0x590,
+    // the sweep block, the trail count or +0x634..+0x644 in the ctor; the init list zeroes them
+    // for determinism -- Create, OnViewObjectChanged and DrawScanSweep write each before it is
+    // read.
 
     HUDItem::Name = "Target";
-    // 0x004e0a3b: the direct call FUN_004e0ee0(0, 0) -- before the Win3D name is set.
+    // Create(0, 0) is a direct (non-virtual) call, before the Win3D name is set.
     HudTarget::Create(nullptr, nullptr);
     Win3D::SetName("HUD_Target");
 
@@ -481,8 +465,7 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     HitHalfWidth = 0.11f;      // 0x3de147ae
     HitHalfHeight = 0.11f;
 
-    // 0x004e0acc: `if (watched != 0) BaseWatcher::set_pointer(0)` -- BaseWatcher::set's body
-    // (see HudTargetBase::~HudTargetBase).
+    // Retail's inlined test-and-set_pointer (see HudTargetBase::~HudTargetBase).
     ViewObject.set(nullptr);
 
     bHadViewObject = 0;
@@ -497,7 +480,7 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     SmallFont = FindMenuFontImp("HudSmall");
     PlayerNameFont = FindMenuFontImp("PlayerName");
 
-    // 0x004e0b34..0x004e0bc8: FUN_005760d0 for each id, on the handler at +0x384.
+    // FUN_005760d0 for each id, on the handler at +0x384.
     unsigned const kEvents[0x10] = {0x5f, 0x21, 0x22, 0xcc, 0x54, 0x58, 0x59, 0x8b,
                                     0x24, 0x25, 0x26, 0xbb, 0xc9, 0xca, 0x23, 0x8a};
     for (unsigned Index = 0; Index < 0x10; ++Index)
@@ -509,9 +492,7 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
 
 HudTarget::~HudTarget()
 {
-    // FUN_004e0cd0: the vptrs put back, then 0x004e0d29: DAT_00674b04 = 0. The hardpoint names,
-    // the sub-target map, the style list and the scaler list are freed by their destructors, then
-    // the HUD_Target_Base members and bases, in retail's order.
+    // FUN_004e0cd0: clears DAT_00674b04; the rest is member and base destructors.
     G_HudTargetPanel = nullptr;
 }
 
@@ -530,7 +511,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
                                          "Interface\\hud\\HUD_target_min.cmp", MinimizedPos,
                                          nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
 
-    // 0x004e1006..0x004e1082: the collapsed hit box.
+    // The collapsed hit box.
     HalfExtents[0] = 0.109f;  // 0x3ddf3b64
     HalfExtents[1] = 0.02f;   // 0x3ca3d70a
     HalfExtents[2] = 0.0f;
@@ -635,7 +616,6 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     RankText = CreateTextControl("TargetRankText", "HudSmall", RankPos, nullptr, 0.228f, 0.03f,
                                  0.9f, 0, 1, 0x574, 1);
 
-    // 0x004e1775: HUDItem slot 13(1), then the sub-target arrows and the trade button hidden.
     HideExpandedControls(true);
     PreviousButton->SetProperty(1, 1, 0);
     NextButton->SetProperty(1, 1, 0);
@@ -643,9 +623,8 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
     TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
 
-    // 0x004e1803..0x004e18bb: a StyleNode(0x3ea8), cloned (vt+0x1c); the list takes a clone of
-    // that clone, the first clone is deleted (vt 0 with 1); then ids 0x60070 is loaded into the
-    // list (FUN_0057da40) and its trailing paragraph stripped (FUN_0057eb40) when that worked.
+    // Retail clones the StyleNode twice: the list takes a clone of the clone, and the first
+    // clone is deleted.
     {
         StyleNode Style(0x3ea8);
         RDLNode* const Clone = Style.Clone();
@@ -677,7 +656,7 @@ void HudTarget::ToggleExpanded()
     if (bExpanded == 0)
     {
         // Opening: slide the toggle from its rest spot to the panel corner and drop the bottom
-        // row from y -0.37 to -0.4 (FUN_0055dee0 takes Control, Start, End).
+        // row from y -0.37 to -0.4.
         ButtonMover::Start(kAnimSeconds);
         ButtonMover::AddButton(ToggleButton, &HomePosition.X, kToggleOpen);
 
@@ -743,13 +722,12 @@ void HudTarget::DrawViewObject()
         return;
     }
 
-    // 0x004e3ce6: the GL viewport saved (FUN_00422390, GL_VIEWPORT), the view camera pointed at
-    // the object (FUN_004e70e0, the fixed orbit when option 0xc is set, shifted -0.0125 screens).
+    // The GL viewport saved (FUN_00422390, GL_VIEWPORT), the view camera pointed at the object.
     int SavedViewport[4];
     Win3DGetViewport(0xba2, SavedViewport);
     SetupViewCamera(GetGameOption(0xc) != 0, -0.0125f);
 
-    // 0x004e3d14: a CSimple (class & 3) is drawn -- as a wire sphere when TypeBits & 7, else as
+    // A CSimple (class & 3) is drawn -- as a wire sphere when TypeBits & 7, else as
     // its coloured part cache -- and the scan sweep over it; anything else draws nothing.
     CSimple* Simple = nullptr;
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
@@ -758,10 +736,9 @@ void HudTarget::DrawViewObject()
         Simple = static_cast<CSimple*>(Object);
         if ((Simple->TypeBits & 7u) != 0)
         {
-            // Depth test off, fov y 45 (FUN_0040fa10), the perspective (FUN_00422910), the chrome
-            // colour at 80 % per byte (FILD / FMUL 0.8f DAT_005d8d40 / ftol / FUN_004104c0) as
-            // the current colour (FUN_00421ba0), and a 16 x 16 sphere of the hierarchy radius
-            // (vt+0x64) in the object's transform (slot 4, ICF-folded with get_transform).
+            // The chrome colour at 80 % per byte (0.8f is DAT_005d8d40) as the current colour,
+            // and a 16 x 16 sphere of the hierarchy radius in the object's transform (slot 4,
+            // ICF-folded with get_transform).
             Win3DDisable(kWin3DDepthTest);
             SpaceCameraSetFovY(&ViewCamera, 45.0f);
             Win3DApplyCameraPerspective(AsCamera(&ViewCamera));
@@ -792,8 +769,7 @@ void HudTarget::DrawViewObject()
         }
         else
         {
-            // FUN_004e7070, then the part cache (FUN_00406510) through the view camera in the
-            // object's transform (slot 4).
+            // The part cache (FUN_00406510) in the object's transform (slot 4).
             ColourViewParts();
             IObjRW* const Viewed = WatchedObjRw(ViewObject);
             PartCacheDraw(&PartCache, AsCamera(&ViewCamera),
@@ -802,13 +778,13 @@ void HudTarget::DrawViewObject()
         DrawScanSweep();
     }
 
-    // 0x004e3ea8: the Win3D camera back (FUN_00422950) and the saved viewport (FUN_00421620).
+    // The Win3D camera back and the saved viewport (FUN_00421620).
     Win3DApplyCamera(AsCamera(Win3DGetCamera()));
     Win3DSetViewportRect(SavedViewport[0], SavedViewport[1], SavedViewport[2], SavedViewport[3],
                          "E:\\FL\\Scratch\\Source\\Client\\space\\HUD_Target.cpp", 0x642);
 
-    // 0x004e3ed5: a flashing sub-target of a CEqObj -- its centre of mass (vt+0xe0), else the
-    // object's position -- projected through the view camera (slot 0x44) gets the bracket.
+    // A flashing sub-target of a CEqObj -- its centre of mass, else the object's position --
+    // projected through the view camera gets the bracket.
     if (SubTargetFlash.SubId == SUBOBJ_ID_NONE)
     {
         return;
@@ -833,7 +809,7 @@ void HudTarget::DrawViewObject()
 
 void HudTarget::UpdateLabels()
 {
-    // FUN_004e3f80 -- the target / sub-target name labels.
+    // FUN_004e3f80.
     if (ShipName == nullptr || SubtargetName == nullptr)
     {
         return;
@@ -850,20 +826,19 @@ void HudTarget::UpdateLabels()
     }
     CSimple* const Simple = static_cast<CSimple*>(Object);
 
-    // 0x004e4061..0x004e408f: the labels show only while expanded and neither the slide nor
-    // the scale animation runs; SetProperty(1, x) takes "hide", so every show below is !bShow.
+    // SetProperty(1, x) takes "hide", so every show below is !bShow.
     bool const bShow =
-        bExpanded != 0 && !ButtonMover::IsActive() && !ButtonScaler::IsActive(); // FUN_0055e280
+        bExpanded != 0 && !ButtonMover::IsActive() && !ButtonScaler::IsActive();
     uintptr_t const Hide = bShow ? 0 : 1;
 
-    wchar_t IdsText[0x80];    // [ESP+0x28]
-    wchar_t SubName[0x100];   // [ESP+0x128]
+    wchar_t IdsText[0x80];
+    wchar_t SubName[0x100];
 
-    // 0x004e4094..0x004e4134: an unvisited solar shows only its type caption.
-    if (HudIsUnvisitedSolar(Simple)) // FUN_004d4c70
+    // An unvisited solar shows only its type caption.
+    if (HudIsUnvisitedSolar(Simple))
     {
         SubName[0] = 0;
-        if (GetIdsStringWWithRawFallback(HudObjectTypeIds(Simple), IdsText, 0x80) == 0) // FUN_004d4d50
+        if (GetIdsStringWWithRawFallback(HudObjectTypeIds(Simple), IdsText, 0x80) == 0)
         {
             IdsText[0] = 0;
         }
@@ -874,15 +849,12 @@ void HudTarget::UpdateLabels()
         return;
     }
 
-    // 0x004e4139..0x004e4160: a ship ((class & 0x503) == 0x503) and whether it is a player's
-    // (CShip +0x2bd).
+    // CShip +0x2bd: a player's ship.
     CShip* const Ship = IsClass(Object, 0x503) ? static_cast<CShip*>(Object) : nullptr;
     bool const bPlayerShip = Ship != nullptr && Ship->bIsPlayer != 0;
 
-    // 0x004e4160..0x004e427e: the font (TextControl::SetFont, FUN_0058a740) -- "PlayerName"
-    // (+0x668) for a player ship, "HudSmall" (+0x664) otherwise -- and the rest position: the
-    // home offset (+0x2d4) copied to the offset (+0xa8), a player ship's y lowered by 0.004
-    // (DAT_005d7bf0, double; FLD float / FSUB double / FSTP float), then SetProperty(6, offset).
+    // The font and the rest position: the home offset (+0x2d4) copied to the offset (+0xa8),
+    // a player ship's y lowered by 0.004 (DAT_005d7bf0, subtracted in double, rounded to float).
     NnTextControl* const Labels[2] = {static_cast<NnTextControl*>(ShipName),
                                       static_cast<NnTextControl*>(SubtargetName)};
     for (int Index = 0; Index < 2; ++Index)
@@ -899,18 +871,17 @@ void HudTarget::UpdateLabels()
         Label->SetProperty(6, reinterpret_cast<uintptr_t>(Label->Offset), 0);
     }
 
-    // 0x004e4284..0x004e42aa: the heap caption (trylevel 0), Mode 0 with the faction short name.
-    FHudWideText Caption = {nullptr, 0}; // [ESP+0x14]
-    if (HudBuildObjectCaption(Simple, &Caption, 0, true)) // FUN_004e8100
+    // The name line (Mode 0) with the faction short name.
+    FHudWideText Caption = {nullptr, 0};
+    if (HudBuildObjectCaption(Simple, &Caption, 0, true))
     {
-        // 0x004e42b0..0x004e42df
         ShipName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
         ShipName->SetProperty(1, Hide, 0);
-        // 0x004e42e5..0x004e433b: the flashing sub-target's name, when it has one.
+        // The flashing sub-target's name, when it has one.
         bool bSubDone = false;
         if (SubTargetFlash.SubId != SUBOBJ_ID_NONE)
         {
-            GetSubTargetName(SubName); // FUN_004e49c0
+            GetSubTargetName(SubName);
             if (SubName[0] != 0)
             {
                 SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(SubName), 0);
@@ -920,9 +891,9 @@ void HudTarget::UpdateLabels()
         }
         if (!bSubDone)
         {
-            // 0x004e4340..0x004e437a: otherwise the location line (Mode 1) -- the label keeps
-            // its old text when that fails, and is shown either way.
-            if (HudBuildObjectCaption(Simple, &Caption, 1, true)) // FUN_004e8100
+            // Otherwise the location line (Mode 1) -- the label keeps its old text when that
+            // fails, and is shown either way.
+            if (HudBuildObjectCaption(Simple, &Caption, 1, true))
             {
                 SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
             }
@@ -931,12 +902,12 @@ void HudTarget::UpdateLabels()
     }
     else
     {
-        // 0x004e4385..0x004e4571: no caption -- the name and sub-name built by hand.
-        wchar_t NameText[0x100]; // [ESP+0x428]
-        wchar_t SubText[0x100];  // [ESP+0x628]
+        // No caption -- the name and sub-name built by hand.
+        wchar_t NameText[0x100];
+        wchar_t SubText[0x100];
         NameText[0] = 0;
         SubText[0] = 0;
-        if (HudIsUnvisitedSolar(Simple)) // FUN_004d4c70
+        if (HudIsUnvisitedSolar(Simple))
         {
             if (GetIdsStringWWithRawFallback(HudObjectTypeIds(Simple), IdsText, 0x80) == 0)
             {
@@ -946,11 +917,11 @@ void HudTarget::UpdateLabels()
         }
         else
         {
-            // 0x004e43ea..0x004e4511: the pilot name (trylevel 1), the sub-target or ship group
-            // name, and the ids_name when there is no pilot name.
-            bool bHavePilot = false; // [ESP+0x13]
-            FHudWideText Pilot = {nullptr, 0}; // [ESP+0x1c]
-            GetShipPilotName(Object, &Pilot); // FUN_005472d0
+            // The pilot name, the sub-target or ship group name, and the ids_name when there is
+            // no pilot name.
+            bool bHavePilot = false;
+            FHudWideText Pilot = {nullptr, 0};
+            GetShipPilotName(Object, &Pilot);
             if (Pilot.Text != nullptr && Pilot.Text[0] != 0)
             {
                 wcscpy(NameText, Pilot.Text);
@@ -958,7 +929,7 @@ void HudTarget::UpdateLabels()
             }
             if (SubTargetFlash.SubId != SUBOBJ_ID_NONE)
             {
-                GetSubTargetName(SubName); // FUN_004e49c0
+                GetSubTargetName(SubName);
                 if (SubName[0] != 0)
                 {
                     wcscpy(SubText, SubName);
@@ -978,8 +949,8 @@ void HudTarget::UpdateLabels()
             }
             if (!bHavePilot)
             {
-                wchar_t ArchName[0x80]; // [ESP+0x328]
-                if (GetIdsStringWWithRawFallback(GetObjectIdsName(Object), ArchName, 0x80) == 0) // FUN_005472a0
+                wchar_t ArchName[0x80];
+                if (GetIdsStringWWithRawFallback(GetObjectIdsName(Object), ArchName, 0x80) == 0)
                 {
                     ArchName[0] = 0;
                 }
@@ -990,14 +961,12 @@ void HudTarget::UpdateLabels()
                 free(Pilot.Text);
             }
         }
-        // 0x004e4514..0x004e4571
         ShipName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(NameText), 0);
         ShipName->SetProperty(1, Hide, 0);
         SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(SubText), 0);
         SubtargetName->SetProperty(1, Hide, 0);
     }
 
-    // 0x004e4577..0x004e4586
     if (Caption.Text != nullptr)
     {
         free(Caption.Text);
@@ -1006,10 +975,9 @@ void HudTarget::UpdateLabels()
 
 void HudTarget::OnViewObjectChanged()
 {
-    // FUN_004e4690 -- the view object changed.
+    // FUN_004e4690.
     SubTargetFlash.SubId = SUBOBJ_ID_NONE;
-    // FUN_0059da10 is Win3DFindByName; NN_Scanner is a Win3D window (nn_scanner.h), not a
-    // flat MenuUi record.
+    // NN_Scanner is a Win3D window (nn_scanner.h), not a flat MenuUi record.
     Win3D* const Scanner = Win3DFindByName("NN_Scanner");
     if (Scanner != nullptr)
     {
@@ -1019,16 +987,14 @@ void HudTarget::OnViewObjectChanged()
     IObjRW* const View = WatchedObjRw(ViewObject);
     if (View != nullptr)
     {
-        // 0x004e46e8: FUN_0059da10 is Win3DFindByName (see the NN_Scanner lookup above).
         Win3D* const Help = Win3DFindByName("NN_Help");
         if (Help != nullptr)
         {
-            // 0x004e46f4..0x004e4708: the view object (watched -> -8, null kept) into the open
-            // info window.
-            static_cast<NnHelp*>(Help)->ShowObjectInfo(View); // FUN_004754a0
+            // The view object into the open info window.
+            static_cast<NnHelp*>(Help)->ShowObjectInfo(View);
         }
 
-        // 0x004e4717..0x004e47a4: both label colours from the reputation colour.
+        // Both label colours from the reputation colour.
         if (WatchedObjRw(HUDItem::Target) != nullptr && WatchedObjRw(ViewObject) != nullptr &&
             ShipName != nullptr && SubtargetName != nullptr)
         {
@@ -1042,9 +1008,8 @@ void HudTarget::OnViewObjectChanged()
 
         SubTargetCount = RebuildSubTargets(&SubTargets);
 
-        // 0x004e47e3: erase(begin, end), then the root instance's hardpoints and every related
-        // instance's (GetRelatedInstance flags 0) through IHardpoint::EnumerateHardpoints. Each
-        // archetype handle is released (slot 15) before it is enumerated -- retail's order.
+        // The root instance's hardpoints and every related instance's. Each archetype handle is
+        // released (slot 15) before it is enumerated -- retail's order.
         HardpointNames.clear();
         void* const RootArch =
             DALib::Engine->GetInstanceArchetype(InstanceFromIndex(View->get_index()));
@@ -1070,7 +1035,7 @@ void HudTarget::OnViewObjectChanged()
         IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
         if (WatchedObjRw(ViewObject) != nullptr && Player != nullptr)
         {
-            // FUN_0045a490(player, view) at 0x004e4950: the view's attitude towards the player.
+            // The view's attitude towards the player.
             if (GetAttitudeClass(Player, WatchedObjRw(ViewObject)) == -1)
             {
                 bClearPlayerTarget = 1;
@@ -1128,7 +1093,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     if (Object != nullptr && IsClass(Object, 0x503) &&
                         static_cast<CSimple*>(Object)->OwnerPlayer != 0)
                     {
-                        // MOVZX EAX,AL of FUN_005763b0's result.
+                        // Only the low byte of the result is returned.
                         return static_cast<unsigned char>(HudPostCommand(0xc9, 0));
                     }
                 }
@@ -1139,7 +1104,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
                 if (Player != nullptr)
                 {
-                    // Pushed in reverse: the system id first, then the view id, the player id.
+                    // Evaluated in retail's order: the system id first.
                     unsigned const SystemId = GetPlayerStarSystemIdRetail();
                     unsigned const ViewId = View->get_id();
                     unsigned const PlayerId = Player->get_id();
@@ -1193,8 +1158,8 @@ void HudTarget::Update()
         }
     }
 
-    // 0x004e1c5e: keep the player's target valid, then drop a target that is cloaked (a ship
-    // with +0x140 >= 1.0) or -- unless the gameobj byte +0xa8 is set -- more than 10 km away.
+    // Keep the player's target valid, then drop a target that is cloaked (a ship with +0x140
+    // >= 1.0) or -- unless the gameobj byte +0xa8 is set -- more than 10 km away.
     IObjRW* const Synced = SyncPlayerTarget();
     if (Synced != nullptr && WatchedObjRw(HUDItem::Target) != nullptr)
     {
@@ -1203,7 +1168,7 @@ void HudTarget::Update()
         {
             CObject const* const Object = Gameobj->cobject();
             bool bClear = false;
-            // FCOMP 1.0 / TEST AH,1 / JNZ: the distance test is taken when +0x140 < 1.0.
+            // A NaN cloak counts as cloaked.
             if (Object != nullptr && IsClass(Object, 0x503) &&
                 !(static_cast<CEqObj const*>(Object)->CloakPercent < kOne))
             {
@@ -1216,7 +1181,7 @@ void HudTarget::Update()
                 float const Dx = To.x - From.x;
                 float const Dy = To.y - From.y;
                 float const Dz = To.z - From.z;
-                // (dx^2 + dz^2) + dy^2, FCOMP / TEST AH,0x41 / JNZ: strictly above clears.
+                // Summed in retail's order.
                 if ((Dx * Dx + Dz * Dz) + Dy * Dy > kFarTargetSquared)
                 {
                     bClear = true;
@@ -1231,8 +1196,7 @@ void HudTarget::Update()
 
     if (ButtonMover::IsActive() || ButtonScaler::IsActive())
     {
-        // 0x004e2257: the toggle hidden while the close (scaler) runs, the scaler stepped, the
-        // trade button refreshed, then the base update.
+        // The toggle is hidden while the close (scaler) runs.
         uintptr_t const Hide = (bExpanded != 0 && !ButtonMover::IsActive()) ? 1 : 0;
         ToggleButton->SetProperty(1, Hide, 0);
         ButtonScaler::Update();
@@ -1243,7 +1207,7 @@ void HudTarget::Update()
 
     if (bExpanded != 0)
     {
-        // 0x004e1d9c: the formation button -- in formation (behaviour 10), with followers
+        // The formation button -- in formation (behaviour 10), with followers
         // (single player) or in a group of at least two live members that holds the player
         // (multiplayer, when the player leads or is the group's first member).
         unsigned char bFormation = 0;
@@ -1259,7 +1223,6 @@ void HudTarget::Update()
             }
             if (SinglePlayer())
             {
-                // _First != 0 and (_Last - _First) >> 3 != 0: the follower vector's size().
                 if (bFormation == 0 && !Ship->FormationFollowers.empty())
                 {
                     bFormation = 1;
@@ -1268,9 +1231,9 @@ void HudTarget::Update()
             else
             {
                 int const Members = static_cast<int>(RetailU32QueueSize());
-                // [+0x1b8] != 0 and [+0x1b8] - 8 != 0 (the leader's IObjRW).
+                // Retail tests the watched pointer (+0x1b8) and the IObjRW 8 below it for null.
                 uintptr_t const RawLeader =
-                    reinterpret_cast<uintptr_t>(Ship->FormationLeader.target()); // BaseWatcher
+                    reinterpret_cast<uintptr_t>(Ship->FormationLeader.target());
                 bool bCount = RawLeader != 0 && RawLeader != 8;
                 if (!bCount && Members != 0 && RetailU32QueueAt(0) == Ship->Id)
                 {
@@ -1307,7 +1270,7 @@ void HudTarget::Update()
         bFormationAvailable = bFormation;
     }
 
-    // 0x004e1efc: the player ship's current target becomes the view object.
+    // The player ship's current target becomes the view object.
     CShip* PlayerShip = nullptr;
     {
         CObject* const TargetObject = CObjectOfObjRw(WatchedObjRw(HUDItem::Target));
@@ -1331,8 +1294,8 @@ void HudTarget::Update()
         FormationButton->SetProperty(0xc, Mode == 2 ? 1 : 0, 0);
     }
 
-    // 0x004e1ff3: the target was lost while flagged unfriendly -- post 0x26 (next target) and
-    // play UI sound 0x23 when that found one.
+    // The target was lost while flagged unfriendly -- post 0x26 (next target) and play UI
+    // sound 0x23 when that found one.
     if (WatchedObjRw(ViewObject) == nullptr && bClearPlayerTarget != 0)
     {
         bClearPlayerTarget = 0;
@@ -1507,7 +1470,7 @@ void HudTarget::OnScaleFinished()
         SetFlagBits(ContactListButton);
         SetFlagBits(TargetButton);
         SetFlagBits(NextEnemyButton);
-        SetFlagBits(TargetButton); // retail sets +0x63c twice (0x004e36c2 / 0x004e36d4)
+        SetFlagBits(TargetButton); // retail sets +0x63c twice
         FormationButton->SetProperty(1, bFormationAvailable == 0 ? 1 : 0, 0);
         ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
         TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
@@ -1584,7 +1547,6 @@ bool HudTarget::OnEvent(unsigned MsgId)
     switch (MsgId)
     {
     case 0xbb:
-        // IObjAffect slot 0x34 (0, 0, 0, connection) on the player.
         static_cast<IObjAffect*>(Player)->fire_weapons(nullptr, 0, nullptr,
                                                   static_cast<int>(GetPlayerConnectionId()));
         return true;
@@ -1596,8 +1558,6 @@ bool HudTarget::OnEvent(unsigned MsgId)
                                               : PlayerShipObject->next_enemy();
         if (Enemy != nullptr)
         {
-            // 0x004e2a19..0x004e2a28 / 0x004e2a43..0x004e2a52: FUN_00544b90(enemy,
-            // SUBOBJ_ID_NONE) on the player's gameobj.
             PlayerShip->SetTargetWithGuns(Enemy, SUBOBJ_ID_NONE);
         }
         return true;
@@ -1605,8 +1565,6 @@ bool HudTarget::OnEvent(unsigned MsgId)
 
     case 0x26:
     {
-        // 0x004e2a63..0x004e2a83: FUN_005449f0(connection) picks the target; a non-null one goes
-        // to FUN_00544b90 with SUBOBJ_ID_NONE.
         IObjRW* const Next =
             PlayerShip->PickNextTarget(static_cast<int>(GetPlayerConnectionId()));
         if (Next != nullptr)
@@ -1618,8 +1576,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
 
     case 0x8b:
     {
-        // 0x004e2a94..0x004e2ab5: FUN_00544c30(the HUD target's CShip's target); its result is
-        // not read.
+        // The result is not read.
         CShip* const Ship = HudShipOfObjRw(WatchedObjRw(HUDItem::Target));
         PlayerShip->RequestTractor(Ship->get_target());
         return true;
@@ -1681,7 +1638,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
 
     case 0x6d:
     case 0x5f:
-        // Jump-table entries into the ToggleExpanded calls of 0x54 / 0x59 (LAB_004e2bdb / 0x004e2c0a).
+        // Retail's jump table sends these into the ToggleExpanded calls of 0x54 / 0x59.
         ToggleExpanded();
         return true;
 
@@ -1704,8 +1661,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
             if (TargetObject != nullptr && IsClass(TargetObject, 0x503) &&
                 static_cast<CSimple const*>(TargetObject)->OwnerPlayer != 0)
             {
-                // 0x004e2ca7..0x004e2cb7: FUN_0045e360(0, {(unsigned short)owner, 0, 0}) --
-                // the group invite (opcode 0) to the target's owner.
+                // The group invite (opcode 0) to the target's owner.
                 unsigned const Owner =
                     static_cast<unsigned>(static_cast<CSimple const*>(TargetObject)->OwnerPlayer);
                 NnGroupSendWireMessage(0, CHAT_ID(Owner & 0xffffu));
@@ -1732,18 +1688,15 @@ bool HudTarget::OnEvent(unsigned MsgId)
         }
         G_Server->RequestTrade(GetPlayerConnectionId(), Simple->OwnerPlayer);
         G_bTradeRequested = 1;
-        // 0x004e2d36..0x004e2d63: FUN_0046b400(CHAT_ID {(word)target->GetOwnerPlayer(), 0, 0})
-        // -- the target owner's name RDL in the chat table; none -> done.
+        // The target owner's name RDL in the chat table.
         RenderDisplayList* const OwnerName =
             ChatFindPlayerName(Simple->GetOwnerPlayer() & 0xffffu);
         if (OwnerName == nullptr)
         {
             return true;
         }
-        // 0x004e2d69..0x004e2e89: FUN_00468a80 (a chat entry: the store's next free one, or the
-        // scratch DAT_0066d440), StyleList (handler +0x1a4) then the name appended to its body
-        // node by node (each element copy-constructed by FUN_0046ea00, count + 1), then
-        // FUN_00468c00 (the store's FUN_004686e0 + FUN_004684e0).
+        // A chat entry (FUN_00468a80: the store's next free one, or the scratch DAT_0066d440)
+        // gets StyleList then the name, and is committed (FUN_00468c00).
         FChatMessageEntry* const Entry = ChatAcquireEntry();
         ChatAppendRdlCopy(Entry->Body, StyleList);
         ChatAppendRdlCopy(Entry->Body, *OwnerName);
@@ -1811,7 +1764,6 @@ void HudTarget::OpenScanner()
     {
         return;
     }
-    // 0x004e5532: FUN_00489e80(DAT_00674ad4 "scanning_cargo", 0) -- the NN voice queue.
     NnVoiceEnqueue(G_ScanningCargoVoiceId, 0);
 
     EquipDescVector Cargo;
@@ -1825,8 +1777,7 @@ void HudTarget::OpenScanner()
     {
         ArchId = TargetObject->get_archetype()->Nickname.Id;
     }
-    // 0x004e5596..0x004e55b1: ??0EquipDescList@@QAE@ABUEquipDescVector@@@Z, then
-    // FUN_004b6b60(&List, ArchId) (nn_scanner.cpp); the list dies right after the call.
+    // The list dies right after the call.
     EquipDescList const CargoList(Cargo);
     OpenNnScanner(&CargoList, ArchId);
 }
@@ -1840,7 +1791,6 @@ void HudTarget::UpdateButtons(bool bFull)
     // FUN_004e22b0: once per second of capped frame time.
     LabelRefreshTimer = static_cast<float>(GetClientFrameTimeCapped() +
                                            static_cast<double>(LabelRefreshTimer));
-    // FCOM 1.0 / TEST AH,0x41 / JNZ: on only when strictly above 1.
     if (!(LabelRefreshTimer > kOne))
     {
         return;
@@ -1852,8 +1802,6 @@ void HudTarget::UpdateButtons(bool bFull)
         if (WatchedObjRw(HUDItem::Target) != nullptr && WatchedObjRw(ViewObject) != nullptr &&
             ShipName != nullptr && SubtargetName != nullptr)
         {
-            // 0x004e2352..0x004e23a8: FUN_0045a4e0(&colour, player, view), then
-            // SetProperty(0x33, &colour, 1) on both labels.
             unsigned long Colour = 0;
             HudReputationColor(&Colour, WatchedObjRw(HUDItem::Target), WatchedObjRw(ViewObject));
             ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
@@ -1892,20 +1840,18 @@ void HudTarget::UpdateButtons(bool bFull)
         goto RankDone;
     }
 
-    // The rank line (0x004e249e): only for a ship view, while open and not sliding.
+    // The rank line: only for a ship view, while open and not sliding.
     if (ViewShip != nullptr)
     {
         if (bExpanded != 0 && !ButtonMover::IsActive())
         {
             SetFlagBits(RankText);
             Rank = static_cast<float>(WatchedObjRw(ViewObject)->get_toughness());
-            // FCOM 0 / TEST AH,5 / JNP (below 0) or FCOMP 10000 / TEST AH,0x41 (above 10000):
-            // keep the rank shown.
+            // Out of range keeps the rank shown.
             if (Rank < 0.0f || Rank > kRankMax)
             {
                 Rank = ShownRank;
             }
-            // FCOMP / TEST AH,0x44 / JNP: rebuilt unless equal.
             if (!(Rank == ShownRank))
             {
                 ShownRank = Rank;
@@ -1923,7 +1869,7 @@ void HudTarget::UpdateButtons(bool bFull)
 
 RankDone:
     {
-        // 0x004e25b1: a loot-like view (class 0x803) takes the tractor button, anything else in
+        // A loot-like view (class 0x803) takes the tractor button, anything else in
         // cargo scanner range the scan button.
         CObject* const LootObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
         bool const bLoot = LootObject != nullptr && IsClass(LootObject, 0x803);
@@ -1946,7 +1892,7 @@ RankDone:
                     CEqObj* const PlayerEq = static_cast<CEqObj*>(PlayerObject);
                     CEScanner const* const Scanner =
                         CEScanner::cast(PlayerEq->EquipManager.FindFirst(0x80000));
-                    // FCOMP range / TEST AH,0x41 / JP: shown when Distance <= range.
+                    // A NaN distance keeps it hidden.
                     if (Scanner != nullptr &&
                         Distance <= Scanner->ScannerArch()->CargoScanRange)
                     {
@@ -2006,7 +1952,7 @@ void HudTarget::UpdateTradeButton()
     {
         Distance = PositionDistance(WatchedObjRw(ViewObject)->get_position(),
                                     Player->get_position());
-        // FCOMP 1500 / TEST AH,0x41 / JNZ: within range (or unordered) keeps the request.
+        // Within range (or NaN) keeps the request.
         bWithdraw = Distance > kTradeRange;
     }
     if (bWithdraw && (G_bTradeRequested != 0 || NnTradeIsOpen()))
@@ -2016,8 +1962,7 @@ void HudTarget::UpdateTradeButton()
 
     if (TradeButton != nullptr)
     {
-        // DAT_006724b4 is the open NN_Trade window (ctor 0x004bfb8b, dtor 0x004bfdc8); the port's
-        // NN_Trade shell keeps the same fact.
+        // NnTradeIsOpen reads DAT_006724b4, the open NN_Trade window.
         bool bEnable = false;
         if (!NnTradeIsOpen() && Distance <= kTradeRange && ViewShip != nullptr &&
             ViewShip->OwnerPlayer != 0 && ViewShip->OwnerPlayer != GetPlayerConnectionId())
@@ -2070,7 +2015,7 @@ void HudTarget::SelectNextSubTarget()
         SubTargetCursor = 0;
     }
     int const Wanted = SubTargetCursor;
-    RebuildSubTargets(&SubTargets); // 0x004e4c20: rebuilt once more before the walk
+    RebuildSubTargets(&SubTargets); // rebuilt once more before the walk, as retail
     unsigned short Key = SUBOBJ_ID_NONE;
     int Index = 0;
     for (std::map<unsigned short, long>::const_iterator It = SubTargets.begin();
@@ -2140,10 +2085,7 @@ void HudTarget::SelectPreviousSubTarget()
 
 int HudTarget::RebuildSubTargets(std::map<unsigned short, long>* Map)
 {
-    // FUN_004e4dd0: erase all, then for a CEqObj view every collision group (key = the group's
-    // CollisionGroup id -- the inlined [+4]+4 of CArchGroup::GetID -- value = GetRootIndex) and
-    // every connected attached equipment with an ids_name (mask 0x1ee0; key = the equipment id,
-    // value = vt+0x84 GetRootIndex). map::insert + assign through the returned node.
+    // FUN_004e4dd0; retail inlines CArchGroup::GetID.
     Map->clear();
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
     if (Object != nullptr && IsClass(Object, 0x103))
@@ -2284,7 +2226,7 @@ void HudTarget::DrawScanSweep()
     }
 
     SweepTime = static_cast<float>(GetClientFrameTimeCapped() + static_cast<double>(SweepTime));
-    // FCOMP 0.3 / TEST AH,5 / JNP: stepped while not below 0.3.
+    // The negated test is retail's: a NaN SweepTime never leaves the loop.
     while (!(SweepTime < kSweepStep))
     {
         SweepTime = SweepTime - kSweepStep;
@@ -2294,7 +2236,7 @@ void HudTarget::DrawScanSweep()
         NextHardpointScreenPos(SweepTo);
     }
     float const T = SweepTime * kSweepRate;
-    // FUN_00422b80: Delta = To - From.
+    // FUN_00422b80.
     float const DeltaX = SweepTo[0] - SweepFrom[0];
     float const DeltaY = SweepTo[1] - SweepFrom[1];
     float const PointX = DeltaX * T + SweepFrom[0];
@@ -2338,9 +2280,8 @@ void HudTarget::DrawScanSweep()
     }
     Win3DEnd();
 
-    // Remember this frame's point: appended, or the oldest dropped when ten are held. The third
-    // float is an uninitialised stack slot in retail (0x004e53ef reads [ESP+0x30], never
-    // written); nothing reads it back.
+    // Remember this frame's point: appended, or the oldest dropped when ten are held. Retail
+    // stores an uninitialised stack value as the third float; nothing reads it back.
     if (SweepTrailCount < 10)
     {
         SweepTrail[SweepTrailCount][0] = X;

@@ -20,8 +20,8 @@ namespace
     char const* const GScriptBaseFile = "E:\\FL\\Scratch\\Source\\Client\\Gf\\ScriptBase.cpp";
 
     // The QueryInterface table at 0x005cca20: {IID, facet offset}, null-terminated. An offset
-    // with the high bit set would name a field holding the facet pointer (LAB_004500d0
-    // 0x00450141 JNS); none of retail's nine entries uses it.
+    // with the high bit set would name a field holding the facet pointer; none of retail's nine
+    // entries uses it.
     struct FThornFacetEntry
     {
         char const* Iid;
@@ -47,9 +47,7 @@ namespace
     }
 }
 
-// FUN_0044fbe0. 0x0044fc25..0x0044fca0: +0x24 -1, +0x28 1, the nine vptrs, 0xc dwords of the
-// frame to +0x2c, +0x5c Owner, +0x60 Desc+0x00, malloc_strcpy(+0x64, Desc+0x38), +0x68 the low
-// bit of Desc+0x04. Name is not cleared first: malloc_strcpy overwrites it.
+// FUN_0044fbe0. Name is not cleared first: malloc_strcpy overwrites it.
 FThornComponent::FThornComponent(Csys const& ScriptFrame, FGfScript* InOwner,
                                  FThornEntitySnap const* Desc)
     : EntityIndex(-1),
@@ -99,10 +97,10 @@ unsigned long DACOM_API FThornComponent::AddRef()
     return RefCount;
 }
 
-// LAB_00450190. 0x00450197 `TEST EAX,EAX; JBE` -- a count of 0 is not decremented. At zero the
-// count goes back to 1 and FUN_005b7e1d (operator delete) frees the block: the destructor does
-// NOT run, so the name copy (and a derived class's resources) is never released on this path.
-// The scalar deleting destructor (slot 13) is the path that does run it.
+// LAB_00450190. A count of 0 is not decremented. At zero the count goes back to 1 and
+// FUN_005b7e1d (operator delete) frees the block: the destructor does NOT run, so the name copy
+// (and a derived class's resources) is never released on this path. The scalar deleting
+// destructor (slot 13) is the path that does run it.
 unsigned long DACOM_API FThornComponent::Release()
 {
     if (RefCount > 0)
@@ -115,8 +113,7 @@ unsigned long DACOM_API FThornComponent::Release()
 }
 
 // --- defaults -------------------------------------------------------------------------------
-// LAB_00454190: MOV EAX,0xfffffff9; RET 8. LAB_0044fcc0 / fcd0 / fce0 / fcf0: the same answer
-// with RET 4 / 0x10 / 0xc / 0x14. LAB_00451370: XOR EAX,EAX; RET 8.
+// LAB_00454190 and LAB_0044fcc0 / fcd0 / fce0 / fcf0 answer 0xfffffff9; LAB_00451370 answers 0.
 
 GENRESULT DACOM_API FThornComponent::StartMotion(void*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::StopMotion(void*) { return kThornSlotNotImplemented; }
@@ -129,7 +126,7 @@ GENRESULT DACOM_API FThornComponent::GetHardpointXform(int, char const*, float*)
     return kThornSlotNotImplemented;
 }
 
-// LAB_0044fcb0: *(dword*)Out = 0; RET 8.
+// LAB_0044fcb0.
 GENRESULT DACOM_API FThornComponent::GetFloorHeight(float* OutHeight)
 {
     *OutHeight = 0.0f;
@@ -215,8 +212,7 @@ void FThornComponent::SetFlags(unsigned char, unsigned char, unsigned char, unsi
 void FThornComponent::RefreshSound() {}
 bool FThornComponent::IsBackgroundSound() { return false; }
 
-// FUN_00450070. 0x00450070..0x004500be: a reference entity never matches; otherwise the type must
-// be equal and the name equal under the inlined exact strcmp.
+// FUN_00450070.
 bool FThornComponent::MatchesEntity(int InType, char const* InName) const
 {
     if (bReference != 0)
@@ -226,9 +222,8 @@ bool FThornComponent::MatchesEntity(int InType, char const* InName) const
     return std::strcmp(Name, InName) == 0;
 }
 
-// FUN_0044fdd0. The two summaries are locals with destructors (EH states 0 / 1, unwind
-// LAB_005b9de2), built A then B; both are analyzed, keyed and searched A then B, and destroy()ed
-// A then B before the destructors run (B, then A).
+// FUN_0044fdd0. The two summaries are destroy()ed A then B before their destructors run (B,
+// then A).
 void FThornComponent::ConnectEntityHardpoints(int IndexA, char const* HpA, int IndexB,
                                               char const* HpB)
 {

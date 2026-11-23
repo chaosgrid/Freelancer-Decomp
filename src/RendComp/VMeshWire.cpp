@@ -67,13 +67,11 @@ public:
     }
 
     // FUN_06c2f7d0 (thiscall in retail).
-    // formerly Slot3
     void* DACOM_API GetWireData() override
     {
         return Blob;
     }
 
-    // formerly Slot4
     int DACOM_API Draw() override
     {
         FVmeshKey Key;
@@ -102,7 +100,6 @@ public:
     }
 
     // FUN_06c2f7e0 (thiscall in retail): the VMeshData header for the blob's CRC, or 0.
-    // formerly Slot5
     void* DACOM_API GetMeshData() override
     {
         FVmeshKey Key;
@@ -187,19 +184,19 @@ public:
     int DACOM_API DestroyArchetype(void* Archetype) override;
     int DACOM_API QueryArchetype(void* Archetype, const char* Name, void** Out) override;
 
-    // LAB_06c2fb40: XOR EAX,EAX; RET 0xC.
+    // LAB_06c2fb40.
     int DACOM_API CreateInstance(void* /*Instance*/, void* /*Archetype*/) override
     {
         return 0;
     }
 
-    // FUN_06c2fb50: a bare RET 8 -- EAX is whatever the caller left; 0 here.
+    // FUN_06c2fb50: empty, EAX undefined in retail; 0 here.
     int DACOM_API DestroyInstance(void* /*Instance*/) override
     {
         return 0;
     }
 
-    // LAB_06c2da60: a bare RET 0xC -- EAX undefined; 0 here.
+    // LAB_06c2da60: empty, EAX undefined in retail; 0 here.
     int DACOM_API UpdateInstance(void* /*Instance*/, void* /*Arg*/) override
     {
         return 0;
@@ -315,11 +312,11 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
         }
     }
     Wire->Release();
-    File->OpenNode(".."); // 06c2f7b5: DAT_06c37250 = ".." (2E 2E 00)
+    File->OpenNode(".."); // DAT_06c37250
     return Result;
 }
 
-// LAB_06c2fa20 (RET 0xC): look up the OLD archetype; on a hit the NEW key shares its wrapper
+// LAB_06c2fa20: look up the OLD archetype; on a hit the NEW key shares its wrapper
 // (the previous value released, the shared one AddRef'd). The blob is not copied. EAX is not
 // set on either path in retail; 0 here.
 int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchetype)
@@ -344,7 +341,7 @@ int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchet
     return 0;
 }
 
-// LAB_06c2f900 (RET 8): a present key is erased (its wrapper released). EAX is not set in
+// LAB_06c2f900: a present key is erased (its wrapper released). EAX is not set in
 // retail; 0 here.
 int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
 {
@@ -352,7 +349,7 @@ int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
     return 0;
 }
 
-// LAB_06c2fac0 (RET 0x10): only "1.11_IVMeshWire" (16-byte REPE CMPSB, an exact match); a
+// LAB_06c2fac0: only "1.11_IVMeshWire" (exact 16-byte compare); a
 // wrong IID or an unknown archetype returns -1 with Out untouched. A hit AddRefs the wrapper.
 int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void** Out)
 {
@@ -367,7 +364,7 @@ int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void
     return 0;
 }
 
-// LAB_06c2fb60 (RET 0x10): the instance's archetype (IEngine +0x64, -1 -> -1), the handle
+// LAB_06c2fb60: the instance's archetype (IEngine +0x64, -1 -> -1), the handle
 // released again (+0x3C), then this component's own QueryArchetype through the vtable.
 int DACOM_API FVMeshWire::QueryInstance(void* Instance, const char* Iid, void** Out)
 {
@@ -378,7 +375,7 @@ int DACOM_API FVMeshWire::QueryInstance(void* Instance, const char* Iid, void** 
     return QueryArchetype(Archetype, Iid, Out);
 }
 
-// LAB_06c2f4e0 (factory vtable slot 3, RET 0xC). Only a 0x18 AGGDESC whose name matches the
+// LAB_06c2f4e0 (factory vtable slot 3). Only a 0x18 AGGDESC whose name matches the
 // factory's; otherwise *Out = 0, -3. Allocation failure -> *Out = 0, -4. Outer = AGGDESC+8;
 // when set the inner goes to *(AGGDESC+0xC), otherwise the object is its own outer.
 GENRESULT DACOM_API VMeshWireFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out)

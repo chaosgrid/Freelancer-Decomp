@@ -34,10 +34,8 @@ namespace
     char const kIntroCpp[] = "E:\\FL\\Scratch\\Source\\Client\\Interface\\Intro.cpp"; // 0x005e2724
     char const kBigImageFailed[] = "Failed to create a BigImage from an image source!\n"; // 0x005e2754
 
-    // The render-state saver FUN_00565a10 builds seven of: {Pipeline, State, Saved}, filled by
-    // GetRenderState (IRenderPipeline slot 61, +0xf4) and then forced by SetRenderState (slot
-    // 60, +0xf0); its destructor FUN_00405840 puts Saved back. Destroyed in reverse order, as
-    // the EH states 6..0 of 0x00565a10 unwind them.
+    // The render-state saver FUN_00565a10 builds seven of; its destructor FUN_00405840 puts the
+    // saved value back. Destroyed in reverse order, as the EH states 6..0 unwind them.
     struct FImageRenderStateSave
     {
         FImageRenderStateSave(int NewState, int Value)
@@ -63,7 +61,7 @@ namespace
     };
 
     // {D3DTEXTURESTAGESTATETYPE, value} pairs, zero-terminated: .rdata 0x005e2558 (stage 0) and
-    // 0x005e2590 (stage 1), read from the PE bytes.
+    // 0x005e2590 (stage 1).
     struct FTextureStageSetting
     {
         int Type;
@@ -74,19 +72,19 @@ namespace
     FTextureStageSetting const kImageStage1[] = {
         {1, 1}, {2, 2}, {3, 1}, {4, 1}, {5, 2}, {6, 1}, {0, 0}};
 
-    // The mapped-file object FUN_00565490 keeps on its stack (0x1c..0x2c): FUN_00575570 is its
-    // IFileSystem AddRef copy, FUN_005658d0 Open, FUN_005659b0 Close, FUN_00565830 the dtor the
-    // EH unwind (0x005c1f3e) runs.
+    // The mapped-file object FUN_00565490 keeps on its stack: FUN_00575570 is its IFileSystem
+    // AddRef copy, FUN_005658d0 Open, FUN_005659b0 Close, FUN_00565830 the dtor the EH unwind
+    // runs.
     struct FImageMappedFile
     {
         explicit FImageMappedFile(IFileSystem* NewFs)
         {
-            // FUN_00575570 (RET 4): store and AddRef (slot 1) when non-null.
+            // FUN_00575570 (RET 4).
             Fs = NewFs;
             if (Fs != nullptr)
                 Fs->AddRef();
-            // 0x0056554f..0x00565557. Mapping (+0x08) is left unwritten: Open stores it before
-            // anything reads it, and Close reads it only behind a valid Handle.
+            // Mapping (+0x08) is left unwritten: Open stores it before anything reads it, and
+            // Close reads it only behind a valid Handle.
             Handle = 0xffffffffu;
             Size = 0;
             View = 0;
@@ -118,10 +116,10 @@ namespace
             Desc.Creation = 3;
             Desc.Flags = 0x8000080u;
             Desc.FindHandle = FindHandle;
-            Handle = static_cast<unsigned long>(Fs->OpenByDesc(&Desc)); // slot 31 (+0x7c)
+            Handle = static_cast<unsigned long>(Fs->OpenByDesc(&Desc));
             if (Handle == 0xffffffffu)
                 return -8;
-            Size = Fs->GetSize(Handle, 0); // +0x28
+            Size = Fs->GetSize(Handle, 0);
             Mapping = static_cast<unsigned long>(Fs->CreateMapping(Handle, 0, 2, 0, 0, 0));
             if (Mapping == 0xffffffffu)
                 return -6;
@@ -140,10 +138,10 @@ namespace
                 {
                     if (View != 0)
                     {
-                        Fs->UnmapFileView(View); // +0x44
+                        Fs->UnmapFileView(View);
                         View = 0;
                     }
-                    Fs->CloseFile(Mapping); // +0x10
+                    Fs->CloseFile(Mapping);
                 }
                 Fs->CloseFile(Handle);
                 Handle = 0xffffffffu;
@@ -175,8 +173,7 @@ namespace
         return AlphaBits > 0;
     }
 
-    // FUN_00565800 (thiscall on the TGA header): colour-mapped -> first entry index (MOVSX
-    // +3) + map length (MOVSX +5); type 3 -> 0x100; otherwise 0.
+    // FUN_00565800 (thiscall on the TGA header). The header words are signed.
     int TgaPaletteEntries(unsigned char const* Header)
     {
         unsigned char const Type = static_cast<unsigned char>(Header[2] & 7);
@@ -200,7 +197,7 @@ namespace
         return Value;
     }
 
-    // The 32-iteration bit count 0x005652c0..0x00565301 over one DIB colour mask.
+    // The bit count FUN_005650f0 inlines over one DIB colour mask.
     unsigned long CountMaskBits(unsigned long Mask)
     {
         unsigned long Count = 0;
@@ -226,8 +223,7 @@ Image::Image()
 
 Image::~Image()
 {
-    // FUN_00565010: release +0x14 (0x00565040..0x00565048), then the member's own release
-    // (0x0056504f..0x00565061), which finds it null.
+    // FUN_00565010: Release, then the member's own release, which finds it null.
     Release();
     if (BigImage != nullptr)
     {
@@ -253,9 +249,9 @@ bool Image::Load(char const* Path)
     if (Dot != nullptr)
     {
         char const* const Extension = Dot + 1;
-        if (_stricmp(Extension, "bmp") == 0) // DACOM stricmp, 0x005e279c
+        if (_stricmp(Extension, "bmp") == 0)
             return LoadBmp(Path);
-        // 0x00565471..0x00565479: stricmp against "tga" (0x005e2798); the result is not read.
+        // Retail compares against "tga" too; the result is not read.
         (void)_stricmp(Extension, "tga");
     }
     return LoadTga(Path);
@@ -267,8 +263,7 @@ bool Image::LoadBmp(char const* Path)
     if (BigImage != nullptr)
         return true;
 
-    // 0x00565139..0x00565214: data path, a '\\' unless it is empty or already ends in one,
-    // TgaPath, then Path.
+    // Data path, a '\\' unless it is empty or already ends in one, TgaPath, then Path.
     std::string FullPath(g_display.data_path.c_str());
     if (!FullPath.empty() && FullPath[FullPath.size() - 1] != '\\')
         FullPath.append("\\");
@@ -286,7 +281,7 @@ bool Image::LoadBmp(char const* Path)
     if (GetObjectA(Bitmap, 0x54, &Dib) == 0x54)
     {
         unsigned long const Compression = Dib.dsBmih.biCompression;
-        unsigned short const BitCount = Dib.dsBmih.biBitCount; // word at +0x26
+        unsigned short const BitCount = Dib.dsBmih.biBitCount;
         if ((Compression == 0 || Compression == 3) &&
             (BitCount == 0x10 || BitCount == 0x18 || BitCount == 0x20))
         {
@@ -321,7 +316,7 @@ bool Image::LoadBmp(char const* Path)
             Desc.Pitch = static_cast<unsigned long>(Dib.dsBm.bmWidthBytes);
             Desc.DrawTile = &ScreenQuadDrawBigImageTile;
 
-            Release(); // 0x00565392..0x0056539a
+            Release();
             if (DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                              reinterpret_cast<void**>(&BigImage)) == 0)
             {
@@ -344,8 +339,7 @@ bool Image::LoadTga(char const* Path)
     if (BigImage != nullptr)
         return true;
 
-    // 0x005654bf..0x00565536: a "FileSystem" (desc size 0x34) rooted at TgaPath under
-    // DALib::Data.
+    // A "FileSystem" rooted at TgaPath under DALib::Data.
     FFileSystemDesc Desc;
     memset(&Desc, 0, 0x34);
     Desc.Size = 0x34;
@@ -360,7 +354,7 @@ bool Image::LoadTga(char const* Path)
     if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                     reinterpret_cast<void**>(&SubFs)) != 0)
     {
-        // 0x0056562a: FUN_00526a20 on the holder, return false.
+        // FUN_00526a20 on the holder.
         if (SubFs != nullptr)
         {
             SubFs->Release();
@@ -377,7 +371,7 @@ bool Image::LoadTga(char const* Path)
             unsigned char const* const Header =
                 reinterpret_cast<unsigned char const*>(static_cast<uintptr_t>(Mapped.View));
 
-            // 0x0056558b..0x005655ef: the header's format, seeded with FUN_005b7010(0).
+            // Seeded with FUN_005b7010(0).
             unsigned long ImageFormat = static_cast<unsigned long>(PixelFormatFromD3D(0));
             unsigned char const Type = static_cast<unsigned char>(Header[2] & 7);
             if (Type == 1 && Header[1] == 1)
@@ -391,11 +385,11 @@ bool Image::LoadTga(char const* Path)
             else
                 PixelFormatFind(&ImageFormat, 0x18, 8, 8, 8, 0);
 
-            // 0x005655f4..0x00565607: CMP bpp,0x20 / JNC -- anything under 32 bits fails.
+            // Anything under 32 bits fails.
             unsigned long const Bpp = PixelFormatGetDesc(static_cast<int>(ImageFormat))->Bpp;
             if (Bpp >= 0x20)
             {
-                // 0x00565641..0x00565663: pitch = ((bpp + 7) >> 3) * (short)width (IMUL).
+                // The header width and height are signed.
                 long const Width = static_cast<long>(TgaShort(Header + 0xc));
                 long const Height = static_cast<long>(TgaShort(Header + 0xe));
                 unsigned long const Pitch =
@@ -403,8 +397,8 @@ bool Image::LoadTga(char const* Path)
                 unsigned long TargetFormat = 0;
                 PixelFormatFind(&TargetFormat, 0x20, 8, 8, 8, 8);
 
-                // 0x00565671..0x00565696: the pixels follow the 0x12-byte header, the id field
-                // and, for a colour-mapped image, 3 bytes per palette entry.
+                // The pixels follow the 0x12-byte header, the id field and, for a colour-mapped
+                // image, 3 bytes per palette entry.
                 unsigned char const* Pixels = nullptr;
                 if ((Header[2] & 7) == 1)
                     Pixels = Header + Header[0] + 3 * (TgaPaletteEntries(Header) + 6);
@@ -424,7 +418,7 @@ bool Image::LoadTga(char const* Path)
                 ImageDesc.Pitch = Pitch;
                 ImageDesc.DrawTile = &ScreenQuadDrawBigImageTile;
 
-                Release(); // 0x005656ef..0x005656f7
+                Release();
                 if (DALib::Dacom->CreateInstance(reinterpret_cast<AGGDESC*>(&ImageDesc),
                                                  reinterpret_cast<void**>(&BigImage)) == 0)
                 {
@@ -440,7 +434,6 @@ bool Image::LoadTga(char const* Path)
         // Every exit: FUN_005659b0, then FUN_00526a20 on the (already cleared) +0x10 holder.
         Mapped.Close();
     }
-    // 0x00565756..0x0056576c / 0x00565794..0x005657aa: release the sub filesystem.
     if (SubFs != nullptr)
         SubFs->Release();
     return bResult;
@@ -466,8 +459,8 @@ void Image::Draw()
 
     Win3DSetOrtho2D(); // FUN_004225e0
 
-    // 0x00565a40..0x00565bee: D3DRS_CULLMODE none, ZFUNC always, ZWRITEENABLE off, ZENABLE
-    // off, SRCBLEND SRCALPHA, DESTBLEND INVSRCALPHA, ALPHABLENDENABLE on.
+    // D3DRS_CULLMODE none, ZFUNC always, ZWRITEENABLE off, ZENABLE off, SRCBLEND SRCALPHA,
+    // DESTBLEND INVSRCALPHA, ALPHABLENDENABLE on.
     FImageRenderStateSave CullMode(0x16, 1);
     FImageRenderStateSave ZFunc(0x17, 8);
     FImageRenderStateSave ZWrite(0xe, 0);
@@ -476,8 +469,7 @@ void Image::Draw()
     FImageRenderStateSave DestBlend(0x14, 6);
     FImageRenderStateSave AlphaBlend(0x1b, 1);
 
-    // 0x00565bee..0x00565c49: the two stage tables through SetTextureStageState (slot 62,
-    // +0xf8); these are not restored.
+    // The two stage tables are not restored.
     IRenderPipeline* Pipeline = DALib::Pipeline;
     for (FTextureStageSetting const* Setting = kImageStage0; Setting->Type != 0; ++Setting)
         Pipeline->SetTextureStageState(0, Setting->Type, Setting->Value);
@@ -485,7 +477,6 @@ void Image::Draw()
     for (FTextureStageSetting const* Setting = kImageStage1; Setting->Type != 0; ++Setting)
         Pipeline->SetTextureStageState(1, Setting->Type, Setting->Value);
 
-    // 0x00565c4b..0x00565ca9: alpha 1, colour {1, 1, 1}, then Draw(null, {0, height, width, 0}).
     RECT Dest;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: the 4:3 picture keeps its own aspect instead of stretching -- centred,
@@ -508,15 +499,13 @@ void Image::Draw()
     Dest.bottom = 0;
 #endif
     float const Color[3] = {1.0f, 1.0f, 1.0f};
-    BigImage->SetAlpha(1.0f); // +0x18
-    BigImage->SetColor(Color); // +0x1c
-    BigImage->Draw(nullptr, &Dest); // +0x10
-    // 0x00565cac..0x00565d74: the seven savers restore in reverse order on scope exit.
+    BigImage->SetAlpha(1.0f);
+    BigImage->SetColor(Color);
+    BigImage->Draw(nullptr, &Dest);
 }
 
 Image* CreateImage()
 {
-    // FUN_00565d90: operator new(0x18) (MSVCRT, null on failure); the Image ctor only on
-    // success, null otherwise.
+    // FUN_00565d90: operator new(0x18) (MSVCRT, null on failure).
     return new (std::nothrow) Image();
 }

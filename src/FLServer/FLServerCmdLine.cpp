@@ -15,7 +15,7 @@
 
 namespace
 {
-	// ServerLogf code of every message ParseParam writes (.text:004138aa, MOV EDI,0x100052).
+	// ServerLogf code of every message ParseParam writes.
 	const ErrorCode CommandLineLogCode = { 0x100052 };
 
 	// Logs string resource Id formatted with one argument (CString destroyed after the log).
@@ -144,7 +144,7 @@ void CFLServerCommandLineInfo::ParseParam(const TCHAR* Param, BOOL bFlag, BOOL b
 	case 'C':
 	case 'c':
 		Control.SetAutoAcceptConfig(true);
-		// fall through: retail continues into the unknown-switch path (00413b76).
+		// fall through: retail continues into the unknown-switch path.
 	default:
 	{
 		CString Format;

@@ -32,9 +32,7 @@
 #include <vector>
 
 // IProfileParser conveniences RP8 wants on top of the raw interface: a zeroed buffer and a
-// "did it actually write anything" answer. They used to be inline helpers in
-// render/IProfileParser.h that dispatched by vtable slot number (5/6/7/8); the interface is
-// typed now, so these are just RP8's own calling conventions.
+// "did it actually write anything" answer.
 static bool ParserGetString(IProfileParser* Parser, void* Section, const char* Key, char* Buf,
                             unsigned int BufSize)
 {
@@ -59,7 +57,7 @@ static void ParserCloseSection(IProfileParser* Parser, void* Section)
     Parser->CloseSection(Section);
 }
 
-// Retail RP8 FUN_06d047df ("populate_format_catalog", rp8.dll.c:1875) walks a section
+// Retail RP8 FUN_06d047df (populate_format_catalog) walks a section
 // line-by-line: pass an incrementing zero-based Index until the call returns 0 (no more lines).
 static bool ParserEnumLine(IProfileParser* Parser, void* Section, int Index, char* Buf,
                            unsigned int BufSize)
@@ -122,7 +120,7 @@ namespace
         unsigned char bEnabled;
     };
 
-    // FUN_06d01c68 (06d01d07..06d02032), map object+0x278.
+    // FUN_06d01c68, map object+0x278.
     const FRp9PropertyInit kPipelineProperties[] = {
         {0x0, "TEXTURE", 0x1, 1},
         {0x1, "LIGHTING", 0x1, 1},
@@ -239,8 +237,8 @@ namespace
         {0xAD, "NORMALORDER", 0x1, 1},
     };
 
-    // FUN_06d19c30(map, bFirstStage): 06d19c47 JZ -- a non-zero flag inserts COLOROP 4 /
-    // ALPHAOP 2 (MODULATE / SELECTARG1), zero inserts 1 / 1 (DISABLE); the rest is shared.
+    // FUN_06d19c30(map, bFirstStage): a non-zero flag inserts COLOROP 4 / ALPHAOP 2 (MODULATE /
+    // SELECTARG1), zero inserts 1 / 1 (DISABLE); the rest is shared.
     const FRp9PropertyInit kStageOpsFirstStage[] = {
         {0x1, "COLOROP", 0x4, 1},
         {0x4, "ALPHAOP", 0x2, 1},
@@ -372,7 +370,7 @@ namespace
                              strchr(G_ProfileValueBuf, 'X') != nullptr)
                         *Out = strtoul(G_ProfileValueBuf, nullptr, 16);
                     else
-                        // 06d16b09 also runs strspn(buf, "0123456789+-") and drops the result.
+                        // Retail also runs strspn(buf, "0123456789+-") and drops the result.
                         *Out = (unsigned long)(MsvcrtAtoi(G_ProfileValueBuf));
                 }
                 Parser->CloseSection(Handle);
@@ -450,10 +448,8 @@ namespace
     const unsigned int kPfBpp[22] = {
         0, 8, 24, 16, 16, 16, 16, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    // Retail FUN_06d5cc70(id)+4 -- per-pfenum-id bpp lookup in BITS (not bytes), used by
-    // check_texture_format's capability-gate math (rp8.dll.c:5212-5220). Retail's table is
-    // valid for ids 0..14 (0xe); ids above that clamp to id 0 (bpp=0). kPfBpp already has 0
-    // for the unpopulated 9..14/15..21 range, so this is a direct index with a range clamp.
+    // Retail FUN_06d5cc70(id)+4: per-pfenum-id bpp in BITS (not bytes), used by
+    // check_texture_format's capability gate. Ids above 14 clamp to id 0 (bpp 0).
     unsigned int RetailPfBppBits(unsigned int PfId)
     {
         return (PfId <= 14) ? kPfBpp[PfId] : kPfBpp[0];
@@ -679,7 +675,7 @@ namespace
         return std::strcmp(Left, Right) == 0;
     }
 
-    // Retail: MOV reg,[->DACOM.DLL::FDUMP]; CALL [reg] -- unconditional, no fallback.
+    // Retail calls FDUMP unconditionally (no null test).
     void Rp9Fdump(int Flags, int Line, const char* Kind, const char* Message,
                   const char* File = kSrcRpDx8)
     {
@@ -724,7 +720,7 @@ namespace
     // ---- StateCache.cpp light state (FUN_06d2be34..FUN_06d2d032) ----
     //
     // One record per light handle (the map value at node+0x10, 0x10 bytes). Its destructor
-    // (inlined at 06d2c4f1..06d2c51b and in the map's erase) returns the D3D index to the pool.
+    // (inlined, also in the map's erase) returns the D3D index to the pool.
     struct FRp9LightRecord
     {
         unsigned char bEnabled;     // +0 LightEnable state last committed to the device
@@ -751,9 +747,7 @@ namespace
     // FUN_06d2c01a: DAT_06d728cc = map<handle, record> (keys compared unsigned).
     std::map<unsigned long, FRp9LightRecord> G_LightRecords;
 
-    // FUN_06d2c553: take an index from the pool. Used >= size -> resize(size + 0x10, 0) and
-    // dump " exceeded 64 allocated lights. now at: %d" (StateCache.cpp 0x7c) with the new size;
-    // Used >= Next -> pool[Used] = Next++; return pool[Used++].
+    // FUN_06d2c553: take an index from the pool, growing it by 0x10 (with a warning) when full.
     int LightIndexAlloc()
     {
         const unsigned int Size = (unsigned int)(G_LightIndexPool.size());
@@ -777,7 +771,7 @@ namespace
         return Index;
     }
 
-    // FUN_06d2c7a2: pool[--Used] = Index.
+    // FUN_06d2c7a2.
     void LightIndexFree(int Index)
     {
         --G_LightIndexUsed;
@@ -790,8 +784,7 @@ namespace
             LightIndexFree(D3dIndex);
     }
 
-    // map::find on DAT_06d728cc (FUN_06d2e9f0 lower_bound, then end or key < node key -> end);
-    // the callers turn end into a null record.
+    // map::find on DAT_06d728cc (FUN_06d2e9f0); the callers turn end into a null record.
     FRp9LightRecord* LightFind(unsigned long Handle)
     {
         std::map<unsigned long, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
@@ -799,8 +792,6 @@ namespace
             return nullptr;
         return &It->second;
     }
-
-
 
     // FUN_06d2be34 (cdecl): queue a record for the next flush once per generation, and only when
     // its enable state changes or it is on with data to resend.
@@ -821,20 +812,6 @@ namespace
         Record->Generation = Manager->Generation;
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     unsigned int FormatBpp(D3DFORMAT Format)
     {
         if (Format == 21 || Format == 22)
@@ -843,7 +820,6 @@ namespace
             return 16;
         return 16;
     }
-
 
     // FUN_06d2b964: DAT_06d72848[0] = 0; D3DXGetErrorStringA(Hr, DAT_06d72848, 0x80) (the
     // statically linked d3dx8 FUN_06d3095a, stdcall); returns the static 0x80-byte buffer.
@@ -902,9 +878,8 @@ namespace
         return true;
     }
 
-    // dx8_texture.h get_subsurface (lock_texture 06d0df26..06d0e01d, unlock_texture
-    // 06d0e253..06d0e35d): hr = E_FAIL; 2D -> GetSurfaceLevel (+0x3c)(Level); cube (Extra == 1)
-    // -> GetCubeMapSurface (+0x3c)(face = Level, mip 0); hr < 0 -> dump line 0xab.
+    // dx8_texture.h get_subsurface, inlined in lock_texture and unlock_texture. A cube texture
+    // (Extra == 1) takes Level as the face, mip 0.
     HRESULT TextureGetSubSurface(FRp9TextureHandle* Handle, UINT Level, IDirect3DSurface9** Out)
     {
         HRESULT Hr = (HRESULT)(0x80004005);
@@ -924,8 +899,7 @@ namespace
         return Hr;
     }
 
-    // dx8_index_buffer.h:49 (06d13319.. / 06d13455..): sprintf("couldnt create ib (err:%x) %d
-    // bytes ", hr, bytes) -> FDUMP WARNING.
+    // dx8_index_buffer.h line 49 (two sites).
     void FdumpIbCreate(HRESULT Hr, unsigned int Bytes)
     {
         char Text[0x2000];
@@ -937,7 +911,6 @@ namespace
 }
 
 // RP8: FRp8LightManager::Initialize
-// formerly LightManagerConstruct
 void FRp9LightManager::Initialize()
 {
     Generation = 0;
@@ -946,7 +919,6 @@ void FRp9LightManager::Initialize()
 }
 
 // RP8: FRp8LightManager::FindOrCreate
-// formerly LightFindOrCreate
 int FRp9LightManager::FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data)
 {
     FRp9LightRecord Record;
@@ -968,7 +940,6 @@ int FRp9LightManager::FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data)
 }
 
 // RP8: FRp8LightManager::Remove
-// formerly LightRemove
 bool FRp9LightManager::Remove(unsigned long Handle)
 {
     std::map<unsigned long, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
@@ -991,7 +962,6 @@ bool FRp9LightManager::Remove(unsigned long Handle)
 }
 
 // RP8: FRp8LightManager::GetEnable
-// formerly LightGetEnable
 unsigned char FRp9LightManager::GetEnable(unsigned long Handle)
 {
     FRp9LightRecord* Record = LightFind(Handle);
@@ -1004,7 +974,6 @@ unsigned char FRp9LightManager::GetEnable(unsigned long Handle)
 }
 
 // RP8: FRp8LightManager::Update
-// formerly LightUpdate
 bool FRp9LightManager::Update(unsigned long Handle)
 {
     FRp9LightRecord* Record = LightFind(Handle);
@@ -1019,7 +988,6 @@ bool FRp9LightManager::Update(unsigned long Handle)
 }
 
 // RP8: FRp8LightManager::SetEnable
-// formerly LightSetEnable
 bool FRp9LightManager::SetEnable(unsigned long Handle, int Enable)
 {
     FRp9LightRecord* Record = LightFind(Handle);
@@ -1036,7 +1004,6 @@ bool FRp9LightManager::SetEnable(unsigned long Handle, int Enable)
 }
 
 // RP8: FRp8LightManager::Reset
-// formerly LightReset
 void FRp9LightManager::Reset()
 {
     G_DirtyLights.clear();
@@ -1057,7 +1024,6 @@ void FRp9LightManager::Reset()
 }
 
 // RP8: FRp8LightManager::Flush
-// formerly LightFlush
 HRESULT FRp9LightManager::Flush(IDirect3DDevice9* Device)
 {
     HRESULT Result = 0;
@@ -1234,25 +1200,24 @@ FDirectX9::FDirectX9()
     memset(SectionName_, 0, sizeof(SectionName_));
     memset(LastSection_, 0, sizeof(LastSection_));
     memset(&StreamCache_, 0, sizeof(StreamCache_));
-    // 06d011d3: the stream cache +0x138 = {0, 0, 0, -1, 0}.
+    // The stream cache +0x138 = {0, 0, 0, -1, 0}.
     StreamCache_.BaseVertex = 0xFFFFFFFF;
-    // RP8's ScratchIbFlags_(0x200 | 8) (06d01220) / ScratchIb_(nullptr) / Pad154_ / IbUsed_ /
-    // IbCapacity_: the scratch node is {0x200|8, 0...}.
+    // RP8's ScratchIbFlags_ / ScratchIb_ / Pad154_ / IbUsed_ / IbCapacity_.
     memset(&ScratchIb_, 0, sizeof(ScratchIb_));
     ScratchIb_.Flags = 0x200 | 8;
-    // 06d012f8 / 06d01316: +0x230 and +0x234 = FUN_06d5cc30(0).
+    // +0x230 and +0x234 = FUN_06d5cc30(0).
     Field230_ = PfIndex(0);
     BbPfIndex_ = PfIndex(0);
     memset(MgsdbPath_, 0, sizeof(MgsdbPath_));
     memset(ModeBlob_, 0, sizeof(ModeBlob_));
-    // 06d0140a: the pipeline-state slots of ids 0..0xD = {0, 0, 0} (RP8 also starts BltNotFlip_,
+    // The pipeline-state slots of ids 0..0xD = {0, 0, 0} (RP8 also starts BltNotFlip_,
     // Field3F4_ and Field3F8_ -- slot 0xD -- at 0; its calloc zeroes the rest).
     memset(PipelineStates_, 0, sizeof(PipelineStates_));
     memset(Ability_, 0, sizeof(Ability_));
     memset(&RenderStates_, 0, sizeof(RenderStates_));
     memset(&DeviceStates_, 0, sizeof(DeviceStates_));
-    // 06d014b4: FUN_06d2c31c(this + 0x21F4), between the texture-transform cache loop and the
-    // VIEW matrix flags.
+    // FUN_06d2c31c(this + 0x21F4), between the texture-transform cache loop and the VIEW matrix
+    // flags.
     LightManager_.Initialize();
     memset(&Transforms_, 0, sizeof(Transforms_));
     memset(&ViewportCache_, 0, sizeof(ViewportCache_));
@@ -1276,7 +1241,7 @@ FDirectX9::~FDirectX9()
         Parser_ = nullptr;
     }
     // The adapter vector and the property maps are released by their own destructors after
-    // this body (retail 06d016fb..06d0182b tears them down inline).
+    // this body (retail tears them down inline).
     ClearFormatCatalog(); // frees each node's Values array
     delete[] FormatCatalogBegin_;
     FormatCatalogBegin_ = nullptr;
@@ -1347,8 +1312,7 @@ unsigned long DACOM_API FDirectX9::Release()
 }
 
 // FUN_06d01a06 (CreateInstance's last step): a non-empty AGGDESC+0x10 is strcpy'd into the
-// 0x80-byte name buffer +0x24 (unbounded, as in retail), else "RenderPipeline"; then
-// FDUMP(0x100003 NOTICE, rp_dx8.cpp line 0x2fb, the buffer). Always 0.
+// 0x80-byte name buffer +0x24 (unbounded, as in retail), else "RenderPipeline".
 // RP8: FDirectX8::ApplySectionName
 GENRESULT FDirectX9::ApplySectionName(const FRp9AggDesc* Desc)
 {
@@ -1360,8 +1324,7 @@ GENRESULT FDirectX9::ApplySectionName(const FRp9AggDesc* Desc)
     return GR_OK;
 }
 
-// e.g. get_pipeline_state FUN_06d0823e: CMP [this+0x1a8],-1; JNZ body; else FDUMP(0x100002,
-// rp_dx8.cpp, 0x6d9, "get_pipeline_state() called outside of startup/shutdown"); OR EAX,-1.
+// e.g. get_pipeline_state FUN_06d0823e: tests AdapterIndex (+0x1a8) against -1.
 // RP8: FDirectX8::NeedStartup
 GENRESULT FDirectX9::NeedStartup(const char* Message, int Line)
 {
@@ -1371,9 +1334,7 @@ GENRESULT FDirectX9::NeedStartup(const char* Message, int Line)
     return GR_GENERIC;
 }
 
-// e.g. clear_buffers FUN_06d09b4c: MOV CL,byte [this+0x184]; AND CL,1; TEST; JNZ body; else
-// FDUMP(0x100002, rp_dx8.cpp, 0x962, "clear_buffers() called outside of
-// create_buffers/destroy_buffers"); OR EAX,-1. Device_ is not looked at.
+// e.g. clear_buffers FUN_06d09b4c: tests bit 0 of +0x184 only; Device_ is not looked at.
 // RP8: FDirectX8::NeedBuffers
 GENRESULT FDirectX9::NeedBuffers(const char* Message, int Line)
 {
@@ -1383,9 +1344,8 @@ GENRESULT FDirectX9::NeedBuffers(const char* Message, int Line)
     return GR_GENERIC;
 }
 
-// e.g. set_world FUN_06d0b09d: CMP [this+0x130],0; JNZ body; else FDUMP(0x100002, rp_dx8.cpp,
-// line, "<name>() called outside of device lifetime"); OR EAX,-1. The create_buffers flag is
-// not looked at.
+// e.g. set_world FUN_06d0b09d: tests Device_ (+0x130) only; the create_buffers flag is not
+// looked at.
 // RP8: FDirectX8::NeedDeviceLifetime
 GENRESULT FDirectX9::NeedDeviceLifetime(const char* Message, int Line)
 {
@@ -1507,9 +1467,8 @@ unsigned long FDirectX9::QueryVidMem()
     return Best;
 }
 
-// FUN_06d020ab 06d02490..06d035c3, after the database's Load succeeded: the "found d3d
-// device" NOTICE, then one DACOM-CRC lookup per quirk flag (FUN_06d01000), each with its own
-// NOTICE at its rp_dx8.cpp line.
+// FUN_06d020ab's MGSDB part, after the database's Load succeeded: one DACOM-CRC lookup per
+// quirk flag (FUN_06d01000), each with its own NOTICE.
 // RP8: FDirectX8::ApplyMgsdbFlags
 void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
 {
@@ -1657,9 +1616,8 @@ void FDirectX9::ApplyMgsdbFlags(FMgsdbDatabase* Db)
     }
 }
 
-// FUN_06d020ab's closing loop (06d035d8..06d03768; both early exits of the MGSDB part,
-// 06d02400 / 06d02412, and its normal end 06d0248a / 06d03556 land here): every enabled node
-// of the ability map +0x28C overrides [this + Id*4 + 0x3FC] with its Value.
+// FUN_06d020ab's closing loop (both early exits of the MGSDB part land here too): every
+// enabled node of the ability map +0x28C overrides [this + Id*4 + 0x3FC] with its Value.
 // RP8: FDirectX8::ApplyAbilityOverrides
 void FDirectX9::ApplyAbilityOverrides()
 {
@@ -1671,9 +1629,9 @@ void FDirectX9::ApplyAbilityOverrides()
     }
 }
 
-// FUN_06d020ab(caps), from startup and create_buffers: the 0x14 abilities from the caps
-// (06d020bf..06d0239b), the texture-stage count into pipeline-state id 6 (06d023a1..06d023ef),
-// the MGSDB database (06d023f1..06d035d1) and the INI ability overrides (06d035d8..06d03768).
+// FUN_06d020ab(caps), from startup and create_buffers: the 0x14 abilities from the caps, the
+// texture-stage count into pipeline-state id 6, the MGSDB database and the INI ability
+// overrides.
 // RP8: FDirectX8::ApplyDeviceCaps. Caps is the D3D8-shaped copy of the D3D9 caps
 // (Rp9Caps8FromCaps9), so every bit test below reads what it reads in RP8.
 void FDirectX9::ApplyDeviceCaps(const FRp9Caps8* Caps)
@@ -1778,24 +1736,23 @@ bool FDirectX9::CheckTextureFormat(unsigned int Format, unsigned long Usage, D3D
     }
     if (Format == 0)
         return false;
-    // this+0x378 gate (rp8.dll.c:5208): TEXTURE_ALLOW_8BIT (default disabled) blocks D3DFMT_P8.
+    // this+0x378 gate: TEXTURE_ALLOW_8BIT (default disabled) blocks D3DFMT_P8.
     if (PipelineStates_[PipelineStateTextureAllow8Bit].Value == 0 && Format == 1)
         return false;
-    // Unconditional check (rp8.dll.c:5212-5216), not gated by any capability flag.
+    // Unconditional check, not gated by any capability flag.
     if (Format != 1 && RetailPfBppBits(Format) < 0x10 && FormatClassKeyFromPfId(Format) == 0)
         return false;
-    // this+900(0x384) gate (rp8.dll.c:5217-5220): TEXTURE_ALLOW_32BIT (default enabled)
+    // this+0x384 gate: TEXTURE_ALLOW_32BIT (default enabled)
     // blocks any format whose bpp is >= 32 once hardware is flagged "Bad8888".
     if (PipelineStates_[PipelineStateTextureAllow32Bit].Value == 0 &&
         RetailPfBppBits(Format) > 0x1F)
         return false;
-    // this+0x390 gate (rp8.dll.c:5221-5230): TEXTURE_ALLOW_DXT (default enabled) blocks the
+    // this+0x390 gate: TEXTURE_ALLOW_DXT (default enabled) blocks the
     // compressed pfenum range [10..14] (DXT1..DXT5) once hardware is flagged "FL_BAD_DXTN".
     if (PipelineStates_[PipelineStateTextureAllowDxt].Value == 0 && (int)(Format) >= 10 &&
         (int)(Format) <= 14)
         return false;
-    // 06d0d5b4: D3D+0x28 CheckDeviceFormat(+0x1A8, +0x1AC, pf_to_d3d(+0x230), usage, rtype,
-    // pf_to_d3d(*format)); SETZ -- true only for hr == 0.
+    // CheckDeviceFormat against the adapter format (+0x230); true only for hr == 0.
     const unsigned int AdapterFormat = PfToD3d(Field230_);
     const unsigned int CheckFormat = PfToD3d(Format);
     const HRESULT Hr = D3d_->CheckDeviceFormat(AdapterIndex_, (D3DDEVTYPE)(DeviceType_),
@@ -1804,9 +1761,7 @@ bool FDirectX9::CheckTextureFormat(unsigned int Format, unsigned long Usage, D3D
     return Hr == 0;
 }
 
-
-// Retail FUN_06d04693 -- linear scan [FormatCatalogBegin_, FormatCatalogEnd_) for a node
-// whose Key matches. Exact port (node stride confirmed 0xC bytes / 3 dwords).
+// Retail FUN_06d04693: linear scan for the node whose Key matches (node stride 0xC).
 // RP8: FDirectX8::FindFormatClass
 FormatClassNode* FDirectX9::FindFormatClass(unsigned int Key)
 {
@@ -2003,7 +1958,7 @@ void FDirectX9::PopulateFormatCatalog()
                     ClearFormatCatalog();
                     continue;
                 }
-                // 06d05b55: the key is the four bytes at the token, little-endian, whatever
+                // The key is the four bytes at the token, little-endian, whatever
                 // they are (bytes past a short token are stale buffer content, as in retail).
                 unsigned int Key = 0;
                 memcpy(&Key, TokenStart, sizeof(Key));
@@ -2014,8 +1969,7 @@ void FDirectX9::PopulateFormatCatalog()
                     ClearFormatClassCandidates(OverrideNode);
                 while (*Cursor != '\0' && *Cursor != '=')
                     ++Cursor;
-                // 06d05bed: stepped past unconditionally, also when the scan stopped at the
-                // terminator.
+                // Stepped past unconditionally, also when the scan stopped at the terminator.
                 ++Cursor;
                 while (*Cursor != '\0')
                 {
@@ -2045,7 +1999,7 @@ void FDirectX9::PopulateFormatCatalog()
             Parser->CloseSection(Section);
         }
     }
-    // 06d05d8f: FUN_06d167a0 -- release the local reference when it is set.
+    // FUN_06d167a0.
     if (Parser != nullptr)
     {
         Parser->Release();
@@ -2099,7 +2053,7 @@ static unsigned int VertexStrideFromFvf(unsigned long Fvf)
 
 // Requested states are deferred until Flush; failed device writes leave Cached unchanged.
 // RP8: FRp8RenderStateCache::Initialize
-void FRp9RenderStateCache::Initialize() // formerly InitRsQueue
+void FRp9RenderStateCache::Initialize()
 {
     for (unsigned int Index = 0; Index < StateCount; ++Index)
     {
@@ -2113,7 +2067,7 @@ void FRp9RenderStateCache::Initialize() // formerly InitRsQueue
 }
 
 // RP8: FRp8RenderStateCache::ResetGeneration
-void FRp9RenderStateCache::ResetGeneration() // formerly RsQueueResetGeneration
+void FRp9RenderStateCache::ResetGeneration()
 {
     DirtyCount = 0;
     ++Generation;
@@ -2121,7 +2075,7 @@ void FRp9RenderStateCache::ResetGeneration() // formerly RsQueueResetGeneration
 
 // Returns the requested value even when a later device write fails.
 // RP8: FRp8RenderStateCache::GetPending
-unsigned long FRp9RenderStateCache::GetPending(unsigned int StateId) const // formerly RsQueueReadPending
+unsigned long FRp9RenderStateCache::GetPending(unsigned int StateId) const
 {
     return Entries[StateId].Pending;
 }
@@ -2129,7 +2083,7 @@ unsigned long FRp9RenderStateCache::GetPending(unsigned int StateId) const // fo
 // RP8: FRp8RenderStateCache::Apply. StateId is a D3D8 number; the device receives its D3D9
 // translation (Rp9SendRenderState), the cache keeps the D3D8 value.
 HRESULT FRp9RenderStateCache::Apply(IDirect3DDevice9* Device, unsigned int StateId,
-                                    unsigned long Value) // formerly RsQueueApply
+                                    unsigned long Value)
 {
     const HRESULT Hr = Rp9SendRenderState(Device, StateId, Value, DepthBiasZBits);
     if (SUCCEEDED(Hr))
@@ -2144,7 +2098,7 @@ static bool g_RsQueueOverflowReported = false;
 
 // Disabled states ignore requests; the result indicates membership in this generation.
 // RP8: FRp8RenderStateCache::MarkDirty
-bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, unsigned long Value) // formerly RsQueueMarkDirty
+bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, unsigned long Value)
 {
     FRp9RenderStateEntry& Entry = Entries[StateId];
     if (Entry.bEnabled != 0)
@@ -2170,7 +2124,7 @@ bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, unsigned long Value) 
 }
 
 // RP8: FRp8RenderStateCache::Flush
-void FRp9RenderStateCache::Flush(IDirect3DDevice9* Device) // formerly RsQueueFlush
+void FRp9RenderStateCache::Flush(IDirect3DDevice9* Device)
 {
     for (unsigned long Index = 0; Index < DirtyCount; ++Index)
     {
@@ -2194,7 +2148,6 @@ void FRp9RenderStateCache::RestorePending(const unsigned long* Snapshot)
 }
 
 // RP8: FRp8TransformCache::Commit
-// formerly Rp8CommitTransform
 void FRp9TransformCache::Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE Type)
 {
     if (bCommitted != 0)
@@ -2206,7 +2159,6 @@ void FRp9TransformCache::Commit(IDirect3DDevice9* Device, D3DTRANSFORMSTATETYPE 
 }
 
 // Flush deferred states, stream bindings, projection/view/world transforms, then lights.
-// formerly static FlushDrawState
 // RP8: FDirectX8::FlushDrawState
 void FDirectX9::FlushDrawState(IDirect3DDevice9* Device)
 {
@@ -2273,13 +2225,11 @@ void FDirectX9::FlushDrawState(IDirect3DDevice9* Device)
     Transforms_.Projection.Commit(Device, D3DTS_PROJECTION);
     Transforms_.View.Commit(Device, D3DTS_VIEW);
     Transforms_.World.Commit(Device, D3DTS_WORLD);
-    // 06d0466c: FUN_06d2d032(this + 0x21F4, [this+0x130]); the hr is stored and not used by
-    // any caller.
+    // FUN_06d2d032; the hr is stored and not used by any caller.
     LightManager_.Flush(Device);
 }
 
 // RP8: FRp8DeviceStateCaches::ReadTextureStageState
-// formerly ReadTssCache
 unsigned long FRp9DeviceStateCaches::ReadTextureStageState(IDirect3DDevice9* Device,
                                                          unsigned long Stage,
                                                          unsigned long Type)
@@ -2296,7 +2246,6 @@ unsigned long FRp9DeviceStateCaches::ReadTextureStageState(IDirect3DDevice9* Dev
 }
 
 // RP8: FRp8StreamCache::Reset
-// formerly ResetStreamCache
 void FRp9StreamCache::Reset()
 {
     Fvf = 0;
@@ -2306,11 +2255,8 @@ void FRp9StreamCache::Reset()
     memset(&Flags, 0, sizeof(Flags));
 }
 
-
-// FUN_06d1bc60 (thiscall on the VB node): Gpu (+0x20) set -> if Locked (+0x10) {Locked = 0;
-// Unlock (+0x30)}; Release; Gpu = 0. Every caller passes a live node.
+// FUN_06d1bc60 (thiscall on the VB node). Every caller passes a live node.
 // RP8: FRp8Vb::ReleaseGpu
-// formerly ReleaseVbGpu
 void FRp9Vb::ReleaseGpu()
 {
     if (Gpu == nullptr)
@@ -2324,9 +2270,8 @@ void FRp9Vb::ReleaseGpu()
     Gpu = nullptr;
 }
 
-// The same release block inlined for index buffers (destroy_buffers 06d09a70, destroy_ib
-// 06d1312b, resize_ib 06d1327b/06d133a2): Gpu (+4) set -> if +8 {+8 = 0; Unlock (+0x30)};
-// Release; Gpu = 0.
+// The same release block, inlined for index buffers in destroy_buffers, destroy_ib and
+// resize_ib.
 static void ReleaseIbGpu(FRp9Ib* Wrapper)
 {
     if (Wrapper->Gpu == nullptr)
@@ -2378,7 +2323,7 @@ void FDirectX9::GrowPoolVb(FRp9Vb* Wrapper, unsigned int Fvf, unsigned int Count
         SelectVb(nullptr);
 }
 
-// The destructor's FUN_06d1a780 over the pool (06d018d6): every node's value goes through
+// The destructor's FUN_06d1a780 over the pool: every node's value goes through
 // FUN_06d1bc60 before the node is freed.
 // RP8: FDirectX8::ReleasePoolVbs
 void FDirectX9::ReleasePoolVbs()
@@ -2390,7 +2335,6 @@ void FDirectX9::ReleasePoolVbs()
 }
 
 // RP8: FRp8StreamCache::SelectVertexStream
-// formerly MarkStreamVb / MarkStreamFvf
 void FRp9StreamCache::SelectVertexStream(FRp9Vb* Buffer, unsigned long InFvf)
 {
     if (Buffer != VertexBuffer || InFvf != Fvf)
@@ -2402,7 +2346,6 @@ void FRp9StreamCache::SelectVertexStream(FRp9Vb* Buffer, unsigned long InFvf)
 }
 
 // RP8: FRp8StreamCache::SelectIndices
-// formerly MarkStreamScratchIb / SelectIb cache stores
 void FRp9StreamCache::SelectIndices(FRp9Ib* Buffer, unsigned int InBaseVertex)
 {
     if (Buffer != IndexBuffer || InBaseVertex != BaseVertex)
@@ -2415,7 +2358,6 @@ void FRp9StreamCache::SelectIndices(FRp9Ib* Buffer, unsigned int InBaseVertex)
 
 // Ring-buffer offsets count 16-bit indices; OutBits is required.
 // RP8: FRp8Ib::LockRange
-// formerly LockIbRange
 HRESULT FRp9Ib::LockRange(unsigned int Start, unsigned int Count, void** OutBits,
                            unsigned int* OutStart, unsigned char bSysLock)
 {
@@ -2452,8 +2394,8 @@ HRESULT FRp9Ib::LockRange(unsigned int Start, unsigned int Count, void** OutBits
 // RP8: FDirectX8::PrimCountFromVerts (D3DPRIMITIVETYPE values are the same in D3D9)
 unsigned int FDirectX9::PrimCountFromVerts(unsigned long Prim, unsigned int Count)
 {
-    // FUN_06d010cf: JA on the type (unsigned); /2 is CDQ;SUB;SAR and /3 is CDQ;IDIV -- signed
-    // divisions, so a negative count stays <= 0 for the callers' JLE test.
+    // FUN_06d010cf. The /2 and /3 are signed divisions, so a negative count stays <= 0 for the
+    // callers' test.
     switch (Prim)
     {
     case 0:
@@ -2523,7 +2465,6 @@ unsigned long FDirectX9::StageCount()
 }
 
 // RP8: FRp8TransformCache::StoreAffine
-// formerly StoreMatrix12
 void FRp9TransformCache::StoreAffine(const float* M12)
 {
     Values[0] = M12[0];
@@ -2546,7 +2487,6 @@ void FRp9TransformCache::StoreAffine(const float* M12)
 }
 
 // RP8: FRp8TransformCache::LoadAffine
-// formerly LoadMatrix12
 void FRp9TransformCache::LoadAffine(float* Out12) const
 {
     Out12[0] = Values[0];
@@ -2568,8 +2508,7 @@ void FRp9TransformCache::LoadAffine(float* Out12) const
 // FUN_06d5cd40();` and then calls through it without a null check.
 static I3DMathEngine* G_Rp9MathEngine = nullptr;
 
-// FUN_06d5cd40 (rp8.dll.txt 149794): a 0xC descriptor {0xC, "3DMathEngine", 0} on the stack,
-// DACOM_Acquire()->CreateInstance(&Desc, &Out) (ICOManager +0x0C), returns Out.
+// FUN_06d5cd40.
 static I3DMathEngine* Rp9CreateMathEngine()
 {
     FMathDesc Desc;
@@ -2589,10 +2528,9 @@ static I3DMathEngine* Rp9MathEngine()
     return G_Rp9MathEngine;
 }
 
-// FUN_06d15d10 then `FDIVR [1.0f]; FSTP float` and three `FLD float; FMUL float; FSTP float`
-// (the inline normalise set_lookat does three times). The squared length and sqrt stay on the
-// x87 stack, so they are double here; the reciprocal and each component are stored as float.
-// No zero-length check: retail divides by whatever _CIsqrt returned.
+// FUN_06d15d10 plus the inline normalise set_lookat does three times. The squared length and
+// sqrt stay on the x87 stack (double); the reciprocal and each component are stored as float.
+// No zero-length check, as in retail.
 static void Rp9NormalizeInPlace(FVector& Vector)
 {
     const double Length = std::sqrt((double)Vector.X * Vector.X +
@@ -2629,7 +2567,6 @@ void FDirectX9::MulZFlip12(float* Out12, const float* In12)
 }
 
 // RP8: FRp8TransformCache::StoreTransposed
-// formerly StoreMatrix16
 void FRp9TransformCache::StoreTransposed(const float* M16)
 {
     Values[0] = M16[0];
@@ -2652,7 +2589,6 @@ void FRp9TransformCache::StoreTransposed(const float* M16)
 }
 
 // RP8: FRp8TransformCache::LoadTransposed
-// formerly LoadMatrix16
 void FRp9TransformCache::LoadTransposed(float* Out16) const
 {
     Out16[0] = Values[0];
@@ -2789,7 +2725,7 @@ void FDirectX9::ApplyDefaultTextureStages()
     }
 }
 
-// The tail of create_buffers FUN_06d08811 (06d095d7..06d098d4), in retail order.
+// The tail of create_buffers FUN_06d08811, in retail order.
 // RP8: FDirectX8::ApplyPostDeviceHelpers
 void FDirectX9::ApplyPostDeviceHelpers()
 {
@@ -2797,17 +2733,14 @@ void FDirectX9::ApplyPostDeviceHelpers()
     ApplyDefaultTextureStages(); // FUN_06d038ba
     ApplyIdentityTransforms();   // FUN_06d03c94
     PopulateFormatCatalog();     // FUN_06d047df
-    ApplyDeviceViewport();       // 06d095f7..06d09877
-    // 06d09877: FUN_06d2ce6a(this+0x21f4): the StateCache light records are re-queued for the
-    // new device (data resent, requested-on lights re-enabled at the next draw).
+    ApplyDeviceViewport();
+    // FUN_06d2ce6a: the StateCache light records are re-queued for the new device (data resent,
+    // requested-on lights re-enabled at the next draw).
     LightManager_.Reset();
-    // 06d09885: stream cache +0x138 = {0, 0, 0, -1, 0}.
+    // Stream cache +0x138 = {0, 0, 0, -1, 0}.
     StreamCache_.Reset();
     // D3D9 only: a created or reset D3D8 device holds SetIndices(NULL, 0).
     DeviceBaseVertex_ = 0;
-    // (Removed: a port-only SetPipelineState(8, 0xff101820) "dark space sky" clear colour,
-    // SetPipelineState(9, 1.0f) and SetPerspective(60, aspect, 1, 50000) -- none of them is in
-    // FUN_06d08811; CLEAR_COLOR / CLEAR_ZDEPTH come from [RenderPipeline] and the callers.)
 }
 
 // Remove the handle from all stage bindings before releasing or updating its texture.
@@ -2930,14 +2863,12 @@ unsigned int FDirectX9::PfIndex(unsigned int Format)
 // RP8: FDirectX8::PfToD3d
 unsigned int FDirectX9::PfToD3d(unsigned int Format)
 {
-    // FUN_06d5cbb0: TEST EAX,EAX / JL warn; CMP EAX,0x16 / JGE warn; else DAT_06d6ffa8[pf].
-    // (A signed negative pf is >= 22 as unsigned, so one unsigned compare covers both.) An
-    // earlier port tried a value lookup (FUN_06d5cc30) first; retail has no such step, and
-    // every caller in the tree passes pfenum ids.
+    // FUN_06d5cbb0. A signed negative pf is >= 22 as unsigned, so one unsigned compare covers
+    // both of retail's range tests.
     if (Format < 22)
         return kPfToD3d[Format];
     {
-        // 06d5cbdd: sprintf("pf_to_d3d: unknown pfenum passed (%x)", id) -> RPUL\Pixel.cpp:82.
+        // RPUL\Pixel.cpp line 82.
         char Text[0x2000];
         _snprintf(Text, sizeof(Text), "pf_to_d3d: unknown pfenum passed (%x)", Format);
         Text[sizeof(Text) - 1] = '\0';
@@ -2993,24 +2924,21 @@ unsigned int FDirectX9::FvfStride(unsigned int Fvf)
 // RP8: FDirectX8::Initialize
 GENRESULT DACOM_API FDirectX9::Initialize()
 {
-    // 06d01c78: no parser held -> DACOM_Acquire()->QueryInterface("1.11_IProfileParser",
-    // &+0x20); the result is not checked.
+    // The QI result is not checked.
     if (Parser_ == nullptr)
         DACOM_Acquire()->QueryInterface(Iids::ProfileParser, (void**)(&Parser_));
-    // 06d01cda: DAT_06d70540 = FUN_06d5cd40() once.
+    // DAT_06d70540 = FUN_06d5cd40() once.
     Rp9MathEngine();
-    // 06d01ced..06d02032: the pipeline-state property map.
     FillPropertyMap(&PropertyMap_, kPipelineProperties,
                     sizeof(kPipelineProperties) / sizeof(kPipelineProperties[0]), true);
-    // 06d02037: FUN_06d19530, the ability map.
+    // FUN_06d19530.
     FillPropertyMap(&AbilityMap_, kAbilityProperties,
                     sizeof(kAbilityProperties) / sizeof(kAbilityProperties[0]), true);
-    // 06d02049: FUN_06d176e0, the render-state map.
+    // FUN_06d176e0.
     FillPropertyMap(&RenderStateMap_, kRenderStateProperties,
                     sizeof(kRenderStateProperties) / sizeof(kRenderStateProperties[0]), true);
-    // 06d0205b: FUN_06d19c30(stage 0, 1), then 06d0206e..06d020a1 FUN_06d19c30(stage i, 0) for
-    // i = 0..7 -- stage 0 is rebuilt with the flag clear, so every stage ends up COLOROP 1 /
-    // ALPHAOP 1.
+    // Retail quirk: FUN_06d19c30(stage 0, 1), then FUN_06d19c30(stage i, 0) for i = 0..7 --
+    // stage 0 is rebuilt with the flag clear, so every stage ends up COLOROP 1 / ALPHAOP 1.
     FillStageStateMap(&StageStateMaps_[0], true);
     for (unsigned int Stage = 0; Stage < 8; ++Stage)
         FillStageStateMap(&StageStateMaps_[Stage], false);
@@ -3026,8 +2954,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
     D3d_ = Direct3DCreate9(D3D_SDK_VERSION);
     if (D3d_ == nullptr)
     {
-        // 06d05dd3: FUN_06d2b920 (vsprintf into a static buffer) of the text, WARNING 0x5ce.
-        // (RP8's text, kept so logs read the same.)
+        // RP8's text, kept so logs read the same.
         Rp9Fdump(kFdumpWarning, 0x5CE, "WARNING", "DX8RP: startup: couldnt create directx8 device");
         return GR_GENERIC;
     }
@@ -3047,16 +2974,15 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
         strcpy(LastSection_, SectionName);
     }
 
-    // 06d06595: MGSDB -> +0x1B0 (default DAT_06d70544, an empty string).
+    // MGSDB -> +0x1B0 (default DAT_06d70544, an empty string).
     ReadProfileString(Dacom, Parser_, SectionName, "MGSDB", "", MgsdbPath_);
 
     EnumAdapters();
 
-    // 06d06ad0.
     AdapterIndex_ = 0;
     DeviceType_ = 1;
     CreateFlags_ = 0;
-    // 06d06af7..06d07091 (FUN_06d16930 inlined, default 0). The D3DCREATE_* bits are the same
+    // FUN_06d16930 inlined, default 0. The D3DCREATE_* bits are the same
     // in D3D9 (FPU_PRESERVE 2, MULTITHREADED 4, PUREDEVICE 0x10, SOFTWARE/HARDWARE/MIXED
     // _VERTEXPROCESSING 0x20/0x40/0x80). Without FPU_PRESERVE Direct3D 9 CreateDevice drops the
     // thread's x87 precision to 24 bits exactly as Direct3D 8 does (Directory.Build.props).
@@ -3066,7 +2992,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
         CreateFlags_ |= 0x4;
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "PUREDEVICE", 0, nullptr) != 0)
         CreateFlags_ |= 0x10;
-    // 06d0735e: SOFTWARE -> 0x20, else MIXED -> 0x80, else 0x40 whatever HARDWARE_VERTEXPROCESSING
+    // SOFTWARE -> 0x20, else MIXED -> 0x80, else 0x40 whatever HARDWARE_VERTEXPROCESSING
     // says (it is read, and both of its outcomes OR 0x40).
     if (ReadProfileNumber(Dacom, Parser_, SectionName, "SOFTWARE_VERTEXPROCESSING", 0, nullptr) != 0)
         CreateFlags_ |= 0x20;
@@ -3078,7 +3004,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
     else
         CreateFlags_ |= 0x40;
 
-    // 06d07457: +0x128 = 0, then bit0 LOCKABLE_BACKBUFFER (dacom.ini's commented-out
+    // +0x128 = 0, then bit0 LOCKABLE_BACKBUFFER (dacom.ini's commented-out
     // "LOCAKABLE_BACKBUFFER" is a typo retail never reads), bit1 USE_SYSLOCK, bit2 HANDLE_SWAPLOSS
     // (default 1).
     SwapFlags_ = 0;
@@ -3093,7 +3019,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
         ReadProfileNumber(Dacom, Parser_, SectionName, "HANDLE_SWAPLOSS", 1, nullptr) != 0 ? 1 : 0;
     *SwapByte = (unsigned char)((*SwapByte & 0xFB) | (bSwapLoss << 2));
 
-    // 06d07577: every enabled pipeline-state property is read into its node and stored as
+    // Every enabled pipeline-state property is read into its node and stored as
     // {Value, 1, 1} at +0x354 + Id*0xC (the slot is first reset to {0, 1, 0}).
     FRp9PropertyMap& Properties = PropertyMap_;
     for (FRp9PropertyMap::iterator It = Properties.begin(); It != Properties.end(); ++It)
@@ -3115,7 +3041,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
         }
     }
 
-    // 06d07766: an ability key present in the last-read section (+0xA4) enables its node and
+    // An ability key present in the last-read section (+0xA4) enables its node and
     // is read into it; FUN_06d020ab applies it.
     FRp9PropertyMap& Abilities = AbilityMap_;
     for (FRp9PropertyMap::iterator It = Abilities.begin(); It != Abilities.end(); ++It)
@@ -3142,7 +3068,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
         }
     }
 
-    // 06d07971: every enabled render-state node is read from the INI (FUN_06d0376f applies it).
+    // Every enabled render-state node is read from the INI (FUN_06d0376f applies it).
     FRp9PropertyMap& RenderStates = RenderStateMap_;
     for (FRp9PropertyMap::iterator It = RenderStates.begin(); It != RenderStates.end(); ++It)
     {
@@ -3151,9 +3077,9 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
             ReadProfileNumber(Dacom, Parser_, SectionName, State.Name, State.Default, &State.Value);
     }
 
-    // 06d07a48: FUN_06d2b6e0.
+    // FUN_06d2b6e0.
     VidMem_ = QueryVidMem();
-    // 06d07a56: GetDeviceCaps(+0x1A8, +0x1AC) -- the result is kept in a local nobody reads --
+    // GetDeviceCaps(+0x1A8, +0x1AC) -- the result is kept in a local nobody reads --
     // then FUN_06d020ab. (RP8 passes its uninitialised local on when the call fails; RP9's
     // starts zeroed.)
     D3DCAPS9 Caps9;
@@ -3168,9 +3094,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
 // RP8: FDirectX8::ShutdownPipeline
 GENRESULT DACOM_API FDirectX9::ShutdownPipeline()
 {
-    // FUN_06d07aa8: destroy_buffers (vtbl+0x38), free every adapter's mode array, empty the
-    // adapter vector (06d07b1a..06d08147: the inlined resize(0) -- its grow branch is dead),
-    // release the device and IDirect3D8. +0x1A8 is left as it is.
+    // FUN_06d07aa8. Retail's inlined resize(0) has a dead grow branch. +0x1A8 is left as it is.
     DestroyGpuResources();
     // RP9 Ex (port-only): shaders and managed volume textures die with the device; their
     // bytecode / texel data stays for a later device.
@@ -3219,8 +3143,8 @@ GENRESULT DACOM_API FDirectX9::SetPipelineState(int Id, int Value)
 // RP8: FDirectX8::GetPipelineState
 GENRESULT DACOM_API FDirectX9::GetPipelineState(int Id, int* Out)
 {
-    // FUN_06d0823e: startup check (line 0x6d9); 0 <= Id <= 0xE (JL / JG signed) ->
-    // *Out = [this+0x354+Id*0xC]; any other Id leaves *Out alone. Returns 0 either way.
+    // FUN_06d0823e. Only 0 <= Id <= 0xE (signed) reads the slot; any other Id leaves *Out
+    // alone. Returns 0 either way.
     const GENRESULT Ready =
         NeedStartup("get_pipeline_state() called outside of startup/shutdown", 1753);
     if (Ready != GR_OK)
@@ -3239,8 +3163,7 @@ GENRESULT DACOM_API FDirectX9::GetPipelineState(int Id, int* Out)
 // RP8: FDirectX8::GetDeviceInfo. The record keeps RP8's D3D8 shape (FRp9Adapter).
 GENRESULT DACOM_API FDirectX9::GetDeviceInfo(void* Out520)
 {
-    // FUN_06d082d1: startup check (line 0x6eb); Count = begin ? (end-begin)/0x520 : 0;
-    // AdapterIndex_ < Count (JNC) -> REP MOVSD 0x148 dwords, 0; else -1.
+    // FUN_06d082d1.
     const GENRESULT Ready =
         NeedStartup("get_device_info() called outside of startup/shutdown", 1771);
     if (Ready != GR_OK)
@@ -3256,7 +3179,7 @@ GENRESULT DACOM_API FDirectX9::GetDeviceInfo(void* Out520)
 // RP8: FDirectX8::QueryDeviceAbility
 GENRESULT DACOM_API FDirectX9::QueryDeviceAbility(unsigned int Index, unsigned long* Out)
 {
-    // FUN_06d083d2: startup check (line 0x6fc); Index > 0x14 (JA) or Out == 0 -> -2.
+    // FUN_06d083d2.
     const GENRESULT Ready =
         NeedStartup("query_device_ability() called outside of startup/shutdown", 1788);
     if (Ready != GR_OK)
@@ -3275,8 +3198,7 @@ GENRESULT DACOM_API FDirectX9::QueryDeviceAbility(unsigned int Index, unsigned l
 // RP8: FDirectX8::GetDisplayModeCount
 GENRESULT DACOM_API FDirectX9::GetDisplayModeCount(unsigned int* Out)
 {
-    // FUN_06d08461: startup check (line 0x716); *Out = D3d->GetAdapterModeCount(AdapterIndex_)
-    // (IDirect3D8 +0x18), 0. RP9: the count of the RP9 mode list (AdapterModeCount).
+    // FUN_06d08461. RP9: the count of the RP9 mode list (AdapterModeCount).
     const GENRESULT Ready =
         NeedStartup("get_display_mode() called outside of startup/shutdown", 1814);
     if (Ready != GR_OK)
@@ -3347,21 +3269,18 @@ GENRESULT DACOM_API FDirectX9::SelectMode(int* Mode, unsigned int* OutIndex)
 // RP8: FDirectX8::CreateBuffers
 GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
 {
-    // FUN_06d08811 RET 0x10, traced line by line (06d08811..06d098dc).
+    // FUN_06d08811.
     const GENRESULT Ready =
         NeedStartup("create_buffers() called outside of startup/shutdown", 1991);
     if (Ready != GR_OK)
         return Ready;
     FRp9Mode* Desc = (FRp9Mode*)(Mode);
-    // 06d08890: a live device whose TestCooperativeLevel (+0xc) is D3DERR_DEVICELOST (raw bytes
-    // 81 7d 88 68 08 76 88) -> OR EAX,-1.
+    // A live device whose TestCooperativeLevel is D3DERR_DEVICELOST -> -1.
     if (Device_ != nullptr &&
         Device_->TestCooperativeLevel() == (HRESULT)(0x88760868))
         return GR_GENERIC;
-    // 06d088c8: this->vtbl[0x38] = destroy_buffers.
+    // vtbl[0x38] = destroy_buffers.
     DestroyGpuResources();
-    // 06d088d4: back-buffer format (local_74) = 0, mode index (local_58) = -1;
-    // GetAdapterDisplayMode (IDirect3D8 +0x20) failing -> 0x7e2, return hr.
     D3DFORMAT BackBuffer = D3DFMT_UNKNOWN;
     int ModeIndex = -1;
     D3DDISPLAYMODE Display;
@@ -3371,7 +3290,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
         FdumpHr("create_buffers_select_mode: %s", Hr, 2018);
         return (GENRESULT)(Hr);
     }
-    // 06d089a4: full screen (mode byte +0x25) picks an adapter mode: mode[0] < 0 -> a copy of
+    // Full screen (mode byte +0x25) picks an adapter mode: mode[0] < 0 -> a copy of
     // the descriptor (bits -1 -> the display format's bits) through this->vtbl[0x2c]
     // (select_mode), then EnumAdapterModes (+0x1c) of the found index, whose format becomes
     // the back buffer's; mode[0] >= 0 -> EnumAdapterModes of that index only.
@@ -3409,10 +3328,9 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
             }
         }
     }
-    // 06d08c81: display pfenum (local_68). No back-buffer format yet: bits -1 or equal to the
-    // display's -> the display format; else the first of pfenum 0..8 with those bits whose
-    // D3DFORMAT passes CheckDeviceFormat (+0x28)(adapter, type, display fmt,
-    // D3DUSAGE_RENDERTARGET 1, D3DRTYPE_SURFACE 1, fmt). Still none -> -1.
+    // No back-buffer format yet: bits -1 or equal to the display's -> the display format; else
+    // the first of pfenum 0..8 with those bits that passes CheckDeviceFormat as a render
+    // target. Still none -> -1.
     const unsigned int DisplayPf = PfIndex((unsigned int)(Display.Format));
     if (BackBuffer == D3DFMT_UNKNOWN)
     {
@@ -3439,7 +3357,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     }
     if (BackBuffer == D3DFMT_UNKNOWN)
         return GR_GENERIC;
-    // 06d08daa: depth bits wanted = mode[5] (-1 -> the back buffer's colour bits), stencil =
+    // Depth bits wanted = mode[5] (-1 -> the back buffer's colour bits), stencil =
     // mode[6] as given; FUN_06d159ff picks the depth format; none -> -1.
     int WantedZ = Desc->WantedZ;
     if (WantedZ == -1)
@@ -3496,7 +3414,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
             break;
         }
     }
-    // 06d08f3e: the D3DPRESENT_PARAMETERS on the stack (EBP-0x40). D3D9 translation:
+    // The D3DPRESENT_PARAMETERS. D3D9 translation:
     //  - D3DSWAPEFFECT_COPY_VSYNC does not exist: it becomes COPY presented on the vertical
     //    blank (PresentationInterval ONE in a window; in full screen the interval RP8 computed,
     //    which is never IMMEDIATE on this path).
@@ -3545,9 +3463,8 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     Present.PresentationInterval = PresentInterval9;
     if (Device_ == nullptr)
     {
-        // 06d08fb8: focus = GetAncestor(hwnd, GA_ROOT); CreateDevice (+0x3c)(adapter, type,
-        // focus, +0x124, &pp, &+0x130); failure while a HARDWARE/MIXED bit (0xc0) is set ->
-        // swap it for SOFTWARE_VERTEXPROCESSING (0x20) and retry (JMP 06d08fca).
+        // A failed CreateDevice with a HARDWARE/MIXED bit (0xc0) set is retried with
+        // SOFTWARE_VERTEXPROCESSING (0x20).
         HWND Focus = GetAncestor(Hwnd, GA_ROOT);
         for (;;)
         {
@@ -3562,7 +3479,6 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
             FdumpHr("create_device: %s", Hr, 2273);
             return (GENRESULT)(Hr);
         }
-        // 06d090f9: GetDeviceCaps (+0x1c) failing -> 'create_device_caps: %s' 0x8e9; else
         // FUN_06d020ab(caps) (abilities + MGSDB flags), on the D3D8-shaped caps.
         D3DCAPS9 Caps9;
         memset(&Caps9, 0, sizeof(Caps9));
@@ -3578,7 +3494,6 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     }
     else
     {
-        // 06d091c7: Reset (+0x38)(&pp); failure -> 'create_device: %s' 0x8f4, return hr.
         Hr = Device_->Reset(&Present);
         if (Hr < 0)
         {
@@ -3631,44 +3546,40 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     // D3D9 only: the depth width the D3DRS_ZBIAS conversion scales by; set before the default
     // render states (ZBIAS among them) are applied below.
     RenderStates_.DepthBiasZBits = ModeBlob_[5];
-    // 06d095be: out mode (if given) = the 10 dwords at +0x238.
+    // Out mode (if given) = the 10 dwords at +0x238.
     if (OutMode != nullptr)
         memcpy(OutMode, ModeBlob_, sizeof(ModeBlob_));
-    // 06d095d7..06d098d4: FUN_06d0376f, FUN_06d038ba, FUN_06d03c94, FUN_06d047df, viewport,
-    // light cache, stream cache.
     ApplyPostDeviceHelpers();
     return (GENRESULT)(Hr);
 }
 
-// FUN_06d09982 RET 0x4 (destroy_buffers, slot 14), traced line by line. The device and the
-// IDirect3D8 stay alive; only the D3DPOOL_DEFAULT resources go.
+// FUN_06d09982 (destroy_buffers, slot 14). The device and the IDirect3D8 stay alive; only the
+// D3DPOOL_DEFAULT resources go.
 // RP8: FDirectX8::DestroyGpuResources
 GENRESULT DACOM_API FDirectX9::DestroyGpuResources()
 {
     // RP9 Ex (port-only): an open Ex pass is ended, the INTZ depth and the Ex render targets
     // (D3DPOOL_DEFAULT) are released before a Reset. Nothing to do when Ex was never used.
     ExReleaseDeviceResources();
-    // 06d09988: stream cache +0x138 = {0, 0, 0, -1, 0}.
     StreamCache_.Reset();
-    // 06d099c4: every node of the VB list (+0x22E4, by +0x14) loses its buffer.
+    // Every node of the VB list (+0x22E4) loses its buffer.
     FRp9Vb* Vb = VbList_.First;
     while (Vb != nullptr)
     {
         Vb->ReleaseGpu();
         Vb = Vb->Next;
     }
-    // 06d09a40: same for the IB list (+0x22F0, by +0xC).
+    // Same for the IB list (+0x22F0).
     FRp9Ib* Ib = IbList_.First;
     while (Ib != nullptr)
     {
         ReleaseIbGpu(Ib);
         Ib = Ib->Next;
     }
-    // 06d09abc: IVertexBufferManager (+4) vtbl[0x10] -- the VB pool.
+    // IVertexBufferManager vtbl[0x10]: the VB pool.
     VbMgrReleaseAll();
-    // 06d09acc: the inline scratch IB node at +0x14C (Gpu +0x150).
+    // The inline scratch IB node at +0x14C.
     ReleaseIbGpu(&ScratchIb_);
-    // 06d09b22: +0x274 = 0; byte +0x184 &= 0xfe; return 0.
     WindowOverride_ = nullptr;
     DeviceReady_ &= ~1ul;
     return GR_OK;
@@ -3733,10 +3644,9 @@ GENRESULT DACOM_API FDirectX9::SwapBuffers()
     // FUN_06d09d28: the no-override branch also SetRects two locals (0,0,+0x240,+0x244) but
     // passes NULL for both rect pointers; those locals are never read, so they are not kept.
     HRESULT Hr = Device_->Present(Src, Dest, PresentHwnd, nullptr);
-    // 06d09f25..06d09f8a: hr == D3DERR_DEVICELOST (CMP 0x88760868, raw bytes 81 7d e4 68 08 76
-    // 88) and HANDLE_SWAPLOSS (byte +0x128 >> 2 & 1) -> hr = TestCooperativeLevel (+0xC); still
-    // 0x88760868 (same constant, bytes checked) -> hr = this->vtable[0x30](Hwnd_, +0x238, 0),
-    // i.e. create_buffers with the saved mode blob. Returns hr of whichever call ran last.
+    // D3DERR_DEVICELOST with HANDLE_SWAPLOSS -> TestCooperativeLevel; when that also answers
+    // D3DERR_DEVICELOST (retail tests the same constant twice) -> create_buffers with the saved
+    // mode blob. Returns hr of whichever call ran last.
     if (Hr == (HRESULT)(0x88760868) && ((SwapFlags_ >> 2) & 1) != 0)
     {
         Hr = Device_->TestCooperativeLevel();
@@ -3753,7 +3663,7 @@ GENRESULT DACOM_API FDirectX9::BeginScene()
         "begin_scene() called outside of create_buffers/destroy_buffers", 3524);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0f786 RET 0x4: BeginScene (+0x88); hr < 0 -> 'begin_scene: %s' 0xdd8; return hr.
+    // FUN_06d0f786.
     const HRESULT Hr = Device_->BeginScene();
     if (Hr < 0)
         FdumpHr("begin_scene: %s", Hr, 3544);
@@ -3767,7 +3677,7 @@ GENRESULT DACOM_API FDirectX9::EndScene()
         "end_scene() called outside of create_buffers/destroy_buffers", 3556);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0f8b5 RET 0x4: EndScene (+0x8c); hr < 0 -> 'end_scene: %s' 0xde8; return hr.
+    // FUN_06d0f8b5.
     const HRESULT Hr = Device_->EndScene();
     if (Hr < 0)
         FdumpHr("end_scene: %s", Hr, 3560);
@@ -3781,18 +3691,14 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitive(unsigned long Prim, unsigned
 {
     // RP8 reads the IRPDraw-adjusted [this+0x128] (Device_) and [this+0x17c] (DeviceReady_).
     IDirect3DDevice9* Device = Device_;
-    // FUN_06d111e1: MOV CL,byte [this+0x17c] (IRPDraw-adjusted DeviceReady_); AND 1; the device
-    // pointer is not looked at.
+    // FUN_06d111e1 tests the ready bit only; the device pointer is not looked at.
     if ((DeviceReady_ & 1) == 0)
     {
         Rp9Fdump(kFdumpWarning, 3945, "WARNING",
                  "draw_indexed_primitive() called outside of create_buffers/destroy_buffers");
         return GR_GENERIC;
     }
-    // 06d11259..06d11351: hr = E_FAIL; PrimCount = FUN_06d010cf(Prim, Count); PrimCount <= 0
-    // (JLE, signed) -> return E_FAIL; FUN_06d04138 (this-8); Device->DrawIndexedPrimitive
-    // (+0x11c)(Prim, MinIndex, NumVertices, StartIndex, PrimCount); hr < 0 ->
-    // "draw_indexed_primitive: %s" (line 0xf79); return hr.
+    // FUN_06d010cf; a signed PrimCount <= 0 returns E_FAIL. FUN_06d04138 flushes.
     HRESULT Hr = (HRESULT)(0x80004005);
     const unsigned int PrimCount = PrimCountFromVerts(Prim, Count);
     if ((int)(PrimCount) <= 0)
@@ -3810,17 +3716,15 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitive(unsigned long Prim, unsigned
 // RP8: FDirectX8::VbMgrInit
 GENRESULT DACOM_API FDirectX9::VbMgrInit(void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/)
 {
-    // FUN_06d11354 RET 0x14: four explicit dwords, none of them read, body is `return 0`.
+    // FUN_06d11354: four explicit dwords, none of them read.
     return GR_OK;
 }
 
 // RP8: FDirectX8::GetModeBlob
 GENRESULT DACOM_API FDirectX9::GetModeBlob(void* OutAdapter, void* OutMode)
 {
-    // LAB_06d098f3 RET 0xC. FDUMP string is create_buffers() called outside…
-    // *out = +0x1A8; REP MOVSD 10 dwords from +0x238. No C++ name in RP8.
-    // Failure: OR EAX,-1. Success has no return statement: EAX still holds AdapterIndex_
-    // (MOV EAX,[EDX+0x1a8] at 06d0995d) after the REP MOVSD, reproduced.
+    // LAB_06d098f3 (no C++ name in RP8). Retail's success path has no return statement: EAX
+    // still holds AdapterIndex_, reproduced.
     const GENRESULT Ready =
         NeedStartup("create_buffers() called outside of startup/shutdown", 2357);
     if (Ready != GR_OK)
@@ -3832,12 +3736,12 @@ GENRESULT DACOM_API FDirectX9::GetModeBlob(void* OutAdapter, void* OutMode)
 // RP8: FDirectX8::LockBuffer
 GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
 {
-    // FUN_06d09f96 RET 0x8, traced line by line. Out = 5 dwords {w, h, pitch, bits, pfenum}.
+    // FUN_06d09f96. Out = 5 dwords {w, h, pitch, bits, pfenum}.
     const GENRESULT Ready = NeedBuffers(
         "lock_buffer() called outside of create_buffers/destroy_buffers", 2478);
     if (Ready != GR_OK)
         return Ready;
-    // 06d0a00e: byte [+0x128] & 1 (LOCKABLE_BACKBUFFER) == 0 -> FDUMP 0x9b2, OR EAX,-1.
+    // LOCKABLE_BACKBUFFER.
     if ((SwapFlags_ & 1) == 0)
     {
         Rp9Fdump(kFdumpWarning, 2482, "WARNING",
@@ -3845,15 +3749,12 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
                  "LOCAKABLE_BACKBUFFER");
         return GR_GENERIC;
     }
-    // 06d0a079: [+0x134] != 0 -> FDUMP 0x9b8, OR EAX,-1.
     if (LockBufferSurf_ != nullptr)
     {
         Rp9Fdump(kFdumpWarning, 2488, "WARNING", "lock_buffer: buffer already locked");
         return GR_GENERIC;
     }
 
-    // 06d0a0e7: Back = 0; GetBackBuffer(0, 0, &Back) (+0x40). hr < 0 -> FDUMP 0x9bf, release
-    // Back if set, return hr.
     IDirect3DSurface9* Back = nullptr;
     // D3D9 adds the swap-chain index (0, the implicit chain).
     HRESULT Hr = Device_->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &Back);
@@ -3868,9 +3769,8 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
         return (GENRESULT)(Hr);
     }
 
-    // 06d0a1e8: no override -> SetRect(&Area, 0,0,+0x240,+0x244) and a NULL rect pointer;
-    // override -> rect pointer = &Area, Area = (0,0,min(+0x26c,+0x240),min(+0x270,+0x244))
-    // with unsigned compares (JNC). Width/height are taken from Area in both cases.
+    // No override -> a NULL rect pointer; override -> Area = (0,0,min(+0x26c,+0x240),
+    // min(+0x270,+0x244)) with unsigned compares. Width/height are taken from Area either way.
     RECT Area = {};
     const RECT* SrcRects = nullptr;
     unsigned int RectCount = 0;
@@ -3891,17 +3791,15 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
     Width = Area.right - Area.left;
     Height = Area.bottom - Area.top;
 
-    // 06d0a2f2: fmt = FUN_06d5cbb0(+0x234).
     const unsigned int D3dFormat = PfToD3d(BbPfIndex_);
-    // 06d0a30f: release a surface still at +0x134 (already excluded above; kept as retail).
+    // Release a surface still at +0x134 (already excluded above; kept as retail).
     if (LockBufferSurf_ != nullptr)
     {
         LockBufferSurf_->Release();
         LockBufferSurf_ = nullptr;
     }
-    // 06d0a373: CreateImageSurface(w, h, fmt, &[+0x134]) (+0x6c). hr < 0 -> FDUMP 0x9ca,
-    // release Back, return hr (the +0x134 slot is not touched). D3D8 image surfaces are
-    // lockable system-memory surfaces: D3D9's CreateOffscreenPlainSurface in D3DPOOL_SYSTEMMEM.
+    // D3D8 CreateImageSurface: image surfaces are lockable system-memory surfaces, D3D9's
+    // CreateOffscreenPlainSurface in D3DPOOL_SYSTEMMEM.
     Hr = Device_->CreateOffscreenPlainSurface((UINT)(Width), (UINT)(Height),
                                               (D3DFORMAT)(D3dFormat), D3DPOOL_SYSTEMMEM,
                                               &LockBufferSurf_, nullptr);
@@ -3916,8 +3814,7 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
         return (GENRESULT)(Hr);
     }
 
-    // 06d0a475: CopyRects(Back, rect, rect != 0, [+0x134], NULL) (+0x70); hr < 0 -> FDUMP 0x9cd.
-    // D3D9 has no CopyRects. Without a rect the copy is the whole back buffer into a surface of
+    // D3D8 CopyRects(Back, rect, rect != 0, surface, NULL); D3D9 has no CopyRects. Without a rect the copy is the whole back buffer into a surface of
     // its size and format: GetRenderTargetData. With the window-override rect the copy is the
     // top-left Width x Height corner, 1:1 and unconverted: D3DXLoadSurfaceFromSurface with
     // D3DX_FILTER_NONE (the back buffer is lockable -- lock_buffer requires
@@ -3932,8 +3829,7 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
 
     if (Hr >= 0)
     {
-        // 06d0a515: NEG/SBB/AND 0xfffff800/ADD 0x800 -> USE_SYSLOCK (bit1) ? 0 : 0x800
-        // (D3DLOCK_NOSYSLOCK); OR 0x10 (D3DLOCK_READONLY). LockRect(&Locked, NULL, flags) (+0x24).
+        // USE_SYSLOCK ? 0 : D3DLOCK_NOSYSLOCK, plus D3DLOCK_READONLY.
         unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
         LockFlags |= 0x10;
         D3DLOCKED_RECT Locked;
@@ -3942,7 +3838,6 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
             FdumpHr("lock_buffer_lock_rect: %s", Hr, 2519);
         else
         {
-            // 06d0a611: Out+8 pitch, +0xc bits, +0x10 FUN_06d5cc30(fmt), +0 w, +4 h.
             unsigned long* OutDwords = (unsigned long*)(Out);
             OutDwords[2] = (unsigned long)(Locked.Pitch);
             OutDwords[3] = (unsigned long)(Locked.pBits);
@@ -3952,7 +3847,6 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
         }
     }
 
-    // 06d0a652: hr < 0 -> release and clear +0x134. Then release Back; return hr.
     if (Hr < 0 && LockBufferSurf_ != nullptr)
     {
         LockBufferSurf_->Release();
@@ -3968,8 +3862,7 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
 // RP8: FDirectX8::UnlockBuffer
 GENRESULT DACOM_API FDirectX9::UnlockBuffer()
 {
-    // FUN_06d0a6c1 RET 0x4: ready bit; [+0x134] == 0 -> FDUMP 0x9f1, -1; else UnlockRect
-    // (+0x28), Release, clear +0x134, return 0.
+    // FUN_06d0a6c1.
     const GENRESULT Ready = NeedBuffers(
         "unlock_buffer() called outside of create_buffers/destroy_buffers", 2541);
     if (Ready != GR_OK)
@@ -3987,7 +3880,7 @@ GENRESULT DACOM_API FDirectX9::UnlockBuffer()
 // RP8: FDirectX8::GetBufferInterface
 GENRESULT DACOM_API FDirectX9::GetBufferInterface(void* /*Out*/, void* /*Unused*/)
 {
-    // FUN_06d0a7ec: checks ready bit only (not device pointer). Returns 0xFFFFFFF9 or -1.
+    // FUN_06d0a7ec: checks the ready bit only (not the device pointer).
     if ((DeviceReady_ & 1) == 0)
     {
         Rp9Fdump(kFdumpWarning, 2573, "WARNING",
@@ -3999,7 +3892,7 @@ GENRESULT DACOM_API FDirectX9::GetBufferInterface(void* /*Out*/, void* /*Unused*
 // RP8: FDirectX8::GetDeviceStats
 GENRESULT DACOM_API FDirectX9::GetDeviceStats(void* /*Out*/)
 {
-    // FUN_06d0a863: checks device pointer only (not ready bit). Returns 0xFFFFFFF9 or -1.
+    // FUN_06d0a863: checks the device pointer only (not the ready bit).
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 2583, "WARNING",
@@ -4084,9 +3977,7 @@ GENRESULT DACOM_API FDirectX9::GetDepthRange(float* OutMinZ, float* OutMaxZ)
         "get_depth_range() called outside of device lifetime", 2631);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0aca6 RET 0xC: +0x22e0 clear -> GetViewport (+0xa4) straight into the cache; ok ->
-    // +0x22e0 = 1, else the 6 cache dwords zeroed (REP STOSD). Then *min/*max; return 0.
-    // (The out pointers are not tested.)
+    // FUN_06d0aca6. The out pointers are not tested.
     if (bDepthRangeValid_ == 0)
     {
         const HRESULT Hr = Device_->GetViewport(&ViewportCache_);
@@ -4142,13 +4033,13 @@ GENRESULT DACOM_API FDirectX9::GetWindow(HWND* OutHwnd, int* OutLeft, int* OutRi
     return GR_OK;
 }
 // The matrix accessors below all inline FUN_06d172f0 / its unpack twin with a constant
-// "commit" argument of 0: `XOR reg,reg; TEST reg,reg; JZ` skips FUN_06d17290, so a setter only
-// writes the store and clears its dirty byte (+0x40 = 0, StoreMatrix12/16); FUN_06d04138
-// (FlushDrawState) sends it at draw time. None of them tests the matrix pointer.
+// "commit" argument of 0, so FUN_06d17290 never runs: a setter only writes the store and clears
+// its dirty byte (+0x40); FUN_06d04138 (FlushDrawState) sends it at draw time. None of them
+// tests the matrix pointer.
 // RP8: FDirectX8::SetWorld
 GENRESULT DACOM_API FDirectX9::SetWorld(const float* M12)
 {
-    // FUN_06d0b09d (line 0xa9a): bFlip = 0 (the local is 1 and is inverted by NEG/SBB/INC).
+    // FUN_06d0b09d: no flip.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_world() called outside of device lifetime", 0xa9a);
     if (Ready != GR_OK)
@@ -4159,7 +4050,7 @@ GENRESULT DACOM_API FDirectX9::SetWorld(const float* M12)
 // RP8: FDirectX8::GetWorld
 GENRESULT DACOM_API FDirectX9::GetWorld(float* Out12)
 {
-    // FUN_06d0b3dd (line 0xaa5): unpack +0x2240, no flip (same inverted local as set_world).
+    // FUN_06d0b3dd: unpack +0x2240, no flip.
     const GENRESULT Ready =
         NeedDeviceLifetime("get_world() called outside of device lifetime", 0xaa5);
     if (Ready != GR_OK)
@@ -4170,7 +4061,7 @@ GENRESULT DACOM_API FDirectX9::GetWorld(float* Out12)
 // RP8: FDirectX8::SetView
 GENRESULT DACOM_API FDirectX9::SetView(const float* M12)
 {
-    // FUN_06d0b607 (line 0xaaf): bFlip = 1 -> ZFlip * M12 into +0x21FC, dirty, no commit.
+    // FUN_06d0b607: ZFlip * M12 into +0x21FC, dirty, no commit.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_view() called outside of device lifetime", 0xaaf);
     if (Ready != GR_OK)
@@ -4183,8 +4074,8 @@ GENRESULT DACOM_API FDirectX9::SetView(const float* M12)
 // RP8: FDirectX8::GetView
 GENRESULT DACOM_API FDirectX9::GetView(float* Out12)
 {
-    // FUN_06d0b939 (line 0xaba; retail's message really says get_modelview): unpack +0x21FC
-    // then ZFlip * stored, which undoes set_view.
+    // FUN_06d0b939 (retail's message really says get_modelview): ZFlip * stored, which undoes
+    // set_view.
     const GENRESULT Ready =
         NeedDeviceLifetime("get_modelview() called outside of device lifetime", 0xaba);
     if (Ready != GR_OK)
@@ -4197,10 +4088,9 @@ GENRESULT DACOM_API FDirectX9::GetView(float* Out12)
 // RP8: FDirectX8::SetModelview
 GENRESULT DACOM_API FDirectX9::SetModelview(const float* M12)
 {
-    // FUN_06d0bb58 (line 0xac4). bOff = ([this+0x3A8] == 0) (SETZ, VIEWSPACE_LIGHTS state 7).
-    // WORLD: !bOff -> ZFlip * M12, else M12 (NEG/SBB/INC on bOff); dirty, no commit.
-    // VIEW, only while [+0x21FC+0x41] == 0: an identity transform, flipped when bOff, stored
-    // dirty without a commit, then +0x41 = 1. Returns 0.
+    // FUN_06d0bb58. bOff = VIEWSPACE_LIGHTS (state 7, +0x3A8) == 0. WORLD: !bOff -> ZFlip * M12,
+    // else M12; dirty, no commit. VIEW, only while its apply marker (+0x41) is clear: an identity
+    // transform, flipped when bOff, then the marker is set.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_modelview() called outside of device lifetime", 0xac4);
     if (Ready != GR_OK)
@@ -4266,9 +4156,8 @@ GENRESULT DACOM_API FDirectX9::GetModelview(float* Out12)
 // RP8: FDirectX8::SetProjection
 GENRESULT DACOM_API FDirectX9::SetProjection(const float* M16)
 {
-    // FUN_06d0c2a1 (line 0xae4): 16 dwords transposed into +0x2284, +0x40 = 0; the commit
-    // block (06d0c3ee: SetTransform(D3DTS_PROJECTION = 3) via device +0x94) sits behind a
-    // constant 0 and never runs. Returns 0.
+    // FUN_06d0c2a1: transposed into +0x2284, dirty; the commit block sits behind a constant 0
+    // and never runs.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_projection() called outside of device lifetime", 0xae4);
     if (Ready != GR_OK)
@@ -4279,7 +4168,7 @@ GENRESULT DACOM_API FDirectX9::SetProjection(const float* M16)
 // RP8: FDirectX8::GetProjection
 GENRESULT DACOM_API FDirectX9::GetProjection(float* Out16)
 {
-    // FUN_06d0c438 (line 0xaed): unpack +0x2284 into Out16. Returns 0.
+    // FUN_06d0c438.
     const GENRESULT Ready =
         NeedDeviceLifetime("get_projection() called outside of device lifetime", 0xaed);
     if (Ready != GR_OK)
@@ -4291,8 +4180,7 @@ GENRESULT DACOM_API FDirectX9::GetProjection(float* Out16)
 GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, float AtX, float AtY,
                                          float AtZ, float UpX, float UpY, float UpZ)
 {
-    // FUN_06d0c57c (rp8.dll.txt 18064-18443). Device check: FDUMP "set_lookat() called
-    // outside of device lifetime" (line 0xAF6), return -1.
+    // FUN_06d0c57c.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_lookat() called outside of device lifetime", 0xaf6);
     if (Ready != GR_OK)
@@ -4310,14 +4198,14 @@ GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, flo
     Fwd.Z = AtZ - EyeZ;
     Rp9NormalizeInPlace(Fwd);
 
-    // FUN_06d15d50: Z = -Fwd (FCHS per component).
+    // FUN_06d15d50: Z = -Fwd.
     FVector AxisZ;
     AxisZ.X = -Fwd.X;
     AxisZ.Y = -Fwd.Y;
     AxisZ.Z = -Fwd.Z;
 
-    // X = Up x Z: each component `FLD a; FMUL b; FLD c; FMUL d; FSUBP` (a*b - c*d on the x87
-    // stack) stored as float by FUN_06d15ce0; then normalised. No fallback axis.
+    // X = Up x Z: each component a*b - c*d on the x87 stack, stored as float by FUN_06d15ce0;
+    // then normalised. No fallback axis.
     FVector AxisX;
     AxisX.X = (float)((double)UpY * AxisZ.Z -
                                  (double)UpZ * AxisZ.Y);
@@ -4365,8 +4253,8 @@ GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, flo
         // FUN_06d172f0(+0x2240, device, bFlip=1, D3DTS_WORLD, &Xform, 0)
         MulZFlip12(Flipped, Xform12);
         Transforms_.World.StoreAffine(Flipped);
-        // View store: `MOVZX [+0x21FC+0x41]; JZ` -- only while the VIEWSPACE view is unset,
-        // FUN_06d172f0(+0x21FC, device, bFlip=0, D3DTS_VIEW, &Identity, 0), then +0x41 = 1.
+        // Only while the VIEWSPACE view is unset (+0x41 clear): FUN_06d172f0(+0x21FC, device,
+        // bFlip=0, D3DTS_VIEW, &Identity, 0).
         if (Transforms_.View.bApplyMarker == 0)
         {
             const float Identity12[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
@@ -4423,14 +4311,13 @@ GENRESULT DACOM_API FDirectX9::SetPerspective(float FovDeg, float Aspect, float 
         return GR_GENERIC;
     if (FarPlane == NearPlane)
         return GR_GENERIC;
-    // cot = float(1.0 / _CItan(pi/180.0 * fov)) -- the product stays unrounded on the x87
-    // stack (FST, not FSTP); inv = float(1.0f / (far - near)).
+    // cot = float(1.0 / _CItan(pi/180.0 * fov)) with the product unrounded on the x87 stack;
+    // inv = float(1.0f / (far - near)).
     const float Cot = (float)(
         1.0 / tan(3.141592653589793 / 180.0 * (double)FovDeg));
     const float InvDepth =
         (float)(1.0 / ((double)FarPlane - (double)NearPlane));
-    // Zeroed 4x4: [0] = cot/aspect, [5] = cot, [10] = far*inv, [11] = 1.0f,
-    // [14] = -far*near*inv; into PROJECTION +0x2284, +0x40 = 0; constant-0 commit (not sent).
+    // Into PROJECTION +0x2284, dirty; the constant-0 commit is not sent.
     float Matrix[16];
     memset(Matrix, 0, sizeof(Matrix));
     Matrix[0] = (float)((double)Cot / (double)Aspect);
@@ -4446,9 +4333,8 @@ GENRESULT DACOM_API FDirectX9::SetPerspective(float FovDeg, float Aspect, float 
 // RP8: FDirectX8::SetLight (D3DLIGHT8 = D3DLIGHT9 layout)
 GENRESULT DACOM_API FDirectX9::SetLight(void* Handle, const D3DLIGHT8* Light)
 {
-    // FUN_06d0ce57 (RET 0xC): no device -> 0xb8b, -1. Else the record's index
-    // (FUN_06d2c487(Handle, 0): created without data when new) and Device +0xB0
-    // SetLight(index, Light) at once; failure -> "set_light: %s" at 0xb96. Returns hr.
+    // FUN_06d0ce57: the record's index (FUN_06d2c487(Handle, 0), created without data when
+    // new), then SetLight at once.
     const GENRESULT Ready = NeedDeviceLifetime(
         "set_light() called outside of device lifetime", 0xb8b);
     if (Ready != GR_OK)
@@ -4465,9 +4351,8 @@ GENRESULT DACOM_API FDirectX9::SetLight(void* Handle, const D3DLIGHT8* Light)
 // RP8: FDirectX8::DestroyLight
 GENRESULT DACOM_API FDirectX9::DestroyLight(void* Handle)
 {
-    // FUN_06d0cf9c (RET 8): no device -> 0xb9e, -1. Else FUN_06d2cb6f(Handle, 0), the flush
-    // FUN_06d2d032(device) (the LightEnable(FALSE) reaches the device now), FUN_06d2c7cf(Handle);
-    // 0.
+    // FUN_06d0cf9c: FUN_06d2cb6f(Handle, 0), the flush FUN_06d2d032 (the LightEnable(FALSE)
+    // reaches the device now), FUN_06d2c7cf(Handle).
     const GENRESULT Ready = NeedDeviceLifetime(
         "destroy_light() called outside of device lifetime", 0xb9e);
     if (Ready != GR_OK)
@@ -4481,8 +4366,7 @@ GENRESULT DACOM_API FDirectX9::DestroyLight(void* Handle)
 // RP8: FDirectX8::GetLight
 GENRESULT DACOM_API FDirectX9::GetLight(void* Handle, D3DLIGHT8* OutLight)
 {
-    // FUN_06d0d044 (RET 0xC): no device -> 0xbad, -1. Else Device +0xB4 GetLight with the first
-    // argument passed through unchanged as the D3D light index; returns that hr.
+    // FUN_06d0d044: the handle is passed through unchanged as the D3D light index.
     const GENRESULT Ready = NeedDeviceLifetime(
         "get_light() called outside of device lifetime", 0xbad);
     if (Ready != GR_OK)
@@ -4494,8 +4378,7 @@ GENRESULT DACOM_API FDirectX9::GetLight(void* Handle, D3DLIGHT8* OutLight)
 // RP8: FDirectX8::SetLightEnable
 GENRESULT DACOM_API FDirectX9::SetLightEnable(void* Handle, int Enable)
 {
-    // FUN_06d0d0d7 (RET 0xC): no device -> 0xbb8, -1. Else FUN_06d2cb6f(this+0x21F4, Handle,
-    // Enable) -- the request is only recorded; the draw-time flush commits it -- and 0.
+    // FUN_06d0d0d7: the request is only recorded; the draw-time flush commits it.
     const GENRESULT Ready = NeedDeviceLifetime(
         "set_light_enable() called outside of device lifetime", 0xbb8);
     if (Ready != GR_OK)
@@ -4507,8 +4390,7 @@ GENRESULT DACOM_API FDirectX9::SetLightEnable(void* Handle, int Enable)
 // RP8: FDirectX8::GetLightEnable
 GENRESULT DACOM_API FDirectX9::GetLightEnable(void* Handle, int* OutEnable)
 {
-    // FUN_06d0d157 (RET 0xC): no device -> 0xbc2, -1. Else *OutEnable = the byte
-    // FUN_06d2c92a(this+0x21F4, Handle) returns (the requested state), zero-extended; 0.
+    // FUN_06d0d157: the requested state (FUN_06d2c92a), zero-extended.
     const GENRESULT Ready = NeedDeviceLifetime(
         "get_light_enable() called outside of device lifetime", 0xbc2);
     if (Ready != GR_OK)
@@ -4524,8 +4406,7 @@ GENRESULT DACOM_API FDirectX9::SetMaterial(const D3DMATERIAL8* Material)
         "set_material() called outside of create_buffers/destroy_buffers", 3020);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0d1dc 06d0d254..06d0d30d: Device->SetMaterial(+0xa8); hr < 0 ->
-    // "set_material: %s" (line 0xbd0); return hr.
+    // FUN_06d0d1dc.
     const HRESULT Hr = Device_->SetMaterial(Material);
     if (Hr < 0)
         FdumpHr("set_material: %s", Hr, 3024);
@@ -4538,8 +4419,7 @@ GENRESULT DACOM_API FDirectX9::GetMaterial(D3DMATERIAL8* Material)
         "get_material() called outside of create_buffers/destroy_buffers", 3035);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0d310 06d0d388..: Device->GetMaterial(+0xac); hr < 0 -> "get_material: %s"
-    // (line 0xbdf); return hr.
+    // FUN_06d0d310.
     const HRESULT Hr = Device_->GetMaterial(Material);
     if (Hr < 0)
         FdumpHr("get_material: %s", Hr, 3039);
@@ -4550,19 +4430,18 @@ GENRESULT DACOM_API FDirectX9::CreateTexture(int Width, int Height, unsigned int
                                              unsigned int Levels, unsigned int Flags,
                                              void** OutHandle)
 {
-    // FUN_06d0d628 opens with CMP [this+0x130],0 -- nothing is written to OutHandle first.
+    // FUN_06d0d628 tests the device first; nothing is written to OutHandle.
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3099, "WARNING", "create_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d0d696: flags & 1 -> 0xFFFFFFFE (nothing written). The winning format starts as
-    // FUN_06d5cc30(0); usage 0, D3DRTYPE_TEXTURE (3).
+    // flags & 1 -> 0xFFFFFFFE (nothing written).
     if ((Flags & 1) != 0)
         return (GENRESULT)(0xFFFFFFFE);
     unsigned int WinningFormat = PfIndex(0);
-    // 06d0d6e7: query_device_ability(5 = TEXTURE_SQUARE_ONLY) through the vtable (+0x20); the
-    // result is not checked. Square-only and W != H -> both become the larger (signed JLE).
+    // TEXTURE_SQUARE_ONLY through the vtable; the result is not checked. Square-only and
+    // W != H -> both become the larger (signed compare).
     unsigned long bSquareOnly = 0;
     QueryDeviceAbility(5, &bSquareOnly);
     if (Width != Height && bSquareOnly != 0)
@@ -4594,16 +4473,14 @@ GENRESULT DACOM_API FDirectX9::CreateTexture(int Width, int Height, unsigned int
             }
         }
     }
-    // 06d0d7dc: nothing usable -> NOTICE 0xc67 (the text ends in '\n'), -1.
+    // Nothing usable -> NOTICE (the text ends in '\n').
     if (!bFound)
     {
         Rp9Fdump(kFdumpNotice, 0xc67, "NOTICE",
                  "DX8RP: create_texture: cannot find suitable texture format.\n");
         return GR_GENERIC;
     }
-    // 06d0d839: Device+0x50 CreateTexture(W, H, levels, 0, pf_to_d3d(winner), D3DPOOL_MANAGED);
-    // hr < 0 -> 'create_texture: %s' 0xc87. A texture -> operator new(8) {texture, 0}, else 0;
-    // *OutHandle written either way; return hr.
+    // *OutHandle is written either way; the handle is operator new(8) {texture, 0}.
     IDirect3DTexture9* Texture = nullptr;
     const HRESULT Hr = Device_->CreateTexture((UINT)(Width), (UINT)(Height),
                                               Levels, 0,
@@ -4630,14 +4507,13 @@ GENRESULT DACOM_API FDirectX9::DestroyTexture(void* Handle)
         return GR_GENERIC;
     }
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
-    // FUN_06d0d997 RET 0x8: invalid handle/texture -> dump (text ends in '\n', PE bytes) and
-    // carry on; the stage-unbind loop runs only for a live texture; then release + delete.
+    // FUN_06d0d997: an invalid handle/texture is reported and teardown carries on; the
+    // stage-unbind loop runs only for a live texture.
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
         Rp9Fdump(kFdumpWarning, 0xc95, "WARNING", "destroy_texture: invalid texture\n");
     if (Wrapper != nullptr && Wrapper->Texture != nullptr)
         UnbindTextureHandle(Wrapper);
-    // 06d0dbdc: the handle's scalar deleting destructor -- texture set -> Release, 0 -- then
-    // operator delete (the handle comes from operator new(8)).
+    // The handle's scalar deleting destructor, then operator delete.
     if (Wrapper != nullptr)
     {
         if (Wrapper->Texture != nullptr)
@@ -4671,16 +4547,13 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
         Rp9Fdump(kFdumpWarning, 3244, "WARNING", "lock_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // FUN_06d0dce3 RET 0x10, traced line by line.
-    // 06d0dd51: handle == 0 -> -2.
+    // FUN_06d0dce3.
     if (Handle == nullptr)
         return (GENRESULT)(0xFFFFFFFE);
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
-    // 06d0dd67..06d0defe: get_desc (Level) failing -> -1.
     D3DSURFACE_DESC Desc;
     if (!TextureGetDesc(Wrapper, (UINT)(Level), &Desc))
         return GR_GENERIC;
-    // 06d0df06..06d0e054: get_subsurface; hr < 0 -> release (the surface pointer is null) and -1.
     IDirect3DSurface9* Surface = nullptr;
     HRESULT Hr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
     if (Hr < 0)
@@ -4692,15 +4565,13 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
         }
         return GR_GENERIC;
     }
-    // 06d0e059: LockRect (+0x24)(&Locked, NULL, USE_SYSLOCK ? 0 : NOSYSLOCK 0x800); hr < 0 ->
-    // 'lock_texture: %s' 0xcc8.
+    // USE_SYSLOCK ? 0 : D3DLOCK_NOSYSLOCK.
     const unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
     D3DLOCKED_RECT Locked;
     Hr = Surface->LockRect(&Locked, nullptr, LockFlags);
     if (Hr < 0)
         FdumpHr("lock_texture: %s", Hr, 3272);
-    // 06d0e134: written whatever the lock returned: +0x10 FUN_06d5cc30(desc.Format),
-    // +0 desc.Width, +4 desc.Height, +8 pitch, +0xc bits. Then release the surface, return hr.
+    // Out is written whatever the lock returned.
     Out[4] = PfIndex((unsigned int)(Desc.Format));
     Out[0] = Desc.Width;
     Out[1] = Desc.Height;
@@ -4720,8 +4591,7 @@ GENRESULT DACOM_API FDirectX9::UnlockTexture(void* A, int Level)
         Rp9Fdump(kFdumpWarning, 3286, "WARNING", "lock_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // FUN_06d0e1af RET 0xC: handle == 0 -> -2; get_subsurface (Level) failing -> -1; else
-    // hr = UnlockRect (+0x28); release the surface; return hr.
+    // FUN_06d0e1af.
     if (Handle == nullptr)
         return (GENRESULT)(0xFFFFFFFE);
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
@@ -4744,10 +4614,7 @@ GENRESULT DACOM_API FDirectX9::UnlockTexture(void* A, int Level)
 // RP8: FDirectX8::GetTextureFormat
 GENRESULT DACOM_API FDirectX9::GetTextureFormat(void* Handle, int* OutFormat)
 {
-    // FUN_06d0e3d9 (RET 0xC), traced line by line: no device -> 0xce9, -1; null handle -> -2
-    // without a dump; handle without a texture -> "get_texture_format: invalid texture\n" at
-    // 0xcf5, -1; dx8_texture.h get_desc of level 0 (TextureGetDesc) failing -> -1; else
-    // *OutFormat = FUN_06d5cc30(desc.Format) and 0.
+    // FUN_06d0e3d9. A null handle returns -2 without a dump.
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0xce9, "WARNING",
@@ -4821,9 +4688,8 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
                  "set_texture_level_data() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // FUN_06d0ea78 RET 0x28, traced line by line. The eighth argument is never read.
-    // 06d0eaf5: handle 0 or texture 0 -> dump 0xd23 (text via sprintf, leading space and the
-    // retail 'passsed' spelling, PE 06d67da0), -2.
+    // FUN_06d0ea78. The eighth argument is never read. The texts keep retail's leading space
+    // and 'passsed' spelling.
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
@@ -4831,24 +4697,21 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
                  " set_texture_level_data: invalid texture handle passsed");
         return (GENRESULT)(0xFFFFFFFE);
     }
-    // 06d0eb9b: *SrcFormat == 0 -> dump 0xd29 (PE 06d67e40), -2 (the pointer is not tested).
+    // The SrcFormat pointer is not tested.
     if (*SrcFormat == 0)
     {
         Rp9Fdump(kFdumpWarning, 3369, "WARNING",
                  " set_texture_level_data: invalid src format passed");
         return (GENRESULT)(0xFFFFFFFE);
     }
-    // 06d0ec36: stage-unbind loop for this handle.
     UnbindTextureHandle(Wrapper);
-    // 06d0ed0e: a non-zero level with TEXTURE_LOD (pipeline state id 2, +0x36c) off -> 0.
+    // A non-zero level with TEXTURE_LOD (pipeline state 2, +0x36c) off -> 0.
     if (Level != 0 && PipelineStateValue(2) == 0)
         return GR_OK;
-    // 06d0ed32: FUN_06d1b1c0 = get_desc of level 0 (its format result is never used); failure
-    // -> -1.
+    // FUN_06d1b1c0 = get_desc of level 0 (its format result is never used).
     D3DSURFACE_DESC Level0Desc;
     if (!TextureGetDesc(Wrapper, 0, &Level0Desc))
         return GR_GENERIC;
-    // 06d0ed92: get_subsurface (Level); failure -> release, -1.
     IDirect3DSurface9* Surface = nullptr;
     HRESULT Hr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
     if (Hr < 0)
@@ -4860,8 +4723,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
         }
         return GR_GENERIC;
     }
-    // 06d0eeeb: SrcRect = (0,0,SrcW,SrcH); filter D3DX_FILTER_NONE (1); surface GetDesc (+0x20);
-    // failure -> 'get_texture_dim: %s' 0xd5b, release, return hr.
+    // Retail reports a GetDesc failure here as 'get_texture_dim'.
     RECT SrcRect;
     SetRect(&SrcRect, 0, 0, SrcW, SrcH);
     DWORD Filter = D3DX_FILTER_NONE;
@@ -4874,10 +4736,10 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
         Surface = nullptr;
         return (GENRESULT)(Hr);
     }
-    // 06d0eff8: a size mismatch switches the filter to 4 (D3DX_FILTER_TRIANGLE).
+    // A size mismatch switches the filter to D3DX_FILTER_TRIANGLE.
     if (Desc.Width != (UINT)(SrcW) || Desc.Height != (UINT)(SrcH))
         Filter = D3DX_FILTER_TRIANGLE;
-    // 06d0f012: an RGB palette (3 bytes/entry) becomes 256 PALETTEENTRY with flags 0xff.
+    // An RGB palette (3 bytes/entry) becomes 256 PALETTEENTRY with flags 0xff.
     PALETTEENTRY PaletteEntries[256];
     const PALETTEENTRY* SrcPalette = nullptr;
     if (Palette != nullptr)
@@ -4892,9 +4754,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureLevelData(void* Handle, int Level, int 
             PaletteEntries[Index].peFlags = 0xFF;
         }
     }
-    // 06d0f0bc: D3DXLoadSurfaceFromMemory (FUN_06d2f6ee)(surface, NULL, NULL, Pixels,
-    // FUN_06d5cbb0(*SrcFormat), Pitch, palette, &SrcRect, filter, 0); hr < 0 ->
-    // 'set_texture_level_data: %s' 0xd7e. Release the surface, return hr.
+    // D3DXLoadSurfaceFromMemory (statically linked in retail: FUN_06d2f6ee).
     Hr = Rp9LoadSurfaceFromMemory(Surface, nullptr, nullptr, Pixels,
                                   (D3DFORMAT)(PfToD3d(*SrcFormat)), Pitch,
                                   SrcPalette, &SrcRect, Filter, 0);
@@ -4913,8 +4773,7 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
         Rp9Fdump(kFdumpWarning, 3463, "WARNING", "blit_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d0f22a / 06d0f2d0: each handle (or its texture) null -> the set_texture_level_data
-    // text (PE 06d68088 / 06d68128, same bytes) at 0xd8c / 0xd93, -2.
+    // A null handle (or texture) reports retail's set_texture_level_data text.
     FRp9TextureHandle* DstWrapper = (FRp9TextureHandle*)(DstHandle);
     if (DstWrapper == nullptr || DstWrapper->Texture == nullptr)
     {
@@ -4929,7 +4788,6 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
                  " set_texture_level_data: invalid texture handle passsed");
         return (GENRESULT)(0xFFFFFFFE);
     }
-    // 06d0f376: get_subsurface of the first (destination) handle; failure -> -1.
     IDirect3DSurface9* DstSurf = nullptr;
     HRESULT Hr = TextureGetSubSurface(DstWrapper, (UINT)(DstLevel), &DstSurf);
     if (Hr < 0)
@@ -4941,8 +4799,7 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
         }
         return GR_GENERIC;
     }
-    // 06d0f4ce: get_subsurface of the second (source) handle; failure -> FUN_06d167a0 on it,
-    // release the first, -1.
+    // A source failure releases both (FUN_06d167a0 on the source).
     IDirect3DSurface9* SrcSurf = nullptr;
     Hr = TextureGetSubSurface(SrcWrapper, (UINT)(SrcLevel), &SrcSurf);
     if (Hr < 0)
@@ -4956,8 +4813,7 @@ GENRESULT DACOM_API FDirectX9::BlitTexture(void* DstHandle, int DstLevel, void* 
         DstSurf = nullptr;
         return GR_GENERIC;
     }
-    // 06d0f62c: D3DXLoadSurfaceFromSurface (FUN_06d2fd77)(dst, NULL, NULL, src, NULL, NULL,
-    // D3DX_FILTER_POINT 2, 0); no text on failure; release both; return hr.
+    // D3DXLoadSurfaceFromSurface (FUN_06d2fd77); no text on failure.
     Hr = Rp9LoadSurfaceFromSurface(DstSurf, nullptr, nullptr, SrcSurf, nullptr, nullptr,
                                    D3DX_FILTER_POINT, 0);
     SrcSurf->Release();
@@ -5033,8 +4889,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageState(int Stage, int Type, int Val
         "set_texture_stage_state() called outside of create_buffers/destroy_buffers", 3640);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0fbcf 06d0fc40: entry {value, valid byte}; valid && value == Value -> nothing;
-    // else Device+0xfc SetTextureStageState, valid = (hr >= 0), valid -> value = Value; 0.
+    // FUN_06d0fbcf.
     FRp9TextureStageState& Cache = DeviceStates_.TextureStates[Stage][Type];
     if (Cache.bValid != 0 && Cache.Value == (unsigned long)Value)
         return GR_OK;
@@ -5052,9 +4907,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageState(int Stage, int Type, int* Ou
         "get_texture_stage_state() called outside of create_buffers/destroy_buffers", 3657);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0fcd5 06d0fd46: cache entry +0x1854 + stage*0xE8 + type*8 {value, valid byte};
-    // invalid -> Device+0xf8 GetTextureStageState(stage, type, &entry.value), valid = (hr >= 0),
-    // still invalid -> value 0; *Out = value (Out is not tested); 0.
+    // FUN_06d0fcd5 (cache entry +0x1854 + stage*0xE8 + type*8). Out is not tested.
     *Out = (int)DeviceStates_.ReadTextureStageState(Device_, (unsigned long)Stage,
                                                   (unsigned long)Type);
     return GR_OK;
@@ -5066,9 +4919,8 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTransform(int Stage, const float* 
         "set_texture_stage_transform() called outside of create_buffers/destroy_buffers", 3667);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0fdd2: M16 is not tested; transposed store into the 0x44 block
-    // +0x1FD4 + stage*0x44, +0x40 = 0, then the inlined FUN_06d17290 commit with
-    // type stage + D3DTS_TEXTURE0; returns 0.
+    // FUN_06d0fdd2 (block +0x1FD4 + stage*0x44). M16 is not tested; the inlined FUN_06d17290
+    // commits at once.
     FRp9TransformCache& Cache = DeviceStates_.TextureTransforms[(unsigned int)Stage];
     Cache.StoreTransposed(M16);
     Cache.Commit(Device_, (D3DTRANSFORMSTATETYPE)((unsigned long)Stage + D3DTS_TEXTURE0));
@@ -5081,7 +4933,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageTransform(int Stage, float* Out16)
         "get_texture_stage_transform() called outside of create_buffers/destroy_buffers", 3677);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0ff7d: Out16 is not tested; transposed read of the stage block; returns 0.
+    // FUN_06d0ff7d. Out16 is not tested.
     DeviceStates_.TextureTransforms[(unsigned int)Stage].LoadTransposed(Out16);
     return GR_OK;
 }
@@ -5092,10 +4944,8 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTexture(int Stage, void* Handle)
         "set_texture_stage_texture() called outside of create_buffers/destroy_buffers", 3687);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d100d3: [this+0x354] (pipeline-state slot 0) == 0 -> 0; stage entry
-    // +0x1F94 + stage*8 {handle, valid byte}: valid && handle == Handle -> 0; texture = 0,
-    // Handle != 0 -> (Handle->Texture == 0 -> dx8_texture.h(0x139) WARNING) texture =
-    // Handle->Texture; Device+0xf4 SetTexture(stage, texture); hr >= 0 -> entry = {Handle, 1}; 0.
+    // FUN_06d100d3 (stage entry +0x1F94 + stage*8). Nothing happens while pipeline state 0
+    // (TEXTURE) is off. A handle without a texture is reported and bound as null.
     if (PipelineStateValue(0) == 0)
         return GR_OK;
     FRp9TextureBinding& Cache = DeviceStates_.TextureBindings[(unsigned int)Stage];
@@ -5125,8 +4975,7 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageTexture(int Stage, void** Out)
         "get_texture_stage_texture() called outside of create_buffers/destroy_buffers", 3701);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d10247: result = 0; slot 0 set -> stage entry, invalid -> {0, valid 1};
-    // result = entry handle; *Out = result (Out is not tested); 0.
+    // FUN_06d10247. Out is not tested.
     void* Result = nullptr;
     if (PipelineStateValue(0) != 0)
     {
@@ -5188,7 +5037,7 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
 GENRESULT DACOM_API FDirectX9::DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
                                             unsigned int Count, void* /*Unused*/)
 {
-    // FUN_06d1067f RET 0x18. Device +0x120 DrawPrimitiveUP.
+    // FUN_06d1067f.
     const GENRESULT Ready = NeedBuffers(
         "draw_primitive() called outside of create_buffers/destroy_buffers", 3789);
     if (Ready != GR_OK)
@@ -5213,9 +5062,8 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(unsigned long Prim, unsign
                                                      const void* Indices, unsigned int IndexCount,
                                                      unsigned long Unused)
 {
-    // FUN_06d1097d RET 0x20 -- eight dwords, this plus seven arguments; the seventh is never
-    // read here but the callee pops it and Freelancer.exe 0x004217b6 / 0x00421973 push it.
-    // Device +0x124 DrawIndexedPrimitiveUP; minIndex=0, format=0x65.
+    // FUN_06d1097d: the seventh argument is never read, but the callee pops it and
+    // Freelancer.exe 0x004217b6 / 0x00421973 push it.
     (void)Unused;
     const GENRESULT Ready = NeedBuffers(
         "draw_indexed_primitive() called outside of create_buffers/destroy_buffers", 3819);
@@ -5240,7 +5088,7 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(unsigned long Prim, unsign
 GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
                                               unsigned int Count, void* /*Unused*/)
 {
-    // FUN_06d10c89 RET 0x18. Device +0x118 DrawPrimitive(prim, start, primCount).
+    // FUN_06d10c89.
     const GENRESULT Ready = NeedBuffers(
         "draw_primitive_vb() called outside of create_buffers/destroy_buffers", 3853);
     if (Ready != GR_OK)
@@ -5273,10 +5121,8 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* 
     if ((int)PrimCount <= 0)
         return (GENRESULT)Result;
 
-    // 06d10ee9..06d11032: FUN_06d1c660 on the scratch IB node +0x14C (start 0, bSysLock =
-    // [+0x128] bit1); success -> copy IndexCount*2 bytes, node.LockedBits = 0, Unlock (+0x30,
-    // result ignored), start index = the lock start. Failure -> "copy_indices: %s" at 0xf2f and
-    // return hr. No null tests on the source or the locked pointer.
+    // FUN_06d1c660 on the scratch IB node +0x14C (start 0); the Unlock result is ignored and the
+    // start index is the lock start. No null tests on the source or the locked pointer.
     FRp9Ib* Scratch = &ScratchIb_;
     void* LockedBits = nullptr;
     unsigned int LockOffset = 0;
@@ -5309,9 +5155,8 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* 
 // RP8: FDirectX8::AddLight
 GENRESULT DACOM_API FDirectX9::AddLight(void* Handle)
 {
-    // FUN_06d0ccb2 (RET 8): no device -> 0xb60, -1. Else FUN_06d2c487(this+0x21F4, Handle,
-    // Handle) -- the handle is the caller's D3DLIGHT8 and doubles as the record's data, so a new
-    // record is sent with SetLight at the next flush -- and 0.
+    // FUN_06d0ccb2: FUN_06d2c487(Handle, Handle) -- the handle is the caller's D3DLIGHT8 and
+    // doubles as the record's data, so a new record is sent with SetLight at the next flush.
     const GENRESULT Ready = NeedDeviceLifetime(
         "add_light() called outside of device lifetime", 0xb60);
     if (Ready != GR_OK)
@@ -5323,8 +5168,8 @@ GENRESULT DACOM_API FDirectX9::AddLight(void* Handle)
 // RP8: FDirectX8::RemoveLight
 GENRESULT DACOM_API FDirectX9::RemoveLight(void* Handle)
 {
-    // FUN_06d0cd32 (RET 8): no device -> 0xb6c, -1. Else vtable +0xA4 set_light_enable(Handle,
-    // 0) on this interface, the flush FUN_06d2d032(device), FUN_06d2c7cf(Handle); 0.
+    // FUN_06d0cd32: set_light_enable(Handle, 0) through the vtable, the flush FUN_06d2d032,
+    // FUN_06d2c7cf(Handle).
     const GENRESULT Ready = NeedDeviceLifetime(
         "remove_light() called outside of device lifetime", 0xb6c);
     if (Ready != GR_OK)
@@ -5337,9 +5182,7 @@ GENRESULT DACOM_API FDirectX9::RemoveLight(void* Handle)
 // RP8: FDirectX8::UpdateLight
 GENRESULT DACOM_API FDirectX9::UpdateLight(void* Handle)
 {
-    // FUN_06d0cddb (RET 8): no device -> 0xb7b, -1. Else FUN_06d2ca43(this+0x21F4, Handle) (the
-    // record's data is resent at the next flush) and 0. The key is the same handle the other
-    // light calls use.
+    // FUN_06d0cddb: FUN_06d2ca43 (the record's data is resent at the next flush).
     const GENRESULT Ready = NeedDeviceLifetime(
         "update_light() called outside of device lifetime", 0xb7b);
     if (Ready != GR_OK)
@@ -5354,8 +5197,8 @@ GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const float* M12)
         "set_world_n() called outside of device lifetime", 2681);
     if (Ready != GR_OK)
         return Ready;
-    // FUN_06d0af55 RET 0xC: unpack into the global DAT_06d70500 (a function-static here), then
-    // return SetTransform (+0x94)(index + 0x100, it) as is. The matrix pointer is not tested.
+    // FUN_06d0af55: unpack into the global DAT_06d70500 (a function-static here) and send at
+    // once. The matrix pointer is not tested.
     static float Scratch[16];
     Scratch[0] = M12[0];
     Scratch[4] = M12[1];
@@ -5382,16 +5225,12 @@ GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const float* M12)
 // RP8: FDirectX8::VbMgrReleaseAll
 GENRESULT DACOM_API FDirectX9::VbMgrReleaseAll()
 {
-    // FUN_06d1135d RET 0x4, this = object+4. 06d11363: this+0x134 (= object+0x138, the
-    // stream cache) = {0, 0, 0, -1, 0}.
+    // FUN_06d1135d (this = object+4).
     StreamCache_.Reset();
-    // 06d1139f..06d114ab: walk the pool map (this+0x16c = object+0x170, its head) in key
-    // order; every node value's VB is released (FUN_06d1bc60 inlined: Gpu set -> Locked ->
-    // 0 + Unlock, Release, 0). The nodes themselves stay.
+    // Every pool node's VB is released (FUN_06d1bc60 inlined); the nodes themselves stay.
     std::map<unsigned long, FRp9Vb>& Pool = VbPool_;
     for (std::map<unsigned long, FRp9Vb>::iterator It = Pool.begin(); It != Pool.end(); ++It)
         It->second.ReleaseGpu();
-    // 06d114b0: this+0x17c (= object+0x180, pool byte total) = 0; return 0.
     VbPoolBytes_ = 0;
     return GR_OK;
 }
@@ -5416,8 +5255,7 @@ GENRESULT DACOM_API FDirectX9::LockVertexMemory(unsigned int Fvf, unsigned int C
 // RP8: FDirectX8::UnlockVertexMemory
 GENRESULT DACOM_API FDirectX9::UnlockVertexMemory(FVertexMemoryLock* Out)
 {
-    // FUN_06d11877 RET 0x8 (06d11877..06d118b9): node = *Out (Out itself is not tested);
-    // node 0 -> 0xFFFFFFFE; else +0x10 = 0 and the result is Unlock's (+0x30) hr on +0x20.
+    // FUN_06d11877. Out itself is not tested.
     FRp9Vb* Wrapper = (FRp9Vb*)Out->Listing.VertexBuffer;
     if (Wrapper == nullptr)
         return (GENRESULT)0xFFFFFFFE;
@@ -5425,7 +5263,6 @@ GENRESULT DACOM_API FDirectX9::UnlockVertexMemory(FVertexMemoryLock* Out)
     return (GENRESULT)(Wrapper->Gpu->Unlock());
 }
 // RP8: FDirectX8::UnsupportedManagerOperation
-// formerly VbMgrSlot7
 GENRESULT DACOM_API FDirectX9::UnsupportedManagerOperation()
 {
     return (GENRESULT)0xFFFFFFF9;
@@ -5448,10 +5285,8 @@ namespace
         }
     }
 
-    // Mirrors FDirectX9::FvfStride's formula (verified identical against the same retail
-    // stride computation, inlined 3x in the decompile: case3, FUN_06d21450, FUN_06d2230f).
-    // Duplicated here (rather than calling the member function) so these free-function
-    // converters don't need an FDirectX9 instance.
+    // FDirectX9::FvfStride's formula (retail inlines it in case3, FUN_06d21450 and
+    // FUN_06d2230f), duplicated so the free-function converters need no FDirectX9 instance.
     unsigned int Rp9ComputeFvfStride(unsigned int Fvf)
     {
         unsigned int Stride = 0;
@@ -5473,8 +5308,7 @@ namespace
         return Stride;
     }
 
-    // FUN_06d1f5fd — confirmed trivial empty thunk in retail (listing 47246-47252, 5 bytes);
-    // a genuine intentional no-op jump-table target, not an unported stub.
+    // FUN_06d1f5fd: retail's empty no-op jump-table target.
     void ConvNoOp(unsigned char*, unsigned int, const FRpVertexSrcDesc*, unsigned int, unsigned int)
     {
     }
@@ -5519,7 +5353,7 @@ namespace
                                  unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d1f818 — dest stride 0x28; only pos+normal (0x18 bytes) populated, bytes
-        // [0x18,0x28) of every record are left untouched (matches retail exactly).
+        // [0x18,0x28) of every record are left untouched.
         const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
         const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x28u;
@@ -5752,8 +5586,8 @@ namespace
     void ConvIndexedGeneric(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                             unsigned int StartVertex, unsigned int Count)
     {
-        // FUN_06d21450 — family-B (indexed) generic FVF conversion fallback. 06d2145b: the
-        // message only goes into the static buffer DAT_06d70648 (sprintf, nothing prints it).
+        // FUN_06d21450 -- family-B (indexed) generic FVF conversion fallback. The message only
+        // goes into the static buffer DAT_06d70648; nothing prints it.
         sprintf(G_ConvIndexedMessage,
                 "VertexBufferManager: Using SLOOOW indexed copy. src_fmt=0x%x dst_fmt=0x%x\n",
                 Src->SrcFvf, DstFvf);
@@ -5836,8 +5670,8 @@ namespace
     void ConvSeqGeneric(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                         unsigned int StartVertex, unsigned int Count)
     {
-        // FUN_06d2230f — family-A (sequential) generic FVF conversion fallback. 06d2231a: the
-        // message only goes into the static buffer DAT_06d70548 (sprintf, nothing prints it).
+        // FUN_06d2230f -- family-A (sequential) generic FVF conversion fallback. The message only
+        // goes into the static buffer DAT_06d70548; nothing prints it.
         sprintf(G_ConvSeqMessage,
                 "VertexBufferManager: Using SLOOOW unindexed copy. src_fmt=0x%x dst_fmt=0x%x\n",
                 Src->SrcFvf, DstFvf);
@@ -5916,10 +5750,8 @@ namespace
         }
     }
 
-    // Retail's two 0x41-entry jump tables (data 0x06d6ba60 / 0x06d6b858), extracted byte-for-
-    // byte from the .txt listing (every 8-byte slot's first dword). Index 0x40 in each is a
-    // distinct fixed "3+ texcoords, non-direct" fallback slot IDA emitted as a standalone
-    // `addr` (not part of the byte-scanned array) — decoded the same way.
+    // Retail's two 0x41-entry jump tables (data 0x06d6ba60 / 0x06d6b858). Index 0x40 in each is
+    // the "3+ texcoords, non-direct" fallback slot.
     const RpVertexConvFn kFamilyASeqJumpTable[0x41] = {
         ConvSeqGeneric, ConvNoOp, ConvSeqGeneric, ConvNoOp,
         ConvSeqGeneric, ConvNoOp, ConvSeqGeneric, ConvNoOp,
@@ -5962,8 +5794,7 @@ namespace
 
     unsigned int Rp9FvfJumpIndex(unsigned int Fvf)
     {
-        // Retail's local_8 formula (identical in both case1 and case5, decomp 14463-14474 /
-        // 14574-14585).
+        // Retail's index formula (the same in switch cases 1 and 5).
         unsigned int TexBucket = (Fvf >> 8) & 3;
         unsigned int High = TexBucket << 4;
         if (TexBucket == 2)
@@ -5978,9 +5809,7 @@ namespace
         return 0x40u;
     }
 
-    // FUN_06d1f040 case 4's nested if/goto chain (decomp 14531-14572), flattened into an
-    // equivalent truth table by manual control-flow trace (every fallthrough/goto target
-    // walked by hand; see notes on FUN_06d1f040 in decomp-tracker for the full derivation).
+    // FUN_06d1f040 case 4's nested if/goto chain, flattened into an equivalent truth table.
     void DispatchFamilyBHardcoded(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                                   unsigned int StartVertex, unsigned int Count, unsigned int SrcFvf)
     {
@@ -6006,7 +5835,7 @@ namespace
         ConvIndexedGeneric(Dst, DstFvf, Src, StartVertex, Count);
     }
 
-    // FUN_06d1f040 case 0's nested if/goto chain (decomp 14442-14461), flattened the same way.
+    // FUN_06d1f040 case 0's nested if/goto chain, flattened the same way.
     void DispatchFamilyASeqHardcoded(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
                                      unsigned int StartVertex, unsigned int Count, unsigned int SrcFvf)
     {
@@ -6029,15 +5858,11 @@ GENRESULT DACOM_API FDirectX9::CopyVertexData(void* Destination, unsigned int Ds
                                            const FRpVertexSrcDesc* Src,
                                            unsigned int StartVertex, unsigned int Count)
 {
-    // Retail FUN_06d114c5 calls FUN_06d1f040(A, B, C, D, E) directly and always returns 0;
-    // FUN_06d1f040 is the real FVF (Flexible Vertex Format) mismatch-conversion dispatcher
-    // (decomp 14426-14591 / listing 46629-47244). See the namespace block above for the full
-    // sub-converter cluster (FUN_06d1f5fd, FUN_06d1f602..FUN_06d2230f) this now dispatches to.
+    // Retail FUN_06d114c5 calls FUN_06d1f040, the FVF mismatch-conversion dispatcher, and always
+    // returns 0.
     unsigned char* Dst = (unsigned char*)Destination;
 
-    // 06d1f048..06d1f06c: the selector is (Src->SrcFvf == DstFvf) | (Src->Flags & 6), read
-    // straight off the descriptor with no test of Dst, Src or Count (a zero Count reaches the
-    // converters, which then copy nothing).
+    // No test of Dst, Src or Count (a zero Count reaches the converters, which copy nothing).
     const unsigned int SrcFvf = Src->SrcFvf;
     const unsigned int Selector = (unsigned int)(SrcFvf == DstFvf) | (Src->Flags & 6u);
 
@@ -6054,8 +5879,7 @@ GENRESULT DACOM_API FDirectX9::CopyVertexData(void* Destination, unsigned int Ds
         break;
     case 3:
     {
-        // Direct/interleaved source, matching layout: byte-for-byte copy (already the proven
-        // fast path used elsewhere in this file, e.g. CopyVertices's memcpy fallback).
+        // Direct/interleaved source, matching layout: byte-for-byte copy.
         const unsigned int Stride = FvfStride(DstFvf);
         const unsigned char* SrcBuf = Src->Position.Base + StartVertex * Src->Position.Stride;
         std::memcpy(Dst + StartVertex * Stride, SrcBuf, (size_t)(Stride) * Count);
@@ -6071,10 +5895,8 @@ GENRESULT DACOM_API FDirectX9::CopyVertexData(void* Destination, unsigned int Ds
         ConvIndexedGeneric(Dst, DstFvf, Src, StartVertex, Count);
         break;
     default:
-        // case 6 (Flags&6==6, SrcFvf!=DstFvf): retail's switch has no case for this value —
-        // confirmed by re-reading the decompiled switch (decomp 14442-14589): control falls
-        // straight through to the function's final `return` with no work done. A genuine
-        // retail no-op, faithfully preserved (not a porting gap).
+        // case 6 (Flags&6 == 6, SrcFvf != DstFvf): retail's switch has no case for this value,
+        // so nothing is copied.
         break;
     }
     return GR_OK;
@@ -6084,7 +5906,7 @@ GENRESULT DACOM_API FDirectX9::CopyVertexData(void* Destination, unsigned int Ds
 GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
                                         unsigned int Flags)
 {
-    // FUN_06d12d4e RET 0x10 (sub = object+0xC).
+    // FUN_06d12d4e (sub = object+0xC).
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
@@ -6092,14 +5914,13 @@ GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
                  "create_index_buffer() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d12dca: usage = (flags&1 ? D3DUSAGE_DYNAMIC 0x200 : 0) | (flags&2 ? 0x10 : 0).
     unsigned long Usage = 0;
     if ((Flags & 1) != 0)
         Usage |= 0x200;
     if ((Flags & 2) != 0)
         Usage |= 0x10;
-    // 06d12dfa: operator new(0x1c); Flags = usage|8 (WRITEONLY); +4,+8,+0xc,+0x10,+0x18 = 0.
-    // +0x14 (Cursor) is not written here; ResizeIb below zeroes it before anyone reads it.
+    // operator new(0x1c). +0x14 (Cursor) is not written here; ResizeIb below zeroes it before
+    // anyone reads it.
     FRp9Ib* Wrapper = new FRp9Ib;
     Wrapper->Flags = Usage | 8;
     Wrapper->Gpu = nullptr;
@@ -6107,7 +5928,7 @@ GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
     Wrapper->Next = nullptr;
     Wrapper->Prev = nullptr;
     Wrapper->Capacity = 0;
-    // 06d12e86: append to the IB list (sub+0x22e4 = object+0x22F0).
+    // Append to the IB list (object+0x22F0).
     FRp9IbList* List = &IbList_;
     FRp9Ib* OldLast = List->Last;
     List->Last = Wrapper;
@@ -6118,37 +5939,34 @@ GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
     Wrapper->Next = nullptr;
     Wrapper->Prev = OldLast;
     List->Count += 1;
-    // 06d12f5b: hr = this->vtbl[0x14](node, count) = resize.
     const GENRESULT Hr = ResizeIb(Wrapper, Count);
     if ((HRESULT)Hr < 0)
         FdumpHr("create_ib: %s", (HRESULT)Hr, 4363);
-    // 06d12ff1: *Out = node even when resize failed (the node stays in the list).
+    // *Out = node even when resize failed (the node stays in the list).
     *Out = (unsigned int*)(Wrapper);
     return Hr;
 }
-// FUN_06d13002 RET 0x8 -- pointer to the caller's handle variable.
+// FUN_06d13002: Handle points at the caller's handle variable.
 // RP8: FDirectX8::DestroyIb
 GENRESULT DACOM_API FDirectX9::DestroyIb(void** Handle)
 {
     IDirect3DDevice9* Device = Device_;
-    // FUN_06d13002: CMP [this+0x124],0 -> FDUMP line 0x1114, -1.
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4372, "WARNING",
                  "destroy_index_buffer() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d13069: result = -1; *H == -1 -> return -1; node = *H; *H = 0; node == 0 -> -1.
+    // *H is cleared before the null test.
     if (*Handle == (void*)((intptr_t)-1))
         return GR_GENERIC;
     FRp9Ib* Wrapper = (FRp9Ib*)(*Handle);
     *Handle = nullptr;
     if (Wrapper == nullptr)
         return GR_GENERIC;
-    // 06d13097: node == [sub+0x134] (the selected IB) -> this->vtbl[0x24](0,0,0,0) = select_ib.
+    // The selected IB -> select_ib(0,0,0,0) through the vtable.
     if (Wrapper == StreamCache_.IndexBuffer)
         SelectIb(nullptr, 0, 0, 0);
-    // 06d130b9: unlink from the IB list (next +0xc, prev +0x10), count--.
     FRp9IbList* List = &IbList_;
     if (Wrapper->Prev == nullptr)
         List->First = Wrapper->Next;
@@ -6159,12 +5977,11 @@ GENRESULT DACOM_API FDirectX9::DestroyIb(void** Handle)
     else
         Wrapper->Next->Prev = Wrapper->Prev;
     List->Count -= 1;
-    // 06d1312b: release (unlock first if +8 is set), operator delete; result = 0.
     ReleaseIbGpu(Wrapper);
     delete Wrapper;
     return GR_OK;
 }
-// FUN_06d131b2 RET 0xC.
+// FUN_06d131b2.
 // RP8: FDirectX8::ResizeIb
 GENRESULT DACOM_API FDirectX9::ResizeIb(void* A, unsigned int Count)
 {
@@ -6175,15 +5992,10 @@ GENRESULT DACOM_API FDirectX9::ResizeIb(void* A, unsigned int Count)
         Rp9Fdump(kFdumpWarning, 4401, "WARNING", "resize() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d13220: node == -1 or 0 -> 0x80004005.
     if (Wrapper == nullptr || Wrapper == (FRp9Ib*)((intptr_t)-1))
         return (GENRESULT)0x80004005;
-    // 06d1325a: a live buffer of the same capacity (+0x18) -> 0.
     if (Wrapper->Gpu != nullptr && Count == Wrapper->Capacity)
         return GR_OK;
-    // 06d1327b / 06d133a2: release (unlock if +8), +0x18 = count, +0x14 = 0,
-    // CreateIndexBuffer(+0x60)(count*2, node Flags, D3DFMT_INDEX16 0x65, D3DPOOL_DEFAULT,
-    // &node->Gpu); hr < 0 -> dx8_index_buffer.h:0x31 text; return hr.
     ReleaseIbGpu(Wrapper);
     Wrapper->Capacity = Count;
     Wrapper->Cursor = 0;
@@ -6198,8 +6010,7 @@ GENRESULT DACOM_API FDirectX9::ResizeIb(void* A, unsigned int Count)
 GENRESULT DACOM_API FDirectX9::CopyIndices(void* Handle, unsigned int* OutOffset, const unsigned short* SrcData,
                                            unsigned int Count)
 {
-    // FUN_06d13847: Handle==-1 → wrapper = this+0x140 (inline scratch). Ring cursor when
-    // Flags&0x200; memcpy into lock; clear LockedBits; Unlock; write start index to OutOffset.
+    // FUN_06d13847. Handle -1 is the inline scratch IB.
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
@@ -6231,16 +6042,15 @@ GENRESULT DACOM_API FDirectX9::CopyIndices(void* Handle, unsigned int* OutOffset
 GENRESULT DACOM_API FDirectX9::LockIb(void* Handle, unsigned int* Offset, void** Out,
                                       unsigned int Count)
 {
-    // FUN_06d134ec: Handle==-1 → ADD ECX,0x140 (address of inline FRp8Ib @ object+0x14C).
+    // FUN_06d134ec. Handle -1 is the inline scratch IB (object+0x14C).
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4419, "WARNING", "lock_ib() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d1355a..06d1378b: node == 0 -> E_FAIL (no dump); start = Offset ? *Offset : 0; the
-    // body is FUN_06d1c660 inlined (LockIbRange, bSysLock = [this+0x11C] bit1, Out not tested);
-    // any failure, including Gpu == 0 and Count > Capacity, dumps "ib_lock: %s" at 0x115a.
+    // A null node -> E_FAIL with no dump. The body is FUN_06d1c660 inlined (Out not tested); any
+    // lock failure, including Gpu == 0 and Count > Capacity, dumps "ib_lock".
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
     if (Wrapper == nullptr)
         return (GENRESULT)0x80004005;
@@ -6256,15 +6066,14 @@ GENRESULT DACOM_API FDirectX9::LockIb(void* Handle, unsigned int* Offset, void**
 // RP8: FDirectX8::UnlockIb
 GENRESULT DACOM_API FDirectX9::UnlockIb(void* Handle)
 {
-    // FUN_06d13794: Handle==-1 → this+0x140; zero LockedBits; Gpu->Unlock.
+    // FUN_06d13794.
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4450, "WARNING", "unlock_ib() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d137f8: Handle == 0 -> E_FAIL; node->LockedBits = 0 and node->Gpu->Unlock (+0x30)
-    // with no Gpu test; returns the Unlock hr.
+    // No Gpu test.
     if (Handle == nullptr)
         return (GENRESULT)0x80004005;
     FRp9Ib* Wrapper = ResolveIbHandle(Handle);
@@ -6276,11 +6085,10 @@ GENRESULT DACOM_API FDirectX9::UnlockIb(void* Handle)
 GENRESULT DACOM_API FDirectX9::SelectIb(void* Handle, unsigned int BaseVertexIndex,
                                         unsigned int /*Unused3*/, unsigned int /*Unused4*/)
 {
-    // FUN_06d13bce RET 0x14. Handle==-1 → ADDRESS this+0x140 (inline scratch). Retail only
-    // marks the stream block (flags bit1); FUN_06d04138 calls SetIndices at the next draw.
-    // RP8 [IbThis+0x178] = DeviceReady_.
+    // FUN_06d13bce. Retail only marks the stream block; FUN_06d04138 calls SetIndices at the
+    // next draw. RP8 [IbThis+0x178] = DeviceReady_.
     const unsigned long Ready = DeviceReady_;
-    // 06d13bd7: MOV CL,byte [this+0x178]; AND 1 -- the device pointer is not read at all.
+    // The device pointer is not read at all.
     if ((Ready & 1) == 0)
     {
         Rp9Fdump(kFdumpWarning, 4520, "WARNING",
@@ -6317,7 +6125,7 @@ GENRESULT DACOM_API FDirectX9::SelectIb(void* Handle, unsigned int BaseVertexInd
     }
     return GR_OK;
 }
-// FUN_06d13d23 RET 0xC. Handle==-1 → ADDRESS this+0x140; write Capacity through out-param.
+// FUN_06d13d23.
 // RP8: FDirectX8::GetIbCapacity
 GENRESULT DACOM_API FDirectX9::GetIbCapacity(void* A, unsigned int* OutCapacity)
 {
@@ -6330,7 +6138,7 @@ GENRESULT DACOM_API FDirectX9::GetIbCapacity(void* A, unsigned int* OutCapacity)
 // RP8: FDirectX8::IsIbValid
 GENRESULT DACOM_API FDirectX9::IsIbValid(void* A)
 {
-    // FUN_06d13b69: null → 0; -1 → ADDRESS this+0x140; return 1 iff Gpu != null.
+    // FUN_06d13b69.
     if (A == nullptr)
         return GR_OK;
     FRp9Ib* Wrapper = ResolveIbHandle(A);
@@ -6349,9 +6157,8 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
         Rp9Fdump(kFdumpWarning, 4048, "WARNING", "create_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d11942: flags & 1 -> the pooled buffer for Fvf (06d11950..06d11bf7): find-or-insert in
-    // the pool map, the inlined grow (select_vb(0) only when it grew the selected node),
-    // FUN_06d1c770(+0x138, node, 0), hr = 0, *Out = node.
+    // flags & 1 -> the pooled buffer for Fvf: find-or-insert, the inlined grow (select_vb(0)
+    // only when it grew the selected node), FUN_06d1c770.
     if ((Flags & 1) != 0)
     {
         FRp9Vb* Wrapper = FindOrInsertPoolVb(Fvf);
@@ -6360,9 +6167,7 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
         *Out = (unsigned int*)(Wrapper);
         return GR_OK;
     }
-    // 06d11bfc: usage = (flags&2 ? 0x10 : 0); operator new(0x24); Flags = usage|8
-    // (WRITEONLY); +4,+8,+0xc,+0x10,+0x14,+0x18,+0x20 = 0 (+0x1c left as allocated; ResizeVb
-    // zeroes it before use).
+    // operator new(0x24); +0x1c is left as allocated (ResizeVb zeroes it before use).
     unsigned long Usage = 0;
     if ((Flags & 2) != 0)
         Usage |= 0x10;
@@ -6375,7 +6180,7 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
     Wrapper->Next = nullptr;
     Wrapper->Prev = nullptr;
     Wrapper->Gpu = nullptr;
-    // 06d11cbc: append to the VB list (sub+0x22d4 = object+0x22E4).
+    // Append to the VB list (object+0x22E4).
     FRp9VbList* List = &VbList_;
     FRp9Vb* OldLast = List->Last;
     List->Last = Wrapper;
@@ -6386,16 +6191,14 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
     Wrapper->Next = nullptr;
     Wrapper->Prev = OldLast;
     List->Count += 1;
-    // 06d11d94: hr = this->vtbl[0x14](node, fvf, count) = resize_vb (which always returns 0);
-    // hr >= 0 -> *Out = node. No hr text here.
+    // resize_vb always returns 0. No hr text here.
     const GENRESULT Hr = ResizeVb(Wrapper, Fvf, Count);
     if ((HRESULT)Hr >= 0)
         *Out = (unsigned int*)(Wrapper);
     return Hr;
 }
-// FUN_06d11db3. The argument is a pointer to the caller's handle variable: retail reads it,
-// clears it, and only then tears the buffer down. Taking the handle by value here is what let
-// alchemy's `CallDestroyVb(Vb, &G_VbHandle)` reach free() with the address of a global.
+// FUN_06d11db3. The argument points at the caller's handle variable: retail reads it, clears
+// it, and only then tears the buffer down.
 // RP8: FDirectX8::DestroyVb
 GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
 {
@@ -6405,21 +6208,19 @@ GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
         Rp9Fdump(kFdumpWarning, 4081, "WARNING", "destroy_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d11e1a: *H == -1 -> return 0 with the handle untouched.
+    // *H == -1 -> 0 with the handle untouched.
     if (*Handle == (void*)((intptr_t)-1))
         return GR_OK;
-    // 06d11e2d: node = *H; *H = 0; node == 0 -> 0.
     FRp9Vb* Wrapper = (FRp9Vb*)(*Handle);
     *Handle = nullptr;
     if (Wrapper == nullptr)
         return GR_OK;
-    // 06d11e48: a pool buffer (usage bit 0x200, create_vb flags&1) is not destroyed here.
+    // A pool buffer (usage bit 0x200, create_vb flags&1) is not destroyed here.
     if ((Wrapper->Flags & 0x200) != 0)
         return GR_OK;
-    // 06d11e64: node == [sub+0x12c] (the selected VB) -> this->vtbl[0x28](0) = select_vb.
+    // The selected VB -> select_vb(0) through the vtable.
     if (Wrapper == StreamCache_.VertexBuffer)
         SelectVb(nullptr);
-    // 06d11e80: unlink from the VB list (next +0x14, prev +0x18), count--.
     FRp9VbList* List = &VbList_;
     if (Wrapper->Prev == nullptr)
         List->First = Wrapper->Next;
@@ -6430,7 +6231,6 @@ GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
     else
         Wrapper->Next->Prev = Wrapper->Prev;
     List->Count -= 1;
-    // 06d11eec: release (Locked -> 0 + Unlock first), operator delete; return 0 (06d11f70).
     Wrapper->ReleaseGpu();
     delete Wrapper;
     return GR_OK;
@@ -6439,33 +6239,28 @@ GENRESULT DACOM_API FDirectX9::DestroyVb(void** Handle)
 GENRESULT DACOM_API FDirectX9::ResizeVb(void* Handle, unsigned int Fvf, unsigned int Count)
 {
     IDirect3DDevice9* Device = Device_;
-    // FUN_06d11f78: CMP [this+0x120],0 -> FDUMP line 0x1010 (retail's own "ressize_vb"
-    // spelling), OR EAX,-1.
+    // FUN_06d11f78. The text keeps retail's "ressize_vb" spelling.
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4112, "WARNING", "ressize_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d11fe6: node == -1 or 0 -> return 0 (06d12284 XOR EAX,EAX).
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == (FRp9Vb*)((intptr_t)-1) || Wrapper == nullptr)
         return GR_OK;
-    // 06d12016: release (Locked -> 0 + Unlock first); +4 fvf, +8 count, +0xc = 0, +0x1c = 0.
     Wrapper->ReleaseGpu();
     Wrapper->Fvf = Fvf;
     Wrapper->Count = Count;
     Wrapper->Used = 0;
     Wrapper->Field1C = 0;
-    // 06d1208f: stride of node->Fvf (inlined position/normal/diffuse/specular sum +
-    // FUN_06d16310 texcoords = FvfStride) * node->Count; CreateVertexBuffer(+0x5c)(bytes,
-    // node Flags, fvf argument, D3DPOOL_DEFAULT, &node->Gpu); hr < 0 -> 'create_vb: %s' 0x101b.
+    // FvfStride is inlined in retail.
     const unsigned int Stride = FvfStride(Wrapper->Fvf);
     const HRESULT Hr = Device->CreateVertexBuffer(
         Stride * Wrapper->Count, Wrapper->Flags,
         Fvf, D3DPOOL_DEFAULT, &Wrapper->Gpu, nullptr);
     if (Hr < 0)
         FdumpHr("create_vb: %s", Hr, 4123);
-    // 06d12268: node == [sub+0x12c] -> select_vb(0). The hr is not returned: always 0.
+    // The hr is not returned: always 0.
     if (Wrapper == StreamCache_.VertexBuffer)
         SelectVb(nullptr);
     return GR_OK;
@@ -6481,14 +6276,13 @@ GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffse
         Rp9Fdump(kFdumpWarning, 4136, "WARNING", "copy_vertices() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // FUN_06d1228c RET 0x18 (06d122f6..06d126b8): hr = -1; node 0 -> return it.
+    // FUN_06d1228c.
     HRESULT Hr = (HRESULT)0xFFFFFFFF;
     if (Wrapper == nullptr)
         return (GENRESULT)Hr;
 
-    // 06d12307: node -1 -> the pooled buffer for the source descriptor's FVF ([desc+0x68], read
-    // unguarded): find-or-insert, the grow (FUN_06d1b650 is the same release/refill/
-    // CreateVertexBuffer as the inlined one), FUN_06d1c770 on the stream cache.
+    // node -1 -> the pooled buffer for the source descriptor's FVF ([desc+0x68], read
+    // unguarded): find-or-insert, the grow (FUN_06d1b650), FUN_06d1c770 on the stream cache.
     if (Wrapper == (FRp9Vb*)((intptr_t)-1))
     {
         const unsigned int Fvf = Src->SrcFvf;
@@ -6497,8 +6291,7 @@ GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffse
         StreamCache_.SelectVertexStream(Wrapper, 0);
     }
 
-    // 06d124db: the caller's offset (0 without an out-pointer); the node's stride (inlined
-    // FvfStride). A node that is already locked (+0x10 holds its data pointer) is written in
+    // A node that is already locked (+0x10 holds its data pointer) is written in
     // place at stride * offset with hr 0; otherwise lock_vb (vtbl+0x1c) locks Count vertices and
     // updates the offset.
     unsigned int Offset = OutOffset != nullptr ? *OutOffset : 0;
@@ -6517,9 +6310,8 @@ GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffse
     if (Hr < 0)
         return (GENRESULT)Hr;
 
-    // 06d1264f: FUN_06d1f040(bits - stride * StartVertex, node Fvf, desc, StartVertex, Count)
-    // (the copier adds StartVertex back); a node locked here is unlocked again (+0x10 = 0,
-    // Unlock's hr is the result); the offset goes back to the caller.
+    // FUN_06d1f040 adds StartVertex back; a node locked here is unlocked again, Unlock's hr
+    // being the result.
     Bits -= Stride * StartVertex;
     CopyVertexData(Bits, Wrapper->Fvf, Src, StartVertex, Count);
     if (!bWasLocked)
@@ -6535,28 +6327,28 @@ GENRESULT DACOM_API FDirectX9::CopyVertices(void* Handle, unsigned int* OutOffse
 GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void** Out,
                                       unsigned int Count)
 {
-    // FUN_06d126bb RET 0x14, traced line by line.
+    // FUN_06d126bb.
     IDirect3DDevice9* Device = Device_;
     if (Device == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 4189, "WARNING", "lock_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d1272b: result = 0x80004005; node == 0 or -1 -> return it (no text).
+    // A null or -1 node returns E_FAIL with no text.
     HRESULT Hr = (HRESULT)0x80004005;
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
         return (GENRESULT)Hr;
-    // 06d1274c: the caller's offset is taken as a BYTE offset (it is not scaled); on success
-    // the vertex index is written back. 06d12763: USE_SYSLOCK = byte [sub+0x118] >> 1 & 1.
+    // The caller's offset is taken as a BYTE offset (it is not scaled); on success the vertex
+    // index is written back.
     unsigned int StartBytes = Offset != nullptr ? *Offset : 0;
-    // ([sub+0x118] = SwapFlags_.)
+    // RP8 [sub+0x118] = SwapFlags_.
     const bool bSysLock = ((SwapFlags_ >> 1) & 1) != 0;
     if (Wrapper->Gpu == nullptr)
         Hr = (HRESULT)0x80004005;
     else if (Wrapper->Count < Count)
     {
-        // 06d12795: [+8] < count (JNC skips) -> NOTICE dx8_vertex_buffer.h:0xa9.
+        // dx8_vertex_buffer.h line 0xa9.
         char Text[0x2000];
         _snprintf(Text, sizeof(Text),
                   "vertex buffer %x at %d verts too small to hold requested locked verts %d",
@@ -6568,14 +6360,12 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
     }
     else
     {
-        // 06d1283b: stride (FUN_06d162b0 + normal + FUN_06d163b0 + FUN_06d16310 = FvfStride);
-        // total = stride * [+8]; size = count * stride; flags = SYSLOCK ? 0 : NOSYSLOCK 0x800.
         const unsigned int Stride = FvfStride(Wrapper->Fvf);
         const unsigned int CapacityBytes = Stride * Wrapper->Count;
         const unsigned int RequestBytes = Count * Stride;
         unsigned long LockFlags = bSysLock ? 0ul : 0x800ul;
-        // 06d128ec: dynamic (usage 0x200): [+0xc] + size > total (JBE keeps) -> [+0xc] = 0,
-        // [+0x1c] = 0, DISCARD 0x2000, offset 0; else NOOVERWRITE 0x1000, offset = [+0xc].
+        // Dynamic (usage 0x200): a ring that restarts at 0 with DISCARD when full, else appends
+        // with NOOVERWRITE.
         if ((Wrapper->Flags & 0x200) != 0)
         {
             if (Wrapper->Used + RequestBytes > CapacityBytes)
@@ -6591,14 +6381,11 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
                 StartBytes = Wrapper->Used;
             }
         }
-        // 06d12993: Lock (+0x2c)(offset, size, &node+0x10, flags) -- the data pointer lands in
-        // +0x10, which doubles as the "locked" marker everywhere else.
+        // The data pointer lands in +0x10, which doubles as the "locked" marker everywhere else.
         Hr = Wrapper->Gpu->Lock(StartBytes, RequestBytes,
                                 (void**)(&Wrapper->Locked), LockFlags);
         if (Hr >= 0)
         {
-            // 06d129a5: [+0x1c] = offset / stride (DIV); *Offset = [+0x1c] if given;
-            // *Out = [+0x10] (always); [+0xc] = offset + size.
             Wrapper->Field1C = StartBytes / Stride;
             if (Offset != nullptr)
                 *Offset = Wrapper->Field1C;
@@ -6606,7 +6393,7 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
             Wrapper->Used = StartBytes + RequestBytes;
         }
     }
-    // 06d129f0: result < 0 -> 'vb_lock: %s' 0x1075 (also after the two early failures).
+    // Also reached by the two early failures.
     if (Hr < 0)
         FdumpHr("vb_lock: %s", Hr, 4213);
     return (GENRESULT)Hr;
@@ -6620,8 +6407,7 @@ GENRESULT DACOM_API FDirectX9::UnlockVb(void* Handle)
         Rp9Fdump(kFdumpWarning, 4222, "WARNING", "unlock_vb() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // FUN_06d12a8b RET 0x8: node == 0 or -1 -> 0x80004005; +0x10 = 0; return
-    // Gpu->Unlock (+0x30) -- the buffer pointer is not tested.
+    // FUN_06d12a8b. The buffer pointer is not tested.
     FRp9Vb* Wrapper = (FRp9Vb*)(Handle);
     if (Wrapper == nullptr || Wrapper == (FRp9Vb*)((INT_PTR)-1))
         return (GENRESULT)0x80004005;
@@ -6629,19 +6415,17 @@ GENRESULT DACOM_API FDirectX9::UnlockVb(void* Handle)
     return (GENRESULT)(Wrapper->Gpu->Unlock());
 }
 // RP8: FDirectX8::UnsupportedVertexBufferOperation
-// formerly VbSlot9
 GENRESULT DACOM_API FDirectX9::UnsupportedVertexBufferOperation(void* /*Handle*/)
 {
-    // FUN_06d12b30 RET 0x8: one explicit dword, unread, always "unsupported".
+    // FUN_06d12b30: one explicit dword, unread.
     return (GENRESULT)0xFFFFFFF9;
 }
 // RP8: FDirectX8::SelectVb
 GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
 {
-    // IRPVertexBuffer this = object+0x10. FUN_06d12b9d RET 0x8 (this, handle).
-    // RP8 [VbThis+0x174] = DeviceReady_.
+    // FUN_06d12b9d (IRPVertexBuffer this = object+0x10). RP8 [VbThis+0x174] = DeviceReady_.
     const unsigned long Ready = DeviceReady_;
-    // 06d12ba6: MOV CL,byte [this+0x174]; AND 1 -- the device pointer is not read at all.
+    // The device pointer is not read at all.
     if ((Ready & 1) == 0)
     {
         Rp9Fdump(kFdumpWarning, 4265, "WARNING",
@@ -6660,9 +6444,8 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
         return (GENRESULT)0x80004005;
     }
 
-    // 06d12c59..06d12cd3: -1 -> the node already in [+4]; a null node or one without Gpu
-    // (+0x20) -> E_FAIL; else the MarkStreamVb compare/stores and 0. The device is not called
-    // here -- FUN_06d04138 binds the stream at the next draw.
+    // -1 -> the node already selected. The device is not called here -- FUN_06d04138 binds the
+    // stream at the next draw.
     FRp9Vb* Wrapper = nullptr;
     if (Handle == (void*)((INT_PTR)-1))
         Wrapper = Cache.VertexBuffer;
@@ -6716,8 +6499,7 @@ GENRESULT DACOM_API FDirectX9::IsVbValid(void* A)
 // RP8: FDirectX8::SetGammaEnable
 GENRESULT DACOM_API FDirectX9::SetGammaEnable(unsigned char Enable)
 {
-    // FUN_06d1535d RET 8: [g+0x3ec]==0 || [g+0x3f0]==0 -> -3; else byte [g+0x170] =
-    // (byte & 0xfd) | ((Enable & 1) << 1); 0.
+    // FUN_06d1535d.
     if (Ability_[1] == 0 || Ability_[2] == 0)
         return (GENRESULT)(0xFFFFFFFD);
     DeviceReady_ = (DeviceReady_ & ~2ul) | ((unsigned long)(Enable & 1) << 1);
@@ -6726,7 +6508,7 @@ GENRESULT DACOM_API FDirectX9::SetGammaEnable(unsigned char Enable)
 // RP8: FDirectX8::GetGammaEnable
 GENRESULT DACOM_API FDirectX9::GetGammaEnable()
 {
-    // FUN_06d153a4 RET 4: same -3 gate; bit1 of byte [g+0x170] set -> 0, else OR EAX,-1.
+    // FUN_06d153a4.
     if (Ability_[1] == 0 || Ability_[2] == 0)
         return (GENRESULT)(0xFFFFFFFD);
     if (((DeviceReady_ >> 1) & 1) == 0)
@@ -6776,10 +6558,7 @@ GENRESULT DACOM_API FDirectX9::SetGammaFunction(unsigned int ChannelMask, float 
 // RP8: FDirectX8::SetGammaRamp
 GENRESULT DACOM_API FDirectX9::SetGammaRamp(unsigned int ChannelMask, const unsigned short* RampData)
 {
-    // FUN_06d1560c RET 0xc (g = this+0x14): [g+0x194] (AdapterIndex_) == -1 -> FDUMP line
-    // 0x12fc, OR EAX,-1; [g+0x3ec] == 0 -> -3; Mask != 7 -> Device->GetGammaRamp(+0x4c)(&ramp);
-    // Mask & 1/2/4 -> REP MOVSD 0x80 dwords from RampData into red/green/blue (the same source
-    // for each); Device->SetGammaRamp(+0x48)(bit1 of byte [g+0x170], &ramp); XOR EAX,EAX.
+    // FUN_06d1560c. Every selected channel gets the same source ramp.
     if (AdapterIndex_ == 0xFFFFFFFF)
     {
         Rp9Fdump(kFdumpWarning, 4860, "WARNING",
@@ -6804,10 +6583,7 @@ GENRESULT DACOM_API FDirectX9::SetGammaRamp(unsigned int ChannelMask, const unsi
 // RP8: FDirectX8::GetGammaRamp
 GENRESULT DACOM_API FDirectX9::GetGammaRamp(unsigned int Channel, unsigned short* OutRamp)
 {
-    // FUN_06d15757 RET 0xc (g = this+0x14): [g+0x194] (AdapterIndex_) == -1 -> FDUMP line
-    // 0x1324, OR EAX,-1; [g+0x3ec] == 0 -> -3; Device->GetGammaRamp(+0x4c); Channel 1/2/4 ->
-    // REP MOVSD 0x80 dwords of red/green/blue into OutRamp, 0; else FDUMP line 0x1334
-    // ("...request\n"), OR EAX,-1.
+    // FUN_06d15757.
     if (AdapterIndex_ == 0xFFFFFFFF)
     {
         Rp9Fdump(kFdumpWarning, 4900, "WARNING",
@@ -6835,12 +6611,12 @@ GENRESULT DACOM_API FDirectX9::GetGammaRamp(unsigned int Channel, unsigned short
 // RP8: FDirectX8::PrintScreen
 GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* FileName)
 {
-    // FUN_06d13d70 (interface this = object+0x18, RET 0xc), traced line by line.
+    // FUN_06d13d70 (interface this = object+0x18).
     const GENRESULT Ready = NeedBuffers(
         "print_screen() called outside of create_buffers/destroy_buffers", 4579);
     if (Ready != GR_OK)
         return Ready;
-    // 06d13de8 / 06d13e47: both argument failures return -2.
+    // Both argument failures return -2.
     if (ParentFileSystem != nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x11e7, "WARNING", "IFilesystem parent not yet supported");
@@ -6851,10 +6627,7 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         Rp9Fdump(kFdumpWarning, 0x11ec, "WARNING", "filename not specified");
         return GR_INVALID_PARMS;
     }
-    // 06d13eb5..06d14093: the extension from strrchr('.') is matched with _stricmp against the
-    // table {".BMP" 0, ".JPG" 1, ".TGA" 2, ".PNG" 3, ".DDS" 4, ".PPM" 5, ".DIB" 6} (PE
-    // 06d6a0e8..06d6a118; the ids are D3DXIMAGE_FILEFORMAT). No '.' -> dump at 0x11f4, no
-    // match -> dump at 0x1214, both -1.
+    // The extension table is PE 06d6a0e8..06d6a118; the ids are D3DXIMAGE_FILEFORMAT.
     char Text[0x2000];
     const char* Extension = strrchr(FileName, '.');
     if (Extension == nullptr || *Extension == '\0')
@@ -6885,8 +6658,6 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         Rp9Fdump(kFdumpWarning, 0x1214, "WARNING", Text);
         return GR_GENERIC;
     }
-    // 06d14093: D3d_ (+0x20) GetAdapterDisplayMode(AdapterIndex_, &mode); failure -> dump at
-    // 0x121d and return hr.
     D3DDISPLAYMODE Mode;
     HRESULT Hr = D3d_->GetAdapterDisplayMode(AdapterIndex_, &Mode);
     if (Hr < 0)
@@ -6894,9 +6665,6 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         FdumpHr("print_screen_get_display_mode: %s", Hr, 0x121d);
         return (GENRESULT)(Hr);
     }
-    // 06d14154: Device_ (+0x6c) CreateImageSurface(mode w, mode h, A8R8G8B8 0x15, &surf);
-    // (+0x78) GetFrontBuffer(surf); each failure dumps (0x1224 / 0x1227), releases surf when
-    // set, returns hr.
     // D3D9: CreateImageSurface -> CreateOffscreenPlainSurface(D3DPOOL_SYSTEMMEM);
     // GetFrontBuffer(surf) -> GetFrontBufferData(swap chain 0, surf). Both want an A8R8G8B8
     // system-memory surface of the display-mode size, as in D3D8.
@@ -6924,7 +6692,7 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
         }
         return (GENRESULT)(Hr);
     }
-    // 06d1433d: byte [+0x25D] == 0 (windowed) -> the source rect is the window's client area in
+    // Byte [+0x25D] == 0 (windowed) -> the source rect is the window's client area in
     // screen coordinates: SetRect from the mode size (+0x240/+0x244) with Hwnd_, or from
     // WindowX/Y/W/H with WindowOverride_ when that is set; then GetClientRect overwrites it and
     // MapWindowPoints(hwnd, 0, rect, 2) maps it. Fullscreen passes no rect.
@@ -6988,9 +6756,8 @@ namespace
         Desc->FindHandle = 0xFFFFFFFF;
     }
 
-    // The file mapping load_texture (06d14972..06d14ab5, 06d14cb1..06d14d58) and load_cubemap
-    // (06d14e8c..06d14fcf, 06d151ca..06d1526f) open around the D3DX decode; the two bodies
-    // are the same instruction sequence.
+    // The file mapping load_texture and load_cubemap open around the D3DX decode (the same
+    // inlined sequence in both).
     struct FRp9TextureFileMap
     {
         IFileSystem* FileSystem;
@@ -7000,9 +6767,8 @@ namespace
         int View;
     };
 
-    // Handle = -1, Size = 0, View = 0, hr = -1; +0x7C OpenByDesc -> -1 gives -8; else +0x28
-    // GetSize(handle, 0) and +0x3C (handle, 0, 2, 0, 0, 0) -> -1 gives -6; else +0x40
-    // (mapping, 4, 0, 0, 0) and a non-zero view gives 0 (a zero view keeps -1).
+    // -8 when the open fails, -6 when the mapping fails, 0 for a non-zero view (a zero view
+    // keeps -1).
     HRESULT OpenTextureFileMap(FRp9TextureFileMap* Map, const char* Name)
     {
         Map->Handle = -1;
@@ -7024,8 +6790,6 @@ namespace
         return Hr;
     }
 
-    // Handle != -1: mapping != -1 -> (view != 0 -> +0x44 unmap(view), view = 0) and +0x10
-    // close(mapping); then +0x10 close(handle) and handle = -1.
     void CloseTextureFileMap(FRp9TextureFileMap* Map)
     {
         if (Map->Handle == -1)
@@ -7043,8 +6807,7 @@ namespace
         Map->Handle = -1;
     }
 
-    // hr == -6 only: FUN_06d168f0 (sprintf) of Format with the FileSystem pointer (%x) and the
-    // name, "<null>" for a null name, into the 0x2000-byte buffer, then FDUMP at Line.
+    // Only for hr == -6; "<null>" stands in for a null name.
     void FdumpTextureMapping(const char* Format, IFileSystem* FileSystem, const char* Name, int Line)
     {
         char Text[0x2000];
@@ -7061,14 +6824,14 @@ namespace
 GENRESULT DACOM_API FDirectX9::LoadTexture(IFileSystem* FileSystem, const char* FileName,
                                            void** OutHandle)
 {
-    // FUN_06d148d4 (interface this = object+0x18, RET 0x10), traced line by line.
+    // FUN_06d148d4 (interface this = object+0x18).
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1265, "WARNING", "load_texture() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d14942: a smart pointer holds FileSystem (+0x04 AddRef when non-null); it is released
-    // (+0x08) at 06d14d5f on every path below. There is no null check before the +0x7C call.
+    // A smart pointer holds FileSystem for the whole call. There is no null check before
+    // OpenByDesc.
     FRp9TextureFileMap Map;
     Map.FileSystem = FileSystem;
     if (FileSystem != nullptr)
@@ -7076,17 +6839,15 @@ GENRESULT DACOM_API FDirectX9::LoadTexture(IFileSystem* FileSystem, const char* 
     HRESULT Hr = OpenTextureFileMap(&Map, FileName);
     if (Hr < 0)
     {
-        // 06d14ac8: only the mapping failure is reported.
+        // Only the mapping failure is reported.
         if (Hr == (HRESULT)(-6))
             FdumpTextureMapping("load_texture: couldnt create file mapping %x %s", FileSystem,
                                 FileName, 0x1271);
     }
     else
     {
-        // 06d14b76: FUN_06d308fa = D3DXCreateTextureFromFileInMemory of the statically linked
-        // D3DX 8.1 (the same 22 instructions as _D3DXCreateTextureFromFileInMemory@16 in
-        // dx8\lib\d3dx8.lib, which RP8 links) on (device, view, size, &texture). RP9 calls the
-        // D3DX9 function of the same name and arguments.
+        // FUN_06d308fa = the statically linked D3DX 8.1 D3DXCreateTextureFromFileInMemory. RP9
+        // calls the D3DX9 function of the same name and arguments.
         IDirect3DTexture9* Texture = nullptr;
         Hr = Rp9CreateTextureFromFileInMemory(Device_,
                                               (const void*)(
@@ -7096,8 +6857,7 @@ GENRESULT DACOM_API FDirectX9::LoadTexture(IFileSystem* FileSystem, const char* 
             FdumpHr("load_texture: %s", Hr, 0x1278);
         if (Hr >= 0)
         {
-            // 06d14c32: operator new(8) {texture, 0} when the texture is non-null, else a null
-            // handle; *OutHandle is written either way.
+            // *OutHandle is written either way.
             FRp9TextureHandle* Handle = nullptr;
             if (Texture != nullptr)
             {
@@ -7117,27 +6877,23 @@ GENRESULT DACOM_API FDirectX9::LoadTexture(IFileSystem* FileSystem, const char* 
 GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned int SrcSize,
                                                const void* SrcData)
 {
-    // FUN_06d1455e (interface this = object+0x18, RET 0x14), traced line by line.
+    // FUN_06d1455e (interface this = object+0x18).
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1242, "WARNING",
                  "load_surface_from_file() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d145cc: a null handle or a handle without a texture -> dump at 0x1249, -2.
     FRp9TextureHandle* Wrapper = (FRp9TextureHandle*)(Handle);
     if (Wrapper == nullptr || Wrapper->Texture == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1249, "WARNING", "load_tga_surface_data: invalid texture\n");
         return (GENRESULT)(0xFFFFFFFE);
     }
-    // 06d14644..06d1476a: dx8_texture.h get_subsurface (hr E_FAIL; 2D -> GetSurfaceLevel(Level);
-    // cube -> GetCubeMapSurface(Level, 0); failure dumped at dx8_texture.h 0xab).
     IDirect3DSurface9* Surface = nullptr;
     const HRESULT SubHr = TextureGetSubSurface(Wrapper, (UINT)(Level), &Surface);
     if (SubHr < 0)
     {
-        // 06d1477f: dump at 0x1250, release the surface when set, -2.
         Rp9Fdump(kFdumpWarning, 0x1250, "WARNING",
                  "load_tga_surface_data: invalid sub surface specified\n");
         if (Surface != nullptr)
@@ -7147,10 +6903,7 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
         }
         return (GENRESULT)(0xFFFFFFFE);
     }
-    // 06d147f6: FUN_06d2fcbf = D3DXLoadSurfaceFromFileInMemory of the statically linked D3DX
-    // 8.1 (surface, no palette, no dest rect, SrcData = param_5, SrcSize = param_4, no src
-    // rect, filter 1 = D3DX_FILTER_NONE, colour key 0, no info); failure -> "load_surface_data:
-    // %s" at 0x125e. The surface is released and hr returned either way.
+    // FUN_06d2fcbf = the statically linked D3DX 8.1 D3DXLoadSurfaceFromFileInMemory.
     const HRESULT Hr = Rp9LoadSurfaceFromFileInMemory(Surface, nullptr, nullptr, SrcData, SrcSize,
                                                       nullptr, D3DX_FILTER_NONE, 0, nullptr);
     if (Hr < 0)
@@ -7166,10 +6919,8 @@ GENRESULT DACOM_API FDirectX9::LoadSurfaceData(void* Handle, int Level, unsigned
 GENRESULT DACOM_API FDirectX9::GetImageInfo(_D3DXIMAGE_INFO* Info, unsigned int SrcSize,
                                             const void* SrcData)
 {
-    // FUN_06d152e4 (interface this = object+0x18, RET 0x10): no device -> the load_texture
-    // text at 0x12ac and -1; else FUN_06d2f6b6(param_4, param_3, param_2), which is
-    // D3DXGetImageInfoFromFileInMemory of the statically linked D3DX 8.1 (instruction for
-    // instruction _D3DXGetImageInfoFromFileInMemory@12 in dx8\lib\d3dx8.lib).
+    // FUN_06d152e4 (interface this = object+0x18): FUN_06d2f6b6 = the statically linked D3DX
+    // 8.1 D3DXGetImageInfoFromFileInMemory. Without a device it reports the load_texture text.
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x12ac, "WARNING", "load_texture() called outside of device lifetime");
@@ -7181,15 +6932,14 @@ GENRESULT DACOM_API FDirectX9::GetImageInfo(_D3DXIMAGE_INFO* Info, unsigned int 
 GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* FileName,
                                            void** OutHandle)
 {
-    // FUN_06d14dd7 (interface this = object+0x18, RET 0x10): load_texture's body with the
+    // FUN_06d14dd7 (interface this = object+0x18): load_texture's body with the
     // cube-map ability gate, its own texts/lines, the cube D3DX entry and handle tag 1.
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 0x1286, "WARNING", "load_cubemap() called outside of device lifetime");
         return GR_GENERIC;
     }
-    // 06d14e45: hr = -7; [this+0x404] (object+0x41C, TEXTURE_CUBEMAPS) == 0 -> return -7 before
-    // the FileSystem is touched.
+    // TEXTURE_CUBEMAPS (object+0x41C) off -> -7 before the FileSystem is touched.
     HRESULT Hr = (HRESULT)(-7);
     if (Ability_[8] == 0)
         return (GENRESULT)(Hr);
@@ -7200,16 +6950,14 @@ GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* 
     Hr = OpenTextureFileMap(&Map, FileName);
     if (Hr < 0)
     {
-        // 06d14fcf..06d1508b: the retail text for the cube path is spelled "maopping".
+        // The retail text for the cube path is spelled "maopping".
         if (Hr == (HRESULT)(-6))
             FdumpTextureMapping("load_texture: couldnt create file maopping %x %s", FileSystem,
                                 FileName, 0x1296);
     }
     else
     {
-        // 06d15090: FUN_06d3092a = D3DXCreateCubeTextureFromFileInMemory of the statically
-        // linked D3DX 8.1 (instruction for instruction the library's
-        // _D3DXCreateCubeTextureFromFileInMemory@16); failure -> "load_texture: %s" at 0x129d.
+        // FUN_06d3092a = the statically linked D3DX 8.1 D3DXCreateCubeTextureFromFileInMemory.
         IDirect3DCubeTexture9* CubeTexture = nullptr;
         Hr = Rp9CreateCubeTextureFromFileInMemory(Device_,
                                                   (const void*)(
@@ -7219,7 +6967,7 @@ GENRESULT DACOM_API FDirectX9::LoadCubemap(IFileSystem* FileSystem, const char* 
             FdumpHr("load_texture: %s", Hr, 0x129d);
         if (Hr >= 0)
         {
-            // 06d15145: operator new(8) {cube texture, 1} when non-null, else a null handle.
+            // Handle tag 1 marks a cube texture.
             FRp9TextureHandle* Handle = nullptr;
             if (CubeTexture != nullptr)
             {

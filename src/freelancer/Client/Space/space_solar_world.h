@@ -8,9 +8,8 @@
 
 #include "common_ini.h"
 
-// Retail FUN_00548a20 — system INI [Object] → real CSolar in client IObjDB.
-// Sole become-real path for system objects (FSpaceSceneObject proxies removed).
-// Runs during LoadSpaceSceneSlice (connect), before any BeginScene.
+// FUN_00548a20 -- a system INI [Object] section becomes a CSolar in the client IObjDB.
+// Runs during the connect, before any BeginScene.
 
 // Returns true when a FClientSolarGameobj was created, inited, and linked.
 bool SpawnWorldSolarFromObjectSection(INI_Reader& Reader);

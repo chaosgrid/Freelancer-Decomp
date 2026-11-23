@@ -53,9 +53,7 @@ class RichTextWin;
 class MissionObjectiveWindow : public WinControl
 {
 public:
-    // Inlined into FUN_004bd170 (0x004bd1a8..0x004bd1e6): WinControl ctor, the vptrs,
-    // DAT_00672400 = this, +0x32c = 0, +0x331 = 1, +0x332 = 0xff, +0x334 = 2.5f, +0x330 = 0,
-    // +0x338 = 0.
+    // Inlined into FUN_004bd170 (0x004bd1a8).
     MissionObjectiveWindow();
     // FUN_004bb1e0
     ~MissionObjectiveWindow() override;
@@ -112,8 +110,7 @@ static_assert(sizeof(void*) != 4 || offsetof(MissionObjectiveWindow, Text) == 0x
 class NeuroNetStoryStar : public WinControl
 {
 public:
-    // Inlined into FUN_004bd030 (0x004bd068..0x004bd09b): WinControl ctor, the vptrs,
-    // DAT_006723fc = this, +0x338 = 0, +0x37c = 1, +0x36c = 0, +0x374 = 0, +0x38c = 0.
+    // Inlined into FUN_004bd030 (0x004bd068).
     NeuroNetStoryStar();
     // FUN_004bb780
     ~NeuroNetStoryStar() override;
@@ -137,7 +134,7 @@ public:
     // FUN_004bc830 -- "Load Autosave": reload the auto-save character.
     void LoadAutosave();
 
-    int Field_0x32c;                // +0x32c -- TODO: never written or read by this class
+    int Field_0x32c;                // +0x32c -- never written or read by this class
     WinControl* CloseButton;        // +0x330 "StoryStarCloseButton"
     RichTextWin* HistoryText;       // +0x334 "StoryStarHistoryText"
     int HistoryShownCount;          // +0x338 -- DAT_00672338 when the text was built
@@ -195,8 +192,7 @@ static_assert(sizeof(void*) != 4 || offsetof(NeuroNetStoryStar, bPausedGame) == 
 class MissionLogMoveToNNWindow : public WinControl, public ButtonMover
 {
 public:
-    // Inlined into FUN_004bd2c0 (0x004bd2f9..0x004bd31f): WinControl ctor, ButtonMover ctor
-    // FUN_0055dec0 at +0x32c, the vptrs.
+    // Inlined into FUN_004bd2c0 (0x004bd2f9), with the ButtonMover ctor FUN_0055dec0.
     MissionLogMoveToNNWindow();
     // FUN_004bd510 -- the mover's list freed, then the WinControl dtor.
     ~MissionLogMoveToNNWindow() override;
@@ -219,7 +215,7 @@ private:
 class MissionLogMoveFromNNWindow : public MissionLogMoveToNNWindow
 {
 public:
-    // Inlined into FUN_004bd3f0 (0x004bd429..0x004bd44f).
+    // Inlined into FUN_004bd3f0 (0x004bd429).
     MissionLogMoveFromNNWindow();
 
     // slot 9 FUN_004bceb0 (RET 8)

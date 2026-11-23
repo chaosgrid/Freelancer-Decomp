@@ -10,7 +10,7 @@
 // Builds merged CPU vertex (16-byte: XYZ + tag) and 16-bit index buffers per engine
 // instance hierarchy for wireframe/damage-hide consumers.
 //
-// Retail callers: FUN_004e64f3 ( sole Build site at this+0x3a0 ).
+// The sole Build site is HUD_Target_Base (this+0x3a0).
 
 #include "x86math.h"
 
@@ -96,14 +96,9 @@ void PartCacheClearHiddenActive(FPartCache* Cache);
 // Returns true if the instance was found in the cache.
 bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChildren, unsigned Tag);
 
-// FUN_00406510 (thiscall on the cache, RET 8) — draw the active parts as one line list: render
-// states DAT_005c7608 (lighting, specular, alpha blend off), stage 0 untextured, DAT_005c7628
-// (colour vertex on, diffuse from colour 1); with any vertices, lock TotalVertices of FVF 0x42
-// in the VB manager and, per active part, append its indices rebased by the running vertex count
-// into MergedIndices and copy its XYZ + tag vertices; texture stage 0 from DAT_005c7650;
-// modelview = Camera view (slot 0x40) * Xform when pipeline state 7 is set, else world Xform and
-// view; DrawIndexedPrimitiveVb(D3DPT_LINELIST); finally DAT_005c7640 (colour vertex off).
-// Caller: HUD_Target's target view 0x004e3e9c (the view camera +0x3b8, the object's transform).
+// FUN_00406510 (thiscall on the cache, RET 8) — draw the active parts as one line list (FVF
+// 0x42, XYZ + diffuse tag), untextured and unlit. Caller: HUD_Target's target view (the view
+// camera +0x3b8, the object's transform).
 struct ICamera;
 void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform);
 
@@ -113,14 +108,13 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform);
 typedef std::map<void*, int> FRendererLodMap;
 
 // FUN_00402580 (cdecl Instance, PreferredLod, Saved). Instance -1 returns 0. Otherwise: when
-// Saved is given, record IRenderer2 Slot9 (current LOD) of Instance, clamp PreferredLod to
-// [.., LodCount-1] and set it (Slot8 / Slot10); then for every GetRelatedInstance(Instance, 0)
-// child the same, except the child's clamp is LodCount (max index + 1). Returns the largest
-// max LOD index seen (0 when none is positive). Callers: HUD_Target_Base 0x004e64c1 (with a
-// map) and 0x00539a1e.
+// Saved is given, record the current LOD of Instance, clamp PreferredLod to [.., LodCount-1]
+// and set it; then every child the same, except the child's clamp is LodCount (max index + 1).
+// Returns the largest max LOD index seen (0 when none is positive). Callers: HUD_Target_Base
+// (with a map) and one site at 0x00539a1e.
 int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved);
 
 // FUN_00402720 (cdecl UnusedInstance, Saved) -- replay every saved (instance, LOD) pair through
-// IRenderer2 Slot8 (LOD count) + Slot10 (set LOD), the LOD clamped to LodCount - 1. The first
-// argument is pushed by the caller (0x004e64fe) but never read.
+// IRenderer2, the LOD clamped to LodCount - 1. The first argument is pushed by the caller but
+// never read.
 void ApplyRendererDetailQueue(void* UnusedInstance, FRendererLodMap const* Saved);

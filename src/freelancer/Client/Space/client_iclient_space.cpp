@@ -4,14 +4,13 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// IClientImpl slots of retail IClientS.cpp (.text:0053aaa0..0053e4a0; the FDUMP path string is
-// .rdata:005dec60) -- the space side of the server's IClient calls. See freelancer_client.h for
-// the split with client_iclient.cpp. Every slot's retail body is quoted by address.
+// IClientImpl slots of retail IClientS.cpp (.text:0053aaa0..0053e4a0) -- the space side of the
+// server's IClient calls. See freelancer_client.h for the split with client_iclient.cpp.
 //
 // The gameobj a slot works on is FUN_005416c0 (ClientObjDb_FindObject); its IObjAffect is the
-// sub-object at +4 (`LEA ECX,[EAX+4]; CALL [vt+N]`), i.e. a plain call through FClientGameobj.
-// "Narrowed to M" is retail's inline `(Object->ObjectClass & M) == M ? Object : 0`, used with no
-// null test after it wherever retail has none.
+// sub-object at +4, i.e. a plain call through FClientGameobj. "Narrowed to M" is retail's
+// inline `(Object->ObjectClass & M) == M ? Object : 0`, used with no null test after it
+// wherever retail has none.
 
 #include "freelancer_client.h"
 
@@ -72,11 +71,8 @@ namespace
     // .rdata 0x005dec60 -- IClientS.cpp's path string.
     char const kIClientSCpp[] = "E:\\FL\\Scratch\\Source\\Client\\space\\IClientS.cpp";
 
-    // DAT_006789f8 -- IClientS.cpp's 3DMathEngine, FUN_005b73e0 on first use. Raw scan: 12
-    // test+fill pairs -- 0x0053ae6b / 0x0053b47e (the unported multiplayer CSolar / CShip builds),
-    // 0x0053ba99 (loot), 0x0053cbb5 / 0x0053cec1 (mine / counter, multiplayer arm), 0x0053d1ca /
-    // 0x0053d371 (guided), 0x0053d6a8 / 0x0053d6e2 (system switch-in, one per arm), 0x0053d816 /
-    // 0x0053d88c (launch), 0x0053e100 (set camera).
+    // DAT_006789f8 -- IClientS.cpp's 3DMathEngine, acquired on first use by the create, launch,
+    // system switch-in and set-camera slots.
     I3DMathEngine* G_IClientSMath = nullptr;
 
     I3DMathEngine* IClientSMath()
@@ -88,8 +84,7 @@ namespace
         return G_IClientSMath;
     }
 
-    // The inline narrowing every handler repeats on the gameobj's object (+0x0c CBase, +0x10
-    // Object): the object when (ObjectClass & Mask) == Mask, else null.
+    // The inline narrowing every handler repeats on the gameobj's object.
     CObject* NarrowObject(CObject* Obj, unsigned Mask)
     {
         if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & Mask) != Mask)
@@ -119,11 +114,8 @@ namespace
         return Info;
     }
 
-    // The local equipment vector CREATESOLAR / CREATESHIP build (0x0053ac68..0x0053acd1,
-    // 0x0053b280..0x0053b2ec): the loadout's items when Field_0x6c names one (the VC6 vector
-    // operator= onto the empty local), then every item of the create info appended (vector
-    // insert at end, one element each). EquipDescVector::add_equipment_item(_, false) is the
-    // plain append.
+    // The local equipment vector CREATESOLAR / CREATESHIP build: the loadout's items, then
+    // every item of the create info. add_equipment_item(_, false) is the plain append.
     void BuildCreateEquipment(CEqObjCreateInfo const* Info, EquipDescVector& Out)
     {
         if (Info->LoadoutId != 0)
@@ -146,7 +138,7 @@ namespace
 // Shared stubs
 // ---------------------------------------------------------------------------------------------
 
-// LAB_0053aaa0 -- `RET 8` (PushToClient, SendServerSetCargo, SendServerRepairObject,
+// LAB_0053aaa0 -- empty (PushToClient, SendServerSetCargo, SendServerRepairObject,
 // SendServerSetStoryCue; also LocationController's GFDESTROYCHARACTER target).
 void IClientImpl::PushToClient(unsigned int /*ClientId*/, CDAPacket* /*Packet*/)
 {
@@ -164,7 +156,7 @@ void IClientImpl::SendServerSetStoryCue(const unsigned int& /*ClientId*/, const 
 {
 }
 
-// LAB_0053e180: `XOR EAX,EAX; RET 4` (GetSendQSize and GetSendQBytes).
+// LAB_0053e180: returns 0 (GetSendQSize and GetSendQBytes).
 unsigned int IClientImpl::GetSendQSize(unsigned int /*ClientId*/)
 {
     return 0;
@@ -175,19 +167,19 @@ unsigned int IClientImpl::GetSendQBytes(unsigned int /*ClientId*/)
     return 0;
 }
 
-// LAB_0053e190: `FLD double [DAT_005c8ba8]; RET 4` -- the constant is 0.0.
+// LAB_0053e190: returns the double DAT_005c8ba8 (0.0).
 double IClientImpl::GetLinkSaturation(unsigned int /*ClientId*/)
 {
     return 0.0;
 }
 
-// FUN_0053d4f0: `RET 0x10` (also Projectile's slot 104).
+// FUN_0053d4f0: empty (also Projectile's slot 104).
 void IClientImpl::SendServerSetGuidedTarget(unsigned int /*ClientId*/, unsigned int /*GuidedId*/,
                                             unsigned int /*TargetId*/, unsigned short /*TargetSubObjId*/)
 {
 }
 
-// LAB_0053e4a0: `RET 4` (SendServerPlayerListClear and DumpPacketStats).
+// LAB_0053e4a0: empty (SendServerPlayerListClear and DumpPacketStats).
 void IClientImpl::SendServerPlayerListClear(unsigned int /*ClientId*/)
 {
 }
@@ -200,9 +192,7 @@ void IClientImpl::DumpPacketStats(const char* /*Name*/)
 // Equipment traffic (slots 0..8)
 // ---------------------------------------------------------------------------------------------
 
-// FUN_0053c2c0 (RET 8) -- ch1 FIREWEAPON: the gameobj (any bucket); when found, its IObjAffect
-// slot 13 (+0x34) with the hardpoint array, its count ((last - first) >> 1, 0 for a null
-// first), &TargetPos and 0.
+// FUN_0053c2c0 -- ch1 FIREWEAPON: IObjAffect slot 13 on the gameobj (any bucket).
 void IClientImpl::SendCommonFireWeapon(unsigned int /*ClientId*/, const XFireWeaponInfo& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -214,7 +204,7 @@ void IClientImpl::SendCommonFireWeapon(unsigned int /*ClientId*/, const XFireWea
                 &Info.TargetPos, 0);
 }
 
-// FUN_0053c730 (RET 8) -- ch1 ACTIVATEEQUIP: IObjAffect slot 19 (+0x4c)(&EquipId, bActivate, 0).
+// FUN_0053c730 -- ch1 ACTIVATEEQUIP: IObjAffect slot 19.
 void IClientImpl::SendCommonActivateEquip(unsigned int /*ClientId*/, const XActivateEquip& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -225,8 +215,7 @@ void IClientImpl::SendCommonActivateEquip(unsigned int /*ClientId*/, const XActi
     Go->toggle_item(&Info.EquipId, Info.bActivate, 0);
 }
 
-// FUN_0053c940 (RET 8) -- ch1 ACTIVATECRUISE: the ship (bucket 1), IObjAffect slot 20 (+0x50)
-// with the two bytes +4 / +5 and 0.
+// FUN_0053c940 -- ch1 ACTIVATECRUISE: the ship (bucket 1), IObjAffect slot 20.
 void IClientImpl::SendCommonActivateCruise(unsigned int /*ClientId*/, const XActivateCruise& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 1);
@@ -237,8 +226,7 @@ void IClientImpl::SendCommonActivateCruise(unsigned int /*ClientId*/, const XAct
     Go->toggle_cruise(Info.bActivate, Info.bDisruptCruise != 0, 0);
 }
 
-// FUN_0053c980 (RET 8) -- ch1 ACTIVATETHRUSTERS: the ship (bucket 1), IObjAffect slot 21
-// (+0x54)(bActivate, 0).
+// FUN_0053c980 -- ch1 ACTIVATETHRUSTERS: the ship (bucket 1), IObjAffect slot 21.
 void IClientImpl::SendCommonActivateThrusters(unsigned int /*ClientId*/, const XActivateThrusters& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 1);
@@ -249,11 +237,8 @@ void IClientImpl::SendCommonActivateThrusters(unsigned int /*ClientId*/, const X
     Go->toggle_thrusters(Info.bActivate, 0);
 }
 
-// FUN_0053c9b0 (RET 8) -- ch1 SETTARGET. With the gameobj (any bucket): outside single player
-// its slot 106 (+0x1a8)(SubObjId, TargetObjectId, TargetSubObjId) first; then the target
-// (FUN_005416c0, any bucket, not tested) goes to IObjAffect set_target (+0x48)(target,
-// TargetSubObjId, 0) when SubObjId is SUBOBJ_ID_NONE, else to slot 17 (+0x44)(&SubObjId,
-// target, TargetSubObjId, 0).
+// FUN_0053c9b0 -- ch1 SETTARGET. Outside single player slot 106 first; the target gameobj is
+// not tested. SUBOBJ_ID_NONE goes to set_target, a gun sub-object to slot 17.
 void IClientImpl::SendCommonSetTarget(unsigned int /*ClientId*/, const XSetTarget& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -275,10 +260,8 @@ void IClientImpl::SendCommonSetTarget(unsigned int /*ClientId*/, const XSetTarge
     Go->set_gun_target(&Info.SubObjId, Target, Info.TargetSubObjId, 0);
 }
 
-// FUN_0053c470 (RET 8) -- ch1 TRACTOROBJECTS: the gameobj (any bucket); every target id that
-// resolves (FUN_005416c0, any bucket) is appended to a local std::vector<IObjInspect*> (Common's
-// vector insert); a non-empty vector goes to IObjAffect slot 15 (+0x3c)(&TractorEquipId, vec,
-// 0); the buffer is freed. The count is taken once, before the loop.
+// FUN_0053c470 -- ch1 TRACTOROBJECTS: every target id that resolves, as a non-empty vector, to
+// IObjAffect slot 15. The count is taken once, before the loop.
 void IClientImpl::SendCommonTractorObjects(unsigned int /*ClientId*/, const XTractorObjects& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -302,14 +285,14 @@ void IClientImpl::SendCommonTractorObjects(unsigned int /*ClientId*/, const XTra
     }
 }
 
-// LAB_0053c830 (RET 8) -- ch2 GOTRADELANE. The client id is not read; the body is
+// LAB_0053c830 -- ch2 GOTRADELANE. The client id is not read; the body is
 // TradeLaneIClientGoTradelane (tradelane_fx.cpp).
 void IClientImpl::SendCommonGoTradeLane(unsigned int /*ClientId*/, const XGoTradelane& Info)
 {
     TradeLaneIClientGoTradelane(&Info);
 }
 
-// LAB_0053c760 (RET 0x10) -- ch2 STOPTRADELANE: (client id, ship id, entrance ring id, unused);
+// LAB_0053c760 -- ch2 STOPTRADELANE: (client id, ship id, entrance ring id, unused);
 // the body is TradeLaneIClientStopTradelane (tradelane_fx.cpp).
 void IClientImpl::SendCommonStopTradeLane(unsigned int /*ClientId*/, unsigned int ShipId,
                                           unsigned int TradelaneRing1, unsigned int /*TradelaneRing2*/)
@@ -317,9 +300,8 @@ void IClientImpl::SendCommonStopTradeLane(unsigned int /*ClientId*/, unsigned in
     TradeLaneIClientStopTradelane(ShipId, TradelaneRing1);
 }
 
-// FUN_0053c570 (RET 8) -- ch1 JETTISONCARGO: when the gameobj (any bucket) exists, IObjAffect
-// slot 14 (+0x38)(ItemId, Count, 0); then, for the player's ship (FUN_00548eb0) whether or not
-// it was found, FUN_004c4320(0, ItemId, Count).
+// FUN_0053c570 -- ch1 JETTISONCARGO: IObjAffect slot 14 when the gameobj exists; then, for the
+// player's ship whether or not it was found, FUN_004c4320.
 void IClientImpl::SendCommonJettisonCargo(unsigned int /*ClientId*/, const XJettisonCargo& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -337,41 +319,29 @@ void IClientImpl::SendCommonJettisonCargo(unsigned int /*ClientId*/, const XJett
 // Object creation (slots 46..51)
 // ---------------------------------------------------------------------------------------------
 
-// FUN_0053ac10 (RET 8) -- ch2 CREATESOLAR, Info the CSolarCreateInfo. Nothing unless PhySys has a
-// system (PhySys::AnyActive). A Solar gameobj (operator new(0x208) + FUN_005475b0) and the local
-// equipment vector (BuildCreateEquipment). Single player: attach to the server's CObject
-// (slot 91 +0x16c find(&ObjId)); a miss warns (IClientS.cpp line 0x67), deletes the gameobj
-// (its CBase vt0(1)) and frees the vector. Multiplayer (0x0053ad44..0x0053b034): Archetype::
-// GetSolar, create, the CSolar::CreateParms build and CSolar::init (MultiplayerCreateSolar).
-// Then the tail 0x0053b039..0x0053b0b3: the object narrowed to 0x303 (no test), its archetype's
-// companion (+4) vt+0x20 Load(1), FUN_004252d0(&vector, 1), FUN_00425480(object +4), slot 92
-// (+0x170), FUN_00547550(DAT_00673344, bMarkedBy), FUN_00540c30(gameobj, 0) and
-// CObject::enable_collisions_r(true). Then 0x0053b0b9..0x0053b1f4 (multiplayer, with a player
-// ship): a solar that appears over the player's ship lifts the ship clear of it.
+// FUN_0053ac10 -- ch2 CREATESOLAR. Nothing unless PhySys has a system. Single player attaches
+// to the server's CObject (slot 91); a miss warns and deletes the gameobj. Multiplayer builds
+// the CSolar itself (MultiplayerCreateSolar). Then the shared tail: companion Load(1),
+// FUN_004252d0, FUN_00425480, slot 92, SetWatchListed, ObjDB registration and collisions on.
+// Finally (multiplayer, with a player ship) a solar that appears over the player's ship lifts
+// the ship clear of it.
 namespace
 {
-    // 0x0053ad44..0x0053b034 -- the multiplayer arm of CREATESOLAR. The parms are the stack
-    // record at [ESP+0x54]; they are destroyed at the end of this function, which is retail's
-    // inlined anim-list teardown (0x0053afd3..0x0053b02c: FUN_0053e430 begin, FUN_004a2f80
-    // erase, the head freed) followed by FUN_004f4a10 (the +0xac list, then the +0x9c vector).
-    // Unwind states 2..4 of LAB_005c0b8b are the same destructors on the exception path.
+    // The multiplayer arm of CREATESOLAR. The parms' destructor at the end is retail's inlined
+    // anim-list teardown followed by FUN_004f4a10 (the +0xac list, then the +0x9c vector);
+    // unwind states 2..4 of LAB_005c0b8b are the same destructors on the exception path.
     void MultiplayerCreateSolar(FClientSolarGameobj* Go, CSolarCreateInfo const* Info,
                                 EquipDescVector const& Equipment)
     {
-        // 0x0053ad44..0x0053ad67: Archetype::GetSolar(+0x08), Root vt+0x0c load, slot 90
-        // (+0x168) create, Archetype::Root::Release. Nothing is null-tested.
+        // Nothing is null-tested.
         Archetype::Solar* const Arch = Archetype::GetSolar(Info->ArchetypeNickname);
         Arch->load();
         Go->create(Arch);
         Arch->Release();
 
-        // 0x0053ad6d..0x0053ad94: the object narrowed to 0x303 and kept at [ESP+0x10]; init
-        // below is called on it with no test.
         CSolar* const Solar = static_cast<CSolar*>(NarrowGameobj(Go, 0x303));
 
-        // 0x0053ad94..0x0053ae2c: FUN_004f4930 (the CEqObj part), then the CSolar tail --
-        // ID_String::clear on +0xb8 / +0xc0 / +0xcc, byte +0xbc, bytes +0xc4 / +0xc5, dwords
-        // +0xc8 and +0xd0..+0xe0 zero -- and the anim list's head (FUN_0042a7e0(0, 0), size 0).
+        // FUN_004f4930 (the CEqObj part), then the CSolar tail.
         CSolar::CreateParms Parms;
         EqObjCreateParmsDefaults(Parms);
         Parms.NicknameSrc.clear();
@@ -387,9 +357,8 @@ namespace
         Parms.AtmosphereRange = 0.0f;
         Parms.DockWithBaseId = 0;
 
-        // 0x0053ae33..0x0053ae86: HitPts is the record's integer +0x68 (FILD, FSTP float); Id
-        // +0x04; the client ObjDB (PTR_DAT_00613ed0); +0x0c into both DockingCount (+0x5c) and
-        // DockWithBaseId (+0xe0); Pos +0x4c; OwnerPlayer 0.
+        // HitPts is an integer in the record; DockingBaseId goes into both DockingCount and
+        // DockWithBaseId.
         Parms.HitPts = static_cast<float>(Info->HitPts);
         Parms.Id = Info->ObjId;
         Parms.ObjDb = GetClientObjDb();
@@ -398,14 +367,10 @@ namespace
         Parms.Pos = Info->Position;
         Parms.OwnerPlayer = 0;
 
-        // 0x0053ae6b..0x0053aeba: the orientation +0x58 through DAT_006789f8 vt+0x54 into a
-        // stack matrix, copied into +0x1c (REP MOVSD, nine dwords).
         IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
                                            reinterpret_cast<FQuaternion const&>(Info->Orientation));
 
-        // 0x0053aea4..0x0053af27: +0x10 -> +0x60, +0x14 -> +0x64, +0x48 -> +0x98, +0x18 ->
-        // +0x68, +0x1c -> +0x6c, +0x20 -> +0x70, the count +0x44 -> +0x94, and that many dwords
-        // from +0x24 into +0x74 (JLE / JL, the count re-read from +0x94 every pass; no clamp).
+        // The accessory count is not clamped.
         Parms.VibeId = static_cast<unsigned>(Info->VibeGroupId);
         Parms.SpaceCostume.PartIds[0] = Info->CostumeHead;
         Parms.VoiceId = Info->VoiceId;
@@ -418,21 +383,14 @@ namespace
             Parms.SpaceCostume.AccessoryIds[Index] = Info->CostumeAccessory[Index];
         }
 
-        // 0x0053af29..0x0053af35: the local equipment vector (loadout + record items) assigned
-        // into +0x9c (Common's vector operator=).
         Parms.Equipment = Equipment;
-        // 0x0053af3b..0x0053af9e: the record's collision groups (+0x80) assigned into +0xac --
-        // VC6's list operator= inlined (the two lists are never the same object).
         Parms.ArchGroupDescs = Info->CollisionGroups;
 
-        // 0x0053afa4..0x0053afc6: byte +0xc4 = the record's +0xad, byte +0xc5 = 1, and the
-        // nickname +0xb8 = the object id just stored in +0x00.
         Parms.bDestructible = Info->bDestructible;
         Parms.bDynamic = 1;
         Parms.NicknameSrc.Id = Parms.Id;
 
-        // 0x0053afcd: CSolar::init (the Common export, not virtual).
-        Solar->init(Parms);
+        Solar->init(Parms); // the Common export, not virtual
     }
 }
 
@@ -448,7 +406,6 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
 
     if (SinglePlayer())
     {
-        // 0x0053acdb..0x0053ad3f: slot 91 (+0x16c) find(&ObjId).
         if (!Go->find(Info.ObjId))
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: SolarCreate - CObject %d not found.",
@@ -462,7 +419,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
         MultiplayerCreateSolar(Go, &Info, Equipment);
     }
 
-    // 0x0053b039..0x0053b0b3.
+    // No null test on the narrowed object.
     CObject* const Obj = NarrowGameobj(Go, 0x303);
     Obj->get_archetype()->Companion->Load(1);
     Archetype::LoadMountedEquipmentCompanions(&Equipment, 1);
@@ -472,16 +429,14 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     ClientObjDb_RegisterGameobj(Go, false);
     Obj->enable_collisions_r(true);
 
-    // 0x0053b0b9..0x0053b0d0: the player's gameobj (FUN_0054baf0) is fetched first; nothing
-    // more in single player or without one.
+    // The player's gameobj is fetched before the single-player test.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (SinglePlayer() || Player == nullptr)
     {
         return;
     }
 
-    // 0x0053b0d6..0x0053b139: both physical spheres (IObjInspect slot 11), the centre seeded
-    // with the position (slot 0) and the radius with 0; the return values are not read.
+    // Both physical spheres; the return values are not read.
     Vector SolarCenter = Go->get_position();
     float SolarRadius = 0.0f;
     Go->get_physical_radius(SolarRadius, SolarCenter);
@@ -489,11 +444,8 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     float PlayerRadius = 0.0f;
     Player->get_physical_radius(PlayerRadius, PlayerCenter);
 
-    // 0x0053b13c..0x0053b183: the differences and the summed radius stay on the FPU (double);
-    // the sum is also stored as a float ([ESP+0x18]). The squared distance adds dz*dz + dy*dy
-    // first, then dx*dx. FCOMPP compares Reach*Reach (ST0) with it; TEST AH,0x41 / JNZ leaves
-    // when Reach*Reach is not greater (or unordered) -- the fall-through is "the spheres
-    // overlap".
+    // The differences and the summed radius stay on the FPU; the sum is also stored as a
+    // float. The squared distance adds dz*dz + dy*dy first, then dx*dx.
     double const Dx = static_cast<double>(SolarCenter.x) - PlayerCenter.x;
     double const Dy = static_cast<double>(SolarCenter.y) - PlayerCenter.y;
     double const Dz = static_cast<double>(SolarCenter.z) - PlayerCenter.z;
@@ -505,10 +457,8 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
         return;
     }
 
-    // 0x0053b185..0x0053b1c0: the new position is the solar's centre with only y changed. FCOMP
-    // of the centre's y against the player's; TEST AH,0x5 / JP is taken when C0 and C2 agree --
-    // not less (or unordered) -- and then y = centre.y - the stored float sum. The fall-through
-    // (centre below the player) is centre.y + player radius + solar radius on the FPU.
+    // Only y changes. Below the player: centre.y + both radii on the FPU; otherwise (also
+    // unordered) centre.y - the stored float sum.
     Vector Clear;
     Clear.x = SolarCenter.x;
     Clear.z = SolarCenter.z;
@@ -521,10 +471,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
         Clear.y = static_cast<float>(static_cast<double>(SolarCenter.y) - ReachStored);
     }
 
-    // 0x0053b1be..0x0053b1f4: the player's CObject (slot 84 +0x150), a CShip ((class & 0x503)
-    // == 0x503) or nothing, beamed there (CObject vt+0x7c) with the player's own transform
-    // (IObjInspect slot 3, its rotation) and bAttach false -- the 0 is pushed before slot 3 is
-    // called.
+    // The player's CShip is beamed there with its own rotation.
     CObject* const PlayerShip = NarrowObject(const_cast<CObject*>(Player->cobject()), 0x503);
     if (PlayerShip == nullptr)
     {
@@ -533,37 +480,26 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     PlayerShip->beam_object(Clear, Player->get_transform().Rotation, false);
 }
 
-// FUN_0053b220 (RET 8) -- ch2 CREATESHIP, Info the CShipCreateInfo. As slot 46 with a Ship gameobj
-// (operator new(0x190) + FUN_00543380); the single-player miss warns at line 0xff; a single-
-// player hit with bMarkedBy first joins the watch list (FUN_00547550(DAT_00673344, 1)). The
-// multiplayer build (0x0053b389..0x0053b6b0) is MultiplayerCreateShip. Tail 0x0053b6b5..
-// 0x0053b729: narrowed to 0x503, companion Load(1), FUN_004252d0, FUN_00425480, slot 92,
-// FUN_00547550(DAT_00673344, bMarkedBy), FUN_00540c30(gameobj, 0). Then, outside single player,
-// the reputation name block 0x0053b73a..0x0053b839.
+// FUN_0053b220 -- ch2 CREATESHIP. As CREATESOLAR with a Ship gameobj; a single-player hit with
+// bMarkedBy first joins the watch list. Then, outside single player, the reputation name
+// block.
 namespace
 {
-    // 0x0053b389..0x0053b6b0 -- the multiplayer arm of CREATESHIP. The CShip::CreateParms are
-    // the stack record at [ESP+0x70]; their list (+0xac, state 4) and vector (+0x9c, state 1)
-    // are destroyed at 0x0053b687..0x0053b6ab, which is the end of this function.
+    // The multiplayer arm of CREATESHIP.
     void MultiplayerCreateShip(FClientShipGameobj* Go, CShipCreateInfo const* Info,
                                EquipDescVector const& Equipment)
     {
-        // 0x0053b389..0x0053b3ac: Archetype::GetShip(+0x08), Root vt+0x0c load, slot 90
-        // (+0x168) create, Archetype::Root::Release. Nothing is null-tested.
+        // Nothing is null-tested.
         Archetype::Ship* const Arch = Archetype::GetShip(Info->ArchetypeNickname);
         Arch->load();
         Go->create(Arch);
         Arch->Release();
 
-        // 0x0053b3b2..0x0053b3d9: the object narrowed to 0x503, kept at [ESP+0x1c]; init and
-        // the +0x1b4 store below use it with no test.
         CShip* const Ship = static_cast<CShip*>(NarrowGameobj(Go, 0x503));
 
-        // 0x0053b3d9..0x0053b443: FUN_0052e0a0 on the CSimple head (+0x00..+0x58), +0x5c = 0,
-        // +0x60 = -1, FUN_004cdc10 on +0x64 (+0x64..+0x70 and the count +0x94), +0x98 = 0, the
-        // EquipDescVector (+0x9c) and the collision-group list (+0xac) constructed, +0xe8 /
-        // +0xec / +0xf0 = 0, byte +0xf4 = 0. Retail leaves +0x74..+0x90 and +0xb8..+0xe7 as
-        // they lie; value-initialisation zeroes them, and CShip::init reads neither.
+        // FUN_0052e0a0 on the CSimple head, FUN_004cdc10 on the costume. Port deviation:
+        // retail leaves +0x74..+0x90 and +0xb8..+0xe7 as they lie; value-initialisation zeroes
+        // them, and CShip::init reads neither.
         CShip::CreateParms Parms{};
         InitCreateParmsScratchRetail(&Parms);
         Parms.DockingCount = 0;
@@ -579,22 +515,16 @@ namespace
         Parms.Rank = 0;
         Parms.bUsingTradelane = 0;
 
-        // 0x0053b44a..0x0053b494: HitPts the record's integer +0x68 (FILD, FSTP float), Id
-        // +0x04, the client ObjDB (PTR_DAT_00613ed0), OwnerPlayer +0xac, Pos +0x4c.
         Parms.HitPts = static_cast<float>(Info->HitPts);
         Parms.Id = Info->ObjId;
         Parms.ObjDb = GetClientObjDb();
         Parms.OwnerPlayer = Info->OwnerPlayer;
         Parms.Pos = Info->Position;
 
-        // 0x0053b47e..0x0053b4ce: the orientation +0x58 through DAT_006789f8 vt+0x54 into a
-        // stack matrix, copied into +0x1c.
         IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
                                            reinterpret_cast<FQuaternion const&>(Info->Orientation));
 
-        // 0x0053b4b6..0x0053b592: Velocity +0xb8 -> +0x40, AngularVelocity +0xc4 -> +0x4c,
-        // +0x10 -> +0x60, +0x48 -> +0x98, +0xb4 -> +0xf0, +0x14..+0x20 -> +0x64..+0x70, the count
-        // +0x44 -> +0x94 and that many dwords from +0x24 into +0x74 (re-read every pass, no clamp).
+        // The accessory count is not clamped.
         Parms.Velocity = Info->Velocity;
         Parms.AngularVelocity = Info->AngularVelocity;
         Parms.VibeId = static_cast<unsigned>(Info->VibeGroupId);
@@ -610,13 +540,10 @@ namespace
             Parms.SpaceCostume.AccessoryIds[Index] = Info->CostumeAccessory[Index];
         }
 
-        // 0x0053b594..0x0053b60a: the local equipment vector into +0x9c (vector operator=), the
-        // record's collision groups (+0x80) into +0xac (VC6 list operator= inlined).
         Parms.Equipment = Equipment;
         Parms.ArchGroupDescs = Info->CollisionGroups;
 
-        // 0x0053b610..0x0053b645: +0xb0 -> +0xec, +0x0c -> +0x5c; a marked record puts this
-        // connection's id (DAT_00673344) into +0x58; the byte +0xdc -> +0xf4.
+        // A marked record puts this connection's id into +0x58.
         Parms.GroupNameId = Info->GroupNameId;
         Parms.DockingCount = Info->DockingBaseId;
         if (Info->bMarkedBy != 0)
@@ -625,11 +552,8 @@ namespace
         }
         Parms.bUsingTradelane = Info->bUsingTradelane;
 
-        // 0x0053b64c..0x0053b655: CShip vt+0x10c init.
         Ship->init(Parms);
 
-        // 0x0053b65b..0x0053b684: CShip+0x1b4 = the record's +0xd8, then
-        // PhySys::RCBegin(ship, +0x4c, +0xb8, +0x58, +0xc4).
         Ship->GroupId = Info->GroupId;
         PhySys::RCBegin(Ship, Info->Position, Info->Velocity, Info->Orientation,
                         Info->AngularVelocity);
@@ -648,7 +572,6 @@ void IClientImpl::SendServerCreateShip(unsigned int /*ClientId*/, const CShipCre
 
     if (SinglePlayer())
     {
-        // 0x0053b2fa..0x0053b384: slot 91 (+0x16c) find(&ObjId).
         if (!Go->find(Info.ObjId))
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: ShipCreate - CObject %d not found.",
@@ -666,7 +589,7 @@ void IClientImpl::SendServerCreateShip(unsigned int /*ClientId*/, const CShipCre
         MultiplayerCreateShip(Go, &Info, Equipment);
     }
 
-    // 0x0053b6b5..0x0053b729.
+    // No null test on the narrowed object.
     CObject* const Obj = NarrowGameobj(Go, 0x503);
     Obj->get_archetype()->Companion->Load(1);
     Archetype::LoadMountedEquipmentCompanions(&Equipment, 1);
@@ -675,12 +598,9 @@ void IClientImpl::SendServerCreateShip(unsigned int /*ClientId*/, const CShipCre
     Go->SetWatchListed(static_cast<int>(GetPlayerConnectionId()), Info.bMarkedBy);
     ClientObjDb_RegisterGameobj(Go, false);
 
-    // 0x0053b72c..0x0053b839: outside single player, the record's reputation group (+0x10)
-    // re-gets its names -- the first FmtStr at [ESP+0x48] (constructed first, unwind state 6),
-    // the second at [ESP+0x30], the display-name pointer zeroed -- and, when the second name
-    // carries a mad-lib id (+0x04), sets them back with that name printed into a 0x18-char
-    // stack buffer (FUN_0041c970). The return values are not read; the two FmtStrs are
-    // destroyed second-first (state 5, then 1).
+    // Outside single player, the record's reputation group re-gets its names and, when the
+    // second name carries a mad-lib id, sets them back with that name printed into a 0x18-char
+    // buffer (FUN_0041c970). The return values are not read.
     if (SinglePlayer())
     {
         return;
@@ -702,13 +622,10 @@ namespace
     // DAT_005dd55c -- 1e10, the "far away" scale the dropper tails aim with.
     constexpr float kIClientFarScale = 1.0e10f;
 
-    // The launcher tail CREATEMINE / CREATECOUNTER (0x0053ccab..0x0053ccef, 0x0053cfb7..
-    // 0x0053cffb) and CREATEGUIDED (0x0053d31e..0x0053d36b) share, on the single-player miss
-    // path too: an owner id that is set and not the player's ship (FUN_00548eb0), its gameobj in
-    // any bucket (FUN_005416c0(Id, 0)), the equipment wrapper of SubObjId on it (FUN_00533100)
-    // with an equipment (+4). Null when any step fails. Retail then calls the wrapper's slot 5
-    // (+0x14) -- FireDirect of the launcher family, the only wrappers a munition's launcher id
-    // can name.
+    // The launcher tail CREATEMINE / CREATECOUNTER / CREATEGUIDED share, on the single-player
+    // miss path too: the equipment wrapper (FUN_00533100) of SubObjId on a remote owner's
+    // gameobj. Retail then calls the wrapper's slot 5 -- FireDirect of the launcher family, the
+    // only wrappers a munition's launcher id can name.
     FCliLauncherFx* FindRemoteLauncher(unsigned OwnerId, unsigned short SubObjId)
     {
         if (OwnerId == 0)
@@ -741,8 +658,7 @@ namespace
     {
         if (SinglePlayer())
         {
-            // 0x0053cad3..0x0053caf1: find(&ObjId); a miss deletes the gameobj (CBase vt0(1),
-            // no warning) and goes straight to the launcher tail.
+            // A miss deletes the gameobj (no warning) and goes straight to the launcher tail.
             if (!Go->find(Info->ObjId))
             {
                 delete Go;
@@ -751,37 +667,29 @@ namespace
         }
         else
         {
-            // 0x0053caf6..0x0053cb1a: Archetype::GetEquipment(+0x04), Root vt+0x0c load, slot 90
-            // create, Archetype::Root::Release.
             Archetype::Equipment* const Arch = Archetype::GetEquipment(Info->ArchetypeNickname);
             Arch->load();
             Go->create(Arch);
             Arch->Release();
-            // 0x0053cb20..0x0053cc3b: the object narrowed by Mask (no null test), the parms, its
-            // vt+0xa0 init.
+            // No null test on the narrowed object.
             CProjectile* const Shot = static_cast<CProjectile*>(NarrowGameobj(Go, Mask));
             CProjectile::CreateParms Parms;
             Parms.Id = Info->ObjId;
             Parms.ObjDb = GetClientObjDb();
             Parms.OwnerPlayer = Info->OwnerPlayer;
             Parms.Pos = Info->Position;
-            // 0x0053cbb5 (mine) / 0x0053cec1 (counter): DAT_006789f8 tested and filled only here,
-            // on the multiplayer arm.
             IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
                                                reinterpret_cast<FQuaternion const&>(Info->Orientation));
             Parms.Velocity = Info->Velocity;
             Parms.AngularVelocity = Info->AngularVelocity;
             Parms.OwnerId = Info->OwnerId;
             Shot->init(Parms);
-            // 0x0053cc41..0x0053cc4c: PhySys::RCBegin(object, +0x10, +0x2c, +0x1c, +0x38).
             PhySys::RCBegin(static_cast<CSimple*>(Shot), Info->Position, Info->Velocity,
                             Info->Orientation, Info->AngularVelocity);
         }
         if (Go != nullptr)
         {
-            // 0x0053cc5b..0x0053cca8: narrowed again (no null test) -- the archetype's companion
-            // Load(1), FUN_00425480 on the object's engine instance (+4), slot 92,
-            // FUN_00540c30(gameobj, 0).
+            // No null test on the narrowed object.
             CObject* const Obj = NarrowGameobj(Go, Mask);
             Obj->get_archetype()->Companion->Load(1);
             Archetype::HookUpInstanceTreeMaterials(Obj->EngineInstanceId);
@@ -789,8 +697,8 @@ namespace
             ClientObjDb_RegisterGameobj(Go, false);
         }
 
-        // 0x0053ccab..0x0053cd4e: the dropper that let it go fires at +0x10 + 1e10 * +0x2c. The
-        // x and y products stay on the FPU; z's is stored to a float before the add.
+        // The dropper that let it go fires at Position + 1e10 * Velocity. The x and y products
+        // stay on the FPU; z's is stored to a float before the add.
         FCliLauncherFx* const Launcher = FindRemoteLauncher(Info->OwnerId, Info->SubObjId);
         if (Launcher == nullptr)
         {
@@ -807,9 +715,8 @@ namespace
     }
 }
 
-// FUN_0053b910 (RET 8) -- ch2 CREATELOOT, Info the FServerCreateLootRequest: one Loot gameobj per
-// item (count byte +0x10, FServerLootDesc stride 0x48 at +0x0c); then, for a kind-1 request,
-// the owner's gameobj plays the cargo-jettisoned sound (FUN_00543f50).
+// FUN_0053b910 -- ch2 CREATELOOT: one Loot gameobj per item (FServerLootDesc stride 0x48);
+// then, for a kind-1 request, the owner's gameobj plays the cargo-jettisoned sound.
 void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerCreateLootRequest& Info)
 {
     if (!PhySys::AnyActive())
@@ -819,12 +726,10 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
     FServerLootDesc const* Desc = Info.Items;
     for (unsigned Left = Info.Count; Left != 0; --Left, ++Desc)
     {
-        // 0x0053b960..0x0053b989: operator new(0xb0) + FUN_0053e470.
         FClientLootGameobj* const Go = new FClientLootGameobj();
         if (SinglePlayer())
         {
-            // 0x0053b9a0..0x0053b9e1: find(&LootId); a miss warns (line 0x17c) and deletes the
-            // gameobj (CBase vt0(1)), and the next item follows.
+            // A miss warns, deletes the gameobj, and the next item follows.
             if (!Go->find(Desc->LootId))
             {
                 FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x17c,
@@ -835,18 +740,11 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
         }
         else
         {
-            // 0x0053b9e6..0x0053ba09: Archetype::GetEquipment(the container, +0x10), load,
-            // slot 90 create, Archetype::Root::Release.
             Archetype::Equipment* const Arch = Archetype::GetEquipment(Desc->ContainerNickname);
             Arch->load();
             Go->create(Arch);
             Arch->Release();
-            // 0x0053ba0f..0x0053bb85: the CLoot (class & 0x803, no null test) and its vt+0xa0
-            // init: Matrix identity (FUN_004215b0), Velocity / AngularVelocity / Pad58 zero,
-            // OwnerPlayer 0, bCanAiTractor 1; Id, ObjDb, HitPts (+0x14), Pos (+0x1c), the
-            // orientation (+0x28, vt+0x54), Velocity (+0x38), the request's OwnerId, NameId
-            // (+0x18), ContentsArch (GetEquipment(+0x04)), bTemporary (+0x45), Units (+0x0c) and
-            // ContentsHitPts (+0x08).
+            // No null test on the narrowed CLoot.
             CLoot* const Loot = static_cast<CLoot*>(NarrowGameobj(Go, 0x803));
             CLoot::CreateParms Parms;
             Parms.Id = Desc->LootId;
@@ -869,8 +767,6 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
             Parms.bCanAiTractor = true;
             Parms.bTemporary = (Desc->bTemporary != 0);
             Loot->init(Parms);
-            // 0x0053bb8b..0x0053bbb2: PhySys::RCBegin(CLoot, +0x1c, +0x38, +0x28, a zero
-            // angular velocity).
             Vector NoSpin;
             NoSpin.x = 0.0f;
             NoSpin.y = 0.0f;
@@ -878,9 +774,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
             PhySys::RCBegin(Loot, Desc->Position, Desc->Velocity, Desc->Orientation, NoSpin);
         }
 
-        // 0x0053bbbd..0x0053bc24: narrowed to 0x803 (no null test) -- the archetype's companion
-        // Load(1), FUN_00425480 on get_index, slot 92, FUN_00547550(DAT_00673344, bMarkedBy
-        // +0x46), FUN_00540c30(gameobj, 0).
+        // No null test on the narrowed object.
         CObject* const Obj = NarrowGameobj(Go, 0x803);
         Obj->get_archetype()->Companion->Load(1);
         Archetype::HookUpInstanceTreeMaterials(Go->get_index());
@@ -889,8 +783,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
         ClientObjDb_RegisterGameobj(Go, false);
     }
 
-    // 0x0053bc46..0x0053bc5f: a kind-1 request -- the owner's gameobj (any bucket) plays
-    // FUN_00543f50. Retail calls it on whatever FUN_005416c0 returns; its body narrows to the
+    // Retail calls FUN_00543f50 on whatever gameobj the owner id finds; its body narrows to the
     // CShip itself.
     if (Info.Kind == 1)
     {
@@ -902,8 +795,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
     }
 }
 
-// FUN_0053ca40 (RET 8) -- ch2 CREATEMINE, Info the FServerCreateProjectileInfo: operator
-// new(0xc0) + FUN_00542550(5) + Mine's vtables (0x0053ca6d..0x0053caa4).
+// FUN_0053ca40 -- ch2 CREATEMINE.
 void IClientImpl::SendServerCreateMine(unsigned int /*ClientId*/, const FServerCreateProjectileInfo& Info)
 {
     if (!PhySys::AnyActive())
@@ -913,8 +805,7 @@ void IClientImpl::SendServerCreateMine(unsigned int /*ClientId*/, const FServerC
     CreateDroppedProjectile(new FClientMineGameobj(), 0xf, &Info);
 }
 
-// FUN_0053d080 (RET 8) -- ch2 CREATEGUIDED, Info the FServerCreateGuidedInfo: operator new(0xc0)
-// + FUN_00542550(4) + Guided's vtables (0x0053d0ad..0x0053d0e4). ClientId is not read.
+// FUN_0053d080 -- ch2 CREATEGUIDED. ClientId is not read.
 void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const FServerCreateGuidedInfo& Info)
 {
     if (!PhySys::AnyActive())
@@ -924,8 +815,7 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
     FClientGuidedGameobj* Go = new FClientGuidedGameobj();
     if (SinglePlayer())
     {
-        // 0x0053d10b..0x0053d129: find(&ObjId); a miss deletes the gameobj and goes to the
-        // launcher tail.
+        // A miss deletes the gameobj and goes to the launcher tail.
         if (!Go->find(Info.ObjId))
         {
             delete Go;
@@ -934,15 +824,11 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
     }
     else
     {
-        // 0x0053d12e..0x0053d152: Archetype::GetEquipment(+0x28), load, create, Release.
         Archetype::Equipment* const Arch = Archetype::GetEquipment(Info.ArchetypeNickname);
         Arch->load();
         Go->create(Arch);
         Arch->Release();
-        // 0x0053d158..0x0053d2a2: the CGuided (class & 0xa7, no null test) and CGuided::init
-        // (the Common export, not virtual): FUN_0052e0a0's head, Id, ObjDb, OwnerPlayer +0x2c,
-        // Pos +0x04, the orientation +0x10 (vt+0x54), zero velocities, OwnerId +0x30, Target =
-        // FUN_005416c0(+0x20, 0), SubTarget +0x24.
+        // No null test on the narrowed CGuided; init is the Common export, not virtual.
         CGuided* const Guided = static_cast<CGuided*>(NarrowGameobj(Go, 0xa7));
         CGuided::CreateParms Parms;
         Parms.SubTarget = SUBOBJ_ID_NONE;
@@ -957,15 +843,11 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
         Parms.SubTarget = Info.TargetSubObjId;
         Parms.Target = static_cast<IObjRW*>(TargetGo);
         Guided->init(Parms);
-        // 0x0053d2a8..0x0053d2bb: PhySys::RCBegin(CGuided, +0x04, the parms' zero velocity,
-        // +0x10, the parms' zero angular velocity).
         PhySys::RCBegin(Guided, Info.Position, Parms.Velocity, Info.Orientation,
                         Parms.AngularVelocity);
     }
     if (Go != nullptr)
     {
-        // 0x0053d2c6..0x0053d31b: narrowed again -- companion Load(1), FUN_00425480 on
-        // get_index, slot 92, FUN_00540c30(gameobj, 0).
         CObject* const Obj = NarrowGameobj(Go, 0xa7);
         Obj->get_archetype()->Companion->Load(1);
         Archetype::HookUpInstanceTreeMaterials(Go->get_index());
@@ -973,9 +855,8 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
         ClientObjDb_RegisterGameobj(Go, false);
     }
 
-    // 0x0053d31e..0x0053d405: the launcher that fired it (owner +0x30, sub-object +0x34) fires
-    // at +0x04 minus 1e10 times the orientation's third column (+0x10 through vt+0x54 again).
-    // The x and y products are stored to floats before the add; z's stays on the FPU.
+    // The launcher that fired it fires at Position minus 1e10 times the orientation's third
+    // column. The x and y products are stored to floats before the add; z's stays on the FPU.
     FCliLauncherFx* const Launcher = FindRemoteLauncher(Info.OwnerId, Info.SubObjId);
     if (Launcher == nullptr)
     {
@@ -994,9 +875,7 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
     Launcher->FireDirect(&Target);
 }
 
-// FUN_0053cd70 (RET 8) -- ch2 CREATECOUNTER, Info the FServerCreateProjectileInfo: operator
-// new(0xc0) + FUN_00542550(6) + CounterMeasure's vtables (0x0053cd9d..0x0053cdd4). ClientId is
-// not read.
+// FUN_0053cd70 -- ch2 CREATECOUNTER. ClientId is not read.
 void IClientImpl::SendServerCreateCounter(const unsigned int& /*ClientId*/,
                                           const FServerCreateProjectileInfo& Info)
 {
@@ -1011,9 +890,8 @@ void IClientImpl::SendServerCreateCounter(const unsigned int& /*ClientId*/,
 // Object state (slots 52..63)
 // ---------------------------------------------------------------------------------------------
 
-// FUN_0053d480 (RET 8) -- ch2 EXPLODEASTEROIDMINE, Info = {mine id, offset}: the gameobj of
-// bucket 8, its object narrowed to class bit 0 (not tested); world position + offset to slot
-// 108 (+0x1b0).
+// FUN_0053d480 -- ch2 EXPLODEASTEROIDMINE: the gameobj of bucket 8 explodes at its world
+// position + offset. No null test on the narrowed object.
 void IClientImpl::SendServerExplodeAsteroidMine(unsigned int /*ClientId*/, const FMineExplosion& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.MineId, 8);
@@ -1030,10 +908,8 @@ void IClientImpl::SendServerExplodeAsteroidMine(unsigned int /*ClientId*/, const
     Go->Explode(&Pos);
 }
 
-// LAB_0053bd40 (RET 8) -- ch1 UPDATEOBJECT (FCommonUpdateObjectInfo): the gameobj (any bucket);
-// PhySys::RCSet on its object narrowed to (class & 3) == 3 (null when not), with the position
-// (+0x14), orientation (+0x04) and the timestamp (+0x20, widened to double); then, when the
-// object is a CShip (0x503), CShip::set_throttle(+0x24) and CShip+0x1a0 = the byte +0x28.
+// LAB_0053bd40 -- ch1 UPDATEOBJECT: PhySys::RCSet (a failed CSimple narrow passes null); a
+// CShip also takes the throttle and the state byte (+0x1a0).
 void IClientImpl::SendCommonUpdateObject(unsigned int /*ClientId*/, const FCommonUpdateObjectInfo& Info)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -1052,16 +928,14 @@ void IClientImpl::SendCommonUpdateObject(unsigned int /*ClientId*/, const FCommo
     Ship->BehaviorIndex = static_cast<int>(Info.State);
 }
 
-// FUN_0053bc80 (RET 8) -- ch2 DESTROYOBJECT, Info = {id, destroy type}. With the gameobj (any
-// bucket): the player's ship asks for a zero hull status on type 1 (FUN_004c4f50(0)) and
-// captures the camera view (FUN_0054b900); any other gameobj is owned by this connection
-// (FUN_005397f0) and its object narrowed to (class & 3) == 3 (not tested) re-connects to the
-// client ObjDB (CSimple vt+0x90 connect(PTR_DAT_00613ed0)). Then slot 103 (+0x19c)(type) and,
-// outside single player for type 0, FUN_00541040 and the gameobj deleted (CBase vt0(1)).
+// FUN_0053bc80 -- ch2 DESTROYOBJECT. The player's ship asks for a zero hull status on type 1
+// and captures the camera view (FUN_0054b900); any other gameobj is owned by this connection
+// and its CSimple (not tested) re-connects to the client ObjDB. Then slot 103 and, outside
+// single player for type 0, the gameobj is unregistered and deleted.
 void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServerDestroyObjectInfo& Info)
 {
-    // Retail reads the destroy type as the whole dword at +0x04 (0x0053bcac CMP dword ptr
-    // [EDI+0x4],1), i.e. Field_0x04 together with the three pad bytes after it.
+    // Retail reads the destroy type as the whole dword at +0x04, i.e. Field_0x04 together
+    // with the three pad bytes after it.
     unsigned int DestroyType = 0;
     memcpy(&DestroyType, reinterpret_cast<unsigned char const*>(&Info) + 4, sizeof(DestroyType));
     FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -1075,7 +949,7 @@ void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServ
         {
             ReqPlayerHullStatusRetail(0.0f);
         }
-        SpaceAppArmDeathCamera(); // 0x0053bcbc FUN_0054b900
+        SpaceAppArmDeathCamera();
     }
     else
     {
@@ -1092,17 +966,16 @@ void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServ
     delete Go;
 }
 
-// FUN_0053d940 (RET 8) -- ch2 ACTIVATEOBJECT; the body is TradeLaneSPObjActivate
-// (tradelane_fx.cpp). Retail reads the argument with no null test.
+// FUN_0053d940 -- ch2 ACTIVATEOBJECT; the body is TradeLaneSPObjActivate (tradelane_fx.cpp).
+// Retail reads the argument with no null test.
 void IClientImpl::SendServerActivateObject(unsigned int /*ClientId*/, const FPayloadServerActivateObject& Info)
 {
     TradeLaneSPObjActivate(Info.ObjectId, Info.bActivate != 0, Info.ActivateParam);
 }
 
-// LAB_0053d500 (RET 8) -- ch2 SYSTEM_SWITCH_OUT, Info = {ship id, gate id}.
+// LAB_0053d500 -- ch2 SYSTEM_SWITCH_OUT.
 void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FServerSystemSwitchOutInfo& Info)
 {
-    // 0x0053d504..0x0053d51b: the ship (bucket 1); none returns.
     FClientShipGameobj* const Ship =
         static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
     if (Ship == nullptr)
@@ -1110,23 +983,23 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
         return;
     }
 
-    // 0x0053d521..0x0053d557: the gate (bucket 2); none is an ERROR, and the handler goes on
-    // (retail reads [EDI+0x1c] next with no test).
+    // A missing gate is an ERROR, and the handler goes on (retail reads the gate next with no
+    // test).
     FClientGameobj* const Gate = ClientObjDb_FindObject(Info.GateId, 2);
     if (Gate == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x54e,
               "No facilitator found for SystemSwitchOut");
     }
-    // 0x0053d55a..0x0053d581: a gate gameobj that is not a solar (ManagerKind 2) warns.
+    // A gate gameobj that is not a solar (ManagerKind 2) warns.
     if (Gate->ManagerKind != 2)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x550,
               "SystemSwitchOut, obj is not a Solar?");
     }
 
-    // 0x0053d585..0x0053d5fa: the player's CEqObj (0x103, no null test) behavior manager, when
-    // it has one, hears event 3 with {gate id, gate type, ship id}.
+    // The player's behavior manager hears event 3 with {gate id, gate type, ship id}. No null
+    // test on the narrowed CEqObj.
     FClientGameobj* const Player = static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
     if (Player != nullptr)
     {
@@ -1147,8 +1020,8 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
         }
     }
 
-    // 0x0053d5fc..0x0053d638: any ship but the player's: owned by this connection (FUN_0054bb00
-    // = DAT_00673344, FUN_005397f0) and control exclusion 1 on its CEqObj (0x103, no null test).
+    // Any ship but the player's: owned by this connection and control exclusion 1 (no null
+    // test on the narrowed CEqObj).
     if (!IsPlayerGameobj(Ship))
     {
         Ship->SetOwnerPlayer(GetPlayerConnectionId());
@@ -1156,8 +1029,8 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
         ShipEq->set_control_exclusion(1);
     }
 
-    // 0x0053d63e..0x0053d66e: the gate's type (vt+0x88): bit 0x40 or 0x800 -> the jump out
-    // through it (FUN_00543530); otherwise the system switch straight away (FUN_00543750).
+    // Gate type bit 0x40 or 0x800 -> the jump out through it; otherwise the system switch
+    // straight away.
     unsigned Type = 0;
     Gate->get_type(Type);
     if ((Type & 0x40u) != 0 || (Type & 0x800u) != 0)
@@ -1170,10 +1043,9 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
     }
 }
 
-// LAB_0053d680 (RET 8) -- ch2 SYSTEM_SWITCH_IN.
+// LAB_0053d680 -- ch2 SYSTEM_SWITCH_IN.
 void IClientImpl::SendServerSystemSwitchIn(unsigned int /*ClientId*/, const FPayloadServerSystemSwitchIn& Info)
 {
-    // 0x0053d684..0x0053d69a: the object (any bucket); none returns.
     FClientShipGameobj* const Ship =
         static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 0));
     if (Ship == nullptr)
@@ -1181,14 +1053,12 @@ void IClientImpl::SendServerSystemSwitchIn(unsigned int /*ClientId*/, const FPay
         return;
     }
 
-    // 0x0053d6a8..0x0053d6c7 / 0x0053d6e2..0x0053d701: the orientation (+0x14) to a matrix
-    // (vt+0x54) on both paths.
+    // Retail converts the orientation on both paths.
     Matrix Orient;
     IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Orient),
                                        reinterpret_cast<FQuaternion const&>(Info.Orientation));
 
-    // 0x0053d69c..0x0053d6a6: jump type bits 0x40 or 0x800 -> the jump in (FUN_00543630);
-    // otherwise the airlock (FUN_005437a0), both at +0x08.
+    // Jump type bits 0x40 or 0x800 -> the jump in; otherwise the airlock.
     if ((Info.JumpObjTypeBits & 0x40u) != 0 || (Info.JumpObjTypeBits & 0x800u) != 0)
     {
         Ship->BeginJumpIn(&Info.Position, &Orient);
@@ -1199,10 +1069,9 @@ void IClientImpl::SendServerSystemSwitchIn(unsigned int /*ClientId*/, const FPay
     }
 }
 
-// FUN_0053d720 (RET 8) -- ch2 LAND, Info = {ship id, dock id, base id}.
+// FUN_0053d720 -- ch2 LAND.
 void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInfo& Info)
 {
-    // 0x0053d725..0x0053d737: the ship (any bucket); none returns.
     FClientShipGameobj* const Ship =
         static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 0));
     if (Ship == nullptr)
@@ -1210,9 +1079,8 @@ void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInf
         return;
     }
 
-    // 0x0053d73d..0x0053d797: the dock (any bucket). When there is one: the player's ship enters
-    // the dock's base at once (FUN_0054bc60 with the dock CEqObj's +0x164, 0x303 narrowing with
-    // no test); any other ship is owned by this connection (FUN_005397f0 with FUN_0054bb00).
+    // With a dock: the player's ship enters the dock's base at once (FUN_0054bc60; no null test
+    // on the narrowed dock); any other ship is owned by this connection.
     FClientGameobj* const Dock = ClientObjDb_FindObject(Info.DockId, 0);
     if (Dock != nullptr)
     {
@@ -1227,23 +1095,19 @@ void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInf
         }
     }
 
-    // 0x0053d799..0x0053d7c5: outside single player the ship's remote-control session ends --
-    // PhySys::RCEnd on its cobject (vt+0x150) narrowed by (class & 3) == 3.
+    // Outside single player the ship's remote-control session ends.
     if (!SinglePlayer())
     {
         CObject* const Obj = const_cast<CObject*>(Ship->cobject());
         PhySys::RCEnd(static_cast<CSimple*>(NarrowObject(Obj, 3)));
     }
 
-    // 0x0053d7c8..0x0053d7cf: FUN_00543b40(dock, &base id).
     Ship->RequestLand(Dock, &Info.BaseId);
 }
 
-// LAB_0053d7e0 (RET 8) -- ch2 LAUNCH (FServerLaunchInfo).
+// LAB_0053d7e0 -- ch2 LAUNCH.
 void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunchInfo& Info)
 {
-    // 0x0053d7e5..0x0053d7fa / 0x0053d8e8..0x0053d906: the ship (bucket 1); none warns (line
-    // 0x5c4) and returns.
     FClientShipGameobj* const Ship =
         static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
     if (Ship == nullptr)
@@ -1253,12 +1117,10 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
         return;
     }
 
-    // The orientation (+0x0c) to a matrix (vt+0x54), and the ship's object (class bit 0, no null
-    // test) beamed to +0x1c, not attached (vt+0x7c) -- outside single player when launching
-    // from a dock, always when not.
+    // The ship's object (no null test) is beamed to the launch position -- outside single
+    // player when launching from a dock, always when not.
     if (Info.LaunchObjId != 0)
     {
-        // 0x0053d80c..0x0053d85f.
         if (!SinglePlayer())
         {
             Matrix Orient;
@@ -1267,13 +1129,11 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
                 reinterpret_cast<FQuaternion const&>(Info.Orientation));
             NarrowGameobj(Ship, 1)->beam_object(Info.Position, Orient, false);
         }
-        // 0x0053d862..0x0053d877: the dock (any bucket) and the launch point to FUN_00543d50.
         Ship->LaunchFromDock(ClientObjDb_FindObject(Info.LaunchObjId, 0),
                              static_cast<int>(Info.LaunchPosIndex));
     }
     else
     {
-        // 0x0053d88c..0x0053d8d5.
         Matrix Orient;
         IClientSMath()->QuaternionToMatrix(
             reinterpret_cast<FMatrix&>(Orient),
@@ -1281,38 +1141,33 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
         NarrowGameobj(Ship, 1)->beam_object(Info.Position, Orient, false);
     }
 
-    // 0x0053d87e / 0x0053d8da: DAT_00678b96 = 1.
-    SetPlayerLaunchAcknowledged(true);
+    SetPlayerLaunchAcknowledged(true); // DAT_00678b96
 }
 
-// LAB_0053d920 (RET 0xc) -- ch2 REQUESTCREATESHIPRESP: DAT_00678b95 = 1, DAT_00678b94 =
-// (byte)bSuccess, DAT_00673378 = ShipId.
+// LAB_0053d920 -- ch2 REQUESTCREATESHIPRESP: DAT_00678b95 = 1, DAT_00678b94 = bSuccess,
+// DAT_00673378 = ShipId.
 void IClientImpl::SendServerRequestCreateShipResp(unsigned int /*ClientId*/, bool bSuccess, unsigned int ShipId)
 {
     SetPlayerCreateShipResponse(static_cast<unsigned char>(bSuccess), ShipId);
 }
 
-// LAB_0053d9d0 (RET 8) -- ch2 REQUEST_SPACE_SCRIPT. The first argument is never read.
+// LAB_0053d9d0 -- ch2 REQUEST_SPACE_SCRIPT. The first argument is never read.
 void IClientImpl::SendServerRequestSpaceScript(unsigned int /*ClientId*/, const FServerRequestSpaceScriptInfo& Info)
 {
-    // 0x0053d9d8..0x0053d9e7: FUN_005416c0(+0x000, 0); no object -> nothing.
     FClientGameobj* const Object = ClientObjDb_FindObject(Info.ObjectId, 0);
     if (Object == nullptr)
     {
         return;
     }
 
-    // 0x0053d9ed..0x0053d9ff: mode 1 -- FUN_0054bb10(object, 0, name): the script camera keeps
-    // the transform it has.
+    // Mode 1: the script camera (FUN_0054bb10) keeps the transform it has.
     if (Info.CameraMode == 1u)
     {
         SetupSpaceScriptCamera(Object, nullptr, Info.Name);
         return;
     }
 
-    // 0x0053da0e..0x0053da7f: mode 2 -- twelve floats on the stack, an identity orientation
-    // (1.0f at +0x00 / +0x10 / +0x20, zero elsewhere) then the position from +0x108..+0x110, and
-    // FUN_0054bb10(object, &transform, name). Any other mode does nothing.
+    // Mode 2: identity orientation at the given position. Any other mode does nothing.
     if (Info.CameraMode != 2u)
     {
         return;
@@ -1333,17 +1188,11 @@ void IClientImpl::SendServerRequestSpaceScript(unsigned int /*ClientId*/, const 
     SetupSpaceScriptCamera(Object, Transform, Info.Name);
 }
 
-// LAB_0053bdd0 (RET 0xc) -- ch2 DAMAGEOBJECT, Damage the DamageList. The gameobj (any bucket) takes
-// the damage (slot 102 +0x198); for the player's ship (FUN_00548eb0) every entry then updates
-// the player's own records, through its CEqObj (0x103, no null test):
-//   an equipment id (SubObjectID::IsEquipID) with fate 0: the CEquip (FindByID) re-read into a
-//     fresh EquipDesc (CEquip vt+0x28) and, when that succeeds, FUN_004c4590 -- the argument
-//     shuffle into FUN_004c43d0 -- with {Id, &Hardpoint, Count, Health, bEquipped}; no CEquip:
-//     FUN_004c4320(0, id, -1);
-//   an equipment id with any other fate: FUN_004c4320(0, id, -1);
-//   a collision group (IsArchGroupID): its CArchGroup's relative health to FUN_004c4000;
-//   the root (SUBOBJ_ID_ROOT): CSimple::get_relative_health to FUN_004c4f80.
-// 0x0053be35 constructs one more EquipDesc that nothing reads.
+// LAB_0053bdd0 -- ch2 DAMAGEOBJECT. The gameobj takes the damage (slot 102); for the player's
+// ship every entry then updates the player's own records (no null test on the narrowed CEqObj):
+// equipment (FUN_004c4590 = FUN_004c43d0, or FUN_004c4320 when gone or separated), collision
+// groups (FUN_004c4000) and the hull (FUN_004c4f80). Retail constructs one more EquipDesc that
+// nothing reads.
 void IClientImpl::SendServerDamageObject(unsigned int /*ClientId*/, unsigned int ObjectId, const DamageList& Damage)
 {
     FClientGameobj* const Go = ClientObjDb_FindObject(ObjectId, 0);
@@ -1396,18 +1245,14 @@ void IClientImpl::SendServerDamageObject(unsigned int /*ClientId*/, unsigned int
     }
 }
 
-// FUN_0053c5d0 (RET 8) -- ch2 ITEMTRACTORED (FPayloadServerItemTractored). The tractoring ship
-// (any bucket): FUN_00533100(tractor equip id) finds its equipment-FX wrapper (EquippedObj
-// +0xb8 list, wrapper +4 == the CEquip) and FUN_0052f9a0(loot id, units) lets the tractor drop
-// the loot (CETractor::GetTractorArm / RemoveTarget). Then, outside single player, the loot (any
-// bucket) narrowed to CLoot (0x803, not tested) loses the units (+0xf0).
+// FUN_0053c5d0 -- ch2 ITEMTRACTORED. The tractoring ship's equipment-FX wrapper
+// (FUN_00533100) lets the tractor drop the loot (FUN_0052f9a0). Then, outside single player,
+// the loot (CLoot, not tested) loses the units.
 void IClientImpl::SendServerItemTractored(unsigned int /*ClientId*/, const FPayloadServerItemTractored& Info)
 {
     FClientGameobj* const Tractoring = ClientObjDb_FindObject(Info.ShipId, 0);
     if (Tractoring != nullptr)
     {
-        // 0x0053c5e7..0x0053c603: FUN_00533100 with the word at +8; a wrapper -> FUN_0052f9a0
-        // with the loot id (+0) and the word at +0xa (MOVZX).
         FClientEquip* const Wrapper = EquippedObjFindEquipFx(Tractoring, Info.TractorEquipId);
         if (Wrapper != nullptr)
         {
@@ -1428,11 +1273,9 @@ void IClientImpl::SendServerItemTractored(unsigned int /*ClientId*/, const FPayl
     Loot->Units -= Info.UnitsTaken;
 }
 
-// LAB_0053c660 (RET 8) -- ch2 USE_ITEM (FPayloadServerUseItem). Outside single player: the
-// gameobj's CEqObj (0x103, not tested), the item's CECargo (FindByID + CECargo::cast), and
-// CECargo::RemoveFromStack(count). Then, for the player's ship, the player's own item
-// (FUN_004c45b0 = EquipDescList::find_equipment_item on DAT_00672960): FUN_004c4320(1, id,
-// count) while it holds more than count, else FUN_004c4320(0, id, count).
+// LAB_0053c660 -- ch2 USE_ITEM. Outside single player the gameobj's cargo stack shrinks (no
+// null test on the narrowed CEqObj). Then, for the player's ship, the player's own item
+// (DAT_00672960) through FUN_004c4320.
 void IClientImpl::SendServerUseItem(unsigned int /*ClientId*/, const FPayloadServerUseItem& Info)
 {
     if (!SinglePlayer())
@@ -1470,7 +1313,7 @@ void IClientImpl::SendServerUseItem(unsigned int /*ClientId*/, const FPayloadSer
 // Comm / reputation / cargo (slots 68..89)
 // ---------------------------------------------------------------------------------------------
 
-// LAB_0053bfb0 (RET 0x5c) -- ch2 SENDCOMM. CommCostume is the sender's Costume by value (four
+// LAB_0053bfb0 -- ch2 SENDCOMM. CommCostume is the sender's Costume by value (four
 // parts, eight accessories, the count -- 13 of the 23 dwords), TextIds the text-id array.
 // hud_comm.cpp ClientSendComm.
 void IClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
@@ -1482,16 +1325,15 @@ void IClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
                    Mood, Duration, bReceiverIsOwnShip);
 }
 
-// LAB_0053c2a0 (RET 8) -- ch2 SENDNNMESSAGE: FUN_00489e80(MessageId, 0), the NeuroNet voice queue.
+// LAB_0053c2a0 -- ch2 SENDNNMESSAGE: the NeuroNet voice queue.
 void IClientImpl::SendServerSendNNMessage(unsigned int /*ClientId*/, unsigned int MessageId)
 {
     NnVoiceEnqueue(MessageId, 0);
 }
 
-// LAB_0053de70 (RET 8): when the hint's Kind (+4) is 1, its Costume (+8, 0xd dwords -- the
-// CostumeHint's Cost) is copied out and handed to FUN_004cc900 (hud_comm.cpp
-// HudCommPreloadCostume). Kind is read through the pointer with no null test (0053de74),
-// although the receivers pass NULL for any wire Kind but 1 -- kept as retail has it.
+// LAB_0053de70: a costume hint (Kind 1) preloads its costume (FUN_004cc900). Kind is read with
+// no null test, although the receivers pass NULL for any wire Kind but 1 -- kept as retail has
+// it.
 void IClientImpl::SendServerLoadHint(const unsigned int& /*ClientId*/, BaseHint* Hint)
 {
     if (Hint->Kind == 1)
@@ -1502,34 +1344,25 @@ void IClientImpl::SendServerLoadHint(const unsigned int& /*ClientId*/, BaseHint*
     }
 }
 
-// FUN_0053da90 (RET 8) -- ch2 SETGROUPFEELINGS, Info = FServerSetGroupFeelingsInfo
-// (rpc_iclient_args.h: char name[0x10], +0x10 Relation*, +0x14 byte count): the relations
-// copied into operator new(count * 8), the name into a TString<16> (strlen clamped to 15),
-// Reputation::set(name, copy, count), the copy freed.
+// FUN_0053da90 -- ch2 SETGROUPFEELINGS: the relations copied, the name into a TString<16>
+// (clamped to 15), Reputation::set.
 void IClientImpl::SendServerSetGroupFeelings(unsigned int /*ClientId*/, const FServerSetGroupFeelingsInfo& Info)
 {
-    // 0x0053da98..0x0053daa3: operator new(count * 8), untested; zero count still allocates.
+    // Untested; a zero count still allocates.
     Reputation::Relation* const Copy = static_cast<Reputation::Relation*>(
         ::operator new(static_cast<unsigned int>(Info.RelationCount) * sizeof(Reputation::Relation)));
-    // 0x0053dab6..0x0053dad2: dword index against the byte count, re-read every pass; the
-    // array pointer is re-read too.
     for (unsigned int Index = 0; Index < static_cast<unsigned int>(Info.RelationCount); ++Index)
     {
         Copy[Index] = Info.Relations[Index];
     }
-    // 0x0053dad4..0x0053db0c: TString<16> = the name (strlen clamped to 15).
     TString<16> Name;
     Name = Info.Name;
-    // 0x0053db10..0x0053db1b: Reputation::set(name, copy, count byte).
     Reputation::set(Name, Copy, Info.RelationCount);
-    // 0x0053db22: FUN_005b7e1d (operator delete).
     ::operator delete(Copy);
 }
 
-// LAB_0053bf80 (RET 0x14) -- ch2 REQUEST_RETURNED: the ship (any bucket), then its
-// FUN_00546d00(RequestType, Response, Extra) -- the ship's pending-request answer ("stale
-// request detected"). The gameobj is not class-tested before the ship method runs on it
-// (0x0053bfa2).
+// LAB_0053bf80 -- ch2 REQUEST_RETURNED: the ship's pending-request answer (FUN_00546d00). The
+// gameobj is not class-tested before the ship method runs on it.
 void IClientImpl::SendServerRequestReturned(const unsigned int& /*ClientId*/, unsigned int ShipId, int RequestType,
                                             int Response, int Extra)
 {
@@ -1541,8 +1374,7 @@ void IClientImpl::SendServerRequestReturned(const unsigned int& /*ClientId*/, un
     static_cast<FClientShipGameobj*>(Go)->RequestReturned(RequestType, Response, Extra);
 }
 
-// FUN_0053deb0 (RET 0x10) -- ch2 REMOTEOBJECTCARGOUPDATE: the gameobj's cobject (vt+0x150) when
-// it is a CShip (0x503), CEqObj::sync_cargo(EquipDescList(Cargo)). Flag is not read.
+// FUN_0053deb0 -- ch2 REMOTEOBJECTCARGOUPDATE: a CShip syncs its cargo. Flag is not read.
 void IClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& /*ClientId*/, unsigned int ObjectId,
                                                     const EquipDescVector& Cargo, unsigned char /*Flag*/)
 {
@@ -1561,12 +1393,9 @@ void IClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& /*Client
     Eq->sync_cargo(CargoList);
 }
 
-// FUN_0053df80 (RET 0xc) -- ch2 OBJECTCARGOUPDATE, Item the EquipDesc. Outside single player: the
-// gameobj's CEqObj (0x103, not tested); the item's CEquip (FindByID) when it is a CECargo gets
-// SetCount(Count) and CEquip vt+0x40 SetHitPoints(Health * its archetype's HitPts); no CEquip
-// at all: CEqObj vt+0xb0 add_item(desc). Then, for the player's ship, the player's own item:
-// FUN_004c4590 (= FUN_004c43d0) with {Id, &Hardpoint, Count, Health, false} while Count > 0,
-// else FUN_004c4320(0, id, -1); no such item: FUN_004c4170(0, desc).
+// FUN_0053df80 -- ch2 OBJECTCARGOUPDATE. Outside single player the gameobj's cargo is updated
+// or added (no null test on the narrowed CEqObj). Then, for the player's ship, the player's own
+// item: FUN_004c4590 while Count > 0, else FUN_004c4320; no such item: FUN_004c4170.
 void IClientImpl::SendServerObjectCargoUpdate(const unsigned int& /*ClientId*/, unsigned int ObjectId,
                                               const EquipDesc& Item)
 {
@@ -1599,7 +1428,7 @@ void IClientImpl::SendServerObjectCargoUpdate(const unsigned int& /*ClientId*/, 
     }
     if (GetPlayerEquipDescListRetail().find_equipment_item(Desc->Id) == nullptr)
     {
-        AddPlayerEquipRetail(0, Desc); // 0x0053e07e..0x0053e081
+        AddPlayerEquipRetail(0, Desc);
         return;
     }
     if (Desc->Count > 0)
@@ -1610,11 +1439,8 @@ void IClientImpl::SendServerObjectCargoUpdate(const unsigned int& /*ClientId*/, 
     RemovePlayerEquipRetail(0, Desc->Id, -1);
 }
 
-// FUN_0053e090 (RET 8) -- ch2 BURNFUSE (FServerBurnFuseInfo): the gameobj (any bucket, used as
-// an EquippedObj, no class test); the fuse id (+0x08) is copied into the argument's own stack
-// slot as an ID_String (0x0053e0b5 / 0x0053e0df). Lit (byte +0x18): slot 112 (+0x1c0)(SourceId,
-// &FuseId, (word) SubObjId, AtT, Lifetime); else slot 113 (+0x1c4)(&FuseId, (word) SubObjId,
-// AtT). Both results are dropped.
+// FUN_0053e090 -- ch2 BURNFUSE: the gameobj is used as an EquippedObj with no class test. Lit:
+// slot 112, else slot 113; both results are dropped.
 void IClientImpl::SendServerBurnFuse(const unsigned int& /*ClientId*/, const FServerBurnFuseInfo& Info)
 {
     FClientGameobj* const Found = ClientObjDb_FindObject(Info.ObjectId, 0);
@@ -1633,15 +1459,12 @@ void IClientImpl::SendServerBurnFuse(const unsigned int& /*ClientId*/, const FSe
     Equipped->UnLightFuse(&FuseId, Info.SubObjId, Info.AtT);
 }
 
-// LAB_0053e100 (RET 8) -- ch2 SET_CAMERA: Info is {Position (3 floats), Orient quaternion at
-// +0x0c, Fov, Aspect}. The quaternion to a matrix (DAT_006789f8 slot 0x54 QuaternionToMatrix,
-// the result unread), a 12-dword Csys {matrix, position}, then FUN_0054bb50(&Csys) -- the static
-// camera (space_app.h SetStaticCameraTransform). Fov and Aspect are not read.
+// LAB_0053e100 -- ch2 SET_CAMERA: the static camera (FUN_0054bb50). Fov and Aspect are not
+// read.
 void IClientImpl::SendServerSetCamera(const unsigned int& /*ClientId*/, const FPayloadServerSetCamera& Info)
 {
     FMatrix Orientation;
     IClientSMath()->QuaternionToMatrix(Orientation, reinterpret_cast<FQuaternion const&>(Info.Orient));
-    // 0x0053e12c..0x0053e150: REP MOVSD of the nine matrix dwords, then +0x00 / +0x04 / +0x08.
     float Csys[12];
     memcpy(Csys, &Orientation, 9 * sizeof(float));
     Csys[9] = Info.Position.x;
@@ -1650,7 +1473,7 @@ void IClientImpl::SendServerSetCamera(const unsigned int& /*ClientId*/, const FP
     SetStaticCameraTransform(Csys);
 }
 
-// LAB_0053e170 (RET 4) -- ch2 REVERT_CAMERA: FUN_0054bc10("player").
+// LAB_0053e170 -- ch2 REVERT_CAMERA.
 void IClientImpl::SendServerRevertCamera(const unsigned int& /*ClientId*/)
 {
     RequestSpaceCameraMode("player");
@@ -1660,13 +1483,13 @@ void IClientImpl::SendServerRevertCamera(const unsigned int& /*ClientId*/)
 // ch1 common traffic (slots 91..100)
 // ---------------------------------------------------------------------------------------------
 
-// LAB_0053c310 (RET 0xc) -- SET_WEAPON_GROUP: DAT_00674c0c FUN_004f5e50(Data, Size).
+// LAB_0053c310 -- SET_WEAPON_GROUP (DAT_00674c0c, FUN_004f5e50).
 void IClientImpl::SendCommonSetWeaponGroup(unsigned int /*ClientId*/, const unsigned char* Data, unsigned int Size)
 {
     G_WeaponGroups.ReadFromServer(reinterpret_cast<char const*>(Data), static_cast<int>(Size));
 }
 
-// FUN_0053c330 (RET 0xc) -- SET_VISITED_STATE, Data = {int count, then count records of 5 bytes
+// FUN_0053c330 -- SET_VISITED_STATE, Data = {int count, then count records of 5 bytes
 // {dword id, byte flags}}: FUN_004c4e00(id, flags, 0) for each. Size is not read.
 void IClientImpl::SendCommonSetVisitedState(unsigned int /*ClientId*/, unsigned char* Data, unsigned int /*Size*/)
 {
@@ -1683,7 +1506,7 @@ void IClientImpl::SendCommonSetVisitedState(unsigned int /*ClientId*/, unsigned 
     }
 }
 
-// FUN_0053c370 (RET 0xc) -- REQUEST_BEST_PATH, Data = {+4 count, +8 byte, +0xc records of 0x14
+// FUN_0053c370 -- REQUEST_BEST_PATH, Data = {+4 count, +8 byte, +0xc records of 0x14
 // {Vector, +0x0c, +0x10}}: DAT_006720a8 = the byte, FUN_004c46c0 (waypoints reset), then
 // FUN_004c4780(&rec, rec+0x10, rec+0x0c) for each record but the last, which gets
 // FUN_004c4ea0() in place of rec+0x0c. The count is re-read every pass. Size is not read.
@@ -1720,10 +1543,8 @@ void IClientImpl::SendCommonRequestBestPath(unsigned int /*ClientId*/, const uns
     }
 }
 
-// LAB_0053c3d0 (RET 0xc) -- REQUEST_PLAYER_STATS: FUN_004a8e40(Data, Data+0x34, Data+0x34 +
-// [Data+0x20]*8) -- the block, its ship-kill table and its reputation table. ClientId and Size
-// are not read. FUN_004a8e40 (nn_player_info.cpp) hands all three to NN_PlayerInfo when one is
-// open and otherwise the reputation table to NN_Dealer's FUN_00483f30.
+// LAB_0053c3d0 -- REQUEST_PLAYER_STATS: the block, its ship-kill table and its reputation
+// table to FUN_004a8e40 (nn_player_info.cpp). ClientId and Size are not read.
 void IClientImpl::SendCommonRequestPlayerStats(unsigned int /*ClientId*/, const unsigned char* Data,
                                                unsigned int /*Size*/)
 {
@@ -1734,50 +1555,44 @@ void IClientImpl::SendCommonRequestPlayerStats(unsigned int /*ClientId*/, const 
     NnPlayerInfoOnPlayerStats(Stats, ShipKills, ShipKills + ShipKillCount * 8);
 }
 
-// LAB_0053c3f0 (RET 0x10) -- POP_UP_DIALOG: FUN_0048a380(&Title, &Text, Buttons) -- the title
-// FmtStr, the text FmtStr and the button bits (Server pub::Player::PopUpDialog / rpclocal
-// DeliverPopUpDialog pass them in that order).
+// LAB_0053c3f0 -- POP_UP_DIALOG (FUN_0048a380).
 void IClientImpl::SendCommonPopUpDialog(unsigned int /*ClientId*/, const FmtStr& Title, const FmtStr& Text,
                                         unsigned int Buttons)
 {
     NnMissionMessagePopUp(&Title, &Text, Buttons);
 }
 
-// LAB_0053c410 (RET 0xc) -- REQUEST_GROUP_POSITIONS: FUN_0048d8a0(Data, Size). FUN_0048d8a0
-// reads only its first argument (the list); Size is pushed and never read.
+// LAB_0053c410 -- REQUEST_GROUP_POSITIONS (FUN_0048d8a0, which never reads Size).
 void IClientImpl::SendCommonRequestGroupPositions(unsigned int /*ClientId*/, unsigned char* Data,
                                                   unsigned int /*Size*/)
 {
     NavMapSetGroupPositions(Data);
 }
 
-// LAB_0053c430 (RET 0xc) -- SET_MISSION_LOG: FUN_004ba430(Data, Size) (0x0053c43a), the story
-// star's history replaced by the packed log.
+// LAB_0053c430 -- SET_MISSION_LOG: the story star's history replaced (FUN_004ba430).
 void IClientImpl::SendCommonSetMissionLog(unsigned int /*ClientId*/, unsigned char* Data, unsigned int Size)
 {
     StoryStarLoadHistory(Data, static_cast<int>(Size));
 }
 
-// LAB_0053c450 (RET 0xc) -- SET_INTERFACE_STATE: FUN_004c8190(*Data) (the first dword).
+// LAB_0053c450 -- SET_INTERFACE_STATE (FUN_004c8190, the first dword).
 void IClientImpl::SendCommonSetInterfaceState(unsigned int /*ClientId*/, unsigned char* Data,
                                               unsigned int /*Size*/)
 {
     AssignGameSessionFlags(*reinterpret_cast<unsigned const*>(Data));
 }
 
-// LAB_0053c460 (RET 0xc) -- REQUEST_RANK_LEVEL: FUN_004c55e0(*Data) (the first dword).
+// LAB_0053c460 -- REQUEST_RANK_LEVEL (FUN_004c55e0, the first dword).
 void IClientImpl::SendCommonRequestRankLevel(unsigned int /*ClientId*/, unsigned char* Data,
                                              unsigned int /*Size*/)
 {
     SetPlayerRankLevelRetail(*reinterpret_cast<int const*>(Data));
 }
 
-// FUN_0053db60 (RET 8) -- ch2 SETDIRECTIVE (FPayloadServerSetDirective). With the player's ship
-// (FUN_0054baf0; none does nothing): its CEqObj (0x503, no test) behavior manager, then the kind
-// (+0x00): 0..4 build the stack op with its default ctor, copy the payload's fields over it and
-// IBehaviorManager::set_current_directive(info, &op); 5 sets the directive with no op and zeroes
-// the current behavior's throttle and cruise; any other kind does nothing. The IDirectiveInfo
-// is {1, 0, type} (type 0x14 delay, 7 dock, 0x11 follow, 2 goto, 6 idle), for cancel {0, 0, -1}.
+// FUN_0053db60 -- ch2 SETDIRECTIVE on the player's ship (no null test on the narrowed CEqObj or
+// its behavior manager). Kinds 0..4 build the op and set it; 5 sets the idle directive with no
+// op and zeroes the current behavior's throttle and cruise. The IDirectiveInfo is {1, 0, type}
+// (type 0x14 delay, 7 dock, 0x11 follow, 2 goto, 6 idle), for cancel {0, 0, -1}.
 void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const FPayloadServerSetDirective& Info)
 {
     void* const PlayerObj = GetPlayerObjRW();
@@ -1793,14 +1608,12 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     {
     case 0:
     {
-        // caseD_0 0x0053ddcf.
         pub::AI::DirectiveCancelOp Op;
         Behavior->set_current_directive(MakeDirectiveInfo(0u, 0xffffffffu), &Op);
         break;
     }
     case 1:
     {
-        // caseD_1 0x0053dbf8.
         pub::AI::DirectiveDelayOp Op;
         Op.DelaySeconds = Info.DelaySeconds;
         Behavior->set_current_directive(MakeDirectiveInfo(1u, 0x14u), &Op);
@@ -1808,7 +1621,6 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     }
     case 2:
     {
-        // caseD_2 0x0053dc26.
         pub::AI::DirectiveDockOp Op;
         Op.DockObjectId = Info.DockObjectId;
         Op.Field_10 = Info.DockSecondaryObjectId;
@@ -1822,7 +1634,6 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     }
     case 3:
     {
-        // caseD_3 0x0053ddef.
         pub::AI::DirectiveFollowOp Op;
         Op.TargetId = Info.FollowTargetId;
         Op.FollowDistance = Info.FollowDistance;
@@ -1835,7 +1646,6 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     }
     case 4:
     {
-        // caseD_4 0x0053dc7e.
         pub::AI::DirectiveGotoOp Op;
         Op.Field_0C = Info.GotoMode;
         Op.Destination = Info.GotoDestination;
@@ -1867,7 +1677,6 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     }
     case 5:
     {
-        // caseD_5 0x0053dbb8.
         Behavior->set_current_directive(MakeDirectiveInfo(1u, 6u), nullptr);
         Behavior->update_current_behavior_throttle(0.0f);
         Behavior->update_current_behavior_cruise(false);
@@ -1882,8 +1691,7 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
 // Misc object updates (slots 109..124)
 // ---------------------------------------------------------------------------------------------
 
-// LAB_0053db40 (RET 0xc) -- ch2 SCANNOTIFY: with a player ship (FUN_0054baf0),
-// FUN_0048a180(ScannerId, GoodId) -- the scanning object's id and the scanned good.
+// LAB_0053db40 -- ch2 SCANNOTIFY: with a player ship, FUN_0048a180.
 void IClientImpl::SendServerScanNotify(unsigned int /*ClientId*/, unsigned int ScannerId, unsigned int GoodId)
 {
     if (GetPlayerObjRW() == nullptr)
@@ -1893,8 +1701,8 @@ void IClientImpl::SendServerScanNotify(unsigned int /*ClientId*/, unsigned int S
     NnMissionMessageShowScanNotice(ScannerId, GoodId);
 }
 
-// LAB_0053e2b0 (RET 0xc) -- MISCOBJUPDATE 0x0009: the gameobj's cobject (vt+0x150) when it is a
-// CShip (0x503) gets the dword GroupId at +0x1b4.
+// LAB_0053e2b0 -- MISCOBJUPDATE 0x0009: a CShip's multiplayer group id (+0x1b4; the server
+// sends it from SystemPlayerView_SendGroupChange).
 void IClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int /*ClientId*/, unsigned int ObjectId,
                                                      unsigned int GroupId)
 {
@@ -1909,16 +1717,12 @@ void IClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int /*ClientId*/, 
     {
         return;
     }
-    // 0x0053e2e2..0x0053e2e6: CShip+0x1b4, the multiplayer group id (the server sends it from
-    // SystemPlayerView_SendGroupChange, 0x06cf712d).
     Ship->GroupId = GroupId;
 }
 
-// LAB_0053e370 (RET 0xc) -- MISCOBJUPDATE 0x0002, the multiplayer mission-offer answer:
-// DAT_0067334c = MissionSetBy (0x0053e378), DAT_00673348 = MissionId (0x0053e386), then
-// FUN_004557d0 (thiscall) on the offer's ScriptSequence DAT_00673350 when there is one
-// (FGfScriptSequence::OnMissionOfferAnswered: DAT_00673350 cleared; with the offer up the
-// NN_OfferDialog closed and the current script run out).
+// LAB_0053e370 -- MISCOBJUPDATE 0x0002, the multiplayer mission-offer answer: DAT_0067334c =
+// MissionSetBy, DAT_00673348 = MissionId, then FUN_004557d0 on the offer's ScriptSequence
+// (DAT_00673350) when there is one.
 void IClientImpl::SendServerMiscObjUpdateMission(unsigned int /*ClientId*/, unsigned int MissionId,
                                                  unsigned int MissionSetBy)
 {
@@ -1928,17 +1732,15 @@ void IClientImpl::SendServerMiscObjUpdateMission(unsigned int /*ClientId*/, unsi
         Sequence->OnMissionOfferAnswered();
 }
 
-// LAB_0053e3a0 (RET 8): EAX = [&Motd+4], the string's _Ptr, or MSVCP60's _Nullstr when it is null
-// (0053e3a7 TEST / JNZ / 0053e3ab); FUN_0046b0f0(EAX). ClientId is not read.
+// LAB_0053e3a0: FUN_0046b0f0 with the string (MSVCP60's _Nullstr when empty). ClientId is not
+// read.
 void IClientImpl::SendServerMiscObjUpdateMotd(unsigned int /*ClientId*/, const std::wstring& Motd)
 {
     ChatSetServerMotd(Motd.c_str());
 }
 
-// FUN_0053e2f0 (RET 0xc) -- MISCOBJUPDATE 0x0028: the gameobj (any bucket): its cobject when it
-// is a CEqObj (0x103) -- Reputation::Vibe::SetAffiliation(its vibe +0x104, Affiliation, true),
-// else nothing. No gameobj but ObjectId is the local character (DAT_00673378): SetAffiliation(
-// FUN_004c4670(), Affiliation, true).
+// FUN_0053e2f0 -- MISCOBJUPDATE 0x0028: a CEqObj's vibe (+0x104) takes the affiliation; with
+// no gameobj but the local character's id, the player's own vibe (FUN_004c4670).
 void IClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int /*ClientId*/, unsigned int ObjectId,
                                                      unsigned int Affiliation)
 {
@@ -1963,9 +1765,7 @@ void IClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int /*ClientId*/, 
     Reputation::Vibe::SetAffiliation(PlayerVibe, Affiliation, true);
 }
 
-// FUN_0053e200 (RET 0xc) -- MISCOBJUPDATE 0x0044: FUN_0046add0(PlayerId, Rank); when PlayerId
-// is this client (ClientId), Reputation::Vibe::SetRank(FUN_004c4670(), Rank); in single player
-// FUN_004b9b20(Rank).
+// FUN_0053e200 -- MISCOBJUPDATE 0x0044.
 void IClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned int PlayerId, int Rank)
 {
     ChatSetPlayerRank(PlayerId, static_cast<unsigned>(Rank)); // FUN_0046add0
@@ -1976,28 +1776,26 @@ void IClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned in
     }
     if (SinglePlayer())
     {
-        StoryStarSetRankUp(Rank); // FUN_004b9b20 (0x0053e23f)
+        StoryStarSetRankUp(Rank); // FUN_004b9b20
     }
 }
 
-// LAB_0053e1e0 (RET 0xc) -- MISCOBJUPDATE 0x0005: FUN_0046ad60(PlayerId, GroupId).
+// LAB_0053e1e0 -- MISCOBJUPDATE 0x0005.
 void IClientImpl::SendServerMiscObjUpdatePlayerGroup(unsigned int /*ClientId*/, unsigned int PlayerId,
                                                      unsigned int GroupId)
 {
     ChatSetPlayerGroupId(PlayerId, GroupId); // FUN_0046ad60
 }
 
-// LAB_0053e250 (RET 0xc) -- MISCOBJUPDATE 0x0084: FUN_0046ae40(PlayerId, SystemId).
+// LAB_0053e250 -- MISCOBJUPDATE 0x0084.
 void IClientImpl::SendServerMiscObjUpdateSystem(unsigned int /*ClientId*/, unsigned int PlayerId,
                                                 unsigned int SystemId)
 {
     ChatSetPlayerSystemId(PlayerId, SystemId); // FUN_0046ae40
 }
 
-// LAB_0053e270 (RET 8): nothing in single player (0053e272 CALL SinglePlayer / 0053e27a JNZ ->
-// return); otherwise FUN_004c5680 (clear), then for i from 0 while _First is non-null and
-// i < (_Last - _First) >> 2 (0053e287..0053e298, both re-read every pass): FUN_004c56b0(
-// _First[i]). ClientId is not read.
+// LAB_0053e270: outside single player, the formation member queue is cleared (FUN_004c5680)
+// and refilled (FUN_004c56b0). ClientId is not read.
 void IClientImpl::SendServerMiscObjUpdateFormation(unsigned int /*ClientId*/,
                                                    const std::vector<unsigned int>& MemberIds)
 {
@@ -2012,9 +1810,7 @@ void IClientImpl::SendServerMiscObjUpdateFormation(unsigned int /*ClientId*/,
     }
 }
 
-// LAB_0053e1a0 (RET 0xc) -- ch2 FORMATION_UPDATE: with a player ship (FUN_0054baf0), its
-// IObjAffect set_formation_leader (+0x10)(the gameobj of LeaderId, any bucket, not tested) and
-// set_formation_offset (+0x14)(Offset).
+// LAB_0053e1a0 -- ch2 FORMATION_UPDATE on the player's ship; the leader gameobj is not tested.
 void IClientImpl::SendServerFormationUpdate(unsigned int /*ClientId*/, unsigned int LeaderId, const Vector& Offset)
 {
     void* const PlayerObj = GetPlayerObjRW();
@@ -2028,22 +1824,20 @@ void IClientImpl::SendServerFormationUpdate(unsigned int /*ClientId*/, unsigned 
     Player->set_formation_offset(Offset);
 }
 
-// LAB_0053e3c0 (RET 0x1c) -- SET_MUSIC: FUN_00553340(Space, Danger, Battle, Override, Fade,
-// bFlag) -- the last two swap: the float fade is the sixth argument, the byte flag the fifth.
+// LAB_0053e3c0 -- SET_MUSIC (FUN_00553340): the last two arguments swap order.
 void IClientImpl::SendServerSetMusic(unsigned int /*ClientId*/, unsigned int SpaceMusic, unsigned int DangerMusic,
                                      unsigned int BattleMusic, unsigned int OverrideMusic, bool bFlag, float Fade)
 {
     StarSysSetMusicOverride(SpaceMusic, DangerMusic, BattleMusic, OverrideMusic, Fade, bFlag);
 }
 
-// LAB_0053e3f0 (RET 4) -- FUN_00553380.
+// LAB_0053e3f0 -- FUN_00553380.
 void IClientImpl::SendServerCancelMusic(unsigned int /*ClientId*/)
 {
     StarSysClearMusicOverride();
 }
 
-// LAB_0053e400 (RET 8) -- ch2 PLAY_SOUND_EFFECT: FUN_0042ae40(&ID_String{SoundId}), then
-// FUN_00428680(arch, 0, 0, 0).
+// LAB_0053e400 -- ch2 PLAY_SOUND_EFFECT.
 void IClientImpl::SendServerPlaySoundEffect(unsigned int /*ClientId*/, unsigned int SoundId)
 {
     ID_String Sound;

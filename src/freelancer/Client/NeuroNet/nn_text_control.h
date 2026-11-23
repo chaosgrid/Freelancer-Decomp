@@ -11,13 +11,8 @@
 // FUN_00589ba0, dtor FUN_00589d50, vftable 0x005e4f24. EditControl (ctor at 0x0058c26a) derives
 // from it and adds +0x3a0..+0x3ad.
 //
-// Retail Init FUN_0058a110 (RET 0x28), called by CreateTextControl FUN_005a0e30 and
-// CreateEditControl FUN_005a0e90:
-//   +0x378 = the last argument; the style's font (FUN_004177b0) is bound into the Font::String
-//   at +0x334; Offset(+0xa8) = *Position; a hardpoint name is copied to +0x1d0 and resolved on
-//   the parent; +0x32c/+0x330 = width/height; the ids through FUN_0058a5f0; +0x358/+0x344.
-// Draw LAB_0058a7f0 has its ordinary Font::String path. Its typewriter and cached-placement
-// branches are still missing (tracker 0x0058a7f0 partial).
+// Init FUN_0058a110 is called by CreateTextControl FUN_005a0e30 and CreateEditControl
+// FUN_005a0e90.
 
 #include "Common/Fonts/font_string.h"
 #include "Interface/wincontrol_base.h"
@@ -36,8 +31,6 @@ public:
     void Init(char const* StyleName, float const* InPosition, char const* Hardpoint,
               float InWidth, float InHeight, float Arg6, unsigned Ids, int InDword358,
               int InDword344, unsigned char InByte378);
-    // (The port-only seven-argument Init adapter for the removed flat menu builders is gone,
-    // 2026-10-07.)
 
     // FUN_0058a5f0 (thiscall, RET 4) -- the ids' string (FUN_004347e0, "IDS?" when it is
     // missing; an empty string for ids 0) into the Font::String, after FUN_004145d0.
@@ -58,7 +51,7 @@ public:
     void SetFont(IFont* Font);
 
     // FUN_0058ad70 (thiscall, RET 8) -- +0x395 = bCached; a non-zero bInvalidate clears +0x394
-    // (the "cached placement valid" byte the draw at 0x0058ac5f..0x0058ac98 tests and sets).
+    // (the "cached placement valid" byte Draw tests and sets).
     // Callers: HUD_CruiseProgress::Draw 0x004d5fb6 / 0x004d6058.
     void SetCachedDraw(unsigned char bCached, unsigned char bInvalidate);
 
@@ -108,8 +101,8 @@ public:
 
     virtual void Draw() override;
 
-    // slot 42 FUN_0058b360 -- property switch 6..0x51 (jump table 0058b6a8 / 0058b6e0); every
-    // other id goes to WinControl FUN_005a13c0.
+    // slot 42 FUN_0058b360 -- properties 6..0x51; every other id goes to WinControl
+    // FUN_005a13c0.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     FFontString* GetFontString() const { return FontString; }
@@ -138,9 +131,8 @@ public:
     unsigned char bTypewriter;      // +0x362 -- property 0x50 (A == 1)
     unsigned char Pad363;
     int TypedCount;                 // +0x364 -- ctor 1; property 0x50 resets it to 1; Update
-                                    //   adds one per TypeInterval (INC dword, CMP to wcslen)
-    float TypeElapsed;              // +0x368 -- ctor 0; property 0x50 resets it to 0; Update's
-                                    //   FLD/FADD/FSTP float accumulator
+                                    //   adds one per TypeInterval
+    float TypeElapsed;              // +0x368 -- ctor 0; property 0x50 resets it to 0
     float TypeInterval;             // +0x36c -- ctor 0.05f; property 0x50: B * 0.001f
     wchar_t* PendingText;           // +0x370 -- the typewriter's full text (free()d)
     unsigned PendingCapacity;       // +0x374
@@ -148,14 +140,14 @@ public:
     unsigned char bBlink;           // +0x379 -- property 0x51; Update's colour blink runs
     unsigned char BlinkPhase;       // +0x37a -- toggled once per whole second of blink time
     unsigned char Pad37b;
-    float BlinkElapsed;             // +0x37c -- ctor 0; Update's FADD/FST float accumulator
+    float BlinkElapsed;             // +0x37c -- ctor 0
     unsigned char Byte380;          // +0x380 -- ctor 1
     unsigned char BlinkColourOn[4]; // +0x381 -- ctor 0; copied to +0x35e while BlinkPhase != 0
     unsigned char BlinkColourOff[4]; // +0x385 -- ctor 0; copied to +0x35e while BlinkPhase == 0
     unsigned char bTyping;          // +0x389 -- a typewriter run holds DAT_0067d8c8
     unsigned char Pad38a[2];
-    float CachedX;                  // +0x38c -- Draw's cached screen x (0x0058aca9 / 0x0058ace0)
-    float CachedY;                  // +0x390 -- Draw's cached screen y (0x0058acb7)
+    float CachedX;                  // +0x38c -- Draw's cached screen x
+    float CachedY;                  // +0x390 -- Draw's cached screen y
     unsigned char Byte394;          // +0x394 -- ctor 0; the cached placement is valid
     unsigned char Byte395;          // +0x395 -- ctor 0; Draw uses the cached placement
     unsigned char Pad396[2];
@@ -196,7 +188,7 @@ static_assert(sizeof(NnTextControl) == 0x3a0, "retail TextControl is 0x3a0 bytes
 // static init LAB_00589b20 (ctor FUN_0058c1c0, atexit LAB_00589b40 -> FUN_00579380); its Create
 // FUN_0058c230 is the template's with the ctor inlined: operator_new(0x3b0), TextControl's
 // FUN_00589ba0, vftable 0x005e501c / face +0x7c 0x005e500c, then the five fields below.
-// vftable 0x005e501c is TextControl's 0x005e4f24 with three overrides (raw dword diff): 11
+// vftable 0x005e501c is TextControl's 0x005e4f24 with three overrides: 11
 // LAB_0058bdb0 Update, 20 LAB_0058b7a0 KeyEvent, 42 LAB_0058c030 SetProperty. Slot 0 is
 // TextControl's FUN_0058b780: EditControl adds no destructor body.
 //
@@ -207,7 +199,7 @@ static_assert(sizeof(NnTextControl) == 0x3a0, "retail TextControl is 0x3a0 bytes
 class NnEditControl : public NnTextControl
 {
 public:
-    // The ctor FUN_0058c230 inlines (0x0058c26a..0x0058c299).
+    // The ctor FUN_0058c230 inlines (0x0058c26a).
     NnEditControl();
 
     // slot 11 LAB_0058bdb0 -- while editable: the blink timer runs (FUN_0042d680) and every

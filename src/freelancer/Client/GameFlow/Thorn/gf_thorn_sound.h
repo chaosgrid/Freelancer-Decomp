@@ -37,14 +37,14 @@ struct FThornSound : FThornComponent
 
     // FUN_00456ff0 (thiscall, RET 8) -- the template: background music / ambience take the
     // global source, anything else (not a voice line) its sound archetype. Caller: the spawn
-    // FUN_0044e030 (0x0044e0f6).
+    // FUN_0044e030.
     void BindTemplate(char const* InTemplate, unsigned char bInVoice);
     // FUN_004572b0 (thiscall, RET 4) -- malloc_strcpy of the speaker unless it is null.
     void SetSpeaker(char const* InSpeaker);
     // FUN_004572d0 (thiscall, RET 4) -- +0x75.
     void SetSpatial(unsigned char bInSpatial);
     // FUN_00457380 (thiscall) -- true for a playing voice line with +0x78 set whose handle's
-    // slot 29 answers true. Caller: FGfScript::GetSoundTailMs (FUN_0044f500, 0x0044f528).
+    // slot 29 answers true. Caller: FGfScript::GetSoundTailMs (FUN_0044f500).
     bool IsHoldingScript() const;
 
     // ICompoundControl (0x005ce290 / 0x005ce294)
@@ -101,7 +101,7 @@ struct FThornSound : FThornComponent
 private:
     // FUN_004570a0 (thiscall, RET 8) -- resolve the voice line for the speaking character:
     // VoiceId is the character's voice (Thorn_Deformable FindActor's first out), Actor the
-    // character itself. Caller: SetSpawnTable (0x0045736c).
+    // character itself. Caller: SetSpawnTable.
     void ResolveVoice(void* VoiceId, void* Actor);
 };
 
@@ -155,7 +155,7 @@ struct FThornSoundReference : FThornComponent
     GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;        // 6  LAB_00453580
 
     // identity tail
-    void Stop() override;                                                  // 14 FUN_00450cd0
+    void Stop() override;                                                  // 14 LAB_00450cd0
     void* GetEngineInstance() override;                                    // 17 LAB_00453550
 
     FThornComponent* Target; // +0x6c the created sound of that name, or null

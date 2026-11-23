@@ -19,7 +19,7 @@ static_assert(sizeof(FRngState) == 0x120u, "rng state");
 static_assert(sizeof(OSVERSIONINFOA) == 0x94u, "version info");
 static_assert(offsetof(OSVERSIONINFOA, dwPlatformId) == 0x10u, "platform id");
 
-// DAT_06add3c0, DAT_06add3c4, DAT_06add3c8. Initial bytes from the listing.
+// DAT_06add3c0, DAT_06add3c4, DAT_06add3c8, with their retail initial bytes.
 static unsigned int GPoolCapacity = 0x200u;
 static unsigned int GPoolIndex = 0x4000u;
 static unsigned int GPlatformNt = 1u;
@@ -263,7 +263,7 @@ static int __stdcall ReadKsecRandom(void* Input, unsigned int InputLength, void*
 }
 
 // Bytes actually consumed in the 0xE00 gather buffer. An early exit keeps the
-// remaining count at the point the listing jumps to 0x06acd08d.
+// remaining count as it was at the exit.
 static unsigned int CollectEntropy(unsigned char* Entropy, const unsigned char* Seed, unsigned int SeedLength)
 {
     unsigned int Remaining = 0xE00u;

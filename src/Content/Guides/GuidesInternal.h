@@ -8,7 +8,7 @@
 
 // Content.dll TU37: the concrete guide classes CreateGuide builds (Guides.h has the base, the
 // descriptions and CreateGuide). Private to the guide sources (Guides.cpp, GotoGuides.cpp);
-// the rest of Content only sees FContentGuide. Lane CNT-AI owns this file.
+// the rest of Content only sees FContentGuide.
 //
 // No RTTI in Content: the names come from what the classes do. Retail vtables:
 //   06fb81d8 FTargetGuide  (intermediate, never created on its own)
@@ -46,9 +46,9 @@ extern float GPatrolScanMaxAttitude;
 class FTargetGuide : public FContentGuide
 {
 public:
-    // The shared ctor prefix (CreateGuide 06f05f52-06f05f77 / 06f06051-06f06076, trade
-    // FUN_06f06fe0 06f06ffd-06f0704e inline): base FUN_06f06560, vtable 06fb81d8,
-    // Desc->GetTargets (FUN_06f062d0) into +0x14..+0x20.
+    // The shared ctor prefix, inlined in CreateGuide (06f05f52 / 06f06051) and the trade ctor
+    // FUN_06f06fe0: base FUN_06f06560, vtable 06fb81d8, Desc->GetTargets (FUN_06f062d0) into
+    // +0x14..+0x20.
     explicit FTargetGuide(FGuideDesc const* Desc);
     FTargetGuide(FTargetGuide const& Other) = default;
 
@@ -85,9 +85,9 @@ public:
 class FNothingGuide final : public FTargetGuide
 {
 public:
-    // CreateGuide case 1 (06f05f32-06f05fda).
+    // CreateGuide case 1 (06f05f32).
     explicit FNothingGuide(FGuideDesc const* Desc);
-    // Clone body (FUN_06f06ed0 06f06f0a-06f06f77).
+    // Clone body (FUN_06f06ed0).
     FNothingGuide(FNothingGuide const& Other);
     // FUN_06f06e00 (sdd 06f06de0): releases the directive.
     ~FNothingGuide() override;
@@ -123,7 +123,7 @@ public:
     virtual int HandleEvent(pub::Controller::EMessage MsgId, void const* Parms);
     // Slot 4 (purecall): the next directives into *Out; returns GetStatus().
     virtual int Update(std::list<FObjListDirective*>* Out) = 0;
-    // Slot 5, LAB_06f07100 (RET 4): +4 = Ship.
+    // Slot 5, LAB_06f07100 (RET 4).
     virtual void SetShip(FContentNpcShip* InShip);
 
     FContentNpcShip* Ship = nullptr;             // +0x04
@@ -149,7 +149,7 @@ public:
     int Update(std::list<FObjListDirective*>* Out) override;           // LAB_06f077b0
 
     // FUN_06f07950 (RET 4): a 1 s Delay directive appended to Out when another member of the
-    // ship's formation group (+0x154) is in its +0x120 state (HasField120).
+    // ship's formation group (+0x154) is in a trade lane.
     bool AddFormationWaitDirective(std::list<FObjListDirective*>* Out);
 
     int State = 0;                               // +0x08 0..4
@@ -167,7 +167,7 @@ class FTradeGuide final : public FTargetGuide
 public:
     // FUN_06f06fe0 (RET 4).
     explicit FTradeGuide(FGuideDesc const* Desc);
-    // Clone body (FUN_06f07180 06f071b4-06f0721e).
+    // Clone body (FUN_06f07180).
     FTradeGuide(FTradeGuide const& Other);
     // FUN_06f07160 (sdd 06f06fc0): the route freed (operator delete, no dtor call).
     ~FTradeGuide() override;
@@ -182,9 +182,9 @@ public:
                                 float& OutFloat) override;             // FUN_06f07470
     void SwapTargets() override;                                       // LAB_06f076c0
 
-    // +0x4c, LAB_06f07140: +0x2c.
+    // +0x4c, LAB_06f07140.
     virtual unsigned int GetTradeGood();
-    // +0x50, LAB_06f07150: +0x30.
+    // +0x50, LAB_06f07150.
     virtual unsigned int GetReturnGood();
 
     int State = 0;                               // +0x24 0..3
@@ -215,7 +215,7 @@ public:
     virtual bool RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
                                         Vector& OutPosition, unsigned int& OutParam,
                                         float& OutFloat);
-    // Slot 7, 06ebf6f0 (`RET 4`): nothing. No caller known; name unknown.
+    // Slot 7, 06ebf6f0: nothing. No caller known; name unknown.
     virtual void Slot1c(unsigned int Unused);
 
     // FUN_06f0bf10: NextPoint one step on (turning at the path's ends, wrapping on a loop).
@@ -240,7 +240,7 @@ public:
 class FCargoScanRoute final : public FGuideRoute
 {
 public:
-    // The patrol guide ctor's inline part (06f0ab23-06f0abab): Ship = Desc->Ship, the members
+    // The patrol guide ctor's inline part (06f0ab23): Ship = Desc->Ship, the members
     // below, then SetShip(Ship) (FUN_06f0c3f0, called directly).
     explicit FCargoScanRoute(FContentNpcShip* InShip);
     // FUN_06f0c2c0 (RET 4; Clone 06f0c500).
@@ -262,19 +262,19 @@ public:
     // Slot 8, FUN_06f0ac10.
     virtual void Reset();
     // Slot 9, FUN_06f0ca10 (RET 8): a TractorBeam directive (0x19) at TargetId appended to
-    // List (BaseOp Field_08 0).
+    // List (priority 0).
     virtual void AddTractorBeamDirective(unsigned int TargetId, std::list<FObjListDirective*>* List);
     // Slot 10, FUN_06f0cad0 (RET 8): a GotoShip directive (3) at TargetId (range 50) appended
-    // to List (BaseOp Field_08 0), then pub::AI::submit_forced_target(ship, TargetId).
+    // to List (priority 0), then pub::AI::submit_forced_target(ship, TargetId).
     virtual void AddGotoShipDirective(unsigned int TargetId, std::list<FObjListDirective*>* List);
 
     // FUN_06f0c6b0: picks TargetId among the ships within 2500 of the scanner (see the .cpp).
     bool FindScanTarget();
-    // The message 0x20 loop of LAB_06f0cbc0 (06f0cc88-06f0d49d, 06f0d4a2-06f0d627).
+    // The message 0x20 (Heartbeat) part of LAB_06f0cbc0 (06f0cc88).
     void HandleTimer(float const* DeltaSeconds);
     // A GCS scan event (FGcsScanEvent, vtable 06fb857c) of Type from the ship to TargetId,
     // CommSpeakerId = the ship's id, then GGcsConversations.QueueConversation (FUN_06ee8d70;
-    // the float result is dropped). E.g. 06f0d4a2-06f0d4f0.
+    // the float result is dropped). E.g. 06f0d4a2.
     void QueueScanEvent(int Type, unsigned int LootTakerId, unsigned int GoodId,
                         unsigned int Response);
 
@@ -306,7 +306,7 @@ class FPatrolGuide final : public FTargetGuide
 public:
     // FUN_06f0aa40 (RET 4).
     explicit FPatrolGuide(FGuideDesc const* Desc);
-    // Clone body (FUN_06f0adb0 06f0adea-06f0ae66).
+    // Clone body (FUN_06f0adb0).
     FPatrolGuide(FPatrolGuide const& Other);
     // FUN_06f0acf0 (sdd 06f0aa20).
     ~FPatrolGuide() override;
@@ -322,8 +322,7 @@ public:
                                 Vector& OutPosition, unsigned int& OutParam,
                                 float& OutFloat) override;             // FUN_06f0b1e0
 
-    // +0x4c, LAB_06f0b2d0: Route->GetPointsToGo() (tail jump). GCS FUN_06edae70 (the patrol
-    // status line) reads it.
+    // +0x4c, LAB_06f0b2d0. GCS FUN_06edae70 (the patrol status line) reads it.
     virtual int GetPathPointsToGo();
 
     bool bUndocked = true;                       // +0x24 0 from the dock directive to the launch
@@ -340,9 +339,9 @@ public:
 class FWanderGuide final : public FTargetGuide
 {
 public:
-    // CreateGuide case 4 (06f06035-06f060c4).
+    // CreateGuide case 4 (06f06035).
     explicit FWanderGuide(FGuideDesc const* Desc);
-    // Clone body (FUN_06f0b350 06f0b384-06f0b3f7).
+    // Clone body (FUN_06f0b350).
     FWanderGuide(FWanderGuide const& Other);
     // FUN_06f0b300 (sdd 06f0b2e0): releases the directive.
     ~FWanderGuide() override;
@@ -353,8 +352,7 @@ public:
     void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // LAB_06f0af30
 
     int State = 0;                               // +0x24 set to 1 by Start
-    // +0x28: the directive Start hands out; a ref-holding member (CreateGuide's unwind state 10,
-    // funclet 06facde2: FUN_06f28e10 on +0x28).
+    // +0x28: the directive Start hands out (ref-holding member).
     TRefHandle<FObjListDirective> Directive;
     unsigned int const* Zone = nullptr;          // +0x2c desc +0x48; *Zone = the zone id
     float MinRange = 1500.0f;                    // +0x30 DAT_06fb8114
@@ -369,7 +367,7 @@ public:
 class FLineGuide : public FContentGuide
 {
 public:
-    // FUN_06f07ef0 06f07f17-06f07f29: base FUN_06f06560, Line = the description's line
+    // Inlined in FUN_06f07ef0: base FUN_06f06560, Line = the description's line
     // (0x41 dwords), vtable 06fb827c.
     explicit FLineGuide(FMetaBehavior const* Desc);
     FLineGuide(FLineGuide const& Other) = default;
@@ -383,7 +381,7 @@ class FGotoGuide : public FLineGuide
 public:
     // FUN_06f07ef0 (RET 4).
     explicit FGotoGuide(FMbGotoGuide const* Desc);
-    // Clone body (FUN_06f08140 06f0817d-06f08367).
+    // Clone body (FUN_06f08140).
     FGotoGuide(FGotoGuide const& Other);
     // FUN_06f08390 (sdd 06f08120).
     ~FGotoGuide() override;
@@ -402,10 +400,9 @@ public:
     // State change used by every handler: State = NewState (the old one kept in PrevState)
     // and a restart requested, unless State already is NewState.
     void SetState(int NewState);
-    // The 0x20 (timer) part of FUN_06f08c70 (06f09168-06f0998a).
+    // The 0x20 (Heartbeat) part of FUN_06f08c70 (06f09168).
     void HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double ApproachSquared);
-    // The common exit of FUN_06f08c70 (06f0998e-06f0999f): Start() (slot +0x10) when a restart
-    // was requested.
+    // The common exit of FUN_06f08c70 (06f0998e): Start() when a restart was requested.
     void FinishEvent();
     // FUN_06f08800 (RET 8).
     bool IsTargetOnPath(int Kind, unsigned int ObjectId);
@@ -425,12 +422,12 @@ public:
     unsigned char bCruise = 0;                   // +0x16c desc +0x174 -> SetGuide bCruise
     unsigned char bNoCruise = 0;                 // +0x16d desc +0x175 -> SetGuide bNoCruise
     unsigned char bStartFollowing = 1;               // +0x16e desc +0x176 -> SetGuide FieldA0
-    // +0x170: the last directive handed out; a ref-holding member (the ctor / Clone / dtor
-    // unwind maps release it with FUN_06f28e10, after +0x180 and +0x1a0).
+    // +0x170: the last directive handed out; a ref-holding member, released after +0x180 and
+    // +0x1a0 (member order).
     TRefHandle<FObjListDirective> Directive;
     int State = 1;                               // +0x174 1..10 (dock guide also 12, 13)
     int PrevState = 0;                           // +0x178
-    int Priority = 0;                            // +0x17c desc +0x114 -> BaseOp Field_08
+    int Priority = 0;                            // +0x17c desc +0x114 -> Op.Priority
     std::list<FNnPathLeg> Path;                  // +0x180
     Vector Waypoint = {};                        // +0x18c (not set by the ctor in retail)
     float Timer = 0.0f;                          // +0x198 state 3 nag timer
@@ -448,7 +445,7 @@ class FDockGuide final : public FGotoGuide
 public:
     // FUN_06f0a270 (RET 4).
     explicit FDockGuide(FMbDockGuide const* Desc);
-    // Clone body (FUN_06f0a3b0 06f0a3ed-06f0a5b6).
+    // Clone body (FUN_06f0a3b0).
     FDockGuide(FDockGuide const& Other);
     // FUN_06f0a140 (sdd 06f0a120): the goto guide's dtor body, repeated.
     ~FDockGuide() override = default;
@@ -468,6 +465,5 @@ public:
 // FUN_06f0de80 (RET 4): smart-pointer assignment: when Slot differs from New, Slot is
 // released and set to New, which is AddRef'ed.
 void AssignDirective(FObjListDirective** Slot, FObjListDirective* New);
-// The "only directive" tail (06f06978-06f069a8 and siblings): CancelDirectives, AddDirective,
-// RestartDirectives on the ship.
+// The inlined "only directive" tail (06f06978 and siblings).
 void IssueOnlyDirective(FContentNpcShip* Ship, FObjListDirective* Directive);

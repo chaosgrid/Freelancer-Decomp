@@ -11,14 +11,11 @@
 // Content.dll per-TU static IDs.
 //
 // Every Content translation unit in retail starts with the same 16 dynamic
-// initializers (_initterm thunks), e.g. TU51 06f57cb0..06f57e90 writing
-// DAT_06fd0e2c..DAT_06fd0df0, TU0 06ea1000..06ea11e0 writing
+// initializers (_initterm thunks), e.g. TU0 06ea1000..06ea11e0 writing
 // DAT_06fce960..DAT_06fce924: CreateID(<literal>) stored into a TU-private
-// global. That is a header with internal-linkage globals included by every
-// source file. This header reproduces it: each including TU gets its own copy,
-// initialized in this declaration order, exactly like retail's per-TU thunks.
-// ("default", present only in 26 of the TUs, comes from a different header and
-// is not part of this set.)
+// global -- a header of internal-linkage globals included by every source file.
+// Each including TU gets its own copy, initialized in this declaration order.
+// ("default", present only in some TUs, is ContentDefaultId.h.)
 
 static unsigned int const GIdAny = CreateID("any");
 static unsigned int const GIdHouseFighters = CreateID("house_fighters");

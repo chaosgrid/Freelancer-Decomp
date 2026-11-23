@@ -43,7 +43,7 @@ static void UnlinkInstance(FImaInstance* Inst)
         Inst->Next->Prev = Inst->Prev;
     else
         GImaTail = Inst->Prev;
-    // Preserve the dying instance links through Data->Release; decrement once after unlinking.
+    // The dying instance's own links stay intact through Data->Release.
     --GImaCount;
 }
 
@@ -81,7 +81,7 @@ static void InitializeMaFileDesc(FFileSystemDesc* Desc, const char* Name)
 
 static void ParseMaKeys(void* FileSystem, FMaKeyBlock* Block)
 {
-    // FUN_06ec6a60..6cb3: scalar reads commit only on success with four bytes;
+    // FUN_06ec6a60: scalar reads commit only on success with four bytes;
     // array reads retain their published allocation regardless of read result/size.
     IFileSystem* Fs = AsFileSystem(FileSystem);
     FFileSystemDesc Desc;
@@ -273,19 +273,19 @@ void DACOM_API FImaInstance::ResetTime()
 
 void DACOM_API FImaInstance::Tick(float Dt)
 {
-    // 06ec72b7 TEST AH,0x41 / JNZ: not-greater (including unordered) returns.
+    // A NaN Dt returns too.
     if (Data == nullptr || !(Dt > 0.0f))
         return;
     FMaKeyBlock* Block = GetKeyBlock();
     if (Block->Count == 0)
         return;
     double ComparisonTime = (double)Dt + Time;
-    Time = (float)ComparisonTime; // FST, first FCOMP retains the sum.
+    Time = (float)ComparisonTime; // the first compare uses the unrounded sum
     while (ComparisonTime > Block->Deltas[Frame].Duration)
     {
         const double RemainingTime = (double)Time - Block->Deltas[Frame].Duration;
         ++Frame;
-        Time = (float)RemainingTime; // FSTP before wrap and next FCOMP.
+        Time = (float)RemainingTime; // later compares use the rounded float
         if (Frame >= Block->Count)
             Frame = 0;
         ComparisonTime = Time;
@@ -294,7 +294,7 @@ void DACOM_API FImaInstance::Tick(float Dt)
 
 unsigned char DACOM_API FImaInstance::FillUvMatrix(float* Out)
 {
-    // LAB_06ec7330..06ec742a: only Out==null has an early return.
+    // LAB_06ec7330: only Out==null has an early return.
     if (Out == nullptr)
         return 0;
     std::memset(Out, 0, 16 * sizeof(float));
@@ -318,12 +318,10 @@ unsigned char DACOM_API FImaInstance::FillUvMatrix(float* Out)
         KeyD = Key.D;
     }
     const FMaDelta& Delta = Block->Deltas[Frame];
-    // Keep x87 intermediates until their actual stores. B and D are spilled
-    // to float at 06ec73d9/06ec73f3; C survives on the FPU stack through +1.
+    // Retail rounds B and D to float before use; C and the A product stay double.
     const float ValueB = (float)((double)Delta.Field8 * Time + KeyB);
     const double ValueC = (double)Delta.FieldC * Time + KeyC;
     const float ValueD = (float)((double)Delta.Field10 * Time + KeyD);
-    // 06ec73f7/73fe load and multiply A before 06ec7401 writes Out[6].
     const double ValueAProduct = (double)Delta.Field4 * Time;
     Out[6] = ValueB;
     Out[2] = (float)(ValueAProduct + KeyA);
@@ -361,7 +359,7 @@ FMaterialAnimationController::FMaterialAnimationController(FMaterialAnimation* I
 
 GENRESULT DACOM_API FMaterialAnimationController::QueryInterface(const char* Iid, void** Out)
 {
-    // LAB_06ec8020: immutable map at 06ed2c00 has offsets 0 and 4 only.
+    // LAB_06ec8020: interface table DAT_06ed2c00 (IMatAnimLibrary +0, IAggregateComponent +4).
     IDAComponent* Face;
     if (std::strcmp(Iid, Iids::MatAnimLibrary) == 0)
         Face = (IMatAnimLibrary*)Owner;
@@ -412,7 +410,7 @@ FMaterialAnimation::~FMaterialAnimation()
             CrcMap[Index].Data = nullptr; // FUN_06ec8240 clears after Release.
         }
     }
-    CrcMap.clear(); // Reset the native count after releasing every payload.
+    CrcMap.clear();
 }
 
 GENRESULT DACOM_API FMaterialAnimation::QueryInterface(const char* Iid, void** Out)
@@ -469,7 +467,7 @@ void FMaterialAnimation::StoreData(unsigned long Crc, FImaData* Data)
 
 void* DACOM_API FMaterialAnimation::LoadAnimationGroup(void* FileSystem)
 {
-    // LAB_06ec6e40..7083: child filesystem creation, never parent-node mutation.
+    // LAB_06ec6e40: each subdirectory is read through a child filesystem.
     IFileSystem* Fs = AsFileSystem(FileSystem);
     if (Fs->OpenNode("MaterialAnim") == 0)
         return nullptr;
@@ -558,7 +556,7 @@ GENRESULT DACOM_API FMaterialAnimation::UnloadAnimationGroup(void* Arg)
 
 GENRESULT DACOM_API FMaterialAnimation::CreateAnimationInstance(int /*Unused*/, void* Query, IImaInstance** OutInstance)
 {
-    // LAB_06ec7190..7275: lookup miss leaves the caller's output untouched.
+    // LAB_06ec7190: lookup miss leaves the caller's output untouched.
     const unsigned long Crc = *(const unsigned long*)((const unsigned char*)Query + 4);
     size_t MapIndex = 0;
     while (MapIndex < CrcMap.size() && CrcMap[MapIndex].Crc != Crc)

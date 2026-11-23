@@ -89,8 +89,7 @@ struct FSpaceCamera : ICamera
     // +0x0ac  the viewport, as Common's ViewRect: left, top, right, bottom in pixels. Slot 0x14
     // hands the whole thing out and the base ctor leaves it alone -- it is FUN_0040fd60 (and its
     // two-argument twin FUN_0040fb80) that fills it in, deriving the aspect, the half-extents,
-    // the screen centre and both frustum planes from it. Retail stores four INTS here, which is
-    // why 0x0040fd87 reads them back with FILD and not FLD.
+    // the screen centre and both frustum planes from it. Retail stores four INTS here.
     int    Viewport[4];
     unsigned char FlagBC;       // +0x0bc  ctor sets 0
     unsigned char Pad0BD[3];
@@ -112,7 +111,7 @@ void SpaceCameraConstruct(FSpaceCamera* Cam);
 // FUN_0040f5f0 are inlined copies of exactly this; the GameCamera ctor (0x0051b2f0) calls it.
 void SpaceCameraSetHalfFovX(FSpaceCamera* Cam, float HalfFovXDeg);
 
-// FUN_0040fa10 -- the vertical twin of the one above (thiscall, one stack float, RET 4): stores
+// FUN_0040fa10 -- the vertical twin of the one above (thiscall, RET 4): stores
 // FovYDeg at +0x9c, derives the horizontal half-angle at +0x98 through the live aspect, then
 // rebuilds both frustum planes and both screen scales. The "fovy" branch of FUN_0040f5f0 is an
 // inlined copy; ShipViewControl's draw (0x00584509) calls it.
@@ -136,20 +135,15 @@ double SpaceCameraHorPlusScale(const FSpaceCamera* Cam);
 // half-extents, the screen centre and the vertical half-angle, then rebuilds the two frustum
 // planes and both screen scales.
 //
-// ViewRect4 is Common's ViewRect: left, top, right, bottom, INCLUSIVE -- retail's extents are
-// `right - left + 1` and `bottom - top + 1` (0x0040fd91 and 0x0040fdac both INC the difference).
+// ViewRect4 is Common's ViewRect: left, top, right, bottom, INCLUSIVE (extents are
+// `right - left + 1` and `bottom - top + 1`).
 //
-// Always returns true. That is not an interpretation: 0x0040ff29 loads AL with 1 outright and
-// the only thing between there and the RET is an FPU compare that cannot touch AL. Retail's
-// callers still branch on it -- FGameCamera's activate slot does -- so the port keeps the
-// return value rather than quietly making it void.
+// Always returns true; retail's callers (FGameCamera's activate slot) still branch on it.
 bool SpaceCameraSetViewport(FSpaceCamera* Cam, const int* ViewRect4);
 
 // FUN_0040fb80 -- byte for byte the same body as FUN_0040fd60 with two differences: it takes a
-// second argument and it returns nothing. The second argument is dead. Retail never reads it:
-// the only stack slots the body touches are the ViewRect pointer and three locals, and the one
-// write that lands on an argument slot (0x0040fbb2) is the compiler reusing the FIRST
-// argument's slot as scratch. Both overloads survived into the shipped build, so both are here.
+// second argument and it returns nothing. The second argument is never read. Both overloads
+// survived into the shipped build, so both are here.
 void SpaceCameraSetViewportEx(FSpaceCamera* Cam, const int* ViewRect4, int UnusedFlag);
 
 // The eight camera slots FUN_00549e70 selects between, at their retail offsets inside the
@@ -180,7 +174,7 @@ FSpaceCamera* SwitchSpaceCameraMode(const char* ModeName, void* AttachTarget);
 // The camera FUN_00549e70 last selected, or null before the first successful switch.
 FSpaceCamera* GetActiveSpaceCamera();
 
-// FUN_0054bc30 / FUN_0054bc40 / FUN_0054bc50 (cdecl, `MOV EAX,imm / RET`) -- the addresses of
+// FUN_0054bc30 / FUN_0054bc40 / FUN_0054bc50 (cdecl) -- the addresses of
 // the first-person (0x00678ba4), third-person (0x00678d48) and turret (0x00678f60) cameras
 // inside the in-flight controller. Caller: the tunnel particle's visibility slot 0x005134c0.
 FSpaceCamera* GetFirstPersonSpaceCamera();
@@ -196,7 +190,7 @@ void RaiseActiveSpaceCameraCut();
 // tests first. Writes: 1 by the space init (0x0054ab8e), 0 by the space teardown (0x0054af8d).
 bool IsSpaceCameraControllerReady();
 
-// FUN_0054bd40 -- MOV AL,[DAT_00678ba3]: in-flight controller 0x00678b98 + 0x0b, raised at the
+// FUN_0054bd40 -- DAT_00678ba3, in-flight controller 0x00678b98 + 0x0b, raised at the
 // head of the space init (0x0054ab68) and dropped on each of its exits (0x0054abf2, 0x0054ac09,
 // 0x0054ae8b). The HUD draws test it first (HUD_Core 0x004d56d9, 0x004d8698, HUD_Status
 // 0x004db2c3, 0x004e1bb3) and skip the frame while the space init is running.
@@ -210,18 +204,10 @@ bool IsFirstPersonCameraCurrent();
 // land request (0x00543c11).
 bool IsDockingCameraCurrent();
 
-// The three-call tail the script and static cameras run when they take the view and when they
-// give it back (0x0051e615 / 0x0051e6f1 and 0x0051e93f / 0x0051e985). All three are identical
-// between the two cameras, so they live here rather than being written out twice:
-//
-//   1. take the player's IObjRW (FUN_0054baf0: the watcher at .data 0x00679744, minus eight);
-//   2. its IObjInspect slot 8 (+0x20) get_id;
-//   3. IServer (DAT_0067ecd0) slot 57 (+0xe4) SPRequestInvincibility(id, bActive, 5,
-//      the connection id at .data 0x00673344) -- the ship is invincible while the view is
-//      cinematic.
-//
-// Does nothing when there is no player object, which is retail's only guard (the server
-// pointer is not tested).
+// The tail the script and static cameras run when they take the view and when they give it back
+// (0x0051e615 / 0x0051e6f1 and 0x0051e93f / 0x0051e985): IServer slot 57 SPRequestInvincibility
+// for the player's ship, so it is invincible while the view is cinematic. Does nothing without
+// a player object, which is retail's only guard (the server pointer is not tested).
 void NotifyCinematicView(bool bActive);
 
 // FUN_0054bc10 -- the guarded front door to the switch above, and what the cameras themselves
@@ -255,13 +241,10 @@ bool GetSpaceScriptCameraLatch();
 // before the switch counts as a cut.
 extern const float kSpaceCameraCutCosine;
 
-// FUN_00549bc0's closing test (0x00549da8 .. 0x00549e18). Both orientations are nine floats,
-// row-major; the axis compared is COLUMN 2 -- elements 2, 5 and 8 -- which is why retail reads
-// them at a stride of 0x0c starting eight bytes into each matrix.
-//
-// The comparison is FCOMP + TEST AH,5 + JNP, which fires only on a strict, ordered "less than":
-// a NaN anywhere leaves the dot unordered and does NOT count as a cut on its own. Having had no
-// previous camera does count, unconditionally.
+// FUN_00549bc0's closing test (0x00549da8). Both orientations are nine floats, row-major; the
+// axis compared is COLUMN 2 -- elements 2, 5 and 8. Only a strict, ordered "less than" cuts: a
+// NaN anywhere does NOT count as a cut on its own. Having had no previous camera does count,
+// unconditionally.
 bool SpaceCameraIsHardCut(const float* OldOrientation, const float* NewOrientation,
                           bool bHadNoPreviousCamera);
 
@@ -273,10 +256,9 @@ bool SpaceCameraIsHardCut(const float* OldOrientation, const float* NewOrientati
 // reinstalls even when the camera is already the active one.
 void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce);
 
-// FUN_0054aec0 0x0054aef4..0x0054af18 -- the space teardown's camera block: FUN_00518410 on the
-// first-person camera (controller + 0x00c, releases its cockpit mesh), then the non-virtual
-// IDPMsgHandler::OnDisconnect (0x00401e90, a bare RET) on the third-person (+0x1b0), turret
-// (+0x3c8) and rear-view (+0x500) cameras of G_SpaceApp.
+// The camera block of the space teardown FUN_0054aec0 (0x0054aef4): FUN_00518410 on the
+// first-person camera releases its cockpit mesh; the calls on the other three cockpit cameras
+// are the ICF-folded bare RET 0x00401e90.
 void ReleaseSpaceCameraControllerParts();
 
 // Retail keeps the player's first/third-person preference in controller + 0xba4 and reuses it

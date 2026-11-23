@@ -9,12 +9,11 @@
 // freelancer_client.h); retail Server / rpclocal / remoteserver reach them through these exports.
 
 #include "freelancer_client.h"
-// MD5Hash: nothing in this file calls it. Retail FreeLancer.exe compiled md5hash.h
-// with the class dllexport and so exports its own copy constructor (ord 13,
-// .text:00564910), operator= (ord 24, .text:00564970), GetStatePtr (ord 47,
-// .text:004d9980) and ??_7 (ord 34, .rdata:005e2668); including the header in this
-// exports translation unit is what emits them (MD5HASH_API = dllexport under
-// FREELANCER_EXPORTS). Every other member resolves to DALib.lib's import thunks.
+// MD5Hash: nothing in this file calls it. Retail FreeLancer.exe compiled md5hash.h with the
+// class dllexport and so exports its own copy constructor (ord 13, 00564910), operator= (ord 24,
+// 00564970), GetStatePtr (ord 47, 004d9980) and ??_7 (ord 34, .rdata:005e2668); including the
+// header here emits them (MD5HASH_API = dllexport under FREELANCER_EXPORTS). Every other member
+// resolves to DALib.lib's import thunks.
 #include "md5hash.h"
 
 // IClient special members — same trivial bodies Server/rpclocal define for their
@@ -33,14 +32,13 @@ IClient& IClient::operator=(const IClient& Other)
 // .text:005b0840 is IClientImpl's constructor (client_iclient.cpp).
 IClientImpl Client;
 
-// Retail .text:005b0860 (ordinal 68): `MOV EAX,Client; RET`.
+// Retail 005b0860 (ordinal 68).
 extern "C" __declspec(dllexport) IClient* GetClientInterface()
 {
     return static_cast<IClient*>(&Client);
 }
 
-// Retail .text:005b0870 (ordinal 67): `MOV EAX,Client+4; RET` -- the IChatClient
-// sub-object of Client.
+// Retail 005b0870 (ordinal 67): the IChatClient sub-object of Client (+4).
 extern "C" __declspec(dllexport) IChatClient* GetChatClientInterface()
 {
     return static_cast<IChatClient*>(&Client);

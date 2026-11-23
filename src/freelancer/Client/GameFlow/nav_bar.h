@@ -87,7 +87,7 @@ public:
     // --- new slots ---
     // slot 45 (+0xb4) LAB_0043dfe0 -- rebuild the buttons for the room just entered.
     virtual void OnLocationEntered();
-    // slot 46 (+0xb8) FUN_0053e4a0 -- RET 4.
+    // slot 46 (+0xb8) FUN_0053e4a0 -- empty.
     virtual void Slot46(unsigned A);
 
     // --- ButtonMover / ButtonScaler ---
@@ -177,12 +177,12 @@ private:
 
 // --- cdecl entry points (RoomControl / NavBar.cpp) ---
 // FUN_00442060 -- the "NavBar" window, created when missing, told the room was entered (slot
-// 45). Caller: the room load FUN_00439d80 (0x0043a05a).
+// 45). Caller: the room load FUN_00439d80.
 void NavBarEnsure();
 // FUN_004420a0 -- every "RoomControl1..9" / "ButtonControl1..9" window deleted (no Destroy).
 void NavBarDeleteRoomControls();
 // FUN_00442130 -- the "NavBar" window's background, the room controls and the bar itself
-// destroyed. Callers: 0x004393aa, 0x0043b55b, 0x0043b7e9, 0x005739b0.
+// destroyed. Callers: the LocationController and IntroFocus::Init.
 void NavBarDestroy();
 // FUN_004421a0 -- the bar hands over to the dealer (FUN_00477bf0(Index, 0, 0)).
 void NavBarOpenDealer(int Index);

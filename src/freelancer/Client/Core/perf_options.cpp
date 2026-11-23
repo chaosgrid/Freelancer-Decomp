@@ -77,14 +77,13 @@ namespace
 
     void ApplySoundMaxDistScale(float Value)  // LAB_005b6230 — DAT_0067ed18
     {
-        // 005b6230..005b6239: one store, RET 4. Readers go through FUN_005b3510(2).
+        // Readers go through FUN_005b3510(2).
         G_Slots[2] = Value;
     }
 
     void ApplySoundLevelOfDetail(float Value)  // LAB_005b4bd0 — DAT_0067ed1c + FUN_0042ac30
     {
-        // FLD float 1.0 (DAT_005c75dc); FSUB float v; the arg stored to DAT_0067ed1c; FADD ST0,ST0;
-        // FSTP double -> floor; ftol of floor's double result -> FUN_0042ac30(int).
+        // floor(2 * (1 - v)) in double, as on the x87 stack.
         G_Slots[3] = Value;
         SetClientSoundLod(static_cast<int>(floor(2.0 * (1.0 - static_cast<double>(Value)))));
     }
@@ -106,8 +105,8 @@ namespace
 
     void ApplyMaxSubmittedSounds(float Value)  // LAB_005b3870 — DAT_00615c6c
     {
-        // FLD float v; FMUL float 100.0 (DAT_005ca230); FADD float 0.5 (DAT_005c75e0); ftol --
-        // the product and sum stay on the x87 stack, so they are not rounded to float.
+        // DAT_005ca230 / DAT_005c75e0; the product and sum stay on the x87 stack, so they are not
+        // rounded to float.
         G_MaxSubmittedSounds = static_cast<int>(static_cast<double>(Value) * 100.0 + 0.5);
     }
 
@@ -125,24 +124,23 @@ namespace
     void ApplyDefaultGraphics(float Value) { G_DefaultGraphics = Ftol(Value); }     // LAB_005b38c0
 
     void ApplySpaceDustDetail(float Value) { G_SpaceDustDetail = Value; }           // LAB_0054c3e0
-    // LAB_004f7090: FLD float Value; FSUBR double 1.0 (DAT_005c89b8); FSTP float DAT_006129c8.
+    // LAB_004f7090 (DAT_005c89b8 is the double 1.0).
     void ApplyGenericEffectPerf(float Value)
     {
         G_GenericEffectPerf = static_cast<float>(1.0 - static_cast<double>(Value));
     }
     void ApplySunEffect(float Value) // LAB_00510bf0 — DAT_0067509c
     {
-        // 00510bf0..00510c10: Q = Value * 1.33333 (the double DAT_005db640, not 4/3); FCOM 1.0 /
-        // TEST AH,0x41 / JNZ keeps Q unless it is greater, then 1.0f. FST stores the float and
-        // keeps Q on the FPU.
+        // 1.33333 is the double DAT_005db640, not 4/3. Retail stores the float and keeps the
+        // unrounded Q on the FPU for the loop.
         double Q = static_cast<double>(Value) * 1.33333;
         if (Q > 1.0)
             Q = 1.0;
         G_SunEffectQuality = static_cast<float>(Q);
 
-        // 00510c16..00510c53: every star of the list DAT_00675180 (StarSphereList): its sun body
-        // (+0x14) gets +0x2b8 = ftol(int +0x2b4 * (1.0f - Q) + 0.5f). No null tests.
-        double const Keep = 1.0 - Q; // FSUBR float 1.0
+        // Every star of the list DAT_00675180 (StarSphereList): its sun body (+0x14) gets
+        // +0x2b8 = ftol(int +0x2b4 * (1.0f - Q) + 0.5f). No null tests.
+        double const Keep = 1.0 - Q;
         FStarSphereListNode* const Sentinel = StarSphereList()->Sentinel;
         for (FStarSphereListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         {
@@ -153,10 +151,8 @@ namespace
         }
     }
 
-    // LAB_005b42a0 - apply shared by AtmosphereMaterialConfig (option +0x20 = 1, set at
-    // 005b41e2) and HUDAnimConfig (+0x20 = 4, 005b435d); vtable PTR_OnAddHost_005e6f80.
-    // No MaterialLib -> nothing. Else record[+0x20] = (v > 0.999 [DAT_005c8b68]) through
-    // IMaterialLibrary slot 24 (+0x60), then slot 12 (+0x30) ResolveTexturesGroup(0, 0).
+    // LAB_005b42a0 - apply shared by AtmosphereMaterialConfig (option +0x20 = 1) and
+    // HUDAnimConfig (+0x20 = 4); vtable PTR_OnAddHost_005e6f80. 0.999 is DAT_005c8b68.
     void ApplyMaterialRecordOption(unsigned long RecordIndex, float Value)
     {
         if (DALib::MaterialLib == nullptr)
@@ -188,8 +184,8 @@ namespace
 
     void ApplyUseEnvironmentMaps(float Value)  // LAB_005b4700 - DAT_0067ed10
     {
-        // v > 0 and a pipeline: ask device ability 8; a non-zero answer keeps the raw value
-        // in slot 0, every other path stores 0 (005b473a). The HRESULT is not examined.
+        // A non-zero device ability 8 keeps the raw value in slot 0, every other path stores 0.
+        // The HRESULT is not examined.
         unsigned long Ability = 0;
         IRenderPipeline* Pipe = DALib::Pipeline;
         if (Value > 0.f && Pipe != nullptr)
@@ -206,14 +202,14 @@ namespace
 
     void ApplyHighDetailTextures(float Value)  // LAB_005b4870 - DAT_0067ed14
     {
-        // 005b4871..005b488b: DALib::Pipeline is dereferenced without a null check.
+        // DALib::Pipeline is dereferenced without a null check here.
         unsigned long VidMem = 0;
         int bLowVidMem = 0;
         IRenderPipeline* Pipe = DALib::Pipeline;
         if (Pipe->QueryDeviceAbility(3, &VidMem) >= 0)
             bLowVidMem = ((VidMem & 0xfff00000u) < 0x01100000u) ? 1 : 0;
 
-        // FLD float / FCOMP double / TEST AH,0x41 / JNZ: each flag is "v > constant".
+        // Each flag is "v > double constant".
         double const V = static_cast<double>(Value);
         int const bHighDetail = (V > 0.6 && bLowVidMem == 0) ? 1 : 0; // DAT_005d5068
         int const bPipelineState4 = (V > 0.5) ? 1 : 0;                // DAT_005c75e8
@@ -239,8 +235,8 @@ namespace
     // LAB_005b4540), +0x20 a byte and +0x24 a float, both written by the apply below. The
     // port keeps the three tail members as file statics.
     //
-    // LAB_005b4540 (thiscall, RET 4): a record with a companion (Root+0x04) gets
-    // FUN_00406c50(companion, 0); every record returns true, so the walk never stops early.
+    // LAB_005b4540: a record with a companion (Root+0x04) gets FUN_00406c50(companion, 0); every
+    // record returns true, so the walk never stops early.
     struct FLevelOfDetailEnumerator : Archetype::ArchEnumerator
     {
         bool Enumerate(Archetype::Root* Record) override
@@ -257,14 +253,12 @@ namespace
 
     void ApplyLevelOfDetail(float Value)  // LAB_005b4560 (thiscall on the option, RET 4)
     {
-        // 005b4560..005b457e: FLD v / FCOMP double 0.75 (DAT_005debf8) / TEST AH,0x5 / JP:
-        // AL = 1 only for v < 0.75 (an unordered v gives 0). Stored at +0x20.
+        // 0.75 is DAT_005debf8; a NaN v is not low.
         bool const bLow = static_cast<double>(Value) < 0.75;
         G_bLevelOfDetailLow = bLow;
 
-        // 005b4587..005b45af, all on the x87 stack, then FSTP float at +0x24:
-        //   low:  v * 4/3 (DAT_005e6fd8) * 0.5 (DAT_005c75e8) + 0.5
-        //   else: (v - 0.75) * 4.0 (DAT_005db628) + 1.0 (DAT_005c89b8)
+        // All on the x87 stack, then rounded once to float. Constants: 4/3 DAT_005e6fd8,
+        // 0.5 DAT_005c75e8, 4.0 DAT_005db628, 1.0 DAT_005c89b8.
         double Scale = 0.0;
         if (bLow)
             Scale = static_cast<double>(Value) * (4.0 / 3.0) * 0.5 + 0.5;
@@ -272,34 +266,23 @@ namespace
             Scale = (static_cast<double>(Value) - 0.75) * 4.0 + 1.0;
         G_LevelOfDetailScale = static_cast<float>(Scale);
 
-        // 005b45b2..005b45b7: FUN_004022b0(AL, [+0x24]).
-        Archetype::CliObjSetArchLodGlobals(bLow ? 1 : 0, G_LevelOfDetailScale);
+        Archetype::CliObjSetArchLodGlobals(bLow ? 1 : 0, G_LevelOfDetailScale); // FUN_004022b0
 
-        // 005b45bc..005b45d5: the enumerator at +0x1c over simples, ships, equipment, solars,
-        // in that order (IAT 005c6b9c / 005c6b98 / 005c6b88 / 005c6b94).
         Archetype::EnumSimples(&G_LevelOfDetailEnumerator);
         Archetype::EnumShips(&G_LevelOfDetailEnumerator);
         Archetype::EnumEquipment(&G_LevelOfDetailEnumerator);
         Archetype::EnumSolars(&G_LevelOfDetailEnumerator);
 
-        // 005b45db..005b45df: FUN_005488a0([+0x24]).
-        SolarSpheresApplyDetail(G_LevelOfDetailScale);
+        SolarSpheresApplyDetail(G_LevelOfDetailScale); // FUN_005488a0
     }
 
     // ------------------------------------------------------------------
     // The registry. Retail builds it from static initializers into a heap std::list
-    // (DAT_0067ed04, count DAT_0067ed08; FUN_005b3520 or the same code inline pushes each
-    // option object, the first push creates the list head and registers atexit LAB_005b3640).
-    // The port holds the same rows in a fixed table. The row order IS retail's list order:
-    // the registrars run in _initterm (XC table 0x0060f000..0x006101bc) order, which for
-    // these 36 is slot 54 (0041d900), 72..74 (00424470 / 004245c0 / 00424660), 469
-    // (004c70f0), 586 (004f7020), 611 (00509bc0), 626 (00510c60), 670 (00526830), 828
-    // (0054c370), 837 (00552d30), then 1107..1131 (005b4180 .. 005b60f0) -- exactly the
-    // rows below. That order drives FUN_005b40f0 (apply) and FUN_005b3ec0 (save).
-    //
-    // Options with a null Apply are still registered: the [PerfCount] check compares
-    // against the full retail count of 36, and their value has to survive a load/save
-    // round trip. Their retail apply bodies drive DALib/pipeline state that is not ported.
+    // (DAT_0067ed04, count DAT_0067ed08; FUN_005b3520 pushes each option object). The port holds
+    // the same rows in a fixed table, in retail's list order -- the _initterm order of the
+    // registrars (XC slots 54, 72..74, 469, 586, 611, 626, 670, 828, 837, then 1107..1131). That
+    // order drives FUN_005b40f0 (apply) and FUN_005b3ec0 (save). The [PerfCount] check compares
+    // against the full retail count of 36.
     // ------------------------------------------------------------------
     FPerfOption G_Options[] = {
         { "mouse_speed",              0x5dd, 0, 0.f, -1.f, ApplyMouseSpeedOption },  // LAB_0041d970
@@ -308,8 +291,7 @@ namespace
         { "MipFilterControlCallback", 0,     0, 0.f, -1.f, ApplyMipFilterControlOption },  // LAB_004246d0
         // TurnSensitivity / Nebula / SunEffect / Asteroids / star_sphere: the ctor leaves +0x08 at
         // 0 and passes the IDS as FUN_005b3520's second argument, which stores it at +0x08 when
-        // non-zero (005b35f2..005b35fc). PUSH sites: 004c7114, 00509be4, 00510c84, 00526854,
-        // 00552d54.
+        // non-zero.
         { "TurnSensitivity",          0x614, 0, 0.f, -1.f, ApplyTurnSensitivity },  // LAB_004c70b0
         { "generic_effect_perf",      0x5cb, 0, 0.f, -1.f, ApplyGenericEffectPerf },
         { "Nebula",                   0x57d, 0, 0.f, -1.f, NebulaApplyGlobalDetail },  // FUN_00509b80
@@ -349,16 +331,15 @@ namespace
     unsigned const kOptionCount = sizeof(G_Options) / sizeof(G_Options[0]);
 }
 
-    // FUN_004a92a0 — hardware graphics score in [0.25, 1.0]. Listing freelancer.exe.txt
-    // 0x004a92a0..0x004a9378. Uses IRenderPipeline::QueryDeviceAbility (vtable+0x20),
-    // NOT GetDeviceInfo / GetDeviceStats.
+    // FUN_004a92a0 — hardware graphics score in [0.25, 1.0], through
+    // IRenderPipeline::QueryDeviceAbility (vtable+0x20).
     //
     // Ability index 4 = HW T&L flag (RP8 Ability_[4]: DevCaps HWTRANSFORMANDLIGHT &&
     // DRAWPRIMITIVES2EX). Ability index 3 = video memory bytes (Ability_[3] = VidMem_).
-    // Timing::GetMachineSpeed thresholds are 1000 / 800 / 700 as written (retail units).
+    // Timing::GetMachineSpeed thresholds are 1000 / 800 / 700 (retail units).
     float ProbeMachineGraphicsLevel()
     {
-        float GfxScore = 1.f;           // set before first query, as retail MOV 0x3f800000
+        float GfxScore = 1.f;
         unsigned long AbilityHwTnL = 0; // out of QueryDeviceAbility(4)
         unsigned long AbilityVidMem = 0;
 
@@ -407,7 +388,6 @@ namespace
             }
         }
 
-        // Return min(CpuScore, GfxScore) — FCOMP / TEST AH,5 / take the lesser.
         if (GfxScore < CpuScore)
             return GfxScore;
         return CpuScore;
@@ -415,8 +395,7 @@ namespace
 
 FPerfOption* FindPerfOption(char const* Name)
 {
-    // FUN_005b36b0 — the registry in order, the name (+0x04) against Name with an inlined
-    // byte strcmp (0x005b3718..0x005b373e; Name is not null-tested); the first match, else 0.
+    // FUN_005b36b0 — the first option whose name (+0x04) matches; Name is not null-tested.
     for (unsigned Index = 0; Index < kOptionCount; ++Index)
     {
         if (strcmp(G_Options[Index].Name, Name) == 0)
@@ -427,9 +406,8 @@ FPerfOption* FindPerfOption(char const* Name)
 
 FPerfOption* FindPerfOptionByIds(int IdsName)
 {
-    // FUN_005b3770 — the registry in order, the first option whose IDS name (+0x08) equals
-    // IdsName (0x005b37c5..0x005b37d1), else 0. Zero is not special-cased: it finds the first
-    // option registered without an IDS name.
+    // FUN_005b3770 — the first option whose IDS name (+0x08) equals IdsName. Zero is not
+    // special-cased: it finds the first option registered without an IDS name.
     for (unsigned Index = 0; Index < kOptionCount; ++Index)
     {
         if (G_Options[Index].IdsName == IdsName)
@@ -452,7 +430,7 @@ FPerfOption* GetPerfOptionAt(unsigned Index)
 
 float GetPerfOptionSlot(int Index)
 {
-    // FUN_005b3510: FLD [EAX*4 + DAT_0067ed10], no bounds check.
+    // FUN_005b3510: no bounds check.
     return G_Slots[Index];
 }
 
@@ -499,7 +477,7 @@ float GetPerfGenericEffectPerf() { return G_GenericEffectPerf; }
 
 bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display)
 {
-    // FUN_005b38d0. 0x005b38fb: GetUserDataPath's result is not tested.
+    // FUN_005b38d0. GetUserDataPath's result is not tested.
     char UserPath[MAX_PATH];
     GetUserDataPath(UserPath);
 
@@ -566,8 +544,7 @@ bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display)
                         continue;
                     float const Value = Ini.get_value_float(0);
                     Parsed += 1;
-                    // 0x005b3b7c..0x005b3b8c: FCOMP double 0.0 / TEST AH,0x1 / JNZ -- a value
-                    // below zero or unordered is rejected.
+                    // A value below zero or NaN is rejected.
                     if (!(Value >= 0.f))
                     {
                         bOk = false;
@@ -612,8 +589,7 @@ bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display)
 
 void SavePerfOptions(char const* FileName)
 {
-    // FUN_005b3ec0 (.text:005b3ec0-005b4049), cdecl(FileName).
-    // 0x005b3ece..0x005b3ed4: GetUserDataPath's result is not tested.
+    // FUN_005b3ec0. GetUserDataPath's result is not tested.
     char UserPath[MAX_PATH];
     GetUserDataPath(UserPath);
 
@@ -626,7 +602,6 @@ void SavePerfOptions(char const* FileName)
 
     // DAT_005e6dfc = 5.0f, pushed as a double.
     fprintf(File, "[PerfVersion]\nversion=%g\n", 5.0);
-    // 0x005b3f71..0x005b3f8e: "TRUE" (DAT_005e6f58) when DAT_0067a439 is set, else "FALSE".
     fprintf(File, "SkipMachineWarnings=%s\n\n", G_bSkipMachineWarnings ? "TRUE" : "FALSE");
     fprintf(File, "[PerfCount]\ncount=%g\n\n", static_cast<double>(kOptionCount));
     fprintf(File, "[PerfOptions]\n");
@@ -637,8 +612,7 @@ void SavePerfOptions(char const* FileName)
             fprintf(File, "%s = %.2f\n", G_Options[Index].Name,
                     static_cast<double>(G_Options[Index].Applied));
     }
-    // 0x005b3ffe..0x005b4037: always written, straight from the options object
-    // (DAT_00679bc8 / bcc / bd0 / bd4 = g_display +0x08..+0x14).
+    // Always written, straight from the options object.
     fprintf(File, "\n[Display]\n");
     fprintf(File, "size= %d, %d\n", g_display.width, g_display.height);
     fprintf(File, "color_bpp= %d\n", g_display.color_bpp);

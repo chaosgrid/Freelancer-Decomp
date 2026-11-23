@@ -12,8 +12,8 @@
 
 #include <intrin.h>
 
-// Callees outside 0x06ac2690..0x06ac3d40. Signatures are the pushes at the
-// call sites in movie.dll.txt (stdcall: no ADD ESP after the CALL).
+// Callees outside 0x06ac2690..0x06ac3d40. Signatures are taken from the pushes
+// at the retail call sites (stdcall).
 
 void __cdecl Movie_InitForProcessor();
 void* __cdecl MovieOperatorNew(unsigned int Size);
@@ -53,7 +53,7 @@ int GMovieGraphLockInit = 0;
 int GMovieGraphCode = 0;
 
 // Five dwords at .rdata:06ada788, 06ada79c, 06ada7b0, 06ada7c4, 06ada7d8, 06ada7ec.
-// 06ada7ec is 20 bytes; Ghidra split the tail into DAT_06ada7f8 / DAT_06ada7fc.
+// 06ada7ec is 20 bytes (its tail shows up as DAT_06ada7f8 / DAT_06ada7fc).
 static const unsigned int GLimbs788[5] = { 0x141424F7u, 0x31415926u, 0x27182818u, 0x01234567u, 0x89ABCDEFu };
 static const unsigned int GLimbs79c[5] = { 0x28C2A675u, 0xEC149044u, 0x2716B26Eu, 0x01234567u, 0x89ABCDEFu };
 static const unsigned int GLimbs7b0[5] = { 0xEBE41497u, 0x4780C009u, 0x7632FF3Du, 0xD277BCE8u, 0x37A5ABCCu };
@@ -492,7 +492,7 @@ long __stdcall Movie_StoreLowFourLimbs(unsigned int* Source, unsigned int* Dest,
     unsigned int Local[5];
     unsigned int* Modulus = *(unsigned int**)Holder;
     Movie_CopyOrReduceField(Source, Local, (unsigned int*)Modulus[4]);
-    // 06ac301e REP MOVSD copies the five local dwords onto themselves. EAX from 4080 is ignored.
+    // Retail copies the five dwords out; the reduce result (FUN_06ac4080) is ignored.
     Dest[0] = Local[0];
     Dest[1] = Local[1];
     Dest[2] = Local[2];
@@ -843,7 +843,7 @@ long __stdcall Movie_PowFieldByBitScan(unsigned int* Base, int Dest, unsigned in
     {
         return 0;
     }
-    // FUN_06ac3140 (06ac315a) returns 1; the JZ at 06ac37dd is not taken.
+    // FUN_06ac3140 always returns 1, so retail's failure test is never taken.
     Movie_MoveBytes(Buf100, Base, Movie_GroupBytes((int*)Field, 1));
     for (;;)
     {
@@ -935,7 +935,7 @@ long __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right
         unsigned int Ret2 = ShiftLimbs(Copy2, 0u - Shift, Copy2 + Count, (int)Count);
         if (Shift != 0u)
         {
-            // 06ac39ec/06ac39f7: OR into the last copied dword (base + count*4 - 4), not [count].
+            // ORs into the last copied dword (index Count - 1), not [Count].
             Copy1[(int)Count - 1] |= Movie_Shl(Ret1, Complement);
             Copy2[(int)Count - 1] |= Movie_Shl(Ret2, Complement);
         }

@@ -48,7 +48,7 @@ namespace
 
     bool HasInstance(WinControl const* Control)
     {
-        // The `CMP [ESI+0x84],-1` test several slots inline instead of calling FUN_00420d60.
+        // Several slots inline this test instead of calling FUN_00420d60.
         return Control->MeshHolder.EngineInstance !=
                reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     }
@@ -56,9 +56,8 @@ namespace
 
 WinControl::WinControl()
 {
-    // FUN_0059f860. The Win3D part (FUN_004b6790) runs as the base ctor; then the
-    // IDataViewOwner face, the mesh holder (FUN_00420d40) with anim -1 and five 1.0f, and the
-    // fields below in the listing's order of meaning (the stores are interleaved there).
+    // FUN_0059f860 (Win3D base ctor FUN_004b6790; holder ctor FUN_00420d40). Retail interleaves
+    // the field stores.
     ClientMeshHolderConstruct(&MeshHolder);
     MeshHolder.UserFloats[3] = 1.0f;
     MeshHolder.UserFloats[2] = 1.0f;
@@ -67,7 +66,6 @@ WinControl::WinControl()
     MeshHolder.UserFloats[4] = 1.0f;
     MeshHolder.AnimOrArchIndex = -1;
 
-    // 0059f903..0059f945: attach transform = identity, zero position.
     SetIdentity3x3(AttachOrientation);
     AttachPosition[2] = 0.0f;
     AttachPosition[1] = 0.0f;
@@ -109,8 +107,7 @@ WinControl::~WinControl()
     }
     ClientUiMeshHolderRelease(&MeshHolder);
 
-    // 0059faab..0059fadd: every child is destroyed and deleted. The dynamic_cast to
-    // WinControl in between (0059fac8) has its result discarded.
+    // Retail also dynamic_casts each child to WinControl here and discards the result.
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
@@ -124,8 +121,7 @@ WinControl::~WinControl()
         Rest->Destroy();
     Win3DUnregister(this);
 
-    // 0059fb0e: the holder member's dtor FUN_0059ef20 runs as ~FClientMeshHolder; the Win3D
-    // dtor FUN_004b4fd0 then runs as the base.
+    // Then ~FClientMeshHolder (FUN_0059ef20) and the Win3D dtor FUN_004b4fd0.
 }
 
 WinControl* WinControl::AsWinControl()
@@ -136,10 +132,7 @@ WinControl* WinControl::AsWinControl()
 
 bool WinControl::HitTest(float const* Ray)
 {
-    // FUN_005a0340. The box transform starts as identity with a zero position; a bound
-    // instance supplies its whole 3x4 transform (Engine vt+0xa0), otherwise the position is
-    // +0x60 + +0xa8. The hit offset +0xc0 is added either way and +0x2d3 forces the
-    // orientation back to identity.
+    // FUN_005a0340.
     float Transform[12];
     SetIdentity3x3(Transform);
     Transform[9] = 0.0f;
@@ -166,8 +159,8 @@ bool WinControl::HitTest(float const* Ray)
     if (!bHit)
         return bHit;
 
-    // 0059e4b4: the parent WinControl hears property 0x25 with this control, then 0x4f when a
-    // tooltip id is set; a non-zero answer to 0x4f ends it there.
+    // The parent hears property 0x25, then 0x4f when a tooltip id is set; a non-zero answer to
+    // 0x4f suppresses this control's own tooltip.
     if (Parent != nullptr)
     {
         WinControl* const ParentControl = Parent->AsWinControl();
@@ -182,7 +175,6 @@ bool WinControl::HitTest(float const* Ray)
         }
     }
 
-    // 005a0502: otherwise an active, visible control with a tooltip id shows it itself.
     if (ToolTipIds != 0 && (Flags & kWin3DActive) != 0 && (Flags & kWin3DVisible) != 0)
         ShowToolTip();
     return bHit;
@@ -212,7 +204,6 @@ void WinControl::SetPosition(float const* NewPosition)
         SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
     }
 
-    // 005a0927: every child is moved to this control's new position.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->SetPosition(Position);
 }
@@ -233,8 +224,7 @@ void WinControl::SetOrientation(float const* NewOrientation)
 
 void WinControl::Destroy()
 {
-    // FUN_0059fb60: release the mesh, destroy and delete every child, then the Win3D
-    // teardown (flags, remaining children, unregister).
+    // FUN_0059fb60.
     ClientUiMeshHolderRelease(&MeshHolder);
     Win3D* Child = ChildHead;
     while (Child != nullptr)
@@ -256,7 +246,7 @@ void WinControl::Draw()
     // reach this without the Win3D draw walk, so the control sets its own HUD shift.
     FWidescreenHudShiftScope const WidescreenScope(WidescreenHudShiftPixelsFor(this), true);
 #endif
-    // FUN_005a0760: the FUN_005a06a0 body inlined, the sorted child draw, then slot 39.
+    // FUN_005a0760 (FUN_005a06a0 inlined).
     DrawStaticMesh();
     Win3DDrawChildren(this);
     Slot39();
@@ -264,9 +254,7 @@ void WinControl::Draw()
 
 void WinControl::DrawStaticMesh()
 {
-    // FUN_005a06a0. With "DRAW STATIC CONTROLS" (FUN_005792b0(0x15)) on and an instance bound
-    // (FUN_00420d60), the instance is submitted with depth test off, tinted by the HUD chrome
-    // colour DAT_00679bb4 scaled by 1/255 (DAT_005c7f68).
+    // FUN_005a06a0. The tint is the HUD chrome colour DAT_00679bb4.
     if (GetGameOption(kGameOptDrawStaticControls) != 0 && ClientMeshHolderHasInstance(&MeshHolder))
     {
         Win3DDisable(kWin3DDepthTest);
@@ -285,8 +273,7 @@ void WinControl::DrawStaticMesh()
 
 void WinControl::SetHiddenWithChildren(bool bHide)
 {
-    // FUN_005a0c30: walk +0x0c / +0x08; a child whose slot 2 answers non-null gets
-    // SetProperty(1, bHide, 0) (vt+0xa8). Then 0x005a0c65: bHide -> Flags &= 0xfc, else |= 3.
+    // FUN_005a0c30.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
         WinControl* const AsControl = Child->AsWinControl();
@@ -331,12 +318,12 @@ bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
 
 void WinControl::DataViewSlot0(unsigned /*A*/, unsigned /*B*/)
 {
-    // LAB_0053aaa0: RET 8.
+    // LAB_0053aaa0.
 }
 
 void WinControl::DataViewSlot1(unsigned /*A*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void WinControl::LoadIni(char const* Path)
@@ -399,8 +386,7 @@ void WinControl::LoadIni(char const* Path)
             ToolTipIds = static_cast<int>(Ini.get_value_float(0));
     }
 
-    // 0059ffca: every further section names a child; its class_name value picks the factory
-    // and the section name becomes the child's name.
+    // Every further section names a child; its class_name value picks the factory.
     while (Ini.read_header())
     {
         char SectionName[0x100];
@@ -418,18 +404,17 @@ void WinControl::LoadIni(char const* Path)
 
 void WinControl::SaveIni(FILE* /*File*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void WinControl::Slot30(unsigned /*A*/)
 {
-    // FUN_0053e4a0: RET 4.
+    // FUN_0053e4a0.
 }
 
 void WinControl::SetOffset(float X, float Y, float Z)
 {
-    // FUN_005a0250: store the new offset and hand every child WinControl the change through
-    // slot 43, then re-place this control at its parent's position (or its own).
+    // FUN_005a0250.
     float Delta[3];
     Delta[0] = X - Offset[0];
     Delta[1] = Y - Offset[1];
@@ -469,29 +454,21 @@ void WinControl::ReleaseMouse()
 
 void WinControl::ShowToolTip()
 {
-    // FUN_005a0530: the hover record handed to FUN_004be370 carries this control as its key
-    // (+0x00, which FUN_004bdea0 compares against the ToolTip's +0xf4) and the tooltip id at
-    // +0x04; no caption, AuxField +0x44 and the live byte +0x60 clear. Retail leaves the world
-    // position / half extents (+0x48..+0x5f) as stack garbage; the port zeroes them.
-    // 005a054e..005a055e: caption +0x08 / +0x0c zeroed, FUN_004144b0 on +0x10 -- the record's
-    // constructor.
+    // FUN_005a0530: the hover record's key (+0x00, compared by FUN_004bdea0 against the
+    // ToolTip's +0xf4) is this control. Retail leaves the world position / half extents
+    // (+0x48..+0x5f) as stack garbage; the port zeroes them.
     FToolTipHoverInfo Info;
     Info.AuxField = 0;                // +0x44
     Info.bLive = 0;                   // +0x60
     Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this)); // +0x00
     Info.IdsAlt = ToolTipIds;         // +0x04 <- +0xcc
     NnToolTipFeedHover(&Info);        // FUN_004be370
-
-    // 005a05c7..005a0630: the record's teardown (~FToolTipHoverInfo) -- FUN_004144f0 on the
-    // Font::String, release its children (FUN_00418f70), free the child vector and the text
-    // buffer, then the caption buffer +0x08 (null here).
 }
 
 void WinControl::RefreshAttachment()
 {
-    // FUN_005a09d0: children first, then this control's own attachment to its parent's
-    // hardpoint +0x1d0; last, the PARENT is re-placed at its own position (0x005a0a5d calls
-    // slot 5 with ECX = parent), which moves this control along with its siblings.
+    // FUN_005a09d0: last, the PARENT (not this) is re-placed at its own position, which moves
+    // this control along with its siblings.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
         WinControl* const ChildControl = Child->AsWinControl();
@@ -551,7 +528,7 @@ bool WinControl::GetHardpointTransform(char const* Name, float* OutTransform12)
 
 WinControl* WinControl::FindChild(char const* ChildName)
 {
-    // FUN_005a0bc0: the first child whose +0x18 name strcmp-equals ChildName, as a WinControl.
+    // FUN_005a0bc0.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
         if (strcmp(Child->Name, ChildName) == 0)
@@ -568,7 +545,7 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
     strcpy(MeshPath, Path);
     ClientUiMeshHolderRelease(&MeshHolder);
     if (Path[0] != '\0')
-        ClientMeshLoadFromPath(&MeshHolder, Path, MaterialPath, false); // 0x0059fc2e (.., 0)
+        ClientMeshLoadFromPath(&MeshHolder, Path, MaterialPath, false);
     if (HasInstance(this))
     {
         float Matrix[12];
@@ -584,13 +561,12 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
 
 void WinControl::Slot39()
 {
-    // FUN_00401e90: RET.
+    // FUN_00401e90.
 }
 
 void WinControl::GetAttachOrientation(float* OutOrientation9)
 {
-    // FUN_005a1670: the attach orientation while attached to a WinControl parent, else
-    // identity.
+    // FUN_005a1670.
     if (Parent != nullptr && bAttached != 0 && Parent->AsWinControl() != nullptr)
     {
         memcpy(OutOrientation9, AttachOrientation, sizeof(AttachOrientation));
@@ -603,7 +579,7 @@ void WinControl::GetAttachOrientation(float* OutOrientation9)
 
 void WinControl::GetAttachPosition(float* OutPosition3)
 {
-    // FUN_005a1750: the attach position under the same condition, else zero.
+    // FUN_005a1750.
     if (Parent != nullptr && bAttached != 0 && Parent->AsWinControl() != nullptr)
     {
         OutPosition3[0] = AttachPosition[0];
@@ -622,14 +598,12 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     switch (Msg)
     {
     case 1:
-        // A == 1 hides, anything else shows.
         if (A == 1)
             Flags = static_cast<unsigned char>(Flags & 0xfc);
         else
             Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return 1;
     case 2:
-        // bit0 = (A == 0).
         Flags = static_cast<unsigned char>((Flags & 0xfe) | (A == 0 ? 1 : 0));
         return 1;
     case 3:
@@ -713,7 +687,6 @@ bool WinControl::NameEquals(char const* OtherName)
     return strcmp(Name, OtherName) == 0;
 }
 
-// Retail DAT_0067dd14 -- WINFACTORY<WinControl> static (LAB_0059f830 -> FUN_005a19b0("WinControl");
-// Create FUN_005a1a20: operator_new(0x32c), FUN_0059f860, +0x10 = &factory+0xc, slot 9); atexit
-// LAB_0059f850 -> FUN_00579380.
+// Retail DAT_0067dd14 -- WINFACTORY<WinControl> static (initializer LAB_0059f830, atexit
+// LAB_0059f850; Create FUN_005a1a20).
 WINFACTORY<WinControl> G_WinControlFactory("WinControl");

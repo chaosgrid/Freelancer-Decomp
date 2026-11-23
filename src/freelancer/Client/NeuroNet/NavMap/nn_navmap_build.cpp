@@ -24,11 +24,11 @@ namespace
     // DAT_005d3d38 / DAT_005ca23c.
     float const kNavMapRadToDeg = 57.2957763671875f; // 0x42652ee0
     float const kNavMapFullTurn = 360.0f;
-    // 0x004917cb -- the system view's map extents.
+    // The system view's map extents.
     float const kNavMapSystemExtent = 112000.0f;
-    // 0x00491af9 -- a sun's alpha.
+    // A sun's alpha.
     float const kNavMapSunAlpha = 0.99f; // 0x3f7d70a4
-    // 0x0049156b -- the waypoint markers' scale.
+    // The waypoint markers' scale.
     float const kNavMapWaypointScale = 0.6f; // 0x3f19999a
 
     // The 0x118-byte [Object] record, its four TStrings emptied the way every NavMap.cpp
@@ -48,8 +48,7 @@ namespace
 
 bool NeuroNetNavMap::IsSkippedSystem(Universe::ISystem const* System) const
 {
-    // Inlined in retail (e.g. 0x0049187b..0x00491892, 0x00491b44..0x00491b5b): the system's id
-    // against the four SkipSystemIds.
+    // Inlined in retail at every use.
     unsigned const Id = System->GetId();
     for (int Index = 0; Index < 4; ++Index)
     {
@@ -70,8 +69,7 @@ void NeuroNetNavMap::BuildSystemItems()
     Universe::FSystemObject Object;
     ClearSystemObject(&Object);
 
-    // 0x00491868..0x004918a5: the object count (read before the null test, as in retail),
-    // none for a null or a skipped system; SystemScale = the system's NavMapScale.
+    // The object count is read before the null test, as in retail.
     unsigned Count = static_cast<unsigned>(CurrentSystem->GetObjectCount());
     if (CurrentSystem == nullptr || IsSkippedSystem(CurrentSystem))
         Count = 0;
@@ -88,7 +86,7 @@ void NeuroNetNavMap::BuildSystemItems()
         unsigned Type = Arch->ObjectType;
         if ((Type & 0x80) != 0)
         {
-            // 0x00491906..0x004919bb: a trade lane ring is remembered; one in the middle of a
+            // A trade lane ring is remembered; one in the middle of a
             // lane (both links set) gets no item of its own.
             FNavMapRing Ring;
             Ring.Nickname.Length = 0;
@@ -112,7 +110,7 @@ void NeuroNetNavMap::BuildSystemItems()
         if ((SolarTypeMask & Type) == 0 || Type == 0x20000000)
             continue;
 
-        // 0x004919e9..0x00491a5e: moons and planets face the system centre.
+        // Moons and planets face the system centre.
         float Heading = 0.0f;
         Archetype::ICliObj* const Companion = Arch->Companion;
         if ((Type & 3) != 0)
@@ -120,7 +118,7 @@ void NeuroNetNavMap::BuildSystemItems()
             double const A = -static_cast<double>(Object.Pos.x);
             double const B = -static_cast<double>(Object.Pos.z);
             double const Length = sqrt(B * B + A * A);
-            // TEST AH,0x41 + JNE: only "greater than 0" computes a heading.
+            // x87: only "greater than 0" computes a heading (unordered does not).
             if (Length > 0.0)
             {
                 double const Inv = 1.0 / Length;
@@ -134,9 +132,6 @@ void NeuroNetNavMap::BuildSystemItems()
             }
         }
 
-        // 0x00491a66..0x00491aed: the item, placed at the scaled position, with the solar's
-        // radius, the companion's shape_name mesh, ids_name / ids_info, the heading, the
-        // nickname id and the visit byte.
         unsigned const Id = CreateID(Object.Nickname.Data);
         double const Scale = static_cast<double>(SystemScale);
         float const X = static_cast<float>(static_cast<double>(Object.Pos.x) * Scale);
@@ -147,17 +142,16 @@ void NeuroNetNavMap::BuildSystemItems()
             Archetype::CliSolarShapeName(Companion), Object.IdsName, Object.IdsInfo, Heading, Id,
             Object.Visit);
 
-        // 0x00491af2..0x00491b15 -- the item is used without a null test, as in retail.
+        // The item is used without a null test, as in retail.
         if ((Type & 4) != 0)
             Item->Mesh.UserFloats[4] = kNavMapSunAlpha;
         if (Object.Goto != 0)
             Item->System = Universe::get_system(Object.Goto);
     }
 
-    // 0x00491b33..0x00491b91.
     BuildLaneSegments(); // FUN_004981f0
     if (CurrentSystem == nullptr || IsSkippedSystem(CurrentSystem))
-        MapZones.clear(); // the element-wise erase(first, last) at 0x00491b9c..0x00491bce
+        MapZones.clear();
     else
         BuildMapZones(); // FUN_004a0670
     if (!HasVisitedContent()) // FUN_00498a80
@@ -172,12 +166,12 @@ void NeuroNetNavMap::AddPlayerMarker()
     PlayerMapPosition(Pos, &Heading); // FUN_00491be0
     PlayerItem = AddItem(2, 0, Pos[0], Pos[1], Pos[2], ShipMarkerSize, "NNM_SM_INFO_POSITION",
                          0x219a, 0, Heading, 0, 0);
-    // 0x00491473 -- no null test, as in retail.
+    // No null test, as in retail.
     PlayerItem->PulsePhase = -1.0f;
     if (ViewMode != 0 && CurrentSystem->GetId() != GetPlayerStarSystemIdRetail())
         PlayerItem->bShown = 0;
 
-    // 0x004914a3..0x0049159e: the ten waypoint markers, tinted with the pulse palette
+    // The ten waypoint markers, tinted with the pulse palette
     // colour (the FUN_004a1af0 sequence inline) and scaled to 0.6.
     for (int Index = 0; Index < 10; ++Index)
     {
@@ -197,19 +191,19 @@ void NeuroNetNavMap::BuildLaneSegments()
     int const Count = static_cast<int>(LaneRings.size());
     for (int Chain = 0; Chain < Count; ++Chain)
     {
-        // 0x00498240..0x00498288: a lane's first ring (no prev_ring, a next_ring) starts a
+        // A lane's first ring (no prev_ring, a next_ring) starts a
         // chain; it is marked used by emptying its nickname.
         FNavMapRing& First = LaneRings[Chain];
         if (First.PrevRing.Data[0] != '\0' || First.NextRing.Data[0] == '\0')
             continue;
         First.Nickname.Data[0] = '\0';
-        TString<32> Name = First.NextRing; // REP MOVSD 9 dwords
+        TString<32> Name = First.NextRing;
         float Pos[3] = {First.Pos[0], First.Pos[1], First.Pos[2]};
 
         for (;;)
         {
-            // 0x00498290..0x004982c5: the unused ring named Name (DACOM stricmp). Retail
-            // starts the scan over, without end, when there is none.
+            // Retail quirk: with no unused ring named Name the scan restarts forever (hang on
+            // a broken lane chain).
             FNavMapRing* Next = nullptr;
             while (Next == nullptr)
             {
@@ -226,7 +220,6 @@ void NeuroNetNavMap::BuildLaneSegments()
                 }
             }
 
-            // 0x004982c7..0x0049836b: one segment, both ends scaled by SystemScale.
             FNavMapSegment Segment;
             double const EndScale = static_cast<double>(SystemScale);
             float const EndX = static_cast<float>(static_cast<double>(Next->Pos[0]) * EndScale);
@@ -241,7 +234,6 @@ void NeuroNetNavMap::BuildLaneSegments()
             Segment.End[2] = EndZ;
             LaneSegments.push_back(Segment); // FUN_004a3680(last, 1, &Segment)
 
-            // 0x00498370..0x004983d5: the ring is used; follow its next_ring.
             Next->Nickname.Data[0] = '\0';
             Pos[0] = Next->Pos[0];
             Pos[1] = Next->Pos[1];
@@ -252,8 +244,6 @@ void NeuroNetNavMap::BuildLaneSegments()
         }
     }
 
-    // 0x004983f4..0x00498460: the rings are dropped (CMP EBX,EBX: an erase of the whole
-    // range, last = first).
     LaneRings.clear();
 }
 
@@ -264,7 +254,7 @@ void NeuroNetNavMap::BuildMapZones()
     TerrainRecheckTimer = 1.0f; // DAT_005d2ecc
     MapZones.clear();   // FUN_005995c0(first, last)
 
-    // 0x004a06b0..0x004a0778: three passes over the zone list; each records where it
+    // Three passes over the zone list; each records where it
     // started in MapZones.
     int PassStart[3];
     for (int Pass = 0; Pass < 3; ++Pass)
@@ -289,7 +279,7 @@ void NeuroNetNavMap::BuildMapZones()
         }
     }
 
-    // 0x004a077e..0x004a07ed: the second pass's zones bubble-sorted by (properties & 0x7fc0),
+    // The second pass's zones bubble-sorted by (properties & 0x7fc0),
     // ascending, until a sweep swaps nothing.
     int const First = PassStart[1];
     int const Last = PassStart[2] - 1;
@@ -322,7 +312,7 @@ bool NeuroNetNavMap::HasVisitedContent()
     Universe::FSystemObject Object;
     ClearSystemObject(&Object);
 
-    // 0x00498ac2..0x00498b3a: an object that is neither a lane ring nor a sun (0x84) -- or
+    // An object that is neither a lane ring nor a sun (0x84) -- or
     // has no solar archetype -- and is visited (the visit map's flags OR its own, bit 0).
     unsigned const Count = static_cast<unsigned>(CurrentSystem->GetObjectCount());
     for (unsigned Index = 0; Index < Count; ++Index)
@@ -333,19 +323,18 @@ bool NeuroNetNavMap::HasVisitedContent()
         if (Arch != nullptr && (Arch->ObjectType & 0x84) != 0)
             continue;
         unsigned char Visit = 0;
-        GetPlayerVisitFlagsRetail(CreateID(Object.Nickname.Data), &Visit, 0, 0); // 0x00498b14
+        GetPlayerVisitFlagsRetail(CreateID(Object.Nickname.Data), &Visit, 0, 0);
         if (((Visit | Object.Visit) & 1) != 0)
             return true;
     }
 
-    // 0x00498b3c..0x00498baa: a visited map zone (the visit map OR the zone's own byte,
-    // IZone slot 32).
+    // A visited map zone (the visit map OR the zone's own byte, IZone slot 32).
     int const ZoneCount = static_cast<int>(MapZones.size());
     for (int Index = 0; Index < ZoneCount; ++Index)
     {
         Universe::IZone const* const Zone = MapZones[Index];
         unsigned char Visit = 0;
-        GetPlayerVisitFlagsRetail(Zone->GetId(), &Visit, 1, 0); // 0x00498b82
+        GetPlayerVisitFlagsRetail(Zone->GetId(), &Visit, 1, 0);
         if (((Visit | Zone->GetVisit()) & 1) != 0)
             return true;
     }

@@ -6,10 +6,8 @@
 
 #pragma once
 
-// Common.dll-internal helpers shared by common_systemmanager.cpp and common_sysmgr_gungroups.cpp.
-// CMN-SPLIT stage 1 (2026-10-14): these were anonymous-namespace helpers of the one
-// common_systemmanager.cpp; the split made them shared, so they live here, inline, in a named
-// namespace (common_aisteer.cpp has its own unrelated anonymous WatchedObject).
+// Common.dll-internal helpers shared by common_systemmanager.cpp and common_sysmgr_gungroups.cpp
+// (common_aisteer.cpp has its own unrelated anonymous WatchedObject).
 
 #include "common_systemmanager.h" // BaseWatcher, Watchable, IObjRW, ObjRwFromWatchable
 
@@ -32,7 +30,7 @@ namespace CmnSysMgr
         return Target != nullptr && reinterpret_cast<std::uintptr_t>(Target) != 8;
     }
 
-    // `EAX = [W]; ECX = EAX ? EAX - 8 : 0` -- the object behind a watcher, or null. Callers
+    // The object behind a watcher (W ? W - 8 : 0), or null. Callers
     // that dereference it without a test do so exactly where retail does.
     inline IObjRW* WatchedObject(BaseWatcher const& Watcher)
     {

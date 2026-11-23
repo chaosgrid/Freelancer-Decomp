@@ -52,9 +52,8 @@ MD5Hash::MD5Hash()
 
 MD5Hash::~MD5Hash() = default;
 
-// .text:065c67d0 (RET 0xc): Length is a BYTE count. Length 0 -> nothing (JBE); otherwise one
-// word per step, low byte first, while the byte offset (a multiple of 4) is below Length --
-// a Length that is not a multiple of 4 still writes the whole last word, as retail does.
+// .text:065c67d0: Length is a BYTE count. A Length that is not a multiple of 4 still writes the
+// whole last word, as retail does.
 void MD5Hash::Encode(unsigned char* Output, unsigned long* Input, unsigned long Length)
 {
     for (unsigned long Offset = 0; Offset < Length; Offset += 4)
@@ -67,8 +66,7 @@ void MD5Hash::Encode(unsigned char* Output, unsigned long* Input, unsigned long 
     }
 }
 
-// .text:065c6820 (RET 0xc): Length is a BYTE count, the same loop shape as Encode -- one
-// little-endian word per 4 input bytes while the byte offset is below Length.
+// .text:065c6820: Length is a BYTE count, same loop shape as Encode.
 void MD5Hash::Decode(unsigned long* Output, unsigned char* Input, unsigned long Length)
 {
     for (unsigned long Offset = 0; Offset < Length; Offset += 4)
@@ -170,8 +168,8 @@ void MD5Hash::Transform(unsigned char* Block)
     State[3] += D;
 }
 
-// Retail .text:065c6870..6926. No null/zero-length early-out (the port used to have one; retail
-// runs the counter update and a zero-byte copy for Length 0, and would fault on a null Data).
+// Retail .text:065c6870. No null/zero-length early-out: retail runs the counter update and a
+// zero-byte copy for Length 0, and would fault on a null Data.
 bool MD5Hash::AddData(void* const Data, unsigned long Length)
 {
     unsigned char* const Input = (unsigned char*)Data;
@@ -183,21 +181,18 @@ bool MD5Hash::AddData(void* const Data, unsigned long Length)
 
     unsigned long BufferIndex = (BitCount >> 3) & 0x3F;
     const unsigned long PartLength = 64 - BufferIndex;
-    // Index = EDI in retail: bytes already consumed from Input.
+    // Bytes already consumed from Input.
     unsigned long Index = 0;
     if (Length >= PartLength)
     {
         memcpy(Buffer + BufferIndex, Input, PartLength);
         Transform(Buffer);
-        // .text:065c68d4..68f9: ESI = Index + 0x3f, loop while ESI < Length.
         for (Index = PartLength; Index + 63 < Length; Index += 64)
             Transform(Input + Index);
         BufferIndex = 0;
     }
 
-    // .text:065c6905..691e: the tail starts at Input + Index (after the whole 64-byte blocks),
-    // not at Input + PartLength -- the port used PartLength here, which re-buffered already
-    // transformed blocks for any input longer than PartLength + 63 bytes.
+    // The tail starts at Input + Index (after the whole 64-byte blocks), not at Input + PartLength.
     memcpy(Buffer + BufferIndex, Input + Index, Length - Index);
     return true;
 }
@@ -218,21 +213,20 @@ bool MD5Hash::CalcValue()
     return true;
 }
 
-// Retail .text:065c69b0: sprintf(this+0x5c, "%08x-%08x-%08x-%08x", +4, +8, +0xc, +0x10);
-// returns this+0x5c.
+// Retail .text:065c69b0 (StringValue at +0x5c, State at +4..+0x10).
 const char* MD5Hash::AsString()
 {
     sprintf(StringValue, "%08x-%08x-%08x-%08x", State[0], State[1], State[2], State[3]);
     return StringValue;
 }
 
-// Retail .text:065c69e0: sscanf(Text, "%x-%x-%x-%x", &+4, &+8, &+0xc, &+0x10) -- no NULL check.
+// Retail .text:065c69e0 -- no NULL check.
 void MD5Hash::FromString(const char* Text)
 {
     sscanf(Text, "%x-%x-%x-%x", &State[0], &State[1], &State[2], &State[3]);
 }
 
-// .text:065c6a10 (RET 4): REPE CMPSD over the four state words of both objects, SETZ.
+// Retail .text:065c6a10.
 bool MD5Hash::Compare(MD5Hash& Other)
 {
     return State[0] == Other.State[0] && State[1] == Other.State[1] &&

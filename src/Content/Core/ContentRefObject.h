@@ -18,10 +18,9 @@ class FContentRefObject
 {
 public:
     FContentRefObject() = default;
-    // Slot 0, FUN_06eacd40 (06eacd40-06eacd47): ++count, returns it.
+    // Slot 0, FUN_06eacd40: ++count, returns it.
     virtual unsigned int AddRef();
-    // Slot 1, FUN_06eacd50 (06eacd50-06eacd66): --count; at 0 vtbl[+8](1) (delete this);
-    // returns the count.
+    // Slot 1, FUN_06eacd50: --count; at 0 delete this (slot 2); returns the count.
     virtual unsigned int Release();
     // Slot 2 (FUN_06ea8cc0 body; LAB_06eacd20 / FUN_06f06eb0 deleting forms).
     virtual ~FContentRefObject() = default;

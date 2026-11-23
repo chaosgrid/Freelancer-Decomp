@@ -45,8 +45,7 @@ namespace
 
     FMainCommandHandler::FMainCommandHandler()
     {
-        // FUN_005b23c0: the ids are laid out on the stack in this order (005b23ec..005b240c) and
-        // registered one by one through FUN_005760d0 (loop 005b2414..005b2424).
+        // FUN_005b23c0: the ids are registered in this order through FUN_005760d0.
         static unsigned const kIds[5] = {kUserExitGame, kUserPause, kUserReset, kUserFullscreen,
                                          kUserScreenShot};
         for (unsigned Index = 0; Index < 5; ++Index)
@@ -60,27 +59,23 @@ namespace
 
     bool FMainCommandHandler::OnEvent(unsigned MsgId)
     {
-        // 005b2440: EAX = MsgId - 0x14; above 0xb7 -> false; byte table 005b2494 picks the arm.
         switch (MsgId)
         {
         case kUserPause:
-            // caseD_14 (005b2466): FUN_004a75c0, then true.
-            NnPauseOpen();
+            NnPauseOpen(); // FUN_004a75c0
             return true;
         case kUserReset:
-            // caseD_15 (005b2475): consumed, nothing else.
+            // Consumed, nothing else.
             return true;
         case kUserExitGame:
-            // caseD_c5 (005b245c): DAT_0067ecbd = 1, true.
             G_bClientQuitRequested = true;
             return true;
         case kUserScreenShot:
-            // caseD_cb (005b2470): FUN_00425170, falls into caseD_15's `MOV AL,1`.
-            TakeClientScreenShot();
+            TakeClientScreenShot(); // FUN_00425170
             return true;
         default:
-            // USER_FULLSCREEN (0x17) is registered but its table byte (005b2497 = 4) sends it to
-            // the shared `XOR AL,AL` arm (005b247a), like every unlisted id.
+            // USER_FULLSCREEN (0x17) is registered but retail's switch sends it to the false arm,
+            // like every unlisted id.
             return false;
         }
     }
@@ -104,10 +99,8 @@ int TakeClientScreenShot()
     // FUN_00425170.
     char ShotDir[0x104];
     if (!GetScreenShotPath(ShotDir))
-        return -1; // 004251a0: OR EAX,-1
+        return -1;
 
-    // 004251d0..00425218: ++DAT_006679fc, "screen%d", _makepath(out, 0, dir, name, "BMP"),
-    // repeat while _access(out, 0) != -1.
     char FileName[0x80];
     char FullPath[0x104];
     do
@@ -117,8 +110,7 @@ int TakeClientScreenShot()
         _makepath(FullPath, nullptr, ShotDir, FileName, "BMP");
     } while (_access(FullPath, 0) != -1);
 
-    // 0042521a..00425277: QI DALib::Pipeline for IRPTexture (slot 0); on GR_OK slot 3
-    // PrintScreen(0, path); release (slot 2) whenever the out pointer is non-null.
+    // Released whenever the out pointer is non-null, whatever QueryInterface answered.
     IRPTexture* Texture = nullptr;
     IRenderPipeline* Pipe = DALib::Pipeline;
     if (Pipe->QueryInterface(Iids::RPTexture, reinterpret_cast<void**>(&Texture)) == GR_OK)

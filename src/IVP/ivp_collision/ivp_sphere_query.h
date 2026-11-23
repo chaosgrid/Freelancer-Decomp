@@ -7,13 +7,11 @@
 #pragma once
 
 // The sphere-overlap query PhysicalSystem::FindSphereCollisions (0628d450) runs against an
-// IVP environment: Common.dll .text:06350630-06350a57 (four functions). Class and member names
-// are port-local (no retail symbol survives); the layout is read off the listing.
+// IVP environment: Common.dll 06350630-06350a57 (four functions). Class and member names are
+// port-local.
 //
-// 0628d450 builds the query object on its stack (local_230, 0x224 bytes): an IVP_U_Vector whose
-// elems point at the 0x80-entry inline buffer right after the header (0628d4be-0628d4c9), filled
-// by collect_objects (06350740) and freed on exit by the vector's own inline-buffer test
-// (0628d525-0628d542, also the EH unwind state 0 at 0628d4dd).
+// 0628d450 builds the query object on its stack (local_230, 0x224 bytes): an IVP_U_Vector with
+// a 0x80-entry inline buffer right after the header, filled by collect_objects (06350740).
 
 #include <cstdint>
 
@@ -28,11 +26,11 @@ class IVP_OV_Tree_Manager;
 // The 6-dword record 0628d450 builds at local_248 and hands to collect_objects.
 struct FIVP_Sphere_Query_Record
 {
-    float Center[3];            // +0x00 (0628d47d..0628d4a8)
-    float Unwritten_0x0c;       // +0x0c: 0628d499/0628d4a8 copy an uninitialised stack dword
-                                //        (local_24c) here; 06350740 never reads it
-    float Radius;               // +0x10 (0628d4b2)
-    int32_t MaxLedgeTreeDepth;  // +0x14 (0628d4b6: 4)
+    float Center[3];            // +0x00
+    float Unwritten_0x0c;       // +0x0c: retail copies an uninitialised stack dword here;
+                                //        06350740 never reads it
+    float Radius;               // +0x10
+    int32_t MaxLedgeTreeDepth;  // +0x14 (0628d450 passes 4)
 };
 static_assert(sizeof(FIVP_Sphere_Query_Record) == 0x18, "the record is six dwords");
 
@@ -45,10 +43,10 @@ public:
     int32_t MaxLedgeTreeDepth;             // +0x21c
     IVP_OV_Tree_Manager* TreeManager;      // +0x220
 
-    // FUN_06350740 (.text:06350740-063507d9, thiscall RET 8).
+    // FUN_06350740, thiscall RET 8.
     void collect_objects(const FIVP_Sphere_Query_Record* Record, IVP_Environment* Environment);
 
-    // FUN_063507e0 (.text:063507e0-06350a57, thiscall RET 0xc), recursive over the OV tree.
+    // FUN_063507e0, thiscall RET 0xc, recursive over the OV tree.
     void collect_objects_in_node(IVP_OV_Node* Node, const IVP_U_Point* HalfSize, const IVP_U_Point* QueryCenter);
 };
 static_assert(sizeof(IVP_Sphere_Object_Query) == 0x224, "0628d450 reserves 0x224 bytes at local_230");

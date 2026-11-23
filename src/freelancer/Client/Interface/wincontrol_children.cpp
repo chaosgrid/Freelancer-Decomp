@@ -15,15 +15,9 @@
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"
 
-// Retail WinControl's child-construction helpers, 0x005a0c90..0x005a0ee5 and 0x005a10e0 /
-// 0x005a1950. Every one has the same shape: FUN_0059db20(Name, <class name>, this, 0); on a
-// non-null result `MOV ECX,ESI` and a direct call to that control class's Init with the
-// helper's remaining arguments, pushed in the same order; the helper returns FUN_0059db20's
-// result either way.
-//
-// StaticControl (nn_static_control), TextControl and EditControl (nn_text_control), ButtonControl
-// (nn_button_control.h) and the wire controls (wire_controls.h) are registered through their
-// WINFACTORY<T> statics at load, as in retail.
+// Retail WinControl's child-construction helpers (0x005a0c90..0x005a0ee5, 0x005a10e0,
+// 0x005a1950). Each is FUN_0059db20(Name, <class name>, this, 0), then on a non-null result a
+// direct call to that class's Init with the remaining arguments in order.
 
 WinControl* WinControl::CreateButtonControl(char const* Name, char const* MeshPath,
                                             char const* String350, char const* SoundName,
@@ -33,9 +27,7 @@ WinControl* WinControl::CreateButtonControl(char const* Name, char const* MeshPa
                                             unsigned char bFlag330Bit5, unsigned char bNoZEnable,
                                             int ToolTipIds, int Dword32c, int Dword34c)
 {
-    // FUN_005a0c90: every argument after the name goes to ButtonControl::Init FUN_0055ac30 in
-    // order (0x005a0cc4..0x005a0cf4). "ButtonControl" is the WINFACTORY<NnButtonControl>
-    // static (nn_button_control.cpp).
+    // FUN_005a0c90 (ButtonControl::Init FUN_0055ac30).
     Win3D* const Created = WinFactoryCreate(Name, "ButtonControl", this, nullptr);
     if (Created != nullptr)
     {
@@ -88,9 +80,7 @@ WinControl* WinControl::CreateStaticControl(char const* Name, char const* MeshPa
                                             int Int418, int Int41c, unsigned char Byte349,
                                             float const* Vector338)
 {
-    // FUN_005a0db0: every argument after the name goes to StaticControl::Init FUN_00588540 in
-    // order (0x005a0dd9..0x005a0e19). "StaticControl" is the WINFACTORY<NnStaticControl>
-    // static (nn_static_control.cpp).
+    // FUN_005a0db0 (StaticControl::Init FUN_00588540).
     Win3D* const Created = WinFactoryCreate(Name, "StaticControl", this, nullptr);
     if (Created != nullptr)
     {
@@ -106,13 +96,10 @@ WinControl* WinControl::CreateTextControl(char const* Name, char const* StyleNam
                                           float Width, float Height, float Arg6, unsigned Ids,
                                           int Dword358, int Dword344, unsigned char Byte378)
 {
-    // FUN_005a0e30: FUN_0059db20(Name, "TextControl", this, 0) -- the WINFACTORY<TextControl>
-    // static (nn_text_control.cpp) -- and on a non-null result FUN_0058a110 with every argument.
+    // FUN_005a0e30 (TextControl::Init FUN_0058a110).
     Win3D* const Created = WinFactoryCreate(Name, "TextControl", this, nullptr);
     if (Created != nullptr)
     {
-        // FUN_0058a110(StyleName, Position, Hardpoint, Width, Height, Arg6, Ids, Dword358,
-        // Dword344, Byte378) -- TextControl::Init with every argument as passed.
         NnTextControl* const Text = static_cast<NnTextControl*>(Created);
         Text->Init(StyleName, Position, Hardpoint, Width, Height, Arg6, Ids, Dword358, Dword344,
                    Byte378);
@@ -124,9 +111,7 @@ UiScroll* WinControl::CreateUIScroll(char const* Name, float const* Position, fl
                                      float Height, int Min, int Max, int Page,
                                      unsigned char bHorizontal)
 {
-    // FUN_005a17e0: the payload is built on the stack (0x005a17e3..0x005a1829) -- the two sizes
-    // as passed, the three ints through FILD, a step of 1.0f and the byte -- and handed to
-    // FUN_0059db20(Name, "UIScroll", this, &Payload).
+    // FUN_005a17e0.
     FUiPayloadScrollCycle Payload;
     Payload.Right = Width;
     Payload.Bottom = Height;
@@ -150,7 +135,7 @@ UiScroll* WinControl::CreateUICycle(char const* Name, float const* Position, flo
                                     float Height, int Min, int Max, int Page,
                                     unsigned char bHorizontal)
 {
-    // FUN_005a1870: FUN_005a17e0 instruction for instruction, the factory name "UICycle".
+    // FUN_005a1870: FUN_005a17e0 with the factory name "UICycle".
     FUiPayloadScrollCycle Payload;
     Payload.Right = Width;
     Payload.Bottom = Height;
@@ -173,8 +158,7 @@ UiScroll* WinControl::CreateUICycle(char const* Name, float const* Position, flo
 RichTextWin* WinControl::CreateRichTextWin(char const* Name, float Width, float Height,
                                            float const* AttachOffset, bool bAutoScrollbar)
 {
-    // FUN_005a10e0: no null test on the factory's result (005a10ff MOV ESI,EAX, then straight
-    // into FUN_00579cc0).
+    // FUN_005a10e0: retail does not test the factory's result for null.
     RichTextWin* const Text =
         static_cast<RichTextWin*>(WinFactoryCreate(Name, "RichTextWin", this, nullptr));
     Text->SetNormSize(Width, Height);          // FUN_00579cc0
@@ -186,9 +170,7 @@ RichTextWin* WinControl::CreateRichTextWin(char const* Name, float Width, float 
 RichTextEditWin* WinControl::CreateUiTextEdit(char const* Name, float const* AttachOffset,
                                               float Width, float Height, wchar_t* Caption)
 {
-    // FUN_005a1900 (RET 0x14): a stack payload {Width, Height, Caption} (UITextEdit's
-    // FUiPayloadText), FUN_0059db20(Name, "UITextEdit", this, &payload), and on a non-null
-    // result FUN_00579c40 (SetAttachOffset) with the position.
+    // FUN_005a1900.
     FUiPayloadText Payload;
     Payload.Right = Width;
     Payload.Bottom = Height;
@@ -224,10 +206,7 @@ WinControl* WinControl::CreateEditControl(char const* Name, char const* StyleNam
                                           float Width, float Height, float Arg6, unsigned Ids,
                                           int Dword358, int Dword344)
 {
-    // FUN_005a0e90: FUN_0059db20(Name, "EditControl", this, 0) -- WINFACTORY<EditControl>
-    // DAT_0067d860, G_EditControlFactory in nn_text_control.cpp; on a non-null result
-    // TextControl's Init FUN_0058a110(StyleName, Position, Hardpoint, Width, Height, Arg6, Ids,
-    // Dword358, Dword344, 0) on it.
+    // FUN_005a0e90 (factory DAT_0067d860; TextControl::Init with a trailing 0).
     Win3D* const Created = WinFactoryCreate(Name, "EditControl", this, nullptr);
     if (Created != nullptr)
     {
@@ -249,9 +228,7 @@ WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* 
                                                   unsigned char bNoZEnable, int ToolTipIds,
                                                   int Dword32c)
 {
-    // FUN_005a0fb0: FUN_0059db20(Name, "ToggleButtonControl", this, 0) -- the WINFACTORY
-    // DAT_00679a80 (G_ToggleButtonControlFactory, nn_button_control.cpp); on a non-null result
-    // ToggleButtonControl::Init FUN_0055c1c0 with the remaining thirteen arguments in order.
+    // FUN_005a0fb0 (factory DAT_00679a80; ToggleButtonControl::Init FUN_0055c1c0).
     Win3D* const Created = WinFactoryCreate(Name, "ToggleButtonControl", this, nullptr);
     if (Created != nullptr)
     {
@@ -264,9 +241,7 @@ WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* 
 
 bool WinControlHalfExtentsFromMesh(float* HalfExtents, FClientMeshHolder* Holder)
 {
-    // FUN_005a1340 (thiscall on HalfExtents, RET 4): FUN_0059f0d0 fills a six-float box on the
-    // stack; when it answers 1, HalfExtents = {box[0], box[2], 0} and the result stays 1 (AL
-    // from the call), otherwise 0 and HalfExtents is left alone.
+    // FUN_005a1340.
     FClientMeshAabb Box;
     if (!ClientMeshQueryAabb(Holder, &Box))
         return false;

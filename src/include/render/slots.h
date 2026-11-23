@@ -179,16 +179,8 @@ namespace Render
         RpDrawSlotCount = 4,
     };
 
-    // IVertexBufferManager, IRPVertexBuffer and IRPIndexBuffer used to carry slot-number
-    // enums here. They are gone: all three are declared as real interfaces in
-    // render/IRenderPipeline.h and every caller in the tree invokes methods, so a second,
-    // hand-maintained numbering could only drift away from the first.
-
-    // IRPTexture's slot enum is gone for the same reason: the interface is declared in
-    // render/IRenderPipeline.h (slot 6 is GetImageInfo, not a second load_texture).
-
-    // IGammaControl — 8 slots. Strings set_gamma_function / set_gamma_ramp /
-    // get_gamma_ramp exist; slot numbers are not evidenced.
+    // IVertexBufferManager, IRPVertexBuffer, IRPIndexBuffer, IRPTexture and IGammaControl
+    // are declared as interfaces in render/IRenderPipeline.h; no slot enums here.
 
     // IMaterial — 29 slots (Shading + flmaterials). C++ name only for initialize / bind.
     enum EMaterialSlot

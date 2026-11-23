@@ -16,10 +16,9 @@
 //
 // The object is a file-scope static in main_command_handler.cpp; nothing else calls into it.
 
-// DAT_0067ecbd -- "leave the session" flag. USER_EXIT_GAME sets it (005b245e). Retail also
-// writes it at 0054abe5 / 0054ae4d / 005b292b / 005b29ac / 005b2ad0 / 005b2c50 and reads it in
-// the frame function FUN_005b2890 (005b28cf / 005b29f8 / 005b2a16): a set flag sends the frame
-// to state 6 (IntroFocus) and is cleared there (TickClientFrame, client_frame_tick.cpp).
+// DAT_0067ecbd -- "leave the session" flag. USER_EXIT_GAME sets it, as do the space state, the
+// frame and the state machine; the frame function FUN_005b2890 reads it: a set flag sends the
+// frame to state 6 (IntroFocus) and is cleared there (TickClientFrame, client_frame_tick.cpp).
 bool ClientQuitRequested();
 void SetClientQuitRequested(bool bQuit);
 

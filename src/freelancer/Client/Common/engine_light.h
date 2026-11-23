@@ -51,13 +51,9 @@ struct FEngineLight
     virtual void Disable();
 
     unsigned RegListNext;     // +0x04 intrusive light-list Next (retail DAT_006164e0 = list head)
-    unsigned RegListPrev;     // +0x08 intrusive light-list Prev (retail DAT_006164e4 = list tail,
-                           // DAT_006164e8 = count). The list-insert routine that actually links a
-                           // light in (setting Flags bit 4) is a different, not yet ported
-                           // function; this batch only ports the unlink side (dtor / Unregister),
-                           // so these fields and G_LightListHead/Tail below stay unused until it
-                           // lands, exactly like retail's dead branches would be for an
-                           // unregistered light.
+    unsigned RegListPrev;     // +0x08 intrusive light-list Prev (DAT_006164e4 = tail,
+                           // DAT_006164e8 = count). Linked (Flags bit 4) by EngineLightApplyNearby
+                           // (FUN_004104e0), unlinked by the dtor / Unregister / ClearList.
     FD3dLight8 D3d;       // +0x0C
     float Orient[9];      // +0x74 3x3, identity from the ctor
     float Position[3];    // +0x98
@@ -68,7 +64,7 @@ struct FEngineLight
                            // bit 3 = enabled, bit 4 = linked into the global light list,
                            // bit 5 = has a D3DLIGHT8
     unsigned char PadB5[3];
-    IGraph* AmbientCurve; // +0xB8 "ambient_curve" (FUN_00411690 @ 00411a8c); an ambient light
+    IGraph* AmbientCurve; // +0xB8 "ambient_curve" (FUN_00411690); an ambient light
                            // (Type -2) scales its colour by it over [0, Range]
     IGraph* ZoneCurve;    // +0xBC "atten_curve" (FUN_00411d90): scales the colour over [0, Range]
     IGraph* ColorCurve;   // +0xC0 "color_curve" (FUN_00411e90): tints the colour over time
@@ -105,12 +101,10 @@ bool EngineLightRegister(FEngineLight* Light);
 // FUN_00410e20 — vtable slot 2 ("Unregister"): drop the enabled bit and, if linked into the
 // global light list, unlink it and tell the pipeline to drop the light (slot 41). Distinct from
 // EngineLightDestroy: this clears Flags bit 3 (enabled), the destructor clears bit 2
-// (registered). Nothing currently sets bit 4 (see FEngineLight::RegListNext above), so the unlink
-// branch is presently dead, same as in retail before the light is ever list-inserted.
+// (registered).
 void EngineLightUnregister(FEngineLight* Light);
-// FUN_00410ec0 — the PushLightUpdate tail every setter below already runs inline; exposed
-// standalone because retail calls this exact 4-line sequence as its own out-of-line function
-// from elsewhere (e.g. the not-yet-ported [LightSource] INI loader around FUN_00411690).
+// FUN_00410ec0 — the PushLightUpdate tail every setter below already runs inline; retail also
+// calls it out of line (e.g. from the [LightSource] reader FUN_00411690).
 void EngineLightPushUpdate(FEngineLight* Light);
 // FUN_00410fe0 — combined "set orientation + position" from one {Orient[9], Pos[3]} block, in
 // that order (position first, then orientation) with the pipeline pushed after each half,
@@ -120,8 +114,8 @@ void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, float co
 // the same switch as EngineLightInit/EngineLightSetLight (StoreType, always touching D3d.Type).
 void EngineLightSetType(FEngineLight* Light, int LightType, bool Bit0);
 // FUN_004112f0 — raw D3d.Range write, no attenuation recompute and no pipeline push (unlike
-// EngineLightSetRadius below). Retail callers: 005011af (nebula directional light,
-// cli_nebula.cpp) and 005060e5 (gate tunnel light, gate_tunnel.cpp), both with 500000.
+// EngineLightSetRadius below). Retail callers: the nebula directional light (cli_nebula.cpp)
+// and the gate tunnel light (gate_tunnel.cpp), both with 500000.
 void EngineLightSetRangeRaw(FEngineLight* Light, float Range);
 // FUN_00411300 — "SetRadius": Range=Radius, Attenuation0=1, Attenuation1=0,
 // Attenuation2=16/Radius^2, then pushes the update.
@@ -139,9 +133,8 @@ void EngineLightSetColorBytesAlt(FEngineLight* Light, unsigned char const RGB[3]
 // does NOT push the update (retail has no pipeline call here, unlike every other setter).
 void EngineLightSetConeAngle(FEngineLight* Light, float DegreesFullAngle);
 
-// FUN_00411350 — generic 3-float negate. Lives in EngineLight.cpp in retail (13 call sites, most
-// outside this subsystem) but isn't otherwise identified/ported, so it's exposed here rather than
-// re-declared per caller.
+// FUN_00411350 — generic 3-float negate. Lives in EngineLight.cpp in retail (most callers are
+// outside this subsystem).
 void Vec3Negate(float* Out, float const* In);
 // FUN_00410190 (thiscall on a 3-float vector) — sqrt((x*x + y*y) + z*z), left on the FPU
 // (so returned as double).
@@ -159,8 +152,8 @@ float* EngineLightUnpackColorBytes(unsigned char const* Bytes3, float* OutRgb3);
 // FUN_00411cd0 — parse a [LightSource] type string. "AMBIENT"->-2, "POINT"->1, "CONE"->2,
 // "DIRECTIONAL"->3, anything else logs an FDUMP error and returns -1.
 int EngineLightParseType(char const* Text);
-// FUN_00411f70 — write column 2 of a row-major 3x3 (elements 2, 5, 8). Shared: also called from
-// 005143f8, 0051673d and 00519c72.
+// FUN_00411f70 — write column 2 of a row-major 3x3 (elements 2, 5, 8). Also called from outside
+// the light code.
 void MatrixSetColumn2(float* Matrix9, float const* Vec3);
 
 // The {length, text} buffer FUN_00411f00 fills from a C string (at most 0x7F characters).
@@ -193,7 +186,7 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
                                 float const* Direction3);
 
 // The Thorn light-props block: 0x90 bytes at snap+0x44. Offsets recovered from the two
-// FUN_00556fd0 call sites (00453075 / 0044975c): +0x0C is the light's local direction (turned
+// FUN_00556fd0 call sites: +0x0C is the light's local direction (turned
 // by the entity orientation in FUN_00556fd0) and +0x28 is the D3DLIGHT8 itself, which fills the
 // block exactly (0x28 + 0x68 = 0x90).
 FD3dLight8 const* ThornLightPropsD3d(float const* Props36);
@@ -202,7 +195,7 @@ float const* ThornLightPropsTarget(float const* Props36);
 void EngineLightDestroy(FEngineLight* Light);
 // FUN_00410ba0 — vtable slot 0 itself, called with 1: the FUN_00410ab0 body (inlined in retail)
 // and operator delete. For a light from operator new(200) + EngineLightInit, e.g.
-// ShipViewControl's three (ctor 0x00583a50, dtor 0x00583cee).
+// ShipViewControl's three.
 void EngineLightDelete(FEngineLight* Light);
 
 // FUN_00410a40 — light range/distance test ("does this light reach that point"). A
@@ -215,8 +208,8 @@ bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, flo
 // modulates it through two GraphLibrary curves: ColorCurve (+0xC0, slot 7, at the client
 // elapsed time over the wrapping range [0, ColorCurvePeriod], packed 0x00RRGGBB) and ZoneCurve
 // (+0xBC, slot 6, at Dist over the clamped range [0, D3d.Range], a scalar that dims all three
-// channels). Dist is passed by value -- both retail callers (004105c0, 004109a7) push the
-// distance FUN_00411370 wrote. Returns true if either modifier applied.
+// channels). Dist is passed by value -- both retail callers push the distance FUN_00411370
+// wrote. Returns true if either modifier applied.
 bool EngineLightGetEffectiveColor(FEngineLight* Light, float Dist, float* OutColor3);
 
 // FUN_00411370 — unit direction toward Point (point/spot with flag bit1), else −Orient col2.
@@ -269,7 +262,7 @@ bool GameLightEnable(FEngineLight* Light);
 void GameLightDisable(FEngineLight* Light);
 
 // FUN_00410240 — pack RGB bytes to D3DCOLOR-ish dword and Pipeline SetRenderState(0x8b, packed).
-// Memory order: R at [0], G at [1], B at [2] (listing MOVZX chain → OR into ESI).
+// Memory order: R at [0], G at [1], B at [2].
 void EngineLightSetAmbientRgbBytes(unsigned char const Rgb[3]);
 
 // ---------------------------------------------------------------------------
@@ -304,8 +297,8 @@ namespace Light
     // operator new(0x4C). vtable PTR_FUN_005de730 { FUN_00538690 deleting dtor }.
     struct AnimationArch : public OwnerList<AnimFrame>
     {
-        // Inlined at 00538bb8..00538bde: OwnerList<AnimFrame>(false) (FUN_00538ed0 + vptr),
-        // NameLen = 0, Name[0] = 0, KeyBuffers(true) (FUN_00538fe0).
+        // Inlined in FUN_00538b20: OwnerList<AnimFrame>(false) (FUN_00538ed0), empty name,
+        // KeyBuffers(true) (FUN_00538fe0).
         AnimationArch();
         // FUN_00538560: free() every spare key buffer, then ~MetaList<void>, then
         // ~OwnerList<AnimFrame>.
@@ -320,8 +313,7 @@ namespace Light
 }
 
 // OwnerList<Light::AnimationArch>::free (FUN_00538ab0) and its destructor (FUN_00539000) release
-// each element through its virtual deleting destructor (`PUSH 1; CALL [EAX]`), not a bare
-// operator delete.
+// each element through its virtual deleting destructor, not a bare operator delete.
 template <>
 inline void OwnerListDeleteData<Light::AnimationArch>(Light::AnimationArch* Data)
 {
@@ -331,11 +323,11 @@ inline void OwnerListDeleteData<Light::AnimationArch>(Light::AnimationArch* Data
 static_assert(offsetof(Light::AnimationArch, NameLen) == 0x14, "AnimationArch NameLen +0x14");
 static_assert(offsetof(Light::AnimationArch, Name) == 0x18, "AnimationArch Name +0x18");
 
-// FUN_00538b20 -- __cdecl(char const* Path), called from FUN_0054aa80 @ 0054ac70 with
-// GetFileSysPath("fx\lightanim.ini"). Appends one AnimationArch per [LightAnim] section.
+// FUN_00538b20 -- __cdecl, called from FUN_0054aa80 with GetFileSysPath("fx\lightanim.ini").
+// Appends one AnimationArch per [LightAnim] section.
 void LightAnimationLoad(char const* Path);
 // FUN_00538ab0 -- OwnerList<Light::AnimationArch>::free on the global list; retail calls it
-// from the space teardown FUN_0054aec0 @ 0054afd4.
+// from the space teardown FUN_0054aec0.
 void LightAnimationFreeAll();
 
 struct FGameLightAnimSlot
@@ -375,16 +367,16 @@ static_assert(offsetof(FGameLight, Anim) == 0xD4, "GameLight Anim +0xD4");
 static_assert(offsetof(FGameLight, Anim.Def) == 0xDC, "Anim.Def +0xDC");
 static_assert(sizeof(FGameLight) == 0x12C, "GameLight 300 bytes");
 
-// A GameLight's vtable slot 2 (+8), the shape of every retail disable site
-// (`MOV EAX,[ECX]; CALL [EAX+8]` -- a raw scan finds no direct CALL FUN_005376f0).
+// A GameLight's vtable slot 2 (+8), the shape of every retail disable site (none calls
+// FUN_005376f0 directly).
 inline void GameLightVirtualDisable(FGameLight* Light)
 {
     Light->Disable();
 }
 
 // DAT_006789c0 -- the game light unit's lazily filled I3DMathEngine (FUN_005b73e0 on first
-// use). Its only readers are FUN_005377c0 (0x005377f9, CliExplosionAttachLocalXform) and
-// FUN_00537860 (0x00537893, GameLightTick); raw PE scan finds no other reference.
+// use). Its only readers are FUN_005377c0 (CliExplosionAttachLocalXform) and FUN_00537860
+// (GameLightTick).
 struct I3DMathEngine;
 extern I3DMathEngine* G_GameLightMath;
 
@@ -419,17 +411,17 @@ void GameLightTickAnim(FGameLightAnimSlot* Slot, float Dt, FGameLight* Light);
 void GameLightTick(FGameLight* Light, float Dt);
 
 // FUN_00538390 — walk DAT_00675570, vtable+0xc(Dt) = GameLightTick. Retail call site
-// LAB_0054b000 (space ClientObj Update) immediately before LightGridRebuild (00537c30),
-// gated by GetGameOption(LIGHTING=0x18).
+// LAB_0054b000 (space ClientObj Update) immediately before LightGridRebuild, gated by
+// GetGameOption(LIGHTING=0x18).
 void GameLightTickAll(float Dt);
 
-// FUN_005383c0 (cdecl, caller StarSysLeave 00554bc2): every GameLight on DAT_00675570 gets
+// FUN_005383c0 (cdecl, caller StarSysLeave): every GameLight on DAT_00675570 gets
 // ++RefCount, its animation detached (the inlined FUN_005379b0), vtable slot 2 (disable) and
 // --RefCount with slot 0 (1) at <= 0; the ones still referenced are chained on a local list
 // and, in a second pass, unlinked from it and re-enabled through vtable slot 1.
 void GameLightLeaveSystem();
 
-// FUN_00538520 (cdecl, caller the space teardown 0054afca): --RefCount on every GameLight of
+// FUN_00538520 (cdecl, caller the space teardown): --RefCount on every GameLight of
 // DAT_00675570 (next read first), vtable slot 0 (1) at <= 0. The list itself is left as is.
 void GameLightReleaseAll();
 
@@ -439,7 +431,7 @@ void GameLightReleaseAll();
 void* GameLightHeapAlloc(size_t Size);
 
 // FUN_00537ab0 — Heap::Shrink on the GameLight pool. Retail calls it from the space teardown
-// FUN_0054aec0 @ 0054afcf (DestroySpaceState), right before FUN_00538ab0.
+// FUN_0054aec0 (DestroySpaceState), right before FUN_00538ab0.
 void GameLightHeapShrink();
 
 // FUN_00537ac0 — RefCount++ at +0xD0.
@@ -451,7 +443,7 @@ int GameLightRelease(FGameLight* Light);
 class INI_Reader;
 // FUN_00537a40 — __thiscall(INI_Reader*): feed every value of the current section to
 // EngineLightReadValue, then vtable slot 1 (enable). Retail caller: the [LightSource] branch of
-// the system loader at 00553db4.
+// the system loader.
 void GameLightLoad(FGameLight* Light, INI_Reader* Reader);
 
 // FUN_005379b0 — if Anim.Keys is set: hand the keys back to Def->KeyBuffers (when Def is set),

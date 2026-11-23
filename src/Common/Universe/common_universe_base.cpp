@@ -35,9 +35,7 @@
 
 namespace CmnUniverse
 {
-    // FUN_06337250 .text:063386d0-06338780 (the stack BASE's construction): ID_String::clear
-    // on +0x04 / +0x14, CacheString::clear on +0x08 / +0x10, an empty string at +0x18, the
-    // vftable, and zero in +0x0c, +0x28, +0x2c (byte), +0x30..+0x68 and +0x6c (byte).
+    // Inlined in FUN_06337250 (the stack BASE, .text:063386d0).
     BASE::BASE()
     {
         NicknameId = 0;
@@ -61,8 +59,8 @@ namespace CmnUniverse
         TerrainDyna01 = 0;
         TerrainDyna02 = 0;
         bAutosaveForbidden = false;
-        SpaceObjectId = 0;          // .text:0633877c
-        SpaceObjectVisit = 0;       // .text:06338780
+        SpaceObjectId = 0;
+        SpaceObjectVisit = 0;
     }
 
     unsigned BASE::GetId() const { return NicknameId; }             // 062d1ad0 [+0x04]
@@ -71,8 +69,7 @@ namespace CmnUniverse
     char const* BASE::GetFile() const { return File; }              // 06263a70 [+0x10]
     unsigned BASE::GetSystem() const { return SystemId; }           // 06263bb0 [+0x14]
 
-    // 0633ba50: the string's buffer ([+0x1c]), or the library's shared empty string when it
-    // has none -- c_str().
+    // 0633ba50 [+0x1c]
     char const* BASE::GetBgcsBaseRunBy() const { return BgcsBaseRunBy.c_str(); }
 
     unsigned BASE::GetShipSml01() const { return ShipSml[0]; }      // 063275a0 [+0x30]

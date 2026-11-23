@@ -7,37 +7,26 @@
 #pragma once
 
 // Retail FUN_005792b0 -- the global display/debug option table, and the loop at 0x005621c0 that
-// fills it.
-//
-// 138 call sites across the whole in-flight game read this table, always as a guard:
-// "[EFFECTS] and PARTICLES are on, so draw them", "HUD is on, so notify the HUD", and so on.
-// Until now those guards read as an opaque `FUN_005792b0(0x26)` in the listing, which is why so
-// much of the in-flight code looked unportable.
-//
-// What the table actually is:
+// fills it. About 138 call sites in the in-flight game read it as a guard ("[EFFECTS] and
+// PARTICLES are on, so draw them").
 //
 //   * `FUN_005792b0(Index)` is `if (Index < 0x46) return Values[Index]; return 0;` over a
-//     70-entry array of ints at .data 0x00679be8. The array is a member of the options object
-//     whose `this` is 0x00679bc0 -- it sits at +0x28, which is why the whole PE contains exactly
-//     ONE absolute reference to 0x00679be8 (the read itself) and the writer is invisible to a
-//     search for that address.
+//     70-entry int array at .data 0x00679be8, +0x28 in the options object at 0x00679bc0 (so the
+//     writer never names 0x00679be8 directly).
 //
-//   * The writer is the first loop of `FUN_005621a0` (the options-object init WinMain calls at
-//     0x005b31d8, before RegisterClassA):
+//   * The writer is the first loop of `FUN_005621a0` (the options-object init WinMain calls
+//     before RegisterClassA):
 //         for (Off = 0; Off < 0x470; Off += 0x10)
 //             This[*(int*)(0x006143b8 + Off) + 10] = *(int*)(0x006143c0 + Off);
-//     `+ 10` dwords is `+0x28` bytes -- exactly the array. So it scatters a table of
-//     0x470 / 0x10 = 71 descriptors into the 70 slots.
+//     It scatters 0x470 / 0x10 = 71 descriptors into the 70 slots.
 //
 //   * Each descriptor is 16 bytes: {int Index; char const* Name; int Default; int bSelectable}.
 //     The names are the in-game debug options menu: category headers in brackets and the
 //     toggles under them.
 //
-// The important consequence for the port: **nothing else in retail ever writes these values.**
-// The option names are referenced from the descriptor table and from nowhere else in the PE --
-// the menu that would have edited them was stripped from the shipped build -- so every option
-// keeps its default for the life of the process, and every one of those 138 guards is decidable
-// ahead of time. See docs/re/freelancer.md.
+// Nothing else in retail ever writes these values: the menu that would have edited them was
+// stripped from the shipped build, so every option keeps its default for the life of the
+// process. See docs/re/freelancer.md.
 
 // The option indices, in the numeric order the array is indexed by. The bracketed entries are
 // the menu's category headers; retail queries those exactly like the toggles under them, and
@@ -126,10 +115,9 @@ enum EGameOption
     kGameOptCount                   = 0x46
 };
 
-// One row of the descriptor table at .data 0x006143b8. Retail's record is
-// {int Index; char const* Name; int Default; int bSelectable} and this is a literal
-// transcription of it, kept in retail's own row order -- which is MENU order, not index order:
-// "SHIP WIRES" is row 18 but index 0x0b, and index 0x2f appears twice.
+// One row of the descriptor table at .data 0x006143b8, kept in retail's own row order -- which
+// is menu order, not index order: "SHIP WIRES" is row 18 but index 0x0b, and index 0x2f appears
+// twice.
 struct FGameOptionDesc
 {
     int         Index;
@@ -146,28 +134,24 @@ extern const int GGameOptionDescCount;
 // is LoadStartupConfig itself (startup_config.cpp); WinMain runs it before the window class is
 // registered, so it is in effect before anything queries an option.
 
-// FUN_005792b0. Out-of-range indices give 0, exactly as retail's `if (Index < 0x46)` does.
-//
-// The compare is signed, as retail's JGE: a negative index reads the options-object fields in
-// front of the array. No caller in the PE passes anything but a small non-negative constant.
+// FUN_005792b0. Indices from 0x46 give 0. The compare is signed: a negative index reads the
+// options-object fields in front of the array. No caller in the PE passes one.
 int GetGameOption(int Index);
 
-// The option's name. Retail keeps these strings but no surviving code reads them: the debug menu
-// that would have edited the options was stripped from the shipped build, which is why the values
-// never move off their defaults. Exposed here for logging. Null for an unknown index.
+// Port-only: the option's name, for logging (retail never reads these strings). Null for an
+// unknown index.
 char const* GetGameOptionName(int Index);
 
 // -------------------------------------------------------------------------------------------
-// Session/game-mode flags word -- .data:00612274. A SEPARATE global from the debug option table
-// above (different address, mutated at runtime, no descriptor table).
+// Session/game-mode flags word -- .data:00612274. A separate global from the debug option table
+// above (mutated at runtime, no descriptor table).
 
 // FUN_004c8120 -- set or clear the bits in Mask, then send the new word to the server through
 // IServer slot 77 SetInterfaceState(DAT_00673344, &word, 4) when DAT_0067ecd0 is set.
 void SetGameSessionFlags(unsigned Mask, bool bSet);
 
-// FUN_004c8190 -- raw overwrite, no broadcast at all in retail either.
+// FUN_004c8190 -- raw overwrite, no broadcast in retail either.
 void AssignGameSessionFlags(unsigned Value);
 
-// FUN_004c8110 -- `(DAT_00612274 & Mask) != 0`. Named here for symmetry with the setters above;
-// FUN_004c8110 itself stays a separate decomp-tracker item (blocked, not this pair's to reclassify).
+// FUN_004c8110.
 bool TestGameSessionFlags(unsigned Mask);

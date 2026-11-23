@@ -21,18 +21,16 @@ struct FmtStr;
 struct FRmSolarFormation;
 struct FSystemInfo;
 
-// Random-mission generator (docs/re/content.md, TU map, lane CNT-RM): TU63 06f97360-06fa75c0.
-// Ported: the generator root object (DAT_06fd3c78: ctor FUN_06f9d550 = all RandomMissions
-// table loads, dtor FUN_06f9d970), the vignette node tree (VignetteParams.ini load
-// FUN_06f9ecb0, link FUN_06f9dd50, difficulty windows FUN_06f9dad0), NpcRankToDiff /
-// Diff2Money tables, the "all groups" enumerator, the voice-properties database, the solar
-// formation pick, the offer walk (offer node, tree paths, path filters) and the building of
-// the TU61 offer (BuildOffer, BuildOfferFromPath, the filters' CreateOffer; the offer
-// classes are RandomMissionOffer.h).
+// Random-mission generator (TU63): the generator root object (DAT_06fd3c78; its ctor
+// FUN_06f9d550 does all RandomMissions table loads), the vignette node tree
+// (VignetteParams.ini), NpcRankToDiff / Diff2Money tables, the "all groups" enumerator, the
+// voice-properties database, the solar formation pick, the offer walk (offer node, tree
+// paths, path filters) and the building of the TU61 offer (the offer classes are in
+// RandomMissionOffer.h).
 
 // TU63 -- random pick among the solar formations (DAT_06fd0e34) whose mandatory slot types
 // are all in SpawnTypes and whose mandatory + optional types cover SpawnTypes. Callers:
-// FUN_06f9ac80 (06f9ad97), FUN_06f9bee0 (06f9bf98).
+// FUN_06f9ac80, FUN_06f9bee0.
 FRmSolarFormation* __cdecl PickSolarFormation(std::vector<int> const* SpawnTypes); // FUN_06f97d90
 
 // TU63 FUN_06f98010 (cdecl): the zone shown as TARGET_ZONE for Position in System -- of the
@@ -137,11 +135,9 @@ struct FRmOfferText
     FRmOfferText();
     virtual void Parse(INI_Reader* Reader);     // FUN_06f99010
     virtual bool IsEmpty() const;               // LAB_06f99390
-    // Slot 2, FUN_06f993c0 (RET 0x10): per entry whose Form passes (see the .cpp), a local
-    // FmtStr is built (begin_mad_lib(StrId), Source slot 0 per parameter, end_mad_lib) and
-    // appended to *Out (FmtStr::append_fmt_str). The two flags are the offer group's and the
-    // hostile group's FFactionProps::bSingularNickname (the only caller, FUN_06f9e1f0
-    // 06f9e231-06f9e249 / 06f9e42a-06f9e445).
+    // Slot 2, FUN_06f993c0: per entry whose Form passes (see the .cpp), a mad-lib FmtStr is
+    // appended to *Out. The two flags are the offer group's and the hostile group's
+    // FFactionProps::bSingularNickname (the only caller is FUN_06f9e1f0).
     virtual void Build(bool bOfferGroupSingular, bool bHostileGroupSingular, FmtStr* Out,
                        IRmTextParamSource* Source);
 };
@@ -174,7 +170,7 @@ struct FRmCommSequence
     int Target;                                 // +0x04 GRmCommTargetNames value, default 1
     float Field_0x08;                           // +0x08 value 2 TODO: meaning unknown
     // +0x0c / +0x10 values 3 / 4: the conversation's delay is MinDelay + (MaxDelay - MinDelay)
-    // * rand() / 32768 (FUN_06f9e770 06f9e82c-06f9e864).
+    // * rand() / 32768 (FUN_06f9e770).
     float MinDelay;                             // +0x0c
     float MaxDelay;                             // +0x10
     std::vector<FRmCommLine> Lines;             // +0x14 (alloc byte) / +0x18..+0x20
@@ -235,7 +231,7 @@ struct FRmOfferQuery
 {
     int OfferGroup;                             // +0x00 -1
     unsigned int EnemyGroup;                    // +0x04 -1
-    int Reward;                                 // +0x08 0 (signed compare in 06f9f714)
+    int Reward;                                 // +0x08 0 (compared signed by BuildOffer)
     float RepReward;                            // +0x0c 0
     float RepHit;                               // +0x10 0
     unsigned int OfferBase;                     // +0x14 0
@@ -377,16 +373,15 @@ struct FRmDestroySolarsFilter : FRmPathFilter
     FRmPathFilter* Specialize() const override; // FUN_06f9a690
     bool CreateOffer(FRmOfferQuery const* Query, FRmOffer** OutOffer) override; // FUN_06f9a700
     bool SupportsTextParam(int Param) const override;                 // FUN_06f9abe0
-    // Slot 6 (+0x18), new in this class (vtables 06fbd034 and 06fbd164, raw dword after
-    // slot 5): LAB_06ee9e10 = MOV EAX,1; RET. TODO: name -- no +0x18 call on a filter found
-    // yet in TU63 (06f9a700 / 06f9ac80 / 06f9af40 / 06f9e1f0 checked).
+    // Slot 6 (+0x18), new in this class (vtables 06fbd034 and 06fbd164): LAB_06ee9e10,
+    // returns 1. TODO: name -- no +0x18 call on a filter found in TU63.
     virtual int Slot06() const;
 
-    // FUN_06f9ac80 (thiscall, RET 8): the solars of the offer -- position, activation, the
+    // FUN_06f9ac80: the solars of the offer -- position, activation, the
     // solar formation and a KillableSolars entry per solar type; false when either is
     // missing.
     bool FillSolarSpawns(FRmOfferQuery const* Query, FRmSolarComponent* Solars) const;
-    // FUN_06f9af40 (thiscall, RET 0x18): one solar per matching formation slot and entry
+    // FUN_06f9af40: one solar per matching formation slot and entry
     // until the entries' scaled difficulties reach Difficulty.
     void SpawnSolars(FRmOfferQuery const* Query, unsigned int EnemyGroup, float Difficulty,
                      FRmSolarFormation* Formation,
@@ -418,19 +413,19 @@ struct FRmAssassinateFilter : FRmPathFilter
     bool CreateOffer(FRmOfferQuery const* Query, FRmOffer** OutOffer) override; // FUN_06f9b790
     bool SupportsTextParam(int Param) const override;                 // FUN_06f9ba50
 
-    // FUN_06f9c100 (thiscall, RET 0x10): the target's ship groups at a random point of a ring
+    // FUN_06f9c100: the target's ship groups at a random point of a ring
     // around the objective (pre-battle or main-battle wave, the target group itself carrying
     // TargetName); +0x50 / +0x54 of the component are set at the end.
     bool FillTargetShips(FRmOfferQuery const* Query, FRmTargetShipComponent* TargetShips,
                          float Share, FNpcNameParams* TargetName) const;
-    // FUN_06f9c410 (thiscall, RET 0x14): the defensive solars (FUN_06f9bee0) and the hostile /
+    // FUN_06f9c410: the defensive solars (FUN_06f9bee0) and the hostile /
     // friendly ship groups of the main battle at the objective.
     bool FillShipGroups(FRmOfferQuery const* Query, FRmShipComponent* Ships, float Share,
                         FRmSolarComponent* Solars, FNpcNameParams* TargetName) const;
-    // FUN_06f9bee0 (thiscall, RET 8): 1..3 defensive solars (type 1) at the objective; false
+    // FUN_06f9bee0: 1..3 defensive solars (type 1) at the objective; false
     // without a formation or a KillableSolars entry.
     bool FillDefensiveSolars(FRmOfferQuery const* Query, FRmSolarComponent* Solars) const;
-    // FUN_06f9bb00 (thiscall, RET 0x18): FRmDestroySolarsFilter::SpawnSolars (FUN_06f9af40)
+    // FUN_06f9bb00: FRmDestroySolarsFilter::SpawnSolars (FUN_06f9af40)
     // without the pk modes -- every solar's +0x4d8 is 0.
     void SpawnSolars(FRmOfferQuery const* Query, unsigned int EnemyGroup, float Difficulty,
                      FRmSolarFormation* Formation,
@@ -460,16 +455,15 @@ struct FRmLootItemFilter : FRmPathFilter
 // TU63 -- the random-mission generator root. One static instance DAT_06fd3c78 (static init
 // LAB_06f9d520, atexit LAB_06f9d540); its address is published in DAT_06fcf25c.
 // vtable 06fbd4fc: [0] scalar deleting dtor FUN_06f9d880, [1] Load FUN_06f9ecb0
-// (VignetteParams.ini), [2] Unload LAB_06f9f600, [3] BuildOffer FUN_06f9f6d0 (build an
-// offer; caller FUN_06ef09c0 at 06ef0a5c).
+// (VignetteParams.ini), [2] Unload LAB_06f9f600, [3] BuildOffer FUN_06f9f6d0 (caller
+// FUN_06ef09c0).
 // ---------------------------------------------------------------------------------------
 struct FRandomMissionGenerator;
 
-// TU63 -- the generator's publishing sub-object (no storage). Its construction is the first
-// thing FUN_06f9d550 does (06f9d57a: DAT_06fcf25c = this, before any member); its destructor
-// FUN_06f9fc10 (DAT_06fcf25c = 0) is inlined last into FUN_06f9d970
-// (06f9da41, after the members) and called by the unwind funclets 06fb19e9 / 06fb1a72 when
-// the ctor or dtor throws.
+// TU63 -- the generator's publishing sub-object (no storage). FUN_06f9d550 sets
+// DAT_06fcf25c = this before any member; the destructor FUN_06f9fc10 (DAT_06fcf25c = 0) runs
+// after the members in FUN_06f9d970 and from the unwind funclets when the ctor or dtor throws.
+// A base class gives the port that ordering.
 struct FRmGeneratorRegistration
 {
     explicit FRmGeneratorRegistration(FRandomMissionGenerator* Generator);
@@ -489,11 +483,9 @@ struct FRandomMissionGenerator : private FRmGeneratorRegistration
     FRandomMissionGenerator();                  // FUN_06f9d550
     virtual ~FRandomMissionGenerator();         // FUN_06f9d970 / sdtor FUN_06f9d880
     virtual void Load(INI_Reader* Reader);      // FUN_06f9ecb0
-    // Slot 2, LAB_06f9f600: +0x04 / +0x05 = 0, RootNodeId = -1, the leaf ids and the node map
-    // emptied (the map's inline clear: FUN_06fa38c0 subtree erase with the node dtor
-    // FUN_06fa58a0, or the one-by-one erase FUN_06fa3470 path).
+    // Slot 2, LAB_06f9f600 (node dtor FUN_06fa58a0).
     virtual void Unload();
-    // Slot 3, FUN_06f9f6d0 (called through the vtable by FUN_06ef09c0 at 06ef0a5c).
+    // Slot 3, FUN_06f9f6d0 (called through the vtable by FUN_06ef09c0).
     virtual bool BuildOffer(FRmOfferQuery const* Query, FRmOffer** OutOffer,
                             FRmTreePath* OutPath);
 
@@ -510,15 +502,15 @@ struct FRandomMissionGenerator : private FRmGeneratorRegistration
     FRmTreePath* PickTreePath(std::vector<FRmTreePath>* Paths);       // FUN_06f9d070
     bool BuildOfferFromPath(FRmTreePath const* Path, FRmOfferQuery const* Query,
                             FRmOffer** OutOffer);                     // FUN_06f9e9b0
-    // FUN_06f9e770 (RET 8): the comm sequences of every node on Path go into the vignette
-    // offer's General component; the holder argument is released on return.
+    // FUN_06f9e770: the comm sequences of every node on Path go into the vignette offer's
+    // General component; the holder argument is released on return.
     void BuildCommSequences(FRmTreePath const* Path, TRmRef<FRmOffer> Offer);
-    // FUN_06f9e1f0 (RET 0x14; caller FUN_06f9e9b0 06f9ec23): the offer text, the reward and
-    // failure texts and the objective texts of every node on Path, then the objectives
-    // (FUN_06f9dee0). Source is the caller's *OutOffer read before the call.
+    // FUN_06f9e1f0 (caller FUN_06f9e9b0): the offer text, the reward and failure texts and the
+    // objective texts of every node on Path, then the objectives (FUN_06f9dee0). Source is
+    // the caller's *OutOffer read before the call.
     void BuildOfferTexts(FRmOfferQuery const* Query, FRmTreePath const* Path,
                          FRmPathFilter* Filter, FRmOffer* Source, FRmOffer** OutOffer);
-    // FUN_06f9dee0 (RET 0x10; caller FUN_06f9e1f0 06f9e524): one TU61 objective per objective
+    // FUN_06f9dee0 (caller FUN_06f9e1f0): one TU61 objective per objective
     // text into the vignette offer's component maps. this and Filter are not read.
     void BuildObjectives(FRmOfferQuery const* Query, FRmOffer** OutOffer,
                          FRmObjectiveText const* Texts, FRmPathFilter* Filter);

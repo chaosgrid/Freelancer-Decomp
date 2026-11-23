@@ -725,16 +725,9 @@ namespace
             }
         }
 
-        // Retail generates one byte-identical QueryInterface clone per curve
-        // factory's own vtable (VC6 does not fold identical thunks across
-        // separate classes/vtables): confirmed clones at LAB_06f33650,
-        // LAB_06f33a10, LAB_06f33b00, LAB_06f33bf0, LAB_06f33ce0 (and more of
-        // the same shape) all walk a 1-entry IID table for the literal
-        // string "1.11_IParamCurve", then on a match adjust `this` and call
-        // AddRef via vtable+4, else write *Out=0 and return -3
-        // (GR_INTERFACE_UNSUPPORTED). This single method reproduces that
-        // observable contract for every curve type via Spec_, so all of
-        // those clones are covered here (not separate 1:1 ports).
+        // Retail has one identical QueryInterface clone per curve vtable (LAB_06f33650,
+        // LAB_06f33a10, LAB_06f33b00, LAB_06f33bf0, LAB_06f33ce0, ...), each walking a 1-entry
+        // IID table; this one method stands for all of them.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             // The retail table compares bytes exactly, including case.
@@ -750,15 +743,11 @@ namespace
 
         unsigned long DACOM_API AddRef() override { return ++RefCount_; }
 
-        // Retail likewise clones Release per curve factory's vtable
-        // (confirmed identical bodies at LAB_06f33710, LAB_06f33800,
-        // LAB_06f338f0, LAB_06f339e0, LAB_06f33ad0, and more): decrement the
-        // dword at +0x3c, and when it reaches zero, force it to 1 and call
-        // vtable+0x38 (Slot14Dtor) with DeleteFlag=1 before returning 0. All
-        // of those clones are covered by this one method + Slot14Dtor.
+        // Release is cloned the same way (LAB_06f33710, LAB_06f33800, LAB_06f338f0,
+        // LAB_06f339e0, LAB_06f33ad0, ...): count at +0x3c, teardown through vtable+0x38.
         unsigned long DACOM_API Release() override
         {
-            // 33717/33719 only decrement a positive count; zero still tears down.
+            // Only a positive count is decremented; zero still tears down.
             if (RefCount_ != 0)
                 --RefCount_;
             if (RefCount_ == 0)

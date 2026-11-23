@@ -9,7 +9,7 @@
 #include "MovieWide.h"
 #include "MovieWindow.h"
 
-// Callees defined in other movie translation units. Address names stay until those lanes name them.
+// Callees defined in other movie translation units.
 
 extern int GMovieGraphCode;
 
@@ -86,7 +86,7 @@ static unsigned int SignificantLimbs(unsigned int* Limbs, unsigned int Count)
     return 0u;
 }
 
-// SAR / NOT / AND 1. Listing 06ac46ff. Reference is the right operand plus 0x1C4.
+// SAR / NOT / AND 1 (at 06ac46ff). Reference is the right operand plus 0x1C4.
 static unsigned int* AlignOddSlot(unsigned int* Slot, unsigned char* Reference)
 {
     int Delta = (int)(Reference - (unsigned char*)Slot);

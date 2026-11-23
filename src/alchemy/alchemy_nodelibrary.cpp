@@ -310,16 +310,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxNodeLibrary::QueryInterface(const char* Iid, void** Out)
     {
-        // LAB_0622afe0 (raw listing 88630-88719): a real 2-entry IID table
-        // walked by index (stride 8, {namePtr, offset} pairs at
-        // 0624e114/0624e11c) — the candidate strings Ghidra resolves at
-        // those slots are "1.11_IFxNodeLibrary" and "1.11_IDAComponent",
-        // both mapping back to offset 0 (this object has no second vtable
-        // to adjust into, unlike FAlchemy's outer/inner split). docs/re/
-        // alchemy.md line 88's RegisterComponent table only lists the
-        // primary "1.11_IFxNodeLibrary" IID; the raw QI bytes show
-        // "1.11_IDAComponent" is accepted too, same as FAlchemy's own QI
-        // (alchemy_alchemy.cpp).
+        // LAB_0622afe0: a 2-entry IID table (0624e114) of "1.11_IFxNodeLibrary" and
+        // "1.11_IDAComponent", both at offset 0.
         if (IidEqual(Iid, Iids::FxNodeLibrary) || IidEqual(Iid, Iids::DAComponent))
         {
             AddRef();
@@ -332,33 +324,14 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FFxNodeLibrary::Release()
     {
-        // FUN_0622b0a0 (alchemy.dll.txt:88728-88753, wired as the standalone
-        // "FxNodeLibrary" component's outer vtable slot 2 / Release,
-        // PTR_LAB_0624e0a4+0x8): re-examined this wave -- retail guards the
-        // decrement itself against underflow (`if (refcount != 0)
-        // refcount--;` before the zero-check), not merely "floors" a
-        // separate clamp step as a prior wave's notes characterized it. This
-        // is the same underflow-guard pattern already fixed in
-        // FComponentFactory::Release, FFxRuntime::Release, and
-        // FFxEffectArchetype::Release: a stray extra Release() call past 0
-        // previously underflowed RefCount_ to 0xFFFFFFFF here (a real
-        // permanent-leak bug, not just a defensive nicety) instead of
-        // retail's no-op. Fixed as part of the wave-42 targeted COM-refcount
-        // sweep.
+        // FUN_0622b0a0 (vtable PTR_LAB_0624e0a4 slot 2): the decrement is guarded against
+        // underflow, and the count (+0x28) is re-armed to 1 before the teardown
+        // (FUN_0622b140 / FUN_062460e0).
         if (RefCount_ != 0)
             --RefCount_;
         if (RefCount_ != 0)
             return RefCount_;
 
-        // [wave59-lane1] re-examined: byte-verified 0x0622b0b7-0x0622b0c0
-        // (MOV [ESI+0x28],1 immediately before the teardown calls
-        // FUN_0622b140/FUN_062460e0) -- retail re-arms RefCount_ to 1 right
-        // before tearing the object down, guarding the teardown path against
-        // observing/acting on a RefCount_==0 object if it were to reenter
-        // AddRef/Release on `this` (e.g. via a QueryInterface loop-back).
-        // This port's destructor only Releases owned FX nodes and never
-        // touches `this`, so today there is no such reentrancy path, but
-        // mirroring the guard costs nothing and matches retail exactly.
         RefCount_ = 1;
         this->~FFxNodeLibrary();
         ::operator delete(this);

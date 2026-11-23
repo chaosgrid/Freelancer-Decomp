@@ -22,10 +22,9 @@ struct FmtStr;
 struct FSystemInfo;
 struct MissionVendorOfferDescription;
 
-// Random mission (docs/re/content.md, TU map, lane CNT-RM): the mission data of TU47 (base) and
-// TU27 (06eef190-06ef2070, DestroyMission.cpp), and the TU47 loader. Shared with the
-// GameSupport lane (bar mission offers FUN_06ea8370, TU35 FUN_06f041c0, player state load
-// FUN_06f483d0).
+// Random mission: the mission data of TU47 (base) and TU27 (retail DestroyMission.cpp), and
+// the TU47 loader. Also used by the bar mission offers (FUN_06ea8370), TU35 (FUN_06f041c0)
+// and the player state load (FUN_06f483d0).
 
 // ---------------------------------------------------------------------------------------
 // TU47 -- random mission data base (retail 0x54 bytes, ctor FUN_06f4d2e0, dtor FUN_06ef0570,
@@ -43,7 +42,7 @@ public:
     unsigned int EnemyGroup = 0xffffffffu;  // +0x18 "enemy_group = %u" (saved by TU27)
     unsigned int OfferBase = 0;             // +0x1c "offer_base = %u"
     int OfferIds = 0;                       // +0x20 "offer_ids = %d"
-    FmtStr Description;                     // +0x24 inline default ctor 06f4d30d-06f4d33a
+    FmtStr Description;                     // +0x24
     int Reward = 0;                         // +0x3c "reward = %d"
     float RepReward = 0.0f;                 // +0x40 "rep_reward = %g"
     float RepHit = 0.0f;                    // +0x44 "rep_hit = %g"
@@ -55,9 +54,9 @@ public:
 
     FRmMissionDataBase() = default;         // FUN_06f4d2e0
     ~FRmMissionDataBase() override;         // FUN_06ef0570
-    // Slot 1 (FUN_06f4d390, RET 4).
+    // Slot 1 (FUN_06f4d390).
     virtual void Save(FILE* File);
-    // Slot 2 (FUN_06f4d420, RET 4): one key of a [RandomMission] section, first match wins.
+    // Slot 2 (FUN_06f4d420): one key of a [RandomMission] section, first match wins.
     virtual void LoadValue(INI_Reader* Reader);
 };
 
@@ -121,7 +120,7 @@ inline void RmRefRelease(FRmOffer* Object)
 extern std::vector<unsigned int> GRmObjectiveZones;
 
 // ---------------------------------------------------------------------------------------
-// Request of FRandomMissionLoader::CreateMission (4 dwords read at 06ef1ca9-06ef1cc7).
+// Request of FRandomMissionLoader::CreateMission (4 dwords).
 // ---------------------------------------------------------------------------------------
 struct FRmMissionRequest
 {
@@ -135,8 +134,8 @@ struct FRmMissionRequest
 // Random-mission loader (retail 0x0c bytes, vtable 06fbb35c, built by FUN_06f4d220; the
 // dtor FUN_06f4d280 resets the vptr to the ref-counted base 06fb43f8 = FContentRefObject).
 // Slots: [0] AddRef FUN_06eacd40, [1] Release FUN_06eacd50, [2] deleting dtor FUN_06f4d260,
-// [3] CreateMission FUN_06ef1c70, [4] Load LAB_06ef0b00, [5] FUN_06ebf6f0 (RET 4, empty),
-// [6] FUN_06ef0be0 (RET 8), [7] LAB_06ef0dc0 (RET 0xc). Slots 3/4/6/7 and their helpers are
+// [3] CreateMission FUN_06ef1c70, [4] Load LAB_06ef0b00, [5] FUN_06ebf6f0 (empty),
+// [6] FUN_06ef0be0, [7] LAB_06ef0dc0. Slots 3/4/6/7 and their helpers are
 // in DestroyMission.cpp (TU27), the ctor / dtor in RandomMissionDB.cpp (TU47).
 // ---------------------------------------------------------------------------------------
 class FRandomMissionLoader : public FContentRefObject
@@ -146,38 +145,38 @@ public:
 
     ~FRandomMissionLoader() override;           // FUN_06f4d280
 
-    // Slot 3 (RET 8). Builds a new random mission from Request into Mission and hands it
-    // out through OutMission (no AddRef). Result codes seen by the callers (06f04286):
+    // Slot 3. Builds a new random mission from Request into Mission and hands it out
+    // through OutMission (no AddRef). Result codes seen by the callers (06f04286):
     // 0 success, 1 no enemy group, 2 no offer (FinalizeMission), 3 no objective zone.
     virtual int CreateMission(FRmMissionRequest const* Request,
                               FRandomMissionData** OutMission);
-    // Slot 4 (RET 0xc): [RandomMission] of a saved player (caller FUN_06f483d0).
+    // Slot 4: [RandomMission] of a saved player (caller FUN_06f483d0).
     virtual bool Load(INI_Reader* Reader, FRandomMissionData** OutMission,
                       unsigned int PlayerId);
-    // Slot 5 (FUN_06ebf6f0: RET 4, no body). Both callers pass the mission CreateMission
-    // handed out: the failed bar offer (FUN_06ea8370 06ea8785-06ea8790) and the mission
-    // offer dtor (FUN_06ea7b90 06ea7bc2-06ea7bc8). TODO: name unknown.
+    // Slot 5 (FUN_06ebf6f0, empty body). Both callers pass the mission CreateMission handed
+    // out: the failed bar offer (FUN_06ea8370) and the mission offer dtor (FUN_06ea7b90).
+    // TODO: name unknown.
     virtual void ReleaseMission(FRandomMissionData* Mission);
-    // Slot 6 (FUN_06ef0be0, RET 8): the mission vendor offer of Mission (caller TU35
-    // 06f04986, then pub::GF::MissionVendorOfferCreate).
+    // Slot 6 (FUN_06ef0be0): the mission vendor offer of Mission (caller TU35, then
+    // pub::GF::MissionVendorOfferCreate).
     virtual void GetOfferDescription(FRandomMissionData const* InMission,
                                      MissionVendorOfferDescription* OutDescription);
-    // Slot 7 (LAB_06ef0dc0, RET 0xc): false (with a reason text and code 2) when the route
-    // from the offer base to the mission's system is blocked. The first argument is not
-    // read. Caller BaseSupport 06eb5163.
+    // Slot 7 (LAB_06ef0dc0): false (with a reason text and code 2) when the route from the
+    // offer base to the mission's system is blocked. The first argument is not read. Caller
+    // BaseSupport 06eb5163.
     virtual bool CanAccept(FRandomMissionData const* Unused, FmtStr* OutReason, int* OutCode);
 
 private:
-    // FUN_06ef09c0 (RET 4, the argument is not read): the offer of Mission; 0 or 2.
+    // FUN_06ef09c0 (the argument is not read): the offer of Mission; 0 or 2.
     int FinalizeMission(int Unused);
-    // FUN_06ef0c90 (RET 0xc): true when no route leads from FromSystem to ToSystem for
-    // PlayerId, or it passes a gate locked for him.
+    // FUN_06ef0c90: true when no route leads from FromSystem to ToSystem for PlayerId, or it
+    // passes a gate locked for him.
     bool IsRouteBlocked(unsigned int FromSystem, unsigned int ToSystem, unsigned int PlayerId);
-    // FUN_06ef15b0 (RET 0x10): a random objective zone within Range of Position, 0 if none.
+    // FUN_06ef15b0: a random objective zone within Range of Position, 0 if none.
     unsigned int PickObjectiveZone(unsigned int PlayerId, FSystemInfo* System,
                                    Vector const* Position, float Range);
-    // FUN_06ef0e30 / FUN_06ef0f20 / FUN_06ef1240 (RET 0x14): candidate zones of System,
-    // along its trade lanes and through its jumps.
+    // FUN_06ef0e30 / FUN_06ef0f20 / FUN_06ef1240: candidate zones of System, along its trade
+    // lanes and through its jumps.
     void CollectZonesInRange(unsigned int PlayerId, FSystemInfo* System,
                              Vector const* Position, float Range,
                              std::vector<unsigned int>* OutZones);
@@ -187,7 +186,7 @@ private:
     void CollectZonesThroughJumps(unsigned int PlayerId, FSystemInfo* System,
                                   Vector const* Position, float Range,
                                   std::vector<unsigned int>* OutZones);
-    // FUN_06ef1810 (RET 0xc): a random group hostile to OfferGroup populating System, or -1.
+    // FUN_06ef1810: a random group hostile to OfferGroup populating System, or -1.
     unsigned int PickEnemyGroup(FSystemInfo* System, Vector const* Position, int OfferGroup);
 };
 

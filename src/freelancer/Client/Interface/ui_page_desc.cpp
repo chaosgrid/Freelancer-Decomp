@@ -14,20 +14,19 @@
 #include <new>
 #include <string>
 
-// Retail .data s_<default>_006155f0.
+// .data 0x006155f0.
 char kUiPageDefaultStyle[] = "<default>";
 
 namespace
 {
-    // FUN_00592230 matches each type with REPE CMPSB over strlen+1 bytes (the literal's NUL is
-    // part of the compare), i.e. an exact match. sizeof(Literal) is that byte count.
+    // An exact match: the literal's NUL is part of the compare, as retail.
     template <unsigned N>
     bool TypeIs(char const* Type, char const (&Literal)[N])
     {
         return memcmp(Type, Literal, N) == 0;
     }
 
-    // MSVCRT ftol — truncation toward zero.
+    // Truncation toward zero.
     int Ftol(float Value)
     {
         return static_cast<int>(Value);
@@ -42,13 +41,13 @@ FUiPageDesc::FUiPageDesc()
 
 FUiPageDesc::~FUiPageDesc()
 {
-    // FUN_00592080: delete every block of the +0x14 set, then the containers' own storage.
+    // FUN_00592080.
     ClearAllocations();
 }
 
 void FUiPageDesc::ClearAllocations()
 {
-    // FUN_00594540: for (it = begin; it != end; ) { operator delete(*it); it = erase(it); }
+    // FUN_00594540.
     std::set<void*>::iterator It = Allocations.begin();
     while (It != Allocations.end())
     {
@@ -59,7 +58,6 @@ void FUiPageDesc::ClearAllocations()
 
 void* FUiPageDesc::TrackedNew(unsigned Size)
 {
-    // operator_new(Size) followed by FUN_0046d170(this+0x14) set insert of the result.
     void* Block = ::operator new(Size);
     Allocations.insert(Block);
     return Block;
@@ -67,7 +65,6 @@ void* FUiPageDesc::TrackedNew(unsigned Size)
 
 char* FUiPageDesc::TrackedDup(char const* Src)
 {
-    // REPNE SCASB length + 1, operator_new, byte loop copy, NUL (e.g. 00592480..005924c6).
     unsigned Length = static_cast<unsigned>(strlen(Src));
     char* Copy = static_cast<char*>(TrackedNew(Length + 1));
     unsigned Index = 0;
@@ -82,8 +79,7 @@ char* FUiPageDesc::TrackedDup(char const* Src)
 
 wchar_t* FUiPageDesc::TrackedWiden(char const* Src)
 {
-    // 005925ed..00592634: operator_new(len*2+2); each byte MOVSX DX,DL (sign-extended) into a
-    // 16-bit unit; terminating 0 unit.
+    // Each byte is sign-extended into a 16-bit unit, so bytes >= 0x80 become 0xff80..0xffff.
     unsigned Length = static_cast<unsigned>(strlen(Src));
     wchar_t* Wide = static_cast<wchar_t*>(TrackedNew(Length * 2 + 2));
     unsigned Index = 0;
@@ -99,8 +95,7 @@ wchar_t* FUiPageDesc::TrackedWiden(char const* Src)
 FUiWidgetEntry* FUiPageDesc::NewEntry(char const* Type, char const* Name, float Left, float Top,
                                       float Right, float Bottom)
 {
-    // Common head of every branch (e.g. 00592404..00592565): operator_new(0x20), the four
-    // floats, +0x1c = 0, type copy at +0x00, nickname copy at +0x08.
+    // The common head of every branch of the loader.
     FUiWidgetEntry* Entry = static_cast<FUiWidgetEntry*>(TrackedNew(sizeof(FUiWidgetEntry)));
     Entry->Bottom = Bottom;
     Entry->Right = Right;
@@ -115,8 +110,7 @@ FUiWidgetEntry* FUiPageDesc::NewEntry(char const* Type, char const* Name, float 
 
 FUiWidgetEntry* FUiPageDesc::ParseBoundsLine(char const* Line, char* Type, char* Name)
 {
-    // UIListBox / UIWinDeform / UIRichTextWin / UIShipViewControl: "%s %s %f %f %f %f" == 6,
-    // 0x08 payload {F3, F4}.
+    // UIListBox / UIWinDeform / UIRichTextWin / UIShipViewControl.
     float F1 = 0.0f;
     float F2 = 0.0f;
     float F3 = 0.0f;
@@ -134,8 +128,7 @@ FUiWidgetEntry* FUiPageDesc::ParseBoundsLine(char const* Line, char* Type, char*
 
 FUiWidgetEntry* FUiPageDesc::ParseTableLine(char const* Line, char* Type, char* Name)
 {
-    // UITable / UIFastTable: "%s %s %f %f %f %f %f %f" == 8; +0x0c = ftol(F6) is written before
-    // +0x08 = ftol(F5) (00593c52 / 00593c5e).
+    // UITable / UIFastTable. Int6 is written before Int5, as retail.
     float F1 = 0.0f;
     float F2 = 0.0f;
     float F3 = 0.0f;
@@ -157,8 +150,7 @@ FUiWidgetEntry* FUiPageDesc::ParseTableLine(char const* Line, char* Type, char* 
 
 FUiWidgetEntry* FUiPageDesc::ParseScrollCycleLine(char const* Line, char* Type, char* Name)
 {
-    // UIScroll / UICycle: 10 or 11 fields; the trailing %d slot is zeroed before the scan
-    // (00593f66 / 00594208).
+    // UIScroll / UICycle: 10 or 11 fields; the trailing %d slot is zeroed before the scan.
     float F1 = 0.0f;
     float F2 = 0.0f;
     float F3 = 0.0f;
@@ -188,14 +180,11 @@ FUiWidgetEntry* FUiPageDesc::ParseScrollCycleLine(char const* Line, char* Type, 
 
 bool FUiPageDesc::LoadFromFile(char const* FullPath)
 {
-    // 0059224f: setlocale(LC_NUMERIC, "C") and keep its RETURN VALUE (the new locale name) in a
-    // std::string; the same string is handed back to setlocale at 005944e8, so the net effect
-    // leaves LC_NUMERIC at "C".
+    // Retail keeps setlocale's RETURN VALUE (the new locale name, not the old one) and "restores"
+    // it at the end, so the net effect leaves LC_NUMERIC at "C".
     std::string SavedLocale(setlocale(LC_NUMERIC, "C"));
     bool bOk = false;
 
-    // 005922cd FUN_00594540(this+0x14); 005922ec FUN_004a2f80 erase(begin, end) of the list;
-    // 005922f8 +0x0c = +0x10 = 0.
     ClearAllocations();
     EntryList.clear();
     Data.Aspect = 0.0f;
@@ -222,8 +211,8 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
 
         while (fgets(Line, 0x100, File) != nullptr)
         {
-            // 00592341..00592386: skip '#', leading whitespace (isspace on MOVSX char) and
-            // lines without a first token.
+            // Skip '#', leading whitespace (isspace on the sign-extended char) and lines
+            // without a first token.
             if (Line[0] == '#')
                 continue;
             if (isspace(static_cast<int>(static_cast<signed char>(Line[0]))) != 0)
@@ -231,7 +220,7 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
             if (sscanf(Line, "%s", Type) != 1)
                 continue;
 
-            // 005923a7: the caption buffer is cleared for every line that reaches the chain.
+            // The caption buffer is cleared for every line that reaches the chain.
             Caption[0] = '\0';
             FUiWidgetEntry* Entry = nullptr;
 
@@ -252,7 +241,6 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
             }
             else if (TypeIs(Type, "UITextMsgButton"))
             {
-                // 005926a8: style[0] = 0 and the trailing %d slot = 0 before the scan.
                 int ExtraId = 0;
                 Style[0] = '\0';
                 int Count = sscanf(Line, "%s %s %f %f %f %f \"%[^\"]\" %f \"%[^\"]\" %d", Type,
@@ -269,8 +257,8 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
                     Payload->CaptionUtf16 = TrackedWiden(Caption);
                     Payload->ExtraInt = Ftol(MsgExtraFloat);
                     Payload->ExtraId = ExtraId;
-                    // 00592994: 7-byte compare with "<none>" → null; empty or equal to
-                    // "<default>" → the shared .data string; otherwise a tracked copy.
+                    // "<none>" -> null; empty or "<default>" -> the shared .data string;
+                    // otherwise a tracked copy.
                     if (TypeIs(Style, "<none>"))
                         Payload->StyleName = nullptr;
                     else if (Style[0] == '\0' || strcmp(Style, kUiPageDefaultStyle) == 0)
@@ -296,11 +284,11 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
             }
             else if (TypeIs(Type, "UIListBox"))
             {
-                Entry = ParseBoundsLine(Line, Type, Name);         // 00592db3
+                Entry = ParseBoundsLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UIWinObject"))
             {
-                // 00593014: the trailing %s lands in the caption buffer.
+                // The trailing %s lands in the caption buffer.
                 int Count = sscanf(Line, "%s %s %f %f %f %f %f %s", Type, Name, &F1, &F2, &F3,
                                    &F4, &F5, Caption);
                 if (Count == 8)
@@ -317,42 +305,41 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
             }
             else if (TypeIs(Type, "UIWinDeform"))
             {
-                Entry = ParseBoundsLine(Line, Type, Name);         // 0059330a
+                Entry = ParseBoundsLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UIRichTextWin"))
             {
-                Entry = ParseBoundsLine(Line, Type, Name);         // 00593562
+                Entry = ParseBoundsLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UIShipViewControl"))
             {
-                Entry = ParseBoundsLine(Line, Type, Name);         // 005937c1
+                Entry = ParseBoundsLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UITable"))
             {
-                Entry = ParseTableLine(Line, Type, Name);          // 00593a24
+                Entry = ParseTableLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UIFastTable"))
             {
-                Entry = ParseTableLine(Line, Type, Name);          // 00593c9e
+                Entry = ParseTableLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UIScroll"))
             {
-                Entry = ParseScrollCycleLine(Line, Type, Name);    // 00593f1c
+                Entry = ParseScrollCycleLine(Line, Type, Name);
             }
             else if (TypeIs(Type, "UICycle"))
             {
-                Entry = ParseScrollCycleLine(Line, Type, Name);    // 005941be
+                Entry = ParseScrollCycleLine(Line, Type, Name);
             }
 
             if (Entry == nullptr)
             {
-                // 00594459: unknown type or a field-count miss clears the success byte and
-                // leaves the loop. Entries already pushed stay in the list; +0x0c/+0x10 stay 0.
+                // Unknown type or a field-count miss: failure, and the loop ends. Entries already
+                // pushed stay in the list; Data stays zero.
                 bOk = false;
                 break;
             }
 
-            // LAB_0059442e: FUN_005947a0 — push_back on the +0x00 list.
             EntryList.push_back(Entry);
         }
 
@@ -360,8 +347,6 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
 
         if (bOk)
         {
-            // 00594474..005944d1: aspect magic, a tracked (count+1)*4 array, list copied in
-            // order, null terminator.
             unsigned MagicBits = kUiPageLoadMagicBits;
             memcpy(&Data.Aspect, &MagicBits, sizeof(float));
             unsigned Count = static_cast<unsigned>(EntryList.size());
@@ -379,7 +364,6 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
         }
     }
 
-    // 005944db: restore from the kept string.
     setlocale(LC_NUMERIC, SavedLocale.c_str());
     return bOk;
 }

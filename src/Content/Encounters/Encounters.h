@@ -14,13 +14,13 @@
 
 class INI_Reader;
 
-// Content.dll lane CNT-POP (docs/re/content.md, TU map): encounters and the static game tables.
+// Content.dll: encounters and the static game tables.
 //   TU31 tail 06efc9b0-06efe100  missions\formations.ini database (DAT_06fcf38c)
 //   TU32      06efe100-06efe8e0  LoadContentGameTables / UnloadContentGameTables
 
 // ---------------------------------------------------------------------------------------
-// TU32 -- the static game tables, loaded by the GameSupport ctor FUN_06efeb10 (06efeb73)
-// and released by its dtor FUN_06efebb0 (06efebdb).
+// TU32 -- the static game tables, loaded by the GameSupport ctor FUN_06efeb10 and
+// released by its dtor FUN_06efebb0.
 // ---------------------------------------------------------------------------------------
 void __cdecl LoadContentGameTables();      // FUN_06efe300
 void __cdecl UnloadContentGameTables();    // FUN_06efe870
@@ -55,7 +55,7 @@ struct FFormation               // map value, retail 0x44 bytes
     // when the slot vector is unallocated or Index is out of range.
     bool GetSlotTransform(unsigned int Index, FVector* OutPosition,
                           FMatrix* OutOrientation) const;       // FUN_06efcbe0
-    // No range check, exactly as retail.
+    // No range check (retail).
     bool IsPlayerSlot(int Index) const;                         // FUN_06efccd0
 };
 

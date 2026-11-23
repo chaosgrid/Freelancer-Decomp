@@ -33,8 +33,8 @@ struct FSystemZone;             // SystemInfo.h (TU64)
 // "SPParams") and the populator ("TLPzr" / "SPPzr") that reads the section into it and
 // decides when it spawns. The TL ("TL_Attack", trade-lane attack) classes live in TU60
 // (06f81120-06f83ec0), the SP ("SP_Attack") classes in TU59 (06f80410-06f81120); their
-// bodies are in RandomEncounters.cpp, the TU31 base in RandomMissionDB.cpp. Retail has no RTTI
-// in Content.dll; the class names are the port's.
+// bodies are in RandomEncounters.cpp, the TU31 base in RandomMissionDB.cpp. Retail has no
+// RTTI in Content.dll; the class names are the port's.
 // =======================================================================================
 
 // +0x28 element (list node 0x18): "formation_position" -- a spawn point and its weight.
@@ -58,9 +58,9 @@ struct FRandEncFormation
     FFormation* Formation = nullptr;        // +0x00 -> FUN_06f66c80 (PlaceFormationBlocks)
     ID_String Nickname;                     // +0x04 dumped with get_string
     // +0x08: "formation" value 1 as read (dumped); the parse copies it into Weight (+0x24).
-    // TODO: whether anything but Dump reads +0x08 (the TL populator).
+    // TODO: whether anything but Dump reads +0x08.
     float Field_0x08 = 0.0f;
-    int MinCount = 0;                       // +0x0c ship count range (FUN_06efba30 06efbb63)
+    int MinCount = 0;                       // +0x0c ship count range (FUN_06efba30)
     int MaxCount = 0;                       // +0x10
     int Count = 0;                          // +0x14 the count picked for the current spawn
     std::list<FRandEncShipChoice> ShipChoices;  // +0x18 (head +0x1c, size +0x20)
@@ -91,7 +91,7 @@ public:
     // Slot 5 (purecall in the base): the values as INI text (TL FUN_06f81d50, SP FUN_06f80f10).
     virtual void Dump(FILE* File) = 0;
 
-    // FUN_06efba30 (RET 0x1c; callers Spawn 06efc6e8 and TU38 FUN_06f145d0 06f1466e): create
+    // FUN_06efba30 (callers Spawn and TU38 FUN_06f145d0): create
     // one weighted-picked formation of the encounter at Placement, through the player's system.
     // Count -1 picks the ship count from the formation's range. A null Choices picks a
     // weighted ship choice per ship, else ship i takes the classes of Choices' i-th element.
@@ -100,14 +100,14 @@ public:
     // DockTarget -> FSystemInfo::CreateNpcShips. False when the player has no system, no
     // formation is picked or no npc_ship arch fits a ship.
     // Choices / Names are the TU38 +0x8c record's lists at +0x3c / +0x48: the snapshot writer
-    // FUN_06f130b0 (MissionSave.cpp, CNT-MS-OBJ11) builds Choices as {npc +0x128 class ids,
+    // FUN_06f130b0 (MissionSave.cpp) builds Choices as {npc +0x128 class ids,
     // 1.0f} and Names as the npcs' TString<0x30> nicknames -- the types declared here.
     bool SpawnFormation(FTransform const* Placement, int Count,
                         std::list<FObjListDirective*> const* Directives,
                         std::list<FRandEncShipChoice> const* Choices,
                         std::list<TString<0x30>>* Names, int Priority, unsigned int DockTarget);
 
-    // +0x08: ctor 0; TU58 FUN_06f782e0 (06f78a9c) writes the trade lane's system.
+    // +0x08: ctor 0; TU58 FUN_06f782e0 writes the trade lane's system.
     FSystemInfo* System = nullptr;
     // +0x0c: the controller id given to every ship (-> ship params +0x6c). Retail's ctor
     // leaves it unset; the port starts it at 0.
@@ -131,7 +131,7 @@ public:
     // +0x88: the object the encounter spawns around (pub::SpaceObj::GetLocation in Spawn).
     // Retail's ctor leaves it unset; the port starts it at 0.
     unsigned int TargetObjectId = 0;
-    // +0x8c "arrival_obj" (a number or a nickname, SP parse 06f81858): SpawnFormation's
+    // +0x8c "arrival_obj" (a number or a nickname, SP parse): SpawnFormation's
     // DockTarget in Spawn.
     unsigned int DockTarget = 0;
     float SpawnAngle = 1.5707964f;          // +0x90 (0x3fc90fdb) -> PlaceFacingAnchor heading
@@ -150,13 +150,13 @@ public:
     FRandEncTLParams() = default;
 
     int GetType() override;                 // LAB_06f5e540: 3
-    // FUN_06f83af0 (RET 4): DrainShields on the ring; bForced -> the base body, else every
+    // FUN_06f83af0: DrainShields on the ring; bForced -> the base body, else every
     // formation to spawn goes to a weighted spawn point turned by the ring's orientation,
     // with a 25 s delay directive for its leader (SpawnLaneFormation).
     void Spawn(bool bForced) override;
     void Dump(FILE* File) override;         // FUN_06f81d50
 
-    // FUN_06f832b0 (RET 0x14; only caller Spawn 06f83e0a): the lane counterpart of
+    // FUN_06f832b0 (only caller Spawn): the lane counterpart of
     // SpawnFormation -- a weighted formation, its ships through the attacker faction's
     // npc_ship archs (a ship without an arch is skipped), named pilots, then the leader's
     // guide description (type 3) walking the path of the ring's zone, and the ships created in
@@ -172,7 +172,7 @@ public:
     int TlAttackChanceReadIn = 20;          // +0xa4 "tl_attack_chance_read_in"
     // +0xa8: the player's travel direction along the lane, +1 or -1 (Accept 0x16:
     // GetTradelaneNextAndPrev of the exit ring leads back to the entry ring -> -1). The
-    // spawn points' z (Accept 06f82345-06f82541) scale with it; TU58 06f789fa writes it too.
+    // spawn points' z (Accept) scale with it; TU58 FUN_06f782e0 writes it too.
     int Direction = 1;
     unsigned int EntryRing = 0;             // +0xac message 0x16 [1], the ring entered
     unsigned int ExitRing = 0;              // +0xb0 message 0x16 [2], the ring left
@@ -180,7 +180,7 @@ public:
     // random ring of the travelled stretch when it is 0; Reset clears it.
     unsigned int TargetTradelane = 0;
     // +0xb8: the smallest zone around the attacked ring (FSystemInfo::FindSmallestZoneAt in
-    // Accept 06f825de); TU58 06f78a04 writes its own zone there.
+    // Accept); TU58 FUN_06f782e0 writes its own zone there.
     FSystemZone* TargetZone = nullptr;
 };
 
@@ -204,7 +204,7 @@ public:
     // ActivationTime[0]] (Parse, and Accept whenever it is 0).
     float CumulativeTime = 0.0f;
     // +0xc0: the smallest zone around the target when the attacker faction was last picked
-    // (FSystemInfo::FindSmallestZoneAt in Accept 06f80894). Retail's ctor leaves it unset.
+    // (FSystemInfo::FindSmallestZoneAt in Accept). Retail's ctor leaves it unset.
     FSystemZone* TargetZone = nullptr;
 };
 
@@ -231,7 +231,7 @@ public:
 class FRandEncTLPopulator : public FRandEncPopulator
 {
 public:
-    // FUN_06f81ed0: 0x16 (a ship left a trade lane: {ship, entry ring, exit ring, system})
+    // FUN_06f81ed0: 0x16 (a ship entered a trade lane: {ship, entry ring, exit ring, system})
     // arms the attack on a ring of the player's lane; 0x20 fires it once the player's ship
     // is within 10000 of that ring; 0x3b restores the attack chance.
     bool Accept(FRandEncParams* Params, pub::Controller::EMessage MessageId,
@@ -241,7 +241,7 @@ public:
     // LAB_06f83280.
     void Reset(FRandEncParams* Params) override;
 
-    // +0x08: an attack is armed (Accept 0x16 06f829ff); 0x20 then tests the distance.
+    // +0x08: an attack is armed (Accept 0x16); 0x20 then tests the distance.
     // Reset clears it.
     bool bAttackArmed = false;
 };
@@ -264,14 +264,13 @@ public:
     float ElapsedTime = 0.0f;
 };
 
-// The weighted pick inlined in TU31 (06efba67-06efbb4c, 06efbd7c-06efbe68, 06efc423-06efc4fa)
-// and TU60 (TL Accept 06f82640-06f82715, TL Spawn 06f83c53-06f83d37): the weights are summed
-// into a float; a zero sum (TEST AH,0x44 + JP falls through only on equal) picks nothing;
-// otherwise R = Sum * (rand() * DAT_06fb4448 (1/32768)) as a float, and the first element
-// whose running float sum reaches R (TEST AH,0x41 + JNP: taken when R < sum or R == sum, an
-// unordered compare keeps walking) is picked; none -> end. Where retail then uses the list's
-// head node (an empty list, a zero sum, a walk past the end), it reads the sentinel's
-// uninitialised value; every caller in the port stops on end() instead.
+// The weighted pick inlined three times in TU31 and twice in TU60 (TL Accept, TL Spawn): the
+// weights are summed into a float; only an exactly zero sum picks nothing; otherwise
+// R = Sum * (rand() * DAT_06fb4448 (1/32768)) as a float, and the first element whose
+// running float sum reaches R is picked (an unordered compare keeps walking); none -> end.
+// Deviation: where retail then uses the list's head node (an empty list, a zero sum, a walk
+// past the end), it reads the sentinel's uninitialised value; every caller in the port stops
+// on end() instead.
 template <typename TElement>
 typename std::list<TElement>::iterator RandEncPickWeighted(std::list<TElement>* Elements,
                                                            float TElement::*Weight)
@@ -295,18 +294,18 @@ typename std::list<TElement>::iterator RandEncPickWeighted(std::list<TElement>* 
     return Elements->end();
 }
 
-// FUN_06efb830 (cdecl; callers TU38 06f11d75 / 06f11dd9 / 06f1802b / 06f18090): "TLParams" or
-// "SPParams" (stricmp) -> a new object in *Out, else null. True when *Out is non-null.
+// FUN_06efb830 (cdecl; callers TU38): "TLParams" or "SPParams" (stricmp) -> a new object in
+// *Out, else null. True when *Out is non-null.
 bool __cdecl CreateRandEncParams(char const* Name, FRandEncParams** Out);
-// FUN_06efb8e0 (cdecl; caller TU58 06f78951): the same by GetType code, 2 SP, 3 TL.
+// FUN_06efb8e0 (cdecl; caller TU58): the same by GetType code, 2 SP, 3 TL.
 bool __cdecl CreateRandEncParamsByType(int Type, FRandEncParams** Out);
 // FUN_06efb980 (cdecl): "TLPzr" or "SPPzr" -> a new populator in *Out, else null.
 bool __cdecl CreateRandEncPopulator(char const* Name, FRandEncPopulator** Out);
-// Random-mission encounters (docs/re/content.md, TU map, lane CNT-RM):
-//   TU62 06f94d10-06f97360  killable solars (RandomMissions\KillableSolars.ini) and vignette
-//                           critical loot (RandomMissions\VignetteCriticalLoot.ini).
-// Both loaders take an already opened INI_Reader; the generator ctor FUN_06f9d550 opens and
-// closes it.
+
+// Random-mission encounters, TU62 (06f94d10-06f97360): killable solars
+// (RandomMissions\KillableSolars.ini) and vignette critical loot
+// (RandomMissions\VignetteCriticalLoot.ini). Both loaders take an already opened INI_Reader;
+// the generator ctor FUN_06f9d550 opens and closes it.
 
 // ---------------------------------------------------------------------------------------
 // TU62 -- killable solars. DAT_06fd3c20: map<nickname id, entry>, static init LAB_06f94f30

@@ -11,18 +11,11 @@
 // builds on its own stack, and the "FLS1" container every saved character file
 // is wrapped in.
 //
-// ADDED 2026-09-17 (wave 18). Everything here is read off EXE\Disasm\Server.dll.txt
-// and, where the listing truncates an operand, off the bytes of EXE\Server.dll
-// itself. Nothing here comes from the .c decompilation.
-//
 // ---------------------------------------------------------------------------
 // THE TWO VTABLES
 //
-// .rdata:PTR_LAB_06d6b5c0 is seven dwords, every one of them .text:LAB_06d5fff0,
-// and .text:06d5fff0 is `ff258c4cd606  JMP dword ptr [->MSVCRT.DLL::purecall]`.
-// Seven purecall slots means an abstract base with seven pure virtuals and no
-// virtual destructor -- there is no eighth slot and no deleting-destructor slot.
-// That base is ISave below.
+// .rdata:PTR_LAB_06d6b5c0 is seven purecall slots: an abstract base (ISave below) with
+// seven pure virtuals and no virtual destructor.
 //
 // .rdata:PTR_GetID_06d6b5a0 is the concrete override table:
 //   +0x00  .text:06ce10f0   `8b4104 MOV EAX,dword ptr [ECX + 0x4]` / `c3 RET`
@@ -32,17 +25,9 @@
 //   +0x10  .text:06d4c2a0   fprintf(file, "%s = %d\n", a, b)        RET 0x8
 //   +0x14  .text:06d4c280   fprintf(file, "%s = %s\n", a, b)        RET 0x8
 //   +0x18  .text:06d4c230   if (a) fprintf(file, a); fprintf(file, "\n")  RET 0x4
-// The `RET n` of each one is what fixes its arity; Ghidra's own signatures were
-// not used. Every one of them reads the FILE* from `[ECX + 0x4]`
-// (e.g. .text:06d4c289 `8b4104 MOV EAX,dword ptr [ECX + 0x4]`), which is what
-// puts the FILE* at +0x04 and the vptr at +0x00.
-//
-// SLOT 0 IS NOT CPlayerGroup::GetID. Ghidra prints .text:06ce10f0 as
-// `CPlayerGroup::GetID` because `MOV EAX,[ECX+4] / RET` is three bytes that the
-// linker folded across every class that has such an accessor. An ICF-folded name
-// does not identify its owner. Here the dword at +0x04 is the FILE* -- proved by
-// the six sibling slots that fprintf to exactly that dword -- so slot 0 is this
-// class's FILE* accessor, whatever the fold named it.
+// Each `RET n` fixes the arity. Every slot reads the FILE* from [ECX + 0x4], so the
+// vptr is at +0x00 and the FILE* at +0x04. Slot 0 is this class's FILE* accessor; Ghidra
+// names it CPlayerGroup::GetID only because the body is ICF-folded.
 //
 // ---------------------------------------------------------------------------
 // THE CLASS HIERARCHY (RTTI, bytes read out of EXE\Server.dll)
@@ -232,10 +217,8 @@ private:
 // EVERY saved character file is wrapped, not just multiplayer ones -- see the
 // note on Server_FLS1Transform in server_savefile.cpp for the proof.
 //
-// .rdata:DAT_06d6b30c is the four bytes `46 4c 53 31` = "FLS1" (read out of
-// EXE\Server.dll; the listing prints it as the dword `31534C46h`). Retail passes
-// it to fprintf as the WHOLE format string, with no arguments -- .text:06d4df85
-// PUSHes it and .text:06d4df8f calls fprintf with a two-argument stack.
+// .rdata:DAT_06d6b30c is the four bytes "FLS1". Retail passes it to fprintf as the whole
+// format string, with no arguments (.text:06d4df8f).
 // ---------------------------------------------------------------------------
 extern char const Server_FLS1Magic[5];   // "FLS1"
 

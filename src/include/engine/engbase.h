@@ -46,7 +46,7 @@ struct IInstanceTransform
     virtual GENRESULT DACOM_API SetUser(void* Instance, unsigned long User) = 0;         // 11 +0x2C
     virtual unsigned long DACOM_API GetUser(void* Instance) = 0;                        // 12 +0x30
     // Returns whether dirtiness should propagate to children; roots stop propagation.
-    virtual unsigned long DACOM_API MarkWorldDirty(void* Instance) = 0; // formerly Slot13; +0x34
+    virtual unsigned long DACOM_API MarkWorldDirty(void* Instance) = 0; // 13 +0x34
 };
 
 struct IEngine : IDAComponent
@@ -105,9 +105,9 @@ struct IEngine : IDAComponent
     virtual float* DACOM_API GetInstanceOrientation(void* Instance) = 0;                 // 38
     virtual GENRESULT DACOM_API SetInstanceMatrix(void* Instance, void* Matrix) = 0;     // 39
     virtual float* DACOM_API GetInstanceTransform(void* Instance) = 0;                   // 40
-    virtual GENRESULT DACOM_API NoOp41(void* A, void* B) = 0; // formerly UnusedSlot41; TODO: original operation purpose.
+    virtual GENRESULT DACOM_API NoOp41(void* A, void* B) = 0; // 41 TODO: original operation purpose.
     virtual float* DACOM_API GetIdentityMatrix(void* Unused) = 0;                      // 42
-    virtual GENRESULT DACOM_API NoOp43(void* A, void* B) = 0; // formerly UnusedSlot43; TODO: original operation purpose.
+    virtual GENRESULT DACOM_API NoOp43(void* A, void* B) = 0; // 43 TODO: original operation purpose.
     virtual float* DACOM_API GetIdentityMatrix2(void* Unused) = 0;                     // 44 = 42
     virtual GENRESULT DACOM_API SetTransformUser(void* Instance, unsigned long User) = 0; // 45
     virtual unsigned long DACOM_API GetTransformUser(void* Instance) = 0;               // 46
@@ -129,7 +129,7 @@ struct IEngine : IDAComponent
                                                void* Cursor) = 0;                       // 54
     virtual void* DACOM_API GetInstanceRoot(void* Instance) = 0;                         // 55
     virtual void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) = 0;   // 56
-    virtual unsigned long DACOM_API RejectOperation(void* A, void* B) = 0; // formerly UnusedSlot57; TODO: original operation purpose.
+    virtual unsigned long DACOM_API RejectOperation(void* A, void* B) = 0; // 57 TODO: original operation purpose.
 };
 
 #ifndef FREELANCER_IENGINE2_DEFINED
@@ -263,7 +263,7 @@ struct IChannelOwner
 };
 // Keys an event channel (archetype flags 8) crossed in one tick: FUN_0661b120 fills at most
 // 0x40 {time, value} pairs, FUN_0661b420 copies them here with the count behind them
-// (0661b4eb..0661b50a, frame +0xA0 .. +0x2A0).
+// (frame +0xA0 .. +0x2A0).
 struct FChannelKeyBatch
 {
     float Keys[0x40][2];
@@ -275,7 +275,7 @@ struct IChannelSink
     virtual void DACOM_API OnKeys(unsigned long ChannelKey, void* Context,
                                   FChannelKeyBatch* Batch) = 0; // +0x00
     // TODO: purpose of both opaque notification arguments remains unknown.
-    virtual void DACOM_API OnOpaqueNotification(void* A, void* B) = 0; // formerly Slot01; +0x04
+    virtual void DACOM_API OnOpaqueNotification(void* A, void* B) = 0; // +0x04
     virtual void DACOM_API OnLoop(unsigned long ChannelKey, float* Transform,
                                   void* Context) = 0; // +0x08
 };
@@ -333,7 +333,7 @@ struct IHardpoint : IDAComponent
                                                   const void* Data) = 0;                // 4
     virtual GENRESULT DACOM_API EnumerateHardpoints(FHardpointEnumProc Callback,
                                                     void* Handle, void* Context) = 0;    // 5
-    // formerly GetRelative; nonzero reports failure when connecting two hardpoints.
+    // Nonzero reports failure when connecting two hardpoints.
     virtual unsigned long DACOM_API ConnectHardpoints(void* InstA, FHardpointKey const* KeyA,
                                                       void* InstB,
                                                       FHardpointKey const* KeyB) = 0;     // 6

@@ -33,9 +33,8 @@ namespace
     int G_RolloverCursorX = 0;                        // DAT_0067228c
     int G_RolloverCursorY = 0;                        // DAT_00672290
 
-    // FUN_005b36b0("enable_rollover") -> the record's +0x14 (the applied value) against 0.999
-    // (DAT_005c8b68, a double): FCOMP / TEST AH,5 / JNP leaves -- only a value below 0.999 bails
-    // (equal and unordered go on). No null test on the record in retail.
+    // The applied value (+0x14) of "enable_rollover" against 0.999 (DAT_005c8b68, a double):
+    // only a value below it bails (equal and unordered go on). No null test in retail.
     bool IsRolloverEnabled()
     {
         FPerfOption const* const Option = FindPerfOption("enable_rollover");
@@ -43,10 +42,7 @@ namespace
     }
 
     // A record {Ids, Ids, empty caption} as FUN_004b62f0 / FUN_004b6440 build it on the stack
-    // (0x004b6319..0x004b6362): +0x08 / +0x0c zeroed and the Font::String constructed
-    // (FUN_004144b0) -- the record's constructor, run by the caller's declaration -- then
-    // FUN_004963a0 inlined (IdsAlt 0, Ids -1, +0x44 0, the caption's first wchar cleared when it
-    // has one, +0x60 0), then Ids = IdsAlt = the argument.
+    // (0x004b6319): FUN_004963a0 inlined, then Ids = IdsAlt = the argument.
     void BuildIdsRecord(FToolTipHoverInfo* Record, int Ids)
     {
         ToolTipHoverReset(Record);
@@ -67,10 +63,8 @@ NnRolloverControl::NnRolloverControl()
     , AnchorXSpace(0.0f)
     , AnchorXIntro(0.0f)
 {
-    // FUN_004b6630 0x004b66cd..0x004b671e: the +0xec record -- +0xf4 / +0xf8 zeroed and the
-    // Font::String at +0xfc constructed (FUN_004144b0), the member's own ctor -- then
-    // FUN_004963a0; the map at +0x150 (FUN_004b6800, an empty tree) is the member's own ctor.
-    // Retail leaves the anchor (+0x16c) unset until Create; the port zeroes it.
+    // Inlined into FUN_004b6630 (0x004b66cd). Retail leaves the anchor (+0x16c) unset until
+    // Create; the port zeroes it.
     ToolTipHoverReset(&Entry);
     Anchor[0] = 0.0f;
     Anchor[1] = 0.0f;
@@ -80,10 +74,7 @@ NnRolloverControl::NnRolloverControl()
 
 NnRolloverControl::~NnRolloverControl()
 {
-    // FUN_004b5340: the singleton cleared when it is this one, the map torn down (inline tree
-    // erase), then the +0xec record (FUN_004144f0 on its Font::String, the child vector, the
-    // text buffer, the caption buffer), then the TextWin dtor FUN_005a1af0. Both are the
-    // members' own dtors, in retail's reverse declaration order (map, then ~FToolTipHoverInfo).
+    // FUN_004b5340; the members' own dtors run in retail's order (map, then the record).
     if (G_RolloverSingleton == this)
         G_RolloverSingleton = nullptr;
 }
@@ -99,9 +90,7 @@ void NnRolloverControl::InitRolloverDefaults()
     AnchorXIntro = 0.2f;           // +0x188 = 0x3e4ccccd
     bWasVisible = 0;               // +0x178
 
-    // 0x004b4f4e: FUN_004177b0("Rollover"); when it differs from the Font::String's font (+0x98):
-    // store it, slot +8 on every child of the vector at +0x8c..+0x90, zero the layout generation
-    // (+0xa4) -- TextWin::SetFont's body without the scale store.
+    // TextWin::SetFont's body without the scale store.
     IFont* const Font = FindMenuFontImp("Rollover");
     if (Text.FontIface != Font)
     {
@@ -111,7 +100,7 @@ void NnRolloverControl::InitRolloverDefaults()
              Index < static_cast<unsigned>(Text.ChildEnd - Text.ChildBegin);
              ++Index)
         {
-            // 0x004b4f8b..0x004b4f97: the child's vt+8 with +0x98 re-read, no null test.
+            // vt+8 with +0x98 re-read, no null test.
             Text.ChildBegin[Index].Child->BindFont(Text.FontIface);
         }
         Text.LayoutGen = 0; // +0xa4
@@ -126,7 +115,6 @@ void NnRolloverControl::InitRolloverDefaults()
 
 bool NnRolloverControl::HitTest(float const* /*Ray*/)
 {
-    // slot 4 FUN_0053f330: XOR AL,AL / RET 4.
     return false;
 }
 
@@ -147,7 +135,7 @@ bool NnRolloverControl::Create(Win3D* NewParent, void* /*Data*/)
     ColorD8 = 0xff434343u;    // +0xd8, bytes 43 43 43 ff
     ColorIdle = 0xffe0c387u;  // +0xcc, bytes 87 c3 e0 ff
 
-    // 0x004b5571: FUN_005b0880 (the current state is the intro menu) picks +0x188 over +0x184.
+    // FUN_005b0880: in the intro menu +0x188, else +0x184.
     Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
     Anchor[1] = 0.385f; // 0x3ec51eb8
     Anchor[2] = -1.0f;  // 0xbf800000
@@ -158,7 +146,7 @@ bool NnRolloverControl::Create(Win3D* NewParent, void* /*Data*/)
 
 void NnRolloverControl::LoadRolloverTable()
 {
-    // FUN_004b59b0. The path buffer is 0x104 bytes (Stack[0x20]..Stack[0x124]).
+    // FUN_004b59b0.
     char FullPath[0x104];
     GetFileSysPath(FullPath, "interface\\Rollover.ini", nullptr);
 
@@ -175,11 +163,10 @@ void NnRolloverControl::LoadRolloverTable()
             {
                 if (Reader.is_value("map"))
                 {
-                    // 0x004b5a7a..0x004b5a9f: both values through ftol -- key first.
+                    // Both values are read as floats and truncated, key first.
                     int const Key = static_cast<int>(Reader.get_value_float(0));
                     int const Value = static_cast<int>(Reader.get_value_float(1));
-                    // 0x004b5aa4..0x004b5b93: the unique-key insert (FUN_004b68b0 only when the
-                    // key is not there yet) -- a repeated key keeps its first value.
+                    // A repeated key keeps its first value.
                     Table.insert(std::pair<int const, int>(Key, Value));
                 }
             } while (Reader.read_value());
@@ -208,8 +195,8 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
 
     if ((Flags & kWin3DVisible) == 0)
     {
-        // 0x004b5628: hidden -- bit 0 cleared; the grace time runs down while it is positive
-        // and is clamped to 0 when the (unrounded) difference goes below 0 (TEST AH,5 / JP).
+        // Hidden: the grace time runs down while positive and is clamped to 0 when the
+        // unrounded difference goes below 0.
         Flags = static_cast<unsigned char>(Flags & 0xfe);
         if (HiddenGrace > 0.0f)
         {
@@ -221,12 +208,12 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
     }
     else
     {
-        HiddenGrace = 0.5f; // 0x004b5665: 0x3f000000
+        HiddenGrace = 0.5f;
     }
 
     bWasVisible = static_cast<unsigned char>((Flags >> 1) & 1); // +0x178
 
-    // 0x004b567c: the cursor (DAT_00616840 / DAT_00616844) against the last one seen.
+    // The cursor (DAT_00616840 / DAT_00616844) against the last one seen.
     int CursorX = 0;
     int CursorY = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
@@ -242,8 +229,7 @@ void NnRolloverControl::TickRollover(double DeltaSeconds)
         CursorStillSeconds = 0.0f;
     }
 
-    // 0x004b56bc: the hold time runs down while it is positive; at or below 0 it is zeroed
-    // and the rollover hidden. Not positive to begin with: hidden.
+    // The hold time runs down; at or below 0 the rollover hides.
     if (HoldSeconds > 0.0f)
     {
         double const Left = static_cast<double>(HoldSeconds) - DeltaSeconds;
@@ -267,30 +253,28 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
     }
     if (!IsRolloverEnabled())
         return;
-    // 0x004b5d04: a record still held (+0x164 > 0) is not replaced.
+    // A record still held is not replaced.
     if (HoldSeconds > 0.0f)
         return;
-    // 0x004b5d1b: the same record while it was visible goes straight on; otherwise, once the
-    // grace time is over (+0x17c <= 0), the cursor must have rested for 0.25s (DAT_005c94f8).
+    // The same record while it was visible goes straight on; otherwise, once the grace time is
+    // over, the cursor must have rested for 0.25s (DAT_005c94f8).
     if (Entry.Ids != Info->Ids || bWasVisible == 0)
     {
         if (!(HiddenGrace > 0.0f) && CursorStillSeconds < 0.25f)
             return;
     }
 
-    // 0x004b5d57: the table maps the hover's IdsAlt to the ids shown; no entry, nothing.
+    // The table maps the hover's IdsAlt to the ids shown.
     std::map<int, int>::const_iterator const Found = Table.find(Info->IdsAlt);
     if (Found == Table.end())
         return;
 
-    // 0x004b5d83..0x004b5e26: the record {Info->Ids, mapped ids, a copy of Info's caption}.
-    FToolTipHoverInfo Record;   // caption null + FUN_004144b0; dtor FUN_00444ee0
-    ToolTipHoverReset(&Record); // with FUN_00413df0(0, -1) on the empty caption
+    FToolTipHoverInfo Record;   // dtor FUN_00444ee0
+    ToolTipHoverReset(&Record);
     Record.IdsAlt = Found->second;
     Record.Ids = Info->Ids;
     if (Info->CaptionW != nullptr)
     {
-        // FUN_004142a0(Length + 1), wcsncpy, NUL.
         ToolTipHoverSetCaption(&Record, Info->CaptionW);
     }
     else if (Record.CaptionW != nullptr && Record.CaptionW[0] != L'\0')
@@ -301,12 +285,10 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
     Flags = static_cast<unsigned char>(Flags | kWin3DActive);
     if (Entry.Ids == Record.Ids)
     {
-        // 0x004b5e3c: already showing it.
         Flags = static_cast<unsigned char>(Flags | kWin3DVisible);
         return;
     }
 
-    // 0x004b5e9f: the anchor, the record's ids, the text, the position, the knowledge map.
     Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
     Anchor[1] = 0.385f;
     Anchor[2] = -1.0f;
@@ -340,14 +322,13 @@ void NnRolloverControl::ShowHover(FToolTipHoverInfo const* Info, float Hold)
     if (!IsRolloverEnabled())
         return;
     Flags = static_cast<unsigned char>(Flags | kWin3DActive);
-    // 0x004b6031: the same record while it is still held only turns visible again.
+    // The same record while it is still held only turns visible again.
     if (Entry.Ids == Info->Ids && HoldSeconds > 0.0f)
     {
         Flags = static_cast<unsigned char>(Flags | kWin3DVisible);
         return;
     }
 
-    // 0x004b6059: FUN_005b0880 picks the anchor X.
     Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
     Anchor[1] = 0.385f; // 0x3ec51eb8
     Anchor[2] = -1.0f;  // 0xbf800000
@@ -426,7 +407,7 @@ void NnRolloverControl::Draw()
     FontStringSetScale(&Text, 0.29f, Position[2]); // FUN_004145d0(0x3e947ae1, +0x68)
     int Extent[2];
     FontStringGetExtent(&Text, Extent); // FUN_00414570
-    // 0x004b5793: both extents widened as unsigned (FILD qword with a zero high dword).
+    // Both extents are widened as unsigned.
     float const ExtentW = static_cast<float>(static_cast<unsigned>(Extent[0]));
     float const ExtentH = static_cast<float>(static_cast<unsigned>(Extent[1]));
     Width = ExtentW;
@@ -442,9 +423,9 @@ void NnRolloverControl::Draw()
 
     if (FlagE1 != 0)
     {
-        // 0x004b57fd: the box -- floored origin, extent + {3, 2} (DAT_005d4f28 / DAT_005d55b4),
-        // filled with +0xd8 then outlined in DAT_00679bb4, in the 2D projection. The
-        // OnDisconnect(0x1701) calls around it are the ICF-folded bare RET 0x00401e90.
+        // The box: floored origin, extent + {3, 2} (DAT_005d4f28 / DAT_005d55b4), in the 2D
+        // projection. Retail's OnDisconnect(0x1701) calls around it are the ICF-folded bare RET
+        // 0x00401e90 and are not ported.
         float const X0 = static_cast<float>(floor(static_cast<double>(ScreenX)));
         float const Y0 = static_cast<float>(floor(static_cast<double>(ScreenY)));
         float const PadW = Width + 3.0f;
@@ -473,7 +454,7 @@ void NnRolloverControl::Draw()
 
     FontAtlasSetDrawColor(static_cast<unsigned>(ColorIdle)); // FUN_00417780(+0xcc)
 
-    // 0x004b5939: the origin {x + 1, y, width, height, 0, 0} into FUN_004143c0(+0x7c, 0, 0).
+    // FUN_004143c0(+0x7c, 0, 0).
     FFontStringDrawOrigin Origin;
     Origin.X = ScreenX + 1.0f;
     Origin.Y = ScreenY;
@@ -489,15 +470,13 @@ void NnRolloverControl::Draw()
 
 void NnRolloverControl::HideRollover()
 {
-    HoldSeconds = 0.0f;                               // 0x004b65a9 +0x164 = 0
-    Flags = static_cast<unsigned char>(Flags & 0xfd); // 0x004b65b8 +0x6c &= 0xfd
+    HoldSeconds = 0.0f;
+    Flags = static_cast<unsigned char>(Flags & 0xfd);
 }
 
 Win3D* RolloverFactory::Create(Win3D* Parent, void* Payload)
 {
-    // FUN_004b6630: operator new(0x18c), the ctor (FUN_004b4f10 inside), +0x6c &= 0xfd, the
-    // singleton DAT_00672288, +0x10 = the factory's name (+0xc), then slot 9; on failure the
-    // scalar deleting dtor and null.
+    // FUN_004b6630: operator new(0x18c); the singleton is DAT_00672288.
     NnRolloverControl* const Tip = new NnRolloverControl();
     Tip->Flags = static_cast<unsigned char>(Tip->Flags & 0xfd);
     G_RolloverSingleton = Tip;
@@ -541,8 +520,7 @@ void NnRolloverShowHoverGlobal(FToolTipHoverInfo const* Info, float HoldSeconds)
 
 void NnRolloverShowIdsGlobal(int Ids, float HoldSeconds)
 {
-    // FUN_004b62f0: the record is built, shown through FUN_004b5fd0 and destroyed
-    // (0x004b6385..0x004b6407) only when the singleton exists.
+    // FUN_004b62f0.
     if (G_RolloverSingleton == nullptr)
         return;
     FToolTipHoverInfo Record;
@@ -553,8 +531,7 @@ void NnRolloverShowIdsGlobal(int Ids, float HoldSeconds)
 void NnRolloverShowHoverAtGlobal(FToolTipHoverInfo const* Info, float HoldSeconds,
                                  float AnchorX)
 {
-    // FUN_004b6420 (Ghidra splits it at LAB_004b6425: the raw bytes are MOV ECX,[DAT_00672288]
-    // / TEST ECX,ECX / JZ ret / the three arguments / CALL FUN_004b6130 / RET).
+    // FUN_004b6420 (Ghidra splits it at LAB_004b6425).
     if (G_RolloverSingleton == nullptr)
         return;
     G_RolloverSingleton->ShowHoverAt(Info, HoldSeconds, AnchorX);
@@ -572,8 +549,7 @@ void NnRolloverShowIdsAtGlobal(int Ids, float HoldSeconds, float AnchorX)
 
 void NnRolloverHideGlobal()
 {
-    // FUN_004b65a0: DAT_00672288 null -> nothing; else the two stores (the singleton is
-    // re-read between them, same object).
+    // FUN_004b65a0.
     if (G_RolloverSingleton == nullptr)
         return;
     G_RolloverSingleton->HideRollover();
@@ -581,8 +557,7 @@ void NnRolloverHideGlobal()
 
 void NnRolloverDestroyGlobal()
 {
-    // FUN_004b6580: slot 10, then the singleton re-read (the dtor clears it only on delete, so
-    // it is the same object) and its scalar deleting dtor with 1.
+    // FUN_004b6580. The singleton is re-read between Destroy and delete.
     if (G_RolloverSingleton == nullptr)
         return;
     G_RolloverSingleton->Destroy();

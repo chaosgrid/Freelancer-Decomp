@@ -11,7 +11,7 @@
 // (MissionObjList.h) to the ship and reacts to the ship's events. CreateGuide builds one from
 // a guide description: FGuideDesc (types 1-4, built by the encounter / mission / random
 // mission code) or a [MetaBehavior] object (types 5 / 6, MB_GOTOGUIDE / MB_DOCKGUIDE, loaded
-// by LoadMetaBehavior). Lane CNT-AI owns this file.
+// by LoadMetaBehavior).
 //
 // No RTTI in Content: class names are chosen from what the classes do; the behavior names of
 // ParseGuideBehavior give the type numbers (1 nothing, 2 trade, 3 patrol_path, 4 wander,
@@ -61,11 +61,8 @@ public:
 };
 
 // The member handle that holds one reference on a guide description: FContentNpcShipParams
-// +0xfc (NpcShip.h). Retail keeps it as a ref-holding member: the copy is FUN_06f21fd0 (copy +
-// AddRef when set), the destructor / unwind step FUN_06f28e10 (Release when set), run in the
-// member order of FUN_06ef4bb0. A raw-pointer assignment does not touch the count: the users'
-// inlined retail code (encounter spawn 06ef47c7.., mission spawn 06f167ad..) does its own
-// AddRef / Release around it, as retail does.
+// +0xfc (NpcShip.h), destroyed in the member order of FUN_06ef4bb0. The users (encounter spawn
+// 06ef47c7, mission spawn 06f167ad) do their own AddRef / Release around raw assignments.
 using FGuideDescHandle = TRefHandle<FGuideDescBase>;
 // The same holder for a guide (e.g. the mission ship's +0x68 guide).
 using FContentGuideHandle = TRefHandle<FContentGuide>;
@@ -100,7 +97,7 @@ struct FSpawnPlan
 struct FGuideDesc : public FGuideDescBase
 {
     // +0x10..+0x47: the placement plan of the encounter spawn (TU29 FUN_06ef4eb0 copies the
-    // spawner's plan here whole, REP MOVSD 0xe; TU53 FUN_06f63cc0 reads it). The ctors set
+    // spawner's plan here whole, 0xe dwords; TU53 FUN_06f63cc0 reads it). The ctors set
     // the same defaults as the spawner's local (+0x10..+0x1c 0, +0x38 0, +0x3c / +0x40 -1,
     // +0x44 0; +0x20..+0x37 unset).
     FSpawnPlan Plan;
@@ -147,7 +144,7 @@ struct FGuideDesc : public FGuideDescBase
         *OutBase2 = TargetBase2;
     }
 
-    // FUN_06f06260 (RET 0x10; caller TU53 FUN_06f63cc0 06f647e5, added by CNT-GS9): the two
+    // FUN_06f06260 (RET 0x10; caller TU53 FUN_06f63cc0 06f647e5): the two
     // target ids and their bases (FindTargetBase; ClassIds goes to it by value).
     void SetTargets(unsigned int const* Id1, unsigned int const* Id2,
                     std::vector<unsigned int> const* ClassIds, int const* Rep);
@@ -197,7 +194,7 @@ public:
     // FUN_06f07c30 (RET 4).
     void Parse(INI_Reader* Reader) override;
 
-    // +0x114: the priority the goto guide gives its Guide directives (their BaseOp Field_08):
+    // +0x114: the priority the goto guide gives its Guide directives (their Op.Priority):
     // "NORMAL" 1, "ALWAYS_EXECUTE" 0, else 0 from the ctor.
     int Priority = 0;
     std::list<FNnPathLeg> Legs;                  // +0x118 copied into the guide's path
@@ -208,8 +205,8 @@ public:
     Vector Destination = {};                     // +0x130 values 4-6 (goto only)
     float Range = 0.0f;                          // +0x13c value 7 (int); dock guide: value 5
     TString<0x30> TargetName;                    // +0x140 value 0
-    unsigned char Field_0x174 = 0;               // +0x174 guide +0x16c. TODO: writer
-    unsigned char Field_0x175 = 0;               // +0x175 guide +0x16d. TODO: writer
+    unsigned char Field_0x174 = 0;               // +0x174 guide +0x16c (bCruise). TODO: writer
+    unsigned char Field_0x175 = 0;               // +0x175 guide +0x16d (bNoCruise). TODO: writer
     unsigned char bStartFollowing = 1;               // +0x176 value 8 (bool); guide +0x16e
 };
 
@@ -276,34 +273,34 @@ public:
     // +0x18 purecall. Name from the caller: the ship's DirectiveCallback forwards here when
     // its own directive list is empty (06f33fbe); 06f0af30 restarts (Start).
     virtual void OnDirectivesDone(int ResultWord11c, int ResultWord118) = 0;
-    // +0x1c, 06ea1490 (`RET 8`). Name from the caller: SpaceSupport's message id and parms,
+    // +0x1c, 06ea1490 (RET 8). Name from the caller: SpaceSupport's message id and parms,
     // forwarded by FUN_06f34c30; the goto guide switches on message ids (06f08d0f).
     virtual void HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
     {
         (void)MsgId;
         (void)Parms;
     }
-    // +0x20, 06ebf700: +8 = Ship.
+    // +0x20, 06ebf700.
     virtual void SetShip(FContentNpcShip* InShip)
     {
         Ship = InShip;
     }
-    // +0x24, 06f06190: byte +0x10.
+    // +0x24, 06f06190.
     virtual bool IsDone()
     {
         return bDone;
     }
-    // +0x28, 06fa8130: +0xc.
+    // +0x28, 06fa8130.
     virtual int GetType()
     {
         return Type;
     }
-    // +0x2c, 06ebf6f0 (`RET 4`): the ship's scan_state_change.
+    // +0x2c, 06ebf6f0: the ship's scan_state_change.
     virtual void OnScanStateChange(bool bScanning)
     {
         (void)bScanning;
     }
-    // +0x30, 06f06590 (`XOR AL,AL; RET 0x10`): the ship's request_flee_destination.
+    // +0x30, 06f06590: the ship's request_flee_destination.
     virtual bool RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
                                         Vector& OutPosition, unsigned int& OutParam,
                                         float& OutFloat)
@@ -314,8 +311,7 @@ public:
         (void)OutFloat;
         return false;
     }
-    // +0x34, 06f065a0 (RET 0x10): *OutId2 = *OutId1 = 0, *OutBase1 / *OutBase2 = 0 when
-    // given (each tested on its own).
+    // +0x34, 06f065a0 (RET 0x10). Each out-base is tested on its own, unlike the overrides.
     virtual void GetTargets(unsigned int* OutId1, unsigned int* OutId2, FContentBase** OutBase1,
                             FContentBase** OutBase2)
     {
@@ -326,7 +322,7 @@ public:
         if (OutBase2 != nullptr)
             *OutBase2 = nullptr;
     }
-    // +0x38, 06ebf720 (`RET`). Name from the overrides: the goto / dock guides recompute
+    // +0x38, 06ebf720. Name from the overrides: the goto / dock guides recompute
     // their target id from its name here (06f07ec0, 06f0a5d0: FindObjectIdByName).
     virtual void RefreshTarget()
     {

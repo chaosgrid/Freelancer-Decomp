@@ -14,23 +14,20 @@
 #include "Interface/win3d_renderables.h"  // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/win_factory.h"
 
-// Retail DAT_0066db9c -- WINFACTORY<BlockingDialog> static (LAB_00472150 -> FUN_00474750; Create
-// FUN_004747c0; atexit LAB_00472170 -> FUN_00579380).
+// Retail DAT_0066db9c -- WINFACTORY<BlockingDialog> static (LAB_00472150).
 WINFACTORY<BlockingDialog> G_BlockingDialogFactory("BlockingDialog");
 
 BlockingDialog::BlockingDialog()
     : bCursorDrawFlag(1)
 {
-    // FUN_004747c0 004747fb..0047481e: FUN_0059f860, vptrs, byte +0x32c = 1, FUN_0042d6c0,
-    // INC DAT_0067dccc.
-    PushClientTimingPause();
-    G_ModalCaptureCount = G_ModalCaptureCount + 1;
+    // Inlined in FUN_004747c0.
+    PushClientTimingPause();                      // FUN_0042d6c0
+    G_ModalCaptureCount = G_ModalCaptureCount + 1; // DAT_0067dccc
 }
 
 BlockingDialog::~BlockingDialog()
 {
-    // FUN_00474420: DEC DAT_0067dccc, FUN_0059d8c0(0), FUN_0042d6d0; then FUN_0059fa50 as the
-    // base-class destructor.
+    // FUN_00474420.
     G_ModalCaptureCount = G_ModalCaptureCount - 1;
     Win3DSetKeyFocus(nullptr);
     PopClientTimingPause();
@@ -38,30 +35,25 @@ BlockingDialog::~BlockingDialog()
 
 bool BlockingDialog::Create(Win3D* NewParent, void* Data)
 {
-    // FUN_00474490 (RET 8).
-    // 00474494..0047449d: FUN_0041dde0("Arrow", 0) -- the Mouse.cpp cursor shape.
-    MouseSetCursor("Arrow", false);
+    // FUN_00474490.
+    MouseSetCursor("Arrow", false); // FUN_0041dde0
 
-    // 004744a2 / 004744a9
     DrawLayer = 0x64;
     DrawSubLayer = 6;
-    // 004744b0..004744bc
     bCursorDrawFlag = NnModalPauseGame();
     Win3DSetKeyFocus(this);
-    // 004744c1..004744f7: +0xb4 = {2.0f, 2.0f, 0.0f}.
     HalfExtents[0] = 2.0f;
     HalfExtents[1] = 2.0f;
     HalfExtents[2] = 0.0f;
 
-    // 00474502: FUN_004b5060, SETNZ.
-    return Win3D::Create(NewParent, Data);
+    return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 
 void BlockingDialog::Draw()
 {
     // FUN_00488960.
     Win3DFlushBeforeOverlayDraw(); // FUN_0045a9f0
-    WinControl::Draw();            // JMP FUN_005a0760
+    WinControl::Draw();            // FUN_005a0760
 }
 
 void BlockingDialogOpen()
@@ -86,7 +78,6 @@ void BlockingDialogClose()
     if (Found == nullptr)
         return;
     BlockingDialog* const Dialog = static_cast<BlockingDialog*>(Found);
-    // 004745a4..004745ad
     if (IsLetterboxVisible())
         Dialog->bCursorDrawFlag = 0;
     NnModalResumeGame(Dialog->bCursorDrawFlag);

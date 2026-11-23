@@ -78,7 +78,7 @@ COMMON_API wchar_t const* __cdecl malloc_wstrcpy(wchar_t** Dest, wchar_t const* 
 COMMON_API void __cdecl malloc_wstrfree(wchar_t** Str);
 
 // ============================================================================
-// Client/server run-permission handshake (Common.dll.txt 0x631d970 .. 0x631da4c)
+// Client/server run-permission handshake (0x0631d970 .. 0x0631da4c)
 // Two named manual-reset events, both created already signalled. Only the client waits with
 // a 5 s budget; the server side gets 500 ms. A wait that times out signals its own event
 // again, so a dead peer degrades to "everyone runs" instead of deadlocking.
@@ -101,7 +101,7 @@ COMMON_API void __cdecl GiveServerRunPermission();
 COMMON_API unsigned long __cdecl SafeWaitForSingleObject(HANDLE Handle, unsigned long Timeout);
 
 // ============================================================================
-// Hex <-> wide-string and GUID text parsing (Common.dll.txt 0x63032b0 / 0x6303260 / 0x631b980)
+// Hex <-> wide-string and GUID text parsing (0x063032b0 / 0x06303260 / 0x0631b980)
 // ============================================================================
 
 // Retail ?HexToWide@@YAXPBDPAG@Z  RVA 0xa32b0 (G = VC6 wchar_t). If every character of Src is a hex digit the string is
@@ -192,18 +192,15 @@ static_assert(sizeof(File) == 0x8C, "File sizeof 0x8C");
 // ============================================================================
 // Heap — tiny fixed-size-block free-list pool allocator (0xae580/0xae5a0/0xae600).
 // Used by CObject::Alloc's per-class object pools (6 static instances, one per
-// CObject subclass size). Not ported here: CObject::Alloc itself (avoided
-// region -- see the CObject/CEqObj cluster note in the marathon's memory).
+// CObject subclass size).
 // ============================================================================
 // Retail exports the ctor, Malloc, Free and Shrink only (no class-level export: no operator=).
 class Heap
 {
 public:
-    // Common.dll.c 80679-80690 (0x4d450, ??0Heap@@QAE@IH@Z): a real exported ctor
-    // does exist -- {ElementSize, FreeList=nullptr, MaxFreeCount, CurrentFreeCount=0}.
-    // Only XREF is Entry Point + an rdata table slot (no traced call site), so the
-    // 6 static per-class pools are presumably still built through this ctor at
-    // static-init time rather than via a traced call.
+    // 0x062ad450 (??0Heap@@QAE@IH@Z): {ElementSize, FreeList=nullptr, MaxFreeCount,
+    // CurrentFreeCount=0}. No traced call site; the 6 static pools are presumably built
+    // through it at static-init time.
     COMMON_API Heap(unsigned int ElementSize, int MaxFreeCount);
 
     COMMON_API void* Malloc();
@@ -230,37 +227,12 @@ static_assert(sizeof(Heap) == 0x10, "Heap sizeof 0x10");
 // DamageEntry — single damage record
 // ============================================================================
 
-// WHAT IS AND IS NOT SOURCED HERE (settled 2026-09-17, server lane, wave 15).
-//
-// Retail names not one of these values. DamageList::DmgCauseToString
-// (.text:062bbce0) is `MOV EAX,.rdata:0639ed24 / RET` and that .rdata reads
-// 3f 3f 3f 00 -- the string "???". There is no table. DamageList::set_cause
-// (.text:06332f50) is ICF-folded with EquipDesc::set_status,
-// TRANode::set_default_mask and StateMachineMessage::set_delivery_state, and
-// all six of its call sites inside Common.dll turn out to be one of those three
-// (they push 0x3f800000, an INI float, a list element -- .text:06270d00,
-// .text:0629578a, .text:0629ae3f, .text:06311c20, .text:06311d15,
-// .text:0631312c), so no caller can be attributed to set_cause at all.
-// DamageList::get_cause (.text:06263a70) is a one-liner folded with four more
-// getters. "DamageCause" appears in exactly four places across every listing in
-// EXE\Disasm, all four inside that one mangled name.
-//
-// So the six enumerators below are UNSOURCED -- carried over from an earlier
-// pass, not read off any byte. They are kept because they compile and nothing
-// depends on their spelling, not because they are confirmed.
-//
-// The one cause value that IS on the bytes is 0x19, and it is the only non-zero
-// cause either DLL ever writes. Both writers are Server.dll callers of
-// GameObject::get_damage_list, building a DamageList on the stack:
-//   .text:06cf61d2  MOV dword ptr [ESP + 0x84],0x19
-//   .text:06d07f8a  MOV dword ptr [ESP + 0x74],0x19
-// with the record bases at S+0x6c and S+0x64 respectively, so both land on
-// +0x10 -- the field get_cause reads. Everywhere else the field keeps the 0 the
-// constructor leaves (including StarSystem::damage_object's reduced list,
-// .text:06d0ba93). 0x19 therefore cannot be a decode error and cannot be named
-// from these two binaries; it would have to come out of freelancer.exe or
-// Content.dll, and neither carries the symbol.
-// Retail DamageCause values verified across Server.dll, Common.dll, FLSDK, and FLHook:
+// Retail has no names for these values: DamageList::DmgCauseToString (.text:062bbce0)
+// returns the string "???" (.rdata:0639ed24); DamageList::set_cause (.text:06332f50) is
+// ICF-folded with EquipDesc::set_status and others, and its six Common.dll call sites all
+// belong to those; get_cause (.text:06263a70) is a folded one-liner. Server.dll writes 0x19
+// into +0x10 of a stack DamageList at .text:06cf61d2 / 06d07f8a.
+// DamageCause values from Server.dll, Common.dll, FLSDK and FLHook across Server.dll, Common.dll, FLSDK, and FLHook:
 //   0    = Unknown (default)
 //   1    = Collision (StarSystem::collision_damage 0x06d0d730 & non-bullet/non-guided fallback)
 //   2    = Gun (ObjectType 0x2000000 BULLET munition hit, 0x06d0d604)
@@ -468,7 +440,7 @@ COMMON_API Vector __cdecl random_sphere_constrained(Vector const& Dir, float Ang
 COMMON_API Vector __cdecl random_sphere_constrained_2(Vector const& Dir, float MinAngle, float MaxAngle);
 
 // Safe string ops. Size is sizeof(Dest) in BYTES for all three (safe_wcscpy divides by 2
-// internally to get a wchar_t count, matching Common.dll.txt:0xa4840's `Size >> 1`).
+// internally to get a wchar_t count, matching 0x06304840's `Size >> 1`).
 COMMON_API char* __cdecl safe_strcpy(char* Dest, int Size, char const* Src);
 COMMON_API char* __cdecl safe_strcat(char* Dest, int Size, char const* Src);
 COMMON_API wchar_t* __cdecl safe_wcscpy(wchar_t* Dest, int Size, wchar_t const* Src);

@@ -69,13 +69,9 @@
 
 // ---------------------------------------------------------------------------
 // Shared helper: the matrix -> quaternion conversion every builder does through
-// the lazily-acquired I3DMathEngine singleton at .data:DAT_06d8da08.
-//   .text:06d076e5  MOV EAX,[.data:DAT_06d8da08]
-//   .text:06d076ee  JNZ LAB_06d076fa
-//   .text:06d076f0  CALL FUN_06d5ff70            ; Acquire3DMathEngine
-//   .text:06d07707  CALL dword ptr [ECX + 0x50]  ; MatrixToQuaternion
-// The same three-instruction preamble is repeated verbatim at .text:06d07c0a
-// (loot), .text:06d07cb0 (countermeasure/mine) and .text:06d07d80 (guided).
+// the lazily-acquired I3DMathEngine singleton at .data:DAT_06d8da08 (acquire through
+// FUN_06d5ff70 when null, then slot +0x50 MatrixToQuaternion); every builder repeats
+// the preamble inline.
 // Server.dll-only; defined in src/Server/server_createinfo.cpp.
 // ---------------------------------------------------------------------------
 void Server_MatrixToQuat(Quaternion& Out, Matrix const& In);
@@ -301,9 +297,7 @@ struct CEqObjCreateInfo
     //   +0x9c Cause, +0xa0 InflictorId, +0xa4 InflictorOwner
     //         (rpclocal .text:06d8cab4 / .text:06d8caba / .text:06d8cac1, the
     //         dwords at +0x10/+0x14/+0x18 of the same object)
-    // which is exactly common_misc.h's DamageList. It was previously sliced here
-    // into a bare list plus four loose fields named as if they were the
-    // record's own.
+    // which is exactly common_misc.h's DamageList.
     DamageList Damage;                  // +0x8c .. +0xa7
     unsigned char bMarkedBy;            // +0xa8  GameObject::is_marked_by(PlayerId),
                                         //        .text:06cf58b8 / .text:06cf58c3 (ship),
@@ -462,12 +456,9 @@ struct CSolarCreateInfo : CEqObjCreateInfo
 };
 
 // ===========================================================================
-// The four flat records. These are plain retail POD and they are written here
-// exactly as the lane brief asked -- one named member per store, with the
-// storing instruction quoted. rpclocal's codecs (rpc_payload_ch2.cpp) read and
-// rebuild these very types for IClient::SendServerCreateLoot / CreateCounter /
-// CreateMine / CreateGuided: their former private mirrors (0x14 / 0x48 / 0x48 /
-// 0x38) were folded onto them 2026-10-16.
+// The four flat records: plain retail POD, one named member per store. rpclocal's codecs
+// (rpc_payload_ch2.cpp) read and rebuild these types for IClient::SendServerCreateLoot /
+// CreateCounter / CreateMine / CreateGuided.
 // ===========================================================================
 
 // The 0x48-byte LootDesc that FUN_06d07b90 fills. It is NOT the SendServerCreateLoot

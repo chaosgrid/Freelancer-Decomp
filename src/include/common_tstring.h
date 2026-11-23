@@ -6,10 +6,8 @@
 
 #pragma once
 
-// TString<N> on its own so a header that only needs the fixed-size string (common_universe.h,
-// for the SYSTEM object record) does not have to pull common_reputation.h and, through
-// common_text.h, <windows.h>. common_reputation.h includes this header, so every existing user
-// still sees the template where it saw it before.
+// TString<N> on its own so a header that only needs the fixed-size string (common_universe.h)
+// does not have to pull common_reputation.h and, through common_text.h, <windows.h>.
 
 #include <cstring>
 
@@ -37,13 +35,10 @@ struct TString
         }
     }
 
-    // Common.dll FUN_062fb910 (the N=64 instance, not exported; also inlined into
-    // CommReferrable::operator= .text:062610a0, CommReferrable::read_comm_ini_data
-    // .text:0632e7b0 and Server.dll pub::Translate{Good,Ship}ToMsgIdPrefix .text:06d5e050/
-    // .text:06d5e0d0): a null Str empties the string; otherwise strlen, clamped to N-1
-    // (`CMP EAX,N; JC; MOV EAX,N-1`), copied without the terminator, then Data[Len] = 0.
-    // Common.dll FUN_06306020 (`len = strlen; if (len >= N) len = N-1; copy; NUL`) is the same
-    // operation spelled as a free function.
+    // Common.dll FUN_062fb910 (the N=64 instance; inlined elsewhere, e.g. CommReferrable and
+    // Server.dll pub::Translate{Good,Ship}ToMsgIdPrefix; FUN_06306020 is the same as a free
+    // function): a null Str empties the string; otherwise strlen clamped to N-1, copied, then
+    // Data[Len] = 0.
     TString& operator=(char const* Str)
     {
         if (Str == nullptr)

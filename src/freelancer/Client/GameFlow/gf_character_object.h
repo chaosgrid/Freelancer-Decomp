@@ -18,7 +18,7 @@
 // (DrawOpaque), 10..12 FUN_00445a90 / FUN_00445be0 / FUN_00445c10 (hotspot events).
 //
 // Built by the room (RoomControl FUN_00449e60 -> FUN_00435960 -> FUN_00435b80) for every
-// character record the server sends, and by the Gf script spawn (FUN_0044e870, 0x0044ea12) for
+// character record the server sends, and by the Gf script spawn (FUN_0044e870) for
 // a DEFORMABLE entity no room character stands in for.
 //
 // The fields keep their retail offsets in comments; the port's RoomObject base is retail's size
@@ -35,7 +35,7 @@ struct ICamera;
 
 // The per-part LOD switch table a character body draws with (0x124 bytes). CharacterObject
 // keeps one at +0x30; the "pc" characters (CharacterProperties +0x1c == 1) all share the one at
-// DAT_00668948 instead (static init 0x00443e40 zero-fills it; FUN_00443e90 releases it).
+// DAT_00668948 instead (static init LAB_00443e40 zero-fills it; FUN_00443e90 releases it).
 struct FCharacterLodSet
 {
     void* Instance;                   // +0x000 the IDeformable instance
@@ -71,12 +71,12 @@ private:
 
 struct FCharacterObject;
 
-// The Character's hotspot (vftable 0x005cb9ec, operator new(0x28) at 0x00444764): the screen
+// The Character's hotspot (vftable 0x005cb9ec, operator new(0x28) in FUN_00444290): the screen
 // rectangle of its bounding sphere.
 class FCharacterHotspot : public FHotspot
 {
 public:
-    // 0x00444781..0x00444791: FUN_00555db0, then +0x20 = 0 and +0x24 = 0.
+    // Inlined in FUN_00444290: FUN_00555db0, then +0x20 = 0 and +0x24 = 0.
     FCharacterHotspot();
     // FUN_00444960 (FUN_00444940 the deleting form): the Hotspot destructor.
     ~FCharacterHotspot() override;
@@ -120,13 +120,13 @@ struct FCharacterObject : FRoomObject
 
     // FUN_00445540 (thiscall, RET 4) -- RoomObject +0x04 cleared; with bRelease the +0x360 /
     // +0x368 pair is cleared and the +0x364 name freed, otherwise +0x36c = 2. Caller:
-    // Thorn_Deformable's slot 14 (0x004521f5) with the owning script's +0x55.
+    // Thorn_Deformable's slot 14 with the owning script's +0x55.
     void ResetScriptState(unsigned char bRelease);
     // FUN_004454e0 (thiscall, RET 4) -- a Gf script takes the character over: RoomObject +0x04
     // set (no more self-update); with bKeepOwnScript clear the character's own sequence (+0x360)
     // is destroyed through the Gf script manager (FUN_004568d0), +0x360 / +0x368 cleared, the
-    // +0x364 name freed, and +0x36c = 1. Caller: the spawn's FUN_0044e870 (0x0044ea43) with the
-    // owning script's +0x55.
+    // +0x364 name freed, and +0x36c = 1. Caller: the spawn's FUN_0044e870 with the owning
+    // script's +0x55.
     void TakeOverForScript(unsigned char bKeepOwnScript);
     // FUN_00445620 (thiscall, RET 4) -- the part named Name: a cached hit from Parts, else
     // CompoundInstanceFindFirstName on the engine instance, cached in the first unused entry
@@ -141,8 +141,8 @@ struct FCharacterObject : FRoomObject
     // FUN_00445720 (thiscall, RET 4) -- one of the six "$BGCS_*" context tokens rewritten into
     // the voice-message name voices.ini carries, from this character's costume gender (+0x178),
     // its room's base ([+0x08]+0x34) and its faction (+0x164). Returns the static buffer
-    // DAT_00668848 on every exit (valid until the next call). Callers: FUN_004570a0 (0x00457129,
-    // 0x00457162) with the speaking actor.
+    // DAT_00668848 on every exit (valid until the next call). Caller: FUN_004570a0 with the
+    // speaking actor.
     char const* ResolveBgcsContextToken(char const* TemplateName) const;
 
     // One cached part lookup (retail +0x324, five of 0xc bytes). LAB_00444060 builds one,
@@ -198,7 +198,7 @@ private:
 };
 
 // FUN_00443e90 (cdecl) -- the shared "pc" body (DAT_00668948) destroyed (IDeformable slot 6)
-// and its table cleared. Caller: the Gameflow base leave FUN_00558a50 (0x00558a71).
+// and its table cleared. Caller: the Gameflow base leave FUN_00558a50.
 void ReleaseSharedCharacterLod();
 
 // FUN_00435b80 (cdecl) -- a new CharacterObject for Owner from Props at Placement (index
@@ -217,6 +217,5 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
 
 // FUN_00435cf0 (cdecl) -- the player character of the current room (FUN_00449cd0) put at the
 // current room's setpoint SetpointName (stricmp over RoomData +0x164): IDeformable slots 19 / 20
-// on its instance, then its slot 3 with the setpoint's height. Callers: NavBar 0x0043ea45 /
-// 0x0043ea7c / 0x0043eab3 / 0x0043fff4 / 0x00440027 / 0x00440057.
+// on its instance, then its slot 3 with the setpoint's height. Callers: the NavBar (six sites).
 void PlacePlayerAtSetpoint(char const* SetpointName);

@@ -7,13 +7,11 @@
 #pragma once
 
 // FFontString — the 0x34 text holder (Font.cpp) embedded at WinControl+0x7c (ToolTip factory
-// LEA ESI+0x7c → FUN_004144b0). It has no vtable and so no RTTI; the port has long called it
-// "Font::String", but retail's `.?AUString@Font@@` is the abstract element its children derive
-// from (FontStringElement below).
-//
-// NOT LayoutRichText / RenderDisplayList / TextNode / DeviceTRC (RichTextPane RDL path).
+// → FUN_004144b0). It has no vtable and so no RTTI; comments call it "Font::String", but
+// retail's `.?AUString@Font@@` is the abstract element its children derive from
+// (FontStringElement below). Not the RichTextPane RDL path.
 // Children: `.?AUFontString@@` (0x2c) / `.?AUFontNumberString@@` (0x34).
-// Measure provider: IFont* at +0x1c (FontImp). See epic:font-string.
+// Measure provider: IFont* at +0x1c (FontImp).
 
 #include "font.h"
 #include "Common/Fonts/font_atlas.h"
@@ -81,8 +79,8 @@ struct FFontStringChildSlot
 {
     FontStringElement* Child; // +0x00
     // +0x04 0 = FontString (0x2c), nonzero = NumberString (0x34). Written only when a slot is
-    // appended (FUN_00414640 0x00414729..0x00414745, the copy FUN_00418f10) and read only by
-    // FUN_00414640's reuse test; an in-range replacement leaves it as it was (0x0041471b).
+    // appended (FUN_00414640, the copy FUN_00418f10) and read only by FUN_00414640's reuse
+    // test; an in-range replacement leaves it as it was.
     unsigned char Kind;
     unsigned char Pad[3];
 };
@@ -103,14 +101,14 @@ public:
     int Release() override;
     // +0x08 LAB_004148b0 — bind IFont* into +0x0c
     void BindFont(IFont* Font) override;
-    // +0x0c — return Font_ (misnamed GetConnection in Ghidra)
+    // +0x0c LAB_004148a0
     IFont* GetFont() const override;
-    // +0x10 LAB_004313f0 — return Text_ (+0x04). The NumberString face build reads the glyph
-    // string through it (FUN_00414070 0x004141e1, LAB_00415090 0x00415216).
+    // +0x10 LAB_004313f0. The NumberString face build reads the glyph string through it
+    // (FUN_00414070, LAB_00415090).
     wchar_t const* GetText() const override;
     // +0x14 LAB_00414920 SetText
     void SetText(wchar_t const* Text) override;
-    // +0x18 LAB_00414a40 GetSize → Out[0]=W Out[1]=H (needs IFont::MeasureString); EAX = OutWH.
+    // +0x18 LAB_00414a40 GetSize → Out[0]=W Out[1]=H (IFont::MeasureString); returns OutWH.
     int* GetSize(int* OutWH) override;
     // +0x1c LAB_00414830 — Color_ (+0x24) = *Argb, then a tail jump into slot 8 with 1.
     void SetColor(unsigned const* Argb) override;
@@ -129,7 +127,7 @@ public:
     int CachedH_;       // +0x1c
     int LayoutGen_;     // +0x20  vs G_FontLayoutGeneration
     unsigned Color_;    // +0x24  shadow colour, 0xff080808
-    unsigned char bShadow_; // +0x28 draw the shadow quad (Paint 0x00413225)
+    unsigned char bShadow_; // +0x28 draw the shadow quad
     unsigned char Pad29_[3];
 };
 
@@ -200,7 +198,7 @@ static_assert(offsetof(NumberStringChild, LayoutGen_) == 0x24, "NumberString gen
 static_assert(offsetof(NumberStringChild, FaceCache_) == 0x30, "NumberString Face +0x30");
 static_assert(sizeof(NumberStringChild) == 0x34, "NumberString 0x34");
 
-// One glyph's texture rect in the face atlas (FUN_00414070 00414228..00414263).
+// One glyph's texture rect in the face atlas (FUN_00414070).
 struct FNumberGlyphUv
 {
     float U0; // +0x00 previous glyph's U1 (0 for the first)
@@ -228,20 +226,21 @@ static_assert(sizeof(FNumberFace) == 0x164, "face 0x164");
 
 FNumberFace* NumberFaceGetOrCreate(IFont* FontKey);
 void NumberFaceRelease(FNumberFace* Face);
-// The walk over DAT_00616524 inlined in FUN_004180c0 (004180d3..00418116): for every face,
-// FUN_00415050 (release +0, zero +4). Faces and nodes stay.
+// The walk over DAT_00616524 inlined in FUN_004180c0: for every face, FUN_00415050 (release
+// +0, zero +4). Faces and nodes stay.
 void NumberFaceResetAll();
 
 struct FFontString;
 void FontStringConstruct(FFontString* Self);
+// FUN_00444e50 -- Font::String's destructor (~FFontString): FUN_004144f0, the child vector's
+// destructor, the text buffer freed. It leaves the string empty, so running it again is a no-op.
 void FontStringDestroy(FFontString* Self);
 
-// Font::String owns its text buffer and its child slots, so it is a RAII holder (AGENTS.md RE
-// rule 13): retail constructs it with FUN_004144b0 and tears it down with FUN_00444e50 on both
-// the normal and the unwind path of every frame and object that holds one (e.g. the hover
-// records' Unwind@ funclets around FUN_005a0530 / FUN_0055bde0, TextWin's member dtor
-// 0x005a1b58..0x005a1bb3). The retail class has no copy: every copy site is a hand-written
-// member walk (UIFastTable FUN_00590b40).
+// Font::String owns its text buffer and its child slots, so it is a RAII holder: retail
+// constructs it with FUN_004144b0 and tears it down with FUN_00444e50 on both the normal and the
+// unwind path of every frame and object that holds one (e.g. the hover records' Unwind@ funclets
+// around FUN_005a0530 / FUN_0055bde0, TextWin's member dtor). The retail class has no copy:
+// every copy site is a hand-written member walk (UIFastTable FUN_00590b40).
 struct FFontString
 {
     // FUN_004144b0
@@ -276,8 +275,6 @@ void FontStringClearContents(FFontString* Self);
 void FontStringChildSlotsDestroy(FFontStringChildSlot* First, FFontStringChildSlot* Last);
 // FUN_00445d70 -- the child vector's destructor: children released, buffer freed, zeroed.
 void FontStringChildVectorDestroy(FFontString* Self);
-// FUN_00444e50 -- Font::String's destructor (~FFontString): FUN_004144f0, the child vector's
-// destructor, the text buffer freed. It leaves the string empty, so running it again is a no-op.
 void FontStringSetText(FFontString* Self, wchar_t const* Text);
 void FontStringSetScale(FFontString* Self, float Param1, float Param2);
 void FontStringSetFont(FFontString* Self, IFont* Font); // FUN_004ea670
@@ -290,16 +287,15 @@ void FontStringSetNumberText(FFontString* Self, char const* Format);
 void FontStringRebuild(FFontString* Self);              // FUN_004155c0
 int* FontStringGetExtent(FFontString* Self, int* OutWH); // FUN_00414570
 // FUN_004145a0 -- the child (line) count after a stale layout is rebuilt; 0 without children.
-// Caller: NN_News RefreshRows (0x004a53be), which moves a one-line headline down.
+// Caller: NN_News RefreshRows, which moves a one-line headline down.
 int FontStringChildCount(FFontString* Self);
 
 // FUN_004143c0 thiscall: ECX = draw origin (not Font::String).
-// Paint (00412e50) FLD [Origin] / [Origin+4] — both floats.
 struct FFontStringDrawOrigin
 {
     float X;     // +0x00
     float Y;     // +0x04
-    float Scale; // +0x08 box width: ftol -> ScaleKey (004143e7); FUN_004142f0 aligns X in it
+    float Scale; // +0x08 box width: ftol -> ScaleKey; FUN_004142f0 aligns X in it
     float Height; // +0x0c box height; FUN_004142f0 aligns Y in it
     unsigned HAlign; // +0x10 horizontal mode (FUN_004142f0): 1 centre, 2 right, else left
     unsigned VAlign; // +0x14 vertical mode: 1 centre, 2 bottom, else top

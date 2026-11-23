@@ -28,7 +28,7 @@ extern "C" {
 }
 
 // ============================================================================
-// Common.dll .text:0636b770-0636c9f2 (2026-10-08, claude-code:cmn-ivp4b).
+// Common.dll 0636b770-0636c9f2.
 //
 // IVP debug router. The three "***" messages go through G_IVPMessageRouter
 // (DAT_0658c730, ivp_message_router.h) exactly as retail calls it; its
@@ -75,7 +75,7 @@ namespace
         }
     };
 
-    // FCOMP + FNSTSW + TEST AH,0x40: C3 is set for equal AND for unordered.
+    // Retail's equality test also holds for unordered (NaN) operands.
     bool X87Equal(float A, float B)
     {
         return !(A < B) && !(A > B);
@@ -88,7 +88,7 @@ IVP_Compact_Ledge* GPointsoupTriangleTemplate = nullptr;
 // IVP_SurMan_PS_Plane
 // ---------------------------------------------------------------------------
 
-// FUN_0636bce0 (.text:0636bce0-0636bdbc). p0 = points[0] (read before the
+// FUN_0636bce0. p0 = points[0] (read before the
 // count test). For i = 0..n-1 with next = points[(i + 1) % n]:
 // A = float(next - p_i), B = float(p_i - p0), C = 0628bed0 cross(A, B)
 // (float components), sum = float(((C.z*h.z + C.x*h.x) + C.y*h.y) + sum).
@@ -119,7 +119,7 @@ float IVP_SurMan_PS_Plane::get_area_size() const
     return Sum;
 }
 
-// FUN_0636bdc0 (.text:0636bdc0-0636be1e): sum += (dz^2 + dy^2) + dx^2 with
+// FUN_0636bdc0: sum += (dz^2 + dy^2) + dx^2 with
 // d = p_i - p_(i+1)%n, all on the x87 stack starting from 0.0f.
 double IVP_SurMan_PS_Plane::get_qlen_of_all_edges() const
 {
@@ -142,8 +142,8 @@ double IVP_SurMan_PS_Plane::get_qlen_of_all_edges() const
 // IVP_SurfaceBuilder_Pointsoup
 // ---------------------------------------------------------------------------
 
-// FUN_0636b770 (.text:0636b770-0636b7bd): the index of the first point whose
-// x, y and z compare equal (FCOMP, TEST AH,0x40: equal or unordered), or 0
+// FUN_0636b770: the index of the first point whose x, y and z compare equal
+// (equal or unordered), or 0
 // when there is none -- index 0 and "not found" are the same answer.
 int32_t IVP_SurfaceBuilder_Pointsoup::point_index(const IVP_U_Float_Point* Array, int32_t Count, const IVP_U_Float_Point* Point)
 {
@@ -157,7 +157,7 @@ int32_t IVP_SurfaceBuilder_Pointsoup::point_index(const IVP_U_Float_Point* Array
     return 0;
 }
 
-// FUN_0636b7c0 (.text:0636b7c0-0636b826): the first line (ushort pair) equal
+// FUN_0636b7c0: the first line (ushort pair) equal
 // to (A, B) -> *Revert = 0, or to (B, A) -> *Revert = 1; returns its index,
 // or 0 with *Revert untouched when there is none.
 int32_t IVP_SurfaceBuilder_Pointsoup::line_index(const void* Lines, int32_t Count, int32_t A, int32_t B, uint8_t* Revert)
@@ -181,7 +181,7 @@ int32_t IVP_SurfaceBuilder_Pointsoup::line_index(const void* Lines, int32_t Coun
     return 0;
 }
 
-// FUN_0636b830 (.text:0636b830-0636bcd5).
+// FUN_0636b830.
 // Template points: operator new(n * 0x10); each input point is appended when
 // point_index returns 0 (a point equal to template point 0 is therefore
 // appended again, as retail). Lines: one per distinct point pair of every
@@ -299,7 +299,7 @@ IVP_Template_Polygon* IVP_SurfaceBuilder_Pointsoup::planes_to_template(IVP_U_Vec
     return Templ;
 }
 
-// FUN_0636be20 (.text:0636be20-0636c250).
+// FUN_0636be20.
 // *Retry = 0. Every qhull facet (FORALLfacets) becomes an IVP_SurMan_PS_Plane
 // (normal[i] = float(facet->normal[i]) for i < hull_dim) whose points are the
 // qh_facet3vertex vertices (point ids collected; Used[id]++). With
@@ -435,7 +435,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::try_to_build_convex_ledge_from_
     return Ledge;
 }
 
-// FUN_0636c260 (.text:0636c260-0636c7b4).
+// FUN_0636c260.
 // Points are deduplicated (stack FPointsoupPointHash(0x400)) into a reduced
 // vector (malloc(n * 4), memsize n) and a double array calloc(n * 4, 8),
 // 3 doubles per point. Loop: "qhull Qs Pp C-0 W1e-14 E1.0e-18" while the
@@ -618,7 +618,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_le
     return Result;
 }
 
-// FUN_0636c800 (.text:0636c800-0636c99c).
+// FUN_0636c800.
 // The template ledge DAT_0658b008 is built once from the triangle
 // (0,0,1), (0,1,0), (0,0,-1) through 0636e0c0 ({0, 2, points}). Degenerate
 // test: A = float(p1 - p0), B = p2 - p0 (unrounded), C = (float(By*Az - Bz*Ay),
@@ -683,8 +683,8 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::single_tri_to_compact_ledge(con
     return Copy;
 }
 
-// FUN_0636c9a0 (.text:0636c9a0-0636c9f2): FSTCW / OR 0x300 / FLDCW -- the
-// x87 precision control is set to 64-bit and not restored; fewer than 3
+// FUN_0636c9a0: the x87 precision control is set to 64-bit (OR 0x300) and
+// not restored; fewer than 3
 // points -> null; exactly 3 -> single_tri_to_compact_ledge; else the qhull path.
 IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_ledge(IVP_U_Vector<IVP_U_Float_Point>* Points)
 {
@@ -720,13 +720,13 @@ namespace
     }
 }
 
-// FUN_0636ca00 (.text:0636ca00-0636ca21).
+// FUN_0636ca00.
 FLedgeConvexHullBuilder::FLedgeConvexHullBuilder()
     : Ledges(static_cast<IVP_Compact_Ledge**>(malloc(0x200)), 0x80) // FUN_06343f70 = malloc
 {
 }
 
-// FUN_0636cf70 (.text:0636cf70-0636cf8a).
+// FUN_0636cf70.
 IVP_Compact_Ledge* FLedgeConvexHullBuilder::Build()
 {
     BuildHull();
@@ -735,7 +735,7 @@ IVP_Compact_Ledge* FLedgeConvexHullBuilder::Build()
     return Result;
 }
 
-// FUN_0636ca30 (.text:0636ca30-0636cbf4). Locals: a point hash
+// FUN_0636ca30. Locals: a point hash
 // FUN_06356a40(0x400 buckets, key 0x10, default 0) and an empty
 // IVP_U_Vector<IVP_U_Point>. Ledges are walked from the last to the first,
 // triangles in order, the 3 edge slots in order; a start point whose 16 bytes
@@ -778,7 +778,7 @@ void FLedgeConvexHullBuilder::BuildHull()
         ::operator delete(Points.elems[I]);
 }
 
-// FUN_0636cc00 (.text:0636cc00-0636cf3b). Three hashes (0x400 buckets each):
+// FUN_0636cc00. Three hashes (0x400 buckets each):
 // points (key 0x10, default -1), triangles (key 0xc, default 0), edges
 // (key 8, default 0).
 //  1. Input ledges from the last to the first, triangles in order: each start

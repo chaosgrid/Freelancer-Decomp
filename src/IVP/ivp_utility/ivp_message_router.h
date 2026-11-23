@@ -29,16 +29,15 @@ public:
     IVP_Message_Router();
 
     // Slot 0, 063922a0: printf("%s", Text) (format DAT_0639c454); the
-    // category is not read. RET 8. Declared before the dtor so that it
-    // takes slot 0, as in retail.
+    // category is not read. Declared before the dtor so that it takes slot 0.
     virtual void Print(int32_t Category, const char* Text);
 
     // Slot 1, 063922e0: scalar deleting dtor around 06392300, which only
     // restores the vtable.
     virtual ~IVP_Message_Router();
 
-    // 06392220: Category < 0x800 (signed, JGE) && CategoryLevels[Category]
-    // != 0 && bEnabled != 0. RET 4.
+    // 06392220: Category < 0x800 (signed) && CategoryLevels[Category] != 0
+    // && bEnabled != 0.
     int32_t IsCategoryEnabled(int32_t Category) const;
 
     // 06392250: vsprintf into a 0x1000-byte stack buffer, then slot 0

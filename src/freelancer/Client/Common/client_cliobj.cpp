@@ -184,7 +184,7 @@ namespace Archetype
         // FCliVc6Vector / FCliMaterialPathPair are declared in client_cliobj.h.
 
         // Distance / FX record at +0x44 (stride 0x24). EffectArch id list + live instances.
-        // Layout from FUN_00555810 / 00555860 / 005559c0 — NOT StarSys (tracker mis-tag).
+        // Layout from FUN_00555810 / 00555860 / 005559c0 (not StarSys code).
         // +0x04/+0x14 are VC6 vector cookies (FUN_00406dc0 surface_hit_effects pushes into +0x04).
         struct FCliDistanceRecord
         {
@@ -220,7 +220,7 @@ namespace Archetype
         };
 
         // Retail default case FUN_0040ca50: operator_new(0x54) + FUN_004068d0.
-        // Layout +0x1C…+0x50 matches the CliRoot table in freelancer_cliobj.md (listing FUN_004068d0).
+        // Layout +0x1C…+0x50: see the CliRoot table in docs/re/freelancer_cliobj.md.
         class FCliObj : public ICliObj
         {
         public:
@@ -242,7 +242,7 @@ namespace Archetype
             void LoadHitEffects(unsigned Arg) override;
             void ReleaseHitEffects() override;
 
-            // FUN_00407310 — public non-virtual thunk: [ESP+4] = [ESP+4]; JMP FUN_00407100.
+            // FUN_00407310 — public non-virtual thunk into FUN_00407100.
             bool PreloadMaterials(bool bLatchSlot10) { return BuildMaterialCache(bLatchSlot10); }
 
             // FUN_00407450 — not a vtable slot; distance-threshold pick into record payload.
@@ -798,11 +798,9 @@ namespace Archetype
         }
 
         // FUN_0041a9a0 (cdecl Path, FCliMaterialEntry** Out) -> bool inserted. Its one caller is
-        // FUN_0041ade0 (0x0041adf6). 0x0041a9b8: enter the lock; the candidate value is built on
-        // the stack exactly as FUN_0041acf0 does (CRC, -1, -1, 0, 0, RefCount 1); FUN_0041b380 is
-        // the map's unique insert (pair<iterator, bool>); leave the lock; *Out = node + 0xc; and
-        // only when the key was ALREADY there does the existing entry gain a reference
-        // (0x0041aa34 INC [ECX+0x14]) -- after the lock has been released, as retail does it.
+        // FUN_0041ade0 (FUN_0041aa50 inlines the same body). FUN_0041b380 is the map's unique
+        // insert. Only when the key was ALREADY there does the existing entry gain a reference
+        // -- after the lock has been released, as retail does it.
         bool FindOrInsertMaterialEntry(char const* Path, FCliMaterialEntry** Out)
         {
             EnterCriticalSection(&GMaterialCacheLock.Cs);
@@ -826,39 +824,32 @@ namespace Archetype
         // Retail tests none of TextureLib, Filesys or Entry.
         bool LoadMaterialTextures(IFileSystem* Filesys, FCliMaterialEntry* Entry, unsigned Arg)
         {
-            // 0x0041ad38: the saved group starts at 0.
             unsigned long SavedGroup = 0;
             bool bRestoreGroup = false;
             int GroupOverride = static_cast<int>(Arg);
 
-            // 0x0041ad40..0x0041ad53: FCOMP 1.0f (DAT_005c75dc) / TEST AH,0x05 / JP -- the
-            // override path is taken only when the slot is strictly LESS than 1.0 (ordered);
-            // >= 1.0 or unordered goes straight to the load with BL = 0.
+            // DAT_005c75dc = 1.0f; unordered takes the plain load.
             if (GetPerfOptionSlot(1) < 1.0f)
             {
-                // 0x0041ad59..0x0041ad65: a zero group arg refuses the load outright.
+                // A zero group arg refuses the load outright.
                 if (GroupOverride == 0)
                     return false;
 
                 bRestoreGroup = true;
-                // 0x0041ad6c: JGE -- a negative arg (the -1 every caller passes) becomes 0x80.
+                // A negative arg (the -1 every caller passes) becomes 0x80.
                 if (GroupOverride < 0)
                     GroupOverride = 0x80;
 
-                // 0x0041ad84 slot 4 (+0x10) GetGenericSlot(4, &saved); 0x0041ad94 slot 3 (+0x0c)
-                // SetGenericSlot(4, group).
                 DALib::TextureLib->GetGenericSlot(4, &SavedGroup);
                 DALib::TextureLib->SetGenericSlot(4, static_cast<unsigned long>(GroupOverride));
             }
 
-            // 0x0041adab: slot 5 (+0x14) with the entry's +0x04.
             GENRESULT const Result = DALib::TextureLib->LoadTextureGroup(Filesys, &Entry->TextureId);
 
-            // 0x0041adae..0x0041adc5: restore the group only if it was overridden.
             if (bRestoreGroup)
                 DALib::TextureLib->SetGenericSlot(4, SavedGroup);
 
-            // 0x0041adcb: SETGE on the load's result -- the texture id is not looked at.
+            // The texture id is not looked at.
             return Result >= 0;
         }
 
@@ -896,20 +887,16 @@ namespace Archetype
     // (client_mesh_load.cpp).
         FCliMaterialEntry* ResolveMaterialEntry(char const* Path, bool bForceApply, unsigned Arg)
         {
-            // 0x0041aa75 / 0x0041aa7e: a null or empty path -> null.
             if (Path == nullptr || Path[0] == '\0')
                 return nullptr;
 
-            // 0x0041aa88 .. 0x0041aae7: the same find-or-insert FUN_0041a9a0 performs, inlined
-            // here (FUN_0041acf0 value, FUN_0041b380 insert, the increment of an existing entry
-            // after the unlock).
+            // FUN_0041a9a0's body, inlined here in retail.
             FCliMaterialEntry* Entry = nullptr;
             bool const bInserted = FindOrInsertMaterialEntry(Path, &Entry);
 
             if (bInserted)
             {
-                // 0x0041aaed .. 0x0041ab5d: a "FileSystem" instance for Path, built inline through
-                // DALib::Data slot 3 (+0x0c) with the DALib::OpenData-shaped descriptor.
+                // The DALib::OpenData-shaped descriptor, built inline.
                 FFileSystemAggDesc Desc;
                 memset(&Desc, 0, sizeof(Desc));
                 Desc.Size = 0x34;
@@ -926,8 +913,8 @@ namespace Archetype
                     reinterpret_cast<AGGDESC*>(&Desc), &FsOut);
                 if (OpenResult < 0)
                 {
-                    // 0x0041ab64 .. 0x0041ab84: the error, and NOTHING else -- the empty entry
-                    // stays in the cache and is still returned below.
+                    // Retail quirk: the error and NOTHING else -- the empty entry stays in the
+                    // cache and is still returned below.
                     FDUMP(0x100001,
                           "%s(%d) : *** ERROR: DATA: MaterialLib::Load(%s) couldn't load file.",
                           "E:\\FL\\Scratch\\Source\\Client\\cmn\\MaterialLib.cpp", 0x10a, Path);
@@ -936,26 +923,22 @@ namespace Archetype
                 {
                     IFileSystem* const Filesys = static_cast<IFileSystem*>(FsOut);
 
-                    // 0x0041ab9b: FUN_0041ad30 (textures).
                     bool const bTexOk = LoadMaterialTextures(Filesys, Entry, Arg);
 
-                    // 0x0041abaa .. 0x0041abbc: MaterialLib +0x20 into +0x08 -- its RESULT is
-                    // what the failure test reads.
+                    // The material load's RESULT is what the failure test reads.
                     GENRESULT MaterialResult = -1;
                     if (DALib::MaterialLib != nullptr)
                         MaterialResult =
                             DALib::MaterialLib->LoadFromFileSystem(Filesys, &Entry->MaterialId);
 
-                    // 0x0041abbe .. 0x0041abe5: MatAnim +0x0c into +0x10, VMesh +0x0c(fs, -1)
-                    // into +0x0c; these library null tests are retail's.
+                    // These library null tests are retail's.
                     if (DALib::MatAnimLibrary != nullptr)
                         Entry->MatAnimHandle = DALib::MatAnimLibrary->LoadAnimationGroup(Filesys);
                     if (DALib::VMeshLibrary != nullptr)
                         Entry->VMeshHandle = DALib::VMeshLibrary->Load(Filesys, -1);
 
-                    // 0x0041abe8 .. 0x0041ac5a: nothing loaded at all -> the entry leaves the
-                    // cache (equal_range FUN_0041ba10 + erase FUN_0041b590 under the lock) and
-                    // the result becomes null.
+                    // Nothing loaded at all -> the entry leaves the cache (FUN_0041ba10 +
+                    // FUN_0041b590 under the lock) and the result becomes null.
                     if (!bTexOk && MaterialResult < 0 && Entry->VMeshHandle == nullptr &&
                         Entry->MatAnimHandle == nullptr)
                     {
@@ -967,17 +950,14 @@ namespace Archetype
                     }
                 }
 
-                // 0x0041ac60 .. 0x0041ac7c: the file system is released whichever way it went.
                 if (FsOut != nullptr)
                     static_cast<IFileSystem*>(FsOut)->Release();
             }
 
-            // 0x0041ac86: null -> null.
             if (Entry == nullptr)
                 return nullptr;
 
-            // 0x0041ac8a .. 0x0041acc1: on request, MaterialLib +0x2c (id, 0, 1.0f) and +0x30
-            // (id, 0) -- for a cache hit and a fresh load alike, with no library null test.
+            // For a cache hit and a fresh load alike, with no library null test.
             if (bForceApply && Entry->MaterialId != -1)
             {
                 DALib::MaterialLib->ApplyVerifyGroup(
@@ -991,32 +971,25 @@ namespace Archetype
     FCliMaterialEntry* ResolveMaterialEntryFromFs(IFileSystem* Filesys, char const* Path,
                                                   bool bForceApply, unsigned Arg)
     {
-        // FUN_0041ade0. 0x0041ade8..0x0041ae04: FUN_0041a9a0 -- find-or-insert Path's CRC under
-        // the cache lock; an existing entry gains a reference (0x0041aa34), a new one starts
-        // at 1. Only a new entry is loaded.
+        // FUN_0041ade0: the same steps as FUN_0041aa50 from the caller's file system. Only a new
+        // entry is loaded.
         FCliMaterialEntry* Entry = nullptr;
         bool const bInserted = FindOrInsertMaterialEntry(Path, &Entry);
 
         if (bInserted)
         {
-            // 0x0041ae0a..0x0041ae17: FUN_0041ad30 (textures) from the caller's file system.
             bool bTexOk = LoadMaterialTextures(Filesys, Entry, Arg);
 
-            // 0x0041ae1e..0x0041ae37: MaterialLib +0x20 into the entry's +0x08; its result is
-            // what the failure test below reads.
             GENRESULT MaterialResult = -1;
             if (DALib::MaterialLib != nullptr)
                 MaterialResult = DALib::MaterialLib->LoadFromFileSystem(Filesys, &Entry->MaterialId);
 
-            // 0x0041ae39..0x0041ae60: MatAnim +0x0c into +0x10, VMesh +0x0c(fs, -1) into +0x0c.
             if (DALib::MatAnimLibrary != nullptr)
                 Entry->MatAnimHandle = DALib::MatAnimLibrary->LoadAnimationGroup(Filesys);
             if (DALib::VMeshLibrary != nullptr)
                 Entry->VMeshHandle = DALib::VMeshLibrary->Load(Filesys, -1);
 
-            // 0x0041ae63..0x0041aeed: nothing loaded at all -- take the entry out of the cache
-            // (equal_range on the entry's own key, FUN_0041bd40 / FUN_0041bd10, then erase
-            // FUN_0041b590; erasing the node frees the entry) and return null.
+            // Erasing the node frees the entry (FUN_0041bd40 / FUN_0041bd10, FUN_0041b590).
             if (!bTexOk && MaterialResult < 0 && Entry->VMeshHandle == nullptr &&
                 Entry->MatAnimHandle == nullptr)
             {
@@ -1028,7 +1001,6 @@ namespace Archetype
             }
         }
 
-        // 0x0041aeee..0x0041af28: MaterialLib +0x2c / +0x30 on request.
         if (Entry != nullptr && bForceApply && Entry->MaterialId != -1)
         {
             DALib::MaterialLib->ApplyVerifyGroup(
@@ -1045,7 +1017,7 @@ namespace Archetype
         int Count = 0;
         if (Paths == nullptr)
             return Count;
-        // 0x0041af4e..0x0041af86: more pairs than Max is an error, reported once.
+        // More pairs than Max is an error, reported once.
         if (Paths->Begin != nullptr && static_cast<unsigned>(Paths->End - Paths->Begin) >
                                            static_cast<unsigned>(Max))
         {
@@ -1053,7 +1025,6 @@ namespace Archetype
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\MaterialLib.cpp", 0x14a,
                   "too many material files passed to the material loader");
         }
-        // 0x0041af89..0x0041afb9: FUN_0041aa50(Path, 1, Arg) for each pair, at most Max.
         FCliMaterialPathPair const* Pair = Paths->Begin;
         for (; Pair != Paths->End; ++Pair)
         {
@@ -1067,9 +1038,8 @@ namespace Archetype
 
     namespace
     {
-        // FUN_0041afd0 — force-realize one cache entry (Slot10 walk). Not a release.
-        // 0x0041afd0..0x0041b027: null -> -1; else under the lock, MaterialId != -1 ->
-        // MaterialLib +0x2c (id, 0, 1.0f) and +0x30 (id, 0) with no library null test; 0.
+        // FUN_0041afd0 — force-realize one cache entry (Slot10 walk). Not a release. No library
+        // null test.
         int ForceRealizeMaterialEntry(FCliMaterialEntry* Entry)
         {
             if (Entry == nullptr)
@@ -1117,15 +1087,12 @@ namespace Archetype
 
     int FlushMaterialCache()
     {
-        // FUN_0041b150 (cdecl, no arguments), called once from the client shutdown at 0x005b22f6.
-        // 0x0041b156: under the cache lock, and with no library null tests anywhere.
+        // FUN_0041b150 (cdecl), called once from the client shutdown. Under the cache lock, and
+        // with no library null tests anywhere.
         EnterCriticalSection(&GMaterialCacheLock.Cs);
 
-        // 0x0041b178 .. 0x0041b20c: an in-order walk over every node; each one is counted and has
-        // its four handles given back and reset in this order -- TextureLib +0x1c on +0x04 (-1),
-        // MaterialLib +0x28 on +0x08 (-1), MatAnimLibrary +0x10 on +0x10 (0), VMeshLibrary +0x10
-        // on +0x0c (0) -- each only when set. That is DestroyMaterialEntryResources, the same
-        // body ReleaseMaterialEntrySlot (FUN_0041b030) inlines. Reference counts are ignored.
+        // Every entry's handles given back (DestroyMaterialEntryResources, the body FUN_0041b030
+        // also inlines). Reference counts are ignored.
         int Count = 0;
         std::map<unsigned long, FCliMaterialEntry>::iterator It = GMaterialCacheByCrc.begin();
         for (; It != GMaterialCacheByCrc.end(); ++It)
@@ -1134,25 +1101,19 @@ namespace Archetype
             DestroyMaterialEntryResources(&It->second);
         }
 
-        // 0x0041b213 .. 0x0041b2c5: erase(begin, end) -- the whole-tree fast path (FUN_0041ba80
-        // on the root, head reset) or node-by-node FUN_0041b640; either way the map is empty and
-        // every entry is freed with its node.
+        // erase(begin, end): every entry is freed with its node.
         GMaterialCacheByCrc.clear();
 
         LeaveCriticalSection(&GMaterialCacheLock.Cs);
 
-        // EBP: the number of entries flushed.
         return Count;
     }
 
     namespace
     {
-        // The per-mesh body FUN_00425330 (0x00425363..0x004253e4) and its child callback
-        // LAB_004253f0 (0x004253f0..0x00425479) share: Renderer slot 11 (+0x2c) fills the level
-        // count (local 0, result not read); for I in [0, count) (signed JLE / JL, the count
-        // re-read every pass): Renderer slot 13 (+0x34)(mesh, count - I - 1), then Engine slot
-        // 18 (+0x48) QueryEngineComponent(mesh, "1.11_IMatHookUp", &hook) with hook = 0 first;
-        // a non-negative answer -> hook slot 3 (+0xc), then Release (+8), no null test.
+        // The per-mesh body FUN_00425330 and its child callback LAB_004253f0 share: for every
+        // LOD level from the last down, select it and hook up its materials through
+        // IMatHookUp (no null test on the hook).
         void UnloadMatHookUpsSimple(void* Handle)
         {
             int LodCount = 0;
@@ -1174,10 +1135,9 @@ namespace Archetype
             }
         }
 
-        // FUN_00425330 (cdecl, one argument), listing-traced 0x00425330..0x004253e7: a compound
-        // archetype (Engine slot 19, +0x4c) walks its children (slot 21, +0x54) with
-        // LAB_004253f0 and a null context (the callback answers AL = 1); otherwise the body on
-        // the argument itself. No test of the argument or of the DALib globals.
+        // FUN_00425330 (cdecl): a compound archetype walks its children with LAB_004253f0;
+        // otherwise the body on the argument itself. No test of the argument or of the DALib
+        // globals.
         void UnloadEngineComponents(long EngineIndex)
         {
             void* const Handle = reinterpret_cast<void*>(EngineIndex);
@@ -1232,10 +1192,9 @@ namespace Archetype
         static float const kArchLodFarCutoff = 15000.0f;
         static double const kArchLodRangeScale = 0.700208;
 
-        // FUN_00401ed0 (cdecl, returns AL = 1 on every path), listing-traced
-        // 0x00401ed0..0x00402174 -- the LOD ranges of one mesh onto the renderer. The callback
-        // IEngine slot 21 (EnumerateArchetypeChildren) calls with (parent, child, 0, context),
-        // and FUN_004021b0 calls directly with (-1, mesh, 0, context). Nothing is null-tested.
+        // FUN_00401ed0 (cdecl, returns 1 on every path) -- the LOD ranges of one mesh onto the
+        // renderer. EnumerateArchetypeChildren calls it with (parent, child, 0, context), and
+        // FUN_004021b0 directly with (-1, mesh, 0, context). Nothing is null-tested.
         // The node's floats are read raw from the node base (Ranges, then whatever follows at
         // +0x20.. when the renderer reports more than eight levels), as retail indexes them.
         int __cdecl ApplyArchLodRanges(void* ParentOrNeg1, void* MeshHandle, int /*Zero*/,
@@ -1243,23 +1202,20 @@ namespace Archetype
         {
             FArchLodContext* const Ctx = static_cast<FArchLodContext*>(ContextRaw);
 
-            // 0x00401eda..0x00401f05: Renderer slot 11 (+0x2c) fills the level count (the local
-            // starts at 0; the call's result is not read); 0 levels -> done.
+            // The call's result is not read.
             int LodCount = 0;
             DALib::Renderer->GetArchetypeLodCount(MeshHandle, &LodCount);
             if (LodCount == 0)
                 return 1;
 
-            // 0x00401f0b..0x00401f2f: the part name is Engine2 slot 56 (+0xe0)(parent, child) --
-            // the child record, whose name is its first member; none -> "Root" (DAT_005c74f8).
+            // The part name is the child record's first member; none -> "Root".
             IEngine* const Engine2 = reinterpret_cast<IEngine*>(DALib::Engine2);
             char const* PartName =
                 static_cast<char const*>(Engine2->FindArchetypeChild(ParentOrNeg1, MeshHandle));
             if (PartName == nullptr)
                 PartName = "Root";
 
-            // 0x00401f2f..0x00401f7d: more than eight levels (signed): the message is formatted
-            // (FUN_00402180, 0x2000 bytes) and reported once (DAT_00616471 latch).
+            // More than eight levels: always formatted, reported once (DAT_00616471 latch).
             if (LodCount > 8)
             {
                 char Message[0x2000];
@@ -1274,8 +1230,7 @@ namespace Archetype
                 }
             }
 
-            // 0x00401f80..0x00401fbd: the first node whose part CRC (+0x24) is 0 or matches; no
-            // list, or no match -> done.
+            // The first node whose part CRC is 0 or matches; no list, or no match -> done.
             unsigned long const PartCrc = DACOM_CRC::GetCRC32(PartName);
             FLodNode* const Head = Ctx->Head;
             FLodNode* Match = Head;
@@ -1289,9 +1244,8 @@ namespace Archetype
             }
             float const* const Raw = Match->Ranges;
 
-            // 0x00401fbe..0x00401fe1: both +0x28 bytes set; the first "previous" range is
-            // range[0] * context scale * 0.700208, stored as a float; the top level is the
-            // context's min-spec cap clamped (signed) to the level count.
+            // The first "previous" range is stored as a float; the cap is clamped (signed) to
+            // the level count.
             Head->Unk28 = 1;
             Match->Unk28 = 1;
             float PriorScaled = static_cast<float>(static_cast<double>(Raw[0]) *
@@ -1301,18 +1255,15 @@ namespace Archetype
             if (Cap > LodCount)
                 Cap = LodCount;
 
-            // 0x00401fe3..0x00402013: the far clamp is on when range[count] is below 15000
-            // (TEST AH,5 / JP skips greater, equal and unordered) and DAT_006101d4 * that range
-            // is above it (TEST AH,0x41 / JNZ skips not-greater and unordered).
+            // Both compares are false when unordered (x87).
             bool bFarClamp = false;
             if (static_cast<double>(Raw[LodCount]) < static_cast<double>(kArchLodFarCutoff) &&
                 static_cast<double>(GArchLodScale) * static_cast<double>(Raw[LodCount]) >
                     static_cast<double>(kArchLodFarCutoff))
                 bFarClamp = true;
 
-            // 0x00402018..0x00402081: the levels below the cap get the ranges (0, 0) while the
-            // next range is not negative (TEST AH,5 / JNP: only an ordered "less" warns); a
-            // negative one warns and stops there.
+            // The levels below the cap get the ranges (0, 0); an ordered negative next range
+            // warns and stops there.
             int Applied = 0;
             if (Cap > 0)
             {
@@ -1331,22 +1282,16 @@ namespace Archetype
                 Applied = Index;
             }
 
-            // 0x00402096..0x00402099: nothing left above the applied levels -> done.
             if (Applied >= LodCount)
                 return 1;
 
-            // 0x0040209f..0x004020af: range[applied] above the context's maximum (TEST AH,0x41 /
-            // JNZ skips not-greater and unordered) becomes the maximum, copied as a dword.
+            // Unordered is not greater; the maximum is copied as a dword.
             if (static_cast<double>(Raw[Applied]) > static_cast<double>(Ctx->MaxDistance))
                 Ctx->MaxDistance = Raw[Applied];
 
-            // 0x004020b2..0x00402163: every remaining level I takes the NEXT range, R =
-            // range[I + 1] (EDI starts at &range[applied + 1]); a negative or unordered one (TEST
-            // AH,1 / JNZ) ends the walk. With the far clamp and R * context scale above 15000,
-            // R becomes I + 15000 (FILD + FADD, kept on the FPU). Current = R * 0.700208 as a
-            // float; R above the maximum becomes the maximum (as a float); then renderer slot 15
-            // (+0x3c)(mesh, I, previous, current) and slot 19 (+0x4c)(mesh, -1, context +8), and
-            // the current range is the next "previous".
+            // Every remaining level I takes the NEXT range, R = range[I + 1]; a negative or
+            // unordered one ends the walk. With the far clamp, R becomes I + 15000 (kept in
+            // double, as on the x87 stack). The current range is the next "previous".
             int Index = Applied;
             do
             {
@@ -1374,14 +1319,11 @@ namespace Archetype
         float ComputeLodPickThis(FLodNode* LodHead, long EngineIndex, float const* BlendSource,
                                  bool bSolarOrShip)
         {
-            // FUN_004021b0 (thiscall on the LOD list head, RET 0xc), listing-traced
-            // 0x004021b0..0x004022a4. The answer starts as -1.0f (DAT_005c7500).
             float const Result = -1.0f;
 
-            // 0x004021bb..0x00402203: a blend source that is neither null nor the list itself,
-            // with a list: every node takes the source's ranges up to the first negative or
-            // unordered one (TEST AH,1 / JNZ), at most eight, copied as dwords, then -1.0f in
-            // the slot after the last copied one (the ninth slot when all eight were copied).
+            // A blend source that is neither null nor the list itself, with a list: every node
+            // takes the source's ranges up to the first negative or unordered one, at most
+            // eight, copied as dwords, then -1.0f in the slot after the last copied one.
             if (BlendSource != nullptr && BlendSource != reinterpret_cast<float const*>(LodHead) &&
                 LodHead != nullptr)
             {
@@ -1403,13 +1345,10 @@ namespace Archetype
                 }
             }
 
-            // 0x00402204..0x0040220b: no engine object -> -1.
             if (EngineIndex == -1)
                 return Result;
 
-            // 0x00402211..0x0040224b: the context {list, -1.0f, bSolarOrShip != 0, 0,
-            // DAT_006101d4}; with DAT_00616470 set the cap is the head's +0x2c (read without a
-            // null test).
+            // With DAT_00616470 set the cap is the head's +0x2c (read without a null test).
             FArchLodContext Ctx;
             Ctx.Head = LodHead;
             Ctx.MaxDistance = -1.0f;
@@ -1419,9 +1358,8 @@ namespace Archetype
             if (GArchLodMute != 0)
                 Ctx.MinSpecCap = LodHead->MinSpecLod;
 
-            // 0x0040224f..0x00402297: a compound archetype (Engine slot 19, +0x4c) runs
-            // FUN_00401ed0 over its children (slot 21, +0x54); otherwise FUN_00401ed0(-1, it, 0,
-            // &context) directly. The answer is the context's maximum.
+            // A compound archetype runs FUN_00401ed0 over its children; otherwise on itself. The
+            // answer is the context's maximum.
             void* const Handle = reinterpret_cast<void*>(EngineIndex);
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
             {
@@ -1460,21 +1398,18 @@ namespace Archetype
         // Next -- null -- and the copied nodes are unreachable (leaked). Every caller then sees
         // an empty LOD list (LodPick -1).
         //
-        // Retail UB (deviations.md, "FUN_00402500 aliasing", closed under the owner's 2026-10-08
-        // ruling): the base Inherit 00406970 calls this after its memberwise copy, so
-        // *DestSlot == Source there and retail frees the donor's chain and then reads the freed
-        // nodes (00402510..20, then 00402550 / 00402565). The port does not free a chain that is
+        // Retail UB (deviations.md, "FUN_00402500 aliasing"): the base Inherit 00406970 calls
+        // this after its memberwise copy, so *DestSlot == Source there and retail frees the
+        // donor's chain and then reads the freed nodes. The port does not free a chain that is
         // also the source; the recipient still ends with an empty slot, as in retail. Shipped
         // data never takes that path (only [Light] archetypes use inherit=, and CliEQLight's
         // Inherit 0040b0a0 does not call this).
         void CopyLodChain(FLodNode** DestSlot, FLodNode* Source)
         {
-            // 00402503..0040252a.
             if (*DestSlot != Source)
                 FreeLodList(*DestSlot);
             *DestSlot = nullptr;
 
-            // 00402532..0040256f.
             FLodNode* Prev = nullptr;
             FLodNode* Src = Source;
             while (Src != nullptr)
@@ -1493,13 +1428,11 @@ namespace Archetype
         // --- EffectArch registry (DAT_006164b0) — shared by distance-record + CliMunition ---
         // The lookup FUN_0040f080 (::FindEffectArch) and EffectArch AddRef/Release
         // FUN_0040e960 / FUN_0040e990 (::EffectArchAddRef / ::EffectArchRelease) live with the
-        // registry in vis_effect_arch.cpp. This file used to carry its own std::map that
-        // nothing ever filled, so every distance-record and munition lookup here missed.
+        // registry in vis_effect_arch.cpp.
 
         // FUN_00555810 — random pick from live EffectArch* vector.
         void* ActivateDistanceRecord(FCliDistanceRecord* Record)
         {
-            // 00555813..00555824: null live begin or an empty live list -> 0.
             if (Record->LiveBegin == nullptr)
                 return nullptr;
 
@@ -1507,8 +1440,8 @@ namespace Archetype
             if (Count == 0)
                 return nullptr;
 
-            // 00555839..00555851: rand()*count, CDQ, the sign mask AND 0x7fff added, SAR 15.
-            // rand() is at most 0x7fff, so the index is always below count; retail has no clamp.
+            // Signed divide by 0x8000. rand() is at most 0x7fff, so the index is always below
+            // count; retail has no clamp.
             int Raw = rand() * Count;
             int Pick = (Raw + ((Raw >> 31) & 0x7fff)) >> 15;
             return Record->LiveBegin[Pick];
@@ -1532,7 +1465,6 @@ namespace Archetype
         // FUN_00555860 — rebuild live list from EffectId keys (Slot12 Arg unused by AddRef body).
         void ApplyDistanceRecord(FCliDistanceRecord* Record, unsigned Arg)
         {
-            // 00555867..005558c0: release every live EffectArch and erase the range.
             ClearLiveEffects(Record);
 
             int IdCount = 0;
@@ -1564,9 +1496,8 @@ namespace Archetype
             unsigned* IdEnd = Record->EffectIdEnd;
             while (IdIt != IdEnd)
             {
-                // 00555980..005559a6: FUN_0040f080, and for a hit FUN_0040e960(Arg) then
-                // push_back (FUN_00537260). The reserve above guarantees room for every id, so
-                // the port's plain store never outgrows the buffer.
+                // The reserve above guarantees room for every id, so the plain store never
+                // outgrows the buffer (retail push_back FUN_00537260).
                 FEffectArch* Arch = FindEffectArch(IdIt);
                 if (Arch != nullptr)
                 {
@@ -1620,9 +1551,8 @@ namespace Archetype
                 FCliDistanceRecord* End = DistanceRecords.End;
                 while (It != End)
                 {
-                    // FUN_00406b80 (00406bd0..00406be5): FUN_004de730 on the Live vector (+0x14)
-                    // then the EffectId vector (+0x04) -- buffers freed only; the live EffectArch
-                    // references are NOT released here (that is Slot13's job, FUN_00407530).
+                    // FUN_00406b80: buffers freed only; the live EffectArch references are NOT
+                    // released here (that is Slot13's job, FUN_00407530).
                     delete[] It->EffectIdBegin;
                     It->EffectIdBegin = nullptr;
                     It->EffectIdEnd = nullptr;
@@ -1747,8 +1677,7 @@ namespace Archetype
         }
 
         // FUN_0040e0a0 -- distance record operator=: threshold; the id vector (skipped only on
-        // self-assignment, 0040e0bd); then the live vector through FUN_005595c0. Cookies are not
-        // copied.
+        // self-assignment); then the live vector through FUN_005595c0. Cookies are not copied.
         void AssignDistanceRecord(FCliDistanceRecord* Dst, FCliDistanceRecord const* Src)
         {
             FCliDistanceRecord* MutableSrc = const_cast<FCliDistanceRecord*>(Src);
@@ -1980,7 +1909,7 @@ namespace Archetype
         // FUN_00406dc0 — vtable slot 2 ReadUnknown.
         bool FCliObj::ReadUnknown(INI_Reader* Reader)
         {
-            // 00406de2: is_value on the reader with no null test.
+            // Retail does not test Reader for null.
             if (Reader->is_value("material_library"))
             {
                 int LibId = -1;
@@ -2038,7 +1967,7 @@ namespace Archetype
         // Retail quirk: if BoundRoot is not loaded, LodPick is left untouched.
         void FCliObj::Redefine(ICliObj* Donor)
         {
-            // 00407051: the donor's +4 is read with no null test.
+            // Retail does not test Donor for null.
             FCliObj* Src = reinterpret_cast<FCliObj*>(Donor);
 
             CopyLodChain(&LodHead, Src->LodHead);
@@ -2051,8 +1980,7 @@ namespace Archetype
                 return;
             }
 
-            // FUN_00406c50 / FUN_00407050: early-out keeps stale LodPick when !is_loaded
-            // (0040708e: Root::is_loaded on +0x14, no null test).
+            // Early-out keeps a stale LodPick when !is_loaded (BoundRoot not null-tested).
             if (!BoundRoot->is_loaded())
                 return;
 
@@ -2068,7 +1996,7 @@ namespace Archetype
 
         void FCliObj::FreeResources()
         {
-            // LAB_00406d10: JMP Slot11.
+            // LAB_00406d10: a tail jump to Slot11.
             ReleaseResources();
         }
 
@@ -2096,7 +2024,7 @@ namespace Archetype
         // LAB_00406970 -- Inherit (slot 7) for CliRoot / CliEQShield.
         void FCliObj::Inherit(ICliObj* Donor)
         {
-            // 0040697a: the donor is used with no null test.
+            // Retail does not test Donor for null.
             FCliObj* Src = reinterpret_cast<FCliObj*>(Donor);
             int SavedRef = RefCount;
 
@@ -2119,7 +2047,7 @@ namespace Archetype
                 return;
             }
 
-            // 00406c67: Root::is_loaded on +0x14 with no null test (retail has none).
+            // Retail does not test BoundRoot for null.
             if (!BoundRoot->is_loaded())
                 return;
 
@@ -2217,7 +2145,7 @@ namespace Archetype
                 }
             }
 
-            // 00407169: +0x14 read with no null test.
+            // Retail does not test BoundRoot for null.
             char const* ArchPath = BoundRoot->DaArchetype.Value;
             FCliMaterialEntry* RootEntry =
                 ResolveMaterialEntry(ArchPath, bForceApply, 0xFFFFFFFFu);
@@ -2249,7 +2177,7 @@ namespace Archetype
             if ((StateFlags & CliObjFlagEngineSide) == 0)
             {
                 StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagEngineSide);
-                // 0040735c: Root::is_loaded on +0x14, no null test.
+                // Retail does not test BoundRoot for null.
                 if (BoundRoot->is_loaded())
                     UnloadEngineComponents(BoundRoot->EngineIndex);
             }
@@ -2260,8 +2188,7 @@ namespace Archetype
             // FUN_00406d20
             if ((StateFlags & CliObjFlagCacheBuilt) != 0)
             {
-                // Retail PendingLoad branch is unreachable: all producers preserve null
-                // (constructor/copy/consumer proof in tracker FUN_00406d20).
+                // Retail's PendingLoad branch is unreachable: nothing ever sets it non-null.
                 FCliMaterialEntry** It = ResolvedEntries.Begin;
                 while (It != ResolvedEntries.End)
                 {
@@ -2321,8 +2248,7 @@ namespace Archetype
 
         // The body shared by FUN_00407450 (CliRoot, the +0x40 list) and FUN_00409f10
         // (CliEQShieldGenerator, the +0x60 list): null begin or empty list -> 0; the first record
-        // whose threshold is above Distance (FCOMP / TEST AH,5 / JNP: strictly less, ordered)
-        // selects the record before it, or 0 when it is the first; no such record -> the last.
+        // whose threshold is above Distance (strictly, ordered) selects the record before it, or 0 when it is the first; no such record -> the last.
         void* PickRecordByDistance(FCliVc6Vector<FCliDistanceRecord> const* Records, float Distance)
         {
             if (Records->Begin == nullptr)
@@ -2378,7 +2304,7 @@ namespace Archetype
             if ((StateFlags & CliObjFlagLodPickDone) != 0)
                 return 1;
 
-            // 004073b5: Root::is_loaded on +0x14, no null test.
+            // Retail does not test BoundRoot for null.
             if (!BoundRoot->is_loaded())
             {
                 StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagLodPickDone);
@@ -2415,10 +2341,8 @@ namespace Archetype
             return 1;
         }
 
-        // caseD_3 0040ca87..0040cb01: FUN_004068d0, ID_String::clear on +0x58 / +0x5c,
-        // CacheString::clear on +0x60, ID_String::clear on +0x64, +0x68 = +0x6c = 0,
-        // +0x70 = 0x3d8f5c29 (0.07), +0x74 = 0x3d23d70a (0.04), +0x78 = +0x7c = +0x80 =
-        // 0x3e4ccccd (0.2), +0x84 = 0x3f000000 (0.5), vptr 005c77b8. +0x54 is not written.
+        // Factory caseD_3 (vptr 005c77b8): the floats are stored as these exact bit patterns
+        // (0.07, 0.04, 0.2, 0.5). Retail does not write +0x54.
         FCliShip::FCliShip()
             : Pad54(0)
             , CameraOffsetX(0.0f)
@@ -2440,12 +2364,11 @@ namespace Archetype
             memcpy(&CamTurnLookAhead, &LookBits, sizeof(float));
         }
 
-        // LAB_00407560. The three turn angles (004076c2..004077e3) go through
+        // LAB_00407560. The three turn angles go through
         // ShipCameraClampTurnAngle (ship_camera_params.cpp): below 0.0 -> 0.0, above 90.0 ->
         // 90.0, NaN kept, then times DAT_005c77f4.
         bool FCliShip::ReadUnknown(INI_Reader* Reader)
         {
-            // 00407570: FUN_00406dc0 first.
             if (FCliObj::ReadUnknown(Reader))
                 return true;
 
@@ -2461,7 +2384,6 @@ namespace Archetype
                 return true;
             }
 
-            // 004075e8..00407606: StringAlloc(value, 1) -> +0x60.
             if (Reader->is_value("cockpit"))
             {
                 CockpitIni.Value = StringAlloc(Reader->get_value_string(), true);
@@ -2556,7 +2478,7 @@ namespace Archetype
 
         // FUN_00407990: __RTDynamicCast to CliShip (no null test), RefCount saved, CliRoot's
         // operator= inlined (no FUN_00402500 -- the LOD list stays shared with the donor), the
-        // dwords +0x54..+0x84 copied (00407b67..00407bc0), RefCount restored.
+        // dwords +0x54..+0x84 copied, RefCount restored.
         void FCliShip::Inherit(ICliObj* Donor)
         {
             FCliShip* DonorShip = AsCliShip(Donor);
@@ -2660,9 +2582,9 @@ namespace Archetype
         }
 
         // LAB_00407d20: __RTDynamicCast to CliSolar (no null test), RefCount saved, CliRoot's
-        // operator= inlined (00407d42..00407dd8; the +0x20 vector through FUN_0040d2c0, the
-        // out-of-line copy of the same assign) -- no FUN_00402500, so the LOD list stays shared
-        // with the donor -- then the solar fields, RefCount restored at 00407e4e.
+        // operator= inlined (the +0x20 vector through FUN_0040d2c0, the out-of-line copy of the
+        // same assign) -- no FUN_00402500, so the LOD list stays shared with the donor -- then
+        // the solar fields, RefCount restored.
         void FCliSolar::Inherit(ICliObj* Donor)
         {
             FCliSolar* DonorSolar = AsCliSolar(Donor);
@@ -2726,8 +2648,7 @@ namespace Archetype
             return Obj;
         }
 
-        // 0040cc4b..0040cc85 (types 0x20 / 0x21): FUN_004068d0, +0x54 = dword 0, ID_String::clear
-        // on +0x58 and +0x5c, vptr 005c79a8.
+        // Factory types 0x20 / 0x21 (vptr 005c79a8).
         FCliProj::FCliProj()
         {
             ConstEffectDelay = 0.0f;
@@ -2738,7 +2659,6 @@ namespace Archetype
         // LAB_00407e60.
         bool FCliProj::ReadUnknown(INI_Reader* Reader)
         {
-            // 00407e6c: FUN_00406dc0 first.
             if (FCliObj::ReadUnknown(Reader))
                 return true;
 
@@ -2763,10 +2683,8 @@ namespace Archetype
             return false;
         }
 
-        // FUN_00407f00. 00407f00..00407f91 is FUN_00407050's body inlined (LOD copy, distance_render
-        // copied when not equal, LodPick recomputed), then +0x54 and +0x58 are copied when they
-        // differ (00407f94..00407fb2; TEST AH,0x44 / JNP skips only on equal, so NaN copies).
-        // +0x5c is not touched.
+        // FUN_00407f00: FUN_00407050's body inlined, then +0x54 and +0x58 are copied when they
+        // differ (a NaN compares unequal, so it copies). +0x5c is not touched.
         void FCliProj::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -2779,7 +2697,7 @@ namespace Archetype
         }
 
         // FUN_00407fc0. __RTDynamicCast(Donor, ICliObj -> CliProj) with no null test, RefCount
-        // saved, CliRoot::operator= inlined (00407fe2..00408195), +0x54 / +0x58 / +0x5c copied,
+        // saved, CliRoot::operator= inlined, +0x54 / +0x58 / +0x5c copied,
         // RefCount restored. No FUN_00402500: the LOD list stays shared with the donor.
         void FCliProj::Inherit(ICliObj* Donor)
         {
@@ -2794,7 +2712,6 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040cfe1..0040d01a: FUN_004068d0, ID_String::clear on +0x54, +0x58 = 0, vptr 005c7fe0.
         FCliEQAttachedFX::FCliEQAttachedFX()
         {
             Particles.clear();
@@ -2823,7 +2740,7 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040b740: FUN_00407050's body inlined (0040b740..0040b7d1), then +0x54 (dword) and
+        // FUN_0040b740: FUN_00407050's body inlined, then +0x54 (dword) and
         // +0x58 (byte) copied when they differ.
         void FCliEQAttachedFX::Redefine(ICliObj* Donor)
         {
@@ -2851,7 +2768,7 @@ namespace Archetype
         }
 
         // FUN_00408ae0: __RTDynamicCast to CliAsteroid (no null test), RefCount saved,
-        // CliRoot::operator= inlined (00408afa..00408cba), RefCount restored. Nothing else.
+        // CliRoot::operator= inlined, RefCount restored. Nothing else.
         void FCliAsteroid::Inherit(ICliObj* Donor)
         {
             FCliAsteroid* Src = reinterpret_cast<FCliAsteroid*>(Donor);
@@ -2860,8 +2777,7 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040cd1a..0040cd43: FUN_004068d0, ID_String::clear on +0x54, then +0x54 = CreateID(0)
-        // (0040cd31..0040cd3e), +0x58 = 0, vptr 005c7a78.
+        // Retail clears +0x54 and then stores CreateID(null) there.
         FCliDynamicAsteroid::FCliDynamicAsteroid()
         {
             ParticleEffect.clear();
@@ -2876,7 +2792,6 @@ namespace Archetype
             if (FCliObj::ReadUnknown(Reader))
                 return true;
 
-            // 00408ce5..00408d0b: CreateID -> +0x54, BL (1) -> +0x58.
             if (Reader->is_value("particle_effect"))
             {
                 ParticleEffect.Id = CreateID(Reader->get_value_string());
@@ -2888,8 +2803,7 @@ namespace Archetype
         }
 
         // FUN_00408d20: __RTDynamicCast to CliDynamicAsteroid (no null test), RefCount saved,
-        // CliRoot::operator= inlined, +0x54 dword and +0x58 byte copied (00408ef8..00408f06),
-        // RefCount restored.
+        // CliRoot::operator= inlined, +0x54 dword and +0x58 byte copied, RefCount restored.
         void FCliDynamicAsteroid::Inherit(ICliObj* Donor)
         {
             FCliDynamicAsteroid* Src = reinterpret_cast<FCliDynamicAsteroid*>(Donor);
@@ -2900,8 +2814,7 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040cf9e..0040cfcb: FUN_004068d0, ID_String::clear on +0x58 and +0x5c, the three color
-        // bytes +0x56/+0x55/+0x54 = 0xff, vptr 005c7f78. +0x57 is left as allocated.
+        // Retail leaves +0x57 as allocated.
         FCliTractor::FCliTractor()
         {
             OperatingEffect.clear();
@@ -2917,7 +2830,7 @@ namespace Archetype
             if (FCliObj::ReadUnknown(Reader))
                 return true;
 
-            // 0040b348..0040b379: three get_value_float + ftol, low byte stored.
+            // ftol, low byte stored.
             if (Reader->is_value("color"))
             {
                 Color[0] = static_cast<unsigned char>(static_cast<int>(Reader->get_value_float(0)));
@@ -2941,8 +2854,8 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040b3f0: FUN_00407050's body inlined (0040b3f0..0040b481), then 0040b484..0040b4a8:
-        // when any of the three color bytes differs, all three are copied. +0x58/+0x5c untouched.
+        // FUN_0040b3f0: FUN_00407050's body inlined, then when any of the three color bytes
+        // differs, all three are copied. +0x58/+0x5c untouched.
         void FCliTractor::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -2957,8 +2870,7 @@ namespace Archetype
         }
 
         // FUN_0040b4c0: __RTDynamicCast to CliEQTractor (no null test), RefCount saved,
-        // CliRoot::operator= inlined, 0040b697..0040b6c1: three color bytes, +0x58, +0x5c,
-        // RefCount restored.
+        // CliRoot::operator= inlined, three color bytes, +0x58, +0x5c, RefCount restored.
         void FCliTractor::Inherit(ICliObj* Donor)
         {
             FCliTractor* Src = reinterpret_cast<FCliTractor*>(Donor);
@@ -2972,8 +2884,6 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040cf49..0040cf6d: FUN_004068d0, ID_String::clear on +0x54, CacheString::clear on
-        // +0x58, vptr 005c7d98.
         FCliEQThruster::FCliEQThruster()
         {
             Particles.clear();
@@ -3001,8 +2911,8 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040a0e0 (also CliSolar's slot 4): FUN_00407050's body inlined, then the dwords at
-        // +0x54 and +0x58 copied when they differ (0040a174..0040a187).
+        // FUN_0040a0e0 (also CliSolar's slot 4) after the inlined FUN_00407050 body (the callers
+        // run FCliObj::Redefine first): the dwords at +0x54 and +0x58 copied when they differ.
         void CliRedefineTwoDwords(FCliObj* This, ICliObj* Donor)
         {
             unsigned* Dst = reinterpret_cast<unsigned*>(reinterpret_cast<char*>(This) + 0x54);
@@ -3014,8 +2924,8 @@ namespace Archetype
                 Dst[1] = Src[1];
         }
 
-        // FUN_00409bd0 (slot 4 of CliEQShieldGenerator and CliEQRepairDroid): FUN_00407050's body
-        // inlined, then 00409c64..00409c6c: the dword at +0x54 copied when it differs.
+        // FUN_00409bd0 (slot 4 of CliEQShieldGenerator and CliEQRepairDroid), likewise: the dword
+        // at +0x54 copied when it differs.
         void CliRedefineFirstDword(FCliObj* This, ICliObj* Donor)
         {
             unsigned* Dst = reinterpret_cast<unsigned*>(reinterpret_cast<char*>(This) + 0x54);
@@ -3040,8 +2950,7 @@ namespace Archetype
         }
 
         // FUN_0040a190: __RTDynamicCast to CliEQThruster (no null test), RefCount saved,
-        // CliRoot::operator= inlined, +0x54 and +0x58 copied (0040a368..0040a376), RefCount
-        // restored.
+        // CliRoot::operator= inlined, +0x54 and +0x58 copied, RefCount restored.
         void FCliEQThruster::Inherit(ICliObj* Donor)
         {
             FCliEQThruster* Src = reinterpret_cast<FCliEQThruster*>(Donor);
@@ -3052,9 +2961,7 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // FUN_0040a9e0: FUN_004068d0, +0x80 = +0x88 = 0, +0x78 = +0x7c = 1.0f, the three color
-        // triplets zeroed (+0x6c, +0x60, +0x54 in that order), +0x8c = +0x90 = -1.0f,
-        // vptr 005c7eb8, +0x84 = 0.3f (0x3e99999a), +0x94 = 180.0f (0x43340000).
+        // FUN_0040a9e0, stores in retail order.
         FCliEQLight::FCliEQLight()
         {
             AvgDelay = 0.0f;
@@ -3093,10 +3000,8 @@ namespace Archetype
                 Color[0] = R;
                 Color[1] = G;
                 Color[2] = B;
-                // 0040abc6..0040ac02: each glow component FCOMP 0.0 / TEST AH,0x44 / JP skips --
-                // PF is clear only for "equal", so the copy into glow_color (+0x60) happens only
-                // while all three glow components are still exactly 0.0 (an unordered compare
-                // skips too). A `color=` line therefore seeds an unset glow.
+                // The copy into glow_color happens only while all three glow components are
+                // still exactly 0.0 (unordered skips too), so a `color=` line seeds an unset glow.
                 if (GlowColor[0] == 0.0f && GlowColor[1] == 0.0f && GlowColor[2] == 0.0f)
                 {
                     GlowColor[0] = R;
@@ -3160,9 +3065,8 @@ namespace Archetype
 
             if (Reader->is_value("flare_cone"))
             {
-                // 0040adea..0040ae1e: value 0 read first, then value 1; cos(v1*deg) -> +0x8c,
-                // cos(v0*deg) -> +0x90. x87 multiplies and takes FCOS in extended precision
-                // before the float store; double is the closest the port gets.
+                // Value 0 read first; note the swap: cos(v1) -> +0x8c, cos(v0) -> +0x90. x87
+                // extended precision before the float store; double is the closest the port gets.
                 float V0 = Reader->get_value_float(0);
                 float V1 = Reader->get_value_float(1);
                 FlareConeCos[0] = static_cast<float>(
@@ -3181,11 +3085,9 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040ae70: FUN_00407050's body inlined, then 0040af04..0040b089. Each color triplet
-        // (+0x54, +0x60, +0x6c) is copied whole when any component differs (the first two
-        // compares JP straight to the copy, the third JNP skips it -- NaN counts as different);
-        // +0x80, +0x88, +0x78, +0x7c, +0x84 each copied unless equal; the flare-cone pair
-        // +0x8c/+0x90 copied together when either differs; +0x94 unless equal.
+        // FUN_0040ae70: FUN_00407050's body inlined, then each color triplet is copied whole when
+        // any component differs (NaN counts as different); the scalars each unless equal; the
+        // flare-cone pair together when either differs.
         void FCliEQLight::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -3233,7 +3135,7 @@ namespace Archetype
         }
 
         // FUN_0040b0a0: __RTDynamicCast to CliEQLight (no null test), RefCount saved,
-        // CliRoot::operator= inlined, 0040b277..0040b30c: +0x54..+0x94 copied, RefCount restored.
+        // CliRoot::operator= inlined, +0x54..+0x94 copied, RefCount restored.
         void FCliEQLight::Inherit(ICliObj* Donor)
         {
             FCliEQLight* Src = reinterpret_cast<FCliEQLight*>(Donor);
@@ -3259,8 +3161,6 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040d04b..0040d074: FUN_004068d0, ID_String::clear on +0x54, +0x58 = +0x5c = 360.0f
-        // (0x43b40000), +0x60 = 0, vptr 005c802c.
         FCliInternalFx::FCliInternalFx()
         {
             UseSound.clear();
@@ -3302,9 +3202,8 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040bab0: FUN_00407050's body inlined, then 0040bb44..0040bb85: the +0x54 dword
-        // copied when it differs; the floats +0x58/+0x5c/+0x60 copied unless equal (TEST AH,0x44
-        // / JNP, so NaN copies).
+        // FUN_0040bab0: FUN_00407050's body inlined, then each field copied unless equal (a NaN
+        // float copies).
         void FCliInternalFx::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -3321,7 +3220,7 @@ namespace Archetype
         }
 
         // FUN_0040bb90: __RTDynamicCast to CliEQInternalFX (no null test), RefCount saved,
-        // CliRoot::operator= inlined, 0040bd68..0040bd82: +0x54..+0x60 copied, RefCount restored.
+        // CliRoot::operator= inlined, +0x54..+0x60 copied, RefCount restored.
         void FCliInternalFx::Inherit(ICliObj* Donor)
         {
             FCliInternalFx* Src = reinterpret_cast<FCliInternalFx*>(Donor);
@@ -3374,9 +3273,7 @@ namespace Archetype
             return false;
         }
 
-        // 0040cbc7..0040cc37: the CliProj part (FUN_004068d0, +0x54 = 0, +0x58/+0x5c cleared),
-        // CacheString::clear on +0x60, an empty vector at +0x64 (its +0x68..+0x70 zeroed) and
-        // FUN_005a6900 for the one at +0x74, vptr 005c8420.
+        // Retail builds the +0x74 vector with FUN_005a6900.
         FCliMunition::FCliMunition()
         {
             HpTrailParent.clear();
@@ -3403,8 +3300,7 @@ namespace Archetype
             this->~FCliMunition();
         }
 
-        // 004089a3..004089de (and 00408296..004082cf in Load): FUN_0040e990 on every live
-        // EffectArch, then erase(begin, end).
+        // Inlined in FUN_004089a0 and in Load: release every live EffectArch, then erase.
         void FCliMunition::ReleaseLiveEffects()
         {
             FEffectArch** It = LiveEffects.Begin;
@@ -3416,15 +3312,13 @@ namespace Archetype
             LiveEffects.End = LiveEffects.Begin;
         }
 
-        // Tail of LAB_004081c0 (00408296..00408393).
+        // Tail of LAB_004081c0.
         void FCliMunition::RebuildLiveEffects(unsigned Arg)
         {
-            // 00408296..004082cf: release + erase the live list.
             ReleaseLiveEffects();
 
-            // 004082d4..0040834c: reserve(HitEffectIds.size()) -- a new buffer of exactly that
-            // many slots when the capacity (FUN_0040d740) is smaller; the (empty) live range
-            // is moved over and the old buffer freed.
+            // reserve(HitEffectIds.size()): a buffer of exactly that many slots when the
+            // capacity is smaller.
             unsigned IdCount = 0;
             if (HitEffectIds.Begin != nullptr)
                 IdCount = static_cast<unsigned>(HitEffectIds.End - HitEffectIds.Begin);
@@ -3447,8 +3341,7 @@ namespace Archetype
                 LiveEffects.Begin = NewBuf;
             }
 
-            // 0040834f..00408393: FUN_0040f080(&id), FUN_0040e960(arch, Arg), push_back
-            // (FUN_00537260). The reserve above guarantees room for every push.
+            // The reserve above guarantees room for every push.
             unsigned* IdIt = HitEffectIds.Begin;
             while (IdIt != HitEffectIds.End)
             {
@@ -3463,32 +3356,30 @@ namespace Archetype
             }
         }
 
-        // FUN_00408a70 (thiscall). Callers 0052ea06 / 00539e2e.
+        // FUN_00408a70 (thiscall).
         FEffectArch* FCliMunition::PickLiveEffect()
         {
-            // 00408a73..00408a84: null begin or empty -> null.
             if (LiveEffects.Begin == nullptr)
                 return nullptr;
             int Count = static_cast<int>(LiveEffects.End - LiveEffects.Begin);
             if (Count == 0)
                 return nullptr;
 
-            // 00408a99..00408ab1: (rand() * n + (sign & 0x7fff)) >> 15 (CDQ / AND / ADD / SAR).
+            // Signed divide by 0x8000, as in FUN_00555810.
             int Raw = rand() * Count;
             int Pick = (Raw + ((Raw >> 31) & 0x7fff)) >> 15;
             return LiveEffects.Begin[Pick];
         }
 
-        // FUN_004089a0: release + erase the live list, then CliRoot's Slot11 inlined
-        // (004089e1..00408a69 is 00406d20's body byte for byte).
+        // FUN_004089a0: release + erase the live list, then CliRoot's Slot11 (00406d20) inlined.
         void FCliMunition::ReleaseResources()
         {
             ReleaseLiveEffects();
             FCliObj::ReleaseResources();
         }
 
-        // LAB_004081c0. 004081c9..004081e1: "skip" = cache built AND Slot12 done, sampled
-        // before anything runs. 004081e1..0040828a is LAB_00407380's body inlined.
+        // LAB_004081c0. "skip" = cache built AND Slot12 done, sampled before anything runs;
+        // then LAB_00407380's body inlined.
         unsigned long FCliMunition::Load(int LoadMode)
         {
             bool bSkipEffectRebuild =
@@ -3545,12 +3436,11 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 00401e90: RET.
+        // 00401e90: an empty function.
         void FCliEQShield::RealizeMaterials()
         {
         }
 
-        // 0040d0c9..0040d0e4: FUN_004068d0, ID_String::clear on +0x54, vptr 005c83a8.
         FCliRepairDroid::FCliRepairDroid()
         {
             ActiveEffect.clear();
@@ -3579,7 +3469,7 @@ namespace Archetype
         }
 
         // FUN_0040c860: __RTDynamicCast to CliEQRepairDroid (no null test), RefCount saved,
-        // CliRoot::operator= inlined, 0040ca3c: +0x54 copied, RefCount restored.
+        // CliRoot::operator= inlined, +0x54 copied, RefCount restored.
         void FCliRepairDroid::Inherit(ICliObj* Donor)
         {
             FCliRepairDroid* Src = reinterpret_cast<FCliRepairDroid*>(Donor);
@@ -3589,8 +3479,6 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // 0040cddc..0040ce0d: FUN_004068d0, ID_String::clear on +0x54/+0x58/+0x5c, the +0x60
-        // vector empty (allocator byte copied, three null pointers), vptr 005c7cfc.
         FCliShieldGenerator::FCliShieldGenerator()
         {
             CollapseParticle.clear();
@@ -3599,9 +3487,8 @@ namespace Archetype
             memset(&ShieldHitEffects, 0, sizeof(ShieldHitEffects));
         }
 
-        // FUN_004097a0: for every +0x60 record, the live buffer (+0x18) and the EffectId buffer
-        // (+0x04) are freed -- no EffectArch release -- then the +0x64 buffer; then the CliRoot
-        // part (vptr 005c7734, FUN_004024d0, the +0x44 records via FUN_00407000, +0x34, +0x24).
+        // FUN_004097a0: every +0x60 record's buffers are freed -- no EffectArch release -- then
+        // the vector's own buffer; then the CliRoot part.
         FCliShieldGenerator::~FCliShieldGenerator()
         {
             FCliDistanceRecord* It = ShieldHitEffects.Begin;
@@ -3646,9 +3533,7 @@ namespace Archetype
                 return true;
             }
 
-            // 00409974..00409bac: value 0 read first, an empty record appended (FUN_0040daa0),
-            // the float stored into the new last record, then CreateID of values 1.. pushed
-            // into its EffectId list until is_value_empty(i). Returns 1.
+            // Unlike the base's surface_hit_effects, the appended record is not null-tested.
             if (Reader->is_value("shield_hit_effects"))
             {
                 float Threshold = Reader->get_value_float(0);
@@ -3675,10 +3560,9 @@ namespace Archetype
         }
 
         // LAB_00409c80: __RTDynamicCast to CliEQShieldGenerator (no null test), RefCount saved;
-        // CliRoot::operator= written out with its helpers called (00409ca6..00409d40: +4..+0x1c
-        // raw, FUN_0040d2c0 / FUN_005595c0 / FUN_0040d4b0 on the three vectors, the +0x50 flag
-        // bits then the dword); +0x54/+0x58/+0x5c raw; the +0x60 record vector assigned when the
-        // two differ (00409d58); RefCount restored.
+        // CliRoot::operator= written out with its helpers called (FUN_0040d2c0 / FUN_005595c0 /
+        // FUN_0040d4b0 on the three vectors); +0x54/+0x58/+0x5c raw; the +0x60 record vector
+        // assigned when the two differ; RefCount restored.
         void FCliShieldGenerator::Inherit(ICliObj* Donor)
         {
             FCliShieldGenerator* Src = reinterpret_cast<FCliShieldGenerator*>(Donor);
@@ -3717,9 +3601,6 @@ namespace Archetype
             }
         }
 
-        // 0040ce41..0040ce69 / 0040cea9..0040ced3: FUN_004068d0, ID_String::clear on +0x54,
-        // +0x58 = 4.0f (0x40800000), +0x5c = 0, +0x60 = 0, ID_String::clear on +0x80, vptr
-        // 005c7df0.
         FCliLauncher::FCliLauncher()
         {
             FlashParticle.clear();
@@ -3738,7 +3619,6 @@ namespace Archetype
                 return;
             }
 
-            // REPNE SCASB strlen; CMP 0x20 / JC keeps it, else 0x1f; REP MOVSD/MOVSB copy.
             unsigned Len = static_cast<unsigned>(strlen(Text));
             if (Len >= 0x20u)
                 Len = 0x1fu;
@@ -3781,9 +3661,9 @@ namespace Archetype
         }
 
         // FUN_0040a5e0 (slot 4 of CliEQLauncher and CliEQGun): FUN_00407050's body (with the
-        // LodPick step through FUN_00406cd0, the same computation), then 0040a663: +0x58 copied
-        // unless equal; 0040a676: the light_anim string re-assigned when strcmp says it differs;
-        // 0040a6fe: +0x54 copied when it differs. +0x80 (and the gun's +0x84) are not touched.
+        // LodPick step through FUN_00406cd0, the same computation), then +0x58 unless equal, the
+        // light_anim string when strcmp says it differs, +0x54 when it differs. +0x80 (and the
+        // gun's +0x84) are not touched.
         void FCliLauncher::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -3799,7 +3679,7 @@ namespace Archetype
 
         // LAB_0040a720: __RTDynamicCast to CliEQLauncher (no null test), RefCount saved,
         // CliRoot::operator= written out with its helpers called, +0x54 / +0x58, the light_anim
-        // string assigned from the donor's (0040a7e7), +0x80, RefCount restored.
+        // string assigned from the donor's, +0x80, RefCount restored.
         void FCliLauncher::Inherit(ICliObj* Donor)
         {
             FCliLauncher* Src = reinterpret_cast<FCliLauncher*>(Donor);
@@ -3813,10 +3693,9 @@ namespace Archetype
         }
 
         // FUN_0040a3b0. Whether this object was already fully loaded (flags 1 and 8 both set) is
-        // taken on entry (0040a3b6..0040a3c9); 0040a3ce..0040a472 is FUN_00407380's body; then,
-        // unless it was already loaded, the launcher's projectile_archetype (Root +0x98) is looked
-        // up with Archetype::GetEquipment and that equipment's companion (Root +0x04) is loaded
-        // with the same argument (0040a4b7 JMP [vt+0x20]).
+        // taken on entry; then FUN_00407380's body; then, unless it was already loaded, the
+        // launcher's projectile_archetype companion is loaded with the same argument (a tail
+        // call; the companion is not null-tested).
         unsigned long FCliLauncher::Load(int LoadMode)
         {
             bool const bWasLoaded = (StateFlags & CliObjFlagCacheBuilt) != 0 &&
@@ -3837,7 +3716,6 @@ namespace Archetype
             return Projectile->Companion->Load(LoadMode);
         }
 
-        // 0040ce71..0040ce7e: the launcher part, then ID_String::clear on +0x84 and vptr 005c7e6c.
         FCliGun::FCliGun()
         {
             TurretSound.clear();
@@ -3859,7 +3737,7 @@ namespace Archetype
         }
 
         // LAB_0040a8a0: __RTDynamicCast to CliEQGun (no null test); the same body as 0040a720
-        // plus +0x84 (0040a9c1); RefCount restored.
+        // plus +0x84; RefCount restored.
         void FCliGun::Inherit(ICliObj* Donor)
         {
             FCliGun* Src = reinterpret_cast<FCliGun*>(Donor);
@@ -3873,9 +3751,7 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // FUN_00408f20: FUN_004068d0; +0x54 = 0, +0x58 = 0x168, +0x5c = 0; ID_String::clear on
-        // +0x60; +0x64..+0x70 = 0; clear on +0x74, +0x78; +0x7c = +0x80 = 0; clear on +0x84 and
-        // every ID from +0x88 to +0xa8; vptr 005c7ac4.
+        // FUN_00408f20.
         FCliEngine::FCliEngine()
         {
             InsideSoundCone = 0;
@@ -3902,9 +3778,8 @@ namespace Archetype
             CruiseDisruptEffect.clear();
         }
 
-        // The three "*_range" keys of 00409172 / 004091bd / 00409260: two get_value_int stored,
-        // then when the first is greater (CMP / JLE, signed) INI_Reader::log_link with the
-        // "... out of order!" text and the second forced down to the first.
+        // The three "*_range" keys: when the first is greater (signed), log_link with the
+        // "... out of order!" text and the second forced to the first.
         void ReadEngineRange(INI_Reader* Reader, int* Range, char const* OutOfOrder)
         {
             Range[0] = Reader->get_value_int(0);
@@ -4040,9 +3915,8 @@ namespace Archetype
             return false;
         }
 
-        // FUN_004093e0: FUN_00407050's body inlined, then 00409474..004094c5: each of the three
-        // int pairs (+0x64/+0x68, +0x6c/+0x70, +0x7c/+0x80) copied whole when either half
-        // differs. Nothing else follows the donor.
+        // FUN_004093e0: FUN_00407050's body inlined, then each of the three int pairs copied
+        // whole when either half differs. Nothing else follows the donor.
         void FCliEngine::Redefine(ICliObj* Donor)
         {
             FCliObj::Redefine(Donor);
@@ -4069,8 +3943,7 @@ namespace Archetype
         }
 
         // FUN_004094e0: __RTDynamicCast to CliEQEngine (no null test), RefCount saved,
-        // CliRoot::operator= inlined, 004096a9..0040976d: every dword +0x54..+0xa8 copied,
-        // RefCount restored.
+        // CliRoot::operator= inlined, every dword +0x54..+0xa8 copied, RefCount restored.
         void FCliEngine::Inherit(ICliObj* Donor)
         {
             FCliEngine* Src = reinterpret_cast<FCliEngine*>(Donor);
@@ -4101,9 +3974,7 @@ namespace Archetype
             RefCount = SavedRef;
         }
 
-        // FUN_0040bd90: FUN_004068d0; ID_String::clear on +0x54..+0x90; +0x94 = +0x9c = +0x98 =
-        // 1.0f; vptr 005c8074; +0xa4 = 300, +0xa0 = 600, +0xa8 = 25, +0xac = 50, +0xb0 = 0.
-        // Retail leaves the five effect pointers at +0xb4 as allocated; FUN_0040c690 writes them
+        // FUN_0040bd90, stores in retail order. Retail leaves the five effect pointers at +0xb4 as allocated; FUN_0040c690 writes them
         // before anything reads them, so the port starts them null.
         FCliTradeLane::FCliTradeLane()
         {
@@ -4145,7 +4016,6 @@ namespace Archetype
             if (FCliObj::ReadUnknown(Reader))
                 return true;
 
-            // 0040beb3..0040c16a: sixteen ID keys, CreateID(get_value_string()).
             struct FIdKey
             {
                 char const* Key;
@@ -4180,7 +4050,6 @@ namespace Archetype
                 Index += 1;
             }
 
-            // 0040c174..0040c26d: seven floats, get_value_float(0).
             struct FFloatKey
             {
                 char const* Key;
@@ -4209,10 +4078,9 @@ namespace Archetype
             return false;
         }
 
-        // FUN_0040c290. Unlike every other Redefine it tests the donor (0040c29d: TEST EDI,EDI /
-        // JZ out). Then FUN_00407050's body (LodPick through FUN_00406cd0), then five floats,
-        // each -- when it differs from the donor's (TEST AH,0x44 / JNP skips only on equal) --
-        // FDUMPed as a warning from CliArch.cpp with (this value, donor value) and then copied.
+        // FUN_0040c290. Unlike every other Redefine it tests the donor for null. Then
+        // FUN_00407050's body (LodPick through FUN_00406cd0), then five floats, each -- when it
+        // differs (NaN differs) -- warned about with (this value, donor value) and then copied.
         void FCliTradeLane::Redefine(ICliObj* Donor)
         {
             if (Donor == nullptr)
@@ -4326,11 +4194,10 @@ namespace Archetype
         }
     }
 
-    // FUN_0040ca50 (DAT_006164a0 vtable slot 0, thiscall, RET 8). Index = TypeId - 2 into the
-    // byte table 0040d1a0 (JA past 0x1f, i.e. types 0/1 and >= 0x22, goes to caseD_7). Every
-    // case stores the new object through Out with no null test (0040cee5 / 0040d127 /
-    // 0040d0ea ...) and calls its slot 0 (AddRef, 00406b50). Retail returns EAX = 0; the port's
-    // ICliObjFactory::Create is void and no caller reads it.
+    // FUN_0040ca50 (DAT_006164a0 vtable slot 0). Index = TypeId - 2 into the byte table
+    // 0040d1a0 (types 0/1 and >= 0x22 go to caseD_7). Every case stores the new object through
+    // Out with no null test and AddRefs it. Retail returns 0; the port's Create is void and no
+    // caller reads it.
     void FCliObjFactory::Create(int TypeId, ICliObj** Out)
     {
         switch (TypeId)
@@ -4351,49 +4218,49 @@ namespace Archetype
 
         case CliObjTypeAsteroid:
         {
-            // caseD_4 0040ccc2: operator_new(0x54), FUN_004068d0, vptr 005c7a3c (CliAsteroid).
+            // caseD_4 (CliAsteroid).
             NewCompanion<FCliAsteroid>(Out);
             return;
         }
 
         case CliObjTypeDynAsteroid:
         {
-            // caseD_5 0040ccf8: operator_new(0x5c), vptr 005c7a78 (CliDynamicAsteroid).
+            // caseD_5 (CliDynamicAsteroid).
             NewCompanion<FCliDynamicAsteroid>(Out);
             return;
         }
 
         case CliObjTypeEngine:
         {
-            // caseD_c: operator_new(0xac), FUN_00408f20 (CliEQEngine ctor).
+            // caseD_c (CliEQEngine).
             NewCompanion<FCliEngine>(Out);
             return;
         }
 
         case CliObjTypeShield:
         {
-            // caseD_d 0040cd7c: operator_new(0x54), FUN_004068d0, vptr 005c83e4 (CliEQShield).
+            // caseD_d (CliEQShield).
             NewCompanion<FCliEQShield>(Out);
             return;
         }
 
         case CliObjTypeShieldGenerator:
         {
-            // caseD_e 0040cdba: operator_new(0x70), vptr 005c7cfc (CliEQShieldGenerator).
+            // caseD_e (CliEQShieldGenerator).
             NewCompanion<FCliShieldGenerator>(Out);
             return;
         }
 
         case CliObjTypeThruster:
         {
-            // caseD_f 0040cf27: operator_new(0x5c), vptr 005c7d98 (CliEQThruster).
+            // caseD_f (CliEQThruster).
             NewCompanion<FCliEQThruster>(Out);
             return;
         }
 
         case CliObjTypeGun:
         {
-            // caseD_11 0040ce1a: operator_new(0x88), vptr 005c7e6c (CliEQGun : CliEQLauncher).
+            // caseD_11 (CliEQGun : CliEQLauncher).
             NewCompanion<FCliGun>(Out);
             return;
         }
@@ -4401,57 +4268,56 @@ namespace Archetype
         case CliObjTypeMineDropper:
         case CliObjTypeCmDropper:
         {
-            // caseD_12 0040ce88 (types 0x12 and 0x13 share it through the byte table 0040d1a0):
-            // operator_new(0x84), vptr 005c7df0 (CliEQLauncher).
+            // caseD_12, shared by types 0x12 and 0x13 (CliEQLauncher).
             NewCompanion<FCliLauncher>(Out);
             return;
         }
 
         case CliObjTypeLight:
         {
-            // caseD_15 0040cef8: operator_new(0x98), FUN_0040a9e0 (CliEQLight ctor).
+            // caseD_15 (CliEQLight).
             NewCompanion<FCliEQLight>(Out);
             return;
         }
 
         case CliObjTypeTractor:
         {
-            // caseD_16 0040cf7c: operator_new(0x60), vptr 005c7f78 (CliEQTractor).
+            // caseD_16 (CliEQTractor).
             NewCompanion<FCliTractor>(Out);
             return;
         }
 
         case CliObjTypeAttachedFx:
         {
-            // caseD_17 0040cfda: operator_new(0x5c), vptr 005c7fe0 (CliEQAttachedFX).
+            // caseD_17 (CliEQAttachedFX).
             NewCompanion<FCliEQAttachedFX>(Out);
             return;
         }
 
         case CliObjTypeInternalFx:
         {
-            // caseD_18 0040d029: operator_new(0x64), vptr 005c802c (CliEQInternalFX).
+            // caseD_18 (CliEQInternalFX).
             NewCompanion<FCliInternalFx>(Out);
             return;
         }
 
         case CliObjTypeRepairDroid:
         {
-            // caseD_19 0040d0ab: operator_new(0x58), vptr 005c83a8 (CliEQRepairDroid).
+            // caseD_19 (CliEQRepairDroid).
             NewCompanion<FCliRepairDroid>(Out);
             return;
         }
 
         case CliObjTypeTradeLane:
         {
-            // caseD_1d 0040d083: operator_new(0xc8), FUN_0040bd90 (CliEQTradeLane ctor).
+            // caseD_1d (CliEQTradeLane).
             NewCompanion<FCliTradeLane>(Out);
             return;
         }
 
         case CliObjTypeMunition:
         {
-            // caseD_1f 0040cbc7: operator_new(0x84), CliProj part + vptr 005c8420 (CliMunition).
+            // caseD_1f (CliMunition).
             NewCompanion<FCliMunition>(Out);
             return;
         }
@@ -4459,17 +4325,16 @@ namespace Archetype
         case CliObjTypeMine:
         case CliObjTypeCounterMeasure:
         {
-            // caseD_20 0040cc44 / caseD_21 0040cc92: operator_new(0x60), vptr 005c79a8 (CliProj).
+            // caseD_20 / caseD_21 (CliProj).
             NewCompanion<FCliProj>(Out);
             return;
         }
 
         default:
         {
-            // caseD_7 0040d0fc: operator_new(0x54) + FUN_004068d0 (the CliRoot vptr it sets).
-            // Byte table 0x13 entries: types 6, 7, LootCrate 8, CargoPod 9, Commodity 0xA,
+            // caseD_7: a bare CliRoot (FUN_004068d0). Types 6, 7, LootCrate 8, CargoPod 9, Commodity 0xA,
             // Power 0xB, 0x10, Scanner 0x14, RepairKit 0x1A, ShieldBattery 0x1B,
-            // CloakingDevice 0x1C, 0x1E; plus the JA range: Simple 0, 1 and Armor 0x22+.
+            // CloakingDevice 0x1C, 0x1E; plus the out-of-range Simple 0, 1 and Armor 0x22+.
             FCliObj* Simple = new FCliObj();
             AdoptCompanion(Out, Simple);
             return;
@@ -4482,29 +4347,28 @@ namespace Archetype
     bool CliObjPreloadMaterials(ICliObj* Companion, bool bDeferApply)
     {
         // FUN_00407310. Retail calls it directly (not through the vtable) on Root+0x04, which
-        // FCliObjFactory::Create always fills with an FCliObj or a subclass of it.
-        // 0040712b/00407171 SETZ: retail's zero means apply now and latch slot 10.
+        // FCliObjFactory::Create always fills with an FCliObj or a subclass of it. Retail's zero
+        // means apply now and latch slot 10.
         return static_cast<FCliObj*>(Companion)->PreloadMaterials(!bDeferApply);
     }
 
     void CliTradeLaneAddEffectRef(ICliObj* Companion)
     {
-        // FUN_0040c690, called at 0x00516cb0 on Equip->arch->Root+0x04 with no null test; the
+        // FUN_0040c690, called on the equipment archetype's companion with no null test; the
         // equipment is a TradeLane, whose companion the factory built as CliEQTradeLane.
         static_cast<FCliTradeLane*>(static_cast<FCliObj*>(Companion))->AddEffectRef();
     }
 
     int CliTradeLaneReleaseEffectRef(ICliObj* Companion)
     {
-        // FUN_0040c7d0, called at 0x00516be4 the same way.
+        // FUN_0040c7d0, called the same way.
         return static_cast<FCliTradeLane*>(static_cast<FCliObj*>(Companion))->ReleaseEffectRef();
     }
 
     FEffectArch* CliObjPickDistanceRecord(ICliObj* Companion, float Distance)
     {
-        // FUN_00407450, thiscall on the archetype's companion; GameObject slot 104 calls it with
-        // ECX = the companion or null (0x00539d47) and no test, so a null companion reaches the
-        // callee exactly as in retail.
+        // FUN_00407450, thiscall on the archetype's companion; GameObject slot 104 passes the
+        // companion or null with no test, so a null companion reaches the callee as in retail.
         return static_cast<FEffectArch*>(static_cast<FCliObj*>(Companion)->PickDistanceRecord(Distance));
     }
 
@@ -4526,8 +4390,7 @@ namespace Archetype
     ID_String const* CliShipBayDoorSound(ICliObj* Companion, bool bOpen)
     {
         // The raw reads FUN_00545670 case 2 makes on a ship archetype's companion (a CliShip by
-        // the factory table): +0x58 bay_doors_open_snd (0x00545804), +0x5c bay_doors_close_snd
-        // (0x00545837).
+        // the factory table): +0x58 bay_doors_open_snd, +0x5c bay_doors_close_snd.
         FCliShip* const Ship = static_cast<FCliShip*>(static_cast<FCliObj*>(Companion));
         return bOpen ? &Ship->Id58 : &Ship->Id5C;
     }
@@ -4535,31 +4398,30 @@ namespace Archetype
     ID_String const* CliSolarDoorSound(ICliObj* Companion, bool bOpen)
     {
         // FUN_005478f0 on a solar archetype's companion (a CliSolar by the factory table): +0x54
-        // open_sound (0x00547c37 / 0x00547ec5), +0x58 close_sound (0x00547a43 / 0x00547ef8).
+        // open_sound, +0x58 close_sound.
         return static_cast<FCliSolar*>(static_cast<FCliObj*>(Companion))->DoorSound(bOpen);
     }
 
     ID_String const* CliEngineFlameEffect(ICliObj* Companion)
     {
-        // Gf ObjectShip FUN_00446ca0 0x00446cfd..0x00446d00: ADD ESI,0x9c on the companion of an
-        // archetype whose class is Engine (0xc).
+        // Gf ObjectShip FUN_00446ca0 reads +0x9c on the companion of an archetype whose class is
+        // Engine (0xc).
         return &static_cast<FCliEngine*>(static_cast<FCliObj*>(Companion))->FlameEffect;
     }
 
     ID_String const* CliEngineRumbleSound(ICliObj* Companion)
     {
-        // FUN_00447f90 0x0044804d: MOV EBP,[ESI+0x60].
+        // FUN_00447f90 reads +0x60.
         return &static_cast<FCliEngine*>(static_cast<FCliObj*>(Companion))->RumbleSound;
     }
 
     ID_String const* CliEngineCharacterLoopSound(ICliObj* Companion)
     {
-        // FUN_00447f90 0x0044804a: MOV ECX,[ESI+0x78].
+        // FUN_00447f90 reads +0x78.
         return &static_cast<FCliEngine*>(static_cast<FCliObj*>(Companion))->CharacterLoopSound;
     }
 
-    // The raw-offset reads Gf::ObjectProp makes on Root+0x04 (FUN_004464f0 0x00446562..
-    // 0x00446588): +0x10 and +0x20. The same FCliObj-or-subclass guarantee as above holds.
+    // The raw-offset reads Gf::ObjectProp (FUN_004464f0) makes on Root+0x04: +0x10 and +0x20. The same FCliObj-or-subclass guarantee as above holds.
     char const* CliObjEnvmapMaterial(ICliObj* Companion)
     {
         return static_cast<FCliObj*>(Companion)->EnvmapMaterial.Value;
@@ -4572,7 +4434,7 @@ namespace Archetype
 
     char const* CliSolarShapeName(ICliObj* Companion)
     {
-        // Companion +0x60 (e.g. the nav map's FUN_004917c0 at 0x00491aa2..0x00491ab9).
+        // Companion +0x60 (e.g. the nav map's FUN_004917c0).
         return static_cast<FCliSolar*>(Companion)->ShapeName();
     }
 
@@ -4614,8 +4476,8 @@ namespace Archetype
 
     char const* CliMunitionHpTrailParent(ICliObj* Companion)
     {
-        // The raw +0x60 read Guided slot 112 LAB_0053f030 makes (0x0053f07d / 0x0053f0b1):
-        // the CacheString's text pointer, tested by its first byte.
+        // The raw +0x60 read Guided slot 112 LAB_0053f030 makes: the CacheString's text
+        // pointer, tested by its first byte.
         return static_cast<FCliMunition*>(static_cast<FCliObj*>(Companion))->HpTrailParent.Value;
     }
 
@@ -4633,31 +4495,25 @@ namespace Archetype
 
     void LoadMountedEquipmentCompanions(EquipDescVector const* Items, int LoadMode)
     {
-        // FUN_004252d0 (cdecl). 0x004252d5 / 0x004252d8: Begin (+4) and End (+8), stride 0x20.
+        // FUN_004252d0 (cdecl).
         for (EquipDesc const* Desc = Items->Begin; Desc != Items->End; ++Desc)
         {
-            // 0x004252f4: Archetype::GetEquipment(Desc +0x04).
             Equipment* const Arch = GetEquipment(Desc->ArchId);
             if (Arch == nullptr)
                 continue;
-            // 0x00425301: EquipDesc::is_internal; 0x0042530b: the byte at +0x0c.
             if (Desc->is_internal())
                 continue;
             if (!Desc->bEquipped)
                 continue;
-            // 0x00425312..0x0042531c: Root +0x04 companion, vt+0x20 Load(LoadMode).
             Arch->Companion->Load(LoadMode);
         }
     }
 
     namespace
     {
-        // The per-instance body FUN_00425480 runs twice (0x004254a1..0x004254fe for the
-        // instance, 0x00425521..0x00425591 for each related instance): renderer slot 8 (+0x20)
-        // yields a count, then for every index from the last down renderer slot 10 (+0x28),
-        // and the instance's IMatHookUp (IEngine slot 30 +0x78 QueryInstance) gets its slot 3
-        // (+0x0c) and is released (+0x08). The out pointer is zeroed before each query
-        // (0x004254d2 / 0x00425565); the count is zeroed before slot 8 (0x00425494 / 0x00425527).
+        // The per-instance body FUN_00425480 inlines twice (the instance, then each related
+        // instance): for every LOD index from the last down, select it and hook up the
+        // instance's materials through IMatHookUp.
         void HookUpInstanceMaterials(void* Instance)
         {
             int Count = 0;
@@ -4681,8 +4537,7 @@ namespace Archetype
         // FUN_00425480 (cdecl).
         void* const Instance = reinterpret_cast<void*>(EngineIndex);
         HookUpInstanceMaterials(Instance);
-        // 0x0042550f / 0x004255a1: IEngine slot 54 (+0xd8) GetRelatedInstance(Instance, 1,
-        // cursor), starting from -1 and ending at -1.
+        // The related-instance cursor starts from -1 and ends at -1.
         void* const kNoInstance = reinterpret_cast<void*>(-1);
         void* Related = DALib::Engine->GetRelatedInstance(Instance, 1, kNoInstance);
         while (Related != kNoInstance)

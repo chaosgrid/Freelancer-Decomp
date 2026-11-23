@@ -6,22 +6,17 @@
 
 #pragma once
 
-// The player / target information window (retail NN_Help, freelancer.exe 0x00474b60..0x004778b0,
-// shares NN_Inventory's CHAR_infowindow.cmp mesh). Opened by the NeuroNet "info" main button
-// (nn_main_button.cpp); the HUD target panel's view change (FUN_004e4690, 0x004e4708) refills it
-// with the viewed object when it is open.
+// The player / target information window (retail NN_Help; shares NN_Inventory's
+// CHAR_infowindow.cmp mesh). Opened by the NeuroNet "info" main button (nn_main_button.cpp); the
+// HUD target panel's view change (FUN_004e4690) refills it with the viewed object when it is
+// open.
 //
-// RTTI .?AVNN_Help@@ : WinControl. operator_new(0x33c) (0x004770f8); the ctor is inlined in the
-// factory's Create: WinControl's FUN_0059f860, vftable 0x005d0acc, the IDataViewOwner face +0x7c
-// its own copy (0x005d0abc) of WinControl's two slots.
-// WINFACTORY<NN_Help> DAT_0066dc18 "NN_Help": static init LAB_00474b60 (ctor FUN_00477070 --
-// the WINFACTORY ctor inlined for this type: WinFactory head, FUN_0059dab0, vftable 0x005d0ab4 --
-// then atexit LAB_00474b80 -> FUN_00579380); Create FUN_004770e0 (operator_new, the ctor, the
-// class-name pointer at +0x10, slot 9, a failed Create followed by slot 0 with 1).
+// RTTI .?AVNN_Help@@ : WinControl. operator_new(0x33c); the ctor is inlined in the factory's
+// Create. The IDataViewOwner face +0x7c has its own copy (0x005d0abc) of WinControl's two slots.
+// WINFACTORY<NN_Help> DAT_0066dc18: static init LAB_00474b60, Create FUN_004770e0.
 //
-// vftable 0x005d0acc -- WinControl's (0x005e5e44) with these overrides (raw dword diff):
-//   0 FUN_0055e9f0 scalar deleting dtor (shared by ICF; NN_Help has no destructor body of its
-//   own), 9 FUN_00474b90 Create, 23 LAB_00475430 ProcessMessage, 42 LAB_00475400 SetProperty.
+// vftable 0x005d0acc; scalar deleting dtor FUN_0055e9f0 (shared by ICF; NN_Help has no
+// destructor body of its own).
 //
 // Layout: retail's -- WinControl (0x32c) and four dwords.
 
@@ -59,7 +54,7 @@ public:
     // of Object: its name (or, never visited, its type and ids 0xd6ef), pilot, attitude, hull,
     // shield, group, affiliation, waypoint number, the base goods sections of its dock base and
     // the infocards. Nothing at all for a null Object, one without a CObject, or a non-CSimple.
-    // Callers: Create 0x00474d39, HUD_Target 0x004e4708.
+    // Callers: Create, HUD_Target.
     void ShowObjectInfo(IObjRW* Object);
 
     WinControl* CloseButton;  // +0x32c "PlayerInfoCloseButton"
@@ -87,12 +82,11 @@ static_assert(sizeof(NnHelp) == 0x33c, "retail NN_Help is 0x33c bytes (operator_
 //   bShips:       title 0x669 -- every ship for sale (ships first in the card).
 // Each list ends with ids 0x67b ("none") when it named nothing. The prices come from a market
 // filled for the occasion with the base's price variance (a random draw, FUN_00437de0).
-// Callers: NN_Help::Create 0x0047514a, NN_Help::ShowObjectInfo 0x00475c96, the nav map's info
-// card FUN_00497970 (0x00497bb3).
+// Callers: NN_Help::Create, NN_Help::ShowObjectInfo, the nav map's info card FUN_00497970.
 void NnHelpAppendBaseGoods(RenderDisplayList* Card, unsigned BaseId, unsigned char bCommodities,
                            unsigned char bEquipment, unsigned char bShips);
 
 // FUN_00475dd0 (cdecl) -- order Goods by the equipment name of each good (_wcsicmp, bubble
 // passes until one swaps nothing); a good without equipment sorts as an empty name. The nodes
-// are rebuilt in the new order. Callers: FUN_00476080 0x004764d8 / 0x00476aca.
+// are rebuilt in the new order. Caller: FUN_00476080 (twice).
 void NnHelpSortGoodsByName(std::list<FClientMarketGood const*>* Goods);

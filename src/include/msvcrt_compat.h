@@ -14,7 +14,7 @@
 // Data files store 32-bit hash ids in decimal (e.g. ship_archetype = 2806013121) and retail
 // reads them back through that wrap; the UCRT would clamp them to 0x7fffffff.
 //
-// Measured against the system msvcrt.dll (2026-09-26, every byte / every BMP code unit):
+// Measured against the system msvcrt.dll (every byte / every BMP code unit):
 //   atoi/atol: "2806013121" -> -1488954175, "4294967296" -> 0, "-2806013121" -> 1488954175,
 //              "99999999999" -> 1215752191. Whitespace is exactly 0x09-0x0d and 0x20;
 //              digits are exactly '0'-'9' (atol is the same function: long is 32-bit).

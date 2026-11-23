@@ -29,27 +29,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-// DAT_0067c488 -- LAB_0057fd20 builds it, LAB_0057fd40 (atexit) runs FUN_00579380 on it.
+// DAT_0067c488 (static init LAB_0057fd20, atexit LAB_0057fd40).
 WINFACTORY<ScrollControl> G_ScrollControlFactory("ScrollControl");
 
 unsigned char G_ScrollControlDragging = 0; // DAT_0067c4c4
 
 namespace
 {
-    // DAT_0067c4c0 -- this TU's 3DMathEngine, FUN_005b73e0 on first use (0x00580a33, 0x00580a8d,
-    // 0x005811db, 0x00581235, 0x00582df5).
+    // DAT_0067c4c0 -- this TU's 3DMathEngine, acquired on first use.
     I3DMathEngine* G_ScrollControlMath = nullptr;
 
     I3DMathEngine* ScrollControlMath()
     {
         if (G_ScrollControlMath == nullptr)
-            G_ScrollControlMath = Acquire3DMathEngine(); // FUN_005b73e0
+            G_ScrollControlMath = Acquire3DMathEngine();
         return G_ScrollControlMath;
     }
 
-    // FUN_004215b0 on the rotation, then the three translation dwords cleared -- the transform
-    // every ScrollControl field starts as, and what a "<part>_hp" key resets before asking the
-    // parent for the hardpoint.
+    // The transform every ScrollControl field starts as, and what a "<part>_hp" key resets
+    // before asking the parent for the hardpoint.
     void SetIdentityTransform(FTransform* Xform)
     {
         Win3DIdentityRotation3x3(&Xform->Rotation.D[0][0]);
@@ -58,8 +56,7 @@ namespace
         Xform->Translation.X = 0.0f;
     }
 
-    // The `CMP [holder+4],-1` pair every slot inlines: DALib::Engine vt+0x9c SetInstanceMatrix,
-    // then vt+0x6c UpdateInstance(instance, 0, 0).
+    // The instance-bound test plus SetInstanceMatrix / UpdateInstance pair every slot inlines.
     void PushInstanceMatrix(FClientMeshHolder* Holder, FTransform* Xform)
     {
         if (!ClientMeshHolderHasInstance(Holder))
@@ -68,7 +65,7 @@ namespace
         DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
     }
 
-    // The same with vt+0x8c SetInstancePosition (the "<part>_offset" keys).
+    // The same with SetInstancePosition (the "<part>_offset" keys).
     void PushInstancePosition(FClientMeshHolder* Holder, FVector* Position)
     {
         if (!ClientMeshHolderHasInstance(Holder))
@@ -77,8 +74,7 @@ namespace
         DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
     }
 
-    // The "<part>_mesh" sequence: release the holder (FUN_0059eee0), load Path when it is not
-    // empty (FUN_0059ec80(Path, 0, 0)), push Xform to a bound instance, then slot 35.
+    // The "<part>_mesh" sequence.
     void LoadPartMesh(ScrollControl* Control, FClientMeshHolder* Holder, char const* Path,
                       FTransform* Xform)
     {
@@ -89,8 +85,7 @@ namespace
         Control->RefreshAttachment();
     }
 
-    // The "<part>_hp" sequence with a non-null Parent: Parent->AsWinControl() (slot 2), and when
-    // that is a WinControl, its slot 36 GetHardpointTransform(Name, Xform).
+    // The "<part>_hp" sequence with a non-null Parent.
     void AskHardpoint(Win3D* Parent, char const* Name, FTransform* Xform)
     {
         WinControl* const Owner = Parent->AsWinControl();
@@ -110,14 +105,14 @@ namespace
         Out->Z = Z;
     }
 
-    // A flag key: get_value_float(0) != 0.0 (FCOMP against DAT_005c8ba8, TEST AH,0x44 / JNP).
+    // A flag key: get_value_float(0) != 0.0.
     unsigned char ReadFlag(INI_Reader* Reader)
     {
         return (static_cast<double>(Reader->get_value_float(0)) != 0.0) ? 1 : 0;
     }
 
-    // FUN_00507e70 (cdecl X) -- the bit-trick reciprocal square root with one Newton step,
-    // (1.5 - Y * Y * X * 0.5) * Y, left in ST0 (the port's double).
+    // FUN_00507e70 (cdecl) -- the bit-trick reciprocal square root with one Newton step; retail
+    // leaves the result unrounded on the x87 stack, the port returns double.
     double FastInvSqrt(float X)
     {
         int Bits = 0;
@@ -128,8 +123,8 @@ namespace
         return (1.5 - static_cast<double>(Y) * Y * X * 0.5) * Y;
     }
 
-    // The same step inlined with the squared length kept on the FPU stack (FST float for the
-    // bits only): ((1.5 - Y * Y * Len2 * 0.5) * Y) * Len2, stored as a float.
+    // The same step inlined with the squared length kept double (rounded to float for the bits
+    // only), times the length, stored as float.
     float FastLengthExtended(double Len2)
     {
         float const Len2Float = static_cast<float>(Len2);
@@ -141,8 +136,7 @@ namespace
         return static_cast<float>((1.5 - static_cast<double>(Y) * Y * Len2 * 0.5) * Y * Len2);
     }
 
-    // The FUN_00507e70 form: the squared length stored as a float first, the result times that
-    // float, stored as a float.
+    // The FastInvSqrt form: the squared length rounded to float first.
     float FastLengthStored(double Len2)
     {
         float const Len2Float = static_cast<float>(Len2);
@@ -156,7 +150,7 @@ namespace
                static_cast<double>(V.X) * V.X;
     }
 
-    // FUN_00423b60 (cdecl Out, A, B) -- Out = A - B, each a float.
+    // FUN_00423b60 (cdecl).
     FVector Subtract(FVector const& A, FVector const& B)
     {
         FVector Out;
@@ -166,7 +160,7 @@ namespace
         return Out;
     }
 
-    // FUN_00423b30 (cdecl Out, A, B) -- Out = A + B, each a float.
+    // FUN_00423b30 (cdecl).
     FVector Add(FVector const& A, FVector const& B)
     {
         FVector Out;
@@ -176,7 +170,7 @@ namespace
         return Out;
     }
 
-    // Win3D camera DAT_0067dbf8, slot 0x34 Project(&x, &y, &z, world); TEST AL,AL.
+    // Through the Win3D camera (DAT_0067dbf8); only the low byte of the result is tested.
     bool ProjectToScreen(FVector const& World, FVector* OutScreen)
     {
         ICamera* const Camera = AsCamera(Win3DGetCamera());
@@ -191,9 +185,8 @@ namespace
                                            reinterpret_cast<float const*>(&Xform), Ray);
     }
 
-    // The colour a part is drawn with: the byte quad into holder +0x14 / +0x18 / +0x1c / +0x24
-    // (FILD, FMUL 1/255 DAT_005c7f68, FSTP float -- FUN_004a1af0's arithmetic, inlined in
-    // every Draw block), FUN_0059efa0(camera, 0, 1.0f, 0), then FUN_00421ed0(GL_DEPTH_TEST).
+    // One tinted part draw, inlined in every Draw block (the colour conversion is
+    // FUN_004a1af0's arithmetic).
     void DrawPartMesh(FClientMeshHolder* Holder, unsigned long const* Rgba)
     {
         ClientMeshHolderSetColor(Holder, reinterpret_cast<unsigned char const*>(Rgba));
@@ -205,7 +198,7 @@ namespace
     {
         int X = 0;
         int Y = 0;
-        GetClientSoftwareCursor(&X, &Y, nullptr); // DAT_00616840
+        GetClientSoftwareCursor(&X, &Y, nullptr);
         return X;
     }
 
@@ -213,17 +206,15 @@ namespace
     {
         int X = 0;
         int Y = 0;
-        GetClientSoftwareCursor(&X, &Y, nullptr); // DAT_00616844
+        GetClientSoftwareCursor(&X, &Y, nullptr);
         return Y;
     }
 }
 
 ScrollControl::ScrollControl()
 {
-    // FUN_0057fd50. WinControl's ctor FUN_0059f860 runs as the base. Every holder is FUN_00420d40
-    // + FUN_00492250 on +0x14 + vftable 0x005d2efc + anim -1; every transform FUN_004215b0 with
-    // a zero translation. The body then sets the working transforms (+0x360, +0x404, +0x4a8,
-    // +0x540, +0x570, +0x5b8) to identity a second time -- same values, not repeated here.
+    // FUN_0057fd50. Retail sets the working transforms to identity a second time; same values,
+    // not repeated here.
     ClientMeshHolderConstruct(&Back.Holder);
     SetIdentityTransform(&Back.Xform);
     SetIdentityTransform(&Back.Hp);
@@ -240,7 +231,6 @@ ScrollControl::ScrollControl()
     SetIdentityTransform(&ThumbHp0);
     SetIdentityTransform(&ThumbHp1);
 
-    // 0x0057ff40..0x005800e3: the vectors.
     Back.Offset = {0.0f, 0.0f, 0.0f};
     Back.MouseSize = {0.0f, 0.0f, 0.0f};
     Next.Offset = {0.0f, 0.0f, 0.0f};
@@ -251,13 +241,12 @@ ScrollControl::ScrollControl()
     ThumbOffset1 = {0.0f, 0.0f, 0.0f};
     ThumbMouse = {0.0f, 0.0f, 0.0f};
 
-    // 0x0057ffaf / 0x00580002 / 0x0058004b / 0x00580104: no part skips its mesh.
     Back.bNoMeshRender = 0;
     Next.bNoMeshRender = 0;
     Prev.bNoMeshRender = 0;
     bThumbNoMeshRender = 0;
 
-    // 0x005800f2..0x00580152. RepeatTime (+0x670) and bPageTowardMin (+0x67b) are not written.
+    // RepeatTime (+0x670) and bPageTowardMin (+0x67b) are not written.
     PageSize = 1;
     Step = 1;
     MinRange = 0;
@@ -277,27 +266,23 @@ ScrollControl::ScrollControl()
 
 ScrollControl::~ScrollControl()
 {
-    // FUN_00580190: FUN_0059eee0 on the back, prev, next and thumb holders (in that order).
+    // FUN_00580190. Back, prev, next, thumb, in that order.
     ClientUiMeshHolderRelease(&Back.Holder);
     ClientUiMeshHolderRelease(&Prev.Holder);
     ClientUiMeshHolderRelease(&Next.Holder);
     ClientUiMeshHolderRelease(&ThumbHolder);
 
-    // 0x005801f7..0x00580228: a held thumb, back plate or button drops the capture.
+    // A held thumb, back plate or button drops the capture.
     if (bDragging != 0 || bPaging != 0 || bNextPressed != 0 || bPrevPressed != 0)
     {
-        Win3DRemoveCapture(this); // FUN_0059d960
+        Win3DRemoveCapture(this);
         G_ScrollControlDragging = 0;
     }
-
-    // 0x0058022f..0x0058025e: the holders' own dtors FUN_0059ef20 (the same release, which
-    // finds nothing now) in reverse order -- thumb, prev, next, back: ~FClientMeshHolder in
-    // reverse declaration order -- then WinControl's dtor FUN_0059fa50.
 }
 
 void ScrollControl::UpdateThumb()
 {
-    // FUN_00580290. Min < Max, Min <= Value, Max >= Value (JGE / JG / JL to 0x005803b3).
+    // FUN_00580290.
     int const Min = MinRange;
     int const Max = MaxRange;
     if (Min >= Max || Min > Value || Max < Value)
@@ -306,13 +291,12 @@ void ScrollControl::UpdateThumb()
         return;
     }
 
-    // FILD (Value - Min) / FIDIV (Max - Min), kept on the FPU stack.
+    // Kept double.
     double const T = static_cast<double>(Value - Min) / static_cast<double>(Max - Min);
     bThumbValid = 1;
     ThumbXform = ThumbStart;
 
-    // 0x005802f8..0x0058036d: the translation between the two ends. dz is stored as a float
-    // before its product, dx * t is stored as a float, dy * t stays on the stack.
+    // dz is rounded to float before its product, dx * t is rounded to float, dy * t stays double.
     double const Dx = static_cast<double>(ThumbEnd.Translation.X) - ThumbStart.Translation.X;
     double const Dy = static_cast<double>(ThumbEnd.Translation.Y) - ThumbStart.Translation.Y;
     float const Dz = static_cast<float>(static_cast<double>(ThumbEnd.Translation.Z) -
@@ -325,48 +309,44 @@ void ScrollControl::UpdateThumb()
     ThumbXform.Translation.Z = static_cast<float>(static_cast<double>(Dzt) +
                                                   ThumbStart.Translation.Z);
 
-    // 0x00580370..0x005803a9.
     PushInstanceMatrix(&ThumbHolder, &ThumbXform);
 }
 
 void ScrollControl::UpdateLayout()
 {
-    // FUN_005803d0. With a WinControl parent (+4, slot 2) the working transforms are rebuilt:
-    // each is its hardpoint transform moved by (offset + position) + WinControl::Offset (+0xa8).
+    // FUN_005803d0. With a WinControl parent the working transforms are rebuilt: each is its
+    // hardpoint transform moved by (offset + position) + WinControl::Offset. The thumb's start
+    // and end add in a different order, as retail.
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
     {
         FVector const Position = {Win3D::Position[0], Win3D::Position[1], Win3D::Position[2]};
         FVector const ControlOffset = {Offset[0], Offset[1], Offset[2]};
 
-        // 0x005803f1..0x0058047a: back.
         Back.Xform = Back.Hp;
         FVector Moved = Add(Add(Back.Offset, Position), ControlOffset);
         Back.Xform.Translation.X += Moved.X;
         Back.Xform.Translation.Y += Moved.Y;
         Back.Xform.Translation.Z += Moved.Z;
 
-        // 0x0058043d..0x005804dd: next.
         Next.Xform = Next.Hp;
         Moved = Add(Add(Next.Offset, Position), ControlOffset);
         Next.Xform.Translation.X += Moved.X;
         Next.Xform.Translation.Y += Moved.Y;
         Next.Xform.Translation.Z += Moved.Z;
 
-        // 0x005804a5..0x00580559: prev (the second sum through FUN_00422b80).
+        // Retail's second sum for prev goes through FUN_00422b80.
         Prev.Xform = Prev.Hp;
         Moved = Add(Add(Prev.Offset, Position), ControlOffset);
         Prev.Xform.Translation.X += Moved.X;
         Prev.Xform.Translation.Y += Moved.Y;
         Prev.Xform.Translation.Z += Moved.Z;
 
-        // 0x0058052f..0x005805fa: the thumb's start (position + offset0, then + offset).
         ThumbStart = ThumbHp0;
         Moved = Add(Add(Position, ThumbOffset0), ControlOffset);
         ThumbStart.Translation.X += Moved.X;
         ThumbStart.Translation.Y += Moved.Y;
         ThumbStart.Translation.Z += Moved.Z;
 
-        // 0x005805c0..0x00580688: the thumb's end.
         ThumbEnd = ThumbHp1;
         Moved = Add(Add(ThumbOffset1, Position), ControlOffset);
         ThumbEnd.Translation.X += Moved.X;
@@ -374,7 +354,6 @@ void ScrollControl::UpdateLayout()
         ThumbEnd.Translation.Z += Moved.Z;
     }
 
-    // 0x0058068f..0x0058073e: the three buttons to the engine, then the thumb.
     PushInstanceMatrix(&Back.Holder, &Back.Xform);
     PushInstanceMatrix(&Next.Holder, &Next.Xform);
     PushInstanceMatrix(&Prev.Holder, &Prev.Xform);
@@ -389,7 +368,7 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     else if (Value == MaxRange)
         bPageTowardMin = 1;
 
-    // FILD qword {coordinate, 0}: the pixel as an unsigned integer.
+    // The pixel converts as unsigned.
     FVector const Mouse = {static_cast<float>(ScreenX), static_cast<float>(ScreenY), 0.0f};
     FVector const Zero = {0.0f, 0.0f, 0.0f};
 
@@ -397,11 +376,11 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     int const ToMin = abs(MinRange - Value);
     if (ToMax < ToMin)
     {
-        // 0x005807a3..0x00580a0f: nearer the top. Is the cursor, seen from the thumb's start,
-        // at least as far along the start->thumb line as the thumb itself?
+        // Nearer the top. Is the cursor, seen from the thumb's start, at least as far along the
+        // start->thumb line as the thumb itself?
         FVector Current;
         FVector Start;
-        HudTransformPoint(&ThumbXform, &Current, &Zero); // FUN_004e7090
+        HudTransformPoint(&ThumbXform, &Current, &Zero);
         HudTransformPoint(&ThumbStart, &Start, &Zero);
         FVector CurrentScreen;
         FVector StartScreen;
@@ -426,13 +405,13 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
         double const Dot = (static_cast<double>(MouseDir[2]) * TrackDir[2] +
                             static_cast<double>(MouseDir[1]) * TrackDir[1]) +
                            static_cast<double>(MouseDir[0]) * TrackDir[0];
-        // TEST AH,5 / JNP: below -> 1, otherwise (and unordered) -> 0.
+        // Unordered gives 0.
         bPageTowardMin = (Dot * MouseLength < TrackLength) ? 1 : 0;
         return;
     }
 
-    // 0x00580a12..0x00580cf5: nearer the bottom (or halfway). The same test from the thumb's
-    // end, through this TU's math engine.
+    // Nearer the bottom (or halfway): the same test from the thumb's end, through this TU's math
+    // engine.
     FVector Current;
     FVector End;
     ScrollControlMath()->TransformXform(Current, ThumbXform, Zero);
@@ -446,7 +425,7 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     }
     FVector const Track = Subtract(CurrentScreen, EndScreen);
     float const TrackLength = FastLengthExtended(SquaredLengthZyx(Track));
-    // 0x00580bcd: z is FCHS of the end's z (the cursor's z is 0).
+    // z is the negated end z (the cursor's z is 0).
     FVector ToMouse;
     ToMouse.X = Mouse.X - EndScreen.X;
     ToMouse.Y = Mouse.Y - EndScreen.Y;
@@ -459,7 +438,7 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     }
     float TrackDir[3];
     HudVec3ScaleByInverse(TrackDir, &Track.X, TrackLength);
-    // 0x00580c80..0x00580ca6: 1.0 / length kept on the stack, the products stored as floats.
+    // The reciprocal stays double, the products are rounded to float.
     double const InvMouse = 1.0 / static_cast<double>(MouseLength);
     float const MouseDir[3] = {static_cast<float>(ToMouse.X * InvMouse),
                                static_cast<float>(ToMouse.Y * InvMouse),
@@ -467,20 +446,20 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                         static_cast<double>(MouseDir[1]) * TrackDir[1]) +
                        static_cast<double>(MouseDir[2]) * TrackDir[2];
-    // TEST AH,5 / JP: below -> 0, otherwise (and unordered) -> 1.
+    // Unordered gives 1.
     bPageTowardMin = (Dot * MouseLength < TrackLength) ? 0 : 1;
 }
 
 void ScrollControl::PageStep()
 {
-    // FUN_00580d00. The cursor is read straight from DAT_00616840 / DAT_00616844 (FILD dword).
+    // FUN_00580d00. The cursor is read straight from DAT_00616840 / DAT_00616844, as signed.
     FVector const Zero = {0.0f, 0.0f, 0.0f};
     FVector const Mouse = {static_cast<float>(CursorPixelX()), static_cast<float>(CursorPixelY()),
                            0.0f};
 
     if (bPageTowardMin != 0)
     {
-        // 0x00580d14..0x00580f45: towards the start while the cursor lies short of the thumb.
+        // Towards the start while the cursor lies short of the thumb.
         FVector Current;
         FVector Start;
         HudTransformPoint(&ThumbXform, &Current, &Zero);
@@ -504,7 +483,7 @@ void ScrollControl::PageStep()
         double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                             static_cast<double>(TrackDir[1]) * MouseDir[1]) +
                            static_cast<double>(TrackDir[2]) * MouseDir[2];
-        // TEST AH,5 / JP: only strictly below goes on.
+        // Only strictly below goes on.
         if (!(Dot * MouseLength < TrackLength))
             return;
         Value -= PageSize;
@@ -513,7 +492,7 @@ void ScrollControl::PageStep()
     }
     else
     {
-        // 0x00580f4a..0x00581191: towards the end.
+        // Towards the end.
         FVector Current;
         FVector End;
         HudTransformPoint(&ThumbXform, &Current, &Zero);
@@ -544,7 +523,6 @@ void ScrollControl::PageStep()
             Value = MaxRange;
     }
 
-    // 0x00581199..0x005811a2.
     UpdateThumb();
     NotifyValue();
 }
@@ -573,8 +551,8 @@ void ScrollControl::DragThumb(unsigned ScreenX, unsigned ScreenY)
     if (TrackLength == 0.0f || MouseLength == 0.0f)
         return;
 
-    // 0x0058140a..0x00581489: both directions through a reciprocal kept on the stack; the
-    // track's reciprocal is also stored as a float and that float is used again below.
+    // Both directions through a double reciprocal; the track's reciprocal is also rounded to
+    // float and that float is used again below.
     double const InvTrack = 1.0 / static_cast<double>(TrackLength);
     float const InvTrackFloat = static_cast<float>(InvTrack);
     float const TrackDir[3] = {static_cast<float>(Track.X * InvTrack),
@@ -588,7 +566,6 @@ void ScrollControl::DragThumb(unsigned ScreenX, unsigned ScreenY)
                         static_cast<double>(TrackDir[1]) * MouseDir[1]) +
                        static_cast<double>(TrackDir[2]) * MouseDir[2];
 
-    // 0x005814ae..0x005814f7: floor(dot * |mouse| * (1 / |track|) * range + 0.5) + min.
     int const Min = MinRange;
     int const Range = MaxRange - Min;
     double const Scaled = Dot * MouseLength * InvTrackFloat * Range + 0.5;
@@ -598,14 +575,13 @@ void ScrollControl::DragThumb(unsigned ScreenX, unsigned ScreenY)
     if (Value < Min)
         Value = Min;
 
-    // 0x00581522..0x00581550: FUN_00580290, then FUN_00581560's body inlined.
     UpdateThumb();
-    NotifyValue();
+    NotifyValue(); // inlined in retail
 }
 
 void ScrollControl::NotifyValue()
 {
-    // FUN_00581560: the value first (pushed as the third argument), then this->AsWinControl().
+    // FUN_00581560.
     if (Parent == nullptr)
         return;
     WinControl* const Owner = Parent->AsWinControl();
@@ -618,8 +594,8 @@ void ScrollControl::NotifyValue()
 
 bool ScrollControl::Create(Win3D* NewParent, void* Data)
 {
-    // LAB_005815a0 (RET 8): Win3D::Create's body inlined (FUN_0059dd00, FUN_0059dbf0, flags),
-    // then the [ScrollControl] keys from the INI_Reader in Data.
+    // LAB_005815a0 (RET 8): Win3D::Create's body inlined, then the [ScrollControl] keys from the
+    // INI_Reader in Data.
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
     Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
@@ -761,7 +737,7 @@ bool ScrollControl::Create(Win3D* NewParent, void* Data)
         }
     }
 
-    // 0x00582103..0x00582112: the linked parent re-applies its own position (slot 5).
+    // The linked parent re-applies its own position.
     Win3D* const LinkedParent = Parent;
     if (LinkedParent != nullptr)
         LinkedParent->SetPosition(LinkedParent->Position);
@@ -780,8 +756,6 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
                          int NewPageSize, bool bNewSliderBehavior, bool bNewNoZEnable)
 {
     // FUN_00582120 (RET 0x6c). Hardpoints here are asked of the linked parent (+4).
-
-    // 0x00582122..0x00582216: back.
     if (BackMesh != nullptr)
         LoadPartMesh(this, &Back.Holder, BackMesh, &Back.Xform);
     Back.Offset = {BackOffset[0], BackOffset[1], BackOffset[2]};
@@ -796,7 +770,6 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
     Back.MouseSize = {BackMouse[0], BackMouse[1], BackMouse[2]};
     Back.bNoMeshRender = bBackNoMeshRender ? 1 : 0;
 
-    // 0x0058223b..0x0058238a: next.
     if (NextMesh != nullptr)
         LoadPartMesh(this, &Next.Holder, NextMesh, &Next.Xform);
     Next.Offset = {NextOffset[0], NextOffset[1], NextOffset[2]};
@@ -811,7 +784,7 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
     Next.MouseSize = {NextMouse[0], NextMouse[1], NextMouse[2]};
     Next.bNoMeshRender = bNextNoMeshRender ? 1 : 0;
 
-    // 0x0058236c..0x005824b9: prev -- all of it only with a mesh name (JZ 0x005824bf).
+    // Prev: all of it only with a mesh name.
     if (PrevMesh != nullptr)
     {
         LoadPartMesh(this, &Prev.Holder, PrevMesh, &Prev.Xform);
@@ -828,7 +801,6 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
         Prev.bNoMeshRender = bPrevNoMeshRender ? 1 : 0;
     }
 
-    // 0x005824bf..0x005825d2: the thumb.
     if (ThumbMesh != nullptr)
         LoadPartMesh(this, &ThumbHolder, ThumbMesh, &ThumbXform);
     ThumbOffset0 = {NewThumbOffset0[0], NewThumbOffset0[1], NewThumbOffset0[2]};
@@ -850,8 +822,7 @@ void ScrollControl::Init(char const* BackMesh, float const* BackOffset, char con
             AskHardpoint(Parent, NewThumbHp1, &ThumbHp1);
     }
 
-    // 0x00582678..0x005826c9.
-    ThumbMouse = {NewThumbMouse[0], NewThumbMouse[1], NewThumbMouse[2]};
+    ThumbMouse ={NewThumbMouse[0], NewThumbMouse[1], NewThumbMouse[2]};
     bThumbNoMeshRender = bNewThumbNoMeshRender ? 1 : 0;
     MinRange = NewMinRange;
     MaxRange = NewMaxRange;
@@ -876,26 +847,25 @@ bool ScrollControl::HitTest(float const* Ray)
 
 void ScrollControl::SetPosition(float const* NewPosition)
 {
-    // LAB_00582aa0: WinControl's SetPosition (FUN_005a0880), then the layout.
+    // LAB_00582aa0.
     WinControl::SetPosition(NewPosition);
     UpdateLayout();
 }
 
 void ScrollControl::SetOrientation(float const* NewOrientation)
 {
-    // FUN_00582ac0: nine dwords into Win3D +0x3c (not WinControl's slot 7), then the layout.
+    // FUN_00582ac0: straight into Win3D's orientation (not WinControl's SetOrientation).
     memcpy(Orientation, NewOrientation, sizeof(Orientation));
     UpdateLayout();
 }
 
 void ScrollControl::Update()
 {
-    // FUN_00582ae0: the children first (FUN_005a17b0).
+    // FUN_00582ae0: the children first.
     WinControl::Update();
 
     if (bThumbValid == 0)
     {
-        // 0x00582af6..0x00582b18.
         Win3DRemoveCapture(this);
         G_ScrollControlDragging = 0;
         bDragging = 0;
@@ -907,13 +877,11 @@ void ScrollControl::Update()
 
     if (bDragging != 0)
     {
-        // 0x00582b29: DAT_00616840 / DAT_00616844 pushed as they are.
         DragThumb(static_cast<unsigned>(CursorPixelX()), static_cast<unsigned>(CursorPixelY()));
         return;
     }
 
-    // FUN_0042d660 - +0x670 against 0.3 (DAT_005c9858): TEST AH,0x41 / JNZ -- only strictly
-    // later goes on.
+    // Auto-repeat every 0.3 s (DAT_005c9858); only strictly later goes on.
     if (bPaging != 0)
     {
         if (GetClientElapsedTime() - static_cast<double>(RepeatTime) > 0.3)
@@ -934,7 +902,7 @@ void ScrollControl::Update()
             if (Value > MaxRange)
                 Value = MaxRange;
             UpdateThumb();
-            NotifyValue(); // 0x00582c14..0x00582c3b, FUN_00581560 inlined
+            NotifyValue(); // inlined in retail
         }
         RepeatTime = static_cast<float>(GetClientElapsedTime());
         return;
@@ -964,20 +932,19 @@ void ScrollControl::Draw()
         return;
     if (GetGameOption(kGameOptNeuronet) == 0)
         return;
-    Win3DDrawChildren(this); // FUN_0059e5c0
+    Win3DDrawChildren(this);
     if (bThumbValid == 0)
         return;
 
-    // 0x00582721..0x00582760: the idle colour DAT_00679bb0 and the hot colour
-    // {0xf5, 0xea, 0x52, 0xff}, each kept twice on the stack.
+    // The idle colour DAT_00679bb0 and the hot colour.
     unsigned long const Idle = G_NnPaletteArgb_679bb0;
     unsigned char const HotBytes[4] = {0xf5, 0xea, 0x52, 0xff};
     unsigned long Hot = 0;
     memcpy(&Hot, HotBytes, sizeof(Hot));
     FSpaceCamera* const Camera = Win3DGetCamera();
 
-    // 0x00582764..0x0058282c: the back plate -- the untinted pass unless back_no_mesh_render,
-    // then depth test off and always the idle-tinted pass.
+    // The back plate: the untinted pass unless back_no_mesh_render, then depth test off and
+    // always the idle-tinted pass.
     if (ClientMeshHolderHasInstance(&Back.Holder))
     {
         if (Back.bNoMeshRender == 0)
@@ -989,7 +956,7 @@ void ScrollControl::Draw()
                                                1.0f, 0);
     }
 
-    // 0x0058282f..0x005828e4: next -- hot while pressed or hovered; no tinted pass.
+    // Next: hot while pressed or hovered; no tinted pass.
     if (ClientMeshHolderHasInstance(&Next.Holder))
     {
         unsigned long const* const Color =
@@ -999,7 +966,6 @@ void ScrollControl::Draw()
         Win3DDisable(kWin3DDepthTest);
     }
 
-    // 0x005828e7..0x0058299c: prev.
     if (ClientMeshHolderHasInstance(&Prev.Holder))
     {
         unsigned long const* const Color =
@@ -1009,8 +975,8 @@ void ScrollControl::Draw()
         Win3DDisable(kWin3DDepthTest);
     }
 
-    // 0x0058299f..0x00582a8e: the thumb -- untinted in the idle colour unless
-    // thumb_no_mesh_render, then tinted hot while dragged or hovered, then depth test off.
+    // The thumb: untinted in the idle colour unless thumb_no_mesh_render, then tinted hot while
+    // dragged or hovered, then depth test off.
     if (bThumbValid == 0)
         return;
     if (!ClientMeshHolderHasInstance(&ThumbHolder))
@@ -1026,7 +992,7 @@ void ScrollControl::Draw()
 
 void ScrollControl::MouseOver(float const* Ray)
 {
-    // LAB_00583120: MOV EAX,[ECX] / JMP [EAX+0x3c] -- slot 15.
+    // LAB_00583120: a virtual tail jump to MouseEnter.
     MouseEnter(Ray);
 }
 
@@ -1048,18 +1014,17 @@ void ScrollControl::MouseEnter(float const* Ray)
 
 void ScrollControl::MouseLeave(float const* Ray)
 {
-    // LAB_00583120, the same tail jump into slot 15.
+    // LAB_00583120.
     MouseEnter(Ray);
 }
 
 bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_00582c50 (RET 4). Without a valid thumb nothing is taken; with one every event is
-    // (EBX stays 1 on every other exit).
+    // LAB_00582c50 (RET 4). Without a valid thumb nothing is taken; with one every event is.
     if (bThumbValid == 0)
         return false;
 
-    // 0x00582c6f..0x00582d6a: a held part lets go on {-1, 1} (the button release).
+    // A held part lets go on {-1, 1} (the button release).
     bool const bRelease = Event->Field0 == -1 && Event->Field1 == 1;
     if (bDragging != 0)
     {
@@ -1099,13 +1064,12 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // 0x00582d6d: only {-1, 2} (the press) goes on.
+    // Only {-1, 2} (the press) goes on.
     if (Event->Field0 != -1 || Event->Field1 != 2)
         return true;
 
-    // 0x00582d80..0x00582e76: the cursor ray -- the pixel onto the near plane of the Win3D
-    // camera DAT_0067dbf8 through a copy of its orientation DAT_0067dbfc (this TU's math engine,
-    // slot +0x2c TransformMatrix), times 1 / FSQRT(length).
+    // The cursor ray: the pixel onto the near plane of the Win3D camera DAT_0067dbf8 through a
+    // copy of its orientation, normalised with a real sqrt (unlike the fast inverse root above).
     FSpaceCamera* const Cam = Win3DGetCamera();
     int const CursorX = CursorPixelX();
     int const CursorY = CursorPixelY();
@@ -1127,16 +1091,15 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     Ray[1] = static_cast<float>(World.Y * Inv);
     Ray[2] = static_cast<float>(World.Z * Inv);
 
-    // 0x00582e78..0x00582ea3: the thumb starts a drag.
     bool bStartDrag = false;
     if (bThumbValid != 0 && RayHits(ThumbMouse, ThumbXform, Ray))
     {
-        Win3DPushCapture(this); // FUN_0059d8d0
+        Win3DPushCapture(this);
         bStartDrag = true;
     }
     else if (RayHits(Next.MouseSize, Next.Xform, Ray))
     {
-        // 0x00582ec7..0x00582f4c: one step up at once, then auto-repeat from Update.
+        // One step up at once, then auto-repeat from Update.
         Win3DPushCapture(this);
         if (Value < MaxRange)
         {
@@ -1152,7 +1115,6 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     }
     else if (RayHits(Prev.MouseSize, Prev.Xform, Ray))
     {
-        // 0x00582f6e..0x00582ff1: one step down.
         Win3DPushCapture(this);
         if (Value > MinRange)
         {
@@ -1168,7 +1130,7 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     }
     else
     {
-        // 0x00582ff4..0x0058301b: the back plate.
+        // The back plate.
         if (bThumbValid == 0)
             return true;
         if (!RayHits(Back.MouseSize, Back.Xform, Ray))
@@ -1176,7 +1138,7 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
         Win3DPushCapture(this);
         if (bSliderBehavior == 0)
         {
-            // 0x00583061..0x00583089: page, and keep paging from Update.
+            // Page, and keep paging from Update.
             bPaging = 1;
             RepeatTime = static_cast<float>(GetClientElapsedTime());
             ChoosePageDirection(static_cast<unsigned>(CursorPixelX()),
@@ -1187,7 +1149,6 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
         bStartDrag = true;
     }
 
-    // LAB_00583035: drag from here.
     if (bStartDrag)
     {
         bDragging = 1;
@@ -1199,13 +1160,13 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
 
 void ScrollControl::RefreshAttachment()
 {
-    // Slot 35 is FUN_00401e90 (RET) in this vftable: a ScrollControl does not follow a
-    // hardpoint the way WinControl's FUN_005a09d0 does.
+    // FUN_00401e90 (empty): a ScrollControl does not follow a hardpoint the way WinControl's
+    // does.
 }
 
 intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // FUN_005831b0 (RET 0xc): Msg - 6 through the byte table 0x00583358.
+    // FUN_005831b0 (RET 0xc).
     switch (Msg)
     {
     case 0x06:
@@ -1264,7 +1225,7 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x3d:
         return PageSize;
     default:
-        return WinControl::SetProperty(Msg, A, B); // FUN_005a13c0
+        return WinControl::SetProperty(Msg, A, B);
     }
 }
 
@@ -1299,8 +1260,7 @@ WinControl* WinControl::CreateScrollControl(
     bool bThumbNoMeshRender, int MinRange, int MaxRange, int PageSize, bool bSliderBehavior,
     bool bNoZEnableArg)
 {
-    // FUN_005a0ef0 (RET 0x70): FUN_0059db20(Name, "ScrollControl", this, 0), then Init with the
-    // other 27 arguments.
+    // FUN_005a0ef0 (RET 0x70).
     Win3D* const Created = WinFactoryCreate(Name, "ScrollControl", this, nullptr);
     if (Created != nullptr)
     {

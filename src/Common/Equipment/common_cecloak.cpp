@@ -4,28 +4,27 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CECloakingDevice -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
+// CECloakingDevice. Declared in common_cequip.h; helpers shared with the sibling TUs are in
 // common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
+#include "common_animdb.h"
 
 #include "common_cobject.h"
-#include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)
-#include "common_fuses.h"    // WeaponModDB_GetShieldMod (CEShield::GetWeaponModifier)
-#include "common_iface.h"    // EquipStatus, EquipStatusFlag* (CEquip::GetStatus)
+#include "common_csys.h"
+#include "common_fuses.h"
+#include "common_iface.h"
 #include "common_ini.h"
-#include "common_misc.h"     // ComputeExplosiveImpulses (CAttachedEquip::Disconnect)
+#include "common_misc.h"
 #include "common_physys.h"
-#include "common_spatial.h"  // ISpatialPartition (ScanList::add_in_range bucket query)
-#include "common_timing.h"   // Timing::GetGlobalTime (CEShieldGenerator / CEShield)
+#include "common_spatial.h"
+#include "common_timing.h"
 #include "common_universe.h"
 #include "DALib.h"
 #include "dacom.h"
 #include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
+#include "ivp_physics/ivp_controller.h"
 
 #include <cstdarg>
 #include <cstdint>
@@ -44,10 +43,8 @@ CECloakingDevice::CECloakingDevice(CEqObj* OwnerObj, unsigned short EquipId,
     , FadeTarget(0)
     , BaselineState(0)
 {
-    // .text:06294460-06294516: retail inlines the CAttachedEquip ctor body (the base ctor
-    // above), then +0x50 = +0x51 = 0 (the pad bytes +0x52/+0x53 and the timer +0x4c are not
-    // written), calls CECloakingDevice::Activate(true) directly (062944f3), and finally copies
-    // Arch->CloakOutTime (+0x90) into the timer, overwriting what Activate stored.
+    // FUN_06294460. The pad bytes +0x52/+0x53 are not written; the timer is set only by
+    // Activate and then overwritten with CloakOutTime.
     CECloakingDevice::Activate(true);
     CloakTimer = CloakArch()->CloakOutTime;
 }
@@ -58,35 +55,19 @@ CECloakingDevice::CECloakingDevice(CECloakingDevice const& Other)
     , FadeTarget(Other.FadeTarget)
     , BaselineState(Other.BaselineState)
 {
-    // Common.dll.c 55259 (0x32fb0): plain field-by-field copy re-stamping the vtable at
-    // each base level (CEquip::_vftable_, CExternalEquip::_vftable_, CAttachedEquip::
-    // _vftable_, then this class's own) -- ordinary MSVC base-then-derived copy-ctor
-    // codegen, reproduced here via CAttachedEquip(Other)'s own copy plus this level's own
-    // fields. Retail only copies the first 6 of the trailing 8 bytes here (the dword at
-    // +0x4c plus the two bytes at +0x50/+0x51) -- the trailing +0x52/+0x53 pad bytes are
-    // left uninitialized by this ctor, so Pad52 is intentionally not copied.
+    // RVA 0x32fb0. The pad bytes +0x52/+0x53 are not copied.
 }
 
 CECloakingDevice::~CECloakingDevice()
 {
-    // Common.dll.c 56458 (0x34520): retail force-calls the non-virtual CExternalEquip::
-    // Destroy() here (bDestroyed=1 + EquipDestroying notify, then Disconnect()) as a safety
-    // net during unwind -- same "Destroy() force-call" pattern as CEPower/CEAttachedFX/
-    // CERepairDroid/CEInternalFX's destructors in this file. The Debris/Attachment/Arch
-    // cleanup that follows in the decompilation is identical to ~CAttachedEquip()'s body
-    // and runs automatically as that base destructor executes after this one returns.
+    // RVA 0x34520: the non-virtual CExternalEquip::Destroy(); ~CAttachedEquip does the rest.
     CExternalEquip::Destroy();
 }
 
 bool CECloakingDevice::Update(float Dt, unsigned Flags)
 {
-    // .text:06294660-0629476c.
-    //  - vt+8 IsDestroyed false and FadeTarget != BaselineState: Total = FadeTarget ? Arch+0x90
-    //    (CloakOutTime) : Arch+0x8c (CloakInTime); FLD Dt; FADD timer; FST float timer -- the
-    //    compare (FCOMP vs Total, TEST AH,0x41 / JNZ) uses the unrounded sum: only a strictly
-    //    greater, ordered sum settles the fade (BaselineState = FadeTarget, timer = 0).
-    //  - Owner non-null: Owner+0x140 = the inlined cloak_percent() body, one FSTP float.
-    //  - Tail: vt+8 IsDestroyed and Debris (+0x2c) -> true; else CExternalEquip::Update.
+    // FUN_06294660. The fade compare uses the unrounded sum (x87); only a strictly greater,
+    // ordered sum settles the fade. The tail is CAttachedEquip::Update inlined.
     if (!IsDestroyed() && FadeTarget != BaselineState)
     {
         Archetype::CloakingDevice const* CloakingArch = CloakArch();
@@ -108,14 +89,7 @@ bool CECloakingDevice::Update(float Dt, unsigned Flags)
 
 bool CECloakingDevice::Activate(bool bActive)
 {
-    // .text:06294770-06294852.
-    //  - vt+4 IsActive() == bActive -> return bActive.
-    //  - Result = CEquip::Activate(bActive) (direct); New = CEquip::bActive (+0x10).
-    //  - FadeTarget == New -> return Result. FadeTarget == BaselineState -> FadeTarget = New,
-    //    timer = 0, return Result.
-    //  - Mid-fade: Frac = the inlined cloak_percent() fade branch, kept on the FPU stack;
-    //    old FadeTarget != 0 -> timer = (1 - Frac) * CloakInTime (+0x8c), else
-    //    timer = Frac * CloakOutTime (+0x90); one FSTP float; FadeTarget = New.
+    // FUN_06294770. Mid-fade, the timer is rescaled from the unrounded cloak_percent (x87).
     if (IsActive() == bActive)
         return bActive;
 
@@ -142,11 +116,8 @@ bool CECloakingDevice::Activate(bool bActive)
 
 double CECloakingDevice::cloak_percent() const
 {
-    // .text:062945d0-06294653. Settled (FadeTarget == BaselineState): BaselineState ? 1.0f
-    // : 0.0f. Fading in (FadeTarget != 0): CloakOutTime (+0x90) FCOMP the double 0.001
-    // (.rdata:0639c9f0), TEST AH,0x41 / JNZ: not greater or unordered -> 1.0f, else
-    // timer / CloakOutTime. Fading out: 0.0 or timer / CloakInTime (+0x8c) by the same test,
-    // then FSUBR the double 1.0 (.rdata:06399410). The result is left unrounded in ST0.
+    // FUN_062945d0. A fade time not greater than 0.001 (or NaN) counts as instant. The result
+    // is left unrounded (x87).
     if (FadeTarget == BaselineState)
         return (BaselineState != 0) ? 1.0f : 0.0f;
     Archetype::CloakingDevice const* CloakingArch = CloakArch();
@@ -169,7 +140,7 @@ Archetype::CloakingDevice const* CECloakingDevice::CloakArch() const
 
 CECloakingDevice* __cdecl CECloakingDevice::cast(CEquip* Equip)
 {
-    // Listing 0x34860: null-check, then Type == 0x1000.
+    // RVA 0x34860
     if (Equip == nullptr || Equip->GetType() != EquipTypeCloak)
         return nullptr;
     return (CECloakingDevice*)(Equip);

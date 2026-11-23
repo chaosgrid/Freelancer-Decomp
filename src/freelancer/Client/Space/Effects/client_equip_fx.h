@@ -21,14 +21,14 @@ class FClientGameobj;
 struct FClientEquip : INotify
 {
     FClientEquip();
-    // FUN_00531af0: vtable back to 005de13c, Equip non-null -> CEquip::NotifyDisconnecting(this),
-    // SeparationExplosion non-null -> FUN_00536170.
+    // FUN_00531af0: a non-null Equip is told to drop this notify, a non-null
+    // SeparationExplosion is released (FUN_00536170).
     virtual ~FClientEquip();
-    // FUN_00532000 (RET 4): `return Equip != nullptr`. Overridden by CliEngine (FUN_00528020),
+    // FUN_00532000: `return Equip != nullptr`. Overridden by CliEngine (FUN_00528020),
     // CliLauncher / MineDropper / CounterMeasureDropper (FUN_0052cd40), CliGun (FUN_0052dbf0),
     // CliAttachedFX (FUN_00532490) and CliTradeLaneEquip (FUN_00516ea0).
     virtual bool Update(float Dt);
-    // FUN_00531b20 (RET 8): code 0xa -> CEquip::NotifyDisconnecting(this) (no test), Equip = 0.
+    // FUN_00531b20: code 0xa -> CEquip::NotifyDisconnecting(this) (no test), Equip = 0.
     void notify(Event Code, void* Param) override;
 
     FClientEquip(FClientEquip const&) = delete;
@@ -39,9 +39,9 @@ struct FClientEquip : INotify
     Archetype::Explosion* SeparationExplosion;  // +0x0c
 };
 
-// FUN_00531a30 (thiscall, RET 8) -- the ClientEquip constructor body every type constructor
-// runs first (called by FUN_0052c830 at 0x0052c85c, inlined into most others): +4 / +8 / +0xc,
-// CEquip::ConnectClientEquip, the attached equipment's separation explosion.
+// FUN_00531a30 -- the ClientEquip constructor body every type constructor runs first (called by
+// FUN_0052c830, inlined into most others): the fields, CEquip::ConnectClientEquip, the attached
+// equipment's separation explosion.
 void ClientEquipBaseFill(FClientEquip* Wrapper, CEquip* Equip, FClientGameobj* Host);
 
 // One node of the EquippedObj +0xb8 list (operator new(0xc), FUN_0042a7e0): a VC6 std::list
@@ -53,26 +53,25 @@ struct FEquipFxListNode
     FClientEquip* Wrapper;    // +0x08
 };
 
-// FUN_00532170 (cdecl) -- IFLAppearance from DALib::Engine (QueryInterface), slot 5 (+0x14) with
-// Key when the query succeeded, released either way; answers whether slot 5 succeeded.
-// Callers: the cloak notify 0x00532037, the equipped object's LOD pick 0x00533847; the cloak
-// destructor FUN_00531f30 inlines the same body.
+// FUN_00532170 -- IFLAppearance from DALib::Engine, RemoveInstanceValue(Key) when the query
+// succeeded, released either way; answers whether the removal succeeded. Callers: the cloak
+// notify, the equipped object's LOD pick; the cloak destructor FUN_00531f30 inlines the same body.
 bool RemoveAppearanceInstanceValue(int Key);
 
-// FUN_00533100 (thiscall on the EquippedObj, RET 4) -- the equipment EquipId of the host's
+// FUN_00533100 (on the EquippedObj) -- the equipment EquipId of the host's
 // CEqObj (narrowed by 0x103, CEquipManager::FindByID with no test of the object), then the
 // first wrapper on the +0xb8 list whose Equip is it; null when none is.
 FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipId);
 
-// FUN_0052f9a0 (thiscall on the CliTractor wrapper, RET 8) -- the ITEMTRACTORED handler's
-// (FUN_0053c5d0, 0x0053c603) second step. Wrapper must be the tractor's (FUN_00533100 with the
+// FUN_0052f9a0 (on the CliTractor wrapper) -- the ITEMTRACTORED handler's (FUN_0053c5d0) second
+// step. Wrapper must be the tractor's (FUN_00533100 with the
 // tractor's equipment id). An intact tractor whose arm holds LootId drops it
 // (CETractor::RemoveTarget) unless the loot keeps more than Units units; outside the player's
 // own host that happens only in multiplayer.
 void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units);
 
-// The shield wrapper's own slots +0x14 (LAB_0052e760, RET 0xc) and +0x18 (FUN_0052e8c0, RET 8),
-// virtual calls on Wrapper. Wrapper must be a shield's (the equipped object's hit slots
+// The shield wrapper's own slots +0x14 (LAB_0052e760) and +0x18 (FUN_0052e8c0), virtual calls on
+// Wrapper. Wrapper must be a shield's (the equipped object's hit slots
 // FUN_005340b0 / FUN_00534190 pick it with FUN_00533100 and require CEquip type 0x100).
 // HitInfo is the hit point (+0) and the surface normal (+0xc).
 // Collision: the hit effect by Other's mass * COLLISION_DAMAGE_FACTOR * closing speed; Unused
@@ -84,7 +83,7 @@ void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, void const* HitInfo,
 void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
                                  FClientGameobj* Munition);
 
-// FUN_00534240 (thiscall on the EquippedObj, RET 0x14) -- the body of
+// FUN_00534240 (on the EquippedObj) -- the body of
 // FClientEquippedObj::LightFuse (vtable +0x1c0): the first fuse named FuseId on the burning list
 // (+0xc4) gets Fuse::IgniteAt(SourceId, SubObjId, AtT); otherwise the ClientFuseDB prototype is
 // copied onto the list, bound to Host, randomised, given OverrideLifetime unless it is -1 and
@@ -96,12 +95,12 @@ bool HostIgniteFuse(FClientGameobj* Host, unsigned SourceId, ID_String const& Fu
 // FUN_00533080 — destroy every wrapper in Host+0xb8 and free list nodes.
 void EquippedObjClearEquipFx(FClientGameobj* Host);
 
-// FUN_00533160 — find equip by id, dispatch EEquipType, insert wrapper at Host+0xb8.
-// All 14 retail type arms allocate; some type-ctors remain simplified (named gaps).
+// FUN_00533160 — find equip by id, dispatch on its EEquipType (14 arms), insert the wrapper at
+// Host+0xb8.
 void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId);
 
-// FUN_00533e10 — clear + Traverse all equip → CreateEquipFx + fuse threshold walks
-// + ResolveExplosion. Host vt+0x1c0 Ignite = FUN_00534240 via HostIgniteFuse.
+// FUN_00533e10 — clear, a wrapper per equipment, the fuse threshold walks (through the host's
+// Ignite slot, FUN_00534240 / HostIgniteFuse) and the explosion arch.
 void EquippedObjRebuildEquipFx(FClientGameobj* Host);
 
 // The CliTradeLaneEquip wrapper (FUN_00516c30, EEquipType 0x800000) as the solar's lane switch

@@ -11,8 +11,7 @@
 
 struct IFileSystem;
 
-// FUN_0057e310, cdecl(value, filesystem): GetFileSysPath(path, RelPath, Filesys) first
-// (0x0057e341..0x0057e34b). FUN_005b0c30 passes DALib::Data. [TrueType] "font" lines go to
+// FUN_0057e310, cdecl(value, filesystem). FUN_005b0c30 passes DALib::Data. [TrueType] "font" lines go to
 // COMMON SetStandardFont, each [Style] becomes a RenderDisplayList handed to
 // StyleCollection::set_style under the CRC-16 of its "name".
 void LoadRichFontsFromIni(char const* RelPath, IFileSystem* Filesys);

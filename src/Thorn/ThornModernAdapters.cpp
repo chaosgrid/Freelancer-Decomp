@@ -27,9 +27,7 @@ char* FThornModernAdapters::FormatDiagnostic(char* Destination, const char* Form
 
 void FThornModernAdapters::ReleaseOwnedComponent(IDAComponent*& Component)
 {
-    // FUN_06f4a910: TEST owned slot, dispatch vtable slot +8 (Release), then
-    // store null.  Clearing after Release preserves the retail observable
-    // state even when the interface implementation observes its final call.
+    // FUN_06f4a910: the slot is cleared after Release, as in retail.
     if (Component != nullptr)
     {
         Component->Release();

@@ -28,25 +28,16 @@ namespace AlchemyImpl
         unsigned long DACOM_API AddRef() override { return ++RefCount_; }
         unsigned long DACOM_API Release() override;
 
-        // FUN_0621f610 (alchemy.dll.c:18966-19002, raw .txt:64408-6469f — read and
-        // verified against retail bytes this wave, not just the decompiled C):
-        // param_1[6] (this+0x18, TransformExtra_) is an override target. If set,
-        // tail-call just that ONE node's SetTransform (vtable+0x3C) with (A,B) and
-        // return its own result. Else walk every node in Nodes_[], skip any
-        // vtable+0x1C-disabled one, call SetTransform(node,A,B) on the rest, and
-        // FDUMP a "Failed to set node transform. Continuing." warning (code
-        // 0x100002) per call that doesn't return GR_OK — the call's own result is
-        // otherwise ignored and the loop always finishes returning GR_OK.
-        // Slot3 never writes this+0x18. A is the node transform slot index (0 composed,
-        // 1 raw -- FUN_062400f0), B the 12-float source; ScriptPsys Tick passes (1, Xform).
-        // A prior port's TransformExtra_=B store was removed 2026-09-23.
+        // FUN_0621f610: when TransformExtra_ (this+0x18) is set, only that node's
+        // SetTransform (vtable+0x3C) runs and its result is returned. Otherwise every
+        // node not disabled (vtable+0x1C) gets SetTransform(A, B), each failure FDUMPs
+        // "Failed to set node transform. Continuing." (0x100002), and the result is
+        // GR_OK. This slot never writes this+0x18. A is the node transform slot index
+        // (0 composed, 1 raw -- FUN_062400f0), B the 12-float source; ScriptPsys Tick
+        // passes (1, Xform).
         GENRESULT DACOM_API SetTransform(void* A, void* B) override;
-        // LAB_0621f6a0: this+0x18 (TransformExtra_) override target takes priority
-        // (JMP straight to *TransformExtra_'s IFxNode+0x40 with (A,B)) — this half
-        // was not previously ported (Slot4 always used Nodes_[0].Node). Else JMP
-        // first list node IFxNode+0x40 (same stack, RET 0xC); no count or null test,
-        // as in retail (the port-only "return a cached effect transform" fallback
-        // was removed 2026-09-26).
+        // LAB_0621f6a0: TransformExtra_'s node IFxNode+0x40 (A, B) when set, else the
+        // first list node's; no count or null test.
         GENRESULT DACOM_API GetTransform(void* A, void* B) override;
         GENRESULT DACOM_API SetAge(float Age) override;
         GENRESULT DACOM_API SetOuterTime(float OuterTime) override;
@@ -61,8 +52,8 @@ namespace AlchemyImpl
         GENRESULT DACOM_API IsFinished(void* Arg) override;
         // LAB_0621fb50: per-node {Id,Node} enumeration callback. See WalkNodesEnumerate.
         GENRESULT DACOM_API EnumerateNodes(void* A, void* B) override;
-        // FUN_0621fba0 Ghidra thiscall (this, effect, flags) RET 8 (formerly Slot13).
-        // Destroy/free effect nodes by bitmask (1=emitters, 2=fields, 4=appearances, 7=all).
+        // FUN_0621fba0: destroy/free effect nodes by bitmask (1=emitters, 2=fields,
+        // 4=appearances, 7=all).
         GENRESULT DACOM_API DestroyNodes(void* Arg) override;
         // LAB_0621f850: per-node call to node+0x88(node, Arg). See WalkNodes.
         GENRESULT DACOM_API SetLodInput(float LodInput) override;
@@ -134,7 +125,7 @@ namespace AlchemyImpl
         static unsigned char CallNodeFlagSlot(
             IDAComponent* Node, GENRESULT (DACOM_API IGenericFx::*Query)(unsigned char*));
 
-        // LAB_0621fb50 enumeration record built per node for Slot12's callback.
+        // LAB_0621fb50 enumeration record built per node for EnumerateNodes' callback.
         struct FNodeIdPair
         {
             unsigned long Id;
@@ -159,21 +150,9 @@ namespace AlchemyImpl
         // IFxAppearance, then [emitter+0x9C](appearance), release both
         // temp interfaces. Else QI A as IFxAppearance -> B as IFxField,
         // then [appearance+0xAC](field), release both temp interfaces.
-        // Else FDUMP line 0x17b. Wave-61 re-audit (byte-for-byte re-trace
-        // of alchemy.dll.txt:64090-64369/alchemy.dll.c:18857-18921): retail
-        // does NOT persist these pairs anywhere -- every QI'd interface is
-        // released immediately after the single associate call, and
-        // FFxEffectObject's own destructor (FUN_0621ed80/FUN_06220d90,
-        // alchemy.dll.txt:63572-63634/67278-67332) only ever releases
-        // Archetype_ (+0x1c) and the node list (+0xc/+0x10) -- no second
-        // array is ever walked or freed. A pre-wave-61 version of this port
-        // invented a persistent Associates_ array (StoreRec8Assoc/
-        // ClearAssociates) that AddRef'd both sides of every pair and held
-        // them until the next rebind or teardown, plus a HintAppearanceCounts
-        // helper that called the (real, elsewhere-verified) IGenericFx::
-        // SetLiveInstanceCount with a guessed hint -- neither has any retail
-        // call site in this loop. Removed: this now matches retail's exact
-        // QI/use/release-once shape with no extra held references.
+        // Else FDUMP line 0x17b. The pairs are not kept: the destructor
+        // (FUN_0621ed80 / FUN_06220d90) releases only Archetype_ (+0x1c) and the node
+        // list (+0xc/+0x10).
         void BindRec8Associates(IFxEffectArchetype* InitialArchetype);
 
         void ClearNodes();

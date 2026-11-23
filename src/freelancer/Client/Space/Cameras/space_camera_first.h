@@ -14,8 +14,8 @@
 // 0x54 (0x00517330, the name), 0x58 (0x005178e0, the attach), 0x64 (0x0051b0a0),
 // 0x6c (0x00517ba0) and 0x78 (0x00518420); the rest it shares with its siblings.
 //
-// Its ini loader FUN_005173c0 is the one the in-flight init calls FIRST (0x0054ad2d), and all
-// four loaders are handed the same cockpit path.
+// Its ini loader FUN_005173c0 is the one the in-flight init calls FIRST; all four loaders are
+// handed the same cockpit path.
 
 #include "Space/Cameras/space_camera_game.h"
 
@@ -44,7 +44,7 @@ struct FFirstPersonCamera : FHudCamera
     float PositionC[3];              // +0x160  zeroed
     float OrientationC[9];           // +0x16c  identity
 
-    // FUN_00420d40 builds the cockpit mesh holder in place here (0x005171a7); FUN_00420dd0
+    // FUN_00420d40 builds the cockpit mesh holder in place here; FUN_00420dd0
     // loads it from the mesh and material-library names the loader collected, and its +0x04
     // (+0x194 here) is the compound instance CompoundInstanceAnalyze walks to find the
     // cockpit's camera hardpoint.
@@ -95,7 +95,7 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object);
 // update (FUN_0051d070) and +0x1a0 cleared.
 void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds);
 
-// Slot 0x78 (LAB_00518420, thiscall RET 8): with an object watched, the scene pass
+// Slot 0x78 (LAB_00518420): with an object watched, the scene pass
 // (FUN_0051c200), a depth clear (always when the "cockpit" option is applied above 0.999,
 // otherwise only with the HUD option), FUN_0051c970, the cockpit mesh pass (near / far 0.05 /
 // 500, the cockpit lighting or the jump ambient, the mesh drawn in depth range [0.75, 1]),
@@ -106,12 +106,11 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
 // blocked mouse pick (FUN_0045a740) -> false, otherwise HUDCamera's FUN_0051d7f0.
 bool FirstPersonCameraOnEvent(FFirstPersonCamera* Cam, unsigned MsgId);
 
-// FUN_00518410 (thiscall): `ADD ECX,0x190 / JMP FUN_00420f70` -- release the cockpit mesh
-// holder (destroy the engine instance, drop both material-cache slots). The space teardown
-// FUN_0054aec0 calls it on controller + 0x00c (0x0054aef7).
+// FUN_00518410: FUN_00420f70 on +0x190 -- release the cockpit mesh holder (destroy the engine
+// instance, drop both material-cache slots). Called by the space teardown FUN_0054aec0.
 void FirstPersonCameraReleaseMesh(FFirstPersonCamera* Cam);
 
-// FUN_005173c0, a __thiscall taking the cockpit ini path. Reads [Cockpit] (mesh and
+// FUN_005173c0, taking the cockpit ini path. Reads [Cockpit] (mesh and
 // material_library into 0x104-byte stack strings, head_turn into two globals), warns about the
 // obsolete [Camera] header, loads the cockpit mesh, takes the head transform from its "cam"
 // part and finishes with the same 4:3 sanity check the third-person loader runs. Returns

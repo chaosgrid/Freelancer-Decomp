@@ -111,9 +111,6 @@ enum EEquipType
     EquipTypeArmor = 0x1000000
 };
 
-// ============================================================================
-// INotify — equipment/object notification listener interface (Common.dll.c 62498-62511)
-// ============================================================================
 // A DALib::Anim script handle (-1 = none) held as a member with a destructor:
 // `if (Index != -1) { Anim slot 0x38 StopPlayback(Index); Anim slot 0x28 DestroyScript(Index);
 // Index = -1; }` -- no AnimDB::Rem. Owners: CEInternalFX +0x20 (Unwind@06393be8 -> FUN_0629abd0;
@@ -140,25 +137,20 @@ struct FAnimScriptRef
 
 static_assert(sizeof(FAnimScriptRef) == 0x04, "FAnimScriptRef sizeof 4");
 
-// Retail never defines a concrete implementation of this interface inside Common.dll --
-// it's only ever used as an opaque listener-pointer type here (CEquip::ConnectServerEquip/
-// ConnectClientEquip/NotifyDisconnecting/Notify below). There is also a second, unrelated
-// INotify* listener slot on CEqObj itself at +0x168, wired through CEqObj's own
-// connect/disconnect/notify triplet (Common.dll.c 77124-77161) -- a distinct, still-unported
-// gap, not addressed here.
+// ============================================================================
+// INotify — equipment/object notification listener interface
+// ============================================================================
+// Common.dll has no concrete implementation; it is an opaque listener type here
+// (CEquip::ConnectServerEquip/ConnectClientEquip/NotifyDisconnecting/Notify). CEqObj has its
+// own INotify* slot at +0x168 with its own connect/disconnect/notify.
 //
-// Slot 0's signature is pinned two ways: CEqObj::notify (Common.dll.c 77150,
-// `?notify@CEqObj@@UAEXW4Event@INotify@@PAX@Z`) is a real override with exactly this
-// signature, and every CEquip::Notify call site dispatches through it as
-// `(**(code**)**NotifyPtr)(Code, Param)` -- vtable slot 0, this = the INotify* itself,
-// args (Event, void*). No virtual destructor precedes it in the vtable (nothing in the
-// retail listing ever deletes through an INotify*), so slot 0 must stay Notify's slot 0 too.
+// Slot 0 is notify(Event, void*): CEqObj::notify (`?notify@CEqObj@@UAEXW4Event@INotify@@PAX@Z`)
+// overrides it, and every CEquip::Notify call dispatches through slot 0. No virtual
+// destructor precedes it (retail never deletes through an INotify*).
 struct INotify
 {
-    // Event codes observed at real retail CEquip::Notify call sites across Common.dll.
-    // Only a handful have confirmed semantics (cross-checked against the calling
-    // function's own state changes); the rest are named by their retail value only --
-    // do not assume the numbering is contiguous, exhaustive, or CEquip-specific.
+    // Event codes seen at retail CEquip::Notify call sites. Codes named Event_0xNN have no
+    // confirmed meaning; the numbering is not contiguous or CEquip-specific.
     enum Event
     {
         DockAnimEnded             = 0x0,  // CEqObj::update_docking_animations (062aabac / 062aac5f): a docking animation reached an end; Param = unsigned char* (1 = back at the start, 0 = at the end)
@@ -222,13 +214,9 @@ public:
     virtual bool IsDisabled() const;
     virtual bool IsTemporary() const;
     virtual bool CanDelete() const;
-    // Retail ??_7CEquip@@6B@ slot 7 (+0x1c) resolves to the giant ICF fold at Common.dll.txt
-    // 0x8d730 (shared with ~20 unrelated symbols, among them CEquip::NotifyArchGroupDestroyed
-    // itself -- confirmed by name in that fold's XREF comment list). That fold's raw bytes are
-    // a bare `RET 0x4`: retail's base CEquip implementation is a genuine empty no-op. Declared
-    // virtual (matching retail's UAEXG@Z/public-virtual mangling) so the API surface is present
-    // for CEqObj::destroy_equipment's arch-group-damage traversal (CEEngine, CELightEquip and
-    // CEAttachedFX override it).
+    // Slot 7 (+0x1c): retail's base body is the shared ICF fold 0x062ed730, a bare `RET 4`.
+    // CEEngine, CELightEquip and CEAttachedFX override it; CEqObj::destroy_equipment's
+    // arch-group traversal calls it.
     virtual void NotifyArchGroupDestroyed(unsigned short SubObjId);
     virtual bool IsLootable() const;
     virtual bool Update(float Dt, unsigned Flags);
@@ -243,9 +231,8 @@ public:
     // consumes it there, so it is double here (export ?GetRelativeHealth@CEquip, same
     // class/method/arity).
     virtual double GetRelativeHealth() const;
-    // Common.dll.c 0xcc0c0: base default always returns false (params unused). Overridden
-    // by CExternalEquip::GetConnectionPosition (Common.dll.c 0x3ee00) with real joint/matrix
-    // logic -- that override is not yet ported (see tracker item for CExternalEquip's version).
+    // 0x0632c0c0: base default always returns false (params unused). Overridden by
+    // CExternalEquip::GetConnectionPosition (0x0629ee00).
     virtual bool GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) const;
     virtual bool EnableController();
     virtual bool DisableController();
@@ -258,10 +245,10 @@ public:
     // Listing 0x71ad0 (ICF-shared): return [this+0x4].
     CEqObj* GetOwner() const;
     char const* IdentifyEquipment() const;
-    void ConnectServerEquip(INotify* NotifyParam);  // Common.dll.c 0x3afd0
-    void ConnectClientEquip(INotify* NotifyParam);  // Common.dll.c 0xbd950
-    void NotifyDisconnecting(INotify* NotifyParam); // Common.dll.c 0x3afe0
-    void Notify(INotify::Event Code, void* Param);  // Common.dll.c 0x3b010
+    void ConnectServerEquip(INotify* NotifyParam);  // 0x3afd0
+    void ConnectClientEquip(INotify* NotifyParam);  // 0xbd950
+    void NotifyDisconnecting(INotify* NotifyParam); // 0x3afe0
+    void Notify(INotify::Event Code, void* Param);  // 0x3b010
 
     CEqObj* Owner;                    // +0x04
     unsigned short Id;                // +0x08 (+0x0a: alignment, the ctor 0629ad70 leaves it)
@@ -288,15 +275,13 @@ class COMMON_API CInternalEquip : public CEquip
 public:
     CInternalEquip(unsigned TypeBits, CEqObj* OwnerObj, unsigned short EquipId,
                    Archetype::Equipment const* Arch, bool bMissionFlag);
-    // Common.dll.c 56748 (0x349e0). Adds no fields beyond CEquip -- plain CEquip(Other)
-    // field copy plus this class's own vtable, matching retail's memberwise-copy-then-
-    // restamp exactly.
+    // 0x349e0. Adds no fields: CEquip(Other) plus this class's vtable.
     CInternalEquip(CInternalEquip const& Other);
     virtual ~CInternalEquip();
 
     virtual bool GetEquipDesc(EquipDesc& Desc) const override;
 
-    // Common.dll.c 66799-66808 (0x3f320): type & 0x1ff0000.
+    // 0x3f320: type & 0x1ff0000.
     static CInternalEquip* __cdecl cast(CEquip* Equip);
     static CInternalEquip const* __cdecl cast(CEquip const* Equip);
 };
@@ -309,56 +294,36 @@ class COMMON_API CExternalEquip : public CEquip
 public:
     CExternalEquip(unsigned TypeBits, CEqObj* OwnerObj, unsigned short EquipId,
                    Archetype::Equipment const* Arch, bool bMissionFlag);
-    // Common.dll.c 54839 (0x32800). Field-by-field copy across the CEquip/CExternalEquip
-    // layers (retail re-stamps the vtable pointer at each base level while copying that
-    // level's own fields, standard MSVC base-then-derived copy-ctor codegen) -- same shape
-    // as CAttachedEquip's own copy ctor below.
+    // 0x32800. Memberwise copy, base level first (same shape as CAttachedEquip's).
     CExternalEquip(CExternalEquip const& Other);
     virtual ~CExternalEquip();
 
     virtual bool GetEquipDesc(EquipDesc& Desc) const override;
-    // Common.dll.c 66343-66356 (0x3ed60). Gates on IsConnected() [vtable+0x58, confirmed via this
-    // class's own named vtable dump: ??_7CExternalEquip@@6B@+0x58 = CExternalEquip::IsConnected --
-    // this resolves the previously-unpinned +0x58 slot shared by GetConnectionPosition/
-    // GetHardPointInfo/GetVelocity/GetCenterOfMass below, task_44e430bf]. Returns CEquip::bDestroyed
-    // when connected, else true (an unconnected equip is treated as destroyed).
+    // 0x3ed60. bDestroyed when IsConnected() (vtable+0x58), else true (an unconnected equip
+    // counts as destroyed).
     virtual bool IsDestroyed() const override;
     virtual void Destroy() override;
     virtual bool Update(float Dt, unsigned Flags) override;
-    // Common.dll.c 66423-66478 (raw 0629ee00-0629eecb, listing 0x3ee00). Overrides
-    // CEquip::GetConnectionPosition (base default above just returns false). The decompiled C
-    // for this one is corrupted (spurious unaff_EBX/EBP/ESI locals, implausible auStack_*
-    // sizes) and was not trusted -- ported from the raw instruction trace instead.
+    // 0x0629ee00. Ghidra's decompile is corrupt here; ported from the listing.
     virtual bool GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) const override;
     // Virtuals introduced here, declared in retail's ??_7CExternalEquip@@6B@ slot order
     // (listing 0x0639c4f4..0x0639c510): IsConnected, Connect, GetParentHPName,
     // GetParentConnector, GetHardPointInfo, GetVelocity, GetCenterOfMass, Disconnect.
     virtual bool IsConnected() const;
     virtual bool Connect(char const* HpName);
-    // Listing 0x327f0 -- base implementation just returns HardpointName by value. No override
-    // found anywhere in the decompiled retail code, so kept non-overridden here too.
+    // 0x327f0 -- returns HardpointName by value. No override in retail.
     virtual CacheString GetParentHPName() const;
-    // Listing 0x3eed0 (?GetParentConnector@CExternalEquip@@UBEJ_N@Z, public virtual).
+    // 0x3eed0 (?GetParentConnector@CExternalEquip@@UBEJ_N@Z, public virtual).
     virtual long GetParentConnector(bool bSearch) const;
-    // Common.dll.c 66517-66538 (raw 0629ef60-0629efdd, listing 0x3ef60). New virtual introduced
-    // at this level (no CEquip base slot) -- vtable+0x68, called by this class's own
-    // GetConnectionPosition override below. Live-queries the engine/hardpoint store for the
-    // equip's own ConnectionIndex+HardpointName every call rather than caching, so a moved/
-    // animated parent is reflected on the next call.
+    // 0x0629ef60, vtable+0x68. Queries the engine's hardpoint store for ConnectionIndex +
+    // HardpointName on every call (no cache), so a moving parent is reflected.
     virtual bool GetHardPointInfo(HardpointInfo& Info) const;
-    // Common.dll.c 66542-66563 (raw 0629efe0, listing 0x3efe0). New virtual introduced at this
-    // level (vtable+0x6c, no CEquip base slot) -- overridden by CAttachedEquip below. Zeroes Out,
-    // and when connected copies Owner->get_velocity() into it (no null-check on Owner, matching
-    // retail). Retail hardcodes the return value to false unconditionally regardless of the
-    // IsConnected/Owner outcome -- a genuine retail quirk, reproduced as-is.
+    // 0x0629efe0, vtable+0x6c. Zeroes Out; when connected copies Owner->get_velocity()
+    // (no null check on Owner). Retail quirk kept: always returns false.
     virtual bool GetVelocity(Vector& Out) const;
-    // Common.dll.c 66567-66590 (raw 0629f030, listing 0x3f030). New virtual introduced at this
-    // level (vtable+0x70, no CEquip base slot) -- overridden by CAttachedEquip below. Zeroes Out,
-    // and when connected fetches this equip's own ConnectionIndex (GetParentConnector(false),
-    // vtable+0x64) and queries DALib::Engine's vtable+0x90 (world-position getter, same slot as
-    // common_misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition +0xa0
-    // sibling) for the connector instance's world position. Like GetVelocity above, retail always
-    // hardcodes the return to false regardless of outcome -- reproduced as-is.
+    // 0x0629f030, vtable+0x70. Zeroes Out; when connected, the connector instance's world
+    // position via DALib::Engine vtable+0x90 on GetParentConnector(false). Retail quirk kept:
+    // always returns false.
     virtual bool GetCenterOfMass(Vector& Out) const;
     static CExternalEquip* __cdecl cast(CEquip* Equip);
     static CExternalEquip const* __cdecl cast(CEquip const* Equip);
@@ -408,14 +373,9 @@ public:
     long EngineInstanceId;            // +0x04  -1
     unsigned HpCrc;                   // +0x08
     unsigned char bCollisions;        // +0x0c
-    // +0x0d: NOT padding -- resolved while tracing tracker item 10932's FUN_0628f700 call
-    // (CNonPhysAttachment::EnableCollisions, Common.dll.txt 0x06293815/0x0629386c). Caches the
-    // is_shield_part-style low byte (CObject PartMap word[2]) of this attachment's own PartMap
-    // entry across a disable/re-enable cycle: EnableCollisions(false) reads it back out of the
-    // matching entry before erasing the entry, EnableCollisions(true) writes it back into the
-    // freshly re-appended entry. Explains why the retail copy ctor/operator= (below) only ever
-    // copy this one byte of the old 3-byte pad and leave the other two untouched -- that was the
-    // tell that this byte alone was live state, not uniform padding.
+    // +0x0d: caches the is_shield_part-style byte (CObject PartMap word[2]) of this
+    // attachment's PartMap entry across EnableCollisions(false)/(true) (.text:06293815 /
+    // 0629386c). The copy ctor/operator= copy this byte but not +0x0e/+0x0f.
     unsigned char CachedShieldFlag;   // +0x0d
     // +0x0e..+0x0f: alignment padding; retail never writes or copies it.
 };
@@ -449,11 +409,7 @@ class COMMON_API CAttachedEquip : public CExternalEquip
 public:
     CAttachedEquip(unsigned TypeBits, CEqObj* OwnerObj, unsigned short EquipId,
                    Archetype::Equipment const* Arch, bool bMissionFlag);
-    // Common.dll.c 54938 (0x32a70). Field-by-field copy across the CEquip/CExternalEquip/
-    // CAttachedEquip layers (retail re-stamps the vtable pointer at each base level while
-    // copying that level's own fields, standard MSVC base-then-derived copy-ctor codegen).
-    // No exported caller found in the retail listing; added for parity with the
-    // CNonPhysAttachment/CPhysAttachment copy ctors, which this class's Attachment already has.
+    // 0x32a70. Memberwise copy, base level first. No caller found in the retail listing.
     CAttachedEquip(CAttachedEquip const& Other);
     virtual ~CAttachedEquip();
 
@@ -462,7 +418,7 @@ public:
     virtual void SetHitPoints(float Hit) override;
     virtual bool IsConnected() const override;
     virtual bool Connect(char const* HpName) override;
-    // Common.dll.c 55580 (0x334e0). Connected guard, then Attachment->GetPhysicsOwner()->
+    // 0x334e0. Connected guard, then Attachment->GetPhysicsOwner()->
     // get_velocity(). Zeroes Out and returns false when not connected or physics-less.
     virtual bool GetVelocity(Vector& Out) const override;
     // Listing 0x33570. Zeroes Out; when connected fills the bound cache once (vtable+0x8c) and
@@ -474,20 +430,14 @@ public:
     // GetRootIndex, SetFate, ComputeBoundingSphere.
     // Listing 0x33200 (?GetToughness@CAttachedEquip@@UBEHXZ): return Arch->Toughness.
     virtual int GetToughness() const;
-    // Common.dll.c 55654-55670 (raw 06293650, listing 0x33650). New virtual (vtable+0x7c, no
-    // CExternalEquip base slot). Same IsConnected guard + lazy bBoundsValid cache as
-    // GetCenterOfMass above (they share the same cache-populate call to ComputeBoundingSphere),
-    // returning the cached BoundRadius (local-space magnitude, not re-transformed).
+    // 0x06293650, vtable+0x7c. Same IsConnected guard and lazy bBoundsValid cache as
+    // GetCenterOfMass; returns the cached BoundRadius (local space, not re-transformed).
     virtual bool GetRadius(float& OutRadius) const;
-    // Common.dll.c 0x336a0. Retail self-dispatches through vtable+0x84 (0 explicit args,
-    // returns long) twice -- no other CAttachedEquip virtual matches that arity, and the
-    // semantics (compare InstIndex to it, then IsDescendant(it, InstIndex)) match GetRootIndex()
-    // exactly, so this is ported as GetRootIndex() reuse. Not fully vtable-slot-verified --
-    // flagged partial rather than ready_unverified.
+    // 0x062936a0, vtable+0x80. True when InstIndex is GetRootIndex() (vtable+0x84) or a
+    // descendant of it.
     virtual bool IsInstOnEquip(long InstIndex) const;
     virtual long GetRootIndex() const;
-    // Listing 0xc75d0 -- sets the Fate field below. 21 call sites in the retail ship
-    // damage/death path (0x62c656b..0x62c8358 range); those callers are not ported yet.
+    // 0x063275d0 (ICF fold `MOV [ECX+0x34],EAX; RET 4`) -- sets Fate.
     virtual void SetFate(DamageEntry::SubObjFate FateValue);
     CObject* GetPhysicsOwner() const;
     CObject* RetrieveDebrisObject();
@@ -525,15 +475,14 @@ class COMMON_API CECargo : public CInternalEquip
 public:
     CECargo(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Equipment const* Arch,
             bool bMissionFlag);
-    // Common.dll.c 57218-57240 (0x35380): plain memberwise copy through CInternalEquip(Other)
-    // plus this class's own CargoPod/HitPts/Count fields.
+    // 0x35380: memberwise copy through CInternalEquip(Other) plus CargoPod/HitPts/Count.
     CECargo(CECargo const& Other);
     virtual ~CECargo();
 
     virtual bool IsDestroyed() const override;
     virtual void Destroy() override;
     virtual float GetHitPoints() const override;
-    virtual void SetHitPoints(float Hit) override;  // Common.dll.c 0x35820
+    virtual void SetHitPoints(float Hit) override;  // 0x35820
     virtual bool GetEquipDesc(EquipDesc& Desc) const override;
     // ??_7CECargo@@6B@ adds two slots after CEquip's: GetType (listing 0x35740, returns the
     // constant 0x10000 -- a virtual that hides the non-virtual CEquip::GetType) and Init.
@@ -547,7 +496,7 @@ public:
     void RemoveFromStack(unsigned Amount);
     float GetDecayDamagePerSecond() const;
     unsigned GetCount() const;
-    void SetCount(unsigned Count);  // Common.dll.txt 0xdbae0
+    void SetCount(unsigned Count);  // 0xdbae0
     static CECargo* __cdecl cast(CEquip* Equip);
     static CECargo const* __cdecl cast(CEquip const* Equip);
 
@@ -585,19 +534,15 @@ public:
     CEquipManager();
     ~CEquipManager();
 
-    // Common.dll.c 0x26fb0/0x270d0: retail's compiler-generated copy ctor/operator= deep-copy
-    // the two node lists (element pointers copied by value, not the CEquip objects themselves).
-    // No caller is visible inside Common.dll's own decompiled xrefs (0 CALL sites in the raw
-    // listing), so this is presumably ODR-used by a CObject/CShip copy path not yet ported --
-    // kept as a real, verified implementation rather than deleted per the "don't guess dead code
-    // from an incomplete port" rule.
+    // 0x26fb0/0x270d0: retail's compiler-generated copy ctor/operator= copy the two lists
+    // (element pointers by value, not the CEquip objects). No CALL site in the listing.
     CEquipManager(CEquipManager const& Other);
     CEquipManager& operator=(CEquipManager const& Other);
 
     bool Init(CEqObj* OwnerObj);
     bool AddNewEquipment(CEquip* Equip);
     void Clear();
-    // Common.dll.c 0x3b380/0x3b8c0: removes every CanDelete() equipment item from both lists
+    // 0x3b380/0x3b8c0: removes every CanDelete() equipment item from both lists
     // (decrementing DecayingCargoCount for decaying cargo before deleting it), Internal first
     // then External. Returns the total number of items removed.
     int CleanUp();
@@ -612,7 +557,7 @@ public:
     CEquip* Traverse(CEquipTraverser& Walk);
     // Listing 0x3b430: a bare JMP to the non-const Traverse.
     CEquip const* Traverse(CEquipTraverser& Walk) const;
-    // Common.dll.c 0x3b530/0x3b540: mirror of Traverse that walks both lists back-to-front and
+    // 0x3b530/0x3b540: mirror of Traverse that walks both lists back-to-front and
     // visits Internal before External (i.e. the reverse of Traverse's own External-then-Internal
     // order). Retail's initial guard is ExternalCount==0 || InternalCount==0 (OR, not AND like
     // Traverse's own guard) -- reproduced verbatim even though it looks asymmetric.
@@ -625,17 +570,11 @@ public:
     // (mask 0x1fe3) and returns the first whose GetParentHPName() matches Hardpoint.
     CExternalEquip* FindByHardpoint(CacheString const& Hardpoint);
     CExternalEquip const* FindByHardpoint(CacheString const& Hardpoint) const;
-    // Common.dll.c 0x3b3a0: maps a physics-engine instance id to the CAttachedEquip mounted
-    // there and returns its equip Id (0 if Instance==-1 or nothing attached matches). Traverses
-    // with TypeMask 0x1fe0 == kAttachedEquipMask (common_cequip_internal.h), i.e. only CAttachedEquip-
-    // castable equipment is visited; retail dispatches through a vtable+0x80 slot taking the
-    // instance id and returning bool, which this reproduces as
-    // CAttachedEquip::cast(Equip)->GetRootIndex() == Instance (GetRootIndex is itself
-    // Attachment->GetRootIndex(), -1 when not connected, so it can never false-positive against
-    // a real instance id). See common_ceqobj.cpp's compute_explosion_dmg_bounding_sphere comment
-    // for the caller-side context (inst_to_subobj_id) this unblocks.
+    // 0x3b3a0: maps an engine instance id to the Id of the CAttachedEquip it belongs to
+    // (TypeMask 0x1fe0 == kAttachedEquipMask, CAttachedEquip::IsInstOnEquip at vtable+0x80);
+    // SUBOBJ_ID_NONE if Instance == -1 or nothing matches.
     unsigned short InstToSubObjID(long Instance) const;
-    // Common.dll.c 0x3b750: cross-checks a serialized EquipDescList against this manager's live
+    // 0x3b750: cross-checks a serialized EquipDescList against this manager's live
     // equipment (Id/ArchId/relative-health match, plus a discarded-result hardpoint stricmp for
     // external equips -- retail computes it but never checks it, reproduced verbatim), then walks
     // every live equip that reports a GetEquipDesc() and requires each to be present in the list.
@@ -650,10 +589,10 @@ private:
 
 public:
     CEqObj* Owner;                    // +0x00
-    unsigned ExternalAllocator;       // +0x04  retail VC6 list allocator byte (formerly Pad04)
+    unsigned ExternalAllocator;       // +0x04  retail VC6 list allocator byte
     std::list<CEquip*>* External;     // +0x08  retail dummy node*
     unsigned ExternalCount;           // +0x0c
-    unsigned InternalAllocator;       // +0x10  retail VC6 list allocator byte (formerly Pad10)
+    unsigned InternalAllocator;       // +0x10  retail VC6 list allocator byte
     std::list<CEquip*>* Internal;     // +0x14  retail dummy node*
     unsigned InternalCount;           // +0x18
     int DecayingCargoCount;           // +0x1c
@@ -671,9 +610,7 @@ class COMMON_API CEPower : public CInternalEquip
 public:
     CEPower(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Power const* Arch,
             bool bMissionFlag);
-    // Common.dll.c 56769 (0x34a90). Adds no fields beyond CEquip -- plain CEquip(Other)
-    // field copy plus this class's own vtable, matching retail's memberwise-copy-then-
-    // restamp exactly.
+    // 0x34a90. Adds no fields: CEquip(Other) plus this class's vtable.
     CEPower(CEPower const& Other);
     virtual ~CEPower();
 
@@ -741,9 +678,8 @@ class COMMON_API CEEngine : public CInternalEquip, public CPhysControllerEquip
 public:
     CEEngine(CShip* OwnerShip, unsigned short EquipId, Archetype::Engine const* Arch,
              bool bMissionFlag);
-    // Common.dll.c 57743-57814 (0x35a40). Deep-copies the nozzle array (exact-fit
-    // allocation) and the embedded Controller-region bytes; see the .cpp for the full
-    // field-by-field trace against retail.
+    // 0x35a40. Deep-copies the nozzle array (exact-fit allocation) and the embedded
+    // Controller-region bytes; see the .cpp.
     CEEngine(CEEngine const& Other);
     virtual ~CEEngine();
 
@@ -752,20 +688,15 @@ public:
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
     Archetype::Engine const* EngineArch() const;
 
-    // Common.dll.c 0x36600: formats "HpEngine0<Index>" via vsprintf+StringAlloc.
+    // 0x36600: formats "HpEngine0<Index>" via vsprintf+StringAlloc.
     static void __cdecl BuildNozzleHPName(int Index, CacheString& Out);
 
-    // Common.dll.c 57997-58026 (0x35ee0). Resolved via the raw ??_7CEEngine@@6BCInternalEquip@@@
-    // vtable dump (Common.dll.txt ~559683): slot4/+0x10=IsDisabled, slot21/+0x54=
-    // IsControllerEnabled (both cross-confirmed independently by CEEngine's own override slots
-    // at +0x4c/+0x50/+0x58 for EnableController/DisableController/IsControllerEnabled). Body:
-    // IsActive() && !IsDisabled() && !IsDestroyed() && IsControllerEnabled() && (has a nozzle
-    // OR Arch->bIndestructible).
+    // 0x35ee0: IsActive() && !IsDisabled() (+0x10) && !IsDestroyed() &&
+    // IsControllerEnabled() (+0x54) && (has a nozzle OR Arch->bIndestructible).
     virtual bool IsFunctioning() const override;
-    // Common.dll.c 58030-58048 (0x35f60). On deactivate, retail first calls
-    // EngageCruise(false, false) to force-disengage cruise; then CEquip::Activate, then
-    // EnableController()/DisableController() (vtbl+0x4c/+0x50, confirmed via the same raw
-    // vtable dump) on success/failure respectively.
+    // 0x35f60. On deactivate, retail first calls EngageCruise(false, false); then
+    // CEquip::Activate, then EnableController()/DisableController() (vtbl+0x4c/+0x50) on
+    // success/failure respectively.
     virtual bool Activate(bool bOn) override;
     // .text:06295fa0..06296113: when functioning, the cruise charge timer and its
     // EngineCruiseStateChanged notifications, then (Flags bit 0 clear) PhySys::Controller::wakeup
@@ -779,10 +710,8 @@ public:
     virtual bool EnableController() override;
     // .text:062961c0: ADD ECX,0x20; JMP CPhysControllerEquip::DisableController.
     virtual bool DisableController() override;
-    // Common.dll.c 58118-58160 (0x36120). Real vtable slot7 override (see the CEEquip slot
-    // writeup on IsFunctioning above). Walks the nozzle vector removing every 0x3c-byte record
-    // whose leading uint16 equals SubObjId, calling Notify(Event_0xD, SubObjId) per removal.
-    // No longer blocked on a missing INotify/Notify -- both now exist (see CEquip::Notify).
+    // 0x36120, slot 7 override. Removes every nozzle record whose leading uint16 equals
+    // SubObjId, calling Notify(ArchGroupDestroyed, SubObjId) per removal.
     virtual void NotifyArchGroupDestroyed(unsigned short SubObjId) override;
 
     float GetLinearDrag() const;
@@ -818,10 +747,9 @@ public:
     // +0x20 .. +0x33: the CPhysControllerEquip base (bControllerEnabled at +0x30).
     // +0x34: retail's VC6 std::vector<ExhaustNozzleInfo> (allocator byte +0x34, then
     // begin/end/capacity at +0x38/+0x3c/+0x40; element stride 0x3c == sizeof(ExhaustNozzleInfo)).
-    // NozzleInfos returns it; the ctor appends through the vector insert helper FUN_06296640
-    // (.text:06295d67), the dtor frees +0x38 (.text:06295e7d). Modern std::vector here (no
-    // retail ABI), so the fields below sit at their retail offsets only in a layout where the
-    // vector is 0x10 bytes; they are reached by name everywhere.
+    // The ctor appends through FUN_06296640 (.text:06295d67), the dtor frees +0x38
+    // (.text:06295e7d). Deviation: a modern std::vector, so the fields below sit at their
+    // retail offsets only where the vector is 0x10 bytes; they are reached by name.
     std::vector<ExhaustNozzleInfo> Nozzles; // +0x34
     // +0x44: the ship throttle (CShip+0x29c) the last time Update woke the controller
     // (.text:062960d6..06296101: a changed, non-zero throttle calls wakeup() and is stored here).
@@ -830,7 +758,7 @@ public:
     float CruiseChargeRate;           // +0x4c  set by EngageCruise on charge-begin to
                                        // CRUISE_ACCEL_TIME * ThrustMultiplier(Arch+0x70) /
                                        // (ShipLinearDrag * CRUISING_SPEED), zeroed on disengage;
-                                       // not yet observed being read elsewhere in this port
+                                       // no reader found
     float CruiseChargeTimeElapsed;    // +0x50
     unsigned char bCruiseActive;      // +0x54  CShip::is_cruise_active (+0x55..+0x57 padding)
 };
@@ -871,7 +799,7 @@ static_assert(offsetof(ProjLaunchInfo, LockSubId) == 0x40, "ProjLaunchInfo+0x40 
 class COMMON_API CELauncher : public CAttachedEquip
 {
 public:
-    // Common.dll.c 58669-58714 (0x369d0): memberwise copy through CAttachedEquip(Other) plus
+    // 0x369d0: memberwise copy through CAttachedEquip(Other) plus
     // Projectile/RefireElapsed/Barrels[8].
     CELauncher(CELauncher const& Other);
     virtual ~CELauncher();
@@ -981,7 +909,7 @@ public:
 
     CEGun(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Gun const* Arch,
           bool bMissionFlag);
-    // Common.dll.c 58860-58937 (0x36d00).
+    // 0x36d00.
     CEGun(CEGun const& Other);
     virtual ~CEGun();
 
@@ -989,10 +917,10 @@ public:
     virtual bool Connect(char const* HpName) override;
     virtual FireResult Fire(Vector const& Target) override;
     virtual void ConsumeFireResources() override;
-    // Common.dll.c 0x370e0: if IsActive() changes and Owner is a CShip, mark
+    // 0x370e0: if IsActive() changes and Owner is a CShip, mark
     // CShip::GunStatsDirty (Owner+0x2c4) so get_gun_stats recomputes.
     virtual bool Activate(bool bOn) override;
-    // Common.dll.c 0x36ce0: Projectile->Seeker != 0 (Archetype::Munition+0x90).
+    // 0x36ce0: Projectile->Seeker != 0 (Archetype::Munition+0x90).
     bool is_guided() const;
     bool SetTarget(CSimple* Target, unsigned short SubId);
     void GetTarget(CSimple*& OutTarget, unsigned short& OutSubId) const;
@@ -1026,14 +954,11 @@ protected:
     // for a bound joint, then resets owner/instance/wrap/desired/current/in-motion.
     void LoseJoints();
     bool IsMovable() const;
-    // Common.dll.c raw 0x062980d0 (listing 0x380d0). Rediscovers Yaw/Pitch from GetRootIndex()
-    // (mirrors Connect()'s own joint walk) and always ends by recomputing TurretFrame. Retail's
-    // only reference to this function found in the disassembly is the data table entry at
-    // 0x63b67ec, not a direct CALL site -- ported anyway per the "port everything" rule; see the
-    // .cpp for the struct-archaeology notes this recovers.
+    // 0x062980d0. Rediscovers Yaw/Pitch from GetRootIndex() (Connect()'s joint walk) and
+    // always ends by recomputing TurretFrame. Its only reference in the listing is a data
+    // table entry at 0x063b67ec, no CALL site.
     void LocateJoints();
-    // Common.dll.c raw 0x06297c70 (listing 0x37c70). See the .cpp for the full instruction-by-
-    // instruction reconstruction (Ghidra's decompilation here is corrupted).
+    // 0x06297c70 (Ghidra's decompile is corrupt; see the .cpp).
     void ComputeTurretFrame();
     // .text:06297fc0 (?DecomposeJointMotion@CEGun@@IBEXABVVector@@AAM1@Z, ordinal 1349,
     // protected const). Expresses the world direction Dir in the frame
@@ -1047,10 +972,9 @@ public:
     JointChannel Pitch;                   // +0x210
     Matrix TurretFrame;                   // +0x22c  world turret basis in connector-local space;
                                            // ctor identity, filled by ComputeTurretFrame()
-    // +0x250: a real BaseWatcher on the target CSimple's Watchable (CSimple+0x9c). SetTarget
+    // +0x250: a BaseWatcher on the target CSimple's Watchable (CSimple+0x9c). SetTarget
     // (.text:06298243), the copy ctor (06296e74) and the dtor (062970b7) all go through
-    // BaseWatcher::set_pointer, so ~Watchable clears it when the target dies. A raw pointer
-    // here dangled after the target was destroyed (CMN-BUG17).
+    // BaseWatcher::set_pointer, so ~Watchable clears it when the target dies.
     BaseWatcher LockWatcher;              // +0x250  watched = target CSimple + 0x9c
     unsigned short LockSubId;             // +0x258 (+0x25a: alignment padding, never written)
     Vector TargetPoint;                  // +0x25c  SetTargetPoint: world - origin
@@ -1091,10 +1015,9 @@ class COMMON_API CEShieldGenerator : public CAttachedEquip
 public:
     CEShieldGenerator(CEqObj* OwnerObj, unsigned short EquipId,
                       Archetype::ShieldGenerator const* Arch, bool bMissionFlag);
-    // Common.dll.c 63483-63521 (0x3bc50): field-by-field copy across the CEquip/CExternalEquip/
-    // CAttachedEquip layers, then LinkedShield (raw pointer copy, NOT re-linked -- the linked
-    // CEShield's own generator list still points at the ORIGINAL, matching CEShield's own copy
-    // ctor's identical quirk) plus Opaque50Value/LastUpdateTime; the +0x54 gap is not copied.
+    // 0x3bc50: memberwise copy, then LinkedShield as a raw pointer (not re-linked: the
+    // shield's generator list still points at the original, as in CEShield's copy ctor)
+    // plus Opaque50Value/LastUpdateTime; the +0x54 gap is not copied.
     CEShieldGenerator(CEShieldGenerator const& Other);
     virtual ~CEShieldGenerator();
 
@@ -1104,7 +1027,7 @@ public:
 
     void LinkShield(CEShield* Shield);
     bool IsLinked() const;
-    // Common.dll.c 0x3cf70. Inverse of LinkShield: if still linked, removes this
+    // 0x3cf70. Inverse of LinkShield: if still linked, removes this
     // generator from the CEShield's generator list, then clears LinkedShield.
     void UnLinkShield();
     static CEShieldGenerator* __cdecl cast(CEquip* Equip);
@@ -1113,12 +1036,8 @@ public:
     Archetype::ShieldGenerator const* ShieldGenArch() const;
 
     CEShield* LinkedShield;            // +0x4c
-    float Opaque50Value;               // +0x50: zeroed at construction, never read anywhere in
-                                        // the decompiled retail code -- kept as an unexplained
-                                        // scalar rather than folded into padding.
-    unsigned char Pad54[4];            // +0x54 .. +0x57: real gap -- retail's own copy ctor
-                                        // skips these 4 bytes too, so this is genuine unused
-                                        // padding, not an unmodeled field.
+    float Opaque50Value;               // +0x50: zeroed at construction, never read in retail
+    unsigned char Pad54[4];            // +0x54 .. +0x57: gap; the copy ctor skips it too
     double LastUpdateTime;             // +0x58: Timing::GetGlobalTime() snapshot; Update()
                                         // computes its OWN Dt from (Now - LastUpdateTime)
                                         // instead of trusting the Dt parameter it's passed.
@@ -1130,28 +1049,10 @@ static_assert(offsetof(CEShieldGenerator, Opaque50Value) == 0x50, "CEShieldGener
 static_assert(offsetof(CEShieldGenerator, LastUpdateTime) == 0x58, "CEShieldGenerator+0x58");
 
 // Listing CEShield operator_new(0x88). Type 0x100. Built in link_shields, not alloc_equip.
-// Listing CEShield operator_new(0x88). Type 0x100. Built in link_shields, not alloc_equip.
-// RE-DERIVED 2026-09-07: CEShield's real retail base class is CAttachedEquip, not
-// CExternalEquip (this class's own previous declaration). Evidence: the primary ctor
-// (Common.dll.c 0x3bd70) explicitly calls `CAttachedEquip::CAttachedEquip(this, 0x100,
-// OwnerObj, EquipId, Arch, bMissionFlag)`; the copy ctor (0x3ba70) re-stamps the vtable
-// through CEquip, then CExternalEquip, then CAttachedEquip::`vftable' before continuing to
-// copy fields past CAttachedEquip's 0x4c-byte region; the dtor explicitly calls
-// `CAttachedEquip::~CAttachedEquip`; Update/Connect/Disconnect all explicitly tail-call the
-// CAttachedEquip:: versions. Real own-field layout, verified directly against the dumped
-// CEShield::`vftable' at raw .rdata 0x0639d50c (Common.dll.txt:560160-560211) plus the ctor's
-// own raw field writes: bOnline (+0x4c, byte), CurrentHitPoints (+0x50, float -- CEShield's
-// own GetHitPoints() override, COMDAT-folded at the same address as the byte-identical
-// CEEngine::GetCruiseChargeTimeElapsed body), a 4-byte gap (+0x54, never read or written
-// anywhere in this method cluster), OfflineEndTime (+0x58, double, compared against
-// Timing::GetGlobalTime()), a raw copy of the ctor's own bMissionFlag argument (+0x60, byte,
-// never read again anywhere in this cluster), then the Gens vector (+0x64 -- NOT +0x60 as an
-// earlier pass's comments claimed), DominantGenArch/OfflineThreshold/OfflineRebuildTime/
-// MaxHitPoints (+0x70/+0x74/+0x78/+0x7c, unchanged from the previous port) and the
-// CEShieldIntruderChecker pointer (+0x80). The real
-// vtable dump also pins vtable+0x44 == CEquip::GetRelativeHealth (label
-// PTR_GetRelativeHealth_0639d550), resolving the one previously-unidentified virtual call
-// shared by the ctor/Update/Activate/SetHitPoints/CanActivate below.
+// Base is CAttachedEquip: the ctor (0x3bd70) calls CAttachedEquip::CAttachedEquip, the copy
+// ctor (0x3ba70) stamps the CEquip/CExternalEquip/CAttachedEquip tables in turn, and the
+// dtor and Update/Connect/Disconnect call the CAttachedEquip versions. Vtable .rdata
+// 0x0639d50c; its +0x44 slot is CEquip::GetRelativeHealth.
 //
 // CEShieldIntruderChecker: RTTI .?AVCEShieldIntruderChecker@@ (COL .rdata:063a7dc0, bases
 // itself + PhySys::CObjectCB), vftable .rdata:0639d6a8 with two slots. Not exported. Retail
@@ -1181,46 +1082,34 @@ class COMMON_API CEShield : public CAttachedEquip
 public:
     CEShield(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Shield const* Arch,
              bool bMissionFlag);
-    // Common.dll.c 0x3ba70 (raw .txt 112482-112616). Re-stamps the vtable through CEquip,
-    // CExternalEquip, CAttachedEquip and finally CEShield::`vftable' while copying each level's
-    // own fields -- standard MSVC base-then-derived copy-ctor codegen, now matching the
-    // corrected CAttachedEquip base.
+    // 0x3ba70. Memberwise copy, base level first.
     CEShield(CEShield const& Other);
     virtual ~CEShield();
 
     virtual bool GetEquipDesc(EquipDesc& Desc) const;
-    // Common.dll.c 0x3bfe0 (?IsFunctioning@CEShield@@UBE_NXZ). CEquip's own base pattern
-    // (IsActive() && !IsDisabled() && !IsDestroyed()) plus the shield-specific
-    // && bOnline.
+    // 0x3bfe0: IsActive() && !IsDisabled() && !IsDestroyed() && bOnline.
     virtual bool IsFunctioning() const override;
-    // Common.dll.c 0x3c020. If not currently functioning but active and CanActivate() holds,
+    // 0x3c020. If not currently functioning but active and CanActivate() holds,
     // fires INotify::ShieldCanReactivate and brings the shield back online via
     // Activate_Internal(true), then forwards to CAttachedEquip::Update.
     virtual bool Update(float Dt, unsigned Flags) override;
     virtual void Destroy() override;
-    // Common.dll.c 0x3c190. CEquip::Activate(bOn) first; if now active, tries
+    // 0x3c190. CEquip::Activate(bOn) first; if now active, tries
     // CanActivate()/Activate_Internal(true); if now inactive and still online, deactivates via
     // Activate_Internal(false).
     virtual bool Activate(bool bOn) override;
-    // Common.dll.c 0x3c2d0. Clamps to MaxHitPoints, sets CurrentHitPoints, then either fires
+    // 0x3c2d0. Clamps to MaxHitPoints, sets CurrentHitPoints, then either fires
     // ShieldWentOffline + Activate_Internal(false) (a functioning shield's relative health
     // dropped to/below OfflineThreshold; also arms the OfflineEndTime cooldown) or
     // ShieldCanReactivate + Activate_Internal(true) (an inactive-but-active shield recovered
     // above OfflineThreshold) -- the same online/offline pattern as Update/Activate.
     virtual void SetHitPoints(float Hit) override;
-    // Common.dll.c 63344-63352 (COMDAT-folded with CEEngine::GetCruiseChargeTimeElapsed's
-    // byte-identical body -- confirmed real target via the CEShield::`vftable' dump).
+    // Returns CurrentHitPoints (COMDAT-folded with CEEngine::GetCruiseChargeTimeElapsed).
     virtual float GetHitPoints() const override;
-    // Common.dll.c 0x3c470. Base CAttachedEquip::Connect(), then flags the owning CObject's
-    // physics part as a shield (PhysicsOwner->flag_part_as_shield(PhysicsOwner->inst_to_part(
-    // Attachment->GetRootIndex())), both already-ported CObject PartMap helpers -- see the
-    // .cpp for the listing evidence) and refreshes the Attachment's collision-enable state to
-    // match the shield's current bOnline. Also broadcasts the shield's physical sphere (via
-    // CObject::get_physical_radius_r, IEngine::GetInstanceTransform, I3DMathEngine's
-    // InverseTransform, and IEngine::SetInstanceExtent) as the root instance's engine extent --
-    // see the .cpp for the full instruction trace; a prior pass had misread the final call's 3rd
-    // argument as uncomputed "unaff_EBX" garbage, but it resolves to this same function's own
-    // Radius local once the stack ledger is walked precisely.
+    // 0x3c470. CAttachedEquip::Connect(), then flag_part_as_shield on the owner's part for
+    // the root instance, sync the Attachment's collisions to bOnline, and publish the
+    // shield's physical sphere as the root instance's engine extent
+    // (IEngine::SetInstanceExtent; Ghidra's unaff_EBX there is the Radius local).
     virtual bool Connect(char const* HpName) override;
     // Listing 0x3ba00 (ICF-shared "xor al,al; ret"): a shield is never lootable.
     virtual bool IsLootable() const override;
@@ -1230,11 +1119,11 @@ public:
     static CEShield const* __cdecl cast(CEquip const* Equip);
     virtual float GetMaxHitPoints() const override;
     float GetOfflineThreshold() const;
-    float GetOfflineRebuildTime() const;  // Common.dll.c 0x3ba50
-    Archetype::ShieldGenerator const* ShieldGenArch() const;  // Common.dll.c 0x3ba60
+    float GetOfflineRebuildTime() const;  // 0x3ba50
+    Archetype::ShieldGenerator const* ShieldGenArch() const;  // 0x3ba60
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
     Archetype::Shield const* ShieldArch() const;
-    // Common.dll.c 0x3c9b0: average, over Gens, of WeaponModDB_GetShieldMod(WeaponType.Id,
+    // 0x3c9b0: average, over Gens, of WeaponModDB_GetShieldMod(WeaponType.Id,
     // Gen->Arch->ShieldType.Id) -- see common_fuses.h. Defaults to 1.0 with no generators.
     // Returns double: retail leaves the average unrounded in ST0 (.text:0629ca29 FDIVR; RET).
     double GetWeaponModifier(ID_String const& WeaponType) const;
@@ -1248,12 +1137,12 @@ protected:
     // ?AddGen@CEShield@@IAEXPAVCEShieldGenerator@@@Z / ?RemGen@... (protected).
     void AddGen(CEShieldGenerator* Gen);
     void RemGen(CEShieldGenerator* Gen);
-    // Common.dll.c 0x3ca50 (?CanActivate@CEShield@@IBE_NXZ). Out-of-line twin of the identical
+    // 0x3ca50 (?CanActivate@CEShield@@IBE_NXZ). Out-of-line twin of the identical
     // condition inlined into the ctor/Update/Activate/SetHitPoints: not in the post-damage
     // cooldown window, relative health above OfflineThreshold, and (if ever allocated) the
     // intruder-checker phantom idle.
     bool CanActivate() const;
-    // Common.dll.c 0x3cad0 (?Activate_Internal@CEShield@@IAE_N_N@Z). Flips bOnline via
+    // 0x3cad0 (?Activate_Internal@CEShield@@IAE_N_N@Z). Flips bOnline via
     // Attachment->EnableCollisions(bOn) + Notify(ShieldOfflineStateChanged, &bOnline); a no-op
     // if bOnline already equals bOn. Warns (does not crash) when called with no Attachment.
     bool Activate_Internal(bool bOn);
@@ -1264,25 +1153,20 @@ public:
     void AttachIntruderChecker();
     // Listing 0x3c980: if the checker exists, count = -1, destroy its phantom, phantom = 0.
     void DestroyIntruderChecker();
-    // Common.dll.c 0x3caa0 (?ShieldBatteryBoost@CEShield@@QAEXM@Z). If MaxHitPoints > 0, clears
+    // 0x3caa0 (?ShieldBatteryBoost@CEShield@@QAEXM@Z). If MaxHitPoints > 0, clears
     // the post-damage cooldown window (OfflineEndTime = 0) and adds Amount to CurrentHitPoints
-    // via SetHitPoints -- retail's own tail call resolves through this class's own vtable+0x40
-    // slot, which the corrected vtable dump pins to CEShield::SetHitPoints (not Activate, as an
-    // earlier draft of this comment guessed), re-running the same online/offline check.
+    // via SetHitPoints (vtable+0x40), re-running the online/offline check.
     void ShieldBatteryBoost(float Amount);
 
     unsigned char bOnline;          // +0x4c (+0x4d..+0x4f: alignment)
     float CurrentHitPoints;         // +0x50 (CEShield::GetHitPoints() override)
-    unsigned char Opaque54[4];      // +0x54 .. +0x57: real gap, never touched in this cluster
-    double OfflineEndTime;          // +0x58
-    unsigned char MissionFlagCopy;  // +0x60: ctor's own bMissionFlag argument, copied but
-                                     // never read again anywhere in this cluster
+    unsigned char Opaque54[4];      // +0x54 .. +0x57: gap, never touched
+    double OfflineEndTime;          // +0x58, compared against Timing::GetGlobalTime()
+    unsigned char MissionFlagCopy;  // +0x60: ctor's bMissionFlag argument, never read
     unsigned char Opaque61[3];
-    std::vector<CEShieldGenerator*>* Gens; // +0x64 heap; listing VC6 vector at +0x64
-    unsigned char Opaque68[8];      // +0x68 .. +0x6f: rest of retail's real inline 3-pointer
-                                     // vector control block; Gens (a single heap pointer)
-                                     // replaces it in the port
-    // AddGen (Common.dll.c 0x3c5e0/raw asm): the linked generator with the highest
+    std::vector<CEShieldGenerator*>* Gens; // +0x64 heap; retail VC6 vector at +0x64
+    unsigned char Opaque68[8];      // +0x68 .. +0x6f: rest of retail's inline vector block
+    // AddGen (0x3c5e0): the linked generator with the highest
     // Arch->Toughness (Archetype::AttachedEquipment+0x84). Retail stores the WINNING
     // GENERATOR'S ARCHETYPE pointer here, not the CEShieldGenerator* itself.
     Archetype::ShieldGenerator* DominantGenArch; // +0x70
@@ -1352,13 +1236,9 @@ public:
 
 static_assert(sizeof(CEThruster) == 0x64, "CEThruster sizeof 0x64");
 
-// CETractor::VerifyTarget (Common.dll.c 65894-65967) return codes. Free enum (mangled
-// W4TractorFailureCode@@, not nested under CETractor or TractorArm), body empty in the
-// decomp (Ghidra couldn't recover the named constants) -- values recovered from
-// VerifyTarget's own `return N` sites and cross-checked against CETractor::AddTarget
-// (65740-65815, which forwards VerifyTarget's result straight through as its own return
-// value and only special-cases 0 == success) and TractorArm::Update (65401-65402, which
-// only treats 0 as "still a valid target").
+// CETractor::VerifyTarget return codes. Free enum (mangled W4TractorFailureCode@@); names are
+// the port's, values from VerifyTarget's `return N` sites. AddTarget forwards the result and
+// TractorArm::Update treats only 0 as a valid target.
 enum TractorFailureCode
 {
     TractorOk                = 0,
@@ -1373,44 +1253,37 @@ enum TractorFailureCode
 struct CLoot;
 class TractorArm;
 
-// CETractor layout recovered from CETractor::CETractor(CShip*,ushort,Archetype::Tractor*,bool)
-// (Common.dll.c 65596-65672, 0x3e030) and its copy ctor (65227-65307, 0x3d9a0): +0x20..+0x4F is
-// a Transform (Matrix Rotation then Vector Translation -- the ctor's identity-diagonal writes at
-// +0x20/+0x30/+0x40 land exactly on Matrix::E[0][0]/[1][1]/[2][2] when the Matrix starts at
-// +0x20), and +0x50 is a std::vector<TractorArm> (VC6 layout: allocator byte +0x50, then
-// begin/end/capacity at +0x54/+0x58/+0x5c, stride 0x24 == sizeof(TractorArm)). The exported
-// GetTractorArms (.text:0629d990, `LEA EAX,[this+0x50]`) returns a const reference to it, and
-// AddTarget grows it through the vector insert helper FUN_0629e840 on `this+0x50`. The byte the
-// ctor writes at +0x50 (`MOV AL,[param_4]; MOV [EBX+0x50],AL`, .text:0629e084/0629e0a7) is the
-// VC6 vector's allocator copy built in the reused param_4 stack slot, not a stored flag -- no
-// reader of +0x50 as a bool exists. The port uses a modern std::vector (no retail ABI).
+// CETractor layout from its ctor (0x3e030) and copy ctor (0x3d9a0): +0x20..+0x4F is a
+// Transform (identity diagonal at +0x20/+0x30/+0x40), and +0x50 a VC6 std::vector<TractorArm>
+// (allocator byte +0x50, begin/end/capacity +0x54/+0x58/+0x5c, stride 0x24). AddTarget grows
+// it through FUN_0629e840. The byte the ctor writes at +0x50 is the allocator copy, not a
+// flag. Deviation: a modern std::vector.
 class COMMON_API CETractor : public CInternalEquip
 {
 public:
     CETractor(CShip* OwnerShip, unsigned short EquipId, Archetype::Tractor const* Arch,
               bool bMissionFlag);
-    // Common.dll.c 65227-65307 (0x3d9a0). Retail inlines CInternalEquip(Other)'s own field copy
-    // here instead of calling it (identical fields/order -- see CInternalEquip's copy ctor
-    // comment) before copying this class's own Transform/flag/arm-array.
+    // 0x3d9a0. Retail inlines CInternalEquip(Other)'s field copy before copying
+    // Transform/flag/arm array.
     CETractor(CETractor const& Other);
     virtual ~CETractor();
 
-    // Common.dll.c 65862-65890 (0x3e440).
+    // 0x3e440.
     virtual bool Update(float Dt, unsigned Flags) override;
 
     float GetRange() const;
-    // Common.dll.c 65722-65736 (0x3e240).
+    // 0x3e240.
     int CountActiveArms() const;
-    // Common.dll.c 65742-65815 (0x3e270).
+    // 0x3e270.
     TractorFailureCode AddTarget(CLoot* Target);
-    // Common.dll.c 65821-65856 (0x3e3d0).
+    // 0x3e3d0.
     void RemoveTarget(unsigned TargetId);
-    // Common.dll.c 65896-65967 (0x3e4a0).
+    // 0x3e4a0.
     TractorFailureCode VerifyTarget(CLoot const* Target) const;
-    // Common.dll.c 66010-66030 (0x3e730). World-space position of the tractor beam's source
+    // 0x3e730. World-space position of the tractor beam's source
     // hardpoint (owner ship's world Transform composed with this equip's own HpXform).
     Vector GetSourcePos() const;
-    // Common.dll.c 66047-66064 (0x3e7a0). Null if no arm currently holds a target with this id.
+    // 0x3e7a0. Null if no arm currently holds a target with this id.
     TractorArm const* GetTractorArm(unsigned TargetId) const;
     static CETractor* __cdecl cast(CEquip* Equip);
     static CETractor const* __cdecl cast(CEquip const* Equip);
@@ -1421,7 +1294,7 @@ public:
     std::vector<TractorArm> const& GetTractorArms() const { return Arms; }
 
 protected:
-    // Common.dll.c 65973-66004 (0x3e660). Line-of-sight range check only (no actual raycast) --
+    // 0x3e660. Line-of-sight range check only (no actual raycast) --
     // same range test as VerifyTarget's first check, against an arbitrary target position.
     bool CanSeeTarget(CLoot const* Target) const;
 
@@ -1435,15 +1308,13 @@ protected:
 // TractorArm: one grab arm of a CETractor (tractor beam equipment), tracking a single CLoot
 // pull in progress. Cluster: ctor(CETractor*) 0x3db80, copy-ctor 0x3d890, operator= 0x3d920,
 // dtor 0x3dbd0, GetTarget 0x3d870, SetTarget 0x3ded0, TurnOff 0x3dea0, Update 0x3dc40,
-// GetTipPos 0x3df10. Update/GetTipPos both resolve the beam source's world Transform via the
-// owner ship's own world Transform composed with CETractor's stored HpXform through the
-// 3DMathEngine singleton's MulTransform (see CETractor::GetSourcePos / ResolveTractorSourceXform
-// in common_cetractor.cpp) -- DAT_063fc22c is just this cluster's own lazily-cached slot for that
-// same already-ported Acquire3DMathEngine() singleton.
+// GetTipPos 0x3df10. Update/GetTipPos both compose the owner ship's world Transform with
+// CETractor's HpXform through the 3DMathEngine's MulTransform (ResolveTractorSourceXform in
+// common_cetractor.cpp); DAT_063fc22c is this cluster's cached Acquire3DMathEngine() slot.
 class COMMON_API TractorArm
 {
 public:
-    // Observed in TractorArm::Update (Common.dll.c 65367-65458): 0 = idle (no target locked,
+    // From TractorArm::Update: 0 = idle (no target locked,
     // Update no-ops), 1 = pulling the target toward the beam tip, 2 = target reached the tip,
     // Timer counting down before consumption.
     enum Mode { MODE_0 = 0, MODE_1 = 1, MODE_2 = 2 };
@@ -1454,24 +1325,17 @@ public:
     ~TractorArm();
 
     Mode GetMode() const { return (Mode)State; }
-    // Common.dll.txt 0629d860 (ordinal 1778): `MOV EDX,[this+4]; XOR EAX,EAX; TEST EDX,EDX;
-    // SETNZ AL` -- on while State (+0x04) is anything but MODE_0.
+    // 0x0629d860 (ordinal 1778): on while State (+0x04) is anything but MODE_0.
     bool IsOn() const { return State != 0; }
-    // Common.dll.txt 0629d880 (ordinal 1577, ICF-folded with CECargo::GetContainer):
-    // `MOV EAX,[this+0x20]` -- the stored ErrorCode.
+    // 0x0629d880 (ordinal 1577, ICF-folded with CECargo::GetContainer): the stored ErrorCode.
     TractorFailureCode GetErrorCode() const { return ErrorCode; }
-    // Common.dll.c 0x3d870 (65123-65131): CLoot* recovered by subtracting the fixed
-    // CSimple::SelfWatchable sub-object offset from the stored Watchable*, the same idiom as
-    // CGuided::get_target (IObjRW+8 there, CSimple+0x9c / CLoot's inherited slot here).
+    // 0x3d870: the watched Watchable* minus CSimple::SelfWatchable's offset (0x9c), as in
+    // CGuided::get_target.
     CLoot* GetTarget() const;
-    // Common.dll.c 0x3ded0 (65508-65532).
-    void SetTarget(CLoot* Target);
-    // Common.dll.c 0x3dea0 (65488-65504).
-    void TurnOff();
-    // Common.dll.c 0x3dc40 (65369-65458).
-    void Update(float Dt);
-    // Common.dll.c 0x3df10 (65539-65589).
-    Vector GetTipPos() const;
+    void SetTarget(CLoot* Target);  // 0x3ded0
+    void TurnOff();                 // 0x3dea0
+    void Update(float Dt);          // 0x3dc40
+    Vector GetTipPos() const;       // 0x3df10
 
     CETractor* Owner;             // +0x00
     unsigned State;               // +0x04  Mode
@@ -1481,13 +1345,10 @@ public:
     TractorFailureCode ErrorCode; // +0x20
 
 protected:
-    // Retail `protected: static float const`, each with its own export ordinal, so these are
-    // real exported symbols and not just literals. Values read off .rdata.
-    // ACQUIRE_DELAY (ordinal 1174, 0x0639d80c = 1.0f) is the value moved into Timer (+0x1c) at
-    // 0629de02, right after State is set to 2 -- the one-second countdown before the towed
-    // CLoot is consumed. GRAB_TOLERANCE_SQUARED (ordinal 1481, 0x0639d810 = 1.0f) has no reader
-    // anywhere in Common.dll: exported but dead in retail, ported for symbol parity only.
-    // Both are DEFINED in common_tractorarm.cpp, with the rest of the class.
+    // Retail `protected: static float const` exports (defined in common_tractorarm.cpp).
+    // ACQUIRE_DELAY (ordinal 1174, 0x0639d80c = 1.0f) is moved into Timer (+0x1c) at 0629de02
+    // when State becomes 2 -- the countdown before the towed CLoot is consumed.
+    // GRAB_TOLERANCE_SQUARED (ordinal 1481, 0x0639d810 = 1.0f) has no reader in Common.dll.
     static float const ACQUIRE_DELAY;
     static float const GRAB_TOLERANCE_SQUARED;
 };
@@ -1558,11 +1419,8 @@ public:
     float GetRadarRange() const;
     float GetCargoScanRange() const;
 
-    // Retail values confirmed against Common.dll.c 0x3f8c0 (CEScanner::ScanCargo):
-    // distance-out-of-range returns literal 0, insufficient-power returns literal 1.
-    // Renamed here from the misleading original guesses (ScanOk/ScanOutOfRange) to
-    // match true retail semantics; only ScanComplete's numeric value is ever checked
-    // by callers (common_iobjinspectimpl.cpp), so this rename carries no external risk.
+    // Values from ScanCargo (0x3f8c0): out of range returns 0, insufficient power 1.
+    // Callers check only ScanComplete.
     enum ScanResult
     {
         ScanTooFar = 0,
@@ -1599,8 +1457,7 @@ class COMMON_API CEArmor : public CInternalEquip
 public:
     CEArmor(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Armor const* Arch,
             bool bMissionFlag);
-    // Common.dll.c 57091-57106 (0x350b0): adds no fields beyond CInternalEquip -- plain
-    // CInternalEquip(Other).
+    // 0x350b0: adds no fields -- plain CInternalEquip(Other).
     CEArmor(CEArmor const& Other);
     virtual ~CEArmor();
     Archetype::Armor const* ArmorArch() const;
@@ -1615,26 +1472,24 @@ class COMMON_API CECargoPod : public CAttachedEquip
 public:
     CECargoPod(CEqObj* OwnerObj, unsigned short EquipId, Archetype::CargoPod const* Arch,
                bool bMissionFlag);
-    // Common.dll.c 57178-57212 (0x35270): memberwise copy through CAttachedEquip(Other) plus
-    // this class's own Cargo field.
+    // 0x35270: memberwise copy through CAttachedEquip(Other) plus Cargo.
     CECargoPod(CECargoPod const& Other);
     virtual ~CECargoPod();
 
-    // Common.dll.c 0x35980. Links the two objects: Cargo = Pod, and Pod->CargoPod = this.
+    // 0x35980. Links the two objects: Cargo = Pod, and Pod->CargoPod = this.
     void FillPod(CECargo* Cargo);
-    // Common.dll.c 0x35990. Inverse of FillPod: if still linked, clears the CECargo's
+    // 0x35990. Inverse of FillPod: if still linked, clears the CECargo's
     // CargoPod back-pointer to null, then clears this->Cargo to null.
     void EmptyPod();
 
-    // Common.dll.c 0x35950. Overrides CEquip::IsLootable: a cargo pod is lootable iff
-    // it currently holds a CECargo with a non-zero stack count.
+    // 0x35950. A cargo pod is lootable iff it holds a CECargo with a non-zero stack count.
     virtual bool IsLootable() const override;
     // Listing 0x35970: a bare JMP to CExternalEquip::Destroy.
     virtual void Destroy() override;
     // Listing 0x369c0 (ICF-shared): return [this+0x4c], the cargo stack in the pod.
     CECargo const* GetContents() const;
 
-    // Common.dll.c 0x359a0.
+    // 0x359a0.
     static CECargoPod* __cdecl cast(CEquip* Equip);
     static CECargoPod const* __cdecl cast(CEquip const* Equip);
 
@@ -1649,13 +1504,9 @@ class COMMON_API CEMineDropper : public CELauncher
 public:
     CEMineDropper(CEqObj* OwnerObj, unsigned short EquipId, Archetype::MineDropper const* Arch,
                   bool bMissionFlag);
-    // Common.dll.c 58720-58765 (0x36af0): adds no fields beyond CELauncher -- plain
-    // CELauncher(Other).
+    // 0x36af0: adds no fields -- plain CELauncher(Other).
     CEMineDropper(CEMineDropper const& Other);
     virtual ~CEMineDropper();
-    // Common.dll.c 61604-61627 (0x3a270): defers to CELauncher::CanFire; if that already
-    // reports FireOk, additionally blocks firing (FireCruise) when the owner is a CShip
-    // currently in cruise mode -- mines can't be dropped while cruising.
     static CEMineDropper* __cdecl cast(CEquip* Equip);
     static CEMineDropper const* __cdecl cast(CEquip const* Equip);
     // Listing 0x3fb90 / 0x369c0 (ICF-shared, non-const in retail): [this+0xc] / [this+0x4c].
@@ -1663,6 +1514,8 @@ public:
     Archetype::Mine const* MineArch();
 
 protected:
+    // 0x3a270: CELauncher::CanFire, then FireCruise when it said FireOk but the owner is a
+    // CShip in cruise -- mines can't be dropped while cruising.
     virtual FireResult CanFire(Vector const& Target) const override;
 };
 
@@ -1676,7 +1529,7 @@ public:
     CECounterMeasureDropper(CECounterMeasureDropper const& Other);
     virtual ~CECounterMeasureDropper();
 
-    // Common.dll.c 61666-61723 (0x3a320). If functioning, flag 0x20 isn't set on Flags, and
+    // 0x3a320. If functioning, flag 0x20 isn't set on Flags, and
     // this launcher's archetype AiRangeSq (already squared on read) is positive: scans the
     // owning ship's own CEScanner (Owner->EquipManager.FindFirst(EquipTypeScanner)) tracked-
     // contact list for a same-owner missile/projectile within AiRangeSq of this equip's own
@@ -1685,7 +1538,7 @@ public:
     // epilogue (RefireElapsed accumulate + CAttachedEquip::Update).
     virtual bool Update(float Dt, unsigned Flags) override;
 
-    // Common.dll.c 61730-61739 (0x3a4a0).
+    // 0x3a4a0.
     static CECounterMeasureDropper* __cdecl cast(CEquip* Equip);
     static CECounterMeasureDropper const* __cdecl cast(CEquip const* Equip);
     // Listing 0x3fb90 / 0x369c0 (ICF-shared, non-const in retail): [this+0xc] / [this+0x4c].
@@ -1700,12 +1553,11 @@ class COMMON_API CELightEquip : public CExternalEquip
 public:
     CELightEquip(CEqObj* OwnerObj, unsigned short EquipId, Archetype::Light const* Arch,
                  bool bMissionFlag);
-    // Common.dll.c 54911 (0x329b0). Same field-by-field base-then-derived copy shape as
-    // CExternalEquip's own copy ctor (CELightEquip adds no fields of its own).
+    // 0x329b0. Same copy shape as CExternalEquip's (adds no fields).
     CELightEquip(CELightEquip const& Other);
     virtual ~CELightEquip();
 
-    // Common.dll.c 0x3f270.
+    // 0x3f270.
     static CELightEquip* __cdecl cast(CEquip* Equip);
     static CELightEquip const* __cdecl cast(CEquip const* Equip);
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
@@ -1722,8 +1574,7 @@ class COMMON_API CEAttachedFX : public CExternalEquip
 public:
     CEAttachedFX(CEqObj* OwnerObj, unsigned short EquipId,
                  Archetype::AttachedFXEquip const* Arch, bool bMissionFlag);
-    // Common.dll.c 54884 (0x328f0). Same field-by-field base-then-derived copy shape as
-    // CExternalEquip's own copy ctor (CEAttachedFX adds no fields of its own).
+    // 0x328f0. Same copy shape as CExternalEquip's (adds no fields).
     CEAttachedFX(CEAttachedFX const& Other);
     virtual ~CEAttachedFX();
 
@@ -1738,26 +1589,21 @@ public:
 static_assert(sizeof(CEAttachedFX) == 0x28, "CEAttachedFX sizeof 0x28");
 
 // CEInternalFX — internal FX equip (asteroid-field ambient effects). Type bit 0x400000,
-// inside CInternalEquip::cast's mask. Confirmed via retail's own `vftable': its GetEquipDesc
-// slot points directly at CInternalEquip::GetEquipDesc (Common.dll.c listing 0x13cbec/
-// 0x3fcc14), which is only possible if CInternalEquip is the real immediate base -- retail's
-// primary/copy ctors and dtor fully inline CInternalEquip's trivial (2-instruction) ctor/dtor
-// bodies at this call site, which is why the raw disassembly looked CEquip-direct at first.
+// inside CInternalEquip::cast's mask. Base is CInternalEquip: the vftable's GetEquipDesc slot
+// is CInternalEquip::GetEquipDesc; the ctors and dtor inline CInternalEquip's trivial bodies.
 class COMMON_API CEInternalFX : public CInternalEquip
 {
 public:
     CEInternalFX(CEqObj* OwnerObj, unsigned short EquipId,
                  Archetype::InternalFXEquip const* Arch, bool bMissionFlag);
-    // Common.dll.c 57065 (0x34ff0). Plain CInternalEquip(Other) field copy plus this class's
-    // own vtable; retail's intermediate CInternalEquip-vtable stamp mid-copy is the genuine
-    // base-then-derived copy-ctor shape, not a leftover artifact.
+    // 0x34ff0. CInternalEquip(Other) plus this class's vtable.
     CEInternalFX(CEInternalFX const& Other);
     virtual ~CEInternalFX();
     // Listing 0x3fe70. Releases Anim (AnimDB::Rem + FAnimScriptRef::Release, same as the
     // dtor) before chaining to the non-virtual CEquip::Destroy().
     virtual void Destroy();
 
-    // Common.dll.c 0x3fec0.
+    // 0x3fec0.
     static CEInternalFX* __cdecl cast(CEquip* Equip);
     static CEInternalFX const* __cdecl cast(CEquip const* Equip);
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
@@ -1769,29 +1615,8 @@ public:
 static_assert(sizeof(CEInternalFX) == 0x24, "CEInternalFX sizeof 0x24");
 
 // ShipGunStats is declared once, in common_cobject.h (beside CShip::get_gun_stats).
-
-// NOTE: this cluster's GetEquipDesc virtual family used to fill in a duplicate,
-// wrongly-laid-out "FEquipDesc" type invented during an earlier porting pass. Ground-
-// truthing CEquip::GetEquipDesc against the raw x86 (Common.dll.txt ~110520-110572,
-// retail RVA 0x3ae10) showed retail's own mangled symbol is
-// `?GetEquipDesc@CEquip@@UBE_NAAUEquipDesc@@@Z` -- a reference to plain `struct
-// EquipDesc` (common_goods.h), the exact same type already used for
-// EquipDescList/EquipDescVector/GoodInfo's AddonLow/Mid/High elsewhere in this port --
-// not a distinct type. Every sibling override (CECargo/CEShield/CExternalEquip/
-// CInternalEquip::GetEquipDesc) carries the identical "AAUEquipDesc@@" mangling, and
-// CECargo::GetEquipDesc's raw byte copy from this+0x12 (CEquip::bMission) into
-// param_1+0x18 only lines up with EquipDesc's real bMission@0x18 field, not this
-// type's Owner@0x18. FEquipDesc/FEquipDescVector/FEquipDescStatic have been removed;
-// every former user now uses EquipDesc/EquipDescVector (and EquipDesc::CARGO_BAY_HP_NAME) directly.
-
-// The retail "engine object" wrapper (ctor 0xa98a0, sizeof 0x4c) dispatching
-// IEngineInstance ops lives at src/include/common_cobject.h as `EngineObject`
-// (decomp-tracker's Ghidra-recovered RTTI name for every vtable slot at this
-// address range, confirmed against both compiled instances of the class in the
-// retail binary). A `CEngineObject` duplicate used to be declared here from an
-// earlier, uncoordinated porting pass over the equip cluster; it was never
-// instantiated, never used as a base class, and had no callers anywhere in the
-// port, so it has been removed in favor of the single real `EngineObject`.
+// The retail "engine object" wrapper (ctor 0xa98a0, sizeof 0x4c) is EngineObject in
+// common_cobject.h.
 
 // ============================================================================
 // IAction — abstract action interface (ActionDB items) (0x27720)
@@ -1913,9 +1738,8 @@ public:
     unsigned int ExitState;           // +0x90
     unsigned char bExitFlag;          // +0x94: set with state 4; turns the pose while leaving
 
-    unsigned char Field95;            // +0x95: TODO zeroed by the ctor (062c1370), no reader in
-                                      // 062c1220..062c242a; LaneAction is not exported and no
-                                      // other listing names it, so no reader exists anywhere
+    unsigned char Field95;            // +0x95: zeroed by the ctor (062c1370), no reader in
+                                      // 062c1220..062c242a (LaneAction is not exported)
     // +0x96: 1 when the ring after the entrance ring (traverse_rings forward) is the exit
     // ring. It is the direction for every later traverse_rings, and BuildRingTransform takes
     // the "HpLeftLane" position and turns the frame 180 degrees when it is zero.
@@ -1923,11 +1747,11 @@ public:
     unsigned char bRingApproachValid; // +0x97: the ctor's bool (go_tradelane's bFastExit);
                                       // InitializeApproach starts at state 2 instead of 1
     float Speed;                      // +0x98: the ctor's float (go_tradelane's); no reader in
-                                      // 062c1220..062c242a  // formerly Field98
+                                      // 062c1220..062c242a
 
     // +0x9c: the pose beamed onto the traveller every tick. Outside state 4 it is the
     // projection onto the current leg (ProjectOntoSegment); in state 4 the traveller's own
-    // transform, turned by bExitFlag.  // formerly Opaque9C
+    // transform, turned by bExitFlag.
     Transform LanePose;
 
     // +0xcc / +0xd8: the traveller's position and orientation when InitializeApproach ran; the
@@ -1942,10 +1766,10 @@ public:
     float TransitRampTarget;
 
     // +0xf4: TransitRamp at the first state-4 tick (seeded while it is still 0.0f); the leaving
-    // ramp's rate is (it - TransitRampTarget * 0.4) per second.  // formerly Field_F4
+    // ramp's rate is (it - TransitRampTarget * 0.4) per second.
     float ExitRampStart;
 
-    // +0xf8: TODO byte zeroed by the ctor (062c1376), no reader in 062c1220..062c242a;
+    // +0xf8: byte zeroed by the ctor (062c1376), no reader in 062c1220..062c242a;
     // +0xf9..+0xfb are never written.
     unsigned char Opaque_F8[4];
 
@@ -1987,17 +1811,10 @@ namespace LaunchActionVars
     extern COMMON_API float const launch_decel_time;
 }
 
-// LaunchAction — ship launch action controller (0x52a20 / 0x62afda0). Multiply
-// inherits IAction (0x08) + PhySys::Controller (0x10) + pub::AI::DirectiveCallback
-// (0x04) = 0x1c bytes of bases. Found by tracing FUN_062afda0 (the ctor): the
-// pointer-sized field retail sets at LaunchAction+0x18 during construction (a "temp"
-// value from the trivial DirectiveCallback base ctor, overwritten at the end to
-// LaunchAction's own combined vtable for that base -- the same construction-order
-// dance IAction's vtable at +0x00 and Controller's vtable at +0x08 go through) is
-// DirectiveCallback's own vtable slot, not a stray data field. This also fixes two
-// field offsets that were wrong before this pass: BaseObj lives at +0x24 (not
-// +0x20) and DockObjWatcher at +0x1c (not +0x18), pushed 4 bytes by the extra base.
-// Not exported by retail; only the two LaunchActionVars constants below are.
+// LaunchAction — ship launch action controller (ctor FUN_062afda0). Bases IAction (0x08) +
+// PhySys::Controller (0x10) + pub::AI::DirectiveCallback (0x04) = 0x1c bytes; the ctor
+// stamps DirectiveCallback's vptr at +0x18 like the other two.
+// Not exported by retail; only the two LaunchActionVars constants above are.
 class LaunchAction : public IAction, public PhySys::Controller, public pub::AI::DirectiveCallback
 {
 public:
@@ -2014,37 +1831,20 @@ public:
     // immediate launch, queues an AI DirectiveLaunchOp instead and returns.
     void Start();
 
-    // Retail 0x62b0270, dispatched via this class's own IAction sub-vtable
-    // (PTR_LAB_0639e5a4 slot 1). Only does anything when LaunchFlags & 0x20 (the
-    // immediate-physical-launch path); the AI-directive path (Start() queued a
-    // DirectiveLaunchOp instead) just reports "not complete" every tick with no
-    // side effects. See common_launchaction.cpp for the full per-branch trace.
+    // 0x062b0270, IAction slot 1 (PTR_LAB_0639e5a4). Does work only when LaunchFlags & 0x20
+    // (the immediate physical launch); on the AI-directive path it just returns
+    // !bUpdateComplete. See common_launchaction.cpp.
     virtual bool update(float Dt) override;
 
-    // Retail 0x62b01f0, dispatched via this class's own DirectiveCallback
-    // sub-vtable (PTR_FUN_0639e57c slot 0). Called by IBehaviorManager when the
-    // AI DirectiveLaunchOp Start() queued (the LaunchFlags&0x20==0 path) finishes:
-    // clears the docked object's control exclusion, notifies the dock's
-    // IObjAffect sub-object (slot 28) with BaseObj->Id, and sets bUpdateComplete
-    // = true. update()'s LaunchFlags&0x20==0 branch returns !bUpdateComplete
-    // without recomputing it, so this is what makes an AI-directive LaunchAction
-    // ever self-remove from its ActionDB: before this callback fires, update()
-    // returns true (not done) forever; afterward, it returns false and
-    // ActionDB::update() removes the action.
+    // 0x062b01f0, DirectiveCallback slot 0 (PTR_FUN_0639e57c). Called by IBehaviorManager
+    // when the DirectiveLaunchOp queued by Start() finishes: clears the docked object's
+    // control exclusion, notifies the dock's IObjAffect (slot 28) with BaseObj->Id and sets
+    // bUpdateComplete -- the only way an AI-directive LaunchAction leaves its ActionDB.
     virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) override;
 
-    // Common.dll 0x62b0560 (LAB_062b0560), LaunchAction's own PhySys::Controller vtable
-    // slot 4 (.rdata PTR_core_is_going_to_be_deleted_event_0639e584+0x10, installed at
-    // [this+8] by the ctor -- structurally identical to JumpInAction's Step(), see that
-    // class's comment for how this slot family was identified). THIS IS the per-tick
-    // producer that was previously believed missing (see the old CoastElapsed comment
-    // this replaces): it advances CoastElapsed by Dt whenever LaunchFlags == 0x20, then
-    // eases the docked ship out along LaunchDir toward LaunchPos over the coast period
-    // and re-teleports it there every tick via beam_object(), matching the analogous
-    // JumpInAction::Step(). Extracted verbatim as a plain (not-yet-wired) method for the
-    // same reason as JumpInAction's. Now the do_simulation_controller override (was the plain
-    // method Step(float Dt)); Dt is the event's delta_time (.text:062b056c-062b0570). Tracker
-    // item 1102.
+    // LAB_062b0560, PhySys::Controller slot 4. While LaunchFlags == 0x20, advances
+    // CoastElapsed by the event's delta_time, eases the docked ship out along LaunchDir
+    // toward LaunchPos and beams it there every tick (as JumpInAction's does).
     virtual void do_simulation_controller(IVP_Event_Sim* EventSim,
                                           IVP_U_Vector<IVP_Core>* CoreList) override;
 
@@ -2052,11 +1852,8 @@ public:
     CEqObj* BaseObj;                  // +0x24
     unsigned int LaunchFlags;         // +0x28  copy of BaseObj's CSimple::TypeBits (ctor); tested for bits 0x20 / 0x200100 in Start()
     int LaunchType;                   // +0x2c  forced to 1 by the ctor when LaunchFlags & 0x20
-    // +0x30  zeroed by ctor, real per-tick reader/writer found: LaunchAction::Step()
-    // (Common.dll 0x62b0560, JumpInAction::Step()'s LaunchAction-side sibling --
-    // previously undiscovered, see Step()'s own comment above). update() reads it back
-    // (FCOMP against LaunchActionVars::launch_coast_time + launch_decel_time, i.e.
-    // compared to 3.0) for its own "coast elapsed" branch.
+    // +0x30: advanced by do_simulation_controller; update() compares it with
+    // launch_coast_time + launch_decel_time (3.0).
     float CoastElapsed;               // +0x30
     Vector LaunchPos;                 // +0x34  filled in by Start() via CEqObj::launch_pos plus a hardpoint offset
     Vector LaunchDir;                 // +0x40  cached forward column of LaunchOrient after Start() runs
@@ -2075,26 +1872,11 @@ static_assert(offsetof(LaunchAction, LaunchPos) == 0x34, "LaunchAction+0x34 Laun
 static_assert(offsetof(LaunchAction, LaunchOrient) == 0x50, "LaunchAction+0x50 LaunchOrient");
 static_assert(offsetof(LaunchAction, CoastTimer) == 0x74, "LaunchAction+0x74 CoastTimer");
 
-// JumpInAction — hyperspace jump-in action controller (0x52d40). Unlike LaunchAction,
-// retail inlines this entire constructor body directly into CShip::jump_in (confirmed
-// via Common.dll.c 84960-85054 -- there is no separate call site for a JumpInAction
-// ctor anywhere in the listing).
-//
-// CORRECTION (tracker item 1093, 2026-09-09): this class DOES have a real per-tick
-// Controller override -- the previous claim here ("no Step()/ControlObject override at
-// all... a single immediate teleport, not a per-frame approach") was wrong. Raw-asm
-// tracing of PTR_core_is_going_to_be_deleted_event_0639e680 (JumpInAction's own combined
-// Controller vtable, installed at [this+8] by the ctor above) shows its slot 4
-// (.rdata 0639e690) is LAB_062afbe0 -- a genuine ~60-instruction JumpInAction-only body,
-// not the shared trivial IVP_Controller default the earlier note assumed. Given the
-// calling convention (RET 0x8, first stack arg dereferenced for its own float member),
-// this is IVP_Controller::do_simulation_controller(IVP_Event_Sim*,
-// IVP_U_Vector<IVP_Core>*) -- the Ipion SDK's per-simulation-tick callback, now declared on
-// PhySys::Controller and overridden below (it used to be the plain method Step(float)).
-// See the .cpp body's own comment for the full trace: it does
-// a smooth eased approach toward JumpPos over JumpSpeed seconds (not an instant-only
-// teleport), which is also why Field20/JumpApproachBudget/Field5c/Field60 below turned
-// out to have real readers after all.
+// JumpInAction — hyperspace jump-in action controller (0x52d40). Retail inlines the whole
+// constructor into CShip::jump_in (no separate ctor call site).
+// Its Controller vtable (PTR_core_is_going_to_be_deleted_event_0639e680) slot 4 is
+// LAB_062afbe0, the do_simulation_controller override: an eased approach toward JumpPos
+// over JumpSpeed seconds, not an instant teleport.
 // Not exported by retail (no JumpInAction name in its export table).
 class JumpInAction : public IAction, public PhySys::Controller
 {
@@ -2105,22 +1887,19 @@ public:
     virtual char const* get_id() const override { return "JumpIn"; }
     virtual bool update(float Dt) override;
 
-    // Common.dll 0x62afbe0 (LAB_062afbe0), JumpInAction's own PhySys::Controller vtable
-    // slot 4 -- see the class comment above: the do_simulation_controller override (was the
-    // plain method Step(float Dt)). Dt is the event's delta_time (.text:062afc35-062afc39).
-    // Tracker item 1093.
+    // LAB_062afbe0, PhySys::Controller slot 4; Dt is the event's delta_time.
     virtual void do_simulation_controller(IVP_Event_Sim* EventSim,
                                           IVP_U_Vector<IVP_Core>* CoreList) override;
 
     BaseWatcher JumpObjWatcher;       // +0x18  watches the jumping object's Watchable (+8)
-    float JumpElapsed;                // +0x20  (formerly Field20) elapsed-time accumulator for do_simulation_controller's ease-in
-    float JumpSpeed;                  // +0x24  also doubles as Step()'s elapsed-time cap (seconds)
-    float JumpApproachBudget;         // +0x28  JumpSpeed * 2000.0f; ease-out distance budget (real reader: Step())
+    float JumpElapsed;                // +0x20  elapsed-time accumulator for do_simulation_controller's ease-in
+    float JumpSpeed;                  // +0x24  also the elapsed-time cap (seconds)
+    float JumpApproachBudget;         // +0x28  JumpSpeed * 2000.0f; ease-out distance budget
     Matrix JumpOrient;                // +0x2c
     Vector JumpPos;                   // +0x50
-    float Field5c;                    // +0x5c  retail constant 1500.0f; still no confirmed reader (not in Step() either)
-    float Field60;                    // +0x60  retail constant 10.0f; still no confirmed reader (not in Step() either)
-    bool bJumpComplete;               // +0x64  (formerly Field64) zeroed by the ctor, set by do_simulation_controller, polled by update(); +0x65..+0x67 padding
+    float Field5c;                    // +0x5c  retail constant 1500.0f; no reader found
+    float Field60;                    // +0x60  retail constant 10.0f; no reader found
+    bool bJumpComplete;               // +0x64  zeroed by the ctor, set by do_simulation_controller, polled by update(); +0x65..+0x67 padding
 };
 
 static_assert(sizeof(JumpInAction) == 0x68, "JumpInAction sizeof 0x68");
@@ -2255,8 +2034,7 @@ class COMMON_API CETradeLaneEquip : public CInternalEquip
 public:
     CETradeLaneEquip(CEqObj* OwnerObj, unsigned short EquipId,
                      Archetype::TradeLaneEquip const* Arch, bool bMissionFlag);
-    // Common.dll.c 57044 (0x34f40). Adds no fields beyond CInternalEquip -- plain
-    // CInternalEquip(Other) field copy plus this class's own vtable.
+    // 0x34f40. CInternalEquip(Other) plus this class's vtable.
     CETradeLaneEquip(CETradeLaneEquip const& Other);
     virtual ~CETradeLaneEquip();
 
@@ -2269,34 +2047,22 @@ public:
 static_assert(sizeof(CETradeLaneEquip) == 0x20, "CETradeLaneEquip sizeof 0x20");
 
 // CERepairDroid — repair-droid internal equip. Type bit 0x200000, inside
-// CInternalEquip::cast's mask. Confirmed via retail's own `vftable': its GetEquipDesc slot
-// points directly at CInternalEquip::GetEquipDesc (Common.dll.c listing 0x13cb2c/0x3f300),
-// which is only possible if CInternalEquip is the real immediate base. The primary ctor's
-// apparent direct CALL to CEquip::CEquip (Common.dll.c 67339, listing 0x3fbc0) and the
-// dtor's apparent direct CALL to CEquip::~CEquip are both the optimizer inlining
-// CInternalEquip's trivial (2-instruction: forward params/stamp vtable, or stamp vtable/
-// tailcall) ctor and dtor bodies at this call site -- the dtor still visibly stamps
-// CInternalEquip's own vtable pointer immediately before the inlined CEquip::~CEquip call,
-// matching CInternalEquip::~CInternalEquip's body byte-for-byte.
+// CInternalEquip::cast's mask. Base is CInternalEquip: the vftable's GetEquipDesc slot is
+// CInternalEquip::GetEquipDesc; the ctor (0x3fbc0) and dtor inline CInternalEquip's trivial
+// bodies, so they appear to call CEquip directly.
 class COMMON_API CERepairDroid : public CInternalEquip
 {
 public:
     CERepairDroid(CEqObj* OwnerObj, unsigned short EquipId,
                   Archetype::RepairDroid const* Arch, bool bMissionFlag);
-    // Common.dll.c 56973 (0x34e00). Plain CInternalEquip(Other) field copy plus this class's
-    // own vtable; retail's intermediate CInternalEquip-vtable stamp mid-copy is the genuine
-    // base-then-derived copy-ctor shape, not a leftover artifact.
+    // 0x34e00. CInternalEquip(Other) plus this class's vtable.
     CERepairDroid(CERepairDroid const& Other);
     virtual ~CERepairDroid();
     virtual float GetHitPoints() const;
-    // Listing 0x3fc50. Stores Hit, then when it drops to/below 0.0f re-dispatches virtually
-    // through vtable+0x30 (CEquip::Activate's slot) with Activate(false) -- confirmed against
-    // the real retail vtable layout (Common.dll.txt 0x639bdcc CEquip::`vftable' dump: slot
-    // 0x30 resolves to CEquip::Activate, not this class's own SetHitPoints -- the pushed 0
-    // operand is the bool false argument, not a recursive float 0.0f call).
+    // 0x3fc50. Stores Hit; at or below 0.0f calls Activate(false) through vtable+0x30.
     virtual void SetHitPoints(float Hit);
 
-    // Common.dll.c 0x3fc80.
+    // 0x3fc80.
     static CERepairDroid* __cdecl cast(CEquip* Equip);
     static CERepairDroid const* __cdecl cast(CEquip const* Equip);
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
@@ -2312,10 +2078,7 @@ class COMMON_API CECloakingDevice : public CAttachedEquip
 public:
     CECloakingDevice(CEqObj* OwnerObj, unsigned short EquipId,
                      Archetype::CloakingDevice const* Arch, bool bMissionFlag);
-    // Common.dll.c 55259 (0x32fb0). Field-by-field copy across the CEquip/CExternalEquip/
-    // CAttachedEquip/CECloakingDevice layers (retail re-stamps the vtable pointer at each
-    // base level while copying that level's own fields) -- same shape as CAttachedEquip's
-    // own copy ctor.
+    // 0x32fb0. Memberwise copy, base level first.
     CECloakingDevice(CECloakingDevice const& Other);
     virtual ~CECloakingDevice();
 
@@ -2328,14 +2091,13 @@ public:
     // Listing 0x3fb90 (ICF-shared): return [this+0xc].
     Archetype::CloakingDevice const* CloakArch() const;
 
-    // Common.dll.c 56458-56644 (0x34520-0x347e0): a 2-state cross-fade engine. FadeTarget is
+    // 0x34520-0x347e0: a 2-state cross-fade engine. FadeTarget is
     // the state (0/1) Activate()'s most recent call is driving toward; BaselineState is the
     // last state the fade fully reached (== FadeTarget once the transition completes). While
     // they differ, a fade is in progress and cloak_percent()/Update() derive the 0..1 fraction
     // from CloakTimer against the archetype's CloakInTime (FadeTarget == 0 branch) or
-    // CloakOutTime (FadeTarget != 0 branch). Ported byte-for-byte from the decompilation; the
-    // exact real-world meaning of state 0 vs 1 relative to CEquip::bActive was not
-    // independently re-derived beyond what the branch structure implies.
+    // CloakOutTime (FadeTarget != 0 branch). The meaning of state 0 vs 1 relative to
+    // CEquip::bActive is not established beyond the branch structure.
     float CloakTimer;                 // +0x4c  elapsed time in the current fade
     unsigned char FadeTarget;         // +0x50  state Activate() is currently driving toward
     unsigned char BaselineState;      // +0x51  last state the fade fully settled at (+0x52/+0x53: alignment)

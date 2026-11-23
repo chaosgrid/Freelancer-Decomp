@@ -90,7 +90,7 @@ enum
 class NnLoadSave : public WinControl, public EventHandler
 {
 public:
-    // FUN_00485960 (inlined nowhere: FUN_00488d10 calls it).
+    // FUN_00485960
     NnLoadSave();
     // FUN_00485a60 -- vptrs back; the members and the bases go in reverse order.
     ~NnLoadSave() override;
@@ -153,12 +153,12 @@ public:
     WinControl* CloseButton;                   // retail +0x1788
 
 private:
-    // The close every path shares (OnEvent 0x00486b93..0x00486c00, Update 0x00488261..
-    // 0x004882c2, LoadSave 0x00488149..0x004881b0): FUN_004a7690(+0x330), slot 10 on both lists,
-    // slot 33 ReleaseMouse, FUN_0043d2a0 on every child, slot 10, the scalar deleting dtor.
+    // Port-only helper for the close retail inlines on every path (OnEvent 0x00486b93, Update
+    // 0x00488261, LoadSave 0x00488149): restore the cursor flag, release the mouse, delete the
+    // window.
     void ResumeAndDelete();
-    // Both lists emptied and unselected (+0xe80 / +0x173c = 0, +0xe88 / +0x1744 = -1), then
-    // SelectSave(-1) -- inline at 0x00487211, 0x004872d2 and 0x0048774e.
+    // Port-only helper, inlined in retail at 0x00487211, 0x004872d2 and 0x0048774e: both lists
+    // emptied and unselected, then SelectSave(-1).
     void ClearListsAndSelection();
     // 0x2c / 0x2d: the caption of the button A, or null for another sender.
     WinControl* ButtonTextFor(uintptr_t Button) const;

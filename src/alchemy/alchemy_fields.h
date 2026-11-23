@@ -8,31 +8,13 @@
 
 #include "alchemy_genericfx.h"
 
-// alchemy.dll — DACOM particle FX scaffolding.
-//
-// The 7 "generic" field leaves (RegisterComponent names FxGravityField/
-// FxAirField/FxRadialField/FxTurbulenceField/FxCollideField/FLDustField/
-// FLBeamField). Each overrides FGenericFxObjectBase's IGenericFx
-// BeginField/ApplyFieldToVel pair with its own logic and owns only the
-// state that type actually needs — this used to be ONE class
-// (FGenericFxObject) with every field type's state (FieldMagnitude_/
-// FieldApproach_/FieldAtten_/FieldCache_/FieldPoint_/FieldReflect_) crammed
-// onto the same object regardless of which type the instance actually was,
-// dispatching via `_stricmp(FactoryName_, "TypeName") == 0` string branches
-// in BeginField/ApplyFieldToVel. That shape hid a real bug: FLDustField's
-// old BeginField branch never wrote FieldMagnitude_ (it only set
-// FieldPoint_ via TransformPoint), so ApplyFieldToVel's
-// `FieldMagnitude_ > 0.0f` guard was always false and the entire
-// kill-by-radius block was silently dead code for every Dust field
-// instance, in every level, since the type was first ported. See
-// FLDustField below for the fix (and the honest state of what could and
-// could not be re-derived from retail this wave).
-//
-// See alchemy_genericfx.h's file-header comment for the full class-
-// hierarchy-split rationale (this is one of the 3 leaf families it lists).
+// The 7 generic field leaves of alchemy.dll (RegisterComponent names FxGravityField,
+// FxAirField, FxRadialField, FxTurbulenceField, FxCollideField, FLDustField, FLBeamField).
+// Each overrides IGenericFx's BeginField / ApplyFieldToVel pair and owns only its own
+// state (see alchemy_genericfx.h).
 namespace AlchemyImpl
 {
-    // ALC-4 / ALC-6 (2026-09-30): every field's properties are ramps held by its property
+    // Every field's properties are ramps held by its property
     // set (tables: gravity .data 0x06256240, air 0x06255af4, radial 0x062569c8,
     // turbulence 0x06256ccc, collide 0x06255d78, dust 0x06255aa8), evaluated once per
     // frame in the field's own node update (outer +0x14, the port's Pad5) into node floats
@@ -196,61 +178,20 @@ namespace AlchemyImpl
         float Cache_[3];  // node+0xac..+0xb4
     };
 
-    // retail LAB_06236ea0 (Begin: cache = world origin) / LAB_06236d90 (Apply:
-    // pull toward cache, attenuated, falloff-ramped). Owns the falloff ramp
-    // (FUN_06235f50 / FxRampSingleRamp, wave 12 alchemy-wave12-lane2) that
-    // used to be InitRadialFalloffRamp() on the shared base class; it is now
-    // a private method directly on this leaf since only FxRadialField needs
-    // it (see alchemy_genericfx.h's file-header comment).
-    //
-    // wave111:radial-field-a0 (2026-09-15, closes item 134549's this+0xa0
-    // contradiction): retail's real Begin (LAB_06236450) and Apply
-    // (LAB_06236d90) are reached through two DIFFERENT vtables of the same
-    // multiply-inherited object -- Begin only via the secondary interface
-    // at object+4 (proved by the LAB_06236a30 "ECX+=4; JMP LAB_06236450"
-    // adjustor thunk sitting in the *primary* vtable next to Apply's own
-    // direct slot; both of Begin's two call paths converge on identical
-    // code that is therefore provably always invoked with this=object+4),
-    // while Apply sits directly in the primary vtable at object+0. Every
-    // prior wave on this pair (12/37/53/94/110's own first pass) read both
-    // functions' literal "this+0xNN" offsets as if they shared one frame;
-    // they don't -- Begin's need +4 added to land on Apply's (object-
-    // relative) frame. Once corrected, Begin's own this+0x9c/+0xa0/+0xa4/
-    // +0xa8/+0xac land on object+0xa0/+0xa4/+0xa8/+0xac/+0xb0 respectively,
-    // which resolves the apparent pointer/float aliasing on "+0xa0" (they
-    // are different bytes) and reassigns which Begin-computed value feeds
-    // which Apply read:
-    //   object+0xa0 = RampsObj (a real pointer, written once at
-    //                 construction by FUN_06236280, also frame-shifted;
-    //                 Apply's FalloffRamp_ wiring off this was already
-    //                 correct and is unaffected).
-    //   object+0xa8 (Apply's Target-magnitude multiply) = Begin's own
-    //                 this+0xa4 = -Eval(RadialField_Magnitude ramp) --
-    //                 i.e. retail unconditionally negates Magnitude before
-    //                 ever multiplying it into Target.
-    //   object+0xac (Apply's LerpVel3-equivalent blend factor) = Begin's
-    //                 own this+0xa8 = min(Dt * RadialField_Attenuation *
-    //                 4.0f, 1.0f) -- NOT the flat RadialField_Approach
-    //                 property as previously ported.
-    //   object+0xb0 (Apply's Dist normalizer) = Begin's own this+0xac =
-    //                 1.0f / RadialField_Approach -- NOT
-    //                 RadialField_Attenuation as previously ported.
-    // Implemented below: Blend_/DistScale_ are the cached, Begin-time
-    // equivalents of object+0xac/+0xb0; Magnitude_ is negated at point of
-    // use in ApplyFieldToVel. (Superseded naming, see the ALC-4 note below.)
-    //
-    // ALC-4 (2026-09-30): the property names above were crossed. The descriptor's
-    // property table (.data 0x062569c8, {name, hash, kind, ..., min, max}) names the
-    // four ramps FUN_06235f50 builds (descriptor-inner offsets):
+    // retail Begin LAB_06236450 (cache = world origin) / Apply LAB_06236d90 (pull toward
+    // the cache, attenuated, falloff-ramped). Begin is reached only through the secondary
+    // interface at object+4 (adjustor thunk LAB_06236a30 in the primary vtable), Apply
+    // directly at object+0, so Begin's this+0xNN offsets are object+0xNN+4: Begin stores
+    // -Magnitude at object+0xa8, the blend min(Dt * Approach * 4, 1) at +0xac and
+    // 1 / Radius at +0xb0, all read by Apply; object+0xa0 is the set pointer
+    // (FUN_06236280).
+    // The four ramps FUN_06235f50 builds (property table .data 0x062569c8; getters
+    // LAB_06236200 / LAB_06236250), descriptor-inner offsets:
     //   +0x4c RadialField_Magnitude   0x0064B3B9 kind 0x202, default 10.0
     //   +0x50 RadialField_Approach    0xF3CF5EA5 kind 0x202, default 0.3
     //   +0x54 RadialField_Radius      0xFF28F620 kind 0x202, default 50.0
     //   +0x58 RadialField_Attenuation 0x1A433168 kind 0x200, keys (0, 1.0) (1.0, 0.001)
-    // So Begin's 1/x is 1/Radius, its blend is Dt * Approach * 4, and the falloff ramp
-    // Apply evaluates is the Attenuation ramp. They are ramps (kinds 0x200 / 0x202),
-    // which the old port read as kind 2/3 floats from Props_ -- never present, so every
-    // radial field ran on the defaults. The ramps live in the radial set (ALC-6), filled
-    // through the set's getters (LAB_06236200 / LAB_06236250).
+    // Apply's falloff is the Attenuation ramp.
     class FxRadialField final : public FGenericFxObjectBase
     {
     public:
@@ -339,8 +280,7 @@ namespace AlchemyImpl
     // a 5-unit margin along the normal, the crossing fraction T, reflection of the
     // velocity direction scaled by -Speed * Reflectivity, and a final position step back
     // by (1 - T) * Dt along the new velocity. See the method bodies for the term-by-term
-    // trace (ALC-5, 2026-09-30; the old "Point_" origin and the Point_-for-Corner_
-    // substitution were a lookalike -- retail never transforms the origin here).
+    // trace; retail never transforms the field origin here.
     class FxCollideField final : public FGenericFxObjectBase
     {
     public:
@@ -353,7 +293,7 @@ namespace AlchemyImpl
             return CollidePropertySet_->ClassName.Buffer;
         }
 
-        // ALC-4: retail update LAB_0621a780 (outer +0x14): TickLifetime, node+0xa0 =
+        // Retail update LAB_0621a780 (outer +0x14): TickLifetime, node+0xa0 =
         // Eval(CollideField_Reflectivity), node+0xa4 = Dt.
         GENRESULT DACOM_API Pad5(float Dt) override;
         // FUN_06219e10 (outer thunk 0621a800).
@@ -385,11 +325,8 @@ namespace AlchemyImpl
         float BeginXform_[12];  // node+0xcc: slot 7 output (no reader besides Begin)
     };
 
-    // retail LAB_0620ed20 (Begin) / LAB_0620ed30 (Apply): both are genuinely
-    // `XOR EAX,EAX RET` no-ops in retail — confirmed by direct disasm read.
-    // The base class's inherited no-op BeginField/ApplyFieldToVel is already
-    // byte-correct for this type, so this leaf adds nothing beyond the
-    // trivial forwarding constructor.
+    // retail LAB_0620ed20 (Begin) / LAB_0620ed30 (Apply) are no-ops returning 0, as the
+    // inherited ones are.
     // Its property set is the base set (create FUN_06244fb0: FUN_0623f7b0 under the field
     // vtables 0x0624fda8 / 0x0624fcf0, bodies identical to the base's), which the
     // inherited CreatePropertySet builds.
@@ -405,8 +342,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
     };
 
-    // FLDustField (ALC-5, 2026-09-30; the earlier "no property exists, Radius_ stays 0"
-    // conclusion was wrong). Its descriptor (inner ctor FUN_06212810, create-descriptor
+    // FLDustField. Its descriptor (inner ctor FUN_06212810, create-descriptor
     // FUN_06212960 -- node slot +0x48, which FUN_0623fde0 calls on every factory create,
     // so node+0x9c is always set) holds ONE kind-0x202 ramp at inner +0x4c, keyed
     // FxAnimatedSingle 60.1 (0x42706666). Its property table (.data 0x06255aa8) names it

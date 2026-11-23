@@ -25,8 +25,8 @@ struct FBatchRecord
     unsigned long Count;         // +0xC0
     unsigned long Zero;          // +0xC4
     unsigned long Field;         // +0xC8
-    FVbListing VertexBufferListing; // +0xCC, formerly OptionalAData
-    FIbScratch IndexBufferScratch;  // +0xD8, formerly OptionalBData
+    FVbListing VertexBufferListing; // +0xCC
+    FIbScratch IndexBufferScratch;  // +0xD8
     unsigned long Flags;         // +0xE0
     void* RecordTag;               // +0xE4
     void* RecordTagContext;               // +0xE8
@@ -63,7 +63,6 @@ struct FBatchBin
 
     FBatchBin();
 };
-
 
 class FMaterialBatcher;
 struct FBatchDispatch;

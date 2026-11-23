@@ -16,15 +16,14 @@
 #include "ivp_surface_builder_polygon_convex.h"
 #include "../ivp_utility/ivp_hash.h"
 
-// Raw port in src/IVP/ivp_collision/ivp_mindist_limiter.cpp: the
-// IVP_Compact_Triangle constructor (16 zero bytes).
+// The IVP_Compact_Triangle constructor (FUN_0635aa20, 16 zero bytes), defined
+// in ivp_collision/ivp_mindist_limiter.cpp.
 extern "C" void* IVP_Compact_Triangle_Init(void* param_1_00);
 
 namespace
 {
-    // FUN_0635aa50 (.text:0635aa50-0635aa5d, thiscall): the IVP_Compact_Ledge
-    // constructor -- four zero dwords over the 16-byte header. Its only caller
-    // is generate_compact_ledge (0637a6b1).
+    // FUN_0635aa50 (thiscall): the IVP_Compact_Ledge constructor, four zero
+    // dwords over the 16-byte header. Only caller is generate_compact_ledge.
     void IVP_Compact_Ledge_Construct(IVP_Compact_Ledge* Ledge)
     {
         uint32_t* const Words = reinterpret_cast<uint32_t*>(Ledge);
@@ -37,8 +36,7 @@ namespace
     static_assert(sizeof(IVP_Tri_Edge*) == 4, "edge_hash keys are 4-byte edge pointers");
 }
 
-// FUN_0637a2e0 (.text:0637a2e0-0637a32a): both vectors {0, 0, null}, then
-// REP STOSD 0xc zero dwords over the whole object.
+// FUN_0637a2e0: both vectors empty, then the whole object zeroed.
 IVP_Compact_Ledge_Generator::IVP_Compact_Ledge_Generator()
     : point_hash(nullptr)
     , n_points(0)
@@ -51,12 +49,9 @@ IVP_Compact_Ledge_Generator::IVP_Compact_Ledge_Generator()
 {
 }
 
-// FUN_0637a750 (.text:0637a750-0637a86f): calc_hesse on every triangle of the
-// input vector; points vector released (FUN_06343fb0 unless inline); point
-// hash deleted through its vtable (slot 1, flag 1); edge hash destroyed
-// (06356a70) and freed; every compact triangle operator-deleted; then the
-// compact triangle vector and the point vector are released (explicitly and
-// again by their member destructors, as retail does).
+// FUN_0637a750. Retail recomputes calc_hesse on every input triangle before
+// freeing. The vectors are released explicitly and again by their member
+// destructors, as retail does.
 IVP_Compact_Ledge_Generator::~IVP_Compact_Ledge_Generator()
 {
     for (int32_t I = 0; I < n_triangles; ++I)
@@ -81,22 +76,10 @@ IVP_Compact_Ledge_Generator::~IVP_Compact_Ledge_Generator()
     c_triangles.Clear();
 }
 
-// FUN_0637a330 (.text:0637a330-0637a696).
-// 1. triangles = Triangles, n_triangles = its count; hash size = 16, doubled
-//    while below n_triangles * 3 / 2 (signed division) when that exceeds 16;
-//    point_hash = new FPolygonPointHash(size).
-// 2. Every triangle gets index = i; each edge's start point not yet in the
-//    point hash gets compact_index = n_points++, is added to the hash and
-//    appended to points.
-// 3. n_edges = 0; edge_hash = new IVP_Hash(size * 4, 4, 0xffffffff); per
-//    triangle a compact triangle (operator new(0x10) + 0635aa20): tri index
-//    (12 bits), pierce index = pierce_partner->index << 12 (or the printf
-//    "no valid pierce index!? Probably a backside triangle...\n"), then
-//    AND 0x80ffffff; each edge's start index (16 bits) and
-//    edge_hash[edge] = i * 4 + 1 + k; appended to c_triangles.
-// 4. Each compact edge's opposite offset = edge_hash[edge->opposite] - (i*4+1+k)
-//    in bits 16..30 (AND 0x7fff, keeping bit 31 and bits 0..15).
-// Returns (n_points + n_triangles + 1) * 16.
+// FUN_0637a330. Numbers the distinct points, builds one compact triangle per
+// triangle, keys every edge in edge_hash by its 4-byte unit index
+// (i * 4 + 1 + k), then stores each edge's opposite offset as the difference
+// of unit indices. Returns (n_points + n_triangles + 1) * 16.
 int32_t IVP_Compact_Ledge_Generator::prepare_compact_ledge(IVP_U_Vector<IVP_Triangle>* Triangles)
 {
     triangles = Triangles;
@@ -189,10 +172,8 @@ int32_t IVP_Compact_Ledge_Generator::prepare_compact_ledge(IVP_U_Vector<IVP_Tria
     return (n_points + n_triangles + 1) << 4;
 }
 
-// FUN_0637a6a0 (.text:0637a6a0-0637a74b): compact_ledge = Buffer; header
-// zeroed (0635aa50); n_triangles (+0xc word); the compact triangles copied
-// (4 dwords each) from +0x10; c_point_offset = their end; each point x, y, z
-// copied and +0xc = 0; dword +8 = ((size >> 4) << 8) | (old & 0xf3) | 4.
+// FUN_0637a6a0. Layout: header, compact triangles from +0x10, then the points
+// (x, y, z, 0). Dword +8 gets the size / 16 in bits 8..31 and bit 2 set.
 void IVP_Compact_Ledge_Generator::generate_compact_ledge(void* Buffer)
 {
     IVP_Compact_Ledge* const Ledge = static_cast<IVP_Compact_Ledge*>(Buffer);

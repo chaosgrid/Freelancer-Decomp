@@ -11,11 +11,9 @@
 // RTTI .?AVNN_ShipTrader@@ : WinControl, Event::Handler (COL 0x005ebd9c; the IDataViewOwner face
 // at +0x7c has COL 0x005ebdb0). operator_new(0x448) (0x004b9738).
 // WINFACTORY<NN_ShipTrader> DAT_006722d0 "NN_ShipTrader": static init LAB_004b7410 (ctor
-// FUN_004b96b0, atexit LAB_004b7430 -> FUN_00579380); Create FUN_004b9720 (operator_new, the
-// WinControl ctor FUN_0059f860 and the three vptrs inlined, the class-name pointer, slot 9; a
-// failed Create is followed by the scalar deleting destructor).
+// FUN_004b96b0, atexit LAB_004b7430 -> FUN_00579380); Create FUN_004b9720 (the ctor inlined).
 //
-// vftable 0x005d593c -- WinControl's with these overrides (raw dword dump):
+// vftable 0x005d593c -- WinControl's with these overrides:
 //   0 FUN_004b97e0 scalar deleting dtor (FUN_004b9800), 9 FUN_004b7440 Create, 11 FUN_004b93d0
 //   Update, 13 LAB_004b9260 Draw, 20 LAB_004b89a0 KeyEvent, 42 LAB_004b85f0 SetProperty.
 // IDataViewOwner face +0x7c: vftable 0x005d5930 (WinControl's LAB_0053aaa0 / FUN_0053e4a0).
@@ -23,8 +21,7 @@
 //
 // The window lists at most three ships the base market sells (market category 3, ship
 // packages), each with its icon, name, class and price, and the player's current ship; picking
-// one shows it in the 3D view with its three info panes. The ctor writes no member: everything
-// below is set by Create.
+// one shows it in the 3D view with its three info panes. Every member is set by Create.
 
 #include "Core/event_handler.h"
 #include "Interface/wincontrol_base.h"
@@ -39,10 +36,9 @@ class ShipViewControl;
 class NnShipTrader : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_004b9720: WinControl's ctor and the vptrs; no member is written.
+    // Inlined into FUN_004b9720.
     NnShipTrader();
-    // FUN_004b9800 -- the Event::Handler (FUN_00576010) and WinControl (FUN_0059fa50)
-    // destructors.
+    // FUN_004b9800.
     ~NnShipTrader() override;
 
     // slot 9 FUN_004b7440 (RET 8) -- the market's ships and every control; Win3D's Create last.
@@ -109,12 +105,11 @@ public:
     WinControl* RowClassTexts[3];    // +0x43c "ShipTraderShipClass%d"
 
 private:
-    // The close sequence of KeyEvent, SetProperty 0x26 / 0x27 / 0x4e and OnEvent: the NavBar
-    // (FUN_004424f0(0), FUN_00442850), FUN_0043d2a0 on every child, slot 10, scalar deleting dtor.
+    // Port-only helper for the teardown KeyEvent, SetProperty 0x26 / 0x27 / 0x4e and OnEvent
+    // inline after the NavBar calls: delete the children, Destroy, delete this.
     void Close();
-    // Retail indexes the row arrays with Selected == -2 in SelectRow (0x004b8f29, 0x004b8f5b,
-    // 0x004b904f) and so reads the dwords 8 bytes before the array. The layout is retail's
-    // (static_asserts below), so this reads the same fields.
+    // Retail indexes the row arrays with Selected == -2 in SelectRow (0x004b8f29) and so reads
+    // the dwords 8 bytes before the array; with retail's layout this reads the same fields.
     int RowDword(size_t ArrayOffset, int Index) const;
 
     NnShipTrader(NnShipTrader const&) = delete;

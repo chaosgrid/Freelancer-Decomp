@@ -21,25 +21,22 @@ PageOptions::PageOptions()
     , Result(0)
     , Preferences(nullptr)
 {
-    // FUN_005735d0: FUN_00591ae0(0), FUN_00591e30 on +0x8c (Desc), the three vftables, then
-    // +0xb4 = 0. +0xb8 is not written; the static object starts zeroed, which is what the
-    // initialiser above reproduces.
+    // FUN_005735d0. Retail leaves +0xb8 unwritten; the static object starts zeroed, which is
+    // what the initialiser above reproduces.
 }
 
 PageOptions::~PageOptions()
 {
-    // FUN_00573710: vftables back, FUN_00591ef0 on +0x8c, FUN_00591ba0 -- the member and base
-    // destructors.
+    // FUN_00573710.
 }
 
 bool PageOptions::Create(Win3D* NewParent, void* /*Payload*/)
 {
-    // FUN_00573650. MasterWin::Create (FUN_00591cd0) with a null payload; its result is not
-    // tested (there is no page data, so it only reparents / registers / sets the flags).
+    // FUN_00573650. With no page data MasterWin::Create only reparents, registers and sets the
+    // flags; its result is not tested.
     UIPage::MasterWin::Create(NewParent, nullptr);
     Result = 0;
-    // 0x00573661..0x00573686: FUN_0059db20("NN_Preferences", "NN_Preferences", 0, 1), then
-    // slot 2 (AsWinControl) on the result with no null test.
+    // No null test on the factory result, as retail.
     Win3D* const Created =
         WinFactoryCreate("NN_Preferences", "NN_Preferences", nullptr, reinterpret_cast<void*>(1));
     Preferences = Created->AsWinControl();
@@ -51,7 +48,7 @@ bool PageOptions::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
     // FUN_005736a0.
     if (Msg == 0x3004)
     {
-        PlayOrRewindUiSoundSlot(0); // FUN_005645c0(0)
+        PlayOrRewindUiSoundSlot(0);
         if (A != 0x300c)
             return false;
         Result = 1;

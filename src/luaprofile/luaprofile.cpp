@@ -44,8 +44,8 @@ public:
     GENRESULT DACOM_API InvokeGlobal(const char* Name, FLuaTaggedValue* OutValue,
                                      int Argc, FLuaTaggedValue* const* Argv) override;
 
-    GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) override; // formerly UnnamedSlot3
-    int DACOM_API EnumerateSections(FSectionEnumCallback Callback, void* Context) override; // formerly UnnamedSlot4
+    GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) override;
+    int DACOM_API EnumerateSections(FSectionEnumCallback Callback, void* Context) override;
     void* DACOM_API OpenSection(const char* Name, unsigned int Flags) override;
     int DACOM_API CloseSection(void* Handle) override;
     int DACOM_API ReadLine(void* Handle, int Index, char* Buffer, unsigned int BufferSize) override;
@@ -123,7 +123,7 @@ extern "C" static void LuaErrorMessage(void)
     FDUMP(kFdumpError, kFdumpFmt, kFdumpPath, kFdumpLine, Message);
 }
 
-// Factory QI 068018e0: REPE CMPSB over 0x17 bytes, stops at the first mismatch.
+// Factory QI (LAB_068018e0): compares 0x17 bytes, stopping at the first mismatch.
 static bool BytesMatch(const char* Left, const char* Right, unsigned int Count)
 {
     for (unsigned int Index = 0; Index < Count; ++Index)
@@ -148,7 +148,7 @@ static bool ExactMatch(const char* Left, const char* Right)
     }
 }
 
-// Inlined REPNE SCASB strlen: every retail site has a non-null string here.
+// Inlined strlen: every retail site has a non-null string here.
 static int StringLength(const char* Text)
 {
     return (int)(strlen(Text));
@@ -187,7 +187,7 @@ static void PushInvokeArg(FLuaTaggedValue* Rec)
     lua_pushnumber(Number);
 }
 
-// LAB_068013b0 tail (068014e2..06801587). The value string is fetched only where retail
+// LAB_068013b0 tail. The value string is fetched only where retail
 // fetches it: after the key copy, and never when the key alone fills the buffer.
 static int FormatKeyValue(char* Buffer, unsigned int BufferSize, const char* Key, lua_Object ValueObj)
 {
@@ -328,7 +328,7 @@ void FLuaObject::CloseLuaVm()
     ExtraLuaRef = -1;
 }
 
-// LAB_06801950 @ 068019e3: +0x18 = Desc->Outer; a null outer means +0x18 = &inner, else
+// LAB_06801950: +0x18 = Desc->Outer; a null outer means +0x18 = &inner, else
 // *Desc->InnerOut = &inner (no null test on InnerOut).
 void FLuaObject::BindOuter(FLuaAggDesc* Desc)
 {
@@ -358,7 +358,7 @@ unsigned long DACOM_API FLuaObject::Release()
 GENRESULT DACOM_API FLuaObject::InvokeGlobal(const char* Name, FLuaTaggedValue* OutValue,
                                            int Argc, FLuaTaggedValue* const* Argv)
 {
-    // Lua 3.2 accepts mutable char pointers for these read-only string inputs.
+    // Lua 3.2 takes char* for read-only strings, hence the const_casts in this file.
     lua_State* Previous = lua_setstate(LuaState);
     lua_Object Func = lua_getglobal(const_cast<char*>(Name));
     if (Func == LUA_NOOBJECT || lua_isfunction(Func) == 0)
@@ -401,7 +401,6 @@ GENRESULT DACOM_API FLuaObject::InvokeGlobal(const char* Name, FLuaTaggedValue* 
 
 GENRESULT DACOM_API FLuaObject::LoadFile(const char* Path, unsigned int Flags)
 {
-    // Lua 3.2 accepts mutable char pointers for these read-only string inputs.
     if (Flags != 0)
         return (GENRESULT)-1;
 
@@ -446,7 +445,6 @@ int DACOM_API FLuaObject::EnumerateSections(FSectionEnumCallback Callback, void*
 
 void* DACOM_API FLuaObject::OpenSection(const char* Name, unsigned int Flags)
 {
-    // Lua 3.2 accepts mutable char pointers for these read-only string inputs.
     // LAB_06801250: only Flags is tested; Name is dereferenced unconditionally.
     if (Flags != 3)
         return nullptr;
@@ -468,7 +466,7 @@ void* DACOM_API FLuaObject::OpenSection(const char* Name, unsigned int Flags)
             lua_pushobject(Table);
             int Ref = lua_ref(0);
             Handle = new (std::nothrow) FSectionHandle{};
-            // Preserve the existing unguarded reference store on allocation failure.
+            // No null test before the store, as in retail.
             Handle->LuaRef = Ref;
         }
     }
@@ -516,7 +514,6 @@ int DACOM_API FLuaObject::CloseSection(void* Handle)
 
 int DACOM_API FLuaObject::ReadLine(void* Handle, int Index, char* Buffer, unsigned int BufferSize)
 {
-    // Lua 3.2 accepts mutable char pointers for these read-only string inputs.
     FSectionHandle* Target = (FSectionHandle*)(Handle);
     if (Target == nullptr)
         return 0;
@@ -562,7 +559,6 @@ int DACOM_API FLuaObject::ReadLine(void* Handle, int Index, char* Buffer, unsign
 
 int DACOM_API FLuaObject::GetString(void* Handle, const char* Key, char* Buffer, unsigned int BufferSize)
 {
-    // Lua 3.2 accepts mutable char pointers for these read-only string inputs.
     FSectionHandle* Target = (FSectionHandle*)(Handle);
     if (Target == nullptr)
         return 0;
@@ -653,7 +649,7 @@ GENRESULT DACOM_API FLuaFactory::CreateInstance(AGGDESC* Desc, void** Instance)
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // Keep zero-filled storage and the original construction-failure cleanup.
+    // Zero-filled storage, as retail.
     void* Memory = calloc(kLuaObjectSize, 1);
     if (Memory == nullptr)
     {

@@ -19,20 +19,12 @@
 #include <cstring>
 #include <vector>
 
-// 2026-10-08 (claude-code:cmn-phy3): every function below now works on the
-// port's single declarations of these retail classes -- IVP_ListManager (the
-// friction system), IVP_ListManager_CorePairEntry (a core pair),
-// IVP_Contact_Point (a friction dist), IVP_Impact_Solver_Long_Term (its long-term
-// contact data) and IVP_Event_Sim -- instead of the duplicate partial structs
-// ivp_contact_point.h used to declare. The field mapping is listed in that
-// header. No arithmetic changed in the merge.
+// Classes used below: IVP_ListManager (the friction system),
+// IVP_ListManager_CorePairEntry (a core pair), IVP_Contact_Point (a friction
+// dist), IVP_Impact_Solver_Long_Term (its long-term contact data).
 
 // ============================================================================
-// 0x063658f0-0x06366008: retail's contact-reaction frame helpers
-// (decomp-tracker items 3519-3523), moved here from
-// src/Common/common_stubs.cpp (via common_stubs_a3.cpp) on 2026-10-14
-// (claude-code:cmn-a3) -- this TU holds their only callers. Renamed from the
-// raw extern "C" FUN_ entry points; bodies unchanged. Overview:
+// 0x063658f0-0x06366008: retail's contact-reaction frame helpers. Overview:
 //
 //   ReactionFrameInit (FUN_06365d50)(ctx, CoreA, CoreB, Position, TangentDir0,
 //     TangentDir1, Aux) -- fills ctx's 2x2 effective-inverse-mass matrix and
@@ -59,14 +51,12 @@
 //   +0x74 / +0xa4       basis2 (core 0 / core 1): basis1 .* core+0x34
 //   +0xd4/+0xd8/+0xdc/+0xe8/+0xec/+0xfc/+0x104/+0x108/+0x10c  float sums
 //
-// x87 PRECISION (cmn-ivp3h 2026-10-08, re-traced): values retail keeps on
-// the FPU stack are doubles here and are rounded to float only where the
-// listing has an FSTP/FST float.
+// x87: values retail keeps on the FPU stack are doubles here and are rounded
+// to float only where retail stores a float.
 // ============================================================================
 namespace
 {
-    // Common.dll.txt 06365ce0-06365d00 (FUN_06365ce0), thiscall (this; param_1),
-    // RET 4: 4-component dot product. The sum is accumulated w, z, y, x on the
+    // FUN_06365ce0, thiscall (this; param_1), RET 4: 4-component dot product. The sum is accumulated w, z, y, x on the
     // x87 stack -- ((t3*p3 + t2*p2) + t1*p1) + t0*p0 -- and returned unrounded
     // in ST0 (double here). Sole caller: ReactionFrameAccumulateCore at 06365c51.
     double __fastcall Dot4(const float* param_1_00, const float* param_1) // formerly FUN_06365ce0
@@ -76,13 +66,8 @@ namespace
                (double)(param_1[0]) * param_1_00[0];
     }
 
-    // Common.dll.c 0x6365d10 / Common.dll.txt:462513-462531 (FUN_06365d10). Pure,
-    // stateless 4-component float component-wise multiply: this[i] = param_1[i] *
-    // param_2[i] for i in 0..3. Verified against the raw FPU sequence (4x FLD/
-    // FMUL/FSTP into the "this" output, matching the pseudocode's field-by-field
-    // assignment; the intermediate MOV EAX/EDX pairs at +0x8/+0xc are just the
-    // compiler shuffling the two computed floats through GP registers before the
-    // final FSTP writes -- no distinct integer-path behavior).
+    // FUN_06365d10: this[i] = param_1[i] * param_2[i] for i in 0..3, each
+    // product rounded to float.
     void __fastcall Mul4(float* param_1_00, const float* param_1, const float* param_2) // formerly FUN_06365d10
     {
         param_1_00[0] = param_1[0] * param_2[0];
@@ -130,7 +115,7 @@ namespace
                Ivp_ReactionFloatAt(Core, 0xfc) * Cx;
     }
 
-    // Common.dll.txt 063658f0-06365cd2 (FUN_063658f0), thiscall (this; posRef,
+    // FUN_063658f0, thiscall (this; posRef,
     // core, basis1, basis2, sign), RET 0x14. Builds up to three rows (tangent 0,
     // tangent 1, aux axis) of the core's reaction to a unit impulse along the
     // axis at posRef and accumulates their products into this's sums.
@@ -266,14 +251,12 @@ namespace
         *SumV2 = (float)((Ivp_ReactionDotZYX(RotSpeed, Basis1Row2) + LinearPart) * sign + *SumV2);
     }
 
-    // Common.dll.txt 06365d50-06365de4 (FUN_06365d50), thiscall (this; core0,
-    // core1, pos, tangentDir0, tangentDir1, auxAxis), RET 0x18. Stores the three
-    // axis pointers at this+0/4/8; when tangentDir1 is non-null REP STOSD clears
-    // this+0xd4..0x103 and +0x104/+0x108/+0x10c are zeroed, otherwise only +0xd4
-    // and +0x104. Then FUN_063658f0 (ReactionFrameAccumulateCore)(this; pos,
-    // core, ...) per non-null core: core0 -> basis this+0xc / this+0x74 with
-    // +1.0f, core1 -> this+0x3c / this+0xa4 with -1.0f (push order at
-    // 06365daa-06365db8 / 06365dc8-06365dd9). No arithmetic of its own.
+    // FUN_06365d50, thiscall (this; core0, core1, pos, tangentDir0,
+    // tangentDir1, auxAxis), RET 0x18. Stores the three axis pointers at
+    // this+0/4/8; when tangentDir1 is non-null this+0xd4..0x10c is cleared,
+    // otherwise only +0xd4 and +0x104. Then ReactionFrameAccumulateCore per
+    // non-null core: core0 -> basis this+0xc / this+0x74 with +1.0f, core1 ->
+    // this+0x3c / this+0xa4 with -1.0f.
     void
     ReactionFrameInit(unsigned char* thisPtr, unsigned char* posA, unsigned char* posB, void* structShared,
                       const float* tangentDir0, const float* tangentDir1, const void* auxAxis) // formerly FUN_06365d50
@@ -302,13 +285,12 @@ namespace
         }
     }
 
-    // Common.dll.txt 06365df0-06366008 (FUN_06365df0), thiscall (this; core0,
-    // core1, impulse[2]), RET 0xc. Applies the solved 2D impulse to both cores:
-    // speed (+0xa4) += inv_mass (+0x40) * impulse[i] * tangent_i and rot_speed
-    // (+0x94) += impulse[i] * basis2 row i, core1 with the opposite sign.
-    // x87: every "field += scale * v" is FLD scale / FMUL v / FADD field with one
-    // FSTP float; the scales stay on the stack except core0's first one, which
-    // is spilled as a float argument to FUN_0628be60 (06365e1d).
+    // FUN_06365df0, thiscall (this; core0, core1, impulse[2]), RET 0xc. Applies
+    // the solved 2D impulse to both cores: speed (+0xa4) += inv_mass (+0x40) *
+    // impulse[i] * tangent_i and rot_speed (+0x94) += impulse[i] * basis2 row i,
+    // core1 with the opposite sign. x87: each "field += scale * v" is rounded
+    // once; the scales stay on the stack except core0's first one, which is
+    // spilled as a float argument to FUN_0628be60.
 
     // Field[i] = float(Scale * V[i] + Field[i]) for i = 0..2; every operand is
     // read before the first store (FUN_0628be60 and the inlined copies).
@@ -326,7 +308,6 @@ namespace
     ReactionFrameApplyImpulse(unsigned char* thisPtr, unsigned char* structA, unsigned char* structB,
                               const float* impulse) // formerly FUN_06365df0
     {
-        // 06365dfb: TEST core0; JZ -> core1 block.
         if (structA != nullptr)
         {
             const float InvMassA = *reinterpret_cast<const float*>(structA + 0x40);
@@ -347,14 +328,13 @@ namespace
             Ivp_ReactionAddScaled(RotSpeedA, reinterpret_cast<const float*>(thisPtr + 0x84), impulse[1]);
         }
 
-        // 06365edf: TEST core1; JZ -> return.
         if (structB != nullptr)
         {
             const double InvMassB = *reinterpret_cast<const float*>(structB + 0x40);
             float* const SpeedB = reinterpret_cast<float*>(structB + 0xa4);
             float* const RotSpeedB = reinterpret_cast<float*>(structB + 0x94);
 
-            // 06365eeb-06365f2b: -(inv_mass*impulse[0]) kept extended (FCHS), times tangent0.
+            // -(inv_mass*impulse[0]) kept extended, times tangent0.
             Ivp_ReactionAddScaled(SpeedB, *reinterpret_cast<const float* const*>(thisPtr + 0x00), -(InvMassB * impulse[0]));
             // 06365f31-06365f6d: -(inv_mass*impulse[1]), times tangent1.
             Ivp_ReactionAddScaled(SpeedB, *reinterpret_cast<const float* const*>(thisPtr + 0x04), -(InvMassB * impulse[1]));
@@ -367,14 +347,10 @@ namespace
 
 namespace
 {
-    // The 0x114-byte stack object FUN_06365d50/FUN_063658f0 fill in. Retail
-    // allocates it as a raw frame slice (Common.dll.txt:06354120's own
-    // `SUB ESP,0x2b8` frame holds two of them back to back at +0xa0 and
-    // +0x1b4, exactly 0x114 apart) and "constructs" its interior blocks at
-    // +0x3c/+0x74/+0xa4/+0xd4 through MSVC's vector-constructor-iterator
-    // (FUN_06273bc0) over an EMPTY ctor -- a runtime no-op, see this
-    // cluster's header comment. Only the accumulator slots below are read
-    // back by the caller.
+    // The 0x114-byte stack object FUN_06365d50/FUN_063658f0 fill in
+    // (FUN_06354120's frame holds two of them, at +0xa0 and +0x1b4). Its
+    // interior "constructors" (FUN_06273bc0 over an empty ctor) do nothing.
+    // Only the accumulator slots below are read back by the caller.
     struct IVP_Friction_Basis_Context
     {
         uint32_t Raw[0x114 / 4];
@@ -418,11 +394,10 @@ namespace
         return Value;
     }
 
-    // The 2x2 solve both paths of FUN_06354120 inline (06354401-06354496 and
-    // 06354793-0635480f), from the context's A00 (+0xd4), A01 (+0xd8), A11
-    // (+0xe8): Det = A00*A11 - A01*A01 kept; Det*Det FCOMP 1e-20 (DAT_063a5658
-    // = 0x1e3ce509, one ulp above 1e-20f), TEST AH,0x1 + JNZ: below or
-    // unordered -> no impulse (returns false). InvDet = 1/Det kept;
+    // The 2x2 solve both paths of FUN_06354120 inline (06354401 and
+    // 06354793), from the context's A00 (+0xd4), A01 (+0xd8), A11 (+0xe8):
+    // Det = A00*A11 - A01*A01 kept; Det*Det below 1e-20 (DAT_063a5658 =
+    // 0x1e3ce509, one ulp above 1e-20f) or unordered -> no impulse (false). InvDet = 1/Det kept;
     // M00 = float(A11*InvDet), M01 = float(-(A01*InvDet)), M11 = InvDet*A00
     // kept; Impulse0 = float(M01*B1 + M00*B0), Impulse1 = float(M11*B1 + M01*B0).
     bool IVP_SolveFrictionRow(const IVP_Friction_Basis_Context& Ctx, double B0, double B1, float Impulse[2])
@@ -445,12 +420,7 @@ namespace
     }
 
     // ========================================================================
-    // FUN_063548e0 (decomp-tracker Common.dll item 3209, Common.dll.txt:
-    // 434173-434422, 203 insns). D-claude:common-ivp2 pass (2026-09-17):
-    // FULLY ported, every instruction accounted for, traced against the raw
-    // listing only.
-    //
-    // The single-body ("SolverMode == 1") half of IVP_ClampFrictionCone's
+    // FUN_063548e0. The single-body ("SolverMode == 1") half of IVP_ClampFrictionCone's
     // per-dist dispatch, and the exact one-dimensional counterpart of
     // IVP_ApplyContactReactionPair below: instead of solving a 2x2 row in a
     // tangent-plane basis, it solves ONE scalar impulse magnitude along a
@@ -472,20 +442,16 @@ namespace
     //      Otherwise Scale = (Refinement * EventSim->delta_time -
     //      RelativeSpeed) / Denominator, clamped -- retail clamps by
     //      REPLACING with +FrictionLimit whenever |Scale| exceeds it, which
-    //      discards Scale's sign; that is retail's own behaviour
-    //      (Common.dll.txt:06354b59-06354b5b), not a transcription slip.
+    //      discards Scale's sign; that is retail's own behaviour (06354b59).
     //   6. Scale * the per-body linear/angular deltas is added into each
     //      live core's Speed (+0xa4) and RotSpeed (+0x94).
     //
     // Step 1's refinement scalar comes from ClampTangentDirection
-    // (FUN_06353b50, item 3205), ported (no longer a stub). x87 precision
-    // (cmn-ivp3g 2026-10-09): FrictionLimit, RelativeSpeed and each
-    // Denominator step are one rounding each; Scale stays extended through
-    // the apply loop.
+    // (FUN_06353b50). x87: FrictionLimit, RelativeSpeed and each Denominator
+    // step are one rounding each; Scale stays extended through the apply loop.
     void IVP_ApplyContactReactionSingle(IVP_Contact_Point* Contact,
                                          const IVP_Event_Sim* EventSim)
     {
-        // Common.dll.txt:063548ea-06354927.
         Vector Direction;
         const float Refinement = Contact->RecomputeTangentDirection(&Direction);
 
@@ -496,8 +462,8 @@ namespace
         IVP_Impact_Solver_Long_Term* Frame = Contact->Owner;
         const Vector* const ContactPointOS[2] = { &Frame->CoordOS[0], &Frame->CoordOS[1] };
 
-        // 063548fd-06354927: (+0x54 * +0x44) * delta_time on the x87 stack,
-        // one FSTP dword into local_e8.
+        // (+0x54 * +0x44) * delta_time on the x87 stack, one float rounding
+        // (local_e8).
         const float FrictionLimit = (float)(
             ((double)(Contact->NowFrictionPressure) * Contact->FrictionCoefficient)
             * EventSim->delta_time);
@@ -513,9 +479,8 @@ namespace
                 Cores[Side]->calc_speed_at_object_position(ContactPointOS[Side], &PointSpeed[Side]);
         }
 
-        // Common.dll.txt:06354964-063549aa. Retail's own z,y,x accumulation;
-        // the three differences are never stored -- they stay on the x87
-        // stack unrounded -- and the sum is FSTP'd once into local_c4.
+        // Retail's z,y,x accumulation; the three differences stay on the x87
+        // stack unrounded and the sum is rounded once (local_c4).
         const double DeltaX = (double)(PointSpeed[0].x) - PointSpeed[1].x;
         const double DeltaY = (double)(PointSpeed[0].y) - PointSpeed[1].y;
         const double DeltaZ = (double)(PointSpeed[0].z) - PointSpeed[1].z;
@@ -543,7 +508,7 @@ namespace
                 ImpulseWS.y = Direction.y * Sign;
                 ImpulseWS.z = Direction.z * Sign;
 
-                // FUN_06366010 == IVP_U_Matrix3::vimult (item 3524): the same
+                // FUN_06366010 == IVP_U_Matrix3::vimult: the same
                 // impulse, rotated into this core's object space, which is
                 // the frame calc_impulse_deltas needs for its cross product.
                 IVP_U_Point ImpulseOS;
@@ -558,8 +523,7 @@ namespace
                 Core->calc_point_speed_ws(ContactPointOS[Side], &LinearDelta[Side],
                                            &AngularDelta[Side], &PointVelocityDelta);
 
-                // 06354acc-06354af7: the dot product stays on the x87 stack,
-                // FADD local_f0, FSTP local_f0 -- one rounding per side.
+                // The dot product stays on the x87 stack; one rounding per side.
                 Denominator = (float)(
                     (((double)(PointVelocityDelta.z) * ImpulseWS.z
                       + (double)(PointVelocityDelta.y) * ImpulseWS.y)
@@ -570,18 +534,16 @@ namespace
             Sign *= -1.0f; // DAT_063a5498, applied on BOTH the taken and skipped paths
         }
 
-        if (!(Denominator > 1e-10f)) // DAT_063a53d8; retail's TEST AH,0x41 covers <= and unordered
+        if (!(Denominator > 1e-10f)) // DAT_063a53d8; <= and unordered return
             return;
 
-        // 06354b35-06354b5b: Scale stays on the x87 stack (never stored) for
-        // the whole apply loop. |Scale| > Limit (TEST AH,0x41 fall-through)
-        // replaces it with the float Limit; <= or unordered keeps it.
+        // Scale stays on the x87 stack for the whole apply loop. |Scale| >
+        // Limit replaces it with the float Limit; <= or unordered keeps it.
         double Scale = ((double)(Refinement) * EventSim->delta_time - RelativeSpeed) / Denominator;
         if (std::fabs(Scale) > (double)(FrictionLimit))
             Scale = FrictionLimit; // retail replaces outright -- sign is intentionally dropped
 
-        // 06354b65-06354be4: per component FLD ST0 / FMUL delta / FADD field /
-        // FSTP field -- one rounding per store.
+        // One rounding per store.
         for (int Side = 0; Side < 2; ++Side)
         {
             IVP_Core* Core = Cores[Side];
@@ -599,12 +561,7 @@ namespace
     }
 
     // ========================================================================
-    // FUN_06354120 (decomp-tracker Common.dll item 3208, Common.dll.txt:
-    // 433535-434166, 557 insns). D-claude:common-ivp2 pass (2026-09-17):
-    // FULLY ported, every instruction accounted for, traced against the raw
-    // listing only.
-    //
-    // The two-body tangential-impulse kernel IVP_ClampFrictionCone dispatches
+    // FUN_06354120. The two-body tangential-impulse kernel IVP_ClampFrictionCone dispatches
     // to for every dist whose SolverMode is not 1. It solves the 2x2 friction
     // LCP row for this dist:
     //
@@ -615,41 +572,37 @@ namespace
     // relative-velocity builder), clamps the solved impulse into the Coulomb
     // cone, and hands it to FUN_06365df0 to be applied to the cores.
     //
-    // Two paths, chosen by the four-test gate at Common.dll.txt:063541bb-
-    // 063541f4:
+    // Two paths, chosen by the four-test gate at 063541bb:
     //
     //  * AXIS-LOCK PATH -- taken only when Owner->ChildCandidate[0] has an
     //    AxisLock (IVP_Core+0x10, see ivp_core.h), Owner->ChildCandidate[1]
     //    is null, and either the next dist of the system
-    //    (ListManagerListNext, +0x00 -- `MOV EAX,[EDI]` at 063541e0) is null
+    //    (ListManagerListNext, +0x00) is null
     //    or its NowFrictionPressure (+0x54) is exactly 0. It replaces Owner's
     //    own tangent pair with a basis built from the locked axis (column
     //    [Owner->+0x74] of the lock frame, rotated into world space by the
     //    OPPOSING core's MWorldFCore), solves in that basis instead, refreshes
     //    the lock's cached contact point and timestamp, and applies one of
     //    three different clamps depending on the lock's +0x64 gate. It always
-    //    returns 0 (retail: `FLD DAT_063a53d4` on both of its exits).
+    //    returns 0 (DAT_063a53d4 on both exits).
     //  * GENERIC PATH -- everything else. Solves in Owner's own
     //    TangentAxis0/TangentAxis1 pair with both cores, clamps the solved
     //    impulse length to the friction limit, applies it, and returns the
     //    per-PSI INCREMENT of TangentWork (+0x50) -- that increment is what
     //    IVP_ClampFrictionCone accumulates into the pair's _field24.
     //
-    // Retail constants, read from raw .rdata bytes this pass:
+    // Retail constants:
     //   DAT_063a53d0 = 1.0f       DAT_063a53d4 = 0.0f
     //   DAT_063a5460 = 0.5f       DAT_063a559c = 0.3f
     //   DAT_063a5604 = 0.001f     DAT_063a5610 = 1e-6f
     //   DAT_063a5658 = 0x1e3ce509 (one ulp above 1e-20f)
-    //   [.data:063edcd0] = 0.9f  (Ghidra prints that one as the string
-    //       "fff?ERROR: " -- the 4 bytes at 0x063edcd0 are 66 66 66 3F, i.e.
-    //       0.9f, immediately followed by an unrelated string literal; it is
-    //       read here with an x87 `FMUL float ptr`, so it is a float, not text.)
+    //   .data:063edcd0 = 0.9f (Ghidra shows it as the string "fff?ERROR: ";
+    //       the bytes 66 66 66 3F are a float read by FMUL).
     //
-    // x87 PRECISION (cmn-ivp3g 2026-10-09, all 557 insns re-traced): values
-    // retail keeps on the FPU stack are doubles here and are rounded only at
-    // its FST/FSTP dword; every compare uses the unrounded operand retail
-    // compares and puts NaN on retail's side; the cross products are
-    // FUN_0628bed0 (IVP_CalcCrossProduct) and the normalize is FUN_06347ef0.
+    // x87: values retail keeps on the FPU stack are doubles here, rounded only
+    // where retail stores a float; every compare uses the unrounded operand
+    // and puts NaN on retail's side; the cross products are FUN_0628bed0
+    // (IVP_CalcCrossProduct) and the normalize is FUN_06347ef0.
     //
     // Both basis contexts are zero-filled before use. Retail leaves everything
     // outside FUN_06365d50's own accumulator reset (+0xd4..+0x10f) as stack
@@ -658,8 +611,8 @@ namespace
     float IVP_ApplyContactReactionPair(IVP_Contact_Point* Contact,
                                         const IVP_Event_Sim* EventSim)
     {
-        // 06354133-06354160: (c * p) * dt kept, FST float local_2b4;
-        // FCOMP 1e-6f, TEST AH,0x1 + JZ: only >= goes on.
+        // (c * p) * dt kept extended (a float copy in local_2b4); only
+        // >= 1e-6f goes on.
         const double FrictionLimitExt =
             ((double)(Contact->FrictionCoefficient) * Contact->NowFrictionPressure) * EventSim->delta_time;
         const float FrictionLimit = (float)(FrictionLimitExt);
@@ -676,13 +629,12 @@ namespace
         IVP_Friction_Basis_Context Ctx;
         std::memset(&Ctx, 0, sizeof(Ctx));
 
-        // --- gate, 063541bb-063541f4 ----------------------------------------
+        // --- gate ------------------------------------------------------------
         bool bUseAxisLock = (CoreA != nullptr) && (CoreA->AxisLock != nullptr) && (CoreB == nullptr);
         if (bUseAxisLock && Contact->ListManagerListNext != nullptr)
         {
-            // 063541e6-063541f4: `FCOMP 0.0f; TEST AH,0x40; JZ generic` --
-            // C3 is set on equal AND on unordered, so only a pressure that is
-            // ordered and non-zero leaves the lock path.
+            // Only a pressure that is ordered and non-zero leaves the lock
+            // path (equal-or-unordered stays).
             const double NextPressure = Contact->ListManagerListNext->NowFrictionPressure;
             if (NextPressure < 0.0 || NextPressure > 0.0)
                 bUseAxisLock = false;
@@ -699,8 +651,7 @@ namespace
             IVP_Core* OppCore = OppObject->core;
 
             // Column `Axis` of the lock frame, rotated to world space
-            // (FUN_06348580 == IVP_U_Matrix3::vmult on OppCore->MWorldFCore,
-            // Common.dll.txt:0635422d-06354249).
+            // (FUN_06348580 == IVP_U_Matrix3::vmult on OppCore->MWorldFCore).
             IVP_U_Point LockAxisOS;
             LockAxisOS.k[0] = Lock->LockFrame.rows[0].k[Axis];
             LockAxisOS.k[1] = Lock->LockFrame.rows[1].k[Axis];
@@ -710,9 +661,9 @@ namespace
             IVP_U_Point LockAxisWS;
             OppCore->MWorldFCore.vmult(&LockAxisOS, &LockAxisWS);
 
-            // 0635424e-06354287: Tangent0 = LockAxisWS x Normal (FUN_0628bed0);
-            // ((x*x + z*z) + y*y) kept, FCOMP 0.001f, TEST AH,0x1 + JNZ: below
-            // or unordered falls to the generic path (LAB_06354756).
+            // Tangent0 = LockAxisWS x Normal (FUN_0628bed0); ((x*x + z*z) +
+            // y*y) below 0.001f or unordered falls to the generic path
+            // (LAB_06354756).
             IVP_U_Point Tangent0;
             IVP_CalcCrossProduct(&Tangent0, &LockAxisWS, NormalPt);
             const double Tangent0LenSq =
@@ -721,20 +672,20 @@ namespace
 
             if (Tangent0LenSq >= (double)(0.001f)) // DAT_063a5604
             {
-                // 0635428d-063542a0: FUN_06347ef0 on Tangent0 (its own 1e-10
+                // FUN_06347ef0 on Tangent0 (its own 1e-10
                 // cutoff included), then Tangent1 = Tangent0 x Normal.
                 IVP_NormalizeX87(reinterpret_cast<Vector*>(Tangent0.k));
                 IVP_U_Point Tangent1;
                 IVP_CalcCrossProduct(&Tangent1, &Tangent0, NormalPt);
 
-                // 063542a5-06354372: projections of the new basis onto Owner's
+                // Projections of the new basis onto Owner's
                 // own tangent pair, one rounding each.
                 const float D00 = (float)(IVP_DotZYX(Tangent0.k, Axis0)); // local_264
                 const float D10 = (float)(IVP_DotZYX(Tangent1.k, Axis0)); // local_250
                 const float D01 = (float)(IVP_DotZYX(Tangent0.k, Axis1)); // local_298
                 const float D11 = (float)(IVP_DotZYX(Tangent1.k, Axis1)); // local_278
 
-                // 0635434b-06354372: this dist's span in the locked basis.
+                // This dist's span in the locked basis.
                 const float P0 = (float)((double)(D01) * Contact->SpanFrictionS[1] +
                                                     (double)(D00) * Contact->SpanFrictionS[0]);
                 const float P1 = (float)((double)(D11) * Contact->SpanFrictionS[1] +
@@ -743,9 +694,9 @@ namespace
                 ReactionFrameInit(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA), nullptr,
                              &Frame->SolverContactPointWS, Tangent0.k, Tangent1.k, nullptr);
 
-                const float A11 = Ctx.A11(); // 0635437e: raw copy into local_2b8
+                const float A11 = Ctx.A11(); // raw copy into local_2b8
 
-                // 063543d6-063543fc: a one-axis context for the OPPOSING core
+                // A one-axis context for the OPPOSING core
                 // along Tangent1 only; its A00 divides the gain below.
                 IVP_Friction_Basis_Context OppCtx;
                 std::memset(&OppCtx, 0, sizeof(OppCtx));
@@ -753,7 +704,7 @@ namespace
                              &Frame->SolverContactPointWS, Tangent1.k, nullptr, nullptr);
                 const float OppA00 = OppCtx.A00();
 
-                // 06354401-06354416: B = P * i_delta_time - RelVel, kept.
+                // B = P * i_delta_time - RelVel, kept.
                 const double B0 = (double)(P0) * EventSim->i_delta_time - Ctx.RelVel0();
                 const double B1 = (double)(P1) * EventSim->i_delta_time - Ctx.RelVel1();
 
@@ -761,19 +712,18 @@ namespace
                 if (!IVP_SolveFrictionRow(Ctx, B0, B1, Impulse))
                     return 0.0f;
 
-                // 063544a9-063544eb: Gain = ((|(Lx*T1x + Lz*T1z) + Ly*T1y| *
+                // Gain = ((|(Lx*T1x + Lz*T1z) + Ly*T1y| *
                 // A11) / OppA00 + 1.0) * 0.3f, one rounding.
                 const float Gain = (float)(
                     ((std::fabs(IVP_DotXZY(LockAxisWS.k, Tangent1.k)) * A11) / OppA00 + 1.0) *
                     (double)(0.3f)); // DAT_063a559c
 
-                // 063544ef-063544ff: Impulse0^2 rounded into local_2b8,
+                // Impulse0^2 rounded into local_2b8,
                 // Impulse1^2 stays on the stack.
                 const float Impulse0Sq = (float)((double)(Impulse[0]) * Impulse[0]);
                 const double Impulse1SqExt = (double)(Impulse[1]) * Impulse[1];
 
-                // Refresh the lock's cached contact point and timestamp
-                // (Common.dll.txt:0635449a-06354525).
+                // Refresh the lock's cached contact point and timestamp.
                 Lock->ContactPoint.k[0] = Frame->SolverContactPointWS.x;
                 Lock->ContactPoint.k[1] = Frame->SolverContactPointWS.y;
                 Lock->ContactPoint.k[2] = Frame->SolverContactPointWS.z;
@@ -784,9 +734,8 @@ namespace
 
                 if (Lock->Field_0x64 != nullptr)
                 {
-                    // 06354536-063545bf: G = ((Impulse1Sq + Impulse0Sq) * Gain) *
-                    // Gain kept, FST float copy; FCOMPP against FL*FL (kept),
-                    // TEST AH,0x41 + JNZ: <= or unordered -> LAB_063545eb.
+                    // G = ((Impulse1Sq + Impulse0Sq) * Gain) * Gain kept (and a
+                    // float copy); <= FL*FL or unordered -> LAB_063545eb.
                     const double GainedExt = ((Impulse1SqExt + Impulse0Sq) * Gain) * Gain;
                     const float GainedF = (float)(GainedExt);
                     if (GainedExt > (double)(FrictionLimit) * FrictionLimit)
@@ -812,17 +761,17 @@ namespace
                 else
                 {
                     // LAB_06354613: FL*FL rounded into local_29c here; only the
-                    // Tangent1 term is gain-weighted in the first test.
-                    // TEST AH,0x41 + JNZ on each test: <= or unordered skips.
+                    // Tangent1 term is gain-weighted in the first test. On
+                    // each test <= or unordered skips.
                     const float LimitSqF = (float)((double)(FrictionLimit) * FrictionLimit);
                     const double GainedExt = ((Impulse1SqExt * Gain) * Gain) + Impulse0Sq;
                     if (GainedExt > LimitSqF)
                     {
                         const double SolvedExt = Impulse1SqExt + Impulse0Sq;
-                        const float SolvedF = (float)(SolvedExt); // FST local_294
+                        const float SolvedF = (float)(SolvedExt); // local_294
                         if (SolvedExt > LimitSqF)
                         {
-                            // 0635464b-063546a8: isotropic clamp.
+                            // Isotropic clamp.
                             const double Scale = IVP_InvSqrtFloat(SolvedF) * FrictionLimit;
                             Impulse[0] = (float)(Scale * Impulse[0]);
                             Impulse[1] = (float)(Scale * Impulse[1]);
@@ -834,15 +783,14 @@ namespace
                         {
                             // LAB_063546ad: keep Impulse[0], give Impulse[1] the
                             // headroom left, sqrt(LimitSqF - Impulse0Sq), negated
-                            // unless the old Impulse[1] > 0 (`TEST AH,0x41; JZ`
-                            // skips the FCHS only on strictly greater).
+                            // unless the old Impulse[1] > 0 (strictly).
                             const float OldImpulse1 = Impulse[1];
                             double NewImpulse1 = std::sqrt((double)(LimitSqF) - Impulse0Sq);
                             if (!(OldImpulse1 > 0.0f))
                                 NewImpulse1 = -NewImpulse1;
                             Impulse[1] = (float)(NewImpulse1);
 
-                            // 063546da-06354715: Ratio = (new_f * 0.9f) / (old *
+                            // Ratio = (new_f * 0.9f) / (old *
                             // Gain) kept; ContactImpulse = float(((InvMass * (1 -
                             // Ratio)) * p) * 0.3f).
                             const double Ratio = ((double)(Impulse[1]) * (double)(0.9f)) /
@@ -850,9 +798,8 @@ namespace
                             Lock->ContactImpulse = (float)(((OppInvMass * (1.0 - Ratio)) * Pressure) *
                                                                       (double)(0.3f));
 
-                            // 06354718-0635474e: FCOM 1.0, TEST AH,0x1 + JZ: >=
-                            // skips; below or unordered projects (P0, Ratio*P1)
-                            // back onto Owner's tangent axes.
+                            // Ratio >= 1.0 skips; below or unordered projects
+                            // (P0, Ratio*P1) back onto Owner's tangent axes.
                             if (!(Ratio >= 1.0))
                             {
                                 const double ScaledP1 = Ratio * P1;
@@ -878,7 +825,7 @@ namespace
                      reinterpret_cast<unsigned char*>(CoreB),
                      &Frame->SolverContactPointWS, Axis0, Axis1, nullptr);
 
-        // 06354779-0635478c: B = i_delta_time * Span - RelVel, kept.
+        // B = i_delta_time * Span - RelVel, kept.
         const double B0 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[0] - Ctx.RelVel0();
         const double B1 = (double)(EventSim->i_delta_time) * Contact->SpanFrictionS[1] - Ctx.RelVel1();
 
@@ -886,9 +833,9 @@ namespace
         if (!IVP_SolveFrictionRow(Ctx, B0, B1, Impulse))
             return 0.0f;
 
-        // 06354817-0635485f: S = Impulse1^2 + Impulse0^2 kept, FST float
-        // local_2b8 (pre-clamp; the work term below uses it); FCOMPP against
-        // FL*FL kept, TEST AH,0x41 + JNZ: <= or unordered keeps the impulse.
+        // S = Impulse1^2 + Impulse0^2 kept, with a float copy (local_2b8,
+        // pre-clamp; the work term below uses it); <= FL*FL or unordered
+        // keeps the impulse.
         const double SolvedExt = (double)(Impulse[1]) * Impulse[1] + (double)(Impulse[0]) * Impulse[0];
         const float SolvedF = (float)(SolvedExt);
         if (SolvedExt > (double)(FrictionLimit) * FrictionLimit)
@@ -901,7 +848,7 @@ namespace
         ReactionFrameApplyImpulse(Ctx.Bytes(), reinterpret_cast<unsigned char*>(CoreA),
                      reinterpret_cast<unsigned char*>(CoreB), Impulse);
 
-        // 0635487a-063548bf: Work = sqrt((S0*S0 + S1*S1) * ((dt*dt) *
+        // Work = sqrt((S0*S0 + S1*S1) * ((dt*dt) *
         // SolvedF)) * 0.5f kept; return float(Work - TangentWork), then
         // TangentWork = float(Work).
         const double Span0 = Contact->SpanFrictionS[0];
@@ -915,7 +862,7 @@ namespace
     }
 
     // FUN_0628be60 applied to Axis0 * Span0: per component float(Span0 * Axis0.c), then
-    // float(Span1 * Axis1.c + that) (.text:0628be60-0628be8b).
+    // float(Span1 * Axis1.c + that).
     Vector IVP_TangentSpanWS(const IVP_Impact_Solver_Long_Term* Frame, const IVP_Contact_Point* Record)
     {
         const double Span0 = (double)(Record->SpanFrictionS[0]);
@@ -930,8 +877,8 @@ namespace
         return Out;
     }
 
-    // FUN_06354dc0 (.text:06354dc0-06355011), re-ported 2026-10-08 (claude-code:cmn-phy4)
-    // with retail's x87 rounding points (extended kept as double, float at each FSTP):
+    // FUN_06354dc0, with retail's x87 rounding points (extended kept as double, float at
+    // each store):
     //   Sign = -1 unless A->Object1->core == B->Object1->core (+0x10 -> +0x98);
     //   TA / TB = the two tangential spans in world space (FUN_0628be60);
     //   R = float(A->Owner->+0x20 - B->Owner->+0x20) per component, then FUN_06347ef0:
@@ -1001,21 +948,17 @@ namespace
         AccumForB->z = AccumForB->z + DeltaB.z;
     }
 
-    // FUN_06355050 (.text:06355050-063551bf, cdecl (pair, arena)). cmn-ivp3g
-    // 2026-10-09, traced in full:
-    //   0635505c-06355093: n = pair->AttachedCtx.n_elems (06355370); Copy =
-    //     arena->GetMem(n*4) (the inlined 06347380 sequence, slow path
-    //     063440d0).
-    //   06355096-063550b0: Weight = float(1.0 / (n + 1e-10f)) (FILD, FADD
-    //     DAT_063a53d8, FDIVR 1.0, one rounding).
-    //   063550b3-063550e8: Accum = _alloca(n * 16); from the top, Copy[i] =
-    //     elems[i] and Accum[i].xyz = 0.
-    //   063550ea-06355195: for i in 0..n-2, j in i+1..n-1: Dot = ((Ni.z*Nj.z +
-    //     Ni.y*Nj.y) + Ni.x*Nj.x) on the owners' normals (+0x40 -> +0x00),
-    //     kept; | |Dot| - 1 | FCOMP 0.001f (DAT_063a5604), TEST AH,0x1 + JZ: only
-    //     >= skips, so < or unordered merges via 06354dc0(Copy[j], Copy[i],
+    // FUN_06355050, cdecl (pair, arena):
+    //   n = pair->AttachedCtx.n_elems; Copy = arena->GetMem(n*4) (the inlined
+    //     06347380 sequence).
+    //   Weight = float(1.0 / (n + 1e-10f)), one rounding.
+    //   Accum = _alloca(n * 16); from the top, Copy[i] = elems[i] and
+    //     Accum[i].xyz = 0.
+    //   for i in 0..n-2, j in i+1..n-1: Dot = ((Ni.z*Nj.z + Ni.y*Nj.y) +
+    //     Ni.x*Nj.x) on the owners' normals, kept; | |Dot| - 1 | < 0.001f
+    //     (DAT_063a5604) or unordered merges via 06354dc0(Copy[j], Copy[i],
     //     &Accum[j], &Accum[i], Weight).
-    //   0635519b-063551b4: forward, Copy[k]->AccumulateFrameTangent(&Accum[k]).
+    //   Forward, Copy[k]->AccumulateFrameTangent(&Accum[k]).
     // The 16-byte stack slots become Vectors in a std::vector (stack scratch,
     // freed on return either way); the arena copy is retail's.
     void IVP_MergeRedundantContacts(IVP_ListManager_CorePairEntry* Pair, IVP_U_Memory* Arena)
@@ -1060,8 +1003,7 @@ namespace
     }
 }
 
-// FUN_06354d70 (.text:06354d70-06354db9, thiscall (&ImpulseChange), RET 4).
-// cmn-ivp3g 2026-10-09: S0 (+0x38) = float(((T0.z*I.z + T0.y*I.y) + T0.x*I.x)
+// FUN_06354d70, thiscall (&ImpulseChange), RET 4: S0 (+0x38) = float(((T0.z*I.z + T0.y*I.y) + T0.x*I.x)
 // + S0), T0 = Owner(+0x40)->TangentAxis0 (+0x78); S1 (+0x3c) likewise with
 // TangentAxis1 (+0x88). The dot stays on the x87 stack.
 void IVP_Contact_Point::AccumulateFrameTangent(const Vector& ImpulseChange)
@@ -1078,10 +1020,8 @@ void IVP_Contact_Point::AccumulateFrameTangent(const Vector& ImpulseChange)
                                           SpanFrictionS[1]);
 }
 
-// D-cluster-06350740 pass (2026-09-10): decomp-tracker item 3207
-// (FUN_06353f10, Common.dll.txt:433355-433521, Common.dll.c:210290-210356,
-// 147 insns). A textbook Baraff-style normal-impulse LCP row solve for one
-// PSI sub-step:
+// FUN_06353f10. A Baraff-style normal-impulse LCP row solve for one PSI
+// sub-step:
 //   1. RelativeVelocity = Dot(Owner->ContactNormalWS, CoreA->Speed)
 //                        + Dot(Owner->CoordOSCrossNormal[0], CoreA->RotSpeed)
 //                        - Dot(Owner->ContactNormalWS, CoreB->Speed)
@@ -1093,41 +1033,19 @@ void IVP_Contact_Point::AccumulateFrameTangent(const Vector& ImpulseChange)
 //   3. Impulse = (Gain*Depth + RelativeVelocity) *
 //      Owner->EffectiveMassDenomRecip. Impulse <= 0 clears
 //      NowFrictionPressure to 0; otherwise NowFrictionPressure is set to
-//      Impulse * EventSim->i_delta_time (the event's +4 -- the only field of
-//      the first argument this function reads; LAB_06356560 passes the
-//      IVP_Event_Sim it was handed, .text:06356560-0635657d).
+//      Impulse * EventSim->i_delta_time (the only field of the event read;
+//      LAB_06356560 passes the IVP_Event_Sim it was handed).
 //   4. The impulse is applied to whichever of CoreA/CoreB are non-null:
 //      RotSpeed += (+/-Impulse) * (CoordOSCrossNormal (componentwise) *
 //      InvRotInertia), Speed += (+/-Impulse * InvMass) * Normal -- opposite
 //      signs for A vs B (action/reaction).
 //
-// 2026-10-08 (claude-code:cmn-phy3): re-traced .text:06353f10-06354101 in
-// full and rewritten with retail's evaluation order. Values kept on the x87
-// stack are double (53-bit, as in ivp_friction_solver.cpp); every FSTP float
-// is a static_cast<float>. The previous version summed the four dot products
-// in a different order and in float, and treated a NaN impulse as positive.
-//   06353f17-06353f28: F = Owner; CoreA = F->ChildCandidate[0] (+0x70).
-//   06353f20: RelSpeed (local_14) = 0.
-//   06353f2a-06353f72: CoreA: ((C0.z*Rot.z + C0.y*Rot.y) + C0.x*Rot.x) +
-//     ((Lin.z*N.z + Lin.y*N.y) + Lin.x*N.x) -> FSTP float.
-//   06353f76-06353fb3: CoreB (+0x74): Rot = FUN_0628be40(&CoreB->RotSpeed,
-//     &C1) = (C1.z*R.z + C1.y*R.y) + C1.x*R.x; Lin likewise;
-//     RelSpeed = RelSpeed - (Rot + Lin) -> FSTP float.
-//   06353fb7-06353fba: D = Depth - GapDistance (FSUBR), kept on the stack.
-//   06353fbe-06353fd7: `FCOMP 0.0f; TEST AH,0x1; JZ` -- C0 set (D < 0 or
-//     unordered) replaces the gain with Gain * 20.0f (DAT_063a543c, bytes
-//     00 00 a0 41).
-//   06353fdd-06353fe6: Impulse = ((G * D) + RelSpeed) * F->+0x68 -> FSTP float.
-//   06353fec-06353ffb: `FCOMP 0.0f; TEST AH,0x41; JNZ` -- <= 0 or unordered
-//     -> 06354104: NowFrictionPressure = 0, return.
-//   06354001-0635400c: NowFrictionPressure = Impulse * EventSim->+4.
-//   06354016-0635406d: CoreA: v = C0 (*) InvRotInertia, each FSTP float;
-//     FUN_0628be60(RotSpeed, RotSpeed, v, -Impulse); then
-//     FUN_0628be60(Speed, Speed, N, -(InvMass * Impulse) as float).
-//     FUN_0628be60(dst, a, v, s): dst.c = s * v.c + a.c, FSTP float.
-//   06354072-063540f5: CoreB: v = C1 (*) InvRotInertia (float);
-//     FUN_0628be60(RotSpeed, RotSpeed, v, Impulse); s = InvMass * Impulse kept
-//     on the stack; Speed.c = s * N.c + Speed.c.
+// x87 detail: each side's relative speed is ((C.z*Rot.z + C.y*Rot.y) +
+// C.x*Rot.x) + ((Lin.z*N.z + Lin.y*N.y) + Lin.x*N.x), rounded once; D stays
+// on the stack; D < 0 or unordered uses Gain * 20.0f (DAT_063a543c); the
+// impulse is rounded once and <= 0 or unordered clears the pressure. CoreA's
+// speed scale -(InvMass * Impulse) is rounded to float (an FUN_0628be60
+// argument), CoreB's stays on the stack.
 void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float Depth, float Gain)
 {
     IVP_Impact_Solver_Long_Term* F = Owner;
@@ -1208,30 +1126,19 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
     }
 }
 
-// D-cluster-06350740 pass (2026-09-10): decomp-tracker item 3206
-// (FUN_06353e80, Common.dll.txt:433297-433350, Common.dll.c:210257-210286,
-// 46 insns). Converts this dist's 2D SpanFrictionS pair back into a
-// world-space direction vector (the exact inverse projection of
-// AccumulateFrameTangent above), normalizes it in place (FUN_06347e90), and
-// in single-direction SolverMode (==1) refines it further via
-// ClampTangentDirection (item 3205, ported 2026-10-08 -- see below).
-//
-// RETURN VALUE ADDED 2026-09-17 (D-claude:common-ivp2, while porting item
-// 3209/FUN_063548e0, this function's only caller): retail returns a float,
-// and the caller uses it. FUN_06353e80 leaves exactly one value on the x87
-// stack at its `RET 4` (Common.dll.txt:06353f05-06353f0a): the
-// pre-normalisation LENGTH of OutDir returned by FUN_06347e90 (whose tail
-// `FMULP` at :06347ee4 multiplies lenSq by 1/sqrt(lenSq); 0.0f when lenSq <
-// 1e-10f), or, in SolverMode 1, whatever ClampTangentDirection returns
-// instead -- retail discards the length with a bare `FSTP ST0` at :06353efc.
-// The definition sits below ClampTangentDirection so that it can share that
-// function's x87-precision helpers.
+// FUN_06353e80 converts this dist's 2D SpanFrictionS pair back into a
+// world-space direction (the inverse projection of AccumulateFrameTangent
+// above), normalizes it in place (FUN_06347e90), and in SolverMode 1 refines
+// it via ClampTangentDirection. It returns, on the x87 stack, the
+// pre-normalisation length from FUN_06347e90 (0.0f when lenSq < 1e-10f), or
+// in SolverMode 1 ClampTangentDirection's result (the length is discarded).
+// Its only caller is FUN_063548e0. The definition sits below
+// ClampTangentDirection to share its x87 helpers.
 
 namespace
 {
-    // The four small vector helpers ClampTangentDirection calls, in retail's
-    // x87 precision (values held on the FPU stack are double, every FSTP is a
-    // float rounding). DAT_063a53d8 = 1e-10f, DAT_063a53d0 = 1.0f.
+    // The small vector helpers ClampTangentDirection calls, in retail's x87
+    // precision. DAT_063a53d8 = 1e-10f, DAT_063a53d0 = 1.0f.
 
     // FUN_06347f50 (this = Out, RET 8): Out = A - (A.N) N.
     // Dot = (A.x*N.x + N.z*A.z) + A.y*N.y, negated, kept on the FPU; y and z are
@@ -1255,8 +1162,8 @@ namespace
                          (double)(V.z) * V.z);
     }
 
-    // FUN_06347ef0 / FUN_06347e90: `FCOM 1e-10f; TEST AH,1; JZ` -- below the
-    // threshold or unordered leaves V untouched (ef0 returns 0 in EAX, e90
+    // FUN_06347ef0 / FUN_06347e90: lenSq below 1e-10f or unordered leaves V
+    // untouched (ef0 returns 0 in EAX, e90
     // returns 0.0f); otherwise each component becomes float(c * 1/sqrt(lenSq)),
     // and e90 returns lenSq * (1/sqrt(lenSq)) unrounded.
     double IVP_NormalizeX87(Vector* V)
@@ -1275,18 +1182,14 @@ namespace
     }
 }
 
-// FUN_06353b50 (decomp-tracker item 3205, .text:06353b50-06353e79, RET 4).
-// 2026-10-08 (claude-code:cmn-phy3), ported against the listing. Frame:
-// SUB ESP,0x78 + four pushes; with B = ESP after them, Materials[2] at B+0x20,
-// the side counter at B+0x1c and a pointer to the OTHER side's material at
-// B+0x18 (starts at &Materials[1], `SUB EDX,4` per side). ESI = Owner, read
-// once at 06353b63.
+// FUN_06353b50 (RET 4). Owner is read once; the "other side" material starts
+// at Materials[1] and steps back per side.
 //
-// Per side whose material has SecondFrictionXEnabled (+8, 06353b7d-06353b84):
+// Per side whose material has SecondFrictionXEnabled (+8):
 //   Axis = column 0 of Object->original_core->MWorldFCore (+0xf4/+0x104/+0x114)
 //   Perp = FUN_06347f50(Axis, Owner->ContactNormalWS); PerpLen = float(|Perp|)
 //   K = Other->get_friction_factor() * float(Side->get_second_friction_factor())
-//       (slot 1 on this side first, `CALL [EDX+4]`, then slot 0 on the other)
+//       (slot 1 on this side first, then slot 0 on the other)
 //   FrictionCoefficient < 1e-10f or unordered -> return 0.0f, even on side 1
 //   Range = float(((coef - (coef-K)*PerpLen) * 0.005f) / coef)   (DAT_063a5654)
 //   W = S0*TangentAxis0 + S1*TangentAxis1 (FUN_0628be60: float(S1*T1.c + float(S0*T0.c)))
@@ -1301,7 +1204,7 @@ namespace
 // One retail write is not reproduced: 06353d94 also copies the uninitialised
 // stack dword at B+0x34 into InOutDir+0xc (the caller's 16-byte point's
 // fourth slot). The port's Vector is 12 bytes and the value is indeterminate,
-// so it is left out (named on the tracker item).
+// so it is left out.
 float IVP_Contact_Point::ClampTangentDirection(Vector* InOutDir)
 {
     IVP_Material* Materials[2];
@@ -1407,14 +1310,12 @@ float IVP_Contact_Point::ClampTangentDirection(Vector* InOutDir)
     return (float)(IVP_NormalizeX87(InOutDir));
 }
 
-// FUN_06353e80 (item 3206; see the comment block above ClampTangentDirection's
-// helpers). 2026-10-08 (claude-code:cmn-phy3) precision re-trace of
-// .text:06353e80-06353f0a: OutDir first receives float(S0*T0.c) for y, z, x;
-// then y and z become float(S1*T1.c + that float) and x likewise (the S1
-// products are never rounded on their own); FUN_06347e90 normalises; in
-// SolverMode 1 (`CMP byte ptr [EDI+0x34],1`) its length is popped and
-// FUN_06353b50's value returned instead. The sole caller (063548e0) stores
-// the result as a float at once (063548f6), so returning float is exact.
+// FUN_06353e80 (see the block above ClampTangentDirection's helpers). OutDir
+// first receives float(S0*T0.c) for y, z, x; then each becomes float(S1*T1.c
+// + that float) (the S1 products are never rounded on their own);
+// FUN_06347e90 normalises; in SolverMode 1 (+0x34) its length is dropped and
+// FUN_06353b50's value returned. The sole caller stores the result as a float
+// at once, so returning float is exact.
 float IVP_Contact_Point::RecomputeTangentDirection(Vector* OutDir)
 {
     const Vector& T0 = Owner->TangentAxis0;
@@ -1441,21 +1342,14 @@ float IVP_Contact_Point::RecomputeTangentDirection(Vector* OutDir)
 
 namespace
 {
-    // The friction-cone clamp of one dist, shared by FUN_06354c10's inner loop
-    // (.text:06354ca3-06354d0c) and LAB_06356660 (.text:06356686-063566f8) --
-    // the two are instruction-for-instruction the same block. x87 values that
-    // stay on the FPU stack are carried in double (53-bit precision under the
-    // VC6 runtime, as in ivp_friction_solver.cpp); every FST/FSTP float is a
-    // static_cast<float>.
-    //   TangentSq: `FLD [+0x3c]; FLD [+0x38]; FLD ST0; FMUL ST1; FLD ST2;
-    //     FMUL ST3; FADDP` = X*X + Y*Y, stored once as float (FST) and kept
-    //     unrounded on the stack for the compare.
-    //   compare against ConeSq: `TEST AH,0x41; JNZ` skips unless TangentSq >
-    //     ConeSq (ordered).
-    //   FUN_06347df0(TangentSq as float) = 1.0f / FSQRT (extended).
+    // The friction-cone clamp of one dist, shared (identically) by
+    // FUN_06354c10's inner loop (06354ca3) and LAB_06356660 (06356686).
+    //   TangentSq = X*X + Y*Y, stored once as float and kept unrounded for
+    //     the compare; the clamp runs only when TangentSq > ConeSq (ordered).
+    //   FUN_06347df0(TangentSq as float) = 1.0f / sqrt (extended).
     //   _flags60 = (_flags60 & 0xffffff01) | 1.
     //   FrictionCorrection = ((InvLen * TangentSqF - Cone) * pressure (+0x54))
-    //     * coefficient (+0x44) + FrictionCorrection, FSTP float.
+    //     * coefficient (+0x44) + FrictionCorrection, one rounding.
     //   Scale = InvLen * Cone; SpanFrictionS[0] = Scale * [0]; [1] likewise.
     void IVP_ClampDistIntoFrictionCone(IVP_Contact_Point* Dist, float Cone, double ConeSq)
     {
@@ -1481,21 +1375,14 @@ namespace
     }
 }
 
-// FUN_06354c10 (RET 4), 2026-10-08 re-trace (claude-code:cmn-phy3):
-//   06354c13-06354c22: pair index = zero-extended word [this+0x36] - 1; JS.
-//   06354c3a-06354c43: pair re-read from [this+0x38] each iteration.
-//   06354c3d-06354c6d: Sum = 0.0 (DAT_063a53d4), then for every dist from the
-//     top: Sum += (pressure (+0x54) * coefficient (+0x44)) * MassFactor (+0x30),
-//     unrounded on the stack.
-//   06354c6f-06354c89: Cone = (dt * dt) * Sum, FSTP float into the argument
-//     slot. 06354c8b: no dist -> next pair.
-//   06354c91-06354c9f: ConeSq = Cone * Cone + 1e-6f, FSTP float (local_4):
-//     here ConeSq IS rounded to float, unlike LAB_06356660.
-//   06354ca3-06354d0c: the clamp above, per dist, top to bottom.
-//   06354d0f-06354d2c: SolverMode == 1 -> FUN_063548e0; else FUN_06354120,
-//     whose return is added into local_14 (float, FADD/FSTP each time).
-//   06354d33-06354d4b: local_14 > 0 (`TEST AH,0x41; JNZ` skip on <=, ==,
-//     unordered) -> pair+0x24 = local_14 + pair+0x24, FSTP float.
+// FUN_06354c10 (RET 4). Pairs from the last; per pair:
+//   Sum = 0.0 (DAT_063a53d4), then for every dist from the top: Sum +=
+//     (pressure (+0x54) * coefficient (+0x44)) * MassFactor (+0x30), unrounded.
+//   Cone = float((dt * dt) * Sum); no dist -> next pair.
+//   ConeSq = float(Cone * Cone + 1e-6f) -- rounded here, unlike LAB_06356660.
+//   Per dist, top to bottom: the clamp above, then SolverMode == 1 ->
+//     FUN_063548e0, else FUN_06354120 whose return is added into a float sum.
+//   Sum > 0 (ordered) -> pair+0x24 += sum, one rounding.
 void IVP_ClampFrictionCone(IVP_ListManager* FrictionSystem, const IVP_Event_Sim* EventSim)
 {
     for (int s = static_cast<int>(FrictionSystem->CorePairEntries.n_elems) - 1; s >= 0; --s)
@@ -1545,13 +1432,9 @@ void IVP_ClampFrictionCone(IVP_ListManager* FrictionSystem, const IVP_Event_Sim*
     }
 }
 
-// FUN_063551c0 (no stack arguments), 2026-10-08 re-trace:
-//   063551c2-063551cb: pair index = zero-extended word [this+0x36] - 1; JS.
-//   063551ce-063551d7: pair re-read from [this+0x38]; `DEC dword [pair+0x18];
-//     JNZ` next.
-//   063551d9-063551e9: FUN_06355050(pair, [this+4]->+0xa0) (cdecl, the
-//     environment's IVP_U_Memory arena, re-read per call).
-//   063551ec: [pair+0x18] = 5.
+// FUN_063551c0 (no stack arguments). Pairs from the last: --[pair+0x18]; at
+// zero FUN_06355050(pair, environment+0xa0, the IVP_U_Memory arena, re-read
+// per call) and [pair+0x18] = 5.
 void IVP_AgeAndRemergeContactSets(IVP_ListManager* FrictionSystem)
 {
     for (int s = static_cast<int>(FrictionSystem->CorePairEntries.n_elems) - 1; s >= 0; --s)
@@ -1565,32 +1448,18 @@ void IVP_AgeAndRemergeContactSets(IVP_ListManager* FrictionSystem)
     }
 }
 
-// FUN_06355590 (RET 4): FUN_06354c10(EventSim) then FUN_063551c0 on this
-// (.text:06355590-063555a5).
+// FUN_06355590 (RET 4): FUN_06354c10(EventSim) then FUN_063551c0 on this.
 void IVP_StepFrictionSolver(IVP_ListManager* FrictionSystem, const IVP_Event_Sim* EventSim)
 {
     IVP_ClampFrictionCone(FrictionSystem, EventSim);
     IVP_AgeAndRemergeContactSets(FrictionSystem);
 }
 
-// LAB_06356660 (item 3248, RET 8): slot 4 of the friction system's vtable
-// (.rdata:063a54d8 = 063a54c8+0x10), i.e. its do_simulation_controller.
-//   06356661-06356668: `CMP word [this+0x3e],1; JG` (signed) -- more than one
-//     dist -> 0635671c-06356721: FUN_06355590(EventSim) on this.
-//   0635666e-06356682: Dist = CtxListHead; cone = MassFactor (+0x30) *
-//     NowFrictionPressure (+0x54) * FrictionCoefficient (+0x44) * dt * dt,
-//     stored as float.
-//   06356686-063566b5: tangentSq = X*X + Y*Y of SpanFrictionS, stored as
-//     float; `FCOMPP` against cone*cone + 1e-6f (DAT_063a5610); `TEST
-//     AH,0x41; JNZ` skips the clamp unless tangentSq > that (ordered).
-//   063566b7-063566f8: invLen = FUN_06347df0(tangentSq); _flags60 low byte = 1;
-//     FrictionCorrection += (invLen*tangentSq - cone) * pressure * coefficient;
-//     SpanFrictionS[0/1] *= invLen * cone.
-//   063566fb-06356719: `CMP byte [Dist+0x34],1` -> FUN_063548e0, else
-//     FUN_06354120 with its return discarded (`FSTP ST0`, 06356709). Both get
-//     the event.
-// The arithmetic is IVP_ClampFrictionCone's inner loop on the system's single
-// dist. CoreList is not read.
+// LAB_06356660 (RET 8): slot 4 of the friction system's vtable (063a54c8),
+// its do_simulation_controller. More than one dist (signed word +0x3e) ->
+// FUN_06355590. Otherwise IVP_ClampFrictionCone's inner loop on the single
+// dist CtxListHead, with ConeSq = cone*cone + 1e-6f left unrounded, and
+// FUN_06354120's return discarded. CoreList is not read.
 void IVP_ListManager::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* /*CoreList*/)
 {
     if (static_cast<int16_t>(CtxListCount) > 1)
@@ -1601,14 +1470,12 @@ void IVP_ListManager::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Ve
 
     IVP_Contact_Point* cp = CtxListHead;
 
-    // 0635666e-06356682: (((MassFactor * pressure) * coefficient) * dt) * dt,
-    // FSTP float.
+    // (((MassFactor * pressure) * coefficient) * dt) * dt, one rounding.
     const double Dt = (double)(EventSim->delta_time);
     const float Cone = (float)(
         (((double)(cp->MassFactor) * (double)(cp->NowFrictionPressure)) *
          (double)(cp->FrictionCoefficient)) * Dt * Dt);
-    // 0635669e-063566a6: Cone * Cone + 1e-6f, left UNROUNDED on the stack for
-    // the FCOMPP (FUN_06354c10 stores its ConeSq as float first; this does not).
+    // Cone * Cone + 1e-6f, left unrounded (FUN_06354c10 rounds its ConeSq).
     const double ConeSq = (double)(Cone) * (double)(Cone) + (double)(1e-6f);
     IVP_ClampDistIntoFrictionCone(cp, Cone, ConeSq);
 
@@ -1623,7 +1490,7 @@ void IVP_ListManager::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Ve
 }
 
 // ---------------------------------------------------------------------------
-// cmn-ivp3d 2026-10-08: FUN_06356bc0, traced against .text:06356bc0-06356f27.
+// FUN_06356bc0, IVP_Mindist::try_to_generate_managed_friction.
 // ---------------------------------------------------------------------------
 namespace
 {
@@ -1639,25 +1506,22 @@ namespace
     };
 }
 
-//   06356bdc-06356c26: Obj0 = synapse[(StateFlags >> 8) & 3].l_obj (EBX),
-//     Obj1 = synapse[((StateFlags ^ 0x100) >> 8) & 3].l_obj; Core0/Core1 =
-//     their +0x9c core (Ipion friction_core; the port's original_core). When
-//     `TEST byte [Core0],0xc` is non-zero the two CORES swap (the objects do
-//     not).
-//   06356c30-06356c4a: Info0 = Core0->+0x5c (FUN_0633ba90), Env =
-//     Core0->Environment; cp = FUN_0635a950(this, &Tag).
-//   06356c58-06356c8e: Tag != 1 -> *OutFs = Info0->FrictionSystem (no null
-//     test), *OutHavingNew = 0, and with bCallRecalcSvals FUN_0635a1e0(cp) +
-//     FUN_06358c50(cp, cp->Owner); return cp.
-//   06356c93-06356cfd: new cp -> the same two calls under bCallRecalcSvals;
-//     event {Obj0->environment, cp->Owner, cp}; FUN_0634cfa0 on that
-//     environment; for Obj0 then Obj1, `TEST AH,0x20` on flags (+0x78) ->
-//     FUN_0634b0e0(env->cluster_manager (+0xc), obj, &event) -- Obj0's
-//     environment for both; *OutHavingNew = 1.
-//   06356d07-06356e98: friction system dispatch (see the branches below).
-//   06356e9d-06356eb7: Info0 / Info1 ->FrDists.Add(cp) (FUN_063556b0);
-//     *OutFs = Fs; FUN_063562d0(cp).
-//   06356ebc-06356f10: Sim1 = Core1->+0x15c, Sim0 = Core0->+0x15c; when
+//   Obj0 = synapse[(StateFlags >> 8) & 3].l_obj, Obj1 = synapse[((StateFlags
+//     ^ 0x100) >> 8) & 3].l_obj; Core0/Core1 = their +0x9c core (Ipion
+//     friction_core; the port's original_core). When Core0's flags & 0xc is
+//     non-zero the two cores swap (the objects do not).
+//   Info0 = Core0->+0x5c (FUN_0633ba90); cp = FUN_0635a950(this, &Tag).
+//   Tag != 1 -> *OutFs = Info0->FrictionSystem (no null test), *OutHavingNew
+//     = 0, and with bCallRecalcSvals FUN_0635a1e0(cp) + FUN_06358c50(cp,
+//     cp->Owner); return cp.
+//   New cp -> the same two calls under bCallRecalcSvals; event
+//     {Obj0->environment, cp->Owner, cp}; FUN_0634cfa0 on that environment;
+//     for Obj0 then Obj1 with flags (+0x78) bit 0x2000 -> FUN_0634b0e0
+//     (Obj0's environment for both); *OutHavingNew = 1.
+//   Friction system dispatch (see the branches below).
+//   Info0 / Info1 ->FrDists.Add(cp) (FUN_063556b0); *OutFs = Fs;
+//     FUN_063562d0(cp).
+//   Sim1 = Core1->+0x15c, Sim0 = Core0->+0x15c; when
 //     neither core has (Flags & 0xc) and Sim0 != Sim1: the unit that is
 //     SimUnitNotDestroy absorbs the other (FUN_06348c60), and the other is
 //     freed (FUN_06348d80 + operator delete FUN_06391d5a) when non-null.
@@ -1819,8 +1683,8 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
 }
 
 // ---------------------------------------------------------------------------
-// Impact-system helpers of the contact point, cmn-ivp3e 2026-10-08. Traced
-// against .text:06359380-063596a4; callers in ivp_impact.cpp.
+// Impact-system helpers of the contact point (06359380-063596a4); callers in
+// ivp_impact.cpp.
 // ---------------------------------------------------------------------------
 namespace
 {
@@ -1830,7 +1694,7 @@ namespace
     const float GImpactEpsilon = 0x1.b7cdfep-34f;      // DAT_063a53d8 (0x2edbe6ff, 1e-10f)
     const float GImpactRotSpeedScale = 0x1.a36e2ep-16f; // DAT_063a5678 (0x37d1b717, 2.5e-5f)
     const float GImpactRotSpeedClamp = 0.25f;          // DAT_063a5674 (0x3e800000)
-    const float GImpactNoPriority = 0x1.5af1d8p+66f;   // `MOV [ESI+0x5c],0x60ad78ec` (1e20f)
+    const float GImpactNoPriority = 0x1.5af1d8p+66f;   // immediate 0x60ad78ec stored to +0x5c (1e20f)
 
     // FUN_0628be40 (this = A, RET 4): (B.z*A.z + B.y*A.y) + B.x*A.x, left on
     // the FPU stack.
@@ -1839,13 +1703,13 @@ namespace
         return ((double)(B.z) * A.z + (double)(B.y) * A.y) + (double)(B.x) * A.x;
     }
 
-    // FUN_063594d0 (.text:063594d0-06359557, 47 insns, thiscall on the contact
-    // point, no arguments, result on the FPU stack). Sum = 0.0f; for side 0
+    // FUN_063594d0 (thiscall on the contact point, no arguments, result on the
+    // FPU stack). Sum = 0.0f; for side 0
     // then 1 -- core = Cp->Owner->contact core (+0x70 / +0x74), type byte =
     // Cp+0x16 / Cp+0x2a (low byte of _hash1 / _hash2) -- a non-null core whose
     // type byte is not 3 adds
     //   s = ((w.x*w.x + w.y*w.y) + w.z*w.z) * 2.5e-5f   (w = RotSpeed, +0x94)
-    //   s > 0.25f -> s = 0.25f   (`FCOM; TEST AH,0x41; JNZ` keeps s <= 0.25 / unordered)
+    //   s > 0.25f -> s = 0.25f   (<= or unordered keeps s)
     //   (1 - cos(sqrt(s))) * core->+0x04 * core->Environment->inv_delta_time
     double IVP_Contact_Point_Get_Rotation_Rescue_Term(const IVP_Contact_Point* Cp)
     {
@@ -1878,12 +1742,12 @@ namespace
     }
 }
 
-// FUN_06359560 (.text:06359560-063595b8, 26 insns, RET 4). local_4 = 0.0f;
-// `FLD Cp+0x58; FCOM DAT_0658aa14 (settings +0x004); TEST AH,1; JZ`:
+// FUN_06359560 (RET 4). local_4 = 0.0f; gap (Cp+0x58) against DAT_0658aa14
+// (settings +0x004):
 //   below the limit (or unordered): local_4 = float((limit - gap) *
 //     Env->inv_delta_time);
-//   otherwise: `MOV dword [Cp->Owner+0x58],0` (the long-term rescue speed).
-// Both tails: (FUN_063594d0() + local_4) doubled (`FADD ST0,ST0`).
+//   otherwise: Cp->Owner+0x58 (the long-term rescue speed) = 0.
+// Both tails: (FUN_063594d0() + local_4) doubled, unrounded.
 double IVP_Contact_Point_Get_Rescue_Speed_Impact(IVP_Contact_Point* Cp, IVP_Environment* Env)
 {
     float Delta = GImpactZero;
@@ -1901,19 +1765,17 @@ double IVP_Contact_Point_Get_Rescue_Speed_Impact(IVP_Contact_Point* Cp, IVP_Envi
     return Sum + Sum;
 }
 
-// FUN_063595c0 (.text:063595c0-063596a4, 72 insns, no arguments).
-//   :063595c7-063595d5  LongTerm = Cp->+0x40; dword +0x54 = (x & 0xffffff01) | 1
-//     -- the state byte becomes 1, the upper bytes are kept.
-//   :063595d8-063595f4  `FCOMP DAT_0658ab30 (settings +0x120); TEST AH,0x41;
-//     JNZ` -- a gap above the limit gives priority 1e20f and returns.
-//   :063595f5-06359605  Env = Cp->Object1->environment; LongTerm->+0x58 =
+// FUN_063595c0 (no arguments).
+//   LongTerm = Cp->+0x40; dword +0x54 = (x & 0xffffff01) | 1 -- the state
+//     byte becomes 1, the upper bytes are kept.
+//   A gap above DAT_0658ab30 (settings +0x120) gives priority 1e20f, return.
+//   Env = Cp->Object1->environment; LongTerm->+0x58 =
 //     float(FUN_06359560(Cp, Env)).
-//   :06359608-06359649  contact core 0: local_8 = float(Dot(w0, +0xb8) +
-//     ((v0.z*n.z + v0.y*n.y) + v0.x*n.x)), else 0.
-//   :0635964d-0635967e  contact core 1: local_8 = float(local_8 -
-//     (Dot(v1, n) + float(Dot(w1, +0xc8)))).
-//   :06359682-0635969c  +0x5c = float(gap - (LongTerm->+0x58 * 0.5 + local_8) *
-//     Env->delta_time) (`FSUBP` DE E9 = ST1 - ST0).
+//   contact core 0: local_8 = float(Dot(w0, +0xb8) + ((v0.z*n.z + v0.y*n.y)
+//     + v0.x*n.x)), else 0.
+//   contact core 1: local_8 = float(local_8 - (Dot(v1, n) + float(Dot(w1,
+//     +0xc8)))).
+//   +0x5c = float(gap - (LongTerm->+0x58 * 0.5 + local_8) * Env->delta_time).
 void IVP_Contact_Point_Calc_Impact_Priority(IVP_Contact_Point* Cp)
 {
     IVP_Impact_Solver_Long_Term* const LongTerm = Cp->Owner;
@@ -1950,17 +1812,14 @@ void IVP_Contact_Point_Calc_Impact_Priority(IVP_Contact_Point* Cp)
         ((double)(LongTerm->LastImpactTimeStep) * GImpactHalf + Closing) * Env->delta_time);
 }
 
-// FUN_06359380 (.text:06359380-063594c0, 94 insns, RET 4), the impact twin of
-// FUN_06353b50 above. Frame: SUB ESP,0x3c + four pushes; Materials[2] at
-// local_28/local_24 (FUN_06358bb0), the found flag at local_34 (0), the
-// solver at local_38. Per side (EBX = &Cp->Object1, then +0x14 = &Object2;
-// ESI = this side's material, EBP = the other side's):
+// FUN_06359380 (RET 4), the impact twin of FUN_06353b50 above. Materials from
+// FUN_06358bb0. Per side:
 //   material +0x8 (SecondFrictionXEnabled) zero -> next side.
 //   Axis = column 0 of Object->original_core (+0x9c)->MWorldFCore.
 //   Perp = FUN_06347f50(Axis, Cp->Owner normal); Len = float(FUN_06347e60(Perp)).
 //   T = float(coef - (coef - Other->slot0() * float(This->slot1())) * Len),
-//     coef = Cp->+0x44 (`FLD; FLD ST0; FSUB ST0,ST2; FMUL Len; FSUBR ST0,ST1`).
-//   `FCOMP 1e-10; TEST AH,1; JNZ` -> Len below 1e-10 (or unordered): next side.
+//     coef = Cp->+0x44.
+//   Len below 1e-10 (or unordered): next side.
 //   found = 1; FUN_06347ef0(Perp); solver +0xdc..+0xe4 = Perp;
 //   FUN_06358c00(T, solver +0xfc, &local_2c, &solver +0xd8) -- the cosine
 //   goes to a scratch slot nobody reads.
@@ -2020,32 +1879,29 @@ namespace
     }
 }
 
-// FUN_06359d10 (.text:06359d10-0635a15c, 284 insns, RET 0x18). Frame SUB
-// ESP,0xcc. Arguments (p1..p6) = (K, L, CacheK, CacheL, LongTerm, Scratch);
-// the caller (0635a344-0635a363) passes the raw edge pointers, &local_14 /
-// &local_28 (IVP_Cache_Ledge_Point) and &local_48.
-//   :06359d17-06359d82  K0, K1 = world start points of K and next(K) through
-//     CacheK; L0, L1 of L and next(L) through CacheL (FUN_0635bda0, next edge
-//     = edge + DAT_063ee4e0[edge & 0xc]).
-//   :06359d87-06359df7  Ld = float(L1 - L0), Kd = float(K1 - K0), each
-//     normalised in place (FUN_06347ef0).
-//   :06359dfc-06359e40  N = Kd x Ld (FUN_0628bed0); q = (N.z^2 + N.y^2) + N.x^2
-//     (float copy in local_44); `FCOMP 1e-12f; TEST AH,0x41; JNZ` -> the
-//     parallel branch when q is not above 1e-12.
-//   :06359e46-06359f52  nK = Kd x N, nL = Ld x N;
+// FUN_06359d10 (RET 0x18). Arguments (K, L, CacheK, CacheL, LongTerm,
+// Scratch); the caller (0635a344) passes the raw edge pointers, two
+// IVP_Cache_Ledge_Point locals and a scratch local.
+//   K0, K1 = world start points of K and next(K) through CacheK; L0, L1 of L
+//     and next(L) through CacheL (FUN_0635bda0, next edge = edge +
+//     DAT_063ee4e0[edge & 0xc]).
+//   Ld = float(L1 - L0), Kd = float(K1 - K0), each normalised in place
+//     (FUN_06347ef0).
+//   N = Kd x Ld (FUN_0628bed0); q = (N.z^2 + N.y^2) + N.x^2 (float copy in
+//     local_44); q not above 1e-12f -> the parallel branch.
+//   nK = Kd x N, nL = Ld x N;
 //     tL = float((1/(nK.L0 - nK.L1)) * (nK.L0 - nK.K0)),
-//     tK = float((1/(nL.K0 - nL.K1)) * (nL.K0 - nL.L0)), every dot (z*z + y*y) + x*x
-//     (FSUBR ST0,ST1 / FSUBR ST0,ST2 = D8 E9 / D8 EA).
-//   :06359f54-06359fc3  Pk = lerp(K0, K1, tK), Pl = lerp(L0, L1, tL)
-//     (FUN_06347e00); D = float(Pl - Pk); len = |D| unrounded (FUN_06347e60).
-//   :06359fc8-0635a03e  len > 1e-10: Cp->+0x58 = float(len), normal =
-//     float(D * (1/len)); else Cp->+0x58 = 0, normal = float(N * (1/sqrt(float q))).
-//   :0635a040-0635a073  LongTerm +0x78 = Kd, +0x20 = Pk.
-//   :0635a076-0635a0e2  when the low byte of Cp->+0x60 is 1: it becomes 0, and
-//     a tL or tK outside [0, 1] (`TEST AH,1` for < 0 / unordered, `TEST AH,0x41`
-//     for > 1; tK <= 1 or unordered returns) sets LongTerm dword +0x54 =
+//     tK = float((1/(nL.K0 - nL.K1)) * (nL.K0 - nL.L0)), every dot
+//     (z*z + y*y) + x*x.
+//   Pk = lerp(K0, K1, tK), Pl = lerp(L0, L1, tL) (FUN_06347e00);
+//     D = float(Pl - Pk); len = |D| unrounded (FUN_06347e60).
+//   len > 1e-10: Cp->+0x58 = float(len), normal = float(D * (1/len)); else
+//     Cp->+0x58 = 0, normal = float(N * (1/sqrt(float q))).
+//   LongTerm +0x78 = Kd, +0x20 = Pk.
+//   When the low byte of Cp->+0x60 is 1: it becomes 0, and a tL or tK outside
+//     [0, 1] (< 0 or unordered, or > 1) sets LongTerm dword +0x54 =
 //     (x & 0xfffffdff) | 0x100.
-//   :0635a0ef-0635a14d  parallel: the same +0x54 update; Scratch = 0;
+//   Parallel: the same +0x54 update; Scratch = 0;
 //     Cp->+0x58 = settings +0x110 (DAT_0658ab20); +0x20 = K0; normal =
 //     (1, 0, 0); +0x78 = (0, 1, 0).
 void IVP_Contact_Point_Calc_Friction_Edge_Edge(IVP_Contact_Point* Cp, const IVP_Compact_Edge* K,
@@ -2149,29 +2005,26 @@ void IVP_Contact_Point_Calc_Friction_Edge_Edge(IVP_Contact_Point* Cp, const IVP_
     }
 }
 
-// FUN_063539d0 (.text:063539d0-06353b4b, thiscall, RET 4, returns this): the
-// contact point's constructor, run by IVP_FindOrCreatePairRecord (FUN_0635a950)
-// on a fresh operator_new(0x74) block. Moved here from ivp_mindist_limiter.cpp
-// (where it was the free function IVP_ConstructPairRecord) by cmn-ivp3f
-// 2026-10-09.
-//   Side 1 = sorted synapse 0, side 2 = sorted synapse 1 (:063539d9 /
-//   :06353a3d `(flags [^ 0x100]) >> 8 & 3`). Per side, the embedded node
-//   (+0x08 / +0x1c): Object = synapse l_obj, Delta = record - node, Next =
-//   l_obj->mindist_list, Prev = 0, old head's Prev = node when non-null,
-//   l_obj->mindist_list = node; hash word (node+0xe) keeps its upper byte
-//   and takes the synapse status' low byte (`((w & 0xff) ^ s) & 0xff ^ w`);
+// FUN_063539d0 (thiscall, RET 4, returns this): the contact point's
+// constructor, run by IVP_FindOrCreatePairRecord (FUN_0635a950) on a fresh
+// operator_new(0x74) block.
+//   Side 1 = sorted synapse 0, side 2 = sorted synapse 1 (`(flags [^ 0x100])
+//   >> 8 & 3`). Per side, the embedded node (+0x08 / +0x1c): Object = synapse
+//   l_obj, Delta = record - node, Next = l_obj->mindist_list, Prev = 0, old
+//   head's Prev = node when non-null, l_obj->mindist_list = node; hash word
+//   (node+0xe) keeps its upper byte and takes the synapse status' low byte;
 //   Feature = synapse edge.
-//   :06353aac +0x68 / +0x6c = raw dwords of physical synapse 0's
+//   +0x68 / +0x6c = raw dwords of physical synapse 0's
 //   l_obj->environment->current_time.
-//   :06353ac4 side 2 status == 2: +0x4c = float(1.0f / real_length(
-//   FUN_0635b940(edge, edge's ledge))) (FUN_06347e60, FDIVR, FSTP dword).
-//   :06353b02 +0x50 / +0x54 / +0x48 / +0x38 / +0x3c / +0x64 / +0x70 = 0;
+//   Side 2 status == 2: +0x4c = float(1.0f / real_length(FUN_0635b940(edge,
+//   edge's ledge))).
+//   +0x50 / +0x54 / +0x48 / +0x38 / +0x3c / +0x64 / +0x70 = 0;
 //   +0x60 = (+0x60 & 0xffffff01) | 1; +0x34 &= 0xffffff00; +0x58 =
 //   DAT_0658ab1c; word +0x5c = 0x14.
 // Retail leaves the rest of the block (+0x00..+0x07, +0x30, +0x40, +0x44,
 // +0x4c off the triangle branch, +0x5e, the hash words' upper bytes and the
 // kept bits of +0x34 / +0x60) as uninitialised heap bytes; the port zeroes
-// the block first so those read as 0 (owner rule on retail UB).
+// the block first so those read as 0 (DEVIATION: owner rule on retail UB).
 IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
 {
     std::memset(this, 0, sizeof(IVP_Contact_Point));
@@ -2227,14 +2080,13 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
     _const5c = 0x14;
 }
 
-// FUN_0635a160 (.text:0635a160-0635a1db, thiscall, RET 8; formerly the free
-// function IVP_WrapUnitCoordinate). Sole caller
-// IVP_ListManager::reset_time (:06355be7).
+// FUN_0635a160 (thiscall, RET 8). Sole caller IVP_ListManager::reset_time
+// (:06355be7).
 //   +0x68 = float(+0x68 - DeltaBase);
-//   t = +0x6c - DeltaOffset, FST float +0x6c, FCOMP 1.0f on the unrounded t;
-//   TEST AH,0x41 / JNZ: loop only while t > 1.0f: +0x68 += 1.0f, t = +0x6c - 1.0f.
-//   :0635a1a6 reloads the stored float; TEST AH,1 / JZ: loop while it is below
-//   0.0f or unordered: +0x68 -= 1.0f, t = +0x6c + 1.0f, compared unrounded again.
+//   t = +0x6c - DeltaOffset, stored as float, compared unrounded; loop while
+//   t > 1.0f: +0x68 += 1.0f, t = +0x6c - 1.0f.
+//   Then the stored float is reloaded; loop while it is below 0.0f or
+//   unordered: +0x68 -= 1.0f, t = +0x6c + 1.0f, compared unrounded again.
 //   An unordered (NaN) +0x6c never leaves the second loop -- as in retail.
 void IVP_Contact_Point::ShiftTimeStamp(float DeltaBase, float DeltaOffset)
 {

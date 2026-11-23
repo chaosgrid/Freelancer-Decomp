@@ -69,8 +69,8 @@ namespace
 
 class FRemoteServerClient;
 
-// Native derived vtables: 06c0b8d8 (IServer) and 06c0b8d0 (IChatServer).
-// Internal C++ layout follows our current compiler; only the RPC wire is fixed.
+// Native derived vtables: 06c0b8d8 (IServer) and 06c0b8d0 (IChatServer). The internal member
+// layout is the port's own; only the RPC wire is fixed.
 struct FRemoteServerImpl final : IServerImpl
 {
     bool Startup(const SStartupInfo& Info) override;
@@ -103,7 +103,8 @@ extern int RegisterChannel1Packets(FPacketSerializer* Serializer);
 extern int RegisterChannel2Packets(FPacketSerializer* Serializer);
 extern int RegisterChannel3Packets(FPacketSerializer* Serializer);
 
-// LAB_06bd9930. Keep the actual network object separate from exported base no-ops.
+// LAB_06bd9930. This derived class is the real network object; the exported base keeps its
+// no-op bodies.
 bool FRemoteServerImpl::Startup(const SStartupInfo& Info)
 {
     bool bResult = false;
@@ -266,7 +267,6 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
     if (Channel == 1)
     {
         // COMMON payloads are reconstructed into real owning argument objects.
-        // Dispatch coverage is tracked separately from the packet registry.
         switch (Opcode)
         {
             case 0x01:
@@ -282,7 +282,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                 float FieldRounded;
                 float* TimeDestination = &Info.Timestamp;
                 float* FieldDestination = &Info.Throttle;
-                // 06bd3b9a..3bca retains the two intermediate FST operations.
+                // 06bd3b9a: retail keeps both intermediate float stores.
                 __asm {
                     mov eax, TimeSource
                     fld dword ptr [eax]

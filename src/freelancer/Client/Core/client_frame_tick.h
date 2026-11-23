@@ -6,7 +6,7 @@
 
 #pragma once
 
-// Retail per-frame tick FUN_005b2890 (partial).
+// Retail per-frame tick.
 void TickClientFrame(double DeltaSeconds); // FUN_005b2890
 
 // The render-frame bracket for the modal loops outside TickClientFrame (the NN dialogs'
@@ -18,7 +18,7 @@ bool BeginClientRenderFrame();
 void EndClientRenderFrame();
 
 // The two halves on their own, for the space frame LAB_0054b000, which runs FUN_00541510,
-// FUN_00541580, FUN_0054a940 and the camera-mode checks between them (0x0054b159 / 0x0054b21a).
+// FUN_00541580, FUN_0054a940 and the camera-mode checks between them.
 void EndClientRenderScene();      // FUN_00425080
 void PresentClientRenderFrame();  // FUN_00425140
 

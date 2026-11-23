@@ -42,7 +42,7 @@ class RichTextEditWin;
 class RichTextWin;
 class RichTextWireButtonControl;
 
-// The Create payload (three dwords on the caller's stack: local_14 / local_10 / local_c).
+// The Create payload (three dwords on the caller's stack).
 struct FNnPromptPayload
 {
     int YesToolTipIds; // [0] -- the OK / Yes box's tool tip; 0 keeps the default (see Create)
@@ -53,8 +53,7 @@ struct FNnPromptPayload
 class NnPrompt : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_00474a30: WinControl ctor, the vptrs, the nine fields zeroed,
-    // ++DAT_0067dccc. Unlike NN_Error there is no FUN_0042d6c0.
+    // Inlined into FUN_00474a30: also ++DAT_0067dccc. Unlike NN_Error there is no FUN_0042d6c0.
     NnPrompt();
     // FUN_00472a20
     ~NnPrompt() override;
@@ -93,11 +92,10 @@ public:
     RichTextWireButtonControl* PromptYes; // +0x350
 
 private:
-    // Inlined at every close path: with PromptEdit and EditText, FUN_0057c2c0 into a 0x400
-    // wchar buffer and the buffer assigned to *EditText.
+    // Port-only helper for the edit-text copy retail inlines at every close path.
     void CopyEditText();
-    // Inlined at 0047312b / 004731f3 / 0047330b / 004733d0 / 004734ff / 004736b4: slot 33
-    // ReleaseMouse, FUN_0043d2a0 on every child (next read first), slot 10 Destroy, delete.
+    // Port-only helper for the close retail inlines at 0x0047312b / 0x004731f3 / 0x0047330b /
+    // 0x004733d0 / 0x004734ff / 0x004736b4: release the mouse, delete the window.
     void Close();
 };
 

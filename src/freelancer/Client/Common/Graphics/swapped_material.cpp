@@ -20,10 +20,10 @@ namespace
     char const* const kNoMaterial = "%s(%d) : *** ERROR: cannot find material name %s\n";
 
     // The TextureLib slot 12 query: +0x04 is the name's CRC. Retail leaves +0x00 as whatever
-    // the stack held (0x0042ce9e / 0x0042d5ae / 0x0042d5ea); it is zero here.
+    // the stack held; it is zero here.
     struct FTextureQuery
     {
-        unsigned long Field_0x00; // TODO: never written by these callers
+        unsigned long Field_0x00; // never written by these callers
         unsigned long Crc;        // +0x04
     };
 
@@ -36,9 +36,8 @@ namespace
         DALib::TextureLib->FindTextureByCrc(&Query, Out);
     }
 
-    // The inlined record destructor of 0x0042cee4..0x0042cf6b / 0x0042d3ec..0x0042d45f: Saved
-    // (FUN_0042cfd0), then Default and Current (the FUN_0042d030 / FUN_0042d090 switches) --
-    // each drops what it owns.
+    // The record destructor FUN_0042cd00 / FUN_0042d1d0 inline: Saved (FUN_0042cfd0), then
+    // Default and Current (FUN_0042d030 / FUN_0042d090).
     void ReleasePropertyRecord(FShadingPropertyRecord& Record)
     {
         Record.Saved.ReleaseOwnedPayload();
@@ -46,9 +45,8 @@ namespace
         Record.Current.ReleaseOwnedPayload();
     }
 
-    // The material search of 0x0042cd1b..0x0042cda7 / 0x0042d1eb..0x0042d279: every material of
-    // MaterialLib group 0 (slots 21 / 22), its name (slot 12, 0x3ff characters) compared with
-    // _strnicmp over Name's length; a non-matching material is released. Null when none matches.
+    // The material search FUN_0042cd00 / FUN_0042d1d0 inline: a prefix match (_strnicmp over
+    // Name's length) in MaterialLib group 0.
     IMaterial* FindMaterial(char const* Name)
     {
         int Count = 0;
@@ -66,7 +64,7 @@ namespace
         return nullptr;
     }
 
-    // `REPE CMPSB` over 8 bytes against "Dt_name" (0x005ca818), the terminator included.
+    // 8 bytes against "Dt_name" (0x005ca818), the terminator included.
     bool IsDtName(char const* ParameterName)
     {
         return memcmp(ParameterName, "Dt_name", 8) == 0;
@@ -95,13 +93,13 @@ void FSwappedMaterial::Reset()
 
 void FSwappedMaterial::Release()
 {
-    // FUN_0042cc50. 0x0042cc55..0x0042cc98: a swap is undone first.
+    // FUN_0042cc50. A swap is undone first.
     if (bSwapped != 0)
     {
         SetDtName(OriginalTexture);
         if (OriginalTexRecord != nullptr)
         {
-            DALib::TextureLib->ReleaseTextureRecord(OriginalTexRecord); // slot 14 (+0x38)
+            DALib::TextureLib->ReleaseTextureRecord(OriginalTexRecord);
             OriginalTexRecord = nullptr;
         }
         if (SwapTexRecord != nullptr)
@@ -112,7 +110,6 @@ void FSwappedMaterial::Release()
         bSwapped = 0;
     }
 
-    // 0x0042cc9b..0x0042ccf1: the strings, the records again, every field zero.
     malloc_strfree(&MaterialName);
     malloc_strfree(&OriginalTexture);
     if (OriginalTexRecord != nullptr)
@@ -137,32 +134,31 @@ bool FSwappedMaterial::CaptureOriginal()
     // FUN_0042cd00.
     IMaterial* const Material = FindMaterial(MaterialName);
     if (Material == nullptr)
-        return false; // 0x0042cda9
+        return false;
 
-    // 0x0042cdc4..0x0042cf7e: every parameter; the string Dt_name is kept.
+    // The string (type 7) Dt_name is kept.
     unsigned long ParameterCount = 0;
-    Material->GetParameterCount(&ParameterCount); // slot 16 (+0x40)
+    Material->GetParameterCount(&ParameterCount);
     bool bFound = false;
     for (unsigned long Parameter = 0; Parameter < ParameterCount; ++Parameter)
     {
         FShadingPropertyRecord Descriptor = {};
-        Material->GetParameterDescriptor(Parameter, &Descriptor); // slot 17 (+0x44)
+        Material->GetParameterDescriptor(Parameter, &Descriptor);
         if (IsDtName(Descriptor.Name))
         {
             FShadingPropertyValue Value = {};
-            Material->GetParameterValue(Parameter, &Value); // slot 18 (+0x48)
+            Material->GetParameterValue(Parameter, &Value);
             if (Value.Type == 7)
             {
                 malloc_strcpy(&OriginalTexture, reinterpret_cast<char const*>(Value.Payload0));
                 FindTextureRecord(OriginalTexture, &OriginalTexRecord);
                 bFound = true;
             }
-            Value.ReleaseOwnedPayload(); // 0x0042ceac..0x0042cee0
+            Value.ReleaseOwnedPayload();
         }
         ReleasePropertyRecord(Descriptor);
     }
 
-    // 0x0042cf8a: no string Dt_name.
     if (!bFound)
         FDUMP(0x100001, kNoDtName, kSwappedMaterialCpp, 0x9c, MaterialName);
     Material->Release();
@@ -175,13 +171,12 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
     IMaterial* const Material = FindMaterial(MaterialName);
     if (Material == nullptr)
     {
-        // 0x0042d280
         FDUMP(0x100001, kNoMaterial, kSwappedMaterialCpp, 0xdf, MaterialName);
         return;
     }
 
-    // 0x0042d2be..0x0042d472: every string Dt_name parameter becomes a ProcessHeap copy of
-    // TextureName (none when TextureName is null) and is written back through slot 19.
+    // Every string Dt_name parameter becomes a ProcessHeap copy of TextureName (none when
+    // TextureName is null).
     unsigned long ParameterCount = 0;
     Material->GetParameterCount(&ParameterCount);
     bool bFound = false;
@@ -202,32 +197,31 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
                 }
                 if (TextureName != nullptr)
                 {
-                    // 0x0042d386..0x0042d3b0: HeapAlloc(strlen + 1), not checked, byte copy.
+                    // HeapAlloc not checked.
                     size_t const Size = strlen(TextureName) + 1;
                     char* const Copy = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, Size));
                     memcpy(Copy, TextureName, Size);
                     Value.Payload0 = reinterpret_cast<unsigned long>(Copy);
                 }
-                Material->SetParameterValue(Parameter, &Value); // slot 19 (+0x4c)
+                Material->SetParameterValue(Parameter, &Value);
                 bFound = true;
             }
-            Value.ReleaseOwnedPayload(); // 0x0042d3c8..0x0042d3e8
+            Value.ReleaseOwnedPayload();
         }
         ReleasePropertyRecord(Descriptor);
     }
 
-    // 0x0042d47e
     if (!bFound)
         FDUMP(0x100001, kNoDtName, kSwappedMaterialCpp, 0xd4, MaterialName);
 
-    // 0x0042d4a4..0x0042d4b5: slot 6 (+0x18) with (0, 1.0f), then the reference goes.
+    // Slot 6 with (0, 1.0f).
     Material->ApplyVerify(nullptr, reinterpret_cast<void*>(0x3f800000u));
     Material->Release();
 }
 
 bool FSwappedMaterial::Init(char const* NewMaterialName)
 {
-    // FUN_0042d4c0: AL is still CaptureOriginal's result at the RET.
+    // FUN_0042d4c0.
     malloc_strcpy(&MaterialName, NewMaterialName);
     bool const bResult = CaptureOriginal();
     bSwapped = 0;
@@ -236,7 +230,7 @@ bool FSwappedMaterial::Init(char const* NewMaterialName)
 
 void FSwappedMaterial::Swap(char const* TextureName, char const* UtfFile)
 {
-    // FUN_0042d4f0. 0x0042d4f6..0x0042d540: undo an earlier swap.
+    // FUN_0042d4f0. Undo an earlier swap first.
     if (bSwapped != 0)
     {
         SetDtName(OriginalTexture);
@@ -253,17 +247,16 @@ void FSwappedMaterial::Swap(char const* TextureName, char const* UtfFile)
         bSwapped = 0;
     }
 
-    // 0x0042d544..0x0042d5f3: the texture from the UTF file. When slot 6 does not load the
-    // named child (nonzero result), the whole "Texture library" is loaded as a group (slot 5),
-    // looked up, and the group is garbage-collected (slot 7).
+    // When the named child does not load, the whole "Texture library" is loaded as a group,
+    // looked up, and the group garbage-collected.
     IFileSystem* FileSystem = nullptr;
     DAEngine_create_filesystem(UtfFile, &FileSystem, "UTF");
-    if (DALib::TextureLib->LoadTextureLibrary(FileSystem, TextureName) != 0) // slot 6 (+0x18)
+    if (DALib::TextureLib->LoadTextureLibrary(FileSystem, TextureName) != 0)
     {
         int Group;
-        DALib::TextureLib->LoadTextureGroup(FileSystem, &Group); // +0x14
+        DALib::TextureLib->LoadTextureGroup(FileSystem, &Group);
         FindTextureRecord(TextureName, &SwapTexRecord);
-        DALib::TextureLib->GarbageCollect(Group);     // +0x1c
+        DALib::TextureLib->GarbageCollect(Group);
     }
     else
     {
@@ -271,7 +264,6 @@ void FSwappedMaterial::Swap(char const* TextureName, char const* UtfFile)
     }
     DAEngine_release_filesystem(&FileSystem);
 
-    // 0x0042d601..0x0042d60a
     SetDtName(TextureName);
     bSwapped = 1;
 }

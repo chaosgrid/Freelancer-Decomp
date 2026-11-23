@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll PUB batch — pub::AI namespace implementations.
+// Common.dll pub::AI namespace implementations.
 
 #include "common_pub.h"
 #include "common_iface.h" // BehaviorTypes::get_behavior_id
@@ -15,21 +15,17 @@
 namespace pub { namespace AI {
 
 // ============================================================================
-// Static constant definitions
-// ============================================================================
-
-// ============================================================================
 // GSplinePath
 // ============================================================================
 
 GSplinePath::GSplinePath()
 {
-    // .text:06261260: `MOV EAX,this; RET` -- nothing is initialised.
+    // .text:06261260: nothing is initialised.
 }
 
 GSplinePath& GSplinePath::operator=(GSplinePath const& Other)
 {
-    // .text:06274100: `MOV ECX,0xc; MOV EDI,this; REP MOVSD` -- 12 dwords, no self-check.
+    // .text:06274100: 12 dwords, no self-check.
     std::memcpy(this, &Other, sizeof(GSplinePath));
     return *this;
 }
@@ -38,12 +34,8 @@ GSplinePath& GSplinePath::operator=(GSplinePath const& Other)
 // Personality nested structs
 // ============================================================================
 
-// RE NOTE (2026-09-05): every sub-struct below was rebuilt byte-for-byte from
-// the real retail default ctors in Common.dll.c (see common_pub.h for the
-// full methodology note and per-struct addresses). Each ctor here writes the
-// exact retail hex constant at each offset; operator= is a raw memberwise
-// copy (equivalent to retail's dword-copy loops, since every one of these
-// structs is a plain-old-data value type with no pointers).
+// The default values are retail's default ctors (per-struct addresses in common_pub.h);
+// operator= is a raw copy, as retail's dword-copy loops (all plain data, no pointers).
 
 Personality::EvadeDodgeUseStruct::EvadeDodgeUseStruct()
     : EvadeActivateRange(500.0f)
@@ -216,7 +208,7 @@ Personality::RepairUseStruct::RepairUseStruct()
 
 Personality::RepairUseStruct& Personality::RepairUseStruct::operator=(RepairUseStruct const& Other)
 {
-    // 06263b40 (ICF-shared with MarshalBuffer::operator=): REP MOVSD of 6 dwords, no self test.
+    // FUN_06263b40 (ICF-shared with MarshalBuffer::operator=), no self test.
     UseShieldRepairPreDelay = Other.UseShieldRepairPreDelay;
     UseShieldRepairAtDamagePercent = Other.UseShieldRepairAtDamagePercent;
     UseShieldRepairPostDelay = Other.UseShieldRepairPostDelay;
@@ -441,8 +433,8 @@ Personality::Personality()
 {
 }
 
-// No user copy constructor: retail exports none (see common_pub.h); the
-// implicit one is the same bitwise copy this file used to spell out by hand.
+// No user copy constructor: retail exports none (see common_pub.h); the implicit one is the
+// same bitwise copy.
 
 Personality& Personality::operator=(Personality const& Other)
 {
@@ -452,7 +444,7 @@ Personality& Personality::operator=(Personality const& Other)
 
 float Personality::get_toughness_ratio(TOUGHNESS_TYPE Type)
 {
-    // Common.dll.c 0x48780 — a hardcoded switch, not a table lookup.
+    // RVA 0x48780: a hardcoded switch, not a table lookup.
     switch (Type)
     {
     case ToughnessDefault: return 0.15f;
@@ -466,8 +458,8 @@ float Personality::get_toughness_ratio(TOUGHNESS_TYPE Type)
 
 double Personality::get_range_threshold_value()
 {
-    // .text:062a87e0: FLD float 5000.0 (DAT_0639e0c8), then for JobParams.Field_00 == 1 /
-    // == 2 FMUL double 2/3 (DAT_0639e0f0) / 1/3 (DAT_0639e0e8), returned unrounded in ST0.
+    // .text:062a87e0: 5000.0f (DAT_0639e0c8) times the doubles 2/3 (DAT_0639e0f0) / 1/3
+    // (DAT_0639e0e8), returned unrounded.
     double const Base = 5000.0f;
     if (JobParams.Field_00 == 1)
         return Base * 0.66666666666666663;
@@ -960,11 +952,8 @@ bool DirectiveGuideOp::validate()
 // ============================================================================
 // Parameter structs
 // ============================================================================
-//
-// RE NOTE (2026-09-05): SetFlagParams and SetZoneBehaviorParams did not
-// derive from BaseOp in the previous port despite their real copy ctors
-// (Common.dll.c 0x48DA0 / 0x48D10) showing the same BaseOp::_vftable_-then-
-// own-vtable patch pattern as every other class here. See common_pub.h.
+// SetFlagParams and SetZoneBehaviorParams derive from BaseOp too: their copy ctors
+// (RVA 0x48DA0 / 0x48D10) patch BaseOp's vftable, then their own. See common_pub.h.
 
 SetFlagParams::SetFlagParams()
     : BaseOp(OpType_SetFlagParams)
@@ -1005,7 +994,7 @@ SetPersonalityParams::SetPersonalityParams(SetPersonalityParams const& Other)
 
 bool SetPersonalityParams::validate()
 {
-    // Common.dll.c 0x7ad50 — checks StateGraphId against its -1 default sentinel.
+    // RVA 0x7ad50
     return StateGraphId != -1;
 }
 
@@ -1036,9 +1025,7 @@ SetZoneBehaviorParams::SetZoneBehaviorParams(SetZoneBehaviorParams const& Other)
 
 bool SetZoneBehaviorParams::validate()
 {
-    // .text:062dad90. Radius: `TEST AH,0x44; JP` continues on not-equal and on NaN.
-    // TargetPoint: ((x*x + y*y) + z*z) on the FPU stack, `TEST AH,0x41; JNZ` -> false
-    // unless the sum is greater than 0 (NaN -> false).
+    // .text:062dad90. A NaN radius passes; a NaN target sum fails.
     if (InvertMode != 2)
     {
         if (Radius == 0.0f)

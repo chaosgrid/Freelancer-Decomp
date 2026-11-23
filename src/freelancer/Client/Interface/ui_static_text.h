@@ -8,15 +8,10 @@
 
 // UIStaticText -- PAGE_*.txt caption widget (RTTI .?AUUIStaticText@@ : StaticText : TextWin :
 // Win3D). StaticText has no vftable of its own (nothing but UIStaticText derives from it), so
-// the port hangs UiStaticText directly on TextWin. UIStaticText's vftable 0x005e5a64 overrides
-// TextWin 0x005d54cc in:
-//   slot 0  FUN_0059cda0  scalar deleting destructor
-//   slot 8  LAB_00599b70  SetTransform
-//   slot 9  FUN_00599ac0  Create
-//   slot 13 0x00599ce0    draw: debug frame (dead -- DAT_0067dbc4 has no writer), then
-//                         JMP TextWin draw FUN_005a1d40 (the port inherits TextWin::Draw)
-// Size 0xf4 (operator_new in WINFACTORY<UIStaticText>::Create FUN_0059c3d0, which inlines the
-// Win3D + TextWin constructors). UIStaticText's own fields: +0xec / +0xf0.
+// the port hangs UiStaticText directly on TextWin. vftable 0x005e5a64 overrides TextWin's slots
+// 0 (FUN_0059cda0), 8, 9 and 13; slot 13 (0x00599ce0) is a dead debug frame (DAT_0067dbc4 has no
+// writer) before TextWin's Draw, so the port inherits TextWin::Draw.
+// Size 0xf4 (WINFACTORY<UIStaticText> Create FUN_0059c3d0). Own fields: +0xec / +0xf0.
 
 #include "Interface/text_win.h"
 

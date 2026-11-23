@@ -13,8 +13,7 @@
 
 namespace SubObjectID
 {
-    // Common.dll.c 0xd4550: retail starts collision-group IDs at 3 (0/1/2 are
-    // reserved -- see IsArchGroupID/IsEquipID/IsShieldEquipID ranges below).
+    // FUN_06334550. Collision-group ids start at 3 (0/1/2 are reserved).
     CollGroupIdMaker::CollGroupIdMaker()
         : NextId(3)
     {
@@ -22,20 +21,18 @@ namespace SubObjectID
 
     unsigned short CollGroupIdMaker::CreateGroupID()
     {
-        // Common.dll.c 0xd4560 [ICF-folded with CreateEquipID/CreateShieldID]:
-        // `INC word ptr [this]; MOV AX,word ptr [this]` -- pre-increment, not post.
+        // FUN_06334560, ICF-folded with CreateEquipID/CreateShieldID. Pre-increment.
         ++NextId;
         return NextId;
     }
 
     void CollGroupIdMaker::Reset()
     {
-        // Common.dll.c 0xd4570: `MOV word ptr [this],0x3`.
+        // FUN_06334570
         NextId = 3;
     }
 
-    // Common.dll.c 0xd4580: retail starts equipment IDs at 0x21 (33) -- matches
-    // SubObjectID::IsEquipID's range check ([0x21, 0xffff)).
+    // FUN_06334580
     EquipIdMaker::EquipIdMaker()
         : NextId(0x21)
     {
@@ -43,20 +40,18 @@ namespace SubObjectID
 
     unsigned short EquipIdMaker::CreateEquipID()
     {
-        // Common.dll.c 0xd4560 [ICF-folded]. Pre-increment, same shared body as
-        // CollGroupIdMaker::CreateGroupID / ShieldIdMaker::CreateShieldID.
+        // FUN_06334560 (ICF-folded, see CreateGroupID)
         ++NextId;
         return NextId;
     }
 
     void EquipIdMaker::Reset()
     {
-        // Common.dll.c 0xd4590: `MOV word ptr [this],0x21`.
+        // FUN_06334590
         NextId = 0x21;
     }
 
-    // Common.dll.c 0xd45a0: retail starts shield IDs at 0xfff0 -- matches
-    // SubObjectID::IsShieldEquipID's range check ([0xfff0, 0xffff)).
+    // FUN_063345a0
     ShieldIdMaker::ShieldIdMaker()
         : NextId(0xfff0)
     {
@@ -64,38 +59,33 @@ namespace SubObjectID
 
     unsigned short ShieldIdMaker::CreateShieldID()
     {
-        // Common.dll.c 0xd4560 [ICF-folded]. Pre-increment, same shared body as the
-        // other two CreateXID methods above.
+        // FUN_06334560 (ICF-folded, see CreateGroupID)
         ++NextId;
         return NextId;
     }
 
     void ShieldIdMaker::Reset()
     {
-        // Common.dll.c 0xd45b0: `MOV word ptr [this],0xfff0`.
+        // FUN_063345b0
         NextId = 0xfff0;
     }
 
     bool IsArchGroupID(unsigned short Id)
     {
-        // Common.dll.c 0xd44f0 (listing 06334f0): range check, NOT a bit test.
-        // True for CollGroupIdMaker's range: 3 <= Id < 0x21.
+        // FUN_063344f0. Range checks, not bit tests.
         return Id >= 3 && Id < 0x21;
     }
 
     bool IsEquipID(unsigned short Id)
     {
-        // Common.dll.c 0xd4510 (listing 06334510): range check, NOT a bit test.
-        // True for EquipIdMaker's range: 0x21 <= Id < 0xffff (this also covers the
-        // ShieldIdMaker sub-range -- retail callers check IsShieldEquipID first
-        // when they need to distinguish shields from ordinary equipment).
+        // FUN_06334510. Also covers the shield sub-range; callers test IsShieldEquipID first
+        // to tell shields apart.
         return Id >= 0x21 && Id < 0xffff;
     }
 
     bool IsShieldEquipID(unsigned short Id)
     {
-        // Common.dll.c 0xd4530 (listing 06334530): range check, NOT a bit test.
-        // True for ShieldIdMaker's range: 0xfff0 <= Id < 0xffff.
+        // FUN_06334530
         return Id >= 0xfff0 && Id < 0xffff;
     }
 }

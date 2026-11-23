@@ -8,11 +8,7 @@
 #include "ivp_mindist.h"
 
 // ============================================================================
-// FUN_0634bec0 (thiscall, RET 8). Retail's store order is +0xc, +0x8, vtable,
-// +0x10, +0x14, +0x18 (.text:0634bec8-0634bede); +0x04 is not written. The
-// vtable store is the compiler's, so the member order below is the observable
-// one: SecondFrictionXEnabled = 0, FrictionFactor = arg1, the two zeroed floats
-// and Elasticity = arg2.
+// FUN_0634bec0. +0x04 is not written.
 // ============================================================================
 IVP_Material_Simple::IVP_Material_Simple(float FrictionValue, float ElasticityValue)
 {
@@ -24,13 +20,9 @@ IVP_Material_Simple::IVP_Material_Simple(float FrictionValue, float ElasticityVa
 }
 
 // ============================================================================
-// FUN_0634be10, IVP_Material_Manager slot 0 (RET 8, both arguments unread).
-// A function-local static guarded by bit 0 of DAT_0658a9f4: on first use
-// operator_new(0x1c), FUN_0634bec0(0.5f, 0.5f) (`PUSH 0x3f000000` twice,
-// .text:0634be54-0634be60), pointer stored in DAT_0658a9f0 (null if
-// operator_new returned null, .text:0634be7b-0634be7d). No atexit is
-// registered, so the material is never freed -- a pointer static reproduces
-// that exactly.
+// FUN_0634be10, IVP_Material_Manager slot 0 (both arguments unread). A
+// function-local static (DAT_0658a9f0, guard bit 0 of DAT_0658a9f4); no atexit
+// is registered, so the material is never freed.
 // ============================================================================
 IVP_Material* IVP_Material_Manager::get_material_by_index(const IVP_U_Point* WorldPosition, int Index)
 {
@@ -41,9 +33,7 @@ IVP_Material* IVP_Material_Manager::get_material_by_index(const IVP_U_Point* Wor
 }
 
 // ============================================================================
-// LAB_0634bcf0 (RET 4). Contact+0x44 (the second side) is asked first and its
-// result spilled to a float (`FSTP float ptr [ESP+0x8]`, .text:0634bcff), then
-// Contact+0x40's slot 0 is multiplied by that float on the FPU.
+// LAB_0634bcf0. The second side (+0x44) is asked first and spilled to float.
 // ============================================================================
 float IVP_Material_Manager::get_friction_factor(IVP_Impact_Solver_Long_Term* Contact)
 {
@@ -52,8 +42,7 @@ float IVP_Material_Manager::get_friction_factor(IVP_Impact_Solver_Long_Term* Con
 }
 
 // ============================================================================
-// LAB_0634bd20 (RET 4). Same shape as slot 1 but slot 2 of each material, and
-// the first side (+0x40) is called first (.text:0634bd24-0634bd38).
+// LAB_0634bd20. As slot 1, but the first side (+0x40) is asked first.
 // ============================================================================
 float IVP_Material_Manager::get_elasticity(IVP_Impact_Solver_Long_Term* Contact)
 {
@@ -62,8 +51,7 @@ float IVP_Material_Manager::get_elasticity(IVP_Impact_Solver_Long_Term* Contact)
 }
 
 // ============================================================================
-// LAB_0634bd50 (RET 4). Slot 3 of each material, first side first, summed
-// (`FADD float ptr [ESP+0x8]`, .text:0634bd6b).
+// LAB_0634bd50. First side first, summed.
 // ============================================================================
 float IVP_Material_Manager::get_adhesion(IVP_Impact_Solver_Long_Term* Contact)
 {
@@ -72,9 +60,8 @@ float IVP_Material_Manager::get_adhesion(IVP_Impact_Solver_Long_Term* Contact)
 }
 
 // ============================================================================
-// LAB_0634bda0 (RET 4). `MOV EAX,[ECX+4]; TEST; JZ; TEST ECX,ECX; JZ;
-// CALL [vtable+0x10](1)` -- the scalar deleting destructor, slot 4. The
-// `this != null` test is the compiler's delete-expression check.
+// LAB_0634bda0. Deletes through slot 4; retail's `this != null` test is the
+// delete expression's own.
 // ============================================================================
 void IVP_Material_Manager::environment_will_be_deleted(IVP_Environment* Environment)
 {

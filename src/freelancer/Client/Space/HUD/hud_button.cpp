@@ -41,8 +41,7 @@ namespace
 
 WinButton::WinButton()
 {
-    // 0x004c8d84: FUN_004b5150 on +0xac (identity rotation, zero translation), the vptr, then
-    // the fields.
+    // Inlined in FUN_004c8d40; the rest pose starts at identity (FUN_004b5150).
     memset(&RestPose, 0, sizeof(RestPose));
     RestPose.Rotation.D[2][2] = 1.0f;
     RestPose.Rotation.D[1][1] = 1.0f;
@@ -84,7 +83,7 @@ bool WinButtonProjectedRect(FClientMeshHolder* Holder, float* OutRect4)
 
 bool WinButton::HitTest(float const* Ray)
 {
-    // FUN_0059f2e0 (RET 4).
+    // FUN_0059f2e0.
     (void)Ray;
     float Rect[4];
     if (!WinButtonProjectedRect(&MeshHolder, Rect))
@@ -96,7 +95,7 @@ bool WinButton::HitTest(float const* Ray)
     GetClientSoftwareCursor(&CursorX, &CursorY, &CursorZ);
     float const Y = static_cast<float>(CursorY);
     float const X = static_cast<float>(CursorX);
-    // TEST AH,1 / JNZ rejects "below or unordered", TEST AH,0x41 / JP "above or unordered".
+    // Edges included; NaN rejects.
     if (!(X >= Rect[0]))
         return false;
     if (!(X <= Rect[2]))
@@ -123,8 +122,7 @@ void WinButton::SetPosition(float const* NewPosition)
 
 void WinButton::SetOrientation(float const* NewOrientation)
 {
-    // LAB_004c92e0: nine dwords into +0x3c, then +0x3c .. +0x6b (orientation and position) into
-    // the rest pose.
+    // LAB_004c92e0: the orientation, then the live orientation and position into the rest pose.
     memcpy(Orientation, NewOrientation, 9 * sizeof(float));
     memcpy(&RestPose, Orientation, 12 * sizeof(float));
     HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
@@ -142,7 +140,7 @@ void WinButton::Update()
     // FUN_0059f360.
     double const Dt = GetClientFrameTimeCapped();
 
-    // 0x0059f36d: only a positive speed moves the angle.
+    // Only a positive speed moves the angle.
     if (SpinSpeed > 0.0f)
     {
         double const Delta = Dt * SpinSpeed;
@@ -172,15 +170,14 @@ void WinButton::Update()
         }
     }
 
-    // 0x0059f3ff: wrap into (-360, 360). TEST AH,1 / JNZ sends "below 360 or unordered" to the
-    // second test, whose TEST AH,0x41 / JP skips "above -360 or unordered".
+    // Wrap into (-360, 360); NaN is left alone.
     if (SpinAngle >= 360.0f)
         SpinAngle = static_cast<float>(static_cast<double>(SpinAngle) - 360.0);
     else if (SpinAngle <= -360.0f)
         SpinAngle = static_cast<float>(static_cast<double>(SpinAngle) + 360.0);
 
-    // 0x0059f43f .. 0x0059f4da: the rest orientation times RotateMatrix((0, angle, 0)) through
-    // the 3DMathEngine (slot +0x20), with the rest translation, into +0x3c and the instance.
+    // The rest orientation times RotateMatrix((0, angle, 0)), with the rest translation, into
+    // the live transform and the instance.
     Vector Angles;
     Angles.x = 0.0f;
     Angles.y = SpinAngle;
@@ -196,7 +193,7 @@ void WinButton::Update()
     memcpy(Orientation, &Live, 12 * sizeof(float));
     HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
 
-    // 0x0059f4df: the Win3D child walk (FUN_005a17b0 inlined).
+    // The Win3D child walk (FUN_005a17b0 inlined).
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
@@ -219,10 +216,8 @@ void WinButton::Draw()
 
     if ((Flags & kWin3DVisible) != 0)
     {
-        // 0x0059f546: FUN_0059efa0(camera, 0, 1.0f, 0) on the holder.
         SubmitWin3DEngineInstance(&MeshHolder, Win3DGetCamera(), 0, 1.0f, 0);
-        // 0x0059f54b: with bit 0 of +0xa4 the tinted pass, FUN_00434630(camera, instance, 1,
-        // &tint, 1, 1.0f, 0).
+        // With bit 0 of +0xa4 the tinted pass (FUN_00434630).
         if ((DrawFlags & 1) != 0)
         {
             SubmitWin3DTintedEngineInstanceWrapped(Win3DGetCamera(), MeshHolder.EngineInstance, 1,
@@ -230,20 +225,19 @@ void WinButton::Draw()
         }
     }
 
-    // 0x0059f57a: JMP FUN_0059e5c0 when there are children.
     if (ChildHead != nullptr)
         Win3DDrawChildren(this);
 }
 
 void WinButton::MouseOver(float const* Ray)
 {
-    // FUN_004c9380: vt+0x10 (slot 4) with the ray, the result into +0xdc.
+    // FUN_004c9380.
     bHover = HitTest(Ray) ? 1 : 0;
 }
 
 void WinButton::MouseLeave(float const* Ray)
 {
-    // LAB_004c93a0 (RET 4).
+    // LAB_004c93a0.
     (void)Ray;
     bHover = 0;
 }
@@ -287,13 +281,11 @@ HUD_Button::HUD_Button(INI_Reader& Reader)
         }
         else if (Reader.is_value("object"))
         {
-            // 0x004c8f6b: FUN_0059f1c0(0, path, 0).
             LoadMeshAndCreate(nullptr, Reader.get_value_string(), 0);
         }
         else if (Reader.is_value("object_pos"))
         {
-            // 0x004c8f93: values 1, 0, 2 read in that order; the point goes to +0x60 and to the
-            // rest translation, then FUN_004c92b0 with the rest pose.
+            // Values 1, 0, 2 read in that order.
             float const Y = Reader.get_value_float(1);
             float const X = Reader.get_value_float(0);
             float const Z = Reader.get_value_float(2);
@@ -329,19 +321,19 @@ void HUD_Button::Update()
     Flags = static_cast<unsigned char>((Flags & ~kWin3DVisible) | (bVisible ? kWin3DVisible : 0));
     if (bHover != 0)
         HUDItem::ShowToolTip(); // FUN_004c81d0 on +0xf4
-    WinButton::Update();        // JMP FUN_0059f360
+    WinButton::Update();        // tail call FUN_0059f360
 }
 
 void HUD_Button::Draw()
 {
-    // LAB_004c93b0: FUN_00421ed0(0xb71), then JMP FUN_0059f510.
+    // LAB_004c93b0: depth test off, then a tail call of FUN_0059f510.
     Win3DDisable(kWin3DDepthTest);
     WinButton::Draw();
 }
 
 bool HUD_Button::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_004c9430 (RET 4): a click (-1, 2) posts the command record through FUN_0054bcb0.
+    // LAB_004c9430: a click (-1, 2) posts the command record through FUN_0054bcb0.
     if (Event->Field0 != -1)
         return false;
     if (Event->Field1 != 2)

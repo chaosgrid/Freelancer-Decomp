@@ -7,7 +7,7 @@
 #pragma once
 
 // Retail Client\Space\HUD_Target_Base.cpp -- HUD_Target_Base, the common base of the target
-// panel (HUD_Target, FUN_004e08b0) and the player-status panel (HUD_Status, W3-D). It owns a
+// panel (HUD_Target, FUN_004e08b0) and the player-status panel (HUD_Status). It owns a
 // private 3D view of one object (a GameCamera at +0x3b8 looking at a wireframe part cache of the
 // object at +0x3a0), a slide-out animation (ButtonMover) and the sub-target pick / tool tip under
 // the mouse.
@@ -55,8 +55,8 @@ struct CSimple;
 // -------------------------------------------------------------------------------------------
 // FHudInstanceBounds -- the object-space AABB of an engine instance hierarchy, each part taken
 // as the sphere IEngine::GetInstanceExtent reports, moved into the frame of Xform.
-// Retail: a 0x18-byte stack object {Max @0x00, Min @0x0c}; ctor FUN_004e65d0 (thiscall, RET 0xc).
-// FUN_004e6880 and FUN_004e69c0 are also called from FUN_00585380 (0x00585434 / 0x005854ca).
+// Retail: a 0x18-byte stack object. FUN_004e6880 and FUN_004e69c0 are also called from
+// ShipViewControl::SetInstance (FUN_00585380).
 // -------------------------------------------------------------------------------------------
 struct FHudInstanceBounds
 {
@@ -68,28 +68,28 @@ struct FHudInstanceBounds
     // child is folded in by ExpandChildren (the loop body is the same code as FUN_004e69c0).
     FHudInstanceBounds(void* Instance, FTransform const* Xform, bool bIncludeShieldParts);
 
-    // No retail ctor: ShipViewControl::SetInstance (FUN_00585380) fills Max / Min on its own
-    // stack (0x00585459..0x005854c6) and then calls ExpandChildren on it.
+    // No retail ctor: ShipViewControl::SetInstance fills Max / Min on its own stack and then
+    // calls ExpandChildren on it.
     FHudInstanceBounds() = default;
 
-    // FUN_004e6580 (thiscall, RET 4) -- *Out = (Max + Min) * 0.5; returns Out.
+    // FUN_004e6580 -- *Out = (Max + Min) * 0.5; returns Out.
     FVector* GetCenter(FVector* Out) const;
 
-    // FUN_004e69c0 (thiscall, RET 0xc) -- for each child of Instance: unless bIncludeShieldParts,
+    // FUN_004e69c0 -- for each child of Instance: unless bIncludeShieldParts,
     // skip a shield part (CObject::is_shield_part of the instance's user-data object); otherwise
     // grow Min / Max by the child's sphere and recurse into it.
     void ExpandChildren(void* Instance, FTransform const* Xform, bool bIncludeShieldParts);
 
-    // FUN_004e68d0 (thiscall, RET 8) -- the part's extent radius; OutCenter = its extent centre
-    // moved to world space through the instance transform.
+    // FUN_004e68d0 -- the part's extent radius; OutCenter = its extent centre moved to world
+    // space through the instance transform.
     float GetPartSphere(void* Instance, FVector* OutCenter) const;
 
-    // FUN_004e6960 (thiscall, RET 4) -- UserData(Instance)->is_shield_part(inst_to_part(Instance))
-    // with both CObject lookups inlined.
+    // FUN_004e6960 -- UserData(Instance)->is_shield_part(inst_to_part(Instance)) with both
+    // CObject lookups inlined.
     bool IsShieldPart(void* Instance) const;
 };
 
-// FUN_004e6880 (thiscall on the transform, RET 8) -- *Out = InverseTransform(Xform, In); returns Out.
+// FUN_004e6880 (thiscall on the transform) -- *Out = InverseTransform(Xform, In); returns Out.
 FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In);
 
 // -------------------------------------------------------------------------------------------
@@ -111,14 +111,13 @@ struct FHudSpherePick
     FVector HitPoint;           // +0x5c  ray point of the best hit
     FVector HitSurface;         // +0x68  sphere point of the best hit
 
-    // FUN_00422ba0 (thiscall, RET 4) -- +0x54 = 0, +0x58 = 0, +0x50 = -1, +0x4c = Flag.
+    // FUN_00422ba0
     explicit FHudSpherePick(unsigned char Flag);
 
-    // FUN_00422bc0 (thiscall, RET 8) -- Origin = From, Dir = normalize(To - From), +0x18 = -1.0f,
-    // HitCount = 0, +0x50 = -1, BestKey = 0.
+    // FUN_00422bc0 -- Origin = From, Dir = normalize(To - From), the rest reset.
     void Setup(FVector const* From, FVector const* To);
 
-    // FUN_00422e30 (thiscall, recursive, RET 8) -- children first (any hit makes the result
+    // FUN_00422e30 (recursive) -- children first (any hit makes the result
     // true), then this instance: extent flag 1 sphere, FUN_00422c70; accepted when the cosine
     // is above 0.5, the ray-to-sphere gap is <= Slack and (no hit yet or -cosine < BestKey).
     bool Test(void* Instance, float Slack);
@@ -146,46 +145,43 @@ unsigned HudCollisionGroupTypeIds(unsigned CollisionGroupType);
 // health: < 0.25 the HUD chrome (DAT_00679bb4); < 0.5 bytes {ff, 80, 40, ff}; <= 0.75 bytes
 // {ff, 40, 40, ff}; above that a red that follows the UI pulse: t = FUN_0059d570, flipped to
 // 1 - t while FUN_0059d560 is set, bytes {R, G, G, ff} with R = ftol(255 * t) and
-// G = ftol(R * t). Callers: 0x004e6d58 (ColourGroupParts), 0x004e6f82 (ColourEquipParts).
+// G = ftol(R * t). Callers: ColourGroupParts, ColourEquipParts.
 unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage);
 
 // FUN_004c71b0 (cdecl, returns Out4) -- the screen rectangle of two points through the Win3D
 // camera (DAT_0067dbf8) slot 0x34 Project: A gives left / top, B right / bottom, each
 // truncated with ftol. A failed projection writes nothing, so that pair keeps whatever the
-// four scratch dwords held (see .cpp). Callers: HudTargetBase::SetupViewCamera 0x004e7166 and
-// 0x004cc1c9.
+// four scratch dwords held (see .cpp). Callers: HudTargetBase::SetupViewCamera and 0x004cc1c9.
 int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B);
 
-// FUN_004e7090 (thiscall on Xform, RET 8, returns Out) -- Out = TransformXform(Xform, In) through
-// the HUD_Target_Base math engine DAT_00674b1c. 29 call sites: 0x004e7360 (SetupViewCamera),
-// the beam effect 0x004fa3c0..0x004fb4ae (beam_effect.cpp, 4 + 9 sites), 0x004ff642..0x004ffc9a, 0x00513e01,
-// 0x0051541a, 0x00516178, 0x005807cb..0x00580f9f, 0x00585409, 0x00596db9.
+// FUN_004e7090 (thiscall on Xform, returns Out) -- Out = TransformXform(Xform, In) through the
+// HUD_Target_Base math engine DAT_00674b1c. 29 retail call sites, among them SetupViewCamera
+// and the beam effect (beam_effect.cpp).
 FVector* HudTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In);
 
 // FUN_00543320 (thiscall on the IObjRW, no arguments) -- the CShip behind an IObjRW: null ObjRw,
 // a null IObjInspectImpl CBase (ObjRw + 0xc), a null CBase::Object or a class that is not a ship
-// (& 0x503 != 0x503) gives null. Callers: HUD_Target 0x004e2aa5 / 0x004e2c6d / 0x004e3bfa.
+// (& 0x503 != 0x503) gives null. Callers: HUD_Target.
 CShip* HudShipOfObjRw(IObjRW* ObjRw);
 
 // FUN_0045a4e0 (cdecl) -- the reputation colour of Other as the player sees it, into *OutArgb:
 // white (DAT_00679b84) without both objects; purple (DAT_00679b9c) when Other's client gameobj
 // has byte +0x18c bit 2; pink (DAT_00679b88) for a player ship in the player's group (CShip
 // +0x1b4); else by Other's attitude towards Player: <= -0.6 red (DAT_00679ba8), >= 0.6 green
-// (DAT_00679bac), otherwise -- or when the query fails -- white. Callers: HUD_Target
-// 0x004e2378 / 0x004e476e, HUD_ContactList 0x004d2875 / 0x004d3a97, 0x004ec0fd, 0x004eef2d.
+// (DAT_00679bac), otherwise -- or when the query fails -- white. Callers: HUD_Target,
+// HUD_ContactList, 0x004ec0fd, 0x004eef2d.
 void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other);
 
 // FUN_0045a6e0 (cdecl) -- the band of a reputation Attitude: 0 at or below -0.6, 1 at or below
-// -0.2, 4 at or above 0.6, 3 above 0.2, otherwise 2. Sole retail caller 0x004a830a
-// (NN_PlayerInfo's Draw, NnPlayerInfo::Draw in nn_player_info.cpp).
+// -0.2, 4 at or above 0.6, 3 above 0.2, otherwise 2. Sole retail caller NnPlayerInfo::Draw
+// (nn_player_info.cpp).
 int HudReputationBand(float Attitude);
 
 // FUN_004d4c70 (cdecl) -- true for a solar the player has not visited. False when the object's
 // client gameobj (FUN_005416c0 on +0xb0) is watch-listed (+0xa8) with get_type & 0x107ffdff,
 // or when the object is not a solar ((class & 0x303) != 0x303); otherwise true unless bit 0 is
-// set in CSolar::GetVisitValue | the visit-map flags (FUN_004c4da0). Callers: HUD_ContactList
-// (0x004d11da..0x004d360a), HUD_Target 0x004e4094 / 0x004e439a, 0x004ecb73, 0x004ece71,
-// 0x004efe0e.
+// set in CSolar::GetVisitValue | the visit-map flags (FUN_004c4da0). Callers: HUD_ContactList,
+// HUD_Target, 0x004ecb73, 0x004ece71, 0x004efe0e.
 bool HudIsUnvisitedSolar(CSimple const* Object);
 
 // FUN_004d4d00 (cdecl) -- the visit byte of an object: 1 for null or a non-solar; for a solar,
@@ -195,42 +191,38 @@ unsigned char HudObjectVisitFlags(CObject const* Object);
 
 // FUN_004d4d50 (cdecl) -- the type caption ids of a CSimple from TypeBits (+0xe0), first match:
 // bit 0 -> 0x4a0, bit 1 -> 0x4a1, bit 2 -> 0x4a2, 0x8010 -> 0x4a3, 0x40 -> 0x4a4, 0x80 -> 0x4a5,
-// 0x100 -> 0x4a6, none -> 0x4a7. Callers: 0x004755d4, 0x004d3617, HUD_Target 0x004e40af /
-// 0x004e43a7, 0x004ecb86, 0x004ece7e, 0x004efecd.
+// 0x100 -> 0x4a6, none -> 0x4a7. Callers: HUD_Target and five other retail sites.
 unsigned HudObjectTypeIds(CSimple const* Object);
 
 // FHudWideText (the two-word heap wide string, FUN_004142a0 / FUN_00414280 / FUN_00444e20) is
 // declared in font_string.h.
 
 // DAT_00674b6c -- the 3DMathEngine HUD_Target_Base.cpp / HUD_Targetable_Objects.cpp share,
-// FUN_005b73e0 on first use at every site (0x004e8d7b, 0x004ecfe6, 0x004ef318, 0x004ef7af,
-// 0x004f063d, 0x004f06c2, 0x004f0bbc, 0x004f0c36, 0x004f1372).
+// fetched with FUN_005b73e0 on first use at every site.
 extern I3DMathEngine* G_HudObjectsMath;
 
 // FUN_005472a0 (cdecl; retail Client\space\ship.cpp) -- the ids_name of an object: 0 for null;
 // a ship ((class & 0x503) == 0x503) reads Archetype (+0x88) -> ids_name (+0x14) with no null
-// test; anything else tail-calls CSimple::get_name (vt+0x88). Callers: 0x00475676, 0x004cb90b,
-// 0x004d310f, 0x004d36a6, 0x004d3714, HUD_Target 0x004e44b9, 0x004e8131, 0x004e8742,
-// 0x004ecbf1, 0x004eced5.
+// test; anything else tail-calls CSimple::get_name (vt+0x88). Callers include HUD_Target and
+// HudBuildObjectCaption.
 unsigned GetObjectIdsName(CObject const* Object);
 
 // FUN_005472d0 (cdecl; retail Client\space\ship.cpp) -- Out = "" (DAT_005c8ce0), then for a
 // ship ((class & 0x503) == 0x503) the pilot name (CShip::get_pilot_name) when there is one, or
-// Out cleared when there is none. Returns wcslen(Out->Text), 0 without a buffer. Callers:
-// 0x004756f8, 0x0048ab1f, 0x004cb85f, HUD_Target 0x004e4400.
+// Out cleared when there is none. Returns wcslen(Out->Text), 0 without a buffer. Callers
+// include HUD_Target.
 unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out);
 
 // FUN_0048dc10 (cdecl; retail NavMap) -- the nav-map sector of Pos into Out: the system's
 // NavMapScale (ISystem slot 20, 1.0 without a system) scales Pos; row = bands of 33333 from
 // -99999 over z * scale + 2700, column = the same over x * scale (0..8 each); ids 0x515 + row
 // and 0x506 + column (0x10 chars) formatted into ids 0x54d (0x40 chars). Out has no bound.
-// Callers: 0x0047522c, 0x0049f89c, 0x004e8990, 0x004e8cbf.
 void NavMapSectorName(Vector const* Pos, wchar_t* Out);
 
 // FUN_004e8060 (cdecl) -- the object-kind ids of TypeBits, first match: 1 -> 0x563, 2 -> 0x44b,
 // 4 -> 0x564, 8 -> 0x565, 0x8010 -> 0x566, 0x20 -> 0x567, 0x40 -> 0x568, 0x80 -> 0x4fa,
 // 0x100 -> 0x44c, 0x200 -> 0x442, 0x400 -> 0x56a, 0x800 -> 0x56b, 0x1000 -> 0x56c,
-// 0x2000 -> 0x56d, none -> 0. Caller: 0x004e8685.
+// 0x2000 -> 0x56d, none -> 0. Caller: HudBuildObjectCaption.
 unsigned HudObjectKindIds(unsigned TypeBits);
 
 // FUN_004e8d30 (cdecl) -- "A->B" for a trade-lane ring: walk PrevRing (+0x1d8) and NextRing
@@ -238,7 +230,7 @@ unsigned HudObjectKindIds(unsigned TypeBits);
 // CSolar::get_tradelane_space_name; the order follows the player's side of the ring's plane
 // (its -z axis through TransformMatrix, normalised: player . n - ring . n > 0 swaps them).
 // False (Out untouched or half written, as in retail) for a non-solar, no player, a broken
-// chain, a missing name or text that would not fit in Capacity. Caller: 0x004e884a.
+// chain, a missing name or text that would not fit in Capacity. Caller: HudBuildObjectCaption.
 bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity);
 
 // FUN_004e8100 (cdecl) -- the caption of an object into Out. Mode 0: the name line; 1: the
@@ -248,15 +240,14 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity);
 // DAT_00674b84), the object-kind ids or the ids_name, plus " (%d)" for a loot stack; the
 // location is the trade-lane "A->B", the ids_name for TypeBits & 0x8c0, or the system name,
 // ids 0x561 and the nav-map sector. Built in G_NnTextScratchB (DAT_0066fc60) with
-// G_NnTextScratchA (DAT_0066dc60) as scratch. Callers: 0x004d3684, HUD_Status 0x004db4b2,
-// HUD_Target 0x004e42a0 / 0x004e434a, 0x004ecbd4, 0x004ecebe, 0x004efea8.
+// G_NnTextScratchA (DAT_0066dc60) as scratch. Callers include HUD_ContactList, HUD_Status and
+// HUD_Target.
 bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                            bool bFactionShortName);
 
-// DAT_00674b00 -- set once a trade request went to the server (0x004e2d39), cleared when the
-// request is withdrawn (0x004e2901, 0x004e49b0) and by the IClient trade handlers LAB_005a6070
-// (0x005a60f0, client_exports.cpp) and FUN_005a6200 (0x005a6238). Defined in
-// hud_target_panel.cpp.
+// DAT_00674b00 -- set once a trade request went to the server, cleared when the request is
+// withdrawn and by the IClient trade handlers LAB_005a6070 (client_exports.cpp) and
+// FUN_005a6200. Defined in hud_target_panel.cpp.
 extern unsigned char G_bTradeRequested;
 
 // -------------------------------------------------------------------------------------------
@@ -265,25 +256,22 @@ extern unsigned char G_bTradeRequested;
 class HudTargetBase : public HUDItem, public WinControl, public ButtonMover, public EventHandler
 {
 public:
-    // FUN_004e6020 -- HUDItem (inlined, empty name), WinControl FUN_0059f860, ButtonMover
-    // FUN_0055dec0, the handler vptr, +0x398 watcher zeroed, FPartCache FUN_00405890 (zeroed),
-    // FGameCamera FUN_0051b2f0, SubTargetId = SUBOBJ_ID_NONE, bExpanded = 0, ViewPanel = 0,
-    // bSubTargetPickEnabled = 0. +0x388..+0x397, +0x4b4..+0x4cb and +0x4d4.. are left to the
-    // derived constructors.
+    // FUN_004e6020. +0x388..+0x397, +0x4b4..+0x4cb and +0x4d4.. are left to the derived
+    // constructors.
     HudTargetBase();
     // FUN_004da630
     ~HudTargetBase() override;
 
     // --- HUDItem face, new slots 11..16 ---
-    // slot 11 (+0x2c) LAB_004e6270 (RET 4) -- point the 3D view at Target's client object and
+    // slot 11 (+0x2c) LAB_004e6270 -- point the 3D view at Target's client object and
     // rebuild the wireframe part cache (see .cpp).
     virtual void SetViewObject(IObjRW* Target);
-    // slot 12 (+0x30) FUN_00401e90 -- RET. SetProperty(0x26, ToggleButton) calls it; HUD_Target
-    // FUN_004e2fe0 starts the slide-out there.
+    // slot 12 (+0x30) FUN_00401e90 (empty) -- SetProperty(0x26, ToggleButton) calls it;
+    // HUD_Target starts the slide-out there.
     virtual void ToggleExpanded();
-    // slot 13 (+0x34) FUN_0053e4a0 -- RET 4. OnMoveFinished passes 0; HUD_Target FUN_004e1930
-    // hands the byte to SetProperty(1, bHide, 0) of its panel controls -- WinControl property 1
-    // hides on A == 1 (wincontrol_base.cpp), so the byte is "hide".
+    // slot 13 (+0x34) FUN_0053e4a0 (empty) -- OnMoveFinished passes 0; HUD_Target hands the
+    // byte to SetProperty(1, bHide, 0) of its panel controls -- WinControl property 1 hides on
+    // A == 1 (wincontrol_base.cpp), so the byte is "hide".
     virtual void HideExpandedControls(bool bHide);
     // slot 14 (+0x38) FUN_00401e90 -- Draw calls it right after drawing ViewPanel.
     virtual void DrawViewObject();
@@ -293,22 +281,22 @@ public:
     virtual void OnViewObjectChanged();
 
     // --- WinControl face ---
-    // LAB_004e7d20 (RET 4)
+    // LAB_004e7d20
     bool HitTest(float const* Ray) override;
     // FUN_004e7980
     void Update() override;
     // FUN_004e7890
     void Draw() override;
-    // FUN_004e7950 (RET 0xc)
+    // FUN_004e7950
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     // --- ButtonMover face ---
     // FUN_004e79b0
     void OnMoveFinished() override;
 
-    // FUN_004e7e20 (thiscall, RET 4) -- the equipment SubId of the HUDItem target (+0x28) when
-    // SubId is not SUBOBJ_ID_NONE and the target's CObject is a ship (class & 0x503 == 0x503):
-    // a tail jump into CEquipManager::FindByID. Otherwise null. Caller: HUD_Status 0x004db93d.
+    // FUN_004e7e20 -- the equipment SubId of the HUDItem target (+0x28) when SubId is not
+    // SUBOBJ_ID_NONE and the target's CObject is a ship (class & 0x503 == 0x503), via
+    // CEquipManager::FindByID. Otherwise null. Caller: HUD_Status.
     CEquip* FindTargetEquip(unsigned short SubId);
 
 protected:
@@ -316,19 +304,19 @@ protected:
     // recursion), then every attached equipment root (mask 0x1fe0, with recursion).
     void HideGroupAndEquipParts();
 
-    // FUN_004e70e0 (thiscall, RET 8) -- point ViewCamera (+0x3b8) at the viewed object for the
+    // FUN_004e70e0 -- point ViewCamera (+0x3b8) at the viewed object for the
     // target view: the viewport is the hit box (+0x4b4 +- the half extents) projected through
     // the Win3D camera, shifted ScreenShift screen widths and inset by an eighth; half fov x 35;
     // the camera stands ViewRadius * 1.1 / tan(35) from the object's centre, either along the
     // player-ship -> object direction (GetDirectionMatrix; four times as far for loot) or, with
     // bFixedOrbit, along the object's own z axis turned -90 degrees about x. Then
     // Win3DSetViewport, the perspective, and bSubTargetPickEnabled = 1. Caller: HUD_Target
-    // DrawViewObject 0x004e3d0f (GetGameOption(0xc) != 0, -0.0125f).
+    // DrawViewObject (GetGameOption(0xc) != 0, -0.0125f).
     void SetupViewCamera(bool bFixedOrbit, float ScreenShift);
 
     // FUN_004e7070 -- recolour the part cache for the damage view: clear the active flag of the
-    // hidden non-root parts (FUN_004059d0), then the collision groups (FUN_004e6cb0) and the
-    // equipment (FUN_004e6ec0, tail jump). Caller: HUD_Target DrawViewObject 0x004e3e73.
+    // hidden non-root parts (FUN_004059d0), then the collision groups and the equipment.
+    // Caller: HUD_Target DrawViewObject.
     void ColourViewParts();
 
     // FUN_004e6cb0 -- for a CEqObj view: every collision group root re-activated (no recursion)
@@ -345,12 +333,12 @@ protected:
     // FUN_004e75b0 -- mouse-over sub-target of the viewed object -> SubTargetId and the ToolTip.
     void UpdateSubTargetToolTip();
 
-    // FUN_004e79f0 (thiscall, RET 0x10) -- ids_name of the part under screen point (X, Y);
-    // *OutSubId / *OutCount describe it (see .cpp).
+    // FUN_004e79f0 -- ids_name of the part under screen point (X, Y); *OutSubId / *OutCount
+    // describe it (see .cpp).
     unsigned PickSubTarget(int X, int Y, unsigned short* OutSubId, int* OutCount);
 
-    // The CObject the +0x398 watcher views: the inlined `watched - 8, IObjInspectImpl::CBase
-    // +4` chain of 0x004e6166.. / 0x004e7a20.. (null anywhere along it -> null).
+    // The CObject the +0x398 watcher views: retail inlines the `watched - 8, IObjInspectImpl::CBase
+    // +4` chain at each use (null anywhere along it -> null).
     CObject* GetViewCObject() const;
 
 public:
@@ -394,20 +382,20 @@ struct FHudSubTargetFlash
     float TickLenFrac;        // +0x1c  0.3636f
     unsigned char Color[4];   // +0x20  {0xff, 0, 0, 0xff}
 
-    // FUN_004dfbd0 (thiscall, no arguments).
+    // FUN_004dfbd0
     FHudSubTargetFlash();
 
-    // FUN_004dfc40 (thiscall, RET 8) -- a new SubId restarts the flash (Timer = Duration) and,
-    // unless it is SUBOBJ_ID_NONE, plays UI sound slot 0x18; then a positive Timer runs down by
+    // FUN_004dfc40 -- a new SubId restarts the flash (Timer = Duration) and, unless it is
+    // SUBOBJ_ID_NONE, plays UI sound slot 0x18; then a positive Timer runs down by
     // DeltaSeconds, clamped at 0.
     void Update(float DeltaSeconds, unsigned short NewSubId);
 
-    // FUN_004e04f0 (thiscall, RET 8) -- 2D overlay in Camera's viewport: ScreenPos is rounded in
-    // place, then (while flashing) two wider dimmed brackets and finally the Color bracket.
+    // FUN_004e04f0 -- 2D overlay in Camera's viewport: ScreenPos is rounded in place, then
+    // (while flashing) two wider dimmed brackets and finally the Color bracket.
     void Draw(FSpaceCamera* Camera, float* ScreenPos) const;
 
-    // FUN_004dfca0 (thiscall, RET 8) -- the bracket: 56 GL_LINES vertices round ScreenPos with
-    // half-size HalfSize (see .cpp).
+    // FUN_004dfca0 -- the bracket: 56 GL_LINES vertices round ScreenPos with half-size
+    // HalfSize (see .cpp).
     void DrawBracket(float const* ScreenPos, float HalfSize) const;
 };
 
@@ -415,7 +403,7 @@ struct FHudSubTargetFlash
 // HudTarget -- retail HUD_Target (Client\Space\HUD_Target.cpp), the [Target] section of hud.ini.
 //
 // RTTI .?AUHUD_Target@@ : HUD_Target_Base @0, ButtonScaler @0x4e0. Size 0x670.
-//   ctor FUN_004e08b0 (INI_Reader&, RET 4; the reader is not read), dtor FUN_004e0cd0
+//   ctor FUN_004e08b0 (the INI_Reader is not read), dtor FUN_004e0cd0
 //   (scalar deleting FUN_004e0bf0). Factory: the static HUDFACTORY<HUD_Target> DAT_00674aa8
 //   ("Target"; XC LAB_004e0880 -> FUN_004e5680, atexit LAB_004e08a0), Create FUN_004e56f0.
 //   vftables: HUDItem face 0x005d896c (17), WinControl 0x005d88b4 (45), IDataViewOwner
@@ -446,15 +434,15 @@ public:
     void OnViewObjectChanged() override;
 
     // --- WinControl face ---
-    // FUN_004e0ee0 (RET 8)
+    // FUN_004e0ee0
     bool Create(Win3D* NewParent, void* Data) override;
     // FUN_004e1c20
     void Update() override;
     // FUN_004e1bb0
     void Draw() override;
-    // FUN_004e4af0 (RET 4)
+    // FUN_004e4af0
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
-    // FUN_004e19e0 (RET 0xc)
+    // FUN_004e19e0
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
     // --- ButtonMover / ButtonScaler faces ---
@@ -464,20 +452,19 @@ public:
     void OnScaleFinished() override;
 
     // --- Event::Handler ---
-    // FUN_004e2970 (RET 4)
+    // FUN_004e2970
     bool OnEvent(unsigned MsgId) override;
 
-    // FUN_004e5460 (RET 4) -- Mode (+0x648) = NewMode. Caller: HUD_ContactList 0x004cfe76.
+    // FUN_004e5460. Caller: HUD_ContactList.
     void SetMode(int NewMode);
-    // FUN_004e5470 (RET 4) -- bRaw: Mode; else Mode while expanded and neither animation runs,
-    // otherwise 3. Callers: HUD_ContactList 0x004d017c / 0x004d061e / 0x004d22fd / 0x004d247d /
-    // 0x004d3ddb.
+    // FUN_004e5470 -- bRaw: Mode; else Mode while expanded and neither animation runs,
+    // otherwise 3. Callers: HUD_ContactList.
     int GetMode(bool bRaw);
     // FUN_004e54c0 -- start a cargo scan of the player's target (see .cpp).
     void OpenScanner();
 
 private:
-    // FUN_004e22b0 (RET 4)
+    // FUN_004e22b0
     void UpdateButtons(bool bFull);
     // FUN_004e27e0
     void UpdateTradeButton();
@@ -486,12 +473,12 @@ private:
     // FUN_004e4ba0 / FUN_004e4cc0
     void SelectNextSubTarget();
     void SelectPreviousSubTarget();
-    // FUN_004e4dd0 (RET 4) -- refill Map with the view object's live groups and equipment;
-    // returns its size. Map is always &SubTargets.
+    // FUN_004e4dd0 -- refill Map with the view object's live groups and equipment; returns its
+    // size. Map is always &SubTargets.
     int RebuildSubTargets(std::map<unsigned short, long>* Map);
-    // FUN_004e49c0 (RET 4) -- the name of the flashing sub-target into Out (0x80 wide chars).
+    // FUN_004e49c0 -- the name of the flashing sub-target into Out (0x80 wide chars).
     void GetSubTargetName(wchar_t* Out);
-    // FUN_004e4f70 (RET 4) -- the next hardpoint of HardpointNames projected to the screen.
+    // FUN_004e4f70 -- the next hardpoint of HardpointNames projected to the screen.
     void NextHardpointScreenPos(float* OutScreen);
     // FUN_004e50d0 -- the scan sweep across the hardpoints while NN_Scanner is up.
     void DrawScanSweep();
@@ -508,7 +495,7 @@ public:
     WinControl* RequestGroupButton;        // +0x520 "TargetRequestGroupButton"
     WinControl* CloseButton;               // +0x524 "TargetCloseButton" (the ctor leaves it)
     // +0x528 one StyleNode(0x3ea8) + ids 0x60070 (Create). Retail builds and frees the list
-    // inline (0x004e08ff.. / 0x004e0db5..); the port uses Common's ctor / dtor, same effect.
+    // inline; the port uses Common's ctor / dtor, same effect.
     RenderDisplayList StyleList;
     FHudSubTargetFlash SubTargetFlash;     // +0x534
     float LabelRefreshTimer;               // +0x558 counts to 1.0f (FUN_004e22b0)

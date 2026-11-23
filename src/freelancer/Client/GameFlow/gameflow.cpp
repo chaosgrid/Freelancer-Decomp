@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // gf\Gameflow.cpp (the GF state, DAT_006686a0, vftable 0x005cae24) and the supt\Support.cpp
-// functions it drives (0x00558850..0x005592aa). See gameflow.h.
+// functions it drives (FUN_00558850 .. FUN_005592a0). See gameflow.h.
 
 #include "GameFlow/gameflow.h"
 
@@ -47,18 +47,15 @@
 #include <stddef.h>
 #include <windows.h>
 
-// Retail runs this file's static initializers before Win3D.cpp's, and the mouse depends on it.
-// _initterm(0x0060f000, 0x006101bc) (0x005b8153) walks the table upwards; LAB_00559030 (the
-// hotspot handler below, DAT_006799ec, registers USER_MOVE 5 / USER_BUTTON0 6) sits at
-// 0x0060fd84, LAB_0059d060 (the Win3D input handler DAT_0067dbf0, 5, 4, 6..13, 1, 2) at
-// 0x00610044. FUN_00576410 calls the handlers of one id in reverse registration order
-// (005764b9..005764d6), so Win3D, registered second, sees every mouse event first and a click
-// on a window (Win3DPick -> MouseEvent) never reaches a room hotspot. MSVC orders the default
-// (user) segment by object-file link order, which put win3d.obj first and let a character's
-// hotspot take clicks through the NeuroNet windows; the lib segment runs ahead of every user
-// initializer whatever the link order. Nothing constructed here reads another file's dynamic
-// initializer: the HUD registry is a pointer allocated on first insert (EnsureHudCmdRegistry),
-// GF only stamps its vptr, the instance cache fills constants.
+// Retail runs this file's static initializers before Win3D.cpp's, and the mouse depends on it:
+// LAB_00559030 (the hotspot handler below, DAT_006799ec) precedes LAB_0059d060 (the Win3D input
+// handler DAT_0067dbf0) in the _initterm table, and FUN_00576410 calls the handlers of one id in
+// reverse registration order, so Win3D sees every mouse event first and a click on a window
+// never reaches a room hotspot. Port: MSVC orders the user segment by link order, which would
+// put win3d.obj first and let a character's hotspot take clicks through the NeuroNet windows;
+// init_seg(lib) runs this file ahead of every user initializer. Nothing constructed here reads
+// another file's dynamic initializer: the HUD registry is a pointer allocated on first insert
+// (EnsureHudCmdRegistry), GF only stamps its vptr, the instance cache fills constants.
 #pragma warning(push)
 #pragma warning(disable : 4073) // initializers put in library initialization area
 #pragma init_seg(lib)
@@ -77,7 +74,8 @@ namespace
     bool G_bGameflowQuit = false;              // DAT_006799de -- answers 1; only ever zeroed
     float G_GameflowMsRemainder = 0.0f;        // DAT_006799e0 -- the tick's sub-millisecond rest
     // DAT_006799e4 -- the arrival caption's delay in milliseconds. Zeroed by FUN_005588a0 before
-    // it is read there; its only other writer is 0x00454f0e (SetGameflowArrivalDelayMs).
+    // it is read there; its only other writer is FGfScriptSequence::AddScript
+    // (SetGameflowArrivalDelayMs).
     unsigned G_GameflowArrivalDelayMs = 0;
     unsigned G_GameflowHoldUntilFrame = 0;     // DAT_006799e8 -- FUN_00558bf0
 
@@ -89,7 +87,7 @@ namespace
     int G_HotspotInputLock = 0;                // DAT_00679a0c -- FUN_00559290 / FUN_005592a0
 
     // DAT_00668784 -- FUN_0043d590's store; the MissionBriefing state's +0x10, which its update
-    // LAB_0043d360 hands to FUN_004c4910 by address (0x0043d440 LEA ECX,[ESI+0x10]).
+    // LAB_0043d360 hands to FUN_004c4910 by address.
     unsigned G_GameflowLocationBase = 0;
 
     // FUN_00558e00's and FUN_00558ed0's shared first half, and FUN_00558f80's body: find the
@@ -175,16 +173,15 @@ namespace
     public:
         FGameflowHotspotHandler()
         {
-            // FUN_00559050: the two ids from a stack array, registered in order.
+            // FUN_00559050.
             static unsigned const kIds[2] = {5, 6};
             for (unsigned Index = 0; Index < 2; ++Index)
                 RegisterEvent(kIds[Index]);
         }
 
-        // LAB_005590c0 (thiscall, RET 4).
+        // LAB_005590c0.
         bool OnEvent(unsigned MsgId) override
         {
-            // 0x005590c3..0x005590db: the software cursor DAT_00616840 / DAT_00616844.
             int Point[2] = {0, 0};
             int Wheel = 0;
             GetClientSoftwareCursor(&Point[0], &Point[1], &Wheel);
@@ -197,7 +194,7 @@ namespace
         }
 
     private:
-        // 0x005591a7..0x00559279 (USER_MOVE).
+        // USER_MOVE.
         bool OnMove(int const* Point)
         {
             bool bHovering = false;
@@ -211,8 +208,7 @@ namespace
                 if (bHovering)
                     return true;
             }
-            // 0x00559238..0x00559269: tracking off; a hovered hotspot (only possible here when
-            // locked) gets bHovered = 0 and a leave with point {0, 0}.
+            // A hovered hotspot (only possible here when locked) gets a leave with point {0, 0}.
             G_bHotspotTracking = false;
             if (G_HoveredHotspot != nullptr)
             {
@@ -224,10 +220,10 @@ namespace
             return bHovering;
         }
 
-        // 0x005590e8..0x005591a4 (USER_BUTTON0).
+        // USER_BUTTON0.
         bool OnButton(int const* Point)
         {
-            // 0x005590e8..0x005590fb: only a button-down record (+0x18), and not while locked.
+            // Only a button-down record (+0x18), and not while locked.
             if (HudCommandRecord()->Byte18 == 0)
                 return false;
             if (G_HotspotInputLock != 0)
@@ -245,13 +241,11 @@ namespace
                     G_HoveredHotspot->SendEvent(2, Point);
                 }
                 G_HoveredHotspot = Hit;
-                // 0x00559166: nothing under the cursor -> false.
                 if (Hit == nullptr)
                     return false;
                 Hit->bHovered = 1;
                 G_HoveredHotspot->SendEvent(1, Point);
             }
-            // 0x00559188..0x0055919c: the hovered hotspot is clicked.
             if (G_HoveredHotspot == nullptr)
                 return false;
             G_HoveredHotspot->SendEvent(3, Point);
@@ -264,22 +258,19 @@ namespace
     // FUN_00558ac0 (cdecl, double) -- the base's world tick.
     void TickGameflow(double DeltaSeconds)
     {
-        // 0x00558ac7..0x00558afa: DAT_006799e0 + Dt, split into whole milliseconds (floor of
-        // the sum * 1000.0) and the rest (the sum rounded to float, less ms * 0.001).
+        // Whole milliseconds are floor(sum * 1000.0) of the unrounded sum; the rest is the sum
+        // rounded to float, less ms * 0.001.
         double const Sum = static_cast<double>(G_GameflowMsRemainder) + DeltaSeconds;
         float const SumAsFloat = static_cast<float>(Sum);
         double const Milliseconds = floor(Sum * 1000.0);
         G_GameflowMsRemainder =
             static_cast<float>(static_cast<double>(SumAsFloat) - Milliseconds * 0.001);
-        // 0x00558b00..0x00558b0b: FUN_00456650(ftol(ms)) on DAT_0066d2d0 -- the Gf script
-        // manager's tick (sequences advanced, finished ones deleted, the script fade stepped).
-        G_GfScriptManager.Update(static_cast<int>(Milliseconds));
+        G_GfScriptManager.Update(static_cast<int>(Milliseconds)); // FUN_00456650
 
         float const Dt = static_cast<float>(DeltaSeconds);
-        // 0x00558b17..0x00558b21: FUN_00439540 on DAT_00668708.
-        TickClientLocationController(Dt);
+        TickClientLocationController(Dt); // FUN_00439540 on DAT_00668708
 
-        // 0x00558b26..0x00558b59: every RoomObject whose +0x04 is clear gets slot 5 (Dt).
+        // RoomObject slot 5 for every object whose +0x04 is clear.
         std::list<FRoomObject*>& Objects = GetRoomObjectList();
         for (std::list<FRoomObject*>::iterator It = Objects.begin(); It != Objects.end(); ++It)
         {
@@ -288,17 +279,16 @@ namespace
                 Object->Update(DeltaSeconds);
         }
 
-        // 0x00558b5b..0x00558b66: FUN_0041a140(FUN_00438c90(), Dt) -- the letterbox update for
-        // the room camera (the room-camera twin of FUN_0041a420, which the space camera uses).
+        // FUN_0041a140 -- the letterbox update for the room camera (the twin of FUN_0041a420,
+        // which the space camera uses).
         UpdateRoomLetterbox(
             static_cast<FRoomCamera*>(static_cast<ICamera*>(GetClientRoomCamera())), Dt);
         UpdateFade(Dt);              // FUN_00412360
         RefreshHoveredHotspot();     // FUN_00558f80
 
-        // 0x00558b7a..0x00558be6: with the letterbox target and amount and the fade target and
-        // level all exactly 0.0 (each FCOMP 0.0 / TEST AH,0x44 / JP out -- only an equal compare
-        // falls through), a current room runtime whose +0x1338 is clear, and the software cursor
-        // not drawn: draw it again.
+        // With the letterbox and the fade all exactly 0.0 (x87 equality: a NaN does not pass), a
+        // current room runtime whose +0x1338 is clear, and the software cursor not drawn: draw
+        // it again.
         if (!(GetLetterboxTarget() == 0.0f))
             return;
         if (!(GetLetterboxAmount() == 0.0f))
@@ -321,13 +311,12 @@ namespace
     // FUN_00558c10 (cdecl) -- the base frame: tick, draw, sound, and the next state code.
     int UpdateGameflowBaseFrame()
     {
-        // 0x00558c19..0x00558c47: the capped frame time, zeroed while the frame counter has not
-        // passed DAT_006799e8 (CMP / JA keeps it only when count > hold, unsigned).
+        // Zeroed while the frame counter has not passed DAT_006799e8 (unsigned).
         double Dt = GetClientFrameTimeCapped();
         if (!(GetClientFrameCount() > G_GameflowHoldUntilFrame))
             Dt = 0.0;
 
-        // 0x00558c4f..0x00558c7b: FUN_0042d740 holds the world -> only the hover is dropped.
+        // FUN_0042d740 holds the world -> only the hover is dropped.
         if (!ShouldSkipLocalServerTick())
         {
             TickGameflow(Dt);
@@ -338,7 +327,6 @@ namespace
             ReleaseHoveredHotspot(); // FUN_00558e90
         }
 
-        // 0x00558c80..0x00558cf6: the scene.
         if (BeginClientRenderFrame())
         {
             Win3DSetViewport(nullptr, kSupportCpp, 0x222);  // FUN_00422610
@@ -354,14 +342,11 @@ namespace
             PresentClientRenderFrame();                     // FUN_00425140
         }
 
-        // 0x00558cfb: FUN_00579190 -- the loading screen's timer reset (DAT_0067c3c8..e0).
-        LoadingScreenReset();
+        LoadingScreenReset(); // FUN_00579190
 
-        // 0x00558d00..0x00558d14: FUN_00428030(3), FUN_00428040(room camera, Dt).
-        SetClientAudioMode(3);
-        TickClientSoundMixer(GetClientRoomCamera(), static_cast<float>(Dt));
+        SetClientAudioMode(3); // FUN_00428030
+        TickClientSoundMixer(GetClientRoomCamera(), static_cast<float>(Dt)); // FUN_00428040
 
-        // 0x00558d19..0x00558d4a.
         int Result = 0;
         if (G_bGameflowMissionBriefing)
             Result = 8;
@@ -376,9 +361,8 @@ namespace
     }
 
     // --------------------------------------------------------------------------------------
-    // The GF state object (DAT_006686a0), RTTI .?AUGF@@ (COL 0x005e8734), vftable 0x005cae24:
-    // fifteen slots, raw PE dwords at 0x005cae24..0x005cae5c (the next dword, 0x25287325, is
-    // string data):
+    // The GF state object (DAT_006686a0), RTTI .?AUGF@@ (COL 0x005e8734), vftable 0x005cae24,
+    // fifteen slots:
     //   0 LAB_00437150  1 LAB_004371e0  2 LAB_00437200  3 LAB_00437230  4 LAB_0043d160
     //   5 LAB_00437260  6 0x0053e4a0    7 LAB_0051ca40  8 LAB_00437270  9 LAB_00437290
     //   10 0x00401e90   11 LAB_00437400 12 LAB_004372a0 13 FUN_004372c0 14 LAB_004372e0
@@ -408,11 +392,9 @@ namespace
         unsigned char bFromIntro = 0;         // +0x06
     };
 
-    // Slot 0 (+0x00, LAB_00437150, RET 0x10) -- a key message (A, Message, B, C). With the
-    // "CTID" window up (FUN_0046a480) it is consumed at once. Otherwise every arm of the switch
-    // on Message - 0x100 (0x100/0x104 and 0x101/0x105 ask FUN_0044fd00 -- `XOR AL,AL / RET`,
-    // always false -- and fall through; 0x102/0x103 and anything else go straight there) ends in
-    // GetKeyState(VK_SHIFT), GetKeyState(VK_CONTROL), their results dropped, and true.
+    // Slot 0 (LAB_00437150) -- a key message. With the "CTID" window up (FUN_0046a480) it is
+    // consumed at once. Every arm of retail's switch on Message (some ask FUN_0044fd00, always
+    // false) ends in the two GetKeyState calls, their results dropped, and true.
     bool GF::OnKeyMessage(unsigned A, unsigned Message, unsigned B, unsigned C)
     {
         (void)A;
@@ -426,7 +408,7 @@ namespace
         return true;
     }
 
-    // Slot 1 (+0x04, LAB_004371e0, RET 0xc) -- FUN_0044fd00(A, B, C): false.
+    // Slot 1 (LAB_004371e0) -- FUN_0044fd00: false.
     bool GF::Slot01(unsigned A, unsigned B, unsigned C)
     {
         (void)A;
@@ -435,8 +417,7 @@ namespace
         return false;
     }
 
-    // Slot 2 (+0x08, LAB_00437200, RET 0xc) -- a mouse move (A, B, Packed): the point unpacked
-    // (FUN_00415850 zeroes it, FUN_00558d80 fills it), FUN_00558e00, and true whatever it said.
+    // Slot 2 (LAB_00437200) -- a mouse move: true whatever FUN_00558e00 said.
     bool GF::OnMouseMove(unsigned A, unsigned B, unsigned long Packed)
     {
         (void)A;
@@ -447,8 +428,7 @@ namespace
         return true;
     }
 
-    // Slot 3 (+0x0c, LAB_00437230, RET 0x10) -- a mouse button (A, Message, B, Packed):
-    // FUN_00558ed0(Message, point) is the answer.
+    // Slot 3 (LAB_00437230) -- a mouse button: FUN_00558ed0 is the answer.
     bool GF::OnMouseButton(unsigned A, unsigned Message, unsigned B, unsigned long Packed)
     {
         (void)A;
@@ -458,7 +438,7 @@ namespace
         return TrackHotspotMouseButton(Message, Point);
     }
 
-    // Slot 4 (+0x10, LAB_0043d160, shared with MissionBriefing, RET 0xc) -- true.
+    // Slot 4 (LAB_0043d160, shared with MissionBriefing).
     bool GF::Slot04(unsigned A, unsigned B, unsigned C)
     {
         (void)A;
@@ -467,21 +447,20 @@ namespace
         return true;
     }
 
-    // Slot 5 (+0x14, LAB_00437260) -- JMP FUN_00558e90.
+    // Slot 5 (LAB_00437260) -- FUN_00558e90.
     void GF::Slot05()
     {
         ReleaseHoveredHotspot();
     }
 
-    // Slot 6 (+0x18, 0x0053e4a0) -- a bare RET 4 (the ICF-folded body IDPMsgHandler::OnAddHost
-    // shares; that name says nothing about GF).
+    // Slot 6 (0x0053e4a0) -- empty (the ICF-folded body IDPMsgHandler::OnAddHost shares).
     void GF::Slot06(unsigned A)
     {
         (void)A;
     }
 
-    // Slot 7 (+0x1c, LAB_0051ca40) -- 1, the environment type FUN_005b0880 and the sound frame
-    // read (IntroFocus answers 2).
+    // Slot 7 (LAB_0051ca40) -- the environment type FUN_005b0880 and the sound frame read
+    // (IntroFocus answers 2).
     int GF::GetEnvironmentType()
     {
         return 1;
@@ -489,7 +468,7 @@ namespace
 
     void GF::PreInit()
     {
-        // LAB_00437270: FUN_00558850(DAT_0067eca0), then +0x04 = +0x05 = 0.
+        // LAB_00437270: FUN_00558850(DAT_0067eca0).
         InitGameflowData();
         bFirstFramePending = 0;
         bBaseEntered = 0;
@@ -497,16 +476,16 @@ namespace
 
     void GF::Shutdown()
     {
-        // LAB_00437290: JMP FUN_00558870.
+        // LAB_00437290: FUN_00558870.
         ShutdownGameflow();
     }
 
-    // Slot 10 (+0x28, 0x00401e90) -- a bare RET. Code 4 of the state machine calls it.
+    // Slot 10 (0x00401e90) -- empty. Code 4 of the state machine calls it.
     void GF::Slot10()
     {
     }
 
-    // Slot 11 (+0x2c, LAB_00437400, RET 8) -- FUN_00558d60(Width, Height), which reads neither.
+    // Slot 11 (LAB_00437400) -- FUN_00558d60(Width, Height), which reads neither.
     void GF::Resize(int Width, int Height)
     {
         (void)Width;
@@ -516,9 +495,8 @@ namespace
 
     bool GF::Init(int Param)
     {
-        // LAB_004372a0 (RET 4): +0x04 = 1, +0x05 = 0, +0x06 = the argument's low byte (MOV DL,
-        // [ESP+4]); true. FUN_005b2a30 case 3 pushes a dword whose low byte it set to 1 and
-        // maybe cleared (0x005b2b75 / 0x005b2b9b) -- only that byte is read here.
+        // LAB_004372a0. Only the argument's low byte is read (FUN_005b2a30 case 3 pushes a
+        // dword whose low byte it set).
         bFirstFramePending = 1;
         bBaseEntered = 0;
         bFromIntro = static_cast<unsigned char>(Param);
@@ -527,24 +505,23 @@ namespace
 
     void GF::Destroy()
     {
-        // FUN_004372c0: FUN_00558a50, FUN_0045a140, +0x04 = 0.
-        LeaveGameflowBase();
-        // 0x004372c8: FUN_0045a140 -- the NN system teardown.
-        NnSystemShutdown();
+        // FUN_004372c0.
+        LeaveGameflowBase();  // FUN_00558a50
+        NnSystemShutdown();   // FUN_0045a140
         bFirstFramePending = 0;
     }
 
     int GF::Update(float DeltaSeconds)
     {
-        // LAB_004372e0 (RET 4). The argument is not read.
+        // LAB_004372e0. The argument is not read.
         (void)DeltaSeconds;
         GF* const State = this;
         if (State->bFirstFramePending == 1)
         {
-            // 0x004372ee..0x00437389: the first frame enters the base.
+            // The first frame enters the base.
             State->bFirstFramePending = 0;
             RefreshLoadingProgress();
-            // 0x004372fc: FUN_0045a100(1) -- the NN system (NN_MainButton and the voice init).
+            // FUN_0045a100 -- the NN system (NN_MainButton and the voice init).
             NnSystemInit(true);
             RefreshLoadingProgress();
 
@@ -562,19 +539,18 @@ namespace
             State->bBaseEntered = 1;
             if (!SinglePlayer() && !ClientQuitRequested())
             {
-                // 0x0043737f: FUN_0046a4a0(1) -- DAT_0066da88 = 1 and the chat window
-                // DAT_0066da80's +0x6c |= 3.
+                // FUN_0046a4a0 -- DAT_0066da88 = 1 and the chat window DAT_0066da80's
+                // +0x6c |= 3.
                 ChatShowMsgWin(true);
             }
             RefreshLoadingProgress();
         }
 
-        // 0x0043738d..0x004373a3.
         if (!ClientQuitRequested() && State->bBaseEntered == 1)
             return UpdateGameflowBaseFrame();
 
-        // 0x004373a6..0x004373f1: a black frame -- FUN_00564f90({0, 0, 0, 0xff}) outside the
-        // scene, then the scene with the Win3D roots unless the client is quitting.
+        // A black frame -- FUN_00564f90 outside the scene, then the scene with the Win3D roots
+        // unless the client is quitting.
         unsigned char const Black[4] = {0, 0, 0, 0xff};
         ClearWin3DBuffersToColor(Black);
         if (BeginClientRenderFrame())
@@ -584,8 +560,7 @@ namespace
             EndClientRenderScene();
             PresentClientRenderFrame();
         }
-        // 0x004373e8: FUN_00579190 -- the loading screen's timer reset.
-        LoadingScreenReset();
+        LoadingScreenReset(); // FUN_00579190
         return 0;
     }
 
@@ -597,9 +572,7 @@ namespace
     // DAT_00667e50 (0x804 bytes). See ResetEngineInstanceCache in gameflow.h.
     struct FEngineInstanceCache
     {
-        // LAB_00434920 (.CRT entry 0x0060f1d0): every handle -1 and every entry null
-        // (0x00434927 / 0x0043492d, 0x100 slots), Count (DAT_00668650) 0, then atexit of
-        // LAB_00434950 -- the destructor below.
+        // LAB_00434920 (static init), with atexit LAB_00434950 -- the destructor below.
         FEngineInstanceCache()
         {
             for (int Index = 0; Index < 0x100; ++Index)
@@ -616,8 +589,8 @@ namespace
             Reset();
         }
 
-        // FUN_004348b0 -- listing 004348b0..00434916. Count is re-read after every release
-        // (0x004348e2); the handle goes to IEngine slot 15 without a -1 test.
+        // FUN_004348b0. Count is re-read after every release; the handle goes to IEngine slot
+        // 15 without a -1 test.
         void Reset()
         {
             for (int Index = 0; Index < Count; ++Index)
@@ -649,16 +622,16 @@ void ResetEngineInstanceCache()
 
 IEnvironment* GetGameflowState()
 {
-    // FUN_00437420: MOV EAX,0x006686a0.
+    // FUN_00437420.
     return &G_Gameflow;
 }
 
 void InitGameflowData()
 {
-    // FUN_00558850. 0x00558850: IDPMsgHandler::OnDisconnect (ICF-folded bare RET) -- nothing.
+    // FUN_00558850. Retail first calls an ICF-folded empty body (IDPMsgHandler::OnDisconnect).
     BuildClientLocationMaps();   // FUN_004393b0 on DAT_00668708
     LoadCharacterInfo();         // FUN_004354e0
-    PreloadCharacterScripts();   // JMP FUN_004355e0
+    PreloadCharacterScripts();   // FUN_004355e0
 }
 
 bool ShutdownGameflow()
@@ -667,19 +640,14 @@ bool ShutdownGameflow()
     ShutdownCharacterInfo();     // FUN_00435500
     ClearClientLocationMaps();   // FUN_00439260 on DAT_00668708
     ClearRoomObjectList();       // FUN_00559380
-    // 0x00558884..0x00558889: FUN_004348b0 on DAT_00667e50 -- the engine-instance cache (per
-    // slot FUN_0041b030 on the +0x400 material entry and IEngine slot 15 on the instance, then
-    // every slot reset).
-    ResetEngineInstanceCache();
-    return ReportLeakedHotspots(); // JMP FUN_00556200
+    ResetEngineInstanceCache();  // FUN_004348b0 on DAT_00667e50
+    return ReportLeakedHotspots(); // FUN_00556200
 }
 
 bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
 {
     // FUN_005588a0.
-    // 0x005588a6: FUN_00579290 -- the loading screen update (FUN_00578f70(-1.0f) on
-    // DAT_0067c3b8, DAT_0067c3e0 = 1).
-    LoadingScreenStart();
+    LoadingScreenStart();                     // FUN_00579290
     ResetClientLocationController();         // FUN_00439200 on DAT_00668708
     SetClientLocationInTransition();          // DAT_00668761 (controller +0x59) = 1
     G_GameflowArrivalDelayMs = 0;             // DAT_006799e4
@@ -687,33 +655,29 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     SetPlayerFactionScratchRetail(LocationId); // FUN_004c4a10(LocationId)
     SetGameflowLocationBase(BaseId);          // FUN_0043d590
     LoadFlashlightTextures();                 // FUN_00557550
-    // 0x005588e7: FUN_0042acb0(2) -- the sound list DAT_00667cc4 walked by category 2.
-    PreloadClientSoundArchesByCategory(2);
+    PreloadClientSoundArchesByCategory(2);    // FUN_0042acb0
     RefreshLoadingProgress();
     SetClientAudioMode(3);                    // FUN_00428030(3)
     RefreshLoadingProgress();
     SetFadeImmediate(1.0f);                   // FUN_00412070(1.0f)
-    // 0x00558909..0x0055891c: FUN_00412050(0, (float)(1.0 / DAT_0061650c)).
+    // FUN_00412050(0, (float)(1.0 / DAT_0061650c)).
     SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
     RefreshLoadingProgress();
     ResetHotspotTracking();                   // FUN_00558db0
     MouseSetCursor("arrow", false);           // FUN_0041dde0("arrow", 0)
     RefreshLoadingProgress();
-    // 0x00558938: FUN_004564d0 on DAT_0066d2d0 -- the Gf script manager's Event::Handler
-    // registers id 0xf (FUN_005760d0).
-    G_GfScriptManager.RegisterEvents();
+    G_GfScriptManager.RegisterEvents();       // FUN_004564d0 on DAT_0066d2d0
     G_GameflowMsRemainder = 0.0f;             // DAT_006799e0
     RefreshLoadingProgress();
     G_bGameflowMissionBriefing = false;       // DAT_006799dc
     G_bGameflowStateFive = false;             // DAT_006799dd
     G_bGameflowQuit = false;                  // DAT_006799de
     RoomControlSetLandingPending(bFromIntro ? 0 : 1); // FUN_004489f0
-    // 0x0055896f: DAT_00668760 = 1 -- the LocationController's this+0x58 (0x00668708 + 0x58),
-    // which the next FUN_0043bab0 reads (0x0043bb13) and clears (0x0043bb7d).
+    // DAT_00668760 = 1 -- the LocationController's +0x58, which the next FUN_0043bab0 reads and
+    // clears.
     SetClientLocationKeepAudio();
     RefreshLoadingProgress();
 
-    // 0x00558978..0x005589a8.
     if (LocationId == 0)
     {
         EnterClientLocationBase(BaseId);      // FUN_0043b290
@@ -727,16 +691,15 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     }
     RefreshLoadingProgress();
 
-    // 0x005589af..0x00558a09: the arrival caption, unless the room runtime's +0x517 is set or
-    // the base was entered from the intro. A runtime whose FUN_0044ab60 is false zeroes the
-    // delay first.
+    // The arrival caption, unless the room runtime's +0x517 is set or the base was entered from
+    // the intro. A runtime whose FUN_0044ab60 is false zeroes the delay first.
     FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
     bool const bShowCaption = !bFromIntro;
     if ((Runtime == nullptr || RoomControlGetField517(Runtime) == 0) && bShowCaption)
     {
         if (Runtime != nullptr && !RoomControlHasLandingScript(Runtime))
             G_GameflowArrivalDelayMs = 0;
-        // FILD qword {DAT_006799e4, 0} (unsigned), FMUL float 0.001f, FSTP float.
+        // The delay is loaded unsigned and multiplied by the float 0.001f.
         float const DelaySeconds = static_cast<float>(
             static_cast<double>(G_GameflowArrivalDelayMs) * static_cast<double>(0.001f));
         NnArrivalTextShowBase(DelaySeconds);  // FUN_0045b2d0
@@ -758,19 +721,13 @@ void LeaveGameflowBase()
     // FUN_00558a50.
     SetClientFpsCap(RtcSlider::get_default_fps_cap()); // DAT_00610a0c
     LeaveClientLocationBase();                // FUN_0043b3e0 on DAT_00668708
-    // 0x00558a67: FUN_004564e0 on DAT_0066d2d0 -- every script sequence deleted, id 0xf
-    // unregistered.
-    G_GfScriptManager.Shutdown();
-    // 0x00558a71: FUN_00443e90 -- the shared character LOD set (DAT_00668948) released and
-    // cleared.
-    ReleaseSharedCharacterLod();              // FUN_00443e90
+    G_GfScriptManager.Shutdown();             // FUN_004564e0 on DAT_0066d2d0
+    ReleaseSharedCharacterLod();              // FUN_00443e90 (DAT_00668948)
     ResetCharacterScripts();                  // FUN_00435630
-    // 0x00558a7b: FUN_004284f0 -- every sound stopped, the live-source leak warning.
-    StopAllClientSounds();
-    // 0x00558a80: FUN_0042ad30(2) (the DAT_00667cc4 sound list by category).
-    UnloadClientSoundArchesByCategory(2);
+    StopAllClientSounds();                    // FUN_004284f0
+    UnloadClientSoundArchesByCategory(2);     // FUN_0042ad30
     ReleaseFlashlightTextures();              // FUN_005575e0
-    ResetEngineInstanceCache();               // 0x00558a8f: FUN_004348b0 on DAT_00667e50
+    ResetEngineInstanceCache();               // FUN_004348b0 on DAT_00667e50
     SetPlayerBaseIdRetail(0);                 // FUN_004c4910(&0)
     SetPlayerFactionScratchRetail(0);         // FUN_004c4a10(0)
 }
@@ -826,7 +783,7 @@ void ResetGameflowRoomLetterbox()
     if (Camera == nullptr)
         return;
     ForgetLetterboxCamera(); // FUN_0041a3d0
-    // 0x00558d71..0x00558d74: FUN_0041a140(Camera, 0) -- PUSH 0 is the float 0.0f.
+    // FUN_0041a140(Camera, 0.0f).
     UpdateRoomLetterbox(static_cast<FRoomCamera*>(static_cast<ICamera*>(Camera)), 0.0f);
 }
 

@@ -26,8 +26,7 @@ namespace
 {
 char const kFontCpp[] = "E:\\FL\\Scratch\\Source\\Client\\cmn\\Font.cpp";
 
-// .rdata:005c8d38 -- the calibration pangram every autoscale search measures (copied onto the
-// stack with REP MOVSD ECX=0x1b, i.e. 53 characters and the terminator).
+// .rdata:005c8d38 -- the calibration pangram every autoscale search measures.
 wchar_t const kPangram[] = L"In the beginning the Earth was without form and void.";
 
 // .rdata:005c8d30 -- the reference width factor (1/800) of the A-variant target.
@@ -68,9 +67,7 @@ FontImp::FontImp()
     , RealizedHeight(0)
     , LayoutGeneration(0)
 {
-    // FUN_00417d50: vptr of IFont (005c8e1c), the three TString<64> emptied (+0x04/+0x08,
-    // +0x48/+0x4c, +0x8c/+0x90), the tree at +0x15c built empty, then +0x118, +0x11c, +0xd8,
-    // +0xd0, +0xd4 and +0x158 zeroed and the FontImp vptr (005c8dec) installed.
+    // FUN_00417d50 (IFont vtable 005c8e1c, FontImp vtable 005c8dec).
     Name.Length = 0;
     Name.Data[0] = '\0';
     Id.Length = 0;
@@ -84,15 +81,13 @@ FontImp::~FontImp()
     // FUN_00416490: the handles are only forgotten -- no DeleteObject / DeleteDC.
     if (Font != nullptr)
     {
-        Font = nullptr; // 004164a8
+        Font = nullptr;
     }
     if (Dc != nullptr)
     {
-        Dc = nullptr; // 004164b6
+        Dc = nullptr;
     }
-    LayoutGeneration = 0; // 004164c2
-    // 004164bc..0041653e: the tree at +0x15c is cleared and its head/nil nodes freed (the
-    // std::map member's destructor).
+    LayoutGeneration = 0;
 }
 
 void FontImp::SetName(char const* Nickname)
@@ -100,9 +95,9 @@ void FontImp::SetName(char const* Nickname)
     // FUN_00417ca0
     if (Id.Length == 0)
     {
-        Id = Nickname; // 00417cb1..00417cf2
+        Id = Nickname;
     }
-    Name = Nickname; // 00417cf5..00417d3d
+    Name = Nickname;
 }
 
 bool FontImp::Realize(int Height)
@@ -112,31 +107,29 @@ bool FontImp::Realize(int Height)
     {
         if (RealizedHeight == Height || Height == Metrics.tmHeight)
         {
-            return true; // 00415eb8 / 00415ec0
+            return true;
         }
         DeleteObject(Font);
         Font = nullptr;
     }
-    LogFont.lfHeight = Height; // 00415eda
+    LogFont.lfHeight = Height;
     Font = CreateFontIndirectA(&LogFont);
     if (Font == nullptr)
     {
-        // 00415f26: FDUMP(0x100001, ..., Font.cpp, 0x9ae, name +0x8, height).
         FDUMP(0x100001, "%s(%d) : *** ERROR: failed to create font %s height=%d\n", kFontCpp, 0x9ae,
               Name.Data, Height);
         return false;
     }
-    RealizedHeight = Height; // 00415ef4
+    RealizedHeight = Height;
     SelectObject(Dc, Font);
     GetTextMetricsA(Dc, &Metrics);
-    LayoutGeneration = G_FontLayoutGeneration; // 00415f19
+    LayoutGeneration = G_FontLayoutGeneration;
     return true;
 }
 
 double FontImp::MeasurePangramRatio(int Height, int Width)
 {
-    // FUN_00415e40: realize, measure through the vtable (+0x20), then FILD qword {width, 0}
-    // (the width read unsigned) FIDIV Width.
+    // FUN_00415e40. The measured width is read unsigned.
     Realize(Height);
     int Extent[2];
     MeasureString(Extent, kPangram, -1);
@@ -146,29 +139,27 @@ double FontImp::MeasurePangramRatio(int Height, int Width)
 int FontImp::SearchScaleDelta(float Fixed, int ScreenW, int ScreenH, float Target)
 {
     // FUN_00416f50
-    // 00416f56: FILD ScreenH, FMUL Fixed, FADD 0.5, floor, ftol.
     int const StartHeight = static_cast<int>(
         std::floor(static_cast<double>(ScreenH) * static_cast<double>(Fixed) + 0.5));
     int Delta = 0;
     Realize(StartHeight);
     int Extent[2];
     MeasureString(Extent, kPangram, -1);
-    // 00416fb5: the width becomes a float once, every ratio divides by it.
+    // The width becomes a float once, every ratio divides by it.
     float const WidthF = static_cast<float>(ScreenW);
     double Ratio = static_cast<double>(static_cast<unsigned>(Extent[0])) / WidthF;
-    // 00416fd0..00416fea: -1, or 1 when the ratio is not above the target (TEST AH,0x41; JZ
-    // keeps -1 only for "greater").
+    // NaN takes 1.
     int Step = -1;
     if (!(Ratio > Target))
     {
         Step = 1;
     }
-    // 00416ff2..0041700a: nothing to do while |ratio - target| <= 0.001 (DAT_005c75f8, double).
+    // DAT_005c75f8 (double 0.001).
     if (std::fabs(Ratio - Target) > 0.001)
     {
         for (;;)
         {
-            // 00417010: vtable +0x18, compared unsigned (JA) with the current height.
+            // Compared unsigned.
             if (static_cast<unsigned>(GetLineHeight()) > static_cast<unsigned>(StartHeight + Delta))
             {
                 break;
@@ -178,7 +169,7 @@ int FontImp::SearchScaleDelta(float Fixed, int ScreenW, int ScreenH, float Targe
             Ratio = static_cast<double>(static_cast<unsigned>(Extent[0])) / WidthF;
             if (Step > 0)
             {
-                // 0041707e: growing -- stop before taking a step that overshoots.
+                // Growing -- stop before taking a step that overshoots.
                 if (Ratio > Target)
                 {
                     break;
@@ -187,8 +178,7 @@ int FontImp::SearchScaleDelta(float Fixed, int ScreenW, int ScreenH, float Targe
             }
             else
             {
-                // 00417087: shrinking -- take the step, stop once at or below the target (JNP) or
-                // at a height of 4 or less.
+                // Shrinking -- take the step, then stop at or below the target or height 4.
                 Delta += Step;
                 if (Ratio <= Target)
                 {
@@ -199,7 +189,6 @@ int FontImp::SearchScaleDelta(float Fixed, int ScreenW, int ScreenH, float Targe
                     break;
                 }
             }
-            // 00417099..004170b1: loop only while |ratio - target| > 0.001.
             if (!(std::fabs(Ratio - Target) > 0.001))
             {
                 break;
@@ -229,36 +218,29 @@ namespace
 int FontImp::ComputeScaleDelta()
 {
     // FUN_00416110
-    // 0041611a: fixed_height == 0 -> 0 (TEST AH,0x44; JNP is taken on "equal").
     if (FixedHeight == 0.0f)
     {
         return 0;
     }
-    // 00416136..00416179: lower_bound on the surface width DAT_00610850, a hit only when the key
-    // is not above it -- find.
+    // Cached per surface width DAT_00610850.
     int const SurfaceWidth = FontSurfaceWidth();
     std::map<int, int>::iterator const Hit = ScaleDeltaByWidth.find(SurfaceWidth);
     if (Hit != ScaleDeltaByWidth.end())
     {
-        return Hit->second; // 0041617b
+        return Hit->second;
     }
-    bool const bHadFont = Font != nullptr;  // 004161a9
-    int const OldHeight = RealizedHeight;   // 004161b1
-    // 00416188..004161f2: realize at round(fixed * 600) (DAT_005c8da4) and measure.
+    bool const bHadFont = Font != nullptr;
+    int const OldHeight = RealizedHeight;
+    // DAT_005c8da4 = 600.
     Realize(static_cast<int>(std::floor(static_cast<double>(FixedHeight) * 600.0 + 0.5)));
     int Extent[2];
     MeasureString(Extent, kPangram, -1);
-    // 0041620a..0041621f: FILD qword {width, 0} FMUL 0.00125f, stored as a float.
     float const Target = static_cast<float>(static_cast<double>(static_cast<unsigned>(Extent[0])) *
                                             static_cast<double>(kPangramWidthScale));
-    // 00416223..0041637b: the height search, the same body as FUN_00416f50 inlined with the
-    // surface size read from DAT_00610850 / DAT_00610854.
+    // FUN_00416f50's body inlined.
     int const Delta = SearchScaleDelta(FixedHeight, SurfaceWidth,
                                        static_cast<int>(G_RenderSurfaceHeight), Target);
-    // 0041637d..004163ae: insert {DAT_00610850, 0} (FUN_00402790), then the node's value =
-    // delta, whether or not the insert found the key.
     ScaleDeltaByWidth[SurfaceWidth] = Delta;
-    // 004163a4: put the previous face back when there was one.
     if (bHadFont)
     {
         Realize(OldHeight);
@@ -268,13 +250,11 @@ int FontImp::ComputeScaleDelta()
 
 int FontImp::ComputeScaleDeltaByRatio()
 {
-    // The prelude body of LAB_00416dc0 (00416df9..00416eca), LAB_004170e0 (00417119..004171ea)
-    // and LAB_004172b0 (004172e9..004173ba).
+    // The prelude body of LAB_00416dc0, LAB_004170e0 and LAB_004172b0.
     if (FixedHeight == 0.0f)
     {
         return 0;
     }
-    // FUN_00418b30 (find) on DAT_00610850.
     int const SurfaceWidth = FontSurfaceWidth();
     std::map<int, int>::iterator const Hit = ScaleDeltaByWidth.find(SurfaceWidth);
     if (Hit != ScaleDeltaByWidth.end())
@@ -283,13 +263,10 @@ int FontImp::ComputeScaleDeltaByRatio()
     }
     bool const bHadFont = Font != nullptr;
     int const OldHeight = RealizedHeight;
-    // FUN_00415e40(round(fixed * 600), 0x320), FSTP float.
     float const Target = static_cast<float>(MeasurePangramRatio(
         static_cast<int>(std::floor(static_cast<double>(FixedHeight) * 600.0 + 0.5)), 0x320));
-    // FUN_00416f50(fixed_height, DAT_00610850, DAT_00610854, target).
     int const Delta = SearchScaleDelta(FixedHeight, SurfaceWidth,
                                        static_cast<int>(G_RenderSurfaceHeight), Target);
-    // FUN_00418430 (operator[]) on DAT_00610850, then the value = delta.
     ScaleDeltaByWidth[SurfaceWidth] = Delta;
     if (bHadFont)
     {
@@ -300,17 +277,15 @@ int FontImp::ComputeScaleDeltaByRatio()
 
 void FontImp::RefreshScale(bool bRatioTarget)
 {
-    // The prelude of every face slot (e.g. LAB_00416570 00416570..0041680d).
+    // The prelude of every face slot (e.g. LAB_00416570).
     if (LayoutGeneration == G_FontLayoutGeneration)
     {
         return;
     }
     LayoutGeneration = G_FontLayoutGeneration;
-    // vtable +0x08 FIMUL DAT_00610854, FSTP float.
     float const Base = static_cast<float>(static_cast<double>(GetFixedHeight()) *
                                           static_cast<double>(static_cast<int>(G_RenderSurfaceHeight)));
     int const Delta = bRatioTarget ? ComputeScaleDeltaByRatio() : ComputeScaleDelta();
-    // FILD delta, FADD base, FADD 0.5, floor, ftol.
     Realize(static_cast<int>(
         std::floor(static_cast<double>(Delta) + static_cast<double>(Base) + 0.5)));
 }
@@ -318,7 +293,7 @@ void FontImp::RefreshScale(bool bRatioTarget)
 bool FontImp::Init(FFontDesc const& Desc)
 {
     // FUN_00415a80
-    // 00415a8b..00415ab3: the previous handles are only forgotten; the generation is zeroed.
+    // The previous handles are only forgotten.
     if (Font != nullptr)
     {
         Font = nullptr;
@@ -328,18 +303,15 @@ bool FontImp::Init(FFontDesc const& Desc)
         Dc = nullptr;
     }
     LayoutGeneration = 0;
-    // 00415ab9..00415acc: FUN_004183c0(&Id, "%s,%d", Desc.Face) -- retail pushes three
-    // arguments only, so the %d reads the next stack slot (the caller's saved EDI). The call is
-    // kept exactly as retail makes it.
+    // Retail bug kept: the format has %d but no argument is pushed, so it reads the next stack
+    // slot (the caller's saved EDI).
     FontIdFormat(&Id, "%s,%d", Desc.Face);
-    // 00415aca..00415b20: the TString<64> assignment of the face (null -> empty).
     Face = Desc.Face;
-    // 00415b22..00415bc1: the LOGFONTA.
     memset(&LogFont, 0, sizeof(LogFont));
     LogFont.lfWidth = 0;
     LogFont.lfEscapement = 0;
     LogFont.lfOrientation = 0;
-    LogFont.lfWeight = Desc.bBold ? 700 : 400; // NEG / SBB / AND 0x12c / ADD 0x190
+    LogFont.lfWeight = Desc.bBold ? 700 : 400;
     LogFont.lfCharSet = 1;                     // DEFAULT_CHARSET
     LogFont.lfOutPrecision = 4;                // OUT_TT_PRECIS
     LogFont.lfClipPrecision = 0;
@@ -350,34 +322,33 @@ bool FontImp::Init(FFontDesc const& Desc)
     LogFont.lfItalic = Desc.bItalic ? 1 : 0;
     LogFont.lfUnderline = Desc.bUnderline ? 1 : 0;
     LogFont.lfStrikeOut = 0;
-    // 00415bb9..00415bd1
     if (Dc == nullptr)
     {
         Dc = CreateCompatibleDC(nullptr);
     }
-    FixedHeight = Desc.FixedHeight; // 00415be0
-    // 00415be6..00415e1c: the autoscale prelude inlined (the generation is 0 here and
-    // DAT_006105b0 never is, so it always runs).
+    FixedHeight = Desc.FixedHeight;
+    // The autoscale prelude inlined (the generation is 0 here and DAT_006105b0 never is, so it
+    // always runs).
     RefreshScale(false);
-    InitLineHeight = Metrics.tmHeight; // 00415e29
+    InitLineHeight = Metrics.tmHeight;
     return true;
 }
 
 char const* FontImp::Slot00()
 {
-    // LAB_00416550 -- LEA EAX,[ECX+0x4c]
+    // LAB_00416550
     return Id.Data;
 }
 
 char const* FontImp::GetName()
 {
-    // LAB_00416560 -- LEA EAX,[ECX+0x8]
+    // LAB_00416560
     return Name.Data;
 }
 
 float FontImp::GetFixedHeight()
 {
-    // LAB_00416ad0 -- FLD [ECX+0xd0]
+    // LAB_00416ad0
     return FixedHeight;
 }
 
@@ -385,22 +356,21 @@ HFONT__* FontImp::Slot03()
 {
     // LAB_00416570
     RefreshScale(false);
-    return Font; // 0041680e
+    return Font;
 }
 
 LOGFONTA const* FontImp::GetLogFont()
 {
     // LAB_00416820
     RefreshScale(false);
-    return &LogFont; // 00416abe
+    return &LogFont;
 }
 
 float FontImp::GetGlyphAdvance(wchar_t Ch)
 {
     // LAB_00416dc0
     RefreshScale(true);
-    // 00416ef9..00416f3c: select the face, GetCharWidthW (FUN_005b7445) into a zeroed int whose
-    // result is not checked, restore the previous object.
+    // GetCharWidthW (FUN_005b7445) result not checked.
     HDC const SelectedDc = Dc;
     HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
     UINT const Glyph = static_cast<unsigned short>(Ch);
@@ -417,14 +387,14 @@ int FontImp::GetLineHeight()
     RefreshScale(false);
     if (Font != nullptr)
     {
-        return Metrics.tmHeight; // 00416d98
+        return Metrics.tmHeight;
     }
-    return Slot07(); // 00416dab, vtable +0x1c
+    return Slot07();
 }
 
 int FontImp::Slot07()
 {
-    // LAB_00416ae0 -- MOV EAX,[ECX+0xd4]
+    // LAB_00416ae0
     return InitLineHeight;
 }
 
@@ -432,23 +402,21 @@ void FontImp::MeasureString(int* OutWH, wchar_t const* Text, int Len)
 {
     // LAB_00415f60 (vtable slot 8). OutWH is the SIZE the caller passes by pointer; retail
     // writes both halves on every path.
-
-    // 00415f6f..00415fbf: the autoscale prelude, with the out-of-line FUN_00416110.
     RefreshScale(false);
 
     int Width = 0;
     int Height = 0;
-    // 00415fc4: a null string or a zero length measures as 0 x 0 without touching the DC.
+    // A null string or a zero length measures as 0 x 0 without touching the DC.
     if (Text != nullptr && Len != 0)
     {
-        HDC const SelectedDc = Dc;                                // +0xd8
-        HGDIOBJ const Previous = SelectObject(SelectedDc, Font); // +0x118
+        HDC const SelectedDc = Dc;
+        HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
         if (Len == -1)
         {
-            Len = static_cast<int>(wcslen(Text)); // 00416004
+            Len = static_cast<int>(wcslen(Text));
         }
 
-        // 0041600f: the one-time OS probe (OSVERSIONINFOA, size 0x94).
+        // The one-time OS probe.
         if (!G_bFontOsVersionProbed)
         {
             G_bFontOsVersionProbed = true;
@@ -460,11 +428,11 @@ void FontImp::MeasureString(int* OutWH, wchar_t const* Text, int Len)
 #pragma warning(pop)
             if (bVersion)
             {
-                G_bFontWholeStringExtent = Version.dwMajorVersion > 4; // 0041603c SETA
+                G_bFontWholeStringExtent = Version.dwMajorVersion > 4;
             }
             else
             {
-                G_bFontWholeStringExtent = false; // 00416062
+                G_bFontWholeStringExtent = false;
             }
         }
 
@@ -472,14 +440,13 @@ void FontImp::MeasureString(int* OutWH, wchar_t const* Text, int Len)
         BOOL bOk = FALSE;
         if (G_bFontWholeStringExtent)
         {
-            // 0041605a: FUN_005b746a, the delay-load stub of gdi32!GetTextExtentPointW.
+            // FUN_005b746a, the delay-load stub of gdi32!GetTextExtentPointW.
             bOk = GetTextExtentPointW(SelectedDc, Text, Len, &Extent);
         }
         else
         {
-            // 00416069: per-glyph sum through FUN_005b7445 (gdi32!GetCharWidthW); the height is
-            // the realized TEXTMETRIC's tmHeight (+0x120). The count is compared unsigned (JBE /
-            // JC), and the first failing glyph zeroes the result.
+            // Per-glyph sum through FUN_005b7445 (gdi32!GetCharWidthW). The count is compared
+            // unsigned, and the first failing glyph zeroes the result.
             Extent.cx = 0;
             Extent.cy = Metrics.tmHeight;
             unsigned const Count = static_cast<unsigned>(Len);
@@ -496,13 +463,13 @@ void FontImp::MeasureString(int* OutWH, wchar_t const* Text, int Len)
             }
         }
 
-        // 004160c1: any failure (or an empty loop) reports 0 x 0.
+        // Any failure (or an empty loop) reports 0 x 0.
         if (bOk)
         {
             Width = Extent.cx;
             Height = Extent.cy;
         }
-        SelectObject(SelectedDc, Previous); // 004160dd
+        SelectObject(SelectedDc, Previous);
     }
     OutWH[0] = Width;
     OutWH[1] = Height;
@@ -512,7 +479,6 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
 {
     // LAB_004172b0 (vtable slot 9, RET 0xc).
     RefreshScale(true);
-    // 004173e9..00417405: count, width sum and index start at 0; Len == -1 -> wcslen.
     int Count = 0;
     unsigned Sum = 0;
     unsigned Index = 0;
@@ -520,11 +486,10 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
     {
         Len = static_cast<int>(wcslen(Text));
     }
-    // 00417408..00417424: select the face into the DC, the previous object kept.
     HDC const SelectedDc = Dc;
     HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
-    // 00417428..00417478: stop once the sum reaches MaxWidth (JNC) or the next character would
-    // pass it (JA); both compares are unsigned.
+    // Stop once the sum reaches MaxWidth or the next character would pass it; both compares
+    // are unsigned.
     unsigned const Limit = static_cast<unsigned>(MaxWidth);
     if (static_cast<unsigned>(Len) > 0u)
     {
@@ -547,7 +512,6 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
             ++Index;
         } while (Index < static_cast<unsigned>(Len));
     }
-    // 0041747e..00417484: restore the previous object.
     SelectObject(SelectedDc, Previous);
     return Count;
 }
@@ -557,16 +521,13 @@ int FontImp::GetCharWidths(wchar_t const* Text, int Len, int* OutWidths)
     // LAB_004170e0 (vtable slot 10, RET 0xc).
     RefreshScale(true);
 
-    // 00417219..0041722d: SelectObject(+0xd8 DC, +0x118 HFONT), the previous object kept.
     HDC const SelectedDc = Dc;
     HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
-    // 00417237..0041724e: Len == -1 -> wcslen.
     if (Len == -1)
     {
         Len = static_cast<int>(wcslen(Text));
     }
-    // 00417250..0041728a: unsigned index loop; the width slot is zeroed before every
-    // GetCharWidthW (FUN_005b7445 is its delay-load thunk) and its result is not checked.
+    // Unsigned index loop; GetCharWidthW's result is not checked.
     int Sum = 0;
     for (unsigned Index = 0; Index < static_cast<unsigned>(Len); ++Index)
     {
@@ -576,14 +537,13 @@ int FontImp::GetCharWidths(wchar_t const* Text, int Len, int* OutWidths)
         Sum += Width;
         OutWidths[Index] = Width;
     }
-    // 0041728c..00417296: restore the previous object; the sum is returned.
     SelectObject(SelectedDc, Previous);
     return Sum;
 }
 
 int LoadFonts(char const* Path, IFileSystem* Filesys)
 {
-    // FUN_00417800 (from FUN_005b0c30 0x005b0d0e with DALib::Data).
+    // FUN_00417800 (from FUN_005b0c30 with DALib::Data).
     char FullPath[MAX_PATH];
     int Count = 0;
     GetFileSysPath(FullPath, Path, Filesys);
@@ -594,10 +554,8 @@ int LoadFonts(char const* Path, IFileSystem* Filesys)
         {
             if (!Reader.is_header("TrueType"))
             {
-                continue; // 004178b4 -> the next header
+                continue;
             }
-            // 004178ba..004178d7: the section's scratch -- two {length, char[0x80]} strings and
-            // fixed_height.
             TString<0x80> Nickname;
             Nickname.Length = 0;
             Nickname.Data[0] = '\0';
@@ -638,19 +596,16 @@ int LoadFonts(char const* Path, IFileSystem* Filesys)
                     FixedHeight = Reader.get_value_float(0);
                 }
             }
-            // 004179b3..00417a0a: a default FontImp (FUN_00417d50) copied onto the list's end
-            // (FUN_00418bc0 / FUN_00418cd0), then the stack temporary destroyed.
+            // A default FontImp copied onto the list's end (FUN_00418bc0 / FUN_00418cd0).
             {
                 FontImp Temp;
                 G_FontList.insert(G_FontList.end(), Temp);
             }
-            // 00417a0f..00417a22: the new last node gets the nickname.
             FontImp* const Imp = &G_FontList.back();
             Imp->SetName(Nickname.Data);
-            // 00417a27: retail's own test of the node pointer (never null).
+            // Retail's own test of the node pointer (never null).
             if (Imp != nullptr)
             {
-                // 00417a2b..00417a4d: {face, fixed_height, not bold, not italic, not underlined}.
                 FFontDesc Desc;
                 Desc.Face = FontName.Data;
                 Desc.FixedHeight = FixedHeight;
@@ -679,7 +634,7 @@ IFont* FindMenuFontImp(char const* Nickname)
     {
         if (_stricmp(It->GetName(), Nickname) == 0)
         {
-            return &*It; // 004177ed LEA EAX,[ESI+0x8]
+            return &*It;
         }
     }
     return nullptr;
@@ -688,18 +643,15 @@ IFont* FindMenuFontImp(char const* Nickname)
 void FontShutdown()
 {
     // FUN_004174a0
-    // 004174a0..004174e6: free the DIB block, put the old bitmap back, delete bitmap and DC.
     FontAtlasReleaseScratch();
-    // 004174ec..00417543: erase every font (FUN_00418fa0 -> FUN_00416490, node freed).
     std::list<FontImp>::iterator It = G_FontList.begin();
     while (It != G_FontList.end())
     {
         It = G_FontList.erase(It);
     }
-    // 00417545..004175c0: destroy every pooled atlas page.
     FontAtlasReleasePagePool();
-    // 004175c2..00417612: every number face drops its glyph string (FUN_00415050 inlined).
+    // FUN_00415050 inlined.
     NumberFaceResetAll();
-    // 0041761a: tail jump to FUN_00402d50.
+    // Tail jump to FUN_00402d50.
     ScreenQuadResetDrawBatchCache();
 }

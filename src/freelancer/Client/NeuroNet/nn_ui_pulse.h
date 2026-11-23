@@ -23,7 +23,7 @@
 void NnUiPulseReset();
 
 // Pulse-advance slice of FUN_0059e080 (DAT_0067dce8 / DAT_0067dce4 only). Retail passes the
-// frame delta as a double (FADD double ptr [ESP+4]); Win3DUpdateAll is the only caller.
+// frame delta as a double; Win3DUpdateAll is the only caller.
 void NnUiPulseAdvance(double DeltaSeconds);
 
 // FUN_00561da0 — write blended ARGB into *OutArgb.
@@ -56,7 +56,7 @@ extern unsigned char G_HudChromeColorRgba[4];
 
 // NeuroNet UI palette -- one 4-byte colour per static initializer, all in this TU's XC run
 // (LAB_00561be0 .. LAB_00561d80). Memory bytes are R,G,B,A, so the little-endian dword is
-// 0xAABBGGRR -- which is how most retail readers load them (MOV r32). None of them has a
+// 0xAABBGGRR -- which is how most retail readers load them. None of them has a
 // writer in the PE besides its initializer. LAB_00561c80 and LAB_00561d20 seed two more
 // slots that nothing reads; they are not declared.
 extern unsigned long G_NnPaletteArgb_679bb0; // LAB_00561c00  87,C3,E0,FF  idle cyan

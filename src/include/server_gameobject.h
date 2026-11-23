@@ -42,7 +42,7 @@
 //   Ship::Ship              .text:06d00e80  -- operator new(200 == 0xc8), EqObj
 //                                              then +0x90..+0xc7.
 //
-// VTABLES (re-checked slot by slot 2026-09-25, claude-code:g-vt1):
+// VTABLES:
 //   * The extension vtable is declared in retail slot ORDER: GameObject +0x154 .. +0x1b8
 //     (111 slots) and EqObj +0x1bc .. +0x24c (148 slots), each with its retail offset and
 //     base body next to it. The absolute slot numbers are retail's too: IObjInspect's 85
@@ -260,8 +260,7 @@ public:
 
     // -- Server.dll's own extension of the IObjInspect vtable ---------------
     //
-    // DECLARATION ORDER IS RETAIL SLOT ORDER (2026-09-24, claude-code:w5-server-06ce).
-    // Every virtual below is declared in the order of GameObject's own vtable
+    // DECLARATION ORDER IS RETAIL SLOT ORDER. Every virtual below is declared in the order of GameObject's own vtable
     // (.rdata:06d65244 family; GameObject ends at +0x1b8 = 111 slots, EqObj
     // continues to +0x24c = 148 slots, Solar adds +0x250). The byte offset in each
     // `// +0xNNN` comment is the retail slot; the address is the base body. The
@@ -273,19 +272,9 @@ public:
     // -- The four slots retail puts between IObjInspect's last (+0x150) and
     //    create() (+0x164). -------------------------------------------------
     //
-    // IDENTIFIED 2026-09-17 (Server.dll lane, wave 8). The header comment above
-    // called these "four unidentified GameObject slots"; they are not
-    // unidentified any more. Ship's vtable is at .rdata:06d6711c, anchored
-    // twice and independently: create() sits at +0x164 (.rdata:06d67280 ->
-    // .text:06d01040, this file's own citation) and get_invincible_flag() at
-    // +0x198 (.rdata:06d672b4 -> .text:06ce61a0, likewise). Slot +0x150 is
-    // .text:06d5fd02, `JMP dword ptr [->COMMON.DLL::IObjInspectImpl::...]`,
-    // i.e. an import thunk -- which is exactly what IObjInspect's last slot
-    // (cobject(), implemented in Common.dll) has to look like from here, and is
-    // the third confirmation of the base address.
-    //
-    // All thirteen Server.dll vtables that share this layout were dumped and
-    // compared, which is what separates GameObject's own body from an override:
+    // Ship's vtable (.rdata:06d6711c) anchors them: create() at +0x164, get_invincible_flag()
+    // at +0x198, and +0x150 is the import thunk of IObjInspect's last slot (cobject(), in
+    // Common.dll). Bodies across the thirteen Server.dll vtables sharing this layout:
     //   +0x154  base .text:06cef1c0;  overridden 5x (CounterMeasure .text:06ce61f0,
     //           .text:06cf3400, .text:06cf3d70, .text:06d08eb0, .text:06d09b90)
     //   +0x158  base .text:06cee630;  overridden 6x (EqObj .text:06ce8080, ...)
@@ -414,39 +403,12 @@ public:
     // (StarSystem FUN_06d0d730), which damages the OTHER object.
     virtual void on_collision(FCollisionEvent const& Hit);
 
-    // Retail slot +0x1a8. ADDED 2026-09-17 (wave 14) because the per-frame
-    // observer update needs it: .text:06cf61dd is
-    //   .text:06cf61be  6800000040      PUSH 0x40000000
-    //   .text:06cf61c3  8d442470        LEA  EAX,[ESP + 0x70]
-    //   .text:06cf61c7  50              PUSH EAX
-    //   .text:06cf61dd  ff92a8010000    CALL dword ptr [EDX + 0x1a8]
-    // on a stack DamageList that the caller then tests for emptiness.
-    //
-    // CORRECTION, and the reason the second argument is a float here: 0x40000000
-    // is NOT a bitmask. Ship's override for this slot is .rdata:06d672c4 ->
-    // .text:06ceb210 (Ship's vtable base is .rdata:06d6711c, anchored by
-    // create() at +0x164 -> .text:06d01040 and get_invincible_timer() at
-    // +0x1a0 -> .text:06ce61c0), and that body uses the argument as
-    //   .text:06ceb295  ff5244          CALL dword ptr [EDX + 0x44]  ; CEquip status
-    //   .text:06ceb298  d85c2434        FCOMP float ptr [ESP + 0x34] ; <- the arg
-    //   .text:06ceb29e  f6c405          TEST  AH,0x5
-    //   .text:06ceb2a1  7a9d            JP    LAB_06ceb240           ; >= -> skip
-    // i.e. a FLOAT comparison against each equip's status. 0x40000000 read as a
-    // float is 2.0f, so "everything, whatever its status" -- a health ceiling,
-    // not a mask. The tracker's earlier note on FUN_06cf53e0 called it "mask
-    // 0x40000000"; that reading is wrong and this comment supersedes it.
-    //
-    // PORTED 2026-09-17 (wave 15). The base body is FUN_06ceee20
-    // (.text:06ceee20), which ten of the thirteen wrapper vtables carry
-    // unchanged; EqObj/Ship/Solar override it with .text:06ceb210. Both are in
-    // src/Server/server_gameobject.cpp with their byte trails.
-    //
-    // CORRECTION to the sketch that used to stand here: it said the non-
-    // destroyed arm records "the equip's own status", i.e. the +0x44 value the
-    // comparison uses. It does not. .text:06ceb295 `ff5244` (GetRelativeHealth)
-    // is the COMPARISON and .text:06ceb2ad `ff503c` (GetHitPoints) is the value
-    // that goes into the entry -- two different accessors, named by
-    // ??_7CETractor@@6B@ at .rdata:0639d908 and .rdata:0639d900.
+    // Retail slot +0x1a8. The per-frame observer update calls it with 0x40000000 on a
+    // stack DamageList and then tests the list for emptiness. The second argument is a
+    // float health ceiling, not a mask: Ship's override (.text:06ceb210) compares each
+    // equip's relative health against it (0x40000000 = 2.0f, i.e. every equip) and
+    // records the equip's hit points in the entry. Base body FUN_06ceee20 (ten of the
+    // thirteen wrapper vtables); EqObj/Ship/Solar override with .text:06ceb210.
     virtual void get_damage_list(DamageList& Out, float StatusCeiling) const;
 
     // +0x1ac -- .text:06cef1e0 (RET 4). Queues a root entry of
@@ -482,73 +444,26 @@ public:
     CSimple* csimple() const;
 
     // -----------------------------------------------------------------
-    // retail +0x14 .. +0x1F -- the "marked by" player list. DECODED
-    // 2026-09-17 (wave 13); it used to be one of the "four VC6 list heads
-    // this port does not model".
-    //
-    // The constructor builds it (raw bytes, .text:06cee360):
-    //   .text:06cee3ba  6a0c     PUSH 0xc                 ; node size
-    //   .text:06cee3c0  884e14   MOV  byte [ESI+0x14],CL  ; std::allocator
-    //   .text:06cee3c3           CALL MSVCRT.DLL::operator_new
-    //   .text:06cee3c8  8900     MOV  [EAX],EAX
-    //   .text:06cee3ca  894004   MOV  [EAX+4],EAX         ; self-linked sentinel
-    //   .text:06cee3cd  894618   MOV  [ESI+0x18],EAX      ; _Head
-    //   .text:06cee3d0  895e1c   MOV  [ESI+0x1c],EBX      ; _Size = 0
-    // so the MSVC6 shape is {allocator +0x14, _Head +0x18, _Size +0x1C} over
-    // 0x0C-byte nodes {next, prev, unsigned int} -- and the element really is
-    // a bare dword, because FUN_06cef3b0's own `operator new(0xc)` writes only
-    // node[2].
-    //
-    // What the dword IS comes from retail's own export name:
-    // pub::Player::MarkObj (?MarkObj@Player@pub@@YAHIIH@Z, .text:06d549d5)
-    // resolves the object id and calls FUN_06cef3b0(obj, player_id, mark_type)
-    // -- so the list holds PLAYER IDS, and the predicate FUN_06cef450 answers
-    // "has that player marked this object?".
-    //
-    // FUN_06cef3b0 (.text:06cef3b0) is mark_for_player() below: it searches the
-    // list for the id, push_backs it when MarkType == 1 and it is absent,
-    // erases it when MarkType == 0 and it is present, and keeps _Size in step
-    // both ways.
-    // FUN_06cef450 (.text:06cef450) is is_marked_by(): fourteen instructions,
-    // `MOV ECX,[ECX+0x18]` / `CMP [EAX+8],EDX` / `SETNZ AL`.
-    //
-    // The answer is a wire field in at least three payloads:
-    //   .text:06cf6c85  884208        MOV byte [EDX + 0x8],AL    ; CREATELOOT +0x08
-    //   .text:06d0addd  888424dc000000 MOV byte [ESP + 0xdc],AL  ; CREATESHIP +0xA8
-    //   .text:06d0a63b  8885a8000000  MOV byte [EBP + 0xa8],AL   ; CREATESOLAR +0xA8
-    // The CREATESOLAR site is the cleanest of the three and is worth reading in
-    // full, because the two dwords it writes are the two payload fields this
-    // wave chased: .text:06d0a630 loads the observer's player id off node+0x40,
-    // .text:06d0a636 asks this predicate, .text:06d0a63b stores the answer,
-    // .text:06d0a64f is `MOV EAX,[EDX + EAX*1 + 0xffffff00]` (Players +
-    // id*0x418 - 0x100, i.e. PlayerData::rep_vibe), .text:06d0a65b stores THAT
-    // at payload +0xb0, and .text:06d0a661 finally calls the notifier.
-    //
-    // A real container, because retail has one. The port uses std::list rather
-    // than reproducing the intrusive node by hand: nothing here is a raw heap
-    // block the way Observer's node is, so there is no reason to.
+    // retail +0x14 .. +0x1F -- the "marked by" player list, a VC6 std::list of dwords
+    // built by the ctor. pub::Player::MarkObj (.text:06d549d5) calls
+    // FUN_06cef3b0(obj, player_id, mark_type), so it holds player ids; FUN_06cef450
+    // answers "has that player marked this object?". The answer is a wire field of
+    // CREATELOOT (+0x08), CREATESHIP and CREATESOLAR (+0xA8).
     std::list<unsigned int> MarkedByPlayers;
 
-    // FUN_06cef3b0 (.text:06cef3b0, `RET 0x8`). MarkType is retail's `param_2`,
-    // and retail tests it against the literals 1 and 0 rather than for
-    // non-zero: `.text:06cef3d0  83fa01  CMP EDX,0x1` adds,
-    // `.text:06cef41b  85d2  TEST EDX,EDX` removes, and every other value falls
-    // through to LAB_06cef442 having done nothing at all. The port keeps the int
-    // and keeps that three-way split -- do not collapse it to a bool.
+    // FUN_06cef3b0. Retail tests MarkType against the literals 1 (add when absent) and 0
+    // (erase when present); any other value does nothing -- keep the int, not a bool.
     void mark_for_player(unsigned int PlayerId, int MarkType);
 
-    // FUN_06cef450 (.text:06cef450, `RET 0x4`).
+    // FUN_06cef450.
     bool is_marked_by(unsigned int PlayerId) const;
 
-    // GameObject's own data members, from the constructor at .text:06cee360
-    // (every member it writes, 2026-09-24) and the accessors above.
+    // GameObject's own data members, from the constructor at .text:06cee360 and the
+    // accessors above.
 
-    // retail +0x20/+0x24 -- a DOUBLE. The ctor zeroes both dwords
-    // (.text:06cee3d7/06cee3da); the only writer is EqObj::apply_damage_list,
-    // `CALL [->Timing::read]` / `FSTP double ptr [ESI+0x20]` (.text:06ceb3cb /
-    // .text:06ceb3d1) while the hull's relative health is above 0; readers are
-    // EqObj::update (.text:06ce7ef7 `FSUB double ptr [EBX+0x20]`) and StarSystem
-    // (.text:06d0bc27).
+    // retail +0x20/+0x24 -- a double, zeroed by the ctor. Only writer:
+    // EqObj::apply_damage_list stores Timing::read() while the hull's relative health is
+    // above 0; read by EqObj::update and StarSystem.
     double LastDamageTime;
 
     // retail +0x2c/+0x30/+0x34 -- VC6 std::list of 0x14-byte nodes (0x0c of
@@ -1200,43 +1115,13 @@ public:
     void compute_jettison_launch(Vector* OutPos, Matrix* OutOrient, Vector* OutVel);
 
     // -----------------------------------------------------------------
-    // Ship's OWN block, +0x90 .. +0xC7. Decoded 2026-09-17 (wave 9) off the
-    // constructor at .text:06d00e80, which writes every one of these in order
-    // and nothing else; the EqObj constructor it chains to (.text:06ce6620)
-    // stops at `MOV byte ptr [ESI + 0x88],BL` (.text:06ce66b0), so the base
-    // really does end at 0x8C/0x90 and this block really is Ship's.
+    // Ship's own block, +0x90 .. +0xC7, written in order by the constructor at
+    // .text:06d00e80 (the EqObj ctor stops at +0x88; +0xB4 is never written; the
+    // EquipIdMaker at +0xC4 ends at 0xC8, the operator new size). The byte at +0xA0 is
+    // MSVC6's 1-byte std::allocator of the list that follows, copied from an uninitialised
+    // temporary -- not data. +0x94, +0xAC, +0xBC and +0xC0 are floats; +0x9C a pointer.
     //
-    //   .text:06d00eab  MOV  [ESI + 0x90],EBX(0)
-    //   .text:06d00eb1  MOV  [ESI + 0x94],EBX
-    //   .text:06d00eb7  MOV  byte [ESI + 0x98],BL
-    //   .text:06d00ebd  MOV  [ESI + 0x9c],EBX
-    //   .text:06d00ec9  MOV  byte [ESI + 0xa0],AL   <- see the CAUTION below
-    //   .text:06d00ec3  PUSH 0x28 / operator new; [EAX]=EAX; [EAX+4]=EAX
-    //   .text:06d00edc  MOV  [ESI + 0xa4],EAX       ; _Head of a std::list
-    //   .text:06d00ee2  MOV  [ESI + 0xa8],EBX       ; its _Size
-    //   .text:06d00ef3  MOV  [ESI + 0xac],EBX
-    //   .text:06d00ef9  MOV  [ESI + 0xb0],EBX
-    //   (+0xb4 is NEVER written by the constructor)
-    //   .text:06d00eff  MOV  byte [ESI + 0xb8],BL
-    //   .text:06d00f05  MOV  [ESI + 0xbc],EBX
-    //   .text:06d00f0b  MOV  [ESI + 0xc0],EBX
-    //   .text:06d00ee8/.text:06d00f11  LEA ECX,[ESI + 0xc4] + a direct call to
-    //                   COMMON.DLL::SubObjectID::EquipIdMaker::EquipIdMaker
-    // 0xC4 + 4 = 0xC8 = exactly what .text:06d0a8c7's operator new asks for.
-    //
-    // CAUTION on +0xA0: `MOV AL,[ESP + 0x0b]` at .text:06d00ea5 reads an
-    // UNINITIALISED local, not an argument (Ship::Ship takes none). It is
-    // MSVC6's 1-byte std::allocator member, copy-initialised from an
-    // `allocator()` temporary -- the same artefact as Observer+0x08.
-    // Do not read it as data. The triple {+0xA0, +0xA4, +0xA8} is one
-    // std::list whose nodes are 0x28 bytes (0x08 header + a 0x20 value).
-    //
-    // DECODED 2026-09-17 (wave 13). The 2026-09-17 (wave 9) note said "what
-    // each field MEANS is still open"; it is not any more, and FOUR of them
-    // were typed wrong -- +0x94, +0xAC, +0xBC and +0xC0 are FLOATS, read with
-    // FLD/FST/FSUB, not `unsigned int`. +0x9C is a pointer, not an int.
-    //
-    // The readers, in order of how much they settle:
+    // The readers:
     //
     //  * Ship::update, retail's vtable slot at .rdata:06d67288 ->
     //    .text:06d01450. `if (Field_0x90 == 0)` is the live path -- it runs
@@ -1292,13 +1177,8 @@ public:
     IObjAffect::RequestCB* PendingRequest; // +0x9C  slot_5c stores it; request_returned calls its OnResult (vtable slot 0)
     // +0xA0..+0xA8 -- the jettison queue, a COMMON.DLL EquipDescList (a VC6
     // std::list<EquipDesc>: allocator +0xA0, head +0xA4, size +0xA8, 0x28-byte nodes
-    // with the EquipDesc at +0x08). The type is proved by the unwind funclets:
-    // Unwind@06d60ecb (Ship::Ship, ECX = this + 0xa0) and Unwind@06d60ef8
-    // (~Ship, ECX = CBase + 0x94 = this + 0xa0) both JMP to the import
-    // COMMON.DLL::EquipDescList::~EquipDescList (.rdata:06d643f0). Ship::Ship builds it
-    // inline (.text:06d00ec3..06d00ee2: operator new(0x28) head, size 0) before the
-    // EquipIdMaker at +0xC4; ~Ship destroys it after its body (.text:06d00fc0..06d01016)
-    // and before ~EqObj -- a member destroyed by the compiler, as here.
+    // with the EquipDesc at +0x08): the unwind funclets of Ship::Ship and ~Ship call the
+    // imported EquipDescList::~EquipDescList on it.
     EquipDescList Jettison;
     float JettisonTimer;                  // +0xAC  JETTISON_CLEARANCE_TIME countdown
     int PendingBayCloses;                 // +0xB0
@@ -1308,18 +1188,9 @@ public:
     // (.text:06d02ae0, main vtable slot 42 +0xA8), which hands it out as the
     // IObjInspect `void const*` data pointer -- hence the type.
     void const* EquipStateData;
-    // +0xB8 -- a ONE-SHOT latch, not a toggle. FUN_06d01110 (.text:06d01110,
-    // called from .text:06cf00d5 and .text:06d0cf66) is its whole story:
-    //   .text:06d01110  8a81b8000000  MOV  AL,byte ptr [ECX + 0xb8]
-    //   .text:06d0111b  752c          JNZ  LAB_06d01149      ; already done
-    //   .text:06d0111d  b801000000    MOV  EAX,0x1
-    //   .text:06d01126  8881b8000000  MOV  byte ptr [ECX + 0xb8],AL
-    //   .text:06d01143  ff9094010000  CALL dword ptr [EAX + 0x194]
-    // i.e. "fire the +0x194 slot exactly once per ship", with a 0x0C-byte
-    // FInvincibility built on the stack: dword 1 (.text:06d0112c), byte 1
-    // (.text:06d01130), byte 1 (.text:06d01134), float 0.0f (.text:06d0113b)
-    // -- not {1, 0, 0} as this note used to say. ECX is the Ship BASE: the
-    // vtable it calls through is `[ECX]`, at +0x00.
+    // +0xB8 -- a one-shot latch. FUN_06d01110 (called from .text:06cf00d5 and
+    // .text:06d0cf66) sets it and calls the +0x194 slot exactly once per ship with an
+    // FInvincibility {1, 1, 1, 0.0f}.
     unsigned char bLaunchInvincible;
     float AccumulatedDamage;              // +0xBC
     float AccumulatedDamageTime;          // +0xC0

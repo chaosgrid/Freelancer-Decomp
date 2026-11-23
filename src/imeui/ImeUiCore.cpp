@@ -1132,7 +1132,7 @@ static void MoveCompositionCaretToEnd()
     SendKey(VK_RIGHT, static_cast<unsigned>(wcslen(GComposition) - GCompositionCursor));
 }
 
-// FUN_06714360(HWND,bool,int), including the HWND obscured by the decompiler.
+// FUN_06714360(HWND, bool, int); the HWND parameter is real.
 static void RemoveComposition(HWND Window, bool bAll, int NewLength)
 {
     if (GSupportLevel != 3) return;

@@ -10,8 +10,8 @@
 // sprites a CliAsteroid field draws beyond its real asteroid cubes (FCliAsteroid +0x198 flag,
 // +0x19C block, see cli_asteroid.h), and the vertex-buffer batch they are drawn through.
 //
-// Retail call path: CliAsteroid tick FUN_005225d0 -> (Flag198, ASTEROID_EXT > 1, [EFFECTS],
-// FUN_0054e040) -> FUN_00522700 ambient pass -> FUN_0054e900(camera, field ExclusionMgr, 2).
+// Call path: the per-field tick (CliAsteroidTickOne, FUN_005225d0) -> (Flag198,
+// ASTEROID_EXT > 1, [EFFECTS], BillboardNearCamera) -> the ambient pass -> BillboardDraw.
 //
 // The batch is one static object, DAT_006797d0 (static init LAB_0054dad0 = FUN_0054daf0(0x142),
 // atexit LAB_0054db50 -> FUN_0054db70). It is an immediate-mode writer over
@@ -30,15 +30,15 @@ namespace Exclusion
     class AsteroidExclusionZoneMgr;
 }
 
-// A {write pointer, stride} pair inside the batch (+0x6c / +0x74 / +0x7c). The retail dtor
-// zeroes both fields: FUN_0054db70 0x0054dbbc..0x0054dbce clears them in reverse member order,
-// which is what three member destructors produce.
+// A {write pointer, stride} pair inside the batch (+0x6c / +0x74 / +0x7c). The retail batch
+// dtor (FUN_0054db70) zeroes both fields of each in reverse member order, which is what three
+// member destructors produce.
 struct FBillboardVertexCursor
 {
     explicit FBillboardVertexCursor(int InStride);
     ~FBillboardVertexCursor();
 
-    // FUN_00552b10 (thiscall, RET 4): Ptr += Stride. The argument is never read.
+    // FUN_00552b10: Ptr += Stride. The argument is never read.
     void Advance(int Unused);
 
     unsigned char* Ptr; // +0x00
@@ -60,20 +60,20 @@ static_assert(sizeof(FBillboardSavedVertex) == 0x18, "saved vertex 0x18");
 class FAsteroidBillboardBatch
 {
 public:
-    // FUN_0054daf0 (thiscall, RET 4).
+    // FUN_0054daf0.
     explicit FAsteroidBillboardBatch(unsigned InFvf);
     // FUN_0054db70.
     ~FAsteroidBillboardBatch();
 
-    // FUN_0054f960 (thiscall, RET 8): release the held pipeline (+0x0c) and vertex-buffer
-    // manager (+0x10), then hold and AddRef the new ones that are not null.
+    // FUN_0054f960: release the held pipeline (+0x0c) and vertex-buffer manager (+0x10), then
+    // hold and AddRef the new ones that are not null.
     void SetInterfaces(IRenderPipeline* InPipeline, IVertexBufferManager* InVbMgr);
     // FUN_0054f9c0: flags bits 0..2, the counters, colour -1, UV 0, primitive 0x7fffffff.
     void Reset();
-    // FUN_0054f830 (thiscall, RET 8): the three cursors from the locked vertex pointer. The
-    // strides come from the batch's own lock FVF (+0x18); the offsets from InFvf.
+    // FUN_0054f830: the three cursors from the locked vertex pointer. The strides come from
+    // the batch's own lock FVF (+0x18); the offsets from InFvf.
     void BindCursors(unsigned char* Base, unsigned InFvf);
-    // FUN_0054fd30 (thiscall, RET 0xc): one vertex at the current colour and UV.
+    // FUN_0054fd30: one vertex at the current colour and UV.
     void Vertex(float X, float Y, float Z);
 
     unsigned Prim;                  // +0x00 0x7fffffff when idle, 4 (triangle list) in use
@@ -105,7 +105,7 @@ extern FAsteroidBillboardBatch G_AsteroidBillboardBatch;
 // FUN_0054f800 (cdecl): SetRenderState for each {state, value} pair up to a zero state.
 void BillboardApplyRenderStates(IRenderPipeline* Pipeline, unsigned const* Table);
 
-// FUN_0054e130 (thiscall on the billboard block, RET 0x24): the ambient colour (D3DRS_AMBIENT *
+// FUN_0054e130 (thiscall on the billboard block): the ambient colour (D3DRS_AMBIENT *
 // ambient_intensity / 255 * tinted ambient * color_shift) into all five outputs, then for up
 // to MaxLights directional (type 3) lights within 100 of Pos, each light's ambient share and
 // its tinted diffuse colour weighted by how far the light faces each of the five directions
@@ -116,7 +116,7 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
                               float* OutCenter, float* OutCorner0, float* OutCorner1,
                               float* OutCorner2, float* OutCorner3);
 
-// FUN_0054f9f0 (thiscall on the billboard block, RET 0x14; the block is not read): one rock as
+// FUN_0054f9f0 (thiscall on the billboard block, which is not read): one rock as
 // a single triangle into G_AsteroidBillboardBatch -- base P -/+ A, apex P + B, A and B the
 // rock-size-scaled Right / Up (swapped by bSwapAxes, B negated by bNegateApex), the base
 // vertices in CornerColor with a corner-UV pair picked by the flip bits, the apex in
@@ -125,7 +125,7 @@ void BillboardEmitRock(FAsteroidBillboardBlock* Bb, FAsteroidBillboardRock* Rock
                        float const* Right, float const* Up, float const* CornerColor,
                        float const* CenterColor);
 
-// FUN_0054e900 (thiscall on the billboard block, RET 0xc). Caller FUN_005225d0 passes the
-// field's ExclusionMgr (+0xdc) and ExcludeType 2 (billboards).
+// FUN_0054e900 (thiscall on the billboard block). The field tick passes the field's
+// ExclusionMgr (+0xdc) and ExcludeType 2 (billboards).
 void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                    Exclusion::AsteroidExclusionZoneMgr* Excl, int ExcludeType);

@@ -40,17 +40,16 @@ namespace
     // source-file argument, lines 0x13d and 0x185).
     char const kStaticControlCpp[] = "E:\\FL\\Scratch\\Source\\Client\\Interface\\StaticControl.cpp";
 
-    // DAT_005db098 -- 0x38d1b717, 1e-4: Update's "already at the start angle" threshold.
+    // DAT_005db098 -- Update's "already at the start angle" threshold.
     float const kAngleEpsilon = 9.99999975e-05f;
-    // DAT_005c7f68 -- 1/255 (0x3b808081)
+    // DAT_005c7f68
     float const kInv255 = 1.0f / 255.0f;
-    // 0x420c0000 -- the render-to-window camera's vertical field of view.
+    // The render-to-window camera's vertical field of view.
     float const kWindowFovY = 35.0f;
-    // 0xc2ae0000 -- where a render-to-window instance sits while it is drawn.
+    // Where a render-to-window instance sits while it is drawn.
     float const kWindowDepth = -87.0f;
 
-    // DAT_0067c53c -- the 3DMathEngine this class acquires on first use (FUN_005b73e0), shared
-    // by Draw (0x00588bc5) and SetOrientation (0x00588d19).
+    // DAT_0067c53c -- the 3DMathEngine this class acquires on first use (FUN_005b73e0).
     I3DMathEngine* G_StaticMathEngine = nullptr;
 
     I3DMathEngine* StaticMathEngine()
@@ -62,7 +61,6 @@ namespace
 
     bool HasInstance(WinControl const* Control)
     {
-        // The `CMP [ESI+0x84],-1` every slot below inlines.
         return Control->MeshHolder.EngineInstance !=
                reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     }
@@ -84,10 +82,8 @@ namespace
         Transform12[11] = 0.0f;
     }
 
-    // The instance placement Init (0x005885a2..0x0058864a), Create's "offset"
-    // (0x005880fb..0x005881b4) and property 0x17 (0x005891b2..0x00589229) spell out: identity
-    // orientation at (offset + position) through Engine SetInstanceMatrix (+0x9c), then
-    // UpdateInstance (+0x6c). The three sums are +0xa8.. + +0x60.. (FUN_00422b80).
+    // Port-only helper for the placement Init (0x005885a2), Create's "offset" (0x005880fb) and
+    // property 0x17 (0x005891b2) inline: identity orientation at offset + position.
     void PlaceInstanceAtOffset(NnStaticControl* Self)
     {
         float Transform[12];
@@ -100,10 +96,8 @@ namespace
     }
 
     // One plane rotation of the three rows of a 3x3, as SetOrientation and the angle
-    // properties unroll it: per row, a = M[r][ColA], b = M[r][ColB] (both read before either
-    // is written), then M[r][ColA] = C*a + S*b and M[r][ColB] = C*b - S*a. The products are
-    // kept on the FPU stack; SetOrientation and the first turn of each property store C as a
-    // float first (FSTP dword), the second turn of each property keeps both on the stack.
+    // properties unroll it. SetOrientation and the first turn of each property round C to a
+    // float first; the second turn of each property keeps both at full precision.
     void RotateColumns(float* M, int ColA, int ColB, double C, double S)
     {
         for (int Row = 0; Row < 3; ++Row)
@@ -115,8 +109,7 @@ namespace
         }
     }
 
-    // The holder tint Draw writes before FUN_0059efa0 (0x00588aab..0x00588b10): bytes 0..2
-    // into +0x14 / +0x18 / +0x1c, byte 3 into +0x24, each times 1/255.
+    // The holder tint Draw writes before FUN_0059efa0 (0x00588aab).
     void SetHolderTint(FClientMeshHolder* Holder, unsigned char const* Rgba)
     {
         Holder->UserFloats[0] = static_cast<float>(static_cast<double>(Rgba[0]) * kInv255);
@@ -125,9 +118,8 @@ namespace
         Holder->UserFloats[4] = static_cast<float>(static_cast<double>(Rgba[3]) * kInv255);
     }
 
-    // SetProperty 0xd / 0xf / 0x11 (0x00589261.., 0x00589379.., 0x0058948b..): the bound
-    // instance's transform (Engine +0xa0) turned back by the old angle, then by the new one,
-    // written back (+0x9c) and updated (+0x6c).
+    // SetProperty 0xd / 0xf / 0x11 (0x00589261, 0x00589379, 0x0058948b): the instance turned
+    // back by the old angle, then by the new one.
     void TurnInstanceAngle(NnStaticControl* Self, int ColA, int ColB, float OldAngle,
                            float NewAngle)
     {
@@ -157,8 +149,7 @@ namespace
         return static_cast<intptr_t>(static_cast<int>(Bits));
     }
 
-    // The "boolean" INI keys: get_value_float(0) against 0.0 (DAT_005c8ba8; FCOMP / TEST
-    // AH,0x44 / JNP: only an equal value gives 0).
+    // The "boolean" INI keys: only a value equal to 0.0 (DAT_005c8ba8) gives 0.
     unsigned char IniFlag(INI_Reader* Ini)
     {
         return (Ini->get_value_float(0) != 0.0) ? 1 : 0;
@@ -181,8 +172,7 @@ NnStaticControl::NnStaticControl()
     , ForceRadius(0.0f)
     , RotationSpeed(0.0f)
 {
-    // FUN_00587e40 after FUN_0059f860: the camera (FUN_0040f150 on +0x350), both colours and
-    // every flag, angle and float zeroed, +0x34a = 1.
+    // FUN_00587e40 after FUN_0059f860.
     SpaceCameraConstruct(&Camera);
     StartYpr[0] = 0.0f;
     StartYpr[1] = 0.0f;
@@ -196,8 +186,7 @@ NnStaticControl::NnStaticControl()
 
 NnStaticControl::~NnStaticControl()
 {
-    // FUN_00587f60: the camera's vftable back to 0x005c8944 and its empty dtor
-    // (IDPMsgHandler::OnDisconnect, a RET), then WinControl's FUN_0059fa50. Nothing to free.
+    // FUN_00587f60. Nothing to free.
 }
 
 void NnStaticControl::SetPosition(float const* NewPosition)
@@ -226,7 +215,6 @@ void NnStaticControl::SetPosition(float const* NewPosition)
     Position[1] = Placed[1];
     Position[2] = Placed[2];
 
-    // 0x00589728: the instance at +0x60 (+ +0xa8 under PositionFlags bit 0).
     if (HasInstance(this))
     {
         float Instance[3];
@@ -246,17 +234,13 @@ void NnStaticControl::SetPosition(float const* NewPosition)
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
 
-    // 0x005897ac: every child placed at this control's position (slot 5).
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->SetPosition(Position);
 }
 
 void NnStaticControl::SetOrientation(float const* NewOrientation)
 {
-    // LAB_00588d00 (RET 4): the new orientation times the attach orientation (slot 40) through
-    // the 3DMathEngine's MulMatrix (+0x20) into Win3D's +0x3c; the instance gets that turned by
-    // the pitch (+0x330, columns 1/2), the yaw (+0x334, columns 2/0) and the roll (+0x32c,
-    // columns 0/1), in that order.
+    // LAB_00588d00 (RET 4). The instance gets the result turned by pitch, yaw, then roll.
     FMatrix Attach;
     GetAttachOrientation(&Attach.D[0][0]);
     FMatrix Result;
@@ -319,9 +303,8 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
             }
             if (Ini->is_value("hardpoint"))
             {
-                // 0x005881cd: the name is kept at +0x1d0, the attach transform reset, then
-                // filled from the NEW parent's hardpoint of that name (slot 36 of the parent
-                // as a WinControl); its answer is +0x328.
+                // Filled from the NEW parent's hardpoint of that name (slot 36); the answer is
+                // +0x328.
                 strcpy(HardpointName, Ini->get_value_string());
                 AttachOrientation[0] = 1.0f;
                 AttachOrientation[1] = 0.0f;
@@ -411,8 +394,7 @@ bool NnStaticControl::Create(Win3D* NewParent, void* Data)
         }
     }
 
-    // 0x00588523: the parent is re-placed at its own position (slot 5), which positions this
-    // control with it.
+    // The parent is re-placed at its own position, which positions this control with it.
     if (Parent != nullptr)
         Parent->SetPosition(Parent->Position);
     return true;
@@ -422,7 +404,7 @@ void NnStaticControl::Update()
 {
     // LAB_00588e80: Win3D's child walk (FUN_005a17b0) at the head and again on every way out.
     Win3D::Update();
-    if (!HasInstance(this) || RotationSpeed == 0.0f) // FCOMP 0 / TEST AH,0x44 / JNP
+    if (!HasInstance(this) || RotationSpeed == 0.0f)
     {
         Win3D::Update();
         return;
@@ -431,7 +413,6 @@ void NnStaticControl::Update()
     float const Identity[9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     if (bEnableRotation != 0)
     {
-        // 0x00588f01: the yaw runs on with the frame time.
         CurYaw = static_cast<float>(GetClientFrameTimeCapped() *
                                         static_cast<double>(RotationSpeed) +
                                     static_cast<double>(CurYaw)); // FUN_0042d680
@@ -440,8 +421,8 @@ void NnStaticControl::Update()
         return;
     }
 
-    // 0x00588f30: rotation off -- if any angle is more than sqrt(1e-4) away from its start
-    // (FCOMP / TEST AH,0x41: JP on greater or unordered), all three snap back.
+    // Rotation off: if any angle is more than sqrt(1e-4) away from its start (or unordered),
+    // all three snap back.
     float const Pitch = CurPitch;
     float const Roll = CurRoll;
     double const DYaw = static_cast<double>(StartYpr[0]) - static_cast<double>(CurYaw);
@@ -480,8 +461,8 @@ void NnStaticControl::Draw()
         return;
     }
 
-    // 0x005887cb: the mesh colour and the wire colour -- the pair from property 0x18, else the
-    // idle cyan for both; an inactive control's wire goes grey, "no_coloring" whitens the mesh.
+    // The mesh and wire colours: the pair from property 0x18, else the idle cyan for both; an
+    // inactive control's wire goes grey, "no_coloring" whitens the mesh.
     unsigned char Mesh[4];
     unsigned char Wire[4];
     if (bUseColours != 0)
@@ -504,12 +485,12 @@ void NnStaticControl::Draw()
         Mesh[3] = 0xff;
     }
 
-    // 0x00588827: the draw scale -- "force_radius" over the instance's radius (Engine +0x88).
+    // The draw scale: "force_radius" over the instance's radius (Engine +0x88); 0 keeps 1.0.
     float Radius = 0.0f;
     float Centre[3];
     DALib::Engine->GetInstanceExtent(MeshHolder.EngineInstance, 0, &Radius, Centre);
     float Scale = 1.0f;
-    if (ForceRadius != 0.0f) // FCOMP 0 / TEST AH,0x44 / JNP: equal keeps 1.0
+    if (ForceRadius != 0.0f)
         Scale = ForceRadius / Radius;
 
     FSpaceCamera* ViewCamera = Win3DGetCamera(); // DAT_0067dbf8
@@ -517,8 +498,8 @@ void NnStaticControl::Draw()
     float Placed[3];
     if (bRenderToWindow != 0)
     {
-        // 0x00588883: the instance's box projected by the Win3D camera, truncated (ftol),
-        // shrunk by two pixels and flipped in y; off-screen or clipped boxes draw nothing.
+        // The instance's box projected by the Win3D camera, truncated, shrunk by two pixels and
+        // flipped in y; off-screen or clipped boxes draw nothing.
         Win3DGetViewport(0xba2, SavedViewport); // FUN_00422390
         float const* const At = ClientMeshHolderGetPosition(&MeshHolder); // FUN_00420fb0
         Placed[0] = At[0];
@@ -562,9 +543,8 @@ void NnStaticControl::Draw()
         if (Rect[0] < 0 || Rect[2] < 0 || Rect[1] < 0 || Rect[3] < 0)
             return;
 
-        // 0x00588a07: the instance moved in front of the window camera, the camera fitted to
-        // the rect with the Win3D camera's near / far (FUN_0040fb60, two stores), a 35 degree
-        // vertical field of view, and made current.
+        // The instance moved in front of the window camera, fitted to the rect with the Win3D
+        // camera's near / far (FUN_0040fb60).
         float const Behind[3] = {0.0f, 0.0f, kWindowDepth};
         ClientMeshHolderSetPosition(&MeshHolder, Behind); // FUN_00420fd0
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
@@ -578,7 +558,7 @@ void NnStaticControl::Draw()
         ViewCamera = &Camera;
     }
 
-    // 0x00588a99: the mesh pass.
+    // The mesh pass.
     if (bNoMeshRender == 0)
     {
         SetHolderTint(&MeshHolder, Mesh);
@@ -587,8 +567,7 @@ void NnStaticControl::Draw()
             Win3DEnable(0xb71); // FUN_00421dd0
             if (bZClear != 0)
             {
-                // 0x00588b37: cull 8, lighting on, then the instance drawn straight through
-                // IRenderer2 +0x1c with a scaled identity (flags 0x30).
+                // Drawn straight through IRenderer2 +0x1c with a scaled identity (flags 0x30).
                 IRenderPipeline* const Pipe = DALib::Pipeline;
                 Pipe->SetRenderState(D3DRS_ZFUNC, 8);
                 Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
@@ -611,7 +590,7 @@ void NnStaticControl::Draw()
         }
     }
 
-    // 0x00588c29: the wire pass.
+    // The wire pass.
     Win3DDisable(0xb71);
     if (bNoWireRender == 0)
     {
@@ -627,7 +606,7 @@ void NnStaticControl::Draw()
         }
     }
 
-    // 0x00588c7f: the Win3D camera, the saved viewport and the instance's place back.
+    // The Win3D camera, the saved viewport and the instance's place restored.
     if (bRenderToWindow != 0)
     {
         Win3DApplyCamera(AsCamera(Win3DGetCamera())); // FUN_00422950(&DAT_0067dbf8)
@@ -657,11 +636,8 @@ bool NnStaticControl::MouseEvent(FWin3DMouseEvent const* Event)
 
 void NnStaticControl::ShowToolTip()
 {
-    // FUN_005897d0: ButtonControl's FUN_0055bde0 without the command -- key -1 and no alt id
-    // first, the empty caption (FUN_00413df0 on null), then both ids from +0xcc, the aux dword
-    // left 0, the instance's position (Engine +0xa0 [9..11]) or +0x60 + +0xa8, the half extents
-    // +0xb4 and the live byte; FUN_004be370; then the record's teardown (~FToolTipHoverInfo).
-    FToolTipHoverInfo Info;           // caption +0x08 / +0x0c null, FUN_004144b0 on +0x10
+    // FUN_005897d0: ButtonControl's FUN_0055bde0 without the command, then FUN_004be370.
+    FToolTipHoverInfo Info;
     Info.IdsAlt = 0;
     Info.Ids = -1;
     Info.AuxField = 0;
@@ -692,8 +668,7 @@ void NnStaticControl::ShowToolTip()
 
 intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_00589050 (RET 0xc): byte table 0x00589660 indexed by Msg - 0xc (0..0x41) into the
-    // dword table 0x0058962c; everything not listed tail-calls WinControl's FUN_005a13c0.
+    // LAB_00589050 (RET 0xc).
     switch (Msg)
     {
     case 0x0c:
@@ -729,8 +704,7 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return BitsFromFloat(CurYaw);
     case 0x17:
     {
-        // 0x005890fc: a new engine instance handed in -- the holder released (FUN_0059eee0),
-        // A bound, every angle cleared, and the instance placed at offset + position.
+        // A new engine instance handed in.
         ClientUiMeshHolderRelease(&MeshHolder);
         MeshHolder.EngineInstance = reinterpret_cast<void*>(A);
         StartYpr[0] = 0.0f;
@@ -766,7 +740,7 @@ intptr_t NnStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
     case 0x4d:
-        // FILD qword {A, 0}: the unsigned dword as a float.
+        // A widened as unsigned.
         ForceRadius = static_cast<float>(static_cast<unsigned long long>(static_cast<unsigned>(A)));
         return 0;
     default:
@@ -796,8 +770,7 @@ void NnStaticControl::Init(char const* NewMeshPath, float const* NewOffset, char
 
     if (Hardpoint != nullptr)
     {
-        // 0x00588654: the name kept at +0x1d0, the attach transform reset and filled from this
-        // control's parent's hardpoint; the answer is +0x328.
+        // Filled from this control's parent's hardpoint; the answer is +0x328.
         strcpy(HardpointName, Hardpoint);
         AttachOrientation[0] = 1.0f;
         AttachOrientation[1] = 0.0f;

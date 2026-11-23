@@ -6,13 +6,12 @@
 
 #pragma once
 
-// EngineCharacter -- retail `cmn\EngineCharacter.h` (the FDUMP file name at .rdata 0x005d7188),
-// freelancer.exe 0x004c98a0-0x004ca610 plus the template helpers 0x004ceb30-0x004cec80.
+// EngineCharacter -- retail `cmn\EngineCharacter.h` (the FDUMP file name).
 //
 // A character "body" is one skeletal deformable (DALib::Deform) built from a Costume's four
 // bodyparts, with up to four accessory meshes hung on its hardpoints. HUD_Comm's talking head
-// (hud_comm.cpp) is the caller that plays animations on it; UIWin (0x0059aea2 / 0x0059b048 /
-// 0x0059b245 / 0x0059b47f) uses the same cache for the NeuroNet character windows.
+// (hud_comm.cpp) is the caller that plays animations on it; UIWin uses the same cache for the
+// NeuroNet character windows.
 //
 // Retail keeps built bodies in one global list DAT_006735b4 (ctor LAB_004c98a0 ->
 // FUN_004c98c0, atexit LAB_004c98f0 -> FUN_004c9900). A node is 0x44 bytes: next, prev, the
@@ -21,7 +20,7 @@
 // (Costume_is_equal) after bumping its count, else builds a new body and appends a node with
 // count 1 -- also when building failed, in which case the node holds a null body. Nothing in
 // the PE ever decrements the count: bodies live until HUD_Receiver's destructor empties the
-// list (0x004ce99d..0x004ce9d1) or the atexit destructor runs.
+// list or the atexit destructor runs.
 //
 // The port keeps the list as std::list<FEngineCharacterCacheNode> (no retail ABI).
 
@@ -96,8 +95,8 @@ struct FEngineCharacterAccessoryLink
 {
     // FUN_004c9de0 -- three empty strings and an empty material-path vector.
     FEngineCharacterAccessoryLink();
-    // The vector's buffer freed (FUN_004de730 on +0x10c at 0x004c9d16; FUN_004ca610 is the same
-    // body for the unwind funclets 0x005bd97d / 0x005c4cf6).
+    // The vector's buffer freed (FUN_004de730; FUN_004ca610 is the same body for the unwind
+    // funclets).
     ~FEngineCharacterAccessoryLink();
 
     // FUN_004c9e20 (thiscall, RET 4) -- MiscUtilLoadEngineInstance(Mesh, *DALib::Data, 0, 0,
@@ -117,11 +116,11 @@ private:
 };
 
 // ------------------------------------------------------------------------------------------
-// The body (0x298 bytes, operator new at 0x004c9b29).
+// The body (0x298 bytes).
 // ------------------------------------------------------------------------------------------
 struct FEngineCharacterBody
 {
-    // 0x004c9b46..0x004c9bc9 (inlined in FindOrCreate): four mesh holders (FUN_00420d40), four
+    // Inlined in FindOrCreate: four mesh holders (FUN_00420d40), four
     // empty animation names, the transform identity/zero, no deformable, four free animation
     // slots (-1), animation rate 1.0.
     FEngineCharacterBody();
@@ -153,7 +152,7 @@ struct FEngineCharacterBody
     // GetListCount into a zeroed int; true when no playback runs. No deformable test.
     bool IsPlaybackIdle() const;
     // FUN_00560ab0 (thiscall, RET 0x14; CharCreate.cpp's copy of the EngineCharacter.h inline
-    // HUD_Comm spells at 0x004cb452 / 0x004cb644) -- RootTransform refreshed from the root bone
+    // HUD_Comm also inlines) -- RootTransform refreshed from the root bone
     // (IEngine slot 40), then with a non-empty Name: the first free playback slot takes the name,
     // gf\CharacterInfo.cpp's script for it (FUN_004356c0 / FUN_00434e90) and IDeformable slot 7
     // Play(instance, &AnimIds[slot], script, Name, Arg2, Arg3, Arg4, 1.0f, Arg5, -1.0f, 0);
@@ -194,7 +193,7 @@ public:
     // FUN_004c9a80 (thiscall, RET 4).
     FEngineCharacterBody* FindOrCreate(Costume const& Key);
 
-    // HUD_Receiver's destructor, 0x004ce99d..0x004ce9d1 (inlined there): every body deleted
+    // Inlined in HUD_Receiver's destructor: every body deleted
     // (FUN_004ceb30) and every node erased (FUN_00516f70). The list itself stays usable.
     void DeleteAll();
 

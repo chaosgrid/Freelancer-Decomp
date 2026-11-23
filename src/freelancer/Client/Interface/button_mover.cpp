@@ -29,25 +29,24 @@ namespace
 // ButtonMover
 // ---------------------------------------------------------------------------------------------
 
-// FUN_0055dec0 -- vftable 0x005e18f8, empty vector, +0x18 = 0. +0x14 / +0x1c stay unwritten.
+// FUN_0055dec0 -- +0x14 / +0x1c stay unwritten.
 ButtonMover::ButtonMover()
     : bActive(false)
 {
 }
 
-// LAB_00401e90 -- RET.
+// LAB_00401e90.
 void ButtonMover::OnMoveFinished()
 {
 }
 
-// LAB_0043d8a0 -- XOR AL,AL / RET 8.
+// LAB_0043d8a0.
 bool ButtonMover::OnMoveStep(WinControl* /*Control*/, float const* /*Position*/)
 {
     return false;
 }
 
-// FUN_0055dee0 -- the inlined vector insert-at-end of one {Start, End, Control} entry (grow by
-// max(size, 1) when full, copy the old range, then the new entry).
+// FUN_0055dee0 (an inlined vector insert-at-end).
 void ButtonMover::AddButton(WinControl* Control, float const* Start, float const* End)
 {
     FButtonMoveEntry Entry;
@@ -61,7 +60,7 @@ void ButtonMover::AddButton(WinControl* Control, float const* Start, float const
     Entries.push_back(Entry);
 }
 
-// FUN_0055e120 -- +0x1c = Seconds, +0x18 = 1, +0x14 = 0, then erase(begin, end).
+// FUN_0055e120.
 void ButtonMover::Start(float Seconds)
 {
     Duration = Seconds;
@@ -78,8 +77,7 @@ void ButtonMover::Update()
         return;
     }
 
-    // FUN_0042d680 + [+0x14] -> FST [+0x14]; FCOMP [+0x1c] / TEST AH,1 / JNZ: the snap is taken
-    // when the (unrounded) sum is not below the duration.
+    // The snap is taken when the unrounded double sum is not below the duration.
     double const Sum = GetClientFrameTimeCapped() + static_cast<double>(Elapsed);
     Elapsed = static_cast<float>(Sum);
     if (!(Sum < static_cast<double>(Duration)))
@@ -103,7 +101,7 @@ void ButtonMover::Update()
         Position[2] = Dz * T + Entry.Start[2];
         if (!OnMoveStep(Entry.Control, Position))
         {
-            // vt+0xa8 slot 42 -- property 6 sets the control's position.
+            // Property 6 sets the control's position.
             Entry.Control->SetProperty(6, reinterpret_cast<uintptr_t>(Position), 0);
         }
     }
@@ -114,8 +112,7 @@ void ButtonMover::Update()
     }
 }
 
-// FUN_0055e290 -- when active: clear the flag, put every control at its End (through
-// OnMoveStep / SetProperty(6)), then OnMoveFinished. Inactive: nothing.
+// FUN_0055e290.
 void ButtonMover::Finish()
 {
     if (!bActive)
@@ -145,24 +142,24 @@ void ButtonMover::Finish()
 // ButtonScaler
 // ---------------------------------------------------------------------------------------------
 
-// FUN_0055e340 -- vftable 0x005e1904, empty vector, +0x18 = 0.
+// FUN_0055e340.
 ButtonScaler::ButtonScaler()
     : bActive(false)
 {
 }
 
-// LAB_00401e90 -- RET.
+// LAB_00401e90.
 void ButtonScaler::OnScaleFinished()
 {
 }
 
-// LAB_0043d8a0 -- XOR AL,AL / RET 8.
+// LAB_0043d8a0.
 bool ButtonScaler::OnScaleStep(WinControl* /*Control*/, float const* /*Scale*/)
 {
     return false;
 }
 
-// FUN_0055e360 -- the inlined vector insert-at-end of one {From, To, Control} entry.
+// FUN_0055e360.
 void ButtonScaler::AddButton(WinControl* Control, float From, float To)
 {
     FButtonScaleEntry Entry;
@@ -172,7 +169,7 @@ void ButtonScaler::AddButton(WinControl* Control, float From, float To)
     Entries.push_back(Entry);
 }
 
-// FUN_0055e590 -- +0x1c = Seconds, +0x18 = 1, +0x14 = 0, then erase(begin, end).
+// FUN_0055e590.
 void ButtonScaler::Start(float Seconds)
 {
     Duration = Seconds;
@@ -197,7 +194,7 @@ void ButtonScaler::Update()
         bActive = false;
     }
 
-    // 1 - (cos(t * pi) + 1) * 0.5 (DAT_005c8a5c pi, DAT_005c75dc 1.0, DAT_005c75e0 0.5).
+    // Cosine ease (DAT_005c75dc 1.0, DAT_005c75e0 0.5).
     double const Phase = static_cast<double>(Elapsed / Duration) * kPi;
     float const S = static_cast<float>(1.0 - (cos(Phase) + 1.0) * 0.5);
 

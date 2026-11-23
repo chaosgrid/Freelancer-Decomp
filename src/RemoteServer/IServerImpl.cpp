@@ -34,8 +34,7 @@ FPacketSerializer* RpcGetRemotePacketSerializer()
     return GRemotePacketSerializer;
 }
 
-// Retail remoteserver.dll ??0IServerImpl@@QAE@XZ (.text:06bd11b0): the two vptrs and
-// `MOV dword ptr [EAX + 0x8],0x0` (06bd11b9) -- the serializer starts out null.
+// Retail remoteserver.dll ??0IServerImpl@@QAE@XZ (.text:06bd11b0); Serializer (+0x8) starts null.
 IServerImpl::IServerImpl() : Serializer(nullptr) {}
 IServerImpl::IServerImpl(const IServerImpl& Other) { Serializer = Other.Serializer; }
 IServerImpl& IServerImpl::operator=(const IServerImpl& Other) { Serializer = Other.Serializer; return *this; }
@@ -56,8 +55,7 @@ unsigned int FRpcRefObject::Release() {
 }
 FPacketSerializer::FPacketSerializer()
 {
-    // 06be1357 is inside the construction EH region: dictionary exceptions
-    // unwind the map/base and the new-expression frees the unpublished storage.
+    // 06be1357: inside the construction EH region, as in retail.
     RpcServerBuildHardpointDictionary();
 }
 FPacketSerializer::~FPacketSerializer() {
@@ -90,31 +88,23 @@ void RpcDispatchMsgs(IServerImpl* Server, const unsigned char* Data, unsigned in
     }
 }
 
-
-// Retail remoteserver.dll FUN_06be1750 -- the same body as rpclocal's FUN_06d96300
-// (src/rpclocal/rpc_transport.cpp):
-//   06be1755 TEST out / 06be175d MOV EAX,0x4 ; RET 0xc      -- null out pointer
-//   06be1766..06be1774  id = (MOVZX Channel word << 16) | MOVZX Opcode word
-//   06be1784..06be17b1  lower_bound + key compare = find; the head node -> 0x19
-//   06be17b3 MOV EAX,[node+0x10] / 06be17b6 PUSH out / 06be17b7 CALL [EAX]
-// The old stub here returned 0 without producing a packet, so every caller wrote
-// through a null CDAPacket*. The base constructor leaves Serializer null; the
+// Retail remoteserver.dll FUN_06be1750, the same body as rpclocal's FUN_06d96300
+// (src/rpclocal/rpc_transport.cpp). The base constructor leaves Serializer null; the
 // concrete network Server's Startup creates it and installs the packet registries.
 int FPacketSerializer::Allocate(unsigned int Channel, unsigned int Opcode, FPacketBase** OutPacket)
 {
     if (OutPacket == nullptr) {
-        return kPacketAllocateNullOut;                  // 06be175d MOV EAX,0x4
+        return kPacketAllocateNullOut;
     }
     const unsigned int PacketId = ((Channel & 0xffffu) << 16) | (Opcode & 0xffffu);
     std::map<unsigned int, FPacketTypeInfo*>::const_iterator It = Types.find(PacketId);
     if (It == Types.end()) {
-        return kPacketAllocateUnknownType;              // 06be17c2 MOV EAX,0x19
+        return kPacketAllocateUnknownType;
     }
-    return It->second->Factory(OutPacket);              // 06be17b7 CALL dword ptr [EAX]
+    return It->second->Factory(OutPacket);
 }
 
-// 06bd8140..06bd8312: object/position stores, deep vector<ushort> assignment,
-// then virtual PushToServer. The packet owns its copy of all hardpoint IDs.
+// 06bd8140. The packet owns its copy of all hardpoint IDs.
 void IServerImpl::FireWeapon(unsigned int PlayerId, const XFireWeaponInfo& Info) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x02, &Packet) == 0) {
@@ -434,7 +424,7 @@ void IServerImpl::ReqAddItem(unsigned int ArchId, const char* Hardpoint, int Cou
         int* CountDestination = &TypedPacket->Count;
         float* HealthDestination = &TypedPacket->Health;
         unsigned char Mounted;
-        // 06bd75bd..75db: FLD precedes both integer stores; FSTP follows them.
+        // 06bd75bd: the float load precedes both integer stores; the float store follows them.
         __asm {
             fld Health
             mov eax, ArchId
@@ -472,7 +462,7 @@ void IServerImpl::ReqModifyItem(unsigned short EquipId, const char* Hardpoint, i
         int* CountDestination = &TypedPacket->Count;
         float* HealthDestination = &TypedPacket->Health;
         unsigned char Mounted;
-        // 06bd768d..76ad: retain MOVZX and the stores between FLD and FSTP.
+        // 06bd768d: as in ReqAddItem, the integer stores sit between the float load and store.
         __asm {
             fld Health
             movzx eax, EquipId
@@ -683,7 +673,7 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& Info, unsigned int Session
     if (Serializer->Allocate(1, 0x01, &Packet) == 0) {
         const double* TimeSource = &Info.Timestamp;
         float NarrowedTime;
-        // 06bd7fc6/7fcc narrows before any packet payload store.
+        // 06bd7fc6: the timestamp is narrowed before any packet payload store.
         __asm {
             mov eax, TimeSource
             fld qword ptr [eax]

@@ -9,7 +9,7 @@
 #include "common_server_types.h" // CHARACTER_ID
 #include "Common/Graphics/image.h"
 
-#include <windows.h> // was reached through the removed menu_input.h
+#include <windows.h>
 
 // Retail Intro.cpp IntroFocus (RTTI .?AUIntroFocus@@, vftable 0x005e3034) -- the main-menu
 // client state. One static instance, DAT_0067a598 (static init LAB_00573790 -> ctor
@@ -18,8 +18,7 @@
 //   slot 12 FUN_00573860 -- Init (RET 4), client_state.cpp
 //   slot 13 FUN_00573c00 -- Exit, client_state.cpp
 //   slot 14 FUN_00573eb0 -- Update (RET 4): MenuStateDriverUpdate
-//   FUN_005743a0 -- EnterState (RET 4, jump table 0x00575360 over state - 1, 19 entries):
-//                   EnterMenuState
+//   FUN_005743a0 -- EnterState (19-entry jump table over state - 1): EnterMenuState
 //   FUN_005739c0 -- start the single-player session (Init and EnterState case 1)
 //
 // FMenuNavState is the object after its vftable pointer; each comment gives the retail offset
@@ -37,12 +36,10 @@ struct FMenuNavState
     CHARACTER_ID CharacterId;
     unsigned char Flag20c;      // +0x20c -- CharacterId holds a pick (Init clears it)
     unsigned char Pad20d[3];
-    // +0x210 -- the menu logo Image (image.h, vftable 0x005e2718, 0x18 bytes): the ctor
-    // FUN_00573840 builds it (0x00573847..0x0057384d), Init loads DAT_0067bf4c into it (slot 1,
-    // 0x005738f6), Exit releases it (FUN_005650d0 inlined, 0x00573e90..0x00573ea2), the Update
-    // frame tail draws it (slot 2, 0x005742dd), the dtor FUN_005737c0 is Image's.
+    // +0x210 -- the menu logo Image (vftable 0x005e2718, 0x18 bytes): Init loads DAT_0067bf4c
+    // into it, Exit releases it, the Update frame tail draws it.
     Image LogoImage;
-    Win3D* ActivePage;          // +0x228 -- slot 10 on it before every page change
+    Win3D* ActivePage;          // +0x228 -- Destroy on it before every page change
     unsigned char Flag22c;      // +0x22c -- the first settled frame hid the loading screen
     unsigned char Flag22d;      // +0x22d -- case 4 (multiplayer) set it: case 1 restarts SP
     unsigned char Pad22e[2];
@@ -55,7 +52,7 @@ struct FMenuNavState
 int MenuNavGetIntroModeLatch(); // DAT_0067c1fc
 void MenuNavSetIntroModeRequest(int Mode); // DAT_0067c200
 int MenuNavGetIntroModeRequest();          // DAT_0067c200 (FUN_00564b00 tests it for != 0)
-bool MenuNavIsServerSelectActive();        // FUN_00564b20 -- MOV AL,[DAT_0067c204]
+bool MenuNavIsServerSelectActive();        // FUN_00564b20 -- DAT_0067c204
 void MenuNavConsumeIntroModeRequest(); // latch = request; request = 0
 
 // FUN_005743a0 -- EnterState(State) on the IntroFocus.
@@ -69,8 +66,6 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds);
 // RequestCharacterInfo. False when any step fails.
 bool MenuNavStartSinglePlayer(FMenuNavState* Nav);
 
-// The TypeSelect column (EnterState case 1) gets its input from the Win3D manager as in retail
-// (FUN_0059d140 mouse buttons, FUN_0059e080 hover, FUN_0059e300 draw); the flat-shell bridge
-// that used to expose it to the port-only menu layer is gone.
+// The TypeSelect column (EnterState case 1) gets its input from the Win3D manager as in retail.
 
 void MenuEnterStateReleaseActivePage(FMenuNavState* Nav);

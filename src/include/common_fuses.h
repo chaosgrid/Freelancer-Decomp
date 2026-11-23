@@ -231,16 +231,12 @@ public:
     // ?find_record@PetalInterfaceDatabase@@QBEPBUpetal_record@1@HK@Z -- the record type
     // is nested in the database, not a free struct.
     //
-    // Retail layout, proven by the pair copy ctor FUN_0631d440 (0631d468-0631d4e0) and by
-    // find_record (0631cb45 LEA EAX,[EAX+EAX*4] / 0631cb48 LEA ESI,[ECX+EAX*4] -> stride
-    // 0x14 = sizeof(std::map); 0631cb69 CMP EDX,[EAX+0xc] -> key at node+0xc; 0631cb84
-    // ADD EAX,0x10 -> value at node+0x10). The record is 0x24 bytes:
-    //   +0x00 unsigned NicknameId   (0631d46e MOV [EBP],ECX = map key, 0631d473 [EBP+4] = rec+0)
-    //   +0x04 std::basic_string<char> Mesh  (allocator byte copied at 0631d476/0631d482,
-    //         _Ptr/_Len/_Res zeroed at 0631d484-0631d48a, then basic_string::assign 0631d49c)
-    //   +0x14 std::vector<char*> Extras     (allocator byte at 0631d4a2, _First at 0631d4d2,
-    //         _Last/_End from [ESI+0x1c]/[ESI+0x18]; element stride 4 -- 0631d4bc SAR EAX,2)
-    // There is NO separate Nickname string in retail: add_record only feeds the nickname to
+    // Retail layout, from the pair copy ctor FUN_0631d440 and find_record (map stride 0x14,
+    // key at node+0xc, value at node+0x10). The record is 0x24 bytes:
+    //   +0x00 unsigned NicknameId (the map key copied in)
+    //   +0x04 std::basic_string<char> Mesh
+    //   +0x14 std::vector<char*> Extras
+    // There is no separate Nickname string in retail: add_record only feeds the nickname to
     // CreateID (0631c89b) and drops it. Mesh is the record's own std::string copy of the ini
     // value (add_record 0631c8e1-0631c91d: basic_string assign of strlen bytes); readers take
     // c_str() (freelancer.exe FUN_00446160 at 0x004461ed). Extras are StringAlloc(name, true).

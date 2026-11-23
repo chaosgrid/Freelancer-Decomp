@@ -24,27 +24,25 @@ namespace
     // DAT_005c75f8 (double 0.001): how far below Max a clamped parameter stops.
     double const kGraphClampMargin = 0.001;
 
-    // DAT_0061065c, initialised to 1 and only ever read (004193f3, 00419606): non-zero
-    // interpolates between the bracketing keys, zero snaps to the nearer one.
+    // DAT_0061065c, initialised to 1 and only ever read: non-zero interpolates between the
+    // bracketing keys, zero snaps to the nearer one.
     unsigned char G_bGraphInterpolate = 1;
 
     // DAT_0061669c / DAT_006166a0 / DAT_006166a4. Constructed by LAB_00419050 and destroyed by
     // LAB_00419090 in retail -- the static constructor/destructor of this object.
     std::list<FGraphData> G_GraphLibrary;
 
-    // The bracketing-key search shared by slots 6 and 7 (004193a7..004193f3 and
-    // 004195ba..00419606): Lo/Hi end up as the two key indices around X.
+    // The bracketing-key search shared by slots 6 and 7. Every compare's unordered outcome
+    // follows retail: a NaN X searches, and moves Lo up.
     void FindBracketingKeys(FGraphPoint const* Keys, unsigned Count, double X, int& OutLo,
                             int& OutHi)
     {
         int Hi = static_cast<int>(Count) - 1;
         int Lo = 0;
-        // TEST AH,0x41 / JP: keep searching only when X > Keys[0] (or unordered).
         if (X <= Keys[0].X)
         {
             Hi = 0;
         }
-        // TEST AH,0x01 / JNZ: search when X < Keys[Hi] (or unordered), else sit on the last key.
         else if (X >= Keys[Hi].X)
         {
             Lo = Hi;
@@ -54,7 +52,6 @@ namespace
             do
             {
                 int const Mid = (Hi + Lo) / 2;
-                // TEST AH,0x05 / JP: X >= Keys[Mid] (or unordered) moves Lo up.
                 if (!(X < Keys[Mid].X))
                     Lo = Mid;
                 else
@@ -64,8 +61,7 @@ namespace
 
         if (G_bGraphInterpolate == 0)
         {
-            // FCOMPP (Hi.X - X) against (X - Lo.X), TEST AH,0x41 / JNZ: not farther from Hi
-            // (or unordered) snaps both to Hi, otherwise both to Lo.
+            // Not farther from Hi (or unordered) snaps both to Hi.
             if (!((Keys[Hi].X - X) > (X - Keys[Lo].X)))
                 Lo = Hi;
             else
@@ -82,19 +78,17 @@ double GraphRangeWrap(FGraphRange const* Range, float T)
 {
     if (Range->bClamp != 0)
     {
-        // FLD Min / FCOMP T / TEST AH,5 / JNP: keep T only when Min < T.
         if (!(Range->Min < T))
             T = Range->Min;
-        // Max - 0.001 stays on the FPU stack; T < limit keeps T, anything else (including
-        // unordered) returns the limit.
+        // Max - 0.001 stays on the FPU stack; unordered returns the limit.
         double const Limit = static_cast<double>(Range->Max) - kGraphClampMargin;
         if (static_cast<double>(T) < Limit)
             return T;
         return Limit;
     }
 
-    float const Span = Range->Max - Range->Min;                                  // 004194a6
-    double const Frac = (static_cast<double>(T) - Range->Min) / Span;            // 004194b5
+    float const Span = Range->Max - Range->Min;
+    double const Frac = (static_cast<double>(T) - Range->Min) / Span;
     return fabs(Frac - floor(Frac)) * Span;
 }
 
@@ -134,7 +128,7 @@ char const* FGraphData::GetName()
     return Name.c_str();
 }
 
-// FUN_00415070 (folded with CGunWrapper::GetBrowser): `MOV EAX,[ECX+0x14]`.
+// FUN_00415070 (ICF-folded).
 int FGraphData::GetElemType()
 {
     return ElemType;
@@ -146,7 +140,7 @@ unsigned FGraphData::GetCount()
     return Count;
 }
 
-// LAB_00431680 (folded): `LEA EAX,[ECX+0x20]`.
+// LAB_00431680 (ICF-folded).
 FGraphRange* FGraphData::GetRange()
 {
     return &Range;
@@ -172,14 +166,14 @@ void FGraphData::SetData(FGraphDesc const* Desc)
     {
         if (NewCount != 0)
         {
-            // 00419243 also tests (Data != 0 && NewCount == Count) before reallocating; that
-            // cannot hold inside this branch, so the realloc always runs.
+            // Retail also tests (Data != 0 && NewCount == Count) here; that cannot hold inside
+            // this branch, so the realloc always runs.
             Data = static_cast<FGraphPoint*>(realloc(Data, NewCount * sizeof(FGraphPoint)));
             Count = NewCount;
         }
         else if (Data != nullptr)
         {
-            // 00419265: Count is left as it was.
+            // Count is left as it was.
             free(Data);
             Data = nullptr;
         }
@@ -188,15 +182,13 @@ void FGraphData::SetData(FGraphDesc const* Desc)
     if (!bSameBuffer)
         memcpy(Data, Desc->Data, Desc->Count * sizeof(FGraphPoint));
 
-    // 00419298: X extent of the keys, reading Count (not Desc->Count) keys.
+    // X extent of the keys, reading Count (not Desc->Count) keys; unordered takes X.
     Range.Max = Data[0].X;
     Range.Min = Data[0].X;
     for (unsigned Index = 1; Index < Count; ++Index)
     {
         float const X = Data[Index].X;
-        // TEST AH,5 / JP: Min >= X (or unordered) takes X.
         Range.Min = (Range.Min < X) ? Range.Min : X;
-        // TEST AH,0x41 / JNZ: Max <= X (or unordered) takes X.
         Range.Max = (Range.Max > X) ? Range.Max : X;
     }
 }
@@ -207,8 +199,8 @@ double FGraphData::Evaluate(float T, FGraphRange const* Caller)
     double X;
     if (Caller != nullptr)
     {
-        // 00419303..00419381 is FUN_00419460 inlined with the result stored as a float, then
-        // mapped from the caller's range onto this curve's X extent.
+        // FUN_00419460 inlined with the result stored as a float, then mapped from the caller's
+        // range onto this curve's X extent.
         float const Wrapped = static_cast<float>(GraphRangeWrap(Caller, T));
         X = GraphRangeNormalize(Caller, Wrapped) *
                 (static_cast<double>(Range.Max) - Range.Min) +
@@ -227,7 +219,7 @@ double FGraphData::Evaluate(float T, FGraphRange const* Caller)
 
     double const Span = static_cast<double>(HiKey.X) - LoKey.X;
     double Weight;
-    // FCOM 0.0 / TEST AH,0x41 / JNZ: a non-positive (or unordered) span weights the low key 1.
+    // A non-positive (or unordered) span weights the low key 1.
     if (Span > 0.0)
         Weight = (HiKey.X - X) / Span;
     else
@@ -261,10 +253,9 @@ unsigned FGraphData::EvaluateColor(float T, FGraphRange const* Caller)
     double Weight;
     if (Span > 0.0)
     {
-        // 0041963c..00419640: FXCH / FSUB [Lo] / FDIVRP -- the weight here is measured from the
-        // LOW key, (X - Lo.X) / Span, the opposite of slot 6's (Hi.X - X) / Span, while the
-        // blend below still puts (1 - Weight) on the high key. Retail's colour curves therefore
-        // run backwards between keys; kept as is.
+        // Retail bug kept: the weight here is measured from the LOW key, the opposite of slot
+        // 6's, while the blend below still puts (1 - Weight) on the high key. Retail's colour
+        // curves therefore run backwards between keys.
         Weight = (X - LoKey.X) / Span;
     }
     else
@@ -275,7 +266,7 @@ unsigned FGraphData::EvaluateColor(float T, FGraphRange const* Caller)
 
     unsigned const HiBits = HiKey.Bits;
     unsigned const LoBits = LoKey.Bits;
-    // Each channel is FILD (qword, unsigned) * weight, summed, then _ftol.
+    // Each channel is read unsigned, weighted, summed, then _ftol.
     int const Red = static_cast<int>(((HiBits >> 0x10) & 0xffu) * HiWeight +
                                      ((LoBits >> 0x10) & 0xffu) * Weight);
     int const Alpha = static_cast<int>((HiBits >> 0x18) * HiWeight + (LoBits >> 0x18) * Weight);
@@ -283,7 +274,7 @@ unsigned FGraphData::EvaluateColor(float T, FGraphRange const* Caller)
                                        ((LoBits >> 8) & 0xffu) * Weight);
     int const Blue = static_cast<int>((HiBits & 0xffu) * HiWeight + (LoBits & 0xffu) * Weight);
 
-    // 004196ba..0041974e: the alpha result is shifted in without the 0xFF mask the others get.
+    // The alpha result is shifted in without the 0xFF mask the others get.
     unsigned Packed = static_cast<unsigned>(Red) & 0xffu;
     Packed = (Packed | (static_cast<unsigned>(Alpha) << 8)) << 8;
     Packed = (Packed | (static_cast<unsigned>(Green) & 0xffu)) << 8;
@@ -321,7 +312,7 @@ bool FGraphData::SetName(char const* NewName)
     if (RefCount != 0 || Data != nullptr)
         return false;
     Name.assign(NewName);
-    AddRef(); // CALL [EDX+0x20]
+    AddRef(); // virtual in retail
     return true;
 }
 
@@ -353,8 +344,8 @@ int GraphLibraryLoad(char const* Path)
         return Created;
     }
 
-    // [ESP+0x30] length / [ESP+0x34] text: the {len, char[0x80]} name buffer FUN_00417c50
-    // fills; [ESP+0x1650]: the key array, 0x2000 bytes, which retail fills without a bound.
+    // The {len, char[0x80]} name buffer FUN_00417c50 fills, and the 0x2000-byte key array,
+    // which retail fills without a bound.
     unsigned NameLen = 0;
     char Name[0x80];
     Name[0] = '\0';
@@ -372,7 +363,7 @@ int GraphLibraryLoad(char const* Path)
             if (!Reader.read_value())
                 continue;
 
-            unsigned PointCount = 0; // EDI
+            unsigned PointCount = 0;
             do
             {
                 if (Reader.is_value("nickname"))
@@ -457,8 +448,6 @@ int GraphLibraryLoad(char const* Path)
                 if (!bDuplicate)
                 {
                     {
-                        // 00419a7f..00419aad: construct a temporary, push_back a copy of it,
-                        // destroy the temporary.
                         FGraphData Temp;
                         G_GraphLibrary.push_back(Temp);
                     }

@@ -4,12 +4,11 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// IVP linear-constraint solver -- Common.dll .text:06366070-063682f2.
-// See ivp_great_matrix.h for the class identification. Every function below
-// was transcribed from the retail listing (EXE/Disasm/Common.dll.txt), not
-// from the Ghidra decompile; x87 compares are reproduced with their NaN side
-// (`TEST AH,0x1; JZ` = jump when a >= b, so the fall-through is written as
-// `!(a >= b)`; `TEST AH,0x41; JZ` = jump when a > b).
+// IVP linear-constraint solver (retail 06366070-063682f2); see
+// ivp_great_matrix.h. Transcribed from the disassembly, not the Ghidra
+// decompile. x87 compares keep their NaN side: `!(a >= b)` is true for
+// unordered operands, `a > b` false. Trailing `TEST AH,...` notes name the
+// retail test each comparison reproduces.
 
 #include "ivp_great_matrix.h"
 
@@ -749,15 +748,15 @@ void IVP_Linear_Constraint_Solver::IncreaseStepCount(int* StepCount)
 // 06366d20-0636712e. Labels carry the retail LAB_ names.
 int IVP_Linear_Constraint_Solver::FullSolveLc()
 {
-    float Eps = SolverEps;   // [ESP+0x14]
-    int StepCount = 0;       // [ESP+0x1c]
-    int SmallStepCount = 0;  // [ESP+0x20]
-    int DidRealStep = 0;     // [ESP+0x24]
-    int TestCountdown = 7;   // [ESP+0x18]
-    float StepLen = 0.0f;    // [ESP+0x10]
-    float NegEps = 0.0f;     // [ESP+0x28]
-    int Limit = 0;           // EBP
-    int Var = 0;             // EDI at 06366d9b
+    float Eps = SolverEps;
+    int StepCount = 0;
+    int SmallStepCount = 0;
+    int DidRealStep = 0;
+    int TestCountdown = 7;
+    float StepLen = 0.0f;
+    float NegEps = 0.0f;
+    int Limit = 0;
+    int Var = 0;
 
 LoopTop: // LAB_06366d45
     if (DidRealStep != 0)

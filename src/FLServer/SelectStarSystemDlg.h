@@ -21,16 +21,16 @@ class CSelectStarSystemDlg : public CDialog
 public:
 	enum { IDD = 0x96 };
 
-	explicit CSelectStarSystemDlg(CWnd* Parent = nullptr);   // .text:00406260
+	explicit CSelectStarSystemDlg(CWnd* Parent = nullptr);
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);          // .text:004062e0
-	virtual BOOL OnInitDialog();                             // .text:00406340
-	virtual void OnOK();                                     // .text:00406370
-	virtual void OnCancel();                                 // .text:00406360
+	virtual void DoDataExchange(CDataExchange* DX);
+	virtual BOOL OnInitDialog();
+	virtual void OnOK();
+	virtual void OnCancel();
 
-	afx_msg void OnDblClkSystemList();                                        // .text:00406450
-	afx_msg void OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo);   // .text:00406460
+	afx_msg void OnDblClkSystemList();
+	afx_msg void OnMeasureItem(int IDCtl, LPMEASUREITEMSTRUCT MeasureInfo);
 
 	DECLARE_MESSAGE_MAP()
 

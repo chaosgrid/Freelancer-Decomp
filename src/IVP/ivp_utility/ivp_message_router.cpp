@@ -31,7 +31,7 @@ IVP_Message_Router::~IVP_Message_Router()
 {
 }
 
-// 063922a0: PUSH [ESP+8] (Text); PUSH "%s"; CALL printf; RET 8.
+// 063922a0: the category is not read.
 void IVP_Message_Router::Print(int32_t Category, const char* Text)
 {
     (void)Category;
@@ -56,8 +56,7 @@ int32_t IVP_Message_Router::IsCategoryEnabled(int32_t Category) const
     return 1;
 }
 
-// 06392250: _chkstk(0x1000); vsprintf(Buffer, Format, &Format + 1);
-// this->vtable[0](Category, Buffer).
+// 06392250: vsprintf into a 0x1000-byte stack buffer, then slot 0.
 void IVP_Message_Router::Report(int32_t Category, const char* Format, ...)
 {
     char Buffer[0x1000];

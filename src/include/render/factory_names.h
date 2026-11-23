@@ -7,8 +7,7 @@
 #pragma once
 
 // Factory registration names for RENDER DLLs -- the strings RegisterComponent /
-// CreateInstance take, not interface ids. The IIDs that used to share this file moved
-// to dacom_iids.h on 2026-09-16; these are a different namespace of strings and stay.
+// CreateInstance take, not interface ids (those are in dacom_iids.h).
 // Sources: docs/re/render.md, docs/re/shading.md.
 // Do not invent names.
 

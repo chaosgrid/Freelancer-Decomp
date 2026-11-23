@@ -26,20 +26,19 @@ CChoosePlayerDlg::CChoosePlayerDlg(CWnd* Parent)
 {
 }
 
-// .text:004038d0 — retail's null test on the list pointer is the compiler's adjustment from
-// the CFLListBox (+0x60) to its CWnd part (+0x64).
+// .text:004038d0
 void CChoosePlayerDlg::DoDataExchange(CDataExchange* DX)
 {
 	DDX_Control(DX, PlayerListId, PlayerList);
 }
 
-// Message map .rdata:0041c1a0: LBN_DBLCLK 1057 -> 00403930, WM_MEASUREITEM -> 00403b00.
+// Message map .rdata:0041c1a0.
 BEGIN_MESSAGE_MAP(CChoosePlayerDlg, CDialog)
 	ON_LBN_DBLCLK(PlayerListId, &CChoosePlayerDlg::OnDblClkPlayerList)
 	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
-// .text:00403930 — a double click is the virtual OnOK (vtable +0xcc).
+// .text:00403930 — a double click is the virtual OnOK.
 void CChoosePlayerDlg::OnDblClkPlayerList()
 {
 	OnOK();
@@ -63,7 +62,7 @@ BOOL CChoosePlayerDlg::OnInitDialog()
 	return TRUE;
 }
 
-// .text:00403990 — the dialog is modeless: Cancel destroys the window (vtable +0x60).
+// .text:00403990 — the dialog is modeless: Cancel destroys the window.
 void CChoosePlayerDlg::OnCancel()
 {
 	DestroyWindow();

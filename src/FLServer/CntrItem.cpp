@@ -15,7 +15,7 @@
 // operator>> 004066a0.
 IMPLEMENT_SERIAL(CFLServerCntrItem, CRichEditCntrItem, 0)
 
-// .text:004066c0 — CRichEditCntrItem(preo, pContainer) then the derived vtable.
+// .text:004066c0
 CFLServerCntrItem::CFLServerCntrItem(REOBJECT* Preo, CFLServerDoc* Container)
 	: CRichEditCntrItem(Preo, Container)
 {

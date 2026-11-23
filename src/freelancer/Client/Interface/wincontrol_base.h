@@ -11,11 +11,7 @@
 // from. Constructed by FUN_0059f860, destroyed by FUN_0059fa50 (scalar deleting FUN_0059fa30),
 // built by WINFACTORY<WinControl>::Create FUN_005a1a20 (operator_new(0x32c)).
 //
-// vftable 0x005e5e44 (45 slots): slots 0..27 are Win3D's (win3d.h) with these overrides --
-//   0 FUN_0059fa30 dtor, 2 FUN_0043d950 (returns this), 4 FUN_005a0340 HitTest,
-//   5 FUN_005a0880 SetPosition, 7 FUN_005a0950 SetOrientation, 10 FUN_0059fb60 Destroy,
-//   13 FUN_005a0760 Draw, 19 FUN_005a0650 MouseEvent, 23 FUN_005a0840 ProcessMessage
-// -- and slots 28..44 are WinControl's own (declared below).
+// vftable 0x005e5e44 (45 slots): slots 0..27 are Win3D's (win3d.h), 28..44 WinControl's own.
 // The IDataViewOwner face sits at +0x7c (vftable 0x005e5e38).
 //
 // Layout (FUN_0059f860):
@@ -64,7 +60,7 @@ public:
     ~WinControl() override;
 
     // --- Win3D overrides ---
-    // slot 2 FUN_0043d950 -- MOV EAX,ECX / RET
+    // slot 2 FUN_0043d950 -- returns this
     WinControl* AsWinControl() override;
     // slot 4 FUN_005a0340
     bool HitTest(float const* Ray) override;
@@ -82,18 +78,18 @@ public:
     bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
     // --- IDataViewOwner (vftable 0x005e5e38) ---
-    // LAB_0053aaa0 -- RET 8
+    // LAB_0053aaa0 -- no-op
     void DataViewSlot0(unsigned A, unsigned B) override;
-    // FUN_0053e4a0 -- RET 4
+    // FUN_0053e4a0 -- no-op
     void DataViewSlot1(unsigned A) override;
 
     // --- WinControl slots 28..44 ---
     // slot 28 (+0x70) LAB_0059fd10 -- read the [BaseFrame] ini at Path, then build every other
     // section's class_name through the factory with this as the parent
     virtual void LoadIni(char const* Path);
-    // slots 29 / 30 (+0x74 / +0x78) FUN_0053e4a0 -- RET 4. Slot 29's argument is a FILE*: the
+    // slots 29 / 30 (+0x74 / +0x78) FUN_0053e4a0 -- no-op. Slot 29's argument is a FILE*: the
     // one override seen, NavBar's FUN_0043efd0, fprintf's its [NavBar] section into it (the
-    // counterpart of slot 28 LoadIni). Name not recovered.
+    // counterpart of slot 28 LoadIni). Slot 30's purpose is unknown.
     virtual void SaveIni(FILE* File);
     virtual void Slot30(unsigned A);
     // slot 31 (+0x7c) FUN_005a0250
@@ -112,7 +108,7 @@ public:
     virtual WinControl* FindChild(char const* Name);
     // slot 38 (+0x98) FUN_0059fbd0 -- MaterialPath is FUN_0059ec80's second argument.
     virtual void SetMesh(char const* Path, char const* MaterialPath);
-    // slot 39 (+0x9c) FUN_00401e90 -- RET; Draw's tail call
+    // slot 39 (+0x9c) FUN_00401e90 -- no-op; Draw's tail call
     virtual void Slot39();
     // slot 40 (+0xa0) FUN_005a1670
     virtual void GetAttachOrientation(float* OutOrientation9);
@@ -162,19 +158,19 @@ public:
     WinControl* CreateWireStaticControl(char const* Name, float const* Position,
                                         float const* HalfExtents, unsigned char bFlag3,
                                         unsigned char bNoZEnable, int ToolTipIds, int WireFlags);
-    // FUN_005a10e0 (RET 0x14) -- "RichTextWin", then SetNormSize (FUN_00579cc0), SetAttachOffset
-    // (FUN_00579c40) and SetAutoScrollbar (FUN_005799f0). Unlike the others it does not test
-    // the factory's result before configuring it.
     // FUN_005a17e0 (RET 0x20) -- "UIScroll" with the FUiPayloadScrollCycle {Width, Height,
     // float(Min), float(Max), float(Page), 1.0f, bHorizontal}; on a non-null result
     // SetScrollOffset(Position) FUN_005972d0, SetValue(0) FUN_00595db0 and SetHorizontal
     // FUN_00597550. Caller: HUD_Status::Create 0x004daf10 ("WeaponListScroll").
     UiScroll* CreateUIScroll(char const* Name, float const* Position, float Width, float Height,
                              int Min, int Max, int Page, unsigned char bHorizontal);
-    // FUN_005a1870 (RET 0x20) -- byte for byte FUN_005a17e0 with the class name "UICycle"
-    // (0x005e53f4). Caller: NN_Preferences::Create 0x004aa7ab ("video_mode_cycle").
+    // FUN_005a1870 (RET 0x20) -- FUN_005a17e0 with the class name "UICycle" (0x005e53f4).
+    // Caller: NN_Preferences::Create 0x004aa7ab ("video_mode_cycle").
     UiScroll* CreateUICycle(char const* Name, float const* Position, float Width, float Height,
                             int Min, int Max, int Page, unsigned char bHorizontal);
+    // FUN_005a10e0 (RET 0x14) -- "RichTextWin", then SetNormSize (FUN_00579cc0), SetAttachOffset
+    // (FUN_00579c40) and SetAutoScrollbar (FUN_005799f0). Unlike the others it does not test
+    // the factory's result before configuring it.
     RichTextWin* CreateRichTextWin(char const* Name, float Width, float Height,
                                    float const* AttachOffset, bool bAutoScrollbar);
     // FUN_005a1900 (RET 0x14) -- "UITextEdit" with the FUiPayloadText {Width, Height, Caption};

@@ -11,17 +11,14 @@
 #include "ivp_compact_ledge.h"
 #include "../ivp_utility/ivp_u_vector.h"
 
-// ============================================================================
 // IVP_Compact_Ledge_Generator -- turns the triangles of an
 // IVP_Object_Polygon_Tetra (or a single triangle pair) into one flat
-// IVP_Compact_Ledge (Common.dll .text:0637a2e0-0637a86f).
-// (2026-10-08, claude-code:cmn-ivp4b)
+// IVP_Compact_Ledge (Common.dll 0637a2e0-0637a86f).
 //
 // Used on the stack by IVP_SurfaceBuilder_Polygon_Convex: ctor, then
 // prepare_compact_ledge (returns the byte size), the caller allocates that
 // many bytes with FUN_06343fc0(size, 0x10), then generate_compact_ledge
 // fills them, then the destructor.
-// ============================================================================
 
 class FPolygonPointHash;
 class IVP_Hash;
@@ -32,10 +29,8 @@ class IVP_Triangle;
 class IVP_Compact_Ledge_Generator
 {
 public:
-    // 0637a2e0: every field zero.
-    IVP_Compact_Ledge_Generator();
-    // 0637a750.
-    ~IVP_Compact_Ledge_Generator();
+    IVP_Compact_Ledge_Generator(); // 0637a2e0
+    ~IVP_Compact_Ledge_Generator(); // 0637a750
 
     // 0637a330 (thiscall, RET 4): numbers the points, builds the compact
     // triangles and their opposite links; returns the ledge size in bytes.

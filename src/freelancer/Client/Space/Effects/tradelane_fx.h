@@ -39,7 +39,7 @@ struct FTradeLaneRingRuntime
     FTradeLaneRingRuntime* LiveNext; // +0x00  live / free list link (FUN_00404d50 / 00404d90)
     FTradeLaneRingRuntime* LivePrev; // +0x04
     // +0x08..+0x13 -- a std::list<unsigned> of ship ids. +0x08 is its allocator byte (the new node
-    // gets the Side argument's byte there, 0x005152dc; nothing reads it), +0x0c the head node
+    // gets the Side argument's byte there; nothing reads it), +0x0c the head node
     // (FUN_0042a7e0, node {Next, Prev, Id}), +0x10 the size.
     unsigned char Side;              // +0x08
     unsigned char Pad09[3];
@@ -86,34 +86,34 @@ enum : unsigned
 // (FUN_00514960), bit 1 enter done (FUN_005145a0), bit 2 exit / disrupt done (FUN_00514bf0 /
 // FUN_00514f20).
 
-// FUN_00515200 (cdecl) -- the live node for (RingGameobj, Side), or a new one (the free list first,
+// FUN_00515200 -- the live node for (RingGameobj, Side), or a new one (the free list first,
 // else operator_new) when bCreate; null for a solar that is not a lane ring.
 FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,
                                                   unsigned char Side,
                                                   bool bCreate);
 
-// FUN_00514110 (cdecl) -- HpRightLane (Side != 0) / HpLeftLane position of the ring, cached in
+// FUN_00514110 -- HpRightLane (Side != 0) / HpLeftLane position of the ring, cached in
 // DAT_006751dc / DAT_006751d0 on the first call for the process (DAT_006751fc).
 void TradeLaneRingLaneHardpoint(FVector* Out, FClientGameobj* RingGameobj, unsigned char Side);
 
-// FUN_00514010 (thiscall on Out, RET 4) -- identity orientation, Translation as the position.
+// FUN_00514010 -- identity orientation, Translation as the position.
 void TradeLaneRingMakeTranslationXform(FTransform* Out, FVector const* Translation);
 
-// FUN_00515890 (cdecl) -- the start tradelane command: the rings must be contiguous (else FDUMP,
+// FUN_00515890 -- the start tradelane command: the rings must be contiguous (else FDUMP,
 // false); the ship moves onto the (entrance or exit, side) node.
 bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRing,
                            FClientGameobj* Ship, unsigned char SideByte);
 
-// FUN_005135b0 (cdecl) -- per frame: a player ship that stopped using the lane leaves its node;
+// FUN_005135b0 -- per frame: a player ship that stopped using the lane leaves its node;
 // then every live node runs FUN_00513b40 and the ones it rejects go to the free list.
 void TradeLaneDetachTick(float Dt);
 
-// FUN_00515b60 / FUN_00515e20 (cdecl) -- the ship leaves its node (exit or disrupt effect when it
-// was riding the lane). 515e20 is the entry the stop-tradelane paths call (IClient slot 7
-// LAB_0053c760, CShip client slot LAB_00546f80 at 0x005470d9); 515b60 is FUN_00515890's.
+// FUN_00515b60 / FUN_00515e20 -- the ship leaves its node (exit or disrupt effect when it was
+// riding the lane). FUN_00515e20 is the entry the stop-tradelane paths call (IClient slot 7
+// LAB_0053c760, CShip client slot LAB_00546f80); FUN_00515b60 is FUN_00515890's.
 void TradeLaneShipStop(FClientGameobj* Ship);
 
-// FUN_00515500 (cdecl) -- the star system unload (0x00554bab): live nodes to the free list with
+// FUN_00515500 -- the star system unload: live nodes to the free list with
 // their ships detached, then free-list nodes destroyed (FUN_00515730) and freed.
 void TradeLaneShutdown();
 
@@ -121,7 +121,7 @@ void TradeLaneShutdown();
 // then the ship uses the lane and FUN_00515890(Ring1, Ring2, Ship, Info->Field_0x0c).
 void TradeLaneIClientGoTradelane(XGoTradelane const* Info);
 
-// LAB_0053c760 -- IClient slot 7 (StopTradelane, RET 0x10): event 4 (leaving) to the player's
+// LAB_0053c760 -- IClient slot 7 (StopTradelane): event 4 (leaving) to the player's
 // behavior manager, then use_tradelane(false) and FUN_00515e20 on the ship.
 void TradeLaneIClientStopTradelane(unsigned ShipId, unsigned EntranceId);
 
@@ -132,19 +132,18 @@ bool TradeLaneShipGoHandler(FClientGameobj* Ship, FClientGameobj* RingA,
 FTradeLaneRingRuntime* TradeLaneRingLiveHead();
 int TradeLaneRingLiveCount();
 
-// FUN_00516060 (cdecl) -- a lane ring (de)activated for a ship: leave (bActivate false) or join
+// FUN_00516060 -- a lane ring (de)activated for a ship: leave (bActivate false) or join
 // the node of the ring's lane direction.
 void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool bActivate);
 
-// FUN_005484c0 (thiscall on the solar gameobj, RET 8) -- a lane ring runs FUN_00516060, then, out
+// FUN_005484c0 (on the solar gameobj) -- a lane ring runs FUN_00516060, then, out
 // of single player, CSolar::activate.
 void TradeLaneClientSolarActivate(FClientGameobj* SolarGo, bool bActivate, unsigned ShipId);
 
 // FUN_0053d940 -- IClient SPObjActivate: FindById(ObjectId); ManagerKind 2 -> 005484c0.
 void TradeLaneSPObjActivate(unsigned ObjectId, bool bActivate, unsigned ShipId);
 
-// FUN_00516910 (cdecl) -- a lane ring solar's notify 0x11 (0x00547979, the event byte as
-// bShipLeft): its CliTradeLaneEquip ship count steps -1 / +1, the lane effects follow, and both
+// FUN_00516910 -- a lane ring solar's notify 0x11 (the event byte as bShipLeft): its CliTradeLaneEquip ship count steps -1 / +1, the lane effects follow, and both
 // side nodes learn whether any ship still uses the lane. Returns 1 when none does; the caller
 // stores it in FClientSolarGameobj +0x1f0.
 unsigned char TradeLaneSolarLaneSwitch(FClientGameobj* SolarGo, unsigned char bShipLeft);

@@ -4,23 +4,22 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// LaunchAction, JumpInAction, LaunchActionVars -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
-// common_cequip_internal.h (namespace CmnCequip).
+// LaunchAction, JumpInAction, LaunchActionVars. Declared in common_cequip.h; shared helpers are
+// in common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
+#include "common_animdb.h"
 
 #include "common_cobject.h"
-#include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)
-#include "common_fuses.h"    // WeaponModDB_GetShieldMod (CEShield::GetWeaponModifier)
-#include "common_iface.h"    // EquipStatus, EquipStatusFlag* (CEquip::GetStatus)
+#include "common_csys.h"
+#include "common_fuses.h"
+#include "common_iface.h"
 #include "common_ini.h"
-#include "common_misc.h"     // ComputeExplosiveImpulses (CAttachedEquip::Disconnect)
+#include "common_misc.h"     // SinglePlayer
 #include "common_physys.h"
-#include "common_spatial.h"  // ISpatialPartition (ScanList::add_in_range bucket query)
-#include "common_timing.h"   // Timing::GetGlobalTime (CEShieldGenerator / CEShield)
+#include "common_spatial.h"
+#include "common_timing.h"
 #include "common_universe.h"
 #include "DALib.h"
 #include "dacom.h"
@@ -57,10 +56,8 @@ namespace
     }
 }
 
-// .text:062afda0: the watcher at +0x1c is zeroed and, for a non-null DockObj, pointed at its
-// Watchable (+8); +0x24 BaseObj, +0x2c LaunchType, +0x30..+0x48 and the two bytes at
-// +0x4c/+0x4d zeroed, LaunchOrient identity, +0x74 zeroed; then LaunchFlags = BaseObj's
-// TypeBits (+0xe0), and bit 0x20 forces LaunchType to 1. The pad bytes +0x4e/+0x4f are not
+// FUN_062afda0. DockObjWatcher +0x1c, BaseObj +0x24, LaunchType +0x2c. LaunchFlags is BaseObj's
+// TypeBits (no null test); bit 0x20 forces LaunchType 1. The pad bytes +0x4e/+0x4f are not
 // written.
 LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InLaunchType)
     : BaseObj(InBaseObj)
@@ -91,17 +88,9 @@ LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InLaunchType)
 
 LaunchAction::~LaunchAction()
 {
-    // Common.dll 0x62afec0 (FUN_062afec0), the real complete-object destructor --
-    // previously ported here as an empty body, which silently dropped this
-    // cleanup. Real bug: an AI-directive launch (Start()'s LaunchFlags&0x20==0
-    // path) registers `this` as a directive callback via
-    // BM->set_directive_callback(this); if the LaunchAction were destroyed while
-    // still registered, the BehaviorManager's DirectiveCallbacks[5] array would
-    // keep a dangling pointer and could later dispatch into freed memory.
-    // Base-class vtable reinstallation and the PhySys::Controller/IAction base
-    // destructors themselves are handled automatically by the compiler once this
-    // body returns -- only the two pieces of LaunchAction's own cleanup logic
-    // need porting here.
+    // FUN_062afec0. An AI-directive launch registered `this` as a directive callback (Start);
+    // it is unregistered here so the BehaviorManager keeps no dangling pointer. The watcher
+    // member destructor runs after this body.
     IObjRW* Dock = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
 
     if (Dock != nullptr)
@@ -109,33 +98,18 @@ LaunchAction::~LaunchAction()
         IBehaviorManager* BM = GetBehaviorManager(Dock);
         if (BM != nullptr)
         {
-            // Upcasts `this` to pub::AI::DirectiveCallback*, applying the same
-            // +0x18 this-adjustment Start()'s set_directive_callback(this) call
-            // does -- unregisters every DirectiveCallbacks[] slot that still
-            // points at this LaunchAction.
+            // Same +0x18 DirectiveCallback adjustment as set_directive_callback in Start.
             BM->clear_directive_callback(this);
         }
     }
-
-    // .text:062aff36: the watcher member's destructor (unlink when watching) runs after
-    // this body.
 }
 
-// Common.dll 0x62b01f0 (FUN_062b01f0), dispatched through LaunchAction's own
-// DirectiveCallback sub-vtable (PTR_FUN_0639e57c slot 0) -- previously
-// unidentified; pub::AI::DirectiveCallback only had a placeholder virtual dtor
-// (see common_pub.h). Retail's own field reads here are relative to the
-// DirectiveCallback subobject (this+0x18: e.g. its "+0x4"==LaunchAction's
-// DockObjWatcher at +0x1c, its "+0xc"==BaseObj at +0x24, its "+0x35"==
-// bUpdateComplete at +0x4d) -- ported as a normal member override using
-// LaunchAction's own field names directly since the compiler generates the
-// this-adjustment thunk automatically.
+// FUN_062b01f0, LaunchAction's DirectiveCallback slot 0 (vtable 0639e57c). Retail addresses the
+// fields relative to the DirectiveCallback sub-object at +0x18; the compiler's thunk does that
+// here.
 void LaunchAction::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
 {
-    // Retail's body (0x062b01f0..062b025d) ends `RET 0x8`, which is the callee-side
-    // confirmation of the two-argument signature, but it never touches either one:
-    // the whole range contains not a single `[ESP + 0x..]` reference. Ignoring them
-    // here is therefore faithful, not an unported gap.
+    // RET 0x8 fixes two arguments, but retail never reads them.
     (void)ResultWord11c;
     (void)ResultWord118;
 
@@ -148,10 +122,7 @@ void LaunchAction::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
 
     CObject* Docked = (CObject*)Dock->cobject();   // slot 84 (+0x150)
 
-    // Raw asm 062b0211-062b0232: retail zeroes EAX (this) when Docked is null or
-    // fails the ObjectClass&0x103 check, then calls set_control_exclusion through
-    // that possibly-null this UNCONDITIONALLY -- same "trust the invariant, don't
-    // guard" pattern as Start()'s unconditional Dock deref above. Reproduced as-is.
+    // Called through the possibly-null narrowing, as in retail.
     EqObjOrNull(Docked)->set_control_exclusion(0);
 
     {
@@ -163,20 +134,15 @@ void LaunchAction::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
 
 void LaunchAction::Start()
 {
-    // Common.dll 0x62aff80. Recover the docking IObjRW* from the Watchable*
-    // the ctor stored (Watchable sits at IObjRW+8), then resolve the CObject
-    // actually docked via IObjRW vtable slot 84 (0x150): get_cobject. Retail
-    // dereferences this unconditionally (crashes if the watcher was never set,
-    // e.g. a null DockObj or a failed LaunchAction allocation) -- reproduced
-    // as-is rather than guarded, matching CShip::launch's own unconditional call.
+    // FUN_062aff80. Retail quirk kept: Dock is dereferenced with no null test (a null DockObj
+    // crashes).
     IObjRW* Dock = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
 
     CObject* Docked = (CObject*)Dock->cobject();   // slot 84 (+0x150)
 
     if ((LaunchFlags & 0x20) == 0)
     {
-        // Not ready for an immediate physical launch -- queue an AI directive
-        // instead (the ship flies itself out under AI control) and return.
+        // An AI directive launch: the ship flies itself out.
         if ((LaunchFlags & 0x200100) != 0)
         {
             pub::AI::DirectiveLaunchOp Op;
@@ -191,9 +157,8 @@ void LaunchAction::Start()
 
                 EqObjOrNull(Docked)->set_control_exclusion(6);
 
-                // 062b01b7-062b01cf: a 12-byte IDirectiveInfo {1, Op+0x08, 8}. The middle
-                // dword is the op's BaseOp::Priority, which the DirectiveLaunchOp ctor
-                // (062db13b) zeroes.
+                // IDirectiveInfo {1, Op+0x08, 8}; the middle dword is BaseOp::Priority, zeroed
+                // by the DirectiveLaunchOp ctor.
                 unsigned const DirWords[3] = { 1, Op.Priority, 8 };
                 IDirectiveInfo Dir;
                 memcpy(&Dir, DirWords, sizeof(Dir));
@@ -209,19 +174,13 @@ void LaunchAction::Start()
 
     EqObjOrNull(Docked)->set_control_exclusion(7);
 
-    // IObjAffect vtable slot 0 on the docking object's IObjAffect sub-object
-    // (IObjRW+4), thiscall(this, 0.0f). IObjAffect now has its thirty slots published --
-    // see common_iface.h -- and slot 0 takes a float: the sibling site below passes 1.0f
-    // through the SAME slot, which is what settles the type. Passing the integer 0 worked
-    // only because 0 and 0.0f have the same bits.
+    // IObjAffect slot 0 (IObjRW+4).
     ObjAffectOf(Dock)->set_throttle(0.0f);
 
     BaseObj->launch_pos(LaunchPos, LaunchOrient, LaunchType);
 
-    // Push the launch point back along the (negated) forward direction, then
-    // correct by how far the docked ship's own origin sits from the hardpoint
-    // "hpmount" is anchored to (Common.dll.txt 062b0003-062b00d7 -- ported from
-    // the raw asm, not the FPU-mangled .c, which lost track of these registers).
+    // Push the launch point 150 along the forward axis, then correct by the docked ship's
+    // origin-to-"hpmount" offset (ported from the listing).
     Vector Forward{-LaunchOrient.E[0][2], -LaunchOrient.E[1][2], -LaunchOrient.E[2][2]};
     LaunchPos.x += Forward.x * 150.0f;
     LaunchPos.y += Forward.y * 150.0f;
@@ -236,8 +195,7 @@ void LaunchAction::Start()
 
     LaunchDir = Vector{LaunchOrient.E[0][2], LaunchOrient.E[1][2], LaunchOrient.E[2][2]};
 
-    // LaunchActionVars::launch_coast_time (retail .rdata 0.5) * 80.0 (retail
-    // .rdata, unnamed in retail's own symbol table).
+    // 80.0f is an unnamed .rdata constant.
     CoastTimer = LaunchActionVars::launch_coast_time * 80.0f;
 
     PhySys::Controller::Register(this, Docked);
@@ -246,65 +204,40 @@ void LaunchAction::Start()
     bNoDockingCamera = !Arch->bDockingCamera;
 }
 
-// Common.dll 0x62b0270 (LAB_062b0270), dispatched through LaunchAction's own
-// IAction sub-vtable (PTR_LAB_0639e5a4 slot 1). Decomp-checked against the raw asm
-// 062b0270-062b055b (no .c pseudocode was generated for this range). Retail's `Dt`
-// stack argument (the RET 0x4 cleanup) is never actually read anywhere in the body.
+// LAB_062b0270, LaunchAction's IAction slot 1 (vtable 0639e5a4), from the listing. Dt is never
+// read.
 bool LaunchAction::update(float /*Dt*/)
 {
     IObjRW* Dock = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
 
     if (Dock == nullptr)
     {
-        // Docked watcher gone (target destroyed) -- report the action finished so
-        // ActionDB::update() removes it.
         bUpdateComplete = true;
         return !bUpdateComplete;
     }
 
     if ((LaunchFlags & 0x20) == 0)
     {
-        // AI-directive launch path (Start() queued a DirectiveLaunchOp instead of
-        // an immediate physical launch): nothing to do per tick. bUpdateComplete
-        // only flips true here once OnDirectiveComplete() fires (IBehaviorManager
-        // calling back through DirectiveCallbacks[] when the queued directive
-        // finishes) -- until then this reports "not done" every tick.
+        // AI-directive launch: done once OnDirectiveComplete fires.
         return !bUpdateComplete;
     }
 
     if (!bNoDockingCamera)
     {
-        // LaunchActionVars::launch_coast_time (0.5, same .rdata constant Start()
-        // uses for CoastTimer) + launch_decel_time (2.5) == the 3.0-second
-        // coast-complete threshold, compared against the elapsed-coast counter at
-        // +0x30. CORRECTION: a real per-tick producer for CoastElapsed WAS found --
-        // LaunchAction::Step() (Common.dll 0x62b0560, tracker item 1102) -- see its
-        // own comment and the CoastElapsed field comment in common_cequip.h. Step()
-        // is extracted but not yet wired into a live vtable (needs the out-of-scope
-        // IVP_Controller interface), so this compare is still always false in
-        // practice in this port today, but the gap is no longer "producer
-        // unidentified" -- it's "producer identified, not yet callable".
-        // .text:062b02b0-062b02cf: FLD launch_coast_time; FADD launch_decel_time;
-        // FCOMP [this+0x30]; TEST AH,0x41 / JP -> complete when CoastElapsed >= 3.0.
+        // Complete once CoastElapsed (+0x30, advanced by do_simulation_controller) reaches
+        // launch_coast_time + launch_decel_time; unordered is not complete.
         bUpdateComplete = ((double)CoastElapsed >=
                            (double)LaunchActionVars::launch_coast_time +
                            LaunchActionVars::launch_decel_time);
 
         if (bUpdateComplete)
         {
-            // CORRECTED 2026-09-23 against .text:062b02d6-062b034c. Retail pokes IObjAffect
-            // slot 0 (1.0f, `PUSH 0x3f800000; CALL [EAX]` at 062b02ea) FIRST, then re-resolves
-            // the watcher, calls get_cobject (+0x150) and nudges with no null check on the
-            // result, and the factor is -80.0f (DAT_0639e560 == 0x42a00000, FCHS), not
-            // -launch_coast_time: the earlier port had the order reversed, a guard retail does
-            // not have, and -0.5f.
+            // Throttle first, then a -80.0f (DAT_0639e560, negated) push along the docked
+            // object's current forward axis (not LaunchOrient); no null test on cobject().
             ObjAffectOf(Dock)->set_throttle(1.0f);
 
             CObject* Docked0 = (CObject*)Dock->cobject();   // slot 84 (+0x150)
 
-            // Docked0's own current forward (Orientation.E[*][2] = +0x10/+0x1c/+0x28), not
-            // the frozen LaunchOrient Start() computed, scaled by -80.0f and built through
-            // FUN_0628b030 (Vec3Assign).
             float const Scale = -80.0f;
             Vector Delta{ Docked0->Orientation.E[0][2] * Scale,
                           Docked0->Orientation.E[1][2] * Scale,
@@ -315,33 +248,26 @@ bool LaunchAction::update(float /*Dt*/)
 
     if (!bUpdateComplete)
     {
-        // Coast threshold not reached (or bNoDockingCamera skipped the check
-        // entirely, which retail also never re-checks on a later tick) -- keep the
-        // physics controller alive and report "not done".
+        // Not complete: keep the controller awake. With bNoDockingCamera the coast check above
+        // is skipped; do_simulation_controller sets the flag instead.
         PhySys::Controller::wakeup();
         return !bUpdateComplete;
     }
 
-    // Coast phase complete: resolve the docked CObject once more (matches retail
-    // re-resolving through the watcher rather than caching Docked0 above).
+    // Retail re-resolves through the watcher rather than reusing Docked0.
     CObject* Docked = (CObject*)Dock->cobject();   // slot 84 (+0x150)
 
     if (!SinglePlayer())
     {
-        // Slot 47 (+0xbc) is IObjInspect::is_player(). The port read it as an unidentified
-        // "is this side authoritative" predicate; what retail is asking is whether the docked
-        // object is the human player.
+        // IObjInspect slot 47 (+0xbc), is_player.
         bool const bIsServer = ObjInspectOf(Dock)->is_player();
 
         if (bIsServer)
         {
-            // .text:062b039e..062b04a0: a multiplayer player leaves the dock with a random
-            // heading: the rotation part of the watched object's transform (IObjInspect slot 3,
-            // get_transform) is turned by two random angles in [-pi/8, pi/8) -- first in the
-            // x/z columns, then in the y/z columns -- and the docked object is beamed to the
-            // watched object's center of mass (slot 5) with that orientation (CObject vt+0x7c).
-            // Angle = rand() * 3.0517578e-05f * pi/4 (double DAT_0639e5c8) - pi/8 (DAT_0639e5c0);
-            // the cosine is stored as a float, the sine stays on the x87 stack.
+            // A multiplayer player leaves the dock with a random heading: two random angles in
+            // [-pi/8, pi/8) (pi/4 double DAT_0639e5c8, pi/8 DAT_0639e5c0) turn the x/z, then y/z
+            // columns, and the object is beamed to its centre of mass (slot 5). cos is rounded
+            // to float, sin and every product are not.
             Matrix Orient = ObjInspectOf(Dock)->get_transform().Rotation;
 
             double Angle = (double)((float)rand() * 3.0517578125e-05f) *
@@ -353,8 +279,6 @@ bool LaunchAction::update(float /*Dt*/)
             {
                 float X = Orient.E[Row][0];
                 float Z = Orient.E[Row][2];
-                // 062b03f5-062b0419: FLD X, FLD Cos(float) FMUL ST1, FLD sin FMUL Z, FSUBP,
-                // FSTP; FLD Cos FMUL Z, FXCH, FMUL sin, FADDP, FSTP -- every product unrounded.
                 Orient.E[Row][0] = (float)((double)Cos * X - Sin * Z);
                 Orient.E[Row][2] = (float)((double)Cos * Z + X * Sin);
             }
@@ -367,7 +291,6 @@ bool LaunchAction::update(float /*Dt*/)
             {
                 float Y = Orient.E[Row][1];
                 float Z = Orient.E[Row][2];
-                // 062b0450-062b0474: sin*Z + Cos*Y, then Cos*Z - Y*sin, products unrounded.
                 Orient.E[Row][1] = (float)(Sin * Z + (double)Cos * Y);
                 Orient.E[Row][2] = (float)((double)Cos * Z - Y * Sin);
             }
@@ -377,20 +300,18 @@ bool LaunchAction::update(float /*Dt*/)
         }
     }
 
-    // Retail dereferences Docked unconditionally here (matches Start()'s own
-    // unconditional Docked-> calls) -- not guarded.
+    // No null test on Docked.
     Docked->enable_collisions_r(true);
 
     EqObjOrNull(Docked)->set_control_exclusion(0);
 
     {
-        // IObjAffect vtable slot 28 (0x70/4) on the dock object, thiscall(BaseObj->Id).
+        // IObjAffect slot 28 (+0x70).
         ObjAffectOf(Dock)->slot_70(BaseObj->Id);
     }
 
     {
-        // IObjAffect vtable slot 0 again, thiscall(this, 1.0f) -- retail really
-        // does poke this slot a second time on this path.
+        // Retail sets the throttle a second time on this path.
         ObjAffectOf(Dock)->set_throttle(1.0f);
     }
 
@@ -403,37 +324,13 @@ bool LaunchAction::update(float /*Dt*/)
     return !bUpdateComplete;
 }
 
-// Common.dll 0x62b0560 (LAB_062b0560), LaunchAction's own PhySys::Controller vtable slot 4
-// (.rdata PTR_core_is_going_to_be_deleted_event_0639e584+0x10, installed at [this+8] by the
-// ctor). Decomp-checked against the raw asm 062b0560-062b0665 (no .c pseudocode was
-// generated for this range). Structurally identical in role to JumpInAction's slot 4; now
-// the class's do_simulation_controller override (was the plain method Step(float Dt)).
-//
-// Retail behavior:
-//   - If LaunchFlags == 0x20 (exact-value compare in the raw asm, not a bit test -- ported
-//     literally), advances CoastElapsed by Dt. THIS IS the per-tick producer that
-//     update()'s old comment (and the CoastElapsed field comment) said was never found.
-//   - If WatchedTarget(DockObjWatcher) is null, returns without touching anything else (update()'s own
-//     null-watcher branch already handles bUpdateComplete in that case).
-//   - Otherwise re-resolves the docked object via get_cobject (vtable slot 0x150) --
-//     unconditionally, with no type/null guard, matching retail's "trusts the watcher
-//     resolved" idiom used throughout this class.
-//   - If bNoDockingCamera: immediately beams the docked object to LaunchPos/LaunchOrient
-//     and sets bUpdateComplete = true right here (short-circuiting the coast entirely).
-//   - Otherwise computes a two-phase ease-out blend distance X along LaunchDir:
-//       - While CoastElapsed < launch_decel_time (2.5): X = 150*Frac^2 + 80*(2.5-CoastElapsed)
-//         + CoastTimer, where Frac = (2.5-CoastElapsed)/2.5. The two retail .rdata constants
-//         150.0f (DAT_0639e56c) and 80.0f (DAT_0639e560) have no separate named symbols.
-//       - Once CoastElapsed >= 2.5: X = ((launch_coast_time(0.5) + launch_decel_time(2.5) -
-//         CoastElapsed) / launch_coast_time(0.5)) * CoastTimer -- a simple linear countdown
-//         over the last 0.5s.
-//     Then beams the docked object to LaunchPos + LaunchDir*X (same orientation, LaunchOrient)
-//     every tick, without touching bUpdateComplete (update() itself flips that once
-//     CoastElapsed reaches 3.0).
+// LAB_062b0560, LaunchAction's PhySys::Controller slot 4 (from the listing). Advances
+// CoastElapsed (only when LaunchFlags == 0x20 exactly, not a bit test) and beams the docked
+// object along LaunchDir: an ease-out (150.0f DAT_0639e56c, 80.0f DAT_0639e560) during
+// launch_decel_time, then a linear countdown over launch_coast_time. With bNoDockingCamera it
+// beams straight to the launch pose and completes. No null test on cobject().
 void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
-    // Slot 4 (RET 0x8): the timestep is the event's delta_time (.text:062b056c-062b0570,
-    // read only inside the LaunchFlags == 0x20 test); CoreList is never read.
     (void)CoreList;
     float const Dt = EventSim->delta_time;
     if (LaunchFlags == 0x20)
@@ -441,7 +338,6 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
         CoastElapsed += Dt;
     }
 
-    // 062b0578-062b0588: watched head non-null and head - 8 non-null.
     IObjRW* Watched = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
     if (Watched == nullptr)
     {
@@ -457,10 +353,7 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
         return;
     }
 
-    // 062b05c7-062b061a: FCOMP CoastElapsed against launch_decel_time, TEST AH,5 + JP: below
-    // eases (Remaining = decel - elapsed, Frac = Remaining / decel, 150*Frac*Frac +
-    // 80*Remaining + CoastTimer); >= or unordered coasts ((coast + decel - elapsed) / coast *
-    // CoastTimer). Everything stays on the FPU.
+    // Unordered takes the countdown branch; all unrounded.
     double X;
     float const Decel = LaunchActionVars::launch_decel_time;
     float const Coast = LaunchActionVars::launch_coast_time;
@@ -475,8 +368,7 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
         X = (((double)Coast + Decel - CoastElapsed) / Coast) * CoastTimer;
     }
 
-    // 062b061d-062b065a: the x product is added to LaunchPos.x on the FPU, while the y and z
-    // products are spilled as floats first (VC6 register pressure) -- reproduced.
+    // x87: the x product is added unrounded; the y and z products are rounded to float first.
     float const StepY = (float)(X * LaunchDir.y);
     float const StepZ = (float)(X * LaunchDir.z);
     Vector InterpPos;
@@ -487,10 +379,8 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     Dock->beam_object(InterpPos, LaunchOrient, false);
 }
 
-// Retail inlines this constructor into CShip::jump_in (.text:062b2d7c-062b2edb): the watcher
-// at +0x18 is zeroed and pointed at JumpObj's Watchable (+8) when non-null; JumpOrient is set
-// to identity, JumpPos and the +0x64 flag zeroed (062b2dbd-062b2de8); then the fields below.
-// The pad bytes +0x65..+0x67 are not written.
+// Inlined in CShip::jump_in (FUN_062b2d40). JumpObjWatcher is +0x18, bJumpComplete +0x64; the
+// pad bytes +0x65..+0x67 are not written.
 JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Speed)
     : JumpElapsed(0.0f)
     , JumpSpeed(0.0f)
@@ -506,13 +396,9 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
     JumpPos.y = 0.0f;
     JumpPos.z = 0.0f;
 
-    JumpObjWatcher.set(JumpObj);                                        // Watchable base at +8; null stays null
+    JumpObjWatcher.set(JumpObj);
 
-    // Re-resolve the actual target through the watched object's own vtable slot 84
-    // (0x150) -- the same "get_cobject" idiom LaunchAction::Start() uses -- and validate
-    // it's really a CShip (ClassShip mask 0x503) before trusting it below.
-    // .text:062b2df9-062b2e0d: receiver = head ? head - 8 : 0 and the call goes out with no
-    // null test (an unwatched JumpObj faults on the vtable load, as in retail).
+    // No null test on the watched object (a null JumpObj faults, as in retail).
     IObjRW* const Watched = ObjRwFromWatchable(WatchedTarget(JumpObjWatcher));
     CObject* Target = (CObject*)Watched->cobject();                     // slot 84 (+0x150)
     if (Target == nullptr || (Target->ObjectClass & 0x503) != 0x503)
@@ -525,16 +411,11 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
     JumpSpeed = Speed;
     JumpApproachBudget = Speed * 2000.0f;
 
-    // Retail .rdata constants written here with no reader anywhere in this decompiled
-    // range (see JumpInAction's class comment on the missing Step/ControlObject
-    // override) -- kept for fidelity even though nothing in this port consumes them yet.
+    // Written but never read by JumpInAction.
     Field5c = 1500.0f;
     Field60 = 10.0f;
 
-    // Retail dereferences Target unconditionally for the rest of this ctor -- same
-    // "trusts the watcher resolved" pattern as LaunchAction::Start()'s Docked-> calls --
-    // reproduced as-is rather than guarded (crashes on a null/non-ship JumpObj, matching
-    // retail).
+    // Retail quirk kept: Target is dereferenced with no null test (a non-ship crashes).
     CShip* TargetShip = (CShip*)Target;
     TargetShip->enable_collisions_r(false);
     TargetShip->Throttle = 0.0f;
@@ -554,14 +435,7 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
 
 JumpInAction::~JumpInAction()
 {
-    // Common.dll.c ~85070 (FUN_062b2f30) -- undo the ctor's enable_collisions_r(false)
-    // on the resolved target, then unregister the physics controller and drop the
-    // watcher. Re-resolves the target the same way the ctor did rather than caching it,
-    // matching retail (which re-walks the watcher here too instead of storing the
-    // CObject* it validated in the ctor).
-    // .text:062b2f60-062b2fb3: watched head non-null and head - 8 non-null, then the target
-    // re-resolved and, when non-null, collisions re-enabled; UnRegister; the watcher member's
-    // destructor unlinks it.
+    // FUN_062b2f30. Undoes the ctor's enable_collisions_r(false) on the re-resolved target.
     IObjRW* const Watched = ObjRwFromWatchable(WatchedTarget(JumpObjWatcher));
     if (Watched != nullptr)
     {
@@ -577,9 +451,7 @@ JumpInAction::~JumpInAction()
 
 bool JumpInAction::update(float /*Dt*/)
 {
-    // .text:062afd80 (IAction slot 1): while the jump is not complete, wake the controller;
-    // the flag (set by do_simulation_controller) is read again after wakeup() for the
-    // result, so the action is removed once the jump has completed.
+    // FUN_062afd80 (IAction slot 1). bJumpComplete is set by do_simulation_controller.
     if (!bJumpComplete)
     {
         PhySys::Controller::wakeup();
@@ -587,39 +459,13 @@ bool JumpInAction::update(float /*Dt*/)
     return !bJumpComplete;
 }
 
-// Common.dll 0x62afbe0 (LAB_062afbe0), JumpInAction's own PhySys::Controller vtable slot 4
-// (.rdata PTR_core_is_going_to_be_deleted_event_0639e680+0x10, installed at [this+8] by the
-// ctor above). Decomp-checked against the raw asm 062afbe0-062afd6e (no .c pseudocode was
-// generated for this range) -- see the class comment in common_cequip.h for how this slot
-// was identified as IVP_Controller::do_simulation_controller; now the class's override (was
-// the plain method Step(float Dt)).
-//
-// Retail behavior:
-//   - If the watched jump target is gone (WatchedTarget(JumpObjWatcher) == nullptr), sets bJumpComplete
-//     (the "done" flag JumpInAction::update() polls) and returns immediately.
-//   - Otherwise re-resolves the target via get_cobject (vtable slot 0x150) and validates the
-//     ClassShip mask (0x503) -- same idiom used throughout this class.
-//   - Accumulates JumpElapsed (previously annotated "no reader found"; it is in fact a per-tick
-//     elapsed-time counter) by Dt, comparing the running total against JumpSpeed, which is
-//     reused here as an elapsed-time cap in seconds despite its name.
-//   - While JumpElapsed < JumpSpeed: computes a clamped, squared ease-out fraction
-//     ((JumpSpeed - JumpElapsed) / JumpSpeed)^2 clamped to [0,1] (retail .rdata constants
-//     DAT_06399408/DAT_0639a1d0 = 0.0f/1.0f), scaled by JumpApproachBudget (also previously
-//     "no reader found"; it is the ease-out distance budget), and offsets JumpPos along
-//     JumpOrient's forward column (E[*][2], the same LaunchDir idiom LaunchAction::Start
-//     uses) to get a smoothly-converging interpolated position, then re-teleports the target
-//     there this tick via the same raw CObject vtable-slot-0x7c beam_object() idiom the ctor
-//     uses. This refutes the class's old "single immediate teleport" assumption -- retail
-//     actually eases the ship toward JumpPos over JumpSpeed seconds.
-//   - Once JumpElapsed >= JumpSpeed: sets bJumpComplete (done), beams the target exactly to
-//     JumpPos/JumpOrient, zeroes Target->Throttle, re-activates the target's engine equip if
-//     inactive, and reports the arrival system id through the watched object's
-//     IObjAffect::slot_74.
+// LAB_062afbe0, JumpInAction's PhySys::Controller slot 4 (from the listing). JumpSpeed is used
+// as a duration in seconds: until it elapses the ship eases toward JumpPos along JumpOrient's
+// forward column by ((JumpSpeed - t) / JumpSpeed)^2 * JumpApproachBudget; then it is placed
+// exactly, its engine re-activated and the arrival system id reported (IObjAffect slot_74).
+// Retail quirk kept: no null test on the resolved ship (a non-ship faults).
 void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
-    // Listing 0x062afbe0..0x062afd6e (re-traced 2026-10-08). Slot 4 (RET 0x8): the timestep is
-    // the event's delta_time (.text:062afc35-062afc39); CoreList is never read. No null guard
-    // on the resolved ship: a non-ship target leaves it null and retail then faults on it.
     (void)CoreList;
     IObjRW* Watched = ObjRwFromWatchable(WatchedTarget(JumpObjWatcher));
 
@@ -633,17 +479,14 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     CShip* TargetShip = (Target != nullptr && (Target->ObjectClass & 0x503) == 0x503)
         ? (CShip*)Target : nullptr;
 
-    // 062afc32-062afc3e: FLD JumpElapsed, FADD delta_time, FCOM JumpSpeed, FST JumpElapsed -- the float
-    // is stored, but the unrounded sum stays on the FPU and feeds the compare and the ease.
+    // FST: the float is stored, the unrounded sum feeds the compare and the ease.
     double const Elapsed = (double)JumpElapsed + EventSim->delta_time;
     JumpElapsed = (float)Elapsed;
 
-    // TEST AH,0x1 + JNZ: below (or unordered) eases in, otherwise arrives.
+    // Unordered eases.
     if (!(Elapsed >= JumpSpeed))
     {
-        // 062afcde-062afd14: ((JumpSpeed - Elapsed) / JumpSpeed)^2 on the FPU; above 1.0
-        // (TEST AH,0x41 + JNZ keeps <=, NaN) -> 1.0; else below 0.0 (TEST AH,0x5 + JP keeps
-        // >=, NaN) -> 0.0; then * JumpApproachBudget (still unrounded).
+        // Clamped to [0, 1] (NaN passes), all unrounded.
         double Blend = ((double)JumpSpeed - Elapsed) / JumpSpeed;
         Blend = Blend * Blend;
         if (Blend > 1.0)
@@ -652,8 +495,7 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
             Blend = 0.0;
         Blend = Blend * JumpApproachBudget;
 
-        // 062afd1a-062afd62: the x and z products are stored as floats before the add, the y
-        // product is added to JumpPos.y while still on the FPU.
+        // x87: x and z are rounded before the add, y is not.
         float const OffsetX = (float)(JumpOrient.E[0][2] * Blend);
         float const OffsetZ = (float)(JumpOrient.E[2][2] * Blend);
         Vector InterpPos;
@@ -664,7 +506,6 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
         return;
     }
 
-    // Arrival (0x062afc4c..0x062afcdb).
     bJumpComplete = true;
     TargetShip->beam_object(JumpPos, JumpOrient, false);
     TargetShip->Throttle = 0.0f;
@@ -672,9 +513,8 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     if (EngineEquip != nullptr && !EngineEquip->IsActive())
         EngineEquip->Activate(true);
 
-    // The jumping object's IObjAffect::slot_74 (+0x74; ship gameobjects send JumpInComplete
-    // with it) receives the id of the system the ship's object database belongs to
-    // (IObjDB::GetZoneDb (+8) -> Universe::ISystem::GetId (+0), the system id).
+    // IObjAffect slot_74 (+0x74; ship gameobjects send JumpInComplete with it) gets the id of
+    // the ship's system.
     IObjDB* ObjDb = TargetShip->ObjectDb;   // +0xac
     if (ObjDb == nullptr)
         return;

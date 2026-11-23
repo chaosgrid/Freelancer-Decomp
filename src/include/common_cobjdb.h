@@ -45,14 +45,9 @@ struct IObjDB
     // +0x0c LAB_005422d0 — if (TypeMask & 0xfdff) return DAT_00678ae0 else 0.
     // DAT_00678ae0 = NewSpatial("BSP") ISpatialPartition*; Fill = vtable +0x1c.
     //
-    // NOT pure. IObjDB's own vtable (Server.dll .rdata:06d67cec, COL
-    // .rdata:06d6cf68 -> .?AUIObjDB@@) holds _purecall (.text:06d5fff0) in
-    // slots 0..2 and a real body in slot 3: LAB_06d06e80,
-    //   .text:06d06e80  33c0    XOR EAX,EAX
-    //   .text:06d06e82  c20400  RET 0x4
-    // i.e. the base answers "no spatial bucket" for any mask. Both known
-    // implementations (Object::IObjDBImpl in freelancer.exe, StarSystem in
-    // Server.dll) override it.
+    // Not pure: IObjDB's own vtable (Server.dll .rdata:06d67cec) has _purecall in slots
+    // 0..2 and LAB_06d06e80 (`XOR EAX,EAX; RET 4`) here -- no spatial bucket for any mask.
+    // Both known implementations override it.
     virtual void* __thiscall GetBucket(unsigned TypeMask)
     {
         (void)TypeMask;

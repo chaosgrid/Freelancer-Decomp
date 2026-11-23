@@ -60,12 +60,8 @@ static_assert(sizeof(ThornCameraProperties) == 0x10, "camera tail is four floats
 
 // ---------------------------------------------------------------------------
 // HardpointInfo — sizeof 0x48. From HardpointSummary::get_info stride.
-// The position/orientation order was recovered from HardpointToWorld (0xaeba0) and confirmed
-// by HardpointToObject (0xaec40): both copy NINE dwords from `Hp + 0x10` as the 3x3 and read
-// the vector from `Hp + 0x04`, `+0x08`, `+0x0c`. The previous comment here had the two
-// swapped (orient at +0x04, pos at +0x28) — that is the layout of the 0x34-byte Barrel
-// record in common_cequip.h, not of this one. 0x10 + 0x24 = 0x34 also lands exactly on the
-// parent-instance field, which is the third piece of agreement.
+// HardpointToWorld (0xaeba0) and HardpointToObject (0xaec40) both copy nine dwords from
+// `Hp + 0x10` as the 3x3 and read the vector from `Hp + 0x04`.
 // ---------------------------------------------------------------------------
 struct HardpointInfo
 {
@@ -202,9 +198,8 @@ struct COMMON_API CharPlaceInfo
     // +0x38 Posture, +0x3c bZoneScript) here, ahead of StartScript at +0x40.
     // read_CharacterPlacement_block (INI [CharacterPlacement]) only ever supplies
     // Name/StartScript, leaving these three at their defaults; RoomData::read_set_script's
-    // post-loop over Setpoints (Common.dll.c 0x06278e20, called after the main Thorn
-    // entity loop, retail line ~28755-28783) is what actually populates them, for every
-    // Setpoint whose Props.bValid is set (i.e. its name matched the zs/zg convention).
+    // post-loop over Setpoints (0x06278e20, after the main Thorn entity loop) populates them
+    // for every Setpoint whose Props.bValid is set (its name matched the zs/zg convention).
     Csys Frame;                 // +0x04, identity by default
     int CharType;                // +0x34, default -1 -- copy of SetpointProperties::CharType
     int Posture;                 // +0x38, default -1 -- copy of SetpointProperties::Posture
@@ -273,14 +268,10 @@ struct COMMON_API RoomLightInfo
 
     Csys Frame;         // +0x00, 0x30 bytes
     // +0x30 -- RoomData::add_set_script_light (0x15960) copies this from
-    // ThornLightProperties+0xC/+0x10/+0x14. PROVEN to be a DIRECTION, not an RGB colour
-    // (this field was named Color until 2026-09-17): RoomData::read_set_script's named
-    // "LtShadowSource"/"LtGlareSource" branch (0x14b40 @ 06274ec9-06274f74) reads the very
-    // same ThornLightProperties+0xC triple, multiplies it by the entity's orientation matrix
-    // and then normalizes it (FSQRT + FDIVR 1.0f) before storing it into RoomData's
-    // Shadow/GlareLightDirection -- a colour is never rotated or normalized. Corroborated by
-    // the retail ctor/clear default of (0, 0, -1.0f), a unit -Z direction rather than any
-    // meaningful colour.
+    // ThornLightProperties+0xC/+0x10/+0x14. A direction, not a colour: read_set_script's
+    // "LtShadowSource"/"LtGlareSource" branch (06274ec9) rotates it by the entity's orientation
+    // and normalizes it into RoomData's Shadow/GlareLightDirection; the ctor/clear default is
+    // (0, 0, -1.0f).
     float Direction[3];
     // +0x3C -- ThornLightProperties+0x28. Retail's named-light branch compares exactly this
     // dword against 3 (06274eb1 `CMP [ESP+0xd4],EBX` with EBX=3, set at 06274dd3) and takes
@@ -288,23 +279,17 @@ struct COMMON_API RoomLightInfo
     // for every other value. So 3 selects directional-light semantics; the meaning of the
     // other values is not established by any call site in this module, hence the neutral name.
     int Mode;
-    // +0x40 -- ThornLightProperties+0x2C/+0x30/+0x34. PROVEN to be the RGB colour: the same
+    // +0x40 -- ThornLightProperties+0x2C/+0x30/+0x34. The RGB colour: the same
     // named-light branch stores this triple verbatim into RoomData::ShadowLightColor /
     // GlareLightColor (06274f9d / 062750cb) on both the mode==3 and mode!=3 paths, i.e. it is
     // the one field that survives unchanged regardless of the geometry interpretation.
     float Color[3];
-    // +0x4C, 0x58 bytes (22 dwords) -- the still-undecoded tail of ThornLightProperties
-    // (+0x38..+0x90). ThornLightProperties is only forward declared in this codebase and no
-    // other call site in Common.dll reads past +0x34, so these bytes are modeled opaquely
-    // rather than by guessing field boundaries. Left uninitialized by the ctor/clear(),
-    // matching retail exactly (Common.dll.c 0x13410 / 0x13490 jump straight from +0x38 to
-    // +0xa4). TODO(full-port): decode against the Thorn-side writer that fills the struct.
+    // +0x4C, 0x58 bytes -- the undecoded tail of ThornLightProperties (+0x38..+0x90); nothing
+    // in Common.dll reads past +0x34. Left uninitialized by the ctor/clear() (0x13410 /
+    // 0x13490 skip from +0x38 to +0xa4). TODO: decode against the Thorn-side writer.
     unsigned char Opaque4C[0x58];
-    // +0xA4 -- the 4th (unsigned char) parameter of add_set_script_light. In the one
-    // in-module producer, RoomData::read_set_script, it is the Thorn entity's own +0x40 byte
-    // (0627510a `MOV BL,byte ptr [EBP+0x40]`). This is the byte the ctor/clear() zero via
-    // `this[0xa4] = 0`. Its semantic meaning is not established by any call site, so the name
-    // stays generic. Previously mismodeled as a Range/Type/Instance trio at +0x3C/+0x40/+0x44.
+    // +0xA4 -- add_set_script_light's 4th parameter; read_set_script passes the Thorn
+    // entity's +0x40 byte (0627510a). The ctor/clear() zero it. Meaning unknown.
     unsigned char Type;
     // +0xA5..+0xA7: trailing compiler alignment padding, not addressed by any retail code path.
 };
@@ -411,8 +396,8 @@ private:
     // current instance and its archetype (part) handle; hardpoint_callback2 records the
     // instance in Instances[cursor] and queries the part's hardpoints. Both are -1 whenever
     // no fill is running (ctor / clear / analyze_instance's end).
-    long FillInstance;           // +0x14  formerly FillIndex
-    void* FillPart;              // +0x18  IEngine archetype handle; formerly CachedInstance
+    long FillInstance;           // +0x14
+    void* FillPart;              // +0x18  IEngine archetype handle
     int FillCursor;              // +0x1C  array-fill cursor, 0..Count-1
 };
 
@@ -437,8 +422,7 @@ struct MissionVendorOfferDescription
         Briefing.destroy();
     }
 
-    // +0x00. Renamed 2026-09-24 from MissionType: init() copies it to
-    // MissionVendorProperties+0x04, which Server.dll's BaseDB::create_mission_vendor
+    // +0x00. init() copies it to MissionVendorProperties+0x04, which Server.dll's BaseDB::create_mission_vendor
     // (FUN_06d14dc0, .text:06d14dcb `MOV EAX,[EDI+0x4]`) looks up in the BASE map.
     unsigned BaseId;
     unsigned TargetId;
@@ -456,8 +440,7 @@ struct MissionVendorOfferDescription
 
 struct NewsBroadcastDescription
 {
-    // +0x00. Renamed 2026-09-24 from IconId: init() copies it to
-    // NewsBroadcastProperties+0x04, the key BaseDB::create_news_broadcast
+    // +0x00. init() copies it to NewsBroadcastProperties+0x04, the key BaseDB::create_news_broadcast
     // (FUN_06d15140, .text:06d1514b) looks up in the BASE map.
     unsigned BaseId;
     bool bFlag1;
@@ -475,34 +458,23 @@ struct NewsBroadcastDescription
 
 struct CharacterDescription
 {
-    // NAMING NOTE (2026-09-17, Server.dll lane wave 8): this first dword is NOT
-    // a system id. CharacterProperties::init copies it to Properties+0x08
-    // (Common.dll .text:0632dc20), and Server.dll's FUN_06d14870 reads exactly
-    // that field at .text:06d1487b and uses it as the key into BaseDB's
-    // LOCATION tree (BaseDB+0x1c, the one BaseDB::find_location uses). It is a
-    // room/location id, exactly like AmbientScriptDescription::RoomId above.
-    // Renamed 2026-09-24 (with CharacterProperties' Key / SessionId / RoomId).
+    // A room/location id, not a system id: CharacterProperties::init copies it to +0x08
+    // (.text:0632dc20), and Server.dll's FUN_06d14870 (.text:06d1487b) keys BaseDB's
+    // LOCATION tree (BaseDB+0x1c) by it.
     unsigned RoomId;
     Costume Cost;
-    // +0x38 / +0x44 / +0x4c renamed 2026-10-14 (were VoiceId / Field_0x44 / Field_0x4c):
-    // init copies them to CharacterProperties' NameIds / BehaviorId / VoiceId
-    // (.text:0632dc25, 0632dc95, 0632dc9e). Content's FBarCharacter::Create (06ea7d20) stores
-    // the individual name into +0x38, -1 into +0x44 and the voice into +0x4c.
+    // +0x38 / +0x44 / +0x4c: init copies them to CharacterProperties' NameIds / BehaviorId /
+    // VoiceId (.text:0632dc25, 0632dc95, 0632dc9e). Content's FBarCharacter::Create (06ea7d20)
+    // stores the individual name into +0x38, -1 into +0x44 and the voice into +0x4c.
     unsigned NameIds;
     unsigned FactionId;
     char const* Script;
     unsigned BehaviorId;
     char const* Location;
     unsigned VoiceId;
-    // +0x50. Added 2026-09-17: the struct used to stop at +0x4c, but retail's
-    // pub::GF::CharacterCreate reads one dword past that --
-    //   .text:06d17f6a  8b4650  MOV EAX,[ESI + 0x50]
-    //   .text:06d17f6d  50      PUSH EAX
-    // -- and hands it to FUN_06d14870, which passes it straight to FUN_06d120b0,
-    // which stores it as the new node's SESSION FILTER at node+0x04
-    // (.text:06d12205). FUN_06d11b50 tests that filter before every per-session
-    // dispatch; 0 means "every session". CharacterProperties::init never touches
-    // it, which is why it is a description field and not a properties field.
+    // +0x50. pub::GF::CharacterCreate reads it (.text:06d17f6a) and FUN_06d120b0 stores it as
+    // the new node's session filter at node+0x04 (.text:06d12205); FUN_06d11b50 tests it
+    // before every per-session dispatch, 0 meaning every session. init() never touches it.
     unsigned Filter;
 };
 
@@ -522,11 +494,10 @@ public:
     unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
     char const* get_icon_texture() const;
 
-    // Public since 2026-09-24: Server.dll's BaseDB stamps the handle into Key
-    // (FUN_06d13070 .text:06d131c3 `MOV [EDI],ECX`) and keys the offer by
-    // BaseId; retail has no setter or getter for either.
+    // Public: Server.dll's BaseDB stamps the handle into Key (FUN_06d13070 .text:06d131c3)
+    // and keys the offer by BaseId; retail has no setter or getter for either.
     int Key;                    // +0x00  default -1
-    unsigned BaseId;            // +0x04  (was MissionType; see the description)
+    unsigned BaseId;            // +0x04
     unsigned TargetId;          // +0x08
     unsigned SystemId;          // +0x0C
     unsigned MissionClass;      // +0x10  1=destroy,2=destroyinstall,3=assassinate,...
@@ -543,8 +514,7 @@ public:
 static_assert(sizeof(MissionVendorProperties) == 0x60, "MissionVendorProperties sizeof 0x60");
 
 // Retail Common.dll class carrying a client's accept/decline response (with an optional
-// FmtStr reason) to a mission vendor offer -- re-derived from its ctor/dtor/clear/destroy/
-// marshal/unmarshal/operator= (Common.dll.c 162870-163088). Not to be confused with the
+// FmtStr reason) to a mission vendor offer. Not to be confused with the
 // unrelated free function pub::GF::MissionVendorAcceptance (server_pub.cpp), which sends
 // this same data (handle/accepted/reason/session) over the wire but does not use this
 // class's marshal format directly.
@@ -564,8 +534,8 @@ public:
     // with AmbientScriptProperties::get_key and other "return the first dword" getters).
     unsigned long get_key() const;
 
-    // Public since 2026-09-24: Server.dll's FUN_06d13270 fills a local one
-    // field by field (.text:06d1329f .. .text:06d132bc) before marshalling it.
+    // Public: Server.dll's FUN_06d13270 fills a local one field by field (.text:06d1329f)
+    // before marshalling it.
     int Key;              // +0x00  default -1
     unsigned TargetId;     // +0x04
     bool bAccepted;        // +0x08
@@ -590,19 +560,10 @@ public:
     unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
     char const* get_logo_texture() const;
 
-    // Public since 2026-09-24 (Server.dll's BaseDB stamps Key, FUN_06d13350
-    // .text:06d134a3, and keys the broadcast by BaseId).
-    // Re-derived from retail's ctor/dtor/clear/destroy/marshal/unmarshal/init (Common.dll.c
-    // 163092-163539): the previous field list here (SourceId/Priority/Flags as three plain
-    // dwords, Headline at +0x14) did not match retail at all -- the real layout only has one
-    // extra dword before the FmtStrs, split as two bools (mirroring NewsBroadcastDescription's
-    // bFlag1/bFlag2) plus one dword, and there is a genuine 5th data member (a heap-owned
-    // override string at +0x58, freed with malloc_strfree / copied with malloc_strcpy /
-    // (un)marshalled with Put/GetString) that get_logo_texture() must consult -- previously
-    // missing entirely, which is why get_logo_texture() always returned the "genericnews"
-    // fallback and ignored any real per-broadcast logo texture.
+    // Public: Server.dll's BaseDB stamps Key (FUN_06d13350 .text:06d134a3) and keys the
+    // broadcast by BaseId.
     int Key;                    // +0x00  default -1
-    unsigned BaseId;            // +0x04  (was NewsType; see the description)
+    unsigned BaseId;            // +0x04
     bool bFlag1;                // +0x08  from NewsBroadcastDescription::bFlag1
     bool bFlag2;                // +0x09  from NewsBroadcastDescription::bFlag2 (+2 bytes padding follows)
     unsigned Category;          // +0x0C  from NewsBroadcastDescription::Category
@@ -628,10 +589,8 @@ public:
     void unmarshal(class MarshalBuffer* Buf);
     unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
 
-    // Public since 2026-09-24: Server.dll's BaseDB writes these directly
-    // (FUN_06d11ee0 / FUN_06d120b0 / FUN_06d14ac0); retail has no setters.
-    // Key, SessionId, RoomId and BehaviorId renamed the same day from RepId,
-    // BaseId, SystemId and Field5C:
+    // Public: Server.dll's BaseDB writes these directly (FUN_06d11ee0 / FUN_06d120b0 /
+    // FUN_06d14ac0); retail has no setters.
     //   +0x00 the pool handle FUN_06d120b0 / FUN_06d11ee0 store (get_key()),
     //   +0x04 the owning player's session (FUN_06d11ee0 .text:06d11f51, matched
     //         by BaseDB::exit_location, FUN_06d143e0),
@@ -640,16 +599,14 @@ public:
     unsigned Key;               // +0x00
     unsigned SessionId;         // +0x04
     unsigned RoomId;            // +0x08
-    // +0x0C / +0x10 / +0x58 renamed 2026-09-26 from ShipArchId / Rank / Affiliation: init
-    // fills them from CharacterDescription's VoiceId / FactionId / Script, and freelancer.exe's
+    // +0x0C / +0x10 / +0x58: init fills them from CharacterDescription's VoiceId / FactionId / Script, and freelancer.exe's
     // CharacterObject reads +0x0C as the ids of the name it shows (FUN_00444290 0x004447f6,
     // FUN_0041c770), +0x10 as the faction marked met on a click (FUN_00445c10 0x00445c32 and
     // FUN_00445720 0x004459ee), and +0x58 as the idle script it plays (0x00444812).
     unsigned NameIds;           // +0x0C
     unsigned FactionId;         // +0x10
     wchar_t* NameWide;          // +0x14  wide string
-    // +0x1c / +0x20 / +0x60 renamed 2026-10-14 from Field1C / Field20 / Field60. Server's
-    // BaseDB stores CharType 1 for a player (.text:06d1201a) and 0 for a placed character
+    // +0x1c / +0x20 / +0x60: Server's BaseDB stores CharType 1 for a player (.text:06d1201a) and 0 for a placed character
     // (.text:06d121fb), with the placement's posture (.text:06d12202); freelancer.exe's
     // RoomControl matches both against the placement's char type and posture, and
     // CharacterObject treats CharType 1 as the shared-deform player. VoiceId is
@@ -665,11 +622,8 @@ public:
 
 // AmbientScriptDescription — input to pub::GF::AmbientScriptCreate.
 // Retail: ?AmbientScriptCreate@GF@pub@@YAKABUAmbientScriptDescription@@@Z (Server.dll 0x384e0).
-// Layout re-derived from AmbientScriptProperties::init (Common.dll.c 163688-163710): init()
-// reads offsets +0x00/+0x04/+0x08 as three plain dwords and +0x0c as a raw `char const*` (NOT
-// an FmtStr -- that field was previously misnamed/mistyped as one). Separately,
-// pub::GF::AmbientScriptCreate itself reads one dword at +0x10 and passes it on as the
-// record's session filter (see the field). No field beyond it is read by anyone.
+// Layout from AmbientScriptProperties::init (three dwords and a raw char const* at +0x0c)
+// and pub::GF::AmbientScriptCreate (the session filter at +0x10). Nothing reads past it.
 // Lives here (not common_server.h) because it pairs with the other pub::GF
 // property-bag classes below.
 struct AmbientScriptDescription
@@ -678,14 +632,13 @@ struct AmbientScriptDescription
     unsigned ScriptId;    // +0x04
     unsigned Flags;       // +0x08  only the low byte is read (AmbientScriptProperties::init)
     char const* Name;     // +0x0C
-    // +0x10. CORRECTED 2026-09-24: this is not an FmtStr. pub::GF::AmbientScriptCreate
-    // reads one dword here (.text:06d1851a `MOV EAX,[ESI+0x10]`) and FUN_06d15390 /
+    // +0x10. pub::GF::AmbientScriptCreate reads one dword here (.text:06d1851a `MOV EAX,[ESI+0x10]`) and FUN_06d15390 /
     // FUN_06d12520 store it as the new record's session filter (record+0x04,
     // .text:06d1267f), the value FUN_06d11b50 compares against each session id.
     unsigned Filter;
 };
 
-// Common.dll.c 163560-163710 (ctor 0xbb7a0, dtor/destroy 0xbb7c0, clear 0xbb7f0,
+// Ctor 0xbb7a0, dtor/destroy 0xbb7c0, clear 0xbb7f0,
 // marshal 0xbb810, unmarshal 0xbb880, operator= 0xbb8e0, init 0xbb930). Backs
 // Server.dll's pub::GF::AmbientScriptCreate (see server_pub.cpp / BaseDB::create_ambient_script).
 // Same small "network property bag" shape as MissionVendorProperties/NewsBroadcastProperties
@@ -705,14 +658,9 @@ public:
     void unmarshal(class MarshalBuffer* Buf);
     unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
 
-    // Re-derived from retail's ctor/dtor/clear/operator=/init (Common.dll.c 163560-163710).
-    // Key defaults to -1 (never constructed via a description); init() resets it to 0 instead
-    // of -1 (a real, deliberate difference in retail -- verified byte-for-byte), since the
-    // handle id itself isn't known until the object is copied onto the heap and linked into
-    // its room's ambient-script list by the registration helper (Server.dll FUN_06d12520,
-    // FRoomEntry::create_ambient_script), which overwrites Key with the allocated handle
-    // by a direct store (.text:06d1266f CALL init / .text:06d1267d MOV [EDI],ECX with
-    // EDI = &Props): the members are public, there is no setter.
+    // Key defaults to -1; init() resets it to 0 (retail quirk). The registration helper
+    // (Server.dll FUN_06d12520, FRoomEntry::create_ambient_script) then stores the allocated
+    // handle directly (.text:06d1267d); there is no setter.
     int Key;                // +0x00  default -1; 0 right after init(); handle id once registered
     unsigned RoomId;        // +0x04  from AmbientScriptDescription::RoomId
     unsigned ScriptId;      // +0x08  from AmbientScriptDescription::ScriptId
@@ -764,12 +712,9 @@ static_assert(sizeof(AmbientScriptInfo) == 0x0c, "AmbientScriptInfo sizeof 0x0c"
 // ---------------------------------------------------------------------------
 // CostumeHint / BaseHint — serializable hint structs
 // ---------------------------------------------------------------------------
-// Common.dll.c 0xb11e0/0xb11f0: BaseHint's own ctor/copy-ctor only ever touch the
-// vtable ptr and this one dword at +0x04 -- confirmed BOTH by BaseHint's own copy
-// ctor (`*(this+4) = *(param+4)`) AND by CostumeHint's copy ctor (0xb1280), which
-// inlines BaseHint's copy first (`this+4 = param+4`) before looping its own 13
-// dwords starting at +8. So BaseHint is sizeof 8 (vtable + one dword), and
-// CostumeHint : public BaseHint puts CostumeHint's own Data[13] at +0x08, not +0x04.
+// 0xb11e0/0xb11f0: BaseHint's ctor/copy-ctor touch only the vptr and the dword at +0x04,
+// and CostumeHint's copy ctor (0xb1280) copies that dword before its own 13 at +0x08, so
+// BaseHint is sizeof 8.
 struct COMMON_API BaseHint
 {
     BaseHint();
@@ -805,8 +750,7 @@ struct COMMON_API CostumeHint : public BaseHint
     void UnSerialize(unsigned char* Buf, unsigned Size) override;
     void CleanUp(unsigned char* Buf) override;
 
-    // The hinted costume (was `unsigned Data[13]`, retyped 2026-10-14). Every member treats it
-    // as one: the ctor (06311370) is the inline Costume ctor (part ids and count zeroed), the
+    // The hinted costume. Every member treats it as one: the ctor (06311370) is the inline Costume ctor (part ids and count zeroed), the
     // copy ctor (06311280) copies all thirteen dwords, operator= (063112b0) is Costume's
     // count-bounded operator=, and Serialize / UnSerialize move exactly sizeof(Costume) = 0x34
     // bytes. Content's FUN_06eba720 fills it from a dialog Costume.
@@ -851,27 +795,18 @@ struct IObjRW;
 struct BaseWatcher
 {
     COMMON_API BaseWatcher();
-    // Common.dll.c FUN_062c2920 (0x62920): retail overload that watches Target's
-    // Watchable sub-object (at IObjRW+8) immediately, in one step. Used both as the
-    // per-element constructor for ScanList's BaseWatcher[256] array (called with a
-    // null Target there, degenerating to the default ctor) and directly elsewhere
-    // (e.g. 0x062d47bb) with a real IObjRW*.
+    // FUN_062c2920: watches Target's Watchable (IObjRW+8) at once. ScanList's
+    // BaseWatcher[256] array uses it with a null Target; 0x062d47bb with a real one.
     explicit BaseWatcher(IObjRW* Target);
-    // Common.dll.c FUN_062ed070 (0x62ed070): a second constructor overload that
-    // dereferences a Watchable* const* directly (no +8 IObjRW adjustment, unlike
-    // the IObjRW* overload above) and additionally guards against a literal 0x8
-    // sentinel value alongside null. Verified against raw disasm (Common.dll.txt
-    // 253086-253125): zero Watched/Next, then `Watchable* V = *Src; if (V != nullptr
-    // && V != (Watchable*)8) set_pointer(V);`. Sole call site (0x062e8720) sits in a
-    // still-unprocessed cluster, but the constructor's own logic is fully verified
-    // regardless of the caller.
+    // FUN_062ed070: zero both fields, then `Watchable* V = *Src; if (V != nullptr &&
+    // V != (Watchable*)8) set_pointer(V);` (no +8 adjustment). Sole caller 0x062e8720.
     explicit BaseWatcher(Watchable* const* Src);
     COMMON_API ~BaseWatcher();
     COMMON_API BaseWatcher& operator=(BaseWatcher const& Other);
 
     COMMON_API void set(Watchable const* Target);
     Watchable const* target() const { return Watched; }
-    // Common.dll.c FUN_062c2ab0 (0x62ab0): 0 if nothing watched, else the watched
+    // FUN_062c2ab0: 0 if nothing watched, else the watched
     // IObjRW's unique id (vtable slot +0x20, the same "GetId" slot used throughout
     // this cluster -- see CEScanner::add_obj / ScanList::add_in_range).
     unsigned int get_watched_id() const;
@@ -918,18 +853,14 @@ struct COMMON_API EquipDesc
 
     unsigned short get_id() const;
     CacheString const& get_hardpoint() const;
-    // ADDED 2026-09-17 (wave 14). Retail exports all six of these by name and
-    // the port had none of them; each one is a single load off the offset named
-    // in its comment, read from Common.dll's own listing:
+    // Retail exports these by name; each is a single load or store at the offset given:
     //   ?get_arch_id@EquipDesc@@QBEIXZ    0xa9ad0 -> [this+0x04]
     //   ?is_equipped@EquipDesc@@QBE_NXZ   0x3b90  -> [this+0x0c] (byte)
     //   ?get_count@EquipDesc@@QBEHXZ      0x3bb0  -> [this+0x14]
     //   ?set_temporary@EquipDesc@@QAEX_N@Z 0x3bd0 -> [this+0x18] = arg (byte)
     //   ?get_owner@EquipDesc@@QBEHXZ      0x29e0  -> [this+0x1c]
     //   ?set_owner@EquipDesc@@QAEXH@Z     (same one-line shape)
-    // Several of those addresses are /OPT:ICF folds shared with unrelated
-    // classes; the MANGLED NAME is what binds each body to EquipDesc, not the
-    // address, so the fold does not make the receiver ambiguous.
+    // Several addresses are /OPT:ICF folds; the mangled name binds each to EquipDesc.
     unsigned get_arch_id() const;
     unsigned char is_equipped() const;
     int get_count() const;
@@ -939,10 +870,9 @@ struct COMMON_API EquipDesc
     void set_id(unsigned short NewId);
     void set_arch_id(unsigned Arch);
     // 0xdbad0 ?set_count@EquipDesc@@QAEXH@Z -- `MOV EAX,[ESP+4] ; MOV [ECX+0x14],EAX ;
-    // RET 4`, ICF-folded onto several other one-line "[this+0x14] = arg" setters. Added
-    // 2026-09-17 because retail rpclocal.dll imports it by name for ch2 op 0x55
-    // FLPACKET_SERVER_OBJECTCARGOUPDATE (rpclocal IAT .rdata:06db3084); it was the only
-    // one of that receiver's seven EquipDesc entry points the port was missing.
+    // RET 4`, ICF-folded onto several other one-line "[this+0x14] = arg" setters.
+    // rpclocal.dll imports it for ch2 op 0x55 FLPACKET_SERVER_OBJECTCARGOUPDATE (IAT
+    // .rdata:06db3084).
     void set_count(int NewCount);
     void set_hardpoint(CacheString const& Hp);
     void set_equipped(unsigned char bOn);
@@ -1087,11 +1017,8 @@ public:
     // 0xaa6e0 ?find_equipment_item@EquipDescList@@Q[AB]EP[AB]UEquipDesc@@ABUCacheString@@@Z
     // (const/non-const overloads ICF-folded onto one retail body). Linear search by
     // Hardpoint identity: retail compares the node's Hardpoint pointer directly
-    // against Hp.Value (CacheString values are interned in retail, so pointer
-    // identity is meaningful there); the port's Hardpoint field already stores that
-    // same kind of pointer (see EquipDesc::is_internal's CARGO_BAY_HP_NAME pointer
-    // comparison), so this is a faithful 1:1 port, not the content-based _stricmp
-    // used by add_equipment_item's separate combinable-merge matching rule.
+    // against Hp.Value (CacheString values are interned), unlike add_equipment_item's
+    // _stricmp match.
     EquipDesc* find_equipment_item(CacheString const& Hp);
     EquipDesc const* find_equipment_item(CacheString const& Hp) const;
 
@@ -1219,18 +1146,12 @@ COMMON_API GoodDesc* __cdecl find_good_item(GoodDescList* List, unsigned int Goo
 
 // ---------------------------------------------------------------------------
 // TradeResponseInfo — retail Common.dll GOODS batch network message
-// (Common.dll.c ~0x1bf70..0x1c400). Used by IServerImpl::TradeResponse
-// (retail 0x65840): unmarshals a wire buffer into one of these, holding the
-// two sides of a trade negotiation (goods offered / goods requested).
+// (~0x0627bf70..0x0627c400). IServerImpl::TradeResponse (0x062c5840) unmarshals a
+// wire buffer into one: the two sides of a trade (goods offered / requested).
 //
-// Field00/Field04/bFlag08 are marshaled (retail's marshal(): put_void x2 then
-// put_bool) but Field04 is notably left uninitialized by the default
-// constructor in retail (0x1bfe0) -- only Field00/bFlag08 are zeroed there,
-// matching a retail quirk we replicate rather than "fix". Named
-// conservatively since no caller in Common.dll sets them with a named
-// accessor (real semantics -- likely requester/responder session ids and an
-// accept/reject flag -- live in the Server-side trade logic, out of scope
-// for Common.dll).
+// Field00/Field04/bFlag08 are marshaled (put_void x2, put_bool); the default ctor
+// leaves Field04 uninitialized (retail quirk kept). TODO: their meaning (probably
+// requester/responder ids and an accept flag) is in Server's trade logic.
 // ---------------------------------------------------------------------------
 class COMMON_API TradeResponseInfo
 {
@@ -1418,12 +1339,8 @@ COMMON_API bool __cdecl arch_is_combinable(unsigned int ArchId);
 //               .text:06d12e2b CMP EAX,0x1 / JNZ reject        -> 0 or 1
 //               (also .text:06d12d70/.text:06d12d77 behind pub::Market::
 //                IsGoodInDemand)
-// So 0 means both directions, 1 demand-only, 2 sale-only, and anything else is
-// neither. The previous port had `TransactionBuy = 0, TransactionSell = 1`,
-// which is an invented pair that gets both the count and the meaning wrong.
-//
-// TODO: retail's own enumerator spellings are in no table we hold; these names
-// are ours. The numeric values are not.
+// So 0 means both directions, 1 demand-only, 2 sale-only, anything else neither.
+// The enumerator names are the port's; the values are retail's.
 // ---------------------------------------------------------------------------
 enum TransactionType
 {
@@ -1435,8 +1352,7 @@ enum TransactionType
 // ---------------------------------------------------------------------------
 // MarketGoodInfo -- the mapped value of BaseData::Market. 0x1C bytes.
 //
-// The size and the field order are read off Common.dll's own bytes, not
-// inferred. BaseDataList::load_market_data (0x06265900) builds the record on
+// BaseDataList::load_market_data (0x06265900) builds the record on
 // the stack at [ESP+0x30] and copies it with `MOV ECX,0x7` + `MOVSD.REP`
 // (.text:06265c95 and again at .text:06265cbf), 7 dwords = 0x1C:
 //
@@ -1457,38 +1373,14 @@ enum TransactionType
 // .text:06265bc0 `ddd8 FSTP ST0`). Index 6 is never stored; it only produces
 // the price at +0x04.
 //
-// Four independent confirmations of the 0x1C size, all on bytes:
-//   1. both `MOV ECX,0x7` + REP MOVSD above;
-//   2. the mangled return type of ?get_market@BaseData@@QBEPBV?$map@IUMarket
-//      GoodInfo@@U?$less@I@std@@V?$allocator@UMarketGoodInfo@@@3@@std@@XZ --
-//      the mapped type IS MarketGoodInfo;
-//   3. Server.dll walks the tree nodes directly and tests `_Isnil` at node+0x2d
-//      (.text:06d12ee4, .text:06d12fa4), so the node's value spans 0x0c..0x2b =
-//      0x20 bytes = key(4) + mapped(0x1c), and the key sits at node+0x0c
-//      (.text:06d12d50 CMP EDX,[EAX+0xc]) with the mapped value at node+0x10
-//      (.text:06d12cfb ADD EAX,0x10);
-//   4. BaseData::set_market_good (0x06264b60) builds the identical 7-dword
-//      record and copies it into node+0x10 with the same `MOV ECX,7` + REP MOVSD
-//      (.text:06264d60 .. .text:06264d69).
+// The 0x1C size is also fixed by ?get_market@BaseData@@'s mangled map type, by
+// Server.dll's direct tree walks (`_Isnil` at node+0x2d, key at node+0x0c, mapped value
+// at node+0x10: .text:06d12ee4 / 06d12d50 / 06d12cfb) and by BaseData::set_market_good
+// (0x06264b60), which copies the same 7 dwords into node+0x10 (.text:06264d60).
 //
-// Field naming, and how sure each name is:
-//   GoodId / Price          -- certain (see above).
-//   MinInventory            -- certain: pub::Market::GetMinInventory's whole
-//                              body is a map find that returns [mapped+0x8]
-//                              (.text:06d12cbe MOV EAX,[EAX+0x8]).
-//   Field_0x0c              -- INI index 4. NO reader found: Server.dll exports
-//                              exactly seven pub::Market functions and none of
-//                              them touches +0x0c, and neither does any market
-//                              path in Common.dll. Placeholder name on purpose.
-//                              TODO: name it once a reader turns up.
-//   Type                    -- certain as an `enum TransactionType` from the
-//                              set_market_good mangling; see the enum below.
-//   MinLevel / MinRep       -- INI indices 1 and 2. Also unread by anything in
-//                              Server.dll. The names come from the defaults the
-//                              ctor installs (0.0 and -1.0; a -1.0 default is a
-//                              Freelancer reputation floor), which is weaker
-//                              evidence than the rest of this comment.
-//                              TODO: confirm against a real reader.
+// Names: MinInventory from pub::Market::GetMinInventory (returns [mapped+0x8],
+// .text:06d12cbe); Type from the set_market_good mangling. MinLevel / MinRep (INI 1 and
+// 2) have no reader; the names rest on the ctor defaults (0.0 / -1.0). TODO: confirm.
 // ---------------------------------------------------------------------------
 struct COMMON_API MarketGoodInfo
 {
@@ -1501,7 +1393,7 @@ struct COMMON_API MarketGoodInfo
     unsigned GoodId;                // +0x00
     float Price;                    // +0x04  nominal * INI index 6, ftol'd
     int MinInventory;               // +0x08  INI index 3, default 0
-    // +0x0c renamed 2026-10-14 from Field_0x0c: the MarketGood value after the minimum
+    // +0x0c: the MarketGood value after the minimum
     // stock (index 3 -> +0x08), and freelancer.exe stocks a market entry only when the
     // minimum is nonzero and this is positive (0x00437ebd..0x00437ecb).
     int MaxInventory;               // +0x0c  INI index 4, default 0
@@ -1518,34 +1410,32 @@ struct COMMON_API MarketGoodInfo
 // All five accessors below share one shape: entity name from slot 7 (+0x1c), user property
 // from slot 33 (+0x84), 0 meaning "found".
 COMMON_API char const* __cdecl ThornGetUserString(IScriptEngine* Engine, int Index, char const* Key);
-// 0x1bd00 / 0x1bca0 -- the same lookup parsed with atol / atof.
+// 0x0627bd00 / 0x0627bca0 -- the same lookup parsed with atol / atof.
 COMMON_API bool __cdecl ThornGetUserInt(IScriptEngine* Engine, int Index, char const* Key,
                                         int* Out);
 COMMON_API bool __cdecl ThornGetUserFloat(IScriptEngine* Engine, int Index, char const* Key,
                                           float* Out);
-// 0x1bd60. Reads the flag byte at entity +0x42: bit 0 -> 1, bit 1 -> 2 (bit 1 wins), else 0.
+// 0x0627bd60. Reads the flag byte at entity +0x42: bit 0 -> 1, bit 1 -> 2 (bit 1 wins), else 0.
 // The second parameter is accepted and ignored, exactly as in retail.
 COMMON_API unsigned long __cdecl ThornGetRenderType(ThornEntity const* Entity, char const* Unused);
-// 0x1b8f0. Creates the "IScriptEngine" component through DALib::Dacom, queries
+// 0x0627b8f0. Creates the "IScriptEngine" component through DALib::Dacom, queries
 // "1.11_IScriptEngine" off it, then feeds it the script file opened as a "DOS" filesystem.
 COMMON_API IScriptEngine* __cdecl ThornScriptLoad(char const* Path);
-// 0x1ba10 -- folded onto DAEngine_release_filesystem in retail: release through slot 2 and null.
+// 0x0627ba10 -- folded onto DAEngine_release_filesystem in retail: release through slot 2 and null.
 COMMON_API void __cdecl ThornScriptDestroy(IScriptEngine** Engine);
-// 0x1ba30. The first type-2 entity whose "actor" user property equals ActorName wins (with a
+// 0x0627ba30. The first type-2 entity whose "actor" user property equals ActorName wins (with a
 // null ActorName: no actor property, or any actor except "player"); its Csys is
 // {x from +0x08, y from +0x44, z from +0x10} with the 3x3 at +0x14. Identity on a miss.
 COMMON_API Csys __cdecl ThornScriptGetCsys(IScriptEngine* Engine, char const* ActorName);
 
 class RoomData;
 
-// FlashLightSetInfo -- Common.dll.c 0x13bb0 ctor / 0x13bf0 dtor / 0x13c30 clear /
-// 0x13d70 add_light_csys / 0x14120 unfixup. Per-object runtime table of resolved
-// flashlight-hardpoint frames (NOT RoomLightInfo -- that's a separate, unrelated
-// retail class at 0x13410 for static Thorn light entities in common_goods.h).
+// FlashLightSetInfo -- ctor 0x06273bb0 / dtor 0x06273bf0 / clear 0x06273c30 /
+// add_light_csys 0x06273d70 / unfixup 0x06274120. Per-object runtime table of resolved
+// flashlight-hardpoint frames (unrelated to RoomLightInfo, 0x06273410).
 //
-// Layout confirmed by reading clear()/dtor byte-for-byte: the two 64-slot Csys banks
-// (LightFrames/FinalFrames) are literally Csys::set_identity() (Common.dll.c 0x1170)
-// repeated inline -- same (0,0,0)/identity-3x3 bit pattern, field for field.
+// clear()/dtor reset the two 64-slot Csys banks (LightFrames/FinalFrames) with
+// Csys::set_identity() (0x06261170) inlined per slot.
 struct COMMON_API FlashLightSetInfo
 {
 public:
@@ -1574,11 +1464,9 @@ private:
 
 public:
 
-    // Common.dll.c 0x13c30 (clear): 7 unconfirmed float params + a mode flag, defaulting
-    // to 1.0f, 1.0f, 1.0f, 2.0f, 0.1f, 0.2f, 1.0f, 0. Plausibly a spotlight-ish
-    // color/range/cone-angle/intensity set given the class name, but nothing in the 4
-    // ported functions reads them back and fixup() (see above) is unported, so that
-    // reading is NOT confirmed. Hex constants decoded exactly; offsets verified.
+    // clear() (0x06273c30): 7 float params + a mode, defaulting to 1.0f, 1.0f, 1.0f, 2.0f,
+    // 0.1f, 0.2f, 1.0f, 0. The floats' meaning is not established (possibly colour/range/
+    // cone/intensity); only Mode is read by fixup().
     float Param0;   // +0x00  0x3f800000 = 1.0f
     float Param1;   // +0x04  0x3f800000 = 1.0f
     float Param2;   // +0x08  0x3f800000 = 1.0f
@@ -1645,9 +1533,9 @@ public:
     // 06277c50: read_from_ini(File) unless bLoaded, then bLoaded = true.
     void load();
     void unload();
-    // Retail 0x17c10 stores param_1 at +0x00 and param_2 at +0x04, and its only caller
+    // Retail 0x06277c10 stores param_1 at +0x00 and param_2 at +0x04, and its only caller
     // (BaseData::read_Room_block, .text:0626504f..06265058) passes (BaseData+0 = base id,
-    // CreateID("%X_%s") = room id, nickname, file). Parameter order fixed 2026-09-24.
+    // CreateID("%X_%s") = room id, nickname, file).
     void init(unsigned NewBaseId, unsigned NewRoomId, char const* NewNickname, char const* NewFile);
     void clear();
     void destroy();
@@ -1667,7 +1555,7 @@ public:
 private:
     // Everything below is private in retail (`AAE` / `CAX` in the mangled names, e.g.
     // ?read_from_ini@RoomData@@AAEXPBD@Z, ?make_setpoint_name_generic@RoomData@@CAXPBDPAD@Z).
-    // FlashLightSetInfo::fixup (Common.dll.c 0x13db0) calls apply_setpoint, so it is a friend.
+    // FlashLightSetInfo::fixup (0x06273db0) calls apply_setpoint, so it is a friend.
     friend struct FlashLightSetInfo;
 
     void warn(INI_Reader* Reader, bool bError);
@@ -1795,13 +1683,9 @@ public:
     std::list<RoomData*> const* get_const_room_data_list() const;
     void read_from_ini(char const* RelPath, unsigned BaseId);
     // 0x06264b60 ?set_market_good@BaseData@@QAEXIHHW4TransactionType@@MMM@Z.
-    // Parameter order is retail's, read off the writes into the record, NOT
-    // guessed from the struct: param 5 is the PRICE MULTIPLIER
-    // (.text:06264bdb FMUL [ESP+param_5], the same multiply the INI path does),
-    // param 6 lands at record+0x14 (.text:06264c71 MOV [ESP+0x68],EDX) and
-    // param 7 at record+0x18 (.text:06264c35 MOV [ESP+0x6c],EAX). The previous
-    // declaration had (MinLevel, MinRank, PriceMult) in those three slots,
-    // i.e. the multiplier last instead of first.
+    // Parameter order read off the record writes: param 5 is the price multiplier
+    // (.text:06264bdb FMUL [ESP+param_5]), param 6 lands at record+0x14 (.text:06264c71)
+    // and param 7 at record+0x18 (.text:06264c35).
     void set_market_good(unsigned GoodId, int MinInventory, int MaxInventory,
                          TransactionType Type, float PriceMult, float MinLevel,
                          float MinRep);
@@ -1868,7 +1752,7 @@ namespace Loadout
 
         unsigned NicknameId;
         std::vector<EquipDesc> Items;
-        // +0x14 (was `unsigned short NextEquipId`): Loadout::Load constructs it with
+        // +0x14: Loadout::Load constructs it with
         // EquipIdMaker() (.text:063116dc), resets it (06311785) and draws every item's id
         // from CreateEquipID (063117d9 / 0631185a).
         SubObjectID::EquipIdMaker IdMaker;
@@ -1895,9 +1779,7 @@ COMMON_API extern float LOOT_UNSEEN_RADIUS;
 COMMON_API extern float MUSIC_CROSS_FADE_DELAY;
 COMMON_API extern float JETTISONED_CARGO_VELOCITY;
 // SND_CARGO_JETTISONED and FIRE_FAILED_SOUND are ?<name>@@3UID_String@@A in retail, not
-// unsigned, and they are declared with the rest of the ID_String globals in common_misc.h.
-// They used to be declared here as plain unsigned as well, which gave the port two globals of
-// the same name and different type in two translation units.
+// unsigned; they are declared with the rest of the ID_String globals in common_misc.h.
 COMMON_API extern float MUZZLE_CONE_ANGLE;
 COMMON_API extern float FIRE_FAILED_DELAY;
 COMMON_API extern float PLAYER_COLLISION_GROUP_HIT_PTS_SCALE;

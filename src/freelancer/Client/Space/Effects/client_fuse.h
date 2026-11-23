@@ -16,8 +16,6 @@
 // FuseAction subclass per action section. A ship ignites a fuse by copy-constructing the
 // prototype into its own burn list (FUN_00534240, client_equip_fx.cpp).
 //
-// Port status: the database, the INI reader, the host binding, every constructor / clone / Read /
-// slot-12 copy, the UnTriggers, every action's Trigger and every Load / UnLoad follow the listing.
 // Slots a retail class does not override fall through to the Common.dll FuseAction bodies.
 
 #include "common_archetype.h" // CacheString
@@ -38,9 +36,9 @@ struct FEffectArch; // vis_effect_arch.h
 class ClientFuse : public Fuse
 {
 public:
-    // FUN_0052a7d0 .text:0052a873-0052a89a: Fuse(ID_String{CreateID("")}, -1.0f), Host = 0.
+    // Inlined in FUN_0052a7d0.
     ClientFuse(ID_String const& Nickname = ID_String{CreateID("")}, float Lifetime = -1.0f);
-    // FUN_00534240 .text:005342d0-005342e4 (and the node copy in FUN_00535a20): the Common copy
+    // Inlined in FUN_00534240 (and the node copy in FUN_00535a20): the Common copy
     // constructor (which clones every action through FuseAction slot 1), then +0x34 copied.
     ClientFuse(ClientFuse const& Other);
     // FUN_0052aab0: Fuse::~Fuse only.
@@ -62,7 +60,7 @@ public:
 class ClientFuseAction : public FuseAction
 {
 public:
-    // Inlined at every construction site (e.g. .text:00529e92-00529e9b): FuseAction(), +0x24 = 0.
+    // Inlined at every construction site.
     ClientFuseAction();
     // FUN_0052a250: the inlined ~FuseAction (restore the Common vftable, free the sub-object
     // vector). FUN_0052a410 is its scalar deleting wrapper.
@@ -96,7 +94,7 @@ public:
     int Load() override;
     // FUN_0052b2c0: the archetype released (FUN_00536170) when set, then FuseAction::UnLoad.
     int UnLoad() override;
-    // LAB_0052b150 (RET 8): unless already triggered, a process-2 explosion starts at the
+    // LAB_0052b150: unless already triggered, a process-2 explosion starts at the
     // host's hardpoint plus pos_offset as an Action_Explode (FUN_005361e0) on the host's action
     // list; then the FuseAction::Trigger tail (inlined in retail).
     void Trigger(unsigned SourceId, unsigned short SubObjId) override;
@@ -129,7 +127,7 @@ public:
     // FUN_0052b4d0: +0x2c released (FUN_0040e990) when set, the pointer left as it is; then
     // FuseAction::UnLoad (tail JMP).
     int UnLoad() override;
-    // LAB_0052b370 (RET 8): unless already triggered, a named effect is started as a world
+    // LAB_0052b370: unless already triggered, a named effect is started as a world
     // one-shot (FUN_00503f40 on the CameraParticles factory DAT_00674c5c) at the host's
     // transform; then the FuseAction::Trigger tail (inlined in retail).
     void Trigger(unsigned SourceId, unsigned short SubObjId) override;
@@ -172,7 +170,7 @@ public:
     // FUN_0052bf70: +0x40 released (FUN_0040e990) when set, the pointer left as it is; then
     // FuseAction::UnLoad (tail JMP).
     int UnLoad() override;
-    // LAB_0052bb00 (RET 8): unless already triggered, the effect starts at the host's root or
+    // LAB_0052bb00: unless already triggered, the effect starts at the host's root or
     // at one of the listed hardpoints (random start, first that resolves) -- attached to the
     // host's effect list (FUN_00503070) or as a world one-shot (FUN_00503f40); then the
     // FuseAction::Trigger tail (inlined in retail).
@@ -203,7 +201,7 @@ public:
 
     FuseAction* Clone() const override;       // FUN_0052a360
     bool Read(INI_Reader& Reader) override;  // FUN_0052bf90
-    // LAB_0052c0c0 (RET 8): unless already triggered, every ObjDB kind-10 object within radius
+    // LAB_0052c0c0: unless already triggered, every ObjDB kind-10 object within radius
     // of the host's hardpoint (+ pos_offset) gets a linear impulse (PhySys::LinearImpulse);
     // then the FuseAction::Trigger tail (inlined in retail).
     void Trigger(unsigned SourceId, unsigned short SubObjId) override;
@@ -259,7 +257,7 @@ public:
     static ClientFuse* Find(unsigned FuseId);
 
 private:
-    static void LoadFile(char const* Path);        // FUN_0052a7d0 (thiscall on the map)
+    static void LoadFile(char const* Path);        // FUN_0052a7d0 (on the map)
 
     static std::map<unsigned, ClientFuse*> Fuses;  // DAT_00675400
 };

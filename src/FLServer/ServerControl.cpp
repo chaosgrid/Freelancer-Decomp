@@ -32,7 +32,7 @@ bool LoadStringChecked(CString& Out, UINT Id)
 	return bLoaded;
 }
 
-// .text:00401440. The order of the stores follows the listing.
+// .text:00401440 — stores in retail order.
 FServerControl::FServerControl()
 	: ServerPassword()
 	, MaxConsoleLines(100000)
@@ -72,14 +72,12 @@ FServerControl::FServerControl()
 	memset(BandwidthLogPath, 0, sizeof(BandwidthLogPath));
 	memset(LocalServerIniPath, 0, sizeof(LocalServerIniPath));
 
-	// .text:004016fd: insert(end, 1, 0x10000) on the empty vector.
 	LogCategories.insert(LogCategories.end(), 1, 0x10000);
 
 	memset(&AppGuid, 0, sizeof(AppGuid));
 }
 
-// .text:00401730: close the log, then the members are destroyed in reverse order
-// (vector +0x770, wstrings +0x75c / +0x74c, string +0x738, wstring +0x618).
+// .text:00401730
 FServerControl::~FServerControl()
 {
 	if (bLogOpen)
@@ -93,7 +91,7 @@ FServerControl::~FServerControl()
 	}
 }
 
-// .text:004018b0: copies the 16 bytes, always succeeds.
+// .text:004018b0
 bool FServerControl::SetAppGuid(const GUID* Guid)
 {
 	AppGuid = *Guid;
@@ -123,7 +121,7 @@ bool FServerControl::SetIniPath(const char* Path)
 	return true;
 }
 
-// .text:00401a20. A 0x104-character path passes the length test, so retail's copy writes its
+// .text:00401a20 — a 0x104-character path passes the length test, so retail's copy writes its
 // terminator into StartupInfo.IniPath[0]; the copy goes through the struct base to keep that.
 bool FServerControl::SetClientModulePath(const char* ModulePath)
 {
@@ -151,7 +149,7 @@ bool FServerControl::SetMaxPlayers(unsigned int MaxPlayers)
 	return true;
 }
 
-// .text:00401a90. Retail stores the new stream even when the open failed (failbit set);
+// .text:00401a90 — retail stores the new stream even when the open failed (failbit set);
 // bLogOpen only tracks that the allocation succeeded.
 bool FServerControl::OpenLog(const char* FileName)
 {
@@ -189,7 +187,7 @@ bool FServerControl::CloseLog()
 	return true;
 }
 
-// .text:00401cb0: ostream::write then the inlined ostream::flush.
+// .text:00401cb0
 bool FServerControl::WriteLog(const char* Data, int Count)
 {
 	if (!bLogOpen || LogFile == nullptr)
@@ -201,7 +199,7 @@ bool FServerControl::WriteLog(const char* Data, int Count)
 	return true;
 }
 
-// .text:00401d40: insert(end, 1, Value) (the vector growth is inlined in retail).
+// .text:00401d40
 bool FServerControl::AddLogCategory(int Category)
 {
 	LogCategories.insert(LogCategories.end(), 1, Category);
@@ -241,8 +239,7 @@ bool FServerControl::SetConsoleTrimLines(unsigned int Value)
 	return false;
 }
 
-// .text:00401f70. x87: FCOMP 60.0 / TEST AH,0x41 / JNZ continues when Rate <= 60 (or unordered);
-// FCOMP 1.0 / TEST AH,0x5 / JP continues when Rate is not below 1.0 (or unordered).
+// .text:00401f70 — x87 compares: a NaN Rate passes both range tests.
 bool FServerControl::SetUpdateRate(float Rate)
 {
 	if ((double)Rate > 60.0)
@@ -257,7 +254,7 @@ bool FServerControl::SetUpdateRate(float Rate)
 	return true;
 }
 
-// .text:00401fc0: Title = sprintf(string 0xf027, Prefix, major, minor, build), cut to 0xff bytes.
+// .text:00401fc0 — Title cut to 0xff bytes.
 bool FServerControl::SetTitle(const char* Prefix)
 {
 	if (Prefix == nullptr || *Prefix == '\0')
@@ -330,7 +327,7 @@ void FServerControl::SetAllowNewPlayers(unsigned char Value)
 	StartupInfo.bAllowNewPlayers = Value;
 }
 
-// .text:00402380: returns the raw byte.
+// .text:00402380 — returns the raw byte.
 unsigned char FServerControl::GetAllowNewPlayers() const
 {
 	return StartupInfo.bAllowNewPlayers;

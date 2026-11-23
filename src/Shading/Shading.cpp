@@ -62,7 +62,7 @@ namespace
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
-            // LAB_06ec6d40..6e2e has its own aggregate descriptor contract.
+            // LAB_06ec6d40.
             if (Spec.Kind == KindMaterialAnimation)
             {
                 FMaterialAggregateDesc* AnimationDesc = (FMaterialAggregateDesc*)Desc;
@@ -118,8 +118,8 @@ namespace
                 return Result;
             }
 
-            // Raw PE 06eceff0..06ecf0fd: publish the nondelegating face only
-            // for aggregation, then run descriptor initialization on both paths.
+            // 06eceff0: the nondelegating face is published only when aggregated;
+            // descriptor initialization runs either way.
             if (Spec.Kind == KindMaterialLibrary)
             {
                 FMaterialAggregateDesc* LibraryDesc = (FMaterialAggregateDesc*)Desc;
@@ -184,8 +184,8 @@ namespace
                 return Result;
             }
 
-            // Each material callback independently has the exact extended descriptor
-            // contract: 10c0, 4840, 5430, 5c70, 6670, 7b90, 8630, 8c40,
+            // Retail has one factory callback per family, all with this descriptor check:
+            // 06eb10c0, 4840, 5430, 5c70, 6670, 7b90, 8630, 8c40,
             // 9260, a400, aca0, c2b0, c800, ce10, d2d0 and de50.
             if (Spec.Kind == KindMaterialType)
             {
@@ -216,8 +216,7 @@ namespace
                 return Result;
             }
 
-            // Raw PE 4530..463b: BatchedMaterial calls its concrete descriptor
-            // initializer (3e80), after publishing the aggregation controller.
+            // 06eb4530: FUN_06eb3e80 runs after the controller is published.
             if (Spec.Kind == KindBatchedMaterial)
             {
                 FMaterialAggregateDesc* BatchedDesc = (FMaterialAggregateDesc*)Desc;
@@ -301,8 +300,8 @@ namespace
         Factory->Release();
     }
 
-    // Each of the 26 f440 registration callees allocates before acquiring.
-    // BatchedMaterial's private name pointer is immutable (06ed4278).
+    // The 26 registration callees of FUN_06ecf440 allocate before acquiring the manager.
+    // BatchedMaterial's name pointer is DAT_06ed4278.
     bool RegisterMaterialComponent(const FComponentSpec& Spec)
     {
         FComponentFactory* Factory = new (std::nothrow) FComponentFactory(Spec);
@@ -317,27 +316,27 @@ namespace
 
     void RegisterMaterialComponents()
     {
-        // 06ecf446..f48c: bd20,83f0,6cf0,3dc0,d140,d280,d0a0,d1e0,
+        // Retail order (FUN_06ecf440); callees bd20,83f0,6cf0,3dc0,d140,d280,d0a0,d1e0,
         // 5c20,d050,d190,d0f0,d230,8590,85e0.
         static const unsigned long First[] = {1, 2, 3, 4, 8, 12, 6, 10, 13, 5, 9, 7, 11, 14, 15};
         for (unsigned long Index = 0; Index < sizeof(First) / sizeof(First[0]); ++Index)
             RegisterMaterialComponent(G_Specs[First[Index]]);
-        ActivateMaterialGlobalRecord(2); // 06ecf491..f52b
-        ActivateMaterialGlobalRecord(1); // 06ecf52d..f580
+        ActivateMaterialGlobalRecord(2);
+        ActivateMaterialGlobalRecord(1);
 
-        // 06ecf582..f596: 1000,c210,c260,cdc0,a3b0.
+        // Callees 1000,c210,c260,cdc0,a3b0.
         static const unsigned long Second[] = {16, 17, 18, 19, 20};
         for (unsigned long Index = 0; Index < sizeof(Second) / sizeof(Second[0]); ++Index)
             RegisterMaterialComponent(G_Specs[Second[Index]]);
-        ActivateMaterialGlobalRecord(3); // 06ecf59b..f5f0
+        ActivateMaterialGlobalRecord(3);
 
-        // 06ecf5f2..f601: 7b40,6620,ac50,9210.
+        // Callees 7b40,6620,ac50,9210.
         static const unsigned long Third[] = {21, 22, 24, 23};
         for (unsigned long Index = 0; Index < sizeof(Third) / sizeof(Third[0]); ++Index)
             RegisterMaterialComponent(G_Specs[Third[Index]]);
-        ActivateMaterialGlobalRecord(0); // 06ecf606..f650
-        RegisterMaterialComponent(G_Specs[25]); // 06ecf652 -> 47a0
-        RegisterMaterialComponent(G_Specs[26]); // 06ecf65d -> 47f0
+        ActivateMaterialGlobalRecord(0);
+        RegisterMaterialComponent(G_Specs[25]); // 47a0
+        RegisterMaterialComponent(G_Specs[26]); // 47f0
     }
 }
 

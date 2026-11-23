@@ -21,10 +21,6 @@ struct IObjRW;  // common_iface.h -- get_target()'s result
 // ".?AVEvadeBehavior@@"; its ClassHierarchyDescriptor (063a8df4, numBaseClasses 2) is
 // [EvadeBehavior, Behavior], single inheritance at offset 0.
 //
-// Re-ported from the listing 2026-10-08 (claude-code:cmn-ai4). Until then the five
-// sub-objects were opaque byte arrays and almost every call into them, into the
-// SystemManager and into the personality was a documented no-op.
-//
 // Constructor FUN_062c7790 builds, in this order (EH states 0..4):
 //   +0x030  DodgeIdea         FUN_062d77d0
 //   +0x110  BreakAwayIdea     FUN_062d8970
@@ -33,7 +29,7 @@ struct IObjRW;  // common_iface.h -- get_target()'s result
 //   +0x28c  AfterburnerIdea   FUN_062da500
 // then the bare BaseWatcher at +0x2a0 (EH state 6), the vptr 0639f874 and its own scalars.
 //
-// Vtable .rdata:0639f874, 27 slots. Overrides of Behavior's table (vtd.py, raw .rdata):
+// Vtable .rdata:0639f874, 27 slots. Overrides of Behavior's table:
 //    0  FUN_062c78e0  scalar-deleting dtor around FUN_062c7900
 //    1  LAB_062c79d0  SetContext
 //    3  LAB_062c8260  OnEngage

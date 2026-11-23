@@ -46,7 +46,7 @@ I3DMathEngine* GTriggerMathEngine = nullptr;
 // DAT_06fd1c79 (see MissionScript.h).
 unsigned char GMissionScanClamp = 0;
 
-// DAT_06fcf018: stored 0 by the TU21 ctor (06eb7799); the listing has no reader (XREF[1] W).
+// DAT_06fcf018: stored 0 by the TU21 ctor; retail never reads it.
 unsigned int GMissionScriptDat06fcf018 = 0;
 
 namespace
@@ -75,9 +75,7 @@ namespace
     }
 
     // One Cnd_* key of FUN_06ebb850: the class and the message ids pushed into trigger +0x18
-    // after Parse (MOV [ESP+0x10],id before the shared tails LAB_06ebcbbc / LAB_06ebbbdf /
-    // LAB_06ebc059 / LAB_06ebceb2, or the inline FUN_06f937c0 / FUN_06eec320 pushes).
-    // The controller message ids (common_server_controller.h), used throughout this file.
+    // after Parse.
     using pub::Controller::EMessage;
 
     struct FCndFactoryEntry
@@ -88,7 +86,7 @@ namespace
         EMessage EventIds[3];   // past EventCount: unused (value-initialized)
     };
 
-    // In the order of the is_value chain (06ebb890-06ebce72).
+    // In the order of the is_value chain.
     FCndFactoryEntry const GCndFactory[] = {
         {"Cnd_BaseEnter", &NewTriggerCondition<CndBaseEnter>, 1, {EMessage::BaseEnter}},
         {"Cnd_BaseExit", &NewTriggerCondition<CndBaseExit>, 1, {EMessage::BaseExit}},
@@ -145,7 +143,7 @@ namespace
         Act* (*Create)(FMissionScript* Mission);
     };
 
-    // In the order of the is_value chain (06ebceea-06ebf59c).
+    // In the order of the is_value chain.
     FActFactoryEntry const GActFactory[] = {
         {"Act_ActTrig", &NewTriggerAction<ActActTrig>},
         {"Act_AddAmbient", &NewTriggerAction<ActAddAmbient>},
@@ -235,12 +233,8 @@ namespace
     };
 }
 
-// FUN_06ebb850 (thiscall on the trigger, RET 4). Every value of the rest of the [Trigger]
-// section: a Cnd_* key replaces +0x04 (the previous condition is not deleted), is parsed,
-// pushes its message ids into +0x18 and gets the trigger id (+0x2c) at +0x08; an Act_* key is
-// parsed, appended to +0x08 and gets the trigger id; "InitState" = ACTIVE 0 / INACTIVE 1 /
-// COMPLETE 2 (stricmp, anything else leaves the state); "repeatable" true sets +0x28 (false
-// leaves it); "system" is tested and ignored.
+// FUN_06ebb850. A second Cnd_* key replaces the condition without deleting the first (a leak,
+// as retail). An unknown InitState and "repeatable = false" leave the field.
 void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
 {
     while (Reader->read_value())
@@ -295,26 +289,23 @@ void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
                 Trigger->bRepeatable = 1;
             continue;
         }
-        // 06ebf692: is_value("system"); the result is not used.
+        // Retail tests "system" and ignores the result.
         Reader->is_value("system");
     }
 }
 
-// FUN_06eb84c0 [Trigger] branch (06eb8527-06eb86f0), after is_header("Trigger").
+// FUN_06eb84c0 [Trigger] branch, after is_header("Trigger").
 void LoadMissionTriggerSection(FMissionScript* Script, INI_Reader* Reader)
 {
-    // 06eb8527: the local ID_String, cleared.
     unsigned int TriggerId = 0;
     while (Reader->read_value())
     {
         if (Reader->is_value("nickname"))
         {
             TriggerId = CreateID(Reader->get_value_string(0));
-            // 06eb8580-06eb858f: FUN_06f7b0f0 (find); a known nickname is skipped.
+            // A known nickname is skipped.
             if (Script->TriggerMap.find(TriggerId) != Script->TriggerMap.end())
                 continue;
-            // 06eb8595-06eb85e6: the stack trigger (State INACTIVE, no condition, empty
-            // lists, mission = this, repeatable 0, id).
             FTrigger Trigger;
             Trigger.State = G_TriggerStateInactive;
             Trigger.Condition = nullptr;
@@ -322,16 +313,15 @@ void LoadMissionTriggerSection(FMissionScript* Script, INI_Reader* Reader)
             Trigger.bRepeatable = 0;
             Trigger.Id = TriggerId;
             LoadTrigger(&Trigger, Reader);
-            // 06eb85ff-06eb8668: {id, copy} (FUN_06ed0030) inserted into +0x1b0 (FUN_06ed06d0);
-            // the copies share the condition and action pointers.
+            // The copies share the condition and action pointers.
             Script->TriggerMap.insert(FTriggerMap::value_type(TriggerId, Trigger));
-            // 06eb866d-06eb8694: an InitState ACTIVE trigger also goes into +0x1e4 as {id, id}.
+            // An InitState ACTIVE trigger also goes into +0x1e4 as {id, id}.
             if (Trigger.State == G_TriggerStateActive)
                 Script->InitiallyActive.insert(
                     std::map<unsigned int, unsigned int>::value_type(TriggerId, TriggerId));
             continue;
         }
-        // 06eb86c3-06eb86dd: "State" goes through vtbl+0x68 and the result is dropped.
+        // "State" goes through vtbl +0x68 and the result is dropped.
         if (Reader->is_value("State"))
             static_cast<void>(Script->MissionStateFromName(Reader->get_value_string(0)));
     }
@@ -345,7 +335,7 @@ void RearmTrigger(FTrigger* Trigger)
         Trigger->Condition->OnActivate();
 }
 
-// FUN_06ebb7f0: vtbl[0](1) on +0x04 when set, then on every non-null list value.
+// FUN_06ebb7f0.
 void DeleteTriggerContents(FTrigger* Trigger)
 {
     if (Trigger->Condition != nullptr)
@@ -365,8 +355,7 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
     if (Found == Script->TriggerMap.end())
         return;
 
-    // 06eb82ea-06eb8313: the whole active list is walked (no early exit); any node whose
-    // key equals the id means the trigger is already active.
+    // The whole active list is walked (no early exit).
     bool bAlreadyActive = false;
     std::list<FTriggerMap::iterator>::iterator ActiveIt = Script->ActiveTriggers.begin();
     for (; ActiveIt != Script->ActiveTriggers.end(); ++ActiveIt)
@@ -382,8 +371,8 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
     if (Trigger.Condition != nullptr)
         Trigger.Condition->OnActivate();
 
-    // 06eb8337: re-read State; the condition is called without a null check (-1, 0). -1 is
-    // no message id: the activation probe, cast into the message-id type Matches takes.
+    // State is re-read; the condition is called without a null check. -1 is no message id:
+    // the activation probe.
     if (Trigger.State == G_TriggerStateActive &&
         Trigger.Condition->Matches(static_cast<EMessage>(-1), nullptr))
     {
@@ -391,7 +380,7 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
         std::list<Act*>::iterator ActIt = Trigger.Actions.begin();
         for (; ActIt != Trigger.Actions.end(); ++ActIt)
             (*ActIt)->Execute();
-        // 06eb836f-06eb8385: inline copy of FUN_06ebb830.
+        // RearmTrigger inlined.
         if (Trigger.bRepeatable != 0)
         {
             Trigger.State = G_TriggerStateActive;
@@ -400,7 +389,6 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
         }
     }
 
-    // 06eb8388-06eb83c5: push_back the map node unless the trigger completed.
     if (Trigger.State != G_TriggerStateComplete)
         Script->ActiveTriggers.push_back(Found);
 }
@@ -408,8 +396,7 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
 // FUN_06eb83e0.
 void DeactivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerId)
 {
-    // 06eb83f8-06eb843d: first active node with this key whose trigger is not COMPLETE:
-    // State = INACTIVE, node erased (--size).
+    // Only the first active node with this key whose trigger is not COMPLETE.
     std::list<FTriggerMap::iterator>::iterator ActiveIt = Script->ActiveTriggers.begin();
     for (; ActiveIt != Script->ActiveTriggers.end(); ++ActiveIt)
     {
@@ -422,7 +409,6 @@ void DeactivateMissionTrigger(FMissionScript* Script, unsigned int const* Trigge
         }
     }
 
-    // 06eb843d-06eb84b7: erase every pending activation keyed by this id.
     std::map<unsigned int, unsigned int>::iterator PendingIt = Script->PendingActivations.begin();
     while (PendingIt != Script->PendingActivations.end())
     {
@@ -442,7 +428,6 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
     {
         FTrigger& Trigger = (*ActiveIt)->second;
 
-        // 06eb9b0e-06eb9b2d: linear scan of the trigger's event vector.
         bool bListens = false;
         std::vector<EMessage>::iterator EventIt = Trigger.EventIds.begin();
         for (; EventIt != Trigger.EventIds.end(); ++EventIt)
@@ -454,7 +439,7 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
             }
         }
 
-        // 06eb9bb6: only ACTIVE triggers are evaluated; others are skipped, never erased.
+        // Only ACTIVE triggers are evaluated; others are skipped, never erased.
         if (bListens && Trigger.State == G_TriggerStateActive)
         {
             if (Trigger.Condition->Matches(*EventId, EventParms))
@@ -466,7 +451,6 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
                 if (Trigger.bRepeatable != 0)
                     RearmTrigger(&Trigger);
             }
-            // 06eb9c1f-06eb9c53: a completed trigger leaves the active list.
             if (Trigger.State == G_TriggerStateComplete)
             {
                 ActiveIt = Script->ActiveTriggers.erase(ActiveIt);
@@ -476,9 +460,8 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
         ++ActiveIt;
     }
 
-    // 06eb9b39-06eb9b90: drain the pending map front to back. Retail also looks the
-    // source id (node+0x10) up in the trigger map (FUN_06f7b0f0 @ 06eb9b63) and discards the
-    // result; that lookup has no side effect and is not reproduced.
+    // Drain the pending map front to back. Retail also looks the source id up in the trigger
+    // map and discards the result; that lookup has no side effect and is not reproduced.
     while (!Script->PendingActivations.empty())
     {
         std::map<unsigned int, unsigned int>::iterator First = Script->PendingActivations.begin();
@@ -486,7 +469,6 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
         Script->PendingActivations.erase(First);
         ActivateMissionTrigger(Script, &TargetId);
     }
-    // 06eb9b92-06eb9ba7: FUN_06ed0e20 erase(begin, end).
     Script->PendingActivations.clear();
 }
 
@@ -497,7 +479,7 @@ void TickMissionTimers(FMissionScript* Script, float DeltaSeconds)
     while (It != Script->Timers.end())
     {
         It->Remaining = It->Remaining - DeltaSeconds;
-        // FCOMP DAT_06fb444c (0.0) / TEST AH,0x41 / JP skip: runs when Remaining <= 0.
+        // DAT_06fb444c; unordered does not run.
         if (It->Remaining <= 0.0f)
         {
             if (It->Action != nullptr)
@@ -509,7 +491,7 @@ void TickMissionTimers(FMissionScript* Script, float DeltaSeconds)
     }
 }
 
-// LAB_06eb8260: stricmp against DAT_06fb47c0 "FAIL", "SUCCEED", "NO_STATE"; miss -> EBX = -1.
+// LAB_06eb8260 (names at DAT_06fb47c0).
 int FMissionScript::MissionStateFromName(char const* Name)
 {
     if (_stricmp(Name, "FAIL") == 0)
@@ -521,7 +503,7 @@ int FMissionScript::MissionStateFromName(char const* Name)
     return -1;
 }
 
-// LAB_06eb9730: CMP byte [+0x2b0],1 / JNZ store; TEST State / JZ skip.
+// LAB_06eb9730.
 void FMissionScript::SetDesiredMissionState(int State, unsigned int MadLibId)
 {
     if (Field_0x2b0 == 1 && State == MissionStateFail)
@@ -530,8 +512,7 @@ void FMissionScript::SetDesiredMissionState(int State, unsigned int MadLibId)
     StateMessageId = MadLibId;
 }
 
-// FUN_06eb8f50 case 0x1000 (06eb94ec-06eb9541): in-order walk of mission+0x1e4, activating
-// each key.
+// FUN_06eb8f50 case 0x1000.
 void ActivateInitialMissionTriggers(FMissionScript* Script)
 {
     std::map<unsigned int, unsigned int>::iterator It = Script->InitiallyActive.begin();
@@ -557,15 +538,11 @@ void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path)
     std::list<FStoryMissionListNode_0x2f4>::iterator It = Script->List_0x2f4.begin();
     for (; It != Script->List_0x2f4.end(); ++It)
     {
-        // 06eba458-06eba494: the inlined TString == (node path against Path->Data).
         if (strcmp(It->Path, Path->Data) != 0)
             continue;
         if (FindContentPlayerState(Script->PlayerId) == nullptr)
             continue;
-        // 06eba4a6-06eba503: the player's base (FUN_06f47980), the room state of the
-        // mission's location (FUN_06eac110 on +0x308), the script (+0x90), the player gate
-        // again, then FBaseRoomState::FindCharacter(script +0x10, player) and
-        // FBarCharacter::SetBehavior(-1). Any miss skips to the +0x94 store.
+        // Any miss below still marks the script finished.
         FContentBase* const Base = Script->PlayerState->GetBaseRecord();
         if (Base != nullptr)
         {
@@ -593,22 +570,20 @@ void MoveMissionPlayer(FMissionScript* Script, Vector const* Position, float Rad
     FContentPlayerShip* const Ship = Script->PlayerState->ShipObject;
     if (Ship == nullptr)
         return;
-    // 06ebb56e: FUN_06eb70f0 (FContentSpaceObj::GetPosition); each delta is stored as a float.
+    // Each delta is stored as a float.
     Vector ShipPosition;
     Ship->GetPosition(&ShipPosition);
     float const DeltaX = ShipPosition.x - Position->x;
     float const DeltaY = ShipPosition.y - Position->y;
     float const DeltaZ = ShipPosition.z - Position->z;
-    // 06ebb59e-06ebb5c3: (y*y + z*z) + x*x on the FPU, FCOMP RadiusSq, TEST AH,0x41 / JNZ
-    // skip: only a distance strictly beyond the radius (and not unordered) moves the ship.
+    // (y*y + z*z) + x*x on the x87 stack; only a distance strictly beyond the radius (and not
+    // unordered) moves the ship.
     double const DistanceSq = static_cast<double>(DeltaY) * DeltaY
                               + static_cast<double>(DeltaZ) * DeltaZ
                               + static_cast<double>(DeltaX) * DeltaX;
     if (!(DistanceSq > static_cast<double>(RadiusSq)))
         return;
-    // 06ebb5c5-06ebb613: the ship's orientation (GetLocation again), the player's system
-    // (FUN_06f478c0 +0x48, no null check), then FUN_06f67740(&ship, &system, Position,
-    // &orientation).
+    // The player's system record is not null-checked.
     Vector CurrentPosition;
     Matrix CurrentOrientation;
     pub::SpaceObj::GetLocation(Ship->SpaceObjId, CurrentPosition, CurrentOrientation);
@@ -621,11 +596,8 @@ void MoveMissionPlayer(FMissionScript* Script, Vector const* Position, float Rad
 // FMissionScript (TU21 script mission, vtable 06fb4710)
 // =======================================================================================
 
-// FUN_06eb75a0 (06eb75a0-06eb780a). The TU38 base ctor, the containers (06eb75d9-06eb7788),
-// then 06eb778d-06eb77f1: vtable, +0x2b0 = 0, DAT_06fcf018 = 0, +0x2bc = 0, +0x2a8 = +0x2ac = 2,
-// +0x2c8 = +0x2ec = 0, FUN_06f1ca50(parms+4) (the slot 18 body, called directly),
-// +0x2a4 = parms+8, FUN_06f1b6d0(+0xc) (the slot 2 body, called directly), +0x30c = 0,
-// +0x2e8 = 1. +0x2b4/+0x2b8/+0x2c0/+0x2c4 and +0x308 are left to the mission ctors.
+// FUN_06eb75a0. Slots 18 and 2 are called directly, not through the vtable.
+// +0x2b4/+0x2b8/+0x2c0/+0x2c4 and +0x308 are left to the mission ctors.
 FMissionScript::FMissionScript(unsigned int const* InControllerId,
                                FStoryMissionCreateParms const* Parms)
     : FMissionObject(InControllerId, Parms)
@@ -652,11 +624,9 @@ FMissionScript::FMissionScript(unsigned int const* InControllerId,
     ElapsedTime = 0.0f;
 }
 
-// FUN_06eb7d30 (the members after the explicit loops are destroyed by their own dtors, then
-// the TU38 base FUN_06f0ed00).
+// FUN_06eb7d30; the remaining members, then the TU38 base (FUN_06f0ed00), die afterwards.
 FMissionScript::~FMissionScript()
 {
-    // 06eb7d58-06eb7dbc: the active list, then every trigger's condition and actions.
     ActiveTriggers.clear();
     FTriggerMap::iterator TriggerIt = TriggerMap.begin();
     while (TriggerIt != TriggerMap.end())
@@ -665,9 +635,7 @@ FMissionScript::~FMissionScript()
         TriggerIt = TriggerMap.erase(TriggerIt);
     }
     TriggerMap.clear();
-    // 06eb7dc3: FUN_06eb8b70.
     ReleaseRtcScripts();
-    // 06eb7dc8-06eb7e0c: vtbl[0](1) on every non-null +0x204 value, erase (FUN_06ecfc80).
     std::map<unsigned int, FMissionNag*>::iterator NagIt = Nags.begin();
     while (NagIt != Nags.end())
     {
@@ -675,9 +643,7 @@ FMissionScript::~FMissionScript()
             delete NagIt->second;
         NagIt = Nags.erase(NagIt);
     }
-    // 06eb7e0e-06eb7e31: +0x2fc erase(begin, end).
     FriendlyFireOffLabels.clear();
-    // 06eb7e36-06eb7e88: every ambient scene with a handle is destroyed, then erased.
     std::list<FMissionAmbientScene>::iterator SceneIt = AmbientScenes.begin();
     for (; SceneIt != AmbientScenes.end(); ++SceneIt)
     {
@@ -694,7 +660,6 @@ FMissionScript::~FMissionScript()
 // FUN_06eb8b70.
 void FMissionScript::ReleaseRtcScripts()
 {
-    // 06eb8b75-06eb8b94: the player's base, null without a live player state.
     FContentBase* Base = nullptr;
     if (FindContentPlayerState(PlayerId) != nullptr)
         Base = PlayerState->GetBaseRecord();
@@ -705,67 +670,54 @@ void FMissionScript::ReleaseRtcScripts()
             continue;
         if (Base != nullptr && It->BarSceneHandle != -1)
         {
-            // 06eb8bb9-06eb8bc3: FUN_06ea9fc0(Base, BarSceneHandle, 0).
+            // RemoveBarScene = FUN_06ea9fc0.
             Base->RemoveBarScene(It->BarSceneHandle, nullptr);
             It->BarSceneHandle = -1;
         }
-        // 06eb8bcd-06eb8be7: FUN_06eb8c40 (the member-wise teardown) + free of the script.
+        // FUN_06eb8c40 is the script's member-wise teardown.
         delete It->Encounter;
         It->Encounter = nullptr;
     }
-    // 06eb8bfb-06eb8c32: unlink and free every node.
     List_0x2f4.clear();
 }
 
-// FUN_06eb8a20 (06eb8a20-06eb8b6d, thiscall, RET 4).
+// FUN_06eb8a20.
 void FMissionScript::StartRtcScript(FStoryMissionListNode_0x2f4* Rtc)
 {
-    // 06eb8a3e-06eb8a63: operator new 0x54 + FUN_06ed4420.
+    // operator new(0x54) + FUN_06ed4420.
     FCharacterEncounter* Script = new FCharacterEncounter();
-    // 06eb8a67-06eb8a8f: the player state (FUN_06f49b00 on +0xc) and its base (FUN_06f47980).
     if (FindContentPlayerState(PlayerId) != nullptr)
     {
         FContentBase* Base = PlayerState->GetBaseRecord();
-        // 06eb8a91-06eb8aaa: FUN_06ed44a0(Rtc path), then the script's base against the
-        // player's (MBase +0x48).
+        // Load = FUN_06ed44a0; the script's base must be the player's.
         if (Base != nullptr && Script->Load(Rtc->Path) && Base->BaseId == Script->BaseId)
         {
-            // 06eb8aac-06eb8ac9: a mission text and no live mission (FUN_06f487c0 & 0x3fffffff
-            // zero) -> +0x2c = +0x34.
+            // A mission text without a live mission takes the loaded text id.
             if (Script->MissionTextId != 0 && (PlayerState->GetLiveMission() & 0x3fffffff) == 0)
                 Script->MissionTextId = Script->LoadedMissionTextId;
-            // 06eb8acc-06eb8ad5: +0x40 = FUN_06efeb00().
+            // AllocateFormationId = FUN_06efeb00, CreateBarScene = FUN_06ea9640.
             Script->SequenceId = AllocateFormationId();
-            // 06eb8ad1-06eb8af1: Rtc +0x84 = FUN_06ea9640(Base, Script, +0xc, +0x4), then
-            // Rtc +0x88 = Script.
             Rtc->BarSceneHandle = Base->CreateBarScene(Script, PlayerId, ControllerId);
             Rtc->Encounter = Script;
             return;
         }
     }
-    // 06eb8afb-06eb8b58: FUN_06eb8c40 inlined + free.
     delete Script;
 }
 
-// FUN_06eb8d10 (06eb8d10-06eb8eeb, thiscall, plain RET).
+// FUN_06eb8d10.
 void FMissionScript::RevertStaticCam()
 {
-    // 06eb8d2b-06eb8d39: no live player -> nothing.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
-    // 06eb8d44-06eb8d62: +0x2c8 = 0, pub::SpaceObj::SetInvincible(ship id, 0, 1, 0) (the id is
-    // not masked here), +0x218 = 0.
+    // The ship id is not masked here.
     Field_0x2c8 = 0;
     pub::SpaceObj::SetInvincible(PlayerState->GetShipId(), false, true, 0.0f);
     NagClamp = 0;
-    // 06eb8d68-06eb8d93: FUN_06f33fd0(npc, 0) over the +0xa4 NPC map, in order.
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.begin();
     for (; NpcIt != NpcObjects.end(); ++NpcIt)
         NpcIt->second->SetCommMuted(false);
-    // 06eb8d95-06eb8ecd: with a player ship object (+0x10): a local directive list holding one
-    // new Avoidance directive (FUN_06f24870 type 0, FUN_06f26020(1), pushed and AddRef'ed),
-    // FUN_06f57840(&list, 0); then the local reference is released and the list's elements
-    // released and erased.
+    // The player ship gets one new Avoidance(true) directive.
     FContentPlayerShip* const Ship = PlayerState->ShipObject;
     if (Ship != nullptr)
     {
@@ -777,7 +729,6 @@ void FMissionScript::RevertStaticCam()
         Directive.Pointer->AddRef();
         Ship->SetDirectives(&Directives.Items, 0);
     }
-    // 06eb8ed1-06eb8ed2: FUN_06f5cf60(0).
     SpacePopSetGcsClampEnabled(0);
 }
 
@@ -798,7 +749,7 @@ void FMissionScript::LoadMissionIni(char const* IniPath)
     Reader.close();
 }
 
-// LAB_06eba010: CMP byte [+0x290] (NnPath.bActive); zero -> JMP FUN_06f1b4f0.
+// LAB_06eba010 (NnPath.bActive is +0x290).
 void FMissionScript::UpdateObjectiveTimer(EMessage MessageId, void const* MessageParms)
 {
     if (NnPath.bActive != 0)
@@ -806,16 +757,15 @@ void FMissionScript::UpdateObjectiveTimer(EMessage MessageId, void const* Messag
     FMissionObject::UpdateObjectiveTimer(MessageId, MessageParms);
 }
 
-// FUN_06ebab90: FUN_06eb9af0(&0x100f, Arg).
+// FUN_06ebab90.
 void FMissionScript::OnNpcSystemEnter(void const* Parms)
 {
     EMessage EventId = EMessage::NpcSystemEnter;
     DispatchMissionTriggerEvent(this, &EventId, Parms);
 }
 
-// FUN_06eb9aa0 (06eb9aa0-06eb9aeb). Desired (+0x2ac) equal to Previous (+0x2a8) -> nothing;
-// else Previous = Desired; 0 (FAIL) -> tail-jump vtbl[+0x60]; 1 (SUCCEED) -> vtbl[+0x5c], then
-// StoryEvents(+0x2a4)->vtbl[0](3, +0x2b8, +4) if the facet is set (TEST ECX / JZ 06eb9ad5).
+// FUN_06eb9aa0. OnMissionFail / OnMissionSucceed are vtbl +0x60 / +0x5c; OnMissionEvent is
+// StoryEvents vtbl 0.
 void FMissionScript::ApplyDesiredMissionState()
 {
     int Desired = MissionState;
@@ -834,9 +784,7 @@ void FMissionScript::ApplyDesiredMissionState()
         StoryEvents->OnMissionEvent(3, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
 }
 
-// FUN_06eb9760 (06eb9760-06eb9861): with a madlib id (+0x2e8 != 0) and a live player state:
-// 1 -> 0x4cf, FmtStr madlib, DisplayMissionMessage(PlayerId, fmt, 1, true), then
-// FUN_06f49090(+8, 7) and FUN_06f171a0(this); always FUN_06f0fda0(this) last.
+// FUN_06eb9760: the default mad lib 1 becomes 0x4cf.
 void FMissionScript::OnMissionSucceed()
 {
     if (StateMessageId != 0 && FindContentPlayerState(PlayerId) != nullptr)
@@ -847,29 +795,25 @@ void FMissionScript::OnMissionSucceed()
         MissionMsg.begin_mad_lib(StateMessageId);
         MissionMsg.end_mad_lib();
         pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_1, true);
-        // 06eb9823-06eb982b: FUN_06f49090 on the cached player state (+0x08) with type 7.
+        // FUN_06f49090.
         PlayerState->CountRandomMissionCompleted(7);
         DestroyMissionObjects();
     }
     FMissionObject::OnMissionSucceed();
 }
 
-// LAB_06eb9870 (06eb9870-06eb999d).
+// LAB_06eb9870: the default mad lib 1 becomes 0x412.
 void FMissionScript::OnMissionFail()
 {
-    // 06eb988d-06eb9896: madlib 1 -> 0x412.
     if (StateMessageId == 1)
         StateMessageId = 0x412;
-    // 06eb98a0-06eb990d: DisplayMissionMessage(&PlayerId, madlib, type 0, true).
     FmtStr MissionMsg;
     MissionMsg.begin_mad_lib(StateMessageId);
     MissionMsg.end_mad_lib();
     pub::Player::DisplayMissionMessage(PlayerId, MissionMsg, MISSION_MSG_TYPE_0, true);
-    // 06eb9913-06eb996a: in-order walk of the +0xa4 NPC map; FUN_06f33fd0(npc, 1).
     std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.begin();
     for (; It != NpcObjects.end(); ++It)
         It->second->SetCommMuted(true);
-    // 06eb996e: FUN_06f171a0.
     DestroyMissionObjects();
     FMissionObject::OnMissionFail();
 }
@@ -877,7 +821,6 @@ void FMissionScript::OnMissionFail()
 // LAB_06eb8070.
 void FMissionScript::EndMission()
 {
-    // 06eb8078-06eb80bc: vtbl[0](1) on every non-null +0x204 value, erase (FUN_06f20e00).
     std::map<unsigned int, FMissionNag*>::iterator NagIt = Nags.begin();
     while (NagIt != Nags.end())
     {
@@ -885,47 +828,40 @@ void FMissionScript::EndMission()
             delete NagIt->second;
         NagIt = Nags.erase(NagIt);
     }
-    // 06eb80be-06eb80d3: +0x1f8 erase(begin, end) (the actions stay owned by their triggers).
+    // The timer actions stay owned by their triggers.
     Timers.clear();
-    // 06eb80d8-06eb80f8: a player without a ship gets its maneuvers unlocked (the ship id is
-    // re-read and passed, TEST EAX,0x3fffffff / JNZ skip).
+    // Retail quirk: only a player without a ship gets lock_maneuvers(false), with that (unset)
+    // ship id. The player state is not null-tested.
     if ((PlayerState->GetShipId() & 0x3fffffff) == 0)
         pub::AI::lock_maneuvers(PlayerState->GetShipId(), false);
-    // 06eb80fb-06eb811a: every active trigger's condition gets slot 4 (+0x10).
     std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
     for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
         (*ActiveIt)->second.Condition->OnMissionEnd();
-    // 06eb811c: FUN_06eb8b70.
     ReleaseRtcScripts();
-    // 06eb8123-06eb8138: +0x2fc erase(begin, end).
     FriendlyFireOffLabels.clear();
-    // 06eb813d-06eb8152: +0x98 (the random encounters) erase(begin, end).
     RandEncs.clear();
-    // 06eb8157-06eb817a: erase(begin, end) of the global dialog map DAT_06fcf260 (TU28).
+    // The global dialog map DAT_06fcf260 (TU28).
     GMissionDialogs.erase(GMissionDialogs.begin(), GMissionDialogs.end());
-    // 06eb817f-06eb81a7: the SpacePop clamps back to their defaults.
+    // The SpacePop clamps back to their defaults.
     SpacePopSetAttackClamp(0);
     GMissionScanClamp = 0;
     SpacePopSetEncounterEnabled(1);
     SpacePopSetPopulationEnabled(1);
     SpacePopClearExclusionSpheres();
     SpacePopSetHostileClamp(1);
-    // 06eb81a7-06eb81d8: a live player regains docking and trade lanes, the music stops.
     if (FindContentPlayerState(PlayerId) != nullptr)
     {
         PlayerState->SetDockAccess(1, nullptr);
         PlayerState->SetTradelaneAccess(1, nullptr);
         pub::Audio::CancelMusic(PlayerId);
     }
-    // 06eb81db-06eb8245: +0x14c, +0x158 and +0x140 emptied.
     Invulnerables.clear();
     DecloakedNames.clear();
     MarkObjNames.clear();
-    // 06eb824c: FUN_06f0fc40, the TU38 slot 22 body.
     FMissionObject::EndMission();
 }
 
-// FUN_06eb8ef0 (thiscall on A, RET 4).
+// FUN_06eb8ef0.
 bool IsSameCostume(Costume const* A, Costume const* B)
 {
     if (A->PartIds[0] != B->PartIds[0] || A->PartIds[1] != B->PartIds[1] ||
@@ -933,7 +869,7 @@ bool IsSameCostume(Costume const* A, Costume const* B)
         return false;
     if (A->AccessoryCount != B->AccessoryCount)
         return false;
-    // 06eb8f21-06eb8f3d: signed count (JLE), accessories compared up to it.
+    // The count is signed.
     int const Count = static_cast<int>(A->AccessoryCount);
     for (int Index = 0; Index < Count; ++Index)
     {
@@ -943,8 +879,7 @@ bool IsSameCostume(Costume const* A, Costume const* B)
     return true;
 }
 
-// The unique push_back into mission +0x31c inlined by FUN_06eb84c0 (06eb8836-06eb88f4) and
-// the Act_* comm senders: FUN_06eb8ef0 over the vector, FUN_06ed1d30 at the end when absent.
+// Inlined by FUN_06eb84c0 and the Act_* comm senders (insert FUN_06ed1d30).
 void AddDialogCostume(FMissionScript* Script, Costume const* SpeakerCostume)
 {
     std::vector<Costume>::iterator It = Script->DialogCostumes.begin();
@@ -956,12 +891,10 @@ void AddDialogCostume(FMissionScript* Script, Costume const* SpeakerCostume)
     Script->DialogCostumes.push_back(*SpeakerCostume);
 }
 
-// FUN_06eb84c0 (06eb84c0-06eb8931).
+// FUN_06eb84c0.
 void FMissionScript::LoadMission(INI_Reader* Reader)
 {
-    // 06eb84eb: FUN_06f172f0(Reader), the TU38 slot 25 body.
     FMissionObject::LoadMission(Reader);
-    // 06eb84f0-06eb84f2.
     Reader->reset();
     while (Reader->read_header())
     {
@@ -973,9 +906,7 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
         // DAT_06fb43a0 = "NPC".
         if (Reader->is_header("NPC"))
         {
-            // 06eb8702-06eb8764: FUN_06f31430 on a stack FMsnNpc, a cleared ID_String,
-            // FUN_06f31470(&id, &npc, Reader), then {id, npc (0x13 dwords)} into the +0x184 map
-            // (FUN_06ed04c0, unique insert).
+            // LoadMsnNpc = FUN_06f31470; a duplicate id keeps the first block.
             FMsnNpc Npc;
             ID_String Nickname;
             Nickname.clear();
@@ -985,10 +916,7 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
         }
         if (Reader->is_header("Dialog"))
         {
-            // 06eb877f-06eb8903: every "line" value whose second string is "Player" (stricmp):
-            // its first string (TString<0x30>, cut to 0x2f) -> FUN_06f155f0 (the costume of that
-            // mission NPC or solar) -> unique push_back into +0x31c (FUN_06eb8ef0 compare,
-            // FUN_06ed1d30 insert).
+            // Every "line" spoken to "Player": the speaker's costume goes into +0x31c.
             while (Reader->read_value())
             {
                 if (!Reader->is_value("line"))
@@ -1008,31 +936,27 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
     }
 }
 
-// FUN_06eb8f50 (06eb8f50-06eb9628). The switch tables: 06eb9630 (byte index 06eb96ac,
-// messages 1..0x3c) and 06eb96e8 (byte index 06eb9714, messages 0x1000..0x1011). Every case
-// ends in either LAB_06eb90e6 (the TU38 body FUN_06f0f150, then the tail) or caseD_7 (the tail
-// only); the tail (06eb90ef-06eb9144) runs the NN path and the nag objects unless the mission
-// is ending, then always vtbl[+0x78].
+// FUN_06eb8f50. Every case ends either with the TU38 body (FUN_06f0f150) and the tail, or the
+// tail only; the tail runs the NN path and the nag objects unless the mission is ending, then
+// always vtbl +0x78.
 void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* MessageParms)
 {
-    // 06eb8f5a-06eb8f68: nothing at all without a live player state.
+    // Nothing at all without a live player state.
     if (FindContentPlayerState(PlayerId) == nullptr)
         return;
 
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
-    // The case's message id (local_c1c) handed to FUN_06eb9af0.
     EMessage EventId = MessageId;
     bool bBaseBody = true;
 
     switch (MessageId)
     {
     case EMessage::BaseEnter:
-        // 06eb90ad: parms {base, player}.
+        // Parms {base, player}.
         if (Parms[1] == PlayerId)
             OnBaseEnter(MessageParms);
         break;
     case EMessage::BaseExit:
-        // 06eb90bf.
         if (Parms[1] == PlayerId)
             OnBaseExit(MessageParms);
         break;
@@ -1050,13 +974,11 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::EncounterLaunched:
     case EMessage::RumorHeard:
     case EMessage::TetherObject:
-        // 06eb92b2 / 06eb94af / 06eb90d1 / 06eb9167 / 06eb917a / 06eb9286 / 06eb9154 /
-        // 06eb9187 / 06eb9353 / 06eb9546 / 06eb956c / 06eb95eb / 06eb94d9 / 06eb9559.
         DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         break;
     case EMessage::PlayerSave:
     {
-        // 06eb9384-06eb93d7: the save {player, FILE*}; skips the TU38 body when the gate fails.
+        // Parms {player, FILE*}; the TU38 body runs inside, only when the gate passes.
         bBaseBody = false;
         if (Parms[0] != PlayerId || !pub::SinglePlayer())
             break;
@@ -1070,7 +992,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     }
     case EMessage::PlayerLoad:
     {
-        // 06eb93dc-06eb9443: the load {player, INI_Reader*}.
+        // Parms {player, INI_Reader*}.
         PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState == nullptr)
         {
@@ -1086,13 +1008,12 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
             LoadMissionState(Reader);
             Reader->set_state(SavedState);
         }
-        // 06eb9432-06eb9443: the TU38 body only while a player state is live.
+        // The TU38 body only while a player state is live.
         if (FindContentPlayerState(PlayerId) == nullptr)
             bBaseBody = false;
         break;
     }
     case EMessage::PlayerLaunch:
-        // 06eb92bf.
         if (Parms[0] == PlayerId)
             DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         break;
@@ -1103,7 +1024,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     case EMessage::PlayerLogout:
     {
-        // 06eb8fef-06eb90ab: drop every trigger.
+        // Drop every trigger.
         ActiveTriggers.clear();
         FTriggerMap::iterator TriggerIt = TriggerMap.begin();
         for (; TriggerIt != TriggerMap.end(); ++TriggerIt)
@@ -1120,8 +1041,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     }
     case EMessage::LootAcquired:
     {
-        // 06eb9251-06eb9281: the trigger event, then word parms+8 into the loot record's
-        // +0xf8 (06eb927a).
+        // The trigger event, then word parms+8 into the loot record's +0xf8.
         DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         FMissionLoot* Found = FindLootById(Parms);
         if (Found != nullptr)
@@ -1130,14 +1050,13 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     }
     case EMessage::GFObjSelect:
-        // 06eb933a.
         if (PlayerId == Parms[1])
             OnCharacterSelect(MessageParms);
         break;
     case EMessage::Heartbeat:
     {
-        // 06eb8fa7-06eb8fea: +0x30c += dt, the delayed actions, event 0x20 with a local copy
-        // of dt, event 0x1011 with no parms, then the TU38 body with the real parms.
+        // Event 0x20 gets a local copy of dt, event 0x1011 no parms, the TU38 body the real
+        // parms.
         float DeltaSeconds = *static_cast<float const*>(MessageParms);
         ElapsedTime = DeltaSeconds + ElapsedTime;
         TickMissionTimers(this, DeltaSeconds);
@@ -1147,13 +1066,13 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     }
     case EMessage::AbortMission:
-        // 06eb9499-06eb94aa: the TU38 body first, then FUN_06eb9cd0; tail only.
+        // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         OnMessage24(MessageParms);
         bBaseBody = false;
         break;
     case EMessage::LocationEnter:
-        // 06eb92dd-06eb931c: the location enter on the player's base is remembered.
+        // The location enter on the player's base is remembered.
         if (PlayerId == Parms[1] && FindContentPlayerState(PlayerId) != nullptr)
         {
             if (PlayerState->GetBaseRecord() != nullptr)
@@ -1162,17 +1081,15 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         break;
     case EMessage::LocationExit:
-        // 06eb9321.
         if (PlayerId == Parms[1])
             OnLocationExit(MessageParms);
         break;
     case EMessage::MissionResponse:
-        // 06eb919a-06eb91b9.
         if (Parms[3] == PlayerId && Parms[0] == ControllerId)
             OnOfferResponse(MessageParms);
         break;
     case EMessage::PopUpDialog:
-        // 06eb91be-06eb923f: the answer to the reputation pop-up.
+        // The answer to the reputation pop-up.
         if (Parms[0] == PlayerId)
         {
             if (bRepPopUpShown != 0)
@@ -1192,49 +1109,44 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         break;
     case EMessage::SpaceEnter:
-        // 06eb9448-06eb9465: the TU38 body first; tail only.
+        // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         if (Parms[1] == PlayerId)
             OnSpaceEnter(MessageParms);
         bBaseBody = false;
         break;
     case EMessage::SpaceExit:
-        // 06eb946a-06eb9494: the TU38 body first; tail only.
+        // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         if (Parms[1] == PlayerId)
             DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         bBaseBody = false;
         break;
     case EMessage::ObjectDestroyed:
-        // 06eb9244.
         OnObjectDestroyed(MessageParms);
         break;
     case EMessage::SystemExit:
-        // 06eb9293.
         if (Parms[2] == PlayerId)
             DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         break;
     case EMessage::SystemEnter:
-        // 06eb9366-06eb937f: the TU38 body first; tail only.
+        // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         OnSystemEnter(MessageParms);
         OnSystemEnterPopUp(MessageParms);
         bBaseBody = false;
         break;
     case EMessage::MissionStart:
-        // 06eb94ec-06eb9541; tail only.
         ActivateInitialMissionTriggers(this);
         bBaseBody = false;
         break;
     case EMessage::DamageReputation:
-        // 06eb95fe-06eb9628; tail only.
         if (FindContentPlayerState(PlayerId) != nullptr
             && PlayerState->GetLiveMission() == ControllerId)
             OnMessage1005(MessageParms);
         bBaseBody = false;
         break;
     case EMessage::Msg0x1006:
-        // 06eb95be-06eb95e6.
         if (Parms[1] == 0)
         {
             if (Parms[2] == 1)
@@ -1244,12 +1156,10 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         break;
     case EMessage::PlayerMissionChanged:
-        // 06eb9579.
         OnMessage100b(MessageParms);
         break;
     case EMessage::NpcShipCreated:
     {
-        // 06eb9586-06eb95b9: an NPC of this mission was created.
         FContentNpcShip* Npc = *static_cast<FContentNpcShip* const*>(MessageParms);
         if (Npc->ControllerId == ControllerId)
         {
@@ -1260,26 +1170,22 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     }
     default:
-        // caseD_9 (0x9, 0xa, 0xc, 0xe..0x15, 0x19..0x1f, 0x21, 0x23, 0x25, 0x27, 0x2b, 0x2d,
-        // 0x2e, 0x31..0x35, 0x38, 0x1001..0x1004, 0x1008, 0x1009, 0x100e, 0x100f, and
-        // everything outside the two tables).
+        // Every other message id, inside or outside the two jump tables.
         break;
     }
 
     if (bBaseBody)
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
 
-    // 06eb90ef-06eb913b: the tail.
+    // The tail.
     if (bPendingDestroy == 0)
     {
         if (bNeedsObjectiveRenumber == 0 && NnPath.bActive != 0
             && (PlayerState->GetLiveMission() == ControllerId
                 || (PlayerState->GetLiveMission() & 0x3fffffff) == 0))
             NnPath.HandleMessage(MessageId, MessageParms);
-        // 06eb9133-06eb913b: FUN_06ecef10(+0x204, msg, parms).
         DispatchNagMessage(this, MessageId, MessageParms);
     }
-    // 06eb9140-06eb9144: vtbl[+0x78].
     ApplyDesiredMissionState();
 }
 
@@ -1287,14 +1193,14 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
 void FMissionScript::OnBaseEnter(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
-    // 06eb9ddd-06eb9e0c: every RTC script not yet started is started.
+    // Every RTC script not yet started is started.
     std::list<FStoryMissionListNode_0x2f4>::iterator ScriptIt = List_0x2f4.begin();
     for (; ScriptIt != List_0x2f4.end(); ++ScriptIt)
     {
         if (ScriptIt->BarSceneHandle == -1)
-            StartRtcScript(&*ScriptIt);                                 // 06eb9dff
+            StartRtcScript(&*ScriptIt);
     }
-    // 06eb9e0e-06eb9e79: every ambient scene of this base is created.
+    // Every ambient scene of this base is created.
     std::list<FMissionAmbientScene>::iterator SceneIt = AmbientScenes.begin();
     for (; SceneIt != AmbientScenes.end(); ++SceneIt)
     {
@@ -1308,7 +1214,6 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
         Desc.Filter = PlayerId;
         SceneIt->Handle = static_cast<int>(pub::GF::AmbientScriptCreate(Desc));
     }
-    // 06eb9e7c-06eb9eb1.
     if (bNeedsObjectiveRenumber != 0)
     {
         RenumberAllObjectives();
@@ -1319,16 +1224,14 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
         NnPath.Rebuild();
         NnPath.SendObjectives(false, false);
     }
-    // 06eb9eb7-06eb9ecb.
     EMessage EventId = EMessage::BaseEnter;
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
 }
 
-// FUN_06eb9ef0 (06eb9ef0-06eba005).
+// FUN_06eb9ef0.
 void FMissionScript::OnBaseExit(void const* MessageParms)
 {
-    // 06eb9ef9-06eb9f08: the base record (FUN_06eac0c0 on *parms); the scripts are only walked
-    // with one.
+    // The scripts are only walked with a base record (FUN_06eac0c0).
     FContentBase* Base = FindContentBaseInfo(static_cast<unsigned int const*>(MessageParms));
     if (Base != nullptr)
     {
@@ -1337,21 +1240,18 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
         {
             if (It->Encounter != nullptr)
             {
-                // 06eb9f2a-06eb9f42: FUN_06ea9fc0(Base, BarSceneHandle, 0), -1 not tested.
+                // The handle is not tested for -1 here.
                 Base->RemoveBarScene(It->BarSceneHandle, nullptr);
                 It->BarSceneHandle = -1;
-                // 06eb9f3a-06eb9f5e: FUN_06eb8c40 + free of the script.
                 delete It->Encounter;
                 It->Encounter = nullptr;
             }
-            // 06eb9f68-06eb9f99: a finished script's node is unlinked.
             if (It->bFinished != 0)
                 It = List_0x2f4.erase(It);
             else
                 ++It;
         }
     }
-    // 06eb9fa9-06eb9fe5: every ambient scene's handle is destroyed.
     std::list<FMissionAmbientScene>::iterator SceneIt = AmbientScenes.begin();
     for (; SceneIt != AmbientScenes.end(); ++SceneIt)
     {
@@ -1366,7 +1266,7 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
 }
 
-// FUN_06eba350 (06eba350-06eba41f).
+// FUN_06eba350.
 void FMissionScript::OnCharacterSelect(void const* MessageParms)
 {
     std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
@@ -1378,9 +1278,7 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
             continue;
         if (It->Encounter == nullptr)
             continue;
-        // 06eba398-06eba3ed: the player's base, its room state of +0x308,
-        // FindCharacter(script +0x10 role, PlayerId); a character whose id (+0x0c) equals
-        // *parms gets SetBehavior(-1) and the node +0x94 = 1.
+        // The selected character (*parms) of the script's role finishes the script.
         FContentBase* const Base = PlayerState->GetBaseRecord();
         if (Base == nullptr)
             continue;
@@ -1399,7 +1297,7 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
 }
 
-// FUN_06eba530 (06eba530-06eba719).
+// FUN_06eba530.
 void FMissionScript::OnLocationExit(void const* MessageParms)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
@@ -1407,8 +1305,7 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
     FContentBase* Base = PlayerState->GetBaseRecord();
     if (Base != nullptr)
     {
-        // 06eba575-06eba5ed: the roles (script +0x10 vector<0x3c>) of the unfinished scripts
-        // of this location (script +0 == *parms), appended one by one (FUN_06ed1040).
+        // The roles of the unfinished scripts of this location are kept.
         unsigned int const LocationId = *static_cast<unsigned int const*>(MessageParms);
         std::vector<FRtcScriptRole> KeepRoles;
         std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
@@ -1422,8 +1319,7 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
             for (; Role != It->Encounter->Roles.end(); ++Role)
                 KeepRoles.push_back(*Role);
         }
-        // 06eba5ef-06eba6b3: every finished script (+0x94 == 1) with an object is released
-        // through FUN_06ea9fc0(Base, +0x8c, &KeepRoles), freed and its node unlinked.
+        // Every finished script with an object is released, sparing the kept roles.
         It = List_0x2f4.begin();
         while (It != List_0x2f4.end())
         {
@@ -1438,64 +1334,57 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
             It->Encounter = nullptr;
             It = List_0x2f4.erase(It);
         }
-        // 06eba6b9-06eba6ec: KeepRoles destroyed.
     }
     EMessage EventId = EMessage::LocationExit;
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
 }
 
-// FUN_06eba030 (06eba030-06eba1e2).
+// FUN_06eba030.
 void FMissionScript::OnOfferResponse(void const* MessageParms)
 {
     EMessage EventId = EMessage::MissionResponse;
     unsigned char const* ParmsBytes = static_cast<unsigned char const*>(MessageParms);
     if (ParmsBytes[8] == 0 || FindContentPlayerState(PlayerId) == nullptr)
     {
-        // 06eba1bb-06eba1cb.
         DispatchMissionTriggerEvent(this, &EventId, MessageParms);
         return;
     }
-    // 06eba073-06eba0d6: an empty FmtStr shown with type 10, broadcast.
+    // An empty FmtStr shown with type 10, broadcast.
     {
         FmtStr EmptyMsg;
         pub::Player::DisplayMissionMessage(PlayerId, EmptyMsg,
                                            static_cast<MissionMessageType>(0xa), true);
     }
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
-    // 06eba0f1-06eba10a.
     if (StoryEvents != nullptr)
         StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
-    // 06eba10c-06eba135: another live mission of the player is destroyed and left.
+    // Another live mission of the player is destroyed and left.
     unsigned int const LiveMission = PlayerState->GetLiveMission();
     if ((LiveMission & 0x3fffffff) != 0 && LiveMission != ControllerId)
     {
         pub::Controller::Destroy(LiveMission);
         PlayerState->EndLiveMission(LiveMission, 4, true);
     }
-    // 06eba13a-06eba17a.
     bRepPopUpShown = 0;
     bRepPopUpArmed = 0;
     RepPopUpSystemId = 0;
     RepPopUpGroups.clear();
-    // 06eba17e-06eba191.
     SpacePopSetAttackClamp(1);
     SpacePopSetEncounterEnabled(0);
     GMissionScanClamp = 1;
-    // 06eba18d-06eba1b4: a cleared ID_String, FUN_06f488b0(PlayerState; +4, EBX = 0, &id, 1,
-    // +0x2c4) -- the group joins this mission. Arguments in retail's positional order.
+    // The group joins this mission (FUN_06f488b0).
     ID_String NoVnpc;
     NoVnpc.clear();
     PlayerState->JoinMissionAsGroup(ControllerId, 0, &NoVnpc, true, AcceptedObjectiveIds);
 }
 
-// FUN_06eba720 (06eba720-06eba859).
+// FUN_06eba720.
 void FMissionScript::OnSpaceEnter(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (Parms[1] != PlayerId)
         return;
-    // 06eba74b-06eba7ef: a CostumeHint per dialog costume, the costume assigned through
-    // Costume's inline operator= (part ids, count, then `count` accessory ids).
+    // A CostumeHint per dialog costume (Costume's inline operator= copies `count` accessories).
     std::vector<Costume>::iterator It = DialogCostumes.begin();
     for (; It != DialogCostumes.end(); ++It)
     {
@@ -1511,7 +1400,6 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
     }
     EMessage EventId = EMessage::SpaceEnter;
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
-    // 06eba810-06eba842.
     if (NnPath.bActive == 0)
     {
         RenumberAllObjectives();
@@ -1525,13 +1413,13 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
     bNeedsObjectiveRenumber = 0;
 }
 
-// FUN_06ebaae0 (06ebaae0-06ebab81).
+// FUN_06ebaae0.
 void FMissionScript::OnObjectDestroyed(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     EMessage EventId = EMessage::ObjectDestroyed;
     DispatchMissionTriggerEvent(this, &EventId, MessageParms);
-    // 06ebaafd-06ebab4a: the first friendly-fire label naming the destroyed object is dropped.
+    // The first friendly-fire label naming the destroyed object is dropped.
     std::list<TString<0x30>>::iterator It = FriendlyFireOffLabels.begin();
     for (; It != FriendlyFireOffLabels.end(); ++It)
     {
@@ -1541,14 +1429,12 @@ void FMissionScript::OnObjectDestroyed(void const* MessageParms)
             break;
         }
     }
-    // 06ebab50-06ebab79: FUN_06f15df0(PlayerId) false, a live player state and no ship ->
-    // +0x19 = 1.
     if (!IsPlayerDead(PlayerId) && FindContentPlayerState(PlayerId) != nullptr
         && PlayerState->ShipObject == nullptr)
         bPendingDestroy = 1;
 }
 
-// FUN_06eba860 (06eba860-06eba8e9).
+// FUN_06eba860.
 void FMissionScript::OnSystemEnter(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
@@ -1559,7 +1445,7 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
     FContentPlayerShip* const Ship = PlayerState->ShipObject;
     if (Ship == nullptr)
         return;
-    // 06eba8a4-06eba8df: event 0x100f with {ship id, parms[0], parms[3] or 0}.
+    // Event 0x100f with {ship id, parms[0], parms[3] or 0}.
     unsigned int NpcEnterParms[3];
     NpcEnterParms[0] = Ship->SpaceObjId;
     NpcEnterParms[1] = Parms[0];
@@ -1568,7 +1454,7 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
     DispatchMissionTriggerEvent(this, &EventId, NpcEnterParms);
 }
 
-// FUN_06eba1f0 (06eba1f0-06eba343).
+// FUN_06eba1f0.
 void FMissionScript::OnSystemEnterPopUp(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
@@ -1584,7 +1470,7 @@ void FMissionScript::OnSystemEnterPopUp(void const* MessageParms)
     bRepPopUpShown = 1;
 }
 
-// FUN_06eb9cd0 (06eb9cd0-06eb9dba).
+// FUN_06eb9cd0.
 void FMissionScript::OnMessage24(void const* MessageParms)
 {
     if (FindContentPlayerState(PlayerId) == nullptr)
@@ -1600,7 +1486,7 @@ void FMissionScript::OnMessage24(void const* MessageParms)
     bPendingDestroy = 1;
 }
 
-// FUN_06eb99a0 (06eb99a0-06eb9a97): parms {kind, ship, victim}.
+// FUN_06eb99a0: parms {kind, ship, victim}.
 void FMissionScript::OnMessage1005(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
@@ -1611,7 +1497,7 @@ void FMissionScript::OnMessage1005(void const* MessageParms)
         return;
     if (Parms[1] != Ship->SpaceObjId || Parms[0] != 1)
         return;
-    // 06eb99e3-06eb9a0c: a victim named by a friendly-fire label is excused.
+    // A victim named by a friendly-fire label is excused.
     std::list<TString<0x30>>::iterator It = FriendlyFireOffLabels.begin();
     for (; It != FriendlyFireOffLabels.end(); ++It)
     {
@@ -1624,30 +1510,27 @@ void FMissionScript::OnMessage1005(void const* MessageParms)
     pub::SpaceObj::GetRep(Parms[2], VictimRep);
     pub::SpaceObj::GetRep(Parms[1], ShipRep);
     pub::Reputation::GetAttitude(VictimRep, ShipRep, Attitude);
-    // 06eb9a47-06eb9a59: FCOMP DAT_06fb4668 (0.2f), TEST AH,0x41 / JNZ: fall-through (fail
-    // with 0x5460) only when Attitude > 0.2.
+    // DAT_06fb4668 (0.2f).
     if (Attitude > 0.2f)
     {
         SetDesiredMissionState(G_MissionStateFail, 0x5460);
         return;
     }
-    // 06eb9a72-06eb9a81: FCOMP DAT_06fb4660 (-0.2f), TEST AH,0x1 / JNZ skip: fail with 0x5463
-    // when Attitude >= -0.2 (not below, not unordered).
+    // DAT_06fb4660 (-0.2f); unordered does not fail.
     if (Attitude >= -0.2f)
         SetDesiredMissionState(G_MissionStateFail, 0x5463);
 }
 
-// FUN_06eba8f0 (06eba8f0-06ebaacf).
+// FUN_06eba8f0.
 void FMissionScript::OnMessage100b(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr
         && Parms[0] != ControllerId)
     {
-        // 06eba930-06eba957: a local record {"", handle -1, no script, 0, 0}.
         FStoryMissionListNode_0x2f4 Restart;
-        // 06eba968-06eba997: the first node with a script whose mission text (+0x2c) is set,
-        // not finished, while the player has a base.
+        // The first unfinished script with a mission text (+0x2c) is restarted, while the
+        // player has a base.
         std::list<FStoryMissionListNode_0x2f4>::iterator It = List_0x2f4.begin();
         for (; It != List_0x2f4.end(); ++It)
         {
@@ -1659,7 +1542,6 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
             FContentBase* const Base = PlayerState->GetBaseRecord();
             if (Base == nullptr)
                 continue;
-            // 06eba99c-06eba9ca: its path (FUN_06ea9f40, max 0x80) and +0x95.
             size_t PathLength = strlen(It->Path);
             if (PathLength >= 0x80)
                 PathLength = 0x7f;
@@ -1667,7 +1549,6 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
             Restart.Path[PathLength] = '\0';
             Restart.PathLength = static_cast<unsigned int>(PathLength);
             Restart.bRepeatable = It->bRepeatable;
-            // 06eba9d1-06ebaa29: FUN_06ea9fc0(Base, +0x8c, 0), FUN_06eb8c40 + free, unlink.
             Base->RemoveBarScene(It->BarSceneHandle, nullptr);
             It->BarSceneHandle = -1;
             delete It->Encounter;
@@ -1675,15 +1556,14 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
             List_0x2f4.erase(It);
             break;
         }
-        // 06ebaa2f-06ebaa76: a copied path restarts the script and appends the record.
         if (Restart.PathLength != 0)
         {
             StartRtcScript(&Restart);
             List_0x2f4.push_back(Restart);
         }
     }
-    // 06ebaa79-06ebaac2: with *parms == 0 the player's first objective is resent with its
-    // type or-ed with 0x30, the record flagged (slot 1) around the send.
+    // With *parms == 0 the player's first objective is resent with its type or-ed with 0x30.
+    // The first objective is not null-tested.
     if (Parms[0] != 0)
         return;
     FMissionPlayer* Player = FindPlayer(PlayerId);
@@ -1698,12 +1578,11 @@ void FMissionScript::OnMessage100b(void const* MessageParms)
     First->Objective.Type = SavedType;
 }
 
-// FUN_06ebabb0 (06ebabb0-06ebae00).
+// FUN_06ebabb0. The player state is not null-tested.
 void FMissionScript::SaveMissionState(FILE* File)
 {
-    // 06ebabbc-06ebabdc: NEG/SBB/INC of (live mission - this id) -> 1 when equal.
     fprintf(File, "mission_accepted = %d\n", PlayerState->GetLiveMission() == ControllerId ? 1 : 0);
-    // 06ebabde: DAT_06fd1c78 (GSpacePopAttackClamp) CMP AL,1.
+    // DAT_06fd1c78.
     fprintf(File, GSpacePopAttackClamp == 1 ? "att_clamp = true\n" : "att_clamp = false\n");
     fprintf(File, SpacePopGetEncounterEnabled() == 1 ? "tradelane_attacks = true\n"
                                                       : "tradelane_attacks = false\n");
@@ -1713,19 +1592,16 @@ void FMissionScript::SaveMissionState(FILE* File)
                                                   : "hostile_clamp = false \n");
     fprintf(File, SpacePopGetPopulationEnabled() != 0 ? "random_pop = true\n"
                                                        : "random_pop = false\n");
-    // 06ebac80-06ebac99: the madlib ids of the TU38 FmtStrs +0x68 and +0x50.
     fprintf(File, "msn_offer = %d\n", MissionOffer.MadLibId);
     fprintf(File, "msn_title = %d\n", MissionTitle.MadLibId);
     if (NnPath.bActive != 0)
         NnPath.Save(File);
     if (bTriggerSavePending != 0)
     {
-        // 06ebaddf-06ebadf6.
         fprintf(File, "\n[TriggerSave]\n");
         fprintf(File, "trigger = %u\n", SaveTriggerId);
         return;
     }
-    // 06ebacbf-06ebad21: every unfinished script.
     std::list<FStoryMissionListNode_0x2f4>::iterator ScriptIt = List_0x2f4.begin();
     for (; ScriptIt != List_0x2f4.end(); ++ScriptIt)
     {
@@ -1741,7 +1617,7 @@ void FMissionScript::SaveMissionState(FILE* File)
     for (; LabelIt != FriendlyFireOffLabels.end(); ++LabelIt)
         fprintf(File, "friendly_fire_excused = %s\n", LabelIt->Data);
     fprintf(File, "story_cue = %d\n", StoryCue);
-    // 06ebad8f-06ebadd3: a [TriggerSave] per active trigger, its condition's slot 5 (+0x14).
+    // A [TriggerSave] per active trigger with its condition's Save (slot 5, +0x14).
     std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
     for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
     {
@@ -1751,7 +1627,7 @@ void FMissionScript::SaveMissionState(FILE* File)
     }
 }
 
-// FUN_06ebae10 (06ebae10-06ebb52f). Four local flags: [MissionState] seen (the [NNObjective]
+// FUN_06ebae10. Four local flags: [MissionState] seen (the [NNObjective]
 // gate), the RTC list released, the active triggers dropped, the objectives cleared. The
 // header loop ends at [BStoryMissionDone]; any other header is skipped.
 void FMissionScript::LoadMissionState(INI_Reader* Reader)
@@ -1764,16 +1640,13 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
     {
         if (Reader->is_header("MissionState"))
         {
-            // 06ebae79-06ebae80.
             bNeedsObjectiveRenumber = 1;
             bMissionStateSeen = true;
             while (Reader->read_value())
             {
                 if (Reader->is_value("rtc"))
                 {
-                    // 06ebaeaa-06ebaf5c: the first "rtc" releases the started scripts; each one
-                    // is appended (FUN_06ed0ed0) with handle -1, no script, not finished,
-                    // +0x95 = b1.
+                    // The first "rtc" releases the started scripts.
                     if (!bRtcReleased)
                         ReleaseRtcScripts();
                     FStoryMissionListNode_0x2f4 Script;
@@ -1788,9 +1661,8 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 if (Reader->is_value("ambi_scene"))
                 {
-                    // 06ebaf74-06ebb052: path s0, room i1, base i2, handle -1, appended to
-                    // +0x310. The AmbientScriptDescription the listing fills on the stack
-                    // (06ebaff7-06ebb03d) is never passed anywhere.
+                    // Retail also fills an AmbientScriptDescription on the stack that is never
+                    // passed anywhere.
                     FMissionAmbientScene Scene;
                     Scene.Path.Length = 0;
                     Scene.Path.Data[0] = '\0';
@@ -1805,7 +1677,6 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 if (Reader->is_value("friendly_fire_excused"))
                 {
-                    // 06ebb064-06ebb0d1: s0 as TString<0x30>, appended to +0x2fc.
                     TString<0x30> Label;
                     Label = Reader->get_value_string(0);
                     FriendlyFireOffLabels.push_back(Label);
@@ -1813,15 +1684,12 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 if (Reader->is_value("mission_accepted"))
                 {
-                    // 06ebb0e3-06ebb147.
                     if (Reader->get_value_bool(0) != true)
                         continue;
                     if (FindContentPlayerState(PlayerId) == nullptr)
                         continue;
                     ID_String ObjectiveIds;
                     ObjectiveIds.clear();
-                    // 06ebb111-06ebb123: FUN_06f488b0(PlayerState; +4, 0, &id, 0, 0), in
-                    // retail's positional order.
                     PlayerState->JoinMissionAsGroup(ControllerId, 0, &ObjectiveIds, false, 0);
                     if (StoryEvents != nullptr)
                         StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
@@ -1830,7 +1698,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 if (Reader->is_value("att_clamp"))
                 {
-                    // 06ebb159-06ebb161: DAT_06fd1c78 in place.
+                    // DAT_06fd1c78 in place.
                     GSpacePopAttackClamp = Reader->get_value_bool(0) ? 1 : 0;
                     continue;
                 }
@@ -1841,7 +1709,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 if (Reader->is_value("scan_clamp"))
                 {
-                    GMissionScanClamp = Reader->get_value_bool(0) ? 1 : 0; // 06ebb1a3
+                    GMissionScanClamp = Reader->get_value_bool(0) ? 1 : 0;
                     continue;
                 }
                 if (Reader->is_value("gcs_clamp"))
@@ -1859,8 +1727,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                     SpacePopSetHostileClamp(Reader->get_value_bool(0) ? 1 : 0); // FUN_06f5a7b0
                     continue;
                 }
-                // 06ebb223-06ebb27d: a non-zero id rebuilds +0x68 / +0x50 (FmtStr::destroy, the
-                // 6 dwords zeroed, begin_mad_lib(i0 read again), end_mad_lib).
+                // A non-zero id rebuilds the offer / title mad lib (i0 is read again).
                 FmtStr* MadLib = nullptr;
                 if (Reader->is_value("msn_offer"))
                 {
@@ -1874,7 +1741,6 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                 }
                 else if (Reader->is_value("nnpath"))
                 {
-                    // 06ebb28a-06ebb299: FUN_06f1b480, then FUN_06f1c430(+0x21c, Reader, this).
                     HideAllObjectives();
                     NnPath.Load(Reader, this);
                     continue;
@@ -1898,22 +1764,21 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
             {
                 if (!Reader->is_value("trigger"))
                     continue;
-                // 06ebb2e7-06ebb348: the first "trigger" drops the active list (FUN_06ecfe80 per
-                // node, the triggers' states untouched), +0x1e4 and +0x1d0.
+                // The first "trigger" drops the active list (the triggers' states untouched),
+                // +0x1e4 and +0x1d0.
                 if (!bTriggersDropped)
                 {
                     ActiveTriggers.clear();
                     InitiallyActive.clear();
                     PendingActivations.clear();
                 }
-                // 06ebb34d-06ebb45a: {i0, i0} unique into +0x1e4 (activated by message 0x1000).
-                // The key is the second read, the value the first.
+                // {i0, i0} unique into +0x1e4 (activated by message 0x1000). The key is the
+                // second read, the value the first.
                 unsigned int const FirstRead = static_cast<unsigned int>(Reader->get_value_int(0));
                 unsigned int const SecondRead = static_cast<unsigned int>(Reader->get_value_int(0));
                 InitiallyActive.insert(
                     std::map<unsigned int, unsigned int>::value_type(SecondRead, FirstRead));
-                // 06ebb45f-06ebb4a3: every trigger with id i0 (read a third time): its condition's
-                // slot 6 (+0x18, Load) on the reader.
+                // Every trigger with id i0 (read a third time) loads its condition (slot 6).
                 unsigned int const TriggerId = static_cast<unsigned int>(Reader->get_value_int(0));
                 FTriggerMap::iterator It = TriggerMap.begin();
                 for (; It != TriggerMap.end(); ++It)
@@ -1927,8 +1792,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
         }
         if (Reader->is_header("NNObjective") && bMissionStateSeen)
         {
-            // 06ebb4cf-06ebb4f5: the first one clears every objective (FUN_06f1b3d0); each is
-            // loaded into slot 6's (+0x18) objective list (+8) by FUN_06f1a630.
+            // The first one clears every objective. GetFirstPlayer() is not null-tested.
             if (!bObjectivesCleared)
             {
                 ClearObjectives();
@@ -1942,11 +1806,9 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
     }
 }
 
-// FUN_06ebb620 (06ebb620-06ebb7ed). stdcall (npc, mode), no this; case 0x1010 passes
-// (*parms, 0).
+// FUN_06ebb620 (stdcall, no this); case 0x1010 passes (*parms, 0).
 void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
 {
-    // 06ebb62f-06ebb634: CMP EBP,0 / JZ return.
     if (Npc == nullptr)
         return;
     unsigned int const Flid = Npc->SpaceObjId;
@@ -1955,7 +1817,6 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
         return;
     if (Mode == 0)
     {
-        // 06ebb741-06ebb774.
         LocalPersonality.JobParams.Field_00 = 0;
         LocalPersonality.JobParams.SceneToughnessThreshold = 4;
         LocalPersonality.JobParams.LootPreference = 0;
@@ -1966,9 +1827,8 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
     }
     else if (Mode == 1)
     {
-        // 06ebb676-06ebb73f: a second Personality from the ship's own pilot (npc +0x1cc) or,
-        // when that is empty, from the pilot of its npcships entry (FUN_06f324d0 on
-        // ship arch +0x138, value +0xc); on success its job fields replace the live ones.
+        // The job fields come from the ship's own pilot or, when that is empty, from the
+        // pilot of its npcships entry (FUN_06f324d0).
         pub::AI::Personality PilotPersonality;
         ID_String PilotId = Npc->PilotId;
         bool bLoaded = false;
@@ -1984,7 +1844,6 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
         }
         if (bLoaded)
         {
-            // 06ebb6dd-06ebb738.
             LocalPersonality.JobParams.FleeSceneThreatStyle = PilotPersonality.JobParams.FleeSceneThreatStyle;
             LocalPersonality.JobParams.FleeWhenHullDamagedPercent = PilotPersonality.JobParams.FleeWhenHullDamagedPercent;
             LocalPersonality.JobParams.bFleeWhenLeaderFleesStyle = PilotPersonality.JobParams.bFleeWhenLeaderFleesStyle;
@@ -1994,7 +1853,6 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
             LocalPersonality.JobParams.LootPreference = PilotPersonality.JobParams.LootPreference;
         }
     }
-    // 06ebb77b-06ebb7e0: SetPersonalityParams + SubmitState.
     pub::AI::SetPersonalityParams Params;
     Params.bSetPersonality = 1;
     Params.Value = LocalPersonality;

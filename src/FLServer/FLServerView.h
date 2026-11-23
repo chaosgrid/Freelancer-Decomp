@@ -23,25 +23,25 @@ protected:
 public:
 	CFLServerDoc* GetDocument() { return (CFLServerDoc*)m_pDocument; }
 
-	virtual BOOL PreCreateWindow(CREATESTRUCT& Cs);     // 0040e040
-	virtual void OnInitialUpdate();                     // 0040e050
-	virtual BOOL OnPreparePrinting(CPrintInfo* Info);   // 0040e160
+	virtual BOOL PreCreateWindow(CREATESTRUCT& Cs);
+	virtual void OnInitialUpdate();
+	virtual BOOL OnPreparePrinting(CPrintInfo* Info);
 
 	virtual ~CFLServerView();
 
-	// .text:0040e280 — deletes the oldest ServerControl.ConsoleTrimLines lines.
+	// Deletes the oldest ServerControl.ConsoleTrimLines lines.
 	bool TrimLines();
 
 	unsigned int LineCount;   // +0x184: lines appended by ServerLogf since the last trim
 
 protected:
-	afx_msg void OnDestroy();                                       // 0040e170
-	afx_msg void OnKeyDown(UINT Char, UINT RepCnt, UINT Flags);     // 0040e680
+	afx_msg void OnDestroy();
+	afx_msg void OnKeyDown(UINT Char, UINT RepCnt, UINT Flags);
 
 	DECLARE_MESSAGE_MAP()
 };
 
-// .text:0040e330 — exported @57 through FLServer.def; also DACOM's FDUMP while the view lives
+// Exported @57 through FLServer.def; also DACOM's FDUMP while the view lives
 // and RemoteClient's log function (SetServerLogFunction). Must stay
 // ?ServerLogf@@YAHUErrorCode@@PBDZZ.
 int __cdecl ServerLogf(ErrorCode Code, const char* Format, ...);

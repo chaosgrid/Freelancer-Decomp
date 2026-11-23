@@ -5,18 +5,6 @@
 // Author: Giperion.
 
 // The client chat core (retail NN_Chat.cpp) -- see chat_init.h for the object map.
-//
-//   FUN_004690c0 ChatInit              FUN_00469b30 ChatShutdown
-//   FUN_004699d0 / FUN_004688b0        the message store ctor / dtor
-//   FUN_004683b0 / FUN_0046a300        Acquire / RecycleOldest
-//   FUN_004684e0 / FUN_004686e0        RebuildRecent / RebuildAll
-//   FUN_0045f860 / FUN_0045fb40 / FUN_00469e60   the channel table
-//   FUN_00469d20                       the name-cache dtor
-//   FUN_0046a150                       ChatDispatchIncoming
-//   FUN_0046aa10 / FUN_0046aeb0 / FUN_0046ad60 / FUN_0046add0 / FUN_0046ae40 / FUN_0046b400
-//   FUN_0046a4d0 / FUN_0046a770 / FUN_0046a480 / FUN_0046a4a0 / FUN_0046b650 / FUN_0046b450
-//   FUN_0046b500 / FUN_0046b520
-//   FUN_0046b0d0 / FUN_0046b0e0 / FUN_0046b0f0   the MOTD
 
 #include "NeuroNet/Chat/chat_init.h"
 #include "Core/event_handler.h"
@@ -88,8 +76,8 @@ namespace
     TextRenderAttributes G_ChatStyle_66d954 = {0xe0c38728u}; // LAB_0045e230
     TextRenderAttributes G_ChatStyle_66d94c = {0xe0c38701u}; // LAB_0045e250
 
-    // FUN_00468c20's colour copy (e.g. 0x00468d5b..0x00468d70): bytes 0..2 of a palette colour
-    // into bytes 1..3 of the attributes; the flags byte stays.
+    // FUN_00468c20's colour copy: bytes 0..2 of a palette colour into bytes 1..3 of the
+    // attributes; the flags byte stays.
     void ChatStyleTakeColor(TextRenderAttributes& Attrs, unsigned long Rgba)
     {
         Attrs.Packed = (Attrs.Packed & 0xffu) | ((Rgba & 0x00ffffffu) << 8);
@@ -98,7 +86,7 @@ namespace
 
 void ChatRegisterTextStyles()
 {
-    // FUN_00468c20 (no arguments; sole caller InitializeEngine 0x005b1ca0).
+    // FUN_00468c20.
     StyleCollection::set_style(0xd5ec, G_ChatStyle_66da14);
     StyleCollection::set_style(0x73f7, G_ChatStyle_66da0c);
     StyleCollection::set_style(0xd681, G_ChatStyle_66da04);
@@ -123,8 +111,8 @@ void ChatRegisterTextStyles()
     StyleCollection::set_style(0x3dbc, G_ChatStyle_66d96c);
     StyleCollection::set_style(0x867f, G_ChatStyle_66d964);
 
-    // 0x00468d5b..0x00468e04: four styles take the HUD chrome colour (DAT_00679bb4), and one
-    // more reuses the +0x66d95c record with the pulse amber (DAT_00679ba4).
+    // Four styles take the HUD chrome colour (DAT_00679bb4), and one more reuses the 66d95c
+    // record with the pulse amber (DAT_00679ba4).
     unsigned long const Chrome = static_cast<unsigned long>(G_HudChromeColorRgba[0]) |
                                  (static_cast<unsigned long>(G_HudChromeColorRgba[1]) << 8) |
                                  (static_cast<unsigned long>(G_HudChromeColorRgba[2]) << 16);
@@ -138,10 +126,7 @@ void ChatRegisterTextStyles()
     ChatStyleTakeColor(G_ChatStyle_66d95c, G_NnPaletteArgb_679ba4);
     StyleCollection::set_style(0x3d0a, G_ChatStyle_66d95c);
 
-    // 0x00468e06..0x00468f9e: style 0x4433 is a list -- TRANode({flags 8, RGB e0c387}, -1, 0)
-    // and JustifyNode(1), each cloned into the stack list (FUN_0046ea00) with the first clone
-    // deleted; StyleCollection::set_style(0x4433, list); the list erased node by node
-    // (FUN_0046d680) and its head freed -- the RenderDisplayList's own destructor here.
+    // Style 0x4433 is a list; retail clones each node twice and deletes the first clone.
     RenderDisplayList Style;
     {
         TextRenderAttributes Attrs;
@@ -176,8 +161,7 @@ RenderDisplayList G_ChatPrefixDepartingPlayer;
 RenderDisplayList G_ChatPrefixNewAffiliation;
 RenderDisplayList G_ChatPrefixLostAffiliation;
 
-// std::string DAT_0066d8e4 -- assigned first thing in FUN_004690c0; ChatTextInputDisplay's
-// Draw (0x0045f521) builds "chat.txm" under it.
+// DAT_0066d8e4 -- ChatTextInputDisplay's Draw builds "chat.txm" under it.
 std::string G_ChatImageRoot;
 
 namespace
@@ -207,8 +191,8 @@ namespace
         FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kNnChatCpp, Line, Message);
     }
 
-    // FUN_004690c0's prefix idiom (0x004691fa..0x00469344 and three more): StyleNode 0x3ea8, then
-    // the IDS text with its trailing paragraph stripped, or JustifyNode(1) + the debug text.
+    // FUN_004690c0's prefix idiom (four times): StyleNode 0x3ea8, then the IDS text with its
+    // trailing paragraph stripped, or JustifyNode(1) + the debug text.
     void BuildPrefix(RenderDisplayList& Prefix, unsigned Ids, wchar_t const* DebugText)
     {
         StyleNode Style(kChatNoticeStyle);
@@ -249,7 +233,6 @@ namespace
     {
         if (!bHaveIds || !LoadIdsIntoRdl(Ids, *Name))
         {
-            // 0x0046b783..0x0046b835: every node erased, then TextPtrNode(u"????", -1).
             RdlClear(*Name);
             TextPtrNode Unknown(L"????", -1);
             RdlAppendNode(*Name, Unknown.Clone());
@@ -292,9 +275,8 @@ FChatMessageEntry* ChatScratchEntry()
 
 FChatMessageEntry* ChatAcquireEntry()
 {
-    // FUN_00468a80, and the same code inlined at every site (e.g. 0x00463683..0x004636c7):
-    // first the DAT_0066d44c bit-0 guard constructs the scratch DAT_0066d440 (and registers
-    // LAB_00468bf0) whether or not it is returned; then DAT_0066da60 ? FUN_004683b0 : scratch.
+    // FUN_00468a80, also inlined at every site: the scratch entry is constructed whether or not
+    // it is returned.
     FChatMessageEntry* const Scratch = ChatScratchEntry();
     if (G_ChatMessageStore != nullptr)
         return G_ChatMessageStore->Acquire();
@@ -303,7 +285,6 @@ FChatMessageEntry* ChatAcquireEntry()
 
 void ChatCommitEntries()
 {
-    // e.g. 0x0046b04b..0x0046b05e: the store's FUN_004686e0 then FUN_004684e0.
     if (G_ChatMessageStore == nullptr)
         return;
     G_ChatMessageStore->RebuildAll();
@@ -312,8 +293,7 @@ void ChatCommitEntries()
 
 void ChatAppendRdlCopy(RenderDisplayList& Dst, RenderDisplayList const& Source)
 {
-    // The FUN_0046c800 loop: one list element per source element, each copy-constructed by
-    // FUN_0046ea00 (a clone of the node).
+    // The FUN_0046c800 loop.
     if (Source.Count == 0)
         return;
     void** const Sentinel = (void**)Source.NodeList;
@@ -334,8 +314,7 @@ FChatChannelTable::FChatChannelTable()
 
 FChatChannelTable::~FChatChannelTable()
 {
-    // FUN_00469e60: every name list deleted and its node erased, the info map emptied,
-    // generation 0, both maps released.
+    // FUN_00469e60.
     for (FNameMap::iterator It = Names.begin(); It != Names.end(); ++It)
     {
         delete It->second;
@@ -350,7 +329,6 @@ void FChatChannelTable::AddChannel(CHAT_ID Id, RenderDisplayList const& Name)
     FNameMap::iterator It = Names.find(Id.Id);
     if (It == Names.end())
     {
-        // 0x0045f89c..0x0045f9cf
         RenderDisplayList* const Copy = new RenderDisplayList();
         ChatAppendRdlCopy(*Copy, Name);
         Names[Id.Id] = Copy;
@@ -363,7 +341,6 @@ void FChatChannelTable::AddChannel(CHAT_ID Id, RenderDisplayList const& Name)
         return;
     }
 
-    // 0x0045f9d4..0x0045fb08
     ChatNotice(0x558, "Channel add attempted on existing channel. Modifying instead.\n");
     RenderDisplayList* const Existing = Names[Id.Id];
     RdlClear(*Existing);
@@ -377,8 +354,7 @@ void FChatChannelTable::AddChannel(CHAT_ID Id, RenderDisplayList const& Name)
 
 void FChatChannelTable::RemovePlayerChannels()
 {
-    // FUN_0045fb40: channel ids (byte 2 set) and G_ChatIdNone stay; every player id loses its
-    // info (equal_range erase on +0x18), its name list and its node.
+    // FUN_0045fb40.
     FNameMap::iterator It = Names.begin();
     while (It != Names.end())
     {
@@ -419,17 +395,14 @@ FChatMessageStore::FChatMessageStore(int Capacity, int InMaxCount, int InMaxAgeM
     , MaxAgeMs(InMaxAgeMs)
     , MaxCount(InMaxCount)
 {
-    // FUN_004699d0: four empty lists, then Capacity fresh 0x10 entries pushed onto the pool
-    // (0x00469a80..0x00469afc); +0x40 = arg 1, +0x18 = +0x28 = +0x38 = 0, +0x3c = arg 2.
+    // FUN_004699d0.
     for (int Index = 0; Index < Capacity; ++Index)
         Free.push_back(new FChatMessageEntry());
 }
 
 FChatMessageStore::~FChatMessageStore()
 {
-    // FUN_004688b0: every active entry cleared and pooled, the active list emptied and both
-    // snapshots rebuilt (FUN_00535980, FUN_004686e0, FUN_004684e0); then every pooled entry
-    // destroyed.
+    // FUN_004688b0.
     for (std::list<FChatMessageEntry*>::iterator It = Active.begin(); It != Active.end(); ++It)
     {
         FChatMessageEntry* const Entry = *It;
@@ -447,8 +420,7 @@ FChatMessageStore::~FChatMessageStore()
 
 void FChatMessageStore::RecycleOldest()
 {
-    // FUN_0046a300: with any active entry, the oldest one is emptied, stamped 0 and pooled, then
-    // both snapshots are rebuilt.
+    // FUN_0046a300.
     if (Active.empty())
         return;
     FChatMessageEntry* const Oldest = Active.front();
@@ -462,10 +434,8 @@ void FChatMessageStore::RecycleOldest()
 
 FChatMessageEntry* FChatMessageStore::Acquire()
 {
-    // FUN_004683b0: an empty pool first takes back the oldest active entry (the same steps as
-    // FUN_0046a300, inlined), then the pool's front is emptied, stamped with the rounded clock
-    // and moved to the back of the active list. The pool is preloaded with Capacity entries and
-    // an entry only ever moves between the two lists, so the front always exists.
+    // FUN_004683b0 (FUN_0046a300 inlined). The pool is preloaded with Capacity entries and an
+    // entry only ever moves between the two lists, so the front always exists.
     if (Free.empty() && !Active.empty())
         RecycleOldest();
     FChatMessageEntry* const Entry = Free.front();
@@ -506,8 +476,7 @@ void FChatMessageStore::RebuildRecent()
 
 void FChatMessageStore::RebuildAll()
 {
-    // FUN_004686e0: the snapshot emptied, one RDLRef + ParagraphNode per active message,
-    // generation + 1.
+    // FUN_004686e0.
     RdlClear(All.Display);
     for (std::list<FChatMessageEntry*>::iterator It = Active.begin(); It != Active.end(); ++It)
         AppendMessageLine(All.Display, (*It)->Body);
@@ -516,8 +485,6 @@ void FChatMessageStore::RebuildAll()
 
 bool FChatMessageStore::Discard(FChatMessageEntry* Entry)
 {
-    // 0x00463706..0x00463736 + 0x00464c83..0x00464cd2: find the entry on the active list; when
-    // it is there, empty it, stamp 0, pool it and unlink it.
     for (std::list<FChatMessageEntry*>::iterator It = Active.begin(); It != Active.end(); ++It)
     {
         if (*It != Entry)
@@ -533,8 +500,6 @@ bool FChatMessageStore::Discard(FChatMessageEntry* Entry)
 
 void FChatMessageStore::DiscardAll()
 {
-    // 0x0046b1ff..0x0046b264: every active entry emptied, stamped 0 and pooled, in order; the
-    // active list emptied (FUN_004a2f80); FUN_004686e0 + FUN_004684e0.
     for (std::list<FChatMessageEntry*>::iterator It = Active.begin(); It != Active.end(); ++It)
     {
         FChatMessageEntry* const Entry = *It;
@@ -552,33 +517,29 @@ void FChatMessageStore::DiscardAll()
 
 void ChatInit()
 {
-    // 0x004690dc..0x004690f8
     G_ChatImageRoot.assign("Interface\\NeuroNet\\Chat\\");
 
-    // 0x004690fe..0x004691ab: the three name caches (FUN_004c5a10).
+    // The three name caches (FUN_004c5a10).
     G_ChatNameCache70 = new std::map<unsigned, RenderDisplayList*>();
     G_ChatNameCache74 = new std::map<unsigned, RenderDisplayList*>();
     G_ChatNameCache78 = new std::map<unsigned, RenderDisplayList*>();
 
-    // 0x004691a5..0x00469207
     G_ChatMessageStore = new FChatMessageStore(kChatMessageStoreCapacity,
                                                kChatMessageStoreMaxCount,
                                                kChatMessageStoreMaxAgeMs);
     G_ChatAllMessages = &G_ChatMessageStore->All;
     G_ChatRecentMessages = &G_ChatMessageStore->Recent;
-    G_ChatInputTarget = G_ChatIdChannel1;   // 0x0046920c
+    G_ChatInputTarget = G_ChatIdChannel1;
 
-    // 0x004691fa..0x00469760: the four notice prefixes.
     BuildPrefix(G_ChatPrefixNewPlayer, 0x60052u, L"DEBUG - New player:");
     BuildPrefix(G_ChatPrefixDepartingPlayer, 0x60053u, L"DEBUG - Departing player:");
     BuildPrefix(G_ChatPrefixNewAffiliation, 0x6004fu, L"DEBUG - New affiliation:");
     BuildPrefix(G_ChatPrefixLostAffiliation, 0x60050u, L"DEBUG - Lost affiliation:");
 
-    // 0x00469760..0x004697c6
     G_ChatChannelTable = new FChatChannelTable();
 
-    // 0x004697b3..0x004698a8: three channel names. The IDS text goes in as loaded (no
-    // FUN_0057eb40) and only when it loaded -- no debug fallback here.
+    // Three channel names. The IDS text goes in as loaded (no FUN_0057eb40) and only when it
+    // loaded -- no debug fallback here.
     {
         RenderDisplayList Label;
         if (LoadIdsIntoRdl(0x6003du, Label))
@@ -595,7 +556,6 @@ void ChatInit()
             G_ChatChannelTable->AddChannel(G_ChatIdNone, Label);
     }
 
-    // 0x004698ad..0x004698f9
     G_ChatGroupControl = static_cast<NnGroupControl*>(
         WinFactoryCreate("NN_GroupControl", "NN_GroupControl", nullptr, nullptr));
     if (G_ChatGroupControl != nullptr)
@@ -611,7 +571,7 @@ void ChatShutdown()
     // FUN_00469b30
     if (G_ChatGroupControl != nullptr)
     {
-        // 0x00469b3f..0x00469b67 is FUN_0043d2a0 inlined on the root.
+        // FUN_0043d2a0 inlined.
         Win3DDeleteTree(G_ChatGroupControl);
         G_ChatGroupControl = nullptr;
     }
@@ -650,13 +610,11 @@ void ChatDispatchIncoming(CHAT_ID Sender, void const* Buffer, unsigned SizeBytes
         return;
     }
 
-    // 0x0046a180..0x0046a228: FUN_004683b0 inlined (with FUN_0046a300 for the empty pool).
     FChatMessageEntry* const Entry = ChatAcquireEntry();
 
     BinaryRDLReader Reader;
     if (!Reader.read_buffer(Entry->Body, static_cast<char const*>(Buffer), SizeBytes))
     {
-        // 0x0046a253..0x0046a2cb
         if (G_ChatMessageStore != nullptr)
             G_ChatMessageStore->Discard(Entry);
         ChatNotice(0x1249, "Failed to decode a chat message!\n");
@@ -681,7 +639,6 @@ void ChatPlayerJoined(wchar_t const* Name, unsigned PlayerId, bool bNotify)
     if (!bNotify)
         return;
 
-    // 0x0046aafe..0x0046ad1b
     FChatMessageEntry* const Entry = ChatAcquireEntry();
     RDLRefNode Ref(G_ChatPrefixNewPlayer);
     RdlAppendNode(Entry->Body, Ref.Clone());
@@ -703,7 +660,6 @@ void ChatPlayerLeft(unsigned PlayerId, bool bNotify)
 
     if (bNotify)
     {
-        // 0x0046af24..0x0046b05e
         FChatMessageEntry* const Entry = ChatAcquireEntry();
         RDLRefNode Ref(G_ChatPrefixDepartingPlayer);
         RdlAppendNode(Entry->Body, Ref.Clone());
@@ -711,7 +667,7 @@ void ChatPlayerLeft(unsigned PlayerId, bool bNotify)
         ChatCommitEntries();
     }
 
-    // 0x0046b063..0x0046b0bb: DAT_0066da7c reloaded, the key looked up again.
+    // Retail reloads DAT_0066da7c and looks the key up again.
     Table = G_ChatChannelTable;
     FChatChannelTable::FNameMap::iterator It = Table->Names.find(Key.Id);
     if (It == Table->Names.end())
@@ -781,8 +737,8 @@ void ChatPostNewAffiliation(wchar_t const* Name)
 
 bool ChatIsInputOpen()
 {
-    // FUN_0046a480: FUN_0059da10("CTID") != 0. The name is the dword string at 0x005cf04c
-    // (43 54 49 44 00); Ghidra shows only its first byte as "C".
+    // FUN_0046a480. The name is the string at 0x005cf04c; Ghidra shows only its first byte as
+    // "C".
     return Win3DFindByName("CTID") != nullptr;
 }
 
@@ -794,16 +750,12 @@ void ChatSetInputOpen(bool bOpen)
     {
         if (Input == nullptr)
         {
-            // 0x0046a3e3..0x0046a422
             Input = WinFactoryCreate("CTID", "ChatTextInputDisplay", nullptr, nullptr);
             if (Input == nullptr)
                 return;
             float const Position[3] = {G_ChatInputX, -0.265f, -1.0f};   // DAT_005ceee4
             Input->SetPosition(Position);
         }
-        // 0x0046a425..0x0046a455: +0x539 = 1 (close after one message), FUN_0045eaf0(&DAT_0066d3fc)
-        // (show the target), FUN_0057c750 (activate), FUN_0057bdb0(0x50), FUN_0057b520(1),
-        // FUN_00579a50(1).
         ChatTextInputDisplay* const Line = static_cast<ChatTextInputDisplay*>(Input);
         Line->bCloseAfterSend = 1;
         Line->SetTarget(G_ChatInputTarget);
@@ -815,7 +767,6 @@ void ChatSetInputOpen(bool bOpen)
     }
     if (Input != nullptr)
     {
-        // 0x0046a463..0x0046a46e: FUN_0057bff0 (clear the edit buffer), FUN_0057c7d0(1).
         ChatTextInputDisplay* const Line = static_cast<ChatTextInputDisplay*>(Input);
         Line->ClearText();
         Line->Deactivate(true);
@@ -824,9 +775,8 @@ void ChatSetInputOpen(bool bOpen)
 
 namespace
 {
-    // DAT_0066d3f8: the chat key-command handler, one vptr (005cfe7c, single slot
-    // LAB_0046a110) -- the FHudCmdHandler shape FUN_00576410 calls through. Built by the static
-    // initializer LAB_0046a0a0 (FUN_0046a0c0), destroyed by its atexit LAB_0046a140.
+    // DAT_0066d3f8: the chat key-command handler (vftable 005cfe7c, static initializer
+    // LAB_0046a0a0).
     unsigned const kChatOpenCommand = 0x5d; // the key command id FUN_0046a0c0 registers
 
     class FChatCommandHandler : public EventHandler
@@ -842,19 +792,18 @@ namespace
 
     FChatCommandHandler::FChatCommandHandler()
     {
-        // FUN_0046a0c0: vptr 005cfe7c, then FUN_005760d0(0x5d).
+        // FUN_0046a0c0.
         RegisterEvent(kChatOpenCommand);
     }
 
     FChatCommandHandler::~FChatCommandHandler()
     {
-        // LAB_0046a140 -> FUN_00576010 runs through the EventHandler base destructor.
+        // LAB_0046a140.
     }
 
     bool FChatCommandHandler::OnEvent(unsigned MsgId)
     {
-        // LAB_0046a110: command 0x5d, not single player, and the chat window wanted
-        // (DAT_0066da88) -> FUN_0046a3c0(1) and consume; anything else is not handled.
+        // LAB_0046a110.
         if (MsgId != kChatOpenCommand)
             return false;
         if (SinglePlayer())
@@ -870,8 +819,7 @@ namespace
 
 namespace
 {
-    // The body FUN_0046b170 and FUN_0046b2b0 share (0x0046b182..0x0046b29a /
-    // 0x0046b2c2..0x0046b3f4). Neither runs in single player.
+    // The body FUN_0046b170 and FUN_0046b2b0 share.
     void ChatResetMultiplayerState()
     {
         if (SinglePlayer())
@@ -880,8 +828,6 @@ namespace
         NnGroupControl* const Group = G_ChatGroupControl;
         if (Group != nullptr)
         {
-            // FUN_0046d380 set erase(begin, end), FUN_004a2f80 list erase(begin, end), then
-            // FUN_00462e30.
             Group->GroupMembers.clear();
             Group->Requests.clear();
             Group->RefreshRequestDisplay();
@@ -895,8 +841,6 @@ namespace
 
         ChatSetInputOpen(false);   // FUN_0046a3c0(0)
 
-        // Every active message cleared, stamped 0 and pooled; the active list emptied;
-        // FUN_004686e0 + FUN_004684e0.
         if (G_ChatMessageStore != nullptr)
             G_ChatMessageStore->DiscardAll();
 
@@ -904,7 +848,6 @@ namespace
         Win3D* const Input = Win3DFindByName("CTID");   // FUN_0059da10
         if (Input != nullptr)
         {
-            // FUN_0045eaf0(&target) + FUN_0057d330 on the input line.
             ChatTextInputDisplay* const Line = static_cast<ChatTextInputDisplay*>(Input);
             Line->SetTarget(G_ChatInputTarget);
             Line->RebuildDisplay();
@@ -956,14 +899,14 @@ void ChatPlaceMsgWinForTrade(int Mode)
         return;
     if (Mode == 0)
     {
-        // 0x0046b4b3: the default place, {-0.51, 0.25, -1}, 1.0 x 0.39.
+        // The default place.
         float const Position[3] = {-0.51f, 0.25f, -1.0f};
         G_ChatMsgWin->SetPosition(Position);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
     else if (Mode == 1)
     {
-        // 0x0046b471: beside the trade window, {-0.275, 0.045, -1}, 0.56 x 0.39.
+        // Beside the trade window.
         float const Position[3] = {-0.275f, 0.045f, -1.0f};
         G_ChatMsgWin->SetPosition(Position);
         G_ChatMsgWin->SetNormSize(0.56f, 0.39f);
@@ -973,36 +916,34 @@ void ChatPlaceMsgWinForTrade(int Mode)
 // ---------------------------------------------------------------------------------------------
 // MsgWin
 
-// DAT_0066d47c -- LAB_00464d60 runs FUN_0046c0a0(&DAT_0066d47c, "MsgWin") and registers the
-// atexit unlink LAB_00464d80.
+// DAT_0066d47c -- static initializer LAB_00464d60.
 WINFACTORY<MsgWin> G_MsgWinFactory("MsgWin");
 
 MsgWin::MsgWin()
     : Snapshot(nullptr)
     , SnapshotGeneration(0)
 {
-    // Inlined in FUN_0046c110 after RichTextWin's ctor FUN_0057b1b0: vftables, +0x49c = 0,
-    // +0x498 = 0.
+    // Inlined in FUN_0046c110.
 }
 
 MsgWin::~MsgWin()
 {
-    // FUN_0046c4c0: +0x49c = +0x498 = 0, then RichTextWin's dtor FUN_0057b260.
+    // FUN_0046c4c0.
     SnapshotGeneration = 0;
     Snapshot = nullptr;
 }
 
 bool MsgWin::HitTest(float const* /*Ray*/)
 {
-    // Slot 4 of vftable 0x005cffc4 (entry 0x005cffd4) is FUN_0053f330 -- XOR AL,AL / RET 4 --
-    // not BaseRichTextWin's LAB_0057aa80: the chat message window is never picked, so the mouse
-    // goes through it to space.
+    // Slot 4 of vftable 0x005cffc4 is FUN_0053f330 (returns false), not BaseRichTextWin's
+    // LAB_0057aa80: the chat message window is never picked, so the mouse goes through it to
+    // space.
     return false;
 }
 
 void MsgWin::Update()
 {
-    // LAB_0046c1d0 -- 0x0046c1df..0x0046c2fb: every changed-affiliation entry of this client.
+    // LAB_0046c1d0.
     std::map<unsigned int, unsigned int>* const Changed =
         Reputation::GetChangedAffiliationClientMap();
     if (Changed != nullptr)
@@ -1019,7 +960,6 @@ void MsgWin::Update()
             Reputation::Vibe::GetAffiliation(PlayerVibe, Current, false);
             if (Lost != 0xffffffffu)
             {
-                // 0x0046c240..0x0046c26b
                 wchar_t Name[0x80];
                 if (GetIdsStringWWithRawFallback(Reputation::get_name(Lost), Name, 0x80) == 0)
                     Name[0] = 0;
@@ -1027,18 +967,16 @@ void MsgWin::Update()
             }
             if (Current != 0xffffffffu)
             {
-                // 0x0046c27c..0x0046c2b0
                 wchar_t Name[0x80];
                 if (GetIdsStringWWithRawFallback(Reputation::get_name(Current), Name, 0x80) == 0)
                     Name[0] = 0;
                 ChatPostNewAffiliation(Name);    // FUN_0046a770
             }
         }
-        // 0x0046c306..0x0046c393: the whole map erased (Common never clears it).
+        // Common never clears this map.
         Changed->clear();
     }
 
-    // 0x0046c395..0x0046c3ed
     if (Snapshot != nullptr)
     {
         FChatMessageStore* const Store = G_ChatMessageStore;
@@ -1075,12 +1013,12 @@ void ChatCreateMsgWin()
     G_ChatMsgWin = static_cast<MsgWin*>(WinFactoryCreate("MsgWin", "MsgWin", nullptr, nullptr));
     if (G_ChatMsgWin != nullptr)
     {
-        // 0x0046b5bc..0x0046b5f7: DAT_005ceec4 / DAT_005ceec8, then DAT_005ceebc / DAT_005ceec0.
+        // DAT_005ceec4 / DAT_005ceec8, then DAT_005ceebc / DAT_005ceec0.
         float const Position[3] = {-0.51f, 0.25f, -1.0f};
         G_ChatMsgWin->SetPosition(Position);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
-    // 0x0046b601..0x0046b642: retail does not test the window again here.
+    // Retail does not test the window again here.
     G_ChatMsgWin->Snapshot = G_ChatRecentMessages;
     G_ChatMsgWin->SnapshotGeneration = 0;
     G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags | 0x03);
@@ -1098,8 +1036,7 @@ void ChatGroupTradeRequestReceived(unsigned ShipId)
 
 void ChatGroupTradeRequestRemoved(unsigned ShipId)
 {
-    // FUN_0046b520: the first request whose +0x10 is ShipId (non-zero) is unlinked, then
-    // FUN_00462e30 (tail jump). Nothing found: no refresh.
+    // FUN_0046b520. Nothing found: no refresh.
     NnGroupControl* const Group = G_ChatGroupControl;
     if (Group == nullptr)
         return;

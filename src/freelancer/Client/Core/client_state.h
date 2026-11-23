@@ -24,22 +24,17 @@ extern CHARACTER_ID G_LoadGameCharacterId;
 // DAT_0067ecc4 -- a state id the frame enters instead of the current state's answer.
 extern int G_PendingClientStateId;
 // FUN_005b2c70 (cdecl) -- a non-empty CharId: DAT_0067ecc4 = 7, DAT_0067ea78 = *CharId, and with
-// bSkipAutosave IServer::CharacterSkipAutosave. Callers: NN_LoadSave's load 0x00488144 and
-// 0x004bc8d5.
+// bSkipAutosave IServer::CharacterSkipAutosave. Called from the load-game paths (NN_LoadSave).
 void QueueLoadGameCharacter(CHARACTER_ID const* CharId, bool bSkipAutosave);
-// The frame's 0x005b29b3..0x005b29be: a queued state (DAT_0067ecc4) replaces StateId and is
-// cleared.
+// Inlined in the frame: a queued state (DAT_0067ecc4) replaces StateId and is cleared.
 int ConsumePendingClientState(int StateId);
 
-// The call NN_Prompt's modal loops (004740b6, 00474220, 0047439b) and ServerFilterDialog's
-// (00563872) inline: DAT_0067ecac != 0 -> DAT_0067ecac->Update (slot 14, +0x38) with the frame
-// time as a float, the answer dropped.
+// The call NN_Prompt's modal loops and ServerFilterDialog's inline: DAT_0067ecac->Update (slot
+// 14) with the frame time when there is a state, the answer dropped.
 void CallClientStateUpdateSlot(float DeltaSeconds);
 
-// FUN_005b0880: DAT_0067ecac != 0 && DAT_0067ecac->GetEnvironmentType() (slot 7) == 2. The types:
-// 0 space (0x005e0554 -> 004b5010), 1 GF (0x005cae24 -> 0051ca40), 2 IntroFocus (0x005e3034 ->
-// 00517320), 3 MissionBriefing (0x005cb094 -> 0043d2e0). So it is "the current state is the
-// intro menu".
+// FUN_005b0880: the current state is the intro menu (GetEnvironmentType() == 2). The types:
+// 0 space, 1 GF, 2 IntroFocus, 3 MissionBriefing.
 bool IsClientIntroEnvironment();
 
 // FUN_00575430 -- the IntroFocus singleton DAT_0067a598 (client_state.cpp).

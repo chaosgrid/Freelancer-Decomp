@@ -43,8 +43,7 @@ namespace
     unsigned int const GIdStateOn = CreateID("ON");             // DAT_06fcefb8
     unsigned int const GIdStateOff = CreateID("OFF");           // DAT_06fcefb4
 
-    // FUN_06f49b00(&mission+0x0c) followed by the mission's cached player state (+0x08,
-    // FUN_06f1ca50): null when the lookup fails, else the cache.
+    // FUN_06f49b00 followed by the mission's cached player state (+0x08, FUN_06f1ca50).
     FContentPlayerState* GetMissionPlayerState(FMissionScript* Mission)
     {
         if (FindContentPlayerState(Mission->PlayerId) == nullptr)
@@ -52,7 +51,7 @@ namespace
         return Mission->PlayerState;
     }
 
-    // FUN_06f478b0: player+0x18 system record ? record+0x48 : 0.
+    // FUN_06f478b0.
     unsigned int GetPlayerSystemId(FContentPlayerState* Player)
     {
         if (Player->SystemRecord == nullptr)
@@ -60,7 +59,7 @@ namespace
         return Player->SystemRecord->SystemId;
     }
 
-    // FUN_06f481e0: player+0x10 ship ? ship+0x04 : 0.
+    // FUN_06f481e0.
     unsigned int GetPlayerShipId(FContentPlayerState* Player)
     {
         if (Player->ShipObject == nullptr)
@@ -68,9 +67,8 @@ namespace
         return Player->ShipObject->SpaceObjId;
     }
 
-    // Shared Parse of Cnd_BaseEnter/Cnd_BaseExit (FUN_06ebf770): s0 into a stack
-    // TString<0x20>; unless it is "ANY" (4-byte compare with DAT_06fb579c, case-sensitive),
-    // pub::GetBaseID(BaseId, s0).
+    // Shared Parse of Cnd_BaseEnter/Cnd_BaseExit (FUN_06ebf770). "ANY" (DAT_06fb579c) is
+    // case-sensitive.
     void ParseBaseCondition(INI_Reader& Reader, unsigned int& BaseId)
     {
         TString<0x20> Name;
@@ -81,8 +79,8 @@ namespace
             pub::GetBaseID(BaseId, Name.Data);
     }
 
-    // Shared Matches LAB_06ebf750 (Cnd_BaseEnter/Exit, Cnd_SpaceEnter/Exit): null parms ->
-    // false; an unset id matches anything, otherwise *parms must equal it.
+    // Shared Matches LAB_06ebf750 (Cnd_BaseEnter/Exit, Cnd_SpaceEnter/Exit): an unset id
+    // matches anything.
     bool MatchesIdOrAny(unsigned int Id, void const* EventParms)
     {
         if (EventParms == nullptr)
@@ -99,8 +97,7 @@ namespace
         LocationId = pub::GF::FindLocation(BaseId, Reader.get_value_string(0));
     }
 
-    // Shared Matches of Cnd_LocEnter/Cnd_LocExit (FUN_06ec2fc0): null parms / FUN_06f49b00 /
-    // no base record -> false; base record +0x48 == BaseId and *parms == LocationId.
+    // Shared Matches of Cnd_LocEnter/Cnd_LocExit (FUN_06ec2fc0).
     bool MatchesPlayerLocation(FMissionScript* Mission, unsigned int LocationId,
                                unsigned int BaseId, void const* EventParms)
     {
@@ -125,9 +122,8 @@ namespace
         LocationId = pub::GF::FindLocation(BaseId, Reader.get_value_string(1));
     }
 
-    // Shared Parse of Cnd_SpaceEnter/Cnd_SpaceExit (FUN_06ec1d00): s0 into a stack
-    // TString<0x40>; when slot 0 is present and is not "no_params" (10-byte compare),
-    // pub::GetSystemID(SystemId, s0).
+    // Shared Parse of Cnd_SpaceEnter/Cnd_SpaceExit (FUN_06ec1d00). "no_params" is
+    // case-sensitive.
     void ParseSpaceCondition(INI_Reader& Reader, unsigned int& SystemId)
     {
         TString<0x40> Name;
@@ -148,8 +144,9 @@ namespace
         Value.Data[0] = '\0';
     }
 
-    // x87 square-if-positive idioms of the distance parsers.
-    // FCOM 0 / FST / TEST AH,0x41 / JNZ skip: squared only when Value > 0.
+    // The three x87 square-if-positive idioms of the distance parsers differ only in how
+    // they treat 0 and NaN.
+    // Squared only when Value > 0.
     float SquareIfGreater(float Value)
     {
         if (Value > 0.0f)
@@ -157,8 +154,7 @@ namespace
         return Value;
     }
 
-    // FCOM 0 / FST / TEST AH,0x41 / JNP skip: skipped when exactly one of C0/C3 is set
-    // (less or equal); squared when greater or unordered.
+    // Squared when greater or unordered.
     float SquareUnlessLessOrEqual(float Value)
     {
         if (!(Value <= 0.0f))
@@ -166,8 +162,7 @@ namespace
         return Value;
     }
 
-    // FCOM 0 / FST / TEST AH,0x5 / JNP skip: skipped when exactly one of C0/C2 is set
-    // (less); squared when greater, equal or unordered.
+    // Squared when greater, equal or unordered.
     float SquareUnlessLess(float Value)
     {
         if (!(Value < 0.0f))
@@ -175,8 +170,7 @@ namespace
         return Value;
     }
 
-    // TICK_AWAY 2 / TICK_TOWARDS 1 / TICK_ALWAYS 0 (Cnd_DistShip / Cnd_DistVec): a missing or
-    // unknown slot leaves the mode unchanged.
+    // Cnd_DistShip / Cnd_DistVec: a missing or unknown slot leaves the mode unchanged.
     void ParseTickMode(INI_Reader& Reader, unsigned int Slot, int& TickMode)
     {
         if (Reader.is_value_empty(Slot))
@@ -195,14 +189,13 @@ namespace
             TickMode = 0;
     }
 
-    // Shared tail of Cnd_DistShip / Cnd_DistVec Matches (06ec0a5e-06ec0af7,
-    // 06ebfdc9-06ebfe4e). DistanceSq is the float the x87 sum was stored to.
+    // Shared tail of Cnd_DistShip / Cnd_DistVec Matches. DistanceSq is the float the x87 sum
+    // was stored to.
     bool TickDistanceCondition(float DistanceSq, float LimitSq, unsigned char bInside,
                                float& TickTimer, float TickInterval, int TickMode,
                                float& LastDistanceSq, float DeltaSeconds)
     {
-        // inside: TEST AH,0x5 / JNP go on (less); outside: TEST AH,0x41 / JNZ reset (not
-        // greater). The other outcomes (and unordered) reload the timer and fail.
+        // Out of range (and unordered) reloads the timer and fails.
         bool const bInRange = (bInside != 0) ? (DistanceSq < LimitSq) : (DistanceSq > LimitSq);
         if (!bInRange)
         {
@@ -214,15 +207,14 @@ namespace
         bool bTick = false;
         if (TickMode == 0)
             bTick = true;
-        // FCOM 0 / TEST AH,0x41 / JP skip: TICK_TOWARDS ticks when the distance did not grow.
+        // TICK_TOWARDS ticks when the distance did not grow.
         else if (Delta <= 0.0 && TickMode == 1)
             bTick = true;
-        // FCOMP 0 / TEST AH,0x1 / JNZ skip: TICK_AWAY ticks when it did not shrink.
+        // TICK_AWAY ticks when it did not shrink.
         else if (Delta >= 0.0 && TickMode == 2)
             bTick = true;
         if (bTick)
             TickTimer -= DeltaSeconds;
-        // FCOMP 0 / TEST AH,0x41 / JP false: done when the timer is <= 0.
         return TickTimer <= 0.0f;
     }
 
@@ -240,40 +232,39 @@ namespace
     }
 }
 
-// Base ctor as inlined in FUN_06ebb850 / the Cnd_* ctors: +0x04 = trigger+0x14 (mission),
-// ID_String::clear on +0x08, vptr 06fb565c.
+// Inlined in FUN_06ebb850 and the Cnd_* ctors.
 Cnd::Cnd(FMissionScript* InMission)
     : Mission(InMission)
     , TriggerId(0)
 {
 }
 
-// LAB_06ebf6d0: restore base vptr, operator delete when (flags & 1).
+// LAB_06ebf6d0.
 Cnd::~Cnd()
 {
 }
 
-// FUN_06ebf720: RET.
+// FUN_06ebf720.
 void Cnd::OnActivate()
 {
 }
 
-// FUN_06ebf720: RET.
+// FUN_06ebf720.
 void Cnd::OnMissionEnd()
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void Cnd::Save(FILE* /*File*/)
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void Cnd::Load(INI_Reader* /*Reader*/)
 {
 }
 
-// FUN_06ebf700: MOV [ECX+8],arg / RET 4.
+// FUN_06ebf700.
 void Cnd::SetTriggerId(unsigned int Id)
 {
     TriggerId = Id;
@@ -283,7 +274,7 @@ void Cnd::SetTriggerId(unsigned int Id)
 // Cnd_BaseEnter / Cnd_BaseExit
 // ---------------------------------------------------------------------------------------
 
-// 06ebb8c0-06ebb8d6: base fields, vptr 06fb5770, +0x0c = 0.
+// Inlined in FUN_06ebb850.
 CndBaseEnter::CndBaseEnter(FMissionScript* InMission)
     : Cnd(InMission)
     , BaseId(0)
@@ -302,7 +293,7 @@ bool CndBaseEnter::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     return MatchesIdOrAny(BaseId, EventParms);
 }
 
-// 06ebb94d-06ebb963: vptr 06fb5744.
+// Inlined in FUN_06ebb850.
 CndBaseExit::CndBaseExit(FMissionScript* InMission)
     : Cnd(InMission)
     , BaseId(0)
@@ -325,7 +316,7 @@ bool CndBaseExit::Matches(pub::Controller::EMessage /*EventId*/, void const* Eve
 // Cnd_CargoScanned
 // ---------------------------------------------------------------------------------------
 
-// 06ebb9c2-06ebba15.
+// Inlined in FUN_06ebb850.
 CndCargoScanned::CndCargoScanned(FMissionScript* InMission)
     : Cnd(InMission)
     , ScannerId(0)
@@ -346,9 +337,8 @@ void CndCargoScanned::Parse(INI_Reader& Reader)
     ScannedLabel = Reader.get_value_string(1);
 }
 
-// FUN_06ebf940: parms = {scanner id, scanned id}. A label "none" (5-byte compare with
-// DAT_06fb57a0) is not resolved; unresolved ids are looked up lazily (FUN_06f15940). Both
-// set: both must match; only the scanner set: it must match; scanner unset: false.
+// FUN_06ebf940: parms = {scanner id, scanned id}. A label "none" (DAT_06fb57a0, case-sensitive)
+// is not resolved; unresolved ids are looked up lazily (GetLabelShipId = FUN_06f15940).
 bool CndCargoScanned::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -378,7 +368,7 @@ bool CndCargoScanned::Matches(pub::Controller::EMessage /*EventId*/, void const*
     return bScannerMatch;
 }
 
-// LAB_06ebf8f0: resolve each label that is not "none" (FUN_06f15940).
+// LAB_06ebf8f0.
 void CndCargoScanned::OnActivate()
 {
     if (strcmp(ScannerLabel.Data, "none") != 0)
@@ -391,7 +381,7 @@ void CndCargoScanned::OnActivate()
 // Cnd_CharSelect
 // ---------------------------------------------------------------------------------------
 
-// 06ebba73-06ebbaaf.
+// Inlined in FUN_06ebb850.
 CndCharSelect::CndCharSelect(FMissionScript* InMission)
     : Cnd(InMission)
     , LocationId(0)
@@ -406,28 +396,23 @@ void CndCharSelect::Parse(INI_Reader& Reader)
     ParseCharacterCondition(Reader, Character, BaseId, LocationId);
 }
 
-// FUN_06ebfac0 (06ebfac0-06ebfb51, RET 8): the player's base record (+0x48 base id) and the
-// mission's current location (+0x308), then the base database (FUN_06eac110 room state,
-// FUN_06eac240 character lookup).
+// FUN_06ebfac0 (FindRoomState = FUN_06eac110, FindCharacter = FUN_06eac240).
 bool CndCharSelect::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
-    // 06ebfac9-06ebfae0: null parms or no live player -> false.
     if (EventParms == nullptr)
         return false;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return false;
-    // 06ebfae2-06ebfaf3: the player's base record +0x48 against +0x34 (no null test here, as
-    // in retail; the second FUN_06f47980 below is the tested one).
+    // No null test on this base record, as in retail; the second lookup below is the tested
+    // one.
     if (Mission->PlayerState->GetBaseRecord()->BaseId != BaseId)
         return false;
-    // 06ebfaf5-06ebfb01: +0x0c against the mission's current location (+0x308).
+    // The mission's current location is +0x308.
     if (LocationId != Mission->CurrentLocationId)
         return false;
     FContentBase* const Base = Mission->PlayerState->GetBaseRecord();
     if (Base == nullptr)
         return false;
-    // 06ebfb0f-06ebfb48: FUN_06eac110 room state, FUN_06eac240(&+0x10, player, &it), the
-    // character's id (node +0x14) against *parms.
     FBaseRoomState* const Room = Base->FindRoomState(&Mission->CurrentLocationId);
     if (Room == nullptr)
         return false;
@@ -441,7 +426,7 @@ bool CndCharSelect::Matches(pub::Controller::EMessage /*EventId*/, void const* E
 // Cnd_CommComplete
 // ---------------------------------------------------------------------------------------
 
-// 06ebbb0e-06ebbb48.
+// Inlined in FUN_06ebb850.
 CndCommComplete::CndCommComplete(FMissionScript* InMission)
     : Cnd(InMission)
     , CommId(0)
@@ -474,7 +459,7 @@ bool CndCommComplete::Matches(pub::Controller::EMessage /*EventId*/, void const*
     return Parms[2] == SourceObjId;
 }
 
-// FUN_06ec0f70: +0x44 = FUN_06f15940(+0x0c) when the label is set.
+// FUN_06ec0f70.
 void CndCommComplete::OnActivate()
 {
     if (SourceLabel.Length != 0)
@@ -485,7 +470,7 @@ void CndCommComplete::OnActivate()
 // Cnd_CmpToPlane
 // ---------------------------------------------------------------------------------------
 
-// 06ebbb9f-06ebbbd4.
+// Inlined in FUN_06ebb850.
 CndCmpToPlane::CndCmpToPlane(FMissionScript* InMission)
     : Cnd(InMission)
     , PlaneA(0.0f)
@@ -512,9 +497,8 @@ void CndCmpToPlane::Parse(INI_Reader& Reader)
     PlaneD = Reader.get_value_float(5);
 }
 
-// LAB_06ec10e0: player in space with a system record, object resolved (lazy
-// FUN_06f15940), then the plane value A*x + B*y + C*z + D: below 0 matches "inside" (0),
-// above 0 matches "outside" (1).
+// LAB_06ec10e0: below the plane matches "inside", above it "outside"; on the plane (or NaN)
+// neither.
 bool CndCmpToPlane::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     FContentPlayerState* Player = GetMissionPlayerState(Mission);
@@ -533,16 +517,14 @@ bool CndCmpToPlane::Matches(pub::Controller::EMessage /*EventId*/, void const* /
     if (pub::SpaceObj::GetLocation(ObjectId, Position, Orientation) != 0)
         return false;
     float const Value = Position.z * PlaneC + Position.y * PlaneB + Position.x * PlaneA + PlaneD;
-    // FLD 0 / FCOMP v / TEST AH,0x41 / JNZ: fall-through only when 0 > v.
     if (0.0f > Value && Side == 0)
         return true;
-    // FLD 0 / FCOMP v / TEST AH,0x5 / JP false: continue only when 0 < v.
     if (0.0f < Value)
         return Side == 1;
     return false;
 }
 
-// FUN_06ec10c0: +0x54 = FUN_06f15940(+0x0c).
+// FUN_06ec10c0.
 void CndCmpToPlane::OnActivate()
 {
     ObjectId = Mission->GetLabelShipId(&ObjectLabel);
@@ -552,8 +534,7 @@ void CndCmpToPlane::OnActivate()
 // Cnd_Destroyed
 // ---------------------------------------------------------------------------------------
 
-// 06ebbc33-06ebbc86: +0x14 ID_String, +0x18 TString, +0x4c = 0, +0x50 = 0x3e6, +0x10 = EBX
-// (-1 at this point of the factory).
+// Inlined in FUN_06ebb850; +0x10 takes a register that holds -1 at that point.
 CndDestroyed::CndDestroyed(FMissionScript* InMission)
     : Cnd(InMission)
     , Count(0)
@@ -569,7 +550,7 @@ CndDestroyed::CndDestroyed(FMissionScript* InMission)
 void CndDestroyed::Parse(INI_Reader& Reader)
 {
     Label = CreateID(Reader.get_value_string(0));
-    // CMP EAX,-1 / JL skip: the count is taken only when >= -1.
+    // The count is taken only when >= -1.
     if (!Reader.is_value_empty(1) && Reader.get_value_int(1) >= -1)
         Needed = Reader.get_value_int(1);
     if (!Reader.is_value_empty(2))
@@ -596,8 +577,8 @@ bool CndDestroyed::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return false;
     unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
-    // 06ec0d20-06ec0d45: a different destroy type only passes for ALL, or for
-    // ALL_IGNORE_LANDING while the player has a ship.
+    // A different destroy type only passes for ALL, or for ALL_IGNORE_LANDING while the
+    // player has a ship.
     if (static_cast<int>(Parms[4]) != Mode && Mode != 0x3e7)
     {
         if (Mission->PlayerState->ShipObject == nullptr)
@@ -613,15 +594,15 @@ bool CndDestroyed::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
         return false;
     if (Needed == -1)
     {
-        // 06ec0da0-06ec0e3c: equal_range of the label in the mission +0xec multimap; true
-        // unless more than one entry is left.
+        // Retail takes the equal_range in the mission +0xec multimap: true unless more than
+        // one entry is left.
         return Mission->FormationMembers.count(Label) <= 1;
     }
     ++Count;
     return Count == Needed;
 }
 
-// FUN_06ec0cc0: +0x0c = 0; +0x4c = FUN_06f15940(+0x18) when the killer label is set.
+// FUN_06ec0cc0.
 void CndDestroyed::OnActivate()
 {
     Count = 0;
@@ -649,7 +630,7 @@ void CndDestroyed::Load(INI_Reader* Reader)
 // Cnd_DistCircle
 // ---------------------------------------------------------------------------------------
 
-// 06ebbce4-06ebbd08: +0x0c/+0x40 zeroed (no "" assignment), +0x74 = 0.
+// Inlined in FUN_06ebb850 (no "" assignment).
 CndDistCircle::CndDistCircle(FMissionScript* InMission)
     : Cnd(InMission)
     , CircleObjId(0)
@@ -683,8 +664,8 @@ bool CndDistCircle::Matches(pub::Controller::EMessage /*EventId*/, void const* /
         return false;
     if ((ObjectId & GIdValueMask) == 0)
         return false;
-    // Retail copies its stack vector into +0x78 even when GetLocation fails (06ec06fc); the
-    // port starts it at zero instead of an indeterminate value.
+    // Retail copies its stack vector into +0x78 even when GetLocation fails; the port starts
+    // it at zero instead of an indeterminate value.
     Vector Position;
     Position.x = Position.y = Position.z = 0.0f;
     Matrix Orientation;
@@ -694,7 +675,7 @@ bool CndDistCircle::Matches(pub::Controller::EMessage /*EventId*/, void const* /
         double const Dx = static_cast<double>(Position.x) - LastPosition.x;
         double const Dy = static_cast<double>(Position.y) - LastPosition.y;
         double const Dz = static_cast<double>(Position.z) - LastPosition.z;
-        // 06ec05a5-06ec05de: TEST AH,0x44 / JNP out: a move parallel to the plane fails.
+        // A move parallel to the plane fails.
         double const Denom = Dy * Normal.y + Dz * Normal.z + Dx * Normal.x;
         if (!(Denom == 0.0))
         {
@@ -702,14 +683,13 @@ bool CndDistCircle::Matches(pub::Controller::EMessage /*EventId*/, void const* /
                                   static_cast<double>(Position.z) * Normal.z +
                                   static_cast<double>(Position.x) * Normal.x + PlaneOffset) /
                                  Denom;
-            // 06ec0626-06ec0660: the move direction, normalised (dz goes through a float).
+            // The move direction, normalised (dz goes through a float).
             float const DzFloat = static_cast<float>(Dz);
             double const Length = sqrt(Dz * DzFloat + Dx * Dx + Dy * Dy);
             float const InvLength = static_cast<float>(1.0 / Length);
             float const DirX = static_cast<float>(Dx * InvLength);
             float const DirY = static_cast<float>(Dy * InvLength);
             float const DirZ = static_cast<float>(static_cast<double>(DzFloat) * InvLength);
-            // 06ec0664-06ec0682: 0 < Param < 1.
             if (0.0 < Param && Param < 1.0)
             {
                 double const Along = static_cast<double>(DirZ) * Normal.z +
@@ -742,14 +722,14 @@ void CndDistCircle::OnActivate()
     Forward.Z = -1.0f;
     if (GTriggerMathEngine == nullptr)
         GTriggerMathEngine = ContentAcquire3DMathEngine();
-    // Engine vtbl +0x2c (TransformMatrix) into a local, copied to +0x90.
+    // TransformMatrix is engine vtbl +0x2c.
     FVector Axis;
     GTriggerMathEngine->TransformMatrix(Axis, reinterpret_cast<FMatrix const&>(Orientation),
                                         Forward);
     Normal.x = Axis.X;
     Normal.y = Axis.Y;
     Normal.z = Axis.Z;
-    // 06ec049c-06ec04dc: (x*x + y*y) + z*z, 1/sqrt kept on the x87 stack.
+    // (x*x + y*y) + z*z, 1/sqrt kept on the x87 stack.
     double const InvLength =
         1.0 / sqrt(static_cast<double>(Normal.x) * Normal.x +
                    static_cast<double>(Normal.y) * Normal.y +
@@ -760,7 +740,7 @@ void CndDistCircle::OnActivate()
     PlaneOffset = static_cast<float>(-(static_cast<double>(CircleCenter.z) * Normal.z +
                                        static_cast<double>(CircleCenter.y) * Normal.y +
                                        static_cast<double>(CircleCenter.x) * Normal.x));
-    // 06ec04fb: GetRadius(&+0x74, &+0x9c, &+0x84) overwrites +0x84 after the plane offset.
+    // GetRadius overwrites the centre (+0x84) after the plane offset is taken.
     pub::SpaceObj::GetRadius(CircleObjId, Radius, CircleCenter);
     unsigned int const ObjectId = Mission->GetLabelShipId(&ObjectLabel);
     if ((ObjectId & GIdValueMask) != 0)
@@ -774,7 +754,7 @@ void CndDistCircle::OnActivate()
 // Cnd_DistShip
 // ---------------------------------------------------------------------------------------
 
-// 06ebbd4b-06ebbdb0.
+// Inlined in FUN_06ebb850.
 CndDistShip::CndDistShip(FMissionScript* InMission)
     : Cnd(InMission)
     , DistanceSq(0.0f)
@@ -801,7 +781,6 @@ void CndDistShip::Parse(INI_Reader& Reader)
     ObjectA = Reader.get_value_string(1);
     ObjectB = Reader.get_value_string(2);
     DistanceSq = SquareIfGreater(Reader.get_value_float(3));
-    // FCOMP 0 / TEST AH,0x41 / JNZ skip: taken only when > 0.
     if (!Reader.is_value_empty(4) && Reader.get_value_float(4) > 0.0f)
         TickInterval = Reader.get_value_float(4);
     ParseTickMode(Reader, 5, TickMode);
@@ -831,14 +810,14 @@ bool CndDistShip::Matches(pub::Controller::EMessage /*EventId*/, void const* Eve
     Vector PositionB;
     if (pub::SpaceObj::GetLocation(ObjectBId, PositionB, Orientation) != 0)
         return false;
-    // 06ec09ee-06ec0a25: both objects must be in the same system (results ignored).
+    // Both objects must be in the same system (GetSystem results ignored).
     unsigned int SystemA = 0;
     unsigned int SystemB = 0;
     pub::SpaceObj::GetSystem(ObjectAId, SystemA);
     pub::SpaceObj::GetSystem(ObjectBId, SystemB);
     if (SystemA != SystemB)
         return false;
-    // 06ec0a27-06ec0a54: (dz*dz + dy*dy) + dx*dx on the x87 stack, stored as float.
+    // (dz*dz + dy*dy) + dx*dx on the x87 stack, stored as float.
     double const Dx = static_cast<double>(PositionA.x) - static_cast<double>(PositionB.x);
     double const Dy = static_cast<double>(PositionA.y) - static_cast<double>(PositionB.y);
     double const Dz = static_cast<double>(PositionA.z) - static_cast<double>(PositionB.z);
@@ -848,8 +827,7 @@ bool CndDistShip::Matches(pub::Controller::EMessage /*EventId*/, void const* Eve
                                  *static_cast<float const*>(EventParms));
 }
 
-// FUN_06ec08e0: +0x8c/+0x90 = FUN_06f15b90(+0x0c/+0x40) when the labels are set;
-// +0x7c = +0x80, +0x88 = 0.
+// FUN_06ec08e0.
 void CndDistShip::OnActivate()
 {
     if (ObjectA.Length != 0)
@@ -884,7 +862,7 @@ void CndDistShip::Load(INI_Reader* Reader)
 // Cnd_DistVec
 // ---------------------------------------------------------------------------------------
 
-// 06ebbdf2-06ebbe32: +0x18 TString, +0x64/+0x58/+0x5c = 0, +0x50 byte 0.
+// Inlined in FUN_06ebb850.
 CndDistVec::CndDistVec(FMissionScript* InMission)
     : Cnd(InMission)
     , PositionX(0.0f)
@@ -914,7 +892,6 @@ void CndDistVec::Parse(INI_Reader& Reader)
     PositionY = Reader.get_value_float(3);
     PositionZ = Reader.get_value_float(4);
     DistanceSq = SquareUnlessLessOrEqual(Reader.get_value_float(5));
-    // FCOMP 0 / TEST AH,0x1 / JNZ skip: taken when not less (and ordered).
     if (!Reader.is_value_empty(6) && Reader.get_value_float(6) >= 0.0f)
         TickInterval = Reader.get_value_float(6);
     ParseTickMode(Reader, 7, TickMode);
@@ -939,7 +916,7 @@ bool CndDistVec::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
     Matrix Orientation;
     if (pub::SpaceObj::GetLocation(ObjectId, Position, Orientation) != 0)
         return false;
-    // 06ebfd95-06ebfdbd: (dz*dz + dx*dx) + dy*dy on the x87 stack, stored as float.
+    // (dz*dz + dx*dx) + dy*dy on the x87 stack, stored as float.
     double const Dx = static_cast<double>(Position.x) - static_cast<double>(PositionX);
     double const Dy = static_cast<double>(Position.y) - static_cast<double>(PositionY);
     double const Dz = static_cast<double>(Position.z) - static_cast<double>(PositionZ);
@@ -949,8 +926,7 @@ bool CndDistVec::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
                                  *static_cast<float const*>(EventParms));
 }
 
-// FUN_06ebfcf0: +0x64 = FUN_06f15940(+0x18) when the label is set; +0x54 = +0x58,
-// +0x60 = 0.
+// FUN_06ebfcf0.
 void CndDistVec::OnActivate()
 {
     if (ObjectLabel.Length != 0)
@@ -983,7 +959,7 @@ void CndDistVec::Load(INI_Reader* Reader)
 // Cnd_DistVecLbl
 // ---------------------------------------------------------------------------------------
 
-// 06ebbe6e-06ebbeaa: +0x18 = DAT_06fcefc8, +0x20 = 0, +0x28 = 0.
+// Inlined in FUN_06ebb850.
 CndDistVecLbl::CndDistVecLbl(FMissionScript* InMission)
     : Cnd(InMission)
     , PositionX(0.0f)
@@ -1033,9 +1009,8 @@ bool CndDistVecLbl::Matches(pub::Controller::EMessage /*EventId*/, void const* E
     return MatchesAll(DeltaSeconds);
 }
 
-// FUN_06ec0000: walks equal_range(+0x18) of the mission +0xec multimap (FUN_06fa7200 /
-// FUN_06ed1670, ++ FUN_06f1fa00). Each object whose location is known either reloads the
-// timer (out of range) or ticks it; the first tick that reaches <= 0 wins.
+// FUN_06ec0000: each labelled object whose location is known either reloads the timer (out
+// of range) or ticks it; the first tick that reaches <= 0 wins.
 bool CndDistVecLbl::MatchesAny(float DeltaSeconds)
 {
     typedef std::multimap<unsigned int, unsigned int>::iterator FMemberIterator;
@@ -1046,7 +1021,7 @@ bool CndDistVecLbl::MatchesAny(float DeltaSeconds)
         Matrix Orientation;
         if (pub::SpaceObj::GetLocation(It->second, Position, Orientation) == 0)
         {
-            // 06ec0059-06ec0087: (dz*dz + dx*dx) + dy*dy, kept on the x87 stack.
+            // (dz*dz + dx*dx) + dy*dy, kept on the x87 stack.
             double const Dx = static_cast<double>(Position.x) - static_cast<double>(PositionX);
             double const Dy = static_cast<double>(Position.y) - static_cast<double>(PositionY);
             double const Dz = static_cast<double>(Position.z) - static_cast<double>(PositionZ);
@@ -1081,7 +1056,7 @@ bool CndDistVecLbl::MatchesAll(float DeltaSeconds)
         Matrix Orientation;
         if (pub::SpaceObj::GetLocation(It->second, Position, Orientation) == 0)
         {
-            // 06ec016d-06ec019b: (dz*dz + dy*dy) + dx*dx, kept on the x87 stack.
+            // (dz*dz + dy*dy) + dx*dx, kept on the x87 stack.
             double const Dx = static_cast<double>(Position.x) - static_cast<double>(PositionX);
             double const Dy = static_cast<double>(Position.y) - static_cast<double>(PositionY);
             double const Dz = static_cast<double>(Position.z) - static_cast<double>(PositionZ);
@@ -1102,7 +1077,7 @@ bool CndDistVecLbl::MatchesAll(float DeltaSeconds)
     return TickTimer <= 0.0f;
 }
 
-// LAB_06ebfff0: +0x24 = +0x28.
+// LAB_06ebfff0.
 void CndDistVecLbl::OnActivate()
 {
     TickTimer = TickInterval;
@@ -1128,7 +1103,7 @@ void CndDistVecLbl::Load(INI_Reader* Reader)
 // Cnd_EncLaunched
 // ---------------------------------------------------------------------------------------
 
-// 06ebbf24-06ebbf4b: +0x0c ID_String.
+// Inlined in FUN_06ebb850.
 CndEncLaunched::CndEncLaunched(FMissionScript* InMission)
     : Cnd(InMission)
     , EncounterId(0)
@@ -1160,15 +1135,14 @@ bool CndEncLaunched::Matches(pub::Controller::EMessage /*EventId*/, void const* 
 // Cnd_HasMsn
 // ---------------------------------------------------------------------------------------
 
-// 06ebbfaa-06ebbfb9: base fields only.
+// Inlined in FUN_06ebb850 (+0x0c not set).
 CndHasMsn::CndHasMsn(FMissionScript* InMission)
     : Cnd(InMission)
     , Wanted(0)
 {
 }
 
-// FUN_06ec2600: s0 into a stack TString<0x40>; "yes" (4-byte compare) -> 0, "no" (3-byte)
-// -> 1; anything else leaves the field.
+// FUN_06ec2600: case-sensitive; anything else leaves the field.
 void CndHasMsn::Parse(INI_Reader& Reader)
 {
     TString<0x40> Answer;
@@ -1183,8 +1157,7 @@ void CndHasMsn::Parse(INI_Reader& Reader)
         Wanted = 1;
 }
 
-// FUN_06ec26b0: the player's +0xd8 (FUN_06f487c0, live mission controller) set -> "yes"
-// matches, unset -> "no" matches.
+// FUN_06ec26b0: the player's +0xd8 (FUN_06f487c0) is the live mission controller id.
 bool CndHasMsn::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     FContentPlayerState* Player = GetMissionPlayerState(Mission);
@@ -1199,7 +1172,7 @@ bool CndHasMsn::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Eve
 // Cnd_HealthDec
 // ---------------------------------------------------------------------------------------
 
-// 06ebbffc-06ebc04f.
+// Inlined in FUN_06ebb850.
 CndHealthDec::CndHealthDec(FMissionScript* InMission)
     : Cnd(InMission)
     , Health(0.0f)
@@ -1219,11 +1192,9 @@ void CndHealthDec::Parse(INI_Reader& Reader)
         AttackerLabel = Reader.get_value_string(2);
 }
 
-// LAB_06ec2ba0. With parms (damage message 0xd: +0x00 object, +0x08 attacker, +0x0c/+0x10
-// must be 0, float +0x20 = new relative health): lazy FUN_06f15b90 of both labels, then the
-// object must match and the health must be <= +0x74 (TEST AH,0x41 / JP: less or equal).
-// Without parms (activation): only for an object label without an attacker label, with the
-// player in space, pub::SpaceObj::GetRelativeHealth <= +0x74.
+// LAB_06ec2ba0. Damage parms (message 0xd): +0x00 object, +0x08 attacker, +0x0c/+0x10 must be
+// 0, float +0x20 new relative health. Without parms (activation) only an object label without
+// an attacker label is tested, by GetRelativeHealth. Both compares are <= (NaN fails).
 bool CndHealthDec::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -1275,7 +1246,7 @@ bool CndHealthDec::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     return AttackerId == Parms[2];
 }
 
-// FUN_06ec2b60: +0x78/+0x7c = FUN_06f15b90 of the set labels.
+// FUN_06ec2b60.
 void CndHealthDec::OnActivate()
 {
     if (ObjectLabel.Length != 0)
@@ -1288,14 +1259,14 @@ void CndHealthDec::OnActivate()
 // Cnd_InSpace
 // ---------------------------------------------------------------------------------------
 
-// 06ebc0ad-06ebc0c3: +0x0c byte = 1.
+// Inlined in FUN_06ebb850.
 CndInSpace::CndInSpace(FMissionScript* InMission)
     : Cnd(InMission)
     , bInSpace(1)
 {
 }
 
-// FUN_06ecdb30: +0x0c = get_value_bool(0) (shared with several Act_* parsers).
+// FUN_06ecdb30 (shared with several Act_* parsers).
 void CndInSpace::Parse(INI_Reader& Reader)
 {
     bInSpace = Reader.get_value_bool(0) ? 1 : 0;
@@ -1316,7 +1287,7 @@ bool CndInSpace::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Ev
 // Cnd_InTradelane
 // ---------------------------------------------------------------------------------------
 
-// 06ebc100-06ebc121: +0x0c/+0x10 zeroed, +0x40 = 1.
+// Inlined in FUN_06ebb850.
 CndInTradelane::CndInTradelane(FMissionScript* InMission)
     : Cnd(InMission)
     , bInLane(1)
@@ -1331,9 +1302,8 @@ void CndInTradelane::Parse(INI_Reader& Reader)
     ObjectLabel = Reader.get_value_string(1);
 }
 
-// FUN_06ec27c0 (06ec27c0-06ec2842). Live player with a ship object; the tested object is that
-// ship for "Player" (stricmp), else FUN_06f15710 (FindNpcByName). True when FUN_06f57710
-// (HasField120, called twice as in retail) agrees with +0x40.
+// FUN_06ec27c0 (FindNpcByName = FUN_06f15710). HasField120 (FUN_06f57710) is called twice,
+// as in retail.
 bool CndInTradelane::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
@@ -1358,7 +1328,7 @@ bool CndInTradelane::Matches(pub::Controller::EMessage /*EventId*/, void const* 
 // Cnd_InZone
 // ---------------------------------------------------------------------------------------
 
-// 06ebc15e-06ebc183.
+// Inlined in FUN_06ebb850.
 CndInZone::CndInZone(FMissionScript* InMission)
     : Cnd(InMission)
     , bInZone(1)
@@ -1394,8 +1364,7 @@ void CndInZone::Parse(INI_Reader& Reader)
         ZoneFlags = 0x200000;
 }
 
-// LAB_06ec2980 (06ec2980-06ec2a83, RET 8): +0x48 = FUN_06f15940(+0x14), then
-// pub::System::InZones / pub::Zone::GetProperties against +0x10.
+// LAB_06ec2980.
 bool CndInZone::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
@@ -1413,7 +1382,7 @@ bool CndInZone::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Eve
     Matrix Orientation;
     if (pub::SpaceObj::GetLocation(ObjectId, Position, Orientation) != 0)
         return false;
-    // 06ec29fd-06ec2a11: at most 8 zones around the point (radius 0).
+    // At most 8 zones around the point (radius 0).
     unsigned int Zones[8];
     unsigned int ZoneCount;
     pub::System::InZones(SystemId, Position, 0.0f, Zones, 8, ZoneCount);
@@ -1425,7 +1394,6 @@ bool CndInZone::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Eve
         if ((ZoneFlags & Properties) != 0)
             bMatched = true;
     }
-    // 06ec2a56-06ec2a72.
     if (bInZone != 0)
         return bMatched;
     if (!bMatched)
@@ -1433,7 +1401,7 @@ bool CndInZone::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Eve
     return ZoneFlags == 0;
 }
 
-// FUN_06ec2960: +0x48 = FUN_06f15b90(+0x14).
+// FUN_06ec2960 (GetLabelObjectId, unlike Matches' GetLabelShipId).
 void CndInZone::OnActivate()
 {
     ObjectId = Mission->GetLabelObjectId(&ObjectLabel);
@@ -1443,7 +1411,7 @@ void CndInZone::OnActivate()
 // Cnd_JumpgateAct
 // ---------------------------------------------------------------------------------------
 
-// 06ebc1bb-06ebc1f0.
+// Inlined in FUN_06ebb850.
 CndJumpgateAct::CndJumpgateAct(FMissionScript* InMission)
     : Cnd(InMission)
     , GateId(0)
@@ -1470,7 +1438,7 @@ bool CndJumpgateAct::Matches(pub::Controller::EMessage /*EventId*/, void const* 
 // Cnd_JumpInComplete
 // ---------------------------------------------------------------------------------------
 
-// 06ebc24b-06ebc261.
+// Inlined in FUN_06ebb850.
 CndJumpInComplete::CndJumpInComplete(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -1502,7 +1470,7 @@ bool CndJumpInComplete::Matches(pub::Controller::EMessage /*EventId*/, void cons
 // Cnd_LaunchComplete
 // ---------------------------------------------------------------------------------------
 
-// 06ebc2bc-06ebc2e3.
+// Inlined in FUN_06ebb850.
 CndLaunchComplete::CndLaunchComplete(FMissionScript* InMission)
     : Cnd(InMission)
     , BaseId(0)
@@ -1522,8 +1490,7 @@ void CndLaunchComplete::Parse(INI_Reader& Reader)
     BaseId = pub::GetNicknameId(BaseNickname.Data);
 }
 
-// FUN_06ec2f10: parms = {base id, ship id}; lazy FUN_06f15940(+0x40); an unset base id
-// matches any base.
+// FUN_06ec2f10: parms = {base id, ship id}; an unset base id matches any base.
 bool CndLaunchComplete::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -1540,7 +1507,7 @@ bool CndLaunchComplete::Matches(pub::Controller::EMessage /*EventId*/, void cons
     return true;
 }
 
-// FUN_06ec2ef0: +0x78 = FUN_06f15940(+0x40).
+// FUN_06ec2ef0.
 void CndLaunchComplete::OnActivate()
 {
     ShipId = Mission->GetLabelShipId(&ShipLabel);
@@ -1550,7 +1517,7 @@ void CndLaunchComplete::OnActivate()
 // Cnd_LocEnter / Cnd_LocExit
 // ---------------------------------------------------------------------------------------
 
-// 06ebc33a-06ebc355.
+// Inlined in FUN_06ebb850.
 CndLocEnter::CndLocEnter(FMissionScript* InMission)
     : Cnd(InMission)
     , LocationId(0)
@@ -1564,14 +1531,13 @@ void CndLocEnter::Parse(INI_Reader& Reader)
     ParseLocationCondition(Reader, LocationId, BaseId);
 }
 
-// FUN_06ec2fc0 (shared with Cnd_LocExit): the player's base record (FUN_06f47980 = player
-// +0x1c) must be BaseId, and *parms the location.
+// FUN_06ec2fc0 (shared with Cnd_LocExit; base record FUN_06f47980 = player +0x1c).
 bool CndLocEnter::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     return MatchesPlayerLocation(Mission, LocationId, BaseId, EventParms);
 }
 
-// 06ebc3ac-06ebc3c7.
+// Inlined in FUN_06ebb850.
 CndLocExit::CndLocExit(FMissionScript* InMission)
     : Cnd(InMission)
     , LocationId(0)
@@ -1595,7 +1561,7 @@ bool CndLocExit::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
 // Cnd_LootAcquired
 // ---------------------------------------------------------------------------------------
 
-// 06ebc422-06ebc465: +0x0c = DAT_06fcefc8, +0x10/+0x14 zeroed, +0x48 = -1.
+// Inlined in FUN_06ebb850.
 CndLootAcquired::CndLootAcquired(FMissionScript* InMission)
     : Cnd(InMission)
     , LootLabel(GNullId)
@@ -1623,15 +1589,15 @@ bool CndLootAcquired::Matches(pub::Controller::EMessage /*EventId*/, void const*
     unsigned int const ShipId = Mission->GetLabelShipId(&ShipLabel);
     if (Mission->HasObjectLabel(Parms[0], &LootLabel) && ShipId == Parms[1])
         ++Count;
-    // 06ec310a-06ec31c0: with no explicit count, done once every entry of the label in the
-    // mission +0xec multimap is picked up.
+    // With no explicit count, done once every entry of the label in the mission +0xec
+    // multimap is picked up.
     if (ShipId == Parms[1] && Needed == -1 &&
         Count == static_cast<int>(Mission->FormationMembers.count(LootLabel)))
         return true;
     return Needed == Count;
 }
 
-// LAB_06ec30b0: +0x44 = 0.
+// LAB_06ec30b0.
 void CndLootAcquired::OnActivate()
 {
     Count = 0;
@@ -1657,7 +1623,7 @@ void CndLootAcquired::Load(INI_Reader* Reader)
 // Cnd_MsnResponse
 // ---------------------------------------------------------------------------------------
 
-// 06ebc4df-06ebc4ee: base fields only.
+// Inlined in FUN_06ebb850 (+0x0c not set).
 CndMsnResponse::CndMsnResponse(FMissionScript* InMission)
     : Cnd(InMission)
     , Response(0)
@@ -1691,7 +1657,7 @@ bool CndMsnResponse::Matches(pub::Controller::EMessage /*EventId*/, void const* 
 // Cnd_NPCSystemEnter / Cnd_NPCSystemExit
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec32e0: three empty lists, +0x30..+0x44 zeroed, vptr 06fb59e4.
+// FUN_06ec32e0.
 CndNpcSystemEnter::CndNpcSystemEnter(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -1712,7 +1678,7 @@ void CndNpcSystemEnter::Parse(INI_Reader& Reader)
     else
         pub::GetSystemID(SystemId, Reader.get_value_string(0));
 
-    // 06ec33fa-06ec34a8: slots 1..0x31; "Player" is skipped here and appended below.
+    // Slots 1..0x31; "Player" is skipped here and appended below.
     int Slot = 1;
     while (!Reader.is_value_empty(static_cast<unsigned int>(Slot)) && Slot < 0x32)
     {
@@ -1733,7 +1699,6 @@ void CndNpcSystemEnter::Parse(INI_Reader& Reader)
     PlayerEntry.SystemId = 0;
     Ships.push_back(PlayerEntry);
 
-    // 06ec3505-06ec3518: every system id of the parsed list = 0.
     std::list<FNpcSystemEntry>::iterator It = Ships.begin();
     for (; It != Ships.end(); ++It)
         It->SystemId = 0;
@@ -1753,7 +1718,7 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
             unsigned int const ShipId = Mission->GetLabelShipId(&It->Label);
             if ((ShipId & GIdValueMask) == 0)
             {
-                // 06ec3755-06ec3781: no ship; forget the label unless loaded NPCs are awaited.
+                // No ship: forget the label unless loaded NPCs are awaited.
                 if (!Awaited.empty())
                 {
                     bResult = false;
@@ -1780,8 +1745,8 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
         }
         if (!bResult)
             return false;
-        // 06ec36c5-06ec374b: the player's own ship entering through a gate or hole
-        // (object type bit 0x800 or 0x40) starts a 10 s delay instead.
+        // The player's own ship entering through a gate or hole (object type bit 0x800 or
+        // 0x40) starts a 10 s delay instead.
         if (FindContentPlayerState(Mission->PlayerId) == nullptr)
             return true;
         FContentPlayerShip* const Ship = Mission->PlayerState->ShipObject;
@@ -1826,7 +1791,7 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
             Delay = 2.0f;
             return false;
         }
-        // 06ec3870-06ec38d9: only "Player" left (7-byte compare) -> drop it and start.
+        // Only "Player" left (case-sensitive): drop it and start.
         if (Awaited.size() == 1 && memcmp(Awaited.front().Label.Data, "Player", 7) == 0)
         {
             Awaited.clear();
@@ -1839,8 +1804,7 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
     }
     if (EventId == pub::Controller::EMessage::Heartbeat && bDelayRunning != 0)
     {
-        // FST +0x3c / FCOMP +0x40 / TEST AH,0x1 / JNZ false: done when the unrounded
-        // difference is not less than the delay.
+        // Retail compares the unrounded difference, not the stored float.
         double const Elapsed =
             static_cast<double>(Mission->ElapsedTime) - static_cast<double>(DelayStart);
         DelayElapsed = static_cast<float>(Elapsed);
@@ -1849,7 +1813,7 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
     return false;
 }
 
-// LAB_06ec3530: +0x24 = +0x0c (list assignment).
+// LAB_06ec3530.
 void CndNpcSystemEnter::OnActivate()
 {
     Pending = Ships;
@@ -1864,8 +1828,7 @@ void CndNpcSystemEnter::Save(FILE* File)
         fprintf(File, "%s,%u, ", It->Label.Data, It->SystemId);
 }
 
-// LAB_06ec3970: rebuilds +0x24 from "label, system" pairs (at most 0x32 slots), clears
-// +0x44 when the system ids differ, then copies +0x24 into +0x18.
+// LAB_06ec3970: at most 0x32 slots.
 void CndNpcSystemEnter::Load(INI_Reader* Reader)
 {
     unsigned int FirstSystem = 0;
@@ -1902,7 +1865,7 @@ void CndNpcSystemEnter::Load(INI_Reader* Reader)
     }
 }
 
-// 06ebc5ee-06ebc651: three empty lists (FUN_06ecffc0), +0x30 = 0, +0x34 = 0.
+// Inlined in FUN_06ebb850 (list ctors FUN_06ecffc0).
 CndNpcSystemExit::CndNpcSystemExit(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -1948,7 +1911,7 @@ bool CndNpcSystemExit::Matches(pub::Controller::EMessage /*EventId*/, void const
         unsigned int const ShipId = Mission->GetLabelShipId(&It->Label);
         if ((ShipId & GIdValueMask) == 0)
         {
-            // 06ec3f39-06ec3f69: no ship; forget the label unless loaded NPCs are awaited.
+            // No ship: forget the label unless loaded NPCs are awaited.
             if (!Awaited.empty())
             {
                 bResult = false;
@@ -1958,7 +1921,7 @@ bool CndNpcSystemExit::Matches(pub::Controller::EMessage /*EventId*/, void const
             It = Pending.erase(It);
             continue;
         }
-        // 06ec3e6b-06ec3ee4: strike the first awaited entry with the same label.
+        // Strike the first awaited entry with the same label.
         std::list<FNpcSystemEntry>::iterator AwaitedIt = Awaited.begin();
         for (; AwaitedIt != Awaited.end(); ++AwaitedIt)
         {
@@ -1998,9 +1961,8 @@ void CndNpcSystemExit::Save(FILE* File)
         fprintf(File, "%s,%u, ", It->Label.Data, It->SystemId);
 }
 
-// LAB_06ec3fd0: rebuilds +0x24 from "label, system" pairs while the next label (read into
-// a TString<0x40>) is non-empty, system ids through get_value_float + ftol; then copies
-// +0x24 into +0x18.
+// LAB_06ec3fd0: unlike Cnd_NPCSystemEnter's, it stops at an empty label and reads the system
+// ids as floats.
 void CndNpcSystemExit::Load(INI_Reader* Reader)
 {
     while (Reader->read_value())
@@ -2034,13 +1996,13 @@ void CndNpcSystemExit::Load(INI_Reader* Reader)
 // Cnd_PlayerLaunch
 // ---------------------------------------------------------------------------------------
 
-// 06ebc6a9-06ebc6b8.
+// Inlined in FUN_06ebb850.
 CndPlayerLaunch::CndPlayerLaunch(FMissionScript* InMission)
     : Cnd(InMission)
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void CndPlayerLaunch::Parse(INI_Reader& /*Reader*/)
 {
 }
@@ -2057,7 +2019,7 @@ bool CndPlayerLaunch::Matches(pub::Controller::EMessage /*EventId*/, void const*
 // Cnd_PlayerManeuver
 // ---------------------------------------------------------------------------------------
 
-// 06ebc717-06ebc753.
+// Inlined in FUN_06ebb850.
 CndPlayerManeuver::CndPlayerManeuver(FMissionScript* InMission)
     : Cnd(InMission)
     , BehaviorId(0)
@@ -2093,8 +2055,8 @@ bool CndPlayerManeuver::Matches(pub::Controller::EMessage /*EventId*/, void cons
         {
             if (Behavior == 0xa)
             {
-                // 06ec206c-06ec2093: formation behaviour; the targeted NPC and the player
-                // ship must share the space-object field +0x154.
+                // Formation behaviour: the targeted NPC and the player ship must share the
+                // formation (+0x154).
                 FContentPlayerShip* const Ship = Mission->PlayerState->ShipObject;
                 FContentNpcShip* const Npc = Mission->FindNpcById(&Target);
                 if (Npc != nullptr && Ship != nullptr)
@@ -2111,7 +2073,7 @@ bool CndPlayerManeuver::Matches(pub::Controller::EMessage /*EventId*/, void cons
     return bResult;
 }
 
-// FUN_06ec1ff0: +0x48 = FUN_06f15940(+0x10) when the label is set.
+// FUN_06ec1ff0.
 void CndPlayerManeuver::OnActivate()
 {
     if (TargetLabel.Length != 0)
@@ -2122,14 +2084,14 @@ void CndPlayerManeuver::OnActivate()
 // Cnd_PopUpDialog
 // ---------------------------------------------------------------------------------------
 
-// 06ebc7ab-06ebc7c1.
+// Inlined in FUN_06ebb850.
 CndPopUpDialog::CndPopUpDialog(FMissionScript* InMission)
     : Cnd(InMission)
     , ButtonMask(0)
 {
 }
 
-// FUN_06ec20d0: s0 into a stack TString<0x40>, stricmp against the button names.
+// FUN_06ec20d0.
 void CndPopUpDialog::Parse(INI_Reader& Reader)
 {
     TString<0x40> Button;
@@ -2166,7 +2128,7 @@ bool CndPopUpDialog::Matches(pub::Controller::EMessage /*EventId*/, void const* 
 // Cnd_ProjHit
 // ---------------------------------------------------------------------------------------
 
-// 06ebc827-06ebc884.
+// Inlined in FUN_06ebb850.
 CndProjHit::CndProjHit(FMissionScript* InMission)
     : Cnd(InMission)
     , Needed(1)
@@ -2187,8 +2149,7 @@ void CndProjHit::Parse(INI_Reader& Reader)
         ShooterLabel = Reader.get_value_string(2);
 }
 
-// FUN_06ec22c0: parms = {target id, ?, shooter id}; lazy FUN_06f15b90 of both labels; an
-// unset shooter matches any; each hit counts, true once the count reaches +0x74 (JGE).
+// FUN_06ec22c0: parms = {target id, ?, shooter id}; an unset shooter matches any.
 bool CndProjHit::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -2208,8 +2169,7 @@ bool CndProjHit::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
     return Count >= Needed;
 }
 
-// FUN_06ec2350: +0x78 = FUN_06f15b90(+0x0c), +0x7c = FUN_06f15b90(+0x40) when set;
-// +0x80 = 0.
+// FUN_06ec2350.
 void CndProjHit::OnActivate()
 {
     TargetId = Mission->GetLabelObjectId(&TargetLabel);
@@ -2238,7 +2198,7 @@ void CndProjHit::Load(INI_Reader* Reader)
 // Cnd_ProjHitShipToLbl
 // ---------------------------------------------------------------------------------------
 
-// 06ebc8c6-06ebc906.
+// Inlined in FUN_06ebb850.
 CndProjHitShipToLbl::CndProjHitShipToLbl(FMissionScript* InMission)
     : Cnd(InMission)
     , TargetLabel(0)
@@ -2270,14 +2230,13 @@ bool CndProjHitShipToLbl::Matches(pub::Controller::EMessage /*EventId*/, void co
         return false;
     if (ShooterLabel.Length != 0 && (ShooterId & GIdValueMask) == 0)
         ShooterId = Mission->GetLabelObjectId(&ShooterLabel);
-    // 06ec24f3-06ec2507: a set shooter id must equal parms+8.
     if ((ShooterId & GIdValueMask) != 0 && Parms[2] != ShooterId)
         return false;
     ++Count;
     return Count >= Needed;
 }
 
-// FUN_06ec2530: +0x48 = FUN_06f15b90(+0x10) when set; +0x4c = 0.
+// FUN_06ec2530.
 void CndProjHitShipToLbl::OnActivate()
 {
     if (ShooterLabel.Length != 0)
@@ -2305,21 +2264,21 @@ void CndProjHitShipToLbl::Load(INI_Reader* Reader)
 // Cnd_RTCDone
 // ---------------------------------------------------------------------------------------
 
-// 06ebc941-06ebc957: +0x0c = 0, +0x10 = 0 (no "" assignment).
+// Inlined in FUN_06ebb850 (no "" assignment).
 CndRtcDone::CndRtcDone(FMissionScript* InMission)
     : Cnd(InMission)
 {
     InitEmpty(RtcFile);
 }
 
-// FUN_06ec1be0: clamp 0x7f.
+// FUN_06ec1be0.
 void CndRtcDone::Parse(INI_Reader& Reader)
 {
     RtcFile = Reader.get_value_string(0);
 }
 
-// FUN_06ec1c50: null parms -> false; for each node of mission+0x2f4: object (node+0x90) set,
-// its +0x40 == parms[1] and stricmp(node path +0x0c, +0x10) == 0 -> true; end -> false.
+// FUN_06ec1c50: the RTC records of mission +0x2f4 (script at node +0x90, its sequence id
+// +0x40).
 bool CndRtcDone::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -2343,7 +2302,7 @@ bool CndRtcDone::Matches(pub::Controller::EMessage /*EventId*/, void const* Even
 // Cnd_RumorHeard
 // ---------------------------------------------------------------------------------------
 
-// 06ebc9b6-06ebc9d7.
+// Inlined in FUN_06ebb850.
 CndRumorHeard::CndRumorHeard(FMissionScript* InMission)
     : Cnd(InMission)
     , LocationId(0)
@@ -2377,7 +2336,7 @@ bool CndRumorHeard::Matches(pub::Controller::EMessage /*EventId*/, void const* E
 // Cnd_SpaceEnter / Cnd_SpaceExit
 // ---------------------------------------------------------------------------------------
 
-// 06ebca2e-06ebca44.
+// Inlined in FUN_06ebb850.
 CndSpaceEnter::CndSpaceEnter(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -2396,7 +2355,7 @@ bool CndSpaceEnter::Matches(pub::Controller::EMessage /*EventId*/, void const* E
     return MatchesIdOrAny(SystemId, EventParms);
 }
 
-// 06ebca9f-06ebcab5.
+// Inlined in FUN_06ebb850.
 CndSpaceExit::CndSpaceExit(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -2419,7 +2378,7 @@ bool CndSpaceExit::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
 // Cnd_SystemEnter / Cnd_SystemExit
 // ---------------------------------------------------------------------------------------
 
-// 06ebcb10-06ebcb2b.
+// Inlined in FUN_06ebb850.
 CndSystemEnter::CndSystemEnter(FMissionScript* InMission)
     : Cnd(InMission)
     , FromSystemId(0)
@@ -2439,13 +2398,11 @@ void CndSystemEnter::Parse(INI_Reader& Reader)
     pub::GetSystemID(FromSystemId, Reader.get_value_string(1));
 }
 
-// FUN_06ec1e30: with parms {system id, from system id} both unset-or-equal; without parms
-// (trigger activation) the player's current system (FUN_06f478b0 on the mission's cached
-// state, no lookup gate in retail) must equal +0x10.
+// FUN_06ec1e30: parms = {system id, from system id}, each unset or equal.
 bool CndSystemEnter::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
-    // 06ec1e63-06ec1e73: null parms (activation) -> FUN_06f478b0 on mission+8 directly, no
-    // FUN_06f49b00 lookup gate.
+    // Activation (null parms): FUN_06f478b0 on the cached player state directly, without the
+    // FUN_06f49b00 lookup gate (as retail).
     if (EventParms == nullptr)
         return GetPlayerSystemId(Mission->PlayerState) == SystemId;
     unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
@@ -2456,7 +2413,7 @@ bool CndSystemEnter::Matches(pub::Controller::EMessage /*EventId*/, void const* 
     return true;
 }
 
-// 06ebcb7f-06ebcb9a.
+// Inlined in FUN_06ebb850.
 CndSystemExit::CndSystemExit(FMissionScript* InMission)
     : Cnd(InMission)
     , SystemId(0)
@@ -2493,7 +2450,7 @@ bool CndSystemExit::Matches(pub::Controller::EMessage /*EventId*/, void const* E
 // Cnd_TetherBroke
 // ---------------------------------------------------------------------------------------
 
-// 06ebcc14-06ebcc83.
+// Inlined in FUN_06ebb850.
 CndTetherBroke::CndTetherBroke(FMissionScript* InMission)
     : Cnd(InMission)
     , ShipAId(0)
@@ -2546,11 +2503,11 @@ bool CndTetherBroke::Matches(pub::Controller::EMessage /*EventId*/, void const* 
         ElapsedBeyond = 0.0f;
         return false;
     }
-    // FCOMP / TEST AH,0x41 / JP out: only while the limit is <= the distance.
+    // Only while the limit is <= the distance (unordered fails).
     if (!(DistanceSq <= Distance))
         return false;
     double const Now = Mission->ElapsedTime;
-    // TEST AH,0x44 / JP: no step on the first check (+0x94 == 0).
+    // No step on the first check (+0x94 == 0).
     float TimeStep = 0.0f;
     if (!(LastCheckTime == 0.0f))
         TimeStep = static_cast<float>(Now - LastCheckTime);
@@ -2559,8 +2516,7 @@ bool CndTetherBroke::Matches(pub::Controller::EMessage /*EventId*/, void const* 
     if (!(LastDistanceSq == 0.0f))
         DistanceStep = static_cast<double>(Distance) - LastDistanceSq;
     LastDistanceSq = Distance;
-    // 06ec1454-06ec148d: within the inner radius (+0x84 > distance) only a non-shrinking
-    // distance counts; unordered compares fail.
+    // Within the inner radius only a non-shrinking distance counts; unordered compares fail.
     if (!(InnerDistanceSq <= Distance))
     {
         if (!(InnerDistanceSq > Distance))
@@ -2568,7 +2524,7 @@ bool CndTetherBroke::Matches(pub::Controller::EMessage /*EventId*/, void const* 
         if (!(DistanceStep >= 0.0))
             return false;
     }
-    // FADD / FST +0x90 / FCOMP +0x8c / TEST AH,0x1 / JNZ false: done when not less.
+    // Retail compares the unrounded sum.
     double const Accumulated = static_cast<double>(TimeStep) + ElapsedBeyond;
     ElapsedBeyond = static_cast<float>(Accumulated);
     return !(Accumulated < BreakDuration);
@@ -2591,7 +2547,7 @@ double __cdecl GetObjectDistanceSq(unsigned int const* IdA, unsigned int const* 
     return Dz * Dz + Dy * Dy + Dx * Dx;
 }
 
-// LAB_06ec12f0: +0x90/+0x88/+0x94 = 0; +0x74/+0x78 = FUN_06f15940 of both labels.
+// LAB_06ec12f0.
 void CndTetherBroke::OnActivate()
 {
     ElapsedBeyond = 0.0f;
@@ -2625,8 +2581,8 @@ void CndTetherBroke::Load(INI_Reader* Reader)
 // Cnd_Timer
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec1560: base fields, vptr 06fb5884, byte +0x14 = 1. +0x0c/+0x10 are not written by
-// the ctor (Parse writes +0x10, OnActivate writes +0x0c before the first Matches).
+// FUN_06ec1560. Retail leaves +0x0c/+0x10 unset (Parse and OnActivate write them before the
+// first Matches).
 CndTimer::CndTimer(FMissionScript* InMission)
     : Cnd(InMission)
     , Elapsed(0.0f)
@@ -2643,7 +2599,6 @@ void CndTimer::Parse(INI_Reader& Reader)
     {
         float const Upper = Reader.get_value_float(1);
         float const Lower = Duration;
-        // FILD rand * DAT_06fb4448; (Upper - Lower) * that; + Lower.
         float const RandUnit = static_cast<float>(rand()) * GRandUnitScale;
         Duration = (Upper - Lower) * RandUnit + Lower;
     }
@@ -2659,8 +2614,8 @@ void CndTimer::Parse(INI_Reader& Reader)
     }
 }
 
-// FUN_06ec1660. EventParms is the float* delta the tick message (0x20) carries. +0x10 of
-// the player state is its ship object: null (docked) counts only when bRunOnBase.
+// FUN_06ec1660. EventParms is the float* delta the tick message (0x20) carries; docked time
+// counts only with RUN_ON_BASE.
 bool CndTimer::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     FContentPlayerState* Player = GetMissionPlayerState(Mission);
@@ -2671,23 +2626,22 @@ bool CndTimer::Matches(pub::Controller::EMessage /*EventId*/, void const* EventP
     float const* Delta = static_cast<float const*>(EventParms);
     if (Delta != nullptr)
         Elapsed = Elapsed + *Delta;
-    // FCOMP [+0x10] / TEST AH,1 / JZ -> true when not (Elapsed < Duration).
     return !(Elapsed < Duration);
 }
 
-// LAB_06ec1650: +0x0c = 0.
+// LAB_06ec1650.
 void CndTimer::OnActivate()
 {
     Elapsed = 0.0f;
 }
 
-// LAB_06ec16c0: fprintf(File, "Cnd_Timer = %f\n", (double)+0x0c).
+// LAB_06ec16c0.
 void CndTimer::Save(FILE* File)
 {
     fprintf(File, "Cnd_Timer = %f\n", static_cast<double>(Elapsed));
 }
 
-// FUN_06ec16e0: while read_value: is_value("Cnd_Timer") -> +0x0c = get_value_float(0).
+// FUN_06ec16e0.
 void CndTimer::Load(INI_Reader* Reader)
 {
     while (Reader->read_value())
@@ -2701,7 +2655,7 @@ void CndTimer::Load(INI_Reader* Reader)
 // Cnd_TLEntered / Cnd_TLExited
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec1730: three TStrings = "", +0xa8/+0xac/+0xb0 = 0, vptr 06fb58d0.
+// FUN_06ec1730.
 CndTlEntered::CndTlEntered(FMissionScript* InMission)
     : Cnd(InMission)
     , ShipId(0)
@@ -2739,13 +2693,13 @@ bool CndTlEntered::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     return Parms[2] == RingBId;
 }
 
-// FUN_06ec1b20: +0xa8 = FUN_06f15940(+0x0c).
+// FUN_06ec1b20.
 void CndTlEntered::OnActivate()
 {
     ShipId = Mission->GetLabelShipId(&ShipLabel);
 }
 
-// FUN_06ec1950: +0x0c/+0x40 = "", +0x74 only zeroed, +0xa8/+0xb0/+0xac = 0, vptr 06fb58ec.
+// FUN_06ec1950.
 CndTlExited::CndTlExited(FMissionScript* InMission)
     : Cnd(InMission)
     , ShipId(0)
@@ -2770,8 +2724,8 @@ void CndTlExited::Parse(INI_Reader& Reader)
     RingBId = pub::GetNicknameId(RingB.Data);
 }
 
-// FUN_06ec1b40: parms = {ship id, +0x04 vs +0xac, +0x08 vs +0xb0}; an unset ring id matches
-// any ring.
+// FUN_06ec1b40: parms+0x04 is tested against RingBId (+0xac), parms+0x08 against RingAId
+// (+0xb0); an unset ring id matches any ring.
 bool CndTlExited::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
@@ -2789,7 +2743,7 @@ bool CndTlExited::Matches(pub::Controller::EMessage /*EventId*/, void const* Eve
     return true;
 }
 
-// FUN_06ec1b20 (Cnd_TLEntered's): +0xa8 = FUN_06f15940(+0x0c).
+// FUN_06ec1b20 (Cnd_TLEntered's).
 void CndTlExited::OnActivate()
 {
     ShipId = Mission->GetLabelShipId(&ShipLabel);
@@ -2799,18 +2753,18 @@ void CndTlExited::OnActivate()
 // Cnd_True
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec1bb0: base fields, vptr 06fb5908.
+// FUN_06ec1bb0.
 CndTrue::CndTrue(FMissionScript* InMission)
     : Cnd(InMission)
 {
 }
 
-// FUN_06ebf6f0: RET 4.
+// FUN_06ebf6f0.
 void CndTrue::Parse(INI_Reader& /*Reader*/)
 {
 }
 
-// LAB_06ec1bd0: MOV AL,1 / RET 8.
+// LAB_06ec1bd0.
 bool CndTrue::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     return true;
@@ -2820,7 +2774,7 @@ bool CndTrue::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Event
 // Cnd_WatchTrigger
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec42a0: +0x0c/+0x10 ID_String, vptr 06fb5a40.
+// FUN_06ec42a0.
 CndWatchTrigger::CndWatchTrigger(FMissionScript* InMission)
     : Cnd(InMission)
     , WatchedTriggerId(0)
@@ -2835,8 +2789,8 @@ void CndWatchTrigger::Parse(INI_Reader& Reader)
     WantedState = CreateID(Reader.get_value_string(1));
 }
 
-// LAB_06ec4350: FUN_06f7b0f0 find in mission+0x1b0; unknown trigger -> false. ON matches
-// ACTIVE, OFF matches INACTIVE or COMPLETE.
+// LAB_06ec4350 (the trigger map mission+0x1b0). ON matches ACTIVE, OFF matches INACTIVE or
+// COMPLETE.
 bool CndWatchTrigger::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     FTriggerMap::iterator Found = Mission->TriggerMap.find(WatchedTriggerId);
@@ -2860,7 +2814,7 @@ bool CndWatchTrigger::Matches(pub::Controller::EMessage /*EventId*/, void const*
 // Cnd_WatchVibe
 // ---------------------------------------------------------------------------------------
 
-// FUN_06ec43e0: +0x10/+0x44 = "", +0x78/+0x7c/+0x0c/+0x80 = 0, vptr 06fb5a5c.
+// FUN_06ec43e0.
 CndWatchVibe::CndWatchVibe(FMissionScript* InMission)
     : Cnd(InMission)
     , Compare(0)
@@ -2883,7 +2837,6 @@ void CndWatchVibe::Parse(INI_Reader& Reader)
     }
     else
     {
-        // 06ec454e-06ec45b0: get_indexed_value(2) into a by-value TString<0x40>.
         TString<0x40> RepName;
         RepName.Length = 0;
         RepName.Data[0] = '\0';
@@ -2906,10 +2859,8 @@ void CndWatchVibe::Parse(INI_Reader& Reader)
         Compare = 2;
 }
 
-// LAB_06ec4670: lazy FUN_06f15b90 of both labels; attitude of A's vibe towards B's
-// (pub::SpaceObj::GetRep x2, pub::Reputation::GetAttitude) compared with +0x80:
-// "lt" (TEST AH,0x41 / JP) less or equal, "gt" (TEST AH,1 / JNZ) not less and ordered,
-// "eq" (TEST AH,0x44 / JP) equal.
+// LAB_06ec4670: A's attitude towards B. Retail's "lt" is less or equal and "gt" is not less
+// (both false on NaN).
 bool CndWatchVibe::Matches(pub::Controller::EMessage /*EventId*/, void const* /*EventParms*/)
 {
     if ((ObjectAId & GIdValueMask) == 0)
@@ -2935,7 +2886,7 @@ bool CndWatchVibe::Matches(pub::Controller::EMessage /*EventId*/, void const* /*
     return false;
 }
 
-// FUN_06ec4640: +0x78/+0x7c = FUN_06f15b90(+0x10/+0x44).
+// FUN_06ec4640.
 void CndWatchVibe::OnActivate()
 {
     ObjectAId = Mission->GetLabelObjectId(&ObjectA);

@@ -6,8 +6,8 @@
 
 #pragma once
 
-// The named-script table a RoomObject keeps for its DALib::Anim script (retail freelancer.exe
-// 0x00555a40..0x00555cd0, no source path string of its own). RoomControl holds one at +0x4c
+// The named-script table a RoomObject keeps for its DALib::Anim script (retail FUN_00555a40 ..
+// FUN_00555ca0, no source path string of its own). RoomControl holds one at +0x4c
 // (FUN_00449260 / FUN_004496b0) and Gf::ObjectProp holds one at +0x4c (FUN_00445f40); the mesh
 // loader FUN_0041c540 fills it from the .cmp's own file system.
 //

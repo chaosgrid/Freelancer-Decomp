@@ -110,7 +110,7 @@ struct IVP_Ray_Hit
 };
 static_assert(sizeof(IVP_Ray_Hit) == 0x20, "IVP_Ray_Hit size");
 
-// IVP_Ray_Solver_Min_Hash (cmn-ivp3d 2026-10-08), vtable .rdata:0639c2c4
+// IVP_Ray_Solver_Min_Hash, vtable .rdata:0639c2c4
 // {06349b40 add_hit_object, 06289ed0 scalar deleting dtor}; RTTI TD 063eb218.
 // Collects up to 0x100 hits, ordered by distance in min_hash. The hit count
 // is min_hash.counter (+0x5c), raised by min_hash.add.

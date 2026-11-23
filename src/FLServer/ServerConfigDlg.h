@@ -9,11 +9,10 @@
 // from FLServer.cfg in the local user directory; OnOK validates them, hands them to the app's
 // FServerControl and writes FLServer.cfg back.
 // Retail: the only instance is a local of CFLServerApp::InitInstance, built inline there
-// (.text:0040bd6c: CDialog::CDialog(0x84, NULL), vtable .rdata:0041d0e0 stored at 0040bd7b);
-// dtor .text:0040be80 (a bare JMP CDialog::~CDialog), scalar deleting dtor 0040be60. The class
-// has no message map of its own (vtable +0x30 is MFC's CDialog::GetMessageMap) and its
-// DoDataExchange slot is the ICF-folded empty `RET 4` at .text:00407040. No RTTI or string names
-// the class; the name follows the dialog caption.
+// (.text:0040bd6c, vtable .rdata:0041d0e0); dtor .text:0040be80 (just CDialog's), scalar
+// deleting dtor 0040be60. No message map of its own; DoDataExchange is the ICF-folded empty
+// function at .text:00407040. No RTTI or string names the class; the name follows the dialog
+// caption.
 #pragma once
 
 class CServerConfigDlg : public CDialog
@@ -24,9 +23,9 @@ public:
 	explicit CServerConfigDlg(CWnd* Parent = nullptr);
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);   // .text:00407040
-	virtual BOOL OnInitDialog();                      // .text:004067f0
-	virtual void OnOK();                              // .text:00406b70
+	virtual void DoDataExchange(CDataExchange* DX);
+	virtual BOOL OnInitDialog();
+	virtual void OnOK();
 
 	// Controls fetched with GetDlgItem by OnInitDialog (MFC temporary wrappers, as retail).
 	CWnd* MaxPlayersSpin;         // +0x60, control 1011 (msctls_updown32)

@@ -10,7 +10,6 @@
 // reads an [ObjList] section into a list of directives; the factory FUN_06f24870 builds one
 // directive per type; the TU50 ship (BehaviorCmds.h) runs them one after the other through
 // slot 3 (Execute). The TU37 guides build them through the factory and the setters below.
-// Owner: lane CNT-AI (moved from CNT-MS-TRIG, 2026-09-30).
 //
 // Every class derives from the abstract base of ObjListDirective.h (vtable 06fb8314) and
 // embeds one pub::AI op at +0x10c; slots 0-2 (AddRef / Release / sdd 06f06eb0) and slot 6
@@ -36,7 +35,7 @@ struct FFormation;            // Encounters.h (TU31)
 // anything above 0x19 give null); returns *Out != null.
 bool __cdecl CreateObjListDirective(int Type, FObjListDirective** Out);
 
-// FUN_06f25260 (cdecl; callers TU38 06f107b7, 06f18296): one [ObjList] section. *OutNickname
+// FUN_06f25260 (cdecl; callers in TU38): one [ObjList] section. *OutNickname
 // = CreateID("") first, then the "nickname" key; every directive key appends a new directive
 // (its Name = the whole line, then its Parse) to List, which holds one reference on it.
 void __cdecl LoadObjList(INI_Reader* Reader, std::list<FObjListDirective*>* List,
@@ -49,7 +48,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f25f60
     void Parse(INI_Reader* Reader) override;         // 06f25fe0
     int GetType() override;                          // 06ea1450: 0
-    // FUN_06f26020 (RET 4; caller TU21 06eb8ddf): FlagId = 0, bValue = bAvoid.
+    // FUN_06f26020 (caller TU21): FlagId = 0, bValue = bAvoid.
     void SetAvoidance(bool bAvoid);
 
     pub::AI::SetFlagParams Op;                       // +0x10c
@@ -62,7 +61,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27900
     void Parse(INI_Reader* Reader) override;         // 06f27950
     int GetType() override;                          // 06ee9e10: 1
-    // FUN_06f27940 (RET 4): DelaySeconds.
+    // FUN_06f27940: DelaySeconds.
     void SetDelay(float Seconds);
 
     pub::AI::DirectiveDelayOp Op;                    // +0x10c
@@ -86,7 +85,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f26040
     void Parse(INI_Reader* Reader) override;         // 06f26190
     int GetType() override;                          // 06f5e540: 3
-    // FUN_06f26150 (RET 0xc; callers TU31 06efc3cf, TU37 06f0cb1c): Field_0C = 0 (target
+    // FUN_06f26150 (callers TU31, TU37): Field_0C = 0 (target
     // object), Field_1C = *TargetId, Field_58 = 0, Field_50 = Range, Field_54 = Param3.
     void SetTarget(unsigned int const* TargetId, float Range, float Param3);
 
@@ -118,8 +117,8 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f263a0
     void Parse(INI_Reader* Reader) override;         // 06f264d0
     int GetType() override;                          // 06ee99a0: 5
-    // FUN_06f26460 (RET 0x18; callers TU37 06f0b54b, 06f0b889, 06f0ba78, 06f0be29, TU43
-    // 06f34e95, ...): Field_0C = 1 (a point), Destination, Field_50 / Field_54, Field_5C =
+    // FUN_06f26460 (callers TU37, TU43, ...): Field_0C = 1 (a point), Destination,
+    // Field_50 / Field_54, Field_5C =
     // ObjectId when (ObjectId & 0x3fffffff) != 0, Field_58 = 0, Field_5A = bCruise, Field_5B
     // = bNoCruise.
     void SetDestination(Vector const* Destination, float Range, float MaxSpeed,
@@ -138,7 +137,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27520
     void Parse(INI_Reader* Reader) override;         // 06f275d0
     int GetType() override;                          // 06f250c0: 6
-    // FUN_06f275b0 (RET 8; caller TU37 06f0ce19).
+    // FUN_06f275b0 (caller TU37).
     void SetTarget(unsigned int const* TargetId, float Distance);
 
     pub::AI::DirectiveTrailOp Op;                    // +0x10c
@@ -167,7 +166,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f266a0
     void Parse(INI_Reader* Reader) override;         // 06f26810
     int GetType() override;                          // 06ee99a0: 5
-    // FUN_06f26770 (RET 0x20; callers TU37 06f09ad6, 06f09baf, 06f09c7e, 06f09eb6).
+    // FUN_06f26770 (callers TU37).
     void SetGuide(unsigned int const* TargetId, Vector const* FollowOffset,
                   Vector const* Destination, float Field50, bool bNoCruise, bool bCruise,
                   bool FieldA0, bool Field58);
@@ -238,7 +237,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27cb0
     void Parse(INI_Reader* Reader) override;         // 06f27df0
     int GetType() override;                          // 06f250f0: 0xd
-    // FUN_06f27db0 (RET 8; callers TU61 06f8e491, 06f91e4d): Mode = InvertMode = 0,
+    // FUN_06f27db0 (callers TU61): Mode = InvertMode = 0,
     // TargetPoint = *Center, Radius = Radius.
     void SetSphere(Vector const* Center, float Radius);
 
@@ -307,7 +306,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27660
     void Parse(INI_Reader* Reader) override;         // 06f27710
     int GetType() override;                          // 06f250a0: 0x13
-    // FUN_06f276f0 (RET 8; callers TU37 06f06965, 06f09d90, 06f0a8cf, TU53 06f60148).
+    // FUN_06f276f0 (callers TU37, TU53).
     void SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId);
 
     pub::AI::DirectiveDockOp Op;                     // +0x10c
@@ -321,7 +320,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27830
     void Parse(INI_Reader* Reader) override;         // 06f278a0
     int GetType() override;                          // 06f250a0: 0x13 (same body as Dock's)
-    // FUN_06f27870 (RET 0xc; caller TU53 06f65e7a).
+    // FUN_06f27870 (caller TU53).
     void SetLane(unsigned int const* TradeLaneId, unsigned int OffsetBits,
                  unsigned int const* NextRingId);
 
@@ -335,7 +334,7 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f27970
     void Parse(INI_Reader* Reader) override;         // 06f27a40
     int GetType() override;                          // 06f25090: 0x15
-    // FUN_06f27a10 (RET 0xc; caller TU53 06f60a48).
+    // FUN_06f27a10 (caller TU53).
     void SetLaunch(unsigned int const* LaunchObjectId, int DockIndex, int TerminalType);
 
     pub::AI::DirectiveLaunchOp Op;                   // +0x10c
@@ -361,7 +360,7 @@ class FObjListTractorBeam : public FObjListDirective
 public:
     bool Execute(FContentShipBase* Ship) override;   // 06f28dd0
     int GetType() override;                          // 06eea870: 0x19
-    // FUN_06f28df0 (RET 8; caller TU37 06f0ca4d).
+    // FUN_06f28df0 (caller TU37).
     void SetTarget(unsigned int TargetId, bool Field10);
 
     pub::AI::DirectiveTractorBeamOp Op;              // +0x10c

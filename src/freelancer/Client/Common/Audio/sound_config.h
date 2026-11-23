@@ -10,7 +10,7 @@
 // and Gf\ScriptSound-family helpers).
 //
 // FUN_00427a70  — parse `audio\SoundCFG.ini` `[CFG]` (called at the tail of the client's
-//                 freelancer.ini pass, FUN_005b0c30 @ 005b0fc4).
+//                 freelancer.ini pass, FUN_005b0c30).
 // FUN_00428be0  — ducking triple: down_by / down_time (RTC vs spaceflight) + music_fade_time.
 // FUN_00428030  — audio mode selector (DAT_00667cac; 3 = RTC).
 // FUN_004569b0/d0/a40, FUN_00456990 — the Gf audio fade object at DAT_0066d2d0
@@ -30,7 +30,7 @@ void GetClientDuckingConfig(float* OutDownBy, float* OutDownTime, float* OutMusi
 // FUN_00428a40 when the caller passes a negative fade.
 float GetClientMusicFadeTime();
 float GetClientCrossFadeSilence();
-// DAT_00667c9c — `COCKPIT_ATTENUATION`; no consumer ported yet.
+// DAT_00667c9c — `COCKPIT_ATTENUATION`; read by the sound mixer's audio-mode term (FUN_00429950).
 float GetClientCockpitAttenuation();
 // DAT_006108e4 / DAT_006108e8 — `ducking_spaceflight_down_by` / `_down_time`, read directly
 // (whatever the audio mode) by the first push of FUN_00428db0.
@@ -52,14 +52,13 @@ float GetClientDialoguePanFactor();
 // Gf audio fade (DAT_0066d2d0). Value is in dB: -96 = silent, 0 = full.
 // FUN_004569b0 — snap current+target, clear rate, raise the dirty flag.
 void SnapClientAudioFade(float Value);
-// FUN_004569d0 — target + seconds; seconds <= 0 falls back to the ducking down_time,
+// FUN_004569d0 — target + seconds; negative seconds fall back to the ducking down_time,
 // and a zero-length fade stores the retail 1000000.0f rate.
 void SetClientAudioFade(float Target, float Seconds);
 // FUN_00456a40 — advance by DeltaSeconds, returns true when the value changed
 // (retail then re-applies volume on every Gf script sound).
 bool TickClientAudioFade(float DeltaSeconds);
-// The Gf script sequence's direct writes of target (+0x18) and rate (+0x1c): FUN_00455290
-// (0x004553ba / 0x004553c9) and FUN_004554c0 (0x00455616 / 0x0045561f) store a fixed rate
-// instead of FUN_004569d0's seconds.
+// The Gf script sequence's direct writes of target (+0x18) and rate (+0x1c): FUN_00455290 and
+// FUN_004554c0 store a fixed rate instead of FUN_004569d0's seconds.
 void SetClientAudioFadeTargetRate(float Target, float Rate);
 float GetClientAudioFade();

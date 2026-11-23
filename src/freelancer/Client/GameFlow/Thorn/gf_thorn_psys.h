@@ -28,7 +28,7 @@ struct FThornPsys : FThornComponent
     FThornPsys(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc);
 
     // FUN_00453e60 (thiscall, RET 4) -- the [VisEffect] named EffectName into +0x74, AddRef'd,
-    // or an FDUMP. Caller: the spawn FUN_0044e340 (0x0044e3a6) with the entity's template.
+    // or an FDUMP. Caller: the spawn FUN_0044e340 with the entity's template.
     void BindVisEffect(char const* EffectName);
 
     // ICompoundControl (0x005cdc58 / 0x005cdc5c)

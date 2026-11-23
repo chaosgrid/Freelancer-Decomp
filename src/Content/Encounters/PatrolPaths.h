@@ -10,7 +10,7 @@
 // path-index order into a polyline of points. The code lives in the COMDAT run at the head
 // of TU45 (06f37110-06f38e00); SystemInfo (TU58) owns the paths (FSystemInfo +0x50, built by
 // FUN_06f76380) and every zone of a path points at it (FSystemZone +0x0c, TU64 FUN_06fa8120).
-// Retail's own class name is not in the binary (no RTTI). Lane CNT-POP.
+// Retail's own class name is not in the binary (no RTTI).
 
 #include "common_id.h"      // ID_String
 #include "common_ini.h"     // Vector

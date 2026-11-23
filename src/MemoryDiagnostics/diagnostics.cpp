@@ -128,7 +128,7 @@ namespace MemoryDiagnostics
 	{
 		if (Path.empty()) { Error = L"Specify a folder for logs."; return false; }
 		const std::wstring Absolute = FullPath(Path);
-		// Project scratch output must stay off the nearly-full C: drive.
+		// Tool policy: logs and the symbol cache stay off the C: drive.
 		if (Absolute.size() > 1 && (Absolute[0] == L'C' || Absolute[0] == L'c') && Absolute[1] == L':')
 		{
 			Error = L"Choose a drive other than C: for logs and symbol cache."; return false;

@@ -9,15 +9,11 @@
 // UITextEdit -- PAGE_*.txt edit field (RTTI .?AUUITextEdit@@ : RichTextEditWin : RichTextWin :
 // BaseRichTextWin : WinControl; Event::Handler face at +0x498).
 //
-// Retail:
-//   WINFACTORY<UITextEdit> DAT_0067db18, static init LAB_0059c240 -> FUN_0059c680("UITextEdit")
-//   Create FUN_0059c6f0: operator_new(0x538), RichTextEditWin ctor FUN_0057b8d0, then vftables
-//   0x005e5bd4 (main) / 0x005e5bc8 (+0x7c) / 0x005e5bc0 (+0x498 Event::Handler).
-//   slot 0 FUN_0059cde0 scalar deleting destructor (dtor FUN_0059cf50)
-//   slot 9 FUN_0059a410 Create
+// WINFACTORY<UITextEdit> DAT_0067db18; Create FUN_0059c6f0 (operator new(0x538)). vftables
+// 0x005e5bd4 / 0x005e5bc8 (+0x7c) / 0x005e5bc0 (+0x498); overrides slots 0 (FUN_0059cde0) and 9.
 //
-// Retail offsets are kept in the comments only: RichTextEditWin holds std containers (current
-// MSVC STL), so the port's layout past +0x4c4 no longer matches retail's 0x538 bytes.
+// Retail offsets are kept in the comments only: RichTextEditWin holds std containers, so the
+// port's layout past +0x4c4 does not match retail's 0x538 bytes.
 
 #include "Interface/rich_text_win.h"
 

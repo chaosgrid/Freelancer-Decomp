@@ -83,12 +83,9 @@ namespace
         operator delete(Ptr);
     }
 
-    // The index-buffer growth body of FUN_004fcb40 (0x004fcb54..0x004fcba5), which the reset
-    // and push paths repeat inline: operator new((cap + extra) * 2) -- VC6's MSVCRT operator new
-    // returns null rather than throwing, and a null (TEST EBP,EBP / JZ) leaves the batch as it
-    // is, which std::nothrow reproduces -- the old buffer's cap*2 bytes copied when there is
-    // one, the old buffer freed (FUN_005b7e1d, called even for null), then the new pointer and
-    // capacity stored.
+    // The index-buffer growth body of FUN_004fcb40, which the reset and push paths repeat
+    // inline. VC6's operator new returns null rather than throwing, and a null leaves the batch
+    // as it is (std::nothrow here). The old buffer is freed even when null.
     void GrowIndexBuffer(FEffectVertexBatch* Batch, unsigned ExtraWords)
     {
         unsigned short* NewBuf = static_cast<unsigned short*>(operator new(
@@ -128,8 +125,7 @@ namespace
         }
     }
 
-    // FUN_00425640 — ShapeDB thiscall: if Shape->Texture != 0, TextureLib->Slot22(record*,
-    // frame, buf), return buf[0] GPU handle; else 0. G_BeamEffectTexture is FTexShape*.
+    // FUN_00425640 — the shape's GPU texture handle for a frame, or 0 without a texture.
     void* ResolveBeamTextureHandle(void* ShapeObj, int Frame)
     {
         return TexShapeGetGpuHandle(static_cast<FTexShape const*>(ShapeObj), Frame);
@@ -185,8 +181,7 @@ void EffectVertexBatchStaticShutdown()
 
 void EffectVertexBatchDestroy(FEffectVertexBatch* Batch)
 {
-    // FUN_0046e9c0 (thiscall): the pipeline released (vt+0x8) and cleared when there is one,
-    // then both buffers freed (FUN_005b7e1d, no null test) and cleared.
+    // FUN_0046e9c0. The buffers are freed without a null test.
     if (Batch->Pipeline != nullptr)
     {
         Batch->Pipeline->Release();
@@ -200,11 +195,9 @@ void EffectVertexBatchDestroy(FEffectVertexBatch* Batch)
 
 void EffectVertexBatchGrowVertices(FEffectVertexBatch* Batch)
 {
-    // FUN_0046ecd0 (thiscall): nothing while count (+0x08) < capacity (+0x20) (unsigned, JC).
-    // Else operator new((growth +0x1c + cap) * 0x18); VC6's operator new returns null instead of
-    // throwing and a null leaves the batch untouched (std::nothrow here). The old cap*0x18 bytes
-    // are copied when the old buffer (+0x04) exists, the old buffer freed (FUN_005b7e1d, even
-    // for null), then +0x04 = the new buffer and +0x20 = cap + growth.
+    // FUN_0046ecd0: nothing while count < capacity (unsigned). Otherwise grow by +0x1c; a null
+    // from VC6's operator new leaves the batch untouched (std::nothrow here), and the old buffer
+    // is freed even when null.
     if (static_cast<unsigned>(Batch->VertCount) < Batch->VertCapacity)
         return;
 
@@ -309,33 +302,27 @@ void EffectVertexBatchPushQuad(FEffectVertexBatch* Batch, unsigned short I0,
 
 void EffectVertexBatchSetColor(FEffectVertexBatch* Batch, float R, float G, float B)
 {
-    // FUN_004fc950 (thiscall, RET 0xc): each argument * 255.0 (double 0x005c89c0) through
-    // ftol, the low byte stored -- R to +0x30, G to +0x31, B to +0x32 -- and 0xff to +0x33.
+    // FUN_004fc950: each argument * 255.0 (double 0x005c89c0) truncated, the low byte stored.
     Batch->ColorR = static_cast<unsigned char>(static_cast<long>(static_cast<double>(R) * 255.0));
     Batch->ColorG = static_cast<unsigned char>(static_cast<long>(static_cast<double>(G) * 255.0));
     Batch->ColorB = static_cast<unsigned char>(static_cast<long>(static_cast<double>(B) * 255.0));
     Batch->ColorA = 0xff;
 }
 
-// FUN_004f9de0 (cdecl: camera), listing-traced 0x004f9de0..0x004fa09e. Its sole caller is the
-// beam branch of FUN_004f7480 (0x004f76cd). It works on the Effect.cpp batch DAT_00674c7c
-// directly; DALib::Pipeline is re-read for every call and never tested.
+// FUN_004f9de0. Its sole caller is the beam branch of FUN_004f7480. It works on the Effect.cpp
+// batch DAT_00674c7c directly; DALib::Pipeline is re-read for every call and never tested.
 void EffectVertexBatchFlush(ICamera* Cam)
 {
     FEffectVertexBatch* const Batch = &G_EffectVertexBatch;
 
-    // 0x004f9de1..0x004f9df3: stage 0 type 0xb = 0.
     DALib::Pipeline->SetTextureStageState(0, 0xb, 0);
-    // 0x004f9df9..0x004f9e28 / 0x004f9e2a..0x004f9e58: DAT_005d9a04 on stage 0, DAT_005d9a3c on
-    // stage 1. 0x004f9e5a..0x004f9e86: the RS table DAT_005d99dc (0x8d first).
     ApplyTssTable(DALib::Pipeline, 0, kTssStage0);
     ApplyTssTable(DALib::Pipeline, 1, kTssStage1);
     ApplyRsTable(DALib::Pipeline, kRsSetup);
 
-    // 0x004f9e88..0x004f9eaa: slot 66 with FUN_00425640(DAT_00674f54, frame 0).
+    // The code_beam texture (DAT_00674f54), frame 0.
     DALib::Pipeline->SetTextureStageTexture(0, ResolveBeamTextureHandle(G_BeamEffectTexture, 0));
 
-    // 0x004f9eb0..0x004f9f3f.
     DALib::Pipeline->SetRenderState(D3DRS_CLIPPING, 1);  // CLIPPING
     DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);  // CULLMODE = NONE
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 1);   // ZENABLE
@@ -344,18 +331,15 @@ void EffectVertexBatchFlush(ICamera* Cam)
     DALib::Pipeline->SetRenderState(D3DRS_SRCBLEND, 2);  // SRCBLEND = ONE
     DALib::Pipeline->SetRenderState(D3DRS_DESTBLEND, 2);  // DESTBLEND = ONE
 
-    // 0x004f9f45..0x004f9f71: RS 0x89 read into the local, then set to 0.
     int SavedLighting = 0;
     DALib::Pipeline->GetRenderState(D3DRS_LIGHTING, &SavedLighting);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 0);
 
-    // 0x004f9f77..0x004f9f95: the camera's view (vt+0x40) as the modelview (slot 31, +0x7c).
     IRenderPipeline* const ModelviewPipe = DALib::Pipeline;
     ModelviewPipe->SetModelview(Cam->GetViewTransform());
 
-    // 0x004f9f98..0x004f9fc6: the batch's pipeline reference (+0x18, DAT_00674c94) released
-    // and cleared when set, then DALib::Pipeline taken with AddRef -- only when it is non-null
-    // (0x004f9fb6 TEST ESI,ESI / JZ, retail's own test on the smart-pointer assignment).
+    // The batch's pipeline reference (DAT_00674c94) is replaced; retail's own null test on the
+    // smart-pointer assignment.
     if (Batch->Pipeline != nullptr)
     {
         Batch->Pipeline->Release();
@@ -368,9 +352,7 @@ void EffectVertexBatchFlush(ICamera* Cam)
         Taken->AddRef();
     }
 
-    // 0x004f9fcb..0x004fa00e: with a pipeline, slot 70 (+0x118) DrawIndexedPrimitiveUp(4, FVF
-    // +0x0c, vertices +0x04, count +0x08, indices +0x10, count +0x14, 0) -- no count or buffer
-    // test -- then the reference released and cleared.
+    // No count or buffer test.
     if (Batch->Pipeline != nullptr)
     {
         Batch->Pipeline->DrawIndexedPrimitiveUp(
@@ -383,7 +365,6 @@ void EffectVertexBatchFlush(ICamera* Cam)
         }
     }
 
-    // 0x004fa018..0x004fa099: RS 0x89 back, 0x1b = 0, 0xe = 1, 0x16 = 2, table DAT_005d99f4.
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, SavedLighting);
     DALib::Pipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 1);

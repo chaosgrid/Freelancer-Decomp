@@ -5,7 +5,6 @@
 // Author: Giperion.
 
 // TU23 (06ed4220-06ed5390): the [CharacterEncounter] RTC script object. See RtcScripts.h.
-// Lane CNT-MS-TRIG (docs/re/content.md).
 
 #include "Bases/RtcScripts.h"
 
@@ -31,8 +30,7 @@ FCharacterEncounter::FCharacterEncounter()
 {
 }
 
-// FUN_06ed4470 (06ed4470-06ed4494): walk +0x48..+0x4c in 0x48 steps, the first element whose
-// +0x00 equals Type -> &element+8 (Text.Data); none -> 0.
+// FUN_06ed4470 (06ed4470-06ed4494).
 char const* FCharacterEncounter::FindActionText(int Type) const
 {
     for (std::vector<FCharacterEncounterAction>::const_iterator It = Actions.begin();
@@ -44,8 +42,7 @@ char const* FCharacterEncounter::FindActionText(int Type) const
     return nullptr;
 }
 
-// FUN_06ed44a0 (06ed44a0-06ed5075, thiscall, RET 4). The local INI_Reader is closed by its
-// destructor (the inlined teardown at 06ed4e95-06ed505d); AL = the FUN_06f24280 result.
+// FUN_06ed44a0 (06ed44a0-06ed5075, thiscall, RET 4).
 bool FCharacterEncounter::Load(char const* Path)
 {
     INI_Reader Reader;
@@ -60,16 +57,14 @@ bool FCharacterEncounter::Load(char const* Path)
                 continue;
             do
             {
-                // 06ed4561-06ed456c: the action record's text is emptied on every line; its
-                // type is written only by the action keys below.
+                // The action record's text is emptied on every line; its type is written
+                // only by the action keys below.
                 FCharacterEncounterAction Action;
                 Action.Text.Length = 0;
                 Action.Text.Data[0] = '\0';
                 bool bAction = true;
                 if (Reader.is_value("Location"))
                 {
-                    // 06ed4589-06ed4626: base (max 0x20), room (max 0x40), GetBaseID into +4,
-                    // FindLocation(+4, room) into +0.
                     TString<0x20> BaseName;
                     BaseName = Reader.get_value_string(0);
                     TString<0x40> RoomName;
@@ -101,7 +96,7 @@ bool FCharacterEncounter::Load(char const* Path)
                     }
                     else if (Reader.is_value("mission_text_id"))
                     {
-                        // 06ed477a-06ed4792: two reads of value 0, the first into +0x34.
+                        // Retail reads value 0 twice.
                         LoadedMissionTextId = Reader.get_value_int(0);
                         MissionTextId = Reader.get_value_int(0);
                     }
@@ -111,7 +106,6 @@ bool FCharacterEncounter::Load(char const* Path)
                     }
                     else if (Reader.is_value("relocate_player"))
                     {
-                        // 06ed47da-06ed488f.
                         TString<0x40> RoomName;
                         RoomName = Reader.get_value_string(0);
                         if (_stricmp(RoomName.Data, "Spaceflight") == 0)
@@ -128,7 +122,6 @@ bool FCharacterEncounter::Load(char const* Path)
                     }
                     else if (Reader.is_value("start_room"))
                     {
-                        // 06ed48aa-06ed493e.
                         TString<0x40> RoomName;
                         RoomName = Reader.get_value_string(0);
                         unsigned int RoomBaseId = BaseId;
@@ -139,8 +132,6 @@ bool FCharacterEncounter::Load(char const* Path)
                 }
                 if (bAction)
                 {
-                    // 06ed494e-06ed4996: the text is the line's first value (max 0x40), the
-                    // record is appended at +0x4c (FUN_06ed5080).
                     Action.Text = Reader.get_value_string();
                     Actions.push_back(Action);
                 }
@@ -148,8 +139,6 @@ bool FCharacterEncounter::Load(char const* Path)
         }
         else if (Reader.is_header("Reserve"))
         {
-            // 06ed49cb-06ed4a39: every spot whose placement resolves in +0x00 is appended at
-            // +0x24 (FUN_06f937c0).
             if (!Reader.read_value())
                 continue;
             int Spot;
@@ -165,7 +154,6 @@ bool FCharacterEncounter::Load(char const* Path)
         }
         else if (Reader.is_header("Char"))
         {
-            // 06ed4a51-06ed4a74: role {"" , no character, spot -1, fidget ""}.
             FRtcScriptRole Role;
             Role.Role.Length = 0;
             Role.Role.Data[0] = '\0';
@@ -177,8 +165,7 @@ bool FCharacterEncounter::Load(char const* Path)
                 {
                     if (Reader.is_value("actor"))
                     {
-                        // 06ed4abd-06ed4b4d: the role name (max 0x20); unless a character is
-                        // already set, the specific NPC of the same name (map find, DAT_06fd081c).
+                        // Unless a character is already set, the specific NPC of the same name.
                         Role.Role = Reader.get_value_string();
                         if (Role.Character == nullptr)
                         {
@@ -190,13 +177,13 @@ bool FCharacterEncounter::Load(char const* Path)
                     }
                     else if (Reader.is_value("spot"))
                     {
-                        // 06ed4b64-06ed4b75: the result is not tested.
+                        // The result is not tested.
                         pub::GF::GetCharacterPlacementByName(LocationId, Reader.get_value_string(),
                                                              Role.Spot);
                     }
                     else if (Reader.is_value("npc"))
                     {
-                        // 06ed4b8f-06ed4be4: the specific NPC, replacing any earlier one.
+                        // Replaces any earlier character.
                         unsigned int const Key = CreateID(Reader.get_value_string());
                         FNpcCharacterDescMap::const_iterator It = GSpecificNpcs.find(Key);
                         if (It != GSpecificNpcs.end())
@@ -204,12 +191,10 @@ bool FCharacterEncounter::Load(char const* Path)
                     }
                     else if (Reader.is_value("fidget"))
                     {
-                        // 06ed4bf8-06ed4c9d: the inlined VC6 string assign.
                         Role.Fidget = Reader.get_value_string();
                     }
                 } while (Reader.read_value());
             }
-            // 06ed4cc2-06ed4e3d: the inlined vector insert at +0x14 (end).
             Roles.push_back(Role);
         }
     } while (Reader.read_header());

@@ -13,10 +13,8 @@
 #include "../ivp_utility/ivp_vhash.h"
 
 // ============================================================================
-// IVP active values (2026-10-08, claude-code:cmn-phy4): named float / int
-// values that notify listeners when they change, and the manager the
-// environment owns at +0x98. Moved here from the raw-offset port in
-// src/Common/common_stubs.cpp (the former "CActiveVarRegistry" cluster).
+// IVP active values: named float / int values that notify listeners when they
+// change, and the manager the environment owns at +0x98.
 //
 // Retail has no RTTI for the IVP code; the classes are fixed by their
 // constructors and vtables:
@@ -51,9 +49,8 @@ class IVP_U_Active_Float;
 class IVP_U_Active_Int;
 class IVP_U_Active_Value_Manager;
 
-// .data:063ee640, initial value -1. Incremented by both terminal setters
-// (063621a9-063621b6, 06362219-06362226) and read by nothing else in the
-// module. PORT-LOCAL NAME.
+// .data:063ee640, initial value -1. Incremented by both terminal setters and
+// read by nothing else in the module. PORT-LOCAL NAME.
 extern int GActiveValueChangeCounter;
 
 // The listeners an active float / int calls when its value changes:
@@ -112,9 +109,8 @@ public:
 
     // FUN_06361e80 (thiscall, RET 4).
     explicit IVP_U_Active_Float(const char* NameIn);
-    // slot 0: FUN_06361ee0 (deleting) -> FUN_06361f80. The vector member's
-    // destructor is the retail body (+0x10 freed unless it is the inline
-    // address +0x14, then the counts zeroed).
+    // slot 0: FUN_06361ee0 (deleting) -> FUN_06361f80; the body is the vector
+    // member's destructor.
     virtual ~IVP_U_Active_Float() {}
     // slot 1: _purecall in this class; the terminal returns 0 after printing
     // its type name. PORT-LOCAL NAME.
@@ -244,8 +240,8 @@ public:
     virtual void FireDelayed();
     // slot 9: FUN_063617b0. PORT-LOCAL NAME.
     virtual void InitActiveValuesGeneric();
-    // slot 10: LAB_06361b30 (RET 4); IVP_Environment::simulate_psi calls it
-    // (.text:0634d0d5-0634d0de). PORT-LOCAL NAME.
+    // slot 10: LAB_06361b30 (RET 4); called by IVP_Environment::simulate_psi:
+    // sets "current_time", then FireDelayed. PORT-LOCAL NAME.
     virtual void RefreshPsiActiveValues(IVP_Environment* Environment);
     // slot 11: LAB_06361b80 (RET 8): the named float, created if missing.
     // PORT-LOCAL NAME.

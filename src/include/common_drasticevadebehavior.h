@@ -20,11 +20,10 @@
 // ".?AVDrasticEvadeBehavior@@", ClassHierarchyDescriptor 063a8e3c with two bases
 // (DrasticEvadeBehavior, Behavior) -- a single-inheritance child of Behavior.
 //
-// Constructor FUN_062c8730 (Common.dll.txt 195469-195488): FUN_062d2020(TypeId),
+// Constructor FUN_062c8730: FUN_062d2020(TypeId),
 // +0x40 = 0, vptr 0639f8ec, +0x30 = 4.0f, +0x34/+0x38/+0x3c = 0.
 //
-// Vtable .rdata:0639f8ec, 27 slots. Overrides of Behavior's table (raw .rdata dwords,
-// 2026-10-08):
+// Vtable .rdata:0639f8ec, 27 slots. Overrides of Behavior's table:
 //    0  FUN_062c7090  scalar-deleting dtor, ICF-shared by 7 behavior vtables
 //    1  LAB_062cf3e0  `JMP FUN_062d2090` -- Behavior::BindContext
 //    3  FUN_062c8790  OnEngage
@@ -41,22 +40,21 @@ public:
     explicit DrasticEvadeBehavior(int InTypeId);
     ~DrasticEvadeBehavior() override;
 
-    // Slot 1, LAB_062cf3e0 (Common.dll.txt 205851-205852): `JMP FUN_062d2090`.
+    // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
 
-    // Slot 3, FUN_062c8790 (Common.dll.txt 195521-195530): FUN_062d20d0, then +0x2c = 0.
+    // Slot 3, FUN_062c8790: FUN_062d20d0, then +0x2c = 0.
     void OnEngage() override;
 
-    // Slot 4, FUN_062c87b0 (Common.dll.txt 195547-195556): FUN_062d20f0, then
-    // Flags28 |= 0x2.
+    // Slot 4, FUN_062c87b0: FUN_062d20f0, then Flags28 |= 0x2.
     void OnDisengage() override;
 
-    // Slot 5, LAB_062c8760 (Common.dll.txt 195491-195507), `RET 4`, argument unread.
+    // Slot 5, LAB_062c8760, `RET 4`, argument unread.
     // With Flags28 bit 0x2: 3 when Flag29 is set, else 0. Without it: 3 when Flag29 is
     // set, else 2. Stored at +0x0c and returned.
     int OnEvaluateReadiness(float Unused) override;
 
-    // Slot 7, LAB_062c8800 (Common.dll.txt 195590-195666). Switch on Kind40:
+    // Slot 7, LAB_062c8800. Switch on Kind40:
     //   0 -> timer += delta; owner's IObjAffect::set_nudge_vec({Offset.x, Offset.y, 0})
     //        while timer < duration (result 1), else set_nudge_vec({0,0,0}) (result 2);
     //   1 -> timer += delta; Behavior_UpdateCruiseGate(Sys+0x18, -1.0f or 0.0f, 0),
@@ -64,7 +62,7 @@ public:
     //   other -> result 3.
     int OnUpdate() override;
 
-    // Slot 10, LAB_062c87c0 (Common.dll.txt 195559-195584), `RET 4`: takes a
+    // Slot 10, LAB_062c87c0, `RET 4`: takes a
     // pub::AI::DirectiveDrasticEvadeOp-shaped op: Kind40 = Op+0xc; when it is 0,
     // Offset = Op+0x10..+0x18; Flags28 |= 0x2; Duration30 = Op+0x1c; returns true.
     bool OnApplyDirective(void* DirectiveOp) override;

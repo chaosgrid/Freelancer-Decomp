@@ -11,27 +11,15 @@
 // Used / Capacity, with an optional highlighted head (+0x33c) and tail (+0x338) segment, a
 // line-loop border and a "used/capacity" tooltip.
 //
-// WINFACTORY<CargoBarControl> "CargoBarControl": ctor FUN_0055fcb0 (called from the static
-// initializer at 0x0055e90a), Create FUN_0055fd20 (operator_new(0x350), FUN_0055e930, slot 9).
-// Built directly by WinControl::CreateCargoBarControl (FUN_005a1080 -> Init FUN_0055ee80).
+// WINFACTORY<CargoBarControl> "CargoBarControl": ctor FUN_0055fcb0, Create FUN_0055fd20
+// (operator new(0x350)). Also built directly by WinControl::CreateCargoBarControl.
 //
-// vftable 0x005e1924 (45 slots) -- WinControl's with these overrides:
-//    0 FUN_0055e9f0 scalar deleting dtor (WinControl's FUN_0059fa50 only)
-//    4 LAB_0055fa80 HitTest          5 LAB_0055f5a0 SetPosition     6 LAB_0043d8e0 (Win3D's)
-//    7 LAB_0055f5f0 SetOrientation   9 LAB_0055eb40 Create         11 LAB_0055f660 Update
-//   13 LAB_0055ef60 Draw            15 FUN_0055fa00 MouseEnter     16 FUN_0055fa40 MouseLeave
-//   19 FUN_005a0650 (WinControl's)  27 LAB_0055e9e0 GetHitPriority (0x64)
-//   35 FUN_00401e90 RefreshAttachment (RET -- no hardpoint re-attach)
-//   40 LAB_0055ea20 GetAttachOrientation   41 FUN_0055eaf0 GetAttachPosition
-//   42 LAB_0055fb00 SetProperty
+// vftable 0x005e1924 (45 slots) -- WinControl's with the overrides declared below; slot 0 is
+// FUN_0055e9f0 (scalar deleting dtor, WinControl's body only), slots 6 and 19 stay Win3D's /
+// WinControl's.
 //
-// Layout (ctor FUN_0055e930, size 0x350):
-//   +0x32c "tooltip2" IDS -- the caption prefix of the tooltip ("%s %d/%d")
-//   +0x330 capacity, +0x334 used, +0x338 tail segment, +0x33c head segment (floats)
-//   +0x340 fill colour RGBA bytes ("color", ctor 0,0,0,0)
-//   +0x344 segment colour RGBA bytes ("color_highlight", ctor 0xff,0xff,0,0xff)
-//   +0x348 bHorizontal, +0x349 bHovered, +0x34a bToolTip, +0x34b (properties 0x2c / 0x2d),
-//   +0x34c bBorder (ctor 1), +0x34d bShow (ctor 1)
+// "color" (+0x340) and "color_highlight" (+0x344) are RGBA bytes; the ctor sets the highlight
+// to 0xff,0xff,0,0xff. +0x34b is set and cleared by properties 0x2c / 0x2d.
 
 #include "Interface/wincontrol_base.h"
 
@@ -64,7 +52,7 @@ public:
     void GetAttachPosition(float* OutPosition3) override;          // slot 41 FUN_0055eaf0
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override; // slot 42 LAB_0055fb00
 
-    int ToolTip2Ids;                  // +0x32c
+    int ToolTip2Ids;                  // +0x32c -- "tooltip2", the "%s %d/%d" caption prefix
     float Capacity;                   // +0x330
     float Used;                       // +0x334
     float TailSegment;                // +0x338
@@ -89,10 +77,10 @@ static_assert(offsetof(CargoBarControl, Color) == 0x340, "CargoBarControl +0x340
 static_assert(offsetof(CargoBarControl, bShow) == 0x34d, "CargoBarControl +0x34d");
 static_assert(sizeof(CargoBarControl) == 0x350, "retail CargoBarControl is 0x350 bytes");
 
-// The tooltip hover record (tooltip_hover.h) as retail inlines it at each hover site: the
-// per-site start values after construction and the caption copy (FUN_004142a0 + wcsncpy). The
-// construction and the teardown (FUN_00444ee0) are the record's own ctor / dtor. Defined in
-// cargo_bar_control.cpp; NN_Inventory's SetProperty 0x4f uses them too.
+// The tooltip hover record (tooltip_hover.h) set-up retail inlines at each hover site: the
+// per-site start values after construction and the caption copy. Construction and teardown
+// (FUN_00444ee0) are the record's own ctor / dtor. NN_Inventory's SetProperty 0x4f uses these
+// too.
 struct FToolTipHoverInfo;
 void ToolTipHoverInit(FToolTipHoverInfo* Info);
 void ToolTipHoverSetCaption(FToolTipHoverInfo* Info, wchar_t const* Text);

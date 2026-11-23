@@ -18,7 +18,7 @@
 //   FUN_005b40f0  apply everything changed since the last apply
 //   FUN_005b4050  clear the registry  FUN_005b3860  max_submitted_sounds accessor
 //
-// Call order in retail InitializeEngine (FUN_005b1300 @ 005b168e):
+// Call order in retail InitializeEngine (FUN_005b1300):
 //   LoadPerfOptions("PerfOptions.ini", &display)
 //   if (!ok) { FUN_004a9380(); ApplyChangedPerfOptions(); }
 //   SavePerfOptions("PerfOptions.ini")
@@ -60,7 +60,7 @@ void ApplyChangedPerfOptions();
 
 // FUN_005b38d0 / FUN_005b3ec0. FileName is a bare name; both prepend GetUserDataPath().
 // Save takes only the name and always writes [Display] from the options object g_display
-// (DAT_00679bc8..bd4).
+// (+0x08..+0x14).
 bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display);
 void SavePerfOptions(char const* FileName);
 

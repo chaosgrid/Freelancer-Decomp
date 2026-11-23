@@ -8,8 +8,7 @@
 
 #include "common_exports.h"
 #include "common_behavior.h" // Behavior
-#include "common_idea.h"     // MoveIdea, FaceIdea, AfterburnerIdea -- the three real embedded
-                             // sub-objects (their ctors FUN_062d4e60 / FUN_062d6750 / FUN_062da500)
+#include "common_idea.h"     // MoveIdea, FaceIdea, AfterburnerIdea (embedded sub-objects)
 
 #include <cstddef>
 
@@ -17,11 +16,9 @@ struct IObjInspect;          // common_iface.h -- SelectStrafePoint's second arg
 
 // ============================================================================
 // StrafeBehavior -- behavior type 13 ("Strafe"), factory body at .text:062d1cc0
-// (`PUSH 0x1bc; CALL operator_new; ... CALL FUN_062c9540`). RTTI: COL at vftable-4 names
-// ".?AVStrafeBehavior@@", a single-inheritance child of Behavior.
+// (operator new(0x1bc), then FUN_062c9540). Single-inheritance child of Behavior (RTTI).
 //
-// Vtable .rdata:0639f9dc, 27 slots. Overrides of Behavior's table (raw .rdata dwords,
-// 2026-10-08):
+// Vtable .rdata:0639f9dc, 27 slots. Overrides of Behavior's table:
 //    0  FUN_062c95c0  scalar-deleting dtor around FUN_062c95e0
 //    1  LAB_062c9660  SetContext
 //    3  LAB_062ca1e0  OnEngage
@@ -64,14 +61,14 @@ public:
     // and the target's speed squared is <= 400; else 2; 3 with +0x29. Stored at +0x0c.
     int OnEvaluateReadiness(float Unused) override;
 
-    // Slot 7, LAB_062c9d20 (Common.dll.txt 197576-197942), 354 instructions.
+    // Slot 7, LAB_062c9d20.
     int OnUpdate() override;
 
     // Slot 10, LAB_062c96e0 (RET 4): Op non-null and FUN_062e74a0(Sys+0x34, Op+0xc) non-null
     // -> Flags28 |= 2, true; else Flags28 &= ~2, false.
     bool OnApplyDirective(void* DirectiveOp) override;
 
-    // FUN_062c9810 (item 1365), thiscall, RET 8. Mode 0 aims at Target (or its subtarget),
+    // FUN_062c9810. Mode 0 aims at Target (or its subtarget),
     // mode 1 picks a point StrafeDistance34 off to the side; both arms hand the point to the
     // MoveIdea and FaceIdea, and every path ends with StrafeMode48 = Mode.
     void SelectStrafePoint(int Mode, IObjInspect const* Target);

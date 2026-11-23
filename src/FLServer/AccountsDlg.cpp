@@ -203,7 +203,7 @@ void CAccountsDlg::OnEditAccount()
 	OnSelChangeList();
 }
 
-// .text:00413180 — JMP 00413030.
+// .text:00413180
 void CAccountsDlg::OnDblClkList()
 {
 	OnEditAccount();

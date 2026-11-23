@@ -31,8 +31,7 @@ struct FNebulaClouds
 static_assert(sizeof(FNebulaClouds) == 0x12c, "Clouds component 0x12c");
 
 // DAT_00679860 -- SpaceTerrainRenderComp.cpp's lazily filled I3DMathEngine (FUN_005b73e0 on
-// first use). Readers: FUN_0054c8b0 (0x0054cb06, the band rings in cli_asteroid.cpp),
-// FUN_00550d40 (0x00550e2f, 0x0055123e) and FUN_00551500 (0x0055156e, 0x005519f3, 0x00551b94).
+// first use). Readers: FUN_0054c8b0 (band rings, cli_asteroid.cpp), FUN_00550d40, FUN_00551500.
 struct I3DMathEngine;
 extern I3DMathEngine* G_CloudsMath;
 
@@ -70,7 +69,7 @@ struct FNebulaCloudsListStorage
 {
     FNebulaCloudsListStorage();
     ~FNebulaCloudsListStorage();
-    unsigned Allocator; // Intentionally unwritten, as in the existing list constructor.
+    unsigned Allocator; // Never written, as in retail's list constructor.
     FNebulaCloudsListNode* Sentinel;
     unsigned Count;
 };
@@ -183,9 +182,8 @@ void NebulaRebuild(FNebulaEffect* Nebula);
 // FUN_00506cc0
 void NebulaShutdown(FNebulaEffect* Nebula);
 
-// LAB_00506f20 — vtable +0x08 (RET 8). Arg1 = camera ([ESP+0x3c] after the prologue, its
-// vt+0xc gives the position); arg2 = frame dt, stored to +0x1c (506f20 MOV EAX,[ESP+8]).
-// Caller: StarSysUpdate FUN_00554eb0 (PUSH dt; PUSH cam; CALL [EDX+8]).
+// LAB_00506f20 — vtable +0x08. Camera's vt+0xc gives the position; Dt is stored to +0x1c.
+// Caller: StarSysUpdate FUN_00554eb0.
 void NebulaUpdate(FNebulaEffect* Nebula, void* Camera, float Dt);
 
 // FUN_00507340 — bolt segment basis re-orient

@@ -9,7 +9,6 @@
 // Content.dll TU29 (06ef3630-06ef8d40): the encounter parameters of a system, read from the
 // files named by [EncounterParameters] sections of the system ini (SystemInfo 06f74c2d),
 // plus their copies that the zone "encounter = id, level, chance" key keeps (TU30).
-// Lane CNT-POP (docs/re/content.md, TU map).
 
 #include "common_id.h"                  // ID_String
 #include "common_weighted_vector.h"     // weighted_vector<unsigned int>
@@ -51,7 +50,7 @@ struct FEncounterShip
     // once (linear find before the insert).
     std::vector<unsigned int> ShipClasses;
     ID_String NpcArch;                  // +0x10 ship_by_npc_arch value 2
-    // +0x14: 0 in both loaders; the spawn (FUN_06ef54e0 06ef5754) resolves the line's arch
+    // +0x14: 0 in both loaders; the spawn (FUN_06ef54e0) resolves the line's arch
     // here -- NpcArch in GNpcShipArchs, else a pick for the formation's faction -- and
     // FUN_06ef4780 builds the blocks from it.
     FNpcShipArch* Arch;
@@ -126,7 +125,7 @@ struct FEncounterParameters
     FEncounterPermutation* CurrentPermutation;
     std::vector<FEncounterFormation> Formations;       // +0x2c [EncounterFormation]
     // +0x3c: faction weights; filled from the zone's "faction = name, weight" lines that
-    // follow its "encounter" line (TU30 06ef90d4).
+    // follow its "encounter" line (TU30 FZonePopulation::ParseValue).
     weighted_vector<unsigned int> Factions;
 
     // FUN_06ef3950: the zone key's local; +0x04..+0x14 and +0x28 are left unset in retail
@@ -183,14 +182,14 @@ struct FEncounterParameters
                         std::list<FContentNpcShipParams>* Blocks);
 };
 
-// FUN_06ef4780 (thiscall with an unused this, RET 0x10; caller 06ef4f00): one parameter block
+// FUN_06ef4780 (thiscall with an unused this; caller SpawnFormation): one parameter block
 // per ship of every ship line of Formation (count = min..max by rand), appended to Blocks.
 // The first ship of the first line carries a guide description of the formation's behavior
 // with Zone as its wander zone; longevity goes to +0x104 / +0x108 (x2).
 void BuildFormationBlocks(FEncounterFormation const* Formation,
                           std::list<FContentNpcShipParams>* Blocks, FSystemZone* Zone,
                           unsigned int ControllerId);
-// FUN_06ef4cf0 (cdecl; caller 06ef4f7b): every block gets a name and reputation from the
+// FUN_06ef4cf0 (cdecl; caller SpawnFormation): every block gets a name and reputation from the
 // formation's faction (TU42 name generation); the first block's name fixes the formation
 // designation for the others.
 void __cdecl NameFormationBlocks(std::list<FContentNpcShipParams>* Blocks,
@@ -203,7 +202,7 @@ struct FZoneEncounter : public FEncounterParameters
 {
     float Chance;                       // +0x4c "encounter" value 2
 
-    // TU30 06ef91ae-06ef91c3: the base copy ctor FUN_06ef9e50, then +0x4c = the chance.
+    // Inlined in TU30 (06ef91ae): the base copy ctor FUN_06ef9e50, then the chance.
     FZoneEncounter(FEncounterParameters const& Parameters, float InChance)
         : FEncounterParameters(Parameters)
         , Chance(InChance)

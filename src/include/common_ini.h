@@ -23,11 +23,7 @@ public:
     float z;
 };
 
-// Common.dll.c 0x0628b030 -- trivial Vector assign (this->x=a, this->y=b, this->z=c). Not
-// exported; one of the highest call-count leaf helpers in Common.dll (273 call sites, mostly
-// steering/physics math building a scratch Vector from three floats). Kept here as a real port
-// of the primitive for tracker completeness; callers elsewhere in this port should normally
-// just assign the three fields directly rather than route through this wrapper.
+// 0x0628b030 -- Vector assign (this->x=a, this->y=b, this->z=c). Not exported; 273 call sites.
 inline void Vec3Assign(Vector* Dst, float X, float Y, float Z)
 {
     Dst->x = X;
@@ -35,11 +31,8 @@ inline void Vec3Assign(Vector* Dst, float X, float Y, float Z)
     Dst->z = Z;
 }
 
-// Common.dll.c 0x062c5a70 -- Vector unary negate (Dst = -*Src). Thiscall leaf helper (Src in
-// ECX, hidden struct-return pointer passed on the stack, EAX = that pointer on return per the
-// usual by-value-return convention). Not exported; 21 call sites across steering/pathfinding
-// math in the 0x062cxxxx/0x062exxxx/0x0633xxxx ranges. Ported as a free function like
-// Vec3Assign rather than a real operator- to match this file's existing convention.
+// 0x062c5a70 -- Vector unary negate (Dst = -*Src). Thiscall (Src in ECX, hidden return
+// pointer on the stack, returned in EAX). Not exported; 21 call sites.
 inline Vector* VecNegate3(Vector const* Src, Vector* Dst)
 {
     Dst->x = -Src->x;
@@ -48,13 +41,8 @@ inline Vector* VecNegate3(Vector const* Src, Vector* Dst)
     return Dst;
 }
 
-// Common.dll.c 0x062e2590 (FUN_062e2590). Thiscall leaf: `this -= *Src` in place
-// (This->x/y/z each FSUB the matching field of *Src, FSTP'd straight back). RET 0x4
-// confirms exactly one stack arg past ECX=this. Sole caller (2 sites) is the still-
-// unported FUN_062e1f40 orientation/basis builder in the AISTEER/TurnHelper cluster
-// (0x062dexxxx-0x062e6xxx); ported standalone since the operation itself is
-// unambiguous. Named to match VecNegate3's free-function convention rather than a
-// real operator-=.
+// FUN_062e2590, thiscall, RET 4: `this -= *Src` in place. Sole caller (2 sites)
+// BuildOrientationBasis (FUN_062e1f40).
 inline void VecSubInPlace3(Vector* This, Vector const* Src)
 {
     This->x -= Src->x;
@@ -62,11 +50,8 @@ inline void VecSubInPlace3(Vector* This, Vector const* Src)
     This->z -= Src->z;
 }
 
-// Common.dll.c 0x062e25c0 (FUN_062e25c0). Thiscall leaf: `this *= Scale` in place
-// (each field FMUL'd by the single stack-passed scalar). RET 0x4, one stack arg past
-// ECX=this. Called from the same FUN_062e1f40 cluster as VecSubInPlace3 above (4
-// sites) and, independently, from ParseGUID (0x0631b980) -- almost certainly a COMDAT
-// fold of identical machine code rather than a real semantic link between the two.
+// FUN_062e25c0, thiscall, RET 4: `this *= Scale` in place. Callers BuildOrientationBasis
+// (4 sites) and ParseGUID (0x0631b980), the latter probably an ICF fold.
 inline void VecScaleInPlace3(Vector* This, float Scale)
 {
     This->x *= Scale;
@@ -74,13 +59,8 @@ inline void VecScaleInPlace3(Vector* This, float Scale)
     This->z *= Scale;
 }
 
-// Common.dll.c 0x062e25f0 (FUN_062e25f0). __cdecl(Out, A, B): standard 3D cross product,
-// Out = A x B. Verified both from the raw x87 disasm (Common.dll.txt:236296-236316, each
-// of the 3 output components built from exactly the expected FLD/FMUL/FSUBP pair) and the
-// decompiled body agrees on operand order. 3 call sites, all from the still-unported
-// FUN_062e1f40 orientation/basis-builder (same AISTEER/TurnHelper cluster as
-// VecSubInPlace3/VecScaleInPlace3 above). Plain cdecl (RET with no stack-adjust immediate),
-// returns Out for chaining like the other free helpers in this file.
+// FUN_062e25f0, __cdecl(Out, A, B): Out = A x B, returns Out. 3 call sites, all in
+// BuildOrientationBasis.
 // Precision (062e25f8-062e2627): each product pair and its FSUBP stay on the x87 stack and
 // all three components are computed before the first FSTP float, so each component rounds
 // once and Out may alias A or B.
@@ -95,22 +75,11 @@ inline Vector* VecCross3(Vector* Out, Vector const* A, Vector const* B)
     return Out;
 }
 
-// Common.dll.c 0x062e1680 (FUN_062e1680, decompiled cleanly -- Common.dll.c:113891-113918).
-// __cdecl(Out, Src): standard Vector normalize by magnitude. Below the 0.01f "near-zero"
-// epsilon on sqrt(x^2+y^2+z^2) (retail's `<=`, matched here), Out is zeroed rather than
-// left with a divide-by-near-zero result; otherwise Out = Src * (1/|Src|). The 0.01f
-// constant is DAT_0639e6b8, confirmed from its raw IEEE-754 bytes in .rdata (0a d7 23 3c
-// little-endian == 0x3c23d70a == 0.01f) -- the same constant is reused at 21 call sites
-// across this module's steering/AISTEER family, not unique to this function. 8 call sites,
-// all from still-unported functions in the AISTEER/TurnHelper cluster (0x062c2430/blocked,
-// 0x062c50e0, 0x062cdfa0, 0x062e1f40, 0x062e6d40, 0x062e8ce0/blocked, 0x062e8e60,
-// 0x062ebf50); ported standalone as a foundational primitive. Returns Out for chaining,
-// matching retail's EAX=Out-on-exit convention and this file's other free helpers.
-// PRECISION CORRECTED 2026-10-08 (claude-code:cmn-ai2) from the listing (.text:062e1680-
-// 062e1723): Src is copied to three float locals first, then (z*z + y*y) + x*x, FSQRT and
-// the reciprocal (FDIVR 1.0f) all stay on the x87 stack (double here), the gate is
-// `FCOM 0.01f; TEST AH,0x41; JNZ` (less, equal or unordered -> zero), and each component
-// is `local * inv` FSTP'd to float. The previous body rounded to float at every step.
+// FUN_062e1680, __cdecl(Out, Src), returns Out: Out = Src / |Src|, or zero when |Src| <=
+// 0.01f (DAT_0639e6b8). 8 callers. Precision (.text:062e1680-062e1723): Src is copied to
+// three float locals, (z*z + y*y) + x*x, FSQRT and the reciprocal (FDIVR 1.0f) stay on the
+// x87 stack, the gate is `FCOM 0.01f; TEST AH,0x41; JNZ` (less, equal or unordered ->
+// zero), and each component is `local * inv` FSTP'd to float.
 inline Vector* VecNormalize3(Vector const* Src, Vector* Out)
 {
     float X = Src->x;
@@ -136,8 +105,7 @@ inline Vector* VecNormalize3(Vector const* Src, Vector* Out)
     return Out;
 }
 
-// Common.dll.c 0x062e4f20 (FUN_062e4f20), raw disasm Common.dll.txt:239939-239965.
-// __cdecl(A, B): Euclidean distance between two points. 062e4f28-062e4f4e: the three
+// FUN_062e4f20, __cdecl(A, B): Euclidean distance between two points. 062e4f28-062e4f4e: the three
 // FSUBs stay on the x87 stack, the sum is (dx*dx + dz*dz) + dy*dy, FSQRT, and the
 // result is returned in ST0 UNROUNDED -- hence double. Callers: 0x062cf724
 // (GuideBehavior, FSTP float at once) and 0x062e83ac (IUStateGraph, which FCOMs the
@@ -149,18 +117,6 @@ inline double Distance3(Vector const* A, Vector const* B)
     double const DZ = (double)A->z - B->z;
     return std::sqrt((DX * DX + DZ * DZ) + DY * DY);
 }
-
-// --- 2026-09-10 re-verification pass, DO-NOT-TOUCH-list correction --------------------------
-// The 0x062e0000-0x06301280 sub-range was previously merged into a "forbidden" megazone under
-// the assumption it was entangled with qhull/PhyArch::Part. That assumption was independently
-// re-checked this pass (git log -- src/qhull/ shows only the one-time bulk vendoring commit;
-// decomp-tracker items 1909/1910/1927/1962 in this exact range already carry their own D40/D43
-// XREF-level re-analysis dated 2026-09-09 proving it) and found stale for this sub-range: real
-// vendored qhull 2002.1 lives entirely under src/qhull/vendor/ (qh_initflags etc., already
-// ported per item 3775), and the functions actually sitting at 0x062e0000-0x06301280 are the
-// AISTEER/TurnHelper math cluster (see VecSubInPlace3/VecScaleInPlace3/VecCross3/VecNormalize3
-// above) plus unrelated Archetype/ArchDB ini-loading code -- nothing here touches qhull. Ported
-// below as the first real functions out of this now-reopened sub-range.
 
 // OrientedBox: the 15-float box (Center, the three axes as columns of the owning rotation,
 // HalfExtent) RayOrientedBoxIntersect (FUN_062dfd80) takes and FUN_062e04c0 (OBBIntersect,
@@ -174,20 +130,9 @@ struct OrientedBox
     Vector HalfExtent;
 };
 
-// Common.dll.c 0x062dc410 (FUN_062dc410), raw disasm Common.dll.txt:062dc410-062dc430 (14
-// insns, decomp matches exactly, Common.dll.c:110718-110726). __thiscall(Vector* This, float
-// Length): in-place normalize using an already-computed magnitude -- Inv = 1/Length; This->{x,
-// y,z} *= Inv. RET 0x4 confirms exactly one stack float past ECX=This. 14 call sites across
-// the module (Common.dll.txt:062dc0b2/062dc115/062e1fcb/062e213d/062e235d/062e350c/062e3663/
-// 062e3ae9/062e3d43/062e3db3/062e3eea/062e530c/06330efd/06331361), most inside the still-
-// unported FUN_062e1f40 orientation/basis-builder (0x062dexxxx-0x062e6xxx AISTEER/TurnHelper
-// cluster, same family as VecNormalize3/VecCross3 above) which always precedes this call with
-// FUN_06347e60 (a plain sqrt(x^2+y^2+z^2) magnitude, already ported elsewhere as VectorLength
-// per decomp-tracker item 2879) guarded by the same 0.01f epsilon as VecNormalize3 -- i.e. this
-// is VecNormalize3's in-place counterpart, split into a separate helper in retail because the
-// length is computed once and reused by the caller. Ported standalone as a foundational
-// primitive; not yet wired into FUN_062e1f40 itself (left for a future pass, see that item's
-// notes) since that caller also needs FUN_06347e60's in-place figure of an unported local.
+// FUN_062dc410, __thiscall(This, Length), RET 4: in-place normalize by an already-computed
+// magnitude (This *= 1/Length). 14 call sites, most in BuildOrientationBasis, each after
+// VectorLength (FUN_06347e60) and the 0.01f gate.
 inline void VecNormalizeInPlaceByLength3(Vector* This, float Length)
 {
     // 062dc410-062dc42d: `FLD 1.0f; FDIV Length` stays on the x87 stack for all
@@ -198,26 +143,10 @@ inline void VecNormalizeInPlaceByLength3(Vector* This, float Length)
     This->z = (float)(This->z * Inv);
 }
 
-// Common.dll.c 0x062e1730 (FUN_062e1730), raw disasm Common.dll.txt:234905-235061 (132 insns,
-// decomp matches raw disasm exactly, Common.dll.c:113922-113977). __cdecl(Out, A, B). NOTE:
-// list_references reports 0 used_by/uses for this item -- confirmed stale per the module's
-// standing XREF-under-report warning; the raw .txt XREF header (Common.dll.txt:234905) plus a
-// direct grep for "CALL FUN_062e1730" show exactly 2 real callers, both still-unported: 0x062cd287
-// (Common.dll.txt:202410) and 0x062d7abd (Common.dll.txt:219854), in the AISTEER/TurnHelper
-// family (0x062cxxxx/0x062dxxxx ranges).
-//
-// Computes NormA = VecNormalize3(A) and NormB = VecNormalize3(B) (identical 0.01f epsilon /
-// zero-fallback as VecNormalize3 above -- same FCOM-against-DAT_0639e6b8 pattern, confirmed
-// against the raw disasm for both halves), then Scale = clamp(dot(NormA, NormB), -1.0f, 1.0f)
-// times |A| -- the ORIGINAL, un-normalized magnitude of A (retail re-reads and re-sums *param_2
-// directly for this second SQRT rather than reusing the normalized copy, since the normalized
-// values live in separate stack locals). Out = NormB * Scale: a vector along B's direction whose
-// length is A's own length scaled by the (clamped) cosine of the angle between A and B -- i.e.
-// the projection of A's magnitude onto B's direction, expressed as a vector along B. Ported as a
-// free function matching this file's Out/A/B convention (see VecCross3 above); no confirmed
-// higher-level/domain name for this operation was established this pass (both real call sites
-// are themselves still unported).
-// PRECISION RE-TRACED 2026-10-08 (cmn-ai9) from .text:062e1730-062e18ec. A is normalised with a
+// FUN_062e1730, __cdecl(Out, A, B). Callers .text:062cd287 (FollowBehavior) and 062d7abd.
+// Out = normalize(B) * (|A| * clamp(dot(normalize(A), normalize(B)), -1, 1)): A's length
+// projected onto B's direction, as a vector along B. Retail name unknown.
+// Precision (.text:062e1730-062e18ec): A is normalised with a
 // double inverse (both lengths are sqrt((y*y + z*z) + x*x), gate `> 0.01f`, else zero); B's
 // inverse is FSTP float, B.z * inv FSTP float, while B.x * inv and B.y * inv stay on the FPU;
 // Dot = (A.y*b.y + b.z*A.z) + b.x*A.x on the FPU, clamped (above 1.0f -> 1.0f, below -1.0f ->
@@ -258,30 +187,14 @@ inline Vector* VecCosineProject3(Vector* Out, Vector const* A, Vector const* B)
     return Out;
 }
 
-// Common.dll.c 0x062e1e20 (FUN_062e1e20), raw disasm Common.dll.txt:235559-235662 (85 insns).
-// Ghidra's own pseudocode (Common.dll.c:114172-114203) already renders this cleanly EXCEPT for
-// the acos-domain clamp, which it splits into two duplicated tail-call copies (one per branch)
-// with the actual clamp assignments dropped from the C rendering -- verified against the raw x87
-// sequence at Common.dll.txt:235613-235662 by hand: MOV [slot],0x3f800000 (clamp to +1.0f) before
-// the first _CIacos call (Common.dll.txt:235700 area) when dot > 1.0, and a second FCOMP against
-// DAT_06399404 clamping to -1.0f before the fallback _CIacos call when dot < -1.0. Confirmed the
-// three referenced .rdata constants from their raw bytes: DAT_06399404 = -1.0f, DAT_06399408 =
-// 0.0f (Common.dll.txt:555837-555850), DAT_0639a1d0 = 1.0f (Common.dll.txt:556960-556964).
+// FUN_062e1e20, __cdecl(Basis, A, B): the angle between Basis's z column (Basis[0..2].z,
+// `FLD [EAX+8]` / `[EAX+0x14]` / `[EAX+0x20]`) and normalize(A - B), as
+// fabs(acos(clamp(dot, -1, 1))). Ghidra's rendering drops the two clamp stores. Constants
+// DAT_06399404 = -1.0f, DAT_06399408 = 0.0f, DAT_0639a1d0 = 1.0f. Basis stays a raw
+// 3-Vector array (no owning type confirmed). Caller: BuzzBehavior.
 //
-// __cdecl(Basis, A, B): Dir = VecNormalize3(A - B) (0.01f epsilon / zero fallback, same pattern
-// as VecNormalize3 above); Dot = clamp(dot(BasisZColumn, Dir), -1.0f, 1.0f); returns
-// fabsf(acosf(Dot)) (the fabsf is a no-op for any real acos() result over this domain, kept only
-// for exact retail parity). "BasisZColumn" is confirmed purely from raw byte offsets (Common.dll.
-// txt:235637/235653/235657, `FLD [EAX+8]` / `[EAX+0x14]` / `[EAX+0x20]`, each exactly 0xC/12
-// bytes apart) to be the .z field of 3 consecutive Vectors starting at Basis[0] -- i.e. the "z
-// column" of a row-major 3x3 basis (Basis[0].z, Basis[1].z, Basis[2].z). No confirmed struct/
-// class owns this exact layout at this address in the port; per the placeholder-field policy the
-// parameter is kept as a raw 3-Vector array (offset + primitive type confirmed, semantic owner
-// not) rather than guessing a Matrix/Csys type. list_references reports 0 used_by/uses for this
-// item too (same stale-index caveat as VecCosineProject3 above); no caller was traced this pass.
-//
-// RE-TRACED 2026-10-08 (cmn-ai7), 85/85 insns, Common.dll.txt 062e1e20-062e1f3e. The
-// normalization is inlined, not VecNormalize3: D = A - B (each FSTP float); Len =
+// Precision (.text:062e1e20-062e1f3e): the normalization is inlined, not VecNormalize3:
+// D = A - B (each FSTP float); Len =
 // sqrt((D.z*D.z + D.x*D.x) + D.y*D.y) unrounded; above 0.01f (TEST AH,0x41 + JNZ) Inv =
 // (float)(1.0 / Len) and N = Inv * D stays on the x87 stack, else N = 0. Dot =
 // (float)((N.z*Basis[2].z + N.y*Basis[1].z) + N.x*Basis[0].z) (the FXCH chain at
@@ -315,21 +228,21 @@ inline double AngleToBasisZColumn3(Vector const* Basis, Vector const* A, Vector 
 
 COMMON_API char const* __cdecl StringIndex(char const* Text, unsigned int Index);
 COMMON_API double __cdecl ParseNumber(char const* Text);
-// Common.dll.txt:06333ca0. Returns a pointer into Common's static StringCache pool: never null,
+// 0x06333ca0. Returns a pointer into Common's static StringCache pool: never null,
 // never freed or moved (null / "" -> the shared empty string; bTemporary == false interns
 // case-insensitively, so equal names share one pointer).
 COMMON_API char* __cdecl StringAlloc(char const* Text, bool bTemporary);
 
-// Common.dll.txt:0631bee0, ?ValueNum@@YANPBDI@Z. Field Index of a comma-separated value,
+// 0x0631bee0, ?ValueNum@@YANPBDI@Z. Field Index of a comma-separated value,
 // run through the CRT atof -- NOT through ParseNumber, so no 0x / base-N / char-literal
 // handling here.
 COMMON_API double __cdecl ValueNum(char const* Text, unsigned int Index);
 
-// Common.dll.txt:06333c70, ?StringShutdown@@YAXXZ. Retail tears down the StringCache pool.
+// 0x06333c70, ?StringShutdown@@YAXXZ. Retail tears down the StringCache pool.
 COMMON_API void __cdecl StringShutdown();
 
 // Retail ILoadingScreen (PAVILoadingScreen). Slot 0 = thiscall, no extra args
-// (Common.dll.txt:06311430 JMP [vtable+0]). Both retail implementers have exactly two slots
+// (.text:06311430 JMP [vtable+0]). Both retail implementers have exactly two slots
 // (FLServer.exe vtable .rdata:0041d030, Freelancer.exe .rdata:005e448c), so slot 1 belongs to
 // the interface. Its name is unrecoverable: no symbol names it and no retail module calls it
 // through the vtable (Common's only reader of the registered pointer, DAT_063fd2a4, is the
@@ -523,7 +436,7 @@ public:
     COMMON_API INI_Reader();
     COMMON_API ~INI_Reader();
 
-    // Common.dll.txt 0x062634f0/0x06263650: memberwise copy / assignment of every member in
+    // 0x062634f0 / 0x06263650: memberwise copy / assignment of every member in
     // declaration order -- both FileMaps included, so the copy aliases the source's open
     // OS mappings (see FileMap's own copy note).
     COMMON_API INI_Reader(INI_Reader const& Other);

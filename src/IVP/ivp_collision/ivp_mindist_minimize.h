@@ -16,12 +16,6 @@
 // Return codes (IVP_MRC_TYPE): the callers clear StateFlags 0x4000 / 0x8000 on
 // OK, call proove_polypoly (06352b30) on BACKSIDE, and hit the library's CORE
 // null store on anything other than OK / ENDLESS_LOOP / BACKSIDE.
-//
-// STATE (cmn-ivp2d, 2026-10-08): every member below has a body in
-// ivp_mindist_minimize.cpp, ported from the listing. This header is in the
-// build (ivp_compact_ledge_solver.cpp includes it for IVP_Cache_Ledge_Point);
-// the .cpp joins Common.vcxproj together with the switch-over of 06352cf0 /
-// 06352b90 (exclusive slot).
 
 #include <cstdint>
 
@@ -85,9 +79,8 @@ public:
     IVP_Ledge_Mindist* mindist;      // +0x000
     int32_t P_Finish_Counter;        // +0x004 decremented by each walk step; below zero the loop hash is consulted
     // +0x008: the polygon-space point of the point side, recorded by a walk
-    // that converged on the back side of the triangle (06363620 :063638e4-
-    // :063638f4); proove_polypoly (06352b30 :06352b6f) walks the pierce
-    // chain toward it. Retail name not in the binary.
+    // that converged on the back side of the triangle (06363620 :063638e4);
+    // proove_polypoly (:06352b6f) walks the pierce chain toward it. Port name.
     IVP_U_Point BacksidePosition;
     FLoopHashEntry loop_hash[0x100]; // +0x018
     int32_t loop_hash_size;          // +0x818

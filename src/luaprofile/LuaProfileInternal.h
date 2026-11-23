@@ -23,7 +23,7 @@ static const char kInnerProfileParser[] = "IProfileParser";
 static const char kInnerAggregate[] = "IAggregateComponent";
 
 // AGGDESC size 0x14 overlay. Same offsets as dacom.h FAGGDESC14; +8 is outer
-// IUnknown* (not an IID string). +0x10 Extra is not read. Header dacom.h unchanged.
+// IUnknown* (not an IID string). +0x10 Extra is not read.
 struct FLuaAggDesc
 {
     unsigned long Size;

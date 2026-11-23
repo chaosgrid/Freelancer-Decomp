@@ -6,8 +6,6 @@
 
 #include "x86math.h"
 
-// DACOM-wide result codes (see the note in x86math.h); kept local until dacom.h owns them.
-
 #include <cmath>
 #include <cstddef>
 #include <cstring>
@@ -21,16 +19,16 @@ namespace
     const char* G_ImplementationId = "x86";
     const float G_MinDet = 1e-8f;
     const unsigned int G_RegisterPriority = 0x40000000u;
-    // LAB_06f71170: CMPSB.REPE ECX=0xD — 12 chars + NUL, not CRT strcmp.
+    // LAB_06f71170 compares exactly 13 bytes (12 chars + NUL), not CRT strcmp.
     const unsigned int G_ComponentNameBytes = 13;
     static_assert(sizeof(G_ComponentName) == G_ComponentNameBytes, "CMPSB ECX=0xD");
 
     // DAT_06f74030..06f7442f: 0x400 bytes (06f74430 is a separate guard byte). Readers index
-    // with (bits >> 14) & 0x3FF (06f72851/06f728d1).
+    // with (bits >> 14) & 0x3FF.
     unsigned char G_InvSqrtTable[0x400];
 
-    // Retail PE .data at DAT_06f74030 is BSS (on-disk zeros). FUN_06f71010 / DllMain fill all
-    // 0x400 entries via FSQRT + FDIVR qword 1.0, then (bits + 0x2000) >> 15. Match that x87 path.
+    // The table is BSS in retail; FUN_06f71010 (from DllMain) fills all 0x400 entries via
+    // FSQRT + FDIVR qword 1.0, then (bits + 0x2000) >> 15, on x87 as here.
     void BuildInvSqrtTable()
     {
         const double One = 1.0;
@@ -58,8 +56,8 @@ namespace
 #endif
             G_InvSqrtTable[Index] = static_cast<unsigned char>((RecipBits + 0x2000u) >> 15);
         }
-        // 06f7104c / 06f710fb: MOV byte [06f74230],0xFF = base + 0x200. Index 0x200 is the
-        // mantissa-1.0 slot (X = 1.0, 4.0, ...): its computed byte wraps to 0x00, retail patches it.
+        // Index 0x200 is the mantissa-1.0 slot (X = 1.0, 4.0, ...): its computed byte wraps
+        // to 0x00, and retail patches it to 0xFF.
         G_InvSqrtTable[0x200] = 0xFF;
     }
 
@@ -216,8 +214,8 @@ namespace
 
     // FastDot (FUN_06f71af0 + LAB_06f71d60…LAB_06f71f90): classify each row coeff
     // as ==0 / ==1 / other. Retail layout: kernel @ +0xC, saved-ops int @ +0x10.
-    // Callers: FUN_06f719b0 (slot 17) and LAB_06f71fb0 (slot 16) only — both wired.
-    // Kernels are isolated thiscall / RET 4 / ST0. Slots 16/17 stay DACOM stdcall.
+    // Callers: FUN_06f719b0 (slot 17) and LAB_06f71fb0 (slot 16) only.
+    // Kernels are thiscall, one argument, result in ST0; slots 16/17 are DACOM stdcall.
     struct FFastDot
     {
         float A;
@@ -621,8 +619,7 @@ namespace
     static_assert(offsetof(FFastDot, SavedOps) == 0x10, "retail saved-ops @ +0x10");
     static_assert(sizeof(FFastDotKernel) == 4, "MSVC simple-class member pointer is a code address");
 
-    // Ordinary C++ member dispatch; the native result/store boundary is
-    // checked against 71ab4..71ad2 and 72110..7213c.
+    // Plain member dispatch; the ST0 result is stored straight to Dst.
     void StoreKernelPlain(FFastDot& Dot, const FVector* Src, float* Dst)
     {
         *Dst = (Dot.*Dot.Kernel)(Src);
@@ -666,7 +663,7 @@ namespace
                 const float Z = Src->Z;
                 if (Translation != nullptr)
                 {
-                    // 7209b..720e8: the FIRST row adds X/Z/Y; rows 1/2 add Z/Y/X.
+                    // The FIRST row adds X/Z/Y; rows 1/2 add Z/Y/X.
                     // Each destination is written before reading the next row.
                     Out->X = ((X * Matrix.D[0][0] + Z * Matrix.D[0][2]) +
                               Y * Matrix.D[0][1]) + Translation->X;
@@ -677,7 +674,7 @@ namespace
                 }
                 else
                 {
-                    // 71a49..71a8d: Z/Y/X addition order, one final float store.
+                    // Z/Y/X addition order, one final float store.
                     Out->X = (Z * Matrix.D[0][2] + Y * Matrix.D[0][1]) + X * Matrix.D[0][0];
                     Out->Y = (Z * Matrix.D[1][2] + Y * Matrix.D[1][1]) + X * Matrix.D[1][0];
                     Out->Z = (Z * Matrix.D[2][2] + Y * Matrix.D[2][1]) + X * Matrix.D[2][0];
@@ -917,7 +914,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
     GENRESULT DACOM_API MulMatrix(FMatrix& Dst, const FMatrix& A, const FMatrix& B) override
     {
-        // 71670..716e1: literal x87 loop, preserving product/add/store order
+        // LAB_06f71670: literal x87 loop, preserving product/add/store order
         // and immediate alias visibility between individual result writes.
         float* ResultMatrix = &Dst.D[0][0];
         const float* LeftMatrix = &A.D[0][0];
@@ -983,7 +980,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
     GENRESULT DACOM_API TransformXform(FVector& Dst, const FTransform& Xform, const FVector& Source) override
     {
-        // 71890..718ed: translation is added while each dot remains extended,
+        // LAB_06f71890: translation is added while each dot remains extended,
         // then that component is stored before the next source read.
         float* ResultVector = &Dst.X;
         const float* TransformValues = &Xform.Rotation.D[0][0];
@@ -1105,7 +1102,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         const float One = 1.0f;
         const float Half = 0.5f;
         static const int NextAxis[3] = {1, 2, 0};
-        // LAB_06f72290..723b1 keeps the trace, root and reciprocal on x87;
+        // LAB_06f72290 keeps the trace, root and reciprocal on x87;
         // only the four destination writes round to float. AND EAX,4100/JNZ
         // takes the not-greater (including unordered) branch in all three tests.
         // Keep the branch-specific store/read order for aliased source/output.
@@ -1208,7 +1205,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
     GENRESULT DACOM_API QuaternionToMatrix(FMatrix& Dst, const FQuaternion& Quat) override
     {
-        // 723c0..724c4: retain S/Xs and selected products on x87; the
+        // LAB_06f723c0: retain S/Xs and selected products on x87; the
         // asymmetric float scratch stores are part of the arithmetic contract.
         float Scratch[5];
         float Zs;
@@ -1311,7 +1308,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
     GENRESULT DACOM_API QuatSlerpValue(FQuaternion& Dst, const FQuaternion& A, const FQuaternion& B, const float* T) override
     {
-        // 724d0..725cb: normalized linear interpolation, literal x87 terms,
+        // LAB_06f724d0: normalized linear interpolation, literal x87 terms,
         // component store order and NaN hemisphere selection. Inputs may alias Dst.
         static const float Zero = 0.0f;
         static const float One = 1.0f;
@@ -1474,7 +1471,8 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
     if (Reason == DLL_PROCESS_ATTACH)
     {
         DisableThreadLibraryCalls(Module);
-        // FUN_06f71090: PUSH 8 / operator_new. Null → DAT=0, RET TRUE, no InvSqrt table.
+        // FUN_06f71090: operator new(8); on null the engine stays null, attach still
+        // succeeds and the InvSqrt table is not built.
         void* Memory = ::operator new(8, std::nothrow);
         if (Memory == nullptr)
         {
@@ -1483,7 +1481,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
         }
         G_Engine = new (Memory) FMathEngine();
         BuildInvSqrtTable();
-        // 06f71107: DACOM_Acquire; JZ 06f71145 skips registration silently (no log in retail).
+        // A null DACOM_Acquire skips registration silently (no log in retail).
         ICOManager* Dacom = DACOM_Acquire();
         if (Dacom != nullptr)
         {

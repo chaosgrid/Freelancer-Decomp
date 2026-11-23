@@ -14,8 +14,7 @@
 
 File::File()
 {
-    // Common.dll.txt 0630b270-0630b288: byte Name[0] = 0, Handle (+0x80) = 0,
-    // Length (+0x88) = 0, Offset (+0x84) = 0. The rest of Name stays uninitialised.
+    // FUN_0630b270. The rest of Name stays uninitialised.
     Name[0] = '\0';
     Handle = nullptr;
     Length = 0;
@@ -24,18 +23,16 @@ File::File()
 
 File::~File()
 {
-    // Common.dll.txt 0630b290: JMP File::close.
+    // FUN_0630b290
     close();
 }
 
 bool File::open(char const* Path)
 {
-    // Common.dll.txt 0630cdc0-0630ce41. A null or empty Path skips the whole body (the
-    // result is the existing handle's null-ness). Otherwise the path is byte-copied into
-    // Name (0630cdd4, unbounded: a path of 0x80+ bytes is undefined behaviour in retail;
-    // the port stops at the buffer), Handle = fopen(Name, "rb" @063a3568) - an already
-    // open handle is overwritten without fclose, as retail - and on success
-    // fseek(END), Length = ftell, Offset = 0, fseek(SET).
+    // FUN_0630cdc0. A null or empty Path skips the whole body (the result is the existing
+    // handle's null-ness). Deviation: retail's copy into Name is unbounded (UB past 0x80
+    // bytes); the port stops at the buffer. An already open handle is overwritten without
+    // fclose, as retail.
     if (Path != nullptr && Path[0] != '\0')
     {
         size_t Index = 0;
@@ -57,7 +54,7 @@ bool File::open(char const* Path)
 
 void File::close()
 {
-    // Common.dll.txt 0630cd40-0630cd62: fclose + null the handle only; Offset/Length stay.
+    // FUN_0630cd40: Offset and Length stay.
     if (Handle != nullptr)
     {
         fclose(Handle);
@@ -67,8 +64,7 @@ void File::close()
 
 int File::read(void* Buffer, int Bytes)
 {
-    // Common.dll.txt 0630cec0-0630cee3: no handle -> 0 (EAX is the null handle);
-    // otherwise fread(Buffer, 1, Bytes, Handle). Offset is not updated.
+    // FUN_0630cec0. Offset is not updated.
     if (Handle == nullptr)
         return 0;
     return (int)fread(Buffer, 1, Bytes, Handle);
@@ -76,22 +72,17 @@ int File::read(void* Buffer, int Bytes)
 
 int File::read(void* Buffer, int OffsetFromStart, int Bytes)
 {
-    // Common.dll.txt 06262de0-06262dff: seek(param_2), then read(param_1, param_3).
+    // FUN_06262de0
     seek(OffsetFromStart);
     return read(Buffer, Bytes);
 }
 
 int File::read_line(char* Line, int MaxLen)
 {
-    // Common.dll.txt 0630cef0-0630cfb3, register for register:
-    //   Count (ESI) = 0; no handle, null Line or MaxLen <= 0 -> return 0.
-    //   Limit (EDI) = MaxLen - 1. Limit <= 0: the last-char register (EAX) is loaded with
-    //   the Line pointer itself (0630cf4e) and the tail below runs with it - it is neither
-    //   -1 nor '\r', so the result is Line[0] = 0, return 1 after ftell.
-    //   Loop: c = fgetc; -1 -> tail-or-0; '\r' / '\n' -> tail; else Line[Count++] = c,
-    //   stop at Count == Limit (c is then the last stored char).
-    //   Tail: c == -1 && Count == 0 -> return 0. Line[Count++] = 0; c == '\r' -> peek the
-    //   next char and fseek(-1, SEEK_CUR) unless it is '\n'; Offset = ftell; return Count.
+    // FUN_0630cef0. Reads up to MaxLen - 1 chars, stopping at EOF, '\r' or '\n'. EOF with
+    // nothing read returns 0. A '\r' not followed by '\n' pushes the peeked char back. The
+    // result counts the NUL. With MaxLen == 1 retail holds the Line pointer as the "last
+    // char" (never -1 or '\r'), so the result is an empty line and 1.
     int Count = 0;
     if (Handle == nullptr || Line == nullptr || MaxLen <= 0)
         return 0;
@@ -128,28 +119,27 @@ int File::read_line(char* Line, int MaxLen)
 
 bool File::is_open()
 {
-    // Common.dll.txt 06262d80: Handle != 0.
+    // FUN_06262d80
     return Handle != nullptr;
 }
 
 int File::eof()
 {
-    // Common.dll.txt 06262d60-06262d77: SETGE on Offset vs Length (signed).
+    // FUN_06262d60 (signed compare).
     return Offset >= Length ? 1 : 0;
 }
 
 int File::tell() const
 {
-    // Common.dll.txt 0x06262dd0: MOV EAX,[this+0x84]; RET -- the cached Offset (retail +0x84
-    // is the field set_offset/seek maintain). No handle check, no ftell.
+    // FUN_06262dd0: the cached Offset; no handle check, no ftell.
     return Offset;
 }
 
 int File::seek(int NewOffset)
 {
-    // Common.dll.txt 0630ce50-0630ceae. -1 is a pure query. Otherwise Offset changes only
-    // for a different value in [0, Length]; then, with a handle, fseek(Handle, Offset, SET)
-    // == 0 returns Offset; no handle or a failed fseek returns 0.
+    // FUN_0630ce50. -1 is a pure query. Otherwise Offset changes only for a value in
+    // [0, Length]; then a successful fseek returns Offset, and no handle or a failed fseek
+    // returns 0.
     if (NewOffset == -1)
         return Offset;
     if (NewOffset != Offset && NewOffset >= 0 && NewOffset <= Length)
@@ -164,15 +154,13 @@ int File::seek(int NewOffset)
 
 int File::get_length()
 {
-    // Common.dll.txt 06262d50: MOV EAX,[this+0x88] - the cached Length (ICF-shared with
-    // several archetype getters).
+    // FUN_06262d50 (ICF-shared with several archetype getters).
     return Length;
 }
 
 void File::get_info()
 {
-    // Common.dll.txt 0630cd70-0630cdb6: fseek(END), Length = ftell, Offset = 0,
-    // fseek(SET). No handle check in retail (callers only reach it with an open handle).
+    // FUN_0630cd70. No handle check in retail (callers only reach it with an open handle).
     fseek(Handle, 0, SEEK_END);
     Length = (int)ftell(Handle);
     Offset = 0;
@@ -181,9 +169,8 @@ void File::get_info()
 
 void File::set_name(char const* NewName)
 {
-    // Common.dll.txt 06262d90-06262da2: byte copy into Name up to and including the NUL
-    // (unbounded in retail - a name of 0x80+ bytes is undefined behaviour; the port stops
-    // at the buffer).
+    // FUN_06262d90. Deviation: retail's copy is unbounded (UB past 0x80 bytes); the port stops
+    // at the buffer.
     size_t Index = 0;
     for (; Index < sizeof(Name) - 1 && NewName[Index] != '\0'; ++Index)
         Name[Index] = NewName[Index];
@@ -192,8 +179,7 @@ void File::set_name(char const* NewName)
 
 int File::set_offset(int NewOffset)
 {
-    // Common.dll.txt 06262db0-06262dcc: store NewOffset when 0 <= NewOffset <= Length
-    // (signed JL / JG); return Offset.
+    // FUN_06262db0 (signed compares).
     if (NewOffset >= 0 && NewOffset <= Length)
         Offset = NewOffset;
     return Offset;
@@ -201,14 +187,13 @@ int File::set_offset(int NewOffset)
 
 char const* File::get_name() const
 {
-    // Common.dll.txt 06261260: MOV EAX,this - Name is at +0.
+    // FUN_06261260 (ICF): Name is at +0.
     return Name;
 }
 
 File& File::operator=(File const& Other)
 {
-    // Common.dll.txt 06262e10-06262e23: MOVSD x 0x23 - a raw 0x8C-byte copy; the copy
-    // shares the source's FILE*.
+    // FUN_06262e10: a raw 0x8C-byte copy; the copy shares the source's FILE* (retail).
     memmove((void*)this, &Other, sizeof(File)); // memmove: self-assignment
     return *this;
 }

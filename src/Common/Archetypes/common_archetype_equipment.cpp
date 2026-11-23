@@ -6,8 +6,8 @@
 
 // Archetype::Equipment and its non-weapon leaves (AttachedEquipment, Power, Engine, Armor, Shield,
 // ShieldGenerator, Thruster, Scanner, Light, Tractor, CargoPod, FX equipment, RepairDroid,
-// CloakingDevice, Commodity, RepairKit, ShieldBattery, TradeLaneEquip, LootCrate) -- split out of
-// common_archetype.cpp (retail Archetype.cpp, one TU) in CMN-SPLIT phase B.
+// CloakingDevice, Commodity, RepairKit, ShieldBattery, TradeLaneEquip, LootCrate). Retail has
+// one Archetype.cpp TU.
 
 #include "common_archetype.h"
 #include "Archetypes/common_archetype_internal.h"
@@ -35,18 +35,12 @@ namespace Archetype
 {
     namespace
     {
-        // Shared prefix copy for the "inherit=" operator= family (Equipment::InheritFrom,
-        // retail FUN_062f3ea0). Every retail leaf (AttachedFXEquip/AttachedEquipment/Armor/
-        // Launcher/Munition/…) starts with Root::operator= (Common.dll.c 21583 / 21895 /
-        // 21751 / 22428 / 23016), which does Companion Release+AddRef — not a raw pointer
-        // store. FUN_062f3ea0 then Release()'s the copied (donor) Companion and restores
-        // the saved OwnCompanion; that Release only balances if the leaf AddRef'd the donor.
-        // A prior port comment claimed this helper was a "raw whole-object copy" independent
-        // of Root::operator=; that was wrong, and with a real CliObjRelease it destroyed the
-        // donor's companion (light_equip.ini White → SmallWhite → MediumWhite AV).
-        // The Equipment shape is exactly what every leaf inlines after the Root::operator= call
-        // (+0x5c, byte +0x60, +0x64, +0x68, byte +0x6c, e.g. 0626daae..0626daca), i.e. the
-        // defaulted Equipment::operator=, which runs Root::operator= first. No self test.
+        // Shared prefix copy for the "inherit=" donor copy (FUN_062f3ea0): the defaulted
+        // Equipment::operator=, which runs Root::operator= first (Companion Release + AddRef,
+        // not a raw store) and then the Equipment fields every leaf inlines. FUN_062f3ea0's
+        // later Release of the donor Companion only balances because of that AddRef (a raw
+        // copy destroys the donor's companion, e.g. light_equip.ini White -> SmallWhite ->
+        // MediumWhite). No self test.
         void CopyEquipmentFields(Equipment& Dst, Equipment const& Src)
         {
             Dst.Equipment::operator=(Src);
@@ -75,23 +69,18 @@ namespace Archetype
             Equipment* Donor = GEquipmentDb.Get(NicknameId);
             if (Donor != nullptr)
             {
-                // Retail has no InheritFrom member: this donor copy is inline in read()/LoadEquipment.
-                // Kept as an immediately-invoked lambda so the port exports no invented name.
-                // Retail FUN_062f3ea0 (Common.dll.c 127857-128008), called from Equipment::read's
-                // "inherit=<archetype>" branch. A dispatch on get_class_type(), grouped by memory shape
-                // rather than by leaf class -- several unrelated sibling leaves (e.g. LootCrate and
-                // AttachedFXEquip; RepairDroid, RepairKit, ShieldBattery and Armor) happen to share the
-                // same size/layout and retail literally reuses one leaf's operator= to copy another's
-                // object. Case labels with no match (Root/EqObj/Solar/Ship/Asteroid/DynamicAsteroid,
-                // bare Equipment/AttachedEquipment/Projectile, and -- notably -- Armor itself, 0x22) fall
-                // through to the switch's implicit default: no field copy at all, matching retail exactly.
+                // FUN_062f3ea0, the donor copy; an immediately-invoked lambda so the port exports
+                // no invented name. A dispatch on get_class_type() grouped by memory shape: retail
+                // reuses one leaf's operator= for siblings of the same layout. Classes with no
+                // case (Root/EqObj/Solar/Ship/Asteroid/DynamicAsteroid, bare Equipment/
+                // AttachedEquipment/Projectile, and Armor, 0x22) copy no fields at all, as retail.
                 [&](Equipment const& Src)
                 {
                     if (get_class_type() != Src.get_class_type())
                         return;
 
-                    // Common.dll.c 127869-127873: AddRef + Inherit the destination's own companion
-                    // object from the donor's, using the ORIGINAL (pre-copy) companion pointers.
+                    // AddRef + Inherit the own companion from the donor's, with the pre-copy
+                    // pointers.
                     ICliObj* OwnCompanion = Companion;
                     if (OwnCompanion != nullptr)
                     {
@@ -151,9 +140,7 @@ namespace Archetype
                     }
 
                     case AClassShieldGenerator:
-                        // .text:062f3f80..062f3ffa: AttachedEquipment::operator=, +0x88..+0xa4
-                        // and the VC6 vector operator= on +0xa8 inline -- ShieldGenerator::
-                        // operator='s body.
+                        // ShieldGenerator::operator='s body, inlined in retail.
                         (ShieldGenerator&)*this = (ShieldGenerator const&)Src;
                         break;
 
@@ -169,9 +156,8 @@ namespace Archetype
 
                     case AClassLauncher:
                     {
-                        // Retail's case 0x10 does the AttachedEquipment-shape copy plus Launcher's own
-                        // 6 raw fields inline (rather than calling Launcher::operator=, which is only
-                        // ever named for cases 0x11-0x13); same observable result either way.
+                        // Retail's case 0x10 inlines the copy rather than calling Launcher::operator=;
+                        // same result.
                         (AttachedEquipment&)*this = (AttachedEquipment const&)Src;
                         Launcher& Dst = (Launcher&)*this;
                         Launcher const& LeafSrc = (Launcher const&)Src;
@@ -185,9 +171,7 @@ namespace Archetype
                     }
 
                     case AClassGun:
-                        // .text:062f4079..062f4101: Launcher::operator=, +0xa0..+0xb4, the bytes
-                        // +0xb8..+0xba, the VC6 vector operator= on +0xbc, +0xcc and +0xd0 inline
-                        // -- Gun::operator='s body.
+                        // Gun::operator='s body, inlined in retail.
                         (Gun&)*this = (Gun const&)Src;
                         break;
 
@@ -295,11 +279,8 @@ namespace Archetype
                         break;
                     }
 
-                    // Common.dll.c 128001-128005: shape copy (via Root::operator= in retail, or
-                    // CopyEquipmentFields' matching Companion Release+AddRef here) left Companion as
-                    // the donor with one extra AddRef. Drop that ref, then restore OwnCompanion
-                    // (whose starting AddRef was balanced by the Release of the old Companion inside
-                    // the shape copy).
+                    // The shape copy left Companion as the donor with one extra AddRef: drop it
+                    // and restore OwnCompanion (whose AddRef above balanced the copy's Release).
                     Nickname = SavedNickname;
                     CliObjRelease(Companion);
                     Companion = OwnCompanion;
@@ -307,8 +288,7 @@ namespace Archetype
                 return true;
             }
 
-            // ArchDB::Get() already FDUMPed the ERROR above on miss; retail's dispatcher
-            // falls through into this WARNING regardless (Common.dll.c 128036-128049).
+            // ArchDB::Get() has already dumped an ERROR; retail warns as well.
             FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
                   ArchetypeSource, 0x828, Reader.get_value_string());
             return true;
@@ -326,8 +306,7 @@ namespace Archetype
             return true;
         }
 
-        // 062f436d..062f438c: retail tests "hit_pts" again here (-> +0x1c HitPts). It is never
-        // reached, because Root::read (062f07e3) already takes the key and returns true.
+        // Dead in retail too: Root::read already takes "hit_pts".
         if (Reader.is_value("hit_pts"))
         {
             HitPts = Reader.get_value_float(0);
@@ -340,7 +319,7 @@ namespace Archetype
             return true;
         }
 
-        // 062f43c1: the no-argument get_value_string (06310b70, the whole value).
+        // The no-argument get_value_string (the whole value).
         if (Reader.is_value("tractored_explosion"))
         {
             TractoredExplosion.Id = CreateID(Reader.get_value_string());
@@ -382,28 +361,25 @@ namespace Archetype
         return HpTypeNone;
     }
 
-    // Common.dll.txt 0x06261260 (ICF-shared, `MOV EAX,ECX; RET`),
-    // ?get_loot_appearance@Equipment@Archetype@@UAEPAU12@XZ.
+    // 0x06261260 (ICF-shared).
     Equipment* Equipment::get_loot_appearance()
     {
         return this;
     }
 
-    // Common.dll.txt 0x06325390 (ICF-shared, `XOR EAX,EAX; RET`),
-    // ?get_pod_appearance@Equipment@Archetype@@UAEPAUCargoPod@2@XZ.
+    // 0x06325390 (ICF-shared).
     CargoPod* Equipment::get_pod_appearance()
     {
         return nullptr;
     }
 
-    // Common.dll.txt 0x0629ba00 (ICF-shared, `XOR AL,AL; RET`),
-    // ?is_attached@Equipment@Archetype@@UBE_NXZ.
+    // 0x0629ba00 (ICF-shared).
     bool Equipment::is_attached() const
     {
         return false;
     }
 
-    // Common.dll.txt 0x062f4720: `EAX = [this+0x74]; if (EAX == 0) EAX = this`.
+    // 0x062f4720 (+0x74).
     Equipment* Commodity::get_loot_appearance()
     {
         if (LootAppearance != nullptr)
@@ -411,14 +387,13 @@ namespace Archetype
         return this;
     }
 
-    // Common.dll.txt 0x062f4730: `EAX = [this+0x78]`.
+    // 0x062f4730 (+0x78).
     CargoPod* Commodity::get_pod_appearance()
     {
         return PodAppearance;
     }
 
-    // Common.dll.txt 0x062f4e30, one body for both classes (both keep the pointer at +0x70):
-    // `EAX = [this+0x70]; if (EAX == 0) EAX = this`.
+    // 0x062f4e30, one body for both classes (both keep the pointer at +0x70).
     Equipment* RepairKit::get_loot_appearance()
     {
         if (LootAppearance != nullptr)
@@ -436,8 +411,7 @@ namespace Archetype
     LootCrate::LootCrate(ICliObj* InCompanion)
         : Equipment(InCompanion)
     {
-        // Listing 0x94460: Equipment fields then ObjectType LOOT. LoadEquipment
-        // inlines Equipment::Equipment + LootCrate vtable + 0x10000000.
+        // Listing 0x94460: ObjectType LOOT. LoadEquipment inlines this ctor.
         ObjectType = 0x10000000;
     }
 
@@ -741,10 +715,8 @@ namespace Archetype
         return HpTypeInternal;
     }
 
-    // Retail Archetype::Armor::operator= (Common.dll.c 127978/127981/127984) -- one leaf of
-    // the "inherit=" shape-copy family, reused verbatim for RepairDroid/RepairKit/
-    // ShieldBattery too (same Equipment+1-field shape); see Equipment::InheritFrom.
-    // Retail 0626dd20: Root::operator=, the Equipment shape +0x5c..+0x6c, +0x70. No self test.
+    // Retail 0626dd20, also used by the "inherit=" donor copy for RepairDroid/RepairKit/
+    // ShieldBattery (same Equipment + one-field shape). No self test.
     Armor& Armor::operator=(Armor const& Other)
     {
         Equipment::operator=(Other);
@@ -812,8 +784,7 @@ namespace Archetype
 
     ShieldGenerator& ShieldGenerator::operator=(ShieldGenerator const& Other)
     {
-        // Retail 0x0626e3c0: Root::operator=, then +0x5c..+0xa4 in order (no self test), then
-        // the array unless it is the same vector (.text:0626e484); +0xa8 is not copied.
+        // Retail 0x0626e3c0: no self test except around the array; +0xa8 is not copied.
         Equipment::operator=(Other);
         SeparationExplosion = Other.SeparationExplosion;
         DebrisType = Other.DebrisType;
@@ -1025,7 +996,7 @@ namespace Archetype
     Scanner::Scanner(ICliObj* InCompanion)
         : Equipment(InCompanion)
     {
-        // Retail 062f48e0: +0x70 = 0, +0x78 = 0, +0x74 = 0x447a0000 (1000.0f).
+        // Retail 062f48e0.
         PowerThreshold = 0.0f;
         RadarRange = 1000.0f;
         CargoScanRange = 0.0f;
@@ -1182,11 +1153,8 @@ namespace Archetype
         return AClassAttachedFX;
     }
 
-    // Retail Archetype::AttachedFXEquip::operator= (Common.dll.c 127878/127887/127893/
-    // 127900/127964/127969/127974/127990) -- one leaf of the "inherit=" shape-copy family,
-    // reused verbatim for LootCrate too (same bare-Equipment shape); see
-    // Equipment::InheritFrom. Retail 0626daa0: Root::operator=, the Equipment shape
-    // +0x5c..+0x6c. No self test.
+    // Retail 0626daa0, also used by the "inherit=" donor copy for LootCrate (same bare
+    // Equipment shape). No self test.
     AttachedFXEquip& AttachedFXEquip::operator=(AttachedFXEquip const& Other)
     {
         Equipment::operator=(Other);
@@ -1325,10 +1293,7 @@ namespace Archetype
         return AClassCloakingDevice;
     }
 
-    // Retail Archetype::CloakingDevice::operator= (Common.dll.c 127987) -- one leaf of the
-    // "inherit=" shape-copy family; see Equipment::InheritFrom. Retail 0626e0a0:
-    // Root::operator=, the Equipment shape +0x5c..+0x6c, then dwords +0x70..+0x98 inline.
-    // No self test.
+    // Retail 0626e0a0, used by the "inherit=" donor copy. No self test.
     CloakingDevice& CloakingDevice::operator=(CloakingDevice const& Other)
     {
         AttachedEquipment::operator=(Other);
@@ -1471,8 +1436,8 @@ namespace Archetype
 
     HpAttachmentType ShieldGenerator::get_hp_type_by_index(int Index) const
     {
-        // DAT_063ecc98 — 34 dwords, Common.dll.txt 063ecc98. Default hp-type table used
-        // when the shield generator has no custom hp_type list (0x95e40).
+        // DAT_063ecc98, 34 dwords: the default hp-type table used when the shield generator
+        // has no custom hp_type list (0x95e40).
         static HpAttachmentType const kDefaultShieldHpTypes[34] = {
             HpTypeShieldGenerator,          HpTypeFighterShieldGenerator,
             HpTypeEliteShieldGenerator,     HpTypeFreighterShieldGenerator,
@@ -1497,16 +1462,16 @@ namespace Archetype
                              : 0;
         if (Count == 0)
         {
-            // 062f5e59: `CMP EAX,0x22 / JG` accepts 0..0x22; index 0x22 is one past the table
-            // and reads the next .data dword, Munition::BEAM_ARCH_INDEX (063ecd20).
+            // Retail accepts 0..0x22; index 0x22 is one past the table and reads the next .data
+            // dword, Munition::BEAM_ARCH_INDEX (063ecd20) -- reproduced.
             if (Index >= 0 && Index < 34)
                 return kDefaultShieldHpTypes[Index];
             if (Index == 0x22)
                 return (HpAttachmentType)Munition::BEAM_ARCH_INDEX;
             return HpTypeNone;
         }
-        // Retail compares with JG (accepts Index == Count, one past the array's end);
-        // the port stops at Count like Gun::get_hp_type_by_index. See docs/re/deviations.md.
+        // Deviation: retail also accepts Index == Count (one past the end); the port stops at
+        // Count like Gun::get_hp_type_by_index. See docs/re/deviations.md.
         if (Index >= 0 && (unsigned)Index < Count)
             return (HpAttachmentType)HpShieldTypesBegin[Index];
         return HpTypeNone;

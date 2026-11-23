@@ -42,24 +42,23 @@ namespace CmnUniverse
     // 0x60ad78ec, the starting "best radius" of slots 10-12.
     float const kNoZoneRadius = 1.0e20f;
 
-    // FUN_06337250 .text:06337376-06337441 (the stack SYSTEM's construction).
+    // Inlined in FUN_06337250 (the stack SYSTEM, .text:06337376).
     SYSTEM::SYSTEM()
         : Spatial(nullptr)
         , SpaceMusicId(0)
     {
-        NicknameId = 0;         // ID_String::clear (+0x4c)
-        ((CacheString*)&Nickname)->clear(); // CacheString::clear (+0x50)
-        ((CacheString*)&File)->clear();     // CacheString::clear (+0x70)
+        NicknameId = 0;         // +0x4c
+        ((CacheString*)&Nickname)->clear(); // +0x50
+        ((CacheString*)&File)->clear();     // +0x70
         StridName = 0;          // +0x68
         IdsInfo = 0;            // +0x6c
         Visit = 0;              // +0x64
-        NavMapScale = 1.0f;     // +0x90 = 0x3f800000
+        NavMapScale = 1.0f;     // +0x90
         // +0x74 (pos) is not written by retail's construction; LoadUniverseIni gives the stack
         // SYSTEM the previous block's position (FUniverseLoadCarry).
     }
 
-    // FUN_0633aee0: FreeSpatial the zone tree, then the zone list and the connection vector
-    // are released (their std:: destructors here).
+    // FUN_0633aee0
     SYSTEM::~SYSTEM()
     {
         if (Spatial != nullptr)
@@ -69,43 +68,43 @@ namespace CmnUniverse
         }
     }
 
-    // Slot 0, 062969c0 (ICF-folded getter): MOV EAX,[ECX+0x4c].
+    // Slot 0, 062969c0 (ICF-folded getter).
     unsigned SYSTEM::GetId() const
     {
         return NicknameId;
     }
 
-    // Slot 1, 0633afa0: ADD ECX,4; JMP CommReferrable::GetMsgIdPrefix.
+    // Slot 1, 0633afa0: a this-adjusting thunk.
     TString<64> const& SYSTEM::GetMsgIdPrefix() const
     {
         return CommReferrable::GetMsgIdPrefix();
     }
 
-    // Slot 2, 063390f0 (ICF-folded getter): MOV EAX,[ECX+0x50].
+    // Slot 2, 063390f0 (ICF-folded getter).
     char const* SYSTEM::GetNickname() const
     {
         return Nickname;
     }
 
-    // Slot 3, 0633aff0: MOV EAX,[ECX+0x68].
+    // Slot 3, 0633aff0
     int SYSTEM::GetStridName() const
     {
         return StridName;
     }
 
-    // Slot 4, 0633b000: MOV EAX,[ECX+0x6c].
+    // Slot 4, 0633b000
     int SYSTEM::GetIdsInfo() const
     {
         return IdsInfo;
     }
 
-    // Slot 5, 0629ba60 (ICF-folded getter): MOV EAX,[ECX+0x70].
+    // Slot 5, 0629ba60 (ICF-folded getter).
     char const* SYSTEM::GetFile() const
     {
         return File;
     }
 
-    // Slot 6, 0633b020: LEA EAX,[ECX+0x80].
+    // Slot 6, 0633b020
     std::list<Universe::FSystemZone> const* SYSTEM::GetZones() const
     {
         return &Zones;
@@ -122,10 +121,10 @@ namespace CmnUniverse
             {
                 Universe::IZone const* Zone = It->Zone;
                 FSpatialEntry Entry;
-                Entry.Radius = Zone->GetRadius();               // zone vt+0x30 first
-                Entry.Position = Zone->GetPos();                // then zone vt+0x10
+                Entry.Radius = Zone->GetRadius();               // radius first, as retail
+                Entry.Position = Zone->GetPos();
                 Entry.Object = const_cast<Universe::IZone*>(Zone);
-                SpatialAddObject(Spatial, &Entry);              // spatial vt+0x10
+                SpatialAddObject(Spatial, &Entry);
             }
         }
         return Spatial;
@@ -137,10 +136,9 @@ namespace CmnUniverse
         return BuildZoneTree();
     }
 
-    // Slot 8, 0633b0c0 (RET 4): property flags at a sphere. Zones whose flags carry any of
-    // 0x7fc0 are exclusive -- only the smallest-radius one of them counts (the first one sets
-    // it, a later one replaces it only with a strictly smaller radius); all other zones'
-    // flags are OR-ed together. The result is that OR plus the chosen exclusive zone's flags.
+    // Slot 8, 0633b0c0: property flags at a sphere. Zones whose flags carry any of 0x7fc0 are
+    // exclusive -- only the smallest-radius one of them counts (ties keep the first); all other
+    // zones' flags are OR-ed together.
     unsigned SYSTEM::GetSphereProperties(Geometry::Sphere const* Query) const
     {
         ISpatialPartition* Tree = BuildZoneTree();
@@ -149,16 +147,16 @@ namespace CmnUniverse
         Result.Count = 0;
         SpatialFill(Tree, Query, &Result);
 
-        unsigned Combined = 0;                     // [ESP+0x18]
-        unsigned ExclusiveFlags = 0;               // EBP
-        float ExclusiveRadius = 0.0f;              // [ESP+0x10], only read once EBP != 0
+        unsigned Combined = 0;
+        unsigned ExclusiveFlags = 0;
+        float ExclusiveRadius = 0.0f;              // only read once ExclusiveFlags != 0
         unsigned Index = 0;
         for (; Index < Result.Count; ++Index)
         {
             Universe::IZone const* Zone = (Universe::IZone const*)Result.Items[Index];
             if (SphereCull(*Query, Zone))
                 continue;
-            unsigned Flags = Zone->GetProperties();  // zone vt+0x1c
+            unsigned Flags = Zone->GetProperties();
             if ((Flags & 0x7fc0) == 0)
             {
                 Combined |= Flags;
@@ -178,7 +176,7 @@ namespace CmnUniverse
         return Combined | ExclusiveFlags;
     }
 
-    // Slot 9, 0633b230 (RET 4): OR of the property flags of every zone the sphere touches.
+    // Slot 9, 0633b230
     unsigned SYSTEM::GetNestedProperties(Geometry::Sphere const* Query) const
     {
         ISpatialPartition* Tree = BuildZoneTree();
@@ -198,8 +196,7 @@ namespace CmnUniverse
         return Combined;
     }
 
-    // Slot 10, 0633b350 (RET 4): the smallest-radius zone containing Point. The query sphere
-    // has radius 0.1f (0x3dcccccd); a null tree or a zero Fill result gives null.
+    // Slot 10, 0633b350: the smallest-radius zone containing Point.
     Universe::IZone const* SYSTEM::GetSmallestZoneAt(Vector const* Point) const
     {
         BuildZoneTree();
@@ -233,8 +230,8 @@ namespace CmnUniverse
         return Best;
     }
 
-    // Slot 11, 0633b4b0 (RET 4): as slot 10, restricted to zones whose slot 0x54 holds; the
-    // radius test comes before the containment test.
+    // Slot 11, 0633b4b0: as slot 10 for physical zones; the radius test comes before the
+    // containment test.
     Universe::IZone const* SYSTEM::GetSmallestPhysicalZoneAt(Vector const* Point) const
     {
         Universe::IZone const* Best = nullptr;
@@ -270,8 +267,7 @@ namespace CmnUniverse
         return Best;
     }
 
-    // Slot 12, 0633b620 (RET 8): as slot 11 with the filter `PropertyFlags & Mask` and a
-    // query sphere of radius 1.0f.
+    // Slot 12, 0633b620: as slot 11 with a property filter and a query radius of 1.0f.
     Universe::IZone const* SYSTEM::GetSmallestZoneWithPropertiesAt(Vector const* Point, unsigned Mask) const
     {
         Universe::IZone const* Best = nullptr;
@@ -307,14 +303,13 @@ namespace CmnUniverse
         return Best;
     }
 
-    // Slot 13, 0633b790: begin null -> 0, else (end - begin) >> 5.
+    // Slot 13, 0633b790
     int SYSTEM::GetConnectionCount() const
     {
         return (int)Connections.size();
     }
 
-    // Slot 14, 0633b7b0 (RET 8): copy connection [Index] (8 dwords) when it exists. Retail
-    // returns false on every path (XOR AL,AL at .text:0633b7de).
+    // Slot 14, 0633b7b0. Retail quirk kept: false on every path, even after the copy.
     bool SYSTEM::GetConnection(unsigned Index, Universe::FSystemConnection* Out) const
     {
         if (Index < Connections.size())
@@ -322,8 +317,7 @@ namespace CmnUniverse
         return false;
     }
 
-    // Slot 15, 0633b7f0: reload the shared object pool from this system's file unless it
-    // already holds it, then return the pool's record count.
+    // Slot 15, 0633b7f0: reloads the shared object pool unless it already holds this system.
     int SYSTEM::GetObjectCount() const
     {
         if (this != GSystemObjectPoolOwner)
@@ -334,9 +328,8 @@ namespace CmnUniverse
         return (int)GSystemObjectPool.size();
     }
 
-    // Slot 16, 0633b840 (RET 8): bounds-check Index against slot 15 (called through the
-    // vtable, so it reloads the pool when needed) and the pool, then copy the record field by
-    // field; the TString fields go through TString assignment (strlen, clamped to N-1).
+    // Slot 16, 0633b840. Slot 15 is called through the vtable, so it reloads the pool when
+    // needed.
     bool SYSTEM::GetSystemObject(unsigned Index, Universe::FSystemObject* Out) const
     {
         if (Index >= (unsigned)GetObjectCount())
@@ -360,31 +353,31 @@ namespace CmnUniverse
         return true;
     }
 
-    // Slot 17, 0633b010: LEA EAX,[ECX+0x74].
+    // Slot 17, 0633b010
     Vector const* SYSTEM::GetPos() const
     {
         return &Pos;
     }
 
-    // Slot 18, 0633afb0: MOV AL,[ECX+0x64].
+    // Slot 18, 0633afb0
     unsigned char SYSTEM::GetVisit() const
     {
         return Visit;
     }
 
-    // Slot 19, 0633afe0 (RET 4): MOV [ECX+0x64],AL.
+    // Slot 19, 0633afe0
     void SYSTEM::SetVisit(unsigned char NewVisit)
     {
         Visit = NewVisit;
     }
 
-    // Slot 20, 0633afc0: FLD [ECX+0x90].
+    // Slot 20, 0633afc0
     float SYSTEM::GetNavMapScale() const
     {
         return NavMapScale;
     }
 
-    // Slot 21, 0633afd0: MOV EAX,[ECX+0x94].
+    // Slot 21, 0633afd0
     unsigned SYSTEM::GetSpaceMusic() const
     {
         return SpaceMusicId;

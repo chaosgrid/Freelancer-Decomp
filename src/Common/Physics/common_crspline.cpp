@@ -18,7 +18,7 @@
 
 namespace
 {
-    // One component of calculate_spline_vector, in retail's term order (063327f0-06332b9f):
+    // One component of calculate_spline_vector (FUN_063327f0), in retail's term order:
     //   0.5 * (2*P1 + ((-P0 + P2)*T + ((2P0 - 5P1 + 4P2 - P3)*T2 + (3P1 + -P0 - 3P2 + P3)*T3)))
     // The two inner sums are added before the 2*P1 term; the last add and the * 0.5 run on
     // the stack.
@@ -32,10 +32,6 @@ namespace
         return (float)(((double)TwoP1 + Rest) * 0.5);
     }
 }
-
-// ----------------------------------------------------------------------------
-// ICRSplineSegment -- see common_aisteer.h for the field-layout writeup.
-// ----------------------------------------------------------------------------
 
 Vector ICRSplineSegment::calculate_spline_vector(float T)
 {
@@ -97,8 +93,8 @@ float ICRSplineSegment::get_spline_length()
     float Total = 0.0f;
     for (unsigned i = 1; i <= SampleCount; ++i)
     {
-        // Very strange: retail computes the parameter with an unsigned integer DIV
-        // (06332d66), so T is 0 for every step but the last, which is 1.
+        // Retail quirk: the parameter is an unsigned integer division, so T is 0 for every
+        // step but the last, which is 1.
         Vector const V = calculate_spline_vector((float)(i / SampleCount));
         double const Dx = (double)V.x - PrevX;
         double const Dy = (double)V.y - PrevY;
@@ -116,8 +112,8 @@ float ICRSplineSegment::get_t_from_point(Vector const& Point, float StartT, floa
     // 06332df0. A forward line search: step T while the squared distance to Point does not
     // get worse, and return the last accepted T. Can loop forever, as retail.
     // The first distance sums dx^2 + dz^2 + dy^2 and is stored as float; the loop sums
-    // dz^2 + dy^2 + dx^2 and compares the unstored value (FCOM float, TEST AH,0x41, JZ:
-    // stop only when greater; equal or unordered keeps going).
+    // dz^2 + dy^2 + dx^2 and compares the unstored value, stopping only when greater (equal or
+    // unordered keeps going).
     Vector const Start = calculate_spline_vector(StartT);
     double const StartDx = (double)Start.x - Point.x;
     double const StartDy = (double)Start.y - Point.y;

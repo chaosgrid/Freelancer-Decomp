@@ -88,11 +88,8 @@ NnLoadSave::NnLoadSave()
     , DescripEdit(nullptr)
     , CloseButton(nullptr)
 {
-    // FUN_00485960: WinControl ctor FUN_0059f860; +0x340 (allocator byte), the vector, +0x350
-    // (allocator byte) and the string; +0x368 = 0 (the CHARACTER_ID ctor); ListBox ctor
-    // FUN_005a2100 at +0x5dc and +0xe98; +0x33d = +0x33e = 1, +0x334 = 0, +0x338 = 0,
-    // +0x33c = 0; the three vptrs. Everything else is written by Create before it is read;
-    // the port zeroes it here.
+    // FUN_00485960. Retail leaves the rest to Create, which writes it before it is read; the
+    // port zeroes it here.
     Pad331[0] = 0;
     Pad331[1] = 0;
     Pad331[2] = 0;
@@ -120,9 +117,7 @@ NnLoadSave::NnLoadSave()
 
 NnLoadSave::~NnLoadSave()
 {
-    // FUN_00485a60: vptrs back; ListBox dtor FUN_005a1fe0 on +0xe98 then +0x5dc, the string at
-    // +0x350, the vector at +0x340 (FUN_00487c30 per entry), then FUN_00576010 (Event::Handler)
-    // and FUN_0059fa50 (WinControl) -- the member / base destructors, in that order.
+    // FUN_00485a60; the member and base destructors do the work.
 }
 
 bool NnLoadSave::Create(Win3D* NewParent, void* Data)
@@ -133,28 +128,24 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
     float const ZFar = NnFloatBits(0xbf866666); // -1.05
 
-    // 0x00485be9..0x00485c78: FUN_005a0db0("LoadSave_BlackPlane", mesh, {0, 0, -1}, 0, {0,0,0},
-    // 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, {0,0,0}).
     float const PlanePosition[3] = {0.0f, 0.0f, -1.0f};
     CreateStaticControl("LoadSave_BlackPlane", kBlackPlaneMesh, PlanePosition, nullptr, Zero, 0, 0,
-                        0, 1, 1, 0, 1, 0, 0, 0, Zero);
+                        0, 1, 1, 0, 1, 0, 0, 0, Zero); // FUN_005a0db0
 
-    // 0x00485c7d..0x00485ccf: "LoadSave_Frame" at {0.14, 0, -1.05}, the same flags.
+    // {0.14, 0, -1.05}
     float const FramePosition[3] = {NnFloatBits(0x3e0f5c29), 0.0f, ZFar};
     CreateStaticControl("LoadSave_Frame", kFrameMesh, FramePosition, nullptr, Zero, 0, 0, 0, 1, 1,
                         0, 1, 0, 0, 0, Zero);
 
-    // 0x00485cd4..0x00485d28: FUN_005a0e30("LoadSave_Title", "PageHeader", {0.145, 0.25, -1.05},
-    // 0, 0.27, 0.03, 1.0, 0, 1, 0, 0) -> +0x5a8, then slot 42 (0x1e, 0x586, 0).
+    // {0.145, 0.25, -1.05}, 0.27 x 0.03 (FUN_005a0e30).
     float const TitlePosition[3] = {NnFloatBits(0x3e147ae1), NnFloatBits(0x3e800000), ZFar};
     Title = CreateTextControl("LoadSave_Title", "PageHeader", TitlePosition, nullptr,
                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
     Title->SetProperty(0x1e, 0x586, 0);
 
-    // 0x00485d2e..0x00485ede: the five buttons. Save and Load share {-0.33, 0.27, -1.05}; Delete,
-    // Main Menu and Resume step down by 0.0916 / 0.1832 / 0.2748 (FSUB float). Half extents
-    // {0.089, 0.021, 0}; FUN_005a0c90(name, FRONT_button.cmp, 0, 0, 0, pos, 0, half, 0, 0, 1, 0,
-    // tooltip ids 0x58c..0x590, 0, 0) -> +0x5ac..+0x5bc.
+    // The five buttons (FUN_005a0c90). Save and Load share {-0.33, 0.27, -1.05}; Delete, Main
+    // Menu and Resume step down by 0.0916 / 0.1832 / 0.2748 (one float subtraction each). Half
+    // extents {0.089, 0.021, 0}.
     float const ButtonX = NnFloatBits(0xbea8f5c2);
     float const ButtonY = NnFloatBits(0x3e8a3d71);
     float const ButtonHalf[3] = {NnFloatBits(0x3db645a2), NnFloatBits(0x3cac0831), 0.0f};
@@ -174,12 +165,11 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     Buttons[4] = CreateButtonControl("LoadSave_ResumeGame", kButtonMesh, nullptr, nullptr, nullptr,
                                      ResumePosition, nullptr, ButtonHalf, 0, 0, 1, 0, 0x590, 0, 0);
 
-    // 0x00485ee4..0x00485f14: FUN_0055bfc0(1) on each (no null test).
+    // No null test.
     for (int Index = 0; Index < 5; ++Index)
         static_cast<NnButtonControl*>(Buttons[Index])->SetMontageMode(1);
 
-    // 0x00485f19..0x004860b4: the captions, FUN_005a0e30(name, "ButtonText", pos, 0, 0.27, 0.03,
-    // 1.0, 0, 1, 0, 0) -> +0x5c0..+0x5d0. Y = the button row's Y + 0.0018 (Save, Load), - 0.0898,
+    // The captions (FUN_005a0e30): Y = the button row's Y + 0.0018 (Save, Load), - 0.0898,
     // - 0.1814, - 0.273.
     float const SaveTextPosition[3] = {ButtonX, ButtonY + NnFloatBits(0x3aebedfa), ZFar};
     ButtonTexts[0] = CreateTextControl("LoadSave_SaveGameText", "ButtonText", SaveTextPosition,
@@ -201,12 +191,10 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                        ResumeTextPosition, nullptr, NnFloatBits(0x3e8a3d71),
                                        NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
 
-    // 0x004860a8..0x0048611c: slot 42 (0x1e, 0x587..0x58b, 0) on the captions.
     for (int Index = 0; Index < 5; ++Index)
         ButtonTexts[Index]->SetProperty(0x1e, static_cast<uintptr_t>(0x587 + Index), 0);
 
-    // 0x00486122..0x004861dd: +0x5d4..+0x5d8 = 0; each caption's +0x381 = DAT_00679bb4 and
-    // +0x385 = DAT_00679ba4 (two unaligned dwords).
+    // Each caption's +0x381 = DAT_00679bb4 and +0x385 = DAT_00679ba4 (two unaligned dwords).
     for (int Index = 0; Index < 5; ++Index)
         bButtonEnabled[Index] = 0;
     for (int Index = 0; Index < 5; ++Index)
@@ -216,16 +204,13 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         memcpy(Text->BlinkColourOff, &G_NnPaletteArgb_679ba4, 4);
     }
 
-    // 0x004861be..0x00486232: "LoadSave_InfoFrame" at {-0.33, -0.2, -1.05}, the static flags.
+    // {-0.33, -0.2, -1.05}
     float const InfoFramePosition[3] = {ButtonX, NnFloatBits(0xbe4ccccd), ZFar};
     CreateStaticControl("LoadSave_InfoFrame", kInfoFrameMesh, InfoFramePosition, nullptr, Zero, 0,
                         0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
 
-    // 0x00486237..0x004864d4: the info texts, FUN_005a0e30(name, "Normal", pos, 0, 0.25, 0.02,
-    // 1.0, 0, 0, 0, 0), from {-0.32, -0.125, -1.05} down by 0, 0.02, 0.0425, 0.0625, 0.085, 0.105,
-    // 0.1275, 0.1475 (FSUB float). Created title, data, title, data...; stored at +0x1768
-    // (location title), +0x1778 (location data), +0x176c, +0x177c, +0x1770, +0x1780, +0x1774,
-    // +0x1784.
+    // The info texts, from {-0.32, -0.125, -1.05} down by 0, 0.02, 0.0425, 0.0625, 0.085, 0.105,
+    // 0.1275, 0.1475; created title, data, title, data...
     float const InfoX = NnFloatBits(0xbea3d70a);
     float const InfoY = NnFloatBits(0xbe000000);
     float const InfoWidth = NnFloatBits(0x3e800000);
@@ -236,7 +221,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     char const* const InfoDataNames[4] = {"LoadSave_InfoLocationData", "LoadSave_InfoCreditsData",
                                           "LoadSave_InfoRankData", "LoadSave_InfoShipData"};
     {
-        // Spelled out per text so every subtraction is the listing's single FSUB.
+        // Spelled out per text so every subtraction is retail's single float FSUB.
         float const LocationTitlePosition[3] = {InfoX, InfoY, ZFar};
         InfoTitles[0] = CreateTextControl(InfoTitleNames[0], "Normal", LocationTitlePosition,
                                           nullptr, InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
@@ -263,8 +248,6 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
     }
 
-    // 0x004864c8..0x00486578: titles slot 42 (0x1e, 0x593 / 0x594 / 0x5ec / 0x591, 0); values
-    // (0x1d, L"", 0).
     InfoTitles[0]->SetProperty(0x1e, 0x593, 0);
     InfoTitles[1]->SetProperty(0x1e, 0x594, 0);
     InfoTitles[2]->SetProperty(0x1e, 0x5ec, 0);
@@ -272,9 +255,8 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     for (int Index = 0; Index < 4; ++Index)
         InfoValues[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
 
-    // 0x0048657e..0x004865c8: 0x10 visible rows in save mode, else 0x14. Row height
-    // (double)0.032538 * rows (DAT_005d1f10) and text scale (double)0.01773 / rows
-    // (DAT_005d1f08), both stored as float; the lists' Y is 0.11 in save mode, else 0.21.
+    // Height and text scale are computed in double (DAT_005d1f10 / DAT_005d1f08) and stored as
+    // float.
     VisibleRows = Mode == kNnLoadSaveModeSave ? 0x10 : 0x14;
     float const ListHeight = static_cast<float>(0.032538 * static_cast<double>(VisibleRows));
     float const ListTextScale = static_cast<float>(0.01773 / static_cast<double>(VisibleRows));
@@ -282,8 +264,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     if (Mode != kNnLoadSaveModeSave)
         ListY = NnFloatBits(0x3e570a3d);
 
-    // 0x004865d0..0x00486654: the name list -- slot 9 Create(this, 0); height, visible rows, no
-    // frame, row rules, width 0.4, text scale; its offset {-0.142, Y, -1.05} at +0xe8c.
+    // Width 0.4, offset {-0.142, Y, -1.05}.
     NameList.Create(this, nullptr);
     NameList.Height = ListHeight;
     NameList.VisibleRows = VisibleRows;
@@ -295,8 +276,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     NameListOffset[1] = ListY;
     NameListOffset[2] = ZFar;
 
-    // 0x00486657..0x004866d1: the date list, the same with width 0.14 and offset
-    // {0.258, Y, -1.05} at +0x1748.
+    // Width 0.14, offset {0.258, Y, -1.05}.
     TimeList.Create(this, nullptr);
     TimeList.Height = ListHeight;
     TimeList.bDrawFrame = 0;
@@ -310,8 +290,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
 
     if (Mode == kNnLoadSaveModeSave)
     {
-        // 0x004866da..0x00486753: FUN_005a1900("LoadSave_Edit2", {0.125 - 0.26, 0.158 + 0.015,
-        // -1.05}, 0.52, 0.03, L"") -> +0x1764; FUN_0057bdb0(0x1e); FUN_0057c750 (no null test).
+        // FUN_005a1900; the edit is not null-tested.
         float const DescripX = NnFloatBits(0x3e000000);
         float const DescripY = NnFloatBits(0x3e21cac1);
         float const EditPosition[3] = {DescripX - NnFloatBits(0x3e851eb8),
@@ -321,9 +300,6 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         DescripEdit->SetMaxLength(0x1e);
         DescripEdit->Activate();
 
-        // 0x00486758..0x004867b4: FUN_005a0c90("LoadSave_DescripButton", LS_bottomframe.3db, 0,
-        // 0, 0, {0.125, 0.158, -1.05}, 0, {0.27, 0.029, 0}, 0, 0, 1, 0, 0x596, 0, 0) -> +0x1760;
-        // FUN_0055bfc0(1); slot 42 (0x32, 1, 0).
         float const DescripPosition[3] = {DescripX, DescripY, ZFar};
         float const DescripHalf[3] = {NnFloatBits(0x3e8a3d71), NnFloatBits(0x3ced9168), 0.0f};
         DescripButton = CreateButtonControl("LoadSave_DescripButton", kDescripButtonMesh, nullptr,
@@ -332,9 +308,6 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         static_cast<NnButtonControl*>(DescripButton)->SetMontageMode(1);
         DescripButton->SetProperty(0x32, 1, 0);
 
-        // 0x004867ba..0x0048680e: FUN_005a0e30("LoadSave_DescripText", "ListText",
-        // {-0.009, 0.204, -1.05}, 0, 0.27, 0.03, 1.0, 0, 0, 0, 0) -> +0x175c; slot 42 (0x1e,
-        // 0x592, 0).
         float const DescripTextPosition[3] = {NnFloatBits(0xbc1374bc), NnFloatBits(0x3e50e560),
                                               ZFar};
         DescripText = CreateTextControl("LoadSave_DescripText", "ListText", DescripTextPosition,
@@ -344,14 +317,12 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
     else
     {
-        // 0x00486816..0x00486822
         DescripEdit = nullptr;
         DescripButton = nullptr;
         DescripText = nullptr;
     }
 
-    // 0x00486828..0x004868ad: FUN_005a17e0("LoadSave_Scroll", {0.406, Y, -1.05}, 0.02, H, 0,
-    // 100, rows, 0) -> +0x1758; Y / H 0.107 / 0.37 in save mode, else 0.21 / 0.465.
+    // FUN_005a17e0; Y / H 0.107 / 0.37 in save mode, else 0.21 / 0.465.
     float ScrollY = NnFloatBits(0x3e570a3d);
     float ScrollHeight = NnFloatBits(0x3eee147b);
     if (Mode == kNnLoadSaveModeSave)
@@ -363,17 +334,14 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     Scroll = CreateUIScroll("LoadSave_Scroll", ScrollPosition, NnFloatBits(0x3ca3d70a),
                             ScrollHeight, 0, 100, VisibleRows, 0);
 
-    // 0x004868a2..0x00486914: FUN_005a0c90("LoadSave_Close", x.3db, 0, 0, 0,
-    // {0.415, 0.26, -1.05}, 0, {0.02, 0.02, 0}, 0, 1, 0, 0, 0x409, 0, 0) -> +0x1788;
-    // FUN_0055bfc0(1).
+    // {0.415, 0.26, -1.05}
     float const ClosePosition[3] = {NnFloatBits(0x3ed47ae2), NnFloatBits(0x3e851eb8), ZFar};
     float const CloseHalf[3] = {NnFloatBits(0x3ca3d70a), NnFloatBits(0x3ca3d70a), 0.0f};
     CloseButton = CreateButtonControl("LoadSave_Close", kCloseMesh, nullptr, nullptr, nullptr,
                                       ClosePosition, nullptr, CloseHalf, 0, 1, 0, 0, 0x409, 0, 0);
     static_cast<NnButtonControl*>(CloseButton)->SetMontageMode(1);
 
-    // 0x00486919..0x004869c2: FUN_004347e0(ids 0x65d, buffer, 0x100) -- FDUMP at line 0x18e on a
-    // miss, the buffer used either way -- into the +0x350 string; +0x360 = its length.
+    // The buffer is used even after a failed lookup.
     wchar_t PrefixText[0x100];
     if (GetIdsStringWWithRawFallback(0x65d, PrefixText, 0x100) == 0)
     {
@@ -382,10 +350,8 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
     SaveNamePrefix.assign(PrefixText, wcslen(PrefixText));
     SaveNamePrefixLength = static_cast<int>(wcslen(SaveNamePrefix.c_str()));
-    // 0x004869d3
     NextSaveNumber = 1;
 
-    // 0x004869c8..0x00486b1e: the title and which buttons show, by mode.
     if (Mode == kNnLoadSaveModeLoad)
     {
         Title->SetProperty(0x1e, 0x588, 0);
@@ -421,18 +387,13 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
               Mode);
     }
 
-    // 0x00486b21..0x00486b28
     DrawLayer = 0x6e;
     DrawSubLayer = 6;
-    // 0x00486b2f: FUN_004a7670.
-    bCursorDrawFlag = NnModalPauseGame();
-    // 0x00486b34..0x00486b42: FUN_005760d0(0xf) on the +0x32c face.
-    RegisterEvent(0xf);
-    // 0x00486b47..0x00486b52
+    bCursorDrawFlag = NnModalPauseGame(); // FUN_004a7670
+    RegisterEvent(0xf); // FUN_005760d0 on the +0x32c face
     RefreshSaveList();
     SelectSave(-1);
-    // 0x00486b69: FUN_004b5060, SETNZ.
-    return Win3D::Create(NewParent, Data);
+    return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 
 void NnLoadSave::ResumeAndDelete()
@@ -463,7 +424,7 @@ void NnLoadSave::ClearListsAndSelection()
 
 WinControl* NnLoadSave::ButtonTextFor(uintptr_t Button) const
 {
-    // 0x00487067..0x004870ba / 0x004870f0..0x00487143
+    // Port-only helper for the lookup retail inlines at 0x00487067 and 0x004870f0.
     for (int Index = 0; Index < 5; ++Index)
     {
         if (Button == reinterpret_cast<uintptr_t>(Buttons[Index]))
@@ -485,8 +446,7 @@ bool NnLoadSave::OnEvent(unsigned MsgId)
 
 void NnLoadSave::Draw()
 {
-    // FUN_00486c10: the software cursor forced on, FUN_0045a9f0, WinControl's draw, then +0x33d
-    // follows +0x33e.
+    // FUN_00486c10: the software cursor is forced on.
     if (GetClientMouseCursorDrawFlag() == 0)
         SetClientMouseCursorDrawFlag(1);
     Win3DFlushBeforeOverlayDraw();
@@ -506,21 +466,19 @@ bool NnLoadSave::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
 intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_00486ca0 (RET 0xc, 0x1218-byte frame: two 0x400-character buffers). Every path
-    // returns 0; nothing reaches WinControl's switch.
+    // LAB_00486ca0 (RET 0xc). Every path returns 0; nothing reaches WinControl's switch.
     wchar_t Format[0x400];
     wchar_t Text[0x400];
 
     if (static_cast<unsigned>(Msg) > 0x3006)
     {
-        // LAB_004873c3: 0xf001..0xf004 (jump table 00487534).
+        // 0xf001..0xf004 (jump table 0x00487534).
         int const Row = static_cast<int>(B);
         switch (static_cast<unsigned>(Msg))
         {
         case 0xf001:
         {
-            // 0x004873d8..0x00487421: a list click -- that row selected in the list(s) it fits,
-            // the date list follows the name list, then SelectSave.
+            // A list click; the date list follows the name list.
             if (Row >= -1)
             {
                 if (Row < NameList.ItemCount)
@@ -536,7 +494,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         case 0xf002:
         {
-            // 0x00487435..0x0048749f: a double click loads, in modes 1 and 3.
+            // A double click loads, in modes 1 and 3.
             if (Mode != kNnLoadSaveModeLoad && Mode != kNnLoadSaveModeStoryStar)
                 return 0;
             if (Row >= -1)
@@ -556,11 +514,10 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         }
         case 0xf003:
-            // 0x004874b3..0x004874c1: the Event::Handler face's slot 0 with USER_CANCEL.
+            // USER_CANCEL through the Event::Handler face's slot 0.
             OnEvent(0xf);
             return 0;
         case 0xf004:
-            // 0x004874d2..0x004874e7: save, when allowed and in save mode.
             if (bSaveAllowed != 0 && Mode == kNnLoadSaveModeSave)
                 SaveGame();
             return 0;
@@ -571,13 +528,11 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Msg == 0x3006)
     {
-        // LAB_004871b0: NN_Confirm answered (A == 1 yes) the question +0x338 names.
+        // NN_Confirm answered (A == 1 yes) the question +0x338 names.
         switch (ConfirmMode)
         {
         case 1:
-            // 0x004871c5..0x00487274: delete the selected save -- its CHARACTER_ID copied
-            // (REP MOVSD 0x80), the list erased (FUN_004890c0), the lists cleared,
-            // FUN_005aa8f0 on DAT_0067e7b8, the list refilled.
+            // Delete the selected save (FUN_005aa8f0 on DAT_0067e7b8).
             if (A == 1 && NameList.SelectedIndex != -1)
             {
                 CHARACTER_ID Id;
@@ -593,15 +548,14 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
             break;
         case 2:
-            // 0x0048727e..0x0048728b: back to the main menu at the next Update.
+            // Back to the main menu at the next Update.
             if (A == 1)
                 bExitToMainMenu = 1;
             break;
         case 3:
             break;
         case 4:
-            // 0x004872a9..0x00487361: overwrite -- the save FUN_00487550 would have made, with
-            // +0x368 as the character.
+            // Overwrite: the save FUN_00487550 would have made, with +0x368 as the character.
             if (A == 1)
             {
                 CHARACTER_ID Id;
@@ -628,7 +582,6 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                   0x2dc, ConfirmMode);
             break;
         }
-        // LAB_00487391: the question is over -- the edit box back, both lists selectable.
         ConfirmMode = 0;
         if (DescripEdit != nullptr)
             DescripEdit->Activate();
@@ -641,8 +594,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
     case 0x42:
     {
-        // caseD_42: slot 31 SetOffset(*A), slot 5 SetPosition(+0x60), then each list's slot 5
-        // with the window position plus its offset (FADD float per component).
+        // Each list goes to the window position plus its offset (float adds).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
@@ -658,17 +610,15 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     case 0x26:
     {
-        // caseD_26: a button was pressed (A = the sender).
+        // A button was pressed (A = the sender).
         if (A == reinterpret_cast<uintptr_t>(Buttons[0]))
         {
-            // 0x00486dba..0x00486dc8 -> LAB_004874e5
             if (bButtonEnabled[0] != 0)
                 SaveGame();
             return 0;
         }
         if (A == reinterpret_cast<uintptr_t>(Buttons[1]))
         {
-            // 0x00486dd5..0x00486df5
             if (bButtonEnabled[1] == 0 || NameList.SelectedIndex == -1)
                 return 0;
             LoadSave(NameList.SelectedIndex);
@@ -676,8 +626,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == reinterpret_cast<uintptr_t>(Buttons[2]))
         {
-            // 0x00486e15..0x00486eac: "delete <name>?" -- ids 0x75c formatted with the row's
-            // name (+0x14 string of the entry), NN_Confirm style "ConfirmPlayerText".
+            // "Delete <name>?"
             if (bButtonEnabled[2] == 0 || NameList.SelectedIndex == -1)
                 return 0;
             wchar_t const* const Name = Entries[NameList.SelectedIndex].Name.c_str();
@@ -692,8 +641,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == reinterpret_cast<uintptr_t>(Buttons[3]))
         {
-            // 0x00486ecb..0x00486f2c: "quit to the main menu?" (ids 0x75b); both lists stop
-            // taking clicks while it is up.
+            // "Quit to the main menu?"; both lists stop taking clicks while it is up.
             if (bButtonEnabled[3] == 0)
                 return 0;
             GetIdsStringWWithRawFallback(0x75b, Text, 0x400);
@@ -707,8 +655,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == reinterpret_cast<uintptr_t>(Buttons[4]))
         {
-            // 0x00486f4b..0x00486f94: resume -- FUN_004a7690, slot 10 on both lists, slot 33
-            // ReleaseMouse, FUN_0043d2a0(this).
+            // Resume: unlike the other closes, retail deletes the tree only (FUN_0043d2a0(this)).
             if (bButtonEnabled[4] == 0)
                 return 0;
             NnModalResumeGame(bCursorDrawFlag);
@@ -722,7 +669,6 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
-            // 0x00486fbf..0x00487023
             ResumeAndDelete();
             return 0;
         }
@@ -731,8 +677,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     case 0x2c:
     {
-        // caseD_2c: the pointer entered a button -- its caption, when shown, gets property
-        // (0x51, 1, 0).
+        // The pointer entered a button: its caption, when shown, highlights.
         WinControl* const Caption = ButtonTextFor(A);
         if (Caption == nullptr || (Caption->Flags & 1) == 0)
             return 0;
@@ -741,7 +686,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     case 0x2d:
     {
-        // caseD_2d: it left -- (0x51, 0, 0), then the colour back to DAT_00679bb4 (0x33).
+        // It left: the colour goes back to DAT_00679bb4.
         WinControl* const Caption = ButtonTextFor(A);
         if (Caption == nullptr || (Caption->Flags & 1) == 0)
             return 0;
@@ -750,7 +695,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
     case 0x3e:
-        // caseD_3e: the scroll bar moved -- B is the first visible row of both lists.
+        // The scroll bar moved: B is the first visible row of both lists.
         NameList.FirstVisible = static_cast<int>(B);
         TimeList.FirstVisible = static_cast<int>(B);
         return 0;
@@ -761,29 +706,27 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
 void NnLoadSave::SaveGame()
 {
-    // FUN_00487550 (0xa14-byte frame).
+    // FUN_00487550.
     FNnLoadSaveEntry const* Selected = nullptr;
     if (NameList.SelectedIndex != -1)
     {
-        // 0x00487567..0x0048757d: CHARACTER_ID::operator= (COMMON.DLL) from the row's record.
         Selected = &Entries[NameList.SelectedIndex];
         OverwriteId = Selected->Info->Id;
     }
 
-    // 0x00487583..0x0048759d: FUN_0057c2c0(+0x568, 0x1f), or an empty name without the box.
     if (DescripEdit != nullptr)
         DescripEdit->GetText(SaveName, 0x1f);
     else
         SaveName[0] = 0;
 
-    // 0x004875a6..0x004875cc: a different name than the selected row's makes a new save.
+    // A different name than the selected row's makes a new save.
     if (Selected != nullptr)
     {
         if (wcscmp(Selected->Name.c_str(), SaveName) != 0)
             OverwriteId.Buffer[0] = 0;
     }
 
-    // 0x004875d3..0x00487617: no name -- the prefix and the next number (_ltow base 10).
+    // No name: the prefix and the next number.
     if (SaveName[0] == 0)
     {
         wcscpy(SaveName, SaveNamePrefix.c_str());
@@ -792,8 +735,7 @@ void NnLoadSave::SaveGame()
 
     if (OverwriteId.Buffer[0] != 0)
     {
-        // 0x0048762e..0x004876f1: "overwrite?" (ids 0x706), +0x338 = 4, the edit box and the
-        // lists put down, then FUN_004889e0's body inline with style "ConfirmText".
+        // "Overwrite?"; retail inlines FUN_004889e0 here.
         wchar_t Text[0x400];
         GetIdsStringWWithRawFallback(0x706, Text, 0x400);
         ConfirmMode = 4;
@@ -805,8 +747,7 @@ void NnLoadSave::SaveGame()
         return;
     }
 
-    // 0x00487700..0x004877dc: the save itself -- the id copied (REP MOVSD 0x80), the list erased,
-    // the lists cleared, IServer::SaveGame (+0xe8) or the FDUMP, the list refilled.
+    // IServer::SaveGame is slot +0xe8.
     CHARACTER_ID Id;
     memcpy(&Id, &OverwriteId, sizeof(CHARACTER_ID));
     Entries.clear();
@@ -829,12 +770,10 @@ void NnLoadSave::SaveGame()
 void NnLoadSave::RefreshSaveList()
 {
     // FUN_004877f0.
-    // 0x0048780d..0x0048783e: erase(begin, end) (FUN_00489200 + FUN_00489160).
     Entries.clear();
 
     if (G_LoginMgr.RequestCharacterInfo() == 1)
     {
-        // 0x0048784f..0x004878f5: count the character list and reserve that many rows.
         int Count = 0;
         MetaNode<CCharacterSet::CharacterInfo>* Node = nullptr;
         while (G_LoginMgr.Characters.traverse(Node, true))
@@ -842,9 +781,7 @@ void NnLoadSave::RefreshSaveList()
         if (Entries.capacity() < static_cast<size_t>(Count))
             Entries.reserve(static_cast<size_t>(Count));
 
-        // 0x004878f8..0x004879ec: one row per record that is not the restart save (+0x200):
-        // the listed text (FUN_00488b70) and the date (filetime_to_wstring(+0x228)), appended
-        // (FUN_00488ee0).
+        // One row per record that is not the restart save (+0x200).
         for (int Index = 0; Index < Count; ++Index)
         {
             CCharacterSet::CharacterInfo* const Info = G_LoginMgr.CharacterAt(Index);
@@ -860,8 +797,7 @@ void NnLoadSave::RefreshSaveList()
             Entries.push_back(Entry);
         }
 
-        // 0x004879f2..0x00487a24: saves failed while away (DAT_0067e984) -- NN_Error ids 0x5cd
-        // over this window, +0x338 = 3.
+        // Saves failed while away (DAT_0067e984).
         if (G_LoginMgr.SaveFailureCount != 0)
         {
             ConfirmMode = 3;
@@ -872,13 +808,12 @@ void NnLoadSave::RefreshSaveList()
     }
     else
     {
-        // LAB_00487a26
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x446,
               "Failed to retrieve available save games\n");
     }
 
-    // 0x00487a4a..0x00487b15: the next generated number -- the largest N among rows named
-    // <prefix>N (wcsncmp, then wcstol base 10 that consumes the rest, N <= 1000000000), plus 1.
+    // The next generated number: the largest N among rows named <prefix>N (N <= 1000000000),
+    // plus 1.
     int Largest = 0;
     for (size_t Index = 0; Index < Entries.size(); ++Index)
     {
@@ -897,7 +832,6 @@ void NnLoadSave::RefreshSaveList()
     }
     NextSaveNumber = Largest + 1;
 
-    // 0x00487b1b..0x00487bbe: at most 0x100 rows go into the lists (names, then dates).
     int Count = static_cast<int>(Entries.size());
     if (Count > 0x100)
         Count = 0x100;
@@ -909,8 +843,6 @@ void NnLoadSave::RefreshSaveList()
         TimeList.SetItemText(Index, Entries[Index].Time.c_str());
     }
 
-    // 0x00487bc0..0x00487c11: the scroll bar -- range 0..1 and hidden when the rows fit
-    // (count - rows + 1 <= 1), else range 0..count and shown.
     if (Count - VisibleRows + 1 <= 1)
     {
         Scroll->SetRange(0.0f, 1.0f);
@@ -925,11 +857,9 @@ void NnLoadSave::RefreshSaveList()
 
 void NnLoadSave::SelectSave(int Index)
 {
-    // FUN_00487cb0 (RET 4, 0x800-byte frame).
+    // FUN_00487cb0 (RET 4).
     if (Index == -1)
     {
-        // 0x00487cca..0x00487dc4: the values read ids 0x595, the description emptied; Save,
-        // Main Menu and Resume on, Load and Delete greyed (caption property 2 = 1).
         for (int Value = 0; Value < 4; ++Value)
             InfoValues[Value]->SetProperty(0x1e, 0x595, 0);
         if (DescripEdit != nullptr)
@@ -950,7 +880,6 @@ void NnLoadSave::SelectSave(int Index)
     int const Count = static_cast<int>(Entries.size());
     if (Index < 0 || Index >= Count)
     {
-        // LAB_004880b6
         FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
               0x4ea, Index);
         return;
@@ -958,22 +887,20 @@ void NnLoadSave::SelectSave(int Index)
 
     CCharacterSet::CharacterInfo const* const Info = Entries[Index].Info;
 
-    // 0x00487e0f..0x00487e4e: the system's name (ISystem slot 3, strid_name), or empty.
     Universe::ISystem const* const System = Universe::get_system(Info->SystemId);
     if (System != nullptr)
         InfoValues[0]->SetProperty(0x1e, (uintptr_t)System->GetStridName(), 0);
     else
         InfoValues[0]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
 
-    // 0x00487e54..0x00487eae: credits (+0x234) and rank (+0x270) through L"%d" (005d0ec4).
+    // L"%d" is 005d0ec4.
     wchar_t Number[0x400];
     swprintf(Number, 0x400, L"%d", Info->Money);
     InfoValues[1]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Number), 0);
     swprintf(Number, 0x400, L"%d", Info->Rank);
     InfoValues[2]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Number), 0);
 
-    // 0x00487eb4..0x00487ee3: the ship's name (Archetype::GetShip(+0x230)->ids_name), or empty
-    // with no ship.
+    // GetShip is not null-tested.
     if (Info->ShipArchetype != 0)
     {
         Archetype::Ship const* const Ship = Archetype::GetShip(Info->ShipArchetype);
@@ -984,9 +911,7 @@ void NnLoadSave::SelectSave(int Index)
         InfoValues[3]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
     }
 
-    // 0x00487ee9..0x00487f6c: the description box -- DescripStrId (+0x224) through FUN_004347e0
-    // into DAT_00671ce8 (FDUMP at line 0x64d on a miss, the buffer either way), else the
-    // Description string; FUN_0057bff0, then FUN_0057c0e0(text, 0).
+    // NnLoadSaveEntryText's body, inlined in retail.
     if (DescripEdit != nullptr)
     {
         wchar_t const* Description = nullptr;
@@ -1007,8 +932,7 @@ void NnLoadSave::SelectSave(int Index)
         DescripEdit->SetText(Description, nullptr);
     }
 
-    // 0x00487f71..0x004880b3: the restart / autosave records (+0x200 / +0x201) cannot be saved
-    // over or deleted.
+    // The restart / autosave records (+0x200 / +0x201) cannot be saved over or deleted.
     if (Info->bIsRestart == 0 && Info->bIsAutoSave == 0)
     {
         for (int Button = 0; Button < 5; ++Button)
@@ -1036,27 +960,23 @@ void NnLoadSave::LoadSave(int Index)
     int const Count = static_cast<int>(Entries.size());
     if (Index < 0 || Index >= Count)
     {
-        // LAB_004881c0
         FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
               0x502, Index);
         return;
     }
-    // 0x0048812e..0x00488144: FUN_005b2c70(record, record +0x201).
     CCharacterSet::CharacterInfo const* const Info = Entries[Index].Info;
     QueueLoadGameCharacter(&Info->Id, Info->bIsAutoSave != 0);
-    // 0x00488149..0x004881b0: close.
     ResumeAndDelete();
-    // 0x004881b2: FUN_004120d0(1).
     FadeIn(true);
 }
 
 void NnLoadSave::Update()
 {
-    // FUN_004881f0: WinControl's Update (FUN_005a17b0).
+    // FUN_004881f0.
     WinControl::Update();
 
-    // 0x004881f8..0x0048823e: outside the main-menu question, the row under the pointer in
-    // either list is drawn highlighted in both (ListBox +0x80).
+    // Outside the main-menu question, the row under the pointer in either list is highlighted
+    // in both (ListBox +0x80).
     if (ConfirmMode != 2)
     {
         int Row = -1;
@@ -1073,8 +993,7 @@ void NnLoadSave::Update()
         }
     }
 
-    // 0x00488244..0x004882c2: main menu confirmed -- FUN_005763b0(0xc5, 0) (USER_EXIT_GAME),
-    // then close.
+    // Main menu confirmed: USER_EXIT_GAME (0xc5), then close.
     if (bExitToMainMenu == 0)
         return;
     bExitToMainMenu = 0;

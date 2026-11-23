@@ -6,10 +6,10 @@
 
 #include "Interface/ui_scroll.h"
 
-#include "common_csys.h" // Acquire3DMathEngine (FUN_005b73e0)
+#include "common_csys.h"
 #include "Core/game_options.h"
 #include "Core/globals.h"
-#include "Space/HUD/hud_target.h"   // HudTransformPoint (FUN_004e7090)
+#include "Space/HUD/hud_target.h"
 #include "NeuroNet/nn_ui_pulse.h"
 #include "Space/star_sphere.h"
 #include "Common/Graphics/texture_shapes.h"
@@ -26,10 +26,8 @@
 
 namespace
 {
-    // DAT_0067d9fc -- UIScroll's lazily acquired 3DMathEngine: every use tests it and fills it
-    // from FUN_005b73e0 when null (LAB_00595f90 0x00596005, LAB_00596050 0x00596078, LAB_00596b90
-    // 0x00596bca, LAB_005971e0 0x005971fd, LAB_00597350 0x0059740a, LAB_0059778e 0x005977ab);
-    // a raw scan finds no other reference. Not the UI_PAGE widgets' DAT_0067dbc0.
+    // DAT_0067d9fc -- UIScroll's own lazily acquired 3DMathEngine, not the UI_PAGE widgets'
+    // DAT_0067dbc0.
     I3DMathEngine* G_UiScrollMath = nullptr;
 
     I3DMathEngine* UiScrollMath()
@@ -39,27 +37,25 @@ namespace
         return G_UiScrollMath;
     }
 
-    // DAT_0067d9e0 — the one-time UITextures.ini load latch in FUN_00595420.
+    // DAT_0067d9e0 — the one-time UITextures.ini load latch in the ctor.
     bool G_bScrollShapesLoaded = false;
-    // DAT_0067d9e4 / DAT_0067d9e8 / DAT_0067d9ec — read by the draw (LAB_00596450).
+    // DAT_0067d9e4 / DAT_0067d9e8 / DAT_0067d9ec.
     FTexShape const* G_ScrollArrowShape = nullptr;
     FTexShape const* G_ScrollTopBottomShape = nullptr;
     FTexShape const* G_ScrollMidShape = nullptr;
 
-    // FUN_00595730 — ShapeDB::Find (cmn\shapedb.h line 0xf2) on DAT_0067d9c8: the named shape,
-    // or a warning and null.
+    // FUN_00595730 — ShapeDB::Find on DAT_0067d9c8: the named shape, or a warning and null.
     FTexShape const* ScrollShapeFind(char const* Name)
     {
         return G_UiShapeDB.Find(Name, kShapeDbHeaderLower);
     }
 
-    // FUN_00595840 builds the thumb from a length along the track; this is the part shared by
-    // both orientations (00595880..00595951 / 00595a8e..00595b5f). Track is stored to a float
-    // local, Pos stays on the x87 stack.
+    // The thumb placement Relayout shares between both orientations. x87: Track is a float,
+    // Pos stays double.
     void ScrollThumbSpan(float Track, float RangeMin, float RangeMax, float Value, float Page,
                          bool bStepMode, double* OutPos, float* OutThumb)
     {
-        // TEST AH,0x44 / JNP: equal → thumb = whole track, position 0.
+        // Equal: thumb = whole track, position 0.
         if (RangeMax == RangeMin)
         {
             *OutPos = 0.0;
@@ -69,36 +65,33 @@ namespace
         float const Range = static_cast<float>(static_cast<double>(RangeMax) - RangeMin);
         double Pos = (static_cast<double>(Value) - RangeMin) * Track / Range;
         float Thumb = static_cast<float>(static_cast<double>(Track) * Page / Range);
-        if (Thumb < 0.01f)                                   // DAT_005c99c8
+        if (Thumb < 0.01f)
             Thumb = 0.01f;
         if (bStepMode)
             Thumb = 0.0f;
-        // TEST AH,0x41 / JNZ keeps Pos when Thumb + Pos <= Track (or unordered).
+        // Pos is kept when Thumb + Pos <= Track (or unordered).
         if (static_cast<double>(Thumb) + Pos > static_cast<double>(Track))
             Pos = static_cast<double>(Track) - Thumb;
         *OutPos = Pos;
         *OutThumb = Thumb;
     }
 
-    // .rdata DAT_005d3e94 (0x3b03126f) -- the thumb's end-cap length along the track.
+    // DAT_005d3e94 -- the thumb's end-cap length along the track.
     float const kScrollThumbCap = 0.002f;
-    // 0x3e99999a -- the auto-repeat delay slot 19 / UICycle slot 19 arm after an arrow press.
+    // The auto-repeat delay both MouseEvents arm after an arrow press.
     float const kScrollRepeatDelay = 0.3f;
-    // 0x3dcccccd -- UICycle's auto-repeat interval (0x00597732).
+    // UICycle's auto-repeat interval.
     float const kCycleRepeatInterval = 0.1f;
-    // .rdata DAT_005d3ee0 (0x3dcccccd) -- the step-mode track click moves a tenth of the range.
+    // DAT_005d3ee0 -- the step-mode track click moves a tenth of the range.
     float const kScrollTrackStepFraction = 0.1f;
 
-    // A point inside a part rect: X0 <= X <= X1 and Y1 <= Y <= Y0, false when unordered
-    // (TEST AH,0x1 / JNZ against X0 and Y1, TEST AH,0x41 / JP against X1 and Y0 -- 0x005960d9..
-    // 0x0059610e and every rect test of slot 19).
+    // A point inside a part rect: X0 <= X <= X1 and Y1 <= Y <= Y0, false when unordered.
     bool ScrollRectContains(FScrollHitRect const& Rect, float X, float Y)
     {
         return X >= Rect.X0 && X <= Rect.X1 && Y <= Rect.Y0 && Y >= Rect.Y1;
     }
 
-    // The control's own box: 0 <= X < Width and -Height < Y <= 0 (0x0059724b..0x0059728f,
-    // 0x00596e01..0x00596e51, 0x005977fc..0x00597856).
+    // The control's own box: 0 <= X < Width and -Height < Y <= 0.
     bool ScrollInsideBox(float X, float Y, float Width, float Height)
     {
         if (!(X >= 0.0f))
@@ -111,8 +104,7 @@ namespace
     }
 }
 
-// FUN_00595400 -- WinMain shutdown (005b2295): clear the UI ShapeDB when FUN_00595420 loaded it.
-// The latch itself is left set, as in retail.
+// FUN_00595400 -- called at WinMain shutdown. The latch itself is left set, as in retail.
 void UiScrollClearShapes()
 {
     if (G_bScrollShapesLoaded)
@@ -138,9 +130,8 @@ UiScroll::UiScroll()
     , DefaultPage_(0.0f)
     , bHorizontal_(false)
 {
-    // FUN_00595420: WinControl ctor FUN_0059f860; the five part rects zeroed (+0x33c..+0x39c);
-    // empty vector at +0x3a4; +0x3dc FUN_004215b0 identity + zero translation; vftables.
-    memcpy(CustomColor_, &G_NnPaletteArgb_679b94, sizeof(CustomColor_));   // +0x32e
+    // FUN_00595420.
+    memcpy(CustomColor_, &G_NnPaletteArgb_679b94, sizeof(CustomColor_));
     FScrollHitRect* const Rects[5] = { &TopArrow_, &BottomArrow_, &TrackBefore_, &TrackAfter_,
                                        &Thumb_ };
     for (int Index = 0; Index < 5; ++Index)
@@ -156,30 +147,26 @@ UiScroll::UiScroll()
     InverseLayout_[0] = 1.0f;
     InverseLayout_[4] = 1.0f;
     InverseLayout_[8] = 1.0f;
-    ScrollOffset_[0] = 0.0f;                                                // +0x41c..+0x424
+    ScrollOffset_[0] = 0.0f;
     ScrollOffset_[1] = 0.0f;
     ScrollOffset_[2] = 0.0f;
-    DefaultPage_ = Page_;                                                   // +0x428 = +0x3cc
+    DefaultPage_ = Page_;
 
     if (!G_bScrollShapesLoaded)
     {
         G_bScrollShapesLoaded = true;
-        // FUN_00425b30("Interface\\UI\\UITextures.ini", *Data_exref) with ECX = DAT_0067d9c8,
-        // UIScroll's own ShapeDB instance (cleared at exit by LAB_00595400 -> FUN_00425a20).
         G_UiShapeDB.Load("Interface\\UI\\UITextures.ini", DALib::Data);
         G_ScrollArrowShape = ScrollShapeFind("HUD_sliderarrow");
         G_ScrollTopBottomShape = ScrollShapeFind("HUD_slidertextopbottom");
         G_ScrollMidShape = ScrollShapeFind("HUD_slidertexmid");
     }
 
-    unsigned long const IdleColor = G_NnPaletteArgb_679bb0;                // DAT_00679bb0
+    unsigned long const IdleColor = G_NnPaletteArgb_679bb0;
     ArrowIdleColor_ = IdleColor;
     ArrowHotColor_ = IdleColor;
     BarIdleColor_ = IdleColor;
     BarHotColor_ = IdleColor;
 
-    // Reserve 5 (FUN_00597c70 copy into a 0x14-byte block), then push_back +0x33c
-    // (FUN_004deb70) and insert +0x350, +0x38c at the end (FUN_00537260).
     HitRects_.reserve(5);
     HitRects_.push_back(&TopArrow_);
     HitRects_.insert(HitRects_.end(), 1, &BottomArrow_);
@@ -188,15 +175,13 @@ UiScroll::UiScroll()
 
 UiScroll::~UiScroll()
 {
-    // FUN_00595800: free the +0x3a4 vector (FUN_005b7e1d), then WinControl FUN_0059fa50.
+    // FUN_00595800.
 }
 
 void UiScroll::SetPosition(float const* NewPosition)
 {
-    // LAB_00595f90 (RET 4): Local = NewPosition + (+0xa8 offset + +0x41c scroll offset). The X
-    // and Y sums stay on the x87 stack; Z's sum is stored to a float first (00595fd7). Then
-    // WinControl FUN_005a0880(&Local) and GeneralInverse (+0x5c)(&Inverse, &scratch, this+0x3c)
-    // copied to +0x3dc.
+    // LAB_00595f90 (RET 4): NewPosition + (offset + scroll offset), then the inverse into
+    // +0x3dc. x87: the X and Y sums stay double; Z's sum is rounded to float first.
     double const SumX = static_cast<double>(Offset[0]) + ScrollOffset_[0];
     double const SumY = static_cast<double>(Offset[1]) + ScrollOffset_[1];
     float const SumZ = static_cast<float>(static_cast<double>(Offset[2]) + ScrollOffset_[2]);
@@ -206,7 +191,6 @@ void UiScroll::SetPosition(float const* NewPosition)
     Local[2] = static_cast<float>(static_cast<double>(NewPosition[2]) + SumZ);
     WinControl::SetPosition(Local);
 
-    // 0x00596005..0x00596013: DAT_0067d9fc tested and filled.
     FTransform Inverse;
     float Scratch = 0.0f;
     UiScrollMath()->GeneralInverse(Inverse, Scratch,
@@ -217,36 +201,35 @@ void UiScroll::SetPosition(float const* NewPosition)
 bool UiScroll::Create(Win3D* NewParent, void* Payload)
 {
     // FUN_00595e90 (RET 8).
-    bool const bResult = Win3D::Create(NewParent, nullptr);                   // FUN_004b5060
+    bool const bResult = Win3D::Create(NewParent, nullptr);
     if (Payload != nullptr)
     {
         FUiPayloadScrollCycle const* Desc = static_cast<FUiPayloadScrollCycle const*>(Payload);
-        Width_ = Desc->Right;                    // +0x334
-        Height_ = Desc->Bottom;                  // +0x338
-        RangeMin_ = Desc->Extra0;                // +0x3c0
-        RangeMax_ = Desc->Extra1;                // +0x3c4
-        Page_ = Desc->Extra2;                    // +0x3cc
-        Step_ = Desc->Extra3;                    // +0x3d0
-        bHorizontal_ = Desc->Flag != 0;          // +0x42c (byte copy)
-        DefaultPage_ = Desc->Extra2;             // +0x428
+        Width_ = Desc->Right;
+        Height_ = Desc->Bottom;
+        RangeMin_ = Desc->Extra0;
+        RangeMax_ = Desc->Extra1;
+        Page_ = Desc->Extra2;
+        Step_ = Desc->Extra3;
+        bHorizontal_ = Desc->Flag != 0;
+        DefaultPage_ = Desc->Extra2;
     }
 
-    // FCOMPP / TEST AH,0x41: Height <= Width (or unordered) → Height, else Width; * 0.2
-    // (double DAT_005cf100).
+    // Height when Height <= Width (or unordered), else Width; times 0.2 in double.
     float const Shorter = (Height_ > Width_) ? Width_ : Height_;
     ArrowSize_ = static_cast<float>(static_cast<double>(Shorter) * 0.2);
-    Relayout();                                                              // FUN_00595840
+    Relayout();
     return bResult;
 }
 
 void UiScroll::Relayout()
 {
     // FUN_00595840. Step mode shrinks the range by one while the thumb is placed and restores
-    // it at the end (00595880 / 00595c81).
+    // it at the end.
     bool const bStep = bStepMode_;
     if (bHorizontal_)
     {
-        // 0059585a..00595a63: arrows at both ends along X.
+        // Arrows at both ends along X.
         float const Lead = static_cast<float>(static_cast<double>(Height_) + ArrowSize_);
         double const Tail = static_cast<double>(Width_) - Height_ - ArrowSize_;
         double Arrows;
@@ -300,7 +283,7 @@ void UiScroll::Relayout()
     }
     else
     {
-        // 00595a68..00595c6f: arrows at both ends along -Y.
+        // Arrows at both ends along -Y.
         float const Lead = static_cast<float>(static_cast<double>(Width_) + ArrowSize_);
         double const Tail = static_cast<double>(Height_) - Width_ - ArrowSize_;
         double Arrows;
@@ -361,10 +344,10 @@ void UiScroll::Relayout()
 void UiScroll::ClampValues()
 {
     // FUN_00595ca0.
-    if (RangeMin_ > RangeMax_)                           // TEST AH,0x41 / JNZ
+    if (RangeMin_ > RangeMax_)
         RangeMin_ = RangeMax_;
     double const Span = static_cast<double>(RangeMax_) - RangeMin_;
-    if (Span < Page_)                                    // TEST AH,0x5 / JP
+    if (Span < Page_)
     {
         if (bStepMode_)
             Page_ = 1.0f;
@@ -426,7 +409,7 @@ bool UiScroll::SetStep(float Step)
 
 void UiScroll::SetSize(float Width, float Height)
 {
-    // FUN_00595e30: FCOMPP of Height against Width, TEST AH,0x41 → Height when Height <= Width.
+    // FUN_00595e30.
     Width_ = Width;
     Height_ = Height;
     if (Height > Width)
@@ -452,9 +435,9 @@ void UiScroll::SetBarColors(unsigned long const* Idle, unsigned long const* Hot)
 
 void UiScroll::SetScrollOffset(float const Offset[3])
 {
-    // FUN_005972d0: new position = old position - old offset + new offset, handed to the
-    // WinControl SetPosition FUN_005a0880 directly (not through the vftable). Z's difference is
-    // stored to a float local first (0059731c); X and Y stay on the x87 stack.
+    // FUN_005972d0: old position - old offset + new offset, handed to WinControl::SetPosition
+    // directly (not through the vftable). x87: Z's difference is rounded to float first; X and
+    // Y stay double.
     float const OldX = ScrollOffset_[0];
     float const OldY = ScrollOffset_[1];
     float const OldZ = ScrollOffset_[2];
@@ -471,10 +454,8 @@ void UiScroll::SetScrollOffset(float const Offset[3])
 
 FVector UiScroll::RayToLocal(float const* Ray) const
 {
-    // The ray scaled onto the z = Position.z plane (the quotient stays on the x87 stack), then
-    // 3DMathEngine +0x28 TransformXform through the +0x3dc inverse with this TU's DAT_0067d9fc
-    // (LAB_00596050, LAB_00596b90, LAB_005971e0, LAB_0059778e). LAB_00596d30 does the same
-    // scaling but transforms through FUN_004e7090 instead (RayToLocalViaHud).
+    // The ray scaled onto the z = Position.z plane (the quotient stays double), then through the
+    // +0x3dc inverse.
     double const Scale = static_cast<double>(Position[2]) / Ray[2];
     FVector Scaled;
     Scaled.X = static_cast<float>(Ray[0] * Scale);
@@ -488,9 +469,8 @@ FVector UiScroll::RayToLocal(float const* Ray) const
 
 FVector UiScroll::RayToLocalViaHud(float const* Ray) const
 {
-    // LAB_00596d30 0x00596d62..0x00596dbe: the ray scaled onto the z = Position.z plane as in
-    // RayToLocal, then FUN_004e7090 (0x00596db9, thiscall on the +0x3dc inverse) -- i.e. the
-    // TransformXform goes through HUD_Target_Base's DAT_00674b1c, not DAT_0067d9fc.
+    // As RayToLocal, but the transform goes through HUD_Target_Base's math engine
+    // (DAT_00674b1c), not DAT_0067d9fc.
     double const Scale = static_cast<double>(Position[2]) / Ray[2];
     FVector Scaled;
     Scaled.X = static_cast<float>(Ray[0] * Scale);
@@ -503,9 +483,7 @@ FVector UiScroll::RayToLocalViaHud(float const* Ray) const
 
 void UiScroll::NotifyParent()
 {
-    // 0x00596b31..0x00596b66 (and the same block in slot 14, slot 19 and UICycle): the parent's
-    // slot 23 (0xf005, this, 0); then, when the parent is a WinControl, its SetProperty
-    // (0x3e, this, ftol(value)).
+    // Inlined at every site in retail.
     if (Parent == nullptr)
         return;
     Parent->ProcessMessage(0xf005u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
@@ -518,8 +496,7 @@ void UiScroll::NotifyParent()
 
 bool UiScroll::HitTest(float const* Ray)
 {
-    // LAB_005971e0 (RET 4): inside the box -> tell a WinControl parent SetProperty(0x25, this, 0)
-    // and hit.
+    // LAB_005971e0 (RET 4).
     FVector const Local = RayToLocal(Ray);
     if (!ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
         return false;
@@ -534,8 +511,7 @@ bool UiScroll::HitTest(float const* Ray)
 
 void UiScroll::Update()
 {
-    // LAB_00596050: the children (FUN_005a17b0), then the hot flag of every part in +0x3a4
-    // (both arrows and the thumb) from the cached mouse ray; a dragged thumb stays hot.
+    // LAB_00596050. A dragged thumb stays hot.
     Win3D::Update();
     float Ray[3];
     Win3DGetMouseRay(Ray);
@@ -551,8 +527,6 @@ void UiScroll::Update()
 
 void UiScroll::BeginDraw()
 {
-    // FUN_00422690(0, this+0x3c), then pipeline +0xf0 SetRenderState (7,0) (0xe,0) (0x16,1)
-    // (0x89,0) (0x13,5) (0x14,6) (0x1b,1).
     Win3DBindModelview(nullptr, Orientation);
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
@@ -571,7 +545,6 @@ void UiScroll::DrawArrowVertical(FScrollHitRect const* Rect, bool bDraw, bool bU
     {
         if (Rect->bHot)
         {
-            // +0x418 pulsed through FUN_00561f20.
             unsigned long Pulse = BarHotColor_;
             NnUiPulseBlendFromArgb(&Pulse, Pulse);
             Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&Pulse));
@@ -685,7 +658,7 @@ void UiScroll::Draw()
     {
         DrawArrowVertical(&BottomArrow_, true, false);
         DrawArrowVertical(&TopArrow_, true, true);
-        // 0x00596842: the track frame before the thumb in the vertical layout.
+        // The track frame, drawn before the thumb in the vertical layout.
         Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&ArrowIdleColor_));
         Win3DBegin(kWin3DLineLoop);
         Win3DVertex3f(Frame1->X0, Frame0->Y0, 0.0f);
@@ -709,8 +682,7 @@ void UiScroll::Draw()
     FScrollHitRect const Thumb = Thumb_;
     if (bHorizontal_)
     {
-        // 0x00596605..0x005967b4: the middle (DAT_0067d9ec) between the two caps, then a cap
-        // (DAT_0067d9e8) at each end, each kScrollThumbCap long.
+        // The middle between the two caps, then a cap at each end, each kScrollThumbCap long.
         float const Lead = static_cast<float>(static_cast<double>(Thumb.X0) + kScrollThumbCap);
         float const Tail = static_cast<float>(static_cast<double>(Thumb.X1) - kScrollThumbCap);
 
@@ -750,7 +722,7 @@ void UiScroll::Draw()
         Win3DVertex3f(Tail, Thumb.Y1, 0.0f);
         Win3DEnd();
 
-        // 0x005967b9: the track frame after the thumb in the horizontal layout.
+        // The track frame, drawn after the thumb in the horizontal layout.
         Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&ArrowIdleColor_));
         Win3DBegin(kWin3DLineLoop);
         Win3DVertex3f(Frame0->X0, Frame1->Y0, 0.0f);
@@ -761,7 +733,7 @@ void UiScroll::Draw()
     }
     else
     {
-        // 0x00596925..0x00596ad3: the same three quads along -Y.
+        // The same three quads along -Y.
         float const Lead = static_cast<float>(static_cast<double>(Thumb.Y0) - kScrollThumbCap);
         float const Tail = static_cast<float>(static_cast<double>(Thumb.Y1) + kScrollThumbCap);
 
@@ -802,7 +774,7 @@ void UiScroll::Draw()
         Win3DEnd();
     }
 
-    // 0x00596ad8: auto-repeat of a held arrow. Below zero the timer steps the value once per
+    // Auto-repeat of a held arrow. Below zero the timer steps the value once per
     // frame (it is never re-armed here); it counts down by the frame time either way.
     if (DragPart_ == -1)
         return;
@@ -852,8 +824,7 @@ void UiScroll::MouseOver(float const* Ray)
     }
     double NewValue = Numerator / Denominator + RangeMin_;
     if (bStepMode_)
-        NewValue = static_cast<double>(static_cast<int>(NewValue));    // ftol + FILD
-    // 0x00596cb1 TEST AH,0x44 / JNP: unchanged -> nothing.
+        NewValue = static_cast<double>(static_cast<int>(NewValue));
     if (NewValue == static_cast<double>(Value_))
         return;
     Value_ = static_cast<float>(NewValue);
@@ -970,7 +941,7 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
         bHandled = true;
     }
 
-    // 0x00597180: a release ends a thumb drag.
+    // A release ends a thumb drag.
     if (!bPress && bDragging_)
     {
         bDragging_ = false;
@@ -991,7 +962,7 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 6:
     {
         // A -> float[3], the new scroll offset: move by its change (each difference and sum
-        // rounded to float through FUN_00422b80), WinControl FUN_005a0880, then the inverse.
+        // rounded to float), then the inverse.
         float const* const NewOffset = reinterpret_cast<float const*>(A);
         float Old[3];
         Old[0] = ScrollOffset_[0];
@@ -1009,7 +980,6 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Moved[1] = static_cast<float>(static_cast<double>(Base[1]) + ScrollOffset_[1]);
         Moved[2] = static_cast<float>(static_cast<double>(Base[2]) + ScrollOffset_[2]);
         WinControl::SetPosition(Moved);
-        // 0x0059740a..0x00597418: DAT_0067d9fc tested and filled.
         FTransform Inverse;
         float Scratch = 0.0f;
         UiScrollMath()->GeneralInverse(Inverse, Scratch,
@@ -1099,8 +1069,8 @@ void UiCycle::Draw()
 
 bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_00597760 (RET 4): outside the box -> WinControl FUN_005a0650; a press (kind 2) on an
-    // arrow steps by +0x3d0 and arms the auto-repeat; anything else inside is swallowed.
+    // LAB_00597760 (RET 4): a press (kind 2) on an arrow steps by +0x3d0 and arms the
+    // auto-repeat; anything else inside is swallowed.
     if (!bActive_)
         return false;
     if (Event->Field0 != -1)
@@ -1138,10 +1108,8 @@ bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
     return true;
 }
 
-// Retail DAT_0067d99c — WINFACTORY<UIScroll> static (LAB_005979e0 → FUN_00597a40; Create
-// FUN_00597ab0); atexit LAB_00597a00 → FUN_00579380.
+// DAT_0067d99c.
 WINFACTORY<UiScroll> G_UIScrollFactory("UIScroll");
 
-// Retail DAT_0067d970 — WINFACTORY<UICycle> static (LAB_00597a10 → FUN_00597b50; Create
-// FUN_00597bc0); atexit LAB_00597a30 → FUN_00579380.
+// DAT_0067d970.
 WINFACTORY<UiCycle> G_UICycleFactory("UICycle");

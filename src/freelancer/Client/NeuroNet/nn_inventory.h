@@ -10,7 +10,7 @@
 // the player's ship in a ShipViewControl, the five-row item list (name / view / price /
 // quantity / button / mesh / "good deal" / damage / equip toggle / mission text), the filter
 // buttons, the info card and the jettison button. NN_Dealer (nn_dealer.h) and NN_Scanner
-// (HUD, W3-D) derive from it.
+// (nn_scanner.h) derive from it.
 //
 // WINFACTORY<NN_Inventory> "NN_Inventory": static init FUN_00485670 (WinFactory head) with
 // vftable 0x005d1d20; Create FUN_004856e0 (operator_new(0x974), the ctor inlined, then slot 9).
@@ -22,14 +22,13 @@
 // and two slots of its own:
 //   45 (+0xb4) FUN_00478100 -- builds the window's controls (called by BindControls on the
 //      first Update after Create); NN_Dealer overrides it with FUN_00480d10
-//   46 (+0xb8) FUN_0044fd00 -- `XOR AL,AL / RET`; NN_Scanner overrides it with FUN_004b6c50
-//      (`MOV AL,1 / RET`). Read at 0x0047f6bf.
+//   46 (+0xb8) FUN_0044fd00 -- returns false; NN_Scanner overrides it with FUN_004b6c50
+//      (true). Read at 0x0047f6bf.
 // IDataViewOwner face +0x7c vftable 0x005d0ee0 (LAB_0053aaa0 / FUN_0053e4a0, as WinControl).
 //
 // Retail layout (size 0x974). The port keeps the members in retail order; the std::list
 // members are modern containers, so offsets past +0x3a8 no longer match retail and only the
-// WinControl base is asserted. Retail offsets stay in the comments because every listing
-// reference is by offset.
+// WinControl base is asserted. The comments give retail offsets.
 
 #include "Interface/wincontrol_base.h"
 
@@ -116,8 +115,7 @@ enum
 class NnInventory : public WinControl
 {
 public:
-    // FUN_00477cf0 -- WinControl ctor, +0x330 FUN_004c6140, +0x394 CacheString ctor,
-    // +0x3a8 list, +0x94c EquipDesc ctor, vptrs, ResetFields.
+    // FUN_00477cf0
     NnInventory();
     // FUN_00477da0
     ~NnInventory() override;
@@ -154,10 +152,10 @@ public:
     // FUN_004795f0 (RET 4) -- show (bShow) or hide the eight +0x91c..+0x938 controls and hide
     // (bShow) or show the info card pair +0x4bc / +0x944.
     void ShowQuantityControls(bool bShow);
-    // The sequence the listing inlines after list changes: +0x3a4 = -1, +0x4f4 = 0,
-    // FUN_004c6a50(0, 0, 5) on +0x330, FUN_004795f0(0), the dealer's +0x4e8 / +0x4ec = 0.
+    // Port-only helper for the sequence retail inlines after list changes: no selection, the
+    // ship view cleared, the quantity controls hidden, the dealer's +0x4e8 / +0x4ec = 0.
     void ClearSelection();
-    // FUN_0047e590 -- the five filter buttons' slot 42 (0xc, Mode == n, 0).
+    // FUN_0047e590 -- check the filter button of the current mode.
     void UpdateFilterButtons();
     // FUN_0047f240 (RET 8) -- switch the list filter: 0 weapons, 1 ammo, 2 equipment,
     // 3 cargo bay, 4 commodity.
@@ -172,8 +170,8 @@ public:
     // onto this window's ship model -- on the hardpoint the ship view offers, else the cargo
     // bay -- and remove it from the dealer's model when it fitted; both selections reset.
     void TakeDealerSelection();
-    // FUN_0047eab0 (RET 4) -- buy Count of the dealer's selected market good: the market
-    // (DAT_00668708) block, then remember the good (+0x3bc) and flag the list for refresh.
+    // FUN_0047eab0 (RET 4) -- buy Count of the dealer's selected market good (with its ammo
+    // package), then remember the good (+0x3bc) and flag the list for refresh.
     void BuyFromDealer(int Count);
     // FUN_0047eea0 (RET 4) -- sell Count of the selected item to the base market, then the
     // NavBar refresh FUN_004427e0(0).
@@ -236,9 +234,8 @@ public:
     unsigned char Pad35d[3];
     NnDealer* Dealer;                 // +0x360 -- the dealer window this inventory sits next to
     // +0x364..+0x37c: the dealer's "transfer item" panel -- NN_Dealer's slot 45 FUN_00480d10
-    // builds them (0x004817ff..0x00481a8e); SetProperty 0x48 copies the dealer's pointers into
-    // the partner inventory (0x0047a7a0..0x0047a7f8); FUN_0047c740 fills them for the selected
-    // row when +0x36c..+0x37c are all set.
+    // builds them; SetProperty 0x48 copies the dealer's pointers into the partner inventory;
+    // FUN_0047c740 fills them for the selected row when +0x36c..+0x37c are all set.
     WinControl* TransferItemButton;   // +0x364 "TransferItemButton"
     WinControl* TransferItemView;     // +0x368 "TransferItemView"
     WinControl* TransferItemMesh;     // +0x36c "TransferItemMesh"
@@ -253,10 +250,9 @@ public:
     int TransferItemMaxCount;                     // +0x38c
     unsigned TransferItemArchId;                // +0x390 -- an archetype id (Draw 0x00479871)
     CacheString PendingMountHardpoint;             // +0x394
-    // +0x398..+0x3a0: the dealer's three-pane info card -- NN_Dealer's slot 45 creates them with
-    // FUN_005a10e0 (0x004811d5 / 0x00481218 / 0x0048125c, each hidden at once); NN_Dealer's
-    // Update copies them into the partner inventory (0x0047ff1c..0x0047ff46). ShowInfoCard and
-    // ClearInfoCard drive them through RichTextWin methods.
+    // +0x398..+0x3a0: the dealer's three-pane info card -- NN_Dealer's slot 45 creates them
+    // hidden (FUN_005a10e0); NN_Dealer's Update copies them into the partner inventory
+    // (0x0047ff1c).
     RichTextWin* InfoCardFacts;       // +0x398 "InfoCard_Facts"
     RichTextWin* InfoCardStats;       // +0x39c "InfoCard_Stats"
     RichTextWin* InfoCardValues;      // +0x3a0 "InfoCard_Values"
@@ -304,8 +300,8 @@ public:
     WinControl* CloseButton;          // +0x4d8 "Inventory_Close" (slot 45)
     WinControl* CargoLabel;           // +0x4dc "CargoLabel" (slot 45 stores it)
     unsigned char bShowShipInfoCard;           // +0x4e0
-    unsigned char Field4e1;           // +0x4e1 -- vestigial (only zeroed and passed to FInventoryShipModel::Stub_0053e4a0)
-    unsigned char Field4e2;           // +0x4e2 -- vestigial (only zeroed and passed to FInventoryShipModel::Stub_0053e4a0)
+    unsigned char Field4e1;           // +0x4e1 -- vestigial (only zeroed and passed to the empty 0x0053e4a0)
+    unsigned char Field4e2;           // +0x4e2 -- vestigial (only zeroed and passed to the empty 0x0053e4a0)
     unsigned char Field4e3;           // +0x4e3 -- vestigial jettison-lock flag (tested == 0, never set to 1 in retail)
     unsigned char Field4e4;           // +0x4e4 -- vestigial write-only confirm-dismissed flag
     unsigned char Result4e5;          // +0x4e5 -- passed to the result callback
@@ -354,13 +350,12 @@ extern unsigned G_NnInsufficientCargoSpaceId;
 // DAT_00674a8c -- CreateID("ge_s_repair_01"), the nanobot archetype (static init LAB_004da100).
 // DAT_00674a88 -- CreateID("ge_s_battery_01"), the shield battery (static init LAB_004da120).
 // Both initializers sit in the HUD status file's range; the readers are the dealer / trade
-// code and the HUD status bars. Declared here so every reader uses one definition.
+// code and the HUD status bars.
 extern unsigned G_NanobotArchId;
 extern unsigned G_ShieldBatteryArchId;
 
 // The NeuroNet voice line ids of the inventory and dealer windows (static initializers
-// LAB_004778c0 .. LAB_00477980). Their readers hand them to the voice queue FUN_00489e80,
-// which the port does not have yet.
+// LAB_004778c0 .. LAB_00477980), for the voice queue FUN_00489e80 (NnVoiceEnqueue).
 extern unsigned G_NnVoiceInsufficientCargoSpaceId; // DAT_00671c78 "insufficient_cargo_space"
 extern unsigned G_NnVoiceNotEnoughMoneyId;         // DAT_00671c74 "not_enough_money"
 extern unsigned G_NnVoiceMountedId;                // DAT_00671c70 "mounted"
@@ -370,10 +365,8 @@ extern unsigned G_NnVoiceCargoJettisonedId;        // DAT_00671c64 "cargo_jettis
 extern unsigned G_NnVoiceShipPurchaseCompleteId;   // DAT_00671c60 "ship_purchase_complete"
 
 // --- The player's loadout requests at 0x004c4xxx ------------------------------------------
-// They sit in the block of player-state accessors that character_select_equip.cpp holds
+// Retail places them among the player-state accessors in character_select_equip.cpp
 // (FUN_004c43d0 / FUN_004c4f90 / FUN_004c4fa0 are there, next to the counters they touch).
-// These three call the server or read one global only; they are defined in nn_inventory.cpp
-// because the inventory is their first ported caller.
 
 // FUN_004c4810 (cdecl) -- the player is docked: (DAT_00673358 & 0x3fffffff) != 0.
 bool IsPlayerDockedRetail();
@@ -407,7 +400,7 @@ void ReqAddPlayerMountedCargoRetail(unsigned ArchId, float Health);
 // DAT_00673344): Count into the cargo bay, not mounted.
 void ReqAddPlayerCargoRetail(unsigned ArchId, int Count, float Health);
 // FUN_004c4260 (cdecl) -- G_Server->ReqRemoveItem(Id, Count, DAT_00673344) (slot 31, +0x7c), then
-// the local removal FUN_004c4320's body (inlined in retail; RemovePlayerEquipRetail here).
+// the local removal FUN_004c4320 (inlined in retail; RemovePlayerEquipRetail here).
 bool ReqRemovePlayerEquipRetail(unsigned short Id, int Count);
 
 // FUN_004c6f70 (cdecl) -- what the base market pays for the items of List (only those whose

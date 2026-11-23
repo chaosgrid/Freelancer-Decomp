@@ -143,18 +143,10 @@ public:
         return TriInfo & 0x0FFF;
     }
 
-    // D-cluster-06350740 pass (2026-09-10, decomp-tracker item 3201,
-    // FUN_06353840): bits [23:12] of TriInfo, confirmed by
-    // Common.dll.txt:06353891-06353894 (`SHR EAX,0xc; AND EAX,0xfff`)
-    // right after reading a triangle's raw TriInfo dword. Matches the
-    // classic IVP_Compact_Triangle bit layout (tri_index:12,
-    // material_index:7, is_virtual:1, pierce_index:12 = 32 bits) at the
-    // pierce_index position -- used by FUN_06353840 as a TRIANGLE INDEX
-    // into the same ledge's own triangle array (see
-    // IVP_WalkPiercingTriangleChain below), i.e. "the other triangle this
-    // one is pierce-linked to". Only this one call site was traced this
-    // pass; bits [18:12] (material_index) / [19] (is_virtual) are not
-    // independently confirmed and are NOT modeled here.
+    // Bits [23:12] of TriInfo (as read by FUN_06353840): the classic IVP
+    // pierce_index, a triangle index into the same ledge. The classic
+    // material_index:7 / is_virtual:1 sub-fields inside these bits are not
+    // confirmed and not modeled.
     inline uint32_t GetPierceIndex() const
     {
         return (TriInfo >> 12) & 0x0FFF;
@@ -195,13 +187,12 @@ public:
         int32_t LedgetreeNodeOffset; // +0x04: Byte offset from 'this' to parent ledgetree node
         int32_t ClientData;
     };
-    // +0x08 (formerly the union CompactSurfaceOffset / Dummy): one packed dword.
+    // +0x08: one packed dword.
     //  - bits 0..1: has-children flag. The ledge-soup compiler clears them on a
-    //    terminal node's ledge (`AND [ledge+8],~3`, 0636b684) and sets 01 on an
-    //    inner node's hull ledge (`AND ~2; OR 1`, 0636b650); `TEST byte
-    //    [ledge+8],3` picks IVP_Complex_Mindist over the plain mindist
+    //    terminal node's ledge and sets 01 on an inner node's hull ledge; a
+    //    nonzero value selects IVP_Complex_Mindist over the plain mindist
     //    (0634e5ad, 06360cdf).
-    //  - bits 8..31: the ledge's byte size / 16 (`(x >> 8) << 4`, 0636b3a0).
+    //  - bits 8..31: the ledge's byte size / 16.
     //  - bits 2..7: not interpreted by any traced code.
     uint32_t SizeAndFlags;
     int16_t NTriangles;             // +0x0C: Number of triangles in this ledge
@@ -303,11 +294,9 @@ inline const IVP_U_Float_Point* IVP_Compact_Edge::GetStartPoint() const
     return GetCompactLedge()->GetPoint(this);
 }
 
-// Retail FUN_06353840: walks pierce-linked triangles of StartEdge's ledge
-// toward the triangle whose Voronoi weights (FUN_0635b210) for Position (in
-// the ledge's object space) are all non-positive or whose neighbours were all
-// visited; returns that triangle's edge. Defined in ivp_compact_ledge.cpp.
-// The visited flags live in a std::vector instead of retail's alloca
-// (FUN_06391dc0) buffer.
+// Retail FUN_06353840: starting at the pierce triangle of StartEdge's
+// triangle, walks across edges toward Position (ledge object space) until
+// every edge of the current triangle has a positive QR weight (FUN_0635b210)
+// or leads to an already visited triangle; returns that triangle's edge.
 struct IVP_U_Point;
 IVP_Compact_Edge* IVP_WalkPiercingTriangleChain(IVP_Compact_Edge* StartEdge, const IVP_U_Point* Position);

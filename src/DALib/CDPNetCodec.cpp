@@ -6,14 +6,14 @@
 
 #include "CDPNetCodec.h"
 
-// Retail FUN_065c1000 @ 0x1000: deflateInit_(strm,6,"1.1.4",0x38) + inflateInit_(strm,"1.1.4",0x38).
+// Retail FUN_065c1000: deflate level 6, zlib 1.1.4.
 CDPNetCodec::CDPNetCodec()
 {
     deflateInit(&DeflateStream, Z_DEFAULT_COMPRESSION);
     inflateInit(&InflateStream);
 }
 
-// Retail FUN_065c1090 @ 0x1090: deflateEnd + inflateEnd.
+// Retail FUN_065c1090.
 CDPNetCodec::~CDPNetCodec()
 {
     deflateEnd(&DeflateStream);

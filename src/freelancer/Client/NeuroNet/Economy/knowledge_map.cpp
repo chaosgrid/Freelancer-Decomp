@@ -35,13 +35,11 @@ namespace
         return &It->second;
     }
 
-    // One {Id, Flags} line of MarkKnown's walk (0x00459250..0x0045929e): a known id whose flags
-    // miss some of the line's gets them OR-ed in; an unknown id gets the line's flags. Both
-    // notify the server.
+    // One {Id, Flags} line of MarkKnown's walk; both writes notify the server.
     void KnowledgeMarkLine(unsigned Id, unsigned char Flags)
     {
         unsigned char Known = 0;
-        if (GetPlayerVisitFlagsRetail(Id, &Known, 0, 0)) // 0x00459261
+        if (GetPlayerVisitFlagsRetail(Id, &Known, 0, 0))
         {
             if (static_cast<unsigned char>(Flags & Known) == Flags)
             {
@@ -76,16 +74,13 @@ void FKnowledgeMap::Load()
             {
                 continue;
             }
-            // 0x0045953a..0x00459587: key = ftol(value 0), Id = CreateID(value 1),
-            // Flags = low byte of ftol(value 2).
             unsigned const Key = static_cast<unsigned>(static_cast<int>(Reader.get_value_float(0)));
             unsigned Id = CreateID(Reader.get_value_string(1));
             unsigned char const Flags =
                 static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(2)));
             if ((Flags & 0x40) != 0)
             {
-                // 0x0045958d..0x004595d2: a faction -- Reputation::get_id of the nickname as a
-                // TString<16> (empty for a missing value).
+                // A faction (empty name for a missing value).
                 char const* const Nickname = Reader.get_value_string(1);
                 TString<16> Name;
                 Name.Length = 0;
@@ -97,8 +92,6 @@ void FKnowledgeMap::Load()
                 Id = Reputation::get_id(Name);
             }
 
-            // 0x004595d4..0x0045964f: a new key gets a tree node; a known one a link after its
-            // first line.
             std::map<unsigned, FKnowledgeMapEntry>::iterator const It = Entries.find(Key);
             if (It == Entries.end())
             {
@@ -140,8 +133,6 @@ bool FKnowledgeMap::Resolve(FmtStr const* Text, unsigned* OutId, unsigned char* 
     FKnowledgeMapEntry const* Entry = KnowledgeFind(this, Text->MadLibId);
     if (Entry == nullptr)
     {
-        // 0x004592fc..0x0045940f: the values in list order; the jump table 0x00459424 over
-        // TypeTag - 0x42 (0x00459438).
         for (FmtStr::Val const* Val = Text->Head; Val != nullptr; Val = Val->Next)
         {
             unsigned Key = 0;
@@ -149,7 +140,7 @@ bool FKnowledgeMap::Resolve(FmtStr const* Text, unsigned* OutId, unsigned char* 
             {
             case 0x73: // 's'
                 Key = Val->Value;
-                // 0x00459331..0x00459338: marked known through DAT_0066d334 first.
+                // Marked known through DAT_0066d334 (not this) first.
                 G_KnowledgeMap->MarkKnown(Key);
                 break;
             case 0x53: // 'S'
@@ -175,7 +166,6 @@ bool FKnowledgeMap::Resolve(FmtStr const* Text, unsigned* OutId, unsigned char* 
             return false;
         }
     }
-    // 0x004592de..0x004592f3
     *OutId = Entry->Id;
     *OutFlags = Entry->Flags;
     return true;
@@ -223,7 +213,6 @@ void KnowledgeMapRevealFmtStr(FmtStr const* Text)
     }
     G_KnowledgeMap->MarkKnown(Text->MadLibId);
 
-    // 0x0045996c..0x00459a4e: the jump table 0x00459a5c over TypeTag - 0x21 (0x00459a78).
     // DAT_0066d334 is re-read for every call.
     for (FmtStr::Val const* Val = Text->Head; Val != nullptr; Val = Val->Next)
     {
@@ -252,7 +241,7 @@ void KnowledgeMapRevealFmtStr(FmtStr const* Text)
             G_KnowledgeMap->MarkKnown(Key);
             break;
         }
-        case 0x5a: // 'Z' -- only a zone that exists (0x00459a22)
+        case 0x5a: // 'Z' -- only a zone that exists
         {
             Universe::IZone const* const Zone = Universe::get_zone(Val->Value);
             if (Zone != nullptr)

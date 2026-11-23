@@ -14,7 +14,6 @@
 // IVP_Template_Polygon -- the IVP SDK's polygonal description of a convex
 // object (points, lines, surfaces), the input of IVP_SurfaceBuilder_Polygon_
 // Convex. Built only by the pointsoup builder (0636b830) in Common.dll.
-// (2026-10-08, claude-code:cmn-ivp4b)
 // ============================================================================
 
 class IVP_Template_Polygon;

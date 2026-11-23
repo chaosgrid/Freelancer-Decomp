@@ -6,7 +6,7 @@
 
 #pragma once
 
-// The client's alchemy mesh factory -- retail freelancer.exe 0x004f67e0..0x004f6dc0, RTTI
+// The client's alchemy mesh factory -- retail FUN_004f67e0 and neighbours, RTTI
 // `FLFxMeshFactory : IFxMeshFactory` and `FLFxMesh : IFxMesh, ObjectHandle` (both wrapped in
 // the DAComponent<> template, which supplies the reference count and the table-driven
 // QueryInterface). The effect-shape warm-up FUN_004f70d0 creates one factory into DAT_00674cdc
@@ -24,7 +24,6 @@ struct IFxMeshFactory;
 // DAT_00674cdc -- the factory FUN_004f70d0 creates and FUN_004f7140 releases.
 extern IFxMeshFactory* G_FLFxMeshFactory;
 
-// FUN_004f67e0 (cdecl Out): operator new(8), the FLFxMeshFactory vtable (005d98bc) and a
-// reference count of 1 into *Out -- or null when the allocation failed. Returns true either
-// way.
+// FUN_004f67e0 (cdecl Out): a new factory (reference count 1) into *Out -- or null when the
+// allocation failed. Returns true either way.
 bool FLFxMeshFactoryCreate(IFxMeshFactory** Out);

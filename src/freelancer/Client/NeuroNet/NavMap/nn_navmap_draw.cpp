@@ -69,7 +69,7 @@ extern void* G_NavMapBufferHandles[3];
 namespace
 {
     // s_E:\FL\Scratch\Source\Client\nn\NN_NavMap.cpp -- the source file retail's viewport calls
-    // name (0x00492aaa, 0x0049329f).
+    // name.
     char const kNavMapCpp[] = "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_NavMap.cpp";
     char const kNavMapLegendMesh[] = "Interface\\NeuroNet\\NavMap\\NewNavMap\\NAV_legend.3db";
     char const kNavMapGroupMarkerMesh[] =
@@ -202,8 +202,8 @@ namespace
         int Saved;
     };
 
-    // The vertex-buffer half the three pipeline drawers share (FUN_0049dcc0 0x0049dee4..
-    // 0x0049e036, FUN_0049c260 0x0049c3f4..0x0049c53e, FUN_004992b0 0x00499561..0x004996a6):
+    // The vertex-buffer half the three pipeline drawers share (FUN_0049dcc0, FUN_0049c260,
+    // FUN_004992b0):
     // keep the buffer when nothing was rebuilt and SelectVb takes it; otherwise destroy it,
     // create one for Count vertices of Fvf, copy Desc in (*OutOffset zeroed first, then the
     // copy's offset) and select it. False on any failure.
@@ -288,8 +288,7 @@ namespace
         return G_NavMapMath;
     }
 
-    // The modelview every map drawer binds (FUN_00497360 0x0049736c..0x0049743d and its
-    // copies): the rotation +0x3d4 with the offset (0, 0, Depth), pushed through
+    // The modelview every map drawer binds (inlined in FUN_00497360 and the others): the rotation +0x3d4 with the offset (0, 0, Depth), pushed through
     // I3DMathEngine::TransformXform (slot 10) of the zero vector, bound with FUN_00422690(0, ...).
     void BindMapModelview(NeuroNetNavMap const* Map, float Depth)
     {
@@ -310,7 +309,7 @@ namespace
     }
 
     // BindMapModelview, then lighting, depth test, culling and texturing off, blending on at
-    // SRCALPHA / INVSRCALPHA (0x00497442..0x00497478).
+    // SRCALPHA / INVSRCALPHA.
     void BeginMapLines(NeuroNetNavMap const* Map, float Depth)
     {
         BindMapModelview(Map, Depth);
@@ -322,8 +321,8 @@ namespace
         Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha); // FUN_004220c0
     }
 
-    // The map frame the zone / lane builders share (FUN_00498bd0 0x00498cb6..0x00498e58,
-    // FUN_0049b600 0x0049b7a2..0x0049b94f, FUN_0049c740 0x0049ca08..0x0049cb91): the origin of
+    // The map frame the zone / lane builders share (FUN_00498bd0, FUN_0049b600,
+    // FUN_0049c740): the origin of
     // the map in map-frame units at the current pan / zoom, and MapSize scaled by the zoom. The
     // rounding of these three is the same and differs from FUN_004a1ce0 / FUN_00499c20:
     // Origin.x adds the UNROUNDED Pan.x * Zoom, Origin.y / .z the rounded ones, and the z term
@@ -363,7 +362,7 @@ namespace
     }
 
     // A point in map units to the map frame, in place (the builders' projection loops, e.g.
-    // FUN_00498bd0 0x00498ef0..0x00498f67): x from (EX + x) / 2EX, y from 1 - (EZ + z) / 2EZ,
+    // FUN_00498bd0): x from (EX + x) / 2EX, y from 1 - (EZ + z) / 2EZ,
     // z the frame's depth. 2EX / 2EZ are rounded to float here (they are not in FUN_004a1ce0).
     void ProjectToFrame(NeuroNetNavMap const* Map, FNavMapFrame const& Frame, float* Point)
     {
@@ -412,8 +411,8 @@ namespace
 
     FNavMapBand MakeBand(float const* From, float const* To, float Width)
     {
-        // 0x00498473..0x0049850e: FPATAN of (To.x - From.x, To.y - From.y) plus the constant,
-        // FSIN / FCOS of it; cos is stored as a float before its multiply, sin is not.
+        // atan2 of (To.x - From.x, To.y - From.y) plus the constant, sin / cos of it; cos is
+        // rounded to float before its multiply, sin is not.
         double const Dx = static_cast<double>(To[0]) - static_cast<double>(From[0]);
         double const Dy = static_cast<double>(To[1]) - static_cast<double>(From[1]);
         double const Angle = atan2(Dx, Dy) + kNavMapQuarterTurn;
@@ -427,7 +426,7 @@ namespace
         Band.Near1[1] = static_cast<float>(static_cast<double>(SideYF) + static_cast<double>(From[1]));
         Band.Far1[0] = static_cast<float>(static_cast<double>(SideXF) + static_cast<double>(To[0]));
         Band.Far1[1] = static_cast<float>(static_cast<double>(SideYF) + static_cast<double>(To[1]));
-        // 0x004985d9..0x0049864a (0x004988ea..0x00498957): the other side, from the rounded
+        // The other side, from the rounded
         // offsets.
         Band.Near2[0] = static_cast<float>(static_cast<double>(From[0]) - static_cast<double>(SideXF));
         Band.Near2[1] = static_cast<float>(static_cast<double>(From[1]) - static_cast<double>(SideYF));
@@ -520,8 +519,7 @@ namespace
         return (Control->Flags & kWin3DVisible) != 0;
     }
 
-    // The zone qualifiers of FUN_0049c740's two walks (0x0049c883..0x0049c98e and
-    // 0x0049cbd2..0x0049cdf4) by the filter mode: 1 populated zones without IZone slot 0x70,
+    // The zone qualifiers of FUN_0049c740's two walks by the filter mode: 1 populated zones without IZone slot 0x70,
     // 2 populated ones with it, 5 zones with visit bit 2, anything else populated zones among
     // the best path's mission zones.
     bool ShadeZoneQualifies(Universe::IZone const* Zone, int Population, int FilterMode,
@@ -545,7 +543,7 @@ namespace
     }
 
     // The jitter FUN_0049b600 gives a terrain point unless the zone is a 0x30000 one
-    // (0x0049bd82..0x0049bdbe): from v = ftol(x), x += ((v & 0xff) - 0x80) << 5 and
+    // : from v = ftol(x), x += ((v & 0xff) - 0x80) << 5 and
     // y += ((v >> 3) & 0x1fe0) - 0x1000 (arithmetic shift).
     void JitterTerrainPoint(float* Point)
     {
@@ -580,8 +578,7 @@ namespace
         return Size;
     }
 
-    // The ellipse point of the zone outlines (FUN_0049b600 0x0049bce5..0x0049bd7d, FUN_0049c740
-    // 0x0049d215..0x0049d2bf): the direction (sin, 0, cos) of Angle through IZone slot 0x40,
+    // The ellipse point of the zone outlines (FUN_0049b600, FUN_0049c740): the direction (sin, 0, cos) of Angle through IZone slot 0x40,
     // times SystemScale, about the zone's scaled position.
     void ZoneEllipsePoint(Universe::IZone const* Zone, float Angle, float SystemScale,
                           FTransform const& Xform, float* OutPoint)
@@ -622,7 +619,7 @@ namespace
 
 void NeuroNetNavMap::Draw()
 {
-    // LAB_004926d0 0x004926dc..0x0049293d: the frame's controls as two null-terminated lists on
+    // LAB_004926d0. The frame's controls as two null-terminated lists on
     // the stack, taken at entry (the first ends at the zero stored at +0xbc).
     WinControl* const Panels[14] = {RightWindow,
                                     LeftWindow,
@@ -651,14 +648,14 @@ void NeuroNetNavMap::Draw()
                                    static_cast<WinControl*>(InfoCard),
                                    CloseInfocardButton, CloseInfocardText, nullptr};
 
-    // 0x00492944..0x00492960: the side panels' controls first (slot 13 on the visible ones).
+    // The side panels' controls first (slot 13 on the visible ones).
     for (int Index = 0; Panels[Index] != nullptr; ++Index)
     {
         if (IsShown(Panels[Index]))
             Panels[Index]->Draw();
     }
 
-    // 0x00492962..0x0049298a: the briefing's three, untested.
+    // The briefing's three, untested.
     if (bBriefing != 0)
     {
         MissionBriefingText->Draw();
@@ -666,7 +663,7 @@ void NeuroNetNavMap::Draw()
         ContinueText->Draw();
     }
 
-    // 0x0049298d..0x004929f3: the objective rows (the hovered one, HoveredObjective, last, over
+    // The objective rows (the hovered one, HoveredObjective, last, over
     // the rest), then their wire joins (FUN_005a4b50).
     for (int Index = 0; Index < 3; ++Index)
     {
@@ -685,7 +682,7 @@ void NeuroNetNavMap::Draw()
     }
     WireControlsJoinColumn(MissionObjective, 3); // FUN_005a4b50
 
-    // 0x00492a00..0x00492a25: flush the overlay batches while the panels slide, or while they
+    // Flush the overlay batches while the panels slide, or while they
     // are shut with the clear-all button up.
     if (ButtonMover::IsActive() ||
         (bSidePanelsOpen == 0 && IsShown(ClearAllWaypointsButton))) // FUN_0055e280
@@ -693,7 +690,7 @@ void NeuroNetNavMap::Draw()
 
     WinControl::DrawStaticMesh(); // FUN_005a06a0
 
-    // 0x00492a31..0x00492ac3: the viewport cut to the map frame (clipped to the surface), the
+    // The viewport cut to the map frame (clipped to the surface), the
     // map camera in; the old viewport kept.
     int SavedViewport[4];
     Win3DGetViewport(0xba2, SavedViewport); // FUN_00422390
@@ -717,7 +714,7 @@ void NeuroNetNavMap::Draw()
     int const FilterMode = G_NavMapFilterMode; // DAT_006720a0
     if (FilterMode != 6 && FilterMode != 7 && FilterMode != 4)
     {
-        // 0x00492aeb..0x00492b8a: the map meshes by view -- the flat one on the universe view,
+        // The map meshes by view -- the flat one on the universe view,
         // the zoomed ones in a system (and while a transition heads for them).
         if (ViewMode == 0)
             DrawHolder(&PrettyMapMesh, &Camera, 0x300);
@@ -726,7 +723,7 @@ void NeuroNetNavMap::Draw()
         if (ViewMode == 2 || TransitionView == 2)
             DrawHolder(&ZoomedMapMesh2, &Camera, 0x300);
 
-        // 0x00492b8d..0x00492bc1: the lines under the markers.
+        // The lines under the markers.
         if (ViewMode == 0)
         {
             DrawJumpLinks(); // FUN_00497360
@@ -741,7 +738,7 @@ void NeuroNetNavMap::Draw()
         DrawRouteLines();       // FUN_0049fe70
         BestPathFirstWaypointNotKind3(); // FUN_004c5490 -- its answer is not used
 
-        // 0x00492bc6..0x00492bfa: the player ship's target (its id), unless docked.
+        // The player ship's target (its id), unless docked.
         unsigned TargetId = 0;
         if (!IsPlayerDockedRetail()) // FUN_004c4810
         {
@@ -755,7 +752,7 @@ void NeuroNetNavMap::Draw()
             }
         }
 
-        // 0x00492bfe..0x00492fde: the markers, with the map-marker option (0x1b) on.
+        // The markers, with the map-marker option (0x1b) on.
         if (GetGameOption(0x1b) != 0) // FUN_005792b0
         {
             IEngine* const Engine = DALib::Engine;
@@ -765,13 +762,13 @@ void NeuroNetNavMap::Draw()
                 if (Item->bShown == 0)
                     continue;
 
-                // 0x00492c32..0x00492cc1: out of a transition, the system view drops the small
+                // Out of a transition, the system view drops the small
                 // ones and the zoomed view the ones away from the pan.
                 if (bTransition == 0)
                 {
                     if (ViewMode == 1)
                     {
-                        // FCOMP DAT_005d3e0c, TEST AH,5 + JNP: skipped when less.
+                        // DAT_005d3e0c: skipped when less (unordered is drawn).
                         if (static_cast<double>(Item->Size) * static_cast<double>(SystemScale) <
                             static_cast<double>(kNavMapMinDrawSize))
                             continue;
@@ -784,13 +781,13 @@ void NeuroNetNavMap::Draw()
                                           static_cast<double>(PanOffset[0]);
                         double const Dy = static_cast<double>(Pos[1]) -
                                           static_cast<double>(PanOffset[1]);
-                        // FCOMP DAT_005d3e08, TEST AH,0x41 + JZ: skipped when greater.
+                        // DAT_005d3e08: skipped when greater.
                         if (Dy * Dy + Dx * Dx > static_cast<double>(kNavMapZoomDrawDist2))
                             continue;
                     }
                 }
 
-                // 0x00492cc7..0x00492cfe: once drawn, the blink hides the player marker
+                // Once drawn, the blink hides the player marker
                 // (Kind 2) and the targeted star (Kind 0 with the target's id).
                 if (bDrawnOnce != 0)
                 {
@@ -800,14 +797,14 @@ void NeuroNetNavMap::Draw()
                         continue;
                 }
 
-                // 0x00492d04..0x00492d2f: the waypoint markers (Kind 3 / 4) are drawn with
+                // The waypoint markers (Kind 3 / 4) are drawn with
                 // their numbers once drawn; a best-path stop without a number (-1) not at all.
                 int const Number = Item->Variant;
                 if (bDrawnOnce != 0 && Item->Kind == 4 && Number == -1)
                     continue;
                 if (bDrawnOnce == 0 || (Item->Kind != 3 && Item->Kind != 4))
                 {
-                    // 0x00492f98..0x00492fcf: the transform read (unused) and the draw.
+                    // The transform is read (unused), then the draw.
                     Engine->GetInstanceTransform(Item->Mesh.EngineInstance); // IEngine slot 40
                     DrawHolder(&Item->Mesh, &Camera, 0x308);
                     continue;
@@ -815,7 +812,7 @@ void NeuroNetNavMap::Draw()
 
                 if (Number == 0)
                 {
-                    // 0x00492d3d..0x00492e28: no number -- drawn at 0.4 of its size, the
+                    // No number -- drawn at 0.4 of its size, the
                     // transform put back after.
                     FTransform Saved;
                     memcpy(&Saved, Engine->GetInstanceTransform(Item->Mesh.EngineInstance),
@@ -831,7 +828,7 @@ void NeuroNetNavMap::Draw()
                     continue;
                 }
 
-                // 0x00492e2d..0x00492f93: the marker, then its number from the digit meshes
+                // The marker, then its number from the digit meshes
                 // at the marker's position -- one digit, or two either side.
                 DrawHolder(&Item->Mesh, &Camera, 0x308);
                 float Pos[3];
@@ -870,7 +867,7 @@ void NeuroNetNavMap::Draw()
     }
     else
     {
-        // 0x00492ff0..0x004930f4: the info-card / legend / base-list modes -- the zoomed map
+        // The info-card / legend / base-list modes -- the zoomed map
         // flat at depth -0.71 (identity rotation), its transform put back after.
         IEngine* const Engine = DALib::Engine;
         FTransform Saved;
@@ -894,7 +891,7 @@ void NeuroNetNavMap::Draw()
         Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, &Saved);
         Engine->UpdateInstance(ZoomedMapMesh.EngineInstance, 0, nullptr);
 
-        // 0x0049310c..0x004931fe: the legend (mode 4), loaded on first use and stretched.
+        // The legend (mode 4), loaded on first use and stretched.
         if (G_NavMapFilterMode == 4)
         {
             if (LegendMesh.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
@@ -915,7 +912,7 @@ void NeuroNetNavMap::Draw()
         }
     }
 
-    // 0x00493201..0x00493282: a view switch fades the zoomed map in (its alpha from the
+    // A view switch fades the zoomed map in (its alpha from the
     // transition's ease), the tint put back to white after.
     if (bViewSwitch != 0)
     {
@@ -934,22 +931,22 @@ void NeuroNetNavMap::Draw()
         ZoomedMapMesh.UserFloats[4] = 1.0f;
     }
 
-    // 0x00493288..0x004932b9: the old viewport and the Win3D camera back.
+    // The old viewport and the Win3D camera back.
     Win3DSetViewportRect(SavedViewport[0], SavedViewport[1], SavedViewport[2], SavedViewport[3],
                          kNavMapCpp, 0x934);            // FUN_00421620
     Win3DApplyCamera(AsCamera(Win3DGetCamera()));      // FUN_00422950(&DAT_0067dbf8)
 
-    // 0x004932be..0x004932e7: the labels (not on the universe view, with the label toggle on),
+    // The labels (not on the universe view, with the label toggle on),
     // then a flush when the option bridge shows.
     if (ViewMode != 0 && G_bNavMapShowLabels != 0) // DAT_00611c5c
         DrawLabels(); // FUN_004999d0
     if (IsShown(OptionBridge))
         Win3DFlushBeforeOverlayDraw(); // FUN_0045a9f0
 
-    // 0x004932f5: the first drawn frame -- Update may now build the pending system view.
+    // The first drawn frame -- Update may now build the pending system view.
     bDrawnOnce = 1;
 
-    // 0x004932ec..0x0049335c: the tool controls, then the grid letters and numbers.
+    // The tool controls, then the grid letters and numbers.
     for (int Index = 0; Tools[Index] != nullptr; ++Index)
     {
         if (IsShown(Tools[Index]))
@@ -968,10 +965,10 @@ void NeuroNetNavMap::Draw()
             Number->Draw();
     }
 
-    // 0x0049335e..0x004935fb: the base list (mode 7) -- each row lit by the cursor ray.
+    // The base list (mode 7) -- each row lit by the cursor ray.
     if (G_NavMapFilterMode == 7)
     {
-        // 0x0049336c..0x00493465: the cursor's ray through the Win3D camera: the screen point
+        // The cursor's ray through the Win3D camera: the screen point
         // to the near plane, rotated by the camera (I3DMathEngine slot 11), normalised.
         FSpaceCamera* const WinCamera = Win3DGetCamera(); // DAT_0067dbf8
         int CursorX = 0;
@@ -1001,7 +998,7 @@ void NeuroNetNavMap::Draw()
         Ray[1] = static_cast<float>(static_cast<double>(Rotated.Y) * InvLength);
         Ray[2] = static_cast<float>(static_cast<double>(Rotated.Z) * InvLength);
 
-        // 0x00493467..0x004934fc: the fifteen base rows -- both halves shown, pulsed when the
+        // The fifteen base rows -- both halves shown, pulsed when the
         // ray hits either (slot 4), coloured through SetProperty(0x33, &colour, 1), drawn.
         for (int Index = 0; Index < 15; ++Index)
         {
@@ -1024,12 +1021,12 @@ void NeuroNetNavMap::Draw()
             SystemText->Draw();
         }
 
-        // 0x00493502..0x00493517: the list's scroll bar.
+        // The list's scroll bar.
         WinControl* const Scroll = static_cast<WinControl*>(BaseListScroll);
         if (Scroll != nullptr && IsShown(Scroll))
             Scroll->Draw();
 
-        // 0x00493517..0x00493586: the two column titles -- the sorted one amber (bBaseListByBase
+        // The two column titles -- the sorted one amber (bBaseListByBase
         // 1: bases), the other pulsed under the ray.
         if (BaseTitleText != nullptr && IsShown(BaseTitleText))
         {
@@ -1065,7 +1062,7 @@ void NeuroNetNavMap::Draw()
         }
     }
 
-    // 0x00493600..0x0049365a: the legend's five labels (mode 4, untested), else the system's
+    // The legend's five labels (mode 4, untested), else the system's
     // name outside the info-card / base-list modes.
     int const ModeNow = G_NavMapFilterMode;
     if (ModeNow == 4)
@@ -1078,7 +1075,7 @@ void NeuroNetNavMap::Draw()
         SystemNameText->Draw();
     }
 
-    // 0x0049365d: slot 39, WinControl's no-op tail.
+    // Slot 39, WinControl's no-op tail.
     Slot39();
 }
 
@@ -1095,7 +1092,7 @@ void NeuroNetNavMap::DrawJumpLinks()
     for (std::list<FNavMapJumpLink*>::iterator It = JumpLinks.begin(); It != JumpLinks.end(); ++It)
     {
         FNavMapJumpLink* const Link = *It;
-        // 0x004974a1..0x004974bc: both ends' instance positions (FUN_00420fb0), From copied
+        // Both ends' instance positions (FUN_00420fb0), From copied
         // before To is read.
         float From[3];
         memcpy(From, ClientMeshHolderGetPosition(&Link->From->Mesh), sizeof(From));
@@ -1103,14 +1100,14 @@ void NeuroNetNavMap::DrawJumpLinks()
         memcpy(To, ClientMeshHolderGetPosition(&Link->To->Mesh), sizeof(To));
         if (Link->Kind == 0)
         {
-            // 0x004974c8..0x00497514: a plain link, blue {00,40,80,ff} fading to {00,10,20,00}.
+            // A plain link, blue {00,40,80,ff} fading to {00,10,20,00}.
             unsigned char const Center[4] = {0x00, 0x40, 0x80, 0xff};
             unsigned char const Edge[4] = {0x00, 0x10, 0x20, 0x00};
             NavMapDrawBand(From, To, Center, Edge, kNavMapLinkWidth); // FUN_00498470
         }
         else if (Link->Kind == 2 || Link->Kind == 1)
         {
-            // 0x00497520..0x00497550: a route link in the palette colour DAT_00679b80, its
+            // A route link in the palette colour DAT_00679b80, its
             // alpha byte cleared for the edges.
             unsigned char Edge[4];
             memcpy(Edge, &G_NnPaletteArgb_679b80, sizeof(Edge));
@@ -1129,7 +1126,7 @@ void NeuroNetNavMap::DrawRouteLines()
     if (bDrawnOnce == 0 || ViewMode == 0)
         return;
 
-    // 0x0049fe98..0x0049ffd1: the line state, the waypath texture bound, white, one list.
+    // The line state, the waypath texture bound, white, one list.
     BeginMapLines(this, 0.0f);
     Win3DBindTexture(TexShapeGetGpuHandle(WaypathShape, 0)); // FUN_004220a0(FUN_00425640)
     Win3DColor3ub(0xff, 0xff, 0xff);                         // FUN_00421a70
@@ -1137,7 +1134,7 @@ void NeuroNetNavMap::DrawRouteLines()
 
     unsigned char Edge[4];
 
-    // 0x0049ffd9..0x004a00f3: the player's waypoints, from the player's marker to the first
+    // The player's waypoints, from the player's marker to the first
     // (index -1, only when the first is shown and the map shows the player's system), then
     // between neighbours when both exist and are shown.
     int const WaypointLast = GetPlayerWaypointCountRetail() - 1; // FUN_004c4690
@@ -1157,7 +1154,7 @@ void NeuroNetNavMap::DrawRouteLines()
         }
         else
         {
-            // 0x004a003e: [+0x4b8 + 4 * Index] -- for Index -1 (no first waypoint) that is
+            // [+0x4b8 + 4 * Index] -- for Index -1 (no first waypoint) that is
             // +0x4b4, the player's marker, and its partner WaypointItems[0] is null.
             From = (Index == -1) ? PlayerItem : WaypointItems[Index];
             if (From == nullptr)
@@ -1177,7 +1174,7 @@ void NeuroNetNavMap::DrawRouteLines()
                                Edge, kNavMapRouteWidth); // FUN_00498730
     }
 
-    // 0x004a00f9..0x004a01fa: the best path the same way over BestPathItems, the first leg
+    // The best path the same way over BestPathItems, the first leg
     // from the player's marker without the system test, at the link width.
     int const BestPathLast = BestPathGetWaypointCount() - 1; // FUN_004c4fb0
     for (int Index = -1; Index < BestPathLast; ++Index)
@@ -1193,7 +1190,7 @@ void NeuroNetNavMap::DrawRouteLines()
         }
         else
         {
-            // 0x004a0145: for Index -1 the slot before BestPathItems[0] is WaypointItems[0x62],
+            // For Index -1 the slot before BestPathItems[0] is WaypointItems[0x62],
             // and the partner BestPathItems[0] is null.
             From = (Index == -1) ? WaypointItems[0x62] : BestPathItems[Index];
             if (From == nullptr)
@@ -1227,13 +1224,13 @@ void NeuroNetNavMap::DrawLabels()
     if (Mode == 4 || Mode == 6 || Mode == 7)
         return;
 
-    // 0x004999f9..0x00499a29: last frame's rects dropped (FUN_004a3bf0 erase), lighting and
+    // Last frame's rects dropped (FUN_004a3bf0 erase), lighting and
     // the depth test off.
     LabelRects.clear();
     Win3DDisable(kWin3DLightingCap);
     Win3DDisable(kWin3DDepthTest);
 
-    // 0x00499a3b..0x00499a8d: the label font by the surface width (compared signed).
+    // The label font by the surface width (compared signed).
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only Hor+: retail knows only its five 4:3 widths. The map is interface, so the font
     // follows the width of a 4:3 surface of this height, by range rather than exact match.
@@ -1257,7 +1254,7 @@ void NeuroNetNavMap::DrawLabels()
 #endif
     IFont* const Font = FindMenuFontImp(FontName); // FUN_004177b0
 
-    // 0x00499a8f..0x00499adb: the idle colour; while a transition runs into this view (or into
+    // The idle colour; while a transition runs into this view (or into
     // the universe view) its alpha byte fades out with the ease.
     unsigned char Colour[4];
     memcpy(Colour, &G_NnPaletteArgb_679bb0, sizeof(Colour));
@@ -1270,7 +1267,7 @@ void NeuroNetNavMap::DrawLabels()
     memcpy(&Packed, Colour, sizeof(Packed));
     FontAtlasSetDrawColor(Packed); // FUN_00417780(&colour)
 
-    // 0x00499add..0x00499b22: the zoomed view (or a transition into it) starts every label
+    // The zoomed view (or a transition into it) starts every label
     // uncrowded.
     if ((ViewMode != 1 && ViewMode != 0) || (bTransition != 0 && TransitionView == 2))
     {
@@ -1278,7 +1275,7 @@ void NeuroNetNavMap::DrawLabels()
             (*It)->bLabelCrowded = 0;
     }
 
-    // 0x00499b24..0x00499c0f: three passes over the named, shown objects (Kind 0) by type --
+    // Three passes over the named, shown objects (Kind 0) by type --
     // 2 first, then 0xc40, then 0x200101 -- so the earlier ones claim their spots first.
     unsigned const PassMasks[3] = {2u, 0xc40u, 0x200101u};
     for (int Pass = 0; Pass < 3; ++Pass)
@@ -1301,13 +1298,13 @@ void NeuroNetNavMap::EnsureItemLabel(IFont* Font, FNavMapItem* Item)
     wchar_t Name[0x80];
     if (Item->Label == nullptr)
     {
-        // 0x00499805..0x00499890: a new Font::String in Font, scaled (1, the label depth).
+        // A new Font::String in Font, scaled (1, the label depth).
         FFontString* const Label = new FFontString; // operator_new(0x34) + FUN_004144b0
         Item->Label = Label;
-        FontStringSetFont(Label, Font); // FUN_004ea670, inline at 0x00499837..0x0049987b
+        FontStringSetFont(Label, Font); // FUN_004ea670, inlined in retail
         FontStringSetScale(Label, 1.0f, MapLabelOrigin[2]); // FUN_004145d0
 
-        // 0x00499895..0x004998eb: the name (empty when the ids is missing), its width cached.
+        // The name (empty when the ids is missing), its width cached.
         if (GetIdsStringWWithRawFallback(static_cast<unsigned>(Item->StridName), Name, 0x80) == 0)
             Name[0] = 0;
         FontStringSetText(Label, Name); // FUN_00415860
@@ -1317,7 +1314,7 @@ void NeuroNetNavMap::EnsureItemLabel(IFont* Font, FNavMapItem* Item)
         return;
     }
 
-    // 0x004998f0..0x004999af: the crowded flag changed -- the name again, with a "*" in front
+    // The crowded flag changed -- the name again, with a "*" in front
     // while crowded (built in G_NnTextScratchB), and its width.
     if (Item->bLabelCrowded == Item->bLabelStarred)
         return;
@@ -1363,7 +1360,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     float Y = 0.0f;
     if (bZoomed)
     {
-        // 0x00499c6c..0x00499dbe: the map's origin at the current pan / zoom. Here the x term
+        // The map's origin at the current pan / zoom. Here the x term
         // multiplies the UNROUNDED Zoom - 1 (the y / z terms use it rounded), and the pan
         // products are rounded before they are added.
         double const Zoom = static_cast<double>(ZoomScale);
@@ -1382,10 +1379,10 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         float const Pan1 = static_cast<float>(static_cast<double>(PanOffset[1]) * Zoom);
         float const OriginX = static_cast<float>(static_cast<double>(Pan0) + static_cast<double>(Base0));
         float const OriginY = static_cast<float>(static_cast<double>(Pan1) + static_cast<double>(Base1));
-        // OriginZ (Zoom * Pan.z + Base2) is built too (0x00499d8f..0x00499d98) and not read.
+        // OriginZ (Zoom * Pan.z + Base2) is built too and not read.
         static_cast<void>(Base2);
 
-        // 0x00499dbe..0x00499e70: the item's point in the frame (2EX / 2EZ unrounded here).
+        // The item's point in the frame (2EX / 2EZ unrounded here).
         float const SizeX = static_cast<float>(static_cast<double>(MapSize[0]) * Zoom);
         float const SizeY = static_cast<float>(static_cast<double>(MapSize[1]) * Zoom);
         double const ExtentX = static_cast<double>(MapExtentX);
@@ -1398,7 +1395,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         float const PointX = static_cast<float>(static_cast<double>(OriginX) + FrameX);
         double const PointY = static_cast<double>(OriginY) + FrameY;
 
-        // 0x00499e72..0x00499edc: to the label frame (+-0.2 wide, +-0.18 high), centred.
+        // To the label frame (+-0.2 wide, +-0.18 high), centred.
         double const ScreenX =
             static_cast<double>(PointX) / static_cast<double>(MapSize[0] * 0.5f);
         float const Half1F = MapSize[1] * 0.5f;
@@ -1408,7 +1405,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     }
     else
     {
-        // 0x00499fce..0x0049a043: the system view -- straight from the extents.
+        // The system view -- straight from the extents.
         float const X0 = static_cast<float>(static_cast<double>(Item->Position[0]) /
                                             static_cast<double>(MapExtentX) *
                                             static_cast<double>(kNavMapLabelFrameX));
@@ -1422,7 +1419,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     {
         if (bZoomed)
             return;
-        // 0x0049a058..0x0049a10f: the system view marks every placed label this one would
+        // The system view marks every placed label this one would
         // have overlapped (X * 0.9, W * 1.2) as crowded.
         float const RectX = static_cast<float>(static_cast<double>(X) * kNavMapLabelRectX);
         float const RectW = static_cast<float>(static_cast<double>(Width) * kNavMapLabelRectW);
@@ -1444,7 +1441,7 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
         return;
     }
 
-    // 0x00499eef..0x00499fc9 / 0x0049a11b..0x0049a1ad: the box (1 x 0.03 at the label depth)
+    // The box (1 x 0.03 at the label depth)
     // and its corner projected through the Win3D camera; the zoomed view takes x from a point
     // just in front and y from one behind.
     FFontStringDrawOrigin Origin;
@@ -1559,7 +1556,7 @@ bool NeuroNetNavMap::PlaceLabel(float* X, float* Y, float W, float H, FNavMapIte
             return false;
     }
 
-    // 0x0049a52d..0x0049a569: the spot reserved at 1.4 times the size (FUN_00477510 insert at
+    // The spot reserved at 1.4 times the size (FUN_00477510 insert at
     // the end).
     FNavMapLabelRect Rect;
     Rect.X = *X;
@@ -1586,7 +1583,7 @@ bool NeuroNetNavMap::LabelRectFits(float X, float Y, float W, float H)
     if (-static_cast<double>(Y) < static_cast<double>(kNavMapLabelMinTop))
         return false;
 
-    // 0x0049a25f..0x0049a2d8: ...and clear of every recorded one. A rect left of it, right of
+    // ...and clear of every recorded one. A rect left of it, right of
     // it or above it is skipped; one it does not end above (Y + H not less than its Y) fails.
     int const Count = static_cast<int>(LabelRects.size());
     for (int Index = 0; Index < Count; ++Index)
@@ -1598,7 +1595,7 @@ bool NeuroNetNavMap::LabelRectFits(float X, float Y, float W, float H)
             continue;
         if (static_cast<double>(Rect.Y) + static_cast<double>(Rect.H) < static_cast<double>(Y))
             continue;
-        // TEST AH,5 + JP: fails unless Y + H is less than the rect's Y (unordered fails too).
+        // x87: fails unless Y + H is less than the rect's Y (unordered fails too).
         if (!(static_cast<double>(Y) + static_cast<double>(H) < static_cast<double>(Rect.Y)))
             return false;
     }
@@ -1615,7 +1612,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
     if (ViewMode == 0 || SinglePlayer() || G_NavMapGroupPositions.empty())
         return;
 
-    // 0x004a1d32..0x004a1dae: the marker mesh on first use, tinted with the palette's
+    // The marker mesh on first use, tinted with the palette's
     // DAT_00679bac bytes / 255.
     if (GroupMarkerMesh.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
     {
@@ -1627,7 +1624,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
         GroupMarkerMesh.UserFloats[4] = static_cast<float>(static_cast<double>(Tint[3]) * static_cast<double>(kNavMapInv255));
     }
 
-    // 0x004a1db1..0x004a1efc: the map's origin -- every Zoom - 1 term with the rounded value,
+    // The map's origin -- every Zoom - 1 term with the rounded value,
     // the x / y pan products rounded before they are added, the z one not.
     double const Zoom = static_cast<double>(ZoomScale);
     float const Half0 = MapSize[0] * 0.5f;
@@ -1644,13 +1641,13 @@ void NeuroNetNavMap::DrawGroupMarkers()
     float const Pan1 = static_cast<float>(static_cast<double>(PanOffset[1]) * Zoom);
     float const OriginX = static_cast<float>(static_cast<double>(Pan0) + static_cast<double>(Base0));
     float const OriginY = static_cast<float>(static_cast<double>(Pan1) + static_cast<double>(Base1));
-    // OriginZ (0x004a1ed5..0x004a1edb) is built and only feeds the z the loop overwrites.
+    // OriginZ is built and only feeds the z the loop overwrites.
     float const OriginZ = static_cast<float>(Zoom * static_cast<double>(PanOffset[2]) + Base2);
     float const SizeX = static_cast<float>(static_cast<double>(MapSize[0]) * Zoom);
     float const SizeY = static_cast<float>(static_cast<double>(MapSize[1]) * Zoom);
     float const SizeZ = static_cast<float>(static_cast<double>(MapSize[2]) * Zoom);
 
-    // 0x004a1f43..0x004a1fd8: the marker size -- ShipMarkerSize over max(zoom / 2, 1), or during
+    // The marker size -- ShipMarkerSize over max(zoom / 2, 1), or during
     // a transition the ease between the start and end distances' values.
     double const Ship = static_cast<double>(ShipMarkerSize);
     double Size = 0.0;
@@ -1673,14 +1670,14 @@ void NeuroNetNavMap::DrawGroupMarkers()
             Div = 1.0;
         Size = Ship / Div;
     }
-    // 0x004a1fda..0x004a1ff0: to the frame (2EZ unrounded), times 60.
+    // To the frame (2EZ unrounded), times 60.
     double const ExtentX = static_cast<double>(MapExtentX);
     double const ExtentZ = static_cast<double>(MapExtentZ);
     float const MarkerScale = static_cast<float>(Size / (ExtentZ + ExtentZ) *
                                                  static_cast<double>(SizeX) *
                                                  static_cast<double>(kNavMapGroupMarkerFactor));
 
-    // 0x004a1ffc..0x004a21e2: each member in the current system -- the marker at its point,
+    // Each member in the current system -- the marker at its point,
     // unrotated (cos / sin of 0), scaled, at the zone depth.
     IEngine* const Engine = DALib::Engine;
     for (size_t Index = 0; Index < G_NavMapGroupPositions.size(); ++Index)
@@ -1696,7 +1693,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
                               static_cast<double>(SizeY);
         float const PointX = static_cast<float>(static_cast<double>(OriginX) + FrameX);
         float const PointY = static_cast<float>(static_cast<double>(OriginY) + FrameY);
-        // 0x004a20f3..0x004a2116: Pz = OriginZ + SizeZ is computed and replaced by the depth.
+        // Pz = OriginZ + SizeZ is computed and replaced by the depth.
         static_cast<void>(static_cast<float>(static_cast<double>(OriginZ) + static_cast<double>(SizeZ)));
 
         double const Angle = 0.0; // DAT_005c8ba8
@@ -1736,21 +1733,21 @@ void NeuroNetNavMap::DrawZoneShading()
     if (ShadeVertexCount == 0)
         return;
 
-    // 0x0049dd16..0x0049de1e: the modelview at the zone depth, the line state.
+    // The modelview at the zone depth, the line state.
     BeginMapLines(this, kNavMapZoneDepth);
-    // 0x0049de23..0x0049dea8: the pipeline states, both stages on diffuse.
+    // The pipeline states, both stages on diffuse.
     ApplyRenderStates(kNavMapRsOn);
     ApplyStageStates(0, kNavMapTssDiffuse);
     ApplyStageStates(1, kNavMapTssDiffuse);
-    FNavMapLightingOff LightingOff; // 0x0049deaa..0x0049deea
+    FNavMapLightingOff LightingOff;
 
-    // 0x0049dee4..0x0049e036: the vertices into handle DAT_006720bc.
+    // The vertices into handle DAT_006720bc.
     FRpVertexSrcDesc Desc = MakeColorDesc(ShadeVertices, ShadeVertexCount);
     if (!NavMapUploadVertices(bRebuilt, &G_NavMapBufferHandles[1], 0x42, ShadeVertexCount, &Desc,
                               &ShadeVbOffset))
         return;
 
-    // 0x0049e038..0x0049e0e6: the indices, then the triangle list.
+    // The indices, then the triangle list.
     unsigned IndexOffset = 0;
     if (G_NavMapIndexBuffer->CopyIndices(reinterpret_cast<void*>(static_cast<intptr_t>(-1)),
                                          &IndexOffset, ShadeIndices,
@@ -1762,7 +1759,7 @@ void NeuroNetNavMap::DrawZoneShading()
     G_NavMapDraw->DrawIndexedPrimitive(4, 0, static_cast<unsigned>(ShadeVertexCount), IndexOffset,
                                        static_cast<unsigned>(ShadeIndexCount)); // +0x0c
 
-    // 0x0049e0e9..0x0049e146: the state table 0x005d2e4c, twice.
+    // The state table 0x005d2e4c, twice.
     ApplyRenderStates(kNavMapRsOff);
     ApplyRenderStates(kNavMapRsOff);
 }
@@ -1774,7 +1771,7 @@ bool NeuroNetNavMap::BuildZoneShading()
     std::list<Universe::FSystemZone> const* const Zones = CurrentSystem->GetZones(); // ISystem +0x18
     BestPathGetFirst(); // FUN_004c5040 -- its answer is not used
 
-    // 0x0049c787..0x0049c995: nothing moved -- once a second (DAT_005d2ed0) count the
+    // Nothing moved -- once a second (DAT_005d2ed0) count the
     // qualifying zones, and rebuild only when that count changed.
     if (PanOffset[0] == ShadeCachePan[0] && PanOffset[1] == ShadeCachePan[1] &&
         PanOffset[2] == ShadeCachePan[2] && ShadeCacheZoom == ZoomScale &&
@@ -1803,7 +1800,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         ShadeZoneCount = Count;
     }
 
-    // 0x0049c99b..0x0049c9f0: the view it is built for.
+    // The view it is built for.
     ShadeCachePan[0] = PanOffset[0];
     ShadeCachePan[1] = PanOffset[1];
     ShadeCachePan[2] = PanOffset[2];
@@ -1827,7 +1824,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
             continue;
 
-        // 0x0049cc72..0x0049cd2b: the population's feeling towards the player, weighted.
+        // The population's feeling towards the player, weighted.
         float WeightedFeel = 0.0f;
         float TotalWeight = 0.0f;
         if (Population > 0)
@@ -1856,7 +1853,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         float const Feel = static_cast<float>(static_cast<double>(WeightedFeel) /
                                               static_cast<double>(TotalWeight));
 
-        // 0x0049cd1f..0x0049ce29: filter modes 1 / 2 keep only the zone filter's band -- all
+        // Filter modes 1 / 2 keep only the zone filter's band -- all
         // (0): neither hostile nor friendly; 1: at or below -0.6; 2: at or above 0.6.
         int const Mode = G_NavMapFilterMode;
         if (Mode == 1 || Mode == 2)
@@ -1881,7 +1878,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             }
         }
 
-        // 0x0049ce2f..0x0049ce79: the colour by feeling (amber in mode 5), at half alpha outside
+        // The colour by feeling (amber in mode 5), at half alpha outside
         // modes 1 / 2.
         unsigned long ColourDword = 0;
         NnReputationColorArgb(&ColourDword, Feel); // FUN_0045a650
@@ -1893,7 +1890,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             Rgba[3] = static_cast<unsigned char>(
                 static_cast<int>(static_cast<double>(Rgba[3]) * static_cast<double>(kNavMapHalf)));
 
-        // 0x0049ce7d..0x0049cf16: the zone's size and transform in map units, its shape.
+        // The zone's size and transform in map units, its shape.
         Vector Size = ZoneMapSize(Zone, SystemScale);
         FTransform const Xform = ZoneMapTransform(Zone, SystemScale);
         unsigned const Shape = Zone->GetShape();
@@ -1902,7 +1899,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         int PointCount = 0;
         if (Shape == 1)
         {
-            // caseD_1 0x0049d11d..0x0049d1f2: 16 points round the sphere's equator, the centre.
+            // Sphere: 16 points round the sphere's equator, the centre.
             float Angle = 0.0f;
             for (int Index = 0; Index < 16; ++Index)
             {
@@ -1916,7 +1913,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         }
         else if (Shape == 2)
         {
-            // caseD_2 0x0049d1f7..0x0049d2ff: 16 points of the ellipsoid's outline, the centre.
+            // Ellipsoid: 16 points of the ellipsoid's outline, the centre.
             float Angle = 0.0f;
             for (int Index = 0; Index < 16; ++Index)
             {
@@ -1928,7 +1925,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         }
         else if (Shape == 3)
         {
-            // caseD_3 0x0049cf1d..0x0049d118: the box's four top corners.
+            // Box: the box's four top corners.
             float const HalfX = static_cast<float>(static_cast<double>(Size.x) * 0.5);
             float const HalfY = static_cast<float>(static_cast<double>(Size.y) * 0.5);
             float const HalfZ = static_cast<float>(static_cast<double>(Size.z) * 0.5);
@@ -1940,7 +1937,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         }
         else if (Shape == 4)
         {
-            // caseD_4 0x0049d304..0x0049d878: the cylinder -- its side as a rectangle and both
+            // The cylinder -- its side as a rectangle and both
             // caps as 16-point rings with their centres (38 points). In the zoomed view (or a
             // transition) the radius shrinks with the zoom.
             Size.y = static_cast<float>(static_cast<double>(Size.y) * 0.5);
@@ -1957,7 +1954,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             TransformPoint(Xform, -Radius, -HalfLen, 0.0f, Points[2]);
             TransformPoint(Xform, Radius, -HalfLen, 0.0f, Points[3]);
 
-            // 0x0049d509..0x0049d6e9: the caps' centres along the local y axis (column 1 of
+            // The caps' centres along the local y axis (column 1 of
             // the rotation) -- the x offset rounded, the y / z ones not -- with identity
             // rotations.
             float const OffsetX = static_cast<float>(static_cast<double>(Xform.Rotation.D[0][1]) *
@@ -1980,7 +1977,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             Bottom.Translation.Y = static_cast<float>(static_cast<double>(Xform.Translation.Y) - OffsetY);
             Bottom.Translation.Z = static_cast<float>(static_cast<double>(Xform.Translation.Z) - OffsetZ);
 
-            // 0x0049d704..0x0049d81e: both rings (sin / cos kept as doubles for the second).
+            // Both rings (sin / cos kept as doubles for the second).
             float Angle = 0.0f;
             for (int Index = 0; Index < 16; ++Index)
             {
@@ -2001,11 +1998,11 @@ bool NeuroNetNavMap::BuildZoneShading()
             continue;
         }
 
-        // 0x0049d881..0x0049d95b: to the map frame.
+        // To the map frame.
         for (int Index = 0; Index < PointCount; ++Index)
             ProjectToFrame(this, Frame, Points[Index]);
 
-        // 0x0049d963..0x0049d994: the ARGB dword; the 6000-vertex buffer ends the build.
+        // The ARGB dword; the 6000-vertex buffer ends the build.
         unsigned long const Argb = (static_cast<unsigned long>(Rgba[3]) << 24) |
                                    (static_cast<unsigned long>(Rgba[0]) << 16) |
                                    (static_cast<unsigned long>(Rgba[1]) << 8) |
@@ -2021,7 +2018,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             ++Vertex;
         }
 
-        // 0x0049d9eb..0x0049dc84: the triangles -- a box as two, the cylinder as its side and
+        // The triangles -- a box as two, the cylinder as its side and
         // two fans, the rest as one fan round the last point.
         int const Base = ShadeVertexCount;
         unsigned short* const Index16 = ShadeIndices;
@@ -2097,7 +2094,7 @@ void NeuroNetNavMap::DrawTerrainPatches()
     if (TerrainVertexCount == 0)
         return;
 
-    // 0x0049c29a..0x0049c38a: the modelview at the zone depth; depth test and culling off,
+    // The modelview at the zone depth; depth test and culling off,
     // blending on (lighting and texturing are left as they are).
     BindMapModelview(this, kNavMapZoneDepth);
     Win3DDisable(kWin3DDepthTest);
@@ -2105,15 +2102,15 @@ void NeuroNetNavMap::DrawTerrainPatches()
     Win3DEnable(kWin3DBlend);
     Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
     ApplyRenderStates(kNavMapRsOn);
-    FNavMapLightingOff LightingOff; // 0x0049c3bb..0x0049c3fa
+    FNavMapLightingOff LightingOff;
 
-    // 0x0049c3f4..0x0049c53e: the vertices into handle DAT_006720b8.
+    // The vertices into handle DAT_006720b8.
     FRpVertexSrcDesc Desc = MakeTexDesc(TerrainVertices, TerrainVertexCount);
     if (!NavMapUploadVertices(bRebuilt, &G_NavMapBufferHandles[0], 0x142, TerrainVertexCount, &Desc,
                               &TerrainVbOffset))
         return;
 
-    // 0x0049c540..0x0049c5a4: the indices.
+    // The indices.
     unsigned IndexOffset = 0;
     if (G_NavMapIndexBuffer->CopyIndices(reinterpret_cast<void*>(static_cast<intptr_t>(-1)),
                                          &IndexOffset, TerrainIndices,
@@ -2123,7 +2120,7 @@ void NeuroNetNavMap::DrawTerrainPatches()
                                       TerrainVbOffset, 0, 0) != 0)
         return;
 
-    // 0x0049c5c9..0x0049c6b3: one draw per patch with its terrain texture on stage 0.
+    // One draw per patch with its terrain texture on stage 0.
     IRenderPipeline* const Pipeline = DALib::Pipeline;
     for (int Patch = 0; Patch < TerrainPatchCount; ++Patch)
     {
@@ -2139,7 +2136,7 @@ void NeuroNetNavMap::DrawTerrainPatches()
             static_cast<unsigned>(TerrainPatchIndexCount[Patch]));
     }
 
-    // 0x0049c6bb..0x0049c6f6: the texture off, the state table 0x005d2e4c.
+    // The texture off, the state table 0x005d2e4c.
     Pipeline->SetTextureStageTexture(0, nullptr);
     ApplyRenderStates(kNavMapRsOff);
 }
@@ -2149,7 +2146,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
     // FUN_0049b600.
     int const ZoneCount = static_cast<int>(MapZones.size());
 
-    // 0x0049b627..0x0049b768: nothing moved -- once a second (DAT_005d2ecc) count the visited
+    // Nothing moved -- once a second (DAT_005d2ecc) count the visited
     // terrain zones, and rebuild only when that count changed.
     if (PanOffset[0] == TerrainCachePan[0] && PanOffset[1] == TerrainCachePan[1] &&
         PanOffset[2] == TerrainCachePan[2] && TerrainCacheZoom == ZoomScale &&
@@ -2174,7 +2171,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         TerrainZoneCount = Count;
     }
 
-    // 0x0049b76a..0x0049b94f: the view it is built for, the frame, everything emptied.
+    // The view it is built for, the frame, everything emptied.
     TerrainCachePan[0] = PanOffset[0];
     TerrainCachePan[1] = PanOffset[1];
     TerrainCachePan[2] = PanOffset[2];
@@ -2196,7 +2193,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         if (bDebugShowAll == 0 && !IsZoneVisited(Zone, 1))
             continue;
 
-        // 0x0049b9bf..0x0049bad3: the terrain texture by the first property bit; a 0x8000
+        // The terrain texture by the first property bit; a 0x8000
         // zone takes IZone slot 0x24's colour, brightened by 1.5 and clamped to 1.
         int Shape = -1;
         bool bNoJitter = false;
@@ -2231,7 +2228,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             }
         }
 
-        // 0x0049badb..0x0049bb30: 0x30000 zones are black, texture 2, unjittered; no texture
+        // 0x30000 zones are black, texture 2, unjittered; no texture
         // at all (or a missing shape) is no patch.
         if ((Properties & 0x30000) != 0)
         {
@@ -2248,7 +2245,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         if (TerrainShapes[Shape] == nullptr)
             continue;
 
-        // 0x0049bb36..0x0049bb6e: opaque, fading with the zoom during a transition, faint in
+        // Opaque, fading with the zoom during a transition, faint in
         // the zoomed view.
         int Alpha = 0xff;
         if (bTransition != 0)
@@ -2258,7 +2255,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         else if (ViewMode == 2)
             Alpha = 0x56;
 
-        // 0x0049bb6e..0x0049bbce: a texture change opens a new patch.
+        // A texture change opens a new patch.
         if (Shape != PreviousShape)
         {
             int const Patch = TerrainPatchCount;
@@ -2271,7 +2268,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             TerrainPatchCount = Patch + 1;
         }
 
-        // 0x0049bbd4..0x0049bc35: white at that alpha, or texture 2's colour.
+        // White at that alpha, or texture 2's colour.
         unsigned long Argb = (static_cast<unsigned long>(Alpha) << 24) | 0xffffffu;
         if (Shape == 2)
         {
@@ -2285,14 +2282,14 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             Argb = Packed;
         }
 
-        // 0x0049bc40..0x0049bccb: the zone in map units; spheres and ellipsoids only.
+        // The zone in map units; spheres and ellipsoids only.
         Vector const Size = ZoneMapSize(Zone, SystemScale);
         FTransform const Xform = ZoneMapTransform(Zone, SystemScale);
         unsigned const ZoneShape = Zone->GetShape();
         float Points[33][3];
         if (ZoneShape == 1)
         {
-            // 0x0049be5c..0x0049bf46: 32 points round the sphere's equator.
+            // 32 points round the sphere's equator.
             float Angle = 0.0f;
             for (int Index = 0; Index < 32; ++Index)
             {
@@ -2306,7 +2303,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         }
         else if (ZoneShape == 2)
         {
-            // 0x0049bcd1..0x0049bdd3: 32 points of the ellipsoid's outline.
+            // 32 points of the ellipsoid's outline.
             float Angle = 0.0f;
             for (int Index = 0; Index < 32; ++Index)
             {
@@ -2320,16 +2317,16 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         {
             continue;
         }
-        // 0x0049bdd9..0x0049be57 / 0x0049bf4c..0x0049bfcd: the centre, jittered the same way.
+        // The centre, jittered the same way.
         memcpy(Points[32], &Xform.Translation, sizeof(Points[32]));
         if (!bNoJitter)
             JitterTerrainPoint(Points[32]);
 
-        // 0x0049bfd4..0x0049c09d: to the map frame.
+        // To the map frame.
         for (int Index = 0; Index < 33; ++Index)
             ProjectToFrame(this, Frame, Points[Index]);
 
-        // 0x0049c0a3..0x0049c17d: the 33 vertices -- the texture spans 1 / (zoom * 0.09) map
+        // The 33 vertices -- the texture spans 1 / (zoom * 0.09) map
         // units round the centre.
         int const Base = TerrainVertexCount;
         TerrainVertexCount = Base + 33;
@@ -2356,7 +2353,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
         Vertex->V = 0.5f;
         ++Vertex;
 
-        // 0x0049c181..0x0049c231: 32 triangles round the centre.
+        // 32 triangles round the centre.
         TerrainPatchIndexCount[TerrainPatchCount - 1] += 0x60;
         unsigned short* const Index16 = TerrainIndices;
         for (int Fan = 0; Fan < 31; ++Fan)
@@ -2378,7 +2375,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
 
 void NeuroNetNavMap::DrawTradeLanes()
 {
-    // FUN_004992b0 0x004992d1..0x0049931b: the animation frame, one step per 1/15 s.
+    // FUN_004992b0. The animation frame, one step per 1/15 s.
     double const Sum = GetClientFrameTimeCapped() + static_cast<double>(TradeLaneFrameTimer);
     TradeLaneFrameTimer = static_cast<float>(Sum);
     if (Sum > static_cast<double>(kNavMapTradeLaneFrameTime)) // TEST AH,0x41 + JNZ: on only when greater
@@ -2394,24 +2391,24 @@ void NeuroNetNavMap::DrawTradeLanes()
     if (TradeLaneVertexCount == 0)
         return;
 
-    // 0x00499332..0x0049944e: the modelview at the zone depth, the line state.
+    // The modelview at the zone depth, the line state.
     BeginMapLines(this, kNavMapZoneDepth);
-    // 0x00499453..0x00499526: the frame's texture on stage 0, the stage and render tables.
+    // The frame's texture on stage 0, the stage and render tables.
     IRenderPipeline* const Pipeline = DALib::Pipeline;
     Pipeline->SetTextureStageTexture(0, TexShapeGetGpuHandle(TradeLaneShapes[TradeLaneFrame], 0));
     Pipeline->SetTextureStageState(0, 0xb, 0);
     ApplyStageStates(0, kNavMapTssTexture);
     ApplyStageStates(1, kNavMapTssDiffuse);
     ApplyRenderStates(kNavMapRsOn);
-    FNavMapLightingOff LightingOff; // 0x00499528..0x00499565
+    FNavMapLightingOff LightingOff;
 
-    // 0x00499561..0x004996a6: the vertices into handle DAT_006720c0.
+    // The vertices into handle DAT_006720c0.
     FRpVertexSrcDesc Desc = MakeTexDesc(TradeLaneVertices, TradeLaneVertexCount);
     if (!NavMapUploadVertices(bRebuilt, &G_NavMapBufferHandles[2], 0x142, TradeLaneVertexCount,
                               &Desc, &TradeLaneVbOffset))
         return;
 
-    // 0x004996a8..0x0049974f: the indices, the triangle list.
+    // The indices, the triangle list.
     unsigned IndexOffset = 0;
     if (G_NavMapIndexBuffer->CopyIndices(reinterpret_cast<void*>(static_cast<intptr_t>(-1)),
                                          &IndexOffset, TradeLaneIndices,
@@ -2423,7 +2420,7 @@ void NeuroNetNavMap::DrawTradeLanes()
     G_NavMapDraw->DrawIndexedPrimitive(4, 0, static_cast<unsigned>(TradeLaneVertexCount), IndexOffset,
                                        static_cast<unsigned>(TradeLaneIndexCount));
 
-    // 0x00499752..0x0049978d: the texture off, the state table 0x005d2e4c.
+    // The texture off, the state table 0x005d2e4c.
     Pipeline->SetTextureStageTexture(0, nullptr);
     ApplyRenderStates(kNavMapRsOff);
 }
@@ -2437,7 +2434,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
         TradeLaneCacheSystem == CurrentSystem->GetId() && TradeLaneCacheSegments == SegmentCount)
         return false;
 
-    // 0x00498c7e..0x00498cc2: the view it is built for, everything emptied.
+    // The view it is built for, everything emptied.
     TradeLaneCachePan[0] = PanOffset[0];
     TradeLaneCachePan[1] = PanOffset[1];
     TradeLaneCachePan[2] = PanOffset[2];
@@ -2447,7 +2444,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
     TradeLaneVertexCount = 0;
     TradeLaneIndexCount = 0;
 
-    // 0x00498cc8..0x00498e70: the frame and the band's half width from the zoom.
+    // The frame and the band's half width from the zoom.
     FNavMapFrame const Frame = MakeZoneFrame(this);
     float const ZoomM1 = static_cast<float>(static_cast<double>(ZoomScale) - 1.0);
     float const HalfWidth = static_cast<float>(static_cast<double>(ZoomM1) *
@@ -2461,7 +2458,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
     unsigned short* const Index16 = TradeLaneIndices;
     for (int Segment = 0; Segment < SegmentCount; ++Segment)
     {
-        // 0x00498e86..0x00498f67: both ends to the map frame.
+        // Both ends to the map frame.
         FNavMapSegment const& Lane = LaneSegments[static_cast<size_t>(Segment)];
         float From[3];
         float To[3];
@@ -2470,7 +2467,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
         ProjectToFrame(this, Frame, From);
         ProjectToFrame(this, Frame, To);
 
-        // 0x00498f6b..0x004990d7: six triangles' indices (two quads either side of the line).
+        // Six triangles' indices (two quads either side of the line).
         int const Base = TradeLaneVertexCount;
         int At = TradeLaneIndexCount;
         TradeLaneIndexCount += 12;
@@ -2479,7 +2476,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
             Index16[At++] = static_cast<unsigned short>(Base + Offsets[Corner]);
         TradeLaneVertexCount = Base + 8;
 
-        // 0x00498f71..0x004990a6: the side offset from atan2(dx, dy) + a quarter turn -- sin
+        // The side offset from atan2(dx, dy) + a quarter turn -- sin
         // times the half width unrounded; cos rounded, times the half width, used unrounded on
         // this side and rounded on the other.
         double const Dx = static_cast<double>(To[0]) - static_cast<double>(From[0]);
@@ -2498,7 +2495,7 @@ bool NeuroNetNavMap::BuildTradeLanes()
         float const FarMinusX = static_cast<float>(-SideX + static_cast<double>(To[0]));
         float const FarMinusY = static_cast<float>(static_cast<double>(To[1]) + static_cast<double>(-SideYF));
 
-        // 0x004990d7..0x00499293: the eight vertices -- on the line opaque at u 0.5, at the
+        // The eight vertices -- on the line opaque at u 0.5, at the
         // edges transparent at u 1; v 0 at From, 1 at To.
         FNavMapTexVertex const Band[8] = {
             {From[0], From[1], From[2], 0xffffffffu, 0.5f, 0.0f},
@@ -2524,12 +2521,10 @@ bool NeuroNetNavMap::BuildTradeLanes()
 
 void NeuroNetNavMap::DrawZoneOutlines()
 {
-    // FUN_0049aa30 0x0049aa3a..0x0049aa44: nothing unless bDrawZoneOutlines (+0x898). The
-    // byte's only writer in freelancer.exe is the constructor's zero (0x0048e337): no other
-    // `[reg + 0x898]` access falls inside NavMap.cpp (0x0048dc10..0x004a3f90) and none takes
-    // its address. The remaining body (0x0049aa4a..0x0049b5e3: every zone's outline as line
-    // strips by shape, with the +0xb48 byte -- also only ever zeroed, 0x0048e34f -- limiting
-    // it to terrain zones) is therefore unreachable in retail, and the port stops here.
+    // FUN_0049aa30: nothing unless bDrawZoneOutlines (+0x898), whose only writer in the exe is
+    // the constructor's zero. The remaining body (every zone's outline as line strips by
+    // shape, limited to terrain zones by the +0xb48 byte -- also only ever zeroed) is
+    // therefore unreachable in retail and NOT ported.
     if (bDrawZoneOutlines == 0)
         return;
 }

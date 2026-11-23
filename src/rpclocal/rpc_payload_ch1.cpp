@@ -4,20 +4,16 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// rpc_payload_ch1.cpp -- the 21 channel-1 packet types, marshalled and delivered the way
-// retail does it.
+// The 21 channel-1 packet types, marshalled and delivered the way retail does it.
 //
 // Channel 1 is the "common" channel: the same 21 packet types travel in BOTH directions,
-// which is why every layout here has two independent readings in the listing --
-// rpclocal's IClient slot (server -> client, the direction this file implements) and
-// rpclocal's IServerImpl method (client -> server, written up in
-// the decomp-tracker IServer card). Where a documented struct exists the two agree field for
-// field, and that agreement is what promotes these layouts from "read once" to "checked".
+// so every layout has two independent readings -- rpclocal's IClient slot (server ->
+// client, the direction this file implements) and its IServerImpl method (client ->
+// server). Where a documented struct exists the two agree field for field.
 //
-// Every Deliver() below reproduces its retail HandlePacket case exactly, including the
-// literal 1 retail pushes in place of the session id. Retail addresses are quoted per
-// codec; the receive-side case labels are the ones Ghidra assigns inside the channel-1
-// switch that starts at 0x06d83256.
+// Every Deliver() below reproduces its retail HandlePacket case, including the literal 1
+// retail pushes in place of the session id. Case labels are those inside the channel-1
+// switch at 0x06d83256.
 
 #include "rpc_payloads.h"
 #include "rpc_iclient.h"
@@ -30,11 +26,10 @@
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-// Copies InSize bytes into a block the packet owns from now on. Retail does the same with
-// a bare operator new (e.g. 0x06d8c4aa for CHATMSG, 0x06d8b5b1 for REQUEST_BEST_PATH,
-// 0x06d8b631 for REQUEST_PLAYER_STATS) -- a zero size included, which still hands back a
-// non-null zero-byte block. Where retail tests the source or the size first (CHATMSG,
-// 06d8c499 / 06d8c4a1), the caller carries that test.
+// Copies InSize bytes into a block the packet then owns. Retail does the same with an
+// untested operator new (e.g. 0x06d8c4aa for CHATMSG) -- a zero size included, which still
+// hands back a non-null zero-byte block. Where retail tests the source or the size first
+// (CHATMSG), the caller carries that test.
 static void* RpcCopyIntoPacketBlock(const void* Source, unsigned int InSize) {
     unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
     const unsigned char* Src = static_cast<const unsigned char*>(Source);
@@ -109,8 +104,8 @@ static bool MarshalFireWeapon(FPacketBase* Packet, const unsigned int* Args, uns
     // the packet keeps. std::vector::size() is the same arithmetic, data() its _First.
     const unsigned int Count = static_cast<unsigned int>(Info->Hardpoints.size());
     if (Count != 0) {
-        // The inlined vector operator= (06d8b370..06d8b4cb): an empty destination gets
-        // _Allocate(size) -- a bare operator new -- and the elements copied in.
+        // The inlined vector operator=: an empty destination gets an untested allocation
+        // and the elements copied in.
         unsigned short* Block = static_cast<unsigned short*>(
             RpcCopyIntoPacketBlock(Info->Hardpoints.data(), Count * 2u));
         Wire.Hardpoints.Begin = Block;
@@ -120,25 +115,20 @@ static bool MarshalFireWeapon(FPacketBase* Packet, const unsigned int* Args, uns
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
-// caseD_2 0x06d833c9: a local XFireWeaponInfo at [ESP+0x50] -- COMMON's
-// vector<unsigned short> ctor for +0x10 (833f0), +0x00..+0x0c copied from payload
-// +0x00..+0x0c (833f6..83422), then the inlined vector operator= from payload+0x10
-// (83426..8353c): an empty source leaves the local empty, otherwise one operator new of
-// Count*2 bytes holds a COPY (8351d / 83536). IClient slot 0 (83553) gets (1, &local);
-// the local vector's destructor frees the copy (83564).
+// caseD_2 0x06d833c9: a local XFireWeaponInfo; +0x00..+0x0c copied from the payload, then
+// the inlined vector operator= from payload+0x10 (an empty source leaves the local empty,
+// otherwise one block of Count*2 bytes holds a COPY). IClient slot 0 gets (1, &local);
+// the local vector's destructor frees the copy.
 static bool DeliverFireWeapon(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonFireWeapon Wire = RpcPayloadRead<FPayloadCommonFireWeapon>(Packet, 0);
     XFireWeaponInfo Info;
     Info.ObjectId = Wire.ObjectId;
     Info.TargetPos = Wire.TargetPos;
-    // operator= from the payload's vector: empty stays empty, otherwise one block of
-    // exactly Count elements holding a copy -- assign() over the wire range.
     const unsigned int Count = Wire.Hardpoints.Count();
     if (Count != 0) {
         Info.Hardpoints.assign(Wire.Hardpoints.Begin, Wire.Hardpoints.Begin + Count);
     }
     Client->SendCommonFireWeapon(1u, Info);
-    // 83564: the local vector's destructor frees the copy -- ~XFireWeaponInfo.
     return true;
 }
 
@@ -184,16 +174,15 @@ static bool MarshalChatMsg(FPacketBase* Packet, const unsigned int* Args, unsign
     Wire.Buffer = nullptr;
     const unsigned int Size = Args[2];
     void* Source = reinterpret_cast<void*>(Args[3]);
-    if (Source != nullptr && Size != 0) {                   // 06d8c499 / 06d8c4a1
-        Wire.Size = Size;                                   // 06d8c4a8
-        Wire.Buffer = RpcCopyIntoPacketBlock(Source, Size); // 06d8c4aa, bare
+    if (Source != nullptr && Size != 0) {
+        Wire.Size = Size;
+        Wire.Buffer = RpcCopyIntoPacketBlock(Source, Size);
     }
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
-// caseD_5 0x06d83900: DAT_06dbbcd4 is read untested (83906) -- no null test here either.
-// The first argument is a 4-byte struct built on the stack, word 1 then two zero bytes
-// (83916..83925), i.e. the dword 1.
+// caseD_5 0x06d83900: DAT_06dbbcd4 is read untested -- no null test here either. The
+// first argument is a 4-byte stack struct, word 1 then two zero bytes, i.e. the dword 1.
 static bool DeliverChatMsg(const FPacketBase* Packet, IClient*, IChatClient* ChatClient) {
     const FPayloadCommonChatMsg Wire = RpcPayloadRead<FPayloadCommonChatMsg>(Packet, 0);
     // Retail pushes the payload's +0x04, +0x08 and +0x0c and a literal 1 -- payload+0x00
@@ -334,9 +323,8 @@ static bool DeliverSetWeaponGroup(const FPacketBase* Packet, IClient* Client, IC
 }
 
 // op 0x13 FLPACKET_COMMON_SET_VISITED_STATE -- sender 0x06d8b540, receiver caseD_13.
-// Stores the caller's pointer and sets the flag (06d8b561 / 06d8b56c / 06d8b573): the
-// packet takes the caller's operator-new block over. Same for 0x17 (06d8b7d3), 0x19
-// (06d8b823), 0x1c (06d8b873) and 0x1a (06d8b8c3).
+// Stores the caller's pointer and sets the flag: the packet takes the caller's
+// operator-new block over. Same for 0x17, 0x19, 0x1c and 0x1a.
 static bool MarshalSetVisitedState(FPacketBase* P, const unsigned int* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
@@ -347,7 +335,7 @@ static bool DeliverSetVisitedState(const FPacketBase* Packet, IClient* Client, I
 }
 
 // op 0x16 FLPACKET_COMMON_REQUEST_BEST_PATH -- sender 0x06d8b590, receiver caseD_16.
-// operator_new(Size) + REP MOVSD/MOVSB at 0x06d8b5b1..0x06d8b5d6: the packet owns the bytes.
+// operator new(Size) + copy: the packet owns the bytes.
 static bool MarshalRequestBestPath(FPacketBase* P, const unsigned int* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, true, 1);
 }
@@ -426,9 +414,9 @@ static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, un
     Wire.Pad_0x11[1] = 0;
     Wire.Pad_0x11[2] = 0;
     // The rest is what the packet constructor FUN_06d9bad0 leaves for the fields a sub-type
-    // does not write: +0x14 = 0xffffffff (06d9bafa), +0x18 / +0x1c = 0 (06d9bb01 / 06d9bb04).
-    // So sub-types 1/2/4/0x20/0x40/0x80 ship EquipArchId -1, not 0. The word at +0x20 is not
-    // seeded at all (operator new residue in retail); zero here.
+    // does not write: +0x14 = 0xffffffff, +0x18 / +0x1c = 0. So sub-types
+    // 1/2/4/0x20/0x40/0x80 ship EquipArchId -1, not 0. The word at +0x20 is not seeded at all
+    // (operator new residue in retail); zero here.
     Wire.EquipArchId = 0xffffffffu;
     Wire.EquipCount = 0;
     Wire.EquipStatus = 0.0f;
@@ -460,8 +448,8 @@ static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, un
         break;
     case 0x08:   // 0x06d8ba20 -- EquipDesc, status included
     case 0x10: { // 0x06d8baa0 -- EquipDesc, status NOT written
-        // 06d8ba48 / 06d8ba52 / 06d8ba5c / 06d8ba71: direct loads off the caller's
-        // EquipDesc (+0x04, +0x14, float +0x10, word +0x02); 0x06d8baa0 skips the float.
+        // Direct loads off the caller's EquipDesc (+0x04, +0x14, float +0x10, word +0x02);
+        // 0x10 skips the float.
         Wire.ShipId = A1;
         const EquipDesc* Desc = reinterpret_cast<const EquipDesc*>(A2);
         Wire.EquipArchId = Desc->ArchId;
@@ -491,9 +479,8 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
         Client->SendCommonPlayerTradeSetTradeMoney(1u, Wire.ShipId, Wire.Money);
         return true;
     case 0x08: {
-        // caseD_8 0x06d837df: COMMON's EquipDesc::EquipDesc() (06d837e3), then
-        // set_arch_id(+0x34) 06d837f1, set_count(+0x38) 06d837ff, set_status(+0x3c)
-        // 06d8380d, set_id(word +0x40) 06d8381e, then IClient+0x1a4 (06d83837).
+        // caseD_8 0x06d837df: EquipDesc::EquipDesc(), then set_arch_id(+0x34),
+        // set_count(+0x38), set_status(+0x3c), set_id(word +0x40), then IClient+0x1a4.
         EquipDesc Desc;
         Desc.set_arch_id(Wire.EquipArchId);
         Desc.set_count((int)Wire.EquipCount);
@@ -504,8 +491,7 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
     }
     case 0x10: {
         // caseD_10 0x06d83842: the same without set_status, so Health keeps the ctor's
-        // default; set_arch_id 06d83854, set_count 06d83862, set_id 06d83873,
-        // IClient+0x1a8 (06d8388c).
+        // default; then IClient+0x1a8.
         EquipDesc Desc;
         Desc.set_arch_id(Wire.EquipArchId);
         Desc.set_count((int)Wire.EquipCount);
@@ -586,20 +572,12 @@ static bool DeliverActivateThrusters(const FPacketBase* Packet, IClient* Client,
 // ch1 op 0x1b FLPACKET_COMMON_POP_UP_DIALOG -- sender 0x06d8b690 (IClient+0x17c,
 // RET 0x10), receiver caseD_1b at 0x06d835e3 -> IClient vtable +0x17c.
 //
-// THE GAP THAT USED TO BE HERE IS CLOSED. The old note said neither FmtStr export was
-// reachable because rpclocal.vcxproj links only kernel32 and user32. That was a property
-// of the port, not of retail: retail rpclocal's import table names COMMON.DLL, and four
-// FmtStr entry points in it. The project now links Common.lib, as retail does, and this
-// type flattens and unflattens for real. The long argument is at the head of the
-// flattened-FmtStr family section in rpc_payloads.h.
+// Both FmtStrs are flattened through the COMMON.DLL exports (see the flattened-FmtStr
+// section in rpc_payloads.h). The inlined size loop at 0x06d8b6d0 costs 0x17 for tag 0x4e
+// and 7 for every other tag.
 //
-// (The old note also had the size table backwards -- it said tag 0x4e costs 7 and
-// everything else 0x17. The loop at 0x06d8b6d0 does the opposite: `CMP EAX,0x4e ; SETZ CL
-// ; DEC ECX ; AND ECX,0xfffffff0 ; ADD ECX,0x17` gives 0x17 for 0x4e and 7 for the rest.)
-//
-// The payload copies now, so the type is self-contained and queues like the rest.
 // Arguments: Args[0] session id (never serialized), Args[1]/Args[2] FmtStr*, Args[3] the
-// dword at packet+0x30 (06d8b780).
+// dword at packet+0x30.
 // ===========================================================================
 static bool MarshalPopUpDialog(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FmtStr* SourceA = reinterpret_cast<const FmtStr*>(Args[1]);
@@ -607,9 +585,9 @@ static bool MarshalPopUpDialog(FPacketBase* Packet, const unsigned int* Args, un
     FPayloadCommonPopUpDialog Wire;
     Wire.SizeA = 0;
     Wire.SizeB = 0;
-    Wire.BufferA = RpcFlattenFmtStr(*SourceA, Wire.SizeA);   // 06d8b6ff..06d8b719
-    Wire.BufferB = RpcFlattenFmtStr(*SourceB, Wire.SizeB);   // 06d8b760..06d8b776
-    Wire.Buttons = Args[3];                               // 06d8b780
+    Wire.BufferA = RpcFlattenFmtStr(*SourceA, Wire.SizeA);
+    Wire.BufferB = RpcFlattenFmtStr(*SourceB, Wire.SizeB);
+    Wire.Buttons = Args[3];
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -617,9 +595,8 @@ static bool DeliverPopUpDialog(const FPacketBase* Packet, IClient* Client, IChat
     const FPayloadCommonPopUpDialog Wire = RpcPayloadRead<FPayloadCommonPopUpDialog>(Packet, 0);
     FmtStr TextA;
     FmtStr TextB;
-    RpcUnflattenFmtStr(TextA, Wire.BufferA, Wire.SizeA);     // 06d8368a
-    RpcUnflattenFmtStr(TextB, Wire.BufferB, Wire.SizeB);     // 06d83698
-    // 06d836a5..06d836b2: PUSH packet+0x30, PUSH &B, PUSH &A, PUSH 1.
+    RpcUnflattenFmtStr(TextA, Wire.BufferA, Wire.SizeA);
+    RpcUnflattenFmtStr(TextB, Wire.BufferB, Wire.SizeB);
     Client->SendCommonPopUpDialog(1u, TextA, TextB, Wire.Buttons);
     return true;
 }
@@ -641,7 +618,7 @@ static bool MarshalTractorObjects(FPacketBase* Packet, const unsigned int* Args,
 
     const unsigned int Count = static_cast<unsigned int>(Info->TargetIds.size());
     if (Count != 0) {
-        // The inlined vector operator=: _Allocate(size), a bare operator new.
+        // The inlined vector operator=: an untested allocation.
         unsigned int* Block = static_cast<unsigned int*>(
             RpcCopyIntoPacketBlock(Info->TargetIds.data(), Count * 4u));
         Wire.TargetIds.Begin = Block;
@@ -651,12 +628,10 @@ static bool MarshalTractorObjects(FPacketBase* Packet, const unsigned int* Args,
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
-// caseD_1d 0x06d8326a: a local XTractorObjects at [ESP+0x18] -- the vector at +0x08 is
-// zeroed (83270..8327c), +0x00 = payload+0x00 and the word +0x04 = payload+0x04
-// (83280..8329b), then the inlined vector<uint> operator= from payload+0x08
-// (832a0..83396): an empty source leaves it empty, otherwise one operator new of Count*4
-// bytes holds a COPY (83378). IClient slot 5 (833ad) gets (1, &local); FUN_06d851d0, the
-// vector destructor, frees the copy (833bf).
+// caseD_1d 0x06d8326a: a local XTractorObjects; +0x00 and the word +0x04 from the payload,
+// then the inlined vector<uint> operator= from payload+0x08 (an empty source leaves it
+// empty, otherwise one block of Count*4 bytes holds a COPY). IClient slot 5 gets
+// (1, &local); FUN_06d851d0, the vector destructor, frees the copy.
 static bool DeliverTractorObjects(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonTractorObjects Wire =
         RpcPayloadRead<FPayloadCommonTractorObjects>(Packet, 0);
@@ -733,8 +708,7 @@ extern "C" __declspec(dllexport) const FRpcPayloadCodec* RpcFindPayloadCodec(uns
         return nullptr;
     }
     if (Channel == 2u) {
-        // Recovered in src/rpclocal/rpc_payload_ch2.cpp; the types still missing there
-        // fall through to the raw-argument-dword blit, as before.
+        // GChannel2Codecs lives in src/rpclocal/rpc_payload_ch2.cpp.
         for (unsigned int i = 0; i < GChannel2CodecCount; ++i) {
             if (GChannel2Codecs[i].Opcode == (unsigned short)Opcode) {
                 return &GChannel2Codecs[i];
@@ -742,9 +716,7 @@ extern "C" __declspec(dllexport) const FRpcPayloadCodec* RpcFindPayloadCodec(uns
         }
         return nullptr;
     }
-    // Channel 3 (client -> server) keeps its codecs in a table of its own, because its
-    // deliver side calls IServer rather than IClient: see RpcFindServerCodec in
-    // src/rpclocal/rpc_payload_ch3.cpp. Callers that need a channel-3 codec ask that
-    // function; this one answers only for the two IClient-facing channels.
+    // Channel 3 (client -> server) delivers to IServer, not IClient: see RpcFindServerCodec
+    // in src/rpclocal/rpc_payload_ch3.cpp.
     return nullptr;
 }

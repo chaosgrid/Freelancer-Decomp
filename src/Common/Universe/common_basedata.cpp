@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll bases and markets (retail BaseData.cpp): MarketGoodInfo, BaseData, BaseDataList and
-// the BaseDataList_* entry points. Split out of common_goods.cpp.
+// the BaseDataList_* entry points.
 
 #include "common_goods.h"
 #include "Archetypes/common_goods_internal.h" // kPathChars
@@ -33,20 +33,9 @@ namespace
 // Bases / markets
 // ---------------------------------------------------------------------------
 
-// Retail inlines this ctor into both of its callers and writes the seven
-// dwords literally. In BaseDataList::load_market_data the inlined copy is at
-// .text:06265c6d .. .text:06265c8d:
-//   [ESP+0x4c] = EBX(0)          +0x00 GoodId       = 0
-//   [ESP+0x50] = 0x3f800000      +0x04 Price        = 1.0f
-//   [ESP+0x54] = EBX(0)          +0x08 MinInventory = 0
-//   [ESP+0x58] = EBX(0)          +0x0c MaxInventory   = 0
-//   [ESP+0x5c] = EBX(0)          +0x10 Type         = 0
-//   [ESP+0x60] = 0               +0x14 MinLevel     = 0.0f
-//   [ESP+0x64] = 0xbf800000      +0x18 MinRep       = -1.0f
-// and BaseData::set_market_good has the same seven writes at
-// .text:06264c25 .. .text:06264c5d. The 1.0f in the Price slot is the price
-// multiplier's default leaking into the field the multiplier feeds; it is not
-// a plausible price, but it is what retail stores.
+// Inlined into both callers (load_market_data, set_market_good). The 1.0f Price is the price
+// multiplier's default leaking into the field it feeds; not a plausible price, but what retail
+// stores.
 MarketGoodInfo::MarketGoodInfo()
     : GoodId(0)
     , Price(1.0f)
@@ -58,9 +47,7 @@ MarketGoodInfo::MarketGoodInfo()
 {
 }
 
-
-// 06264980: the four scalars zeroed, ship_repair_cost 0.33f (0x3ea8f5c3), empty market map
-// and room list. The copy ctor (06261de0) and operator= (06261f20) are defaulted in the header.
+// 06264980. The copy ctor (06261de0) and operator= (06261f20) are defaulted in the header.
 BaseData::BaseData()
     : BaseId(0)
     , StartRoomId(0)
@@ -69,7 +56,7 @@ BaseData::BaseData()
 {
 }
 
-// 06264a40: delete every RoomData in the list, then the list and the market map go.
+// 06264a40
 BaseData::~BaseData()
 {
     for (std::list<RoomData*>::iterator It = Rooms.begin(); It != Rooms.end(); ++It)
@@ -99,13 +86,13 @@ unsigned BaseData::get_start_location() const
 
 std::map<unsigned, MarketGoodInfo> const* BaseData::get_market() const
 {
-    // .text:06261dc0: LEA EAX,[this+0x10]; RET.
+    // .text:06261dc0 (+0x10)
     return &Market;
 }
 
 std::list<RoomData*>* BaseData::get_room_data_list()
 {
-    // .text:06261dd0: LEA EAX,[this+0x24]; RET.
+    // .text:06261dd0 (+0x24)
     return &Rooms;
 }
 
@@ -115,33 +102,9 @@ std::list<RoomData*> const* BaseData::get_const_room_data_list() const
     return &Rooms;
 }
 
-// ---------------------------------------------------------------------------
-// 0x06264b60 ?set_market_good@BaseData@@QAEXIHHW4TransactionType@@MMM@Z
-// (ordinal 3623). `RET 0x1c` at .text:06264d74 = seven dwords of arguments,
-// which is the arity the mangling also gives.
-//
-// Was previously declared in common_goods.h with NO definition anywhere in the
-// port, and its tracker note argued that an uncalled member of a dllexport'd
-// class "emits/exports nothing". Rather than rely on that, it is implemented
-// here -- it is real retail code and the implementation is short.
-//
-// Body:
-//   .text:06264b69 .. .text:06264bc4 -- a pure early-out. If MinInventory,
-//     MaxInventory and Type are all zero AND PriceMult == 1.0 (FCOMP against the
-//     double at .rdata:06399410) AND MinLevel == 0.0 (float at
-//     .rdata:06399408) AND MinRep == -1.0 (float at .rdata:06399404), the
-//     function jumps straight to its epilogue at LAB_06264d6b and does
-//     nothing. Note it does NOT erase an existing entry.
-//   .text:06264bca .. .text:06264c71 -- build the 7-dword record: GoodId, then
-//     (float)ftol(GoodList::find_by_id(GoodId)->Price * PriceMult) at +0x04,
-//     MinInventory at +0x08, MaxInventory at +0x0c, Type at +0x10, MinLevel at
-//     +0x14, MinRep at +0x18.
-//   .text:06264c39 .. .text:06264d69 -- an inlined map insert against the tree
-//     at this+0x10 (`ADD EBX,0x10` at .text:06264c22), followed by
-//     `LEA EDI,[EAX+0x10] / MOV ECX,7 / REP MOVSD`: the mapped value is
-//     overwritten whether or not the key was already there. That is
-//     `Market[GoodId] = record`.
-// ---------------------------------------------------------------------------
+// 0x06264b60 (ordinal 3623). An all-default line (constants .rdata:06399410 / 06399408 /
+// 06399404) is a no-op: it does NOT erase an existing entry. Otherwise the entry is
+// overwritten whether or not the key was already there.
 void BaseData::set_market_good(unsigned GoodId, int MinInventory, int MaxInventory,
                                TransactionType Type, float PriceMult, float MinLevel,
                                float MinRep)
@@ -154,9 +117,8 @@ void BaseData::set_market_good(unsigned GoodId, int MinInventory, int MaxInvento
 
     MarketGoodInfo Entry;
     Entry.GoodId = GoodId;
-    // .text:06264bd3 CALL GoodList::find_by_id / .text:06264bd8 FLD [EAX + 0x58]
-    // -- no null test -- then FMUL by the multiplier (the product stays on the x87
-    // stack, exact in a double), ftol (.text:06264be9) and FILD back (.text:06264c00).
+    // No null test of the good. The product is exact in a double, so it truncates as the x87
+    // one does.
     Entry.Price = (float)(int)((double)GoodList::find_by_id(GoodId)->Price * PriceMult);
     Entry.MinInventory = MinInventory;
     Entry.MaxInventory = MaxInventory;
@@ -167,9 +129,7 @@ void BaseData::set_market_good(unsigned GoodId, int MinInventory, int MaxInvento
     Market[GoodId] = Entry;
 }
 
-// 0x06264d80 ?read_Base_block@BaseData@@AAEXPAVINI_Reader@@@Z -- [Base]/[BaseInfo] block.
-// "nickname" is skipped; any other unknown key FDUMPs line 0x89 (06264e30); after the block a
-// zero start room FDUMPs line 0x90 (06264e65).
+// 0x06264d80 -- [Base]/[BaseInfo] block.
 void BaseData::read_Base_block(INI_Reader* Reader)
 {
     while (Reader->read_value())
@@ -178,7 +138,6 @@ void BaseData::read_Base_block(INI_Reader* Reader)
             continue;
         if (Reader->is_value("start_room"))
         {
-            // 06264dce-06264ded: sprintf into a 0x100 frame buffer, then CreateID.
             char Combined[0x100];
             sprintf(Combined, "%X_%s", BaseId, Reader->get_value_string());
             StartRoomId = CreateID(Combined);
@@ -204,15 +163,13 @@ void BaseData::read_Base_block(INI_Reader* Reader)
     }
 }
 
-// 0x06264ea0 ?read_Room_block@BaseData@@AAEXPAVINI_Reader@@@Z -- [Room] block.
-// The RoomData is new-ed and appended BEFORE the keys are read (06264ebd-06264f0a); when the
-// block lacks a nickname or a file (the two string lengths, 06264ff8 / 06264ffe) retail only
-// FDUMPs line 0xc1 and the never-initialised RoomData stays in the list. Its BaseId / RoomId
-// / bLoaded are whatever the heap held (RoomData's ctor does not write them), as in retail.
+// 0x06264ea0 -- [Room] block. The RoomData is new-ed and appended BEFORE the keys are read; when
+// the block lacks a nickname or a file the never-initialised RoomData stays in the list, its
+// BaseId / RoomId / bLoaded whatever the heap held (RoomData's ctor does not write them), as in
+// retail.
 void BaseData::read_Room_block(INI_Reader* Reader)
 {
-    // 06264ebd-06264ee6: VC6 operator new returns null on failure and the ctor is skipped;
-    // the (possibly null) pointer is appended either way.
+    // VC6 new: a (possibly null) pointer is appended either way.
     RoomData* Room = new (std::nothrow) RoomData();
     Rooms.push_back(Room);
 
@@ -232,9 +189,7 @@ void BaseData::read_Room_block(INI_Reader* Reader)
     }
     if (Nickname.length() != 0 && File.length() != 0)
     {
-        // 0626501a-06265058: sprintf "%X_%s", CreateID, then
-        // RoomData::init(BaseData+0, room id, nickname, file) -- init malloc_strcpy's both
-        // strings (06277c29/06277c37); RoomData::destroy frees them with malloc_strfree.
+        // init malloc_strcpy's both strings; RoomData::destroy frees them.
         char Combined[0x100];
         sprintf(Combined, "%X_%s", BaseId, Nickname.c_str());
         Room->init(BaseId, CreateID(Combined), Nickname.c_str(), File.c_str());
@@ -247,10 +202,7 @@ void BaseData::read_Room_block(INI_Reader* Reader)
     }
 }
 
-// 0x06265100 ?read_from_ini@BaseData@@QAEXPBDI@Z. BaseId first, then the path through
-// GetFileSysPath with *DALib::Data. [Base] and [BaseInfo] go to read_Base_block, [Room] to
-// read_Room_block, anything else FDUMPs "Invalid ini block" line 0xe2; the reader is closed
-// at the end (06265239). An unopenable file FDUMPs line 0xea with the resolved path.
+// 0x06265100. BaseId is stored before the open.
 void BaseData::read_from_ini(char const* RelPath, unsigned NewBaseId)
 {
     BaseId = NewBaseId;
@@ -288,19 +240,19 @@ void BaseData::read_from_ini(char const* RelPath, unsigned NewBaseId)
 
 static BaseDataList* GBaseDataList = nullptr;
 
-// 06265450: empty base list and the two empty maps. Copy ctor / operator= are defaulted.
+// 06265450. Copy ctor / operator= are defaulted.
 BaseDataList::BaseDataList()
 {
 }
 
-// 06265560: delete every BaseData (null-tested, 06265598), then the list and both maps go.
+// 06265560
 BaseDataList::~BaseDataList()
 {
     for (std::list<BaseData*>::iterator It = Bases.begin(); It != Bases.end(); ++It)
         delete *It;
 }
 
-// 06265f80: lookup in the +0x0c map; a miss FDUMPs line 0x1e8 and returns 0.
+// 06265f80 (map at +0x0c)
 BaseData* BaseDataList::get_base_data(unsigned BaseId) const
 {
     std::map<unsigned, BaseData*>::const_iterator Found = ById.find(BaseId);
@@ -313,7 +265,7 @@ BaseData* BaseDataList::get_base_data(unsigned BaseId) const
 
 std::list<BaseData*>* BaseDataList::get_base_data_list()
 {
-    // .text:06261260: MOV EAX,this; RET -- the list is the first member.
+    // .text:06261260 (the list is the first member)
     return &Bases;
 }
 
@@ -323,8 +275,7 @@ std::list<BaseData*> const* BaseDataList::get_const_base_data_list() const
     return &Bases;
 }
 
-// 06266080: the same body as get_unloaded_room_data -- a lookup in the +0x20 room map, a miss
-// FDUMPs line 0x1fc and returns 0. It does not load the room.
+// 06266080: the same body as get_unloaded_room_data (map at +0x20). It does not load the room.
 RoomData* BaseDataList::get_room_data(unsigned RoomId) const
 {
     std::map<unsigned, RoomData*>::const_iterator Found = RoomById.find(RoomId);
@@ -335,7 +286,7 @@ RoomData* BaseDataList::get_room_data(unsigned RoomId) const
     return nullptr;
 }
 
-// 06266000: +0x20 room map lookup, FDUMP line 0x1fc on a miss.
+// 06266000
 RoomData* BaseDataList::get_unloaded_room_data(unsigned RoomId) const
 {
     std::map<unsigned, RoomData*>::const_iterator Found = RoomById.find(RoomId);
@@ -346,11 +297,9 @@ RoomData* BaseDataList::get_unloaded_room_data(unsigned RoomId) const
     return nullptr;
 }
 
-// 06265780. One BaseData per universe base, appended before it is read; IBase slot 3 is the
-// base ini, slot 0 the base id. A base without an ini keeps BaseId 0 (read_from_ini is what
-// stores it). Only after the whole walk (0626587e-062658e2) are the two maps filled: every
-// base under BaseData+0, every room of it under RoomData+4 -- insert, so the first of two
-// equal keys wins (FUN_063222f0).
+// 06265780. A base without an ini keeps BaseId 0 (read_from_ini is what stores it). The two
+// maps are filled only after the whole walk, by insert, so the first of two equal keys wins
+// (FUN_063222f0).
 void BaseDataList::load()
 {
     Universe::IBase* Base = Universe::GetFirstBase();
@@ -385,10 +334,7 @@ void BaseDataList::load()
     }
 }
 
-// 06265900 ?load_market_data@BaseDataList@@QAEXPBD@Z. Every [BaseGood] block starts with no
-// current base (062659b0). "base" resolves the nickname: an unknown name only warns (line
-// 0x153) and leaves the current base as it was; a known id goes through the +0x0c map (the
-// inlined get_base_data, miss = FDUMP line 0x1e8 and no current base).
+// 06265900. An unknown "base" name only warns and leaves the current base as it was.
 void BaseDataList::load_market_data(char const* RelPath)
 {
     char FullPath[kPathChars];
@@ -437,10 +383,7 @@ void BaseDataList::load_market_data(char const* RelPath)
                 if (Info != nullptr)
                     GoodId = Info->Id;
 
-                // Retail keeps the seven INI values in registers/stack slots and
-                // only assembles the record once it has decided to keep the line,
-                // so the locals below mirror retail's scratch, not the struct.
-                // Defaults installed at .text:06265ab0 .. .text:06265acd.
+                // Retail assembles the record only once it has decided to keep the line.
                 float ValueLevel = 0.0f;        // index 1  -> record+0x14
                 float ValueRep = -1.0f;         // index 2  -> record+0x18
                 int ValueMinInventory = 0;      // index 3  -> record+0x08
@@ -460,14 +403,10 @@ void BaseDataList::load_market_data(char const* RelPath)
                     ValueType = Reader.get_value_int(5);
                 if (!Reader.is_value_empty(6))
                     ValuePriceMult = Reader.get_value_float(6);
-                // .text:06265bbb / .text:06265bc0 `FSTP ST0` -- index 7 is read
-                // off the line and dropped on the floor.
+                // Index 7 is read and discarded.
                 if (!Reader.is_value_empty(7))
                     Reader.get_value_float(7);
 
-                // .text:06265bc4 .. .text:06265c15 -- skip the line entirely when
-                // the good is unknown, no [BaseGood] base is current, or every
-                // value is still at its default.
                 bool bKeep = false;
                 if (GoodId != 0 && Current != nullptr)
                 {
@@ -482,9 +421,8 @@ void BaseDataList::load_market_data(char const* RelPath)
                 {
                     MarketGoodInfo Market;
                     Market.GoodId = GoodId;
-                    // 06265c1c-06265c50: find_by_id(...)->price (+0x58) with no null test,
-                    // FMUL by the multiplier, ftol, FILD, FSTP float. The product of two
-                    // floats is exact in a double, so it truncates as the x87 one does.
+                    // No null test of the good; the product of two floats is exact in a
+                    // double, so it truncates as the x87 one does.
                     double const Product =
                         (double)GoodList::find_by_id(GoodId)->Price * ValuePriceMult;
                     Market.Price = (float)(int)Product;
@@ -494,16 +432,12 @@ void BaseDataList::load_market_data(char const* RelPath)
                     Market.MinLevel = ValueLevel;
                     Market.MinRep = ValueRep;
 
-                    // .text:06265cac .. .text:06265cbf -- retail inserts a
-                    // default-constructed value under GoodId and then overwrites
-                    // the mapped value through the returned iterator, which is an
-                    // assign-over-existing, not insert-if-absent.
+                    // Assign-over-existing, not insert-if-absent.
                     Current->Market[GoodId] = Market;
                 }
             }
             else
             {
-                // 06265cc3-06265cff: header, key and the whole value string.
                 FDUMP(0x100002,
                       "%s(%d) : *** WARNING: Unknown ini data: [%s]  %s = %s in market .ini file - ignoring\n",
                       kBaseDataSource, 0x1c2, Reader.get_header_ptr(), Reader.get_name_ptr(),
@@ -514,15 +448,14 @@ void BaseDataList::load_market_data(char const* RelPath)
     Reader.close();
 }
 
-// 06266110: a fresh BaseDataList (ctor inlined) into the global, then load(). The previous
-// list is not destroyed -- it is simply overwritten, as in retail.
+// 06266110. The previous list is not destroyed -- it is simply overwritten, as in retail.
 void __cdecl BaseDataList_load()
 {
     GBaseDataList = new BaseDataList();
     GBaseDataList->load();
 }
 
-// 06266270: a plain forward through the global, no null test.
+// 06266270: no null test of the global.
 void __cdecl BaseDataList_load_market_data(char const* RelPath)
 {
     GBaseDataList->load_market_data(RelPath);

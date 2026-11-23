@@ -20,8 +20,8 @@ extern HMODULE G_ContentModule;
 // the timer/handler-id writers of TU21, TU25, TU36, TU38, TU47 and TU53. Content.cpp.
 extern unsigned int GContentNextUniqueId;
 
-// Retail FUN_06efec10 (TU33, GameSupport.cpp): FLD double DAT_06fcf430 -- the game time
-// accumulated from GameSupport heartbeats.
+// Retail FUN_06efec10 (TU33, GameSupport.cpp): DAT_06fcf430, the game time accumulated
+// from GameSupport heartbeats.
 double __cdecl GetContentGameTime();
 
 // Retail FUN_06efec20 (TU33, GameSupport.cpp): |*A - *B|, or the .rdata default
@@ -31,16 +31,13 @@ double __cdecl GetContentTimeDistance(double const* A, double const* B);
 class Vector;   // common_ini.h
 
 // Retail FUN_06eeaee0 (cdecl, COMDAT emitted in TU25; Populators.cpp): A - B returned by
-// value -- FLD A.z FSUB B.z, FLD A.y FSUB B.y, FLD A.x FSUB B.x, each FSTP'd as float.
-// 34 CALL sites (raw listing grep): 06eeab75 (TU25), 06f06b81/06f06bd1/06f091c0/06f0b4a5
-// (TU37), 06f27cdb/06f27fcb (TU40), TU45 06f37400/06f37416 (PatrolPaths), TU46 06f475fa,
-// TU52 06f5ac81, TU53 06f5eb00 .. 06f674f4 (18), TU54 06f6be9a, TU58 06f7274b,
-// TU61 06f88d6e/06f8906e/06f8cb92.
+// value, each component rounded to float. 34 call sites across TU25, TU37, TU40, TU45, TU46,
+// TU52, TU53, TU54, TU58 and TU61.
 Vector __cdecl SubtractVectors(Vector const& A, Vector const& B);
 
 // Retail FUN_06f5aeb0 (cdecl, TU52; Populators.cpp): y = bits 0x5f3759df - (bits(Value)
 // SAR 1); returns (1.5f - ((y * y) * Value) * 0.5f) * y on the x87 stack (double here).
-// CALL sites: TU52 06f5acab, TU53 06f65105/06f651c4/06f6751e/06f675c0/06f675d2.
+// Callers in TU52 and TU53.
 double __cdecl FastReciprocalSqrt(float Value);
 
 // Retail DAT_06fd1c74 (TU53, SpaceSupport.cpp): the SpaceSupport controller id, written by

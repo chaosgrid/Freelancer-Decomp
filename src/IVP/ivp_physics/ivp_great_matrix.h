@@ -11,32 +11,23 @@
 #include "../ivp_utility/ivp_u_memory.h"
 
 // ============================================================================
-// IVP linear-constraint solver (Common.dll .text:06366070-063682f2).
-//
-// Three classes, identified by the field offsets every function reads and by
-// the one place that builds them all, the friction solver FUN_06368560:
+// IVP linear-constraint solver (retail 06366070-063682f2). The three classes
+// are all built by the friction solver FUN_06368560:
 //   - IVP_Great_Matrix_Many_Zero (0x18 bytes): a dense row-aligned matrix with
 //     a right-hand side and a result vector; Gauss elimination with partial
-//     pivoting (06366070-06366584). FUN_06368560 builds one on its stack with
-//     the ctor 06366400.
+//     pivoting (06366070-06366584).
 //   - IVP_Incr_L_U_Matrix (0x2c bytes): an incrementally maintained L/U pair
-//     (063678c0-063682f2), embedded in the solver at +0x6c (every caller does
-//     `LEA ECX,[ESI+0x6c]`).
+//     (063678c0-063682f2), embedded in the solver at +0x6c.
 //   - IVP_Linear_Constraint_Solver (0xf8 bytes): the LCP solver
-//     (06366590-063678bc). FUN_06368560 keeps it on its stack at ESP+0x30 and
-//     runs the IVP_Great_Matrix_Many_Zero ctor on +0x98, +0xb0, +0xc8, +0xe0
-//     (0636865f-0636868a) -- the solver's own ctor is inlined and does nothing
-//     else.
+//     (06366590-063678bc). Its ctor is inlined and only constructs the four
+//     IVP_Great_Matrix_Many_Zero members.
 //
-// Retail is VC6/x87. Every value the listing keeps on the FPU stack is held in
-// `double` here; every `FSTP float` is a float store. All buffers come from an
-// IVP_U_Memory arena (32-byte aligned); several loops start at the 16-byte
-// aligned-down address of a row and process whole blocks of four floats, which
-// is reproduced exactly (they can touch up to three elements before/after the
-// logical range, as retail does).
+// x87 stack values are `double` here. All buffers come from an IVP_U_Memory
+// arena (32-byte aligned); several loops start at the 16-byte aligned-down
+// address of a row and process whole blocks of four floats, so they can touch
+// up to three elements outside the logical range, as retail does.
 //
-// Class / method names follow the Ipion SDK naming where the role is certain;
-// methods are PascalCase per AGENTS.md.
+// Names follow the Ipion SDK where the role is certain.
 // ============================================================================
 
 class IVP_Great_Matrix_Many_Zero
@@ -86,8 +77,8 @@ public:
     float  MatrixEps;      // +0x00 (solver init: SolverEps * 10)
     float* LMatrix;        // +0x04 (solver +0x70)
     float* UMatrix;        // +0x08 (solver +0x74)
-    int    Field_0x0C;     // +0x0C TODO: not read or written by any function of this cluster
-    int    Field_0x10;     // +0x10 TODO: not read or written by any function of this cluster
+    int    Field_0x0C;     // +0x0C not read or written by this cluster
+    int    Field_0x10;     // +0x10 not read or written by this cluster
     float* InputVec;       // +0x14 (solver +0x80)
     float* OutVec;         // +0x18 (solver +0x84)
     float* TempVec;        // +0x1C (solver +0x88)
@@ -152,7 +143,7 @@ public:
     int    RActives;              // +0x44
     int    AlignedSubSize;        // +0x48
     int    IgnoredPos;            // +0x4C
-    int    Field_0x50;            // +0x50 TODO: zeroed by InitAndSolveLc, never read in this cluster
+    int    Field_0x50;            // +0x50 zeroed by InitAndSolveLc, never read in this cluster
     int    SubSolverCalls;        // +0x54 incremented each time the Gauss sub-solver is used
     int    FirstPermuteIndex;     // +0x58
     int    SecondPermuteIndex;    // +0x5C
@@ -162,7 +153,7 @@ public:
     IVP_Incr_L_U_Matrix        LuMatrix;     // +0x6C
     IVP_Great_Matrix_Many_Zero LuSubSolver;  // +0x98
     IVP_Great_Matrix_Many_Zero FullAMatrix;  // +0xB0
-    IVP_Great_Matrix_Many_Zero Field_0xC8;   // +0xC8 TODO: constructed (06368677) but unused by this cluster
+    IVP_Great_Matrix_Many_Zero Field_0xC8;   // +0xC8 constructed (06368677) but unused by this cluster
     IVP_Great_Matrix_Many_Zero SubSolverMat; // +0xE0 eps/buffers set by InitAndSolveLc, no reader in this cluster
 
     // 063669b0

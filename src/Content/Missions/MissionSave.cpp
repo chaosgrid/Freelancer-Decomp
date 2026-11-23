@@ -4,8 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// TU38 (MissionObject.h): the mission object's snapshot and save. Split from MissionObject.cpp
-// (which holds the rest of TU38) to keep that file workable; the class is one retail class.
+// TU38 (MissionObject.h): the mission object's snapshot and save. The rest of TU38 is in
+// MissionObject.cpp; the class is one retail class.
 //
 //   FUN_06f130b0  SnapshotMissionObjects   (messages 4 and 0x37)
 //   FUN_06f11ff0  SnapshotVibeInfos        (the tail of FUN_06f130b0)
@@ -41,13 +41,13 @@
 
 namespace
 {
-    // The 9 dwords of a rotation copied as one block (REP MOVSD 9).
+    // The 9 dwords of a rotation copied as one block.
     void CopyRotation(FMatrix* Dest, Matrix const* Source)
     {
         std::memcpy(Dest, Source, sizeof(FMatrix));
     }
 
-    // The inlined label walk (e.g. 06f131d0-06f1321f): the NPC's +0x17c list holds LabelId.
+    // The inlined label walk: the NPC's +0x17c list holds LabelId.
     bool HasLabelId(FContentNpcShip const* Npc, unsigned int LabelId)
     {
         std::list<unsigned int>::const_iterator It = Npc->LabelIds.begin();
@@ -59,8 +59,7 @@ namespace
         return false;
     }
 
-    // The inlined hit point read (e.g. 06f13478-06f134c8): both floats start at 0, GetHealth on a
-    // copy of the SpaceObj id, the current value through ftol.
+    // The inlined hit point read: the current value truncated.
     int ReadHitPoints(FContentNpcShip const* Npc)
     {
         float Current = 0.0f;
@@ -70,8 +69,8 @@ namespace
         return static_cast<int>(Current);
     }
 
-    // FUN_06f11ff0's filter (e.g. 06f12063-06f120ca): the NPC's +0x1bc is -1.0f (DAT_06fb8584;
-    // TEST AH,0x44 + JNP taken = equal), or it carries "Mission_Random_Encounter".
+    // FUN_06f11ff0's filter: the NPC's +0x1bc is exactly -1.0f (DAT_06fb8584), or it carries
+    // "Mission_Random_Encounter".
     bool IsVibeParty(FContentNpcShip const* Npc)
     {
         if (Npc->Longevity == -1.0f)
@@ -79,9 +78,8 @@ namespace
         return HasLabelId(Npc, GIdMissionRandomEncounter);
     }
 
-    // 06f13aec-06f13b1a / 06f13edd-06f13f0d: the ship takes the NPC's guide (old one Released
-    // and cleared unless it is the same, the new one AddRef'ed), then the guide's slot 8
-    // (SetShip, +0x20) with null.
+    // The ship takes the NPC's guide, then the guide's SetShip (slot 8, +0x20) with null. The
+    // result is not null-tested.
     void TakeGuide(FMissionShip* Ship, FContentGuide* Guide)
     {
         if (Ship->Guide.Pointer != Guide)
@@ -98,10 +96,7 @@ namespace
         Ship->Guide.Pointer->SetShip(nullptr);
     }
 
-    // 06f134eb-06f13578 (and 06f137f1, 06f13b1f, 06f13f12): Target takes a copy of the NPC's
-    // directive list (FUN_06f14400, each AddRef'ed): the old elements Released and erased
-    // (FUN_06ed2a00), the copy assigned (FUN_06f93490), each AddRef'ed; then the copy Released,
-    // erased and freed (its unwind step is FUN_06ecfa90).
+    // Target takes a copy of the NPC's directive list (CopyDirectives = FUN_06f14400).
     void TakeDirectives(FMissionDirectiveList* Target, FContentNpcShip const* Npc)
     {
         FMissionDirectiveList Copied;
@@ -109,7 +104,7 @@ namespace
         *Target = Copied;
     }
 
-    // 06f13426-06f13442 / 06f13454-06f13463 (FUN_06eb70f0 / FUN_06eb7130).
+    // FUN_06eb70f0 / FUN_06eb7130.
     void ReadPlacement(FContentNpcShip const* Npc, FTransform* Out)
     {
         Vector Position;
@@ -122,7 +117,7 @@ namespace
         CopyRotation(&Out->Rotation, &Orientation);
     }
 
-    // 06f139ec-06f13a31 / 06f13e46-06f13e8b: the record takes the NPC's position and orientation.
+    // The record takes the NPC's position and orientation.
     void ReadGroupPlacement(FContentNpcShip const* Npc, FMissionShipGroup* Group)
     {
         Npc->GetPosition(&Group->Position);
@@ -131,8 +126,7 @@ namespace
         CopyRotation(&Group->Orientation, &Orientation);
     }
 
-    // The nine rotation floats as doubles, in memory order (the FLD / FSTP double runs of
-    // 06f101c3-06f10226 and 06f10377-06f103e0).
+    // The nine rotation floats as doubles, in memory order.
     void PrintOrientation(FILE* File, FMatrix const* Rotation)
     {
         std::fprintf(File, "orientation = %f,%f,%f, %f,%f,%f, %f,%f,%f\n",
@@ -143,10 +137,10 @@ namespace
                      static_cast<double>(Rotation->D[2][2]));
     }
 
-    // 06f10047-06f100ac / 06f102e8-06f1033e: a ship with a guide writes the guide's
-    // [MetaBehavior] line - retail passes the chars at guide +0x18 (FLineGuide::Line, only the
-    // goto / dock guides a [MetaBehavior] gives have one) to fprintf as the format; a ship
-    // without one writes its directives under [MObjective] (slot 6, +0x18, of each).
+    // A ship with a guide writes the guide's [MetaBehavior] line; retail passes the chars at
+    // guide +0x18 (FLineGuide::Line, only the goto / dock guides a [MetaBehavior] gives have
+    // one) to fprintf as the format. A ship without one writes its directives under
+    // [MObjective] (Save is slot 6, +0x18).
     void SaveGuideOrDirectives(FILE* File, FContentGuide* Guide, FMissionDirectiveList const* Directives)
     {
         if (Guide != nullptr)
@@ -164,7 +158,7 @@ namespace
     }
 }
 
-// FUN_06f68360 (06f68360-06f683a0, cdecl). Retail leaves both reputations unset before GetRep
+// FUN_06f68360. Retail leaves both reputations unset before GetRep
 // (which writes its out-parameter on every path); the port starts them at 0.
 bool __cdecl GetSpaceObjAttitude(unsigned int FromId, unsigned int ToId, float* OutAttitude)
 {
@@ -175,7 +169,7 @@ bool __cdecl GetSpaceObjAttitude(unsigned int FromId, unsigned int ToId, float* 
     return pub::Reputation::GetAttitude(FromRep, ToRep, *OutAttitude) == 0;
 }
 
-// 06f135ac-06f13618.
+// The template in FUN_06f130b0.
 FMissionRandEncRespawn::FMissionRandEncRespawn()
     : FormationRef(0xffffffffu)
     , Count(0)
@@ -184,15 +178,14 @@ FMissionRandEncRespawn::FMissionRandEncRespawn()
     , HitPoints(-1)
 {
     EncounterId.clear();
-    // FUN_06f143d0: identity rotation, zero translation.
+    // FUN_06f143d0.
     std::memset(&Placement, 0, sizeof(Placement));
     Placement.Rotation.D[0][0] = 1.0f;
     Placement.Rotation.D[1][1] = 1.0f;
     Placement.Rotation.D[2][2] = 1.0f;
 }
 
-// FUN_06f15790 (06f15790-06f1583d, RET 4): per +0xb8 record in list order, first its nickname
-// (stricmp, node +0xc), then each ship's (stricmp, element +8).
+// FUN_06f15790: per record, first its nickname, then each ship's.
 FMissionShipGroup* FMissionObject::FindMissionShipGroup(TString<0x30> const* Nickname)
 {
     std::list<FMissionShipGroup>::iterator It = MissionShips.begin();
@@ -210,7 +203,7 @@ FMissionShipGroup* FMissionObject::FindMissionShipGroup(TString<0x30> const* Nic
     return nullptr;
 }
 
-// FUN_06f22f50 (06f22f50-06f22f9a, RET 8).
+// FUN_06f22f50.
 bool FMissionObject::IsShipBeforeInFormation(FMissionShip const* A, FMissionShip const* B)
 {
     FContentNpcShip* NpcA = FindNpcByName(&A->Nickname);
@@ -220,41 +213,33 @@ bool FMissionObject::IsShipBeforeInFormation(FMissionShip const* A, FMissionShip
     return static_cast<int>(NpcA->FormationSlot) < static_cast<int>(NpcB->FormationSlot);
 }
 
-// FUN_06f130b0 (06f130b0-06f143ce). EH (FuncInfo 06fc26d8, 21 states): the local multimap
-// (FUN_06f14510) and list (FUN_06f15350), the ship class copies (FUN_06eec8d0), the directive
-// copies (FUN_06ecfa90), the new +0x8c record (FUN_06f11a40 / its members), the new +0x128
-// record (FUN_06ec6960) and the local ship vector (FUN_06f1d760) - all RAII locals below.
+// FUN_06f130b0.
 void FMissionObject::SnapshotMissionObjects()
 {
-    // 06f130d0-06f13147: the three lists emptied.
     RespawnShips.clear();
     RandEncRespawns.clear();
     RespawnSolars.clear();
 
-    // 06f1314c-06f13191: formation ref -> NPC (FUN_06f1f4f0 multi) and the refs in first-seen
-    // order.
+    // Formation ref -> NPC, and the refs in first-seen order.
     std::multimap<unsigned int, FContentNpcShip*> FormationNpcs;
     std::list<unsigned int> FormationRefs;
-    // 06f13185-06f131a9: the player's system record, null without a player state.
     FSystemInfo* PlayerSystem = nullptr;
     if (FindContentPlayerState(PlayerId) != nullptr)
         PlayerSystem = PlayerState->GetSystemRecord();
 
-    // 06f131ad-06f13bc9: every live mission NPC.
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.begin();
     for (; NpcIt != NpcObjects.end(); ++NpcIt)
     {
         FContentNpcShip* Npc = NpcIt->second;
         if (!HasLabelId(Npc, GIdMissionRandomEncounter))
         {
-            // 06f13221-06f13239: only NPCs whose +0x1bc is -1.0f (TEST AH,0x44 + JP taken when
-            // not equal).
+            // Only NPCs whose +0x1bc is exactly -1.0f.
             if (!(Npc->Longevity == -1.0f))
                 continue;
             unsigned int const FormationRef = Npc->FormationId;
             if (FormationRef != 0xffffffffu)
             {
-                // 06f13254-06f132b6: remembered for the formation pass.
+                // Remembered for the formation pass.
                 FormationNpcs.insert(std::make_pair(FormationRef, Npc));
                 if (std::find(FormationRefs.begin(), FormationRefs.end(), FormationRef) ==
                     FormationRefs.end())
@@ -262,7 +247,7 @@ void FMissionObject::SnapshotMissionObjects()
                 continue;
             }
 
-            // 06f1390c-06f13bab: a single mission ship - a copy of its [MsnShip] record.
+            // A single mission ship: a copy of its [MsnShip] record.
             FMissionShipGroup* Group = FindMissionShipGroup(&Npc->Nickname);
             if (Group == nullptr)
                 continue;
@@ -271,7 +256,7 @@ void FMissionObject::SnapshotMissionObjects()
             FSystemInfo* NpcSystem = Npc->GetSystem();
             if (Npc->Formation != nullptr)
                 Copy.Formation = Npc->Formation->Nickname;
-            // 06f13970-06f139d7: retail does not test the ship for null.
+            // Retail does not test the ship for null.
             FMissionShip* Ship = FindMissionShip(&Npc->Nickname);
             Ship->Priority = Npc->GetPriority();
             Ship->HitPoints = ReadHitPoints(Npc);
@@ -282,10 +267,10 @@ void FMissionObject::SnapshotMissionObjects()
             }
             else if (Ship->bJumper != 0)
             {
-                // 06f13a35-06f13a3f: a jumper out of every system arrives through the gate.
+                // A jumper out of every system arrives through the gate.
                 Copy.ArrivalObjId = JumpGateId;
             }
-            // 06f13a45-06f13ac4: the copy keeps only this ship.
+            // The copy keeps only this ship.
             Copy.Ships.clear();
             FMissionShip* Again = FindMissionShip(&Npc->Nickname);
             if (Again != nullptr)
@@ -308,8 +293,7 @@ void FMissionObject::SnapshotMissionObjects()
             continue;
         }
 
-        // 06f132bb-06f13331: a random-encounter ship - the first [MsnRandEnc] whose id it
-        // carries.
+        // A random-encounter ship: the first [MsnRandEnc] whose id it carries.
         std::list<FMissionRandEnc>::iterator EncIt = RandEncs.begin();
         for (; EncIt != RandEncs.end(); ++EncIt)
         {
@@ -319,7 +303,7 @@ void FMissionObject::SnapshotMissionObjects()
         if (EncIt == RandEncs.end())
             continue;
 
-        // 06f13336-06f135a6: every record of the ship's formation group counts it.
+        // Every record of the ship's formation group counts it.
         bool bFound = false;
         std::list<FMissionRandEncRespawn>::iterator RecordIt = RandEncRespawns.begin();
         for (; RecordIt != RandEncRespawns.end(); ++RecordIt)
@@ -328,9 +312,8 @@ void FMissionObject::SnapshotMissionObjects()
                 continue;
             ++RecordIt->Count;
             bFound = true;
-            // 06f13370-06f133de: a copy of the ship's class ids [ESP+0x194] (EH state 2, alive to
-            // the end of the iteration, 06f13584), then a temporary choice [ESP+0x16c] = {copy of
-            // it, weight 1.0f} (state 3) pushed and destroyed at once.
+            // A copy of the ship's class ids, alive to the end of the iteration; the choice is a
+            // temporary pushed and destroyed at once.
             std::vector<unsigned int> Classes(Npc->ClassIds);
             {
                 FRandEncShipChoice const Choice{Classes, 1.0f};
@@ -339,8 +322,8 @@ void FMissionObject::SnapshotMissionObjects()
             RecordIt->Names.push_back(Npc->Nickname);
             if (Npc->FormationSlot != 0 && Npc->FormationId != 0xffffffffu)
                 continue;
-            // 06f13422-06f13578: the leader gives the place, priority, hit points and guide
-            // (raw) or directives.
+            // The leader gives the place, priority, hit points and guide (raw, no AddRef) or
+            // directives.
             ReadPlacement(Npc, &RecordIt->Placement);
             RecordIt->Priority = Npc->GetPriority();
             RecordIt->HitPoints = ReadHitPoints(Npc);
@@ -357,15 +340,13 @@ void FMissionObject::SnapshotMissionObjects()
         if (bFound)
             continue;
 
-        // 06f135ac-06f13902: a new record for the group.
+        // A new record for the group.
         FMissionRandEncRespawn Record;
         Record.EncounterId = EncIt->NicknameId;
         Record.FormationRef = Npc->FormationId;
         Record.Priority = Npc->GetPriority();
         Record.Count = 1;
-        // 06f13670-06f136d9: a copy of the ship's class ids [ESP+0x1a4] (EH state 9, destroyed
-        // after the record is pushed, 06f138be-06f138d2), then a temporary choice [ESP+0x160]
-        // = {copy of it, weight 1.0f} (state 0xa) pushed and destroyed at once.
+        // The class-id copy outlives the record's push, as in retail.
         std::vector<unsigned int> Classes(Npc->ClassIds);
         {
             FRandEncShipChoice const Choice{Classes, 1.0f};
@@ -389,7 +370,7 @@ void FMissionObject::SnapshotMissionObjects()
         RandEncRespawns.push_back(Record);
     }
 
-    // 06f13bcf-06f14231: one +0x128 record per formation group, in first-seen order.
+    // One +0x128 record per formation group, in first-seen order.
     std::list<unsigned int>::iterator RefIt = FormationRefs.begin();
     for (; RefIt != FormationRefs.end(); ++RefIt)
     {
@@ -405,7 +386,7 @@ void FMissionObject::SnapshotMissionObjects()
         for (; It != Range.second; ++It)
         {
             FContentNpcShip* Npc = It->second;
-            // 06f13c98-06f13ca1: a random-encounter ship ends the walk (to 06f14071).
+            // A random-encounter ship ends the walk.
             if (HasLabelId(Npc, GIdMissionRandomEncounter))
                 break;
             FMissionShip* Ship = FindMissionShip(&Npc->Nickname);
@@ -415,12 +396,11 @@ void FMissionObject::SnapshotMissionObjects()
             Ship->HitPoints = ReadHitPoints(Npc);
             if (Npc->FormationSlot != 0 && Npc->FormationId != 0xffffffffu)
             {
-                // 06f1403a-06f14046: a wingman is appended.
                 Ships.push_back(*Ship);
                 continue;
             }
-            // 06f13d5a-06f13e08: the leader's [MsnShip] record is copied over the new one
-            // (FUN_06f15790); none -> the record stays empty (to 06f141c3).
+            // The leader's [MsnShip] record is copied over the new one; none: the record stays
+            // empty.
             Group = FindMissionShipGroup(&Npc->Nickname);
             if (Group == nullptr)
             {
@@ -440,7 +420,7 @@ void FMissionObject::SnapshotMissionObjects()
             {
                 Dest.ArrivalObjId = JumpGateId;
             }
-            // 06f13ea7-06f14038: appended; the vector's first ship takes the guide or the
+            // The vector's first ship (not necessarily the leader) takes the guide or the
             // directives.
             Ships.push_back(*Ship);
             FMissionShip& First = Ships.front();
@@ -454,13 +434,10 @@ void FMissionObject::SnapshotMissionObjects()
                 TakeDirectives(&First.Directives, Npc);
             }
         }
-        // 06f14071-06f141c0: the record takes the collected ships when a leader record was
-        // found (the vector assignment inlined).
         if (!bAbandon && Group != nullptr)
             Dest.Ships = Ships;
-        // 06f141c3-06f141d9: FUN_06f22b00 = std::sort by formation slot (FUN_06f22f50). The
-        // slots of one group's live ships are distinct, so the order does not depend on VC6's
-        // introsort (threshold 16, FUN_06f236c0 insertion pass).
+        // FUN_06f22b00 = std::sort by formation slot. The slots of one group's live ships are
+        // distinct, so the order does not depend on VC6's introsort.
         std::sort(Dest.Ships.begin(), Dest.Ships.end(),
                   [this](FMissionShip const& A, FMissionShip const& B)
                   {
@@ -468,7 +445,7 @@ void FMissionObject::SnapshotMissionObjects()
                   });
     }
 
-    // 06f14237-06f142bf: the spawned [MsnSolar]s of the player's system, by name.
+    // The spawned [MsnSolar]s of the player's system, by name.
     std::list<FMissionSolar>::iterator SolarIt = MissionSolars.begin();
     for (; SolarIt != MissionSolars.end(); ++SolarIt)
     {
@@ -481,13 +458,11 @@ void FMissionObject::SnapshotMissionObjects()
         RespawnSolars.push_back(SolarIt->Nickname);
     }
 
-    // 06f142c1-06f142c3.
     SnapshotVibeInfos();
 }
 
-// FUN_06f11ff0 (06f11ff0-06f12c0f). The rows are built on the stack and appended (FUN_06f1ede0,
-// FUN_06f202f0 with 1, and the inlined push_back of 06f12a3d-06f12bf9). The label rows leave
-// RepA / RepB unset in retail (only read for an empty name); the port zeroes them.
+// FUN_06f11ff0. The label rows leave RepA / RepB unset in retail (only read for an empty
+// name); the port zeroes them.
 void FMissionObject::SnapshotVibeInfos()
 {
     VibeInfos.clear();
@@ -497,7 +472,6 @@ void FMissionObject::SnapshotVibeInfos()
     if (PlayerSystem == nullptr)
         return;
 
-    // 06f12043-06f124ee: every live mission NPC.
     std::map<unsigned int, FContentNpcShip*>::iterator NpcIt = NpcObjects.begin();
     for (; NpcIt != NpcObjects.end(); ++NpcIt)
     {
@@ -505,7 +479,7 @@ void FMissionObject::SnapshotVibeInfos()
         if (!IsVibeParty(Npc))
             continue;
 
-        // 06f120cf-06f12182: towards the player.
+        // Towards the player.
         if (FindContentPlayerState(PlayerId) != nullptr)
         {
             int NpcRep = 0;
@@ -521,7 +495,7 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f12187-06f122c6: towards every NPC of the same filter (itself included).
+        // Towards every NPC of the same filter (itself included).
         std::map<unsigned int, FContentNpcShip*>::iterator OtherIt = NpcObjects.begin();
         for (; OtherIt != NpcObjects.end(); ++OtherIt)
         {
@@ -538,7 +512,7 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f122cc-06f12390: towards every spawned solar of the player's system.
+        // Towards every spawned solar of the player's system.
         std::list<FMissionSolar>::iterator SolarIt = MissionSolars.begin();
         for (; SolarIt != MissionSolars.end(); ++SolarIt)
         {
@@ -556,13 +530,13 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f12396-06f124d1: both ways with every +0x174 reputation.
+        // Both ways with every +0x174 reputation.
         int NpcRep = -1;
         pub::SpaceObj::GetRep(NpcIt->first, NpcRep);
         std::vector<int>::iterator RepIt = SolarReps.begin();
         for (; RepIt != SolarReps.end(); ++RepIt)
         {
-            // 06f123d0-06f1243b: {"", npc, rep, -1} - the reputation towards the NPC.
+            // {"", npc, rep, -1}: the reputation towards the NPC.
             FMissionVibeInfo Towards = {};
             Towards.RepA = *RepIt;
             Towards.RepB = -1;
@@ -570,7 +544,7 @@ void FMissionObject::SnapshotVibeInfos()
             pub::Reputation::GetAttitude(*RepIt, NpcRep, Towards.Attitude);
             VibeInfos.push_back(Towards);
 
-            // 06f12440-06f124bd: {npc, "", -1, rep} - the NPC towards the reputation.
+            // {npc, "", -1, rep}: the NPC towards the reputation.
             FMissionVibeInfo From = {};
             From.RepA = -1;
             From.RepB = *RepIt;
@@ -580,7 +554,7 @@ void FMissionObject::SnapshotVibeInfos()
         }
     }
 
-    // 06f124f4-06f12978: every spawned solar of the player's system.
+    // Every spawned solar of the player's system.
     std::list<FMissionSolar>::iterator SolarIt = MissionSolars.begin();
     for (; SolarIt != MissionSolars.end(); ++SolarIt)
     {
@@ -589,7 +563,7 @@ void FMissionObject::SnapshotVibeInfos()
         if (SolarIt->bSpawned != 1)
             continue;
 
-        // 06f12533-06f125ca: towards the player.
+        // Towards the player.
         if (FindContentPlayerState(PlayerId) != nullptr)
         {
             int SolarRep = 0;
@@ -605,7 +579,7 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f125cf-06f126df: towards every NPC of the filter.
+        // Towards every NPC of the filter.
         std::map<unsigned int, FContentNpcShip*>::iterator NpcIt2 = NpcObjects.begin();
         for (; NpcIt2 != NpcObjects.end(); ++NpcIt2)
         {
@@ -622,8 +596,7 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f126e5-06f12792: towards every spawned solar of the player's system (itself
-        // included).
+        // Towards every spawned solar of the player's system (itself included).
         std::list<FMissionSolar>::iterator OtherIt = MissionSolars.begin();
         for (; OtherIt != MissionSolars.end(); ++OtherIt)
         {
@@ -641,13 +614,13 @@ void FMissionObject::SnapshotVibeInfos()
             VibeInfos.push_back(Row);
         }
 
-        // 06f12798-06f1295e: both ways with every +0x174 reputation.
+        // Both ways with every +0x174 reputation.
         int SolarRep = -1;
         pub::SpaceObj::GetRep(SolarIt->SpaceObjId, SolarRep);
         std::vector<int>::iterator RepIt = SolarReps.begin();
         for (; RepIt != SolarReps.end(); ++RepIt)
         {
-            // 06f127d0-06f12881: {"", solar, rep, -1} (the name assignment inlined).
+            // {"", solar, rep, -1}.
             FMissionVibeInfo Towards = {};
             Towards.RepA = *RepIt;
             Towards.RepB = -1;
@@ -655,7 +628,7 @@ void FMissionObject::SnapshotVibeInfos()
             pub::Reputation::GetAttitude(*RepIt, SolarRep, Towards.Attitude);
             VibeInfos.push_back(Towards);
 
-            // 06f12886-06f1294a: {solar, "", -1, rep}.
+            // {solar, "", -1, rep}.
             FMissionVibeInfo From = {};
             From.RepA = -1;
             From.RepB = *RepIt;
@@ -665,7 +638,7 @@ void FMissionObject::SnapshotVibeInfos()
         }
     }
 
-    // 06f1297e-06f12bff: every +0x174 reputation towards the player.
+    // Every +0x174 reputation towards the player.
     int PlayerRep = -1;
     pub::Player::GetRep(PlayerId, PlayerRep);
     std::vector<int>::iterator RepIt = SolarReps.begin();
@@ -680,9 +653,8 @@ void FMissionObject::SnapshotVibeInfos()
     }
 }
 
-// FUN_06f12c10 (06f12c10-06f12e01). A named party's reputation is GetRep of its label's object
-// (FUN_06f15b90 inlined twice: 06f12c54-06f12ccd with FUN_06ed01c0 for the loot names,
-// 06f12cf0-06f12dad with an inline strcmp), an unnamed one is the row's own.
+// FUN_06f12c10. A named party's reputation is GetRep of its label's object (GetLabelObjectId
+// inlined twice), an unnamed one is the row's own.
 void FMissionObject::ApplyVibeInfos()
 {
     std::vector<FMissionVibeInfo>::iterator It = VibeInfos.begin();
@@ -702,14 +674,13 @@ void FMissionObject::ApplyVibeInfos()
     }
 }
 
-// FUN_06f0ff90 (06f0ff90-06f106d5, RET 4).
+// FUN_06f0ff90.
 void FMissionObject::SaveMission(FILE* File)
 {
-    // 06f0ffb1-06f102c6: every +0x128 record.
     std::list<FMissionShipGroup>::iterator GroupIt = RespawnShips.begin();
     for (; GroupIt != RespawnShips.end(); ++GroupIt)
     {
-        // 06f0ffd5-06f0fff2: the ship names, written after the record (FUN_06ed0440 list).
+        // The ship names, written after the record.
         std::list<TString<0x30>> Names;
         std::vector<FMissionShip>::iterator ShipIt = GroupIt->Ships.begin();
         for (; ShipIt != GroupIt->Ships.end(); ++ShipIt)
@@ -735,7 +706,6 @@ void FMissionObject::SaveMission(FILE* File)
                 std::fprintf(File, "label = %u\n", *LabelIt);
         }
 
-        // 06f10176-06f1027e.
         std::fprintf(File, "\n[MsnWingSave]\n");
         std::fprintf(File, "nickname = %s\n", GroupIt->Nickname.Data);
         if ((GroupIt->ArrivalObjId & 0x3fffffff) == 0)
@@ -755,7 +725,6 @@ void FMissionObject::SaveMission(FILE* File)
             std::fprintf(File, "ship = %s\n", NameIt->Data);
     }
 
-    // 06f102ce-06f104cd: every +0x8c record.
     std::list<FMissionRandEncRespawn>::iterator RecordIt = RandEncRespawns.begin();
     for (; RecordIt != RandEncRespawns.end(); ++RecordIt)
     {
@@ -786,21 +755,18 @@ void FMissionObject::SaveMission(FILE* File)
         std::fprintf(File, "END\n");
     }
 
-    // 06f104d3-06f1051d.
     if (!RespawnSolars.empty())
         std::fprintf(File, "\n[MsnSolarSave]\n");
     std::list<TString<0x30>>::iterator SolarIt = RespawnSolars.begin();
     for (; SolarIt != RespawnSolars.end(); ++SolarIt)
         std::fprintf(File, "solar_name = %s\n", SolarIt->Data);
 
-    // 06f10521-06f10563.
     if (!MarkObjNames.empty())
         std::fprintf(File, "\n[MarkObj]\n");
     std::list<TString<0x30>>::iterator MarkIt = MarkObjNames.begin();
     for (; MarkIt != MarkObjNames.end(); ++MarkIt)
         std::fprintf(File, "name = %s\n", MarkIt->Data);
 
-    // 06f10567-06f105c1.
     if (!Invulnerables.empty())
         std::fprintf(File, "\n[Invulnerables]\n");
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
@@ -808,14 +774,13 @@ void FMissionObject::SaveMission(FILE* File)
         std::fprintf(File, "invulnerable = %s, %f, %d\n", InvIt->Nickname.Data,
                      static_cast<double>(InvIt->MaxHpLoss), InvIt->bPlayerCanDamage != 0 ? 1 : 0);
 
-    // 06f105c5-06f1060d.
     if (!DecloakedNames.empty())
         std::fprintf(File, "\n[Decloaked]\n");
     std::list<TString<0x30>>::iterator DecloakIt = DecloakedNames.begin();
     for (; DecloakIt != DecloakedNames.end(); ++DecloakIt)
         std::fprintf(File, "decloaked= %s\n", DecloakIt->Data);
 
-    // 06f1060f-06f106a9: an empty name is written "empty".
+    // An empty name is written "empty".
     if (!VibeInfos.empty())
     {
         std::fprintf(File, "\n[MsnVibeInfo]\n");
@@ -831,12 +796,11 @@ void FMissionObject::SaveMission(FILE* File)
         }
     }
 
-    // 06f106af-06f106b9: the first player's objectives (slot 6, +8; retail does not test the
-    // record for null).
+    // The first player's objectives; retail does not test the record for null.
     SaveNNObjectives(File, &GetFirstPlayer()->Objectives);
 }
 
-// FUN_06f11f70 (06f11f70-06f11fe2, RET 4).
+// FUN_06f11f70. Params is not null-tested.
 void FMissionObject::SaveRandEncs(FILE* File)
 {
     std::list<FMissionRandEnc>::iterator It = RandEncs.begin();
@@ -852,8 +816,7 @@ void FMissionObject::SaveRandEncs(FILE* File)
 
 namespace
 {
-    // The nine "orientation" floats (values 0..8) in memory order (06f10cd2-06f10d7c /
-    // 06f11210-06f112ba: read into a stack matrix, then copied as 9 dwords).
+    // The nine "orientation" floats (values 0..8) in memory order.
     void ReadOrientation(INI_Reader* Reader, FMatrix* Out)
     {
         FMatrix Read;
@@ -869,8 +832,7 @@ namespace
         *Out = Read;
     }
 
-    // The value is one of the "END"-terminated lists of the save (a TString<0x40> of it
-    // compared as 4 bytes with "END\0", 06f10e39-06f10e53).
+    // The terminator of the save's "END"-terminated lists (case-sensitive).
     bool IsEndMarker(char const* Value)
     {
         TString<0x40> Text;
@@ -878,8 +840,7 @@ namespace
         return Text == "END";
     }
 
-    // FUN_06f12e10's inlined unique insert into +0x174 (find, else insert at the end; the
-    // returned pair is not used).
+    // FUN_06f12e10's inlined unique insert into +0x174.
     void AddUniqueRep(std::vector<int>* Reps, int Rep)
     {
         if (std::find(Reps->begin(), Reps->end(), Rep) == Reps->end())
@@ -887,11 +848,8 @@ namespace
     }
 }
 
-// FUN_06f106e0 (06f106e0-06f11a06, RET 4; message 5). Locals in retail order: the pending ship
-// vector (+0x1c), the [MObjective] directive list (+0x48, state 1) and the [MetaBehavior] list
-// (+0x2c, state 2); the end releases the two lists and frees the ships (06f118dd-06f119e7).
-// The [MetaBehavior] list is never emptied inside the loop: every later [MsnShipSave] gets a guide
-// from its first object.
+// FUN_06f106e0 (message 5). Retail quirk: the [MetaBehavior] list is never emptied inside the
+// loop, so every later [MsnShipSave] gets a guide from its first object.
 void FMissionObject::LoadMissionSave(INI_Reader* Reader)
 {
     Reader->reset();
@@ -902,26 +860,24 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
     {
         if (Reader->is_header("RandomEncounter"))
         {
-            // 06f10771-06f1078c.
             LoadRandEncsSave(Reader);
         }
         else if (Reader->is_header("MObjective"))
         {
-            // 06f10791-06f107bf: FUN_06f25260 appends to the list; the nickname is dropped.
+            // Appends to the list; the nickname is dropped.
             ID_String Nickname;
             Nickname.clear();
             LoadObjList(Reader, &ObjectiveList.Items, &Nickname.Id);
         }
         else if (Reader->is_header("MetaBehavior"))
         {
-            // 06f107c4-06f107f2: FUN_06f065e0 appends to the list; the nickname is dropped.
+            // Appends to the list; the nickname is dropped.
             ID_String Nickname;
             Nickname.clear();
             LoadMetaBehavior(Reader, &MetaList.Items, &Nickname.Id);
         }
         else if (Reader->is_header("MsnShipSave"))
         {
-            // 06f107f7-06f10b70: a ship slot (the FUN_06f18eb0 template) from the values.
             FMissionShip Ship;
             while (Reader->read_value())
             {
@@ -944,23 +900,23 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                 else if (Reader->is_value("radius"))
                     Ship.Radius = Reader->get_value_float(0);
             }
-            // 06f10a3a-06f10a9c: the pending [MObjective] directives (AddRef'ed).
+            // The pending [MObjective] directives.
             Ship.InitObjectives.Id = GIdLocalObjective;
             Ship.Directives = ObjectiveList;
-            // 06f10a9e-06f10ad4: with a [MetaBehavior] loaded, the guide of its first object instead.
+            // With a [MetaBehavior] loaded, the guide of its first object instead.
             if (!MetaList.Items.empty())
             {
                 Ship.Directives.Clear();
                 Ship.InitMetaBehavior.Id = GIdLocalObjective;
                 CreateGuide(MetaList.Items.front(), &Ship.Guide.Pointer);
             }
-            // 06f10ad7-06f10af1: the slot waits for its [MsnWingSave]; the directives are dropped.
+            // The slot waits for its [MsnWingSave]; the directives are dropped.
             PendingShips.push_back(Ship);
             ObjectiveList.Clear();
         }
         else if (Reader->is_header("MsnRandEncSave"))
         {
-            // 06f10b75-06f11132: a +0x8c record (template 06f10b8a-06f10c15).
+            // A +0x8c record.
             FMissionRandEncRespawn Record;
             while (Reader->read_value())
             {
@@ -992,10 +948,7 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                 }
                 else if (Reader->is_value("ship_type"))
                 {
-                    // 06f10dd4-06f10f41: up to 0x20 class ids until "END", each once, into a
-                    // local vector [ESP+0x5c] (EH state 0xe); then a temporary choice [ESP+0x1d0]
-                    // = {copy of the vector (FUN_06eb35b0), weight 1.0f} (state 0xf) is pushed
-                    // (FUN_06f1e3e0) and destroyed before the vector.
+                    // Up to 0x20 class ids until "END", each once.
                     std::vector<unsigned int> Classes;
                     for (unsigned int Index = 0; Index < 0x20; ++Index)
                     {
@@ -1010,7 +963,7 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                 }
                 else if (Reader->is_value("names"))
                 {
-                    // 06f10f4b-06f11036: up to 0x20 names until "END".
+                    // Up to 0x20 names until "END".
                     for (unsigned int Index = 0; Index < 0x20; ++Index)
                     {
                         if (IsEndMarker(Reader->get_value_string(Index)))
@@ -1021,14 +974,13 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                     }
                 }
             }
-            // 06f1104c-06f110ca: the pending directives, then the record into +0x8c.
             Record.Directives = ObjectiveList;
             RandEncRespawns.push_back(Record);
             ObjectiveList.Clear();
         }
         else if (Reader->is_header("MsnWingSave"))
         {
-            // 06f11137-06f11511: a +0x128 record (FUN_06f0e2d0) that takes the pending ships.
+            // A +0x128 record that takes the pending ships.
             FMissionShipGroup Group;
             while (Reader->read_value())
             {
@@ -1055,15 +1007,12 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                     Group.Formation.Id = static_cast<unsigned int>(Reader->get_value_int(0));
                 }
             }
-            // 06f11308-06f114b9: the vector assignment inlined, the pending vector emptied, then
-            // the record appended (FUN_06f1e750).
             Group.Ships = PendingShips;
             PendingShips.clear();
             RespawnShips.push_back(Group);
         }
         else if (Reader->is_header("MsnSolarSave"))
         {
-            // 06f11516-06f115e9.
             while (Reader->read_value())
             {
                 if (!Reader->is_value("solar_name"))
@@ -1075,7 +1024,6 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
         }
         else if (Reader->is_header("MarkObj"))
         {
-            // 06f115ee-06f116ba.
             while (Reader->read_value())
             {
                 if (!Reader->is_value("name"))
@@ -1087,7 +1035,7 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
         }
         else if (Reader->is_header("Invulnerables"))
         {
-            // 06f116bf-06f117a2: values read in the order 2, 1, 0 (get_indexed_value for the name).
+            // Values read in the order 2, 1, 0 (get_indexed_value for the name).
             while (Reader->read_value())
             {
                 if (!Reader->is_value("invulnerable"))
@@ -1103,7 +1051,6 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
         }
         else if (Reader->is_header("Decloaked"))
         {
-            // 06f117a7-06f118b1.
             while (Reader->read_value())
             {
                 if (!Reader->is_value("decloaked"))
@@ -1115,15 +1062,14 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
         }
         else if (Reader->is_header("MsnVibeInfo"))
         {
-            // 06f118b3-06f118c7.
             LoadVibeInfos(Reader);
         }
     }
 }
 
-// FUN_06f11b90 (06f11b90-06f11f60, RET 4): the values of one [RandomEncounter] section of the
-// save. The nickname buffer is strncpy'd (0x20) by "nickname" and is garbage in retail until then;
-// the port zeroes it. "enabled" updates every +0x98 record of that name (not for
+// FUN_06f11b90: the values of one [RandomEncounter] section of the save. The nickname buffer is
+// garbage in retail until "nickname" strncpy's it (0x20, possibly unterminated); the port
+// zeroes it. "enabled" updates every +0x98 record of that name (not for
 // "RandomMission"); "encounter_type" creates a new record only for the name "RandomMission".
 void FMissionObject::LoadRandEncsSave(INI_Reader* Reader)
 {
@@ -1136,7 +1082,6 @@ void FMissionObject::LoadRandEncsSave(INI_Reader* Reader)
         }
         else if (Reader->is_value("enabled"))
         {
-            // 06f11c02-06f11c94.
             if (_stricmp(Nickname, "RandomMission") == 0)
                 continue;
             std::list<FMissionRandEnc>::iterator It = RandEncs.begin();
@@ -1153,14 +1098,13 @@ void FMissionObject::LoadRandEncsSave(INI_Reader* Reader)
         }
         else if (Reader->is_value("encounter_type"))
         {
-            // 06f11c99-06f11f31.
             if (_stricmp(Nickname, "RandomMission") != 0)
                 continue;
             char const* Type = Reader->get_value_string(0);
             FMissionRandEnc Record;
             Record.Nickname = Nickname;
             Record.bEnabled = 0;
-            // 06f11d37-06f11e26: the type compared as 10 bytes (REPE CMPSB) = strcmp.
+            // Case-sensitive here, unlike LoadMission's stricmp.
             char const* ParamsName = nullptr;
             char const* PopulatorName = nullptr;
             if (std::strcmp(Type, "TL_Attack") == 0)
@@ -1189,8 +1133,7 @@ void FMissionObject::LoadRandEncsSave(INI_Reader* Reader)
                 CreateRandEncPopulator(PopulatorName, &Record.Populator.Pointer);  // FUN_06efb980
                 Record.Populator->Parse(Reader, Record.Params);
             }
-            // 06f11e29-06f11e44: the mission's controller and player state (no null test, as in
-            // retail), then the copy appended (FUN_06f228c0, AddRef of both objects).
+            // No null test, as in retail.
             Record.Params->ControllerId = ControllerId;
             Record.Params->Player = PlayerState;
             RandEncs.push_back(Record);
@@ -1198,7 +1141,7 @@ void FMissionObject::LoadRandEncsSave(INI_Reader* Reader)
     }
 }
 
-// FUN_06f12e10 (06f12e10-06f130a4, RET 4): one row per "vibe" value; a name "empty" (stricmp)
+// FUN_06f12e10: one row per "vibe" value; a name "empty" (stricmp)
 // leaves the party unnamed and adds its reputation (value 2 / 3) to +0x174 once.
 void FMissionObject::LoadVibeInfos(INI_Reader* Reader)
 {

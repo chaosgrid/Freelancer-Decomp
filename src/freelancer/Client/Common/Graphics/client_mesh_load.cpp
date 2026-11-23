@@ -12,7 +12,7 @@
 #include "common_csys.h"    // Acquire3DMathEngine (FUN_005b73e0)
 #include "x86math.h"        // I3DMathEngine::TransformXform
 #include "dacom.h"
-#include "readfile.h" // IFileSystem (00420e58 CreateInstance, 00420f05 Release)
+#include "readfile.h" // IFileSystem
 #include "engine/engbase.h"
 #include "render/rendcomp.h" // IRenderer2
 #include "render/RenderPipeline.h"
@@ -27,23 +27,21 @@
 namespace
 {
     // FUN_0059ec60 (cdecl Instance, Context) -- the CompoundInstanceAnalyze callback of
-    // FUN_0059ec80: IEngine vt+0x7c SetInstanceUserData(Instance, Context), nothing else.
+    // FUN_0059ec80.
     void __cdecl MeshAnalyzeSetUserData(long Instance, void* Context)
     {
         DALib::Engine->SetInstanceUserData(reinterpret_cast<void*>(Instance), Context);
     }
 
-    // FUN_0059ec80 0x0059ecd9..0x0059ecec (and its two copies): analyze the bound instance
-    // with the holder's floats +0x14 as the context.
+    // Inlined three times in FUN_0059ec80: the holder's floats +0x14 are the context.
     void AnalyzeBoundInstance(FClientMeshHolder* Holder)
     {
         long const Inst = static_cast<long>(reinterpret_cast<ptrdiff_t>(Holder->EngineInstance));
         CompoundInstanceAnalyze(Inst, MeshAnalyzeSetUserData, Holder->UserFloats);
     }
 
-    // The DALib::Data FileSystem description FUN_0059ec80 (0x0059ed1c..0x0059ed7b) and
-    // FUN_0059e980 (0x0059ea47..0x0059ea9c) build on the stack: the 0x34-byte desc,
-    // "FileSystem", no backend, the path, and the fixed open flags.
+    // The DALib::Data FileSystem description FUN_0059ec80 and FUN_0059e980 build on the stack
+    // (no backend name).
     void BuildMeshFileSystemDesc(FFileSystemAggDesc* Desc, char const* Path)
     {
         memset(Desc, 0, sizeof(*Desc));
@@ -62,9 +60,7 @@ namespace
     // releasing anything; FUN_0059e8d0 is what releases the entries.
     std::vector<FWin3DModelCacheEntry> G_Win3DModelCache;
 
-    // The linear search FUN_0059ec80 (0x0059edc8..0x0059ee0b) and FUN_0059e980
-    // (0x0059e9d1..0x0059ea0a, 0x0059eb0e..0x0059eb4b) run on the cache: first entry whose
-    // handle is ArchHandle, or null.
+    // The linear search FUN_0059ec80 and FUN_0059e980 inline.
     FWin3DModelCacheEntry* FindModelCacheEntry(void* ArchHandle)
     {
         size_t const Count = G_Win3DModelCache.size();
@@ -131,9 +127,7 @@ void ClientMeshHolderRelease(FMeshHolder* Holder)
 
 FClientMeshHolder::~FClientMeshHolder()
 {
-    // FUN_0059ef20 (thiscall, plain RET): the Object3D vptr, then 0x0059ef43..0x0059ef75 --
-    // FUN_0059eee0's body inlined (anim +0x10 != -1 -> DALib::Anim vt+0x10 and -1; a bound
-    // instance -> FUN_00420f70) -- then FUN_00420d10, which only resets the vptr.
+    // FUN_0059ef20: FUN_0059eee0's body inlined, then FUN_00420d10, which only resets the vptr.
     ClientUiMeshHolderRelease(this);
 }
 
@@ -153,7 +147,7 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
     // FUN_00420dd0 (thiscall, RET 8).
     bool bOk = false;
 
-    // 00420df6..00420e4a: the DALib::OpenData-shaped FileSystem desc with no backend name.
+    // The DALib::OpenData-shaped FileSystem desc with no backend name.
     FFileSystemAggDesc Desc;
     memset(&Desc, 0, sizeof(Desc));
     Desc.Size = 0x34;
@@ -166,11 +160,9 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
     Desc.FindHandle = 0xffffffffu;
 
     void* FsOut = nullptr;
-    // 00420e58: DALib::Data vt+0xc CreateInstance(&Desc, &Fs).
     if (static_cast<IFileSystem*>(DALib::Data)
             ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
     {
-        // 00420e63..00420e8a: material-cache entries for the path and the aux path.
         if (Path != nullptr)
             Holder->MaterialEntry = Archetype::ResolveMaterialEntry(Path, true, 0xffffffffu);
         if (AuxPath != nullptr)
@@ -180,8 +172,8 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
         bOk = Archetype::Load(static_cast<IFileSystem*>(FsOut), &Handle, nullptr);
         if (bOk)
         {
-            // 00420eac: an instance already bound is destroyed and BOTH cache slots released --
-            // including the two entries resolved just above; retail does exactly this.
+            // Retail quirk: an instance already bound is destroyed and BOTH cache slots
+            // released -- including the two entries resolved just above.
             if (Holder->EngineInstance != G_InvalidEngineHandle)
             {
                 DALib::Engine->DestroyInstance(Holder->EngineInstance);
@@ -189,14 +181,12 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
                 Archetype::ReleaseMaterialEntrySlot(&Holder->MaterialEntry);
                 Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
             }
-            // 00420ede: CreateInstance(Handle, 0), then ReleaseHandle(Handle).
             void* const HandlePtr = reinterpret_cast<void*>(static_cast<ptrdiff_t>(Handle));
             Holder->EngineInstance = DALib::Engine->CreateInstance(HandlePtr, nullptr);
             DALib::Engine->ReleaseHandle(HandlePtr);
         }
     }
 
-    // 00420f05: the FileSystem reference is dropped whether or not the create succeeded.
     if (FsOut != nullptr)
         static_cast<IFileSystem*>(FsOut)->Release();
     return bOk;
@@ -213,8 +203,7 @@ void ClientMeshHolderSetMaterials(FMeshHolder* Holder, char const* Path, char co
 
 bool ClientMeshHolderBindInstance(FMeshHolder* Holder, void* ArchHandle)
 {
-    // FUN_00420d70. 0x00420d73..0x00420da2: a bound instance is destroyed, the slot set back to
-    // -1 and both material entries released.
+    // FUN_00420d70. A bound instance takes both material entries with it.
     void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
     if (Holder->EngineInstance != NoInstance)
     {
@@ -223,14 +212,13 @@ bool ClientMeshHolderBindInstance(FMeshHolder* Holder, void* ArchHandle)
         Archetype::ReleaseMaterialEntrySlot(&Holder->MaterialEntry);
         Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
     }
-    // 0x00420da5..0x00420dc8: CreateInstance(ArchHandle, 0) into +0x04; true unless -1.
     Holder->EngineInstance = DALib::Engine->CreateInstance(ArchHandle, nullptr);
     return Holder->EngineInstance != NoInstance;
 }
 
 float* ClientMeshHolderGetTransform(FMeshHolder const* Holder)
 {
-    // FUN_00421030: return Engine->vt+0xa0(Engine, Holder+0x04).
+    // FUN_00421030.
     return DALib::Engine->GetInstanceTransform(Holder->EngineInstance);
 }
 
@@ -259,51 +247,50 @@ float ClientMeshHolderGetBoundingSphere(FMeshHolder const* Holder, float* OutCen
 
 void ClientMeshHolderSetMatrix(FMeshHolder* Holder, void* Transform)
 {
-    // FUN_00421050: Engine->vt+0x9c(Engine, Holder+0x04, Transform).
+    // FUN_00421050.
     DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, Transform);
 }
 
 void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags)
 {
-    // FUN_00421120: Renderer->vt+0x1c(Renderer, Camera, Holder+0x04, 1.0f, Flags, 0, 0).
+    // FUN_00421120.
     DALib::Renderer->RenderInstance(Camera, Holder->EngineInstance, 1.0f, Flags, nullptr, nullptr);
 }
 
 void ClientMeshHolderSetPosition(FMeshHolder* Holder, float const Position[3])
 {
-    // FUN_00420fd0: Engine->vt+0x8c(Engine, Holder+0x04, Position).
+    // FUN_00420fd0.
     DALib::Engine->SetInstancePosition(Holder->EngineInstance, const_cast<float*>(Position));
 }
 
 float* ClientMeshHolderGetPosition(FMeshHolder const* Holder)
 {
-    // FUN_00420fb0: return Engine->vt+0x90(Engine, Holder+0x04).
+    // FUN_00420fb0.
     return DALib::Engine->GetInstancePosition(Holder->EngineInstance);
 }
 
 float* ClientMeshHolderGetOrientation(FMeshHolder const* Holder)
 {
-    // FUN_00420ff0: return Engine->vt+0x98(Engine, Holder+0x04).
+    // FUN_00420ff0.
     return DALib::Engine->GetInstanceOrientation(Holder->EngineInstance);
 }
 
 void ClientMeshHolderSetOrientation(FMeshHolder* Holder, float const Orientation[9])
 {
-    // FUN_00421010: Engine->vt+0x94(Engine, Holder+0x04, Orientation).
+    // FUN_00421010.
     DALib::Engine->SetInstanceOrientation(Holder->EngineInstance,
                                           const_cast<float*>(Orientation));
 }
 
 void ClientMeshHolderUpdate(FMeshHolder* Holder)
 {
-    // FUN_00421070: Engine->vt+0x6c(Engine, Holder+0x04, 0, 0).
+    // FUN_00421070.
     DALib::Engine->UpdateInstance(Holder->EngineInstance, 0, nullptr);
 }
 
 void ClientMeshHolderSetColor(FClientMeshHolder* Holder, unsigned char const* Rgba)
 {
-    // FUN_004a1af0: each byte FILD, FMUL float 1/255 (DAT_005c7f68), stored as a float into
-    // +0x14 / +0x18 / +0x1c / +0x24. +0x20 (UserFloats[3]) is not written.
+    // FUN_004a1af0: float 1/255 is DAT_005c7f68. UserFloats[3] (+0x20) is not written.
     double const Inv255 = static_cast<double>(0.003921568859368563f);
     Holder->UserFloats[0] = static_cast<float>(static_cast<double>(Rgba[0]) * Inv255);
     Holder->UserFloats[1] = static_cast<float>(static_cast<double>(Rgba[1]) * Inv255);
@@ -315,32 +302,27 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
                             char const* MaterialPath, bool bRegisterCache)
 {
     // FUN_0059ec80 (thiscall on the holder, RET 0xc).
-
-    // 0x0059ec9e..0x0059ecc1: FindArchetype({RelPath, GetCRC32(RelPath)}) (IEngine vt+0x44).
     FEngineName Name = {};
     Name.Text = RelPath;
     Name.Crc = DACOM_CRC::GetCRC32(RelPath);
     void* const Found = DALib::Engine->FindArchetype(&Name);
     if (Found != G_InvalidEngineHandle)
     {
-        // 0x0059eccd..0x0059ed19: bind, analyze on success, release the FindArchetype handle
-        // (vt+0x3c) either way, return FUN_00420d60. No FileSystem, no material entries.
+        // Already loaded: no FileSystem, no material entries.
         if (ClientMeshHolderBindInstance(Holder, Found))
             AnalyzeBoundInstance(Holder);
         DALib::Engine->ReleaseHandle(Found);
         return ClientMeshHolderHasInstance(Holder);
     }
 
-    // 0x0059ed1c..0x0059ed85: open RelPath as a DALib::Data FileSystem (vt+0xc CreateInstance).
-    // The FileSystem is the EH-guarded local released at 0x0059eeb2 whatever happened.
+    // The FileSystem is an EH-guarded local released whatever happened.
     FFileSystemAggDesc Desc;
     BuildMeshFileSystemDesc(&Desc, RelPath);
     void* FsOut = nullptr;
     if (static_cast<IFileSystem*>(DALib::Data)
             ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
     {
-        // 0x0059ed90..0x0059ed98: FUN_00420f30(RelPath, MaterialPath) -- the material-cache
-        // entries of the mesh itself (+0x08) and of the material library (+0x0c).
+        // FUN_00420f30: the mesh's own material entry and the material library's.
         ClientMeshHolderSetMaterials(Holder, RelPath, MaterialPath);
 
         // Archetype::Load(Fs, &handle, holder +0x10) on both branches; the handle lands in
@@ -349,20 +331,19 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
         int* const AnimIndex = reinterpret_cast<int*>(&Holder->AnimOrArchIndex);
         if (bRegisterCache)
         {
-            // 0x0059eda9..0x0059ee54: a loaded handle is kept -- appended to the model cache
-            // unless already there -- and NOT released here (FUN_0059e8d0 does that).
+            // A loaded handle is kept in the model cache and NOT released here (FUN_0059e8d0
+            // does that).
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
                 void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
                 if (FindModelCacheEntry(Loaded) == nullptr)
-                    AppendModelCacheEntry(Loaded); // 0x0059ee0d..0x0059ee29 FUN_0059f5b0
+                    AppendModelCacheEntry(Loaded);
                 if (ClientMeshHolderBindInstance(Holder, Loaded))
                     AnalyzeBoundInstance(Holder);
             }
         }
         else
         {
-            // 0x0059ee56..0x0059eea6: bind, analyze on success, then release the handle.
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
                 void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
@@ -373,7 +354,6 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
         }
     }
 
-    // 0x0059eea9..0x0059eec5: result = FUN_00420d60, then the FileSystem is released (vt+8).
     bool const bResult = ClientMeshHolderHasInstance(Holder);
     if (FsOut != nullptr)
         static_cast<IFileSystem*>(FsOut)->Release();
@@ -383,17 +363,14 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
 bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
 {
     // FUN_0059e980 (thiscall on DAT_0067dcf4, RET 8).
-
-    // 0x0059e9a0..0x0059e9c3: FindArchetype({Path, GetCRC32(Path)}).
     FEngineName Name = {};
     Name.Text = Path;
     Name.Crc = DACOM_CRC::GetCRC32(Path);
     void* const Found = DALib::Engine->FindArchetype(&Name);
     if (Found != G_InvalidEngineHandle)
     {
-        // 0x0059e9d1..0x0059ea2c: not cached yet -> the FindArchetype handle itself is
-        // appended (FUN_00470c90, one element {handle, 0, 0} at end) and kept; already cached
-        // -> 0x0059ea31 releases it. True either way.
+        // Not cached yet: the FindArchetype handle itself is kept (FUN_00470c90). True either
+        // way.
         if (FindModelCacheEntry(Found) == nullptr)
         {
             AppendModelCacheEntry(Found);
@@ -403,7 +380,6 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
         return true;
     }
 
-    // 0x0059ea47..0x0059eab4: open Path as a DALib::Data FileSystem; failure -> false.
     bool bResult = false;
     FFileSystemAggDesc Desc;
     BuildMeshFileSystemDesc(&Desc, Path);
@@ -412,26 +388,22 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
             ->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &FsOut) == 0)
     {
         IFileSystem* const Filesys = static_cast<IFileSystem*>(FsOut);
-        // 0x0059eaba..0x0059eac4: FUN_0041ade0(Fs, Path, 1, -1) -- the mesh's own materials,
-        // from the file system already open. 0x0059eac9..0x0059ead7: FUN_0041aa50(AuxPath, 1,
-        // -1), AuxPath passed as is.
+        // FUN_0041ade0 reads the mesh's own materials from the file system already open;
+        // FUN_0041aa50 takes AuxPath as is.
         Archetype::FCliMaterialEntry* const Material =
             Archetype::ResolveMaterialEntryFromFs(Filesys, Path, true, 0xffffffffu);
         Archetype::FCliMaterialEntry* const AuxMaterial =
             Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 
-        // 0x0059eadc..0x0059eb08: Archetype::Load(Fs, &handle, &anim) with anim = -1.
         long LoadedHandle = -1;
         int AnimIndex = -1;
         if (Archetype::Load(Filesys, &LoadedHandle, &AnimIndex))
         {
             void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
-            // 0x0059eb0e..0x0059eb67: append {handle, 0, 0} when not cached (FUN_0059ebf0 +
-            // FUN_0059f5b0).
             if (FindModelCacheEntry(Loaded) == nullptr)
                 AppendModelCacheEntry(Loaded);
-            // 0x0059eb6b..0x0059ebb0: every entry of that handle takes both material entries
-            // (whatever it held before is overwritten, not released).
+            // Every entry of that handle takes both material entries (whatever it held before
+            // is overwritten, not released).
             size_t const Count = G_Win3DModelCache.size();
             for (size_t Index = 0; Index < Count; ++Index)
             {
@@ -441,11 +413,10 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
                     G_Win3DModelCache[Index].AuxMaterialEntry = AuxMaterial;
                 }
             }
-            bResult = true; // 0x0059ebb2
+            bResult = true;
         }
     }
 
-    // 0x0059ebb4..0x0059ebca: the FileSystem is released whatever happened.
     if (FsOut != nullptr)
         static_cast<IFileSystem*>(FsOut)->Release();
     return bResult;
@@ -453,9 +424,7 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
 
 void Win3DModelCacheClear()
 {
-    // FUN_0059e8d0 (thiscall on DAT_0067dcf4).
-    // 0x0059e8d4..0x0059e93b: per entry, a handle other than -1 is released (IEngine
-    // vt+0x3c) and set to -1, then both material-cache slots go through FUN_0041b030.
+    // FUN_0059e8d0 (thiscall on DAT_0067dcf4). FUN_0041b030 releases the material slots.
     size_t const Count = G_Win3DModelCache.size();
     for (size_t Index = 0; Index < Count; ++Index)
     {
@@ -468,23 +437,20 @@ void Win3DModelCacheClear()
         Archetype::ReleaseMaterialEntrySlot(&Entry.MaterialEntry);
         Archetype::ReleaseMaterialEntrySlot(&Entry.AuxMaterialEntry);
     }
-    // 0x0059e93d..0x0059e971: erase(begin, end) -- the storage is kept.
+    // The storage is kept.
     G_Win3DModelCache.clear();
 }
 
 bool ClientMeshQueryAabb(FClientMeshHolder* Holder, FClientMeshAabb* OutAabb)
 {
-    // FUN_0059f0d0 (thiscall on the holder, RET 4). The only test is the instance against -1
-    // (0x0059f0d3); OutAabb is not cleared, and the Renderer's answer is not looked at -- the
-    // function returns true (0x0059f10f) whatever Slot4 did.
+    // FUN_0059f0d0 (thiscall on the holder, RET 4). The only test is the instance against -1;
+    // OutAabb is not cleared, and the Renderer's answer is not looked at.
     if (!ClientMeshHolderHasInstance(Holder))
-        return false; // LAB_0059f115
+        return false;
 
-    // Engine vt+0x64 GetInstanceArchetype (0x0059f0e4).
     void* Arch = DALib::Engine->GetInstanceArchetype(Holder->EngineInstance);
-    // IRenderer2 Slot4 (+0x10) -- GetExtents(arch, lod=1.0, out6) (0x0059f0fe).
+    // IRenderer2 slot 4 (+0x10).
     DALib::Renderer->GetBounds(Arch, 1.0f, OutAabb->Values);
-    // Engine vt+0x3c ReleaseHandle (0x0059f10c).
     DALib::Engine->ReleaseHandle(Arch);
     return true;
 }

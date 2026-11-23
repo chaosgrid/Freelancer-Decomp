@@ -9,9 +9,9 @@
 #include "thorn_controls.h"
 #include "thorn_iface.h"
 
-// 06f493a1..06f493ac: publish the captured four-word packet through slot 3.
+// Retail 06f493a1: publish the captured four-word packet through slot 3.
 void ThornSetReverbProperties(IReverbControl* Control,
                               const FThornReverb4* Properties);
 
-// 06f49b45..06f49b4d: raw stored-height publication through slot 5.
+// Retail 06f49b45: raw stored-height publication through slot 5.
 void ThornSetFloorHeight(ICompoundControl* Control, const float* Height);

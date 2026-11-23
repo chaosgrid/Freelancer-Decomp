@@ -133,9 +133,8 @@ namespace
                    static_cast<unsigned int>(Right->StartTimeMs);
     }
 
-    // Retail FUN_06f401b0: select the median node by the unsigned key at
-    // +0x08. The branch order is intentional; it also preserves retail's
-    // null fallbacks instead of imposing a modern total-order policy.
+    // FUN_06f401b0: median of three by the unsigned +0x08 key. Branch order
+    // and null fallbacks follow retail.
     FThornEvent* SelectRetailMedianNode(FThornEvent* First, FThornEvent* Second, FThornEvent* Third)
     {
         if (First != nullptr)
@@ -170,8 +169,8 @@ namespace
         return Second;
     }
 
-    // Retail FUN_06f40230: Hoare-style partition over [Begin, End), using
-    // the unsigned +0x08 key and retaining the retail null-stop branches.
+    // FUN_06f40230: Hoare partition over [Begin, End) on the unsigned +0x08
+    // key, with retail's null-stop branches.
     FThornEvent** PartitionRetailNodes(FThornEvent** Begin, FThornEvent** End, FThornEvent* Pivot)
     {
         FThornEvent** Left = Begin;
@@ -225,8 +224,8 @@ namespace
         }
     }
 
-    // Slot4_Load, 06f3833f-06f38414: restore the complete original range
-    // before sorting the first 16 entries and inserting the remaining entries.
+    // Inlined in the scene load (IScriptEngine slot 4): partition the whole
+    // range, sort the first 16 entries, then insert the rest.
     void SortMasterEvents(FThornEvent** Events, int Count)
     {
         if (Count <= 16)
@@ -338,8 +337,8 @@ namespace
         return Value;
     }
 
-    // Literal DWORD pose transport for 38950/38a80. Forward reads/stores
-    // preserve overlapping initial outputs without x87 conversion.
+    // Raw DWORD pose copy (FUN_06f38950/06f38a80). Forward reads/stores
+    // keep overlapping outputs right and avoid x87 conversion.
     void CopyPoseWordsForward(float* Dst, const float* Src, int Count)
     {
         for (int Index = 0; Index < Count; ++Index)
@@ -499,8 +498,8 @@ namespace
 
     void WriteColumn(float* M9, int Col, const float* V)
     {
-        // 2ed60/2ed80/2eda0 interleave raw word reads and stores. Avoid
-        // floating loads, which quiet signalling NaNs in the Debug build.
+        // FUN_06f2ed60/80/a0 interleave raw word reads and stores. Floating
+        // loads would quiet signalling NaNs in the Debug build.
         for (int Index = 0; Index != 3; ++Index)
         {
             unsigned int Word;
@@ -558,11 +557,9 @@ namespace
         }
     }
 
-    // FUN_06f3b9a0: math +0x38 transpose_transform(out, csys.orient, csys.pos).
-    // Retail (thorn.dll.txt:53057-53098) calls I3DMathEngine vtbl+0x38 and
-    // writes the 3 result dwords into the destination unconditionally -- it
-    // never checks the returned GENRESULT before consuming the buffer, and
-    // there is no manual-math fallback path in retail at all.
+    // FUN_06f3b9a0: math +0x38 TransposeTransform(out, csys.orient, csys.pos).
+    // Retail consumes the result without testing the GENRESULT and has no
+    // manual-math fallback.
     void Fun06f3b9a0(float* Out3, const FThornCsys* Csys)
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
@@ -576,15 +573,13 @@ namespace
         std::memcpy(Out3, &Result, sizeof(Result));
     }
 
-    // FUN_06f23090 -- negate vec3.
     void Fun06f23090(float* Out3, const float* In3)
     {
         NegateVector3(Out3, In3);
     }
 
-    // FUN_06f3b970: REP9, then three forward DWORD reads/stores.
-    // Byte transport accepts actual float/unsigned objects without overlays;
-    // reading each word immediately before its store preserves overlap.
+    // FUN_06f3b970: nine then three forward DWORD copies. Reading each word
+    // just before its store keeps overlapping buffers right.
     void PackCsysWords(void* Destination, const void* Orientation, const void* Position)
     {
         unsigned char* Output = static_cast<unsigned char*>(Destination);
@@ -623,7 +618,7 @@ namespace
         Orientation
     };
 
-    // 409ef..40a2b: each component is negated and stored before the next.
+    // FUN_06f409a0's inline negate: each component is stored before the next.
     void NegateInversePositionWords(float* Words)
     {
         Words[0] = -Words[0];
@@ -631,7 +626,7 @@ namespace
         Words[2] = -Words[2];
     }
 
-    // 40b7f..40ba0: the orientation getter's local negate runs Z/Y/X.
+    // FUN_06f40b30's inline negate runs Z/Y/X.
     void NegateInverseOrientationWords(float* Words)
     {
         Words[2] = -Words[2];
@@ -665,7 +660,7 @@ namespace
             else
                 NegateInverseOrientationWords(Neg);
         }
-        // 409a0/40b30 inline inverse: raw constructor transpose, then REP9.
+        // Raw word transpose, as in the inline inverse of FUN_06f409a0/06f40b30.
         unsigned int Transposed[9];
         const int SourceIndices[9] = {0, 3, 6, 1, 4, 7, 2, 5, 8};
         for (int Index = 0; Index < 9; ++Index)
@@ -676,8 +671,7 @@ namespace
     // Retail calls the typed foreign slots without native wrapper guards.
     GENRESULT SceneMathTransform(I3DMathEngine* Math, float* Out, const float* Xform, const float* Source)
     {
-        // All actual callers provide a distinct output buffer. The sole math
-        // producer is a callback-free kernel; preserve its input bits until entry.
+        // All callers pass a distinct output buffer.
         FTransform TransformInput;
         FVector SourceInput;
         FVector Result;
@@ -734,19 +728,18 @@ namespace
         return Status;
     }
 
-    // FUN_06f44ce0 receives an already prepared inverse in ECX, a distinct
-    // destination and source. It neither builds an inverse nor checks pointers.
+    // FUN_06f44ce0: takes an already prepared inverse; builds none and checks
+    // no pointers.
     void MulTransformByPreparedInverse(const float* Inverse, float* Destination, const float* Source)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         float Result[12];
         SceneMathMulTransform(Math, Result, Inverse, Source);
-        // 44d1a copies twelve result DWORDs without re-evaluating them.
         std::memcpy(Destination, Result, sizeof(Result));
     }
 
-    // Hardpoint predecessors CALL FUN_06f3b9a0 (DAT_06f61e1c), then pass the
-    // resulting inverse into FUN_06f44ce0 (DAT_06f61e20). Keep both owners.
+    // Hardpoint callers use FUN_06f3b9a0 (math DAT_06f61e1c), then pass the
+    // inverse to FUN_06f44ce0 (math DAT_06f61e20); both caches are kept.
     void MulXformByInverseCsys(const FThornCsys* Csys, float* Xform12)
     {
         float Inverse[12];
@@ -754,8 +747,7 @@ namespace
         MulTransformByPreparedInverse(Inverse, Xform12, Xform12);
     }
 
-    // 49a64..49b1f: captured parent, Csys math cache, Z/Y/X negate,
-    // raw transpose, then the independent event transform cache.
+    // Csys math cache, Z/Y/X negate, raw transpose, then the event math cache.
     void TransformFloorHardpoint(const FThornCsys* Parent, float* Hardpoint)
     {
         float NegativePosition[3];
@@ -770,10 +762,8 @@ namespace
         MulTransformByPreparedInverse(Inverse, Hardpoint, Hardpoint);
     }
 
-    // Type 11 after FUN_06f2e440: math +0x28 Transform pos, +0x20 MulMatrix orient.
-    // Retail (thorn.dll.txt:69900-69965, inside LAB_06f44140) never tests
-    // either vtbl call's GENRESULT -- both results are copied into Pos/Orient
-    // unconditionally.
+    // Type 11 after FUN_06f2e440 (LAB_06f44140): math +0x28 Transform pos,
+    // +0x20 MulMatrix orient. Neither GENRESULT is tested.
     void ApplyForwardCsys(const FThornCsys* Csys, float* Pos, float* Orient)
     {
         if (Csys == nullptr || Pos == nullptr || Orient == nullptr)
@@ -787,8 +777,8 @@ namespace
         Copy9(Orient, WorldOrient);
     }
 
-    // 2e5b2 and each inlined axis normalization multiply FLD(component)
-    // by the still-extended reciprocal, then discard the reciprocal last.
+    // Each inlined axis normalization multiplies by the still-extended
+    // reciprocal and pops it last.
     void NormalizeAxis3(float* V)
     {
         const float One = 1.0f;
@@ -825,8 +815,8 @@ namespace
         }
     }
 
-    // Inlined 2e53d/2e7c7/2e737: Up cross Front, Z/Y/X float stores.
-    // Initial basis differs only in the operand order of the final product.
+    // Inlined in FUN_06f2e440: Up cross Front, Z/Y/X float stores.
+    // The initial basis differs only in the operand order of the final product.
     void CrossAxisSide3(float* Result, const float* Up, const float* Front, bool bInitial)
     {
         const float* LastLeft = bInitial ? Front + 1 : Up + 2;
@@ -859,7 +849,7 @@ namespace
         }
     }
 
-    // Inlined 2e687/2e85f: Dir cross Side, Z/Y/X float stores.
+    // Inlined in FUN_06f2e440: Dir cross Side, Z/Y/X float stores.
     void CrossAxisUp3(float* Result, const float* Dir, const float* Side)
     {
         __asm
@@ -890,7 +880,7 @@ namespace
 
     bool AxisDotNotGreater(const float* Up, const float* Dir)
     {
-        // Raw DAT_06f5a248 = 3fefae147ae147ae (double 0.99).
+        // DAT_06f5a248 = 3fefae147ae147ae (double 0.99).
         const double Threshold = 0.99;
         unsigned char bNotGreater;
         __asm
@@ -911,12 +901,11 @@ namespace
             test ah, 41h
             setnz bNotGreater
         }
-        // TEST AH41/JNZ selects not-greater, including unordered; greater
-        // falls through to the near-parallel fallback in the retail listing.
+        // Not-greater includes unordered; greater takes the near-parallel fallback.
         return bNotGreater != 0;
     }
 
-    // FUN_06f2e440 -- look-at frame from direction + Lua up/front axis IDs (0..5).
+    // FUN_06f2e440: look-at frame from direction + Lua up/front axis IDs (0..5).
     void BuildAxisFrame(float* Out9, const float* Direction, unsigned FrontAxis, unsigned UpAxis,
                         const unsigned int* SceneFrontAxis, const unsigned int* SceneUpAxis)
     {
@@ -926,7 +915,7 @@ namespace
 
         int UpIdx = 1;
         int FrontIdx = 2;
-        // FUN_06f2e440: null/sentinel shared-up skips BOTH shared selections.
+        // A null or sentinel (6) scene up axis skips BOTH scene selections.
         if (SceneUpAxis != nullptr && *SceneUpAxis != 6)
         {
             UpIdx = static_cast<int>(*SceneUpAxis);
@@ -964,7 +953,7 @@ namespace
         }
         else
         {
-            // 2e687..2e731 builds the final up directly from Dir x TableSide.
+            // Near-parallel: build the final up directly from Dir x TableSide.
             CrossAxisUp3(OrthoUp, Dir, TableSide);
             NormalizeAxis3(OrthoUp);
             CrossAxisSide3(Side, OrthoUp, Dir, false);
@@ -1012,13 +1001,13 @@ namespace
             break;
         }
 
-        // Up column 0 jumps directly to 2e971, skipping missing-X handling.
+        // Retail: up in column 0 skips the missing-X handling.
         if (!bUpColumn0 && !bCol0)
         {
             float ColY[3];
             float ColZ[3];
             float ColX[3];
-            // 2ea11 uses raw DWORDs for Z before the x87 Y getter.
+            // Retail reads Z as raw DWORDs before the x87 Y getter.
             std::memcpy(ColZ, Out9 + 2, 4);
             std::memcpy(ColZ + 1, Out9 + 5, 4);
             std::memcpy(ColZ + 2, Out9 + 8, 4);
@@ -1062,8 +1051,8 @@ namespace
 
     float Lerp1(float A, float B, float T) { return A + (B - A) * T; }
 
-    // AUDIO 4745e..47588: the private caller keeps one owned progress below
-    // capture/result. Ordinary C++ changed FADDP/store and final-pop stages.
+    // AUDIO tick: expects the caller's progress on the x87 stack at entry, as
+    // retail keeps it there. Plain C++ changed the FADDP/store and pop stages.
     void AudioLerpFloat(const float* From, const float* To, float* Output)
     {
         __asm
@@ -1081,8 +1070,8 @@ namespace
         }
     }
 
-    // 47500/47534: wrapped32 SUB zero-extends into FILD qword;
-    // FIADD reads signed capture. The normal caller performs the modern cast.
+    // AUDIO tick: the wrapped 32-bit difference is zero-extended into a qword
+    // FILD, while From is added signed. Progress is on ST(0) at entry.
 #pragma warning(push)
 #pragma warning(disable: 4716) // The x86 double result is left in ST(0).
     __declspec(noinline) double ComputeAudioLerpInteger(int From, int To)
@@ -1099,9 +1088,8 @@ namespace
     }
 #pragma warning(pop)
 
-    // 45ce4/45d10/45d35: signed low32 difference, FMUL float U, FIADD From.
-    // Actual C++ Debug/Release spilled these operands to double. Only the
-    // arithmetic is explicit; the ordinary caller performs the modern cast.
+    // Signed 32-bit difference, times float U, plus From, all on x87; plain
+    // C++ spilled the operands to double.
 #pragma warning(push)
 #pragma warning(disable: 4716) // The x86 double result is left in ST(0).
     __declspec(noinline) double ComputeLightColor(int From, int To, const float* U)
@@ -1119,10 +1107,8 @@ namespace
     }
 #pragma warning(pop)
 
-    // FOG 48eb3..48f0c retains both inputs on x87 before FSUB/FMUL/FADD.
-    // Normal C++ pointer expressions reload From for FSUB/FADD; float locals
-    // add early FSTP32 stores. Native wave68 proved both differ for SNaN/load
-    // ordering. Keep this existing arithmetic-only kernel; it has no calls.
+    // FOG tick: both inputs stay on x87 through FSUB/FMUL/FADD. Plain C++
+    // reloads From or adds early float stores, which differ for SNaN/load order.
     void FogLerpFloat(const float* From, const float* To, const float* U, float* ResultValue)
     {
         __asm
@@ -1141,8 +1127,8 @@ namespace
         }
     }
 
-    // FOG 48f17..48f98 wraps SUB as an int32, FILDs that value, then
-    // FMUL/FIADD and _ftol's chop-to-qword with low32 return. No float store.
+    // FOG tick: int32 wrapped difference, FILD, FMUL/FIADD, then _ftol's chop
+    // to qword returning the low 32 bits. No float store.
     int FogLerpInteger(int From, int To, const float* U)
     {
         int Difference;
@@ -1207,14 +1193,13 @@ namespace
         std::memcpy(Blob + Offset, &Value, sizeof(Value));
     }
 
-    // FUN_06f2eb20: exact compact source (+0x00..+0x24) to the retail target
-    // light record (+0x00..+0x64).  The public FThornLightProps type is a
-    // normalized port-side record, so the adapter below is deliberately kept
-    // separate from this raw-layout implementation.
+    // FUN_06f2eb20: compact source record (+0x00..+0x24) to the retail light
+    // record (+0x00..+0x64). FThornLightProps is a port-side normalized record,
+    // so its adapter is kept separate from this raw-layout code.
     void ConvertCompactLightRetail(const unsigned char* Source, unsigned char* Target)
     {
-        // Full98 retail instructions: selective writes and literal x87 branches.
-        // TEST AH,05h + JP takes equal/greater/unordered; strict less falls through.
+        // Selective writes and literal x87 branches; the TEST AH,05h + JP
+        // compares take equal/greater/unordered, strict less falls through.
         const unsigned int Constant_6f5a1d4 = 0x0u;
         const unsigned int Constant_6f5a230 = 0x3c8efa35u;
         const unsigned long long Constant_6f5a270 = 0x400921fb60000000ull;
@@ -1419,8 +1404,8 @@ namespace
         Copy3(Entity->LightAtten, In->Atten);
     }
 
-    // 45b2a/45d5c/45e17: input-first signaling comparison. Actual ordinary
-    // C++ reverses the operands or changes the waiting instruction boundary.
+    // Input-first signalling compare against 1.0; plain C++ reverses the
+    // operands or moves the FWAIT boundary.
     bool IsLightInterpolationComplete(const float* U)
     {
         static const float One = 1.0f;
@@ -1432,13 +1417,13 @@ namespace
             fcomp dword ptr One
             fnstsw Status
         }
-        // TEST AH,01 + JNZ skips for less/unordered; equal/greater continue.
+        // Less/unordered skip; equal/greater continue.
         return (Status & 0x0100u) == 0;
     }
 
-    // 45d81..45e0e retains X/Y differences, rounds Z's difference and X's
-    // product, then publishes each raw result before the next final FSTP.
-    // Both native C++ configurations changed these FP lifetimes/publications.
+    // Keeps the X/Y differences on x87, rounds Z's difference and X's product
+    // to float, and stores each result before the next final FSTP. Plain C++
+    // changed these lifetimes in both Debug and Release.
     void InterpolateLightDirection(float* Out, const float* From, const float* To, const float* U)
     {
         float Capture[3];
@@ -1487,7 +1472,8 @@ namespace
         }
     }
 
-    // LAB_06f45890 FPU mask loop. Out starts as live primary; To is target (or secondary live).
+    // LAB_06f45890 mask loop. Out starts as the live primary; Target is the
+    // target (or the live secondary).
     void EvalLightProps(FThornLightProps* Out, const FThornLightProps* Capture,
                         const FThornLightProps* Target, const volatile int* MaskOwner, const float* U)
     {
@@ -1529,7 +1515,7 @@ namespace
             Out->Color[2] = static_cast<int>(static_cast<unsigned int>(static_cast<__int64>(
                 ComputeLightColor(Capture->Color[2], Target->Color[2], U))));
         }
-        Mask = *MaskOwner; // 45d54 rereads the mask after the color conversion calls.
+        Mask = *MaskOwner; // Retail rereads the mask after the color conversions.
         if ((Mask & kThornLightBitInfinite) != 0 && IsLightInterpolationComplete(U))
             Out->Infinite = Target->Infinite;
         if ((Mask & kThornLightBitDirection) != 0)
@@ -1564,10 +1550,7 @@ namespace
         TControl*& Control;
     };
 
-    // The generic `CallXxx(Ctrl, Slot, ...)` dispatchers that used to live here are gone.
-    // They took the slot number as a runtime argument, so one helper served a dozen unrelated
-    // interfaces and no call could be checked against any declaration. Everything now goes
-    // through src/include/thorn_controls.h.
+    // Control calls go through the typed interfaces in src/include/thorn_controls.h.
 
     void IdentityQuat4(FQuaternion& Output)
     {
@@ -1579,12 +1562,12 @@ namespace
 
     void CopyQuat4(float* Dst, const float* Src)
     {
-        // 46e09..46e2c copies the four result words without FP evaluation.
+        // Raw copy, no FP evaluation.
         std::memcpy(Dst, Src, sizeof(float) * 4);
     }
 
-    // SPATIAL slot +50 writes the actual event owner throughout the call.
-    // A later arithmetic exception must retain already published components.
+    // SPATIAL: math +0x50 writes straight into the event-owned destination, so
+    // a later FP exception leaves the components already written.
     void SpatialMatrixToQuaternion(I3DMathEngine* Math, FQuaternion& Destination, const void* Source)
     {
         FMatrix MatrixInput;
@@ -1592,9 +1575,8 @@ namespace
         Math->MatrixToQuaternion(Destination, MatrixInput);
     }
 
-    // Retail (LAB_06f46a40, thorn.dll.txt:74369-74375, CALL[ECX+0x54]) never
-    // tests the QuatToMatrix GENRESULT and has no identity fallback -- the
-    // matrix is consumed unconditionally.
+    // LAB_06f46a40 (math +0x54): the GENRESULT is not tested and there is no
+    // identity fallback.
     void Quat4ToMat9(float* Out9, const float* Src4)
     {
         FQuat Quat;
@@ -1609,16 +1591,14 @@ namespace
         FQuaternion FromQuat;
         FQuaternion ToQuat;
         FQuaternion ResultQuat;
-        // 46df2/46df9 reads the current owners after cache acquisition.
-        // The sole kernel is pure; U stays a pointer for its actual load stage.
+        // Inputs are read after the math cache is acquired; U stays a pointer.
         std::memcpy(&FromQuat, &From4, sizeof(FromQuat));
         std::memcpy(&ToQuat, &To4, sizeof(ToQuat));
         Math->QuatSlerpValue(ResultQuat, FromQuat, ToQuat, U);
         std::memcpy(Out4, &ResultQuat, sizeof(ResultQuat));
     }
 
-    // 46d5a..46db5 retains each subtraction/product on x87 until its
-    // final float store; the inputs are current event-owned positions.
+    // Each subtraction/product stays on x87 until its final float store.
     void LerpSpatialPosition(float* ResultPosition, const float* From, const float* To, const float* Scale)
     {
         __asm
@@ -1645,8 +1625,8 @@ namespace
         }
     }
 
-    // 46e6d..46ed8 stores the delta as float, but adds old Applied to the
-    // still-extended delta before storing the new accumulator.
+    // Stores the delta as float but adds old Applied to the still-extended
+    // delta before storing the new accumulator.
     void AccumulateAxisDelta(const float* AnimT, const float* Angle, float* Applied, float* Delta)
     {
         __asm
@@ -1664,9 +1644,9 @@ namespace
         }
     }
 
-    // 46eef..46fd7: FCOS is stored to float, FSIN remains on x87 through
-    // all three columns. The radian product has no intermediate float store.
-    // Jump table0/3=X,1/4=Y,2/5=Z; unsigned>5 keeps identity without trig.
+    // FCOS is stored to float, FSIN stays on x87 through all three columns, and
+    // the radian product has no intermediate float store.
+    // Axis 0/3=X, 1/4=Y, 2/5=Z; unsigned >5 keeps identity without trig.
     void InitializeEventFrameWords(float* Frame);
 
     void ApplyAxisRotFpu(float* Orient9, const FQuaternion& BaseQuat4, int AxisId, const float* DeltaDeg)
@@ -1777,7 +1757,7 @@ namespace
             SceneMathMulMatrix(Math, ResultMatrix, Rot, Base9);
         else
             SceneMathMulMatrix(Math, ResultMatrix, Base9, Rot);
-        // 47098..470a8 raw REP9 precedes the primary orientation callback.
+        // Raw nine-word copy before the primary orientation callback.
         std::memcpy(Orient9, ResultMatrix, sizeof(ResultMatrix));
     }
 
@@ -1789,9 +1769,9 @@ namespace
     static_assert(sizeof(FThornSceneFogSnapshot) == 15 * sizeof(unsigned int), "packed scene snapshot");
     static_assert(offsetof(FThornSceneFogSnapshot, Fog) == 7 * sizeof(unsigned int), "packed fog offset");
 
-    // FUN_06f431d0(blob, mask): copy 15 dword, mirror words 5/6 through the
-    // optional native output pointers, and notify the typed light control when
-    // the caller requests the retail bit-1 side effect.
+    // FUN_06f431d0(blob, mask): copy 15 dwords, mirror words 5/6 through the
+    // optional output pointers, and push the colour to the light control on
+    // mask bit 1.
     void Fun06f431d0(FThornEntity* Entity, const void* Blob15, unsigned char Mask)
     {
         const unsigned char* Source = static_cast<const unsigned char*>(Blob15);
@@ -1807,7 +1787,7 @@ namespace
             *Entity->SceneFogOutputB = Entity->SceneFogPacked[6];
         if (Entity->LightControl != nullptr && (Mask & 1) != 0)
         {
-            // QI 43283 identifies +0x104 as ILightControl; slot 3 reads RGB words 0..2.
+            // +0x104 is ILightControl (from its QI); slot 3 reads RGB words 0..2.
             Entity->LightControl->SetColor(reinterpret_cast<int*>(Entity->SceneFogPacked));
         }
     }
@@ -1830,7 +1810,7 @@ namespace
         }
         if ((Mask & 4) != 0)
         {
-            // 0x06f431bb: the packed block's int colour, not a float copy.
+            // The packed block's int colour, not a float copy.
             Entity->FogControl->SetColor(reinterpret_cast<const int*>(&Entity->SceneFogPacked[8]));
         }
     }
@@ -1842,13 +1822,10 @@ namespace
             return;
         if (Entity->Snap.Type == kThornEntityLight)
         {
-            // LAB_06f456e0 (thorn.dll.txt:72079-72148): the GETs write in
-            // place into the entity's persistent +0x160 blob and all 0x24
-            // dwords are copied out afterwards; with neither control bound
-            // the blob is copied untouched.  Seed from LightEntityDescriptor
-            // so the RangeTemp/CutoffTemp/Unused words that have no
-            // normalized-field equivalent survive exactly as retail keeps
-            // them, instead of being rebuilt by PackEntityLightProps.
+            // Retail GETs in place into the entity's persistent +0x160 blob and
+            // copies all 0x24 dwords out; with no control bound the blob is
+            // copied untouched. Seeding from LightEntityDescriptor keeps the
+            // RangeTemp/CutoffTemp/Unused words that have no normalized field.
             std::memcpy(Out, &Entity->LightEntityDescriptor, sizeof(*Out));
             char* Blob = reinterpret_cast<char*>(Out);
             if (Entity->D3dLightControl != nullptr)
@@ -1872,15 +1849,10 @@ namespace
         }
         if (Entity->Snap.Type == kThornEntityScene)
         {
-            // LAB_06f456e0 (thorn.dll.txt:72149-72177): ILightControl slot 9
-            // GETs in place at scene +0x11c, then exactly three dwords
-            // (+0x11c..+0x128, the ambient) are staged and the 0x24-dword
-            // copy takes those three plus 33 uninitialized stack words.  The
-            // modern owner keeps the scene ambient in SceneAmbient. The tail
-            // is deterministic: tick's SCENE sink (06f45e68..06f45eb2) copies
-            // only Color[0..2] into the existing scene blob; getter/save/Stop
-            // never expose the private capture tail. Recreating stack garbage
-            // would add undefined behavior without preserving any scene output.
+            // Retail GETs the ambient (ILightControl slot 9) in place at scene
+            // +0x11c and stages only those three dwords; the rest of its 0x24-
+            // dword copy is uninitialized stack. Deviation: the tail is defined
+            // here. Nothing reads it: the tick's SCENE sink copies only Color[0..2].
             PackEntityLightProps(Out, Entity);
             if (Entity->LightControl != nullptr)
             {
@@ -1896,14 +1868,14 @@ namespace
             }
             return;
         }
-        // Any other entity type: retail copies nothing (jumps straight to
-        // the end-time tail).  Zero the output so callers stay deterministic.
+        // Other entity types: retail copies nothing. Deviation: the output is
+        // zeroed so callers stay deterministic.
         std::memset(Out, 0, sizeof(*Out));
     }
 
     int LightColorToInteger(const float* Value)
     {
-        // 41b64..41b97: FLD32/FMUL255 followed by qword ftol, consuming low32.
+        // Float * 255.0, qword _ftol, low 32 bits kept.
         const __int64 Converted = static_cast<__int64>(static_cast<double>(*Value) * 255.0);
         const unsigned int Word = static_cast<unsigned int>(Converted);
         int Result;
@@ -1913,7 +1885,7 @@ namespace
 
     void ApplyEntityLightRuntimeProps(FThornEntity* Entity, const FThornLightProps* Props)
     {
-        static const float PiOver180 = 0.017453292f; // Exact retail 0x3c8efa35.
+        static const float PiOver180 = 0.017453292f; // Retail 0x3c8efa35.
         ID3DLightControl* D3dLight = Entity->D3dLightControl;
         FThornLightProps& Live = Entity->LightEntityDescriptor;
         for (int Index = 0; Index < 36; ++Index)
@@ -1988,7 +1960,7 @@ namespace
             Destination[Offset] = Source[Offset];
     }
 
-    // Sole modern string owner; no VC6 object layout or shared-buffer header.
+    // Port-side string owner; retail used a VC6 std::string with a shared-buffer header.
     const char* AssignMotionPathType(FThornEntity* Entity, const char* Source, bool bConstructionCopy)
     {
         static const char Empty[] = "";
@@ -2002,8 +1974,7 @@ namespace
             Entity->PathTypeCapacity = 0;
             return Empty;
         }
-        // 42973..4297d reuses sufficient capacity only while it is <=31.
-        // The binder's Grow policy is delegated to the current private owner.
+        // Retail reuses sufficient capacity only while it is <= 31.
         if (Entity->PathTypeCapacity < Length ||
             (!bConstructionCopy && Entity->PathTypeCapacity > 31))
         {
@@ -2017,7 +1988,7 @@ namespace
                 delete[] Entity->PathType;
             Entity->PathType = nullptr;
             Entity->PathTypeCapacity = 0;
-            // Preserve only a modern defined aliased copy, not freed-source bytes.
+            // An aliased source stays alive until copied (retail read freed bytes).
             const std::size_t Capacity = Length | std::size_t(31);
             char* Replacement = new char[Capacity + 1];
             CopyMotionPathBytesForward(Replacement, Source, Length);
@@ -2042,8 +2013,8 @@ namespace
 
     void ApplyMotionPathDesc(FThornEntity* Entity, const FThornMotionPathDesc* Desc)
     {
-        // 42900 has one string owner (+d4) and a separate descriptor pointer
-        // (+c8). A null input clears only that pointer, preserving the owner.
+        // Retail has one string owner (+0xd4) and a separate descriptor pointer
+        // (+0xc8). A null input clears only the pointer, keeping the owner.
         const char* Source = Desc->PathType;
         if (Source != nullptr)
         {
@@ -2052,9 +2023,8 @@ namespace
         else
             Entity->Snap.MotionPath.PathType = nullptr;
 
-        // Publish the string pointer before Release. The input object's word
-        // is reread after that callback (429e8..429f2), then published before
-        // AddRef. In particular, Desc may alias the entity's public packet.
+        // Desc may alias the entity's own packet, so Desc->MotionPath is reread
+        // after the Release, as retail does.
         if (Entity->Snap.MotionPath.MotionPath != nullptr)
             Entity->Snap.MotionPath.MotionPath->Release();
         Entity->Snap.MotionPath.MotionPath = Desc->MotionPath;
@@ -2062,9 +2032,8 @@ namespace
             Entity->Snap.MotionPath.MotionPath->AddRef();
     }
 
-    // FUN_06f409a0: GeoControl GetPosition, then the inline parent inverse
-    // and TransformXform through the shared DAT_06f61e20 math owner. No
-    // orientation getter or full-pose MulTransform occurs in this helper.
+    // FUN_06f409a0: GeoControl GetPosition, then the inline parent inverse and
+    // TransformXform through the DAT_06f61e20 math engine.
     void GetRetailRelativePosition(FThornEntity* Entity, float* Pos)
     {
         if (Entity->GeoControl == nullptr)
@@ -2082,10 +2051,9 @@ namespace
         }
     }
 
-    // FUN_06f40b30: GeoControl GetOrientation, then the inline parent
-    // inverse and MulMatrix through the same DAT_06f61e20 owner. Retail
-    // still computes the inverse translation with TransposeTransform even
-    // though this final matrix operation consumes only the rotation.
+    // FUN_06f40b30: GeoControl GetOrientation, then the inline parent inverse
+    // and MulMatrix through DAT_06f61e20. Retail still computes the inverse
+    // translation although only the rotation is used. The GENRESULT is not tested.
     void GetRetailRelativeOrientation(FThornEntity* Entity, float* Orient)
     {
         if (Entity->GeoControl == nullptr)
@@ -2098,17 +2066,13 @@ namespace
             InvertEventParentCsys(Inv, Parent, EEventInverseNegateOrder::Orientation);
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
             float Result[9];
-            // Retail FUN_06f40b30 (thorn.dll.txt:63575-63636) calls vtbl+0x20
-            // and REP MOVSD-copies the 9 result dwords unconditionally; the
-            // GENRESULT is never tested.
             SceneMathMulMatrix(Math, Result, Inv, Orient);
             std::memcpy(Orient, Result, sizeof(Result));
         }
     }
 
-    // FUN_06f49f60 (and its per-type copies FUN_06f4a070/0d0/170/210/2b0/350):
-    // entity slot 5 refreshes Snap.Pos in place through FUN_06f409a0
-    // (thorn.dll.txt:63398 LEA EBX,[Snap+8]; 63478-63480 stores) and returns
+    // FUN_06f49f60 (per-type copies FUN_06f4a070/0d0/170/210/2b0/350): entity
+    // slot 5 refreshes Snap.Pos in place through FUN_06f409a0 and returns
     // &Snap.Pos; the caller reads Y at +4.
     float GetLocalPosY(FThornEntity* Entity)
     {
@@ -2132,8 +2096,8 @@ namespace
         return Entity->CompoundControl->GetHardpointXform(TypeId, Name, Xform12) == GR_OK;
     }
 
-    // 47e6c..47e93 stores position Z/Y/X; 47f6a..47f93 stores target X/Y/Z.
-    // Each original child word is the first x87 operand; no SSE add substitutes.
+    // Retail stores the position Z/Y/X and the target X/Y/Z; the child word
+    // is the first x87 operand.
     void AddAttachOffset(float* Result, const float* ChildPosition, const float* OffsetVector, bool bReverseStores)
     {
         if (bReverseStores)
@@ -2150,8 +2114,8 @@ namespace
         }
     }
 
-    // 47f9a..47fdf: squared-direction test retains Y/Z subtraction on x87.
-    // TEST AH,44h + JNP exits on zero; fall-through invokes the look-at helper.
+    // Squared-length test keeps the Y/Z differences on x87. Zero exits;
+    // nonzero or unordered goes on to the look-at helper.
     bool BuildAttachLookDirection(float* DirectionOut, const float* Target, const float* Origin)
     {
         unsigned char bUseDirection;
@@ -2189,14 +2153,14 @@ namespace
         return bUseDirection != 0;
     }
 
-    // These local frames are raw retail MOVs, even with a pending x87 trap.
+    // Identity written with raw MOVs, even with a pending x87 trap.
     void InitializeEventFrameWords(float* Frame)
     {
         static const unsigned int Words[9] = {
             0x3f800000u, 0u, 0u, 0u, 0x3f800000u, 0u, 0u, 0u, 0x3f800000u};
         std::memcpy(Frame, Words, sizeof(Words));
     }
-    // 441c5/44567 retain this event-owned effector after the first hardpoint write.
+    // The effector xform is event-owned and kept after the first hardpoint write.
     void BuildIkPose(FThornEvent* Event, FThornEntity* Primary, FThornEntity** SecondaryEntry,
                      float* Pos, float* Orient)
     {
@@ -2209,8 +2173,8 @@ namespace
                 MulXformByInverseCsys(Parent, Event->IkEffectorXform);
         }
 
-        // 44235/445d7 initializes only the local frame. Slot5 returns position;
-        // there is no secondary orientation getter on either concrete IK body.
+        // Only the local frame is initialized: slot 5 returns the position and
+        // neither IK body reads the secondary's orientation.
         InitializeEventFrameWords(Orient);
         std::memset(Pos, 0, sizeof(float) * 3);
         const float* SecondaryPosition = (*SecondaryEntry)->InnerGetPos();
@@ -2228,8 +2192,8 @@ namespace
                     PackCsysWords(Hardpoint, Orient, Pos);
                     Compound->GetHardpointXform(Event->TargetType, Event->TargetPart, Hardpoint);
                     const FThornCsys* Parent = Event->ParentCsys;
-                    // ParentNULL ignores the hardpoint result and keeps the
-                    // original secondary position and identity local frame.
+                    // With no parent the hardpoint result is ignored: the
+                    // secondary position and identity frame stay.
                     if (Parent != nullptr)
                     {
                         MulXformByInverseCsys(Parent, Hardpoint);
@@ -2256,8 +2220,7 @@ namespace
             float WorldPosition[3];
             SceneMathTransform(Math, WorldPosition, Parent->Orient, StablePosition);
             std::memcpy(Pos, WorldPosition, sizeof(WorldPosition));
-            // 44433/447bf reloads the event parent after the point callback,
-            // then independently acquires the live math owner for the matrix.
+            // Retail rereads the parent and the math engine after the point transform.
             Parent = Event->ParentCsys;
             Math = AcquireSceneEventMathEngine();
             float WorldOrientation[9];
@@ -2274,7 +2237,8 @@ namespace
         Entity->InnerSetOrient(Orient);
     }
 
-    // Bind callbacks observe and write the actual typed owner, including failed QI.
+    // Releases and clears Slot, then QIs straight into it (a failed QI leaves
+    // whatever the callee wrote).
     template <class TControl>
     void BindQi(void* EngineObj, const char* Iid, TControl*& Slot, int& Result)
     {
@@ -2290,7 +2254,7 @@ namespace
             Result = 0;
     }
 
-    // PSYS43730: actual owner slot is cleared after Release, then is the QI out.
+    // Same as BindQi (PSYS bind, LAB_06f43730).
     template <class TControl>
     void BindLiveEntityControl(IDAComponent* EngineObject, const char* Iid,
                          TControl*& Slot, int& Result)
@@ -2313,10 +2277,9 @@ namespace
 
     unsigned char RetailStillRunningPredicate(int TimeMs, int EndTimeMs)
     {
-        // LAB_06f483a0 / LAB_06f485e0 use CMP followed by JC, then retain
-        // negative end times as unbounded.  Preserve the unsigned compare
-        // explicitly; a signed C++ comparison is not equivalent for a
-        // negative clock or a high-bit end value.
+        // LAB_06f483a0 / LAB_06f485e0: unsigned compare (JC), then a negative
+        // end time means unbounded. A signed compare differs for a negative
+        // clock or a high-bit end value.
         const unsigned int TimeBits = static_cast<unsigned int>(TimeMs);
         const unsigned int EndBits = static_cast<unsigned int>(EndTimeMs);
         if (TimeBits < EndBits)
@@ -2338,23 +2301,23 @@ namespace
         }
     }
 
-    // FUN_06f423d0: GET slot 10 -> entity+0xf0, copy 8 dword out.
+    // FUN_06f423d0: GET slot 10 -> entity+0xf0, copy 8 dwords out.
     void CaptureAudioFromEntity(FThornEntity* Entity, float* Out8)
     {
         Entity->CaptureAudioProps(Out8);
     }
 
-    // FUN_06f423a0: copy 8 dword -> entity+0xf0, SET slot 9.
+    // FUN_06f423a0: copy 8 dwords -> entity+0xf0, SET slot 9.
     void ApplyAudioProps(FThornEntity* Entity, const float* Props8)
     {
-        // 423ae..423c9 retains the control before the forward eight-word copy.
+        // The control is read before the copy.
         ISoundControl* Control = Entity->SoundControl;
         CopyPoseWordsForward(Entity->Audio, Props8, 8);
         if (Control != nullptr)
             Control->SetAudioProps(Entity->Audio, -1);
     }
 
-    // FUN_06f43560: descriptor+c8 is untouched; +d0 is runtime state.
+    // FUN_06f43560: descriptor +0xc8 is untouched; +0xd0 is runtime state.
     void ApplyPsysSparam(FThornEntity* Entity, const float* Value)
     {
         float Argument;
@@ -2366,17 +2329,17 @@ namespace
             mov edx, Runtime
             fstp dword ptr [edx]
         }
-        // The pointer is read only after the runtime float has been published.
+        // The control is read only after the runtime float is stored.
         IPSysControl* Control = Entity->PsysControl;
         if (Control != nullptr)
         {
-            // Typed public slot6; the argument was already rounded above.
+            // Slot 6; the argument was already rounded above.
             Control->SetSparam(Argument);
         }
     }
 
-    // LAB_06f46a6b..46aee: store Tfloat but retain original slot6 ST value
-    // for the first subtraction. Later comparisons reload the stored Tfloat.
+    // LAB_06f46a40: stores T as float but subtracts from the extended value;
+    // later compares reload the stored float.
     void SpatialWrapScale(float* Last, const FThornExtendedProgress* Progress, float* RoundedProgress, float* ResultScale)
     {
         static const float Zero = 0.0f;
@@ -2434,13 +2397,13 @@ namespace
             mov Scale, 0
         SpatialScaleDone:
         }
-        // Retail retains exactly the initial FST dword for the later axis pass.
+        // The initial FST dword feeds the later axis pass.
         std::memcpy(RoundedProgress, &T, sizeof(T));
         std::memcpy(ResultScale, &Scale, sizeof(Scale));
     }
 
-    // LAB_06f498ad..49918 retains original extended T below Delta/Remain;
-    // T is not stored as float until the conditional final Last update.
+    // FLOOR tick: extended T stays below Delta/Remain and is stored as float
+    // only by the conditional final Last update.
     void FloorWrapScale(FThornEvent* Event, const FThornExtendedProgress* Progress, float* ScaleOutput)
     {
         float* Last = &Event->FloorWrapLast;
@@ -2494,13 +2457,13 @@ namespace
             fstp st(0)
         FloorScaleDone:
         }
-        // Transport the stored DWORD without an early x87 denormal load.
+        // Raw copy; avoids an x87 load of a denormal.
         std::memcpy(ScaleOutput, &Scale, sizeof(Scale));
     }
 
     void InterpolateFloorHeight(const float* Capture, const float* Target, const float* ScaleSource, float* HeightOutput)
     {
-        // 49b31..49b4a: Capture remains below the unrounded difference/product.
+        // Capture stays on x87 below the unrounded difference/product.
         float Height;
         __asm
         {
@@ -2520,9 +2483,8 @@ namespace
 
     int EventElapsedTime(int TimeMs, int StartTimeMs)
     {
-        // LAB_06f45ef0 subtracts two 32-bit retail integers before FILD.
-        // Spell the wraparound out so the modern compiler cannot introduce
-        // undefined signed-overflow behavior on the same input domain.
+        // LAB_06f45ef0: 32-bit wrapping subtract before FILD; done unsigned
+        // to avoid signed-overflow UB.
         const unsigned int ElapsedBits = static_cast<unsigned int>(TimeMs) -
                                          static_cast<unsigned int>(StartTimeMs);
         return static_cast<int>(ElapsedBits);
@@ -2530,7 +2492,7 @@ namespace
 
     void EvaluateAnimT(FThornEvent* Event, int TimeMs, FThornExtendedProgress* Result)
     {
-        // The typed output worker retains the concrete progress result in 80 bits.
+        // Progress is kept in 80 bits.
         Event->EvaluateProgressExtended(TimeMs, Result, Event->Type == kThornTypeReverbPropAnim);
     }
 
@@ -2555,7 +2517,7 @@ namespace
 
     void ApplyCameraProps(FThornEntity* Entity, const float* FovNearFarAspect)
     {
-        // 41548..41570: raw writes in near/far/fov/aspect order, before SET.
+        // Raw writes in near/far/fov/aspect order, before the SETs.
         const int StoreOrder[4] = {1, 2, 0, 3};
         for (int Index = 0; Index < 4; ++Index)
         {
@@ -2578,7 +2540,7 @@ namespace
             while (Node != Entity->MonitorLinks.Sentinel)
             {
                 ApplyCameraProps(Node->Entity, Entity->CameraRuntimeProps);
-                // 415d9: fetch live Next after the child callback, not before.
+                // Next is read after the child callback, not before.
                 Node = Node->Next;
             }
         }
@@ -2588,8 +2550,8 @@ namespace
                                 const float* CapturedValues,
                                 const FThornExtendedProgress* Progress, int Mask)
     {
-        // 46318..46374: preserve one extended curve result under each pair
-        // of loads. Only the final interpolated field receives a float store.
+        // The extended progress stays on x87 under each pair of loads; only the
+        // interpolated fields get float stores.
         __asm
         {
             mov ecx, Progress
@@ -2652,7 +2614,7 @@ namespace
             Entity->CameraControl->GetFar(&Entity->CameraRuntimeProps[2]);
             Entity->CameraControl->GetAspect(&Entity->CameraRuntimeProps[3]);
         }
-        // 4617f..46195 copies forward one raw DWORD at a time.
+        // Forward raw DWORD copy.
         for (int Index = 0; Index < 4; ++Index)
         {
             unsigned int Word;
@@ -2665,10 +2627,8 @@ namespace
     {
         if (Entity == nullptr)
             return nullptr;
-        // FUN_06f49d70/06f49e20 select the subtitle facet by the resolved
-        // entity type.  Marker, hardpoint, motion-path, psys and compound
-        // type 1 do not enter those switch cases even if a stale native
-        // pointer happens to exist.
+        // FUN_06f49d70/06f49e20 pick the subtitle facet by entity type; other
+        // types get none even if a stale pointer exists.
         const int Type = Entity->Snap.Type;
         if (Type != kThornEntityDeformable &&
             Type != kThornEntityCamera && Type != kThornEntityMonitor &&
@@ -2699,7 +2659,7 @@ namespace
         return true;
     }
 
-    // 415f0: identity scan, one node allocation, tail append, then count/AL1.
+    // FUN_06f415f0: append Other unless already linked; returns 1 if added.
     unsigned char AddMonitorLink(FThornEntity* Self, FThornEntity* Other)
     {
         FThornMonitorLinkNode* Sentinel = Self->MonitorLinks.Sentinel;
@@ -2713,7 +2673,7 @@ namespace
         FThornMonitorLinkNode* Previous = Sentinel->Previous;
         Node = new FThornMonitorLinkNode;
         Node->Next = Sentinel;
-        // 41624 TEST saved tail / JNZ: null falls through to Node itself.
+        // A null tail falls back to Node itself.
         if (Previous == nullptr)
             Previous = Node;
         Node->Previous = Previous;
@@ -2724,7 +2684,7 @@ namespace
         return 1;
     }
 
-    // 41660: erase the first identity match, free its node, then decrement.
+    // FUN_06f41660: erase the first link to Other.
     unsigned char RemoveMonitorLink(FThornEntity* Self, FThornEntity* Other)
     {
         FThornMonitorLinkNode* Sentinel = Self->MonitorLinks.Sentinel;
@@ -2747,22 +2707,21 @@ namespace
         while (Node != Self->MonitorLinks.Sentinel)
         {
             RemoveMonitorLink(Node->Entity, Self);
-            // 416ca reads current.Next only AFTER reciprocal removal.
-            // 416ef then visits savedNext.Next, deliberately skipping a node.
-            // A self-link makes current dangling in retail too: no invented guard.
+            // Retail quirk kept: Next is read after the reciprocal removal and
+            // the loop continues at SavedNext->Next, skipping a node. A self-link
+            // leaves Node dangling, as in retail.
             FThornMonitorLinkNode* SavedNext = Node->Next;
             Self->MonitorLinks.Erase(Node);
             Node = SavedNext->Next;
         }
-        return 1; // 416fb AL=1, including an initially empty list.
+        return 1; // Also for an empty list.
     }
 }
 
 void ThornInitLightEntityDefaults(FThornLightProps* Props)
 {
-    // FUN_06f41840: execute the retail compact/D3D initialization against a
-    // raw adapter first, then expose the values through the port-side record.
-    // This keeps the retail offsets explicit without importing the retail ABI.
+    // FUN_06f41840: runs the retail initialization on a raw-offset buffer,
+    // then copies the values into the port-side record.
     static const unsigned int kOneBits = 0x3f800000;
     if (Props == nullptr)
         return;
@@ -2824,9 +2783,9 @@ void ThornCopyLightPropsToEntity(FThornEntity* Entity, const FThornLightProps* P
 {
     if (Entity == nullptr || Props == nullptr)
         return;
-    // The retail loader (FUN_06f28a60 case 5) fills the entity's own +0x160
-    // blob; keep LightEntityDescriptor in step with the normalized fields so
-    // the START_LIGHT_PROP_ANIM capture can seed from it like retail does.
+    // The retail loader (FUN_06f28a60 case 5) fills the entity's +0x160 blob;
+    // LightEntityDescriptor mirrors it so the START_LIGHT_PROP_ANIM capture can
+    // seed from it.
     std::memcpy(&Entity->LightEntityDescriptor, Props, sizeof(Entity->LightEntityDescriptor));
     UnpackEntityLightProps(Entity, Props);
 }
@@ -2847,11 +2806,11 @@ static void InitializeLightEntityPortState(FThornEntity* Entity)
 
 void ThornPublishEntityDescTail(FThornEntity* Entity)
 {
-    // Retail's loader builds each entity's descriptor, tail included, and hands it to the
-    // type's constructor, whose ApplyDesc copies the whole descriptor into the entity (the
-    // LIGHT entity keeps it at +0x84, LAB_06f4a110); IScriptEngine slots 8 / 9 hand that copy
-    // out. The port's Lua loader writes the native fields instead, so the descriptor tail
-    // (thorn_iface.h FThornEntitySnap) is filled from them here, once per loaded entity.
+    // Retail's loader builds each entity's descriptor, tail included, and the type's
+    // constructor copies it into the entity (LIGHT keeps it at +0x84, LAB_06f4a110);
+    // IScriptEngine slots 8 / 9 hand that copy out. The port's Lua loader writes the
+    // native fields instead, so the descriptor tail (thorn_iface.h FThornEntitySnap)
+    // is filled from them here, once per loaded entity.
     if (Entity == nullptr)
         return;
     const int Type = Entity->Snap.Type;
@@ -2862,7 +2821,7 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
         Entity->Snap.FloorHeight = Entity->FloorHeight;
     else if (Type == kThornEntityLight)
     {
-        // Lua parses into runtime fields; a fresh reference owner discards that tail.
+        // A reference entity (flag 1) gets the defaults, not the parsed fields.
         if ((Entity->Snap.Flags & 1) != 0)
         {
             ThornInitLightEntityDefaults(&Entity->Snap.Light);
@@ -2873,8 +2832,8 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
     }
     else if (Type == kThornEntitySound)
     {
-        // Lua's parse owner passes all eight words, including reference inputs.
-        // The actual Slot35 constructor owns the later reference-tail gate.
+        // All eight words, even for reference entities; the constructor
+        // (IScriptEngine slot 35) applies the reference gate later.
         std::memcpy(Entity->Snap.Audio, Entity->Audio, sizeof(Entity->Snap.Audio));
     }
     else if (Type == kThornEntityScene || Type == kThornEntitySubScene)
@@ -2906,8 +2865,8 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
 bool FThornConnectString::Assign(const char* Source)
 {
     const size_t SourceLength = std::strlen(Source);
-    // Inline max_size/_Xlen branches at 48255/495d4. The private owner has
-    // current-CRT allocation, not the imported VC6 reference-count header.
+    // Retail's inline max_size/_Xlen check. Allocation is plain new[], not
+    // the VC6 reference-counted std::string buffer.
     if (SourceLength > 0xfffffffdu)
         throw std::length_error("Thorn descriptor string too long");
     if (SourceLength == 0)
@@ -2918,9 +2877,8 @@ bool FThornConnectString::Assign(const char* Source)
 
     if (Capacity > 31u || Capacity < SourceLength)
     {
-        // trim=true clears the old owner before growth. Keep an aliased old
-        // allocation alive only for the modern defined copy; retail's dangling
-        // source after this reset has no defined bytes to reproduce.
+        // Retail frees the old buffer before growing (trim=true), leaving an
+        // aliased source dangling; here it stays alive until copied.
         std::unique_ptr<char[]> AliasedData;
         const UINT_PTR SourceAddress = reinterpret_cast<UINT_PTR>(Source);
         const UINT_PTR DataAddress = reinterpret_cast<UINT_PTR>(Data.get());
@@ -2936,8 +2894,8 @@ bool FThornConnectString::Assign(const char* Source)
         }
         catch (const std::bad_alloc&)
         {
-            // Imported _Copy reference retries the exact length. Its precise
-            // 2003 CRT/new-handler/COW exception protocol remains unverified.
+            // The CRT's _Copy retries with the exact length. Its new-handler/COW
+            // exception behaviour is not reproduced.
             NewCapacity = SourceLength;
             Data.reset(new char[NewCapacity + 1u]);
         }
@@ -2946,8 +2904,8 @@ bool FThornConnectString::Assign(const char* Source)
     }
     else
     {
-        // Own-buffer substrings move toward the beginning, matching forward
-        // retail REP copies; identical source is also defined here.
+        // Own-buffer substrings move toward the start, like retail's forward
+        // REP copy.
         std::memmove(Data.get(), Source, SourceLength);
     }
     Length = SourceLength;
@@ -2957,7 +2915,7 @@ bool FThornConnectString::Assign(const char* Source)
 
 char* FThornConnectString::GetPublishedData()
 {
-    // 48223/482d8 publish owner data, or the imported static empty byte.
+    // Owner data, or a static empty string (retail: the CRT's shared empty byte).
     static char Empty[1] = {'\0'};
     return Data ? Data.get() : Empty;
 }
@@ -2971,15 +2929,15 @@ void FThornConnectString::Reset()
 
 void FThornEvent::AdoptConnectStringStorage()
 {
-    // All native Lua producers use the setters; exposure is borrowed, never
-    // adopted. Retain this activation flag for the existing cleanup routing.
+    // Strings arrive only through the setters, so nothing is adopted; the flag
+    // only routes cleanup.
     bConnectStorageActive = true;
 }
 
 void FThornEvent::ReleaseConnectStringStorage()
 {
     AdoptConnectStringStorage();
-    // 4811a..48188: parent owner first, then hardpoint, then common base (no curve).
+    // Parent hardpoint first, then hardpoint; the common base releases no curve.
     ConnectParentHardpointStorage.Reset();
     ConnectHardpointStorage.Reset();
 }
@@ -3015,9 +2973,9 @@ void FThornEvent::SetSpatialTargetPart(const char* Name)
 {
     AdoptSpatialStringStorage();
     TargetPart = nullptr;
-    // 466b0..46769 skips the private assignment for null input. Otherwise
-    // publish the retained owner after copying, including its empty-string byte.
-    // Exact imported CRT capacity/COW/allocation failure remains a named gap.
+    // Null skips the assignment; otherwise the owner's data (or the empty
+    // string) is published. CRT capacity/COW/allocation-failure details are
+    // not reproduced.
     if (Name != nullptr)
     {
         SpatialTargetPartStorage.Assign(Name);
@@ -3034,8 +2992,8 @@ void FThornEvent::SetFloorTargetPart(const char* Name)
 {
     AdoptFloorStringStorage();
     TargetPart = nullptr;
-    // 495c2 skips assignment for null; the private owner survives while the
-    // descriptor pointer stays null. Imported CRT growth/failure remains open.
+    // Null skips the assignment: the owner survives while the descriptor
+    // pointer stays null.
     if (Name != nullptr)
     {
         FloorTargetPartStorage.Assign(Name);
@@ -3047,8 +3005,8 @@ void FThornEvent::ApplyFloorHeightDesc(const void* DescIn)
 {
     AdoptFloorStringStorage();
     ApplyCommonDesc(DescIn);
-    // 4959c..495b1: callback-completed common descriptor, forced owner type,
-    // cleared exposed pointer/type, then reread the current incoming type.
+    // Common descriptor, forced type, cleared target, then the incoming type
+    // is reread.
     Desc.Type = kThornTypeFloorHeightAnim;
     TargetPart = nullptr;
     TargetType = 0;
@@ -3058,7 +3016,7 @@ void FThornEvent::ApplyFloorHeightDesc(const void* DescIn)
         SetFloorTargetPart(reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12))));
         TargetType = ReadEventWord(DescIn, 13);
     }
-    // 49677..49696 mirrors common timing/endpoints after the payload work.
+    // Common timing/endpoints are mirrored after the payload.
     FinalizeDesc();
 }
 
@@ -3074,7 +3032,7 @@ void FThornEvent::ReleaseFloorOwnedState()
     }
     catch (...)
     {
-        // 59638 unwinds the private owner after a curve Release exception.
+        // Retail's unwind also frees the string if the curve Release throws.
         FloorTargetPartStorage.Reset();
         throw;
     }
@@ -3167,7 +3125,7 @@ FThornEvent::FThornEvent(int DescriptorStorageType)
     AttachXform[0] = 1.0f;
     AttachXform[4] = 1.0f;
     AttachXform[8] = 1.0f;
-    // 47291..472b6 defaults; the actual owning target is the public packet.
+    // Retail audio defaults, written into the descriptor packet.
     AudioTarget.Dmin = 50.0f;
     AudioTarget.Dmax = 1000.0f;
     AudioTarget.Ain = 0x168;
@@ -3175,14 +3133,14 @@ FThornEvent::FThornEvent(int DescriptorStorageType)
     std::memset(&FogTarget, 0, sizeof(FogTarget));
     std::memset(FogCaptureColor, 0, sizeof(FogCaptureColor));
     std::memset(&FogCapturePacked, 0, sizeof(FogCapturePacked));
-    // TODO(49070): retail leaves the four target words unwritten on mismatch;
-    // the defined native packet defaults remain a separately tracked gap.
+    // Deviation: retail (FUN_06f49070) leaves the four reverb target words
+    // unwritten on a type mismatch; here they are zeroed.
     std::memset(ReverbCapture, 0, sizeof(ReverbCapture));
 }
 
-// Descriptor callbacks run inside native construction, before MASTER publication.
-// If they throw, C++ unwinds the delegated owner and the new-expression storage.
-// Exact retail typed-constructor subobject paths remain tracked separately.
+// Descriptor callbacks run inside construction, before the event joins MASTER.
+// If they throw, C++ unwinds the delegated constructor and the storage; retail's
+// per-type constructor unwind paths are not reproduced exactly.
 FThornEvent::FThornEvent(int Type, const void* Desc)
     : FThornEvent(Type)
 {
@@ -3195,8 +3153,8 @@ FThornEvent::FThornEvent(int Type, const void* Desc)
 
         ~FConstructorUnwindStage()
         {
-            // The traced typed constructor unwind maps destroy only the
-            // common base. This local runs before the delegated destructor.
+            // Retail's typed constructor unwind destroys only the common base.
+            // This runs before the delegated destructor.
             if (!bCompleted && bClearCurveOnFailure)
                 Event->ParamCurve = nullptr;
         }
@@ -3214,46 +3172,41 @@ FThornEvent::FThornEvent(int Type, const void* Desc)
         Type == kThornTypeSpatialPropAnim ||
         Type == kThornTypeAttachEntity;
     FConstructorUnwindStage ConstructorUnwind = {Event, bClearCurveOnFailure, false};
+    // Each typed constructor overwrites the descriptor's ID with the event's
+    // own only after its setter callbacks.
     if (Type == kThornTypeLightPropAnim)
     {
         Event->ApplyLightEventDesc(Desc);
-        // 455c8/455cf publishes the independent ID only after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeReverbPropAnim)
     {
         Event->ApplyReverbPropAnimDesc(Desc);
-        // 490b8/490bf: publish the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypePsysPropAnim)
     {
         Event->ApplyPsysPropAnimDesc(Desc);
-        // 48888/4888f publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeFogPropAnim)
     {
         Event->ApplyFogPropAnimDesc(Desc);
-        // 48c28..48c2f publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeAudioPropAnim)
     {
         Event->ApplyAudioPropAnimDesc(Desc);
-        // 471e8/471ef publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeSetCamera)
     {
         Event->ApplySetCameraDesc(Desc);
-        // 44e08..44e0f publishes the independent ID after common callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeCameraPropAnim)
     {
         Event->ApplyCameraPropAnimDesc(Desc);
-        // 45fc8..45fcf publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeStartSubScene)
@@ -3261,26 +3214,22 @@ FThornEvent::FThornEvent(int Type, const void* Desc)
         float StartTimeValue = 0.0f;
         std::memcpy(&StartTimeValue, static_cast<const unsigned char*>(Desc) + 44, sizeof(StartTimeValue));
         Event->ApplySubSceneDesc(Desc, StartTimeValue);
-        // Own constructor publishes the independent ID after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeSubtitle)
     {
         Event->ApplySubtitleDesc(Desc);
-        // Own constructor publishes the independent ID after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeUserEvent)
     {
         Event->bUserDescriptorOwner = true;
         Event->ApplyUserEventDesc(Desc);
-        // 44b98..44b9f: overwrite the incoming descriptor ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeAttachEntity)
     {
         Event->ApplyAttachDesc(Desc);
-        // 47708/4770b publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeConnectHardpoints)
@@ -3288,43 +3237,36 @@ FThornEvent::FThornEvent(int Type, const void* Desc)
     else if (Type == kThornTypePathAnim)
     {
         Event->ApplyPathAnimDesc(Desc);
-        // Own constructor publishes the independent ID after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeSpatialPropAnim)
     {
         Event->ApplySpatialPropAnimDesc(Desc);
-        // 46509/4650c: typed construction publishes its id after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeStartMotion)
     {
         Event->ApplyMotionDesc(Desc);
-        // 43a30/43a37 publishes the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeStartIk)
     {
         Event->ApplyStartIkDesc(Desc);
-        // 43e7c/43e83: publish the independent ID after the specialized setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeStartPsys)
     {
         Event->ApplyStartPsysDesc(Desc);
-        // Own constructor publishes the independent ID after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeStartSound)
     {
         Event->ApplyStartSoundDesc(Desc);
-        // 44958/4495f: publish the independent ID after setter callbacks.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else if (Type == kThornTypeFloorHeightAnim)
     {
         Event->ApplyFloorHeightDesc(Desc);
-        // 4949b/4949e publishes the independent event ID after the setter.
         Event->Desc.UniqueId = Event->UniqueId;
     }
     else
@@ -3338,9 +3280,8 @@ void FThornEvent::DestroyNative(FThornEvent*& Event)
 {
     if (Event == nullptr)
         return;
-    // The extended retail wrappers (FUN_06f43a50/FUN_06f43ea0) reach the same
-    // native virtual owner; type-specific string cleanup is selected by the
-    // destructor before the current-CRT delete.
+    // Retail's typed deleting destructors (FUN_06f43a50/FUN_06f43ea0, ...) map
+    // to the one destructor, which picks the type-specific string cleanup.
     delete Event;
     Event = nullptr;
 }
@@ -3369,7 +3310,7 @@ FThornEvent::~FThornEvent() noexcept(false)
 
     if (NativeEventType == kThornTypeStartIk || bIkStorageActive)
     {
-        // 43ec0/592c7/592b8: target owner, endpoint owner, then common base.
+        // FUN_06f43ec0: target string, end-effector string, then common base.
         // The IK class never releases the copied curve.
         ReleaseIkOwnedState();
         ParentCsys = nullptr;
@@ -3377,22 +3318,23 @@ FThornEvent::~FThornEvent() noexcept(false)
     }
     if (&Desc == &FloorDesc.Common)
     {
-        // 494e0: live curve Release, private string teardown, base parent clear.
+        // FUN_06f494e0: curve Release, string teardown, then parent clear.
         ReleaseFloorOwnedState();
         ParentCsys = nullptr;
         return;
     }
     if (&Desc == &SetCameraDesc)
     {
-        // 44e30 -> 44e50 -> 439a0 clears borrowed parent, without curve Release.
+        // FUN_06f44e30 -> 06f44e50 -> 06f439a0: clears the borrowed parent; no
+        // curve Release.
         ParentCsys = nullptr;
         ParamCurve = nullptr;
         return;
     }
     if (bUserDescriptorOwner)
     {
-        // 44be0 -> 439a0 clears the borrowed parent. USER never releases
-        // its copied curve, including delegated-constructor failure cleanup.
+        // FUN_06f44be0 -> 06f439a0: clears the borrowed parent. USER never
+        // releases its copied curve, even on constructor failure.
         ParentCsys = nullptr;
         ParamCurve = nullptr;
         return;
@@ -3476,15 +3418,14 @@ void FThornEvent::ApplyDesc(const void* DescIn)
         ApplyAudioPropAnimDesc(DescIn);
         return;
     }
-    // Fallback for wrappers not yet split: their payload/tail ordering remains
-    // a tracked gap. Specialized wrappers call the two operations explicitly.
+    // Fallback for types without a typed setter: common record only.
     ApplyCommonDesc(DescIn);
     FinalizeDesc();
 }
 
 void FThornEvent::ApplyCommonDesc(const void* DescIn)
 {
-    // Every retail caller snapshots the common record before 438c0 callbacks.
+    // FUN_06f438c0. Retail snapshots the common record before any callback.
     FThornEventDesc Incoming;
     std::memcpy(&Incoming, DescIn, sizeof(Incoming));
     Desc.Type = Incoming.Type;
@@ -3506,15 +3447,14 @@ void FThornEvent::ApplyCommonDesc(const void* DescIn)
 
 void FThornEvent::FinalizeDesc()
 {
-    // Native mirrors belong to the per-type wrapper tail after common438c0.
+    // The per-type ApplyDesc tail that follows FUN_06f438c0.
     Type = Desc.Type;
     StartTimeMs = Desc.StartMs;
     PrimaryIndex = Desc.PrimaryIndex;
     SecondaryIndex = Desc.SecondaryIndex;
-    // Every retail per-type ApplyDesc tail (FUN_06f465f0 thorn.dll.c:28066-
-    // 28070, FUN_06f48700 28799-28802, ...) sets +0x1c = Desc.DurationMs + Desc.StartMs
-    // unconditionally.  The USE_SCRIPT_DURATION -> -1 selection is the
-    // Start-time prologue (ApplyEndTime), which START_PSYS alone lacks.
+    // Every retail tail (FUN_06f465f0, FUN_06f48700, ...) sets +0x1c =
+    // DurationMs + StartMs unconditionally. USE_SCRIPT_DURATION -> -1 is the
+    // Start prologue's job (ApplyEndTime), which START_PSYS alone lacks.
     const unsigned int EndBits = static_cast<unsigned int>(StartTimeMs) +
                                  static_cast<unsigned int>(Desc.DurationMs);
     std::memcpy(&EndTimeMs, &EndBits, sizeof(EndTimeMs));
@@ -3533,8 +3473,7 @@ void FThornEvent::ApplySubtitleDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeSubtitle;
-    // FUN_06f49d00 preserves the existing subtitle id on a mismatched
-    // descriptor, while the matching type copies dword 11.
+    // FUN_06f49d00: a mismatched descriptor keeps the existing subtitle id.
     if (ReadEventWord(DescIn, 0) == kThornTypeSubtitle)
         std::memcpy(&Strid, static_cast<const unsigned char*>(DescIn) + 44, sizeof(Strid));
     FinalizeDesc();
@@ -3554,14 +3493,14 @@ void FThornEvent::ApplySubSceneDesc(const void* DescIn, float StartTimeValue)
 
 void FThornEvent::InitializeConnectDesc(const void* DescIn)
 {
-    // 48050 has already initialized the common header, eleven descriptor
-    // defaults and both string owners. Keep both calls on the original input:
-    // callbacks from the first call may change it before the second snapshot.
-    ApplyConnectDesc(DescIn); // 480b8
-    Hardpoint = nullptr;     // 480c0: exposed pointers only
-    ParentHardpoint = nullptr; // 480c3
-    ApplyConnectDesc(DescIn); // 480c6; private string owners survive
-    Desc.UniqueId = UniqueId;       // 480d2, only after both setter calls complete
+    // FUN_06f48050 applies the descriptor twice, both times from the original
+    // input (callbacks from the first call may change it). Only the exposed
+    // pointers are cleared in between; the string owners survive.
+    ApplyConnectDesc(DescIn);
+    Hardpoint = nullptr;
+    ParentHardpoint = nullptr;
+    ApplyConnectDesc(DescIn);
+    Desc.UniqueId = UniqueId;
 }
 
 void FThornEvent::ApplyConnectDesc(const void* DescIn)
@@ -3570,7 +3509,7 @@ void FThornEvent::ApplyConnectDesc(const void* DescIn)
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeConnectHardpoints;
     AdoptConnectStringStorage();
-    // 481c9/481cc clear exposed pointers without destroying either owner.
+    // Clears the exposed pointers without destroying either owner.
     Hardpoint = nullptr;
     ParentHardpoint = nullptr;
     const bool bMatchingType = ReadEventWord(DescIn, 0) == kThornTypeConnectHardpoints;
@@ -3580,7 +3519,7 @@ void FThornEvent::ApplyConnectDesc(const void* DescIn)
             reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 11)));
         if (HardpointName != nullptr)
             SetConnectHardpoint(HardpointName);
-        // 48237 reads the second argument after the first string operation.
+        // The second name is read after the first string operation.
         const char* ParentHardpointName =
             reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12)));
         if (ParentHardpointName != nullptr)
@@ -3620,17 +3559,12 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
 
 void FThornEvent::ApplyPathAnimDesc(const void* DescIn)
 {
-    // Retail FUN_06f450a0: common eleven-word copy, force type 6, then either
-    // (input type == 6) copy StartPercent/StopPercent/PercentDelta/PathOffset
-    // /LookAtUpAxis/LookAtFrontAxis from dwords 11..18, or (mismatch) reset
-    // them to the construction-time defaults (0.0, 1.0, 1.0, {0,0,0}, 1, 5).
+    // FUN_06f450a0: common eleven words, force type 6, then dwords 11..18
+    // (floats copied as raw bits) or, on a mismatch, the constructor defaults.
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypePathAnim;
     if (ReadEventWord(DescIn, 0) == kThornTypePathAnim)
     {
-        // DescIn[11..16] are raw IEEE-754 float bit patterns, not integers to
-        // convert -- memcpy preserves the bits (same convention as the other
-        // float payloads carried past dword 11 in this descriptor format).
         std::memcpy(&StartPercent, static_cast<const unsigned char*>(DescIn) + 44, sizeof(StartPercent));
         std::memcpy(&StopPercent, static_cast<const unsigned char*>(DescIn) + 48, sizeof(StopPercent));
         std::memcpy(&PercentDelta, static_cast<const unsigned char*>(DescIn) + 52, sizeof(PercentDelta));
@@ -3655,13 +3589,13 @@ void FThornEvent::ApplyPathAnimDesc(const void* DescIn)
 void FThornEvent::ApplyLightEventDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
-    // 4568e forces the owner type before rereading input after callbacks.
+    // The type is forced before the input is reread.
     Desc.Type = kThornTypeLightPropAnim;
     if (ReadEventWord(DescIn, 0) == kThornTypeLightPropAnim)
     {
         LightMask = ReadEventWord(DescIn, 11);
-        // 456ac forward REP MOVSD: preserve each DWORD, including any alias
-        // with the destination rather than imposing memcpy's non-overlap rule.
+        // Forward DWORD copy (REP MOVSD); stays defined if the input aliases
+        // the destination.
         unsigned char* Destination = reinterpret_cast<unsigned char*>(&LightTarget);
         const unsigned char* Source = reinterpret_cast<const unsigned char*>(static_cast<const unsigned char*>(DescIn) + 48);
         for (int Index = 0; Index < 0x24; ++Index)
@@ -3673,7 +3607,7 @@ void FThornEvent::ApplyLightEventDesc(const void* DescIn)
     }
     else
     {
-        // 456b0 clears only the mask. The previous target payload survives.
+        // Only the mask is cleared; the previous target survives.
         LightMask = 0;
     }
     FinalizeDesc();
@@ -3681,7 +3615,7 @@ void FThornEvent::ApplyLightEventDesc(const void* DescIn)
 
 void FThornEvent::ApplyMotionDesc(const void* DescIn)
 {
-    // FUN_06f43af0: input descriptor -> owned event state, not serialization.
+    // FUN_06f43af0.
     bMotionStorageActive = true;
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeStartMotion;
@@ -3689,7 +3623,7 @@ void FThornEvent::ApplyMotionDesc(const void* DescIn)
     LockedBone = nullptr;
     if (ReadEventWord(DescIn, 0) == kThornTypeStartMotion)
     {
-        // 43b36..43b63 stores every scalar before either string operation.
+        // Every scalar is stored before either string operation.
         std::memcpy(&Heading, static_cast<const unsigned char*>(DescIn) + 68, sizeof(Heading));
         Field_0x40 = static_cast<unsigned char>(ReadEventWord(DescIn, 16));
         std::memcpy(&MotionStartTime, static_cast<const unsigned char*>(DescIn) + 44, sizeof(MotionStartTime));
@@ -3727,20 +3661,15 @@ void FThornEvent::ApplyMotionDesc(const void* DescIn)
 
 void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
 {
-    // FUN_06f465f0 (thorn.dll.c:27941-28072).  Pre-reset: +0x98 axis-rot
-    // angle = 0, +0x9c axis id = 1, +0x104 applied rotation = 0; common
-    // eleven-word copy; forced Type 7; +0x54 mask, +0xa0 target-part c_str
-    // and +0xa4 target type cleared.  Only an input type 7 carries the
-    // payload: Desc[11] mask, Desc[12..20] target orientation (+0x58),
-    // Desc[21..23] target position (+0x7c), Desc[24..27] quaternion (+0x88)
-    // when kThornFlagQuatOrient is set in the copied flags -- otherwise the
-    // quaternion is derived from the orientation through math vtbl+0x50
-    // (SceneMatrixToQuat) -- Desc[28] angle, Desc[29] axis, Desc[30] target
-    // part string (VC6 basic_string at +0xa8), Desc[31] target type.  The
-    // retail Lua loader (FUN_06f25340 case 7, thorn.dll.c:4897-5011) writes
-    // the same slots: [0x26]/[0x27] axisrot, [0x1f..0x21] pos,
-    // [0x22..0x25] q_orient, and the tick LAB_06f46a40 reads +0x98/+0x9c
-    // (thorn.dll.txt:74386-74388) and +0xa0/+0xa4 (74199-74224).
+    // FUN_06f465f0. Pre-reset: +0x98 axis-rot angle = 0, +0x9c axis id = 1,
+    // +0x104 applied rotation = 0; common eleven words; forced type 7; +0x54
+    // mask, +0xa0 target-part c_str and +0xa4 target type cleared. Only an
+    // input type 7 carries the payload: Desc[11] mask, Desc[12..20] target
+    // orientation (+0x58), Desc[21..23] target position (+0x7c), Desc[24..27]
+    // quaternion (+0x88) when kThornFlagQuatOrient is set (else derived from
+    // the orientation through math +0x50), Desc[28] angle, Desc[29] axis,
+    // Desc[30] target part (VC6 basic_string at +0xa8), Desc[31] target type.
+    // The Lua loader (FUN_06f25340 case 7) writes the same slots.
     AxisRotAngle = 0.0f;
     AxisRotApplied = 0.0f;
     AxisRotAxis = 1;
@@ -3748,7 +3677,7 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
     Desc.Type = kThornTypeSpatialPropAnim;
     SpatialMask = 0;
     AdoptSpatialStringStorage();
-    TargetPart = nullptr; // 46636 clears exposure, not the private owner.
+    TargetPart = nullptr; // Clears the pointer, not the owner.
     TargetType = 0;
     if (ReadEventWord(DescIn, 0) != kThornTypeSpatialPropAnim)
     {
@@ -3757,8 +3686,7 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
     }
     SpatialMask = ReadEventWord(DescIn, 11);
     const bool bQuaternionOrientation = (Desc.Flags & kThornFlagQuatOrient) != 0;
-    // 46665 copies twelve words forwards; retain the store boundaries if the
-    // incoming descriptor aliases the owner's orientation/position storage.
+    // Forward word copy; stays defined if the input aliases this storage.
     for (int Index = 0; Index < 9; ++Index)
         std::memcpy(TargetOrient + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
     for (int Index = 0; Index < 3; ++Index)
@@ -3771,22 +3699,22 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
     }
     else
     {
-        // 4668a..466ab: acquire before reading the original descriptor matrix.
-        // Do not substitute the earlier TargetOrient snapshot for this input.
+        // Converts the descriptor's matrix, read after the engine is acquired,
+        // not the TargetOrient copy.
         if (G_SceneEventMathEngine == nullptr)
             G_SceneEventMathEngine = ThornAcquire3DMathEngine();
         SpatialMatrixToQuaternion(G_SceneEventMathEngine, TargetQuat,
             static_cast<const unsigned char*>(DescIn) + 48);
     }
     const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 30)));
-    // 46636 already cleared exposure before the math callback. Null input
-    // skips assignment entirely; do not clear a callback's later publication.
+    // TargetPart was cleared before the math callback; a null name skips the
+    // assignment entirely.
     if (TargetPartName != nullptr)
     {
         SpatialTargetPartStorage.Assign(TargetPartName);
         TargetPart = SpatialTargetPartStorage.GetPublishedData();
     }
-    // Read these only after the string call, matching 46773..46788.
+    // Read only after the string call, as retail does.
     TargetType = ReadEventWord(DescIn, 31);
     std::memcpy(&AxisRotAngle, static_cast<const unsigned char*>(DescIn) + 112, sizeof(AxisRotAngle));
     AxisRotAxis = ReadEventWord(DescIn, 29);
@@ -3797,14 +3725,14 @@ void FThornEvent::ApplyStartSoundDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeStartSound;
-    // 449e1 rereads the input after common callbacks and the forced store.
+    // The input is reread after the common callbacks and the forced type.
     SoundStartTime = ReadEventWord(DescIn, 0) == kThornTypeStartSound ? ReadEventWord(DescIn, 11) : 0;
     FinalizeDesc();
 }
 
 void FThornEvent::ApplySetCameraDesc(const void* DescIn)
 {
-    // Full33-instruction44e60: common snapshot/callbacks, force2, cached tail.
+    // FUN_06f44e60: common record, force type 2, common tail.
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeSetCamera;
     FinalizeDesc();
@@ -3814,7 +3742,7 @@ void FThornEvent::ApplyCameraPropAnimDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeCameraPropAnim;
-    // 46091 reads the current input type after the common curve callbacks.
+    // The input type is read after the common curve callbacks.
     if (ReadEventWord(DescIn, 0) == kThornTypeCameraPropAnim)
     {
         CamMask = ReadEventWord(DescIn, 11);
@@ -3822,16 +3750,15 @@ void FThornEvent::ApplyCameraPropAnimDesc(const void* DescIn)
             std::memcpy(CamTarget + Index, static_cast<const unsigned char*>(DescIn) + 48 + Index * 4, 4);
     }
     else
-        CamMask = 0; // 460c0 retains the four target words on mismatch.
+        CamMask = 0; // The four target words are kept on a mismatch.
     FinalizeDesc();
 }
 
 void FThornEvent::ApplyCameraPropAnimPayload(int DescriptorType, int Mask,
                                              const float* Target4)
 {
-    // FUN_06f46060: the common descriptor is applied first, then the
-    // specialized owner is forced to type 5.  Only an input type 5 copies
-    // the mask and four camera values; mismatch clears the mask.
+    // FUN_06f46060 payload step: only an input type 5 copies the mask and
+    // four camera values.
     Type = kThornTypeCameraPropAnim;
     if (DescriptorType == kThornTypeCameraPropAnim && Target4 != nullptr)
     {
@@ -3847,7 +3774,6 @@ void FThornEvent::ApplyCameraPropAnimPayload(int DescriptorType, int Mask,
 
 void FThornEvent::ApplyStartPsysDesc(const void* DescIn)
 {
-    // 48721 common callbacks precede the unconditional type-13 stores.
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeStartPsys;
     FinalizeDesc();
@@ -3857,11 +3783,11 @@ void FThornEvent::ApplyPsysPropAnimDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypePsysPropAnim;
-    // 48951 rereads the input after common callbacks and the forced store.
+    // The input is reread after the common callbacks and the forced type.
     if (ReadEventWord(DescIn, 0) == kThornTypePsysPropAnim)
     {
         PsysMask = ReadEventWord(DescIn, 11);
-        // 48961/48964 reads a DWORD before its store, including self input.
+        // Raw DWORD read before its store.
         unsigned int TargetBits;
         std::memcpy(&TargetBits, static_cast<const unsigned char*>(DescIn) + 48, sizeof(TargetBits));
         std::memcpy(&SparamTarget, &TargetBits, sizeof(TargetBits));
@@ -3877,8 +3803,8 @@ void FThornEvent::ApplyPsysPropAnimDesc(const void* DescIn)
 
 void FThornEvent::ApplyPsysPropAnimPayload(int DescriptorType, int Mask, float Target)
 {
-    // FUN_06f48920: type 0xe keeps the descriptor mask and sparam; a
-    // mismatched source clears both specialized payload words.
+    // FUN_06f48920 payload step: type 0xe copies mask and sparam; a mismatch
+    // clears both.
     Type = kThornTypePsysPropAnim;
     if (DescriptorType == kThornTypePsysPropAnim)
     {
@@ -3896,11 +3822,11 @@ void FThornEvent::ApplyFogPropAnimDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeFogPropAnim;
-    // 48cf1 reads the input type only after common curve callbacks return.
+    // The input type is read after the common curve callbacks.
     if (ReadEventWord(DescIn, 0) == kThornTypeFogPropAnim)
     {
         FogMask = ReadEventWord(DescIn, 11);
-        // 48d0c is a forward DWORD copy, preserving flags and padding.
+        // Forward DWORD copy, flag bytes and padding included.
         for (int Index = 0; Index < 8; ++Index)
         {
             unsigned int Word;
@@ -3917,7 +3843,7 @@ void FThornEvent::ApplyReverbPropAnimDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeReverbPropAnim;
-    // 49181 rereads type; 49194..491ab copies four raw words in order.
+    // Type reread after the callbacks; four raw words copied in order.
     if (ReadEventWord(DescIn, 0) == kThornTypeReverbPropAnim)
     {
         ReverbMask = ReadEventWord(DescIn, 11);
@@ -3933,8 +3859,8 @@ void FThornEvent::ApplyReverbPropAnimDesc(const void* DescIn)
 void FThornEvent::ApplyFogPropAnimPayload(int DescriptorType, int Mask,
                                           const FThornFog8* Target)
 {
-    // 48cfb..48d0c copies all eight words, including both flag bytes and padding.
-    // 48d10 clears only the mask on a descriptor type mismatch.
+    // Copies all eight words, flag bytes and padding included; a mismatch
+    // clears only the mask.
     Type = kThornTypeFogPropAnim;
     Desc.Type = kThornTypeFogPropAnim;
     if (DescriptorType == kThornTypeFogPropAnim)
@@ -3949,12 +3875,9 @@ void FThornEvent::ApplyFogPropAnimPayload(int DescriptorType, int Mask,
 void FThornEvent::ApplyReverbPropAnimPayload(int DescriptorType, int Mask,
                                              const FThornReverb4* Target4)
 {
-    // FUN_06f49150 first applies the common eleven-word descriptor through
-    // FUN_06f438c0, then forces the specialized owner type to 0x11.  For a
-    // matching input it copies the mask and exactly four reverb words;
-    // otherwise only the specialized mask is cleared.  FThornEvent's
-    // native zero defaults on unwritten retail target words remain a named
-    // constructor gap; the target itself has one public owning packet.
+    // FUN_06f49150 payload step (after FUN_06f438c0): forces type 0x11; a
+    // matching input copies the mask and four reverb words, otherwise only
+    // the mask is cleared.
     Type = kThornTypeReverbPropAnim;
     Desc.Type = kThornTypeReverbPropAnim;
     ReverbMask = 0;
@@ -3966,7 +3889,7 @@ void FThornEvent::ApplyReverbPropAnimPayload(int DescriptorType, int Mask,
 
 void FThornEvent::ApplyAudioPropAnimDesc(const void* DescIn)
 {
-    // 47291..472b6 ordered raw defaults precede the common curve callbacks.
+    // Raw defaults, written before the common curve callbacks.
     AudioTarget.Ain = 0x168;
     AudioTarget.Aout = 0x168;
     const unsigned int ZeroBits = 0;
@@ -3980,11 +3903,11 @@ void FThornEvent::ApplyAudioPropAnimDesc(const void* DescIn)
     std::memcpy(&AudioTarget.Rmix, &ZeroBits, 4);
     ApplyCommonDesc(DescIn);
     Desc.Type = kThornTypeAudioPropAnim;
-    // 472d1 rereads input type after callbacks; mismatch clears only mask.
+    // Type reread after the callbacks; a mismatch clears only the mask.
     if (ReadEventWord(DescIn, 0) == kThornTypeAudioPropAnim)
     {
         AudioMask = ReadEventWord(DescIn, 11);
-        // Exact DWORD-forward transport, including self/overlapping input.
+        // Forward DWORD copy; defined for overlapping input.
         for (int Index = 0; Index < 8; ++Index)
         {
             unsigned int Word;
@@ -3999,10 +3922,8 @@ void FThornEvent::ApplyAudioPropAnimDesc(const void* DescIn)
 
 void FThornEvent::ReleaseAudioOwnedState()
 {
-    // FUN_06f47230 releases the specialized object's +0x4c pointer before
-    // invoking common event cleanup. In the portable owner that pointer is
-    // the optional parameter curve kept in ParamCurve; release it once and do
-    // not reproduce the retail subobject/vtable layout.
+    // FUN_06f47230: releases the +0x4c curve (ParamCurve) before the common
+    // event cleanup.
     if (ParamCurve != nullptr)
     {
         ParamCurve->Release();
@@ -4012,10 +3933,7 @@ void FThornEvent::ReleaseAudioOwnedState()
 
 void FThornEvent::ReleaseCameraOwnedState()
 {
-    // FUN_06f46010 releases the camera event's optional +0x4c curve and then
-    // delegates to FUN_06f439a0.  ParamCurve is the modern owner-side form;
-    // the retail vtable reset/deleting-destructor wrapper is intentionally
-    // not part of the current-CRT object contract.
+    // FUN_06f46010: releases the +0x4c curve (ParamCurve), then FUN_06f439a0.
     if (ParamCurve != nullptr)
     {
         ParamCurve->Release();
@@ -4025,10 +3943,8 @@ void FThornEvent::ReleaseCameraOwnedState()
 
 void FThornEvent::ReleaseSpatialOwnedState()
 {
-    // FUN_06f46550 releases +0x4c, then decrements/frees the ref-counted
-    // target-part string at +0xac and clears its three words.  The modern
-    // owner uses the already-owned curve and native string independently of
-    // the retail VC6 basic_string representation.
+    // FUN_06f46550: releases the +0x4c curve, then frees the ref-counted
+    // target-part string at +0xac and clears its three words.
     AdoptSpatialStringStorage();
     try
     {
@@ -4039,14 +3955,12 @@ void FThornEvent::ReleaseSpatialOwnedState()
     }
     catch (...)
     {
-        // State 1 -> 0 invokes private-string destruction (59438) even if
-        // the curve Release throws; common-tail cleanup follows during unwind.
+        // Retail's unwind also frees the string if the curve Release throws.
         SpatialTargetPartStorage.Reset();
         throw;
     }
     SpatialTargetPartStorage.Reset();
-    // Retail only clears the private owner words; the exposed pointer remains
-    // stale during final common cleanup. No subsequent consumer owns it.
+    // As in retail, TargetPart is left stale; nothing reads it afterwards.
 }
 
 void FThornEvent::ReleaseAttachOwnedState()
@@ -4058,7 +3972,7 @@ void FThornEvent::ReleaseAttachOwnedState()
     }
     catch (...)
     {
-        // 594c8 destroys the private target owner before common-base unwind.
+        // Retail's unwind also frees the string if the curve Release throws.
         AttachTargetPartStorage.Reset();
         throw;
     }
@@ -4067,7 +3981,7 @@ void FThornEvent::ReleaseAttachOwnedState()
 
 void FThornEvent::ReleaseIkOwnedState()
 {
-    // 43ec0 retains the exposed descriptor pointers during private teardown.
+    // FUN_06f43ec0 leaves the exposed descriptor pointers set.
     IkTargetPartStorage.Reset();
     IkEndEffectorStorage.Reset();
 }
@@ -4096,7 +4010,7 @@ void FThornEvent::SetIkTargetPart(const char* Name)
 
 void FThornEvent::ReleaseMotionOwnedState()
 {
-    // 43a70: locked-bone owner, animation owner, then common base; no curve Release.
+    // FUN_06f43a70: locked bone, animation, then common base; no curve Release.
     MotionLockedBoneStorage.Reset();
     MotionAnimationStorage.Reset();
 }
@@ -4106,8 +4020,8 @@ void FThornEvent::ReleaseMotionOwnedState()
 #pragma float_control(precise, off, push) // Keep the complete curve FMUL/FADD result in ST(0).
 float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
 {
-    // Full454f0..4556f: TEST AH,44h / JNP takes only ordered equality.
-    // Equal gives 40h (odd parity); unordered gives 44h (even parity).
+    // FUN_06f454f0. TEST AH,44h / JNP takes only ordered equality (equal 40h
+    // has odd parity; unordered 44h even).
     const float Zero = 0.0f;
     const float One = 1.0f;
     bool bScaleZero;
@@ -4132,8 +4046,8 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
         const int Duration = Desc.DurationMs;
         IParamCurve* Curve = ParamCurve;
         float Ratio;
-        // 4551b..45527 always computes/stores the ratio, even before Slot12.
-        // FST does not pop: the unbound arithmetic consumes extended ST(0).
+        // The ratio is always computed and stored, even on the wrap path. FST
+        // does not pop: the unbound path uses the extended ST(0).
         __asm
         {
             fild qword ptr ExtendedElapsed
@@ -4144,14 +4058,12 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
         {
             const int Period = PcurvePeriod;
             __asm { fstp st(0) }
-            // Ordinary typed expression: retain the curve return through both
-            // operations, and read StartPercent only after the callback.
+            // StartPercent is read only after the callback.
             if (Period > 0)
                 return Curve->Slot12WrapEvaluate(static_cast<int>(ElapsedBits), Period) * Scale + StartPercent;
             return Curve->Evaluate(Ratio) * Scale + StartPercent;
         }
-        // Scale is the incoming argument; StartPercent is read AFTER curve
-        // callbacks. The unbound quotient stays extended through both operations.
+        // The unbound quotient stays extended through both operations.
         const float* StartPercentValue = &StartPercent;
         __asm
         {
@@ -4181,7 +4093,7 @@ namespace
     {
         Event->Desc.Type = kThornTypeStartIk;
         Event->bIkStorageActive = true;
-        // 43f76/43f79 precede the type gate and either string assignment.
+        // Cleared before the type gate and either string assignment.
         Event->EndEffector = nullptr;
         Event->TargetPart = nullptr;
         if (GetIkDescriptorType(Descriptor) == kThornTypeStartIk)
@@ -4228,8 +4140,8 @@ void FThornEvent::ApplyIkExtendedDesc(const FThornIkEventDesc* DescIn)
 
 void FThornEvent::ApplyStartIkDesc(const void* DescIn)
 {
-    // The canonical native packet has Key before CountToRoot. Read its payload
-    // after the common callback; the parser's private aggregate has no Key.
+    // FThornStartIkDesc has Key before CountToRoot; FThornIkEventDesc (the Lua
+    // parser's) has none. The payload is read after the common callback.
     const FThornStartIkDesc* Descriptor = static_cast<const FThornStartIkDesc*>(DescIn);
     ApplyCommonDesc(&Descriptor->Common);
     ApplyIkPayload(this, Descriptor);
@@ -4237,7 +4149,7 @@ void FThornEvent::ApplyStartIkDesc(const void* DescIn)
 
 static FThornPathEventDesc* GetPathEventDesc(FThornEvent* Event)
 {
-    // 4a4b0: the selected PATH descriptor remains a live, nullable view.
+    // LAB_06f4a4b0: the live PATH descriptor.
     return Event != nullptr ? &Event->PathDesc : nullptr;
 }
 
@@ -4249,7 +4161,7 @@ void* FThornEvent::GetDesc()
         return &FloorDesc.Common;
     if (&Desc == &SetCameraDesc)
         return &SetCameraDesc;
-    // 4a6d0 returns the live descriptor even after cached Type changes.
+    // Live descriptor, even if Type has changed since (LAB_06f4a6d0).
     if (&Desc == &CameraDesc.Common)
         return &CameraDesc.Common;
     if (&Desc == &ReverbDesc.Common)
@@ -4318,7 +4230,7 @@ void* FThornEvent::GetDesc()
     }
     if (Type == kThornTypePsysPropAnim)
     {
-        // 4a670 returns the actual live 13-word packet, without repacking.
+        // The live 13-word packet, not repacked (LAB_06f4a670).
         return &PsysPropDesc.Common;
     }
     if (Type == kThornTypeFogPropAnim)
@@ -4362,9 +4274,9 @@ void FThornEvent::PackConnectDesc()
 void FThornEvent::PackIkDesc()
 {
     // FUN_06f43f40 (thorn_iface.h FThornStartIkDesc): the common words, then the event's own
-    // address at +0x2c (0x06f43f73), count_to_root +0x30, up +0x34, front +0x38, damping +0x3c,
+    // address at +0x2c, count_to_root +0x30, up +0x34, front +0x38, damping +0x3c,
     // point_at +0x40, move_to +0x41, transition_duration +0x44, the two name strings' c_str at
-    // +0x48 / +0x4c (null without a name, 0x06f43f76 / 0x06f43f79) and target_type +0x50.
+    // +0x48 / +0x4c (null without a name) and target_type +0x50.
     std::memcpy(&IkDesc.Common, &Desc, sizeof(IkDesc.Common));
     IkDesc.Key = this;
     IkDesc.CountToRoot = CountToRoot;
@@ -4392,7 +4304,7 @@ void FThornEvent::PackMotionDesc()
     std::memcpy(&MotionDesc.TimeScale, &TimeScale, sizeof(TimeScale));
     std::memcpy(&MotionDesc.Weight, &Weight, sizeof(Weight));
     MotionDesc.Animation = Animation;
-    // Raw-descriptor fields are retained even while their semantic names are unknown.
+    // Field40/Field50: meaning unknown, copied through.
     MotionDesc.Field40 = Field_0x40;
     MotionDesc.Pad41[0] = 0;
     MotionDesc.Pad41[1] = 0;
@@ -4407,14 +4319,13 @@ void FThornEvent::PackMotionDesc()
 #pragma warning(disable: 4716) // The retail result is returned explicitly in ST(0).
 float FThornEvent::EvaluateProgress(int TimeMs) const
 {
-    // 06f4a450: USER_EVENT's fixed progress slot returns +0.
+    // LAB_06f4a450: USER_EVENT's progress is +0.
     if (bUserDescriptorOwner)
         return 0.0f;
-    // 06f4a490: SET MONITOR's fixed progress slot returns +0 without a curve call.
+    // LAB_06f4a490: SET MONITOR's progress is +0, no curve call.
     if (&Desc == &SetCameraDesc)
         return 0.0f;
-    // Full 49b90..49c1c: unbound quotient remains extended; bound calls
-    // return directly through ordinary typed C++ virtual dispatch.
+    // FUN_06f49b90: the unbound quotient stays extended.
     const int Duration = Desc.DurationMs;
     const float One = 1.0f;
     if (Duration == 0)
@@ -4461,8 +4372,8 @@ float FThornEvent::EvaluateProgress(int TimeMs) const
 #pragma warning(disable: 4716) // Return the reloaded ratio or curve's original ST(0).
 float FThornEvent::EvaluateProgressNoPeriodWrap(int TimeMs) const
 {
-    // Full493e0..49437: this copy ALWAYS stores the quotient as float,
-    // including the unbound path. Bound output returns directly from typed call.
+    // FUN_06f493e0: unlike EvaluateProgress, this copy always stores the
+    // quotient as float, also on the unbound path.
     const int Duration = Desc.DurationMs;
     const float One = 1.0f;
     if (Duration == 0)
@@ -4518,7 +4429,7 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
         const int Period = PcurvePeriod;
         if (Period > 0)
         {
-            // Modern internal method retains the exact Slot12 result in output80.
+            // Keeps the wrap-evaluate result in 80 bits.
             Curve->WrapEvaluateToExtended(static_cast<int>(ElapsedBits), Period, Result);
             return;
         }
@@ -4534,8 +4445,8 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
         }
         return;
     }
-    // Both ordinary Evaluate branches require one float argument store.
-    // NoPeriodWrap also requires that store in the unbound path (493e0).
+    // The Evaluate branches take a float argument; NoPeriodWrap also rounds
+    // to float on the unbound path (FUN_06f493e0).
     float Ratio;
     __asm
     {
@@ -4545,7 +4456,7 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
     }
     if (Curve != nullptr)
     {
-        // No return-value capture: the typed worker publishes its original80.
+        // The curve writes its 80-bit result directly.
         Curve->EvaluateToExtended(&Ratio, Result);
     }
     else
@@ -4561,8 +4472,8 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
 
 const char* FThornEvent::TypeName() const
 {
-    // Retail Family-B event vtables (0x06f5b1cc .. 0x06f5b40c, 0x20 stride)
-    // carry a slot-7 getter that is just `MOV EAX,"NAME"; RET`:
+    // Retail event vtables (0x06f5b1cc .. 0x06f5b40c, 0x20 stride) have a
+    // slot-7 getter returning a literal:
     //   LAB_06f4a3d0 "MOTION"            LAB_06f4a400 "IK"
     //   LAB_06f4a430 "SOUND"             LAB_06f4a460 "USER_EVENT"
     //   LAB_06f4a4a0 "SET MONITOR"       LAB_06f4a4d0 "PATH MOTION"
@@ -4609,8 +4520,8 @@ unsigned char FThornEvent::StartSetCamera(FThornScene* Scene)
     FThornEntity* SourceEnt = nullptr;
     if (SecondaryIndex >= 0)
         SourceEnt = Scene->EntityAt(SecondaryIndex);
-    // LAB_06f44ec0: either FUN_06f4aa40 lookup may return the scene sentinel;
-    // the modern index lookup represents that failure as nullptr.
+    // LAB_06f44ec0: a failed FUN_06f4aa40 lookup returns the scene sentinel;
+    // here it is nullptr.
     if (DestEnt == nullptr || SourceEnt == nullptr)
         return 0;
 
@@ -4624,8 +4535,8 @@ unsigned char FThornEvent::StartSetCamera(FThornScene* Scene)
     CaptureCameraProps(SourceEnt, Props);
     ApplyCameraProps(DestEnt, Props);
 
-    // The retail tail calls the source vtable getters (+0x14/+0x18), not a
-    // cached descriptor copy.  GeoControl is the modern live-pose owner.
+    // Retail calls the source's live pose getters (vtable +0x14/+0x18), not a
+    // cached descriptor copy.
     float Position[3];
     float Orient[9];
     GetLivePose(SourceEnt, Position, Orient);
@@ -4636,19 +4547,17 @@ unsigned char FThornEvent::StartSetCamera(FThornScene* Scene)
 
 unsigned char FThornEvent::StartCameraPropAnim(FThornScene* Scene)
 {
-    // 460f8..46120: one primary lookup and only concrete type CAMERA (3).
-    // Missing/non-camera receivers leave the prior captured four words intact.
+    // Only a CAMERA (3) primary is captured; otherwise the previous capture stays.
     FThornEntity* Primary = Scene->EntityAt(PrimaryIndex);
     if (Primary != nullptr && Primary->Snap.Type == kThornEntityCamera)
         CaptureCameraProps(Primary, CamCapture);
-    // End-time selection follows every capture/lookup branch; return is 1.
     ApplyEndTime(this);
     return 1;
 }
 
 unsigned char FThornEvent::StartSpatialPropAnim(FThornScene* Scene)
 {
-    // LAB_06f46910: each getter selects the current payload of one stable entry.
+    // LAB_06f46910: the entity is reread from its entry before each getter.
     AxisRotApplied = 0.0f;
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry != nullptr)
@@ -4661,12 +4570,12 @@ unsigned char FThornEvent::StartSpatialPropAnim(FThornScene* Scene)
         CopyPoseWordsForward(CaptureOrient, Primary->Snap.Orient, 9);
         Primary = *PrimaryEntry;
         GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
-        // 46983 retains the third getter's returned storage across the factory.
+        // The third getter's result pointer is kept across the engine acquire.
         const float* QuaternionMatrix = Primary->Snap.Orient;
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         SpatialMatrixToQuaternion(Math, CaptureQuat, QuaternionMatrix);
     }
-    // Re-read the secondary ID after all primary getter and math callbacks.
+    // The secondary ID is read after the primary callbacks.
     if (SecondaryIndex != -1)
     {
         FThornEntity** SecondaryEntry = Scene->FindEntityEntry(SecondaryIndex);
@@ -4684,7 +4593,7 @@ unsigned char FThornEvent::StartSpatialPropAnim(FThornScene* Scene)
 
 unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
 {
-    // LAB_06f478f0: the OR AL,80h makes the apparent flags gate unconditional.
+    // LAB_06f478f0: an OR AL,80h makes the apparent flags gate unconditional.
     ApplyEndTime(this);
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry == nullptr)
@@ -4728,9 +4637,7 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     GetRetailRelativeOrientation(Primary, Primary->Snap.Orient);
     CopyPoseWordsForward(PrimaryXform, Primary->Snap.Orient, 9);
 
-    // 47b60: read the completed child only AFTER cache acquisition. The
-    // sole math producer has no callbacks; its output is distinct from both
-    // input objects, so raw typed snapshots preserve every operand read.
+    // The child is read only after the math engine is acquired.
     float TransformedPosition[3];
     I3DMathEngine* Math = AcquireSceneEventMathEngine();
     FMatrix ChildOrientation;
@@ -4743,7 +4650,7 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     float NegativePosition[3];
     const float* PositionSource = TransformedPosition;
     float* PositionResult = NegativePosition;
-    // 47b63..47b84: each Z/Y/X word is rounded immediately after FCHS.
+    // Each Z/Y/X word is stored right after its FCHS.
     __asm {
         mov ecx, PositionSource
         mov eax, PositionResult
@@ -4757,14 +4664,13 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
         fchs
         fstp dword ptr [eax]
     }
-    // 47b8c..47bc0/428b0 pass raw DWORDs in transpose order. In contrast to
-    // FUN_3b670, this path has no x87 load/store of the nine matrix words.
+    // Raw DWORD transpose (via FUN_06f428b0); unlike FUN_06f3b670 there is no
+    // x87 load/store of the matrix words.
     float InverseChild[12];
     for (int Row = 0; Row < 3; ++Row)
     {
         for (int Column = 0; Column < 3; ++Column)
         {
-            // Raw words preserve NaN payloads and the retail read order.
             unsigned int Word;
             std::memcpy(&Word, Child + Row + Column * 3, sizeof(Word));
             std::memcpy(InverseChild + Row * 3 + Column, &Word, sizeof(Word));
@@ -4778,25 +4684,25 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     return 1;
 }
 
-// LAB_06f48d40: concrete FOG owner, exact signed key selection and raw GET capture.
+// LAB_06f48d40: signed key lookup, raw GET capture.
 unsigned char FThornEvent::StartFogPropAnim(FThornScene* Scene)
 {
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry != nullptr && (*PrimaryEntry)->Snap.Type == kThornEntityScene)
     {
-        // SCENE slot1 is 4a300: MOV EAX,[ECX+84]; RET, with no callback.
+        // The SCENE type getter (LAB_06f4a300) is a plain field read.
         FThornEntity* Primary = *PrimaryEntry;
         IFogControl* Control = Primary->FogControl;
         if (Control != nullptr)
             Control->GetPacked(reinterpret_cast<unsigned char*>(&Primary->SceneFogPacked[7]));
-        // GET may mutate the registry; retail retains the captured entity here.
+        // Retail keeps the entity pointer captured before the GET.
         std::memcpy(&FogCapturePacked, &Primary->SceneFogPacked[7], sizeof(FogCapturePacked));
     }
     ApplyEndTime(this);
     return 1;
 }
 
-// FUN_06f48de0: full150-instruction concrete FOG tick; immutable owner dispatch.
+// FUN_06f48de0: FOG tick.
 unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
 {
     if (FogMask != 0)
@@ -4812,7 +4718,7 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
             StoreAnimTValue(&Progress, &U);
             if ((*PrimaryEntry)->Snap.Type == kThornEntityScene)
             {
-                // FLD U/FCOMP 1; TEST AH,01 + JNZ skips for less/unordered.
+                // Less and unordered skip the discrete fields.
                 const bool bSnapDiscrete = U >= 1.0f;
                 FThornEntity* Primary = *PrimaryEntry;
                 FThornSceneFogSnapshot Out;
@@ -4839,7 +4745,7 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
                     ResultFog->Color[1] = FogLerpInteger(Capture->Color[1], Target.Color[1], &U);
                     ResultFog->Color[2] = FogLerpInteger(Capture->Color[2], Target.Color[2], &U);
                 }
-                // 431d0 reads middle argument zero; third pushed mask is unused.
+                // Mask 0; retail pushes a third argument that is unused.
                 Fun06f431d0(Primary, &Out, 0);
                 Fun06f43140(Primary, static_cast<unsigned char>(FogMask));
             }
@@ -4850,25 +4756,23 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::StartPsysPropAnim(FThornScene* Scene)
 {
-    // Full60 LAB_06f489a0: only the primary keyed lookup occurs here.
+    // LAB_06f489a0: primary lookup only.
     FThornEntity* Primary = Scene->EntityAt(PrimaryIndex);
     if (Primary != nullptr && Primary->Snap.Type == kThornEntityPsys)
     {
-        // All concrete entity slot1 getters are pure published Type reads.
-        // 489ed captures this payload before the foreign GetSparam callback.
         IPSysControl* Control = Primary->PsysControl;
         if (Control != nullptr)
             Control->GetSparam(&Primary->PsysRuntimeSparam);
         std::memcpy(&SparamCapture, &Primary->PsysRuntimeSparam, sizeof(SparamCapture));
     }
-    // Read the current canonical flags/duration/start after capture callbacks.
+    // Flags/duration/start are read after the capture callbacks.
     ApplyEndTime(this);
     return 1;
 }
 
 unsigned char FThornEvent::StartReverbPropAnim(FThornScene* Scene)
 {
-    // 491e0..49265: primary-only lookup; the concrete type leaf has no callback.
+    // LAB_06f491e0: primary lookup only.
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry != nullptr && (*PrimaryEntry)->Snap.Type == kThornEntityScene)
     {
@@ -4882,14 +4786,14 @@ unsigned char FThornEvent::StartReverbPropAnim(FThornScene* Scene)
             std::memcpy(ReverbCapture, Defaults, sizeof(ReverbCapture));
         }
     }
-    // 49265 reads current flags/start/duration only after GET returns.
+    // Flags/start/duration are read after the GET.
     ApplyEndTime(this);
     return 1;
 }
 
 unsigned char FThornEvent::TickReverbPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // 49298 zero mask skips target reads, lookup and the progress callback.
+    // A zero mask skips the target read, lookup and progress callback.
     if (ReverbMask != 0)
     {
         FThornReverb4 Target;
@@ -4901,7 +4805,7 @@ unsigned char FThornEvent::TickReverbPropAnim(int TimeMs, FThornScene* Scene)
             EvaluateProgressExtended(TimeMs, &Progress, true);
             float U;
             StoreAnimTValue(&Progress, &U);
-            // 492f8 rereads the saved map entry AFTER the progress callback.
+            // The entry is reread after the progress callback.
             FThornEntity* Primary = *PrimaryEntry;
             FThornReverb4 Output;
             std::memcpy(&Output, ReverbCapture, sizeof(Output));
@@ -4910,13 +4814,11 @@ unsigned char FThornEvent::TickReverbPropAnim(int TimeMs, FThornScene* Scene)
                 IReverbControl* Control = (*PrimaryEntry)->ReverbControl;
                 if (Control != nullptr)
                 {
-                    // FCOMP 1 / TEST AH,1 / JNZ skips ordered-less and
-                    // unordered. Equal/greater alone can replace environment.
+                    // Only U >= 1 (ordered) replaces the environment.
                     if (U >= 1.0f && (ReverbMask & 1) != 0)
                         Output.Environment = Target.Environment;
                     const int Mask = ReverbMask;
-                    // 49352/4936b/49388 share the existing seven-operation
-                    // retained-capture x87 kernel; calls stay outside asm.
+                    // Same x87 kernel as the FOG floats.
                     if ((Mask & 2) != 0)
                         FogLerpFloat(&ReverbCapture[1], &Target.Volume, &U, &Output.Volume);
                     if ((Mask & 4) != 0)
@@ -4933,7 +4835,7 @@ unsigned char FThornEvent::TickReverbPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::StartAudioPropAnim(FThornScene* Scene)
 {
-    // Full51 LAB_06f47320: primary lookup, pure type6 gate, captured receiver.
+    // LAB_06f47320: primary lookup, SOUND (6) entities only.
     FThornEntity* Primary = Scene->EntityAt(PrimaryIndex);
     if (Primary != nullptr && Primary->Snap.Type == kThornEntitySound)
     {
@@ -4947,7 +4849,7 @@ unsigned char FThornEvent::StartAudioPropAnim(FThornScene* Scene)
 
 unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // Full186 LAB_06f473a0: snapshot target before either lookup or curve.
+    // LAB_06f473a0: the target is copied before either lookup or the curve.
     if (AudioMask != 0)
     {
         FThornAudio8 To;
@@ -4963,14 +4865,14 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
         {
             FThornExtendedProgress Progress;
             EvaluateProgressExtended(TimeMs, &Progress, false);
-            // Retain the existing typed80 result through baseline and every selected term.
+            // The 80-bit progress stays on the x87 stack for every term below.
             const FThornExtendedProgress* ProgressValue = &Progress;
             __asm
             {
                 mov eax, ProgressValue
                 fld tbyte ptr [eax]
             }
-            // 47438..47448 selects the current payload AFTER the curve callback.
+            // The entity is read after the curve callback.
             FThornEntity* Primary = *PrimaryEntry;
             const int Mask = AudioMask;
             FThornAudio8 Out;
@@ -4979,7 +4881,7 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
                 AudioLerpFloat(&AudioCapture.Attenuation, &To.Attenuation, &Out.Attenuation);
             if ((Mask & 2) != 0)
                 AudioLerpFloat(&AudioCapture.Pan, &To.Pan, &Out.Pan);
-            // 4748d..474b9 repeats these two stores, including exceptional FP effects.
+            // Retail repeats these two, FP exception effects included.
             if ((Mask & 1) != 0)
                 AudioLerpFloat(&AudioCapture.Attenuation, &To.Attenuation, &Out.Attenuation);
             if ((Mask & 2) != 0)
@@ -4998,7 +4900,7 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
                 AudioLerpFloat(&AudioCapture.Atout, &To.Atout, &Out.Atout);
             if ((Mask & 0x80) != 0)
                 AudioLerpFloat(&AudioCapture.Rmix, &To.Rmix, &Out.Rmix);
-            // 47592 waits and discards progress before the output callback.
+            // Pop the progress before the output callback.
             __asm { fstp st(0) }
             float OutWords[8];
             std::memcpy(OutWords, &Out, sizeof(Out));
@@ -5010,7 +4912,7 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::StartFloorHeightAnim(FThornScene* Scene)
 {
-    // Full79-instruction497b0: primary capture precedes live secondary lookup.
+    // FUN_06f497b0: primary capture, then the secondary lookup.
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry != nullptr && (*PrimaryEntry)->Snap.Type == kThornEntityDeformable)
     {
@@ -5020,8 +4922,8 @@ unsigned char FThornEvent::StartFloorHeightAnim(FThornScene* Scene)
             Control->GetFloorHeight(&FloorCapture);
         else
         {
-            // Keep the widened source across both publications; reloading the
-            // runtime float would add a denormal exception between the stores.
+            // One widened load feeds both stores; reloading would add a
+            // denormal exception between them.
             const double Height = static_cast<double>(Primary->Snap.FloorHeight);
             Primary->FloorHeight = static_cast<float>(Height);
             FloorCapture = static_cast<float>(Height);
@@ -5096,13 +4998,12 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
     }
     if (Type == kThornTypeUserEvent)
     {
-        // 44c64..44c88: end-time publication precedes the primary lookup.
         ApplyEndTime(this);
         FThornEntity* Primary = Scene->EntityAt(PrimaryIndex);
         if (Primary == nullptr || Primary->UserEventControl == nullptr)
             return 0;
         IUserEventControl* Control = Primary->UserEventControl;
-        // Retail passes owner+28 directly, without an event virtual getter.
+        // Retail passes event +0x28 directly, not through the GetDesc virtual.
         return HrToAl(Control->StartUserEvent(&UserEventDesc));
     }
     if (Type == kThornTypeCameraPropAnim)
@@ -5125,9 +5026,8 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
 
     if (Type == kThornTypePathAnim)
     {
-        // LAB_06f45160: the retail callback only derives the percent delta and
-        // end time. It does not bind or mutate the event parent coordinate
-        // system on this path.
+        // LAB_06f45160: only the percent delta and end time; the parent Csys
+        // is not touched.
         PercentDelta = StopPercent - StartPercent;
         ApplyEndTime(this);
         return 1;
@@ -5153,7 +5053,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
 
     if (Type == kThornTypeLightPropAnim)
     {
-        // LAB_06f456e0: GET into entity blob, REP MOVSD 0x24 -> event+0xE8.
+        // LAB_06f456e0: GET into the entity blob, copy 0x24 dwords -> event +0xe8.
         if (Primary != nullptr && (Primary->Snap.Type == kThornEntityLight ||
                                    Primary->Snap.Type == kThornEntityScene))
         {
@@ -5184,27 +5084,24 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
 
     if (Type == kThornTypeStartIk)
     {
-        // LAB_06f44140: both lookups + IIKControl; invert after hp; FUN_06f2e440;
-        // forward Csys; slot 3. AL=0 on miss.
+        // LAB_06f44140: both lookups + IIKControl; inverse after the hardpoint;
+        // FUN_06f2e440; forward Csys; slot 3. Returns 0 on a miss.
         ApplyEndTime(this);
         if (Primary == nullptr || Secondary == nullptr || Primary->IkControl == nullptr)
             return 0;
         float Pos[3];
         float Orient[9];
         BuildIkPose(this, Primary, &Secondary, Pos, Orient);
-        // 0x06f44496 `ADD EBX,0x28; PUSH EBX`: the event's descriptor, IK fields included.
+        // Event +0x28: the descriptor, IK fields included.
         return HrToAl(Primary->IkControl->StartIk(GetDesc(), Pos, Orient));
     }
 
     if (Type == kThornTypeStartPsys)
     {
-        // LAB_06f48760 (thorn.dll.txt:76954-76996) is the one retail Start
-        // without the end-time prologue (compare LAB_06f48320 at 76375):
-        // it goes straight to the FUN_06f4af00 lookup, and EndTimeMs stays
-        // whatever ApplyDesc (FUN_06f48700: StartTime + Desc.DurationMs,
-        // unconditionally) left there -- so a START_PSYS with
-        // USE_SCRIPT_DURATION ends at its own start time in retail rather
-        // than running unbounded.  Do not recompute it here.
+        // LAB_06f48760 is the one retail Start without the end-time prologue:
+        // EndTimeMs stays as ApplyDesc (FUN_06f48700) left it, StartTime +
+        // DurationMs, so a START_PSYS with USE_SCRIPT_DURATION ends at its own
+        // start time rather than running unbounded. Retail quirk, kept.
         if (Primary == nullptr || Primary->PsysControl == nullptr)
             return 0;
         return HrToAl(Primary->PsysControl->Start());
@@ -5250,7 +5147,7 @@ void FThornEvent::DispatchSubtitleControl(FThornScene* Scene, bool bShow)
 
 unsigned char FThornEvent::Stop(FThornScene* Scene)
 {
-    // Concrete virtual slots remain fixed when common Type is changed.
+    // Dispatch on the constructed type: retail's vtable does not follow Type.
     switch (NativeEventType)
     {
     case kThornTypeStartMotion:
@@ -5278,7 +5175,7 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
                 Primary->SoundControl->StopSound(&Desc);
             break;
         case kThornTypeStartIk:
-            // Secondary lookup precedes the live control read, even for negative keys.
+            // The secondary lookup comes first, even for negative keys.
             if (Scene->EntityAt(SecondaryIndex) != nullptr && Primary->IkControl != nullptr)
             {
                 IIKControl* Control = Primary->IkControl;
@@ -5310,19 +5207,17 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
         return 0;
     }
 
-    // 06f4a6b0: FOG PROP ANIM stops without scene access.
+    // These Stop slots return 0 without touching the scene: FOG LAB_06f4a6b0,
+    // REVERB LAB_06f4a6e0, CAMERA LAB_06f4a520, LIGHT LAB_06f4a4f0, SET
+    // MONITOR LAB_06f4a480.
     if (&Desc == &FogDesc.Common)
         return 0;
-    // 06f4a6e0: REVERB PROP ANIM stops without scene access.
     if (&Desc == &ReverbDesc.Common)
         return 0;
-    // 06f4a520: CAMERA PROP ANIM's stop slot ignores the scene.
     if (&Desc == &CameraDesc.Common)
         return 0;
-    // 06f4a4f0: LIGHT PROP ANIM's fixed stop slot returns before lookups.
     if (&Desc == &LightDesc.Common)
         return 0;
-    // 06f4a480: the SET MONITOR stop slot does not perform a scene lookup.
     if (&Desc == &SetCameraDesc)
         return 0;
     if (&Desc == &AudioPropDesc.Common)
@@ -5357,9 +5252,8 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
     }
     else if (Type == kThornTypeStartIk && Primary != nullptr && Primary->IkControl != nullptr)
     {
-        // LAB_06f44860 (thorn.dll.txt:70358-70397): both PrimaryIndex and
-        // SecondaryIndex must resolve in the entity tree before IIKControl
-        // slot 4 is issued; a missing secondary silently skips the stop.
+        // LAB_06f44860: both indices must resolve before IIKControl slot 4;
+        // a missing secondary silently skips the stop.
         if (SecondaryIndex >= 0 && Scene->EntityAt(SecondaryIndex) != nullptr)
             Primary->IkControl->StopIk(GetDesc());
     }
@@ -5374,33 +5268,28 @@ unsigned char FThornEvent::Stop(FThornScene* Scene)
 
 unsigned char FThornEvent::TickCameraPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // Mask zero skips all lookup, GET, curve and SET work.
     if (CamMask != 0)
     {
         float TargetValues[4];
         for (int Index = 0; Index < 4; ++Index)
             std::memcpy(&TargetValues[Index], &CamTarget[Index], sizeof(float));
-        // 461f4 tests only -1; all other signed IDs go through the lookup.
+        // Only -1 skips; any other signed ID goes through the lookup.
         if (SecondaryIndex != -1)
         {
             FThornEntity* Secondary = Scene->EntityAt(SecondaryIndex);
             if (Secondary != nullptr && Secondary->Snap.Type == kThornEntityCamera)
                 CaptureCameraProps(Secondary, TargetValues);
         }
-        // Primary lookup follows secondary GET callbacks and reads the current ID.
         FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
         if (PrimaryEntry != nullptr)
         {
             FThornExtendedProgress Progress;
-            // Camera's fixed slot6 uses the period-aware progress accessor even
-            // when an earlier callback has changed the mirrored event type.
+            // Period-aware progress, whatever Type says by now.
             EvaluateProgressExtended(TimeMs, &Progress, false);
-            // 462d6 retains the selected node across slot6; 462ed reads
-            // its live payload AFTER that callback, not a fresh ID lookup.
+            // The entry found before the curve callback is reread after it
+            // (no fresh lookup); the primary's runtime cache is used, no GET.
             FThornEntity* Primary = *PrimaryEntry;
             float ResultValues[4];
-            // 462ed..46312 uses the primary runtime cache AFTER the curve callback;
-            // there is no primary GET call on this tick path.
             for (int Index = 0; Index < 4; ++Index)
                 std::memcpy(&ResultValues[Index], &Primary->CameraRuntimeProps[Index], sizeof(float));
             InterpolateCameraProps(ResultValues, TargetValues, CamCapture, &Progress, CamMask);
@@ -5412,8 +5301,8 @@ unsigned char FThornEvent::TickCameraPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // LAB_06f48a40: secondary runtime is captured before the primary lookup
-    // and before the curve callback. No secondary GetSparam call occurs here.
+    // LAB_06f48a40: the secondary's runtime sparam is read (no GetSparam)
+    // before the primary lookup and the curve callback.
     if (PsysMask != 0)
     {
         float Target;
@@ -5431,11 +5320,9 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
             EvaluateProgressExtended(TimeMs, &Progress, false);
             float Scale;
             StoreAnimTValue(&Progress, &Scale);
-            // The primary type and live cache are consumed after the curve call.
+            // The primary's type and cache are read after the curve call.
             if ((*PrimaryEntry)->Snap.Type == kThornEntityPsys)
             {
-                // 48ae3/48af0 reload the selected node payload after the
-                // curve and the concrete descriptor-type getter, respectively.
                 FThornEntity* Primary = *PrimaryEntry;
                 float Result;
                 std::memcpy(&Result, &Primary->PsysRuntimeSparam, sizeof(Result));
@@ -5462,7 +5349,7 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // 45890: a zero initial mask skips all registry and curve callbacks.
+    // LAB_06f45890: a zero mask skips all lookups and the curve.
     if (LightMask == 0)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
 
@@ -5479,7 +5366,7 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
                 FThornLightProps& Live = Secondary->LightEntityDescriptor;
                 if (Secondary->D3dLightControl != nullptr)
                 {
-                    // Each later call rereads the facet after the previous callback.
+                    // The control is reread before each call.
                     Secondary->D3dLightControl->GetLight(&Live.Type);
                     Secondary->D3dLightControl->GetOn(&Live.On);
                     Secondary->D3dLightControl->GetDirection(Live.Direction);
@@ -5502,8 +5389,8 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
                 FThornEntity* Secondary = *SecondaryEntry;
                 if (Secondary->LightControl != nullptr)
                     Secondary->LightControl->GetColor(reinterpret_cast<float*>(Secondary->SceneFogPacked));
-                // Retail keeps color 2 in EBX while color 0/1 replace the target snapshot.
-                // All three values are consumed by the later color interpolation.
+                // Retail keeps color 2 in EBX rather than in the target copy;
+                // all three feed the colour interpolation either way.
                 std::memcpy(Target.Color, Secondary->SceneFogPacked, sizeof(Target.Color));
             }
         }
@@ -5522,8 +5409,8 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
             std::memcpy(&Output, &(*PrimaryEntry)->LightEntityDescriptor, sizeof(Output));
         else if ((*PrimaryEntry)->Snap.Type == kThornEntityScene)
         {
-            // Only the first three words of the scene baseline reach its output sink.
-            // The unused private tail is initialized without reproducing stack garbage.
+            // Only the three colour words reach the scene sink; the rest is
+            // zeroed here instead of retail's stack garbage.
             std::memcpy(Output.Color, (*PrimaryEntry)->SceneFogPacked, sizeof(Output.Color));
         }
         EvalLightProps(&Output, &LightCapture, &Target, &LightMask, &U);
@@ -5534,7 +5421,7 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
             unsigned int SceneSnapshot[15];
             std::memcpy(SceneSnapshot, (*PrimaryEntry)->SceneFogPacked, sizeof(SceneSnapshot));
             std::memcpy(SceneSnapshot, Output.Color, sizeof(Output.Color));
-            // 45e96/45e9f use -1 for both remaining arguments; the third is unused.
+            // Retail passes -1 for both remaining arguments; the third is unused.
             Fun06f431d0(*PrimaryEntry, SceneSnapshot, 0xff);
         }
     }
@@ -5543,8 +5430,8 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
 {
-    // LAB_06f46a40: zero mask skips both slot6 and registry access. The
-    // concrete SPATIAL slot6 is 47110, independent of mutable descriptor Type.
+    // LAB_06f46a40: a zero mask skips the progress call and lookups. SPATIAL's
+    // progress slot (LAB_06f47110) does not follow Type.
     if (SpatialMask == 0)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
     FThornExtendedProgress Progress;
@@ -5555,8 +5442,7 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry != nullptr)
     {
-        // 46b19 writes the descriptor position, copied into +dc before
-        // the orientation getter and direct owner-output math call.
+        // The position is copied to +0xdc before the orientation getter.
         FThornEntity* Primary = *PrimaryEntry;
         GetRetailRelativePosition(Primary, Primary->Snap.Pos);
         std::memcpy(CapturePos, Primary->Snap.Pos, sizeof(CapturePos));
@@ -5565,7 +5451,7 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         SpatialMatrixToQuaternion(Math, CaptureQuat, Primary->Snap.Orient);
 
-        // 46b61 rereads the index after the primary math callback.
+        // The index is reread after the primary math callback.
         FThornEntity** SecondaryEntry = SecondaryIndex != -1 ? Scene->FindEntityEntry(SecondaryIndex) : nullptr;
         if (SecondaryEntry != nullptr)
         {
@@ -5579,7 +5465,7 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
             if (TargetPart != nullptr && TargetType != 0)
             {
                 const int SecondaryType = (*SecondaryEntry)->Snap.Type;
-                // 46bfc rereads the name after the type getter.
+                // The name is reread after the type getter.
                 const char* PartName = TargetPart;
                 if (PartName != nullptr &&
                     (SecondaryType == kThornEntityCompound || SecondaryType == kThornEntityDeformable))
@@ -5594,8 +5480,8 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
                         const FThornCsys* Parent = ParentCsys;
                         if (Parent != nullptr)
                             MulXformByInverseCsys(Parent, HpXform);
-                        // 46d23 copies all12 words and requats even with
-                        // Parent==NULL. Foreign GENRESULT is ignored.
+                        // All 12 words are copied and the quaternion rebuilt
+                        // even without a parent; the GENRESULT is ignored.
                         std::memcpy(TargetOrient, HpXform, sizeof(TargetOrient));
                         std::memcpy(TargetPos, HpXform + 9, sizeof(TargetPos));
                         Math = AcquireSceneEventMathEngine();
@@ -5612,8 +5498,8 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
             (*PrimaryEntry)->InnerSetPos(Pos);
         }
 
-        // 46dce and46e63 are independent tests. Ordinary orientation
-        // publication runs before axis rotation when both bits are set.
+        // Independent tests: with both bits set the orientation is written,
+        // then overwritten by the axis rotation.
         if ((SpatialMask & kThornSpatialBitOrient) != 0)
         {
             float Quat[4];
@@ -5637,7 +5523,7 @@ unsigned char FThornEvent::TickSpatialPropAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
 {
-    // LAB_06f47c30: no event slot6/curve call on this concrete tick.
+    // LAB_06f47c30: no progress/curve call on this tick.
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
     if (PrimaryEntry == nullptr)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
@@ -5662,8 +5548,7 @@ unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
             ICompoundControl* Compound = (*SecondaryEntry)->CompoundControl;
             if (Compound != nullptr)
             {
-                // Unlike SPATIAL there is no second part-name null test after
-                // the type getter. The live arguments feed the captured control.
+                // Unlike SPATIAL there is no second part-name null test.
                 Compound->GetHardpointXform(TargetType, TargetPart, Child);
                 const FThornCsys* Parent = ParentCsys;
                 if (Parent != nullptr)
@@ -5719,8 +5604,7 @@ unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
             }
             float Target[3];
             AddAttachOffset(Target, Child + 9, Offset, false);
-            // 47f97 calls the entity relative position getter, including its
-            // parent inverse. Keep that selected receiver's returned buffer.
+            // The entity's relative position getter, parent inverse included.
             FThornEntity* Primary = *PrimaryEntry;
             GetRetailRelativePosition(Primary, Primary->Snap.Pos);
             float Direction[3];
@@ -5736,8 +5620,8 @@ unsigned char FThornEvent::TickAttachEntity(int TimeMs, FThornScene* Scene)
     return RetailStillRunningPredicate(TimeMs, EndTimeMs);
 }
 
-// LAB_06f451a0, all 260 instructions: secondary payload is captured before
-// progress; primary selected-entry payload is reread after each callback.
+// LAB_06f451a0: the secondary is captured before the progress call; the
+// primary is reread from its entry after each callback.
 unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
 {
     FThornEntity** PrimaryEntry = Scene->FindEntityEntry(PrimaryIndex);
@@ -5750,7 +5634,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
     if (Secondary->MotionPath == nullptr)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
 
-    // Concrete PATH slot 6 is 454f0. Its extended return is stored once.
+    // PATH's progress slot is FUN_06f454f0; its extended result is stored once.
     const float Percent = EvaluateControlBackedCurve(PercentDelta, TimeMs);
     float Position[3];
     float Orientation[9];
@@ -5775,10 +5659,10 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
         GetRetailRelativePosition(Secondary, Secondary->Snap.Pos);
         Copy3(PathXform + 9, Secondary->Snap.Pos);
         float OffsetPosition[3];
-        // 452b9..452ef: live offsets read AFTER both getters, Z/Y/X stores.
+        // Offsets are read after both getters; Z/Y/X stores.
         AddAttachOffset(OffsetPosition, PathVector, PathOffset, true);
         float WorldPosition[3];
-        I3DMathEngine* Math = AcquireSceneEventMathEngine(); // 452f7
+        I3DMathEngine* Math = AcquireSceneEventMathEngine();
         SceneMathTransform(Math, WorldPosition, PathXform, OffsetPosition);
         Copy3(Position, WorldPosition);
     }
@@ -5796,7 +5680,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
                 GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
                 Copy9(PathXform, Secondary->Snap.Orient);
                 float Rotated[3];
-                I3DMathEngine* Math = AcquireSceneEventMathEngine(); // 453ae
+                I3DMathEngine* Math = AcquireSceneEventMathEngine();
                 SceneMathRotate(Math, Rotated, PathXform, PathVector);
                 Copy3(PathVector, Rotated);
                 BuildAxisFrame(Orientation, PathVector,
@@ -5812,12 +5696,12 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
                 FQuaternion Quaternion;
                 std::memcpy(&Quaternion, QuaternionWords, sizeof(Quaternion));
                 FMatrix PathMatrix;
-                I3DMathEngine* Math = AcquireSceneEventMathEngine(); // 45432
+                I3DMathEngine* Math = AcquireSceneEventMathEngine();
                 Math->QuaternionToMatrix(PathMatrix, Quaternion);
                 GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
-                // Preserve the getter's original storage through the next acquisition.
+                // The getter's result pointer is kept across the next acquire.
                 const float* SecondaryMatrix = Secondary->Snap.Orient;
-                Math = AcquireSceneEventMathEngine(); // 45462
+                Math = AcquireSceneEventMathEngine();
                 float Combined[9];
                 SceneMathMulMatrix(Math, Combined, SecondaryMatrix, &PathMatrix.D[0][0]);
                 Copy9(Orientation, Combined);
@@ -5831,7 +5715,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
 
 unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
 {
-    // The concrete FLOOR slot6 is fixed even if callbacks mutate common Type.
+    // FLOOR's progress slot does not follow Type.
     FThornExtendedProgress Progress;
     EvaluateProgressExtended(TimeMs, &Progress, false);
     float Scale;
@@ -5844,7 +5728,7 @@ unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
             CaptureControl->GetFloorHeight(&FloorCapture);
         else
             std::memcpy(&FloorCapture, &Primary->FloorHeight, sizeof(FloorCapture));
-        // 49962 reads the live ID only after the primary GET callback.
+        // The secondary ID is read after the primary GET callback.
         if (SecondaryIndex != -1)
         {
             FThornEntity** SecondaryEntry = Scene->FindEntityEntry(SecondaryIndex);
@@ -5866,7 +5750,7 @@ unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
                             IdentityOrient(Hardpoint);
                             std::memset(Hardpoint + 9, 0, 3 * sizeof(float));
                             HardpointControl->GetHardpointXform(TargetType, TargetPart, Hardpoint);
-                            // Keep the same parent through both math/cache callbacks.
+                            // One parent read serves both math calls.
                             const FThornCsys* Parent = ParentCsys;
                             if (Parent != nullptr)
                                 TransformFloorHardpoint(Parent, Hardpoint);
@@ -5876,7 +5760,7 @@ unsigned char FThornEvent::TickFloorHeightAnim(int TimeMs, FThornScene* Scene)
                 }
             }
         }
-        // Retail retains the originally selected primary through every callback.
+        // Retail keeps the primary pointer from before the callbacks.
         ICompoundControl* OutputControl = Primary->CompoundControl;
         if (OutputControl != nullptr)
         {
@@ -5911,16 +5795,16 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
         }
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
     }
-    // These concrete tick slots are pure end-time predicates (43d50 etc.).
-    // They perform neither entity lookup nor parameter-curve callbacks.
+    // These tick slots only test the end time (LAB_06f43d50 etc.): no lookup,
+    // no curve call.
     if (EventType == kThornTypeStartMotion || EventType == kThornTypeStartSound ||
         EventType == kThornTypeConnectHardpoints || EventType == kThornTypeStartSubScene ||
         EventType == kThornTypeStartPsys || EventType == kThornTypeSubtitle)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
-    // 06f44d30: USER_EVENT's tick only compares the clock and end time.
+    // LAB_06f44d30: USER_EVENT's tick only tests the end time.
     if (bUserDescriptorOwner)
         return RetailStillRunningPredicate(TimeMs, EndTimeMs);
-    // 06f44fb0: this one-shot event has a constant-false tick slot.
+    // LAB_06f44fb0: SET MONITOR is one-shot; its tick returns 0.
     if (&Desc == &SetCameraDesc)
         return 0;
     if (bFloorEventOwner)
@@ -5961,7 +5845,7 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
         if (Type == kThornTypeStartIk && Primary != nullptr && Secondary != nullptr &&
                  Primary->IkControl != nullptr)
         {
-            // LAB_06f444f0: same invert / look-at / forward Csys as Start; IIKControl slot 5.
+            // LAB_06f444f0: same pose build as Start; IIKControl slot 5.
             float Pos[3];
             float Orient[9];
             BuildIkPose(this, Primary, &Secondary, Pos, Orient);
@@ -5970,7 +5854,7 @@ unsigned char FThornEvent::StillRunning(int TimeMs, FThornScene* Scene)
         else if (Type == kThornTypeReverbPropAnim && ReverbMask != 0 && Primary != nullptr &&
                  Primary->ReverbControl != nullptr && Primary->Snap.Type == kThornEntityScene)
         {
-            // LAB_06f49290: TO = load (no secondary); Out = capture; env snap U>=1; bits 2/4/8 lerp.
+            // LAB_06f49290: no secondary; environment snaps at U >= 1; bits 2/4/8 lerp.
             float To[4];
             std::memcpy(To, &ReverbTarget, sizeof(To));
             float Out[4];
@@ -6007,10 +5891,9 @@ FThornScene::FThornScene()
     SceneForwardCsys_.Pos[2] = 0.0f;
 }
 
-// Retail 3a5a3/3a5af seeds outer +98/+94 only for the SCENE constructor.
-// Common post-constructor stores 3a6a2..3a6b1 bind every entity's output pointers.
-// Retail defines the outer axes only when the first SCENE writes them.
-// Initial 1/2 values do not reconstruct its unwritten heap words.
+// Retail sets the scene's axes (+0x98/+0x94) only from a SCENE entity, and
+// binds every entity's output pointers to them after construction. Until a
+// SCENE writes them retail leaves them unwritten; the 1/2 defaults are the port's.
 void FThornScene::BuildInverseCsys(float* Out12) const
 {
     InvertParentCsys(Out12, &SceneForwardCsys_);
@@ -6023,7 +5906,7 @@ void FThornScene::BindEntitySceneAxes(FThornEntity* Entity)
         SceneUpAxis_ = Entity->Snap.SceneBlob[5];
         SceneFrontAxis_ = Entity->Snap.SceneBlob[6];
     }
-    // 3a69c/3a69f: borrowed forward frame, not the inverse cache.
+    // Borrows the forward frame, not the inverse cache.
     Entity->ParentCsys = &SceneForwardCsys_;
     Entity->SceneFogOutputA = &SceneUpAxis_;
     Entity->SceneFogOutputB = &SceneFrontAxis_;
@@ -6039,8 +5922,8 @@ void FThornScene::RegisterFrameEntity(FThornEntity* Entity)
 
 void FThornScene::BindEventSceneAxes(FThornEvent* Event)
 {
-    // 39fbb..39fca: event +20 up and +24 front point at the same owner fields.
-    // 39fb1/39fb4: every event borrows the same forward scene frame.
+    // Event +0x20 up / +0x24 front point at the scene's fields; every event
+    // borrows the same forward scene frame.
     Event->ParentCsys = &SceneForwardCsys_;
     Event->bOwnsParentCsys = 0;
     Event->SceneUpAxis = &SceneUpAxis_;
@@ -6049,8 +5932,7 @@ void FThornScene::BindEventSceneAxes(FThornEvent* Event)
 
 FThornScene::~FThornScene()
 {
-    // ~FScriptEngine performs Clear on the normal path, before this cleanup.
-    // 58bed..58b90 unwind only storage if a preceding callback throws.
+    // ~FScriptEngine calls Clear first; this frees only storage.
     FrameEntities_.reset();
     StopTimes_.reset();
     delete[] reinterpret_cast<unsigned char*>(Active_);
@@ -6070,10 +5952,11 @@ FThornScene::~FThornScene()
 
 void FThornScene::Clear()
 {
-    // 37f70 clears ranges but retains vector storage and the alias-list sentinel.
+    // FUN_06f37f70: clears the ranges but keeps vector storage and the list
+    // sentinel.
     StopAll();
     FrameEntities_->clear();
-    // 37f98..37fc3: clear pending aliases before event deleting callbacks.
+    // Pending aliases are cleared before the events are deleted.
     PendingCount_ = 0;
     PendingBegin_ = 0;
     if (MasterCount_ != 0)
@@ -6081,7 +5964,6 @@ void FThornScene::Clear()
         FThornEvent** EventSlot = Master_;
         do
         {
-            // 37fda..37ff1 retains the selected slot through deleting-dtor.
             FThornEvent::DestroyNative(*EventSlot);
             *EventSlot = nullptr;
             ++EventSlot;
@@ -6097,7 +5979,7 @@ void FThornScene::Clear()
     Entities_.clear();
     EntityCount_ = 0;
     DurationMs_ = 0;
-    // 37f70..38105 does not reset outer+24/+28: retain both clocks.
+    // Retail does not reset the clocks (+0x24/+0x28).
     PlaybackState_ = 0;
 }
 
@@ -6134,7 +6016,7 @@ FThornMonitorLinks::~FThornMonitorLinks()
 
 void FThornMonitorLinks::Initialize()
 {
-    // 41144 allocates this owner only after common entity construction.
+    // Allocated only after common entity construction (FUN_06f41144 area).
     OwnedSentinel.reset(new FThornMonitorLinkNode);
     Sentinel = OwnedSentinel.get();
     Sentinel->Next = Sentinel;
@@ -6194,20 +6076,16 @@ FThornEntity::FThornEntity()
     Snap.NearPlane = 0.1f;
     Snap.FarPlane = 100000.0f;
     Snap.Aspect = 4.0f / 3.0f;
-    // Retail FUN_06f42d70 (the SCENE/SUBSCENE entity constructor) sets both
-    // axis fields to the sentinel value 6 at construction; FThornScene::Attach
-    // (LAB_06f43230 tail) only remaps that sentinel to the real defaults
-    // (front=5, up=1) when the field is still 6.  Nothing else in the
-    // descriptor-load path assigns these fields, so without this initializer
-    // the memset above would leave them at 0 and the Attach-time remap would
-    // never fire.  Harmless for non-scene entity types (unused fields).
+    // FUN_06f42d70 (SCENE/SUBSCENE constructor) sets both axes to the
+    // sentinel 6; Attach (LAB_06f43230 tail) remaps a remaining 6 to the
+    // defaults (front=5, up=1). Unused for other entity types.
     SceneUpAxis = 6;
     SceneFrontAxis = 6;
     BoundControlType = -1;
     InitializeLightEntityPortState(this);
 }
 
-// Typed construction completes before LAB_06f3a3f0 binds or publishes this object.
+// Construction completes before LAB_06f3a3f0 binds or publishes the entity.
 FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* OwnerScene)
     : FThornEntity()
 {
@@ -6247,7 +6125,7 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     OwnerScene->ApplyEntitySnap(this, Desc);
     if (Type == kThornEntityCompound || Type == kThornEntityDeformable)
     {
-        // Concrete construction replays the live floor and pose after ApplyDesc.
+        // The typed constructors replay floor and pose after ApplyDesc.
         std::memcpy(&FloorHeight, &Snap.FloorHeight, sizeof(FloorHeight));
         InnerSetPos(LoadPos);
         InnerSetOrient(LoadOrient);
@@ -6255,7 +6133,6 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     else if (Type == kThornEntityCamera || Type == kThornEntityMonitor)
     {
         ApplyCameraProps(this, &Snap.Fovh);
-        // 411bb/411c6 consume the saved pose after the property callback.
         InnerSetPos(LoadPos);
         InnerSetOrient(LoadOrient);
     }
@@ -6284,7 +6161,6 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     }
     else if (Type == kThornEntityPsys)
     {
-        // 434aa/434b6 replay the live saved pose only after concrete ApplyDesc.
         InnerSetPos(LoadPos);
         InnerSetOrient(LoadOrient);
     }
@@ -6308,12 +6184,10 @@ FThornEntity::~FThornEntity() noexcept(false)
         ~FCommonTeardownStage() noexcept(false) { Entity->ReleaseCommonEntityState(); }
     };
     FCommonTeardownStage CommonTeardown{this};
-    // Each retail deleting wrapper enters its concrete destructor, which
-    // releases specialized controls before the common entity destructor.
-    // The scene owner performs no extra control release before this body.
-    // Retail MOTION_PATH destructor FUN_06f42cb0 (thorn.dll.c:25902-25929)
-    // releases +0xe8 (constructor-retained path object) and +0xcc (the
-    // descriptor's path object) before the path-type string and +0xd0.
+    // Retail's typed destructors release their specialized controls before
+    // the common entity destructor. MOTION_PATH (FUN_06f42cb0) releases +0xe8
+    // (bound path object) and +0xcc (descriptor's path object) before the
+    // path-type string and +0xd0.
     if (bMotionPathDescriptorOwner)
     {
         FThornControlReleaseStage<IMotionPath> RuntimeTeardown(MotionPath);
@@ -6328,8 +6202,8 @@ FThornEntity::~FThornEntity() noexcept(false)
             }
         };
         FPathTypeTeardownStage PathTypeTeardown{this};
-        // 42ce1/42cee read each live owner after the preceding Release callback.
-        // 426f0 construction unwind has only string/runtime/common stages.
+        // Each pointer is read after the preceding Release. A constructor
+        // (FUN_06f426f0) unwind has only the string/runtime/common stages.
         if (bMotionPathConstructionComplete)
         {
             if (MotionPathBoundObject != nullptr)
@@ -6337,7 +6211,7 @@ FThornEntity::~FThornEntity() noexcept(false)
             if (Snap.MotionPath.MotionPath != nullptr)
                 Snap.MotionPath.MotionPath->Release();
         }
-        // RAII also unwinds sole string then live runtime +d0 after either throw.
+        // The stages above free the string, then +0xd0, even if a Release throws.
     }
     else
         ReleaseControl(MotionPathBoundObject);
@@ -6357,13 +6231,14 @@ FThornEntity::~FThornEntity() noexcept(false)
     }
     else if (bPsysOwner)
     {
-        // 434f0 specializes only +cc; base strings/UserProps precede +14/+10.
+        // FUN_06f434f0 adds only +0xcc; the common base frees strings and
+        // UserProps before +0x14/+0x10.
         ReleaseControl(PsysControl);
     }
     else if (bCameraOwner)
     {
-        // 41210 destruction is distinct from 417e0 Detach: no reciprocal
-        // UnbindMonitorChildren, and +e8 is released BEFORE +e4.
+        // FUN_06f41210, unlike Detach (FUN_06f417e0): no reciprocal
+        // UnbindMonitorChildren, and +0xe8 is released before +0xe4.
         struct FMonitorTeardownStage
         {
             FThornMonitorLinks& Links;
@@ -6375,21 +6250,15 @@ FThornEntity::~FThornEntity() noexcept(false)
     }
     else
         ReleaseDerivedControls();
-    // 41277..412bb deletes each local node without touching its child owner.
-    // The member's RAII destructor also clears nodes if a control throws.
+    // Deletes each node without touching the linked entity.
     MonitorLinks.Clear();
 
 }
 
 void FThornEntity::ReleaseCommonEntityState()
 {
-    // Retail FUN_06f405e0 (the common-base entity destructor) owns this
-    // teardown directly: it walks the type-3 refcounted strings and the
-    // UserProps tree/sentinel pair before releasing the two bound controls.
-    // The modern equivalents are owned here rather than by the scene-level
-    // FThornScene::DestroyEntity caller so that any direct destruction of an
-    // FThornEntity observes the same cleanup retail's destructor performs
-    // unconditionally.
+    // FUN_06f405e0 (common entity destructor): frees the ref-counted strings
+    // and the UserProps tree, then releases the two bound controls.
     UserProps.reset();
     TemplateStorage.reset();
     NameStorage.reset();
@@ -6397,13 +6266,13 @@ void FThornEntity::ReleaseCommonEntityState()
     PathType = nullptr;
     delete[] PathData;
     PathData = nullptr;
-    // Common405e0: all concrete owners reach live User before live Geo.
+    // User is released before Geo.
     {
-        // Geo is read when this stage runs, including User Release unwinding.
+        // Geo is read when this stage runs, also when the User Release throws.
         FThornControlReleaseStage<IGeoTransformControl> GeoTeardown(GeoControl);
         ReleaseControl(UserEventControl);
     }
-    // Common retail destructor 405e0 does not delete borrowed inner+4.
+    // Borrowed (+0x4); not deleted.
     ParentCsys = nullptr;
 }
 
@@ -6437,21 +6306,13 @@ void FThornEntity::InnerUnused1()
 
 void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
 {
-    // FUN_06f41c50 / FUN_06f41fe0 / FUN_06f42410 / FUN_06f42a10 / FUN_06f43590 are the
-    // per-type implementations of this operation in retail.  The common
-    // descriptor has already been copied by FThornScene::ApplyEntitySnap;
-    // this method owns the type-specific tail that can be represented by the
-    // native snapshot.  The retail engine-resource callback chain is
-    // intentionally not fabricated here: it is supplied by the object bound
-    // through Attach and has a different VC6/vtable ABI.
-    // FUN_06f41fe0 (thorn.dll.txt:65968-66062) and its per-type siblings:
-    // right after the snapshot/name copy, when a parent Csys is bound, the
-    // incoming world-space pose is converted into the parent frame in
-    // place -- math vtbl+0x38 TransposeTransform of the parent position,
-    // FUN_06f22d50 negate, FUN_06f428b0 transpose of the parent 3x3 and
-    // FUN_06f3b970 pack (= InvertParentCsys), then vtbl+0x28 Transform for
-    // Snap.Pos and vtbl+0x20 MulMatrix for Snap.Orient.  Both results are
-    // copied back unconditionally; the GENRESULTs are never tested.
+    // Retail per-type versions: FUN_06f41c50 / FUN_06f41fe0 / FUN_06f42410 /
+    // FUN_06f42a10 / FUN_06f43590. The common descriptor was already copied
+    // by FThornScene::ApplyEntitySnap; this is the type-specific tail.
+    // With a parent Csys bound, the incoming world pose is first converted
+    // into the parent frame in place (parent inverse, then math +0x28
+    // Transform for Pos and +0x20 MulMatrix for Orient); the GENRESULTs are
+    // not tested.
     if (ParentCsys != nullptr)
     {
         float Inv[12];
@@ -6465,13 +6326,10 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
         CopyPoseWordsForward(Snap.Orient, LocalOrient, 9);
     }
 
-    // Every retail per-type ApplyDesc ends with FUN_06f40c40 / FUN_06f40c60
-    // (thorn.dll.txt:66063-66071 for MARKER/HARDPOINT): a plain copy of the
-    // (parent-converted) Snap pose into entity +0x38 / +0x44.  No control
-    // publish happens on this path -- the non-virtual FUN_06f40900 /
-    // FUN_06f40ab0 calls are issued by the constructors only, with a null
-    // GeoControl, and UpdateEntityFromDesc (LAB_06f38bd0) invokes slot 2
-    // alone.  LoadPos/LoadOrient are what IScriptEngine slots 10/11 report.
+    // Every per-type ApplyDesc ends with FUN_06f40c40 / FUN_06f40c60: a plain
+    // copy of the Snap pose into entity +0x38 / +0x44, no control publish
+    // (FUN_06f40900 / FUN_06f40ab0 are called by the constructors only).
+    // LoadPos/LoadOrient are what IScriptEngine slots 10/11 report.
     CopyPoseWordsForward(LoadPos, Snap.Pos, 3);
     CopyPoseWordsForward(LoadOrient, Snap.Orient, 9);
 
@@ -6495,7 +6353,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     {
         if ((SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntitySound)
             CopyPoseWordsForward(Snap.Audio, SnapIn->Audio, 8);
-        // 42576..42595 reads Name/Template only after the saved pose and tail.
+        // Name/Template are read after the pose and tail.
         Snap.Name = AssignEntityName(SnapIn->Name);
         Snap.TemplateName = AssignEntityTemplate(SnapIn->TemplateName);
     }
@@ -6507,7 +6365,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     if (DescriptorOwnerType == kThornEntityLight &&
         (SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityLight)
     {
-        // 41dc1..41dd3: saved pose precedes live Flags/Type and raw36 tail.
+        // Raw 36-word tail copy.
         for (int Index = 0; Index < 36; ++Index)
         {
             unsigned int Word;
@@ -6522,18 +6380,17 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
         (SnapIn->Flags & 1) == 0 &&
         (SnapIn->Type == kThornEntityCompound || SnapIn->Type == kThornEntityDeformable))
     {
-        // 40f80 changes the retained descriptor; 40f90 owns runtime publication.
+        // Only the descriptor copy (FUN_06f40f80); FUN_06f40f90 sets the runtime value.
         std::memcpy(&Snap.FloorHeight, &SnapIn->FloorHeight, sizeof(Snap.FloorHeight));
     }
 
     if (DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor)
     {
-        // 4144e/4145c load pose BEFORE 41463 reciprocal unlink. The input
-        // flags/type/tail are read only after that operation has completed.
+        // The input flags/type/tail are read only after the unlink.
         UnbindMonitorChildren(this);
         if ((SnapIn->Flags & 1) == 0 && SnapIn->Type == kThornEntityCamera)
         {
-            // 41510 raw Near/Far/Fov/Aspect stores preserve partial aliases.
+            // Raw stores in Near/Far/Fov/Aspect order.
             const int StoreOrder[4] = {1, 2, 0, 3};
             for (int Index = 0; Index < 4; ++Index)
             {
@@ -6562,9 +6419,8 @@ float* FThornEntity::InnerGetOrient()
 
 void FThornEntity::InnerSetPos(const float* Pos)
 {
-    // FUN_06f40900 / LAB_06f49f00 thiscall vtable+0x0C RET 4.
-    // CAMERA: FUN_06f41490 -- after store, type!=4 fans out list +0x88 via child +0x0C.
-    // 40914..40921 are raw forward word transfers, including overlap.
+    // FUN_06f40900 / LAB_06f49f00 (vtable +0x0c). CAMERA (FUN_06f41490): after
+    // the store, a non-MONITOR fans out to the +0x88 list via child +0x0c.
     for (int Index = 0; Index < 3; ++Index)
     {
         unsigned int Word;
@@ -6580,15 +6436,13 @@ void FThornEntity::InnerSetPos(const float* Pos)
             const FThornCsys* Parent = ParentCsys;
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
             float Out[3];
-            // Retail FUN_06f40900 copies the transform result into World
-            // unconditionally after the call -- it never inspects the
-            // returned GENRESULT before consuming the output buffer.
+            // The GENRESULT is not tested.
             SceneMathTransform(Math, Out, Parent->Orient, Pos);
             std::memcpy(World, Out, sizeof(World));
         }
         GeoControl->SetPosition(const_cast<float*>(World));
     }
-    // Only concrete CAMERA/MONITOR dispatch enters 41490's late fanout.
+    // Only CAMERA/MONITOR entities fan out (FUN_06f41490).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
         Snap.Type != kThornEntityMonitor)
     {
@@ -6596,17 +6450,16 @@ void FThornEntity::InnerSetPos(const float* Pos)
         while (Node != MonitorLinks.Sentinel)
         {
             Node->Entity->InnerSetPos(Pos);
-            Node = Node->Next; // 414c0: AFTER child virtual callback.
+            Node = Node->Next; // Read after the child callback.
         }
     }
 }
 
 void FThornEntity::InnerSetOrient(const float* Mat9)
 {
-    // FUN_06f40ab0 / LAB_06f49f20 thiscall vtable+0x10 RET 4.
-    // CAMERA: FUN_06f414d0 -- after store, the camera owner fans out its
-    // linked list through child +0x10; type-4 monitor nodes are terminal.
-    // 40acb REP MOVSD copies forward; do not collapse overlapping input.
+    // FUN_06f40ab0 / LAB_06f49f20 (vtable +0x10). CAMERA (FUN_06f414d0): after
+    // the store, fans out to the linked list via child +0x10; MONITOR nodes
+    // are terminal. Forward word copy (REP MOVSD), defined for overlap.
     for (int Index = 0; Index < 9; ++Index)
     {
         unsigned int Word;
@@ -6622,15 +6475,13 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
             const FThornCsys* Parent = ParentCsys;
             I3DMathEngine* Math = AcquireSceneEventMathEngine();
             float Out9[9];
-            // Retail FUN_06f40ab0 copies the mul-matrix result into World
-            // unconditionally after the call -- it never inspects the
-            // returned GENRESULT before consuming the output buffer.
+            // The GENRESULT is not tested.
             SceneMathMulMatrix(Math, Out9, Parent->Orient, Mat9);
             std::memcpy(World, Out9, sizeof(World));
         }
         GeoControl->SetOrientation(const_cast<float*>(World));
     }
-    // Only concrete CAMERA/MONITOR dispatch enters 414d0's late fanout.
+    // Only CAMERA/MONITOR entities fan out (FUN_06f414d0).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
         Snap.Type != kThornEntityMonitor)
     {
@@ -6638,14 +6489,14 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
         while (Node != MonitorLinks.Sentinel)
         {
             Node->Entity->InnerSetOrient(Mat9);
-            Node = Node->Next; // 41500: AFTER child virtual callback.
+            Node = Node->Next; // Read after the child callback.
         }
     }
 }
 
 void FThornEntity::CaptureAudioProps(float* Out8)
 {
-    // 423d3..42400: optional GET, then raw forward REP8 with ignored HRESULT.
+    // Optional GET (result ignored), then a raw forward 8-word copy.
     ISoundControl* Control = SoundControl;
     if (Control != nullptr)
         Control->GetAudioProps(Audio, -1);
@@ -6654,8 +6505,8 @@ void FThornEntity::CaptureAudioProps(float* Out8)
 
 void FThornEntity::InitializeSoundDefaults()
 {
-    // FUN_06f42210 descriptor defaults: dmin=1, dmax=1e9, raw integer cones=360.
-    // The constructor copies these retained words to the runtime cache after ApplyDesc.
+    // FUN_06f42210 descriptor defaults: dmin=1, dmax=1e9, integer cones=360.
+    // The constructor copies them to the runtime cache after ApplyDesc.
     std::memset(Audio, 0, sizeof(Audio));
     AudioMask = 0;
     Audio[2] = 1.0f;
@@ -6669,20 +6520,18 @@ void FThornEntity::InitializeSoundDefaults()
 void FThornEntity::ReleaseLightControls()
 {
     // FUN_06f41a20: +0x15c (ID3DLightControl), then +0x158 (ILightControl).
-    // The modern owner stores these as typed interface members, so each slot
-    // is released and cleared without exposing the retail object offsets.
     FThornControlReleaseStage<ILightControl> LightTeardown(LightControl);
     ReleaseControl(D3dLightControl);
 }
 
 void FThornEntity::InnerUnbindControls()
 {
-    // These standalone slot+24 sequences differ from deleting destructors.
-    // Concrete owner selects the slot even if ApplyDesc changes Snap.Type.
+    // Entity vtable +0x24; the release orders differ from the destructors'.
+    // Keyed on the constructed type, even if ApplyDesc changed Snap.Type.
     const int Type = DescriptorOwnerType;
     if (Type == kThornEntityCompound || Type == kThornEntityDeformable)
     {
-        // 410a0: +10, +d0, +cc, +14, +d4.
+        // FUN_06f410a0: +0x10, +0xd0, +0xcc, +0x14, +0xd4.
         ReleaseControl(GeoControl);
         ReleaseControl(IkControl);
         ReleaseControl(CompoundControl);
@@ -6691,7 +6540,7 @@ void FThornEntity::InnerUnbindControls()
     }
     else if (Type == kThornEntityCamera || Type == kThornEntityMonitor)
     {
-        // 417e0: child unlink, +e4, +10, +14, +e8.
+        // FUN_06f417e0: child unlink, +0xe4, +0x10, +0x14, +0xe8.
         UnbindMonitorChildren(this);
         ReleaseControl(CameraControl);
         ReleaseControl(GeoControl);
@@ -6700,7 +6549,7 @@ void FThornEntity::InnerUnbindControls()
     }
     else if (Type == kThornEntityLight)
     {
-        // 41ed0: +158 BEFORE +15c, unlike deleting-dtor 41a20.
+        // FUN_06f41ed0: +0x158 before +0x15c, unlike the destructor (FUN_06f41a20).
         ReleaseControl(LightControl);
         ReleaseControl(D3dLightControl);
         ReleaseControl(GeoControl);
@@ -6708,7 +6557,7 @@ void FThornEntity::InnerUnbindControls()
     }
     else if (Type == kThornEntitySound)
     {
-        // 42690: +10, +e8, +14, +ec.
+        // FUN_06f42690: +0x10, +0xe8, +0x14, +0xec.
         ReleaseControl(GeoControl);
         ReleaseControl(SoundControl);
         ReleaseControl(UserEventControl);
@@ -6724,14 +6573,14 @@ void FThornEntity::InnerUnbindControls()
     }
     else if (Type == kThornEntityPsys)
     {
-        // 437e0: +10, +cc, +14; this is PSYS, not MOTION_PATH.
+        // FUN_06f437e0 (PSYS): +0x10, +0xcc, +0x14.
         ReleaseControl(GeoControl);
         ReleaseControl(PsysControl);
         ReleaseControl(UserEventControl);
     }
     else
     {
-        // 421e0: +10, +14.
+        // FUN_06f421e0: +0x10, +0x14.
         ReleaseControl(GeoControl);
         ReleaseControl(UserEventControl);
     }
@@ -6740,12 +6589,12 @@ void FThornEntity::InnerUnbindControls()
 
 void FThornEntity::ReleaseDerivedControls()
 {
-    // Concrete destructor identity stays fixed when binding or Snap.Type changes.
-    // Common User/Geo owners are released after the common owned-data teardown.
+    // Keyed on the constructed type. The common User/Geo controls are released
+    // later, after the common data teardown.
     const int Type = DescriptorOwnerType;
     if (Type == kThornEntityCompound || Type == kThornEntityDeformable)
     {
-        // Reverse destruction reads each live field only at its retail stage.
+        // Each field is read only when its stage runs.
         FThornControlReleaseStage<ICompoundControl> CompoundTeardown(CompoundControl);
         FThornControlReleaseStage<IIKControl> IkTeardown(IkControl);
         ReleaseControl(SubtitleControl);
@@ -6780,9 +6629,8 @@ void FThornEntity::ReleaseSceneBoundControls()
 
 void FThornEntity::ReleaseMotionPathControls()
 {
-    // FUN_06f42c60: release +0xd0 (IMotionPath), then +0x10 (IGeo), then
-    // +0x14 (IUserEvent), and clear the bound state. This is the observed
-    // retail order; it is not the reverse of the bind QI sequence.
+    // FUN_06f42c60: +0xd0 (IMotionPath), +0x10 (IGeo), +0x14 (IUserEvent);
+    // retail order, not the reverse of the bind sequence.
     ReleaseControl(MotionPath);
     ReleaseControl(GeoControl);
     ReleaseControl(UserEventControl);
@@ -6791,21 +6639,18 @@ void FThornEntity::ReleaseMotionPathControls()
 
 void FThornEntity::BindMotionPathFromDescObject()
 {
-    // FUN_06f427d0 (thorn.dll.txt:66842-66935), called by the MOTION_PATH
-    // constructor FUN_06f426f0 (66792-66794) with &this+0xc8, i.e. the
-    // entity's own mutable Snap.MotionPath descriptor pair.
-    // Both 427f9 and 4292e address the SAME +d4 string owner. The +e4
-    // pointer refreshed at 4283f is a second cache, never a second owner;
-    // its private self-assignment/allocation contract remains unverified.
-    // Publish +e4 before any interface callbacks. Null clears only the cache.
+    // FUN_06f427d0, called by the MOTION_PATH constructor (FUN_06f426f0) with
+    // the entity's own Snap.MotionPath pair (+0xc8). The +0xe4 pointer is a
+    // second cache of the one +0xd4 string, set before any interface call;
+    // null clears only the cache. Retail's self-assignment/allocation details
+    // for it are unconfirmed.
     const char* Source = Snap.MotionPath.PathType;
     MotionPathBoundType = Source != nullptr ? AssignMotionPathType(this, Source, true) : nullptr;
-    // The object part: Release the old +0xe8, +0xe8 = +0xcc,
-    // and if non-null AddRef it, Release +0xd0, then QueryInterface
+    // Release the old +0xe8, +0xe8 = +0xcc (AddRef), release +0xd0, then QI
     // "1.11_IMotionPath" from +0xe8 straight into +0xd0.
     if (MotionPathBoundObject != nullptr)
         MotionPathBoundObject->Release();
-    // 42862/42866 reread the public owning field AFTER the Release callback.
+    // +0xcc is reread after the Release.
     MotionPathBoundObject = Snap.MotionPath.MotionPath;
     if (MotionPathBoundObject == nullptr)
         return;
@@ -6820,7 +6665,7 @@ FThornEntity* FThornScene::AddEntity()
     FThornEntity* Entity = new (std::nothrow) FThornEntity();
     if (Entity == nullptr)
         return nullptr;
-    // Unique signed-key insertion retains the existing payload on collision.
+    // A key collision keeps the existing entity.
     Entities_.insert(std::make_pair(EntityCount_, Entity));
     EntityCount_ = static_cast<int>(static_cast<unsigned int>(EntityCount_) + 1u);
     return Entity;
@@ -6859,15 +6704,14 @@ bool FThornScene::EntityExists(int Index) const
 
 void FThornScene::DestroyEntity(FThornEntity* Entity)
 {
-    // Clear calls the concrete deleting destructor directly. RemoveEntityAt
-    // performs its explicit inner unbind before reaching this owner. Derived
-    // controls and common data are released only in ~FThornEntity().
+    // RemoveEntityAt unbinds before calling this; controls and common data
+    // are released only in ~FThornEntity().
     delete Entity;
 }
 
 namespace
 {
-    // FUN_06f40380 receives the complete common packet by value at its callers.
+    // FUN_06f40380; callers pass the common packet by value.
     void PackEntitySnapCommon(FThornEntitySnap* Destination,
                               const FThornEntitySnap& Snapshot)
     {
@@ -6885,8 +6729,8 @@ namespace
 
 void FThornScene::ApplyEntitySnap(FThornEntity* Entity, const FThornEntitySnap* Snap)
 {
-    // All concrete ApplyDesc callers pass a 17-DWORD common snapshot before
-    // the leaf publishes it. Name/Template inputs are reread afterwards.
+    // Retail passes a 17-dword snapshot of the common part; Name/Template are
+    // reread from the input afterwards.
     FThornEntitySnap CommonSnapshot;
     std::memcpy(&CommonSnapshot, Snap, offsetof(FThornEntitySnap, Fovh));
     PackEntitySnapCommon(&Entity->Snap, CommonSnapshot);
@@ -6895,14 +6739,13 @@ void FThornScene::ApplyEntitySnap(FThornEntity* Entity, const FThornEntitySnap* 
         Entity->Snap.Name = Entity->AssignEntityName(Snap->Name);
         Entity->Snap.TemplateName = Entity->AssignEntityTemplate(Snap->TemplateName);
     }
-    // Concrete CAMERA replay owns its LoadPose/unlink/late-tail sequence.
     Entity->InnerApplyDesc(Snap);
 }
 
 bool FThornScene::EventAllowsMissingSecondary(int Type)
 {
-    // Table 06f3a1e8 indexed by type-2: 0 -> fail, 1 -> continue.
-    // Types 2/6/8/9/11 fail when secondary < 0; others continue (incl. type 1 via JA).
+    // Table at 06f3a1e8, indexed by type-2: types 2/6/8/9/11 fail when the
+    // secondary is < 0; all others (type 1 included) continue.
     if (Type == kThornTypeSetCamera || Type == kThornTypePathAnim ||
         Type == kThornTypeAttachEntity || Type == kThornTypeConnectHardpoints ||
         Type == kThornTypeStartIk)
@@ -6912,7 +6755,7 @@ bool FThornScene::EventAllowsMissingSecondary(int Type)
 
 FThornEvent** FThornScene::EraseMasterEventAt(FThornEvent** Slot)
 {
-    // 3a249..3a26e removes MASTER publication before the first Stop callback.
+    // Removed from MASTER before the first Stop callback.
     FThornEvent* Event = *Slot;
     FThornEvent** MasterEnd = Master_ + MasterCount_;
     for (FThornEvent** Read = Slot + 1; Read != MasterEnd; ++Read)
@@ -6942,7 +6785,7 @@ FThornEvent** FThornScene::EraseMasterEventAt(FThornEvent** Slot)
         } while (ActiveSlot != Active_ + ActiveCount_);
     }
 
-    // 3a2d3..3a30c erases only the first PENDING match. STOPLIST is untouched.
+    // Only the first PENDING match is erased; STOPLIST is untouched.
     for (int PendingIndex = 0; PendingIndex != PendingCount_; ++PendingIndex)
     {
         if (Pending_[PendingIndex] != Event)
@@ -6958,8 +6801,8 @@ FThornEvent** FThornScene::EraseMasterEventAt(FThornEvent** Slot)
 
 void FThornScene::FinalizeLoad(int DurationMs)
 {
-    // Slot4_Load 3831d sets state before the parser's second GetDuration.
-    // 38335 stores that duration, then 3833f..38414 sorts only MASTER.
+    // Tail of the scene load (IScriptEngine slot 4): store the duration, then
+    // sort MASTER only.
     DurationMs_ = DurationMs;
     SortMasterEvents(Master_, MasterCount_);
 }
@@ -6983,9 +6826,9 @@ int FThornScene::FindEntityByName(const char* Name) const
 
 FThornEntity** FThornScene::FindEntityEntry(int Index)
 {
-    // 4aa40 exact-find / 4af00 signed lower_bound plus caller equality gate.
-    // Insertion preserves this selected payload address. Erasing that entry
-    // invalidates it, as the retail node does; no guessed lifetime guard.
+    // FUN_06f4aa40 / FUN_06f4af00: signed lower_bound plus an equality test.
+    // The returned address survives insertions; erasing the entry invalidates
+    // it, as with retail's tree node.
     std::map<int, FThornEntity*>::iterator Entry = Entities_.lower_bound(Index);
     if (Entry == Entities_.end() || Index < Entry->first)
         return nullptr;
@@ -7044,7 +6887,7 @@ FThornEntitySnap* FThornScene::EntitySnapInorder(int Index)
 
 unsigned long FThornScene::UserPropCount(int Index) const
 {
-    // LAB_06f38ca0: lookup by key; *(inner+0x80). Miss -> 0.
+    // LAB_06f38ca0: lookup by key, entity +0x80; a miss gives 0.
     if (!EntityExists(Index))
         return 0;
     return static_cast<unsigned long>(EntityAt(Index)->UserProps->size());
@@ -7052,7 +6895,7 @@ unsigned long FThornScene::UserPropCount(int Index) const
 
 const char* FThornScene::UserPropKey(int Index, int N) const
 {
-    // LAB_06f38d20: slot 31 then n inorder steps from inner+0x74; node+0x10 or "".
+    // LAB_06f38d20: slot 31, then N in-order steps from entity +0x74.
     if (!EntityExists(Index))
         return nullptr;
     return NthSortedUserPropKey(EntityAt(Index), N);
@@ -7062,10 +6905,9 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
 {
     if (!EntityExists(Index))
         return GR_GENERIC;
-    // LAB_06f38950 (thorn.dll.txt:48024-48120): Index >= this+0xa0 or a
-    // missing tree entry -> -1; else copy entity +0x38 (the ApplyDesc-time
-    // pose, not the live Snap.Pos) and, with a parent Csys, math vtbl+0x28
-    // Transform through it.  AL/EAX = 0 on success.
+    // LAB_06f38950: Index >= this+0xa0 or a missing entry -> -1; else copy
+    // entity +0x38 (the ApplyDesc-time pose, not the live Snap.Pos) and, with a
+    // parent Csys, math +0x28 Transform through it.
     FThornEntity* Entity = EntityAt(Index);
     CopyPoseWordsForward(OutVec3, Entity->LoadPos, 3);
     const FThornCsys* Parent = Entity->ParentCsys;
@@ -7075,12 +6917,11 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
         FTransform ParentInput;
         FVector PositionInput;
         FVector World;
-        // The captured parent and output pose remain live until acquisition returns.
         std::memcpy(&ParentInput.Rotation, Parent->Orient, sizeof(ParentInput.Rotation));
         std::memcpy(&ParentInput.Translation, Parent->Pos, sizeof(ParentInput.Translation));
         std::memcpy(&PositionInput, OutVec3, sizeof(PositionInput));
         Math->TransformXform(World, ParentInput, PositionInput);
-        // 38a46..38a57 loads all three result words before publishing them.
+        // All three result words are loaded before any is stored.
         unsigned int ResultWords[3];
         std::memcpy(ResultWords, &World, sizeof(ResultWords));
         std::memcpy(OutVec3, ResultWords, sizeof(ResultWords));
@@ -7092,9 +6933,8 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
 {
     if (!EntityExists(Index))
         return GR_GENERIC;
-    // LAB_06f38a80 (thorn.dll.txt:48136-48244): same lookup as slot 10, then
-    // REP MOVSD 9 dwords from entity +0x44 and, with a parent Csys, math
-    // vtbl+0x20 MulMatrix by the parent orientation.
+    // LAB_06f38a80: same lookup as slot 10, then 9 dwords from entity +0x44
+    // and, with a parent Csys, math +0x20 MulMatrix by its orientation.
     FThornEntity* Entity = EntityAt(Index);
     CopyPoseWordsForward(OutMat9, Entity->LoadOrient, 9);
     const FThornCsys* Parent = Entity->ParentCsys;
@@ -7116,8 +6956,8 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
 
 GENRESULT FThornScene::Attach(int Index, void* EngineObj)
 {
-    // Slot 12: lookup + inner thiscall vtable+0x20. Does not AddRef engineObj.
-    // Bind(NULL) AVs in retail QI -- callers must use Detach (slot 13 / +0x24).
+    // Slot 12: lookup + entity vtable +0x20. Does not AddRef EngineObj.
+    // A null EngineObj crashes in retail's QI; callers use Detach (slot 13).
     FThornEntity* Entity = EntityAt(Index);
     if (Entity == nullptr)
         return GR_GENERIC;
@@ -7126,8 +6966,7 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
         Entity->DescriptorOwnerType != kThornEntitySubScene)
         return GR_GENERIC;
 
-    // The constructor's concrete vtable selects this bind sequence even when
-    // slot 2 replaces the published descriptor Type.
+    // Keyed on the constructed type, even if slot 2 changed the descriptor Type.
     Entity->EngineObj = EngineObj;
     const int EntType = Entity->DescriptorOwnerType;
     Entity->BoundControlType = EntType;
@@ -7178,7 +7017,7 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
         BindLiveEntityControl(EngineObject, Iids::FogControl, Entity->FogControl, Result);
         BindLiveEntityControl(EngineObject, Iids::ReverbControl, Entity->ReverbControl, Result);
         BindLiveEntityControl(EngineObject, Iids::SubtitleControl, Entity->SubtitleControl, Result);
-        // 43375..433af: test retained descriptor, update descriptor and runtime together.
+        // Sentinel 6 in the descriptor is replaced in descriptor and runtime alike.
         if (Entity->Snap.SceneBlob[6] == 6)
         {
             Entity->Snap.SceneBlob[6] = 5;
@@ -7218,7 +7057,7 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
 
 GENRESULT FThornScene::Detach(int Index)
 {
-    // Slot 13: inner vtable+0x24 unbind. Not Attach(index, NULL).
+    // Slot 13: entity vtable +0x24 unbind. Not Attach(index, NULL).
     // CAMERA FUN_06f417e0: FUN_06f416b0 (drop child monitors) then Release.
     FThornEntity* Entity = EntityAt(Index);
     if (Entity == nullptr)
@@ -7233,8 +7072,8 @@ GENRESULT FThornScene::Detach(int Index)
 
 void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrient)
 {
-    // 3b530/3b6c0 retain each inner across both getters and setters.
-    // Advance the live signed-key iterator only after that inner's callbacks.
+    // FUN_06f3b530/06f3b6c0: the entity pointer is kept across its getters and
+    // setters; the iterator advances only after them.
     for (std::map<int, FThornEntity*>::iterator Entry = Entities_.begin();
          Entry != Entities_.end(); ++Entry)
     {
@@ -7244,8 +7083,8 @@ void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrie
         float PositionWords[3];
         float OrientationWords[9];
         Entity->GeoControl->GetPosition(PositionWords);
-        // Reload this retained inner's GeoControl after GetPosition; retail
-        // performs no second null check and gets orientation before any math.
+        // GeoControl is reloaded without a second null check; orientation is
+        // read before any math.
         if (bOrient)
             Entity->GeoControl->GetOrientation(OrientationWords);
 
@@ -7259,8 +7098,8 @@ void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrie
 
         if (bOrient)
         {
-            // Reacquire the shared cache after InnerSetPos, then read the
-            // stable orientation captured before that callback.
+            // The math engine is reacquired after InnerSetPos; the orientation
+            // was captured before it.
             Math = AcquireSceneCsysMathEngine();
             FMatrix Orientation;
             FMatrix OrientationResult;
@@ -7279,11 +7118,11 @@ GENRESULT FThornScene::UserProp(void* Handle, const char* Key, char** Out)
         return GR_GENERIC;
     FThornUserProps::iterator Prop;
     {
-        // 38e97 strlen and owning key construction occur only after entity gates.
+        // The key is built only after the entity checks.
         const std::string KeyOwner(Key, std::strlen(Key));
         Prop = EntityAt(Index)->UserProps->find(KeyOwner);
     }
-    // Retail destroys the temporary key before the final entity/end reread.
+    // Retail destroys the temporary key before rereading the entity.
     if (Prop == EntityAt(Index)->UserProps->end())
         return GR_GENERIC;
     *Out = Prop->second.data();
@@ -7296,17 +7135,15 @@ GENRESULT FThornScene::SetUserProp(int Index, const char* Key, const char* Value
         return GR_GENERIC;
     FThornUserProps::iterator Prop;
     {
-        // 39035..3908f: own the lookup key, then destroy it after lookup.
         const std::string KeyOwner(Key, std::strlen(Key));
         Prop = EntityAt(Index)->UserProps->find(KeyOwner);
     }
     if (Prop != EntityAt(Index)->UserProps->end())
     {
-        // 390ce/390d8: length before assignment; std::string supports self-alias.
         Prop->second.assign(Value, std::strlen(Value));
         return GR_OK;
     }
-    // 390f3..391b4: value owner, key owner, pair copies, then unique insertion.
+    // Value string, key string, pair copy, then a unique insert.
     const std::string ValueOwner(Value, std::strlen(Value));
     const std::string KeyOwner(Key, std::strlen(Key));
     const std::pair<std::string, std::string> Property(KeyOwner, ValueOwner);
@@ -7316,24 +7153,20 @@ GENRESULT FThornScene::SetUserProp(int Index, const char* Key, const char* Value
 
 GENRESULT FThornScene::AddEntityFromDesc(void* Desc, int* OutIndex)
 {
-    // LAB_06f3a3f0: write -1, construct completely, bind axes, publish, then
-    // write the current index and increment the bound count (3a766..3a77e).
+    // LAB_06f3a3f0: write -1, construct, bind axes, insert, then write the
+    // index and increment the count.
     *OutIndex = -1;
     const FThornEntitySnap* Snap = static_cast<const FThornEntitySnap*>(Desc);
     const int Type = Snap->Type;
     if (Type < 1 || Type > 13 || Type == 12)
         return GR_GENERIC;
-    // Use the required current throwing allocator. The retail import's obsolete
-    // null result and subsequent null payload/AV paths are not a modern CRT ABI.
+    // Throwing new; retail's VC6 operator new could return null and then crash.
     FThornEntity* Entity = new FThornEntity(Type, Snap, this);
-    // 3a455/3a5ef/3a643..3a689: append after the typed constructor,
-    // before owner bindings and before main entity-map publication.
+    // Frame list append after construction, before bindings and map insert.
     RegisterFrameEntity(Entity);
     BindEntitySceneAxes(Entity);
-    // Retail clears the raw allocation unwind state before tree insertion.
-    // No guessed delete/RAII ownership of a completed object is added here.
-    // 3a6b4..3a761 unique signed tree insertion; collision keeps old payload.
-    // Completed-object ownership is not guessed on insertion failure/collision.
+    // Unique signed-key insert; on a collision the old entity stays and the
+    // new one leaks, as in retail.
     Entities_.insert(std::make_pair(EntityCount_, Entity));
     *OutIndex = EntityCount_;
     EntityCount_ = static_cast<int>(static_cast<unsigned int>(EntityCount_) + 1u);
@@ -7344,10 +7177,11 @@ GENRESULT FThornScene::AddEntityFromDesc(void* Desc, int* OutIndex)
 
 GENRESULT FThornScene::RemoveEntityAt(int Index)
 {
-    // FUN_06f3a7e0: erase events that bind this inner; dtor entity; map erase. Bound not decremented.
+    // FUN_06f3a7e0: erase events that reference the entity, destroy it, erase
+    // the map entry. EntityCount_ is not decremented.
     if (!EntityExists(Index))
         return GR_GENERIC;
-    // 3a834 keeps the selected node through all event/unbind callbacks.
+    // The node found here is kept through all event/unbind callbacks.
     std::map<int, FThornEntity*>::iterator Entry = Entities_.find(Index);
     if (MasterCount_ != 0)
     {
@@ -7361,7 +7195,6 @@ GENRESULT FThornScene::RemoveEntityAt(int Index)
                 ++EventSlot;
         } while (EventSlot != Master_ + MasterCount_);
     }
-    // 3a885..3a8c8 removes every pointer match before the entity callback/dtor.
     std::list<FThornEntity*>::iterator FrameIt = FrameEntities_->begin();
     while (FrameIt != FrameEntities_->end())
     {
@@ -7370,7 +7203,7 @@ GENRESULT FThornScene::RemoveEntityAt(int Index)
         else
             ++FrameIt;
     }
-    // 3a8d9 invokes the concrete inner+24 unbind BEFORE deleting-dtor/map erase.
+    // Entity vtable +0x24 unbind before the destructor and map erase.
     Entry->second->InnerUnbindControls();
     DestroyEntity(Entry->second);
     Entities_.erase(Entry);
@@ -7379,7 +7212,7 @@ GENRESULT FThornScene::RemoveEntityAt(int Index)
 
 GENRESULT FThornScene::UpdateEntityFromDesc(int Index, void* Desc)
 {
-    // LAB_06f38bd0: lookup; inner vtable+0x08 apply-desc.
+    // LAB_06f38bd0: lookup, then entity vtable +0x08 (apply desc).
     if (!EntityExists(Index))
         return GR_GENERIC;
     ApplyEntitySnap(EntityAt(Index), static_cast<const FThornEntitySnap*>(Desc));
@@ -7388,7 +7221,8 @@ GENRESULT FThornScene::UpdateEntityFromDesc(int Index, void* Desc)
 
 GENRESULT FThornScene::AddEventFromDesc(const void* Desc, int* OutId)
 {
-    // LAB_06f39b50: *out=-1; primary in map; secondary in map unless <0 and table allows.
+    // LAB_06f39b50: *OutId = -1; the primary must exist; the secondary too,
+    // unless it is < 0 and the type allows that.
     *OutId = -1;
     const int Primary = ReadEventWord(Desc, 7);
     if (!EntityExists(Primary))
@@ -7402,26 +7236,25 @@ GENRESULT FThornScene::AddEventFromDesc(const void* Desc, int* OutId)
     else if (!EntityExists(Secondary))
         return GR_GENERIC;
 
-    // 39c5a rereads the type after validation. An unknown type returns
-    // success with the initial -1 output; allocation uses our throwing CRT.
+    // The type is reread after validation. An unknown type returns success
+    // with *OutId still -1.
     const int Type = ReadEventWord(Desc, 0);
     if (Type < kThornEventTypeMin || Type > kThornEventTypeMax)
         return GR_OK;
     FThornEvent* Event = new FThornEvent(Type, Desc);
 
     BindEventSceneAxes(Event);
-    // 39fe6 CMP / 39fe9 JA: scan past equal unsigned start-time keys.
+    // Insert after equal start times (unsigned compare).
     int Pos = 0;
     const unsigned int StartKey = static_cast<unsigned int>(Event->StartTimeMs);
     while (Pos < MasterCount_ &&
            static_cast<unsigned int>(Master_[Pos]->StartTimeMs) <= StartKey)
         ++Pos;
 
-    // Retail drops its allocation unwind state at 39fa3, before growing
-    // MASTER. Do not add an event owner that deletes it on insertion failure.
+    // As in retail, a failed grow leaks the event.
     if (MasterCount_ == MasterCap_)
     {
-        // 3a012..3a047: grow by max(size, 1), without a minimum capacity.
+        // Grow by max(size, 1), no minimum capacity.
         const unsigned int Count = Master_ != nullptr ? static_cast<unsigned int>(MasterCount_) : 0u;
         const unsigned int Growth = Count > 1u ? Count : 1u;
         const unsigned int CapacityBits = Count + Growth;
@@ -7434,7 +7267,7 @@ GENRESULT FThornScene::AddEventFromDesc(const void* Desc, int* OutId)
         NewMaster[Pos] = Event;
         for (int Index = Pos; Index < MasterCount_; ++Index)
             NewMaster[Index + 1] = Master_[Index];
-        // 3a0ae precedes capacity, end and begin publication, in that order.
+        // Free, then capacity, end and begin, in retail's order.
         delete[] reinterpret_cast<unsigned char*>(Master_);
         MasterCap_ = NewCapacity;
         MasterCount_ = static_cast<int>((Master_ != nullptr ? static_cast<unsigned int>(MasterCount_) : 0u) + 1u);
@@ -7442,7 +7275,6 @@ GENRESULT FThornScene::AddEventFromDesc(const void* Desc, int* OutId)
     }
     else
     {
-        // 3a0fc..3a1ca: append or shift the occupied tail backwards.
         for (int Index = MasterCount_; Index > Pos; --Index)
             Master_[Index] = Master_[Index - 1];
         Master_[Pos] = Event;
@@ -7454,7 +7286,7 @@ GENRESULT FThornScene::AddEventFromDesc(const void* Desc, int* OutId)
 
 GENRESULT FThornScene::RemoveEventById(int Id)
 {
-    // LAB_06f3a330: linear find event+0xC; FUN_06f3a240 erase.
+    // LAB_06f3a330: linear search on event +0xc, then FUN_06f3a240 erase.
     for (int Index = 0; Index < MasterCount_; ++Index)
     {
         FThornEvent* Event = Master_[Index];
@@ -7507,7 +7339,7 @@ int FThornScene::CompareEventStart(const void* Left, const void* Right)
 
 void FThornScene::RebuildPending()
 {
-    // 39485/39672/39871 clear PENDING, then assign MASTER without sorting.
+    // Clear PENDING, then copy MASTER into it unsorted.
     PendingCount_ = 0;
     PendingBegin_ = 0;
     const int SourceCount = Master_ != nullptr ? MasterCount_ : 0;
@@ -7538,7 +7370,7 @@ void FThornScene::RebuildPending()
 
 void FThornScene::StopAll()
 {
-    // 3b497..3b4c3 clears stop aliases before any virtual Stop callback.
+    // STOPLIST is cleared before any Stop callback.
     StopTimes_->clear();
     if (ActiveCount_ == 0)
         return;
@@ -7546,21 +7378,19 @@ void FThornScene::StopAll()
     FThornEvent** Successor = ActiveBegin + 1;
     do
     {
-        // 3b4d6 retains Begin; 3b4e4 rereads the live end after Stop.
+        // Begin is kept; the end is reread after each Stop. As in retail, a
+        // Stop that reallocates or clears ACTIVE invalidates these cursors.
         (*ActiveBegin)->Stop(this);
         FThornEvent** ActiveEnd = Active_ + ActiveCount_;
         for (FThornEvent** Read = Successor; Read != ActiveEnd; ++Read)
             *(Read - 1) = *Read;
         ActiveCount_ = ActiveCount_ - 1;
     } while (ActiveBegin != Active_ + ActiveCount_);
-    // Reallocation or recursive clear can invalidate the retail cursors too.
-    // Do not invent a relocated cursor, iteration cap or post-Stop empty guard.
-
 }
 
 void FThornScene::CompactPendingFrom(FThornEvent** SelectedBegin, FThornEvent** SelectedEnd)
 {
-    // 3a9c8 reads the live end after callbacks, preserving the selected slots.
+    // The end is read after the callbacks.
     FThornEvent** LiveEnd = Pending_ + PendingCount_;
     FThornEvent** Write = SelectedBegin;
     for (FThornEvent** Read = SelectedEnd; Read != LiveEnd; ++Read)
@@ -7574,7 +7404,7 @@ void FThornScene::DrainTimedStops(const int* TimeMs, bool bBeforeStartTime,
     std::list<float>::iterator Stop = StopTimes_->begin();
     if (bBeforeStartTime)
     {
-        // 3b000..3b01d rereads the cached event's unsigned start each iteration.
+        // The event's unsigned start is reread on each iteration.
         while (Stop != StopTimes_->end())
         {
             if (!(static_cast<double>(*Stop) <
@@ -7582,7 +7412,7 @@ void FThornScene::DrainTimedStops(const int* TimeMs, bool bBeforeStartTime,
                 break;
             UpdateActive(static_cast<int>(static_cast<unsigned int>(
                 static_cast<long long>(*Stop))));
-            // 3b02f reads this same live node again after the callbacks.
+            // The same node is read again after the callbacks.
             UpdatedTimes->insert(static_cast<int>(static_cast<unsigned int>(
                 static_cast<long long>(*Stop))));
             Stop = StopTimes_->erase(Stop);
@@ -7590,7 +7420,7 @@ void FThornScene::DrainTimedStops(const int* TimeMs, bool bBeforeStartTime,
     }
     else if (Stop != StopTimes_->end())
     {
-        // Tick 399ca/ce stores its signed clock to float once before draining.
+        // Tick rounds its signed clock to float once before draining.
         const float RoundedTime = static_cast<float>(*TimeMs);
         do
         {
@@ -7598,7 +7428,7 @@ void FThornScene::DrainTimedStops(const int* TimeMs, bool bBeforeStartTime,
                 break;
             UpdateActive(static_cast<int>(static_cast<unsigned int>(
                 static_cast<long long>(*Stop))));
-            // The successor is read and the selected node freed AFTER UpdateActive.
+            // The node is erased only after UpdateActive.
             Stop = StopTimes_->erase(Stop);
         } while (Stop != StopTimes_->end());
     }
@@ -7606,7 +7436,8 @@ void FThornScene::DrainTimedStops(const int* TimeMs, bool bBeforeStartTime,
 
 void FThornScene::DispatchWindow(int OldTime, int NewTime)
 {
-    // FUN_06f3a960 selects an inclusive unsigned window without erasing the prefix.
+    // FUN_06f3a960: selects an inclusive unsigned start-time window; the
+    // prefix before it is not erased.
     int TakeFrom = 0;
     while (TakeFrom < PendingCount_ &&
            static_cast<unsigned int>(Pending_[TakeFrom]->StartTimeMs) <
@@ -7621,22 +7452,20 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
            static_cast<unsigned int>(Pending_[TakeTo]->StartTimeMs) <=
                static_cast<unsigned int>(NewTime))
         ++TakeTo;
-    // 3a960 saves this range before 3af50 constructs its local set.
     FThornEvent** SelectedBegin = Pending_ + TakeFrom;
     FThornEvent** SelectedEnd = Pending_ + TakeTo;
     {
-        // FUN_06f3af50's local set records each start time that was already updated.
+        // FUN_06f3af50: the set records start times already updated.
         std::set<int> UpdatedTimes;
         for (FThornEvent** PendingSlot = SelectedBegin; PendingSlot != SelectedEnd; ++PendingSlot)
         {
-            // 3afb0..3afdb: unique signed-key insertion of a null placeholder.
-            // A miss is observable in the registry even though this event is skipped.
+            // Retail looks the primary up with map operator[], so a missing
+            // primary leaves a null entry in the registry; the event is skipped.
             const int PrimaryId = (*PendingSlot)->PrimaryIndex;
             const std::pair<std::map<int, FThornEntity*>::iterator, bool> Registration =
                 Entities_.insert(std::make_pair(PrimaryId, static_cast<FThornEntity*>(nullptr)));
             if (Registration.first->second == nullptr)
                 continue;
-            // 3afe1 caches the event only after insertion and the payload gate.
             FThornEvent* Event = *PendingSlot;
 
             DrainTimedStops(&Event->StartTimeMs, true, &UpdatedTimes);
@@ -7646,12 +7475,9 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
                 UpdatedTimes.insert(Event->StartTimeMs);
             }
 
-            // The retail function rejects types outside 1..19 before invoking the
-            // registered event handler.  FThornEvent::Start performs the same
-            // dispatch, but retain the explicit gate here so the range walker has
-            // the same no-start/no-registration side effect for bad descriptors.
-            // 3b0c8 reloads Type from the selected slot after UpdateActive;
-            // Start still receives the earlier cached event at 3b0e2.
+            // Retail rejects types outside 1..19 here, before Start. Type is
+            // reloaded from the slot after UpdateActive, but Start gets the
+            // event read earlier.
             const int CurrentType = (*PendingSlot)->Type;
             if (CurrentType < kThornEventTypeMin || CurrentType > kThornEventTypeMax)
             {
@@ -7667,8 +7493,7 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
                 const unsigned char Ok = Event->Start(this, ClockAfterDt_);
                 if (Ok != 0)
                 {
-                    // 3b0fb..3b10f inserts the cached event into ACTIVE before
-                    // reading its live EndTime; allocation failure is not skipped.
+                    // Into ACTIVE before EndTime is read.
                     AppendActiveGroupEvent(Event);
                     if (Event->EndTimeMs >= 0)
                     {
@@ -7676,7 +7501,7 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
                         std::list<float>::iterator Stop = StopTimes_->begin();
                         while (Stop != StopTimes_->end())
                         {
-                            // TEST AH,44 / JP advances unless ordered equal.
+                            // Erase only on ordered equality.
                             if (*Stop == StopTime)
                                 Stop = StopTimes_->erase(Stop);
                             else
@@ -7687,7 +7512,7 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
                     }
                 }
             }
-            // Retail rebuilds after every live-primary event, including failed Start.
+            // Rebuilt after every event with a live primary, even a failed Start.
             RebuildActiveGroups();
         }
     }
@@ -7696,7 +7521,7 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
 
 void FThornScene::AppendActiveGroupEvent(FThornEvent* Event)
 {
-    // 3accb..3ae1d: append to the actual ACTIVE owner, publishing each event.
+    // Append to ACTIVE (inlined vector insert).
     if (ActiveCap_ - ActiveCount_ >= 1)
     {
         Active_[ActiveCount_] = Event;
@@ -7712,7 +7537,7 @@ void FThornScene::AppendActiveGroupEvent(FThornEvent* Event)
     const unsigned int AllocationCount = Capacity < 0 ? 0 : static_cast<unsigned int>(Capacity);
     std::unique_ptr<FThornEvent*[]> Storage(new FThornEvent*[AllocationCount]);
     FThornEvent** Write = Storage.get();
-    // The old begin is read AFTER allocation, while Position was saved before.
+    // The old begin is read after the allocation; Position was saved before it.
     for (FThornEvent** Read = Active_; Read != Position; ++Read)
         *Write++ = *Read;
     *Write++ = Event;
@@ -7728,7 +7553,7 @@ void FThornScene::AppendActiveGroupEvent(FThornEvent* Event)
 void FThornScene::EmitActiveGroup(std::map<int, FActiveGroup>& Groups,
                                  std::map<int, FActiveGroup>::iterator Group)
 {
-    // 3abec..3ac13: visited belongs to the group, and is set before sorting.
+    // Visited is per group and set before sorting.
     if (Group->second.bVisited)
         return;
     std::vector<FThornEvent*>& Events = Group->second.Events;
@@ -7745,7 +7570,7 @@ void FThornScene::EmitActiveGroup(std::map<int, FActiveGroup>& Groups,
             InsertActiveEventType(Slot, *Slot);
     }
 
-    // 3ac74 retains Event across dependency recursion and output allocation.
+    // Groups an event depends on (its secondary) are emitted first.
     FThornEvent** Slot = Events.data();
     while (Slot != (Events.empty() ? Events.data() : Events.data() + Events.size()))
     {
@@ -7764,7 +7589,7 @@ void FThornScene::EmitActiveGroup(std::map<int, FActiveGroup>& Groups,
 
 void FThornScene::RebuildActiveGroups()
 {
-    // 3aa00: local signed-primary map owns each vector and visited flag.
+    // FUN_06f3aa00: ACTIVE regrouped by primary, emitted in dependency order.
     std::map<int, FActiveGroup> Groups;
     FThornEvent** Slot = Active_;
     while (Slot != (ActiveCount_ == 0 ? Active_ : Active_ + ActiveCount_))
@@ -7778,7 +7603,7 @@ void FThornScene::RebuildActiveGroups()
         Registration.first->second.Events.push_back(Event);
         ++Slot;
     }
-    // 3aaff..3ab19 clears ACTIVE only after all group collection succeeds.
+    // ACTIVE is cleared only after all groups are collected.
     ActiveCount_ = 0;
     for (std::map<int, FActiveGroup>::iterator Group = Groups.begin();
          Group != Groups.end(); ++Group)
@@ -7787,9 +7612,9 @@ void FThornScene::RebuildActiveGroups()
 
 void FThornScene::FrameUpdateEntities(int TimeMs)
 {
-    // FUN_06f3b330: entity GetType; case 1|2 compound+0x18, case 10 IScriptControl+0x10,
-    // case 0xD psys+0x14. dt = time - clock, then clock := time.
-    // 3b3bb loads the live next node AFTER its callback: appends stay visible.
+    // FUN_06f3b330: by entity type, 1|2 compound +0x18, 10 IScriptControl +0x10,
+    // 0xd psys +0x14, with dt = time - clock; then clock = time. The next node
+    // is read after each callback, so appends stay visible.
     std::list<FThornEntity*>::iterator FrameIt = FrameEntities_->begin();
     while (FrameIt != FrameEntities_->end())
     {
@@ -7826,7 +7651,7 @@ void FThornScene::UpdateActive(int TimeMs)
             }
             else
             {
-                // 3b438 rereads the selected payload after StillRunning.
+                // The slot is reread after StillRunning.
                 (*ActiveSlot)->Stop(this);
                 FThornEvent** ActiveEnd = Active_ + ActiveCount_;
                 for (FThornEvent** Read = Successor; Read != ActiveEnd; ++Read)
@@ -7839,7 +7664,7 @@ void FThornScene::UpdateActive(int TimeMs)
 
 GENRESULT FThornScene::StartPlayback(int Arg)
 {
-    // LAB_06f39460: EAX = state-2; cases 2..7.
+    // LAB_06f39460: switch on state 2..7.
     const int State = PlaybackState_;
     if (State == kThornPlaybackLoaded || State == kThornPlaybackReset ||
         State == kThornPlaybackDone)
@@ -7886,8 +7711,8 @@ GENRESULT FThornScene::StopPlayback()
 
 GENRESULT FThornScene::PausePlayback()
 {
-    // LAB_06f397f0: if this+0x2c in {6, 7} -> 5, EAX=0; else -1.
-    // Does not Stop, does not touch clock. Slot 26 still ticks state 5.
+    // LAB_06f397f0: state (+0x2c) 6 or 7 -> 5 and 0; else -1. No Stop, clock
+    // untouched; slot 26 still ticks state 5.
     if (PlaybackState_ == kThornPlaybackPlay || PlaybackState_ == kThornPlaybackLoop)
     {
         PlaybackState_ = kThornPlaybackPaused;
@@ -7910,8 +7735,8 @@ GENRESULT FThornScene::Tick(int DtMs)
         ClockMs_ = 0;
         RebuildPending();
     }
-    // 39992 reads the live clock after reset/allocation callbacks; 39997
-    // publishes the new clock even when the unsigned backwards gate exits.
+    // The clock is read after the reset; ClockAfterDt_ is set even when the
+    // unsigned backwards test exits.
     const int WindowOld = ClockMs_;
     ClockAfterDt_ = NewTime;
     if (static_cast<unsigned int>(NewTime) < static_cast<unsigned int>(WindowOld))
@@ -7955,8 +7780,8 @@ namespace
         "UNKNOWN_ENTITY", "COMPOUND",    "DEFORMABLE", "CAMERA",     "MONITOR",
         "LIGHT",          "SOUND",       "MARKER",     "HARDPOINT",  "SCENE",
         "SUB_SCENE",      "MOTION_PATH", "DELETED",    "PSYS"};
-    // FUN_06f27bf0 indexes PTR_s_UNDEFINED_EVENT_06f5e090 directly.  Preserve
-    // the retail spellings and ordering used by the serializer/parser ABI.
+    // Retail table PTR_s_UNDEFINED_EVENT_06f5e090 (indexed by FUN_06f27bf0);
+    // spellings and order are the serializer/parser format.
     static const char* const kEventTypeNames[] = {
         "UNDEFINED_EVENT",          "START_MOTION",
         "START_SOUND",              "START_IK",
@@ -7982,7 +7807,7 @@ namespace
     {
         if (Type < 0 || Type > 19)
             return kEventTypeNames[0];
-        // 06f2b1f1 searches the numeric IDs before indexing the registration names.
+        // Retail maps the numeric ID to the table position first.
         static const int EventIds[] = {0, 10, 3, 11, 6, 8, 4, 5, 7, 2, 9, 12, 1,
                                         13, 14, 15, 16, 17, 18, 19};
         for (int Index = 0; Index < 20; ++Index)
@@ -7999,7 +7824,7 @@ namespace
                Type == 9 || Type == 10 || Type == 11 || Type == 13;
     }
 
-    // 2d2c0 / Unwind58640/58660: independently constructed FS owner.
+    // Holds the save file system (FUN_06f2d2c0); releases it on unwind.
     struct FThornSaveFileSystemOwner
     {
         IFileSystem* FileSystem;
@@ -8036,7 +7861,7 @@ namespace
             : FileSystemOwner(InFileSystem), Data(nullptr), Len(0), Cap(Capacity),
               StorageCapacity(Capacity + 1)
         {
-            // Retain before allocation; the owner releases on constructor unwind.
+            // AddRef before the allocation.
             if (FileSystemOwner.FileSystem != nullptr)
                 FileSystemOwner.FileSystem->AddRef();
             Data = new (std::nothrow) char[StorageCapacity];
@@ -8044,8 +7869,7 @@ namespace
 
         ~FThornSaveBuf() noexcept(false)
         {
-            // 2ca00: no flush. Owner retries Release if this call throws;
-            // a successful Release clears it before the owner's destructor.
+            // FUN_06f2ca00: no flush.
             delete[] Data;
             FileSystemOwner.Release();
         }
@@ -8056,8 +7880,8 @@ namespace
 
     int SaveBufFlush(FThornSaveBuf* Buf)
     {
-        // 2ca80: one write; its return value is ignored. A short write still
-        // discards the entire pending buffer, and is never retried.
+        // FUN_06f2ca80: one write, return value ignored; a short write still
+        // discards the whole buffer and is not retried.
         if (Buf->Len == 0)
             return 0;
         unsigned long Written = 0;
@@ -8083,14 +7907,14 @@ namespace
 
     int SaveBufAppendText(FThornSaveBuf* Buf, const char* Text)
     {
-        // Full FUN_06f2cda0: cache strlen before the single optional flush.
+        // FUN_06f2cda0: strlen before the optional flush.
         const unsigned int Length = static_cast<unsigned int>(std::strlen(Text));
         int Result = 0;
         if (static_cast<unsigned int>(Buf->Len) + Length > static_cast<unsigned int>(Buf->Cap))
             Result = SaveBufFlush(Buf);
 
-        // After the callback, read the current destination and copy forwards
-        // through the current NUL, including it, even when flushing failed.
+        // Copies through the NUL even when the flush failed; as in retail,
+        // text longer than Cap overruns the buffer.
         char* Destination = Buf->Data + static_cast<unsigned int>(Buf->Len);
         const char* Cursor = Text;
         char Byte;
@@ -8106,7 +7930,7 @@ namespace
         return Result;
     }
 
-    // FUN_06f2cbb0: direct bounded formatting, flush, retry, then grow.
+    // FUN_06f2cbb0: bounded format; on overflow flush and retry, then grow.
     int SaveBufAppendVariadic(FThornSaveBuf* Buf, const char* Format, ...)
     {
         va_list Args;
@@ -8132,7 +7956,7 @@ namespace
             va_end(Attempt);
             while (Written < 0)
             {
-                // 2cc18 ignores the resize return; no retry bound or abort latch.
+                // Resize result ignored; no retry bound, as in retail.
                 SaveBufSetCapacity(Buf, static_cast<int>(static_cast<unsigned int>(Buf->Cap) * 2u));
                 va_copy(Attempt, Args);
                 Written = _vsnprintf(Buf->Data + static_cast<unsigned int>(Buf->Len),
@@ -8147,7 +7971,7 @@ namespace
         return 0;
     }
 
-    // 2ae63/82/a1/c1 and2af15/34 promote each retained raw float once.
+    // Each float is promoted to double once.
     int SaveBufAppendNamedFloat(FThornSaveBuf* Buf, const char* Format,
                                 const char* Key, const float* Value)
     {
@@ -8155,7 +7979,7 @@ namespace
         return SaveBufAppendVariadic(Buf, Format, Key, Promoted);
     }
 
-    // FUN_06f2ce00 / 2ce80: one raw integer argument, fixed scratch.
+    // FUN_06f2ce00 / FUN_06f2ce80: one integer argument, fixed scratch buffer.
     int SaveBufAppendInteger(FThornSaveBuf* Buf, const char* Format, int Value)
     {
         char Temporary[512];
@@ -8177,7 +8001,7 @@ namespace
         return SaveBufAppendText(Buf, Temporary);
     }
 
-    // Keep source bits untouched until retail2ce40's first float load.
+    // FUN_06f2ce40: the float is loaded only here.
     int SaveBufAppendFloat(FThornSaveBuf* Buf, const char* Format, const float* Value)
     {
         char Temporary[512];
@@ -8185,11 +8009,10 @@ namespace
         return SaveBufAppendText(Buf, Temporary);
     }
 
-    // Writer2aa6b..2aa94: zero-extend milliseconds, then one float store.
+    // Writer: zero-extended milliseconds, one float store.
     int SaveBufAppendUnsignedMilliseconds(FThornSaveBuf* Buf, const char* Format,
                                           unsigned int Milliseconds)
     {
-        // Every uint32 value is exact in both signed int64 and double.
         const __int64 ExtendedMilliseconds = Milliseconds;
         static const double GMillisecondsToSeconds = 0.001;
         const float Seconds = static_cast<float>(
@@ -8197,7 +8020,7 @@ namespace
         return SaveBufAppendFloat(Buf, Format, &Seconds);
     }
 
-    // Event duration callers: signed descriptor DWORD, exact double scale.
+    // Event durations: signed dword, scaled in double.
     int SaveBufAppendSignedMilliseconds(FThornSaveBuf* Buf, const char* Format,
                                         const int* Milliseconds)
     {
@@ -8212,7 +8035,7 @@ namespace
         return SaveBufAppendFloat(Buf, Format, Value);
     }
 
-    // Full FUN_06f2cf10 / FUN_06f2d080: reverse loads, direct double args.
+    // FUN_06f2cf10 / FUN_06f2d080: loads in Z/Y/X order, double args.
     int SaveBufAppendVector(FThornSaveBuf* Buf, const char* Format, const float* Values)
     {
         char Temporary[512];
@@ -8223,7 +8046,7 @@ namespace
         return SaveBufAppendText(Buf, Temporary);
     }
 
-    // Full FUN_06f2cec0: integer reads [1], [2], [0], then sprintf.
+    // FUN_06f2cec0: reads [1], [2], [0], then sprintf.
     int SaveBufAppendColor(FThornSaveBuf* Buf, const char* Format, const int* Values)
     {
         char Temporary[512];
@@ -8247,15 +8070,15 @@ namespace
             setp al
             mov Emit, al
         }
-        // TEST AH,44h / JNP skips equality; unordered and nonzero emit.
+        // Equality skips; unordered and nonzero emit.
         return Emit != 0;
     }
 
     int SaveBufAppendPromotedFloatAsInteger(FThornSaveBuf* Buf, const char* Format, const float* Value)
     {
-        // 2bf31 -> 2ce40: FLD float / FSTP double precedes sprintf("%d").
-        // The integer conversion reads the first four bytes of that double.
-        // Pass the recovered word with its proper type instead of variadic UB.
+        // Retail quirk: passes the float promoted to double to sprintf("%d"),
+        // which prints the double's low dword. That word is passed explicitly
+        // here to avoid variadic UB.
         const double PromotedValue = static_cast<double>(*Value);
         int IntegerWord;
         static_assert(sizeof(PromotedValue) == 8 && sizeof(IntegerWord) == 4,
@@ -8273,8 +8096,9 @@ namespace
         double Payload;
         std::memcpy(&Payload, Words, sizeof(Payload));
         char Temporary[512];
-        // Native current-MSVC Win32 va_list reads the actual double object.
-        // Passing it by value would add FLD64/FSTP64 before CRT consumption.
+        // Retail quirk: "%.6f" reads a double made of IntegerWord and the next
+        // pushed argument. The va_list points at the bytes directly, since
+        // passing a double by value would add an x87 load/store.
         va_list Args = reinterpret_cast<va_list>(&Payload);
         std::vsprintf(Temporary, "%.6f", Args);
         va_end(Args);
@@ -8283,7 +8107,7 @@ namespace
 
     int SaveBufAppendStringValue(FThornSaveBuf* Buf, const char* Format, const char* Value)
     {
-        // 2cc90: dynamic scalar scratch; format and value lengths are DWORDs.
+        // FUN_06f2cc90: heap scratch sized from the format and value lengths.
         if (Value == nullptr)
             Value = "NULL";
         const unsigned int AllocationSize = static_cast<unsigned int>(std::strlen(Format)) +
@@ -8298,7 +8122,7 @@ namespace
         if (Pending + FormattedLength > static_cast<unsigned int>(Buf->Cap))
             Result = SaveBufFlush(Buf);
 
-        // Remaining is allocation size only on the first test (2cd17).
+        // Remaining is the allocation size only on the first test.
         while (Remaining > static_cast<unsigned int>(Buf->Cap))
         {
             const unsigned int ChunkLength = static_cast<unsigned int>(Buf->Cap);
@@ -8319,16 +8143,13 @@ namespace
         return Result;
     }
 
-    // Retail FUN_06f2c310.  Copy at most Capacity bytes, expanding the four
-    // escaped control characters when there is room for both bytes.  The
-    // serializer uses this helper for strings embedded in its Lua text.
+    // FUN_06f2c310: copy at most Capacity bytes, escaping \\ \r \n \b when
+    // both bytes fit. Used for strings embedded in the saved Lua text.
     char* EscapeThornString(char* Destination, const char* Source, int Capacity)
     {
-        // 2c317 tests the source, before touching the destination.
         if (Source == nullptr)
             return nullptr;
-        // Actual retail producer passes a nonnull 1024-byte stack buffer.
-        // Zero/negative capacity would write before/outside that buffer.
+        // Port-only guard; the one retail caller passes a 1024-byte stack buffer.
         if (Destination == nullptr || Capacity <= 0)
             return nullptr;
 
@@ -8367,7 +8188,7 @@ namespace
         return Destination;
     }
 
-    // FUN_06f2cb00: fixed scratch; first token is the format itself.
+    // FUN_06f2cb00: fixed scratch; the first token is used as the format itself.
     int SaveBufAppendStringFormat(FThornSaveBuf* Buf, const char* Token, char* Started)
     {
         char Temporary[512];
@@ -8375,7 +8196,7 @@ namespace
             std::sprintf(Temporary, " +%s", Token);
         else
             std::sprintf(Temporary, Token);
-        *Started = '\x01'; // 2cb4c: publication follows the first formatting call.
+        *Started = '\x01'; // Set after the first sprintf.
         const unsigned int Pending = static_cast<unsigned int>(Buf->Len);
         const unsigned int Length = static_cast<unsigned int>(std::strlen(Temporary));
         int Result = 0;
@@ -8408,8 +8229,7 @@ namespace
         return "F_NONE";
     }
 
-    // Full104-instruction FUN_06f2c3e0: mask is captured as one byte;
-    // each payload read follows its separate key-format callback.
+    // FUN_06f2c3e0: byte mask; each value is read after its key is written.
     void SaveFogProps(FThornSaveBuf* Buf, const FThornFog8* Props, unsigned char Mask)
     {
         if ((Mask & 0x1) != 0)
@@ -8449,8 +8269,7 @@ namespace
         }
     }
 
-    // FUN_06f2c8f0: keep the captured byte mask across writer callbacks,
-    // while reading each payload only after its key has been written.
+    // FUN_06f2c8f0: byte mask; each value is read after its key is written.
     void SaveReverbProps(FThornSaveBuf* Buf, const FThornReverb4* Props, unsigned char Mask)
     {
         if ((Mask & 0x1) != 0)
@@ -8494,8 +8313,8 @@ namespace
         return SaveBufAppendFloat(Buf, "%.6f, ", &Scaled);
     }
 
-    // Full FUN_06f2c560..06f2c8b8: each selected field has distinct
-    // prefix, key, value and suffix calls. Both retail callers ignore EAX.
+    // FUN_06f2c560: prefix, key, value and suffix calls per selected field.
+    // Both retail callers ignore the result.
     void SaveLightProps(FThornSaveBuf* Buf, const char* Prefix, const char* Suffix,
                         const FThornLightProps* Props, unsigned int Mask)
     {
@@ -8561,7 +8380,7 @@ namespace
         }
         if ((Mask & kThornLightBitAtten) != 0)
         {
-            // 2c858..2c877 snapshots these words before the prefix append.
+            // Copied before the prefix append.
             float Atten[3];
             const float* Source = Props->Atten;
             Atten[0] = Source[0];
@@ -8575,8 +8394,8 @@ namespace
 
     int SaveParamCurve(FThornSaveBuf* Buf, IParamCurve* Curve)
     {
-        // 2d120: stage the header before key callbacks and append it together
-        // with the first point. Later points overwrite scratch from offset zero.
+        // FUN_06f2d120: the header is staged before the key callbacks and
+        // appended with the first point; later points reuse the scratch from 0.
         const unsigned int Count = Curve->GetKeyCount();
         if (Count == 0)
             return -1;
@@ -8619,19 +8438,18 @@ namespace
         if (Descriptor->ParamCurve == nullptr)
             return;
         SaveParamCurve(Buf, Descriptor->ParamCurve);
-        // 2c1bc reads the period AFTER all curve and flush callbacks.
+        // The period is read after the curve and flush callbacks.
         SaveBufAppendInteger(Buf, ", pcurve_period = %d", Descriptor->ParamCurvePeriod);
     }
 
-    // 2cf60 promotes the matrix by columns: 0,3,6,1,4,7,2,5,8.
-    // A four-conversion format consumes only the first four arguments.
+    // FUN_06f2cf60: the matrix is passed in column order 0,3,6,1,4,7,2,5,8.
     int SaveMatrixValues(FThornSaveBuf* Buf, const char* Format, const float* Matrix)
     {
         char Temporary[512];
-        // Explicit column order; argument evaluation cannot reorder source reads.
+        // Read order is retail's: two doubles, then seven float stores before
+        // promotion.
         const double M22 = static_cast<double>(Matrix[8]);
         const double M12 = static_cast<double>(Matrix[5]);
-        // Retail keeps these seven float stores before argument promotion.
         const volatile float M02 = Matrix[2];
         const volatile float M21 = Matrix[7];
         const volatile float M11 = Matrix[4];
@@ -8639,7 +8457,6 @@ namespace
         const volatile float M20 = Matrix[6];
         const volatile float M10 = Matrix[3];
         const volatile float M00 = Matrix[0];
-        // Publish each promoted argument before loading the next staged float.
         volatile double Arguments[9];
         Arguments[8] = M22;
         Arguments[7] = M12;
@@ -8650,7 +8467,7 @@ namespace
         Arguments[2] = static_cast<double>(M20);
         Arguments[1] = static_cast<double>(M10);
         Arguments[0] = static_cast<double>(M00);
-        // Current x86 va_list reads these nine actual double objects in order.
+        // x86 va_list over the nine doubles.
         va_list Args = reinterpret_cast<va_list>(const_cast<double*>(Arguments));
         std::vsprintf(Temporary, Format, Args);
         va_end(Args);
@@ -8708,15 +8525,14 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         if (Index == -1)
             continue;
         FThornEntitySnap* Entity = EntitySnap(Index);
-        // 2aae9/2aaf5 capture both outputs before any entity text callbacks.
-        // Their GENRESULT values are discarded by the retail writer.
+        // Both are read before any text is written; results ignored.
         float Pos[3];
         float Orient[9];
         GetEntityPos(Index, Pos);
         GetEntityOrient(Index, Orient);
         if (Entity == nullptr)
             continue;
-        const int RegisteredType = Entity->Type; // 2ab00 lookup precedes text callbacks.
+        const int RegisteredType = Entity->Type; // Read before any text is written.
         if (!bWroteEntity)
             SaveBufAppendLiteral(&Buf, "\r\n\t{\r\n");
         else
@@ -8724,11 +8540,10 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         bWroteEntity = true;
 
         const char* Name = Entity->Name;
-        // 2ab40..2ab60: entity_name is raw; template_name below alone has
-        // the separate escape producer at 2ab73..2ab81.
+        // entity_name is written raw; only template_name is escaped.
         SaveBufAppendStringValue(&Buf, "\t\tentity_name = \"%s\",\r\n", Name);
         SaveBufAppendStringValue(&Buf, "\t\ttype = %s,\r\n", EntityTypeName(RegisteredType));
-        // 2ab65 reads the live template only after the name/type format callbacks.
+        // The template is read after the name/type writes.
         char TemplateScratch[1024];
         const char* TemplateName = "";
         const char* TemplateSource = Entity->TemplateName;
@@ -8736,7 +8551,6 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             TemplateName = EscapeThornString(TemplateScratch, TemplateSource,
                                              sizeof(TemplateScratch));
         SaveBufAppendStringValue(&Buf, "\t\ttemplate_name = \"%s\",\r\n", TemplateName);
-        // 2aba6/2abb9/2abcc: distinct writes and late descriptor reads.
         SaveBufAppendInteger(&Buf, "\t\tlt_grp = %d,", Entity->LtGrp);
         SaveBufAppendInteger(&Buf, " srt_grp = %d,", static_cast<signed char>(Entity->SrtGrp));
         SaveBufAppendInteger(&Buf, " usr_flg = %d", Entity->UsrFlg);
@@ -8821,7 +8635,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         }
         else if (Entity->Type == 6)
         {
-            // All8 retail2cbb0 callers: key+value stay in one formatting attempt.
+            // Key and value in one FUN_06f2cbb0 call each.
             SaveBufAppendLiteral(&Buf, ",\r\n\t\taudioprops =\r\n\t\t{\r\n");
             SaveBufAppendNamedFloat(&Buf, "\t\t\t%s = %.6f,\r\n", "attenuation", &Entity->Audio[0]);
             SaveBufAppendNamedFloat(&Buf, "\t\t\t%s = %.6f,\r\n", "pan", &Entity->Audio[1]);
@@ -8837,7 +8651,6 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         {
             SaveBufAppendStringValue(&Buf, ",\r\n\t\tup = %s", kAxisNames[Entity->SceneBlob[5]]);
             SaveBufAppendStringValue(&Buf, ",\r\n\t\tfront = %s", kAxisNames[Entity->SceneBlob[6]]);
-            // Signed/unsigned corresponding types may alias the same DWORDs.
             SaveBufAppendColor(&Buf, ",\r\n\t\tambient = {%d,%d,%d}",
                                reinterpret_cast<const int*>(Entity->SceneBlob));
         }
@@ -8852,8 +8665,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                 if (Size != 0)
                 {
                     char* Data = new char[Size + 1u];
-                    // 2b00e rereads the descriptor after Slot5 and allocation.
-                    // Preserve Size while selecting the current receiver/vtable.
+                    // The path object is reread after the size call and allocation.
                     Entity->MotionPath.MotionPath->Slot4Save(Data, Size);
                     SaveBufAppendStringValue(&Buf, ",\r\n\t\t\tpath_data = \"%s\"\r\n", Data);
                     delete[] Data;
@@ -8894,13 +8706,13 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
 
     for (unsigned int Index = 0; Index < static_cast<unsigned int>(MasterCount_); ++Index)
     {
-        // 2b1c1 retains the selected packet through every formatting callback.
+        // One descriptor read serves all the writes below.
         FThornEventDesc* Descriptor = static_cast<FThornEventDesc*>(
             EventDescByIndex(static_cast<int>(Index)));
         FThornEntitySnap* Primary = EntitySnap(Descriptor->PrimaryIndex);
         FThornEntitySnap* Secondary = Descriptor->SecondaryIndex >= 0
             ? EntitySnap(Descriptor->SecondaryIndex) : nullptr;
-        // 2b1ec..2b269 selects the type name before any output callbacks.
+        // The type name is looked up before any output.
         const char* EventName = EventTypeName(Descriptor->Type);
         SaveBufAppendStringValue(&Buf, "%s\r\n\t", Index == 0 ? "" : ",");
         SaveBufAppendUnsignedMilliseconds(&Buf, "{%.3f",
@@ -8931,8 +8743,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         {
             if (Descriptor->EventFlags != 0)
                 SaveBufAppendInteger(&Buf, ", event_flags = %d", Descriptor->EventFlags);
-            // 2b4ce..2b525: size+1 scalar allocation; Slot4 receives Size too.
-            // Delete is on the normal path, including a nonzero Slot4 HRESULT.
+            // Size+1 allocation; the getter receives Size. Freed on every path.
             if (ComContext != nullptr)
             {
                 FThornUserEventDesc* UserDescriptor = reinterpret_cast<FThornUserEventDesc*>(Descriptor);
@@ -9004,11 +8815,9 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         {
             const FThornPathEventDesc* Packet = static_cast<const FThornPathEventDesc*>(
                 static_cast<const void*>(Descriptor));
-            // 2b86e/2b880 are separate scalar calls; reread stop after the first append.
             SaveBufAppendRawFloat(&Buf, ", start_percent = %.6f", &Packet->StartPercent);
             SaveBufAppendRawFloat(&Buf, ", stop_percent = %.6f", &Packet->StopPercent);
             SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", Packet->Offset);
-            // Separate string calls preserve the late front-axis read.
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->LookAtUpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->LookAtFrontAxis]);
             SavePathAttachFlags(&Buf, Descriptor, false);
@@ -9024,12 +8833,12 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
                 : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
             SaveBufAppendLiteral(&Buf, ", spatialprops = {");
-            // 2bb74 clears BL; only the position branch sets it (2bbc0).
-            // Orientation does not set it before the axisrot comma test.
+            // Retail quirk: only the position branch sets the comma flag, so
+            // orient followed by axisrot without pos gets no separating comma.
             const bool bWrotePosition = (Packet->Mask & kThornSpatialBitPos) != 0;
             if (bWrotePosition)
             {
-                // 2bb81..2bba4 captures all three raw words before the key callback.
+                // Copied before the key is written.
                 float Position[3];
                 std::memcpy(Position, Packet->Position, sizeof(Position));
                 SaveBufAppendStringValue(&Buf, "%s = ", "pos");
@@ -9041,12 +8850,12 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                     SaveBufAppendLiteral(&Buf, ", ");
                 if ((Descriptor->Flags & kThornFlagQuatOrient) != 0)
                 {
-                    // 2bbff calls math +0x54, then formats the resulting
-                    // matrix with q_orient's four conversions at 2bc07.
+                    // Retail quirk: converts to a matrix (math +0x54) and prints
+                    // its first four values (column order) as q_orient.
                     if (G_SpatialWriterMathEngine == nullptr)
                         G_SpatialWriterMathEngine = ThornAcquire3DMathEngine();
                     FQuaternion Quaternion;
-                    // Raw W/X/Y/Z input, read after the lazy factory callback.
+                    // Raw W/X/Y/Z, read after the lazy acquire.
                     std::memcpy(&Quaternion, Packet->Quaternion, sizeof(Quaternion));
                     FMatrix Orientation;
                     G_SpatialWriterMathEngine->QuaternionToMatrix(Orientation, Quaternion);
@@ -9056,7 +8865,6 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                 }
                 else
                 {
-                    // 2bc0e..2bc1a snapshots nine words before entering the formatter.
                     float Matrix[9];
                     std::memcpy(Matrix, Packet->Orient, sizeof(Matrix));
                     SaveMatrixValues(&Buf,
@@ -9082,7 +8890,6 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
         {
             const FThornAttachEventDesc* Packet = reinterpret_cast<const FThornAttachEventDesc*>(Descriptor);
             SaveBufAppendVector(&Buf, ", offset = { %.6f, %.6f, %.6f }", Packet->Offset);
-            // Separate string calls preserve the late front-axis read.
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->UpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->FrontAxis]);
             if (Packet->TargetPart != nullptr)
@@ -9114,7 +8921,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                 SaveBufAppendRawFloat(&Buf, ", time_scale = %.6f", &Packet->TimeScale);
             if (ShouldSaveNonzeroFloat(&Packet->Weight))
                 SaveBufAppendRawFloat(&Buf, ", weight = %.6f", &Packet->Weight);
-            // 2b385 tests the captured entity descriptor, after weight output.
+            // Tests the primary entity's type (read earlier), after weight.
             if (Primary->Type == 2)
                 SaveBufAppendRawFloat(&Buf, ", heading = %.6f", &Packet->Heading);
             else if (ShouldSaveNonzeroFloat(&Packet->TransScale))
@@ -9131,7 +8938,6 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendLiteral(&Buf, Packet->TargetType == 1 ? ", target_type = HARDPOINT"
                 : Packet->TargetType == 2 ? ", target_type = PART" : ", target_type = ROOT");
             SaveBufAppendRawFloat(&Buf, ", damping = %.6f", &Packet->Damping);
-            // Separate string calls preserve the late front-axis read.
             SaveBufAppendStringValue(&Buf, ", up = %s", kAxisNames[Packet->LookAtUpAxis]);
             SaveBufAppendStringValue(&Buf, ", front = %s", kAxisNames[Packet->LookAtFrontAxis]);
             SaveBufAppendInteger(&Buf, ", point_at = %d", static_cast<int>(Packet->bPointAt));
@@ -9144,7 +8950,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             const FThornSubSceneEventDesc* Packet = reinterpret_cast<const FThornSubSceneEventDesc*>(Descriptor);
             if (ShouldSaveNonzeroFloat(&Packet->StartTime))
                 SaveBufAppendPromotedFloatAsInteger(&Buf, ", start_time = %d", &Packet->StartTime);
-            // 2bf36/2bf4a independently reread flags around the prefix append.
+            // Flags are reread around the prefix append.
             if ((Descriptor->Flags & kThornFlagUseScriptDuration) != 0)
             {
                 SaveBufAppendLiteral(&Buf, ", flags =");
@@ -9241,7 +9047,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             if (Packet->Strid != 0)
                 SaveBufAppendUnsigned(&Buf, ", strid = %u", Packet->Strid);
         }
-        // 2bf85 is the shared tail of these eight branches.
+        // Shared tail of these eight branches.
         if (EvType == kThornTypeStartMotion || EvType == kThornTypeStartSound ||
             EvType == kThornTypeStartIk || EvType == kThornTypeAttachEntity ||
             EvType == kThornTypeConnectHardpoints || EvType == kThornTypeStartSubScene ||
@@ -9251,14 +9057,14 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                 SaveBufAppendInteger(&Buf, ", event_flags = %d", Descriptor->EventFlags);
         }
 
-        // 2c1d7 and 2c1e5 remain separate flush/callback stages.
+        // Two separate appends, as in retail.
         SaveBufAppendLiteral(&Buf, "}");
         SaveBufAppendLiteral(&Buf, "}");
     }
 
     SaveBufAppendLiteral(&Buf, "\r\n};\r\n");
 
-    // 2c216..2c233: final flush status is discarded, then return zero.
+    // The final flush status is discarded.
     SaveBufFlush(&Buf);
     return GR_OK;
 }

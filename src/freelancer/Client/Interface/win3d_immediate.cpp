@@ -4,26 +4,23 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// The OpenGL immediate-mode emulator (retail `E:\FL\Scratch\Source\Client\cmn\OpenGL.cpp`):
-// FUN_00421670 glBegin, FUN_00421cc0 glVertex3f, FUN_00421bd0 glColor4f, FUN_00421a70 glColor3ub,
-// FUN_00421690 glEnd, FUN_00421290 the texture-stage apply, and the state helpers FUN_004220c0,
-// FUN_00422190, FUN_00422610 and FUN_004225e0; FUN_00421ad0 glColor3f; and at the end of the
-// file the fuzzy-line drawers FUN_00423be0 / FUN_004231f0 with their vector helpers.
+// The OpenGL immediate-mode emulator (retail `E:\FL\Scratch\Source\Client\cmn\OpenGL.cpp`), and
+// at the end of the file the fuzzy-line drawers with their vector helpers.
 
 #include "Interface/win3d_immediate.h"
 
 #include "Core/game_options.h"
 #include "Space/Cameras/space_camera.h"
-#include "Space/star_sphere.h"      // Win3DBindModelview (FUN_00422690)
-#include "Common/engine_light.h"     // ScaleVec3 (FUN_00411d60)
-#include "Interface/win3d.h"            // Win3DTransformByMatrix (FUN_00423b90), DAT_006679d8
+#include "Space/star_sphere.h"
+#include "Common/engine_light.h"
+#include "Interface/win3d.h"
 
-#include "common_misc.h"      // RandomVector
+#include "common_misc.h"
 #include "DALib.h"
 #include "dacom.h"
 #include "Core/globals.h"
 #include "render/IRenderPipeline.h"
-#include "render/shading.h"   // ITextureLibrary2::GetTextureFrame
+#include "render/shading.h"
 #include "x86math.h"
 
 #include <math.h>
@@ -61,17 +58,15 @@ namespace
     // .rdata 0x005c96f8 -- and what an untextured stage is set to: DISABLE.
     const int kStageDisabled[6] = {1, 2, 1, 1, 2, 1};
 
-    // 0x00421741: the FVF the pipeline is handed. XYZ | DIFFUSE | TEX1.
+    // XYZ | DIFFUSE | TEX1.
     const unsigned kWin3DFvf = 0x142;
 
-    // DAT_006168a4 / DAT_006168b0: both buffers are 0x3000 entries. Retail keeps them as globals,
-    // but their only writers (the static initializer 0x004211ef / 0x00421200 and FUN_004213d0)
-    // store 0x3000 and their only readers are glVertex's bounds tests (0x00421cc6 / 0x00421cd3),
-    // so a constant is the same value.
+    // DAT_006168a4 / DAT_006168b0: retail keeps the capacities as globals, but every writer
+    // stores 0x3000, so a constant is the same value.
     const int kMaxVertices = 0x3000;
     const int kMaxIndices = 0x3000;
 
-    // 0x00421904: the quad path caps the index count it will triangulate.
+    // The quad path caps the index count it will triangulate.
     const unsigned kMaxQuadIndices = 0xaaa;
 
     // The accumulator. Retail's vertex buffer is .data 0x006168b8 with a 0x18 stride, and the
@@ -90,30 +85,28 @@ namespace
     FWin3DVertex   G_Vertices[kMaxVertices];
     unsigned short G_Indices[kMaxIndices];
 
-    // 0x00616888 / 0x006168a8 / 0x006168b4 / 0x006168ac.
+    // DAT_00616888 / DAT_006168a8 / DAT_006168b4 / DAT_006168ac.
     int           G_PrimitiveMode = -1;
     int           G_VertexCount = 0;
     int           G_IndexCount = 0;
     unsigned char G_bBufferLocked = 0;
 
-    // 0x00616898 / 0x0061689c / 0x006168a0 -- the current vertex attributes. DAT_00616898 is 0 in
-    // .data and neither the static initializer (LAB_00421160) nor FUN_004213d0 writes it; only
-    // the colour setters do.
+    // DAT_00616898 / DAT_0061689c / DAT_006168a0 -- the current vertex attributes. Only the
+    // colour setters write the colour.
     unsigned long G_CurrentColour = 0;
     float         G_CurrentU = 0.0f;
     float         G_CurrentV = 0.0f;
 
-    // 0x006648d0 / 0x006648d4 -- whether a texture is bound, and which.
+    // DAT_006648d0 / DAT_006648d4 -- whether a texture is bound, and which.
     unsigned char G_bTextureBound = 0;
     void*         G_BoundTexture = nullptr;
 
-    // 0x006648d8 -- the lighting flag glEnd installs while it draws.
+    // DAT_006648d8 -- the lighting flag glEnd installs while it draws.
     unsigned char G_bLighting = 0;
 
-    // 0x006648b8 / 0x006648bc / 0x006648c0 / 0x006648c4 / 0x006648c8 / 0x006648cc -- the cached
-    // pieces of render state the two setters below re-apply alongside the one they change.
-    // Initial values from the static initializer LAB_00421160 (0x00421210..0x0042124b), the same
-    // ones Win3DResetState (FUN_004213d0) restores.
+    // DAT_006648b8..DAT_006648cc -- the cached render state the setters below re-apply alongside
+    // the one they change. Initial values from the static initializer LAB_00421160, the same ones
+    // Win3DResetState restores.
     int           G_AlphaBlendEnable = 0;
     int           G_SrcBlend = 2;
     int           G_DestBlend = 2;
@@ -121,53 +114,46 @@ namespace
     int           G_DepthWrite = 1;
     int           G_DepthFunc = 4;
 
-    // 0x0042227b: the pipeline-state id the projection setter asks about. Non-zero means the
-    // pipeline wants one combined modelview rather than a separate world and view.
+    // The pipeline-state id the projection setter asks about. Non-zero means the pipeline wants
+    // one combined modelview rather than a separate world and view.
     const int kPipelineStateViewspace = 7;
 
-    // 0x004222f0: the value the projection kind is compared against and set to. Only one kind is
-    // ever stored here by this function, so it doubles as "an ortho projection is installed".
+    // The only kind the ortho setter stores, so it doubles as "an ortho projection is
+    // installed".
     const int kProjectionKindOrtho = 2;
 
     const int kProjectionParamCount = 6;
 
-    // 0x00610844 -- and it is 1 in .data, so the cache is on out of the box.
+    // DAT_00610844 -- 1 in .data, so the cache is on out of the box.
     unsigned char G_bProjectionCacheEnabled = 1;
 
-    // 0x0066490c / 0x00664910 / 0x00664990 / 0x0066498c.
+    // DAT_0066490c / DAT_00664910 / DAT_00664990 / DAT_0066498c.
     int   G_ProjectionKind = 0;
     float G_ProjectionParams[kProjectionParamCount] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     int   G_ProjectionSetCount = 0;
     int   G_ProjectionSkipCount = 0;
 
-    // 0x00422851: the perspective setter's own cache kind, sharing DAT_0066490c/DAT_00664910
-    // with the ortho setter but only ever comparing/storing the first four slots.
+    // The perspective setter's own cache kind, sharing the ortho cache but only ever comparing /
+    // storing the first four slots.
     const int kProjectionKindPerspective = 1;
 
-    // 0x00664928 / 0x0066492c / 0x00664948 -- Win3DPushProjection's shadow copy. DAT_00664928 is
-    // the saved cache kind (0 means "nothing saved" / "matrix path"), the six floats from
-    // DAT_0066492c are the saved cache params, and the 16 floats at DAT_00664948 are the raw
+    // DAT_00664928 / DAT_0066492c / DAT_00664948 -- Win3DPushProjection's shadow copy: the saved
+    // cache kind (0 = "nothing saved" / "matrix path"), the saved cache params, and the raw
     // projection matrix saved when the cache is off.
     int   G_SavedProjectionKind = 0;
     float G_SavedProjectionParams[kProjectionParamCount] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     float G_SavedProjectionMatrix[16] = {};
 
-    // 0x00664994 / 0x00664998 / 0x0066499c / 0x006649a0 -- the last viewport Win3DSetViewport
-    // installed, kept only so Win3DGetViewport can answer a GL_VIEWPORT query. The stored Y is
-    // the flipped origin Win3DSetViewport's own comment describes, not Top itself -- that is what
-    // retail stored and what retail hands back.
+    // DAT_00664994..DAT_006649a0 -- the last viewport Win3DSetViewport installed, kept only for
+    // Win3DGetViewport. The stored Y is the flipped origin, as retail.
     int G_ViewportLeft = 0;
     int G_ViewportFlippedTop = 0;
     int G_ViewportWidth = 0;
     int G_ViewportHeight = 0;
 
-    // 0x00422390: the only GL_VIEWPORT-style query id retail's glGetIntegerv understood.
     const int kWin3DQueryViewport = 0xba2;
 
-    // DALib::Pipeline, never tested: no function in OpenGL.cpp (0x00421160..0x00423000) checks
-    // the pipeline for null before calling through it -- a raw scan of that range finds no
-    // TEST/CMP on a value loaded from DALib::Pipeline. The guards this module used to carry at
-    // every call were port-only and are gone (exe-w4p3, 2026-09-30).
+    // No function in OpenGL.cpp tests the pipeline for null before calling through it.
     IRenderPipeline* GetPipeline()
     {
         return DALib::Pipeline;
@@ -189,34 +175,31 @@ namespace
 
         if (G_bTextureBound == 0)
         {
-            // 0x004212a4: nothing bound -- clear stage 0's texture and disable it.
             Pipe->SetTextureStageTexture(0, nullptr);
             ApplyStageTable(Pipe, 0, kStageDisabled);
             return;
         }
 
-        // 0x004212cd: the handle is checked against the pipeline before it is used. A handle it
-        // no longer knows leaves the stage disabled, which is what stops a freed texture from
-        // being drawn with.
+        // A handle the pipeline no longer knows leaves the stage disabled, which is what stops a
+        // freed texture from being drawn with.
         const GENRESULT Known = Pipe->IsTexture(G_BoundTexture);
         if (Known != GR_OK)
         {
             Pipe->SetTextureStageTexture(0, nullptr);
             ApplyStageTable(Pipe, 0, kStageDisabled);
-            // 0x0042138b: and the stale handle is dropped -- DAT_006648d4 takes EAX, which the
-            // table loop left at its zero terminator. The bound flag (DAT_006648d0) stays set.
+            // The stale handle is dropped (retail stores the table loop's zero terminator); the
+            // bound flag stays set.
             G_BoundTexture = nullptr;
             return;
         }
 
         Pipe->SetTextureStageTexture(0, G_BoundTexture);
 
-        // 0x004212f4: and stage 0's ARG2 is forced to zero before the table runs -- retail
-        // writes state 0xb (D3DTSS_TEXTURETRANSFORMFLAGS) with 0 first.
+        // Stage state 0xb (D3D8 D3DTSS_TEXCOORDINDEX) is set to 0 before the table runs.
         Pipe->SetTextureStageState(0, 0xb, 0);
         ApplyStageTable(Pipe, 0, kStageTextured);
 
-        // 0x00421320: stage ONE is always disabled, textured or not.
+        // Stage ONE is always disabled, textured or not.
         ApplyStageTable(Pipe, 1, kStageDisabled);
     }
 
@@ -225,10 +208,8 @@ namespace
 
     int ScaleClampToByte(float Component)
     {
-        // 0x00421bd0 (and 0x00421ad0 / 0x004214d0): FLD float component, FMUL float 255.0f --
-        // the product stays on the FPU -- then ftol, which truncates toward zero, and the clamp
-        // afterwards (TEST/JGE to 0, CMP 0xff/JLE), so the clamp catches what the conversion
-        // produced, not what it was given.
+        // x87: the product stays double, ftol truncates, and the clamp comes afterwards, so it
+        // catches what the conversion produced, not what it was given.
         const double Scaled = static_cast<double>(Component) * static_cast<double>(kColourByteScale);
         int Value = static_cast<int>(Scaled);
         if (Value < 0)
@@ -246,30 +227,27 @@ float GWin3DModelview[12] = {1.0f, 0.0f, 0.0f,
 
 void Win3DResetState()
 {
-    // FUN_004213d0 (cdecl; RenderMgrCreateBuffers pushes the surface width and height at
-    // 0x00424bdd, neither is read). Listing 0x004213d0..0x00421491, the same stores as the static
-    // initializer LAB_00421160. The two buffer capacities (0x3000, DAT_006168a4 / DAT_006168b0)
-    // are constants here -- see kMaxVertices.
-    G_SrcBlend = 2;                  // DAT_006648bc
-    G_DestBlend = 2;                 // DAT_006648c0
-    G_PrimitiveMode = -1;            // DAT_00616888
-    G_VertexCount = 0;               // DAT_006168a8
-    G_bBufferLocked = 0;             // DAT_006168ac
-    G_IndexCount = 0;                // DAT_006168b4
-    // DAT_006648dc: the 4x3 modelview -- diagonal 1.0, everything else 0.
+    // FUN_004213d0 (cdecl; the caller's surface width and height are not read). The same stores
+    // as the static initializer LAB_00421160.
+    G_SrcBlend = 2;
+    G_DestBlend = 2;
+    G_PrimitiveMode = -1;
+    G_VertexCount = 0;
+    G_bBufferLocked = 0;
+    G_IndexCount = 0;
     GWin3DModelview[0] = 1.0f; GWin3DModelview[4] = 1.0f; GWin3DModelview[8] = 1.0f;
     GWin3DModelview[7] = 0.0f; GWin3DModelview[6] = 0.0f; GWin3DModelview[5] = 0.0f;
     GWin3DModelview[3] = 0.0f; GWin3DModelview[2] = 0.0f; GWin3DModelview[1] = 0.0f;
     GWin3DModelview[11] = 0.0f; GWin3DModelview[10] = 0.0f; GWin3DModelview[9] = 0.0f;
-    G_AlphaBlendEnable = 0;          // DAT_006648b8
-    G_bDepthTest = 1;                // DAT_006648c4
-    G_DepthWrite = 1;                // DAT_006648c8
-    G_DepthFunc = 4;                 // DAT_006648cc
-    G_bTextureBound = 0;             // DAT_006648d0
-    G_BoundTexture = nullptr;        // DAT_006648d4
-    G_bLighting = 0;                 // DAT_006648d8
-    G_ProjectionKind = 0;            // DAT_0066490c
-    G_SavedProjectionKind = 0;       // DAT_00664928
+    G_AlphaBlendEnable = 0;
+    G_bDepthTest = 1;
+    G_DepthWrite = 1;
+    G_DepthFunc = 4;
+    G_bTextureBound = 0;
+    G_BoundTexture = nullptr;
+    G_bLighting = 0;
+    G_ProjectionKind = 0;
+    G_SavedProjectionKind = 0;
 }
 
 void Win3DBegin(int PrimitiveMode)
@@ -278,24 +256,20 @@ void Win3DBegin(int PrimitiveMode)
     G_PrimitiveMode = PrimitiveMode;
     G_IndexCount = 0;
 
-    // 0x00421681: the vertex counter survives a begin while the buffer is locked. That is what
-    // lets a caller build one vertex pool and issue several index runs against it.
+    // The vertex counter survives a begin while the buffer is locked, so a caller can build one
+    // vertex pool and issue several index runs against it.
     if (G_bBufferLocked == 0)
         G_VertexCount = 0;
 }
 
 void Win3DVertex3f(float X, float Y, float Z)
 {
-    // FUN_00421cc0. Both counters are checked (CMP / JNC against the 0x3000 caps), so the last
-    // usable slot is the cap minus one.
+    // FUN_00421cc0.
     if (G_IndexCount >= kMaxIndices || G_VertexCount >= kMaxVertices)
     {
-        // 0x00421d35..0x00421db0: the vertex is dropped, and a function-static rate limiter
-        // (guard bit DAT_00616880, last time DAT_00616878 = 0.0f, interval DAT_0061687c = 1.0f,
-        // its empty destructor registered through atexit) warns at most once per interval of
-        // client time (FUN_0042d660): FSUBR now - last, FCOMP interval, TEST AH,0x41 / JNZ --
-        // only a strictly greater gap warns (less, equal and unordered skip). The warning
-        // stores now into the last time first.
+        // The vertex is dropped; a function-static rate limiter (DAT_00616878 / DAT_0061687c)
+        // warns at most once per second of client time. Only a strictly greater gap warns
+        // (unordered skips).
         static float LastWarnTime = 0.0f;
         static float WarnInterval = 1.0f;
         const double Now = GetClientElapsedTime();
@@ -308,7 +282,7 @@ void Win3DVertex3f(float X, float Y, float Z)
         return;
     }
 
-    // 0x00421ce2: the index is written first and points at the vertex about to be appended.
+    // The index is written first and points at the vertex about to be appended.
     G_Indices[G_IndexCount] = static_cast<unsigned short>(G_VertexCount);
     ++G_IndexCount;
 
@@ -339,9 +313,7 @@ void Win3DColor4f(float R, float G, float B, float A)
 
 void Win3DColor3f(float R, float G, float B)
 {
-    // FUN_00421ad0: each component times 255.0f (DAT_005c75d8), ftol, then the clamp -- red into
-    // the argument slot, green into EBX, blue into EAX -- and `((R | 0xffffff00) << 8 | G) << 8 | B`
-    // into DAT_00616898, so alpha is 0xff.
+    // FUN_00421ad0.
     const int Red = ScaleClampToByte(R);
     const int Green = ScaleClampToByte(G);
     const int Blue = ScaleClampToByte(B);
@@ -354,8 +326,7 @@ void Win3DColor3f(float R, float G, float B)
 
 void Win3DSetPipelineClearColor(float R, float G, float B, float A)
 {
-    // FUN_004214d0: same scale-clamp-pack as Win3DColor4f (0x00421bd0), but the packed value goes
-    // straight to the pipeline's SetPipelineState(8, ...) instead of the immediate-mode colour.
+    // FUN_004214d0.
     IRenderPipeline* const Pipe = GetPipeline();
 
     const int Red = ScaleClampToByte(R);
@@ -374,8 +345,7 @@ void Win3DSetPipelineClearColor(float R, float G, float B, float A)
 
 void Win3DColor3ub(unsigned char R, unsigned char G, unsigned char B)
 {
-    // FUN_00421a70: `((R | 0xffffff00) << 8 | G) << 8 | B`, which is the alpha byte left at 0xff
-    // with the three components shifted in under it.
+    // FUN_00421a70: alpha 0xff with the three components shifted in under it.
     G_CurrentColour = ((static_cast<unsigned long>(R) | 0xffffff00u) << 8 |
                        static_cast<unsigned long>(G)) << 8 |
                       static_cast<unsigned long>(B);
@@ -383,8 +353,7 @@ void Win3DColor3ub(unsigned char R, unsigned char G, unsigned char B)
 
 void Win3DColor3ubv(const unsigned char* Rgb)
 {
-    // FUN_00421aa0 (.text:00421aa0-00421ac5): MOVZX the three bytes, `((R | 0xffffff00) << 8 |
-    // G) << 8 | B` into DAT_00616898.
+    // FUN_00421aa0.
     G_CurrentColour = ((static_cast<unsigned long>(Rgb[0]) | 0xffffff00u) << 8 |
                        static_cast<unsigned long>(Rgb[1])) << 8 |
                       static_cast<unsigned long>(Rgb[2]);
@@ -392,8 +361,7 @@ void Win3DColor3ubv(const unsigned char* Rgb)
 
 void Win3DColor4ub(unsigned char R, unsigned char G, unsigned char B, unsigned char A)
 {
-    // FUN_00421b70. The same ARGB pack as Win3DColor4f, but the four components arrive as bytes
-    // already -- no scale by 255, no clamp.
+    // FUN_00421b70.
     G_CurrentColour = (static_cast<unsigned long>(A) << 24) |
                       (static_cast<unsigned long>(R) << 16) |
                       (static_cast<unsigned long>(G) << 8) |
@@ -402,8 +370,7 @@ void Win3DColor4ub(unsigned char R, unsigned char G, unsigned char B, unsigned c
 
 void Win3DColor4ubv(const unsigned char* Rgba)
 {
-    // FUN_00421ba0. The pointer form of Win3DColor4ub: Rgba[0]=R, Rgba[1]=G, Rgba[2]=B, Rgba[3]=A,
-    // packed the same way.
+    // FUN_00421ba0.
     G_CurrentColour = (static_cast<unsigned long>(Rgba[3]) << 24) |
                       (static_cast<unsigned long>(Rgba[0]) << 16) |
                       (static_cast<unsigned long>(Rgba[1]) << 8) |
@@ -432,9 +399,8 @@ void Win3DEnable(int Capability)
     switch (Capability)
     {
     case kWin3DDepthTest:
-        // 0x00421ddf: the flag is raised and then all three depth states are written, the
-        // other two from the cache. Retail even branches on the flag it has just set and takes
-        // the same path either way -- a leftover the port simply does not reproduce.
+        // All three depth states are written, the other two from the cache. (Retail then
+        // branches on the flag it has just set, to the same path either way.)
         G_bDepthTest = 1;
         Pipe->SetRenderState(kRsZFunc, G_DepthFunc);
         Pipe->SetRenderState(kRsZEnable, 1);
@@ -442,12 +408,12 @@ void Win3DEnable(int Capability)
         return;
 
     case kWin3DCullFace:
-        // 0x00421e2a: D3DCULL_CCW. glDisable writes 1 (NONE) into the same state.
+        // D3DCULL_CW (2). glDisable writes 1 (NONE) into the same state.
         Pipe->SetRenderState(kRsCullMode, 2);
         return;
 
     case kWin3DLightingCap:
-        // 0x00421e42: no pipeline call at all -- the flag is only read by glEnd.
+        // No pipeline call -- the flag is only read by glEnd.
         G_bLighting = 1;
         return;
 
@@ -457,12 +423,11 @@ void Win3DEnable(int Capability)
         return;
 
     case kWin3DTexture2D:
-        // 0x00421e7c: likewise a flag only; the stage apply in glEnd is what acts on it.
+        // A flag only; the stage apply in glEnd acts on it.
         G_bTextureBound = 1;
         return;
 
     default:
-        // 0x00421e9b: CALL [FDUMP] through the import, no test of the pointer.
         FDUMP(0x100002, "%s(%d) : *** WARNING: GL: %s\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x287, "glEnable - invalid");
         return;
@@ -494,9 +459,7 @@ void Win3DDisable(int Capability)
         return;
 
     case kWin3DFog:
-        // 0x00421f02..0x00421f97: glDisable(GL_FOG) zeroes seven render states in this order --
-        // 0x1c (FOGENABLE), 0x23, 0x8c, 0x22, 0x24, 0x25, 0x26. glEnable has no fog case
-        // (FUN_00421dd0 sends 0xb60 to its warning).
+        // Seven fog states zeroed in this order. glEnable has no fog case.
         Pipe->SetRenderState(D3DRS_FOGENABLE, 0);
         Pipe->SetRenderState(D3DRS_FOGTABLEMODE, 0);
         Pipe->SetRenderState(D3DRS_FOGVERTEXMODE, 0);
@@ -517,7 +480,6 @@ void Win3DDisable(int Capability)
         return;
 
     default:
-        // 0x00422030..: CALL [FDUMP] through the import, no test of the pointer.
         FDUMP(0x100002, "%s(%d) : *** WARNING: GL: %s\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x2bf, "glDisable");
         return;
@@ -549,7 +511,7 @@ void Win3DSetTextureFilterPoint()
 
 void Win3DSetDepthFunc(int CompareFunc)
 {
-    // FUN_00422120: the same three-write shape as everything else in this group.
+    // FUN_00422120
     G_DepthFunc = CompareFunc;
 
     IRenderPipeline* const Pipe = GetPipeline();
@@ -560,8 +522,7 @@ void Win3DSetDepthFunc(int CompareFunc)
 }
 void Win3DSetBlendFunc(int SourceFactor, int DestFactor)
 {
-    // FUN_004220c0. Note it re-applies the alpha-blend enable from the cache as well, so a
-    // blend-func change cannot leave blending in a state the cache disagrees with.
+    // FUN_004220c0. Also re-applies the alpha-blend enable from the cache.
     G_SrcBlend = SourceFactor;
     G_DestBlend = DestFactor;
 
@@ -574,7 +535,7 @@ void Win3DSetBlendFunc(int SourceFactor, int DestFactor)
 
 void Win3DSetDepthWrite(int bEnabled)
 {
-    // FUN_00422190, the same shape: the one field it owns, then two re-applies.
+    // FUN_00422190
     G_DepthWrite = bEnabled;
 
     IRenderPipeline* const Pipe = GetPipeline();
@@ -586,16 +547,14 @@ void Win3DSetDepthWrite(int bEnabled)
 
 void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
 {
-    // FUN_00422610. The file and line are retail's diagnostic pair; nothing in the ported path
-    // consumes them, and they are kept in the signature because every call site passes them.
+    // FUN_00422610. Nothing consumes the file and line.
     (void)SourceFile;
     (void)SourceLine;
 
-    // 0x00422653: DALib::Pipeline is read and called with no null test.
     IRenderPipeline* const Pipe = GetPipeline();
 
-    // 0x0042263b .. 0x0042264b: no camera -> the whole surface, DAT_00610850 / DAT_00610854
-    // (the size ApplyGameWindowLayout recorded, not the requested display mode).
+    // No camera: the whole surface, DAT_00610850 / DAT_00610854 (the size ApplyGameWindowLayout
+    // recorded, not the requested display mode).
     int Left = 0;
     int Top = 0;
     int Width = static_cast<int>(G_RenderSurfaceWidth);
@@ -603,8 +562,7 @@ void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
 
     if (Cam != nullptr)
     {
-        // 0x0042261f: the camera's ViewRect comes out of slot 0x14, and the extents are the
-        // inclusive-edge difference plus one -- the same convention SpaceCameraSetViewport uses.
+        // Inclusive edges: the extents are the difference plus one, as SpaceCameraSetViewport.
         const int* const Rect = Cam->GetViewport();
         Left = Rect[0];
         Top = Rect[1];
@@ -612,11 +570,9 @@ void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
         Height = Rect[3] - Rect[1] + 1;
     }
 
-    // 0x00422655. Retail stores a flipped origin -- `SurfaceHeight - Height - Top` -- and then
-    // hands the pipeline `SurfaceHeight - that - Height`, which cancels exactly back to Top.
-    // The value that reaches the viewport does not need the round trip, so the port passes Top
-    // directly; the flipped value itself DOES have another reader (Win3DGetViewport, retail's
-    // GL_VIEWPORT query), so it is still computed and stored below.
+    // Retail stores a flipped origin and hands the pipeline its flip again, which cancels back
+    // to Top; the port passes Top directly. The flipped value is still stored for
+    // Win3DGetViewport.
     G_ViewportLeft = Left;
     G_ViewportWidth = Width;
     G_ViewportHeight = Height;
@@ -627,9 +583,7 @@ void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine)
 
 void Win3DGetViewport(int Query, int* Out4)
 {
-    // FUN_00422390. Retail only ever compares against one query id; anything else falls through
-    // to nothing, matching the disassembly (there is no else branch). The out array is written
-    // untested (0x004223a0).
+    // FUN_00422390. The out array is written untested.
     if (Query == kWin3DQueryViewport)
     {
         Out4[0] = G_ViewportLeft;
@@ -642,9 +596,7 @@ void Win3DGetViewport(int Query, int* Out4)
 void Win3DSetViewportRect(int X, int Y, int Width, int Height, const char* SourceFile,
                           int SourceLine)
 {
-    // FUN_00421620. The stores to 0x00664994..0x006649a0 come first, then pipeline slot 21
-    // (+0x54) with the flipped Y (DAT_00610854 is the surface height). Retail has no pipeline
-    // null test; GetPipeline() is this module's accessor for DALib::Pipeline.
+    // FUN_00421620. The stores come first, then the pipeline with the flipped Y.
     (void)SourceFile;
     (void)SourceLine;
     G_ViewportLeft = X;
@@ -657,8 +609,7 @@ void Win3DSetViewportRect(int X, int Y, int Width, int Height, const char* Sourc
 
 void Win3DSetOrtho2DForCamera(FSpaceCamera* Cam)
 {
-    // FUN_004227d0. Win3DSetOrtho2D's shape, but sized from Cam's own viewport rect (the same
-    // Vtable[5] accessor Win3DSetViewport uses) instead of the display.
+    // FUN_004227d0
     const int* const Rect = AsCamera(Cam)->GetViewport();
     const float Width = static_cast<float>(Rect[2] - Rect[0] + 1);
     const float Height = static_cast<float>(Rect[3] - Rect[1] + 1);
@@ -668,47 +619,36 @@ void Win3DSetOrtho2DForCamera(FSpaceCamera* Cam)
 void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float NearPlane,
                         float FarPlane)
 {
-    // FUN_004221f0.
-    //
-    // 0x004221fa .. 0x0042226d: an identity is built on the stack and copied into the modelview.
-    // This happens FIRST, before any cache test -- so every call resets it, even the ones that
-    // decide the projection has not changed.
+    // FUN_004221f0. The modelview reset comes FIRST, before any cache test.
     GWin3DModelview[0] = 1.0f; GWin3DModelview[1] = 0.0f; GWin3DModelview[2] = 0.0f;
     GWin3DModelview[3] = 0.0f; GWin3DModelview[4] = 1.0f; GWin3DModelview[5] = 0.0f;
     GWin3DModelview[6] = 0.0f; GWin3DModelview[7] = 0.0f; GWin3DModelview[8] = 1.0f;
     GWin3DModelview[9] = 0.0f; GWin3DModelview[10] = 0.0f; GWin3DModelview[11] = 0.0f;
 
     IRenderPipeline* const Pipe = GetPipeline();
-    // 0x0042226f: the out-parameter is seeded with 1 before the query, so a pipeline that
-    // does not answer leaves it non-zero and takes the combined-modelview path below.
+    // The out-parameter is seeded with 1, so a pipeline that does not answer takes the
+    // combined-modelview path.
     int PipelineState = 1;
     Pipe->GetPipelineState(kPipelineStateViewspace, &PipelineState);
 
     if (PipelineState != 0)
     {
-        // 0x00422298: the pipeline is in view space, so one combined matrix is enough.
         Pipe->SetModelview(GWin3DModelview);
     }
     else
     {
-        // 0x0042229d: otherwise world and view are set separately, both to the identity.
         Pipe->SetWorld(GWin3DModelview);
         Pipe->SetView(GWin3DModelview);
     }
 
-    // 0x004222b2: the whole cache is behind one flag, and that flag is 1 in .data -- so the
-    // cache is on unless something turns it off.
     if (G_bProjectionCacheEnabled != 0)
     {
         const float Args[kProjectionParamCount] = {Left, Right, Bottom, Top, NearPlane, FarPlane};
 
-        // 0x004222f5: a different projection KIND always counts as a change, whatever the
-        // parameters say.
+        // A different projection KIND always counts as a change.
         bool bChanged = (G_ProjectionKind != kProjectionKindOrtho);
 
-        // 0x00422300: the compare and the store share one loop, and the STORE IS
-        // UNCONDITIONAL -- it happens on the equal path too, where it writes back what was
-        // already there. Once a difference is found the compare is skipped for the rest.
+        // The compare and the store share one loop, and the store is unconditional.
         for (int I = 0; I < kProjectionParamCount; ++I)
         {
             if (!bChanged && G_ProjectionParams[I] != Args[I])
@@ -718,7 +658,6 @@ void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float 
 
         if (!bChanged)
         {
-            // 0x00422371: nothing to do but count it.
             ++G_ProjectionSkipCount;
             return;
         }
@@ -727,15 +666,12 @@ void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float 
         G_ProjectionKind = kProjectionKindOrtho;
     }
 
-    // 0x00422365: and the six parameters go to the pipeline in glOrtho's own order.
     Pipe->SetOrtho(Left, Right, Bottom, Top, NearPlane, FarPlane);
 }
 
 void Win3DSetOrtho2D()
 {
-    // FUN_004225e0: glOrtho(0, Width, Height, 0, -1, 1) -- x to the right, y DOWN, which is why
-    // the top and bottom arguments are the way round they are. 0x004225e0 / 0x004225f9: FILD
-    // DAT_00610854 / DAT_00610850, the recorded surface size.
+    // FUN_004225e0: the recorded surface size, y DOWN.
     Win3DSetProjection(0.0f, static_cast<float>(static_cast<int>(G_RenderSurfaceWidth)),
                        static_cast<float>(static_cast<int>(G_RenderSurfaceHeight)), 0.0f, -1.0f,
                        1.0f);
@@ -743,10 +679,7 @@ void Win3DSetOrtho2D()
 
 void Win3DSetPerspective(float FovDeg, float Aspect, float NearPlane, float FarPlane)
 {
-    // FUN_00422820. Perspective's sibling to Win3DSetProjection's ortho path: same change-cache,
-    // same backing store (only the first four of its six slots), cache "kind" 1 instead of 2.
-    // Unlike the ortho setter, no modelview reset happens here -- retail's disassembly never
-    // touches it.
+    // FUN_00422820. No modelview reset here, unlike the ortho setter.
     IRenderPipeline* const Pipe = GetPipeline();
 
     if (G_bProjectionCacheEnabled != 0)
@@ -776,8 +709,7 @@ void Win3DSetPerspective(float FovDeg, float Aspect, float NearPlane, float FarP
 
 void Win3DApplyCameraPerspective(ICamera* Camera)
 {
-    // FUN_00422910: the four getters in retail's call order (0x00422918 far, 0x00422922 near,
-    // 0x0042292c aspect, 0x00422936 fov), then FUN_00422820.
+    // FUN_00422910: the four getters in retail's call order.
     const float FarPlane = Camera->GetZFar();
     const float NearPlane = Camera->GetZNear();
     const float Aspect = Camera->GetAspect();
@@ -787,10 +719,8 @@ void Win3DApplyCameraPerspective(ICamera* Camera)
 
 void Win3DPushProjection()
 {
-    // FUN_00422a70. With the cache on, the save is just the cache's own kind and params -- cheap,
-    // and exactly what Win3DPopProjection needs to replay through Win3DSetPerspective or
-    // Win3DSetProjection. With the cache off there is no cached shape to save, so retail reads the
-    // pipeline's actual 4x4 projection matrix back out instead.
+    // FUN_00422a70. With the cache on, the cache's kind and params; with it off, the pipeline's
+    // 4x4 projection matrix.
     if (G_bProjectionCacheEnabled != 0)
     {
         G_SavedProjectionKind = G_ProjectionKind;
@@ -804,7 +734,7 @@ void Win3DPushProjection()
 
 void Win3DPopProjection()
 {
-    // FUN_00422ab0, the mirror image.
+    // FUN_00422ab0
     if (G_bProjectionCacheEnabled == 0)
     {
         GetPipeline()->SetProjection(G_SavedProjectionMatrix);
@@ -836,39 +766,35 @@ int Win3DGetProjectionSkipCount()
     return G_ProjectionSkipCount;
 }
 
-// FUN_004214a0 (listing 004214a0-004214c1).
+// FUN_004214a0
 void Win3DOnPresentFrame()
 {
     G_ProjectionSetCount = 0;
     G_ProjectionSkipCount = 0;
-    // NEG/SBB/INC: AL = 1 when option is 0, else 0.
     G_bProjectionCacheEnabled =
         static_cast<unsigned char>(GetGameOption(kGameOptLikePetal) == 0 ? 1 : 0);
 }
 
 void Win3DEnd()
 {
+    // FUN_00421690.
     IRenderPipeline* const Pipe = GetPipeline();
 
-    // 0x004216ac: clipping goes on before anything else, and stays on -- nothing turns it back
-    // off at the end.
+    // Clipping goes on first and stays on.
     Pipe->SetRenderState(kRsClipping, 1);
 
     ApplyTextureStages();
 
     if (G_VertexCount > 0)
     {
-        // 0x004216e0, from .rdata 0x005c9698: the vertex colour is made to drive the diffuse
-        // material, which is what makes the packed per-vertex colour visible at all.
+        // The vertex colour drives the diffuse material (.rdata 0x005c9698).
         Pipe->SetRenderState(kRsColorVertex, 1);
         Pipe->SetRenderState(kRsDiffuseMaterialSource, 1);
 
-        // 0x00421701: the current lighting flag is saved so it can be put back afterwards.
         int SavedLighting = 0;
         Pipe->GetRenderState(kRsLighting, &SavedLighting);
         Pipe->SetRenderState(kRsLighting, G_bLighting);
 
-        // 0x0042173e: and the emulator's own modelview is installed.
         Pipe->SetModelview(GWin3DModelview);
 
         const unsigned VertexCount = static_cast<unsigned>(G_VertexCount);
@@ -880,8 +806,8 @@ void Win3DEnd()
             break;
 
         case kWin3DLines:
-            // 0x00421784: the locked path draws through the index buffer instead, because a
-            // locked pool's vertices are not in draw order.
+            // The locked path draws through the index buffer, since a locked pool's vertices
+            // are not in draw order.
             if (G_bBufferLocked == 0)
                 Pipe->DrawPrimitive(2, kWin3DFvf, G_Vertices, VertexCount, nullptr);
             else
@@ -913,8 +839,7 @@ void Win3DEnd()
 
         case kWin3DLineLoop:
         {
-            // 0x00421809: a strip over everything, then a single indexed line closing the last
-            // vertex back onto the first.
+            // A strip over everything, then one indexed line from the last vertex to the first.
             Pipe->DrawPrimitive(3, kWin3DFvf, G_Vertices, VertexCount, nullptr);
 
             const unsigned short Closing[2] = {
@@ -925,8 +850,7 @@ void Win3DEnd()
 
         case kWin3DQuads:
         {
-            // 0x00421904: quads are triangulated into an index list, four vertices becoming two
-            // triangles -- (0,1,2) and (0,2,3) -- and the run is capped.
+            // Each quad becomes (0,1,2) and (0,2,3); the run is capped.
             unsigned Usable = static_cast<unsigned>(G_IndexCount);
             if (Usable > kMaxQuadIndices)
                 Usable = kMaxQuadIndices;
@@ -954,19 +878,16 @@ void Win3DEnd()
         }
 
         default:
-            // 0x004219cc: retail warns (CALL [FDUMP], pointer not tested) and draws nothing.
             FDUMP(0x100002, "%s(%d) : *** WARNING: glEnd invalid vertex mode (0x%X)\n",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x1d2, G_PrimitiveMode);
             break;
         }
 
-        // 0x004219f0, from .rdata 0x005c96b0: the vertex colour is switched back off, and the
-        // lighting flag is restored to whatever it was.
         Pipe->SetRenderState(kRsColorVertex, 0);
         Pipe->SetRenderState(kRsLighting, SavedLighting);
     }
 
-    // 0x00421a09: everything is reset whether or not anything was drawn.
+    // Everything is reset whether or not anything was drawn.
     G_PrimitiveMode = -1;
     G_VertexCount = 0;
     G_IndexCount = 0;
@@ -1011,28 +932,24 @@ bool Win3DGetVertex(int Index, float* OutXyz3, unsigned long* OutColour)
 
 namespace
 {
-    // local_804 / afStack_404 in retail: 256-entry cosine/sine tables indexed 1..Cols.
+    // Retail's two 256-entry stack tables, indexed 1..Cols.
     const int kMaxSphereCols = 256;
 }
 
 void Win3DBuildSpherePoints(float* OutPoints, float Radius, int Cols, int Rows)
 {
-    // FUN_00422fe0 (cdecl: Out, Radius, Cols, Rows). The two 256-entry float tables are filled
-    // from index 1 up to Cols, and read the same way.
+    // FUN_00422fe0 (cdecl).
     float CosTable[kMaxSphereCols + 1];
     float SinTable[kMaxSphereCols + 1];
 
-    // 0x00422ff5..0x0042301b: FILD (Rows - 1), FDIVR float DAT_005c8a5c (pi as 0x40490fdb) ->
-    // FSTP float; FILD Cols, FDIVR double DAT_005c97f8 (0x401921fb60000000, 2 pi widened from
-    // float) -> FSTP float.
+    // pi as a float and 2 pi widened from float, each step rounded to float.
     const float PhiStep =
         static_cast<float>(static_cast<double>(3.1415927f) / static_cast<double>(Rows - 1));
     const float ThetaStep =
         static_cast<float>(static_cast<double>(6.2831855f) / static_cast<double>(Cols));
 
-    // 0x0042301f..0x00423041: theta starts at 0.0f and lives on the FPU for the whole loop --
-    // FCOS / FSIN of the unrounded angle go straight to FSTP float, and FADD float adds the
-    // stored step. TEST/JLE: nothing for Cols <= 0.
+    // x87: theta stays double for the whole loop; cos / sin of the unrounded angle are rounded
+    // to float.
     double Theta = 0.0;
     for (int Index = 1; Index <= Cols; ++Index)
     {
@@ -1041,9 +958,7 @@ void Win3DBuildSpherePoints(float* OutPoints, float Radius, int Cols, int Rows)
         Theta += static_cast<double>(ThetaStep);
     }
 
-    // 0x0042304e..0x004230ad: phi the same way, one ring per row (TEST/JLE, then DEC/JNZ). Per
-    // ring: Y = f(cos(phi) * Radius) and SR = f(sin(phi) * Radius), each rounded once; per column
-    // [+4] = Y, [+0] = f(SR * cos[i]), [+8] = f(SR * sin[i]).
+    // Phi the same way, one ring per row; Y and sin(phi) * Radius are rounded once per ring.
     if (Rows > 0)
     {
         double Phi = 0.0;
@@ -1070,9 +985,7 @@ void Win3DBuildSpherePoints(float* OutPoints, float Radius, int Cols, int Rows)
 
 void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows)
 {
-    // FUN_004230c0 (cdecl: Points, Cols, Rows). 0x004230c4: PUSH 0xde1 / CALL FUN_00421ed0 --
-    // GL_TEXTURE_2D is DISABLED first (FUN_00421ed0 is glDisable; glEnable is FUN_00421dd0), so
-    // the wireframe grid draws untextured.
+    // FUN_004230c0 (cdecl). Untextured.
     Win3DDisable(kWin3DTexture2D);
 
     // Skip the first ring (the pole row) and draw every ring up to but not including the last as
@@ -1117,9 +1030,8 @@ void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows)
 
 void Win3DDrawWireSphere(void* Camera, float const* Xform12, float Radius, int Cols, int Rows)
 {
-    // FUN_00423180. DAT_006649c8 is a function static guarded by bit 0 of DAT_006679c8 whose
-    // atexit destructor LAB_004231e0 is a bare RET, so a plain static array is the same object.
-    // Its extent is the 0x3000 bytes up to the guard byte: 0x400 points.
+    // FUN_00423180. DAT_006649c8 is a function static with an empty destructor; 0x3000 bytes,
+    // 0x400 points.
     static float Points[0xc00];
     Win3DBuildSpherePoints(Points, Radius, Cols, Rows);
     Win3DBindModelview(Camera, Xform12);
@@ -1128,7 +1040,7 @@ void Win3DDrawWireSphere(void* Camera, float const* Xform12, float Radius, int C
 
 void Win3DVec3Add(float* Out, float const* A, float const* B)
 {
-    // FUN_00423b30: z, y, x summed on the FPU, then stored x, y, z.
+    // FUN_00423b30
     Out[0] = A[0] + B[0];
     Out[1] = A[1] + B[1];
     Out[2] = A[2] + B[2];
@@ -1149,7 +1061,7 @@ namespace
     constexpr float kFuzzyLineQuadScale = 1.25f;
     constexpr float kFuzzyArcQuadScale = 1.2f;
 
-    // FUN_00410190 (thiscall on the vector): sqrt((x*x + y*y) + z*z), left on the FPU.
+    // FUN_00410190 (thiscall on the vector): sqrt((x*x + y*y) + z*z), unrounded.
     double FuzzyVecLength(float const* V)
     {
         return sqrt(static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1] +
@@ -1163,8 +1075,7 @@ namespace
                     static_cast<double>(V[0]) * V[0]);
     }
 
-    // The FUN_00422b80 cross product both drawers build inline: Out = D x E, each difference of
-    // products rounded to float on its FSTP.
+    // The cross product both drawers build inline: Out = D x E, each component rounded to float.
     void FuzzyCross(float* Out, float const* D, float const* E)
     {
         Out[0] = static_cast<float>(static_cast<double>(E[2]) * D[1] -
@@ -1175,7 +1086,7 @@ namespace
                                     static_cast<double>(D[1]) * E[0]);
     }
 
-    // Common's RandomVector(Radius) (IAT 0x005c60a4) added to P through FUN_00423b30.
+    // Common's RandomVector(Radius) added to P.
     void FuzzyJitter(float* Out, float const* P, float Radius)
     {
         Vector const Offset = RandomVector(Radius);
@@ -1183,7 +1094,7 @@ namespace
         Win3DVec3Add(Out, P, OffsetXyz);
     }
 
-    // Scale V in place by Wanted / FUN_00410190(V), each product rounded to float.
+    // Scale V in place by Wanted / |V|, each product rounded to float.
     void FuzzyRescale(float* V, float Wanted)
     {
         double const Scale = static_cast<double>(Wanted) / FuzzyVecLength(V);
@@ -1192,9 +1103,8 @@ namespace
         V[2] = static_cast<float>(V[2] * Scale);
     }
 
-    // One camera-facing quad (0x00423ff6..0x0042416a, 0x00423786..0x004238ee): glBindTexture of
-    // the frame's handle, GL_QUADS, then (0,0) Mid + Along, (1,0) Mid + Side, (1,1) Mid - Along,
-    // (0,1) Mid - Side, glEnd.
+    // One camera-facing quad: (0,0) Mid + Along, (1,0) Mid + Side, (1,1) Mid - Along,
+    // (0,1) Mid - Side.
     void FuzzyEmitQuad(unsigned long Handle, float const* Mid, float const* Along,
                        float const* Side)
     {
@@ -1219,36 +1129,32 @@ namespace
 
 void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
 {
-    // FUN_00423be0. 0x00423bf0: a set flag hands the record to the arc drawer.
+    // FUN_00423be0.
     if (Line->bCurved != 0)
     {
         Win3DDrawFuzzyArc(Line);
         return;
     }
 
-    // 0x00423c0a..0x00423c62: Dir = End - Start; its length is kept as a float, and divided
-    // unrounded by Width for the segment count ftol(floor(Length / Width) + 1.0).
+    // The length is kept as a float, but divided unrounded for the segment count.
     float Dir[3];
     Win3DVec3Sub(Dir, Line->End, Line->Start);
     double const LengthExt = FuzzyInlineLength(Dir);
     float const Length = static_cast<float>(LengthExt);
     int const Count = static_cast<int>(floor(LengthExt / Line->Width) + 1.0);
 
-    // 0x00423c68..0x00423cc3: Step = Length / Count, and Unit = Dir rescaled to Step.
     float const Step = static_cast<float>(static_cast<double>(Length) / Count);
     float Unit[3] = {Dir[0], Dir[1], Dir[2]};
     FuzzyRescale(Unit, Step);
 
-    // 0x00423cc5: the colour, on both paths.
+    // The colour, on both paths.
     Win3DColor3f(Line->Color[0], Line->Color[1], Line->Color[2]);
 
-    // 0x00423cca..0x00423cdc: the jitter radius; no texture takes the line-strip path.
     float const Jitter = Line->JitterScale * Line->Width;
     if (Line->Texture == nullptr)
     {
-        // 0x0042419f..0x0042429f: texturing and blending off, then Start, the Count - 1 jittered
-        // interior points Start + Unit * i, and End as one line strip. The x product stays on the
-        // FPU into its sum; y and z are rounded to float first.
+        // Start, the Count - 1 jittered interior points and End as one line strip. x87: the x
+        // product stays double into its sum; y and z are rounded to float first.
         Win3DDisable(kWin3DTexture2D);
         Win3DDisable(kWin3DBlend);
         Win3DBegin(kWin3DLineStrip);
@@ -1271,7 +1177,7 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
         return;
     }
 
-    // 0x00423ce2..0x00423d31: frame 0 of the texture (ITextureLibrary2 +0x58), additive blend.
+    // Frame 0 of the texture, additive blend.
     float Cur[3] = {Line->Start[0], Line->Start[1], Line->Start[2]};
     unsigned long Frame[5];
     DALib::TextureLib->GetTextureFrame(Line->Texture, 0, Frame);
@@ -1280,8 +1186,7 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
 
     for (int Index = 1; Index <= Count; ++Index)
     {
-        // 0x00423d40..0x00423dc2: the last point is End itself, the others Start + Unit * i
-        // (FUN_00411d60 with (float)i) jittered.
+        // The last point is End itself, the others Start + Unit * i jittered.
         float Next[3];
         if (Index == Count)
         {
@@ -1298,7 +1203,7 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
             FuzzyJitter(Next, OnLine, Jitter);
         }
 
-        // 0x00423dc5..0x00423e73: the side direction (Next - Cur) x (Eye - Cur).
+        // The side direction (Next - Cur) x (Eye - Cur).
         float ToEye[3];
         float Segment[3];
         float Side[3];
@@ -1306,8 +1211,7 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
         Win3DVec3Sub(Segment, Next, Cur);
         FuzzyCross(Side, Segment, ToEye);
 
-        // 0x00423e78..0x00423f44: the midpoint, and the side rescaled to half of |Mid - Cur|
-        // (the root times DAT_005c75e8, 0.5 as a double).
+        // The midpoint, and the side rescaled to half of |Mid - Cur| (0.5 as a double).
         float Half[3];
         float HalfScaled[3];
         float Mid[3];
@@ -1318,7 +1222,7 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
         Win3DVec3Sub(FromCur, Mid, Cur);
         FuzzyRescale(Side, static_cast<float>(FuzzyInlineLength(FromCur) * 0.5));
 
-        // 0x00423f44..0x00423ff1: Along = (Cur - Mid) * 1.25, Side * 1.25 * SideScale.
+        // Along = (Cur - Mid) * 1.25, Side * 1.25 * SideScale.
         float Back[3];
         Win3DVec3Sub(Back, Cur, Mid);
         float const Along[3] = {Back[0] * kFuzzyLineQuadScale, Back[1] * kFuzzyLineQuadScale,
@@ -1330,7 +1234,6 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
 
         FuzzyEmitQuad(Frame[0], Mid, Along, SideQuad);
 
-        // 0x0042416f..0x0042418e.
         Cur[0] = Next[0];
         Cur[1] = Next[1];
         Cur[2] = Next[2];
@@ -1339,14 +1242,13 @@ void Win3DDrawFuzzyLine(FWin3DFuzzyLine const* Line)
 
 void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
 {
-    // FUN_004231f0. 0x00423201..0x0042321d: both ends relative to the centre.
+    // FUN_004231f0.
     float FromCentre[3];
     float ToEnd[3];
     Win3DVec3Sub(FromCentre, Line->Start, Line->Control);
     Win3DVec3Sub(ToEnd, Line->End, Line->Control);
 
-    // 0x00423222..0x00423281: either radius below 0.001 (DAT_005c75f8, a double compared with
-    // the unrounded root; TEST AH,5 / JNP taken = below) draws nothing.
+    // Either radius below 0.001 (compared with the unrounded root) draws nothing.
     double const RadiusExt = FuzzyInlineLength(FromCentre);
     float const Radius = static_cast<float>(RadiusExt);
     if (RadiusExt < 0.001)
@@ -1354,12 +1256,12 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
     if (FuzzyInlineLength(ToEnd) < 0.001)
         return;
 
-    // 0x00423287..0x004232bf: the jitter radius, and ToEnd rescaled to the start radius.
+    // ToEnd rescaled to the start radius.
     float const Jitter = Line->JitterScale * Line->Width;
     FuzzyRescale(ToEnd, Radius);
 
-    // 0x004232c1..0x0042332a: the swept angle. The cosine is compared unrounded with -1.0f
-    // (below -> -1) and then, stored, with 1.0f (above -> 1); NaN passes both.
+    // The swept angle. The cosine is compared unrounded with -1.0f and then, rounded, with 1.0f;
+    // NaN passes both.
     float const RadiusSq = Radius * Radius;
     double const CosineExt = (static_cast<double>(ToEnd[2]) * FromCentre[2] +
                               static_cast<double>(ToEnd[1]) * FromCentre[1] +
@@ -1372,8 +1274,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         Cosine = 1.0f;
     float const Angle = static_cast<float>(acos(static_cast<double>(Cosine)));
 
-    // 0x0042332e..0x0042337d: the angle one chord of Width subtends, acos(1 - W^2 / (2 R^2)),
-    // clamped the same way on the stored float.
+    // The angle one chord of Width subtends, acos(1 - W^2 / (2 R^2)), clamped on the float.
     double const Width = Line->Width;
     float ChordCosine = static_cast<float>(
         1.0 - Width * Width / (static_cast<double>(RadiusSq) + RadiusSq));
@@ -1382,13 +1283,10 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
     else if (ChordCosine > 1.0f)
         ChordCosine = 1.0f;
 
-    // 0x00423381..0x004233af: Count = ftol(floor(Angle / acos(chord)) + 1.0), Step = Angle /
-    // Count.
     int const Count = static_cast<int>(
         floor(static_cast<double>(Angle) / acos(static_cast<double>(ChordCosine))) + 1.0);
     float const Step = static_cast<float>(static_cast<double>(Angle) / Count);
 
-    // 0x004233b3..0x004233fb: the rotation axis FromCentre x ToEnd.
     float Axis[3];
     FuzzyCross(Axis, FromCentre, ToEnd);
 
@@ -1396,8 +1294,8 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
 
     if (Line->Texture == nullptr)
     {
-        // 0x00423923..0x00423b2b: texturing and blending off, the colour, then Start, the
-        // Count - 1 rotated and jittered interior points, and Control + ToEnd as a line strip.
+        // Start, the Count - 1 rotated and jittered interior points, and Control + ToEnd as a
+        // line strip.
         Win3DDisable(kWin3DTexture2D);
         Win3DDisable(kWin3DBlend);
         Win3DColor3f(Line->Color[0], Line->Color[1], Line->Color[2]);
@@ -1405,8 +1303,8 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         Win3DVertex3f(Line->Start[0], Line->Start[1], Line->Start[2]);
         for (int Index = 1; Index < Count; ++Index)
         {
-            // 0x00423980..0x004239e5: the half angle stays on the FPU; the axis length is the
-            // inline (x*x + z*z) + y*y root.
+            // x87: the half angle stays double; the axis length is the inline
+            // (x*x + z*z) + y*y root.
             double const HalfAngle = static_cast<double>(Index) * Step * 0.5f;
             double const AxisLength = sqrt(static_cast<double>(Axis[0]) * Axis[0] +
                                            static_cast<double>(Axis[2]) * Axis[2] +
@@ -1419,13 +1317,12 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             Rotation.Y = Vec[1];
             Rotation.Z = Vec[2];
 
-            // 0x00423a06..0x00423a6b: DAT_006679d8 slots +0x54 and +0x2c called directly.
+            // Through DAT_006679d8 directly.
             FMatrix Matrix;
             Win3DTransformMathEngine()->QuaternionToMatrix(Matrix, Rotation);
             FVector Rotated;
             Win3DTransformMathEngine()->TransformMatrix(Rotated, Matrix, Source);
 
-            // 0x00423a6e..0x00423ad5.
             float const OnArc[3] = {Rotated.X + Line->Control[0], Rotated.Y + Line->Control[1],
                                     Rotated.Z + Line->Control[2]};
             float Point[3];
@@ -1438,8 +1335,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         return;
     }
 
-    // 0x0042340b..0x00423459: frame 0 of the texture, additive blend. No colour is set on this
-    // path.
+    // Frame 0 of the texture, additive blend. No colour is set on this path.
     float Cur[3] = {Line->Start[0], Line->Start[1], Line->Start[2]};
     unsigned long Frame[5];
     DALib::TextureLib->GetTextureFrame(Line->Texture, 0, Frame);
@@ -1451,13 +1347,11 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         float Next[3];
         if (Index == Count)
         {
-            // 0x00423466..0x00423491: the last point is Control + ToEnd.
             Win3DVec3Add(Next, Line->Control, ToEnd);
         }
         else
         {
-            // 0x00423496..0x004235aa: the half angle is stored as a float (FST) after its sine
-            // is taken unrounded; the cosine is of the stored float. Axis length FUN_00410190.
+            // x87: the sine is of the unrounded half angle, the cosine of the rounded float.
             double const HalfAngleExt = static_cast<double>(Index) * Step * 0.5f;
             float const HalfAngle = static_cast<float>(HalfAngleExt);
             float const Sine = static_cast<float>(sin(HalfAngleExt));
@@ -1472,14 +1366,13 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             FMatrix Matrix;
             Win3DTransformMathEngine()->QuaternionToMatrix(Matrix, Rotation);
             FVector Rotated;
-            Win3DTransformByMatrix(Rotated, Matrix, Source);   // FUN_00423b90
+            Win3DTransformByMatrix(Rotated, Matrix, Source);
             float const RotatedXyz[3] = {Rotated.X, Rotated.Y, Rotated.Z};
             float OnArc[3];
             Win3DVec3Add(OnArc, Line->Control, RotatedXyz);
             FuzzyJitter(Next, OnArc, Jitter);
         }
 
-        // 0x004235ad..0x0042363a: the side direction (Next - Cur) x (Eye - Cur).
         float ToEye[3];
         float Segment[3];
         float Side[3];
@@ -1487,8 +1380,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         Win3DVec3Sub(Segment, Next, Cur);
         FuzzyCross(Side, Segment, ToEye);
 
-        // 0x0042363f..0x00423706: the midpoint, and the side rescaled to |Mid - Cur| (no halving
-        // here, unlike the straight drawer).
+        // The side rescaled to |Mid - Cur| (no halving here, unlike the straight drawer).
         float Half[3];
         float HalfScaled[3];
         float Mid[3];
@@ -1499,7 +1391,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
         Win3DVec3Sub(FromCur, Mid, Cur);
         FuzzyRescale(Side, static_cast<float>(FuzzyInlineLength(FromCur)));
 
-        // 0x00423708..0x00423781: Along = (Cur - Mid) * 1.2, Side * 1.2 (no SideScale).
+        // Along = (Cur - Mid) * 1.2, Side * 1.2 (no SideScale).
         float Back[3];
         Win3DVec3Sub(Back, Cur, Mid);
         float const Along[3] = {Back[0] * kFuzzyArcQuadScale, Back[1] * kFuzzyArcQuadScale,
@@ -1509,7 +1401,6 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
 
         FuzzyEmitQuad(Frame[0], Mid, Along, SideQuad);
 
-        // 0x004238f3..0x00423912.
         Cur[0] = Next[0];
         Cur[1] = Next[1];
         Cur[2] = Next[2];

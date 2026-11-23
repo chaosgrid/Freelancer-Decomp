@@ -7,41 +7,29 @@
 #pragma once
 
 // -------------------------------------------------------------------------------------------
-// NeuroNetNavMap -- Client\Interface\NeuroNet\NavMap.cpp (retail 0x0048dc10..0x004a3f90).
+// NeuroNetNavMap -- retail Client\Interface\NeuroNet\NavMap.cpp.
 // The NeuroNet navigation map: the universe view (every system as a NAV_star) and the system
 // view (solars, zones, trade lanes, patrol paths, waypoints, the best path), the filter / zoom /
 // waypoint buttons along its frame, the info card and the known-bases list.
 //
 // RTTI .?AVNeuroNetNavMap@@ (0x00611cc4): WinControl @0 (IDataViewOwner @0x7c),
 // Event::Handler @0x32c, ButtonMover @0x330. COLs 0x005eb5fc / 0x005eb610 / 0x005eb624 /
-// 0x005eb680. Size 0x100c (operator new at 0x004a2e5b).
+// 0x005eb680. Size 0x100c.
 //
-// vftables (read out of the PE):
-//   WinControl face 0x005d2f84 (45 slots) -- overrides 0 FUN_0048e630 (scalar deleting dtor
-//     around FUN_0048e650), 4 LAB_00492270 HitTest, 5 LAB_004948a0 SetPosition, 9 LAB_0048eba0
-//     Create, 11 LAB_00494920 Update, 13 LAB_004926d0 Draw, 19 LAB_00497d30 MouseEvent,
-//     23 LAB_004945e0 ProcessMessage (0xef01 show / 0xef02 close), 42 LAB_00493680 SetProperty; every
-//     other slot is WinControl's 0x005e5e44 entry.
-//   IDataViewOwner face 0x005d2f74 -- WinControl's LAB_0053aaa0 / FUN_0053e4a0.
-//   Event::Handler 0x005d2f6c -- LAB_0049e190 OnEvent.
-//   ButtonMover 0x005d2f60 -- LAB_00401e90 / LAB_0043d8a0, i.e. ButtonMover's own bodies: no
-//     override.
+// vftables: WinControl face 0x005d2f84 (45 slots; scalar deleting dtor FUN_0048e630),
+// IDataViewOwner face 0x005d2f74 (WinControl's entries), Event::Handler 0x005d2f6c,
+// ButtonMover 0x005d2f60 (ButtonMover's own bodies, no override).
 //
-// Factory: WINFACTORY<NeuroNetNavMap> "NeuroNetNavMap", static init LAB_0048d700 ->
-// FUN_004a2dd0 (the WinFactory head, FUN_0059dab0, vftable 0x005d3fa0) + atexit; Create
-// FUN_004a2e40 is operator new(0x100c) + FUN_0048de20 + slot 9. Built by the MissionBriefing
-// state (0x0043d45c, parent "BriefingParentWindow") and by NavBar / NN_MainButton
-// (0x0045cfb7, 0x0045d358).
+// Factory: WINFACTORY<NeuroNetNavMap> "NeuroNetNavMap", static init LAB_0048d700; Create
+// FUN_004a2e40 (operator new(0x100c)). Built by the MissionBriefing state (parent
+// "BriefingParentWindow") and by NavBar / NN_MainButton.
 //
 // Member offsets in the comments are retail's. The port holds the lists and vectors in
-// current-STL containers (no retail ABI, AGENTS.md), so from +0x3fc on the C++ offsets differ.
+// current-STL containers, so from +0x3fc on the C++ offsets differ.
 //
-// Slot 11 Update (LAB_00494920) and its helpers are ported (nn_navmap_update.cpp /
-// nn_navmap_view.cpp), slot 13 Draw (LAB_004926d0) and its helpers too (nn_navmap_draw.cpp),
-// slot 19 MouseEvent (LAB_00497d30) and slot 42 SetProperty (LAB_00493680) with the helpers only
-// they reach (nn_navmap_input.cpp). The info card's base sections are FUN_00476080
-// (NnHelpAppendBaseGoods, nn_help.cpp). Remaining hole there: the story star reset
-// (FUN_004b9bb0), named in nn_navmap_input.cpp.
+// Update and its helpers live in nn_navmap_update.cpp / nn_navmap_view.cpp, Draw in
+// nn_navmap_draw.cpp, MouseEvent / SetProperty in nn_navmap_input.cpp. The info card's base
+// sections are FUN_00476080 (NnHelpAppendBaseGoods, nn_help.cpp).
 // -------------------------------------------------------------------------------------------
 
 #include "Interface/button_mover.h"
@@ -78,9 +66,7 @@ namespace Universe
 // FUN_0048eb80. Held by pointer in NeuroNetNavMap::Items.
 struct FNavMapItem
 {
-    // FUN_00491f90 00491fd3..0049200d: the holder (FUN_00420d40), its five tint floats
-    // (FUN_00492250), the holder vftable / anim index, then +0x5c / +0x60 / +0x78 / +0x80 /
-    // +0x81 cleared.
+    // Inlined in FUN_00491f90.
     FNavMapItem();
     // FUN_0048dd40
     ~FNavMapItem();
@@ -108,10 +94,9 @@ struct FNavMapItem
     int Ordinal;                // +0x58 0; a waypoint marker's slot + 1, then the waypoint's
                                 //       AutoId (FUN_00496e50)
     // +0x5c -- retail {wchar_t* (msvcrt malloc), capacity}, freed with free by FUN_0048dd40.
-    // Update (0x00494d67) shows it as a Kind 4 item's tool tip when it is non-null and not
-    // empty (wcscmp against L"" at DAT_005c8ce0). No writer in NavMap.cpp (0x0048dc10..
-    // 0x004a3f90) sets it (only FUN_00491f90's null); the port's empty string stands for both
-    // retail's null and L"", which Update treats alike. TODO: meaning / writer.
+    // Update shows it as a Kind 4 item's tool tip when it is non-null and not empty. Nothing
+    // in NavMap.cpp writes it (only FUN_00491f90's null); the port's empty string stands for
+    // both retail's null and L"", which Update treats alike. TODO: meaning / writer.
     std::wstring TooltipText;
     Universe::ISystem const* System; // +0x64 the universe view's system
     float PulseRate;            // +0x68 universe view: (rand() * 100 >> 15 + 1) * 0.01
@@ -135,16 +120,15 @@ private:
     FNavMapItem& operator=(FNavMapItem const&) = delete;
 };
 
-// One trade lane segment of the system view, 0x18 bytes (FUN_004981f0 0x004982c7..0x0049836b):
-// ring to next ring, both already scaled by SystemScale.
+// One trade lane segment of the system view, 0x18 bytes (FUN_004981f0): ring to next ring,
+// both already scaled by SystemScale.
 struct FNavMapSegment
 {
     float Start[3]; // +0x00
     float End[3];   // +0x0c
 };
 
-// One trade lane ring of the system view, 0x7c bytes (FUN_004917c0 0x00491906..0x004919a0):
-// the [Object]'s nickname, position, archetype and ring links.
+// One trade lane ring of the system view, 0x7c bytes (FUN_004917c0).
 struct FNavMapRing
 {
     TString<32> Nickname;  // +0x00 (FUN_00420750); FUN_004981f0 empties it when chained
@@ -154,8 +138,8 @@ struct FNavMapRing
     TString<32> PrevRing;  // +0x58 prev_ring (FUN_00417c50, capacity 0x20)
 };
 
-// One placed label (FUN_0049a2f0 0x0049a535..0x0049a569): its rect in screen fractions (the
-// width and height grown by 1.4) and the item it belongs to.
+// One placed label (FUN_0049a2f0): its rect in screen fractions (the width and height grown by
+// 1.4) and the item it belongs to.
 struct FNavMapLabelRect
 {
     float X;           // +0x00
@@ -165,8 +149,7 @@ struct FNavMapLabelRect
     FNavMapItem* Item; // +0x10
 };
 
-// One row of the known-bases list, 0x18 bytes (FUN_004a2370 0x004a25f6..0x004a2655): the
-// system's id, the base's [Object] position (unscaled) and the indices of its name in BaseNames
+// One row of the known-bases list, 0x18 bytes (FUN_004a2370): the system's id, the base's [Object] position (unscaled) and the indices of its name in BaseNames
 // and its system's name in SystemNames.
 struct FNavMapBaseEntry
 {
@@ -347,7 +330,7 @@ public:
     void SlideSidePanels(unsigned char bOpen);
 
     // --- The frame's drawing (nn_navmap_draw.cpp) ---
-    // slot 13 LAB_004926d0 -- see nn_navmap_draw.cpp. Sets bDrawnOnce (0x004932f5).
+    // slot 13 LAB_004926d0 -- see nn_navmap_draw.cpp. Sets bDrawnOnce.
     void Draw() override;
     // FUN_00497360 -- the universe view's jump links as gradient bands (FUN_00498470).
     void DrawJumpLinks();
@@ -465,7 +448,7 @@ public:
     // +0x80c -- retail VC6 std::list<FNavMapJumpLink*> (head +0x810, size +0x814).
     std::list<FNavMapJumpLink*> JumpLinks;
     unsigned char bDebugTeleportMode;   // +0x818 ctor 0; shows "NavMapDebugText" ("TELEPORT TO?") when set.
-                                        //        MouseEvent (0x00497fbe): while set, a release
+                                        //        MouseEvent: while set, a release
                                         //        in a system view beams the player ship to the
                                         //        cursor and clears it. TODO: the writer of 1
     unsigned char Pad819[3];
@@ -475,7 +458,6 @@ public:
     unsigned char Pad835[3];
     unsigned CachedObjectId;            // +0x838 ctor -1; FUN_00491e10's cache key
     float CachedObjectPosition[3];      // +0x83c FUN_00491e10's cached position
-    // +0x848 / +0x858 / +0x868 -- retail VC6 vectors. Element types: TODO (see the users).
     // +0x848 -- the trade lane segments FUN_004981f0 chains out of LaneRings (VC6 vector of
     // 0x18-byte records, erase FUN_004a2fd0, insert FUN_004a3680).
     std::vector<FNavMapSegment> LaneSegments;
@@ -491,11 +473,11 @@ public:
     Universe::ISystem const* PendingSystem;
     unsigned char bSystemViewPending;   // +0x87c ctor 0; InitialShow 1: Update builds the system
                                         //        view once Draw has run
-    unsigned char bDrawnOnce;           // +0x87d ctor 0; InitialShow 0; Draw sets it (0x004932f5)
+    unsigned char bDrawnOnce;           // +0x87d ctor 0; InitialShow 0; Draw sets it
     unsigned char bDebugShowAll;        // +0x87e ctor 0; bypasses visit checks for stars, objects, and zones
     unsigned char Pad87f;
     FShapeDB Shapes;                    // +0x880 NavMapTextures.ini (retail 0x18 bytes)
-    unsigned char bDrawZoneOutlines;    // +0x898 ctor 0 (0x0048e337), its only writer in the
+    unsigned char bDrawZoneOutlines;    // +0x898 ctor 0, its only writer in the
                                         //        exe; FUN_0049aa30 draws only with it set
     unsigned char Pad899[3];
     FClientMeshHolder GroupMarkerMesh;  // +0x89c NAV_playership.3db, loaded by FUN_004a1ce0
@@ -520,8 +502,7 @@ public:
     WinControl* ClearAllWaypointsText;  // +0x900 "NavMapClearAllWaypointsText"
     WinControl* AbortMissionButton;     // +0x904 "NavMapAbortMissionButton"
     WinControl* AbortMissionText;       // +0x908 "NavMapAbortMissionText"
-    // +0x90c..+0x92b -- the map click the object tools opened on (MouseEvent 0x0049edab..
-    // 0x0049edf5): the picked point in map units, the cursor's ray point then, and the click in
+    // +0x90c..+0x92b -- the map click the object tools opened on (MouseEvent): the picked point in map units, the cursor's ray point then, and the click in
     // map-frame fractions (Update also sets the two fractions from G_NavMapRequestedPos).
     float ClickMapPos[3];               // +0x90c
     float ClickRayPos[3];               // +0x918
@@ -530,7 +511,7 @@ public:
     unsigned char bObjectToolsShown;    // +0x92c ctor 0; FUN_0049f0e0 0
     unsigned char Pad92d[3];
     // +0x930 FUN_005b7fba(10, 0x28, FUN_0048e600): the digits 0..9 FUN_00491410 loads, drawn
-    // over the waypoint markers by Draw (0x00492e2d..0x00492f93).
+    // over the waypoint markers by Draw.
     FClientMeshHolder DigitMeshes[10];
     WinControl* AbortYesButton;         // +0xac0 "NavMapAbortYesButton"
     WinControl* AbortYesText;           // +0xac4 "NavMapAbortYesText"
@@ -657,7 +638,7 @@ public:
     RichTextWin* InfoCard;              // +0xf38 "NavMapInfoCard"
     WinControl* CloseInfocardButton;    // +0xf3c "NavMapCloseInfocardButton"
     WinControl* CloseInfocardText;      // +0xf40 "NavMapCloseInfocardText"
-    int FilterModeBeforeInfoCard;       // +0xf44 ctor 0; the filter mode 0x00497c5a saves
+    int FilterModeBeforeInfoCard;       // +0xf44 ctor 0; the filter mode ShowInfoCard saves
                                         //        before the info card (mode 6) opens
     float SystemScale;                  // +0xf48 ctor / universe view 1.0f; the NavMapScale
     WinControl* BaseTexts[15];          // +0xf4c "NavMapBaseText%d"
@@ -691,7 +672,7 @@ private:
 extern int G_NavMapFilterMode;              // DAT_006720a0 -- 0..7 (the FUN_004a0220 modes)
 extern int G_NavMapZoneFilter;              // DAT_006720a4 -- 0 all / 1 hostile / 2 friendly
 extern unsigned char G_bNavMapNoBestPath;   // DAT_006720a8 -- ctor 0; IClient slot 93
-                                            // (0x0053c37d) stores the best-path answer's byte;
+                                            // stores the best-path answer's byte;
                                             // Update shows NoBestPathText 8 s and clears it
 extern unsigned G_NavMapRequestedSystem;    // DAT_006720c4 -- the system InitialShow opens
 extern float G_NavMapRequestedPos[3];       // DAT_00672084..8c -- FUN_004a2aa0's focus point
@@ -717,13 +698,13 @@ float* NavMapBasePosition(float* Out, unsigned BaseId, unsigned SystemId);
 // sphere at Pos) that holds Pos in its XZ plane (IZone slot 0x38): with bNamed only zones with
 // an ids_name, with bInfo only ones with an ids_info; unless bShowAll, only visited ones (the
 // visit map | the zone's own visit byte, bit 0; with bInfo also bit 3). Null when none.
-// Callers: NeuroNetNavMap::Update (0x004955dc), MouseEvent (0x0049ed8d).
+// Callers: NeuroNetNavMap::Update, MouseEvent.
 Universe::IZone const* NavMapZoneAt(Universe::ISystem const* System, float const* Pos,
                                     unsigned char bNamed, unsigned char bInfo,
                                     unsigned char bShowAll);
 
 // FUN_004a2a80 (cdecl) -- with a pending G_NavMapRequestedSystem, post command 0x63
-// (FUN_005763b0(0x63, 0)). Tail-called by NN_MainButton's update (0x0045cacf).
+// (FUN_005763b0). Tail-called by NN_MainButton's update.
 void NavMapPostPendingOpen();
 
 // One group member's map position (0x18 bytes), IClient slot 96 REQUEST_GROUP_POSITIONS.
@@ -750,5 +731,5 @@ void NavMapSetGroupPositions(void const* Data);
 // system with that id (G_NavMapRequestedPos = its position). Otherwise a system with that id
 // (system only), else a system [Object] whose nickname hashes to Id (its position). A hit sets
 // G_NavMapRequestedSystem (and, with a position, G_NavMapRequestedPos /
-// G_bNavMapRequestedPos). Callers: 0x00455225, NnCommodityByBase (0x0046f6b4).
+// G_bNavMapRequestedPos). Callers: 0x00455225 (unidentified), NnCommodityByBase.
 void NavMapRequestFocus(unsigned Id, unsigned char bZone);

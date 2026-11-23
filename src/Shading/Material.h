@@ -108,7 +108,6 @@ public:
     bool bDetailSecondStageVerified; // Detail +0x79, illum/masked +0x7D
     bool bDetailMultiPassEnabled; // Detail +0x78, illum/masked +0x7C: global record0 gate
 
-
     unsigned long RefCount;
     const char* FactoryName;
     const char* ClassNameText;  // slot 20 answers with this, else FactoryName
@@ -118,7 +117,6 @@ public:
     bool bSecondaryTextureEnabled;
     bool bSecondaryTextureVerified;
     unsigned long TextureAllocationCount;
-
 
     void SetInstanceName(const char* Name);
     GENRESULT InitializeOwnedSchema();

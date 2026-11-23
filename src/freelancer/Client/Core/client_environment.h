@@ -25,19 +25,18 @@
 // answer) in IInputEvent and the rest in IEnvironment; the vtable order -- the only thing a
 // caller sees -- is the retail order either way.
 //
-// Who calls what (raw listing, every holder of a state pointer read: DAT_0067ecac XREF[14] and
-// the four singleton getters FUN_00437420 / FUN_0054bd30 / FUN_00575430 / FUN_0043d560):
-//   +0x1c slot 7   FUN_005b0880 (IsClientIntroEnvironment), FUN_005b2a30 case 3 (0x005b2b93)
-//   +0x20 slot 8   InitializeEngine 0x005b1e0d / 0x005b1ea5 / 0x005b1f50 / 0x005b1f5c
-//   +0x24 slot 9   the atexit teardown LAB_005b2190 (0x005b21db..0x005b21ff)
-//   +0x28 slot 10  FUN_005b2a30 cases 4 / 5 (0x005b2c05 / 0x005b2bf2)
-//   +0x2c slot 11  the render surface reset 0x00424c23 (Width, Height)
-//   +0x30 slot 12  FUN_005b2a30 (0x005b2af4, 0x005b2b50, 0x005b2bb7, 0x005b2bdf)
-//   +0x34 slot 13  FUN_005b2a30 (every case), LAB_005b2190 (0x005b21ac), SpaceApp slot 9
-//   +0x38 slot 14  the frame FUN_005b2890 (0x005b2a0b), NN_Prompt's modal loops (0x004740b6,
-//                  0x00474220, 0x0047439b), ServerFilterDialog's loop (0x00563872)
-// Slots 0..6 are called by nothing in the exe (tracker LAB_0054a0e0 has the full survey); the
-// window procedure feeds input through the Win3D manager and Event::Handler, not these slots.
+// Callers (every reader of DAT_0067ecac and of the four singleton getters FUN_00437420 /
+// FUN_0054bd30 / FUN_00575430 / FUN_0043d560):
+//   +0x1c slot 7   FUN_005b0880 (IsClientIntroEnvironment), FUN_005b2a30 case 3
+//   +0x20 slot 8   InitializeEngine
+//   +0x24 slot 9   the atexit teardown LAB_005b2190
+//   +0x28 slot 10  FUN_005b2a30 cases 4 / 5
+//   +0x2c slot 11  the render surface reset (Width, Height)
+//   +0x30 slot 12  FUN_005b2a30
+//   +0x34 slot 13  FUN_005b2a30 (every case), LAB_005b2190, SpaceApp slot 9
+//   +0x38 slot 14  the frame FUN_005b2890, NN_Prompt's modal loops, ServerFilterDialog's loop
+// Slots 0..6 are called by nothing in the exe; the window procedure feeds input through the
+// Win3D manager and Event::Handler, not these slots.
 //
 // Names: slots 7..9 and 11..14 are named after what every one of the four bodies and every
 // caller does; the retail names are not recovered. Slots with no caller and no shared meaning

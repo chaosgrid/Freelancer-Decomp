@@ -12,24 +12,20 @@
 // "...Label" / "Character..." UIRichTextWins, CharScroll, the two UIListBoxes CharSelDesc and
 // CharSelTime, ScreenTitle). One static instance, DAT_0067ae10 (static init LAB_0056b030 ->
 // ctor FUN_0056b050, atexit LAB_0056d4e0 -> dtor FUN_0056d360). vftables: main 0x005e2a84
-// (0 FUN_0056d340 scalar deleting dtor, 9 LAB_0056b330 Create, 10 LAB_0056b240 Destroy,
-// 11 FUN_0056ce30 Update, 23 LAB_0056c360 ProcessMessage), IUIPage face (+0x7c) 0x00575ce0,
-// Event::Handler face (+0x80) 0x0056d310.
+// (slot 0 FUN_0056d340 scalar deleting dtor), IUIPage face (+0x7c) 0x00575ce0, Event::Handler
+// face (+0x80) 0x0056d310.
 //
-// CharSelDesc / CharSelTime are UIListBox (the page file's type; WINFACTORY<UIListBox>
-// FUN_0059c810 builds ListBox FUN_005a2100 + vftable 0x005e5cb4, COL .?AUUIListBox@@), so the
-// page's +0x88c / +0x8a0 / +0x8a1 / +0x8a2 / +0x8a4 / +0x8a8 / +0x8ac writes and FUN_005a1f50 /
-// FUN_005a1f20 calls are ListBox's FirstVisible / bDrawFrame / bDrawRowRules / bSelectable /
-// ItemCount / VisibleRows / SelectedIndex / AddItem / GetItemData (list_box.h).
+// CharSelDesc / CharSelTime are UIListBox (WINFACTORY<UIListBox> FUN_0059c810 builds ListBox
+// FUN_005a2100, vftable 0x005e5cb4), so the page's raw +0x88c..+0x8ac writes are ListBox fields
+// (list_box.h).
 //
-// Call path: IntroFocus EnterState case 18 (0x00574fbe) builds the five StaticControls under
-// the page (+0xf4..+0x104), loads the descriptor (+0x8c) and calls slot 9 Create(0, 0).
-// IntroFocus::Update poll index 8 (0x005740cd) watches +0x368 / +0x369 and moves to the state in
-// +0xb4 with the CHARACTER_ID at +0x118. IntroFocus Exit (0x00573d51..0x00573e67) inlines
-// slot 10.
+// IntroFocus EnterState case 18 builds the five StaticControls under the page (+0xf4..+0x104),
+// loads the descriptor (+0x8c) and calls Create(0, 0). IntroFocus::Update watches +0x368 /
+// +0x369 and moves to the state in +0xb4 with the CHARACTER_ID at +0x118. IntroFocus Exit inlines
+// Destroy.
 //
-// Retail layout past MasterWin (+0x00..+0x8b) is listed member by member below. The port's
-// MasterWin has no retail byte layout (see page_options.h), so the members keep only the order.
+// Member offsets are retail's (MasterWin is +0x00..+0x8b). The port's MasterWin has no retail
+// byte layout (see page_options.h), so the members keep only the order.
 
 #include "common_text.h"         // RenderDisplayList
 #include "server_characterset.h" // CHARACTER_ID, CCharacterSet::CharacterInfo
@@ -44,9 +40,8 @@ class UiRichTextWin;
 class UiScroll;
 class UiTextMsgButton;
 
-// One row of the page's list (0x24 bytes in retail; constructor FUN_0056d4b0 -- the pointer
-// and two empty strings -- destructor FUN_00487c30, the {dword, wstring, wstring} body folded for
-// every such record).
+// One row of the page's list (0x24 bytes in retail; constructor FUN_0056d4b0, destructor
+// FUN_00487c30, folded for every {dword, wstring, wstring} record).
 struct FCharSelectSingleEntry
 {
     CCharacterSet::CharacterInfo* Info; // +0x00 -- the G_LoginMgr record (FUN_005aaca0)
@@ -118,8 +113,7 @@ private:
     void ShowDetails(CCharacterSet::CharacterInfo const* Info);
     // FUN_0056cb40 -- the roster (all but the restart save) into Entries and both lists.
     void RefillLists();
-    // The leave sequence ProcessMessage spells inline three times (0x0056c3bb..0x0056c4a7,
-    // 0x0056c732..0x0056c824, 0x0056c9b6..0x0056caa2, then 0x0056caac..0x0056cac1).
+    // The leave sequence retail inlines three times in ProcessMessage.
     void BeginLeave(int Direction);
 
     PageCharacterSelectSingle(PageCharacterSelectSingle const&) = delete;

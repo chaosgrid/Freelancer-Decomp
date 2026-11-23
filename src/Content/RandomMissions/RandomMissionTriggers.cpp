@@ -4,11 +4,10 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// TU57 (06f70dd0-06f71fc0): trigger state machines and the machine group of the TU61
-// random-mission runtime (docs/re/content.md, TU map, lane CNT-RM). Declarations in
-// RandomMissionRuntime.h.
+// TU57: trigger state machines and the machine group of the TU61 random-mission runtime.
+// Declarations in RandomMissionRuntime.h.
 
-#include "Core/ContentStaticIds.h"       // TU57's 16 static-init thunks 06f70dd0-06f70fb0
+#include "Core/ContentStaticIds.h"       // TU57's 16 static-init thunks
 
 #include "RandomMissions/RandomMissionRuntime.h"
 
@@ -28,14 +27,13 @@ unsigned int const GRmMsgTriggerFired = StateMachineMessage::GenerateUniqueMessa
 
 namespace
 {
-    // The (DeliveryState == -1 || == get_state()) test of 06f715f5-06f7160a.
     bool RmTriggerIsForCurrentState(StateMachine const* Machine, StateMachineMessage const* Message)
     {
         return Message->DeliveryState == -1 || Machine->get_state() == Message->DeliveryState;
     }
 
-    // The inline squared distance of 06f71455-06f7147a / 06f717aa-06f717cd: the deltas
-    // (position - centre) in x, y, z order, then (dz * dz + dx * dx) + dy * dy on the FPU.
+    // The inline squared distance of both proximity triggers, summed in retail's order on the
+    // FPU.
     double RmTriggerDistanceSq(FContentPlayerState const* Player, Vector const& Center)
     {
         Vector Position;
@@ -51,7 +49,7 @@ namespace
 // FRmTriggerFiredMessage
 // =======================================================================================
 
-// Inline at 06f71283-06f712a5: StateMachineMessage(DAT_06fd3a18), then the three fields.
+// Inlined in LAB_06f71240.
 FRmTriggerFiredMessage::FRmTriggerFiredMessage(unsigned int InCookie, bool bInFinal,
                                                unsigned int InActivator)
     : StateMachineMessage(GRmMsgTriggerFired)
@@ -71,7 +69,7 @@ StateMachineMessage* FRmTriggerFiredMessage::clone() const
 // FRmTrigger
 // =======================================================================================
 
-// FUN_06f70ff0 (RET 0x10). +0x30 is not written (only read after Fire stores it).
+// FUN_06f70ff0. +0x30 is not written (only read after Fire stores it).
 FRmTrigger::FRmTrigger(unsigned int InCookie, unsigned int InOwnerId, bool bInOneShot,
                        float InRearmDelay)
     : StateMachineMessageHandler(GMessageRouter)
@@ -82,7 +80,7 @@ FRmTrigger::FRmTrigger(unsigned int InCookie, unsigned int InOwnerId, bool bInOn
 {
 }
 
-// LAB_06f71090 (RET 8): the state value picks the slot; the slot's result is dropped.
+// LAB_06f71090: the slot's result is dropped.
 bool FRmTrigger::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0)
@@ -100,13 +98,13 @@ bool FRmTrigger::OnStateEvent(SMEventData const* Event, int const& State)
     return false;
 }
 
-// FUN_06f71080 (RET 4; ICF with every other +0x20 setter).
+// FUN_06f71080 (ICF with every other +0x20 setter).
 void FRmTrigger::SetActivator(unsigned int InActivator)
 {
     Activator = InActivator;
 }
 
-// LAB_06f71100 (RET 8): state 0 and an enter event (type < 4, == 1) -> state 1.
+// LAB_06f71100.
 bool FRmTrigger::OnIdle(SMEventData const* Event, int const& State)
 {
     if (State == 0 && Event->get_event_type() < 4 && Event->get_event_type() == 1)
@@ -117,9 +115,7 @@ bool FRmTrigger::OnIdle(SMEventData const* Event, int const& State)
     return false;
 }
 
-// LAB_06f71140 (RET 8): state 2 and an enter event -> Fire (slot 10); one-shot -> state 4;
-// otherwise RearmDelay > 0 -> state 3, else state 1 (FCOMP 0.0, TEST AH,0x41 + JNZ: less,
-// equal or unordered -> state 1).
+// LAB_06f71140. An unordered RearmDelay re-arms at once.
 bool FRmTrigger::OnFired(SMEventData const* Event, int const& State)
 {
     if (State != 2 || Event->get_event_type() >= 4 || Event->get_event_type() != 1)
@@ -137,10 +133,8 @@ bool FRmTrigger::OnFired(SMEventData const* Event, int const& State)
     return true;
 }
 
-// FUN_06f711c0 (RET 8): state 3 and the 0x20 heartbeat (controller event) -> once the time
-// since LastFireTime (FUN_06efec20 against FUN_06efec10) exceeds RearmDelay (as double;
-// TEST AH,0x41 + JNZ: less, equal or unordered keep waiting) -> state 1. True for every
-// heartbeat in state 3.
+// FUN_06f711c0 (time distance FUN_06efec20, game time FUN_06efec10); unordered keeps waiting.
+// True for every heartbeat in state 3.
 bool FRmTrigger::OnRearmWait(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
@@ -156,15 +150,14 @@ bool FRmTrigger::OnRearmWait(SMEventData const* Event, int const& State)
     return true;
 }
 
-// LAB_06f9a6f0 (ICF: XOR AL,AL; RET 8).
+// LAB_06f9a6f0 (ICF).
 bool FRmTrigger::OnDone(SMEventData const* /*Event*/, int const& /*State*/)
 {
     return false;
 }
 
-// LAB_06f71240: LastFireTime = the game time (FST); the message's final flag is bOneShot
-// unless the time is the -1.0 sentinel (FCOMP DAT_06fb78f0, TEST AH,0x44 + JNP: equal ->
-// 0); sent to OwnerId through the MessageHandler side's send_delayed_message with 0.01 s.
+// LAB_06f71240. The final flag is bOneShot unless the time is the -1.0 sentinel
+// (DAT_06fb78f0).
 void FRmTrigger::Fire()
 {
     LastFireTime = GetContentGameTime();
@@ -179,7 +172,7 @@ void FRmTrigger::Fire()
 // FRmProximityTrigger
 // =======================================================================================
 
-// FUN_06f712e0 (RET 0x18).
+// FUN_06f712e0.
 FRmProximityTrigger::FRmProximityTrigger(unsigned int InCookie, unsigned int InOwnerId,
                                          unsigned int InSystemId, Vector const* InCenter,
                                          float InRadius,
@@ -192,10 +185,7 @@ FRmProximityTrigger::FRmProximityTrigger(unsigned int InCookie, unsigned int InO
 {
 }
 
-// LAB_06f713f0 (RET 8): state 1 and the 0x20 heartbeat. The first player with a ship in
-// SystemId (system record +0x48, not null-tested) whose squared distance is <= RadiusSq
-// (TEST AH,0x41 + JNP: less or equal) becomes the activator (slot 4, its ship id) and the
-// state goes to 2. True for every heartbeat in state 1.
+// LAB_06f713f0. The system record is not null-tested. True for every heartbeat in state 1.
 bool FRmProximityTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
@@ -224,16 +214,14 @@ bool FRmProximityTrigger::OnArmed(SMEventData const* Event, int const& State)
 // FRmTimerTrigger
 // =======================================================================================
 
-// FUN_06f714d0 (RET 0xc).
+// FUN_06f714d0.
 FRmTimerTrigger::FRmTimerTrigger(unsigned int InCookie, unsigned int InOwnerId, float InDelay)
     : FRmTrigger(InCookie, InOwnerId, true, 1.0f)
     , Delay(InDelay)
 {
 }
 
-// LAB_06f71560 (RET 8): state 1. Enter event (type < 4, == 1): an SMM_TIMEOUT message to
-// itself after Delay (send_delayed_message_to_me, scope 1, target 0) -> true. Message
-// event (type 3) carrying that timeout for this state -> state 2, true. Otherwise false.
+// LAB_06f71560.
 bool FRmTimerTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
     if (State != 1)
@@ -259,7 +247,7 @@ bool FRmTimerTrigger::OnArmed(SMEventData const* Event, int const& State)
 // FRmProximityLeaveTrigger
 // =======================================================================================
 
-// FUN_06f71660 (RET 0x18).
+// FUN_06f71660.
 FRmProximityLeaveTrigger::FRmProximityLeaveTrigger(
     unsigned int InCookie, unsigned int InOwnerId, unsigned int InSystemId,
     Vector const* InCenter, float InRadius, std::vector<FContentPlayerState*> const* InPlayers)
@@ -271,11 +259,7 @@ FRmProximityLeaveTrigger::FRmProximityLeaveTrigger(
 {
 }
 
-// LAB_06f71740 (RET 8): state 1 and the 0x20 heartbeat. A player ship of SystemId within
-// RadiusSq (FCOM, TEST AH,0x41 + JNP: less or equal) -> true at once, nothing changes.
-// Otherwise every such ship closer than DAT_06fb781c (1e10; FCOMP, TEST AH,0x05 + JP: only
-// "less" falls through) is remembered, the last one becomes the activator (slot 4) when
-// there is one, and the state goes to 2.
+// LAB_06f71740. 1e10 is DAT_06fb781c; unordered distances are neither inside nor kept.
 bool FRmProximityLeaveTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
@@ -307,14 +291,13 @@ bool FRmProximityLeaveTrigger::OnArmed(SMEventData const* Event, int const& Stat
 // FRmMachineGroup
 // =======================================================================================
 
-// FUN_06f718b0 (RET 4).
+// FUN_06f718b0.
 FRmMachineGroup::FRmMachineGroup(IMessageRouter* InRouter)
     : StateMachineGroup(InRouter)
 {
 }
 
-// FUN_06f71920: the front id is removed (slot 5 of the group's own table) and erased until
-// each vector is empty; the buffers are freed; ~StateMachineGroup.
+// FUN_06f71920.
 FRmMachineGroup::~FRmMachineGroup()
 {
     while (!Machines.empty())
@@ -329,7 +312,7 @@ FRmMachineGroup::~FRmMachineGroup()
     }
 }
 
-// FUN_06f71bd0 (RET 4): slot 4 add_state_machine, then vector insert(end, 1, &id).
+// FUN_06f71bd0.
 void FRmMachineGroup::AddStateMachine(StateMachineMessageHandler* Machine)
 {
     add_state_machine(Machine);
@@ -337,7 +320,7 @@ void FRmMachineGroup::AddStateMachine(StateMachineMessageHandler* Machine)
     StateMachines.insert(StateMachines.end(), 1, Id);
 }
 
-// FUN_06f71da0 (RET 4).
+// FUN_06f71da0.
 void FRmMachineGroup::AddMachine(StateMachineMessageHandler* Machine)
 {
     add_state_machine(Machine);
@@ -345,7 +328,7 @@ void FRmMachineGroup::AddMachine(StateMachineMessageHandler* Machine)
     Machines.insert(Machines.end(), 1, Id);
 }
 
-// FUN_06f71af0 (RET 4).
+// FUN_06f71af0.
 void FRmMachineGroup::RemoveMachine(unsigned int Id)
 {
     remove_state_machine(Id);

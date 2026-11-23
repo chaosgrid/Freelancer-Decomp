@@ -73,7 +73,7 @@ namespace
         float GetRandomPitch() override;
         Archetype::ISound* GetLinked() override;
         unsigned char IsPitchBendable() override;
-        // LAB_004b5010: XOR EAX,EAX.
+        // LAB_004b5010.
         int GetPriority() override { return 0; }
 
         unsigned NicknameId;
@@ -125,22 +125,16 @@ namespace
         unsigned Size;
     };
 
-    // Sound::Source (vtable 0x005c9fac), retail sizeof 0x30 -- the Heap pool DAT_00667a44 has
-    // that element size and FUN_00428f80 / FUN_00428fc0 dispatch on it, so the size is a
-    // behavioural fact here, not a layout nicety. Sound::StreamedSource (0x40) and
-    // Sound::Source3D (0x64) derive from it below.
+    // Sound::Source (vtable 0x005c9fac), retail sizeof 0x30. The size is behavioural: the Heap
+    // pool DAT_00667a44 has that element size and FUN_00428f80 / FUN_00428fc0 dispatch on it.
+    // Sound::StreamedSource (0x40) and Sound::Source3D (0x64) derive from it below.
     struct FSoundSource : ISoundSource
     {
         // FUN_00429040(bBit2). OldFlags is the flag byte the allocation already held: retail
         // keeps its top three bits (AND 0xe0) and the pools do not clear memory.
         FSoundSource(unsigned char bBit2, unsigned char OldFlags);
 
-        // 43 slots, src/include/soundmanager.h. Until 2026-09-16 this was a plain struct with
-        // a `void** Vtable` first member, filled from a hand-written `static void*[42]` and
-        // memcpy'd onto two more arrays to fake the streamed and 3D subclasses. The stub that
-        // sat in the unimplemented entries returned `unsigned long` with no arguments, i.e.
-        // RET 4, while SoundManager calls six of those slots with an out-pointer -- four bytes
-        // of stack leaked per call. Real virtuals make that shape impossible to get wrong.
+        // 43 slots, src/include/soundmanager.h.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
         unsigned long DACOM_API AddRef() override;
         unsigned long DACOM_API Release() override;
@@ -194,10 +188,10 @@ namespace
         void __thiscall SetVelocity(const float* /*Velocity*/) override {}
         void __thiscall SetPose(int /*AttachHandle*/, const float* /*Transform*/) override {}
         void __thiscall SetPitch(float NewPitch) override;
-        // FUN_00450870 -- `OR EAX,0xffffffff; RET`: not attached.
+        // FUN_00450870: not attached.
         int __thiscall GetAttachHandle() override { return -1; }
 
-        // FUN_0044fd00 -- `XOR AL,AL; RET`.
+        // FUN_0044fd00.
         unsigned char __thiscall IsFadedOut() override { return 0; }
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
         // FUN_00429690 (RET 8): slot 31 with the listener, then the negation of slot 29. The
@@ -232,7 +226,7 @@ namespace
     static_assert(sizeof(FSoundSource) == 0x30, "Sound::Source is 0x30 (pool DAT_00667a44)");
 
     // DAT_00667cc0 -- SoundArch.cpp's archetype registry: a VC6 std::set<SoundArch> ordered by
-    // the nickname id at +0x04 (unsigned: FUN_0042c300 0x0042c320 CMP [node+0x10] / JNC), head
+    // the nickname id at +0x04 (unsigned compare, FUN_0042c300), head
     // DAT_00667cc4, size DAT_00667cd0. Built by the static initializer FUN_0042aac0, emptied by
     // FUN_0042b4d0 and destroyed through atexit FUN_0042aae0. Retail holds each SoundArch by
     // value inside its node; the port keeps it on the heap under the same key. Entries are only
@@ -244,7 +238,7 @@ namespace
 
     // DAT_00667c70 -- every started source, in start order (Start pushes at the back).
     // Declared before the three pools so it is built first, as in retail's initializer table
-    // (0x0060f144 LAB_004278a0, then 0x0060f148 / 0x0060f14c / 0x0060f150).
+    // (0x0060f144 LAB_004278a0, then the pools).
     FPlayingSourceList G_PlayingSources;
 
     // The three Common.dll Heap pools of Sound.cpp, {element size, 0, -1, 0} each, built by
@@ -262,7 +256,7 @@ namespace
     void* G_SoundListenerObject = nullptr;
 
     // A stream handle of IStreamer2::CreateStream counts only when it is neither 0 nor -1
-    // (the paired `TEST EAX,EAX` / `CMP EAX,-1` of 0x0042a1f0, 0x0042a256, 0x0042a2b1, ...).
+    // (retail tests both everywhere).
     bool IsStreamHandle(void* Handle)
     {
         return Handle != nullptr && Handle != reinterpret_cast<void*>(static_cast<intptr_t>(-1));
@@ -327,7 +321,7 @@ namespace
         unsigned long __thiscall SetPosition(void* Arg) override;
         void __thiscall SetVelocity(const float* Velocity) override;
         void __thiscall SetPose(int AttachHandle, const float* Transform) override;
-        // LAB_00428810 -- slot 39: `MOV EAX,[ECX+0x60]; RET`.
+        // LAB_00428810 -- slot 39.
         int __thiscall GetAttachHandle() override { return Source3dId; }
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
 
@@ -393,8 +387,8 @@ namespace
     // option (LAB_005b4bd0 → FUN_0042ac30). 0 = "no lod", which is what the port starts from.
     int G_SoundLod = 0;
     // DAT_00667cd4 = CreateID("NONE"): a lod slot naming NONE resolves to *no* archetype.
-    // Static initializer LAB_0042aaa0 (PUSH "NONE"; CALL CreateID; MOV [0x667cd4],EAX), so it
-    // holds the id from load time; the only reader is 0x0042bfda (CMP EAX,[0x667cd4]).
+    // Static initializer LAB_0042aaa0, so it holds the id from load time; the only reader is
+    // FUN_0042bf90.
     unsigned const G_SoundNoneId = CreateID("NONE");
 
     // FUN_00428040 mixer state (Sound.cpp globals).
@@ -434,13 +428,13 @@ namespace
 
     char const* DACOM_API ArchSlot1File(void* This)
     {
-        // LAB_0042adc0: MOV EAX,[ECX+8]; RET.
+        // LAB_0042adc0.
         return ArchFrom(This)->File;
     }
 
     unsigned DACOM_API ArchSlot2Type(void* This)
     {
-        // LAB_0042add0: XOR EAX,EAX; MOV AL,[ECX+0x1a]; AND EAX,0xf.
+        // LAB_0042add0.
         return (ArchFrom(This)->Flags >> 16) & 0xfu;
     }
 
@@ -456,8 +450,8 @@ namespace
 
     int DACOM_API ArchSlot5UseCount(void* This)
     {
-        // FUN_0042b910: slot 12 against this -> MOVSX word [+0x2a]; a link -> its slot 5 (tail
-        // jump); none -> MOVSX word [+0x28].
+        // FUN_0042b910: own count when slot 12 is this, the link's slot 5 when linked, else the
+        // signed word at +0x28.
         FClientSoundArch* Arch = ArchFrom(This);
         FClientSoundArch* Linked = ArchGetLinked(Arch);
         if (Linked == Arch)
@@ -469,31 +463,31 @@ namespace
 
     int DACOM_API ArchSlot6Attenuation(void* This)
     {
-        // LAB_0042ade0: MOVSX EAX,byte [ECX+0x18].
+        // LAB_0042ade0: signed byte.
         return static_cast<signed char>(ArchFrom(This)->Flags & 0xffu);
     }
 
     float DACOM_API ArchSlot7RangeMin(void* This)
     {
-        // LAB_0042adf0: FLD float [ECX+0x10].
+        // LAB_0042adf0.
         return ArchFrom(This)->RangeMin;
     }
 
     float DACOM_API ArchSlot8RangeMax(void* This)
     {
-        // LAB_0042ae00: FLD float [ECX+0x14].
+        // LAB_0042ae00.
         return ArchFrom(This)->RangeMax;
     }
 
     unsigned char DACOM_API ArchSlot9Streamer(void* This)
     {
-        // LAB_0042ae10: [ECX+0x18] >> 0x1a & 1.
+        // LAB_0042ae10.
         return static_cast<unsigned char>((ArchFrom(This)->Flags >> 26) & 1u);
     }
 
     unsigned char DACOM_API ArchSlot10Is2d(void* This)
     {
-        // LAB_0042ae20: [ECX+0x18] >> 0x1b & 1.
+        // LAB_0042ae20.
         return static_cast<unsigned char>((ArchFrom(This)->Flags >> 27) & 1u);
     }
 
@@ -502,9 +496,7 @@ namespace
     // rand() % (2N+1) - N. Lod-linked archetypes delegate to the linked archetype.
     float DACOM_API ArchSlot11RandomPitch(void* This)
     {
-        // 0x0042bf10..0x0042bf6b. Slot 12 (the lod link) against this; a link -> its slot 11
-        // (tail jump), none -> 0.0f (DAT_005c7474). Own: flag 0x2000000 and the signed pitch
-        // byte +0x19 > 0 (TEST AL,AL / JLE) -> FILD of rand() % (2N + 1) - N (IDIV, signed).
+        // The pitch byte +0x19 is signed; the modulo is signed IDIV.
         FClientSoundArch* Arch = ArchFrom(This);
         if (ArchGetLinked(Arch) != Arch)
         {
@@ -522,14 +514,13 @@ namespace
 
     unsigned char DACOM_API ArchSlot13PitchBendable(void* This)
     {
-        // LAB_0042ae30: XOR EAX,EAX; MOV AL,[ECX+0x1b]; AND EAX,1.
+        // LAB_0042ae30.
         return static_cast<unsigned char>((ArchFrom(This)->Flags >> 24) & 1u);
     }
 
     int DACOM_API ArchSlot0SmArchId(void* This)
     {
-        // FUN_0042bee0: slot 12 against this -> +0xc; a link -> its slot 0 (tail jump); none ->
-        // OR EAX,-1.
+        // FUN_0042bee0.
         FClientSoundArch* Arch = ArchFrom(This);
         FClientSoundArch* Linked = ArchGetLinked(Arch);
         if (Linked == Arch)
@@ -539,10 +530,7 @@ namespace
         return -1;
     }
 
-    // The Archetype::SoundImpl table 0x005ca36c. Until 2026-09-25 this was a hand-filled
-    // `void*[16]` that nothing called through (every caller named the ArchSlotN function
-    // directly), so a VoiceMsg could not ride the same heap; the source now holds an ISound*.
-    // FUN_0042b030's field defaults (formerly InitSoundArch's memset + stores).
+    // FUN_0042b030's field defaults.
     FClientSoundArch::FClientSoundArch()
         : NicknameId(0), File(nullptr), SmArchId(-1), RangeMin(kDefaultRangeMin),
           RangeMax(kDefaultRangeMax), Flags(kDefaultFlags), Linked(nullptr), Pad28(0),
@@ -579,11 +567,10 @@ namespace
         return 0.f;
     }
 
-    // The category switch FUN_004299e0 (0x00429a1c) and FUN_0042a420 (0x0042a46c) inline, the
-    // same one LAB_00429450 reaches through FUN_00429950. Source type (+0x4) picks the audio_*
-    // master volume (float loads); sfx / music / ambient / voice-5 add the ducking offset
-    // DAT_00667ca4 on the FPU (FADD float, so the sum is x87 -- double here), interface and
-    // voice-2 do not. The audio-mode term is 0, DAT_00667c9c or -1e10 (DAT_005ca238): mode 2
+    // The category switch FUN_004299e0 and FUN_0042a420 inline, the same one LAB_00429450
+    // reaches through FUN_00429950. Source type (+0x4) picks the audio_* master volume;
+    // sfx / music / ambient / voice-5 add the ducking offset DAT_00667ca4 at x87 precision
+    // (double here), interface and voice-2 do not. The audio-mode term is 0, DAT_00667c9c or -1e10 (DAT_005ca238): mode 2
     // without flag 2 / mode 1 with flag 2 for sfx and ambient; mode 1 alone for interface, where
     // it also drops the master volume. Types above 5 contribute nothing.
     void SourceCategoryDb(FSoundSource const* Source, double* OutBase, double* OutMode)
@@ -639,9 +626,8 @@ namespace
         return 0;
     }
 
-    // LAB_0044fce0 -- slot 0 of all three source tables is `MOV EAX,0xfffffff9; RET 0xC`: a
-    // source answers no interface query and writes nothing to Out. (The port used to hand back
-    // this with an AddRef.)
+    // LAB_0044fce0 -- slot 0 of all three source tables: a source answers no interface query
+    // and writes nothing to Out.
     GENRESULT DACOM_API FSoundSource::QueryInterface(const char* /*Iid*/, void** /*Out*/)
     {
         return kGrNoValue;
@@ -657,11 +643,10 @@ namespace
 
     unsigned long DACOM_API FSoundSource::Release()
     {
-        // FUN_00429c70 -- listing 00429c70..00429c8f: --[this+0x24] with no floor; at exactly
-        // zero, slot 41 (+0xa4) with 1 -- the scalar deleting destructor of whatever class the
-        // source is (CliThrusterSound overrides it); the new count is returned as is. The
-        // destructor of a still-playing source releases the list's reference once more
-        // (FUN_004290a0, 0x0042910c) and so takes the count below zero -- no second destroy.
+        // FUN_00429c70 -- no floor; at exactly zero, slot 41 (the scalar deleting destructor;
+        // CliThrusterSound overrides it). The destructor of a still-playing source releases the
+        // list's reference once more (FUN_004290a0) and so takes the count below zero -- no
+        // second destroy.
         --RefCount;
         int const Remaining = RefCount;
         if (Remaining == 0)
@@ -670,9 +655,8 @@ namespace
     }
 
     // FUN_004298b0 / FUN_004298f0 -- slots 3 and 4. Retail's slot 4 calls slot 3 and then
-    // hands back this+0x14, the tick the sound started on. The port used to install its
-    // zero-returning stub in both, so every one-shot looked like it had started at tick 0 and
-    // ISoundManager::OneShotAlreadyExpired treated it as already over.
+    // hands back this+0x14, the tick the sound started on (ISoundManager::OneShotAlreadyExpired
+    // reads it).
     unsigned long DACOM_API FSoundSource::MarkStarted()
     {
         SourceMarkStarted(this);
@@ -686,7 +670,7 @@ namespace
         return static_cast<unsigned long>(StartTick);
     }
 
-    // FUN_00429910 -- slot 5: `[this+0x2c] != 0`, the source has a node in DAT_00667c70.
+    // FUN_00429910 -- slot 5: the source has a node in DAT_00667c70.
     unsigned char DACOM_API FSoundSource::IsActive()
     {
         return ListNode != nullptr ? 1u : 0u;
@@ -704,17 +688,15 @@ namespace
         return static_cast<unsigned char>(Flags & 1u);
     }
 
-    // LAB_00429940 -- slot 8: `MOV ECX,[ECX+0x18]; MOV EAX,[ECX]; JMP [EAX]`, the archetype's
-    // slot 0. No test of the archetype.
+    // LAB_00429940 -- slot 8: the archetype's slot 0. No test of the archetype.
     int DACOM_API FSoundSource::GetArchId()
     {
         return Arch->GetSmArchId();
     }
 
     // FUN_004299e0 (RET 8) — the volume the SoundManager applies to the instance, in dB. No
-    // archetype: *Out = 0 and 0xfffffff9. Otherwise (arch slot 6 FILD + the +0x1c dB) +
-    // ((master [+ duck]) + mode) on the FPU, then `TEST AH,0x41 / JNZ` (only "greater" takes
-    // 0.0) and `TEST AH,5 / JP` (only "less" takes -96, DAT_005ca16c). No test of Out.
+    // archetype: *Out = 0 and 0xfffffff9. Summed on the x87; only "greater" clamps to 0.0 and
+    // only "less" to -96 (DAT_005ca16c), so NaN passes. No test of Out.
     GENRESULT DACOM_API FSoundSource::GetAttenuation(float* Out)
     {
         if (Arch == nullptr)
@@ -740,8 +722,8 @@ namespace
     }
 
     // FUN_00429b80 (RET 8) — slot 10: the random pitch latched at play time (+0x10), but only
-    // for archetypes that declared themselves pitch-bendable (slot 13). `TEST AH,0x44 / JNP`
-    // rejects only an exact 0.0 (a NaN pitch is handed out). No test of Out.
+    // for archetypes that declared themselves pitch-bendable (slot 13). Only an exact 0.0 is
+    // rejected (a NaN pitch is handed out). No test of Out.
     GENRESULT DACOM_API FSoundSource::GetPitch(float* Out)
     {
         if (Arch != nullptr && Arch->IsPitchBendable() != 0 && !(Pitch == 0.f))
@@ -753,8 +735,7 @@ namespace
         return kGrNoValue;
     }
 
-    // LAB_00429330 (RET 4) -- slot 32: below -96.0 (double DAT_005ca210, `TEST AH,5 / JP`)
-    // -96; above 0.0 (`TEST AH,0x41 / JNZ`) 0; otherwise the value, NaN included.
+    // LAB_00429330 (RET 4) -- slot 32: clamp to -96.0 (double DAT_005ca210) .. 0.0; NaN passes.
     void __thiscall FSoundSource::SetAttenuation(float Attenuation)
     {
         if (Attenuation < -96.f)
@@ -824,14 +805,12 @@ namespace
     // I3DMathEngine+0x28 TransformXform(local +0x30 → world Out). Else copy Spatial[0..2].
     GENRESULT DACOM_API FSpatialSource::GetPosition(FVec3* Out)
     {
-        // Listing 0x00429d30..0x00429db8 (RET 8): no test of Out, the engine, the transform or
-        // the math engine; both arms return 0.
+        // RET 8. No test of Out, the engine, the transform or the math engine.
         if (Source3dId != -1)
         {
             void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
             FTransform const* const InstXform =
                 reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
-            // 0x00429d54..0x00429d62: DAT_00667c98 tested and filled.
             I3DMathEngine* const Math = AcquireSoundMathEngine();
             FVector const Local = {Spatial[0], Spatial[1], Spatial[2]};
             FVector World;
@@ -850,8 +829,8 @@ namespace
     // LAB_00429ca0 -- slot 35 (+0x8c, RET 4): set the world position. Attached (+0x60 != -1):
     // the instance transform (IEngine+0xa0) and DAT_00667c98's vt+0x3c InverseTransform turn
     // the point into the instance's frame, stored at +0x30; unattached, the point is stored as
-    // it is. No null test on the argument, the engine or the transform, as in retail. The
-    // non-3D tables fold this slot onto a `RET 0x4` no-op (the base Slot35).
+    // it is. No null test on the argument, the engine or the transform. The non-3D tables fold
+    // this slot onto a no-op.
     unsigned long __thiscall FSpatialSource::SetPosition(void* Arg)
     {
         FVector const* const WorldPos = static_cast<FVector const*>(Arg);
@@ -896,17 +875,15 @@ namespace
         return static_cast<int>(Value);
     }
 
-    // The cone gate every Source3D cone getter opens with (00429ec0 / 00429f20 / 00429f60):
-    // +0x54 FCOMP 0 / TEST AH,0x41 / JZ: above 0 (ordered) passes; otherwise +0x58 FCOMP 360.0f
-    // (DAT_005ca23c) / TEST AH,0x5 / JP: >= 360 or unordered fails, below 360 passes. So a
-    // cone is "set" when inner > 0 or outer < 360, both ordered (a NaN fails its test).
+    // The cone gate every Source3D cone getter opens with: a cone is "set" when inner > 0 or
+    // outer < 360.0f (DAT_005ca23c), both ordered compares (a NaN fails its test).
     bool SourceHasCone(FSpatialSource const* This)
     {
         return This->Spatial[9] > 0.f || This->Spatial[10] < 360.f;
     }
 
     // FUN_00429ec0 — slot 15. Retail ftol()s both angles into ints. No test of the out
-    // pointers (0x00429ec0..0x00429f07).
+    // pointers.
     GENRESULT DACOM_API FSpatialSource::GetConeAngles(unsigned long* Inside,
                                                       unsigned long* Outside)
     {
@@ -921,8 +898,7 @@ namespace
     // IEngine+0x98 GetInstanceOrientation + I3DMathEngine+0x2c TransformMatrix.
     GENRESULT DACOM_API FSpatialSource::GetConeOrientation(FVec3* Out)
     {
-        // Listing 0x00429f60..0x0042a016 (RET 8): the cone gate (fail -> 0xfffffff9 at
-        // 0x0042a00d), then no test of Out, the engine, the orientation or the math engine.
+        // RET 8. No test of Out, the engine, the orientation or the math engine.
         if (!SourceHasCone(this))
             return kGrNoValue;
         if (Source3dId != -1)
@@ -930,7 +906,6 @@ namespace
             void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
             FMatrix const* const Orient =
                 reinterpret_cast<FMatrix const*>(DALib::Engine->GetInstanceOrientation(Instance));
-            // 0x00429fa8..0x00429fb6: DAT_00667c98 tested and filled.
             I3DMathEngine* const Math = AcquireSoundMathEngine();
             FVector const Local = {Spatial[3], Spatial[4], Spatial[5]};
             FVector World;
@@ -960,8 +935,7 @@ namespace
     // userdata → zero vector (LAB_00429e2e).
     GENRESULT DACOM_API FSpatialSource::GetVelocity(FVec3* Out)
     {
-        // Listing 0x00429de0..0x00429e5e (RET 8): no test of Out or the engine; only the
-        // user-data pointer is tested (0x00429e02).
+        // RET 8. No test of Out or the engine; only the user-data pointer is tested.
         if (Source3dId != -1)
         {
             void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
@@ -985,9 +959,8 @@ namespace
         return GR_OK;
     }
 
-    // LAB_00454190 -- slots 19, 20 and 21 share one retail body: MOV EAX,0xFFFFFFF9; RET 0x8.
-    // "Unsupported", one argument. The port installed its zero-argument stub in all three,
-    // so SoundManager pushed eight bytes and the callee popped four, three times over.
+    // LAB_00454190 -- slots 19, 20 and 21 share one retail body: "unsupported", one argument
+    // (RET 8).
     GENRESULT DACOM_API FSoundSource::GetEaxEnvironment(unsigned long* /*Out*/)
     {
         return static_cast<GENRESULT>(-7);
@@ -1012,9 +985,8 @@ namespace
     }
 
     // FUN_00429e70 (RET 8) — slot 37. The second argument is a Transform: a 3x3 orientation at
-    // +0x00 and the world position at +0x24 (the call site at 0052d9de builds exactly that on
-    // the stack — identity rows at +0x00/+0x10/+0x20 and a zero Vector at +0x24). Retail keeps
-    // only the position; the orientation is re-fetched from the attached object when it needs
+    // +0x00 and the world position at +0x24 (as the call site at 0052d9de builds it). Retail
+    // keeps only the position; the orientation is re-fetched from the attached object when it needs
     // one. +0x60 first, then the three dwords; no test of the pointer.
     void __thiscall FSpatialSource::SetPose(int AttachHandle, const float* Transform)
     {
@@ -1042,9 +1014,8 @@ namespace
         return SourceStart(this, static_cast<Archetype::ISound*>(ArchArg), Extra);
     }
 
-    // FUN_0053f330 -- slot 23 of Sound::Source and Sound::Source3D: `XOR AL,AL; RET 4`. Only
-    // the streamed class has a second way to start (LAB_0042a210). The port used to run the
-    // ordinary Start here.
+    // FUN_0053f330 -- slot 23 of Sound::Source and Sound::Source3D returns 0. Only the streamed
+    // class has a second way to start (LAB_0042a210).
     unsigned char __thiscall FSoundSource::AltStart(void* /*ArchArg*/)
     {
         return 0;
@@ -1090,8 +1061,8 @@ namespace
     }
 
     // FUN_004290a0 -- slot 41 of Sound::Source: the destructor body (FUN_00429140's, inlined:
-    // SourceTeardown) always, then with bit 0 the block back to the 0x30 pool DAT_00667a44
-    // (Heap::Free, 0x00429125). Returns this.
+    // SourceTeardown) always, then with bit 0 the block back to the 0x30 pool DAT_00667a44.
+    // Returns this.
     void* __thiscall FSoundSource::ScalarDeletingDestructor(unsigned char bDelete)
     {
         void* const Self = this;
@@ -1136,14 +1107,14 @@ namespace
     // resolved"; retail sets it *first* so the slot 3/4/5 calls below re-enter slot 12 harmlessly.
     void ArchResolveLod(FClientSoundArch* Arch, int Lod)
     {
-        // No null test (0x0042bf97 reads +0x18 at once).
+        // No null test.
         Arch->Flags |= 0x20000000u;
         if (Arch->Linked == nullptr)
             Arch->Linked = Arch;
 
         FClientSoundArch* Target = Arch;
-        // 0x0042bfad..0x0042bfbf: any Lod above 0 -- no upper bound -- picks the ID_String at
-        // this + 0x18 + Lod * 4 (lod1 +0x1c, lod2 +0x20).
+        // Any Lod above 0 -- no upper bound -- picks the ID_String at this + 0x18 + Lod * 4
+        // (lod1 +0x1c, lod2 +0x20).
         if (Lod > 0)
         {
             unsigned const LodId = *reinterpret_cast<unsigned const*>(
@@ -1156,14 +1127,13 @@ namespace
                 }
                 else
                 {
-                    // 0x0042bfe9..0x0042c077: FUN_0042ae40's body inlined on the lod id --
-                    // LookupClientSoundArch emits the same 0x168 miss warning.
+                    // FUN_0042ae40's body inlined on the lod id -- LookupClientSoundArch emits
+                    // the same 0x168 miss warning.
                     ID_String LodName;
                     LodName.Id = LodId;
                     Target = ArchFrom(LookupClientSoundArch(&LodName));
                     if (Target == nullptr)
                     {
-                        // 0x0042c07e..0x0042c0b0: both names through ID_String::get_string.
                         ID_String ArchName;
                         ArchName.Id = Arch->NicknameId;
                         FDUMP(0x100001,
@@ -1193,31 +1163,21 @@ namespace
     // FUN_0042bf70 — arch slot 12: resolve the lod once, then hand back the link.
     FClientSoundArch* ArchGetLinked(FClientSoundArch* Arch)
     {
-        // 0x0042bf73..0x0042bf8b: TEST [+0x18],0x20000000 / JNZ; else FUN_0042bf90(DAT_00667ce4);
-        // return +0x24. No null test.
+        // No null test.
         if ((Arch->Flags & 0x20000000u) == 0)
             ArchResolveLod(Arch, G_SoundLod);
         return Arch->Linked;
     }
 
-    // ISoundManager slot 36 (+0x90) takes two arguments, not one: FUN_06ee32e0 is RET 0xC and
-    // retail 0x0043b542 pushes DAT_00673344 before the play key. The port was passing only the
-    // key, which unbalances the stack on a __stdcall that pops 12 bytes.
-    //
-    // TODO: DAT_00673344 is a sound-subsystem global written by FUN_005a9c10 (reached through
-    // the thunk at LAB_005a81f0) and zeroed on sound shutdown at 0x005a881f / 0x005a5a71. That
-    // setter is not ported yet, so this holds retail's own initial .data value. Port
-    // FUN_005a9c10 and its caller before treating this as final; do not guess a meaning for
-    // the index from AttachPlayKey's insert-before-Index behaviour.
+    // ISoundManager slot 36 (+0x90, AttachPlayKey) takes the key and an index: FUN_06ee32e0 is
+    // RET 0xC, and retail pushes DAT_00673344 (GetPlayerConnectionId) as the index. Unused here.
     unsigned long G_SoundAttachIndex = 0;
 
-    // The power-ratio fade step shared by the ducking fade of FUN_00428040 (0x0042809a..
-    // 0x0042811f) and the streamed fade of LAB_0042a6b0 (0x0042a71a..0x0042a78d), the same
-    // arithmetic as FUN_00427940 (ClientSoundFadeDb): both ends to power ratios through
-    // exp(dB * DAT_005c9cf4) (a float constant), moved Dt / (Remaining + Dt) of the way --
-    // (To - From) * ratio + From on the FPU --, then `TEST AH,0x41 / JP`: at or below
-    // DAT_005c9cf0 (float 10^-9.6) -96 dB, above it 10 * log10 (FLDLG2 / FYL2X, double 10.0).
-    // The result stays on the FPU for the caller, so it is returned as a double.
+    // The power-ratio fade step shared by the ducking fade of FUN_00428040 and the streamed fade
+    // of LAB_0042a6b0, the same arithmetic as FUN_00427940 (ClientSoundFadeDb): both ends to
+    // power ratios through exp(dB * DAT_005c9cf4) (a float constant), moved Dt / (Remaining +
+    // Dt) of the way on the x87; at or below DAT_005c9cf0 (float 10^-9.6) -96 dB, above it
+    // 10 * log10. The result stays on the FPU for the caller, so it is returned as a double.
     double DbBlend(float FromDb, float ToDb, float Dt, double Remaining)
     {
         double const K = static_cast<double>(0.230258509516716f); // DAT_005c9cf4
@@ -1233,9 +1193,8 @@ namespace
     // LAB_00429730 -- slot 30 (bare RET, SEH frame for the archetype reference): the length of
     // the sound in ms. No archetype, SoundManager id -1 (arch slot 0) or no ISoundArchetype
     // (SoundManager slot 35) -> 0. Otherwise the archetype's slot 8, and when slot 10 hands out
-    // a pitch, that pitch clamped to [-100, 100] (DAT_005ca234 `TEST AH,5 / JP`, DAT_005ca230
-    // `TEST AH,0x41 / JNZ`) divides it by pow(2.0, pitch * 0.01f) -- the length as an unsigned
-    // FILD qword --, truncated by ftol. The archetype reference is released on every path.
+    // a pitch, that pitch clamped to [-100, 100] (DAT_005ca234 / DAT_005ca230) divides it by
+    // pow(2.0, pitch * 0.01f) -- the length loaded as an unsigned qword --, truncated by ftol. The archetype reference is released on every path.
     unsigned long SourceDurationMs(FSoundSource* Source)
     {
         if (Source->Arch == nullptr)
@@ -1273,8 +1232,7 @@ namespace
     // FUN_00429840 (slot 29, bare RET): looping -> not finished. No archetype, or no
     // SoundManager for a SoundManager-played source (flag 4) -> finished. Not started (flag 8)
     // or not SoundManager-played -> not finished. SoundManager id -1 -> finished. Otherwise
-    // finished once start tick + slot 30 is below the SoundManager clock (slot 44; SETC,
-    // unsigned).
+    // finished once start tick + slot 30 is below the SoundManager clock (slot 44, unsigned).
     unsigned char SourceIsFinished(FSoundSource* Source)
     {
         if ((Source->Flags & 1u) != 0)
@@ -1476,12 +1434,11 @@ namespace
     // FUN_0042a420 (thiscall, no arguments) -- push a streamed source's volume to its stream.
     // Nothing while +0x30 is 0 (only 0 is tested here) or the archetype is null. The sum is
     // GetAttenuation's, computed inline and NOT clamped to [-96, 0]: the category term
-    // (master [+ duck]) + mode, + the arch slot 6 FILD, + the +0x1c dB (read before the arch
-    // call), all on the FPU, times 100.0 (double DAT_005ca320) and stored as a float. Below
-    // -9600 (DAT_005ca31c; `TEST AH,5 / JP`: only "less") the volume is -9999 (0xffffd8f1);
-    // above 0 (`TEST AH,0x41 / JNZ`: only "greater") it is 0; otherwise ftol. Then IStreamer2
-    // slot 8 (+0x20) SetVolume with no test of DALib::Streamer. Callers: LAB_0042a5d0,
-    // LAB_0042a6b0, FUN_0042a2a0.
+    // (master [+ duck]) + mode, + the arch slot 6, + the +0x1c dB (read before the arch call),
+    // all on the x87, times 100.0 (double DAT_005ca320) and stored as a float. Below -9600
+    // (DAT_005ca31c) -9999, above 0 it is 0, otherwise ftol (NaN takes ftol). Then IStreamer2
+    // slot 8 SetVolume with no test of DALib::Streamer. Callers: LAB_0042a5d0, LAB_0042a6b0,
+    // FUN_0042a2a0.
     void StreamedApplyVolume(FStreamedSource* Source)
     {
         if (Source->StreamHandle == nullptr)
@@ -1506,12 +1463,11 @@ namespace
     }
 
     // LAB_0042a6b0 (slot 42, RET 8): slot 31 with the listener, then slot 29 -- finished
-    // answers false. Otherwise the fade: with +0x38 not below zero (`TEST AH,5 / JNP`: only
-    // "less" skips) the time left drops by Dt (FSUB, stored as a float, the x87 value kept for
-    // the test and the blend). At or below zero (`TEST AH,0x41 / JP`: "greater" and NaN blend)
-    // it becomes -1 and the dB is the target (+0x34); otherwise the power-ratio blend from the
-    // +0x1c dB to the target. The result, below -96.0 (double DAT_005ca210) -96, above 0.0
-    // (double DAT_005c8ba8) 0, goes to +0x1c. Then FUN_0042a420 and true.
+    // answers false. Otherwise the fade: with +0x38 not below zero (NaN runs) the time left
+    // drops by Dt (stored as a float, the x87 value kept for the test and the blend). At or
+    // below zero it becomes -1 and the dB is the target (+0x34); otherwise (NaN included) the
+    // power-ratio blend from the +0x1c dB to the target. The result, clamped to -96.0 (double
+    // DAT_005ca210) .. 0.0 (DAT_005c8ba8), goes to +0x1c. Then FUN_0042a420 and true.
     unsigned char __thiscall FStreamedSource::Update(const float* Listener, float DeltaSeconds)
     {
         ComputeMixerScore(Listener);
@@ -1546,9 +1502,8 @@ namespace
     }
 
     // FUN_0042a970 -- the mixer's ranking predicate (VC6 std::sort's less): A goes before B
-    // when both are non-null and B's score (+0x28) is below A's -- FCOMPP of B against A,
-    // `TEST AH,5 / JP`, so only "less" is true and a NaN compares false. The same test is
-    // inlined all through FUN_0042a810 / FUN_0042a9a0 / FUN_0042a9e0.
+    // when both are non-null and B's score (+0x28) is below A's (a NaN compares false). The
+    // same test is inlined all through FUN_0042a810 / FUN_0042a9a0 / FUN_0042a9e0.
     bool MixerRanksBefore(FSoundSource const* A, FSoundSource const* B)
     {
         return A != nullptr && B != nullptr && B->MixerScale < A->MixerScale;
@@ -1596,10 +1551,9 @@ namespace
     }
 
     // FUN_0042a810 -- VC6 _Sort(First, Last): while more than 16 entries remain, partition
-    // around the median of the first, middle (count / 2) and last entries (VC6 _Median, the
-    // predicate order of 0x0042a855..0x0042a8cc) with the unguarded partition
-    // (0x0042a8d4..0x0042a91b), recurse into the part that is not larger -- the byte distances
-    // compared signed (JG) -- and loop on the other.
+    // around the median of the first, middle (count / 2) and last entries (VC6 _Median, in
+    // retail's predicate order) with the unguarded partition, recurse into the part that is not
+    // larger -- the distances compared signed -- and loop on the other.
     void MixerIntroSort(FSoundSource** First, FSoundSource** Last)
     {
         int Count = static_cast<int>(Last - First);
@@ -1664,9 +1618,9 @@ namespace
         }
     }
 
-    // 0x004282fb..0x00428372 of FUN_00428040: VC6 std::sort over DAT_00667a58[0..count) --
-    // above 16 entries (byte span > 0x40, signed JG) FUN_0042a810, FUN_0042a9e0 on the first
-    // 16 and FUN_0042a9a0 for each of the rest; otherwise FUN_0042a9e0 alone.
+    // FUN_00428040's inlined VC6 std::sort over DAT_00667a58[0..count) -- above 16 entries
+    // FUN_0042a810, FUN_0042a9e0 on the first 16 and FUN_0042a9a0 for each of the rest;
+    // otherwise FUN_0042a9e0 alone.
     void MixerSortRanked(FSoundSource** First, FSoundSource** Last)
     {
         if ((Last - First) > 16)
@@ -1712,10 +1666,9 @@ namespace
         Size = 0;
     }
 
-    // The push_back FUN_004291c0 inlines twice (0x00429265..0x004292ab / 0x004292d4..
-    // 0x0042931b): a node made before the head (the list's _Buynode FUN_0042a7e0(head,
-    // head->prev)), linked in, the value constructed in it (FUN_005999b0), the size + 1. The
-    // source's +0x2c then takes head->prev, which is that node.
+    // The push_back FUN_004291c0 inlines twice: a node made before the head (the list's
+    // _Buynode FUN_0042a7e0), linked in, the size + 1. The source's +0x2c then takes
+    // head->prev, which is that node.
     FPlayingSourceNode* PlayingListPushBack(FSoundSource* Source)
     {
         FPlayingSourceNode* const Head = G_PlayingSources.Head;
@@ -1730,9 +1683,8 @@ namespace
         return G_PlayingSources.Head->Prev;
     }
 
-    // The erase every stop path inlines (0x00429412..0x00429434 and its copies in
-    // FUN_004290a0, FUN_00429140 and FUN_0042a0c0): prev->next = next, next->prev = prev, the
-    // node freed (FUN_005b7e1d), the size - 1.
+    // The erase every stop path inlines (FUN_004293e0, FUN_004290a0, FUN_00429140,
+    // FUN_0042a0c0).
     void PlayingListErase(FPlayingSourceNode* Node)
     {
         Node->Prev->Next = Node->Next;
@@ -1761,7 +1713,7 @@ namespace
     // The Sound::Source destructor body FUN_00429140 (inlined again in FUN_004290a0), shared by
     // every slot 41 so a derived class (CliThrusterSound FUN_0052f0a0, the engine emitter
     // FUN_00527b20) can run it and then free its own block: a source that still has a node
-    // (FUN_00429910 called through the Sound::Source table, 0x0042914a) takes the stop body,
+    // (FUN_00429910 called through the Sound::Source table) takes the stop body,
     // then DAT_00667cbc drops by one. Retail has reinstalled the Sound::Source table first, so
     // the stop body's vt+8 is always FUN_00429c70; every class here shares that Release, and the
     // count is already at zero on this path, so the call only takes it to -1.
@@ -1772,9 +1724,7 @@ namespace
         --G_AliveSoundSourceCount;
     }
 
-    // FUN_004293e0 (slot 24, bare RET) -- listing 004293e0..00429448. Only a playing source
-    // (slot 5, vt+0x14) does anything; see SourceStopLinked. A Stop on an idle source is a
-    // no-op.
+    // FUN_004293e0 (slot 24). A Stop on an idle source is a no-op.
     void SourceStopBody(FSoundSource* Source)
     {
         if (Source->IsActive() == 0)
@@ -1784,13 +1734,13 @@ namespace
 
     // The dword right after the vptr of an Archetype::ISound: FClientSoundArch::NicknameId and
     // FVoiceMsg::Id (voice_profiles.h) both sit at +4. FUN_004291c0 compares the two
-    // archetypes by this dword (MOV EDX,[EDI+4] / CMP EDX,[ECX+4]), not by pointer.
+    // archetypes by this dword, not by pointer.
     unsigned ArchIdentity(Archetype::ISound* Arch)
     {
         return *reinterpret_cast<unsigned const*>(reinterpret_cast<char const*>(Arch) + 4);
     }
 
-    // FUN_004291c0 (slot 22, RET 8) -- listing 004291c0..00429328.
+    // FUN_004291c0 (slot 22, RET 8).
     unsigned char SourceStart(FSoundSource* Source, Archetype::ISound* Arch, int Extra)
     {
         if (Source->IsActive() != 0) // vt+0x14
@@ -1816,7 +1766,7 @@ namespace
         Source->StartTick = Extra;
         Source->Flags = static_cast<unsigned char>(Source->Flags & 0xe7u);
         // Flag 4 (SoundManager-played) first needs DALib::Sound and the archetype's slot 3;
-        // either failing answers false before anything is linked (0x004292b4..0x004292c8).
+        // either failing answers false before anything is linked.
         if ((Source->Flags & 4u) != 0)
         {
             if (DALib::Sound == nullptr)
@@ -1831,9 +1781,8 @@ namespace
         return 1;
     }
 
-    // FUN_00429040 (thiscall, RET 4) -- the base Sound::Source constructor: vtable, +0x04 /
-    // +0x08 / +0x10 .. +0x20 zero, the flag byte's top three bits kept and bit 2 = bBit2 & 1,
-    // +0x24 = 1, +0x28 = DAT_00667c58 (FLT_MAX), +0x2c = 0, then INC DAT_00667cbc.
+    // FUN_00429040 (thiscall, RET 4) -- the base Sound::Source constructor: the flag byte's top
+    // three bits kept, +0x28 = DAT_00667c58 (FLT_MAX), then DAT_00667cbc counts it.
     FSoundSource::FSoundSource(unsigned char bBit2, unsigned char OldFlags)
         : Type(0), Field08(0),
           Flags(static_cast<unsigned char>((OldFlags & 0xe0u) | ((bBit2 & 1u) << 2))),
@@ -1843,17 +1792,15 @@ namespace
         ++G_AliveSoundSourceCount;
     }
 
-    // FUN_00428850 (thiscall) -- FUN_00429040(0), +0x30 / +0x34 = 0, +0x38 = -1.0f,
-    // +0x3c = 0, the Sound::StreamedSource table 0x005ca05c.
+    // FUN_00428850 (thiscall) -- FUN_00429040(0), the Sound::StreamedSource table 0x005ca05c.
     FStreamedSource::FStreamedSource(unsigned char OldFlags)
         : FSoundSource(0, OldFlags), StreamHandle(nullptr), FadeTargetDb(0.f), FadeTime(-1.f),
           bFadeOut(0)
     {
     }
 
-    // FUN_00428790 (thiscall) -- FUN_00429040(1), +0x30 .. +0x5c zero but +0x44 = 1.0f (the cone
-    // direction's z) and +0x58 = 360.0f (the outer cone), +0x60 = -1, the Sound::Source3D table
-    // 0x005c9efc. The engine emitter's ctor FUN_00527a70 inlines the same stores.
+    // FUN_00428790 (thiscall) -- FUN_00429040(1), the Sound::Source3D table 0x005c9efc. The
+    // engine emitter's ctor FUN_00527a70 inlines the same stores.
     FSpatialSource::FSpatialSource(unsigned char OldFlags)
         : FSoundSource(1, OldFlags), Source3dId(-1)
     {
@@ -1871,7 +1818,7 @@ namespace
     }
 
     // FUN_00428f80 (cdecl) -- the sources' operator new: 0x30 / 0x40 / 0x64 bytes come from
-    // their Heap pool (DAT_00667a44 / DAT_00667a24 / DAT_00667a34, JMP Heap::Malloc), any
+    // their Heap pool (DAT_00667a44 / DAT_00667a24 / DAT_00667a34), any
     // other size from malloc (the 0x50 CliThrusterSound and the 0x68 engine emitter).
     void* SoundSourceAlloc(unsigned Size)
     {
@@ -1910,9 +1857,8 @@ namespace
 
     // FUN_0042a2a0 (thiscall Arch, Offset; RET 8). With DALib::Streamer and a stream handle
     // (neither 0 nor -1): FUN_004291c0(Arch, Offset) called directly, not through the table; on
-    // success FUN_0042a420, IStreamer2 slot 7 (+0x1c) StartStream and slot 10 (+0x28)
-    // QueryStatus, a zero status being the "Bad streamer status" warning with the archetype's
-    // slot 1 name (Sound.cpp:0x905). The answer is only whether +0x30 is a handle.
+    // success FUN_0042a420, StartStream and QueryStatus (zero warns). The answer is only
+    // whether +0x30 is a handle.
     unsigned char StreamedRestart(FStreamedSource* Source, Archetype::ISound* Arch, int Offset)
     {
         if (DALib::Streamer != nullptr && IsStreamHandle(Source->StreamHandle))
@@ -1932,8 +1878,7 @@ namespace
         return IsStreamHandle(Source->StreamHandle) ? 1u : 0u;
     }
 
-    // LAB_0042a1d0 -- slot 22 (RET 8): slot 23 (vt+0x5c, open the stream) with Arch, then
-    // FUN_0042a2a0(Arch, Extra); true when +0x30 ends up a handle.
+    // LAB_0042a1d0 -- slot 22 (RET 8): slot 23 (open the stream), then FUN_0042a2a0.
     unsigned char __thiscall FStreamedSource::Start(void* ArchArg, int Extra)
     {
         Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(ArchArg);
@@ -1942,10 +1887,7 @@ namespace
         return IsStreamHandle(StreamHandle) ? 1u : 0u;
     }
 
-    // LAB_0042a210 -- slot 23 (RET 4), open the stream. No DALib::Streamer: true. Otherwise
-    // IStreamer2 slot 4 (+0x10) CreateStream(arch slot 1 name, DALib::Data, 2 when slot 7
-    // says looping, else 0) into +0x30; 0 or -1 is the "Failed to start streamer sound"
-    // warning (Sound.cpp:0x8e5) and false.
+    // LAB_0042a210 -- slot 23 (RET 4), open the stream. No DALib::Streamer: true.
     unsigned char __thiscall FStreamedSource::AltStart(void* ArchArg)
     {
         Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(ArchArg);
@@ -1963,9 +1905,7 @@ namespace
         return 1;
     }
 
-    // FUN_0042a0c0 -- slot 24 (bare RET). A non-zero +0x30 (only 0 is tested) is stopped and
-    // destroyed (IStreamer2 slots 6 and 5, no test of DALib::Streamer) and cleared; +0x34 = 0,
-    // +0x38 = -1.0f; then, when slot 5 says playing, the common stop body.
+    // FUN_0042a0c0 -- slot 24. Only a 0 handle is skipped (not -1); no test of DALib::Streamer.
     void __thiscall FStreamedSource::Stop()
     {
         if (StreamHandle != nullptr)
@@ -1981,16 +1921,14 @@ namespace
         SourceStopLinked(this);
     }
 
-    // LAB_00428880 -- slot 25 (RET 4): a streamed source cannot be moved; the ERROR names
-    // Sound.h:0x13f.
+    // LAB_00428880 -- slot 25 (RET 4): a streamed source cannot be moved.
     void __thiscall FStreamedSource::SetStartOffset(int /*Offset*/)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSoundH, 0x13f,
               "Tried to restart streaming sound");
     }
 
-    // LAB_0042a3a0 -- slot 26: not for the background music (DAT_00667cb0), nor without
-    // DALib::Streamer or a stream handle; otherwise +0x08 = 1 and IStreamer2 slot 6 StopStream.
+    // LAB_0042a3a0 -- slot 26: the background music (DAT_00667cb0) is never paused.
     void __thiscall FStreamedSource::Pause()
     {
         if (this == G_BackgroundMusic)
@@ -2003,7 +1941,7 @@ namespace
         DALib::Streamer->StopStream(StreamHandle);
     }
 
-    // LAB_0042a3e0 -- slot 27: the same gates, then IStreamer2 slot 7 StartStream and +0x08 = 0.
+    // LAB_0042a3e0 -- slot 27.
     void __thiscall FStreamedSource::Resume()
     {
         if (this == G_BackgroundMusic)
@@ -2016,9 +1954,7 @@ namespace
         Field08 = 0;
     }
 
-    // FUN_0042a350 -- slot 29: no stream handle -> finished. With one: slot 40 (faded out) ->
-    // finished; IStreamer2 slot 10 QueryStatus 0 or 4 -> finished; any other status goes on to
-    // the base FUN_00429840 (JMP).
+    // FUN_0042a350 -- slot 29; falls through to the base FUN_00429840.
     unsigned char __thiscall FStreamedSource::IsFinished()
     {
         if (!IsStreamHandle(StreamHandle))
@@ -2031,10 +1967,8 @@ namespace
         return SourceIsFinished(this);
     }
 
-    // LAB_0042a5d0 -- slot 32 (RET 4): below -96.0 (double DAT_005ca210, `TEST AH,5 / JP`)
-    // -96; above 0.0 (double DAT_005c8ba8, `TEST AH,0x41 / JNZ`) 0; otherwise the value. It
-    // goes to both +0x1c and the fade target +0x34, the fade time +0x38 = 0.0, then
-    // FUN_0042a420.
+    // LAB_0042a5d0 -- slot 32 (RET 4): clamped to -96.0 (DAT_005ca210) .. 0.0 (DAT_005c8ba8),
+    // NaN passes; it also becomes the fade target with no fade time.
     void __thiscall FStreamedSource::SetAttenuation(float Attenuation)
     {
         float Value = Attenuation;
@@ -2048,10 +1982,9 @@ namespace
         StreamedApplyVolume(this);
     }
 
-    // LAB_0042a620 -- slot 33 (RET 4): the pan clamped to [-10000, 10000] (DAT_005ca21c
-    // `TEST AH,5 / JP`, DAT_005ca218 `TEST AH,0x41 / JNZ`) into +0x20; with a non-zero +0x30,
-    // slot 11 reads it back as an integer, clamped again (signed JGE / JLE), and IStreamer2
-    // slot 13 (+0x34) SetPan gets it.
+    // LAB_0042a620 -- slot 33 (RET 4): the pan clamped to [-10000, 10000] (DAT_005ca21c /
+    // DAT_005ca218); with a non-zero handle slot 11 reads it back as an integer, clamped again,
+    // for IStreamer2 SetPan.
     void __thiscall FStreamedSource::SetPan(float NewPan)
     {
         float Value = NewPan;
@@ -2072,9 +2005,7 @@ namespace
     }
 
     // FUN_0042a170 -- slot 34 (RET 4): nothing when slot 7 already answers bLooping (a byte
-    // compare). A playing source (slot 5) switched to looping is the "attributes changing
-    // _after_ the stream was started" ERROR (Sound.cpp:0x8bf, the archetype's slot 1 name);
-    // either way bit 0 of the flags takes bLooping's bit 0.
+    // compare). Switching a playing source to looping only warns; the bit is set either way.
     void __thiscall FStreamedSource::SetLooping(unsigned char bLooping)
     {
         if (bLooping == IsLooping())
@@ -2089,8 +2020,8 @@ namespace
         Flags = static_cast<unsigned char>(((Flags ^ bLooping) & 1u) ^ Flags);
     }
 
-    // LAB_0042a0a0 -- slot 40 (bare RET): faded out -- +0x3c set and the +0x1c dB at or below
-    // the +0x34 target (FCOMP, `TEST AH,0x41 / JNP`: "less" or "equal"; a NaN is false).
+    // LAB_0042a0a0 -- slot 40: faded out -- +0x3c set and the +0x1c dB at or below the +0x34
+    // target (a NaN is false).
     unsigned char __thiscall FStreamedSource::IsFadedOut()
     {
         if (bFadeOut == 0)
@@ -2104,8 +2035,8 @@ namespace
             *OutFs = nullptr;
         // Both candidates are IFileSystem, which derives from IComponentFactory -- slot 3
         // (+0x0C) is plain CreateInstance, the same one DALib::OpenData goes through.
-        // 0042b648..0042b69d. Only caller is CreateSoundArchWav, which has already required
-        // DALib::Data; RelPath goes in untested, as retail's EBP does.
+        // Only caller is CreateSoundArchWav, which has already required DALib::Data; RelPath
+        // goes in untested.
         IComponentFactory* const Factory = ParentFs != nullptr
             ? static_cast<IComponentFactory*>(static_cast<IFileSystem*>(ParentFs))
             : static_cast<IComponentFactory*>(DALib::Data);
@@ -2138,39 +2069,31 @@ namespace
     // FUN_0042b840 -- SoundImpl slot 3.
     unsigned char ArchAcquire(FClientSoundArch* Arch)
     {
-        // 0x0042b843..0x0042b84a: slot 12 (the lod link) against this.
         FClientSoundArch* Linked = ArchGetLinked(Arch);
         if (Linked == Arch)
         {
-            // 0x0042b84c..0x0042b868: no SoundManager id yet and a [DALib::Sound] -> FUN_0042b5e0
-            // (this, 0) into +0xc; then INC word [+0x2a]; SETNZ of +0xc != -1.
             if (Arch->SmArchId == -1 && DALib::Sound != nullptr)
                 Arch->SmArchId = CreateSoundArchWav(Arch, nullptr);
             ++Arch->UseCount;
             return Arch->SmArchId != -1 ? 1 : 0;
         }
-        // 0x0042b87c..0x0042b886: a link -> its slot 3 (tail jump).
         if (Arch->Linked != nullptr)
             return ArchAcquire(Arch->Linked);
-        // 0x0042b889..0x0042b890: no link -- INC word [+0x28], AL = 1.
+        // Lod resolved to NONE: the uses are counted in the +0x28 word.
         ++Arch->Pad28;
         return 1;
     }
 
-    // FUN_0042b8a0 -- SoundImpl slot 4. Returns the remaining count sign-extended from its word
-    // (MOVSX), not a flag.
+    // FUN_0042b8a0 -- SoundImpl slot 4. Returns the remaining count sign-extended from its word,
+    // not a flag.
     int ArchReleaseWav(FClientSoundArch* Arch)
     {
-        // 0x0042b8a3..0x0042b8aa: slot 12 (the lod link) against this.
         FClientSoundArch* Linked = ArchGetLinked(Arch);
         if (Linked == Arch)
         {
-            // 0x0042b8ac..0x0042b8b8: a non-zero +0x2a is decremented.
             if (Arch->UseCount != 0)
                 --Arch->UseCount;
-            // 0x0042b8bc..0x0042b8dd: CMP word [+0x2a],0 / JG (signed) -- at or below zero and
-            // with a SoundManager id, [DALib::Sound] slot 34 (+0x88) destroys it (no null test)
-            // and +0xc = -1.
+            // Signed compare; no test of DALib::Sound.
             if (static_cast<short>(Arch->UseCount) <= 0 && Arch->SmArchId != -1)
             {
                 DALib::Sound->DestroyArchetype(Arch->SmArchId);
@@ -2178,17 +2101,14 @@ namespace
             }
             return static_cast<short>(Arch->UseCount);
         }
-        // 0x0042b8ea..0x0042b8f4: a link -> its slot 4 (tail jump).
         if (Arch->Linked != nullptr)
             return ArchReleaseWav(Arch->Linked);
-        // 0x0042b8f7..0x0042b907: no link -- the +0x28 word, decremented when non-zero.
         if (Arch->Pad28 != 0)
             --Arch->Pad28;
         return static_cast<short>(Arch->Pad28);
     }
 
-    // The field copy both arms of FUN_0042bc70 share (0x0042bcc6..0x0042bdb1 /
-    // 0x0042bdda..0x0042bebf): +0x04 .. +0x14 as dwords, the +0x18 flag word bit-field by
+    // The field copy both arms of FUN_0042bc70 share: +0x04 .. +0x14 as dwords, the +0x18 flag word bit-field by
     // bit-field except bits 30..31, which stay the target's, the two lod ids, the lod link and
     // the two words at +0x28 / +0x2a. The port's +0x08 file is a malloc'd copy (retail: a
     // StringAlloc'd CacheString, never freed), so it moves from Src instead of being shared.
@@ -2216,32 +2136,31 @@ namespace
     }
 
     // FUN_0042bc70 (thiscall on the registered SoundArch, RET 8) -- redefine it from Src. The
-    // same file (the inlined strcmp at 0x0042bc86..0x0042bcbb, case-sensitive) without bForce
-    // keeps the loaded wav: every field is copied but +0x0c SmArchId is put back. Otherwise the
-    // outstanding uses (slot 5, +0x14) are released one by one (slot 4, +0x10), everything is
-    // copied, and the same number of uses is taken again (slot 3, +0x0c). Always true.
+    // same file (case-sensitive compare) without bForce keeps the loaded wav. Otherwise the
+    // outstanding uses are released, everything is copied, and the same number of uses is
+    // taken again. Always true.
     bool SoundArchRedefine(FClientSoundArch* This, FClientSoundArch* Src, bool bForce)
     {
         char const* const ThisFile = This->File != nullptr ? This->File : "";
         char const* const SrcFile = Src->File != nullptr ? Src->File : "";
         if (!bForce && strcmp(ThisFile, SrcFile) == 0)
         {
-            int const KeepSmArchId = This->SmArchId;                          // 0x0042bcc9
+            int const KeepSmArchId = This->SmArchId;
             SoundArchCopyFields(This, Src);
-            This->SmArchId = KeepSmArchId;                                     // 0x0042bdae
+            This->SmArchId = KeepSmArchId;
             return true;
         }
-        int const Uses = This->GetUseCount();                                  // 0x0042bdc1
+        int const Uses = This->GetUseCount();
         for (int Index = 0; Index < Uses; ++Index)
-            This->Release();                                                   // 0x0042bdd4
+            This->Release();
         SoundArchCopyFields(This, Src);
         for (int Index = 0; Index < Uses; ++Index)
-            This->Acquire();                                                   // 0x0042becb
+            This->Acquire();
         return true;
     }
 
-    // FUN_0042aef0 (cdecl Id, Arch, bForce; caller the loader 0x0042b283 with the loader's own
-    // second argument) -- register a parsed SoundArch. A non-empty id already present: the
+    // FUN_0042aef0 (cdecl Id, Arch, bForce; bForce is the loader's own second argument) --
+    // register a parsed SoundArch. A non-empty id already present: the
     // same nickname text (stricmp of the two ID_String::get_string results) warns "Redefining"
     // and redefines the registered one through FUN_0042bc70; different texts under one id are a
     // collision ERROR and nothing is registered (null). Otherwise (a new id, or an empty one)
@@ -2251,32 +2170,28 @@ namespace
     {
         ID_String Id;
         Id.Id = Arch->NicknameId;
-        if (!Id.IsEmpty())                                                     // 0x0042aefd
+        if (!Id.IsEmpty())
         {
-            // 0x0042af0b..0x0042af69: the scratch key DAT_0067ede0 (+0x04 = the id) looked up
-            // with FUN_0042c300.
+            // Retail looks up through the scratch key DAT_0067ede0 with FUN_0042c300.
             std::map<unsigned, FClientSoundArch*>::iterator Found = G_SoundArchs.find(Id.Id);
             if (Found != G_SoundArchs.end())
             {
                 FClientSoundArch* const Existing = Found->second;
                 ID_String ExistingId;
                 ExistingId.Id = Existing->NicknameId;
-                // 0x0042af6f..0x0042af8f: stricmp(existing text, new text).
                 if (_stricmp(ExistingId.get_string(), Id.get_string()) != 0)
                 {
-                    // 0x0042afd0..0x0042affb.
                     FDUMP(0x100001, "%s(%d) : *** ERROR: Sound nickname collision (%s) and (%s)\n",
                           kSoundArchCpp, 0x182, ExistingId.get_string(), Id.get_string());
                     return nullptr;
                 }
-                // 0x0042af91..0x0042afc5.
                 FDUMP(0x100002, "%s(%d) : *** WARNING: Redefining sound '%s'.\n", kSoundArchCpp,
                       0x17a, Id.get_string());
                 SoundArchRedefine(Existing, Arch, bForce);
                 return Existing;
             }
         }
-        // 0x0042b002..0x0042b01d: insert (a present key keeps its entry) and the node's value.
+        // Insert (a present key keeps its entry).
         FClientSoundArch* const Copy = new FClientSoundArch(*Arch);
         std::pair<std::map<unsigned, FClientSoundArch*>::iterator, bool> Inserted =
             G_SoundArchs.insert(std::pair<unsigned const, FClientSoundArch*>(Id.Id, Copy));
@@ -2320,7 +2235,6 @@ namespace
         }
         if (Reader.is_value("attenuation"))
         {
-            // 0x0042b996..0x0042b9a3: ftol(value 0), low byte into +0x18.
             int const Atten = static_cast<int>(Reader.get_value_float(0));
             Arch->Flags = (Arch->Flags & 0xffffff00u) | (static_cast<unsigned>(Atten) & 0xffu);
             return true;
@@ -2329,7 +2243,7 @@ namespace
         {
             Arch->RangeMin = Reader.get_value_float(0);
             if (Reader.is_value_empty(1))
-                // Retail multiplier is `_DAT_00610984` = 30.0f (0x41F00000), not 2x.
+                // _DAT_00610984 = 30.0f.
                 Arch->RangeMax = Arch->RangeMin * 30.f;
             else
                 Arch->RangeMax = Reader.get_value_float(1);
@@ -2337,8 +2251,7 @@ namespace
         }
         if (Reader.is_value("persistent"))
         {
-            // 0x0042ba11..0x0042ba98: DACOM stricmp against "space" / "gameflow", no test of
-            // the value pointer.
+            // No test of the value pointer.
             char const* Value = Reader.get_value_string();
             if (_stricmp("space", Value) == 0)
                 Arch->Flags = (Arch->Flags & 0xff1fffffu) | 0x100000u;
@@ -2351,7 +2264,7 @@ namespace
         }
         if (Reader.is_value("type"))
         {
-            // 0x0042baa8..0x0042bb1b: the PTR_s_normal_00610988 table walk, no test of the value.
+            // No test of the value.
             char const* Value = Reader.get_value_string();
             if (!ParseSoundType(Arch, Value))
             {
@@ -2388,8 +2301,7 @@ namespace
             Arch->Flags = (Arch->Flags & 0xffff00ffu) | (static_cast<unsigned>(PitchByte) << 8);
             return true;
         }
-        // 0x0042bbe1..0x0042bc2e: "lod1" -> index 0, "lod2" -> index 1; CreateID of the value
-        // (no test) fills Lod[index..1] (REP STOSD of 2 - index dwords from +0x1c).
+        // "lod1" fills both lod slots, "lod2" only the second.
         int LodIndex = 0;
         if (Reader.is_value("lod1"))
             LodIndex = 0;
@@ -2397,7 +2309,6 @@ namespace
             LodIndex = 1;
         else
         {
-            // 0x0042bc31..0x0042bc6d: FDUMP with get_name_ptr, then log_link(""), AL = 0.
             FDUMP(0x100002, "%s(%d) : *** WARNING: unknown [Sound] parameter %s.\n",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x329,
                   Reader.get_name_ptr());
@@ -2413,9 +2324,8 @@ namespace
         return true;
     }
 
-    // FUN_00428ba0 / FUN_00428bc0 body: store the global source into *OutSource and AddRef it
-    // (428bb7 CALL [EDX+4]); the caller owns that reference and Releases it (StarSys tick
-    // 00554ff3). Retail has no null test on OutSource.
+    // FUN_00428ba0 / FUN_00428bc0 body: the caller owns the AddRef'd reference (the StarSys
+    // tick releases it). Retail has no null test on OutSource.
     unsigned char BindSource(FStreamedSource* Source, void** OutSource)
     {
         if (Source == nullptr)
@@ -2427,18 +2337,11 @@ namespace
 
     // The shared body of FUN_004288e0 (DAT_00667cb0, type 3) / FUN_00428a40 (DAT_00667cb4,
     // type 4); retail's first argument is the ID_String*.
-    // 0x004288e0..0x0042890f: the fade time is `music_fade_time` (DAT_006108d0) unless Fade is
-    // not below 0.0 (`TEST AH,1 / JNZ`: "less" and NaN keep the default); `cross_fade_silence`
-    // (DAT_006108d4) is read with it.
-    // 0x0042890f..0x0042897f: with a current source, a non-empty id is looked up
-    // (FUN_0042ae40, its 0x168 warning included) and the same archetype pointer as the
-    // source's +0x18 keeps it playing (true). Otherwise the current source fades out -- +0x34 =
-    // the silence, +0x38 = the fade time, +0x3c = 1 --, is released and the slot cleared.
-    // 0x0042897f..0x00428a27: an empty id answers false. Otherwise the stack play key {0,
-    // 4 | (Flags & 1), 0, 0, 0, silence} (the byte's bits 3..7 are left over from the stack in
-    // retail; zero here), FUN_00428680(FUN_0042ae40(id), key, &handle, 0); on success the
-    // handle (__RTDynamicCast to Sound::StreamedSource -- key bit 2 always makes one) takes the
-    // slot, +0x04 = the type, +0x34 = 0, +0x38 = the fade time; true.
+    // The fade time is `music_fade_time` (DAT_006108d0) unless Fade >= 0 (NaN keeps the
+    // default); the fade-out target is `cross_fade_silence` (DAT_006108d4). The same archetype
+    // already in the slot keeps playing; otherwise the current source fades out and is
+    // released. The play key's flag byte bits 3..7 are left over from the stack in retail;
+    // zero here. Key bit 2 always yields a Sound::StreamedSource (retail __RTDynamicCast).
     unsigned char WriteBackgroundSource(FStreamedSource** Slot, unsigned NicknameId,
                                         unsigned Flags, float Fade, int SourceType)
     {
@@ -2494,9 +2397,7 @@ namespace
     // replaces slot 41 only.
     struct FEquipSoundEmitter : FSpatialSource
     {
-        // FUN_00527a70 -- listing 00527a70..00527af0: FUN_00429040(1), the Source3D block
-        // (0x00527a94..0x00527ac2, FSpatialSource's stores), +0x64 = Arch, the 005dd084 table,
-        // then the archetype's slot 3 (+0x0c, Acquire) with no null test and its result dropped.
+        // FUN_00527a70 -- Acquire with no null test and its result dropped.
         FEquipSoundEmitter(unsigned char OldFlags, Archetype::ISound* Arch)
             : FSpatialSource(OldFlags), EmitterArch(Arch)
         {
@@ -2507,10 +2408,8 @@ namespace
         // when bit 0 is set; returns this either way.
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override
         {
-            // FUN_00527b20 -- listing 00527b20..00527b7c: the Stop body FUN_004293e0 called
-            // directly (0x00527b4b), the +0x64 archetype released through its slot 4
-            // (0x00527b55, no null test), then the Source3D destructor, inlined down to the
-            // Sound::Source destructor FUN_00429140 (0x00527b68).
+            // FUN_00527b20 -- the Stop body FUN_004293e0 called directly, the archetype
+            // released (no null test), then the Sound::Source destructor FUN_00429140.
             SourceStopBody(this);
             EmitterArch->Release();
             SourceTeardown(this);
@@ -2533,9 +2432,9 @@ namespace
     // Sound::Source's table (005c9fac) it replaces slots 6, 12, 15, 16, 17, 18 and 41.
     struct FThrusterSoundSource : FSoundSource
     {
-        // LAB_0052f3d0 -- slot 6: `return this->bExterior`.
+        // LAB_0052f3d0 -- slot 6.
         unsigned char DACOM_API Is3d() override { return bExterior; }
-        // LAB_0052f3e0 -- slot 12: the thrusters' mean position (+0x34), GR_OK.
+        // LAB_0052f3e0 -- slot 12.
         GENRESULT DACOM_API GetPosition(FVec3* Out) override
         {
             Out->X = ThrusterPosition[0];
@@ -2543,16 +2442,14 @@ namespace
             Out->Z = ThrusterPosition[2];
             return GR_OK;
         }
-        // LAB_0052f430 -- slot 15: ftol of ThrusterEquipConsts::INSIDE_CONE_ANGLE and
-        // OUTSIDE_CONE_ANGLE, GR_OK.
+        // LAB_0052f430 -- slot 15.
         GENRESULT DACOM_API GetConeAngles(unsigned long* Inside, unsigned long* Outside) override
         {
             *Inside = static_cast<unsigned long>(Ftol(ThrusterEquipConsts::INSIDE_CONE_ANGLE));
             *Outside = static_cast<unsigned long>(Ftol(ThrusterEquipConsts::OUTSIDE_CONE_ANGLE));
             return GR_OK;
         }
-        // LAB_0052f460 -- slot 16: the ship's transform (IObjInspect slot 3) third column,
-        // rotation dwords +0x08 / +0x14 / +0x20, GR_OK.
+        // LAB_0052f460 -- slot 16: the third column of the ship's rotation.
         GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override
         {
             Transform const& Xform = Ship->get_transform();
@@ -2561,13 +2458,13 @@ namespace
             Out->Z = Xform.Rotation.E[2][2];
             return GR_OK;
         }
-        // LAB_0052f4b0 -- slot 17: ThrusterEquipConsts::OUTSIDE_CONE_ATTENUATION, GR_OK.
+        // LAB_0052f4b0 -- slot 17.
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override
         {
             *Out = ThrusterEquipConsts::OUTSIDE_CONE_ATTENUATION;
             return GR_OK;
         }
-        // LAB_0052f400 -- slot 18: the ship's velocity (IObjInspect slot 1), GR_OK.
+        // LAB_0052f400 -- slot 18.
         GENRESULT DACOM_API GetVelocity(FVec3* Out) override
         {
             Vector const Velocity = Ship->get_velocity();
@@ -2576,9 +2473,7 @@ namespace
             Out->Z = Velocity.z;
             return GR_OK;
         }
-        // FUN_0052f080 -- slot 41: the body FUN_0052f0a0 (the exterior, then the interior
-        // archetype released through slot 4 when set; then the Sound::Source destructor
-        // FUN_00429140), then the 0x50 free when bit 0 is set. Returns this either way.
+        // FUN_0052f080 -- slot 41, body FUN_0052f0a0.
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override
         {
             if (ExteriorArch != nullptr)
@@ -2606,7 +2501,7 @@ namespace
         FClientEquippedObj* Ship;        // retail +0x30  the ship gameobj (ctor argument)
         float ThrusterPosition[3];       // retail +0x34  written by FUN_0052f110
         int Field_0x40;                  // retail +0x40  zeroed by the ctor; no other access in
-                                         //               005ddbfc's slots or 0052f110 -- TODO
+                                         //               005ddbfc's slots or 0052f110
         unsigned char bExterior;         // retail +0x44  1 = exterior (3D), 0 = interior
         Archetype::ISound* InteriorArch; // retail +0x48  INTERIOR_SOUND_NAME, player ship only
         Archetype::ISound* ExteriorArch; // retail +0x4c  EXTERIOR_SOUND_NAME
@@ -2622,8 +2517,8 @@ namespace
         return static_cast<Archetype::ISound*>(LookupClientSoundArch(&Name));
     }
 
-    // 0x0052f117..0x0052f136 and 0x0052f273..0x0052f28d: exterior prefers the exterior
-    // archetype, interior the interior one; either falls back on the other.
+    // Exterior prefers the exterior archetype, interior the interior one; either falls back on
+    // the other.
     Archetype::ISound* ThrusterCurrentArch(FThrusterSoundSource const* Self)
     {
         if (Self->bExterior != 0)
@@ -2631,9 +2526,8 @@ namespace
         return Self->InteriorArch != nullptr ? Self->InteriorArch : Self->ExteriorArch;
     }
 
-    // 0x0052f326..0x0052f34d / 0x0052f376..0x0052f39e: to interior -- the interior archetype
-    // looked up and acquired (slot 3) on first use, with no null test of the lookup, then the
-    // sound stopped so the next tick starts the other archetype.
+    // To interior -- the interior archetype is looked up and acquired on first use, with no
+    // null test of the lookup, then the sound stopped so the next tick starts the other one.
     void ThrusterSwitchToInterior(FThrusterSoundSource* Self)
     {
         Archetype::ISound* const Interior = Self->InteriorArch;
@@ -2649,22 +2543,19 @@ namespace
 
 ISoundSource* CreateClientThrusterSound(FClientEquippedObj* Ship)
 {
-    // 0x00545535..0x0054554f: FUN_00428f80(0x50) (malloc), null -> null; else
-    // FUN_0052efb0(Ship).
     void* const Block = SoundSourceAlloc(0x50u);
     if (Block == nullptr)
         return nullptr;
 
-    // FUN_0052efb0 -- listing 0052efb0..0052f07c. FUN_00429040(1) first, then the fields.
+    // FUN_0052efb0.
     FThrusterSoundSource* const Self = new (Block) FThrusterSoundSource(BlockFlagByte(Block), Ship);
 
-    // 0x0052effa..0x0052f018: the exterior archetype, acquired (slot 3) when found.
     Self->ExteriorArch = ThrusterLookupArch(ThrusterEquipConsts::EXTERIOR_SOUND_NAME);
     if (Self->ExteriorArch != nullptr)
         Self->ExteriorArch->Acquire();
 
-    // 0x0052f01b..0x0052f05f: the interior one too when the ship is this client's -- the
-    // object's owner (class & 3 -> +0xb4, else FUN_0054bb00) against DAT_00673344.
+    // The interior one too when the ship is this client's: the owner (class & 3 -> +0xb4, else
+    // FUN_0054bb00) against DAT_00673344.
     CObject* const Obj = Ship->Object;
     unsigned const Owner =
         (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x3u) == 0x3u)
@@ -2677,21 +2568,20 @@ ISoundSource* CreateClientThrusterSound(FClientEquippedObj* Ship)
             Self->InteriorArch->Acquire();
     }
 
-    // 0x0052f062..0x0052f06b: looping.
+    // Looping.
     Self->Flags = static_cast<unsigned char>(Self->Flags | 1u);
     return Self;
 }
 
 void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
 {
-    // FUN_0052f110 (thiscall, RET 4) -- listing 0052f110..0052f3bf. Dt is not read.
+    // FUN_0052f110 (thiscall, RET 4). Dt is not read.
     FThrusterSoundSource* const Self = static_cast<FThrusterSoundSource*>(Sound);
     if (ThrusterCurrentArch(Self) == nullptr)
         return;
 
-    // 0x0052f13c..0x0052f200: every functioning thruster that could thrust (equip-FX wrapper
-    // list at ship +0xb8, equipment type exactly 0x400) adds its thrust and its connection
-    // position (CEquip slot 18, no matrix).
+    // Every functioning thruster that could thrust (equip-FX wrapper list at ship +0xb8,
+    // equipment type exactly 0x400) adds its thrust and its connection position.
     FEquipFxListNode* const Head =
         static_cast<FEquipFxListNode*>(Self->Ship->EquipFx.Head);
     float SumX = 0.0f;
@@ -2719,8 +2609,7 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
         SumThrust = Thrust + SumThrust;
     }
 
-    // 0x0052f206..0x0052f222: nothing thrusting (no thruster, or a sum not above 0, NaN
-    // included: TEST AH,0x41 / JNZ) -> 0x0052f3a9: stop when playing.
+    // Nothing thrusting (NaN sum included): stop when playing.
     if (Count == 0 || !(SumThrust > 0.0f))
     {
         if (Self->IsActive() != 0)
@@ -2728,20 +2617,17 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
         return;
     }
 
-    // 0x0052f228..0x0052f26a: the mean position; 1/Count stays on the FPU.
+    // 1/Count stays on the FPU.
     double const InvCount = 1.0 / static_cast<double>(Count);
     Self->ThrusterPosition[0] = static_cast<float>(static_cast<double>(SumX) * InvCount);
     Self->ThrusterPosition[1] = static_cast<float>(static_cast<double>(SumY) * InvCount);
     Self->ThrusterPosition[2] = static_cast<float>(static_cast<double>(SumZ) * InvCount);
 
-    // 0x0052f26c..0x0052f297: not playing -> Start(current archetype, 0) (slot 22).
     if (Self->IsActive() == 0)
         Self->Start(ThrusterCurrentArch(Self), 0);
 
-    // 0x0052f29a..0x0052f2fc: the level -- 0 below MIN_VOLUME_FORCE (TEST AH,0x5 / JP: only
-    // "less" takes it), 1 above MAX_VOLUME_FORCE (TEST AH,0x41 / JNZ: only "greater"), a linear
-    // ramp in between; then 10*log10(level*0.8 + 0.2) dB (DAT_005d7e50, DAT_005cf100,
-    // FLDLG2/FYL2X, DAT_005c9ce8) as the attenuation (slot 32).
+    // The level: a linear ramp between MIN_VOLUME_FORCE and MAX_VOLUME_FORCE, then
+    // 10*log10(level*0.8 + 0.2) dB (DAT_005d7e50, DAT_005cf100, DAT_005c9ce8).
     double Level = 0.0;
     if (SumThrust < ThrusterEquipConsts::MIN_VOLUME_FORCE)
         Level = 0.0;
@@ -2754,8 +2640,7 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
                  static_cast<double>(ThrusterEquipConsts::MIN_VOLUME_FORCE));
     Self->SetAttenuation(static_cast<float>(log10(Level * 0.8 + 0.2) * 10.0));
 
-    // 0x0052f302..0x0052f319: the player's own character in the first-person camera hears the
-    // interior sound.
+    // The player's own character in the first-person camera hears the interior sound.
     if (Self->Ship->get_id() == GetPlayerCharacterId() && IsFirstPersonCameraCurrent())
     {
         if (Self->bExterior == 0)
@@ -2764,8 +2649,7 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
         return;
     }
 
-    // 0x0052f358..0x0052f3a6: back to exterior (1 stays, 0 flips and stops, any other value
-    // takes the interior switch).
+    // Back to exterior (1 stays, 0 flips and stops, any other value takes the interior switch).
     if (Self->bExterior == 1)
         return;
     if (Self->bExterior == 0)
@@ -2779,21 +2663,19 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
 
 int LoadClientSoundArchIni(char const* FullPath, bool bForce)
 {
-    // FUN_0042b030 (cdecl Path, bForce; the one caller, the [Data] sounds = key at 0x005b0d6f,
-    // passes the GetFileSysPath result and 0). Returns how many SoundArchs the registry grew by
-    // (DAT_00667cd0 after minus before, 0x0042b04f / 0x0042b2ad).
+    // FUN_0042b030 (cdecl Path, bForce; the one caller, the [Data] sounds = key, passes the
+    // GetFileSysPath result and 0). Returns how many SoundArchs the registry grew by.
     size_t const OldCount = G_SoundArchs.size();
 
     INI_Reader Reader;
-    if (Reader.open(FullPath, false))                                          // 0x0042b07c
+    if (Reader.open(FullPath, false))
     {
-        while (Reader.read_header())                                           // 0x0042b08e
+        while (Reader.read_header())
         {
-            if (!Reader.is_header("Sound"))                                    // 0x0042b0b1
+            if (!Reader.is_header("Sound"))
                 continue;
 
-            // 0x0042b0bf..0x0042b0dc: a default SoundArch (FUN_0042b7b0) with both range ends
-            // reset to -1.0 before the keys are read.
+            // A default SoundArch (FUN_0042b7b0) with both range ends reset to -1.0.
             FClientSoundArch Scratch;
             Scratch.RangeMax = -1.0f;
             Scratch.RangeMin = -1.0f;
@@ -2801,7 +2683,7 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
             {
                 if (Reader.is_value("nickname"))
                 {
-                    // 0x0042b103..0x0042b113: CreateID into +0x04. The port also keeps the text.
+                    // The port also keeps the text.
                     char const* const Nick = Reader.get_value_string();
                     Scratch.NicknameId = CreateID(Nick);
                     strncpy(Scratch.Nickname, Nick, sizeof(Scratch.Nickname) - 1);
@@ -2815,10 +2697,8 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
 
             ID_String Id;
             Id.Id = Scratch.NicknameId;
-            if (Id.IsEmpty())                                                  // 0x0042b139
+            if (Id.IsEmpty())
             {
-                // 0x0042b143..0x0042b177: the reader's link log, then the ERROR with the file
-                // (+0x08) and the ini path.
                 Reader.log_link("Sound has no nickname!");
                 FDUMP(0x100001,
                       "%s(%d) : *** ERROR: Sound has no nickname.  Skipping. Filename(%s) "
@@ -2828,10 +2708,8 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
             }
             else
             {
-                // 0x0042b17f..0x0042b1c2: the attenuation (signed low byte of +0x18) clamped
-                // to [-96, 0]. FCOM 0.0 / TEST AH,0x41 / JNZ: a value above 0 takes 0; else
-                // FCOMP -96.0 (DAT_005ca16c) / TEST AH,5 / JP: below -96 takes -96, anything
-                // else (including an unordered compare) keeps the value.
+                // The attenuation (signed low byte of +0x18) clamped to [-96 (DAT_005ca16c), 0];
+                // an unordered compare keeps the value.
                 double const Atten =
                     static_cast<double>(static_cast<signed char>(Scratch.Flags & 0xffu));
                 float Clamped;
@@ -2841,7 +2719,6 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
                     Clamped = -96.0f;
                 else
                     Clamped = static_cast<float>(Atten);
-                // 0x0042b1c2..0x0042b1f2: FCOMP / TEST AH,0x44 / JNP skips only on equal.
                 if (!(static_cast<double>(Clamped) == Atten))
                 {
                     FDUMP(0x100002,
@@ -2849,27 +2726,22 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
                           "(0, -96)\n",
                           kSoundArchCpp, 0x1c9, Scratch.File != nullptr ? Scratch.File : "");
                 }
-                // 0x0042b1f5..0x0042b218: ftol of the clamp into the low byte.
                 int const ClampedInt = static_cast<int>(Clamped);
                 Scratch.Flags = (Scratch.Flags & 0xffffff00u) |
                                 (static_cast<unsigned>(ClampedInt) & 0xffu);
 
-                // 0x0042b1fe..0x0042b233: RangeMin (+0x10) FCOMP 0.0 / TEST AH,5 / JP -- only a
-                // RangeMin below 0 resets both ends to -1.0.
                 if (Scratch.RangeMin < 0.0f)
                 {
                     Scratch.RangeMax = -1.0f;
                     Scratch.RangeMin = -1.0f;
                 }
-                // 0x0042b235..0x0042b26f: RangeMin FCOMP RangeMax / TEST AH,1 / JNZ -- no warning
-                // when RangeMin is below RangeMax or the compare is unordered.
+                // No warning when the compare is unordered.
                 else if (!(Scratch.RangeMin < Scratch.RangeMax) &&
                          !_isnan(Scratch.RangeMin) && !_isnan(Scratch.RangeMax))
                 {
                     FDUMP(0x100002, "%s(%d) : *** WARNING: Sound archetype '%s' has invalid range.\n",
                           kSoundArchCpp, 0x1d5, Id.get_string());
                 }
-                // 0x0042b271..0x0042b283: FUN_0042aef0(&Id, &Scratch, bForce).
                 RegisterSoundArch(&Scratch, bForce);
             }
             // The scratch's own malloc'd file, when RegisterSoundArch did not take it over.
@@ -2883,14 +2755,12 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
 
 void* LookupClientSoundArch(ID_String const* Id)
 {
-    // FUN_0042ae40 (cdecl, ID_String const*). An empty id and an id with no registered
-    // SoundArch both end at 0x0042aeb2: the 0x168 WARNING with ID_String::get_string, and null.
-    // Otherwise the scratch key DAT_0067ede0 (+0x04 = the id, 0x0042ae94) is looked up with
-    // FUN_0042c300 and the node's SoundArch (+0x0c) returned.
-    if (!Id->IsEmpty())                                                        // 0x0042ae48
+    // FUN_0042ae40 (cdecl). An empty id warns too. Retail looks up through the scratch key
+    // DAT_0067ede0 with FUN_0042c300.
+    if (!Id->IsEmpty())
     {
         std::map<unsigned, FClientSoundArch*>::iterator Found = G_SoundArchs.find(Id->Id);
-        if (Found != G_SoundArchs.end())                                       // 0x0042aea3
+        if (Found != G_SoundArchs.end())
             return static_cast<Archetype::ISound*>(Found->second);
     }
     FDUMP(0x100002, "%s(%d) : *** WARNING: unknown Sound archetype '%s'", kSoundArchCpp, 0x168,
@@ -2900,42 +2770,34 @@ void* LookupClientSoundArch(ID_String const* Id)
 
 void PreloadClientSoundArchesByCategory(unsigned Mask)
 {
-    // FUN_0042acb0 (cdecl Mask; callers 0x0054ac99 with 1, 0x005588e9 with 2). The in-order
-    // walk of DAT_00667cc0 (0x0042acb0..0x0042ad27): a SoundArch whose persistence nibble
-    // ((+0x18 >> 20) & Mask & 0xf) is non-zero and whose slot 0 (GetSmArchId) answers -1 takes
-    // one slot 3 (Acquire, +0x0c).
+    // FUN_0042acb0 (cdecl). In-order walk of DAT_00667cc0.
     std::map<unsigned, FClientSoundArch*>::iterator It = G_SoundArchs.begin();
     for (; It != G_SoundArchs.end(); ++It)
     {
         FClientSoundArch* const Arch = It->second;
-        if ((((Arch->Flags >> 20) & Mask) & 0xfu) == 0)                         // 0x0042accd
+        if ((((Arch->Flags >> 20) & Mask) & 0xfu) == 0)
             continue;
-        if (Arch->GetSmArchId() == -1)                                         // 0x0042acd5
-            Arch->Acquire();                                                   // 0x0042ace0
+        if (Arch->GetSmArchId() == -1)
+            Arch->Acquire();
     }
 }
 
 void UnloadClientSoundArchesByCategory(unsigned Mask)
 {
-    // FUN_0042ad30 (cdecl Mask; callers 0x0054afde with 1, 0x00558a80 with 2). The same walk
-    // and the same test, including the slot 0 answer of -1, then one slot 4 (Release, +0x10).
+    // FUN_0042ad30 (cdecl). Retail tests SmArchId == -1 here too, as in the preload.
     std::map<unsigned, FClientSoundArch*>::iterator It = G_SoundArchs.begin();
     for (; It != G_SoundArchs.end(); ++It)
     {
         FClientSoundArch* const Arch = It->second;
-        if ((((Arch->Flags >> 20) & Mask) & 0xfu) == 0)                         // 0x0042ad4d
+        if ((((Arch->Flags >> 20) & Mask) & 0xfu) == 0)
             continue;
-        if (Arch->GetSmArchId() == -1)                                         // 0x0042ad55
-            Arch->Release();                                                   // 0x0042ad60
+        if (Arch->GetSmArchId() == -1)
+            Arch->Release();
     }
 }
 
-// FUN_0042b4d0 -- app-shutdown teardown of the whole registry (retail 0x5b22af, right after the
-// voice registry drop / before the rest of WinMain's teardown chain). 0x0042b4d9..0x0042b528:
-// every SoundArch in id order has slot 4 (Release, +0x10) called until it answers 0.
-// 0x0042b52a..0x0042b5d8: the set is emptied (the fast path frees every node through
-// FUN_0042c750 / FUN_0042cbc0 / operator delete when the range is the whole tree; the general
-// one erases node by node). The port also frees each archetype's malloc'd file and heap entry.
+// FUN_0042b4d0 -- every SoundArch in id order is released until it answers 0, then the set is
+// emptied. The port also frees each archetype's malloc'd file and heap entry.
 void ShutdownClientSoundArch()
 {
     std::map<unsigned, FClientSoundArch*>::iterator It = G_SoundArchs.begin();
@@ -2956,8 +2818,7 @@ void ShutdownClientSoundArch()
 
 unsigned char AcquireClientSoundArch(void* Arch)
 {
-    // Archetype slot 3 (+0x0c). The null test is the one ArchAcquire always had (unchanged by
-    // the ISound conversion; its status is part of the menu_ui_init callers' own entries).
+    // Archetype slot 3. Port-side null test.
     if (Arch == nullptr)
         return 0;
     return static_cast<Archetype::ISound*>(Arch)->Acquire();
@@ -2965,7 +2826,7 @@ unsigned char AcquireClientSoundArch(void* Arch)
 
 unsigned char ReleaseClientSoundArch(void* Arch)
 {
-    // Archetype slot 4 (+0x10); the same pre-existing null test as ArchReleaseWav.
+    // Archetype slot 4. Port-side null test.
     if (Arch == nullptr)
         return 0;
     return static_cast<unsigned char>(static_cast<Archetype::ISound*>(Arch)->Release());
@@ -2973,8 +2834,7 @@ unsigned char ReleaseClientSoundArch(void* Arch)
 
 unsigned char PreloadClientSoundArch(ID_String const* Id)
 {
-    // FUN_00427a10: empty id or unknown archetype -> 0; else tail-jump into slot 3.
-    // The second stack argument (the StarSys caller pushes 1) is never read.
+    // FUN_00427a10. The second stack argument (the StarSys caller pushes 1) is never read.
     if (Id->IsEmpty())
         return 0;
     void* const Arch = LookupClientSoundArch(Id);
@@ -2985,7 +2845,7 @@ unsigned char PreloadClientSoundArch(ID_String const* Id)
 
 void UnloadClientSoundArch(ID_String const* Id)
 {
-    // FUN_00427a40: empty id or unknown archetype -> nothing; else tail-jump into slot 4.
+    // FUN_00427a40.
     if (Id->IsEmpty())
         return;
     void* const Arch = LookupClientSoundArch(Id);
@@ -2996,8 +2856,7 @@ void UnloadClientSoundArch(ID_String const* Id)
 
 void* CreateClientSoundSource3D()
 {
-    // LAB_00503420: FUN_00428f80(0x64) (the pool DAT_00667a34); null -> null, else
-    // FUN_00428790 (JMP) on the block.
+    // LAB_00503420: FUN_00428f80(0x64), then FUN_00428790.
     void* const Block = SoundSourceAlloc(0x64u);
     if (Block == nullptr)
         return nullptr;
@@ -3006,8 +2865,7 @@ void* CreateClientSoundSource3D()
 
 void* CreateClientSoundSource()
 {
-    // LAB_00513460: FUN_00428f80(0x30) (the pool DAT_00667a44); null -> null, else
-    // FUN_00429040(1) on the block.
+    // LAB_00513460: FUN_00428f80(0x30), then FUN_00429040(1).
     void* const Block = SoundSourceAlloc(0x30u);
     if (Block == nullptr)
         return nullptr;
@@ -3016,9 +2874,8 @@ void* CreateClientSoundSource()
 
 void* CreateClientEquipSoundEmitter(void* Arch)
 {
-    // The caller's FUN_00428f80(0x68) (malloc) with its null test (e.g. 0x00529086..
-    // 0x00529092): a failed allocation gives a null emitter and the constructor is not run.
-    // Every caller passes a found archetype (FUN_0042ae40 tested non-null).
+    // The caller's FUN_00428f80(0x68) (malloc) with its null test. Every caller passes a found
+    // archetype.
     void* const Block = SoundSourceAlloc(0x68u);
     if (Block == nullptr)
         return nullptr;
@@ -3029,23 +2886,18 @@ void* CreateClientEquipSoundEmitter(void* Arch)
 
 void* GetClientEquipSoundEmitterArch(void* Emitter)
 {
-    // The engine emitter's +0x64, read raw by FUN_00528240 (0x005282e2, 0x005283f1).
+    // The engine emitter's +0x64, read raw by FUN_00528240.
     return static_cast<FEquipSoundEmitter*>(static_cast<ISoundSource*>(Emitter))->EmitterArch;
 }
 
 unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle,
                                   unsigned char bAltStart)
 {
-    // FUN_00428680 (cdecl Arch, PlayKey, OutHandle, bAltStart). A SoundImpl or a VoiceMsg
-    // (HUD_Comm 0x004cb188 / 0x004cc01b): table calls only. No archetype: false, OutHandle
-    // untouched.
+    // FUN_00428680 (cdecl). Arch is a SoundImpl or a VoiceMsg (HUD_Comm): table calls only.
     Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(Arch);
     if (SoundArch == nullptr)
         return 0;
 
-    // 0x00428695..0x004286ff: a streamer archetype (slot 9) or key bit 2 -> Sound::
-    // StreamedSource from the 0x40 pool; key bit 1 -> Sound::Source3D from the 0x64 pool;
-    // otherwise (no key included) a plain Sound::Source, FUN_00429040(1), from the 0x30 pool.
     // Each pool is Heap::Malloc'd directly; a null block skips the constructor and retail then
     // faults on the flag byte -- there is no failure path.
     unsigned char const* const KeyFlags =
@@ -3067,9 +2919,8 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
         Source = new (Block) FSoundSource(1, BlockFlagByte(Block));
     }
 
-    // 0x00428701..0x00428732: with a key -- flag bit 1 = key bit 3, bit 0 = key bit 0, +0x1c =
-    // key +0x14, then slot 35 (+0x8c) with key +0x08 (Source3D: the world position; the other
-    // two tables: a do-nothing).
+    // With a key: flag bit 1 = key bit 3, bit 0 = key bit 0, +0x1c = key +0x14, then slot 35
+    // with key +0x08 (Source3D: the world position; the other two tables: a do-nothing).
     if (PlayKey != nullptr)
     {
         unsigned char Bits = Source->Flags;
@@ -3079,11 +2930,8 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
         memcpy(&Source->AttenuationDb, &PlayKey[5], sizeof(float));
         Source->SetPosition(&PlayKey[2]);
     }
-    // 0x00428738..0x0042873f: slot 11 (+0x2c) into +0x10.
     Source->Pitch = SoundArch->GetRandomPitch();
 
-    // 0x00428742..0x00428763: slot 22 Start(Arch, key[0] or 0), or with bAltStart slot 23
-    // AltStart(Arch) -- through the source's own table.
     int const Extra = PlayKey != nullptr ? static_cast<int>(PlayKey[0]) : 0;
     unsigned char bOk = 0;
     if (bAltStart == 0)
@@ -3091,8 +2939,7 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
     else
         bOk = Source->AltStart(SoundArch);
 
-    // 0x00428765..0x0042877c: success with an out pointer -> AddRef, *OutHandle = source; then
-    // the creation reference is released either way.
+    // The creation reference is released either way.
     if (bOk != 0 && OutHandle != nullptr)
     {
         Source->AddRef();
@@ -3104,16 +2951,14 @@ unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandl
 
 unsigned char RestartClientStreamedSound(ISoundSource* Handle, void* Arch, int Offset)
 {
-    // FUN_0042a2a0 on a Sound::StreamedSource the Gf script started (FUN_0044f610 0x0044f707).
+    // FUN_0042a2a0 on a Sound::StreamedSource the Gf script started (FUN_0044f610).
     return StreamedRestart(static_cast<FStreamedSource*>(Handle),
                            static_cast<Archetype::ISound*>(Arch), Offset);
 }
 
 unsigned char PlayClientSoundArchIfIdle(void* Arch, unsigned* PlayKey, void** OutHandle)
 {
-    // FUN_004285f0: count the nodes of DAT_00667c70, first to last, whose source +0x18 is Arch
-    // (0x00428604..0x00428611); a non-zero count answers false (0x00428618), else
-    // FUN_00428680(Arch, PlayKey, OutHandle, 0).
+    // FUN_004285f0.
     int Count = 0;
     FPlayingSourceNode* const Head = G_PlayingSources.Head;
     for (FPlayingSourceNode* Node = Head->Next; Node != Head; Node = Node->Next)
@@ -3128,9 +2973,7 @@ unsigned char PlayClientSoundArchIfIdle(void* Arch, unsigned* PlayKey, void** Ou
 
 void PlayOrRewindClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle)
 {
-    // FUN_00428640: the first node (from the front of DAT_00667c70) whose source +0x18 is Arch
-    // (0x00428651..0x0042865d) gets vt+0x64 (SetStartOffset) with 0 (0x00428676); no match ->
-    // FUN_00428680(Arch, PlayKey, OutHandle, 0).
+    // FUN_00428640.
     FPlayingSourceNode* const Head = G_PlayingSources.Head;
     for (FPlayingSourceNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
@@ -3145,9 +2988,8 @@ void PlayOrRewindClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle
 
 void StopClientSoundArch(void* Arch)
 {
-    // FUN_004285c0: walk DAT_00667c70 from the front (0x004285c0..0x004285e7). 0x004285d7
-    // loads the next node before the match test, so a source that Stop unlinks does not break
-    // the walk; a match gets vt+0x60 (0x004285dd), and the head is re-read after the call.
+    // FUN_004285c0: the next node is loaded before the match test, so a source that Stop
+    // unlinks does not break the walk; the head is re-read after the call.
     FPlayingSourceNode* Node = G_PlayingSources.Head->Next;
     while (Node != G_PlayingSources.Head)
     {
@@ -3160,9 +3002,7 @@ void StopClientSoundArch(void* Arch)
 
 int CountClientSoundArchSources(void* Arch)
 {
-    // FUN_00428000 (cdecl): walk DAT_00667c70 from its first node to the head (00428006..
-    // 00428021) and count the nodes whose source +0x18 is Arch (0042801a / 0042801c). An empty
-    // list answers 0 (0042800c).
+    // FUN_00428000 (cdecl).
     int Count = 0;
     FPlayingSourceNode* const Head = G_PlayingSources.Head;
     for (FPlayingSourceNode* Node = Head->Next; Node != Head; Node = Node->Next)
@@ -3175,8 +3015,7 @@ int CountClientSoundArchSources(void* Arch)
 
 void PauseAllClientSounds()
 {
-    // FUN_00428550 (cdecl): every node of DAT_00667c70 from the front gets slot 26 (vt+0x68,
-    // Pause); the next node is read after the call.
+    // FUN_00428550 (cdecl): the next node is read after the call.
     FPlayingSourceNode* Node = G_PlayingSources.Head->Next;
     while (Node != G_PlayingSources.Head)
     {
@@ -3187,9 +3026,7 @@ void PauseAllClientSounds()
 
 void ResumePausedClientSounds()
 {
-    // FUN_00428580 (cdecl): every node of DAT_00667c70 from the front whose source answers
-    // slot 28 (vt+0x70, IsPaused) gets slot 27 (vt+0x6c, Resume); the next node is read after
-    // the calls.
+    // FUN_00428580 (cdecl): the next node is read after the calls.
     FPlayingSourceNode* Node = G_PlayingSources.Head->Next;
     while (Node != G_PlayingSources.Head)
     {
@@ -3223,12 +3060,9 @@ unsigned char SetClientBackgroundAmbient(unsigned NicknameId, unsigned Flags, fl
 namespace
 {
     // The shared body of FUN_00428c50 / FUN_00428d00 (they differ only in the global they
-    // read). 0x00428c6a..0x00428c90: a target above 1e8 (DAT_005ca158; `TEST AH,0x41` + JNZ
-    // skips on not-greater) is replaced by the ducking down_by of the audio mode (DAT_006108d8
-    // in mode 3, else DAT_006108e4 -- FUN_00428be0's pair). 0x00428c94..0x00428ccf: a rate above
-    // 1e8 stores that mode's down_time as the remaining time (+0x38) and the target (+0x34);
-    // otherwise 0x00428cd0..0x00428cf8: slot 9 (+0x24) the current dB, target stored, the time
-    // |target - current| / Rate (FSUB, FDIV, FABS). No source, nothing.
+    // read). A target above 1e8 (DAT_005ca158) is replaced by the ducking down_by of the audio
+    // mode (DAT_006108d8 in mode 3, else DAT_006108e4 -- FUN_00428be0's pair); a rate above 1e8
+    // takes that mode's down_time as the fade time.
     void FadeBackgroundSource(FStreamedSource* Source, float TargetDb, float Rate)
     {
         if (Source == nullptr)
@@ -3268,10 +3102,9 @@ void FadeClientBackgroundAmbient(int Unused, float TargetDb, float Rate)
 
 void PushClientSoundDucking()
 {
-    // FUN_00428db0 (0x00428db0..0x00428dd5) — the first push arms the spaceflight duck:
-    // DAT_00610904 = DAT_006108e8 (ducking_spaceflight_down_time), DAT_00667ca0 =
-    // DAT_006108e4 (ducking_spaceflight_down_by), read directly -- not through FUN_00428be0,
-    // so the RTC pair is never used here whatever the audio mode. Then ++DAT_00667ca8.
+    // FUN_00428db0 — the first push arms the spaceflight duck from DAT_006108e8 / DAT_006108e4,
+    // read directly -- not through FUN_00428be0, so the RTC pair is never used here whatever
+    // the audio mode.
     if (G_DuckRefCount == 0)
     {
         G_DuckTimer = GetClientSpaceflightDuckDownTime();
@@ -3298,24 +3131,20 @@ float GetClientSoundDuckingDb()
 
 void StopAllClientSoundsExceptArch(void* KeepArch)
 {
-    // FUN_00428430 (cdecl). 0x00428430..0x00428452: the background music (DAT_00667cb0) gets
-    // vt+0x60 (Stop), then vt+8 (Release) on the reloaded global, which is then cleared.
+    // FUN_00428430 (cdecl).
     if (G_BackgroundMusic != nullptr)
     {
         G_BackgroundMusic->Stop();
         G_BackgroundMusic->Release();
         G_BackgroundMusic = nullptr;
     }
-    // 0x00428454..0x00428476: the same for the background ambience (DAT_00667cb4).
     if (G_BackgroundAmbient != nullptr)
     {
         G_BackgroundAmbient->Stop();
         G_BackgroundAmbient->Release();
         G_BackgroundAmbient = nullptr;
     }
-    // 0x00428478..0x004284a8: every live source (DAT_00667c70, from the front) whose +0x18 is
-    // not KeepArch gets vt+0x60; the next node is read before the call (0x00428496) and the
-    // head re-read after it.
+    // The next node is read before the call and the head re-read after it.
     FPlayingSourceNode* Node = G_PlayingSources.Head->Next;
     while (Node != G_PlayingSources.Head)
     {
@@ -3324,11 +3153,8 @@ void StopAllClientSoundsExceptArch(void* KeepArch)
         if (static_cast<void*>(Source->Arch) != KeepArch)
             Source->Stop();
     }
-    // 0x004284a9..0x004284ba: SoundManager slot 46 (+0xb8) with 0.
     if (DALib::Sound != nullptr)
         DALib::Sound->MixerTick(nullptr);
-    // 0x004284c0..0x004284de: the ducking state reset -- DAT_00667ca0 / ca4 / ca8 = 0 and
-    // DAT_00610904 = -1.0f.
     G_DuckTargetDb = 0.f;
     G_DuckCurrentDb = 0.f;
     G_DuckRefCount = 0;
@@ -3337,17 +3163,14 @@ void StopAllClientSoundsExceptArch(void* KeepArch)
 
 void StopAllClientSounds()
 {
-    // FUN_004284f0. 0x004284f0..0x004284fd: FUN_00428430(0).
+    // FUN_004284f0.
     StopAllClientSoundsExceptArch(nullptr);
-    // 0x004284f7..0x00428521: a non-zero live Sound::Source count (DAT_00667cbc) is reported.
     if (G_AliveSoundSourceCount != 0)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: sound reference count leaks detected: %d sounds",
               kSoundCpp, 0x4da, G_AliveSoundSourceCount);
     }
-    // 0x00428524..0x0042853e: Heap::Shrink on the three source pools, in this order:
-    // DAT_00667a44 (0x30, Sound::Source), DAT_00667a34 (0x64, Source3D), DAT_00667a24 (0x40,
-    // StreamedSource).
+    // Retail shrink order.
     G_SourceHeap.Shrink();
     G_Source3DHeap.Shrink();
     G_StreamedHeap.Shrink();
@@ -3370,11 +3193,9 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
     // FUN_00428040 (cdecl Camera, Dt). DAT_00667cb8 = 0 first.
     G_MixerRankedCount = 0;
 
-    // (1) 0x00428040..0x0042811f, the global ducking fade. A timer below zero (`TEST AH,5 /
-    // JNP`: only "less" skips) means none. Otherwise the timer drops by Dt (stored as a float,
-    // the x87 value tested): at or below zero (`TEST AH,0x41 / JP`: "greater" and NaN blend)
-    // the timer becomes -1 and the current dB the target; above it the power-ratio blend from
-    // the current to the target dB, with the remaining time re-read from the stored float.
+    // (1) The global ducking fade. A timer below zero means none (NaN runs). The timer drops by
+    // Dt (stored as a float, the x87 value tested); NaN takes the blend, whose remaining time
+    // is re-read from the stored float.
     if (!(G_DuckTimer < 0.f))
     {
         double const NewTimer = static_cast<double>(G_DuckTimer) - static_cast<double>(DeltaSeconds);
@@ -3392,12 +3213,9 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         }
     }
 
-    // (2) 0x0042811f..0x00428224, the listener. DAT_00667c5c/60/64 are a function-local
-    // static in retail (guard bit DAT_00667c68), zero until first written. With a camera its
-    // position comes from camera slot 3 (+0xc, no test of the pointer) and, with a
-    // SoundManager, the orientation from slot 4 (+0x10) goes to ISoundManager slot 14, the
-    // position to slot 15 and the velocity of FUN_0040f130's object (vt+0x48) to slot 16.
-    // With no camera the manager's own listener (slot 22) is read back.
+    // (2) The listener. DAT_00667c5c/60/64 are a function-local static in retail (guard bit
+    // DAT_00667c68), zero until first written. The velocity comes from FUN_0040f130's object,
+    // not the camera. With no camera the manager's own listener (slot 22) is read back.
     ISoundManager* const Sound = DALib::Sound;
     if (Camera != nullptr)
     {
@@ -3408,11 +3226,8 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         G_MixerListener[2] = Pos[2];
         if (Sound != nullptr)
         {
-            // 004281a2/004281af: camera slot 4 hands its 3x3 straight to ISoundManager
-            // slot 14 SetOrientationFromMatrix.
             Sound->SetOrientationFromMatrix(const_cast<float*>(Cam->GetOrientation()));
             Sound->SetListenerPosition(reinterpret_cast<FVector*>(G_MixerListener));
-            // 004281c5..004281ee: FUN_0040f130 → ICamera::GetVelocity (+0x48) → SM slot 16.
             void* const VelSrc = G_SoundListenerObject;
             if (VelSrc != nullptr)
             {
@@ -3427,9 +3242,8 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         Sound->GetListenerPosition(reinterpret_cast<FVector*>(G_MixerListener));
     }
 
-    // (3) 0x00428224..0x0042825e, the voice budget: 0x80, and when GetGameOption(0x2d)
-    // ("[AUDIO]") is set `max_submitted_sounds` (FUN_005b3860): at or above 0x80 (unsigned
-    // JNC) 0x80, below 8 (signed JGE) 8, otherwise itself.
+    // (3) The voice budget: 0x80, or `max_submitted_sounds` (FUN_005b3860) when [AUDIO] is
+    // set -- the upper bound compared unsigned, the lower signed.
     unsigned MaxVoices = kMixerMaxEntries;
     if (GetGameOption(kGameOptAudioGroup) != 0)
     {
@@ -3442,13 +3256,9 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
             MaxVoices = Submitted;
     }
 
-    // (4) 0x0042825e..0x004282e6, the audible sources: DAT_00667c70 walked from the LAST node
-    // back to the first (prev links; the loop ends after the node that is head->next). A
-    // source that slot 28 says is paused, or that slot 42 (Update: score and the finished
-    // test) drops, or that SoundManager does not play (flag 4 clear), is skipped. A score
-    // equal to DAT_00667c58 (`TEST AH,0x44 / JNP`: only "equal"; a NaN is ranked) or a full
-    // table (0x80) takes slot 3 (start latch) unless flag 8 is set; any other source goes into
-    // DAT_00667a58.
+    // (4) The audible sources: DAT_00667c70 walked from the LAST node back to the first. A
+    // score equal to DAT_00667c58 (a NaN is ranked) or a full table takes the start latch
+    // instead of a place in DAT_00667a58.
     FPlayingSourceNode* Walk = G_PlayingSources.Head;
     if (Walk->Next != Walk)
     {
@@ -3475,10 +3285,8 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         } while (Walk != G_PlayingSources.Head->Next);
     }
 
-    // (5) 0x004282ec..0x004283d1, with a SoundManager: VC6 std::sort by score, the count cut
-    // to the voice budget (unsigned JBE), slot 3 for every ranked source without flag 8 (the
-    // count re-read after each call), then ISoundManager slot 38 (+0x98) with the table and
-    // slot 46 (+0xb8) with 0.
+    // (5) With a SoundManager: VC6 std::sort by score, the count cut to the voice budget, the
+    // start latch for every ranked source, then the table to ISoundManager slot 38.
     if (DALib::Sound != nullptr)
     {
         MixerSortRanked(G_MixerRanked, G_MixerRanked + G_MixerRankedCount);
@@ -3495,9 +3303,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
         DALib::Sound->MixerTick(nullptr);
     }
 
-    // (6) 0x004283dc..0x0042840c, the retirement: DAT_00667c70 from the front, the next node
-    // read before the calls; a source slot 28 says is not paused and slot 29 says is finished
-    // gets slot 24 (Stop).
+    // (6) The retirement: finished, unpaused sources are stopped.
     FPlayingSourceNode* Node = G_PlayingSources.Head->Next;
     while (Node != G_PlayingSources.Head)
     {
@@ -3512,61 +3318,52 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
 {
     // FUN_0042b5e0 (cdecl). One function for both archetype kinds: the SoundImpl (FUN_0042b840)
     // and the VoiceMsg (FUN_00431220) differ only in what their slots 1/10/13 return.
-    // 0042b601..0042b616: EBX = -1; no ISoundManager or no Data -> -1.
     if (DALib::Sound == nullptr || DALib::Data == nullptr)
         return -1;
 
-    // 0042b61e..0042b629: slot 1 (+4) GetFileName.
     char const* const RelPath = Arch->GetFileName();
 
-    // 0042b62b..0042b6af: the wav is opened as its own IFileSystem ("FileSystem", UTF inside
-    // ParentFs or DOS through DALib::Data) and that component, not a path, goes to
-    // ISoundManager slot 33 (0042b724: MOV EDX,[ESP+0x54]). This is what lets a VoiceMsg read
-    // its wav out of the profile .utf.
+    // The wav is opened as its own IFileSystem ("FileSystem", UTF inside ParentFs or DOS
+    // through DALib::Data) and that component, not a path, goes to ISoundManager slot 33. This
+    // is what lets a VoiceMsg read its wav out of the profile .utf.
     void* ChildFs = nullptr;
     int SmId = -1;
     if (OpenWavFileSystem(RelPath, ParentFs, &ChildFs) != 0)
     {
-        // 0042b788..0042b7a8: "not found", then JMP into the "failed to create" dump below.
+        // Falls through to the "failed to create" dump below too.
         FDUMP(0x100002, "%s(%d) : *** WARNING: Sound filename \"%s\" not found.\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x227, RelPath);
     }
     else
     {
-        // 0042b6b5..0042b6d0: FUN_005b3510(4) (USE_3D_SOUNDS) FCOMP DAT_005c75dc (1.0f);
-        // TEST AH,5 + JP: C0 alone (value below 1.0) falls through to BL = 1.
+        // FUN_005b3510(4) (USE_3D_SOUNDS) against DAT_005c75dc (1.0f).
         bool const bNo3dSounds = GetPerfOptionSlot(4) < 1.f;
-        // 0042b6d2..0042b6e6: slot 10 (+0x28) Is2d is called first; it or BL -> 0x11, else 9.
+        // Is2d is called even when 3D sounds are off.
         unsigned char const bIs2d = Arch->Is2d();
         unsigned Flags = (bIs2d != 0 || bNo3dSounds) ? 0x11u : 9u;
-        // 0042b6eb..0042b70d: FUN_005792b0(0x2d) [AUDIO], then (0x34) PITCH_BEND_SOUNDS.
         bool const bPitchBendOn = GetGameOption(kGameOptAudioGroup) != 0 &&
                                   GetGameOption(kGameOptPitchBendSounds) != 0;
-        // 0042b70d..0042b71c: slot 13 (+0x34) IsPitchBendable, always called; with BL -> |2.
+        // IsPitchBendable is always called.
         unsigned char const bBendable = Arch->IsPitchBendable();
         if (bBendable != 0 && bPitchBendOn)
             Flags |= 2u;
-        // 0042b71f..0042b735: ISoundManager slot 33 (+0x84).
         SmId = DALib::Sound->CreateArchetypeFromWav(static_cast<IDAComponent*>(ChildFs), Flags);
     }
 
     if (SmId == -1)
     {
-        // 0042b73c..0042b75a.
         FDUMP(0x100002,
               "%s(%d) : *** WARNING: Failed to create archetype for sound filename \"%s\"\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x22b, RelPath);
     }
 
-    // 0042b75d..0042b772: release the created component when there is one.
     ReleaseComponent(ChildFs);
     return SmId;
 }
 
 void DestroyClientSoundWav(int SmArchId)
 {
-    // FUN_00431260's tail (0x00431282..0x0043128d): ISoundManager slot 34 (+0x88). The caller
-    // has already tested SmArchId against -1.
+    // FUN_00431260's tail. The caller has already tested SmArchId against -1.
     DALib::Sound->DestroyArchetype(SmArchId);
 }
 
@@ -3575,11 +3372,10 @@ void DestroyClientSoundWav(int SmArchId)
 // at -96 dB (the threshold 0.0012886 is exactly 2^-9.6).
 static float LinearToOptionDb(float Linear)
 {
-    // FCOMP DAT_005ca168 (0x3aa8e63e) + TEST AH,0x41 + JNZ: the jump (keep -96) is taken for
-    // less, equal and unordered; only "greater" falls through to the log.
+    // Unordered takes -96 too.
     if (!(Linear > 0.0012886f)) // DAT_005ca168
         return -96.f;           // DAT_005ca16c
-    // FLDLN2 / FYL2X / FMUL DAT_005ca160 (= 10 / ln 2).
+    // DAT_005ca160 = 10 / ln 2.
     return static_cast<float>(log(static_cast<double>(Linear)) * 14.426950454711914);
 }
 
@@ -3645,7 +3441,7 @@ unsigned GetClientSoundArchId(void* Arch)
 
 // FUN_0042ac30 — the `sound_level_of_detail` option callback (LAB_005b4bd0): store the new
 // level (DAT_00667ce4), then re-resolve the lod link (FUN_0042bf90) of every registered
-// archetype in id order (the in-order walk of DAT_00667cc0, 0x0042ac42..0x0042ac9f).
+// archetype in id order.
 void SetClientSoundLod(int Lod)
 {
     if (Lod == G_SoundLod)
@@ -3687,22 +3483,18 @@ void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, float const* Tr
 
 void SetClientSoundSourceType(void* SourcePtr, int Type)
 {
-    // A plain store into the source's +0x04 (`MOV dword ptr [EAX+4],2` at 0x004cb0f6 /
-    // 0x004cb1f4 in HUD_Comm's FUN_004cae10). No null test: the callers only reach it after a
-    // successful FUN_00428680, which returned the source.
+    // A plain store into the source's +0x04 (HUD_Comm's FUN_004cae10). No null test: the
+    // callers only reach it after a successful FUN_00428680.
     static_cast<FSoundSource*>(SourcePtr)->Type = Type;
 }
 
 bool ClientSoundFadeDb(float FromDb, float ToDb, float Dt, float* Remaining, float* OutDb)
 {
     // FUN_00427940 (cdecl).
-    // 0x00427944..0x00427955: `FCOMP 0.0; TEST AH,5; JP` -- a remaining time below zero means
-    // no fade is running.
     if (*Remaining < 0.0f)
         return false;
 
-    // 0x00427956..0x0042797f: Remaining -= Dt (stored as a float, the x87 value kept); not above
-    // zero -> the fade ends on its target and Remaining becomes -1.
+    // Stored as a float, the x87 value kept for the test.
     double const NewRemaining = static_cast<double>(*Remaining) - static_cast<double>(Dt);
     *Remaining = static_cast<float>(NewRemaining);
     if (!(NewRemaining > 0.0))
@@ -3712,22 +3504,19 @@ bool ClientSoundFadeDb(float FromDb, float ToDb, float Dt, float* Remaining, flo
         return true;
     }
 
-    // 0x00427980..0x004279ce: both ends to power ratios through exp(dB * [0x005c9cf4]), the
-    // ratio moved Dt / (NewRemaining + Dt) of the way.
     double const K = static_cast<double>(0.230258509516716f); // DAT_005c9cf4 (float)
     double const From = exp(static_cast<double>(FromDb) * K);
     double const To = exp(static_cast<double>(ToDb) * K);
     double const Linear =
         From + (To - From) * (static_cast<double>(Dt) / (NewRemaining + static_cast<double>(Dt)));
 
-    // 0x004279d0..0x004279eb: `TEST AH,0x41; JP` -- at or below DAT_005c9cf0 (float
-    // 2.5118899e-10) the result is -96 dB (0xc2c00000).
+    // DAT_005c9cf0 (float 10^-9.6); NaN takes -96 too.
     if (!(Linear > static_cast<double>(2.5118898627773945e-10f)))
     {
         *OutDb = -96.0f;
         return true;
     }
-    // 0x004279ec..0x00427a00: FLDLG2 / FYL2X = log10, times DAT_005c9ce8 (double 10.0).
+    // DAT_005c9ce8 (double 10.0).
     *OutDb = static_cast<float>(log10(Linear) * 10.0);
     return true;
 }

@@ -29,7 +29,7 @@
 
 namespace
 {
-    // DAT_00611c84 -- the filter title per mode (FUN_004a0220 0x004a054e).
+    // DAT_00611c84 -- the filter title per mode (FUN_004a0220).
     unsigned const kNavMapFilterTitleIds[8] = {0x53a, 0x53b, 0x53c, 0x53d,
                                                0x550, 0x551, 0x1,   0x3c8};
 }
@@ -44,7 +44,7 @@ void NeuroNetNavMap::BuildJumpLinks()
     if (ViewMode != 0)
         return;
 
-    // 004975b4..004975c9: FUN_004a2f80 erases every node; the records are NOT freed (retail
+    // FUN_004a2f80 erases every node; the records are NOT freed (retail
     // leaks them here -- only the destructor frees what is left).
     JumpLinks.clear();
 
@@ -58,16 +58,16 @@ void NeuroNetNavMap::BuildJumpLinks()
         int const ConnectionCount = System->GetConnectionCount();
         for (int Index = 0; Index < ConnectionCount; ++Index)
         {
-            // 00497622..0049765f: the connection, its object's visit flags OR'd with its own.
+            // The connection, its object's visit flags OR'd with its own.
             Universe::FSystemConnection Connection;
             System->GetConnection(static_cast<unsigned>(Index), &Connection);
             unsigned char VisitFlags = 0;
-            GetPlayerVisitFlagsRetail(Connection.ObjectId, &VisitFlags, 0, 0); // FUN_004c4da0 0x0049764d
+            GetPlayerVisitFlagsRetail(Connection.ObjectId, &VisitFlags, 0, 0); // FUN_004c4da0
             unsigned char const Flags = static_cast<unsigned char>(VisitFlags | Connection.Visit);
             if ((Flags & 1) == 0)
                 continue;
 
-            // 00497665..004976a3: every shown system item the connection leads to.
+            // Every shown system item the connection leads to.
             for (std::list<FNavMapItem*>::iterator ToIt = Items.begin(); ToIt != Items.end();
                  ++ToIt)
             {
@@ -84,7 +84,7 @@ void NeuroNetNavMap::BuildJumpLinks()
 void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
 {
     // FUN_004976e0.
-    // 004976eb..00497725: the same pair is ignored; the reverse pair becomes two-way.
+    // The same pair is ignored; the reverse pair becomes two-way.
     for (std::list<FNavMapJumpLink*>::iterator It = JumpLinks.begin(); It != JumpLinks.end();
          ++It)
     {
@@ -98,7 +98,6 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
         }
     }
 
-    // 00497727..00497749
     FNavMapJumpLink* const Link = static_cast<FNavMapJumpLink*>(operator new(0x10));
     Link->From = From;
     Link->To = To;
@@ -106,7 +105,7 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
     Link->bBothWays = 0;
     Link->Kind = 0;
 
-    // 00497750..00497815: both ends on the best path (a best-path waypoint's system, or the
+    // Both ends on the best path (a best-path waypoint's system, or the
     // player's own system) -> kind 2.
     bool bFromOnPath = GetPlayerStarSystemIdRetail() == From->System->GetId();
     if (!bFromOnPath)
@@ -144,7 +143,7 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
         }
     }
 
-    // 004977d8..004978b7: otherwise both ends on the player's waypoint route (a waypoint in
+    // Otherwise both ends on the player's waypoint route (a waypoint in
     // the system, or the player's own system) -> kind 1.
     if (!bKindSet)
     {
@@ -183,7 +182,6 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
         }
     }
 
-    // 00497869..0049789c: push_back.
     JumpLinks.push_back(Link);
 }
 
@@ -197,7 +195,7 @@ Universe::ISystem const* NeuroNetNavMap::BestPathWaypointSystem(int Index)
         unsigned short const Tag = Token->TypeTag;
         if (Tag == 0x42)
         {
-            // 0049a965..0049a9e2: 'B' -- the system one of whose objects docks with the base.
+            // 'B' -- the system one of whose objects docks with the base.
             unsigned const BaseId = Token->Value;
             for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
                  System = Universe::GetNextSystem())
@@ -213,12 +211,12 @@ Universe::ISystem const* NeuroNetNavMap::BestPathWaypointSystem(int Index)
         }
         else if (Tag == 0x4e)
         {
-            // 0049aa05: 'N' -- the data block's first dword.
+            // 'N' -- the data block's first dword.
             return Universe::get_system(Token->Marker->Data[0]);
         }
         else if (Tag == 0x53)
         {
-            // 0049a94b: 'S' -- the id itself.
+            // 'S' -- the id itself.
             return Universe::get_system(Token->Value);
         }
         Token = Token->Next;
@@ -236,7 +234,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
     FBestPath* const Path = G_BestPaths.empty() ? nullptr : &G_BestPaths.begin()->second;
     if (Path == nullptr)
     {
-        // 0049a5ab..0049a701: no route -- no abort button, a blank title and text.
+        // No route -- no abort button, a blank title and text.
         AbortMissionButton->SetProperty(1, 1, 0);
         AbortMissionText->SetProperty(1, 1, 0);
         wcscpy(G_NnTextScratchB, L" ");
@@ -256,13 +254,12 @@ void NeuroNetNavMap::RefreshMissionInfo()
         return;
     }
 
-    // 0049a706..0049a742: the route's title and text (node +0x20 / +0x38).
+    // The route's title and text (node +0x20 / +0x38).
     FmtStrSprintf(&Path->Title, G_NnTextScratchB, G_NnTextScratchCapacity);
     InfoTitle->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     FmtStrSprintf(&Path->Text, G_NnTextScratchB, G_NnTextScratchCapacity);
     InfoText->Flags = static_cast<unsigned char>(InfoText->Flags | 2);
 
-    // 0049a75a..0049a853
     {
         RenderDisplayList Text;
         {
@@ -276,7 +273,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
         InfoText->SetScrollOrigin(0, 0);
     }
 
-    // 0049a858..0049a895: the abort button is hidden for routes of kind 7 and 8.
+    // The abort button is hidden for routes of kind 7 and 8.
     unsigned char bHideAbort = 1;
     FBestPath const* const First = BestPathGetFirst(); // FUN_004c5040
     if (First != nullptr && First->MissionType != 7 && First->MissionType != 8)
@@ -308,7 +305,7 @@ void NeuroNetNavMap::RefreshObjectives()
 
     if (bBestPathObjectives == 0)
     {
-        // 0049f7c5..0049f822: the player's waypoints -- the scroll range, and the first row
+        // The player's waypoints -- the scroll range, and the first row
         // back to 0 when it ran past the end.
         int const Count = GetPlayerWaypointCountRetail();
         int FirstScroll = Count - 3;
@@ -322,7 +319,7 @@ void NeuroNetNavMap::RefreshObjectives()
         if (ObjectiveFirstRow >= Count)
             ObjectiveFirstRow = 0;
 
-        // 0049f822..0049f9af: up to three rows from ObjectiveFirstRow.
+        // Up to three rows from ObjectiveFirstRow.
         for (int Index = ObjectiveFirstRow; Index < Count; ++Index)
         {
             G_NnTextScratchB[0] = L'\0';
@@ -352,7 +349,7 @@ void NeuroNetNavMap::RefreshObjectives()
                 wcscat(G_NnTextScratchB, Sector);
             }
 
-            // 0049f94c..0049f991: the row's text in the idle colour, both shown.
+            // The row's text in the idle colour, both shown.
             ObjectiveText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB),
                                             0);
             ObjectiveText[Row]->SetProperty(0x33,
@@ -365,7 +362,7 @@ void NeuroNetNavMap::RefreshObjectives()
                 return;
         }
 
-        // 0049f9b9..0049f9ec: the rows left, hidden.
+        // The rows left, hidden.
         for (; Row < 3; ++Row)
         {
             ObjectiveText[Row]->SetProperty(1, 1, 0);
@@ -374,7 +371,7 @@ void NeuroNetNavMap::RefreshObjectives()
         return;
     }
 
-    // 0049f9f9..0049fb49: the best path. The loop runs over five times the waypoint count
+    // The best path. The loop runs over five times the waypoint count
     // (retail's bound; the records past the end are null and skipped). Kind 9 is not listed
     // and not counted; the rows before ObjectiveFirstRow only advance the stop number.
     int const Total = BestPathGetWaypointCount() * 5;
@@ -397,7 +394,6 @@ void NeuroNetNavMap::RefreshObjectives()
         if (Kind == 9 || Row >= 3)
             continue;
 
-        // 0049fa7b..0049fb34
         if (Kind == 0xa)
         {
             GetIdsStringWWithRawFallback(0x4df, G_NnTextScratchA, G_NnTextScratchCapacity);
@@ -416,14 +412,13 @@ void NeuroNetNavMap::RefreshObjectives()
         ++Row;
     }
 
-    // 0049fb4f..0049fb87
     for (; Row < 3; ++Row)
     {
         ObjectiveText[Row]->SetProperty(1, 1, 0);
         MissionObjective[Row]->SetProperty(1, 1, 0);
     }
 
-    // 0049fb89..0049fbda: the scroll range over the listed records.
+    // The scroll range over the listed records.
     int FirstScroll = Listed - 3;
     if (FirstScroll < 0)
         FirstScroll = 0;
@@ -439,7 +434,7 @@ void NeuroNetNavMap::RefreshObjectives()
 void NeuroNetNavMap::SetFilterMode(int Mode)
 {
     // FUN_004a0220.
-    // 004a0229..004a0285: the known-base rows (and their titles) take property 0x24 = mode 7.
+    // The known-base rows (and their titles) take property 0x24 = mode 7.
     uintptr_t const bBaseList = Mode == 7 ? 1 : 0;
     for (int Index = 0; Index < 15; ++Index)
     {
@@ -449,7 +444,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     BaseTitleText->SetProperty(0x24, bBaseList, 0);
     SystemTitleText->SetProperty(0x24, bBaseList, 0);
 
-    // 004a028b..004a037b: leaving an info-card mode (6 / 7) closes the card and brings back
+    // Leaving an info-card mode (6 / 7) closes the card and brings back
     // what it covered.
     if (G_NavMapFilterMode == 6 || G_NavMapFilterMode == 7)
     {
@@ -475,7 +470,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
         }
     }
 
-    // 004a037e..004a0461: the new mode and the toggles' pressed state.
+    // The new mode and the toggles' pressed state.
     G_NavMapFilterMode = Mode;
     PhysicalFilter->SetProperty(0xc, G_NavMapFilterMode == 0 ? 1 : 0, 0);
     PoliticalFilter->SetProperty(0xc, G_NavMapFilterMode == 1 ? 1 : 0, 0);
@@ -485,7 +480,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     BaseListFilter->SetProperty(0xc, G_NavMapFilterMode == 7 ? 1 : 0, 0);
     MineableFilter->SetProperty(0xc, G_NavMapFilterMode == 5 ? 1 : 0, 0);
 
-    // 004a0467..004a04ea: the zone filters only in the political / patrol modes.
+    // The zone filters only in the political / patrol modes.
     if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
     {
         AllFilter->SetProperty(1, 0, 0);
@@ -499,7 +494,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
         FriendlyFilter->SetProperty(1, 1, 0);
     }
 
-    // 004a04f0..004a0545: mode 6 (the info card) hides the filter row.
+    // Mode 6 (the info card) hides the filter row.
     if (G_NavMapFilterMode == 6)
     {
         PhysicalFilter->Flags = static_cast<unsigned char>(PhysicalFilter->Flags & 0xfc);
@@ -512,7 +507,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
         LabelButton->Flags = static_cast<unsigned char>(LabelButton->Flags & 0xfc);
     }
 
-    // 004a0549..004a0564: the title (the mode indexes DAT_00611c84 unchecked, as in retail).
+    // The title (the mode indexes DAT_00611c84 unchecked, as in retail).
     FilterTitle->SetProperty(0x1e, kNavMapFilterTitleIds[G_NavMapFilterMode], 0);
 }
 
@@ -521,10 +516,9 @@ void NeuroNetNavMap::RefreshMissionZones()
     // FUN_004a0580.
     ShadeRecheckTimer = 1.0f; // DAT_005d2ed0
 
-    // 004a0593..004a05bf: the vector emptied (a self-copy of [last, last) then last = first).
     MissionZoneIds.clear();
 
-    // 004a05c2..004a0609: every 'Z' token of every best-path waypoint, appended. The record is
+    // Every 'Z' token of every best-path waypoint, appended. The record is
     // dereferenced without a null test (the index stays below the count).
     int const Count = BestPathGetWaypointCount();
     for (int Index = 0; Index < Count; ++Index)
@@ -537,7 +531,7 @@ void NeuroNetNavMap::RefreshMissionZones()
         }
     }
 
-    // 004a060f..004a0664: in the system view (and with no transition running) the mission
+    // In the system view (and with no transition running) the mission
     // filter shows only with zones; the mission mode falls back to physical without them.
     if (ViewMode != 0 && bTransition == 0)
     {

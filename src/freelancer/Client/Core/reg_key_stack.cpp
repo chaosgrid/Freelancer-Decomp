@@ -68,7 +68,7 @@ HKEY FRegKeyStack::Open(char const* SubKey, REGSAM Access)
     return Key;
 }
 
-// Inline in FUN_0056daa0 (0x0056dac3..0x0056db88) and FUN_00567350.
+// Inline in FUN_0056daa0 and FUN_00567350.
 HKEY FRegKeyStack::Create(char const* SubKey, REGSAM Access)
 {
     if (Depth <= 0 || Keys[Depth - 1] == nullptr || Depth >= 32)

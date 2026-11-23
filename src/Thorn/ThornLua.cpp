@@ -355,7 +355,7 @@ namespace
                     const lua_Object Field4 = GetIndexOrNil(Row, 4.0);
                     float F3;
                     StoreLuaNumberFloat(Field4, &F3);
-                    // Raw2a438/2a445 both test EDI (field1), including
+                    // Both retail tests (06f2a438 / 06f2a445) are on field1, including
                     // the repeated call; field2 has no nil predicate.
                     if (lua_isnil(Field1) == 0 && lua_isnil(Field1) == 0)
                     {
@@ -731,7 +731,7 @@ namespace
             }
             else
                 std::memset(Coordinates, 0, sizeof(Coordinates));
-            // All numeric callbacks/FSTPfloat stores precede ANY RGB output.
+            // All numeric callbacks and float stores precede ANY RGB output.
             // The exact retained-Z ftol core is shared with SCENE ambient.
             StoreSceneAmbientIntegers(Coordinates, Target->Color);
             LoadedMask |= 0x4;
@@ -836,7 +836,7 @@ namespace
         return true;
     }
 
-    // ForeachEntity29d5d..2a010 publishes one column after its own callbacks.
+    // ForeachEntity (06f29d5d) publishes one column after its own callbacks.
     // Row1 probes use unsigned->double after pushobject; Row2/3 instead store
     // an unsigned->float index before 27c10's repeated table predicate.
     void ReadEntityOrientationColumn(lua_Object Table, int Column, float* Orientation)
@@ -867,7 +867,7 @@ namespace
             std::memcpy(&Orientation[Index * 3 + Column], &Coordinates[Index], sizeof(float));
     }
 
-    // Actual entity-only SPATIAL block29c3d..2a010 runs after all typed tails.
+    // The entity-only SPATIAL block (06f29c3d) runs after all typed tails.
     // Nonnil malformed vectors become zero; an absent orientation column is
     // left unchanged, while a present incomplete column is individually zeroed.
     void LoadEntitySpatialDesc(lua_Object Table, FThornEntitySnap* Descriptor)
@@ -894,7 +894,7 @@ namespace
         }
     }
 
-    // The inline vectors in SPATIAL event case269da use complete double
+    // The inline vectors in the SPATIAL event case (06f269da) use complete double
     // probes, then independent 27c10 numeric reads staged as float locals.
     void ReadSpatialEventVector(lua_Object Table, void* Output, unsigned int Count)
     {
@@ -1116,9 +1116,8 @@ namespace
             const int* Colors = Props->Color;
             float* Diffuse = Props->Diffuse;
             unsigned int ColorBits[4];
-            // Actual C++ Debug/Release publishes R/G before FILD blue and
-            // B/alpha before mask800. Retail24b80..95 instead publishes R/G
-            // after FILD blue, then mask800 before its waiting FSTP32.
+            // Plain C++ publishes R/G before loading blue and B/alpha before mask 0x800. Retail
+            // (06f24b80) publishes R/G after loading blue, then the mask before the last store.
             __asm
             {
                 mov ecx, Colors
@@ -1154,17 +1153,15 @@ namespace
             Props->Type = (Props->Infinite == 0) ? 2 : 3;
             *Mask = (InfiniteMask & ~kThornLightBitInfinite) | kThornLightBitType;
         }
-        // FCOMP +0.0, TEST AH,05, JP skips greater/equal/unordered.
-        // Only ordered less (C0=1,C2=0, odd parity) falls through here.
+        // Only an ordered cutoff < 0 takes this branch; greater, equal and unordered skip it.
         const int CutoffMask = *Mask;
         if ((CutoffMask & kThornLightBitCutoff) != 0)
         {
             const unsigned int ZeroBits = 0;
             const float* Cutoff = &Props->Cutoff;
             unsigned char bOrderedNegative;
-            // Actual optimized C++ compares zero to cutoff and executes a
-            // waiting FSTP on the unordered return path. Retail24be4..c10
-            // has no waiting instruction after FNSTSW/TEST AH,05/JP.
+            // Optimized C++ compares zero to cutoff and executes a waiting FSTP on the unordered
+            // path; retail (06f24be4) has no waiting instruction after the compare.
             __asm
             {
                 mov ecx, Cutoff
@@ -1291,7 +1288,7 @@ namespace
         return 0;
     }
 
-    // ForeachEntity AUDIO case28ede..29270. This object is parse-owned;
+    // ForeachEntity AUDIO case (06f28ede). This object is parse-owned;
     // Audio is staging storage, not the eventual entity's runtime cache.
     FThornEntitySnap* LoadAudioEntityDesc(lua_Object Table, char*& TemplateName)
     {
@@ -1460,7 +1457,7 @@ namespace
             return;
         }
         const lua_Object TypeObject = GetFieldOrNil(Table, "type");
-        // 28aee jumps directly to2a0f8, deliberately bypassing endblock.
+        // Retail (06f28aee) jumps straight to 06f2a0f8, bypassing endblock.
         if (lua_isnil(TypeObject) != 0)
             return;
         const unsigned int Identity[9] = {
@@ -1609,7 +1606,7 @@ namespace
         lua_endblock();
     }
 
-    // Shared common stack descriptor256d4..258bf, before typed allocation/ID.
+    // The shared common stack descriptor (06f256d4), before typed allocation/ID.
     lua_Object ParseEventCommon(lua_Object Table, FThornEventDesc& Common)
     {
         const lua_Object Props = GetIndexOrNil(Table, 4.0);
@@ -1636,7 +1633,7 @@ namespace
         return Props;
     }
 
-    // USER case25f0a constructs an unpublished typed temporary after common parsing.
+    // USER case (06f25f0a) constructs an unpublished typed temporary after common parsing.
     void ParseUserEvent(lua_Object Props, FThornEventDesc& Common)
     {
         FThornEvent* Temporary = new FThornEvent(kThornTypeUserEvent,
@@ -1653,12 +1650,12 @@ namespace
                 // 25fc8 changes only the temporary packet after the published copy.
                 Temporary->UserEventDesc.Common.UniqueId = ResultId;
                 const char* String = lua_getstring(StringObject);
-                // Retail leaves this context null; retain the canonical callback
-                // for modern providers (see ForeachEvent in decomp-tracker).
+                // Retail leaves this context null, so the call never happens there; the port
+                // keeps it for modern context providers.
                 G_LoadComContext->SetUserEventString(Descriptor, String);
             }
         }
-        // 27b54 normal temporary delete, then27b60..6b common curve Release.
+        // Normal temporary delete, then the common curve Release.
         // Retail drops unwind state after construction; do not add cleanup for
         // a later Lua/COM exception or an invented context-null fallback event.
         FThornEvent::DestroyNative(Temporary);
@@ -1666,7 +1663,7 @@ namespace
             static_cast<IParamCurve*>(Common.ParamCurve)->Release();
     }
 
-    // Case14: real temporary owner273ff..274d8, shared registration27b35..27b6b.
+    // Case 14: a real temporary owner (06f273ff), then the shared registration (06f27b35).
     void ParsePsysPropEvent(lua_Object Props, FThornEventDesc& Common)
     {
         FThornEvent* Temporary = new FThornEvent(kThornTypePsysPropAnim, &Common);
@@ -1694,7 +1691,7 @@ namespace
         // unwind cleanup for later Lua/factory exceptions.
     }
 
-    // Ordinary terminal27b35..27b6b, shared by independently traced AUDIO/FOG.
+    // The ordinary terminal (06f27b35), shared with AUDIO/FOG.
     void RegisterParsedEvent(FThornEvent* Temporary, void* Descriptor,
                              FThornEventDesc& Common)
     {
@@ -1797,7 +1794,7 @@ namespace
         RegisterParsedEvent(Temporary, Descriptor, Common);
     }
 
-    // SET_CAMERA272df..2730c has no own property lookups after common parsing.
+    // SET_CAMERA (06f272df) has no own property lookups after common parsing.
     void ParseSetCameraEvent(lua_Object Props, FThornEventDesc& Common)
     {
         FThornEvent* Temporary = new FThornEvent(kThornTypeSetCamera, &Common);
@@ -1805,7 +1802,7 @@ namespace
         RegisterParsedEvent(Temporary, Descriptor, Common);
     }
 
-    // Actual CAMERA case2688b..269a3 owns only these four property probes.
+    // The CAMERA case (06f2688b) owns only these four property probes.
     void ParseCameraPropEvent(lua_Object Props, FThornEventDesc& Common)
     {
         FThornEvent* Temporary = new FThornEvent(kThornTypeCameraPropAnim, &Common);
@@ -1828,7 +1825,7 @@ namespace
         RegisterParsedEvent(Temporary, Descriptor, Common);
     }
 
-    // FLOOR case27942..27b27, then the ordinary terminal27b2a..27b6b.
+    // FLOOR case (06f27942), then the ordinary terminal (06f27b2a).
     void ParseFloorHeightEvent(lua_Object Props, FThornEventDesc& Common)
     {
         FThornEvent* Temporary = new FThornEvent(kThornTypeFloorHeightAnim, &Common);

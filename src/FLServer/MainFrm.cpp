@@ -16,8 +16,6 @@
 #include <sys/timeb.h>
 #include <string.h>
 
-// CMainFrame TU, retail .text:00411ea0..00412a80.
-
 namespace
 {
 	// .data:00425978 — the status bar panes: the stretching message pane and the uptime pane

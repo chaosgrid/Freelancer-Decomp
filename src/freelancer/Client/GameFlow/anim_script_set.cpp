@@ -59,11 +59,10 @@ void FAnimScriptSet::Reset()
 
 void FAnimScriptSet::Destroy()
 {
-    // FUN_00555a90. 0x00555a9b..0x00555ab7: malloc_strfree every name.
+    // FUN_00555a90.
     int Index = 0;
     for (Index = 0; Index < Count; ++Index)
         malloc_strfree(&Names[Index]);
-    // 0x00555aba..0x00555add: both arrays.
     if (Names != nullptr)
     {
         operator delete(Names);
@@ -74,14 +73,12 @@ void FAnimScriptSet::Destroy()
         operator delete(Durations);
         Durations = nullptr;
     }
-    // 0x00555ae0..0x00555afb: Count = 0, then Anim +0x10 (CloseScript) when there is a script.
     Count = 0;
     if (Script != 0xffffffffu)
     {
         DALib::Anim->CloseScript(reinterpret_cast<void*>(Script));
         Script = 0xffffffffu;
     }
-    // 0x00555afe..0x00555b0d.
     Script = 0xffffffffu;
     LoadScript = 0xffffffffu;
     Count = 0;
@@ -104,24 +101,23 @@ int FAnimScriptSet::Find(char const* Name) const
 
 int FAnimScriptSet::Load(unsigned long NewScript)
 {
-    // FUN_00555bf0. 0x00555bfa..0x00555bfd: both handles take the argument.
+    // FUN_00555bf0.
     Script = NewScript;
     LoadScript = NewScript;
     if (NewScript != 0xffffffffu)
     {
-        // 0x00555c03..0x00555c1a: count the names.
+        // Count the names.
         Count = 0;
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&CountScriptName),
                                      reinterpret_cast<void*>(NewScript), this);
-        // 0x00555c1d..0x00555c39: one pointer and one float per name.
+        // One pointer and one float per name.
         Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * 4));
         Durations = static_cast<float*>(operator new(static_cast<size_t>(Count) * 4));
         FillCursor = 0;
-        // 0x00555c40..0x00555c58: fill them.
+        // Fill them.
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&FillScriptName),
                                      reinterpret_cast<void*>(LoadScript), this);
     }
-    // 0x00555c5b..0x00555c64.
     int Result = Count;
     LoadScript = 0xffffffffu;
     FillCursor = 0;

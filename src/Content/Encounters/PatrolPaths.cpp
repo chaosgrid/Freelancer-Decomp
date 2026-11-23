@@ -5,9 +5,8 @@
 // Author: Giperion.
 
 // Content.dll: zone paths (PatrolPaths.h), the COMDAT run 06f37110-06f38e00 at the head of
-// TU45. The STL instantiations of the run (06f38120..06f38cf0: find / destroy / insert of
-// the 0x14 object vector, the map ctor / insert / erase, Vector vector insert) are the std
-// containers used here. Lane CNT-POP.
+// TU45. The STL instantiations of the run (06f38120..06f38cf0) are the std containers used
+// here.
 
 #include "Encounters/PatrolPaths.h"
 
@@ -27,9 +26,9 @@ namespace
         return Result;
     }
 
-    // FUN_06f37d00 (cdecl): Out = V * (1.0f / Divisor). FST float stores the rounded
-    // reciprocal but keeps the unrounded one on the x87 stack: z is scaled by the unrounded
-    // value, y and x by the reloaded float.
+    // FUN_06f37d00 (cdecl): Out = V * (1.0f / Divisor). Retail stores the rounded reciprocal
+    // but keeps the unrounded one on the x87 stack: z is scaled by the unrounded value, y and
+    // x by the reloaded float.
     Vector DivideVector(Vector const& V, float Divisor)
     {
         double const ExactReciprocal = 1.0 / static_cast<double>(Divisor);
@@ -41,14 +40,14 @@ namespace
         return Result;
     }
 
-    // Squared length summed x, z, y (the x87 order of 06f3741b-06f37466 and 06f3757d-06f37597).
+    // Squared length summed x, z, y (retail x87 order in FUN_06f37110).
     double LengthSquaredXZY(Vector const& V)
     {
         return static_cast<double>(V.x) * V.x + static_cast<double>(V.z) * V.z
              + static_cast<double>(V.y) * V.y;
     }
 
-    // Linear find of the entry with ObjectId (inline in 06f379a0 and friends, FUN_06f38120).
+    // Linear find of the entry with ObjectId (FUN_06f38120, also inlined).
     std::vector<FPatrolPathObject>::iterator FindPathObject(std::vector<FPatrolPathObject>* Objects,
                                                             unsigned int ObjectId)
     {
@@ -70,26 +69,24 @@ namespace
     }
 }
 
-// FUN_06f37110 (06f37110-06f377e9, RET 0xc).
+// FUN_06f37110.
 FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* Last,
                          FSystemInfo* InSystem)
 {
-    // 06f37183-06f371ac
     System = InSystem;
     bLoop = false;
     Label.Id = (*First)->Label.Id;
     Usage = (*First)->Usage;
     bMissionEligible = (*First)->bMissionEligible;
 
-    // 06f371b8-06f37200: the number of path indices over the whole label range.
+    // The number of path indices over the whole label range.
     int IndexCount = 0;
     for (FZonePathLabel* It = *First; It != *Last; ++It)
         IndexCount += static_cast<int>(It->Indices.size());
 
-    // 06f3720a-06f372bf: the labels in path-index order; each gets its zone's two ends. A
-    // label listing several indices is taken once per index. Retail does not stop at a
-    // missing index: the scan ends on *Last and that record is used (06f37281 falls through
-    // with EAX = the range end), exactly as here.
+    // The labels in path-index order; each gets its zone's two ends. A label listing several
+    // indices is taken once per index. Retail does not stop at a missing index: the scan
+    // ends on *Last and that record is used (06f37281).
     std::vector<FZonePathLabel*> Steps;
     for (int Index = 1; Index <= IndexCount; ++Index)
     {
@@ -101,7 +98,7 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
         Steps.insert(Steps.end(), Step);                                     // FUN_06eb5770
     }
 
-    // 06f372c9-06f372d6: one step -> its two ends (LAB_06f37658).
+    // One step -> its two ends.
     if (Steps.begin() + 1 == Steps.end())
     {
         FZonePathLabel* Step = Steps.front();
@@ -111,9 +108,8 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
     }
     else
     {
-        // 06f372dc-06f3732e: which end of the first step lies nearer the second step's
-        // segment. FCOMP of the stored float against the x87 value, TEST AH,5 / JNP: taken
-        // (start) only when less.
+        // Which end of the first step lies nearer the second step's segment: the start
+        // distance is rounded to float, the end distance is not; start only when less.
         FZonePathLabel* FirstStep = Steps[0];
         FZonePathLabel* SecondStep = Steps[1];
         Vector StartClosest;
@@ -125,9 +121,9 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
         Vector const Near = (static_cast<double>(StartDistance) < EndDistance)
             ? FirstStep->Start : FirstStep->End;
 
-        // 06f37330-06f373ae: Near equals Start when every component differs by at most 1
-        // (squared, TEST AH,0x41 / JP: greater or unordered leaves). The far end is the first
-        // point; Current is the near end, not yet added.
+        // Near equals Start when every squared component difference is at most 1 (greater
+        // or unordered fails). The far end is the first point; Current is the near end, not
+        // yet added.
         double const DeltaX = static_cast<double>(Near.x) - FirstStep->Start.x;
         double const DeltaY = static_cast<double>(Near.y) - FirstStep->Start.y;
         double const DeltaZ = static_cast<double>(Near.z) - FirstStep->Start.z;
@@ -143,9 +139,8 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
             Current = FirstStep->End;
         }
 
-        // 06f373cc-06f37549: every further step adds the midpoint between Current and its
-        // nearer end; its other end becomes Current. FCOMPP |ToEnd|^2 against |ToStart|^2,
-        // TEST AH,0x41 / JNZ: the start is taken only when strictly nearer.
+        // Every further step adds the midpoint between Current and its nearer end; its other
+        // end becomes Current. The start is taken only when strictly nearer.
         for (std::vector<FZonePathLabel*>::iterator It = Steps.begin() + 1; It != Steps.end(); ++It)
         {
             FZonePathLabel* Step = *It;
@@ -165,11 +160,10 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
             Points.insert(Points.end(), 1, Joint);                           // FUN_06f6f3e0
         }
 
-        // 06f3754f-06f3763c: a path whose last end lies within 5000 of its first point
-        // (DAT_06fb95d0 = 25e6, TEST AH,5 / JP: only less falls through) is a loop; both
-        // ends become their midpoint (float adds, then * 0.5f DAT_06fb605c).
-        // 06f3754f-06f37578: here the difference is inlined (FLD/FSUB/FSTP z, y, x) and the
-        // result built by FUN_06eb7810 -- not a CALL of FUN_06eeaee0.
+        // A path whose last end lies within 5000 of its first point (DAT_06fb95d0 = 25e6,
+        // only less passes) is a loop; both ends become their midpoint (float adds, then
+        // * 0.5f DAT_06fb605c). The difference is inlined here (float stores z, y, x), not a
+        // call of SubtractVectors.
         Vector Gap;
         Gap.z = Points.front().z - Current.z;
         Gap.y = Points.front().y - Current.y;
@@ -192,7 +186,7 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
         }
     }
 
-    // 06f37680-06f377bc: every step index under its zone.
+    // Every step index under its zone.
     int StepIndex = 0;
     for (std::vector<FZonePathLabel*>::iterator It = Steps.begin(); It != Steps.end(); ++It)
     {
@@ -200,7 +194,7 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
         std::map<unsigned int, std::vector<int>>::iterator Found = ZoneSteps.find(ZoneId);
         if (Found == ZoneSteps.end())
         {
-            // 06f376b9-06f37787: insert(value_type(zone, empty vector)) (FUN_06f38410).
+            // FUN_06f38410.
             Found = ZoneSteps.insert(
                 std::pair<unsigned int const, std::vector<int>>(ZoneId, std::vector<int>())).first;
         }
@@ -209,14 +203,14 @@ FPatrolPath::FPatrolPath(FZonePathLabel* const* First, FZonePathLabel* const* La
     }
 }
 
-// FUN_06f378c0 (06f378c0-06f37a96, RET 8).
+// FUN_06f378c0.
 bool FPatrolPath::RegisterObject(unsigned int ObjectId, Vector const* Position)
 {
     bool bRegistered = false;
     for (unsigned int Index = 0; Index < Points.size(); ++Index)
     {
-        // 06f37910-06f37961: the offset is built from float differences (FUN_06eb7810); the
-        // squares are summed z, y, x. DAT_06fb95d4 = 25e6, TEST AH,5 / JP: only less passes.
+        // The offset is built from float differences; the squares are summed z, y, x.
+        // DAT_06fb95d4 = 25e6, only less passes.
         Vector Offset;
         Offset.x = Points[Index].x - Position->x;
         Offset.y = Points[Index].y - Position->y;
@@ -227,7 +221,6 @@ bool FPatrolPath::RegisterObject(unsigned int ObjectId, Vector const* Position)
         if (!(DistanceSquared < 25000000.0))
             continue;
 
-        // 06f37972-06f37a55
         FPatrolPathObject Entry;
         Entry.ObjectId = ObjectId;
         std::vector<FPatrolPathObject>::iterator Found = FindPathObject(&Objects, ObjectId);
@@ -237,8 +230,7 @@ bool FPatrolPath::RegisterObject(unsigned int ObjectId, Vector const* Position)
         }
         else
         {
-            // FUN_06f937c0 into the local entry, then FUN_06f38620 insert(end); the re-find
-            // and its pair (FUN_06fa6e80) are discarded.
+            // FUN_06f38620 insert(end); retail's re-find afterwards is discarded.
             Entry.PointIndices.insert(Entry.PointIndices.end(), 1, static_cast<int>(Index));
             Objects.insert(Objects.end(), Entry);
         }
@@ -247,22 +239,21 @@ bool FPatrolPath::RegisterObject(unsigned int ObjectId, Vector const* Position)
     return bRegistered;
 }
 
-// FUN_06f37aa0 (06f37aa0-06f37cf6, RET 0x10).
+// FUN_06f37aa0.
 void FPatrolPath::FindObjectsInRange(std::vector<FPatrolPathObject>* Out, int First, int Last,
                                      unsigned int TypeMask)
 {
-    // 06f37aab-06f37ad5: erase(begin, end) (FUN_06f6f810 + FUN_06f38140).
     Out->clear();
 
     if (First == -1)
         First = 0;
     if (Last == -1)
-        Last = static_cast<int>(Points.size()) - 1;                          // 06f37aeb-06f37b0b
+        Last = static_cast<int>(Points.size()) - 1;
 
     for (std::vector<FPatrolPathObject>::iterator Object = Objects.begin();
          Object != Objects.end(); ++Object)
     {
-        // 06f37b30-06f37b51: a zero mask never matches (the type stays -1 and -1 & 0 == 0).
+        // A zero mask never matches.
         unsigned int Type = 0xffffffff;
         if (TypeMask != 0)
             pub::SpaceObj::GetType(Object->ObjectId, Type);
@@ -272,8 +263,7 @@ void FPatrolPath::FindObjectsInRange(std::vector<FPatrolPathObject>* Out, int Fi
         for (std::vector<int>::iterator Index = Object->PointIndices.begin();
              Index != Object->PointIndices.end(); ++Index)
         {
-            // 06f37b65-06f37b71 (JG / JG): inside [First, Last]; 06f37c55-06f37c61 (JLE /
-            // JLE) when First > Last: outside (Last, First).
+            // Signed: inside [First, Last]; when First > Last (wrapping): outside (Last, First).
             bool bInRange;
             if (First <= Last)
                 bInRange = First <= *Index && *Index <= Last;
@@ -283,8 +273,7 @@ void FPatrolPath::FindObjectsInRange(std::vector<FPatrolPathObject>* Out, int Fi
                 continue;
 
             // The first index in range settles the object: added unless Out already holds
-            // its id (FUN_06f38620 insert(end); the re-find FUN_06f38120 and the pair
-            // FUN_06fa6e80 are discarded), then the index scan stops.
+            // its id, then the index scan stops.
             if (FindPathObject(Out, Object->ObjectId) == Out->end())
                 Out->insert(Out->end(), *Object);
             break;
@@ -292,37 +281,33 @@ void FPatrolPath::FindObjectsInRange(std::vector<FPatrolPathObject>* Out, int Fi
     }
 }
 
-// FUN_06f37d30 (06f37d30-06f37e98, RET 8).
+// FUN_06f37d30.
 void FPatrolPath::GetObjectPointIndices(unsigned int const* ObjectId, std::vector<int>* Out)
 {
-    // 06f37d38-06f37d63: erase(begin, end).
     Out->clear();
 
-    // 06f37d66-06f37d8e (the free of an empty temporary at 06f37d81 has no effect).
     std::vector<FPatrolPathObject>::iterator Found = FindPathObject(&Objects, *ObjectId);
     if (Found == Objects.end())
         return;
-    // 06f37d94-06f37e92: vector operator= (self-assignment skipped).
+    // vector operator= (self-assignment skipped).
     if (&Found->PointIndices == Out)
         return;
     *Out = Found->PointIndices;
 }
 
-// FUN_06f37ea0 (06f37ea0-06f37fea, RET 8).
+// FUN_06f37ea0.
 bool FPatrolPath::GetZoneSegments(unsigned int ZoneId, std::vector<FPatrolPathSegment>* Out)
 {
-    // 06f37ea9-06f37ed8: erase(begin, end) (FUN_06f38b20 + FUN_06ea1490).
     Out->clear();
 
     std::map<unsigned int, std::vector<int>>::iterator Found = ZoneSteps.find(ZoneId);  // FUN_06f7b0f0
     if (Found == ZoneSteps.end())
         return false;
 
-    // 06f37eed-06f37fa5: grow the capacity to twice the step count when it is smaller.
     std::vector<int> const& Steps = Found->second;
     Out->reserve(Steps.size() * 2);
 
-    // 06f37fa6-06f37fd5: {step, step + 1} each, FUN_06f96770 insert(end).
+    // {step, step + 1} each.
     for (std::vector<int>::const_iterator Step = Steps.begin(); Step != Steps.end(); ++Step)
     {
         FPatrolPathSegment Segment;
@@ -333,14 +318,12 @@ bool FPatrolPath::GetZoneSegments(unsigned int ZoneId, std::vector<FPatrolPathSe
     return true;
 }
 
-// FUN_06f37ff0 (06f37ff0-06f38117, RET 4).
+// FUN_06f37ff0.
 int FPatrolPath::GetZoneIds(std::vector<unsigned int>* Out)
 {
-    // 06f37ff7-06f3801e: erase(begin, end); 06f38021-06f3809a: reserve(ZoneSteps.size()).
     Out->clear();
     Out->reserve(ZoneSteps.size());
 
-    // 06f3809d-06f380f9: in-order walk of the map, key each (FUN_06f937c0 insert(end)).
     for (std::map<unsigned int, std::vector<int>>::iterator It = ZoneSteps.begin();
          It != ZoneSteps.end(); ++It)
     {

@@ -50,11 +50,7 @@ inline float* AsFloat12(FRendCompXform* Xform)
     return (float*)Xform;
 }
 
-// LogStream::LogEvent is dacom.dll's export (dacom.def, declared in dacom.h); the local
-// definition that used to sit here shadowed it with a log-file writer.
-
-// Retail pushes (Message, Line, __FILE__, fmt, Flags) and calls through the FDUMP import with
-// no null check (e.g. FUN_06c2dd20 @ 06c2de02..06c2de1f).
+// Retail calls through the FDUMP import with no null check.
 void RendCompFdumpAt(int Flags, const char* File, int Line, const char* Message)
 {
     const char* Format = G_FdumpFmtNotice;
@@ -157,8 +153,7 @@ int FileOpenByName(void* File, const char* ChildName)
     return 0;
 }
 
-// FUN_06c24980 (thiscall desc, RET 8): +4 = ComponentName, +8..+0x33 zeroed, Access 0x80000000,
-// ShareMode 1, Creation 3, Flags 0x8000080, Path, Size 0x34, +0x30 = -1.
+// FUN_06c24980 (thiscall on the desc).
 FFileSystemDesc* FileDescInit(FFileSystemDesc* Desc, const char* Path, const char* ComponentName)
 {
     std::memset(Desc, 0, sizeof(FFileSystemDesc));
@@ -189,9 +184,8 @@ void ReleaseIf(IDAComponent* Object)
         Object->Release();
 }
 
-// FUN_06c34e60 (06c34e60..06c34e98): desc at ESP+4 {0xC, "3DMathEngine", 0}, out at ESP+0;
-// DACOM_Acquire's result is dereferenced unchecked and the CreateInstance result is ignored.
-// Retail's out slot is uninitialised stack; the port's starts at nullptr.
+// FUN_06c34e60: DACOM_Acquire's result is dereferenced unchecked and the CreateInstance result
+// is ignored. Retail's out slot is uninitialised stack; the port's starts at nullptr.
 I3DMathEngine* AcquireMathEngine()
 {
     ICOManager* Manager = DACOM_Acquire();
@@ -241,7 +235,7 @@ void PipelineApplySubmit(ICamera* Camera, void* Inst, const void* Transform,
     G_Pipeline->SetWorld((const float*)World);
 }
 
-// FUN_06c33090 (thiscall on Src, RET 4): Dest = -Src. Only caller IRenderer Slot7.
+// FUN_06c33090 (thiscall on Src). Only caller: IRenderer slot 7.
 void VectorNegate3(const float* Src, float* Dest)
 {
     Dest[0] = -Src[0];
@@ -249,7 +243,7 @@ void VectorNegate3(const float* Src, float* Dest)
     Dest[2] = -Src[2];
 }
 
-// FUN_06c330b0 (thiscall on Src, RET 4): Dest = the transpose of Src's 3x3; returns Dest.
+// FUN_06c330b0 (thiscall on Src).
 float* TransposeXform3x3(const float* Src12, float* Dest9)
 {
     Dest9[0] = Src12[0];
@@ -264,8 +258,7 @@ float* TransposeXform3x3(const float* Src12, float* Dest9)
     return Dest9;
 }
 
-// FUN_06c33100 (cdecl, Dest, Matrix, Vec): the math engine (DAT_06c37d48, created on first use)
-// slot 14 +0x38 TransposeTransform into a local, copied to Dest; returns Dest. No fallback.
+// FUN_06c33100: math engine DAT_06c37d48, TransposeTransform into a local. No fallback.
 float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3)
 {
     FVector Local;
@@ -290,9 +283,8 @@ GENRESULT DACOM_API PluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void
     return CreateSphereMeshPlugin(Extended, Out);
 }
 
-// LAB_06c221d0 (slot 0 of every RendComp factory vtable): *Out = 0, then a 0x17-byte
-// REPE CMPSB against "1.11_IComponentFactory" (NUL included, so an exact match); miss -> -3,
-// hit -> *Out = this, AddRef through the vtable, 0.
+// LAB_06c221d0 (slot 0 of every RendComp factory vtable): a 0x17-byte compare against
+// "1.11_IComponentFactory" (NUL included, so an exact match).
 GENRESULT DACOM_API FDacomFactory::QueryInterface(const char* Iid, void** Out)
 {
     *Out = nullptr;
@@ -303,15 +295,14 @@ GENRESULT DACOM_API FDacomFactory::QueryInterface(const char* Iid, void** Out)
     return GR_OK;
 }
 
-// LAB_06c306b0: ++[this+4], return it.
+// LAB_06c306b0.
 unsigned long DACOM_API FDacomFactory::AddRef()
 {
     RefCount += 1;
     return RefCount;
 }
 
-// FUN_06c2a3a0: decrement when above 0; still non-zero -> return it; zero -> pin the count
-// at 1, operator delete (FUN_06c34ea0), return 0.
+// FUN_06c2a3a0: at zero the count is pinned at 1 before operator delete (FUN_06c34ea0).
 unsigned long DACOM_API FDacomFactory::Release()
 {
     if (RefCount > 0)
@@ -403,7 +394,7 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID /*Reserved*/)
 {
     if (Reason == DLL_PROCESS_ATTACH)
     {
-        // FUN_06c34080: RenderManager inline (06c34093), then FUN_06c21a90, FUN_06c2a000,
+        // FUN_06c34080: RenderManager inline, then FUN_06c21a90, FUN_06c2a000,
         // FUN_06c2dae0 (which chains FUN_06c2ecf0 and FUN_06c2f490).
         DisableThreadLibraryCalls(Module);
         RegisterFactoryUnchecked(&RenderManagerFactoryCreate, G_NameRenderManager, Iids::Renderer2);

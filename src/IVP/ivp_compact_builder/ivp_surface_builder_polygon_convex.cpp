@@ -16,7 +16,7 @@
 
 #include "../ivp_utility/ivp_malloc.h" // IVP's 16-byte aligned block allocator (FUN_06343fc0)
 
-// FUN_0636da30 (.text:0636da30-0636dada): point_hash = new
+// FUN_0636da30: point_hash = new
 // FPolygonPointHash(8); tetras = new IVP_Object_Polygon_Tetra(Templ), then
 // tetras->template_polygon = Templ (the tetra ctor cleared it); c_ledge = 0;
 // init_surface_manager_polygon().
@@ -32,7 +32,7 @@ IVP_SurfaceBuilder_Polygon_Convex::IVP_SurfaceBuilder_Polygon_Convex(IVP_Templat
     init_surface_manager_polygon();
 }
 
-// FUN_0636db00 (.text:0636db00-0636de6d).
+// FUN_0636db00.
 // tetras = c_ledge = 0; point_hash = new FPolygonPointHash(8); a null
 // triangle returns here. The three points are deduplicated through the hash
 // (probe: x / y / z of the 16-byte source point, compact_index 0; a miss
@@ -114,7 +114,7 @@ IVP_SurfaceBuilder_Polygon_Convex::IVP_SurfaceBuilder_Polygon_Convex(IVP_Templat
     c_ledge = static_cast<IVP_Compact_Ledge*>(Buffer);
 }
 
-// FUN_0636de70 (.text:0636de70-0636decb): every stored point of the hash
+// FUN_0636de70: every stored point of the hash
 // (entries SizeMm..0, element at +4 of each 8-byte entry) operator-deleted;
 // the hash deleted through slot 1 (flag 1) and cleared; the tetra destroyed
 // (06379b10) and operator-deleted, then cleared. c_ledge belongs to the caller.
@@ -141,7 +141,7 @@ IVP_SurfaceBuilder_Polygon_Convex::~IVP_SurfaceBuilder_Polygon_Convex()
     tetras = nullptr;
 }
 
-// FUN_0636ded0 (.text:0636ded0-0636e020).
+// FUN_0636ded0.
 // tetras->edge_hash = new IVP_Hash(0x1f4, 8, 0) for the duration of
 // make_triangles, then destroyed and cleared. An error leaves tetras and
 // c_ledge null (the tetra object leaks, as retail). Otherwise calc_hesse on
@@ -180,7 +180,7 @@ void IVP_SurfaceBuilder_Polygon_Convex::init_surface_manager_polygon()
     c_ledge = static_cast<IVP_Compact_Ledge*>(Buffer);
 }
 
-// FUN_0636e030 (.text:0636e030-0636e06f).
+// FUN_0636e030.
 void IVP_SurfaceBuilder_Polygon_Convex::add_triangles_to_vector(IVP_U_Vector<IVP_Triangle>* Triangles)
 {
     for (IVP_Triangle* Triangle = tetras->triangles; Triangle != nullptr; Triangle = Triangle->next)
@@ -192,7 +192,7 @@ void IVP_SurfaceBuilder_Polygon_Convex::add_triangles_to_vector(IVP_U_Vector<IVP
     }
 }
 
-// FUN_0636e080 (.text:0636e080-0636e0b5): null -> 0; else a stack builder
+// FUN_0636e080: null -> 0; else a stack builder
 // (0636da30), its c_ledge taken and cleared, the builder destroyed (0636de70).
 IVP_Compact_Ledge* IVP_SurfaceBuilder_Polygon_Convex::convert_template_to_ledge(IVP_Template_Polygon* Templ)
 {
@@ -206,7 +206,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Polygon_Convex::convert_template_to_ledge(
     return Ledge;
 }
 
-// FUN_0636e0c0 (.text:0636e0c0-0636e0f5): the same over the triangle ctor (0636db00).
+// FUN_0636e0c0: the same over the triangle ctor (0636db00).
 IVP_Compact_Ledge* IVP_SurfaceBuilder_Polygon_Convex::convert_triangle_to_ledge(IVP_Template_Triangle_Points* Triangle)
 {
     if (Triangle == nullptr)

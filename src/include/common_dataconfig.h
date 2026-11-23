@@ -14,7 +14,7 @@ namespace Archetype
     struct ICliObjFactory;
 }
 
-// Common.dll.c DataConfig::startup @ 0xa8e60 / shutdown @ 0xa9850
+// DataConfig::startup 0x06308e60 / shutdown 0x06309850
 // ?startup@DataConfig@@YAHPBDPAUICliObjFactory@Archetype@@PAUProgressCB@1@@Z
 // ?shutdown@DataConfig@@YAXXZ
 // ProgressCB is nested in DataConfig (mangle @1). ICliObjFactory / ICliObj nested in Archetype.

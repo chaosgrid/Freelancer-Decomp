@@ -10,15 +10,8 @@
 // glEnable / glDisable (FUN_00421dd0 / FUN_00421ed0) are Win3DEnable / Win3DDisable in
 // win3d_immediate.h.
 
-// FUN_004215e0 -- the glClear translation. Its argument is a GL-style bit set, but retail only
-// ever looks at AH, so exactly two bits mean anything and every other bit (including anything
-// above bit 15) is ignored:
-//
-//     0x4000 -> clear the colour buffer      0x0100 -> clear the depth buffer
-//
-// Those map to D3DCLEAR_TARGET (1) and D3DCLEAR_ZBUFFER (2) for IRenderPipeline::ClearBuffers.
-// The call sites pass 0x100 (depth only, e.g. camera slot 0x78), 0x4000 (colour only) and
-// 0x4100 (both).
+// FUN_004215e0 -- the glClear translation. Retail only looks at bits 0x4000 (colour) and 0x0100
+// (depth); every other bit is ignored. They map to D3DCLEAR_TARGET (1) and D3DCLEAR_ZBUFFER (2).
 enum EWin3DClearBits
 {
     kWin3DClearColour = 0x4000,
@@ -27,15 +20,12 @@ enum EWin3DClearBits
 
 void ClearWin3DBuffers(unsigned int Bits);
 
-// FUN_00564f90 (cdecl, one pointer to four 0..255 bytes in R,G,B,A order). Sets the pipeline's
-// clear colour (each byte times 1/255) and clears both the colour and depth buffers -- retail
-// tail-calls FUN_004215e0(0x4100) after setting the colour, which is exactly ClearWin3DBuffers
-// with both bits set.
+// FUN_00564f90 (cdecl, R,G,B,A bytes) -- sets the clear colour (each byte times 1/255), then
+// clears both the colour and depth buffers.
 void ClearWin3DBuffersToColor(unsigned char const* Rgba);
 
-// FUN_00422950 (cdecl, one argument): the camera's perspective through FUN_00422820 (fovY,
-// aspect, znear, zfar from slots 0x1c / 0x28 / 0x20 / 0x24), then its packed view (slot 0x40)
-// copied into DAT_006648dc; pipeline state 7 is READ -- non-zero sends the copy through
-// SetModelview, zero sets an identity view and the slot-0x40 view as the world.
+// FUN_00422950 (cdecl) -- the camera's perspective, then its view copied into DAT_006648dc;
+// pipeline state 7 is READ: non-zero sends the copy through SetModelview, zero sets an identity
+// view and the camera's view as the world.
 struct ICamera;
 void Win3DApplyCamera(ICamera* Camera);

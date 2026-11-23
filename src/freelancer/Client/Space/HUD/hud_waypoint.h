@@ -25,12 +25,8 @@
 // Factory: the static HUDFACTORY<HUD_Waypoint> DAT_00674b88 ("Waypoint"; XC entry
 // LAB_004f3ac0, ctor FUN_004f4d30, atexit LAB_004f3ae0 -> FUN_004cf010), vftable 0x005d97e0.
 //
-// DAT_00674bc8 is the live instance (ctor 0x004f3b91, dtor 0x004f3d16). It is read by
-// FUN_004f4cd0, HUD_Comm's FUN_004cef30 (0x004cefc0) and the other getters' callers.
-//
-// Named gaps (see the .cpp):
-//   * best-path waypoints: the list is read faithfully, but its writers are not ported, and
-//     the record resolvers FUN_004c5110 / FUN_004c52d0 are holes (best_path.h).
+// DAT_00674bc8 is the live instance (set by the ctor, cleared by the dtor). It is read by
+// FUN_004f4cd0, HUD_Comm's FUN_004cef30 and the other getters' callers.
 // -------------------------------------------------------------------------------------------
 
 #include "Space/HUD/hud_element_list.h"
@@ -66,20 +62,19 @@ public:
     // FUN_004f42e0 (thiscall, RET 0x10) -- make Pos the waypoint: bUser / Index / Id say which
     // list entry it is. The same entry at (within 2 m) the same place only re-targets it;
     // otherwise the old waypoint Solar is released and a new one is spawned and targeted.
-    // Callers: Render 0x004f4116, HUD_Comm 0x004cefc6 (FUN_004cef30), 0x004cef1d,
-    // 0x004d0062, 0x004d010a.
+    // Callers: Render, HudWaypointSelectBestPath / SelectPlayerWaypoint (FUN_004cef30 /
+    // FUN_004ceeb0), the contact list.
     void SetWaypoint(Vector const* Pos, bool bUser, int Index, int Id);
-    // FUN_004f42a0 (thiscall, RET 8) -- with a live waypoint: its list and index, true.
-    // Caller 0x00475a2e.
+    // FUN_004f42a0 (thiscall) -- with a live waypoint: its list and index, true.
     bool GetWaypointEntry(unsigned char* OutUser, int* OutIndex);
-    // FUN_004f4b90 (thiscall, RET 4) -- a live waypoint within 2 m of Pos on every axis.
-    // Callers: HUD_Comm 0x004d4171, 0x004d41dd, 0x004d4245, 0x004d429e.
+    // FUN_004f4b90 (thiscall) -- a live waypoint within 2 m of Pos on every axis. Called by the
+    // contact list.
     bool IsWaypointAt(Vector const* Pos);
-    // FUN_004f4ca0 -- FLD [this+0x37c]. Caller 0x00548347.
+    // FUN_004f4ca0 -- returns Scale.
     float GetScale() const;
-    // FUN_004f4cb0 -- the waypoint Solar's IObjRW, or null. Callers 0x004c83c6, 0x004c83ee.
+    // FUN_004f4cb0 -- the waypoint Solar's IObjRW, or null.
     IObjRW* GetWaypointObject() const;
-    // FUN_004f4d20 -- MOV AL,[this+0x38c]. Caller 0x0054833a.
+    // FUN_004f4d20 -- returns bActive.
     bool IsActive() const;
 
     BaseWatcher Waypoint;          // +0x364 the waypoint Solar (its Watchable, IObjRW + 8)
@@ -106,34 +101,32 @@ HUD_Waypoint* GetHudWaypoint();
 
 // FUN_004f4cd0 (cdecl) -- the player's waypoint list was emptied: with a live, active waypoint
 // and a player ship, clear the ship's target (IObjAffect::set_target(0, SUBOBJ_ID_NONE,
-// player connection)). Callers: FUN_004c46c0 (tail JMP, player_spawn.cpp) and 0x004c4aaa.
+// player connection)). Callers: FUN_004c46c0 (player_spawn.cpp) and 0x004c4aaa.
 void HudWaypointOnPlayerWaypointsCleared();
 
-// FUN_004c83c0 (cdecl) -- 1 when the waypoint has a Solar, else 0 (NEG / SBB / NEG on
-// FUN_004f4cb0; DAT_00674bc8 is not tested). Caller: the space draw 0x0051c4f1.
+// FUN_004c83c0 (cdecl) -- 1 when the waypoint has a Solar, else 0 (DAT_00674bc8 is not
+// tested). Caller: the space draw.
 int HudWaypointGetObjectCount();
 // FUN_004c83e0 (cdecl) -- object Index of that list: the waypoint Solar for 0, null otherwise.
-// Caller: the space draw 0x0051c501.
+// Caller: the space draw.
 IObjRW* HudWaypointGetObject(int ObjectIndex);
 
 // FUN_004f4930 (thiscall, returns this) -- freelancer.exe's own compiled default constructor of
 // CEqObj::CreateParms (0xb8 bytes in retail): the CSimple part (+0x0..+0x8 = 0, +0xc = -1.0f,
-// +0x10..+0x18 = 0, FUN_004215b0 identity at +0x1c, +0x40..+0x54 = 0), +0x58 / +0x5c = 0,
-// +0x60 = -1, +0x64..+0x70 = 0, +0x94 / +0x98 = 0, the +0x9c equipment vector empty and the
-// +0xac collision-group list with a fresh self-linked head. +0x74..+0x90 are not written.
-// The port runs it on a freshly constructed Parms: the two containers are the port's std
-// containers, which their own constructors leave empty, as retail's inline construction does.
-// Callers: HUD_Waypoint::SetWaypoint 0x004f44d3 and the multiplayer CREATESOLAR build
-// 0x0053ad98 (FUN_0053ac10).
+// +0x10..+0x18 = 0, identity at +0x1c, +0x40..+0x54 = 0), +0x58 / +0x5c = 0, +0x60 = -1,
+// +0x64..+0x70 = 0, +0x94 / +0x98 = 0, the equipment vector and collision-group list empty.
+// +0x74..+0x90 are not written. The port runs it on a freshly constructed Parms, whose std
+// containers start empty as retail's inline construction does. Callers: SetWaypoint and the
+// multiplayer CREATESOLAR build FUN_0053ac10.
 void EqObjCreateParmsDefaults(CEqObj::CreateParms& Parms);
 
 // FUN_004cef30 (cdecl) -- make best-path point Index the waypoint: target the object its
-// record names, else put the waypoint at the record's position. Retail keeps it with HUD_Comm
-// (0x004cef30); Render calls it with 0 when a best-path waypoint is lost.
+// record names, else put the waypoint at the record's position. Retail keeps it with HUD_Comm;
+// Render calls it with 0 when a best-path waypoint is lost.
 void HudWaypointSelectBestPath(int Index);
 
 // FUN_004ceeb0 (cdecl) -- make the player's waypoint Index the waypoint: a waypoint on an object
 // sends "select target" (0x1c) for it; otherwise HUD_Waypoint::SetWaypoint(&Pos, true, Index,
-// AutoId). Retail keeps it with HUD_Comm (0x004ceeb0). Callers: 0x00494017,
-// HUD_Targetable_Objects::PickUnderCursor 0x004edbf7 / 0x004ede8a.
+// AutoId). Retail keeps it with HUD_Comm. Callers: 0x00494017,
+// HUD_Targetable_Objects::PickUnderCursor.
 void HudWaypointSelectPlayerWaypoint(int Index);

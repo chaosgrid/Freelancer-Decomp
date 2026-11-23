@@ -18,7 +18,7 @@ unsigned CopyBoundedString(char* Dest, unsigned Capacity, const char* Src);
 
 // The {length, text[0x104]} path buffer the options object keeps its strings in. FUN_00417c50
 // fills Text and the caller stores the returned length in front of it; the accessor retail calls
-// (ICF-folded with MD5Hash::GetStatePtr, .text:004d9980 `LEA EAX,[ECX+4]`) returns Text.
+// (ICF-folded with MD5Hash::GetStatePtr, 004d9980) returns Text.
 struct FClientPathString
 {
     unsigned Length;  // +0x00
@@ -32,7 +32,7 @@ static_assert(sizeof(FClientPathString) == 0x108, "FClientPathString stride is 0
 // ten-dword render mode FUN_004249c0 hands to RP8 create_buffers as the out-blob (RP8 FRp8Mode:
 // Field00, Field04, Width, Height, Format, WantedZ, WantedStencil, Interval, BufferCount,
 // SwapExtra, Fullscreen); the rest is FUN_005621a0's freelancer.ini state. Field defaults are
-// the stores at 0x00562225..0x00562265.
+// FUN_005621a0's stores.
 struct DisplaySettings
 {
     int mode_field00;   // +0x000  -1
@@ -56,8 +56,8 @@ struct DisplaySettings
     FClientPathString gate_tunnels;   // +0x668  [Data] gate_tunnels
     FClientPathString jump_effect;    // +0x770  [Data] jump_effect
     char field_878;                   // +0x878  (DAT_0067a438) cleared by FUN_005621a0 through `this`;
-                                      //         read once, by ClientWndProc @0x005b2667 -- modelled
-                                      //         there as window.cpp's kActivateOverrideByte (always 0)
+                                      //         read once, by ClientWndProc -- modelled there as
+                                      //         window.cpp's kActivateOverrideByte (always 0)
     char quick_flag;                  // +0x879  "+Q"/"-Q": set to 1, never read anywhere in the PE
     char pad87a[2];
 };
@@ -97,10 +97,9 @@ extern ClientGlobals g_client;
 extern bool G_bFpExceptionTrap;
 
 // DAT_0067ecb4 -- the "WinDebug" root window: InitializeEngine stores
-// FUN_0059db20("WinDebug", "WinDebug", 0, 0) (0x005b1d73), the atexit teardown deletes its tree
-// (0x005b223c..0x005b226f, FUN_0043d2a0 inlined). No WinFactory in the exe registers the class
-// "WinDebug" (the only copy of the string, 0x005e6a8c, is referenced by those two pushes alone),
-// so the lookup finds nothing and the root is always null in retail.
+// FUN_0059db20("WinDebug", "WinDebug", 0, 0), the atexit teardown deletes its tree (FUN_0043d2a0
+// inlined). No WinFactory in the exe registers the class "WinDebug", so the root is always null
+// in retail.
 struct Win3D;
 extern Win3D* G_WinDebugRoot;
 
@@ -123,16 +122,16 @@ extern bool G_bRenderMgrShuttingDown;   // DAT_006679f9 -- FUN_004247c0 re-entry
 extern float G_RenderGamma;             // DAT_00610858 -- .data 1.3f; "gamma_ramp" option + 1.0
 extern int G_bRenderDither;             // DAT_0061085c -- .data 1; "DitherControl" option >= 0.3
 extern int G_RenderMipFilter;           // DAT_00610860 -- .data 1; "MipFilterControlCallback"
-// DAT_00610864 -- .data 1. Cleared by FUN_004249c0 on entry (0x00424a09) and by FUN_00424c60 when
-// a fullscreen surface is re-activated (0x00424c7c); set at the end of a successful
-// FUN_004249c0 (0x00424c4f); FUN_00425140 stores (SwapBuffers == 0) into it (0x00425158).
+// DAT_00610864 -- .data 1. Cleared by FUN_004249c0 on entry and by FUN_00424c60 when a fullscreen
+// surface is re-activated; set at the end of a successful FUN_004249c0; FUN_00425140 stores
+// (SwapBuffers == 0) into it.
 extern bool G_bRenderPostCreate;
 // DAT_006679f8 -- this frame's BeginScene succeeded. Written only by FUN_00424f30 (which returns
 // it); FUN_00424cb0 reads it.
 extern bool G_bRenderFrameBegun;
 // DAT_00610848 -- .data 0x35, never written: the FPU precision the renderer wants (0x35 = 53-bit,
 // 0x18 = 24-bit). DAT_0061084c -- .data 0x18, the precision FUN_004249c0 found in the control word
-// after create_buffers (0x00424b6c). FUN_00424f30 puts the found one in place for the frame,
+// after create_buffers. FUN_00424f30 puts the found one in place for the frame,
 // FUN_00425080 puts the wanted one back.
 extern int G_FpuPrecisionWanted;
 extern int G_FpuPrecisionFound;
@@ -153,17 +152,17 @@ void ShutdownRenderMgr(bool bRestoreWindowedMode);
 bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySettings* Out);
 // FUN_00424ce0 (cdecl) -- try Mode (its first 0x28 bytes); a windowed mode then retries Format
 // 32/24/16, then the options object itself, then a 640x480 window. Callers: InitializeEngine
-// (engine_init.cpp) and NN_Preferences::TryApplyVideoMode 0x004b1ce4.
+// (engine_init.cpp) and NN_Preferences::TryApplyVideoMode.
 bool SetRenderModeWithFallback(HWND Hwnd, const DisplaySettings* Mode);
 LRESULT CALLBACK ClientWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
-// DAT_00615ba8 — WinMain only presents a frame while this is set (0x5b0fe8). WM_ACTIVATEAPP
+// DAT_00615ba8 — WinMain only presents a frame while this is set. WM_ACTIVATEAPP
 // clears it when a fullscreen single-player session loses focus.
 bool ClientPresentAllowed();
 // DAT_00610865 — latched by FUN_00424c60 on WM_ACTIVATEAPP.
 bool ClientAppIsActive();
 // FUN_00424cb0 -- DAT_00610865 && DAT_00610864 && DAT_006679f8. Callers: the loading screen's
-// Update (0x00578f8b) and WndProc's SC_CLOSE (0x005b2727).
+// Update and WndProc's SC_CLOSE.
 bool RenderMgrFrameReady();
 // DAT_0067ecc8 / DAT_0067ecc9 — WinMain arms the quit screen once InitializeEngine returns and
 // replays a close that arrived earlier.
@@ -192,6 +191,6 @@ void SetClientFpsCap(float Fps);        // DAT_00610a0c
 bool InitializeEngine(const FClientCommandLine* CommandLine); // FUN_005b1300
 void OpenSpewLog();               // FUN_005b2800
 // FUN_005b27c0 — developer FPU-exception-trap toggle, "+X"/"-X"-gated (G_bFpExceptionTrap).
-// Retail calls this every frame (Enable=false in TryBeginFrame/FUN_00424f30, Enable=true at the end
-// of FinishPresentFrame's first half/FUN_00425080), not just once at WinMain startup.
+// Retail calls this every frame (off in FUN_00424f30, on again in FUN_00425080), not just once at
+// WinMain startup.
 void SetFpuExceptionTrap(bool Enable);

@@ -6,9 +6,8 @@
 
 #pragma once
 
-// FadeToBlack -- the full-screen fade the client runs over every transition. The retail source
-// file names itself in the binary: `E:\FL\Scratch\Source\Client\cmn\FadeToBlack.cpp`, printed by
-// the render path at 0x00412454.
+// FadeToBlack -- the full-screen fade the client runs over every transition (retail
+// `E:\FL\Scratch\Source\Client\cmn\FadeToBlack.cpp`, named by the render path).
 //
 // It is a plain global state machine, no object: a current level, a target, a speed and a
 // colour, all in .data. The level is what the rest of the client reads -- the letterbox uses it
@@ -28,8 +27,6 @@
 //   0x006164f0  Colour[3]  the colour faded to, as three floats
 //   0x006164fc  Default[3] the colour the setters reset to -- all zero in .data, and NOTHING in
 //                          the whole exe ever writes it, so "fade to black" is literal
-//
-// The render half (FUN_00412430) is NOT here; see the note at the bottom of the file.
 
 // FUN_00412010. True once the fade is (near enough) fully opaque -- retail's threshold is a
 // literal 0.999, not 1.0, so a fade that has all but finished already counts as covering the
@@ -78,11 +75,8 @@ const float* GetFadeColour();
 // through the Win3D immediate-mode layer. Cam supplies the rectangle through its slot 0x14; a
 // null Cam covers the whole surface.
 //
-// Two details worth knowing. The quad is inset by HALF A PIXEL on every edge -- retail writes
-// left-0.5 / top-0.5 / right+0.5 / bottom+0.5 -- which is the usual D3D texel-centre correction
-// and is what stops a one-pixel seam at the edges. And blending is enabled only while the level
-// is UNDER 0.999: a fully covered screen draws opaque, which is both faster and exactly what
-// IsFadeOpaque already reports.
+// The quad is pushed out by HALF A PIXEL on every edge (the usual D3D texel-centre correction).
+// Blending is enabled only while the level is UNDER 0.999: a fully covered screen draws opaque.
 //
 // Draws nothing at all when the level is not strictly positive. Callers: the space frame
 // LAB_0054b000 (the active space camera, through AsCamera) and FUN_00558c10 (the room camera).

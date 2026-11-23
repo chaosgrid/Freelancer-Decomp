@@ -17,8 +17,7 @@
 // object's own thiscall virtuals after ICompoundControl's thirteen slots: 13 the scalar deleting
 // destructor, 14..22 below. Every facet's IDAComponent slots are the shared LAB_004500d0 /
 // LAB_00450180 / LAB_00450190; the eight other facets reach them through the compiler's
-// this-adjustor thunks 0x004501c0..0x00450330 (`SUB [ESP+4],N; JMP`), which C++ multiple
-// inheritance produces for us.
+// this-adjustor thunks, which C++ multiple inheritance produces.
 //
 // CONSTRUCTION. The Gf script spawn FUN_0044ed90 and its factories FUN_0044d630..FUN_0044e3c0
 // (gf_script_spawn.cpp) new the concrete class per entity type.
@@ -32,8 +31,8 @@ struct ICamera;
 
 static_assert(sizeof(void*) == 4, "the facet offsets of the QI table (0x005cca20) are x86 offsets");
 
-// The "not implemented" answer of every default slot (LAB_00454190, LAB_0044fcc0..LAB_0044fcf0:
-// MOV EAX,0xfffffff9). dacom.h has no name for it.
+// The "not implemented" answer of every default slot (LAB_00454190, LAB_0044fcc0..LAB_0044fcf0).
+// dacom.h has no name for it.
 static const GENRESULT kThornSlotNotImplemented = static_cast<GENRESULT>(0xFFFFFFF9);
 
 struct FThornComponent : ICompoundControl,
@@ -150,11 +149,11 @@ struct FThornComponent : ICompoundControl,
     virtual void Stop();
     // 15 (+0x3c) -- the script's spawned table. Base: RET 8.
     virtual void SetSpawnTable(FThornComponent** Table, int Count);
-    // 16 (+0x40) -- the actor named Name, if this entity is it. Base: XOR AL,AL; RET 0xc.
+    // 16 (+0x40) -- the actor named Name, if this entity is it. Base: false.
     virtual bool FindActor(char const* ActorName, void** OutActorField, void** OutActor);
     // 17 (+0x44) -- the engine instance the entity moves. Base: _purecall.
     virtual void* GetEngineInstance() = 0;
-    // 18 (+0x48) -- the effects pass (FUN_0044f970 0x0044f98f, per spawned entity). Base: RET 4.
+    // 18 (+0x48) -- the effects pass (FUN_0044f970, per spawned entity). Base: RET 4.
     virtual void DrawEffects(ICamera* Camera);
     // 19 (+0x4c) -- the scene entity whose ambient override the room object takes (RoomObject
     // +0x0c, FUN_00559590). Base: RET 4.
@@ -163,12 +162,12 @@ struct FThornComponent : ICompoundControl,
     virtual void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
                           unsigned char bFlag14);
     // 21 (+0x54) -- re-apply the entity's sound state to what plays it. Only Thorn_Sound has a
-    // body (LAB_00457630); the Gf fade tick (FUN_00456650 0x0045671c) sends it to every spawned
-    // entity of the playing scripts. Base: RET.
+    // body (LAB_00457630); the Gf fade tick (FUN_00456650) sends it to every spawned entity of
+    // the playing scripts. Base: RET.
     virtual void RefreshSound();
     // 22 (+0x58) -- a background (music / ambience) sound. Only Thorn_Sound has a body
-    // (LAB_00456ea0); the spawn skips the initial property writes for one (0x0044f0d5).
-    // Base: FUN_0044fd00 (XOR AL,AL; RET).
+    // (LAB_00456ea0); the spawn skips the initial property writes for one.
+    // Base: FUN_0044fd00 (false).
     virtual bool IsBackgroundSound();
 
     // FUN_00450070 (thiscall, RET 8) -- a created (not reference) entity of this type and name.

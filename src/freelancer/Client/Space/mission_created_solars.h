@@ -16,11 +16,11 @@
 //   pos      = x, y, z
 //
 // Readers: the nav map's base / solar position lookups (FUN_0048d780, FUN_00491e10) and the
-// NN base-info code at 0x0047503c.
+// NN base-info code.
 
 #include <vector>
 
-// One record, 0x14 bytes (FUN_00476c40 0x00476dd5..0x00476e03).
+// One record, 0x14 bytes.
 struct FMissionCreatedSolar
 {
     unsigned BaseId; // +0x00 CreateID(base)
@@ -38,6 +38,6 @@ extern unsigned char G_bMissionCreatedSolarsLoaded;
 // has given all three keys (and the three flags start over).
 void LoadMissionCreatedSolars();
 
-// FUN_00476fe0 (cdecl) -- load, then the first record for BaseId: its position into OutPos
+// FUN_00476fe0 -- load, then the first record for BaseId: its position into OutPos
 // (3 floats) and its ids_info into OutIdsInfo. False (nothing written) when there is none.
 bool FindMissionCreatedSolar(unsigned BaseId, float* OutPos, int* OutIdsInfo);

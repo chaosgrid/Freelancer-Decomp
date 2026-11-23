@@ -63,7 +63,7 @@ void IMEInputBox::Resize(const RECT* pRect)
 
 void IMEInputBox::ImeShowToolbar(bool bShow)
 {
-    // Retail 0x06711110 is RET 4 (ICF-shared with UpdatedText).
+    // Empty in retail (FUN_06711110, folded with UpdatedText).
 }
 
 void IMEInputBox::ToggleInsertMode()

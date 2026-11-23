@@ -103,7 +103,7 @@ unsigned int __stdcall Movie_StoreScaledLimbs(int Source, unsigned int Digit, un
 }
 
 // 0x06ac86f0
-// Count <= 2 writes the low limbs with 32-bit IMUL and drops the add carry (06ac8888).
+// Count <= 2 writes the low limbs with 32-bit IMUL and drops the add carry.
 // Count >= 3 fills the 0x428-byte stack image: diagonal products at ESP+0x10, limb copies
 // at ESP+0x220 and ESP+0x324. Cross terms are |Li-L0|*|Rj-R0| added at a sign-adjusted index.
 // The odd and even epilogues subtract adjacent buffer limbs into Count outputs.
@@ -300,7 +300,7 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
 }
 
 // 0x06ac8910
-// The listing pairs limbs with SBB, then propagates the borrow. A cleared borrow copies
+// Retail pairs limbs with SBB, then propagates the borrow. A cleared borrow copies
 // the untouched tail when Dest is not Left. The final borrow is 0 or 1.
 long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum)
 {

@@ -6,12 +6,10 @@
 
 #pragma once
 
-// Gf::ObjectProp -- E:\FL\Scratch\Source\Client\Gf\ObjectProp.cpp (freelancer.exe
-// 0x00445e20..0x00446b9f). A room prop: one engine instance loaded from a PetalDB record or an
+// Gf::ObjectProp -- E:\FL\Scratch\Source\Client\Gf\ObjectProp.cpp. A room prop: one engine instance loaded from a PetalDB record or an
 // archetype, optionally with the ship loadout's equipment attached and its lights blinking.
 // RoomControl builds one per RoomData+0x158 record (FUN_0044a030); the Thorn spawn FUN_0044e430
-// builds one per COMPOUND entity. Vtable 0x005cbc0c, sizeof 0x80 (operator new(0x80) at
-// 0x0044a19f and 0x0044e7ab).
+// builds one per COMPOUND entity. Vtable 0x005cbc0c, sizeof 0x80 (operator new(0x80) in both).
 
 #include "GameFlow/anim_script_set.h"
 #include "common_csys.h"
@@ -52,8 +50,8 @@ public:
     void DrawOpaque(ICamera* Camera) override;      // 7  FUN_00446ac0
     void DrawTranslucent(ICamera* Camera) override; // 8  FUN_00446b40
 
-    // RoomControl's reads (FUN_0044a030 0x0044a2a3 / FUN_0044e430 0x0044e506 read +0x58, the
-    // script table's +0x0c; FUN_00449420 0x00449566 tests +0x49).
+    // RoomControl's reads (FUN_0044a030 / FUN_0044e430 read +0x58, the script table's +0x0c;
+    // FUN_00449420 tests +0x49).
     unsigned long GetMainScript() const { return Scripts.Script; }
     char const* GetName() const { return Name.c_str(); }
 

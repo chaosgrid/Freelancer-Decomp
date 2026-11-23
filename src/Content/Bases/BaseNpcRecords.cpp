@@ -22,7 +22,7 @@
 
 namespace
 {
-    // FUN_06ed4010 06ed4029-06ed4057 / 06ed4070-06ed409e: the value of the first
+    // Inlined twice in FUN_06ed4010: the value of the first
     // GContentStageNames entry whose name matches (all 43 entries, null names skipped);
     // Default when none does.
     int FindStageValue(char const* Name, int Default)
@@ -54,9 +54,8 @@ bool FBaseNpcBribe::Parse(INI_Reader* Reader)
     return true;
 }
 
-// FUN_06ed4160 (06ed4160-06ed41ae). 06ed4187 calls IAT 06fb35e8 =
-// ?GetReputation@Reputation@pub@@YAHABHABIAAM@Z (result ignored). FCOMP DAT_06fb60ac
-// (0.6), TEST AH,5 / JP: not below (or unordered) -> 0; below -> 1.
+// FUN_06ed4160 (06ed4160-06ed41ae). The GetReputation result is ignored; 0.6 is
+// DAT_06fb60ac, and an unordered feeling is not offered.
 bool FBaseNpcBribe::IsOffered(FContentPlayerStateBase const* Player) const
 {
     float Feeling = 0.0f;
@@ -65,8 +64,7 @@ bool FBaseNpcBribe::IsOffered(FContentPlayerStateBase const* Player) const
     return Feeling < 0.6f;
 }
 
-// FUN_06ed3f90 (06ed3f90-06ed3fc0). FCOMP threshold, TEST AH,1 / JNZ: below (or
-// unordered) -> 0.
+// FUN_06ed3f90 (06ed3f90-06ed3fc0). An unordered feeling is not offered.
 bool FBaseNpcKnow::IsOffered(FContentPlayerState const* Player, float Feeling) const
 {
     if (!(Feeling >= GBaseNpcRepThresholds[RepLevel]))
@@ -88,8 +86,8 @@ bool FBaseNpcKnow::Parse(INI_Reader* Reader)
 bool FBaseNpcRumor::Parse(INI_Reader* Reader)
 {
     // Retail keeps the stage in the stack slot of the Reader argument, never
-    // initialised: a name missing from the table leaves the Reader pointer bits
-    // (06ed4053), and a missing second name repeats the first result (06ed409e).
+    // initialised: a name missing from the table leaves the Reader pointer bits, and a
+    // missing second name repeats the first result.
     int Stage = static_cast<int>(reinterpret_cast<intptr_t>(Reader));
     Stage = FindStageValue(Reader->get_value_string(0), Stage);
     FromStage = Stage;
@@ -97,8 +95,7 @@ bool FBaseNpcRumor::Parse(INI_Reader* Reader)
     ToStage = Stage;
     RepLevel = Reader->get_value_int(2);
 
-    // 06ed40b4-06ed40ec: values 3.. into Ids until the first empty one. Retail has no
-    // bound on the 8 slots; missions\mbases.ini never gives more than one id.
+    // Retail has no bound on the 8 slots; missions\mbases.ini never gives more than one id.
     unsigned int Index = 3;
     while (!Reader->is_value_empty(Index))
     {
@@ -108,8 +105,7 @@ bool FBaseNpcRumor::Parse(INI_Reader* Reader)
     return true;
 }
 
-// FUN_06ed4100 (06ed4100-06ed415b). Stage bounds are signed (JL / JG); the rumor test is
-// unsigned (CMP EAX,1 / JNC).
+// FUN_06ed4100 (06ed4100-06ed415b). Stage bounds are signed; the rumor test is unsigned.
 int FBaseNpcRumor::GetWeight(FContentPlayerState const* Player, float Feeling) const
 {
     int Stage = static_cast<int>(Player->MissionNumber);

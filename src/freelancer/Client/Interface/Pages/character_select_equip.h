@@ -28,17 +28,16 @@ unsigned GetPlayerCollisionRevisionRetail();        // FUN_004c4fa0 → DAT_0067
 bool ModifyPlayerEquipRetail(unsigned short Id, CacheString const* Hardpoint, int Count,
                              float Health, unsigned char bEquipped);
 // FUN_004c45d0 (cdecl) -- the first entry of DAT_00672960 with this archetype id whose
-// bMission (+0x18) is clear; null when there is none. Callers: 0x0048af5f, 0x004c0533,
-// 0x004c0540, 0x004dc77b, 0x004dc7ea, HUD_Status 0x004de2fd / 0x004de34f, 0x0052d464.
+// bMission (+0x18) is clear; null when there is none. Callers include HUD_Status.
 EquipDesc* FindPlayerNonMissionEquipRetail(unsigned ArchId);
 // FUN_004c4320 (cdecl; the first argument is never read) -- remove Count of the player's item
 // Id from DAT_00672960 (EquipDescList::remove_equipment_item), bumping DAT_00673384; false when
 // there is no such item, then the ObjectShip unmount notify (FUN_00446be0 / FUN_00447850).
-// Callers: 0x0043760f, the launcher fire 0x0052d494, 0x0053beda..0x0053e070 (six).
+// Callers include the launcher fire and six IClient handlers.
 bool RemovePlayerEquipRetail(unsigned char UnusedFlag, unsigned short Id, int Count);
 // FUN_004c4170 (cdecl; the first argument is never read) -- DAT_00673384++, add Desc to
 // DAT_00672960 (combined when arch_is_combinable), then the GF ObjectShip mount notify
-// (FUN_00446be0 / FUN_004477d0). Callers: IClient slot 26 (0x004375ea), slot 86 (0x0053e081).
+// (FUN_00446be0 / FUN_004477d0). Callers: IClient slots 26 and 86.
 void AddPlayerEquipRetail(unsigned char UnusedFlag, EquipDesc const* Desc);
 std::list<CollisionGroupDesc>& GetPlayerCollisionGroupListRetail(); // FUN_004c3f00
 unsigned const* GetPlayerRepVibeScratchRetail();    // FUN_004c3de0 → &DAT_006728e4
@@ -69,19 +68,18 @@ void SetPlayerCreditsRetail(unsigned Credits, int bFromCharacterSelect); // FUN_
 void SetPlayerNumKillsRetail(unsigned Kills);           // FUN_004c4d70 → DAT_00673368
 void SetPlayerMissionSuccessesRetail(unsigned Successes); // FUN_004c4d80 → DAT_0067336c
 void SetPlayerMissionFailuresRetail(unsigned Failures); // FUN_004c4d90 → DAT_00673370
-void SetPlayerStarSystemIdRetail(unsigned SystemId);    // FUN_004c4840 (visit/notify stubbed)
-void SetPlayerBaseIdRetail(unsigned BaseId);            // FUN_004c4910 (core assign only)
+void SetPlayerStarSystemIdRetail(unsigned SystemId);    // FUN_004c4840
+void SetPlayerBaseIdRetail(unsigned BaseId);            // FUN_004c4910
 void SetPlayerFactionScratchRetail(unsigned Value);     // FUN_004c4a10
 
 // The player ship's last position (DAT_006732e4, 3 floats) and orientation (DAT_006732c0,
-// 9 floats), refreshed every space frame from the watched ship (0x0054b192 / 0x0054b1b0).
+// 9 floats), refreshed every space frame from the watched ship.
 float const* GetPlayerLastPositionRetail();                   // FUN_004c4a20
 void SetPlayerLastPositionRetail(float const* Position);      // FUN_004c4a30
 float const* GetPlayerLastOrientationRetail();                // FUN_004c4a50
 void SetPlayerLastOrientationRetail(float const* Orientation); // FUN_004c4a60
 
-// Zero-init a CSimple::CreateParms-sized scratch (FUN_0052e0a0). Prefer CShip::CreateParms
-// default members for new code; kept for listing parity with FUN_0054b520.
+// Zero-init a CSimple::CreateParms-sized scratch (FUN_0052e0a0), as FUN_0054b520 does.
 void InitCreateParmsScratchRetail(void* ParmsBytes);
 
 // Apply CharacterSelect response fields (FUN_005ab250 extract tail) from one record
@@ -104,15 +102,14 @@ OwnerList<CCharacterSet::CharacterInfo>& CharacterSelect_GetConnectCharacters();
 void NotifyCharacterSelectComplete(unsigned const Response4[4]);
 
 // DAT_006732f0 -- the name of the selected character (wcscpy'd by FUN_005ab250; read by
-// EnterState case 19 through FUN_005aad30, and by 0x004c0842 / 0x004d328d / 0x0054b7a7).
+// EnterState case 19 through FUN_005aad30, and directly by three other readers).
 wchar_t* GetPlayerCharacterNameRetail();
 
 // The player's visit map DAT_00673320 (system / object id -> visit flags).
-// FUN_004c4da0 (cdecl, four arguments: every one of the 33 call sites pushes four and cleans
-// 0x10) -- the id's flags into *OutFlags; false (nothing written) when the id has no entry.
-// Arg3 / Arg4 are not read by the body; the callers pass (0, 0), zones (1, 0) -- 0x0049398d,
-// 0x00497f5c, 0x00498b82, 0x0049b71b.., 0x004a1c45 -- and 0x004a8bb3 / 0x0051cfea (0, 1).
-// Their meaning is not recovered.
+// FUN_004c4da0 (cdecl, four arguments at all 33 call sites) -- the id's flags into *OutFlags;
+// false (nothing written) when the id has no entry. Arg3 / Arg4 are not read by the body; most
+// callers pass (0, 0), the zone lookups (1, 0) and two callers (0, 1). Their meaning is not
+// recovered.
 bool GetPlayerVisitFlagsRetail(unsigned Id, unsigned char* OutFlags, unsigned Arg3,
                                unsigned Arg4);
 // FUN_004c4e00 (cdecl) -- unless the entry already carries every bit of Flags, store Flags as
@@ -121,9 +118,9 @@ bool GetPlayerVisitFlagsRetail(unsigned Id, unsigned char* OutFlags, unsigned Ar
 void SetPlayerVisitFlagsRetail(unsigned Id, unsigned char Flags, bool bNotifyServer);
 // The map clear FUN_004c4a80 / FUN_004c4bc0 inline (not a retail function of its own).
 void ClearPlayerVisitMapRetail();
-// The two stores FUN_004c4a80 inlines (0x004c4a8a / 0x004c4a94): DAT_0067337c = 0 and
+// The two stores FUN_004c4a80 inlines: DAT_0067337c = 0 and
 // DAT_00673380 = 0 -- plain stores, not FUN_004c3e20 / FUN_004c4f80. Not a retail function.
 void ClearPlayerShipArchAndHealthRetail();
 // FUN_004c4000 (cdecl) -- the health of the player's collision group Id in DAT_0067296c, then
-// DAT_00673388++ (also when there is no such group). Caller: IClient slot 63 (0x0053bf3a).
+// DAT_00673388++ (also when there is no such group). Caller: IClient slot 63.
 void SetPlayerCollisionGroupHealthRetail(unsigned short Id, float Health);

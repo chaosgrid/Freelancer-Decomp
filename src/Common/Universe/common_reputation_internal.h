@@ -19,7 +19,7 @@ namespace CmnReputation
 {
     // A record of the group registry DAT_064018ec (std::map keyed by the 16-bit MakeId value;
     // record = node+0x10): +0x00 nickname TString<16>, +0x14 ids_name, +0x18 ids_info,
-    // +0x1c ids_short_name, +0x20 feelings map (Reputation::Startup 0631eb11-0631eba1).
+    // +0x1c ids_short_name, +0x20 feelings map.
     struct FGroup
     {
         TString<16> Nickname;

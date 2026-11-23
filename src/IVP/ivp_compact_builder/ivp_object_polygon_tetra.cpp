@@ -17,12 +17,8 @@
 #include "../ivp_utility/ivp_min_hash.h"
 
 // ============================================================================
-// Common.dll .text:06378a10-0637a2d9 (2026-10-08, claude-code:cmn-ivp4b).
-// Compare idioms used below (FNSTSW AX after FCOM ST0, src):
-//   TEST AH,0x41 + JZ  -> taken when ST0 > src (ordered)         == (a > b)
-//   TEST AH,0x41 + JNZ -> taken when ST0 <= src or unordered     == !(a > b)
-//   TEST AH,0x01 + JZ  -> taken when ST0 >= src (ordered)        == (a >= b)
-//   TEST AH,0x01 + JNZ -> taken when ST0 < src or unordered      == !(a >= b)
+// Common.dll 06378a10-0637a2d9. Compares are written as (a > b) / !(a > b) /
+// (a >= b) / !(a >= b) so the unordered (NaN) case falls on retail's side.
 // ============================================================================
 
 namespace
@@ -55,7 +51,7 @@ namespace
 // IVP_Triangle / IVP_Tri_Edge
 // ---------------------------------------------------------------------------
 
-// FUN_06378a10 (.text:06378a10-06378a36): set_plane_from_3_points (063480a0)
+// FUN_06378a10: set_plane_from_3_points (063480a0)
 // with (e0.start, e0.prev.start, e0.next.start), then normize_plane (06348150).
 void IVP_Triangle::calc_hesse()
 {
@@ -64,7 +60,7 @@ void IVP_Triangle::calc_hesse()
     tmp_hesse.normize_plane();
 }
 
-// FUN_06378a40 (.text:06378a40-06378a65).
+// FUN_06378a40.
 IVP_Tri_Edge* IVP_Tri_Edge::other_side()
 {
     IVP_Triangle* const Other = triangle->other_side;
@@ -83,9 +79,8 @@ IVP_Tri_Edge* IVP_Tri_Edge::other_side()
     return nullptr;
 }
 
-// FUN_0637a0e0 (.text:0637a0e0-0637a10d): vtable 063a5998; +0x04..+0x10 = 0,
-// the two flag bytes = 0, +0x18 = 0, then REP STOSD of 0x1b zero dwords over
-// the three edges (+0x1c..+0x87). tmp_hesse and index are left as allocated.
+// FUN_0637a0e0: vtable 063a5998; everything up to and including the three
+// edges (+0x1c..+0x87) zeroed. tmp_hesse and index are left as allocated.
 IVP_Triangle::IVP_Triangle()
     : next(nullptr)
     , prev(nullptr)
@@ -108,7 +103,7 @@ IVP_Triangle::~IVP_Triangle()
 // IVP_Poly_Surface
 // ---------------------------------------------------------------------------
 
-// FUN_06379b00 (.text:06379b00-06379b07): MOV [ECX+4],[ESP+8]; RET 8.
+// FUN_06379b00, RET 8: writes only +0x04.
 void IVP_Poly_Surface::set(IVP_Template_Surface* TemplSurface, IVP_Object_Polygon_Tetra* Tetra)
 {
     (void)TemplSurface;
@@ -119,7 +114,7 @@ void IVP_Poly_Surface::set(IVP_Template_Surface* TemplSurface, IVP_Object_Polygo
 // P_Sur_2D_Point / P_Sur_2D_Line / P_Sur_2D_Triangle
 // ---------------------------------------------------------------------------
 
-// FUN_06378aa0 (.text:06378aa0-06378ab8): REP STOSD 7 zero dwords, +0x10 = arg.
+// FUN_06378aa0: 7 zero dwords, +0x10 = arg.
 P_Sur_2D_Point::P_Sur_2D_Point(int32_t PointNum)
     : point_num(PointNum)
     , chain_mark(0)
@@ -131,7 +126,7 @@ P_Sur_2D_Point::P_Sur_2D_Point(int32_t PointNum)
     k[3] = 0.0f;
 }
 
-// FUN_06378ac0 (.text:06378ac0-06378af7): REP STOSD 6 zero dwords; start /
+// FUN_06378ac0: 6 zero dwords; start /
 // end stored; only when both are set: delta = end - start for x and y.
 P_Sur_2D_Line::P_Sur_2D_Line(P_Sur_2D_Point* StartPoint, P_Sur_2D_Point* EndPoint)
     : next(nullptr)
@@ -148,7 +143,7 @@ P_Sur_2D_Line::P_Sur_2D_Line(P_Sur_2D_Point* StartPoint, P_Sur_2D_Point* EndPoin
     }
 }
 
-// FUN_06378a70 (.text:06378a70-06378a99): five zero dwords, then the three
+// FUN_06378a70: five zero dwords, then the three
 // point numbers at +0x08 / +0x0c / +0x10.
 P_Sur_2D_Triangle::P_Sur_2D_Triangle(int32_t Point0, int32_t Point1, int32_t Point2)
     : next(nullptr)
@@ -159,7 +154,7 @@ P_Sur_2D_Triangle::P_Sur_2D_Triangle(int32_t Point0, int32_t Point1, int32_t Poi
     point_nums[2] = Point2;
 }
 
-// FUN_06378c10 (.text:06378c10-06378c29): (p.y - s.y) * dx + (s.x - p.x) * dy,
+// FUN_06378c10: (p.y - s.y) * dx + (s.x - p.x) * dy,
 // returned on the x87 stack.
 double P_Sur_2D_Line::hesse_dist_to_point(const P_Sur_2D_Point* Point) const
 {
@@ -168,11 +163,9 @@ double P_Sur_2D_Line::hesse_dist_to_point(const P_Sur_2D_Point* Point) const
     return A + B;
 }
 
-// FUN_06378b00 (.text:06378b00-06378b35): d = hesse_dist_to_point(p);
-// FCOM 1e-10f, TEST AH,0x41, JZ -> d > 1e-10f continues, otherwise return 0;
-// then FCOMP DAT_0658b9c8, TEST AH,0x41: EAX = 2, JNZ keeps 2 (d <= value or
-// unordered), else 1. DAT_0658b9c8 is always 0 and d > 1e-10f here, so 1 is
-// the only value this path returns.
+// FUN_06378b00: d = hesse_dist_to_point(p); d <= 1e-10f (or unordered) -> 0;
+// then 2 when d <= DAT_0658b9c8 (or unordered), else 1. DAT_0658b9c8 is
+// always 0 and d > 1e-10f here, so 1 is the only value this path returns.
 int32_t P_Sur_2D_Line::point_lies_to_the_left(const P_Sur_2D_Point* Point) const
 {
     const double Dist = hesse_dist_to_point(Point);
@@ -187,7 +180,7 @@ int32_t P_Sur_2D_Line::point_lies_to_the_left(const P_Sur_2D_Point* Point) const
     return 1;
 }
 
-// FUN_06378b40 (.text:06378b40-06378b8e, RET 8).
+// FUN_06378b40, RET 8.
 int32_t P_Sur_2D_Line::has_points(const P_Sur_2D_Point* A, const P_Sur_2D_Point* B) const
 {
     if (B == nullptr)
@@ -205,8 +198,7 @@ int32_t P_Sur_2D_Line::has_points(const P_Sur_2D_Point* A, const P_Sur_2D_Point*
     return 0;
 }
 
-// FUN_06378ba0 (.text:06378ba0-06378c08): len2 = dx*dx + dy*dy; FCOM 1e-10f,
-// TEST AH,1, JZ -> len2 >= 1e-10f takes the signed distance
+// FUN_06378ba0: len2 = dx*dx + dy*dy; len2 >= 1e-10f takes the signed distance
 // hesse_dist / sqrt(len2) (computed inline, same terms as 06378c10); less or
 // unordered returns (s.y - p.y)^2 + (s.x - p.x)^2 instead (no sqrt).
 double P_Sur_2D_Line::dist_to_point(const P_Sur_2D_Point* Point) const
@@ -223,12 +215,10 @@ double P_Sur_2D_Line::dist_to_point(const P_Sur_2D_Point* Point) const
     return Hesse / std::sqrt(Len2);
 }
 
-// FUN_06378c30 (.text:06378c30-06378d00). The dominant axis is x when
-// |dx| > 1e-10f, else y when |dy| > 1e-10f, else the result is 0. On that
-// axis: sign = +1 when delta > 0 else -1 (FIMUL by the int), v = (p - s) * sign;
-// v <= 1e-4f (or unordered) -> 0; then FLD |delta| (rounded to float by the
-// FST at 06378c38 / 06378c94), FSUB 1e-4f, FCOMPP against v: TEST AH,1, JZ
-// -> v not less -> 0; otherwise 1.
+// FUN_06378c30. The dominant axis is x when |dx| > 1e-10f, else y when
+// |dy| > 1e-10f, else the result is 0. On that axis: sign = +1 when delta > 0
+// else -1 (an int multiply), v = (p - s) * sign; v <= 1e-4f (or unordered)
+// -> 0; v >= float(|delta|) - 1e-4f -> 0; otherwise 1.
 int32_t P_Sur_2D_Line::point_lies_in_interval(const P_Sur_2D_Point* Point) const
 {
     int32_t Axis = 0;
@@ -261,7 +251,7 @@ int32_t P_Sur_2D_Line::point_lies_in_interval(const P_Sur_2D_Point* Point) const
     return 1;
 }
 
-// FUN_06378d10 (.text:06378d10-06378e91). Axis x when |dx| > 1e-8f, else y
+// FUN_06378d10. Axis x when |dx| > 1e-8f, else y
 // when |dy| > 1e-8f, else Other->point_lies_in_interval(start_point).
 // On the axis: delta > 0 -> lo = start, hi = end, else lo = end, hi = start;
 // MinV = float(lo + 1e-8f), MaxV = float(hi - 1e-8f); with os / oe the other
@@ -317,7 +307,7 @@ int32_t P_Sur_2D_Line::overlaps_with_line(const P_Sur_2D_Line* Other) const
     return 0;
 }
 
-// FUN_06378ea0 (.text:06378ea0-06378fc7).
+// FUN_06378ea0.
 //   cr = dy * o.dx - dx * o.dy (kept on the stack; FST rounds a float copy).
 //   |cr| < 1e-9f (or unordered): parallel -> |dist_to_point(o.start)| below
 //     DAT_063a5994 (or unordered) ? overlaps_with_line(o) != 0 : 0.
@@ -385,7 +375,7 @@ int32_t P_Sur_2D_Line::is_crossing_line(const P_Sur_2D_Line* Other) const
 // P_Sur_2D
 // ---------------------------------------------------------------------------
 
-// FUN_06378fd0 (.text:06378fd0-06378ffa): all 8 dwords zero, then
+// FUN_06378fd0: all 8 dwords zero, then
 // tetra / orig_surface.
 P_Sur_2D::P_Sur_2D(IVP_Object_Polygon_Tetra* Tetra, IVP_Template_Surface* OrigSurface)
     : tetra(Tetra)
@@ -399,7 +389,7 @@ P_Sur_2D::P_Sur_2D(IVP_Object_Polygon_Tetra* Tetra, IVP_Template_Surface* OrigSu
 {
 }
 
-// FUN_06379000 (.text:06379000-063790f5): frees line_array / point_array
+// FUN_06379000: frees line_array / point_array
 // (FUN_06343fb0, nulled); deletes every remaining line together with its
 // start and end point (the no-op dtor 062a8920 + operator delete each),
 // unlinking it first (next = 0xffffffff, n_lines--); then unlinks and
@@ -466,7 +456,7 @@ P_Sur_2D::~P_Sur_2D()
     }
 }
 
-// FUN_06379100 (.text:06379100-063793c6).
+// FUN_06379100.
 // Projection axis = argmax |normal| (strictly greater replaces, x first);
 // (U, V) = axis 0: (2, 1), axis 1: (2, 0), axis 2: (1, 0); a 2D point is
 // x = coord[V], y = coord[U], z = 0. flip = normal[axis] < 0 (or unordered),
@@ -599,7 +589,7 @@ const char* P_Sur_2D::calc_line_representation()
     return nullptr;
 }
 
-// FUN_063793d0 (.text:063793d0-063793f6).
+// FUN_063793d0.
 int32_t P_Sur_2D::mark_point_chain(P_Sur_2D_Point* Point)
 {
     int32_t Count = 0;
@@ -612,7 +602,7 @@ int32_t P_Sur_2D::mark_point_chain(P_Sur_2D_Point* Point)
     return Count;
 }
 
-// FUN_06379400 (.text:06379400-0637945a): a = P2 - P0, b = P2 - P1, all on
+// FUN_06379400: a = P2 - P0, b = P2 - P1, all on
 // the x87 stack; sum = ((((bz^2 + by^2) + bx^2) + az^2) + ay^2) + ax^2.
 double P_Sur_2D::sum_quad_dists(const IVP_U_Point* P0, const IVP_U_Point* P1, const IVP_U_Point* P2)
 {
@@ -630,7 +620,7 @@ double P_Sur_2D::sum_quad_dists(const IVP_U_Point* P0, const IVP_U_Point* P1, co
     return Sum;
 }
 
-// FUN_06379460 (.text:06379460-063799ac): ear clipping of the outline.
+// FUN_06379460: ear clipping of the outline.
 // Each pass (at most 101; the 102nd fails with "Cannot convert" after
 // printing every remaining line's start point) takes the head line as the
 // base, ranks every line by sum_quad_dists(base.start, base.end, line.start)
@@ -643,7 +633,7 @@ double P_Sur_2D::sum_quad_dists(const IVP_U_Point* P0, const IVP_U_Point* P1, co
 // deleted (it cancels) or else the side is added at the head.
 const char* P_Sur_2D::calc_triangle_representation()
 {
-    // Retail reads lines->start_point with no null check (.text:06379482-06379491);
+    // Retail reads lines->start_point with no null check (:06379482);
     // the returned count is not used.
     mark_point_chain(lines->start_point);
 
@@ -853,7 +843,7 @@ const char* P_Sur_2D::calc_triangle_representation()
 // IVP_Object_Polygon_Tetra
 // ---------------------------------------------------------------------------
 
-// FUN_06379a10 (.text:06379a10-06379afb): REP STOSD 0x14 zero dwords;
+// FUN_06379a10: 0x14 zero dwords;
 // template_polygon = Templ; points = FUN_06343f80 (calloc) of n_points * 0x18,
 // each point's x / y / z copied from the template point and l_tetras = this;
 // surfaces = calloc of n_surfaces * 0xc, each set(&templ->surfaces[i], this)
@@ -895,7 +885,7 @@ IVP_Object_Polygon_Tetra::IVP_Object_Polygon_Tetra(IVP_Template_Polygon* Templ)
     template_polygon = nullptr;
 }
 
-// FUN_06379b10 (.text:06379b10-06379b47): free_triangles, then free (FUN_06343fb0)
+// FUN_06379b10: free_triangles, then free (FUN_06343fb0)
 // surfaces and points when set, nulling each.
 IVP_Object_Polygon_Tetra::~IVP_Object_Polygon_Tetra()
 {
@@ -912,7 +902,7 @@ IVP_Object_Polygon_Tetra::~IVP_Object_Polygon_Tetra()
     }
 }
 
-// FUN_06379ff0 (.text:06379ff0-0637a05d): unlinks the head triangle
+// FUN_06379ff0: unlinks the head triangle
 // (next = 0xffffffff, n_triangles--) and deletes it through vtable slot 0
 // until the list is empty; then operator-deletes the Field_0x48 chain (next
 // pointer at +0x18) and clears it.
@@ -948,7 +938,7 @@ void IVP_Object_Polygon_Tetra::free_triangles()
     Field_0x48 = nullptr;
 }
 
-// FUN_063799b0 (.text:063799b0-06379a06): key = {min(A, B), max(A, B)}
+// FUN_063799b0: key = {min(A, B), max(A, B)}
 // (unsigned pointer compare); a stored edge -> both opposite links set to
 // each other, otherwise Edge is stored under the key.
 void IVP_Object_Polygon_Tetra::link_edge(IVP_Hash* Hash, IVP_Poly_Point* A, IVP_Poly_Point* B, IVP_Tri_Edge* Edge)
@@ -976,7 +966,7 @@ void IVP_Object_Polygon_Tetra::link_edge(IVP_Hash* Hash, IVP_Poly_Point* A, IVP_
     Found->opposite = Edge;
 }
 
-// FUN_06379b50 (.text:06379b50-06379fe8).
+// FUN_06379b50.
 // Edge hash (point pair -> edge) of (n_points - 2) * 6 buckets. For every
 // template surface in order: a P_Sur_2D, its lines and its ear-clipped 2D
 // triangles (an error prints "make_triangles:...: %s\n" and returns with the
@@ -1123,7 +1113,7 @@ const char* IVP_Object_Polygon_Tetra::make_triangles()
     return nullptr;
 }
 
-// FUN_0637a060 (.text:0637a060-0637a088): for each of the three edges:
+// FUN_0637a060: for each of the three edges:
 // triangle = Triangle, behind = the edge itself, opposite = other_side().
 void IVP_Object_Polygon_Tetra::init_tri_edges(IVP_Triangle* Triangle)
 {
@@ -1136,9 +1126,8 @@ void IVP_Object_Polygon_Tetra::init_tri_edges(IVP_Triangle* Triangle)
     }
 }
 
-// FUN_0637a090 (.text:0637a090-0637a0da): key = {min, max} of the edge's start
-// point and its next edge's start point (unsigned compare, JBE keeps the
-// order); stored in edge_hash only when the key is absent.
+// FUN_0637a090: key = {min, max} of the edge's start point and its next
+// edge's start point (unsigned compare); stored in edge_hash only when the key is absent.
 void IVP_Object_Polygon_Tetra::add_edge_to_hash(IVP_Tri_Edge* Edge)
 {
     uintptr_t Key[2];
@@ -1156,7 +1145,7 @@ void IVP_Object_Polygon_Tetra::add_edge_to_hash(IVP_Tri_Edge* Edge)
     }
 }
 
-// FUN_0637a140 (.text:0637a140-0637a23a): front triangle P1 -> P2 -> P3 and
+// FUN_0637a140: front triangle P1 -> P2 -> P3 and
 // its reverse P2 -> P1 -> P3 (array order P2, P3, P1 linked e0 -> e2 -> e1),
 // other_side linked both ways, init_tri_edges and calc_hesse on both, then
 // every edge's start_point_index = its start point's compact_index (three steps
@@ -1220,11 +1209,10 @@ IVP_Triangle* IVP_Object_Polygon_Tetra::make_double_triangle(IVP_Poly_Point* P1,
     return Front;
 }
 
-// FUN_0637a240 (.text:0637a240-0637a2d9): clears every pierce_partner; then
-// every front triangle without a partner takes the front triangle whose
-// hesse normal gives the smallest dot product below -1e-6f
-// ((z*z' + y*y') + x*x' on the stack; the running minimum is stored as a
-// float; a NaN dot also replaces it, FCOM + TEST AH,1 + JZ) and the two are
+// FUN_0637a240: clears every pierce_partner; then every front triangle
+// without a partner takes the front triangle whose hesse normal gives the
+// smallest dot product below -1e-6f (the running minimum is stored as a
+// float; a NaN dot also replaces it) and the two are
 // paired both ways. With no such triangle the partner is null and the
 // reverse store writes through it -- retail crashes there the same way.
 void IVP_Object_Polygon_Tetra::pair_pierce_triangles()

@@ -49,23 +49,20 @@ struct FButtonMontageTile;
 struct FFontString;
 struct IObjRW;
 
-// DAT_0067494c -- "rebuild the contact list on the next Draw". Written 1 by FUN_004bcbf0
-// (0x004bcbfc; the best-path -> player-waypoint rebuild, not ported yet, so nothing in the
-// port raises it), cleared by the ctor (0x004cf590) and by Draw when it consumes it
-// (0x004d2532).
+// DAT_0067494c -- "rebuild the contact list on the next Draw". Raised by
+// BestPathObjectivesChanged (FUN_004bcbf0), cleared by the ctor and by Draw when it consumes it.
 extern unsigned char G_bHudContactListRefreshRequested;
 
 // One row source of the list (retail element 0x1c bytes in a VC6 std::list node of 0x24).
 struct FHudContactEntry
 {
-    // FUN_004cf030 (thiscall, RET 0x14) -- see the .cpp: the watcher takes Obj, and the
-    // distance, id and "is the player's target listed" latch (DAT_006748fc) come from the kind.
+    // FUN_004cf030 -- the watcher takes Obj; the "is the player's target listed" latch
+    // (DAT_006748fc) depends on the kind, see the .cpp.
     FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, unsigned InId, int InIndex);
-    // FUN_004d49b0 (node copy-construct, and the same body inlined at 0x004d2267 /
-    // 0x004d23ec): Kind, a fresh watcher on the other's target (BaseWatcher::set_pointer when it
-    // watches something, FUN_004d4a40), then Distance, Id, Index and the watch-list byte.
+    // FUN_004d49b0 (list node copy-construct; also inlined at 0x004d2267 / 0x004d23ec): a fresh
+    // watcher on the other's target (FUN_004d4a40) plus a field copy.
     FHudContactEntry(FHudContactEntry const& Other);
-    // FUN_004d0470 -- the watcher's release (~BaseWatcher); nothing else.
+    // Implicit dtor = FUN_004d0470, the watcher's release (~BaseWatcher) only.
 
     // Watcher.target() - 8, or null: the IObjRW the row stands for.
     IObjRW* Object() const;
@@ -115,8 +112,7 @@ public:
     void SelectEntry(int Index);
     // FUN_004d0490 (thiscall on the HUDItem face) -- rebuild Contacts.
     void RebuildContacts();
-    // FUN_004d3fd0 (thiscall, RET 4; `this` is not read) -- the row kind of an object, -1 for
-    // none. Callers: RebuildContacts 0x004d216e / 0x004d236d.
+    // FUN_004d3fd0 (`this` is not read) -- the row kind of an object, -1 for none.
     int ClassifyContact(CSimple const* Object);
     // FUN_004d0250 (thiscall, RET 8) -- push a ship row for Ship / its client object Gameobj.
     void AddShipEntry(CShip const* Ship, FClientGameobj* Gameobj);

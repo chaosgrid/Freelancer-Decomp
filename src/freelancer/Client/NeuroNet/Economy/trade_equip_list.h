@@ -12,15 +12,14 @@
 // an item-view frame with its icon mesh, an info frame, an optional "?" info-card button, the
 // item's name and count texts and a health bar. vftable 0x005d6028 holds only the scalar
 // deleting destructor LAB_004be7c0 (the widgets belong to the parent's Win3D tree and are not
-// destroyed with the row). The constructor is inlined at every allocation site (0x004bf257,
-// 0x004bf2f2, NN_Trade 0x004c0d91): vftable, +0x04 owner list, +0x24 = 0.
+// destroyed with the row). The constructor is inlined at every allocation site (two here, one
+// in NN_Trade).
 //
 // CTradeEquipList (RTTI .?AVCTradeEquipList@@, no base; operator_new(0x68)) -- a fixed number
 // of rows over an EquipDescList, scrolled by a ScrollControl. vftable 0x005d628c holds only the
-// scalar deleting destructor FUN_004bf520. Built by NN_Trade's Create (0x004c18b9, 0x004c1911,
-// 0x004c1970). NN_Trade keeps three of them (+0x330 / +0x334 / +0x338) and drives everything
-// else: the scroll value (0x004c3775..0x004c378c writes +0x2c and refreshes), the selected item
-// +0x58, the select mode +0x5d and the cargo volume +0x60 (0x004c2220, 0x004c2380).
+// scalar deleting destructor FUN_004bf520. NN_Trade's Create builds three of them (+0x330 /
+// +0x334 / +0x338) and drives everything else: the scroll value (+0x2c), the selected item
+// +0x58, the select mode +0x5d and the cargo volume +0x60.
 //
 // Container note: +0x20 is an EquipDescList, a std::list<EquipDesc> as in retail, so element
 // addresses never move. The rows (+0x24) and NN_Trade's selection (+0x58, NN_Trade +0x428) keep
@@ -41,7 +40,7 @@ class NnButtonControl;
 
 // DAT_006724b8 -- the "%s-%06d" widget-name buffer (0x400 bytes) and DAT_006728b8, the counter
 // that makes each name unique. Shared by CTradeEquipListLine::Init, the CTradeEquipList ctor
-// ("ScrollBar") and NN_Trade's Create (0x004c0655..0x004c1836).
+// ("ScrollBar") and NN_Trade's Create.
 extern char G_TradeWidgetName[0x400];
 extern int G_TradeWidgetNameCounter;
 
@@ -57,7 +56,7 @@ void FormatTradeWidgetName(char const* Base);
 //   client companion; ids = the good's ids_name / ids_info (+0x88 / +0x8c).
 // Without a good: the equipment archetype's DA archetype, the companion's first material path
 // and the archetype's ids -- or nothing at all (not even the ids) when there is no archetype.
-// Callers: CTradeEquipListLine::SetItem (0x004bef9e, bShopArchetype 0), NN_Trade 0x004c2856.
+// Callers: CTradeEquipListLine::SetItem (bShopArchetype 0) and NN_Trade.
 void GetTradeItemVisuals(EquipDesc const* Item, CacheString* OutMesh, CacheString* OutMaterial,
                          int* OutIdsName, int* OutIdsInfo, bool bShopArchetype);
 
@@ -121,7 +120,7 @@ public:
     void Refresh(int Index);
 
     unsigned Field04;             // +0x04 -- never written by the ctor; TODO: meaning
-    WinControl* ScrollBar;        // +0x08 "ScrollBar" -- ScrollControl, Field2f0 = this
+    WinControl* ScrollBar;        // +0x08 "ScrollBar" -- ScrollControl, its +0x2f0 = this
     WinControl* Parent;           // +0x0c
     std::vector<CTradeEquipListLine*> Lines; // +0x10 VC6 vector (allocator byte + 3 pointers)
     EquipDescList Items;          // +0x20 std::list<EquipDesc> (see note above)
@@ -134,7 +133,7 @@ public:
     unsigned char bSelectMode;    // +0x5d -- NN_Trade sets it; Refresh shows only frame/icon/bar
     unsigned char bHighlight;     // +0x5e -- SetHighlight value for every row outside select mode
     unsigned char Pad5f;
-    double CargoVolume;           // +0x60 -- NN_Trade (0x004c22a1 get_cargo_space_occupied)
+    double CargoVolume;           // +0x60 -- NN_Trade (get_cargo_space_occupied)
 
 private:
     CTradeEquipList(CTradeEquipList const&) = delete;

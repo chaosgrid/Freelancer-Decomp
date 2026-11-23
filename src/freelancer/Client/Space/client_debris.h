@@ -24,14 +24,12 @@
 
 class INI_Reader;
 
-// One [Debris] section (FUN_00530a20 reads it; the default below is the same values). The
-// retail map node keeps the nickname at +0x0c and this record at +0x10 (FUN_005309c0 returns
-// node + 0x10), 0x24 bytes (the MOVSD.REP ECX=9 at 0x00530caa).
+// One [Debris] section (FUN_00530a20 reads it). The retail map node keeps the nickname at
+// +0x0c and this record at +0x10; 0x24 bytes (nine dwords copied into the node).
 struct FDebrisArch
 {
-    // The defaults both retail builders store inline -- the section reader's local
-    // (0x00530a30..0x00530a74) and the static initialiser of the default record LAB_00530960:
-    // 0, FLT_MAX, 1, both ids cleared, 0, {0, 0, 0}.
+    // The defaults both retail builders store inline -- the section reader's local and the
+    // static initialiser of the default record (LAB_00530960).
     FDebrisArch();
 
     float LifetimeMin;    // +0x00  lifetime = min[, max]; default 0
@@ -44,49 +42,45 @@ struct FDebrisArch
 };
 static_assert(sizeof(FDebrisArch) == 0x24, "Debris archetype 0x24");
 
-// FUN_00530a20 (cdecl) -- read one [Debris] section. A nicknamed section goes into the table;
-// a nickname already there is kept and, unless bQuiet, FDUMPs the duplicate warning. True
-// only when the section was added.
+// FUN_00530a20 -- read one [Debris] section. A nickname already in the table is kept and,
+// unless bQuiet, FDUMPs the duplicate warning. True only when the section was added.
 bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet);
-// FUN_00530d20 (cdecl) -- read every [Debris] section of Path. Returns how many entries the
-// table gained. Caller: DataConfig's debris= (0x005b0e3d, bQuiet = false).
+// FUN_00530d20 -- read every [Debris] section of Path. Returns how many entries the table
+// gained. Caller: DataConfig's debris= (bQuiet = false).
 int LoadDebrisArchFile(char const* Path, bool bQuiet);
-// FUN_00530fa0 -- empty the table (main.cpp's shutdown, 0x005b22a5).
+// FUN_00530fa0 -- empty the table (main.cpp's shutdown).
 void ShutdownDebrisArchDb();
-// FUN_005309c0 (cdecl) -- the entry named *Nickname, null when there is none.
+// FUN_005309c0 -- the entry named *Nickname, null when there is none.
 FDebrisArch* FindDebrisArch(ID_String const* Nickname);
-// FUN_00530a10 -- &DAT_006754d0, the default record (static initialiser LAB_00530960).
+// FUN_00530a10 -- the default record (DAT_006754d0).
 FDebrisArch* GetDefaultDebrisArch();
 
 class FClientDebrisGameobj : public FClientGameobj
 {
 public:
-    // FUN_005392d0(0xa), +0xb4 = 0, +0xb8 = 0, +0xbc = 1, Debris's vtables (0x00530656..
-    // 0x00530687). +0xa8..+0xb0 are left for FUN_005301d0.
+    // Inlined in the two factories. +0xa8..+0xb0 are left for Init.
     FClientDebrisGameobj();
-    // FUN_00530160 (this = the CBase sub-object); deleting wrapper FUN_00530130. Releases the
-    // explosion (FUN_00536170) when there is one, then GameObject's destructor.
+    // FUN_00530160 (this = the CBase sub-object); deleting wrapper FUN_00530130.
     ~FClientDebrisGameobj() override;
 
-    // IObjInspect 34 +0x88 LAB_00530610 (RET 4): *OutType = 0x80000000, returns 0.
+    // IObjInspect slot 34 (+0x88), LAB_00530610.
     int get_type(uint& OutType) const override;
 
-    // 90 +0x168 FUN_005304b0 (RET 4): FUN_00539bc0(1, Arch), then the object's vt+0x4c
-    // open(Arch).
+    // Slot 90 (+0x168), FUN_005304b0.
     void create(Archetype::Root* Arch) override;
-    // 91 +0x16c FUN_0053f330: XOR AL,AL / RET 4 (the body Beam shares).
+    // Slot 91 (+0x16c), FUN_0053f330 (the body Beam shares): returns false.
     bool find(unsigned const& Id) override;
-    // 93 +0x174 LAB_005304d0 (RET 4): the object's update, GameObject's update, then the
+    // Slot 93 (+0x174), LAB_005304d0: the object's update, GameObject's update, then the
     // lifetime countdown -- explode (slot 108) or vanish (slot 87) at 0.
     void update(float Dt) override;
-    // 95 +0x17c FUN_005300f0 (RET 0xc): GameObject's LOD pick; a picked LOD whose low word is
+    // Slot 95 (+0x17c), FUN_005300f0: GameObject's LOD pick; a picked LOD whose low word is
     // below 3, or whose high word is 2 or more, clears Field_0xbc.
     unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
-    // 108 +0x1b0 LAB_005305a0 (RET 4): with an explosion, FUN_005361e0(Explosion, this, Pos or
-    // get_position()) into the action list; without one, GameObject's slot 108.
+    // Slot 108 (+0x1b0), LAB_005305a0: with an explosion, Action_Explode into the action list;
+    // without one, GameObject's slot 108.
     void Explode(Vector const* Pos) override;
 
-    // FUN_005301d0 (RET 4): bind the piece to its [Debris] record -- GameObject's slot 92, the
+    // FUN_005301d0: bind the piece to its [Debris] record -- GameObject's slot 92, the
     // record's lifetime / death method / explosion, the trail effect, the drag, the nebula.
     void Init(FDebrisArch const* Arch);
 
@@ -103,13 +97,11 @@ public:
     unsigned char Padbd[3];
 };
 
-// FUN_00530620 (cdecl) -- a Debris gameobj around an existing object: new Debris, +0x10 =
-// Object, CBase::advise(true), Init(Arch), FUN_00540c30(Debris, 0). Callers: the explosion
-// shatter FUN_00536800 (0x00536995) and EquippedObj FUN_00533d10 (0x00533d77).
+// FUN_00530620 -- a Debris gameobj around an existing object. Callers: the explosion shatter
+// FUN_00536800 and EquippedObj FUN_00533d10.
 FClientDebrisGameobj* CreateDebrisGameobjForObject(CObject* Object, FDebrisArch const* Arch);
-// FUN_005306e0 (cdecl) -- a Debris gameobj built from a simple archetype at Pos: Arch->load,
-// the companion's Load(1), create(Arch), Arch->Release, the position, PhySys::BuildIVP_Real,
-// Init(DebrisArch), FUN_00540c30(Debris, 0). Caller: the explosion innards FUN_00536fb0.
+// FUN_005306e0 -- a Debris gameobj built from a simple archetype at Pos, with its own physics
+// body. Caller: the explosion innards FUN_00536fb0.
 FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
                                                   FDebrisArch const* DebrisArch,
                                                   Vector const* Pos);

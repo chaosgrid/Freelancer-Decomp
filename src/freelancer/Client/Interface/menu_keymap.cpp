@@ -24,39 +24,28 @@
 
 namespace
 {
-    // Retail PTR_s_USER_NONE_00614dd8 — 0xcc entries (listing .data:00614dd8..00615104).
+    // Retail PTR_s_USER_NONE_00614dd8 -- 0xcc entries.
     unsigned const kKeyCmdNicknameCount = 0xCCu;
 
     char const* const GKeyCmdNicknames[kKeyCmdNicknameCount] = {
 #include "Interface/menu_keymap_nicknames.inc"
     };
 
-    // DAT_0067c254 (allocator byte) / DAT_0067c258 (head) / DAT_0067c25c (size): every KeyCmd,
-    // held by value in 0x28-byte nodes. The static initializer LAB_00576950 builds the empty
-    // sentinel; LAB_00576990 (atexit) unlinks each node, runs the payload destructor
-    // (FUN_0052d3f0, the binding vector) and frees it, then frees the sentinel. The
-    // namespace-scope std::list does all of that; FUN_005785d0 is its insert and
-    // FUN_00578980 the payload copy-constructor.
+    // DAT_0067c254..DAT_0067c25c: every KeyCmd, by value in 0x28-byte list nodes (static init
+    // LAB_00576950, atexit LAB_00576990).
     std::list<FKeyCmd> GKeyCmds;
-    // DAT_0067c224 / DAT_0067c228 / DAT_0067c22c: every [KeyMap] group, by value, 0x24-byte
-    // nodes. LAB_00576a10 builds it, LAB_00576a50 (atexit) destroys each payload through
-    // FUN_00576ac0 (the KeyCmd-pointer list, then the nickname string); FUN_00578630 is the
-    // insert and FUN_00578a40 the payload copy-constructor.
+    // DAT_0067c224..DAT_0067c22c: every [KeyMap] group, by value in 0x24-byte nodes (static init
+    // LAB_00576a10, atexit LAB_00576a50).
     std::list<FKeyMapGroup> GKeyMapGroups;
-    // DAT_0067c218 (allocator byte) / DAT_0067c21c (head) / DAT_0067c220 (size): the active
-    // groups, newest first -- a std::list of group pointers in 0xc-byte nodes. The static
-    // initializer LAB_005773f0 builds the empty sentinel, LAB_00577430 (atexit) frees the nodes
-    // and the sentinel; a namespace-scope std::list does both. The walkers read a node's next
-    // pointer after its body, as a list iterator does.
+    // DAT_0067c218..DAT_0067c220: the active groups, newest first (static init LAB_005773f0,
+    // atexit LAB_00577430). The walkers read a node's next pointer after its body, as a list
+    // iterator does.
     std::list<FKeyMapGroup*> GActiveGroups;
     bool G_bKeyMapLoaded = false;                     // DAT_0067c3b0
-    char GUserKeyMapPath[0x104] = {};                 // DAT_0067c2a0 (0x104 bytes, next is DAT_0067c3a4)
+    char GUserKeyMapPath[0x104] = {};                 // DAT_0067c2a0
 
-    // DAT_0067c260 (allocator byte) / DAT_0067c264 (head) / DAT_0067c268 (size) -- the list of
-    // keys held down, each with the modifier mask captured at its key-down. 0x10-byte nodes:
-    // next +0, prev +4, key +8, modifiers +0xc (FUN_00578580 copies the pair into node+8).
-    // The static initializer LAB_005768b0 builds the empty sentinel and registers LAB_005768f0
-    // through atexit to free every node; a namespace-scope std::list does both.
+    // DAT_0067c260..DAT_0067c268 -- the keys held down, each with the modifier mask captured at
+    // its key-down (0x10-byte nodes; static init LAB_005768b0, atexit LAB_005768f0).
     struct FKeyMapHeldKey
     {
         unsigned Key;       // node+0x08
@@ -64,9 +53,8 @@ namespace
     };
     std::list<FKeyMapHeldKey> GHeldKeys;
 
-    // The inlined nickname lookup of FUN_005766e0 (0x00576723..0x00576746), FUN_00576f40
-    // (0x005770e0..0x005770ff) and FUN_00577ef0: stricmp against the 0xcc names in order,
-    // the first match wins, no match gives 0 (USER_NONE).
+    // The nickname lookup retail inlines in three places: stricmp against the 0xcc names in
+    // order, the first match wins, no match gives 0 (USER_NONE).
     unsigned ResolveNicknameId(char const* Name)
     {
         unsigned Index = 0;
@@ -78,7 +66,7 @@ namespace
         return 0;
     }
 
-    // The first KeyCmd in list order with this id (FUN_00577ec0 / FUN_00577ef0's walk).
+    // The first KeyCmd in list order with this id.
     FKeyCmd* FindKeyCmdByNicknameId(unsigned NicknameId)
     {
         for (std::list<FKeyCmd>::iterator It = GKeyCmds.begin(); It != GKeyCmds.end(); ++It)
@@ -89,7 +77,7 @@ namespace
         return nullptr;
     }
 
-    // FUN_005765b0 — parse one "key" value into VirtualKey + Modifiers.
+    // FUN_005765b0 -- parse one "key" value into VirtualKey + Modifiers.
     bool ParseKeyValue(INI_Reader& Reader, FKeyBinding* OutBinding)
     {
         OutBinding->VirtualKey = 0;
@@ -143,9 +131,8 @@ namespace
         return true;
     }
 
-    // FUN_005766e0 (thiscall on the KeyCmd, RET 4) -- parse the current [KeyCmd] section into
-    // *Cmd. Only the nickname id is reset (0x005766f3); the other fields keep whatever the
-    // caller's template put there. True when the nickname resolved (SETNZ on +0 at the end).
+    // FUN_005766e0 (thiscall on the KeyCmd, RET 4). Only the nickname id is reset; the other
+    // fields keep whatever the caller's template put there. True when the nickname resolved.
     bool ParseKeyCmdSection(INI_Reader& Reader, FKeyCmd* Cmd)
     {
         Cmd->NicknameId = 0;
@@ -154,14 +141,14 @@ namespace
         {
             if (Reader.is_value("nickname"))
             {
-                // 0x0057671d..0x0057675c: an unknown nickname stores 0 and fails at once.
+                // An unknown nickname stores 0 and fails at once.
                 Cmd->NicknameId = ResolveNicknameId(Reader.get_value_string());
                 if (Cmd->NicknameId == 0)
                     return false;
             }
             else if (Reader.is_value("ids_name"))
             {
-                // 0x0057676c..0x00576779: get_value_float(0) through ftol.
+                // Read as a float, as retail.
                 Cmd->IdsName = static_cast<unsigned>(static_cast<int>(Reader.get_value_float(0)));
             }
             else if (Reader.is_value("ids_info"))
@@ -170,7 +157,7 @@ namespace
             }
             else if (Reader.is_value("state"))
             {
-                // 0x005767b4..0x00576847: an empty first parameter means keydown; otherwise
+                // An empty first parameter means keydown; otherwise
                 // every parameter up to the first empty one ORs its bit in (unknown words add
                 // nothing), and a zero result becomes keydown.
                 unsigned Mask = 0;
@@ -197,8 +184,6 @@ namespace
             }
             else if (Reader.is_value("key"))
             {
-                // 0x00576859..0x0057687f: a zeroed local through FUN_005765b0, appended at the
-                // end of the binding vector (FUN_00578690(end, 1, &binding)).
                 FKeyBinding Binding;
                 Binding.VirtualKey = 0;
                 Binding.Modifiers = 0;
@@ -210,30 +195,28 @@ namespace
         return Cmd->NicknameId != 0;
     }
 
-    // FUN_00576550 (thiscall on the KeyCmd, RET 8: binding, event record DAT_0067c278) — state /
-    // modifier gate for one binding against the event being routed.
+    // FUN_00576550 (thiscall on the KeyCmd, RET 8) -- the state / modifier gate for one binding
+    // against the event being routed (DAT_0067c278).
     bool BindingMatchesState(FKeyCmd const* Cmd, FKeyBinding const* Binding,
                              FHudCmdRecord const* Record)
     {
-        // 00576550..00576566: record+0x18 (key down) selects state bit 1, else bit 2.
+        // record+0x18 (key down) selects the keydown bit, else keyup.
         unsigned const NeedBit =
             Record->Byte18 != 0 ? kKeyCmdStateKeyDown : kKeyCmdStateKeyUp;
         if ((Cmd->StateMask & NeedBit) == 0)
             return false;
 
-        // 0057656f..0057657f: an auto-repeat key-down (record+0x19) needs the `repeat` bit.
+        // An auto-repeat key-down (record+0x19) needs the `repeat` bit.
         if (Record->Byte19 != 0 && (Cmd->StateMask & kKeyCmdStateRepeat) == 0)
             return false;
 
-        // 00576588: state bit 8 accepts any modifiers.
         if ((Cmd->StateMask & kKeyCmdStateShiftIgnore) != 0)
             return true;
 
-        // 00576593..005765a2: binding+4 against record+8.
         return Binding->Modifiers == Record->Modifiers;
     }
 
-    // FUN_00576410 — real body in hud_command_dispatch.cpp (KeyMap handler tree).
+    // FUN_00576410 -- the body is in hud_command_dispatch.cpp (KeyMap handler tree).
     bool DispatchKeyCommand(unsigned NicknameId, int EventKind)
     {
         return HudDispatchCommand(NicknameId, EventKind) != 0;
@@ -249,20 +232,18 @@ int LoadKeyMapIni(char const* RelPath, bool bFatal)
     GetFileSysPath(FullPath, RelPath, nullptr);
 
     INI_Reader Reader;
-    // 0x00576bfc..0x00576c1f: the caller's bFatal is open's second argument.
     if (!Reader.open(FullPath, bFatal))
         return 0;
 
-    // 0x00576c25..0x00576c78: a missing or wrong first header is reported and loading goes on.
+    // A missing or wrong first header is reported and loading goes on.
     if (!Reader.read_header() || !Reader.is_header("KeyMap=1.1"))
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: KeyMap file (%s) is not version 1.1",
               "E:\\FL\\Scratch\\Source\\Client\\Interface\\KeyMap.cpp", 0x2ea, FullPath);
     }
 
-    // 0x00576cb6..0x00576cf6: the template every new KeyCmd is copied from (DAT_0067c230, built
-    // on first use behind the DAT_0067c250 bit, freed at exit through LAB_00576a00): all zero
-    // except StateMask = 1.
+    // DAT_0067c230, the template every new KeyCmd is copied from (built on first use behind the
+    // DAT_0067c250 bit).
     static FKeyCmd const DefaultKeyCmd = {0u, 0u, 0u, kKeyCmdStateKeyDown,
                                           std::vector<FKeyBinding>()};
 
@@ -271,16 +252,13 @@ int LoadKeyMapIni(char const* RelPath, bool bFatal)
     {
         if (Reader.is_header("KeyCmd"))
         {
-            // 0x00576cfe..0x00576d6c: a copy of the template at the end of the list; if the
-            // section does not resolve, that last node is unlinked and destroyed again.
+            // If the section does not resolve, the appended node is removed again.
             GKeyCmds.push_back(DefaultKeyCmd);
             if (!ParseKeyCmdSection(Reader, &GKeyCmds.back()))
                 GKeyCmds.pop_back();
         }
         else if (Reader.is_header("KeyMap"))
         {
-            // 0x00576d87..0x00576de2: count it, append an empty group (a temporary copied in
-            // and destroyed), then fill the new last node.
             ++GroupCount;
             GKeyMapGroups.push_back(FKeyMapGroup());
             FKeyMapGroup& Group = GKeyMapGroups.back();
@@ -288,13 +266,10 @@ int LoadKeyMapIni(char const* RelPath, bool bFatal)
             {
                 if (Reader.is_value("nickname"))
                 {
-                    // 0x00576e20..0x00576e38: std::string assign of the whole value.
                     Group.Nickname = Reader.get_value_string();
                 }
                 else if (Reader.is_value("key"))
                 {
-                    // 0x00576e4f..0x00576e7f: FUN_00577ef0(get_value_string(0)); a hit is
-                    // appended to the group's list (FUN_005947a0 at the end).
                     FKeyCmd* const Cmd = FindKeyCmdByNickname(Reader.get_value_string(0));
                     if (Cmd != nullptr)
                         Group.Commands.push_back(Cmd);
@@ -316,15 +291,14 @@ int LoadUserKeyMapIni(char const* Path)
     if (!Reader.open(FullPath, false))
         return 0;
 
-    // 0x00576faf..0x00577022: without a leading [KeyMap=1.1] nothing changes and 0 returns.
+    // Without a leading [KeyMap=1.1] nothing changes and 0 returns.
     if (!Reader.read_header() || !Reader.is_header("KeyMap=1.1"))
         return 0;
 
-    // 0x00577027..0x0057706c: every KeyCmd's binding vector emptied.
     for (std::list<FKeyCmd>::iterator It = GKeyCmds.begin(); It != GKeyCmds.end(); ++It)
         It->Bindings.clear();
 
-    // 0x0057706e..0x005771a6: per [KeyCmd] section, "nickname" selects the existing KeyCmd
+    // Per [KeyCmd] section, "nickname" selects the existing KeyCmd
     // (the first with that id, or none) and every later "key" is appended to it while one is
     // selected. Nothing else in the section is read. Every [KeyCmd] section is counted.
     int SectionCount = 0;
@@ -357,9 +331,8 @@ int LoadUserKeyMapIni(char const* Path)
 
 int SaveUserKeyMapIni(char const* FullPath)
 {
-    // FUN_005772d0 — listing 0x005772d0..0x005773ac. Writes only KeyCmds that still have
-    // at least one binding; nickname 0 (USER_NONE) is skipped. The tail from 0x005773ad (the
-    // modifier suffix fprintf, the loop step and fclose) is the Ghidra-split LAB_005773ad.
+    // FUN_005772d0 (Ghidra splits the tail off as LAB_005773ad). Writes only KeyCmds that still
+    // have at least one binding; nickname 0 (USER_NONE) is skipped.
     FILE* File = fopen(FullPath, "w");
     if (File == nullptr)
         return 0;
@@ -403,17 +376,17 @@ int SaveUserKeyMapIni(char const* FullPath)
 
 char const* GetKeyMapIniRelPath()
 {
-    // FUN_00575d60 — returns pointer to the static "interface/KeyMap.ini" string.
+    // FUN_00575d60.
     return "interface/KeyMap.ini";
 }
 
 char const* EnsureUserKeyMapPath()
 {
-    // FUN_00575d70 — DAT_0067c2a0. Build once: GetUserDataPath + "/UserKeyMap.ini".
+    // FUN_00575d70 -- built once.
     if (GUserKeyMapPath[0] == '\0')
     {
         GetUserDataPath(GUserKeyMapPath);
-        // 005774d0..005774f8: unconditional strcat of "/UserKeyMap.ini" (16 bytes with NUL).
+        // An unconditional strcat (no length check), as retail.
         size_t Len = strlen(GUserKeyMapPath);
         memcpy(GUserKeyMapPath + Len, "/UserKeyMap.ini", 16);
     }
@@ -422,14 +395,13 @@ char const* EnsureUserKeyMapPath()
 
 FKeyCmd* FindKeyCmdByNickname(char const* Nickname)
 {
-    // FUN_00577ef0 — stricmp against PTR_s_USER_NONE table, then walk DAT_0067c258.
+    // FUN_00577ef0.
     return FindKeyCmdByNicknameId(ResolveNicknameId(Nickname));
 }
 
 bool KeyMapFindCommandBinding(unsigned NicknameId, FKeyBindingLookup* Out, unsigned BindingIndex)
 {
-    // FUN_00577e10: walk DAT_0067c258; every command with this id writes Out->NicknameId, and
-    // the first whose binding list reaches BindingIndex fills VK / modifiers and wins.
+    // FUN_00577e10: every command with this id writes Out->NicknameId.
     for (std::list<FKeyCmd>::iterator It = GKeyCmds.begin(); It != GKeyCmds.end(); ++It)
     {
         FKeyCmd* const Cmd = &*It;
@@ -460,13 +432,13 @@ bool KeyMapFindAltBinding(unsigned NicknameId, FKeyBindingLookup* Out)
 
 FKeyCmd* FindKeyCmdById(unsigned NicknameId)
 {
-    // FUN_00577ec0: the first command with this id (its +8 payload), or null.
+    // FUN_00577ec0.
     return FindKeyCmdByNicknameId(NicknameId);
 }
 
 unsigned KeyMapGetModifierState()
 {
-    // FUN_00575dc0: GetKeyState high bit of VK_SHIFT -> 1, VK_CONTROL -> 4, VK_MENU -> 0x10.
+    // FUN_00575dc0.
     unsigned Mods = 0;
     if (GetKeyState(VK_SHIFT) < 0)
         Mods = 1;
@@ -480,10 +452,8 @@ unsigned KeyMapGetModifierState()
 bool UpdateKeyCmdBinding(unsigned NicknameId, int NewVirtualKey, unsigned NewModifiers,
                          int OldVirtualKey, unsigned OldModifiers)
 {
-    // FUN_00578220(actionIndex, newVk, newMod, oldVk, oldMod).
-    // Vector growth helpers (FUN_005995f0 / FUN_004363b0 / FUN_00436bb0) collapse to
-    // std::vector; IDPMsgHandler::OnReceive on reallocation is COMDAT container glue —
-    // not reproduced (vector owns its buffer).
+    // FUN_00578220. Retail's inlined vector growth (including a COMDAT-folded
+    // IDPMsgHandler::OnReceive call on reallocation) is std::vector here.
     FKeyCmd* Cmd = FindKeyCmdByNicknameId(NicknameId);
     if (Cmd == nullptr)
         return false;
@@ -506,8 +476,7 @@ bool UpdateKeyCmdBinding(unsigned NicknameId, int NewVirtualKey, unsigned NewMod
         return true;
     }
 
-    // Not found: insert only when NewVirtualKey != 0 and the vector is "small"
-    // (retail gate: size < 2 before grow — listing 00578220 after the find-miss fallthrough).
+    // Not found: insert only when NewVirtualKey != 0 and fewer than two bindings exist.
     if (NewVirtualKey == 0)
         return false;
     if (Cmd->Bindings.size() >= 2)
@@ -517,13 +486,12 @@ bool UpdateKeyCmdBinding(unsigned NicknameId, int NewVirtualKey, unsigned NewMod
     Added.VirtualKey = NewVirtualKey;
     Added.Modifiers = NewModifiers;
     Cmd->Bindings.push_back(Added);
-    return false; // retail returns low-byte 0 on the insert-via-grow path
+    return false; // retail returns false after an insert too
 }
 
 FKeyMapGroup* FindKeyMapGroup(char const* GroupNickname)
 {
-    // FUN_00576b60 (cdecl) — the first group whose nickname stricmp-matches (an unset string
-    // reads as ""), its node payload; none -> null.
+    // FUN_00576b60 (cdecl). An unset nickname reads as "".
     for (std::list<FKeyMapGroup>::iterator It = GKeyMapGroups.begin(); It != GKeyMapGroups.end();
          ++It)
     {
@@ -537,9 +505,8 @@ namespace
 {
     void EnsureKeyMapLoaded()
     {
-        // Lazy-load block inlined at the head of both FUN_00577490 (00577490..00577505) and
-        // FUN_00577590 (0057759e..00577610): DAT_0067c3b0 is set only after a successful
-        // FUN_00576bb0; a failed load leaves it clear so the next call retries.
+        // Inlined at the head of Register / UnregisterAcceleratorGroup. The flag is set only
+        // after a successful load, so a failed load is retried on the next call.
         if (G_bKeyMapLoaded)
             return;
         int Loaded = LoadKeyMapIni("interface/KeyMap.ini", true);
@@ -562,16 +529,13 @@ bool RegisterAcceleratorGroup(char const* GroupNickname)
         return false;
     }
 
-    // 0x0057751b..0x00577539: already active -> true.
     for (std::list<FKeyMapGroup*>::iterator It = GActiveGroups.begin();
          It != GActiveGroups.end(); ++It)
     {
         if (*It == Group)
             return true;
     }
-    // Retail 0057753b..00577564 links the new node before head->next (std::list
-    // insert(begin())): the newest group sits at the front and every walker
-    // (FUN_00577850, FUN_00577dd0, 00577a59) goes head->next forward, so the most
+    // The newest group sits at the front and every walker goes front to back, so the most
     // recently registered group wins.
     GActiveGroups.push_front(Group);
     return true;
@@ -579,9 +543,7 @@ bool RegisterAcceleratorGroup(char const* GroupNickname)
 
 void UnregisterAcceleratorGroup(char const* GroupNickname)
 {
-    // FUN_00577590.
-    // 00577590..00577598: empty active list (DAT_0067c220 == 0) returns before any
-    // load, lookup or error box.
+    // FUN_00577590. An empty active list returns before any load, lookup or error box.
     if (GActiveGroups.empty())
         return;
     EnsureKeyMapLoaded();
@@ -593,8 +555,7 @@ void UnregisterAcceleratorGroup(char const* GroupNickname)
         return;
     }
 
-    // 0x00577624..0x0057765b: the first node holding the group is unlinked and freed
-    // (FUN_005b7e1d), size - 1; none -> nothing.
+    // Only the first node holding the group is removed.
     for (std::list<FKeyMapGroup*>::iterator It = GActiveGroups.begin();
          It != GActiveGroups.end(); ++It)
     {
@@ -607,23 +568,21 @@ void UnregisterAcceleratorGroup(char const* GroupNickname)
 
 bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
 {
-    // FUN_00577850 (cdecl, 3 args) -- listing 00577850..00577b1c. Every message the pump reads
-    // comes through here; true means consumed (the caller skips Translate/Dispatch).
+    // FUN_00577850 (cdecl). Every message the pump reads comes through here.
     FHudCmdRecord* const Record = HudCommandRecord();
 
-    // 00577864 / 0057786c: local_14 = 1 and record+0x19 (DAT_0067c291) = 0 before the switch,
-    // so every message clears the auto-repeat flag, including the ones that fall out below.
+    // Every message clears the auto-repeat flag (record+0x19), including the ones that fall
+    // out below.
     int Mode = 1;
     Record->Byte19 = 0;
 
-    // 00577859..00577873: only 0x100..0x105; 0x103 (WM_DEADCHAR) shares the "false" arm.
+    // Only 0x100..0x105; WM_DEADCHAR shares the "false" arm.
     unsigned Kind = 0;
     switch (Message)
     {
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
-        // 00577884..005778aa: key = wParam, repeat = (lParam & 0xf0000000) == 0x40000000
-        // (previous state down, transition 0, no context bit), key-down byte set at 005778ea.
+        // Repeat = previous state down, transition 0, no context bit.
         Record->Key = Wparam;
         Record->Byte19 = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
         Kind = 1;
@@ -631,14 +590,12 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         break;
     case WM_KEYUP:
     case WM_SYSKEYUP:
-        // 005778ac..005778d9: same key/repeat, key-down byte cleared.
         Record->Key = Wparam;
         Record->Byte18 = 0;
         Record->Byte19 = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
         Kind = 1;
         break;
     case WM_CHAR:
-        // 005778db..005778ea: no key, kind 2, key-down byte set.
         Record->Key = 0;
         Kind = 2;
         Record->Byte18 = 1;
@@ -647,12 +604,10 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         return false;
     }
 
-    // 005778f1..0057790d: the raw message, wParam and lParam into record +0x0c/+0x10/+0x14.
     Record->Field0C = Message;
     Record->Arg10 = Wparam;
     Record->Arg14 = Lparam;
 
-    // 00577912..00577937: GetKeyState high bit of Shift / Ctrl / Alt into record+8.
     unsigned Modifiers = 0;
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
         Modifiers = 1;
@@ -662,35 +617,30 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         Modifiers = Modifiers | 0x10u;
     Record->Modifiers = Modifiers;
 
-    // 0057793d..00577956: kind 0 cannot reach here; kinds 1..2 dispatch in mode 1, anything
-    // else in mode 2 (local_14 = 2 as well).
+    // Kind 0 cannot reach here; kinds 1..2 dispatch in mode 1, anything else in mode 2.
     if (Kind == 0)
         return false;
     if (Kind > 2)
         Mode = 2;
 
-    // 00577958..0057796e: the raw kind (1 = key, 2 = char) goes to the handler tree first.
+    // The raw kind (1 = key, 2 = char) goes to the handler tree first.
     if (HudDispatchCommand(Kind, Mode) != 0)
         return true;
 
-    // 0057796f..00577977: no key (WM_CHAR) skips the held-key list and the group walk.
+    // No key (WM_CHAR) skips the held-key list and the group walk.
     if (Record->Key != 0)
     {
-        // 00577980..0057798a: remember the live modifiers; restore them only when a held key
-        // lent its own.
+        // The live modifiers are restored only when a held key lent its own.
         bool bRestoreModifiers = false;
         unsigned const LiveModifiers = Record->Modifiers;
 
-        // 0057797d..005779b7: key events that are not Shift/Ctrl/Alt themselves and not an
-        // auto-repeat.
+        // Key events that are not Shift/Ctrl/Alt themselves and not an auto-repeat.
         unsigned const Key = Record->Key;
         if (Kind == 1 && Key != VK_SHIFT && Key != VK_CONTROL && Key != VK_MENU &&
             Record->Byte19 == 0)
         {
             if (Record->Byte18 != 0)
             {
-                // 005779c7..005779e4: key down -- FUN_00578580 inserts {key, modifiers} before
-                // the sentinel (push_back).
                 FKeyMapHeldKey Held;
                 Held.Key = Key;
                 Held.Modifiers = LiveModifiers;
@@ -698,9 +648,8 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
             }
             else
             {
-                // 005779eb..00577a4a: key up -- every held node with this key lends its
-                // modifiers to the record and is unlinked; the walk continues past an erase,
-                // so the last match wins. A zero key in a node is skipped (00577a05).
+                // Key up: every held node with this key lends its modifiers to the record and
+                // is removed; the walk continues past an erase, so the last match wins.
                 std::list<FKeyMapHeldKey>::iterator It = GHeldKeys.begin();
                 while (It != GHeldKeys.end())
                 {
@@ -716,9 +665,8 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
             }
         }
 
-        // 00577a4c..00577aea: active accelerator groups (DAT_0067c21c, newest first) -> each
-        // group's KeyCmd list (+0x14) -> each binding (+0x14..+0x18, 8 bytes). The key is
-        // re-read from the record for every binding (00577a90).
+        // Active groups (newest first) -> their KeyCmds -> each binding. The key is re-read
+        // from the record for every binding.
         if (Record->Key != 0)
         {
             for (std::list<FKeyMapGroup*>::iterator GroupIt = GActiveGroups.begin();
@@ -737,9 +685,8 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
                             continue;
                         if (!BindingMatchesState(Cmd, Binding, Record))
                             continue;
-                        // 00577aaa..00577abc: FUN_00576410(KeyCmd nickname id, local_14);
-                        // consumed returns true at once -- the lent modifiers are NOT
-                        // restored on this path (00577b09).
+                        // Consumed returns at once: the lent modifiers are NOT restored on
+                        // this path, as retail.
                         if (DispatchKeyCommand(Cmd->NicknameId, Mode))
                         {
                             return true;
@@ -749,12 +696,11 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
             }
         }
 
-        // 00577aec..00577af8.
         if (bRestoreModifiers)
             Record->Modifiers = LiveModifiers;
     }
 
-    // 00577afd..00577b12: a key event for VK_MENU itself is always consumed.
+    // A key event for VK_MENU itself is always consumed.
     if (Kind == 1 && Wparam == VK_MENU)
         return true;
     return false;
@@ -762,11 +708,10 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
 
 bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
 {
-    // FUN_00577680 (cdecl, 1 arg) -- listing 00577680..00577821, called only by FUN_0041ef20
-    // (0x0041f106) for button and wheel events.
+    // FUN_00577680 (cdecl). Called only by MouseDispatchEvents (FUN_0041ef20) for button and
+    // wheel events.
     FHudCmdRecord* const Record = HudCommandRecord();
 
-    // 00577688..005776d7: the event kind from the key (switch table 0x00577824, key + 9).
     unsigned Kind = 0;
     switch (static_cast<int>(Event->Key))
     {
@@ -801,13 +746,11 @@ bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
         break;
     }
 
-    // 005776dc..005776fc: seven dwords into DAT_0067c278, then +0x0c / +0x10 / +0x14 cleared.
     *Record = *Event;
     Record->Field0C = 0;
     Record->Arg10 = 0;
     Record->Arg14 = 0;
 
-    // 00577704..00577728: GetKeyState high bit of Shift / Ctrl / Alt into record+8.
     unsigned Modifiers = 0;
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
         Modifiers = 1;
@@ -817,13 +760,11 @@ bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
         Modifiers = Modifiers | 0x10u;
     Record->Modifiers = Modifiers;
 
-    // 00577725..00577738: the kind to the handler tree in mode 2.
     if (DispatchKeyCommand(Kind, 2))
         return true;
 
-    // 00577742..0057781a: no key -> not consumed; else every binding on the key in the active
-    // groups, gated like FUN_00576550, dispatches its KeyCmd in mode 2. The record's flags are
-    // re-read after every dispatch (0x005777e2).
+    // Every binding on the key in the active groups dispatches its KeyCmd in mode 2. The
+    // record's flags are re-read after every dispatch.
     if (Record->Key == 0)
         return false;
 
@@ -870,10 +811,8 @@ unsigned KeyMapGetActiveGroupCount()
 
 bool KeyMapFindActiveBinding(unsigned NicknameId, FKeyBindingLookup* Out)
 {
-    // FUN_00577dd0 (cdecl) → FUN_00577d60(group, NicknameId, Out, 0) per active group, newest
-    // first, until one succeeds. FUN_00577d60 walks the group's KeyCmd list: a command with the
-    // id writes Out->NicknameId, and succeeds when its binding vector is allocated and holds
-    // the index (0x00577d80..0x00577d9a); otherwise the walk goes on. Nothing is null-tested.
+    // FUN_00577dd0 (cdecl), with FUN_00577d60's per-group walk (index 0) inlined. A command with
+    // the id writes Out->NicknameId even when it has no binding. Nothing is null-tested.
     for (std::list<FKeyMapGroup*>::iterator GroupIt = GActiveGroups.begin();
          GroupIt != GActiveGroups.end(); ++GroupIt)
     {
@@ -899,7 +838,7 @@ bool KeyMapFindActiveBinding(unsigned NicknameId, FKeyBindingLookup* Out)
 
 bool KeyMapIsCommandHeld(unsigned NicknameId)
 {
-    // FUN_005784a0. The first command in DAT_0067c258 with this id; none, or no bindings -> false.
+    // FUN_005784a0. Only the first command with this id is looked at.
     FKeyCmd* const Cmd = FindKeyCmdByNicknameId(NicknameId);
     if (Cmd == nullptr)
         return false;
@@ -909,7 +848,7 @@ bool KeyMapIsCommandHeld(unsigned NicknameId)
     {
         FKeyBinding const& Binding = Cmd->Bindings[Index];
 
-        // 0x005784e6..0x00578514: Shift 1, Ctrl 4, Alt 0x10, re-read for every binding.
+        // Re-read for every binding.
         unsigned Modifiers = 0;
         if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
             Modifiers = 1;
@@ -922,14 +861,13 @@ bool KeyMapIsCommandHeld(unsigned NicknameId)
 
         if (Binding.VirtualKey >= 0)
         {
-            // 0x00578567: the key's own high bit.
             if ((GetKeyState(Binding.VirtualKey) & 0x8000) != 0)
                 return true;
             continue;
         }
 
-        // 0x00578521..0x0057854e: mouse buttons -1/-2/-3 -> bits 1/2/4 of DAT_00616850; any
-        // other negative key tests mask 0 and never matches.
+        // Mouse buttons -1/-2/-3 -> bits 1/2/4 of DAT_00616850; any other negative key tests
+        // mask 0 and never matches.
         unsigned Mask = 0;
         if (Binding.VirtualKey == -3)
             Mask = 4;
@@ -945,7 +883,7 @@ bool KeyMapIsCommandHeld(unsigned NicknameId)
 
 void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, unsigned DestChars)
 {
-    // FUN_00577f50 — MapVirtualKey + GetKeyNameTextW; IDS fallbacks on miss; modifier prefix.
+    // FUN_00577f50 -- GetKeyNameTextW with IDS fallbacks, behind a modifier prefix.
     if (Binding == nullptr || Dest == nullptr || DestChars == 0)
         return;
     Dest[0] = L'\0';
@@ -1021,7 +959,7 @@ void KeyMapFormatBindingName(FKeyBindingLookup const* Binding, wchar_t* Dest, un
         return;
     }
 
-    // Modifiers first (Shift/Control/Alt), then key name — listing LAB_00578071.
+    // Modifiers first (Shift/Control/Alt), then the key name.
     wchar_t Prefix[256];
     Prefix[0] = L'\0';
     if ((Binding->Modifiers & kKeyModShift) != 0)

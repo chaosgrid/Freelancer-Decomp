@@ -38,8 +38,8 @@ typedef int(DACOM_API* FSectionEnumCallback)(void* Parser, const char* Name, voi
 // LoadFile and EnumerateSections apply to both INI sections and Lua global tables.
 struct IProfileParser : IDAComponent
 {
-    virtual GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) = 0; // formerly UnnamedSlot3
-    virtual int DACOM_API EnumerateSections(FSectionEnumCallback Callback, void* Context) = 0; // formerly UnnamedSlot4
+    virtual GENRESULT DACOM_API LoadFile(const char* Path, unsigned int Flags) = 0;
+    virtual int DACOM_API EnumerateSections(FSectionEnumCallback Callback, void* Context) = 0;
     virtual void* DACOM_API OpenSection(const char* Name, unsigned int Flags) = 0;      // RET 0xC
     virtual int DACOM_API CloseSection(void* Handle) = 0;                               // RET 8
     virtual int DACOM_API ReadLine(void* Handle, int Index, char* Buffer,

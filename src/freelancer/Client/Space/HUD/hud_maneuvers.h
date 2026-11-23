@@ -27,10 +27,9 @@
 // Factory: the static HUDFACTORY<HUD_Maneuvers> DAT_00674a1c ("Maneuvers"; XC entry
 // LAB_004d7570, ctor FUN_004d9990, atexit LAB_004d7590 -> FUN_004cf010), vftable 0x005d8470.
 //
-// DAT_00674a58 is the one instance (ctor 0x004d76bb, dtor 0x004d7aca). Outside this file it is
-// read by 0x00463e9d (switch case 7 at 0x00463e8b, after FUN_00462e30: RequestManeuver(0x13, 0)
-// when the player's behaviour is 0xa, formation; nn_group_control.cpp) and 0x004c8071 (FUN_004c7cb0,
-// which passes it to 0x0053e4a0 -- `RET 4`).
+// DAT_00674a58 is the one instance (set by the ctor, cleared by the dtor). Outside this file it
+// is read by nn_group_control.cpp (RequestManeuver(0x13, 0) when the player's behaviour is 0xa,
+// formation) and by FUN_004c7cb0, which passes it to the no-op 0x0053e4a0.
 // -------------------------------------------------------------------------------------------
 
 #include "Core/event_handler.h"
@@ -46,11 +45,10 @@
 class INI_Reader;
 struct FButtonMontageTile; // nn_montage_draw.h
 
-// FUN_004d9ca0 (thiscall on the table, RET 0xc) -- the first entry of a {name, value} table
-// whose name is non-null and stricmp-equal to Name: *OutValue = its value, true; none of the
-// first Count entries: false, *OutValue untouched. Callers: the HUD_Maneuvers ctor 0x004d77b2
-// (table DAT_00612638, four entries) and 0x0043fb9b (the IDS_HOTSPOT table DAT_00610c80,
-// 0x13 entries; not ported).
+// FUN_004d9ca0 (thiscall on the table) -- the first entry of a {name, value} table whose name
+// is non-null and stricmp-equal to Name: *OutValue = its value, true; none of the first Count
+// entries: false, *OutValue untouched. Callers: the HUD_Maneuvers ctor (table DAT_00612638)
+// and nav_bar.cpp (the IDS_HOTSPOT table DAT_00610c80).
 struct FHudNamedValue
 {
     char const* Name;   // +0x00
@@ -111,7 +109,7 @@ public:
     // FUN_004d8e20 (thiscall, RET 8) -- put the player ship on behaviour BehaviorId (a
     // directive through IBehaviorManager::set_current_directive) and tell the server
     // (IServer::SetManeuver). Callers: OnEvent 0x83 / 0xf, OnResult, ActivateManeuver and
-    // 0x00463eef.
+    // nn_group_control.cpp.
     bool RequestManeuver(int BehaviorId, bool bFlag);
     // FUN_004d9470 (thiscall, RET 4) -- a maneuver button or its key.
     void ActivateManeuver(FHudManeuver* Maneuver);

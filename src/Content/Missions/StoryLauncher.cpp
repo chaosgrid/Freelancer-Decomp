@@ -32,13 +32,8 @@ namespace
         unsigned int ControllerId;
     };
 
-    // FUN_06ea6ff0 (06ea6ff0-06ea7325, RET 8): (&ControllerId, Parms); Parms is not read. The
-    // heartbeat is switched off, then missions\specific_npc.ini (FUN_06f24280, result not
-    // tested) is read into the process-wide table DAT_06fd081c: every [NPC] block becomes a
-    // description (FUN_06f32920) filled by FUN_06f32b70 - whose result is not tested either -
-    // and inserted under its nickname id (the map's unique insert inlined, 06ea70f0-06ea71d3;
-    // a repeated nickname keeps the first). EH states: 0 the IDLL base, 1-4 the local
-    // INI_Reader and its members (destroyed inline at 06ea71f1-06ea7305).
+    // FUN_06ea6ff0; Parms is not read. Fills DAT_06fd081c from missions\specific_npc.ini; neither
+    // the open nor FUN_06f32b70 is result-tested, and a repeated nickname keeps the first.
     FStoryLauncher::FStoryLauncher(unsigned int const* InControllerId)
         : ControllerId(*InControllerId)
     {
@@ -57,17 +52,14 @@ namespace
         }
     }
 
-    // FUN_06ea7350 (06ea7350-06ea744a): the specific NPC table DAT_06fd081c is emptied (the
-    // tree's erase(begin, end) inlined: the whole-tree path FUN_06ea76a0 when it holds every
-    // node, else node by node FUN_06ea76e0 / FUN_06f44330), then the IDLL base.
+    // FUN_06ea7350: empties the process-wide table DAT_06fd081c.
     FStoryLauncher::~FStoryLauncher()
     {
         GSpecificNpcs.clear();
     }
 
-    // LAB_06ea6f50 (RET 8): message 7 carries the player id; create "Story" through
-    // this module's own path (GetModuleFileNameA on DAT_06fcf3a4), priority NORMAL. The
-    // parameter object has a vtable (06fb439c, EH state 0).
+    // LAB_06ea6f50: message 7 carries the player id. The parameter object has a vtable
+    // (06fb439c).
     void FStoryLauncher::HandleMessage(pub::Controller::EMessage MessageId, void const* MessageParms)
     {
         if (MessageId != pub::Controller::EMessage::PlayerLogin)
@@ -83,6 +75,6 @@ namespace
 
 IDLL* CreateStoryLauncher(char const* /*Name*/, unsigned int ControllerId, void const* /*Parms*/)
 {
-    // FUN_06eeec50: operator new(8), then FUN_06ea6ff0(&ControllerId, Parms).
+    // FUN_06eeec50.
     return new (std::nothrow) FStoryLauncher(&ControllerId);
 }

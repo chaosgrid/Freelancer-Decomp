@@ -45,10 +45,7 @@ bool ThornNameEqual(const char* Left, const char* Right)
 {
     if (Left == nullptr || Right == nullptr)
         return false;
-    // Retail IID-table lookup uses a case-insensitive byte comparison
-    // (the same contract used by the engine's other interface dispatchers).
-    // Keep that behavior at the modern boundary without reproducing the
-    // retail table/object layout.
+    // Retail's IID-table lookups here compare case-insensitively.
     return _stricmp(Left, Right) == 0;
 }
 
@@ -159,8 +156,7 @@ namespace
         GENRESULT DACOM_API Save(IFileSystem* FileSystem, IScriptEngine* Engine,
                                  IThornComContext* ComContext) override
         {
-            // 06f2aa33..06f2aa55: default writer needs FS, engine, and either
-            // entities or a nonzero duration. ComContext is passed by Slot5Save.
+            // The default writer needs FS, engine, and either entities or a nonzero duration.
             if (FileSystem == nullptr || Engine == nullptr ||
                 (EntityCount_ == 0 && DurationMs_ == 0))
                 return GR_GENERIC;
@@ -184,7 +180,7 @@ namespace
         explicit FThornContextTailRelease(IThornComContext*& Context) : Context_(Context) {}
         ~FThornContextTailRelease() noexcept(false)
         {
-            // 37f33..37f45: a callback may install a new context during Clear.
+            // A callback may install a new context during Clear.
             if (Context_ != nullptr)
             {
                 Context_->Release();
@@ -197,10 +193,7 @@ namespace
     // FUN_06f37b50 stores three vtables: +0 IScriptEngine (.rdata:06f5ad50), +4
     // IGeoTransformControl (06f5ad34, seven slots) and +8 IScriptControl (06f5ad18, seven
     // slots) -- three real bases, answered by the {IID, offset} table at .rdata:06f5b010
-    // (offsets 0 / 4 / 8). Until 2026-10-16 the port built the two facets from hand-filled
-    // `void*[7]` arrays and `this - 4` / `this - 8` adjustors instead of deriving from the
-    // public interfaces in thorn_controls.h, so callers reached them through a type the
-    // object did not have.
+    // (offsets 0 / 4 / 8).
     class FScriptEngine final : public IScriptEngine, public IGeoTransformControl,
                                 public IScriptControl
     {
@@ -234,11 +227,8 @@ namespace
 
         ~FScriptEngine() noexcept(false)
         {
-            // FUN_06f37e00 (thorn.dll.c:17241-17250) releases the embedded
-            // COM context twice on teardown, re-checking for null between
-            // calls -- the same double-Release contract Slot40SetCom already
-            // matches for its double-AddRef.  Mirror it exactly here so a
-            // context installed via SetCom is fully released on destruction.
+            // FUN_06f37e00 releases the COM context twice, re-checking for null between calls;
+            // this pairs with Slot40SetCom's double AddRef.
             if (ComContext_ != nullptr)
             {
                 ComContext_->Release();
@@ -248,15 +238,13 @@ namespace
                     ComContext_ = nullptr;
                 }
             }
-            // 37e5e is reached only after both initial context releases.
+            // The scene is cleared only after both context releases.
             Scene_.Clear();
         }
 
-        // COM aggregation (LAB_06f3f4c0 factory): the public facets'
-        // QI/AddRef/Release (FUN_06f3f7a0 / FUN_06f3f7c0 / FUN_06f3f7e0 =
-        // `MOV EAX,[this+0x108]; MOV ECX,[EAX]; JMP [ECX+slot]`) forward to
-        // the controlling unknown, which is either the aggregating Outer
-        // passed in the AGGDESC or the object's own inner unknown at +0x10c.
+        // COM aggregation (LAB_06f3f4c0 factory): the public facets' QI/AddRef/Release
+        // (FUN_06f3f7a0 / 7c0 / 7e0) forward to the controlling unknown at +0x108, either the
+        // aggregating Outer or the object's own inner unknown at +0x10c.
         IDAComponent* Aggregate(IDAComponent* Outer)
         {
             Outer_ = (Outer != nullptr) ? Outer : static_cast<IDAComponent*>(&Inner_);
@@ -272,13 +260,9 @@ namespace
 
         unsigned long DACOM_API Release() override { return Outer_->Release(); }
 
-        // LAB_06f3f690 (inner unknown slot 0): the retail IScriptEngine table
-        // walk (.rdata:06f5b010 = {IID, facet offset} triples) is a plain
-        // byte-exact strcmp loop (no case-folding instructions at all),
-        // unlike some of the other DACOM dispatchers in this module that do
-        // use a case-insensitive contract.  On a hit the facet's OWN vtbl+4
-        // (i.e. the delegating AddRef above) is invoked, then *Out = facet
-        // and 0 is returned; a miss stores NULL and returns -3.
+        // LAB_06f3f690 (inner unknown slot 0): the table walk (.rdata:06f5b010) is a plain
+        // case-sensitive strcmp, unlike the module's other dispatchers. A hit AddRefs through
+        // the facet's own (delegating) AddRef.
         GENRESULT NonDelegatingQueryInterface(const char* Iid, void** Out)
         {
             void* Interface;
@@ -310,7 +294,7 @@ namespace
 
         GENRESULT DACOM_API Slot3(void* A, void* B) override
         {
-            // LAB_06f3a910: XOR EAX,EAX / RET 0xC.
+            // LAB_06f3a910: returns 0.
             (void)A;
             (void)B;
             return GR_OK;
@@ -318,7 +302,7 @@ namespace
 
         GENRESULT DACOM_API Slot4Load(void* FileSystem) override
         {
-            // LAB_06f38250: if state≠0 Clear; NULL FS → EAX=0 without parser.
+            // LAB_06f38250: a NULL FS returns 0 without creating a parser.
             if (Scene_.PlaybackState() != 0)
                 Scene_.Clear();
             if (FileSystem == nullptr)
@@ -345,8 +329,8 @@ namespace
             }
             if (Result >= 0)
             {
-                // LAB_06f38442..3856c: exactly one monitor and camera, with no
-                // existing SET_CAMERA event, produces a zero-time default event.
+                // Exactly one monitor and camera, with no existing SET_CAMERA event, produces a
+                // zero-time default event.
                 int MonitorCount = 0;
                 int CameraCount = 0;
                 int MonitorIndex = 0;
@@ -376,7 +360,7 @@ namespace
                         Desc[5] = -1;
                         Desc[7] = MonitorIndex;
                         Desc[8] = CameraIndex;
-                        // 38530..3856c constructs this heap event and never frees it.
+                        // Retail constructs this heap event and never frees it.
                         FThornEvent* Temporary = new(std::nothrow) FThornEvent(kThornTypeSetCamera, Desc);
                         const void* TemporaryDesc = Temporary != nullptr
                             ? &Temporary->SetCameraDesc : nullptr;
@@ -404,8 +388,8 @@ namespace
             const GENRESULT Hr = SaveParser_->Save(Fs, static_cast<IScriptEngine*>(this), ComContext_);
             if (bDefaultParser)
             {
-                // 3874d reloads the current member after callbacks; 38754
-                // deallocates without a virtual destructor call.
+                // Retail reloads the member after the callbacks and deallocates without a
+                // virtual destructor call.
                 ::operator delete(SaveParser_);
                 SaveParser_ = nullptr;
             }
@@ -469,7 +453,7 @@ namespace
 
         GENRESULT __thiscall Slot20SetLoop(unsigned char Value) override
         {
-            // LAB_06f39430: MOV AL,[ESP+4]; MOV [ECX+0x30],AL; XOR EAX,EAX; RET 4.
+            // LAB_06f39430: byte at +0x30.
             Scene_.SetLoop(Value);
             return GR_OK;
         }
@@ -488,7 +472,7 @@ namespace
 
         GENRESULT DACOM_API Slot25Start(int Arg) override
         {
-            // LAB_06f39450: JMP [vtable+0x58] = slot 22, same arity RET 0x8.
+            // LAB_06f39450: tail-jumps to slot 22 through the vtable.
             return Slot22Start(Arg);
         }
 
@@ -572,7 +556,8 @@ namespace
 
         GENRESULT DACOM_API Slot40SetCom(IThornComContext* Com) override
         {
-            // FUN_06f3a380: double Release old this+0x1c; write p; AddRef; if non-null AddRef again.
+            // FUN_06f3a380: the old context (+0x1c) is released twice and the new one AddRef'd
+            // twice.
             if (ComContext_ != nullptr)
             {
                 ComContext_->Release();
@@ -615,10 +600,8 @@ namespace
 
         GENRESULT DACOM_API Slot43LoadPath(const char* Path) override
         {
-            // LAB_06f38110: FileSystem read 0x80000000 / creation 3 → slot 4. NULL path still slot 4.
-            // The path is first stored into the +0xc basic_string
-            // (`LEA EBX,[this+0xc]` ... basic_string::assign(Path, strlen))
-            // -- only on the non-NULL branch.
+            // LAB_06f38110: a NULL path still goes to slot 4. The path is stored into the +0xc
+            // string only on the non-NULL branch.
             IFileSystem* FileSystem = nullptr;
             if (Path != nullptr)
             {
@@ -647,8 +630,8 @@ namespace
 
         GENRESULT DACOM_API Slot44SavePath(const char* Path) override
         {
-            // LAB_06f38590: no null path gate, factory HRESULT controls Save;
-            // Release follows on both HRESULT paths, with no Win32 fallback.
+            // LAB_06f38590: no null path gate; Release follows on both result paths, even when
+            // the create failed.
             ScriptPath_ = Path;
             FFileSystemDesc Desc = {};
             Desc.Size = 0x34;
@@ -669,9 +652,8 @@ namespace
             return Result;
         }
 
-        // IGeoTransformControl facet (+4, .rdata:06f5ad34). QueryInterface / AddRef /
-        // Release are the overrides above (retail FUN_06f3f7a0 / 06f3f7c0 / 06f3f7e0 forward
-        // to the controlling unknown for every facet).
+        // IGeoTransformControl facet (+4, .rdata:06f5ad34). QueryInterface / AddRef / Release
+        // are the forwarding overrides above.
 
         // Slot 3, LAB_06f3b530: snapshot the inverse csys, raw-copy three dwords into the
         // forward position, rebuild the inverse and push it to the bound entities.
@@ -692,13 +674,13 @@ namespace
             return GR_OK;
         }
 
-        // Slot 4, LAB_06f3b6c0: the same for the nine orientation dwords (REP MOVSD).
+        // Slot 4, LAB_06f3b6c0: the same for the nine orientation dwords.
         GENRESULT DACOM_API SetOrientation(float* Orient9) override
         {
             FTransform OldInverse;
             std::memcpy(&OldInverse, SceneCsys(), sizeof(OldInverse));
             const float* Source = Orient9;
-            // REP9 is a forward raw copy, with no floating-point conversion.
+            // A forward raw copy, with no floating-point conversion.
             for (int Index = 0; Index < 9; ++Index)
             {
                 unsigned int Word;
@@ -710,23 +692,22 @@ namespace
             return GR_OK;
         }
 
-        // Slot 5, LAB_06f3b860: three dwords from facet+0x54 into *OutPosition, return 0,
-        // RET 8. Nothing is null-tested.
+        // Slot 5, LAB_06f3b860: three dwords from facet+0x54. Nothing is null-tested.
         GENRESULT DACOM_API GetPosition(float* OutPosition) override
         {
             std::memcpy(OutPosition, ScenePos(), 3 * sizeof(float));
             return GR_OK;
         }
 
-        // Slot 6, LAB_06f3b880: nine dwords from facet+0x30 (REP MOVSD), return 0, RET 8.
+        // Slot 6, LAB_06f3b880: nine dwords from facet+0x30.
         GENRESULT DACOM_API GetOrientation(float* OutOrient9) override
         {
             std::memcpy(OutOrient9, SceneOrient(), 9 * sizeof(float));
             return GR_OK;
         }
 
-        // IScriptControl facet (+8, .rdata:06f5ad18). Each slot is an adjustor thunk:
-        // `this -= 8; JMP [vtbl + n]` into this object's IScriptEngine slot.
+        // IScriptControl facet (+8, .rdata:06f5ad18). Each slot is an adjustor thunk into this
+        // object's IScriptEngine slot.
         // Slot 3, LAB_06f3c080 -> +0x58, slot 22.
         GENRESULT DACOM_API Start(int Arg) override { return Slot22Start(Arg); }
         // Slot 4, LAB_06f3c0a0 -> +0x68, slot 26.
@@ -742,15 +723,15 @@ namespace
 
         void RebuildSceneCsys()
         {
-            // Retail 3b9a0 calls foreign math+0x38, then 23090/3b670 pack inverse.
+            // Retail (06f3b9a0) calls 3DMath +0x38, then packs the inverse.
             Scene_.BuildInverseCsys(SceneCsys_);
         }
 
         const float* SceneCsys() const { return SceneCsys_; }
 
     private:
-        // Retail +0x108 controlling unknown / +0x10c embedded inner unknown;
-        // the object's reference count lives in Inner_ exactly as in retail.
+        // Retail +0x108 controlling unknown / +0x10c embedded inner unknown, which holds the
+        // reference count.
         IDAComponent* Outer_;
         FThornInnerUnknown Inner_;
         // Retail +0xc basic_string: the last path handed to LoadPath/SavePath.
@@ -807,23 +788,11 @@ namespace
             return Next;
         }
 
-        // LAB_06f37400 (CV_CRSplinePath / CV_CROrientationSplinePath,
-        // listing 43219-43286) and LAB_06f3f4c0 (IScriptEngine, listing
-        // 51466-51535) share one shape (stdcall, RET 0xc):
-        //   [Desc] != 0x14 || strcmp([Desc+4], [factory+8]) != 0
-        //                              -> *Instance = 0, return -3
-        //   operator_new(0x80) / calloc(1, 0x118) == 0
-        //                              -> *Instance = 0, return -4
-        //   ctor (FUN_06f374d0 / FUN_06f37b50)
-        //   [obj+0x70] / [obj+0x108] = [Desc+8] (Outer) if non-NULL,
-        //                              else &obj->inner (+0x74 / +0x10c)
-        //   if (Outer) *[Desc+0xc] = &obj->inner   (retail derefs [Desc+0xc]
-        //                              without a NULL test)
-        //   FUN_06f34830 / FUN_06f3b520 post-init are `XOR EAX,EAX; RET` stubs
-        //   *Instance = obj; return 0
-        // The name compare is a byte-exact strcmp loop (no case folding);
-        // every in-tree caller (ThornLua.cpp, harness/ThornHarness.cpp)
-        // already passes the exact-case names.
+        // LAB_06f37400 (CV_CRSplinePath / CV_CROrientationSplinePath) and LAB_06f3f4c0
+        // (IScriptEngine) share one shape: operator_new(0x80) / calloc(1, 0x118), ctor
+        // FUN_06f374d0 / FUN_06f37b50, controlling unknown at +0x70 / +0x108, and with an Outer
+        // *[Desc+0xc] = inner without a NULL test. The post-init calls FUN_06f34830 /
+        // FUN_06f3b520 return 0. The name compare is case-sensitive.
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             if (Desc->size != G_AggDescSizeThorn)
@@ -854,8 +823,8 @@ namespace
             }
             else if (Kind_ == KindParamCurve)
             {
-                // Raw PE 06f31e70-06f31f6a and its eleven factory clones:
-                // neither Desc+8 nor Desc+0xc is read; curves do not aggregate.
+                // 06f31e70 and its eleven factory clones: neither Desc+8 nor Desc+0xc is
+                // read; curves do not aggregate.
                 Object = ThornCreateParamCurve(Name_, bDeadSecondLinear_);
                 if (Object == nullptr)
                 {
@@ -865,8 +834,8 @@ namespace
             }
             else if (Kind_ == KindSplinePos || Kind_ == KindSplineOrient)
             {
-                // LAB_06f37400: only allocation failure returns -4 here;
-                // math is acquired lazily by spline operations.
+                // Only allocation failure returns -4 here; math is acquired lazily by spline
+                // operations.
                 Object = ThornCreateSplinePath(Name_, Kind_ == KindSplineOrient, Extended->Outer,
                                                &Inner);
                 if (Object == nullptr)

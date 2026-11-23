@@ -15,7 +15,8 @@ int RegisterChannel1Packets(FPacketSerializer* Serializer) {
     return RpcRegisterCommonScalarPackets(Serializer);
 }
 
-// Implement Serializer methods missing from rpclocal exports
+// Serializer and packet-base members that RemoteServer defines itself (rpclocal does not export
+// them).
 
 int FPacketSerializer::RegisterType(unsigned int PacketId, const char* Name, FPacketFactoryFn Factory) {
     std::map<unsigned int, FPacketTypeInfo*>::iterator It = Types.lower_bound(PacketId);
@@ -37,7 +38,7 @@ FPacketBase::FPacketBase(unsigned int InPacketId) : PacketId(InPacketId) {
 FPacketBase::~FPacketBase() {}
 void FPacketBase::Dump(std::ostream& Out) const {}
 unsigned int FPacketBase::Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) {
-    // 06bebec0: inline entry, cached header commit, Error=0, OutLength, stats, 0.
+    // Retail 06bebec0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     return Stream.FinishEncodeSuccess(OutLength);
@@ -61,7 +62,6 @@ using FLPACKET_CLIENT_REQCARGO = FRpcRequestCargoPacket;
 using FLPACKET_CLIENT_REQADDITEM = FRpcRequestAddItemPacket;
 
 using FLPACKET_CLIENT_REQSHIPARCH = FRpcRequestShipArchPacket;
-
 
 using FLPACKET_CLIENT_REQEQUIPMENT = FRpcRequestEquipmentPacket;
 
@@ -172,7 +172,6 @@ using FLPACKET_CLIENT_REQDIFFICULTYSCALE = FRpcRequestDifficultyScalePacket;
 int RegisterChannel3Packets(FPacketSerializer* Serializer) {
     return RpcRegisterClientScalarPackets(Serializer);
 }
-
 
 int RegisterChannel2Packets(FPacketSerializer* Serializer) {
     return RpcRegisterRemoteServerServerPackets(Serializer);

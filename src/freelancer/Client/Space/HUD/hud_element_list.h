@@ -32,24 +32,22 @@ struct FTextureRef;
 // HUDItem (RTTI .?AVHUDItem@@, vftable 0x005d6eac, 11 slots, 0x38 bytes).
 //
 // No out-of-line constructor exists: every derived constructor inlines it (e.g. 0x004c84d8 in
-// HUD_Steer's factory, 0x004c8de3 in HUD_Button's). The inlined sequence is: +0x04 name length
-// = 0, +0x08 name[0] = 0, the watcher at +0x28 built (BaseWatcher() + set(0)), the vptr, +0x34
-// = 0, then an inlined SetTarget(0) (`if (watched) set_pointer(0)`), then +0x30 = 0.
+// HUD_Steer's factory, 0x004c8de3 in HUD_Button's), including a redundant inlined SetTarget(0).
 // Destructor FUN_004c8630 (vptr back, watcher cleared); scalar deleting FUN_004c8650.
 //
 // Slots (retail byte offset; implementation in the HUDItem vftable):
 //   0 +0x00 FUN_004c8650  scalar deleting dtor
-//   1 +0x04 FUN_0044fd00  XOR AL,AL / RET -- HUD_Steer answers its +0x38 byte (LAB_004c8670)
-//   2 +0x08 FUN_0053e4a0  RET 4 -- broadcast by FUN_004c78a0 from the HUD camera's slot 0x5c
-//                          (0x0051cb9c), whose argument is the ViewRect it just applied
-//   3 +0x0c FUN_004b6c50  MOV AL,1 / RET -- FUN_004c73d0 keeps the element only when true
-//   4 +0x10 FUN_00401e90  RET -- FUN_004c77a0's first pass
-//   5 +0x14 FUN_004c81a0  watch an IObjRW (broadcast by FUN_004c7330 from 0x0051cbea)
-//   6 +0x18 FUN_0053aaa0  RET 8 -- FUN_004c8090 (camera, frame time) from 0x0051dae6
-//   7 +0x1c FUN_0053f330  XOR AL,AL / RET 4 -- polled by FUN_004c7820 (camera slot 0x70)
+//   1 +0x04 FUN_0044fd00  false -- HUD_Steer answers its +0x38 byte (LAB_004c8670)
+//   2 +0x08 FUN_0053e4a0  no-op -- broadcast by FUN_004c78a0 from the HUD camera's slot 0x5c,
+//                          whose argument is the ViewRect it just applied
+//   3 +0x0c FUN_004b6c50  true -- FUN_004c73d0 keeps the element only when true
+//   4 +0x10 FUN_00401e90  no-op -- FUN_004c77a0's first pass
+//   5 +0x14 FUN_004c81a0  watch an IObjRW (broadcast by FUN_004c7330)
+//   6 +0x18 FUN_0053aaa0  no-op -- FUN_004c8090 (camera, frame time)
+//   7 +0x1c FUN_0053f330  false -- polled by FUN_004c7820 (camera slot 0x70)
 //   8 +0x20 FUN_0053f330  -- polled by FUN_004c7860 (camera slot 0x74)
 //   9 +0x24 FUN_0053f330
-//  10 +0x28 FUN_00401e90  RET
+//  10 +0x28 FUN_00401e90  no-op
 // Slots 7 and 8 receive the command record FUN_0054bcb0 hands the active camera (a 0x28-byte
 // block whose first dword is the command id -- HUD_Button::MouseEvent 0x004c9430 builds one).
 // -------------------------------------------------------------------------------------------
@@ -80,9 +78,8 @@ public:
     // slot 10 (+0x28) FUN_00401e90
     virtual void Slot10();
 
-    // FUN_004c81d0 (thiscall) -- with a tool-tip id at +0x30, feed the ToolTip window
-    // (FUN_004be370) with a rich-text copy of that string. HUD_Button::Update 0x004c941c calls it
-    // while the button is hovered.
+    // FUN_004c81d0 -- with a tool-tip id at +0x30, feed the ToolTip window (FUN_004be370) with
+    // a rich-text copy of that string. HUD_Button::Update calls it while the button is hovered.
     void ShowToolTip();
 
     TString<32> Name;          // +0x04
@@ -97,19 +94,17 @@ private:
 
 static_assert(sizeof(HUDItem) == 0x38, "retail HUDItem is 0x38 bytes");
 
-// Transitional name kept while the HUD-A lane (hud_targetable_objects / hud_target) moves over.
+// Alias; nothing in the tree uses it.
 using IHudElement = HUDItem;
 
 // -------------------------------------------------------------------------------------------
 // HUDItem_Factory (RTTI .?AVHUDItem_Factory@@, vftable 0x005d6e30: two slots, both
-// FUN_0053e180 `XOR EAX,EAX / RET 4`) and HUDFACTORY<T>.
+// FUN_0053e180 returning null) and HUDFACTORY<T>.
 //
 // Layout: +0x00 vptr, +0x04 next in the factory chain, +0x08 TString<32> section name. The
-// constructor is inlined into every HUDFACTORY<T> constructor (0x004cd270, 0x004d9990, ...):
-// base vptr, +0x08 = 0, +0x0c = 0, +0x04 = 0, the name copied (<= 31 chars), FUN_004c72b0 to
-// append to the chain, then the derived vptr. The destructor is not virtual: the atexit thunks
-// (LAB_004c8310, LAB_004c8340) call LAB_004c8350 directly, which puts the base vptr back and
-// unlinks the factory (same body as FUN_004c72e0, inlined).
+// constructor is inlined into every HUDFACTORY<T> constructor (0x004cd270, 0x004d9990, ...)
+// and appends to the chain (FUN_004c72b0). The destructor is not virtual: the atexit thunks
+// call LAB_004c8350 directly, which unlinks the factory (FUN_004c72e0's body, inlined).
 // -------------------------------------------------------------------------------------------
 
 class HUDItem_Factory
@@ -149,7 +144,7 @@ public:
     }
 };
 
-// Transitional name kept while the HUD-A lane moves over (see IHudElement above).
+// Alias; nothing in the tree uses it.
 using HudElementFactoryBase = HUDItem_Factory;
 
 // -------------------------------------------------------------------------------------------
@@ -167,7 +162,7 @@ struct HUD_Steer : public HUDItem
     // FUN_004c8c20
     ~HUD_Steer() override;
 
-    // LAB_004c8670 -- MOV AL,[ECX+0x38]
+    // LAB_004c8670 -- returns Byte38
     bool Slot1() override;
     // LAB_004c8680
     void Render(FSpaceCamera* Camera, float DeltaSeconds) override;
@@ -212,17 +207,16 @@ void HudElementListInit();
 void HudElementListSetTarget(IObjRW* Target);
 // FUN_004c78a0 (cdecl) -- HUDItem::SetViewport(ViewRect4) on every active element.
 void HudElementListSetViewport(int const* ViewRect4);
-// FUN_004c8090 (cdecl) -- IMaterialBatcher slot 8 (bin 1, -1), HUDItem::Render(Camera,
-// DeltaSeconds) on every active element, slot 8 (1, 1). Its one caller, 0x0051dae6 in
-// FUN_0051daa0 (the HUD camera's draw), pushes the frame time (FUN_0042d680) then the camera.
+// FUN_004c8090 (cdecl) -- HUDItem::Render on every active element, bracketed by the material
+// batcher's bin order (1, -1) / (1, 1). Its one caller is the HUD camera's draw FUN_0051daa0.
 void HudElementListRender(FSpaceCamera* Camera, float DeltaSeconds);
 // FUN_004c7820 (cdecl) -- true at the first active element whose Slot7(Command) is true.
 bool HudElementListAnySlot7(void* Command);
 // FUN_004c7860 (cdecl) -- the same over Slot8.
 bool HudElementListAnySlot8(void* Command);
-// FUN_004c77a0 -- release the static_txm texture (DAT_00673570, TextureLib slot +0x38),
-// Shutdown() on every element, delete every element, empty the list, then tail-jump into
-// FUN_00425a20 on the HUD ShapeDB. Caller: the space teardown 0x0054af1d.
+// FUN_004c77a0 -- release the static_txm texture, Shutdown() on every element, delete every
+// element, empty the list, then clear the HUD ShapeDB (FUN_00425a20). Called by the space
+// teardown.
 void HudElementListShutdown();
 
 // FUN_004c7370 -- ProgressCB's `HUD = ...` key stores the resolved path (cap 0x103).
@@ -233,19 +227,17 @@ char const* GetHudIniPath();
 // FUN_004c73d0 -- open the stored hud.ini; [HUD] loads shapes / static_txm / static_blend,
 // every other section is offered to each factory in chain order until one builds an element;
 // an element whose Init() is false is deleted, a section nobody builds is FDUMPed. Then the
-// mouse-flight state is reset (0x004c75c5 .. 0x004c75ee). Caller: the space init 0x0054ad62.
+// mouse-flight state is reset. Called by the space init.
 void LoadHudElementsFromIni();
 
 // DAT_00673570 / DAT_00612374 -- read by the comm window's static-noise draw (FUN_004cc9a0).
 FTextureRef* GetHudStaticTexture();
 int GetHudStaticBlend();
 
-// FUN_004c8b10 (cdecl Out, In, Length) -- Out = In * (1 / Length); callers besides HUD_Steer at
-// 0x005809a0, 0x005809cc, 0x00580c7b.
+// FUN_004c8b10 (cdecl Out, In, Length) -- Out = In * (1 / Length).
 void HudVec3ScaleByInverse(float* Out, float const* In, float Length);
 
-// The three rotation helpers on a row-major 3x3 matrix (retail thiscall on the matrix, RET 4);
-// callers besides HUD_Steer: 0x00583fa7 .. 0x005848xx, 0x0059b196, 0x004f4249.
+// The three rotation helpers on a row-major 3x3 matrix (retail thiscall on the matrix).
 // FUN_004c8b40 -- rotation about Y: [ cos 0 sin ; 0 1 0 ; -sin 0 cos ].
 void HudMatrixRotationY(float* M, float Angle);
 // FUN_004c8b80 -- rows 1 and 2 turned column by column:

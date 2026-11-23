@@ -16,10 +16,8 @@
 namespace AnimDB {
 
 // Retail RTTI ".?AUVChannel@AnimDB@@": an abstract struct with no data and two __thiscall
-// slots. AnimDB::Update calls slot 0 on every registered channel (.text:0627def0..0627def6:
-// MOV ECX,[node+8] / MOV EAX,[ECX] / PUSH Dt / CALL [EAX]); Add(VChannel*) calls slot 1
-// (.text:0627d4df..0627d4e3 / 0627d601..0627d603 / 0627d62c..0627d62e: CALL [EDX+4]).
-// No virtual destructor: retail never deletes a channel through this type. Known derived
+// slots. AnimDB::Update calls slot 0 on every registered channel (.text:0627def0);
+// Add(VChannel*) calls slot 1 (.text:0627d4df). No virtual destructor: retail never deletes a channel through this type. Known derived
 // classes: CEGun::JointChannel (Common, vftable .rdata:0639d200); freelancer.exe carries one
 // more (its RTTI base list at .rdata:005eda74).
 struct VChannel

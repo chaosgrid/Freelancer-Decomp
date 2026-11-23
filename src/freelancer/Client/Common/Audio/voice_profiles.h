@@ -8,9 +8,8 @@
 
 // Client voice archetypes (E:\FL\Scratch\Source\Client\cmn\Voice.cpp).
 //
-// RTTI names from freelancer.exe.txt: Archetype::IVoice (pure base, vtable
-// 005cad10) implemented by VoiceProfile (vtable 005cacec); Archetype::IVoiceMsg
-// implemented by VoiceMsg (vtable 005cabfc).
+// RTTI: Archetype::IVoice (pure base, vtable 005cad10) implemented by VoiceProfile (vtable
+// 005cacec); Archetype::IVoiceMsg implemented by VoiceMsg (vtable 005cabfc).
 //
 // FUN_00430b00 loads `voices =` files listed in freelancer.ini [Data];
 // FUN_00430ab0 resolves a profile by CreateID(nickname); FUN_00431850 clears
@@ -29,7 +28,7 @@ struct FVoiceProfile;
 
 // VoiceMsg — retail object 0x14 bytes, vtable 005cabfc (the 15 slots of Archetype::ISound, via
 // Archetype::IVoiceMsg; RTTI in sound_archetype.h). It IS a sound archetype: HUD_Comm hands it
-// to the sound heap FUN_00428680 directly (0x004cb188 / 0x004cc01b).
+// to the sound heap FUN_00428680 directly.
 // FUN_004311d0 is the default ctor; FUN_00431690 copies +4..+0x13.
 struct FVoiceMsg : Archetype::IVoiceMsg
 {
@@ -42,34 +41,34 @@ struct FVoiceMsg : Archetype::IVoiceMsg
 
     FVoiceMsg();
 
-    // slot 0 LAB_0042adc0 — MOV EAX,[ECX+8].
+    // slot 0 LAB_0042adc0.
     int GetSmArchId() override { return SmArchId; }
     // slot 1 LAB_00431200 — Owner->GetSoundFile(Id).
     char const* GetFileName() override;
-    // slot 2 LAB_00517320 — MOV EAX,2.
+    // slot 2 LAB_00517320.
     unsigned GetSourceType() override { return 2; }
-    // slot 3 FUN_00431220 — create the wav archetype on first use, ++RefCount; SETNZ (id != -1).
+    // slot 3 FUN_00431220 — create the wav archetype on first use, ++RefCount.
     unsigned char Acquire() override;
-    // slot 4 FUN_00431260 — --RefCount, destroy archetype at 0; returns MOVSX of the count.
+    // slot 4 FUN_00431260 — --RefCount, destroy archetype at 0; returns the signed count.
     int Release() override;
-    // slot 5 LAB_004312a0 — MOVSX [+0x12].
+    // slot 5 LAB_004312a0.
     int GetUseCount() override { return RefCount; }
-    // slot 6 LAB_004312b0 — MOVSX [+0x11].
+    // slot 6 LAB_004312b0.
     int GetAttenuation() override { return Attenuation; }
-    // slots 7/8 LAB_004312c0 — FLD -1.0f (DAT_005c7500).
+    // slots 7/8 LAB_004312c0 (DAT_005c7500).
     float GetRangeMin() override { return -1.f; }
     float GetRangeMax() override { return -1.f; }
-    // slot 9 FUN_0044fd00 — XOR AL,AL (not streamed).
+    // slot 9 FUN_0044fd00.
     unsigned char IsStreamer() override { return 0; }
-    // slot 10 FUN_004b6c50 — MOV AL,1 (2D).
+    // slot 10 FUN_004b6c50.
     unsigned char Is2d() override { return 1; }
-    // slot 11 LAB_004312d0 — FLD 0.0f (DAT_005c7474).
+    // slot 11 LAB_004312d0.
     float GetRandomPitch() override { return 0.f; }
-    // slot 12 FUN_0043d950 — MOV EAX,ECX.
+    // slot 12 FUN_0043d950.
     Archetype::ISound* GetLinked() override { return this; }
-    // slot 13 FUN_0044fd00 — XOR AL,AL.
+    // slot 13 FUN_0044fd00.
     unsigned char IsPitchBendable() override { return 0; }
-    // slot 14 LAB_00431210 — MOVSX [+0x10].
+    // slot 14 LAB_00431210.
     int GetPriority() override { return Priority; }
 };
 
@@ -114,7 +113,7 @@ int LoadClientVoicesIni(char const* FullPath);
 // FUN_00430ab0 — profile by CreateID(nickname), null when unknown.
 FVoiceProfile* LookupClientVoice(unsigned int VoiceId);
 
-// FUN_00431850 — drop every profile (engine shutdown, FUN_005b22af).
+// FUN_00431850 — drop every profile (WinMain teardown).
 void ClearClientVoices();
 
 // Registry size (retail DAT_00667e28).

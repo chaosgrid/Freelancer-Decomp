@@ -6,6 +6,7 @@
 
 #pragma once
 
-// Registration into the Win3D registry is Win3D::Create (FUN_004b5060, win3d.h) and its
-// overrides such as FUN_0047b3e0. The raw-offset RegisterSceneRenderable that stood here was
-// removed on 2026-09-25 (see scene_render_registry.cpp).
+// Registration into the Win3D registry is Win3D::Create (FUN_004b5060, win3d.h: FUN_0059dd00
+// parent, FUN_0059dbf0 register, flags = (flags & 0xfb) | 3) and its overrides such as
+// FUN_0047b3e0 (the same two calls, flags &= 0xf8, byte +0x4e7 = 1). Neither retail sequence
+// unregisters first.

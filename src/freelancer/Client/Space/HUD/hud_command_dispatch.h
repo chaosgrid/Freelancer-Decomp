@@ -34,8 +34,8 @@ struct FHudCmdRecord
 FHudCmdRecord* HudCommandRecord();
 
 // FUN_005763b0(msgId, bSkipMods): if bSkipMods==0 capture Shift/Ctrl/Alt into
-// DAT_0067c280 and set DAT_0067c290=1; then FUN_00576410(msgId, 0). The tail is a JMP, so the
-// result is FUN_00576410's (HUD_Target's SetProperty 0x004e1b04 / 0x004e1b8e returns its low byte).
+// DAT_0067c280 and set DAT_0067c290=1; then FUN_00576410(msgId, 0), a tail call, so the result
+// is FUN_00576410's (HUD_Target's SetProperty returns its low byte).
 int HudPostCommand(unsigned MsgId, int bSkipMods);
 
 // FUN_00576410(msgId, mode): walk DAT_0067c3a4 handler tree; call handler vt[0].
@@ -75,8 +75,7 @@ void HudPopInputFocus(FHudCmdHandler* Handler);
 FHudCmdHandler* HudGetInputFocus();
 
 // The 0x28-byte command record FUN_0054bcb0 routes. HUD_Button's click (LAB_004c9430) zeroes
-// ten dwords, sets +0x26 = 1 and the id at +0; the other posters (0x0049407d, 0x004cef01 ...)
-// fill the target fields as well.
+// ten dwords, sets +0x26 = 1 and the id at +0; the other posters fill the target fields as well.
 struct FSpaceCommand
 {
     int Id;                        // +0x00 -- 0 ends routing after the camera's first look
@@ -89,7 +88,7 @@ struct FSpaceCommand
 };
 static_assert(sizeof(FSpaceCommand) == 0x28, "retail command record is 0x28 bytes");
 
-// FUN_0054bcb0 (cdecl, one argument) -- route a command through the in-flight camera
+// FUN_0054bcb0 -- route a command through the in-flight camera
 // controller. False when no controller exists (DAT_00678ba0); otherwise the active camera
 // (DAT_00679738) sees it through its slot 0x70, a record whose id is then 0 is consumed, slot
 // 0x74 may consume it, and ids above 0xe go on to the watched client ship's slot 0x1cc. True

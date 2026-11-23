@@ -22,8 +22,8 @@ struct ZONE : Universe::IZone
     ZONE();
     // FUN_0633e3f0: member-wise copy (common_zone.cpp).
     ZONE(ZONE const& Other);
-    // FUN_06339010 (.text:06339010-0633909b). Non-virtual, as in retail: the vftable has no
-    // destructor slot. Releases the mesh handle through DALib::Engine (vt+0x3c) and frees
+    // FUN_06339010. Non-virtual, as in retail: the vftable has no destructor slot.
+    // Releases the mesh handle through DALib::Engine (vt+0x3c) and frees
     // the owned loot record; the population buffer goes with IZone::Population.
     ~ZONE();
 

@@ -29,25 +29,9 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FFxEffectArchetype::Release()
     {
-        // FUN_06222900 (alchemy.dll.txt:71344-71367): retail guards the
-        // decrement against underflow (`if (refcount != 0) refcount--;`
-        // before the zero-check) rather than decrementing unconditionally --
-        // the same underflow-guard pattern already fixed in
-        // FComponentFactory::Release (alchemy_factory.cpp) and in
-        // FFxRuntime::Release (alchemy_fxruntime.cpp). An extra Release()
-        // call past 0 previously underflowed RefCount_ to 0xFFFFFFFF here
-        // instead of retail's no-op.
-        //
-        // [wave61-lane2] fresh re-derivation from raw bytes also found retail
-        // stores 0x1 back into [ESI+0x48] (`MOV dword ptr [ESI+0x48],0x1`,
-        // 06222919) immediately before calling the member-teardown helper
-        // (FUN_06222c50) and operator delete (FUN_062460e0) -- the same
-        // teardown reentrancy-guard pattern documented for FFxNodeLibrary
-        // (alchemy_nodelibrary.cpp), FFxAnimatedSingle
-        // (alchemy_ramp.cpp) and FFxEffectObject (alchemy_effectobject.cpp).
-        // It guards against a reentrant AddRef/Release on `this` observing
-        // RefCount_==0 while teardown is still in progress. Mirrored here to
-        // match retail exactly.
+        // FUN_06222900: the decrement saturates at 0, and the count (+0x48) is set back to
+        // 1 before teardown (FUN_06222c50) and operator delete, so a reentrant
+        // AddRef/Release during teardown does not see 0.
         if (RefCount_ != 0)
             --RefCount_;
         if (RefCount_ == 0)

@@ -18,15 +18,15 @@
 namespace
 {
 	// .data:00426300 — the '|'-separated list of files Dr. Watson attaches, 0x410 wchar ending
-	// where GCrashAppName begins. In FLServer.exe only AppendDxDiagReport writes it (all six
-	// references are inside 00408b70..00408f5e), so it holds at most the dxdiag report.
+	// where GCrashAppName begins. In FLServer.exe only AppendDxDiagReport writes it, so it holds
+	// at most the dxdiag report.
 	wchar_t GCrashReportFiles[0x410];
 
 	// .data:00426b20 — the application name handed to Dr. Watson (0x80 wchar, the last one
-	// forced to zero at .data:00426c1e).
+	// forced to zero).
 	wchar_t GCrashAppName[0x80];
 
-	// .text:00408b70..00408cbd: run "dxdiag.exe <temp>\dxdiag.txt", wait up to 60 s and, unless
+	// .text:00408b70 — run "dxdiag.exe <temp>\dxdiag.txt", wait up to 60 s and, unless
 	// it timed out, append the report path to GCrashReportFiles.
 	void AppendDxDiagReport()
 	{
@@ -60,7 +60,7 @@ namespace
 			size_t Length = wcslen(GCrashReportFiles);
 			MultiByteToWideChar(CP_UTF8, 0, ReportPath, -1, GCrashReportFiles + Length,
 				(int)(0x410 - Length));
-			// .text:00408c98: the terminator lands 0x104 wchar past the old end, not after the
+			// Retail quirk: the terminator lands 0x104 wchar past the old end, not after the
 			// appended text.
 			GCrashReportFiles[Length + 0x104] = L'\0';
 		}
@@ -68,21 +68,20 @@ namespace
 		CloseHandle(ProcessInfo.hThread);
 	}
 
-	// .text:00408cc0..004090e9, the unhandled-exception filter. Breakpoint (0x80000003) and
+	// .text:00408cc0 — the unhandled-exception filter. Breakpoint (0x80000003) and
 	// single-step (0x80000004) go to the next handler. Everything else: close a hosted
 	// DirectPlay session, then hand the crash to Dr. Watson (dw15.exe) through a 0x1c50-byte
 	// shared block and wait for it. Returns EXCEPTION_EXECUTE_HANDLER unless dw15 says the
 	// process may continue.
 	LONG WINAPI CrashFilter(EXCEPTION_POINTERS* Info)
 	{
-		LONG Result = 1; // [ebp-0x1c]
+		LONG Result = 1;
 		DWORD Code = Info->ExceptionRecord->ExceptionCode;
 		if (Code == 0x80000003 || Code == 0x80000004)
 		{
 			return 0;
 		}
 
-		// .text:00408d0d..00408d32: its own __try whose filter (00408d22) returns 1.
 		__try
 		{
 			CDPServer::CrashCleanup();
@@ -107,13 +106,13 @@ namespace
 		if (Block != NULL)
 		{
 			memset(Block, 0, 0x714 * 4);
-			HANDLE EventDone = CreateEventA(&Security, FALSE, FALSE, NULL); // [ebp-0x30]
+			HANDLE EventDone = CreateEventA(&Security, FALSE, FALSE, NULL);
 			if (EventDone != NULL)
 			{
-				HANDLE EventAlive = CreateEventA(&Security, FALSE, FALSE, NULL); // [ebp-0x34]
+				HANDLE EventAlive = CreateEventA(&Security, FALSE, FALSE, NULL);
 				if (EventAlive != NULL)
 				{
-					HANDLE Mutex = CreateMutexA(&Security, FALSE, NULL); // [ebp-0x38]
+					HANDLE Mutex = CreateMutexA(&Security, FALSE, NULL);
 					if (Mutex != NULL)
 					{
 						if (DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(),
@@ -183,7 +182,6 @@ namespace
 							}
 							else
 							{
-								// .text:00408ff9..00409083.
 								bool bWaiting = true;
 								do
 								{
@@ -240,7 +238,7 @@ namespace
 	}
 }
 
-// .text:004090f0..0040911c
+// .text:004090f0
 void InstallCrashHandler(const wchar_t* AppName)
 {
 	wcsncpy(GCrashAppName, AppName, 0x80);

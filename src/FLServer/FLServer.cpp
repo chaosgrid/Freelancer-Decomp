@@ -17,10 +17,10 @@
 #include "UniverseChatDlg.h"
 #include "ServerNewsDlg.h"
 #include "ServerConfigDlg.h"
-#include "FLServerCmdLine.h"    // CFLServerCommandLineInfo (ParseParam .text:00413880)
+#include "FLServerCmdLine.h"    // CFLServerCommandLineInfo
 #include "Motd.h"               // GMotd
 #include "ResourceStrings.h"    // AddResourceDll, LoadIdsString
-#include "CrashReport.h"        // InstallCrashHandler (.text:004090f0)
+#include "CrashReport.h"        // InstallCrashHandler
 
 #include "dalib_core.h"         // DALib::Startup / OpenData / CloseData / Shutdown, CriticalWarningFn
 #include "dalib_net.h"          // CGunWrapper, IGunHost
@@ -40,7 +40,7 @@
 #include <mmsystem.h>
 #include <vector>
 
-// FLServer.exe application TU (retail .text:0040ab90..0040d7ff, statics included).
+// FLServer.exe application TU.
 
 CFLServerApp theApp;            // .data:00426c58 (constructed by .text:0040af50)
 CFLServerApp* GApp = NULL;      // .data:004278b8
@@ -64,12 +64,12 @@ static int GLastGunStatus = 0;
 // .data:004278c8 — server frames run since startup (incremented by the server thread, no reader).
 static unsigned int GServerFrameCount = 0;
 // .data:00425548 — the server thread's frame period in seconds (1/30). Retail keeps it in
-// writable .data but nothing writes it (only the two reads at .text:0040cda0 / 0040cdb4).
+// writable .data but nothing writes it.
 static float GServerFramePeriod = 0.0333333351f;
 
 // .data:004278a0 (vtable .rdata:0041d030, set by the static initializer .text:0040b340) — the
-// loading screen InitInstance registers with Common: both slots are a bare RET
-// (.text:0040b350 / 0040b360), so Common's progress refreshes do nothing in the server.
+// loading screen InitInstance registers with Common: both slots are empty, so Common's
+// progress refreshes do nothing in the server.
 class FServerLoadingScreen : public ILoadingScreen
 {
 public:
@@ -320,7 +320,7 @@ static DWORD WINAPI GunThreadProc(LPVOID)
 	return 0;
 }
 
-// The FPU setup of InitInstance (.text:0040bae3) and the server thread (.text:0040cc6c):
+// The FPU setup of InitInstance and the server thread (inlined in both in retail):
 // "unmask FPU exceptions" clears the zero-divide / overflow / invalid masks of the current
 // control word, otherwise every exception is masked with 53-bit precision.
 static void SetupServerFpu(bool bUnmaskExceptions)
@@ -354,7 +354,7 @@ static DWORD WINAPI ServerThreadProc(LPVOID)
 		fclose(MotdFile);
 		size_t Length = wcslen(MotdText);
 		GMotd.assign(MotdText, Length);
-		// Retail pushes &GMotd (.text:0040cc4e), which ApplyServerNews ignores.
+		// Retail pushes &GMotd, which ApplyServerNews ignores.
 		ApplyServerNews();
 	}
 
@@ -378,8 +378,7 @@ static DWORD WINAPI ServerThreadProc(LPVOID)
 		long long Ticks = Timing::read_ticks();
 		long long DeltaTicks = Ticks - LastTicks;
 		double Elapsed = Timing::seconds(DeltaTicks);
-		// x87: FLD period / FCOMP Elapsed / TEST AH,0x41 / JNZ skips the sleep when
-		// period <= Elapsed; the fall-through (period > Elapsed) sleeps the remainder.
+		// x87 compare: equal or unordered skips the sleep.
 		if ((double)GServerFramePeriod > Elapsed)
 		{
 			SleepEx((DWORD)(long)(((double)GServerFramePeriod - Elapsed) * 1000.0), FALSE);
@@ -475,7 +474,7 @@ BOOL CFLServerApp::InitInstance()
 		AfxMessageBox(100, 0, (UINT)-1);
 		return FALSE;
 	}
-	// .text:0040b9e4 CWinApp::Enable3dControls: obsolete in MFC 14 (3-D controls are always
+	// Retail calls CWinApp::Enable3dControls here: obsolete in MFC 14 (3-D controls are always
 	// on), so there is nothing to call.
 
 	if (RichEditModule == NULL)
@@ -489,7 +488,7 @@ BOOL CFLServerApp::InitInstance()
 	}
 
 	AddResourceDll(LoadLibraryA("resources.dll"));
-	InstallCrashHandler(L"Freelancer-Server");   // .text:0040ba20 (u"" .data:004256a0)
+	InstallCrashHandler(L"Freelancer-Server");   // u"" .data:004256a0
 
 	ServerControl.SetTitle("FLServer -");
 	SetRegistryKey("Microsoft");
@@ -523,8 +522,8 @@ BOOL CFLServerApp::InitInstance()
 	{
 		CString Name;
 		LoadStringChecked(Name, 0xf00d);
-		// .text:0040bc1f calls the virtual CWnd::Create (vtbl+0x5c); CFormView::Create is
-		// protected in MFC 14, so dispatch through the public CWnd declaration.
+		// Retail calls the virtual CWnd::Create; CFormView::Create is protected in MFC 14, so
+		// dispatch through the public CWnd declaration.
 		((CWnd*)SummaryForm)->Create(NULL, Name, WS_CHILD, Rect, m_pMainWnd, AFX_IDW_PANE_FIRST + 1, &Context);
 		::SendMessageA(SummaryForm->m_hWnd, WM_INITIALUPDATE, 0, 0);
 	}
@@ -738,7 +737,7 @@ bool CFLServerApp::OnServerStartupFinished(bool bStarted)
 			ServerLogf(ErrorCode{ 0x100004 }, (LPCTSTR)Text);
 		}
 		ServerControl.SetLogLevel(SavedLevel);
-		// KERNEL32 CreateThread (.text:0040bff7); the CWinThread member hides the name here.
+		// KERNEL32 CreateThread; the CWinThread member hides the name here.
 		GServerThread = ::CreateThread(NULL, 0, ServerThreadProc, NULL, 0, &GServerThreadId);
 		if (GServerThread == NULL)
 		{
@@ -750,8 +749,6 @@ bool CFLServerApp::OnServerStartupFinished(bool bStarted)
 	}
 	SetRemoteClientSessionName(ServerControl.ServerName.c_str());
 	SetRemoteClientPassword(ServerControl.ServerPassword.c_str());
-	// .text:0040c09a..0040c0cf: (AllowPvp, AllowNewPlayers, exe version, description,
-	// server id, server signature); remoteclient.h's parameter names lag (see FLS-E handoff).
 	SetRemoteClientResponseData(ServerControl.GetAllowPvp() != 0, ServerControl.GetAllowNewPlayers() != 0,
 		(int)GServerVersion, ServerControl.ServerDescription.c_str(), Server.GetServerID(),
 		Server.GetServerSig());
@@ -800,7 +797,7 @@ bool CFLServerApp::ReadFreelancerIni(const char* Path)
 			}
 			else if (Reader.is_header("Server"))
 			{
-				// Retail tests "death_penalty" and ignores the answer (.text:0040c330..0040c343).
+				// Retail tests "death_penalty" and ignores the answer.
 				while (Reader.read_value())
 				{
 					Reader.is_value("death_penalty");
@@ -946,8 +943,7 @@ void CFLServerApp::OnUpdateNeedsServer(CCmdUI* CmdUI)
 	CmdUI->Enable(StartupThread == NULL);
 }
 
-// .text:0040d070 — modal "Manage Accounts & Characters" (the dialog's dtor is inlined at
-// 0040d0aa..0040d131; its out-of-line copy is 0040d150).
+// .text:0040d070 — modal "Manage Accounts & Characters".
 void CFLServerApp::OnEditAccounts()
 {
 	CAccountsDlg AccountsDlg(NULL);
@@ -995,8 +991,7 @@ void CFLServerApp::OnChatUniverse()
 	GUniverseChatDlg.ShowWindow(SW_SHOW);
 }
 
-// .text:0040d310 — modal "Edit Server News" (dtor inlined at 0040d34a..0040d36d, out-of-line
-// copy 0040d390).
+// .text:0040d310 — modal "Edit Server News".
 void CFLServerApp::OnServerNews()
 {
 	CServerNewsDlg NewsDlg(NULL);

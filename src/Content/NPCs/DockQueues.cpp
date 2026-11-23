@@ -6,9 +6,8 @@
 
 // Content.dll TU53: the dock queues and the formation helpers (see DockQueues.h).
 
-// 06f6b840-06f6ba20: TU54's own 16 static-ID initializers (DAT_06fd1d08..DAT_06fd1ccc), before
-// the TU's other dynamic initializers (the dock lists, LAB_06f6bb10, LAB_06f6eec0). The
-// dock-type tests read the last four (GIdCanUseBerths .. GIdCanUseLargeMoors).
+// TU54's own 16 static ids; the dock-type tests read the last four (GIdCanUseBerths ..
+// GIdCanUseLargeMoors).
 #include "Core/ContentStaticIds.h"
 
 #include "NPCs/DockQueues.h"
@@ -42,9 +41,8 @@ std::vector<FDockTerminal> GDockTerminals;
 std::vector<FDockTerminal> GDockTerminalsApplied;
 std::map<unsigned int, std::list<FContentNpcShipParams>> GDockLaunchQueues;
 
-// LAB_06f6eec0: DAT_06fd1c84 = DAT_06fbbcf4 (-0.6f).
+// LAB_06f6eec0: copied from DAT_06fbbcf4.
 float GDockHostileAttitude = -0.6f;
-
 
 namespace
 {
@@ -53,13 +51,11 @@ namespace
 
     bool ContainsClass(std::vector<unsigned int> const* ClassIds, unsigned int ClassId)
     {
-        // FUN_06eb5f30: std::find over the vector.
+        // FUN_06eb5f30.
         return std::find(ClassIds->begin(), ClassIds->end(), ClassId) != ClassIds->end();
     }
 
-    // The terminal-type switch of FUN_06f6c580 (06f6c5fb-06f6c635 and 06f6c791-06f6c7d1):
-    // types 1, 2, 6 berths, 3 small, 4 medium, 5 large moors need that class; 7 and 8 take
-    // any ship; any other type takes none.
+    // The terminal-type switch inlined twice in FUN_06f6c580.
     bool DoesTerminalFitClasses(unsigned int TerminalType, std::vector<unsigned int> const* ClassIds)
     {
         switch (TerminalType)
@@ -82,7 +78,7 @@ namespace
         }
     }
 
-    // The docking-list scan of FUN_06f6c580 (06f6c637-06f6c660, 06f6c7d7-06f6c7fd).
+    // The docking-list scan inlined twice in FUN_06f6c580.
     bool IsDockTerminalInUse(unsigned int DockTargetId, int DockIndex)
     {
         for (std::list<FDockQueueEntry>::iterator It = GDockingShips.begin();
@@ -94,7 +90,7 @@ namespace
         return false;
     }
 
-    // FUN_06f6c250's local vector (0x14 elements, FUN_06f6eed0 / FUN_06eedcc0 inserts).
+    // FUN_06f6c250's local vector (0x14-byte elements).
     struct FDockKick
     {
         FContentShipBase* Ship;      // +0x00 null: cancel the docking by id
@@ -114,9 +110,8 @@ namespace
         return static_cast<double>(Z) * Z + static_cast<double>(Y) * Y + static_cast<double>(X) * X;
     }
 
-    // The inverse-square-root idiom of FUN_06f6bdd0 (06f6c09f-06f6c161, 06f6c1a2-06f6c1fa):
-    // y = 0x5f3759df - (bits(StoredSquare) >> 1), one Newton step, times Square:
-    // ((1.5 - y*y*Square*0.5) * y) * Square.
+    // The 0x5f3759df inverse-square-root idiom inlined twice in FUN_06f6bdd0 (one Newton step,
+    // times Square).
     double ApproximateSqrt(float StoredSquare, double Square)
     {
         int Bits;
@@ -129,13 +124,8 @@ namespace
     }
 }
 
-// FUN_06f6e530 (06f6e530-06f6e80a, cdecl; caller SpaceSupport msg 0x27 06f5dd8b), and the same
-// terminal-vector update inlined in FUN_06f6c250 (06f6c3c8-06f6c3ff, 06f6c43c-06f6c47e,
-// 06f6c525-06f6c530) and FUN_06f6e9d0 (06f6e9f1-06f6ea34, 06f6eb53-06f6eb5e): the first
-// GDockTerminals entry (DAT_06fd1c88) with this target and index only changes when its flag
-// is clear (`if (!b) b = bOccupied`, so a set flag is never cleared here); an unlisted pair
-// is appended {target, index, bOccupied} (06f6e560-06f6e7fd: the VC6 vector growth inlined,
-// FUN_06f6f760 / FUN_06f6f720 / FUN_06f6f3e0 / FUN_06f38170).
+// FUN_06f6e530, also inlined in FUN_06f6c250 and FUN_06f6e9d0. A set flag is never cleared
+// here.
 void __cdecl MarkDockTerminal(unsigned int DockTargetId, int DockIndex, bool bOccupied)
 {
     for (std::vector<FDockTerminal>::iterator It = GDockTerminals.begin();
@@ -155,7 +145,7 @@ void __cdecl MarkDockTerminal(unsigned int DockTargetId, int DockIndex, bool bOc
     GDockTerminals.push_back(Terminal);
 }
 
-// FUN_06f6bbf0 (06f6bbf0-06f6bc17).
+// FUN_06f6bbf0.
 FDockQueueEntry::FDockQueueEntry()
     : SystemId(0)
     , ShipId(0)
@@ -167,7 +157,7 @@ FDockQueueEntry::FDockQueueEntry()
 {
 }
 
-// FUN_06f601f0 (06f601f0-06f60219).
+// FUN_06f601f0.
 std::list<FDockQueueEntry>::iterator __cdecl FindDockQueueEntry(std::list<FDockQueueEntry>* List,
                                                                 unsigned int ShipId)
 {
@@ -179,14 +169,8 @@ std::list<FDockQueueEntry>::iterator __cdecl FindDockQueueEntry(std::list<FDockQ
     return List->end();
 }
 
-// FUN_06f66220 (06f66220-06f66438). For each SystemInfo of the map (FUN_06f75f20) its space
-// objects (+0xdc) whose +0x154 is FormationId, then every player state's ship (+0x10, when
-// set) with the same test -- all appended (FUN_06f937c0). Then the whole vector is sorted by
-// +0x14c (signed `<`, JL): retail's inlined VC6 std::sort = ContentSort -- up to 16 elements
-// the insertion sort 06f66322 (unguarded insert FUN_06f6b0f0); above, the first _Sort pass
-// inlined (median FUN_06f6b550 of first/mid/last-1, partition FUN_06f6b5a0, _Sort
-// FUN_06f6aff0 into the not-larger side, loop while > 16), then insertion FUN_06f6b4c0 of the
-// first 16 and the unguarded inserts 06f663f4. Ties keep retail's order.
+// FUN_06f66220. The whole vector is sorted by the signed slot with retail's inlined VC6
+// std::sort (ContentSort), so ties keep retail's order.
 void __cdecl CollectFormationMembers(std::vector<FContentShipBase*>* Out, unsigned int FormationId)
 {
     if (FormationId == 0xffffffffu)
@@ -223,9 +207,8 @@ void __cdecl CollectFormationMembers(std::vector<FContentShipBase*>* Out, unsign
                 });
 }
 
-// FUN_06f67660 (06f67660-06f67733). The player walk sits inside the system loop: for each
-// system its space objects, then all players. A match is +0x154 == FormationId with slot
-// +0x14c == 0 or (+0x154 == -1).
+// FUN_06f67660. The player walk sits inside the system loop (retail quirk: the players are
+// rescanned per system).
 FContentShipBase* __cdecl FindFormationLeader(unsigned int FormationId)
 {
     std::map<unsigned int, FSystemInfo>* Systems = GetSystemInfos();
@@ -256,9 +239,7 @@ FContentShipBase* __cdecl FindFormationLeader(unsigned int FormationId)
     return nullptr;
 }
 
-// FUN_06f6ee40 (06f6ee40-06f6eeb2). The docking entry of the leader (first match); its
-// terminal's type (GetTerminalInfo's result is not tested) 7 or 8 -> CancelShipDocking(ship,
-// that entry's dock target, 0).
+// FUN_06f6ee40. GetTerminalInfo's result is not tested.
 void __cdecl CancelDockingBehindLeader(FContentShipBase* Ship, unsigned int FormationId)
 {
     FContentShipBase* Leader = FindFormationLeader(FormationId);
@@ -281,12 +262,8 @@ void __cdecl CancelDockingBehindLeader(FContentShipBase* Ship, unsigned int Form
         CancelShipDocking(Ship->SpaceObjId, DockTargetId, false);
 }
 
-// FUN_06f671a0 (06f671a0-06f672c6). Offset: zero, or with a formation (+0x150) its slot
-// position for +0x14c (FUN_06efcb20). SetPersonalityParams (Common ctor) carries only the
-// state graph (+0xc). A follower (formation != -1, slot != 0, +0x154 != -1) whose leader is
-// found gets the ESCORT graph and follows the leader; without a leader nothing is sent.
-// Anyone else gets the LEADER graph and update_formation_state(ship, formation == -1 ? 0 :
-// ship, offset).
+// FUN_06f671a0 (slot position FUN_06efcb20). The SetPersonalityParams carries only the state
+// graph. A follower without a leader gets nothing.
 void __cdecl ResetFormationState(FContentShipBase* Ship)
 {
     unsigned int FormationId = Ship->FormationId;
@@ -322,11 +299,8 @@ void __cdecl ResetFormationState(FContentShipBase* Ship)
     pub::AI::update_formation_state(Ship->SpaceObjId, LeaderId, Offset);
 }
 
-// FUN_06f67090 (06f67090-06f67198). The leader of the ship's formation is the ship: every
-// member is looked up again in its own system (FUN_06eea860 + FindShip); a live one still in
-// a formation gets CancelDockingBehindLeader(member, its formation) and SetFormation(-1, 0,
-// null); every member then ResetFormationState. Anyone else in a formation:
-// SetFormation(-1, -1, null) and ResetFormationState.
+// FUN_06f67090. A leader's members are looked up again in their own system; a dissolved member
+// gets slot 0, a single leaver slot -1.
 void __cdecl RemoveFromFormation(FContentShipBase* Ship)
 {
     unsigned int FormationId = Ship->FormationId;
@@ -356,9 +330,7 @@ void __cdecl RemoveFromFormation(FContentShipBase* Ship)
     ResetFormationState(Ship);
 }
 
-// FUN_06f66dc0 (06f66dc0-06f66eba). Members of Ship's formation (+0x154) other than Ship (by
-// space object id): a player's ship (FUN_06f49bc0, state +0x10 non-null) is pushed to the
-// back of Ships; each of them then leaves the formation (FUN_06f67090).
+// FUN_06f66dc0.
 void __cdecl ReleaseFormationMembers(FContentShipBase* Ship, std::list<FContentShipBase*>* Ships)
 {
     std::vector<FContentShipBase*> Members;
@@ -376,15 +348,9 @@ void __cdecl ReleaseFormationMembers(FContentShipBase* Ship, std::list<FContentS
     }
 }
 
-// FUN_06f66ec0 (06f66ec0-06f67046). An empty list does nothing. The first ship, when in a
-// formation and its slot 1 (vtbl +4, Slot04: true for NPC ships) says so, releases its
-// formation's other members into the list. A new formation id (FUN_06efeb00); Slot = 0.
-// Pass 1 over the list, NPC ships (no player state): skipped while Slot is a player slot
-// (FUN_06efccd0, not advanced); with bReleaseLeaderFollowers a leader (+0x14c == 0) releases
-// its formation's members first; SetFormation(id, Slot, Formation), ResetFormationState,
-// ++Slot. Pass 2, player ships: unless Slot is already a player slot, Slot advances until it
-// is one or reaches the slot count (0x34-byte slots); below the count SetFormation(id, Slot,
-// Formation) and ResetFormationState (Slot is not advanced).
+// FUN_06f66ec0 (IsPlayerSlot = FUN_06efccd0). Retail quirk: in pass 1 an NPC ship that meets
+// a player slot is skipped without advancing Slot, so it gets no formation; in pass 2 Slot is
+// not advanced, so every player shares one slot.
 void __cdecl FormFormation(std::list<FContentShipBase*>* Ships, FFormation* Formation,
                            bool bReleaseLeaderFollowers)
 {
@@ -435,7 +401,7 @@ void __cdecl FormFormation(std::list<FContentShipBase*>* Ships, FFormation* Form
     }
 }
 
-// FUN_06f6eca0 (06f6eca0-06f6ed02).
+// FUN_06f6eca0.
 bool __cdecl GetShipDockingTarget(unsigned int const* ShipId, unsigned int* DockTargetId,
                                   int* DockIndex, unsigned int* OutTerminalType)
 {
@@ -457,8 +423,8 @@ bool __cdecl GetShipDockingTarget(unsigned int const* ShipId, unsigned int* Dock
     return false;
 }
 
-// FUN_06f6dff0 (06f6dff0-06f6e10d). EQInfo: retail writes only Type (+0) and the flag byte
-// (+4); the port zero-fills the rest (deviations.md, zeroed indeterminate stack bytes).
+// FUN_06f6dff0. Deviation: retail writes only Type and the flag byte of EQInfo; the port
+// zero-fills the rest.
 void __cdecl SetDockEquipment(unsigned int ShipId, bool bOn, bool bFormation, FSystemInfo* System)
 {
     pub::SpaceObj::EQInfo Info;
@@ -479,17 +445,13 @@ void __cdecl SetDockEquipment(unsigned int ShipId, bool bOn, bool bFormation, FS
     std::vector<FContentShipBase*> Members;
     CollectFormationMembers(&Members, Ship->FormationId);
     if (Members.empty())
-        Members.push_back(Ship);                                                   // FUN_06f937c0
+        Members.push_back(Ship);
     for (int Index = 0; Index < static_cast<int>(Members.size()); ++Index)
         pub::SpaceObj::ActivateEquipment(Members[Index]->SpaceObjId, &Info);
 }
 
-// FUN_06f6e810 (06f6e810-06f6e9cf). The system is looked up (FUN_06f75f30) at the first
-// matching entry of either list and reused. Waiting entries of the ship (from the first
-// match on): SetDockEquipment(ship, off, formation, system) and erase. A docking entry: the
-// ship is answered Dock(ship, its dock target, -1, 5) once, then every docking entry of the
-// ship goes through FinishDocking. With a system and bFormation, the ship (FindShip, not
-// null-tested) and the other members of its formation are cancelled too (bFormation 0).
+// FUN_06f6e810. The system is looked up at the first matching entry of either list and
+// reused. With bFormation the ship is not null-tested.
 void __cdecl CancelShipDocking(unsigned int ShipId, unsigned int PassThrough, bool bFormation)
 {
     FSystemInfo* System = nullptr;
@@ -539,7 +501,7 @@ void __cdecl CancelShipDocking(unsigned int ShipId, unsigned int PassThrough, bo
     }
 }
 
-// FUN_06f67740 (06f67740-06f6777a).
+// FUN_06f67740.
 void __cdecl RelocateShip(unsigned int const* ShipId, unsigned int const* SystemId,
                           Vector const* Position, Matrix const* Orientation)
 {
@@ -549,11 +511,7 @@ void __cdecl RelocateShip(unsigned int const* ShipId, unsigned int const* System
     UpdateDockQueues();
 }
 
-// FUN_06f682c0 (06f682c0-06f68356). The result local starts at 0xc0000000 (-2.0f); both GetRep
-// results zero: result = Lo; `FCOMP Hi; FNSTSW; TEST AH,0x44; JNP` jumps (skips the random
-// pick) only when Lo == Hi (C3 alone set, odd parity); unequal or unordered fall through to
-// result = float(rand()) * DAT_06fb4448 (1/32768) * (Hi - Lo) + Lo (x87, stored as float);
-// then pub::Reputation::SetAttitude(repA, repB, result).
+// FUN_06f682c0 (1/32768 = DAT_06fb4448). x87: unordered takes the random pick.
 float __cdecl SetObjectAttitude(unsigned int ObjA, unsigned int ObjB, float Lo, float Hi)
 {
     float Result = -2.0f;
@@ -573,15 +531,9 @@ float __cdecl SetObjectAttitude(unsigned int ObjA, unsigned int ObjB, float Lo, 
     return Result;
 }
 
-// FUN_06f6c250 (06f6c250-06f6c577). Per docking entry:
-//   - neither +0x20 nor +0x10 set and more than 90 s (DAT_06fbbd20 = 90.0) since it entered
-//     (FUN_06efec20): its ship (FindShip in its system) is kicked -- gone: by id; a leader or
-//     formation-less ship: cancel its directive and dock again; a follower: nothing;
-//   - else at the docking point (FUN_06f6bdd0): its terminal is marked occupied;
-//   - else with +0x10: FinishDocking (which advances the iterator);
-//   - else its terminal is marked free.
-// Then each kicked entry: no ship -> CancelShipDocking(id, dock target, 0); else
-// DirectiveCancelOp and, when redocking, a DirectiveDockOp on the dock target.
+// FUN_06f6c250. A docking entry times out after 90 s (DAT_06fbbd20): a gone ship is cancelled
+// by id, a leader or formation-less ship cancels its directive and docks again, a follower
+// gets nothing. The kicks run after the list walk.
 void __cdecl UpdateDockQueues()
 {
     std::vector<FDockKick> Kicks;
@@ -593,8 +545,7 @@ void __cdecl UpdateDockQueues()
         if (!Entry.bField_0x20 && !Entry.bField_0x10)
         {
             double Now = GetContentGameTime();
-            // 06f6c2e1: FCOMP 90.0; TEST AH,0x41; JNZ -> not greater falls to the dock-point
-            // test, greater times out.
+            // x87: unordered does not time out.
             if (GetContentTimeDistance(&Now, &Entry.Time) > 90.0)
             {
                 FSystemInfo* System = FindSystemInfo(&Entry.SystemId);
@@ -608,17 +559,17 @@ void __cdecl UpdateDockQueues()
                     Kick.DockTargetId = Entry.DockTargetId;
                     Kick.DockIndex = Entry.DockIndex;
                     Kick.bRedock = false;
-                    Kicks.push_back(Kick);                                     // FUN_06eedcc0
+                    Kicks.push_back(Kick);
                 }
                 else if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
                 {
                     FDockKick Kick;
                     Kick.Ship = Ship;
-                    Kick.ShipId = 0;   // +0x04 left unwritten by retail (06f6c329-06f6c34d)
+                    Kick.ShipId = 0;   // +0x04 left unwritten by retail
                     Kick.DockTargetId = Entry.DockTargetId;
                     Kick.DockIndex = Entry.DockIndex;
                     Kick.bRedock = true;
-                    Kicks.push_back(Kick);                                     // FUN_06f6eed0
+                    Kicks.push_back(Kick);
                 }
                 ++It;
                 continue;
@@ -659,14 +610,9 @@ void __cdecl UpdateDockQueues()
     }
 }
 
-// FUN_06f6e9d0 (06f6e9d0-06f6ec7d). The launch queue of the dock target (map operator[],
-// FUN_06f68cf0 -- it inserts an empty one) is empty -> the terminal is marked free. The
-// entry is erased and *It advanced (FUN_06f68e30). Then every waiting entry: dock target's
-// type (GetType failing -> response 5); a docking ring's terminal is +0x10 != 0, else -1;
-// TryStartDocking. 4: Dock(ship, target, index, 4) and the formation handling -- a target of
-// type & 0xc40 (jump gate / airlock / jump hole) takes the followers along
-// (DockFormationFollowers), else FUN_06f6d920(&system, &ship, 0, 1); then the entry is
-// erased. 3: the entry stays. 0, 1, 2, 5: Dock(ship, target, -1, response) and erase.
+// FUN_06f6e9d0. The launch-queue lookup is map operator[] (it inserts an empty queue). A
+// granted gate / airlock / jump hole (type & 0xc40) takes the followers along, any other
+// target breaks the formation up; response 3 keeps the waiting entry.
 void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
 {
     FDockQueueEntry& Finished = **It;
@@ -688,9 +634,8 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
                                        &DockIndex, Wait->bField_0x20);
             if (Response == DOCK_HOST_RESPONSE_4)
             {
-                // 06f6eaf6-06f6ebb6: the radio chatter of a granted dock -- the type 2 event
-                // (System not null-tested before FindShip) to DAT_06fd1c08 (FUN_06ee8d70);
-                // its float result is dropped.
+                // The radio chatter of a granted dock (DAT_06fd1c08, FUN_06ee8d70; its float
+                // result is dropped). System is not null-tested before FindShip.
                 FGcsDockGrantedEvent Event;
                 Event.System = FindSystemInfo(&Wait->SystemId);
                 if (DockIndex != -1)
@@ -711,12 +656,12 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
                 Event.DockIndex = DockIndex;
                 Event.Response = DOCK_HOST_RESPONSE_4;
                 Event.bWaitedInQueue = true;
-                GGcsConversations.QueueConversation(&Event);                  // FUN_06ee8d70
+                GGcsConversations.QueueConversation(&Event);
                 unsigned int DockTargetType = 0;
                 pub::SpaceObj::GetType(Wait->DockTargetId, DockTargetType);
                 pub::SpaceObj::Dock(Wait->ShipId, Wait->DockTargetId, DockIndex, DOCK_HOST_RESPONSE_4);
                 if ((DockTargetType & 0xc40) == 0)
-                    BreakFormationAtDock(&Wait->SystemId, &Wait->ShipId, false, true); // FUN_06f6d920
+                    BreakFormationAtDock(&Wait->SystemId, &Wait->ShipId, false, true);
                 else
                 {
                     DockFormationFollowers(&Wait->SystemId, &Wait->ShipId, &Wait->DockTargetId,
@@ -741,13 +686,13 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
             ++Wait;
             break;
         default:
-            // 06f6ec2a JA caseD_4: retail does not advance (TryStartDocking returns 1..5).
+            // Retail does not advance here (unreachable: TryStartDocking returns 1..5).
             break;
         }
     }
 }
 
-// FUN_06f6d820 (06f6d820-06f6d919). FindSystemInfo is not null-tested; an unknown ship -> 5.
+// FUN_06f6d820. FindSystemInfo is not null-tested.
 int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
                             unsigned int const* DockTargetId, int* DockIndex, bool bField_0x20)
 {
@@ -757,8 +702,8 @@ int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
         return DOCK_HOST_RESPONSE_5;
 
     Vector Position;
-    Ship->GetPosition(&Position);                                                  // FUN_06eb70f0
-    int ShipRep = Ship->ReputationHandle->GetReputation();                         // FUN_06f33f80
+    Ship->GetPosition(&Position);
+    int ShipRep = Ship->ReputationHandle->GetReputation();
     int Response = CheckDockPermission(&Ship->ClassIds, &ShipRep, ShipId, &Position,
                                        DockTargetId, DockIndex);
     if (Response != DOCK_HOST_RESPONSE_4)
@@ -776,18 +721,8 @@ int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
     return Response;
 }
 
-// FUN_06f6c920 (06f6c920-06f6cb17).
-//   - A player's ship (FUN_06f49bc0) asks CanDockAt (FUN_06f47d10), else allowed.
-//   - Locked gate (IsGateLockedForShip) or a refused player -> the player gets
-//     "dock_disallowed" when on a live mission and refused, else "info_access_denied"
-//     (SendNNMessage); index -1; 1.
-//   - Not a gate / airlock / hole (type & 0xc40): the attitude (1.0 when the ship's rep is
-//     -1) of the target's rep (GetRep) towards the ship's; at or below DAT_06fd1c84 (FCOMP;
-//     TEST AH,0x41; JZ = greater passes) -> index -1, a player hears
-//     "nnv_dock_denied_destination_hostile"; 0.
-//   - DropPlayersLockedOutOfGate(ship, target); ChooseDockTerminal; not 4 -> that.
-//   - 4: TerminalInfo of the chosen terminal (result unused); the target's motion
-//     (GetMotion failing -> 4); |linear| or |angular| above 0.01 (DAT_06fb7a88) -> 3, else 4.
+// FUN_06f6c920 (CanDockAt = FUN_06f47d10). x87: an unordered attitude refuses. The chosen
+// terminal's TerminalInfo is fetched but unused; the motion threshold 0.01 is DAT_06fb7a88.
 int __cdecl CheckDockPermission(std::vector<unsigned int> const* ClassIds, int const* ShipRep,
                                 unsigned int const* ShipId, Vector const* Position,
                                 unsigned int const* DockTargetId, int* DockIndex)
@@ -857,15 +792,10 @@ int __cdecl CheckDockPermission(std::vector<unsigned int> const* ClassIds, int c
     return DOCK_HOST_RESPONSE_4;
 }
 
-// FUN_06f6c580 (06f6c580-06f6c8db). Candidates (a local list, FUN_06f93790 / FUN_06f1e390):
-//   - index -1: every terminal (GetTerminalInfo 0, 1, ... until it fails; failing at 0 -> 5)
-//     that fits the classes and is not in the docking list; none fitting at all -> 2;
-//   - a given index: its TerminalInfo (failing -> 5); not fitting -> 2; free -> the index.
-// No candidate -> 3. Else 4 with the index: given -> itself (random pick of one); -1 with a
-// Position -> the candidate whose hardpoint (GetHardpoint of the terminal's name, results
-// not tested) is nearest (strictly smaller squared distance, from FLT_MAX; none -> -1);
-// -1 without a Position -> a random candidate (rand() * n / 32768; no rand() for one).
-// Every refusal also stores -1.
+// FUN_06f6c580. With index -1 the terminals are walked until GetTerminalInfo fails (failing at
+// 0 -> 5); none fitting -> 2, none free -> 3. The nearest pick needs a strictly smaller squared
+// distance (GetHardpoint results not tested); without a Position a random candidate
+// (rand() * n / 32768, no rand() for one). Every refusal also stores -1.
 int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
                                unsigned int const* DockTargetId, Vector const* Position,
                                int* DockIndex)
@@ -924,11 +854,10 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
     {
         int BestIndex = -1;
         float BestDistance = FLT_MAX;
-        // Retail keeps one local across the loop and overwrites it with the difference
-        // (06f6c720-06f6c736). Common HardpointPosition (0630ef30) writes nothing when it
-        // fails, so a failed GetHardpoint leaves the previous difference in it, as here.
-        // Before the first call the retail slot is never written (stack residue); the port
-        // starts it at zero.
+        // Retail keeps one local across the loop and overwrites it with the difference; a
+        // failed GetHardpoint (Common 0630ef30 writes nothing) leaves the previous difference
+        // in it, as here. Deviation: before the first call the retail slot is stack residue;
+        // the port starts it at zero.
         Vector Work;
         Work.x = 0.0f;
         Work.y = 0.0f;
@@ -940,11 +869,10 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
             Work.x = Work.x - Position->x;
             Work.y = Work.y - Position->y;
             Work.z = Work.z - Position->z;
-            // 06f6c73a-06f6c754: (x*x + z*z) + y*y on the x87 stack.
+            // x87 sum order (x*x + z*z) + y*y.
             double Distance = static_cast<double>(Work.x) * Work.x +
                               static_cast<double>(Work.z) * Work.z +
                               static_cast<double>(Work.y) * Work.y;
-            // 06f6c756: FCOM best; TEST AH,5; JP -> not below keeps the best.
             if (Distance < BestDistance)
             {
                 BestIndex = *It;
@@ -966,17 +894,10 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
     return DOCK_HOST_RESPONSE_4;
 }
 
-// FUN_06f6bdd0 (06f6bdd0-06f6c226). The terminal's hardpoint (GetTerminalInfo, then
-// GetHardpoint with its orientation) and the ship's location (the ship must be known in the
-// system; GetLocation); any failure -> false. By terminal type:
-//   1, 3, 4, 5: |ship - hardpoint|^2 < 40000 (DAT_06fbbcfc);
-//   7: < 6250000 (DAT_06fbbd00); 8: < 250000 (DAT_06fbbd04); 2 and others: false;
-//   6 (a berth): |dx| < 10 and |dz| < 10 (DAT_06fbbd18); else, with Far = the hardpoint
-//     transform applied to (0, 0, -5000) (math engine slot +0x28), the ship lies on the
-//     hardpoint-Far segment (| 5000 - (|ship - Far| + |ship - hardpoint|) | < 25, DAT_06fbbd10
-//     / DAT_06fbbd08, lengths by the 0x5f3759df idiom); else the distance to the hardpoint is
-//     below 1.85 (DAT_06fbbcf8) times the target's radius (GetRadius).
-// Every "< c" is FCOMP; TEST AH,5; JP (not below -> false).
+// FUN_06f6bdd0. Constants: 40000 DAT_06fbbcfc, 6250000 DAT_06fbbd00, 250000 DAT_06fbbd04, 10
+// DAT_06fbbd18, 25 / 5000 DAT_06fbbd10 / DAT_06fbbd08, 1.85 DAT_06fbbcf8. A berth (6) also
+// accepts a ship on the segment from the hardpoint to 5000 behind it. x87: every unordered
+// compare is false.
 bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId,
                                unsigned int const* DockTargetId, int const* DockIndex)
 {
@@ -1002,7 +923,7 @@ bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId
     case 4:
     case 5:
     {
-        // The one CALL of FUN_06eeaee0 here (06f6be9a); (z*z + y*y) + x*x on the x87 stack.
+        // The one call of FUN_06eeaee0 here; x87 sum order (z*z + y*y) + x*x.
         Vector const Delta = SubtractVectors(ShipPosition, Hardpoint);
         return (static_cast<double>(Delta.z) * Delta.z + static_cast<double>(Delta.y) * Delta.y) +
                    static_cast<double>(Delta.x) * Delta.x < 40000.0f;
@@ -1050,19 +971,17 @@ bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId
     float Radius = 0.0f;
     Vector Center;
     pub::SpaceObj::GetRadius(*DockTargetId, Radius, Center);
-    // 06f6c19a-06f6c1ce: unlike FUN_06eb7810, the three differences stay on the x87 stack
-    // (FSUB with no FSTP to float) before (z*z + y*y) + x*x.
+    // Unlike FUN_06eb7810, the three differences are not rounded to float here.
     double const DeltaX = static_cast<double>(ShipPosition.x) - Hardpoint.x;
     double const DeltaY = static_cast<double>(ShipPosition.y) - Hardpoint.y;
     double const DeltaZ = static_cast<double>(ShipPosition.z) - Hardpoint.z;
     double DistanceSquare = DeltaZ * DeltaZ + DeltaY * DeltaY + DeltaX * DeltaX;
     double Distance = ApproximateSqrt(static_cast<float>(DistanceSquare), DistanceSquare);
-    // 06f6c206: FCOMPP of Radius * 1.85 against the distance; TEST AH,0x41; JNZ -> false.
     return static_cast<double>(Radius) * 1.85f > Distance;
 }
 
-// FUN_06f6e420 (06f6e420-06f6e52f). GetType's result is not tested; pub::SpaceObj::GetType
-// zeroes the type before any check (Server 06cf8db5), so a failure reads 0.
+// FUN_06f6e420. GetType's result is not tested; Server's GetType zeroes the type first, so a
+// failure reads 0.
 int __cdecl GetDockTypeForClasses(unsigned int const* DockTargetId,
                                   std::vector<unsigned int> const* ClassIds)
 {
@@ -1083,10 +1002,8 @@ int __cdecl GetDockTypeForClasses(unsigned int const* DockTargetId,
     return ContainsClass(ClassIds, GIdCanUseLargeMoors) ? 5 : 0;
 }
 
-// FUN_06f6dd80 (06f6dd80-06f6def4). FindSystemInfo / FindShip are not null-tested. Every
-// member after the first (the sorted leader) is appended to the docking list {system, member,
-// target, index, +0x10 0, now, +0x20 0} (FUN_06eb1810 copy) and told Dock(member, target,
-// index, 4).
+// FUN_06f6dd80. FindSystemInfo / FindShip are not null-tested. Element 0 (the sorted leader)
+// is skipped.
 void __cdecl DockFormationFollowers(unsigned int const* SystemId, unsigned int const* ShipId,
                                     unsigned int const* DockTargetId, int const* DockIndex)
 {
@@ -1110,11 +1027,7 @@ void __cdecl DockFormationFollowers(unsigned int const* SystemId, unsigned int c
     }
 }
 
-// FUN_06f6df00 (06f6df00-06f6dfe6, cdecl). A player's ship (FUN_06f49bc0) -> true at once.
-// Otherwise the ship (FUN_06f73930, not null-tested) gives its formation +0x154; the members
-// (FUN_06f66220 into a local vector -- EH state 0 of FuncInfo 06fc5010, funclet 06fafe40) are
-// walked in order and the first player's ship among them -> true; none -> false. The vector
-// is freed on both exits (FUN_06fa8fe0).
+// FUN_06f6df00. The ship is not null-tested.
 bool __cdecl IsPlayerInShipFormation(FSystemInfo* System, unsigned int ShipId)
 {
     if (FindContentPlayerStateByShip(&ShipId) != nullptr)
@@ -1131,12 +1044,7 @@ bool __cdecl IsPlayerInShipFormation(FSystemInfo* System, unsigned int ShipId)
     return false;
 }
 
-// FUN_06f6ed10 (06f6ed10-06f6ee30, cdecl). Only a wingman: +0x14c != 0 and +0x154 != -1.
-// The leader of its formation (FUN_06f67660, not null-tested) is looked up by id in
-// GDockingShips (DAT_06fd1bc8, first match); none -> done. GetTerminalInfo(the entry's target,
-// its index) (status not tested); Value 7 or 8 only: a docking entry {the ship's system
-// (FUN_06eea860()->+0x48), the ship, target, index, +0x10 0, now (FUN_06efec10), +0x20 0} is
-// appended (node new(0x30), size DAT_06fd1bd0 + 1), then Dock(ship, target, index, 4).
+// FUN_06f6ed10. The leader is not null-tested, nor GetTerminalInfo's status.
 void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
 {
     if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
@@ -1157,8 +1065,8 @@ void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
         return;
 
     FDockQueueEntry Entry;
-    Entry.Time = GetContentGameTime();                                        // FUN_06efec10
-    Entry.SystemId = Ship->GetSystem()->SystemId;                             // FUN_06eea860
+    Entry.Time = GetContentGameTime();
+    Entry.SystemId = Ship->GetSystem()->SystemId;
     Entry.ShipId = Ship->SpaceObjId;
     Entry.DockTargetId = DockTargetId;
     Entry.DockIndex = DockIndex;
@@ -1169,30 +1077,12 @@ void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
     pub::SpaceObj::Dock(ShipId, DockTargetId, DockIndex, DOCK_HOST_RESPONSE_4);
 }
 
-// FUN_06f66690 (06f66690-06f66c75, cdecl; EH FuncInfo of LAB_06fafc68). Leader / ship looked
-// up in System (FUN_06f73930; -4 / -3 when missing); both formation ids (+0x154) and both
-// formation leaders (FUN_06f57640) are read first, then the player states of both ships
-// (FUN_06f49bc0). The formations "multiplayer_freighter" and "freighter_basic" (FUN_06efd1a0)
-// must both exist (-8).
-// Not multiplayer-with-a-player (06f667be-06f66a22): a formation-less leader founds one
-// (AllocateFormationId, slot 0, freighter_basic, ResetFormationState); the ship already in it
-// -> -1. The first member of the leader's formation (FUN_06f66220; element 0 read without an
-// empty test) must not be a wingman (-8). When that member is docking (GetShipDockingTarget)
-// and the requesting ship is a player's: a gate locked for the player (FUN_06f6ce90) or a
-// target type with 0x120 -> -9 (the type local is the freighter_basic slot reused; GetType
-// zeroes it even when it fails, Server 06cf8db5). Then the first slot of the member's formation (+0x150)
-// that no member holds (+0x14c) and that suits the ship (a player's ship a player slot,
-// FUN_06efccd0, an NPC a non-player slot; the player lookup repeated per slot) is taken:
-// SetFormation(member's formation, slot, formation) -> 0. None -> -5.
-// Multiplayer with a player (06f66a23-06f66c75): both players' ships -> they must be grouped
-// (FUN_06f48190, -8); the same formation leader -> -1; "multiplayer_freighter" looked up again;
-// a formation-less leader founds one with it. The joining ships: the ship's whole formation
-// when it leads one (each member found again through its own system, out of its formation:
-// CancelDockingBehindLeader, SetFormation(-1, 0, null)), else the ship alone (FUN_06f937c0).
-// Each joining ship takes the first slot not held by a member of the leader's formation as
-// collected before the loop (the list is not refreshed, so several joiners can get the same
-// slot) -- SetFormation(leader's formation, slot, formation), ResetFormationState; a full
-// formation (or none with slots) -> -5 at that joiner. Otherwise 0.
+// FUN_06f66690 (FindFormation = FUN_06efd1a0). Two paths: single player or NPC-only uses
+// freighter_basic and a player / non-player slot match; multiplayer with a player uses
+// multiplayer_freighter and moves the ship's whole formation when it leads one.
+// Retail quirks kept: the leader formation's element 0 is read without an empty test; in the
+// multiplayer path the members list is not refreshed per joiner, so several joiners can get
+// the same slot (a full formation -> -5 at that joiner).
 int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int const* LeaderId,
                                    FSystemInfo* System)
 {
@@ -1205,7 +1095,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
 
     unsigned int LeaderFormation = Leader->FormationId;
     unsigned int const ShipFormation = Ship->FormationId;
-    FContentShipBase* const ShipLeader = Ship->GetFormationLeader();                 // FUN_06f57640
+    FContentShipBase* const ShipLeader = Ship->GetFormationLeader();
     FContentShipBase* const LeaderLeader = Leader->GetFormationLeader();
     FContentPlayerState* const ShipPlayer = FindContentPlayerStateByShip(ShipId);
     FContentPlayerState* const LeaderPlayer = FindContentPlayerStateByShip(LeaderId);
@@ -1213,7 +1103,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
         !pub::SinglePlayer() && (ShipPlayer != nullptr || LeaderPlayer != nullptr);
 
     unsigned int FormationName = CreateID("multiplayer_freighter");
-    FFormation* const MultiplayerFreighter = FindFormation(&FormationName);         // FUN_06efd1a0
+    FFormation* const MultiplayerFreighter = FindFormation(&FormationName);
     FormationName = CreateID("freighter_basic");
     FFormation* const FreighterBasic = FindFormation(&FormationName);
     if (MultiplayerFreighter == nullptr || FreighterBasic == nullptr)
@@ -1223,16 +1113,16 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
     {
         if (LeaderFormation == 0xffffffffu)
         {
-            LeaderFormation = AllocateFormationId();                                  // FUN_06efeb00
-            Leader->SetFormation(LeaderFormation, 0, FreighterBasic);                  // FUN_06f576c0
-            ResetFormationState(Leader);                                              // FUN_06f671a0
+            LeaderFormation = AllocateFormationId();
+            Leader->SetFormation(LeaderFormation, 0, FreighterBasic);
+            ResetFormationState(Leader);
         }
         if (ShipFormation == LeaderFormation)
             return -1;
 
         std::vector<FContentShipBase*> Members;
-        CollectFormationMembers(&Members, LeaderFormation);                           // FUN_06f66220
-        FContentShipBase* const First = *Members.data();     // 06f66832: no empty test
+        CollectFormationMembers(&Members, LeaderFormation);
+        FContentShipBase* const First = *Members.data();     // no empty test
         if (First->FormationSlot != 0 && First->FormationId != 0xffffffffu)
             return -8;
 
@@ -1240,7 +1130,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
         unsigned int DockTargetId = 0;
         unsigned int FirstId = First->SpaceObjId;
         int DockIndex = 0;
-        GetShipDockingTarget(&FirstId, &DockTargetId, &DockIndex, nullptr);         // FUN_06f6eca0
+        GetShipDockingTarget(&FirstId, &DockTargetId, &DockIndex, nullptr);
         if ((DockTargetId & 0x3fffffff) != 0)
         {
             unsigned int TargetType = 0;
@@ -1249,7 +1139,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
             {
                 unsigned int PlayerId = Player->PlayerId;
                 if (IsContentGateLocked(&PlayerId, &DockTargetId) || (TargetType & 0x120) != 0)
-                    return -9;                                                        // FUN_06f6ce90
+                    return -9;
             }
         }
 
@@ -1270,7 +1160,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
             if (bTaken)
                 continue;
             bool const bPlayerShip = FindContentPlayerStateByShip(ShipId) != nullptr;
-            bool const bPlayerSlot = Formation->IsPlayerSlot(Slot);                   // FUN_06efccd0
+            bool const bPlayerSlot = Formation->IsPlayerSlot(Slot);
             if (bPlayerShip != bPlayerSlot)
                 continue;
             Ship->SetFormation(First->FormationId, static_cast<unsigned int>(Slot), Formation);
@@ -1280,7 +1170,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
     }
 
     if (ShipPlayer != nullptr && LeaderPlayer != nullptr &&
-        !ShipPlayer->IsGroupMember(LeaderPlayer->PlayerId))                          // FUN_06f48190
+        !ShipPlayer->IsGroupMember(LeaderPlayer->PlayerId))
         return -8;
     if (ShipLeader != nullptr && ShipLeader == LeaderLeader)
         return -1;
@@ -1305,13 +1195,13 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
                 static_cast<FContentShipBase*>((*It)->GetSystem()->FindShip(MemberId));
             if (Member == nullptr || Member->FormationId == 0xffffffffu)
                 continue;
-            CancelDockingBehindLeader(Member, Member->FormationId);                  // FUN_06f6ee40
+            CancelDockingBehindLeader(Member, Member->FormationId);
             Member->SetFormation(0xffffffffu, 0, nullptr);
         }
     }
     else
     {
-        Joining.push_back(Ship);                                                      // FUN_06f937c0
+        Joining.push_back(Ship);
     }
 
     std::vector<FContentShipBase*> Members;
@@ -1347,26 +1237,10 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
     return 0;
 }
 
-// FUN_06f6e110 (06f6e110-06f6e419, RET 4; SpaceSupport message 0x12 06f5e019).
-//   06f6e119-06f6e14b: GetType(target) (status not tested; GetType zeroes the type before
-//     any check, Server 06cf8db5) -> index 0 for a docking ring (& 0x20), else -1.
-//   06f6e14d-06f6e15e: Response = TryStartDocking(system, &ship, &target, &index, +0x0c);
-//     System = FindSystemInfo(&system).
-//   Response != 5 (06f6e173-06f6e20a): the type 2 GCS event {System, target, ship, index,
-//     the terminal's TerminalInfo::Value (index != -1) or GetDockTypeForClasses(&target, the
-//     ship's ClassIds) (index -1; FindShip not null-tested), Response, 0} to DAT_06fd1c08
-//     (FUN_06ee8d70, float result dropped).
-//   4 (06f6e211-06f6e282): GetType(target) into the System local; Dock(ship, target, index, 4);
-//     type & 0xc40 (gate / lane kinds) -> DockFormationFollowers(&system, &ship, &target,
-//     &index); else BreakFormationAtDock(&system, &ship, false, (type & 0x120) != 0).
-//   3 (06f6e28e-06f6e3d7): a waiting entry {system, ship, target, index, +0x10 0, now, +0x20
-//     0} (the FUN_06f6bbf0 init inlined) goes into GDockWaitingShips: a player's ship, a ship
-//     with a player in its formation (FUN_06f6df00), or a space object whose +0x1b4 is 0 or 1
-//     (FUN_06f73990; read whatever the object is -- an NPC ship's CreationKind) is placed
-//     behind the players already waiting (first node whose ship is no player's); any other
-//     ship goes to the end. Dock(ship, target, -1, 3).
-//   2, 1, 0, 5 (06f6e3d9-06f6e40d): Dock(ship, target, index, Response).
-//   Returns Response.
+// FUN_06f6e110. GetType's status is not tested; with index -1 FindShip is not null-tested.
+// On 3 a player's ship, a ship with a player in its formation, or a space object of creation
+// kind 0 / 1 (+0x1b4 read whatever the object is) queues behind the players already waiting;
+// any other ship goes to the end.
 int HandleDockRequest(FDockRequest const* Request)
 {
     unsigned int TargetType = 0;
@@ -1398,7 +1272,7 @@ int HandleDockRequest(FDockRequest const* Request)
         Event.Listener = Request->ShipId;
         Event.DockIndex = DockIndex;
         Event.Response = Response;
-        GGcsConversations.QueueConversation(&Event);                          // FUN_06ee8d70
+        GGcsConversations.QueueConversation(&Event);
     }
 
     if (Response == DOCK_HOST_RESPONSE_4)
@@ -1410,13 +1284,13 @@ int HandleDockRequest(FDockRequest const* Request)
         if ((DockTargetType & 0xc40) != 0)
         {
             DockFormationFollowers(&Request->SystemId, &Request->ShipId, &Request->DockTargetId,
-                                   &DockIndex);                               // FUN_06f6dd80
+                                   &DockIndex);
         }
         else
         {
             bool const bReleasePlayers = (DockTargetType & 0x120) != 0;
             BreakFormationAtDock(&Request->SystemId, &Request->ShipId, false,
-                                 bReleasePlayers);                            // FUN_06f6d920
+                                 bReleasePlayers);
         }
         return Response;
     }
@@ -1424,7 +1298,7 @@ int HandleDockRequest(FDockRequest const* Request)
     if (Response == DOCK_HOST_RESPONSE_3)
     {
         FDockQueueEntry Entry;
-        Entry.Time = GetContentGameTime();                                    // FUN_06efec10
+        Entry.Time = GetContentGameTime();
         Entry.SystemId = Request->SystemId;
         Entry.ShipId = Request->ShipId;
         Entry.DockTargetId = Request->DockTargetId;
@@ -1463,26 +1337,11 @@ int HandleDockRequest(FDockRequest const* Request)
     return Response;
 }
 
-// FUN_06f6d920 (06f6d920-06f6dd7a). The system is not null-tested. The ship must be known and
-// lead (slot +0x14c 0) or be formation-less (+0x154 -1); its formation (FUN_06f66220) needs
-// more than one member. Members after the first: in the system's space objects
-// (FUN_06f73990) -> the NPC list, else the ship object of the player whose ship it is
-// (FUN_06f49bc0, not null-tested) -> the player list (both FUN_06eb5770 push_backs).
-//   NPC members: RemoveFromFormation (FUN_06f67090), FollowDirectivesOf(leader) (FUN_06f579c0);
-//     a leader guide (FUN_06f34ca0) is cloned (slot +0x0c), set on the member
-//     (FUN_06f34b70(clone, 1, 0)) and the creating reference released (the member's guide,
-//     slot +0x04).
-//   Without either flag: done. Player members: RemoveFromFormation.
-//   bRedirectPlayers (non-empty list), per player ship: the leader's directives copied
-//     (FUN_06f14400, each AddRef'ed); non-empty: a first directive of type 0x13 (slot +0x14)
-//     gives a DirectiveDockOp copy of its op (+0x10c); the ship's docking entry, when found,
-//     overrides DockObjectId / Field_14 = 1 / DockPortIndex; SubmitDirective. Empty list:
-//     only with a docking entry -- a fresh DirectiveDockOp {Field_08 1, the entry's target,
-//     Field_14 1, its index}. Then every copied directive is released.
-// The leader's guide is read at +0x178 whatever the ship is; for a player's ship that is the
-// low dword of CalmSince. The port reads a guide from NPC ships only (Slot04).
-// Type 0x13 also names InstantTradelane directives (GetType ICF-shared): retail copies their
-// bytes (and the bytes past their end) as a DockOp; the port copies Dock directives only.
+// FUN_06f6d920. The system is not null-tested, nor the player state of a non-NPC member.
+// Deviations: retail reads the leader's guide at +0x178 whatever the ship is (for a player's
+// ship the low dword of CalmSince); the port reads a guide from NPC ships only. Type 0x13 also
+// names InstantTradelane directives (GetType ICF-shared): retail copies their bytes (and the
+// bytes past their end) as a DockOp; the port copies Dock directives only.
 void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int const* ShipId,
                                   bool bRedirectPlayers, bool bReleasePlayers)
 {
@@ -1520,7 +1379,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
             Leader->IsNpcShip() ? static_cast<FContentNpcShip*>(Leader)->GetGuide() : nullptr;
         if (LeaderGuide == nullptr)
             continue;
-        Member->SetGuide(LeaderGuide->Clone(), true, false);                  // FUN_06f34b70
+        Member->SetGuide(LeaderGuide->Clone(), true, false);
         Member->GetGuide()->Release();
     }
 
@@ -1534,10 +1393,9 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
     for (int Index = 0; Index < static_cast<int>(PlayerMembers.size()); ++Index)
     {
         FContentShipBase* Player = PlayerMembers[Index];
-        // EH state 3 of FuncInfo 06fc4f80: the copy lives in a list that owns its references
-        // (dtor FUN_06ecfa90: Release every element, then erase) -- FMissionDirectiveList.
+        // The copy lives in a list that owns its references (retail unwind FUN_06ecfa90).
         FMissionDirectiveList Directives;
-        Directives.Items = Leader->CopyDirectives();                          // FUN_06f14400
+        Directives.Items = Leader->CopyDirectives();
         std::list<FDockQueueEntry>::iterator Entry =
             FindDockQueueEntry(&GDockingShips, Player->SpaceObjId);
         if (!Directives.Items.empty())
@@ -1566,14 +1424,10 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
             Op.DockPortIndex = Entry->DockIndex;
             pub::AI::SubmitDirective(Player->SpaceObjId, &Op);
         }
-        // The list's destructor releases the copied references.
     }
 }
 
-// FUN_06f6d040 (06f6d040-06f6d1b1). Ship id & 0x3fffffff == 0 -> nothing. The ship's system
-// (GetSystem into a local preset to 0) must have a SystemInfo and know the ship, which must
-// be in a formation; each member that is a player's ship and for whom the target is a locked
-// gate (the IsContentGateLocked test inlined) leaves the formation.
+// FUN_06f6d040 (the IsContentGateLocked test inlined).
 void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int const* DockTargetId)
 {
     if ((*ShipId & 0x3fffffffu) == 0)
@@ -1600,17 +1454,9 @@ void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int
     }
 }
 
-// FUN_06f67440 (06f67440-06f67630). Per object of System->SpaceObjs (list head +0xe0), taken
-// as an NPC ship, skipped when its +0x5a8 byte is set:
-//   - the squared distance to the placement's position (differences and sum on the x87
-//     stack) not above *Radius squared (stored as float; TEST AH,0x41, JNP) -> counted;
-//   - else only with *ConeRange > 0.0 (DAT_06fb444c; JNZ skips not-greater): V = ship -
-//     placement (FUN_06eeaee0, float), |V| = |V|^2 * FUN_06f5aeb0(|V|^2) not above *ConeRange
-//     (JP skips greater); F = -(column 2 of the orientation) (FUN_06eb7810 + FUN_06f67640);
-//     |F|^2, |V|^2, V.F and |V| stored as float, cos = V.F / (|F| * |V|); counted when
-//     cos(0.6108652334660292 rad, double DAT_06fbbcc8 = 35 degrees) is not above it
-//     (FCOMPP, TEST AH,0x41, JP).
-//   - counted only with no ClassId or HasClassId(ClassId) (FUN_06f575a0).
+// FUN_06f67440. Every object of SpaceObjs is taken as an NPC ship. The radius test keeps the
+// differences unrounded; the cone test rounds V, |V|^2, |F|^2, V.F and |V| to float (fast
+// rsqrt FUN_06f5aeb0; cos 35 degrees from double DAT_06fbbcc8). x87: unordered compares fail.
 int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Placement,
                               float const* Radius, float const* ConeRange,
                               unsigned int const* ClassId)
@@ -1624,7 +1470,7 @@ int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Pla
         if (Ship->Field_0x5a8 != 0)
             continue;
         Vector Position;
-        Ship->GetPosition(&Position);                                          // FUN_06eb70f0
+        Ship->GetPosition(&Position);
         double DX = static_cast<double>(Placement->Position.x) - Position.x;
         double DY = static_cast<double>(Placement->Position.y) - Position.y;
         double DZ = static_cast<double>(Placement->Position.z) - Position.z;
@@ -1633,14 +1479,14 @@ int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Pla
         {
             if (!(*ConeRange > 0.0f))
                 continue;
-            Vector const V = SubtractVectors(Position, Placement->Position);          // 06f674f4
+            Vector const V = SubtractVectors(Position, Placement->Position);
             float VX = V.x;
             float VY = V.y;
             float VZ = V.z;
             float VSquare = static_cast<float>(static_cast<double>(VZ) * VZ +
                                                static_cast<double>(VY) * VY +
                                                static_cast<double>(VX) * VX);
-            if (!(FastReciprocalSqrt(VSquare) * VSquare <= *ConeRange))                // 06f6751e
+            if (!(FastReciprocalSqrt(VSquare) * VSquare <= *ConeRange))
                 continue;
             float FX = -Placement->Orientation.E[0][2];
             float FY = -Placement->Orientation.E[1][2];
@@ -1651,10 +1497,10 @@ int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Pla
             float Dot = static_cast<float>(static_cast<double>(VZ) * FZ +
                                            static_cast<double>(VY) * FY +
                                            static_cast<double>(FX) * VX);
-            float VLength = static_cast<float>(FastReciprocalSqrt(VSquare) * VSquare); // 06f675c0
-            double FLength = FastReciprocalSqrt(FSquare) * FSquare;                    // 06f675d2
+            float VLength = static_cast<float>(FastReciprocalSqrt(VSquare) * VSquare);
+            double FLength = FastReciprocalSqrt(FSquare) * FSquare;
             double Cosine = Dot / (FLength * VLength);
-            if (!(std::cos(0.6108652334660292) <= Cosine))                   // DAT_06fbbcc8
+            if (!(std::cos(0.6108652334660292) <= Cosine))
                 continue;
         }
         if (ClassId != nullptr && !Ship->HasClassId(ClassId))
@@ -1664,52 +1510,41 @@ int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Pla
     return Count;
 }
 
-// FUN_06f6cb20 (06f6cb20-06f6cb5e). The docking target lands in the ObjectId argument slot
-// (retail reuses it as the out-parameter); pub::SpaceObj::GetDockingTarget zeroes it before
-// any check (Server 06cf9889), so a failed call reads 0 -> false.
+// FUN_06f6cb20. Server's GetDockingTarget zeroes the out value first, so a failed call reads 0.
 bool __cdecl IsGroupAtDockBase(unsigned int const* Group, unsigned int const* ObjectId)
 {
     unsigned int BaseId = 0;
     pub::SpaceObj::GetDockingTarget(*ObjectId, BaseId);
     if (BaseId == 0)
         return false;
-    FContentBase* Base = FindContentBaseInfo(&BaseId);                         // FUN_06eac0c0
-    return Base->FindFaction(*Group) != nullptr;                               // FUN_06eab770
+    FContentBase* Base = FindContentBaseInfo(&BaseId);
+    return Base->FindFaction(*Group) != nullptr;
 }
 
-// FUN_06f6cb90 (06f6cb90-06f6ce47). Two copies of one body that differ in the attitude:
-//   - *ShipRep != -1: GetRep(target) and GetAttitude(target rep, *ShipRep) (06f6cbd7-06f6cbe8;
-//     the inner "*ShipRep == -1" skip can never be taken there);
-//   - *ShipRep == -1: 1.0 unless *Group != -1 and the target's affiliation (GetRep +
-//     GetAffiliation) is not -1 -> the group/group GetReputation(affiliation, *Group).
-// IsGateLockedForShip(*ShipId, *DockTargetId) first -> false; attitude not above -0.6
-// (DAT_06fd1c84; TEST AH,0x41, JNZ) -> false. Then terminals 0, 1, ... (GetTerminalInfo
-// failing -> false): types 1 / 2 / 6 need can_use_berths, 3 / 4 / 5 the moor classes (the
-// class ids DAT_06fd1cd8..06fd1ccc, std::find FUN_06eb5f30 or inline), 7 / 8 -> true at once,
-// any other type fits nothing; the first fitting terminal -> true.
+// FUN_06f6cb90: retail has two copies of one body that differ only in the attitude source.
+// x87: an unordered attitude refuses.
 bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int const* ShipRep,
                               unsigned int const* Group, unsigned int const* ShipId,
                               unsigned int const* DockTargetId)
 {
-    if (IsGateLockedForShip(*ShipId, *DockTargetId))                          // FUN_06f6cf20
+    if (IsGateLockedForShip(*ShipId, *DockTargetId))
         return false;
 
     // Retail keeps the out-values in argument slots it no longer needs, and GetRep's result is
-    // not checked: a failed GetRep (it writes only on success, Server 06cf8bed) leaves the
-    // slot's argument bits in place, and the next call reads them as the rep. GetAffiliation
-    // always writes its out-value (-1 on failure, Server 06d5f400).
+    // not checked: a failed GetRep (it writes only on success) leaves the slot's argument bits
+    // in place, and the next call reads them as the rep. GetAffiliation always writes its
+    // out-value (-1 on failure).
     float Attitude = 1.0f;
     if (*ShipRep != -1)
     {
-        // 06f6cbd1: the target rep lands in the ShipRep argument's slot.
+        // The target rep lands in the ShipRep argument's slot.
         int TargetRep = static_cast<int>(reinterpret_cast<uintptr_t>(ShipRep));
         pub::SpaceObj::GetRep(*DockTargetId, TargetRep);
         pub::Reputation::GetAttitude(TargetRep, *ShipRep, Attitude);
     }
     else if (*Group != 0xffffffffu)
     {
-        // 06f6cd03: the target rep lands in the Group argument's slot, 06f6cd0f: the
-        // affiliation in the ShipId argument's slot.
+        // The target rep lands in the Group argument's slot, the affiliation in ShipId's.
         int TargetRep = static_cast<int>(reinterpret_cast<uintptr_t>(Group));
         pub::SpaceObj::GetRep(*DockTargetId, TargetRep);
         unsigned int Affiliation = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(ShipId));
@@ -1742,14 +1577,7 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
     }
 }
 
-// FUN_06f6bc20 (06f6bc20-06f6bdc6). For every pending state (in order), the first applied
-// entry of the same target and index:
-//   - found with a different flag: Activate(target, flag, index); 0 -> the applied flag
-//     takes it, and a set flag queues the target;
-//   - found with the same flag: nothing;
-//   - none: Activate; 0 -> the state is appended (FUN_06f6f3e0), a set flag queues the target.
-// Then GDockTerminals is emptied (FUN_06ea1490 on the empty tail) and every queued target
-// (a local vector<uint>, FUN_06f937c0) is announced: controller 0 gets 0x1007 with it.
+// FUN_06f6bc20.
 void __cdecl ApplyDockTerminalStates()
 {
     std::vector<unsigned int> OccupiedTargets;
@@ -1793,13 +1621,13 @@ void __cdecl ApplyDockTerminalStates()
     }
 }
 
-// LAB_06ee9660 (ICF-shared `MOV EAX,2; RET`).
+// LAB_06ee9660 (ICF-shared).
 int FGcsDockGrantedEvent::GetType() const
 {
     return 2;
 }
 
-// LAB_06f5e540 (`MOV EAX,3; RET`).
+// LAB_06f5e540.
 int FGcsLaunchEvent::GetType() const
 {
     return 3;
@@ -1840,32 +1668,21 @@ namespace
     // yet (0).
     unsigned int const GLaunchNoShipId = 0;
 
-    // The directive insert of FUN_06f607e0 (06f60892-06f60a9b, twice): the new directive is
-    // put in front of the block's list (FUN_06f1e390 at FUN_06f1df30's begin) and AddRef'ed
-    // through a copy of the pointer (no null test). The creating reference belongs to the
-    // caller's holder (FuncInfo 06fc4b28 states 0 / 1, TRefHandle), which releases it.
+    // Inlined twice in FUN_06f607e0 (no null test). The creating reference belongs to the
+    // caller's holder, which releases it.
     void AddLeadingDirective(FContentNpcShipParams* Params, FObjListDirective* Directive)
     {
         Params->Directives.Items.push_front(Directive);
         Directive->AddRef();
     }
 
-    // FUN_06f603d0 (06f603d0-06f60753, cdecl): where a ship launched from a terminal starts.
-    //   - A docking ring (low byte of *TargetType & 0x20): Position = the hardpoint position
-    //     plus (0, rand() * 1/32768 (DAT_06fb4448) * 10000.0 (double DAT_06fbbc38) + 10000.0f
-    //     (DAT_06fbbc30), 0) (FUN_06f0bb80, each sum stored as float); nothing else.
-    //   - Else Orientation = the hardpoint orientation; unless the terminal type is 3 / 4 / 5
-    //     (moors) it is turned half a circle about its own column 1: quaternion (cos(pi/2),
-    //     column 1 * (sin(pi/2) / |column 1|)) -- pi/2 is double DAT_06fb74e8, sin and the
-    //     quotient stored as float, |.| FUN_06f0bb50, the scaling FUN_06f60760 -- through
-    //     QuaternionToMatrix (+0x54) and MulMatrix (+0x20) = rotation * orientation.
-    //   - Then the ship arch's "HpMount" (pub::FindHardpoint, result not tested; retail leaves
-    //     the outputs as they were on failure, the port's start at zero): A = hardpoint +
-    //     Orientation * mount (TransformMatrix +0x2c); MulMatrix(Orientation, mount
-    //     orientation) is computed into a local that is never read (06f6061f); D = hardpoint -
-    //     A; D' = transpose(Orientation) (FUN_06f60790 = Matrix(9 floats)) * D; Position =
-    //     Orientation * D' + hardpoint. Every intermediate sum is stored as float.
-    // |column 1| is summed on the x87 stack in extended precision; the port uses double.
+    // FUN_06f603d0: where a ship launched from a terminal starts. A docking ring only offsets
+    // the position (constants DAT_06fb4448, DAT_06fbbc38, DAT_06fbbc30); otherwise a non-moor
+    // terminal turns the orientation half a circle about its own column 1 (pi/2 is double
+    // DAT_06fb74e8). Every intermediate sum is stored as float.
+    // Retail quirks kept: FindHardpoint's result is not tested (the port's outputs start at
+    // zero, retail's keep earlier values); the mount-orientation product is computed into a
+    // local that is never read. |column 1| is x87 extended in retail; the port uses double.
     void PlaceLaunchedShip(FContentNpcShipParams* Params, unsigned int const* TargetType,
                            unsigned int TerminalType, Vector const* HardpointPosition,
                            Matrix const* HardpointOrientation)
@@ -1948,9 +1765,7 @@ namespace
         Params->Position.z = Back.Z + HardpointPosition->z;
     }
 
-    // The whole-queue erase of FUN_06f607e0: element by element from the front
-    // (FUN_06f1f4b0 at 06f60cac; the range erase FUN_06efc8c0 at 06f60945 / 06f60974 walks
-    // the same way).
+    // The whole-queue erase of FUN_06f607e0: element by element from the front.
     void EraseLaunchQueue(std::list<FContentNpcShipParams>* Queue)
     {
         while (!Queue->empty())
@@ -1958,12 +1773,11 @@ namespace
     }
 }
 
-// FUN_06f60340 (06f60340-06f603c6). The node is linked before the copy is built into it
-// (FUN_06ef7bd0 = the block's copy ctor).
+// FUN_06f60340 (the block's copy ctor is FUN_06ef7bd0).
 bool __cdecl QueueDockLaunch(FContentNpcShipParams const* Params, unsigned int DockTarget,
                              FContentNpcShip** OutShip)
 {
-    GDockLaunchQueues[DockTarget].push_back(*Params);                         // FUN_06f68cf0
+    GDockLaunchQueues[DockTarget].push_back(*Params);
     if (OutShip != nullptr)
         *OutShip = LaunchQueuedShips();
     else
@@ -1971,35 +1785,14 @@ bool __cdecl QueueDockLaunch(FContentNpcShipParams const* Params, unsigned int D
     return !GDockLaunchQueues[DockTarget].empty();
 }
 
-// FUN_06f607e0 (06f607e0-06f60d41). Per map node (dock target, the key's address is handed
-// on) and per queued block:
-//   - GetType of the target fails -> the whole queue is erased.
-//   - index = block +0x110.
-//   - A jump gate / hole / airlock (type & 0xc40): unless the block is a formation follower
-//     (+0x48 != 0 and +0x4c != -1), a Delay directive (type 1) of 2.0 s leads its list.
-//   - A base / docking ring (type & 0x600de0): a docking ring asks for terminal 1;
-//     CheckDockPermission(+0x50 classes, the block's reputation, ship 0, no position,
-//     target, &index) -- jump table 06f60d44:
-//       0, 2: this block is erased;  5: the whole queue;
-//       3: kept while +0x104 < 0.0f (DAT_06fb444c; FCOMP, TEST AH,1, JNZ keeps), else the
-//          whole queue;
-//       4: TerminalInfo of the terminal and its hardpoint (results not tested), then as 1;
-//       1 and above 5: PlaceLaunchedShip (FUN_06f603d0) with the terminal type, hardpoint
-//          and orientation locals -- on these paths they still hold an earlier block's values
-//          (function-scope locals; the port's start at zero). Unless +0x104 is -1.0f (integer
-//          compare 0xbf800000) and the terminal type is 2..5, a Launch directive (type 0x15;
-//          target, index, terminal type) leads the block's list.
-//   - Any other type: straight to the creation.
-// Creation (06f60a9e): +0x110 = index, +0x114 = target; new FContentNpcShip (0x5b0); the
-// result becomes it when +0x104 >= 0.0f (TEST AH,1, JNZ skips); AddSpaceObj on the block's
-// system; controller 0 gets 0x1010 with the ship; a gate type jumps it in (JumpIn); a base /
-// ring type enters it in the docking list ({system, ship, target, index, +0x10 = 1}, ctor
-// FUN_06f6bbf0, inserted at the end by FUN_06f69050) and launches it (pub::SpaceObj::Launch
-// ..., 0) unless type & 0x100. The block is erased, and then retail's loop increment runs on
-// the iterator erase returned (06f60c8c: MOV EDI,[EBP]) -- the block after a created one is
-// skipped this pass, and erasing the last one wraps to the queue's first block (the VC6
-// list's head node links back to it).
-// After the queue: empty -> its map node is erased (FUN_06f690d0), else the next node.
+// FUN_06f607e0. A gate-type target gives a non-follower a leading 2 s Delay directive; a
+// base / ring target asks CheckDockPermission (0, 2 erase the block, 5 the whole queue, 3 keeps
+// the block while Longevity < 0 else erases the queue) and gives a Launch directive unless
+// Longevity is exactly -1.0f (an integer compare) and the terminal is 2..5.
+// Retail quirks kept: on responses 1 and above 5 the terminal / hardpoint locals still hold an
+// earlier block's values (the port's start at zero); after a created ship the loop increment
+// runs on the iterator erase returned, so the next block is skipped this pass, and erasing the
+// last one wraps to the queue's first block (the VC6 list head links back to it).
 FContentNpcShip* __cdecl LaunchQueuedShips()
 {
     FContentNpcShip* Result = nullptr;
@@ -2038,9 +1831,9 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
             {
                 if (Params.FormationSlot == 0 || Params.FormationId == 0xffffffffu)
                 {
-                    TRefHandle<FObjListDirective> Directive;                  // EH state 0
-                    CreateObjListDirective(1, &Directive.Pointer);            // FUN_06f24870
-                    static_cast<FObjListDelay*>(Directive.Pointer)->SetDelay(2.0f); // FUN_06f27940
+                    TRefHandle<FObjListDirective> Directive;
+                    CreateObjListDirective(1, &Directive.Pointer);
+                    static_cast<FObjListDelay*>(Directive.Pointer)->SetDelay(2.0f);
                     AddLeadingDirective(&Params, Directive);
                 }
             }
@@ -2048,12 +1841,12 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
             {
                 if ((TargetType & 0x20) != 0)
                     DockIndex = 1;
-                int ShipRep = Params.ReputationHandle->GetReputation();       // FUN_06f33f80
+                int ShipRep = Params.ReputationHandle->GetReputation();
                 int Response = CheckDockPermission(&Params.ClassIds, &ShipRep, &GLaunchNoShipId,
                                                    nullptr, DockTargetId, &DockIndex);
                 if (Response == 0 || Response == 2)
                 {
-                    It = Queue.erase(It);                                     // FUN_06ef8790(0)
+                    It = Queue.erase(It);
                     continue;
                 }
                 if (Response == 5)
@@ -2084,9 +1877,9 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                                        Info.Value == 5);
                 if (Params.Longevity != -1.0f || bOpenTerminal)
                 {
-                    TRefHandle<FObjListDirective> Directive;                  // EH state 1
-                    CreateObjListDirective(0x15, &Directive.Pointer);         // FUN_06f24870
-                    static_cast<FObjListLaunch*>(Directive.Pointer)->SetLaunch( // FUN_06f27a10
+                    TRefHandle<FObjListDirective> Directive;
+                    CreateObjListDirective(0x15, &Directive.Pointer);
+                    static_cast<FObjListLaunch*>(Directive.Pointer)->SetLaunch(
                         DockTargetId, DockIndex, static_cast<int>(Info.Value));
                     AddLeadingDirective(&Params, Directive);
                 }
@@ -2094,10 +1887,10 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
 
             Params.DockIndex = DockIndex;
             Params.GuideTargetId = *DockTargetId;
-            FContentNpcShip* Ship = new FContentNpcShip(&Params);             // FUN_06f336a0
+            FContentNpcShip* Ship = new FContentNpcShip(&Params);
             if (Params.Longevity >= 0.0f)
                 Result = Ship;
-            Params.System->AddSpaceObj(Ship);                                 // FUN_06f74380
+            Params.System->AddSpaceObj(Ship);
             unsigned int const Controller = 0;
             FContentNpcShip* MsgShip = Ship;
             pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::NpcShipCreated, &MsgShip);
@@ -2115,13 +1908,12 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 Entry.DockTargetId = *DockTargetId;
                 Entry.ShipId = Ship->SpaceObjId;
                 Entry.bField_0x10 = true;
-                GDockingShips.push_back(Entry);                               // FUN_06f69050
+                GDockingShips.push_back(Entry);
 
                 if ((TargetType & 0x200100) != 0)
                 {
-                    // 06f60bb6-06f60be0: the dock hail handler (GetGcsHandler(&0),
-                    // FUN_06ee93f0) keeps quiet about this ship for 30 s (FUN_06ee9b70 with
-                    // the phantom DAT_06fbbb98 = 0, i.e. any).
+                    // The dock hail handler keeps quiet about this ship for 30 s (FUN_06ee9b70;
+                    // phantom DAT_06fbbb98 = 0, i.e. any).
                     int const HandlerType = 0;
                     void* const AnyPhantom = nullptr;
                     unsigned int ShipId = Ship->SpaceObjId;
@@ -2129,9 +1921,8 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                         ->SuppressHail(&ShipId, &AnyPhantom, 0x1e);
                 }
 
-                // 06f60be5-06f60c40: the type 3 launch event to DAT_06fd1c08 (FUN_06ee8d70,
-                // float result dropped). The info goes into the same local as the
-                // permission path's (ESP+0x90), so a later block's case 1 sees it.
+                // The info goes into the same local as the permission path's, so a later
+                // block's case 1 sees it.
                 FGcsLaunchEvent Event;
                 Event.System = Params.System;
                 pub::SpaceObj::GetTerminalInfo(Entry.DockTargetId, Entry.DockIndex, Info);
@@ -2139,7 +1930,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 Event.Speaker = Entry.DockTargetId;
                 Event.DockIndex = Entry.DockIndex;
                 Event.Listener = Ship->SpaceObjId;
-                GGcsConversations.QueueConversation(&Event);                  // FUN_06ee8d70
+                GGcsConversations.QueueConversation(&Event);
 
                 if ((TargetType & 0x100) == 0)
                 {
@@ -2148,7 +1939,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 }
             }
 
-            It = Queue.erase(It);                                             // FUN_06ef4bb0
+            It = Queue.erase(It);
             if (It == Queue.end())
                 It = Queue.begin();
             else
@@ -2156,20 +1947,14 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
         }
 
         if (Queue.empty())
-            QueueIt = GDockLaunchQueues.erase(QueueIt);                       // FUN_06f690d0
+            QueueIt = GDockLaunchQueues.erase(QueueIt);
         else
             ++QueueIt;
     }
     return Result;
 }
 
-// FUN_06f66c80 (06f66c80-06f66db2). Pass 1 (06f66ca2-06f66ce8): slot counter from 0 over the
-// list, FUN_06efccd0 IsPlayerSlot -> the block is left alone, else +0x48 = slot, +0x44 =
-// Formation, +0x4c = the new id (FUN_06efeb00); the counter advances for every block. Pass
-// 2: FUN_06efcbe0 GetSlotTransform(+0x48, &pos, &orient) (result not tested; a rejected slot
-// keeps the previous block's outputs, see below), then the engine DAT_06fd1c70:
-// TransformXform (+0x28) of the slot position by *Placement -> +0xb4, MulMatrix (+0x20)
-// (Placement's rotation, slot orientation) -> +0x90.
+// FUN_06f66c80 (GetSlotTransform = FUN_06efcbe0, result not tested).
 void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFormation* Formation,
                                   FTransform const* Placement)
 {
@@ -2187,11 +1972,10 @@ void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFor
         ++Slot;
     }
 
-    // 06f66d11-06f66d21: the slot transform lands in two frame locals ([ESP+0x28] position,
-    // [ESP+0x34] orientation) that only GetSlotTransform writes, so a block whose slot it
-    // rejects (a player slot left at -1 by pass 1, or an index past the slots) gets the
-    // previous block's transform. Declared once, outside the loop, for the same carry-over;
-    // retail's first values are indeterminate, the port's are zero.
+    // Retail quirk: only GetSlotTransform writes these locals, so a block whose slot it rejects
+    // (a player slot left at -1 by pass 1, or an index past the slots) gets the previous
+    // block's transform. Declared outside the loop for the same carry-over; retail's first
+    // values are indeterminate, the port's are zero.
     FVector SlotPosition;
     SlotPosition.X = 0.0f;
     SlotPosition.Y = 0.0f;

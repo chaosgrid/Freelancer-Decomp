@@ -47,14 +47,14 @@ namespace
 FVoiceMsg::FVoiceMsg()
     : SmArchId(-1), Owner(nullptr), Priority(0), Attenuation(0), RefCount(0)
 {
-    // FUN_004311d0: ID_String::clear, +0x10/+0x11/+0x12 zeroed, +0xC null, +8 = -1.
+    // FUN_004311d0.
     Id.clear();
 }
 
 char const* FVoiceMsg::GetFileName()
 {
-    // LAB_00431200: MOV EAX,[ECX+4]; MOV ECX,[ECX+0xC]; CALL [vtable+4]. No null test in
-    // retail: every message is built by the [Sound] reader with Owner already set.
+    // LAB_00431200. No null test in retail: every message is built by the [Sound] reader with
+    // Owner already set.
     return Owner->GetSoundFile(Id.Id);
 }
 
@@ -63,9 +63,7 @@ unsigned char FVoiceMsg::Acquire()
     // FUN_00431220.
     if (SmArchId == -1)
     {
-        // 0x0043122a..0x00431248: Owner slot 2 (+8) opens the profile .utf as an IFileSystem;
-        // FUN_0042b5e0(this, fs) reads the wav name through this->slot 1 and the flags through
-        // slots 10/13; the file system is released afterwards when there was one.
+        // The wav is read out of the profile .utf when there is one.
         void* ScriptFs = Owner->OpenScriptFileSystem();
         SmArchId = CreateSoundArchWav(this, ScriptFs);
         if (ScriptFs != nullptr)
@@ -77,8 +75,7 @@ unsigned char FVoiceMsg::Acquire()
 
 int FVoiceMsg::Release()
 {
-    // FUN_00431260: a non-zero count drops by one; at <= 0 (CMP word,0 + JG skips) with a
-    // created archetype, ISoundManager slot 34 destroys it and SmArchId goes back to -1.
+    // FUN_00431260. Signed word compare.
     if (RefCount != 0)
         --RefCount;
     if (RefCount < 1 && SmArchId != -1)
@@ -96,10 +93,10 @@ FVoiceProfile::FVoiceProfile() : Name(nullptr)
 
 void FVoiceProfile::SetSoundFile(unsigned int MsgId, char const* File)
 {
-    // LAB_00431410: MOV EAX,[ECX+0x34]; a resolved .utf wins over per-message `file =`.
+    // LAB_00431410: a resolved .utf wins over per-message `file =`.
     if (!UtfPath.empty())
         return;
-    // Retail assigns straight from the INI pointer (repne scasb), with no null test.
+    // Retail assigns straight from the INI pointer, with no null test.
     SoundFiles[MsgId] = File;
 }
 
@@ -111,8 +108,7 @@ char const* FVoiceProfile::GetSoundFile(unsigned int MsgId)
         FVoiceMsg const* Msg = FindMessage(MsgId);
         if (Msg == nullptr)
             return "";
-        // 0x0043154a..0x00431561: sprintf(DAT_0067eda0, "0x%X", msg+4), unbounded as retail
-        // (at most "0xFFFFFFFF" -- 11 bytes of the 32).
+        // Unbounded as retail (at most "0xFFFFFFFF" -- 11 bytes of the 32).
         sprintf(GVoiceFileScratch, "0x%X", Msg->Id.Id);
         return GVoiceFileScratch;
     }
@@ -125,9 +121,8 @@ char const* FVoiceProfile::GetSoundFile(unsigned int MsgId)
 
 void* FVoiceProfile::OpenScriptFileSystem()
 {
-    // LAB_00431590 — same AGGDESC as DALib::OpenData, backend "UTF" (DAT_005c944c). The only
-    // test is the string's length (+0x34, the VC6 _Len of the std::string at +0x2c);
-    // DALib::Data is called untested (0x004315c3).
+    // LAB_00431590 — same AGGDESC as DALib::OpenData, backend "UTF". The only test is the
+    // string's length; DALib::Data is called untested.
     if (UtfPath.empty())
         return nullptr;
 
@@ -153,7 +148,7 @@ void* FVoiceProfile::OpenScriptFileSystem()
 
 FVoiceMsg* FVoiceProfile::FindMessage(unsigned int MsgId)
 {
-    // LAB_00431630 — lower_bound then the "end / key > wanted" pair of checks.
+    // LAB_00431630.
     std::map<unsigned int, FVoiceMsg>::iterator It = Messages.find(MsgId);
     if (It == Messages.end())
         return nullptr;
@@ -162,13 +157,11 @@ FVoiceMsg* FVoiceProfile::FindMessage(unsigned int MsgId)
 
 void FVoiceProfile::ResolveScriptFile()
 {
-    // FUN_004312e0 — DATA\AUDIO\<nickname>.utf ("audio" @ 005cab4c, "utf" @ 005cab48).
+    // FUN_004312e0 — DATA\AUDIO\<nickname>.utf.
     char AudioDir[MAX_PATH];
     AudioDir[0] = '\0';
     GetFileSysPath(AudioDir, "audio", static_cast<IFileSystem*>(DALib::Data));
 
-    // 0x004312e5: the frame is 0x208 bytes -- two 0x104 buffers, the audio directory
-    // (local_104) and the full path ([ESP+0x10]).
     char FullPath[MAX_PATH];
     FullPath[0] = '\0';
     _makepath(FullPath, nullptr, AudioDir, Name, "utf");
@@ -222,8 +215,7 @@ int LoadClientVoicesIni(char const* FullPath)
                         }
                         else if (Reader.is_value("script"))
                         {
-                            // 0x00430cfa..0x00430d3e: std::string straight from the pointer
-                            // (REPNE SCASB, no null test), appended to the list.
+                            // Straight from the pointer, no null test.
                             char const* Script = Reader.get_value_string();
                             Local.Scripts.push_back(std::string(Script));
                         }
@@ -233,7 +225,6 @@ int LoadClientVoicesIni(char const* FullPath)
                                   "%s(%d) : *** WARNING: Voice (%s) has invalid parameter %s",
                                   kVoiceSource, 0x203, Local.Id.get_string(),
                                   Reader.get_name_ptr());
-                            // 0x00430d9b: log_link("") (DAT_005c865c) after every warning.
                             Reader.log_link("");
                         }
                     } while (Reader.read_value());
@@ -268,7 +259,7 @@ int LoadClientVoicesIni(char const* FullPath)
                 {
                     FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kVoiceSource, 0x21f,
                           "Voice [Sound] listed outside [Voice] block\n");
-                    Reader.log_link(""); // 0x00430f0d
+                    Reader.log_link("");
                 }
                 else
                 {
@@ -308,7 +299,7 @@ int LoadClientVoicesIni(char const* FullPath)
                                       "parameter %s",
                                       kVoiceSource, 0x249, Current->GetName(),
                                       Reader.get_name_ptr());
-                                Reader.log_link(""); // 0x0043104e
+                                Reader.log_link("");
                             }
                         } while (Reader.read_value());
                     }
@@ -318,7 +309,7 @@ int LoadClientVoicesIni(char const* FullPath)
                         FDUMP(0x100001,
                               "%s(%d) : *** ERROR: Voice (%s) missing [Sound] msg parameter",
                               kVoiceSource, 0x250, Current->GetName());
-                        Reader.log_link(""); // 0x004310a6
+                        Reader.log_link("");
                     }
                     else if (Current->Messages.find(Msg.Id.Id) == Current->Messages.end())
                     {
@@ -349,7 +340,7 @@ FVoiceProfile* LookupClientVoice(unsigned int VoiceId)
 
 void ClearClientVoices()
 {
-    // FUN_00431850 — engine shutdown (FUN_005b22af).
+    // FUN_00431850 — WinMain teardown.
     GVoiceProfiles.clear();
 }
 

@@ -4,9 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// SpaceDust -- retail Client\Space\SpaceDust.cpp, freelancer.exe 0x0054bda0..0x0054c361.
-// Listing: LAB_0054bda0 / LAB_0054bdb0 (static init), FUN_0054bdc0, FUN_0054bde0, FUN_0054be20,
-//          FUN_0054beb0, FUN_0054c320.
+// SpaceDust -- retail Client\Space\SpaceDust.cpp: LAB_0054bda0 / LAB_0054bdb0 (static init),
+// FUN_0054bdc0, FUN_0054bde0, FUN_0054be20, FUN_0054beb0, FUN_0054c320.
 
 #include "Space/space_dust.h"
 
@@ -35,11 +34,11 @@ namespace
     double const kFadeCutoff = 1e-5;                    // DAT_005c75f0
     double const kOneD = 1.0;                           // DAT_005c89b8
     double const kSystemDustIntensityScale = 0.002;     // DAT_005e08f8
-    int const kDefaultZoneDustParticles = 0x32;         // 0054c013
-    unsigned const kPropDustZoneMask = 0x200000;        // 0054bfc0, System slot +0x30 mask
+    int const kDefaultZoneDustParticles = 0x32;
+    unsigned const kPropDustZoneMask = 0x200000;        // PROP_DUST_ZONE
 
-    // DAT_00614084 (.data, initial 0xffffffc4, read only at 0054bf1c): the dust frame sits
-    // this far along the camera's Z axis.
+    // DAT_00614084 (.data, read only by FUN_0054beb0): the dust frame sits this far along the
+    // camera's Z axis.
     int const kSpaceDustOffsetZ = -60;
 
     CacheString MakeClearedCacheString()
@@ -67,14 +66,12 @@ namespace
     // death arm (LAB_004f84d0), +0x0c SetIntensity (LAB_004f8c20). Retail calls them
     // virtually; so does the port.
 
-    // Camera vt+0x10: __stdcall(this), returns the camera transform.
-
     void DustArmDeath(FParticleEffect* Effect)
     {
         Effect->Kill();
     }
 
-    // FUN_0054bdc0 (cdecl): death-arm and release *Slot, then null it.
+    // FUN_0054bdc0
     void ReleaseDustEffect(FParticleEffect** Slot)
     {
         if (*Slot != nullptr)
@@ -85,8 +82,8 @@ namespace
         }
     }
 
-    // FUN_0054c320 (thiscall on the camera transform, RET 8): Out = CamXform * Offset through
-    // the file's own lazily acquired 3DMathEngine (FUN_005b73e0), slot +0x1c.
+    // FUN_0054c320 (thiscall on the camera transform): Out = CamXform * Offset through the
+    // file's own lazily acquired 3DMathEngine.
     void ComposeDustXform(FTransform const* CamXform, FTransform* Out, FTransform const* Offset)
     {
         if (G_SpaceDustMath == nullptr)
@@ -96,8 +93,8 @@ namespace
         *Out = Local;
     }
 
-    // 0054c0a1..0054c0f2 / 0054c299..0054c311: allocate (FUN_004f79a0(0x84) + FUN_004f8060(0)),
-    // then start it on the archetype named Name (FUN_0040f080(&CreateID(Name))), or FDUMP.
+    // Inlined twice in FUN_0054beb0: allocate, then start it on the archetype named Name, or
+    // FDUMP.
     void CreateDustEffect(FParticleEffect** Slot, char const* Name)
     {
         *Slot = ParticleEffectCreate();
@@ -115,8 +112,8 @@ namespace
         }
     }
 
-    // 0054c146..0054c174 / 0054c186..0054c1c8 / 0054c22b..0054c283: place the effect on the
-    // dust frame, set its intensity, mark it (+0x08 |= 1) and link it (FUN_004f7af0).
+    // Inlined three times in FUN_0054beb0: place the effect on the dust frame, set its
+    // intensity, mark it (+0x08 |= 1) and link it (FUN_004f7af0).
     void PlaceDustEffect(FParticleEffect* Effect, FTransform const& DustXform, float Intensity)
     {
         Effect->LocalXform = DustXform;
@@ -128,7 +125,7 @@ namespace
 
 void SpaceDustSetSystemDust(CacheString const* Dust)
 {
-    // FUN_0054bde0.
+    // FUN_0054bde0
     G_SystemDust.Value = Dust->Value;
     G_SystemDustAtFullDetail = 0x50;
     G_SystemDustAtZeroDetail = 0x1e;
@@ -152,9 +149,9 @@ void SpaceDustShutdown()
 
 void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
 {
-    // FUN_0054beb0.
+    // FUN_0054beb0
 
-    // 0054beb7..0054bf19: background option off -- drop every dust effect (no early return).
+    // Background option off -- drop every dust effect (no early return).
     if (GetGameOption(kGameOptBackgroundGroup) == 0 &&
         (G_SystemDustEffect != nullptr || G_ZoneDustEffect != nullptr ||
          G_FadingDustEffect != nullptr))
@@ -167,7 +164,6 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
         ReleaseDustEffect(&G_SystemDustEffect);
     }
 
-    // 0054bf1c..0054bf79: DustXform = camera transform * (identity, (0, 0, -60)).
     FTransform Offset;
     Win3DIdentityRotation3x3(&Offset.Rotation.D[0][0]); // FUN_004215b0
     Offset.Translation.X = 0.0f;
@@ -179,7 +175,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
     ComposeDustXform(CamXform, &DustXform, &Offset);
     Vector const& DustPos = *reinterpret_cast<Vector const*>(&DustXform.Translation);
 
-    // 0054bf7e..0054bf95: TEST AH,0x41 / JNZ -- the zone dust runs only when detail > 0.75.
+    // The zone dust runs only when detail > 0.75 (not when unordered).
     if (GetPerfSpaceDustDetail() > kDustDetailThreshold) // DAT_00614080
     {
         CacheString Name;
@@ -203,8 +199,8 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
             }
         }
 
-        // 0054c02a..0054c0f2: a different zone dust name (pointer compare, as retail) moves the
-        // current zone effect to the fading slot and starts the new one.
+        // A different zone dust name (pointer compare, as retail) moves the current zone effect
+        // to the fading slot and starts the new one.
         if (Name.Value != G_ZoneDust.Value)
         {
             G_ZoneDust.Value = Name.Value;
@@ -220,7 +216,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
                 CreateDustEffect(&G_ZoneDustEffect, Name.Value);
         }
 
-        // 0054c0f8..0054c144: fading effect -- dies once its level reaches 1e-5.
+        // The fading effect dies once its level reaches 1e-5.
         G_ZoneDustParticles = Particles;
         if (G_FadingDustEffect != nullptr)
         {
@@ -228,7 +224,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
                 (static_cast<double>(G_FadingDustParticles) *
                  static_cast<double>(kDustIntensityPerParticle)) *
                 (static_cast<double>(kOneF) - static_cast<double>(Blend));
-            // TEST AH,0x41 / JP at 0054c12c: the effect stays when Fade > 1e-5 or unordered.
+            // It stays when Fade > 1e-5 or unordered.
             if (!(Fade <= kFadeCutoff))
             {
                 PlaceDustEffect(G_FadingDustEffect, DustXform, static_cast<float>(Fade));
@@ -241,7 +237,6 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
             }
         }
 
-        // 0054c179..0054c1c8: current zone effect.
         if (G_ZoneDustEffect != nullptr)
         {
             float const Level = static_cast<float>(
@@ -253,7 +248,6 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
     }
     else
     {
-        // 0054c1cf..0054c21c.
         ReleaseDustEffect(&G_FadingDustEffect);
         ReleaseDustEffect(&G_ZoneDustEffect);
         G_ZoneDust.clear();
@@ -261,7 +255,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
         G_FadingDustParticles = 0;
     }
 
-    // 0054c222..0054c311: the system's own dust.
+    // The system's own dust.
     if (G_SystemDustEffect != nullptr)
     {
         double const Detail = static_cast<double>(GetPerfSpaceDustDetail()); // DAT_00614080

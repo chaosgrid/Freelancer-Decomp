@@ -11,8 +11,7 @@
 #include <cmath>
 #include <new>
 
-// .data:06602ad0, read from the PE bytes (the listing truncates it): the __FILE__ of the one
-// FDUMP site in the material code (065ff37f, line 0x23F).
+// .data:06602ad0: the __FILE__ of the one FDUMP site in the material code (line 0x23F).
 static const char* const G_FdumpFileMaterialImpl =
     "C:\\work\\builds\\dalibs\\DALIBS~1\\build\\include\\imaterialimpl.h";
 
@@ -91,7 +90,7 @@ namespace
         {0xe, 0, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 1}};
 }
 
-// FUN_06600d90: MOV EAX,DAT_06602c30; RET.
+// FUN_06600d90.
 static unsigned long* PixelFormatGetD3DFormats()
 {
     return G_PixelFormatD3D;
@@ -111,7 +110,7 @@ static int PixelFormatFromD3D(unsigned long D3DFormat)
     return 0;
 }
 
-// FUN_06600dc0 (cdecl): Id > 14 (signed JLE) -> entry 0, else &DAT_06602c88[Id].
+// FUN_06600dc0 (cdecl). The bound test is signed.
 static FPixelFormatDesc* PixelFormatGetDesc(int Id)
 {
     if (Id > 0xe)
@@ -127,7 +126,6 @@ static GENRESULT MaterialFsResult(bool bOk)
 
 static void FillMaterialWriteDesc(FFileSystemDesc* Desc, const char* Key)
 {
-    // 066006e0..0731: the reader fields, then +8 "UTF", +0x10 0xC0000000, +0x1C 2.
     FillFileDesc(Desc, Key);
     Desc->Implementation = "UTF";
     Desc->Access = 0xC0000000;
@@ -292,8 +290,7 @@ static unsigned long MaterialAddressModeBits(unsigned long Flags, int Which)
     return 0;
 }
 
-// The pair index a type-9 parameter works on: 0065fe4e8 / 065fe86f -- flag 0x20000 -> 0 (U),
-// else 0x40000 -> 1 (V), else 0.
+// The pair index a type-9 parameter works on (inlined twice): 0 = U, 1 = V.
 static int MaterialAddressModeWhich(unsigned long Flags)
 {
     if ((Flags & 0x20000) != 0)
@@ -329,7 +326,6 @@ FMaterialParamValue::~FMaterialParamValue()
 
 void FMaterialParamValue::Clear()
 {
-    // FUN_065fe5c0, 065fe5c0..e613.
     if (Type == 5 || Type == 7)
     {
         if (Value[0] != 0)
@@ -356,7 +352,6 @@ void FMaterialParamValue::Clear()
 
 void FMaterialParamValue::DupString(const char* Src)
 {
-    // FUN_065fe620, 065fe620..e67d.
     if (Value[0] != 0)
     {
         HeapFree(GetProcessHeap(), 0, DwordToPointer(Value[0]));
@@ -372,7 +367,6 @@ void FMaterialParamValue::DupString(const char* Src)
 
 void FMaterialParamValue::SwapCom(IDAComponent* NewCom)
 {
-    // FUN_065fe930, 065fe930..e950.
     IDAComponent* const Old = (IDAComponent*)(DwordToPointer(Value[0]));
     Value[0] = PointerToDword(NewCom);
     if (NewCom != nullptr)
@@ -383,8 +377,8 @@ void FMaterialParamValue::SwapCom(IDAComponent* NewCom)
 
 FMaterialParamValue& FMaterialParamValue::operator=(const FMaterialParamValue& Src)
 {
-    // FUN_065fef00, 065fef00..f026 (jump table 065ff02c): the old value is cleared by the OLD
-    // type when the types differ, then copied by the new one.
+    // The old value is cleared by the OLD type when the types differ, then copied by the new
+    // one.
     if (Src.Type != Type)
         Clear();
     Type = Src.Type;
@@ -399,7 +393,7 @@ FMaterialParamValue& FMaterialParamValue::operator=(const FMaterialParamValue& S
         break;
     case 4:
         Value[3] = Src.Value[3];
-        // fall through (065fef72 -> ef78)
+        // fall through
     case 3:
         Value[2] = Src.Value[2];
         Value[1] = Src.Value[1];
@@ -420,7 +414,6 @@ FMaterialParamValue& FMaterialParamValue::operator=(const FMaterialParamValue& S
 
 void FMaterialParamValue::Set(int InType, unsigned long Arg)
 {
-    // FUN_065ffab0, 065ffab0..fbed (jump table 065ffbf0).
     if (InType != Type)
         Clear();
     Type = InType;
@@ -438,7 +431,7 @@ void FMaterialParamValue::Set(int InType, unsigned long Arg)
         break;
     case 4:
         Value[3] = Source[3];
-        // fall through (065ffb36 -> fb3c)
+        // fall through
     case 3:
         Value[2] = Source[2];
         Value[1] = Source[1];
@@ -521,8 +514,7 @@ FEyeMaterialImpl::FEyeMaterialImpl()
     , bTranslucent(0)
     , bOneBitAlpha(0)
 {
-    // LAB_065fe070 065fe0f2..e119: the 0x11 dwords of +0x20 zeroed, then Diffuse and Ambient
-    // (+0x20..+0x3C) set to 1.0f.
+    // Inlined in LAB_065fe070.
     std::memset(&Colors, 0, sizeof(Colors));
     int Index = 0;
     while (Index < 4)
@@ -535,7 +527,7 @@ FEyeMaterialImpl::FEyeMaterialImpl()
 
 FEyeMaterialImpl::~FEyeMaterialImpl()
 {
-    // FUN_06600a30, 06600a30..0ae3 (vtable 06601598 stored first).
+    // The body of FUN_06600a30 (vtable 06601598 stored first).
     unsigned long Index = 0;
     while (Index < TextureRowCount)
     {
@@ -559,8 +551,6 @@ FEyeMaterialImpl::~FEyeMaterialImpl()
 
 void* __thiscall FEyeMaterialImpl::ScalarDeletingDestructor(unsigned char bDelete)
 {
-    // FUN_06600a30: the destructor body, then operator delete(this) when bit 0 is set; EAX =
-    // this.
     if ((bDelete & 1) != 0)
         delete this;
     else
@@ -570,7 +560,6 @@ void* __thiscall FEyeMaterialImpl::ScalarDeletingDestructor(unsigned char bDelet
 
 GENRESULT DACOM_API FEyeMaterialImpl::Initialize(IDAComponent* Outer)
 {
-    // FUN_065fe1b0 (RET 8), 065fe1b0..e311.
     if (Outer == nullptr)
         return GR_GENERIC;
     if (Outer->QueryInterface(Iids::TextureLibraryA, (void**)(&TextureLib)) < 0)
@@ -587,8 +576,8 @@ GENRESULT DACOM_API FEyeMaterialImpl::Initialize(IDAComponent* Outer)
         return GR_GENERIC;
     VertexBufferMgr->Release();
 
-    // 065fe260..e30b: one texture row per type-7 parameter, then every parameter's default
-    // stored through slot 26.
+    // One texture row per type-7 parameter, then every parameter's default stored through
+    // slot 26.
     FMaterialParamDesc* Table = nullptr;
     const unsigned long Count = GetParameterTable((void**)(&Table));
     TextureRowCount = 0;
@@ -626,7 +615,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::LoadFromFileSystem(void* FileSystem)
             switch (Cell.Type)
             {
             case 1:
-                // 065fe3a2..e41b: FUN_066003a0's body inline, FUN_065f3e80 building the desc.
+                // FUN_066003a0's body, inlined.
                 Result = MaterialFsReadDword(Fs, Entry->Key, &Cell.Value[0]);
                 break;
             case 2:
@@ -710,7 +699,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                     break;
                 case 4:
                     Cell.Value[3] = Address[3];
-                    // fall through (065fe716 -> e71d)
+                    // fall through
                 case 3:
                     Cell.Value[2] = Address[2];
                     Cell.Value[1] = Address[1];
@@ -750,8 +739,8 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                 }
                 case 8:
                 {
-                    // 065fe817..e855: the stored dword is read back (result ignored) and only its
-                    // bits 4..7 replaced.
+                    // The stored dword is read back (result ignored) and only its bits 4..7
+                    // replaced.
                     unsigned long Raw = 0;
                     MaterialFsReadDword(Fs, Entry->Key, &Raw);
                     Raw ^= ((Cell.Value[0] << 4) ^ Raw) & 0xF0u;
@@ -760,8 +749,8 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                 }
                 case 9:
                 {
-                    // 065fe85a..e8b8: pair 0 (U) writes bits 0..1 AND then falls into the pair-1
-                    // code writing bits 2..3 as well (JMP 065fe896); pair 1 writes bits 2..3.
+                    // Retail quirk: pair 0 (U) writes bits 0..1 AND then falls into the pair-1
+                    // code writing bits 2..3 as well; pair 1 writes bits 2..3.
                     unsigned long Raw = 0;
                     MaterialFsReadDword(Fs, Entry->Key, &Raw);
                     const int Which = MaterialAddressModeWhich(Entry->Flags);
@@ -787,8 +776,6 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
 
 GENRESULT DACOM_API FEyeMaterialImpl::ApplyVerify(void* /*Context*/, void* /*Extra*/)
 {
-    // FUN_065fe960 (RET 0xC): slot 24 Setup, slot 8 Bind(0), Pipeline +0x110 VerifyState, slot 9
-    // Teardown(0); the VerifyState result.
     Setup();
     Bind(nullptr);
     const GENRESULT Result = Pipeline->VerifyState();
@@ -798,8 +785,6 @@ GENRESULT DACOM_API FEyeMaterialImpl::ApplyVerify(void* /*Context*/, void* /*Ext
 
 GENRESULT DACOM_API FEyeMaterialImpl::ResolveTextures(float /*Delta*/)
 {
-    // LAB_065fe9a0 (RET 8): per row, Handle -1 -> Frame = 0; else a row that is not single-frame
-    // re-reads its frame through TextureLib +0x70 GetFrame(Handle, -1, &Frame). Always 0.
     unsigned long Index = 0;
     while (Index < TextureRowCount)
     {
@@ -814,7 +799,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::ResolveTextures(float /*Delta*/)
 }
 
 // Context +0x0C is the source-vertex descriptor; a non-null diffuse stream turns
-// D3DRS_COLORVERTEX (0x8D) on around the draw (06600b0b / 065fff3e / 06600290 / 06600b44).
+// D3DRS_COLORVERTEX on around the draw.
 static bool ContextHasDiffuseStream(const FMaterialSubmitContext* Context)
 {
     if (Context == nullptr)
@@ -825,8 +810,6 @@ static bool ContextHasDiffuseStream(const FMaterialSubmitContext* Context)
 
 GENRESULT DACOM_API FEyeMaterialImpl::Bind(void* Context)
 {
-    // FUN_06600af0 (RET 8): Pipeline +0xAC SetMaterial(&+0x20); diffuse stream ->
-    // SetRenderState(0x8D, 1). 0.
     Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors);
     if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
@@ -835,24 +818,21 @@ GENRESULT DACOM_API FEyeMaterialImpl::Bind(void* Context)
 
 GENRESULT DACOM_API FEyeMaterialImpl::Teardown(void* Context)
 {
-    // LAB_06600b40 (RET 8): diffuse stream -> SetRenderState(0x8D, 0). 0.
     if (ContextHasDiffuseStream((FMaterialSubmitContext*)(Context)))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, 0);
     return GR_OK;
 }
-
 
 GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimType,
                                           unsigned long Start, unsigned long Count,
                                           unsigned long IbStart, unsigned long IndexSpan,
                                           unsigned long Flags)
 {
-    // LAB_065fea00 (RET 0x20), 065fea00..ebf7.
     FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
     GENRESULT Result;
     if ((Flags & 0x100) != 0)
     {
-        // 065fea1c: IRPDraw +0xC with the IB scratch bias.
+        // IRPDraw +0xC with the IB scratch bias.
         Result = Draw->DrawIndexedPrimitive(PrimType, Start, Count, Ctx->IbScratch->Bias + IbStart,
                                             IndexSpan);
         if (Result >= 0)
@@ -868,7 +848,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
     if (Result >= 0)
         return Result;
 
-    // 065fea93..ebea: copy the vertices through the VB manager and draw from its buffer.
+    // Copy the vertices through the VB manager and draw from its buffer.
     const FRpVertexSrcDesc* const Source = Ctx->SourceVertices;
     if (Source == nullptr || Count == 0 || IndexSpan == 0)
         return Result;
@@ -877,7 +857,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
     if (Result < 0)
         return Result;
 
-    // 065feacb..eb78: the vertex stride from the locked FVF.
+    // The vertex stride from the locked FVF.
     const unsigned long Fvf = Lock.Listing.Fvf;
     unsigned long PositionBytes = 0;
     if ((Fvf & 0xC) == 0xC)
@@ -895,7 +875,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
     unsigned long Shift = 0x10;
     while (TexCount > 0)
     {
-        // SHR EAX,CL: x86 masks the count to five bits.
+        // x86 masks the shift count to five bits.
         switch ((Fvf >> (Shift & 31u)) & 3u)
         {
         case 0:
@@ -924,8 +904,6 @@ GENRESULT DACOM_API FEyeMaterialImpl::Submit(void* Context, unsigned long PrimTy
 
 GENRESULT DACOM_API FEyeMaterialImpl::SetName(const char* InName)
 {
-    // LAB_065fec10 (RET 8): the old name deleted; null -> 0. Otherwise a copy of at most 0x40
-    // bytes (strlen + 1 capped), NUL-terminated and lowercased. 0.
     delete[] Name;
     Name = nullptr;
     if (InName == nullptr)
@@ -942,7 +920,6 @@ GENRESULT DACOM_API FEyeMaterialImpl::SetName(const char* InName)
 
 GENRESULT DACOM_API FEyeMaterialImpl::GetName(char* Out, unsigned long Size)
 {
-    // LAB_065fec80 (RET 0xC): -1 before SetName; else strncpy and a forced NUL.
     if (Name == nullptr)
         return GR_GENERIC;
     std::strncpy(Out, Name, Size);
@@ -952,7 +929,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetName(char* Out, unsigned long Size)
 
 GENRESULT DACOM_API FEyeMaterialImpl::CopyClassName(char* Out, unsigned long Size)
 {
-    // FUN_065fecc0 (RET 0xC): slot 20 tested, then called again for the strncpy.
+    // Slot 20 is called twice, as in retail.
     if (ClassName() == nullptr)
         return GR_GENERIC;
     std::strncpy(Out, ClassName(), Size);
@@ -962,14 +939,12 @@ GENRESULT DACOM_API FEyeMaterialImpl::CopyClassName(char* Out, unsigned long Siz
 
 GENRESULT DACOM_API FEyeMaterialImpl::GetPassCount(int* Out)
 {
-    // LAB_065fed00 (RET 8).
     *Out = 1;
     return GR_OK;
 }
 
 GENRESULT DACOM_API FEyeMaterialImpl::GetParameterCount(unsigned long* OutCount)
 {
-    // LAB_065fed10 (RET 8): slot 27 with a null out-pointer.
     *OutCount = GetParameterTable(nullptr);
     return GR_OK;
 }
@@ -993,8 +968,8 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterDescriptor(unsigned long Index
 
 GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, void* InOutDesc)
 {
-    // FUN_065ff060 (RET 0xC), jump table 065ff1c8. InOutDesc is one value cell: retyped to the
-    // parameter's type (old value cleared by its old type), then filled from slot 28's address.
+    // InOutDesc is one value cell: retyped to the parameter's type (old value cleared by its old
+    // type), then filled from slot 28's address.
     FMaterialParamDesc* Table = nullptr;
     if (GetParameterTable((void**)(&Table)) <= Index)
         return GR_GENERIC;
@@ -1017,7 +992,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, voi
         break;
     case 4:
         Out->Value[3] = Address[3];
-        // fall through (065ff110 -> f116)
+        // fall through
     case 3:
         Out->Value[2] = Address[2];
         Out->Value[1] = Address[1];
@@ -1038,7 +1013,6 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(unsigned long Index, voi
 
 GENRESULT DACOM_API FEyeMaterialImpl::SetParameterValue(unsigned long Index, void* Value)
 {
-    // LAB_065ff1f0 (RET 0xC): Index >= count or slot 25 false -> -1; else slot 26, 0.
     FMaterialParamDesc* Table = nullptr;
     if (GetParameterTable((void**)(&Table)) <= Index)
         return GR_GENERIC;
@@ -1050,7 +1024,7 @@ GENRESULT DACOM_API FEyeMaterialImpl::SetParameterValue(unsigned long Index, voi
 
 GENRESULT __thiscall FEyeMaterialImpl::InitializeFromDescriptor(void* /*Arg*/)
 {
-    // FUN_06600ba0: XOR EAX,EAX; RET 4.
+    // FUN_06600ba0, shared with two more slots.
     return GR_OK;
 }
 
@@ -1111,7 +1085,7 @@ GENRESULT __thiscall FEyeMaterialImpl::Setup()
             void* Texture;
             if (Library->FindTextureByCrc(&Query, &Texture) < 0)
             {
-                // 065ff32d: REPE CMPSB over the 7 bytes of "(None)".
+                // Retail compares the 7 bytes of "(None)".
                 bVerified = std::strcmp(Row->Name, G_TextureNameNone) == 0;
             }
             else
@@ -1187,7 +1161,7 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
             break;
         case 4:
             Address[3] = Cell->Value[3];
-            // fall through (065ff58a -> f590)
+            // fall through
         case 3:
             Address[2] = Cell->Value[2];
             Address[1] = Cell->Value[1];
@@ -1246,7 +1220,7 @@ GENRESULT __thiscall FEyeMaterialImpl::StoreParameterValue(unsigned long Index, 
 
 unsigned long __thiscall FEyeMaterialImpl::GetParameterTable(void** OutBase)
 {
-    // LAB_06600b80 (RET 4): no table.
+    // No table.
     if (OutBase != nullptr)
         *OutBase = nullptr;
     return 0;
@@ -1303,15 +1277,14 @@ GENRESULT DACOM_API FEyeMaterialInner::QueryInterface(const char* Iid, void** Ou
 
 unsigned long DACOM_API FEyeMaterialInner::AddRef()
 {
-    // LAB_065fe060 (the factory's AddRef too): ++[this+4].
+    // LAB_065fe060 (the factory's AddRef too).
     RefCount += 1;
     return RefCount;
 }
 
 unsigned long DACOM_API FEyeMaterialInner::Release()
 {
-    // LAB_066009d0 (RET 4): decrement when above 0; reaching 0 re-arms it to 1 and calls the
-    // owner's slot 21 with 1, then returns 0.
+    // LAB_066009d0: reaching 0 re-arms the count to 1 and deletes the owner through slot 21.
     if (RefCount > 0)
         RefCount -= 1;
     if (RefCount != 0)
@@ -1377,32 +1350,28 @@ FEyeMaterial::FEyeMaterial()
 
 GENRESULT DACOM_API FEyeMaterial::QueryInterface(const char* Iid, void** Out)
 {
-    // LAB_06600a00: [ESP+4] = [this+0x68], JMP [vtable+0].
     return Controlling->QueryInterface(Iid, Out);
 }
 
 unsigned long DACOM_API FEyeMaterial::AddRef()
 {
-    // LAB_06600a10.
     return Controlling->AddRef();
 }
 
 unsigned long DACOM_API FEyeMaterial::Release()
 {
-    // LAB_06600a20.
     return Controlling->Release();
 }
 
 GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
 {
-    // LAB_065fff20 (RET 8), 065fff20..001ae.
     FMaterialSubmitContext* const Ctx = (FMaterialSubmitContext*)(Context);
     Pipeline->SetMaterial((const D3DMATERIAL8*)&Colors); // +0xAC
     if (ContextHasDiffuseStream(Ctx))
         Pipeline->SetRenderState(D3DRS_COLORVERTEX, 1);
 
-    // 065fff63..ffb4: the first texture row on stage 0; its wrap mode less 4 (0 below 4) as
-    // state 0xB, the address modes plus 1 as 0xD / 0xE.
+    // The first texture row on stage 0: its wrap mode less 4 (0 below 4), the address modes
+    // plus 1.
     IRenderPipeline* const StagePipeline = Pipeline;
     const FMaterialTextureRow* const Row = TextureRows;
     StagePipeline->SetTextureStageTexture(0, DwordToPointer(Row->Frame)); // +0x108
@@ -1460,8 +1429,6 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
 
 GENRESULT DACOM_API FEyeMaterial::Teardown(void* Context)
 {
-    // LAB_06600270 (RET 8): no context -> 0 at once. Else D3DTSS_TEXTURETRANSFORMFLAGS off on
-    // stage 0 and, with a diffuse stream, D3DRS_COLORVERTEX off.
     if (Context == nullptr)
         return GR_OK;
     Pipeline->SetTextureStageState(0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
@@ -1472,14 +1439,13 @@ GENRESULT DACOM_API FEyeMaterial::Teardown(void* Context)
 
 GENRESULT DACOM_API FEyeMaterial::GetRenderFlags(unsigned long* Out)
 {
-    // LAB_065ffef0 (RET 8): NEG/SBB -> 0xA when translucent, else 8.
     *Out = bTranslucent != 0 ? 0xAu : 0x8u;
     return GR_OK;
 }
 
 const char* __thiscall FEyeMaterial::ClassName()
 {
-    // LAB_065fff10: MOV EAX,"EyeMaterial" (.rdata:066014dc); RET.
+    // .rdata:066014dc.
     return G_EyeMaterialName;
 }
 
@@ -1501,7 +1467,7 @@ unsigned long __thiscall FEyeMaterial::GetParameterTable(void** OutBase)
         Table[7].Init(8, 0, "Dt_flags", "Texture Wrap Mode", G_ParamNoDescription, 4, 0, 0);
         Table[8].Init(9, 0x20000, "Dt_flags", "Texture U Address Mode", G_ParamNoDescription, 2,
                       0, 0);
-        // 065ffa6f: the last one through the FUN_065ffc50 constructor.
+        // The last one goes through the FUN_065ffc50 constructor.
         Table[9].Init(9, 0x40000, "Dt_flags", "Texture V Address Mode", G_ParamNoDescription, 2,
                       0, 0);
     }
@@ -1512,30 +1478,29 @@ unsigned long __thiscall FEyeMaterial::GetParameterTable(void** OutBase)
 
 void* __thiscall FEyeMaterial::GetParameterAddress(unsigned long Index)
 {
-    // LAB_065ffe60 (RET 4), jump table 065ffebc. 6..9 are offsets from the row pointer itself
-    // (no null test).
+    // 6..9 are offsets from the row pointer itself (no null test).
     switch (Index)
     {
     case 0:
-        return Colors.Ambient; // Ambient
+        return Colors.Ambient;
     case 1:
-        return Colors.Diffuse; // Diffuse
+        return Colors.Diffuse;
     case 2:
-        return Colors.Emissive; // Emissive
+        return Colors.Emissive;
     case 3:
-        return Colors.Specular; // Specular
+        return Colors.Specular;
     case 4:
-        return &Colors.Power; // Power
+        return &Colors.Power;
     case 5:
-        return &Colors.Diffuse[3]; // Diffuse alpha
+        return &Colors.Diffuse[3];
     case 6:
-        return &TextureRows[0].Name;        // row 0 Name
+        return &TextureRows[0].Name;
     case 7:
-        return &TextureRows[0].WrapMode; // row 0 WrapMode
+        return &TextureRows[0].WrapMode;
     case 8:
-        return &TextureRows[0].AddressU; // row 0 AddressU
+        return &TextureRows[0].AddressU;
     case 9:
-        return &TextureRows[0].AddressV; // row 0 AddressV
+        return &TextureRows[0].AddressV;
     default:
         return nullptr;
     }
@@ -1570,7 +1535,7 @@ namespace
 
 GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Out)
 {
-    // LAB_065fe070 (RET 0xC), 065fe070..e1a8. The desc is {0x14, name, outer, inner-out}.
+    // LAB_065fe070. The desc is {0x14, name, outer, inner-out}.
     FAGGDESC14* const Aggregate = (FAGGDESC14*)(Desc);
     if (Aggregate->Size != 0x14 || std::strcmp(Aggregate->NameAt4, Name) != 0)
     {
@@ -1605,7 +1570,7 @@ GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Ou
 
 bool RegisterEyeMaterialFactory()
 {
-    // FUN_065fdfd0, 065fdfd0..e019.
+    // FUN_065fdfd0.
     FEyeMaterialFactory* const Factory = new (std::nothrow) FEyeMaterialFactory();
     if (Factory == nullptr)
         return false;

@@ -104,7 +104,7 @@ unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch);
 // LAB_004f97a0 — vtable[+0x04]: arm death / freeze + Float7C clamp to DAT_006129cc.
 void BeamEffectArmDeath(FBeamEffect* This);
 
-// LAB_004f9480 — vtable[+0x08]: world translation → Out; returns Float74 on ST0.
+// LAB_004f9480 — vtable[+0x08]: world translation → Out; returns Float74.
 float BeamEffectGetWorldPos(FBeamEffect* This, FVector* Out);
 
 // LAB_004f9980 — vtable[+0x14]: frustum / pbubble visibility → Flags70 bit0.
@@ -128,8 +128,8 @@ unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam);
 int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
                                  float Intensity);
 
-// FUN_004fb1e0 — multi builder; listing-verified (ESP+0x94 = B4 via SUB ESP alias;
-// UvU1-bits-as-index is a retail bug, reproduced).
+// FUN_004fb1e0 — multi-segment builder (ESP+0x94 = B4 via a SUB ESP alias; UvU1-bits-as-index
+// is a retail bug, reproduced).
 int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
                                 float Intensity);
 

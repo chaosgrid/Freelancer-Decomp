@@ -110,7 +110,7 @@ bool CInputBox::CharFilter(unsigned short Character) const
 
 void CInputBox::UpdatedText(const unsigned short* pText)
 {
-    // Retail 0x06711110 is RET 4 (ICF-shared with ImeShowToolbar).
+    // Empty in retail (FUN_06711110, folded with ImeShowToolbar).
 }
 
 void CInputBox::ToggleInsertMode()

@@ -17,7 +17,7 @@
 // common_dacom_stricmp.cpp: DACOM.DLL!stricmp, the import the CHARACTER_ID comparisons call.
 int CallDacomStricmp(const char* Left, const char* Right);
 
-// Retail FLIDMaker CRC state is 0x41c bytes (Common.dll.c:144062–144124).
+// Retail FLIDMaker CRC state, 0x41c bytes.
 struct FFlidCrcState
 {
     unsigned int Table[256];
@@ -52,7 +52,7 @@ namespace
 
     void InitMakeIdTable()
     {
-        // DAT_063ed230 — CRC-16-CCITT poly 0x1021, MSB-first table (Common.dll.c:145676).
+        // DAT_063ed230: CRC-16-CCITT poly 0x1021, MSB-first table.
         if (bMakeIdTableReady)
             return;
 
@@ -79,7 +79,8 @@ namespace
 
     unsigned int ReflectBits(unsigned int Value, int BitCount)
     {
-        // Common.dll.c:144078–144091 / 144108–144119 — overlay each dest bit from LSB of Source.
+        // Overwrites the low BitCount bits with Value's bits reversed (inlined twice in
+        // Initialize in retail).
         unsigned int Result = Value;
         unsigned int Source = Value;
         int BitIndex = 0;
@@ -110,7 +111,7 @@ namespace
 
     void UpdateCrc(FFlidCrcState* State, unsigned char Byte)
     {
-        // FUN_0630d330 — thiscall on CRC state, byte on the stack (Common.dll.c:144216).
+        // FUN_0630d330, thiscall on the CRC state.
         if (State->bReflectIn != 0)
         {
             if (State->bUseTablePath != 0)
@@ -139,7 +140,7 @@ namespace
 
     unsigned int FinalizeStaticId(FFlidCrcState* State)
     {
-        // Common.dll.c:144185–144209
+        // The tail of CreateStaticID; bit 31 marks a static id.
         unsigned int Width32 = State->RegisterWidth;
         unsigned int CrcWidth = State->CrcWidth;
         unsigned int Msb = 1u << (CrcWidth - 1u);
@@ -179,14 +180,14 @@ CFLIDMaker::CFLIDMaker()
 
 CFLIDMaker::~CFLIDMaker()
 {
-    // Common.dll.txt 0630d030-0630d03d: operator delete of the CRC state when it is set.
+    // FUN_0630d030
     if (CrcState != nullptr)
         ::operator delete(CrcState);
 }
 
 CFLIDMaker* __cdecl CFLIDMaker::GetInstance()
 {
-    // Common.dll.c:143990 — VC6 operator_new returns null; use nothrow.
+    // VC6 operator new returns null; nothrow here.
     if (m_pTheMaker == nullptr)
     {
         m_pTheMaker = new (std::nothrow) CFLIDMaker();
@@ -198,7 +199,6 @@ CFLIDMaker* __cdecl CFLIDMaker::GetInstance()
 
 void __cdecl CFLIDMaker::Shutdown()
 {
-    // Common.dll.c:144024 — delete table, then the singleton.
     if (m_pTheMaker != nullptr)
     {
         delete m_pTheMaker;
@@ -208,7 +208,6 @@ void __cdecl CFLIDMaker::Shutdown()
 
 int CFLIDMaker::Initialize()
 {
-    // Common.dll.c:144045
     if (CrcState != nullptr)
         return 1;
 
@@ -226,7 +225,7 @@ int CFLIDMaker::Initialize()
     State->XorOut = 0;
     State->bReflectIn = 1;
     State->bUseTablePath = 1;
-    State->RunningCrc = 0; // 0630d0e5; the two pad bytes +0x416/+0x417 are not written
+    State->RunningCrc = 0; // the two pad bytes +0x416/+0x417 are not written
 
     unsigned int ByteIndex = 0;
     do
@@ -261,12 +260,9 @@ int CFLIDMaker::Initialize()
 
 unsigned int CFLIDMaker::CreateStaticID(char const* Name)
 {
-    // Common.dll.txt 0630d1f0-0630d320. No table yet -> Initialize (its result is not
-    // checked: a failed allocation leaves CrcState null and the next read faults, as in
-    // retail). Null Name -> 0. Length = strlen(Name); strlen+1 bytes are copied into a
-    // 0x100-byte stack buffer (unbounded in retail - a name of 0x100+ bytes is undefined
-    // behaviour; the port copies at most 0xff bytes and hashes what it copied), _strlwr,
-    // RunningCrc = XorIn, FUN_0630d330 per byte for Length bytes, then the fold below.
+    // FUN_0630d1f0. Initialize's result is not checked (a failed allocation faults on the next
+    // read, as in retail). Deviation: retail copies the name into a 0x100-byte stack buffer
+    // unbounded; the port copies at most 0xff bytes and hashes what it copied.
     if (CrcState == nullptr)
         Initialize();
 
@@ -297,7 +293,6 @@ unsigned int CFLIDMaker::CreateStaticID(char const* Name)
 
 unsigned int CFLIDMaker::AllocateObjectID()
 {
-    // Common.dll.c:64598
     unsigned int Id = NextDynamicId;
     NextDynamicId = Id + 1;
     return Id & 0x3FFFFFFFu;
@@ -305,7 +300,6 @@ unsigned int CFLIDMaker::AllocateObjectID()
 
 unsigned int __cdecl CreateID(char const* Name)
 {
-    // Common.dll.c:144253
     CFLIDMaker* Maker = CFLIDMaker::GetInstance();
     if (Maker == nullptr)
     {
@@ -318,20 +312,17 @@ unsigned int __cdecl CreateID(char const* Name)
 
 void ID_String::clear()
 {
-    // Common.dll.c:180414 / ?clear@ID_String@@QAEXXZ
     Id = 0;
 }
 
 bool ID_String::IsEmpty() const
 {
-    // Common.dll.c:180426 / ?IsEmpty@ID_String@@QBE_NXZ
     return Id == 0;
 }
 
 char const* ID_String::get_string() const
 {
-    // Common.dll.c:180437 / ?get_string@ID_String@@QBEPBDXZ
-    // Four 0x20-byte slots at DAT_0640a780; counter DAT_0658a818. Formats Id as "0x"+_itoa(hex).
+    // Four rotating 0x20-byte slots at DAT_0640a780 (counter DAT_0658a818); "0x" + hex.
     unsigned int SlotOffset = (GIdStringHexSlot & 3u) * IdStringHexSlotBytes;
     GIdStringHexSlot += 1;
     char* Slot = GIdStringHexScratch + SlotOffset;
@@ -349,57 +340,50 @@ char const* ID_String::get_string() const
 
 CHARACTER_ID::CHARACTER_ID()
 {
-    // Common.dll.txt 0x1030:  MOV EAX,this / MOV byte ptr [EAX],0x0 / RET
-    // Retail only writes Buffer[0]; the port zeroes the whole buffer so that a
-    // slot copied wholesale never carries uninitialized bytes. No retail code
-    // reads past the terminator, so this is a harmless deviation.
+    // RVA 0x1030. Deviation: retail writes only Buffer[0]; the port zeroes the whole buffer
+    // (nothing reads past the terminator).
     memset(Buffer, 0, sizeof(Buffer));
 }
 
 bool CHARACTER_ID::is_valid() const
 {
-    // Common.dll.txt 0x1040:  MOV DL,[this] / XOR EAX,EAX / TEST DL,DL / SETNZ AL
+    // RVA 0x1040
     return Buffer[0] != '\0';
 }
 
 void CHARACTER_ID::invalidate()
 {
-    // Common.dll.txt 0x1050: writes ONE byte to 0 (empty string), not the whole buffer.
+    // RVA 0x1050: one byte only.
     Buffer[0] = '\0';
 }
 
 CHARACTER_ID const& CHARACTER_ID::operator=(CHARACTER_ID const& other)
 {
-    // Common.dll.c:181542 (0xce720): byte-copy loop that stops after copying the
-    // terminating 0 byte — equivalent to strcpy, not a full-buffer memcpy.
+    // RVA 0xce720: a strcpy loop, not a full-buffer copy.
     strcpy(Buffer, other.Buffer);
     return *this;
 }
 
+// The comparisons (0632e740 / 0632e760 / 0632e780) use DACOM.DLL stricmp.
 bool operator<(CHARACTER_ID const& lhs, CHARACTER_ID const& rhs)
 {
-    // Common.dll.txt 0632e740-0632e75c: DACOM.DLL stricmp(lhs, rhs), SETL.
     return CallDacomStricmp(lhs.Buffer, rhs.Buffer) < 0;
 }
 
 bool operator==(CHARACTER_ID const& lhs, CHARACTER_ID const& rhs)
 {
-    // Common.dll.txt 0632e760-0632e778: DACOM.DLL stricmp(lhs, rhs), NEG/SBB/INC = (result == 0).
     return CallDacomStricmp(lhs.Buffer, rhs.Buffer) == 0;
 }
 
 bool operator!=(CHARACTER_ID const& lhs, CHARACTER_ID const& rhs)
 {
-    // Common.dll.txt 0632e780-0632e799: DACOM.DLL stricmp(lhs, rhs), NEG/SBB/NEG = (result != 0).
     return CallDacomStricmp(lhs.Buffer, rhs.Buffer) != 0;
 }
 
 unsigned int __cdecl MakeLocationID(unsigned int BaseId, char const* Name)
 {
-    // Common.dll.txt 062662d0-06266300: sprintf(local[0x100], "%X_%s", BaseId, Name), then
-    // CreateID(local). No null or length checks (a null Name prints "(null)" in both CRTs).
-    // Retail's sprintf is unbounded - a text of 0x100+ characters is undefined behaviour;
-    // the port truncates at the buffer.
+    // FUN_062662d0. No null or length checks (a null Name prints "(null)" in both CRTs).
+    // Deviation: retail's sprintf is unbounded; the port truncates at the 0x100 buffer.
     char Local[0x100];
     _snprintf(Local, sizeof(Local), "%X_%s", BaseId, Name);
     Local[sizeof(Local) - 1] = '\0';
@@ -408,12 +392,10 @@ unsigned int __cdecl MakeLocationID(unsigned int BaseId, char const* Name)
 
 unsigned short __cdecl MakeId(char const* Name)
 {
-    // Common.dll.txt 0630e510-0630e57c: strcpy Name into a 0x80-byte stack buffer, _strlwr it,
-    // then CRC = 0xFFFF; per byte until the NUL: CRC = DAT_063ed230[(CRC & 0xff) ^ c] ^
-    // (CRC >> 8). No null or length checks. Retail's copy is unbounded - a name of 0x80+
-    // bytes is undefined behaviour; the port copies at most 0x7f bytes. DAT_063ed230 is
-    // initialised data in retail (0x0000, 0x1021, 0x2042, ...); the port computes the same
-    // table on first use.
+    // FUN_0630e510: lower-cased, CRC from 0xFFFF through DAT_063ed230. No null check.
+    // Deviation: retail's copy into the 0x80-byte buffer is unbounded; the port copies at most
+    // 0x7f bytes. DAT_063ed230 is initialised data in retail; the port computes the same table
+    // on first use.
     InitMakeIdTable();
 
     char Local[MakeIdCopyBytes];

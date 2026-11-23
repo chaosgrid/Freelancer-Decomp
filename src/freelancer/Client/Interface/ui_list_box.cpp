@@ -14,19 +14,18 @@ UiListBox::UiListBox()
     : LocalWidth(0.0f)
     , LocalHeight(0.0f)
 {
-    // FUN_0059c810 0x0059c84b..0x0059c850: the ListBox ctor, then the UIListBox vftable.
-    // +0x8b0 / +0x8b4 are left unset by retail; the port zeroes them.
+    // Inlined into FUN_0059c810. +0x8b0 / +0x8b4 are left unset by retail; the port zeroes them.
 }
 
 UiListBox::~UiListBox()
 {
-    // FUN_0059ce00: the ListBox dtor (thunk to FUN_005a1fe0) and nothing of its own.
+    // FUN_0059ce00.
 }
 
 bool UiListBox::Create(Win3D* NewParent, void* Payload)
 {
-    // FUN_0059a490 (RET 8): ListBox's resets and registration (LAB_005a2070 inlined), then
-    // the payload's width / height into both the unprojected and the projected extent.
+    // FUN_0059a490 (RET 8): ListBox's Create inlined, then the payload's width / height into
+    // both the unprojected and the projected extent.
     SelectedIndex = -1;
     HoverIndex = -1;
     HighlightIndex = -1;
@@ -36,8 +35,8 @@ bool UiListBox::Create(Win3D* NewParent, void* Payload)
     bDrawFrame = 1;
     bDrawRowRules = 0;
     bSelectable = 1;
-    Win3DReparent(this, NewParent); // FUN_0059dd00
-    Win3DRegister(this);            // FUN_0059dbf0
+    Win3DReparent(this, NewParent);
+    Win3DRegister(this);
     Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
 
     if (Payload != nullptr)
@@ -53,13 +52,11 @@ bool UiListBox::Create(Win3D* NewParent, void* Payload)
 
 void UiListBox::SetTransform(float const* Transform)
 {
-    // LAB_0059a530 (RET 4): slot 7 SetOrientation(Transform), slot 5 SetPosition(Transform + 9),
-    // then the shared extent projection through DAT_0067dbc0 with the new Z (Transform[11]).
+    // LAB_0059a530 (RET 4): then the shared extent projection (DAT_0067dbc0) with the new Z.
     SetOrientation(Transform);
     SetPosition(Transform + 9);
     UiWidgetProjectExtent(Orientation, Transform[11], LocalWidth, LocalHeight, &Width, &Height);
 }
 
-// Retail DAT_0067daec -- WINFACTORY<UIListBox> static (LAB_0059c270 -> FUN_0059c7a0; Create
-// FUN_0059c810); atexit dtor FUN_00579380.
+// DAT_0067daec.
 WINFACTORY<UiListBox> G_UIListBoxFactory("UIListBox");

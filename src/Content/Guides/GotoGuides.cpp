@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Content.dll TU37 (06f07de0-06f0aa00): the [MetaBehavior] guides - goto_guide (type 5) and
-// dock_guide (type 6). See GuidesInternal.h. Lane CNT-AI owns this file.
+// dock_guide (type 6). See GuidesInternal.h.
 
 #include "Guides/GuidesInternal.h"
 #include "Core/ContentPlayerState.h"   // FindContentPlayerStateByShip, GetValueE4 / GetValueE8
@@ -101,7 +101,7 @@ FLineGuide::FLineGuide(FMetaBehavior const* Desc)
 // Goto guide (06fb8404)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f07ef0 (06f07ef0-06f08114). TargetName = the description's (FUN_06ea9f40 clamp 0x30),
+// FUN_06f07ef0. TargetName = the description's (FUN_06ea9f40 clamp 0x30),
 // Path = its legs (FUN_06f0ddb0), bRestart / bNodeEndSent 0, State 1. With a ship: TargetId =
 // FindObjectIdByName on the ship's system (the first call does not test the system), again on
 // a non-null system, whose path is then built (range 1000, flags 0x19) when Path is empty;
@@ -162,7 +162,7 @@ FGotoGuide::FGotoGuide(FGotoGuide const& Other)
 {
 }
 
-// FUN_06f08390 (06f08390-06f084a0): lock_maneuvers(TargetId, false), the ship leaves
+// FUN_06f08390: lock_maneuvers(TargetId, false), the ship leaves
 // GSpaceSupportGuidedShips (FUN_06f60da0); then the members as the unwind map FuncInfo
 // 06fc1e58 orders them: CombatIds (+0x1a0), Path (+0x180), the +0x170 directive handle
 // (FUN_06f28e10), the base.
@@ -172,7 +172,7 @@ FGotoGuide::~FGotoGuide()
     UnregisterGuidedShip(Ship);
 }
 
-// FUN_06f08140 (06f08140-06f08380).
+// FUN_06f08140.
 FContentGuide* FGotoGuide::Clone()
 {
     return new FGotoGuide(*this);
@@ -211,7 +211,7 @@ void FGotoGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
     (void)ResultWord118;
 }
 
-// LAB_06f07de0 (06f07de0-06f07eae).
+// LAB_06f07de0.
 void FGotoGuide::SetShip(FContentNpcShip* InShip)
 {
     bool bWasNull = false;
@@ -235,7 +235,7 @@ void FGotoGuide::SetShip(FContentNpcShip* InShip)
     RegisterGuidedShip(Ship);
 }
 
-// FUN_06f07ec0 (06f07ec0-06f07eeb).
+// FUN_06f07ec0.
 void FGotoGuide::RefreshTarget()
 {
     if (Ship == nullptr)
@@ -243,7 +243,7 @@ void FGotoGuide::RefreshTarget()
     TargetId = Ship->GetSystem()->FindObjectIdByName(&TargetName, Ship->ControllerId);
 }
 
-// LAB_06f084d0 (06f084d0-06f087ad). The first leg is copied once; the loop runs on PrevState
+// LAB_06f084d0. The first leg is copied once; the loop runs on PrevState
 // while Path is not empty and nothing was found (states other than 2, 3, 5, 6, 9 fall
 // through with nothing found; a state that does not change repeats, as retail).
 bool FGotoGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
@@ -263,8 +263,7 @@ bool FGotoGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinatio
         {
         case 2:
         {
-            // FCOMP 1500 / TEST AH,5 / JP: taken (the leg start is the destination) when the
-            // length is 1500 or more, or NaN.
+            // The leg start is the destination when the length is 1500 or more, or NaN.
             Vector const ShipPosition = GetShipPosition(Ship);
             if (!(FastLength(DistanceSquaredZyx(ShipPosition, Leg.PointA)) < 1500.0f))
             {
@@ -317,7 +316,7 @@ bool FGotoGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinatio
     return bFound;
 }
 
-// FUN_06f08800 (06f08800-06f0890b, RET 8).
+// FUN_06f08800 (RET 8).
 bool FGotoGuide::IsTargetOnPath(int Kind, unsigned int ObjectId)
 {
     if (Kind != 7)
@@ -340,9 +339,9 @@ bool FGotoGuide::IsTargetOnPath(int Kind, unsigned int ObjectId)
     return false;
 }
 
-// FUN_06f08930 (06f08930-06f08a74): for a lane first leg, the entry ring of that lane nearest
-// the target (FindEntryRing, no side test); within 3000 of the target (3000 * 3000 compared
-// on the x87 stack, TEST AH,0x41 / JNZ) it becomes the Waypoint.
+// FUN_06f08930: for a lane first leg, the entry ring of that lane nearest the target
+// (FindEntryRing, no side test); within 3000 of the target (squared compare, false on NaN)
+// it becomes the Waypoint.
 bool FGotoGuide::FindLaneEntryNearTarget()
 {
     FNnPathLeg const Leg = GetFirstLeg();
@@ -370,9 +369,9 @@ bool FGotoGuide::FindLaneEntryNearTarget()
     return true;
 }
 
-// FUN_06f08a80 (06f08a80-06f08c6c): the first leg point (A of every leg but the first, then
-// B) within 1500 of the target becomes the Waypoint. The second test (the ship-target
-// distance squared not below 0, TEST AH,1 / JZ) only fails for NaN.
+// FUN_06f08a80: the first leg point (A of every leg but the first, then B) within 1500 of
+// the target becomes the Waypoint. The second test (the ship-target distance squared not
+// below 0) only fails for NaN.
 bool FGotoGuide::FindLegPointNearTarget()
 {
     if (Path.empty())
@@ -383,9 +382,6 @@ bool FGotoGuide::FindLegPointNearTarget()
     double const Limit = 1500.0 * 1500.0;                               // DAT_06fb810c squared
     for (std::list<FNnPathLeg>::iterator Leg = Path.begin(); Leg != Path.end(); ++Leg)
     {
-        // FCOMPP (1500^2 against the distance) / TEST AH,0x41 / JNZ: near when 1500^2 is
-        // greater; then FCOMP 0 / TEST AH,1 / JZ: taken when the distance is not below 0 and
-        // not NaN.
         if (Leg != Path.begin() && Limit > DistanceSquaredZyx(TargetPosition, Leg->PointA))
         {
             Vector const ShipPosition = GetShipPosition(Ship);
@@ -408,10 +404,9 @@ bool FGotoGuide::FindLegPointNearTarget()
     return false;
 }
 
-// FUN_06f08c70 (06f08c70-06f099aa, RET 8). Range used by the approach tests (06f08c70-
-// 06f08c9f: FLD 1500 / FCOMP Range / TEST AH,5 / JP -> 1500 when 1500 >= Range or NaN): the
-// larger of Range and 1500. Every path ends with Start() when a state change asked for a
-// restart (FinishEvent).
+// FUN_06f08c70 (RET 8). The approach tests use the larger of Range and 1500 (1500 when Range
+// is NaN). Every path ends with Start() when a state change asked for a restart
+// (FinishEvent).
 void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
 {
     using pub::Controller::EMessage;
@@ -434,8 +429,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
     case EMessage::TradelaneExit:
         if (Ids[0] == TargetId)
             pub::AI::lock_maneuvers(TargetId, false);
-        // FCOMPP (r^2 against the distance) / TEST AH,5 / JP: skipped when r^2 >= distance
-        // or NaN.
+        // Skipped when r^2 >= distance or NaN.
         if (Ids[0] == Ship->SpaceObjId && State == 7 &&
             ApproachSquared < DistanceSquaredZyx(GetShipPosition(Ship), Leg.PointB))
             SetState(3);
@@ -565,7 +559,7 @@ void FGotoGuide::FinishEvent()
         Start();
 }
 
-// 06f09168-06f0998a: switch on State - 1 (1..10).
+// 06f09168 (inlined in HandleEvent): the Heartbeat switch on State 1..10.
 void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double ApproachSquared)
 {
     switch (State)
@@ -575,8 +569,8 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
         break;
     case 2:
     {
-        // 06f091a6-06f091f3: (x*x + z*z) + y*y of ship - leg start; FCOMPP r^2 / TEST AH,0x41
-        // / JNZ: not within reach when r^2 <= distance or NaN.
+        // Retail sums (x*x + z*z) + y*y here, unlike DistanceSquaredZyx; not within reach
+        // when r^2 <= distance or NaN.
         Vector const ShipPosition = GetShipPosition(Ship);
         Vector const Delta = SubtractVectors(ShipPosition, Leg.PointA);   // 06f091c0
         double const DistanceSquared =
@@ -694,8 +688,8 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
             Ship->GetPosition(&ShipPosition);
             Vector TargetPosition;
             Target->GetPosition(&TargetPosition);
-            // FCOMP 0 / TEST AH,5 / JP: the node is passed only when the distance is below 0
-            // (never for a real distance), else the "at node end" line below.
+            // Retail quirk: the node is passed only when the distance is below 0 (never for a
+            // real distance), else the "at node end" line below.
             if (DistanceSquaredZyx(TargetPosition, ShipPosition) < 0.0)
             {
                 bNodeEndSent = false;
@@ -721,9 +715,9 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
     }
 }
 
-// FUN_06f099f0 (06f099f0-06f09ffe). The first leg is read before the tests (retail reads
-// the head's first node even when Path is empty; GetFirstLeg gives the zeroed leg then).
-// Only runs when a restart was requested and the ship is not in its +0x120 state; the
+// FUN_06f099f0. The first leg is read before the tests (retail reads the head's first node
+// even when Path is empty; GetFirstLeg gives the zeroed leg then).
+// Only runs when a restart was requested and the ship is not in a trade lane; the
 // directives built for the state (possibly none) replace the ship's list with priority 0.
 void FGotoGuide::Start()
 {
@@ -818,7 +812,7 @@ void FGotoGuide::Start()
 // Dock guide (06fb8490)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f0a270 (06f0a270-06f0a3a0): the goto guide, then DockTargetId, the two flags 0; the
+// FUN_06f0a270: the goto guide, then DockTargetId, the two flags 0; the
 // target id refreshed with a ship; Destination = the dock target's position; with a ship in a
 // system the path is rebuilt to it (range 1000, flags 0x19).
 FDockGuide::FDockGuide(FMbDockGuide const* Desc)
@@ -854,13 +848,13 @@ FDockGuide::FDockGuide(FDockGuide const& Other)
     pub::SpaceObj::GetLocation(DockTargetId, Destination, Orientation);
 }
 
-// FUN_06f0a3b0 (06f0a3b0-06f0a5cb).
+// FUN_06f0a3b0.
 FContentGuide* FDockGuide::Clone()
 {
     return new FDockGuide(*this);
 }
 
-// LAB_06f0a5d0 (06f0a5d0-06f0a61d).
+// LAB_06f0a5d0.
 void FDockGuide::RefreshTarget()
 {
     if (Ship != nullptr)
@@ -869,8 +863,8 @@ void FDockGuide::RefreshTarget()
     pub::SpaceObj::GetLocation(DockTargetId, Destination, Orientation);
 }
 
-// LAB_06f0a620 (06f0a620-06f0a7f7, RET 8). Messages 0x11 / 0x16 / 0x20 / 0x27 (byte table
-// 06f0a810); the others, and those four when their state test fails, go to the goto guide's
+// LAB_06f0a620 (RET 8). Messages 0x11 / 0x16 / 0x20 / 0x27 (byte table 06f0a810); the
+// others, and those four when their state test fails, go to the goto guide's
 // handler unless the docking part has started. Ends with Start() when bDockRestart is set.
 void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
 {
@@ -972,9 +966,8 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         Start();
 }
 
-// LAB_06f0a830 (06f0a830-06f0aa00). Before docking the goto guide's Start runs first
-// (FUN_06f099f0); then, when a dock restart is pending and the ship is not in its +0x120
-// state, state 12 hands the ship one Dock directive at DockTargetId (FUN_06f276f0 with
+// LAB_06f0a830. Before docking the goto guide's Start runs first (FUN_06f099f0); then, when
+// a dock restart is pending and the ship is not in a trade lane, state 12 hands the ship one Dock directive at DockTargetId (FUN_06f276f0 with
 // DAT_06fb80e4 = 0), and the pending flag is cleared.
 void FDockGuide::Start()
 {
@@ -987,7 +980,6 @@ void FDockGuide::Start()
     if (State == 12)
     {
         FMissionDirectiveList Directives;                               // FUN_06f93790 head
-        // Ref-holding local (FuncInfo 06fc1fd4 state 1: FUN_06f28e10).
         TRefHandle<FObjListDirective> New;
         CreateObjListDirective(0x13, &New.Pointer);
         unsigned int const Zero = 0;

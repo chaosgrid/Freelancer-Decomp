@@ -22,8 +22,8 @@
 
 // =======================================================================================
 // TU61 message types (static initialisers LAB_06f842a0 ... LAB_06f84520, 0x20 apart, in
-// this order). Retail increments the exported generator itself; the port calls the exported
-// Common function that does the same (StateMachineMessage::GenerateUniqueMessageType).
+// this order). Retail increments the exported generator inline; the port calls the exported
+// Common function that does the same.
 // =======================================================================================
 
 unsigned int const GRmMsgStartMachine = StateMachineMessage::GenerateUniqueMessageType();      // 06f842a0
@@ -48,21 +48,20 @@ unsigned int const GRmMsgType06fd3b74 = StateMachineMessage::GenerateUniqueMessa
 unsigned int const GRmMsgPlayerLeft = StateMachineMessage::GenerateUniqueMessageType();        // 06f84500
 unsigned int const GRmMsgType06fd3b6c = StateMachineMessage::GenerateUniqueMessageType();      // 06f84520
 
-// FUN_06f86d90 (RET 4): StateMachineMessage(DAT_06fd3bb0), +0x1c = Reason, vtable 06fbc81c.
+// FUN_06f86d90.
 FRmMachineFailedMessage::FRmMachineFailedMessage(int InReason)
     : StateMachineMessage(GRmMsgMachineFailed)
     , Reason(InReason)
 {
 }
 
-// FUN_06f86de0: operator new(0x20) (StateMachineMessage::operator new); on success the copy
-// ctor and +0x1c; a failed new returns null.
+// FUN_06f86de0: StateMachineMessage::operator new(0x20); a failed new returns null.
 StateMachineMessage* FRmMachineFailedMessage::clone() const
 {
     return new FRmMachineFailedMessage(*this);
 }
 
-// FUN_06f86e40 (RET 4): StateMachineMessage(DAT_06fd3b70), +0x1c = PlayerId, vtable 06fbc824.
+// FUN_06f86e40.
 FRmPlayerLeftMessage::FRmPlayerLeftMessage(unsigned int InPlayerId)
     : StateMachineMessage(GRmMsgPlayerLeft)
     , PlayerId(InPlayerId)
@@ -136,22 +135,19 @@ FRmNamedValue const GRmCommTargetNames[12] = {
 // TU61 -- text with parameters (vtable 06fbc700)
 // =======================================================================================
 
-// Inline ctor at every owner (e.g. FUN_06f9efb0 +0x30/+0x60, FUN_06f99560): FmtStr zeroed
-// (FUN_06eac680 shape), StrId 0, empty vector.
+// Inlined at every owner (e.g. FUN_06f9efb0, FUN_06f99560).
 FRmParamText::FRmParamText()
     : StrId(0)
 {
 }
 
-// FUN_06f85550: frees the vector, then FmtStr::~FmtStr on +0x04.
+// FUN_06f85550.
 FRmParamText::~FRmParamText()
 {
 }
 
-// FUN_06f84540 (RET 8): StrId = int value Index; every following value is looked up in
-// GRmTextParamNames (DACOM stricmp, null names skipped) and its value appended. A name not
-// in the table appends the previous lookup's value; for the first value that is retail's
-// uninitialised stack slot [ESP+0x10] -- TODO: no defined value exists, the port uses 0
+// FUN_06f84540. A name not in the table appends the previous lookup's value; for the first
+// value that is retail's uninitialised stack slot, for which the port uses 0
 // (FSTRING_PARAM_NONE).
 void FRmParamText::Parse(INI_Reader* Reader, unsigned int Index)
 {
@@ -175,9 +171,7 @@ void FRmParamText::Parse(INI_Reader* Reader, unsigned int Index)
     }
 }
 
-// LAB_06f84740 (06f84740-06f8478b, RET 4). Text's mad-lib id (+0x08) already set -> nothing
-// is rebuilt; otherwise begin_mad_lib(StrId), Source slot 0 (GetTextParam) per parameter
-// (+0x24..+0x28) into Text, end_mad_lib. Returns &Text either way.
+// LAB_06f84740.
 FmtStr* FRmParamText::Build(IRmTextParamSource* Source)
 {
     if (Text.MadLibId == 0)
@@ -190,7 +184,7 @@ FmtStr* FRmParamText::Build(IRmTextParamSource* Source)
     return &Text;
 }
 
-// LAB_06f85430: StrId == 0.
+// LAB_06f85430.
 bool FRmParamText::IsEmpty() const
 {
     return StrId == 0;
@@ -202,51 +196,50 @@ bool FRmParamText::IsEmpty() const
 
 unsigned int GRmShipGroupSerial = 0;                            // DAT_06fd3c08
 
-// FUN_06f89400 (RET 4). The members' defaults are the ctor's stores; +0x2c..+0x38 are not
-// written by retail (see the header).
+// FUN_06f89400. The members' defaults are the ctor's stores; +0x2c..+0x38 are not written by
+// retail (see the header).
 FRmOffer::FRmOffer(int InMachineType)
     : MachineType(InMachineType)
 {
 }
 
-// FUN_06f883e0: FailureText (+0x88: vector freed, FmtStr), RewardText (+0x58), Text (+0x3c),
-// then the +0x04 vptr back to 06fb43f8.
+// FUN_06f883e0.
 FRmOffer::~FRmOffer()
 {
 }
 
-// FUN_06f89550 (RET 8): switch (Param - 1), bound 0xd.
+// FUN_06f89550.
 bool FRmOffer::GetTextParam(int Param, FmtStr* Out)
 {
     switch (Param)
     {
-    case 1:     // OFFER_GROUP: append_rep_group(&+0x24)
+    case 1:     // OFFER_GROUP
     {
         unsigned int const Group = static_cast<unsigned int>(OfferGroup);
         Out->append_rep_group(Group);
         return true;
     }
-    case 2:     // HOSTILE_GROUP: append_rep_group(&+0x28)
+    case 2:     // HOSTILE_GROUP
         Out->append_rep_group(HostileGroup);
         return true;
-    case 7:     // REWARD_MONEY: append_int(+0x30)
+    case 7:     // REWARD_MONEY
         Out->append_int(static_cast<unsigned int>(Reward));
         return true;
-    case 8:     // FACTION_REWARD: ftol(+0x38 * 100.0f DAT_06fb8574), x87 product (exact in double)
+    case 8:     // FACTION_REWARD: x 100.0f (DAT_06fb8574) on x87, exact in double
         Out->append_int(static_cast<unsigned int>(
             static_cast<int>(static_cast<double>(RepReward) * 100.0)));
         return true;
-    case 9:     // FACTION_HIT: ftol(+0x34 * 100.0f)
+    case 9:     // FACTION_HIT
         Out->append_int(static_cast<unsigned int>(
             static_cast<int>(static_cast<double>(RepHit) * 100.0)));
         return true;
-    case 11:    // MISSION_DIFFICULTY: ftol(+0x2c)
+    case 11:    // MISSION_DIFFICULTY
         Out->append_int(static_cast<unsigned int>(static_cast<int>(Difficulty)));
         return true;
-    case 12:    // OFFER_BASE: append_base(&+0x20)
+    case 12:    // OFFER_BASE
         Out->append_base(OfferBase);
         return true;
-    case 14:    // TARGET_SYSTEM: pub::System::GetName(System->SystemId, &id), append_string(id)
+    case 14:    // TARGET_SYSTEM
     {
         unsigned int NameId = static_cast<unsigned int>(Param);    // the argument slot
         pub::System::GetName(System->SystemId, NameId);
@@ -259,11 +252,10 @@ bool FRmOffer::GetTextParam(int Param, FmtStr* Out)
 }
 
 // =======================================================================================
-// TU61 comm sequence lines and conversations (06f84790-06f84d60)
+// TU61 comm sequence lines and conversations
 // =======================================================================================
 
-// FUN_06f84790 (06f84790-06f847b8): FUN_06ed6180(0), +0x40 / +0x44 / +0x48 = 0, +0x4c = 0
-// (the empty text), +0x8c = 0, vtable 06fbc648.
+// FUN_06f84790.
 FRmLine::FRmLine()
     : FGcsPlayerListLine(nullptr)
     , SpeakerKind(0)
@@ -274,8 +266,7 @@ FRmLine::FRmLine()
     Text.Data[0] = '\0';
 }
 
-// FUN_06f849c0 (06f849c0-06f849e0): FUN_06ed6710 (called directly) true and +0x8c non-zero
-// -> 1, else 0.
+// FUN_06f849c0; the base CanPlay (FUN_06ed6710) is called directly.
 bool FRmLine::CanPlay()
 {
     if (FGcsPlayerListLine::CanPlay() && bPrepared != 0)
@@ -283,17 +274,13 @@ bool FRmLine::CanPlay()
     return false;
 }
 
-// FUN_06f84820 (06f84820-06f849b2): new 0x90 and a member-wise copy -- the FGcsLine part
-// (the text ids copied), vptr 06fb6268, the player ids copied, vptr 06fb623c, +0x40, +0x44,
-// the text (0x11 dwords), +0x8c, vptr 06fbc648. A failed new returns null.
+// FUN_06f84820: new 0x90 member-wise copy; a failed new returns null.
 FGcsCloneableLine* FRmLine::Clone()
 {
     return new FRmLine(*this);
 }
 
-// FUN_06f84a20 (06f84a20-06f84bd6): a local vector gets each line's slot 5 copy appended
-// (FUN_06f937c0 insert(end, 1, &copy)); the inlined vector assign then makes it Lines (the
-// old buffer freed, the old pointers not deleted), and the local buffer is freed.
+// FUN_06f84a20. The old line pointers are not deleted.
 void FRmConversationBase::CloneLines()
 {
     std::vector<FGcsLine*> Copies;
@@ -305,8 +292,7 @@ void FRmConversationBase::CloneLines()
     Lines = Copies;
 }
 
-// FUN_06f84c00 (06f84c00-06f84c31): +0x18 zero -> false; a line whose slot 1 fails ->
-// false; otherwise true.
+// FUN_06f84c00.
 bool FRmConversation::IsValid()
 {
     if (!bReady)
@@ -319,9 +305,7 @@ bool FRmConversation::IsValid()
     return true;
 }
 
-// FUN_06f84c40 (06f84c40-06f84d15): new 0x24, member copy (+0x04 byte, the line pointers,
-// vptr 06fbc690, +0x14, +0x18, +0x1c, +0x20, vptr 06fbc660), then the copy's slot 6
-// (06f84d00).
+// FUN_06f84c40: new 0x24 member copy, then the copy's slot 6.
 FRmConversationBase* FRmConversation::Clone()
 {
     FRmConversation* const Copy = new FRmConversation(*this);
@@ -329,7 +313,7 @@ FRmConversationBase* FRmConversation::Clone()
     return Copy;
 }
 
-// FUN_06f71080 (RET 4; one ICF body for every class storing its argument at +0x20).
+// FUN_06f71080 (one ICF body for every class storing its argument at +0x20).
 void FRmConversation::SetTrigger(int InTrigger)
 {
     Trigger = InTrigger;
@@ -347,20 +331,19 @@ void FRmConversation::MarkReady()
     bReady = true;
 }
 
-// LAB_06f84d50 (FLD float: the value goes out on the FPU stack).
+// LAB_06f84d50.
 float FRmConversation::GetDelay()
 {
     return Delay;
 }
 
-// LAB_06f84d60 (RET 4).
+// LAB_06f84d60.
 void FRmConversation::SetDelay(float InDelay)
 {
     Delay = InDelay;
 }
 
-// FUN_06f89230: every held objective is deleted through its vtable slot 0 (with 1) and its
-// slot cleared (06f89270-06f89281); then the tree nodes and the head/nil nodes are freed.
+// FUN_06f89230.
 FRmObjectiveMap::~FRmObjectiveMap()
 {
     for (std::map<int, FRmParamText*>::iterator It = Objectives.begin(); It != Objectives.end();
@@ -374,27 +357,23 @@ FRmObjectiveMap::~FRmObjectiveMap()
     }
 }
 
-// FUN_06f84d70: MessageHandler(DAT_06fcf254) (it registers with the router), +0x0c = 0, the
-// empty list (0x2c-byte head node), the empty objective map (FUN_06f891a0 inline), vtables
-// 06fbc6cc at +0x1c and 06fbc6ac.
+// FUN_06f84d70: MessageHandler(DAT_06fcf254) registers with the router.
 FRmOfferComponent::FRmOfferComponent()
     : MessageHandler(GMessageRouter)
 {
 }
 
-// FUN_06f84e60: the objective map (FUN_06f89230), the list (each element's slot 0 with 0,
-// node freed), the head node, ~MessageHandler.
+// FUN_06f84e60.
 FRmOfferComponent::~FRmOfferComponent()
 {
 }
 
-// FUN_06ebf6f0 (RET 4): no body.
+// FUN_06ebf6f0: empty.
 void FRmOfferComponent::receive_message(StateMachineMessage* /*Msg*/)
 {
 }
 
-// FUN_06f88500: every group's ship vector (FUN_06f93370: slot 0 with 0 per ship, stride
-// 0xf0), the group buffer, then the component (objective map, list, MessageHandler).
+// FUN_06f88500.
 FRmShipComponent::~FRmShipComponent()
 {
 }
@@ -404,27 +383,22 @@ FRmTargetShipComponent::~FRmTargetShipComponent()
 {
 }
 
-// FUN_06f88620: the solar list (FUN_06f93d10 per node, the head freed), then the objective
-// map, the event list and ~MessageHandler.
+// FUN_06f88620.
 FRmSolarComponent::~FRmSolarComponent()
 {
 }
 
-// FUN_06f862e0: the FMissionShip template (vtable 06fb60a8 first), FUN_06f31430 on +0x88,
-// +0xd4 = 0, +0xd8 = 2, +0xdc = 1, the loot vector empty, vtable 06fbc7a0.
+// FUN_06f862e0.
 FRmShipSpawn::FRmShipSpawn()
 {
 }
 
-// FUN_06f86420: the loot vector (each loot's label list freed), then the FMissionShip dtor
-// (vtable 06fb60a8, guide released, cargo, directives, labels).
+// FUN_06f86420.
 FRmShipSpawn::~FRmShipSpawn()
 {
 }
 
-// FUN_06f865e0: +0 = 1, +1/+2 = 0, +4 = 0, +8 = -1, +0xc = 0, identity 3x3 at +0x10, +0x34
-// zero, +0x40 = -2.0f (DAT_06fbc2e8), +0x44/+0x48 = 0 (empty name), +0x78 = 0, +0x7c = -1,
-// +0x80 = CreateID("transport_liberty"), the ship vector empty, +0x94 = ++DAT_06fd3c08.
+// FUN_06f865e0.
 FRmShipGroup::FRmShipGroup()
 {
     Orientation.D[0][0] = 1.0f;
@@ -446,32 +420,20 @@ FRmShipGroup::FRmShipGroup()
     Serial = GRmShipGroupSerial;
 }
 
-// FUN_06f88240 (RET 4): FRmOffer(InMachineType), then +0xb8 the general component (inline:
-// MessageHandler, +0xc = 0, list FUN_06f93640, map FUN_06f1f4f0), +0xec the target ship
-// component (FUN_06f84d70, vector FUN_06eac620, +0x50 = 0, +0x54 = -1, +0xc = 0), +0x144 the
-// solar component (inline base, FUN_06f891a0, list FUN_06f93430), +0x190 the ship component
-// (FUN_06f84d70, vector), +0x1e0/+0x1f8 FmtStr (FUN_06eac680), +0x210 = 0, +0x214 = -1;
-// vtables 06fbc898 / 06fbc88c last. Unwind states 1..0xc follow this member order.
+// FUN_06f88240; the component ctors are inlined. Unwind states 1..0xc follow the member order.
 FRmVignetteOffer::FRmVignetteOffer(int InMachineType)
     : FRmOffer(InMachineType)
 {
 }
 
-// FUN_06f88710: vtables 06fbc898 / 06fbc88c, FUN_06f88940, then TargetName (+0x1f8, +0x1e0),
-// Ships, Solars, TargetShips, General (member dtors inlined), then ~FRmOffer.
+// FUN_06f88710; the member dtors are inlined.
 FRmVignetteOffer::~FRmVignetteOffer()
 {
     ReleaseTargetName();
 }
 
-// FUN_06f88940 (06f88940-06f88ac7). Nothing when neither name part has a mad lib (+0x1e4 and
-// +0x1fc zero). Otherwise the target ship groups (+0x124..+0x128), then -- when no ship there
-// has +0xd4 set -- the ship groups (+0x1c8..+0x1cc) are searched for the first ship with
-// +0xd4 != 0; its group's +0x01 is read. A found ship in a group with +0x01 set keeps the
-// name; in every other case the faction's name tables (GetFactionNames(&Affiliation), not
-// null-tested) get the parts back at once: the pilot pair when GetSecondNameValues gives two
-// non-zero values, else the large ship name GetSecondNameThirdValue gives (when non-zero);
-// then always the formation designation (GetFirstNameValue, GetFirstNameLastValue).
+// FUN_06f88940. The first ship carrying the name, in a spawned group, keeps it; otherwise the
+// faction's name tables (GetFactionNames, not null-tested) get the parts back.
 void FRmVignetteOffer::ReleaseTargetName()
 {
     if (TargetName.First.MadLibId == 0 && TargetName.Second.MadLibId == 0)
@@ -524,7 +486,7 @@ void FRmVignetteOffer::ReleaseTargetName()
     Names->ReleaseFormationDesig(Desig, DesigNumber, true);
 }
 
-// FUN_06f89650 (06f89650-06f896e1).
+// FUN_06f89650.
 void FRmVignetteOffer::CountCriticalLoot(std::vector<FRmShipGroup> const* Groups,
                                          FRmCriticalLoot const** OutLoot,
                                          int* InOutCount) const
@@ -549,23 +511,9 @@ void FRmVignetteOffer::CountCriticalLoot(std::vector<FRmShipGroup> const* Groups
     }
 }
 
-// LAB_06f896f0 (RET 8). The base offer's answer first (FUN_06f89550); otherwise switch
-// (Param - 3), bound 0xa:
-//   3 BIG_SOLAR: the first solar (+0x188 list) of type 0 -> append_installation(its
-//     KillableSolars entry's string id); none -> false.
-//   4 OTHER_SOLAR: the solars of type 1 or 2; one -> its string id, more (the scan stops at
-//     the second) -> the last seen one's string id + 1; none -> false.
-//   5 CRITICAL_LOOT: count 0; CountCriticalLoot over the target groups (+0x120), then -- while
-//     the count is at most 1 -- over the ship groups (+0x1c4), then over the solars' loot
-//     (Kind 2 adds its units and takes its record; a solar's scan stops past 1); count 0 ->
-//     false, else append_loot(record->Name).
-//   6 TARGET_FULL_NAME: GetSecondNameValues on the target name; both non-zero -> both
-//     appended as strings. Else GetSecondNameThirdValue; zero -> false; otherwise
-//     append_string(the faction's large_ship_desig) and append_string(the second value the
-//     first reader left).
-//   13 TARGET_ZONE: the position of the active component -- target ships (+0xf8), else ships
-//     (+0x19c), else solars -- through GetRmZoneAtPosition(System, &pos), append_zone_id.
-//   7..12: false.
+// LAB_06f896f0. OTHER_SOLAR with more than one solar uses the second one's string id + 1
+// (the plural text). TARGET_FULL_NAME for a large ship appends the second value the first
+// reader left, as retail.
 bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
 {
     if (FRmOffer::GetTextParam(Param, Out))

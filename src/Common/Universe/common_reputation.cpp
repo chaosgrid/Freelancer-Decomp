@@ -112,8 +112,8 @@ namespace
 
     void ReadRepValue(FGroup& Group, INI_Reader& Reader)
     {
-        // 0631f0a0-0631f108: the pair {MakeId(value 1), value 0} is INSERTED (FUN_063222f0, the
-        // unique path of VC6 _Tree::insert): a group already in the map keeps its first value.
+        // 0631f0a0: INSERTED (FUN_063222f0, unique insert): a group already in the map keeps
+        // its first value.
         TString<16> OtherName;
         CopyTString(OtherName, Reader.get_value_string(1));
         unsigned OtherId = (unsigned)MakeId(OtherName.Data);
@@ -129,11 +129,9 @@ namespace
         CopyTString(Name, Reader.get_value_string());
         unsigned Id = MakeId(Name.Data);
 
-        // 0631ea7d-0631eaee: an empty record {Length 0, Data[0] 0, feelings map} is inserted
-        // (FUN_063225b0, unique -- an existing group keeps its record), then 0631eaf3-0631eb11
-        // the nickname is copied into the node. Retail UB: the inserted stack record's
-        // IdsName/IdsInfo/IdsShortName are never written, but all three are overwritten below
-        // on every path, so nothing of the garbage survives; operator[] value-initialises.
+        // Unique insert of an empty record (FUN_063225b0); an existing group keeps its feelings.
+        // Retail's stack record leaves the three Ids uninitialised, but all are overwritten
+        // below on every path.
         FGroup& Group = GGroups[Id];
         Group.Nickname = Name;
 
@@ -152,16 +150,14 @@ namespace
         else
             Group.IdsShortName = 0;
 
-        // 0631eba4: straight back to read_header -- Startup reads no `rep` values. Group
-        // feelings come from Reputation::LoadFeelings (the server's load of the initial world /
-        // save game) and Reputation::set.
+        // Startup reads no `rep` values: feelings come from Reputation::LoadFeelings (the
+        // server's load of the initial world / save game) and Reputation::set.
     }
 }
 
 bool __cdecl Reputation::Startup(char const* Path)
 {
-    // .text:0631e9a0-0631ed69: open(Path, false) with no null check (0631e9db-0631e9eb); false
-    // when it fails (0631e9f2 skips the 0631ebb8 `bResult = 1`), true after the header loop.
+    // .text:0631e9a0. No null check of Path.
     INI_Reader Reader;
     if (!Reader.open(Path, false))
         return false;
@@ -176,16 +172,14 @@ bool __cdecl Reputation::Startup(char const* Path)
 
 void __cdecl Reputation::Shutdown()
 {
-    // .text:0631e8e0-0631e998: erase(begin, end) on the group registry DAT_064018ec only; the
-    // story-faction id list DAT_064018dc is left as it is.
+    // .text:0631e8e0: the group registry DAT_064018ec only; the story-faction id list
+    // DAT_064018dc is left as it is.
     GGroups.clear();
 }
 
 void __cdecl Reputation::Save(ISave* Writer)
 {
-    // Common.dll.txt:0631eef0. No null check on Writer: retail loads it at .text:0631ef13 and
-    // calls through it straight away. WriteSection is vtbl+0x04 (.text:0631ef22), WriteString
-    // vtbl+0x14 (.text:0631ef32, 0631efa8).
+    // 0631eef0. No null check on Writer.
     std::map<unsigned, FGroup>::const_iterator It = GGroups.begin();
     for (; It != GGroups.end(); ++It)
     {
@@ -196,11 +190,9 @@ void __cdecl Reputation::Save(ISave* Writer)
         std::map<unsigned, float>::const_iterator FeelIt = Group.Feelings.begin();
         for (; FeelIt != Group.Feelings.end(); ++FeelIt)
         {
-            // 0631ef43-0631ef79: retail looks the target group back up by id (lower_bound) to
-            // print its nickname; if the id no longer names a real group (a stale relation) it
-            // prints head-node+0x14 instead. Retail UB: the registry's head node is a raw
-            // operator new block whose value area is never initialised, so that text is heap
-            // garbage. The port prints an empty string there and still writes the line.
+            // Retail UB: for a stale relation (the id no longer names a group) retail prints the
+            // map head node's uninitialised value area. The port prints an empty string there
+            // and still writes the line.
             FGroup const* Other = FindGroupConst(FeelIt->first);
             char const* OtherNick = (Other != nullptr) ? Other->Nickname.Data : "";
             char Buffer[260];
@@ -223,10 +215,8 @@ void __cdecl Reputation::LoadFeelings(INI_Reader& Reader)
         Reader.read_value();
         CopyTString(Name, Reader.get_value_string());
         unsigned Id = MakeId(Name.Data);
-        // 0631f075-0631f080: retail takes find()'s node+0x10 without testing for end().
-        // Retail UB: for an unknown group that is the map head node, whose value area
-        // operator new never initialised, and the `rep` lines are inserted into a garbage
-        // map. The port cannot reproduce that and skips the lines instead.
+        // Retail UB: find() is not tested for end(), so an unknown group's `rep` lines go into
+        // the head node's uninitialised map. The port skips the lines instead.
         FGroup* Group = FindGroup(Id);
         unsigned RepCount = 0;
         while (Reader.read_value())
@@ -240,10 +230,8 @@ void __cdecl Reputation::LoadFeelings(INI_Reader& Reader)
 
         if (RepCount == 0)
         {
-            // 0631f120-0631f13f: the DACOM FDUMP pointer is called directly, no null test, and
-            // the name printed is the found record's nickname (EBX = node+0x10, +4 = Data), which
-            // differs from Name when two nicknames share a 16-bit MakeId. Name.Data only stands
-            // in for the UB head-node case above.
+            // The name printed is the found record's nickname, which differs from Name when two
+            // nicknames share a 16-bit MakeId. Name.Data only stands in for the UB case above.
             char const* GroupNick = (Group != nullptr) ? Group->Nickname.Data : Name.Data;
             FDUMP(0x100001,
                   "%s(%d) : *** ERROR: FACTION: save game has corrupted reputation data for group "
@@ -275,8 +263,7 @@ int __cdecl Reputation::get_nickname(TString<16>& Out, unsigned const& GroupId)
     FGroup const* Group = FindGroupConst(GroupId);
     if (Group == nullptr)
         return -1;
-    // 0631f49e-0631f4ed: the record's Data is re-measured (strlen, capped at 15) and copied
-    // with its terminator; Out's bytes past the terminator are left as they were.
+    // Out's bytes past the terminator are left as they were.
     char const* Src = Group->Nickname.Data;
     unsigned Len = (unsigned)strlen(Src);
     if (Len >= 16)
@@ -318,7 +305,7 @@ unsigned __cdecl Reputation::group_count()
 
 void __cdecl Reputation::enumerate(RepGroupCB* Callback)
 {
-    // 0631f600-0631f619: no null test of Callback; an empty registry never calls it.
+    // 0631f600. No null test of Callback.
     std::map<unsigned, FGroup>::const_iterator It = GGroups.begin();
     for (; It != GGroups.end(); ++It)
     {
@@ -363,17 +350,13 @@ int __cdecl Reputation::affect_relation(unsigned const& FromId, unsigned const& 
     if (From == nullptr)
         return -1;
 
-    // Common.dll.txt:0631f7a0. Retail checks for an existing Feelings entry FIRST and only
-    // validates that ToId still names a real group when no entry exists yet -- a relation left
-    // over for a group id that has since disappeared from GGroups is still updated in place,
-    // not rejected with -2. Validating ToId unconditionally (as an earlier port draft did)
-    // would wrongly refuse that update.
+    // 0631f7a0. Retail checks for an existing Feelings entry FIRST and validates ToId only when
+    // there is none: a relation to a group that has since disappeared is still updated in
+    // place, not rejected with -2.
     std::map<unsigned, float>::iterator It = From->Feelings.find(ToId);
     if (It != From->Feelings.end())
     {
-        // 0631f873-0631f8ab: Delta + old stays on the FPU stack for the clamp. FCOM 1.0f /
-        // TEST AH,0x5 / JNP keeps the sum only when it is ordered-less than 1.0, so a NaN
-        // becomes 1.0; FLD -1.0f / FCOMP / TEST AH,0x41 / JNZ keeps it unless -1.0 > sum.
+        // The sum is clamped unrounded (x87); a NaN becomes 1.0.
         double Value = (double)Delta + (double)It->second;
         if (!(Value < 1.0))
             Value = 1.0;
@@ -386,8 +369,7 @@ int __cdecl Reputation::affect_relation(unsigned const& FromId, unsigned const& 
     if (FindGroupConst(ToId) == nullptr)
         return -2;
 
-    // 0631f81b-0631f849: the same clamp on Delta (TEST AH,0x5 / JP -> 1.0 for >= 1 or NaN),
-    // then the pair is inserted (FUN_063222f0, 0631f865).
+    // The same clamp (NaN -> 1.0), then a unique insert (FUN_063222f0).
     float Value = Delta;
     if (!(Value < 1.0f))
         Value = 1.0f;
@@ -411,36 +393,28 @@ bool __cdecl Reputation::IsStoryFaction(unsigned GroupId)
 
 void __cdecl Reputation::set(TString<16> const& Name, Relation* const Rels, unsigned Count)
 {
-    // .text:0631f260-0631f3ea. Id = MakeId(Name.Data), zero-extended (0631f289-0631f290), looked
-    // up in the group registry DAT_064018ec (FUN_06301640).
+    // .text:0631f260.
     unsigned const Id = MakeId(Name.Data);
     std::map<unsigned, FGroup>::iterator It = GGroups.find(Id);
     if (It != GGroups.end())
     {
-        // 0631f2be-0631f2d0: an existing group's feelings map is erased(begin, end).
         It->second.Feelings.clear();
     }
     else
     {
-        // 0631f2da-0631f394: a new record is built on the stack -- only its nickname's Length
-        // (local_80 = 0) and first character (local_7c = 0) are written, the feelings map is
-        // constructed (FUN_06322280) -- copied into the pair {Id, record} (FUN_06322070) and
-        // inserted (FUN_063225b0). The new group therefore has an EMPTY nickname, not Name.
-        // Retail UB: IdsName/IdsInfo/IdsShortName (+0x14/+0x18/+0x1c of the stack record) are
-        // never written and carry stack garbage into the registry; the port value-initialises
-        // the record, so they are 0.
+        // The new group has an EMPTY nickname, not Name. Retail UB: IdsName/IdsInfo/
+        // IdsShortName (+0x14/+0x18/+0x1c) carry stack garbage into the registry; the port
+        // value-initialises them to 0.
         FGroup Record = FGroup();
         Record.Nickname.Length = 0;
         Record.Nickname.Data[0] = '\0';
         It = GGroups.insert(std::pair<unsigned const, FGroup>(Id, Record)).first;
     }
 
-    // 0631f397-0631f3d1: each relation is INSERTED (FUN_063222f0, a unique insert), so for a
-    // repeated GroupId in Rels the first value wins.
-    // Retail UB: the loop at 0631f3b0 has no exit -- after the `Count == 0` test (0631f39e JBE)
-    // it advances ESI by 8 and jumps back unconditionally (0631f3d1 `eb dd`), reading past
-    // Rels until the read faults. The port stops after Count entries, which is what the
-    // `Count` parameter and the 0631f39e test describe.
+    // Unique inserts: for a repeated GroupId in Rels the first value wins.
+    // Retail UB: the loop at 0631f3b0 has no exit -- after the Count == 0 test it jumps back
+    // unconditionally, reading past Rels until the read faults. The port stops after Count
+    // entries.
     if (Count == 0)
         return;
     std::map<unsigned, float>& Feelings = It->second.Feelings;

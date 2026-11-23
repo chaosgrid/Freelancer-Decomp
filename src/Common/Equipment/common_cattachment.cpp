@@ -4,10 +4,9 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CAttachmentObj, CNonPhysAttachment, CPhysAttachment -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
-// common_cequip_internal.h (namespace CmnCequip). Engine instances are the IEngine's `void*`
-// instance handles; the attachments keep them as `long` ids, as retail does.
+// CAttachmentObj, CNonPhysAttachment, CPhysAttachment. Declared in common_cequip.h; helpers
+// shared with the sibling TUs are in common_cequip_internal.h (namespace CmnCequip). Engine
+// instances are IEngine `void*` handles; the attachments keep them as `long` ids, as retail does.
 #include "common_cequip.h"
 #include "x86math.h"
 
@@ -25,9 +24,7 @@ using namespace CmnCequip;
 
 namespace
 {
-    // FUN_0628f700 (VC6 vector<FPartMapEntry>::_Insert_n on CObject+0x64). Every call site
-    // (CNonPhysAttachment::Connect 062939a2, EnableCollisions 0629382e) inserts one element at
-    // _Last, i.e. a push_back onto CObject::PartMap.
+    // FUN_0628f700 (VC6 vector _Insert_n); every call site inserts one element at the end.
     void AppendPartMapEntry(CObject* Owner, unsigned PartId, long InstanceId, bool bShieldPart)
     {
         FPartMapEntry Entry;
@@ -37,17 +34,16 @@ namespace
         Owner->PartMap.push_back(Entry);
     }
 
-    // 0629386c (EnableCollisions(false)): the first PartMap entry for InstanceId is erased (tail
-    // shifted down one slot) and its shield byte handed back; false when there is none.
+    // Inlined in EnableCollisions(false): the first entry for InstanceId is erased and its
+    // shield byte handed back; false when there is none. No null check on Owner.
     bool RemovePartMapEntryByInstance(CObject* Owner, long InstanceId, unsigned char& OutFlag)
     {
-        // No null check: retail 0629383f reads Owner+0x68 directly.
         for (std::vector<FPartMapEntry>::iterator It = Owner->PartMap.begin(); It != Owner->PartMap.end(); ++It)
         {
             if (It->EngineInstanceId == InstanceId)
             {
                 OutFlag = It->bShieldPart;
-                Owner->PartMap.erase(It);   // shift the tail down one slot, _Last -= 0xc
+                Owner->PartMap.erase(It);
                 return true;
             }
         }
@@ -68,21 +64,18 @@ namespace
     };
     static_assert(sizeof(FHardpointData) == 0x48, "FHardpointData 0x48");
 
-    // .text:062942b0..062942f1 (and the copy at 06294326): wrap a limit range into [0, 360) by
-    // whole steps of the double 6.2831854820251465 (DAT_0639c9e0); bounds DAT_0639c430 0.0 and
-    // DAT_0639c9d8 360.0. Kept on the x87 stack in retail, so double here.
+    // Inlined twice in FUN_062940c0. Retail quirk: the range is wrapped against 360 (degrees,
+    // DAT_0639c9d8) in steps of 2pi (DAT_0639c9e0). Kept on the x87 stack, so double here.
     double WrapLimitRange(double Range)
     {
-        // TEST AH,0x5 + JP: falls into the loop only while C0 is set (Range < 0).
         while (Range < 0.0)
             Range += 6.2831854820251465;
-        // TEST AH,0x1 + JNZ skips when Range < 360; JZ loops while Range >= 360.
         while (Range >= 360.0)
             Range -= 6.2831854820251465;
         return Range;
     }
 
-    // Retail FUN_062940c0 (.text:062940c0..06294459, cdecl). Connects ChildInst's ChildHp to
+    // FUN_062940c0 (cdecl). Connects ChildInst's ChildHp to
     // ParentInst's ParentHp. When both hardpoints are revolute (type 2) it builds a revolute
     // joint (narrower of the two limit ranges, orientation = parent * child, axis = child axis in
     // that frame) through IEngine::CreateJoint; otherwise IHardpoint::ConnectHardpoints. Returns
@@ -92,14 +85,14 @@ namespace
                                              char const* ChildHp)
     {
         unsigned long* Result = nullptr;
-        void* ParentHandle = DALib::Engine->GetInstanceArchetype((void*)ParentInst); // +0x64
+        void* ParentHandle = DALib::Engine->GetInstanceArchetype((void*)ParentInst);
         if (ParentHandle != (void*)-1)
         {
             FHardpointKey ParentKey;
             ParentKey.Name = ParentHp;
             ParentKey.Crc = DACOM_CRC::GetCRC32(ParentHp);
             FHardpointData ParentData;
-            // IHardpoint+0xc; retail tests only AL.
+            // Retail tests only AL.
             if ((unsigned char)DALib::Hardpoint->GetHardpoint(ParentHandle, &ParentKey, &ParentData) != 0)
             {
                 void* ChildHandle = DALib::Engine->GetInstanceArchetype((void*)ChildInst);
@@ -113,7 +106,7 @@ namespace
                     {
                         if (ChildData.Type == 2 && ParentData.Type == 2)
                         {
-                            FJointRelative Joint;   // retail ESP+0x30 (after PUSH EBP)
+                            FJointRelative Joint;
                             Joint.Type = 2;
                             Joint.Field_0x54 = 0;  // retail: unwritten stack (see FJointRelative)
                             Joint.Field_0x58 = 0;
@@ -122,21 +115,20 @@ namespace
                             I3DMathEngine* Math = Acquire3DMathEngine();  // DAT_063fc114
                             Matrix Combined;
                             Math->MulMatrix((FMatrix&)Combined, (FMatrix const&)ParentData.Orient,
-                                            (FMatrix const&)ChildData.Orient); // +0x20
+                                            (FMatrix const&)ChildData.Orient);
                             Joint.Orient = Combined;
                             Vector Axis;
                             Math->TransformMatrix((FVector&)Axis, (FMatrix const&)Joint.Orient,
-                                                  (FVector const&)ChildData.Axis); // +0x2c
+                                                  (FVector const&)ChildData.Axis);
                             Joint.Axis = Axis;
 
-                            // 0x06294265: parent range; FCOM float 2pi + TEST AH,0x1 + JNZ:
-                            // range >= 2pi falls through and opens the limits to [-pi, pi]
-                            // (unordered sets C0 too, so a NaN range takes the wrap path).
+                            // A range >= 2pi opens the limits to [-pi, pi]; a NaN range takes
+                            // the wrap path.
                             double ParentRange = (double)ParentData.Max - ParentData.Min;
                             if (ParentRange >= 6.2831855f)
                             {
-                                ParentData.Min = -3.1415927f;  // 0xc0490fdb
-                                ParentData.Max = 3.1415927f;   // 0x40490fdb
+                                ParentData.Min = -3.1415927f;
+                                ParentData.Max = 3.1415927f;
                             }
                             else
                             {
@@ -152,8 +144,7 @@ namespace
                             {
                                 ChildRange = WrapLimitRange(ChildRange);
                             }
-                            // 0x06294366: FCOMP parent vs child, TEST AH,0x5 + JP: parent < child
-                            // falls through and keeps the parent limits, else the child's.
+                            // The narrower range's limits (the child's on a tie or NaN).
                             if (ParentRange < ChildRange)
                             {
                                 Joint.Min = ParentData.Min;
@@ -165,7 +156,7 @@ namespace
                                 Joint.Max = ChildData.Max;
                             }
                             DALib::Engine->CreateJoint((void*)ParentInst, (void*)ChildInst,
-                                                       (unsigned long const*)&Joint); // +0xbc
+                                                       (unsigned long const*)&Joint);
                         }
                         else
                         {
@@ -176,15 +167,15 @@ namespace
                             ParentConnectKey.Name = ParentHp;
                             ParentConnectKey.Crc = DACOM_CRC::GetCRC32(ParentHp);
                             DALib::Hardpoint->ConnectHardpoints((void*)ParentInst, &ParentConnectKey,
-                                                                (void*)ChildInst, &ChildConnectKey); // +0x18
+                                                                (void*)ChildInst, &ChildConnectKey);
                         }
-                        Result = DALib::Engine->GetInstanceRelative((void*)ChildInst); // +0xc4
+                        Result = DALib::Engine->GetInstanceRelative((void*)ChildInst);
                     }
                 }
-                DALib::Engine->ReleaseHandle(ChildHandle);   // +0x3c
+                DALib::Engine->ReleaseHandle(ChildHandle);
             }
         }
-        DALib::Engine->ReleaseHandle(ParentHandle);          // +0x3c
+        DALib::Engine->ReleaseHandle(ParentHandle);
         return Result;
     }
 }
@@ -198,8 +189,7 @@ CAttachmentObj::~CAttachmentObj()
 
 CNonPhysAttachment::CNonPhysAttachment()
 {
-    // 062937a0: +4 = -1, +8 = 0, byte +0xc = 0. Retail leaves CachedShieldFlag (+0xd)
-    // unwritten; the port zeroes it.
+    // FUN_062937a0. Deviation: retail leaves CachedShieldFlag (+0xd) unwritten; the port zeroes it.
     EngineInstanceId = -1;
     HpCrc = 0;
     bCollisions = 0;
@@ -208,7 +198,7 @@ CNonPhysAttachment::CNonPhysAttachment()
 
 CNonPhysAttachment::CNonPhysAttachment(const CNonPhysAttachment& Other)
 {
-    // 06292c00: +4, +8, byte +0xc, byte +0xd.
+    // FUN_06292c00
     EngineInstanceId = Other.EngineInstanceId;
     HpCrc = Other.HpCrc;
     bCollisions = Other.bCollisions;
@@ -217,7 +207,7 @@ CNonPhysAttachment::CNonPhysAttachment(const CNonPhysAttachment& Other)
 
 CNonPhysAttachment& CNonPhysAttachment::operator=(const CNonPhysAttachment& Other)
 {
-    // 06292c30: +4, +8, byte +0xc, byte +0xd; no self test.
+    // FUN_06292c30; no self test.
     EngineInstanceId = Other.EngineInstanceId;
     HpCrc = Other.HpCrc;
     bCollisions = Other.bCollisions;
@@ -227,11 +217,9 @@ CNonPhysAttachment& CNonPhysAttachment::operator=(const CNonPhysAttachment& Othe
 
 CNonPhysAttachment::~CNonPhysAttachment()
 {
-    // Listing 0x06292bf0: ICF-folded with ~CAttachmentObj -- the vtable store and RET, nothing
-    // else (the scalar deleting destructor LAB_06292c60 at vftable 0639c6cc slot 0 calls it).
-    // The engine instance is NOT destroyed here: on a FATE_STAY disconnect it stays a child of
-    // the owner's instance and keeps its PartMap entry (Connect appended one); it goes away
-    // with the owner's instance tree.
+    // FUN_06292bf0, ICF-folded with ~CAttachmentObj. The engine instance is not destroyed: on a
+    // FATE_STAY disconnect it stays a child of the owner's instance (with its PartMap entry) and
+    // goes away with the owner's instance tree.
 }
 
 long CNonPhysAttachment::GetRootIndex() const
@@ -241,7 +229,7 @@ long CNonPhysAttachment::GetRootIndex() const
 
 CObject* CNonPhysAttachment::GetPhysicsOwner() const
 {
-    // .text:062937c0..062937dc: only -1 means "no instance"; otherwise IEngine+0x80.
+    // FUN_062937c0: only -1 means "no instance".
     if (EngineInstanceId == -1)
         return nullptr;
     return (CObject*)DALib::Engine->GetInstanceUserData((void*)EngineInstanceId);
@@ -249,23 +237,21 @@ CObject* CNonPhysAttachment::GetPhysicsOwner() const
 
 void CNonPhysAttachment::EnableCollisions(bool bEnable)
 {
-    // Listing 0x337e0: nothing unless the state changes and there is an instance
-    // (0x062937eb / 0x062937f4).
-    if ((unsigned char)bEnable == bCollisions)   // 062937eb
+    // RVA 0x337e0: nothing unless the state changes and there is an instance.
+    if ((unsigned char)bEnable == bCollisions)
         return;
-    if (EngineInstanceId == -1)                  // 062937f4
+    if (EngineInstanceId == -1)
         return;
 
     CObject* Owner = GetPhysicsOwner();
     if (bEnable)
     {
-        // 0x06293815/0x06293820: the entry comes back with the cached shield byte.
+        // The entry comes back with the cached shield byte.
         AppendPartMapEntry(Owner, HpCrc, EngineInstanceId, CachedShieldFlag != 0);
     }
     else
     {
-        // 0x0629386c: the entry is removed and its shield byte cached; with no entry the cache
-        // keeps its value.
+        // With no entry the cache keeps its value.
         unsigned char RemovedFlag = 0;
         if (RemovePartMapEntryByInstance(Owner, EngineInstanceId, RemovedFlag))
             CachedShieldFlag = RemovedFlag;
@@ -275,16 +261,16 @@ void CNonPhysAttachment::EnableCollisions(bool bEnable)
 
 bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
 {
-    // Listing 0x062938c0..0x06293a51.
+    // FUN_062938c0
     Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
     EngineInstanceId = Arch->create_instance(nullptr);
-    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr); // +0x6c
+    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr);
     if (EngineInstanceId == -1)
         return false;
 
-    char const* ChildHp = Arch->HpChild.Value;                       // Arch+0x80
-    if (ConnectAttachedHardpoints(Equip->GetParentConnector(false),  // vt+0x64
-                                  Equip->GetParentHPName().Value,    // vt+0x60
+    char const* ChildHp = Arch->HpChild.Value;
+    if (ConnectAttachedHardpoints(Equip->GetParentConnector(false),
+                                  Equip->GetParentHPName().Value,
                                   EngineInstanceId, ChildHp) == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
@@ -294,14 +280,12 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     }
 
     HpCrc = DACOM_CRC::GetCRC32(Equip->GetParentHPName().Value);
-    void* ParentUser = DALib::Engine->GetInstanceUserData((void*)Equip->GetParentConnector(false)); // +0x80
-    DALib::Engine->SetInstanceUserData((void*)EngineInstanceId, ParentUser); // +0x7c
+    void* ParentUser = DALib::Engine->GetInstanceUserData((void*)Equip->GetParentConnector(false));
+    DALib::Engine->SetInstanceUserData((void*)EngineInstanceId, ParentUser);
 
-    // 0x062939a2: FUN_0628f700 = insert one {HpCrc, instance, flag byte 0} at the end of the
-    // parent's PartMap vector (+0x64 object, end = +0x6c).
     AppendPartMapEntry((CObject*)ParentUser, HpCrc, EngineInstanceId, false);
 
-    void* Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, (void*)-1);   // +0xd8
+    void* Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, (void*)-1);
     while (Child != (void*)-1)
     {
         DALib::Engine->SetInstanceUserData(Child, ParentUser);
@@ -313,16 +297,15 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
 
 CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
 {
-    // Listing 0x06293a60..0x06293cec.
+    // FUN_06293a60
     CObject* Debris = nullptr;
     if (bMakeDebris)
     {
         void* Inst = (void*)EngineInstanceId;
-        CObject* ParentObj = (CObject*)DALib::Engine->GetInstanceUserData(Inst); // +0x80
+        CObject* ParentObj = (CObject*)DALib::Engine->GetInstanceUserData(Inst);
         if (ParentObj != nullptr)
         {
-            // 0x06293a91..0x06293af8: erase the first PartMap entry whose PartId (hardpoint
-            // CRC) is HpCrc (tail shifted down one slot, _Last -= 0xc).
+            // Erase the first PartMap entry whose PartId (hardpoint CRC) is HpCrc.
             for (std::vector<FPartMapEntry>::iterator It = ParentObj->PartMap.begin();
                  It != ParentObj->PartMap.end(); ++It)
             {
@@ -334,26 +317,23 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
             }
         }
 
-        void* ParentInst = DALib::Engine->GetInstanceParent(Inst);                 // +0xd4
-        DALib::Engine->DestroyJoint(ParentInst, Inst);                             // +0xc0
+        void* ParentInst = DALib::Engine->GetInstanceParent(Inst);
+        DALib::Engine->DestroyJoint(ParentInst, Inst);
         Debris = CObject::Alloc(CObject::ClassEquipmentObj);
         Debris->open(Equip->Arch);
         IEngineInstance* const DebrisInstance = Debris;
-        DALib::Engine->SetInstanceTransform(Inst, DebrisInstance);                 // +0x70
+        DALib::Engine->SetInstanceTransform(Inst, DebrisInstance);
 
-        // 0x06293b53..0x06293c56. Retail first stores the CreateParms defaults (mass 1.0, default
-        // linear/angular damping) and then overwrites them; the values that reach BuildIVP_Real
-        // are: archetype mass, ZERO linear and angular damping (a zero Vector temporary is copied
-        // over the angular damping, re-checked in the raw bytes at 0x06293c18), the parent's
-        // system id, type 2, flag 0, collisions on, itoa(owner id, radix 0x18) and the
-        // archetype's rotation inertia when it has one. Pad27 is not written by retail.
+        // Retail stores the CreateParms defaults and then overwrites them: what reaches
+        // BuildIVP_Real is ZERO linear and angular damping (verified in the raw bytes), radix
+        // 0x18 for the name. Pad27 is not written by retail.
         PhySys::CreateParms Parms;
-        Parms.Mass = Equip->Arch->Mass;                        // Arch+0x20
+        Parms.Mass = Equip->Arch->Mass;
         Parms.LinearDamping = 0.0f;
         Parms.AngularDamping[0] = 0.0f;
         Parms.AngularDamping[1] = 0.0f;
         Parms.AngularDamping[2] = 0.0f;
-        Parms.CollisionGroupId = ParentObj->PhysicsSystemId;   // parent +0x50
+        Parms.CollisionGroupId = ParentObj->PhysicsSystemId;
         Parms.Type = 2;
         Parms.bFlag1c = 0;
         Parms.bEnableCollisions = 1;
@@ -364,10 +344,10 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
         Parms.Inertia.x = 0.0f;
         Parms.Inertia.y = 0.0f;
         Parms.Inertia.z = 0.0f;
-        if (Equip->Arch->bHasRotationInertia)                  // Arch+0x38
+        if (Equip->Arch->bHasRotationInertia)
         {
             Parms.bHasInertia = 1;
-            Parms.Inertia.x = Equip->Arch->RotationInertiaX;   // Arch+0x2c..+0x34
+            Parms.Inertia.x = Equip->Arch->RotationInertiaX;
             Parms.Inertia.y = Equip->Arch->RotationInertiaY;
             Parms.Inertia.z = Equip->Arch->RotationInertiaZ;
         }
@@ -390,7 +370,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
     }
     else
     {
-        // 0x06293cc0: FUN_0628a410(GetRootIndex()) (vtable+4).
+        // FUN_0628a410
         DetachInstanceInPlace(GetRootIndex());
     }
 
@@ -407,7 +387,7 @@ CPhysAttachment::CPhysAttachment()
 
 CPhysAttachment::CPhysAttachment(const CPhysAttachment& Other)
 {
-    // Common.dll.c 0x32cc0: a shallow pointer copy of EquipObject, no AddRef.
+    // RVA 0x32cc0: a shallow pointer copy, no AddRef.
     EquipObject = Other.EquipObject;
 }
 
@@ -434,7 +414,7 @@ CObject* CPhysAttachment::GetPhysicsOwner() const
 
 void CPhysAttachment::EnableCollisions(bool bEnable)
 {
-    // Common.dll.c 56086-56099 (0x33d60): only on a change of the physics collision state.
+    // RVA 0x33d60: only on a change of the physics collision state.
     if (EquipObject == nullptr)
         return;
     if (PhySys::GetCollisionState(EquipObject) != bEnable)
@@ -443,22 +423,19 @@ void CPhysAttachment::EnableCollisions(bool bEnable)
 
 bool CPhysAttachment::Connect(CAttachedEquip* Equip)
 {
-    // 06293d90..06293fc2 (RET 4).
+    // FUN_06293d90
     CEqObj* ParentObj = Equip->Owner;
     Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
 
-    // 06293d9e-06293ddc: a new equipment object, opened on the archetype (CObject slot
-    // +0x4c); create_instance writes its instance through IEngineInstance (the returned id is
-    // not stored); UpdateInstance(instance, 0, 0).
+    // create_instance writes the instance through IEngineInstance; the returned id is not stored.
     EquipObject = CObject::Alloc(CObject::ClassEquipmentObj);
     EquipObject->open(Arch);
     Arch->create_instance(EquipObject);
-    DALib::Engine->UpdateInstance((void*)EquipObject->EngineInstanceId, 0, nullptr); // +0x6c
+    DALib::Engine->UpdateInstance((void*)EquipObject->EngineInstanceId, 0, nullptr);
 
     if (EquipObject == nullptr)
     {
-        // 06293f90-06293fc2, then 06293f33: unreachable (EquipObject was dereferenced above).
-        // Retail reports the owner archetype's nickname and then calls CObject::Release on the
+        // Unreachable (EquipObject was dereferenced above). Retail then calls Release on the
         // null pointer.
         FDUMP(0x100001,
               "%s(%d) : *** ERROR: CAttachedEquip: Object (%s) failed to create attachment instance (Ignorable)\n",
@@ -468,15 +445,13 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
         return false;
     }
 
-    // 06293dea-06293e19: the child hardpoint (Arch+0x80) and the instance id are read first,
-    // then GetParentHPName (vt+0x60), then GetParentConnector(false) (vt+0x64).
+    // Retail evaluation order.
     char const* ChildHp = Arch->HpChild.Value;
     long const Inst = EquipObject->EngineInstanceId;
     char const* ParentHp = Equip->GetParentHPName().Value;
     long const ParentInst = Equip->GetParentConnector(false);
     if (ConnectAttachedHardpoints(ParentInst, ParentHp, Inst, ChildHp) == nullptr)
     {
-        // 06293f50-06293f8c.
         FDUMP(0x100001, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
               kCAttachedEquipSource, 0x2a5, Arch->HpChild.Value, Arch->DaArchetype.Value,
               Equip->GetParentHPName().Value);
@@ -485,15 +460,14 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
         return false;
     }
 
-    // 0x06293e29..0x06293ec2: mass 1.0, default damping, the owner's system id, type 2,
-    // flag 0, collisions OFF (+0x1d = 0, written last), itoa(owner id, radix 0x18), no inertia.
+    // Collisions start off (enabled after Attach below).
     PhySys::CreateParms Parms;
     Parms.Mass = 1.0f;
     Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
     Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Parms.CollisionGroupId = ParentObj->PhysicsSystemId;   // Owner+0x50
+    Parms.CollisionGroupId = ParentObj->PhysicsSystemId;
     Parms.Type = 2;
     Parms.bFlag1c = 0;
     Parms.bEnableCollisions = 0;
@@ -523,7 +497,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
 
 CObject* CPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
 {
-    // Listing 0x06293fd0..0x06294099.
+    // FUN_06293fd0
     CObject* Debris = nullptr;
     if (bMakeDebris)
     {
@@ -532,15 +506,15 @@ CObject* CPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
         Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
         Parms.AngularDamping = PhySys::DEFAULT_ANGULAR_DAMPING;
         Parms.Name[0] = '\0';
-        Parms.Mass = Arch->Mass;                         // 1.0f, then Arch+0x20
+        Parms.Mass = Arch->Mass;
         Parms.bHasInertia = 0;
         Parms.Inertia.x = 0.0f;
         Parms.Inertia.y = 0.0f;
         Parms.Inertia.z = 0.0f;
-        if (Arch->bHasRotationInertia)                   // Arch+0x38
+        if (Arch->bHasRotationInertia)
         {
             Parms.bHasInertia = 1;
-            Parms.Inertia.x = Arch->RotationInertiaX;    // Arch+0x2c..+0x34
+            Parms.Inertia.x = Arch->RotationInertiaX;
             Parms.Inertia.y = Arch->RotationInertiaY;
             Parms.Inertia.z = Arch->RotationInertiaZ;
         }

@@ -10,8 +10,7 @@
 
 bool MenuMpSessionIsReady(FServerInfo const* Server)
 {
-    // FUN_005accb0 (0x005accb0..0x005accc9): AL = 0; [arg+0x28] != 0 and [arg+0x98] != 0 ->
-    // AL = 1. No null test on the argument.
+    // FUN_005accb0. No null test on the argument.
     if (Server->bAddressValid == 0)
         return false;
     if (Server->bSessionValid == 0)

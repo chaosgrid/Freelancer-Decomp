@@ -13,9 +13,7 @@
 
 // ============================================================================
 // IVP_SurfaceBuilder_Pointsoup -- convex hull of a point cloud as one
-// IVP_Compact_Ledge (Common.dll .text:0636b770-0636c9f2).
-// (2026-10-08, claude-code:cmn-ivp4b: rewritten from the listing; the former
-// direct qhull-to-ledge shortcut is gone.)
+// IVP_Compact_Ledge (Common.dll 0636b770-0636c9f2).
 //
 // Retail path: deduplicated points -> qhull (vendored, src/qhull) -> one
 // IVP_SurMan_PS_Plane per facet -> IVP_Template_Polygon ->
@@ -51,7 +49,7 @@ public:
     // 0636c9a0 (cdecl).
     static IVP_Compact_Ledge* convert_pointsoup_to_compact_ledge(IVP_U_Vector<IVP_U_Float_Point>* Points);
 
-    // 0636c7e0 (.text:0636c7e0-0636c7fc), tail-jumped from PhySys::Shutdown:
+    // 0636c7e0, tail-jumped from PhySys::Shutdown:
     // frees the single-triangle template ledge DAT_0658b008 (FUN_06343ff0)
     // when set and clears it.
     static void Cleanup();

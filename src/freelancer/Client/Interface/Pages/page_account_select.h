@@ -12,15 +12,12 @@
 // FUN_005726c0, atexit LAB_00573570 -> dtor FUN_00573470). vftables: main 0x005e2ef4, IUIPage
 // face (+0x7c) 0x005e2ed8, Event::Handler face (+0x80) 0x005e2ed0 (slot 0 LAB_005733b0).
 //
-// Call path: IntroFocus EnterState case 6 (0x00574c1a) loads the page descriptor (+0x8c),
-// calls slot 9 Create(0, 0) and makes this the active page (+0x228). IntroFocus::Update poll
-// index 2 (0x00574021) moves to the state in +0xb4 (DAT_0067aac4) and clears it. IntroFocus
-// Exit calls slot 10 (0x00573e81).
+// IntroFocus EnterState case 6 loads the page descriptor (+0x8c), calls Create(0, 0) and makes
+// this the active page (+0x228); IntroFocus::Update moves to the state in +0xb4 (DAT_0067aac4)
+// and clears it; IntroFocus Exit calls Destroy.
 //
-// Retail layout past MasterWin (+0x00..+0x8b): +0x8c FUiPageDesc, +0xb4 Result, +0xb8 slide
-// parameter (double), +0xc0 leaving, +0xc4 leave direction, +0xd4 the box's home position,
-// +0xe0..+0xf0 the five widgets, +0xf4 / +0x100 two RenderDisplayLists. The port's MasterWin
-// has no retail byte layout (see page_options.h), so the members below keep only the order.
+// The offsets below are retail's (MasterWin is +0x00..+0x8b). The port's MasterWin has no
+// retail byte layout (see page_options.h), so the members keep only the order.
 
 #include "common_text.h" // RenderDisplayList
 #include "Interface/ui_page.h"
@@ -67,10 +64,9 @@ public:
     RenderDisplayList Text601eb;   // +0x100 -- StyleNode 0x9ca4 + IDS 0x601eb; no reader here
 
 private:
-    // The leave sequence ProcessMessage and OnEvent spell out inline, identical at all four sites
-    // (0x005730fd.., 0x0057322d.., 0x005732dd.., 0x005733bc..): leaving from SlideT 0, both
-    // buttons inert and their surfaces frozen, the edit field and the explanation hidden, the
-    // slide sound, the three ToolTips off, then the direction.
+    // The leave sequence retail inlines at four sites in ProcessMessage and OnEvent: leaving from
+    // SlideT 0, both buttons inert and their surfaces frozen, the edit field and the explanation
+    // hidden, the slide sound, the three ToolTips off, then the direction.
     void BeginLeave(int Direction);
     // The key check both "SelectServer" (0x3004 / 0x3ea) and 0xf004 spell out: the typed key
     // lower-cased and narrowed into CPlayerAccount::SetTextKey; refused -> the 0x76a error and

@@ -51,15 +51,15 @@ float GetLetterboxAmount();
 float GetLetterboxTarget();
 
 // FUN_0041a420. Advances the amount and, when anything changed, recomputes the camera's
-// viewport. Called once a frame from FGameCamera's update slot (0x0051b4b0) with the capped
+// viewport. Called once a frame from FGameCamera's update slot (FUN_0051b4b0) with the capped
 // frame time. A null camera advances the amount and nothing more.
 void UpdateLetterbox(FSpaceCamera* Cam, float DeltaSeconds);
 
 // FUN_0041a140. The room camera's twin of the above: the same amount step and bar geometry, but
 // the room camera (an FRoomCamera, room runtime +0x500) has no viewport setter, so its viewport,
 // half extents, tangents, half-angles, aspect and side planes are rebuilt inline from its own
-// slot-6 half-angle. Callers: the Gameflow tick (0x00558b66) with the frame time, the Gameflow
-// letterbox reset FUN_00558d60 (0x00558d74) with 0, and the menu's intro tick (0x0057426c).
+// slot-6 half-angle. Callers: the Gameflow tick with the frame time, the Gameflow letterbox
+// reset FUN_00558d60 with 0, and the menu's intro tick.
 // A null camera advances the amount and nothing more. Shares DAT_006166b8 with UpdateLetterbox.
 void UpdateRoomLetterbox(FRoomCamera* Cam, float DeltaSeconds);
 
@@ -70,6 +70,6 @@ void UpdateRoomLetterbox(FRoomCamera* Cam, float DeltaSeconds);
 //
 // At Amount 0 the divisor is the surface's own aspect, the division gives the height back and
 // the bars are zero. At Amount 1 the divisor is 1.85 and what is left is the 1.85 rectangle,
-// centred. Retail computes this inline at 0x0041a4e9; it is a function here so the harness can
-// pin it down without driving a camera.
+// centred. Retail computes this inline; it is a function here so the harness can pin it down
+// without driving a camera.
 int GetLetterboxBarHeight(float Amount);

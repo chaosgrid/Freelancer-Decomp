@@ -23,7 +23,7 @@ namespace
     unsigned long const kCompoundNoPlayback = 0xFFFFFFFFu;
 
     // DAT_0066d11c -- this file's 3DMathEngine, acquired (FUN_005b73e0) on first use by each of
-    // the eight bodies that read it (0x00451515 .. 0x00451d17; nothing else references it).
+    // the eight bodies that read it.
     I3DMathEngine* G_ThornCompoundMath = nullptr;
 
     I3DMathEngine* ThornCompoundMath()
@@ -53,8 +53,7 @@ namespace
         return *reinterpret_cast<Matrix const*>(&Value);
     }
 
-    // The transposed copy LAB_004517b0 / LAB_00451930 / LAB_00451a00 build with nine FLD / FSTP
-    // pairs: row r of the result is column r of Source.
+    // The transposed copy LAB_004517b0 / LAB_00451930 / LAB_00451a00 build.
     Matrix Transposed(Matrix const& Source)
     {
         Matrix Out;
@@ -115,10 +114,7 @@ namespace
     }
 }
 
-// FUN_004510f0. Base ctor, the summary's ctor, then +0x6c 0, +0x70 / +0x74 / +0x78 -1, 0xc dwords
-// of Offset, Local identity (0x004511a3..0x004511c8), the sixteen slots {-1, -1, 0}
-// (0x004511e4 loop), and HardpointSummary::clear. +0x7c is not written. (0x004511d0..0x004511d8
-// also zero a stack vector nothing reads.)
+// FUN_004510f0. +0x7c (bUseScene) is not written.
 FThornCompound::FThornCompound(Csys const& ScriptFrame, Csys const& InOffset, FGfScript* InOwner,
                                FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -147,13 +143,10 @@ FThornCompound::~FThornCompound()
 {
 }
 
-// FUN_004513b0 (stdcall facet, RET 8). No AnimScript -> 0. The first idle slot takes the
-// descriptor's unique id and is marked playing; IAnimation2 slot 9 plays the animation on the
-// instance and slot 11 evaluates it (event flags, start_time, time_scale, trans_time, weight,
-// trans_scale, 0) unless the playback id is -1. Always 0.
+// FUN_004513b0. Always 0.
 //
-// RETAIL DEFECT KEPT: with all sixteen slots busy the slot index stays -1 (0x004513c8 OR EBX,-1)
-// and the three stores go to [-1] -- EventId[-1] is Playback[15] (+0x11c), bPlaying[-1] the top
+// RETAIL DEFECT KEPT: with all sixteen slots busy the slot index stays -1 and the three stores
+// go to [-1] -- in retail's layout EventId[-1] is Playback[15] (+0x11c), bPlaying[-1] the top
 // byte of EventId[15] (+0x15f), Playback[-1] Local.Orient's last element (+0xdc).
 GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
 {
@@ -187,9 +180,8 @@ GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
     return GR_OK;
 }
 
-// FUN_00451450 (stdcall facet, RET 8). No AnimScript -> 0. The playing slot with the event's
-// unique id (index -1 when none: retail then tests bPlaying[-1], the top byte of EventId[15]) is
-// stopped (IAnimation2 slot 14), its playback destroyed (slot 10) and reset. Always 0.
+// FUN_00451450. With no matching slot the index stays -1 and retail tests bPlaying[-1], the top
+// byte of EventId[15]. Always 0.
 GENRESULT DACOM_API FThornCompound::StopMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -217,8 +209,7 @@ GENRESULT DACOM_API FThornCompound::StopMotion(void* DescArg)
     return GR_OK;
 }
 
-// FUN_00451e50 (stdcall facet, RET 8): FUN_0044fdd0(+0x1c, +0x2c, +0x20, +0x30), then the
-// Owner's FUN_0044f9a0(+0x1c, 1). Always 0.
+// FUN_00451e50.
 GENRESULT DACOM_API FThornCompound::ConnectHardpoints(void* DescArg)
 {
     FThornConnectEventDesc const* Desc = static_cast<FThornConnectEventDesc const*>(DescArg);
@@ -228,7 +219,7 @@ GENRESULT DACOM_API FThornCompound::ConnectHardpoints(void* DescArg)
     return GR_OK;
 }
 
-// FUN_00451e90: the disconnect twin, FUN_0044ff30 and 0.
+// FUN_00451e90.
 GENRESULT DACOM_API FThornCompound::DisconnectHardpoints(void* DescArg)
 {
     FThornConnectEventDesc const* Desc = static_cast<FThornConnectEventDesc const*>(DescArg);
@@ -238,13 +229,8 @@ GENRESULT DACOM_API FThornCompound::DisconnectHardpoints(void* DescArg)
     return GR_OK;
 }
 
-// LAB_00451b90 (stdcall, RET 0x10). World-space answer (no script-frame conversion):
-//   0 ROOT, or 2 PART named "root" / "" -> the instance's position / orientation, -1 without one;
-//   2 with any other name -> "sub_part ... not written" ERROR, 0 (the Petal-bug WARNING branch
-//     needs an empty name, which the second stricmp has already taken);
-//   1 HARDPOINT -> the named hardpoint of Hardpoints (-1 when unknown): its instance's frame
-//     applied to the hardpoint's local position and orientation;
-//   anything else -> the same ERROR, 0.
+// LAB_00451b90. A world-space answer (no script-frame conversion). The Petal-bug WARNING branch
+// is unreachable: it needs an empty name, which the second stricmp has already taken.
 GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const* Name,
                                                       float* OutXform12)
 {
@@ -309,9 +295,7 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
     return GR_OK;
 }
 
-// LAB_00451660 (stdcall, RET 8). Local takes the transform; the instance goes to
-// from_frame(Local.Orient * Offset.Pos + Local.Pos) and from_frame(Local.Orient *
-// Offset.Orient), position first, then Engine slot 27 (0, 0). Always 0.
+// LAB_00451660. Position first, then orientation, then Engine slot 27.
 GENRESULT DACOM_API FThornCompound::SetTransform(float const* Transform12)
 {
     Transform const* In = reinterpret_cast<Transform const*>(Transform12);
@@ -329,7 +313,7 @@ GENRESULT DACOM_API FThornCompound::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_00451a00 (stdcall, RET 8): the script-frame transform LocalFromInstance recovers.
+// LAB_00451a00.
 GENRESULT DACOM_API FThornCompound::GetTransform(float* OutTransform12)
 {
     Transform* Out = reinterpret_cast<Transform*>(OutTransform12);
@@ -341,7 +325,7 @@ GENRESULT DACOM_API FThornCompound::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_004514f0 (geo facet, RET 8): Local.Pos only, then the SetTransform position path.
+// LAB_004514f0.
 GENRESULT DACOM_API FThornCompound::SetPosition(float* Position)
 {
     Local.Pos = *reinterpret_cast<Vector const*>(Position);
@@ -353,7 +337,7 @@ GENRESULT DACOM_API FThornCompound::SetPosition(float* Position)
     return GR_OK;
 }
 
-// LAB_004515b0 (geo facet, RET 8): Local.Orient only, then the orientation path.
+// LAB_004515b0.
 GENRESULT DACOM_API FThornCompound::SetOrientation(float* Orient9)
 {
     Local.Orient = *reinterpret_cast<Matrix const*>(Orient9);
@@ -364,7 +348,7 @@ GENRESULT DACOM_API FThornCompound::SetOrientation(float* Orient9)
     return GR_OK;
 }
 
-// LAB_004517b0 (geo facet, RET 8).
+// LAB_004517b0.
 GENRESULT DACOM_API FThornCompound::GetPosition(float* OutPosition)
 {
     Vector Pos;
@@ -374,7 +358,7 @@ GENRESULT DACOM_API FThornCompound::GetPosition(float* OutPosition)
     return GR_OK;
 }
 
-// LAB_00451930 (geo facet, RET 8). Only the orientation half: no position is read.
+// LAB_00451930. Only the orientation half: no position is read.
 GENRESULT DACOM_API FThornCompound::GetOrientation(float* OutOrient9)
 {
     void* const Inst = InstancePointer(Instance);
@@ -388,9 +372,7 @@ GENRESULT DACOM_API FThornCompound::GetOrientation(float* OutOrient9)
     return GR_OK;
 }
 
-// FUN_00451290 (slot 14). The summary destroyed, every playing slot stopped (IAnimation2 14),
-// destroyed (10) and reset, all sixteen reset again (FUN_00451380), and the room object, when
-// there is one, back to light group 3, layer 0, render mode 0, +0x14 0.
+// FUN_00451290 (slot 14).
 void FThornCompound::Stop()
 {
     Hardpoints.destroy();

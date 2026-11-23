@@ -12,10 +12,7 @@
 // WINFACTORY<NN_Exit> DAT_0066db08 "NN_Exit": static init LAB_00471740 (FUN_00471fb0 + atexit
 // LAB_00471760 -> FUN_00579380), Create FUN_00472020 (operator_new(0x350)).
 //
-// vftable 0x005d035c (45 slots) -- WinControl's with these overrides:
-//   0 FUN_00471770 (scalar deleting dtor around FUN_00471790), 9 FUN_00471810 Create,
-//   11 FUN_00471e00 Update, 13 FUN_00471b60 Draw, 42 LAB_00471cb0 SetProperty.
-// IDataViewOwner face +0x7c vftable 0x005d0350; Event::Handler face +0x32c vftable 0x005d0348
+// vftable 0x005d035c (45 slots), scalar deleting dtor FUN_00471770. IDataViewOwner face +0x7c vftable 0x005d0350; Event::Handler face +0x32c vftable 0x005d0348
 // (LAB_00471b90).
 //
 // Layout:
@@ -79,8 +76,8 @@ static_assert(offsetof(NnExit, ButtonBox) == 0x340, "NN_Exit +0x340 button boxes
 static_assert(offsetof(NnExit, ButtonText) == 0x348, "NN_Exit +0x348 button texts");
 
 // FUN_00471e80 (cdecl) -- the player's ship is gone: a mission message of kind 5 (the story star,
-// FUN_004b9c60) whose FmtStr is the bare ids 0x723. Caller: the space state's frame 0x0054b1e2,
-// once per loss (space_state.cpp, latched in its +0x09).
+// FUN_004b9c60) whose FmtStr is the bare ids 0x723. Caller: the space state's frame, once per
+// loss (space_state.cpp, latched in its +0x09).
 void NnExitPostShipLostMessage();
 
 // FUN_00471f30 (cdecl) -- unless an NN_Exit is registered, build one through the factory, centre

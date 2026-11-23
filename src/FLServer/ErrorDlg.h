@@ -17,7 +17,7 @@ public:
 	CErrorDlg(CWnd* Parent = NULL);   // .text:00401290
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);   // .text:00401330 (empty: RET 4)
+	virtual void DoDataExchange(CDataExchange* DX);   // .text:00401330 (empty in retail)
 
 	DECLARE_MESSAGE_MAP()
 };

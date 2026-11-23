@@ -4,8 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Retail FUN_00484090 — dealer equipment stat / tip text.
-// Listing: freelancer.exe.txt 0x00484090–0x004854d8. Table: docs/re/dealer_equip_stats.md
+// Retail FUN_00484090 — dealer equipment stat / tip text. Table: docs/re/dealer_equip_stats.md
 
 #include "NeuroNet/Economy/dealer_equip_stats.h"
 
@@ -286,7 +285,7 @@ namespace
         float ExplEnergy = 0.0f;
         LoadExplosionDamage(Mun->ExplosionArch, ExplHull, ExplEnergy);
 
-        // Listing adds munition hull into the explosion-hull scratch before energy uses it.
+        // Retail adds munition hull into the explosion-hull scratch before energy uses it.
         const float HullTotal = ExplHull + Mun->HullDamage;
         const float EnergyTotal =
             EnergyFromHullAndEnergy(HullTotal, ExplEnergy + Mun->EnergyDamage);
@@ -295,7 +294,7 @@ namespace
         EmitIntStat(OutRdl, 0x6d0, EnergyTotal, bEmitLabels, bEmitValues);
 
         // Range lines. MuzzleVelocity kept separately; guided path leaves SeekerRange on the
-        // FPU for the first displayed value (listing 0x004846f3–0x00484753).
+        // FPU for the first displayed value.
         const float MuzzleVelocity = Gun->MuzzleVelocity;
         const float SimpleRange = Mun->Lifetime * MuzzleVelocity;
 

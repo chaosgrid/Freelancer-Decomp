@@ -20,7 +20,7 @@ FPacketSerializer* GRemotePacketSerializer = nullptr;
 }
 
 // =================================================================================================
-// Base Classes (local stubs to avoid rpclocal dependency)
+// Base classes (RemoteClient's own copies; it does not link rpclocal)
 // =================================================================================================
 
 FRpcRefObject::~FRpcRefObject() {}
@@ -44,7 +44,7 @@ FPacketBase::FPacketBase(unsigned int InPacketId) {
 FPacketBase::~FPacketBase() {}
 
 unsigned int FPacketBase::Encode(unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) {
-    // 06b4e7b0: inline entry, cached header commit, Error=0, OutLength, stats, 0.
+    // Retail 06b4e7b0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     return Stream.FinishEncodeSuccess(OutLength);
@@ -55,10 +55,6 @@ unsigned int FPacketBase::Decode(const unsigned char* Buffer, unsigned int Size,
 }
 
 void FPacketBase::Dump(std::ostream& Out) const {}
-
-// =================================================================================================
-// Packet Classes Implementation
-// =================================================================================================
 
 #if 0 // Unfinished COMMON packet classes remain disabled.
 

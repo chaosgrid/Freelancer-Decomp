@@ -58,13 +58,12 @@ namespace
 
     char const kHudCpp[] = "E:\\FL\\Scratch\\Source\\Client\\space\\HUD.cpp"; // .rdata 0x005d6dcc
 
-    // 0x004c868d .. 0x004c86b1 (and the same lines in FUN_004c7cb0): the player's IObjRW from
-    // FUN_0054baf0, `+ 0xc` tested against null, the CEqObj* at [+0x10], and the ship class
-    // test ([CObject+0x4c] & 0x503) == 0x503.
+    // Inlined in HUD_Steer::Render and FUN_004c7cb0: the player's IObjRW, `+ 0xc` tested
+    // against null, the CEqObj* at [+0x10], and the ship class test.
     CEqObj* HudPlayerShip()
     {
         void* const ObjRW = GetPlayerObjRW();
-        // `ADD EAX,0xc / TEST EAX,EAX`: an IObjRW* of -0xc is the other "no object" value.
+        // Retail tests `ObjRW + 0xc`, so an IObjRW* of -0xc is the other "no object" value.
         if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(static_cast<intptr_t>(-0xc)))
             return nullptr;
         CEqObj* const EqObj =
@@ -76,7 +75,7 @@ namespace
         return EqObj;
     }
 
-    // The cursor Y block repeated at 0x004c8745 and 0x004c8885: with the mouse-flight lock on
+    // The cursor Y block Render repeats twice: with the mouse-flight lock on
     // (FUN_0045a470 clear and DAT_0067354c set) or the hold timer past 0.25s, "INVERSE MOUSE"
     // (option 0x17) flips the cursor against the laid-out surface height DAT_00610854.
     int HudSteerCursorY(int CursorY)
@@ -90,8 +89,7 @@ namespace
 
 void HudVec3ScaleByInverse(float* Out, float const* In, float Length)
 {
-    // FUN_004c8b10: FLD 1.0 / FDIV Length / FST float -- Z uses the unrounded reciprocal, Y and
-    // X the float re-read.
+    // FUN_004c8b10: Z uses the unrounded reciprocal, Y and X the reciprocal rounded to float.
     double const InvExact = 1.0 / static_cast<double>(Length);
     float const Inv = static_cast<float>(InvExact);
     float const Z = static_cast<float>(InvExact * In[2]);
@@ -104,7 +102,7 @@ void HudVec3ScaleByInverse(float* Out, float const* In, float Length)
 
 void HudMatrixRotationY(float* M, float Angle)
 {
-    // FUN_004c8b40: the zeros and the 1, then cos / sin (FCOS / FSIN of the same argument).
+    // FUN_004c8b40.
     double const C = cos(static_cast<double>(Angle));
     double const S = sin(static_cast<double>(Angle));
     M[1] = 0.0f;
@@ -152,7 +150,7 @@ void HudMatrixRotateRows01(float* M, float Angle)
 
 HUDItem::HUDItem()
 {
-    // The inlined constructor (0x004c84de .. 0x004c8516, 0x004c8de3 .. 0x004c8e05).
+    // Always inlined in retail; the second set(nullptr) is the inlined SetTarget(0).
     Name.Length = 0;
     Name.Data[0] = '\0';
     Target.set(nullptr);
@@ -163,8 +161,7 @@ HUDItem::HUDItem()
 
 HUDItem::~HUDItem()
 {
-    // FUN_004c8630: `if (+0x28) set_pointer(0)` -- BaseWatcher::set(0); the member's own
-    // destructor then finds nothing to unlink.
+    // FUN_004c8630; the member's own destructor then finds nothing to unlink.
     if (Target.target() != nullptr)
         Target.set(nullptr);
 }
@@ -194,8 +191,7 @@ void HUDItem::Shutdown()
 
 void HUDItem::SetTarget(IObjRW* NewTarget)
 {
-    // FUN_004c81a0: the Watchable is IObjRW + 8 (null stays null); set_pointer only when it
-    // differs from the one watched, which is BaseWatcher::set.
+    // FUN_004c81a0: the Watchable is IObjRW + 8 (null stays null).
     Watchable const* const Watched = (NewTarget == nullptr)
         ? nullptr
         : reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char const*>(NewTarget) + 8);
@@ -237,13 +233,11 @@ void HUDItem::Slot10()
 
 void HUDItem::ShowToolTip()
 {
-    // FUN_004c81d0. Nothing without a tool-tip id (0x004c81f3).
+    // FUN_004c81d0.
     if (ToolTipIds == 0)
         return;
 
-    // 0x004c81f9 .. 0x004c8250: the hover record on the stack -- caption null, the Font::String
-    // built (FUN_004144b0) -- the record's constructor -- then +0x04 = 0, +0x00 = -1, +0x44 = 0
-    // and the (null) caption emptied, +0x60 = 0, then +0x04 = the id and +0x00 = this + id (the
+    // The record's fields are reset, then filled: +0x04 = the id and +0x00 = this + id (the
     // ToolTip's "same source" key).
     FToolTipHoverInfo Info;
     Info.IdsAlt = 0;
@@ -253,10 +247,6 @@ void HUDItem::ShowToolTip()
     Info.IdsAlt = ToolTipIds;
     Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this) + ToolTipIds);
     NnToolTipFeedHover(&Info); // FUN_004be370
-
-    // 0x004c8258 .. 0x004c82d7: the record's teardown (~FToolTipHoverInfo) -- FUN_004144f0,
-    // the child releases (FUN_00418f70 per slot), the child vector freed, then the caption
-    // buffer (null here).
 }
 
 // ============================================================================================
@@ -265,8 +255,7 @@ void HUDItem::ShowToolTip()
 
 HUDItem_Factory::HUDItem_Factory(char const* Name)
 {
-    // The inlined base constructor (e.g. 0x004cd270 .. 0x004cd2cb): +0x08 = 0, +0x0c = 0,
-    // +0x04 = 0, the name (a null name leaves it empty), then FUN_004c72b0.
+    // Always inlined in retail. A null name leaves it empty.
     SectionName.Length = 0;
     SectionName.Data[0] = '\0';
     Next = nullptr;
@@ -276,7 +265,7 @@ HUDItem_Factory::HUDItem_Factory(char const* Name)
 
 HUDItem_Factory::~HUDItem_Factory()
 {
-    // LAB_004c8350: the base vptr back, then FUN_004c72e0's body inlined.
+    // LAB_004c8350 (FUN_004c72e0's body inlined).
     HudElementFactoryListRemove(this);
 }
 
@@ -412,8 +401,7 @@ void HudElementListShutdown()
     }
     G_HudItemTail = nullptr;
     G_HudItemHead = nullptr;
-    // 0x004c7810: JMP FUN_00425a20 on DAT_00673520.
-    G_HudShapeDB.Clear();
+    G_HudShapeDB.Clear(); // FUN_00425a20 (tail jump)
 }
 
 void SetHudIniPath(char const* Path)
@@ -454,7 +442,6 @@ void LoadHudElementsFromIni()
     INI_Reader Reader;
     if (!Reader.open(G_HudIniPath, false))
     {
-        // 0x004c75a0.
         FDUMP(0x100002, "%s(%d) : *** WARNING: hud file not found '%s'\n", kHudCpp, 0x13d,
               G_HudIniPath);
     }
@@ -468,25 +455,23 @@ void LoadHudElementsFromIni()
                 {
                     if (Reader.is_value("shapes"))
                     {
-                        // 0x004c747a: FUN_00425b30 on DAT_00673520 against DALib::Data.
-                        G_HudShapeDB.Load(Reader.get_value_string(), DALib::Data);
+                        G_HudShapeDB.Load(Reader.get_value_string(), DALib::Data); // FUN_00425b30
                     }
                     else if (Reader.is_value("static_txm"))
                     {
-                        // 0x004c74a1: FUN_004255c0 on DAT_00673570.
-                        TextureRefLoad(&G_HudStaticTexture, Reader.get_value_string());
+                        TextureRefLoad(&G_HudStaticTexture, Reader.get_value_string()); // FUN_004255c0
                     }
                     else if (Reader.is_value("static_blend"))
                     {
-                        // 0x004c74c1: get_value_float(0), ftol.
+                        // Read as a float, then truncated.
                         G_HudStaticBlend = static_cast<int>(Reader.get_value_float(0));
                     }
                 }
                 continue;
             }
 
-            // 0x004c74e0: every factory whose name matches the header is asked in chain order;
-            // the first one that returns an element wins.
+            // Every factory whose name matches the header is asked in chain order; the first one
+            // that returns an element wins.
             HUDItem* Item = nullptr;
             for (HUDItem_Factory* Factory = G_HudFactoryHead; Factory != nullptr;
                  Factory = Factory->Next)
@@ -500,7 +485,6 @@ void LoadHudElementsFromIni()
 
             if (Item == nullptr)
             {
-                // 0x004c7557.
                 FDUMP(0x100002, "%s(%d) : *** WARNING: HUD - unknown INI entry '%s'\n", kHudCpp,
                       0x136, Reader.get_header_ptr());
                 continue;
@@ -508,7 +492,6 @@ void LoadHudElementsFromIni()
 
             if (Item->Init())
             {
-                // 0x004c752b: append through +0x34.
                 if (G_HudItemTail != nullptr)
                 {
                     G_HudItemTail->Next = Item;
@@ -522,13 +505,11 @@ void LoadHudElementsFromIni()
             }
             else
             {
-                // 0x004c754d: vt[0](1).
                 delete Item;
             }
         } while (Reader.read_header());
     }
 
-    // 0x004c75c5 .. 0x004c75ee.
     ResetMouseFlightState();
 }
 
@@ -546,14 +527,12 @@ float HudVectorAngle(float X, float Y)
 
     if (AbsX > AbsY)
     {
-        // 0x0053eb62: FPATAN of (Y / |X|, 1).
         double const A = atan(static_cast<double>(Y) / AbsX);
         if (X > 0.0f)
             return static_cast<float>(A - HalfPi);
         return static_cast<float>(HalfPi - A);
     }
 
-    // 0x0053eb93: FPATAN of (-X / |Y|, 1).
     double const A = atan(-(static_cast<double>(X) / AbsY));
     if (!(Y < 0.0f))
         return static_cast<float>(A);
@@ -568,10 +547,7 @@ float HudVectorAngle(float X, float Y)
 
 HUD_Steer::HUD_Steer(INI_Reader& Reader)
 {
-    // FUN_004c84a0 after operator new(0x74): the HUDItem part, +0x30 = 0, the holder at +0x4c
-    // (FUN_00420d40, five 1.0f, anim -1), the name "Steer" (FUN_00417c50, cap 0x20), +0x38 = 0,
-    // an inlined SetTarget(0), the three floats and +0x48, then the steering-arrow mesh
-    // (FUN_0059ec80(path, 0, 1)) and the ini overrides.
+    // Inlined in FUN_004c84a0 after operator new(0x74).
     ClientMeshHolderConstruct(&MeshHolder);
     MeshHolder.UserFloats[4] = 1.0f;
     MeshHolder.UserFloats[3] = 1.0f;
@@ -599,9 +575,8 @@ HUD_Steer::HUD_Steer(INI_Reader& Reader)
 
 HUD_Steer::~HUD_Steer()
 {
-    // FUN_004c8c20: with an instance bound, FUN_0059eee0; then the holder's destructor
-    // FUN_0059ef20 (~FClientMeshHolder: the same release again, which finds nothing); then
-    // ~HUDItem.
+    // FUN_004c8c20; the holder's own destructor then runs the same release again and finds
+    // nothing.
     if (MeshHolder.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
         ClientUiMeshHolderRelease(&MeshHolder);
 }
@@ -614,13 +589,13 @@ bool HUD_Steer::Slot1()
 
 void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
 {
-    // LAB_004c8680 (RET 8). Neither argument is read.
+    // LAB_004c8680. Neither argument is read.
     (void)Camera;
     (void)DeltaSeconds;
 
-    // 0x004c868b .. 0x004c86da: shown unless the player's ship says otherwise -- its behaviour
-    // interface byte +0x168 when it has one, then a tradelane ride or the letterbox hides it.
-    // Without a ship the arrow stays enabled.
+    // Shown unless the player's ship says otherwise -- its behaviour interface's steering
+    // byte, then a tradelane ride or the letterbox hides it. Without a ship the arrow stays
+    // enabled.
     unsigned char bShow = 1;
     CEqObj* const Ship = HudPlayerShip();
     if (Ship != nullptr)
@@ -634,14 +609,11 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
             bShow = 0;
     }
 
-    // 0x004c86dc .. 0x004c8709: under the 0.25s hold, only a locked mouse-flight draws
-    // (FUN_0045a470 clear and DAT_0067354c set -- IsMouseFlightLocked).
+    // Under the 0.25s hold, only a locked mouse-flight draws.
     if (!IsMouseFlightHoldThresholdReached() && !IsMouseFlightLocked())
         return;
-    // 0x004c870f .. 0x004c872a: not in the turret or rear view (HUD_Status +0x5b9 / +0x5ba).
     if (HudStatusIsTurretView() || HudStatusIsRearView())
         return;
-    // 0x004c8730: FUN_0042d740.
     if (ShouldSkipLocalServerTick())
         return;
     if (bShow == 0)
@@ -654,8 +626,8 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
     int const SurfaceW = static_cast<int>(G_RenderSurfaceWidth);   // DAT_00610850
     int const SurfaceH = static_cast<int>(G_RenderSurfaceHeight);  // DAT_00610854
 
-    // 0x004c8794 .. 0x004c8850: the cursor's offset from the surface centre, divided by
-    // -(range * width * 0.00125) (FUN_004c8b10), and radius / range as the dead zone.
+    // The cursor's offset from the surface centre, divided by -(range * width * 0.00125), and
+    // radius / range as the dead zone.
     float const CursorYf = static_cast<float>(HudSteerCursorY(CursorY));
     float const HalfW = static_cast<float>(SurfaceW / 2);
     float const HalfH = static_cast<float>(SurfaceH / 2);
@@ -674,46 +646,41 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
     HudVec3ScaleByInverse(Dir, Offset, -RangePixels);
     float const DeadZone = static_cast<float>(static_cast<double>(Radius) / Range);
 
-    // 0x004c8850 .. 0x004c8885: FUN_00410190's length clamped to 1, and zero inside the dead
-    // zone.
+    // The length (FUN_00410190) clamped to 1, and zero inside the dead zone.
     double const LengthExact = sqrt(static_cast<double>(Dir[0]) * Dir[0] +
                                     static_cast<double>(Dir[1]) * Dir[1] +
                                     static_cast<double>(Dir[2]) * Dir[2]);
     float Length = static_cast<float>(LengthExact);
     if (LengthExact > 1.0)
         Length = 1.0f;
-    // 0x004c8878: TEST AH,0x41 / JP keeps the length when it is above the dead zone or unordered.
+    // An unordered compare keeps the length.
     if (Length <= DeadZone)
         Length = 0.0f;
 
-    // 0x004c888b .. 0x004c8924: the arrow's roll, -FUN_0053eb10(dx, dy) with dx = x - w/2 and
-    // dy = h/2 - y.
+    // The arrow's roll; retail recomputes the cursor Y here.
     int const CursorYi2 = static_cast<int>(static_cast<float>(HudSteerCursorY(CursorY)));
     float const Dx = static_cast<float>(CursorX - SurfaceW / 2);
     float const Dy = static_cast<float>(SurfaceH / 2 - CursorYi2);
     float const Angle = -HudVectorAngle(Dx, Dy);
 
-    // 0x004c8928: FUN_0059e500.
     Win3DBeginDraw();
 
-    // 0x004c892d .. 0x004c8990: the HUD chrome colour into the holder's user floats.
+    // The HUD chrome colour into the holder's user floats.
     double const Inv255 = 0.003921568859368563; // DAT_005c7f68
     MeshHolder.UserFloats[0] = static_cast<float>(G_HudChromeColorRgba[0] * Inv255);
     MeshHolder.UserFloats[1] = static_cast<float>(G_HudChromeColorRgba[1] * Inv255);
     MeshHolder.UserFloats[2] = static_cast<float>(G_HudChromeColorRgba[2] * Inv255);
     MeshHolder.UserFloats[4] = static_cast<float>(G_HudChromeColorRgba[3] * Inv255);
 
-    // 0x004c8993 .. 0x004c89b5: FUN_004c8b40(0), FUN_004c8b80(0), then FUN_004c8bc0 with the
-    // roll times -0.99999994f (DAT_005d6ee0).
+    // The roll is multiplied by -0.99999994f (DAT_005d6ee0), not negated.
     FMatrix Rotation;
     HudMatrixRotationY(&Rotation.D[0][0], 0.0f);
     HudMatrixRotateRows12(&Rotation.D[0][0], 0.0f);
     HudMatrixRotateRows01(&Rotation.D[0][0],
                           static_cast<float>(static_cast<double>(Angle) * -0.9999999403953552));
 
-    // 0x004c89ba .. 0x004c8af1: one arrow segment every 0.15 (DAT_005d6edc) while below the
-    // length: placed at Rotation * (0, t * 0.265, 0) with z = -1, scaled by t * 0.5 + 0.1, drawn
-    // through the Win3D camera DAT_0067dbf8.
+    // One arrow segment every 0.15 (DAT_005d6edc) while below the length: placed at
+    // Rotation * (0, t * 0.265, 0) with z = -1, scaled by t * 0.5 + 0.1.
     float const Step = 0.15000000596046448f;
     float T = Step;
     if (Step < Length)
@@ -745,7 +712,7 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
             DALib::Renderer->RenderInstance(Win3DGetCamera(), MeshHolder.EngineInstance, 1.0f, 0, nullptr,
                                    nullptr);
 
-            // 0x004c8ada: FADD / FST into T, then FCOMP of the unrounded sum against the length.
+            // The unrounded sum is compared against the length.
             double const Sum = static_cast<double>(T) + Step;
             T = static_cast<float>(Sum);
             if (!(Sum < Length))
@@ -753,7 +720,6 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
         } while (true);
     }
 
-    // 0x004c8af7: FUN_0059e5a0.
     Win3DEndDraw();
 }
 
@@ -765,7 +731,6 @@ HUDItem* HUD_SteerFactory::Create(INI_Reader& Reader)
 
 namespace
 {
-    // DAT_006733dc -- the static factory (XC entry LAB_004c82f0: FUN_004c8400(this, "Steer"),
-    // atexit LAB_004c8310 -> LAB_004c8350).
+    // DAT_006733dc (XC entry LAB_004c82f0, atexit LAB_004c8310).
     HUD_SteerFactory G_HudSteerFactory("Steer");
 }

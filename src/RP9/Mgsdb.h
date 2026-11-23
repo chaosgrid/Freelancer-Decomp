@@ -50,7 +50,7 @@ public:
     FMgsdbDatabase();  // FUN_06d25e9a
     ~FMgsdbDatabase(); // FUN_06d26172
 
-    // Slot 0, FUN_06d25808 (thiscall, RET 0x18).
+    // Slot 0, FUN_06d25808.
     bool Load(const char* Path, const FRp9Identifier8* Ident, const FRp9Caps8* Caps,
               unsigned long Ram, unsigned long VideoRam, unsigned long CpuSpeed);
     // Slot 1, FUN_06d27da0: destroy + operator delete.

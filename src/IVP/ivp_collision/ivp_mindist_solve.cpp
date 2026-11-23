@@ -9,16 +9,11 @@
 #include "../ivp_physics/ivp_mindist.h"
 #include "ivp_compact_ledge_solver.h"
 
-// ============================================================================
-// IVP_Compact_Ledge_Solver (ivp_compact_ledge_solver.h). Raw-ledge helpers traced against
-// the listing with retail's x87 rounding points: values that stay on the FPU stack are
-// double here, every FSTP dword is a float conversion.
-// ============================================================================
+// Retail's x87 rounding points are kept: values held on the FPU stack are
+// double, every float store is a float.
 
-// FUN_0635b940 (.text:0635b940-0635ba09), cdecl (edge, ledge, out).
-// P0 = start(edge), P1 = start(next edge, DAT_063ee4e0), P2 = start(prev edge, DAT_063ee4f0).
-// b = P2 - P0 is spilled as floats; a = P1 - P0 stays on the stack.
-// out.x = ay*bz - az*by, out.y = az*bx - ax*bz, out.z = ax*by - ay*bx.
+// FUN_0635b940, cdecl. (P1 - P0) x (P2 - P0) with P1 / P2 the next / prev
+// edge's start; b = P2 - P0 is spilled as floats, a stays double.
 void IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(const IVP_Compact_Edge* Edge,
                                                                   const IVP_Compact_Ledge* Ledge,
                                                                   IVP_U_Point* OutNormal)
@@ -40,15 +35,11 @@ void IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(const IVP_Comp
     OutNormal->k[2] = (float)(Ax * By - Ay * Bx);
 }
 
-// FUN_0635b210 (.text:0635b210-0635b3ad), cdecl (ledge, edge, point, result).
-// The three vertices come from the TRIANGLE (edge & ~0xf): T0 = start(tri+4),
-// T1 = start(tri+8), T2 = start(tri+0xc). a = T0 - T1 (stack), b = T2 - T1 (floats),
-// d = P - T1 (floats). AA = (az*az + ax*ax) + ay*ay, BB = (bz*bz + by*by) + bx*bx,
-// AB = (bz*az + by*ay) + bx*ax, DA = (dz*az + dy*ay) + dx*ax, DB = (dz*bz + dy*by) + dx*bx,
-// all float. Det = float(BB*AA - AB*AB). X = DA*BB - DB*AB (weight of T0),
-// Y = DB*AA - DA*AB (weight of T2), W1 = (Det - X) - Y (weight of T1), all extended.
-// Slots: byte table DAT_063ee500 = {00,08,04,00,08} indexed by k = ((edge >> 2) & 3) - 1:
-// result[tbl[k]] = Y, result[tbl[k+1]] = W1, result[tbl[k+2]] = X; result[3] = Det.
+// FUN_0635b210, cdecl. The vertices come from the TRIANGLE (edge & ~0xf), not
+// from the edge, relative to T1. Products are rounded to float, the three
+// weights (X for T0, Y for T2, W1 for T1) stay extended until stored; the
+// byte table DAT_063ee500 = {00,08,04,00,08}, indexed by the edge's position
+// in its triangle, rotates them into Checks[] relative to the given edge.
 void IVP_Compact_Ledge_Solver::calc_unscaled_qr_vals_F_space(const IVP_Compact_Ledge* Ledge,
                                                              const IVP_Compact_Edge* Edge,
                                                              const IVP_U_Point* Point,

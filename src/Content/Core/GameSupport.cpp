@@ -106,8 +106,7 @@ namespace
         return 1;
     }
 
-    // Block handed to pub::Player::ReturnPlayerStats by msg 0x33 (06eff8d7-06effaec):
-    // this 0x34-byte header, then ShipTypesKilledCount {ship type, count} pairs,
+    // Block handed to pub::Player::ReturnPlayerStats by msg 0x33: this 0x34-byte header, then ShipTypesKilledCount {ship type, count} pairs,
     // then GroupCount {group, feeling} pairs.
     struct FPlayerStatsBlock
     {
@@ -127,7 +126,7 @@ namespace
     };
     static_assert(sizeof(FPlayerStatsBlock) == 0x34, "retail stats header is 0x34 bytes");
 
-    // GameSupport message 0x31 parms (0x28 bytes, read at 06eff207-06eff8d2).
+    // GameSupport message 0x31 parms (0x28 bytes).
     struct FBestPathRequest
     {
         unsigned int PlayerId;                                // +0x00 the ReturnBestPath target
@@ -147,8 +146,8 @@ namespace
     {
         unsigned int ClientCookie;                            // +0x00 = request +0x04
         int Count;                                            // +0x04
-        // +0x08: same system -- set when BuildNnPath found no lane path (FUN_06f5e910 false,
-        // SETE); across systems -- the failure flag (no route, a locked gate, a missing system
+        // +0x08: same system -- set when BuildBestPathLegs (FUN_06f5e910) found no lane path;
+        // across systems -- the failure flag (no route, a locked gate, a missing system
         // or a failed system path).
         bool bFlag8;
     };
@@ -172,17 +171,16 @@ namespace
 
         // FUN_06f002e0 (message 5).
         static void OnPlayerLoad(FPlayerLoadMessage const* Message);
-        // Message 0x33 body (06eff8d7-06effaec).
+        // Message 0x33 body.
         static void OnPlayerStatsRequest(unsigned int const* PlayerId);
-        // Message 0x36 body (06efeec1-06eff115).
+        // Message 0x36 body.
         static void OnPlayerLaunch(unsigned int const* PlayerId);
-        // Message 0x31 body (06eff207-06eff8d2).
+        // Message 0x31 body.
         static void OnBestPathRequest(FBestPathRequest const* Request);
     };
 
-    // The point loop shared by both halves of message 0x31 (06eff352-06eff410 and
-    // 06eff6b8-06eff75f): per leg, its start point unless it equals the previous end point
-    // (FCOMP x, y, z with TEST AH,0x44 / JP: any unequal or unordered component adds it) --
+    // The point loop shared by both halves of message 0x31: per leg, its start point unless
+    // it equals the previous end point (any unequal or unordered component adds it) --
     // dropped again when it is the block's first point and has no object -- then its end
     // point. Last is the previous end point (all zero at the start); Index the block's point
     // count, which the caller caps. Returns the last point written (null when none).
@@ -209,31 +207,29 @@ namespace
         return End;
     }
 
-    // GameSupport message 0x31 (06eff207-06eff8d2): the best path between two points, sent with
+    // GameSupport message 0x31: the best path between two points, sent with
     // pub::Player::ReturnBestPath.
     void FGameSupport::OnBestPathRequest(FBestPathRequest const* Request)
     {
         if (Request->FromSystemId == Request->ToSystemId)
         {
-            // 06eff221-06eff234: no system record -> no reply.
+            // No system record -> no reply.
             FSystemInfo* System = FindSystemInfo(&Request->FromSystemId);        // FUN_06f75f30
             if (System == nullptr)
                 return;
             System->Load(false);                                                // FUN_06f75830
 
-            // 06eff242-06eff296: FUN_06f5e910(player, system, from, to, &legs, 0x19, &500.0f
-            // (0x43fa0000), 1).
-            std::list<FNnPathLeg> Legs;                                         // [ESP+0x30]
+            std::list<FNnPathLeg> Legs;
             float const Range = 500.0f;
             bool const bPath = BuildBestPathLegs(Request->PlayerId, System, &Request->FromPosition,
                                                  &Request->ToPosition, &Legs, 0x19, &Range, 1);
 
-            // 06eff29a-06eff2a9: new (legs * 0x28 + 0xc) -- two points per leg at most.
+            // Two points per leg at most.
             std::vector<unsigned char> Data(Legs.size() * 0x28 + sizeof(FBestPathHeader));
             FBestPathHeader* Header = reinterpret_cast<FBestPathHeader*>(Data.data());
             FBestPathPoint* Points =
                 reinterpret_cast<FBestPathPoint*>(Data.data() + sizeof(FBestPathHeader));
-            int Count = 0;                                                      // EDI / EDX
+            int Count = 0;
             Vector Last;
             Last.x = 0.0f;
             Last.y = 0.0f;
@@ -241,26 +237,25 @@ namespace
             for (std::list<FNnPathLeg>::const_iterator Leg = Legs.begin(); Leg != Legs.end(); ++Leg)
                 AppendLegPoints(Points, &Count, &Last, &*Leg, Request->FromSystemId);
 
-            // 06eff2d7-06eff307: header {request +4, count, !bPath}; size count * 0x14 + 0xc.
             Header->ClientCookie = Request->ClientCookie;
             Header->Count = Count;
             Header->bFlag8 = !bPath;
             pub::Player::ReturnBestPath(Request->PlayerId, Data.data(),
                                         Count * static_cast<int>(sizeof(FBestPathPoint)) +
                                             static_cast<int>(sizeof(FBestPathHeader)));
-            // 06eff301: the block is freed before the unload; the legs after it.
+            // The block is freed before the unload; the legs after it.
             Data.clear();
             Data.shrink_to_fit();
             System->Unload();                                                   // FUN_06f75840
             return;
         }
 
-        // 06eff426-06eff44c: a 0x7c8 block (header + 99 points) and the gate path (type 1)
-        // between the systems (FUN_06f29d80).
-        // The port allocates two points more than retail: the cap test sits only at the loop
-        // top (06eff6b8 CMP ESI,0x63 / JGE), so a leg that starts at point 98 writes point 99,
-        // 0x14 bytes past retail's block, and the reply then reads it. The send size is
-        // retail's; only the overrun lands in owned memory.
+        // A 0x7c8 block (header + 99 points) and the gate path (type 1) between the systems
+        // (FUN_06f29d80).
+        // Deviation: the port allocates two points more than retail. The cap test sits only at
+        // the loop top, so a leg that starts at point 98 writes point 99, 0x14 bytes past
+        // retail's block, and the reply then reads it. The send size is retail's; only the
+        // overrun lands in owned memory.
         int const MaxPoints = 0x63;
         std::vector<unsigned char> Data(0x7c8 + 2 * sizeof(FBestPathPoint));
         FBestPathHeader* Header = reinterpret_cast<FBestPathHeader*>(Data.data());
@@ -269,11 +264,10 @@ namespace
         std::list<unsigned int> Route =
             GetSystemPath(Request->FromSystemId, Request->ToSystemId, 1);
 
-        // 06eff450-06eff47b: the gates locked for the player (or everybody, FUN_06f6d2b0).
-        std::vector<unsigned int> LockedGates;                                  // [ESP+0x48]
+        // The gates locked for the player (or everybody).
+        std::vector<unsigned int> LockedGates;
         CollectContentGateLocks(Request->PlayerId, LockedGates);
 
-        // 06eff480-06eff4a2: fewer than two systems on the route -> {request +4, 0, 1}.
         if (Route.size() < 2)
         {
             Header->ClientCookie = Request->ClientCookie;
@@ -284,17 +278,17 @@ namespace
             return;
         }
 
-        // 06eff4a7-06eff4c0: the walk starts at the route's second system.
-        unsigned int CurrentSystemId = Request->FromSystemId;                   // [ESP+0x24]
-        unsigned int PreviousSystemId = CurrentSystemId;                        // EBX
+        // The walk starts at the route's second system.
+        unsigned int CurrentSystemId = Request->FromSystemId;
+        unsigned int PreviousSystemId = CurrentSystemId;
         std::list<unsigned int>::const_iterator Next = Route.begin();
-        ++Next;                                                                 // [ESP+0x28]
-        int Count = 0;                                                          // ESI
-        bool bFailed = false;                                                   // [ESP+0x1b]
+        ++Next;
+        int Count = 0;
+        bool bFailed = false;
         for (;;)
         {
-            // 06eff4c5-06eff4e0: the next system; past the route's end, the target system.
-            unsigned int NextSystemId;                                          // [ESP+0x2c]
+            // Past the route's end, the target system.
+            unsigned int NextSystemId;
             if (Next != Route.end())
             {
                 NextSystemId = *Next;
@@ -305,8 +299,7 @@ namespace
                 NextSystemId = Request->ToSystemId;
             }
 
-            // 06eff4e4-06eff4f7: no system record -> failure.
-            FSystemInfo* System = FindSystemInfo(&CurrentSystemId);              // [ESP+0x14]
+            FSystemInfo* System = FindSystemInfo(&CurrentSystemId);
             if (System == nullptr)
             {
                 bFailed = true;
@@ -314,13 +307,13 @@ namespace
             }
             System->Load(false);
 
-            // 06eff505-06eff5aa: where the trip through this system starts: the request's
-            // point, or the jump in from the previous system (FUN_06f29c10 type 1, its
-            // position FUN_06f2a190). A locked entry gate is a failure; an earlier failure
-            // also stops here (only tested when gates are locked).
-            bool bExitIsConnection = false;                                     // [ESP+0x13]
-            unsigned int ExitObjectId = 0;                                      // [ESP+0x20]
-            Vector Start;                                                       // [ESP+0x70]
+            // Where the trip through this system starts: the request's point, or the jump in
+            // from the previous system (FUN_06f29c10 type 1, its position FUN_06f2a190). A
+            // locked entry gate is a failure; an earlier failure also stops here (only tested
+            // when gates are locked).
+            bool bExitIsConnection = false;
+            unsigned int ExitObjectId = 0;
+            Vector Start;
             if (CurrentSystemId == Request->FromSystemId)
             {
                 Start = Request->FromPosition;
@@ -329,7 +322,7 @@ namespace
             {
                 unsigned int const EntryObjectId =
                     GetNextHopConnectionObject(CurrentSystemId, PreviousSystemId, 1);
-                Vector Position;                                                // [ESP+0xa0]
+                Vector Position;
                 GetConnectionPosition(CurrentSystemId, EntryObjectId, &Position);
                 Start = Position;
                 if (!LockedGates.empty())
@@ -345,9 +338,8 @@ namespace
                 }
             }
 
-            // 06eff5b0-06eff61b: where it ends: the request's point, or the jump out to the
-            // next system.
-            Vector End;                                                         // [ESP+0x64]
+            // Where it ends: the request's point, or the jump out to the next system.
+            Vector End;
             if (CurrentSystemId == Request->ToSystemId)
             {
                 End = Request->ToPosition;
@@ -355,15 +347,14 @@ namespace
             else
             {
                 ExitObjectId = GetNextHopConnectionObject(CurrentSystemId, NextSystemId, 1);
-                Vector Position;                                                // [ESP+0xac]
+                Vector Position;
                 GetConnectionPosition(CurrentSystemId, ExitObjectId, &Position);
                 End = Position;
                 bExitIsConnection = true;
             }
 
-            // 06eff620-06eff687: BuildNnPath(system, start, end, &legs, 0x19, &1.0f, 0);
-            // false -> failure, and the walk goes on.
-            std::list<FNnPathLeg> Legs;                                         // [ESP+0x30]
+            // A failed path marks the failure, and the walk goes on.
+            std::list<FNnPathLeg> Legs;
             float const Range = 1.0f;
             if (!BuildNnPath(System, &Start, &End, &Legs, 0x19, &Range, 0))
             {
@@ -371,8 +362,8 @@ namespace
             }
             else
             {
-                // 06eff68c-06eff775: the points while fewer than 99; the last one written in
-                // this system gets the exit connection as its object.
+                // The last point written in this system gets the exit connection as its
+                // object.
                 FBestPathPoint* LastPoint = nullptr;
                 Vector Last;
                 Last.x = 0.0f;
@@ -387,8 +378,6 @@ namespace
                     LastPoint->ObjectId = ExitObjectId;
             }
 
-            // 06eff778-06eff7f0: unload; the target reached (current == next) ends the walk,
-            // otherwise step on while fewer than 99 points.
             System->Unload();
             if (CurrentSystemId == NextSystemId)
                 break;
@@ -398,7 +387,6 @@ namespace
                 break;
         }
 
-        // 06eff82c-06eff860: a failure sends no points.
         if (bFailed)
             Count = 0;
         Header->ClientCookie = Request->ClientCookie;
@@ -409,7 +397,7 @@ namespace
                                         static_cast<int>(sizeof(FBestPathHeader)));
     }
 
-    // GameSupport message 0x36 (06efeec1-06eff115): build the player ship.
+    // GameSupport message 0x36: build the player ship.
     void FGameSupport::OnPlayerLaunch(unsigned int const* PlayerId)
     {
         FContentPlayerShipParams Params;                                        // FUN_06efff70
@@ -420,8 +408,7 @@ namespace
         Params.ShipArchId = ShipArch;
         GetShipMissionProperties(ShipArch, &Params.ClassIds);                   // FUN_06f587d0
 
-        // 06efef1b-06efef4b: the reputation handle takes the player state (release the
-        // old one, AddRef the new one).
+        // The reputation handle takes the player state.
         FContentPlayerState* State = FindContentPlayerState(*PlayerId);          // FUN_06f49b00
         if (Params.ReputationHandle != State)
         {
@@ -433,7 +420,7 @@ namespace
         }
         Params.System = State->GetSystemRecord();                               // FUN_06f478c0
 
-        // 06efef66-06eff08f: fighters and freighters get their class id once.
+        // Fighters and freighters get their class id once.
         unsigned int Type;
         pub::SpaceObj::GetType(Params.ShipId, Type);
         unsigned int const* ClassId = nullptr;
@@ -455,8 +442,8 @@ namespace
         : ControllerId(InControllerId)
     {
         pub::Controller::SetHeartbeatInterval(ControllerId, 1.0f);
-        // 06efeb50-06efeb69: new 0x24 + FUN_06f058d0; the router ctor publishes
-        // itself in GMessageRouter (DAT_06fcf254). The pointer is not kept here.
+        // The router ctor publishes itself in GMessageRouter (DAT_06fcf254); the pointer is
+        // not kept here.
         new FContentMessageRouter;
         LoadContentGameTables();
     }
@@ -464,9 +451,7 @@ namespace
     // FUN_06efebb0 (06efebb0-06efec06).
     FGameSupport::~FGameSupport()
     {
-        // 06efebdb: FUN_06efe870.
-        UnloadContentGameTables();
-        // 06efebe0-06efebee: DAT_06fcf254->vtbl[+0x10](1) = virtual deleting dtor.
+        UnloadContentGameTables();                                             // FUN_06efe870
         if (GMessageRouter != nullptr)
             delete GMessageRouter;
     }
@@ -479,8 +464,8 @@ namespace
         LoadContentPlayerState(State, Message->Reader);
     }
 
-    // GameSupport message 0x33 (06eff8d7-06effaec): build the statistics block and
-    // send it with pub::Player::ReturnPlayerStats. Parms = &player id.
+    // GameSupport message 0x33: build the statistics block and send it with
+    // pub::Player::ReturnPlayerStats. Parms = &player id.
     void FGameSupport::OnPlayerStatsRequest(unsigned int const* PlayerId)
     {
         FContentPlayerState* State = FindContentPlayerState(*PlayerId);
@@ -552,52 +537,47 @@ namespace
         {
         case EMessage::PlayerWorthChanged:
         {
-            // 06effb34
             FPlayerIdMessage const* Message = static_cast<FPlayerIdMessage const*>(Parms);
             RecalculateContentPlayerRank(FindContentPlayerState(Message->PlayerId));
             break;
         }
         case EMessage::BaseEnter:
         {
-            // 06eff17e: base enter.
             FBaseMessage const* Message = static_cast<FBaseMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->OnBaseChange(Message->BaseId);
             FContentBase* Base = FindContentBaseInfo(&Message->BaseId);
             if (Base != nullptr)
             {
-                Base->Load(nullptr);                            // 06eff1b2 FUN_06eaa820
-                Base->OnPlayerEnter(Message->PlayerId);         // 06eff1bc FUN_06eaa3e0
+                Base->Load(nullptr);                            // FUN_06eaa820
+                Base->OnPlayerEnter(Message->PlayerId);         // FUN_06eaa3e0
             }
             break;
         }
         case EMessage::BaseExit:
         {
-            // 06eff1c6: base exit.
             FBaseMessage const* Message = static_cast<FBaseMessage const*>(Parms);
             FContentBase* Base = FindContentBaseInfo(&Message->BaseId);
             FContentPlayerState* State = FindContentPlayerState(Message->PlayerId);
             if (State != nullptr)
             {
                 if (Base != nullptr)
-                    Base->OnPlayerExit(Message->PlayerId);      // 06eff1f4 FUN_06eaa790
+                    Base->OnPlayerExit(Message->PlayerId);      // FUN_06eaa790
                 State->OnBaseChange(0);
             }
             break;
         }
         case EMessage::PlayerSave:
         {
-            // 06effb50
             FPlayerSaveMessage const* Message = static_cast<FPlayerSaveMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->Save(Message->File);
             break;
         }
         case EMessage::PlayerLoad:
-            // 06effb70
             OnPlayerLoad(static_cast<FPlayerLoadMessage const*>(Parms));
             break;
         case EMessage::Heartbeat:
         {
-            // 06efec8a: heartbeat, parms = float elapsed.
+            // Parms = float elapsed.
             float DeltaTime = *static_cast<float const*>(Parms);
             GGameSupportElapsed = GGameSupportElapsed + DeltaTime;
             UpdateAllContentPlayerTimes(DeltaTime);
@@ -605,28 +585,25 @@ namespace
         }
         case EMessage::LocationEnter:
         {
-            // 06effb12: location enter.
             FLocationMessage const* Message = static_cast<FLocationMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->SetLocation(Message->LocationId);
             break;
         }
         case EMessage::LocationExit:
         {
-            // 06effaf1: location exit.
             FLocationMessage const* Message = static_cast<FLocationMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->SetLocation(0);
             break;
         }
         case EMessage::SpaceExit:
         {
-            // 06eff11a
             FLocationMessage const* Message = static_cast<FLocationMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->SetShipObject(nullptr);
             break;
         }
         case EMessage::ObjectDestroyed:
         {
-            // 06efecd8: parms = ship id.
+            // Parms = ship id.
             FContentPlayerState* State =
                 FindContentPlayerStateByShip(static_cast<unsigned int const*>(Parms));
             if (State != nullptr)
@@ -638,29 +615,26 @@ namespace
         }
         case EMessage::SystemExit:
         {
-            // 06eff15d: system exit.
             FSystemMessage const* Message = static_cast<FSystemMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->OnSystemChange(0);
             break;
         }
         case EMessage::PlayerLogout:
-            // 06effb82: logout, parms = &player id.
+            // Parms = &player id.
             RemoveContentPlayerState(*static_cast<unsigned int const*>(Parms));
             break;
         case EMessage::RequestPlayerStats:
-            // 06eff8d7: player stats request.
             OnPlayerStatsRequest(static_cast<unsigned int const*>(Parms));
             break;
         case EMessage::SystemEnter:
         {
-            // 06eff13b: system enter.
             FSystemMessage const* Message = static_cast<FSystemMessage const*>(Parms);
             FindContentPlayerState(Message->PlayerId)->OnSystemChange(Message->SystemId);
             break;
         }
         case EMessage::LoadGame:
         {
-            // 06effe5e: load a save, parms = INI_Reader*.
+            // Parms = INI_Reader*.
             INI_Reader* Reader = static_cast<INI_Reader*>(const_cast<void*>(Parms));
             LoadDynBaseInfo(Reader);                            // FUN_06eabf40
             Reader->reset();
@@ -668,12 +642,12 @@ namespace
             Reader->reset();
             LoadDynSysInfo(Reader);                             // FUN_06f76200
             Reader->reset();
-            InitSystemPathTables();                             // 06effe92 FUN_06f29a90
+            InitSystemPathTables();                             // FUN_06f29a90
             break;
         }
         case EMessage::SaveGame:
         {
-            // 06effe99: write a save, parms = FILE*.
+            // Parms = FILE*.
             FILE* File = static_cast<FILE*>(const_cast<void*>(Parms));
             SaveContentBases(File);                             // FUN_06eac090
             SaveContentGateLocks(File);                         // FUN_06f67bc0
@@ -682,8 +656,7 @@ namespace
         }
         case EMessage::TradelaneEnter:
         {
-            // 06efed55-06efee93: a ship enters a trade lane; parms = {ship, entry ring, target
-            // ring, system}.
+            // Parms = {ship, entry ring, target ring, system}.
             unsigned int const* Message = static_cast<unsigned int const*>(Parms);
             FSystemInfo* System = FindSystemInfo(&Message[3]);                  // FUN_06f75f30
             FContentShipBase* Ship =
@@ -692,8 +665,6 @@ namespace
                 break;
             FTradeLane* Lane;
             System->FindTradeLaneByRing(&Message[1], &Lane);                    // FUN_06f77e00
-            // 06efed96-06efee08: the indices of the entry and the target ring (the scan
-            // stops once both are known).
             std::vector<FTradeLaneRing> const& Rings = Lane->Rings;
             unsigned int EntryIndex = 0xffffffffu;
             unsigned int TargetIndex = 0xffffffffu;
@@ -714,7 +685,7 @@ namespace
                 }
             }
             unsigned int ShipId = Ship->SpaceObjId;
-            // 06efee0a-06efee12: JAE (unsigned) -- forward when the entry comes first.
+            // Unsigned compare: forward when the entry comes first.
             if (EntryIndex < TargetIndex)
             {
                 Ship->SetTradeLaneRings(&Message[1], &Rings.back().ObjectId);         // FUN_06f576f0
@@ -731,7 +702,7 @@ namespace
         }
         case EMessage::TradelaneExit:
         {
-            // 06efed04-06efed50: a ship leaves a trade lane; parms = {ship, ring, ?, system}.
+            // Parms = {ship, ring, ?, system}.
             unsigned int const* Message = static_cast<unsigned int const*>(Parms);
             FSystemInfo* System = FindSystemInfo(&Message[3]);                  // FUN_06f75f30
             FContentShipBase* Ship =
@@ -745,7 +716,7 @@ namespace
         }
         case EMessage::Msg0x25:
         {
-            // 06efee98: parms = {ship, target}.
+            // Parms = {ship, target}.
             unsigned int const* Message = static_cast<unsigned int const*>(Parms);
             FContentPlayerState* State = FindContentPlayerStateByShip(Message);   // FUN_06f49bc0
             if (State != nullptr)
@@ -753,13 +724,10 @@ namespace
             break;
         }
         case EMessage::SpaceEnter:
-            // 06efeec1: player launch. 06efeed6-06efeee4: MOV EDX,[parms]; LEA ESI,[EDX+4] --
-            // the player id is the SECOND dword (GetShip, GetShipID and FUN_06f49b00 all get
-            // ESI), like messages 1 and 0x37.
+            // Player launch. The player id is the second dword, like messages 1 and 0x37.
             OnPlayerLaunch(static_cast<unsigned int const*>(Parms) + 1);
             break;
         case EMessage::RequestBestPath:
-            // 06eff207: best path request.
             OnBestPathRequest(static_cast<FBestPathRequest const*>(Parms));
             break;
         default:
@@ -774,20 +742,20 @@ namespace
     unsigned int GLastFormationId = 0;
 }
 
-// FUN_06efeb00 (06efeb00-06efeb0b): pre-increment of DAT_06fcf42c. Declared in DockQueues.h.
+// FUN_06efeb00 (06efeb00-06efeb0b). Declared in DockQueues.h.
 unsigned int __cdecl AllocateFormationId()
 {
     return ++GLastFormationId;
 }
 
-// FUN_06efec10 (06efec10-06efec16): FLD double DAT_06fcf430.
+// FUN_06efec10 (06efec10-06efec16).
 double __cdecl GetContentGameTime()
 {
     return GGameSupportElapsed;
 }
 
-// FUN_06efec20 (06efec20-06efec4e): either time equal to the -1.0 sentinel (raw
-// compare of both dwords with 0 / 0xbff00000) -> -1.0 (DAT_06fb78f0); else FABS(*A - *B).
+// FUN_06efec20 (06efec20-06efec4e): retail tests the -1.0 sentinel by comparing both raw
+// dwords (0 / 0xbff00000); -1.0 = DAT_06fb78f0.
 double __cdecl GetContentTimeDistance(double const* A, double const* B)
 {
     if (*A == -1.0 || *B == -1.0)

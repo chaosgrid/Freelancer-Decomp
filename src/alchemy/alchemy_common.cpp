@@ -8,15 +8,8 @@
 #include "common_misc.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
-// wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): needed for
-// FGenericFxObjectBase's full definition (InstanceListHead_/InstanceListTail_/
-// LiveInstanceCount_ member access from IntegratePool/ApplyFieldsToPool
-// below, both friended there). Included here in the .cpp, not in
-// alchemy_common.h, to avoid a header include cycle — alchemy_genericfx.h
-// itself includes alchemy_common.h, which by the time this file processes
-// this include is already fully parsed once (via the include above), so this
-// is a one-directional dependency at the .cpp level only. See
-// alchemy_common.h's FGenericFxObjectBase forward-declaration comment.
+// FGenericFxObjectBase's definition, for IntegratePool / ApplyFieldsToPool (its friends);
+// included here rather than in alchemy_common.h to avoid an include cycle.
 #include "alchemy_genericfx.h"
 
 // The concrete ramp classes the node-lib readers construct with `new`, as retail does
@@ -31,13 +24,8 @@
 #include <intrin.h>
 #include <xmmintrin.h>
 
-// alchemy.dll — DACOM particle FX scaffolding.
-// Shared constants, CRC/hash helpers, string helpers, FDUMP/debug helpers,
-// appearance-pool alloc/free, COM-pointer helpers, particle/math helpers,
-// mesh-pose helpers, byte-bag helpers, generic COM/VB call-thunk helpers and
-// the ALE node-lib parsing helpers used by more than one of the concrete
-// alchemy classes. This file also owns the definitions of every shared
-// global declared extern in alchemy_common.h.
+// alchemy.dll shared helpers, and the definitions of the globals declared in
+// alchemy_common.h.
 namespace AlchemyImpl
 {
     const GENRESULT GR_ALE_LOAD_FAIL = static_cast<GENRESULT>(0xFFFFFFFA);
@@ -61,8 +49,6 @@ namespace AlchemyImpl
     const unsigned long kAleFileFlags = 0x08000080;
     const unsigned long kAleVersion10Bits = 0x3F800000; // 1.0f DAT_0624bac4
     const unsigned long kAleVersion11Bits = 0x3F8CCCCD; // 1.1f
-    // kAleNameMax is now a constexpr in alchemy_common.h (used as an array
-    // bound from other translation units).
     // FUN_0623ef70 / IAlchemy+0x14 / DAT_06256d68: same 256-dword table as
     // dacom.dll DAT_065b8530 (NOT IEEE poly 0xEDB88320). Case-preserving —
     // unlike DACOM_CRC::GetCRC32 which lowercases. VisEffect effect_crc and
@@ -257,13 +243,11 @@ namespace AlchemyImpl
         return std::strcmp(Left, Right) == 0;
     }
 
-    // Callers pass G_Specs[] names and string literals only, so there is no null case
-    // (the old null guard had no retail counterpart).
+    // Callers pass G_Specs[] names and string literals only, so there is no null case.
     bool NameEqual(const char* Left, const char* Right)
     {
         return std::strcmp(Left, Right) == 0;
     }
-
 
     GENRESULT CreateNamedFx(const char* Name, IDAComponent** Out)
     {
@@ -337,28 +321,11 @@ namespace AlchemyImpl
     IDAComponent* G_RpDraw = nullptr;          // DAT_06257bcc
     void* G_VbHandle = nullptr;                // DAT_0625791c
     void* G_IbHandle = nullptr;
-    // wave15 (sonnet:alchemy-wave15-lane3): DAT_06257908 is NOT an opaque
-    // handle in retail — every one of its 12+ XREFs dereferences it as a COM
-    // object (`(**(code**)(*DAT_06257908 + N))(DAT_06257908, ...)`, N in
-    // {0xc,0x10,0x40}). It is populated directly from IAlchemy::DrawNodes's
-    // own first stack parameter (LAB_06201910, alchemy.dll.c: `MOV
-    // ECX,[ESP+8]` then `MOV [DAT_06257908],ECX`, executed before the
-    // node-tree walk begins) — NOT via a DACOM_Acquire/CreateInstance call
-    // like G_3DMath and its per-appearance-type siblings
-    // (DAT_06257ac0/b8c/79c8, all lazily built by FUN_0623e830). This port's
-    // FAlchemy::DrawNodes (alchemy_alchemy.cpp) already receives and stores
-    // that exact parameter unchanged:
-    //     G_DrawCookie = static_cast<unsigned long>(reinterpret_cast<unsigned int>(Cookie));
-    // See DrawCameraFromCookie/GetDrawCameraPosition below for the
-    // retail-verified vtable+0xc "GetPosition" method this cookie exposes —
-    // consumed as a live camera/viewpoint position by at least
-    // FLDustAppearance (FUN_0620fcb0, alchemy.dll.c 11485-11526, distance
-    // fade) and FxRectAppearance (FUN_06238a70, alchemy.dll.c 35349-35354,
-    // camera-facing axis). Recovering this needs no change to
-    // FAlchemy::DrawNodes, its signature, or any file outside this one: the
-    // pointer already round-trips through this unsigned long bit-for-bit on
-    // this project's Win32 target (alchemy.vcxproj) — it was only ever
-    // stored as a plain integer because nothing previously dereferenced it.
+    // DAT_06257908: the camera, stored from IAlchemy::DrawNodes's first argument
+    // (LAB_06201910) before the node walk. Retail dereferences it as a COM object
+    // (vt+0xc position, +0x10, +0x40; see DrawCameraFromCookie), e.g. in the dust fade
+    // (FUN_0620fcb0) and rect's camera-facing axis (FUN_06238a70). Kept as an integer;
+    // the pointer round-trips on the Win32 target.
     unsigned long G_DrawCookie = 0;            // DAT_06257908
     unsigned long G_DrawCounters[9] = {};      // DAT_062578e4
     unsigned char G_DrawFlagA = 1;             // DAT_06255060
@@ -380,8 +347,8 @@ namespace AlchemyImpl
     void* G_DrawVbHandle = nullptr;            // DAT_06257bd4
 
 
-    // Field descriptor ramp defaults (ALC-4 2026-09-30, from the descriptor builders and
-    // named by each field's inner ramp getter):
+    // Field descriptor ramp defaults, from the descriptor builders and named by each
+    // field's inner ramp getter:
     //   gravity 0x06223408: inner +0x4c = 9.8 (0x411ccccd), GravityField_Gravity
     //     0xE02B8BD4 (getter LAB_06223310);
     //   air 0x062140c2 / 0x062140f6: +0x4c = 1.0 AirField_Approach 0x10423CEB,
@@ -389,46 +356,22 @@ namespace AlchemyImpl
     const float kDefaultGravity = 9.8f;
     const float kDefaultAirApproach = 1.0f;
     const float kDefaultAirMagnitude = 1.0f;
-    // wave 12 (alchemy-wave12-lane2): independently re-read FUN_06235f50
-    // (listing 0x06235f50-0x062361cb) byte-for-byte. It builds three
-    // FxAnimatedSingleRamps (FUN_06206ce0 + FUN_06209ad0) with weights 0x41200000,
-    // 0x3e99999a, 0x42480000 = 10.0f/0.3f/50.0f in that order, matching the
-    // read order of RadialField_Magnitude/RadialField_Attenuation/
-    // RadialField_Approach in FGenericFxObject::BeginField. Previously all
-    // three were the placeholder 1.0f.
-    // ALC-4: the names follow the descriptor's property table (.data 0x062569c8):
-    // +0x4c RadialField_Magnitude 10.0, +0x50 RadialField_Approach 0.3,
-    // +0x54 RadialField_Radius 50.0 (the old Atten/Approach names were crossed).
+    // Radial FUN_06235f50 (three FxAnimatedSingleRamps, FUN_06206ce0 + FUN_06209ad0),
+    // named by the property table .data 0x062569c8: +0x4c RadialField_Magnitude 10.0,
+    // +0x50 RadialField_Approach 0.3, +0x54 RadialField_Radius 50.0.
     const float kDefaultRadialMagnitude = 10.0f;
     const float kDefaultRadialApproach = 0.3f;
     const float kDefaultRadialRadius = 50.0f;
-    // Turbulence (ALC-4 2026-09-30): the descriptor builder at 0x0623d547..0x0623d59b
-    // gives inner +0x4c the 1.0 ramp and +0x50 the 10.0 ramp (FUN_06210900(10.0,
-    // &+0x50)); the inner getter LAB_0623d470 names them: 0x1B970B9A -> +0x4c, 0x1CEAC6D1
-    // -> +0x50, and the property table .data 0x06256ccc pairs 0x1CEAC6D1 with
-    // "TurbulenceField_Magnitude" and 0x1B970B9A with "TurbulenceField_Approach"
-    // (0x06256d08). So Approach = 1.0 and Magnitude = 10.0; the wave-14 reading
-    // (Magnitude 1.0, Approach 10.0) had them crossed.
+    // Turbulence 0x0623d547: +0x4c TurbulenceField_Approach 1.0 (0x1B970B9A), +0x50
+    // TurbulenceField_Magnitude 10.0 (0x1CEAC6D1) (getter LAB_0623d470, property table
+    // .data 0x06256ccc).
     const float kDefaultTurbulenceApproach = 1.0f;
     const float kDefaultTurbulenceMagnitude = 10.0f;
-    // wave 14 (sonnet:alchemy-wave14-lane1): FxCollideField's real ctor
-    // FUN_06219a30 (listing line 52965 / .text:06219aec) hardcodes literal
-    // 0x3f333333 = 0.7f as the reflectivity default — confirmed the ONLY
-    // occurrence of that literal anywhere in alchemy.dll via a whole-binary
-    // grep of the raw listing. Was previously an arbitrary 1.0f placeholder.
+    // Collide FUN_06219a30: reflect 0x3f333333 = 0.7f (.text:06219aec); +0x50
+    // CollideField_Width and +0x54 CollideField_Height 10.0 (0x06219b92, 0x06219c38).
     const float kDefaultCollideReflect = 0.7f;
-    // ALC-4: the same builder's +0x50 CollideField_Width and +0x54 CollideField_Height
-    // ramps, both 0x41200000 (0x06219b92, 0x06219c38).
     const float kDefaultCollideWidth = 10.0f;
     const float kDefaultCollideHeight = 10.0f;
-    // kBeamRibbonHalfWidth (0.25f) removed 2026-09-15: live-debug (dbgmcp,
-    // PID 41976) plus raw-listing tracing proved it was never retail's real
-    // multiplier — see FillBeamRibbon's doc comment and alchemy_common.h's
-    // declaration-site comment for the full evidence trail.
-    // FLDustAppearance's .rdata floats (DAT_062559f4..06255a08, 0624c354/58) are read
-    // inline by FLDustAppearance::DrawOrEnqueue (alchemy_appearances.cpp) as FloatFromBits
-    // locals; the old shared copies here fed only the deleted FillDustAppearanceQuad /
-    // ComputeDustCameraFadeAlpha lookalikes (removed 2026-09-26, ALC-2).
     const unsigned long kDustKillAgeBits = 0x7F7FFFFF;
     // FUN_0623f1f0's state (DAT_06257bac) and call counter (DAT_06257bb0).
     unsigned long G_AlchemyRandState = 0;
@@ -463,12 +406,8 @@ namespace AlchemyImpl
         *Tail = Node;
     }
 
-    // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): mechanically
-    // identical to UnlinkPoolNode/AppendPoolNode above, typed for
-    // FPooledParticle's own Next/Prev instead of FPoolLink's. Backs
-    // FGenericFxObjectBase::InstanceListHead_/InstanceListTail_
-    // (alchemy_genericfx.h) — see IntegratePool/ApplyFieldsToPool below and
-    // decomp-tracker item 132111 for what this closes.
+    // As UnlinkPoolNode/AppendPoolNode, on FPooledParticle's own Next/Prev (the per-node
+    // particle list).
     void UnlinkParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node)
     {
         FPooledParticle* Prev = Node->Prev;
@@ -530,9 +469,7 @@ namespace AlchemyImpl
         // used (+0x14/+0x18) and free (+0x1c/+0x20) chains, free the item and node buffers,
         // zero the counters. No COM release of any live item -- the per-item teardown
         // (IFxMesh slot 7, the particle record's child effects) belongs to the erasers.
-        // ALC-1 2026-09-26: removed the port's live-item ReleaseComPtr(+0x30 / +0x6c) walk
-        // that stood here; retail has none, and on the perp/dust pools +0x30 is a float
-        // triple, so the walk would Release a float.
+        // On the perp/dust pools +0x30 is a float triple, not a COM pointer.
         ::operator delete(Pool->Items);
         ::operator delete(Pool->FreeNodes);
         Pool->Items = nullptr;
@@ -575,23 +512,9 @@ namespace AlchemyImpl
     // LAB_06219520 / LAB_06219540 (Basic +0xd0/+0xd4): live * 4 verts / * 6 idx.
     // ComputeDrawBufferHints: Beam * 5 / * 0x18. Particle/Mesh not in max VB.
     //
-    // wave87 (sonnet:alchemy-wave87-lane2, 2026-09-15): FxSphereEmitter added
-    // after byte-verifying its own copy of GetQueuedVertCount/
-    // GetQueuedIndexCount (decomp-tracker items 134765/134766, alchemy.dll.c
-    // 36669-36683, alchemy.dll.txt 119966-120001, reached via the class's own
-    // this+0xf0 LiveInstanceCount-style field, `<<2` / `*6` respectively) --
-    // same literal 4/6 shape as the billboard-appearance family above, just
-    // implemented as a per-class hardcoded copy instead of a shared body, and
-    // present even though FxSphereEmitter is an emitter, not an appearance
-    // (every FGenericFxObjectBase-shaped leaf mechanically carries the full
-    // IGenericFx vtable, including draw-unit slots it may never actually be
-    // queried through). Before this fix, GetQueuedVertCount/GetQueuedIndexCount
-    // silently returned 0 for FxSphereEmitter instances instead of matching
-    // retail's 4/6 -- a real, previously-unmodeled gap, not merely an
-    // unconfirmed accessor. Cone/Cube emitters were not re-audited this wave
-    // (out of this wave's assigned cluster) and may carry the same gap; left
-    // as an open TODO for whichever wave next touches their own copies of
-    // these two vtable slots.
+    // FxSphereEmitter carries its own 4/6 copy of the two count slots (live count at
+    // this+0xf0, `<<2` / `*6`) although it is an emitter.
+    // TODO: Cone/Cube emitters' copies of these two slots have not been checked.
     void AppearanceDrawUnits(const char* Factory, unsigned long* VertsPer,
                              unsigned long* IndicesPer)
     {
@@ -686,22 +609,10 @@ namespace AlchemyImpl
         // Extra2 +0x30 itself. Particle (0x74) records never come through here either:
         // FxParticleAppearance::Pad47 (FUN_0622f6a0) allocates and fills them itself.
         //
-        // kStridePerp (0x3C) also satisfies Stride>=0x34 but its +0x30 tail is
-        // NOT a COM pointer: FUN_06233330 reads/writes three floats there
-        // (Item+0x30/+0x34/+0x38, the persisted velocity-facing billboard "up"
-        // axis fed back frame to frame — see BuildPerpBillboardBasis /
-        // FillPerpBillboardQuad). Treating it as a COM pointer would make
-        // FreePoolItem call Release() on a bit-reinterpreted float when a Perp
-        // particle dies — a real crash. Zero the float triplet instead: pool
-        // storage is a raw new[] with no zero-init, so without this the very
-        // first cross-product for a freshly carved slot reads heap garbage.
-        // wave34 (sonnet:alchemy-wave34-lane1): kStrideDust == kStridePerp
-        // (both 0x3C), so this same `==` branch also zero-inits Dust's own
-        // +0x30 float triplet — FillDustAppearanceQuad's persisted
-        // "previous frame CameraSpacePos" (see its doc comment) relies on
-        // this exact zero-init for a freshly emitted particle's first
-        // frame, the same way Perp's Axis already did. Not a coincidence to
-        // "fix": kept as one shared branch rather than duplicated per pool.
+        // Perp and dust (stride 0x3C, kStrideDust == kStridePerp) keep three floats at
+        // +0x30 (perp's persisted billboard axis, FUN_06233330; dust's previous
+        // view-space position), not a COM pointer, so they are zeroed instead -- pool
+        // storage is a raw new[], and the first frame reads them.
         if (Pool->Stride == kStridePerp)
         {
             float* Axis = reinterpret_cast<float*>(Item + 0x30);
@@ -736,7 +647,7 @@ namespace AlchemyImpl
     // then translation): Out = R * (X, Y, Z). Every retail caller (field Begins gravity
     // 0x0622424b, air, collide 0x0621ab79) goes through the engine singleton
     // (FUN_0623e830, cached per call site), so the port calls the same engine rather
-    // than an inline product with its own rounding (ALC-5, 2026-09-30).
+    // than an inline product with its own rounding.
     void TransformDirection(const float* Xform12, float X, float Y, float Z, float* Out)
     {
         const FVector Source = { X, Y, Z };
@@ -753,17 +664,15 @@ namespace AlchemyImpl
                                         *reinterpret_cast<const FTransform*>(Xform12), Source);
     }
 
-    // The lerp every retail field Apply inlines (e.g. radial 0x062366c8..0x062366fb:
-    // FLD T; FSUB V; FMUL Alpha; FADD V; FSTP float per axis -- one rounding, at the
-    // store). All callers pass PosVel6 + 3 and a stack/member array, so there is no null
-    // case (the old null guard had no retail counterpart).
+    // The lerp every retail field Apply inlines (e.g. radial 0x062366c8): one rounding
+    // per axis, at the float store. Callers never pass null.
     void LerpVel3(float* Vel, const float* Target, float Alpha)
     {
         LerpVel3(Vel, static_cast<double>(Target[0]), Target[1], Target[2], Alpha);
     }
 
     // The same lerp when the x target never left the FPU (radial 0x062366a9 / turbulence
-    // 0x0623e427: FMUL into ST0, then FSUB [vel.x] on it); y and z were FSTP'd to float.
+    // 0x0623e427): x stays double; y and z were rounded to float.
     void LerpVel3(float* Vel, double TargetX, float TargetY, float TargetZ, float Alpha)
     {
         Vel[0] = static_cast<float>((TargetX - Vel[0]) * Alpha + Vel[0]);
@@ -771,11 +680,6 @@ namespace AlchemyImpl
         Vel[2] = static_cast<float>((static_cast<double>(TargetZ) - Vel[2]) * Alpha + Vel[2]);
     }
 
-    // ALC-1 2026-09-26: MultiplyQuatWxyz / SlerpQuatWxyz / ApplySmoothRotationSlerp /
-    // WriteVelOrientQuat were removed with IntegratePool's particle branch. They were a
-    // lookalike of FUN_0622ff00 (nlerp for the engine's QuatSlerp, acos(N.y) on the
-    // |N.y| >= 0.99 side where retail takes acos(N.x), an invented zero-length guard);
-    // the listing port is FxParticleAppearance::IntegrateRecord (alchemy_appearances.cpp).
 
     // FUN_0623f1f0: the module's shift-register generator. State S = DAT_06257bac,
     // call counter C = DAT_06257bb0 (both 0 at load).
@@ -783,11 +687,8 @@ namespace AlchemyImpl
     //   Bit   = ((S >> 14) & 1) ^ (S & 1);  C += 1
     //   S     = Bit + Mixed * 2
     //   return ((S & 0xff) ^ ((S >> 8) & 0xff)) * DAT_0624bc98 (1/255), in [0, 1].
-    // Replaces an LCG (1664525 / 1013904223) that no retail instruction matches.
-    // The result is FILD qword * FMUL float (0x0623f250..0x0623f254) left in ST0: an
-    // unrounded x87 value, so it is returned as double (ALC-5; it used to be rounded to
-    // float here). The product of an 8-bit integer and a 24-bit mantissa is exact in
-    // double.
+    // The product (0x0623f250) is left unrounded on the x87 stack, so it is returned as
+    // double; an 8-bit integer times a 24-bit mantissa is exact in double.
     double AlchemyRand01()
     {
         const unsigned long State = G_AlchemyRandState;
@@ -802,73 +703,13 @@ namespace AlchemyImpl
                static_cast<double>(kAlchemyRandScale);
     }
 
-    // ALC-3 2026-09-30: ComputeRampSlopes / SampleHermite (a lookalike of FUN_06246550 /
-    // FUN_06246950 with invented guards) were removed; the listing ports are
-    // FFxAnimatedSingle::ComputeTrackSlopes / EvalSegment (alchemy_ramp.cpp).
-
-    // FUN_0620bda0 (age/pos formula) + FUN_062188c0 (confirmed retail
-    // traversal root — decomp-tracker items 132111/132872): age += dt; if
-    // age <= duration then pos += vel * dt; else unlink-from-owner's-list
-    // and free. (The particle appearance's FUN_06230370 / FUN_0622ff00 are not
-    // this function -- see FxParticleAppearance::Pad5 / IntegrateRecord.)
-    //
-    // alchemy-wave14-lane2 (2026-09-10) re-verified an earlier wave's claim
-    // that "no actual particle array exists" in this port: FALSE as stated —
-    // this function plus AllocPoolItem/FreePoolItem/EmitOneParticle/
-    // ApplyFieldsToPool below already implement a real per-particle pool
-    // (age/position/velocity integration, freelist recycling, orientation
-    // quaternion) and were correctly closed ready_unverified back in wave 11.
-    // Cross-checking retail bytes at 0x0623a000/a070/a190/a280/a2a0/a2e0/
-    // a360/a4a0/a590/b410 and the pool-ctor/dtor pair at 0x0623ea30/e890/
-    // e950/eb40 found those addresses are a genuinely SEPARATE mechanism —
-    // Cluster A, a per-emitter-NODE private-instance tracking system
-    // (AllocPrivatePoolItem/FreePrivatePoolItem below already give it a
-    // pool-arena carve-out; the node-side list/refcount fields themselves
-    // still belong on the emitter leaves, alchemy_emitters.*, out of this
-    // lane's ownership — see alchemy_genericfx.cpp's Pad25 doc comment for
-    // the full Cluster A/B trace) — NOT this function's own subject.
-    //
-    // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): this function itself
-    // used to walk Pool->UsedHead (every live particle of this FACTORY
-    // across every instance sharing the pool) once per ANY instance's Pad25
-    // tick — a wave-11 simplification substituting for retail's real
-    // per-OWNER-INSTANCE sentinel list, confirmed by wave19/20/21/22's
-    // extensive byte trace (decomp-tracker item 132111) and independently
-    // reconfirmed by FIVE separate retail call sites (FUN_06215f40 emit-
-    // and-link, FUN_062188c0 per-instance age/integrate, FUN_06217ae0
-    // unlink+free, FUN_06219070 destructor erase-range, FUN_06218780
-    // per-instance field-apply — items 132827/132872/132839/132921/132871 —
-    // plus FUN_06230370's independently-retraced parallel lineage on a
-    // different concrete leaf class). Now walks Owner->InstanceListHead_
-    // (FGenericFxObjectBase, alchemy_genericfx.h) — this instance's OWN
-    // active particles, threaded through FPooledParticle::Next/Prev
-    // (alchemy_types.h) — instead. FAppearancePool's own Used/Free
-    // bookkeeping (Pool->UsedHead/UsedTail/FreeHead/FreeTail, a physically
-    // separate FPoolLink*-typed list) is untouched: FreePoolItem below still
-    // unlinks the freed slot from Pool->UsedHead and appends it to
-    // Pool->FreeHead exactly as before, only reached via
-    // Owner->InstanceListHead_ now instead of a direct Pool->UsedHead walk.
-    //
-    // NOT YET HANDLED (decomp-tracker item 132111, step 8 — deliberately
-    // deferred, see ~FGenericFxObjectBase's TODO in alchemy_genericfx.cpp):
-    // an instance destroyed while InstanceListHead_ still has live nodes
-    // leaks those particles permanently (no other instance's Owner-scoped
-    // walk can ever reach them again) — this function's own per-Owner
-    // scoping is exactly why that gap is now load-bearing rather than
-    // cosmetic.
-    // ALC-1 2026-09-26: the G_PoolParticle (stride 0x74) orientation branch that lived
-    // here, with its WriteVelOrientQuat / ApplySmoothRotationSlerp / SlerpQuatWxyz helpers
-    // and OrientFlags parameter, was removed: FxParticleAppearance has its own update
-    // (FUN_06230370 -> FxParticleAppearance::Pad5) and integrate (FUN_0622ff00 ->
-    // IntegrateRecord), so this function is only reached for the billboard pools and the
-    // beam pool, neither of which carries the 0x74 tail.
-    //
     // FUN_062188c0 (basic; perp FUN_06234c70, rect FUN_0623a4a0, oriented FUN_0622de40 are
-    // the same instructions): for each item, Age = Dt + Age (0x06218912); FLD Age / FCOMP
-    // Duration / AND 0x4100 / JNZ -> not greater (or unordered) integrates pos += vel * Dt,
-    // greater erases through FUN_06217ae0. The erase unlinks, decrements the live count of
-    // the item's own appearance ([item+8] + 0xe4, only when [item+8] is non-null) and
-    // frees the slot to the pool (FUN_0623ecf0). No Dt, pool or count guards.
+    // the same instructions; beam FUN_0620bda0) over Owner's own particle list: Age = Dt +
+    // Age; not greater than Duration (or unordered) integrates pos += vel * Dt, greater
+    // erases through FUN_06217ae0 -- unlink, decrement the owning appearance's live count
+    // ([item+8] + 0xe4, only when [item+8] is non-null), free the slot (FUN_0623ecf0).
+    // No Dt, pool or count guards. Only the billboard and beam pools come here; the
+    // particle appearance has its own (FUN_06230370 / FUN_0622ff00).
 #pragma optimize("", off)
 #pragma float_control(except, on, push)
     __declspec(noinline) void IntegratePool(FGenericFxObjectBase* Owner, FAppearancePool* Pool,
@@ -891,7 +732,7 @@ namespace AlchemyImpl
             }
             else
             {
-                // 06218950..1897f rounds only the Z product before all three additions.
+                // Retail rounds only the Z product before the three additions.
                 const double DeltaX = static_cast<double>(Dt) * Particle->VelX;
                 const double DeltaY = static_cast<double>(Dt) * Particle->VelY;
                 const float DeltaZ = static_cast<float>(static_cast<double>(Dt) * Particle->VelZ);
@@ -1102,11 +943,6 @@ namespace AlchemyImpl
         FreePoolItem(Pool, Item);
     }
 
-    // AllocPrivatePoolItem / FreePrivatePoolItem (wave19) were removed on
-    // 2026-09-26 with the private particle list they served: retail keeps one list
-    // per appearance node (node+0xd8), allocated straight from the pool with
-    // FUN_0623ec90 and left on the pool's used chain -- see
-    // FGenericFxObjectBase::SpawnListParticle.
 
     void AllocateAppearancePool(FAppearancePool* Pool, unsigned long Count, unsigned long Stride)
     {
@@ -1356,8 +1192,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06244f30 (the frame lookup the draws make) is FFxTextureWrapper::LookupFrame
-    // (alchemy_genericfx.cpp) since ALC-4; the free helper that took a bare handle and
-    // added null tests retail does not make is gone.
+    // (alchemy_genericfx.cpp).
 
     // FUN_06208aa0 (thiscall on a draw context, RET 0x18), 0x06208aa0..0x06208af4:
     //   (u16 count at +4, zero-extended) > [+0x18] (signed JG) -> return (u16)[+0x18], nothing
@@ -1520,8 +1355,7 @@ namespace AlchemyImpl
             *OutSin = Result[1];
     }
 
-    // FUN_06240f50 (thiscall on a draw context, RET 0xc), traced 2026-09-26 against
-    // alchemy.dll.txt 0x06240f50-0x06241065:
+    // FUN_06240f50 (thiscall on a draw context):
     //   [+0x18] = verts, [+0x1c] = indices -- stored before the capacity checks;
     //   DAT_06257bd8 (max verts) < verts -> FDUMP 0x76 "Max Vertices exceeded", false;
     //   DAT_06257bdc (max indices) < indices -> FDUMP 0x7d, false (signed JGE both);
@@ -1573,7 +1407,7 @@ namespace AlchemyImpl
         return VbLock >= 0 && IbLock >= 0;
     }
 
-    // FUN_06241070 (thiscall, RET), traced 2026-09-26 against 0x06241070-0x0624117e:
+    // FUN_06241070 (thiscall):
     //   [+8] == 0 -> FDUMP 0x9e "End() called before Begin()", return 0;
     //   VB vt+0x20 Unlock(DAT_06257bd4); IB vt+0x20 Unlock(-1);
     //   requested verts < [+4] -> FDUMP 0xa9, [+6] = 0;
@@ -1602,7 +1436,7 @@ namespace AlchemyImpl
         return Context.IndexCount;
     }
 
-    // FUN_06241180 (thiscall, RET), traced 2026-09-26 against 0x06241180-0x0624122a:
+    // FUN_06241180 (thiscall):
     //   [+8] != 0 -> FDUMP 0xc2 "End() must be called before Draw()", return -1;
     //   VB vt+0x28 Select(DAT_06257bd4) < 0 -> return 0;
     //   IB vt+0x24 Select(-1, [+0x20], 0, 0) < 0 -> return 0 (the VB offset is the base
@@ -2156,11 +1990,8 @@ namespace AlchemyImpl
     }
 
 
-    // Until 2026-09-16 the helpers below reached IGenericFx through hand-written slot
-    // numbers, two of them (CallNodeGetter / CallNodeSetter) taking the number as a RUNTIME
-    // argument. The interface was declared the whole time, in this module's own
-    // alchemy_types.h -- what was missing was the type of the variable. Retail casts too:
-    // 0x0621f537 calls [node+0x2c] straight off the stored pointer, with no QueryInterface.
+    // The helpers below call IGenericFx (alchemy_types.h) on the stored node pointer with
+    // no QueryInterface, as retail does (0x0621f537 calls [node+0x2c] directly).
     IGenericFx* AsFxNode(void* Node)
     {
         return static_cast<IGenericFx*>(static_cast<IDAComponent*>(Node));
@@ -2229,8 +2060,7 @@ namespace AlchemyImpl
             AsFxNode(Node)->SetNextSibling(Next);
     }
 
-    // FUN_06201e00: list link, not particle update. Ghidra .c drops SetParent
-    // arg and compares sibling key to parent pointer — listing is source.
+    // FUN_06201e00: node-tree link (sort-key ordered), not a particle update.
     void LinkNodeTree(IDAComponent* Parent, IDAComponent* Child)
     {
         IGenericFx* const ParentNode = AsFxNode(Parent);

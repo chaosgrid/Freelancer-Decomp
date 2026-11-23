@@ -16,23 +16,22 @@
 // Not SoundManager.dll internals.
 
 // FUN_0042b030 -- read every [Sound] of the ini into the registry (DAT_00667cc0); returns how many
-// SoundArchs it added. bForce = retail's second argument (0 from the one caller, 0x005b0d6f),
-// handed on to the redefine FUN_0042bc70.
+// SoundArchs it added. bForce = retail's second argument (0 from the one caller), handed on to
+// the redefine FUN_0042bc70.
 int LoadClientSoundArchIni(char const* FullPath, bool bForce);
 // FUN_0042ae40 -- the registered SoundArch of Id; null (with the 0x168 "unknown Sound archetype"
 // WARNING, which names Id->get_string()) for an empty or unknown id.
 void* LookupClientSoundArch(struct ID_String const* Id);
 // FUN_0042acb0 -- every registered SoundArch whose persistence bits ((flags >> 20) & Mask & 0xf)
-// match and whose SoundManager id is still -1 is acquired once. Mask 1 from the space entry
-// (0x0054ac99), 2 from the base entry (0x005588e9).
+// match and whose SoundManager id is still -1 is acquired once. Mask 1 from the space entry,
+// 2 from the base entry.
 void PreloadClientSoundArchesByCategory(unsigned Mask);
 // FUN_0042ad30 -- the same walk and test (SoundManager id -1 included), releasing once. Mask 1
-// from the space exit (0x0054afde), 2 from the base exit (0x00558a80).
+// from the space exit, 2 from the base exit.
 void UnloadClientSoundArchesByCategory(unsigned Mask);
 
 // FUN_0042b4d0 — app-shutdown teardown: force-release every archetype's wav references and
-// free the whole registry. Retail calls this from WinMain's teardown chain (0x5b22af), right
-// after the voice registry drop and before the rest of shutdown.
+// free the whole registry. Called from WinMain's teardown right after the voice registry drop.
 void ShutdownClientSoundArch();
 
 // FUN_0042b840 — slot 3: create wav if needed, bump UseCount.
@@ -57,11 +56,11 @@ void* CreateClientSoundSource();
 class FClientEquippedObj;
 struct ISoundSource;
 
-// FUN_00428f80(0x50) + FUN_0052efb0 -- a CliThrusterSound (vtable 005ddbfc) for the ship
-// (0x00545535): exterior archetype always, interior too for this client's own ship, looping.
+// FUN_00428f80(0x50) + FUN_0052efb0 -- a CliThrusterSound (vtable 005ddbfc) for the ship:
+// exterior archetype always, interior too for this client's own ship, looping.
 // Null when the allocation fails. The ship holds it at +0xf0.
 ISoundSource* CreateClientThrusterSound(FClientEquippedObj* Ship);
-// FUN_0052f110 (RET 4) -- the per-update tick (0x00545567): the working thrusters' summed
+// FUN_0052f110 (RET 4) -- the per-update tick: the working thrusters' summed
 // thrust sets the level and their mean position the 3D position; the player's first-person
 // view switches to the interior sound. Dt is not read.
 void TickClientThrusterSound(ISoundSource* Sound, float Dt);
@@ -73,15 +72,15 @@ void TickClientThrusterSound(ISoundSource* Sound, float Dt);
 // retail calls its Acquire unconditionally.
 void* CreateClientEquipSoundEmitter(void* Arch);
 // That emitter's +0x64 archetype (FUN_00528240 restarts the emitter with it through
-// FUN_004291c0, 0x005282e2 / 0x005283f1).
+// FUN_004291c0).
 void* GetClientEquipSoundEmitterArch(void* Emitter);
 
-// FUN_00428680. PlayKey layout matches listing (flags @ +4). OutHandle = param_3.
+// FUN_00428680. PlayKey flags at +4.
 unsigned char PlayClientSoundArch(void* Arch, unsigned* PlayKey, void** OutHandle,
                                   unsigned char bAltStart);
 // FUN_0042a2a0 (Sound::StreamedSource) -- restart a streamed source on Arch at Offset and kick
 // its stream. Caller: the Gf script's streamed sound events (FGfScript::PlayStreamedSoundEvent,
-// FUN_0044f610 0x0044f707). The answer is only whether the source holds a stream handle.
+// FUN_0044f610). The answer is only whether the source holds a stream handle.
 unsigned char RestartClientStreamedSound(ISoundSource* Handle, void* Arch, int Offset);
 // FUN_004285f0(Arch, PlayKey, OutHandle): if any live source already plays Arch, return 0;
 // otherwise FUN_00428680(Arch, PlayKey, OutHandle, 0).
@@ -98,8 +97,7 @@ void StopClientSoundArch(void* Arch);
 void StopAllClientSoundsExceptArch(void* KeepArch);
 // FUN_004284f0 (cdecl) -- FUN_00428430(0), then the "sound reference count leaks" warning when
 // Sound::Source instances are still alive (DAT_00667cbc), then Heap::Shrink on the three source
-// pools (DAT_00667a44 / a34 / a24). Callers: 0x0054afd9 (space exit), 0x00558a7b (base exit),
-// 0x005b227b (shutdown).
+// pools (DAT_00667a44 / a34 / a24). Callers: space exit, base exit, shutdown.
 void StopAllClientSounds();
 // FUN_00428550 / FUN_00428580 (cdecl) -- every playing source (DAT_00667c70, from the front)
 // paused (slot 26), resp. every paused one (slot 28) resumed (slot 27). Only caller:
@@ -141,13 +139,13 @@ void SetClientSoundSourceCone(void* SourcePtr, float InnerAngle, float OuterAngl
 void SetClientSoundSourceConeOutsideVolume(void* SourcePtr, float Volume);
 void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, float const* Transform);
 // The source's +0x04 category (0 sfx, 1 interface, 2/5 voice, 3 music, 4 ambient), written
-// directly by callers after FUN_00428680 (HUD_Comm 0x004cb0f6 / 0x004cb1f4 store 2).
+// directly by callers after FUN_00428680 (HUD_Comm stores 2).
 void SetClientSoundSourceType(void* SourcePtr, int Type);
 
 // FUN_00427940 (cdecl) -- one step of a dB fade. False when *Remaining < 0 (no fade running).
 // Otherwise *Remaining -= Dt; at or below zero *Remaining = -1 and *OutDb = ToDb; else
 // *OutDb = FromDb..ToDb interpolated Dt / (old remaining) of the way in power-ratio space,
-// -96 dB at or below 10^-9.6. Returns true. Caller: HUD_Receiver::Update (0x004cdf76).
+// -96 dB at or below 10^-9.6. Returns true. Caller: HUD_Receiver::Update.
 bool ClientSoundFadeDb(float FromDb, float ToDb, float Dt, float* Remaining, float* OutDb);
 
 // FUN_00428db0 / FUN_00428de0 — refcounted spaceflight ducking of the whole mix.

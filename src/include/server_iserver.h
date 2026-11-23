@@ -5,9 +5,9 @@
 // Author: Giperion.
 
 // server_iserver.h -- IServer (the 92-slot server interface), IChatServer, Server.dll's
-// two C factories and its three chat-hook data exports. Split out of common_server.h (which includes this header at the spot the
-// declarations used to occupy) so that a translation unit which must not see common_cobject.h
-// -- FLServer.exe's MFC code, whose CObject clashes with Freelancer's -- can still name IServer.
+// two C factories and its three chat-hook data exports. Separate from common_server.h (which
+// includes it) so that FLServer.exe's MFC code, whose CObject clashes with Freelancer's, can
+// name IServer without seeing common_cobject.h.
 // Closure: common_server_types.h (parameter structs, CHAT_ID, CHARACTER_ID, the EFLConnection /
 // CommResult / InvincibilityReason enums, forward declarations of EquipDesc / EquipDescList /
 // CollisionGroupDesc) and server_exports.h (SERVER_API).
@@ -20,7 +20,7 @@
 // ===========================================================================
 // IServer — exactly 92 slots (+0x000 .. +0x16c).
 //
-// Ground truth (retail listings; IServer card in decomp-tracker):
+// From the retail listings:
 //   * IServer's own abstract table, Server.dll .rdata:06d65d4c .. 06d65eb8 (COL at
 //     06d65d48 -> 06d6c49c, TD IServer; stored by IServerImpl's copy ctor at 06cef586), holds
 //     (0x16c / 4) + 1 = 92 entries, every one _purecall (LAB_06d5fff0).

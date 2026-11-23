@@ -14,11 +14,9 @@
 #include <cstring>
 
 // alchemy.dll -- the shared emitter body and the three generic emitters.
-// See alchemy_emitters.h for the retail vtable map. Everything here was
-// re-traced against alchemy.dll.txt on 2026-09-26 (ALC-1) and again, term by term with
-// the x87 precision, on 2026-09-30 (ALC-5): values that stay on the FPU stack are
-// double here, every FSTP float is a cast to float, and the properties are the ramps of
-// the emitter's property set (ALC-6: the set objects themselves, shared with clones).
+// See alchemy_emitters.h for the retail vtable map. Values that stay on the x87 stack in
+// retail are double here and every float store is a cast to float; the properties are
+// the ramps of the emitter's property set (shared with clones).
 namespace AlchemyImpl
 {
     namespace
@@ -85,8 +83,7 @@ namespace AlchemyImpl
             {nullptr, 0, 0, 0.0f, 1.0f},
         };
 
-        // The shared ramp-getter hit (e.g. FUN_06245a20 0x06245a82..0x06245a92): *Out =
-        // the ramp, AddRef, 0.
+        // The shared ramp-getter hit (e.g. in FUN_06245a20).
         GENRESULT HandOutRamp(INestedSingleRamp* Ramp, INestedSingleRamp** Out)
         {
             *Out = Ramp;
@@ -97,10 +94,9 @@ namespace AlchemyImpl
         const float kTwoPi = 6.2831855f;     // DAT_0624d4c8
         const float kDegToRad = 0.017453292f; // DAT_0624d4c4
 
-        // FUN_0623bf90 (thiscall on the vector): L = (x*x + y*y) + z*z FSTP float; one
-        // Newton step of the 0x5f3759df inverse square root, s = (1.5f - ((y*y)*L)*0.5f)
-        // * y kept in the FPU (DAT_0624bab8 = 0.5, DAT_0624bac0 = 1.5); v[i] = (float)(s *
-        // v[i]).
+        // FUN_0623bf90 (thiscall on the vector): the length squared is stored as float; one
+        // Newton step of the 0x5f3759df inverse square root (DAT_0624bab8 = 0.5,
+        // DAT_0624bac0 = 1.5) stays in the FPU.
         __declspec(noinline) void FastNormalize3(float* Vec)
         {
             float LengthSq;
@@ -119,9 +115,8 @@ namespace AlchemyImpl
             StoreAlchemyFpuFloat(Vec[2], Scale * Vec[2]);
         }
 
-        // The cone / cube direction (0621bab7..0621badd, cube 0621d467..0621d491): the
-        // spread stays in the FPU; FSIN of it is reused for x and z.
-        //   x = (float)(cos(Az) * sin(Sp)); y = (float)cos(Sp); z = (float)-(sin(Az) * sin(Sp)).
+        // The cone / cube direction (inlined in both samplers): the spread stays in the
+        // FPU and its sine is reused for x and z.
         __declspec(noinline) void SpreadDirection(float Azimuth, double Spread, float* Dir)
         {
             const double SinSpread = ComputeAlchemyFpuSine(Spread);
@@ -132,14 +127,10 @@ namespace AlchemyImpl
         }
     } // namespace
 
-    // ---- FFxEmitterBase ------------------------------------------------------
-
     // ---- Emitter property sets ------------------------------------------------
 
-    // FUN_062455b0 (after FUN_0623f7b0): +0x4c FxAnimatedSingleRamp (FUN_06212db0) whose
-    // key 0 is FUN_06209ad0(100.0); +0x50 (FUN_06206ce0) 10000.0; +0x54 2.0; +0x58 10.0;
-    // +0x5c 0; +0x60 0; +0x64 = 0; +0x68 FUN_06217c20(1.0) (FxRampSingleRamp with an
-    // FxRampSingle child in mode 4 keyed 1.0).
+    // FUN_062455b0 (after FUN_0623f7b0): +0x4c..+0x60 one-key FxAnimatedSingleRamps,
+    // +0x64 = 0, +0x68 a one-key FxRampSingleRamp (FUN_06217c20).
     FFxEmitterPropertySet::FFxEmitterPropertySet()
         : FrequencyRamp(nullptr), MaxParticlesRamp(nullptr), InitLifeSpanRamp(nullptr),
           PressureRamp(nullptr), EmitCountRamp(nullptr), VelocityApproachRamp(nullptr),
@@ -205,8 +196,7 @@ namespace AlchemyImpl
         ReleaseDescriptorSlot(MaxSpreadRamp);
     }
 
-    // FUN_0623bb80 0x0623bbd4..0x0623bc68: +0x6c an FxAnimatedSingleRamp (FUN_06206ce0)
-    // with AddKey(0, FUN_06209ad0(0)); +0x70 FUN_06210900(1.0).
+    // Inlined in FUN_0623bb80: +0x6c keyed 0, +0x70 keyed 1.
     FFxSphereEmitterPropertySet::FFxSphereEmitterPropertySet()
         : MinRadiusRamp(nullptr), MaxRadiusRamp(nullptr)
     {
@@ -263,7 +253,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06245aa0 (0x06245aa0..0x06245ac7).
+    // FUN_06245aa0.
     GENRESULT DACOM_API FFxEmitterPropertySet::GetPropSingleRampRamp(unsigned long Hash,
                                                                      INestedSingleRamp** Out)
     {
@@ -272,9 +262,7 @@ namespace AlchemyImpl
         return HandOutRamp(LodCurveRamp, Out);
     }
 
-    // FUN_06245a20 (0x06245a20..0x06245a9a): Frequency +0x4c, MaxParticles +0x50,
-    // EmitCount +0x5c, Pressure +0x58, InitLifeSpan +0x54, VelocityApproach +0x60, in
-    // that test order; else -8.
+    // FUN_06245a20, in retail's test order.
     GENRESULT DACOM_API FFxEmitterPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
                                                                          INestedSingleRamp** Out)
     {
@@ -331,15 +319,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06245bf0 (RET 8: node, Dt). Descriptor D = [node+0x9c]; every ramp is evaluated
-    // with +0x1C Eval(node+0x8c, InnerTime).
+    // FUN_06245bf0 (node, Dt). Every ramp is evaluated at (node+0x8c, InnerTime).
     GENRESULT FFxEmitterBase::UpdateEmitter(float Dt)
     {
-        // 06245c14: node vt+0x44.
         TickLifetime(Dt);
 
-        // 06245c1c..06245c3f, 062460a9: no appearance -> done; a dead appearance
-        // or a dead emitter drops the association.
+        // A dead appearance or a dead emitter drops the association.
         if (AssociatedAppearance_ == nullptr)
             return GR_OK;
         IGenericFx* const Appearance = AsFxNode(AssociatedAppearance_);
@@ -351,11 +336,10 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // 06245c45: node slot 7 (FUN_0623ffb0) -> +0xbc.
+        // Node slot 7 (FUN_0623ffb0) into +0xbc.
         ComputeRelativeTransform(AssociatedAppearance_, EmitterXform_);
 
-        // 06245c59..06245cbc: D+0x58 -> +0xb0, D+0x54 -> +0xb4, D+0x4c -> the local
-        // frequency, each FSTP float, at (+0x8c, Age).
+        // Each stored as float.
         FFxEmitterPropertySet* const Set = EmitterProps(); // node+0x9c
         Pressure_ = static_cast<float>(Set->PressureRamp->Eval(AppearanceOuterTime_, Age_));
         InitLifeSpan_ =
@@ -363,14 +347,14 @@ namespace AlchemyImpl
         const float Frequency =
             static_cast<float>(Set->FrequencyRamp->Eval(AppearanceOuterTime_, Age_));
 
-        // 06245cc0..06245cd4: Age - LastEmit is FST'd (Elapsed, float) but the FMUL by
-        // the frequency uses the unrounded difference; ftol truncates.
+        // Elapsed is stored as float, but the product with the frequency uses the unrounded
+        // difference; ftol truncates.
         const double ElapsedExt = static_cast<double>(Age_) - LastEmitTime_;
         const float Elapsed = static_cast<float>(ElapsedExt);
         long EmitCount = static_cast<long>(ElapsedExt * Frequency);
 
-        // 06245cd9..06245d12: first frame after construction / re-association:
-        // + D+0x64 (InitialParticles, ADD), PrevNodePos = node+0x70.. (translation).
+        // First frame after construction / re-association: InitialParticles (+0x64) is
+        // added (unsigned) and the previous position reset to the current translation.
         if (bResetEmitHistory_ != 0)
         {
             bResetEmitHistory_ = 0;
@@ -381,9 +365,8 @@ namespace AlchemyImpl
             PrevNodePos_[2] = NodeWorldXform_[11];
         }
 
-        // 06245d15..06245dd1: keyed bursts. D+0x5c's +0x24 GetKeyValue(0, &Keys) (AddRefs);
-        // Keys->GetKeyCount (+0x14) with no null check; every key with
-        // LastEmitTime_ <= time <= Age adds its count.
+        // Keyed bursts (EmitCount +0x5c): every key with LastEmitTime_ <= time <= Age adds
+        // its count. No null check on the key object.
         {
             IDAComponent* KeyObject = nullptr;
             Set->EmitCountRamp->GetKeyValue(0, &KeyObject);
@@ -392,31 +375,26 @@ namespace AlchemyImpl
             long KeyIndex = 0;
             for (KeyIndex = 0; KeyIndex < KeyCount; ++KeyIndex)
             {
-                // 06245d51: GetKeyTime (+0x2C); a non-zero result skips the key.
                 float KeyTime = 0.0f;
                 if (Keys->GetKeyTime(static_cast<int>(KeyIndex), &KeyTime) != GR_OK)
                     continue;
-                // FCOMP LastEmit; TEST AH,5; JNP skips when only C0 is set (time < last).
+                // Ordered compares: NaN key times neither skip nor stop.
                 if (KeyTime < LastEmitTime_)
                     continue;
-                // FCOMP Age; AND 0x4100; JZ stops when neither C0 nor C3 (time > Age).
                 if (KeyTime > Age_)
                     break;
-                // 06245da1: GetKeyValue (+0x30) into a zeroed triple.
                 float Value[3] = { 0.0f, 0.0f, 0.0f };
                 if (Keys->GetKeyValue(static_cast<int>(KeyIndex), Value) != GR_OK)
                     continue;
-                // `FILD count; FADD Value[0]; CALL ftol` -- the sum stays on the x87 stack.
+                // The sum stays in double before the truncation.
                 EmitCount = static_cast<long>(static_cast<double>(EmitCount) + Value[0]);
             }
-            // 06245dbe..06245dd1: the holder releases a non-null object.
             if (Keys != nullptr)
                 Keys->Release();
         }
 
-        // 06245dd4..06245e20: D+0x68 at (+0x8c, +0x90 LodInput) FIMUL count, FADD
-        // +0xec, FST float +0xec; ftol of the unrounded sum; FILD the result, FSTP float
-        // (EmitNowF), +0xec -= EmitNowF.
+        // LodCurve (+0x68) at (+0x8c, LodInput +0x90). EmitFraction_ (+0xec) gets the rounded
+        // sum, the truncation uses the unrounded one.
         const double FractionExt =
             Set->LodCurveRamp->Eval(AppearanceOuterTime_, LodInput_) * EmitCount + EmitFraction_;
         EmitFraction_ = static_cast<float>(FractionExt);
@@ -424,8 +402,7 @@ namespace AlchemyImpl
         const float EmitNowF = static_cast<float>(EmitNow);
         EmitFraction_ = EmitFraction_ - EmitNowF;
 
-        // 06245e26..06245e49: nothing to emit. FCOMP 0.0; TEST AH,0x44; JP returns
-        // unless exactly C3 (equal): a zero frequency settles the history at Age.
+        // Nothing to emit; a frequency of exactly 0 settles the history at Age.
         if (EmitNow == 0)
         {
             if (Frequency == 0.0f)
@@ -433,9 +410,9 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // 06245e4e..06245ee6: how far the emitter moved since the last emit, in this
-        // frame's local space (math +0x3C InverseTransform); 1.0f / EmitNowF stays in the
-        // FPU for the per-particle step and is FST'd to float for the time step.
+        // How far the emitter moved since the last emit, in this frame's local space;
+        // 1.0f / EmitNowF stays in the FPU for the per-particle step and is rounded to float
+        // for the time step.
         float Delta[3] = { 0.0f, 0.0f, 0.0f };
         Acquire3DMath()->InverseTransform(*reinterpret_cast<FVector*>(Delta),
                                           *reinterpret_cast<const FTransform*>(NodeWorldXform_),
@@ -451,9 +428,8 @@ namespace AlchemyImpl
                           static_cast<float>(Delta[1] * InvCountExt),
                           static_cast<float>(Delta[2] * InvCountExt) };
 
-        // 06245ee8..06245f7c: FCOMP 0.0; AND 0x4100; JNZ skips Elapsed <= 0 (and
-        // unordered). N = 1.0f / -Elapsed (FCHS, FDIVR) stays in the FPU; the scaled
-        // delta is FSTP float; D+0x60 Eval stays in the FPU for the product.
+        // Elapsed <= 0 (or unordered) skips. 1 / -Elapsed and the VelocityApproach Eval stay
+        // double; the scaled delta is rounded to float.
         if (Elapsed > 0.0f)
         {
             const double NegInvElapsed = 1.0 / -static_cast<double>(Elapsed);
@@ -466,9 +442,8 @@ namespace AlchemyImpl
             Velocity[2] = static_cast<float>(Scaled[2] * Approach);
         }
 
-        // 06245f80..06245fcd: sub-frame spacing (the float InvCount times Elapsed); no
-        // motion compensation when the appearance shares this emitter's parent
-        // (outer +0x28 == node+8).
+        // Sub-frame spacing; no motion compensation when the appearance shares this
+        // emitter's parent.
         float AgeOffset = Elapsed;
         const float TimeStep = InvCount * Elapsed;
         if (Appearance->GetAttachParent() == AttachParent_)
@@ -481,9 +456,8 @@ namespace AlchemyImpl
             FullDelta[2] = 0.0f;
         }
 
-        // 06245fd5..0624602a: D+0x50 FSTP float; FILD the appearance's live count
-        // (outer +0xCC), FSUBR (kept in the FPU); FCOM EmitNowF; TEST AH,5; JP keeps N
-        // unless only C0 is set (room < N), then N = ftol(room).
+        // Room = MaxParticles minus the appearance's live count (outer +0xCC), in double; an
+        // ordered room < N clamps N to ftol(room).
         const float MaxParticles =
             static_cast<float>(Set->MaxParticlesRamp->Eval(AppearanceOuterTime_, Age_));
         unsigned long LiveCount = 0;
@@ -493,7 +467,7 @@ namespace AlchemyImpl
         if (Room < EmitNowF)
             EmitNow = static_cast<long>(Room);
 
-        // 0624602c..06246091: outer +0xB4, N x node slot 20, outer +0xC0.
+        // Begin fields (outer +0xB4), N emits (node slot 20), end fields (outer +0xC0).
         Appearance->Pad45();
         if (EmitNow > 0)
         {
@@ -509,7 +483,6 @@ namespace AlchemyImpl
         }
         Appearance->Pad48();
 
-        // 06246097..062460a1.
         LastEmitTime_ = Elapsed + LastEmitTime_;
         return GR_OK;
     }
@@ -518,13 +491,13 @@ namespace AlchemyImpl
                                        const float* PosOffset3, const float* VelIn3,
                                        I3DMathEngine*& MathSlot)
     {
-        // Q = W * AgeOffset (FUN_06206ab0, FSTP float each).
+        // Q = W * AgeOffset (FUN_06206ab0, each stored as float).
         float Q[3];
         StoreAlchemyFpuFloat(Q[2], static_cast<double>(Vel3[2]) * AgeOffset);
         StoreAlchemyFpuFloat(Q[1], static_cast<double>(Vel3[1]) * AgeOffset);
         StoreAlchemyFpuFloat(Q[0], static_cast<double>(Vel3[0]) * AgeOffset);
-        // 0621bb88..0621bbbe (cone; cube 0621d541.., sphere 0623be5c..): x and y sums stay
-        // in the FPU until + PosOffset; the z sum is FSTP'd first.
+        // The common sampler tail (cone 0621bb88, cube 0621d541, sphere 0623be5c): x and y
+        // sums stay in the FPU until + PosOffset; the z sum is rounded to float first.
         float Pos[3];
         const double SumX = static_cast<double>(Q[0]) + Pos3[0];
         const double SumY = static_cast<double>(Pos3[1]) + Q[1];
@@ -582,18 +555,15 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_0621b7b0: operator_new(0x84), FUN_0621b490 on +4, the set's vtables, count 1;
-    // node +0x7c / +0x80 / +0x9c / +0xf0.
+    // FUN_0621b7b0: operator_new(0x84); cached at node +0x7c / +0x80 / +0x9c / +0xf0.
     void FxConeEmitter::CreatePropertySet()
     {
         AdoptPropertySet(new FFxConeEmitterPropertySet());
     }
 
-    // FUN_0621b890 (0x0621b890..0x0621b9c1, RET 8; this = the prototype's node):
-    // operator_new(0x10c) and the cone's constructor inline (0x0621b8cc..0x0621b976, the
-    // same stores as the factory's 0x0621c546.. body), then FUN_06245b30 (FUN_0623fc30 and
-    // the +0x9c set cache) and the +0xf0 set cache (0x0621b99c..0x0621b9a7); *Out = the new
-    // outer, 0. Both caches are PropertySet_ here.
+    // FUN_0621b890: operator_new(0x10c), the cone's constructor inline, then FUN_06245b30
+    // (FUN_0623fc30 and the +0x9c set cache) and the +0xf0 set cache. Both caches are
+    // PropertySet_ here.
     GENRESULT DACOM_API FxConeEmitter::CloneNode(IDAComponent** Out)
     {
         FxConeEmitter* const Node = new FxConeEmitter(PrimaryIid_, FactoryName_);
@@ -602,9 +572,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0621c030 (RET 0xc, through the outer thunk): 0x1C73D16B -> +0x6c, 0xF636F07F ->
-    // +0x70, 0x100E7F55 -> +0x74, 0xFA4B5E41 -> +0x78 (AddRef'd, 0); otherwise JMP
-    // FUN_06245a20.
+    // LAB_0621c030 (through the outer thunk); otherwise FUN_06245a20.
     GENRESULT DACOM_API FFxConeEmitterPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -629,10 +597,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kConePropertyRows, Callback, Context);
     }
 
-    // LAB_0621b9d0 (RET 8: node, Dt): t = (float)(Dt + Age); D = [node+0xf0];
-    // +0xfc = D+0x6c Eval; +0x100 = D+0x70 Eval - [+0xfc]; +0xf4 = D+0x74 Eval * 0.017453292f;
-    // +0xf8 = D+0x78 Eval * 0.017453292f - [+0xf4] (each FSTP float, Evals at (+0x8c, t));
-    // then FUN_06245bf0(node, Dt).
+    // LAB_0621b9d0: the shape values are sampled at Age + Dt (float), then FUN_06245bf0.
     GENRESULT DACOM_API FxConeEmitter::Pad5(float Dt)
     {
         FFxConeEmitterPropertySet* const Set = ConeProps();
@@ -647,9 +612,7 @@ namespace AlchemyImpl
         return UpdateEmitter(Dt);
     }
 
-    // LAB_0621ba90 (thiscall, RET 0xc): Az = (float)(rand * 2pi); Sp = rand * [+0xf8] +
-    // [+0xf4] (FPU); Dir from SpreadDirection; R = rand * [+0x100] + [+0xfc] (FPU);
-    // P = (float)(Dir * R); W = (float)(Dir * [+0xb0]); the common tail.
+    // LAB_0621ba90 (thiscall): the spread and radius stay in the FPU; then the common tail.
     void FxConeEmitter::EmitParticle(float AgeOffset, const float* PosOffset3, const float* Vel3)
     {
         const float Azimuth = static_cast<float>(AlchemyRand01() * kTwoPi);
@@ -681,14 +644,13 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_0621d140: operator_new(0x88), FUN_0621cdd0 on +4, the set's vtables, count 1.
+    // FUN_0621d140: operator_new(0x88).
     void FxCubeEmitter::CreatePropertySet()
     {
         AdoptPropertySet(new FFxCubeEmitterPropertySet());
     }
 
-    // FUN_0621d220 (RET 8): the cube's constructor inline (as its factory 0x0621dd26..),
-    // FUN_06245b30 (0x0621d32d), the +0xf0 set cache (0x0621d332..0x0621d33d); *Out, 0.
+    // FUN_0621d220: the cone's clone shape.
     GENRESULT DACOM_API FxCubeEmitter::CloneNode(IDAComponent** Out)
     {
         FxCubeEmitter* const Node = new FxCubeEmitter(PrimaryIid_, FactoryName_);
@@ -697,9 +659,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0621d080 (RET 0xc): 0xFD22A11C -> +0x6c, 0xEFB0F8CF -> +0x70, 0x14B74EB2 ->
-    // +0x74, 0xE282006B -> +0x78, 0x08C7217F -> +0x7c (AddRef'd, 0); otherwise JMP
-    // FUN_06245a20.
+    // LAB_0621d080; otherwise FUN_06245a20.
     GENRESULT DACOM_API FFxCubeEmitterPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -726,9 +686,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kCubePropertyRows, Callback, Context);
     }
 
-    // LAB_0621d360 (RET 8): t = (float)(Dt + Age); +0xfc / +0x100 / +0x104 = D+0x6c /
-    // +0x70 / +0x74 Eval; +0xf4 = D+0x78 Eval * 0.017453292f; +0xf8 = D+0x7c Eval *
-    // 0.017453292f - [+0xf4] (FSTP float each); FUN_06245bf0(node, Dt).
+    // LAB_0621d360: as the cone's.
     GENRESULT DACOM_API FxCubeEmitter::Pad5(float Dt)
     {
         FFxCubeEmitterPropertySet* const Set = CubeProps();
@@ -743,9 +701,8 @@ namespace AlchemyImpl
         return UpdateEmitter(Dt);
     }
 
-    // LAB_0621d430 (thiscall, RET 0xc): Az, Sp and Dir as the cone; then three draws,
-    // each ((rand - 0.5f) * extent) FADD ST0,ST0 FSTP float: height (y), width (x),
-    // depth (z); P = (x, y, z); W = (float)(Dir * [+0xb0]); the common tail.
+    // LAB_0621d430 (thiscall): direction as the cone; the three extent draws come in the
+    // order height (y), width (x), depth (z).
     void FxCubeEmitter::EmitParticle(float AgeOffset, const float* PosOffset3, const float* Vel3)
     {
         const float Azimuth = static_cast<float>(AlchemyRand01() * kTwoPi);
@@ -771,15 +728,13 @@ namespace AlchemyImpl
     {
     }
 
-    // FUN_0623bb80: operator_new(0x7c), the emitter set (FUN_062455b0) on +4 plus the two
-    // sphere ramps, the set's vtables, count 1 (0x0623bc81).
+    // FUN_0623bb80: operator_new(0x7c).
     void FxSphereEmitter::CreatePropertySet()
     {
         AdoptPropertySet(new FFxSphereEmitterPropertySet());
     }
 
-    // FUN_0623ba50 (RET 8): the sphere's constructor inline (as its factory 0x0623ca46..),
-    // FUN_06245b30 (0x0623bb4b), the +0xf0 set cache (0x0623bb50..0x0623bb5b); *Out, 0.
+    // FUN_0623ba50: the cone's clone shape.
     GENRESULT DACOM_API FxSphereEmitter::CloneNode(IDAComponent** Out)
     {
         FxSphereEmitter* const Node = new FxSphereEmitter(PrimaryIid_, FactoryName_);
@@ -788,8 +743,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_0623c210 (RET 0xc): 0xF231FF60 -> +0x6c, 0x1874DE74 -> +0x70 (AddRef'd, 0);
-    // otherwise JMP FUN_06245a20.
+    // LAB_0623c210; otherwise FUN_06245a20.
     GENRESULT DACOM_API FFxSphereEmitterPropertySet::GetPropAnimatedSingleRamp(
         unsigned long Hash, INestedSingleRamp** Out)
     {
@@ -810,8 +764,7 @@ namespace AlchemyImpl
         return WalkPropertyRows(kSpherePropertyRows, Callback, Context);
     }
 
-    // LAB_0623bcf0 (RET 8): t = (float)(Dt + Age); +0xf4 = D+0x6c Eval; +0xf8 = D+0x70
-    // Eval - [+0xf4] (FSTP float); FUN_06245bf0(node, Dt).
+    // LAB_0623bcf0: as the cone's.
     GENRESULT DACOM_API FxSphereEmitter::Pad5(float Dt)
     {
         FFxSphereEmitterPropertySet* const Set = SphereProps();
@@ -822,10 +775,7 @@ namespace AlchemyImpl
         return UpdateEmitter(Dt);
     }
 
-    // LAB_0623bd60 (thiscall, RET 0xc): three draws (rand - 0.5f) FADD ST0,ST0 FSTP
-    // float -- the first is y, the second x, the third z; FUN_0623bf90 normalises;
-    // R = rand * [+0xf8] + [+0xf4] (FPU); P = (float)(Dir * R); W = (float)(Dir *
-    // [+0xb0]); the common tail.
+    // LAB_0623bd60 (thiscall): the three direction draws come in the order y, x, z.
     void FxSphereEmitter::EmitParticle(float AgeOffset, const float* PosOffset3, const float* Vel3)
     {
         float Dir[3];

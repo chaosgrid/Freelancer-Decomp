@@ -6,7 +6,7 @@
 
 #pragma once
 
-// Retail PixelFormat helpers (0x005b7000..0x005b70d7) and their two .data tables. Every
+// Retail PixelFormat helpers (FUN_005b7000..FUN_005b7050) and their two .data tables. Every
 // BigImage descriptor, texture-format query and display-mode record in the exe identifies a
 // pixel format by the small integer id these tables index.
 //
@@ -14,8 +14,8 @@
 //                   FUN_005b7010 maps a D3DFORMAT back to its id).
 //   DAT_00615ec8 -- 15 descriptors of 0x4c bytes, indexed by id (FUN_005b7030).
 //
-// The only code references to either table are those accessors (.text:005b7000 / 005b7039 /
-// 005b7045); nothing in the PE writes them after load.
+// The only code references to either table are those accessors; nothing writes them after
+// load.
 
 // One colour channel of a descriptor.
 struct FPixelFormatChannel
@@ -54,7 +54,7 @@ FPixelFormatDesc* PixelFormatGetDesc(int Id);
 // this Bpp, HasAlpha == (AlphaBits != 0), and matching channel widths. Stores its id in *OutId
 // and returns true; otherwise stores FUN_005b7010(0) and returns false.
 //
-// Retail quirk kept: the blue width is compared against the descriptor's RED width
-// (.text:005b709c CMP EDX,ECX with ECX still [EAX+8]), not its blue width.
+// Retail quirk kept: the blue width is compared against the descriptor's RED width, not its
+// blue width.
 bool PixelFormatFind(unsigned long* OutId, unsigned long Bpp, unsigned long RedBits,
                      unsigned long GreenBits, unsigned long BlueBits, unsigned long AlphaBits);

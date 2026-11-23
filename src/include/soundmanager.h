@@ -7,7 +7,7 @@
 #pragma once
 
 #include "dacom.h"
-#include "x86math.h"            // FVector -- SoundManager's FVec3 was a third copy of it
+#include "x86math.h"            // FVector
 #include "audio/dsound8.h"
 
 // soundmanager.dll public ABI. Source: EXE/Disasm/soundmanager.dll, docs/re/audio.md.
@@ -16,11 +16,10 @@
 // src/SoundManager/SoundManagerInternal.h.
 //
 // DALib holds the live manager in DALib::Sound and freelancer drives it from
-// menu_sound_arch.cpp; until 2026-09-16 both did it by raw slot number
-// (docs/re/cross_dll_protocol.md).
+// menu_sound_arch.cpp (docs/re/cross_dll_protocol.md).
 
-// The listener/source vectors this interface takes are plain 3-float records -- x86math.h's
-// FVector, which SoundManager and Thorn each used to redeclare as FVec3.
+// The listener/source vectors this interface takes are plain 3-float records (x86math.h's
+// FVector).
 typedef FVector FVec3;
 
 struct ISoundManagerStatus : IDAComponent
@@ -45,31 +44,23 @@ struct ISoundArchetype : IDAComponent
 
 // ISoundSource -- the "play key". SoundManager never creates one: freelancer.exe hands it in
 // through AttachPlayKey and the mixer then calls back into it every tick to ask where the
-// sound is, how loud, how far, whether it is still alive. The port had no declaration for it
-// at all -- SoundManager reached it through 44 hand-written `reinterpret_cast<Fn>(Vtable[N])`
-// wrappers, and menu_sound_arch.cpp answered with a hand-built `static void* [42]` table that
-// it memcpy'd onto two more tables to fake derived classes.
+// sound is, how loud, how far, whether it is still alive.
 //
-// Slot widths below are read off retail's own Source3D vtable, PTR_LAB_005c9efc in
+// Slot widths below are read off retail's Source3D vtable, PTR_LAB_005c9efc in
 // freelancer.exe. All three source vtables -- PTR_LAB_005c9fac (Sound::Source),
 // PTR_LAB_005ca05c (Sound::StreamedSource) and PTR_LAB_005c9efc (Sound::Source3D) -- are
-// exactly 0xAC bytes, i.e. 43 entries; the port's hand-built table had 42 and was one short.
+// 0xAC bytes, i.e. 43 entries.
 //
-// THE CALLING CONVENTION IS MIXED, exactly like IMaterial, and the split is clean: slots
-// 3..21 read `this` off the stack (DACOM_API); slots 22..42 take it in ECX (__thiscall).
-// Verified per slot against the listing -- 0x00429910 (slot 5) opens `MOV ECX,[ESP+4]`, while
-// 0x004291c0 (slot 22) opens `PUSH ESI; MOV ESI,ECX` and returns `RET 0x8` for two arguments,
-// and slot 39 at 0x00428810 is `MOV EAX,[ECX+0x60]; RET` -- a bare RET, which no explicit-this
-// reading allows. Everything from slot 22 down is called only from inside freelancer.exe;
-// SoundManager only ever touches 3..21, which is why the port got away with declaring the
-// whole tail DACOM_API until 2026-09-16.
+// THE CALLING CONVENTION IS MIXED, like IMaterial: slots 3..21 read `this` off the stack
+// (DACOM_API); slots 22..42 take it in ECX (__thiscall). Slots 22 and up are called only from
+// inside freelancer.exe; SoundManager only touches 3..21.
 //
 // THE BASE CLASS DOES NOT IMPLEMENT THE 3D SLOTS. In Sound::Source and Sound::StreamedSource
 // slots 12 and 15..18 (position, cone angles, cone orientation, cone outside volume,
 // velocity) are the shared "unsupported" stubs -- LAB_0044fce0 (`MOV EAX,0xFFFFFFF9; RET 0xC`)
 // for the three-dword slot 15, LAB_00454190 (`MOV EAX,0xFFFFFFF9; RET 0x8`) for the rest.
 // Only Sound::Source3D has real bodies. The mixer guards every one of those calls with
-// Is3d(), so this is not a behavioural difference, but the port now mirrors it: FSoundSource
+// Is3d(), so this is not a behavioural difference, but the port mirrors it: FSoundSource
 // answers "unsupported" and FSpatialSource overrides.
 struct ISoundSource : IDAComponent
 {
@@ -126,16 +117,14 @@ struct ISoundSource : IDAComponent
     // 1 => dwApply 0 (DS3D_IMMEDIATE); anything else is a warning and 1.
     virtual GENRESULT DACOM_API GetApplyMode(unsigned long* Out) = 0;
     // Slots 19/20/21 all share one retail implementation, LAB_00454190:
-    // `MOV EAX,0xFFFFFFF9; RET 0x8` -- "unsupported", one argument. The port used to install a
-    // zero-argument stub here, which is what made these three a live stack bug (see below).
+    // `MOV EAX,0xFFFFFFF9; RET 0x8` -- "unsupported", one argument.
 
     // 22..25 +0x58..+0x64: start / alternate start / stop / offset. All __thiscall.
     // 22 FUN_004291c0 RET 0x8 -- `PUSH ESI; MOV ESI,ECX`, two stack arguments.
     virtual unsigned char __thiscall Start(void* Arch, int Extra) = 0;
     // 23 FUN_0053f330 RET 0x4 -- `XOR AL,AL; RET 0x4`: one argument, always fails.
     virtual unsigned char __thiscall AltStart(void* Arch) = 0;
-    // 24 FUN_004293e0 bare RET -- NO arguments. The port declared `Stop(int)` and threw the
-    // argument away, which is four bytes wider than retail.
+    // 24 FUN_004293e0 bare RET -- no arguments.
     virtual void __thiscall Stop() = 0;
     // 25 FUN_004293b0 RET 0x4 -- stores Offset, or clock - Offset when flag 0x10 is set.
     virtual void __thiscall SetStartOffset(int Offset) = 0;
@@ -147,8 +136,7 @@ struct ISoundSource : IDAComponent
     virtual void __thiscall Resume() = 0;
     // 28 LAB_004287e0: pause timestamp != 0; pausing at clock zero still reports false.
     virtual unsigned long __thiscall IsPaused() = 0;
-    // 29 FUN_00429840 bare RET, 0 args. an earlier note read this one as
-    // *is_finished*: it returns false when the looping bit at +0x0C is set, which squares with
+    // 29 FUN_00429840 bare RET, 0 args. It returns false when the looping bit at +0x0C is set, which squares with
     // SoundManager handing looping buffers DSBPLAY_LOOPING. Slot 42 calls it.
     virtual unsigned char __thiscall IsFinished() = 0;
     // 30 LAB_00429730 bare RET, 0 args -- sets up an SEH frame, so it owns a C++ object.
@@ -187,7 +175,6 @@ struct ISoundSource : IDAComponent
     // integrates the velocity triple at +0x48 into the position at +0x30 by that delta, then
     // calls its own slot 31 with the first argument and slot 29 (IsFinished), returning the
     // logical NOT of that. The base class body FUN_00429690 is the same minus the integration.
-    // The port's hand-built table stopped at 41 and never had this slot at all.
     virtual unsigned char __thiscall Update(const float* Listener, float DeltaSeconds) = 0;
 };
 
@@ -197,8 +184,7 @@ struct ISoundSource : IDAComponent
 // keeps its current setting otherwise.
 //
 // NOT IMPLEMENTED ANYWHERE IN THE PORT YET: both MixerTick call sites in
-// menu_sound_arch.cpp pass nullptr, so the listener never moves. Declaring the interface is
-// what makes that gap visible instead of hiding it behind a void*.
+// menu_sound_arch.cpp pass nullptr, so the listener never moves.
 struct ISoundListenerPose : IDAComponent
 {
     virtual int DACOM_API GetOrientation(FVec3* OutFront, FVec3* OutUp) = 0; // +0x0C

@@ -11,15 +11,14 @@
 //
 // RTTI .?AVNN_Trade@@ : WinControl, Event::Handler. operator_new(0x440) (0x004c381c).
 // WINFACTORY<NN_Trade> DAT_0067245c "NN_Trade": static init LAB_004be670 (ctor FUN_004c37a0,
-// atexit LAB_004be690 -> FUN_00579380); Create FUN_004c3810 (operator_new, FUN_004bfb60, the
-// class-name pointer, slot 9; a failed Create is followed by the scalar deleting destructor).
+// atexit LAB_004be690 -> FUN_00579380); Create FUN_004c3810 (operator_new, then FUN_004bfb60).
 //
-// vftable 0x005d62ac -- WinControl's with these overrides (raw dword dump):
+// vftable 0x005d62ac -- WinControl's with these overrides:
 //   0 FUN_004bfd20 scalar deleting dtor (FUN_004bfd40), 9 LAB_004c04f0 Create, 13 LAB_004c0120
 //   Draw, 20 FUN_004c2c70 KeyEvent, 36 LAB_004bfe00 GetHardpointTransform, 42 FUN_004c2d50
 //   SetProperty.
 // IDataViewOwner face +0x7c: vftable of WinControl (PTR_OnReceive 0x0053aaa0).
-// Event::Handler face +0x32c: vftable 0x005d6294, slot 0 LAB_0043d8e0 (MOV AL,1; RET 4).
+// Event::Handler face +0x32c: vftable 0x005d6294, slot 0 LAB_0043d8e0.
 //
 // The window sits between the two players' cargo lists. +0x338 is the local player's cargo
 // (Rebuild from the player's EquipDescList), +0x334 the offer the local player puts up (sent
@@ -46,11 +45,10 @@ class ShipViewControl;
 class NnTrade : public WinControl, public EventHandler
 {
 public:
-    // FUN_004bfb60 -- WinControl's ctor, the vptrs, G_NnTrade = this, every member below 0
-    // (+0x42c = -1). +0x394, +0x3e4, +0x438 and +0x43c are not written.
+    // FUN_004bfb60 -- every member below 0 (+0x42c = -1); +0x394, +0x3e4, +0x438 and +0x43c are
+    // not written.
     NnTrade();
-    // FUN_004bfd40 -- the three lists through their deleting destructors, G_NnTrade = 0, then the
-    // Event::Handler (FUN_00576010) and WinControl (FUN_0059fa50) destructors.
+    // FUN_004bfd40 -- the three lists through their deleting destructors.
     ~NnTrade() override;
 
     // slot 9 LAB_004c04f0 (RET 8) -- build the whole window.

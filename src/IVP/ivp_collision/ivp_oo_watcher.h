@@ -17,16 +17,15 @@ class IVP_Hull_Manager;
 class IVP_OO_Watcher;
 
 // ============================================================================
-// IVP_OO_Watcher / IVP_Synapse_OO (cmn-ivp2b, 2026-10-08). Library names
-// (Ipion). The collision record IVP_Collision_Delegator_Root_Mindist::
-// delegate_collisions_for_object (FUN_06360c80) creates for an object pair
-// whose surface managers do not both hand out a single convex ledge
-// (.text:06360d5a-06360d7e: operator_new(0x40) + FUN_06369be0(this, obj0,
-// obj1)). The watcher keeps one hull listener on each object and, whenever
-// either hull value passes its key, rebuilds the pair's exact mindists
-// (FUN_0634e0b0) into its own vector, acting as their delegator.
+// IVP_OO_Watcher / IVP_Synapse_OO (Ipion names). The collision record
+// IVP_Collision_Delegator_Root_Mindist::delegate_collisions_for_object
+// (FUN_06360c80) creates for an object pair whose surface managers do not
+// both hand out a single convex ledge (operator_new(0x40) at :06360d5a). The
+// watcher keeps one hull listener on each object and, whenever either hull
+// value passes its key, rebuilds the pair's exact mindists (FUN_0634e0b0)
+// into its own vector, acting as their delegator.
 //
-// Retail vtables (Common.dll.txt .rdata):
+// Retail vtables (.rdata):
 //   063a58e0  IVP_OO_Watcher (IVP_Collision part, +0x00):
 //             0634dc00 (base trap) / 06369e20 get_objects / 06369e40 get_ledges
 //             / 0634dc10 (base) / 06369cc0 deleting dtor
@@ -82,7 +81,7 @@ public:
     IVP_Synapse_OO synapses[2];             // +0x18 / +0x28
     IVP_U_Vector<IVP_Collision> mindists;   // +0x38: memsize 8, 0x20-byte heap buffer from the ctor
 
-    // FUN_06369be0 (.text:06369be0-06369ca6, RET 0xc).
+    // FUN_06369be0, RET 0xc.
     IVP_OO_Watcher(IVP_Collision_Delegator* Delegator, IVP_Real_Object* Object0, IVP_Real_Object* Object1);
 
     // FUN_06369ce0 (+ deleting wrapper FUN_06369cc0 and the secondary-base

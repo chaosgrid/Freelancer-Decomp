@@ -7,8 +7,7 @@
 #pragma once
 
 // Common.dll's IVP object hierarchy (IVP_Object .. IVP_Real_Object, IVP_Polygon, IVP_Ball).
-// Public since 2026-10-14 (claude-code:cmn-s2-phy8; formerly src/IVP/ivp_physics/
-// ivp_real_object.h, which now only includes this file): Server.dll reads IVP_Real_Object
+// Public header (src/IVP/ivp_physics/ivp_real_object.h only includes it): Server.dll reads IVP_Real_Object
 // fields directly (StarSystem_MpCollisionFilter 06d06c30: client_data +0xa4, first_child
 // +0x1c; the mine push 06cf3c03: core +0x98), and the client's collision filter LAB_005544e0
 // reads client_data, so the layout is a cross-DLL contract.
@@ -16,13 +15,8 @@
 #include <cstdint>
 #include "../IVP/ivp_utility/ivp_math.h"
 #include "../IVP/ivp_physics/ivp_core.h"
-// D-claude-common-ivp pass (2026-09-17): IVP_SurfaceManager used to be a bare
-// forward declaration here (class-shape defect 3c from the vtable-
-// identification lane). It is now a real, fully documented 11-slot abstract
-// class with one concrete default implementation and its static instance --
-// see ivp_surface_manager.h. IVP_Ball's constructor below needs the complete
-// type (it stores the default instance's address into surface_manager), so
-// this is a full include rather than a forward declaration.
+// Full include: IVP_Ball's constructor stores the default IVP_SurfaceManager instance's
+// address.
 #include "../IVP/ivp_physics/ivp_surface_manager.h"
 
 // Forward declarations
@@ -33,24 +27,19 @@ class IVP_OV_Element; // src/IVP/ivp_physics/ivp_ov_element.h -- IVP_Real_Object
 // src/IVP/ivp_physics/ivp_mindist.h -- the node type IVP_Real_Object::
 // synapse_list_head (+0x20) heads. Only a pointer is needed here.
 class IVP_Synapse_Real;
-class IVP_Controller_Phantom; // src/IVP/ivp_physics/ivp_phantom.h (cmn-ivp3d)
-class IVP_Template_Phantom;   // src/IVP/ivp_physics/ivp_phantom.h (cmn-ivp3d)
+class IVP_Controller_Phantom; // src/IVP/ivp_physics/ivp_phantom.h
+class IVP_Template_Phantom;   // src/IVP/ivp_physics/ivp_phantom.h
 
 #pragma pack(push, 4)
 
 // ============================================================================
 // IVP_Priority_Pool -- retail's generic fixed-slot priority pool, the 0x14-byte
-// object FUN_06362ef0 (ctor) / FUN_06362f70 (dtor) / FUN_06362f90 (Insert,
-// decomp-tracker item 3506) / FUN_06363280 (Remove, item 3507) operate on.
+// object FUN_06362ef0 (ctor) / FUN_06362f70 (dtor) / FUN_06362f90 (Insert) /
+// FUN_06363280 (Remove) operate on. Used from 30+ call sites with caller-defined payloads.
 //
-// EXTRACTED 2026-09-17 (lane claude:w26-simunit) out of IVP_Hull_Manager, which
-// embeds one of these at its own +0x20 and which used to be the only place the
-// port declared the layout. The extraction is what makes retail's OTHER
-// instantiation expressible: IVP_Sim_Unit_Manager::EventPool (ivp_environment.h)
-// is a STANDALONE, heap-allocated pool, `operator new(0x14)` + FUN_06362ef0(p,
-// 0x10) at Common.dll.txt:063608e2-06360912, with no hull manager around it.
-// Proof that the standalone allocation really is this same 0x14-byte layout,
-// read off THREE independent sites rather than assumed from the size:
+// Two instantiations: embedded in IVP_Hull_Manager at +0x20, and
+// IVP_Sim_Unit_Manager::EventPool (ivp_environment.h), standalone, `operator new(0x14)` +
+// FUN_06362ef0(p, 0x10) at .text:063608e2-06360912. The standalone one has the same layout:
 //   * :06360a13 `CMP word ptr [ECX+0x10],0x0`          -> Count   at pool+0x10
 //   * :06360a1a/:06360a1f/:06360a24/:06360a27
 //       `EDX=[ECX+4]; AX=[ECX+0xe]; SHL EAX,4; ESI=[EAX+EDX+0xc]`
@@ -64,28 +53,17 @@ class IVP_Template_Phantom;   // src/IVP/ivp_physics/ivp_phantom.h (cmn-ivp3d)
 //                                                         Entry::Key  at +0x08
 //     and finally :06360b96-:06360b9e `EAX=[EDX+8]; [EAX+8] -= elapsed`
 //                                                      -> KeyThreshold at pool+0x08
-// Every one of those matches IVP_Hull_Manager's own +0x20-relative field map
-// exactly (hull+0x24 -> pool+0x04, hull+0x28 -> pool+0x08, hull+0x2e ->
-// pool+0x0e, hull+0x30 -> pool+0x10), which is the independent confirmation
-// that there is ONE pool layout here and not two.
+// matching IVP_Hull_Manager's +0x20-relative map (hull+0x24 -> pool+0x04, ...).
 //
-// The member NAMES deliberately keep IVP_Hull_Manager's `Pool...` spelling so
-// that the two implementations below are literally the same text, and so that
-// src/Common/common_physys.cpp (which reads Hull.PoolEntries / Hull.PoolLiveIndex
-// / Hull.PoolKeyThreshold directly, and which this lane must not touch) keeps
-// compiling unchanged.
+// Member names keep the `Pool...` spelling that IVP_Hull_Manager and
+// src/Common/common_physys.cpp use.
 // ============================================================================
 class IVP_Priority_Pool
 {
 public:
-    // Confirmed retail per-entry shape (Common.dll.txt:06362f90-0636309e,
-    // the shared pool's Insert path).
-    // ENTRY LAYOUT CORRECTED 2026-09-17 (lane claude:w18-ivp) by porting the
-    // pool's Insert (FUN_06362f90, Common.dll.txt:06362f90-0636327b, 247 insns)
-    // and Remove (FUN_06363280, :06363280-0636333f, 62 insns) in full instead
-    // of only the first ~40 instructions of Insert. The previous reading had
-    // Prev at +0x2 and "Pad6" at +0x6; both are wrong. The pool threads TWO
-    // separate intrusive doubly-linked lists through every entry:
+    // Per-entry shape, from Insert (FUN_06362f90, 247 instructions) and Remove
+    // (FUN_06363280, 62 instructions). Two intrusive doubly-linked lists run through
+    // every entry:
     //   * the ASCENDING-KEY list at +0x4 (next) / +0x6 (prev), headed by
     //     PoolLiveIndex (+0x0e). Insert's fast path writes `new->+0x4 =
     //     PoolLiveIndex; Entries[PoolLiveIndex].+0x6 = new` (:063630b3/
@@ -101,29 +79,27 @@ public:
     //     when +0x0 still reads 0xfffe (:063632f1).
     struct Entry
     {
-        uint16_t ExpressNext; // +0x0: express-list next, or the literal 0xfffe meaning "not in the express list" (Common.dll.txt:06363099 sets it, :063631e1 and :063632f1 both test for exactly 0xfffe).
-        uint16_t ExpressPrev; // +0x2: express-list prev; 0xffff == this entry is the express head (Common.dll.txt:0636324e writes the sentinel, :06363301/:0636331b read it).
-        uint16_t Next;        // +0x4: ascending-key-list next while in use, free-list "next free" while free (dual-purpose) -- Common.dll.txt:06362f28/06362fba (ctor/Insert free-list), :063630b3/:0636319d (key list), :06363335 (Remove pushes the slot back onto the free list).
-        uint16_t Prev;        // +0x6: ascending-key-list prev; 0xffff == this entry is PoolLiveIndex (Common.dll.txt:063630da/:06363199/:06363238 write it, :06363294 reads it).
-        float Key;            // +0x8: Insert's `param_2`, stored as a raw float (Common.dll.txt:0636308b/06363093).
+        uint16_t ExpressNext; // +0x0: express-list next, or 0xfffe "not in the express list" (06363099 sets it, 063631e1 / 063632f1 test it).
+        uint16_t ExpressPrev; // +0x2: express-list prev; 0xffff == the express head (0636324e writes, 06363301 / 0636331b read).
+        uint16_t Next;        // +0x4: key-list next in use, free-list next while free (06362f28 / 06362fba free list, 063630b3 / 0636319d key list, 06363335 Remove).
+        uint16_t Prev;        // +0x6: key-list prev; 0xffff == this entry is PoolLiveIndex (063630da / 06363199 / 06363238 write, 06363294 reads).
+        float Key;            // +0x8: Insert's `param_2`, stored as a raw float (0636308b / 06363093).
         void* Payload;        // +0xc: Insert's `param_1` (06363096) -- a vtable-bearing listener object.
     };
     static_assert(sizeof(Entry) == 0x10, "IVP_Priority_Pool::Entry size");
 
-    uint16_t PoolCapacity = 0;      // +0x00: Common.dll.txt:06362ef7.
-    uint16_t PoolFreeHead = 0xffff; // +0x02: 0xffff == free list empty; Common.dll.txt:06362eff (ctor)/06362fa2 (Insert check).
-    Entry* PoolEntries = nullptr;   // +0x04: Common.dll.txt:06362f0f (ctor alloc).
-    float PoolKeyThreshold = 0.0f;  // +0x08: init'd from the literal bit pattern 0x501502f9 (Common.dll.txt:06362f59).
-    uint16_t PoolSortedHead = 0xffff; // +0x0c: 0xffff == empty; Common.dll.txt:06362f4d.
-    uint16_t PoolLiveIndex = 0xffff;  // +0x0e: 0xffff == empty; Common.dll.txt:06362f53.
-    uint16_t PoolCount = 0;           // +0x10: incremented by Insert (Common.dll.txt:06362f98).
+    uint16_t PoolCapacity = 0;      // +0x00: 06362ef7.
+    uint16_t PoolFreeHead = 0xffff; // +0x02: 0xffff == free list empty; 06362eff (ctor) / 06362fa2 (Insert check).
+    Entry* PoolEntries = nullptr;   // +0x04: 06362f0f (ctor alloc).
+    float PoolKeyThreshold = 0.0f;  // +0x08: init'd from the bit pattern 0x501502f9 (06362f59).
+    uint16_t PoolSortedHead = 0xffff; // +0x0c: 0xffff == empty; 06362f4d.
+    uint16_t PoolLiveIndex = 0xffff;  // +0x0e: 0xffff == empty; 06362f53.
+    uint16_t PoolCount = 0;           // +0x10: incremented by Insert (06362f98).
     uint16_t Field_0x12 = 0;          // +0x12: trailing bytes of the 0x14-byte allocation; never read by any pool function.
 
     IVP_Priority_Pool() {}
-    // FUN_06362ef0 (Common.dll.txt:06362ef0-06362f63). `InitialCapacity` is
-    // retail's own second argument: 8 from IVP_Hull_Manager's ctor
-    // (Common.dll.txt:0635217e), 0x10 from IVP_SimUnitManager_Construct
-    // (:063608fb).
+    // FUN_06362ef0. `InitialCapacity` is 8 from IVP_Hull_Manager's ctor (.text:0635217e),
+    // 0x10 from IVP_SimUnitManager_Construct (.text:063608fb).
     explicit IVP_Priority_Pool(uint16_t InitialCapacity) { Init(InitialCapacity); }
     ~IVP_Priority_Pool() { Destroy(); }
 
@@ -131,9 +107,8 @@ public:
     // FUN_06362f70 -- frees Entries if non-null.
     void Destroy();
 
-    // FUN_06362f90 (item 3506) / FUN_06363280 (item 3507). Insert returns
-    // retail's own return value: the slot index, which callers store so they
-    // can Remove it later.
+    // FUN_06362f90 / FUN_06363280. Insert returns the slot index, which callers store
+    // to Remove it later.
     uint16_t Insert(void* Payload, float Key);
     void Remove(uint16_t Slot);
 };
@@ -148,66 +123,26 @@ static_assert(offsetof(IVP_Priority_Pool, PoolCount) == 0x10, "IVP_Priority_Pool
 
 // ============================================================================
 // IVP_Hull_Manager (FUN_06352150 ctor / FUN_063521b0 dtor / FUN_063521f0 /
-// FUN_06352220, decomp-tracker item 3166, Common.dll.txt:06352150-0635229c).
-// Embedded BY VALUE inside IVP_Real_Object at +0x44 (see `hull_manager`
-// below), 0x34 (52) bytes.
+// FUN_06352220). Embedded by value in IVP_Real_Object at +0x44 (the base ctor
+// FUN_06345100 calls FUN_06352150 on `this+0x44`, .text:06345140), 0x34 bytes.
 //
-// OUTER-CLASS RESOLUTION (D-hullmanager-outer pass, 2026-09-10): a prior
-// pass (D102) left this item `blocked`, flagging FUN_06345100/0x063622bc as
-// the unexplored lead needed to identify the embedding outer class. Both
-// are now resolved: FUN_06345100 (decomp-tracker item 2790) is IVP_Real_
-// Object/IVP_Object's own confirmed real base constructor (see that item's
-// notes), and it calls FUN_06352150 directly on `this+0x44`
-// (Common.dll.txt:06345140, `LEA ECX,[ESI+0x44]` immediately before the
-// CALL -- no allocation, a true by-value embedded member). 0x063622bc
-// (Common.dll.txt:456688) turned out to be a dead end, exactly as D102
-// feared it might not be: it is just a SIBLING call site of FUN_06345100
-// inside FUN_06362280, another near-identical "type-specific second-half
-// object constructor" (a twin of FUN_06362570/item 3487, building a
-// different IVP_Real_Object subtype -- vtable PTR_FUN_063a5824 vs
-// PTR_FUN_063a585c, IVP_Object::object_type tag 2 vs 3), not a new class.
-// So the outer class was IVP_Real_Object all along.
-//
-// INTERNAL LAYOUT: this class embeds exactly one instance of the same
-// low-level fixed-slot pool allocator IVP_Complex_Mindist::PriorityPool
-// (ivp_mindist_limiter.cpp) already wraps -- its ctor/dtor call the
-// IDENTICAL FUN_06362ef0/FUN_06362f70 (Common.dll.txt:06352150-0635219d /
-// 063521b0-063521e8) -- but that existing port is explicitly a clean-room,
-// NOT-byte-identical stand-in (see its own header comment there), and its
-// hardcoded Entry shape (float Key/int Payload/Next/Prev/InUse) does not
-// match what THIS class's own accessor functions read from the pool's
-// entries (a different per-entry payload: a float Key plus a vtable-
-// bearing listener pointer, at different byte offsets -- see `Entry`
-// below). Retail's pool allocator (FUN_06362ef0/f70/f90/FUN_06363280) is
-// used from 30+ unrelated call sites across the module (confirmed via its
-// own XREF list), so it is a genuinely generic, caller-defined-payload
-// allocator, not something specific to IVP_Complex_Mindist -- this class
-// is simply a second, independent instantiation of it. Full field-by-field
-// re-derivation this pass, straight from FUN_06362ef0/FUN_06362f90's own
-// raw bytes (Common.dll.txt:06362ef0-06362f63 / 06362f90-0636309e), settles
-// which bytes belong to the pool's own bookkeeping vs. to this class
-// itself (see field comments below for exact citations).
+// Embeds one IVP_Priority_Pool at +0x20 (the ctor / dtor call FUN_06362ef0 /
+// FUN_06362f70). IVP_Complex_Mindist::PriorityPool (ivp_mindist_limiter.cpp) is a
+// clean-room stand-in for the same allocator with a different entry shape.
+// TODO: unify it with IVP_Priority_Pool.
 class IVP_Hull_Manager
 {
 public:
-    // The per-entry shape now lives on IVP_Priority_Pool above (extracted
-    // 2026-09-17, lane claude:w26-simunit, so retail's OTHER instantiation of
-    // the same allocator can be expressed). This alias keeps every existing
-    // `IVP_Hull_Manager::Entry` spelling -- including the ones in
-    // src/Common/common_physys.cpp, which this lane must not touch -- valid.
-    // Entries read by this class's own WalkActiveEntries/DrainAndShift:
+    // Alias for the `IVP_Hull_Manager::Entry` spelling. Entries read by this class's own
+    // WalkActiveEntries/DrainAndShift:
     // Entry::Next at +0x4 (:0635225d/:06352277), Entry::Key at +0x8
     // (06352263-0635226f), Entry::Payload at +0xc, dispatched through vtable
     // slots 2/3 (0635220d/06352274).
     typedef IVP_Priority_Pool::Entry Entry;
 
-    // +0x00..+0x17: RESOLVED 2026-09-17 (lane claude:common-ivp5, decomp-tracker
-    // items 3117/3128). This span used to read "8 dwords, all directly zeroed by
-    // the real constructor (Common.dll.txt:06352170-06352196). None of these are
-    // read by either accessor function or the destructor, so their purpose is
-    // otherwise unconstrained" -- true only because the evidence lives OUTSIDE
-    // this class's own 4 functions. FUN_06350050 (item 3128, Common.dll.txt:
-    // 06350080-063500c7 and its mirrored second half at :063500e8-06350123)
+    // +0x00..+0x17: zeroed by the ctor (.text:06352170-06352196) and not read by this
+    // class's own functions. FUN_06350050 (.text:06350080-063500c7, mirrored at
+    // 063500e8-06350123)
     // reads all six of them off an IVP_Real_Object* at the object-relative
     // offsets +0x44/+0x48/+0x4c/+0x50/+0x54/+0x58 -- i.e. exactly this embedded
     // member's +0x00/+0x04/+0x08/+0x0c/+0x10/+0x14 -- and evaluates, twice per
@@ -220,24 +155,20 @@ public:
     // Every one of those operands is reached by an x87 FSUB/FMUL/FADD on the
     // memory operand itself (`FSUB [ESI+0x44]`, `FSUB [ESI+0x48]`,
     // `FMUL [ESI+0x4c]`, `FSUB [ESI+0x50]`, `FADD [ESI+0x54]`,
-    // `FSUB [ESI+0x58]`), so all six are FLOATS, not the dwords this class used
-    // to declare. This is a linearly-extrapolated OUTER/INNER value pair with a
-    // shared split-precision timestamp, NOT the bounding sphere / AABB an
-    // earlier blocker guessed at.
+    // `FSUB [ESI+0x58]`), so all six are floats: a linearly extrapolated
+    // outer/inner value pair with a shared split-precision timestamp.
     float LastEditTimeHi = 0.0f;  // +0x00: high half of the split-precision "value was last edited at" stamp.
     float LastEditTimeLo = 0.0f;  // +0x04: low half. Differenced against IVP_Environment::current_time's own pair.
     float OuterGradient  = 0.0f;  // +0x08: d(outer value)/dt since LastEditTime.
     float InnerGradient  = 0.0f;  // +0x0c: d(inner value)/dt since LastEditTime.
 
     // +0x10/+0x14: the outer/inner values sampled AT LastEditTime, which the
-    // gradients above extrapolate forward. Three independent write/read sites
-    // agree, and they were previously named PendingDeltaA/PendingDeltaB on the
-    // strength of only the third:
+    // gradients above extrapolate forward:
     //   1. FUN_06350050 (above) adds +0x10 after `dt * OuterGradient` and
     //      differences +0x10 against +0x14 -- an absolute base value, not a
     //      delta.
     //   2. IVP_InitCoreRestStateAndDamping's per-object hull edit (ivp_core.cpp,
-    //      Common.dll.txt:06351da2-06351dc9) ZEROES both gradients and then does
+    //      .text:06351da2-06351dc9) zeroes both gradients and then does
     //      `OuterValueAtLastEdit = AccumulatedDeltaA + ExtraMargin` (a plain
     //      assignment of a running absolute total) and
     //      `InnerValueAtLastEdit += DistanceMoved` (the inner hull being eaten
@@ -245,61 +176,46 @@ public:
     //      to exactly these two values, which is what (1) then reads back.
     //   3. DrainAndShift below (FUN_06352220) negates both, folds -Outer into
     //      every live entry's Key and into PoolKeyThreshold/AccumulatedDeltaA
-    //      (Common.dll.txt:06352263-06352292), hands both negated values to each
+    //      (.text:06352263-06352292), hands both negated values to each
     //      entry's vtable-slot-3 callback (06352265/06352274, push order
-    //      EBX=-Outer then EBP=-Inner) and then zeroes both. That is a REBASE of
-    //      the whole hull-value coordinate system back to zero -- consistent
-    //      with (1)/(2), and the reason the old "pending delta" reading looked
-    //      plausible in isolation.
-    // Names are this port's own; retail's own identifiers were not recovered.
+    //      EBX=-Outer then EBP=-Inner) and then zeroes both: a rebase of the
+    //      hull-value coordinate system to zero.
+    // Names are the port's.
     float OuterValueAtLastEdit = 0.0f; // +0x10
     float InnerValueAtLastEdit = 0.0f; // +0x14
     // +0x18: running total of every DrainAndShift rebase's OuterValueAtLastEdit
-    // (only A, never B -- confirmed asymmetry, Common.dll.txt:0635228b-
-    // 06352292 has no counterpart write using InnerValueAtLastEdit).
+    // (only the outer value: .text:0635228b-06352292 has no inner counterpart).
     float AccumulatedDeltaA = 0.0f; // +0x18
-    // +0x1c (formerly Field_0x1c): integer time of the next rebase. Read by
+    // +0x1c: integer time of the next rebase. Read by
     // FILD dword and compared with LastEditTimeHi; when behind, DrainAndShift
     // runs and this becomes ftol(LastEditTimeHi + 10.0f)
     // (hull check inlined in 06351b90 / 06351f80; golem controller :06343f31-:06343f53).
     int32_t TimeOfNextReset = 0;    // +0x1c
 
-    // +0x20..+0x33: the embedded pool (fixed initial capacity 8, see ctor).
-    // Field-by-field layout independently re-derived this pass from
-    // FUN_06362ef0 (ctor, Common.dll.txt:06362ef0-06362f63) and FUN_06362f90
-    // (Insert, :06362f90-0636309e) -- Insert is not one of this class's own
-    // 4 functions but shares the SAME pool layout, so tracing it was the
-    // only way to settle which bytes are pool-owned vs. class-owned (this
-    // resolves an apparent boundary ambiguity an earlier evidence-gathering
-    // pass left open: PoolKeyThreshold at +0x28 and PoolCount at +0x30 both
-    // genuinely belong to the pool, not to this class directly).
-    uint16_t PoolCapacity = 0;         // +0x20: Common.dll.txt:06362ef7.
-    uint16_t PoolFreeHead = 0xffff;     // +0x22: 0xffff == free list empty; Common.dll.txt:06362eff (ctor)/06362fa2 (Insert check).
-    Entry* PoolEntries = nullptr;        // +0x24: Common.dll.txt:06362f0f (ctor alloc) -- this is the field WalkActiveEntries/DrainAndShift read directly as `this+0x24`.
-    float PoolKeyThreshold = 0.0f;        // +0x28: init'd from the literal bit pattern 0x501502f9 (Common.dll.txt:06362f59); compared against each inserted Key (FCOMP, 0636309e) and shifted by DrainAndShift below (06352279-06352288) -- exact semantic purpose (a running priority bound?) not confirmed.
-    uint16_t PoolSortedHead = 0xffff;      // +0x2c: 0xffff == empty; Common.dll.txt:06362f4d (ctor). Retail name unconfirmed.
-    uint16_t PoolLiveIndex = 0xffff;        // +0x2e: 0xffff == empty; Common.dll.txt:06362f53 (ctor) -- this is the field WalkActiveEntries/DrainAndShift both read directly as `this+0x2e` (their shared iteration cursor).
-    uint16_t PoolCount = 0;                  // +0x30: incremented by Insert (Common.dll.txt:06362f98); this is the field WalkActiveEntries/DrainAndShift both read directly as `this+0x30` (their shared loop guard).
-    uint16_t Field_0x32 = 0;                  // +0x32: unconfirmed trailing bytes -- outside the pool's own confirmed 0x20..0x31 footprint, never read by any of this class's own 4 functions.
+    // +0x20..+0x33: the embedded pool (initial capacity 8, see ctor).
+    uint16_t PoolCapacity = 0;         // +0x20: 06362ef7.
+    uint16_t PoolFreeHead = 0xffff;     // +0x22: 0xffff == free list empty; 06362eff (ctor) / 06362fa2 (Insert check).
+    Entry* PoolEntries = nullptr;        // +0x24: 06362f0f (ctor alloc); read as `this+0x24` by WalkActiveEntries / DrainAndShift.
+    float PoolKeyThreshold = 0.0f;        // +0x28: init'd from the bit pattern 0x501502f9 (06362f59); compared against each inserted Key (FCOMP, 0636309e) and shifted by DrainAndShift (06352279-06352288). TODO: exact meaning (a running priority bound?).
+    uint16_t PoolSortedHead = 0xffff;      // +0x2c: 0xffff == empty; 06362f4d (ctor).
+    uint16_t PoolLiveIndex = 0xffff;        // +0x2e: 0xffff == empty; 06362f53 (ctor); the iteration cursor of WalkActiveEntries / DrainAndShift.
+    uint16_t PoolCount = 0;                  // +0x30: incremented by Insert (06362f98); the loop guard of WalkActiveEntries / DrainAndShift.
+    uint16_t Field_0x32 = 0;                  // +0x32: trailing bytes, never read by this class.
 
-    // The seven fields above ARE an IVP_Priority_Pool, byte for byte; retail
-    // calls FUN_06362ef0/f70/f90/FUN_06363280 on `this+0x20` directly
-    // (Common.dll.txt:0635217e ctor, :063521d8 dtor). They are kept spelled out
-    // here rather than replaced by an `IVP_Priority_Pool Pool;` member only
-    // because src/Common/common_physys.cpp reads Hull.PoolEntries /
-    // Hull.PoolLiveIndex / Hull.PoolKeyThreshold by those names and is owned by
-    // another lane. This accessor is the single bridge, and the static_asserts
-    // right after the class pin all seven offsets across the two spellings, so
-    // the aliasing cannot silently drift.
+    // The seven fields above are an IVP_Priority_Pool (retail calls the pool functions on
+    // `this+0x20`, .text:0635217e ctor, 063521d8 dtor). They stay spelled out because
+    // common_physys.cpp reads Hull.PoolEntries / PoolLiveIndex / PoolKeyThreshold by name;
+    // Pool() is the bridge and the static_asserts below pin the aliasing.
+    // TODO: replace them with an `IVP_Priority_Pool Pool;` member.
     IVP_Priority_Pool& Pool() { return *reinterpret_cast<IVP_Priority_Pool*>(&PoolCapacity); }
     const IVP_Priority_Pool& Pool() const { return *reinterpret_cast<const IVP_Priority_Pool*>(&PoolCapacity); }
 
-    // FUN_06352150 (Common.dll.txt:06352150-063521a7, 30 insns).
+    // FUN_06352150.
     IVP_Hull_Manager();
-    // FUN_063521b0 (Common.dll.txt:063521b0-063521e8, ~14 insns).
+    // FUN_063521b0.
     ~IVP_Hull_Manager();
 
-    // FUN_063521f0 (Common.dll.txt:063521f0-06352218, 16 insns). While
+    // FUN_063521f0. While
     // PoolCount > 0, repeatedly RE-READS PoolLiveIndex (never advanced by
     // this function's own body) and dispatches
     // `Entries[PoolLiveIndex].Payload->vtable[2](this)` -- the listener's
@@ -309,29 +225,13 @@ public:
     // this port's own.
     void WalkActiveEntries();
 
-    // FUN_06352220 (Common.dll.txt:06352220-0635229c, 49 insns). See the
-    // Outer/InnerValueAtLastEdit field comments above for the full per-entry and tail
-    // behavior. Name is this port's own.
+    // FUN_06352220. See the Outer/InnerValueAtLastEdit field comments above. Name is
+    // the port's.
     void DrainAndShift();
 
-    // FUN_06362f90 (decomp-tracker item 3506, Common.dll.txt:06362f90-
-    // 0636327b, 247 insns) and FUN_06363280 (item 3507, :06363280-0636333f,
-    // 62 insns) -- the shared pool allocator's Insert/Remove, ported
-    // byte-faithfully against THIS class's own pool layout by lane
-    // claude:w18-ivp (2026-09-17). They were previously present only as the
-    // clean-room, deliberately NOT-byte-identical IVP_Complex_Mindist::
-    // PriorityPool in ivp_mindist_limiter.cpp, which is why every caller of
-    // this pool (item 3128/FUN_06350050, item 3333/FUN_0635c130) had to stay
-    // `simplified`. That clean-room copy is left alone: it is a SECOND,
-    // independent instantiation of the same retail allocator for a different
-    // embedding class, and retyping its Entry would be an unrelated change.
-    //
-    // PoolInsert returns retail's own return value: the slot index, which
-    // callers store so they can PoolRemove it later (e.g. IVP_OV_Element::
-    // HullPoolSlot). Both are one-line forwarders onto Pool() as of 2026-09-17
-    // (lane claude:w26-simunit) -- the bodies moved verbatim to
-    // IVP_Priority_Pool::Insert/Remove so there is exactly ONE copy of retail's
-    // 247+62 instructions in the port.
+    // FUN_06362f90 / FUN_06363280 on this pool (forwarders to IVP_Priority_Pool).
+    // PoolInsert returns the slot index callers keep for PoolRemove (e.g.
+    // IVP_OV_Element::HullPoolSlot).
     uint16_t PoolInsert(void* Payload, float Key) { return Pool().Insert(Payload, Key); }
     void PoolRemove(uint16_t Slot) { Pool().Remove(Slot); }
 };
@@ -358,20 +258,15 @@ static_assert(offsetof(IVP_Hull_Manager, PoolKeyThreshold) == 0x28, "IVP_Hull_Ma
 static_assert(offsetof(IVP_Hull_Manager, PoolLiveIndex) == 0x2e, "IVP_Hull_Manager+0x2e");
 static_assert(offsetof(IVP_Hull_Manager, PoolCount) == 0x30, "IVP_Hull_Manager+0x30");
 
-// Moved here unchanged from ivp_real_object.cpp (cmn-phy5, 2026-10-08) so the
-// ray solver can read it (0634a600 reads slot->WorldTransform.vv at +0x4c).
-// One slot of the pool above. Fields +0x0/+0x4/+0x8 are confirmed by
-// FUN_0634d530 and FUN_06353510's own bytes; +0xc onward is written only by
-// FUN_0634d640 (the refresh step, FULLPORT-DEFERRED below) and was not
-// otherwise touched by either of the two functions this pass ported for
-// real, so it is left as an opaque byte span rather than guessed at.
+// One narrow-phase cache slot (public because the ray solver reads it: 0634a600 reads
+// slot->WorldTransform.vv at +0x4c). +0x0/+0x4/+0x8 from FUN_0634d530 / FUN_06353510;
+// +0xc on is written by the refresh step FUN_0634d640 (IVP_RefreshNarrowPhaseCacheSlot).
 struct IVP_NarrowPhaseCacheSlot
 {
-    int32_t          LastRefreshTick; // +0x0: stamped from IVP_Environment::sim_step_count by FUN_0634d640 (confirmed: `MOV [EDI],EAX` at Common.dll.txt:0634d669, EAX==Env->sim_step_count read the line before).
-    int32_t          RefCount;        // +0x4: 0 == free/reusable (tested by FUN_0634d530's claim scan); bumped by FUN_06353510/ResolveNarrowPhaseCacheSlot below, decremented by IVP_Real_Object::ReleaseNarrowPhaseCacheSlot below (D-item319x pass, 2026-09-10 -- see that method's own comment for the evidence trail that resolved the old "no decrement site traced" TODO here).
+    int32_t          LastRefreshTick; // +0x0: IVP_Environment::sim_step_count, stamped by FUN_0634d640 (`MOV [EDI],EAX` at .text:0634d669).
+    int32_t          RefCount;        // +0x4: 0 == free (FUN_0634d530's claim scan); bumped by FUN_06353510 / ResolveNarrowPhaseCacheSlot, decremented by IVP_Real_Object::ReleaseNarrowPhaseCacheSlot.
     IVP_Real_Object* Owner;           // +0x8: back-pointer to the cached object.
-    // +0xc..+0x1b (16 bytes): d237:common-port pass (2026-09-10). Confirmed a
-    // genuine IVP_U_Quat -- this slot's own cached/interpolated orientation,
+    // +0xc..+0x1b: an IVP_U_Quat -- this slot's cached/interpolated orientation,
     // written by IVP_RefreshNarrowPhaseCacheSlot below (either copied
     // verbatim from Core->QWorldFCore when DTime==0, or slerped from
     // Core->QWorldFCore/QWorldFCoreNext otherwise) and then immediately
@@ -392,7 +287,7 @@ struct IVP_NarrowPhaseCacheSlot
     // IVP_Ledge_Mindist::SecondaryNormalDot (e.g. 063536d0 :063537fe,
     // 06363620 :06363774). No retail name recovered.
     Vector           Secondary;        // +0x5c..+0x67 (12 bytes)
-    char             _pad68[0x70 - 0x68]; // +0x68..+0x6f: still unconfirmed.
+    char             _pad68[0x70 - 0x68]; // +0x68..+0x6f: unknown.
 };
 static_assert(sizeof(IVP_NarrowPhaseCacheSlot) == 0x70, "IVP_NarrowPhaseCacheSlot size mismatch");
 static_assert(offsetof(IVP_NarrowPhaseCacheSlot, WorldTransform) == 0x1c, "WorldTransform offset mismatch");
@@ -401,34 +296,14 @@ static_assert(offsetof(IVP_NarrowPhaseCacheSlot, Secondary) == 0x5c, "Secondary 
 // ============================================================================
 // IVP_RealObjectConstructionTemplate -- port-local name (no retail source) for
 // the "CreateParms"-shaped struct pointer threaded through IVP_Environment::
-// static_object's real construction chain: FUN_0634cdf0/item 3050 ->
-// FUN_06362570/item 3487 -> BOTH FUN_06345100/item 2790 (this class's own
-// constructor below, which reads +0x00/+0x0c/+0x10/+0x18/+0x54) AND, as a
-// confirmed SIBLING call sharing the exact same pointer (not a child call --
-// see FUN_06345b20's own header comment in ivp_real_object.cpp for the
-// CALLER CORRECTION that established this), FUN_06345b20/item 2817 (which
-// reads +0x38/+0x3c/+0x40/+0x44). D-rotinertia-selector pass (2026-09-10):
-// +0x1c/+0x20/+0x24..+0x2c/+0x34 are now ALSO modeled (MassInput/
-// RotInertiaShapePtr/InertiaBoxVector/RotInertiaClampFactor below), closing
-// out FUN_06345b20's own RotInertia/Mass block. Only +0x14 (4 bytes) and
-// +0x30 (4 bytes) remain genuine, real, unmodeled gaps -- confirmed off the
-// same raw instructions to exist, but never read by either of this struct's
-// 2 confirmed consumers, so left as opaque bytes rather than guessed at.
+// static_object's construction chain: FUN_0634cdf0 -> FUN_06362570 -> both
+// FUN_06345100 (the constructor below; reads +0x00/+0x0c/+0x10/+0x18/+0x54) and, as a
+// sibling call with the same pointer, FUN_06345b20 (reads +0x1c..+0x34 and
+// +0x38/+0x3c/+0x40/+0x44). +0x14 and +0x30 are read by neither.
 //
-// +0x00/+0x04 (LongNamePtr/ShortNameTag): D-hullmanager-outer-wire pass
-// (2026-09-10) CORRECTED a prior pass's "+0x4 name-source char*, feeding
-// BOTH copies" reading. Direct re-trace of FUN_06345100's own call site
-// (Common.dll.txt:06345124 `PUSH EBP` -- EBP holds the raw CreateParms
-// pointer itself, offset +0, with NO +4 adjustment before the push) shows
-// the template argument passed to FUN_06345610 (IVP_Object::IVP_Object)
-// is CreateParms itself, so the name read is CreateParms+0x0,
-// not +0x4. The OTHER copy (Common.dll.txt:06345179, `LEA EDX,[EBP+0x4]`,
-// feeding IVP_Real_Object::name[8] via strncpy) independently confirms
-// +0x4 is a SEPARATE 8-byte embedded field, not a second read of the same
-// pointer -- and +0x4 + 8 bytes lands EXACTLY on the already-confirmed
-// FlagsHi field at +0xc with zero gap, strong corroborating evidence for
-// this corrected two-field reading (the old single-pointer-at-+0x4 model
-// left an unaccounted 4-byte gap between +0x8 and +0xc).
+// +0x00 / +0x04: FUN_06345100 passes the template itself (`PUSH EBP`, .text:06345124) to
+// IVP_Object::IVP_Object, which reads the name pointer at +0; the 8-byte short name at +4
+// is copied separately (`LEA EDX,[EBP+0x4]`, .text:06345179) and ends at FlagsHi.
 struct IVP_RealObjectConstructionTemplate
 {
     // +0x00: a "long" display-name pointer. Read unconditionally and strdup'd
@@ -438,69 +313,45 @@ struct IVP_RealObjectConstructionTemplate
 
     // +0x04..+0x0b: an embedded 8-byte "short" name/tag buffer, copied
     // (raw bytes, via strncpy, not a further pointer indirection) into
-    // IVP_Real_Object::name[8] (Common.dll.txt:06345179-063451b1).
+    // IVP_Real_Object::name[8] (.text:06345179-063451b1).
     char ShortNameTag[8];
 
-    uint32_t FlagsHi; // +0x0c: -> IVP_Core::IVP_Core's own FlagsHi param; also tested for zero/nonzero to pick IVP_Real_Object::flags' (+0x78) initial 0x10-vs-0x8 bit pattern (Common.dll.txt:063451fd-06345224).
-    uint32_t FlagsLo; // +0x10: -> IVP_Core::IVP_Core's own FlagsLo param (Common.dll.txt:063451d1).
+    uint32_t FlagsHi; // +0x0c: -> IVP_Core::IVP_Core's FlagsHi; zero/nonzero also picks IVP_Real_Object::flags' (+0x78) initial 0x10-vs-0x8 bit (.text:063451fd-06345224).
+    uint32_t FlagsLo; // +0x10: -> IVP_Core::IVP_Core's FlagsLo (.text:063451d1).
 
-    uint8_t _unknown_0x14[0x18 - 0x14]; // +0x14: real, unread by either of this struct's 2 confirmed consumers -- not guessed at.
+    uint8_t _unknown_0x14[0x18 - 0x14]; // +0x14: unread by both consumers.
 
-    IVP_Material* Material; // +0x18: -> IVP_Real_Object::material (+0x8C), Common.dll.txt:06345227-0634522a.
+    IVP_Material* Material; // +0x18: -> IVP_Real_Object::material (+0x8C), .text:06345227-0634522a.
 
-    // +0x1c..+0x34: D-rotinertia-selector pass (2026-09-10). RotInertia/Mass
-    // computation inputs, consumed by FUN_06345b20 (item 2817)'s
-    // IVP_InitCoreRestStateAndDamping (ivp_real_object.cpp, Common.dll.txt:
-    // 408294-408377). Resolved this pass by a full single-step physical-ESP
-    // stack simulation of that function's first ~100 instructions -- see that
-    // function's own header comment for the complete trace, including the
-    // pass's central finding that the long-unresolved `[ESP+0x1c]` RotInertia
-    // shape-selector (Common.dll.txt:408307) is simply Self->object_type,
-    // re-read from a stack copy stashed at function entry (Common.dll.txt:
-    // 06345b6e, `MOV [ESP+0x1c],EBP` where EBP==object_type) because by the
-    // time the selector is needed, the register EBP has been repurposed to
-    // point at &Core->RotInertia (Common.dll.txt:06345c67).
-    float MassInput; // +0x1c: clamped to a minimum of 1.0f (Common.dll.txt:408294-408301, `MassValue = (MassInput < DAT_063a545c) ? 1.0f : MassInput`) to produce IVP_Core::Mass. DAT_063a545c is a small positive epsilon (~0x3b449ba6), not yet independently named.
+    // +0x1c..+0x34: RotInertia / Mass inputs of IVP_InitCoreRestStateAndDamping
+    // (FUN_06345b20, ivp_real_object.cpp). Its `[ESP+0x1c]` shape selector is
+    // Self->object_type, stashed at entry (`MOV [ESP+0x1c],EBP`, .text:06345b6e) because
+    // EBP later points at &Core->RotInertia (.text:06345c67).
+    float MassInput; // +0x1c: clamped to at least 1.0f (`(MassInput < DAT_063a545c) ? 1.0f : MassInput`, DAT_063a545c a small epsilon ~0x3b449ba6) to give IVP_Core::Mass.
 
-    // +0x20: gates which of 2 RotInertia formulas applies (Common.dll.txt:
-    // 408303-408306, `TEST EAX,EAX; JZ ...`). NULL -> RotInertia is copied
-    // directly from InertiaBoxVector below (Common.dll.txt:408344-408352, no
-    // mass/shape scaling at all). Non-NULL -> a further switch on
-    // Self->object_type (2 or 3) computes a scaled RotInertia instead (see
-    // IVP_InitCoreRestStateAndDamping for the full box-shape/sphere-shape
-    // formulas). Only this pointer's nullness is load-bearing here -- it is
-    // never dereferenced anywhere in FUN_06345b20, so its own pointee type
-    // remains unidentified, per this project's placeholder-field policy.
-    // 2026-10-08 (claude-code:cmn-phy3): not a pointer -- the template's own
-    // constructor FUN_063486c0 stores the integer 1 here (`MOV [ESI+0x20],1`),
-    // so it is a flag (the SDK's auto_check_rot_inertia).
+    // +0x20: the SDK's auto_check_rot_inertia flag (the template ctor FUN_063486c0 stores
+    // 1). Zero -> RotInertia is InertiaBoxVector unscaled; nonzero -> a switch on
+    // Self->object_type (2 box, 3 sphere) computes a scaled RotInertia.
     int32_t AutoCheckRotInertia; // +0x20
 
     // +0x24..+0x2c: a per-axis "shape factor" Vector, componentwise-multiplied
     // into RotInertia in BOTH the object_type==2 ("box", via
     // Self->surface_manager->vtable[3]) and object_type==3 ("sphere", via a
-    // literal 0.4f == 2/5 solid-sphere coefficient, DAT_063a5458) sub-cases
-    // (Common.dll.txt:408329-408342), and copied through UNSCALED when
-    // RotInertiaShapePtr above is NULL (Common.dll.txt:408344-408352).
+    // literal 0.4f == 2/5 solid-sphere coefficient, DAT_063a5458) sub-cases,
+    // and copied through unscaled when AutoCheckRotInertia is 0.
     Vector InertiaBoxVector; // +0x24
 
-    uint8_t _unknown_0x30[0x34 - 0x30]; // +0x30: real (read nowhere in FUN_06345b20's own traced body), still unconfirmed -- not guessed at.
+    uint8_t _unknown_0x30[0x34 - 0x30]; // +0x30: not read by FUN_06345b20.
 
-    // +0x34: RotInertia post-clamp factor (Common.dll.txt:408354-408377).
-    // 0.0f (DAT_063a53d4, the confirmed exact-zero sentinel already used
-    // elsewhere in this port, e.g. FUN_063481b0's identity-matrix test)
-    // disables the clamp entirely. Otherwise: `Threshold = |Core->RotInertia|
-    // * RotInertiaClampFactor` (via the already-ported FUN_06347e60/
-    // VectorLength magnitude helper, item 2879), then each of RotInertia's 3
+    // +0x34: RotInertia post-clamp factor. 0.0f (DAT_063a53d4) disables the clamp.
+    // Otherwise `Threshold = |Core->RotInertia| * RotInertiaClampFactor`
+    // (VectorLength, FUN_06347e60), then each of RotInertia's 3
     // components is raised to Threshold if it is currently smaller --
     // a "don't let any single axis' inertia get too small relative to the
     // tensor's own overall magnitude" stability floor.
     float RotInertiaClampFactor; // +0x34
 
-    // +0x38..+0x44: mass/damping inputs, consumed by FUN_06345b20 (item
-    // 2817)'s IVP_InitCoreRestStateAndDamping (ivp_real_object.cpp), NOT by
-    // this class's own constructor. See that function's own field comments
-    // for the citation trail (Common.dll.txt:408377-408390).
+    // +0x38..+0x44: damping inputs, consumed by FUN_06345b20, not by the object ctor.
     float SpeedDampInput;     // +0x38
     float RotSpeedDampInputX; // +0x3c
     float RotSpeedDampInputY; // +0x40
@@ -508,40 +359,21 @@ struct IVP_RealObjectConstructionTemplate
 
     uint8_t _unknown_0x48[0x4c - 0x48];
 
-    // +0x4c: D-core-init-tail pass (2026-09-10). Confirmed a genuine float,
-    // read by FUN_06362570/item 3487 (Common.dll.txt:063625bf, `FLD float
-    // ptr [EDI+0x4c]`, EDI==this Template pointer) and added to a caller-
-    // supplied float* (that function's own param_2 -- `&local_c0`, holding
-    // the literal 1.0f at the one confirmed call site, Common.dll.txt:
-    // 420520) to produce Self->field_94 (see FUN_06362570's own port in
-    // ivp_real_object.cpp, IVP_Ball::IVP_Ball). Semantic meaning not identified -- this whole
-    // Template struct is a partially-uncharacterized stack buffer at that
-    // one call site (see FUN_06362570's own header comment for the "NOT
-    // safely resolved" provenance caveat), so only the primitive type/offset
-    // are confirmed here, per this project's placeholder-field policy.
-    float Field_0x4c; // +0x4c (ends exactly at +0x50, no further padding needed)
+    // +0x4c: a float FUN_06362570 (IVP_Ball::IVP_Ball) adds to its param_2 (1.0f at the one
+    // call site) to produce Self->field_94 (`FLD [EDI+0x4c]`, .text:063625bf). Meaning
+    // unknown.
+    float Field_0x4c; // +0x4c
 
-    // +0x50: D-item2785-wire pass (2026-09-10). Confirmed a genuine pointer,
-    // read by FUN_06345b20/item 2817 itself (Common.dll.txt:06345b46-06345b72,
-    // `MOV EAX,[EDI+0x50]; TEST EAX,EAX; JZ ...`) while building the LocalCsys
-    // argument for the Self->vtable[2]/LAB_06344de0 call (item 2785, see
-    // IVP_Real_Object::ApplyLocalCsys in ivp_real_object.cpp). When non-null,
-    // its OWN +0x30/+0x34/+0x38 float triple (Common.dll.txt:06345b74-06345b8b)
-    // is copied directly into LocalCsys.vv, bypassing surface_manager entirely
-    // -- an explicit caller-supplied center-of-mass/shift override. When null,
-    // Self->surface_manager->vtable[1] computes it instead (same unidentified-
-    // surface_manager-class blocker as FUN_06345b20's own RotInertia/Mass
-    // block). Pointed-to struct's own type/size not identified -- only the
-    // +0x30/+0x34/+0x38 sub-offsets are confirmed, per this project's
-    // placeholder-field policy.
+    // +0x50: an optional center-of-mass override. FUN_06345b20 tests it
+    // (.text:06345b46-06345b72) while building the LocalCsys for Self->vtable[2]
+    // (LAB_06344de0, ApplyLocalCsys): when non-null its +0x30/+0x34/+0x38 floats become
+    // LocalCsys.vv; when null surface_manager->vtable[1] computes it. Pointee type unknown.
     void* OptionalComOverride; // +0x50
 
-    void* ClientData; // +0x54: -> IVP_Real_Object::client_data (+0xA4), Common.dll.txt:0634523c-06345240.
+    void* ClientData; // +0x54: -> IVP_Real_Object::client_data (+0xA4), .text:0634523c-06345240.
 
-    // 2026-10-08 (claude-code:cmn-phy3): the four functions below were ported
-    // on a duplicate class named IVP_Material (ivp_material.h) that is now the
-    // real material class; they belong to this struct (the environment ctor
-    // builds one at 0634c5ff with FUN_063486c0 and passes it to FUN_0634cdf0).
+    // The environment ctor builds one at 0634c5ff with FUN_063486c0 and passes it to
+    // FUN_0634cdf0.
 
     // FUN_063486c0: `REP STOSD` 0x16 dwords of zero, then +0x14 = 0 again,
     // +0x1c = 1.0f, +0x20 = 1, +0x24/+0x28/+0x2c = 1.0f, +0x34 = 0x3cf5c28f,
@@ -572,7 +404,7 @@ static_assert(offsetof(IVP_RealObjectConstructionTemplate, OptionalComOverride) 
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, ClientData) == 0x54, "IVP_RealObjectConstructionTemplate+0x54");
 
 // ============================================================================
-// The IVP object hierarchy (cmn-phy7 2026-10-08).
+// The IVP object hierarchy.
 //
 //   IVP_Object                   vtbl 063a5450 {06345650 deleting dtor}, 0x1c
 //   +- IVP_Cluster               vtbl 063a5454 {06345740 deleting dtor}, 0x20
@@ -664,20 +496,16 @@ public:
     // Name kept from the port's earlier flattened layout (many users).
     void* first_child; // +0x1C
 
-    // +0x20: IDENTIFIED 2026-09-17 (lane claude:w26-simunit). Was `void*
-    // field_20`. Head of this object's intrusive "every synapse attached to me"
-    // list. The list is threaded through the SYNAPSE BASE (an IVP_Ledge_Mindist's
-    // own +0x18 or +0x34 slot), so the stored pointer is a mindist + 0x18 or
-    // + 0x34, never the mindist itself. Two independent sites, both read in
-    // full this pass:
-    //   * FUN_0634fec0 (item 3125, Common.dll.txt:0634ff06-0634ff2b and
-    //     :0634ff2b-0634ff50) unlinks a mindist from BOTH of its slots and, on
+    // +0x20: head of this object's intrusive list of attached synapses, threaded
+    // through the synapse (an IVP_Ledge_Mindist's +0x18 or +0x34 slot), so the stored
+    // pointer is mindist + 0x18 or + 0x34:
+    //   * FUN_0634fec0 (.text:0634ff06-0634ff50) unlinks a mindist from BOTH of its slots and, on
     //     the "no prev" branch, writes the successor back to the object's own
     //     +0x20: `EAX=[ESI+0x28]; ECX=[ESI+0x20]; MOV [EAX+0x20],ECX`
     //     (:0634ff22-:0634ff28) for slot A, and the symmetric
     //     `EDX=[ESI+0x44]; EAX=[ESI+0x3c]; MOV [EDX+0x20],EAX`
     //     (:0634ff47-:0634ff4d) for slot B. ESI+0x28/+0x44 are ObjectA/ObjectB.
-    //   * FUN_063454b0 (Common.dll.txt:063454b7-063454d4) walks it:
+    //   * FUN_063454b0 (.text:063454b7-063454d4) walks it:
     //     `EAX=[ECX+0x20]` then per node `MOVSX ECX,word[EAX+0x18]; ADD ECX,EAX`
     //     (node + a self-relative int16 delta == the owning mindist) and
     //     `ESI=[EAX+0x8]` for the next node -- which independently pins Next at
@@ -686,25 +514,17 @@ public:
     // +0x24: head of this object's list of synapses whose mindist is filed as
     // "invalid". FUN_0634e960 (.text:0634e98d-0634e9ca) pushes both synapses
     // of a mindist onto ObjectA/ObjectB's +0x24 with the same Next(+0x8)/
-    // Prev(+0xc) threading as synapse_list_head (cmn-phy5, 2026-10-08; was
-    // `void* field_24`).
+    // Prev(+0xc) threading as synapse_list_head.
     IVP_Synapse_Real* invalid_synapse_list_head; // +0x24
     void*               mindist_list;     // +0x28
     IVP_U_Quat*         q_core_f_object;  // +0x2C
     IVP_U_Point         shift_core_f_object; // +0x30 (16 bytes)
-    // +0x40: D-item3192-leaves pass (2026-09-10). RETYPED from a bare
-    // int32_t placeholder -- confirmed a lazily-populated narrow-phase
-    // cache-slot pointer, not a plain integer. Written only by
-    // IVP_AllocateCacheObject (FUN_0634d530, Common.dll.txt:0634d530-
-    // 0634d5b5, `MOV [EAX+0x40],ESI` at 0634d595 where EAX==this and
-    // ESI==the freshly claimed slot) and read only by
-    // ResolveNarrowPhaseCacheSlot (FUN_06353510, ivp_real_object.cpp) --
-    // see that method's comment for the full evidence trail, and
-    // IVP_NarrowPhaseCacheSlot's own comment above for the slot layout.
-    // Cleared by IVP_Real_Object_Free_Cache_Object (0634d510). Formerly
-    // `void* field_40`.
+    // +0x40: the lazily claimed narrow-phase cache slot. Written by
+    // IVP_AllocateCacheObject (FUN_0634d530, `MOV [EAX+0x40],ESI` at 0634d595), read by
+    // ResolveNarrowPhaseCacheSlot (FUN_06353510), cleared by
+    // IVP_Real_Object_Free_Cache_Object (0634d510).
     IVP_NarrowPhaseCacheSlot* cache_object; // +0x40
-    IVP_Hull_Manager    hull_manager;     // +0x44 (0x34 bytes) -- see IVP_Hull_Manager's own class comment above for the full evidence trail (decomp-tracker item 3166).
+    IVP_Hull_Manager    hull_manager;     // +0x44 (0x34 bytes)
 };
 
 struct IVP_Anchor;
@@ -755,15 +575,13 @@ public:
     ~IVP_Real_Object() override;
 
     uint32_t            flags;            // +0x78 (IVP_OBJECT_LOCATION / IVP_MOVEMENT_STATE flags)
-    IVP_Anchor*         anchors;          // +0x7C (formerly void* field_7c): this object's anchor list
+    IVP_Anchor*         anchors;          // +0x7C: this object's anchor list
     IVP_SurfaceManager* surface_manager;  // +0x80
     char                name[8];          // +0x84 (8-byte fixed string)
     IVP_Material*       material;         // +0x8C
-    // +0x90: IDENTIFIED 2026-09-17 (lane claude:w18-ivp). Was `void* field_90`.
-    // This is the object's IVP_OV_Element -- the record that represents the
-    // object inside the environment's spatial-subdivision (OV) tree. Proof
-    // chain, all in Common.dll.txt:
-    //   * FUN_0634f180 (item 3113, :0634f19d-:0634f1e9) reads this+0x90, calls
+    // +0x90: the object's IVP_OV_Element, its record in the environment's
+    // spatial-subdivision (OV) tree:
+    //   * FUN_0634f180 (.text:0634f19d-0634f1e9) reads this+0x90, calls
     //     its vtable slot 4 with arg 1 (the scalar deleting destructor, which
     //     is FUN_0635c070 at .rdata:063a5690), then `operator new(0x30)` and
     //     FUN_0635c020(newObj, this) -- so the allocation is exactly 0x30
@@ -771,40 +589,16 @@ public:
     //   * FUN_0635c020 (:0635c024-:0635c060) stores the OWNING object back
     //     into the new record's +0x24 and initialises the record's own
     //     0x10-slot IVP_U_Vector at +0x28.
-    //   * FUN_0635c090 (item 3332, the real destructor) unlinks it from the
+    //   * FUN_0635c090 (the destructor) unlinks it from the
     //     owner's hull manager pool (:0635c0c8) and from the OV tree
     //     (:0635c0e8, FUN_0635d2e0 on Environment->+0x14).
     // See src/IVP/ivp_physics/ivp_ov_element.h for the full class.
     IVP_OV_Element*     ov_element;       // +0x90
-    // +0x94: D-ivpenv-staticobject pass (2026-09-10). RETYPED from a bare
-    // void* placeholder -- confirmed FLOAT by FUN_06362570 (Common.dll.txt:
-    // 457092-457097, `FLD [name_holder+0x4c]; FADD [param2]; FSTP [this+0x94]`,
-    // part of IVP_Environment's own static_object build chain, decomp-tracker
-    // item 3487).
-    //
-    // CORRECTED [2026-09-10, D-item2817 dedicated pass]: an earlier version
-    // of this comment claimed FUN_06345b20 (item 2817) "zeroes it again
-    // shortly after", making this value transient. That was a misread --
-    // FUN_06345b20 sets ESI = this->core (Common.dll.txt:408262, `MOV
-    // ESI,[EBX+0x98]`) once, near its own midpoint, and ESI stays bound to
-    // that IVP_Core* for the REST of the function; every `[ESI+...]` write
-    // after that point (including the +0x94/+0x98/+0x9c/+0xa4/+0xa8/+0xac
-    // zero-fill at Common.dll.txt:408392-408399) targets IVP_Core::RotSpeed/
-    // Speed (ivp_core.h, same +0x94/+0xA4 offsets -- an ordinary "new rigid
-    // body starts at rest" init), NOT this field. This object's OWN +0x94 is
-    // read exactly once in the whole function (Common.dll.txt:408284, `FLD
-    // float ptr [EBX+0x94]`, EBX=this here) as a real input added into
-    // IVP_Core::UpperLimitRadius -- see IVP_InitCoreRestStateAndDamping() in
-    // ivp_real_object.cpp for the full trace. So this field is NOT transient:
-    // it is a genuine, load-bearing per-object bias term for the owning
-    // core's angular-speed limit. Its semantic name is still not assigned.
-    // CORRECTED [2026-09-10, D-core-init-tail pass]: the source operand was
-    // misread as "[name_holder+0x4c]" by an earlier pass -- it is actually
-    // `Template->Field_0x4c` (EDI at that point in FUN_06362570 is the SAME
-    // Template pointer passed through to IVP_InitCoreRestStateAndDamping,
-    // not a separate "name_holder" local; see IVP_RealObjectConstructionTemplate's
-    // own Field_0x4c comment above). Only the primitive type and real usage
-    // are confirmed, per this project's placeholder-field policy.
+    // +0x94: a float. FUN_06362570 writes `Template->Field_0x4c + *param_2`
+    // (`FLD [EDI+0x4c]; FADD [param2]; FSTP [this+0x94]`); FUN_06345b20 reads it once
+    // (`FLD [EBX+0x94]`, EBX = this) as an input to IVP_Core::UpperLimitRadius. (The
+    // +0x94.. zero-fill later in FUN_06345b20 is on the core, ESI = this->core.) A
+    // per-object bias of the core's angular-speed limit; name not assigned.
     float               field_94;         // +0x94
     IVP_Core*           core;             // +0x98 (Physical core)
     IVP_Core*           original_core;    // +0x9C
@@ -821,19 +615,18 @@ public:
     // FUN_06345710: convenience overload using environment's current simulation time.
     void calc_at_time_AT(IVP_U_Quat* OutQuat, IVP_U_Point* OutPosition);
 
-    // FUN_063454e0 (cmn-phy8): forces the core's movement-state byte to 0x21,
+    // FUN_063454e0: forces the core's movement-state byte to 0x21,
     // re-files this object's OV element (IVP_Mindist_Manager::RecheckOvElement
     // 0634ebd0), then restores the byte. Port-local name (behaviour); no OV
     // element test, unlike recheck_collision_filter 06345530. Body in
     // ivp_real_object.cpp.
     void recheck_ov_element_as_moving();
 
-    // ---- claude-code:cmn-ivp3d block (2026-10-08): contact points, collision
-    // detection and phantoms. Bodies in ivp_real_object.cpp under the same
-    // banner; IVP_Controller_Phantom is in ivp_phantom.h. ----
+    // ---- Contact points, collision detection and phantoms (IVP_Controller_Phantom is in
+    // ivp_phantom.h). ----
 
     // FUN_06345550 (.text:06345550-063455b8, RET 4), the SDK's
-    // unlink_contact_points (was the empty stub DeleteAllAnchors): removes
+    // unlink_contact_points: removes
     // every contact-point record on this object's list (+0x28) from its
     // friction system, waking both cores first unless bSilently.
     void unlink_contact_points(bool bSilently);
@@ -867,9 +660,6 @@ public:
     // exact list (0634ffa0, then 0634e8a0).
     void recalc_invalid_mindists();
 
-    // ---- cmn-phy6 block (2026-10-08). Bodies in ivp_real_object.cpp under the
-    // same banner. ----
-
     // FUN_06344dc0 (.text:06344dc0-06344dd1): if the core's movement byte
     // (+0x60) is exactly 8, tail-jump to ReviveOriginalCoreIfSleeping (063450e0).
     void ensure_in_simulation();
@@ -892,15 +682,13 @@ public:
     // set_transformation (06351b90). Callers PhySys 06285047 / 0628b72a and
     // 0634313d.
     void beam_object_to_new_position(const IVP_U_Quat* RotationWs, const IVP_U_Point* PositionWs, int32_t bOptimizeForRepeatedCalls);
-    // ---- end cmn-phy6 block ----
 
     // FUN_06346170 (.text:06346170-06346190): movement byte (+0x78) == 8 ->
     // environment->add_revive_core(original_core) (0634bb90), else
     // core->update_time_of_last_motion() (063470e0).
     void EnsureInSimulation();
 
-    // ---- cmn-physys4 block (2026-10-08). Bodies in ivp_real_object.cpp under the
-    // same banner; IVP SDK names where the SDK has the method. ----
+    // ---- PhySys-facing helpers (IVP SDK names where the SDK has the method). ----
 
     // FUN_06344d30 (.text:06344d30-06344d40, RET 4): core->set_mass (06347c10).
     // Caller PhySys::SetMass 062841fa.
@@ -937,108 +725,61 @@ public:
     // space; core->apply_impulse_at_point(PosCs, ImpulseCs, ImpulseWs)
     // (06346c00). Callers PhySys::AddImpulseAtPoint 06285674, 0636108b, 063610f5.
     void async_push_object_ws(const IVP_U_Point* PositionWs, const IVP_U_Point* ImpulseWs);
-    // ---- end cmn-physys4 block ----
 
-    // FUN_063450e0 (Common.dll.txt:406987-406999, decomp-tracker item 2789).
-    // RE-ATTRIBUTED 2026-09-09 (was incorrectly pointing at
-    // IVP_Core::revive_sleeping_core -- see ivp_core.cpp's comment above that
-    // method for the full evidence trail). This `this` is unambiguously
-    // IVP_Real_Object* (this->flags at +0x78, this->original_core at +0x9C,
-    // both already-documented fields above -- no offsetof static_assert exists
-    // for this class yet, only sizeof), not IVP_Core*. Tiny
-    // 8-insn gate: if (flags&0xFF)==8, forward into original_core's own
-    // sim-unit wake pass.
+    // FUN_063450e0 (8 instructions; `this` is an IVP_Real_Object: flags +0x78,
+    // original_core +0x9C): if (flags & 0xFF) == 8, forward into original_core's sim-unit
+    // wake pass.
     void ReviveOriginalCoreIfSleeping();
 
-    // FUN_06353510 (Common.dll.txt:06353510-06353559, decomp-tracker item
-    // 3196, 25 insns). D-item3192-leaves pass (2026-09-10): lazily resolves
-    // this object's narrow-phase cache slot (see field_40 above and
-    // IVP_NarrowPhaseCacheSlot's comment in ivp_real_object.cpp for the
-    // full evidence trail), bumps its refcount, and conditionally
-    // refreshes it. Opaque return type: the slot layout is a file-local
-    // detail of ivp_real_object.cpp.
+    // FUN_06353510: lazily resolves this object's narrow-phase cache slot (cache_object),
+    // bumps its refcount and conditionally refreshes it.
     struct IVP_NarrowPhaseCacheSlot* ResolveNarrowPhaseCacheSlot();
 
-    // The library's get_cache_object_no_lock (cmn-ivp2b, 2026-10-08): the
+    // The library's get_cache_object_no_lock: the
     // same lazy resolve + conditional refresh as ResolveNarrowPhaseCacheSlot
     // WITHOUT the refcount bump. No own retail function: inlined twice in
     // FUN_0634e0b0 (.text:0634e18d-0634e1d1 / 0634e2a8-0634e2ec).
     struct IVP_NarrowPhaseCacheSlot* get_cache_object_no_lock();
 
-    // D-item319x pass (2026-09-10): the matching decrement for the refcount
-    // ResolveNarrowPhaseCacheSlot bumps above. Not a separate retail
-    // function -- every one of the 3 real DAT_0658ab4c narrow-phase dispatch
-    // handlers (FUN_06353370/FUN_06353560/FUN_063536d0, decomp-tracker items
-    // 3195/3197/3200) ends its shared tail with a plain
-    // `DEC dword ptr [Slot+0x4]` on each side's slot (e.g. Common.dll.txt:
-    // 06353826/0635382c for FUN_063536d0's own two sides). This resolves
-    // ivp_real_object.cpp's own "no decrement site traced this pass -- open
-    // TODO" note on IVP_NarrowPhaseCacheSlot::RefCount.
+    // The matching refcount decrement. Not a retail function: the three DAT_0658ab4c
+    // narrow-phase handlers (FUN_06353370 / FUN_06353560 / FUN_063536d0) each end with
+    // `DEC dword ptr [Slot+0x4]` on both sides' slots (e.g. .text:06353826 / 0635382c).
     void ReleaseNarrowPhaseCacheSlot(struct IVP_NarrowPhaseCacheSlot* Slot);
 
-    // LAB_06344de0 (Common.dll.txt:06344de0-06344f06, decomp-tracker item
-    // 2785, 100 insns / 297 bytes). D-item2785-wire pass (2026-09-10):
-    // IVP_Real_Object's real, concrete vtable slot 2 -- confirmed via a full
-    // .rdata vtable dump by the immediately-prior pass (see item 2817's own
-    // notes) to be the target of the unconditional `Self->vtable[2](&LocalCsys)`
-    // call inside FUN_06345b20/IVP_InitCoreRestStateAndDamping below. "Apply a
+    // LAB_06344de0 (100 instructions), vtable slot 2, called unconditionally as
+    // `Self->vtable[2](&LocalCsys)` by IVP_InitCoreRestStateAndDamping. "Apply a
     // new LOCAL (object-to-core) coordinate system": recomputes
     // q_core_f_object/shift_core_f_object (this object's fixed offset from its
     // physical IVP_Core, e.g. a turret mounted off-center on a ship's core),
     // refreshes every cached mindist-list transform via the just-inverted
-    // matrix, and invalidates the narrow-phase cache slot. NewLocalCsys is a
-    // genuine `const IVP_U_Matrix*` (this port's own class, NOT Freelancer's
-    // tightly-packed `class Csys`) -- see ivp_real_object.cpp for the full
-    // derivation that settled this (cross-checked against FUN_063481b0/item
-    // 2889's own identity-matrix-builder byte pattern).
+    // matrix, and invalidates the narrow-phase cache slot. NewLocalCsys is an
+    // IVP_U_Matrix (not Freelancer's packed Csys); see ivp_real_object.cpp.
     // Declared below SetLocalCsysFromQuatAndPosition so the two virtuals take
     // slots 1 and 2 in retail's order (063a5444 = 06344f10, 063a5448 = 06344de0).
 
-    // LAB_06344f10 (Common.dll.txt:06344f10-06344f4c, decomp-tracker item
-    // 2786, 22 insns, kind=vtable_method). IVP_Real_Object's real, concrete
-    // vtable slot 1 -- confirmed via the same PTR_FUN_063a5444/PTR_FUN_063a5828/
-    // PTR_FUN_063a5860 .rdata XREF triple item 2785's own vtable dump used to
-    // settle ApplyLocalCsys (slot 2). Builds a full IVP_U_Matrix from a
-    // quaternion (via the already-generic IVP_U_Quat::set_matrix) plus an
-    // explicit translation, then forwards to ApplyLocalCsys through slot 2
-    // (this->vtable[2] in retail, a virtual call here). All 3 callees fully
-    // ported: IVP_U_Quat::set_matrix (ivp_math.h), ApplyLocalCsys.
+    // LAB_06344f10 (22 instructions), vtable slot 1: builds an IVP_U_Matrix from the
+    // quaternion (IVP_U_Quat::set_matrix) and the translation, then calls slot 2.
     virtual void SetLocalCsysFromQuatAndPosition(const IVP_U_Quat* Orientation, const IVP_U_Point* Position); // slot 1
     virtual void ApplyLocalCsys(const IVP_U_Matrix* NewLocalCsys);                                         // slot 2
 
-    // FUN_063455c0 (Common.dll.txt:063455c0-0634560c, decomp-tracker item
-    // 2802, 33 insns). D-cluster-ivp-adjacent pass (2026-09-10): destructor
-    // phase-2 helper, sole caller is ~IVP_Real_Object (FUN_06345300/item
-    // 2795) immediately after the hull_manager WalkActiveEntries broadcast.
-    // Drains the anchors list (+0x7c) via the already-ported
-    // IVP_Anchor_ObjectDeletedEvent notify trampoline (retail expects each listener to
-    // unlink itself from the anchors list as a side effect -- an infinite-loop
-    // safety net, the same assert-fail-on-stuck-head idiom already used by
-    // IVP_Hull_Manager::WalkActiveEntries' own retail sibling), calls
-    // unlink_contact_points(true), then dispatches vtable slot 4 on every node in
-    // field_20's own listener chain (same self-unlinking-listener
-    // assumption, raw vtable dispatch since that node's class is not
-    // identified anywhere in this port -- matches this file's existing
-    // convention for unidentified interface candidates).
+    // FUN_063455c0 (33 instructions): destructor phase 2, called only by ~IVP_Real_Object
+    // (FUN_06345300) after the hull_manager WalkActiveEntries broadcast. Drains the anchors
+    // list (+0x7c) through IVP_Anchor_ObjectDeletedEvent (each listener must unlink itself;
+    // the port asserts on a stuck head), calls unlink_contact_points(true), then dispatches
+    // vtable slot 4 on every node of synapse_list_head (+0x20), again self-unlinking.
     void TeardownMindistListenersAndCandidates();
 };
 
 // ============================================================================
-// The two concrete IVP_Real_Object leaves (class-shape defect 3b from the
-// vtable-identification lane; D-claude-common-ivp pass, 2026-09-17). Before
-// this pass the port instantiated IVP_Real_Object directly and neither leaf
-// existed, so `object_type` 2 and 3 were bare magic numbers set by nobody.
-//
-// Retail's evidence, identical in shape for both -- each is a "second-half"
+// The two concrete IVP_Real_Object leaves. Each is a "second-half"
 // constructor that CALLs the shared base constructor FUN_06345100 with the
 // same five arguments, then installs its OWN 3-slot vtable at [this+0] and
 // tags [this+4] (IVP_Object::object_type):
 //
-//   FUN_06362280  (Common.dll.txt:456652-456720)  vtable 063a5824, type 2
-//   FUN_06362570  (Common.dll.txt:457067-457131)  vtable 063a585c, type 3
+//   FUN_06362280  vtable 063a5824, type 2
+//   FUN_06362570  vtable 063a585c, type 3
 //
-// Byte-extent-checked vtable geometry (Common.dll.txt:569364-569383), both
-// 3 slots -- the same shape as IVP_Real_Object's own 063a5440 table, with
+// Both vtables have 3 slots -- the same shape as IVP_Real_Object's own 063a5440 table, with
 // only slot 0 (the scalar-deleting destructor) overridden and slots 1 and 2
 // inherited verbatim:
 //
@@ -1046,14 +787,9 @@ public:
 //   .rdata:063a585c  IVP_Ball     {FUN_06362620, LAB_06344f10, LAB_06344de0}
 //   .rdata:063a5440  IVP_Real_Object {FUN_063452e0, LAB_06344f10, LAB_06344de0}
 //
-// NAMING CAVEAT: "IVP_Polygon" and "IVP_Ball" come from the vtable-
-// identification lane's report and match the upstream IVP/Ipion class names
-// for the object_type 2 / 3 pair. No retail symbol survives to confirm
-// either name from this module's own listing. What IS proven from the
-// listing is the shape: exactly two leaves, type tags 2 and 3, and type 3
-// alone carries a radius input and the default surface manager -- which is
-// consistent with the sphere/polyhedron split those names describe. TODO:
-// re-check if an RTTI COL or an exported symbol for either turns up.
+// "IVP_Polygon" and "IVP_Ball" are the upstream IVP/Ipion names for the
+// object_type 2 / 3 pair; no retail symbol confirms them. Type 3 alone takes a
+// radius and the default surface manager, consistent with sphere vs polyhedron.
 //
 // LAYOUT: neither adds a member. Their destructors are implicit: 06362320
 // (Polygon slot 0) deletes after ~IVP_Real_Object (thunk to 06345300), and
@@ -1062,15 +798,11 @@ public:
 // derived destructor.
 // ============================================================================
 
-// FUN_06362280 (Common.dll.txt:456652-456720, 48 insns). object_type == 2.
-// Sole caller: 0634cdd5.
+// FUN_06362280 (48 instructions). object_type == 2. Sole caller: 0634cdd5.
 class IVP_Polygon : public IVP_Real_Object
 {
 public:
-    // Argument roles are identical to the base constructor's -- retail
-    // forwards all five straight through (Common.dll.txt:063622b1-063622bc,
-    // `PUSH EAX/ECX/EDI/EDX/EBX` in reverse-argument order ahead of
-    // `CALL FUN_06345100`).
+    // All five arguments are forwarded unchanged to FUN_06345100 (.text:063622b1-063622bc).
     IVP_Polygon(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager,
                 const IVP_RealObjectConstructionTemplate* Parms,
                 const IVP_U_Quat* InitialOrientationOrNull,
@@ -1078,19 +810,14 @@ public:
 };
 static_assert(sizeof(IVP_Polygon) == 0xA8, "IVP_Polygon must not change IVP_Real_Object's layout");
 
-// FUN_06362570 (Common.dll.txt:457067-457131, 47 insns). object_type == 3.
-// Sole caller: 0634ce45.
+// FUN_06362570 (47 instructions). object_type == 3. Sole caller: 0634ce45.
 class IVP_Ball : public IVP_Real_Object
 {
 public:
-    // NOTE the second argument's different role from IVP_Polygon's: retail
-    // pushes a literal 0 as the base constructor's SurfaceManager argument
-    // (Common.dll.txt:063625a0, `PUSH 0x0`) and instead dereferences this
-    // parameter as a float, adding it to Parms->Field_0x4c
-    // (Common.dll.txt:063625ae-063625d1, `MOV EDX,[ESP+param_2]; FLD
-    // [EDI+0x4c]; FADD [EDX]; FSTP [ESI+0x94]`). The surface manager is then
-    // overwritten unconditionally with the module's default instance
-    // (Common.dll.txt:063625c4).
+    // The second argument differs from IVP_Polygon's: retail passes 0 as the base ctor's
+    // SurfaceManager (`PUSH 0x0`, .text:063625a0) and reads this parameter as a float,
+    // field_94 = Parms->Field_0x4c + *Radius (.text:063625ae-063625d1). The surface manager
+    // is then set to the module's default instance (.text:063625c4).
     IVP_Ball(IVP_Cluster* Father, const float* Radius,
              const IVP_RealObjectConstructionTemplate* Parms,
              const IVP_U_Quat* InitialOrientationOrNull,
@@ -1098,22 +825,15 @@ public:
 };
 static_assert(sizeof(IVP_Ball) == 0xA8, "IVP_Ball must not change IVP_Real_Object's layout");
 
-// FUN_06345b20 (Common.dll.txt:06345b20-06345e2f, decomp-tracker item 2817).
-// The "second phase" of IVP_Real_Object construction -- rest-state (RotSpeed/
-// Speed), damping, LocalCsys/ApplyLocalCsys, RotInertia/Mass, and the
-// DeltaTime/InvDeltaTime world-transform snapshot. Always called AFTER
-// IVP_Real_Object::IVP_Real_Object (Self->environment must already be set --
-// see this function's own header comment in ivp_real_object.cpp for why).
-// Declared here (not just file-local to ivp_real_object.cpp) so the
-// IVP_Environment::static_object build chain (FUN_06362570/FUN_0634cdf0,
-// decomp-tracker items 3487/3050; IVP_Ball::IVP_Ball in ivp_real_object.cpp and the
-// IVP_Environment constructor in ivp_environment.cpp) can call it.
-// FUN_06345b20: thiscall on Self, stack (Environment, Template), RET 8.
+// FUN_06345b20 (.text:06345b20-06345e2f): thiscall on Self, stack (Environment, Template),
+// RET 8. The second phase of IVP_Real_Object construction -- rest state (RotSpeed/Speed),
+// damping, LocalCsys/ApplyLocalCsys, RotInertia/Mass and the DeltaTime/InvDeltaTime
+// world-transform snapshot. Runs after the constructor (Self->environment must be set).
+// Called by IVP_Ball::IVP_Ball and the IVP_Environment constructor (FUN_0634cdf0).
 void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Environment,
                                      const IVP_RealObjectConstructionTemplate* Template);
 
-// ---- cmn-phy6 block (2026-10-08): core merge / split, both cdecl free
-// functions in retail. Port-local names. ----
+// ---- Core merge / split, both cdecl free functions in retail. Port-local names. ----
 
 // FUN_06343700 (.text:06343700-0634393c): weld Object into Host's core.
 // Distance < 0 (or NaN) means "measure it": the distance between the two
@@ -1129,41 +849,17 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
 // rotation speed and the old core's surface speed at Object's position.
 // Callers: PhySys 062848e2 / 0628b6b1.
 void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectConstructionTemplate* Template);
-// ---- end cmn-phy6 block ----
 
 // ============================================================================
 // IVP_GetDefaultSurfaceManager() -- returns the module's one static
 // IVP_SurfaceManager_Default instance, DAT_0658afe0.
 //
-// REWRITTEN AND CORRECTED (D-claude-common-ivp pass, 2026-09-17). The block
-// that stood here described a hand-rolled 10-slot fake vtable over an opaque
-// {VTable, Inner} pair, because IVP_SurfaceManager was only forward-declared.
-// It is now a real class -- see ivp_surface_manager.h for the complete,
-// byte-extent-checked 11-slot geometry of both the abstract base
-// (.rdata:063a56ac) and this default implementation (.rdata:063a5830), the
-// per-slot bodies, the /OPT:ICF caveat on the borrowed slot names, and the
-// static-init/atexit lifetime of the instance itself.
+// See ivp_surface_manager.h for the 11-slot tables of the abstract base (.rdata:063a56ac,
+// slot 10 _purecall) and this default implementation (.rdata:063a5830; slot 10
+// `MOV EAX,1; RET`, slots 7/8 the base's bare `RET 4` at 062ed730), and the instance's
+// owned block (FUN_06343fc0(0x20, 0x10) in the ctor, FUN_06343ff0 in the dtor).
 //
-// THREE CLAIMS FROM THE OLD BLOCK ARE NOW KNOWN TO BE WRONG, recorded here
-// so they are not reintroduced:
-//   1. "Vtable SIZE ... ambiguous past slot 9 ... Sized this port's own
-//      table to 10 slots (0-9) to stay inside the unambiguous range."
-//      Wrong: the table is unambiguously 11 slots. The abstract BASE table
-//      at 063a56ac has exactly the same 0x28-byte extent and its slot 10 is
-//      _purecall, which only makes sense if slot 10 belongs to this class
-//      hierarchy. Slot 10's body is `MOV EAX,1; RET`.
-//   2. "Slots 3-8 ... are real-but-unexamined bodies." They are examined
-//      now; slots 7 and 8 are not even overrides -- both tables share the
-//      one address 062ed730, a bare `RET 4` inherited from the base.
-//   3. "this port's own singleton needs neither [static init nor atexit
-//      teardown], being a simple non-owning zero-filled scratch block."
-//      Retail's block is genuinely owned: allocated by FUN_06343fc0(0x20,
-//      0x10) in the constructor and released by FUN_06343ff0 in the
-//      destructor. The port now owns it the same way.
-//
-// This accessor is kept because existing callers use it; it is a port-only
-// convenience, NOT a retail function -- retail has no getter and takes the
-// instance's address directly (see ivp_surface_manager.h).
+// Port-only accessor: retail has no getter and takes the instance's address directly.
 // ============================================================================
 IVP_SurfaceManager* IVP_GetDefaultSurfaceManager();
 

@@ -16,28 +16,14 @@
 // FleeBehavior -- AI "break off and run" state (Behavior family)
 // ============================================================================
 //
-// RTTI identity (hand-decoded directly from EXE/Disasm/Common.dll.txt raw
-// bytes, NOT from Ghidra's .c decompilation -- see "ground truth precedence"
-// in this marathon's methodology):
-//
-//   RTTICompleteObjectLocator @ .rdata:0x063a8dbc (offset field = 0, i.e. the
-//   primary -- and only -- vtable installs at object offset 0)
-//     -> pTypeDescriptor @ .data:0x063ebe7c, name ".?AVFleeBehavior@@"
-//     -> pClassHierarchyDescriptor @ .rdata:0x063a8dac, numBaseClasses = 2,
-//        BaseClassArray @ 0x063a8da0 = [ FleeBehavior(self, numContained=1),
-//                                        Behavior(numContained=0, mdisp=0,
-//                                        the SAME shared Behavior
-//                                        BaseClassDescriptor every other
-//                                        sibling in this family reuses) ]
-//
-// Single-inheritance direct child of Behavior -- same shape as
-// IdleBehavior/CruiseBehavior, no secondary vtable. Retail's own debug strings in
+// RTTI: COL .rdata:0x063a8dbc -> ".?AVFleeBehavior@@" (.data:0x063ebe7c), numBaseClasses
+// = 2 (self + Behavior): single inheritance, no secondary vtable. Retail's own debug strings in
 // .rdata name three of its methods: "FleeBehavior::Perform()" (slot 7, 0639f6b8 and
 // 0639f750), "FleeBehavior::deactivate()" (slots 3 and 4, 0639f7a8) and
 // "FleeBehavior::event_handler()" (slot 22, 0639f810).
 //
 // ----------------------------------------------------------------------------
-// Constructor: FUN_062c7020 (Common.dll.txt 193301-193339). FUN_062d2020 (Behavior's
+// Constructor: FUN_062c7020. FUN_062d2020 (Behavior's
 // own field initialisation), DirectiveGotoOp at +0x4c, DirectiveDockOp at +0xbc,
 // byte +0x2c = 0, byte +0x38 = 0, +0x34 = 0, vptr, +0x30 = 4.
 // ============================================================================
@@ -51,8 +37,7 @@ public:
     ~FleeBehavior() override;
 
     // ------------------------------------------------------------------
-    // Vtable .rdata:0639f64c, 27 slots. Overrides of Behavior's table (read off the raw
-    // .rdata dwords, 2026-10-08):
+    // Vtable .rdata:0639f64c, 27 slots. Overrides of Behavior's table:
     //   0  FUN_062c7090  scalar-deleting dtor, ICF-shared by 7 behavior vtables
     //   1  LAB_062cf3e0  `JMP FUN_062d2090` -- Behavior::BindContext
     //   3  LAB_062c7570  OnEngage below
@@ -66,29 +51,29 @@ public:
     // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090`.
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
 
-    // Slot 3, LAB_062c7570 (Common.dll.txt 193788-193844). Re-reads the three delegates out
+    // Slot 3, LAB_062c7570. Re-reads the three delegates out
     // of the manager's dispatch table; if a flee is running (bFleeActive), re-arms whichever
     // delegate it drives through that delegate's own slot 3.
     void OnEngage() override;
 
-    // Slot 4, LAB_062c7610 (Common.dll.txt 193847-193938). Same delegate refresh; with
+    // Slot 4, LAB_062c7610. Same delegate refresh; with
     // bFollowFleeingTarget set, FormationDelegate's slot 4; otherwise the mode-selected delegate's slot 4 and, if
     // the manager's current directive is the delegate's own kind and bHasSavedDirective says Perform
     // took a copy of it, the copied op is handed back through the delegate's slot 10.
     void OnDisengage() override;
 
-    // Slot 5, LAB_062c70b0 (Common.dll.txt 193365-193551), `RET 4`, the argument unread.
+    // Slot 5, LAB_062c70b0, `RET 4`, the argument unread.
     // The flee evaluation: hull+shield ratio against the personality's flee threshold,
     // the TargetManager's hostile power ratio against a per-level table, and the "flee
     // when no ready weapon" switch. Returns 0 (flee) or 2, or 3 when +0x29 is set; the
     // value is also stored at +0x0c.
     int OnEvaluateReadiness(float Unused) override;
 
-    // Slot 7, LAB_062c72c0 (Common.dll.txt 193556-193784), retail "FleeBehavior::Perform()".
+    // Slot 7, LAB_062c72c0, retail "FleeBehavior::Perform()".
     int Perform();
     int OnUpdate() override { return Perform(); }
 
-    // Slot 22, LAB_062c7710 (Common.dll.txt 193949-193997), retail
+    // Slot 22, LAB_062c7710, retail
     // "FleeBehavior::event_handler()". Same delegate refresh, then tail-jumps the event
     // into the active delegate's own slot 22.
     void OnEvent(void* Event) override;
@@ -104,9 +89,7 @@ public:
     // Fields, ascending offset. +0x04..+0x29 is Behavior's own block (see common_behavior.h),
     // still declared here until the family-wide hoist.
     // ------------------------------------------------------------------
-    int TypeId;  // +0x04. The type id retail's shared base ctor FUN_062d2020 parks here, taken
-                 // from this class's own ctor argument -- see Behavior::GetTypeId() (common_behavior.h)
-                 // for the twenty-one-factory evidence.
+    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
     unsigned CachedHandle08;   // +0x08. IObjInspect::get_id() of the owner (the binder).
     int ModeSelector0xc;       // +0x0c. OnEvaluateReadiness's result.
     int UpdateResult10;        // +0x10. Perform's result.

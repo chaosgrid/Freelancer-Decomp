@@ -12,8 +12,7 @@
 #include "ivp_vhash.h"
 
 // ============================================================================
-// IVP_U_Set_Active<T> -- the IVP SDK's pointer set with change listeners
-// (claude-code:cmn-ivp3d, 2026-10-08).
+// IVP_U_Set_Active<T>: the IVP SDK's pointer set with change listeners.
 //
 // Retail builds three instantiations, all inside IVP_Controller_Phantom
 // (FUN_06344710): T = IVP_Mindist_Base (embedded at phantom +0x10),

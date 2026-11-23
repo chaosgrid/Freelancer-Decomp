@@ -19,23 +19,12 @@
 // gf_thorn_*.cpp. A second, much smaller implementation of IGeoTransformControl alone lives in
 // space_camera_script.cpp.
 //
-// Until 2026-09-16 NONE of these were declared anywhere. Thorn reached them through generic
-// dispatchers that took the slot number as a runtime argument --
-// `CallCtrlFloat(Ctrl, 6, Value)` -- and freelancer answered with `static void* [16]` arrays
-// filled out with SlotOk / SlotOk1 / SlotGeneric placeholder stubs. Neither side could be
-// checked against the other, and they disagreed in sixteen places. The comment that used to
-// sit on the padding stub says it best: short tables had already made a call run off the end
-// of the array into adjacent .data, and the fix at the time was to pad with more stubs.
-//
-// WHERE THE SIGNATURES COME FROM. thorn.dll's side of this contract is ported and verified
-// (see the thorn.dll marathon), so a Thorn call site is a trace of what retail pushes. The
-// freelancer placeholders were not traces of anything. Where the two disagreed, the caller
-// wins, and each such slot says so below. Slots nobody calls keep the shape the placeholder
-// had, marked TODO -- their widths are assumptions, not recoveries, and they must not be
+// WHERE THE SIGNATURES COME FROM. thorn.dll's side of this contract is ported, so a Thorn call
+// site is a trace of what retail pushes; where the freelancer side's slot shape disagreed, the
+// caller wins. Slots marked TODO have assumed widths, not recovered ones, and must not be
 // called until someone reads the retail body.
 //
-// SLOT COUNTS (2026-09-26). They now follow retail's tables, not the placeholder arrays they
-// replaced. Every Thorn object in freelancer.exe (RTTI Thorn_Component and its thirteen
+// SLOT COUNTS follow retail's tables. Every Thorn object in freelancer.exe (RTTI Thorn_Component and its thirteen
 // derived classes, Client\Gf\ScriptBase.cpp) is these nine facets in one fixed order, and the
 // shared QueryInterface LAB_004500d0 answers them from the table at 0x005cca20:
 //   +0x00 ICompoundControl      +0x04 ISoundControl        +0x08 IIKControl
@@ -43,8 +32,7 @@
 //   +0x18 IPSysControl          +0x1c IFogControl          +0x20 IReverbControl
 // Thorn_Component's tables (0x005cc590 .. 0x005cc6d4, each followed by the next table's RTTI
 // locator) fix the length of every facet and, through each default body's RET n, the width of
-// every slot. The slots the placeholders appended past those lengths never existed; no caller
-// in the tree used them. ILightControl, IScriptControl, ISubtitleControl and IUserEventControl
+// every slot. ILightControl, IScriptControl, ISubtitleControl and IUserEventControl
 // are not in that table -- a Thorn object answers E_NOINTERFACE (-3) for them.
 
 // "1.11_IGeoTransformControl" -- position and orientation of the attached entity.
@@ -55,18 +43,15 @@ struct IGeoTransformControl : IDAComponent
     virtual GENRESULT DACOM_API SetOrientation(float* Orient9) = 0;   // 4
     virtual GENRESULT DACOM_API GetPosition(float* OutPosition) = 0;  // 5
     virtual GENRESULT DACOM_API GetOrientation(float* OutOrient9) = 0; // 6
-    // The interface stops here. The two retail sinks in freelancer.exe's script camera
-    // (.rdata tables behind 0x0051e830) are seven entries long and nothing in the tree reads
-    // past slot 6, so the nine further slots the port used to pad this table with were
-    // invented, not recovered.
+    // The interface stops here: the two retail sinks in freelancer.exe's script camera
+    // (.rdata tables behind 0x0051e830) are seven entries long.
 };
 
 // "1.11_ICameraControl" -- camera and monitor entities.
 // Retail sink: the Thorn_Camera camera facet, .rdata 0x005ccb18, thirteen entries (the dword
 // at 0x005ccb4c is the next table's RTTI locator). Slots 4, 5, 9 and 10 are all LAB_00454190
 // (MOV EAX,0xfffffff9; RET 8): one dword argument, "not implemented". Thorn does call 5 and
-// 10 (the aspect pair) and gets that result back. The seven slots the port used to declare
-// past 12 do not exist.
+// 10 (the aspect pair) and gets that result back.
 struct ICameraControl : IDAComponent
 {
     // Slots 4 and 9 carry the facet prefix (see ICompoundControl).
@@ -91,7 +76,6 @@ struct ICameraControl : IDAComponent
 // engine's abstract-base table .rdata:06f5ae04 and its final table .rdata:06f5ad18 both end
 // after slot 6 (the next dword is the following table). Slots 3..6 are adjustor thunks
 // (`this -= 8; JMP [vtbl+n]`) into IScriptEngine slots 22 / 26 / 23 / 17, which name them.
-// Until 2026-10-16 this declared slots 7..15 as well; they never existed.
 struct IScriptControl : IDAComponent
 {
     virtual GENRESULT DACOM_API Start(int Arg) = 0;      // 3  LAB_06f3c080 -> engine slot 22
@@ -152,11 +136,8 @@ struct IIKControl : IDAComponent
     virtual GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) = 0;
 };
 
-// "1.11_ILightControl" -- light and scene entities.
-//
-// Slots 6 and 7 were transposed. ThornScene sends the cone cutoff to slot 6 and the on/off
-// flag to slot 7; freelancer had a no-argument placeholder in 6 and the cutoff setter in 7,
-// so the cutoff was dropped on the floor and the setter received a boolean instead.
+// "1.11_ILightControl" -- light and scene entities. ThornScene sends the cone cutoff to slot 6
+// and the on/off flag to slot 7.
 struct ILightControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetColor(int* Rgb) = 0;        // 3
@@ -164,13 +145,13 @@ struct ILightControl : IDAComponent
     virtual GENRESULT DACOM_API SetRange(float Range) = 0;     // 5
     virtual GENRESULT DACOM_API SetCutoff(float Radians) = 0;  // 6
     virtual GENRESULT DACOM_API SetOn(int On) = 0;             // 7
-    // 8: placeholder took nothing; ThornScene sends `(Type == 3) ? 1 : 0` (D3DLIGHT_DIRECTIONAL == 3).
+    // 8: ThornScene sends `(Type == 3) ? 1 : 0` (D3DLIGHT_DIRECTIONAL == 3).
     virtual GENRESULT DACOM_API SetInfinite(int IsInfinite) = 0;
     virtual GENRESULT DACOM_API GetColor(float* OutRgb) = 0;      // 9
     virtual GENRESULT DACOM_API GetDirection(float* OutDir3) = 0; // 10
     virtual GENRESULT DACOM_API GetRange(float* OutRange) = 0;    // 11
     virtual GENRESULT DACOM_API GetCutoff(float* OutRadians) = 0; // 12
-    // 13 and 14: placeholders took nothing; ThornScene reads both with a float*. Which
+    // 13 and 14: ThornScene reads both with a float*. Which
     // property each returns is not recovered -- the port's callers only copy them into a
     // light blob -- so they keep numeric names.
     virtual GENRESULT DACOM_API GetOn(float* Out) = 0;
@@ -184,12 +165,10 @@ struct ILightControl : IDAComponent
 
 // "1.11_ID3DLightControl" -- the Direct3D-facing half of a light entity.
 //
-// ThornScene sends (on-flag, &type, direction) to slots 3, 4 and 5. freelancer's table read
-// those as (float, direction, colour), so the direction went into the colour setter and the
-// light type into the direction setter.
+// ThornScene sends (on-flag, &type, direction) to slots 3, 4 and 5.
 //
-// Slot semantics read off the one implementation, Thorn_Light (freelancer.exe table 0x005cd458,
-// 2026-09-26): 3 LAB_00453310 writes the registry enable byte, 4 LAB_004533d0 hands its
+// Slot semantics read off the one implementation, Thorn_Light (freelancer.exe table 0x005cd458):
+// 3 LAB_00453310 writes the registry enable byte, 4 LAB_004533d0 hands its
 // argument to the engine light's D3DLIGHT8 setter FUN_00411120, 5 LAB_00453330 stores a
 // direction, 6 LAB_004533f0 reads the enable byte into an int, 7 LAB_00453450 copies 0x68 bytes
 // (a D3DLIGHT8) out of the engine light, 8 LAB_00453420 reads the direction back. ThornScene
@@ -239,9 +218,7 @@ struct IFogControl : IDAComponent
 // "1.11_IReverbControl" -- scene entities.
 struct IReverbControl : IDAComponent
 {
-    // 3 and 4 are the widest mismatch in this family. ThornScene sends four dwords to each;
-    // freelancer had a ONE-argument setter in slot 3 and a NO-argument placeholder in slot 4,
-    // so a reverb set leaked twelve bytes of stack and a reverb get leaked sixteen.
+    // 3 and 4: ThornScene sends four dwords to each.
     virtual GENRESULT DACOM_API SetReverb(unsigned int Environment, float Volume, float Decay,
                                           float Damping) = 0;
     virtual GENRESULT DACOM_API GetReverb(float* OutEnvironment, float* OutVolume,
@@ -310,7 +287,7 @@ struct ISubtitleControl : IDAComponent
 struct IUserEventControl : IDAComponent
 {
     virtual GENRESULT DACOM_API StartUserEvent(void* Desc) = 0; // 3
-    // 4: placeholder took nothing, ThornScene passes a descriptor.
+    // 4: ThornScene passes a descriptor.
     virtual GENRESULT DACOM_API StopUserEvent(void* Desc) = 0;
     virtual GENRESULT DACOM_API Slot5() = 0;                   // 5, 6 TODO
     virtual GENRESULT DACOM_API Slot6() = 0;

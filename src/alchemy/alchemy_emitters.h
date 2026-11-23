@@ -18,7 +18,7 @@
 // folds outer and node into one FGenericFxObjectBase-derived class; offsets
 // below are NODE-relative.
 //
-// Per frame: IAlchemy Slot16 (LAB_06201870 / FUN_06201810) calls outer +0x14
+// Per frame: IAlchemy UpdateNodes (LAB_06201870 / FUN_06201810) calls outer +0x14
 // (IGenericFx::Pad5) on every node. For an emitter that is the per-type update
 // (cone LAB_0621b9d0, cube LAB_0621d360, sphere LAB_0623bcf0): evaluate the
 // shape properties at (node+0x8c, Dt + Age), cache them at node+0xf4.., then
@@ -27,7 +27,7 @@
 // the per-type sampler: cone LAB_0621ba90, cube LAB_0621d430, sphere
 // LAB_0623bd60 -- EmitParticle below).
 //
-// Properties (ALC-5 / ALC-6, 2026-09-30). Retail keeps them in the emitter's property set
+// Properties. Retail keeps them in the emitter's property set
 // (node+0x9c / +0xf0 / +0x80, created by cone FUN_0621b7b0, cube FUN_0621d140, sphere
 // FUN_0623bb80 -- node slot +0x48 -- and shared with clones by FUN_06245b30): the emitter
 // part built by FUN_062455b0 (+0x4c..+0x68) and the shape part by the per-type set ctor

@@ -91,7 +91,7 @@ void ShutdownServerConnection()
 {
     if (!IsIntroModeRequested())
     {
-        ChatResetForDisconnect(); // .text:005a8269 FUN_0046b170 (returns at once in SP)
+        ChatResetForDisconnect(); // FUN_0046b170 (returns at once in SP)
         if (G_Server != nullptr)
         {
             G_LoginMgr.Logout();        // FUN_005aa440
@@ -110,8 +110,7 @@ void ShutdownServerConnection()
 bool StartServer(char const* IniPath)
 {
     RefreshLoadingProgress();
-    // .text:005a808f-005a80ed: ShutdownServerConnection's body, inlined.
-    ShutdownServerConnection();
+    ShutdownServerConnection(); // inlined in retail
     RefreshLoadingProgress();
 
     if (SinglePlayer())
@@ -138,7 +137,7 @@ bool StartServer(char const* IniPath)
     memset(&Info, 0, sizeof(Info));
     // DAT_0067eca4 is the exe's own module handle; nullptr names the same module.
     GetModuleFileNameA(nullptr, Info.ModulePath, 0x104);
-    strcpy(Info.IniPath, IniPath);      // .text:005a8183 byte-copy loop
+    strcpy(Info.IniPath, IniPath);
     Info.MaxPlayers = 1;
     Info.Port = 0x36d9;
     Info.bAllowPvp = 1;

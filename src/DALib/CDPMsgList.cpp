@@ -6,17 +6,15 @@
 
 #include "dalib_net.h"
 
-// Retail DALib.dll.c CDPMsgList::CDPMsgList(void) @ 0x41f0: InitializeCriticalSection +
-// CreateEventA(manual-reset, initially non-signaled).
+// Retail DALib.dll.c CDPMsgList::CDPMsgList(void) @ 0x41f0.
 CDPMsgList::CDPMsgList()
 {
     InitializeCriticalSection(&Cs);
     EmptyEvent = CreateEventA(nullptr, TRUE, FALSE, nullptr);
 }
 
-// Copy ctor @ 0x2c70 / operator= @ 0x2d20 are the compiler's memberwise members (list copy,
-// then the CRITICAL_SECTION by MOVSD.REP x6, then the event handle) -- implicit in
-// src/include/dalib_net.h, not defined here.
+// Copy ctor @ 0x2c70 / operator= @ 0x2d20 are the compiler's memberwise members (implicit): they
+// copy the list, then the CRITICAL_SECTION bitwise, then the event handle.
 
 // Retail DALib.dll.c CDPMsgList::~CDPMsgList(void) @ 0x4240.
 CDPMsgList::~CDPMsgList()
@@ -26,25 +24,25 @@ CDPMsgList::~CDPMsgList()
     Messages.clear();
 }
 
-// Retail .text:065c4300: ADD ECX,0x10; PUSH ECX; CALL EnterCriticalSection.
+// Retail .text:065c4300 (Cs at +0x10).
 void CDPMsgList::Lock()
 {
     EnterCriticalSection(&Cs);
 }
 
-// Retail .text:065c4310: ADD ECX,0x10; PUSH ECX; CALL LeaveCriticalSection.
+// Retail .text:065c4310.
 void CDPMsgList::Unlock()
 {
     LeaveCriticalSection(&Cs);
 }
 
-// Retail .text:065c45a0: WaitForSingleObject([this+0x28], TimeoutMs); RET 4.
+// Retail .text:065c45a0 (EmptyEvent at +0x28).
 void CDPMsgList::WaitForMsg(unsigned long TimeoutMs)
 {
     WaitForSingleObject(EmptyEvent, TimeoutMs);
 }
 
-// Retail .text:065c45c0: SetEvent([this+0x28]).
+// Retail .text:065c45c0.
 void CDPMsgList::SetEmptyEvent()
 {
     SetEvent(EmptyEvent);

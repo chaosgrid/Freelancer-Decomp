@@ -16,10 +16,8 @@ class IVP_Collision;
 class IVP_Collision_Delegator;
 
 // ============================================================================
-// FUN_0634e0b0 (.text:0634e0b0-0634e7cc, cdecl, 9 arguments) -- the library's
-// IVP_Mindist_Manager::create_exact_mindists (cmn-ivp2b, 2026-10-08). Kept a
-// free function: the library member is static (no `this`), and the port's
-// IVP_Mindist_Manager is declared in another lane's header.
+// FUN_0634e0b0 (cdecl, 9 arguments) -- the library's static
+// IVP_Mindist_Manager::create_exact_mindists, kept a free function.
 //
 // Re-synchronises `Mindists` (an IVP_U_Vector of IVP_Collision records whose
 // two back-indices +0x0c/+0x10 are kept in step, the "fvector" convention)
@@ -59,8 +57,8 @@ struct FCollisionIndexTable
     ~FCollisionIndexTable();
 };
 
-// FUN_063505a0 (.text:063505a0-063505de, thiscall on the vector, RET 8): swap
-// two slots of a collision fvector and repair each moved record's back-index
-// (+0x0c if it equals the old slot, else +0x10). Callers: 0634e57f (above)
-// and 0634ef99 (IVP_Mindist_Manager::RecheckOvElement).
+// FUN_063505a0 (thiscall on the vector, RET 8): swap two slots of a collision
+// fvector and repair each moved record's back-index (+0x0c if it equals the
+// old slot, else +0x10). Callers: 0634e57f (above) and 0634ef99
+// (IVP_Mindist_Manager::RecheckOvElement).
 void IVP_SwapCollisionSlots(IVP_U_Vector<IVP_Collision>* Vector, int32_t IndexA, int32_t IndexB);

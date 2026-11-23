@@ -63,7 +63,7 @@ struct IDAConnectionPointContainer : IDAComponent
     virtual GENRESULT DACOM_API EnumConnectionPoints(void* Arg0, void* Arg1) = 0;     // +0x10
 };
 
-// operator_new(0x14) node. Retail zeroes only Next/Inner (06f112d6/06f114ef); Object is the
+// operator new(0x14) node. Retail zeroes only Next/Inner; Object is the
 // CreateInstance out-param, SystemComponent/Aggregate are the QI out-params.
 struct FComponentNode
 {
@@ -146,7 +146,7 @@ static_assert(sizeof(FSystemContainerFactory) == 0x0C, "factory is 0xC");
 ICOManager* GDacom = nullptr; // DAT_06f13194
 HMODULE GModule = nullptr;    // DAT_06f13198
 
-// Inlined smart-pointer release of node->Inner (06f111ac..b9, 06f11350..5c, 06f115ad..b9).
+// Smart-pointer release of node->Inner, inlined three times in retail.
 static void ReleaseNodeInner(FComponentNode* Node)
 {
     if (Node->Inner != nullptr)
@@ -256,7 +256,7 @@ unsigned long DACOM_API FInnerUnknown::Release()
     return 0;
 }
 
-// Inline constructor in LAB_06f118a0 (06f11905..06f11928) on calloc'd memory: Inner.RefCount=1,
+// Inlined in LAB_06f118a0, on calloc'd memory: Inner.RefCount=1,
 // Inner.Outer=this, Controlling=&Inner; Head/Tail/bAggregated/bLoaded are calloc zeros.
 FSystemContainer::FSystemContainer()
     : Head(nullptr), Tail(nullptr), Controlling(nullptr), bAggregated(0), bLoaded(0)
@@ -373,8 +373,8 @@ GENRESULT DACOM_API FSystemContainer::LoadSystemComponents()
                     } while (*Extra == ' ' || *Extra == '\t');
                 }
 
-                // 06f112c8: operator_new(0x14); retail has no null path (a null node faults at
-                // 06f112ef), so the throwing form is used here.
+                // operator new(0x14); retail has no null path (a null node faults), so
+                // the throwing form is used.
                 FComponentNode* Node = new FComponentNode;
                 Node->Inner = nullptr;
                 Node->Next = nullptr;
@@ -527,8 +527,8 @@ GENRESULT DACOM_API FSystemContainer::EnumConnectionPoints(void* Arg0, void* Arg
     return Result;
 }
 
-// FUN_06f110e0: refuse an Extra of exactly "SystemContainer" (CMPSB ECX=0x10 over the 16-byte
-// literal incl. NUL == strcmp), else adopt the outer unknown when one is given.
+// FUN_06f110e0: refuse an Extra of exactly "SystemContainer" (16-byte compare, NUL
+// included), else adopt the outer unknown when one is given.
 GENRESULT FSystemContainer::BindOuter(FSystemAggDesc* Desc)
 {
     if (Desc->Extra != nullptr && strcmp(Desc->Extra, kComponentName) == 0)
@@ -542,10 +542,10 @@ GENRESULT FSystemContainer::BindOuter(FSystemAggDesc* Desc)
     return GR_OK;
 }
 
-// Inline constructor in FUN_06f117a0 (06f117c0..06f117ce).
+// Inlined in FUN_06f117a0.
 FSystemContainerFactory::FSystemContainerFactory() : RefCount(1), Name(kComponentName) {}
 
-// LAB_06f11830: *Out = 0, CMPSB 0x17 bytes vs "1.11_IComponentFactory" (== strcmp).
+// LAB_06f11830: *Out = 0, then an exact compare with "1.11_IComponentFactory".
 GENRESULT DACOM_API FSystemContainerFactory::QueryInterface(const char* Iid, void** Out)
 {
     *Out = nullptr;
@@ -584,7 +584,7 @@ GENRESULT DACOM_API FSystemContainerFactory::CreateInstance(AGGDESC* Desc, void*
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    // Pair zero-filled placement construction with the existing C-runtime teardown.
+    // calloc'd storage with placement construction, freed with free() on release.
     void* Memory = calloc(sizeof(FSystemContainer), 1);
     if (Memory == nullptr)
     {
@@ -618,14 +618,14 @@ static void RegisterSystemContainer(ICOManager* Dacom)
 
 BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID)
 {
-    // FUN_06f117f0: DEC reason; JNZ → return 1. DETACH / THREAD_* are no-ops
-    // (no UnregisterComponent, no Release of DAT_06f13194).
+    // FUN_06f117f0: only PROCESS_ATTACH does anything; DETACH does not
+    // unregister or release DAT_06f13194.
     if (Reason == DLL_PROCESS_ATTACH)
     {
         GModule = Instance;
         DisableThreadLibraryCalls(Instance);
         GDacom = DACOM_Acquire();
-        // 06f11815: a second DACOM_Acquire call feeds the registration, not DAT_06f13194.
+        // A second DACOM_Acquire call feeds the registration, not DAT_06f13194.
         RegisterSystemContainer(DACOM_Acquire());
     }
     return TRUE;

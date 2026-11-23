@@ -10,14 +10,13 @@
 
 #include <string.h>
 
-// FUN_0634bcb0 (.text:0634bcb0..0634bcbf): vtable 0639c3fc, +0x04 = argument.
+// FUN_0634bcb0
 IVP_Collision_Filter_Coll_Group_Ident::IVP_Collision_Filter_Coll_Group_Ident(int32_t bInDeleteOnEnvDelete)
     : bDeleteOnEnvDelete(bInDeleteOnEnvDelete)
 {
 }
 
-// FUN_0634bc60 (.text:0634bc60..0634bc9d). Each object's 8-byte group tag at +0x84:
-// either empty -> 1; otherwise `strncmp(a, b, 8) != 0` (NEG / SBB / NEG).
+// FUN_0634bc60. Compares each object's 8-byte group tag at +0x84.
 int32_t IVP_Collision_Filter_Coll_Group_Ident::check_objects_for_collision_detection(IVP_Real_Object* A,
                                                                                      IVP_Real_Object* B)
 {
@@ -26,8 +25,7 @@ int32_t IVP_Collision_Filter_Coll_Group_Ident::check_objects_for_collision_detec
     return strncmp(A->name, B->name, 8) != 0 ? 1 : 0;
 }
 
-// LAB_0634bcd0 (.text:0634bcd0..0634bce2): `if (+0x04 != 0 && this != 0)
-// this->vtbl[2](1)` -- the deleting destructor.
+// LAB_0634bcd0. Retail's extra null-this test cannot fire through a virtual call.
 void IVP_Collision_Filter_Coll_Group_Ident::environment_will_be_deleted(IVP_Environment* /*Env*/)
 {
     if (bDeleteOnEnvDelete != 0)

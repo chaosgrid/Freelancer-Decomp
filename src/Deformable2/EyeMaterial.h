@@ -17,27 +17,26 @@ struct FMaterialParamValue
     int Type;                // +0x00
     unsigned long Value[4];  // +0x04
 
-    // FUN_065ffc20 per cell / the inline pattern at 065fe373: Type = 0, Value[0] = 0 (the other
-    // three dwords are left as they were).
+    // FUN_065ffc20 per cell (also inlined): Type = 0, Value[0] = 0 (the other three dwords are
+    // left as they were).
     FMaterialParamValue();
-    // 065fe373..e391 / 065fe6cb..e6ee: default construction, then Clear() when the wanted type
-    // is not 0, then Type = InType. Value[0] is 0 either way.
+    // Inlined: default construction, then Clear() when the wanted type is not 0, then
+    // Type = InType. Value[0] is 0 either way.
     explicit FMaterialParamValue(int InType);
-    // FUN_065fe5c0 at every scope exit (065fe52e, 065fe8c2, ...), and per cell in FUN_066002c0.
+    // FUN_065fe5c0 at every scope exit, and per cell in FUN_066002c0.
     ~FMaterialParamValue();
 
-    // FUN_065fef00 (thiscall RET 4); inlined twice in LAB_065fed30.
+    // FUN_065fef00; inlined twice in LAB_065fed30.
     FMaterialParamValue& operator=(const FMaterialParamValue& Src);
     FMaterialParamValue(const FMaterialParamValue&) = delete;
 
     // FUN_065fe5c0: 5/7 HeapFree Value[0]; 6 Release; Value[0] = 0 in every case.
     void Clear();
-    // FUN_065fe620 (thiscall RET 4): HeapFree Value[0], then a HeapAlloc copy of Src (null Src
-    // leaves 0).
+    // FUN_065fe620: HeapFree Value[0], then a HeapAlloc copy of Src (null Src leaves 0).
     void DupString(const char* Src);
-    // FUN_065fe930 (thiscall RET 4): Value[0] = NewCom, AddRef it, Release the old one.
+    // FUN_065fe930: Value[0] = NewCom, AddRef it, Release the old one.
     void SwapCom(IDAComponent* NewCom);
-    // FUN_065ffab0 (thiscall RET 8: Type, Arg). Arg is the value itself for 1/8/9/10, a pointer
+    // FUN_065ffab0 (Type, Arg). Arg is the value itself for 1/8/9/10, a pointer
     // to the value for 2/3/4, the string for 5/7 and the object for 6.
     void Set(int InType, unsigned long Arg);
 };
@@ -82,14 +81,14 @@ struct FMaterialTextureRow
     int Handle;                 // +0x04 ITextureLibrary2 playback group id, -1 = none
     unsigned long Frame;        // +0x08 current stage handle (+0x70 GetFrame)
     unsigned char Field0C[0x10]; // +0x0C TODO: never read or written by this module (the
-                                 //       ctor at 065fe2c0 skips it)
+                                 //       ctor skips it)
     unsigned long WrapMode;     // +0x1C "Texture Wrap Mode", default 4
     unsigned long AddressU;     // +0x20 "Texture U Address Mode"
     unsigned long AddressV;     // +0x24 "Texture V Address Mode"
     unsigned char bSingleFrame; // +0x28 Setup: GetFrameCount == 1
     unsigned char Pad29[3];
 
-    // 065fe2c0..e2dc: Name 0, Handle -1, Frame 0, +0x1C 4, +0x20 0, +0x24 0, +0x28 0.
+    // Inlined at 065fe2c0; +0x0C is left alone.
     FMaterialTextureRow();
     // Rows release their owned name buffers in reverse array order.
     ~FMaterialTextureRow();
@@ -170,8 +169,8 @@ public:
     unsigned char Pad66[2];
 
 protected:
-    // The tail of LAB_065ff250 (065ff3bb..f46d) and, inlined a second time, of FUN_065ff550
-    // behind the "Oc" key (065ff675..f721). Returns the value Setup leaves in EAX.
+    // The tail of LAB_065ff250 and, inlined a second time, of FUN_065ff550 behind the "Oc" key.
+    // Returns the value Setup leaves in EAX.
     GENRESULT UpdateTranslucency();
 };
 

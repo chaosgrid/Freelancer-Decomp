@@ -17,7 +17,7 @@
 //   FUN_005a0340; slot 44 is WinControl's LAB_00585090.
 // WINFACTORY<StaticControl> DAT_0067c504 "StaticControl": static init LAB_00587e10 (ctor
 // FUN_005899b0 + atexit LAB_00587e30 -> FUN_00579380), Create FUN_00589a20
-// (operator_new(0x420) + FUN_00587e40, slot 9, scalar delete on failure).
+// (operator_new(0x420)).
 //
 // Layout (ctor FUN_00587e40 after FUN_0059f860):
 //   +0x000 WinControl (0x32c)
@@ -34,21 +34,13 @@
 //   +0x418 "force_radius" (the draw scale is force_radius / the instance's radius)
 //   +0x41c "rotation_speed" (radians per second added to the yaw while rotation is on)
 //   size 0x420
-//
-// The port-only menu adapter (the seven-argument Init, the screen rect, ButtonId,
-// ContainsScreenPoint) is gone with its last user, menu_ui_widgets' FOverlayNav /
-// CreateWinStaticChrome (the flat NN_Preferences shell, 2026-09-26); menu_enter_state's case-18
-// chrome uses the retail 15-argument Init. The flat registry's own StaticControl
-// (MenuUiCreateStaticControl[Ex]) and the caption-id adapter ApplyIdsCaption are gone too
-// (2026-09-26): their only user was the briefing window, now LAB_0043d170 itself
-// (mission_briefing.cpp).
 
 #include "Space/Cameras/space_camera.h"
 #include "Interface/wincontrol_base.h"
 
 #include <stddef.h>
 #include <stdint.h>
-#include <windows.h> // was reached through the removed menu_input.h
+#include <windows.h>
 
 class NnStaticControl : public WinControl
 {
@@ -77,7 +69,7 @@ public:
 
     // FUN_00588540 (RET 0x3c). Callers: WinControl::CreateStaticControl FUN_005a0db0
     // (0x005a0e19) and LAB_0043d170 (0x0043d222, the briefing window, mission_briefing.cpp).
-    // ForceRadius / RotationSpeed arrive as ints and are stored as floats (FILD).
+    // ForceRadius / RotationSpeed arrive as ints and are stored as floats.
     void Init(char const* NewMeshPath, float const* NewOffset, char const* Hardpoint,
               float const* NewHalfExtents, unsigned char bNewNoZEnable, unsigned char bNewZClear,
               unsigned char bNewNoMeshRender, unsigned char bNewNoWireRender,
@@ -92,7 +84,7 @@ public:
     unsigned char bNoMeshRender;   // +0x344
     unsigned char bNoWireRender;   // +0x345
     unsigned char bNoColoring;     // +0x346
-    unsigned char Field_0x347;     // +0x347 -- property 0xc; TODO: meaning (no reader found)
+    unsigned char Field_0x347;     // +0x347 -- property 0xc; no reader found
     unsigned char bUseColours;     // +0x348
     unsigned char bEnableRotation; // +0x349
     unsigned char bNoClearRender;  // +0x34a

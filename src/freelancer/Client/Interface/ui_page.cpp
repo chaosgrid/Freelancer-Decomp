@@ -19,11 +19,11 @@
 
 namespace
 {
-    // Retail DAT_0067d96c — FUN_005916b0's own lazy FUN_005b73e0 result.
+    // DAT_0067d96c -- Instantiate's own lazily acquired 3DMathEngine.
     I3DMathEngine* G_UiPageMathEngine = nullptr;
 
-    // .data 0x006155ec = 0xb22bcc77 (-1e-08f), added to the depth of the top-left unproject in
-    // FUN_00591cd0.
+    // .data 0x006155ec (-1e-08f), added to the depth of the top-left unproject in
+    // MasterWin::Create.
     unsigned const kMasterWinDepthBiasBits = 0xb22bcc77u;
 
     float FloatFromBits(unsigned Bits)
@@ -36,7 +36,7 @@ namespace
 
 namespace
 {
-    // Retail DAT_0067dbc0.
+    // DAT_0067dbc0.
     I3DMathEngine* G_UiWidgetMathEngine = nullptr;
 }
 
@@ -83,14 +83,12 @@ namespace UIPage
     Page::Page()
         : Aspect(1.0f)
     {
-        // FUN_00594590 inline ctor: vftable 0x005e534c then 0x005e5334, empty _Tree
-        // (head + nil nodes), +0x18 = 0x3f800000.
+        // Inlined into FUN_00594590.
     }
 
     Page::~Page()
     {
-        // FUN_00591510: for every node, if (second) second->vftable[0](1); then erase all and
-        // free the head/nil nodes (std::map destructor).
+        // FUN_00591510.
         for (std::map<std::string, Win3D*>::iterator It = Widgets.begin();
              It != Widgets.end(); ++It)
         {
@@ -102,14 +100,13 @@ namespace UIPage
 
     unsigned Page::GetCount()
     {
-        // LAB_00415070: MOV EAX,[ECX+0x14].
+        // LAB_00415070.
         return static_cast<unsigned>(Widgets.size());
     }
 
     char const* Page::GetWidgetName(unsigned Index)
     {
-        // FUN_00591900: it = begin; while (it != end && Index-- != 0) ++it;
-        // it == end → 0; else node string _Ptr, or the shared empty string when _Ptr is 0.
+        // FUN_00591900.
         std::map<std::string, Win3D*>::iterator It = Widgets.begin();
         while (It != Widgets.end())
         {
@@ -126,7 +123,7 @@ namespace UIPage
 
     Win3D* Page::GetWidget(unsigned Index)
     {
-        // FUN_00591980: same walk; it == end → 0; else node+0x1c (second).
+        // FUN_00591980.
         std::map<std::string, Win3D*>::iterator It = Widgets.begin();
         while (It != Widgets.end())
         {
@@ -143,8 +140,7 @@ namespace UIPage
 
     Win3D* Page::FindWidget(char const* Name)
     {
-        // FUN_005919f0: std::string key(Name); lower_bound (FUN_00594de0); it == end or
-        // key < it->first → end; return it == end ? 0 : it->second.
+        // FUN_005919f0.
         std::map<std::string, Win3D*>::iterator It = Widgets.find(std::string(Name));
         if (It == Widgets.end())
             return nullptr;
@@ -163,7 +159,6 @@ namespace UIPage
         {
             FUiWidgetEntry* Entry = *Cursor;
 
-            // 0x0059170f FUN_0059db20(InstanceName, TypeName, Parent, Payload).
             Win3D* Widget =
                 WinFactoryCreate(Entry->InstanceName, Entry->TypeName, Parent, Entry->Payload);
             if (Widget == nullptr)
@@ -187,21 +182,20 @@ namespace UIPage
             if (G_UiPageMathEngine == nullptr)
                 G_UiPageMathEngine = Acquire3DMathEngine();
 
-            // 0x005917aa vftable+0x1c MulTransform(Out, *Matrix, Local).
             FTransform Placed;
             G_UiPageMathEngine->MulTransform(Placed, *Matrix, Local);
 
-            // 0x005917cf Widget->vftable+0x20 with a 12-dword copy of Out.
+            // SetTransform gets a copy, as retail.
             FTransform PlacedCopy = Placed;
             Widget->SetTransform(reinterpret_cast<float const*>(&PlacedCopy));
 
-            // FUN_00594b90 insert(pair(string(InstanceName), 0)) then it->second = Widget.
+            // A duplicate name overwrites the earlier entry's pointer.
             std::pair<std::map<std::string, Win3D*>::iterator, bool> Inserted =
                 Widgets.insert(std::make_pair(std::string(Entry->InstanceName),
                                               static_cast<Win3D*>(nullptr)));
             Inserted.first->second = Widget;
 
-            // 0x005918b9 — recursion result overwrites the running result every iteration.
+            // The recursion result overwrites the running result every iteration.
             bResult = Instantiate(Entry->NestedChildren, Widget, Matrix);
         }
         return bResult;
@@ -212,8 +206,7 @@ namespace UIPage
         // FUN_00594590.
         Page* NewPage = new Page();
 
-        // 0x00594637..0x00594695 — delete any mapped widget and erase the whole map. On a
-        // freshly constructed page the map is empty, so both loops fall through.
+        // Retail clears the map here; on a freshly constructed page it is empty.
         for (std::map<std::string, Win3D*>::iterator It = NewPage->Widgets.begin();
              It != NewPage->Widgets.end(); ++It)
         {
@@ -236,46 +229,41 @@ namespace UIPage
         , PageData(Data)
         , PageObject(nullptr)
     {
-        // FUN_00591ae0 (RET 4): the inline Win3D ctor (Win3D(), FUN_004b6790's stores and
-        // ++DAT_0067dcd4), the IUIPage (+0x7c) and Event::Handler (+0x80) faces, then
-        // +0x84 = Data, +0x88 = 0. Nothing is registered with the Event registry here.
+        // FUN_00591ae0 (RET 4). Nothing is registered with the Event registry here.
     }
 
     MasterWin::~MasterWin()
     {
-        // FUN_00591ba0: if (+0x88) { delete Page; +0x88 = 0; }
+        // FUN_00591ba0.
         if (PageObject != nullptr)
         {
             delete PageObject;
             PageObject = nullptr;
         }
-        // Then FUN_00576010 on the +0x80 face (~EventHandler) and the inline Win3D dtor
-        // (--DAT_0067dcd4, flags &= 0xfc, children slot 10, FUN_0059dc00 = ~Win3D) -- the base
-        // destructors run in that order after this body.
     }
 
     bool MasterWin::OnEvent(unsigned /*MsgId*/)
     {
-        // vftable 0x005e5364 slot 0 = FUN_0053f330: XOR AL,AL / RET 4.
+        // FUN_0053f330.
         return false;
     }
 
     bool MasterWin::Create(Win3D* NewParent, void* /*Payload*/)
     {
         // FUN_00591cd0 (RET 8).
-        Win3DReparent(this, NewParent);                                  // FUN_0059dd00
-        Win3DRegister(this);                                             // FUN_0059dbf0
+        Win3DReparent(this, NewParent);
+        Win3DRegister(this);
         Flags = static_cast<unsigned char>((Flags & 0xfb) | kWin3DActive | kWin3DVisible);
 
         if (PageData == nullptr)
             return false;
 
-        // FUN_0059da60 → &DAT_0067dbf8; vftable+0x38 Unproject.
+        // The Win3D camera (DAT_0067dbf8).
         ICamera* Camera = AsCamera(GetWin3DSceneCamera());
         float TopLeft[3];
         Camera->Unproject(TopLeft, 0.0f, 0.0f);
         float BottomRight[3];
-        // 0x00591d1b..0x00591d39: FILD DAT_00610850 / DAT_00610854 — the created surface size.
+        // The created surface size (DAT_00610850 / DAT_00610854).
         Camera->Unproject(BottomRight,
                           static_cast<float>(static_cast<int>(G_RenderSurfaceWidth)),
                           static_cast<float>(static_cast<int>(G_RenderSurfaceHeight)));
@@ -311,7 +299,7 @@ namespace UIPage
         Flags = static_cast<unsigned char>(Flags & 0xfc);
         for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
             Child->Destroy();
-        Win3DUnregister(this);                                           // FUN_0059dc00
+        Win3DUnregister(this);
     }
 
     unsigned MasterWin::GetCount()

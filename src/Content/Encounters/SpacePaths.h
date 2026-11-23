@@ -7,8 +7,8 @@
 #pragma once
 
 // Content.dll TU53 (SpaceSupport's TU, 06f5c760-06f6b840): the path and route helpers the
-// TU37 guides, the mission NN path (TU38) and the random missions (TU47) use. Lane CNT-AI
-// owns this file (the rest of TU53 is SpaceSupport.cpp / DockQueues.cpp, lane CNT-GS).
+// TU37 guides, the mission NN path (TU38) and the random missions (TU47) use (the rest of TU53
+// is SpaceSupport.cpp / DockQueues.cpp).
 //
 // The NN path builder (BuildNnPath, FUN_06f5ea40) plans a trip through a system over its
 // trade lanes: each lane is a leg of kind 0 between its two end rings, the free flight
@@ -65,8 +65,7 @@ bool __cdecl IsBaseOfAffiliation(int const* Reputation, unsigned int const* Base
 // ((1.5 - y * y * LengthSquared * 0.5) * y) * LengthSquared, all on the x87 stack.
 double __cdecl FastLength(double LengthSquared);
 
-// FUN_06f5ea40 (cdecl; callers TU37 guides, TU38 06f1c5e0 NN path, TU47 06f4b9e0, TU53
-// 06f5e938): plan From -> To through System's trade lanes into Legs (which the caller passes
+// FUN_06f5ea40 (cdecl; callers TU37 guides, TU38 NN path, TU47, TU53): plan From -> To through System's trade lanes into Legs (which the caller passes
 // empty or cleared). Flags (callers pass 0x19) and the seventh argument (0 or 1) are not
 // read; *Range: a trip shorter than it needs no path (false). Returns false when no path is
 // needed, true otherwise (Legs then ends with the kind 1 leg to To).
@@ -76,20 +75,19 @@ bool __cdecl BuildNnPath(FSystemInfo* System, Vector const* From, Vector const* 
 
 // FUN_06f60020 (cdecl): BuildNnPath, then one directive per leg appended to Directives (the
 // list holds one reference on each): kind 0 -> Dock (0x13) at the leg's first ring towards its
-// second, kind 1 -> GotoVec (5) to the leg's end with range *Range; both with BaseOp
-// Field_08 = 1.
+// second, kind 1 -> GotoVec (5) to the leg's end with range *Range; both with Op.Priority = 1.
 void __cdecl BuildPathDirectives(FSystemInfo* System, Vector const* From, Vector const* To,
                                  std::list<FObjListDirective*>* Directives, int Flags,
                                  float const* Range);
 
 class FContentShipBase;       // BehaviorCmds.h
 
-// FUN_06f68270 (cdecl; callers TU37 06f0d75f, 06f0daa1): OtherId is a ship of Ship's system
+// FUN_06f68270 (cdecl; callers TU37): OtherId is a ship of Ship's system
 // (FindShip) that flies in Ship's formation group (+0x154, not -1) or is Ship itself; false
 // when no such ship is known.
 bool __cdecl IsSameShipOrFormation(FContentShipBase* Ship, unsigned int OtherId);
 
-// FUN_06f67d80 (cdecl; callers TU37 06f0d618, 06f0db34): pub::Reputation::SetAttitude from
+// FUN_06f67d80 (cdecl; callers TU37): pub::Reputation::SetAttitude from
 // ShipId towards OtherId (and back when bMutual). bFormations: every member of both
 // formation groups (CollectFormationMembers, or the ship alone outside a group; OtherId's
 // group only when OtherId is a ship, else OtherId's own reputation); an NPC member's

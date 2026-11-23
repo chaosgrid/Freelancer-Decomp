@@ -17,7 +17,7 @@
 // dialogs keep the result in a byte of their own and hand it back to NnModalResumeGame.
 unsigned char NnModalPauseGame();
 
-// FUN_004a7690 -- FUN_0042d6f0(0), then FUN_0041dda0(bCursorDrawFlag) (a tail jump).
+// FUN_004a7690 -- FUN_0042d6f0(0), then FUN_0041dda0(bCursorDrawFlag).
 void NnModalResumeGame(unsigned char bCursorDrawFlag);
 
 // DAT_0067dcc8 -- a byte the NeuroNet windows raise while one of them holds the screen (written
@@ -25,7 +25,7 @@ void NnModalResumeGame(unsigned char bCursorDrawFlag);
 // 0x0048b005.., 0x004af057, and the space teardown 0x0054af3c = DestroySpaceState) and readers test (0x0043e748.., 0x0045a297 in FUN_0045a270,
 // 0x0045a740, 0x0046fcf3, NN_Pause 0x004a75c0). The Ship's jump states also write it (1 at
 // 0x005438ce entering state 1, 0 at 0x00543851 leaving state 5 -- FClientShipGameobj::
-// SetJumpState); of the writers listed above only the space teardown is ported so far.
+// SetJumpState).
 extern bool G_bNnScreenUp;
 
 // The NN_MainButton singleton, DAT_0066d3f0 (RTTI .?AVNN_MainButton@@; class in
@@ -37,14 +37,14 @@ extern NN_MainButton* G_NnMainButton;
 
 // FUN_0045a100 (cdecl) -- the NeuroNet system: when NN_MainButton does not exist yet,
 // DAT_0066d35a = 0, the KnowledgeMap (FUN_00459830) and InfocardMap (FUN_00458790) singletons,
-// NN_MainButton through the WinFactory when bCreateMainButton, and the NN voice init (tail JMP
-// FUN_00489de0). Callers: GF's first frame 0x004372fe, the MissionBriefing state 0x0043d434,
+// NN_MainButton through the WinFactory when bCreateMainButton, and the NN voice init
+// (FUN_00489de0). Callers: GF's first frame 0x004372fe, the MissionBriefing state 0x0043d434,
 // the space init 0x0054ab7c.
 void NnSystemInit(bool bCreateMainButton);
 
 // FUN_0045a140 (cdecl) -- NN_MainButton Destroy + delete, the trade window's 0xef02, the
 // KnowledgeMap / InfocardMap frees, NN_ArrivalText teardown, the story star reset
-// (FUN_004b9bb0) and the NeuroNetMissionMessage teardown (tail JMP FUN_0048a130). Callers: GF
+// (FUN_004b9bb0) and the NeuroNetMissionMessage teardown (FUN_0048a130). Callers: GF
 // Destroy 0x004372c8, the MissionBriefing state 0x0043d337 / 0x0043d52d, the space teardown
 // 0x0054aff1, the client teardown 0x005b2232.
 void NnSystemShutdown();
@@ -59,7 +59,7 @@ void NnMissionMessageDestroy();
 
 // DAT_0066d35a -- zeroed by FUN_0045a100, set at 0x004bc1ff (the story star's button
 // dispatcher); while set FUN_004b9bb0 keeps the story star's pending list. Read at 0x004b9bb0,
-// 0x004b9d90, 0x004b9dd7, 0x004ba46f, 0x004bcc4e -- none ported yet.
+// 0x004b9d90, 0x004b9dd7, 0x004ba46f, 0x004bcc4e (nn_story_star.cpp).
 extern unsigned char G_bNnStoryStarKeepPending;
 
 // FUN_0045a7a0 (cdecl) -- null when there is no NN_MainButton, else FUN_0045c820(PanelId): the

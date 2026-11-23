@@ -18,8 +18,8 @@ public:
 	// Which app worker thread the timer waits for (the dword at +0x60).
 	enum EWaitThread
 	{
-		WaitStartupThread = 0,  // CFLServerApp::PollStartupThread  (.text:0040c100)
-		WaitShutdownThread = 1, // CFLServerApp::PollShutdownThread (.text:0040b6a0)
+		WaitStartupThread = 0,  // CFLServerApp::PollStartupThread
+		WaitShutdownThread = 1, // CFLServerApp::PollShutdownThread
 	};
 
 	explicit CShutdownDlg(CWnd* Parent = nullptr);

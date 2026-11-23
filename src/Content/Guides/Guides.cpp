@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Content.dll TU37 (06f05d00-06f0e000): the NPC guides. Lane CNT-AI owns this file.
+// Content.dll TU37 (06f05d00-06f0e000): the NPC guides.
 
 #include "Guides/Guides.h"
 #include "Guides/GuidesInternal.h"
@@ -61,7 +61,7 @@ namespace
     }
 }
 
-// FUN_06f0de80 (06f0de80-06f0dead).
+// FUN_06f0de80.
 void AssignDirective(FObjListDirective** Slot, FObjListDirective* New)
 {
     if (*Slot == New)
@@ -84,8 +84,7 @@ void IssueOnlyDirective(FContentNpcShip* Ship, FObjListDirective* Directive)
     Ship->RestartDirectives();
 }
 
-// FUN_06f07a80 (06f07a80-06f07b51): REPE CMPSB over each literal including its NUL, i.e.
-// strcmp == 0; the last compare (against the empty string DAT_06fb572c) returns SETNZ.
+// FUN_06f07a80. Any other non-empty name (compared against DAT_06fb572c "") gives 1.
 int __cdecl ParseGuideBehavior(char const* Name)
 {
     if (strcmp(Name, "trade") == 0)
@@ -109,7 +108,7 @@ int __cdecl ParseGuideBehavior(char const* Name)
 // [MetaBehavior]
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f07b60 (06f07b60-06f07c0b): head (FUN_06f06530 inline: RefCount 1, Type 5, Ship 0,
+// FUN_06f07b60: head (FUN_06f06530 inline: RefCount 1, Type 5, Ship 0,
 // Line empty), +0x114 = 0, the leg list (+0x118 allocator byte, +0x11c head, +0x120 size 0),
 // +0x13c = 0, TargetName empty, +0x174 = 0, +0x175 = 0, +0x176 = 1, vtable 06fb82d8. The
 // positions +0x124 / +0x130 are not written.
@@ -120,11 +119,11 @@ FMbGotoGuide::FMbGotoGuide()
     TargetName.Data[0] = '\0';
 }
 
-// FUN_06f06840 (06f06840-06f068c2; called by the sdd 06f07c10): every leg node erased
+// FUN_06f06840 (called by the sdd 06f07c10): every leg node erased
 // (FUN_06ecfe80), the head freed, then the base vptr.
 FMbGotoGuide::~FMbGotoGuide() = default;
 
-// FUN_06f07c30 (06f07c30-06f07dda). The float values are read 3, 2, 1 and 6, 5, 4 (the order
+// FUN_06f07c30. The float values are read 3, 2, 1 and 6, 5, 4 (the order
 // does not matter: get_value_float has no side effect on the reader's position).
 void FMbGotoGuide::Parse(INI_Reader* Reader)
 {
@@ -135,7 +134,7 @@ void FMbGotoGuide::Parse(INI_Reader* Reader)
     Destination.z = Reader->get_value_float(6);
     Destination.y = Reader->get_value_float(5);
     Destination.x = Reader->get_value_float(4);
-    Range = static_cast<float>(Reader->get_value_int(7));             // FILD / FSTP float
+    Range = static_cast<float>(Reader->get_value_int(7));             // read as an int
     if (!Reader->is_value_empty(8))
         bStartFollowing = Reader->get_value_bool(8) ? 1 : 0;
     if (Reader->is_value_empty(9))
@@ -149,7 +148,7 @@ void FMbGotoGuide::Parse(INI_Reader* Reader)
         Priority = 0;
 }
 
-// FUN_06f0a030 (06f0a030-06f0a0ea). Values 2, 1, 3 are read in that order (no side effect).
+// FUN_06f0a030. Values 2, 1, 3 are read in that order (no side effect).
 // Destination (+0x130) is left as the ctor left it (not written).
 void FMbDockGuide::Parse(INI_Reader* Reader)
 {
@@ -164,7 +163,7 @@ void FMbDockGuide::Parse(INI_Reader* Reader)
     Range = Reader->get_value_float(5);
 }
 
-// FUN_06f065e0 (06f065e0-06f0683c). The new object gets an extra local reference (smart
+// FUN_06f065e0. The new object gets an extra local reference (smart
 // pointer) and one for the list (the node copy AddRefs); both local references are released
 // afterwards, so the list holds the one reference. The Type is written a second time after the
 // ctor (5 / 6); Line = get_line_ptr() (FUN_06f0dfa0 for the goto guide, the inlined
@@ -215,13 +214,11 @@ void __cdecl LoadMetaBehavior(INI_Reader* Reader, std::list<FMetaBehavior*>* Lis
 // CreateGuide
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f05f00 (06f05f00-06f0616d). Switch on Desc->Type - 1 (0..5): 1 nothing (0x28),
-// 2 trade (0x34, FUN_06f06fe0), 3 patrol_path (0x34, FUN_06f0aa40), 4 wander (0x3c),
+// FUN_06f05f00. By Desc->Type (allocation sizes): 1 nothing (0x28), 2 trade (0x34,
+// FUN_06f06fe0), 3 patrol_path (0x34, FUN_06f0aa40, PatrolGuides.cpp), 4 wander (0x3c),
 // 5 goto (0x1b0, FUN_06f07ef0), 6 dock (0x1b8, FUN_06f0a270); anything else gives null.
-// Tail (06f06124-06f0615f): *InOut != new -> the old one released and cleared, *InOut = new,
-// new AddRef'ed; then (also when equal) *InOut released once more -> the fresh guide ends at
-// RefCount 1 held by *InOut. Returns *InOut != null. Type 3 (06f06004-06f06030): new 0x34,
-// FUN_06f0aa40 (FPatrolGuide, PatrolGuides.cpp).
+// The extra Release after the swap leaves the fresh guide at RefCount 1 held by *InOut.
+// Returns *InOut != null.
 bool __cdecl CreateGuide(FGuideDescBase* Desc, FContentGuide** InOutGuide)
 {
     FContentGuide* Guide = nullptr;
@@ -281,7 +278,7 @@ void FTargetGuide::Reset()
 {
 }
 
-// LAB_06f068f0 (06f068f0-06f0691c).
+// LAB_06f068f0.
 void FTargetGuide::GetTargets(unsigned int* OutId1, unsigned int* OutId2,
                               FContentBase** OutBase1, FContentBase** OutBase2)
 {
@@ -295,7 +292,7 @@ void FTargetGuide::GetTargets(unsigned int* OutId1, unsigned int* OutId2,
     *OutBase2 = TargetBase2;
 }
 
-// LAB_06f068d0 (06f068d0-06f068ea).
+// LAB_06f068d0.
 void FTargetGuide::SwapTargets()
 {
     unsigned int const Id1 = TargetId1;
@@ -306,9 +303,8 @@ void FTargetGuide::SwapTargets()
     TargetBase2 = Base1;
 }
 
-// FUN_06f06a50 (06f06a50-06f06b11): seconds = (rand() * 11) / 32768 (signed division) + 20,
-// FILD of the int64 {seconds, 0} into the float argument of SetDelay (FUN_06f27940). The
-// directive lives in a ref-holding local (FuncInfo 06fc1ba8 state 0: FUN_06f28e10).
+// FUN_06f06a50: a 20..30 s delay; retail converts the seconds through an int64 into the
+// float argument of SetDelay (FUN_06f27940).
 void FTargetGuide::IssueDelayDirective()
 {
     TRefHandle<FObjListDirective> Directive;
@@ -320,8 +316,7 @@ void FTargetGuide::IssueDelayDirective()
     IssueOnlyDirective(Ship, Directive);
 }
 
-// FUN_06f069c0 (06f069c0-06f06a47): factory 0x15 without a setter; ref-holding local
-// (FuncInfo 06fc2280 state 0: FUN_06f28e10).
+// FUN_06f069c0: factory 0x15 without a setter.
 void FTargetGuide::IssueLaunchDirective()
 {
     TRefHandle<FObjListDirective> Directive;
@@ -330,8 +325,7 @@ void FTargetGuide::IssueLaunchDirective()
     IssueOnlyDirective(Ship, Directive);
 }
 
-// FUN_06f06920 (06f06920-06f069b9): Dock SetTarget(&TargetId2, &DAT_06fb80e4 (0)); ref-holding
-// local (FuncInfo 06fc2280 state 0: FUN_06f28e10).
+// FUN_06f06920.
 void FTargetGuide::IssueDockDirective()
 {
     TRefHandle<FObjListDirective> Directive;
@@ -343,8 +337,8 @@ void FTargetGuide::IssueDockDirective()
     IssueOnlyDirective(Ship, Directive);
 }
 
-// LAB_06f06b20 (06f06b20-06f06dd9). The two squared distances are stored as floats and
-// compared (TEST AH,5 / JP: the first target wins only when strictly nearer). The directive
+// LAB_06f06b20. The two squared distances are rounded to float before the compare; the
+// first target wins only when strictly nearer (not on NaN). The directive
 // list is built for the nearer target (Range 2500, flags 1) only to read its first directive;
 // taking the first target swaps the targets. The list is released afterwards.
 bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
@@ -387,10 +381,8 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     if (Directives.Items.empty())
         return false;
 
-    // The front is held in a ref-holding local (06f06c99-06f06cae: AddRef when set; FuncInfo
-    // 06fc1c04 state 1, funclet 06faceb8: FUN_06f28e10), and the type 5 / 0x13 branches take a
-    // second, typed copy (AddRef 06f06d4d / 06f06ce4, Release 06f06d8a / 06f06d06) before the
-    // holder is released (06f06d95 / 06f06d11 / 06f06cd2), then the list.
+    // As retail, the front is held in a ref-holding local (raw store + AddRef), and the type
+    // 5 / 0x13 branches take a second, typed copy before both are released, then the list.
     TRefHandle<FObjListDirective> First;
     First = Directives.Items.front();
     if (First.Pointer != nullptr)
@@ -421,8 +413,8 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
 // CreateGuide case 1: the Delay directive is built with the directive's own ctor (FUN_06f06e50:
 // base, DirectiveDelayOp, vtable 06fb82f8 - the factory's case 1) and assigned through
 // FUN_06f0de80, which AddRefs it: the creation reference is never released, so the
-// directive keeps one reference more than the guide's (retail behaviour, kept). +0x24 is a
-// ref-holding member (CreateGuide's unwind state 3, funclet 06facd9b: FUN_06f28e10 on +0x24).
+// directive keeps one reference more than the guide's (retail leak, kept). +0x24 is a
+// ref-holding member (released on CreateGuide's unwind path).
 FNothingGuide::FNothingGuide(FGuideDesc const* Desc)
     : FTargetGuide(Desc)
 {
@@ -432,8 +424,7 @@ FNothingGuide::FNothingGuide(FGuideDesc const* Desc)
     static_cast<FObjListDelay*>(DelayDirective.Pointer)->Op.Priority = 1;
 }
 
-// Clone body 06f06f46-06f06f77: +0x24 = 0 (EH state 2: the member), then the smart assignment
-// of the source's directive (AddRef when set) = the holder's copy.
+// Clone body 06f06f46: the source's directive copied with AddRef (the holder's copy).
 FNothingGuide::FNothingGuide(FNothingGuide const& Other)
     : FTargetGuide(Other)
     , DelayDirective(Other.DelayDirective)
@@ -443,19 +434,19 @@ FNothingGuide::FNothingGuide(FNothingGuide const& Other)
 // FUN_06f06e00: +0x24 released when set and cleared (the member's destructor).
 FNothingGuide::~FNothingGuide() = default;
 
-// FUN_06f06ed0 (06f06ed0-06f06f9e).
+// FUN_06f06ed0.
 FContentGuide* FNothingGuide::Clone()
 {
     return new FNothingGuide(*this);
 }
 
-// FUN_06f06fa0 (06f06fa0-06f06fbb).
+// FUN_06f06fa0.
 void FNothingGuide::Start()
 {
     IssueOnlyDirective(Ship, DelayDirective);
 }
 
-// LAB_06f0af30: Start().
+// LAB_06f0af30.
 void FNothingGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
 {
     (void)ResultWord11c;
@@ -481,7 +472,7 @@ void FGuideRoute::SetShip(FContentNpcShip* InShip)
     Ship = InShip;
 }
 
-// LAB_06f07750 (06f07750-06f077a3): +4, +8, +0xc..+0x14, +0x18 copied, +0x1c = 0.
+// LAB_06f07750: everything copied but +0x1c, which is zeroed.
 FGuideRoute* FTradeRoute::Clone()
 {
     FTradeRoute* Copy = new FTradeRoute(*this);
@@ -489,20 +480,19 @@ FGuideRoute* FTradeRoute::Clone()
     return Copy;
 }
 
-// 06ee9e10: 1.
+// 06ee9e10.
 int FTradeRoute::GetType()
 {
     return 1;
 }
 
-// LAB_06f07110: State == 4 ? 3 : 1.
+// LAB_06f07110.
 int FTradeRoute::GetStatus()
 {
     return State == 4 ? 3 : 1;
 }
 
-// LAB_06f077b0 (06f077b0-06f0792f, RET 4). The state loop (JA to its own head for State > 4,
-// as retail). Each BuildPathDirectives uses flags 1 and &Range.
+// LAB_06f077b0 (RET 4). As retail, a State above 4 spins the loop forever.
 int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
 {
     for (;;)
@@ -562,7 +552,7 @@ int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
     }
 }
 
-// FUN_06f07950 (06f07950-06f07a73).
+// FUN_06f07950.
 bool FTradeRoute::AddFormationWaitDirective(std::list<FObjListDirective*>* Out)
 {
     std::vector<FContentShipBase*> Members;
@@ -573,7 +563,6 @@ bool FTradeRoute::AddFormationWaitDirective(std::list<FObjListDirective*>* Out)
             continue;
         if (!(*It)->IsInTradeLane())                                      // FUN_06f57710
             continue;
-        // Ref-holding local (FuncInfo 06fc1d5c state 1: FUN_06f28e10; state 0 the vector).
         TRefHandle<FObjListDirective> Directive;
         CreateObjListDirective(1, &Directive.Pointer);
         FObjListDelay* Delay = static_cast<FObjListDelay*>(Directive.Pointer);
@@ -590,7 +579,7 @@ bool FTradeRoute::AddFormationWaitDirective(std::list<FObjListDirective*>* Out)
 // Type 2: trade (06fb8330)
 // ---------------------------------------------------------------------------------------
 
-// FUN_06f06fe0 (06f06fe0-06f070e0). The route (0x20): Ship = Desc->Ship, State 0, Center =
+// FUN_06f06fe0. The route (0x20): Ship = Desc->Ship, State 0, Center =
 // the GetRadius centre of TargetId2, Range = its radius + DAT_06fb83b4 (3000), +0x1c = 0.
 FTradeGuide::FTradeGuide(FGuideDesc const* Desc)
     : FTargetGuide(Desc)
@@ -623,17 +612,15 @@ FTradeGuide::~FTradeGuide()
     delete Route;                                                       // FUN_06fa8fe0
 }
 
-// FUN_06f07180 (06f07180-06f07233).
+// FUN_06f07180.
 FContentGuide* FTradeGuide::Clone()
 {
     return new FTradeGuide(*this);
 }
 
-// FUN_06f07240 (06f07240-06f07434). Retail also builds an outer local directive list before
-// the state loop that nothing fills (head 06f0725f-06f0727e) and tears it down on the way out
-// (06f073a4-06f07421; unwind states 0 / 3, funclets 06facf40 FUN_06ecfa90 / 06facf58
-// FUN_06f15350); the port holds it as the same local. The State > 3 head jump (JA to the loop
-// head) spins as in retail.
+// FUN_06f07240. Retail also builds an outer local directive list that nothing fills and tears
+// it down on the way out; the port keeps it as the same local. A State above 3 spins the loop
+// as in retail.
 void FTradeGuide::Start()
 {
     FMissionDirectiveList UnusedDirectives;
@@ -688,7 +675,7 @@ void FTradeGuide::Reset()
     State = 0;
 }
 
-// LAB_06f0af30: Start().
+// LAB_06f0af30.
 void FTradeGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
 {
     (void)ResultWord11c;
@@ -696,7 +683,7 @@ void FTradeGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
     Start();
 }
 
-// LAB_06f07120: Ship = InShip, then the route's SetShip (slot 5, tail jump).
+// LAB_06f07120.
 void FTradeGuide::SetShip(FContentNpcShip* InShip)
 {
     Ship = InShip;
@@ -715,7 +702,7 @@ unsigned int FTradeGuide::GetReturnGood()
     return ReturnGood;
 }
 
-// LAB_06f076c0 (06f076c0-06f07743): goods and targets swapped; the route aims at the new
+// LAB_06f076c0: goods and targets swapped; the route aims at the new
 // TargetId2: Center = its GetLocation position (the GetRadius centre is fetched and unused),
 // Range = its radius + 3000, State 0.
 void FTradeGuide::SwapTargets()
@@ -736,10 +723,10 @@ void FTradeGuide::SwapTargets()
     Route->State = 0;
 }
 
-// FUN_06f07470 (06f07470-06f076b1). Legs to TargetId2 (flags 1, range 1500, seventh argument
-// 1). No legs, or a free first leg: dock type 2 at TargetId2. A lane first leg: within 10000
-// (DAT_06fd0648, TEST AH,0x41 / JNZ = not greater) of its first ring -> type 2 at that ring;
-// else type 3 towards it: the unit direction times 10000 (x / y rounded to float after the
+// FUN_06f07470. Legs to TargetId2 (flags 1, range 1500, seventh argument 1). No legs, or a
+// free first leg: dock type 2 at TargetId2. A lane first leg: within 10000 (DAT_06fd0648,
+// not greater, so NaN counts as within) of its first ring -> type 2 at that ring; else type 3
+// towards it: the unit direction times 10000 (x / y rounded to float after the
 // normalisation, z kept on the x87 stack), OutFloat 500.
 bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
                                          Vector& OutPosition, unsigned int& OutParam,
@@ -792,7 +779,7 @@ bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinati
 // Type 4: wander (06fb8138)
 // ---------------------------------------------------------------------------------------
 
-// CreateGuide case 4 (06f06051-06f060c4): +0x24 = 0, +0x28 = 0 (FUN_06f0de80 with null),
+// CreateGuide case 4 (06f06051): +0x24 = 0, +0x28 = 0 (FUN_06f0de80 with null),
 // +0x2c = Desc->WanderZone, +0x30 / +0x34 / +0x38 = 1500 / 3000 / 500.
 FWanderGuide::FWanderGuide(FGuideDesc const* Desc)
     : FTargetGuide(Desc)
@@ -815,7 +802,7 @@ FWanderGuide::FWanderGuide(FWanderGuide const& Other)
 // FUN_06f0b300: +0x28 released when set and cleared (the member's destructor).
 FWanderGuide::~FWanderGuide() = default;
 
-// FUN_06f0b350 (06f0b350-06f0b40f).
+// FUN_06f0b350.
 FContentGuide* FWanderGuide::Clone()
 {
     return new FWanderGuide(*this);
@@ -827,7 +814,7 @@ void FWanderGuide::Reset()
     State = 0;
 }
 
-// LAB_06f0af30: Start().
+// LAB_06f0af30.
 void FWanderGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
 {
     (void)ResultWord11c;
@@ -835,7 +822,7 @@ void FWanderGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
     Start();
 }
 
-// LAB_06f0b410 (06f0b410-06f0bb48).
+// LAB_06f0b410.
 //   An obstacle near the ship (FindObstacleCenter, range DAT_06fce590): a GotoVec 200 away
 //   from its centre (range 100).
 //   Else 16 candidate points around (ship x, Height, ship z) (PickPointsAround with
@@ -846,10 +833,8 @@ void FWanderGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
 //   None found: MinRange > 100 -> a 0.5 s Delay and both ranges halved; else the ranges are
 //   reset and, with a zone, a GotoVec towards the zone (its position when within 1000,
 //   else 1000 towards it; range 250).
-//   Every GotoVec: Field_5A 0, Field_5B 1, Field_58 1, BaseOp Field_08 1. Each new directive
-//   lives in a ref-holding local (FuncInfo 06fc2164 states 0 / 2 / 3 / 4: FUN_06f28e10; state
-//   1 is the index vector) and replaces +0x28 (FUN_06f0de80 smart assignment); the tail hands
-//   +0x28 to the ship as its only directive (also when nothing new was made).
+//   Each new directive replaces +0x28 (FUN_06f0de80); the tail hands +0x28 to the ship as its
+//   only directive (also when nothing new was made).
 void FWanderGuide::Start()
 {
     if (State == 0)
@@ -872,7 +857,7 @@ void FWanderGuide::Start()
         Away.y = static_cast<float>(static_cast<double>(Away.y) * 200.0);
         Away.z = static_cast<float>(static_cast<double>(Away.z) * 200.0);
 
-        TRefHandle<FObjListDirective> New;                              // EH state 0
+        TRefHandle<FObjListDirective> New;
         CreateObjListDirective(5, &New.Pointer);
         Vector const Destination = Add(ShipPosition, Away);             // FUN_06f0bb80
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
@@ -930,7 +915,7 @@ void FWanderGuide::Start()
 
     if (bFound)
     {
-        TRefHandle<FObjListDirective> New;                              // EH state 2
+        TRefHandle<FObjListDirective> New;
         CreateObjListDirective(5, &New.Pointer);
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
         Goto->SetDestination(&Destination, 500.0f, -1.0f, 0, false, false);
@@ -939,16 +924,15 @@ void FWanderGuide::Start()
         Goto->Op.Field_58 = 1;
         Goto->Op.Priority = 1;
         AssignDirective(&Directive.Pointer, New);
-        // FCOMP 1500 / TEST AH,5 / JP: skipped when MinRange >= 1500 or NaN.
         if (MinRange < 1500.0f)
         {
             MaxRange = 3000.0f;
             MinRange = 1500.0f;
         }
     }
-    else if (MinRange > 100.0f)                                         // TEST AH,0x41 / JNZ
+    else if (MinRange > 100.0f)
     {
-        TRefHandle<FObjListDirective> New;                              // EH state 3
+        TRefHandle<FObjListDirective> New;
         CreateObjListDirective(1, &New.Pointer);
         FObjListDelay* Delay = static_cast<FObjListDelay*>(New.Pointer);
         Delay->SetDelay(0.5f);
@@ -991,7 +975,7 @@ void FWanderGuide::Start()
                 Target.z = static_cast<float>(Z + ShipPosition.z);
             }
 
-            TRefHandle<FObjListDirective> New;                          // EH state 4
+            TRefHandle<FObjListDirective> New;
             CreateObjListDirective(5, &New.Pointer);
             FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
             Goto->SetDestination(&Target, 250.0f, -1.0f, 0, false, false);
@@ -1006,7 +990,7 @@ void FWanderGuide::Start()
     IssueOnlyDirective(Ship, Directive);
 }
 
-// FUN_06f06260 (06f06260-06f062be, RET 0x10; added by CNT-GS9). The class list is copied
+// FUN_06f06260 (RET 0x10). The class list is copied
 // for each FindTargetBase call (FUN_06eb35b0 into the by-value argument).
 void FGuideDesc::SetTargets(unsigned int const* Id1, unsigned int const* Id2,
                             std::vector<unsigned int> const* ClassIds, int const* Rep)
@@ -1017,24 +1001,24 @@ void FGuideDesc::SetTargets(unsigned int const* Id1, unsigned int const* Id2,
     TargetBase2 = FindTargetBase(Id2, *ClassIds, Rep);
 }
 
-// FUN_06f06300 (06f06300-06f06526, RET 0x18; added by CNT-GS9).
+// FUN_06f06300 (RET 0x18).
 FContentBase* FGuideDesc::FindTargetBase(unsigned int const* ObjectId,
                                          std::vector<unsigned int> ClassIds, int const* Rep)
 {
     (void)ClassIds;                                         // freed at 06f064fd, never read
     unsigned int BaseId = 0;
     unsigned int Type;
-    pub::SpaceObj::GetType(*ObjectId, Type);                                    // 06f0633b
+    pub::SpaceObj::GetType(*ObjectId, Type);
     if ((Type & 0x40) != 0)
     {
-        // 06f06350-06f064cf: through a jump object, a random base of the destination system
+        // Through a jump object, a random base of the destination system
         // that accepts the ship's affiliation (rejected ones leave the list).
         unsigned int SystemId;
         unsigned int JumpTarget;
-        pub::SpaceObj::GetJumpTarget(*ObjectId, SystemId, JumpTarget);          // 06f0635d
+        pub::SpaceObj::GetJumpTarget(*ObjectId, SystemId, JumpTarget);
         unsigned int Bases[0x14];
         unsigned int Count = 0;
-        pub::GetBases(SystemId, Bases, 0x14, Count);                            // 06f0637c
+        pub::GetBases(SystemId, Bases, 0x14, Count);
         std::vector<unsigned int> Candidates;
         Candidates.reserve(Count);
         for (unsigned int Index = 0; Index < Count; ++Index)
@@ -1050,7 +1034,7 @@ FContentBase* FGuideDesc::FindTargetBase(unsigned int const* ObjectId,
     }
     else
     {
-        pub::SpaceObj::GetDockingTarget(*ObjectId, BaseId);                     // 06f064ea
+        pub::SpaceObj::GetDockingTarget(*ObjectId, BaseId);
     }
     return FindContentBaseInfo(&BaseId);                                        // FUN_06eac0c0
 }

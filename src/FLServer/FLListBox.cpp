@@ -39,8 +39,7 @@ CFLListBox::CFLListBox()
 	::ReleaseDC(nullptr, ScreenDC);
 }
 
-// .text:0040fe50 — deletes the fonts explicitly (regular, bold, italic, bold italic), then the
-// maps and the CFont members are destroyed by the compiler.
+// .text:0040fe50
 CFLListBox::~CFLListBox()
 {
 	RegularFont.DeleteObject();
@@ -49,8 +48,8 @@ CFLListBox::~CFLListBox()
 	BoldItalicFont.DeleteObject();
 }
 
-// Message map .rdata:0041dac4: WM_DRAWITEM reflection -> DrawItem through the vcall thunk
-// 00411db0 (CListBox vtable +0xc0). Written out by hand because ON_WM_DRAWITEM_REFLECT would
+// Message map .rdata:0041dac4: WM_DRAWITEM reflection -> DrawItem through a vcall thunk
+// (CListBox vtable +0xc0). Written out by hand because ON_WM_DRAWITEM_REFLECT would
 // take &CFLListBox::DrawItem, whose member-pointer representation (CWnd is not the first base)
 // does not convert to a CWnd member pointer; &CListBox::DrawItem is what retail's entry holds.
 BEGIN_MESSAGE_MAP(CFLListBox, CListBox)
@@ -85,13 +84,13 @@ int CFLListBox::SelectItem(const wchar_t* Text)
 	return (int)::SendMessageA(m_hWnd, LB_SELECTSTRING, 0, (LPARAM)Hex);
 }
 
-// .text:004100a0 — map operator[] (retail inlines the insert-unique path).
+// .text:004100a0
 void CFLListBox::SetItemColor(DWORD_PTR Data, COLORREF Color)
 {
 	ItemColors[Data] = Color;
 }
 
-// .text:00410240 — erase(equal_range(Data)).
+// .text:00410240
 void CFLListBox::RemoveItemColor(DWORD_PTR Data)
 {
 	ItemColors.erase(Data);

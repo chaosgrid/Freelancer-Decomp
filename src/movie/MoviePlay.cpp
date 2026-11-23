@@ -699,7 +699,6 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	Top = (Client.bottom - UsedHeight) / 2;
 
 	// control.h: SetDefaultSourcePosition sits at 0x78, so SetDestinationPosition is slot 0x7C.
-	// Listing 06ac231f is CALL [vtable+0x7C] with Left, Top, Width, Height.
 	Hr = g_basicVideo->SetDestinationPosition(Left, Top, UsedWidth, UsedHeight);
 	Movie_LogNegativeCode(Hr, GMoviePlayerSourceFile, 0x2C6);
 

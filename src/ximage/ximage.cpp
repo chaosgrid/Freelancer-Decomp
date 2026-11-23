@@ -307,7 +307,7 @@ namespace
             return RefCount_;
         }
 
-        // FUN_06f82820: JBE skips DEC; on zero, store 1, run the destructor, operator_delete.
+        // FUN_06f82820: guarded decrement; at zero, store 1, destroy, free.
         unsigned long DACOM_API Release() override
         {
             if (RefCount_ != 0)
@@ -319,8 +319,8 @@ namespace
             return 0;
         }
 
-        // Reserved — retail LAB_06f82640 is RET 0xC, no body, no name (EAX is the caller's).
-        // formerly Slot3; TODO: original purpose and return contract.
+        // LAB_06f82640: empty body, two arguments; retail returns whatever EAX held.
+        // TODO: original purpose unknown.
         GENRESULT DACOM_API NoOp(void* A, void* B) override
         {
             (void)A;
@@ -360,7 +360,7 @@ namespace
             if (SrcH == 0)
                 return 0;
 
-            // 06f820f7..06f82139: FILD/FIDIV int by int, FSTP float.
+            // Integer division on the x87 stack, then rounded to float.
             float DestX = (float)(Dest->left);
             const float ScaleX = (float)((double)(Dest->right - Dest->left) /
                                                     (double)(SrcW));
@@ -375,7 +375,7 @@ namespace
             while (Col < (long)(TilesX_))
             {
                 float DestY = (float)(Dest->top);
-                // Column U span is read from the row-0 tile of this column (06f8215a).
+                // Column U span is read from the row-0 tile of this column.
                 const float* ColUv = Uvs_ + Col * 8;
                 const float USpan = ColUv[2] - ColUv[0];
                 unsigned long PixW = AbilityMaxWidth_;
@@ -395,7 +395,7 @@ namespace
                     const unsigned long Index = TilesX_ * (unsigned long)(Row) +
                                                 (unsigned long)(Col);
                     float* Uv = Uvs_ + Index * 8;
-                    // V span stays on the FPU stack (06f821b9..06f821f6).
+                    // V span stays on the FPU stack.
                     const double VSpan = (double)(Uv[5]) - (double)(Uv[1]);
                     unsigned long PixH = AbilityMaxHeight_;
                     if (Row == (long)(TilesY_) - 1)
@@ -407,12 +407,12 @@ namespace
                     const float RowH = (float)((double)(PixH) *
                                                           (double)(ScaleY) * VSpan);
 
-                    // FCOMP 0.0 / TEST AH,0x44 / JNP: skip only when USpan == 0 (unordered draws).
+                    // Skips only when USpan == 0 (unordered draws).
                     if (!(USpan == 0.0f))
                     {
                         if (DrawTile_ != nullptr)
                         {
-                            // 06f8221a..06f82273: callback Y endpoints reverse the destination RECT.
+                            // The callback's Y endpoints reverse the destination RECT.
                             float DestXy[4];
                             DestXy[0] = (float)((double)(DestX) - 0.5);
                             DestXy[1] = (float)((double)(RowH) +
@@ -435,7 +435,7 @@ namespace
             return (GENRESULT)(TilesX_);
         }
 
-        // LAB_06f82650: RET 0xC with EAX = Height.
+        // LAB_06f82650: retail returns Height in EAX.
         GENRESULT DACOM_API GetSize(unsigned long* Width, unsigned long* Height) override
         {
             *Width = Width_;
@@ -443,7 +443,7 @@ namespace
             return (GENRESULT)(Height_);
         }
 
-        // LAB_06f82670: FMUL 255.0f (DAT_06f830e0), _ftol, low byte -> +0x2c; EAX = _ftol result.
+        // LAB_06f82670 (255.0f = DAT_06f830e0); retail returns the _ftol result.
         GENRESULT DACOM_API SetAlpha(float Alpha) override
         {
             const long Value = FtolLow((double)(Alpha) * 255.0);
@@ -451,8 +451,7 @@ namespace
             return (GENRESULT)(Value);
         }
 
-        // FUN_06f82690: G, R, B through _ftol*255 with OR 0xFFFFFF00 / SHL chain -> 0xFFRRGGBB.
-        // RET 8 with EAX = this.
+        // FUN_06f82690: converted G, R, B order; packs 0xFFRRGGBB. Retail returns this in EAX.
         GENRESULT DACOM_API SetColor(const float* Rgb) override
         {
             unsigned long Packed = (unsigned long)(FtolLow((double)(Rgb[1]) * 255.0)) & 0xFFu;
@@ -562,14 +561,14 @@ namespace
             return GR_OK;
         }
 
-        // formerly Slot11; TODO: original operation purpose.
+        // Slot 11. TODO: original purpose unknown.
         GENRESULT DACOM_API ReturnMinusSeven(void* Unused) override
         {
             (void)Unused;
             return (GENRESULT)-7;
         }
 
-        // Body of FUN_06f823f0 after the inline ctor (06f8249a..06f82573). Returns the
+        // Body of FUN_06f823f0 after the inline ctor. Returns the
         // function's fail local: -1 unless the tile upload returned non-zero.
         GENRESULT Initialize(FBigImageDesc* Desc)
         {
@@ -587,7 +586,7 @@ namespace
                 Pipeline->AddRef();
             }
 
-            // Results are not tested (06f824e0 / 06f824ee / 06f824fc).
+            // Results are not tested, as in retail.
             Pipeline_->QueryDeviceAbility(Render::TextureSquareOnly, &AbilitySquareOnly_);
             Pipeline_->QueryDeviceAbility(Render::TextureMaxWidth, &AbilityMaxWidth_);
             Pipeline_->QueryDeviceAbility(Render::TextureMaxHeight, &AbilityMaxHeight_);
@@ -774,7 +773,7 @@ namespace
                     const unsigned char* TilePixels = Base + TileW * Bpp * Col + TileH * Row * Pitch;
                     if (AbilitySquareOnly_ != 0)
                     {
-                        // 06f8173b..06f81760: square side = max(POT(RemX), POT(RemY)), signed JLE.
+                        // Square side = max(POT(RemX), POT(RemY)), signed compare.
                         long Side = RoundUpPot(RemX);
                         if (Side <= PotY)
                             Side = PotY;
@@ -843,7 +842,7 @@ namespace
                     if (Rem != 0)
                         SpanW = Rem;
                 }
-                // FILD qword (unsigned remainder) / FIDIV dword (span): kept on the FPU stack.
+                // Unsigned remainder / signed span, kept on the FPU stack.
                 const double U0 = (LeftTile == Col)
                                       ? (double)(LeftRem) / (double)((long)(SpanW))
                                       : 0.0;
@@ -930,7 +929,7 @@ namespace
     public:
         FBigImageFactory() : RefCount_(1), Name_(Render::Factory::BigImage) {}
 
-        // LAB_06f82370: *Out = 0, CMPSB 0x17 bytes vs "1.11_IComponentFactory" (== strcmp).
+        // LAB_06f82370: retail compares 0x17 bytes, equivalent to strcmp.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
             *Out = nullptr;
@@ -1006,7 +1005,7 @@ namespace
     }
 }
 
-// FUN_06f828d0: DEC reason / JNZ -> return 1; attach registers the factory.
+// FUN_06f828d0: always returns 1; attach registers the factory.
 BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID Reserved)
 {
     (void)Instance;

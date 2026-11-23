@@ -21,8 +21,8 @@
 
 struct IFileSystem;
 
-// The by-value font description FUN_00415a80 reads (its only builder is FUN_00417800,
-// 0x00417a2b..0x00417a4d, which clears all three flags).
+// The by-value font description FUN_00415a80 reads (its only builder is FUN_00417800, which
+// clears all three flags).
 struct FFontDesc
 {
     char const* Face;  // +0x00 GDI face name
@@ -73,7 +73,7 @@ private:
     // read TEXTMETRICA; false (and an FDUMP) when CreateFontIndirectA fails.
     bool Realize(int Height);
     // FUN_00415e40 (RET 8): realize at Height, measure the calibration pangram, return
-    // width / Width (FILD qword / FIDIV, kept on the FPU stack).
+    // width / Width (kept on the FPU stack).
     double MeasurePangramRatio(int Height, int Width);
     // FUN_00416f50 (RET 0x10): step the pixel height from round(Fixed * ScreenH) one pixel at a
     // time until the pangram-width ratio crosses Target; returns the accumulated step.
@@ -113,7 +113,7 @@ int LoadFonts(char const* Path, IFileSystem* Filesys);
 // else null.
 IFont* FindMenuFontImp(char const* Nickname);
 
-// FUN_004174a0: the font subsystem teardown from WinMain's shutdown (0x005b229a) -- the glyph
+// FUN_004174a0: the font subsystem teardown from WinMain's shutdown -- the glyph
 // scratch, the font list, the atlas page pool, every number face's glyph string and the screen
 // quad batch cache.
 void FontShutdown();

@@ -6,8 +6,7 @@
 
 #pragma once
 
-// EngBase.dll — EXE/Disasm/engbase.dll.c / .txt
-// Interface methods are __stdcall (this on the stack). C helpers are __cdecl.
+// EngBase.dll. Interface methods are __stdcall (this on the stack). C helpers are __cdecl.
 
 #include "dacom.h"
 #include "luaprofile.h"
@@ -22,7 +21,6 @@
 #include <vector>
 
 static const GENRESULT GR_E_FAIL = (GENRESULT)0x80004005;
-
 
 static const char* const G_NameEngine = "Engine";
 static const char* const G_NameAnimation = "Animation";
@@ -59,8 +57,8 @@ static const char* const G_NameParentDot = "..";
 static const char* const G_NameFrames = "Frames";
 static const char* const G_NameChannel = "Channel";
 static const char* const G_NameHeader = "Header";
-// .data:0662a308 "DOS": the implementation name ChannelArchetype::Load (0661d938) puts at +8 of
-// its FileSystem open descriptor.
+// .data:0662a308: the implementation name ChannelArchetype::Load puts at +8 of its FileSystem
+// open descriptor.
 static const char* const G_NameDos = "DOS";
 static const char* const G_NameJointMap = "Joint map";
 static const char* const G_NameObjectMap = "Object map";
@@ -94,7 +92,7 @@ static const unsigned long G_ChannelPlayFlag = 0x1;
 static const unsigned long G_ChannelBlendFlag = 0x2;
 static const unsigned long G_ChannelHoldFlag = 0x4;
 
-// FUN_06616c10 06616d32: the first playback id IAnimation2::PlayScript hands out.
+// FUN_06616c10: the first playback id IAnimation2::PlayScript hands out.
 static const unsigned long G_AnimFirstPlaybackId = 0xED;
 
 static const unsigned long G_EngineInstanceSize = 0xEC;
@@ -124,7 +122,7 @@ struct FAggDesc8
     const char* Name;
 };
 
-// load_engine_components stack @ 0661fac5–0661fad9 + factory FUN_0661a750 / FUN_06627c40.
+// Built on the stack by load_engine_components; read by the factories FUN_0661a750 / FUN_06627c40.
 struct FAggDesc18
 {
     unsigned long Size;
@@ -169,13 +167,13 @@ struct FHardpointInner : IDAComponent
     unsigned long DACOM_API Release() override;                                // LAB_06627f00
 };
 
-// Node 0x3C: circular list. QI target / IEngineComponent* at +0x38 (Engine QI, pass 2/3).
+// Node 0x3C of a circular list with a sentinel.
 struct FEngineChildNode
 {
     FEngineChildNode* Next;
     FEngineChildNode* Prev;
     char Name[0x30];
-    // Shared node: Object holds an inner unknown or an EngineComponent facet.
+    // +0x38: an inner unknown (component list) or an IEngineComponent facet (engine-component list).
     IDAComponent* Object;
 };
 
@@ -195,8 +193,8 @@ struct FArchetypeChild
     struct FArchetypeHandle* Handle;
 };
 
-// Handle +0x2C vector element, stride 0x64, appended by insert(end, 1, record) (FUN_066237a0
-// from 06621072). +0 child part, +4 parent part, +8 type; UTF remap (not linear).
+// Handle +0x2C vector element, stride 0x64, appended by insert(end, 1, record) (FUN_066237a0).
+// The payload starts with the joint type; the rest is remapped from the UTF record (not linear).
 struct FConstraintRecord
 {
     FArchetypeChild* ChildPart;
@@ -247,7 +245,7 @@ struct FHardpointRecord
 };
 
 // Retail keeps one std::list of records per archetype handle, in a std::map keyed by the
-// handle as a signed int (FUN_06612e70 compares with JGE; the dtor prints it with %d).
+// handle as a signed int (FUN_06612e70 compares signed; the dtor prints it with %d).
 typedef std::list<FHardpointRecord> FHardpointList;
 typedef std::map<long, FHardpointList> FHardpointMap;
 
@@ -269,7 +267,7 @@ struct FInstanceTransform : IInstanceTransform
     GENRESULT DACOM_API SetExtra(void* Instance, float Extra, const float* Vec) override; // LAB_0661f430
     GENRESULT DACOM_API SetUser(void* Instance, unsigned long User) override;            // LAB_0661f460
     unsigned long DACOM_API GetUser(void* Instance) override;                           // LAB_0661f470
-    unsigned long DACOM_API MarkWorldDirty(void* Instance) override; // formerly Slot13
+    unsigned long DACOM_API MarkWorldDirty(void* Instance) override;                    // LAB_0661f320
 
     float Matrix[12];        // +0x04
     float Extra;             // +0x34
@@ -377,9 +375,9 @@ struct FEngineObject : IEngine
     float* DACOM_API GetInstanceOrientation(void* Instance) override;
     GENRESULT DACOM_API SetInstanceMatrix(void* Instance, void* Matrix) override;
     float* DACOM_API GetInstanceTransform(void* Instance) override;
-    GENRESULT DACOM_API NoOp41(void* A, void* B) override; // formerly UnusedSlot41; TODO: original operation purpose.
+    GENRESULT DACOM_API NoOp41(void* A, void* B) override; // TODO: original operation purpose.
     float* DACOM_API GetIdentityMatrix(void* Unused) override;
-    GENRESULT DACOM_API NoOp43(void* A, void* B) override; // formerly UnusedSlot43; TODO: original operation purpose.
+    GENRESULT DACOM_API NoOp43(void* A, void* B) override; // TODO: original operation purpose.
     float* DACOM_API GetIdentityMatrix2(void* Unused) override;
     GENRESULT DACOM_API SetTransformUser(void* Instance, unsigned long User) override;
     unsigned long DACOM_API GetTransformUser(void* Instance) override;
@@ -396,7 +394,7 @@ struct FEngineObject : IEngine
     void* DACOM_API GetRelatedInstance(void* From, unsigned long Flags, void* Cursor) override;
     void* DACOM_API GetInstanceRoot(void* Instance) override;
     void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) override;
-    unsigned long DACOM_API RejectOperation(void* A, void* B) override; // formerly UnusedSlot57; TODO: original operation purpose.
+    unsigned long DACOM_API RejectOperation(void* A, void* B) override; // TODO: original operation purpose.
 };
 
 // Track copies retain the channel and duplicate names; destruction releases them.
@@ -417,16 +415,15 @@ struct FAnimTrack
 // Script animation value owns tracks and retains its longest channel.
 struct FAnimNameEntry
 {
-    // Retail value +0: the channel archetype with the longest duration, AddRef'd; the previous
-    // holder is Released (066117b1..e4). Read by GetNamedDuration (066147c0) and
-    // GetScriptDuration (06615160) through IChannelArchetype::GetDuration.
+    // Retail value +0: the channel archetype with the longest duration, AddRef'd. Read by
+    // GetNamedDuration and GetScriptDuration.
     struct FChannelArchetypeObject* LongestChannel = nullptr;
-    // Retail value +4: set to 1 once a "Root height" file was read (06611568).
+    // Retail value +4: set to 1 once a "Root height" file was read.
     unsigned long bHasRootHeight = 0;
-    // Retail value +8: the "Root height" float (06611551..59), read back by
-    // GetNamedDurationOut (06615076..7d) and GetDurationIfNamed (06615264..6b).
+    // Retail value +8: the "Root height" float, read back by GetNamedDurationOut and
+    // GetDurationIfNamed.
     float RootHeight = 0.0f;
-    char* Name = nullptr;                    // retail value +0xC (_strdup, 0661146e)
+    char* Name = nullptr;                    // retail value +0xC (_strdup)
     std::vector<FAnimTrack> Tracks;          // retail value +0x10 vector, in file order
 
     FAnimNameEntry() = default;
@@ -435,18 +432,17 @@ struct FAnimNameEntry
     FAnimNameEntry& operator=(const FAnimNameEntry&) = delete;
 };
 
-// The script's name map, keyed by CRC32 of the name and compared unsigned (JC at 06614813 /
-// 0661505a / 06616bdf); every walk over it (EnumScriptNames 06614cf0, GetFirstInstanceField
-// 066151b0) visits the keys in ascending order, as std::map does.
+// The script's name map, keyed by CRC32 of the name and compared unsigned; every walk over it
+// (EnumScriptNames, GetFirstInstanceField) visits the keys in ascending order.
 using FAnimNameMap = std::map<unsigned long, FAnimNameEntry>;
 
 // Private reference-counted script handle; public callers use it opaquely.
 class FAnimScript
 {
 public:
-    // LAB_06612df0 (vtable +0x00): OR EAX,-1 / RET 0xC -- two arguments ignored, answers -1.
-    // The same body is also referenced from 06629714 (ICF fold); its name is not recovered.
-    virtual unsigned long DACOM_API RejectOperation(void* ArgA, void* ArgB); // formerly Slot00
+    // LAB_06612df0 (vtable +0x00): answers -1. The same body is also referenced from 06629714
+    // (ICF fold); its name is not recovered.
+    virtual unsigned long DACOM_API RejectOperation(void* ArgA, void* ArgB);
     // LAB_06612d20 (vtable +0x04).
     virtual unsigned long DACOM_API AddRef();
     // FUN_06612d30 (vtable +0x08); deletes the script at zero.
@@ -456,8 +452,7 @@ public:
     unsigned long RefCount = 1;              // retail +0x18
 
 protected:
-    // Only Release destroys a script (the inlined destructor at 06612d55..dd: vtable reset,
-    // map teardown, delete).
+    // Only Release destroys a script (retail inlines the destructor there).
     ~FAnimScript() = default;
 };
 
@@ -489,7 +484,7 @@ struct FTypedChannel
     virtual unsigned long AddOverlayPos(const float* Delta);
     virtual float* GetSampled();
     virtual unsigned long TouchMapped(void* ArgA, void* ArgB);
-    virtual unsigned long UpdateDeltaRate(float Dt); // formerly Slot13
+    virtual unsigned long UpdateDeltaRate(float Dt);
     virtual unsigned long Step(float* Out, float Dt);
 
     IChannelOwner* Owner;                            // +0x04
@@ -499,8 +494,7 @@ struct FTypedChannel
     unsigned long Instance;                          // +0x14 FEngineInstance* / 0xFFFFFFFF unbound
     void* Bind;                                      // +0x18
     float Time;                                      // +0x1C
-    // Retail +0x20: header[1] as FUN_0661af30 stores it (0661af37..3a); bit 1 loop, bit 2
-    // ping-pong (FUN_0661b120 0661b325 / 0661b38c, FUN_0661b420 0661b5a0 / 0661b71a).
+    // Retail +0x20: header[1] as FUN_0661af30 stores it; bit 1 loop, bit 2 ping-pong.
     unsigned long LoopFlags;                         // +0x20
     struct FChannelArchetypeObject* Archetype;       // +0x24
     float Weight;                                    // +0x28 (header[2])
@@ -508,9 +502,8 @@ struct FTypedChannel
     // TODO: name this play-header position factor when its purpose is known.
     float TranslationScale;                          // +0x30
     unsigned long PlayFlags;                         // +0x34
-    // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play
-    // (066164a0..a7), tested by IChannel::StopGraph (06616527) and by the standalone pass of
-    // LAB_066157f0 (066158f8), cleared by FUN_06611f90 (AND byte[+0x38],0xFE).
+    // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play, tested by
+    // IChannel::StopGraph and the standalone pass of LAB_066157f0, cleared by FUN_06611f90.
     unsigned char PlayState;                         // +0x38
 };
 
@@ -528,9 +521,8 @@ struct FScalarTypedChannel : FTypedChannel
     float* GetSampled() override;                                                             // LAB_066121a0
 
     float Sampled[1];                                // +0x3C
-    // Retail +0x40: 0xFFFFFFFF at construction (06612080 / 06615998), the bound instance's
-    // joint type (IEngine+0xC4 result [0]) after slot 7 FUN_0661b830, tested `== 2` by the
-    // slot 3 wrap-lerp LAB_0661b8a0.
+    // Retail +0x40: 0xFFFFFFFF at construction, the bound instance's joint type (IEngine+0xC4
+    // result [0]) after slot 7 FUN_0661b830, tested `== 2` by the slot 3 wrap-lerp LAB_0661b8a0.
     unsigned long JointType;                         // +0x40
 };
 
@@ -581,7 +573,7 @@ struct FPosQuatTypedChannel : FTypedChannel
     unsigned long AddOverlayPos(const float* Delta) override;
     float* GetSampled() override;
     unsigned long TouchMapped(void* ArgA, void* ArgB) override;
-    unsigned long UpdateDeltaRate(float Dt) override; // formerly Slot13
+    unsigned long UpdateDeltaRate(float Dt) override;
     unsigned long Step(float* Out, float Dt) override;
 
     float Matrix[9];                                 // +0x3C
@@ -615,8 +607,8 @@ using FTypedChannelSet = std::set<FTypedChannel*>;
 
 struct FMixerNode;
 
-// FUN_0661d0b0 / FUN_0661d0d0 / FUN_0661d0f0: 0x101 dwords on FUN_066152d0's frame
-// (local_404), the node pointers first and the count at +0x400. No bound check in retail.
+// FUN_0661d0b0 / FUN_0661d0d0 / FUN_0661d0f0: 0x101 dwords on FUN_066152d0's frame, the node
+// pointers first and the count at +0x400. No bound check in retail.
 struct FMixerStack
 {
     FMixerNode* Nodes[0x100];
@@ -624,7 +616,7 @@ struct FMixerStack
 };
 
 // The value of the inner map (node +0x1C): head, tail, count, and at +0xC the blend
-// duration FUN_06616090 records (06616307) and FUN_066152d0 reads back (06615425).
+// duration FUN_06616090 records and FUN_066152d0 reads back.
 struct FMixerList
 {
     FMixerNode* Head;
@@ -636,15 +628,15 @@ struct FMixerList
 // Nodes have no virtual destructor; MixerFreeNode deallocates their storage directly.
 struct FMixerNode
 {
-    // Slot 0 (+0x00), thiscall RET 4: advance by Dt; 1 means "finished".
+    // Slot 0: advance by Dt; 1 means "finished".
     virtual unsigned long Tick(float Dt) = 0;
-    // Slot 1 (+0x04), thiscall RET 8: write this node's value into Out, popping any inputs it
-    // needs from Stack. FUN_0661d0f0 enters it with a tail jump.
+    // Slot 1: write this node's value into Out, popping any inputs it needs from Stack.
+    // FUN_0661d0f0 enters it with a tail jump.
     virtual void Evaluate(float* Out, FMixerStack* Stack) = 0;
-    // Advance the sampled delta rate; blend and overlay nodes ignore Dt.
-    virtual void UpdateDeltaRate(float Dt) = 0; // formerly Slot02
-    // Sample displacement into Out and return its address.
-    virtual float* SampleDisplacement(float* Out, float Dt) = 0; // formerly Slot03
+    // Slot 2: advance the sampled delta rate; blend and overlay nodes ignore Dt.
+    virtual void UpdateDeltaRate(float Dt) = 0;
+    // Slot 3: sample displacement into Out and return its address.
+    virtual float* SampleDisplacement(float* Out, float Dt) = 0;
 
     unsigned long Type;     // +0x04: 0 leaf, 1 blend, 2 overlay
     FMixerNode* Prev;       // +0x08
@@ -652,26 +644,25 @@ struct FMixerNode
     unsigned char bRemove;  // +0x10: FUN_066152d0's third pass unlinks and frees these
 };
 
-// operator_new(0x18), vtable PTR_LAB_06629228 (FUN_06616090 06616202..0661621c).
+// operator_new(0x18), vtable PTR_LAB_06629228 (built by FUN_06616090).
 struct FMixerLeaf : FMixerNode
 {
     FTypedChannel* Typed;   // +0x14
 
     unsigned long Tick(float Dt) override;                    // LAB_0661d110
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d120
-    void UpdateDeltaRate(float Dt) override; // formerly Slot02
-    float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
+    void UpdateDeltaRate(float Dt) override;
+    float* SampleDisplacement(float* Out, float Dt) override;
 };
 
-// operator_new(0x48), vtable PTR_LAB_06629210 (FUN_06616090 06616284..066162ca,
-// FUN_066152d0 06615417..06615459).
+// operator_new(0x48), vtable PTR_LAB_06629210 (built by FUN_06616090 and FUN_066152d0).
 struct FMixerBlend : FMixerNode
 {
     float Time;             // +0x14
     float Duration;         // +0x18
     float InvDuration;      // +0x1C
-    // +0x20, a byte: bit 0 "drop the outgoing side when done" (FUN_066152d0 06615372),
-    // bit 1 "carry the root's position through the blend" (06616334..3d, 0661d21d).
+    // +0x20, a byte: bit 0 "drop the outgoing side when done" (FUN_066152d0),
+    // bit 1 "carry the root's position through the blend".
     unsigned char Flags;
     float PoseStart[3];     // +0x24: IEngine+0x90 of the root when the blend was attached
     float PoseRate[3];      // +0x30: predecessor's slot 3 over the duration, times InvDuration
@@ -679,8 +670,8 @@ struct FMixerBlend : FMixerNode
 
     unsigned long Tick(float Dt) override;                    // LAB_0661d130
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d160
-    void UpdateDeltaRate(float Dt) override; // formerly Slot02
-    float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
+    void UpdateDeltaRate(float Dt) override;
+    float* SampleDisplacement(float* Out, float Dt) override;
 };
 
 // operator_new(0x34), FUN_0661d5b0, vtable PTR_FUN_06629518: the value the target had when
@@ -694,8 +685,8 @@ struct FMixerOverlay : FMixerNode
 
     unsigned long Tick(float Dt) override;                    // FUN_0661d700
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d710
-    void UpdateDeltaRate(float Dt) override; // formerly Slot02
-    float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
+    void UpdateDeltaRate(float Dt) override;
+    float* SampleDisplacement(float* Out, float Dt) override;
 };
 
 // FUN_06612b20, the inner map's ordering.
@@ -705,23 +696,23 @@ struct FAnimBindLess
 };
 
 using FMixerDescMap = std::map<FAnimBindOut, FMixerList, FAnimBindLess>;
-// Retail compares the outer key as a signed int (FUN_06614f70: `(int)param_1 < (int)node[3]`).
+// Retail compares the outer key as a signed int (FUN_06614f70).
 using FMixerKeyMap = std::map<long, FMixerDescMap>;
 
 // Playback value: track channels, root instance, longest channel and retained script.
 struct FAnimPlayback
 {
-    FAnimNameEntry* Name;                 // +0x00: FUN_06611f90 06611fa2
-    FEngineInstance* Root;                // +0x04: -1 from 06611f75, the bind root from 06612503
+    FAnimNameEntry* Name;                 // +0x00: set by FUN_06611f90
+    FEngineInstance* Root;                // +0x04: -1 until FUN_066124e0 binds it
     // +0x08: VC6 vector (allocator byte, First +0xC, Last +0x10, End +0x14) of the channels
     // FUN_06611f90 created, one per track, minus the ones FUN_066124e0 failed to bind.
     std::vector<FTypedChannel*> Typed;
-    FTypedChannel* LongestTyped;          // +0x18: FUN_066124e0 066125b2, 0 when none bound
-    FAnimScript* Script;                  // +0x1C: LAB_06614920 06614983
+    FTypedChannel* LongestTyped;          // +0x18: set by FUN_066124e0, 0 when none bound
+    FAnimScript* Script;                  // +0x1C: set by LAB_06614920
 };
 
 // Retail Animation+0x14: playback id -> record. FUN_06614580 / FUN_06612e70 compare the key
-// signed (`CMP ECX,EDX; JL` at 066145a9..ab).
+// signed.
 using FAnimPlaybackMap = std::map<long, FAnimPlayback>;
 
 // Animation exposes four facets sharing the aggregate's controlling unknown.
@@ -756,20 +747,19 @@ struct FAnimationChannelFacet : IChannel
 
 struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChannelFacet, IRootData
 {
-    // Retail +0x10: the next playback id. FUN_06616c10 seeds it with 0xED (06616d32);
-    // LAB_06614920 hands out the current value and increments it (066149d3..e5).
+    // Retail +0x10: the next playback id, seeded with 0xED by FUN_06616c10.
     unsigned long NextPlaybackId;
-    // Retail +0x14: the playback map (VC6 _Tree, 0x14 bytes). Held through a pointer for the
-    // same reason as Channels and Mixers; allocated by AnimationFactoryCreateInstance.
+    // Deviation: retail holds the three trees below in place (VC6 _Tree, 0x14 bytes each). The
+    // port holds them through pointers so the object keeps its 0x60 size under every
+    // iterator-debug level; allocated by AnimationFactoryCreateInstance, released by
+    // DestroyAnimationLists.
+    // Retail +0x14: the playback map.
     FAnimPlaybackMap* Playbacks;
     unsigned char Pad18[0x10];
-    // Retail +0x28: the typed-channel set (see FTypedChannelSet). Held through a pointer for
-    // the same reason as Mixers below; allocated by AnimationFactoryCreateInstance.
+    // Retail +0x28: the typed-channel set.
     FTypedChannelSet* Channels;
     unsigned char Pad2C[0x10];
-    // Retail +0x3C: the mixer map itself (VC6 _Tree). Held through a pointer here so the
-    // object keeps its 0x60 size under every iterator-debug level; allocated by
-    // AnimationFactoryCreateInstance, released by DestroyAnimationLists.
+    // Retail +0x3C: the mixer map.
     FMixerKeyMap* Mixers;
     unsigned char Pad40[0x10];
     IDAComponent* Controller;    // +0x50: desc +8 (the aggregating outer) or &Inner
@@ -862,8 +852,7 @@ struct FHardpointObject : IHardpoint, IEngineComponent
     int DACOM_API Notify(void* Arg1) override;
 };
 
-// ChannelArchetype operator_new(0x20): LAB_0661d8d0 Header 0xC + Frames blob.
-// Slots 3–6 load/duration/flags/sample; 7–10 pair/get-frame/range/exact (not IK).
+// ChannelArchetype, operator_new(0x20). LAB_0661d8d0 loads a 0xC-byte Header plus a Frames blob.
 struct FChannelArchetypeObject : IChannelArchetype
 {
     unsigned long FrameCount;
@@ -915,7 +904,8 @@ extern FEngineObject* G_AnimEngine;
 I3DMathEngine* Create3DMathEngine();
 // Create-on-first-use over FUN_06628190. Retail caches it per call site
 // (DAT_0662ace8 / DAT_0662b0f8 / DAT_0662acf4 / DAT_0662ace0 / DAT_0662b1b0); one cache serves
-// the ported sites except FUN_0661f250, which has its own (DAT_0662b178).
+// the ported sites except FUN_0661f250 (DAT_0662b178) and the joint helpers (DAT_0662b1b0),
+// which have their own.
 I3DMathEngine* Acquire3DMathEngine();
 
 // Typed-channel members the mixer drives (EngBase.cpp).

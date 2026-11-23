@@ -10,7 +10,7 @@
 
 namespace
 {
-	// SetTimer id and period used by OnCreate (.text:004079e6).
+	// SetTimer id and period used by OnCreate.
 	const UINT_PTR InfoTimerId = 0x2000;
 	const UINT InfoTimerPeriod = 2000;
 }
@@ -27,8 +27,7 @@ void CServerInfoDlg::DoDataExchange(CDataExchange* DX)
 	DDX_Control(DX, 1005, InfoTree);
 }
 
-// Message map .rdata:0041c8f0: WM_CLOSE -> 004075f0, WM_TIMER -> 004079c0, WM_CREATE -> 004079d0,
-// WM_SIZE -> 00407a00.
+// Message map .rdata:0041c8f0.
 BEGIN_MESSAGE_MAP(CServerInfoDlg, CDialog)
 	ON_WM_CLOSE()
 	ON_WM_TIMER()
@@ -42,7 +41,7 @@ void CServerInfoDlg::OnClose()
 	ShowWindow(SW_HIDE);
 }
 
-// .text:004079c0 — CWnd::OnTimer (the inline Default()); retail's timer does nothing else.
+// .text:004079c0 — the timer does nothing.
 void CServerInfoDlg::OnTimer(UINT_PTR IDEvent)
 {
 	Default();

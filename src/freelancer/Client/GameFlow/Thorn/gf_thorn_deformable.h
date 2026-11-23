@@ -9,7 +9,7 @@
 // Thorn_Deformable (RTTI .?AVThorn_Deformable@@, E:\FL\Scratch\Source\Client\Gf\
 // ScriptDeformable.cpp) -- the object a DEFORMABLE entity is bound to: a CharacterObject whose
 // animations (CharacterInfo scripts through DALib::Deform) and IK aims the script drives.
-// operator new(0x9f8) in FUN_0044ded0 (ctor call 0x0044df6c); identity vtable 0x005cd1ec.
+// operator new(0x9f8) in FUN_0044ded0; identity vtable 0x005cd1ec.
 //
 // Built by FGfScript::SpawnDeformable (FUN_0044ded0 -> FUN_0044e870, gf_script_spawn.cpp) with
 // the room's character (FUN_00449cd0 / FUN_00449d50), the sequence's, or a new one from the
@@ -60,9 +60,9 @@ struct FThornDeformable : FThornComponent
                   unsigned char bFlag14) override;                       // 20 LAB_00452ed0
 
     // FUN_00452e40 (thiscall, RET 4) -- the character instance's frame (world). Caller: the
-    // spawn FUN_0044ded0 (0x0044dfd8).
+    // spawn FUN_0044ded0.
     Csys GetCharacterCsys() const;
-    // FUN_00452eb0 -- the character's deformable instance. Caller: FUN_0044ded0 (0x0044dffb).
+    // FUN_00452eb0 -- the character's deformable instance. Caller: FUN_0044ded0.
     void* GetDeformInstance() const;
 
     // One motion (retail slot ctor LAB_00451f50).

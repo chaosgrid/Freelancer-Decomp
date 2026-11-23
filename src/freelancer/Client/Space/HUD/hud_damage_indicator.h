@@ -24,13 +24,11 @@
 // entry LAB_004d62a0, ctor FUN_004d7450, atexit LAB_004d62c0 -> FUN_004cf010), vftable
 // 0x005d81d8 whose Create FUN_004d74c0 is operator new(0x414) + FUN_004d62d0.
 //
-// DAT_00674a10 is the one instance (written by the ctor at 0x004d63c9, cleared by the dtor at
-// 0x004d6507). The client ship's hit handlers read it and, when it is set, call:
-//   FUN_004d6d40 -- client object slot 104 FUN_00545e90 (0x00545ec3), its first argument
-//   FUN_004d6cd0 -- client object slot 105 FUN_00545ed0 (0x00545f33)
-//   FUN_004d6f00 -- the explosion spawn FUN_005361e0 (0x005363f2)
-// All three callers read it through GetHudDamageIndicator(): client_gameobj.cpp (slots 104 /
-// 105) and client_explosion.cpp (FUN_005361e0).
+// DAT_00674a10 is the one instance (set by the ctor, cleared by the dtor). Callers, through
+// GetHudDamageIndicator():
+//   FUN_004d6d40 -- client object slot 104 FUN_00545e90 (client_gameobj.cpp)
+//   FUN_004d6cd0 -- client object slot 105 FUN_00545ed0 (client_gameobj.cpp)
+//   FUN_004d6f00 -- the explosion spawn FUN_005361e0 (client_explosion.cpp)
 // -------------------------------------------------------------------------------------------
 
 #include "Common/Graphics/client_mesh_load.h"
@@ -41,15 +39,12 @@ class INI_Reader;
 class Vector;
 
 // One arrow (0x2c bytes): the HUD mesh holder and its flash timer.
-// FUN_004d72a0 (thiscall, RET 8) builds it; FUN_004d7400 (the unwind copy) and the inlined
-// blocks of FUN_004d64c0 destroy it.
 struct FHudDamageIndicatorPart
 {
-    // FUN_004d72a0 -- the holder (FUN_00420d40, five 1.0f, anim -1), Flash = 0, the mesh
-    // (FUN_0059ec80(Path, 0, 1)), an FDUMP when no instance came of it, then the instance's
-    // matrix: a rotation of Degrees about Z at (0, 0, -1) (IEngine +0x9c, +0x6c).
+    // FUN_004d72a0 -- the holder, the mesh (FDUMP when no instance came of it), then the
+    // instance's matrix: a rotation of Degrees about Z at (0, 0, -1).
     FHudDamageIndicatorPart(char const* Path, float Degrees);
-    // FUN_004d7400 -- FUN_0059eee0 when an instance is bound, then the holder dtor FUN_0059ef20.
+    // FUN_004d7400 (also inlined in FUN_004d64c0).
     ~FHudDamageIndicatorPart();
 
     FClientMeshHolder Holder;  // +0x00

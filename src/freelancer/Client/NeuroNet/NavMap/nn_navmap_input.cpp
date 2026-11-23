@@ -53,7 +53,7 @@ namespace
     double const kNavMapPlaneDepth = -0.55;
     // DAT_005d2edc -- a view switch's transition time.
     float const kNavMapViewSwitchSeconds = 0.4f;
-    // 0x3fc00000 -- a zoom-out's transition time (0x004944a6).
+    // 0x3fc00000 -- a zoom-out's transition time.
     float const kNavMapZoomOutSeconds = 1.5f;
     // DAT_005d3f18 -- the object tools' spacing around the cursor (FUN_0049ea50).
     float const kNavMapToolSpacing = 0.038f;
@@ -65,7 +65,7 @@ namespace
     float const kNavMapSelectMinSize = 700.0f;
 
     // Not a retail function: the tail SetProperty's waypoint buttons share (LAB_00493aad and
-    // its copy at 0x00493cc4) -- "clear all" hidden while there is no waypoint or the
+    // an inlined copy) -- "clear all" hidden while there is no waypoint or the
     // objectives follow the best path, then the objectives and the jump links again.
     void RefreshWaypointButtons(NeuroNetNavMap& Map)
     {
@@ -78,15 +78,15 @@ namespace
         Map.BuildJumpLinks();    // FUN_004975a0
     }
 
-    // Not a retail function: the item half of the info request SetProperty (0x00493866..
-    // 0x00493921) and MouseEvent (0x00497e51..0x00497eea) inline -- refresh the item's visit
+    // Not a retail function: the item half of the info request SetProperty and MouseEvent
+    // inline -- refresh the item's visit
     // bits and shown flag from the visit map, then its card.
     void ShowItemInfoCard(NeuroNetNavMap& Map, FNavMapItem* Item)
     {
         if (Item->Id != 0)
         {
             unsigned char Flags = 0;
-            GetPlayerVisitFlagsRetail(Item->Id, &Flags, 0, 0); // FUN_004c4da0 0x00493899 / 0x00497e70
+            GetPlayerVisitFlagsRetail(Item->Id, &Flags, 0, 0); // FUN_004c4da0
             Item->Visit = static_cast<unsigned char>(Item->Visit | Flags);
             Item->bShown = static_cast<unsigned char>(Item->Visit & 1);
             if (Map.bDebugShowAll != 0)
@@ -95,12 +95,12 @@ namespace
         int const IdsName = Item->StridName;
         int const IdsInfo = Item->IdsInfo;
         unsigned char Visit = 0;
-        GetPlayerVisitFlagsRetail(Item->Id, &Visit, 0, 0); // 0x004938e0 / 0x00497eb2
+        GetPlayerVisitFlagsRetail(Item->Id, &Visit, 0, 0);
         Visit = static_cast<unsigned char>(Visit | Item->Visit);
         Map.ShowInfoCard(IdsName, IdsInfo, Visit, Map.ObjectBaseId(Item->Id)); // FUN_004978c0
     }
 
-    // Not a retail function: the zone half (0x00493924..0x004939d9, 0x00497eed..0x00497fa4) --
+    // Not a retail function: the zone half --
     // the named-info zone at the last click (ClickMapPos, unscaled), its card; false when none.
     bool ShowZoneInfoCard(NeuroNetNavMap& Map)
     {
@@ -114,7 +114,7 @@ namespace
         if (Zone == nullptr)
             return false;
         unsigned char Visit = 0;
-        GetPlayerVisitFlagsRetail(Zone->GetId(), &Visit, 1, 0); // 0x0049398d / 0x00497f5c
+        GetPlayerVisitFlagsRetail(Zone->GetId(), &Visit, 1, 0);
         Visit = static_cast<unsigned char>(Visit | Zone->GetVisit());
         // The arguments are built right to left: 0, the visit bits, slot 0x88 (ids_info), then
         // slot 0x84 (ids_name).
@@ -131,11 +131,11 @@ namespace
 
 intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_00493680 (RET 0xc). The switch on Msg - 0x26 (byte table 0x004945c0): 0x26 click,
+    // LAB_00493680. 0x26 click,
     // 0x2c / 0x2d hover, 0x3e scroll; everything else returns 0 -- without WinControl's body.
     if (Msg == 0x2c || Msg == 0x2d)
     {
-        // caseD_2c 0x00494556..0x004945ad: only the objective rows.
+        // Only the objective rows.
         for (int Row = 0; Row < 3; ++Row)
         {
             if (A != reinterpret_cast<uintptr_t>(MissionObjective[Row]))
@@ -150,7 +150,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (Msg == 0x3e)
     {
-        // caseD_3e 0x004936ab..0x004936f8: the two scroll bars; any other sender is a click.
+        // The two scroll bars; any other sender is a click.
         if (A == reinterpret_cast<uintptr_t>(static_cast<WinControl*>(ObjectiveScroll)))
         {
             ObjectiveFirstRow = static_cast<int>(B);
@@ -169,11 +169,11 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    // caseD_26 0x004936fb: nothing while the side panels slide (FUN_0055e280 on +0x330).
+    // 0x26: nothing while the side panels slide (FUN_0055e280 on +0x330).
     if (ButtonMover::IsActive())
         return 0;
 
-    // 0x0049370e..0x0049375e: the universe button starts a view switch unless one runs.
+    // The universe button starts a view switch unless one runs.
     if (A == reinterpret_cast<uintptr_t>(UniverseButton))
     {
         if (bTransition != 0)
@@ -198,7 +198,6 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(AbortNoButton))
     {
-        // 0x004937a1..0x004937fb
         AbortYesButton->SetProperty(1, 1, 0);
         AbortYesText->SetProperty(1, 1, 0);
         AbortNoButton->SetProperty(1, 1, 0);
@@ -213,14 +212,13 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(LabelButton))
     {
-        // 0x00493828..0x00493857
         G_bNavMapShowLabels = G_bNavMapShowLabels == 0 ? 1 : 0;
         LabelButton->SetProperty(0xc, G_bNavMapShowLabels, 0);
         return 0;
     }
     if (A == reinterpret_cast<uintptr_t>(InfoButton))
     {
-        // 0x00493866..0x004939d9: the item at the click (waypoint markers skipped), else the
+        // The item at the click (waypoint markers skipped), else the
         // zone there.
         FNavMapItem* const Item = ItemAt(ClickMapPos, 1); // FUN_00496d40
         if (Item != nullptr)
@@ -233,7 +231,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(SetWaypointButton))
     {
-        // 0x004939e8..0x00493aa3: nothing while the best path shows its text; else a
+        // Nothing while the best path shows its text; else a
         // waypoint at the clicked item (not a waypoint marker) or point.
         if (BestPathHasText()) // FUN_004c58e0
             return 1;
@@ -262,7 +260,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(BestPathButton))
     {
-        // 0x00493b16..0x00493c21: ask the server for a route from the player (in its own
+        // Ask the server for a route from the player (in its own
         // system's scale) to the clicked item (its id as the tag) or point.
         FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
         unsigned TargetId = 0;
@@ -302,7 +300,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(ClearWaypointButton))
     {
-        // 0x00493c32..0x00493cab: remove the clicked waypoint marker's waypoint.
+        // Remove the clicked waypoint marker's waypoint.
         FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
         if (Item != nullptr && Item->Kind == 3)
         {
@@ -326,7 +324,6 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(ClearAllWaypointsButton))
     {
-        // 0x00493cb8..0x00493d1b
         bBestPathObjectives = 1;
         ResetPlayerWaypointsRetail(); // FUN_004c46c0
         RefreshWaypointButtons(*this);
@@ -339,14 +336,13 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(ContinueButton))
     {
-        // 0x00493d42..0x00493d63
         RequestMissionBriefingContinue(); // FUN_0043d580
         ProcessMessage(0xef02, 0, 0);
         return 1;
     }
     if (A == reinterpret_cast<uintptr_t>(ShipButton))
     {
-        // 0x00493d6e..0x00493d8c: the player's system, not null-tested.
+        // The player's system, not null-tested.
         PendingSystem = Universe::get_system(GetPlayerStarSystemIdRetail());
         return 0;
     }
@@ -386,7 +382,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         A == reinterpret_cast<uintptr_t>(HostileFilter) ||
         A == reinterpret_cast<uintptr_t>(FriendlyFilter))
     {
-        // 0x00493e53..0x00493fa4: the zone filter, then the three check boxes (the first set
+        // The zone filter, then the three check boxes (the first set
         // from the case, the other two re-read from DAT_006720a4).
         uintptr_t bAll = 0;
         if (A == reinterpret_cast<uintptr_t>(AllFilter))
@@ -414,7 +410,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(SelectObjectButton))
     {
-        // 0x00493fd0..0x0049408e: in a system view, target the clicked object (command 0x1c),
+        // In a system view, target the clicked object (command 0x1c),
         // or select the first waypoint / best-path stop as the HUD waypoint.
         HideObjectTools();
         if (ViewMode != 1 && ViewMode != 2)
@@ -445,7 +441,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
     if (A == reinterpret_cast<uintptr_t>(JumpGateButton))
     {
-        // 0x0049409d..0x00494191: in a system view, open the system the clicked item leads to
+        // In a system view, open the system the clicked item leads to
         // (a star's own, a waypoint's target object's, or the star under a best-path stop).
         HideObjectTools();
         if (ViewMode != 1 && ViewMode != 2)
@@ -470,7 +466,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     FNavMapItem* const Target = *It;
                     if (Target->bShown == 0 || Target->Id != Record->ObjectId)
                         continue;
-                    // 0x00494178: found -- 1 whether or not it has a system.
+                    // Found -- 1 whether or not it has a system.
                     if (Target->System != nullptr)
                         PendingSystem = Target->System;
                     return 1;
@@ -492,7 +488,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         HideObjectTools();
         if (ViewMode == 0)
         {
-            // 0x004944e4..0x00494553: into the clicked star's system.
+            // Into the clicked star's system.
             FNavMapItem* const Item = ItemAt(ClickMapPos, 0);
             if (Item == nullptr || (Item->Kind != 0 && Item->Kind != 1))
                 return 1;
@@ -513,9 +509,8 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (ViewMode != 2 || bDragging != 0)
             return 1;
 
-        // 0x00494414..0x004944cb: zoomed in -- back out to the whole system over 1.5 s.
-        // TransitionDelta z is first stored as -PanOffset z and then overwritten
-        // (0x00494484 / 0x0049448e).
+        // Zoomed in -- back out to the whole system over 1.5 s. Retail first stores
+        // TransitionDelta z as -PanOffset z and then overwrites it.
         HideObjectTools();
         double const Distance = static_cast<double>(MapExtentX) / static_cast<double>(ZoomScale);
         TransitionStart[0] = PanOffset[0];
@@ -537,7 +532,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (A == reinterpret_cast<uintptr_t>(BaseTitleText) ||
         A == reinterpret_cast<uintptr_t>(SystemTitleText))
     {
-        // 0x004941ac..0x004941dc: sort by the clicked column.
+        // Sort by the clicked column.
         SortBaseList(A == reinterpret_cast<uintptr_t>(BaseTitleText) ? 1 : 0); // FUN_004a2760
         RefreshBaseList();
         return 1;
@@ -573,7 +568,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         CurrentSystem = Universe::get_system(Entry->SystemId);
         if (CurrentSystem != nullptr && !IsSkippedSystem(CurrentSystem))
         {
-            // 0x004942e6: retail tests CurrentSystem again here.
+            // Retail tests CurrentSystem again here.
             GetIdsStringWWithRawFallback(static_cast<unsigned>(CurrentSystem->GetStridName()),
                                          G_NnTextScratchB, G_NnTextScratchCapacity);
             CharUpperW(G_NnTextScratchB);
@@ -588,7 +583,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         bTransition = 0;
         EnterSystemView(); // FUN_0049e1d0
 
-        // 0x00494352..0x004943ab: the base in map-frame fractions of the new system (x kept in
+        // The base in map-frame fractions of the new system (x kept in
         // the FPU, z * scale stored as a float first).
         double const Scale = static_cast<double>(SystemScale);
         double const X = static_cast<double>(Entry->Pos[0]) * Scale;
@@ -616,13 +611,12 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
     NnToolTipHideGlobal(); // FUN_004be390
 
-    // 0x00497d58..0x00497d72: nothing in the legend, info card and base list modes.
+    // Nothing in the legend, info card and base list modes.
     if (G_NavMapFilterMode == 4 || G_NavMapFilterMode == 6 || G_NavMapFilterMode == 7)
         return true;
 
-    // 0x00497d78..0x00497dda: the cursor inside ScreenRect (x kept in the FPU, y stored);
-    // TEST AH,1 + JNZ rejects a negative (or unordered) offset, TEST AH,5 + JP one at or past
-    // the size.
+    // The cursor inside ScreenRect (x kept in double, y rounded to float). x87: a negative (or
+    // unordered) offset is rejected, as is one at or past the size.
     int MouseX = 0;
     int MouseY = 0;
     GetClientSoftwareCursor(&MouseX, &MouseY, nullptr); // DAT_00616840 / DAT_00616844
@@ -634,7 +628,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     if (!(Dx < static_cast<double>(ScreenRectSize[0])) || !(Dy < ScreenRectSize[1]))
         return true;
 
-    // 0x00497de0..0x00497e13: a press while zoomed in arms a drag (Update moves the pan).
+    // A press while zoomed in arms a drag (Update moves the pan).
     if (Event->Field1 == 2 && ViewMode == 2)
     {
         bMouseDown = 1;
@@ -645,7 +639,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
 
     if (Event->Field1 == 3)
     {
-        // 0x00497e25..0x00497fa4: the info card of the star under the cursor, else of the
+        // The info card of the star under the cursor, else of the
         // zone at the LAST CLICK (retail reads ClickMapPos here, not the cursor's point).
         float MapPos[3];
         if (!MapPointUnderCursor(MapPos)) // FUN_00492410
@@ -673,10 +667,10 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // 0x00497fdf..0x0049809f: the debug beam -- the player ship to the cursor's point.
+    // The debug beam -- the player ship to the cursor's point.
     if (IsPlayerDockedRetail()) // FUN_004c4810
         return true;
-    if (ViewMode == 0) // retail's own test (0x00497fec)
+    if (ViewMode == 0) // retail's own test
         return true;
     float MapPos[3];
     if (!MapPointUnderCursor(MapPos))
@@ -689,7 +683,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
     Pos.x = static_cast<float>(static_cast<double>(MapPos[0]) * InvScale);
     Pos.y = static_cast<float>(static_cast<double>(MapPos[1]) * InvScale);
     Pos.z = static_cast<float>(static_cast<double>(MapPos[2]) * InvScale);
-    // 0x00498021..0x00498066: the IObjInspectImpl's CBase (+0xc) and its object, when that
+    // The IObjInspectImpl's CBase (+0xc) and its object, when that
     // object's class has bit 0; retail calls through it untested.
     CObject* Object = nullptr;
     IObjInspectImpl* const Impl = static_cast<IObjInspectImpl*>(Player);
@@ -700,7 +694,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         if (Candidate != nullptr && (static_cast<unsigned>(Candidate->ObjectClass) & 1u) == 1u)
             Object = Candidate;
     }
-    // 0x00498066..0x00498079: CObject slot +0x7c beam_object(Pos, the player's orientation,
+    // CObject slot +0x7c beam_object(Pos, the player's orientation,
     // false). Retail takes the orientation through IObjInspect slot 3 (+0x0c, get_transform),
     // whose body 0x062bf1f0 is folded with slot 4 get_orientation.
     Object->beam_object(Pos, Player->get_orientation(), false);
@@ -711,7 +705,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
 
 bool NeuroNetNavMap::CursorMapFraction(float* OutU, float* OutV)
 {
-    // FUN_004980d0 (RET 8). 0x004980d3..0x00498140: the ScreenRect test of FUN_00492410.
+    // FUN_004980d0. The ScreenRect test of FUN_00492410.
     int MouseX = 0;
     int MouseY = 0;
     GetClientSoftwareCursor(&MouseX, &MouseY, nullptr);
@@ -725,7 +719,7 @@ bool NeuroNetNavMap::CursorMapFraction(float* OutU, float* OutV)
     if (!(Dx < static_cast<double>(ScreenRectSize[0])) || !(Dy < ScreenRectSize[1]))
         return false;
 
-    // 0x00498146..0x004981d0: the camera ray (slot 0x38) scaled to the map plane, as
+    // The camera ray (slot 0x38) scaled to the map plane, as
     // fractions of the map frame: U = x / (MapSize x / 2), V = -y / (MapSize y / 2), each
     // then * 0.5 + 0.5.
     float Ray[3];
@@ -743,7 +737,7 @@ bool NeuroNetNavMap::CursorMapFraction(float* OutU, float* OutV)
 
 void NeuroNetNavMap::ShowObjectTools()
 {
-    // FUN_0049ea50. 0x0049ea58..0x0049eaa0: not during a transition; the cursor's map point,
+    // FUN_0049ea50. Not during a transition; the cursor's map point,
     // ray point and frame fractions.
     if (bTransition != 0)
         return;
@@ -758,14 +752,13 @@ void NeuroNetNavMap::ShowObjectTools()
     if (!CursorMapFraction(&U, &V)) // FUN_004980d0
         return;
 
-    // 0x0049eaa6..0x0049ead5: filter modes 1 / 2 -- none in the corner right of U 0.81 and
-    // below V -0.0133 (TEST AH,0x41 + JNZ skips on not-greater; TEST AH,5 + JNP returns on
-    // less).
+    // Filter modes 1 / 2 -- none in the corner right of U 0.81 and below V -0.0133 (x87
+    // compares; unordered does not return).
     if ((G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2) && U > kNavMapToolsLegendU &&
         V < kNavMapToolsLegendV)
         return;
 
-    // 0x0049eadb..0x0049ec25: the tools around the ray point -- zoom / jump left, waypoint /
+    // The tools around the ray point -- zoom / jump left, waypoint /
     // select right, info above, clear / best path below (property 6 = position).
     float Pos[3];
     Pos[0] = static_cast<float>(static_cast<double>(RayPos[0]) -
@@ -793,9 +786,7 @@ void NeuroNetNavMap::ShowObjectTools()
     ClearWaypointButton->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
     BestPathButton->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
 
-    // 0x0049ec2b..0x0049eef1: what is under the cursor. Retail's stack bytes: +0x11 bInfo,
-    // +0x12 bSelect, +0x13 bJump, +0x14 bWaypointEnd, +0x15 bZoneHit, +0x16 bWaypointsFull,
-    // +0x17 bWaypointMarker.
+    // What is under the cursor.
     unsigned char bInfo = 0;
     unsigned char bJump = 0;
     unsigned char bWaypointEnd = 0;
@@ -805,7 +796,7 @@ void NeuroNetNavMap::ShowObjectTools()
     {
         if (Item->Kind == 3)
         {
-            // 0x0049ec64..0x0049ee79: a waypoint marker. Its number (Variant) against the
+            // A waypoint marker. Its number (Variant) against the
             // smallest / largest AutoId marks the route's ends; its record's target object
             // (ObjectId, +0x10), when shown and a star, allows the jump.
             bWaypointMarker = 1;
@@ -839,7 +830,7 @@ void NeuroNetNavMap::ShowObjectTools()
         }
         else if (Item->Kind == 4)
         {
-            // 0x0049ee83..0x0049eebc: a best-path stop over a star (in a system view).
+            // A best-path stop over a star (in a system view).
             FNavMapItem* const Under = ItemAt(MapPos, 1);
             if (Under != nullptr && ViewMode != 0 && Under->System != nullptr)
             {
@@ -849,7 +840,6 @@ void NeuroNetNavMap::ShowObjectTools()
         }
         else if (Item->Kind == 0 || Item->Kind == 1)
         {
-            // 0x0049eece..0x0049eef1
             bInfo = 1;
             if (ViewMode != 0 && Item->System != nullptr)
                 bJump = 1;
@@ -882,7 +872,7 @@ void NeuroNetNavMap::ShowObjectTools()
         }
     }
 
-    // LAB_0049eda3..0x0049ee41: remember the click, show the option bridge at the ray point
+    // LAB_0049eda3: remember the click, show the option bridge at the ray point
     // plus its attach position (RayPos moved in place).
     ClickMapPos[0] = MapPos[0];
     ClickMapPos[1] = MapPos[1];
@@ -902,14 +892,14 @@ void NeuroNetNavMap::ShowObjectTools()
                                    static_cast<double>(OptionBridge->AttachPosition[2]));
     OptionBridge->SetProperty(6, reinterpret_cast<uintptr_t>(RayPos), 0);
 
-    // 0x0049ee47..0x0049eefe: the zoom button of the view, hidden when the jump applies.
+    // The zoom button of the view, hidden when the jump applies.
     WinControl* const ZoomButton = ViewMode == 2 ? OutZoomButton : InZoomButton;
     ZoomButton->SetProperty(1, bJump, 0);
 
-    // 0x0049ef04..0x0049ef16: no more waypoints past AutoId 99.
+    // No more waypoints past AutoId 99.
     unsigned char const bWaypointsFull = GetPlayerWaypointMaxIdRetail() >= 0x63 ? 1 : 0;
 
-    // 0x0049ef18..0x0049f03f: select (in the player's system, undocked; in the unzoomed
+    // Select (in the player's system, undocked; in the unzoomed
     // system view only markers of scaled size >= 700; a route end only when it is waypoint 1)
     // and clear (a route end in a system view).
     unsigned char bSelect = 0;
@@ -931,7 +921,7 @@ void NeuroNetNavMap::ShowObjectTools()
         }
         else if (ViewMode == 1 && Item != nullptr)
         {
-            // 0x0049ef76..0x0049ef8a: TEST AH,5 + JP keeps it on not-less (or unordered).
+            // x87: kept on not-less (or unordered).
             if (static_cast<double>(SystemScale) * static_cast<double>(Item->Size) <
                 static_cast<double>(kNavMapSelectMinSize))
                 bSelect = 0;
@@ -940,7 +930,7 @@ void NeuroNetNavMap::ShowObjectTools()
     ClearWaypointButton->SetProperty(1, bHideClear, 0);
     InfoButton->SetProperty(1, bInfo == 0 ? 1 : 0, 0);
 
-    // 0x0049efc7..0x0049efef: a best path with text blocks a new one; a zone is neither
+    // A best path with text blocks a new one; a zone is neither
     // selectable nor a waypoint target.
     unsigned char bBestPathLocked = 0;
     if (BestPathGetWaypointCount() > 0 && BestPathHasText()) // FUN_004c4fb0 / FUN_004c58e0
@@ -951,7 +941,7 @@ void NeuroNetNavMap::ShowObjectTools()
         bInfo = 0;
     }
 
-    // 0x0049efef..0x0049f0bb: set waypoint / best path, jump, select, then the sound.
+    // Set waypoint / best path, jump, select, then the sound.
     uintptr_t bHideSetWaypoint = 0;
     uintptr_t bHideBestPath = 0;
     if (bWaypointsFull != 0 || bWaypointEnd != 0 || ViewMode == 0 || bWaypointMarker != 0 ||
@@ -994,7 +984,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
     if (IdsName == 0 && IdsInfo == 0)
         return;
 
-    // 0x004979a0..0x00497b27: the title (upper case, a line break) in style 0xf64, then style
+    // The title (upper case, a line break) in style 0xf64, then style
     // 0x9ca4 for the body.
     RenderDisplayList Card;
     {
@@ -1016,7 +1006,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
     }
     G_NnTextScratchB[0] = 0;
 
-    // 0x00497b2e..0x00497c0d: the info text, and from the InfocardMap the base sections (with a
+    // The info text, and from the InfocardMap the base sections (with a
     // base) and the extra ids (visit bit 1).
     if (IdsInfo != 0)
     {
@@ -1032,7 +1022,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
                     ((Visit & 8) != 0 && Entry->bShowEquipment != 0) ? 1 : 0;
                 unsigned char const bSection3 =
                     ((Visit & 0x10) != 0 && Entry->bShowShips != 0) ? 1 : 0;
-                // 0x00497b9e..0x00497bb3: FUN_00476080(&card, base, commodities, equipment,
+                // FUN_00476080(&card, base, commodities, equipment,
                 // ships).
                 NnHelpAppendBaseGoods(&Card, BaseId, bSection1, bSection2, bSection3);
             }
@@ -1047,7 +1037,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
         }
     }
 
-    // 0x00497c10..0x00497cb3: show the card and its close button, filter mode 6 (the mode
+    // Show the card and its close button, filter mode 6 (the mode
     // before it kept), the faction labels and the object tools hidden.
     InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags | 3);
     CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags | 3);
@@ -1097,7 +1087,7 @@ void NeuroNetNavMap::AskAbortMission()
 
 void NeuroNetNavMap::ConfirmAbortMission()
 {
-    // FUN_0049f540. 0x0049f55c..0x0049f6e9: yes / no hidden, the info text and the objective
+    // FUN_0049f540. Yes / no hidden, the info text and the objective
     // rows blanked.
     AbortYesButton->SetProperty(1, 1, 0);
     AbortYesText->SetProperty(1, 1, 0);
@@ -1120,13 +1110,13 @@ void NeuroNetNavMap::ConfirmAbortMission()
         ObjectiveText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     ObjectiveScroll->SetProperty(2, 1, 0);
 
-    // 0x0049f6ef..0x0049f741: abort the first route's mission (not kinds 7 / 8), then leave
+    // Abort the first route's mission (not kinds 7 / 8), then leave
     // the briefing (continue + close) or the NeuroNet screen.
     FBestPath const* const First = BestPathGetFirst(); // FUN_004c5040
     if (First == nullptr || First->MissionType == 7 || First->MissionType == 8)
         return;
     G_Server->AbortMission(GetPlayerConnectionId(), First->MissionType); // IServer slot 68
-    StoryStarReset(); // FUN_004b9bb0 (0x0049f71b)
+    StoryStarReset(); // FUN_004b9bb0
     if (bBriefing != 0)
     {
         RequestMissionBriefingContinue(); // FUN_0043d580
@@ -1157,20 +1147,20 @@ void NeuroNetNavMap::BuildBaseList()
     for (Universe::ISystem* System = Universe::GetFirstSystem(); System != nullptr;
          System = Universe::GetNextSystem())
     {
-        // 0x004a2410..0x004a243f: visited systems only (the visit map | the system's own).
+        // Visited systems only (the visit map | the system's own).
         unsigned char SystemVisit = 0;
-        GetPlayerVisitFlagsRetail(System->GetId(), &SystemVisit, 0, 0); // FUN_004c4da0 0x004a2423
+        GetPlayerVisitFlagsRetail(System->GetId(), &SystemVisit, 0, 0); // FUN_004c4da0
         SystemVisit = static_cast<unsigned char>(SystemVisit | System->GetVisit());
         if ((SystemVisit & 1) == 0)
             continue;
 
-        // 0x004a2445..0x004a24cd: the system's name, whether or not it has a listed base.
+        // The system's name, whether or not it has a listed base.
         GetIdsStringWWithRawFallback(static_cast<unsigned>(System->GetStridName()), G_NnTextScratchB,
                                      G_NnTextScratchCapacity);
         SystemNames.push_back(std::wstring(G_NnTextScratchB)); // FUN_00413df0 + FUN_004a3360
         ++SystemIndex;
 
-        // 0x004a24d1..0x004a2718: every visited [Object] with a base and a listed name.
+        // Every visited [Object] with a base and a listed name.
         Universe::FSystemObject Object;
         unsigned const Count = static_cast<unsigned>(System->GetObjectCount());
         for (unsigned Index = 0; Index < Count; ++Index)
@@ -1178,11 +1168,11 @@ void NeuroNetNavMap::BuildBaseList()
             if (!System->GetSystemObject(Index, &Object) || Object.BaseId == 0)
                 continue;
             unsigned char ObjectVisit = 0;
-            GetPlayerVisitFlagsRetail(CreateID(Object.Nickname.Data), &ObjectVisit, 0, 0); // 0x004a255a
+            GetPlayerVisitFlagsRetail(CreateID(Object.Nickname.Data), &ObjectVisit, 0, 0);
             ObjectVisit = static_cast<unsigned char>(ObjectVisit | Object.Visit);
             if ((ObjectVisit & 1) == 0)
                 continue;
-            // 0x004a2579..0x004a25f0: FUN_004a2310's eleven ids_name compares, inlined here in
+            // FUN_004a2310's eleven ids_name compares, inlined here in
             // the same order.
             if (!IsCommodityByBaseListedName(Object.IdsName))
                 continue;
@@ -1197,7 +1187,7 @@ void NeuroNetNavMap::BuildBaseList()
             ++BaseIndex;
             BaseEntries.push_back(Entry); // FUN_004a3680
 
-            // 0x004a265a..0x004a26db: the base's name (FUN_004142a0 + wcsncpy + NUL).
+            // The base's name (FUN_004142a0 + wcsncpy + NUL).
             GetIdsStringWWithRawFallback(static_cast<unsigned>(Object.IdsName), G_NnTextScratchB,
                                          G_NnTextScratchCapacity);
             BaseNames.push_back(std::wstring(G_NnTextScratchB));
@@ -1252,7 +1242,7 @@ void NeuroNetNavMap::SortBaseList(unsigned char bByBase)
 
 void NeuroNetNavMap::RefreshBaseList()
 {
-    // FUN_004a2930. 0x004a2988..0x004a2a09: the fifteen rows from BaseListFirstRow (signed
+    // FUN_004a2930. The fifteen rows from BaseListFirstRow (signed
     // test, as retail), shown with their base and system names or hidden past the end.
     int const Count = static_cast<int>(BaseEntries.size());
     for (int Row = 0; Row < 15; ++Row)
@@ -1275,7 +1265,7 @@ void NeuroNetNavMap::RefreshBaseList()
             0x1d, reinterpret_cast<uintptr_t>(SystemNames[Entry->SystemIndex].c_str()), 0);
     }
 
-    // 0x004a2a0f..0x004a2a74: the scroll bar only past fifteen rows (range + 2).
+    // The scroll bar only past fifteen rows (range + 2).
     WinControl* const Scroll = static_cast<WinControl*>(BaseListScroll);
     int const Extra = Count - 15;
     if (Extra <= 0)

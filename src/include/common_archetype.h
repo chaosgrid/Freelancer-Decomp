@@ -29,18 +29,9 @@ struct IEngineInstance;
 
 struct IFileSystem;
 
-// MOVED HERE 2026-09-17 (Server.dll lane, wave 11) from common_cobject.h. It used to be a
-// forward declaration, with the definition sitting in the object layer, which meant that
-// anything wanting to HOLD a std::list<CollisionGroupDesc> by value had to include the whole
-// of common_cobject.h. PlayerData needs exactly that (retail slot+0x26c -- see
-// common_server_playerdb.h), and common_server_playerdb.h reaches fourteen translation units.
-//
-// Moving the struct costs nothing: every translation unit that includes common_cobject.h
-// gets this header through common_cobject.h's own `#include "common_archetype.h"`, and this
-// header already declares Archetype::EqObj::get_undamaged_collision_group_list(
-// std::list<CollisionGroupDesc>&) below, i.e. it was already the type's real user.
-//
-// Listing CollisionGroupDesc sizeof 8. GetCollisionGroupDesc writes ushort id + float health.
+// Defined here rather than in common_cobject.h so that PlayerData (common_server_playerdb.h,
+// +0x26c) can hold a std::list<CollisionGroupDesc> without the object layer.
+// sizeof 8; GetCollisionGroupDesc writes ushort id + float health.
 struct COMMON_API CollisionGroupDesc
 {
     // User-declared so that no implicit move members are generated and exported:
@@ -59,7 +50,6 @@ struct COMMON_API CollisionGroupDesc
 
 static_assert(sizeof(CollisionGroupDesc) == 8, "CollisionGroupDesc sizeof 8");
 
-// MOVED HERE 2026-09-24 (claude:srv-pdb) from common_cobject.h -- see the note there.
 // SubObjectID: ID generation and classification for equipment/shields/collision groups.
 namespace SubObjectID
 {
@@ -142,13 +132,9 @@ struct CacheString
 static_assert(sizeof(CacheString) == 4, "CacheString is a single pointer");
 
 // Retail's global enum HpAttachmentType
-// (?get_hp_type_by_index@Gun@Archetype@@QBE?AW4HpAttachmentType@@H@Z). Enumerators leave no
-// symbols in a binary, but the whole mapping IS recoverable, and it is recovered here: the
-// ship loader's hp_type directive (Common.dll .text:062f2549) walks a 0x1f8-byte table of
-// {char const* Name; HpAttachmentType Value;} pairs at Common.dll .data:063eca40 -- 63 entries,
-// stricmp against the INI token -- and that table pins every value from 4 to 0x42 to a name.
-// The first two entries (.data:063eca40 = "hp_gun"/4, .data:063eca48 = "hp_shield_generator"/5)
-// are visible as labels in the listing; the rest decode from the same 8-byte stride.
+// (?get_hp_type_by_index@Gun@Archetype@@QBE?AW4HpAttachmentType@@H@Z). Values 4..0x42 come
+// from the ship loader's hp_type table (.text:062f2549): 63 {char const* Name; Value} pairs
+// at .data:063eca40 ("hp_gun"/4, "hp_shield_generator"/5, ...).
 // 0..3 appear in no table entry -- they are the hard-coded returns of the get_hp_type()
 // overrides, and their names say only which override returns them: Equipment's base and the
 // out-of-range arm of every get_hp_type_by_index 0, Commodity 1, the internally mounted
@@ -307,19 +293,17 @@ namespace Archetype
     };
 
     // Callback for Enum* functions. Return true to continue enumeration.
-    // ?EnumShips@Archetype@@YAXPAUArchEnumerator@1@@Z -- retail passes a callback OBJECT by
-    // pointer, not a function pointer: 062f3329 loads its vtable and calls slot 0 as a thiscall
-    // with the record as the only stack argument, and a false return stops the walk. The slot's
-    // own name is not in the binary (nothing about ArchEnumerator is exported), so the port
-    // names it Enumerate.
+    // ?EnumShips@Archetype@@YAXPAUArchEnumerator@1@@Z -- retail passes a callback object
+    // whose slot 0 (thiscall, record argument) is called per record (062f3329). The slot name
+    // is not in the binary; Enumerate is the port's.
     struct ArchEnumerator
     {
         virtual bool Enumerate(Root* Record) = 0;
     };
 
     // ICliObj -- client archetype companion (Root+0x04). Retail Client\cmn\CliArch.cpp.
-    // Vtable PTR_FUN_005c7734: 14 slots. Names 0-8 are the port catalog (no PE strings);
-    // Slot09-13 keep SlotNN until a PE name is recovered. See docs/re/freelancer_cliobj.md.
+    // Vtable PTR_FUN_005c7734: 14 slots. Names are the port's (no PE strings).
+    // See docs/re/freelancer_cliobj.md.
     struct ICliObj
     {
         virtual void AddRef() = 0;                          // 0 +0x00  FUN_00406b50
@@ -352,19 +336,15 @@ namespace Archetype
         explicit Root(ICliObj* Companion = nullptr);
         virtual ~Root();
 
-        // Common.dll.txt:258697 (0x901f0, ??0Root@Archetype@@QAE@ABU01@@Z). User-declared in
+        // 0x062901f0 (??0Root@Archetype@@QAE@ABU01@@Z). User-declared in
         // retail: clears the three string members, builds an empty surfaces map, stamps the
         // vptr and then runs operator=. The leaf copy constructors (Armor 0xdcd0, Equipment
         // 0xd2c0, ...) are the compiler-generated memberwise ones that call it.
         Root(Root const& Other);
 
-        // Common.dll.txt:258901-259123 (??4Root@Archetype@@QAEABU01@ABU01@@Z). CORRECTED
-        // (D51, 2026-09-09): real retail logic, reachable from Archetype::LoadShips/LoadSolar's
-        // "inherit=" donor-copy sequence via EqObj::operator= -- NOT dead code as a prior lane's
-        // used_by_count=0 verdict concluded (that check used the corrupted decompiled .c's call
-        // graph; the raw .txt XREF list shows 19 real callers). See tracker items 71875/71899
-        // for the full XREF trail. Returns Root const& (not Root&) matching retail's mangled
-        // return type.
+        // ??4Root@Archetype@@QAEABU01@ABU01@@Z. Reached from LoadShips/LoadSolar's "inherit="
+        // donor copy via EqObj::operator= (19 callers). Returns Root const&, as retail's
+        // mangled name does.
         Root const& operator=(Root const& Other);
 
         // Slot 1. INI_Reader API is the ported text/BINI reader (common_ini.h).
@@ -475,21 +455,16 @@ namespace Archetype
         CacheString Hardpoint;
         ID_String Arch;
 
-        // Common.dll.c 23240-23245 (0xf840): unsigned compare on the Arch id only
-        // (Hardpoint is not compared).
-        bool operator<(DamageObjInfo const& Other) const;
-        // Common.dll.c 23228-23233 (0xf820): Arch id equality only (Hardpoint not compared).
-        bool operator==(DamageObjInfo const& Other) const;
-        // Common.dll.c 23252-23257 (0xf860): Arch id inequality only (Hardpoint not compared).
-        bool operator!=(DamageObjInfo const& Other) const;
-        // Common.dll.c 23264-23273 (0xf880): unsigned greater-than on the Arch id only.
-        bool operator>(DamageObjInfo const& Other) const;
+        // The comparisons look at the Arch id only (unsigned); Hardpoint is not compared.
+        bool operator<(DamageObjInfo const& Other) const;  // 0xf840
+        bool operator==(DamageObjInfo const& Other) const; // 0xf820
+        bool operator!=(DamageObjInfo const& Other) const; // 0xf860
+        bool operator>(DamageObjInfo const& Other) const;  // 0xf880
     };
 
     // fuse element = CreateID + two floats. Shared shape for both CollisionGroup's own fuse
     // list (CollisionGroup::Fuses, ReadCollisionGroup) and EqObj's separate +0x74 fuse list
-    // (EqObj::Fuses, EqObj::read's "fuse" case, D46) -- retail parses "fuse" identically in
-    // both contexts, confirmed by direct trace of each call site.
+    // (EqObj::Fuses, EqObj::read's "fuse" case); retail parses "fuse" identically in both.
     struct FGroupFuse
     {
         ID_String Fuse;
@@ -517,10 +492,9 @@ namespace Archetype
         // order, surplus nodes erased, missing ones appended -- i.e. element-wise assignment.
         DamageObjInfoList& operator=(DamageObjInfoList const& Other);
 
-        // Common.dll.c 23292-23307 (0xf8c0, ?IsValid@DamageObjInfoList@Archetype@@QAE_NXZ,
-        // non-const). Retail walks the raw VC6 list checking every node's Hardpoint string is
-        // non-empty and its Arch id's low 30 bits are nonzero; false as soon as either fails,
-        // true for an empty list. Ported directly over the vector representation used here.
+        // 0xf8c0 (?IsValid@DamageObjInfoList@Archetype@@QAE_NXZ, non-const). True iff every
+        // node's Hardpoint string is non-empty and its Arch id's low 30 bits are nonzero
+        // (true for an empty list).
         bool IsValid();
 
         unsigned char Pad0[4];               // +0x00  VC6 list allocator byte (unused by the port)
@@ -605,28 +579,17 @@ namespace Archetype
     {
     public:
         explicit EqObj(ICliObj* Companion = nullptr);
-        // Common.dll.txt 0x91460 (??0EqObj@Archetype@@QAE@ABU01@@Z): user-declared in retail --
+        // 0x06291460 (??0EqObj@Archetype@@QAE@ABU01@@Z): user-declared in retail --
         // default-constructs the base and the containers, then runs operator=.
         EqObj(EqObj const& Other);
         virtual ~EqObj();
 
-        // Common.dll.txt:261602-261819 (??4EqObj@Archetype@@QAEABU01@ABU01@@Z). CORRECTED
-        // (D51, 2026-09-09): real retail logic backing Ship/Solar "inherit=" (Archetype::
-        // LoadShips 0x062f2d43 / Archetype::LoadSolar 0x062f383d), not dead code -- see
-        // tracker item 71899's notes. Field trace against raw disasm: calls Root::operator=
-        // for the base part, deep-clones the CollisionGroups singly-linked list (heap-alloc +
-        // CollisionGroup copy-ctor per node, matching retail's node-by-node relink loop) and
-        // assigns DockingSpheres (plain std::vector assignment subsumes retail's inlined
-        // vector-operator= helpers). Deliberately does NOT touch ShieldIdNext/ShieldLinks/
-        // Fuses/bNomad/bDockingCamera -- confirmed by direct disasm read that retail's real
-        // body never references those offsets (+0x60/+0x68/+0x74/+0x80/+0x81) at all, so they
-        // are not a missed copy, they are retail's own actual (partial) behavior. NOT a general-
-        // purpose deep-copy: like retail, does not free/merge into a non-empty destination
-        // CollisionGroups chain (both known callers assign into freshly-constructed objects).
-        // Returns EqObj const&, matching retail's mangled return type. Explicitly declared here
-        // (rather than left implicit) because Root::operator= now being real would otherwise
-        // make the compiler synthesize an unsafe memberwise EqObj::operator= that shallow-
-        // copies CollisionGroups/ShieldLinks/Fuses pointers.
+        // ??4EqObj@Archetype@@QAEABU01@ABU01@@Z, backing Ship/Solar "inherit=" (LoadShips
+        // 0x062f2d43 / LoadSolar 0x062f383d). Root::operator= for the base, deep-clones the
+        // CollisionGroups chain node by node and assigns DockingSpheres. Retail never touches
+        // ShieldIdNext/ShieldLinks/Fuses/bNomad/bDockingCamera (+0x60/+0x68/+0x74/+0x80/+0x81),
+        // and does not free a non-empty destination chain (both callers assign into fresh
+        // objects). Returns EqObj const&, as retail's mangled name does.
         EqObj const& operator=(EqObj const& Other);
 
         virtual bool read(INI_Reader& Reader);
@@ -638,7 +601,7 @@ namespace Archetype
         CollisionGroup const* get_group_by_name(CacheString const& Name) const;
         bool traverse_groups(CollisionGroup const*& Cursor) const;
         bool dock_terminal_valid(int Index) const;
-        // Common.dll.c 0x91f00. Archetype-level (not per-instance) group list: clears
+        // 0x06291f00. Archetype-level (not per-instance) group list: clears
         // OutDescs then appends one CollisionGroupDesc per CollisionGroup in the +0x5C
         // chain, each with Health forced to 1.0f -- the archetype has no damage state, so
         // "undamaged" just means every group at full health. See CEqObj::get_collision_
@@ -650,32 +613,13 @@ namespace Archetype
         unsigned char Pad62[6];                   // +0x62..+0x67 VC6 vector allocator
         std::vector<ShieldLink>* ShieldLinks;    // +0x68 heap; retail begin/end/cap
         unsigned char Pad6c[8];                   // +0x6c/+0x70 unused (retail end/cap)
-        // +0x74 fuse list. Archetype::Ship::Ship's raw disassembly (Common.dll.c 126553-126567,
-        // FUN_062f2180, item 1932) shows the real retail construction shape: byte[0] is set from
-        // an uninitialized-in-source value (the compiler happened to fill it from the high byte
-        // of the `this` pointer -- not meaningful data, matches this codebase's established
-        // "harmless uninitialized field" precedent), then a heap 0x14-byte circular-list
-        // sentinel is allocated (self-referential Next=Prev=self, the VC6 std::list default
-        // ctor, as for CSolar::ContinualAnims) and stored at +4 (Head), with +8 (Count) set to 0.
-        // CORRECTED (D46): EqObj::read DOES populate this list -- Common.dll.c 126077-126091
-        // (?read@EqObj@Archetype@@UAE_NAAVINI_Reader@@@Z, item 12866) handles a "fuse" INI
-        // value by CreateID'ing value(0) and reading value(1)/value(2) as two floats into a
-        // freshly list-inserted node, exactly the same {ID_String Fuse; float Value1; float
-        // Value2;} element shape already modeled as Archetype::FGroupFuse for
-        // CollisionGroup::Fuses (see ReadCollisionGroup's own "fuse" handling, common_
-        // archetype.cpp) -- so this is a real, previously-mislabeled gap, not a genuinely-
-        // discarded field. Ported the same way as ShieldLinks just above: a heap
-        // std::vector<FGroupFuse>* in the first 4 bytes of the old 0x0C-byte slot (this
-        // build's std::vector is 16 bytes, too wide to embed by value here without shifting
-        // the retail-matching +0x80/+0x81 offsets of bNomad/bDockingCamera below -- same
-        // constraint documented for DockingSpheres/VibeValue, avoided here by using a pointer
-        // like ShieldLinks/CollisionGroup::Fuses already do instead of growing the struct).
-        // CONSUMER: freelancer.exe FUN_00533e10 (EquippedObjScanFuseIgnitions,
-        // client_equip_fx.cpp) walks this list and CollisionGroup::Fuses, compares HitPts
-        // against the Fuse{Id,Value1,Value2} thresholds, ignites the named fuse through
-        // FUN_00534240 (a copy of the exe's ClientFuse prototype, client_fuse.h) and
-        // Fuse::Load's the prototype. Common.dll's Fuse/FuseAction (common_fuses.h) are the
-        // runtime base classes; Server.dll's own fuse database (FUN_06cfd4b0) is not ported.
+        // +0x74 fuse list. Retail is a VC6 std::list (allocator byte, heap 0x14-byte sentinel
+        // at +4, Count at +8; ctor in FUN_062f2180), filled by EqObj::read's "fuse" case with
+        // FGroupFuse elements. The port keeps a heap std::vector<FGroupFuse>* in the first 4
+        // bytes, like ShieldLinks, so bNomad/bDockingCamera stay at +0x80/+0x81.
+        // Consumer: freelancer.exe FUN_00533e10 (EquippedObjScanFuseIgnitions,
+        // client_equip_fx.cpp) compares HitPts against these thresholds and ignites the named
+        // fuse. Server.dll's own fuse database (FUN_06cfd4b0) is not ported.
         std::vector<FGroupFuse>* Fuses;           // +0x74 heap (retail VC6 list dummy slot)
         unsigned char Pad78[8];                   // +0x78 unused (retail Head/Count remainder)
         bool bNomad;                              // +0x80
@@ -756,8 +700,8 @@ namespace Archetype
     // EqObj + CommReferrable (at +0x94) + named scalars. Retail exports both tables:
     // ??_7Ship@Archetype@@6BEqObj@1@@ and ??_7Ship@Archetype@@6BCommReferrable@@@ (.rdata:06399828,
     // HasVoiceInfo/GetMsgIdPrefix/read_comm_ini_data). Ship::read reaches msg_id_prefix through the
-    // CommReferrable subobject's slot 2 (.text:062f2531: `LEA ECX,[ESI+0x94]; CALL [EAX+8]`), and
-    // Server.dll pub::TranslateShipToMsgIdPrefix calls its slot 1 at +0x94 (.text:06d5e0e8).
+    // CommReferrable subobject's slot 2 (.text:062f2531), and Server.dll
+    // pub::TranslateShipToMsgIdPrefix calls its slot 1 at +0x94 (.text:06d5e0e8).
     struct COMMON_API Ship : public EqObj, public CommReferrable
     {
     public:
@@ -800,13 +744,11 @@ namespace Archetype
         float StrafePowerUsage;                 // +0x128
         float MaxBankAngle;                     // +0x12C radians
 
-        // Retail +0x130: a VC6 std::vector of 0x14-byte {HpAttachmentType; vector<CacheString>}
-        // records -- Ship::get_legal_hps (.text:062f29a0) walks [this+0x134,this+0x138) with a 0x14
-        // stride comparing element+0x00 and returns element+0x04. Filled by the "hp_type" INI
-        // directive (.text:062f2549). Same member, same place in the declaration order, as a
-        // modern std::vector (no retail ABI): its size differs from VC6's 0x10 and between Debug
-        // and Release, so the two members after it are no longer at retail's +0x140/+0x144 and
-        // neither they nor sizeof(Ship) are asserted. Every access is by name.
+        // Retail +0x130: a VC6 std::vector of 0x14-byte LegalHpTypes records, filled by the
+        // "hp_type" INI directive (.text:062f2549). Deviation: a modern std::vector, whose size
+        // differs from VC6's 0x10 and between Debug and Release, so the two members after it
+        // are not at retail's +0x140/+0x144 and neither they nor sizeof(Ship) are asserted.
+        // Every access is by name.
         std::vector<LegalHpTypes> LegalHps;     // retail +0x130
         int NanobotLimit;                       // retail +0x140
         int ShieldBatteryLimit;                 // retail +0x144
@@ -878,9 +820,8 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual bool is_attached() const;
 
-        // Retail Archetype::AttachedEquipment::operator= (Common.dll.c 127882/127910/127923/
-        // 127929, one of the "inherit=" shape-copy family driven by Equipment::InheritFrom).
-        // Not virtual, no traced retail call site of its own besides FUN_062f3ea0's dispatch.
+        // Retail Archetype::AttachedEquipment::operator=, one of the "inherit=" shape-copy
+        // family driven by Equipment::InheritFrom (FUN_062f3ea0's dispatch).
         AttachedEquipment& operator=(AttachedEquipment const& Other);
 
         ID_String SeparationExplosion; // +0x70
@@ -906,8 +847,8 @@ namespace Archetype
         virtual void redefine(Root const& Other);
         virtual AClassType get_class_type() const;
 
-        // Retail Archetype::Launcher::operator= (Common.dll.c 127939/127957/127960), part of
-        // the "inherit=" shape-copy family; see Equipment::InheritFrom.
+        // Retail Archetype::Launcher::operator=, part of the "inherit=" shape-copy family;
+        // see Equipment::InheritFrom.
         Launcher& operator=(Launcher const& Other);
 
         float DamagePerFire;              // +0x88
@@ -961,10 +902,7 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual HpAttachmentType get_hp_type() const;
 
-        // Field names/offsets verified against Common.dll.c ~128973 (Engine::read, retail
-        // 0x950b0): max_force->+0x70, linear_drag->+0x74, power_usage->+0x78,
-        // cruise_power_usage->+0x7c, cruise_charge_time->+0x80, indestructible->+0x84,
-        // reverse_fraction->+0x88.
+        // INI keys from Engine::read (0x062950b0).
         float ThrustMultiplier;           // +0x70  max_force; GetThrust multiplies by this
         float LinearDrag;                 // +0x74  GetLinearDrag returns this; GetCruiseDrag adds CRUISE_DRAG
         float PowerDrawFactor;            // +0x78  power_usage; GetPowerDraw multiplies abs(throttle) by this
@@ -993,7 +931,7 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual HpAttachmentType get_hp_type() const;
 
-        // Retail Archetype::Armor::operator= (Common.dll.c 127978/127981/127984), part of the
+        // Retail Archetype::Armor::operator=, part of the
         // "inherit=" shape-copy family -- reused verbatim for RepairDroid/RepairKit/
         // ShieldBattery too (same Equipment+1-field shape); see Equipment::InheritFrom.
         Armor& operator=(Armor const& Other);
@@ -1044,8 +982,8 @@ namespace Archetype
         float RebuildPowerDraw;       // +0x9c
         float OfflineThreshold;       // +0xa0
         float OfflineRebuildTime;     // +0xa4
-        // Retail's ctor copies the low byte of its ICliObj* companion parameter here --
-        // uninitialized-stack-reuse decompiler noise, not real data. Always zero in the port.
+        // Retail's ctor copies the low byte of its ICliObj* parameter here (stack-reuse noise,
+        // not real data). Always zero in the port.
         unsigned char PadA8[4];
         // +0xac/+0xb0/+0xb4: malloc'd [begin,end,cap) array of hp_shield_type ids (retail
         // VC6 vector<unsigned>, doubling growth). ~ShieldGenerator frees HpShieldTypesBegin.
@@ -1119,8 +1057,7 @@ namespace Archetype
         bool bElevationValid;             // +0xb9
         bool bAutoTurret;                 // +0xba
         unsigned char PadBb;              // +0xbb
-        // Retail's ctor copies the low byte of its ICliObj* companion parameter here --
-        // uninitialized-stack-reuse decompiler noise, not real data (same pattern as
+        // Retail's ctor copies the low byte of its ICliObj* parameter here (as for
         // ShieldGenerator::PadA8). Always zero in the port.
         unsigned char PadBc[4];                 // +0xbc..+0xbf
         // +0xc0/+0xc4/+0xc8: malloc'd [begin,end,cap) array of hp_gun_type ids (retail
@@ -1260,9 +1197,8 @@ namespace Archetype
         explicit AttachedFXEquip(ICliObj* Companion = nullptr);
         virtual AClassType get_class_type() const;
 
-        // Retail Archetype::AttachedFXEquip::operator= (Common.dll.c 127878/127887/127893/
-        // 127900/127964/127969/127974/127990), part of the "inherit=" shape-copy family --
-        // reused verbatim for LootCrate too (same bare-Equipment shape); see
+        // Retail Archetype::AttachedFXEquip::operator=, part of the "inherit=" shape-copy
+        // family -- reused verbatim for LootCrate too (same bare-Equipment shape); see
         // Equipment::InheritFrom.
         AttachedFXEquip& operator=(AttachedFXEquip const& Other);
     };
@@ -1314,8 +1250,8 @@ namespace Archetype
         virtual void redefine(Root const& Other);
         virtual AClassType get_class_type() const;
 
-        // Retail Archetype::CloakingDevice::operator= (Common.dll.c 127987), part of the
-        // "inherit=" shape-copy family; see Equipment::InheritFrom.
+        // Retail Archetype::CloakingDevice::operator=, part of the "inherit=" shape-copy
+        // family; see Equipment::InheritFrom.
         CloakingDevice& operator=(CloakingDevice const& Other);
 
         float PowerUsage;      // +0x88  power_usage
@@ -1428,9 +1364,8 @@ namespace Archetype
         // Slot 7, 0x96f90: LootAppearance (+0x7c), or this when there is none.
         virtual Equipment* get_loot_appearance();
 
-        // Retail Archetype::Projectile::operator= (Common.dll.c 22914-22930). Not part of
-        // FUN_062f3ea0's dispatch itself (Munition/Mine/CounterMeasure::operator= each inline
-        // this instead of calling it), but a real retail symbol; provided for completeness.
+        // Retail Archetype::Projectile::operator=. Not used by FUN_062f3ea0's dispatch
+        // (Munition/Mine/CounterMeasure::operator= each inline it), but a real retail symbol.
         Projectile& operator=(Projectile const& Other);
 
         float Lifetime;                   // +0x70
@@ -1457,21 +1392,16 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual HpAttachmentType get_hp_type() const;
 
-        // Retail `Archetype::Munition::BEAM_ARCH_INDEX`, export ordinal 1223, .data 0x063ecd20,
-        // statically initialised to -1 (0xffffffff). Unlike the other recovered statics in this
-        // wave it is NOT const -- it is the lazily-filled cache of the "BEAM_ARCH" compound
-        // archetype handle, read at 062f7461/76b0/7700/930e/ab7f and written at
-        // 062f76e9/7719/9347/ab98. This port already had the right value and lifecycle; only
-        // the name was this port's own invention (BeamArchIndex), renamed here to the retail
-        // exported name. Protected, as the mangling says (?BEAM_ARCH_INDEX@Munition@Archetype@@1JA);
-        // declared in the protected section at the end of the class.
+        // BEAM_ARCH_INDEX (protected, below; export ordinal 1223, .data 0x063ecd20, initially
+        // -1) is the lazily-filled, non-const cache of the "BEAM_ARCH" compound archetype
+        // handle that these load and free.
         static void LoadBeamArchIdx();
         static void FreeBeamArchIdx();
 
         bool is_guided() const { return Seeker != 0; }
 
-        // Retail Archetype::Munition::operator= (Common.dll.c 127993), part of the
-        // "inherit=" shape-copy family; see Equipment::InheritFrom.
+        // Retail Archetype::Munition::operator=, part of the "inherit=" shape-copy family;
+        // see Equipment::InheritFrom.
         Munition& operator=(Munition const& Other);
 
         float HullDamage;                 // +0x80  damage / hull_damage
@@ -1514,8 +1444,8 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual HpAttachmentType get_hp_type() const;
 
-        // Retail Archetype::Mine::operator= (Common.dll.c 127996), part of the "inherit="
-        // shape-copy family; see Equipment::InheritFrom.
+        // Retail Archetype::Mine::operator=, part of the "inherit=" shape-copy family; see
+        // Equipment::InheritFrom.
         Mine& operator=(Mine const& Other);
 
         float LinearDrag;                 // +0x80
@@ -1538,8 +1468,8 @@ namespace Archetype
         virtual AClassType get_class_type() const;
         virtual HpAttachmentType get_hp_type() const;
 
-        // Retail Archetype::CounterMeasure::operator= (Common.dll.c 127999), part of the
-        // "inherit=" shape-copy family; see Equipment::InheritFrom.
+        // Retail Archetype::CounterMeasure::operator=, part of the "inherit=" shape-copy
+        // family; see Equipment::InheritFrom.
         CounterMeasure& operator=(CounterMeasure const& Other);
 
         float LinearDrag;                 // +0x80
@@ -1631,7 +1561,7 @@ namespace Archetype
     struct COMMON_API Explosion
     {
     public:
-        // Common.dll.txt 0x10b730 (??0Explosion@Archetype@@QAE@ABUID_String@@@Z): copies the
+        // 0xab730 (??0Explosion@Archetype@@QAE@ABUID_String@@@Z): copies the
         // nickname, then the same defaults reset() stores, with empty containers.
         explicit Explosion(ID_String const& InNickname);
         // User-declared so that no implicit move members are generated and exported: VC6 had
@@ -1674,71 +1604,20 @@ namespace Archetype
     // (?DecodeType@@YAIPBD@Z) -- declared after this namespace, at the end of this header.
 
     // ------------------------------------------------------------------------
-    // decomp-tracker items 1938/1939/1940/1941/1942/1949/1951/1954/1974/1979/1984
-    // (Common.dll.c/.txt 0x062fabb0-0x062fd410, d222:cluster-062eb550 pass,
-    // 2026-09-10) -- raw VC6 `std::_Tree<Traits>` (map) INTERNALS for exactly
-    // the "separate std::map instances (DAT_063fca84 ... DAT_063fcaf8)" this
-    // class's own header comment above already names. Investigated individually
-    // (not bulk-classified) and confirmed, not guessed:
-    //   * FUN_062fb070/FUN_062fb0e0 (1941/1942): the generic 0x44-byte-node
-    //     _Tree_nod constructor/destructor (allocate/free the Nil+Head sentinel
-    //     pair, self-linking an empty tree) -- byte-for-byte the classic
-    //     Dinkumware `_Tree_nod()`/`~_Tree_nod()` shape, confirmed against the
-    //     raw disasm (Common.dll.txt:275886-276031), not the (wrongly single-
-    //     byte-typed) Ghidra pseudocode.
-    //   * FUN_062fabb0/FUN_062facf0/FUN_062fae00 (1938/1939/1940): per-global
-    //     teardown routines operating directly on the DAT_063fca74/84/9c/ec-
-    //     series statics -- each walks its own tree, and two of the three
-    //     (1938/1940) additionally warn on dangling references via FDUMP with
-    //     the format strings "Archetype::SimpleDB %s has %d dangling
-    //     references.\n" / "Archetype::Asteroid %s ..." / "Archetype::
-    //     DynamicAsteroid %s ..." (Common.dll.c:133736/133864/133891) before
-    //     releasing each entry (vtable slot 0, arg 1) and erasing it.
-    //   * FUN_062fb890/FUN_062fbad0/FUN_062fcf30/FUN_062fd060 (1949/1954/1974/
-    //     1979): in-order "get Nth element" walk, `lower_bound`-style binary
-    //     search, recursive subtree copy, and a textbook CLRS red-black
-    //     insert-with-fixup (FUN_062fd060 alone is ~200 decompiled lines,
-    //     matching the algorithm shape exactly) -- all operating on the SAME
-    //     0x44-byte node shape (Left/Parent/Right at +0/+4/+8, Value at +0xc,
-    //     Color/IsNil bytes at +0x40/+0x41).
-    //   * FUN_062fd3e0 (1984): the mapped-value's own "destroy, then maybe
-    //     free" wrapper, called only from 1942's per-node cleanup loop
-    //     (Common.dll.txt:275976-275979, `LEA ECX,[EBX+0xc]; CALL FUN_062fd3e0`).
-    //
-    // ArchDB below (already ported, pre-existing this pass) is the project's
-    // OWN already-shipped, functionally-equivalent replacement for this exact
-    // machinery -- confirmed, not assumed: ArchDB::FImpl stores a REAL
-    // `std::map<unsigned, void*> Records` (common_archetype.cpp ArchDB::FImpl),
-    // ArchDB::Insert's own doc comment cites "FUN_062fbeb0 insert" (the
-    // insert entry point that itself calls FUN_062fbad0 lower_bound +
-    // FUN_062fd060 rebalance-insert, items 1954/1979 above), and
-    // item 1949's own "get Nth element by index" walk (FUN_062fb890) is
-    // ArchDB::KeyAt, which Archetype::GetId uses for every class (retail
-    // inlines the same walk for five classes and calls 062fb890 for the
-    // sixth). This is the SAME
-    // "replace identified raw _Tree machinery with a real std::map once the
-    // owning container is known" convention already established elsewhere in
-    // this port (CArchGroupManager::Traverse, common_carchgroup.cpp).
-    //
-    // Per this project's "skipped vs ported-name for rewrites" convention, all
-    // eleven items above are marked `skipped` with ported_name pointing at
-    // Archetype::ArchDB (this header) rather than `ready_unverified` -- they
-    // are a full functional rewrite, not a 1:1 port, and 1:1-porting the raw
-    // VC6 tree internals here on top of the already-complete ArchDB would only
-    // reintroduce the exact duplication ArchDB was written to replace.
+    // Deviation: 0x062fabb0-0x062fd410 is the raw VC6 std::_Tree internals of the per-kind
+    // maps (0x44-byte nodes: Left/Parent/Right +0/+4/+8, Value +0xc, Color/IsNil +0x40/+0x41):
+    // _Tree_nod ctor/dtor FUN_062fb070/FUN_062fb0e0, Nth-element walk FUN_062fb890,
+    // lower_bound FUN_062fbad0, subtree copy FUN_062fcf30, red-black insert FUN_062fd060,
+    // value destroy FUN_062fd3e0. ArchDB replaces all of it with a std::map; FUN_062fb890 is
+    // ArchDB::KeyAt.
     //
     // The per-map teardown (062fabb0 / 062facf0 / 062fae00 and the inline walks in
-    // 062fa980) -- release loop, dangling-reference warning, scalar deleting dtor --
-    // lives in Archetype::Free's per-record callbacks (common_archetypeloader.cpp); ArchDB::Clear
-    // only empties the map.
+    // 062fa980) -- release loop, "%s has %d dangling references" FDUMP, scalar deleting
+    // dtor -- lives in Archetype::Free's per-record callbacks (common_archetypeloader.cpp);
+    // ArchDB::Clear only empties the map.
     //
-    // decomp-tracker item 1944 (FUN_062fb1e0, Common.dll.c:134030-134055) is a
-    // SEPARATE raw-array copy-construct helper for a 0x14-byte-element vector
-    // (matching FUN_062fb260's sibling destructor, Ghidra-typed `Loadout::
-    // Map::~Map`, not in this pass's item range) -- superseded the same way by
-    // this project's already-existing `Loadout::Map` (common_goods.h), which
-    // stores a real `std::vector<EquipDesc> Items` rather than retail's raw
-    // fixed-layout array. Also marked `skipped`, ported_name Loadout::Map.
+    // FUN_062fb1e0 / FUN_062fb260 (0x14-byte-element array copy / dtor) are likewise replaced
+    // by Loadout::Map's std::vector<EquipDesc> (common_goods.h).
     // ------------------------------------------------------------------------
 
     // ArchDB's out-of-line pieces (common_archetype.cpp): the three dumps and the small-id
@@ -1818,9 +1697,8 @@ namespace Archetype
 
         unsigned Size() const { return (unsigned)Records.size(); }
 
-        // FUN_062fb890 (thiscall, RET 4): 062fb89a CMP Index,[this+0x10] / JNC -> return 0;
-        // otherwise 062fb8a3..062fb8f8 walk from begin() in key order, counting, and 062fb902
-        // returns the key [node+0xc] of the Index-th node; reaching the head returns 0 (062fb8fa).
+        // FUN_062fb890 (thiscall, RET 4): 0 when Index >= size; otherwise the key of the
+        // Index-th node in key order (0 if the head is reached). Archetype::GetId uses it.
         unsigned KeyAt(unsigned Index) const
         {
             if (Index >= Size())
@@ -1933,12 +1811,9 @@ namespace Archetype
     COMMON_API void __cdecl FreeExplosions();
 }
 
-// Common.dll.txt:062ef3d0, ?DecodeType@@YAIPBD@Z (ordinal 1348, global scope). Maps an
+// 0x062ef3d0, ?DecodeType@@YAIPBD@Z (ordinal 1348, global scope). Maps an
 // OBJECT_TYPE name (e.g. "FIGHTER", "ASTEROID") to its bitmask via a fixed 29-entry name table
-// -- NOT a CreateID/CRC hash. Unknown name: FDUMP warning, 0.
+// -- not a CreateID/CRC hash. Unknown name: FDUMP warning, 0.
 COMMON_API unsigned __cdecl DecodeType(char const* Name);
 
 struct IEngine;
-
-// (ArchetypeLoadFromPath moved to freelancer.exe -- src/freelancer/Client/client_mesh_load.h.
-// It is a client-only port helper; retail Common.dll does not export it.)

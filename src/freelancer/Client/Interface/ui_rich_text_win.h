@@ -8,11 +8,8 @@
 
 // Retail UIRichTextWin (RTTI .?AUUIRichTextWin@@ : RichTextWin : BaseRichTextWin : WinControl :
 // Win3D). vftable 0x005e58d4 (48 slots) + IDataViewOwner face 0x005e58c8 at +0x7c.
-// Overrides against RichTextWin (0x005e476c): slot 0 (FUN_0059bf60 scalar deleting dtor ->
-// FUN_0059bf80 -> RichTextWin dtor FUN_0057b260) and slot 9 (FUN_0059bfa0).
-// Factory: WINFACTORY<UIRichTextWin> DAT_0067da68 (static init LAB_0059c300, ctor
-// FUN_0059cb60, Create FUN_0059cbd0: operator_new(0x498) + RichTextWin ctor FUN_0057b1b0).
-// No fields of its own.
+// Overrides RichTextWin's slots 0 (FUN_0059bf60) and 9. WINFACTORY<UIRichTextWin> DAT_0067da68,
+// Create FUN_0059cbd0 (operator new(0x498)). No fields of its own.
 
 #include "Interface/rich_text_win.h"
 
@@ -20,7 +17,7 @@ class UiRichTextWin : public RichTextWin
 {
 public:
     UiRichTextWin();
-    // FUN_0059bf80 -- vftables back, then the RichTextWin dtor.
+    // FUN_0059bf80
     ~UiRichTextWin() override;
 
     // slot 9 (+0x24) -- FUN_0059bfa0 (RET 8); Data is an FUiPayloadBounds*.

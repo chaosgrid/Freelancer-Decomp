@@ -46,7 +46,7 @@ FThornDeformable::FMotionSlot::FMotionSlot() : Handle(-1), ScriptId(0), EventId(
 {
 }
 
-// LAB_00451f70. (0x00451fae..0x00451fb6 also zero a stack vector nothing reads.)
+// LAB_00451f70.
 FThornDeformable::FAimSlot::FAimSlot() : Handle(nullptr), Key(nullptr), bActive(0), bStarted(0)
 {
     Target.Pos.x = 0.0f;
@@ -55,8 +55,7 @@ FThornDeformable::FAimSlot::FAimSlot() : Handle(nullptr), Key(nullptr), bActive(
     MatrixSetIdentity(Target.Orient);
 }
 
-// FUN_00451fd0. Base ctor, the two slot arrays (FUN_005b7fba with LAB_00451f50 / LAB_00451f70),
-// then +0x6c / +0x70 / +0x74 = 0.
+// FUN_00451fd0. The two slot arrays are built by FUN_005b7fba (array ctor).
 FThornDeformable::FThornDeformable(Csys const& ScriptFrame, FGfScript* InOwner,
                                    FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -72,17 +71,10 @@ FThornDeformable::~FThornDeformable()
 {
 }
 
-// LAB_00452240 (stdcall facet, RET 8).
-//   The script id is CreateID(animation). The first idle motion slot takes the event id, the
-//   script id and bActive -- or nothing, when all 32 are busy (the slot index stays -1).
-//   CharacterInfo FUN_00434d10 acquires the script (-1: "does not exist" WARNING, 0).
-//   IDeformable slot 7 plays it on the character with the descriptor's timing, event flags and
-//   heading; the handle lands in the slot and the character counts it (FUN_004456e0).
-//   A locked bone that resolves to a part is blocked through IAnimation2 slot 36 ("Failed to
-//   block bone" WARNING when that answers non-zero), and that answer is returned; otherwise
-//   slot 7's is.
-// RETAIL DEFECT KEPT: with no idle slot, slot 7 still gets &Motions[-1].Handle -- this + 0x68, the
-// reference byte and its padding.
+// LAB_00452240. AcquireScript is CharacterInfo FUN_00434d10, AddMotionHandle FUN_004456e0. With a
+// locked bone the IAnimation2 slot 36 answer is returned, otherwise IDeformable slot 7's.
+// RETAIL DEFECT KEPT: with all 32 slots busy the index stays -1 and slot 7 still gets
+// &Motions[-1].Handle -- in retail's layout this + 0x68, the reference byte and its padding.
 GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -137,11 +129,8 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
     return static_cast<GENRESULT>(BlockResult);
 }
 
-// LAB_004523a0 (stdcall facet, RET 8). The active slot with the event's id (-1 when none). A
-// locked bone that resolves is released through IAnimation2 slot 38 (answer ignored). The
-// character forgets the slot's handle (FUN_004456f0) either way; an active slot's handle is
-// destroyed (IDeformable slot 10), its script released (FUN_00434e20) and the slot reset.
-// Always 0.
+// LAB_004523a0. With no matching slot the index stays -1 (Motions[-1] is read, as retail). The
+// character forgets the slot's handle (FUN_004456f0) either way. Always 0.
 GENRESULT DACOM_API FThornDeformable::StopMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -177,8 +166,7 @@ GENRESULT DACOM_API FThornDeformable::StopMotion(void* DescArg)
     return GR_OK;
 }
 
-// LAB_00452d00 (stdcall facet, RET 8). The height is kept; the character gets the world y of
-// the script-frame point (0, Height, 0) through RoomObject slot 3.
+// LAB_00452d00. The character gets the world y of the script-frame point (0, Height, 0).
 GENRESULT DACOM_API FThornDeformable::SetFloorHeight(float Height)
 {
     FloorHeight = Height;
@@ -191,16 +179,14 @@ GENRESULT DACOM_API FThornDeformable::SetFloorHeight(float Height)
     return GR_OK;
 }
 
-// LAB_00452210 (stdcall facet, RET 8): RoomObject slot 5 with DeltaMs * 0.001 (FILD, FMUL by the
-// double at 0x005c75f8, pushed as a double).
+// LAB_00452210. 0.001 is the double at 0x005c75f8; the product is passed as a double.
 GENRESULT DACOM_API FThornDeformable::AdvanceTime(int DeltaMs)
 {
     Character->Update(static_cast<double>(DeltaMs) * 0.001);
     return GR_OK;
 }
 
-// FUN_00452d70: FUN_0044fdd0(+0x20, +0x30, +0x1c, +0x2c) -- the Compound's order swapped --, then
-// the Owner's FUN_0044f9a0(+0x1c, 1). Always 0.
+// FUN_00452d70. The entity order is the Compound's swapped.
 GENRESULT DACOM_API FThornDeformable::ConnectHardpoints(void* DescArg)
 {
     FThornConnectEventDesc const* Desc = static_cast<FThornConnectEventDesc const*>(DescArg);
@@ -210,7 +196,7 @@ GENRESULT DACOM_API FThornDeformable::ConnectHardpoints(void* DescArg)
     return GR_OK;
 }
 
-// FUN_00452db0: the disconnect twin.
+// FUN_00452db0.
 GENRESULT DACOM_API FThornDeformable::DisconnectHardpoints(void* DescArg)
 {
     FThornConnectEventDesc const* Desc = static_cast<FThornConnectEventDesc const*>(DescArg);
@@ -220,13 +206,8 @@ GENRESULT DACOM_API FThornDeformable::DisconnectHardpoints(void* DescArg)
     return GR_OK;
 }
 
-// LAB_00452730 (stdcall, RET 0x10). World position (0) and orientation (identity) of:
-//   0 ROOT -> the character's engine instance (-1 when it has none, returned as is);
-//   2 PART -> the named part ("Invalid part name" WARNING and -1 when unknown);
-//   1 HARDPOINT -> the character's named hardpoint ("Invalid hardpoint name" ERROR and -1): its
-//     instance's frame applied to the hardpoint's local position and orientation;
-//   anything else -> the defaults.
-// The answer is converted into the script frame (trans_to_frame). 0.
+// LAB_00452730. Unlike the Compound's, the answer is converted into the script frame; an unknown
+// target type answers the origin / identity.
 GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char const* Name,
                                                         float* OutXform12)
 {
@@ -292,8 +273,7 @@ GENRESULT DACOM_API FThornDeformable::GetFloorHeight(float* OutHeight)
     return GR_OK;
 }
 
-// LAB_00452b50 (stdcall, RET 8): IDeformable slots 19 / 20 with the transform brought out of the
-// script frame, position first. 0.
+// LAB_00452b50. Position first.
 GENRESULT DACOM_API FThornDeformable::SetTransform(float const* Transform12)
 {
     Transform const* In = reinterpret_cast<Transform const*>(Transform12);
@@ -304,7 +284,7 @@ GENRESULT DACOM_API FThornDeformable::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_00452c70 (stdcall, RET 8): the character's engine instance, into the script frame.
+// LAB_00452c70.
 GENRESULT DACOM_API FThornDeformable::GetTransform(float* OutTransform12)
 {
     void* const Instance = Character->GetEngineInstance();
@@ -314,16 +294,8 @@ GENRESULT DACOM_API FThornDeformable::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_00452460 (IK facet, RET 0x10).
-//   End effector = the character's part named by the descriptor; root = its count_to_root-th
-//   ancestor (FUN_0044fa60, run before either is tested). Either -1 -> -1.
-//   The target comes out of the script frame; the first inactive aim slot (none -> -1) takes the
-//   key, the target and bActive. The aim descriptor (engbase.h FDeformAimDesc) carries the
-//   event flags, plus 0x40 for point_at (and 0x80 when count_to_root is 1 inside that), 0x20 for
-//   move_to, 0x100 when the flags' low byte has its top bit set (0x004525e8 `TEST CL,CL; JNS`).
-//   IDeformable slot 11 starts it (transition duration as the last argument), the character
-//   counts the handle (FUN_00445700), and a zero answer marks the slot started (0); anything
-//   else is a TRACE and -1 with bStarted cleared. bActive stays set either way.
+// LAB_00452460. The root ancestor (FUN_0044fa60) is computed before either part is tested.
+// AddAimHandle is FUN_00445700. bActive stays set even when the start fails.
 GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, float* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
@@ -391,9 +363,8 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
     return GR_GENERIC;
 }
 
-// FUN_00452a30 (IK facet, RET 8). The active slot with the descriptor's key (-1 when none); the
-// character forgets its handle (FUN_00445710); an active slot is stopped (IDeformable slot 12,
-// only if it started) and deactivated. Answer: slot 12's, or -1 when it was not called.
+// FUN_00452a30. With no matching slot the index stays -1 (Aims[-1] is read, as retail).
+// RemoveAimHandle is FUN_00445710.
 GENRESULT DACOM_API FThornDeformable::StopIk(void* DescArg)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
@@ -420,8 +391,7 @@ GENRESULT DACOM_API FThornDeformable::StopIk(void* DescArg)
     return Result;
 }
 
-// LAB_00452680 (IK facet, RET 0x10). The active slot with the key (-1 when none); not started
-// -> -1; otherwise its target takes the new position and orientation out of the script frame. 0.
+// LAB_00452680. With no matching slot the index stays -1 (Aims[-1] is read, as retail).
 GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, float* Position, float* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
@@ -444,7 +414,7 @@ GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, float* Position, f
     return GR_OK;
 }
 
-// LAB_00452ab0 (geo facet, RET 8): IDeformable slot 19 with the position out of the script frame.
+// LAB_00452ab0.
 GENRESULT DACOM_API FThornDeformable::SetPosition(float* Position)
 {
     Vector WorldPos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
@@ -452,7 +422,7 @@ GENRESULT DACOM_API FThornDeformable::SetPosition(float* Position)
     return GR_OK;
 }
 
-// LAB_00452b00 (geo facet, RET 8): IDeformable slot 20.
+// LAB_00452b00.
 GENRESULT DACOM_API FThornDeformable::SetOrientation(float* Orient9)
 {
     Matrix WorldOrient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orient9));
@@ -460,7 +430,7 @@ GENRESULT DACOM_API FThornDeformable::SetOrientation(float* Orient9)
     return GR_OK;
 }
 
-// LAB_00452bd0 (geo facet, RET 8).
+// LAB_00452bd0.
 GENRESULT DACOM_API FThornDeformable::GetPosition(float* OutPosition)
 {
     void* const Instance = Character->GetEngineInstance();
@@ -468,7 +438,7 @@ GENRESULT DACOM_API FThornDeformable::GetPosition(float* OutPosition)
     return GR_OK;
 }
 
-// LAB_00452c20 (geo facet, RET 8).
+// LAB_00452c20.
 GENRESULT DACOM_API FThornDeformable::GetOrientation(float* OutOrient9)
 {
     void* const Instance = Character->GetEngineInstance();
@@ -476,11 +446,8 @@ GENRESULT DACOM_API FThornDeformable::GetOrientation(float* OutOrient9)
     return GR_OK;
 }
 
-// FUN_00452130 (slot 14). The actor name freed; every active motion's handle destroyed
-// (IDeformable slot 10), its script released and the slot reset; every active aim stopped (slot
-// 12, only if started) and deactivated (bStarted is left as it is); the character's light group,
-// layer and render mode cleared when there is one -- and then FUN_00445540 is called on it with
-// the owning script's +0x55 byte WITHOUT that check (0x004521e9).
+// FUN_00452130 (slot 14). bStarted is left as it is. FUN_00445540 (ResetScriptState) is called
+// on the character WITHOUT the null check the lines above it make, as retail.
 void FThornDeformable::Stop()
 {
     malloc_strfree(&ActorName);
@@ -515,8 +482,7 @@ void FThornDeformable::Stop()
     Character->ResetScriptState(Owner->Field_0x55);
 }
 
-// LAB_00452df0 (thiscall, RET 0xc). A non-null name equal (DACOM stricmp) to the actor name hands
-// out the character's +0x1b4 and the character itself.
+// LAB_00452df0. Hands out the character's +0x1b4 (voice id) and the character itself.
 bool FThornDeformable::FindActor(char const* InActorName, void** OutActorField, void** OutActor)
 {
     if (InActorName == nullptr)

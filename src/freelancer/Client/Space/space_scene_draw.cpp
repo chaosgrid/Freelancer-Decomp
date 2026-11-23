@@ -14,7 +14,7 @@ namespace
 void OnSpaceSceneObjectDraw(void* /*Renderable*/, unsigned char /*SceneKind*/, unsigned /*Layer*/,
                             int /*SubLayer*/)
 {
-    // Proxy path abolished. Live walk: space_scene_obj_draw.cpp (FUN_0051b250…).
+    // The live walk is space_scene_obj_draw.cpp (FUN_0051b250).
 }
 
 bool ShouldDrawSpaceSceneObject(void* /*Renderable*/, unsigned char /*SceneKind*/)

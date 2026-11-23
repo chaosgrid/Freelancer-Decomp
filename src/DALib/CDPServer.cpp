@@ -9,8 +9,7 @@
 #include <list>
 
 CDPServer* CDPServer::m_pServer = nullptr;
-// .data:065ca254 is seeded at DLL load by the static initializer LAB_065c4630 (__xc table entry
-// .data:065ca008): CALL timeGetTime; MOV [065ca254],EAX.
+// .data:065ca254, seeded with timeGetTime() at DLL load by the static initializer LAB_065c4630.
 unsigned long CDPServer::m_dwLastMsgReceivedTime = timeGetTime();
 
 namespace
@@ -62,7 +61,7 @@ CDPServer::CDPServer()
     AppDesc.dwFlags &= ~kFlagRequirePassword;
     Server->SetApplicationDesc(&AppDesc, 0);
 
-    // Retail default guidApplication (hardcoded in the ctor, DALib.dll.c @ 0x4bf0 lines ~4348-4351).
+    // Retail default guidApplication, hardcoded in the ctor.
     AppDesc.guidApplication = {0xA690F026, 0x26F0, 0x4E57,
                                 {0xAC, 0xA0, 0xEC, 0xF8, 0x68, 0xE4, 0x8D, 0x21}};
 
@@ -87,8 +86,8 @@ CDPServer::~CDPServer()
     m_pServer = nullptr;
 }
 
-// Copy ctor @ 0x3bc0 / operator= @ 0x3d20 are the compiler's memberwise members -- implicit in
-// src/include/dalib_net.h, not defined here.
+// Copy ctor @ 0x3bc0 / operator= @ 0x3d20 are the compiler's memberwise members (implicit).
+
 // Retail DALib.dll.c CDPServer::UpdateDescription @ 0x4e30.
 void CDPServer::UpdateDescription()
 {
@@ -102,8 +101,7 @@ void CDPServer::SetGUID(GUID& Guid)
     AppDesc.guidApplication = Guid;
 }
 
-// Retail .text:065c4e70: unbounded wcscpy into +0x50, then the SetApplicationDesc that
-// UpdateDescription (.text:065c4e30) performs -- inlined in retail.
+// Retail .text:065c4e70: unbounded wcscpy into +0x50; UpdateDescription is inlined in retail.
 void CDPServer::SetSessionName(const wchar_t* Name)
 {
     wcscpy(SessionName, Name);
@@ -118,8 +116,8 @@ void CDPServer::SetMaxPlayers(int MaxPlayers)
     UpdateDescription();
 }
 
-// Retail .text:065c4ec0: `CMP word ptr [EAX],0` with no null check, unbounded wcscpy into +0x258,
-// then SetApplicationDesc (inlined UpdateDescription).
+// Retail .text:065c4ec0: no null check on NewPassword, unbounded wcscpy into +0x258,
+// UpdateDescription inlined.
 void CDPServer::SetPassword(const wchar_t* NewPassword)
 {
     if (NewPassword[0] == L'\0')
@@ -137,8 +135,7 @@ void CDPServer::SetPassword(const wchar_t* NewPassword)
 }
 
 // Retail DALib.dll.c CDPServer::GetHostAddresses @ 0x4f20 (protected) -- caches
-// GetLocalHostAddresses() results and logs each as a URL via OutputDebugStringA (retail debug
-// spew, "HOSTING URL: ...").
+// GetLocalHostAddresses() results and logs each URL (retail debug spew).
 void CDPServer::GetHostAddresses()
 {
     if (Server == nullptr || NumHostAddresses != 0)
@@ -252,9 +249,8 @@ void CDPServer::DisconnectClient(unsigned long PlayerId)
         Server->DestroyClient(PlayerId, nullptr, 0, 0);
 }
 
-// Retail .text:065c53f0 CDPServer::GetConnectionStats(CDPClientProxy*, ...): dwSize = 0x5c,
-// GetConnectionInfo (slot 0x80) on the proxy's dpnid (+0x8); `NEG; SBB AL,AL; INC AL`
-// (.text:065c5421) returns true only for exactly S_OK, not for any SUCCEEDED code.
+// Retail .text:065c53f0: dwSize = 0x5c, proxy dpnid at +0x8. True only for exactly S_OK, not for
+// any SUCCEEDED code.
 bool CDPServer::GetConnectionStats(CDPClientProxy* Proxy, DPN_CONNECTION_INFO* Info)
 {
     if (Server == nullptr || Proxy == nullptr || Info == nullptr)
@@ -263,9 +259,7 @@ bool CDPServer::GetConnectionStats(CDPClientProxy* Proxy, DPN_CONNECTION_INFO* I
     return Server->GetConnectionInfo(Proxy->PlayerId, Info, 0) == S_OK;
 }
 
-// Retail .text:065c5440 CDPServer::GetConnectionStats(DPN_CONNECTION_INFO*) -- own
-// (server-local) connection stats via OwnPlayerId (+0x568); same `== S_OK` result
-// (.text:065c546c).
+// Retail .text:065c5440 -- server-local stats via OwnPlayerId (+0x568); same `== S_OK` result.
 bool CDPServer::GetConnectionStats(DPN_CONNECTION_INFO* Info)
 {
     if (Server == nullptr || Info == nullptr)
@@ -274,7 +268,6 @@ bool CDPServer::GetConnectionStats(DPN_CONNECTION_INFO* Info)
     return Server->GetConnectionInfo(OwnPlayerId, Info, 0) == S_OK;
 }
 
-// Return the message count written by GetSendQueueInfo.
 unsigned int CDPServer::GetSendQSize(CDPClientProxy* Proxy)
 {
     if (Server == nullptr || Proxy == nullptr)
@@ -284,8 +277,8 @@ unsigned int CDPServer::GetSendQSize(CDPClientProxy* Proxy)
     return NumMsgs;
 }
 
-// Retail DALib.dll.c CDPServer::GetSendQBytes @ 0x54c0 -- same decompiler-artifact return value as
-// GetSendQSize; ported as the real (byte count) behavior.
+// Retail DALib.dll.c CDPServer::GetSendQBytes @ 0x54c0. Returns the GetSendQueueInfo byte count
+// (GetSendQSize: the message count); the decompiled C's return values are decompiler artifacts.
 unsigned int CDPServer::GetSendQBytes(CDPClientProxy* Proxy)
 {
     if (Server == nullptr || Proxy == nullptr)
@@ -312,7 +305,7 @@ bool CDPServer::SetEnumResponse(void* Data, unsigned long Size)
     return true;
 }
 
-// Retail .text:065c5560: MOV EAX,[m_dwLastMsgReceivedTime]; RET.
+// Retail .text:065c5560.
 unsigned long CDPServer::GetLastMsgTimestamp()
 {
     return m_dwLastMsgReceivedTime;
@@ -325,7 +318,6 @@ void CDPServer::CrashCleanup()
     if (m_pServer != nullptr && m_pServer->Server != nullptr)
         m_pServer->Server->Close(0);
 }
-
 
 // Retail DALib.dll.c CDPServer::HandleDPServerMsg @ 0x4670 -- DirectPlay8 IO-thread callback.
 long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long MessageId, void* MsgData)

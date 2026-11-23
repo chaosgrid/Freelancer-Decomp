@@ -36,7 +36,7 @@ struct FScreenQuadRecord
     float U1;       // +0x20
     float V1;       // +0x24
     // +0x28 packed ARGB, a raw dword: retail only ever moves it with MOV (the vertex expand
-    // FUN_004042c0 reads it at 0x00404387, 0x004043d6, 0x0040440c, 0x0040443d). Not a float:
+    // FUN_004042c0 included). Not a float:
     // in an x87 build (/arch:IA32) a float passed by value goes through FLD/FSTP, which
     // quiets a signalling NaN, and an opaque colour (A = 0xFF) with R in 0x80..0xBF is one --
     // its R would gain 0x40 (grey 0xFF808080 -> 0xFFC08080).
@@ -44,9 +44,8 @@ struct FScreenQuadRecord
 };
 
 // The pipeline render-state saver retail keeps on the stack (FUN_00403ea0, FUN_00404720,
-// FUN_00563af0, ...): {pipeline, state, saved}; the constructor reads the state (slot 61, +0xf4)
-// into Saved and sets the new value (slot 60, +0xf0); the destructor FUN_00405840 (inlined at
-// most sites, and run by the EH unwind funclets) writes Saved back.
+// FUN_00563af0, ...); the destructor FUN_00405840 (inlined at most sites, and run by the EH
+// unwind funclets) writes the saved value back.
 struct FScreenQuadRenderStateSaver
 {
     IRenderPipeline* Pipe;
@@ -83,7 +82,7 @@ void ScreenQuadResetDrawBatchCache();
 
 // DAT_006101d8 -- the default texture frame {no texture, u0 0, v0 0, u1 1.0f, v1 1.0f} (.data,
 // never written): a new container's key (FUN_00402f40 / FUN_00403ea0) and the frame the core
-// bars (0x004d54a2) and the IME background (0x00563f91) hand to FUN_00402e30.
+// bars and the IME background hand to FUN_00402e30.
 extern unsigned long const G_ScreenQuadDefaultFrame[5];
 
 // FUN_004038f0 (cdecl) -- a light's flare at Position through Cam: 0 when it is not in front of
@@ -105,10 +104,8 @@ unsigned char ScreenQuadEnqueueFlare(ICamera* Cam, float const* Position, float 
 void ScreenQuadBeginBatchFrame(unsigned long const* Frame, int BlendMode, bool bFind);
 
 // The record append retail inlines into the callers of FUN_00402e30 (NumberString paint
-// LAB_004137a0 00413bb7..00413c6a / 00413cfe..00413dc1, FUN_004034a0 0x004035e6..0x004036a8):
-// count + 1; past the capacity a new block of count + 1 + 0x20 records (operator new), the old
-// records copied and the old block freed; the 0x2c record written at the old count -- into the
-// node FUN_00402e30 returned, i.e. the container's current node.
+// LAB_004137a0, FUN_004034a0): past the capacity a new block of count + 1 + 0x20 records --
+// into the node FUN_00402e30 returned, i.e. the container's current node.
 void ScreenQuadAppendRecord(FScreenQuadRecord const& Record);
 
 // FUN_004034a0 (cdecl) -- one icon square of Size (world units) around Position through Cam

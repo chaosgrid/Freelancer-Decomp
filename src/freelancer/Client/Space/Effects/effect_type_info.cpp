@@ -39,8 +39,8 @@ namespace
 }
 
 // PTR_s_EFT_NONE_00612a68 .. PTR_s_EFT_NUMTYPES_006131c0: an initialised .data table (0x2f rows
-// of 0x28 bytes), no run-time seeding; [EffectType] sections overlay it in place. Every row
-// below was diffed byte-for-byte against the retail PE's .data (2026-09-25, exe-w3b).
+// of 0x28 bytes), no run-time seeding; [EffectType] sections overlay it in place. The rows are
+// the retail .data values.
 FEffectTypeInfo G_EffectTypeTable[kEffectTypeCount] = {
         {"EFT_NONE", 0.f, 0.f, 0, 10.f, 0, 0, {0, 0}, 15.f, 5.f, 100.f, 500.f},
         {"EFT_EXPLOSION_SMALL", 1.f, 0.5f, 3, 10.f, 0, 0, {0, 0}, 15.f, 5.f, 100.f, 500.f},
@@ -91,8 +91,7 @@ FEffectTypeInfo G_EffectTypeTable[kEffectTypeCount] = {
         {"EFT_FLASHLIGHT", 1.f, 1.f, 0, -1.f, 1, 0, {0, 0}, -1.f, 5.f, 100.f, 500.f},
     };
 
-// LAB_0042dac0 (_initterm slot 0x0060f1a0): EAX from 0x00667d98, 8 rows, [EAX-8]/[EAX-4]/[EAX] =
-// 0xbf800000 (-1.0f).
+// DAT_00667d90, seeded to -1.0f by the static initializer LAB_0042dac0.
 FEffectLodSizes G_EffectLodTable[kEffectLodTableRows] = {
     {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f},
     {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f},
@@ -100,9 +99,7 @@ FEffectLodSizes G_EffectLodTable[kEffectLodTableRows] = {
 
 int EffectTypeIndexFromName(char const* Nickname)
 {
-    // FUN_004fd500 (cdecl): an inlined strcmp of every row's name against Nickname, EDI walking
-    // 0x00612a68 by 0x28 up to PTR_s_EFT_NUMTYPES_006131c0; the returned EBP is the row index,
-    // 0x2f when nothing matched. No null test on either string.
+    // FUN_004fd500: 0x2f when nothing matched. No null test on either string.
     int Index = 0;
     for (Index = 0; Index < kEffectTypeCount; ++Index)
     {
@@ -114,15 +111,14 @@ int EffectTypeIndexFromName(char const* Nickname)
 
 FEffectTypeInfo* EffectTypeInfoByIndex(int Index)
 {
-    // FUN_004fd560 (cdecl): `LEA EAX,[Index*5]; LEA EAX,[EAX*8 + 0x00612a68]` -- no range test.
+    // FUN_004fd560: no range test.
     return &G_EffectTypeTable[Index];
 }
 
 bool EffectTypeWithinPerf(int Index)
 {
-    // FUN_004fd570 (cdecl): the row's Priority (DAT_00612a6c + Index * 0x28, no range test)
-    // against FUN_004f70b0 = DAT_006129c8; FCOMP perf vs priority, TEST AH,0x41 / JP -> 1 when
-    // exactly one of C0/C3 is set: perf below or equal to the priority, never when unordered.
+    // FUN_004fd570: the row's Priority (no range test) against the perf level DAT_006129c8;
+    // true when perf is below or equal, never when unordered.
     float const Perf = GetPerfGenericEffectPerf();
     float const Priority = G_EffectTypeTable[Index].Priority;
     return Perf < Priority || Perf == Priority;
@@ -130,9 +126,8 @@ bool EffectTypeWithinPerf(int Index)
 
 bool LoadEffectTypeSection(INI_Reader* Reader)
 {
-    // FUN_004fd5a0 (cdecl, Reader in ESI). Current lives in EBX with a copy at [ESP+0x10]; that
-    // copy is written only when a nickname resolves, so an unknown nickname keeps the previous
-    // row (0x004fd669 reloads EBX from it) instead of clearing it. No null test on Reader.
+    // FUN_004fd5a0. An unknown nickname keeps the previous row instead of clearing it. No null
+    // test on Reader.
     static char const* const kSourceFile = "E:\\FL\\Scratch\\Source\\Client\\Space\\EffectTypes.cpp";
 
     FEffectTypeInfo* Current = nullptr;
@@ -141,7 +136,7 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
     {
         if (Reader->is_value("nickname"))
         {
-            // 0x004fd5e4..0x004fd62e: the same inlined lookup as FUN_004fd500.
+            // FUN_004fd500 inlined.
             char const* Nick = Reader->get_value_string();
             int Index = EffectTypeIndexFromName(Nick);
             if (Index >= kEffectTypeCount)
@@ -163,7 +158,7 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
                 Current->GenericPriority = Reader->get_value_float(0);
             else if (Reader->is_value("lod_type"))
             {
-                // 0x004fd6e6: EDI from 1 to 6; get_value_string() is re-read every pass.
+                // get_value_string() is re-read every pass.
                 int Lod = 1;
                 for (Lod = 1; Lod < kEffectLodTypeCount; ++Lod)
                 {
@@ -176,8 +171,8 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
             }
             else if (Reader->is_value("radius"))
             {
-                // FCOM 0.0 (DAT_005c7474), TEST AH,5 / JP: only a strictly negative value is
-                // reported and replaced with 1.0 (DAT_005c75dc); NaN is stored as read.
+                // Only a strictly negative value is reported and replaced with 1.0; NaN is
+                // stored as read.
                 float Radius = Reader->get_value_float(0);
                 if (Radius < 0.0f)
                 {
@@ -205,8 +200,7 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
                 Current->Fps = Reader->get_value_float(0);
             else if (Reader->is_value("pbubble"))
             {
-                // 0x004fd83d: FST far, FCOMP near, TEST AH,5 / JP -- warns only when far is
-                // strictly below near.
+                // Warns only when far is strictly below near.
                 Current->PbubbleNear = Reader->get_value_float(0);
                 Current->PbubbleFar = Reader->get_value_float(1);
                 if (Current->PbubbleFar < Current->PbubbleNear)
@@ -218,7 +212,6 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
             }
             else
             {
-                // 0x004fd880: any other key.
                 FDUMP(0x100001, "%s(%d) : *** ERROR: EffectType (%s) has unknown parameter (%s)",
                       kSourceFile, 0xc7, Current->Nickname, Reader->get_file_name());
             }
@@ -244,8 +237,6 @@ bool LoadEffectLodSection(INI_Reader* Reader)
     }
     if (Lod >= static_cast<unsigned>(kEffectLodTypeCount))
     {
-        // 0042db85..0042dbb9: FDUMP the bad name, then log_link("") (.rdata 0x005c865c is an
-        // empty string) and return false.
         FDUMP(0x100001, "%s(%d) : *** ERROR: invalid LOD type (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\VisEffectArch.cpp", 0x69, TypeName);
         Reader->log_link("");
@@ -272,31 +263,27 @@ bool LoadEffectLodSection(INI_Reader* Reader)
 bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance, float Radius,
                        float* OutBlend)
 {
-    // FUN_0042da00. 0x0042da00: FCOMP the distance against the double 1e-5, TEST AH,5 / JP --
-    // only strictly below gives 1.0 straight away.
+    // FUN_0042da00. Only a distance strictly below the double 1e-5 gives 1.0 straight away.
     if (static_cast<double>(Distance) < 1e-05)
     {
         *OutBlend = 1.0f;
         return true;
     }
 
-    // 0x0042da2b..0x0042da46: slot +0x2c first (stored as a float), then slot +0x20 times it;
-    // Radius / Distance times that product, all on the FPU.
+    // Slot +0x2c first (rounded to float), then slot +0x20 times it; the rest unrounded.
     float const XScale = static_cast<float>(Cam->GetXScaleOverNear());
     double const ZNear = Cam->GetZNear();
     double const ScreenSize =
         (static_cast<double>(Radius) / Distance) * (ZNear * static_cast<double>(XScale));
 
-    // 0x0042da48: FCOM min_screen_size (+8), TEST AH,0x41 / JNZ -- at or below (or NaN) the
-    // effect is not drawn: *Out = 0, false.
+    // At or below min_screen_size (or NaN) the effect is not drawn.
     if (!(ScreenSize > Row->MinScreenSize))
     {
         *OutBlend = 0.0f;
         return false;
     }
 
-    // 0x0042da52..0x0042da6e: (size - min_lod) / (max_lod - min_lod); above 1.0
-    // (TEST AH,0x41 / JNZ) -> 1.0; LAB_0042da98: strictly below 0.0 (TEST AH,5 / JP) -> 0.0.
+    // Clamped to [0, 1].
     double Blend = (ScreenSize - Row->MinLodScreenSize) /
                    (static_cast<double>(Row->MaxLodScreenSize) - Row->MinLodScreenSize);
     if (Blend > 1.0)
@@ -312,13 +299,11 @@ bool EffectLodRowBlend(FEffectLodSizes const* Row, ICamera* Cam, float Distance,
 
 bool EffectTypeLodBlend(int TypeIndex, ICamera* Cam, float Distance, float* OutBlend)
 {
-    // FUN_0042dcd0. FUN_004fd560 with retail's null test; lod_type must be 1..6 (JLE / JGE,
-    // signed).
+    // FUN_0042dcd0. Retail's own null test; lod_type must be 1..6 (signed).
     FEffectTypeInfo const* const Info = EffectTypeInfoByIndex(TypeIndex);
     if (Info != nullptr && Info->LodType > 0 && Info->LodType < kEffectLodTypeCount)
         return EffectLodRowBlend(&G_EffectLodTable[Info->LodType], Cam, Distance, Info->Radius,
                                  OutBlend);
-    // LAB_0042dd10.
     *OutBlend = 1.0f;
     return true;
 }

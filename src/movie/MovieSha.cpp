@@ -25,7 +25,7 @@ static unsigned int RotateRight(unsigned int Value, unsigned int Bits)
     return (Value >> Bits) | (Value << (32u - Bits));
 }
 
-// 32 trips, two words each. Listing at 06acb3b0 / 06acbf05:
+// 32 trips, two words each (06acb3b0 / 06acbf05):
 // W[i] = ROL1(W[i-16] ^ W[i-14] ^ W[i-8] ^ W[i-3]), i = 16..79.
 static void ExpandSchedule(unsigned int* Schedule)
 {
@@ -39,8 +39,7 @@ static void ExpandSchedule(unsigned int* Schedule)
     }
 }
 
-// Rounds 0..79. The listing unrolls them; both retail bodies are the same
-// 988 instructions from the state load through the instruction before ADD ESP.
+// Rounds 0..79, fully unrolled in both retail compressors (same body).
 // Ch / Parity / Majority and the four K constants change on the phase edges.
 // Each round does ROL5(A), ROR2(B) as two ROR1, then A,B,C,D,E rotate.
 static void CompressSchedule(unsigned int* State, const unsigned int* Schedule)

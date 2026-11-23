@@ -36,8 +36,7 @@ namespace
 
 FmtStr::Val const* FmtStrFindVal(FmtStr const* Fmt, unsigned char Index, unsigned short Code)
 {
-    // 0041c940: walk from [this], compare word [node+8] with Code and byte [node+0xa] with
-    // Index; null when the list runs out.
+    // 0041c940.
     for (FmtStr::Val const* Node = Fmt->Head; Node != nullptr; Node = Node->Next)
     {
         if (Node->TypeTag == Code && Node->Flags == Index)
@@ -95,7 +94,7 @@ int MiscUtilLoadMaterialLibrary(char const* File)
 
 void MiscUtilAppendIds(wchar_t** Cursor, wchar_t* End, unsigned Ids)
 {
-    // 0041d5b0. The character count is the SAR'd byte distance to End (0041d5ca).
+    // 0041d5b0.
     int const Copied = static_cast<int>(
         GetIdsStringWWithRawFallback(Ids, *Cursor, static_cast<int>(End - *Cursor)));
     if (Copied == 0)
@@ -103,7 +102,6 @@ void MiscUtilAppendIds(wchar_t** Cursor, wchar_t* End, unsigned Ids)
     *Cursor += Copied;
     if (End == *Cursor)
     {
-        // 0041d60f: step back, terminate, step forward again.
         *Cursor -= 1;
         **Cursor = L'\0';
         *Cursor += 1;
@@ -130,11 +128,10 @@ void FormatGroupedNumber(wchar_t* Out, int Value, int PrefixIds)
     bool bStarted = false;
     do
     {
-        // 00477a20: signed compare (JGE).
         if (Value >= Divisor || bStarted)
         {
             int const Group = Value / Divisor;
-            wchar_t Text[64]; // local_80, 0x80 bytes
+            wchar_t Text[64];
             // u"%03d" 005d0ecc once a group has been written, u"%d" 005d0ec4 before.
             swprintf(Text, 64, bStarted ? L"%03d" : L"%d", Group);
             wcscat(Out, Text);
@@ -152,11 +149,11 @@ void MiscUtilAppendRepInstanceName(int RepId, wchar_t** Cursor, wchar_t* End)
     // 0041d440. End (the third argument) is never read: the copy is an unbounded wcscpy.
     (void)End;
 
-    FmtStr Name1;              // [ESP+0x28]
-    FmtStr Name2;              // [ESP+0x10]
-    wchar_t Rebuilt[0x18];     // [ESP+0x40]
-    // local_70 is not written before the call; on a miss GetName leaves it untouched and
-    // retail reads whatever the stack held. Null steers that case into the rebuild branch.
+    FmtStr Name1;
+    FmtStr Name2;
+    wchar_t Rebuilt[0x18];
+    // Retail does not initialise this local; on a miss GetName leaves it untouched and retail
+    // reads whatever the stack held. Null steers that case into the rebuild branch.
     wchar_t const* DisplayName = nullptr;
 
     Reputation::Vibe::GetName(RepId, Name1, Name2, DisplayName);
@@ -182,17 +179,17 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
     if (Fmt->MadLibId == 0)
         return 0;
 
-    bool bPercent = false;                  // local_res3
-    wchar_t Number[32];                     // [ESP+0x28] -> FUN_004779a0
-    wchar_t Digits[64];                     // [ESP+0x68]
-    wchar_t Template[0x1000];               // [ESP+0xe8]
-    GetIdsStringWWithRawFallback(Fmt->MadLibId, Template, 0x1000); // result unused (0041c9de)
+    bool bPercent = false;
+    wchar_t Number[32];
+    wchar_t Digits[64];
+    wchar_t Template[0x1000];
+    GetIdsStringWWithRawFallback(Fmt->MadLibId, Template, 0x1000); // result unused
 
     wchar_t* Cursor = Dest;
     wchar_t const* Source = Template;
     for (;;)
     {
-        if (Cursor >= End) // 0041c9fe JNC
+        if (Cursor >= End)
         {
             FDUMP(0x100002,
                   "%s(%d) : *** WARNING: FmtStr::sprintf(): mad_lib %u (%S) was too long, please shorten",
@@ -221,7 +218,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             continue;
         }
 
-        // 0041ca53: "%<code><index digits>[v<digit>]".
+        // "%<code><index digits>[v<digit>]".
         bPercent = false;
         unsigned DigitCount = 0;
         wchar_t Next = *Source;
@@ -233,7 +230,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
                     break;
                 Digits[DigitCount] = Next;
                 ++DigitCount;
-                // 0041ca72: the 63rd digit is stored but Source is not stepped past it.
+                // The 63rd digit is stored but Source is not stepped past it.
                 if (DigitCount >= 0x3f)
                     break;
                 Next = Source[1];
@@ -245,10 +242,10 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
         Digits[DigitCount] = L'\0';
         unsigned char const Index = static_cast<unsigned char>(MsvcrtWtoi(Digits));
 
-        int Variant = -1; // ESI
+        int Variant = -1;
         if (*Source == L'v')
         {
-            // 0041caa7: the low byte of the next character, compared signed.
+            // The low byte of the next character, compared signed.
             signed char const VariantChar = static_cast<signed char>(Source[1]);
             if (VariantChar >= '0' && VariantChar <= '9')
             {
@@ -259,7 +256,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
 
         switch (Code)
         {
-        case L's': // 0041cae0
+        case L's':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -271,14 +268,14 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'd': // 0041cb8c
+        case L'd':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
                 break;
             FormatGroupedNumber(Number, (int)Val->Value, 0x1f);
             size_t const Length = wcslen(Number);
-            if (Cursor + Length < End) // 0041cbe1 JNC
+            if (Cursor + Length < End)
             {
                 wcscat(Cursor, Number);
                 Cursor += Length;
@@ -286,7 +283,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'S': // 0041cc0d
+        case L'S':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -299,7 +296,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'B': // 0041cc59
+        case L'B':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -308,13 +305,13 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
                 Universe::get_base(Val->Value);
             if (Base == nullptr)
                 break;
-            // Retail calls BASE vtable +0x8 (Common 0629fb90: MOV EAX,[this+0xc] -- strid_name).
-            // The port's Universe::IBase is a plain record, so the field is read directly.
+            // Retail calls IBase vtable +0x8 (Common 0629fb90, returns strid_name at +0xc); the
+            // port's Universe::IBase is a plain record, so the field is read directly.
             MiscUtilAppendIds(&Cursor, End, static_cast<unsigned>(Base->StridName));
             break;
         }
 
-        case L'R': // 0041cca0
+        case L'R':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -324,7 +321,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'F': // 0041cce0
+        case L'F':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -338,7 +335,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
                 MiscUtilAppendIds(&Cursor, End, Name);
                 break;
             }
-            // 0041cd9c: the faction's variant name table.
+            // The faction's variant name table.
             unsigned const Offset = Name - 0x300ee;
             if (Offset >= 100)
                 break;
@@ -346,7 +343,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'G': // 0041cdba
+        case L'G':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -359,7 +356,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'N': // 0041cdfe
+        case L'N':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -371,7 +368,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'Z': // 0041ce39
+        case L'Z':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -385,7 +382,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
                     MiscUtilAppendIds(&Cursor, End, static_cast<unsigned>(Zone->GetName())); // +0x84
                     break;
                 }
-                // 0041ce87: no zone -- a grid cell id: ids 0x331b, ids 1, column, row.
+                // No zone -- a grid cell id: ids 0x331b, ids 1, column, row.
                 if (ZoneId > 0x3f)
                     break;
                 MiscUtilAppendIds(&Cursor, End, 0x331b);
@@ -396,25 +393,24 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             }
             if (Zone != nullptr)
             {
-                // 0041d017.
                 unsigned const Offset = static_cast<unsigned>(Zone->GetName()) - 0x3fc58;
                 if (Offset >= 0xc7)
                     break;
                 MiscUtilAppendIds(&Cursor, End, static_cast<unsigned>(Variant * 200) + Offset + 0x50fa1);
                 break;
             }
-            // 0041d094. The FDUMP severity here is built by FUN_00411c50(0x10000, 2), which is
+            // Retail builds the inlined append's FDUMP severity with FUN_00411c50(0x10000, 2),
             // the same 0x100002 every other warning passes.
             if (ZoneId > 0x3f)
                 break;
             MiscUtilAppendIds(&Cursor, End, static_cast<unsigned>(Variant * 200) + 0x50fa0);
             MiscUtilAppendIds(&Cursor, End, 1);
             MiscUtilAppendIds(&Cursor, End, (ZoneId & 7) + 0x514);
-            MiscUtilAppendIds(&Cursor, End, ((ZoneId >> 3) & 7) + 0x506); // FUN_0041d5b0 call
+            MiscUtilAppendIds(&Cursor, End, ((ZoneId >> 3) & 7) + 0x506);
             break;
         }
 
-        case L'!': // 0041d267
+        case L'!':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr || Val->Subtree == nullptr)
@@ -425,8 +421,8 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             break;
         }
 
-        case L'I': // 0041d2b3
-        case L'L': // 0041d301
+        case L'I':
+        case L'L':
         {
             FmtStr::Val const* Val = FmtStrFindVal(Fmt, Index, Code);
             if (Val == nullptr)
@@ -434,19 +430,17 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
             unsigned const Id = Val->Value;
             if (Id >= 100)
                 break;
-            // SETLE/DEC/AND: the variant counts only when positive.
             unsigned const Page = Variant > 0 ? static_cast<unsigned>(Variant) : 0u;
             unsigned const Base = Code == L'I' ? 0x507d0u : 0x50bb8u;
             MiscUtilAppendIds(&Cursor, End, Page * 100 + Id + Base);
             break;
         }
 
-        default: // table entry 0xc (caseD_22): the escape is consumed, nothing is written
+        default: // the escape is consumed, nothing is written
             break;
         }
     }
 
-    // 0041d37c.
     if (Cursor >= End)
         Cursor = End - 1;
     *Cursor = L'\0';
@@ -460,7 +454,7 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
                                  std::vector<Archetype::FCliMaterialEntry*>* Entries,
                                  long* OutHandle)
 {
-    // FUN_0041c540. 0041c546..0041c572: Engine +0x44 on {File, CRC32(File)}.
+    // FUN_0041c540.
     void* Instance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     FEngineName Key;
     Key.Text = File;
@@ -469,13 +463,12 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
 
     if (Found != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
     {
-        // 0041c6fa..0041c722: already loaded -- *OutHandle, Engine +0x5c (Handle, 0), +0x3c.
+        // Already loaded.
         if (OutHandle != nullptr)
             *OutHandle = reinterpret_cast<long>(Found);
         void* const Created = DALib::Engine->CreateInstance(Found, nullptr);
         DALib::Engine->ReleaseHandle(Found);
-        // 0041c725..0041c763: the scripts through a fresh file system (retail parks it in the
-        // OutHandle argument slot and does not test it).
+        // The scripts through a fresh file system, which retail does not test.
         if (Scripts != nullptr)
         {
             IFileSystem* Filesys = nullptr;
@@ -486,24 +479,22 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
         return Created;
     }
 
-    // 0041c57d..0041c594: File's own file system (retail parks it in the File argument slot).
     IFileSystem* Filesys = nullptr;
     DAEngine_create_filesystem(File, &Filesys, nullptr);
     if (Filesys == nullptr)
     {
-        // 0041c6e0..0041c6f5 -> 0041c5e9.
         FDUMP(0x100002, "%s(%d) : *** WARNING: file (%s) does not exist.", kMiscUtilCpp, 0xbe,
               File);
         return Instance;
     }
 
-    // 0041c59a..0041c5b9: the file's own material entry, then at most 5 listed extra files.
+    // The file's own material entry, then at most 5 listed extra files.
     Archetype::FCliMaterialEntry* FileEntry =
         Archetype::ResolveMaterialEntryFromFs(Filesys, File, true, 0xffffffffu);
     Archetype::FCliMaterialEntry* ExtraEntries[5];
     int const ExtraCount = Archetype::ResolveMaterialEntryList(MaterialPaths, ExtraEntries, 5);
 
-    // 0041c5bf..0041c5fe: the archetype; a failure leaves the file system and the entries as
+    // A failed archetype load leaves the file system and the entries as
     // they are.
     long Handle = 0;
     if (!Archetype::Load(Filesys, &Handle, nullptr))
@@ -513,20 +504,17 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
         return Instance;
     }
 
-    // 0041c5ff..0041c62e: *OutHandle, Engine +0x5c (Handle, 0), +0x3c.
     if (OutHandle != nullptr)
         *OutHandle = Handle;
     Instance = DALib::Engine->CreateInstance(reinterpret_cast<void*>(Handle), nullptr);
     DALib::Engine->ReleaseHandle(reinterpret_cast<void*>(Handle));
 
-    // 0041c631..0041c64e: Anim +0xc on the file system into FUN_00555bf0.
     if (Scripts != nullptr)
         Scripts->Load(reinterpret_cast<unsigned long>(DALib::Anim->OpenScript(Filesys)));
-    // 0041c653..0041c658.
     DAEngine_release_filesystem(&Filesys);
 
-    // 0041c65e..0041c699: the entries appended to Entries (FUN_00537260 at its end), the
-    // file's own first -- or 0041c6a5..0041c6cd: each released through FUN_0041b030.
+    // The entries are appended to Entries, the file's own first, or each released
+    // (FUN_0041b030).
     if (Entries != nullptr)
     {
         Entries->push_back(FileEntry);
@@ -543,13 +531,11 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
 namespace
 {
     // DAT_00616720 -- this file's 3DMathEngine, acquired (FUN_005b73e0) by FUN_0041c8d0 on first
-    // use (0x0041c8e1..0x0041c8ef).
+    // use.
     I3DMathEngine* G_MiscUtilMath = nullptr;
 }
 
-// FUN_0041c8d0. 0x0041c8d8 Camera slot 16 (+0x40) the view transform; 0x0041c8f4..0x0041c902
-// TransformXform (+0x28) (out, *View, *Center); 0x0041c91d..0x0041c92a Camera slot 15 (+0x3c)
-// (&out, Radius); 0x0041c92f `CMP EAX,3; SETGE`.
+// FUN_0041c8d0.
 bool MiscUtilSphereInView(ICamera* Camera, float const* Center, float Radius)
 {
     float const* const View = Camera->GetViewTransform();

@@ -41,7 +41,7 @@ public:
 
 public:
 	// Retail offsets are from the start of the object (CListBox subobject at +4).
-	// The accounts dialog measures its rows with RegularFont (.text:00412c99).
+	// The dialogs measure their rows with RegularFont.
 	CFont RegularFont;    // +0x44  weight 400
 	CFont ItalicFont;     // +0x4c  weight 400, italic
 	CFont BoldFont;       // +0x54  weight 700

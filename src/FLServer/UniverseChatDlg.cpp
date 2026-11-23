@@ -19,7 +19,7 @@ namespace
 
 	// .data:00429ea4 — the shared chat-id header's "universe" id: word 0 and byte 2 = 1 set by
 	// the CRT initializer .text:00417ff0, byte 3 left at its .data zero. The target of every
-	// message this dialog submits; the sender is a zero id built on the stack (0041849b).
+	// message this dialog submits; the sender is a zero id built on the stack.
 	const CHAT_ID GChatIdUniverse(0x00010000u);
 
 	// Style id of the outgoing message's StyleNode (.text:00418374).
@@ -70,19 +70,19 @@ void CUniverseChatDlg::OnOK()
 {
 }
 
-// .text:00418570 — JMP [vtable +0x60]: DestroyWindow only (the object is a global).
+// .text:00418570 — DestroyWindow only (the object is a global).
 void CUniverseChatDlg::OnCancel()
 {
 	DestroyWindow();
 }
 
-// .text:00418590 — JMP [vtable +0x60], DestroyWindow.
+// .text:00418590
 void CUniverseChatDlg::OnCloseButton()
 {
 	DestroyWindow();
 }
 
-// .text:004185a0 — DestroyWindow (vtable +0x60), then JMP CWnd::Default.
+// .text:004185a0
 void CUniverseChatDlg::OnClose()
 {
 	DestroyWindow();
@@ -114,9 +114,7 @@ void CUniverseChatDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 		LockServer();
 		{
 			RenderDisplayList Rdl;
-			// Double clone as in CChatAccountDlg::OnMsgFilterInput: holder of the first clone
-			// (0041838a..00418396), list insert 004149a0 (second clone), holder delete
-			// (004183bd..004183d3), ~StyleNode (004183e2); the text at 004183e8..00418451.
+			// Double clone as in CChatAccountDlg::OnMsgFilterInput.
 			{
 				StyleNode Style(ChatUniverseStyleId);
 				{
@@ -139,7 +137,7 @@ void CUniverseChatDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 				const CHAT_ID Sender(0u);
 				Server.SubmitChat(Sender, Size, GChatUniverseBuffer, GChatIdUniverse, -1);
 			}
-			// Retail releases the server lock before the list is destroyed (004184b6).
+			// Retail releases the server lock before the list is destroyed.
 			UnlockServer();
 		}
 	}

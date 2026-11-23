@@ -4,26 +4,26 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CEquip, CInternalEquip, CExternalEquip, CEquipTraverser, CEquipManager -- split out of common_cequip.cpp (CMN-B2).
+// CEquip, CInternalEquip, CExternalEquip, CEquipTraverser, CEquipManager.
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
+#include "common_animdb.h"
 
 #include "common_cobject.h"
-#include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)
-#include "common_fuses.h"    // WeaponModDB_GetShieldMod (CEShield::GetWeaponModifier)
+#include "common_csys.h"
+#include "common_fuses.h"
 #include "common_iface.h"    // EquipStatus, EquipStatusFlag* (CEquip::GetStatus)
 #include "common_ini.h"
-#include "common_misc.h"     // ComputeExplosiveImpulses (CAttachedEquip::Disconnect)
+#include "common_misc.h"
 #include "common_physys.h"
-#include "common_spatial.h"  // ISpatialPartition (ScanList::add_in_range bucket query)
-#include "common_timing.h"   // Timing::GetGlobalTime (CEShieldGenerator / CEShield)
+#include "common_spatial.h"
+#include "common_timing.h"
 #include "common_universe.h"
 #include "DALib.h"
 #include "dacom.h"
 #include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
+#include "ivp_physics/ivp_controller.h"
 
 #include <cstdarg>
 #include <cstdint>
@@ -44,14 +44,12 @@ namespace
     const unsigned kExternalEquipMask = 0x1fe3u;
     const unsigned kInternalEquipMask = 0x1ff0000u;
 
-    // .data DAT_063fc198: CEquip::IdentifyEquipment's 0x40-byte result buffer.
+    // DAT_063fc198: CEquip::IdentifyEquipment's 0x40-byte result buffer.
     char GIdentifyEquipmentBuf[0x40];
 
-    // Retail keeps the list node in CEquipTraverser+0xc and steps node->next
-    // (.text:0629b493 / 0629b4c7); the port keeps the CEquip* and rescans from begin() to step
-    // past it -- the same element while the list is unchanged between calls. The payload null,
-    // type-mask and IsDestroyed (vtbl+0x8, unless bIncludeDestroyed) tests are retail's
-    // (.text:0629b4d6..0629b4fb).
+    // Deviation: retail keeps the list node in CEquipTraverser+0xc and steps node->next; the
+    // port keeps the CEquip* and rescans from begin() past it -- the same element while the
+    // list is unchanged between calls (not if `After` was removed). The filters are retail's.
     CEquip* NextMatching(std::list<CEquip*>* List, CEquip* After, unsigned TypeMask,
                          bool bIncludeDestroyed)
     {
@@ -77,8 +75,7 @@ namespace
         return nullptr;
     }
 
-    // Mirror of NextMatching for CEquipManager::ReverseTraverse (Common.dll.c 0x3b530/0x3b540):
-    // walks the list back-to-front instead of front-to-back.
+    // NextMatching back to front, for CEquipManager::ReverseTraverse (RVA 0x3b530 / 0x3b540).
     CEquip* PrevMatching(std::list<CEquip*>* List, CEquip* Before, unsigned TypeMask,
                         bool bIncludeDestroyed)
     {
@@ -133,8 +130,7 @@ CEquip::CEquip(unsigned TypeBits, CEqObj* OwnerObj, unsigned short EquipId,
 
 CEquip::CEquip()
 {
-    // Listing 0x26d60: Owner, Arch, Type and both notify sinks zeroed, Id = SUBOBJ_ID_NONE,
-    // bActive (+0x10) and bMission (+0x12) cleared. bDestroyed (+0x11) is left untouched.
+    // RVA 0x26d60. bDestroyed (+0x11) is left untouched.
     Owner = nullptr;
     Id = SUBOBJ_ID_NONE;
     Arch = nullptr;
@@ -151,26 +147,23 @@ CEquip::~CEquip()
 
 void* CEquip::operator new(size_t Size) noexcept
 {
-    // Listing 0x9d560: JMP msvcrt!malloc.
+    // RVA 0x9d560: msvcrt malloc.
     return malloc(Size);
 }
 
 void CEquip::operator delete(void* Block)
 {
-    // Listing 0x9d570: JMP msvcrt!free.
+    // RVA 0x9d570: msvcrt free.
     free(Block);
 }
 
-// Common.dll.c 0x3afd0 (ICF-folded with DamageList::set_inflictor_owner_player,
-// which is unrelated -- both just store a pointer at a fixed offset).
+// RVA 0x3afd0 (ICF-shared).
 void CEquip::ConnectServerEquip(INotify* NotifyParam)
 {
     NotifyA = NotifyParam;
 }
 
-// Common.dll.c 0xbd950 (ICF-folded with CPlayerTradeOffer::SetMoneyOffered and
-// EquipDesc::set_owner, which are unrelated -- all just store a value at a
-// fixed offset).
+// RVA 0xbd950 (ICF-shared).
 void CEquip::ConnectClientEquip(INotify* NotifyParam)
 {
     NotifyB = NotifyParam;
@@ -178,7 +171,7 @@ void CEquip::ConnectClientEquip(INotify* NotifyParam)
 
 void CEquip::NotifyDisconnecting(INotify* NotifyParam)
 {
-    // Common.dll.c 0x3afe0: clears whichever of NotifyA/NotifyB matches.
+    // RVA 0x3afe0: clears the first matching sink only.
     if (NotifyA == NotifyParam) {
         NotifyA = nullptr;
         return;
@@ -188,8 +181,7 @@ void CEquip::NotifyDisconnecting(INotify* NotifyParam)
     }
 }
 
-// Common.dll.c 0x3b010: dispatches to both registered listeners' vtable slot 0
-// (INotify::notify), in NotifyA-then-NotifyB order, each only if non-null.
+// RVA 0x3b010
 void CEquip::Notify(INotify::Event Code, void* Param)
 {
     if (NotifyA != nullptr)
@@ -210,15 +202,9 @@ bool CEquip::IsDestroyed() const
 
 bool CEquip::IsFunctioning() const
 {
-    // .text:06286d20-06286d4c: vt+0x4 IsActive, vt+0x10 IsDisabled, vt+0x8 IsDestroyed;
-    // true only for active, not disabled, not destroyed. vt+0x10 is slot 4 = IsDisabled
-    // (ordinal 1762 ?IsDisabled@CEquip@@UBE_NXZ). Its base body 0629ba00 (`XOR AL,AL; RET`)
-    // is ICF-folded with EnableController / IsControllerEnabled, but that fold only makes
-    // them equal in CEquip's own table: CEThruster (0639d744) keeps slot 4 = 0629ba00 while
-    // overriding IsControllerEnabled (slot 21, 0629d290 = [+0x5c], true once registered),
-    // and CELauncher overrides IsDisabled. Calling IsControllerEnabled here made every
-    // registered thruster "not functioning", so CEThruster::do_simulation_controller
-    // returned at 0629d2e8 and the afterburner pushed no force (CMN-BUG10).
+    // FUN_06286d20. Vtable slot 4 is IsDisabled, not IsControllerEnabled: their base bodies
+    // are ICF-folded (0629ba00), but CEThruster overrides only IsControllerEnabled, so the
+    // wrong one makes every registered thruster "not functioning".
     if (IsActive()) {
         if (!IsDisabled() && !IsDestroyed())
             return true;
@@ -228,9 +214,7 @@ bool CEquip::IsFunctioning() const
 
 bool CEquip::Activate(bool bOn)
 {
-    // Common.dll.c 0x3aed0: on an actual 0->1 or 1->0 transition (not a same-state call),
-    // retail notifies NotifyA/NotifyB with event 0xb (activating) or 0xc (deactivating) and
-    // a null context, before flipping bActive.
+    // RVA 0x3aed0: notifies only on a real transition, before flipping bActive.
     if (bOn) {
         if (bActive == 0) {
             Notify(INotify::EquipActivating, nullptr);
@@ -247,23 +231,20 @@ bool CEquip::Activate(bool bOn)
 
 void CEquip::Destroy()
 {
-    // Common.dll.c 0x3af40: retail notifies NotifyA/NotifyB with event 0xa and this
-    // equip's Id (zero-extended to a pointer-sized context value) after setting bDestroyed.
+    // RVA 0x3af40
     bDestroyed = 1;
     Notify(INotify::EquipDestroying, (void*)(uintptr_t)Id);
 }
 
 float CEquip::GetMaxHitPoints() const
 {
-    // .text:0629af70: MOV EAX,[this+0xc]; FLD [EAX+0x1c]; RET -- no Arch null test.
+    // FUN_0629af70; no Arch null test.
     return Arch->HitPts;
 }
 
 void CEquip::SetHitPoints(float Hit)
 {
-    // Retail 0x8d730 (ICF-folded): RET 4 — empty function body.
-    // Shared with ~18 other trivial functions via ICF folding.
-    // Base CEquip ignores SetHitPoints; subclasses like CAttachedEquip override.
+    // RVA 0x8d730 (an ICF-shared empty body).
     (void)Hit;
 }
 
@@ -279,7 +260,7 @@ bool CEquip::EnableController()
 
 bool CEquip::DisableController()
 {
-    // Common.dll.c 0x3ba00
+    // RVA 0x3ba00
     return false;
 }
 
@@ -297,20 +278,13 @@ bool CEquip::Update(float Dt, unsigned Flags)
 
 float CEquip::GetHitPoints() const
 {
-    // Common.dll.c 0x3af80 / raw asm: a pure tail-jump to vtable+0x38 (GetMaxHitPoints),
-    // no destroyed check at all -- confirmed via Common.dll.txt:110779-110780
-    // ("MOV EAX,[this]; JMP [EAX+0x38]"). The previous version of this port added an
-    // IsDestroyed() early-return that retail does not have; removed to match retail
-    // exactly (subclasses that need a destroyed-aware GetHitPoints already override it,
-    // e.g. CAttachedEquip::GetHitPoints, CECargo::GetHitPoints).
+    // RVA 0x3af80: a tail jump to the virtual GetMaxHitPoints; no destroyed check.
     return GetMaxHitPoints();
 }
 
 double CEquip::GetRelativeHealth() const
 {
-    // .text:0629af90-0629afc0: Max = vt+0x38 (FST float copy); FCOMP 0.0f, TEST AH,0x44 / JNP
-    // -> 0.0f only on equal (NaN divides); else vt+0x3c GetHitPoints FDIV the float Max, the
-    // quotient left unrounded in ST0.
+    // FUN_0629af90: the quotient is left unrounded in ST0; a NaN max divides.
     float const MaxHit = GetMaxHitPoints();
     if (MaxHit == 0.0f)
         return 0.0f;
@@ -324,9 +298,7 @@ bool CEquip::IsTemporary() const
 
 bool CEquip::CanDelete() const
 {
-    // Common.dll.c 0x3adc0: equipment attached to a solar (station/planet/etc, the only
-    // retail CObject::Class whose bits satisfy (class & 0x303) == 0x303 -- ClassSolar
-    // itself is literally 0x303) can never be deleted; everything else follows IsDestroyed().
+    // RVA 0x3adc0: equipment on a solar can never be deleted.
     if (Owner != nullptr && (Owner->ObjectClass & CObject::ClassSolar) == CObject::ClassSolar)
         return false;
     return IsDestroyed();
@@ -334,8 +306,7 @@ bool CEquip::CanDelete() const
 
 bool CEquip::IsLootable() const
 {
-    // .text:0629ade0..0629adff: lootable iff the archetype allows it (+0x6c, read with no Arch
-    // test) AND it maps to a real sellable Good (Arch2Good(Arch+8) != 0).
+    // FUN_0629ade0: the archetype allows it (no Arch test) and it maps to a Good.
     if (Arch->bLootable)
         return Arch2Good(Arch->get_id()) != 0;
     return false;
@@ -343,9 +314,7 @@ bool CEquip::IsLootable() const
 
 void CEquip::GetStatus(EquipStatus& OutStatus) const
 {
-    // .text:0629ae80..0629aec3: sets three independent bits of OutStatus.Flags (documented in
-    // common_iface.h next to the EquipStatus struct): bit1 = IsDestroyed (vtbl+0x8), bit0 =
-    // IsActive (vtbl+0x4), bit2 = IsDisabled (vtbl+0x10, slot 4). Order matches retail.
+    // FUN_0629ae80, in retail order.
     if (IsDestroyed())
         OutStatus.Flags |= EquipStatusFlagDestroyed;
     else
@@ -364,9 +333,7 @@ void CEquip::GetStatus(EquipStatus& OutStatus) const
 
 bool CEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) const
 {
-    // Common.dll.c 0xcc0c0: base default is unconditional `return false` (params unused).
-    // CExternalEquip::GetConnectionPosition (0x3ee00) overrides this with real joint/matrix
-    // lookup logic that is not yet ported.
+    // RVA 0xcc0c0
     (void)OutPos;
     (void)OutMatrix;
     return false;
@@ -374,33 +341,14 @@ bool CEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) const
 
 void CEquip::NotifyArchGroupDestroyed(unsigned short SubObjId)
 {
-    // Common.dll.txt 0x8d730. This retail vtable slot (??_7CEquip@@6B@+0x1c) is ICF-folded
-    // together with ~20 unrelated symbols (that fold's own XREF comment list names
-    // CEquip::NotifyArchGroupDestroyed explicitly). The folded target's actual raw bytes are a
-    // bare `RET 0x4`: a genuine empty no-op in retail's base implementation. Called by
-    // CEqObj::destroy_equipment on every equip when a DamageEntry targets an arch-group
-    // SubObjId; kept as a real virtual so a future override can hook it.
+    // RVA 0x8d730 (an ICF-shared empty body).
     (void)SubObjId;
 }
 
 bool CEquip::GetEquipDesc(EquipDesc& Desc) const
 {
-    // Common.dll.c 0x3ae10: bails out (returns false) if the equip is destroyed;
-    // otherwise fills in the fields CEquip itself knows about. Ghidra mistypes every
-    // field-fill call here (DamageList/CPlayerTradeOffer/CNudgeEngine make no sense for
-    // an equipment descriptor) because they're all ICF-folded with EquipDesc's own
-    // setters -- resolved via each callee's own tracker entry (raw asm Common.dll.txt
-    // 110520-110572): set_id->set_id(Id), set_cause(float)->set_status(GetRelativeHealth()),
-    // SetSourcePlayerID(Arch->get_id())->set_arch_id, SetOwner(1)->Count=1 (tracker id
-    // 14300: this exact ICF-shared dword-store-at-+0x14 body's sibling aliases list
-    // "EquipDesc::set_count"), set_destroyed(true)->set_equipped(true) (tracker id 13245:
-    // sibling alias "EquipDesc::set_equipped"). The final raw byte copy (EquipDesc+0x18
-    // = CEquip+0x12 bMission) is EquipDesc's own bMission field, confirmed by the mangled
-    // symbol for every override in this family (`AAUEquipDesc@@`, not some other type) and
-    // by CECargo::GetEquipDesc's identical +0x18 byte copy lining up with EquipDesc's
-    // bMission rather than any Owner field -- this port previously filled in a distinct,
-    // wrongly-laid-out "FEquipDesc" type here that does not match retail at all.
-    // .text:0629ae10..0629ae6f in retail call order; Arch is read with no null test (0629ae44).
+    // RVA 0x3ae10, in retail call order; no Arch null test. Ghidra names the setters after
+    // unrelated ICF-shared bodies (DamageList, CPlayerTradeOffer...); they are EquipDesc's own.
     if (IsDestroyed())
         return false;
     Desc.set_id(Id);
@@ -424,22 +372,20 @@ unsigned short CEquip::GetID() const
 
 Archetype::Equipment const* CEquip::EquipArch() const
 {
-    // Listing 0x3fb90: MOV EAX,[ECX+0xc]; RET.
+    // RVA 0x3fb90
     return Arch;
 }
 
 CEqObj* CEquip::GetOwner() const
 {
-    // Listing 0x71ad0: MOV EAX,[ECX+0x4]; RET.
+    // RVA 0x71ad0
     return Owner;
 }
 
 char const* CEquip::IdentifyEquipment() const
 {
-    // Listing 0x0629b040..0x0629b085: clear byte 0 of the 0x40-byte .data buffer DAT_063fc198,
-    // then sprintf "ID(0x%X) EQ_ID(0x%X) EQ_ARCH(%s)" with [Owner+0xb0], the zero-extended
-    // +0x08 id and Arch nickname; no null guards. Retail's sprintf can run past the 0x40 bytes
-    // for a long nickname (UB into the next .data object); the port truncates at 0x40 instead.
+    // FUN_0629b040; no null guards. Deviation: retail's sprintf can overrun the 0x40-byte
+    // buffer for a long nickname; the port truncates.
     GIdentifyEquipmentBuf[0] = '\0';
     _snprintf(GIdentifyEquipmentBuf, sizeof(GIdentifyEquipmentBuf), "ID(0x%X) EQ_ID(0x%X) EQ_ARCH(%s)",
               Owner->Id, (unsigned)(Id), Arch->Nickname.get_string());
@@ -464,8 +410,7 @@ CInternalEquip::~CInternalEquip()
 
 bool CInternalEquip::GetEquipDesc(EquipDesc& Desc) const
 {
-    // Common.dll.c 66784-66792 (listing 0x3f300): fill in the base descriptor, then flag it
-    // as internal (retail EquipDesc::make_internal).
+    // RVA 0x3f300
     bool Result = CEquip::GetEquipDesc(Desc);
     Desc.make_internal();
     return Result;
@@ -473,8 +418,7 @@ bool CInternalEquip::GetEquipDesc(EquipDesc& Desc) const
 
 CInternalEquip* __cdecl CInternalEquip::cast(CEquip* Equip)
 {
-    // Common.dll.c 66799-66808 (0x3f320): null-check + type & 0x1ff0000 (all internal-equip
-    // subtype bits: Cargo/Engine/Power/Scanner/Tractor/RepairDroid/InternalFX/TradeLane/Armor).
+    // RVA 0x3f320
     if (Equip == nullptr || (Equip->GetType() & kInternalEquipMask) == 0)
         return nullptr;
     return (CInternalEquip*)(Equip);
@@ -499,10 +443,7 @@ CExternalEquip::CExternalEquip(CExternalEquip const& Other)
     , HardpointName(Other.HardpointName)
     , ConnectionIndex(Other.ConnectionIndex)
 {
-    // Common.dll.c 54839 (0x32800): plain field-by-field copy re-stamping the vtable at
-    // each base level (CEquip::_vftable_ then this class's own) -- ordinary MSVC
-    // base-then-derived copy-ctor codegen, reproduced here via CEquip(Other)'s own
-    // (compiler-generated) memberwise copy plus this level's two fields.
+    // RVA 0x32800
 }
 
 CExternalEquip::~CExternalEquip()
@@ -511,8 +452,7 @@ CExternalEquip::~CExternalEquip()
 
 bool CExternalEquip::GetEquipDesc(EquipDesc& Desc) const
 {
-    // Common.dll.c 66330-66339 (listing 0x3ed30): fill in the base descriptor, then stamp
-    // this equip's hardpoint name over whatever the base left there.
+    // RVA 0x3ed30
     bool Result = CEquip::GetEquipDesc(Desc);
     Desc.set_hardpoint(HardpointName);
     return Result;
@@ -520,8 +460,7 @@ bool CExternalEquip::GetEquipDesc(EquipDesc& Desc) const
 
 bool CExternalEquip::IsDestroyed() const
 {
-    // Common.dll.c 66343-66356 (0x3ed60). Gates on IsConnected() [vtable+0x58]. An unconnected
-    // equip is treated as destroyed; otherwise returns the plain CEquip::bDestroyed flag.
+    // RVA 0x3ed60: an unconnected equip counts as destroyed.
     if (!IsConnected())
         return true;
     return bDestroyed != 0;
@@ -529,14 +468,13 @@ bool CExternalEquip::IsDestroyed() const
 
 bool CExternalEquip::IsConnected() const
 {
-    // Listing 0x3ed80: GetParentConnector(false) != -1.
+    // RVA 0x3ed80
     return GetParentConnector(false) != kInvalidEngineInstance;
 }
 
 long CExternalEquip::GetParentConnector(bool bSearch) const
 {
-    // Listing 0x0629eed0..0x0629ef53. false -> +0x24. true -> exported FindHardpoint(owner
-    // instance, +0x20 name, &Hit) with Hit preset to -1; a miss warns and returns Hit as left.
+    // FUN_0629eed0: a search miss warns and returns the hit as FindHardpoint left it.
     if (!bSearch)
         return ConnectionIndex;
     long HitInst = -1;
@@ -552,15 +490,8 @@ long CExternalEquip::GetParentConnector(bool bSearch) const
 
 bool CExternalEquip::GetHardPointInfo(HardpointInfo& Info) const
 {
-    // Common.dll.c 66517-66538 (raw 0629ef60-0629efdd, listing 0x3ef60). Unlike FindHardpointOs
-    // above (the shared recursive search), this is a flat, single-level query: it converts this
-    // equip's own ConnectionIndex to an engine handle (IEngine+0x64), looks up HardpointName
-    // against that handle only (IHardpoint+0x0C, no child recursion on a miss), then
-    // unconditionally releases the handle (IEngine+0x3C) regardless of whether the lookup hit --
-    // all three steps confirmed against the raw instruction trace, which also confirmed retail
-    // does NOT null/validity-check the intermediate handle before using it (matched here).
-    // .text:0629ef60..0629efdd: vtbl+0x64 GetParentConnector(false) is called twice (test, then
-    // the argument); DALib::Engine / DALib::Hardpoint are used with no null test.
+    // FUN_0629ef60: a flat lookup on the connector's archetype (no child recursion, unlike
+    // FindHardpoint_OS). GetParentConnector is called twice; no null or handle tests.
     if (GetParentConnector(false) == kInvalidEngineInstance)
         return false;
 
@@ -578,24 +509,10 @@ bool CExternalEquip::GetHardPointInfo(HardpointInfo& Info) const
 
 bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) const
 {
-    // Common.dll.c 66423-66478 (raw 0629ee00-0629eecb, listing 0x3ee00). Traced instruction-by-
-    // instruction from the .txt listing -- the decompiled C for this function is corrupted
-    // (spurious unaff_EBX/EBP/ESI locals, implausible auStack_* sizes) and was not trusted.
-    // Sequence: IsConnected() [vtable+0x58], then GetHardPointInfo(Buf) [vtable+0x68] into a
-    // local HardpointInfo, then the connector instance's world Transform via IEngine+0xA0
-    // (same slot as common_hardpointsummary.cpp's EngineGetTransform / EngBase's EngineGetInstanceTransform),
-    // then the 3DMathEngine singleton's slot 0x28 (FnTransformXform, already established at
-    // common_ceqobj.cpp's get_explosion_dmg_bounding_sphere: world = Xform * Buf.Position) and
-    // slot 0x20 (FnMulMatrix, already established at the former common_cobject.cpp's
-    // get_docking_point_offset -- CEqObj code, now common_ceqobj.cpp: world = A * B) fill OutPos/OutMatrix respectively -- the matrix
-    // call's "A" operand is the Transform's own leading 3x3 read as a plain Matrix (Transform's
-    // Rotation field sits at offset 0, so this is a safe reinterpret, not a layout guess).
-    // Return value is exactly GetHardPointInfo's own result; OutPos/OutMatrix are each optional
-    // and only filled when non-null (retail never null-checks the Transform pointer itself
-    // before using it, so neither does this port).
-    // .text:0629ee00..0629eecb: DALib::Engine and the cached 3DMathEngine (DAT_063fc23c,
-    // FUN_06391cf0 on first use) are used with no null test; each result goes into a stack
-    // temporary and is then copied out. Buf is not initialised (GetHardPointInfo fills it).
+    // FUN_0629ee00 (reconstructed from the listing; Ghidra's output is corrupted). The
+    // hardpoint through the connector's world transform; the matrix operand is the transform's
+    // leading 3x3. The outputs are optional; no null tests on the engine, the transform or the
+    // math engine (DAT_063fc23c).
     if (!IsConnected())
         return false;
 
@@ -610,7 +527,7 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
     {
         FVector Pos;
         Acquire3DMathEngine()->TransformXform(Pos, *(FTransform const*)XformPtr,
-                                              (FVector const&)(Buf.Position)); // +0x28
+                                              (FVector const&)(Buf.Position));
         *(FVector*)OutPos = Pos;
     }
 
@@ -618,7 +535,7 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
     {
         FMatrix Rot;
         Acquire3DMathEngine()->MulMatrix(Rot, *(FMatrix const*)XformPtr,
-                                         (FMatrix const&)(Buf.Orient)); // +0x20
+                                         (FMatrix const&)(Buf.Orient));
         *(FMatrix*)OutMatrix = Rot;
     }
 
@@ -627,10 +544,7 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
 
 bool CExternalEquip::GetVelocity(Vector& Out) const
 {
-    // Common.dll.c 66542-66563 (raw 0629efe0, listing 0x3efe0). Zero Out, then when connected
-    // [vtable+0x58] copy Owner->get_velocity() over it (no null-check on Owner, matching retail --
-    // Owner is always set by the CEquip ctor). Retail hardcodes the return to false regardless of
-    // outcome; reproduced as-is (a genuine retail quirk, not a porting bug).
+    // FUN_0629efe0. Retail quirk: always returns false. No Owner null test.
     Out.x = 0.0f;
     Out.y = 0.0f;
     Out.z = 0.0f;
@@ -641,16 +555,10 @@ bool CExternalEquip::GetVelocity(Vector& Out) const
 
 bool CExternalEquip::GetCenterOfMass(Vector& Out) const
 {
-    // Common.dll.c 66567-66590 (raw 0629f030, listing 0x3f030). Zero Out, then when connected
-    // [vtable+0x58] fetch this equip's own ConnectionIndex (GetParentConnector(false),
-    // vtable+0x64) and query DALib::Engine's own vtable+0x90 (world-position getter, same slot as
-    // common_misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition's +0xa0
-    // sibling) for that connector instance's world position. Retail hardcodes the return to false
-    // regardless of outcome, matching GetVelocity above.
+    // FUN_0629f030: the connector's world position. Retail quirk: always returns false.
     Out.x = 0.0f;
     Out.y = 0.0f;
     Out.z = 0.0f;
-    // .text:0629f05b..0629f07d: DALib::Engine used with no null test.
     if (IsConnected())
     {
         long const ConnIdx = GetParentConnector(false);
@@ -664,7 +572,7 @@ bool CExternalEquip::GetCenterOfMass(Vector& Out) const
 
 bool CExternalEquip::Connect(char const* HpName)
 {
-    // Listing 0x3eda0: StringAlloc, GetParentConnector(true) → +0x24.
+    // RVA 0x3eda0
     HardpointName.Value = StringAlloc(HpName, false);
     ConnectionIndex = (int)(GetParentConnector(true));
     if (ConnectionIndex == kInvalidEngineInstance)
@@ -688,13 +596,13 @@ void CExternalEquip::Destroy()
 
 CacheString CExternalEquip::GetParentHPName() const
 {
-    // Common.dll.c 0x327f0: struct-return copy of HardpointName.
+    // RVA 0x327f0
     return HardpointName;
 }
 
 bool CExternalEquip::Update(float Dt, unsigned Flags)
 {
-    // Common.dll.c 0x3ed20. Pure passthrough to CEquip::Update.
+    // RVA 0x3ed20
     return CEquip::Update(Dt, Flags);
 }
 
@@ -772,12 +680,8 @@ CEquipManager::CEquipManager(CEquipManager const& Other)
 
 CEquipManager& CEquipManager::operator=(CEquipManager const& Other)
 {
-    // Common.dll.c 0x270d0: reuses nodes in place while both lists overlap, then either erases
-    // the destination's remaining tail or appends the source's remaining tail -- exactly what
-    // std::list<T>::operator= already does, so delegating to it is a faithful high-level port.
-    // .text:062870d0..062871f2: +0 copied, each list assigned unless it is the same object
-    // (the +4/+0x10 allocator bytes are not copied; the counts follow the list sizes), +0x1c
-    // copied. A self-assignment is therefore a no-op, as the early return below.
+    // RVA 0x270d0: VC6 list assignment (std::list::operator= here); the allocator bytes are not
+    // copied, and a self-assignment is a no-op.
     if (this == &Other)
         return *this;
 
@@ -810,10 +714,8 @@ bool CEquipManager::Init(CEqObj* OwnerObj)
 
 bool CEquipManager::AddNewEquipment(CEquip* Equip)
 {
-    // .text:0629b210..0629b2a7: no Equip null test; type & 0xc10003 picks the internal list
-    // (+0x10), else the external one (+0x04); a cargo stack (type == 0x10000) whose
-    // GetDecayDamagePerSecond() is not 0.0 (FCOMP, TEST AH,0x44 / JNP skips only on equal)
-    // bumps +0x1c. Always true.
+    // FUN_0629b210: no Equip null test; a decaying cargo stack (NaN counts) bumps the decay
+    // count. Always true.
     if ((Equip->GetType() & kInternalListMask) == 0)
     {
         External->push_back(Equip);
@@ -833,8 +735,7 @@ bool CEquipManager::AddNewEquipment(CEquip* Equip)
 
 void CEquipManager::Clear()
 {
-    // Listing 0x3b2b0 inlines the static Clear(list&) below for Internal, then External, then
-    // zeroes +0x1c. The lists are owned by the manager (allocated in every constructor).
+    // RVA 0x3b2b0: the static Clear(list&) inlined, internal list first.
     Clear(*Internal);
     InternalCount = 0;
     Clear(*External);
@@ -844,8 +745,7 @@ void CEquipManager::Clear()
 
 void __cdecl CEquipManager::Clear(std::list<CEquip*>& List)
 {
-    // Listing 0x3b860: null each slot and delete its equipment (scalar deleting destructor),
-    // then unlink every node.
+    // RVA 0x3b860: null each slot and delete its equipment, then unlink every node.
     std::list<CEquip*>::iterator It = List.begin();
     for (; It != List.end(); ++It)
     {
@@ -858,9 +758,8 @@ void __cdecl CEquipManager::Clear(std::list<CEquip*>& List)
 
 int CEquipManager::CleanUp()
 {
-    // Listing 0x3b380: CleanUp(Internal list) then CleanUp(External list), summed. In retail
-    // the counts are the lists' own size fields, which the private overload decrements as it
-    // unlinks; this port keeps them as separate fields and adjusts them here.
+    // RVA 0x3b380. In retail the counts are the lists' own size fields; the port keeps them
+    // separate and adjusts them here.
     int InternalRemoved = CleanUp(*Internal);
     int ExternalRemoved = CleanUp(*External);
     InternalCount -= (unsigned)(InternalRemoved);
@@ -870,9 +769,7 @@ int CEquipManager::CleanUp()
 
 int CEquipManager::CleanUp(std::list<CEquip*>& List)
 {
-    // Listing 0x3b8c0: for each item whose CanDelete() (vtable+0x18) holds -- a decaying cargo
-    // stack (Type == 0x10000 and GetDecayDamagePerSecond() != 0) first decrements
-    // DecayingCargoCount -- unlink the node, then delete the equipment. Returns the count.
+    // RVA 0x3b8c0: unlink, then delete, every deletable item.
     int Removed = 0;
     std::list<CEquip*>::iterator It = List.begin();
     while (It != List.end())
@@ -900,33 +797,32 @@ int CEquipManager::Size() const
 
 bool CEquipManager::HasDecayingCargo() const
 {
-    // Common.dll.c 0x26fa0: return 0 < *(int*)(this+0x1c);
+    // RVA 0x26fa0
     return DecayingCargoCount > 0;
 }
 
 CEquip* CEquipManager::FindFirst(unsigned TypeMask)
 {
-    // Listing 0x3b720 (both overloads): a {TypeMask, false, 0} traverser and one Traverse.
+    // RVA 0x3b720 (both overloads).
     CEquipTraverser Walk((int)(TypeMask));
     return Traverse(Walk);
 }
 
 CEquip const* CEquipManager::Traverse(CEquipTraverser& Walk) const
 {
-    // Listing 0x3b430: JMP to the non-const Traverse.
+    // RVA 0x3b430
     return const_cast<CEquipManager*>(this)->Traverse(Walk);
 }
 
 CEquip const* CEquipManager::ReverseTraverse(CEquipTraverser& Walk) const
 {
-    // Listing 0x3b530: JMP to the non-const ReverseTraverse.
+    // RVA 0x3b530
     return const_cast<CEquipManager*>(this)->ReverseTraverse(Walk);
 }
 
 CEquip const* CEquipManager::FindFirst(unsigned TypeMask) const
 {
-    // Traverse walks the manager's own lists and is not const; retail's FindFirst is declared
-    // const anyway (QBE), so the cast is retail's own const-correctness gap, not ours.
+    // Retail declares this const although Traverse is not.
     CEquipTraverser Walk((int)(TypeMask));
     return const_cast<CEquipManager*>(this)->Traverse(Walk);
 }
@@ -965,7 +861,6 @@ CEquip* CEquipManager::Traverse(CEquipTraverser& Walk)
         case 3:
             break;
         default:
-            // .text:0629b466 JA -> 0629b509: State = 0, null.
             Walk.State = 0;
             return nullptr;
         }
@@ -993,7 +888,8 @@ CEquip* CEquipManager::Traverse(CEquipTraverser& Walk)
 
 CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
 {
-    // Common.dll.c 0x3b540: retail's own guard is OR (not Traverse's AND) -- reproduced as-is.
+    // RVA 0x3b540. Retail quirk: the guard is OR, not Traverse's AND, so a manager with only
+    // one list never reverse-traverses.
     if (ExternalCount == 0 || InternalCount == 0)
         return nullptr;
 
@@ -1026,7 +922,6 @@ CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
         case 1:
             break;
         default:
-            // .text:0629b56a JA -> 0629b615: State = 0, null.
             Walk.State = 0;
             return nullptr;
         }
@@ -1054,9 +949,7 @@ CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
 
 CExternalEquip* CEquipManager::FindByHardpoint(CacheString const& Hardpoint)
 {
-    // Listing 0x3b640: traverse with mask 0x1fe3 (every external type) and return the first
-    // equip whose GetParentHPName() (vtable+0x60) matches Hardpoint by stricmp; null once the
-    // traversal runs out. Retail neither casts nor null-checks the names.
+    // RVA 0x3b640. Retail neither casts nor null-checks the names.
     CEquipTraverser Walk((int)(kExternalEquipMask));
     for (;;)
     {
@@ -1064,21 +957,20 @@ CExternalEquip* CEquipManager::FindByHardpoint(CacheString const& Hardpoint)
         if (Equip == nullptr)
             return nullptr;
         CExternalEquip* Ext = (CExternalEquip*)(Equip);
-        if (CallDacomStricmp(Ext->GetParentHPName().Value, Hardpoint.Value) == 0)   // 0629b697
+        if (CallDacomStricmp(Ext->GetParentHPName().Value, Hardpoint.Value) == 0)
             return Ext;
     }
 }
 
 CExternalEquip const* CEquipManager::FindByHardpoint(CacheString const& Hardpoint) const
 {
-    // Listing 0x3b640: the same body as the non-const overload.
+    // RVA 0x3b640 (shared).
     return const_cast<CEquipManager*>(this)->FindByHardpoint(Hardpoint);
 }
 
 CEquip* CEquipManager::FindByID(unsigned short EquipId)
 {
-    // .text:0629b6d0..0629b713: external list, then internal list; the payload's +0x08 word is
-    // compared with no null test.
+    // FUN_0629b6d0: external list first; no null test of the payloads.
     std::list<CEquip*>::iterator It = External->begin();
     for (; It != External->end(); ++It)
     {
@@ -1095,16 +987,13 @@ CEquip* CEquipManager::FindByID(unsigned short EquipId)
 
 CEquip const* CEquipManager::FindByID(unsigned short EquipId) const
 {
-    // Common.dll.c 0x3b6c0
+    // RVA 0x3b6c0
     return const_cast<CEquipManager*>(this)->FindByID(EquipId);
 }
 
 unsigned short CEquipManager::InstToSubObjID(long Instance) const
 {
-    // .text:0629b3a0..0629b428: -1 -> SUBOBJ_ID_NONE; otherwise a {0x1fe0, false} traversal
-    // (CAttachedEquip types only) asking each equip vtbl+0x80 = CAttachedEquip::IsInstOnEquip
-    // (Instance) -- root instance or any descendant of it; the first hit's Id, else
-    // SUBOBJ_ID_NONE. The equip is not cast-checked (the mask guarantees the type).
+    // FUN_0629b3a0: the first attached equip whose instance tree holds Instance.
     if (Instance == -1)
         return SUBOBJ_ID_NONE;
 
@@ -1121,17 +1010,16 @@ unsigned short CEquipManager::InstToSubObjID(long Instance) const
 
 bool CEquipManager::VerifyListSync(EquipDescList const& Other) const
 {
-    // Common.dll.c 0x3b750, phase 1: every desc in Other must have a live matching equip.
+    // RVA 0x3b750, phase 1: every desc in Other must have a live matching equip.
     for (EquipDesc const& Desc : Other.Items)
     {
         CEquip const* Equip = FindByID(Desc.Id);
         if (Equip == nullptr)
             return false;
-        // 0629b788: Arch (+0xc) read with no null test, its +8 id against desc+4.
+        // No Arch null test.
         if (Desc.ArchId != Equip->Arch->Nickname.Id)
             return false;
-        // 0629b797..0629b7b6: |Health - GetRelativeHealth()| on the FPU stack, FCOMP the double
-        // 0.001 (.rdata:0639c9f0), TEST AH,0x5 / JP -> false when not less or unordered.
+        // Unrounded against 0.001 (DAT_0639c9f0); NaN fails.
         double const HealthDiff =
             fabs((double)Desc.Health - Equip->GetRelativeHealth());
         if (!(HealthDiff < 0.001))
@@ -1139,7 +1027,7 @@ bool CEquipManager::VerifyListSync(EquipDescList const& Other) const
         // Retail computes this stricmp but never checks its result -- reproduced verbatim.
         CExternalEquip const* Ext = CExternalEquip::cast(const_cast<CEquip*>(Equip));
         if (Ext != nullptr)
-            CallDacomStricmp(Desc.Hardpoint, Ext->GetParentHPName().Value); // vtbl+0x60 0629b7d2, DACOM stricmp 0629b7dc
+            CallDacomStricmp(Desc.Hardpoint, Ext->GetParentHPName().Value);
     }
 
     // Phase 2: every live equip that reports a GetEquipDesc() must appear somewhere in Other.

@@ -11,12 +11,10 @@
 //
 // RTTI .?AVNN_Repair@@ : WinControl, Event::Handler. operator_new(0x494) (0x004b48ba).
 // WINFACTORY<NN_Repair> DAT_00672210 "NN_Repair": static init LAB_004b2ba0 (ctor FUN_004b4830,
-// atexit LAB_004b2bc0 -> FUN_00579380); Create FUN_004b48a0 (operator_new, WinControl's ctor
-// FUN_0059f860, the members and vptrs inlined, the class-name pointer, slot 9; a failed Create
-// is followed by the scalar deleting destructor). FUN_004b4830 is the WINFACTORY ctor inlined
-// for this type (name clamped to 31, FUN_0059dab0, vftable 0x005d5434).
+// atexit LAB_004b2bc0 -> FUN_00579380; FUN_004b4830 is the WINFACTORY ctor inlined, vftable
+// 0x005d5434); Create FUN_004b48a0 (the ctor inlined).
 //
-// vftable 0x005d51e4 -- WinControl's with these overrides (raw dword dump):
+// vftable 0x005d51e4 -- WinControl's with these overrides:
 //   0 FUN_004b2bf0 scalar deleting dtor (FUN_004b2c10), 9 FUN_004b2c90 Create, 11 LAB_004b4670
 //   Update, 13 FUN_004b43b0 Draw, 42 LAB_004b3530 SetProperty.
 // IDataViewOwner face +0x7c: vftable 0x005d51d4 (WinControl's).
@@ -39,8 +37,7 @@
 
 class UiScroll;
 
-// One row of the list, 0x20 bytes (the vector's stride; PopulateList 0x004b3a5c..0x004b3a9c,
-// 0x004b3b0f..0x004b3b54, 0x004b3cd1..0x004b3d2a builds it on the stack).
+// One row of the list, 0x20 bytes (the vector's stride; PopulateList builds it on the stack).
 struct FRepairItem
 {
     int Kind;                   // +0x00 0 hull, 1 collision group, 2 equipment
@@ -62,7 +59,7 @@ static_assert(offsetof(FRepairItem, bSelected) == 0x1c, "FRepairItem +0x1c");
 class NnRepair : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_004b48a0 (0x004b48dc..0x004b4944).
+    // Inlined into FUN_004b48a0 (0x004b48dc).
     NnRepair();
     // FUN_004b2c10 (FUN_004b2bf0 the scalar deleting wrapper).
     ~NnRepair() override;
@@ -85,7 +82,7 @@ public:
 
     // FUN_004b4510 (cdecl) -- whether anything of the player's ship is damaged: the hull, a
     // collision group, or an item (other than hp class 1) whose health is not 1. Callers: the
-    // unported 0x0043e050 (0x0043e0c8), 0x0043e1b0 and 0x0043e570 (0x0043e59d).
+    // NavBar (0x0043e0c8, 0x0043e1b0, 0x0043e59d; nav_bar.cpp).
     static bool PlayerNeedsRepair();
 
     std::vector<FRepairItem> Items;      // +0x330 (retail: allocator byte, +0x334 first,
@@ -113,8 +110,8 @@ public:
     float HealthScale;                   // +0x490 FUN_004c4f70 when the list was built
 
 private:
-    // The tail every close shares (e.g. 0x004b362b..0x004b3656): FUN_0043d2a0 on every child
-    // (the next sibling read first), slot 10, then slot 0 with 1.
+    // Port-only helper for the tail every close shares (e.g. 0x004b362b): delete the children,
+    // Destroy, delete this.
     void DeleteSelf();
     // FUN_004b39b0 -- the list rebuilt from the player's hull, collision groups and equipment,
     // and the scroll range.
@@ -123,14 +120,12 @@ private:
     void RefreshRows();
     // FUN_004b40d0 -- pay for the checked items and ask the server to repair them.
     void DoRepair();
-    // The checked items' cost, inlined at 0x004b36c3, 0x004b38eb, 0x004b40f1, 0x004b43c1 and
-    // 0x004b46ec (the loop walks `index < size` and adds +0x0c where +0x1c is set).
+    // Port-only helper: the checked items' cost, inlined at 0x004b36c3, 0x004b38eb, 0x004b40f1,
+    // 0x004b43c1 and 0x004b46ec.
     int SelectedTotal() const;
-    // swprintf(L"%d", SelectedTotal()) into TotalCost with 0x1d (0x004b3921..0x004b3948,
-    // 0x004b4722..0x004b4747).
+    // Port-only helper, inlined at 0x004b3921 and 0x004b4722.
     void ShowTotalCost();
-    // FormatGroupedNumber(credits, 0x476) into PlayerCash with 0x1d (0x004b34c2..0x004b34f1,
-    // 0x004b42b7..0x004b42e0, 0x004b474d..0x004b4776).
+    // Port-only helper, inlined at 0x004b34c2, 0x004b42b7 and 0x004b474d.
     void ShowPlayerCash();
 
     NnRepair(NnRepair const&) = delete;

@@ -11,8 +11,7 @@
 #include "dalib_net.h"
 #include "CDPNetCodec.h"
 
-// .data:065ca120 is seeded at DLL load by the static initializer LAB_065c19c0 (__xc table entry
-// .data:065ca004): CALL timeGetTime; MOV [065ca120],EAX.
+// .data:065ca120, seeded with timeGetTime() at DLL load by the static initializer LAB_065c19c0.
 unsigned long CDPClient::m_dwLastMsgReceivedTime = timeGetTime();
 unsigned long CDPClient::m_dwPingSendTime = 0;
 unsigned long CDPClient::m_dwPingReceiveTime = 0;
@@ -84,10 +83,9 @@ CDPClient::~CDPClient()
     PendingConnectAttempts.clear();
 }
 
-// Copy ctor @ 0x2ec0 / operator= @ 0x3030 are the compiler's memberwise members -- implicit in
-// src/include/dalib_net.h, not defined here.
+// Copy ctor @ 0x2ec0 / operator= @ 0x3030 are the compiler's memberwise members (implicit).
 
-// Retail .text:065c22e0: MOV EAX,[ECX+0x4]; RET.
+// Retail .text:065c22e0.
 IDirectPlay8Client* CDPClient::GetClient()
 {
     return Client;
@@ -294,25 +292,25 @@ bool CDPClient::EnumerateHost(const wchar_t* HostAddress, unsigned long Port, un
     return true;
 }
 
-// Retail .text:065c2bc0: MOV EAX,[m_dwLastMsgReceivedTime]; RET.
+// Retail .text:065c2bc0.
 unsigned long CDPClient::GetLastMsgTimestamp()
 {
     return m_dwLastMsgReceivedTime;
 }
 
-// Retail .text:065c2c40: CMP ReceiveCount,SendCount; SBB; NEG -- ReceiveCount < SendCount.
+// Retail .text:065c2c40.
 bool CDPClient::IsPingOutstanding()
 {
     return m_dwPingReceiveCount < m_dwPingSendCount;
 }
 
-// Retail .text:065c2c50: MOV [m_dwSourcePort],[ESP+4]; RET.
+// Retail .text:065c2c50.
 void CDPClient::SetSourcePort(unsigned long Port)
 {
     m_dwSourcePort = Port;
 }
 
-// Retail .text:065c2c60: MOV EAX,[m_dwLinkQuality]; RET.
+// Retail .text:065c2c60.
 unsigned long CDPClient::GetLinkQuality()
 {
     return m_dwLinkQuality;
@@ -335,9 +333,8 @@ unsigned long CDPClient::GetPingDelay()
     return Elapsed;
 }
 
-// Retail DALib.dll.c CDPClient::GetSendQueueSize @ 0x2c10 — see header comment: the decompiled C
-// return value (the client pointer) is a decompiler artifact; ported as the real disassembled
-// behavior (the message count from GetSendQueueInfo).
+// Retail DALib.dll.c CDPClient::GetSendQueueSize @ 0x2c10. Returns the GetSendQueueInfo message
+// count; the decompiled C's client-pointer return value is a decompiler artifact.
 unsigned long CDPClient::GetSendQueueSize()
 {
     if (GActiveClient == nullptr || GActiveClient->Client == nullptr)
@@ -576,8 +573,7 @@ void CDPClient::DispatchMsgs(unsigned long TimeoutMs)
             break;
         case kMsgEnumHostsResponse:
         {
-            // .text:065c1ff8: OnAddHost, then Release the AddRef'd sender address and free the
-            // session name, the application desc, the response data (if any) and the copy.
+            // .text:065c1ff8
             DPNMSG_ENUM_HOSTS_RESPONSE* const Response = (DPNMSG_ENUM_HOSTS_RESPONSE*)(Msg->Data);
             OnAddHost(Response);
             Response->pAddressSender->Release();
@@ -595,5 +591,5 @@ void CDPClient::DispatchMsgs(unsigned long TimeoutMs)
     }
     WorkingMsgs.Unlock();
 
-    (void)TimeoutMs; // retail's DispatchMsgs(param_1) never consumes its own timeout parameter either
+    (void)TimeoutMs; // unused in retail too
 }

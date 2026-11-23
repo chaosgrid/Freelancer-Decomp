@@ -5,7 +5,6 @@
 // Author: Giperion.
 
 // Client equipment-FX — EquippedObj factory + FlashLight light arm.
-// Agent: cursor:equip-fx-factory.
 
 #include "Space/Effects/client_equip_fx.h"
 
@@ -85,8 +84,7 @@ namespace
     };
     static_assert(sizeof(FCliEQLightView) == 0x98 - 0x54, "CliEQLight tail +0x54..+0x98");
 
-    // Every reader dereferences the companion without a test (0x004fda41, 0x004fdb3b,
-    // 0x004fddc4, 0x004fe06b).
+    // Every reader dereferences the companion without a test.
     FCliEQLightView const* CompanionAsLight(Archetype::ICliObj* Companion)
     {
         return reinterpret_cast<FCliEQLightView const*>(
@@ -105,9 +103,9 @@ namespace
     //   0 LAB_004f7ab0  Effect base start (EffectBaseStart)
     //   1 FUN_004f7bd0  Effect base kill (EffectKill)
     //   2 LAB_004fe040  world position out, radius back
-    //   3 0x0053e4a0    empty, RET 4 (ICF fold)
+    //   3 0x0053e4a0    empty (a shared folded stub)
     //   4 LAB_004fd990  Flags +8 bit 0
-    //   5 LAB_004fdcf0  clear bit 0, return the old bit 0 (RET 8)
+    //   5 LAB_004fdcf0  clear bit 0, return the old bit 0
     //   6 FUN_004fdd00  blink tick
     //   7 LAB_004fdfe0  FLASHLIGHTS gate, then the flare FUN_004fdda0
     //   8 FUN_004fd9a0  scalar deleting dtor (body FUN_004fd920, free 0x9c)
@@ -173,14 +171,12 @@ namespace
         return *reinterpret_cast<int*>(Base + 0xc8);
     }
 
-    // FUN_00534240 — Host vt+0x1c0 Ignite (NOT FUN_005340b0 which is +0x1a0).
-    // Params (RET 0x14): SourceId, ID_String const* FuseId, SubObjId, AtT, OverrideLifetime.
-    // Published as HostIgniteFuse (end of file); FClientEquippedObj::LightFuse runs it.
+    // FUN_00534240 — the host's Ignite slot (+0x1c0; NOT FUN_005340b0 at +0x1a0). Published as
+    // HostIgniteFuse (end of file); FClientEquippedObj::LightFuse runs it.
     bool HostIgniteFuseImpl(FClientGameobj* Host, unsigned SourceId, ID_String const& FuseId,
                             unsigned short SubObjId, float AtT, float OverrideLifetime)
     {
-        // 0053425e-005342a5: walk the burn list; the first node whose fuse nickname
-        // (node+0xc = ClientFuse+4) matches is ignited and the walk stops (BL test at loop top).
+        // The first burn-list node whose fuse nickname matches is ignited and the walk stops.
         FFuseBurnNode* Sentinel = HostFuseSentinelRef(Host);
         for (FFuseBurnNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         {
@@ -191,20 +187,17 @@ namespace
             }
         }
 
-        // 005342ab-005342ca: find the prototype in the exe fuse database.
         ClientFuse* Proto = ClientFuseDB::Find(FuseId.Id);
         if (Proto == nullptr)
         {
-            // 00534391-005343b4.
             FDUMP(0x100002, "%s(%d) : *** WARNING: Fuse(%s) not found in FuseDB. Aborting.",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\EquippedObj.cpp", 0x2b8,
                   FuseId.get_string());
             return false;
         }
 
-        // 005342d0-0053431c: copy-construct a temporary ClientFuse (Fuse copy ctor clones the
-        // actions, +0x34 host copied), push_back a copy of it (FUN_00535a20: node before the
-        // sentinel, size++), destroy the temporary.
+        // A temporary copy of the prototype (the Fuse copy ctor clones the actions), pushed back
+        // as a copy of it (FUN_00535a20), then destroyed.
         {
             ClientFuse Temp(*Proto);
             FFuseBurnNode* NewNode = new FFuseBurnNode{Sentinel, Sentinel->Prev, Temp};
@@ -213,11 +206,11 @@ namespace
             HostFuseCountRef(Host) = HostFuseCountRef(Host) + 1;
         }
 
-        // 00534322-00534389: all on the new last node.
+        // All on the new last node.
         ClientFuse& Live = Sentinel->Prev->Live;
         Live.BindHost(Host);
         Live.RandomizeActions();
-        // FCOMP DAT_005c7500 (-1.0f); TEST AH,0x44; JNP skip -> call unless equal.
+        // Unless exactly -1.0f (DAT_005c7500).
         if (OverrideLifetime != -1.0f)
             Live.OverrideLifetime(OverrideLifetime);
         Live.IgniteAt(SourceId, SubObjId, AtT);
@@ -242,19 +235,19 @@ namespace
     // Slot 2 (Update) is the base's FUN_00532000.
     struct FCliLightEquipFx : FClientEquip
     {
-        // FUN_00531b40 (thiscall, RET 8).
+        // FUN_00531b40.
         FCliLightEquipFx(CEquip* EquipParam, FClientGameobj* HostParam);
         // FUN_005323c0.
         ~FCliLightEquipFx() override;
 
-        // FUN_00531c20 (RET 8).
+        // FUN_00531c20.
         void notify(Event Code, void* Param) override;
-        // FUN_00531cf0 (thiscall, no arguments): a new CliEquipLight on the hardpoint, taken into
-        // Companion and the host's effect list.
+        // FUN_00531cf0: a new CliEquipLight on the hardpoint, taken into Companion and the
+        // host's effect list.
         unsigned char Activate();
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*}; only
-        // the effect slot is ever filled here (the CliEquipLight, 0x00531e11).
+        // the effect slot is ever filled here (the CliEquipLight).
         void* Companion[4];
     };
 
@@ -262,7 +255,7 @@ namespace
     static_assert(offsetof(FCliLightEquipFx, Companion) == 0x10, "CliLightEquipFx +0x10");
 
     // FUN_00536100 / FUN_00536170 are ExplosionArchAddRef / ExplosionArchRelease
-    // (client_gameobj.h); this file used to carry its own copies.
+    // (client_gameobj.h).
 
     // ---- CliEquipLight (Client\space\FlashLight.cpp) -------------------------------------
 
@@ -276,31 +269,26 @@ namespace
     constexpr char const kFlashLightCpp[] =                  // .rdata 0x005da434
         "E:\\FL\\Scratch\\Source\\Client\\space\\FlashLight.cpp";
 
-    // FUN_004fdbc9..0x004fdc35's colour byte: FLD float / FMUL double 255.0 / FADD double 0.5 /
-    // FSTP double, floor, ftol -- and only AL is kept.
+    // FUN_004fda00's colour byte: floor(c * 255.0 + 0.5) in double, truncated, low byte kept.
     unsigned char LightColorByte(float Component)
     {
         double const Scaled = static_cast<double>(Component) * 255.0 + 0.5;
         return static_cast<unsigned char>(static_cast<long>(floor(Scaled)));
     }
 
-    // FUN_004fd920 -- the destructor body.
+    // FUN_004fd920 -- the destructor body; the Effect base destructor FUN_004f8dd0 follows.
     FCliEquipLight::~FCliEquipLight()
     {
         FCliEquipLight* const Self = this;
-        // 0x004fd93d: the class's own table goes back in first.
         if (Self->EngineLight != nullptr)
         {
-            // 0x004fd955..0x004fd965: the light's slot 2 (disable), FUN_00537ad0, cleared.
             Self->EngineLight->Disable();
             GameLightRelease(Self->EngineLight);
             Self->EngineLight = nullptr;
         }
-        // 0x004fd979: FUN_004f8dd0, the Effect base destructor.
     }
 
-    // FUN_004fd9d0 (thiscall, RET 4) -- nothing else of the tail is written here; FUN_004fda00
-    // fills it.
+    // FUN_004fd9d0 -- nothing else of the tail is written here; FUN_004fda00 fills it.
     FCliEquipLight::FCliEquipLight(unsigned char bPlayerOwnedParam) : FEffectBase(0x2e)
     {
         FCliEquipLight* const Self = this;
@@ -313,8 +301,8 @@ namespace
         return ::new (Self) FCliEquipLight(bPlayerOwned);
     }
 
-    // FUN_004fda00 (thiscall, RET 4) -- blink parameters from the CliEQLight, the "shine"
-    // frame, and for a player-owned light a real GameLight. Always returns 1.
+    // FUN_004fda00 -- blink parameters from the CliEQLight, the "shine" frame, and for a
+    // player-owned light a real GameLight. Always returns 1.
     unsigned char CliEquipLightInit(FCliEquipLight* Self, Archetype::ICliObj* Companion)
     {
         Self->Companion = Companion;
@@ -322,39 +310,34 @@ namespace
         Self->BlinkDuty = 1.0f;
         FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
 
-        // 0x004fda22..0x004fda56: the period (rand / 32768 * 0.2 + 0.9) * avg_delay stays on the
-        // FPU for the test and is kept as a float (FST) for the rest.
+        // The period (rand / 32768 * 0.2 + 0.9) * avg_delay is tested unrounded and kept as a
+        // float for the rest.
         double const PeriodExt =
             (static_cast<double>(rand()) * kRandUnit * kBlinkJitterScale + kBlinkJitterBase) *
             View->AvgDelay;
         float const Period = static_cast<float>(PeriodExt);
-        // FCOMP 0.0 / TEST AH,0x41 / JNZ: only a period above zero (not NaN) blinks.
+        // Only a period above zero (not NaN) blinks.
         if (PeriodExt > 0.0)
         {
-            // 0x004fda58..0x004fda62: FLD 1.0 / FDIV Period / FST Rate -- the quotient stays on
-            // the FPU unrounded for the duty below.
+            // The quotient stays unrounded for the duty below.
             double const RateExt = 1.0 / static_cast<double>(Period);
             Self->BlinkRate = static_cast<float>(RateExt);
-            // 0x004fda65..0x004fda7c: FCOMP / TEST AH,0x41 / JNZ -- blink_duration at or below
-            // the period (or NaN) is used as is, above it the period.
+            // blink_duration at or below the period (or NaN) is used as is, above it the period.
             float const Lit = (View->BlinkDuration > Period) ? Period : View->BlinkDuration;
             Self->BlinkDuty = static_cast<float>(RateExt * static_cast<double>(Lit));
         }
 
-        // 0x004fda8b..0x004fdaad.
         Self->BlinkBrightness = 1.0f;
         Self->BlinkPhase = static_cast<float>(static_cast<double>(rand()) * kRandUnit);
 
-        // 0x004fdab0..0x004fdb35: the ShapeDB lookup inlined (FDUMP at cmn\ShapeDB.h line 0xf2
-        // when missing), then TextureLib slot +0x58 on the record's texture -- no test of the
-        // record in between.
+        // The inlined ShapeDB lookup FDUMPs a miss; the record is not tested before use.
         FTexShape* const Shine = G_EffectShapeDB.Find("shine");
         DALib::TextureLib->GetTextureFrame(Shine->Texture, 0, Self->TexFrame);
 
-        // 0x004fdb38..0x004fdb4c: TEST AH,0x41 / JNZ -- only an intensity above zero.
+        // Only an intensity above zero.
         if (View->Intensity > 0.0f)
         {
-            // 0x004fdb52..0x004fdb60: TEST AH,0x44 / JNP skips only an exact 0.0 rate.
+            // Only an exact 0.0 rate is quiet.
             if (Self->BlinkRate != 0.0f)
             {
                 FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kFlashLightCpp, 0x8d,
@@ -363,8 +346,7 @@ namespace
 
             if (Self->bPlayerOwned != 0)
             {
-                // 0x004fdb95..0x004fdbc3: FUN_00537a90(0x130) (malloc, the size is not the
-                // pool's), FUN_005374e0, owner, PTR_FUN_005da424; +0x98 stored either way.
+                // FUN_00537a90(0x130) is a plain malloc, not the pool; +0x98 stored either way.
                 void* const Mem = GameLightHeapAlloc(sizeof(FCliEquipGameLight));
                 FCliEquipGameLight* Light = nullptr;
                 if (Mem != nullptr)
@@ -374,8 +356,6 @@ namespace
                 }
                 Self->EngineLight = Light;
 
-                // 0x004fdbc9..0x004fdc47: FUN_004115b0 with the colour bytes, FUN_00411300 with
-                // the intensity.
                 unsigned char Rgb[3];
                 Rgb[0] = LightColorByte(View->Color[0]);
                 Rgb[1] = LightColorByte(View->Color[1]);
@@ -383,8 +363,7 @@ namespace
                 EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);
                 EngineLightSetRadius((FEngineLight*)Light, View->Intensity);
 
-                // 0x004fdc4c..0x004fdc7c: FCOMP 180.0 / TEST AH,5 / JP -- a cone below 180 is a
-                // spot (type 2 plus FUN_00411670), anything else (NaN too) a point (type 1).
+                // A cone below 180 is a spot (type 2), anything else (NaN too) a point.
                 if (View->LightsourceCone < kFullConeDegrees)
                 {
                     EngineLightSetType((FEngineLight*)Light, 2, true);
@@ -395,7 +374,7 @@ namespace
                     EngineLightSetType((FEngineLight*)Light, 1, true);
                 }
 
-                // 0x004fdc81..0x004fdc98: slot 1 (enable); a refusal releases the light.
+                // A refused enable releases the light.
                 if (!Light->Enable())
                 {
                     GameLightRelease(Self->EngineLight);
@@ -406,32 +385,26 @@ namespace
         return 1;
     }
 
-    // FUN_004fdda0 (thiscall, RET 4) -- the flare: the "shine" node of the screen-quad batch,
-    // the fade from the flare cone, then FUN_004038f0. Returns 1.
+    // FUN_004fdda0 -- the flare: the "shine" node of the screen-quad batch, the fade from the
+    // flare cone, then FUN_004038f0. Returns 1.
     unsigned char CliEquipLightDrawFlare(FCliEquipLight* Self, FSpaceCamera* Cam)
     {
-        // 0x004fdda5..0x004fddbc: FUN_004f7ef0, then FUN_00402e30(&TexFrame, 1, 1).
         FTransform World;
         EffectGetWorldTransform(Self, &World);
         ScreenQuadBeginBatchFrame(Self->TexFrame, 1, true);
 
         FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
         float Fade = 1.0f;
-        // 0x004fddc4..0x004fdde7: FCOMP / TEST AH,0x41 / JNZ -- only FlareConeCos[0] above
-        // FlareConeCos[1] fades.
+        // Only FlareConeCos[0] strictly above FlareConeCos[1] fades.
         if (View->FlareConeCos[0] > View->FlareConeCos[1])
         {
-            // 0x004fdded..0x004fde19: camera slot +0xc (GetPosition), the offset built as a
-            // float Vector (FUN_00422b80).
             float const* const CamPos = AsCamera(Cam)->GetPosition();
             float Dir[3];
             Dir[0] = World.Translation.X - CamPos[0];
             Dir[1] = World.Translation.Y - CamPos[1];
             Dir[2] = World.Translation.Z - CamPos[2];
 
-            // 0x004fde1e..0x004fde8c: the fast inverse square root on the float length^2
-            // ((z*z + y*y) + x*x, FSTP float), one Newton step on the FPU, each component
-            // stored back as a float.
+            // The fast inverse square root on the float length^2, one Newton step in double.
             float const LengthSq = static_cast<float>(
                 static_cast<double>(Dir[2]) * Dir[2] + static_cast<double>(Dir[1]) * Dir[1] +
                 static_cast<double>(Dir[0]) * Dir[0]);
@@ -448,15 +421,14 @@ namespace
             Dir[1] = static_cast<float>(Dir[1] * InvLength);
             Dir[2] = static_cast<float>(Dir[2] * InvLength);
 
-            // 0x004fde8e..0x004fdeb2: the dot with the forward column (+0x08, +0x14, +0x20 of
-            // the rotation), (z + y) + x, stored as a float.
+            // The dot with the forward column, (z + y) + x, rounded to float.
             float const Dot = static_cast<float>(
                 static_cast<double>(Dir[2]) * World.Rotation.D[2][2] +
                 static_cast<double>(Dir[1]) * World.Rotation.D[1][2] +
                 static_cast<double>(Dir[0]) * World.Rotation.D[0][2]);
 
-            // 0x004fdeba..0x004fdefe: TEST AH,5 / JP twice -- below the outer cosine no flare,
-            // between the two a linear fade, otherwise (NaN too) full.
+            // Below the outer cosine no flare, between the two a linear fade, otherwise (NaN
+            // too) full.
             if (Dot < View->FlareConeCos[1])
             {
                 Fade = 0.0f;
@@ -469,15 +441,14 @@ namespace
             }
         }
 
-        // 0x004fdf02..0x004fdf24: the glow colour scaled by the blink brightness.
         float const Brightness = Self->BlinkBrightness;
         float Glow[3];
         Glow[0] = Brightness * View->GlowColor[0];
         Glow[1] = Brightness * View->GlowColor[1];
         Glow[2] = Brightness * View->GlowColor[2];
 
-        // 0x004fdf29..0x004fdf90: the bulb colour, min_color + brightness * (color - min_color);
-        // x and y go through a float temporary, z stays on the FPU.
+        // The bulb colour, min_color + brightness * (color - min_color); x and y go through a
+        // float temporary, z stays unrounded.
         float Span[3];
         Span[0] = View->Color[0] - View->MinColor[0];
         Span[1] = View->Color[1] - View->MinColor[1];
@@ -489,28 +460,20 @@ namespace
         Bulb[1] = ScaledY + View->MinColor[1];
         Bulb[2] = static_cast<float>(static_cast<double>(Brightness) * Span[2] + View->MinColor[2]);
 
-        // 0x004fdf94..0x004fdfb4: the glow faded.
         Glow[0] = Glow[0] * Fade;
         Glow[1] = Glow[1] * Fade;
         Glow[2] = Glow[2] * Fade;
 
-        // 0x004fdfb8..0x004fdfcc: FUN_004038f0(Cam, position, bulb colour, glow colour,
-        // bulb_size, glow_size).
         float const Position[3] = {World.Translation.X, World.Translation.Y, World.Translation.Z};
         ScreenQuadEnqueueFlare(AsCamera(Cam), Position, Bulb, Glow, View->BulbSize,
                                View->GlowSize);
         return 1;
     }
 
-    // Slot 0 -- LAB_004f7ab0.
+    // Slots 0 and 1 are the Effect base's LAB_004f7ab0 / FUN_004f7bd0.
 
-
-    // Slot 1 -- FUN_004f7bd0.
-
-
-    // Slot 2 -- LAB_004fe040 (RET 4): the world position (FUN_004f7ef0) out, and the larger of
-    // bulb_size / glow_size back on the FPU (FCOMPP / TEST AH,5 / JP: bulb_size unless it is
-    // below glow_size).
+    // Slot 2 -- LAB_004fe040: the world position out, and the larger of bulb_size / glow_size
+    // back (bulb_size unless it is strictly below glow_size).
     float FCliEquipLight::GetWorldPos(FVector* Out)
     {
         FCliEquipLight* const Self = this;
@@ -525,7 +488,7 @@ namespace
         return View->BulbSize;
     }
 
-    // Slot 3 -- 0x0053e4a0, a bare RET 4.
+    // Slot 3 -- 0x0053e4a0, empty.
 
 
     // Slot 4 -- LAB_004fd990: Flags +8 bit 0 (set by the owner's list sweep FUN_004fd040).
@@ -535,7 +498,7 @@ namespace
         return static_cast<unsigned char>(Self->Flags08 & 1u);
     }
 
-    // Slot 5 -- LAB_004fdcf0 (RET 8, both arguments unread): bit 0 cleared, its old value back.
+    // Slot 5 -- LAB_004fdcf0 (both arguments unread): bit 0 cleared, its old value back.
     unsigned char FCliEquipLight::UpdateVisibility(float /*Dt*/, FSpaceCamera* /*Cam*/)
     {
         FCliEquipLight* const Self = this;
@@ -544,30 +507,29 @@ namespace
         return static_cast<unsigned char>(Flags & 1u);
     }
 
-    // Slot 6 -- FUN_004fdd00 (RET 8): the blink. Returns 1.
+    // Slot 6 -- FUN_004fdd00: the blink. Returns 1.
     unsigned char FCliEquipLight::TickDraw(float Dt, FSpaceCamera* Cam)
     {
         FCliEquipLight* const Self = this;
-        // 0x004fdd06..0x004fdd14: TEST AH,0x44 / JNP -- a rate of exactly 0.0 does nothing.
+        // A rate of exactly 0.0 does nothing.
         if (Self->BlinkRate == 0.0f)
             return 1;
 
-        // 0x004fdd16..0x004fdd4e: the new phase on the FPU, FST into +0x78; at or above 1.0
-        // (FCOM double / TEST AH,1 / JNZ: below and NaN keep it) it is x - floor(x).
+        // The unrounded new phase at or above 1.0 (NaN keeps it) wraps to x - floor(x).
         double const Phase =
             static_cast<double>(Dt) * Self->BlinkRate + static_cast<double>(Self->BlinkPhase);
         Self->BlinkPhase = static_cast<float>(Phase);
         if (Phase >= 1.0)
             Self->BlinkPhase = static_cast<float>(Phase - floor(Phase));
 
-        // 0x004fdd52..0x004fdd70: TEST AH,0x41 / JNZ -- past the duty the light is dark.
+        // Past the duty the light is dark.
         if (Self->BlinkPhase > Self->BlinkDuty)
         {
             Self->BlinkBrightness = 0.0f;
             return 1;
         }
 
-        // 0x004fdd73..0x004fdd91: the triangle 2/duty * phase, folded above 1.0 as 2 - x.
+        // The triangle 2/duty * phase, folded above 1.0 as 2 - x.
         double Wave = static_cast<double>(kBlinkPeak) / Self->BlinkDuty * Self->BlinkPhase;
         if (Wave > 1.0)
             Wave = kBlinkPeak - Wave;
@@ -575,13 +537,13 @@ namespace
         return 1;
     }
 
-    // Slot 7 -- LAB_004fdfe0 (RET 4): FUN_005792b0(0x29) is read twice.
+    // Slot 7 -- LAB_004fdfe0: the FLASHLIGHTS option is read twice.
     unsigned char FCliEquipLight::BuildGeometry(FSpaceCamera* Cam)
     {
         FCliEquipLight* const Self = this;
         if (GetGameOption(kGameOptFlashlights) == 0)
             return 0;
-        // 0x004fdff7..0x004fe00a: FCOMP 0.0 / TEST AH,5 / JP -- only a negative brightness.
+        // Only a negative brightness (ordered) stops it.
         if (Self->BlinkBrightness < 0.0f)
             return 0;
         if (GetGameOption(kGameOptFlashlights) == 1)
@@ -589,11 +551,11 @@ namespace
         return 1;
     }
 
-    // Slot 8 -- FUN_004fd9a0 (RET 4).
+    // Slot 8 -- FUN_004fd9a0, the scalar deleting destructor.
 
 
-    // PTR_FUN_005da424 slot 3 -- LAB_004fdcb0 (RET 4): the GameLight tick FUN_00537860, then
-    // the owner's world transform (FUN_004f7ef0 on +0x12c) through FUN_00410fe0.
+    // PTR_FUN_005da424 slot 3 -- LAB_004fdcb0: the GameLight tick, then the owner's world
+    // transform.
     void FCliEquipGameLight::Tick(float Dt)
     {
         FCliEquipGameLight* const Self = this;
@@ -605,9 +567,7 @@ namespace
 
     FCliLightEquipFx::FCliLightEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)
     {
-        // 0x00531b6d..0x00531bce: the inlined base -- +4 / +8 / +0xc, connect, then an attached
-        // equipment's separation_explosion (arch +0x70) resolved and referenced. No test of
-        // Equip.
+        // FUN_00531b40, with the base constructor inlined. No test of Equip.
         Equip = EquipParam;
         Host = HostParam;
         SeparationExplosion = nullptr;
@@ -624,34 +584,30 @@ namespace
             }
         }
 
-        // 0x00531bd6..0x00531bdf: the companion's own constructor zeroes all four slots.
         Companion[0] = nullptr;
         Companion[1] = nullptr;
         Companion[2] = nullptr;
         Companion[3] = nullptr;
 
-        // 0x00531be8..0x00531bfa: an equipment already on (vtable +4, IsActive) lights at once.
+        // An equipment already on lights at once.
         if (Equip->IsActive())
             Activate();
     }
 
     FCliLightEquipFx::~FCliLightEquipFx()
     {
-        // FUN_005323c0. 0x005323de..0x00532412: the companion's destructor (FUN_00502d90's
-        // body) -- effect FUN_004f7a90, sound Release, light FUN_00537ad0, arch slot cleared.
-        // The node the host's effect list holds keeps its own references.
+        // FUN_005323c0. The node the host's effect list holds keeps its own references.
         CliEffectCompanionClear(Companion);
-        // 0x00532415..0x00532439 (the inlined base destructor) is ~FClientEquip.
+        // The inlined base destructor is ~FClientEquip.
     }
 
     void FCliLightEquipFx::notify(Event Code, void* /*Param*/)
     {
-        // FUN_00531c20 (RET 8).
+        // FUN_00531c20.
         if (Code == EquipDeactivating)
         {
-            // 0x00531c3d..0x00531c7d: the light leaves the host's effect list while anything of
-            // it still runs -- a live effect (+8 bit 1 clear), an active sound (vtable +0x14) or
-            // a light without anim keys (+0xd4 null).
+            // The light leaves the host's effect list while anything of it still runs -- a live
+            // effect, an active sound or a light without anim keys.
             FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
             ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
             FGameLight const* const Light = static_cast<FGameLight const*>(Companion[3]);
@@ -666,8 +622,7 @@ namespace
 
         if (Code == EquipActivating)
         {
-            // 0x00531c80..0x00531cb1: nothing while any of the same three still runs, otherwise
-            // a fresh light.
+            // Nothing while any of the same three still runs, otherwise a fresh light.
             FEffectBase const* const Effect = static_cast<FEffectBase const*>(Companion[2]);
             if (Effect != nullptr && (Effect->Flags08 & 2u) == 0)
                 return;
@@ -683,7 +638,6 @@ namespace
 
         if (Code == EquipDestroying)
         {
-            // 0x00531cbb..0x00531cdb: out of the host's list, then the base's disconnect.
             CliEffectListRemove(&Host->EffectList, Companion);
             Equip->NotifyDisconnecting(this);
             Equip = nullptr;
@@ -692,8 +646,7 @@ namespace
 
     unsigned char FCliLightEquipFx::Activate()
     {
-        // FUN_00531cf0. 0x00531d0e..0x00531d3a: FUN_004f79a0(0x9c), then FUN_004fd9d0 with
-        // "the host is the player" (FUN_0054baf0, a raw pointer compare).
+        // FUN_00531cf0. "The host is the player" is a raw pointer compare.
         void* const Mem = EffectAlloc(0x9c);
         FCliEquipLight* Light = nullptr;
         if (Mem != nullptr)
@@ -703,19 +656,16 @@ namespace
             Light = CliEquipLightConstruct(static_cast<FCliEquipLight*>(Mem), bPlayer);
         }
 
-        // 0x00531d3c..0x00531d4b: equipment vtable +0x68 (CExternalEquip::GetHardPointInfo),
-        // called on the CEquip without a cast check.
+        // Called on the CEquip without a cast check.
         CExternalEquip const* const External = static_cast<CExternalEquip const*>(Equip);
         HardpointInfo Hardpoint;
         if (!External->GetHardPointInfo(Hardpoint))
         {
-            // 0x00531e53..0x00531e5a.
             EffectRelease(Light);
             return 0;
         }
 
-        // 0x00531d51..0x00531d90: the hardpoint's orientation and position as the local frame,
-        // vtable +0x64 (GetParentConnector(false)) as the part, FUN_004f7d20.
+        // The hardpoint as the local frame, on the parent connector's part.
         FTransform Local;
         std::memcpy(&Local.Rotation, &Hardpoint.Orient, sizeof(Local.Rotation));
         Local.Translation.X = Hardpoint.Position.x;
@@ -724,15 +674,13 @@ namespace
         long const Part = External->GetParentConnector(false);
         EffectAttach(Light, Host, static_cast<int>(Part), &Local);
 
-        // 0x00531d95..0x00531da9: the arch's +4 (Companion, the CliEQLight), null without an
-        // equipment.
+        // The arch's CliEQLight companion, null without an equipment.
         Archetype::ICliObj* const LightArch = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
         unsigned char const bOk = CliEquipLightInit(Light, LightArch);
         if (bOk != 0)
         {
-            // 0x00531dba..0x00531e34: a local companion {0, 0, light, 0} (its copy takes a
-            // reference), assigned into +0x10 (the old contents released as FUN_00502d90
-            // does), then the local destroyed.
+            // A local companion {0, 0, light, 0} (its copy takes a reference), assigned into
+            // +0x10 (the old contents released), then the local destroyed.
             void* const Local4[4] = {nullptr, nullptr, Light, nullptr};
             if (Light != nullptr)
                 EffectAddRef(Light);
@@ -746,11 +694,10 @@ namespace
             if (Light != nullptr)
                 EffectRelease(Light);
 
-            // 0x00531e39..0x00531e40: FUN_004fcea0 on the host's list (+0x28).
             CliEffectListInsert(&Host->EffectList, Companion);
         }
 
-        // 0x00531e45..0x00531e47: the allocation's own reference goes.
+        // The allocation's own reference goes.
         EffectRelease(Light);
         return bOk;
     }
@@ -781,7 +728,7 @@ namespace
 
     void EquippedObjResolveExplosion(FClientGameobj* Host)
     {
-        // FUN_00539740 on EquippedObj — store @+0x40. Watcher/vt+0x88 gap unchanged.
+        // Part of FUN_00539740 on EquippedObj: the explosion arch stored at +0x40.
         if (Host == nullptr)
             return;
         CObject* Obj = Host->Object;
@@ -803,14 +750,11 @@ namespace
     using FCliEquipFxBase = FClientEquip;
     static_assert(sizeof(FCliEquipFxBase) == 0x10, "CliEquipFxBase 0x10");
 
-    // The code-0xa "the player lost this" test the equipment notifies inline (shield generator
-    // 0x0052eb6e..0x0052ebc3, engine 0x00527f0b..0x00527f68, thruster, the launcher family):
-    // the host is the player's (FUN_0054baf0, a pointer compare), not reaped (vtable +0x158),
-    // and its object narrowed by Mask (host +0xc, +4, ObjectClass & Mask == Mask, else null --
-    // get_hit_pts is called on it regardless) has hit points above 0 (FCOMP DAT_005c7474,
-    // TEST AH,0x41, JNZ skips on <= / NaN).
-    // Its first half alone (repair droid 0x005329a8..0x005329c4 / 0x00532b33..0x00532b4c):
-    // the player's host, not reaped.
+    // The code-0xa "the player lost this" test the equipment notifies inline (shield generator,
+    // engine, thruster, the launcher family): the host is the player's (a pointer compare), not
+    // reaped, and its object narrowed by Mask (null otherwise -- get_hit_pts is called on it
+    // regardless) has hit points above 0 (NaN fails).
+    // Its first half alone (the repair droid): the player's host, not reaped.
     bool CliEquipHostIsPlayer(FClientGameobj* Host)
     {
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
@@ -839,7 +783,7 @@ namespace
     // base's FUN_00531af0 through the thunk 0052eb50), Update FUN_00532000}.
     struct FCliShieldGenEquipFx : FCliEquipFxBase
     {
-        // FUN_0052eb60 (RET 8).
+        // FUN_0052eb60.
         void notify(Event Code, void* Param) override;
     };
     static_assert(sizeof(FCliShieldGenEquipFx) == 0x10, "ShieldGenFx 0x10");
@@ -861,30 +805,26 @@ namespace
     {
         // FUN_00531f30.
         ~FCliCloakEquipFx() override;
-        // LAB_00532010 (RET 8).
+        // LAB_00532010.
         void notify(Event Code, void* Param) override;
     };
     static_assert(sizeof(FCliCloakEquipFx) == 0x10, "CloakFx 0x10");
 
     FCliCloakEquipFx::~FCliCloakEquipFx()
     {
-        // FUN_00531f30: the host's index (vtable +0x1c, no test of the host), then the body of
-        // FUN_00532170 inlined -- IFLAppearance from DALib::Engine, slot 5 with the index when
-        // the query succeeded, released either way. The base destructor follows.
+        // FUN_00531f30 (no test of the host), with FUN_00532170 inlined. The base destructor
+        // follows.
         long const Index = Host->get_index();
         RemoveAppearanceInstanceValue(static_cast<int>(Index));
     }
 
     void FCliCloakEquipFx::notify(Event Code, void* /*Param*/)
     {
-        // LAB_00532010 (RET 8). FUN_00531b20 is never called.
+        // LAB_00532010. FUN_00531b20 is never called.
         CEquip* const Device = Equip;
         if (Code == EquipActivating)
         {
-            // 0x0053209a..0x00532149: an identity frame; the equipment's vtable +0x84
-            // (CAttachedEquip::GetRootIndex); cloakout_fx (CECloakingDevice::CloakArch +0x98);
-            // not empty -> FUN_0040f080 and FUN_00503070 on DAT_00674c60 (host, root, frame, no
-            // companion).
+            // cloakout_fx on the host's root part, identity frame, no companion.
             FTransform Identity;
             std::memset(&Identity, 0, sizeof(Identity));
             Identity.Rotation.D[0][0] = 1.0f;
@@ -903,10 +843,8 @@ namespace
         }
         if (Code == EquipDeactivating)
         {
-            // 0x0053202e..0x00532097: FUN_00532170 with the host's index; the host's velocity
-            // (vtable +4) and orientation (vtable +0x10, the Transform it points into);
-            // cloakin_fx (+0x94); not empty -> FUN_0040f080 and FUN_00503f40 on DAT_00674c60
-            // (the frame, the velocity, no companion).
+            // cloakin_fx in world space at the host's frame (the Transform its orientation
+            // points into) with its velocity, no companion.
             RemoveAppearanceInstanceValue(static_cast<int>(Host->get_index()));
             Vector const Velocity = Host->get_velocity();
             Matrix const& Orientation = Host->get_orientation();
@@ -922,7 +860,6 @@ namespace
         }
         if (Code == EquipDestroying)
         {
-            // 0x0053214c..0x0053215a: CEquip::NotifyDisconnecting(this), Equip = 0.
             Device->NotifyDisconnecting(this);
             Equip = nullptr;
         }
@@ -930,18 +867,15 @@ namespace
 
     // DAT_00675468 / DAT_0067546c / DAT_00675464 / DAT_00675460, filled by the static
     // initializers LAB_0052ea90 / LAB_0052eab0 / LAB_0052ead0 / LAB_0052eaf0 (LAB_0052eaf5 is
-    // that initializer's CreateID-and-store tail, reached by its fall-through only; its other
-    // XREFs, e.g. 0x0045e05a / 0x005671d7 / 0x00599dea, are OR-immediates 0x0052eaf5 that
-    // Ghidra mislabelled as addresses).
+    // only that initializer's tail; its other apparent XREFs are immediates that happen to
+    // match).
     unsigned const G_ShieldDeactivatedId = CreateID("shield_deactivated");
     unsigned const G_ShieldActivatedId = CreateID("shield_activated");
     unsigned const G_ShieldFailedId = CreateID("nnv_shield_failed");
     unsigned const G_ShieldRestoredId = CreateID("shield_restored");
 
-    // The shield's client wrapper (RTTI CliShield: COL 005ee7c8 at vtable[-4], type descriptor
-    // 00613b8c ".?AUCliShield@@"; seven slots, 005ddaf0 is already a string): operator new(0x18)
-    // in the factory arm 0x005333ab,
-    // constructor FUN_0052e200, vtable PTR_LAB_005ddad4 {notify LAB_0052e3e0, scalar deleting
+    // The shield's client wrapper (RTTI .?AUCliShield@@, seven slots): operator new(0x18) in the
+    // factory, constructor FUN_0052e200, vtable PTR_LAB_005ddad4 {notify LAB_0052e3e0, scalar deleting
     // dtor FUN_0052e2c0 (body FUN_0052e2e0), Update FUN_00532000, then four slots of its own:
     // +0xc LAB_0052e350, +0x10 FUN_0052e3c0, +0x14 LAB_0052e760, +0x18 FUN_0052e8c0}. The
     // equipped object's hit slots (FUN_005340b0 / FUN_00534190) reach +0x14 / +0x18 on the
@@ -950,21 +884,21 @@ namespace
     {
         // FUN_0052e2e0.
         ~FCliShieldEquipFx() override;
-        // LAB_0052e3e0 (RET 8).
+        // LAB_0052e3e0.
         void notify(Event Code, void* Param) override;
-        // +0x0c LAB_0052e350 (bare RET): the collapse / rebuilt sound archetypes looked up and
-        // acquired again (neither is released or cleared first).
+        // +0x0c LAB_0052e350: the collapse / rebuilt sound archetypes looked up and acquired
+        // again (neither is released or cleared first).
         virtual void ReloadSounds();
-        // +0x10 FUN_0052e3c0 (bare RET): both released, neither cleared.
+        // +0x10 FUN_0052e3c0: both released, neither cleared.
         virtual void ReleaseSounds();
-        // +0x14 LAB_0052e760 (RET 0xc): a collision on the shield bubble. HitInfo is the hit
-        // point (+0) and the surface normal (+0xc); the third argument is not read.
+        // +0x14 LAB_0052e760: a collision on the shield bubble. HitInfo is the hit point (+0)
+        // and the surface normal (+0xc); the third argument is not read.
         virtual void OnCollisionHit(void const* HitInfo, FClientGameobj* Other,
                                     void const* Unused);
-        // +0x18 FUN_0052e8c0 (RET 8): a munition hitting the shield bubble.
+        // +0x18 FUN_0052e8c0: a munition hitting the shield bubble.
         virtual void OnMunitionHit(void const* HitInfo, FClientGameobj* Munition);
 
-        // The body both the constructor (0x0052e246..0x0052e299) and ReloadSounds run.
+        // The body both the constructor and ReloadSounds run.
         void LoadSounds();
 
         void* CollapseSound; // +0x10  CliEQShieldGenerator +0x58 (FUN_0042ae40, Acquire'd)
@@ -987,9 +921,7 @@ namespace
 
     void FCliShieldEquipFx::LoadSounds()
     {
-        // 0x0052e246..0x0052e299 / 0x0052e353..0x0052e3ae: the generator companion; its +0x58
-        // not empty -> FUN_0042ae40 into +0x10 and that archetype's vtable +0xc (Acquire) with
-        // no test of the result; the same for +0x5c into +0x14.
+        // The generator companion's +0x58 / +0x5c sounds, acquired with no test of the lookup.
         Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
         if (Comp == nullptr)
             return;
@@ -1016,7 +948,7 @@ namespace
 
     void FCliShieldEquipFx::ReleaseSounds()
     {
-        // FUN_0052e3c0: +0x10, then +0x14, each non-null -> vtable +0x10 (Release).
+        // FUN_0052e3c0.
         if (CollapseSound != nullptr)
             static_cast<Archetype::ISound*>(CollapseSound)->Release();
         if (RebuiltSound != nullptr)
@@ -1045,9 +977,7 @@ namespace
         PlayClientSoundArch(Sound, Key, nullptr, 0);
     }
 
-    // CEShield::cast on the equipment (no test of the result), its vtable +0x84
-    // (CAttachedEquip::GetRootIndex) and DALib::Engine vtable +0xa0 on that part: the
-    // shield's world frame.
+    // The shield's world frame: its root part's engine transform (no test of the cast).
     float const* CliShieldWorldFrame(CEquip* Equip)
     {
         CEShield* const Shield = CEShield::cast(Equip);
@@ -1058,21 +988,18 @@ namespace
 
     void FCliShieldEquipFx::notify(Event Code, void* Param)
     {
-        // LAB_0052e3e0 (RET 8): a jump table on Code - 0xb (0..8); every path ends in
-        // FUN_00531b20(Code, 0) -- the base notify gets a null Param whatever came in.
+        // LAB_0052e3e0: every path ends in the base notify with a null Param, whatever came in.
         switch (Code)
         {
         case EquipActivating:
-            // 0x0052e3ff..0x0052e41d: the player's host (FUN_0054baf0, a pointer compare
-            // only) -> "shield_activated".
+            // The player's host (a pointer compare only).
             if (static_cast<void*>(static_cast<IObjRW*>(Host)) == GetPlayerObjRW())
                 NnVoiceEnqueue(G_ShieldActivatedId, 0);
             break;
         case EquipDeactivating:
         {
-            // 0x0052e422..0x0052e478: the player's host whose object, narrowed by 0x503 (null
-            // when it is not a ship) is not CShip::is_launching (called with no test) ->
-            // "shield_deactivated".
+            // The player's host whose ship (null when it is not one; is_launching is called with
+            // no test) is not launching.
             FClientGameobj* const Owner = Host;
             if (static_cast<void*>(static_cast<IObjRW*>(Owner)) != GetPlayerObjRW())
                 break;
@@ -1087,41 +1014,32 @@ namespace
             break;
         }
         case ShieldGeneratorSetChanged:
-            // 0x0052e70c..0x0052e717: this vtable +0x10, then +0xc.
             ReleaseSounds();
             ReloadSounds();
             break;
         case ShieldOfflineStateChanged:
         {
-            // 0x0052e654..0x0052e6f8: *(bool*)Param and a +0x14 sound -> played at the
-            // shield's world position (frame +0x24).
+            // *(bool*)Param and a rebuilt sound -> played at the shield's world position.
             unsigned char const* const Flag = static_cast<unsigned char const*>(Param);
             if (*Flag != 0 && RebuiltSound != nullptr)
             {
                 float const* const Frame = CliShieldWorldFrame(Equip);
                 CliShieldPlayAt(RebuiltSound, Frame + 9);
             }
-            // 0x0052e6fb..0x0052e708: then the host's own INotify (EquippedObj +0xac) with the
-            // same code and Param.
+            // Then the host's own INotify (EquippedObj +0xac) with the same code and Param.
             static_cast<INotify*>(static_cast<FClientEquippedObj*>(Host))->notify(Code, Param);
             break;
         }
         case ShieldWentOffline:
         {
-            // 0x0052e47d..0x0052e48a: a host already destroyed (vtable +0x154) -> nothing.
+            // A host already exploding -> nothing.
             if (Host->IsExploding())
                 break;
-            // 0x0052e490..0x0052e4f5: the player's live host (not reaped, class 0x503 hit
-            // points above 0: FCOMP DAT_005c7474, TEST AH,0x41, JNZ skips) ->
-            // "nnv_shield_failed".
             if (CliEquipHostIsLivePlayer(Host, 0x503u))
                 NnVoiceEnqueue(G_ShieldFailedId, 0);
-            // 0x0052e4f8..0x0052e522: the shield's world frame.
             float const* const Frame = CliShieldWorldFrame(Equip);
-            // 0x0052e526..0x0052e57c: with a generator companion -- the owner's velocity
-            // (Equip +4, CObject vtable +0x54, read before the id test), then collapse_particle
-            // (+0x54) not empty -> FUN_0040f080 and FUN_00503f40 on DAT_00674c60 (the frame,
-            // the velocity, no companion).
+            // With a generator companion: the owner's velocity (read before the id test), then
+            // collapse_particle in world space at the frame, no companion.
             Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
             if (Comp != nullptr)
             {
@@ -1136,14 +1054,11 @@ namespace
                                                 nullptr);
                 }
             }
-            // 0x0052e581..0x0052e5d6: +0x10 non-null -> played at the frame's position.
             if (CollapseSound != nullptr)
                 CliShieldPlayAt(CollapseSound, Frame + 9);
             break;
         }
         case ShieldCanReactivate:
-            // 0x0052e5db..0x0052e64f: the player's live host (class 0x503) ->
-            // "shield_restored".
             if (CliEquipHostIsLivePlayer(Host, 0x503u))
                 NnVoiceEnqueue(G_ShieldRestoredId, 0);
             break;
@@ -1151,57 +1066,47 @@ namespace
             // 0xd, 0xe, 0xf and anything outside 0xb..0x13.
             break;
         }
-        // 0x0052e71a..0x0052e723.
         FClientEquip::notify(Code, nullptr);
     }
 
     void FCliShieldEquipFx::OnCollisionHit(void const* HitInfo, FClientGameobj* Other,
                                            void const* /*Unused*/)
     {
-        // LAB_0052e760 (RET 0xc). 0x0052e77b..0x0052e797: no generator companion -> nothing.
+        // LAB_0052e760.
         Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
         if (Comp == nullptr)
             return;
-        // 0x0052e79d..0x0052e7ec: |Other's velocity - the host's| (host vtable +4 first, then
-        // Other's; dx*dx + dy*dy, then + dz*dz, FSQRT, stored as a float).
+        // The relative speed (the host's velocity read first).
         Vector const HostVelocity = Host->get_velocity();
         Vector const OtherVelocity = Other->get_velocity();
         float const Dz = OtherVelocity.z - HostVelocity.z;
         float const Dy = OtherVelocity.y - HostVelocity.y;
         float const Dx = OtherVelocity.x - HostVelocity.x;
         float const Speed = sqrtf(Dx * Dx + Dy * Dy + Dz * Dz);
-        // 0x0052e7ee..0x0052e801: Other's mass (vtable +0x30) * COLLISION_DAMAGE_FACTOR * Speed.
         float const Damage = Other->get_mass() * COLLISION_DAMAGE_FACTOR * Speed;
-        // 0x0052e805..0x0052e81a: the companion re-read (null tests again) picks the hit effect
-        // -- FUN_00409f10.
+        // The companion is re-read (null tests again) to pick the hit effect (FUN_00409f10).
         FEffectArch* const HitArch = Archetype::CliShieldGeneratorPickHitEffect(Comp, Damage);
-        // 0x0052e81f..0x0052e84d: a zeroed local companion; FUN_00539f90(Other's id (vtable
-        // +0x20), the arch, &HitInfo[0], &HitInfo[1], &companion) on the host.
         void* Companion[4] = {nullptr, nullptr, nullptr, nullptr};
         Vector const* const Hit = static_cast<Vector const*>(HitInfo);
         Host->SpawnSurfaceHitEffect(Other->get_id(), HitArch, Hit, Hit + 1, Companion);
-        // 0x0052e852..0x0052e86c: an effect in the companion -> its vtable +0xc (SetIntensity)
-        // with the equipment's relative health (vtable +0x44). FUN_00539f90 never writes its
-        // fifth argument, so the slot stays null and this does not run.
+        // Dead in retail: FUN_00539f90 never writes its fifth argument, so the slot stays null
+        // and this does not run.
         FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
         if (Effect != nullptr)
         {
             typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
             Effect->SetIntensity(Equip->GetRelativeHealth());
         }
-        // 0x0052e873..0x0052e8a6: the local companion's destructor (the FUN_00502d90 body).
         CliEffectCompanionClear(Companion);
     }
 
     void FCliShieldEquipFx::OnMunitionHit(void const* HitInfo, FClientGameobj* Munition)
     {
-        // FUN_0052e8c0 (RET 8). 0x0052e8d8..0x0052e8f8: no generator companion -> nothing.
+        // FUN_0052e8c0.
         Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
         if (Comp == nullptr)
             return;
-        // 0x0052e8ff..0x0052e958: the munition's class & 7 object (narrowed twice, no null
-        // test before +0x88) and its Munition archetype: hull_damage (+0x80) *
-        // ShieldEquipConsts::HULL_DAMAGE_FACTOR + energy_damage (+0x84).
+        // The munition's class & 7 object (no null test before the archetype read).
         CObject* const MunObject = Munition->Object;
         CObject* Shot7 = nullptr;
         if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & 7u) == 7u)
@@ -1210,10 +1115,8 @@ namespace
             static_cast<Archetype::Munition const*>(Shot7->Archetype);
         float const Damage =
             MunArch->HullDamage * ShieldEquipConsts::HULL_DAMAGE_FACTOR + MunArch->EnergyDamage;
-        // 0x0052e95a..0x0052e96a: FUN_00409f10 on the companion.
         FEffectArch* const HitArch = Archetype::CliShieldGeneratorPickHitEffect(Comp, Damage);
-        // 0x0052e96f..0x0052e9bd: a zeroed local companion; FUN_00539f90 keyed by the shot's
-        // owner (the class & 0x27 object, no test before +0xe4) on the host.
+        // Keyed by the shot's owner (the class & 0x27 object, no test before the read).
         void* Companion[4] = {nullptr, nullptr, nullptr, nullptr};
         CProjectile const* Shot = nullptr;
         if (MunObject != nullptr &&
@@ -1223,25 +1126,22 @@ namespace
         }
         Vector const* const Hit = static_cast<Vector const*>(HitInfo);
         Host->SpawnSurfaceHitEffect(Shot->OwnerId, HitArch, Hit, Hit + 1, Companion);
-        // 0x0052e9c2..0x0052e9e0: as in OnCollisionHit (never runs: the slot stays null).
+        // As in OnCollisionHit (never runs: the slot stays null).
         FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
         if (Effect != nullptr)
         {
             typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
             Effect->SetIntensity(Equip->GetRelativeHealth());
         }
-        // 0x0052e9e5..0x0052ea06: a random live effect of the munition archetype's companion
-        // (the class & 7 object narrowed again) -- FUN_00408a70.
+        // A random live effect of the munition archetype's companion (FUN_00408a70).
         FEffectArch* const LiveEffect =
             Archetype::CliMunitionPickLiveEffect(Shot7->Archetype->Companion);
-        // 0x0052ea0b..0x0052ea3b: the class & 1 object's vtable +0x54 get_velocity (no test),
-        // then FUN_0053a230(LiveEffect, &HitInfo[0], &HitInfo[1], &velocity, 0) on the host.
+        // The class & 1 object's velocity (no test).
         CObject* Shot1 = nullptr;
         if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & 1u) == 1u)
             Shot1 = MunObject;
         Vector const Velocity = Shot1->get_velocity();
         Host->SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
-        // 0x0052ea40..0x0052ea78: the local companion's destructor.
         CliEffectCompanionClear(Companion);
     }
 
@@ -1252,11 +1152,11 @@ namespace
     {
         // FUN_0052edc0.
         ~FCliThrusterEquipFx() override;
-        // FUN_0052ee40 (RET 8).
+        // FUN_0052ee40.
         void notify(Event Code, void* Param) override;
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
-        // FUN_00503070 fills with the exhaust particle (0x0052ed40 passes &this+0x10).
+        // FUN_00503070 fills with the exhaust particle.
         void* Companion[4];
     };
     static_assert(sizeof(FCliThrusterEquipFx) == 0x20, "ThrusterFx 0x20");
@@ -1276,17 +1176,17 @@ namespace
     // Update FUN_00532490}.
     struct FCliAttachedFxEquipFx : FCliEquipFxBase
     {
-        // FUN_00532210 (thiscall, RET 8).
+        // FUN_00532210.
         FCliAttachedFxEquipFx(CEquip* EquipParam, FClientGameobj* HostParam);
         // FUN_005323c0.
         ~FCliAttachedFxEquipFx() override;
-        // LAB_00532460 (RET 8).
+        // LAB_00532460.
         void notify(Event Code, void* Param) override;
-        // FUN_00532490 (RET 4).
+        // FUN_00532490.
         bool Update(float Dt) override;
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
-        // FUN_00503070 fills (0x0053235b passes &this+0x10 as its out-param).
+        // FUN_00503070 fills.
         void* Companion[4];
     };
     static_assert(sizeof(FCliAttachedFxEquipFx) == 0x20, "AttachedFx 0x20");
@@ -1299,11 +1199,11 @@ namespace
     {
         // FUN_005328e0.
         ~FCliRepairDroidEquipFx() override;
-        // LAB_00532980 (RET 8).
+        // LAB_00532980.
         void notify(Event Code, void* Param) override;
 
         // +0x10 the 0x10-byte effect companion {arch, ISoundSource*, effect, FGameLight*} that
-        // FUN_00503070 fills on activation (0x00532b17 passes &this+0x10).
+        // FUN_00503070 fills on activation.
         void* Companion[4];
     };
     static_assert(sizeof(FCliRepairDroidEquipFx) == 0x20, "RepairDroidFx 0x20");
@@ -1316,7 +1216,7 @@ namespace
     {
         // FUN_00532740.
         ~FCliInternalFxEquipFx() override;
-        // LAB_005327d0 (RET 8).
+        // LAB_005327d0.
         void notify(Event Code, void* Param) override;
 
         ISoundSource* Voice; // +0x10 Source3D looping on the companion's +0x54 sound
@@ -1330,18 +1230,17 @@ namespace
     {
         // FUN_0052f660.
         ~FCliTractorEquipFx() override;
-        // LAB_0052f740 (RET 8).
+        // LAB_0052f740.
         void notify(Event Code, void* Param) override;
-        // FUN_0052fa10 (thiscall, no arguments): a fresh tractor beam effect into +0x10 and
-        // the host's effect list.
+        // FUN_0052fa10: a fresh tractor beam effect into +0x10 and the host's effect list.
         unsigned char StartBeam();
-        // FUN_0052f9a0 (thiscall, RET 8).
+        // FUN_0052f9a0.
         void DropLoot(unsigned LootId, int Units);
 
         void* BeamCompanion[4];       // +0x10 {0, 0, the CliTractorBeam, 0} (FUN_0052fa10)
-        void* OperatingCompanion[4];  // +0x20 the operating_effect one-shot (LAB_0052f740 0xb)
+        void* OperatingCompanion[4];  // +0x20 the operating_effect one-shot (notify 0xb)
         FEffectArch* OperatingEffect; // +0x30 CliEQTractor +0x58, FUN_0040e960(..., 1)
-        void* CompleteSound;          // +0x34 CliEQTractor +0x5c, FUN_0042ae40 + vt+0xc
+        void* CompleteSound;          // +0x34 CliEQTractor +0x5c, looked up and acquired
     };
     static_assert(sizeof(FCliTractorEquipFx) == 0x38, "TractorFx 0x38");
     static_assert(offsetof(FCliTractorEquipFx, BeamCompanion) == 0x10, "Tractor +0x10");
@@ -1366,9 +1265,8 @@ namespace
     // relocation of these plain slots does too. The wrapper is only ever reached by member
     // name in the port, so retail's field offsets after +0x10 are documentation, not layout.
     // The destructor is FUN_005298e0: the EH unwind action of both the engine constructor
-    // FUN_00527b80 (Unwind@005c0218 -> 0x005c021e, state 1 set at 0x00527bca) and the engine
-    // destructor FUN_00527d10 (Unwind@005c0238 -> 0x005c023e); the normal path inlines it at
-    // 0x00527dfd..0x00527e4a. A member with its own destructor, so every exit runs it.
+    // FUN_00527b80 and the engine destructor FUN_00527d10, whose normal path inlines it. A
+    // member with its own destructor, so every exit runs it.
     struct FCliEngineNozzleVector
     {
         FCliEngineNozzleVector()
@@ -1395,15 +1293,15 @@ namespace
     // The engine's client wrapper, FUN_00527b80, vtable PTR_LAB_005dd134 (slot 2 LAB_00528020).
     struct FCliEngineEquipFx : FCliEquipFxBase
     {
-        // FUN_00527b80 (RET 8) -- the body is the former factory helper, see its definition.
+        // FUN_00527b80.
         FCliEngineEquipFx(CEquip* InEquip, FClientGameobj* InHost);
         // FUN_00527d10 (the body of the scalar deleting FUN_00527cf0).
         ~FCliEngineEquipFx() override;
-        // FUN_00527e70 (RET 8).
+        // FUN_00527e70.
         void notify(Event Code, void* Param) override;
-        // LAB_00528020 (RET 4).
+        // LAB_00528020.
         bool Update(float Dt) override;
-        // FUN_00528240 (thiscall, RET 8): the rumble / character / cruise loop sounds.
+        // FUN_00528240: the rumble / character / cruise loop sounds.
         void UpdateSound(float Throttle, float Dt);
 
         FCliEngineNozzleVector Nozzles;   // +0x10 .. +0x1c
@@ -1434,22 +1332,21 @@ namespace
     };
     unsigned char const kEngineSoundLoop[9] = {1, 0, 1, 0, 0, 1, 0, 0, 0};
 
-    // DAT_006753f8 -- FUN_00528d70's lazily acquired 3DMathEngine (0x00528e1c / 0x00528ec9).
+    // DAT_006753f8 -- FUN_00528d70's lazily acquired 3DMathEngine.
     I3DMathEngine* G_EngineNozzleMath = nullptr;
 
-    // FUN_00528d70 (thiscall on the wrapper, RET 4): the average nozzle position in the HOST's
+    // FUN_00528d70 (on the wrapper): the average nozzle position in the HOST's
     // frame. Adds into *OutPos (the callers zero it) and returns how many nozzles resolved.
     int CliEngineAvgNozzleLocalPos(FCliEngineEquipFx* Wrapper, float OutPos[3])
     {
-        // 0x00528d7a..0x00528da4: the equipment's nozzle vector (+0x38 / +0x3c, stride 0x3c,
-        // read with no class test): no buffer, or no element, returns 0 with *OutPos untouched.
+        // The equipment's nozzle vector (read with no class test): no element returns 0 with
+        // *OutPos untouched.
         std::vector<ExhaustNozzleInfo> const& Nozzles =
             static_cast<CEEngine*>(Wrapper->Equip)->NozzleInfos();
         if (Nozzles.empty())
             return 0;
 
-        // 0x00528dac..0x00528dd4: one hardpoint frame shared by the whole loop -- identity
-        // (FUN_004215b0) and a zero position.
+        // One hardpoint frame shared by the whole loop, starting at identity.
         Transform HpXform;
         HpXform.Rotation.E[0][0] = 1.0f;
         HpXform.Rotation.E[0][1] = 0.0f;
@@ -1468,12 +1365,9 @@ namespace
         for (std::vector<ExhaustNozzleInfo>::const_iterator Cur = Nozzles.begin(); Cur != Nozzles.end();
              ++Cur)
         {
-            // 0x00528df0..0x00528dff: COMMON ExhaustNozzleInfo::GetHardpointOffset_NS.
             if (!Cur->GetHardpointOffset_NS(HpXform))
                 continue;
-            // 0x00528e05..0x00528e52: World = instance frame of the nozzle's part (DALib::Engine
-            // vt+0xa0 with nozzle +8, no test) * hardpoint, through MulTransform (vt+0x1c),
-            // copied by FUN_00406880.
+            // World = instance frame of the nozzle's part (no test) * hardpoint.
             float const* const Instance = DALib::Engine->GetInstanceTransform(
                 reinterpret_cast<void*>(static_cast<intptr_t>(Cur->ParentInstance)));
             if (G_EngineNozzleMath == nullptr)
@@ -1483,10 +1377,8 @@ namespace
                                              *reinterpret_cast<FTransform const*>(&HpXform));
             FTransform const World = Combined;
 
-            // 0x00528e57..0x00528ec4: the inverse of the host's frame -- get_orientation
-            // (vt+0x10; the Transform it points into carries the position at +0x24): rotation
-            // transposed (FUN_00447b60), position -(M^T * P) (FUN_00447be0, FUN_00411350),
-            // packed by FUN_00447bb0.
+            // The inverse of the host's frame (the Transform get_orientation points into carries
+            // the position at +0x24): rotation transposed, position -(M^T * P).
             Transform const& HostFrame =
                 reinterpret_cast<Transform const&>(Wrapper->Host->get_orientation());
             FMatrix const& HostRotation = reinterpret_cast<FMatrix const&>(HostFrame.Rotation);
@@ -1495,7 +1387,7 @@ namespace
             HostPos.Y = HostFrame.Translation.y;
             HostPos.Z = HostFrame.Translation.z;
             FVector Rotated;
-            ShipTransposeRotate(Rotated, HostRotation, HostPos); // FUN_00447be0 (0x00528e6b)
+            ShipTransposeRotate(Rotated, HostRotation, HostPos); // FUN_00447be0
             FTransform Inverse;
             for (int Row = 0; Row < 3; ++Row)
             {
@@ -1506,9 +1398,7 @@ namespace
             Inverse.Translation.Y = -Rotated.Y;
             Inverse.Translation.Z = -Rotated.Z;
 
-            // 0x00528ec9..0x00528f36: Local = Inverse * World (MulTransform), copied
-            // (FUN_00406880); its position is added into *OutPos (FLD / FADD / FSTP each) and
-            // the count goes up.
+            // Local = Inverse * World; its position is added into *OutPos.
             if (G_EngineNozzleMath == nullptr)
                 G_EngineNozzleMath = Acquire3DMathEngine();
             FTransform Local;
@@ -1523,10 +1413,9 @@ namespace
                                            static_cast<double>(OutPos[2]));
         }
 
-        // 0x00528f48..0x00528f67: FILD count, FDIVR 1.0 (DAT_005c75dc) -- no test for 0: with
-        // no nozzle resolved this is 1/0 = +inf on the x87 and the sums (0) become NaN, which
-        // is what retail hands on (FUN_00528f90 keeps going for an indestructible engine).
-        // Each component is multiplied on the x87 and stored as a float.
+        // Retail quirk kept: no test for 0. With no nozzle resolved this is 1/0 = +inf and the
+        // sums (0) become NaN, which is what retail hands on (FUN_00528f90 keeps going for an
+        // indestructible engine).
         double const Inv = 1.0 / static_cast<double>(Count);
         OutPos[0] = static_cast<float>(Inv * static_cast<double>(OutPos[0]));
         OutPos[1] = static_cast<float>(Inv * static_cast<double>(OutPos[1]));
@@ -1566,9 +1455,8 @@ namespace
 
     void CliEngineSoundInit(FCliEngineEquipFx* Wrapper)
     {
-        // FUN_00528f90 (thiscall on the wrapper). 0x00528f95..0x00528fcb: the nozzle average
-        // (FUN_00528d70 into a zeroed local); none resolved and the archetype not
-        // indestructible (+0x84, read with no class test) ends here.
+        // FUN_00528f90 (on the wrapper). No nozzle resolved and the archetype not
+        // indestructible (read with no class test) ends here.
         float NozzleAvg[3] = {0.0f, 0.0f, 0.0f};
         int const NozzleCount = CliEngineAvgNozzleLocalPos(Wrapper, NozzleAvg);
         if (NozzleCount == 0 &&
@@ -1576,12 +1464,10 @@ namespace
         {
             return;
         }
-        // 0x00528fd1..0x00528fd8: nothing without DALib::Sound.
         if (DALib::Sound == nullptr)
             return;
 
-        // 0x00528fde..0x00529000: identity orientation (FUN_004215b0), the average as the
-        // position.
+        // Identity orientation, the average as the position.
         FTransform PoseXform;
         std::memset(&PoseXform, 0, sizeof(PoseXform));
         PoseXform.Rotation.D[0][0] = 1.0f;
@@ -1591,9 +1477,8 @@ namespace
         PoseXform.Translation.Y = NozzleAvg[1];
         PoseXform.Translation.Z = NozzleAvg[2];
 
-        // 0x00529004..0x00529057: the companion (equipment +0xc, archetype +4; a null
-        // equipment gives a null companion that is read anyway): cone angles +0x54 / +0x58 as
-        // unsigned ints (zero-extended FILD qword) to float, cone outside volume +0x5c raw.
+        // The companion (a null equipment gives a null companion that is read anyway): cone
+        // angles +0x54 / +0x58 as unsigned ints to float, cone outside volume +0x5c raw.
         unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
         float const ConeInner = static_cast<float>(
@@ -1602,12 +1487,9 @@ namespace
             static_cast<long long>(*reinterpret_cast<unsigned const*>(CompBytes + 0x58)));
         float const ConeOutsideVol = *reinterpret_cast<float const*>(CompBytes + 0x5c);
 
-        // 0x00529067..0x00529565: per cue, in slot order +0x38..+0x58: an ID_String that is
-        // not empty is looked up (FUN_0042ae40), and a found archetype gets an emitter
-        // (FUN_00428f80(0x68) + FUN_00527a70); the slot takes the emitter or null. A made
-        // emitter gets the cone pair (FUN_00429ea0) and outside volume (FUN_00429f10) --
-        // except engine_kill (+0x44), cruise_disrupt (+0x54) and cruise_backfire (+0x58) --
-        // then SetPose (vt+0x94, the host's get_index per emitter) and SetLooping (vt+0x88).
+        // Per cue, in slot order: a found archetype gets an emitter (FUN_00527a70); the slot
+        // takes the emitter or null. Every emitter but engine_kill, cruise_disrupt and
+        // cruise_backfire gets the cone; the host's index is read per emitter.
         static unsigned char const kEngineSoundCone[9] = {1, 1, 1, 0, 1, 1, 1, 0, 0};
         for (int Index = 0; Index < 9; ++Index)
         {
@@ -1633,10 +1515,8 @@ namespace
             Emitter->SetLooping(kEngineSoundLoop[Index]);
         }
 
-        // 0x00529565..0x005295b9: the equipment's +0x54 (CEEngine::bCruiseActive, no class
-        // test): in cruise the cruise loop (+0x4c) starts, otherwise rumble (+0x38), character
-        // start (+0x3c) and character loop (+0x40) -- each FUN_004291c0 with its own
-        // archetype, when set.
+        // In cruise (no class test) the cruise loop starts, otherwise rumble, character start
+        // and character loop.
         if (static_cast<CEEngine*>(Wrapper->Equip)->bCruiseActive != 0)
         {
             if (Wrapper->SoundEmitters[5] != nullptr)
@@ -1668,8 +1548,7 @@ namespace
         return &Wrapper->Nozzles.Slots.back();
     }
 
-    // The reference store both arms of FUN_00528980 inline (0x00528b9d..0x00528bb9 /
-    // 0x00528c66..0x00528c82): when the effect is not already the slot's, release the old one
+    // The reference store both arms of FUN_00528980 inline: when the effect is not already the slot's, release the old one
     // (clear), store it and AddRef (FUN_004f7a80).
     void CliEngineAssignParticleRef(FParticleEffect*& Ref, FParticleEffect* Effect)
     {
@@ -1684,13 +1563,11 @@ namespace
         ParticleEffectAddRef(Effect);
     }
 
-    // FUN_00528980 (thiscall on the wrapper): one slot per nozzle whose hardpoint resolves,
-    // with a trail and a cruise particle effect.
+    // FUN_00528980 (on the wrapper): one slot per nozzle whose hardpoint resolves, with a trail
+    // and a cruise particle effect.
     void CliEngineAttachExhaustEffects(FCliEngineEquipFx* Wrapper)
     {
-        // 0x0052899d..0x005289ea: the companion (equipment +0xc, archetype +4; a null
-        // equipment gives a null companion that is read anyway). trail +0x9c, when not
-        // empty, through FUN_0040f080.
+        // A null equipment gives a null companion that is read anyway.
         unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
         FEffectArch* TrailArch = nullptr;
@@ -1699,8 +1576,7 @@ namespace
         ID_String const* const TrailId = reinterpret_cast<ID_String const*>(CompBytes + 0x9c);
         if (!TrailId->IsEmpty())
             TrailArch = FindEffectArch(&TrailId->Id);
-        // 0x005289ee..0x00528a8e: the host's id (vt+0x20, get_id) against DAT_00673378:
-        // the player's engine takes +0xa4, every other +0xa0.
+        // The player's engine (host id against DAT_00673378) takes +0xa4, every other +0xa0.
         if (Wrapper->Host->get_id() != GetPlayerCharacterId())
         {
             ID_String const* const NpcId = reinterpret_cast<ID_String const*>(CompBytes + 0xa0);
@@ -1714,13 +1590,11 @@ namespace
             if (!PlayerId->IsEmpty())
                 CruisePlayerArch = FindEffectArch(&PlayerId->Id);
         }
-        // 0x00528a91..0x00528aa1: nothing to make ends here.
         if (TrailArch == nullptr && CruiseNpcArch == nullptr && CruisePlayerArch == nullptr)
             return;
 
-        // 0x00528aa7..0x00528ad7: one hardpoint frame for the whole loop -- identity
-        // (FUN_004215b0), zero position -- and the equipment's nozzle vector (+0x38 / +0x3c,
-        // stride 0x3c, no class test).
+        // One hardpoint frame for the whole loop, starting at identity; the nozzle vector is
+        // read with no class test.
         Transform HpXform;
         HpXform.Rotation.E[0][0] = 1.0f;
         HpXform.Rotation.E[0][1] = 0.0f;
@@ -1739,21 +1613,17 @@ namespace
         for (std::vector<ExhaustNozzleInfo>::const_iterator Cur = Nozzles.begin(); Cur != Nozzles.end();
              ++Cur)
         {
-            // 0x00528ae0..0x00528aef: COMMON ExhaustNozzleInfo::GetHardpointOffset_NS.
             if (!Cur->GetHardpointOffset_NS(HpXform))
                 continue;
 
-            // 0x00528af5..0x00528b4f: an empty slot appended (FUN_005299b0 with a local
-            // temporary, destroyed after), then the last slot takes the nozzle's +0 word.
+            // An empty slot appended, then it takes the nozzle's +0 word.
             FCliEngineNozzleSlot* const Slot = CliEngineNozzlePushBack(Wrapper);
             Slot->SubObjId = Cur->SubObjId;
             FTransform const* const Local = reinterpret_cast<FTransform const*>(&HpXform);
             int const Part = static_cast<int>(Cur->ParentInstance);
 
-            // 0x00528b52..0x00528bc5: trail -- EffectAlloc(0x84) + FUN_004f8060(0) (a failed
-            // allocation leaves null, used anyway), FUN_004f7d20 (host, nozzle +8, frame),
-            // vtable slot 0 with the arch; on success the slot's +4 takes it; the creation
-            // reference is dropped either way.
+            // Trail: a failed allocation leaves null, used anyway; the creation reference is
+            // dropped either way.
             if (TrailArch != nullptr)
             {
                 FParticleEffect* const Effect = ParticleEffectCreate();
@@ -1762,10 +1632,7 @@ namespace
                     CliEngineAssignParticleRef(Slot->TrailFx, Effect);
                 ParticleEffectRelease(Effect);
             }
-            // 0x00528bc9..0x00528c8e: cruise -- the NPC arch makes the 0x90 cruise effect
-            // (FUN_004f8060(0), +0x84 = 1.0, vtable PTR_FUN_005dd144), else the player's arch a
-            // plain 0x84 one; attach, slot 0, the slot's +8 on success, creation reference
-            // dropped.
+            // Cruise: the NPC arch makes the 0x90 cruise effect, the player's arch a plain one.
             FEffectArch* CruiseArch = nullptr;
             FParticleEffect* Cruise = nullptr;
             if (CruiseNpcArch != nullptr)
@@ -1795,10 +1662,10 @@ namespace
     // spin angle it drives.
     struct FTradeLaneRingChannel : AnimDB::VChannel
     {
-        // LAB_00516cd0 (RET 4): the owner's spin angle in radians (* DAT_005c77f4) as joint
-        // parameter 0 of GetId()'s instance -- IEngine slot 50 (+0xc8). Dt is not read.
+        // LAB_00516cd0: the owner's spin angle in radians (* DAT_005c77f4) as joint parameter 0
+        // of GetId()'s instance. Dt is not read.
         void Tick(float Dt) override;
-        // LAB_004313f0 (ICF-folded, also in 005c8cc8 / 005cacf8): `return [this+4]`.
+        // LAB_004313f0 (shared with other channel tables).
         int GetId() const override;
 
         int ChildIndex;                         // +0x04
@@ -1812,7 +1679,7 @@ namespace
     struct FCliTradeLaneEquipFx : FCliEquipFxBase
     {
         ~FCliTradeLaneEquipFx() override;
-        // LAB_00516ea0 (RET 4).
+        // LAB_00516ea0.
         bool Update(float Dt) override;
 
         FTradeLaneRingChannel TlrLeft;          // +0x10
@@ -1820,7 +1687,7 @@ namespace
         float SpinAngle;                        // +0x28 degrees, wrapped to (.., 360]
         float SpinSpeed;                        // +0x2c degrees/s, starts at CliEQTradeLane +0xac
         // +0x30: ships using the lane -- zeroed by the constructor, stepped +/-1 by the solar's
-        // lane switch FUN_00516910 (INC 0x00516957 / DEC 0x0051695f, store 0x00516962); Update
+        // lane switch FUN_00516910; Update
         // spins the rings up while it is 0 and down otherwise.
         int ShipsUsingLane;
     };
@@ -1836,7 +1703,7 @@ namespace
     void FTradeLaneRingChannel::Tick(float /*Dt*/)
     {
         float const Radians = Owner->SpinAngle * kTradeLaneDegToRad;
-        int const Id = GetId();                                      // vtable +0x04
+        int const Id = GetId();
         DALib::Engine->SetJointParams(reinterpret_cast<void*>(static_cast<intptr_t>(Id)), 0,
                                       &Radians);
     }
@@ -1883,13 +1750,10 @@ namespace
         }
     }
 
-    // FUN_00516d10 (thiscall, no args). Root = Host vt+0x1c get_index() (no test of Host,
-    // Equip, arch or companion — all dereferenced unchecked). Lane arch = FUN_0040f080(companion
-    // +0x84): when found, HpRightLane then HpLeftLane (a missing HpRightLane still tries the
-    // left one; a missing HpLeftLane falls through to the shield). Shield arch = FUN_0040f080
-    // (companion+0x80) -> HpShield01. Every hit: xf = {hardpoint Orient, Position},
-    // FUN_00503070(arch, Host, Root, &xf, nullptr) on DAT_00674c60 — the third argument is the
-    // root index (EBP), not the hardpoint handle FindHardpoint_PS wrote (that out value is unused).
+    // FUN_00516d10. No test of Host, Equip, arch or companion. The lane effect goes on
+    // HpRightLane then HpLeftLane (each tried on its own), the shield effect on HpShield01. Every
+    // effect is attached to the root index, not the hardpoint handle FindHardpoint_PS wrote
+    // (that out value is unused).
     void CliTradeLaneAttachLaneEffects(FCliTradeLaneEquipFx* Wrapper)
     {
         FClientGameobj* const Host = Wrapper->Host;
@@ -1945,10 +1809,8 @@ namespace
 
     void CliEquipFxBaseFill(FCliEquipFxBase* Wrapper, CEquip* Equip, FClientGameobj* Host)
     {
-        // FUN_00531a30 (thiscall, RET 8; inlined into most type constructors, e.g.
-        // 0x00532243..0x005322aa). No test of Equip: +4 / +8 / +0xc, connect, then an attached
-        // equipment's separation_explosion (arch +0x70) resolved, stored, and referenced
-        // (FUN_00536100) when found.
+        // FUN_00531a30 (inlined into most type constructors). No test of Equip; an attached
+        // equipment's separation_explosion is resolved and referenced when found.
         Wrapper->Equip = Equip;
         Wrapper->Host = Host;
         Wrapper->SeparationExplosion = nullptr;
@@ -1966,8 +1828,7 @@ namespace
 
     FCliShieldGenEquipFx* CliShieldGenEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm 0x00533357: operator new(0x10), null-tested. FUN_0052eb10 (RET 8):
-        // FUN_00531a30, then the vtable PTR_FUN_005ddb40.
+        // Factory arm: operator new(0x10), null-tested; FUN_0052eb10.
         FCliShieldGenEquipFx* Wrapper = new (std::nothrow) FCliShieldGenEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -1977,8 +1838,7 @@ namespace
 
     FCliCloakEquipFx* CliCloakEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm 0x0053356e: operator new(0x10), null-tested. FUN_00531e80 (RET 8): the
-        // base FUN_00531a30 inlined, then the vtable PTR_LAB_005de15c.
+        // Factory arm: operator new(0x10), null-tested; FUN_00531e80.
         FCliCloakEquipFx* Wrapper = new (std::nothrow) FCliCloakEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -1988,8 +1848,7 @@ namespace
 
     FCliRepairDroidEquipFx* CliRepairDroidEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm 0x005335ec: operator new(0x20), null-tested. FUN_00532800 (RET 8): the
-        // base FUN_00531a30 inlined, the companion's four slots zeroed, vtable 005de18c.
+        // Factory arm: operator new(0x20), null-tested; FUN_00532800.
         FCliRepairDroidEquipFx* Wrapper = new (std::nothrow) FCliRepairDroidEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -2009,26 +1868,18 @@ namespace
 
     FCliRepairDroidEquipFx::~FCliRepairDroidEquipFx()
     {
-        // FUN_005328e0: the companion's destructor inlined (particle FUN_004f7a90, sound
-        // vt+8, light FUN_00537ad0, each cleared, then slot 0 = 0 -- the body of
-        // FUN_00502d90); the base destructor follows.
+        // FUN_005328e0; the base destructor follows.
         CliEffectCompanionClear(Companion);
     }
 
     void FCliRepairDroidEquipFx::notify(Event Code, void* /*Param*/)
     {
-        // LAB_00532980 (RET 8). FUN_00531b20 is never called.
+        // LAB_00532980. FUN_00531b20 is never called.
         if (Code == EquipActivating)
         {
-            // 0x00532a0f..0x00532a77: the companion stopped (the FUN_004fcef0 prelude inlined:
-            // effect vt+4, sound pose (-1, identity) + Stop, light FUN_005379b0 + vt+8) and
-            // cleared (FUN_00502d90).
             CliEffectCompanionArmStop(Companion);
             CliEffectCompanionClear(Companion);
-            // 0x00532a7c..0x00532b2e: an identity frame; the companion archetype (null without
-            // an equipment, read anyway), the host's index (vt+0x1c); a non-empty +0x54 ->
-            // FUN_0040f080 and FUN_00503070 on DAT_00674c60 with the host, the index, the frame
-            // and &this+0x10.
+            // The companion archetype is null without an equipment and read anyway.
             FTransform Identity;
             std::memset(&Identity, 0, sizeof(Identity));
             Identity.Rotation.D[0][0] = 1.0f;
@@ -2044,20 +1895,14 @@ namespace
                 CliCreateEffectOneShot(FindEffectArch(&FxId->Id), Owner, static_cast<int>(Index),
                                        &Identity, Companion);
             }
-            // 0x00532b33..0x00532b56: the player's host (FUN_0054baf0, not reaped vt+0x158)
-            // queues "repair_droid_activated".
             if (CliEquipHostIsPlayer(Host))
                 NnVoiceEnqueue(G_RepairDroidActivatedId, 0);
             return;
         }
         if (Code == EquipDeactivating)
         {
-            // 0x00532999..0x005329a3: out of the host's effect list (FUN_004fcef0 on Host+0x28
-            // with &this+0x10).
             CliEffectListRemove(&Host->EffectList, Companion);
-            // 0x005329a8..0x005329ff: on the player's host, the equipment's hit points (vtable
-            // +0x3c, GetHitPoints; FCOMP 0, TEST AH,0x41, JNZ on <= / NaN) pick
-            // "repair_droid_deactivated" (above 0) or "repair_droid_exhausted".
+            // Hit points above 0 pick "deactivated", else (NaN included) "exhausted".
             if (CliEquipHostIsPlayer(Host))
             {
                 if (Equip->GetHitPoints() > 0.0f)
@@ -2069,7 +1914,7 @@ namespace
         }
         if (Code == EquipDestroying)
         {
-            // 0x00532b66..0x00532b75: CEquip::NotifyDisconnecting(this) (no test), Equip = 0.
+            // No test of Equip.
             Equip->NotifyDisconnecting(this);
             Equip = nullptr;
         }
@@ -2077,10 +1922,8 @@ namespace
 
     FCliShieldEquipFx* CliShieldEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm: operator new(0x18), null-tested. FUN_0052e200 (RET 8): 0x0052e22a
-        // FUN_00531a30; 0x0052e23a..0x0052e240 +0x10 / +0x14 zeroed and the vtable
-        // PTR_LAB_005ddad4; 0x0052e246..0x0052e299 the two sounds (LoadSounds -- the
-        // equipment's +0x70 read with no cast, as in every shield slot).
+        // Factory arm: operator new(0x18), null-tested; FUN_0052e200. LoadSounds reads the
+        // equipment's +0x70 with no cast, as every shield slot does.
         FCliShieldEquipFx* Wrapper = new (std::nothrow) FCliShieldEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -2093,9 +1936,7 @@ namespace
 
     FCliTractorEquipFx* CliTractorEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm: operator new(0x38), null-tested. FUN_0052f540 (RET 8): 0x0052f56a
-        // FUN_00531a30; 0x0052f56f..0x0052f59a +0x10..+0x34 zeroed; 0x0052f59d vtable
-        // PTR_LAB_005ddcdc.
+        // Factory arm: operator new(0x38), null-tested; FUN_0052f540.
         FCliTractorEquipFx* Wrapper = new (std::nothrow) FCliTractorEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -2108,20 +1949,17 @@ namespace
         Wrapper->OperatingEffect = nullptr;
         Wrapper->CompleteSound = nullptr;
 
-        // Each use re-reads the companion archetype: the equipment (+4) non-null ->
-        // [[+4]+0xc]+4, else null -- and the +0x58 / +0x5c address is taken either way.
+        // Each use re-reads the companion archetype (null without an equipment), and the
+        // +0x58 / +0x5c address is taken either way.
         unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
-        // 0x0052f5a5..0x0052f5e3: operating_effect (+0x58) not empty -> FUN_0040f080 into
-        // +0x30, FUN_0040e960(arch, 1).
         ID_String const* const Operating = reinterpret_cast<ID_String const*>(Comp + 0x58);
         if (!Operating->IsEmpty())
         {
             Wrapper->OperatingEffect = FindEffectArch(&Operating->Id);
             EffectArchAddRef(Wrapper->OperatingEffect, 1u);
         }
-        // 0x0052f5e8..0x0052f623: tractor_complete_snd (+0x5c) not empty -> FUN_0042ae40 into
-        // +0x34, then its vtable +0xc (Acquire) with no test of the result.
+        // tractor_complete_snd, acquired with no test of the lookup.
         ID_String const* const Complete = reinterpret_cast<ID_String const*>(Comp + 0x5c);
         if (!Complete->IsEmpty())
         {
@@ -2138,31 +1976,27 @@ namespace
 
     FCliTractorEquipFx::~FCliTractorEquipFx()
     {
-        // FUN_0052f660. 0x0052f684..0x0052f695: +0x30 non-null -> FUN_0040e990.
+        // FUN_0052f660.
         if (OperatingEffect != nullptr)
             EffectArchRelease(OperatingEffect);
-        // 0x0052f69a..0x0052f6a3: +0x34 non-null -> vtable +0x10 (Release); not cleared.
+        // Not cleared.
         if (CompleteSound != nullptr)
             static_cast<Archetype::ISound*>(CompleteSound)->Release();
-        // 0x0052f6a6..0x0052f6d9 / 0x0052f6dc..0x0052f710: the two companions' destructors
-        // inlined in reverse member order (+0x20, then +0x10) -- the FUN_00502d90 body each.
+        // The two companions in reverse member order.
         CliEffectCompanionClear(OperatingCompanion);
         CliEffectCompanionClear(BeamCompanion);
-        // 0x0052f71b: the base destructor FUN_00531af0 follows.
+        // The base destructor FUN_00531af0 follows.
     }
 
     unsigned char FCliTractorEquipFx::StartBeam()
     {
-        // FUN_0052fa10. 0x0052fa2b..0x0052fa66: the 0x84 effect (null when the allocation
-        // failed -- used anyway).
+        // FUN_0052fa10. A failed allocation leaves null, used anyway.
         FCliTractorBeam* const Beam = CliTractorBeamCreate();
-        // 0x0052fa6a..0x0052fa78: FUN_00512be0(this).
         unsigned char const bOk = CliTractorBeamInit(Beam, this);
         if (bOk != 0)
         {
-            // 0x0052fa7e..0x0052fb00: a local companion {0, 0, beam, 0} (its copy takes a
-            // reference; the sound / light arms of that copy see zeros), FUN_004fcea0 on the
-            // host's list (+0x28), the local destroyed.
+            // A local companion {0, 0, beam, 0} (its copy takes a reference) into the host's
+            // list, then destroyed.
             void* Local[4] = {nullptr, nullptr, Beam, nullptr};
             if (Beam != nullptr)
                 EffectAddRef(Beam);
@@ -2170,8 +2004,7 @@ namespace
             if (Local[2] != nullptr)
                 EffectRelease(static_cast<FEffectBase*>(Local[2]));
 
-            // 0x0052fb00..0x0052fb76: a second local {0, 0, beam, 0} (reference), assigned into
-            // +0x10 (the old contents released as FUN_00502d90 does, the new beam referenced),
+            // A second local {0, 0, beam, 0} assigned into +0x10 (the old contents released),
             // then the local released.
             if (Beam != nullptr)
                 EffectAddRef(Beam);
@@ -2184,30 +2017,26 @@ namespace
             if (Beam != nullptr)
                 EffectRelease(Beam);
         }
-        // 0x0052fb7b..0x0052fb7d: the allocation's own reference, no test.
+        // The allocation's own reference, no test.
         EffectRelease(Beam);
         return bOk;
     }
 
     void FCliTractorEquipFx::DropLoot(unsigned LootId, int Units)
     {
-        // FUN_0052f9a0 (RET 8). 0x0052f9a5..0x0052f9b3: no equipment, or its vtable +8
-        // (IsDestroyed) -> nothing.
+        // FUN_0052f9a0.
         if (Equip == nullptr || Equip->IsDestroyed())
             return;
-        // 0x0052f9b5..0x0052f9c7: CETractor::GetTractorArm(LootId) (no cast); none -> nothing.
+        // No cast check.
         CETractor* const Tractor = static_cast<CETractor*>(Equip);
         TractorArm const* const Arm = Tractor->GetTractorArm(LootId);
         if (Arm == nullptr)
             return;
-        // 0x0052f9c9..0x0052f9e5: the arm's watched loot ([arm+8] - 0x9c, the GetTarget idiom
-        // inlined); with one, its units (+0xf0) minus Units still above zero (SUB / TEST / JG,
-        // signed) -> the arm keeps it.
+        // Loot with units left (signed) stays on the arm.
         CLoot const* const Loot = Arm->GetTarget();
         if (Loot != nullptr && static_cast<int>(Loot->Units) - Units > 0)
             return;
-        // 0x0052f9e7..0x0052f9fe: the player's host (FUN_0054baf0, a pointer compare), or any
-        // host outside single player -> CETractor::RemoveTarget(LootId).
+        // The player's host (a pointer compare), or any host outside single player.
         if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW() && SinglePlayer())
             return;
         Tractor->RemoveTarget(LootId);
@@ -2215,21 +2044,14 @@ namespace
 
     void FCliTractorEquipFx::notify(Event Code, void* Param)
     {
-        // LAB_0052f740 (RET 8): Code - 0xa checked JA 0xb, a byte map 0x0052f990 into the
-        // table 0x0052f978 {0xa, 0xb, 0xc, 0x14, 0x15, default}; every arm ends in
-        // FUN_00531b20 with both arguments.
+        // LAB_0052f740: every arm ends in the base notify with both arguments.
         switch (Code)
         {
         case EquipDestroying:
-            // 0x0052f76b..0x0052f784: both companions out of the host's list (FUN_004fcef0 on
-            // Host+0x28, +0x10 then +0x20).
             CliEffectListRemove(&Host->EffectList, BeamCompanion);
             CliEffectListRemove(&Host->EffectList, OperatingCompanion);
             break;
         case EquipActivating:
-            // 0x0052f79c..0x0052f82d: FUN_0052fa10; an operating effect (+0x30) -> an identity
-            // frame, the host's index (vtable +0x1c), FUN_00503070 on DAT_00674c60 with the
-            // host and &this+0x20.
             StartBeam();
             if (OperatingEffect != nullptr)
             {
@@ -2245,26 +2067,22 @@ namespace
             break;
         case EquipDeactivating:
         {
-            // 0x0052f845..0x0052f8ae: CETractor::GetSourcePos (no cast) into a play key
-            // {+0 0, +4 flags (the byte's low three bits cleared, then | 2 -- positional; its
-            // upper bits are whatever the stack held, zero here), +8 the position, +0x14 0},
-            // FUN_00428680(+0x34, &key, 0, 0) with no test of the archetype.
+            // The complete sound at the tractor's source (no cast), positional (the key's upper
+            // flag bits are stack garbage in retail, zero here); no test of the archetype.
             Vector const Source = static_cast<CETractor*>(Equip)->GetSourcePos();
             unsigned Key[6] = {0u, 2u, 0u, 0u, 0u, 0u};
             std::memcpy(&Key[2], &Source.x, sizeof(float));
             std::memcpy(&Key[3], &Source.y, sizeof(float));
             std::memcpy(&Key[4], &Source.z, sizeof(float));
             PlayClientSoundArch(CompleteSound, Key, nullptr, 0);
-            // 0x0052f8b3..0x0052f8cf: both companions out of the host's list.
             CliEffectListRemove(&Host->EffectList, BeamCompanion);
             CliEffectListRemove(&Host->EffectList, OperatingCompanion);
             break;
         }
         case Event_0x14:
         {
-            // 0x0052f8e7..0x0052f91e: the player's host (FUN_0054baf0, a pointer compare) with no
-            // arm active (CETractor::CountActiveArms == 0): the failure code (*Param) 2 ->
-            // "target_out_of_range", 3..6 -> "nnv_tractor_failure" (FUN_00489e80 with 0).
+            // The player's host with no arm active: failure code 2 -> "target_out_of_range",
+            // 3..6 -> "nnv_tractor_failure".
             CETractor* const Tractor = static_cast<CETractor*>(Equip);
             if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
                 break;
@@ -2279,8 +2097,8 @@ namespace
         }
         case Event_0x15:
         {
-            // 0x0052f920..0x0052f95d: the same with exactly one arm active and the arm's own
-            // error code (Param is the TractorArm, +0x20).
+            // The same with exactly one arm active and the arm's own error code (Param is the
+            // TractorArm).
             CETractor* const Tractor = static_cast<CETractor*>(Equip);
             if (static_cast<void*>(static_cast<IObjRW*>(Host)) != GetPlayerObjRW())
                 break;
@@ -2301,9 +2119,7 @@ namespace
 
     FCliThrusterEquipFx* CliThrusterEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // Factory arm: operator new(0x20), null-tested. FUN_0052ec40 (RET 8):
-        // 0x0052ec76 FUN_00531a30; 0x0052ec7b..0x0052ec90 the companion's four slots zeroed;
-        // 0x0052ec96 vtable PTR_FUN_005ddbd8.
+        // Factory arm: operator new(0x20), null-tested; FUN_0052ec40.
         FCliThrusterEquipFx* Wrapper = new (std::nothrow) FCliThrusterEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
@@ -2313,40 +2129,34 @@ namespace
         Wrapper->Companion[2] = nullptr;
         Wrapper->Companion[3] = nullptr;
 
-        // 0x0052ec93..0x0052ecb3: the companion archetype ([[Equip+0xc]+4], no tests); its
-        // hp_particles name (+0x58, a char pointer) empty -> done.
+        // The companion archetype, no tests; hp_particles (+0x58) is a char pointer.
         unsigned char const* const Comp =
             reinterpret_cast<unsigned char const*>(Equip->Arch->Companion);
         char const* const HpName = *reinterpret_cast<char const* const*>(Comp + 0x58);
         if (HpName[0] == '\0')
             return Wrapper;
-        // 0x0052ecb9..0x0052ecc8: particles (+0x54, ID_String) empty -> done.
         ID_String const* const Particles = reinterpret_cast<ID_String const*>(Comp + 0x54);
         if (Particles->IsEmpty())
             return Wrapper;
-        // 0x0052ecce..0x0052ecf4: the equipment's vtable +0x84 (CAttachedEquip::GetRootIndex,
-        // no cast check), FindHardpoint_PS(root, name, &handle, &info).
+        // No cast check.
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         long HpHandle;
         HardpointInfo HpInfo;
         if (!FindHardpoint_PS(Root, HpName, HpHandle, HpInfo))
         {
-            // 0x0052ed60..0x0052ed7e.
             FDUMP(0x100002, "%s(%d) : *** WARNING: Thruster hardpoint not found: %s\n",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliThruster.cpp", 0x2c, HpName);
             return Wrapper;
         }
-        // 0x0052ecf6..0x0052ed29: the frame {hardpoint orientation (MOVSD.REP 9), position}.
         FTransform Xform;
         std::memcpy(&Xform.Rotation, &HpInfo.Orient, sizeof(Xform.Rotation));
         Xform.Translation.X = HpInfo.Position.x;
         Xform.Translation.Y = HpInfo.Position.y;
         Xform.Translation.Z = HpInfo.Position.z;
-        // 0x0052ed2d..0x0052ed36: particles tested again.
+        // Particles tested again (retail).
         if (Particles->IsEmpty())
             return Wrapper;
-        // 0x0052ed38..0x0052ed57: FUN_0040f080(&particles), FUN_00503070 on DAT_00674c60 with the
-        // host, the hardpoint handle, the frame and &this+0x10.
+        // The hardpoint handle is passed as the part index.
         CliCreateEffectOneShot(FindEffectArch(&Particles->Id), Host, static_cast<int>(HpHandle),
                                &Xform, Wrapper->Companion);
         return Wrapper;
@@ -2357,22 +2167,16 @@ namespace
 
     FCliThrusterEquipFx::~FCliThrusterEquipFx()
     {
-        // FUN_0052edc0: the companion's destructor inlined (particle +0x18 FUN_004f7a90, sound
-        // +0x14 vt+8, light +0x1c FUN_00537ad0, each cleared, then +0x10 = 0 -- the body of
-        // FUN_00502d90); 0x0052ee1f the base destructor FUN_00531af0 follows.
+        // FUN_0052edc0; the base destructor FUN_00531af0 follows.
         CliEffectCompanionClear(Companion);
     }
 
     void FCliThrusterEquipFx::notify(Event Code, void* Param)
     {
-        // FUN_0052ee40 (RET 8): a jump table on Code - 0xa (0..5, JA to the default); every arm
-        // ends in FUN_00531b20 with both arguments.
+        // FUN_0052ee40: every arm ends in the base notify with both arguments.
         switch (Code)
         {
         case EquipDestroying:
-            // 0x0052ee5b..0x0052eec1: the player's live host (class 0x503) queues
-            // "thruster_destroyed"; 0x0052eec4..0x0052eece out of the host's effect list
-            // (FUN_004fcef0 on Host+0x28 with &this+0x10).
             if (CliEquipHostIsLivePlayer(Host, 0x503u))
                 NnVoiceEnqueue(G_ThrusterDestroyedId, 0);
             CliEffectListRemove(&Host->EffectList, Companion);
@@ -2380,9 +2184,6 @@ namespace
         case EquipActivating:
         case EquipDeactivating:
         {
-            // 0x0052eee6..0x0052eef4 / 0x0052ef09..0x0052ef14: the particle (+0x18) non-null ->
-            // its slot +0xc (SetIntensity) with 1.0f (0x3f800000) on activation, 0 on
-            // deactivation.
             FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
             if (Effect != nullptr)
             {
@@ -2393,9 +2194,8 @@ namespace
         }
         case NotEnoughPower:
         {
-            // 0x0052ef29..0x0052ef60: the host object's owner (class & 3 == 3 -> CSimple +0xb4,
-            // else FUN_0054bb00 = DAT_00673344); the local player's -> the host's IObjAffect face
-            // (+4) slot +0x54 (false, DAT_00673344).
+            // The host object's owner (a non-CSimple counts as the local player, DAT_00673344);
+            // the local player's thrusters are switched off.
             CObject* const Obj = Host->Object;
             unsigned const Owner =
                 (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 3u) == 3u)
@@ -2421,23 +2221,20 @@ namespace
 
     FCliAttachedFxEquipFx::FCliAttachedFxEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)
     {
-        // 0x00532243..0x005322aa: the inlined base (FUN_00531a30).
+        // FUN_00532210, with the base (FUN_00531a30) inlined.
         CliEquipFxBaseFill(this, EquipParam, HostParam);
 
-        // 0x005322b3..0x005322bc: the companion's constructor zeroes all four slots.
         Companion[0] = nullptr;
         Companion[1] = nullptr;
         Companion[2] = nullptr;
         Companion[3] = nullptr;
 
-        // 0x005322bf..0x005322e5: the CliEQAttachedFX (null without an equipment -- retail then
-        // reads +0x54 off null); an empty "particles" ends here.
+        // The CliEQAttachedFX is null without an equipment -- retail then reads +0x54 off null.
         Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
         if (CompanionAsAttachedFX(Comp)->Particles.IsEmpty())
             return;
 
-        // 0x005322ec..0x00532324: equipment vtable +0x68 (CExternalEquip::GetHardPointInfo) --
-        // result not tested -- and the hardpoint as the local frame.
+        // GetHardPointInfo's result is not tested.
         CExternalEquip const* const External = static_cast<CExternalEquip const*>(Equip);
         HardpointInfo Hardpoint;
         External->GetHardPointInfo(Hardpoint);
@@ -2447,16 +2244,13 @@ namespace
         Local.Translation.Y = Hardpoint.Position.y;
         Local.Translation.Z = Hardpoint.Position.z;
 
-        // 0x00532328..0x00532355: the companion again, vtable +0x64 (GetParentConnector(false)),
-        // and a second IsEmpty on the same "particles".
+        // The companion read again, and a second IsEmpty on the same "particles".
         Archetype::ICliObj* const Comp2 = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
         long const Part = External->GetParentConnector(false);
         FCliEQAttachedFXView const* const View = CompanionAsAttachedFX(Comp2);
         if (View->Particles.IsEmpty())
             return;
 
-        // 0x00532357..0x00532375: FUN_0040f080 on the id, then FUN_00503070 on DAT_00674c60
-        // with the host, the part, the frame and &this+0x10.
         CliCreateEffectOneShot(FindEffectArch(&View->Particles.Id), Host, static_cast<int>(Part),
                                &Local, Companion);
     }
@@ -2470,8 +2264,7 @@ namespace
 
     void FCliAttachedFxEquipFx::notify(Event Code, void* /*Param*/)
     {
-        // LAB_00532460 (RET 8): code 0xa only -- out of the host's effect list (FUN_004fcef0 on
-        // Host+0x28 with &this+0x10), then CEquip::NotifyDisconnecting(this), Equip = 0.
+        // LAB_00532460: code 0xa only.
         if (Code == EquipDestroying)
         {
             CliEffectListRemove(&Host->EffectList, Companion);
@@ -2482,9 +2275,8 @@ namespace
 
     bool FCliAttachedFxEquipFx::Update(float /*Dt*/)
     {
-        // FUN_00532490 (RET 4). A live equipment (vtable +8, IsDestroyed, false) with a particle
-        // in the companion's effect slot (+0x18) whose CliEQAttachedFX has use_throttle, on a
-        // ship host: the particle's slot +0xc (SetIntensity) gets CShip::Throttle (+0x29c).
+        // FUN_00532490. A live equipment with a particle whose CliEQAttachedFX has use_throttle,
+        // on a ship host: the particle's intensity follows CShip::Throttle (+0x29c).
         if (Equip != nullptr && !Equip->IsDestroyed() && Companion[2] != nullptr)
         {
             Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
@@ -2498,30 +2290,25 @@ namespace
                 Effect->SetIntensity(Ship->Throttle);
             }
         }
-        // 0x00532515..0x0053251c.
         return Equip != nullptr;
     }
 
     FCliAttachedFxEquipFx* CliAttachedFxEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // The factory's attached-FX arm (FUN_00533160, 0x0053325c): operator new(0x20),
-        // FUN_00532210.
+        // The factory's attached-FX arm (FUN_00533160): operator new(0x20), FUN_00532210.
         return new FCliAttachedFxEquipFx(Equip, Host);
     }
 
     FCliInternalFxEquipFx* CliInternalFxEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // FUN_00532530 (RET 8). 0x00532548..0x005325bd: the inlined base (FUN_00531a30) --
-        // CEquip::Connect, the separation explosion (FUN_00536100).
+        // FUN_00532530, with the base (FUN_00531a30) inlined.
         FCliInternalFxEquipFx* Wrapper = new (std::nothrow) FCliInternalFxEquipFx();
         if (Wrapper == nullptr)
             return nullptr;
         CliEquipFxBaseFill(Wrapper, Equip, Host);
-        // 0x005325c0..0x005325cc: +0x10 = 0, vtable PTR_LAB_005de17c.
         Wrapper->Voice = nullptr;
 
-        // 0x005325d2..0x00532610: the companion (a null equipment gives a null companion,
-        // read anyway); an empty +0x54 or an unknown archetype (FUN_0042ae40) ends here.
+        // A null equipment gives a null companion, read anyway.
         unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
         ID_String const* const SoundId = reinterpret_cast<ID_String const*>(Comp + 0x54);
@@ -2531,13 +2318,9 @@ namespace
         if (SoundArch == nullptr)
             return Wrapper;
 
-        // 0x00532616..0x0053266e: a Source3D (FUN_00428f80(0x64) + FUN_00429040(1) + the 3D
-        // fields, vtable PTR_LAB_005c9efc) into +0x10 -- a failed allocation stores null and is
-        // used anyway.
+        // A Source3D; a failed allocation stores null and is used anyway.
         ISoundSource* const Voice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
         Wrapper->Voice = Voice;
-        // 0x00532671..0x005326ff: SetLooping(1) (vt+0x88); SetPose (vt+0x94) with the host's
-        // get_index (vt+0x1c) and an identity frame; Start (vt+0x58) with the archetype, 0.
         Voice->SetLooping(1);
         FTransform IdentityXform;
         std::memset(&IdentityXform, 0, sizeof(IdentityXform));
@@ -2552,16 +2335,12 @@ namespace
 
     FCliEngineEquipFx::FCliEngineEquipFx(CEquip* InEquip, FClientGameobj* InHost)
     {
-        // FUN_00527b80 (RET 8). Its EH states: 0 after the base part (unwind FUN_00531af0 =
-        // ~FClientEquip), 1 after the nozzle vector (unwind FUN_005298e0) -- a real constructor,
-        // so a throw from the body below destroys Nozzles and then the base, in that order.
+        // FUN_00527b80. Its EH states unwind the nozzle vector and then the base, as a real
+        // constructor does.
         FCliEngineEquipFx* const Wrapper = this;
-        // 0x00527b96..0x00527baa: FUN_00531a30 (Equip, Host).
         CliEquipFxBaseFill(Wrapper, InEquip, InHost);
-        // 0x00527baf..0x00527bfc: +0x10 is the nozzle vector's (empty) allocator -- retail
-        // copies a stray stack byte into it; nothing reads it. +0x14..+0x1c (the vector,
-        // FCliEngineNozzleVector's constructor) and +0x20..+0x5c are zeroed, the vtable
-        // (PTR_FUN_005dd134) is stamped.
+        // Retail copies a stray stack byte into the nozzle vector's allocator byte (+0x10);
+        // nothing reads it.
         Wrapper->FxThrottle = 0.0f;
         Wrapper->ThrottleSteadyTime = 0.0f;
         Wrapper->CruiseTime = 0.0f;
@@ -2572,8 +2351,7 @@ namespace
             Wrapper->SoundEmitters[I] = nullptr;
         Wrapper->TrailEffect = nullptr;
 
-        // 0x00527bc5..0x00527c33: the host's CShip (class 0x503, else null -- COMMON
-        // CShip::get_speed is called on it regardless), get_speed(1.0, engine) into +0x30.
+        // The host's CShip (null otherwise -- get_speed is called on it regardless).
         CShip* Ship = nullptr;
         if (Wrapper->Host != nullptr && Wrapper->Host->Object != nullptr &&
             (static_cast<unsigned>(Wrapper->Host->Object->ObjectClass) & 0x503u) == 0x503u)
@@ -2581,8 +2359,7 @@ namespace
             Ship = static_cast<CShip*>(Wrapper->Host->Object);
         }
         Wrapper->CruiseSpeed = Ship->get_speed(1.0f, ThrustEquipEngine);
-        // 0x00527c36..0x00527c7a: with game option 0x2d ("[AUDIO]", FUN_005792b0) at 2, the
-        // same ship re-derived and get_speed(1.0, thruster) replaces it.
+        // With game option 0x2d ("[AUDIO]") at 2, the thruster speed replaces it.
         if (GetGameOption(kGameOptAudioGroup) == 2)
         {
             CShip* ThrusterShip = nullptr;
@@ -2594,9 +2371,8 @@ namespace
             Wrapper->CruiseSpeed = ThrusterShip->get_speed(1.0f, ThrustEquipThruster);
         }
 
-        // 0x00527c7d..0x00527cc3: the companion's +0xa8 ID_String (a null equipment gives a
-        // null companion, read anyway); not empty -> FUN_0040f080 into +0x5c and
-        // FUN_0040e960 (EffectArch AddRef, argument 0) on it with no null test.
+        // The companion's +0xa8 (a null equipment gives a null companion, read anyway); the
+        // found arch is referenced with no null test.
         unsigned char const* const CompBytes = reinterpret_cast<unsigned char const*>(
             Wrapper->Equip != nullptr ? Wrapper->Equip->Arch->Companion : nullptr);
         ID_String const* const BackfireId = reinterpret_cast<ID_String const*>(CompBytes + 0xa8);
@@ -2606,15 +2382,13 @@ namespace
             EffectArchAddRef(Wrapper->TrailEffect, 0);
         }
 
-        // 0x00527cc8..0x00527cd1: FUN_00528980, FUN_00528f90.
         CliEngineAttachExhaustEffects(Wrapper);
         CliEngineSoundInit(Wrapper);
     }
 
     FCliEngineEquipFx* CliEngineEquipFxConstruct(CEquip* Equip, FClientGameobj* Host)
     {
-        // 0x0053351d..0x00533544: operator new(0x60) (MSVCRT: null on failure, tested), then
-        // FUN_00527b80 on it.
+        // operator new(0x60) (null on failure, tested), then FUN_00527b80.
         return new (std::nothrow) FCliEngineEquipFx(Equip, Host);
     }
 
@@ -2625,10 +2399,8 @@ namespace
         if (Wrapper == nullptr)
             return nullptr;
         CliEquipFxBaseFill(Wrapper, Equip, Host);
-        // 0x00516c5e..0x00516c98: both channels' vtable, +0x2c / +0x28 / +0x30 = 0, both child
-        // indices -1, then +0x2c = CliEQTradeLane +0xac (spin_max) with no test. The channels'
-        // owners (+0x18 / +0x24) are left for FUN_00516af0.
-        // (the channel vtables are stamped by the FTradeLaneRingChannel member constructors)
+        // The speed starts at CliEQTradeLane +0xac (spin_max), read with no test. The channels'
+        // owners are left for FUN_00516af0.
         Wrapper->TlrLeft.Owner = nullptr;
         Wrapper->TlrRight.Owner = nullptr;
         Wrapper->SpinSpeed = 0.0f;
@@ -2640,7 +2412,7 @@ namespace
             reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0xac);
         CliTradeLaneFindTlrHardpoints(Wrapper);
         CliTradeLaneAttachLaneEffects(Wrapper);
-        // 0x00516ca7..0x00516cb0: FUN_0040c690 on the companion, no test.
+        // FUN_0040c690 on the companion, no test.
         Archetype::CliTradeLaneAddEffectRef(Equip->EquipArch()->Companion);
         return Wrapper;
     }
@@ -2650,14 +2422,12 @@ namespace
 
     bool FCliTradeLaneEquipFx::Update(float Dt)
     {
-        // LAB_00516ea0 (RET 4). Nothing without the TRADE_LANES option (FUN_005792b0(0x2a)).
+        // LAB_00516ea0. Nothing without the TRADE_LANES option.
         if (GetGameOption(kGameOptTradeLanes) != 0)
         {
-            // 0x00516eb5..0x00516f00: the companion (no test); the speed step is
-            // spin_accel (+0xa8) * Dt. +0x30 clear: speed up, capped at spin_max (+0xac) --
-            // FCOMP, TEST AH,0x41, JNZ skips the cap on <= / NaN. +0x30 set: slow down, floored
-            // at 0 (DAT_005c7474) -- TEST AH,5, JP skips the floor on >= / NaN. The compare is
-            // on the unrounded x87 value, the store (FST) is the float.
+            // The companion is read with no test. No ship on the lane: speed up, capped at
+            // spin_max; otherwise slow down, floored at 0 (NaN skips either clamp). The compare
+            // is on the unrounded value.
             unsigned char const* const Comp =
                 reinterpret_cast<unsigned char const*>(Equip->Arch->Companion);
             float const SpinAccel = *reinterpret_cast<float const*>(Comp + 0xa8);
@@ -2678,8 +2448,7 @@ namespace
                     SpinSpeed = 0.0f;
             }
 
-            // 0x00516f07..0x00516f39: angle += Dt * speed (FST), then while it is above 360
-            // (TEST AH,0x41, JZ loops on >), subtract 360 and store once at the end.
+            // Wrapped by repeated subtraction on the unrounded value, stored once at the end.
             double Angle = static_cast<double>(Dt) * static_cast<double>(SpinSpeed) +
                            static_cast<double>(SpinAngle);
             SpinAngle = static_cast<float>(Angle);
@@ -2692,25 +2461,20 @@ namespace
                 SpinAngle = static_cast<float>(Angle);
             }
 
-            // 0x00516f3b..0x00516f5d: each bound joint channel is registered for this frame.
+            // Each bound joint channel is registered for this frame.
             if (TlrLeft.ChildIndex != -1)
                 AnimDB::Add(&TlrLeft);
             if (TlrRight.ChildIndex != -1)
                 AnimDB::Add(&TlrRight);
         }
-        // 0x00516f61: MOV AL,1 on both paths.
         return true;
     }
 
-    // The derived destructors that carry work of their own. They used to be branches of a
-    // dynamic_cast chain here; with the ClientEquip vtable (slot 1) they are the classes' own
-    // destructors, and ~FClientEquip (FUN_00531af0) runs after each -- which is also where the
-    // separation explosion's FUN_00536170 now happens (the InternalFX branch used to do it by
-    // hand, and the other classes leaked the reference).
+    // The derived destructors that carry work of their own; ~FClientEquip (FUN_00531af0) runs
+    // after each and releases the separation explosion (FUN_00536170).
     FCliInternalFxEquipFx::~FCliInternalFxEquipFx()
     {
-        // FUN_00532740: the voice, when set, Stop (vt+0x60), Release (vt+8), cleared; then the
-        // inlined base destructor (~FClientEquip: NotifyDisconnecting, FUN_00536170).
+        // FUN_00532740; then the inlined base destructor (~FClientEquip).
         if (Voice != nullptr)
         {
             Voice->Stop();
@@ -2721,9 +2485,8 @@ namespace
 
     void FCliInternalFxEquipFx::notify(Event Code, void* /*Param*/)
     {
-        // LAB_005327d0 (RET 8): code 0xa only -- the voice stopped (vt+0x60) when set, then
-        // CEquip::NotifyDisconnecting(this) with no test of the equipment and Equip = 0. The
-        // base FUN_00531b20 is not called (its body is what the tail repeats).
+        // LAB_005327d0: code 0xa only; no test of the equipment. The base FUN_00531b20 is not
+        // called (its body is what the tail repeats).
         if (Code == EquipDestroying)
         {
             if (Voice != nullptr)
@@ -2744,7 +2507,7 @@ namespace
         Effect->Kill();
     }
 
-    // FUN_005298c0 (thiscall on the reference): release when set (FUN_004f7a90), then clear.
+    // FUN_005298c0 (on the reference).
     void CliEngineReleaseParticleRef(FParticleEffect*& Ref)
     {
         if (Ref != nullptr)
@@ -2762,7 +2525,7 @@ namespace
         CliEngineReleaseParticleRef(Slot->TrailFx);
     }
 
-    // FUN_00529920 (thiscall on the vector at +0x10): erase(begin, end). The copy-down loop
+    // FUN_00529920 (on the vector at +0x10): erase(begin, end). The copy-down loop
     // over [end, end) moves nothing, so what is left is the element destructor on every slot
     // and End = Begin.
     void CliEngineClearNozzles(FCliEngineEquipFx* Wrapper)
@@ -2775,39 +2538,35 @@ namespace
 
     FCliEngineNozzleVector::~FCliEngineNozzleVector()
     {
-        // FUN_005298e0 (thiscall on the vector, 0x005298e0..0x00529918): FUN_00528d00 on every
-        // slot of [first, last), operator delete(first) (FUN_005b7e1d, null-safe), then first,
-        // last and end = 0. Also the inlined tail of FUN_00527d10 (0x00527dfd..0x00527e4a).
-        // The buffer itself goes with the std::vector member.
+        // FUN_005298e0 (also the inlined tail of FUN_00527d10): every slot destroyed; the buffer
+        // itself goes with the std::vector member.
         for (FCliEngineNozzleSlot* Slot = First(); Slot != Last(); ++Slot)
             CliEngineNozzleSlotDestruct(Slot);
     }
 
-    // FUN_005288a0 (RET 4): notify 0xb passes 0, 0xc passes 1.
+    // FUN_005288a0: notify 0xb passes 0, 0xc passes 1.
     void CliEngineSetActiveSounds(FCliEngineEquipFx* Wrapper, unsigned char bDeactivating)
     {
         ISoundSource** const Snd = Wrapper->SoundEmitters;
         if (bDeactivating != 0)
         {
-            // 0x005288ab..0x005288cc: stop rumble (+0x38), character loop (+0x40) and
-            // character start (+0x3c).
+            // Stop rumble, character loop and character start.
             if (Snd[0] != nullptr)
                 Snd[0]->Stop();
             if (Snd[2] != nullptr)
                 Snd[2]->Stop();
             if (Snd[1] != nullptr)
                 Snd[1]->Stop();
-            // 0x005288cf..0x005288de: a cruise stop sound (+0x50) still playing ends here.
+            // A cruise stop sound still playing ends here; otherwise the kill sound restarts.
             if (Snd[6] != nullptr && Snd[6]->IsActive())
                 return;
-            // 0x005288e4..0x00528913: the engine kill sound (+0x44), restarted.
             if (Snd[3] == nullptr)
                 return;
             CliEngineRestartEmitter(Snd[3]);
             return;
         }
-        // 0x00528919..0x00528974: stop the kill sound, start rumble and character loop (no
-        // IsActive test), restart the character start sound.
+        // Stop the kill sound, start rumble and character loop (no IsActive test), restart
+        // the character start sound.
         if (Snd[3] != nullptr)
             Snd[3]->Stop();
         if (Snd[0] != nullptr)
@@ -2819,23 +2578,22 @@ namespace
         CliEngineRestartEmitter(Snd[1]);
     }
 
-    // FUN_00528560 (RET 4): notify 0xe, the new cruise state. The old one is +0x34.
+    // FUN_00528560: notify 0xe, the new cruise state. The old one is +0x34.
     void CliEngineSetCruiseState(FCliEngineEquipFx* Wrapper, int State)
     {
         ISoundSource** const Snd = Wrapper->SoundEmitters;
-        // 0x00528569..0x00528576: CMP 3, JA -- above 3 (unsigned) takes caseD_4.
+        // Above 3 (unsigned) takes the common tail.
         switch (static_cast<unsigned>(State))
         {
         case 0:
         {
-            // 0x0052857d..0x00528588: only from state 3 or 2; anything else is caseD_4.
+            // Only from state 3 or 2; anything else is the common tail.
             int const Old = Wrapper->CruiseState;
             if (Old != 3 && Old != 2)
                 break;
             if (Old == 3)
             {
-                // 0x00528593..0x005285c5: cruise stop (+0x50) restarted, cruise loop (+0x4c)
-                // stopped.
+                // Cruise stop restarted, cruise loop stopped.
                 if (Snd[6] != nullptr)
                     CliEngineRestartEmitter(Snd[6]);
                 if (Snd[5] != nullptr)
@@ -2843,11 +2601,10 @@ namespace
             }
             else
             {
-                // 0x005285c7..0x005285d5: cruise start (+0x48) stopped.
                 if (Snd[4] != nullptr)
                     Snd[4]->Stop();
             }
-            // 0x005285d8..0x0052861e: rumble and character loop started when idle.
+            // Rumble and character loop started when idle.
             if (Snd[0] != nullptr && !Snd[0]->IsActive())
                 CliEngineStartEmitter(Snd[0]);
             if (Snd[2] != nullptr && !Snd[2]->IsActive())
@@ -2858,7 +2615,7 @@ namespace
         {
             if (Wrapper->CruiseState == 3)
             {
-                // 0x00528638..0x0052865f: cruise loop stopped, disrupt (+0x54) restarted.
+                // Cruise loop stopped, disrupt restarted.
                 if (Snd[5] != nullptr)
                     Snd[5]->Stop();
                 if (Snd[7] != nullptr)
@@ -2866,22 +2623,19 @@ namespace
             }
             else
             {
-                // 0x00528661..0x00528688: cruise start stopped, backfire (+0x58) restarted.
+                // Cruise start stopped, backfire restarted.
                 if (Snd[4] != nullptr)
                     Snd[4]->Stop();
                 if (Snd[8] != nullptr)
                     CliEngineRestartEmitter(Snd[8]);
             }
-            // 0x00528693..0x005286cc: rumble and character loop started when idle.
             if (Snd[0] != nullptr && !Snd[0]->IsActive())
                 CliEngineStartEmitter(Snd[0]);
             if (Snd[2] != nullptr && !Snd[2]->IsActive())
                 CliEngineStartEmitter(Snd[2]);
-            // 0x005286d1..0x00528783: with a backfire effect (+0x5c), one one-shot per
-            // nozzle whose hardpoint resolves (COMMON ExhaustNozzleInfo::GetHardpointOffset_NS
-            // into one identity frame shared by the loop), FUN_00503070 on DAT_00674c60 with
-            // the host, the nozzle's +8 part and no companion. The equipment's nozzle vector
-            // (+0x38 / +0x3c, stride 0x3c) is read without a class test.
+            // With a backfire effect, one one-shot per nozzle whose hardpoint resolves (one
+            // frame shared by the loop), no companion. The nozzle vector is read without a
+            // class test.
             if (Wrapper->TrailEffect == nullptr)
                 break;
             Transform Xform;
@@ -2912,8 +2666,7 @@ namespace
             break;
         }
         case 2:
-            // 0x0052879d..0x0052881a: stop rumble, character start, character loop and kill;
-            // restart the cruise start sound (+0x48).
+            // Stop rumble, character start, character loop and kill; restart cruise start.
             if (Snd[0] != nullptr)
                 Snd[0]->Stop();
             if (Snd[1] != nullptr)
@@ -2926,9 +2679,8 @@ namespace
                 CliEngineRestartEmitter(Snd[4]);
             break;
         case 3:
-            // 0x0052881d..0x00528869: the same four stops, the cruise loop (+0x4c) started
-            // with no IsActive test -- and only the state is stored: this arm returns without
-            // the +0x28 reset (null loop: LAB_00528878, also past it).
+            // The same four stops, the cruise loop started with no IsActive test -- and only the
+            // state is stored: this arm returns without the +0x28 reset.
             if (Snd[0] != nullptr)
                 Snd[0]->Stop();
             if (Snd[1] != nullptr)
@@ -2944,7 +2696,7 @@ namespace
         default:
             break;
         }
-        // caseD_4 and every other exit: +0x28 = 0, +0x34 = the new state.
+        // The common tail.
         Wrapper->CruiseTime = 0.0f;
         Wrapper->CruiseState = State;
     }
@@ -2961,7 +2713,7 @@ namespace
         {
             CliEngineReleaseSoundEmitters(Wrapper);
         }
-        // 0x00529714..0x00529775: identity orientation, the average as the position.
+        // Retail goes on after the release; every emitter is null by then.
         FTransform Pose;
         std::memset(&Pose, 0, sizeof(Pose));
         Pose.Rotation.D[0][0] = 1.0f;
@@ -2970,8 +2722,7 @@ namespace
         Pose.Translation.X = Avg[0];
         Pose.Translation.Y = Avg[1];
         Pose.Translation.Z = Avg[2];
-        // 0x00529779..0x00529894: each emitter, when set, gets vtable +0x94 (SetPose) with
-        // the host's index (vtable +0x1c) and the frame.
+        // The host's index is read per emitter.
         for (int Index = 0; Index < 9; ++Index)
         {
             ISoundSource* const Emitter = Wrapper->SoundEmitters[Index];
@@ -2985,15 +2736,12 @@ namespace
 
     void FCliEngineEquipFx::notify(Event Code, void* Param)
     {
-        // FUN_00527e70 (RET 8): codes 0xa..0xe (ADD -0xa, CMP 4, JA), then FUN_00531b20 with
-        // both arguments on every path.
+        // FUN_00527e70: codes 0xa..0xe, then the base notify with both arguments on every path.
         switch (Code)
         {
         case EquipDestroying:
         {
-            // 0x00527eae..0x00527ef6: per nozzle, the trail (+4) is killed (vtable +4),
-            // released and cleared; the cruise (+8) is killed, then released through
-            // FUN_005298c0.
+            // Per nozzle, both effects killed and released.
             for (FCliEngineNozzleSlot* Slot = Nozzles.First(); Slot != Nozzles.Last(); ++Slot)
             {
                 if (Slot->TrailFx != nullptr)
@@ -3011,29 +2759,21 @@ namespace
                     CliEngineReleaseParticleRef(Slot->CruiseFx);
                 }
             }
-            // 0x00527efc..0x00527f06: FUN_00529920 on the vector, FUN_005295d0.
             CliEngineClearNozzles(this);
             CliEngineReleaseSoundEmitters(this);
-            // 0x00527f0b..0x00527f7a: the player's host (FUN_0054baf0, a pointer compare), not
-            // reaped (vtable +0x158), its CShip (class 0x503, else null -- get_hit_pts is
-            // called on it regardless) above 0 hit points (FCOMP 0, TEST AH,0x41, JNZ skips on
-            // <= / NaN) queues "engine_destroyed" (FUN_00489e80 with DAT_006753e8, 0).
             if (CliEquipHostIsLivePlayer(Host, 0x503u))
                 NnVoiceEnqueue(G_EngineDestroyedId, 0);
             break;
         }
         case EquipActivating:
-            // 0x00527ea0: FUN_005288a0(0).
             CliEngineSetActiveSounds(this, 0);
             break;
         case EquipDeactivating:
-            // 0x00527e92: FUN_005288a0(1).
             CliEngineSetActiveSounds(this, 1);
             break;
         case ArchGroupDestroyed:
         {
-            // 0x00527f7c..0x00527fcd: the slots whose sub-object id is the low word of Param
-            // lose both effects (kill, release, clear); then FUN_005296d0.
+            // The slots whose sub-object id is the low word of Param lose both effects.
             unsigned short const SubObjId =
                 static_cast<unsigned short>(reinterpret_cast<uintptr_t>(Param));
             for (FCliEngineNozzleSlot* Slot = Nozzles.First(); Slot != Nozzles.Last(); ++Slot)
@@ -3063,7 +2803,6 @@ namespace
             break;
         }
         case EngineCruiseStateChanged:
-            // 0x00527fd8..0x00527fe1: FUN_00528560(*Param).
             CliEngineSetCruiseState(this, *static_cast<int const*>(Param));
             break;
         default:
@@ -3074,8 +2813,7 @@ namespace
 
     FCliEngineEquipFx::~FCliEngineEquipFx()
     {
-        // FUN_00527d10. 0x00527d38..0x00527d8d: per nozzle, trail (+4) then cruise (+8):
-        // kill (vtable +4), then -- re-read -- release (FUN_004f7a90) and clear.
+        // FUN_00527d10. Per nozzle, trail then cruise: kill, then -- re-read -- release.
         for (FCliEngineNozzleSlot* Slot = Nozzles.First(); Slot != Nozzles.Last(); ++Slot)
         {
             if (Slot->TrailFx != nullptr)
@@ -3097,18 +2835,14 @@ namespace
                 }
             }
         }
-        // 0x00527d8f..0x00527de7: the inlined erase(begin, end) -- the FUN_00529d50 copy loop
-        // runs over [end, end) and does nothing, the element destructors run, End = Begin.
+        // The inlined erase(begin, end).
         CliEngineClearNozzles(this);
-        // 0x00527dea: FUN_005295d0.
         CliEngineReleaseSoundEmitters(this);
-        // 0x00527def..0x00527df8: the backfire effect arch (FUN_0040e990) when set; the
-        // pointer is left as it is.
+        // The pointer is left as it is.
         if (TrailEffect != nullptr)
             EffectArchRelease(TrailEffect);
-        // 0x00527dfd..0x00527e4a: the vector's own destructor (FUN_005298e0 inlined) -- runs
-        // as the Nozzles member's ~FCliEngineNozzleVector after this body; ~FClientEquip
-        // (FUN_00531af0) follows it.
+        // The vector's destructor (FUN_005298e0 inlined) runs as the Nozzles member's after this
+        // body; ~FClientEquip (FUN_00531af0) follows it.
     }
 
     // Retail Archetype::CliEQEngine (vtable 005c7ac4, 0xac) is private to client_cliobj.cpp
@@ -3134,10 +2868,9 @@ namespace
 
     bool FCliEngineEquipFx::Update(float Dt)
     {
-        // LAB_00528020 (RET 4). Nothing but the base's answer without an equipment.
+        // LAB_00528020. Nothing but the base's answer without an equipment.
         if (Equip != nullptr)
         {
-            // 0x00528036..0x00528062: the host's ship (class 0x503), else null.
             CShip const* Ship = nullptr;
             if (Host != nullptr && Host->Object != nullptr &&
                 (static_cast<unsigned>(Host->Object->ObjectClass) & 0x503u) == 0x503u)
@@ -3146,9 +2879,8 @@ namespace
             }
             CEEngine const* const Engine = static_cast<CEEngine const*>(Equip);
 
-            // 0x00528064..0x0052808f: the target throttle -- 0 while the engine is off
-            // (vtable +4, IsActive), 1 (DAT_005c75dc) in cruise (+0x54), else the ship's
-            // throttle (+0x29c, read with no test of the ship).
+            // The target throttle: 0 while the engine is off, 1 in cruise, else the ship's
+            // throttle (read with no test of the ship).
             double Target = 0.0;
             if (Equip->IsActive())
             {
@@ -3158,11 +2890,9 @@ namespace
                     Target = static_cast<double>(Ship->Throttle);
             }
 
-            // 0x00528093..0x005280e4: step FxThrottle toward the target by at most
-            // Dt * MAX_DELTA_FX_THROTTLE. The difference and the step are stored as floats;
-            // the compare is step (x87) > |difference| (FCOMPP, TEST AH,0x41, JZ takes the
-            // target on >). Otherwise the sign of the difference (FCOMP 0, TEST AH,0x41, JNZ
-            // subtracts on <= / NaN) picks FxThrottle +/- step.
+            // Step FxThrottle toward the target by at most Dt * MAX_DELTA_FX_THROTTLE. The
+            // difference and the step are stored as floats; the compare uses the unrounded step.
+            // Otherwise the sign of the difference (NaN subtracts) picks FxThrottle +/- step.
             float const Diff =
                 static_cast<float>((Target - static_cast<double>(FxThrottle)) * static_cast<double>(Dt));
             double const StepX87 = static_cast<double>(Dt) *
@@ -3176,15 +2906,14 @@ namespace
             else
                 NewThrottle = static_cast<float>(static_cast<double>(FxThrottle) - static_cast<double>(Step));
 
-            // 0x005280e8..0x00528102: unchanged (TEST AH,0x44, JP resets on not-equal / NaN)
-            // counts the steady time up by Dt, any change resets it.
+            // Unchanged counts the steady time up by Dt; any change (or NaN) resets it.
             if (NewThrottle == FxThrottle)
                 ThrottleSteadyTime = static_cast<float>(static_cast<double>(Dt) + static_cast<double>(ThrottleSteadyTime));
             else
                 ThrottleSteadyTime = 0.0f;
 
-            // 0x00528109..0x0052818b: the exhaust intensity. In cruise with charge time elapsed
-            // (+0x50 > 0) and an archetype cruise_charge_time (+0x80) > 0 it blends toward 1:
+            // The exhaust intensity. In cruise with charge time elapsed and an archetype
+            // cruise_charge_time > 0 it blends toward 1:
             // New * MAX_ENGINE_FX_THROTTLE + (elapsed / charge) * (1 - MAX_ENGINE_FX_THROTTLE);
             // charge time 0 gives New itself; otherwise New * MAX_ENGINE_FX_THROTTLE.
             float Intensity = 0.0f;
@@ -3218,9 +2947,7 @@ namespace
                 Intensity = static_cast<float>(static_cast<double>(NewThrottle) * MaxFx);
             }
 
-            // 0x0052818f..0x0052820d: every nozzle's trail (+4) and cruise (+8) particle gets
-            // slot +0xc (SetIntensity) with the intensity, floored at 0 (TEST AH,0x41, JNZ
-            // gives 0 on <= / NaN).
+            // Every nozzle particle gets the intensity, floored at 0 (NaN gives 0).
             typedef void(__thiscall * FSetIntensity)(FParticleEffect*, float);
             for (FCliEngineNozzleSlot* Slot = Nozzles.First(); Slot != Nozzles.Last(); ++Slot)
             {
@@ -3238,17 +2965,15 @@ namespace
                 }
             }
 
-            // 0x0052820f..0x00528221: the sounds with the new throttle, then it is kept.
             UpdateSound(NewThrottle, Dt);
             FxThrottle = NewThrottle;
         }
-        // 0x00528225..0x00528228: FUN_00532000.
         return FClientEquip::Update(Dt);
     }
 
     void FCliEngineEquipFx::UpdateSound(float Throttle, float Dt)
     {
-        // FUN_00528240 (RET 8). Nothing while the engine is off (vtable +4, no test of Equip).
+        // FUN_00528240. Nothing while the engine is off (no test of Equip).
         if (!Equip->IsActive())
             return;
         CEEngine const* const Engine = static_cast<CEEngine const*>(Equip);
@@ -3260,10 +2985,8 @@ namespace
         {
             if (Rumble != nullptr)
             {
-                // 0x0052826f..0x005282cc: the host's tradelane state (IObjInspect slot 77,
-                // +0x134) and speed (slot 1, get_velocity); the rumble plays only above
-                // 0.001 (DAT_005c75f8, a double; TEST AH,0x41, JNZ stops on <= / NaN) and off
-                // a tradelane.
+                // The rumble plays only above 0.001 (unrounded; NaN stops it) and off a
+                // tradelane.
                 bool bUsingTradelane = false;
                 Host->is_using_tradelane(&bUsingTradelane);
                 Vector const Velocity = Host->get_velocity();
@@ -3273,21 +2996,18 @@ namespace
                 float const Speed = static_cast<float>(SpeedX87);
                 if (SpeedX87 > kEngineRumbleMinSpeed && !bUsingTradelane)
                 {
-                    // 0x005282d2..0x005282e8: an idle rumble restarts on its stashed archetype
-                    // (FUN_004291c0 called directly, the second argument 0).
+                    // An idle rumble restarts on its stashed archetype.
                     if (Rumble->IsActive() == 0)
                         Rumble->Start(GetClientEquipSoundEmitterArch(Rumble), 0);
 
-                    // 0x005282ed..0x00528318: speed over the cruise speed (+0x30); with the
-                    // [AUDIO] option at 2 (FUN_005792b0(0x2d)), capped at 1 (TEST AH,5, JNP
-                    // keeps it below 1; >= / NaN take 1).
+                    // Speed over the cruise speed; with the [AUDIO] option at 2, capped at 1
+                    // (NaN takes 1).
                     float Ratio = static_cast<float>(static_cast<double>(Speed) /
                                                      static_cast<double>(CruiseSpeed));
                     if (GetGameOption(kGameOptAudioGroup) == 2 && !(Ratio < kEngineFxFull))
                         Ratio = kEngineFxFull;
 
-                    // 0x00528320..0x005283bc: pitch and attenuation interpolated across the
-                    // companion's int ranges (FILD of the int span, FMUL, FIADD of the low end).
+                    // Pitch and attenuation interpolated across the companion's int ranges.
                     FCliEQEngineRangesView const* const Ranges =
                         CompanionAsEngineRanges((Equip != nullptr) ? Equip->Arch->Companion : nullptr);
                     int const PitchSpan = Ranges->RumblePitchRange[1] - Ranges->RumblePitchRange[0];
@@ -3301,19 +3021,17 @@ namespace
                 }
                 else if (Rumble->IsActive() != 0)
                 {
-                    // 0x005283c4..0x005283d6.
                     Rumble->Stop();
                 }
             }
 
-            // 0x005283d9..: the character loop; without one, nothing more.
+            // The character loop; without one, nothing more.
             if (CharacterLoop == nullptr)
                 return;
             if (CharacterLoop->IsActive() == 0)
                 CharacterLoop->Start(GetClientEquipSoundEmitterArch(CharacterLoop), 0);
             if (CharacterLoop->IsActive() != 0)
             {
-                // 0x00528409..0x00528457: pitch across character_pitch_range by the throttle.
                 FCliEQEngineRangesView const* const Ranges =
                     CompanionAsEngineRanges((Equip != nullptr) ? Equip->Arch->Companion : nullptr);
                 int const PitchSpan =
@@ -3323,12 +3041,10 @@ namespace
                     static_cast<double>(Ranges->CharacterPitchRange[0])));
             }
 
-            // 0x0052845d..0x005284cf: the attenuation offset. Before THROTTLE_STEADY_TIME
-            // (TEST AH,5, JP takes the steady arm on >= / NaN) it climbs by
-            // Dt * DELTA_THROTTLE_ATTEN_MOD_CHANGING, capped at 0 (0 below it keeps the sum,
-            // JP on >= / NaN); once steady it moves by Dt * DELTA_THROTTLE_ATTEN_MOD_STEADY,
-            // floored at -THROTTLE_ATTEN_MOD_RANGE (TEST AH,0x41, JNZ keeps the sum when the
-            // floor is <= it). The result goes to the loop's attenuation.
+            // The attenuation offset. Before THROTTLE_STEADY_TIME (NaN counts as steady) it
+            // climbs by Dt * DELTA_THROTTLE_ATTEN_MOD_CHANGING, capped at 0; once steady it moves
+            // by Dt * DELTA_THROTTLE_ATTEN_MOD_STEADY, floored at -THROTTLE_ATTEN_MOD_RANGE. The
+            // stored value is rounded twice.
             double Mod = 0.0;
             if (ThrottleSteadyTime < EngineEquipConsts::THROTTLE_STEADY_TIME)
             {
@@ -3354,8 +3070,8 @@ namespace
             return;
         }
 
-        // 0x005284dc..0x0052854e: in cruise, a playing cruise loop counts CruiseTime up by Dt;
-        // past CRUISE_STEADY_TIME (TEST AH,0x41, JNZ keeps 0 on <= / NaN) its attenuation is
+        // In cruise, a playing cruise loop counts CruiseTime up by Dt; past CRUISE_STEADY_TIME
+        // (NaN keeps 0) its attenuation is
         // (CruiseTime - CRUISE_STEADY_TIME) * DELTA_CRUISE_ATTEN_MOD_STEADY, floored at
         // -CRUISE_ATTEN_MOD_RANGE; before that 0.
         if (CruiseLoop != nullptr && CruiseLoop->IsActive() != 0)
@@ -3375,15 +3091,13 @@ namespace
             CruiseLoop->SetAttenuation(Atten);
             return;
         }
-        // 0x00528551.
         CruiseTime = 0.0f;
     }
 
     FCliTradeLaneEquipFx::~FCliTradeLaneEquipFx()
     {
-        // FUN_00516bc0 (0x00516bd3..0x00516be4): Equip(+0x04) -> archetype(+0x0c) ->
-        // companion(+0x04), FUN_0040c7d0 -- the release matching the constructor's
-        // FUN_0040c690. No null tests in retail.
+        // FUN_00516bc0: FUN_0040c7d0, the release matching the constructor's FUN_0040c690. No
+        // null tests in retail.
         Archetype::CliTradeLaneReleaseEffectRef(Equip->EquipArch()->Companion);
     }
 
@@ -3395,11 +3109,9 @@ namespace
 
     void EquippedObjScanFuseIgnitions(FClientGameobj* Host)
     {
-        // FUN_00533e10 fuse block — threshold walks + Host vt+0x1c0 Ignite
-        // (FUN_00534240) + Fuse::Load on prototype map entry.
-        // 0x00533e79..0x00533ea6: the host's object narrowed by 0x103 (null otherwise, then read
-        // anyway); 0x00533ea6..0x00533eac: its archetype (+0x88, no class test -- a 0x103 object
-        // is a ship or a solar) and the root fuse list at archetype +0x78.
+        // The fuse block of FUN_00533e10: the hit-point threshold walks that ignite fuses, and
+        // Fuse::Load on each prototype. The host's object narrowed by 0x103 (null otherwise, then
+        // read anyway); its root fuse list at archetype +0x78.
         CObject* const Obj = ResolveEqObjFromHost(Host);
         Archetype::EqObj const* const EqArch =
             static_cast<Archetype::EqObj const*>(Obj->get_archetype());
@@ -3409,16 +3121,14 @@ namespace
             for (size_t Index = 0; Index < List.size(); ++Index)
             {
                 Archetype::FGroupFuse const& Node = List[Index];
-                // 0x00533eb5..0x00533ec5: CSimple::get_hit_pts per node, FCOMP Value1,
-                // TEST AH,0x41 / JP skips above and NaN (hp <= Value1 ignites).
-                // 0x00533ec7..0x00533ee7: SUBOBJ_ID_ROOT (Common .rdata, 1), through the
-                // object's own vtable +0x1c0 (a ship runs FUN_00545a90).
+                // Hit points re-read per node; hp <= Value1 ignites (NaN does not). The host's
+                // own Ignite slot (a ship runs FUN_00545a90).
                 if (static_cast<CSimple*>(Obj)->get_hit_pts() <= Node.Value1)
                 {
                     static_cast<FClientEquippedObj*>(Host)->LightFuse(0u, &Node.Fuse, SUBOBJ_ID_ROOT,
                                                                    Node.Value2, -1.0f);
                 }
-                // 00533ef0-00533f0a: FUN_00432240 find in DAT_00675400, Fuse::Load on the value.
+                // FUN_00432240 find in DAT_00675400.
                 ClientFuse* Proto = ClientFuseDB::Find(Node.Fuse.Id);
                 if (Proto != nullptr)
                     Proto->Load();
@@ -3437,16 +3147,13 @@ namespace
                 for (size_t Index = 0; Index < Items.size(); ++Index)
                 {
                     Archetype::FGroupFuse const& Node = Items[Index];
-                    // 0x00533f62..0x00533f72: CArchGroup::GetHitPoints per item, FCOMP Value1,
-                    // TEST AH,0x41 / JP skips above and NaN. 0x00533f74..0x00533f92: the group's
-                    // arch (+4) id (+4, no test), vtable +0x1c0 as above.
+                    // As above, on the group's hit points and its arch id (no test).
                     if (Group->GetHitPoints() <= Node.Value1)
                     {
                         static_cast<FClientEquippedObj*>(Host)->LightFuse(
                             0u, &Node.Fuse, Group->Arch->Id, Node.Value2, -1.0f);
                     }
-                    // 00533f98-00533fd2: FUN_0052c7a0 lower_bound + key check (= find) in
-                    // DAT_00675400, Fuse::Load on the value.
+                    // FUN_0052c7a0 (a find) in DAT_00675400.
                     ClientFuse* Proto = ClientFuseDB::Find(Node.Fuse.Id);
                     if (Proto != nullptr)
                         Proto->Load();
@@ -3543,11 +3250,10 @@ void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId)
 
 void EquippedObjRebuildEquipFx(FClientGameobj* Host)
 {
-    // FUN_00533e10 (returns nothing: EAX is whatever FUN_00539740 left, 0x00533ffb..0x00534007).
-    // 0x00533e19: FUN_00533080.
+    // FUN_00533e10 (returns nothing: EAX is whatever FUN_00539740 left).
     EquippedObjClearEquipFx(Host);
-    // 0x00533e30..0x00533e72: each step narrows the object by 0x103 again (null otherwise) and
-    // takes CEquipManager::Traverse on its +0xe4 without a test; FUN_00533160 per equipment id.
+    // Each step narrows the object by 0x103 again (null otherwise) and traverses its equipment
+    // without a test.
     CEqObj* Eq = ResolveEqObjFromHost(Host);
     CEquipTraverser Walk;
     CEquip* Equip = Eq->EquipManager.Traverse(Walk);
@@ -3560,12 +3266,9 @@ void EquippedObjRebuildEquipFx(FClientGameobj* Host)
     EquippedObjResolveExplosion(Host);
 }
 
-// The port's CliEquipLight driver that stood here (AttachClientEquipFxForShip /
-// ClearClientEquipFx / TickClientEquipFx / DrawClientEquipFxFlares over a private list of the
-// last rebuilt host's lights) is gone: the lights now carry retail's vtable PTR_LAB_005da3f8 and
-// run where retail runs them -- linked into bucket 0x2e by the owner's effect-list sweep
-// (FUN_004fd040, space_scene_obj_draw.cpp GameobjSweepEffectList) and ticked / drawn by the
-// bucket walk FUN_004f7810 inside FUN_004f7480, whose FUN_00403ea0 flushes the flares.
+// The CliEquipLights are linked into bucket 0x2e by the owner's effect-list sweep (FUN_004fd040,
+// space_scene_obj_draw.cpp GameobjSweepEffectList) and ticked / drawn by the bucket walk
+// FUN_004f7810 inside FUN_004f7480, whose FUN_00403ea0 flushes the flares.
 
 // ---- ClientEquip (vtable PTR_FUN_005de13c) -------------------------------------------------
 
@@ -3582,8 +3285,7 @@ FClientEquip::FClientEquip()
 
 FClientEquip::~FClientEquip()
 {
-    // FUN_00531af0 (the body of the scalar deleting FUN_00531ab0): vtable 005de13c, then a
-    // non-null Equip told to drop this notify, then a non-null separation explosion released.
+    // FUN_00531af0 (the body of the scalar deleting FUN_00531ab0).
     if (Equip != nullptr)
         Equip->NotifyDisconnecting(this);
     if (SeparationExplosion != nullptr)
@@ -3592,13 +3294,13 @@ FClientEquip::~FClientEquip()
 
 bool FClientEquip::Update(float /*Dt*/)
 {
-    // FUN_00532000 (RET 4): XOR EAX,EAX / TEST [ECX+4] / SETNZ AL.
+    // FUN_00532000.
     return Equip != nullptr;
 }
 
 void FClientEquip::notify(Event Code, void* /*Param*/)
 {
-    // FUN_00531b20 (RET 8): only 0xa, and no test of Equip before the call.
+    // FUN_00531b20: only 0xa, and no test of Equip before the call.
     if (Code == EquipDestroying)
     {
         Equip->NotifyDisconnecting(this);
@@ -3610,35 +3312,33 @@ void FClientEquip::notify(Event Code, void* /*Param*/)
 
 int* CliTradeLaneEquipFxShipCount(FClientEquip* Wrapper)
 {
-    // FUN_00516910 reads and writes [wrapper+0x30] directly (0x00516952 / 0x00516962).
+    // FUN_00516910 reads and writes [wrapper+0x30] directly.
     return &static_cast<FCliTradeLaneEquipFx*>(Wrapper)->ShipsUsingLane;
 }
 
 void CliTradeLaneEquipFxAttachLaneEffects(FClientEquip* Wrapper)
 {
-    // FUN_00516910 calls FUN_00516d10 (thiscall on the wrapper) when the count returns to 0.
+    // FUN_00516910 calls FUN_00516d10 on the wrapper when the count returns to 0.
     CliTradeLaneAttachLaneEffects(static_cast<FCliTradeLaneEquipFx*>(Wrapper));
 }
 
 void ClientEquipBaseFill(FClientEquip* Wrapper, CEquip* Equip, FClientGameobj* Host)
 {
-    // FUN_00531a30 for the constructors outside this file (the launcher family, 0x0052c85c).
+    // FUN_00531a30 for the constructors outside this file (the launcher family).
     CliEquipFxBaseFill(Wrapper, Equip, Host);
 }
 
 bool RemoveAppearanceInstanceValue(int Key)
 {
-    // FUN_00532170 (cdecl). 0x0053218e..0x005321b2: DALib::Engine slot 0 (QueryInterface) for
-    // "1.11_IFLAppearance" into a zeroed local.
+    // FUN_00532170. "1.11_IFLAppearance" from DALib::Engine.
     IFLAppearance* Ifl = nullptr;
     if (DALib::Engine->QueryInterface(Iids::FLAppearance, reinterpret_cast<void**>(&Ifl)) < 0)
     {
-        // 0x005321ed..0x00532203: failed -- released if anything came back, false.
+        // Released if anything came back.
         if (Ifl != nullptr)
             Ifl->Release();
         return false;
     }
-    // 0x005321b4..0x005321db: slot 5 (+0x14) with Key, SETGE on the result, released.
     bool const bOk = Ifl->RemoveInstanceValue(Key) >= 0;
     if (Ifl != nullptr)
         Ifl->Release();
@@ -3647,13 +3347,10 @@ bool RemoveAppearanceInstanceValue(int Key)
 
 FClientEquip* EquippedObjFindEquipFx(FClientGameobj* Host, unsigned short EquipId)
 {
-    // FUN_00533100 (thiscall on the EquippedObj, RET 4). 0x00533103..0x00533126: the host's
-    // object narrowed by 0x103 (a null host gives null).
+    // FUN_00533100 (on the EquippedObj). The narrowed object is used without a test.
     CEqObj* const Eq = ResolveEqObjFromHost(Host);
-    // 0x00533128..0x00533133: CEquipManager::FindByID on the object's +0xe4 -- taken without a
-    // test of the narrowed object.
     CEquip const* const Equip = Eq->EquipManager.FindByID(EquipId);
-    // 0x00533139..0x0053315d: the first wrapper on the +0xb8 list whose +4 is that equipment.
+    // The first wrapper on the +0xb8 list whose +4 is that equipment.
     FCliEquipFxListNode* const Sentinel = EquipFxSentinelRef(Host);
     for (FCliEquipFxListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
@@ -3672,7 +3369,7 @@ bool HostIgniteFuse(FClientGameobj* Host, unsigned SourceId, ID_String const& Fu
 
 void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units)
 {
-    // FUN_0052f9a0 (thiscall on the tractor wrapper); the caller picks the wrapper with
+    // FUN_0052f9a0 (on the tractor wrapper); the caller picks the wrapper with
     // FUN_00533100 by the tractor's equipment id.
     static_cast<FCliTractorEquipFx*>(Wrapper)->DropLoot(LootId, Units);
 }
@@ -3680,13 +3377,13 @@ void CliTractorEquipFxDropLoot(FClientEquip* Wrapper, unsigned LootId, int Units
 void CliShieldEquipFxCollisionHit(FClientEquip* Wrapper, void const* HitInfo,
                                   FClientGameobj* Other, void const* Unused)
 {
-    // Wrapper vtable +0x14 (0x0053417d): LAB_0052e760 on a shield wrapper.
+    // Wrapper vtable +0x14: LAB_0052e760 on a shield wrapper.
     static_cast<FCliShieldEquipFx*>(Wrapper)->OnCollisionHit(HitInfo, Other, Unused);
 }
 
 void CliShieldEquipFxMunitionHit(FClientEquip* Wrapper, void const* HitInfo,
                                  FClientGameobj* Munition)
 {
-    // Wrapper vtable +0x18 (0x0053422a): FUN_0052e8c0 on a shield wrapper.
+    // Wrapper vtable +0x18: FUN_0052e8c0 on a shield wrapper.
     static_cast<FCliShieldEquipFx*>(Wrapper)->OnMunitionHit(HitInfo, Munition);
 }

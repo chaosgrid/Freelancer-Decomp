@@ -7,13 +7,11 @@
 #pragma once
 
 // ScriptCamera -- the in-flight camera a Thorn script drives (cutscenes, tradelane rides,
-// jump sequences). Retail source is `E:\FL\Scratch\Source\Client\space\scriptcam.cpp`, which the
-// binary still carries because the load-failure warning prints it.
+// jump sequences). Retail source is `E:\FL\Scratch\Source\Client\space\scriptcam.cpp` (printed
+// by the load-failure warning).
 //
-// It is the last class in the camera hierarchy the port had not touched, and the vtable settles
-// where it sits: 0x005dc164 is identical to FGameCamera's 0x005dbf5c in every slot except five,
-// so ScriptCamera derives from FGameCamera directly -- NOT from FHudCamera, which the other four
-// concrete cameras use. The five overrides are:
+// Vtable 0x005dc164 is identical to FGameCamera's 0x005dbf5c in every slot except five, so
+// ScriptCamera derives from FGameCamera directly -- NOT from FHudCamera. The five overrides:
 //
 //   0x54  0x0051e070   the class name, "ScriptCamera"
 //   0x60  0x0051e810   "is this camera finished?"
@@ -32,21 +30,11 @@
 
 #include <stddef.h>
 
-// The camera's own transform sink -- retail's 0x38-byte heap object with vtable 0x005dc140.
-// Its ctor sets only the vtable and the reference count; the Csys is left as whatever the
-// allocator returned, because the script writes it before anything reads it.
-//
-// The field ORDER is the sink's own, and it is not the FTransform order: the four accessor
-// slots settle it outright. 0x0051e08d writes three dwords at `this + 8` and 0x0051e0aa writes
-// nine at `this + 0x14`; 0x0051e0c8 and 0x0051e0ea read them back from exactly those two
-// addresses. So the position comes first and the orientation second -- the reverse of the
-// nine-then-three layout the camera itself and the math engine use.
-// The DACOM plumbing the two sinks share: one QueryInterface (LAB_0051e830), one AddRef
-// (LAB_0051e8e0) and one Release (LAB_0041a800), sitting in the first three slots of both
-// retail vtables. Declaring it as a base is what lets the compiler emit those tables.
+// The DACOM plumbing the two sinks share: QueryInterface (LAB_0051e830), AddRef (LAB_0051e8e0)
+// and Release (LAB_0041a800), the first three slots of both retail vtables.
 struct FScriptCamSink : IGeoTransformControl
 {
-    //                              // +0x00  the vtable pointer the port used to install by hand
+    //                              // +0x00  vtable
     int            RefCount;        // +0x04  1
 
     FScriptCamSink() : RefCount(1) {}
@@ -56,6 +44,12 @@ struct FScriptCamSink : IGeoTransformControl
     unsigned long DACOM_API Release();
 };
 
+// The camera's own transform sink -- retail's 0x38-byte heap object with vtable 0x005dc140.
+// Its ctor sets only the vtable and the reference count; the Csys is left uninitialised because
+// the script writes it before anything reads it.
+//
+// Position comes first and orientation second (the accessors use this+8 and this+0x14) -- the
+// reverse of the nine-then-three layout the camera and the math engine use.
 struct FScriptCamTransform : FScriptCamSink
 {
     float          Position[3];     // +0x08  slot 0x0c writes it, slot 0x14 reads it
@@ -81,8 +75,8 @@ struct FScriptCamObjectTransform : FScriptCamSink
 
     FScriptCamObjectTransform();
 
-    // LAB_00451370, a bare `XOR EAX,EAX / RET 8` shared by twenty-one vtable slots across the
-    // exe: this sink silently discards everything written to it.
+    // Both setters are LAB_00451370, a `return 0` stub shared by twenty-one vtable slots across
+    // the exe: this sink silently discards everything written to it.
     GENRESULT DACOM_API SetPosition(float* Position3);
     GENRESULT DACOM_API SetOrientation(float* Orientation9);
     GENRESULT DACOM_API GetPosition(float* OutPosition3);
@@ -122,8 +116,8 @@ struct FScriptCamera : FGameCamera
     float                      Position[3];     // +0x238 .. +0x244
 };
 
-// Every offset below is a store in the ctor (0x0051e100), the dtor (0x0051dfc0) or the setup
-// (0x0051e3b0). The three sizes are the three operator new / class sizes retail uses.
+// Offsets from the ctor (0x0051e100), dtor (0x0051dfc0) and setup (0x0051e3b0); sizes from
+// retail's operator new calls.
 static_assert(sizeof(FScriptCamTransform) == 0x38, "the camera transform sink is 0x38");
 static_assert(offsetof(FScriptCamTransform, RefCount) == 0x04, "SCT +0x04");
 static_assert(offsetof(FScriptCamTransform, Position) == 0x08, "SCT +0x08");
@@ -145,8 +139,7 @@ static_assert(offsetof(FScriptCamera, ObjectEntity) == 0x108, "SC +0x108");
 static_assert(offsetof(FScriptCamera, NameLength) == 0x10c, "SC +0x10c");
 static_assert(offsetof(FScriptCamera, Name) == 0x110, "SC +0x110");
 
-// The name buffer runs right up against the transform, which is the independent check that its
-// 0x104 bytes are the whole of it: 0x110 + 0x104 == 0x214.
+// The name buffer runs right up against the transform: 0x110 + 0x104 == 0x214.
 static_assert(offsetof(FScriptCamera, Orientation) == 0x214, "SC +0x214");
 static_assert(offsetof(FScriptCamera, Position) == 0x238, "SC +0x238");
 static_assert(sizeof(FScriptCamera) == 0x244, "ScriptCamera is 0x244");
@@ -156,8 +149,7 @@ static_assert(sizeof(FScriptCamera) == 0x244, "ScriptCamera is 0x244");
 void ScriptCameraConstruct(FScriptCamera* Cam);
 
 // 0x0051dfc0. Releases the two sinks and unhooks both watchers. Retail's destructor does NOT
-// release the script engine -- slot 0x68 is expected to have done that -- and the port keeps that
-// asymmetry rather than "fixing" it; see docs/re/deviations.md.
+// release the script engine (slot 0x68 is expected to have); kept, see docs/re/deviations.md.
 void ScriptCameraDestruct(FScriptCamera* Cam);
 
 // 0x0051e3b0. Points the camera at an object, under a script name, from a starting transform.
@@ -204,8 +196,7 @@ bool ScriptCameraIsFinished(const FScriptCamera* Cam);
 // `watcher->Watched - 8` inline, the same idiom the other cameras use.
 void* ScriptCameraWatchedObject(const FScriptCamera* Cam);
 
-// Both sinks are the seven slots of DACOM IGeoTransformControl, and until 2026-09-16 the port
-// installed them as two hand-written `void*[7]` arrays of free functions:
+// Both sinks implement the seven slots of DACOM IGeoTransformControl:
 //
 //   0x00  QueryInterface -- shared, LAB_0051e830; answers only "1.11_IGeoTransformControl"
 //   0x04  AddRef         -- shared, LAB_0051e8e0
@@ -215,10 +206,7 @@ void* ScriptCameraWatchedObject(const FScriptCamera* Cam);
 //   0x14  GetPosition
 //   0x18  GetOrientation
 //
-// The camera's sink implements all four accessors against its own fields. The OBJECT sink does
-// not: its two setters are both LAB_00451370, a bare `XOR EAX,EAX / RET 8` shared by twenty-one
-// vtable slots across the exe. So the object sink is READ-ONLY -- a script can ask where
-// `main_object` is but cannot move it, which is the whole reason the camera hands the script two
-// different sinks rather than two of the same.
+// The OBJECT sink is READ-ONLY (both setters are the LAB_00451370 stub): a script can ask where
+// `main_object` is but cannot move it.
 
 inline FSpaceCamera* SpaceCameraOf(FScriptCamera* Cam) { return Cam; }

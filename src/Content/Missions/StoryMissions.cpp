@@ -31,8 +31,6 @@
 
 namespace
 {
-
-
     // Save message parms (msg 4) and load message parms (msg 5) of the mission overrides.
     struct FMissionSaveParms
     {
@@ -54,8 +52,8 @@ namespace
     class FGenericMission : public FMissionScript
     {
     public:
-        // FUN_06ea1220 (06ea1220-06ea1449, RET 8). The ini path is the char array that
-        // follows the CreateParms (parms+0xc, FStory::OnLoad lays it out); no validation.
+        // FUN_06ea1220. The ini path is the char array that follows the CreateParms
+        // (parms+0xc, laid out by FStory::OnLoad); no validation.
         FGenericMission(unsigned int const* InControllerId, FStoryMissionCreateParms const* Parms)
             : FMissionScript(InControllerId, Parms)
         {
@@ -67,19 +65,18 @@ namespace
     class FMission01a : public FMissionScript
     {
     public:
-        // FUN_06ea1880 (06ea1880-06ea1b3b, RET 8).
+        // FUN_06ea1880.
         FMission01a(unsigned int const* InControllerId, FStoryMissionCreateParms const* Parms);
-        // LAB_06ea1b60 (06ea1b60-06ea1d25).
+        // LAB_06ea1b60.
         void HandleMissionMessage(pub::Controller::EMessage MessageId, void const* MessageParms) override;
 
     private:
-        // +0x32c once-flag: set when the player first enters Li01_01_Base (msg 1, 06ea1d12);
-        // gates the [Mission01aSave] block (06ea1ca5).
+        // +0x32c once-flag: set when the player first enters Li01_01_Base; gates the
+        // [Mission01aSave] block.
         unsigned char bBaseEnterHandled;
-        // Write-only in retail: only this ctor stores them (06ea1921-06ea1939). Vtable
-        // 06fb38a8 differs from the TU21 table 06fb4710 in slots 1 (06ea1b40) and 21
-        // (06ea1b60) only, and neither reads +0x334..+0x43d. +0x334 and +0x3b8 are 0x84
-        // apart (the first dword of two 0x84-byte blocks ending at +0x43c).
+        // Write-only in retail: only this ctor stores them, and neither overridden slot reads
+        // +0x334..+0x43d. +0x334 and +0x3b8 are the first dwords of two 0x84-byte blocks
+        // ending at +0x43c.
         // TODO: meaning (no reader exists to derive it from).
         int Field_0x334;                              // +0x334 (ctor -1)
         int Field_0x3b8;                              // +0x3b8 (ctor -1)
@@ -87,9 +84,7 @@ namespace
         unsigned char Field_0x43d;                    // +0x43d (ctor 0)
     };
 
-    // 06ea18c0-06ea1991: chapter 1/2, 0x5528/0x7d00, heartbeat 0.0333 again (+0x14 and
-    // SetHeartbeatInterval), +0x2ac = 3, +0x43c/+0x43d/+0x32c = 0, +0x334/+0x3b8 = -1,
-    // then the ini, then pub::GetBaseID into DAT_06fce968 / DAT_06fce964.
+    // The heartbeat is set to 0.0333 again here.
     FMission01a::FMission01a(unsigned int const* InControllerId,
                              FStoryMissionCreateParms const* Parms)
         : FMissionScript(InControllerId, Parms)
@@ -114,7 +109,7 @@ namespace
         using pub::Controller::EMessage;
         if (MessageId == EMessage::BaseEnter)
         {
-            // 06ea1cde-06ea1d19: {BaseId, PlayerId}.
+            // Parms {BaseId, PlayerId}.
             FMissionScript::HandleMissionMessage(EMessage::BaseEnter, MessageParms);
             unsigned int const* BaseParms = static_cast<unsigned int const*>(MessageParms);
             if (BaseParms[1] != PlayerState->PlayerId)
@@ -124,13 +119,12 @@ namespace
             if (bBaseEnterHandled != 0)
                 return;
             bBaseEnterHandled = 1;
-            // 06ea1d19: CALL [vtbl+0x78] = slot 30 FUN_06eb9aa0.
+            // Virtual slot 30 (FUN_06eb9aa0).
             ApplyDesiredMissionState();
             return;
         }
         if (MessageId == EMessage::PlayerSave)
         {
-            // 06ea1c78-06ea1cdb.
             FMissionSaveParms const* Save = static_cast<FMissionSaveParms const*>(MessageParms);
             if (Save->PlayerId != PlayerState->PlayerId)
                 return;
@@ -145,7 +139,6 @@ namespace
         }
         if (MessageId == EMessage::PlayerLoad)
         {
-            // 06ea1ba3-06ea1c75.
             FMissionLoadParms const* Load = static_cast<FMissionLoadParms const*>(MessageParms);
             if (Load->PlayerId != PlayerState->PlayerId)
                 return;
@@ -165,7 +158,7 @@ namespace
                     int Value = Reader->get_value_int(0);
                     PreviousMissionState = Value;
                     MissionState = Value;
-                    // 06ea1c27-06ea1c3a: not 3 -> FUN_06f1b610 (ECX = this).
+                    // FUN_06f1b610.
                     if (Value != 3)
                         RenumberAllObjectives();
                 }
@@ -180,22 +173,20 @@ namespace
     class FMission01b : public FMissionScript
     {
     public:
-        // FUN_06ea1f50 (06ea1f50-06ea21b5, RET 8).
+        // FUN_06ea1f50.
         FMission01b(unsigned int const* InControllerId, FStoryMissionCreateParms const* Parms);
-        // LAB_06ea21c0 (06ea21c0-06ea2406).
+        // LAB_06ea21c0.
         void HandleMissionMessage(pub::Controller::EMessage MessageId, void const* MessageParms) override;
 
     private:
-        // FUN_06ea2410 (06ea2410-06ea252e, RET 4).
+        // FUN_06ea2410.
         void LoadSuccessState(INI_Reader* Reader);
 
-        // +0x32c once-flag: set by msg 1 after the group join (06ea235b), by msg 5
-        // (06ea225c) and by LoadSuccessState (06ea241f); tested at 06ea22eb.
+        // +0x32c once-flag: set by msg 1 after the group join, by msg 5 and by
+        // LoadSuccessState.
         unsigned char bBaseEnterHandled;
     };
 
-    // 06ea1f8f-06ea2000: +0x2a8 = +0x2ac = +0x2b4 = +0x2b8 = 4, +0x32c = 0,
-    // 0x55f0/0x7d64, then the ini.
     FMission01b::FMission01b(unsigned int const* InControllerId,
                              FStoryMissionCreateParms const* Parms)
         : FMissionScript(InControllerId, Parms)
@@ -213,7 +204,7 @@ namespace
         using pub::Controller::EMessage;
         if (MessageId == EMessage::BaseEnter)
         {
-            // 06ea22cb-06ea23f6: {BaseId, PlayerId}.
+            // Parms {BaseId, PlayerId}.
             FMissionScript::HandleMissionMessage(EMessage::BaseEnter, MessageParms);
             unsigned int const* BaseParms = static_cast<unsigned int const*>(MessageParms);
             if (PlayerState->PlayerId != BaseParms[1])
@@ -222,8 +213,7 @@ namespace
                 return;
             unsigned int BaseId = 0;
             pub::GetBaseID(BaseId, "Li01_02_base");
-            // 06ea230e-06ea2327: a cleared ID_String, then FUN_06f488b0(PlayerState, ControllerId,
-            // 0, &IdString, 0, 0) (TU46; the arguments in retail's push order).
+            // JoinMissionAsGroup = FUN_06f488b0 (TU46).
             ID_String Vnpc;
             Vnpc.clear();
             PlayerState->JoinMissionAsGroup(ControllerId, 0, &Vnpc, false, 0);
@@ -232,7 +222,6 @@ namespace
             SpacePopSetAttackClamp(1);                // DAT_06fd1c78 = 1
             bBaseEnterHandled = 1;
             FStoryMissionListNode_0x2f4 Node;
-            // .rdata:06fb3a14 (raw PE bytes).
             char const* Path = "missions\\m01a\\M001a_s006x_Li01_02_nrml.ini";
             size_t Length = strlen(Path);
             if (Length >= 0x80)
@@ -240,15 +229,12 @@ namespace
             memcpy(Node.Path, Path, Length);
             Node.Path[Length] = '\0';
             Node.PathLength = static_cast<unsigned int>(Length);
-            // 06ea23af-06ea23b6: FUN_06eb8a20(this, &Node) (TU21 RTC script start), then the
-            // node is copied to the end of +0x2f0 (06ea23bb-06ea23f6).
             StartRtcScript(&Node);
             List_0x2f4.push_back(Node);
             return;
         }
         if (MessageId == EMessage::PlayerSave)
         {
-            // 06ea226e-06ea22c8.
             FMissionSaveParms const* Save = static_cast<FMissionSaveParms const*>(MessageParms);
             if (Save->PlayerId != PlayerState->PlayerId)
                 return;
@@ -261,7 +247,6 @@ namespace
         }
         if (MessageId == EMessage::PlayerLoad)
         {
-            // 06ea2205-06ea226b.
             FMissionLoadParms const* Load = static_cast<FMissionLoadParms const*>(MessageParms);
             if (Load->PlayerId != PlayerState->PlayerId)
                 return;
@@ -280,16 +265,13 @@ namespace
     void FMission01b::LoadSuccessState(INI_Reader* Reader)
     {
         bBaseEnterHandled = 1;
-        // 06ea241b-06ea243e: a cleared ID_String, then FUN_06f488b0(PlayerState, ControllerId,
-        // 0, &IdString, 0, 0) (TU46; the arguments in retail's push order).
         ID_String Vnpc;
         Vnpc.clear();
         PlayerState->JoinMissionAsGroup(ControllerId, 0, &Vnpc, false, 0);
         StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
                                     ControllerId);
         SpacePopSetAttackClamp(1);                    // DAT_06fd1c78 = 1
-        // 06ea245a-06ea24ac: FUN_06eba430(this, {len, "missions\\m01a\\rtc_success.ini"}) (the
-        // TString<0x80> built on the stack: strlen, clamp 0x7f, copy, NUL).
+        // RemoveMissionRtc = FUN_06eba430.
         TString<0x80> RtcPath;
         RtcPath = "missions\\m01a\\rtc_success.ini";
         RemoveMissionRtc(this, &RtcPath);
@@ -441,8 +423,7 @@ namespace
             LoadMissionIni("Missions\\M13\\m13.ini");
         }
 
-        // FUN_06ea5b50 (06ea5b50-06ea5c0a): the base SUCCEED display (direct CALL
-        // FUN_06eb9760), then madlib 0x5faa shown to +0xc with type 9, broadcast true.
+        // FUN_06ea5b50 (calls the base FUN_06eb9760 directly).
         void OnMissionSucceed() override
         {
             unsigned int const TargetPlayerId = PlayerId;
@@ -455,8 +436,7 @@ namespace
         }
     };
 
-    // FUN_06eeec50: operator new(size) then the class ctor with (&ControllerId, Parms);
-    // a failed new yields 0.
+    // FUN_06eeec50.
     template <class TMission>
     IDLL* NewMission(unsigned int ControllerId, void const* Parms)
     {

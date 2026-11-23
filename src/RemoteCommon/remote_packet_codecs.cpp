@@ -72,7 +72,6 @@ unsigned int FRpcSaveGamePacket::Encode(unsigned char** BufferHolder,
     if (DescriptionCount != 0) {
         const unsigned int ByteCount = DescriptionCount * 2u;
         if (!Stream.Reserve(ByteCount, 0x16u)) return 0x16u;
-        // RC06b55748..06b55772: cached destination, REP copy, Ptr=cached+bytes.
         Stream.PutReserved(Description, ByteCount);
     }
     return Stream.FinishEncodeSuccess(OutLength);
@@ -122,8 +121,7 @@ unsigned int FRpcTradeResponsePacket::Encode(unsigned char** BufferHolder,
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&DataSize, 4u)) return 0x16u;
-    // Literal native wire pointer DWORD, not the pointed-to buffer's bytes
-    // (RC06b5458c..06b545bf: reserve, cached destination, load +0x24, commit).
+    // Retail sends the pointer DWORD (+0x24) itself, not the pointed-to buffer's bytes.
     if (!Stream.Put(&Data, 4u)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);
 }
@@ -217,9 +215,8 @@ unsigned int RpcWireDecodeCollisionGroups(FPacketBase& Packet, FRpcWireStream& S
     unsigned short Count;
     if (!Stream.Get(&Count, 2u)) return Packet.MarshalError;
     for (unsigned int Index = 0; Index < Count; ++Index) {
-        // Native appends a copy of two uninitialized stack DWORDs before bounds.
-        // The canonical modern node is value-initialized instead; retain this
-        // explicit partial-node/padding and allocator/EH representation gap.
+        // Native appends a copy of two uninitialized stack DWORDs before the bounds check;
+        // the port value-initializes the node instead.
         Groups.emplace_back();
         CollisionGroupDesc& Group = Groups.back();
         if (!Stream.Get(&Group.Id, 2u)) return Packet.MarshalError;
@@ -239,8 +236,7 @@ bool RpcWireGetThenStore(FRpcWireStream& Stream, T& Field) {
 
 bool RpcWirePutVector(FRpcWireStream& Stream, const Vector& Value) {
     if (!Stream.Reserve(12u, 0x16u)) return false;
-    // CLIENT03 RC06b5340c..06b5343a: native snapshots all three DWORDs and the
-    // destination once, MOV-copies them (06b3a160), then commits Ptr=cached+12.
+    // Integer copy (06b3a160), no x87.
     unsigned int Bits[3];
     std::memcpy(&Bits[0], &Value.x, 4u);
     std::memcpy(&Bits[1], &Value.y, 4u);
@@ -251,7 +247,7 @@ bool RpcWirePutVector(FRpcWireStream& Stream, const Vector& Value) {
 
 bool RpcWireGetVector(FPacketBase& Packet, FRpcWireStream& Stream, Vector& Value) {
     if (!Stream.Reserve(12u, 0x17u)) return false;
-    // RC06b3a160 / RS06bda4c0: MOV DWORD load/store pairs, no x87 operations.
+    // RC06b3a160 / RS06bda4c0: integer moves, no x87.
     std::memcpy(&Value.x, reinterpret_cast<const void*>(Packet.MarshalPtr), 4u);
     std::memcpy(&Value.y, reinterpret_cast<const void*>(Packet.MarshalPtr + 4u), 4u);
     std::memcpy(&Value.z, reinterpret_cast<const void*>(Packet.MarshalPtr + 8u), 4u);
@@ -294,7 +290,7 @@ FRpcDebugCreateShipPacket::~FRpcDebugCreateShipPacket() {
 
 unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b58290 / RS06c05c80: every failure returns 0x16 (literal or ECX=0x16).
+    // RC06b58290 / RS06c05c80.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
@@ -305,8 +301,7 @@ unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
     if (!RpcWirePutVector(Stream, Field_0x14)) return 0x16u;
     if (!RpcWirePutVector(Stream, Field_0x20)) return 0x16u;
     if (!Stream.Reserve(16u, 0x16u)) return 0x16u;
-    // RC06b58473..06b584a2 / RS06c05e63..5e92: snapshot W/X/Y/Z as DWORDs and the
-    // destination, MOV-copy all four (06b39ec0), then commit Ptr=cached+16.
+    // W/X/Y/Z as integer DWORDs (06b39ec0).
     unsigned int QuaternionBits[4];
     std::memcpy(&QuaternionBits[0], &Field_0x2c.w, 4u);
     std::memcpy(&QuaternionBits[1], &Field_0x2c.x, 4u);
@@ -318,18 +313,15 @@ unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
     if (WideCount != 0) {
         const unsigned int Width = WideCount * 2u;
         if (!Stream.Reserve(Width, 0x16u)) return 0x16u;
-        // RC06b5853b..06b58560. Native unsigned multiplication may wrap to zero;
-        // REP then does no access and the pointer commit adds zero.
+        // The unsigned multiply may wrap to zero, as in retail; nothing is copied then.
         Stream.PutReserved(WideData, Width);
     }
     if (!Stream.Put(&DataSizeA, 4u)) return 0x16u;
     if (DataSizeA != 0) {
-        // RC06b585a3..06b585ee: reserve, cached REP copy, Ptr=cached+size.
         if (!Stream.PutBlock(DataA, DataSizeA)) return 0x16u;
     }
     if (!Stream.Put(&DataSizeB, 4u)) return 0x16u;
     if (DataSizeB != 0) {
-        // RC06b58631..06b5867f.
         if (!Stream.PutBlock(DataB, DataSizeB)) return 0x16u;
     }
     if (!Stream.Put(&Field_0x50, 4u)) return 0x16u;
@@ -340,7 +332,6 @@ unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
     if (ArrayCount != 0) {
         const unsigned int Width = ArrayCount * 4u;
         if (!Stream.Reserve(Width, 0x16u)) return 0x16u;
-        // RC06b587bd..06b587e9.
         Stream.PutReserved(ArrayData, Width);
     }
     return Stream.FinishEncodeSuccess(OutLength);
@@ -439,9 +430,8 @@ unsigned int FRpcDebugLoadSystemPacket::Encode(unsigned char** BufferHolder,
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&DataSize, 4u)) return 0x16u;
-    // RC06b58efa rereads the size after the prefix store; the body is reserved
-    // unconditionally, then RC06b58f2b..06b58f55 copies to the cached destination
-    // (a zero REP count performs no access) and commits Ptr=cached+size.
+    // Retail rereads the size after the prefix store and reserves the body unconditionally
+    // (a zero size copies nothing).
     if (!Stream.Reserve(DataSize, 0x16u)) return 0x16u;
     Stream.PutReserved(Data, DataSize);
     return Stream.FinishEncodeSuccess(OutLength);
@@ -453,8 +443,8 @@ unsigned int FRpcDebugLoadSystemPacket::Decode(const unsigned char* Buffer,
     if (!RpcWireGetThenStore(Stream, DataSize)) return MarshalError;
     if (DataSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        // RC06b59036..5904b checks the body without committing its cursor.
-        // RS06c069b6 allocates first. Neither decoder has an OOM-return guard.
+        // RC checks the body without committing its cursor; RS allocates first. Neither
+        // decoder has an OOM-return guard.
         if (MarshalCursor + DataSize > MarshalLimit) {
             MarshalError = 0x17u;
             return MarshalError;
@@ -497,8 +487,7 @@ unsigned int FRpcDebugDestroyObjectPacket::Decode(const unsigned char* Buffer,
 
 unsigned int FRpcDebugConsolePacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b59a00 / RS06c07360: the 0x80-byte command is copied by REP MOVSD into
-    // the cached destination (RC06b59aac..06b59acb), then Ptr=cached+0x80.
+    // RC06b59a00 / RS06c07360: the command is a fixed 0x80-byte block.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&Field_0x00, 4u)) return 0x16u;
@@ -534,7 +523,7 @@ unsigned int FRpcDebugRelocateShipPacket::Decode(const unsigned char* Buffer,
 
 unsigned int FRpcDebugFreeSystemPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b591b0 / RS06c06b10: header, then the shared trailer tail.
+    // RC06b591b0 / RS06c06b10.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     return Stream.FinishEncodeSuccess(OutLength);
@@ -568,7 +557,7 @@ FRpcRequestCancelPacket::FRpcRequestCancelPacket() : FPacketBase(0x30032u) {}
 
 unsigned int FRpcMunitionCollisionPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b532f0 / RS06c01820: every failure exits through EAX=0x16 (06b5334d).
+    // RC06b532f0 / RS06c01820.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ProjectileArchId, 4u)) return 0x16u;
@@ -590,10 +579,9 @@ unsigned int FRpcMunitionCollisionPacket::Decode(const unsigned char* Buffer,
     return Stream.Finish(OutLength, false);
 }
 
-
 unsigned int FRpcObjectCollisionPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b53910 / RS06c01e40: every failure returns EBP=0x16 (06b53967).
+    // RC06b53910 / RS06c01e40.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
@@ -615,10 +603,9 @@ unsigned int FRpcObjectCollisionPacket::Decode(const unsigned char* Buffer,
     return Stream.Finish(OutLength, false);
 }
 
-
 unsigned int FRpcMineAsteroidPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b53c60 / RS06c02190: every failure returns 0x16 (literal or EBP).
+    // RC06b53c60 / RS06c02190.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&SystemId, 4u)) return 0x16u;
@@ -640,7 +627,6 @@ unsigned int FRpcMineAsteroidPacket::Decode(const unsigned char* Buffer,
     return Stream.Finish(OutLength, false);
 }
 
-
 unsigned int FRpcSetManeuverPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
     const unsigned int* Fields[3] = { &ShipFrom, &ObjectId, &Flag };
@@ -655,7 +641,7 @@ unsigned int FRpcSetManeuverPacket::Decode(const unsigned char* Buffer,
 
 unsigned int FRpcRequestEventPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b59f60 / RS06bf2440: every failure returns EBP=0x16 (06b59fb5).
+    // RC06b59f60 / RS06bf2440.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&EventType, 1u)) return 0x16u;
@@ -679,7 +665,7 @@ unsigned int FRpcRequestEventPacket::Decode(const unsigned char* Buffer,
 
 unsigned int FRpcRequestCancelPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b5a280 / RS06bf2760: every failure returns EBP=0x16 (06b5a2d5).
+    // RC06b5a280 / RS06bf2760.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&EventType, 1u)) return 0x16u;
@@ -719,12 +705,11 @@ unsigned int FRpcBadlandsObjectCollisionPacket::Decode(const unsigned char* Buff
     return Stream.Finish(OutLength, false);
 }
 
-
 unsigned int RpcWireEncodeDwords(FPacketBase& Packet, const unsigned int* const* Fields,
     unsigned int FieldCount, unsigned char** BufferHolder, unsigned int Capacity,
     unsigned int* OutLength) {
-    // DWORD-record encoders (e.g. CLIENT2b RC06b3ada0, CLIENT37 RC06b559c0,
-    // CLIENT2f RC06b59cb0): each failed reservation returns 0x16.
+    // Shared by the DWORD-record encoders (e.g. CLIENT 0x2b RC06b3ada0, 0x37 RC06b559c0,
+    // 0x2f RC06b59cb0).
     FRpcWireStream Stream(Packet, BufferHolder, Capacity);
     Stream.PutHeader();
     for (unsigned int Index = 0; Index < FieldCount; ++Index) {
@@ -801,8 +786,7 @@ unsigned int FRpcRequestRemoveItemPacket::Decode(const unsigned char* Buffer,
 
 unsigned int FRpcRequestRemoveItemPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b52590 / RS06c01400: failure returns literal 0x16 without rewriting the
-    // sticky Error; success stores Error=0 before OutLength (RC06b52590 tail).
+    // RC06b52590 / RS06c01400: failure returns 0x16 without rewriting the sticky Error.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&EquipId, 4u)) return 0x16u;
@@ -838,9 +822,7 @@ void FRpcItemChangePacketBase::CopyHardpoint(const void* Data, unsigned int Size
 
 unsigned int FRpcItemChangePacketBase::EncodeFields(const unsigned int& Selector,
     unsigned char** BufferHolder, unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b52820 / RS06be2d50 (ADDITEM) and RC06b52cc0 / RS06be31e0 (MODIFYITEM):
-    // every failure returns EDI=0x16; the hardpoint body is a cached REP copy
-    // (RC06b5297f..06b529a1).
+    // RC06b52820 / RS06be2d50 (ADDITEM) and RC06b52cc0 / RS06be31e0 (MODIFYITEM).
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&Selector, 4u)) return 0x16u;
@@ -862,8 +844,8 @@ unsigned int FRpcItemChangePacketBase::DecodeFields(unsigned int& Selector,
     if (!Stream.Get(&HardpointSize, 4u)) return MarshalError;
     if (HardpointSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        // RC's preflight does not commit the body cursor. RS allocates before
-        // that bounds check, and has no separate allocation-failure return.
+        // RC's preflight does not commit the body cursor. RS allocates before the bounds
+        // check and has no allocation-failure return.
         if (MarshalCursor + HardpointSize > MarshalLimit) {
             MarshalError = 0x17u;
             return MarshalError;
@@ -908,8 +890,8 @@ FRpcCreateNewCharacterPacket::FRpcCreateNewCharacterPacket()
 
 FRpcCharacterIdPacketBase::FRpcCharacterIdPacketBase(unsigned int Id)
     : FPacketBase(Id) {
-    // Native inlines only Buffer[0]=0. Canonical CHARACTER_ID also initializes
-    // the unused tail; the packet's strlen-based wire body stops at its NUL.
+    // Native sets only Buffer[0]; the port's CHARACTER_ID also initializes the unused tail,
+    // which the strlen-based wire body never reaches.
     CharacterId.Buffer[0] = '\0';
 }
 
@@ -921,7 +903,6 @@ unsigned int FRpcCharacterIdPacketBase::Encode(unsigned char** BufferHolder,
     const unsigned short Length = static_cast<unsigned short>(
         std::strlen(CharacterId.Buffer));
     if (!Stream.Put(&Length, 2u)) return 0x16u;
-    // RC06b56616..06b5663c: cached REP copy, Ptr=cached+length.
     if (!Stream.PutBlock(CharacterId.Buffer, Length)) return 0x16u;
     return Stream.FinishEncodeSuccess(OutLength);
 }
@@ -971,8 +952,7 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
     *Value = nullptr;
     if (Length != 0) {
         *Value = static_cast<wchar_t*>(::operator new(ByteCount + 2u, std::nothrow));
-        // Native has no OOM branch. A zero-length value instead leaves both
-        // the packet name and the moving input pointer completely untouched.
+        // Native has no OOM branch. A zero-length value leaves the input pointer untouched.
         std::memcpy(*Value, Source, ByteCount);
         (*Value)[Length] = L'\0';
         Packet.MarshalPtr = reinterpret_cast<unsigned int>(Source + ByteCount);
@@ -982,7 +962,7 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
 
 unsigned int FRpcCreateNewCharacterPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b55eb0 / RS06c038b0: every failure returns 0x16 (literal or EBP).
+    // RC06b55eb0 / RS06c038b0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (RpcEncodeWideString(*this, Name) != 0) return 0x16u;
@@ -1003,7 +983,7 @@ unsigned int FRpcCreateNewCharacterPacket::Decode(const unsigned char* Buffer,
         std::wcsncpy(Name, Temporary, 24u);
         Name[23] = L'\0';
 #else
-        // RS uses wcscpy, not the bounded RC operation or a synthetic 64 cap.
+        // RS uses an unbounded wcscpy.
         std::wcscpy(Name, Temporary);
 #endif
         ::operator delete(Temporary);
@@ -1020,8 +1000,7 @@ void FRpcCharacterIdPacketBase::Dump(std::ostream& Out) const {
 }
 
 void FRpcCreateNewCharacterPacket::Dump(std::ostream& Out) const {
-    // Both native IAT entries select ostream::operator<<(const void*), not a
-    // wchar_t text conversion. Keep the address insertion into the char stream.
+    // Retail (both DLLs) inserts the name's address via operator<<(const void*), not its text.
     Out << "   Name: " << static_cast<const void*>(Name)
         << "   Fac: " << FactionId << "   Base: " << BaseId
         << "   Pkg: " << PackageId << "   Pilot: " << PilotId << "\n";
@@ -1043,7 +1022,7 @@ FRpcPlayerTradePacket::FRpcPlayerTradePacket()
 
 unsigned int FRpcPlayerTradePacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b68c90 / RS06bfff80: every failure returns 0x16 (literal or ECX).
+    // RC06b68c90 / RS06bfff80.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     const unsigned char ActionByte = static_cast<unsigned char>(Action);
@@ -1086,10 +1065,8 @@ unsigned int FRpcPlayerTradePacket::Encode(unsigned char** BufferHolder,
         break;
     }
     if (bNeedTarget) {
-        // RC06b68e06/06b68d66/06b68ee9: the DWORD is counted only on this
-        // direction, but the sticky Error is tested on every path (06b68e1d,
-        // 06b68d7d, 06b68efc) before the target DWORD is written to the cached
-        // destination and Ptr=cached+4 is committed (06b68f7a..06b68f85).
+        // The target DWORD is counted only in this direction, but the sticky Error is tested
+        // on every path before it is written.
         if (bCountTarget) Stream.Reserve(4u, 0x16u);
         if (MarshalError != 0) return 0x16u;
         Stream.PutReserved(&TargetPlayer, 4u);
@@ -1138,9 +1115,8 @@ unsigned int FRpcPlayerTradePacket::Decode(const unsigned char* Buffer,
         if (!Stream.Get(&Accepted, 1u)) return MarshalError;
         bAccepted = static_cast<unsigned char>(Accepted != 0);
         if (bCountDirectedTarget && !Stream.Reserve(4u, 0x16u)) return MarshalError;
-        // Native decoder bug: writes existing packet TargetPlayer INTO INPUT,
-        // rather than reading it (RS06c004ab..4b1 / RC06b691bb..1c1).
-        // The packet target remains unchanged; the input pointer still advances.
+        // Native decoder bug kept: writes the packet's TargetPlayer INTO the input instead of
+        // reading it (RS06c004ab / RC06b691bb). The target stays unchanged; the input advances.
         Stream.PutUncounted(&TargetPlayer, 4u);
         bNeedTarget = false;
         break;
@@ -1165,8 +1141,7 @@ FRpcChatMsgPacket::~FRpcChatMsgPacket() {
 
 unsigned int FRpcChatMsgPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b678c0 / RS06bfebd0: size, reserve size, cached REP body copy
-    // (RC06b6796b..06b67990), two DWORDs; every failure returns 0x16.
+    // RC06b678c0 / RS06bfebd0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&DataSize, 4u)) return 0x16u;
@@ -1186,8 +1161,7 @@ unsigned int FRpcChatMsgPacket::Decode(const unsigned char* Buffer,
         return MarshalError;
     }
 #endif
-    // Both native decoders replace the pointer unconditionally. Re-decoding an
-    // existing packet does not release its previous allocation in retail.
+    // Both native decoders replace the pointer unconditionally (leaking any previous one).
     Data = static_cast<unsigned char*>(::operator new(DataSize, std::nothrow));
 #if defined(REMOTECLIENT_EXPORTS)
     if (Data == nullptr) return 5u; // MarshalError and the decoded size remain intact.
@@ -1208,8 +1182,7 @@ FRpcPopUpDialogPacket::~FRpcPopUpDialogPacket() {
 
 unsigned int FRpcPopUpDialogPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b66a10 / RS06bfdde0: both bodies are cached REP copies
-    // (RC06b66abb..06b66ae0, 06b66b44..); every failure returns 0x16.
+    // RC06b66a10 / RS06bfdde0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&SizeA, 4u)) return 0x16u;
@@ -1261,10 +1234,9 @@ void FRpcCommonBufferPacketBase::CopyDataIfNull(const void* InData, unsigned int
 
 unsigned int FRpcCommonBufferPacketBase::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // Eight COMMON bodies, e.g. COMMON11 RC06b65e50 / RS06bfd2d0: size prefix
-    // (RC06b65ec3..06b65ed0, size reread after the prefix store), unconditional
-    // reserve of that size, cached REP copy and commit (06b65efb..06b65f25);
-    // every failure returns literal 0x16 without rewriting the sticky Error.
+    // Eight COMMON bodies, e.g. COMMON 0x11 RC06b65e50 / RS06bfd2d0: the size is reread after
+    // the prefix store and reserved unconditionally; failure returns 0x16 without rewriting the
+    // sticky Error.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&DataSize, 4u)) return 0x16u;
@@ -1277,9 +1249,8 @@ unsigned int FRpcCommonBufferPacketBase::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&DataSize, 4u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-    // RC 06b66006..601a preflights without committing the cursor. The RS
-    // counterpart 06bfd480..4bd instead allocates before its only body check.
-    // This is native module behavior; the shared packet class layout is identical.
+    // RC (06b66006) preflights without committing the cursor; RS (06bfd480) allocates before
+    // its only body check.
     if (MarshalCursor + DataSize > MarshalLimit) {
         MarshalError = 0x17u;
         return MarshalError;
@@ -1319,8 +1290,8 @@ unsigned int RpcWireDecodeOwnedBlock(FPacketBase& Packet, FRpcWireStream& Stream
     }
 #endif
     if (!Stream.Reserve(BlockSize, 0x17u)) return Packet.MarshalError;
-    // Native REP with count zero does not access either pointer, including
-    // RS's null result from operator new(0). Allocation is still unconditional.
+    // A zero-size copy touches neither pointer (RS may get null from operator new(0));
+    // allocation is still unconditional.
     if (BlockSize != 0)
         std::memcpy(Data, reinterpret_cast<const void*>(Packet.MarshalPtr), BlockSize);
     Stream.CommitReadPointer(BlockSize);
@@ -1338,10 +1309,9 @@ const double GFireSmallInverse = 64.0 / 127.0;    // PE 06c0e348: 080402814020e0
 const double GFireMediumInverse = 8192.0 / 32767.0; // PE 06c0e340: 800040002000d03f
 const double GUpdateInverseScale = 1.0 / 127.0;   // PE 06c0df48: 080402814020803f
 
-// UPDATEOBJECT performs FLD/FMUL before committing the position or W pointer,
-// and only then calls _ftol. Keep that ordering around an unmasked FP exception.
-// The commit stores the destination cached before the preceding payload write
-// plus its width (RC06b64d58/06b64d5b, 06b64e3d/06b64e3e); it never rereads Ptr.
+// UPDATEOBJECT performs FLD/FMUL before committing the position or W pointer, and only then
+// calls _ftol; the ordering matters around an unmasked FP exception. The commit stores the
+// destination cached before the preceding payload write plus its width; it never rereads Ptr.
 unsigned char RpcUpdateQuantize(const float& Value, unsigned int* PointerToCommit,
     unsigned int CommittedPointer) {
     const float* Source = &Value;
@@ -1380,8 +1350,8 @@ void RpcUpdateExpand(signed char Encoded, float& Value) {
     }
 }
 
-// TEST AH,5 + JP takes the equal/greater/unordered side, while fall-through
-// selects the strictly-less tier. Z has only the small comparison in retail.
+// Retail's x87 test sends equal, greater and unordered (NaN) on to the next tier; only
+// strictly-less selects a tier. Z has only the small comparison in retail.
 unsigned char RpcFirePickTier(const float& Value, bool bHasMediumTier) {
     const float* Source = &Value;
     unsigned char Tier;
@@ -1506,14 +1476,13 @@ bool RpcFireGetComponent(FRpcWireStream& Stream, float& Value,
 
 unsigned int FRpcUpdateObjectPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b64c70 / RS06bfc0f0: every failure returns EAX=0x16.
+    // RC06b64c70 / RS06bfc0f0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&State, 1u)) return 0x16u;
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
     if (!Stream.Reserve(12u, 0x16u)) return 0x16u;
-    // RC06b64d2b..06b64d4a: snapshot X/Y/Z and the destination, MOV-copy via the
-    // Vector assignment helper; the pointer commit is delayed past the next FMUL.
+    // Integer copy of the position; the pointer commit is delayed past the next FMUL.
     unsigned int PositionBits[3];
     std::memcpy(&PositionBits[0], &Position.x, 4u);
     std::memcpy(&PositionBits[1], &Position.y, 4u);
@@ -1529,8 +1498,8 @@ unsigned int FRpcUpdateObjectPacket::Encode(unsigned char** BufferHolder,
     if (!Stream.Put(&X, 1u)) return 0x16u;
     if (!Stream.Put(&Y, 1u)) return 0x16u;
     if (!Stream.Put(&Z, 1u)) return 0x16u;
-    // RC06b64e2f..06b64e3e: W is stored at the cached destination, the extra
-    // value's FLD/FMUL follows, then Ptr=cached+1, then _ftol.
+    // W is stored at the cached destination, the extra value's FLD/FMUL follows, then the
+    // pointer commit, then _ftol.
     if (!Stream.Reserve(1u, 0x16u)) return 0x16u;
     const unsigned int WDestination = MarshalPtr;
     std::memcpy(reinterpret_cast<void*>(WDestination), &W, 1u);
@@ -1577,14 +1546,13 @@ unsigned int FRpcPopUpDialogPacket::Decode(const unsigned char* Buffer,
     return Stream.Finish(OutLength, false);
 }
 
-// CLIENT_LOGIN: native packet constructor leaves both string buffers and the
-// creation byte for the sender/decoder. It does not add synthetic defaults.
+// CLIENT_LOGIN: the native constructor leaves both string buffers and the creation byte
+// uninitialized.
 FRpcClientLoginPacket::FRpcClientLoginPacket() : FPacketBase(0x30001u) {}
 
 unsigned int FRpcClientLoginPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b56850 / RS06c04260: every failure returns 0x16; both string bodies are
-    // cached REP copies (RC06b56996..06b569b6, 06b569ed..06b56a10).
+    // RC06b56850 / RS06c04260.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&CreateFlag, 1u)) return 0x16u;
@@ -1639,12 +1607,11 @@ FRpcFireWeaponPacket::FRpcFireWeaponPacket() : FPacketBase(0x10002u), ObjectId(0
 
 unsigned int FRpcFireWeaponPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b651f0 / RS06bfc670: every failure returns 0x16 (literal or EDX).
+    // RC06b651f0 / RS06bfc670.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
     if (SinglePlayer()) {
-        // RC06b65288..06b652dc: reserve 12, snapshot X/Y/Z, MOV-copy, Ptr=cached+12.
         if (!RpcWirePutVector(Stream, TargetPos)) return 0x16u;
         const unsigned char Count = static_cast<unsigned char>(Hardpoints.size());
         if (!Stream.Put(&Count, 1u)) return 0x16u;
@@ -1699,7 +1666,7 @@ FRpcTractorObjectsPacket::FRpcTractorObjectsPacket()
 
 unsigned int FRpcTractorObjectsPacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b697b0 / RS06c00aa0: every failure returns EBP=0x16 (06b69807).
+    // RC06b697b0 / RS06c00aa0.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;
@@ -1732,7 +1699,7 @@ FRpcGoTradeLanePacket::FRpcGoTradeLanePacket() : FPacketBase(0x1000fu) {}
 
 unsigned int FRpcGoTradeLanePacket::Encode(unsigned char** BufferHolder,
     unsigned int Capacity, unsigned int* OutLength) {
-    // RC06b68180 / RS06bff470: every failure returns EBP=0x16 (06b681d7).
+    // RC06b68180 / RS06bff470.
     FRpcWireStream Stream(*this, BufferHolder, Capacity);
     Stream.PutHeader();
     if (!Stream.Put(&ObjectId, 4u)) return 0x16u;

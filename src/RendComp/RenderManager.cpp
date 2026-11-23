@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 #include "RendComp.h"
-#include "common_misc.h" // ICamera (IRenderer Slot7 reads the camera)
+#include "common_misc.h" // ICamera (RenderInstance reads the camera)
 
 #include <cmath>
 #include <cstddef>
@@ -30,7 +30,7 @@ struct FAggDesc18
     IDAComponent* Parent;
 };
 
-// IRenderer Slot7 flag bits (LAB_06c32a80).
+// RenderInstance flag bits (LAB_06c32a80).
 static const unsigned long kDrawPickSwitch = 0x08;     // pick the LOD by distance (FUN_06c32040)
 static const unsigned long kDrawRotateOffset = 0x10;   // rotate the matrix offset by its own 3x3
 static const unsigned long kDrawConjugate = 0x20;      // matrix := World * matrix * World^-1
@@ -40,7 +40,7 @@ static const unsigned long kDrawNoCull = 0x100;        // skip ICamera ClassifyS
 static const unsigned long kDrawNoChildren = 0x2000;   // do not recurse into child instances
 
 // The archetype map (retail VC6 std::map<int, FLodSet> at +8, head +0xC, helpers FUN_06c34170 /
-// 06c34380 / 06c34ab0 / 06c2a270). Every lookup in the listing is lower_bound plus a key compare,
+// 06c34380 / 06c34ab0 / 06c2a270). Every retail lookup is lower_bound plus a key compare,
 // i.e. find.
 typedef std::map<int, FLodSet> FArchetypeMap;
 
@@ -72,27 +72,27 @@ public:
     int DACOM_API QueryInstance(void* Arg1, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg1) override;
 
-    int DACOM_API QueryGeometry(void* A, float Lod, void* C, void* D, void* E, void* F, void* G) override; // formerly Slot3
-    int DACOM_API GetBounds(void* Id, float Lod, void* Out) override; // formerly Slot4
-    int DACOM_API GetCentroid(void* Id, float Lod, void* Out) override; // formerly Slot5
-    int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override; // formerly Slot6
+    int DACOM_API QueryGeometry(void* A, float Lod, void* C, void* D, void* E, void* F, void* G) override;
+    int DACOM_API GetBounds(void* Id, float Lod, void* Out) override;
+    int DACOM_API GetCentroid(void* Id, float Lod, void* Out) override;
+    int DACOM_API NoOp(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override;
     int DACOM_API RenderInstance(void* Camera, void* Inst, float Threshold, unsigned long Flags, void* Matrix,
                         void* Extra) override;
-    int DACOM_API GetInstanceLodCount(void* Inst, void* Out) override; // formerly Slot8
-    int DACOM_API GetInstanceCurrentLod(void* Inst, void* Out) override; // formerly Slot9
-    int DACOM_API SetInstanceLod(void* Inst, int Index) override; // formerly Slot10
-    int DACOM_API GetArchetypeLodCount(void* Id, int* Out) override; // formerly Slot11
-    int DACOM_API GetArchetypeCurrentLod(void* Id, int* Out) override; // formerly Slot12
-    int DACOM_API SetArchetypeLod(void* Id, int Index) override; // formerly Slot13
-    int DACOM_API GetArchetypeLodRange(void* Id, int Index, void* OutA, void* OutB) override; // formerly Slot14
-    int DACOM_API SetArchetypeLodRange(void* Id, int Index, float A, float B) override; // formerly Slot15
-    int DACOM_API GetInstanceLodRange(void* Inst, int Index, void* OutA, void* OutB) override; // formerly Slot16
-    int DACOM_API SetInstanceLodRange(void* Inst, int Index, float A, float B) override; // formerly Slot17
-    int DACOM_API QueryGeometryAtLod(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override; // formerly Slot18
-    int DACOM_API SetArchetypeRootLodSelection(void* Id, void* Unused, unsigned long Flags) override; // formerly Slot19
-    int DACOM_API SetInstanceRootLodSelection(void* Id, void* A, void* B) override; // formerly Slot20
-    int DACOM_API GetArchetypeRootLodSelection(void* Key, void* Unused, unsigned long* Out) override; // formerly Slot21
-    int DACOM_API GetInstanceRootLodSelection(void* Id, void* A, void* B) override; // formerly Slot22
+    int DACOM_API GetInstanceLodCount(void* Inst, void* Out) override;
+    int DACOM_API GetInstanceCurrentLod(void* Inst, void* Out) override;
+    int DACOM_API SetInstanceLod(void* Inst, int Index) override;
+    int DACOM_API GetArchetypeLodCount(void* Id, int* Out) override;
+    int DACOM_API GetArchetypeCurrentLod(void* Id, int* Out) override;
+    int DACOM_API SetArchetypeLod(void* Id, int Index) override;
+    int DACOM_API GetArchetypeLodRange(void* Id, int Index, void* OutA, void* OutB) override;
+    int DACOM_API SetArchetypeLodRange(void* Id, int Index, float A, float B) override;
+    int DACOM_API GetInstanceLodRange(void* Inst, int Index, void* OutA, void* OutB) override;
+    int DACOM_API SetInstanceLodRange(void* Inst, int Index, float A, float B) override;
+    int DACOM_API QueryGeometryAtLod(void* A, void* B, void* C, void* D, void* E, void* F, void* G) override;
+    int DACOM_API SetArchetypeRootLodSelection(void* Id, void* Unused, unsigned long Flags) override;
+    int DACOM_API SetInstanceRootLodSelection(void* Id, void* A, void* B) override;
+    int DACOM_API GetArchetypeRootLodSelection(void* Key, void* Unused, unsigned long* Out) override;
+    int DACOM_API GetInstanceRootLodSelection(void* Id, void* A, void* B) override;
 
     // Non-delegating inner IDAComponent (retail this+0x34, vtable PTR_LAB_06c368b0:
     // LAB_06c34cb0 / LAB_06c306b0 / LAB_06c34d70). The engine keeps this one in its component
@@ -161,8 +161,7 @@ void LodSetAssign(FLodSet& Dest, const FLodSet& Src)
 }
 
 // FUN_06c32040: Distance < 0 (ordered) -> none. Otherwise the first LOD whose upper switch value
-// Switch[i + 1] is >= Distance (FCOMP + TEST AH,1 + JZ: C0 clear, an unordered compare never
-// matches); none -> null.
+// Switch[i + 1] is >= Distance (an unordered compare never matches); none -> null.
 FLodEntry* LodSetPick(FLodSet& Set, float Distance)
 {
     if (Distance < 0.0f)
@@ -175,7 +174,7 @@ FLodEntry* LodSetPick(FLodSet& Set, float Distance)
     return nullptr;
 }
 
-// FUN_06c32090 (+ the inner seed FUN_06c34b90 writes @ 06c34c00..06c34c10). DAT_06c37d4c
+// FUN_06c32090 (+ the inner seed FUN_06c34b90 writes). DAT_06c37d4c
 // (G_Engine) is zeroed here; it is a borrowed pointer, see Initialize.
 FRenderManager::FRenderManager()
     : Parent(nullptr)
@@ -199,7 +198,7 @@ FRenderManager::~FRenderManager()
         _snprintf(Line, sizeof(Line), "RenderMgr: dtor: Archetype %d has dangling render data\n",
                   It->first);
         Line[sizeof(Line) - 1] = '\0';
-        RendCompFdumpAt(kFdumpNotice, G_FileRenderMgr, 0xBF, Line); // file = 06c37a38
+        RendCompFdumpAt(kFdumpNotice, G_FileRenderMgr, 0xBF, Line);
     }
     ReleaseIf(Parent);
     Parent = nullptr;
@@ -292,8 +291,7 @@ unsigned long DACOM_API FRenderManager::FInner::Release()
 }
 
 // FUN_06c33bf0: Release every plugin (no null test), then unlink and free every node,
-// counting down; the loaded flag goes back to 0. Callers: the dtor (06c3225f) and a reload
-// in FUN_06c33a10 (06c33a22).
+// counting down. Callers: the dtor and a reload in FUN_06c33a10.
 int FRenderManager::UnloadPlugins()
 {
     FPluginNode* Walk = PluginSentinel.Next;
@@ -323,7 +321,7 @@ int FRenderManager::LoadPlugins()
     IProfileParser* Parser = nullptr;
     if (DACOM_Acquire()->QueryInterface(Iids::ProfileParser, (void**)(&Parser)) < 0)
     {
-        // 06c37c10: the retail message ends in "\n" (unlike the section-not-found one below).
+        // The retail message ends in "\n" (unlike the section-not-found one below).
         RendCompFdumpAt(kFdumpWarning, G_FileRenderMgr, 0x563,
                         "RenderMgr: load_engine_components: unable to acquire IID_IProfileParser\n");
         ReleaseIf(Parser);
@@ -350,7 +348,6 @@ int FRenderManager::LoadPlugins()
                 Cut += 1;
             *Cut = '\0';
 
-            // 06c33a39 / 06c33b28..06c33b38.
             FRenderPluginDesc Desc;
             Desc.Size = 0x10;
             Desc.Name = Line;
@@ -359,7 +356,7 @@ int FRenderManager::LoadPlugins()
             void* Child = nullptr;
             if (DACOM_Acquire()->CreateInstance((AGGDESC*)(&Desc), &Child) >= 0)
             {
-                // 06c33b5a..06c33b92: push_back, the value copied as is (FUN_06c27640).
+                // push_back, the value copied as is (FUN_06c27640).
                 FPluginNode* Node = new FPluginNode();
                 Node->Plugin = (IRenderComponent*)Child;
                 Node->Next = &PluginSentinel;
@@ -438,7 +435,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     {
         const unsigned long Bytes = Child->GetSize((unsigned long)SwitchHandle, 0);
         SwitchCount = Bytes >> 2;
-        // Retail allocates Bytes / 4 * 4 and reads Bytes (06c33d74..06c33d9d).
+        // Retail allocates Bytes / 4 * 4 and reads Bytes.
         SwitchData = (float*)new unsigned char[SwitchCount * sizeof(float)];
         unsigned long ReadOut = 0;
         if (Child->Read((unsigned long)SwitchHandle, SwitchData, Bytes, &ReadOut, 0) == 0)
@@ -514,9 +511,8 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     return 0;
 }
 
-// FUN_06c33fe0 (thiscall, RET 8: Id, File). The archetype's set must be in the map (else -1).
-// The first plugin in list order whose Claim (+0xC) is not -1 becomes the only LOD: one entry
-// {handle, plugin}, switch {0, 1e6} (0x49742400). No claimant -> -1.
+// FUN_06c33fe0 (thiscall: Id, File). The first plugin in list order whose Claim is not -1
+// becomes the only LOD, switch {0, 1e6} (0x49742400).
 int FRenderManager::WalkPlugins(int Id, void* File)
 {
     FArchetypeMap::iterator Found = Archetypes.find(Id);
@@ -538,9 +534,8 @@ int FRenderManager::WalkPlugins(int Id, void* File)
     return -1;
 }
 
-// LAB_06c32520 (IEngineComponent slot 4, RET 0xC: Id, File). An empty set is inserted under Id;
-// an Id already present -> 0. MultiLevel, then the single-LOD plugin walk; either succeeding ->
-// 1. Both failing erase the entry again -> 0.
+// LAB_06c32520 (IEngineComponent slot 4: Id, File). MultiLevel, then the single-LOD plugin
+// walk; when both fail the entry is erased again.
 int DACOM_API FRenderManager::CreateArchetype(void* Arg1, void* Arg2)
 {
     const int Id = ArchetypeKey(Arg1);
@@ -577,9 +572,8 @@ int DACOM_API FRenderManager::DuplicateArchetype(void* Arg1, void* Arg2)
     return 0;
 }
 
-// LAB_06c327a0 (IEngineComponent slot 6, RET 8: Id). Missing -> nothing. Every LOD handle goes to
-// its plugin's DestroyHandle (+0x14), then the map entry is erased. Retail returns EAX as left by
-// the erase helper; the port returns 0.
+// LAB_06c327a0 (IEngineComponent slot 6). Retail returns EAX as left by the erase helper; the
+// port returns 0.
 int DACOM_API FRenderManager::DestroyArchetype(void* Arg1)
 {
     FArchetypeMap::iterator Found = Archetypes.find(ArchetypeKey(Arg1));
@@ -639,7 +633,7 @@ int DACOM_API FRenderManager::DestroyInstance(void* Arg1)
     return 0;
 }
 
-// LAB_06c32a40 (IEngineComponent slot 10): every plugin's Slot9 (+0x24) with both arguments.
+// LAB_06c32a40 (IEngineComponent slot 10).
 int DACOM_API FRenderManager::UpdateInstance(void* Arg1, void* Arg2)
 {
     for (FPluginNode* Walk = PluginSentinel.Next; Walk != &PluginSentinel; Walk = Walk->Next)
@@ -665,7 +659,7 @@ int DACOM_API FRenderManager::QueryInstance(void* Arg1, const char* Iid, void** 
     return Entry.Plugin->QueryMeshInstance(Arg1, Entry.Handle, Iid, Out);
 }
 
-// LAB_06c324f0 (IEngineComponent slot 12): every plugin's Slot11 (+0x2c) with the argument.
+// LAB_06c324f0 (IEngineComponent slot 12).
 int DACOM_API FRenderManager::Notify(void* Arg1)
 {
     for (FPluginNode* Walk = PluginSentinel.Next; Walk != &PluginSentinel; Walk = Walk->Next)
@@ -673,7 +667,6 @@ int DACOM_API FRenderManager::Notify(void* Arg1)
     return 0;
 }
 
-// formerly Slot3
 int DACOM_API FRenderManager::QueryGeometry(void* A, float Lod, void* C, void* D, void* E, void* F, void* G)
 {
     FLodSet* Set = FindSet(ArchetypeKey(A));
@@ -687,9 +680,7 @@ int DACOM_API FRenderManager::QueryGeometry(void* A, float Lod, void* C, void* D
     return Entry->Plugin->QueryGeometry(Entry->Handle, LodBits, C, D, E, F, G) & 0xFF;
 }
 
-// LAB_06c33350 (IRenderer slot 4, RET 0x10). Archetype missing or no LOD for Lod -> 0; else the
-// LOD's plugin Slot13 (+0x34)(Handle, Lod, Out), low byte.
-// formerly Slot4
+// LAB_06c33350 (IRenderer slot 4). The plugin's answer is cut to its low byte.
 int DACOM_API FRenderManager::GetBounds(void* Id, float Lod, void* Out)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -701,8 +692,7 @@ int DACOM_API FRenderManager::GetBounds(void* Id, float Lod, void* Out)
     return Entry->Plugin->GetBounds(Entry->Handle, Lod, Out) & 0xFF;
 }
 
-// LAB_06c333d0 (IRenderer slot 5, RET 0x10). As slot 4 with the plugin's Slot14 (+0x38).
-// formerly Slot5
+// LAB_06c333d0 (IRenderer slot 5). As slot 4.
 int DACOM_API FRenderManager::GetCentroid(void* Id, float Lod, void* Out)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -714,15 +704,13 @@ int DACOM_API FRenderManager::GetCentroid(void* Id, float Lod, void* Out)
     return Entry->Plugin->GetCentroid(Entry->Handle, Lod, Out) & 0xFF;
 }
 
-// LAB_06c33450: XOR EAX,EAX; RET 0x20.
-// formerly Slot6
+// LAB_06c33450.
 int DACOM_API FRenderManager::NoOp(void* /*A*/, void* /*B*/, void* /*C*/, void* /*D*/, void* /*E*/, void* /*F*/,
                                     void* /*G*/)
 {
     return 0;
 }
 
-// formerly Slot7
 int DACOM_API FRenderManager::RenderInstance(void* CameraArg, void* Inst, float Threshold, unsigned long Flags,
                                     void* MatrixArg, void* Extra)
 {
@@ -833,7 +821,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, void* Inst, float 
                     Camera->GetHalfFovXDeg();
                     const int* Viewport = Camera->GetViewport();
                     const float HalfWidth = (float)((Viewport[2] - Viewport[0] + 1) / 2);
-                    const float XScale = (float)(Camera->GetXScaleOverNear()); // FSTP float
+                    const float XScale = (float)(Camera->GetXScaleOverNear()); // rounded to float
                     const double ZNear = Camera->GetZNear();
                     const float Distance = (float)(
                         (double)HalfWidth / (ZNear * XScale) / Scale * Depth * Threshold);
@@ -875,9 +863,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, void* Inst, float 
     return Rank;
 }
 
-// LAB_06c33460 (IRenderer slot 8, RET 0xC). Instance archetype (IEngine +0x64, -1 -> -1,
-// ReleaseHandle +0x3c) forwarded to slot 11 (+0x2c): the LOD count.
-// formerly Slot8
+// LAB_06c33460 (IRenderer slot 8).
 int DACOM_API FRenderManager::GetInstanceLodCount(void* Inst, void* Out)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Inst);
@@ -887,8 +873,7 @@ int DACOM_API FRenderManager::GetInstanceLodCount(void* Inst, void* Out)
     return GetArchetypeLodCount(Arch, (int*)Out);
 }
 
-// LAB_06c334b0 (IRenderer slot 9, RET 0xC). As slot 8, forwarded to slot 12 (+0x30).
-// formerly Slot9
+// LAB_06c334b0 (IRenderer slot 9).
 int DACOM_API FRenderManager::GetInstanceCurrentLod(void* Inst, void* Out)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Inst);
@@ -898,7 +883,6 @@ int DACOM_API FRenderManager::GetInstanceCurrentLod(void* Inst, void* Out)
     return GetArchetypeCurrentLod(Arch, (int*)Out);
 }
 
-// formerly Slot10
 int DACOM_API FRenderManager::SetInstanceLod(void* Inst, int Index)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Inst);
@@ -922,8 +906,7 @@ int DACOM_API FRenderManager::SetInstanceLod(void* Inst, int Index)
     return Result;
 }
 
-// LAB_06c335b0 (IRenderer slot 11, RET 0xC): set missing -> -1; *Out = LodCount, 0.
-// formerly Slot11
+// LAB_06c335b0 (IRenderer slot 11).
 int DACOM_API FRenderManager::GetArchetypeLodCount(void* Id, int* Out)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -933,8 +916,7 @@ int DACOM_API FRenderManager::GetArchetypeLodCount(void* Id, int* Out)
     return 0;
 }
 
-// LAB_06c33610 (IRenderer slot 12, RET 0xC): set missing -> -1; *Out = CurrentLod, 0.
-// formerly Slot12
+// LAB_06c33610 (IRenderer slot 12).
 int DACOM_API FRenderManager::GetArchetypeCurrentLod(void* Id, int* Out)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -944,9 +926,7 @@ int DACOM_API FRenderManager::GetArchetypeCurrentLod(void* Id, int* Out)
     return 0;
 }
 
-// LAB_06c33670 (IRenderer slot 13, RET 0xC): set missing or Index > LodCount (signed) -> -1;
-// CurrentLod = Index, 0.
-// formerly Slot13
+// LAB_06c33670 (IRenderer slot 13). The Index test is signed.
 int DACOM_API FRenderManager::SetArchetypeLod(void* Id, int Index)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -956,9 +936,7 @@ int DACOM_API FRenderManager::SetArchetypeLod(void* Id, int Index)
     return 0;
 }
 
-// LAB_06c33780 (IRenderer slot 14, RET 0x14): set missing or Index >= LodCount -> -1;
-// *OutA = Switch[Index], *OutB = Switch[Index + 1], 0.
-// formerly Slot14
+// LAB_06c33780 (IRenderer slot 14).
 int DACOM_API FRenderManager::GetArchetypeLodRange(void* Id, int Index, void* OutA, void* OutB)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -969,9 +947,7 @@ int DACOM_API FRenderManager::GetArchetypeLodRange(void* Id, int Index, void* Ou
     return 0;
 }
 
-// LAB_06c33800 (IRenderer slot 15, RET 0x14): A > B or unordered (TEST AH,0x41 + JP) -> -1; set
-// missing or Index >= LodCount -> -1; Switch[Index] = A, Switch[Index + 1] = B, 0.
-// formerly Slot15
+// LAB_06c33800 (IRenderer slot 15). A > B or unordered -> -1.
 int DACOM_API FRenderManager::SetArchetypeLodRange(void* Id, int Index, float A, float B)
 {
     if (!(A <= B))
@@ -984,8 +960,7 @@ int DACOM_API FRenderManager::SetArchetypeLodRange(void* Id, int Index, float A,
     return 0;
 }
 
-// LAB_06c336e0 (IRenderer slot 16, RET 0x14): instance archetype as slot 8, forwarded to slot 14.
-// formerly Slot16
+// LAB_06c336e0 (IRenderer slot 16).
 int DACOM_API FRenderManager::GetInstanceLodRange(void* Inst, int Index, void* OutA, void* OutB)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Inst);
@@ -995,8 +970,7 @@ int DACOM_API FRenderManager::GetInstanceLodRange(void* Inst, int Index, void* O
     return GetArchetypeLodRange(Arch, Index, OutA, OutB);
 }
 
-// LAB_06c33730 (IRenderer slot 17, RET 0x14): instance archetype as slot 8, forwarded to slot 15.
-// formerly Slot17
+// LAB_06c33730 (IRenderer slot 17).
 int DACOM_API FRenderManager::SetInstanceLodRange(void* Inst, int Index, float A, float B)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Inst);
@@ -1006,9 +980,8 @@ int DACOM_API FRenderManager::SetInstanceLodRange(void* Inst, int Index, float A
     return SetArchetypeLodRange(Arch, Index, A, B);
 }
 
-// LAB_06c332b0 (IRenderer slot 18, RET 0x20): set missing or B >= LodCount (signed) -> 0;
-// else LOD B's plugin Slot12 (+0x30) with (Handle, 1.0f bits, C, D, E, F, G), low byte.
-// formerly Slot18
+// LAB_06c332b0 (IRenderer slot 18): LOD B's plugin gets the bits of 1.0f as its LOD; the answer
+// is cut to its low byte.
 int DACOM_API FRenderManager::QueryGeometryAtLod(void* A, void* B, void* C, void* D, void* E, void* F, void* G)
 {
     FLodSet* Set = FindSet(ArchetypeKey(A));
@@ -1021,9 +994,7 @@ int DACOM_API FRenderManager::QueryGeometryAtLod(void* A, void* B, void* C, void
     return Entry.Plugin->QueryGeometry(Entry.Handle, 0x3f800000, C, D, E, F, G) & 0xFF;
 }
 
-// FUN_06c33890 (IRenderer slot 19, RET 0x10): set missing -> -1; flag byte = bit 0 of the low
-// byte of Flags, 0.
-// formerly Slot19
+// FUN_06c33890 (IRenderer slot 19).
 int DACOM_API FRenderManager::SetArchetypeRootLodSelection(void* Id, void* /*Unused*/, unsigned long Flags)
 {
     FLodSet* Set = FindSet(ArchetypeKey(Id));
@@ -1033,8 +1004,7 @@ int DACOM_API FRenderManager::SetArchetypeRootLodSelection(void* Id, void* /*Unu
     return 0;
 }
 
-// LAB_06c33900 (IRenderer slot 20, RET 0x10): instance archetype as slot 8, forwarded to slot 19.
-// formerly Slot20
+// LAB_06c33900 (IRenderer slot 20).
 int DACOM_API FRenderManager::SetInstanceRootLodSelection(void* Id, void* A, void* B)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Id);
@@ -1044,9 +1014,7 @@ int DACOM_API FRenderManager::SetInstanceRootLodSelection(void* Id, void* A, voi
     return SetArchetypeRootLodSelection(Arch, A, (unsigned long)((uintptr_t)B));
 }
 
-// LAB_06c33950 (IRenderer slot 21, RET 0x10): *Out = 0 first; set missing -> -1; flag on ->
-// *Out |= 1; 0.
-// formerly Slot21
+// LAB_06c33950 (IRenderer slot 21).
 int DACOM_API FRenderManager::GetArchetypeRootLodSelection(void* Key, void* /*Unused*/, unsigned long* Out)
 {
     *Out = 0;
@@ -1058,8 +1026,7 @@ int DACOM_API FRenderManager::GetArchetypeRootLodSelection(void* Key, void* /*Un
     return 0;
 }
 
-// LAB_06c339c0 (IRenderer slot 22, RET 0x10): instance archetype as slot 8, forwarded to slot 21.
-// formerly Slot22
+// LAB_06c339c0 (IRenderer slot 22).
 int DACOM_API FRenderManager::GetInstanceRootLodSelection(void* Id, void* A, void* B)
 {
     void* Arch = G_Engine->GetInstanceArchetype(Id);

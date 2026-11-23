@@ -7,11 +7,8 @@
 #pragma once
 
 // Every DACOM interface id used anywhere in the port, in one place.
-// The strings are evidence from the retail binaries (QueryInterface / CreateInstance
-// call sites and .rdata), never invented -- adding one means you read it out of a
-// listing first. Before 2026-09-16 these lived in 203 scattered declarations under
-// three naming schemes plus 201 inline literals, so a typo in one copy was a silent
-// QI failure at runtime (docs/re/cross_dll_protocol.md).
+// The strings come from the retail binaries (QueryInterface / CreateInstance call sites
+// and .rdata); a typo is a silent QI failure at runtime (docs/re/cross_dll_protocol.md).
 
 namespace Iids
 {

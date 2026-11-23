@@ -118,10 +118,10 @@ public:
     unsigned long Type = 0;         // +0x04 -- 0 receive, 1 connect complete, 3 terminated, 4 enum response
     unsigned char* Data = nullptr;  // +0x08
     unsigned long Size = 0;         // +0x0c
-    DPNHANDLE ReceiveBufferHandle = 0; // formerly Field10; returned to DirectPlay after dispatch
+    DPNHANDLE ReceiveBufferHandle = 0; // +0x10 -- returned to DirectPlay after dispatch
     unsigned long SenderId = 0;     // +0x14 -- DPNID of the sender; ExtractMsgs filters on this
     void* Owner = nullptr;          // +0x18 -- owning CDPClient / CDPClientProxy
-    HRESULT ConnectResult = 0;      // formerly Field1C; connect-complete result
+    HRESULT ConnectResult = 0;      // +0x1c -- connect-complete result
 };
 
 static_assert(sizeof(DPNHANDLE) == 4 && sizeof(HRESULT) == 4, "DirectPlay message words");
@@ -377,17 +377,17 @@ struct IGunConnection : public IUnknown
 
     // +0x0c CGunWrapper ctor .text:065c58f5: (GUID&, cd-key, 0, L"CD-KEY"); non-zero aborts.
     virtual long __stdcall InitializeConnection(GUID* Guid, wchar_t* CdKey, unsigned long Zero,
-                                  const wchar_t* KeyName) = 0; // formerly Slot03
-    // +0x10 ctor .text:065c5907 / Update .text:065c5bb6: (server name, port).
-    virtual long __stdcall Connect(const char* ServerName, unsigned short Port) = 0; // formerly Slot04
-    // +0x14 called right before the final Release in the teardown (.text:065c59dd / 5aed).
-    virtual long __stdcall Disconnect() = 0; // formerly Slot05
-    // +0x18 Update .text:065c5b70 / 5bc4: writes the current ConnectStatus.
-    virtual long __stdcall GetConnectionStatus(ConnectStatus* Status) = 0; // formerly Slot06
+                                  const wchar_t* KeyName) = 0;
+    // +0x10 ctor / Update: (server name, port).
+    virtual long __stdcall Connect(const char* ServerName, unsigned short Port) = 0;
+    // +0x14 called right before the final Release in the teardown.
+    virtual long __stdcall Disconnect() = 0;
+    // +0x18 Update: writes the current ConnectStatus.
+    virtual long __stdcall GetConnectionStatus(ConnectStatus* Status) = 0;
     // +0x1c: stored connection failure HRESULT, or zero outside the error state.
-    virtual long __stdcall GetConnectionError() = 0; // formerly Slot07
-    // +0x20 DispatchQueue .text:065c5c4b: (IGunQueueReader*).
-    virtual long __stdcall DispatchQueue(IGunQueueReader* Reader) = 0; // formerly Slot08
+    virtual long __stdcall GetConnectionError() = 0;
+    // +0x20 DispatchQueue: (IGunQueueReader*).
+    virtual long __stdcall DispatchQueue(IGunQueueReader* Reader) = 0;
 };
 
 // QueryInterface'd from the connection (IIDs {EEEEEE26-...} / {EEEEEE27-...}); DALib only ever
@@ -420,11 +420,11 @@ struct IGunHost : public IUnknown
 struct IGunBrowser : public IUnknown
 {
     // DWORD argument names describe packet storage; Text is copied as UTF-16.
-    virtual long __stdcall SendRequest7102(unsigned long Field1C) = 0; // formerly Slot03
+    virtual long __stdcall SendRequest7102(unsigned long Field1C) = 0;
     virtual long __stdcall SendRequest7103(unsigned long Field20,
-                                           unsigned long Field1C) = 0; // formerly Slot04
+                                           unsigned long Field1C) = 0;
     virtual long __stdcall SendRequest7104(unsigned long A, unsigned long B, unsigned long C,
-                                           const wchar_t* Text, unsigned long E) = 0; // formerly Slot05
+                                           const wchar_t* Text, unsigned long E) = 0;
 };
 
 // GUN queue reader and COM-reference lifetime owner.

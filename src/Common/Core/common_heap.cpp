@@ -16,12 +16,12 @@
 Heap::Heap(unsigned int ElementSize, int MaxFreeCount)
     : ElementSize(ElementSize), FreeList(nullptr), MaxFreeCount(MaxFreeCount), CurrentFreeCount(0)
 {
-    // Common.dll.c 80681-80690 (0x4d450).
+    // RVA 0x4d450.
 }
 
 void* Heap::Malloc()
 {
-    // Common.dll.c RVA 0xae580. Pop the free list on a hit; otherwise a fresh malloc().
+    // RVA 0xae580.
     if (FreeList != nullptr)
     {
         FFreeBlock* Block = FreeList;
@@ -34,9 +34,8 @@ void* Heap::Malloc()
 
 void Heap::Free(void* Ptr)
 {
-    // Common.dll.c RVA 0xae5a0. If the pool is full (MaxFreeCount >= 0 and already at/over
-    // cap), just free() straight to the CRT. Otherwise stomp the whole block with the 0xCD
-    // debug fill (dwords, then the tail bytes) and push it onto the free list.
+    // RVA 0xae5a0. A negative MaxFreeCount means no cap. Pooled blocks get the 0xCD debug
+    // fill.
     if (MaxFreeCount <= CurrentFreeCount && MaxFreeCount >= 0)
     {
         free(Ptr);
@@ -53,7 +52,7 @@ void Heap::Free(void* Ptr)
 
 void Heap::Shrink()
 {
-    // Common.dll.c RVA 0xae600. Frees every pooled block back to the CRT and empties the pool.
+    // RVA 0xae600.
     FFreeBlock* Node = FreeList;
     while (Node != nullptr)
     {

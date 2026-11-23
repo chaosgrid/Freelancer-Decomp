@@ -11,8 +11,7 @@
 #include "FLServer.h"
 #include "server_playerdb.h"
 
-// .text:00409200 — CButton +0x60, CFLListBox +0xa0 (0040fad0), CButton +0x140, CButton +0x180,
-// CRichEditCtrl +0x1c0; Account (+0x200) is not written.
+// .text:00409200 — Account is not written.
 CEditAccountDlg::CEditAccountDlg(CWnd* Parent)
 	: CDialog(IDD, Parent)
 {

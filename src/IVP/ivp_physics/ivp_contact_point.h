@@ -8,33 +8,11 @@
 
 // IVP per-PSI friction-impulse pass: Coulomb friction-cone clamp,
 // redundant-dist merging and the two tangential reaction kernels. Retail
-// Common.dll cluster 0x06353b50-0x063555a8 plus LAB_06356660 (decomp-tracker
-// Common.dll items 3205-3215/3221/3248).
-//
-// MERGED 2026-10-08 (claude-code:cmn-phy3). This header used to carry four
-// partial second declarations of retail classes the port already declares in
-// full in ivp_mindist.h; every field mapped 1:1 onto the offsets there:
-//   IVP_Friction_System  -> IVP_ListManager (Ipion's IVP_Friction_System)
-//       SinglePendingContact +0x20 = CtxListHead, SetCount/Sets +0x36/+0x38 =
-//       CorePairEntries, SinglePendingCount +0x3e = CtxListCount
-//   IVP_Contact_Set      -> IVP_ListManager_CorePairEntry
-//       Count/Points +0x02/+0x04 = AttachedCtx, MergeCacheCountdown +0x18,
-//       FrictionCorrectionTotal +0x24 = _field24
-//   IVP_Contact_Point    -> IVP_Contact_Point (then still called IVP_Mindist_PairRecord)
-//       ReactionGate +0x00 = ListManagerListNext, TouchedObject(2) +0x10/+0x24
-//       = Object1/Object2, NormalImpulse +0x30 = MassFactor, TangentImpulseX/Y
-//       +0x38/+0x3c = SpanFrictionS[0/1], Frame +0x40 = Owner, MassFactor
-//       +0x54 = NowFrictionPressure, PenetrationMargin +0x58 = GapDistance,
-//       Flags +0x60 = _flags60 (SolverMode/FrictionCoefficient/
-//       FrictionCorrection/TangentWork kept their names)
-//   IVP_Contact_Frame    -> IVP_Impact_Solver_Long_Term (then still called IVP_Mindist)
-//       Normal +0x00 = ContactNormalWS, Position +0x20 = SolverContactPointWS,
-//       NormalMassFactor +0x68 = EffectiveMassDenomRecip, CoreA/CoreB
-//       +0x70/+0x74 = ChildCandidate[0/1], ContactPointOS0/1 +0x98/+0xa8 =
-//       CoordOS[0/1], JacobianAngularA/B +0xb8/+0xc8 = CoordOSCrossNormal[0/1]
-//   IVP_Friction_Step_Params -> IVP_Event_Sim (+0 delta_time, +4
-//       i_delta_time, +8 environment): LAB_06356660 is the friction system's
-//       do_simulation_controller and passes its event straight down.
+// Common.dll 06353b50-063555a8 plus LAB_06356660 (the friction system's
+// do_simulation_controller, which passes its IVP_Event_Sim straight down).
+// The classes are declared in ivp_mindist.h: IVP_ListManager is Ipion's
+// IVP_Friction_System and IVP_ListManager_CorePairEntry its contact set
+// (pair list); IVP_Impact_Solver_Long_Term is the contact frame.
 
 #include "ivp_mindist.h"
 
@@ -46,7 +24,7 @@ void IVP_ClampFrictionCone(IVP_ListManager* FrictionSystem, const IVP_Event_Sim*
 // its redundant dists (FUN_06355050) and reset the countdown to 5.
 void IVP_AgeAndRemergeContactSets(IVP_ListManager* FrictionSystem);
 
-// FUN_06355590 (decomp-tracker Common.dll item 3221): the two steps above,
+// FUN_06355590: the two steps above,
 // run back to back once per PSI.
 void IVP_StepFrictionSolver(IVP_ListManager* FrictionSystem, const IVP_Event_Sim* EventSim);
 
@@ -57,14 +35,13 @@ void IVP_StepFrictionSolver(IVP_ListManager* FrictionSystem, const IVP_Event_Sim
 // units are fused. *OutFrictionSystem gets the system, *OutHavingNew 1 for a
 // new contact point. SimUnitNotDestroy is the sim unit that survives the
 // fusion; bCallRecalcSvals re-runs the contact frame and the materials.
-// cmn-ivp3d 2026-10-08.
 IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindist,
                                                              IVP_ListManager** OutFrictionSystem,
                                                              int32_t* OutHavingNew,
                                                              IVP_Simulation_Unit* SimUnitNotDestroy,
                                                              int32_t bCallRecalcSvals);
 
-// ---- impact-system helpers of the contact point (cmn-ivp3e 2026-10-08) ----
+// ---- impact-system helpers of the contact point ----
 
 // FUN_06359560 (thiscall on the contact point, RET 4): Ipion
 // IVP_Contact_Point::get_rescue_speed_impact. Returned on the x87 stack

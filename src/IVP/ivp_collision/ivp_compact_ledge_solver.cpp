@@ -5,8 +5,8 @@
 // Author: Giperion.
 
 // IVP_Compact_Ledge_Solver (ivp_compact_ledge_solver.h): raw-ledge distance helpers and the
-// ledge-tree collector. Traced against EXE\Disasm\Common.dll.txt with retail's x87 rounding
-// points: values kept on the FPU stack are double, every `FSTP float ptr` is a float.
+// ledge-tree collector. Retail's x87 rounding points are kept: values held on the FPU stack are
+// double, every float store is a float.
 
 #include "ivp_compact_ledge_solver.h"
 
@@ -27,17 +27,13 @@ namespace
         return Bits;
     }
 
-    // The sample parameters of calc_unscaled_KK_vals' near-parallel branch, stored to the stack
-    // at :0635b6ea-:0635b753 (0xbf800000, 0x3f000000, ...). The K samples use the first 11, the
-    // L samples the first 9.
+    // Sample parameters of calc_unscaled_KK_vals' near-parallel branch (stack-built at
+    // :0635b6ea). The K samples use the first 11, the L samples the first 9.
     const float GKKSampleParams[13] = { -1.0f, 0.5f, 2.0f, 0.0f, 1.0f, -0.001f, 0.001f, 0.999f, 1.001f,
                                         -1.0e-6f, 1.0e-6f, 0.999999f, 1.000001f };
 }
 
-// FUN_0635b150 (.text:0635b150-0635b207), cdecl (ledge, edge, point, result).
-// P0 = start(edge), P1 = start(next edge). e = P1 - P0 and a = P0 - p stay on the stack,
-// b = P1 - p is spilled as floats.
-//   Checks[0] = float(-((ez*az + ey*ay) + ax*ex)), Checks[1] = float((ez*bz + ey*by) + bx*ex).
+// FUN_0635b150, cdecl. b = P1 - p is spilled as floats; e and a stay double.
 void IVP_Compact_Ledge_Solver::calc_unscaled_s_val_K_space(const IVP_Compact_Ledge* Ledge,
                                                            const IVP_Compact_Edge* Edge,
                                                            const IVP_U_Point* Point,
@@ -62,11 +58,7 @@ void IVP_Compact_Ledge_Solver::calc_unscaled_s_val_K_space(const IVP_Compact_Led
     OutResult->Checks[1] = (float)((Ez * Bz + Ey * By) + Bx * Ex);
 }
 
-// FUN_0635ba10 (.text:0635ba10-0635bb31), cdecl (ledge, edge, point).
-// e = float(P1 - P0); d = float(p - P0) for x/y, dz kept on the stack;
-// c = d x e: cx = float(dy*ez - dz*ey), cy = dz*ex - dx*ez (stack), cz = float(dx*ey - dy*ex);
-// f = float(P0 - P1); L = (fz*fz + fx*fx) + fy*fy;
-// result = ((cz*cz + cy*cy) + cx*cx) * (1 / L).
+// FUN_0635ba10, cdecl. |d x e|^2 / |e|^2, with retail's mixed float/double intermediates.
 double IVP_Compact_Ledge_Solver::quad_dist_edge_to_point_K_space(const IVP_Compact_Ledge* Ledge,
                                                                  const IVP_Compact_Edge* Edge,
                                                                  const IVP_U_Point* Point)
@@ -97,15 +89,9 @@ double IVP_Compact_Ledge_Solver::quad_dist_edge_to_point_K_space(const IVP_Compa
     return QuadCross * InvQuadLength;
 }
 
-// FUN_0635bb40 (.text:0635bb40-0635bcb5), cdecl (ledge, triangle, point).
-// Inside the triangle (no sign bit in the three QR checks, -0.0 counts as negative):
-//   h = ((ny*py + nz*pz) + nx*px) - ((ny*Py + nz*Pz) + nx*Px) with P = start(edge 0),
-//   N = (nz*nz + ny*ny) + nx*nx, result = h * ((1 / N) * h).
-// Otherwise the minimum over edges 2, 1, 0 (starting from the float 1e20f) of:
-//   s[0] < 0 (or unordered)  -> |p - start(edge)|^2 = (dz*dz + dy*dy) + dx*dx;
-//   else s[1] < 0 (or unord.) -> edge skipped;
-//   else quad_dist_edge_to_point_K_space. FCOM best; TEST AH,0x1; JZ -> kept only when
-//   strictly smaller; stored as float.
+// FUN_0635bb40, cdecl. Inside the triangle (sign-bit test on the three QR checks, so -0.0 counts
+// as negative) returns the squared plane distance; otherwise the minimum over edges 2, 1, 0 of
+// the vertex or edge distance, kept as float. Unordered compares count as "less".
 double IVP_Compact_Ledge_Solver::calc_qlen_PF_F_space(const IVP_Compact_Ledge* Ledge,
                                                       const IVP_Compact_Triangle* Triangle,
                                                       const IVP_U_Point* Point)
@@ -154,16 +140,13 @@ double IVP_Compact_Ledge_Solver::calc_qlen_PF_F_space(const IVP_Compact_Ledge* L
             Dist = quad_dist_edge_to_point_K_space(Ledge, Edge, Point);
         }
 
-        if (!(Dist >= Best)) // unordered also stores (C0 set)
+        if (!(Dist >= Best)) // unordered also stores
             Best = (float)(Dist);
     }
     return Best;
 }
 
-// FUN_0635aba0 (.text:0635aba0-0635abea): while the node has a right son, recurse into the
-// left son (node + 1) and continue with the right one; then append the terminal node's
-// ledge, growing the big vector through FUN_0635d3e0 (IVP_U_BigVector_Grow) when
-// Count >= Capacity.
+// FUN_0635aba0: recurses into left sons, iterates along right sons, appends each terminal ledge.
 void IVP_Compact_Ledge_Solver::get_all_ledges(const IVP_Compact_Ledgetree_Node* Node,
                                               IVP_SurfaceManager_OutList* OutLedges)
 {
@@ -180,26 +163,17 @@ void IVP_Compact_Ledge_Solver::get_all_ledges(const IVP_Compact_Ledgetree_Node* 
     OutLedges->Count = OutLedges->Count + 1;
 }
 
-// FUN_0635abf0 (.text:0635abf0-0635ac07).
+// FUN_0635abf0.
 void IVP_Compact_Ledge_Solver::get_all_ledges(const IVP_Compact_Surface* Surface,
                                               IVP_SurfaceManager_OutList* OutLedges)
 {
     get_all_ledges(Surface->get_compact_ledge_tree_root(), OutLedges);
 }
 
-// ---- cmn-ivp2c block (2026-10-08): helpers of IVP_Mindist_Minimize_Solver ----
+// ---- helpers of IVP_Mindist_Minimize_Solver ----
 
-// FUN_0635ae60 (.text:0635ae60-0635af68), cdecl (P, CacheP, CacheOther, out).
-// p = CacheP->compact_poly_points[P & 0xffff]; M = CacheP->cache_object + 0x1c,
-// O = CacheOther->cache_object + 0x1c (IVP_U_Matrix: rows at +0/+0x10/+0x20, vv at +0x30).
-//   :0635ae7e-:0635aeb0 A = float(m00*px), B = float(m10*px) (spilled to the argument
-//     slots), px*m20 stays on the stack; A = float(m01*py + A), B = float(m11*py + B),
-//     acc += m21*py (FADDP ST2).
-//   :0635aebd-:0635aef5 W.x = float((m02*pz + A) + vv.x), W.y = float((m12*pz + B) + vv.y),
-//     W.z = (acc + m22*pz) + vv.z kept on the stack.
-//   :0635aefa-:0635af10 d.x = float(W.x - O.vv.x), d.y = float(W.y - O.vv.y),
-//     d.z = W.z - O.vv.z (stack).
-//   :0635af13-:0635af60 out.i = float((O.r2[i]*dz + O.r1[i]*dy) + O.r0[i]*dx).
+// FUN_0635ae60, cdecl. Point of CacheP's ledge -> world (cache_object + 0x1c) -> CacheOther's
+// object space. The x and y partial sums are spilled as floats, z stays double throughout.
 void IVP_Compact_Ledge_Solver::calc_pos_other_space(const IVP_Compact_Edge* P, const IVP_Cache_Ledge_Point* CacheP,
                                                     const IVP_Cache_Ledge_Point* CacheOther, IVP_U_Point* OutPos)
 {
@@ -229,9 +203,7 @@ void IVP_Compact_Ledge_Solver::calc_pos_other_space(const IVP_Compact_Edge* P, c
                                       (double)(O.rows[0].k[2]) * Dx);
 }
 
-// FUN_0635bcc0 (.text:0635bcc0-0635bd02), cdecl (ledge, edge, point). V = start(edge)
-// (ledge + [ledge] + (edge & 0xffff) * 16); dx/dy/dz = point - V on the stack;
-// returns (dz*dz + dy*dy) + dx*dx.
+// FUN_0635bcc0, cdecl.
 double IVP_Compact_Ledge_Solver::quad_dist_edge_start_to_point(const IVP_Compact_Ledge* Ledge,
                                                                const IVP_Compact_Edge* Edge, const IVP_U_Point* Point)
 {
@@ -242,11 +214,7 @@ double IVP_Compact_Ledge_Solver::quad_dist_edge_start_to_point(const IVP_Compact
     return (Dz * Dz + Dy * Dy) + Dx * Dx;
 }
 
-// FUN_0635bd10 (.text:0635bd10-0635bd94), cdecl (point, ledge, edge).
-//   :0635bd2a FUN_0635b150(ledge, edge, point, &s).
-//   :0635bd2f-:0635bd40 no sign bit in (s[1] | s[0]) -> FUN_0635ba10(ledge, edge, point).
-//   :0635bd54-:0635bd64 FCOMP s[0], 0.0f; TEST AH,0x1; JZ -> s[0] < 0 (or unordered)
-//     takes FUN_0635bcc0(ledge, edge, point), otherwise FUN_0635bcc0(ledge, next(edge), point).
+// FUN_0635bd10, cdecl. s[0] < 0 or unordered picks the edge start, otherwise the next start.
 double IVP_Compact_Ledge_Solver::calc_qlen_PK_K_space(const IVP_U_Point* Point, const IVP_Compact_Ledge* Ledge,
                                                       const IVP_Compact_Edge* Edge)
 {
@@ -259,10 +227,7 @@ double IVP_Compact_Ledge_Solver::calc_qlen_PK_K_space(const IVP_U_Point* Point, 
     return quad_dist_edge_start_to_point(Ledge, Edge->GetNextEdge(), Point);
 }
 
-// ---- cmn-ivp2d block (2026-10-08) ----
-
-// FUN_0635bda0 (.text:0635bda0-0635bdc5), cdecl (edge, cache, out): the point
-// cache->compact_poly_points[edge & 0xffff] through FUN_0634d8d0 with ECX = cache->cache_object.
+// FUN_0635bda0, cdecl. The edge's start point through FUN_0634d8d0 on cache->cache_object.
 void IVP_Compact_Ledge_Solver::give_world_coords_AT(const IVP_Compact_Edge* Edge, const IVP_Cache_Ledge_Point* Cache,
                                                     IVP_U_Point* OutWorld)
 {
@@ -270,11 +235,8 @@ void IVP_Compact_Ledge_Solver::give_world_coords_AT(const IVP_Compact_Edge* Edge
     IVP_TransformSlotToWorldSpace(Cache->cache_object, reinterpret_cast<const IVP_U_Point*>(Point), OutWorld);
 }
 
-// FUN_0635af70 (.text:0635af70-0635b02c), cdecl (vec, cacheIn, cacheOther, out).
-// M = cacheIn->cache_object + 0x1c, O = cacheOther->cache_object + 0x1c.
-//   :0635af7b-:0635afc1 w[i] = (M.r[i][2]*vz + M.r[i][1]*vy) + M.r[i][0]*vx, all three on the stack.
-//   :0635afc3-:0635b025 out.x = (O.r2[0]*w2 + O.r1[0]*w1) + O.r0[0]*w0, likewise y and z
-//     (column i of O), each rounded only at its FSTP.
+// FUN_0635af70, cdecl. Rotates by M, then by O transposed; double throughout, each output
+// rounded only at its store.
 void IVP_Compact_Ledge_Solver::transform_vec_other_space(const IVP_U_Point* Vec, const IVP_Cache_Ledge_Point* CacheIn,
                                                          const IVP_Cache_Ledge_Point* CacheOther, IVP_U_Point* OutVec)
 {
@@ -292,13 +254,7 @@ void IVP_Compact_Ledge_Solver::transform_vec_other_space(const IVP_U_Point* Vec,
     OutVec->k[2] = (float)((W2 * O.rows[2].k[2] + O.rows[1].k[2] * W1) + O.rows[0].k[2] * W0);
 }
 
-// FUN_0635b030 (.text:0635b030-0635b144), cdecl (pos, cacheIn, cacheOther, out). Same rounding
-// points as FUN_0635ae60 (calc_pos_other_space above), on the point passed in:
-//   A = float(m00*px), B = float(m10*px), acc = px*m20; A = float(m01*py + A),
-//   B = float(m11*py + B), acc += m21*py; W.x = float((m02*pz + A) + vv.x),
-//   W.y = float((m12*pz + B) + vv.y), W.z = (acc + m22*pz) + vv.z (stack);
-//   d.x = float(W.x - O.vv.x), d.y = float(W.y - O.vv.y), d.z = W.z - O.vv.z (stack);
-//   out.i = float((O.r2[i]*dz + O.r1[i]*dy) + O.r0[i]*dx).
+// FUN_0635b030, cdecl. Same rounding points as calc_pos_other_space, on the point passed in.
 void IVP_Compact_Ledge_Solver::transform_pos_other_space(const IVP_U_Float_Point* Pos, const IVP_Cache_Ledge_Point* CacheIn,
                                                          const IVP_Cache_Ledge_Point* CacheOther, IVP_U_Point* OutPos)
 {
@@ -327,9 +283,7 @@ void IVP_Compact_Ledge_Solver::transform_pos_other_space(const IVP_U_Float_Point
                                       (double)(O.rows[0].k[2]) * Dx);
 }
 
-// FUN_0635b8d0 (.text:0635b8d0-0635b932), cdecl (edge, ledge, out): the three start points
-// start(edge), start(prev edge) (DAT_063ee4f0), start(next edge) (DAT_063ee4e0) of the ledge;
-// FUN_063480a0(out; p0, p_prev, p_next) then FUN_06348150(out).
+// FUN_0635b8d0, cdecl. Plane through start(edge), start(prev), start(next), normized.
 void IVP_Compact_Ledge_Solver::calc_hesse_object(const IVP_Compact_Edge* Edge, const IVP_Compact_Ledge* Ledge,
                                                  IVP_U_Point* OutHesse)
 {
@@ -341,13 +295,7 @@ void IVP_Compact_Ledge_Solver::calc_hesse_object(const IVP_Compact_Edge* Edge, c
     OutHesse->normize_plane();
 }
 
-// FUN_0635b3b0 (.text:0635b3b0-0635b4c5), thiscall (K, L, cacheK, cacheL), RET 0x10.
-//   :0635b3c0 +0x48 = K, +0x4c = L.
-//   :0635b3c6-:0635b423 k = float(start(next K) - start(K)) from cacheK's points (y, z, x).
-//   :0635b427 FUN_0635af70(&k, cacheK, cacheL, this + 0x28); :0635b436 +0x50 = cacheK, +0x54 = cacheL.
-//   :0635b43c / :0635b458 FUN_0635ae60(K / next(K), cacheK, cacheL, this + 0x08 / + 0x18).
-//   :0635b45d-:0635b4b4 +0x00 / +0x04 = cacheL's points of L / next(L); +0x38 = float(L1 - L0).
-//   :0635b4b7 FUN_0628bed0(this + 0x58, this + 0x28, this + 0x38).
+// FUN_0635b3b0, thiscall. Store order (and the y, z, x component order) follows retail.
 IVP_KK_Input::IVP_KK_Input(const IVP_Compact_Edge* KIn, const IVP_Compact_Edge* LIn, const IVP_Cache_Ledge_Point* CacheKIn,
                            const IVP_Cache_Ledge_Point* CacheLIn)
 {
@@ -380,12 +328,7 @@ IVP_KK_Input::IVP_KK_Input(const IVP_Compact_Edge* KIn, const IVP_Compact_Edge* 
     IVP_CalcCrossProduct(&cross_KL_Los, &K_vec_Los, &L_vec_Los);
 }
 
-// FUN_0635b4d0 (.text:0635b4d0-0635b566), thiscall, returns on the x87 stack.
-//   :0635b4d0-:0635b4fa q = (cx*cx + cy*cy) + cz*cz of cross_KL_Los (stack); FCOM 1e-12f
-//     (DAT_063a5494); TEST AH,0x41; JNZ -> q <= 1e-12 (or unordered) takes the fallback.
-//   :0635b4fc-:0635b539 d = ((K0z*cz + K0y*cy) + K0x*cx) - ((L0z*cz + L0y*cy) + L0x*cx);
-//     returns (d * d) / q.
-//   :0635b53a-:0635b562 fallback: FUN_0635bd10(&K_Los[0], ledge of L's triangle, L).
+// FUN_0635b4d0, thiscall. q <= 1e-12f (DAT_063a5494) or unordered takes the point-edge fallback.
 double IVP_KK_Input::calc_quad_distance_edge_edge() const
 {
     const double Cx = cross_KL_Los.k[0];
@@ -402,23 +345,9 @@ double IVP_KK_Input::calc_quad_distance_edge_edge() const
     return IVP_Compact_Ledge_Solver::calc_qlen_PK_K_space(&K_Los[0], L->GetCompactLedge(), L);
 }
 
-// FUN_0635b570 (.text:0635b570-0635b8ca), cdecl (in, result), returns EAX.
-//   :0635b57e-:0635b5ab q = (cx*cx + cy*cy) + cz*cz; FCOMP 1e-6f (DAT_063a5610); TEST AH,0x41;
-//     JNZ -> q <= 1e-6 (or unordered) takes the sampled branch.
-//   :0635b5b1-:0635b5c8 nK = K_vec_Los x c, nL = L_vec_Los x c (FUN_0628bed0).
-//   :0635b5cd-:0635b63c a = nK.L0 (stack), b = float(nK.L1), c0 = float(nK.K0) (each dot is
-//     (y*y' + z*z') + x*x'); s = float(a - b); checks_L[0] = float((a - c0) * s),
-//     checks_L[1] = float((c0 - b) * s).
-//   :0635b64e-:0635b6c4 d = nL.K0 (stack), e = float(nL.K1), f = float(nL.L0); s = float(d - e);
-//     checks_K[0] = float((d - f) * s), checks_K[1] = float((f - e) * s). Returns 1.
-//   :0635b6d3-:0635b7ed min = 1e20f; for the first 11 sample parameters t: p = K0 (1 - t) + K1 t
-//     (FUN_06347e00 on K_Los); d = FUN_0635ba10(cacheL ledge, L, p); FCOM min; TEST AH,1 -> d < min
-//     (or unordered): min = float(d), checks_K = {t, float(1 - t)}, checks_L = FUN_0635b150(
-//     cacheL ledge, L, p).
-//   :0635b7f3-:0635b819 FUN_0635b030 carries L0 and L1 into K's space.
-//   :0635b827-:0635b8b8 for the first 9 parameters, the same with p on L (in K space) against
-//     K in cacheK's ledge: checks_L = {t, float(1 - t)}, checks_K = s values. min is not reset.
-//     Returns 0.
+// FUN_0635b570, cdecl. Returns 1 for the analytic case; when q <= 1e-6f (DAT_063a5610) or
+// unordered, samples points along K against L, then along L (in K space) against K without
+// resetting the minimum, and returns 0.
 int32_t IVP_Compact_Ledge_Solver::calc_unscaled_KK_vals(const IVP_KK_Input* In, IVP_Unscaled_KK_Result* OutResult)
 {
     const IVP_U_Point* const C = &In->cross_KL_Los;
@@ -508,17 +437,9 @@ int32_t IVP_Compact_Ledge_Solver::calc_unscaled_KK_vals(const IVP_KK_Input* In, 
     return 0;
 }
 
-// FUN_0635bdd0 (.text:0635bdd0-0635bfef), cdecl (K, L, cacheK, cacheL), returns on the x87 stack.
-//   :0635bdfe-:0635be0d IVP_KK_Input in(K, L, cacheK, cacheL); FUN_0635b570(&in, &r) (EAX unused).
-//   :0635be12-:0635be23 no sign bit in (r.L0 | r.L1):
-//     r.K0 not > 0 (TEST AH,0x41) -> FUN_0635bd10(&in.K_Los[0], cacheL ledge, L);
-//     r.K1 not > 0 -> FUN_0635bd10(&in.K_Los[1], cacheL ledge, L); else FUN_0635b4d0(&in).
-//   :0635be95-:0635bf2b else no sign bit in (r.K1 | r.K0):
-//     r.L0 not > 0 -> FUN_0635ae60(L, cacheL, cacheK, &p), FUN_0635bd10(&p, cacheK ledge, K);
-//     r.L1 not > 0 -> the same with next(L); else CORE (:0635bf2c) and fall through.
-//   :0635bf36-:0635bfe1 min = 1e20f over i = 0, 1: p = FUN_0635ae60({L, next L}[i], cacheL, cacheK);
-//     d = FUN_0635bd10(&p, cacheK ledge, K); then FUN_0635bd10(&in.K_Los[i], cacheL ledge, L);
-//     each FCOM min; TEST AH,1 -> d < min (or unordered): min = float(d). Returns min.
+// FUN_0635bdd0, cdecl. The KK_vals return value is unused. When the K checks have no sign bit
+// and both L checks are > 0, the CORE trap (:0635bf2c) fires and execution falls through to the
+// four-endpoint minimum.
 double IVP_Compact_Ledge_Solver::calc_qlen_KK(const IVP_Compact_Edge* K, const IVP_Compact_Edge* L,
                                               const IVP_Cache_Ledge_Point* CacheK, const IVP_Cache_Ledge_Point* CacheL)
 {

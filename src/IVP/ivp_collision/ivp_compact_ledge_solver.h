@@ -73,7 +73,7 @@ public:
     // FUN_0635abf0 (cdecl): get_all_ledges from the surface's ledge-tree root.
     static void get_all_ledges(const IVP_Compact_Surface* Surface, IVP_SurfaceManager_OutList* OutLedges);
 
-    // ---- cmn-ivp2c block (2026-10-08): helpers of IVP_Mindist_Minimize_Solver ----
+    // ---- helpers of IVP_Mindist_Minimize_Solver ----
     // FUN_0635ae60 (cdecl): the start point of P (in CacheP's ledge) carried to world space
     // by CacheP's cache object matrix and back into CacheOther's object space.
     static void calc_pos_other_space(const IVP_Compact_Edge* P, const IVP_Cache_Ledge_Point* CacheP,
@@ -94,7 +94,6 @@ public:
     static double calc_qlen_KK(const IVP_Compact_Edge* K, const IVP_Compact_Edge* L,
                                const IVP_Cache_Ledge_Point* CacheK, const IVP_Cache_Ledge_Point* CacheL);
 
-    // ---- cmn-ivp2d block (2026-10-08) ----
     // FUN_0635bda0 (cdecl): the start point of Edge (Cache's ledge) in world space, through
     // the cache object's matrix (FUN_0634d8d0).
     static void give_world_coords_AT(const IVP_Compact_Edge* Edge, const IVP_Cache_Ledge_Point* Cache,
@@ -144,7 +143,6 @@ public:
     const IVP_Cache_Ledge_Point* cache_L;  // +0x54
     IVP_U_Point cross_KL_Los;              // +0x58: K_vec_Los x L_vec_Los (FUN_0628bed0)
 
-    // FUN_0635b3b0.
     IVP_KK_Input(const IVP_Compact_Edge* KIn, const IVP_Compact_Edge* LIn, const IVP_Cache_Ledge_Point* CacheKIn,
                  const IVP_Cache_Ledge_Point* CacheLIn);
 

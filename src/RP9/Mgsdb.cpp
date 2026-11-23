@@ -26,7 +26,7 @@ namespace
     // DAT_06d70748: the 0x100-byte global that FUN_06d23639 copies a quoted string into.
     char G_MgsdbQuoted[0x100];
 
-    // "true" result of FUN_06d23e0a (MOV EAX,1); null is "false", anything else is a message.
+    // "true" result of FUN_06d23e0a (1); null is "false", anything else is a message.
     const char* const kMgsdbTrue = (const char*)1;
 
     // FUN_06d23c7f: the characters that may follow a keyword.
@@ -35,9 +35,8 @@ namespace
         return C == '>' || C == '<' || C == '!' || C == '=' || C == ' ' || C == '\r' || C == '\t';
     }
 
-    // FUN_06d23e0a's caps keys: object+0x488 + offset in D3DCAPS8 (06d23e4a..06d24b8e). RP8
-    // lists the raw offsets; here they are the FRp9Caps8 members at those offsets (pinned by
-    // the static_asserts in Rp9D3d8Types.h). "MaxTextureHeight" (0x5C) has no key, as in RP8.
+    // FUN_06d23e0a's caps keys: offsets into the D3DCAPS8 copy at object+0x488, as FRp9Caps8
+    // members (pinned by Rp9D3d8Types.h). "MaxTextureHeight" (0x5C) has no key, as in RP8.
     struct FMgsdbCapsKey
     {
         const char* Name;
@@ -886,7 +885,7 @@ bool FMgsdbDatabase::ReadVendorDevice()
                 ++Cursor_;
                 if (Match("unknown"))
                 {
-                    // The cursor stays on "unknown" (06d26b86..06d26b92).
+                    // The cursor stays on "unknown".
                     Vendor = Ident_.VendorId;
                     break;
                 }

@@ -4,8 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Archetype::Asteroid, DynamicAsteroid, MotorData, Explosion and the explosion map -- split out of
-// common_archetype.cpp (retail Archetype.cpp, one TU) in CMN-SPLIT phase B.
+// Archetype::Asteroid, DynamicAsteroid, MotorData, Explosion and the explosion map (retail
+// Archetype.cpp).
 
 #include "common_archetype.h"
 #include "Archetypes/common_archetype_internal.h"
@@ -44,7 +44,7 @@ namespace Archetype
 
     bool Asteroid::read(INI_Reader& Reader)
     {
-        // No "inherit" case: LoadAsteroids handles that key before calling read() (062fa2c0).
+        // No "inherit" case: LoadAsteroids (062fa2c0) handles that key before calling read().
         if (Root::read(Reader))
             return true;
 
@@ -71,7 +71,7 @@ namespace Archetype
 
     AClassType Asteroid::get_class_type() const
     {
-        // Common.dll.c 0xfd90 (Archetype::Asteroid::get_class_type): return 4.
+        // Retail 0xfd90.
         return AClassAsteroid;
     }
 
@@ -81,7 +81,7 @@ namespace Archetype
         ObjectType = 0x40000000;
     }
 
-    // Common.dll.txt 0x062fa0b0-0x062fa0bf: Root::read(Reader), result normalised with SETNZ.
+    // FUN_062fa0b0
     bool DynamicAsteroid::read(INI_Reader& Reader)
     {
         return Root::read(Reader) != false;
@@ -89,7 +89,7 @@ namespace Archetype
 
     AClassType DynamicAsteroid::get_class_type() const
     {
-        // Common.dll.c 0xfe80 (Archetype::DynamicAsteroid::get_class_type): return 5.
+        // Retail 0xfe80.
         return AClassDynamicAsteroid;
     }
 
@@ -104,10 +104,8 @@ namespace Archetype
 
     void MotorData::redefine(MotorData const& Other)
     {
-        // Retail vtable 063a1ecc slot 1 = 062f7ba0 (left undisassembled by Ghidra; decoded from
-        // the raw bytes): for accel (+0x0c), lifetime (+0x10) and delay (+0x08) in that order,
-        // `FLD Other; FCOMP this; FNSTSW; TEST AH,0x44; JNP skip` -- equal skips, unequal or
-        // unordered copies the dword. The nickname is not touched. RET 4.
+        // FUN_062f7ba0 (vtable 063a1ecc slot 1; not disassembled by Ghidra). Unequal or
+        // unordered copies; the nickname is not touched.
         if (Other.Accel != Accel)
             Accel = Other.Accel;
         if (Other.Lifetime != Lifetime)
@@ -118,8 +116,7 @@ namespace Archetype
 
     bool MotorData::read(INI_Reader& Reader)
     {
-        // Retail 062f7b00..062f7b99. "nickname" uses the no-argument get_value_string
-        // (062f7b1a -> 06310b70, the whole value).
+        // FUN_062f7b00. "nickname" uses the no-argument get_value_string (the whole value).
         if (Reader.is_value("nickname"))
         {
             Nickname.Id = CreateID(Reader.get_value_string());
@@ -147,10 +144,7 @@ namespace Archetype
         return false;
     }
 
-    // Common.dll.txt 0x0630b730-0x0630b7b2: Nickname = *InNickname; Radius, Impulse,
-    // HullDamage, EnergyDamage = 0; Process = 1; Lifetime = 0; LifetimeMax = 10000.0f; empty
-    // effect list; NumChildPieces = 0; DebrisImpulse = 5.0f; InnardsDebrisStartTime = -1.0f;
-    // InnardsDebrisNum/Radius = 0; both vectors empty -- exactly reset()'s values.
+    // FUN_0630b730; the field values are exactly reset()'s.
     Explosion::Explosion(ID_String const& InNickname)
         : Nickname(InNickname)
     {
@@ -220,8 +214,7 @@ namespace Archetype
         }
         if (Reader.is_value("process"))
         {
-            // 0630b94c..0630b99b: the 3-entry table 063ed218 {none 2, shatter 0, disappear 1},
-            // DACOM.DLL stricmp, first match stored at +0x14; no match leaves it.
+            // Table 063ed218 via DACOM.DLL stricmp; no match leaves the value.
             char const* Text = Reader.get_value_string();
             if (CallDacomStricmp(Text, "none") == 0)
                 Process = 2;
@@ -243,7 +236,7 @@ namespace Archetype
         }
         if (Reader.is_value("num_child_pieces"))
         {
-            // 0630ba34: ftol on the unrounded get_value_float result (value_num = same read).
+            // ftol on the unrounded value.
             NumChildPieces = (int)Reader.value_num(0);
             return true;
         }

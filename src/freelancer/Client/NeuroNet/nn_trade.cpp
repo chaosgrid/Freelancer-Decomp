@@ -64,8 +64,7 @@ WINFACTORY<NnTrade> G_NnTradeFactory("NN_Trade");
 
 namespace
 {
-    // DAT_00672458 -- LAB_004be6a0: CreateID("insufficient_cargo_space"), read by SetMode
-    // (0x004c1e1c, 0x004c1e90).
+    // DAT_00672458 (static init LAB_004be6a0), read by SetMode.
     unsigned const G_InsufficientCargoSpaceVoiceId = CreateID("insufficient_cargo_space");
 
     // DAT_006728bc (.bss float, 0.0) -- the x of the window's offset; only Create reads it.
@@ -77,7 +76,7 @@ namespace
     // DAT_0061218c (.data byte, 1) -- the caret is shown.
     unsigned char G_bNnTradeCaretShown = 1;
 
-    // The window's meshes (.rdata strings 0x005d6c68..0x005d64d8).
+    // The window's meshes.
     char const kBackgroundMesh[] = "interface\\multiplayer\\trade\\TRADE_background.cmp";
     char const kTitleBoxMesh[] = "Interface\\multiplayer\\trade\\TRADE_tradetitlebox.3db";
     char const kTitleArrowMesh[] = "Interface\\multiplayer\\trade\\TRADE_transactiondirection.3db";
@@ -97,7 +96,7 @@ namespace
     wchar_t const kQuantityFormat[] = L"%d";
     wchar_t const kTargetNamePlaceholder[] = L"Target Name";
 
-    // 50000000 (0x2faf080): what an unlimited (-1) nanobot / battery limit becomes.
+    // What an unlimited (-1) nanobot / battery limit becomes.
     int const kUnlimitedAmmo = 50000000;
 
     uintptr_t PointerArg(void const* Pointer)
@@ -126,8 +125,7 @@ namespace
         return static_cast<NnStaticControl*>(Control);
     }
 
-    // 0x004c0a15..0x004c0a4d / 0x004c0ba7..0x004c0be0: bytes {ff,00,00,c0} built on the stack and
-    // stored as the dword at +0x410, then again at +0x414.
+    // Port-only helper for the colours Create stores twice (0x004c0a15, 0x004c0ba7).
     void SetCargoBarColours(NnStaticControl* Bar)
     {
         Bar->MeshColour[0] = 0xff;
@@ -147,8 +145,8 @@ namespace
         Item->Cached = static_cast<unsigned short>((Item->Cached & 0xff00) | bMarked);
     }
 
-    // The inlined "scroll range [0, max(0, size - rows)], then Refresh(-1)" of FUN_004c2220 /
-    // FUN_004c2380 / FUN_004c2d50 (e.g. 0x004c22a4..0x004c22c2).
+    // Port-only helper for the scroll range and Refresh(-1) FUN_004c2220 / FUN_004c2380 /
+    // FUN_004c2d50 inline (e.g. 0x004c22a4).
     void RefreshTradeListRange(CTradeEquipList* List)
     {
         int Range = static_cast<int>(List->Items.Items.size()) - List->VisibleRows;
@@ -158,8 +156,8 @@ namespace
         List->Refresh(-1);
     }
 
-    // FUN_00489e80(Id, 0) -- the NN voice queue (DAT_00671f50, FUN_00489b50) is not in the port.
-    // HOLE: each call is reported instead of queueing the line.
+    // FUN_00489e80(Id, 0). HOLE: the call is only reported, although the voice queue is ported
+    // now (NnVoiceEnqueue, nn_messaging.h); this stub should forward to it.
     void QueueTradeVoice(unsigned VoiceId)
     {
         FDUMP(0x100002, "NN_Trade: HOLE FUN_00489e80 (voice %u) -- voice queue not ported",
@@ -169,16 +167,16 @@ namespace
     // FUN_004bff30 (cdecl) -- blink a '|' caret at the end of Text every half second.
     void BlinkQuantityCaret(NnTextControl* Text)
     {
-        // 0x004bff48..0x004bff7a: the sum is compared before it is rounded to the float.
+        // The sum is compared before it is rounded to the float.
         double const Timer = GetClientFrameTimeCapped() + static_cast<double>(G_NnTradeCaretTimer);
         G_NnTradeCaretTimer = static_cast<float>(Timer);
-        if (Timer > 0.5) // DAT_005c75e8; TEST AH,0x41 / JNZ skips on not-greater
+        if (Timer > 0.5) // DAT_005c75e8
         {
             G_bNnTradeCaretShown = (G_bNnTradeCaretShown == 0) ? 1 : 0;
             G_NnTradeCaretTimer = 0.0f;
         }
 
-        // 0x004bff7f..0x004bffaf: nothing to do when the text is empty or already agrees.
+        // Nothing to do when the text is empty or already agrees.
         wchar_t const* const Current = Text->GetFontString()->Text; // FUN_0058a520
         int const Last = static_cast<int>(wcslen(Current)) - 1;
         if (Last < 0)
@@ -187,8 +185,7 @@ namespace
         if (bHasCaret == G_bNnTradeCaretShown)
             return;
 
-        // 0x004bffb5..0x004c00f1: a heap copy (FUN_004142a0 + wcsncpy) with the '|' appended, or
-        // with its last character cut, handed to FUN_0058a530 and freed.
+        // A copy with the '|' appended or its last character cut, through FUN_0058a530.
         std::wstring Copy(Current);
         if (G_bNnTradeCaretShown != 0)
             Copy.append(L"|");
@@ -197,8 +194,8 @@ namespace
         Text->SetText(Copy.c_str());
     }
 
-    // 0x004c01a9..0x004c0312 (and 0x004c0362..0x004c04cb): the dark quad over the part of a
-    // cargo bar right of X in the bar's frame, then the bar's own mesh.
+    // Port-only helper for Draw's two bars (0x004c01a9, 0x004c0362): the dark quad over the part
+    // of a cargo bar right of X in the bar's frame, then the bar's own mesh.
     void DrawCargoFill(WinControl* Bar, float X)
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
@@ -207,7 +204,7 @@ namespace
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
         float Transform[12];
         memcpy(Transform, DALib::Engine->GetInstanceTransform(Bar->MeshHolder.EngineInstance),
-               sizeof(Transform)); // IEngine +0xa0, REP MOVSD 12 dwords
+               sizeof(Transform)); // IEngine +0xa0
         Win3DBindModelview(nullptr, Transform); // FUN_00422690(0, &Transform)
         Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
         Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
@@ -227,7 +224,7 @@ namespace
         Win3DDisable(kWin3DBlend);               // FUN_00421ed0(0xbe2)
     }
 
-    // X = 2 * hx * Ratio - hx, kept as a double on the FPU and rounded to a float at the vertex.
+    // Kept at full precision and rounded to a float at the vertex.
     float CargoFillX(WinControl const* Bar, double Ratio)
     {
         double X = static_cast<double>(Bar->HalfExtents[0]) * Ratio;
@@ -344,7 +341,7 @@ NnTrade::~NnTrade()
 
 bool NnTrade::OnEvent(unsigned MsgId)
 {
-    // LAB_0043d8e0 -- MOV AL,1 / RET 4.
+    // LAB_0043d8e0.
     (void)MsgId;
     return true;
 }
@@ -363,7 +360,7 @@ bool NnTrade::GetHardpointTransform(char const* Name, float* OutTransform12)
         if (static_cast<unsigned char>(DALib::Hardpoint->GetHardpoint(Archetype, &Key, Blob)) != 0)
         {
             // Blob +0x10 orientation, +0x04 position; this window's +0xa8 is added, then the z
-            // translation is overwritten with 0 (0x004bfeda).
+            // translation is overwritten with 0.
             float Local[12];
             memcpy(Local, Blob + 0x10, 9 * sizeof(float));
             memcpy(Local + 9, Blob + 0x04, 3 * sizeof(float));
@@ -375,7 +372,7 @@ bool NnTrade::GetHardpointTransform(char const* Name, float* OutTransform12)
         }
     }
 
-    // 0x004bfeec..0x004bff27: identity, no translation, no offset.
+    // Identity, no translation, no offset.
     OutTransform12[8] = 1.0f;
     OutTransform12[4] = 1.0f;
     OutTransform12[0] = 1.0f;
@@ -397,7 +394,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     if (!Win3D::Create(NewParent, Data)) // FUN_004b5060
         return false;
 
-    // 0x004c052a..0x004c055e: what the player carries of nanobots and shield batteries.
+    // What the player carries of nanobots and shield batteries.
     EquipDesc* const Nanobots = FindPlayerNonMissionEquipRetail(G_NanobotArchId);    // FUN_004c45d0
     EquipDesc* const Batteries = FindPlayerNonMissionEquipRetail(G_ShieldBatteryArchId);
     if (Nanobots != nullptr)
@@ -405,7 +402,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     if (Batteries != nullptr)
         PlayerBatteries = Batteries->Count;
 
-    // 0x004c0564..0x004c05df: the player's ship (FUN_00543320 inlined) and its limits.
+    // The player's ship (FUN_00543320 inlined) and its limits.
     CShip* const Ship = HudShipOfObjRw(static_cast<IObjRW*>(GetPlayerObjRW())); // FUN_0054baf0
     if (Ship != nullptr)
     {
@@ -420,7 +417,6 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerShip = Ship;
     PlayerCargoUsed = GetPlayerEquipDescListRetail().get_cargo_space_occupied(); // FUN_004c4640
 
-    // 0x004c05e5..0x004c0650: the offset, the background and its size.
     Offset[0] = G_NnTradeOffsetX;
     Offset[1] = G_NnTradeOffsetY;
     Offset[2] = 0.0f;
@@ -428,23 +424,19 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     SetMesh(kBackgroundMesh, 0); // slot 38
     WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
 
-    // 0x004c0655..0x004c06c9: the title box, hidden.
     FormatTradeWidgetName("TitleFrame");
     TitleFrame = CreateStaticControl(G_TradeWidgetName, kTitleBoxMesh, Zero, "hp_title_frame", Zero,
                                      1, 1, 1, 0, 0, 0, 1, 0, 0, 0, Zero);
     TitleFrame->SetProperty(1, 1, 0);
 
-    // 0x004c06cb..0x004c0724: the transfer arrow.
     FormatTradeWidgetName("TitleArrow");
     TitleArrow = CreateStaticControl(G_TradeWidgetName, kTitleArrowMesh, Zero, "hp_title_arrow",
                                      Zero, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
 
-    // 0x004c0729..0x004c0785: the page title (ids 0x754).
     FormatTradeWidgetName("TitleText");
     TitleText = CreateTextControl(G_TradeWidgetName, "PageHeader", Zero, "hp_title_text", 0.172f,
                                   0.051f, 2.0f, 0x754, 1, 0, 0);
 
-    // 0x004c078a..0x004c0867: the two players' names.
     FormatTradeWidgetName("PlayerName");
     PlayerName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", Zero, "hp_player_name",
                                    0.415f, 0.039f, 2.0f, 0, 1, 0, 0);
@@ -454,7 +446,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerName->SetProperty(0x1d, PointerArg(GetPlayerCharacterNameRetail()), 0); // DAT_006732f0
     TargetName->SetProperty(0x1d, PointerArg(kTargetNamePlaceholder), 0);
 
-    // 0x004c086d..0x004c099c: the two "accepted" texts, red "not accepted" (ids 0x75a).
+    // The two "accepted" texts start as red "not accepted" (ids 0x75a).
     FormatTradeWidgetName("PlayerAcceptedText");
     PlayerAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", Zero,
                                                   "hp_player_accepted", 0.415f, 0.029f, 1.5f, 0,
@@ -468,8 +460,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetAcceptedText->SetProperty(0x1e, 0x75a, 0);
     TargetAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
 
-    // 0x004c099c..0x004c0a4d: the player's full cargo bar, its half extents from the mesh, and
-    // the StaticControl colours +0x410 / +0x414 = {ff,00,00,c0} (0x004c0a2b, 0x004c0a4d).
+    // The player's full cargo bar, its half extents from the mesh.
     FormatTradeWidgetName("PlayerCargoBarFull");
     PlayerCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, Zero,
                                           "hp_player_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
@@ -477,22 +468,20 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     WinControlHalfExtentsFromMesh(PlayerCargoFull->HalfExtents, &PlayerCargoFull->MeshHolder);
     SetCargoBarColours(AsStatic(PlayerCargoFull));
 
-    // 0x004c0a53..0x004c0aba: its caption (ids 0x755), as wide as the bar.
+    // Its caption, as wide as the bar.
     FormatTradeWidgetName("PlayerCargoText");
     PlayerCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", Zero, "hp_player_cargo_text",
                                         PlayerCargoFull->HalfExtents[0] + PlayerCargoFull->HalfExtents[0],
                                         0.051f, 1.25f, 0x755, 1, 0, 0);
 
-    // 0x004c0ac0..0x004c0b2b: the empty bar under the same name and hardpoint; the full one is
-    // hidden (Draw shades the empty one instead).
+    // The empty bar under the same name and hardpoint; the full one is hidden.
     FormatTradeWidgetName("PlayerCargoBarFull");
     PlayerCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, Zero,
                                            "hp_player_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
                                            0, 0, 0, Zero);
     PlayerCargoFull->SetProperty(1, 1, 0);
 
-    // 0x004c0b31..0x004c0bf2: the other player's full bar with the same colours (0x004c0bbd,
-    // 0x004c0be0), hidden.
+    // The other player's full bar with the same colours, hidden.
     FormatTradeWidgetName("TargetCargoBarFull");
     TargetCargoFull = CreateStaticControl(G_TradeWidgetName, kCargoFullMesh, Zero,
                                           "hp_target_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
@@ -501,20 +490,19 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     SetCargoBarColours(AsStatic(TargetCargoFull));
     TargetCargoFull->SetProperty(1, 1, 0);
 
-    // 0x004c0bf8..0x004c0c60: its caption (retail's hardpoint name is spelt "traget").
+    // Its caption (retail's hardpoint name is spelt "traget").
     FormatTradeWidgetName("TargetCargoText");
     TargetCargoText = CreateTextControl(G_TradeWidgetName, "SubHeader", Zero, "hp_traget_cargo_text",
                                         TargetCargoFull->HalfExtents[0] + TargetCargoFull->HalfExtents[0],
                                         0.051f, 1.25f, 0x755, 1, 0, 0);
 
-    // 0x004c0c66..0x004c0cc3: the other player's empty bar.
     FormatTradeWidgetName("TargetCargoBarFull");
     TargetCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, Zero,
                                            "hp_target_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
                                            0, 0, 0, Zero);
 
-    // 0x004c0cc9..0x004c0db5: the quantity panel's item row, 0.015 right and 0.032 down
-    // (DAT_005d1f04, DAT_005d69c0) of the centre list's hardpoint (this window's slot 36).
+    // The quantity panel's item row, 0.015 right and 0.032 down (DAT_005d1f04, DAT_005d69c0) of
+    // the centre list's hardpoint.
     float Centre[12];
     Win3DIdentityRotation3x3(Centre);
     Centre[9] = 0.0f;
@@ -528,20 +516,17 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     QuantityLine = new CTradeEquipListLine(nullptr); // operator_new(0x2c), ctor inlined
     QuantityLine->Init(this, RowAt);
 
-    // 0x004c0dbb..0x004c0e17: the panel's title.
     FormatTradeWidgetName("QuantTitTxt");
     QuantityTitle = CreateTextControl(G_TradeWidgetName, "ItemName", Zero, "hp_quantity_title",
                                       0.415f, 0.051f, 1.5f, 0, 1, 0, 0);
 
-    // 0x004c0e1d..0x004c0e90: the number box.
     FormatTradeWidgetName("QuantFrame");
     QuantityFrame = CreateStaticControl(G_TradeWidgetName, kQuantityBoxMesh, Zero,
                                         "hp_quantity_number_frame", Zero, 1, 1, 1, 0, 0, 0, 1, 0,
                                         0, 0, Zero);
     WinControlHalfExtentsFromMesh(QuantityFrame->HalfExtents, &QuantityFrame->MeshHolder);
 
-    // 0x004c0e95..0x004c0f25: the number, 0.01 up (DAT_005c99c8), as wide as the box and as
-    // high as its half height; then 0.
+    // The number, 0.01 up (DAT_005c99c8), as wide as the box and as high as its half height.
     float const NumberAt[3] = {Zero[0], Zero[1] + 0.01f, Zero[2]};
     FormatTradeWidgetName("QuantText");
     QuantityText = AsText(CreateTextControl(
@@ -550,7 +535,6 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
         1.5f, 0, 1, 0, 0));
     SetQuantity(0);
 
-    // 0x004c0f25..0x004c0ffa: accept and cancel of the quantity panel.
     FormatTradeWidgetName("QuantAccept");
     QuantityAccept = CreateButtonControl(G_TradeWidgetName, kExecuteMesh, kExecuteMesh, nullptr,
                                          nullptr, Zero, "hp_center_add_accept", Zero, 0, 0, 0, 1,
@@ -561,8 +545,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                          Zero, "hp_center_add_cancel", Zero, 0, 0, 0, 1, 0, 0, 0);
     WinControlHalfExtentsFromMesh(QuantityReject->HalfExtents, &QuantityReject->MeshHolder);
 
-    // 0x004c0fff..0x004c10f3: the quantity bar [0, 100], page 1, and the half extents of its
-    // four parts from their meshes.
+    // The quantity bar [0, 100], page 1.
     FormatTradeWidgetName("QuantScrollBar");
     QuantityBar = static_cast<ScrollControl*>(CreateScrollControl(
         G_TradeWidgetName, kQuantityBarMesh, Zero, "hp_center_quantity_bar", Zero, true,
@@ -575,8 +558,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize.X, &QuantityBar->Prev.Holder);
     WinControlHalfExtentsFromMesh(&QuantityBar->ThumbMouse.X, &QuantityBar->ThumbHolder);
 
-    // 0x004c10f8..0x004c11d7: the "accept trade" box (+0x331 bit 0 set) and its caption
-    // (ids 0x756) filling it.
+    // The "accept trade" box (+0x331 bit 0 set) and its caption filling it.
     FormatTradeWidgetName("AcceptTradeFrame");
     AcceptTradeFrame = CreateButtonControl(G_TradeWidgetName, kAcceptTradeMesh, kAcceptTradeMesh,
                                            nullptr, nullptr, Zero, "hp_center_trade_accept", Zero,
@@ -588,8 +570,8 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
         AcceptTradeFrame->HalfExtents[0] + AcceptTradeFrame->HalfExtents[0],
         AcceptTradeFrame->HalfExtents[1] + AcceptTradeFrame->HalfExtents[1], 2.0f, 0x756, 1, 0, 0);
 
-    // 0x004c11dd..0x004c14e7: the player's info card, hidden -- frame, close button, a turning
-    // ship view (+0x518 bit 7 cleared), the item's name and a RichTextWin for the info text.
+    // The player's info card, hidden: frame, close button, a turning ship view (+0x518 bit 7
+    // cleared), the item's name and a RichTextWin for the info text.
     float const CardFrameAt[3] = {0.002f, -0.007f, 0.0f};
     FormatTradeWidgetName("PICFrame");
     PlayerCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, CardFrameAt,
@@ -631,7 +613,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardInfo->SetAttachOffset(PlayerInfoAt);          // FUN_00579c40
     PlayerCardInfo->Flags &= 0xfc;
 
-    // 0x004c14e7..0x004c1804: the other player's info card, the same, a little further right.
+    // The other player's info card, the same, a little further right.
     float const TargetFrameAt[3] = {0.01f, -0.007f, 0.0f};
     FormatTradeWidgetName("TICFrame");
     TargetCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, TargetFrameAt,
@@ -671,13 +653,12 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetCardInfo->SetAttachOffset(TargetInfoAt);
     TargetCardInfo->Flags &= 0xfc;
 
-    // 0x004c1809..0x004c1876: the window's close button.
     FormatTradeWidgetName("TradeClose");
     TradeClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr, nullptr,
                                      Zero, "hp_tradecancel", Zero, 0, 0, 0, 1, 0, 0, 0);
     WinControlHalfExtentsFromMesh(TradeClose->HalfExtents, &TradeClose->MeshHolder);
 
-    // 0x004c187b..0x004c1983: the three lists; the player's is filled at once.
+    // The three lists; the player's is filled at once.
     TargetList = new CTradeEquipList(this, "hp_target_inventory_list", "hp_target_scroll_bar",
                                      "hp_target_scroll_up", "hp_target_scroll_down",
                                      "hp_target_thumb_top", "hp_target_thumb_bottom", 5, 1, 0);
@@ -690,13 +671,13 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                      "hp_center_scroll_up", "hp_center_scroll_down",
                                      "hp_center_thumb_top", "hp_center_thumb_down", 5, 0, 1);
 
-    // 0x004c1989..0x004c1997: closed, then browsing; drawn above the other windows.
+    // Closed, then browsing; drawn above the other windows.
     SetMode(1);
     SetMode(2);
     DrawLayer = 1;
 
-    // 0x004c199a..0x004c19e3: the status and target panels are collapsed while trading; what
-    // they were is kept for the close (0xef02).
+    // The status and target panels are collapsed while trading; what they were is kept for the
+    // close (0xef02).
     HUD_Status* const Status = GetHudStatus(); // DAT_00674aa0
     if (Status != nullptr)
     {
@@ -712,7 +693,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
             Target->ToggleExpanded();
     }
 
-    ChatPlaceMsgWinForTrade(1); // FUN_0046b450(1), 0x004c19e4
+    ChatPlaceMsgWinForTrade(1); // FUN_0046b450(1)
     return true;
 }
 
@@ -727,15 +708,14 @@ void NnTrade::Draw()
     BlinkQuantityCaret(QuantityText); // FUN_004bff30
     WinControl::Draw();               // FUN_005a0760
 
-    // 0x004c0144..0x004c0312: the player's bar, shaded right of the used share of the hold.
-    // Every branch then sets the full bar's bUseColours (+0x348) = 1 (0x004c018b, 0x004c01a2).
+    // The player's bar, shaded right of the used share of the hold.
     if (PlayerCargoFull != nullptr)
     {
         double const Hold = GetPlayerShipHoldSizeRetail(); // FUN_004c4610
         double Ratio;
-        if (PlayerCargoUsed > 1e-5) // DAT_005cbfb0; TEST AH,0x41 / JNZ -> not greater
+        if (PlayerCargoUsed > 1e-5) // DAT_005cbfb0
         {
-            Ratio = PlayerCargoUsed / Hold; // FDIVR
+            Ratio = PlayerCargoUsed / Hold;
             if (Ratio > 1.0)                // DAT_005c89b8
                 Ratio = 1.0;
         }
@@ -744,12 +724,11 @@ void NnTrade::Draw()
             Ratio = 0.0; // DAT_005c8ba8
         }
         AsStatic(PlayerCargoFull)->bUseColours = 1;
-        // The quad and the mesh are both the (hidden) full bar's (0x004c020e, 0x004c02e5).
+        // The quad and the mesh are both the (hidden) full bar's.
         DrawCargoFill(PlayerCargoFull, CargoFillX(PlayerCargoFull, Ratio));
     }
 
-    // 0x004c0315..0x004c04cb: the other player's bar; both paths join at 0x004c035b, which sets
-    // its bUseColours (+0x348) = 1.
+    // The other player's bar.
     if (TargetCargoFull != nullptr)
     {
         double Ratio;
@@ -783,15 +762,14 @@ bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
     int const Code = static_cast<int>(Key);
     if (Code == 8)
     {
-        // 0x004c2ca3..0x004c2cc6: backspace drops the last digit.
+        // Backspace drops the last digit.
         if (bDown != 0)
             Quantity = Quantity / 10;
         bHandled = true;
     }
     else if (Code >= '0' && Code <= '9')
     {
-        // 0x004c2cd2..0x004c2d0f: the first digit typed replaces the value; a value outside the
-        // bar's range is ignored.
+        // The first digit typed replaces the value; a value outside the bar's range is ignored.
         bHandled = true;
         if (bDown != 0)
         {
@@ -803,7 +781,6 @@ bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
         }
     }
 
-    // 0x004c2d15..0x004c2d42.
     bQuantityTyped = 1;
     if (bHandled)
     {
@@ -828,8 +805,8 @@ void NnTrade::SetQuantity(int NewQuantity)
             NewQuantity = QuantityBar->MinRange;
     }
 
-    // 0x004c1a47..0x004c1ab3: "%d" into the first 32 characters of the 0x80-byte buffer, then
-    // copied backwards into the second half with a ',' after every third digit from the right.
+    // "%d" into the first 32 characters of the buffer, then copied backwards into the second
+    // half with a ',' after every third digit from the right.
     wchar_t Buffer[64];
     swprintf(Buffer, 32, kQuantityFormat, NewQuantity);
     int Remaining = static_cast<int>(wcslen(Buffer));
@@ -855,7 +832,6 @@ void NnTrade::SetQuantity(int NewQuantity)
         }
     }
 
-    // 0x004c1ab5..0x004c1ac8.
     QuantityText->SetProperty(0x1d, PointerArg(Out), 0);
     Quantity = NewQuantity;
 }
@@ -873,7 +849,7 @@ void NnTrade::SetMode(int NewMode)
 
     if (NewMode == 1)
     {
-        // 0x004c207d..0x004c2205: everything but the lists hidden.
+        // Everything but the lists hidden.
         TitleFrame->SetProperty(1, 1, 0);
         TitleArrow->SetProperty(1, 1, 0);
         TitleText->SetProperty(1, 1, 0);
@@ -894,7 +870,7 @@ void NnTrade::SetMode(int NewMode)
 
     if (NewMode == 2)
     {
-        // 0x004c1ed6..0x004c2074: the arrow, the title, the offer list and "accept trade".
+        // The arrow, the title, the offer list and "accept trade".
         TitleFrame->SetProperty(1, 1, 0);
         TitleArrow->SetProperty(1, 0, 0);
         TitleText->SetProperty(1, 0, 0);
@@ -917,7 +893,7 @@ void NnTrade::SetMode(int NewMode)
     if (NewMode != 3)
         return;
 
-    // 0x004c1b1f..0x004c1c33: the quantity panel replaces the offer list.
+    // The quantity panel replaces the offer list.
     for (size_t Index = 0; Index < CenterList->Lines.size(); ++Index)
         CenterList->Lines[Index]->Hide();
     CenterList->ScrollBar->SetProperty(1, 1, 0);
@@ -935,20 +911,19 @@ void NnTrade::SetMode(int NewMode)
     QuantityText->SetProperty(1, 0, 0);
     QuantityBar->SetProperty(1, 0, 0);
 
-    // 0x004c1c39..0x004c1ce0: one unit of the item, which side it comes from, the other hold's
-    // free space (1000 when the other ship's hold size is unknown).
+    // The other hold's free space is 1000 when the other ship's hold size is unknown.
     EquipDesc Unit = *SelectedItem;
     Unit.set_count(1);
     bool const bFromPlayer = SelectedLine->Owner == PlayerList;
     double const UnitVolume = Unit.get_cargo_space_occupied();
     double Free;
-    if (TargetHoldSize != 0.0) // TEST AH,0x44 / JNP -> equal
+    if (TargetHoldSize != 0.0)
         Free = TargetHoldSize - TargetCargoUsed;
     else
         Free = 1000.0;
 
-    // 0x004c1ce0..0x004c1dad: the most the other side can take. (EBP -- Held -- is 0 again by
-    // the clamp at 0x004c1da9, so the clamp and the bar's minimum are 0.)
+    // The most the other side can take. Held is 0 again by the clamp, so the clamp and the
+    // bar's minimum are 0.
     int Held = 0;
     int Most;
     if (Unit.ArchId == G_ShieldBatteryArchId) // DAT_00674a88
@@ -961,7 +936,7 @@ void NnTrade::SetMode(int NewMode)
     }
     else if (PlayerShip->get_ammo_capacity_remaining(Unit.ArchId) > -1)
     {
-        // 0x004c1d43..0x004c1d7c: ammo -- the other ship's room less what is already offered.
+        // Ammo: the other ship's room less what is already offered.
         if (bFromPlayer)
         {
             EquipDesc const* const Offered = CenterList->Items.find_matching_cargo(Unit.ArchId, 1, 1.0f);
@@ -984,14 +959,14 @@ void NnTrade::SetMode(int NewMode)
     if (!bFromPlayer)
         Most = SelectedItem->Count;
 
-    // 0x004c1dbc..0x004c1e07: the bar's range; a single unit of the player's has no bar.
+    // A single unit of the player's has no bar.
     QuantityBar->MinRange = Held;
     QuantityBar->MaxRange = (SelectedItem->Count < Most) ? SelectedItem->Count : Most;
     if (bFromPlayer && SelectedItem->Count == 1)
         QuantityBar->SetProperty(1, 1, 0);
 
-    // 0x004c1e07..0x004c1e35: re-entered (4) with a value that no longer fits -- the voice line;
-    // a fresh panel forgets the typed digits.
+    // Re-entered (4) with a value that no longer fits: the voice line; a fresh panel forgets
+    // the typed digits.
     if (Previous == 4)
     {
         if (QuantityBar->Value > Most)
@@ -1002,12 +977,12 @@ void NnTrade::SetMode(int NewMode)
         bQuantityTyped = 0;
     }
 
-    // 0x004c1e35..0x004c1e87: start at the most; the title says which way it goes.
+    // Start at the most; the title says which way it goes.
     QuantityBar->SetProperty(0x38, static_cast<uintptr_t>(Most), 0);
     SetQuantity(Most);
     QuantityTitle->SetProperty(0x1e, (SelectedLine->Owner == PlayerList) ? 0x757 : 0x758, 0);
 
-    // 0x004c1e87..0x004c1ec8: nothing fits -- the voice line and back to browsing.
+    // Nothing fits: the voice line and back to browsing.
     if (Most >= 1)
         return;
     QueueTradeVoice(G_InsufficientCargoSpaceVoiceId);
@@ -1028,14 +1003,14 @@ void NnTrade::AddTargetItem(EquipDesc const* Item)
     // FUN_004c2220 (RET 4).
     if (TargetList != nullptr)
     {
-        // 0x004c223c..0x004c22c2: a copy without the selection mark, merged when combinable.
+        // A copy without the selection mark, merged when combinable.
         EquipDesc Copy = *Item;
         SetTradeMark(&Copy, 0);
         TargetList->Items.add_equipment_item(Copy, arch_is_combinable(Copy.ArchId));
         TargetList->CargoVolume = TargetList->Items.get_cargo_space_occupied();
         RefreshTradeListRange(TargetList);
 
-        // 0x004c22c7..0x004c2321: the other hold as it will be after the trade.
+        // The other hold as it will be after the trade.
         FClientGameobj* const Object = FindTradeObject(TargetObjectId);
         if (Object != nullptr)
         {
@@ -1046,14 +1021,13 @@ void NnTrade::AddTargetItem(EquipDesc const* Item)
                               PlayerOffer;
         }
 
-        // 0x004c2327..0x004c235c: and the player's.
         double const PlayerOffer = CenterList->CargoVolume;
         double const TargetOffer = TargetList->CargoVolume;
         PlayerCargoUsed = GetPlayerEquipDescListRetail().get_cargo_space_occupied() - PlayerOffer +
                           TargetOffer; // FUN_004c4640
     }
 
-    // 0x004c2362..0x004c236f: an open quantity panel re-checks its limits.
+    // An open quantity panel re-checks its limits.
     if (Mode == 3)
         SetMode(4);
 }
@@ -1063,16 +1037,15 @@ void NnTrade::RemoveTargetItem(EquipDesc const* Item)
     // FUN_004c2380 (RET 4).
     if (TargetList != nullptr)
     {
-        // 0x004c239c..0x004c2406: the entry before and after the removal.
         EquipDescList& Items = TargetList->Items;
         EquipDesc* const Before = Items.find_equipment_item(Item->Id);
         Items.remove_equipment_item(Item->Id, Item->Count);
         TargetList->CargoVolume = Items.get_cargo_space_occupied();
         EquipDesc* const After = Items.find_equipment_item(Item->Id);
         RefreshTradeListRange(TargetList);
-        EquipDesc* const Kept = (After != nullptr) ? Before : nullptr; // NEG / SBB / AND
+        EquipDesc* const Kept = (After != nullptr) ? Before : nullptr;
 
-        // 0x004c240b..0x004c24b0: the two holds (see AddTargetItem).
+        // The two holds (see AddTargetItem).
         FClientGameobj* const Object = FindTradeObject(TargetObjectId);
         if (Object != nullptr)
         {
@@ -1087,9 +1060,9 @@ void NnTrade::RemoveTargetItem(EquipDesc const* Item)
         PlayerCargoUsed = GetPlayerEquipDescListRetail().get_cargo_space_occupied() - PlayerOffer +
                           TargetOffer;
 
-        // 0x004c24b6..0x004c24e6: the entry shown on the other player's card changed -- close
-        // the card and drop the selection. (A removed entry leaves Kept null, which matches a
-        // list with nothing selected.)
+        // The entry shown on the other player's card changed: close the card and drop the
+        // selection. (A removed entry leaves Kept null, which matches a list with nothing
+        // selected.)
         if (Kept == TargetList->SelectedItem)
         {
             ShowInfoCard(TargetList, 0);
@@ -1114,7 +1087,6 @@ void NnTrade::SetTarget(unsigned ObjectId)
     if (Object == nullptr)
         return;
 
-    // 0x004c2531..0x004c2608: the other ship, its hold, name, owner and ammo room.
     CShip* const Ship = HudShipOfObjRw(Object); // FUN_00543320, not null-tested after
     TargetShip = Ship;
     Archetype::Ship const* const ShipArch = Ship->shiparch(); // CObject +0x88
@@ -1164,9 +1136,7 @@ void NnTrade::SetPlayerAccepted(unsigned char bAccepted)
 
 void NnTrade::SetTargetMoney(int Money)
 {
-    // FUN_004c2700 (RET 4) -- the body of FUN_004bf620 on +0x330, instruction for instruction
-    // (credits entry found: count, or erase every entry with its id; none: insert the template
-    // at the end and count it; then the template's count and Refresh(-1)).
+    // FUN_004c2700 (RET 4) -- the body of FUN_004bf620 on +0x330, inlined in retail.
     TargetList->SetMoney(Money);
 }
 
@@ -1186,7 +1156,6 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
 
     if (List == PlayerList)
     {
-        // 0x004c286a..0x004c2a26.
         List->bSelectMode = bShow;
         List->Refresh(-1);
         uintptr_t const bHide = (bShow == 0) ? 1 : 0;
@@ -1196,7 +1165,7 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
         PlayerCardTitle->SetProperty(1, bHide, 0);
         if (bShow != 0)
         {
-            // 0x004c28d3: FUN_0053e4a0(1) on the ship view -- RET 4, nothing.
+            // Retail's FUN_0053e4a0(1) on the ship view is a bare RET 4 and is not ported.
             if (Mesh.Value != nullptr)
                 PlayerCardModel->LoadMesh(Mesh.Value, Material.Value, false,
                                           false); // FUN_00585890
@@ -1220,8 +1189,8 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
     }
     else if (List == TargetList)
     {
-        // 0x004c2a37..0x004c2c32: the same for the other player's card, except that the ship
-        // view is loaded without testing the mesh (0x004c2aad..0x004c2ac1).
+        // The same for the other player's card, except that the ship view is loaded without
+        // testing the mesh (0x004c2aad).
         List->bSelectMode = bShow;
         List->Refresh(-1);
         uintptr_t const bHide = (bShow == 0) ? 1 : 0;
@@ -1251,7 +1220,7 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
         }
     }
 
-    // 0x004c2c37..0x004c2c4c: the quantity panel's item follows the card of its list.
+    // The quantity panel's item follows the card of its list.
     if (SelectedLine != nullptr && SelectedLine->Owner == List)
         SetTradeMark(SelectedItem, bShow);
 }
@@ -1267,11 +1236,10 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Msg == 0x2c || Msg == 0x2d)
     {
-        // 0x004c2d82..0x004c2e31 (0x2c, mouse over) / 0x004c35bb..0x004c369d (0x2d, mouse out):
-        // a row's frames follow the hovered button's bit 2, get bit 0 (pressed-look) set or
-        // cleared and the row is lifted: layer 2 when selected (bit 6), else 1 while hovered.
-        // Only ButtonControls send these (0x0055b8cb, 0x0055bbf9); the rows' buttons carry the
-        // row in +0x2f0.
+        // Mouse over (0x2c) / out (0x2d): a row's frames follow the hovered button's bit 2, get
+        // bit 0 (pressed-look) set or cleared and the row is lifted: layer 2 when selected
+        // (bit 6), else 1 while hovered. Only ButtonControls send these (0x0055b8cb,
+        // 0x0055bbf9); the rows' buttons carry the row in +0x2f0.
         CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->OwnerData);
         if (Line == nullptr)
             return 0;
@@ -1310,8 +1278,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Msg == 0x3e)
     {
-        // 0x004c374c..0x004c378c: the quantity bar moved, or a list's bar (its +0x2f0 is the
-        // list) scrolled.
+        // The quantity bar moved, or a list's bar (its +0x2f0 is the list) scrolled.
         if (Control == QuantityBar)
         {
             if (Quantity != static_cast<int>(B))
@@ -1329,8 +1296,8 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Msg == 0xef02)
     {
-        // 0x004c36bf..0x004c3741: close -- the HUD panels the window collapsed come back, then
-        // the window takes itself apart.
+        // Close: the HUD panels the window collapsed come back, then the window takes itself
+        // apart.
         if (bHudStatusWasExpanded != 0)
         {
             HUD_Status* const Status = GetHudStatus();
@@ -1343,7 +1310,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (Target != nullptr && Target->bExpanded == 0)
                 Target->ToggleExpanded();
         }
-        ChatPlaceMsgWinForTrade(0); // FUN_0046b450(0), 0x004c3707
+        ChatPlaceMsgWinForTrade(0); // FUN_0046b450(0)
         Win3DReparent(this, nullptr); // FUN_0059dd00
         Win3D* Child = ChildHead;
         while (Child != nullptr)
@@ -1363,7 +1330,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // --- 0x26: a click ---
     if (Control == TradeClose)
     {
-        // 0x004c2e4a..0x004c2e70: IServer +0x140, then the button is disabled.
+        // IServer +0x140, then the button is disabled.
         G_Server->TerminateTrade(GetPlayerConnectionId(), 0);
         TradeClose->SetProperty(2, 1, 0);
         return 0;
@@ -1371,7 +1338,6 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Control == PlayerCardClose || Control == TargetCardClose)
     {
-        // 0x004c2e89..0x004c2eb8 / 0x004c2ed0..0x004c2eff.
         CTradeEquipList* const List = (Control == PlayerCardClose) ? PlayerList : TargetList;
         ShowInfoCard(List, 0);
         if (List->SelectedItem != nullptr)
@@ -1385,9 +1351,9 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Control == QuantityAccept)
     {
-        // 0x004c2f1b..0x004c3443: move the chosen quantity. From the offer (+0x334) the value is
-        // what stays offered; from the player's cargo (+0x338) it is what is added to the offer.
-        EquipDesc* Unmark = SelectedItem; // EDI -- cleared when its entry is gone
+        // Move the chosen quantity. From the offer (+0x334) the value is what stays offered;
+        // from the player's cargo (+0x338) it is what is added to the offer.
+        EquipDesc* Unmark = SelectedItem; // cleared when its entry is gone
         EquipDesc* const Item = SelectedItem;
         unsigned const Session = GetPlayerConnectionId(); // DAT_00673344
 
@@ -1396,7 +1362,6 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             // Credits.
             if (SelectedLine->Owner == CenterList)
             {
-                // 0x004c2f4b..0x004c2f95.
                 int const Value = QuantityBar->Value;
                 if (Value < Item->Count)
                 {
@@ -1410,7 +1375,6 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
             else if (QuantityBar->Value != 0)
             {
-                // 0x004c2fa8..0x004c3006.
                 G_Server->SetTradeMoney(Session, static_cast<unsigned long>(
                                                      CenterList->CreditsTemplate.Count +
                                                      QuantityBar->Value));
@@ -1421,7 +1385,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         else if (SelectedLine->Owner == CenterList)
         {
-            // 0x004c3022..0x004c320c: back from the offer to the player.
+            // Back from the offer to the player.
             int const Value = QuantityBar->Value;
             if (Value < Item->Count)
             {
@@ -1468,7 +1432,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         else
         {
-            // 0x004c3211..0x004c343d: from the player's cargo into the offer.
+            // From the player's cargo into the offer.
             if (QuantityBar->Value != 0)
             {
                 EquipDesc Moved = *Item;
@@ -1509,7 +1473,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
         }
 
-        // 0x004c3443..0x004c3488: the panel closes.
+        // The panel closes.
         CTradeEquipList* const Owner = SelectedLine->Owner;
         if (Unmark != nullptr)
             SetTradeMark(Unmark, 0);
@@ -1522,7 +1486,6 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Control == QuantityReject)
     {
-        // 0x004c345e..0x004c3488.
         CTradeEquipList* const Owner = SelectedLine->Owner;
         SetTradeMark(SelectedItem, 0);
         SelectedLine = nullptr;
@@ -1534,14 +1497,14 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     if (Control == AcceptTradeFrame)
     {
-        // 0x004c34a0..0x004c34ef: the player accepts -- green text, IServer +0x144.
+        // The player accepts: green text, IServer +0x144.
         PlayerAcceptedText->SetProperty(0x1e, 0x759, 0);
         PlayerAcceptedText->TextColour = TradeColour(0, 0xff, 0, 0xc0);
         G_Server->AcceptTrade(GetPlayerConnectionId(), true);
         return 0;
     }
 
-    // 0x004c3500..0x004c35b0: a row's button.
+    // A row's button.
     CTradeEquipListLine* const Line = reinterpret_cast<CTradeEquipListLine*>(Control->OwnerData);
     if (Line == nullptr || Line->bInUse == 0)
         return 0;
@@ -1555,7 +1518,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (List == TargetList)
                 return 0;
 
-            // 0x004c3577..0x004c35ab: open the quantity panel on the row's item.
+            // Open the quantity panel on the row's item.
             if (Line->Item == SelectedItem)
                 return 0;
             if (SelectedItem != nullptr)
@@ -1569,8 +1532,8 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
     }
 
-    // 0x004c3540..0x004c3567: the "?" button, or any button of a list in select mode -- the row's
-    // item goes onto the list's info card.
+    // The "?" button, or any button of a list in select mode: the row's item goes onto the
+    // list's info card.
     if (List->SelectedItem != nullptr)
     {
         SetTradeMark(List->SelectedItem, 0);

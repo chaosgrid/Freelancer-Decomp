@@ -22,10 +22,6 @@ struct IObjRW;
 // .text:062d1df7 (`PUSH 0x180; CALL operator_new; ... CALL FUN_062ce400`). RTTI: the COL at
 // vftable-4 of .rdata:0639fdbc names ".?AVLootBehavior@@", single inheritance from Behavior.
 //
-// Re-ported from the listing 2026-10-08 (claude-code:cmn-ai5). Until then slots 3/4/5/10 were
-// unbound members, the candidate search (FUN_062ce870 / FUN_062ce740) and the tractor calls
-// (FUN_062ecd90 / FUN_062ece40) were no-op stand-ins, and Update skipped the live branch.
-//
 // Constructor FUN_062ce400 builds MoveIdea +0x2c (FUN_062d4e60, EH 0) and FaceIdea +0xa4
 // (FUN_062d6750, EH 1), the loot-target slot at +0x174 (EH 4), the vptr and its scalars.
 //

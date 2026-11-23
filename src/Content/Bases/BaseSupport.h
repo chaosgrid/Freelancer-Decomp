@@ -21,7 +21,7 @@ class INI_Reader;
 struct FContentPlayerState;     // ContentPlayerState.h
 
 // One [NewsItem] record, 0x80 bytes (element of vector DAT_06fcef24..DAT_06fcef30).
-// Default state is set by the loader FUN_06eb44c0 (06eb451a-06eb4597); copy is the
+// Default state is set by the loader FUN_06eb44c0; copy is the
 // member-wise FUN_06eb68a0, destruction FUN_06eb4680.
 struct FNewsItem
 {

@@ -4,12 +4,12 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// rpc_packet_registry.cpp -- the 162 retail packet classes and the three registrators.
+// The 162 retail packet classes and the three registrators.
 //
-// GENERATED from EXE/Disasm/rpclocal.dll.txt; every number below is an instruction
-// operand, quoted with its address. Regenerate rather than hand-edit.
+// Generated from EXE/Disasm/rpclocal.dll.txt; every number below is an instruction
+// operand, quoted with its address.
 //
-// THE HIERARCHY (measured 2026-09-24 on the listing and the .rdata vtables):
+// THE HIERARCHY (from the .rdata vtables):
 //   * the refcounted root, vtable 06db3c54 = { LAB_06d8f4d0 }       -> FRpcRefObject
 //   * CDAPacket, vtable 06db4fbc = { 06d9c5d0, 06da13d0, 06da1470,
 //     no-op dump }                                                  -> FPacketBase
@@ -20,10 +20,9 @@
 //     classes whose own dtor is `vptr store ; JMP FUN_06da21d0`     -> FRpcEquipListPacket
 //   * the 162 concrete classes, one vtable each                     -> FPacket_<name>
 //
-// FACTORIES. All 162 have the same 19-instruction body, e.g. FUN_06d9af70:
-//   06d9af77 MOV [ESI],0 ; 06d9af75 PUSH 0x40 ; CALL operator_new ; 06d9af87 JZ -> MOV EAX,5 ;
-//   06d9af8b CALL ctor ; 06d9af94 MOV [ESI],EAX ; 06d9af96 XOR EAX,EAX ; RET
-// -- __cdecl, one argument, no null test on it. RpcPacketFactory<T> below is that body.
+// FACTORIES. All 162 have the same body (e.g. FUN_06d9af70): clear *Out, operator new,
+// return 5 on failure, construct, store, return 0 -- __cdecl, one argument, no null test
+// on it. RpcPacketFactory<T> below is that body.
 //
 // CONSTRUCTORS store exactly what the retail ctor stores and nothing else: retail's
 // operator new does not zero, so neither does the port. The CDAPacket stores (+0x04 = 1,
@@ -32,8 +31,8 @@
 // of an uninitialised stack slot -- the empty allocator object of an MSVCP60 container,
 // or the top byte of a pushed register -- is stored as 0; nothing ever reads it.
 //
-// DESTRUCTORS are the retail bodies, [ESI+n] for [ESI+n]; the implicit call to
-// ~FPacketBase at the end is retail's closing `JMP FUN_06da1370`. A class without one
+// DESTRUCTORS are the retail bodies, offset for offset; the implicit call to
+// ~FPacketBase at the end is retail's closing jump to FUN_06da1370. A class without one
 // shares retail's scalar dtor 06d9af50, whose dtor is the thunk 06da11e0 -> 06da1370.
 //
 // ENCODE / DECODE / DUMP are the class's own vtable slots, forwarding to the codec bodies
@@ -64,16 +63,16 @@ struct FRpcPacketListNode {
     void* Value;                // +0x08
 };
 
-// The 19-instruction factory every class registers; see the header comment.
+// The factory every class registers; see the header comment.
 template<typename T>
 int RpcPacketFactory(FPacketBase** OutPacket) {
-    *OutPacket = nullptr;                               // MOV dword ptr [ESI],0x0
-    T* Packet = new (std::nothrow) T;                   // PUSH size ; CALL operator_new
+    *OutPacket = nullptr;
+    T* Packet = new (std::nothrow) T;
     if (Packet == nullptr) {
-        return kPacketFactoryNoMemory;                  // MOV EAX,0x5
+        return kPacketFactoryNoMemory;
     }
-    *OutPacket = Packet;                                // MOV dword ptr [ESI],EAX
-    return kPacketFactoryOk;                            // XOR EAX,EAX
+    *OutPacket = Packet;
+    return kPacketFactoryOk;
 }
 
 // Vtable 06db5e54 { 06da26f0, ... }: the five classes that carry one equipment handle
@@ -84,10 +83,10 @@ protected:
 public:
     // FUN_06da21d0
     ~FRpcEquipListPacket() override {
-        FRpcEquipWireHandle* Handle = RpcPacketField<FRpcEquipWireHandle*>(this, 0x20u);  // 06da21f4
-        if (Handle != nullptr) {                        // 06da21f7 TEST / 06da2201 JZ
-            RpcEquipHandleDestroy(Handle);              // 06da2205 CALL FUN_06d91340
-            ::operator delete(Handle);                  // 06da220b CALL FUN_06db1dc2
+        FRpcEquipWireHandle* Handle = RpcPacketField<FRpcEquipWireHandle*>(this, 0x20u);
+        if (Handle != nullptr) {
+            RpcEquipHandleDestroy(Handle);              // FUN_06d91340
+            ::operator delete(Handle);
         }
     }
     unsigned char EquipBody[0x04];   // +0x20 the handle pointer
@@ -98,12 +97,11 @@ public:
 // concrete ones; what they build and tear down is the create-object header at +0x20,
 // which the port holds as the first member of each class's payload,
 // FRpcCreateObjectWire (rpc_containers.h). That type's constructor and destructor ARE
-// this class's parts: the head stores 06d9cca2..06d9ccd2, the COMMON.DLL list ctor
-// 06d9cce2 and DamageList ctor 06d9ccf3, and -- after 06d97bf9 / 06d9e78a store this
-// vptr -- the DamageList (06d97bff), the list (06d97c54), the handle (06d97c94) and the
-// id block (06d97ca7). Held as a real member, the compiler also emits the EH unwind retail
-// has for it (FuncInfo_06db70a4, states 1..3). The destruction order is unchanged:
-// derived body, then the payload member (header last), then FPacketBase.
+// this class's parts: the head stores, the COMMON.DLL list and DamageList ctors, and --
+// after this vptr is stored -- the DamageList, the list, the handle and the id block.
+// Held as a real member, the compiler also emits the EH unwind retail has for it
+// (FuncInfo_06db70a4, states 1..3). Destruction order: derived body, then the payload
+// member (header last), then FPacketBase.
 class FRpcCreateObjectPacket : public FPacketBase {
 protected:
     explicit FRpcCreateObjectPacket(unsigned int InPacketId) : FPacketBase(InPacketId) {}
@@ -130,19 +128,18 @@ static_assert(sizeof(FRpcCreateObjectPacket) == 0x20u,
 class FPacket_FLPACKET_COMMON_FIREWEAPON : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_FIREWEAPON() : FPacketBase(0x10002u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9afc5
-        RpcPacketStoreField(this, 0x24u, 4, 0x7f7fffffu);   // 06d9afcd
-        RpcPacketStoreField(this, 0x28u, 4, 0x7f7fffffu);   // 06d9afd0
-        RpcPacketStoreField(this, 0x2cu, 4, 0x7f7fffffu);   // 06d9afd3
-        RpcPacketStoreField(this, 0x30u, 1, 0u);   // 06d9afda byte copied from an uninitialised stack slot
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9afdd
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9afe0
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9afe3
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0x7f7fffffu);
+        RpcPacketStoreField(this, 0x28u, 4, 0x7f7fffffu);
+        RpcPacketStoreField(this, 0x2cu, 4, 0x7f7fffffu);
+        RpcPacketStoreField(this, 0x30u, 1, 0u);   // byte copied from an uninitialised stack slot
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
     }
     // FUN_06d9b020
     ~FPacket_FLPACKET_COMMON_FIREWEAPON() override {
-        // No test: 06d9b023 MOV EAX,[ESI+0x34] / 06d9b027 CALL free, then the three
-        // dwords of the hardpoint vector cleared (06d9b031..06d9b037).
+        // No test: free, then the three dwords of the hardpoint vector cleared.
         ::operator delete(RpcPacketField<void*>(this, 0x34u));
         RpcPacketField<unsigned int>(this, 0x34u) = 0;
         RpcPacketField<unsigned int>(this, 0x38u) = 0;
@@ -166,13 +163,13 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_FIREWEAPON) == 0x40u, "FLPACKET_COM
 class FPacket_FLPACKET_COMMON_UPDATEOBJECT : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_UPDATEOBJECT() : FPacketBase(0x10001u) {
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9af24
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9af27
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9af2a
-        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);   // 06d9af2d
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9af34
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9af37
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9af3a
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da49e0
@@ -192,14 +189,14 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_UPDATEOBJECT) == 0x4cu, "FLPACKET_C
 class FPacket_FLPACKET_COMMON_CHATMSG : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_CHATMSG() : FPacketBase(0x10005u) {
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9b791
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9b794
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9b797
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b79a
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     // FUN_06d9b7c0
     ~FPacket_FLPACKET_COMMON_CHATMSG() override {
-        if (RpcPacketField<void*>(this, 0x2cu) != nullptr) {   // 06d9b7c3..06d9b7d1
+        if (RpcPacketField<void*>(this, 0x2cu) != nullptr) {
             ::operator delete(RpcPacketField<void*>(this, 0x2cu));
         }
     }
@@ -221,7 +218,7 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_CHATMSG) == 0x30u, "FLPACKET_COMMON
 class FPacket_FLPACKET_COMMON_ACTIVATEEQUIP : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_ACTIVATEEQUIP() : FPacketBase(0x10008u) {
-        RpcPacketStoreField(this, 0x26u, 2, 0u);   // 06d9b844
+        RpcPacketStoreField(this, 0x26u, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da67a0
@@ -241,8 +238,8 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_ACTIVATEEQUIP) == 0x28u, "FLPACKET_
 class FPacket_FLPACKET_COMMON_SETTARGET : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_SETTARGET() : FPacketBase(0x10004u) {
-        RpcPacketStoreField(this, 0x28u, 2, 0u);   // 06d9ba74
-        RpcPacketStoreField(this, 0x2au, 2, 0u);   // 06d9ba78
+        RpcPacketStoreField(this, 0x28u, 2, 0u);
+        RpcPacketStoreField(this, 0x2au, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da8b50
@@ -319,9 +316,9 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_GOTRADELANE) == 0x30u, "FLPACKET_CO
 class FPacket_FLPACKET_COMMON_STOPTRADELANE : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_STOPTRADELANE() : FPacketBase(0x10010u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ba11
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ba14
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ba17
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -341,18 +338,18 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_STOPTRADELANE) == 0x2cu, "FLPACKET_
 class FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP() : FPacketBase(0x10011u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b0b1
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b0b4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b0e0
     ~FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP() override {
-        // 06d9b0e3: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
+        // The byte at +0x28 says whether the packet owns the block at +0x20 -- the
         // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
         // its own copy, the wire decoder on its own allocation.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b0f0
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b0f8
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b100
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -373,14 +370,14 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP) == 0x2cu, "FLPACK
 class FPacket_FLPACKET_COMMON_PLAYER_TRADE : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_PLAYER_TRADE() : FPacketBase(0x10012u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9baf1
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9baf4
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9baf7
-        RpcPacketStoreField(this, 0x34u, 4, 0xffffffffu);   // 06d9bafa
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9bb01
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9bb04
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9bb07
-        RpcPacketStoreField(this, 0x30u, 1, 0u);   // 06d9bb0a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0xffffffffu);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da7030
@@ -400,18 +397,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_PLAYER_TRADE) == 0x44u, "FLPACKET_C
 class FPacket_FLPACKET_COMMON_SET_VISITED_STATE : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_SET_VISITED_STATE() : FPacketBase(0x10013u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b171
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b174
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b1a0
     ~FPacket_FLPACKET_COMMON_SET_VISITED_STATE() override {
-        // 06d9b1a3: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b1b0
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b1b8
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b1c0
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -432,9 +427,9 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_VISITED_STATE) == 0x2cu, "FLPAC
 class FPacket_FLPACKET_COMMON_JETTISONCARGO : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_JETTISONCARGO() : FPacketBase(0x10014u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9bb64
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06d9bb67
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9bb6b
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae620
@@ -454,18 +449,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_JETTISONCARGO) == 0x2cu, "FLPACKET_
 class FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH() : FPacketBase(0x10016u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b231
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b234
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b260
     ~FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH() override {
-        // 06d9b263: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b270
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b278
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b280
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -486,18 +479,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH) == 0x2cu, "FLPAC
 class FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS() : FPacketBase(0x10018u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b2f1
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b2f4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b320
     ~FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS() override {
-        // 06d9b323: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b330
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b338
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b340
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -518,11 +509,11 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS) == 0x2cu, "FL
 class FPacket_FLPACKET_COMMON_POP_UP_DIALOG : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_POP_UP_DIALOG() : FPacketBase(0x1001bu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b3a4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9b3a7
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9b3aa
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9b3ad
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9b3bd
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
     }
     // FUN_06d9b3f0
     ~FPacket_FLPACKET_COMMON_POP_UP_DIALOG() override {
@@ -552,18 +543,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_POP_UP_DIALOG) == 0x34u, "FLPACKET_
 class FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS() : FPacketBase(0x10017u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b491
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b494
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b4c0
     ~FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS() override {
-        // 06d9b4c3: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b4d0
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b4d8
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b4e0
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -584,18 +573,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS) == 0x2cu, 
 class FPacket_FLPACKET_COMMON_SET_MISSION_LOG : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_SET_MISSION_LOG() : FPacketBase(0x10019u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b551
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b554
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b580
     ~FPacket_FLPACKET_COMMON_SET_MISSION_LOG() override {
-        // 06d9b583: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b590
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b598
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b5a0
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -616,18 +603,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_MISSION_LOG) == 0x2cu, "FLPACKE
 class FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL() : FPacketBase(0x1001au) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b6d1
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b6d4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b700
     ~FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL() override {
-        // 06d9b703: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b710
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b718
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b720
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -648,18 +633,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL) == 0x2cu, "FLPA
 class FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE() : FPacketBase(0x1001cu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9b611
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9b614
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
     }
     // FUN_06d9b640
     ~FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE() override {
-        // 06d9b643: the byte at +0x28 says whether the packet owns the block at +0x20 -- the
-        // IClient-side sender sets it on the CALLER's pointer, the IServerImpl-side one on
-        // its own copy, the wire decoder on its own allocation.
+        // +0x28: owns-the-block flag, as in SET_WEAPON_GROUP.
         if (RpcPacketField<unsigned char>(this, 0x28u) != 0 &&
             RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d9b650
-            ::operator delete(RpcPacketField<void*>(this, 0x20u));   // 06d9b658
-            RpcPacketField<void*>(this, 0x20u) = nullptr;            // 06d9b660
+            ::operator delete(RpcPacketField<void*>(this, 0x20u));
+            RpcPacketField<void*>(this, 0x20u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -680,16 +663,16 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE) == 0x2cu, "FLP
 class FPacket_FLPACKET_COMMON_TRACTOROBJECTS : public FPacketBase {
 public:
     FPacket_FLPACKET_COMMON_TRACTOROBJECTS() : FPacketBase(0x1001du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9bbd9
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06d9bbdc
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9bbe0 byte copied from an uninitialised stack slot
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9bbe3
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9bbe6
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9bbe9
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);   // byte copied from an uninitialised stack slot
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
     }
     // FUN_06d9bc20
     ~FPacket_FLPACKET_COMMON_TRACTOROBJECTS() override {
-        // No test: 06d9bc23 / 06d9bc27 CALL free, then the three vector dwords cleared.
+        // No test: free, then the three vector dwords cleared.
         ::operator delete(RpcPacketField<void*>(this, 0x2cu));
         RpcPacketField<unsigned int>(this, 0x2cu) = 0;
         RpcPacketField<unsigned int>(this, 0x30u) = 0;
@@ -717,7 +700,7 @@ static_assert(sizeof(FPacket_FLPACKET_COMMON_TRACTOROBJECTS) == 0x38u, "FLPACKET
 class FPacket_FLPACKET_SERVER_CONNECTRESPONSE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CONNECTRESPONSE() : FPacketBase(0x20001u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c804
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -740,7 +723,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CONNECTRESPONSE) == 0x24u, "FLPACKE
 class FPacket_FLPACKET_SERVER_LOGINRESPONSE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_LOGINRESPONSE() : FPacketBase(0x20002u) {
-        RpcPacketStoreField(this, 0x20u, 1, 0u);   // 06d9c874
+        RpcPacketStoreField(this, 0x20u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da82e0
@@ -766,8 +749,7 @@ public:
     }
     // FUN_06d90230
     ~FPacket_FLPACKET_SERVER_DAMAGEOBJECT() override {
-        // 06d9023b..06d9027c is the DamageList destructor inlined: every node erased with
-        // --Size, the sentinel freed, Head and Size cleared. The payload holds Common.dll's
+        // Retail inlines the DamageList destructor here; the payload holds Common.dll's
         // DamageList itself, whose destructor runs after this body.
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -789,8 +771,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_DAMAGEOBJECT) == 0x20u + sizeof(FPa
 class FPacket_FLPACKET_SERVER_DESTROYOBJECT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_DESTROYOBJECT() : FPacketBase(0x20006u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9cb14
-        RpcPacketStoreField(this, 0x24u, 1, 0u);   // 06d9cb17
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab0e0
@@ -810,30 +792,30 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_DESTROYOBJECT) == 0x28u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_CREATESHIP : public FRpcCreateObjectPacket {
 public:
     // FUN_06d9cc60. Wire.Common is built first, by FRpcCreateObjectWire's constructors
-    // (06d9cca2..06d9ccf3: the head, then COMMON.DLL's std::list<CollisionGroupDesc> ctor
-    // at +0x74 and DamageList ctor at +0x80); the body is the tail, 06d9ccfd..06d9cd77.
+    // (the head, then COMMON.DLL's std::list<CollisionGroupDesc> ctor at +0x74 and
+    // DamageList ctor at +0x80); the body is the tail.
     FPacket_FLPACKET_SERVER_CREATESHIP() : FRpcCreateObjectPacket(0x20004u) {
-        Wire.bUsingTradelane = 0;         // 06d9ccfd  byte +0x9c
-        Wire.VelXBits = 0;                // 06d9cd03  +0xa0
-        Wire.VelY = 0.0f;                 // 06d9cd09  +0xa4 (integer 0 == +0.0f)
-        Wire.VelZ = 0.0f;                 // 06d9cd0f  +0xa8
-        Wire.AngVelXBits = 0;             // 06d9cd15  +0xac
-        Wire.AngVelY = 0.0f;              // 06d9cd1b  +0xb0
-        Wire.AngVelZ = 0.0f;              // 06d9cd21  +0xb4
-        Wire.Throttle = 0.0f;             // 06d9cd27  +0xb8
-        Wire.OwnerPlayer = 0;             // 06d9cd2d  +0xbc
-        Wire.GroupNameId = 0;             // 06d9cd33  word +0xc0
-        Wire.ReputationRank = 0;          // 06d9cd3a  byte +0xc2
-        Wire.GroupId = 0;                 // 06d9cd40  word +0xc4
-        Wire.NameASize = 0;               // 06d9cd47  +0xc8
-        Wire.NameABuffer = nullptr;       // 06d9cd4d  +0xcc
-        Wire.NameBSize = 0;               // 06d9cd53  +0xd0
-        Wire.NameBBuffer = nullptr;       // 06d9cd59  +0xd4
-        Wire.DisplayNameLength = 0;       // 06d9cd5f  +0xd8
-        Wire.DisplayName = nullptr;       // 06d9cd65  +0xdc
-        Wire.Affiliation = 0;             // 06d9cd6b  +0xe0
-        Wire.Attitude = 0.0f;             // 06d9cd71  +0xe4
-        Wire.bMarkedBy = 0;               // 06d9cd77  byte +0xe8
+        Wire.bUsingTradelane = 0;         // byte +0x9c
+        Wire.VelXBits = 0;                // +0xa0
+        Wire.VelY = 0.0f;                 // +0xa4 (integer 0 == +0.0f)
+        Wire.VelZ = 0.0f;                 // +0xa8
+        Wire.AngVelXBits = 0;             // +0xac
+        Wire.AngVelY = 0.0f;              // +0xb0
+        Wire.AngVelZ = 0.0f;              // +0xb4
+        Wire.Throttle = 0.0f;             // +0xb8
+        Wire.OwnerPlayer = 0;             // +0xbc
+        Wire.GroupNameId = 0;             // word +0xc0
+        Wire.ReputationRank = 0;          // byte +0xc2
+        Wire.GroupId = 0;                 // word +0xc4
+        Wire.NameASize = 0;               // +0xc8
+        Wire.NameABuffer = nullptr;       // +0xcc
+        Wire.NameBSize = 0;               // +0xd0
+        Wire.NameBBuffer = nullptr;       // +0xd4
+        Wire.DisplayNameLength = 0;       // +0xd8
+        Wire.DisplayName = nullptr;       // +0xdc
+        Wire.Affiliation = 0;             // +0xe0
+        Wire.Attitude = 0.0f;             // +0xe4
+        Wire.bMarkedBy = 0;               // byte +0xe8
     }
     // FUN_06d97b90
     ~FPacket_FLPACKET_SERVER_CREATESHIP() override {
@@ -847,8 +829,8 @@ public:
         if (Wire.NameABuffer != nullptr) {                     // 06d97be4..06d97bef (+0xcc)
             ::operator delete(Wire.NameABuffer);
         }
-        // 06d97bf9 stores the abstract base vptr 06db3fb4; Wire.Common's destructor
-        // (06d97bff..06d97cb1) and ~FPacketBase follow.
+        // 06d97bf9 stores the abstract base vptr 06db3fb4; Wire.Common's destructor and
+        // ~FPacketBase follow.
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d97d20
@@ -888,13 +870,12 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUEST_RETURNED) == 0x28u, "FLPACK
 class FPacket_FLPACKET_SERVER_CHARACTERINFO : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CHARACTERINFO() : FPacketBase(0x20003u) {
-        RpcPacketBuildListSentinel(this, 0x24u, 0x0cu);   // 06d9d549 operator new(0xc), Head
+        RpcPacketBuildListSentinel(this, 0x24u, 0x0cu);   // operator new(0xc), Head
     }
     // FUN_06d93350
     ~FPacket_FLPACKET_SERVER_CHARACTERINFO() override {
-        // 06d9337c..06d9346c: every record first (two id blocks, the collision list, the
-        // equipment handle, the two strings, the record), then 06d93472..06d934ab the
-        // nodes through FUN_06d901f0 and the sentinel.
+        // Every record first (two id blocks, the collision list, the equipment handle, the
+        // two strings, the record), then the nodes through FUN_06d901f0 and the sentinel.
         RpcCharacterInfoWireListRelease(
             reinterpret_cast<FRpcCharacterInfoWireList*>(Payload() + 0x04));
     }
@@ -919,13 +900,13 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CHARACTERINFO) == 0x30u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_LAUNCH : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_LAUNCH() : FPacketBase(0x20007u) {
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9d5c4
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9d5c7
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9d5ca
-        RpcPacketStoreField(this, 0x38u, 4, 0x3f800000u);   // 06d9d5cd
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9d5d4
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9d5d7
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06d9d5da
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daab40
@@ -1122,13 +1103,13 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT) == 0x28u, "FLPAC
 class FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN() : FPacketBase(0x20022u) {
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9cbf4
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9cbf7
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9cbfa
-        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);   // 06d9cbfd
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9cc04
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9cc07
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9cc0a
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9260
@@ -1148,7 +1129,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN) == 0x44u, "FLPACK
 class FPacket_FLPACKET_SERVER_SETSHIPARCH : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETSHIPARCH() : FPacketBase(0x20023u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c794
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -1168,7 +1149,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETSHIPARCH) == 0x24u, "FLPACKET_SE
 class FPacket_FLPACKET_SERVER_SETEQUIPMENT : public FRpcEquipListPacket {
 public:
     FPacket_FLPACKET_SERVER_SETEQUIPMENT() : FRpcEquipListPacket(0x20024u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c6b4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     // FUN_06d91310
     ~FPacket_FLPACKET_SERVER_SETEQUIPMENT() override {
@@ -1191,7 +1172,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETEQUIPMENT) == 0x24u, "FLPACKET_S
 class FPacket_FLPACKET_SERVER_SETCARGO : public FRpcEquipListPacket {
 public:
     FPacket_FLPACKET_SERVER_SETCARGO() : FRpcEquipListPacket(0x20025u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c724
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     // FUN_06d91670
     ~FPacket_FLPACKET_SERVER_SETCARGO() override {
@@ -1347,8 +1328,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT) == 0x28u, "
 class FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR() : FPacketBase(0x2001au) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e154
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e157
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d97540
     ~FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR() override {
@@ -1374,8 +1355,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR) == 0x28u, "FLPACK
 class FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT() : FPacketBase(0x2001fu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e2a4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e2a7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d97700
     ~FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT() override {
@@ -1420,8 +1401,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_MISSIONSAVEA) == 0x24u, "FLPACKET_S
 class FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER() : FPacketBase(0x2001du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e1c4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e1c7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d978c0
     ~FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER() override {
@@ -1447,8 +1428,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER) == 0x28u, 
 class FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST() : FPacketBase(0x2001eu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e234
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e237
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d97ad0
     ~FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST() override {
@@ -1474,8 +1455,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST) == 0x28u, "F
 class FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE() : FPacketBase(0x20020u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e31a
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e31d
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d97a30
     ~FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE() override {
@@ -1520,8 +1501,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY) == 0x24u, 
 class FPacket_FLPACKET_SERVER_GFUPDATECHAR : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_GFUPDATECHAR() : FPacketBase(0x20026u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9dc14
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9dc17
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d974c0
     ~FPacket_FLPACKET_SERVER_GFUPDATECHAR() override {
@@ -1547,9 +1528,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATECHAR) == 0x28u, "FLPACKET_S
 class FPacket_FLPACKET_SERVER_CREATELOOT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CREATELOOT() : FPacketBase(0x20028u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9d17f
-        RpcPacketStoreField(this, 0x24u, 1, 0u);   // 06d9d182
-        RpcPacketBuildListSentinel(this, 0x28u, 0x50u);   // 06d9d19c operator new(0x50), Head
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 1, 0u);
+        RpcPacketBuildListSentinel(this, 0x28u, 0x50u);   // operator new(0x50), Head
     }
     // FUN_06d9d1f0
     ~FPacket_FLPACKET_SERVER_CREATELOOT() override {
@@ -1574,22 +1555,22 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATELOOT) == 0x34u, "FLPACKET_SER
 class FPacket_FLPACKET_SERVER_SETREPUTATION : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETREPUTATION() : FPacketBase(0x20029u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9d2d0
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9d2d3
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9d2d6
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9d2d9
-        RpcPacketStoreField(this, 0x38u, 4, 0x00000002u);   // 06d9d2e1
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9d2ec
-        RpcPacketStoreField(this, 0x34u, 4, 0x00000001u);   // 06d9d2ef
-        RpcPacketStoreField(this, 0x3cu, 4, 0x00000004u);   // 06d9d2f2
-        RpcPacketStoreField(this, 0x40u, 4, 0x00000008u);   // 06d9d2f9
-        RpcPacketStoreField(this, 0x44u, 4, 0x00000010u);   // 06d9d300
-        RpcPacketBuildListSentinel(this, 0x48u, 0x0cu);   // 06d9d31a operator new(0xc), Head
-        RpcPacketStoreField(this, 0x54u, 1, 0u);   // 06d9d323
-        RpcPacketStoreField(this, 0x58u, 4, 0u);   // 06d9d326
-        RpcPacketStoreField(this, 0x60u, 4, 0u);   // 06d9d329
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06d9d32c
-        RpcPacketStoreField(this, 0x5cu, 4, 0xffffffffu);   // 06d9d32f
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0x00000002u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0x00000001u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0x00000004u);
+        RpcPacketStoreField(this, 0x40u, 4, 0x00000008u);
+        RpcPacketStoreField(this, 0x44u, 4, 0x00000010u);
+        RpcPacketBuildListSentinel(this, 0x48u, 0x0cu);   // operator new(0xc), Head
+        RpcPacketStoreField(this, 0x54u, 1, 0u);
+        RpcPacketStoreField(this, 0x58u, 4, 0u);
+        RpcPacketStoreField(this, 0x60u, 4, 0u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0xffffffffu);
     }
     // FUN_06d91dd0
     ~FPacket_FLPACKET_SERVER_SETREPUTATION() override {
@@ -1603,7 +1584,7 @@ public:
         if (RpcPacketField<void*>(this, 0x64u) != nullptr) {   // 06d91e1e..06d91e26
             ::operator delete(RpcPacketField<void*>(this, 0x64u));
         }
-        RpcPacketDestroyEmbeddedList(this, 0x48u);   // 06d91e2f..06d91e66, FUN_06d901f0
+        RpcPacketDestroyEmbeddedList(this, 0x48u);   // FUN_06d901f0
         if (RpcPacketField<void*>(this, 0x2cu) != nullptr) {   // 06d91e69..06d91e73
             ::operator delete(RpcPacketField<void*>(this, 0x2cu));
         }
@@ -1651,9 +1632,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_ADJUSTATTITUDE) == 0x28u, "FLPACKET
 class FPacket_FLPACKET_SERVER_SETGROUPFEELINGS : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETGROUPFEELINGS() : FPacketBase(0x2002bu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c57f
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9c582
-        RpcPacketBuildListSentinel(this, 0x28u, 0x0cu);   // 06d9c59f operator new(0xc), Head
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketBuildListSentinel(this, 0x28u, 0x0cu);   // operator new(0xc), Head
     }
     // FUN_06d917a0
     ~FPacket_FLPACKET_SERVER_SETGROUPFEELINGS() override {
@@ -1667,7 +1648,7 @@ public:
         if (RpcPacketField<void*>(this, 0x20u) != nullptr) {   // 06d917cb..06d917d3
             ::operator delete(RpcPacketField<void*>(this, 0x20u));
         }
-        RpcPacketDestroyEmbeddedList(this, 0x28u);   // 06d917db..06d9181f
+        RpcPacketDestroyEmbeddedList(this, 0x28u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d91890
@@ -1687,24 +1668,24 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETGROUPFEELINGS) == 0x34u, "FLPACK
 class FPacket_FLPACKET_SERVER_CREATEMINE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CREATEMINE() : FPacketBase(0x2002cu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ce14
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ce17
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ce1a
-        RpcPacketStoreField(this, 0x2cu, 2, 0u);   // 06d9ce1d
-        RpcPacketStoreField(this, 0x30u, 4, 0x3f800000u);   // 06d9ce21
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9ce28
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9ce2b
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9ce2e
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9ce31
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06d9ce34
-        RpcPacketStoreField(this, 0x48u, 4, 0u);   // 06d9ce37
-        RpcPacketStoreField(this, 0x4cu, 4, 0u);   // 06d9ce3a
-        RpcPacketStoreField(this, 0x50u, 4, 0u);   // 06d9ce3d
-        RpcPacketStoreField(this, 0x54u, 4, 0u);   // 06d9ce40
-        RpcPacketStoreField(this, 0x58u, 4, 0u);   // 06d9ce43
-        RpcPacketStoreField(this, 0x5cu, 4, 0u);   // 06d9ce46
-        RpcPacketStoreField(this, 0x60u, 4, 0u);   // 06d9ce49
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06d9ce4c
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 2, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
+        RpcPacketStoreField(this, 0x48u, 4, 0u);
+        RpcPacketStoreField(this, 0x4cu, 4, 0u);
+        RpcPacketStoreField(this, 0x50u, 4, 0u);
+        RpcPacketStoreField(this, 0x54u, 4, 0u);
+        RpcPacketStoreField(this, 0x58u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0u);
+        RpcPacketStoreField(this, 0x60u, 4, 0u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da95d0
@@ -1724,24 +1705,24 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATEMINE) == 0x68u, "FLPACKET_SER
 class FPacket_FLPACKET_SERVER_CREATECOUNTER : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CREATECOUNTER() : FPacketBase(0x2002du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9cebd
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9cec0
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9cec3
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9cec6
-        RpcPacketStoreField(this, 0x30u, 2, SUBOBJ_ID_NONE);   // 06d9ced2 COMMON.DLL SUBOBJ_ID_NONE
-        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);   // 06d9ced6
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9cedd
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9cee0
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9cee3
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06d9cee6
-        RpcPacketStoreField(this, 0x48u, 4, 0u);   // 06d9cee9
-        RpcPacketStoreField(this, 0x4cu, 4, 0u);   // 06d9ceec
-        RpcPacketStoreField(this, 0x50u, 4, 0u);   // 06d9ceef
-        RpcPacketStoreField(this, 0x54u, 4, 0u);   // 06d9cef2
-        RpcPacketStoreField(this, 0x58u, 4, 0u);   // 06d9cef5
-        RpcPacketStoreField(this, 0x5cu, 4, 0u);   // 06d9cef8
-        RpcPacketStoreField(this, 0x60u, 4, 0u);   // 06d9cefb
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06d9cefe
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 2, SUBOBJ_ID_NONE);   // COMMON.DLL SUBOBJ_ID_NONE
+        RpcPacketStoreField(this, 0x34u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
+        RpcPacketStoreField(this, 0x48u, 4, 0u);
+        RpcPacketStoreField(this, 0x4cu, 4, 0u);
+        RpcPacketStoreField(this, 0x50u, 4, 0u);
+        RpcPacketStoreField(this, 0x54u, 4, 0u);
+        RpcPacketStoreField(this, 0x58u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0u);
+        RpcPacketStoreField(this, 0x60u, 4, 0u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9b50
@@ -1761,10 +1742,10 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATECOUNTER) == 0x68u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE() : FPacketBase(0x20031u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9cf64
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9cf67
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9cf6a
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9cf6d
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db14f0
@@ -1784,9 +1765,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE) == 0x30u, "FLP
 class FPacket_FLPACKET_SERVER_LOADHINT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_LOADHINT() : FPacketBase(0x2004du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9cfe1
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9cfe4
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9cfe7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     // FUN_06d909d0
     ~FPacket_FLPACKET_SERVER_LOADHINT() override {
@@ -1813,45 +1794,45 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_LOADHINT) == 0x2cu, "FLPACKET_SERVE
 class FPacket_FLPACKET_SERVER_SETDIRECTIVE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETDIRECTIVE() : FPacketBase(0x2004eu) {
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9d044
-        RpcPacketStoreField(this, 0x28u, 1, 0u);   // 06d9d047
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9d04a
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9d04d
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9d050
-        RpcPacketStoreField(this, 0x38u, 4, 0xffffffffu);   // 06d9d053
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9d05a
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9d05d
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06d9d060
-        RpcPacketStoreField(this, 0x48u, 4, 0u);   // 06d9d063
-        RpcPacketStoreField(this, 0x4cu, 4, 0u);   // 06d9d066
-        RpcPacketStoreField(this, 0x50u, 4, 0u);   // 06d9d069
-        RpcPacketStoreField(this, 0x54u, 4, 0u);   // 06d9d06c
-        RpcPacketStoreField(this, 0x58u, 4, 0u);   // 06d9d06f
-        RpcPacketStoreField(this, 0x5cu, 4, 0u);   // 06d9d072
-        RpcPacketStoreField(this, 0x60u, 4, 0x00000003u);   // 06d9d075
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06d9d07c
-        RpcPacketStoreField(this, 0x68u, 4, 0u);   // 06d9d07f
-        RpcPacketStoreField(this, 0x6cu, 4, 0u);   // 06d9d082
-        RpcPacketStoreField(this, 0x70u, 4, 0u);   // 06d9d085
-        RpcPacketStoreField(this, 0x74u, 4, 0u);   // 06d9d088
-        RpcPacketStoreField(this, 0x78u, 4, 0u);   // 06d9d08b
-        RpcPacketStoreField(this, 0x7cu, 4, 0u);   // 06d9d08e
-        RpcPacketStoreField(this, 0x80u, 4, 0u);   // 06d9d091
-        RpcPacketStoreField(this, 0x84u, 4, 0u);   // 06d9d097
-        RpcPacketStoreField(this, 0x88u, 4, 0u);   // 06d9d09d
-        RpcPacketStoreField(this, 0x8cu, 4, 0u);   // 06d9d0a3
-        RpcPacketStoreField(this, 0x90u, 4, 0u);   // 06d9d0a9
-        RpcPacketStoreField(this, 0x94u, 4, 0u);   // 06d9d0af
-        RpcPacketStoreField(this, 0x98u, 4, 0u);   // 06d9d0b5
-        RpcPacketStoreField(this, 0x9cu, 4, 0u);   // 06d9d0bb
-        RpcPacketStoreField(this, 0xa0u, 4, 0u);   // 06d9d0c1
-        RpcPacketStoreField(this, 0xa4u, 4, 0u);   // 06d9d0c7
-        RpcPacketStoreField(this, 0xa8u, 4, 0u);   // 06d9d0cd
-        RpcPacketStoreField(this, 0xacu, 1, 0u);   // 06d9d0d3
-        RpcPacketStoreField(this, 0xadu, 1, 0u);   // 06d9d0d9
-        RpcPacketStoreField(this, 0xaeu, 1, 0u);   // 06d9d0df
-        RpcPacketStoreField(this, 0xafu, 1, 0u);   // 06d9d0e5
-        RpcPacketStoreField(this, 0xb0u, 1, 0u);   // 06d9d0eb
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 1, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0xffffffffu);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
+        RpcPacketStoreField(this, 0x48u, 4, 0u);
+        RpcPacketStoreField(this, 0x4cu, 4, 0u);
+        RpcPacketStoreField(this, 0x50u, 4, 0u);
+        RpcPacketStoreField(this, 0x54u, 4, 0u);
+        RpcPacketStoreField(this, 0x58u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0u);
+        RpcPacketStoreField(this, 0x60u, 4, 0x00000003u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
+        RpcPacketStoreField(this, 0x68u, 4, 0u);
+        RpcPacketStoreField(this, 0x6cu, 4, 0u);
+        RpcPacketStoreField(this, 0x70u, 4, 0u);
+        RpcPacketStoreField(this, 0x74u, 4, 0u);
+        RpcPacketStoreField(this, 0x78u, 4, 0u);
+        RpcPacketStoreField(this, 0x7cu, 4, 0u);
+        RpcPacketStoreField(this, 0x80u, 4, 0u);
+        RpcPacketStoreField(this, 0x84u, 4, 0u);
+        RpcPacketStoreField(this, 0x88u, 4, 0u);
+        RpcPacketStoreField(this, 0x8cu, 4, 0u);
+        RpcPacketStoreField(this, 0x90u, 4, 0u);
+        RpcPacketStoreField(this, 0x94u, 4, 0u);
+        RpcPacketStoreField(this, 0x98u, 4, 0u);
+        RpcPacketStoreField(this, 0x9cu, 4, 0u);
+        RpcPacketStoreField(this, 0xa0u, 4, 0u);
+        RpcPacketStoreField(this, 0xa4u, 4, 0u);
+        RpcPacketStoreField(this, 0xa8u, 4, 0u);
+        RpcPacketStoreField(this, 0xacu, 1, 0u);
+        RpcPacketStoreField(this, 0xadu, 1, 0u);
+        RpcPacketStoreField(this, 0xaeu, 1, 0u);
+        RpcPacketStoreField(this, 0xafu, 1, 0u);
+        RpcPacketStoreField(this, 0xb0u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d90d10
@@ -1871,13 +1852,13 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETDIRECTIVE) == 0xb4u, "FLPACKET_S
 class FPacket_FLPACKET_SERVER_CREATEGUIDED : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CREATEGUIDED() : FPacketBase(0x20037u) {
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9c9b4
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06d9c9b7
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06d9c9ba
-        RpcPacketStoreField(this, 0x48u, 4, 0x3f800000u);   // 06d9c9bd
-        RpcPacketStoreField(this, 0x4cu, 4, 0u);   // 06d9c9c4
-        RpcPacketStoreField(this, 0x50u, 4, 0u);   // 06d9c9c7
-        RpcPacketStoreField(this, 0x54u, 4, 0u);   // 06d9c9ca
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
+        RpcPacketStoreField(this, 0x48u, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x4cu, 4, 0u);
+        RpcPacketStoreField(this, 0x50u, 4, 0u);
+        RpcPacketStoreField(this, 0x54u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da84e0
@@ -1897,10 +1878,10 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATEGUIDED) == 0x58u, "FLPACKET_S
 class FPacket_FLPACKET_SERVER_ITEMTRACTORED : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_ITEMTRACTORED() : FPacketBase(0x20038u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ca34
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ca37
-        RpcPacketStoreField(this, 0x28u, 2, 0u);   // 06d9ca3a
-        RpcPacketStoreField(this, 0x2au, 2, 0u);   // 06d9ca3e
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 2, 0u);
+        RpcPacketStoreField(this, 0x2au, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da8b50
@@ -1920,9 +1901,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_ITEMTRACTORED) == 0x2cu, "FLPACKET_
 class FPacket_FLPACKET_SERVER_SETREMOVEITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETREMOVEITEM() : FPacketBase(0x2002fu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9c4c4
-        RpcPacketStoreField(this, 0x24u, 4, 0xffffffffu);   // 06d9c4ca
-        RpcPacketStoreField(this, 0x28u, 4, 0xffffffffu);   // 06d9c4cd
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0xffffffffu);
+        RpcPacketStoreField(this, 0x28u, 4, 0xffffffffu);
     }
     // FUN_06da7fa0
     ~FPacket_FLPACKET_SERVER_SETREMOVEITEM() override {
@@ -1946,9 +1927,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETREMOVEITEM) == 0x2cu, "FLPACKET_
 class FPacket_FLPACKET_SERVER_SETADDITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETADDITEM() : FPacketBase(0x2002eu) {
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9c454
-        RpcPacketStoreField(this, 0x39u, 1, 0u);   // 06d9c457
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06d9c45a
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x39u, 1, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
     }
     // FUN_06d96f40
     ~FPacket_FLPACKET_SERVER_SETADDITEM() override {
@@ -1993,12 +1974,12 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCASH) == 0x24u, "FLPACKET_SERVER
 class FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT() : FPacketBase(0x20032u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9db25
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9db28
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9db2b
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9db2e
-        RpcPacketStoreField(this, 0x34u, 1, 0x00000001u);   // 06d9db31
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9db34
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 1, 0x00000001u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
     }
     // FUN_06d98690
     ~FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT() override {
@@ -2081,12 +2062,12 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_MARKOBJ) == 0x28u, "FLPACKET_SERVER
 class FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES() : FPacketBase(0x20035u) {
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9da7f
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9da82
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9da85
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9da88
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9da8f
-        RpcPacketBuildListSentinel(this, 0x3cu, 0x0cu);   // 06d9daad operator new(0xc), Head
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketBuildListSentinel(this, 0x3cu, 0x0cu);   // operator new(0xc), Head
     }
     // FUN_06d8fb00
     ~FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES() override {
@@ -2095,14 +2076,14 @@ public:
         for (FRpcPacketListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
             unsigned char* Record = static_cast<unsigned char*>(Node->Value);
             if (Record != nullptr) {                                   // 06d8fb43
-                void* Text = *reinterpret_cast<void**>(Record + 0x08);  // 06d8fb47
+                void* Text = *reinterpret_cast<void**>(Record + 0x08);
                 if (Text != nullptr) {
-                    ::operator delete(Text);                           // 06d8fb4f
+                    ::operator delete(Text);
                 }
-                ::operator delete(Record);                             // 06d8fb58
+                ::operator delete(Record);
             }
         }
-        RpcPacketDestroyEmbeddedList(this, 0x3cu);   // 06d8fb67..06d8fb97, FUN_06d901f0
+        RpcPacketDestroyEmbeddedList(this, 0x3cu);   // FUN_06d901f0
         if (RpcPacketField<void*>(this, 0x34u) != nullptr) {   // 06d8fb9a..06d8fba6
             ::operator delete(RpcPacketField<void*>(this, 0x34u));
         }
@@ -2128,8 +2109,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES) == 0x48u, "FL
 class FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE() : FPacketBase(0x20034u) {
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9d794
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9d797
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
     }
     // FUN_06d9d7d0
     ~FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE() override {
@@ -2174,13 +2155,13 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_STORY_CUE) == 0x24u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_SET_CAMERA : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SET_CAMERA() : FPacketBase(0x2004bu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9d8b4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9d8b7
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9d8ba
-        RpcPacketStoreField(this, 0x2cu, 4, 0x3f800000u);   // 06d9d8bd
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9d8c4
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9d8c7
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9d8ca
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dab780
@@ -2218,8 +2199,8 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REVERT_CAMERA) == 0x20u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE() : FPacketBase(0x20045u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9d9a4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9d9a7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d9d9e0
     ~FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE() override {
@@ -2245,9 +2226,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE) == 0x2cu, "FLP
 class FPacket_FLPACKET_SERVER_REPAIROBJECT : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_REPAIROBJECT() : FPacketBase(0x2003cu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e3f4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e3f7
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9e3fa
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -2327,13 +2308,13 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONFAILURES) == 0x24u, "FLPA
 class FPacket_FLPACKET_SERVER_BURNFUSE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_BURNFUSE() : FPacketBase(0x20041u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e5bd
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9e5c0
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9e5c3
-        RpcPacketStoreField(this, 0x2cu, 2, SUBOBJ_ID_NONE);   // 06d9e5cf COMMON.DLL SUBOBJ_ID_NONE
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9e5d3
-        RpcPacketStoreField(this, 0x34u, 4, 0xbf800000u);   // 06d9e5d6
-        RpcPacketStoreField(this, 0x38u, 1, 0u);   // 06d9e5dd
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 2, SUBOBJ_ID_NONE);   // COMMON.DLL SUBOBJ_ID_NONE
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0xbf800000u);
+        RpcPacketStoreField(this, 0x38u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dac3c0
@@ -2353,17 +2334,16 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_BURNFUSE) == 0x3cu, "FLPACKET_SERVE
 class FPacket_FLPACKET_SERVER_CREATESOLAR : public FRpcCreateObjectPacket {
 public:
     // FUN_06d9e630. Wire.Common is built first, by FRpcCreateObjectWire's constructors
-    // (06d9e66b..06d9e6c8: the head -- 06d9e67b..06d9e68a is FUN_06d9cda0 inlined -- then
-    // COMMON.DLL's list ctor at +0x74 and DamageList ctor at +0x80); the body is the tail,
-    // 06d9e6d2..06d9e6f0. +0x9e/+0x9f and Affiliation / Attitude (+0xb0 / +0xb4) are not
-    // stored by retail's constructor and are not stored here.
+    // (the head, with FUN_06d9cda0 inlined, then COMMON.DLL's list ctor at +0x74 and
+    // DamageList ctor at +0x80); the body is the tail. +0x9e/+0x9f and Affiliation /
+    // Attitude (+0xb0 / +0xb4) are not stored by retail's constructor and are not stored here.
     FPacket_FLPACKET_SERVER_CREATESOLAR() : FRpcCreateObjectPacket(0x20042u) {
-        Wire.NameASize = 0;               // 06d9e6d2  +0xa0
-        Wire.NameABuffer = nullptr;       // 06d9e6d8  +0xa4
-        Wire.NameBSize = 0;               // 06d9e6de  +0xa8
-        Wire.NameBBuffer = nullptr;       // 06d9e6e4  +0xac
-        Wire.bDestructible = 0;           // 06d9e6ea  byte +0x9c
-        Wire.bMarkedBy = 0;               // 06d9e6f0  byte +0x9d
+        Wire.NameASize = 0;               // +0xa0
+        Wire.NameABuffer = nullptr;       // +0xa4
+        Wire.NameBSize = 0;               // +0xa8
+        Wire.NameBBuffer = nullptr;       // +0xac
+        Wire.bDestructible = 0;           // byte +0x9c
+        Wire.bMarkedBy = 0;               // byte +0x9d
     }
     // FUN_06d9e740
     ~FPacket_FLPACKET_SERVER_CREATESOLAR() override {
@@ -2373,8 +2353,8 @@ public:
         if (Wire.NameABuffer != nullptr) {                     // 06d9e777..06d9e782 (+0xa4)
             ::operator delete(Wire.NameABuffer);
         }
-        // 06d9e78a stores the abstract base vptr 06db3fb4; Wire.Common's destructor
-        // (06d9e791..06d9e83c) and ~FPacketBase follow.
+        // 06d9e78a stores the abstract base vptr 06db3fb4; Wire.Common's destructor and
+        // ~FPacketBase follow.
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dac7c0
@@ -2395,7 +2375,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATESOLAR) == 0x20u + sizeof(FPay
 class FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS() : FPacketBase(0x20048u) {
-        RpcPacketBuildListSentinel(this, 0x20u, 0x10u);   // 06d9e909 operator new(0x10), Head
+        RpcPacketBuildListSentinel(this, 0x20u, 0x10u);   // operator new(0x10), Head
     }
     // FUN_06d9e930
     ~FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS() override {
@@ -2421,7 +2401,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS) == 0x2cu, "FLPA
 class FPacket_FLPACKET_SERVER_SETHULLSTATUS : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETHULLSTATUS() : FPacketBase(0x20049u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9e9e4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1cd0
@@ -2441,9 +2421,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETHULLSTATUS) == 0x24u, "FLPACKET_
 class FPacket_FLPACKET_SERVER_SETGUIDEDTARGET : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SETGUIDEDTARGET() : FPacketBase(0x2004au) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ea54
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ea57
-        RpcPacketStoreField(this, 0x28u, 2, 0u);   // 06d9ea5a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daaf90
@@ -2463,20 +2443,20 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SETGUIDEDTARGET) == 0x2cu, "FLPACKE
 class FPacket_FLPACKET_SERVER_SENDCOMM : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SENDCOMM() : FPacketBase(0x2004fu) {
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9eac5
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06d9eac8
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06d9eacb
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06d9eace
-        RpcPacketStoreField(this, 0x5cu, 4, 0u);   // 06d9ead1
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06d9eae1
-        RpcPacketStoreField(this, 0x74u, 1, 0x00000001u);   // 06d9eae4
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
+        RpcPacketStoreField(this, 0x74u, 1, 0x00000001u);
     }
     // FUN_06d9eb10
     ~FPacket_FLPACKET_SERVER_SENDCOMM() override {
         if (RpcPacketField<void*>(this, 0x64u) != nullptr) {   // 06d9eb13..06d9eb21
             ::operator delete(RpcPacketField<void*>(this, 0x64u));
         }
-        RpcPacketField<void*>(this, 0x64u) = nullptr;           // 06d9eb29, unconditional
+        RpcPacketField<void*>(this, 0x64u) = nullptr;           // unconditional
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dad000
@@ -2496,9 +2476,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SENDCOMM) == 0x78u, "FLPACKET_SERVE
 class FPacket_FLPACKET_SERVER_USE_ITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_USE_ITEM() : FPacketBase(0x20051u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9eb94
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06d9eb97
-        RpcPacketStoreField(this, 0x26u, 2, 0u);   // 06d9eb9b
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x26u, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db19b0
@@ -2537,17 +2517,17 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_SCANNOTIFY) == 0x28u, "FLPACKET_SER
 class FPacket_FLPACKET_SERVER_PLAYERLIST : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_PLAYERLIST() : FPacketBase(0x20052u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0x00000003u);   // 06d9ec81
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ec88
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ec8b
-        RpcPacketStoreField(this, 0x2cu, 1, 0u);   // 06d9ec8e
+        RpcPacketStoreField(this, 0x20u, 4, 0x00000003u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 1, 0u);
     }
     // FUN_06d99900
     ~FPacket_FLPACKET_SERVER_PLAYERLIST() override {
-        RpcPacketField<unsigned int>(this, 0x28u) = 0;          // 06d9990e, before the test
+        RpcPacketField<unsigned int>(this, 0x28u) = 0;          // before the test
         if (RpcPacketField<void*>(this, 0x24u) != nullptr) {   // 06d99903..06d99915
-            ::free(RpcPacketField<void*>(this, 0x24u));          // 06d99918 MSVCRT free, not delete
-            RpcPacketField<void*>(this, 0x24u) = nullptr;        // 06d99921
+            ::free(RpcPacketField<void*>(this, 0x24u));          // MSVCRT free, not delete
+            RpcPacketField<void*>(this, 0x24u) = nullptr;
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -2568,9 +2548,9 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_PLAYERLIST) == 0x30u, "FLPACKET_SER
 class FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE : public FRpcEquipListPacket {
 public:
     FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE() : FRpcEquipListPacket(0x2003du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ecf4
-        RpcPacketStoreField(this, 0x24u, 1, 0u);   // 06d9ecf7
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ecfa
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 1, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     // FUN_06d8f810
     ~FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE() override {
@@ -2594,23 +2574,23 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE) == 0x2cu, 
 class FPacket_FLPACKET_SERVER_MISCOBJUPDATE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_MISCOBJUPDATE() : FPacketBase(0x20054u) {
-        Wire.ObjectId = 0;   // 06d9ee02
-        Wire.GroupId = 0;   // 06d9ee05
-        Wire.Flags = 0;   // 06d9ee08
-        Wire.PlayerId = 0;   // 06d9ee0c
-        Wire.MissionId = 0;   // 06d9ee0f
-        Wire.MissionSetBy = 0;   // 06d9ee12
-        Wire.Field_0x30 = 0;   // 06d9ee15
-        Wire.Affiliation = 0xffffffffu;   // 06d9ee18
-        Wire.Rank = 0;   // 06d9ee1f
-        Wire.SystemId = 0;   // 06d9ee23
-        Wire.IdCount = 0;   // 06d9ee26
+        Wire.ObjectId = 0;
+        Wire.GroupId = 0;
+        Wire.Flags = 0;
+        Wire.PlayerId = 0;
+        Wire.MissionId = 0;
+        Wire.MissionSetBy = 0;
+        Wire.Field_0x30 = 0;
+        Wire.Affiliation = 0xffffffffu;
+        Wire.Rank = 0;
+        Wire.SystemId = 0;
+        Wire.IdCount = 0;
     }
     // FUN_06d98a30
     ~FPacket_FLPACKET_SERVER_MISCOBJUPDATE() override {
-        // 06d98a3a..06d98a4b frees the vector at +0x5c first, 06d98a4e..06d98a8d then the
-        // string at +0x44. Both are real std members here (see the class), destroyed in
-        // reverse declaration order: Ids, then Text -- the same order.
+        // Retail frees the vector at +0x5c first, then the string at +0x44. Both are real
+        // std members here, destroyed in reverse declaration order: Ids, then Text -- the
+        // same order.
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d98d30
@@ -2631,10 +2611,10 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_MISCOBJUPDATE) == 0x20u + sizeof(FP
 class FPacket_FLPACKET_SERVER_FORMATION_UPDATE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_FORMATION_UPDATE() : FPacketBase(0x20053u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ed64
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ed67
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ed6a
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06d9ed6d
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db14f0
@@ -2654,12 +2634,12 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_FORMATION_UPDATE) == 0x30u, "FLPACK
 class FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE() : FPacketBase(0x20055u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ee85
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ee88
-        RpcPacketStoreField(this, 0x28u, 2, 0u);   // 06d9ee8b
-        RpcPacketStoreField(this, 0x2au, 2, 0x00000001u);   // 06d9ee8f
-        RpcPacketStoreField(this, 0x2cu, 4, 0x3f800000u);   // 06d9ee93
-        RpcPacketStoreField(this, 0x30u, 1, 0u);   // 06d9ee9a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 2, 0u);
+        RpcPacketStoreField(this, 0x2au, 2, 0x00000001u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x30u, 1, 0u);
     }
     // FUN_06dad9a0
     ~FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE() override {
@@ -2683,7 +2663,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE) == 0x34u, "FLPAC
 class FPacket_FLPACKET_SERVER_SENDNNMESSAGE : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_SENDNNMESSAGE() : FPacketBase(0x20056u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06d9ef24
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -2801,8 +2781,8 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQSETCASH) == 0x24u, "FLPACKET_CLI
 class FPacket_FLPACKET_CLIENT_REQREMOVEITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQREMOVEITEM() : FPacketBase(0x30019u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da05e4
-        RpcPacketStoreField(this, 0x24u, 4, 0xffffffffu);   // 06da05e7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0xffffffffu);
     }
     // FUN_06dae240
     ~FPacket_FLPACKET_CLIENT_REQREMOVEITEM() override {
@@ -2826,12 +2806,12 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQREMOVEITEM) == 0x28u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_REQMODIFYITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQMODIFYITEM() : FPacketBase(0x3001au) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0674
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0677
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da067a
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06da067d
-        RpcPacketStoreField(this, 0x30u, 1, 0u);   // 06da0680
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06da0683
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 1, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
     }
     // FUN_06d9a1d0
     ~FPacket_FLPACKET_CLIENT_REQMODIFYITEM() override {
@@ -2857,7 +2837,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQMODIFYITEM) == 0x38u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_REQCARGO : public FRpcEquipListPacket {
 public:
     FPacket_FLPACKET_CLIENT_REQCARGO() : FRpcEquipListPacket(0x30017u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da06b4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     // FUN_06d95cf0
     ~FPacket_FLPACKET_CLIENT_REQCARGO() override {
@@ -2880,12 +2860,12 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCARGO) == 0x24u, "FLPACKET_CLIEN
 class FPacket_FLPACKET_CLIENT_REQADDITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQADDITEM() : FPacketBase(0x30018u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0634
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0637
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da063a
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06da063d
-        RpcPacketStoreField(this, 0x30u, 1, 0u);   // 06da0640
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06da0643
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
+        RpcPacketStoreField(this, 0x30u, 1, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
     }
     // FUN_06d99d40
     ~FPacket_FLPACKET_CLIENT_REQADDITEM() override {
@@ -2930,7 +2910,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQSHIPARCH) == 0x24u, "FLPACKET_CL
 class FPacket_FLPACKET_CLIENT_REQEQUIPMENT : public FRpcEquipListPacket {
 public:
     FPacket_FLPACKET_CLIENT_REQEQUIPMENT() : FRpcEquipListPacket(0x30016u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0714
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     // FUN_06d95bc0
     ~FPacket_FLPACKET_CLIENT_REQEQUIPMENT() override {
@@ -2953,13 +2933,13 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQEQUIPMENT) == 0x24u, "FLPACKET_C
 class FPacket_FLPACKET_CLIENT_MUNCOLLISION : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_MUNCOLLISION() : FPacketBase(0x30003u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da07ad
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da07b0
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da07b3
-        RpcPacketStoreField(this, 0x2cu, 2, SUBOBJ_ID_NONE);   // 06da07bf COMMON.DLL SUBOBJ_ID_NONE
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06da07c3
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06da07c6
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06da07c9
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 2, SUBOBJ_ID_NONE);   // COMMON.DLL SUBOBJ_ID_NONE
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae280
@@ -2979,9 +2959,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_MUNCOLLISION) == 0x3cu, "FLPACKET_C
 class FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION() : FPacketBase(0x3003du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da07f4
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06da07f7
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da07fb
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae620
@@ -3001,11 +2981,11 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION) == 0x2cu, "FL
 class FPacket_FLPACKET_CLIENT_OBJCOLLISION : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_OBJCOLLISION() : FPacketBase(0x3000cu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0824
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06da0827
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da082b
-        RpcPacketStoreField(this, 0x2cu, 2, 0u);   // 06da082e
-        RpcPacketStoreField(this, 0x30u, 4, 0u);   // 06da0832
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 2, 0u);
+        RpcPacketStoreField(this, 0x30u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06dae770
@@ -3124,7 +3104,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE) == 0x20u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_SELECTCHARACTER : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_SELECTCHARACTER() : FPacketBase(0x30006u) {
-        RpcPacketStoreField(this, 0x20u, 1, 0u);   // 06da0bf4
+        RpcPacketStoreField(this, 0x20u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daf830
@@ -3198,7 +3178,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_CREATENEWCHAR) == 0xb0u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_DESTROYCHAR : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_DESTROYCHAR() : FPacketBase(0x3003au) {
-        RpcPacketStoreField(this, 0x20u, 1, 0u);   // 06da0bc4
+        RpcPacketStoreField(this, 0x20u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daf830
@@ -3415,7 +3395,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED) == 0x24u, "FLPAC
 class FPacket_FLPACKET_CLIENT_RTCDONE : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_RTCDONE() : FPacketBase(0x30047u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0d21
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0310
@@ -3473,8 +3453,8 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE) == 0x28u, "FLPACKET
 class FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE() : FPacketBase(0x30043u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0db1
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0db4
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -3494,9 +3474,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE) == 0x28u, "FLPACKET
 class FPacket_FLPACKET_CLIENT_HAIL : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_HAIL() : FPacketBase(0x3003fu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da1194
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da1197
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da119a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -3592,7 +3572,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFSELECTOBJECT) == 0x24u, "FLPACKET
 class FPacket_FLPACKET_CLIENT_SAVEGAME : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_SAVEGAME() : FPacketBase(0x3001eu) {
-        RpcPacketStoreField(this, 0x20u, 1, 0u);   // 06da0a74
+        RpcPacketStoreField(this, 0x20u, 1, 0u);
     }
     // FUN_06d9a7d0
     ~FPacket_FLPACKET_CLIENT_SAVEGAME() override {
@@ -3618,9 +3598,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_SAVEGAME) == 0x228u, "FLPACKET_CLIE
 class FPacket_FLPACKET_CLIENT_MINEASTEROID : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_MINEASTEROID() : FPacketBase(0x30020u) {
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0864
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da0867
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06da086a
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06daeac0
@@ -3659,13 +3639,13 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_MISSIONRESPONSE) == 0x2cu, "FLPACKE
 class FPacket_FLPACKET_CLIENT_TRADERESPONSE : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_TRADERESPONSE() : FPacketBase(0x30027u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0901
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0904
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06d9a630
     ~FPacket_FLPACKET_CLIENT_TRADERESPONSE() override {
-        ::operator delete(RpcPacketField<void*>(this, 0x24u));   // 06d9a633..06d9a63d, no test
-        RpcPacketField<void*>(this, 0x24u) = nullptr;            // 06d9a645
+        ::operator delete(RpcPacketField<void*>(this, 0x24u));   // no test
+        RpcPacketField<void*>(this, 0x24u) = nullptr;
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
@@ -3685,29 +3665,29 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_TRADERESPONSE) == 0x28u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_DBGCREATESHIP : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_DBGCREATESHIP() : FPacketBase(0x30022u) {
-        RpcPacketStoreField(this, 0x34u, 4, 0u);   // 06da0e34
-        RpcPacketStoreField(this, 0x38u, 4, 0u);   // 06da0e37
-        RpcPacketStoreField(this, 0x3cu, 4, 0u);   // 06da0e3a
-        RpcPacketStoreField(this, 0x40u, 4, 0u);   // 06da0e3d
-        RpcPacketStoreField(this, 0x44u, 4, 0u);   // 06da0e40
-        RpcPacketStoreField(this, 0x48u, 4, 0u);   // 06da0e43
-        RpcPacketStoreField(this, 0x4cu, 4, 0x3f800000u);   // 06da0e46
-        RpcPacketStoreField(this, 0x50u, 4, 0u);   // 06da0e4d
-        RpcPacketStoreField(this, 0x54u, 4, 0u);   // 06da0e50
-        RpcPacketStoreField(this, 0x58u, 4, 0u);   // 06da0e53
-        RpcPacketStoreField(this, 0x5cu, 4, 0u);   // 06da0e56
-        RpcPacketStoreField(this, 0x60u, 4, 0u);   // 06da0e59
-        RpcPacketStoreField(this, 0x64u, 4, 0u);   // 06da0e5c
-        RpcPacketStoreField(this, 0x68u, 4, 0u);   // 06da0e5f
-        RpcPacketStoreField(this, 0x6cu, 4, 0u);   // 06da0e62
-        RpcPacketStoreField(this, 0x84u, 4, 0u);   // 06da0e65
-        RpcPacketStoreField(this, 0x80u, 4, 0u);   // 06da0e6b
-        RpcPacketStoreField(this, 0x7cu, 4, 0u);   // 06da0e71
-        RpcPacketStoreField(this, 0x78u, 4, 0u);   // 06da0e74
-        RpcPacketStoreField(this, 0x74u, 4, 0u);   // 06da0e77
-        RpcPacketStoreField(this, 0x70u, 4, 0u);   // 06da0e7a
-        RpcPacketStoreField(this, 0x88u, 4, 0u);   // 06da0e7d
-        RpcPacketStoreField(this, 0x8cu, 4, 0u);   // 06da0e83
+        RpcPacketStoreField(this, 0x34u, 4, 0u);
+        RpcPacketStoreField(this, 0x38u, 4, 0u);
+        RpcPacketStoreField(this, 0x3cu, 4, 0u);
+        RpcPacketStoreField(this, 0x40u, 4, 0u);
+        RpcPacketStoreField(this, 0x44u, 4, 0u);
+        RpcPacketStoreField(this, 0x48u, 4, 0u);
+        RpcPacketStoreField(this, 0x4cu, 4, 0x3f800000u);
+        RpcPacketStoreField(this, 0x50u, 4, 0u);
+        RpcPacketStoreField(this, 0x54u, 4, 0u);
+        RpcPacketStoreField(this, 0x58u, 4, 0u);
+        RpcPacketStoreField(this, 0x5cu, 4, 0u);
+        RpcPacketStoreField(this, 0x60u, 4, 0u);
+        RpcPacketStoreField(this, 0x64u, 4, 0u);
+        RpcPacketStoreField(this, 0x68u, 4, 0u);
+        RpcPacketStoreField(this, 0x6cu, 4, 0u);
+        RpcPacketStoreField(this, 0x84u, 4, 0u);
+        RpcPacketStoreField(this, 0x80u, 4, 0u);
+        RpcPacketStoreField(this, 0x7cu, 4, 0u);
+        RpcPacketStoreField(this, 0x78u, 4, 0u);
+        RpcPacketStoreField(this, 0x74u, 4, 0u);
+        RpcPacketStoreField(this, 0x70u, 4, 0u);
+        RpcPacketStoreField(this, 0x88u, 4, 0u);
+        RpcPacketStoreField(this, 0x8cu, 4, 0u);
     }
     // FUN_06db0500
     ~FPacket_FLPACKET_CLIENT_DBGCREATESHIP() override {
@@ -3742,8 +3722,8 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGCREATESHIP) == 0x90u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM() : FPacketBase(0x30023u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da0ed4
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0ed7
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
     }
     // FUN_06db10b0
     ~FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM() override {
@@ -3810,7 +3790,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_DOCK) == 0x24u, "FLPACKET_CLIENT_DO
 class FPacket_FLPACKET_CLIENT_DBGCONSOLE : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_DBGCONSOLE() : FPacketBase(0x3002du) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da1004
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1670
@@ -3849,9 +3829,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT) == 0x28u, "FLPACK
 class FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP() : FPacketBase(0x30030u) {
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da0fd4
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da0fd7
-        RpcPacketStoreField(this, 0x2cu, 4, 0u);   // 06da0fda
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
+        RpcPacketStoreField(this, 0x2cu, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db14f0
@@ -3871,9 +3851,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP) == 0x30u, "FLPACK
 class FPacket_FLPACKET_CLIENT_SETMANEUVER : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_SETMANEUVER() : FPacketBase(0x3002fu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da1034
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06da1037
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06da103a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 4, 0u);
+        RpcPacketStoreField(this, 0x28u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db0160
@@ -3893,7 +3873,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_SETMANEUVER) == 0x2cu, "FLPACKET_CL
 class FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS() : FPacketBase(0x30036u) {
-        RpcPacketBuildListSentinel(this, 0x20u, 0x10u);   // 06da1109 operator new(0x10), Head
+        RpcPacketBuildListSentinel(this, 0x20u, 0x10u);   // operator new(0x10), Head
     }
     // FUN_06d9e930
     ~FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS() override {
@@ -3919,7 +3899,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS) == 0x2cu, "FLPA
 class FPacket_FLPACKET_CLIENT_REQHULLSTATUS : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQHULLSTATUS() : FPacketBase(0x3003bu) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da1164
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1cd0
@@ -3939,9 +3919,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQHULLSTATUS) == 0x24u, "FLPACKET_
 class FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM() : FPacketBase(0x30040u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da11c4
-        RpcPacketStoreField(this, 0x24u, 2, 0u);   // 06da11c7
-        RpcPacketStoreField(this, 0x26u, 2, 0u);   // 06da11cb
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 2, 0u);
+        RpcPacketStoreField(this, 0x26u, 2, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db19b0
@@ -3961,9 +3941,9 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM) == 0x28u, "FLPACK
 class FPacket_FLPACKET_CLIENT_REQINVINCIBILITY : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQINVINCIBILITY() : FPacketBase(0x30044u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0u);   // 06da1204
-        RpcPacketStoreField(this, 0x24u, 1, 0u);   // 06da1207
-        RpcPacketStoreField(this, 0x25u, 1, 0u);   // 06da120a
+        RpcPacketStoreField(this, 0x20u, 4, 0u);
+        RpcPacketStoreField(this, 0x24u, 1, 0u);
+        RpcPacketStoreField(this, 0x25u, 1, 0u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1b60
@@ -4002,7 +3982,7 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_MISSIONSAVEB) == 0x24u, "FLPACKET_C
 class FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE : public FPacketBase {
 public:
     FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE() : FPacketBase(0x30046u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0x3f800000u);   // 06da1234
+        RpcPacketStoreField(this, 0x20u, 4, 0x3f800000u);
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06db1cd0
@@ -4018,8 +3998,8 @@ static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE) == 0x24u, "FLPA
 
 }  // namespace
 
-// Retail FUN_06d9ace0, __cdecl, one argument. 0x06d9ace5 TEST ESI,ESI / JZ -> MOV EAX,0x4;
-// otherwise every RegisterType result is ignored and the function returns 0.
+// Retail FUN_06d9ace0, __cdecl, one argument. A null serializer returns 4; otherwise
+// every RegisterType result is ignored and the function returns 0.
 int RpcRegisterChannel1Types(FPacketSerializer* Serializer) {
     if (Serializer == nullptr) {
         return 4;
@@ -4069,8 +4049,8 @@ int RpcRegisterChannel1Types(FPacketSerializer* Serializer) {
     return 0;
 }
 
-// Retail FUN_06d9bc80, __cdecl, one argument. 0x06d9bc85 TEST ESI,ESI / JZ -> MOV EAX,0x4;
-// otherwise every RegisterType result is ignored and the function returns 0.
+// Retail FUN_06d9bc80, __cdecl, one argument. A null serializer returns 4; otherwise
+// every RegisterType result is ignored and the function returns 0.
 int RpcRegisterChannel2Types(FPacketSerializer* Serializer) {
     if (Serializer == nullptr) {
         return 4;
@@ -4240,8 +4220,8 @@ int RpcRegisterChannel2Types(FPacketSerializer* Serializer) {
     return 0;
 }
 
-// Retail FUN_06d9f100, __cdecl, one argument. 0x06d9f105 TEST ESI,ESI / JZ -> MOV EAX,0x4;
-// otherwise every RegisterType result is ignored and the function returns 0.
+// Retail FUN_06d9f100, __cdecl, one argument. A null serializer returns 4; otherwise
+// every RegisterType result is ignored and the function returns 0.
 int RpcRegisterChannel3Types(FPacketSerializer* Serializer) {
     if (Serializer == nullptr) {
         return 4;

@@ -8,7 +8,7 @@
 
 // Content.dll TU44 (06f34ef0-06f36f10): faction / NPC ship arch / cargo helpers used by the
 // encounter spawn path (TU29), the random missions (TU31, TU61, TU63) and SystemInfo (TU58).
-// Lane CNT-POP (docs/re/content.md, TU map). All free functions are cdecl in retail.
+// All free functions are cdecl in retail.
 
 #include "common_weighted_vector.h"     // weighted_vector<unsigned int>
 

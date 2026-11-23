@@ -44,7 +44,7 @@ public:
     // +0x04: reads the rest of the Act_* line.
     virtual void Parse(INI_Reader& Reader) = 0;
     // +0x08: runs the action. Called with no arguments by the trigger engine and by the
-    // mission timer list (FUN_06eb9c60). Implementations return AL=1.
+    // mission timer list (FUN_06eb9c60). Implementations return true.
     virtual bool Execute() = 0;
 
     // FUN_06ebf700 (shared with Cnd by /OPT:ICF): +0x08 = id.
@@ -260,7 +260,7 @@ class ActDebugMsg : public Act
 public:
     explicit ActDebugMsg(FMissionScript* InMission);
     void Parse(INI_Reader& Reader) override; // LAB_06ec7af0
-    bool Execute() override;                 // LAB_06ea1460 (MOV AL,1; RET)
+    bool Execute() override;                 // LAB_06ea1460
 
     TString<0x80> Text; // +0x0c s0
 };

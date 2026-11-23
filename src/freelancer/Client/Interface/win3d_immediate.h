@@ -52,8 +52,7 @@ void Win3DVertex3f(float X, float Y, float Z);
 // so an out-of-range float saturates rather than wrapping.
 void Win3DColor4f(float R, float G, float B, float A);
 
-// FUN_00421ad0. The three-float form: each component scaled by 255 (DAT_005c75d8), ftol, clamped
-// to 0..255 afterwards like Win3DColor4f; the alpha byte is 0xff (`OR ECX,0xffffff00` on red).
+// FUN_00421ad0. The three-float form, clamped like Win3DColor4f; the alpha byte is 0xff.
 void Win3DColor3f(float R, float G, float B);
 
 // FUN_00421a70. The three-byte form; the alpha byte is left as 0xff.
@@ -73,10 +72,8 @@ void Win3DColor4ubv(const unsigned char* Rgba);
 // onto the vertex, the same way Win3DColor4f/3ub set the current colour.
 void Win3DTexCoord2f(float U, float V);
 
-// FUN_004214d0. Packs four 0..1 floats into a D3DCOLOR the same way Win3DColor4f does (scale by
-// 255, ftol, clamp to a byte) and sets it as pipeline state 8 -- the swap-chain clear colour, not
-// the immediate-mode "current vertex colour" -- so it takes effect independently of glColor4f.
-// Called by the space-camera background-clear path right before Win3DSetViewport/ClearWin3DBuffers.
+// FUN_004214d0. Packs four 0..1 floats into a D3DCOLOR the same way Win3DColor4f does and sets
+// it as pipeline state 8 -- the clear colour, not the current vertex colour.
 void Win3DSetPipelineClearColor(float R, float G, float B, float A);
 
 // FUN_00421690. Ends the primitive and issues the draw.
@@ -88,7 +85,7 @@ enum EWin3DCapability
 {
     kWin3DCullFace  = 0xb44,
     kWin3DLightingCap = 0xb50,
-    kWin3DFog       = 0xb60,   // glDisable only (0x00421f02); glEnable warns on it
+    kWin3DFog       = 0xb60,   // glDisable only; glEnable warns on it
     kWin3DDepthTest = 0xb71,
     kWin3DBlend     = 0xbe2,
     kWin3DTexture2D = 0xde1
@@ -129,37 +126,31 @@ void Win3DSetBlendFunc(int SourceFactor, int DestFactor);
 // FUN_00422190. D3DRS_ZWRITEENABLE, plus a re-apply of the cached ZFUNC and ZENABLE.
 void Win3DSetDepthWrite(int bEnabled);
 
-// FUN_00422610. Sets the pipeline viewport from a camera's ViewRect (slot 0x14), or to the whole
-// surface when Cam is null. The file and line are retail's own diagnostic arguments, carried
-// through so the call sites keep reading the way they do in the binary.
+// FUN_00422610. Sets the pipeline viewport from a camera's ViewRect, or to the whole surface
+// when Cam is null. The file and line are retail's own diagnostic arguments.
 struct ICamera;
 void Win3DSetViewport(ICamera* Cam, const char* SourceFile, int SourceLine);
 
-// FUN_00422390. Answers retail's own GL_VIEWPORT (0xba2) query out of the state Win3DSetViewport
-// last installed. Any other query id is silently ignored -- retail's glGetIntegerv only ever
-// understood this one. Out4[1] is the flipped Y origin Win3DSetViewport's comment describes, not
-// Top itself; that is what retail stored and what retail hands back.
+// FUN_00422390. Answers GL_VIEWPORT (0xba2) out of the state Win3DSetViewport last installed;
+// any other query id is ignored. Out4[1] is the flipped Y origin, not Top itself, as retail.
 void Win3DGetViewport(int Query, int* Out4);
 
 // FUN_00421620 (cdecl X, Y, Width, Height, SourceFile, SourceLine) -- retail's glViewport:
 // stores the four values where Win3DGetViewport reads them and hands the pipeline the rectangle
 // with Y flipped back, (X, SurfaceHeight - Y - Height, Width, Height). Y is the flipped origin a
 // GL_VIEWPORT query returned, so a query / set pair restores a viewport exactly (the
-// ShipViewControl draw does that, 0x00584518 / 0x00584667).
+// ShipViewControl draw does that).
 void Win3DSetViewportRect(int X, int Y, int Width, int Height, const char* SourceFile,
                           int SourceLine);
 
-// FUN_004227d0. Win3DSetOrtho2D's shape, but the box comes from an arbitrary object's own
-// viewport rect (the same Vtable[5] accessor Win3DSetViewport uses) instead of the display size.
+// FUN_004227d0. Win3DSetOrtho2D's shape, but the box comes from the camera's own viewport rect
+// instead of the display size.
 void Win3DSetOrtho2DForCamera(FSpaceCamera* Cam);
 
 // FUN_004221f0. Sets the projection, and resets the modelview to the identity on the way.
 //
-// The six arguments are glOrtho's, in glOrtho's order. Two things about it are worth knowing.
-// The modelview reset happens BEFORE the cache test, so it runs on every call whether or not the
-// projection itself changes. And the cache stores the new parameters even on the path where it
-// decides nothing changed -- harmless, since on that path they are equal anyway, but it means
-// the store is unconditional and the port keeps it that way.
+// The six arguments are glOrtho's, in glOrtho's order. The modelview reset happens BEFORE the
+// cache test, so it runs on every call; the cache store is unconditional.
 void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float NearPlane,
                         float FarPlane);
 
@@ -173,10 +164,9 @@ void Win3DSetOrtho2D();
 // kind 2. Unlike the ortho setter it does NOT touch the modelview.
 void Win3DSetPerspective(float FovDeg, float Aspect, float NearPlane, float FarPlane);
 
-// FUN_00422910 (cdecl Camera) -- Win3DSetPerspective(GetFovYDeg, GetAspect, GetZNear, GetZFar)
-// of Camera (slots 0x1c / 0x28 / 0x20 / 0x24, called in the order far, near, aspect, fov).
-// NOTE: space_scene_obj_draw.cpp still keeps a private copy of this function (with null
-// guards retail lacks); cli_nebula.cpp's copy was folded into this one.
+// FUN_00422910 (cdecl Camera) -- Win3DSetPerspective from the camera's getters, called in the
+// order far, near, aspect, fov. space_scene_obj_draw.cpp keeps a private copy (with null guards
+// retail lacks).
 void Win3DApplyCameraPerspective(ICamera* Camera);
 
 // FUN_00422a70 / FUN_00422ab0. Save and restore the whole projection -- cache included when the
@@ -192,23 +182,21 @@ void Win3DPopProjection();
 int Win3DGetProjectionSetCount();
 int Win3DGetProjectionSkipCount();
 
-// FUN_004213d0 -- the render-state defaults RenderMgrCreateBuffers (FUN_004249c0, 0x00424bdf)
-// installs after the device is made: blend 2/2, depth test/write on, depth func 4, no alpha
-// blend / texture / lighting, an empty accumulator, identity modelview, no cached projection.
+// FUN_004213d0 -- the render-state defaults RenderMgrCreateBuffers installs after the device is
+// made: blend 2/2, depth test/write on, depth func 4, no alpha blend / texture / lighting, an
+// empty accumulator, identity modelview, no cached projection.
 void Win3DResetState();
 
-// FUN_004214a0 — called from FUN_00425140 just before SwapBuffers: zeroes the projection
-// set/skip counters and latches DAT_00610844 from game option LIKE_PETAL (0x3e).
+// FUN_004214a0 — called just before SwapBuffers: zeroes the projection set/skip counters and
+// latches DAT_00610844 from game option LIKE_PETAL (0x3e).
 void Win3DOnPresentFrame();
 
 // The modelview the emulator hands to the pipeline at glEnd (retail's .data 0x006648dc, twelve
 // floats). Exposed because the projection setter is what writes it and glEnd is what reads it.
 extern float GWin3DModelview[12];
 
-// A read-only window on the accumulator. Retail has no such thing -- its buffers are plain .data
-// and anything that wanted to look simply read them. These exist so the state can be checked
-// without a live pipeline, which is the only way the packing and the counters can be pinned down
-// offline; nothing in the port's own code path calls them.
+// Port-only read-only accessors on the accumulator, for checking the state without a live
+// pipeline; nothing in the port's own code path calls them.
 int Win3DGetVertexCount();
 int Win3DGetIndexCount();
 unsigned long Win3DGetCurrentColour();
@@ -216,10 +204,9 @@ unsigned long Win3DGetCurrentColour();
 // Reads back one accumulated vertex. Returns false for an index outside what has been written.
 bool Win3DGetVertex(int Index, float* OutXyz3, unsigned long* OutColour);
 
-// FUN_00422fe0. A small GLU-style sphere helper living in the same retail source file as the
-// rest of this emulator (OpenGL.cpp), adjacent in the binary to Win3DBegin/Vertex/End. Fills
-// OutPoints (Cols*Rows*3 floats, one XYZ triplet per grid point) with a UV-sphere point grid:
-// Rows rings from pole to pole (phi 0..pi) of Cols points each (theta 0..2pi), at Radius.
+// FUN_00422fe0. A GLU-style sphere helper from the same retail source file. Fills OutPoints
+// (Cols*Rows*3 floats) with a UV-sphere point grid: Rows rings from pole to pole (phi 0..pi) of
+// Cols points each (theta 0..2pi), at Radius.
 //
 // Retail builds the per-column cosine/sine table into two 256-float stack arrays indexed 1..Cols
 // (index 0 unused) and reads table[Cols] for the last column rather than wrapping back to
@@ -229,26 +216,24 @@ void Win3DBuildSpherePoints(float* OutPoints, float Radius, int Cols, int Rows);
 
 // FUN_004230c0. Draws the grid Win3DBuildSpherePoints produces: every interior latitude ring
 // (all rows except the first and last) as a closed line loop, then every longitude line (all
-// rows, one column) as a line strip. Disables kWin3DTexture2D first (FUN_00421ed0(0xde1)).
+// rows, one column) as a line strip. Disables kWin3DTexture2D first.
 void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows);
 
-// FUN_00423180 (cdecl Camera, Xform12, Radius, Cols, Rows) -- a wireframe sphere: the points into
-// the function-static 0x3000-byte buffer DAT_006649c8 (Win3DBuildSpherePoints), the modelview
-// from Camera and Xform (FUN_00422690, Win3DBindModelview), then Win3DDrawSphereGrid. Caller:
-// HUD_Target's target view 0x004e3e63 (16 x 16).
+// FUN_00423180 (cdecl) -- a wireframe sphere: the points into the static 0x3000-byte buffer
+// DAT_006649c8, the modelview from Camera and Xform, then Win3DDrawSphereGrid. Caller:
+// HUD_Target's target view (16 x 16).
 void Win3DDrawWireSphere(void* Camera, float const* Xform12, float Radius, int Cols, int Rows);
 
-// FUN_00423b30 / FUN_00423b60 (cdecl Out, A, B): Out = A + B / Out = A - B, per component, each
-// sum rounded to float on its FSTP. Out may alias an input (all three loads precede the stores).
+// FUN_00423b30 / FUN_00423b60 (cdecl Out, A, B): Out = A + B / Out = A - B, each component
+// rounded to float. Out may alias an input (all loads precede the stores).
 void Win3DVec3Add(float* Out, float const* A, float const* B);
 void Win3DVec3Sub(float* Out, float const* A, float const* B);
 
 // The argument of the fuzzy-line drawers, 0x50 bytes. Retail has no name for it; the only
-// builder is the tractor beam draw (LAB_00512da0), which fills it on its own stack. Offsets are
-// the ones both drawers read.
+// builder is the tractor beam draw (LAB_00512da0).
 struct FWin3DFuzzyLine
 {
-    unsigned char bCurved;   // +0x00 0 = FUN_00423be0 draws a straight line, else FUN_004231f0's arc
+    unsigned char bCurved;   // +0x00 0 = a straight line, else the arc
     unsigned char Pad01[3];  // +0x01
     void* Texture;           // +0x04 ITextureLibrary2 record (a shape's FTextureRef::Texture); null
                              //       = an untextured line strip

@@ -15,37 +15,35 @@
 
 class INI_Reader;
 
-// Random-mission runtime (docs/re/content.md, TU map, lane CNT-RM):
-//   TU57 06f70dd0-06f71fc0  StateMachine / MessageHandler derivatives for TU61
-//   TU61 06f84060-06f94d10  random-mission runtime objects
-// Ported so far: the parametrised text object used by the vignette tree (failure_text /
-// reward_text / objective_text) and the three .data name tables TU61/TU63 share.
+// Random-mission runtime:
+//   TU57  StateMachine / MessageHandler derivatives for TU61 (triggers, machine group)
+//   TU61  random-mission runtime objects: the parametrised texts and objectives, the message
+//         types and the three .data name tables TU61/TU63 share.
 
 // ---------------------------------------------------------------------------------------
 // .data name tables ({name, value} rows, FRmNamedValue from RandomMissionDB.h).
 // ---------------------------------------------------------------------------------------
 
-// .data PTR_s_FSTRING_PARAM_NONE_06fce868, 15 rows (loop bound 0x78): FSTRING_PARAM_NONE 0,
+// .data PTR_s_FSTRING_PARAM_NONE_06fce868, 15 rows: FSTRING_PARAM_NONE 0,
 // OFFER_GROUP 1, HOSTILE_GROUP 2, BIG_SOLAR 3, OTHER_SOLAR 4, CRITICAL_LOOT 5,
 // TARGET_FULL_NAME 6, REWARD_MONEY 7, FACTION_REWARD 8, FACTION_HIT 9,
 // TIME_TO_RETURN_TO_BATTLE 10, MISSION_DIFFICULTY 11, OFFER_BASE 12, TARGET_ZONE 13,
 // TARGET_SYSTEM 14. Readers: FUN_06f84540, FUN_06f99010.
 extern FRmNamedValue const GRmTextParamNames[15];
 
-// .data PTR_DAT_06fce780, 17 rows (loop bound 0x88): comm_sequence trigger names.
+// .data PTR_DAT_06fce780, 17 rows: comm_sequence trigger names.
 // Reader: FUN_06f98df0.
 extern FRmNamedValue const GRmCommTriggerNames[17];
 
-// .data PTR_DAT_06fce808, 12 rows (loop bound 0x60): comm_sequence speaker/target names.
+// .data PTR_DAT_06fce808, 12 rows: comm_sequence speaker/target names.
 // Reader: FUN_06f98df0.
 extern FRmNamedValue const GRmCommTargetNames[12];
 
 // ---------------------------------------------------------------------------------------
 // TU61 state machine message types. The TU61 static initialisers LAB_06f842a0 ...
 // LAB_06f84520 (one per global, in this order) each inline
-// StateMachineMessage::GenerateUniqueMessageType() (INC [s_unique_message_type_generator],
-// store the new value). Names come from the DestroyMission handler (LAB_06eef740) where it
-// reads them; the others keep their address.
+// StateMachineMessage::GenerateUniqueMessageType(). Names come from the DestroyMission
+// handler (LAB_06eef740) where it reads them; the others keep their address.
 // ---------------------------------------------------------------------------------------
 extern unsigned int const GRmMsgStartMachine;       // DAT_06fd3bbc: DestroyMission -> a runtime machine
 extern unsigned int const GRmMsgMachineStarted;     // DAT_06fd3bb8: machine -> mission, now running
@@ -70,8 +68,8 @@ extern unsigned int const GRmMsgPlayerLeft;         // DAT_06fd3b70: DestroyMiss
 extern unsigned int const GRmMsgType06fd3b6c;       // DAT_06fd3b6c
 
 // =======================================================================================
-// TU57 (06f70dd0-06f71fc0, RandomMissionTriggers.cpp): the trigger state machines and the
-// machine group the TU61 runtime machine (FUN_06f89a00) is built on. Every user is in TU61
+// TU57 (RandomMissionTriggers.cpp): the trigger state machines and the machine group the
+// TU61 runtime machine (FUN_06f89a00) is built on. Every user is in TU61
 // (FUN_06f8beb0, FUN_06f8c460).
 // =======================================================================================
 
@@ -82,13 +80,12 @@ extern unsigned int const GRmMsgTriggerFired;
 
 // TU57 -- trigger fired (retail 0x28 bytes, vtable 06fbbde4: [0] FUN_06f86dc0, the deleting
 // dtor shared by the TU61 messages, [1] clone FUN_06f71840). Built on the stack by
-// FRmTrigger::Fire (06f71283-06f712a5) and sent to the trigger's owner.
+// FRmTrigger::Fire and sent to the trigger's owner.
 class FRmTriggerFiredMessage : public StateMachineMessage
 {
 public:
     FRmTriggerFiredMessage(unsigned int InCookie, bool bInFinal, unsigned int InActivator);
-    // FUN_06f71840: operator new(0x28) (StateMachineMessage::operator new), the exported copy
-    // ctor, +0x1c / +0x20 / +0x24; a failed new returns null.
+    // FUN_06f71840: StateMachineMessage::operator new(0x28); a failed new returns null.
     StateMachineMessage* clone() const override;
 
     unsigned int Cookie;            // +0x1c the trigger's Cookie
@@ -106,12 +103,11 @@ public:
 class FRmTrigger : public StateMachineMessageHandler
 {
 public:
-    // FUN_06f70ff0 (RET 0x10): StateMachine, MessageHandler(DAT_06fcf254) at +0x10, +0x1c =
-    // InOwnerId, +0x38 = InCookie, +0x24 = bInOneShot, +0x20 = 0, +0x28 = InRearmDelay.
+    // FUN_06f70ff0: MessageHandler(DAT_06fcf254) at +0x10.
     FRmTrigger(unsigned int InCookie, unsigned int InOwnerId, bool bInOneShot,
                float InRearmDelay);
 
-    // LAB_06f71090 (RET 8): State 0..4 -> slots 5..9 with (Event, State); always false.
+    // LAB_06f71090: State 0..4 -> slots 5..9 with (Event, State); always false.
     bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
     virtual void SetActivator(unsigned int InActivator);            // [4] FUN_06f71080
@@ -135,8 +131,7 @@ public:
 class FRmProximityTrigger : public FRmTrigger
 {
 public:
-    // FUN_06f712e0 (RET 0x18): the base inline with bOneShot 1 and RearmDelay 1.0, +0x40 =
-    // *InCenter, +0x4c = InRadius * InRadius, +0x50 = InSystemId, +0x54 = InPlayers.
+    // FUN_06f712e0: the base inline with bOneShot 1 and RearmDelay 1.0.
     FRmProximityTrigger(unsigned int InCookie, unsigned int InOwnerId, unsigned int InSystemId,
                         Vector const* InCenter, float InRadius,
                         std::vector<FContentPlayerState*> const* InPlayers);
@@ -153,8 +148,7 @@ public:
 class FRmTimerTrigger : public FRmTrigger
 {
 public:
-    // FUN_06f714d0 (RET 0xc): the base inline with bOneShot 1 and RearmDelay 1.0, +0x40 =
-    // InDelay.
+    // FUN_06f714d0: the base inline with bOneShot 1 and RearmDelay 1.0.
     FRmTimerTrigger(unsigned int InCookie, unsigned int InOwnerId, float InDelay);
     bool OnArmed(SMEventData const* Event, int const& State) override;
 
@@ -168,7 +162,7 @@ public:
 class FRmProximityLeaveTrigger : public FRmTrigger
 {
 public:
-    // FUN_06f71660 (RET 0x18): as FUN_06f712e0.
+    // FUN_06f71660: as FUN_06f712e0.
     FRmProximityLeaveTrigger(unsigned int InCookie, unsigned int InOwnerId,
                              unsigned int InSystemId, Vector const* InCenter, float InRadius,
                              std::vector<FContentPlayerState*> const* InPlayers);
@@ -184,24 +178,23 @@ public:
 // FUN_06f71900 (dtor FUN_06f71920), [1] process (import), [2] purecall, [3]
 // handle_state_change LAB_06f71a30, [4]..[6] the StateMachineGroup add / remove imports;
 // MessageHandler side 06fbbeac ([0] LAB_06f71fb0 = this - 0x10 -> FUN_06f71900)). Base of
-// the TU61 runtime machine (ctor FUN_06f89a00 06f89a26). Member machines are kept by handler
-// id: Machines live as long as the group, StateMachines only until the next state change.
+// the TU61 runtime machine (ctor FUN_06f89a00). Member machines are kept by handler id:
+// Machines live as long as the group, StateMachines only until the next state change.
 class FRmMachineGroup : public StateMachineGroup
 {
 public:
-    // FUN_06f718b0 (RET 4): StateMachineGroup(InRouter), both id vectors empty.
+    // FUN_06f718b0.
     explicit FRmMachineGroup(IMessageRouter* InRouter);
     // FUN_06f71920: every id of Machines, then of StateMachines, goes to
     // remove_state_machine(unsigned) (front first); then ~StateMachineGroup.
     ~FRmMachineGroup() override;
 
-    // FUN_06f71bd0 (RET 4): add_state_machine(Machine), then its handler id (+0x10 get_id)
-    // appended to StateMachines.
+    // FUN_06f71bd0: add_state_machine(Machine), then its handler id appended to StateMachines.
     void AddStateMachine(StateMachineMessageHandler* Machine);
-    // FUN_06f71da0 (RET 4): the same into Machines.
+    // FUN_06f71da0: the same into Machines.
     void AddMachine(StateMachineMessageHandler* Machine);
-    // FUN_06f71af0 (RET 4): remove_state_machine(Id); then Id is removed from StateMachines,
-    // or, when it is not there, from Machines (std::remove + erase, FUN_06f71f70).
+    // FUN_06f71af0: remove_state_machine(Id); then Id is removed from StateMachines, or, when
+    // it is not there, from Machines (FUN_06f71f70).
     void RemoveMachine(unsigned int Id);
 
 protected:
@@ -221,8 +214,8 @@ protected:
 // StateMachineMessage::operator new), the exported copy ctor and the +0x1c copy.
 // ---------------------------------------------------------------------------------------
 
-// Vtable 06fbc81c: ctor FUN_06f86d90 (RET 4), clone FUN_06f86de0. Sent by a runtime machine
-// when it fails; DestroyMission keeps the reason (06eefe9a) for slot 35.
+// Vtable 06fbc81c: ctor FUN_06f86d90, clone FUN_06f86de0. Sent by a runtime machine when it
+// fails; DestroyMission keeps the reason for slot 35.
 class FRmMachineFailedMessage : public StateMachineMessage
 {
 public:
@@ -232,8 +225,8 @@ public:
     int Reason;                                     // +0x1c
 };
 
-// Vtable 06fbc824: ctor FUN_06f86e40 (RET 4), clone FUN_06f86e70. DestroyMission sends it to
-// every running machine on controller message 9 (06eef9d0-06eefa13).
+// Vtable 06fbc824: ctor FUN_06f86e40, clone FUN_06f86e70. DestroyMission sends it to every
+// running machine on controller message 9.
 class FRmPlayerLeftMessage : public StateMachineMessage
 {
 public:
@@ -261,7 +254,7 @@ struct FRmParamText
     FRmParamText();
     virtual ~FRmParamText();                                  // FUN_06f85550
     virtual void Parse(INI_Reader* Reader, unsigned int Index); // FUN_06f84540
-    // Slot 2, LAB_06f84740 (RET 4): builds Text once (mad lib StrId, Source slot 0 per
+    // Slot 2, LAB_06f84740: builds Text once (mad lib StrId, Source slot 0 per
     // parameter) and returns &Text.
     virtual FmtStr* Build(IRmTextParamSource* Source);
     virtual bool IsEmpty() const;                             // LAB_06f85430
@@ -281,23 +274,21 @@ class FRmRuntimeMachine;            // RandomMissionMachine.h
 class FRmObjective : public FRmParamText
 {
 public:
-    // The base part of the derived ctors (FUN_06f90a50 06f90a72-06f90acd, FUN_06f855f0
-    // 06f8560c-06f85642): the text empty, +0x30 = 0x3a, the rest 0.
+    // The base part of the derived ctors (inlined in FUN_06f90a50 and FUN_06f855f0).
     FRmObjective() = default;
 
-    // Slot 4, FUN_06f85440: new 0x48 member copy (FmtStr copy ctor, the parameter vector,
-    // +0x30..+0x44), vtable 06fbc6d8; null when new fails.
+    // Slot 4, FUN_06f85440: new 0x48 member copy; null when new fails.
     virtual FRmObjective* Clone() const;
     // Slot 5, LAB_06ee9e10 (ICF): 1.
     virtual int GetType() const;
-    // Slot 6, LAB_06f85590 (RET 8): a type 7 mission objective (CreateMissionObjective with
-    // Mission) whose Type is ObjectiveType and whose text is slot 2 built with Machine's
-    // text-parameter source (+0x54; null without a machine); bHidden 0.
+    // Slot 6, LAB_06f85590: a type 7 mission objective whose Type is ObjectiveType and whose
+    // text is slot 2 built with Machine's text-parameter source (+0x54; null without a
+    // machine).
     virtual FMissionObjective* CreateMissionObjective(FMissionObject* InMission,
                                                       FRmRuntimeMachine* Machine);
-    // Slot 7, LAB_06ea1470 (ICF: XOR AL,AL; RET 4): no position.
+    // Slot 7, LAB_06ea1470 (ICF): no position.
     virtual bool GetPosition(Vector* Out);
-    // Slot 8, LAB_06f85580 (RET 0xc): nothing.
+    // Slot 8, LAB_06f85580: nothing.
     virtual void SetPosition(Vector InPosition);
     // Slot 9, LAB_06ea1470 (ICF): no system.
     virtual bool GetSystemId(unsigned int* Out);
@@ -320,24 +311,23 @@ class FRmObjectiveType2 : public FRmObjective
 public:
     // FUN_06f90a50: the FRmObjective defaults, vtable 06fbc710.
     FRmObjectiveType2() = default;
-    // FUN_06f855f0 (RET 4): the defaults, then StrId and Params of Source (the vector
-    // assigned unless it is the same object).
+    // FUN_06f855f0: the defaults, then StrId and Params of Source.
     explicit FRmObjectiveType2(FRmParamText const* Source);
 
-    // Slot 2, LAB_06f860a0 (RET 4): FRmParamText::Build, and when the text was rebuilt the
-    // marker appended (FmtStr::append_nav_marker) after end_mad_lib.
+    // Slot 2, LAB_06f860a0: FRmParamText::Build, and when the text was rebuilt the marker
+    // appended after end_mad_lib.
     FmtStr* Build(IRmTextParamSource* Source) override;
     // Slot 4, FUN_06f85790: new 0x5c member copy.
     FRmObjective* Clone() const override;
     // Slot 5, LAB_06ee9660 (ICF): 2.
     int GetType() const override;
-    // Slot 7, LAB_06f86060 (RET 4): *Out = MarkerPosition; true.
+    // Slot 7, LAB_06f86060.
     bool GetPosition(Vector* Out) override;
-    // Slot 8, LAB_06f86080 (RET 0xc): MarkerPosition = InPosition.
+    // Slot 8, LAB_06f86080.
     void SetPosition(Vector InPosition) override;
-    // Slot 9, LAB_06f858b0 (RET 4): *Out = MarkerSystemId; true.
+    // Slot 9, LAB_06f858b0.
     bool GetSystemId(unsigned int* Out) override;
-    // Slot 10, LAB_06f86030 (RET 0x14): the three marker fields.
+    // Slot 10, LAB_06f86030: the three marker fields.
     virtual void SetMarker(unsigned int InSystemId, int InValue, Vector InPosition);
 
     // +0x48..+0x5b: not written by the ctors (heap garbage in retail); the port starts at 0.
@@ -356,11 +346,9 @@ class FRmRecordList;                // RandomMissionMachine.h
 class FRmObjectiveType3 : public FRmObjectiveType2
 {
 public:
-    // FUN_06f858c0 (RET 4): as FRmObjectiveType2's, the id vector empty; +0x6c not written
-    // (the port starts it null).
+    // FUN_06f858c0: as FRmObjectiveType2's; +0x6c not written (the port starts it null).
     explicit FRmObjectiveType3(FRmParamText const* Source);
-    // FUN_06f85f60: every id unmarked (pub::Player::MarkObj 0) for every player of Players,
-    // then the members and the base.
+    // FUN_06f85f60: every id unmarked for every player of Players.
     ~FRmObjectiveType3() override;
 
     // Slot 2 of 06fbc73c is FRmParamText's LAB_06f84740 (no nav marker), not
@@ -373,13 +361,12 @@ public:
     FRmObjective* Clone() const override;
     // Slot 5, LAB_06f5e540 (ICF): 3.
     int GetType() const override;
-    // Slot 11, LAB_06f85d90 (RET 0x18): the marker (value 0), InPlayers kept, the text reset;
-    // the old ids unmarked for InPlayers, Ids = *InIds (unless the same vector), the new ids
-    // marked (MarkObj 1).
+    // Slot 11, LAB_06f85d90: the marker (value 0), InPlayers kept, the text reset; the old
+    // ids unmarked for InPlayers, the new ids marked.
     virtual void SetTargets(std::vector<unsigned int> const* InIds,
                             std::vector<FContentPlayerState*>* InPlayers, unsigned int InSystemId,
                             Vector InPosition);
-    // Slot 12, LAB_06f85c40 (RET 0x1c): slot 11 with the ids of Records' records that are
+    // Slot 12, LAB_06f85c40: slot 11 with the ids of Records' records that are
     // alive (State 2) and have a bit of Mask in Flags.
     virtual void SetTargetRecords(FRmRecordList* Records,
                                   std::vector<FContentPlayerState*>* InPlayers,
@@ -392,9 +379,9 @@ public:
 
 // ---------------------------------------------------------------------------------------
 // TU61 -- countdown objective (retail 0x60 bytes, vtable 06fbc770, 12 slots; GetType 4): the
-// "return to the combat area" timer of the vignette machine (FUN_06f8c460 06f8cd07-06f8cd33:
-// operator new(0x60), FUN_06f90a50, the 06fbc770 store, +0x30 = 0xda). No ctor or dtor of its
-// own: slot 0 is FRmParamText's deleting dtor FUN_06f86100.
+// "return to the combat area" timer of the vignette machine (built inline in FUN_06f8c460:
+// operator new(0x60), FUN_06f90a50, ObjectiveType 0xda). No ctor or dtor of its own: slot 0
+// is FRmParamText's deleting dtor FUN_06f86100.
 // ---------------------------------------------------------------------------------------
 class FRmObjectiveType4 : public FRmObjectiveType2
 {
@@ -405,17 +392,15 @@ public:
     {
         return FRmObjective::Clone();
     }
-    // Slot 2, LAB_06f86230 (RET 4): built once -- the mad lib of StrId and the parameters,
-    // end_mad_lib, the marker (append_nav_marker of +0x48) only when the position is away from
-    // the origin, then append_int(Seconds).
+    // Slot 2, LAB_06f86230: built once; the marker only when the position is away from the
+    // origin, then append_int(Seconds).
     FmtStr* Build(IRmTextParamSource* Source) override;
     // Slot 5, LAB_06f25080 (ICF): 4.
     int GetType() const override;
-    // Slot 7, LAB_06f861c0 (RET 4): the marker position, only when it is away from the origin.
+    // Slot 7, LAB_06f861c0: the marker position, only when it is away from the origin.
     bool GetPosition(Vector* Out) override;
-    // Slot 11, LAB_06f86120 (RET 0x18): the text reset (FmtStr::destroy, six dwords zeroed);
-    // the marker (InSystemId, InValue, InPosition) only for a position away from the origin;
-    // Seconds always.
+    // Slot 11, LAB_06f86120: the text reset; the marker only for a position away from the
+    // origin; Seconds always.
     virtual void SetCountdown(int InSeconds, unsigned int InSystemId, int InValue,
                               Vector InPosition);
 

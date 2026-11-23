@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// HUD_Waypoint -- see hud_waypoint.h for the class, its vftables and the named gaps.
+// HUD_Waypoint -- see hud_waypoint.h for the class and its vftables.
 
 #include "Space/HUD/hud_waypoint.h"
 
@@ -76,9 +76,8 @@ namespace
         return static_cast<FClientGameobj*>(static_cast<IObjInspectImpl*>(Obj));
     }
 
-    // The release sequence the listing inlines (0x004f3f7a..0x004f3fb1, 0x004f40b2..0x004f40e9,
-    // 0x004f4445..0x004f4473): with a watched waypoint, its slot 87 (+0x15c) with 1, then the
-    // watcher dropped.
+    // The release sequence retail inlines three times: with a watched waypoint, its slot 87
+    // (MarkForRemoval) with 1, then the watcher dropped.
     void ReleaseWaypointObject(BaseWatcher& Watcher)
     {
         IObjRW* const Obj = WatchedObjRw(Watcher);
@@ -88,8 +87,7 @@ namespace
         Watcher.set(nullptr);
     }
 
-    // Command 0x1c (target) on object ObjectId: a zeroed 0x28-byte record, +0x00 = 0x1c,
-    // +0x10 = the id, +0x14 = SUBOBJ_ID_NONE, +0x26 = 1, through FUN_0054bcb0.
+    // Command 0x1c (target) on object ObjectId, through FUN_0054bcb0.
     void SendTargetCommand(unsigned ObjectId)
     {
         FSpaceCommand Command = {};
@@ -100,8 +98,7 @@ namespace
         SpaceSendCommand(&Command);
     }
 
-    // The FPU distance the listing builds from two positions: the three differences A - B,
-    // then sqrt(dz*dz + dy*dy + dx*dx) in that order.
+    // Retail's summation order: sqrt(dz*dz + dy*dy + dx*dx).
     double Distance(Vector const& A, Vector const& B)
     {
         double const Dx = static_cast<double>(A.x) - static_cast<double>(B.x);
@@ -110,8 +107,7 @@ namespace
         return sqrt(Dz * Dz + Dy * Dy + Dx * Dx);
     }
 
-    // The same distance when the listing loads z first (SetWaypoint 0x004f480c..0x004f482c):
-    // sqrt(dx*dx + dy*dy + dz*dz).
+    // SetWaypoint's summation order: sqrt(dx*dx + dy*dy + dz*dz).
     double DistanceXFirst(Vector const& A, Vector const& B)
     {
         double const Dx = static_cast<double>(A.x) - static_cast<double>(B.x);
@@ -137,13 +133,9 @@ HUD_Waypoint::HUD_Waypoint(INI_Reader& /*Reader*/)
     , Field388(0)
     , bActive(0)
 {
-    // FUN_004f3af0: HUDItem inlined (0x004f3b0f..0x004f3b40), WinControl FUN_0059f860
-    // (0x004f3b50), the +0x364 watcher zeroed, the two vptrs, DAT_00674bc8 = this (0x004f3b91),
-    // HUDItem's name "Waypoint", then Create's body inlined (SetOffset slot 31, SetPosition slot
-    // 5 with +0x60, Win3D::Create FUN_004b5060(0, 0) called directly, 0x004f3bb8..0x004f3c09),
-    // +0x36c / +0x370 = 0, the Win3D name "HUD_Waypoint", +0x36c = +0x384 = -1, the class name,
-    // +0x374 = 0, +0x37c = 1.0f, +0x380 = 0, +0x388 = 0, +0x38c = 0 (0x004f3c18..0x004f3c94).
-    // +0x378 is not written (operator_new memory); the port starts it at 0.
+    // FUN_004f3af0: Create's body is inlined here (Win3D::Create called directly);
+    // SpawnCounter is written twice, as in retail. Index (+0x378) is not written in retail
+    // (operator new memory); the port starts it at 0.
     G_HudWaypoint = this;
     HUDItem::Name = "Waypoint";
     SetOffset(0.0f, 0.0f, -1.0f);
@@ -159,32 +151,31 @@ HUD_Waypoint::HUD_Waypoint(INI_Reader& /*Reader*/)
 
 HUD_Waypoint::~HUD_Waypoint()
 {
-    // FUN_004f3cd0: the vptrs, DAT_00674bc8 = 0 (0x004f3d16), the +0x364 watcher cleared,
-    // ~WinControl FUN_0059fa50, HUDItem's vptr and watcher -- the member and base destructors.
+    // FUN_004f3cd0: then the member and base destructors.
     G_HudWaypoint = nullptr;
 }
 
 bool HUD_Waypoint::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004f3d70 (this = the WinControl face).
-    SetOffset(0.0f, 0.0f, -1.0f);   // slot 31 (+0x7c)
-    SetPosition(Position);          // slot 5 (+0x14)
+    SetOffset(0.0f, 0.0f, -1.0f);
+    SetPosition(Position);
     return Win3D::Create(NewParent, Data);
 }
 
 void HUD_Waypoint::Update()
 {
     // LAB_004f4c50 (this = the WinControl face).
-    if (GetClientMouseCursorDrawFlag() != 0                // FUN_0041dd90
-        && GetGameOption(kGameOptInterfaceGroup) != 0      // FUN_005792b0(6)
-        && GetGameOption(kGameOptHud) != 0                 // FUN_005792b0(0xa)
-        && GetPlayerObjRW() != nullptr)                    // FUN_0054baf0
+    if (GetClientMouseCursorDrawFlag() != 0
+        && GetGameOption(kGameOptInterfaceGroup) != 0
+        && GetGameOption(kGameOptHud) != 0
+        && GetPlayerObjRW() != nullptr)
     {
-        SetHiddenWithChildren(false);                      // FUN_005a0c30(0)
-        Win3D::Update();                                   // tail jump FUN_005a17b0
+        SetHiddenWithChildren(false);
+        Win3D::Update();
         return;
     }
-    SetHiddenWithChildren(true);                           // FUN_005a0c30(1)
+    SetHiddenWithChildren(true);
 }
 
 void HUD_Waypoint::UpdateInactive()
@@ -192,29 +183,29 @@ void HUD_Waypoint::UpdateInactive()
     // FUN_004d6140 (this = the WinControl face; the body HUD_CruiseProgress shares).
     if (GetClientMouseCursorDrawFlag() != 0 && GetPlayerObjRW() != nullptr)
     {
-        SetHiddenWithChildren(false);             // FUN_005a0c30(0)
+        SetHiddenWithChildren(false);
     }
     Win3D::UpdateInactive();
 }
 
 void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
 {
-    // LAB_004f3de0 (RET 8).
+    // LAB_004f3de0.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player == nullptr)
         return;
-    Scale = 1.0f;                                                   // 0x004f3dfe
+    Scale = 1.0f;
 
     if (WatchedObjRw(Waypoint) != nullptr && bActive != 0)
     {
-        // 0x004f3e2f..0x004f3e6b: the player must still target the waypoint Solar.
+        // The player must still target the waypoint Solar.
         IObjRW* Target = nullptr;
-        Player->get_target(Target);                                 // slot 29 (+0x74)
+        Player->get_target(Target);
         if (Target == nullptr)
         {
-            bActive = 0;                                            // 0x004f4120
+            bActive = 0;
         }
-        else if (Target->get_id() != WatchedObjRw(Waypoint)->get_id()) // slot 8 (+0x20) both
+        else if (Target->get_id() != WatchedObjRw(Waypoint)->get_id())
         {
             bActive = 0;
         }
@@ -223,11 +214,11 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             bool bFound = false;
             if (bUser != 0)
             {
-                // 0x004f3e7b..0x004f3ead: the entry with our id is still in the player's list.
-                int const Count = GetPlayerWaypointCountRetail();   // FUN_004c4690
+                // The entry with our id is still in the player's list.
+                int const Count = GetPlayerWaypointCountRetail();
                 for (int i = 0; i < Count; ++i)
                 {
-                    if (GetPlayerWaypointRetail(i)->AutoId == Id)   // FUN_004c46a0, no null test
+                    if (GetPlayerWaypointRetail(i)->AutoId == Id)   // no null test
                     {
                         bFound = true;
                         break;
@@ -236,21 +227,21 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             }
             else
             {
-                // 0x004f3eb4..0x004f3f74: a best-path record in the player's system lies within
-                // 4 m (squared 16) of the waypoint Solar.
-                int const Count = BestPathGetWaypointCount();       // FUN_004c4fb0
-                Vector const WaypointPos = WatchedObjRw(Waypoint)->get_position(); // slot 0
+                // A best-path record in the player's system lies within 4 m (squared 16) of the
+                // waypoint Solar.
+                int const Count = BestPathGetWaypointCount();
+                Vector const WaypointPos = WatchedObjRw(Waypoint)->get_position();
                 for (int i = 0; i < Count; ++i)
                 {
-                    FBestPathWaypoint* const Record = BestPathGetWaypoint(i); // FUN_004c4ff0
+                    FBestPathWaypoint* const Record = BestPathGetWaypoint(i);
                     Vector RecordPos;
                     unsigned RecordSystem = 0;
                     if (!BestPathWaypointResolvePosition(Record, &RecordPos, &RecordSystem))
-                        continue;                                   // FUN_004c52d0
-                    if (GetPlayerStarSystemIdRetail() != RecordSystem) // FUN_004c4830
                         continue;
-                    // FUN_00422b80(Pos - WaypointPos), then dy^2 + dz^2 + dx^2 against 16
-                    // (TEST AH,5 / JNP: strictly below).
+                    if (GetPlayerStarSystemIdRetail() != RecordSystem)
+                        continue;
+                    // Float differences (FUN_00422b80), then dy^2 + dz^2 + dx^2 strictly below
+                    // 16.
                     float const Dx = RecordPos.x - WaypointPos.x;
                     float const Dy = RecordPos.y - WaypointPos.y;
                     float const Dz = RecordPos.z - WaypointPos.z;
@@ -266,17 +257,16 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
 
             if (!bFound)
             {
-                // 0x004f3f7a..0x004f3fd6: drop the waypoint; a best-path one moves on to the
-                // route's first point.
+                // Drop the waypoint; a best-path one moves on to the route's first point.
                 ReleaseWaypointObject(Waypoint);
                 if (bUser != 0)
                     return;
-                HudWaypointSelectBestPath(0);                       // FUN_004cef30(0)
+                HudWaypointSelectBestPath(0);
                 return;
             }
 
-            // 0x004f3fdd..0x004f4044: the distance from the waypoint to the player sets the
-            // scale -- 0 inside 15 m (TEST AH,5 / JP keeps >= or NaN), dist * 0.01 below 100 m.
+            // The distance from the waypoint to the player sets the scale -- 0 inside 15 m,
+            // dist * 0.01 below 100 m (NaN keeps 1).
             double const Dist = Distance(Player->get_position(), Target->get_position());
             if (Dist < kScaleZeroDistance)
             {
@@ -287,22 +277,21 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                 Scale = static_cast<float>(static_cast<double>(kScalePerMeter) * Dist);
             }
 
-            // 0x004f404a..0x004f411b: first time within 150 m -- reached.
+            // First time within 150 m -- reached.
             if (bReached == 0 && Dist < kReachedDistance)
             {
                 bReached = 1;
                 QueueWaypointVoice(G_VoiceObjectiveReached);
                 if (bUser != 0)
                 {
-                    // 0x004f408f..0x004f40b0: Index + 1 removals of entry Index, i.e. this entry
-                    // and every one before it.
+                    // Index + 1 removals of entry Index, i.e. this entry and every one before it.
                     if (Index >= 0)
                     {
                         for (int Left = Index + 1; Left != 0; --Left)
-                            RemovePlayerWaypointRetail(Index);      // FUN_004c46e0
+                            RemovePlayerWaypointRetail(Index);
                     }
                     ReleaseWaypointObject(Waypoint);
-                    // 0x004f40ef..0x004f4116: the entry now at Index becomes the waypoint.
+                    // The entry now at Index becomes the waypoint.
                     FPlayerWaypointRecord* const Next = GetPlayerWaypointRetail(Index);
                     if (Next != nullptr)
                         SetWaypoint(&Next->Pos, true, Index, Next->AutoId);
@@ -312,8 +301,8 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     }
     else
     {
-        // 0x004f412c..0x004f41bc: no live waypoint -- the first player waypoint within 300 m
-        // counts as reached, and it and every entry before it are removed.
+        // No live waypoint -- the first player waypoint within 300 m counts as reached, and it
+        // and every entry before it are removed.
         int const Count = GetPlayerWaypointCountRetail();
         for (int i = 0; i < Count; ++i)
         {
@@ -330,11 +319,11 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         }
     }
 
-    // 0x004f41c0..0x004f428b: spin the waypoint Solar about its Y axis.
+    // Spin the waypoint Solar about its Y axis.
     if (WatchedObjRw(Waypoint) == nullptr)
         return;
-    // FLD Dt, FMUL 250.0f, FADD +0x370, FST +0x370 (the sum stays unrounded on the stack),
-    // FMUL pi / 180, FST a float copy; FCOS runs on the unrounded angle, FSIN on the float copy.
+    // The sum stays unrounded for the radians; the cosine takes the unrounded angle, the sine
+    // the angle rounded to float.
     double const Sum = static_cast<double>(DeltaSeconds) * kSpinDegPerSecond +
                        static_cast<double>(SpinAngle);
     SpinAngle = static_cast<float>(Sum);
@@ -343,11 +332,10 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     float const Cos = static_cast<float>(cos(Radians));
     float const Sin = static_cast<float>(sin(static_cast<double>(RadiansF)));
     float Rotation[9] = {Cos, 0.0f, Sin, 0.0f, 1.0f, 0.0f, -Sin, 0.0f, Cos};
-    HudMatrixRotateRows12(Rotation, 0.0f);                          // FUN_004c8b80(0)
-    HudMatrixRotateRows01(Rotation, 0.0f);                          // FUN_004c8bc0(0)
+    HudMatrixRotateRows12(Rotation, 0.0f);
+    HudMatrixRotateRows01(Rotation, 0.0f);
 
-    // 0x004f4259..0x004f428b: into the CObject's orientation (+0x08) when it is a CSimple
-    // ((class & 3) == 3).
+    // Into the CObject's orientation when it is a CSimple.
     IObjRW* const Obj = WatchedObjRw(Waypoint);
     if (Obj == nullptr)
         return;
@@ -361,10 +349,10 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
 
 void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, int NewId)
 {
-    // FUN_004f42e0 (RET 0x10).
+    // FUN_004f42e0.
     //
-    // 0x004f4300..0x004f4440: the same entry, and its Solar within 2 m on every axis (FABS,
-    // TEST AH,5 / JP: below 2.0 only) -- just target it again.
+    // The same entry, and its Solar strictly within 2 m on every axis -- just target it again.
+    // dx stays unrounded, dy / dz are rounded to float.
     IObjRW* const Current = WatchedObjRw(Waypoint);
     if (Current != nullptr && static_cast<unsigned char>(bNewUser) == bUser && NewIndex == Index &&
         NewId == Id)
@@ -382,23 +370,22 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
         }
     }
 
-    // 0x004f4445..0x004f4498: drop the old Solar, remember the entry.
+    // Drop the old Solar, remember the entry.
     ReleaseWaypointObject(Waypoint);
     bUser = static_cast<unsigned char>(bNewUser);
     Index = NewIndex;
     Id = NewId;
 
-    // 0x004f4487..0x004f44cc: the "waypoint" solar archetype, loaded, and its companion's
-    // Load(0). Retail tests neither for null.
+    // The "waypoint" solar archetype, loaded, and its companion's Load(0). Retail tests
+    // neither for null.
     ID_String ArchName;
     ArchName.Id = CreateID("waypoint");
     Archetype::Solar* const Arch = Archetype::GetSolar(Archetype::GetSolarID(ArchName));
-    Arch->load();                                                   // Root slot 3 (+0x0c)
-    Arch->Companion->Load(0);                                       // ICliObj slot 8 (+0x20)
+    Arch->load();
+    Arch->Companion->Load(0);
 
-    // 0x004f44cf..0x004f4557: CSolar::CreateParms on the stack. FUN_004f4930 (0x004f44d3) is
-    // the CEqObj::CreateParms default constructor (EqObjCreateParmsDefaults). Then the CSolar
-    // part: ID_String::clear on +0xb8 / +0xc0 / +0xcc and zeros through +0xe0, and the anim list.
+    // CSolar::CreateParms on the stack: the CEqObj part through FUN_004f4930, then the CSolar
+    // part cleared.
     CSolar::CreateParms Parms;
     EqObjCreateParmsDefaults(Parms);
     Parms.NicknameSrc.clear();
@@ -414,12 +401,11 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Parms.AtmosphereRange = 0.0f;
     Parms.DockWithBaseId = 0;
 
-    // 0x004f456a..0x004f45e1: nickname "waypoint_target<old counter>", the counter incremented;
-    // the id goes into Id, the nickname and the reputation group, which gets an entry and
-    // affiliation -1.
+    // Nickname "waypoint_target<old counter>", the counter incremented; the id goes into Id,
+    // the nickname and the reputation group, which gets an entry and affiliation -1.
     char Nickname[0x80];
     int const Suffix = SpawnCounter;
-    // 004f4570..004f4577: PTR_DAT_00613ed0 -> CreateParms+0x04 before CSolar::init.
+    // PTR_DAT_00613ed0 -> CreateParms+0x04.
     Parms.ObjDb = GetClientObjDb();
     SpawnCounter = Suffix + 1;
     sprintf(Nickname, "waypoint_target%d", Suffix);
@@ -431,8 +417,7 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Reputation::Vibe::Alloc(RepGroup);
     Reputation::Vibe::SetAffiliation(RepGroup, 0xffffffffu, false);
 
-    // 0x004f45e4..0x004f46a7: the name is mad-lib ids 0x442 with no values, the second name
-    // empty; no infocard.
+    // The name is mad-lib ids 0x442 with no values, the second name empty; no infocard.
     FmtStr Name;
     FmtStr Name2;
     Name.begin_mad_lib(0x442);
@@ -440,12 +425,10 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Reputation::Vibe::SetName(RepGroup, Name, Name2, nullptr);
     Reputation::Vibe::SetInfocard(RepGroup, 0);
 
-    // 0x004f46ad..0x004f46cf
     Parms.Pos = *Pos;
 
-    // 0x004f46bc..0x004f4757: a client Solar (FUN_005475b0), slot 90 create, CSolar::init on its
-    // CObject when that is an EqObj ((class & 0x303) == 0x303; retail calls init on whatever
-    // that yields), slot 92, FUN_00540c30(Solar, 0).
+    // A client Solar (FUN_005475b0), created, CSolar::init on its CObject when that is a solar
+    // (retail calls init on whatever that yields, null included), then registered.
     FClientSolarGameobj* const Solar = new FClientSolarGameobj();
     Solar->create(Arch);
     CObject* const SolarObject = static_cast<CBase*>(Solar)->Object;
@@ -456,20 +439,17 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Solar->PostCreateInit();
     ClientObjDb_RegisterGameobj(Solar, false);
 
-    // 0x004f475a..0x004f4767
     Arch->Release();
     SolarCObject->enable_collisions_r(false);
 
-    // 0x004f476d..0x004f47b6: target it.
     SendTargetCommand(Solar->get_id());
 
-    // 0x004f47bb..0x004f47e1: watch it; live, not reached yet.
+    // Watch it; live, not reached yet.
     Waypoint.set(static_cast<Watchable const*>(static_cast<IObjRW*>(Solar)));
     bActive = 1;
     bReached = 0;
 
-    // 0x004f47e7..0x004f4841: already within 100 m (TEST AH,0x41 / JP: at most 100) counts as
-    // reached.
+    // Already within 100 m (at most 100) counts as reached.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player != nullptr)
     {
@@ -477,12 +457,11 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
         if (DistanceXFirst(Player->get_position(), WaypointPos) <= kScaleFullDistance)
             bReached = 1;
     }
-    // 0x004f4848..0x004f490c: the two FmtStr and the CreateParms die here.
 }
 
 bool HUD_Waypoint::GetWaypointEntry(unsigned char* OutUser, int* OutIndex)
 {
-    // FUN_004f42a0 (RET 8).
+    // FUN_004f42a0.
     if (WatchedObjRw(Waypoint) == nullptr || bActive == 0)
         return false;
     *OutUser = bUser;
@@ -492,8 +471,7 @@ bool HUD_Waypoint::GetWaypointEntry(unsigned char* OutUser, int* OutIndex)
 
 bool HUD_Waypoint::IsWaypointAt(Vector const* Pos)
 {
-    // FUN_004f4b90 (RET 4): as SetWaypoint's same-spot test -- dx kept unrounded, dy / dz
-    // stored as floats, each FABS below 2.0.
+    // FUN_004f4b90: SetWaypoint's same-spot test.
     if (WatchedObjRw(Waypoint) == nullptr || bActive == 0)
         return false;
     Vector const WaypointPos = WatchedObjRw(Waypoint)->get_position();
@@ -539,20 +517,19 @@ void HudWaypointOnPlayerWaypointsCleared()
         return;
     if (G_HudWaypoint->bActive == 0)
         return;
-    // 0x004f4d03..0x004f4d1b: the IObjAffect face (+4), slot 18 (+0x48).
     static_cast<IObjAffect*>(Player)->set_target(nullptr, SUBOBJ_ID_NONE,
                                                  static_cast<int>(GetPlayerConnectionId()));
 }
 
 int HudWaypointGetObjectCount()
 {
-    // FUN_004c83c0: MOV ECX,[DAT_00674bc8] / CALL FUN_004f4cb0 / NEG / SBB / NEG.
+    // FUN_004c83c0 (no null test of DAT_00674bc8).
     return G_HudWaypoint->GetWaypointObject() != nullptr ? 1 : 0;
 }
 
 IObjRW* HudWaypointGetObject(int ObjectIndex)
 {
-    // FUN_004c83e0: a non-zero index gives 0; 0 tail-jumps to FUN_004f4cb0.
+    // FUN_004c83e0.
     if (ObjectIndex != 0)
         return nullptr;
     return G_HudWaypoint->GetWaypointObject();
@@ -560,8 +537,8 @@ IObjRW* HudWaypointGetObject(int ObjectIndex)
 
 void EqObjCreateParmsDefaults(CEqObj::CreateParms& Parms)
 {
-    // FUN_004f4930, in the listing's store order.
-    Parms.HitPts = -1.0f;                                           // +0xc 0xbf800000
+    // FUN_004f4930, in retail's store order.
+    Parms.HitPts = -1.0f;                                           // +0xc
     Parms.Id = 0;                                                   // +0x0
     Parms.ObjDb = nullptr;                                          // +0x4
     Parms.OwnerPlayer = 0;                                          // +0x8
@@ -584,58 +561,53 @@ void EqObjCreateParmsDefaults(CEqObj::CreateParms& Parms)
     Parms.SpaceCostume.PartIds[3] = 0;
     Parms.SpaceCostume.AccessoryCount = 0;                          // +0x94
     Parms.VoiceId = 0;                                              // +0x98
-    // +0x9c..+0xa8 (allocator byte, three null pointers) and +0xac..+0xb4 (allocator byte,
-    // operator new(0x10) head linked to itself, size 0): Equipment and ArchGroupDescs, which
-    // their std constructors already left empty. +0x74..+0x90 (AccessoryIds) are not written.
+    // Equipment (+0x9c) and ArchGroupDescs (+0xac) are already empty from their std
+    // constructors. +0x74..+0x90 (AccessoryIds) are not written.
 }
 
 void HudWaypointSelectBestPath(int PointIndex)
 {
     // FUN_004cef30 (cdecl).
-    if (PointIndex >= BestPathGetWaypointCount())                  // FUN_004c4fb0, signed
+    if (PointIndex >= BestPathGetWaypointCount())                  // signed
         return;
-    FBestPathWaypoint* const Record = BestPathGetWaypoint(PointIndex); // FUN_004c4ff0
+    FBestPathWaypoint* const Record = BestPathGetWaypoint(PointIndex);
 
-    // 0x004cef53..0x004cef94: a record that names an object -- target it.
-    IObjRW* const Obj = BestPathWaypointResolveObject(Record);     // FUN_004c5110
+    // A record that names an object -- target it.
+    IObjRW* const Obj = BestPathWaypointResolveObject(Record);
     if (Obj != nullptr)
     {
         SendTargetCommand(Obj->get_id());
         return;
     }
 
-    // 0x004cefa2..0x004cefc6: otherwise its position becomes the waypoint (the system is not
-    // read; DAT_00674bc8 is not tested).
+    // Otherwise its position becomes the waypoint (the system is not read; DAT_00674bc8 is not
+    // tested).
     Vector Pos;
     unsigned System = 0;
-    if (BestPathWaypointResolvePosition(Record, &Pos, &System))    // FUN_004c52d0
+    if (BestPathWaypointResolvePosition(Record, &Pos, &System))
         G_HudWaypoint->SetWaypoint(&Pos, false, PointIndex, PointIndex);
 }
 
 void HudWaypointSelectPlayerWaypoint(int Index)
 {
     // FUN_004ceeb0 (cdecl).
-    if (Index >= GetPlayerWaypointCountRetail())                   // FUN_004c4690, signed
+    if (Index >= GetPlayerWaypointCountRetail())                   // signed
         return;
-    FPlayerWaypointRecord* const Record = GetPlayerWaypointRetail(Index); // FUN_004c46a0
+    FPlayerWaypointRecord* const Record = GetPlayerWaypointRetail(Index);
 
-    // 0x004ceec7..0x004cef0e: a waypoint on an object -- target it.
+    // A waypoint on an object -- target it.
     if (Record->ObjectId != 0)
     {
         SendTargetCommand(Record->ObjectId);
         return;
     }
 
-    // 0x004cef0f..0x004cef1d: otherwise its position becomes the waypoint (DAT_00674bc8 is not
-    // tested).
+    // Otherwise its position becomes the waypoint (DAT_00674bc8 is not tested).
     G_HudWaypoint->SetWaypoint(&Record->Pos, true, Index, Record->AutoId);
 }
 
 namespace
 {
-    // The static HUDFACTORY<HUD_Waypoint> DAT_00674b88: XC entry LAB_004f3ac0 runs the ctor
-    // FUN_004f4d30 ("Waypoint", appended to the factory chain by FUN_004c72b0) and registers
-    // LAB_004f3ae0 with atexit (-> FUN_004cf010, the unlink). Its Create FUN_004f4da0 is
-    // operator new(0x390) + FUN_004f3af0, null when the allocation fails.
+    // DAT_00674b88; see the header for the factory's retail functions.
     HUDFACTORY<HUD_Waypoint> G_HudWaypointFactory("Waypoint");
 }

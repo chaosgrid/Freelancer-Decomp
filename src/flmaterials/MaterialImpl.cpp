@@ -164,10 +164,10 @@ namespace
     // Colorize declared property descriptor; some fields are type-dependent.
     struct FFlmMaterialParamDesc
     {
-        unsigned long Path; // see comment above -- EntryFlags for indices 8/9, else 0
+        unsigned long Path; // EntryFlags for the U/V address-mode entries, else 0
         const char* ShortTag;
         const char* Name;
-        const char* Metadata; // "" for entries 0-9 (ESI = 067016d4), "flcopt" for entry 10
+        const char* Metadata; // "" (067016d4), or "flcopt" for Colorize Options
         unsigned long Type0;
         unsigned long Value0[4];
         unsigned long Type1;
@@ -307,41 +307,32 @@ namespace
     {
         const unsigned long kF0 = 0x00000000ul; // 0.0f
         const unsigned long kF1 = 0x3f800000ul; // 1.0f
+        // Type 7 is a string, 8 a wrap nibble, 9 a packed address-mode field whose Path
+        // holds the EntryFlags (0x20000 U, 0x40000 V). Entries 9 and 10 are built by
+        // FUN_066f3de0.
         static const FFlmMaterialParamDesc kParams[11] = {
-            // 0: Ambient Color / Ac / type4
             {0, "Ac", "Ambient Color", "",
              4, {kF1, kF1, kF1, kF1}, 4, {kF0, kF0, kF0, kF0}, 4, {kF1, kF1, kF1, kF1}},
-            // 1: Diffuse Color / Dc / type3
             {0, "Dc", "Diffuse Color", "",
              3, {kF1, kF1, kF1, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
-            // 2: Emissive Color / Ec / type3
             {0, "Ec", "Emissive Color", "",
              3, {kF0, kF0, kF0, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
-            // 3: Specular Color / Sc / type3
             {0, "Sc", "Specular Color", "",
              3, {kF0, kF0, kF0, 0}, 3, {kF0, kF0, kF0, 0}, 3, {kF1, kF1, kF1, 0}},
-            // 4: Specular Power / Sp / type2
             {0, "Sp", "Specular Power", "",
              2, {kF0, 0, 0, 0}, 2, {kF0, 0, 0, 0}, 2, {kF1, 0, 0, 0}},
-            // 5: Opacity / Oc / type2
             {0, "Oc", "Opacity ", "",
              2, {kF1, 0, 0, 0}, 2, {kF0, 0, 0, 0}, 2, {kF1, 0, 0, 0}},
-            // 6: Texture Name / Dt_name / type7 (string) -- default "(None)"
             {0, "Dt_name", "Texture Name", "",
              7, {(unsigned long)("(None)"), 0, 0, 0},
              7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
-            // 7: Texture Wrap Mode / Dt_flags / type8 (nibble), default nibble=4
             {0, "Dt_flags", "Texture Wrap Mode", "",
              8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
-            // 8: Texture U Address Mode / Dt_flags / type9, Path=EntryFlags 0x20000
             {0x20000ul, "Dt_flags", "Texture U Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            // 9: Texture V Address Mode / Dt_flags / type9, Path=EntryFlags 0x40000 -- built
-            // via FUN_066f3de0 at 066f49b9: (9, 0x40000, "Dt_flags", Name, ESI="", 0, 0, 0).
             {0x40000ul, "Dt_flags", "Texture V Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
-            // 10: Colorize Options / type1 -- built via FUN_066f3de0 at 066f49d4:
-            // (1, 0, NULL, Name, "flcopt", 0, 0, 0). No +4 tag; "flcopt" sits at +0xC.
+            // No +4 tag; "flcopt" sits at +0xC.
             {0, nullptr, "Colorize Options", "flcopt",
              1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}},
         };
@@ -511,8 +502,8 @@ namespace
         }
     }
 
-    // FUN_066f1b80 (flmaterials.dll.txt 5249-5273 / .c 896-910, clean decompile): owned-
-    // interface-pointer swap -- AddRef the new pointer before Release-ing the old one.
+    // FUN_066f1b80: owned-interface-pointer swap -- AddRef the new pointer before
+    // Release-ing the old one.
     void FlmAssignInterface(unsigned long* Slot, IDAComponent* NewIface)
     {
         IDAComponent* Old = (IDAComponent*)(Slot[1]);
@@ -683,8 +674,6 @@ namespace
         FReleaseSubBlock Third{Entry + 0x38 / 4};
     }
 
-    // Slot numbers used to live here; the calls below go through ReadFile's published
-    // IFileSystem (src/include/readfile.h) instead.
 
     FFileSystemDesc* FlmBuildFileSystemDesc(FFileSystemDesc* Desc, const char* Path,
                                 const char* ComponentName = "FileSystem")
@@ -1130,14 +1119,13 @@ namespace
 
     double NomadFadeFromValue(float Value)
     {
-        // 066f8ccd stores float but keeps the original subtraction on the FPU stack.
+        // Retail stores a float but keeps the original subtraction on the FPU stack.
         const double WideDelta = 1.0 - (double)(Value);
         const float Delta = (float)(WideDelta);
         double Curve;
-        // TEST AH,05 + JP: negative falls through to zero; positive/equal/unordered jump.
+        // Unordered skips the zero branch and takes the polynomial.
         if (WideDelta < 0.0)
             Curve = 0.0;
-        // TEST AH,01 + JNZ: less/unordered take the polynomial; >=1 takes one.
         else if (Delta >= 1.0f)
             Curve = 1.0;
         else
@@ -1198,7 +1186,7 @@ namespace
     {
         float Combined[12];
         NomadComposeViewWorld(World, View, Combined);
-        // 066f901b..066f9041 re-read the cache after MulTransform, independently of its helper.
+        // Retail re-reads the cache after MulTransform, independently of its helper.
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
         const FVector MinusZ = {0.0f, 0.0f, -1.0f};
@@ -1238,7 +1226,7 @@ namespace
         const float NormalY = Normal[1];
         const float NormalZ = Normal[2];
         *(unsigned long*)(ColorOut.Pointer) = Color;
-        // 066f9140..9181 / 066f92de..9326: Z*Z + Y*Y, then X*X, +1, double .5.
+        // Summation order Z, Y, then X, on the x87 stack.
         const double Zy = (double)(Light[2]) * NormalZ +
                           (double)(Light[1]) * NormalY;
         const double Lit = ((Zy + (double)(Light[0]) * NormalX) + 1.0) * kNomadHalf;
@@ -1303,7 +1291,7 @@ namespace
         }
     }
 
-    // Each state becomes armed after its Set call: unwind states 3 (lighting), 4 (zwrite).
+    // Each state becomes armed after its Set call (retail unwind states 3 and 4).
     struct FNomadRenderStateRestore
     {
         IRenderPipeline* Pipeline;
@@ -1354,8 +1342,8 @@ namespace
         return Value;
     }
 
-    // 066f8c84..066f8cbd: preserve the engine captured before root lookup;
-    // Context-null skips this prelude, but a nonnull Context always calls slot49.
+    // 066f8c84: the engine is captured before the root lookup; a non-null Context always
+    // calls slot 49 (GetInstanceRelative), result unused.
     float NomadFadeLookup(void* Context)
     {
         IEngine* Engine = (IEngine*)(G_FlmEngineOuter);
@@ -1416,10 +1404,10 @@ namespace
         NomadCopyMesh(Submit->Mesh, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, Light);
         VbMgr->UnlockVertexMemory(&LockOut);
 
-        FNomadRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE); // formerly Lighting
+        FNomadRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
         DepthWrite.Pipeline->SetRenderState(DepthWrite.State, 0);
         DepthWrite.bActive = true;
-        FNomadRenderStateRestore CullMode(Pipeline, D3DRS_CULLMODE); // formerly ZWrite
+        FNomadRenderStateRestore CullMode(Pipeline, D3DRS_CULLMODE);
         CullMode.Pipeline->SetRenderState(CullMode.State, 1);
         CullMode.bActive = true;
         Pipeline->DrawIndexedPrimitiveVb(Prim, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
@@ -1434,7 +1422,7 @@ namespace
                                 unsigned long Prim, unsigned long Start, unsigned long Count,
                                 unsigned long IbStart, unsigned long IndexSpan, unsigned long /*Flags*/)
     {
-        // 066f60d0..622a: all pointers required, and lock/draw results pass through.
+        // 066f60d0: all pointers required, and lock/draw results pass through.
         FNomadContext* Submit = (FNomadContext*)(Context);
         IVertexBufferManager* Manager = VbMgr;
         const unsigned long RequestedFvf =
@@ -1450,7 +1438,7 @@ namespace
         unsigned long Shift = 16;
         while (TextureCount != 0)
         {
-            // 066f6182 SHR EAX,CL masks the shift to five bits on x86.
+            // x86 masks the shift count to five bits.
             const unsigned long Lane = (GrantedFvf >> (Shift & 31)) & 3;
             if (Lane == 0)
                 TextureBytes += 8;
@@ -1542,10 +1530,10 @@ namespace
                                 unsigned long Prim, unsigned long Start, unsigned long Count,
                                 unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
     {
-        FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE); // formerly Lighting
+        FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
         Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
         DepthWrite.bActive = true;
-        FFlmRenderStateRestore DepthFunction(Pipeline, D3DRS_ZFUNC); // formerly Cull
+        FFlmRenderStateRestore DepthFunction(Pipeline, D3DRS_ZFUNC);
         Pipeline->SetRenderState(D3DRS_ZFUNC, 4);
         DepthFunction.bActive = true;
         const GENRESULT Result = FlmMeshDrawPass(Pipeline, RpDraw, VbMgr, Context, Prim, Start,
@@ -1584,10 +1572,8 @@ namespace
     const double kWireEdgeDegenerateThreshold = 0.1;
     const float kWireEdgeQuadHalfOffset = 0.005f;
 
-    // File-local stat counters for the two IMesh edge-draw paths below (DAT_067045c8/cc for
-    // Wire's own fallback -- 26924/26920; DAT_067045d4/d8 for Wire2 -- 28307/28303). No
-    // confirmed external reader anywhere in this DLL, so kept file-local rather than
-    // invented as part of the public FMaterialImpl/FLAppearance surface.
+    // Stat counters of the two IMesh edge-draw paths (DAT_067045c8/cc Wire, DAT_067045d4/d8
+    // Wire2). No reader in this DLL.
     unsigned long G_WireLockFailCount = 0;
     unsigned long G_WireDrawAttemptCount = 0;
     unsigned long G_Wire2LockFailCount = 0;
@@ -1665,8 +1651,7 @@ namespace
             unsigned long ValidVertexCount = 0;
             for (unsigned long Edge = 0; Edge < (Arrays.IndexCount >> 1); ++Edge)
             {
-                // FCOMP double(0.1); TEST AH,41; JNP exits for less/equal.
-                // Unordered has TWO set mask bits: even parity, so it falls through.
+                // Exits for less/equal; unordered falls through and draws.
                 if ((double)(Arrays.Values[Arrays.ValueIndices[Edge]]) <=
                     kWireEdgeDegenerateThreshold)
                     break;
@@ -1753,7 +1738,7 @@ namespace
         }
     };
 
-    // 066fb540..ba20: mandatory Context, optional mesh/count/engine gates.
+    // 066fb540: mandatory Context, optional mesh/count/engine gates.
     // QI owners and state savers unwind in reverse construction order.
     GENRESULT SubmitWireGeometry(const unsigned long& WireColor, IRenderPipeline* Pipeline, IVertexBufferManager* VertexBufferManager,
                         unsigned long* GroupCursor, void* Context, unsigned long StartArg,
@@ -1783,7 +1768,7 @@ namespace
         return WireDrawEdges(Pipeline, VertexBufferManager, Mesh, WireColor, 0, false);
     }
 
-    // 066fc150..c7d0: only IMesh QI, same status/cursor cleanup, twelve output vertices per edge.
+    // 066fc150: only IMesh QI, same status/cursor cleanup, twelve output vertices per edge.
     GENRESULT SubmitWire2Geometry(const unsigned long& ColorFromP0, const unsigned long& ColorFromP1, IRenderPipeline* Pipeline,
                          IVertexBufferManager* VertexBufferManager, unsigned long* GroupCursor, void* Context,
                          unsigned long CountArg, unsigned long IndexSpanArg)
@@ -1851,7 +1836,7 @@ namespace
         return (GENRESULT)(Count);
     }
 
-    // 066f6b40..6dbc: engine/userdata may be null, Context and material are mandatory.
+    // 066f6b40: engine/userdata may be null, Context and material are mandatory.
     GENRESULT SubmitExclusionGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
                                  unsigned long PrimArg, unsigned long StartArg, unsigned long CountArg,
                                  unsigned long IbStartArg, unsigned long IndexSpanArg, unsigned long FlagsArg,
@@ -1968,19 +1953,17 @@ FMaterialImpl::FMaterialImpl(const FMaterialSpec& Spec)
     MaterialBlock_[0] = 1.0f;
     MaterialBlock_[5] = 1.0f;
     MaterialBlock_[10] = 1.0f;
-    // Colorize 066f45bd..066f45d8, Wire 066fafc1..066fafdc and
-    // Wire2 066fbc51..066fbc6c clear all 17 words, then seed only
-    // Diffuse and Ambient RGBA to white.
+    // The Colorize (066f45bd), Wire (066fafc1) and Wire2 (066fbc51) factories clear all
+    // 17 words, then seed only Diffuse and Ambient RGBA to white.
     if (Kind_ == KindColorize || Kind_ == KindWire || Kind_ == KindWire2 || Kind_ == KindShadow)
     {
         for (int Index = 0; Index < 17; ++Index)
             MaterialBlock_[Index] = Index < 8 ? 1.0f : 0.0f;
     }
-    // EngineGlow factory 066f529b..066f52c8 seeds diffuse/ambient white,
-    // while every later material-block word remains zero (not an identity matrix).
+    // The EngineGlow (066f529b) and HUDAnim (066ffa98) factories seed the same white block;
+    // every later material-block word stays zero.
     if (Kind_ == KindEngineGlow || Kind_ == KindHudAnim)
     {
-        // HUDAnim factory 066ffa98..066ffabc has the same white block.
         for (int Index = 0; Index < 17; ++Index)
             MaterialBlock_[Index] = Index < 8 ? 1.0f : 0.0f;
     }
@@ -2105,7 +2088,7 @@ void FMaterialImpl::ReleaseMaterialResources()
 
 void FMaterialImpl::ConfigureAggregation(FMaterialAggregateDesc* Desc)
 {
-    // 066f52cb..066f52fc: controller is installed before Slot22.
+    // 066f52cb: the controller is installed before Slot22.
     ControllingOuter_ = Desc->OuterAt8;
     if (ControllingOuter_ == nullptr)
         ControllingOuter_ = &Inner_;
@@ -2263,7 +2246,7 @@ GENRESULT DACOM_API FMaterialImpl::Initialize(IDAComponent* Outer)
     {
         // LAB_066ffee0: common success, then QI/Release; its HRESULT is ignored.
         Outer->QueryInterface(Iids::MaterialLibrary, (void**)(&MaterialLibrary_));
-        MaterialLibrary_->Release(); // 066fff06..0b: outer container owns the object.
+        MaterialLibrary_->Release(); // The outer container owns the object.
     }
 
     return GR_OK;
@@ -2449,15 +2432,13 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
                 HudAnimFlag_ = (OutValue >= 1) ? 1 : 0;
         }
 
-        // FUN_066FFF80 0x066fffc0..0x0670006f: QI 1.11_IMatAnimLibrary on this+4 (the pipeline,
-        // no null test); a failed QI (JL) goes straight to the release of the out pointer.
+        // FUN_066FFF80: the pipeline (+4) is QI'd with no null test.
         FScopedComponentReference AnimLib;
         if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, &AnimLib.Object) >= 0)
         {
             if (HudAnimFlag_ != 0)
             {
-                // 0x066fffed..0x0670002f: only while +0x68 is still empty -- {name +0x14, its
-                // CRC}, the (dead) release of +0x68, then the library's slot 5(-1, &rec, +0x68).
+                // Only while +0x68 is still empty; the inner release is dead code in retail too.
                 if (MatAnim_ == nullptr)
                 {
                     const char* Name = InstanceName_;
@@ -2474,7 +2455,6 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
             }
             else if (MatAnim_ != nullptr)
             {
-                // 0x06700031..0x06700042: the flag clear -- +0x68 released and zeroed.
                 MatAnim_->Release();
                 MatAnim_ = nullptr;
             }
@@ -2618,7 +2598,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
 {
     if (Kind_ == KindVisibleCounter)
     {
-        // LAB_066FADC0: B4++, B8 += [ESP+0x1C] (IndexSpan), BC += [ESP+0x14] (Count).
+        // LAB_066FADC0: counters at +0xB4 / +0xB8 / +0xBC.
         G_VisibleCounterA += 1;
         G_VisibleCounterB += IndexSpan;
         G_VisibleCounterC += Count;
@@ -2655,8 +2635,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
 
     if (Kind_ == KindWire2)
     {
-        // 066fc150: IMesh path; Color0 for original points, Color1 for shifted duplicates.
-        // Four triangles (twelve vertices) per edge, including shifted P0 with Color1.
+        // 066fc150: Color0 for original points, Color1 for shifted duplicates.
         return SubmitWire2Geometry(WireColorArgb_, WireColorRgb555_, Pipeline_, VertexBufferManager_,
                            &WireGroupIndex_, Context, Count, IndexSpan);
     }
@@ -2678,8 +2657,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
 
     if (Kind_ == KindEngineGlow || Kind_ == KindColorize || Kind_ == KindHudIcon)
     {
-        // LAB_066f3370 -- shared Slot10 draw
-        // override for these 3 kinds, XREF-confirmed against each instance vtable's +0x28.
+        // LAB_066f3370: the shared Slot10 draw (vtable +0x28) of these three kinds.
         return SubmitRpDrawGeometry(RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     }
 
@@ -2705,7 +2683,7 @@ GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType,
 
 GENRESULT DACOM_API FMaterialImpl::SetName(const char* Name)
 {
-    // LAB_066f1670..16d9: free old, null, allocate min(strlen+1, 64), lowercase.
+    // LAB_066f1670: at most 64 bytes, lowercased.
     std::free(InstanceName_);
     InstanceName_ = nullptr;
     bInstanceNameSet_ = false;
@@ -2727,7 +2705,7 @@ GENRESULT DACOM_API FMaterialImpl::SetName(const char* Name)
 
 GENRESULT DACOM_API FMaterialImpl::GetName(char* Out, unsigned long Size)
 {
-    // LAB_066f16e0..1710: the only early return is an unset name.
+    // LAB_066f16e0: the only early return is an unset name.
     if (InstanceName_ == nullptr)
         return GR_GENERIC;
     std::strncpy(Out, InstanceName_, Size);
@@ -2757,8 +2735,7 @@ GENRESULT DACOM_API FMaterialImpl::GetRenderFlags(unsigned long* Out)
     unsigned long Mask = 8;
     if (Kind_ == KindColorize)
     {
-        // 066f4a90: TEST AH,05 / JP skips the extra bit on >= or unordered;
-        // fall-through is strictly less than the retail double 1.0 constant.
+        // 066f4a90: >= 1.0 and unordered skip the extra bit.
         if (Flag64_ != 0 || (double)(ColorizeExtraW_) < 1.0)
             Mask |= 2;
     }
@@ -2773,8 +2750,8 @@ GENRESULT DACOM_API FMaterialImpl::GetRenderFlags(unsigned long* Out)
     else if (Kind_ == KindEngineGlow || Kind_ == KindEnvMap ||
              Kind_ == KindVisibleCounter || Kind_ == KindHudAnim)
         Mask = Flag64_ != 0 ? 0x0a : 0x08; // 066f56e0
-    // 066f2d80: the XOR ECX,ECX discards the preceding Flag64 mask;
-    // Backdrop/Starsphere, Glass, PlanetWater and Shadow always answer 8.
+    // 066f2d80 discards the Flag64 mask: Backdrop/Starsphere, Glass, PlanetWater and
+    // Shadow always answer 8.
     *Out = Mask;
     return GR_OK;
 }
@@ -2858,7 +2835,7 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterValue(unsigned long Index, void* 
         FlmAssignInterface((unsigned long*)Result, (IDAComponent*)RawWords[0]);
         return GR_OK;
     default:
-        return GR_OK; // 066f1c2f -> 066f1d02 for unrecognized types.
+        return GR_OK;
     }
 }
 
@@ -2874,7 +2851,7 @@ GENRESULT DACOM_API FMaterialImpl::SetParameterValue(unsigned long Index, void* 
     if (!ValueWithinDeclaredRange(Index, Entry, Value))
         return (GENRESULT)-1;
     StoreParameterValue(Index, Entry, Value);
-    return GR_OK; // 066f1d8f: XOR EAX,EAX, independent of Slot26 result.
+    return GR_OK; // Independent of Slot26's result, as in retail.
 }
 
 const char* __thiscall FMaterialImpl::ClassName()
@@ -2908,7 +2885,7 @@ GENRESULT __thiscall FMaterialImpl::InitializeFromDescriptor(void* Arg)
 {
     if (Kind_ == KindNomad)
     {
-        // 066f884b/884e: both accumulators reset before the required name lookup.
+        // Both accumulators are reset before the required name lookup.
         NomadLive6C_ = 0.0f;
         NomadDead68_ = 0.0f;
         const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
@@ -2921,7 +2898,7 @@ GENRESULT __thiscall FMaterialImpl::InitializeFromDescriptor(void* Arg)
     {
         const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
         bBackdrop_ = std::strcmp(Agg->NameAt4, G_NameBackdropMaterial) == 0 ? 1 : 0;
-        bBackdropNameMatchCopy_ = bBackdrop_; // 066f2d2f/2d47: identical stored name-equality predicate.
+        bBackdropNameMatchCopy_ = bBackdrop_; // Retail stores the same predicate twice.
         return GR_OK;
     }
 
@@ -2956,7 +2933,7 @@ GENRESULT __thiscall FMaterialImpl::ApplyInitialRenderStates(void* Arg)
 
 GENRESULT __thiscall FMaterialImpl::Setup()
 {
-    // LAB_066f1da0..066f1fbd: resolve new groups before dropping old IDs.
+    // LAB_066f1da0: resolve new groups before dropping old IDs.
     void* ResolvedRecord; // Retail does not preclear the Slot12 output scratch.
     for (unsigned long Index = 0; Index < TextureVerifyCount_; ++Index)
     {
@@ -2996,7 +2973,7 @@ GENRESULT __thiscall FMaterialImpl::Setup()
             }
         }
         if (OldPlaybackGroupId != -1)
-            Library->DecRefById(OldPlaybackGroupId); // 066f1e92..066f1ea0
+            Library->DecRefById(OldPlaybackGroupId);
         if (!bVerified)
         {
             char Message[0x2000];
@@ -3008,8 +2985,8 @@ GENRESULT __thiscall FMaterialImpl::Setup()
             FlmFdump(kFdumpNotice, kImplFile, 0x23F, "NOTICE", Message);
         }
     }
-    // The zero-count branch also reaches this tail (066f1db9 -> 066f1f0b).
-    RecomputeOpacityFlags(); // Full own 066f1f0b..1fbd tail also uses threshold 1.0.
+    // The zero-count branch also reaches this tail; it uses threshold 1.0.
+    RecomputeOpacityFlags();
     return GR_OK;
 }
 
@@ -3038,8 +3015,7 @@ bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, voi
 
     for (unsigned long Component = 0; Component < ComponentCount; ++Component)
     {
-        // Upper TEST AH,0x41 / JNP rejects ordered <= (upper vs value).
-        // Lower TEST AH,0x1 / JZ rejects ordered >=; unordered passes both.
+        // Unordered passes both tests.
         if ((double)(Val[Component]) >=
             (double)(Hi[Component]) + kFlmVerifyEpsilon)
             return false;
@@ -3115,7 +3091,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
             unsigned long Alpha;
             if (Kind_ == KindWire)
             {
-                // 066fb30e..066fb3a5: Wire explicitly overwrites RGBA for every type.
+                // 066fb30e: Wire overwrites RGBA for every type.
                 WireColorR_ = Components[0];
                 WireColorG_ = Components[1];
                 WireColorB_ = Components[2];
@@ -3132,8 +3108,8 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
             }
             else
             {
-                // 066fbfaf..066fc02d: Wire2 packs incoming values without a
-                // second RGBA/material writeback. Reduced RGB keeps 5 bits per byte.
+                // 066fbfaf: Wire2 packs incoming values without a second RGBA/material
+                // writeback. Reduced RGB keeps 5 bits per byte.
                 Red = FlmWireColorByte(Components[0]);
                 Green = FlmWireColorByte(Components[1]);
                 Blue = FlmWireColorByte(Components[2]);
@@ -3162,8 +3138,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
         }
         if (Index == 0xA)
         {
-            // `Index==0xA` (10): writes Value[1] into this+0x6C (ColorizeOptionsFlags_) -- raw
-            // dword copy, confirmed flmaterials.dll.txt 11707-11716.
+            // this+0x6C, a raw dword copy.
             ColorizeOptionsFlags_ = SrcWords[1];
             return GR_OK;
         }
@@ -3257,7 +3232,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
         }
     }
 
-    // 066f2b21..066f2c9d: the entry and its ShortTag are required by retail.
+    // 066f2b21: the entry and its ShortTag are required by retail.
     const char* ShortTag = *(const char* const*)(
         (const unsigned char*)(Entry) + 4);
     if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
@@ -3275,8 +3250,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
 
 void FMaterialImpl::RecomputeOpacityFlags()
 {
-    // Shared 066f2bf5..066f2c9d and Colorize 066f4c43..066f4ce6.
-    // TEST AH,0x5 / JP: equal/greater/unordered -> clear; less -> set.
+    // Shared 066f2bf5 and Colorize 066f4c43. Equal/greater/unordered clear the flag.
     Flag64_ = MaterialBlock_[3] < (float)(kCloakColorizeThreshold) ? 1 : 0;
     Flag65_ = 0;
     if (Flag64_ != 0)
@@ -3289,8 +3263,6 @@ void FMaterialImpl::RecomputeOpacityFlags()
         return;
     const unsigned long* ActualDescriptor = FlmPixelFormatDescriptor(ActualFormat);
     Flag65_ = ActualDescriptor[0x38 / 4] == 1 ? 1 : 0;
-    // 066f2c4f PUSH shifts the same GetTextureFormat output from ESP+14 to
-    // ESP+18 at 066f2c58; Colorize, Setup and Wire have the same stack shift.
     if ((ActualFormat >= 10 && ActualFormat <= 14) ||
         (FlmPixelFormatDescriptor(ActualFormat)[0x48 / 4] & 0xff) != 0)
         Flag64_ = Flag65_ == 0 ? 1 : 0;
@@ -3300,9 +3272,8 @@ void FMaterialImpl::RecomputeOpacityFlags()
 
 unsigned long __thiscall FMaterialImpl::GetParameterTable(void** OutBase)
 {
-    // Mutable table objects are exposed through the existing void** API.
-    // FUN_066F2CD0 is the zero-property base. Per-kind Slot27 overrides below
-    // supply the retail tables decoded from their disassembly or raw PE bytes.
+    // FUN_066F2CD0 is the zero-property base; the per-kind Slot27 overrides supply their
+    // own tables.
     if (Kind_ == KindWire || Kind_ == KindWire2)
     {
         void* Table = FlmWireColorDescBase(Kind_ == KindWire2);
@@ -3362,8 +3333,8 @@ void* __thiscall FMaterialImpl::GetParameterAddress(unsigned long Index)
         void* Result = nullptr;
         switch (Index)
         {
-        case 0: Result = &MaterialBlock_[4]; break;   // this+0x30 ("Diffuse" slot, see §28)
-        case 1: Result = &MaterialBlock_[0]; break;   // this+0x20 ("Ambient" slot, see §28)
+        case 0: Result = &MaterialBlock_[4]; break;   // this+0x30 ("Diffuse" slot)
+        case 1: Result = &MaterialBlock_[0]; break;   // this+0x20 ("Ambient" slot)
         case 2: Result = &MaterialBlock_[12]; break;  // this+0x50 (Emissive)
         case 3: Result = &MaterialBlock_[8]; break;   // this+0x40 (Specular Color)
         case 4: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
@@ -3487,7 +3458,7 @@ void FMaterialImpl::BindNomad()
     StageCounter_ += 1;
     if (bSecondTexture_ != 0)
     {
-        // 066f8ab0..066f8ac1: the second of Nomad's two allocated texture records.
+        // The second of Nomad's two allocated texture records.
         const unsigned long* Second = TextureBlock_ + (0x2C / 4);
         PipelineSetTextureStageTexture(Pipeline_, StageCounter_, TextureHandleAt(Second));
         ApplyTssFromTextureBlock(StageCounter_, Second);
@@ -3520,8 +3491,7 @@ void FMaterialImpl::BindHudIcon(void* Context)
         }
     }
     SetMaterialBlock(Pipeline_, MaterialBlock_);
-    // TEST AH,0x5 / JNP selects blend for less; unordered follows opaque
-    // when Flag64 is clear, just like equal/greater.
+    // Unordered follows opaque when Flag64 is clear, like equal/greater.
     if (!((double)(CompareField2C()) < 1.0) && Flag64_ == 0)
         PipelineApplyRsTable(Pipeline_, kHudIconRsOpaque);
     else
@@ -3558,7 +3528,7 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
     float Opacity = ColorizeExtraW_;
     if ((ColorizeOptionsFlags_ & 1) != 0)
     {
-        // 066f4ee8..066f4f88: only the fast branch binds our texture/TSS.
+        // Only this branch binds our texture/TSS.
         PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
         ApplyTssFromTextureBlock(0, TextureBlock_);
         PipelineApplyTssTable(Pipeline_, 0, kCloakTss); // DAT_06701768
@@ -3592,7 +3562,7 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
         if (DescriptorResult == GR_OK)
         {
             const char* ShortTag = (const char*)(Descriptor.Words[1]);
-            // 066f4def..066f4dfc: compare two characters, no length/null test.
+            // Two characters compared, no length/null test.
             if (ShortTag[0] == 'O' && ShortTag[1] == 'c')
             {
                 struct FScopedParameterValue
@@ -3603,17 +3573,17 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
                 ((IMaterial*)(Submit->Candidate))->GetParameterValue(5, Value.Words);
                 float CandidateOpacity;
                 std::memcpy(&CandidateOpacity, &Value.Words[1], sizeof(CandidateOpacity));
-                // FLD float / FMUL float / FSTP float: multiply before rounding.
+                // Multiply in x87 precision, then round.
                 Opacity = (float)((double)(CandidateOpacity) *
                                              (double)(Opacity));
             }
         }
     }
 
-    // 066f4f8a..066f4ff8. Bind does not modify the cached Flag64/Flag65.
+    // Bind does not modify the cached Flag64/Flag65.
     MaterialBlock_[3] = Opacity;
     SetMaterialBlock(Pipeline_, MaterialBlock_);
-    // TEST AH,0x5 / JP -> plain for equal/greater/unordered; less falls into blend.
+    // Equal/greater/unordered take the plain table.
     PipelineApplyRsTable(Pipeline_, (double)(Opacity) < kCloakColorizeThreshold
         ? kCloakRsBlend : kCloakRsPlain); // DAT_06701738 / DAT_06701718
     return GR_OK;
@@ -3621,7 +3591,6 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
 
 void FMaterialImpl::BindCloak(void* Context)
 {
-
     // Cloak inherits opacity from the root-instance value and candidate material.
     float Base = FlmRootInstanceValue(Context, 1.0f); // 0x3f800000
 
@@ -3635,8 +3604,7 @@ void FMaterialImpl::BindCloak(void* Context)
         FScopedComponentReference Batched;
         if (Candidate->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
         {
-            // 066f4093/066f40a1: Context is pushed ahead of the branch, so both slots
-            // receive it. This port used to call each with the object alone.
+            // Retail pushes Context ahead of the branch, so both slots receive it.
             ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
         }
         else
@@ -3652,14 +3620,13 @@ void FMaterialImpl::BindCloak(void* Context)
     }
     else
     {
-        // 066f40ed-06f418e: no Candidate — texture-block-driven TSS setup instead.
+        // No candidate: texture-block-driven TSS setup instead.
         PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
         ApplyTssFromTextureBlock(0, TextureBlock_);
         PipelineApplyTssTable(Pipeline_, 0, kCloakTss);
         PipelineApplyTssTable(Pipeline_, 1, kCloakTss);
     }
 
-    // 066f4190-066f41a1: write the final Base into Opacity, then SetMaterial.
     MaterialBlock_[3] = Base;
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if ((double)(Base) < kCloakColorizeThreshold)
@@ -3703,7 +3670,7 @@ void FMaterialImpl::BindExclusion()
 
 void FMaterialImpl::BindEnvMap(void* Context)
 {
-    // 066f5af0..5db1: HRESULTs are tested only for QI and Slot22.
+    // 066f5af0: HRESULTs are tested only for QI and Slot22.
     EnvMapFlag_ = 0;
     const char* Name = nullptr;
     IDAComponent* Candidate = Context != nullptr
@@ -4035,14 +4002,14 @@ GENRESULT FMaterialImpl::DrawBackdrop(void* Context, unsigned long Prim, unsigne
     if (Submit->Candidate == nullptr)
         return (GENRESULT)(-1);
 
-    // 066f2ef9..2f93: capture each pipeline anew; arm only after the corresponding force.
+    // 066f2ef9: capture each pipeline anew; arm only after the corresponding force.
     FFlmRenderStateRestore Depth(Pipeline_, D3DRS_ZENABLE);
     Depth.Pipeline->SetRenderState(Depth.State, 0);
     Depth.bActive = true;
-    FFlmRenderStateRestore DepthWrite(Pipeline_, D3DRS_ZWRITEENABLE); // formerly Lighting
+    FFlmRenderStateRestore DepthWrite(Pipeline_, D3DRS_ZWRITEENABLE);
     DepthWrite.Pipeline->SetRenderState(DepthWrite.State, 0);
     DepthWrite.bActive = true;
-    FFlmRenderStateRestore DepthFunction(Pipeline_, D3DRS_ZFUNC); // formerly Cull
+    FFlmRenderStateRestore DepthFunction(Pipeline_, D3DRS_ZFUNC);
     DepthFunction.Pipeline->SetRenderState(DepthFunction.State, 8);
     DepthFunction.bActive = true;
     GENRESULT Result;
@@ -4055,7 +4022,7 @@ GENRESULT FMaterialImpl::DrawBackdrop(void* Context, unsigned long Prim, unsigne
             Result = ((IMaterial*)(Submit->Candidate))->Submit(Context, Prim, Start,
                 Count, IbStart, IndexSpan, Flags);
     }
-    // 066f3005..3055: reverse construction order on normal and EH paths.
+    // Reverse construction order on normal and EH paths.
     DepthFunction.Restore();
     DepthWrite.Restore();
     Depth.Restore();

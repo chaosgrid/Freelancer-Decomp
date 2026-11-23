@@ -7,26 +7,14 @@
 #pragma once
 
 // The camera block inside a ship archetype's client companion (Archetype::Root + 0x04, the
-// ICliObj). Written by the ship ini value handler at 0x0040763f .. 0x00407816, and read back
-// by the third-person camera's attach (FUN_00518af0 at 0x00518b75).
+// ICliObj). Written by the ship ini value handler at 0x0040763f, and read back by the
+// third-person camera's attach (FUN_00518af0 at 0x00518b75).
 //
-// These are the only ICliObj fields the port needs so far, so the struct covers just them and
-// records their retail offsets rather than pretending to be the whole companion.
+// The struct covers only the camera fields and records their retail offsets inside the ICliObj
+// (just before them: +0x5c bay_doors_close_snd, +0x60 cockpit, +0x64 pilot_mesh).
 
 class INI_Reader;
 
-// Field offsets inside the ship ICliObj, for the record:
-//   +0x5c  bay_doors_close_snd   (CreateID)      -- not part of this block
-//   +0x60  cockpit               (StringAlloc)   -- not part of this block
-//   +0x64  pilot_mesh            (CreateID)      -- not part of this block
-//   +0x68  camera_offset[0]
-//   +0x6c  camera_offset[1]
-//   +0x70  camera_angular_acceleration
-//   +0x74  camera_angular_slerp_multiplier
-//   +0x78  camera_horizontal_turn_angle          (clamped, radians)
-//   +0x7c  camera_vertical_turn_up_angle         (clamped, radians)
-//   +0x80  camera_vertical_turn_down_angle       (clamped, radians)
-//   +0x84  camera_turn_look_ahead_slerp_amount
 struct FShipCameraParams
 {
     float Offset[2];                    // +0x68 / +0x6c  camera_offset

@@ -26,28 +26,28 @@ namespace Archetype
 // (Archetype::Light's Root+0x04, client_cliobj.cpp FCliEQLight).
 struct FFlashLight
 {
-    // FUN_00557700 (thiscall, RET 4).
+    // FUN_00557700.
     explicit FFlashLight(Archetype::ICliObj* Companion);
 
-    // FUN_00557630 (thiscall, RET 0x1c) -- the explicit form the room flashlights use
+    // FUN_00557630 -- the explicit form the room flashlights use
     // (FUN_0044a3a0): Color / MinColor by pointer, then period, starting phase, blink duration,
     // bulb size and glow size. The flare cone is left 0.
     FFlashLight(Vector const* InColor, Vector const* InMinColor, float Period, float InPhase,
                 float BlinkDuration, float InBulbSize, float InGlowSize);
 
-    // FUN_00557810 (thiscall, RET 4) -- +0x4c = Frame's matrix (its +0x0c), +0x70 its
+    // FUN_00557810 -- +0x4c = Frame's matrix (its +0x0c), +0x70 its
     // position (its +0x00).
     void SetFrame(Csys const& Frame);
 
-    // FUN_00557860 (thiscall, RET 4) -- advance the blink phase by Delta * Rate (wrapped into
+    // FUN_00557860 -- advance the blink phase by Delta * Rate (wrapped into
     // [0, 1)) and rebuild both colours from it.
     void Update(float Delta);
 
-    // FUN_005579b0 (thiscall, RET 4) -- the first flare pass (the "shine" texture): a
+    // FUN_005579b0 -- the first flare pass (the "shine" texture): a
     // camera-facing quad of half-size GlowSize in GlowColor, scaled by the flare cone term when
     // +0x44 > +0x48. Nothing for a black GlowColor.
     void DrawShine(ICamera* Camera);
-    // FUN_00557d70 (thiscall, RET 4) -- the second pass (the "b" texture): a camera-facing quad
+    // FUN_00557d70 -- the second pass (the "bulb" texture): a camera-facing quad
     // of half-size BulbSize in BlendColor. Nothing for a black BlendColor.
     void DrawBulb(ICamera* Camera);
 
@@ -78,31 +78,31 @@ struct FFlashLightEntry
 // Retail: an allocator byte, then a VC6 std::list<FFlashLightEntry*> (head +0x04, size +0x08).
 struct FFlashLightSet
 {
-    // FUN_00558180 (thiscall, no arguments).
+    // FUN_00558180.
     FFlashLightSet();
     // FUN_005581b0 -- delete every light and entry, then the list.
     ~FFlashLightSet();
 
     // FUN_005582a0 -- delete every light and entry and empty the list.
     void Clear();
-    // FUN_00558310 (thiscall, RET 8) -- a new light for Companion bound to HardpointIndex.
+    // FUN_00558310 -- a new light for Companion bound to HardpointIndex.
     void Add(Archetype::ICliObj* Companion, int HardpointIndex);
-    // FUN_00558470 (thiscall, RET 8) -- place every light on its hardpoint's current world
+    // FUN_00558470 -- place every light on its hardpoint's current world
     // frame and advance it by Delta.
     void Update(HardpointSummary const* Hardpoints, float Delta);
-    // FUN_00558580 (thiscall, RET 4) -- the first 0x20 lights into FUN_00558000.
+    // FUN_00558580 -- the first 0x20 lights into FUN_00558000.
     void Draw(ICamera* Camera);
 
     std::list<FFlashLightEntry*> Entries;
 };
 
-// FUN_00558000 (cdecl) -- the flashlight flares: the EFFECTS and FLASHLIGHTS options and a
-// non-empty list, then two quad passes over it -- FUN_005579b0 with the "shine" texture, then
-// FUN_00557d70 with the "b" texture -- between viewport / camera / state setup and the state
+// FUN_00558000 -- the flashlight flares: the EFFECTS and FLASHLIGHTS options and a non-empty
+// list, then two quad passes over it -- FUN_005579b0 with the "shine" texture, then
+// FUN_00557d70 with the "bulb" texture -- between viewport / camera / state setup and the state
 // restore. Callers: FUN_00558580 and the room draw FUN_0044b570 (RoomControl +0x81c / +0x101c).
 void DrawFlashlightFlares(FFlashLight* const* Lights, int Count, ICamera* Camera);
 
-// DAT_006799c0 / DAT_006799c4 -- the flare textures ("b" and "shine" in fx\efx.txm), texture
+// DAT_006799c0 / DAT_006799c4 -- the flare textures ("bulb" and "shine" in fx\efx.txm), texture
 // records of ITextureLibrary2 slot 12. Null outside a base.
 extern void* G_FlashlightBulbTexture;
 extern void* G_FlashlightShineTexture;

@@ -49,25 +49,9 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FFxEffectLibrary::Release()
     {
-        // FUN_06222ab0 (alchemy.dll.txt:71581-71606, wired as IFxEffectLibrary
-        // vtable slot 2 at 0624d980, immediately after QueryInterface/AddRef
-        // at 0624d978/97c): retail guards the decrement against underflow
-        // (`if (refcount != 0) refcount--;` before the zero-check) rather
-        // than decrementing unconditionally -- the same underflow-guard
-        // pattern already fixed in FComponentFactory::Release,
-        // FFxRuntime::Release, and FFxEffectArchetype::Release. A stray
-        // extra Release() call past 0 previously underflowed RefCount_ to
-        // 0xFFFFFFFF here instead of retail's no-op. Fixed as part of the
-        // wave-42 targeted COM-refcount sweep.
-        //
-        // [wave61-lane2] fresh re-derivation from raw bytes also found retail
-        // stores 0x1 back into [ESI+0x24] (`MOV dword ptr [ESI+0x24],0x1`,
-        // 06222ac9) immediately before calling the map-teardown helper
-        // (FUN_06222cc0) and operator delete (FUN_062460e0) -- the same
-        // teardown reentrancy-guard pattern documented for FFxEffectArchetype
-        // ::Release (this wave), FFxNodeLibrary,
-        // FFxAnimatedSingle, and FFxEffectObject. Mirrored here to match
-        // retail exactly.
+        // FUN_06222ab0 (vtable slot 2 at 0624d980): the decrement saturates at 0, and the
+        // count (+0x24) is set back to 1 before the map teardown (FUN_06222cc0) and
+        // operator delete.
         if (RefCount_ != 0)
             --RefCount_;
         if (RefCount_ == 0)
@@ -166,7 +150,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_06220020 (RET 0x10: this, Param1, Key, Out), 0x06220020..0x0622012f:
+    // FUN_06220020 (this, Param1, Key, Out):
     //   operator_new(0x24) and the effect constructor inline (count +0x20 = 1) come FIRST;
     //   this->+0x2C FindByHash(Key as a raw dword, &Archetype); non-zero -> Release the
     //   archetype if one came back, return -8 -- the new effect is not released (retail
@@ -277,8 +261,7 @@ namespace AlchemyImpl
             Archetype->SetName(Name);
 
             unsigned char Header16[16];
-            // FNSTSW AX; AND EAX,0x100; JNZ skips reads for less/unordered;
-            // greater/equal falls through to the two header reads.
+            // Less or unordered skips the two header reads.
             if (Version >= Threshold)
             {
                 if (Chunk.ReadBytes(Header16, 12) < 0 || Chunk.ReadBytes(Header16 + 12, 4) < 0)
@@ -342,7 +325,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // LAB_06220760 (RET 0xC: this, Hash, Out): FUN_06222000 lower_bound on the map at this+4;
+    // LAB_06220760 (this, Hash, Out): FUN_06222000 lower_bound on the map at this+4;
     // end or node key (+0xC) above Hash -> return -1, *Out untouched. Hit: *Out = node value
     // (+0x18) -- no null test on Out -- then AddRef on it, return 0.
     GENRESULT DACOM_API FFxEffectLibrary::FindByHash(unsigned long Hash, IFxEffectArchetype** Out)
@@ -379,7 +362,7 @@ namespace AlchemyImpl
                 else
                     Ext[0] = '\0';
             }
-            // INC EBP wraps all 32 bits; avoid signed C++ overflow at INT_MAX.
+            // Retail's counter wraps at 32 bits; unsigned avoids signed overflow.
             unsigned int SuffixBits;
             std::memcpy(&SuffixBits, &Suffix, sizeof(SuffixBits));
             ++SuffixBits;

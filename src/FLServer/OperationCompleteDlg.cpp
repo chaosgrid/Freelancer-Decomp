@@ -13,7 +13,7 @@ COperationCompleteDlg::COperationCompleteDlg(CWnd* Parent)
 {
 }
 
-// .text:00413da0 — retail body is RET 4.
+// .text:00413da0 — empty in retail.
 void COperationCompleteDlg::DoDataExchange(CDataExchange* DX)
 {
 	CDialog::DoDataExchange(DX);

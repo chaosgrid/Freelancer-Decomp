@@ -17,7 +17,7 @@ public:
 	CAreYouSureDlg(CWnd* Parent = NULL);   // .text:00402770
 
 protected:
-	virtual void DoDataExchange(CDataExchange* DX);   // .text:004027c0 (empty: RET 4)
+	virtual void DoDataExchange(CDataExchange* DX);   // .text:004027c0 (empty in retail)
 
 	DECLARE_MESSAGE_MAP()
 };

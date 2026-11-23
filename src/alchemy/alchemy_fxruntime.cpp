@@ -80,7 +80,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxRuntime::BindAlchemy(void* Alchemy)
     {
         // LAB_0623b670 (DAT_06257b98): raw store, no AddRef / no Release of the
-        // previous value — same pattern as BindMeshFactory below.
+        // previous value.
         G_RuntimeAlchemy = Alchemy;
         return GR_OK;
     }

@@ -4,9 +4,9 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// CPhysControllerEquip, CSteering, CNudgeEngine, CStrafeEngine (retail CStrafeEngine.cpp) -- split out of common_cequip.cpp (CMN-B2).
-// Declared in common_cequip.h; helpers shared with the sibling TUs are in
-// common_cequip_internal.h (namespace CmnCequip).
+// CPhysControllerEquip, CSteering, CNudgeEngine, CStrafeEngine (retail CStrafeEngine.cpp).
+// Declared in common_cequip.h; shared helpers are in common_cequip_internal.h (namespace
+// CmnCequip).
 #include "common_cequip.h"
 #include "x86math.h"
 
@@ -39,21 +39,6 @@
 using namespace CmnCequip;
 
 // ============================================================
-// CNudgeEngine — ship controller applying nudge vectors
-// ============================================================
-// (The "FEquipDesc"/"FEquipDescVector"/"FEquipDescStatic" types this equip batch
-// previously duplicated here as a distinct equipment-descriptor family have been
-// removed: every one of their real callers -- the CEquip::GetEquipDesc virtual family,
-// CEShield's override, CEScanner's cargo-scan vector, and CEquipManager::VerifyListSync
-// -- retail-confirmed (mangled `AAUEquipDesc@@` on every GetEquipDesc override, plus
-// CECargo::GetEquipDesc's raw +0x18 byte copy landing on EquipDesc's own bMission field)
-// to actually operate on plain `EquipDesc` (common_goods.h), the same type already used
-// by EquipDescList/EquipDescVector/GoodInfo's AddonLow/Mid/High elsewhere in this port.
-// (The retail engine-object wrapper this equip batch previously duplicated as
-// CEngineObject is ported once, correctly, as EngineObject in
-// src/Common/common_engineobject.cpp -- see the note in common_cequip.h.)
-
-// ============================================================
 // CPhysControllerEquip — base equipment physics controller
 // ============================================================
 
@@ -83,8 +68,7 @@ CPhysControllerEquip::~CPhysControllerEquip()
 
 CPhysControllerEquip& CPhysControllerEquip::operator=(CPhysControllerEquip const& Other)
 {
-    // Listing 0x06280ad0 (ICF-folded with PhyCollisionStateManager::operator=): the Controller
-    // base dwords (+4/+8/+0xc) and the bControllerEnabled byte (+0x10), with no self test.
+    // 0x06280ad0 (ICF-folded with PhyCollisionStateManager::operator=); no self test.
     PhySys::Controller::operator=(Other);
     bControllerEnabled = Other.bControllerEnabled;
     return *this;
@@ -115,7 +99,7 @@ bool CPhysControllerEquip::DisableController()
 
 bool CPhysControllerEquip::IsControllerEnabled() const
 {
-    // Listing 0x26e60 (ICF-shared with CEquip::IsActive): return [this+0x10].
+    // 0x26e60 (ICF-shared with CEquip::IsActive).
     return bControllerEnabled;
 }
 
@@ -150,8 +134,7 @@ CSteering::~CSteering()
 
 CSteering& CSteering::operator=(CSteering const& Other)
 {
-    // .text:06287950 (ICF-folded with CNudgeEngine::operator=): base dwords +4..+0xc and the
-    // +0x10 byte, then OwnerShip (+0x14), bActive (+0x18), AxisThrottle (+0x1c); no self test.
+    // .text:06287950 (ICF-folded with CNudgeEngine::operator=); no self test.
     CPhysControllerEquip::operator=(Other);
     OwnerShip = Other.OwnerShip;
     bActive = Other.bActive;
@@ -161,10 +144,9 @@ CSteering& CSteering::operator=(CSteering const& Other)
 
 bool CSteering::EnableController()
 {
-    // Listing 0x4d330 (one body shared by CNudgeEngine/CSteering/CStrafeEngine::EnableController;
-    // CPhysControllerEquip's own slot is _purecall): an unconditional virtual call to
-    // this->vtable[0x28](OwnerShip), i.e. ControlObject(OwnerShip) -- no bControllerEnabled or
-    // OwnerShip-null guard here (ControlObject is itself the idempotency check).
+    // 0x4d330, one body shared by CNudgeEngine/CSteering/CStrafeEngine::EnableController
+    // (CPhysControllerEquip's own slot is _purecall): an unconditional virtual
+    // ControlObject(OwnerShip) (+0x28), with no guard; ControlObject is the idempotency check.
     return ControlObject(OwnerShip);
 }
 
@@ -184,10 +166,8 @@ bool CSteering::IsActive() const
 
 double CSteering::GetAxisSteeringTorque(unsigned Axis, float Factor) const
 {
-    // .text:062bb610-062bb699: the virtual IsControllerEnabled and bActive gate the result
-    // (a local 0.0f otherwise); OwnerShip and its archetype (+0x88) are dereferenced without
-    // a test. Axis 0/1/2 multiplies Factor by SteeringTorqueX/Y/Z; any other axis returns that
-    // local 0.0f times Factor (062bb686). The product stays unrounded in ST0.
+    // .text:062bb610. OwnerShip and its archetype (+0x88) are dereferenced without a test; any
+    // other axis returns the local 0.0f times Factor. The product stays unrounded in ST0.
     float const Zero = 0.0f;
     if (!IsControllerEnabled() || !bActive)
         return Zero;
@@ -208,19 +188,15 @@ Vector const& CSteering::GetAxisThrottle() const
 
 void CSteering::SetAxisThrottle(Vector const& Throttle)
 {
-    // .text:062bb6a0-062bb7b2. Each axis (z, y, x) is clamped: FCOM -1.0 / TEST AH,5 / JP
-    // keeps >= -1 or unordered, else -1; FCOM 1.0 / TEST AH,0x41 / JNZ keeps <= 1 or
-    // unordered, else 1. A NaN passes through.
+    // .text:062bb6a0. Each axis (z, y, x) is clamped to [-1, 1]; a NaN passes through.
     float const ClampedZ = Throttle.z < -1.0f ? -1.0f : (Throttle.z > 1.0f ? 1.0f : Throttle.z);
     float const ClampedY = Throttle.y < -1.0f ? -1.0f : (Throttle.y > 1.0f ? 1.0f : Throttle.y);
     float const ClampedX = Throttle.x < -1.0f ? -1.0f : (Throttle.x > 1.0f ? 1.0f : Throttle.x);
 
-    // 062bb743-062bb74f: the threshold is squared and spilled as a float.
+    // The threshold is squared and stored as a float.
     float const ThresholdSq = AXIS_CHANGE_THRESHOLD * AXIS_CHANGE_THRESHOLD;
 
-    // 062bb753-062bb78d: per axis x, y, z the squared difference (kept on the FPU) is FCOMPed
-    // with ThresholdSq; TEST AH,0x41 + JP takes "greater or unordered" straight to the update,
-    // and only when all three are ordered <= does the function return unchanged.
+    // Squared differences stay on the FPU; greater or unordered on any axis updates.
     double const Dx = (double)AxisThrottle.x - ClampedX;
     double const Dy = (double)AxisThrottle.y - ClampedY;
     double const Dz = (double)AxisThrottle.z - ClampedZ;
@@ -240,21 +216,14 @@ void CSteering::SetOwner(CShip* Ship)
 
 void CSteering::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
-    // .text:062bb7c0-062bb8e7 (RET 0x8; CoreList is never read).
-    //  - vtbl[0x24] (IsControllerEnabled) false -> return; bActive (+0x18) clear -> return.
-    //  - (x*x + y*y) + z*z of AxisThrottle (+0x1c) compared with 0.0 (TEST AH,0x44; JNP):
-    //    exactly zero -> return.
-    //  - Math (lazily acquired, DAT_063fc490) slot 0x34 InverseRotate(Local, OwnerShip+0x08 as
-    //    the transform, AxisThrottle).
-    //  - Scaled = Local times Archetype::Ship::SteeringTorque X/Y/Z (+0x114/+0x118/+0x11c),
-    //    component by component.
-    //  - Math slot 0x30 Rotate(Torque, OwnerShip+0x08, Scaled); rotate(Torque, dt).
+    // .text:062bb7c0, RET 8. The math engine is acquired lazily (DAT_063fc490); OwnerShip+0x08
+    // is the transform; SteeringTorque X/Y/Z are Archetype::Ship +0x114/+0x118/+0x11c.
     (void)CoreList;
     if (!IsControllerEnabled())
         return;
     if (!bActive)
         return;
-    // 062bb7df-062bb80b: summed on the FPU, (x*x + y*y) + z*z; a NaN does not return.
+    // Unrounded; a NaN does not return.
     double const LenSq = ((double)AxisThrottle.x * AxisThrottle.x + (double)AxisThrottle.y * AxisThrottle.y) +
                          (double)AxisThrottle.z * AxisThrottle.z;
     if (LenSq == 0.0)
@@ -310,9 +279,7 @@ CNudgeEngine::~CNudgeEngine()
 
 CNudgeEngine& CNudgeEngine::operator=(CNudgeEngine const& Other)
 {
-    // .text:06287950 (ICF-folded with CSteering::operator=): the base part stops at +0x10
-    // (CPhysControllerEquip::operator=, .text:06280ad0), then OwnerShip (+0x14), bActive
-    // (+0x18) and CurrentNudge (+0x1c); no self test.
+    // .text:06287950 (ICF-folded with CSteering::operator=); no self test.
     CPhysControllerEquip::operator=(Other);
     OwnerShip = Other.OwnerShip;
     bActive = Other.bActive;
@@ -322,10 +289,7 @@ CNudgeEngine& CNudgeEngine::operator=(CNudgeEngine const& Other)
 
 bool CNudgeEngine::EnableController()
 {
-    // Listing 0x4d330 (one body shared by CNudgeEngine/CSteering/CStrafeEngine::EnableController;
-    // CPhysControllerEquip's own slot is _purecall): an unconditional virtual call to
-    // this->vtable[0x28](OwnerShip), i.e. ControlObject(OwnerShip) -- no bControllerEnabled or
-    // OwnerShip-null guard here (ControlObject is itself the idempotency check).
+    // 0x4d330, shared; see CSteering::EnableController.
     return ControlObject(OwnerShip);
 }
 
@@ -348,10 +312,7 @@ Vector CNudgeEngine::GetNudgeVec() const
 
 void CNudgeEngine::SetNudgeVec(Vector const& Vec)
 {
-    // .text:062ad250-062ad326. The threshold is squared and spilled as a float (062ad251-
-    // 062ad266). Per axis x, y, z the squared difference stays on the FPU and is FCOMPed with
-    // it; TEST AH,0x41 + JP takes "greater or unordered" to the update, so the call returns
-    // unchanged only when all three are ordered <=.
+    // .text:062ad250. Same change test as CSteering::SetAxisThrottle.
     float const ThresholdSq = NUDGE_CHANGE_THRESHOLD * NUDGE_CHANGE_THRESHOLD;
     double const DiffX = (double)CurrentNudge.x - Vec.x;
     double const DiffY = (double)CurrentNudge.y - Vec.y;
@@ -362,9 +323,7 @@ void CNudgeEngine::SetNudgeVec(Vector const& Vec)
     // wakeup() comes before CurrentNudge is written, as in retail.
     wakeup();
 
-    // 062ad2b2-062ad2dd: length on the FPU, summed (z*z + y*y) + x*x, FSQRT, then FCOM 1.0
-    // (double) / TEST AH,0x41 / JNZ: <= 1 or unordered copies Vec unchanged; only an ordered
-    // > 1 normalises, by the unrounded reciprocal (FDIVR 1.0), each product rounded once.
+    // Only an ordered length > 1 normalises, by the unrounded reciprocal.
     double const Len = sqrt(((double)Vec.z * Vec.z + (double)Vec.y * Vec.y) + (double)Vec.x * Vec.x);
     CurrentNudge = Vec;
     if (Len > 1.0)
@@ -383,20 +342,14 @@ void CNudgeEngine::SetOwner(CShip* Ship)
 
 void CNudgeEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
-    // .text:062ad340-062ad418 (RET 0x8; CoreList is never read).
-    //  - vtbl[0x24] (IsControllerEnabled) false -> return; bActive (+0x18) clear -> return.
-    //  - (x*x + y*y) + z*z of CurrentNudge (+0x1c) compared with 0.0 (FCOMP 0.0; TEST AH,0x44;
-    //    JNP): exactly zero -> return. The gate is 0.0, not NUDGE_CHANGE_THRESHOLD.
-    //  - Math (lazily acquired, DAT_063fc324) slot 0x30 Rotate(World, OwnerShip+0x08 as the
-    //    transform, CurrentNudge).
-    //  - Force = World times Archetype::Ship::NudgeForce ((OwnerShip+0x88)+0x120), then
-    //    push(Force, dt).
+    // .text:062ad340, RET 8. The math engine is acquired lazily (DAT_063fc324); NudgeForce is
+    // Archetype::Ship +0x120.
     (void)CoreList;
     if (!IsControllerEnabled())
         return;
     if (!bActive)
         return;
-    // 062ad35f-062ad38b: summed on the FPU, (x*x + y*y) + z*z; a NaN does not return.
+    // The gate is exactly 0.0, not NUDGE_CHANGE_THRESHOLD; a NaN does not return.
     double const LenSq = ((double)CurrentNudge.x * CurrentNudge.x + (double)CurrentNudge.y * CurrentNudge.y) +
                          (double)CurrentNudge.z * CurrentNudge.z;
     if (LenSq == 0.0)
@@ -441,8 +394,7 @@ CStrafeEngine::~CStrafeEngine()
 
 CStrafeEngine& CStrafeEngine::operator=(CStrafeEngine const& Other)
 {
-    // .text:06287a50: the base part stops at +0x10, then OwnerShip (+0x14) and CurrentStrafe
-    // (+0x18); no self test.
+    // .text:06287a50; no self test.
     CPhysControllerEquip::operator=(Other);
     OwnerShip = Other.OwnerShip;
     CurrentStrafe = Other.CurrentStrafe;
@@ -451,10 +403,7 @@ CStrafeEngine& CStrafeEngine::operator=(CStrafeEngine const& Other)
 
 bool CStrafeEngine::EnableController()
 {
-    // Listing 0x4d330 (one body shared by CNudgeEngine/CSteering/CStrafeEngine::EnableController;
-    // CPhysControllerEquip's own slot is _purecall): an unconditional virtual call to
-    // this->vtable[0x28](OwnerShip), i.e. ControlObject(OwnerShip) -- no bControllerEnabled or
-    // OwnerShip-null guard here (ControlObject is itself the idempotency check).
+    // 0x4d330, shared; see CSteering::EnableController.
     return ControlObject(OwnerShip);
 }
 
@@ -483,29 +432,18 @@ void CStrafeEngine::SetOwner(CShip* Ship)
 
 void CStrafeEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
-    // .text:062bb960-062bbadd (RET 0x8; CoreList is never read).
-    //  - CurrentStrafe (+0x18) == 0 -> return.
-    //  - Cost = Archetype::Ship::StrafePowerUsage (+0x128) * dt against OwnerShip->ThrustPower
-    //    (FCOMP; TEST AH,0x41; JP): above the pool (or unordered) -> CurrentStrafe = 0, return
-    //    (062bbacd). Else ThrustPower -= Cost.
-    //  - Jump table on CurrentStrafe - 1 (062bbae0), the ship orientation at OwnerShip+0x08:
-    //      1 Left:  -(column 0), built through the Vector(x,y,z) ctor FUN_0628b030;
-    //      2 Right: +(column 0);  3 Up: +(column 1);  4 Down: -(column 1).
-    //    Any other value: FDUMP(0x100001, "%s(%d) : *** ERROR: %s", CStrafeEngine.cpp, 0x4d,
-    //    "No strafe direction!") and return, after the power has been drained.
-    //  - push(Dir * Archetype::Ship::StrafeForce (+0x124), dt).
+    // .text:062bb960, RET 8. StrafePowerUsage is Archetype::Ship +0x128, StrafeForce +0x124;
+    // jump table at 062bbae0. An unknown direction returns after the power has been drained.
     (void)CoreList;
     if (CurrentStrafe == StrafeNone)
         return;
 
-    // 062bb97b-062bb99e: Cost stays unrounded on the FPU (FLD arch+0x128 / FMUL [dt]); FCOMP
-    // Cost vs pool, TEST AH,0x41 / JP: taken on 0 (Cost above) or 0x41 (unordered); the
-    // FSUB result is rounded once by the FSTP float.
+    // Cost stays unrounded; a cost above the pool (or unordered) cancels the strafe.
     double const Cost = (double)OwnerShip->shiparch()->StrafePowerUsage * EventSim->delta_time;
     double const Pool = OwnerShip->ThrustPower;
     if (!(Cost <= Pool))
     {
-        CurrentStrafe = StrafeNone;     // 062bbacf
+        CurrentStrafe = StrafeNone;
         return;
     }
     OwnerShip->ThrustPower = (float)(Pool - Cost);

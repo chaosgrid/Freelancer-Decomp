@@ -45,7 +45,6 @@ static GENRESULT MathQuatSlerp(I3DMathEngine* Math, float* Dst, const float* A, 
     return Math->QuatSlerp(*(FQuaternion*)Dst, *(const FQuaternion*)A, *(const FQuaternion*)B, C);
 }
 
-
 static const int kFdumpNotice = 0x100003;
 static const int kFdumpError = 0x100001;
 static const int kFdumpWarning = 0x100002;
@@ -53,9 +52,9 @@ static const int kFdumpFatal = 0x100000;
 static const char* const G_FdumpFmtNotice = "%s(%d) : NOTICE:General:%s";
 static const char* const G_FdumpFmtError = "%s(%d) : ERROR:General:%s";
 static const char* const G_FdumpFmtWarning = "%s(%d) : WARNING:General:%s";
-// s_%s(%d)_:_FATAL:General:%s, pushed with 0x100000 (e.g. 06615567 / 0661556c).
+// Pushed with 0x100000 (e.g. 06615567 / 0661556c).
 static const char* const G_FdumpFmtFatal = "%s(%d) : FATAL:General:%s";
-// .data:0662a208 (from the PE bytes; the listing truncates it): the __FILE__ that the
+// .data:0662a208 (from the PE bytes): the __FILE__ that the
 // "Unknown data type!" sites of IChannel::CreateTyped (06615a5f, line 0x44D) and
 // CreateFromObject (06615c16, line 0x479) push.
 static const char* const G_FdumpFileAnimComponent =
@@ -194,14 +193,12 @@ static void BuildNodeName(char* Buffer, const char* Source)
     std::memcpy(Buffer, Source, Length < 0x30 ? Length : 0x30);
 }
 
-// FUN_0661d700: XOR EAX,EAX / RET 4. Always 0; factories destroy the object if nonzero.
+// FUN_0661d700: always 0; factories destroy the object if nonzero.
 static int DACOM_API EngBaseAggregationHook(void* Desc)
 {
     (void)Desc;
     return 0;
 }
-
-
 
 GENRESULT DACOM_API FDacomFactory::QueryInterface(const char* Iid, void** Out)
 {
@@ -266,8 +263,7 @@ static GENRESULT DACOM_API StubRet10(void* This, void* A, void* B, void* C)
     return GR_GENERIC;
 }
 
-// LAB_06626cd0 / IEC+0x20 RET 0xC: XOR EAX.
-// formerly HardpointIecStubRetC
+// LAB_06626cd0 (IEC+0x20): returns 0.
 static GENRESULT DACOM_API NoOpHardpointInstance(void* Nested, void* A, void* B)
 {
     (void)Nested;
@@ -276,8 +272,7 @@ static GENRESULT DACOM_API NoOpHardpointInstance(void* Nested, void* A, void* B)
     return GR_OK;
 }
 
-// LAB_06626cf0 / IEC+0x1C and +0x2C RET 0x10: OR EAX,-1.
-// formerly HardpointIecStubRet10
+// LAB_06626cf0 (IEC+0x1C and +0x2C): returns -1.
 static GENRESULT DACOM_API RejectHardpointQuery(void* Nested, void* A, const void* ArgIid, void* C)
 {
     (void)Nested;
@@ -335,8 +330,7 @@ static GENRESULT DACOM_API StubRet24(void* This, void* A, void* B, void* C, void
     return GR_GENERIC;
 }
 
-// LAB_06627ef0 (RET 4), ICF-shared by six inner/factory vtables: INC [this+4] and return it.
-// No check of This (the port's null guard is gone, 2026-09-30).
+// LAB_06627ef0, ICF-shared by six inner/factory vtables. No null check of this.
 unsigned long DACOM_API FAnimationInner::AddRef()
 {
     RefCount += 1;
@@ -357,7 +351,7 @@ static char* DuplicateLoweredName(char const* Name)
     return Copy;
 }
 
-// FUN_06626310 (create_archetype, 0662604b) / FUN_066265e0 behind DAT_0662ace4 (add_hardpoint,
+// FUN_06626310 (create_archetype, 0662604b) / FUN_066265e0 behind DAT_0662ace4 (add_hardpoint).
 FHardpointRecord::FHardpointRecord(unsigned long InCrc, char const* InName)
     : Crc(InCrc)
     , Name(DuplicateLoweredName(InName != nullptr ? InName : ""))
@@ -394,7 +388,7 @@ static void HardpointConstruct(FHardpointObject* Object)
     Object->bCacheValid = 0;
 }
 
-// FUN_06625d00 (dtor, thiscall). Walks the map from begin() in ascending key order and, for
+// FUN_06625d00 (dtor, thiscall). Reports each archetype still in the map, in ascending key order.
 static void HardpointDestruct(FHardpointObject* Object)
 {
     for (FHardpointMap::iterator It = Object->Archetypes.begin(); It != Object->Archetypes.end();
@@ -412,9 +406,8 @@ static void HardpointDestruct(FHardpointObject* Object)
 
 static void DestroyAnimationLists(FAnimationObject* Object);
 
-// LAB_06627f00 (RET 4): count > 0 (JBE, unsigned) -> count--; count != 0 -> return it. At zero:
-// count = 1, and when the object pointer is non-null run the dtor FUN_06625d00 and free it;
-// return 0.
+// LAB_06627f00. Unsigned decrement guarded at zero; at zero the count is reset to 1 and the
+// object (dtor FUN_06625d00) is freed.
 unsigned long DACOM_API FHardpointInner::Release()
 {
     if (RefCount > 0)
@@ -431,9 +424,7 @@ unsigned long DACOM_API FHardpointInner::Release()
     return 0;
 }
 
-// LAB_0661a940 (RET 4): count > 0 (JBE, unsigned) -> count--; count != 0 -> return it. At
-// zero: count = 1, and when the object pointer (+8) is non-null run the dtor FUN_06616d90 and
-// free it; return 0.
+// LAB_0661a940. Same shape as FHardpointInner::Release; object pointer at +8, dtor FUN_06616d90.
 unsigned long DACOM_API FAnimationInner::Release()
 {
     if (RefCount > 0)
@@ -450,7 +441,7 @@ unsigned long DACOM_API FAnimationInner::Release()
     return 0;
 }
 
-// The {iid, offset} walk both inner unknowns inline (LAB_0661a880 over 06629478,
+// The {iid, offset} walk both inner unknowns inline (LAB_0661a880, LAB_06627e30).
 static GENRESULT InnerQueryTable(void* Object, const char* Iid, void** Out,
                                  const FInnerIidEntry* Table)
 {
@@ -519,9 +510,8 @@ static int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND
 static int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData);
 static void FileSystemFindClose(void* FileSystem, int FindHandle);
 
-// LAB_0661a980 / LAB_0661a990 / LAB_0661a9a0 (the IAnimation2 slots 0-2, also reached from the
-// three facet thunks after SUB this): replace the this argument with [this+0x50] and jump
-// through its vtable +0 / +4 / +8. No checks.
+// LAB_0661a980 / LAB_0661a990 / LAB_0661a9a0 (IAnimation2 slots 0-2, also reached from the
+// three facet thunks): forward to the controller at +0x50. No checks.
 static GENRESULT DACOM_API AnimationQueryInterface(FAnimationObject* This, const char* Iid,
                                                   void** Out)
 {
@@ -640,7 +630,6 @@ static bool IsValidAnimScript(FAnimScript* Script)
     return Script != G_InvalidAnimScript && Script != nullptr;
 }
 
-// formerly Slot00
 unsigned long DACOM_API FAnimScript::RejectOperation(void* ArgA, void* ArgB)
 {
     (void)ArgA;
@@ -1604,7 +1593,7 @@ static unsigned long DACOM_API TypedLerpScaledVec3(FVectorTypedChannel* This, fl
     return (unsigned long)((size_t)Out);
 }
 
-// formerly TypedNopRet10; TODO: derive the retail return contract.
+// TODO: derive the retail return contract (also for the three no-ops below).
 static unsigned long DACOM_API NoOpTypedChannelApply(FTypedChannel* This, const float* Left,
                                             const float* Right, double Alpha)
 {
@@ -1615,7 +1604,6 @@ static unsigned long DACOM_API NoOpTypedChannelApply(FTypedChannel* This, const 
     return 0;
 }
 
-// formerly TypedNopSlot0; TODO: derive the retail return contract.
 static unsigned long DACOM_API NoOpTypedChannelInterpolate(FTypedChannel* This, float* Out, const float* Left,
                                              const float* Right, double Alpha)
 {
@@ -1627,7 +1615,6 @@ static unsigned long DACOM_API NoOpTypedChannelInterpolate(FTypedChannel* This, 
     return 0;
 }
 
-// formerly TypedNopArg1; TODO: derive the retail return contract.
 static unsigned long DACOM_API NoOpTypedChannelCopy(FTypedChannel* This, void* A)
 {
     (void)This;
@@ -1635,7 +1622,6 @@ static unsigned long DACOM_API NoOpTypedChannelCopy(FTypedChannel* This, void* A
     return 0;
 }
 
-// formerly TypedNopArg2; TODO: derive the retail return contract.
 static unsigned long DACOM_API NoOpTypedChannelMapped(FTypedChannel* This, void* A, void* B)
 {
     (void)This;
@@ -1644,9 +1630,8 @@ static unsigned long DACOM_API NoOpTypedChannelMapped(FTypedChannel* This, void*
     return 0;
 }
 
-// LAB_06612170 RET 0x8: zero three floats through the first argument, ignore the second.
-// Slot 0x38 of every table except type-6's, whose LAB_0661bd30 shows the second argument is a
-// float -- so that is how it is spelled here, one signature for the slot.
+// LAB_06612170: slot 0x38 of every table except type-6's. Type-6's LAB_0661bd30 shows the
+// second argument is a float, so the slot uses that one signature.
 static unsigned long DACOM_API TypedZeroVec3(FTypedChannel* This, float* Out, float Dt)
 {
     (void)This;
@@ -1659,7 +1644,7 @@ static unsigned long DACOM_API TypedZeroVec3(FTypedChannel* This, float* Out, fl
     return 0;
 }
 
-// FUN_0661af70 thiscall RET 4 (Header): header[0] is the start time.
+// FUN_0661af70: header[0] is the start time.
 static unsigned long DACOM_API TypedTimePlayable(FTypedChannel* This, float* Time)
 {
     unsigned long Bits = 0;
@@ -1671,7 +1656,7 @@ static unsigned long DACOM_API TypedTimePlayable(FTypedChannel* This, float* Tim
     if (Bits == 0xC0000000)
         return 1;
     float Duration = 0.0f;
-    This->Archetype->GetDuration(&Duration);                     // 0661af94..9f vtbl+0x10
+    This->Archetype->GetDuration(&Duration);
     if (!(*Time <= Duration))
         return 0;
     if (!(*Time >= 0.0f))
@@ -1679,8 +1664,7 @@ static unsigned long DACOM_API TypedTimePlayable(FTypedChannel* This, float* Tim
     return 1;
 }
 
-// FUN_0661ad90 thiscall RET 4: FUN_0661af70; if AL != 0, virtual slot 1 (Bind) with the same
-// header (0661ada5..aa). Returns the check's AL.
+// FUN_0661ad90.
 static unsigned long DACOM_API TypedTryBindIfTimeValid(FTypedChannel* This, float* Header)
 {
     const unsigned long Ok = TypedTimePlayable(This, Header);
@@ -1691,49 +1675,49 @@ static unsigned long DACOM_API TypedTryBindIfTimeValid(FTypedChannel* This, floa
     return Ok;
 }
 
-// FUN_0661b070 thiscall RET 0: pose the channel at its current time -- or, once it has
-// stopped (PlayFlags bit 1), at the end it ran into -- without advancing it.
+// FUN_0661b070: pose the channel at its current time -- or, once it has stopped (PlayFlags
+// bit 1), at the end it ran into -- without advancing it.
 void TypedApplyFromArchetype(FTypedChannel* This)
 {
-    This->PlayFlags |= 1;                                        // 0661b076..81
-    if (This->Archetype == nullptr)                              // 0661b07f..84
+    This->PlayFlags |= 1;
+    if (This->Archetype == nullptr)
         return;
     unsigned long Flags = 0;
-    This->Archetype->GetFlags(&Flags);                           // 0661b08a..92 vtbl+0x14
-    if (Flags == 8)                                              // 0661b095..9a
+    This->Archetype->GetFlags(&Flags);
+    if (Flags == 8)
         return;
-    float Time = This->Time;                                     // 0661b09c..9f
-    if ((This->PlayFlags & 2) != 0)                              // 0661b0a3..a8 (byte test)
+    float Time = This->Time;
+    if ((This->PlayFlags & 2) != 0)
     {
-        // FLD Weight; FCOMP qword 0.0; TEST AH,5; JP -- taken for "greater", "equal" and
-        // unordered (C0 clear, or C0 and C2 both set): Duration. Only Weight < 0 gives 0.
+        // Greater, equal and unordered Weight all take Duration; only Weight < 0 gives 0.
         if (This->Weight < 0.0f)
-            Time = 0.0f;                                         // 0661b0ba
+            Time = 0.0f;
         else
         {
             float Duration = 0.0f;
-            This->Archetype->GetDuration(&Duration);             // 0661b0c4..cf vtbl+0x10
+            This->Archetype->GetDuration(&Duration);
             Time = Duration;
         }
     }
     const unsigned char* Left = nullptr;
     const unsigned char* Right = nullptr;
     float Alpha = 0.0f;
-    This->Archetype->Sample(Time, &Left, &Right, &Alpha);        // 0661b0da..f4 vtbl+0x18
-    // Retail's FUN_0661b070 pushes Alpha as a DOUBLE here -- `SUB ESP,8; FSTP qword [ESP]` --
+    This->Archetype->Sample(Time, &Left, &Right, &Alpha);
+    // Retail pushes Alpha as a double here.
     This->Apply((const float*)Left,
                                      (const float*)Right, Alpha);
 }
 
-// FUN_0661b120 thiscall RET 0x18 (T0, T1, Mode, Buf, Cap, Count): gather the keys an event
+// FUN_0661b120: gather the archetype keys between T0 and T1 into Buf, recursing across the
+// end of a looping or ping-pong channel.
 static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsigned long Mode,
                                   float* Buf, unsigned long Cap, unsigned long* Count)
 {
     float Duration = 0.0f;
-    This->Archetype->GetDuration(&Duration);                     // 0661b12d..36 vtbl+0x10
-    unsigned long Found = 0;                                     // frame +0x10
+    This->Archetype->GetDuration(&Duration);
+    unsigned long Found = 0;
 
-    // 0661b139..5c / 0661b228..37. Weight: FCOMP qword 0.0; TEST AH,5; JP -- taken for >= 0
+    // An unordered Weight counts as forward (>= 0).
     unsigned char bWrap = 0;
     if (!(This->Weight < 0.0f))
     {
@@ -1745,43 +1729,41 @@ static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsig
 
     if (bWrap == 0)
     {
-        Found = 0;                                               // 0661b16e
-        if ((Mode & 1) != 0)                                     // 0661b172..97
+        Found = 0;
+        if ((Mode & 1) != 0)
         {
             This->Archetype->CollectAt(T0, Buf, Cap, &Found);
             *Count += Found;
         }
-        // FLD T0; FCOMP T1; TEST AH,0x44; JNP -- "equal" skips the range.
-        if (T0 != T1)                                            // 0661b199..a6
+        if (T0 != T1)
         {
             Found = 0;
             This->Archetype->CollectRange(T0, T1, Buf + *Count * 2, Cap - *Count, &Found);
-            *Count += Found;                                     // 0661b1a8..e1
-            if ((Mode & 2) != 0)                                 // 0661b1df..0661b213
+            *Count += Found;
+            if ((Mode & 2) != 0)
             {
                 Found = 0;
                 This->Archetype->CollectAt(T1, Buf + *Count * 2, Cap - *Count, &Found);
                 *Count += Found;
             }
         }
-        This->Time = T1;                                         // 0661b215..1a
+        This->Time = T1;
         return 0;
     }
 
-    // 0661b23d..71: the span up to the end the channel is running towards.
+    // The span up to the end the channel is running towards.
     float Span = 0.0f;
     if (This->Weight < 0.0f)
-        Span = -T0;                                              // FLD T0; FCHS
+        Span = -T0;
     else
         Span = (float)((double)Duration - T0);
-    Found = 0;                                                   // 0661b269
-    if ((Mode & 1) != 0)                                         // 0661b275..96
+    Found = 0;
+    if ((Mode & 1) != 0)
     {
         This->Archetype->CollectAt(T0, Buf, Cap, &Found);
         *Count += Found;
     }
-    // FLD Span; FCOMP 0.0f; TEST AH,0x44; JNP -- a zero span skips the range. Found is not
-    // cleared before either of the two calls below (0661b2a9..0661b317).
+    // Retail does not clear Found before either of the two calls below.
     if (Span != 0.0f)
     {
         const float EndTime = (float)((double)Span + T0);
@@ -1794,9 +1776,9 @@ static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsig
         }
     }
 
-    const unsigned long Loop = This->LoopFlags;                  // 0661b319
-    const bool bForward = !(This->Weight < 0.0f);                // 0661b31c..1f, TEST AH,5 / JP
-    if ((Loop & 2) != 0)                                         // 0661b325..0661b389
+    const unsigned long Loop = This->LoopFlags;
+    const bool bForward = !(This->Weight < 0.0f);
+    if ((Loop & 2) != 0)
     {
         Found = 0;
         if (bForward)
@@ -1808,116 +1790,112 @@ static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsig
         *Count += Found;
         return 0;
     }
-    if ((Loop & 4) != 0)                                         // 0661b38c..0661b3f2
+    if ((Loop & 4) != 0)
     {
         const float Turn = bForward ? Duration : 0.0f;
-        This->Weight = -This->Weight;                            // FLD; FCHS; FSTP
+        This->Weight = -This->Weight;
         Found = 0;
         TypedCollect(This, Turn, (float)((double)Turn - T1), 2,
                      Buf + *Count * 2, Cap - *Count, &Found);
         *Count += Found;
         return 0;
     }
-    This->Time = bForward ? Duration : 0.0f;                     // 0661b3f5..0a
-    This->PlayFlags |= 2;                                        // 0661b40d..0f
+    This->Time = bForward ? Duration : 0.0f;
+    This->PlayFlags |= 2;
     return 1;
 }
 
-// FUN_0661b420 thiscall RET 4 (Dt): advance the channel by Dt * Weight and pose it. Answers 1
+// FUN_0661b420: advance the channel by Dt * Weight and pose it. Answers 1
 // when a non-looping channel has run off its end this tick and nothing has posed it since
 // (PlayFlags bit 0 clear); an owner-driven channel answers whatever its owner does.
 unsigned long TypedTick(FTypedChannel* This, float Dt)
 {
-    unsigned long Result = 0;                                    // frame +0x10
-    This->PlayFlags |= 4;                                        // 0661b42c..38
-    if ((This->PlayFlags & 3) != 0)                              // 0661b43b..3d
+    unsigned long Result = 0;
+    This->PlayFlags |= 4;
+    if ((This->PlayFlags & 3) != 0)
         return 0;
 
-    const float OldTime = This->Time;                            // 0661b44d..51
-    // FLD Dt; FMUL Weight; FADD Time; FST local; FSTP Time.
+    const float OldTime = This->Time;
     const float NewTime = (float)((double)Dt * This->Weight + This->Time);
     This->Time = NewTime;
 
-    if (This->Owner != nullptr)                                  // 0661b45b..64
+    if (This->Owner != nullptr)
     {
         float* Sampled = This->GetSampled();
         IChannelOwner* Owner = This->Owner;
         return (unsigned long)(Owner->Apply(
             Sampled, (unsigned long)((size_t)This),
-            TypedBindDesc(This), NewTime));                       // 0661b466..7e
+            TypedBindDesc(This), NewTime));
     }
 
     unsigned long Flags = 0;
-    This->Archetype->GetFlags(&Flags);                           // 0661b490..9b vtbl+0x14
-    if (Flags == 8)                                              // 0661b49e..a3
+    This->Archetype->GetFlags(&Flags);
+    if (Flags == 8)
     {
-        float Keys[0x40][2];                                     // frame +0x2A4
+        float Keys[0x40][2];
         unsigned long KeyCount = 0;
         Result = TypedCollect(This, OldTime, This->Time, 3, &Keys[0][0], 0x40, &KeyCount);
-        if (KeyCount == 0)                                       // 0661b4d6..d8
+        if (KeyCount == 0)
             return Result;
         void* Sink = (void*)((size_t)(This->Sink));
-        if (Sink == nullptr)                                     // 0661b4de..e3
+        if (Sink == nullptr)
             return Result;
-        FChannelKeyBatch Batch;                                  // frame +0xA0
-        Batch.Count = KeyCount;                                  // 0661b4eb
-        // REP MOVSD of (count & 0x1FFFFFFF) * 2 dwords (0661b4f4..0661b50a).
+        FChannelKeyBatch Batch;
+        Batch.Count = KeyCount;
+        // Retail copies (count & 0x1FFFFFFF) * 2 dwords.
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
         IChannelSink* KeySink = (IChannelSink*)Sink;
         KeySink->OnKeys((unsigned long)((size_t)This),
                         (void*)((size_t)(This->SinkContext)),
-                        &Batch);                                  // 0661b50c..1c
+                        &Batch);
         return Result;
     }
 
     float Duration = 0.0f;
-    This->Archetype->GetDuration(&Duration);                     // 0661b52e..39 vtbl+0x10
-    // FLD Weight; FCOMP qword 0.0; TEST AH,5; JP -- >= 0 and unordered take Duration - Time.
+    This->Archetype->GetDuration(&Duration);
+    // Weight >= 0 and unordered take Duration - Time.
     const double Remaining = This->Weight < 0.0f
                                  ? (double)(This->Time)
                                  : (double)Duration - This->Time;
-    // FCOM qword 0.0; TEST AH,0x41; JP -- "greater" and unordered go straight to sampling.
+    // "Greater" and unordered go straight to sampling.
     if (Remaining <= 0.0)
     {
-        // FLD Duration; FCOMP 0.0f; TEST AH,0x44; JNP -- a zero-length clip keeps 0 wraps.
-        unsigned long Wraps = 0;                                 // EBX
+        unsigned long Wraps = 0;
         if (Duration != 0.0f)
         {
-            // FDIVR -> Remaining / Duration; _ftol; CDQ / XOR / SUB: |low dword|.
+            // _ftol, then the absolute value of the low dword.
             const long Low = (long)((long long)(Remaining / Duration));
             Wraps = (unsigned long)((Low ^ (Low >> 31)) - (Low >> 31));
         }
-        // FABS; FILD qword {Wraps, 0}; FMUL Duration; FSUBP; FSTP dword.
         const float Frac = (float)(std::fabs(Remaining) -
                                               (double)Wraps * Duration);
-        const unsigned long Loop = This->LoopFlags;              // 0661b59d
-        unsigned long Header[7];                                 // frame +0x1C
-        if ((Loop & 2) != 0)                                     // 0661b5a0..ad
+        const unsigned long Loop = This->LoopFlags;
+        unsigned long Header[7];
+        if ((Loop & 2) != 0)
         {
-            // Frame +0x50: a 3x3 orientation (0..8), the applied position (9..11) and the
-            // matrix QuaternionToMatrix writes (12..20), which is copied over 0..8.
+            // A 3x3 orientation (0..8), the applied position (9..11) and the matrix
+            // QuaternionToMatrix writes (12..20), which is copied over 0..8.
             float Frame[21];
-            if (This->Kind == 1)                                 // 0661b5b3..bd
+            if (This->Kind == 1)
             {
-                // bLast = Weight >= 0 (or unordered): TEST AH,5; JP -> ECX 0 -> SETZ 1.
                 const unsigned char bLast = This->Weight < 0.0f ? 0 : 1;
                 const unsigned char* FrameData = nullptr;
-                This->Archetype->GetFrame(bLast, &FrameData);    // 0661b5d9..ea vtbl+0x20
+                This->Archetype->GetFrame(bLast, &FrameData);
                 This->Apply(
                     (const float*)FrameData,
                     (const float*)FrameData,
-                    (double)Dt);                    // 0661b5ed..0661b605
-                // Retail reads +0x78 / +0x84 straight off the object, whatever its class. A
+                    (double)Dt);
+                // Retail reads +0x78 / +0x84 straight off the object, whatever its class.
                 FPosQuatTypedChannel* Pose = (FPosQuatTypedChannel*)This;
-                Frame[9] = Pose->AppliedPos[0];                  // 0661b608..1c
+                Frame[9] = Pose->AppliedPos[0];
                 Frame[10] = Pose->AppliedPos[1];
                 Frame[11] = Pose->AppliedPos[2];
-                I3DMathEngine* Math = Acquire3DMathEngine();     // DAT_0662acf4
+                I3DMathEngine* Math = Acquire3DMathEngine();
                 Math->QuaternionToMatrix(*(FMatrix*)(&Frame[12]),
                                          *(const FQuaternion*)(Pose->AppliedQuat));
-                std::memcpy(Frame, &Frame[12], 9 * sizeof(float)); // 0661b648..5d
+                std::memcpy(Frame, &Frame[12], 9 * sizeof(float));
                 void* Sink = (void*)((size_t)(This->Sink));
-                if (Sink != nullptr)                             // 0661b65b..6e
+                if (Sink != nullptr)
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
                     LoopSink->OnLoop((unsigned long)((size_t)This),
@@ -1925,7 +1903,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
                                      (void*)((size_t)(This->SinkContext)));
                 }
             }
-            // 0661b673..0661b6d6: rebind at the start the channel wraps back to.
+            // Rebind at the start the channel wraps back to.
             float StartTime = 0.0f;
             if (This->Weight < 0.0f)
                 StartTime = Duration;
@@ -1939,9 +1917,8 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
                             ? (unsigned long)((size_t)(&Frame[0]))
                             : 0;
             This->BindHeader(Header);
-            // FLD Duration (frame +0x10); FCOMP 0.0f; TEST AH,0x44; JNP -- skipped only when the
-            // clip has zero length. Then Weight >= 0 (or unordered) -> Frac, else Duration - Frac.
-            if (Duration != 0.0f)                                // 0661b6d9..0661b715
+            // Weight >= 0 or unordered takes Frac.
+            if (Duration != 0.0f)
             {
                 if (This->Weight < 0.0f)
                     This->Time = (float)((double)Duration - Frac);
@@ -1949,13 +1926,13 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
                     This->Time = Frac;
             }
         }
-        else if ((Loop & 4) != 0)                                // 0661b71a..0661b77b
+        else if ((Loop & 4) != 0)
         {
             // Ping-pong: an odd number of wraps keeps the direction, an even one reverses it.
             float NewWeight = This->Weight;
-            if ((Wraps & 1) == 0)                                // TEST BL,1; JNZ; FCHS
+            if ((Wraps & 1) == 0)
                 NewWeight = -NewWeight;
-            float StartTime = Frac;                              // FCOMP 0.0f; TEST AH,5; JP
+            float StartTime = Frac;
             if (NewWeight < 0.0f)
                 StartTime = (float)((double)Duration - Frac);
             std::memcpy(&Header[0], &StartTime, sizeof(float));
@@ -1967,11 +1944,11 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
             Header[6] = 0;
             This->BindHeader(Header);
         }
-        else                                                     // 0661b77d..b4
+        else
         {
             This->Time = This->Weight < 0.0f ? 0.0f : Duration;
             This->PlayFlags |= 2;
-            if ((This->PlayFlags & 1) == 0)                      // TEST BL,AL with BL = 1
+            if ((This->PlayFlags & 1) == 0)
                 Result = 1;
         }
     }
@@ -1979,15 +1956,14 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
     const unsigned char* Left = nullptr;
     const unsigned char* Right = nullptr;
     float Alpha = 0.0f;
-    This->Archetype->Sample(This->Time, &Left, &Right, &Alpha);  // 0661b7b8..d1 vtbl+0x18
+    This->Archetype->Sample(This->Time, &Left, &Right, &Alpha);
     This->Apply((const float*)Left,
                                      (const float*)Right,
-                                     (double)Alpha); // 0661b7d4..ed
+                                     (double)Alpha);
     return Result;
 }
 
-// LAB_0661caf0, the type-6 table's slot 8 (+0x20, .rdata:06629110), thiscall RET 0x4 (Target),
-// formerly TypedEvalType6Caf0
+// LAB_0661caf0, the type-6 table's slot 8 (+0x20, .rdata:06629110).
 static unsigned long DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* This, const float* Target)
 {
     if (This->Kind != 1)
@@ -2024,7 +2000,7 @@ static unsigned long DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* T
     return Bits;
 }
 
-// LAB_0661bc80 RET 0x14: lerp pos + 3DMath +0x58 slerp quat. Not IK.
+// LAB_0661bc80: lerp position, slerp quaternion (3DMath +0x58). Not IK.
 static unsigned long DACOM_API TypedLerpPosQuat(FPosQuatTypedChannel* This, float* Out, const float* Left,
                                                const float* Right, double Alpha)
 {
@@ -2045,7 +2021,7 @@ static unsigned long DACOM_API TypedLerpPosQuat(FPosQuatTypedChannel* This, floa
     return Bits;
 }
 
-// LAB_0661ba60, the type-6 table's slot 0 (.rdata:PTR_LAB_066290f0[0]). Recovered
+// LAB_0661ba60, the type-6 table's slot 0 (.rdata:PTR_LAB_066290f0[0]).
 static unsigned long DACOM_API TypedLerpPosQuatScaled(FPosQuatTypedChannel* This, float* Out,
                                                       const float* Left, const float* Right,
                                                       double Alpha)
@@ -2068,16 +2044,14 @@ static unsigned long DACOM_API TypedLerpPosQuatScaled(FPosQuatTypedChannel* This
     return LastBits;
 }
 
-// LAB_0661b880, slot 2 of the type 1 / 2 / 4 tables (.rdata:066291ac, 06629170, 06629134; one
-// formerly TypedApplySlot2
+// LAB_0661b880, slot 2 of the type 1 / 2 / 4 tables (.rdata:066291ac, 06629170, 06629134).
 static unsigned long DACOM_API ApplyInterpolatedChannelSample(FTypedChannel* This, float* Sampled,
                                                const float* Left, const float* Right, double Alpha)
 {
     return This->InterpolatePose(Sampled, Left, Right, Alpha);
 }
 
-// LAB_0661bb10, the type-6 table's slot 2 (.rdata:066290f8), thiscall RET 0x10 (Left, Right,
-// formerly TypedApplySlot2Type6
+// LAB_0661bb10, the type-6 table's slot 2 (.rdata:066290f8).
 static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChannel* This, const float* Left,
                                                     const float* Right, double Alpha)
 {
@@ -2125,7 +2099,7 @@ static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChanne
     return Kind;
 }
 
-// LAB_0661afe0 thiscall RET 0x4 (Time), 0661afe0..66. Each test is FCOMP + TEST AH,0x44:
+// LAB_0661afe0.
 static unsigned long DACOM_API TypedSetTime(FTypedChannel* This, float Time)
 {
     if (Time == -1.0f)
@@ -2148,15 +2122,14 @@ static unsigned long DACOM_API TypedSetTime(FTypedChannel* This, float Time)
     return 1;
 }
 
-// LAB_0661cf90: MOV EAX,6; RET.
+// LAB_0661cf90.
 static unsigned long DACOM_API TypedGetType6(FTypedChannel* This)
 {
     (void)This;
     return 6;
 }
 
-// LAB_06612190 RET 4 (06612190..99): MOV EAX,[ECX+0x3C]; *Out = EAX. EAX -- the copied dword
-// -- is the answer. No null checks.
+// LAB_06612190: copies the dword at +0x3C and returns it. No null checks.
 static unsigned long DACOM_API TypedCopySampledDword(FScalarTypedChannel* This, float* Out)
 {
     Out[0] = This->Sampled[0];
@@ -2165,8 +2138,7 @@ static unsigned long DACOM_API TypedCopySampledDword(FScalarTypedChannel* This, 
     return Bits;
 }
 
-// LAB_066121b0 RET 4 (066121b0..cd): copy 16 bytes from this+0x3C; EAX = Out is the answer.
-// No null checks. Type-4 slot 6.
+// LAB_066121b0, type-4 slot 6: 16 bytes from +0x3C. No null checks.
 static unsigned long DACOM_API TypedCopySampled16(FQuatTypedChannel* This, float* Out)
 {
     Out[0] = This->Sampled[0];
@@ -2176,16 +2148,14 @@ static unsigned long DACOM_API TypedCopySampled16(FQuatTypedChannel* This, float
     return (unsigned long)((size_t)Out);
 }
 
-// LAB_066121d0 RET 4 (066121d0..e7): copy 12 bytes from this+0x3C; EAX = Out. No null checks.
-// Type-2 slot 6.
+// LAB_066121d0, type-2 slot 6: 12 bytes from +0x3C. No null checks.
 static unsigned long DACOM_API TypedCopySampled12(FVectorTypedChannel* This, float* Out)
 {
     TypedCopyVec3(Out, This->Sampled);
     return (unsigned long)((size_t)Out);
 }
 
-// LAB_066121f0 RET 0x4 (066121f0..2e): copy 12 bytes from +0x78 and 16 from +0x84 into
-// Out / Out+0xC; EAX = Out+0xC is the answer. No null checks.
+// LAB_066121f0: 12 bytes from +0x78 and 16 from +0x84; returns Out+0xC. No null checks.
 static unsigned long DACOM_API TypedCopyApplied(FPosQuatTypedChannel* This, float* Out)
 {
     TypedCopyVec3(Out, This->AppliedPos);
@@ -2196,7 +2166,7 @@ static unsigned long DACOM_API TypedCopyApplied(FPosQuatTypedChannel* This, floa
     return (unsigned long)((size_t)(Out + 3));
 }
 
-// LAB_0661c6d0 thiscall RET 0x4 (Add), 0661c6d0..f9: Delta (+0x60) [i] = float(Delta[i] +
+// LAB_0661c6d0: Delta is at +0x60.
 static unsigned long DACOM_API TypedAddDelta(FPosQuatTypedChannel* This, const float* Add)
 {
     This->Delta[0] += Add[0];
@@ -2207,13 +2177,13 @@ static unsigned long DACOM_API TypedAddDelta(FPosQuatTypedChannel* This, const f
     return (unsigned long)((size_t)Add);
 }
 
-// LAB_06612240: LEA EAX,[ECX+0x78]; RET. No null check.
+// LAB_06612240: +0x78. No null check.
 static float* DACOM_API TypedAppliedPtr(FPosQuatTypedChannel* This)
 {
     return This->AppliedPos;
 }
 
-// LAB_0661c5c0, the type-6 table's slot 0x30, thiscall RET 0x8 (Out, OutSampled),
+// LAB_0661c5c0, the type-6 table's slot 0x30.
 static unsigned long DACOM_API TypedSampleXformType6(FPosQuatTypedChannel* This, float* Out,
                                                      float* OutSampled)
 {
@@ -2244,7 +2214,7 @@ static unsigned long DACOM_API TypedSampleXformType6(FPosQuatTypedChannel* This,
     return (unsigned long)((size_t)Out);
 }
 
-// One pass of LAB_0661c320 (retail inlines it twice, 0661c34d..0661c423 and
+// One pass of LAB_0661c320 (retail inlines it twice).
 static void TypedType6SampleXform(FPosQuatTypedChannel* This, float Time, const float** KeyA,
                                   const float** KeyB, float* Alpha, float* Xformed)
 {
@@ -2266,7 +2236,7 @@ static void TypedType6SampleXform(FPosQuatTypedChannel* This, float Time, const 
     MathTransformMatrix(Acquire3DMathEngine(), Xformed, This->Matrix, V);
 }
 
-// LAB_0661c320, the type-6 table's slot 0x34, thiscall RET 0x4 (Dt), 0661c320..0661c5b2.
+// LAB_0661c320, the type-6 table's slot 0x34.
 static unsigned long DACOM_API TypedStepDeltaType6(FPosQuatTypedChannel* This, float Dt)
 {
     const float Shifted = (double)(This->Weight) < 0.0
@@ -2311,7 +2281,7 @@ static void TypedType6ScaledFrame(FPosQuatTypedChannel* This, unsigned char bLas
     Out[2] = Scaled[2] * This->TranslationScale;
 }
 
-// LAB_0661bd30, the type-6 table's slot 0x38, thiscall RET 0x8 (Out, Dt), 0661bd30..0661c26b.
+// LAB_0661bd30, the type-6 table's slot 0x38.
 static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, float* Out, float Dt)
 {
     const float WeightedDt = Dt * This->Weight;
@@ -2401,7 +2371,7 @@ static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, flo
         Step[1] = Scaled1 - Now[1];
         Step[2] = Scaled2 - Now[2];
     }
-    // else: a failed Sample leaves Step zero (0661c20e).
+    // A failed Sample leaves Step zero.
 
     float Xformed[3];
     MathTransformMatrix(Acquire3DMathEngine(), Xformed, This->Matrix, Step);
@@ -2411,8 +2381,7 @@ static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, flo
     return (unsigned long)((size_t)Out);
 }
 
-// LAB_0661cc40, the type-6 table's slot 9 (+0x24, .rdata:06629114), thiscall RET 0x4 (Orient:
-// formerly TypedEvalType6Cc40
+// LAB_0661cc40, the type-6 table's slot 9 (+0x24, .rdata:06629114).
 static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel* This, const float* Orient)
 {
     if (This->Kind != 1)
@@ -2475,9 +2444,8 @@ static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel
     return Bits;
 }
 
-// The typed-channel vtable, as four retail tables actually have it (cross-DLL ABI pass 34).
-// The 15 slots below follow retail's __thiscall table order (PTR_LAB_066294ac,
-// PTR_LAB_0662912c/168/a4 and PTR_LAB_066290f0). Member dispatch puts this in ECX.
+// The typed-channel vtable. The 15 slots follow retail's __thiscall table order
+// (PTR_LAB_066294ac, PTR_LAB_0662912c/168/a4 and PTR_LAB_066290f0).
 unsigned long FTypedChannel::Interpolate(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
 unsigned long FTypedChannel::BindHeader(unsigned long* Header) { return TypedBind(this, Header); }
 unsigned long FTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelApply(this, Left, Right, Alpha); }
@@ -2491,7 +2459,7 @@ unsigned long FTypedChannel::SetOverlayExtra(const float* Extra) { (void)Extra; 
 unsigned long FTypedChannel::AddOverlayPos(const float* Delta) { (void)Delta; return 0; }
 float* FTypedChannel::GetSampled() { return nullptr; }
 unsigned long FTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return NoOpTypedChannelMapped(this, ArgA, ArgB); }
-unsigned long FTypedChannel::UpdateDeltaRate(float Dt) { (void)Dt; return 0; } // formerly Slot13
+unsigned long FTypedChannel::UpdateDeltaRate(float Dt) { (void)Dt; return 0; }
 unsigned long FTypedChannel::Step(float* Out, float Dt) { return TypedZeroVec3(this, Out, Dt); }
 
 // Type 1 (066291a4): slots 0/1/4/8..10/12..14 inherited (the shared bodies), 2 LAB_0661b880,
@@ -2501,7 +2469,7 @@ unsigned long FScalarTypedChannel::InterpolatePose(float* Out, const float* Left
 unsigned long FScalarTypedChannel::GetType() { return TypedGetType1(this); }
 unsigned long FScalarTypedChannel::CopySampled(float* Out) { return TypedCopySampledDword(this, Out); }
 unsigned long FScalarTypedChannel::BindMap(unsigned long* Map, void* Bind) { return TypedBindMapType1(this, Map, Bind); }
-float* FScalarTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0: LEA EAX,[ECX+0x3C]
+float* FScalarTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0 (+0x3C)
 
 // Type 2 (06629168): 2 LAB_0661b880, 3 LAB_0661cfa0, 5 LAB_0661d040, 6 LAB_066121d0,
 // 7 FUN_0661adc0 (the base's), 11 LAB_066121a0; the rest as the base.
@@ -2530,7 +2498,7 @@ unsigned long FPosQuatTypedChannel::SetOverlayExtra(const float* Extra) { return
 unsigned long FPosQuatTypedChannel::AddOverlayPos(const float* Delta) { return TypedAddDelta(this, Delta); }
 float* FPosQuatTypedChannel::GetSampled() { return TypedAppliedPtr(this); }
 unsigned long FPosQuatTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return TypedSampleXformType6(this, (float*)ArgA, (float*)ArgB); }
-unsigned long FPosQuatTypedChannel::UpdateDeltaRate(float Dt) { return TypedStepDeltaType6(this, Dt); } // formerly Slot13
+unsigned long FPosQuatTypedChannel::UpdateDeltaRate(float Dt) { return TypedStepDeltaType6(this, Dt); }
 unsigned long FPosQuatTypedChannel::Step(float* Out, float Dt) { return TypedStepPosType6(this, Out, Dt); }
 
 // ---- Typed-channel construction (retail operator new + ctor chain) ----------------------------
@@ -2544,9 +2512,9 @@ static void TypedResetPlayState(FTypedChannel* This)
     This->TranslationScale = 1.0f;
 }
 
-// FUN_0661ad50 thiscall RET 4 (Owner), 0661ad50..7d: +4 Owner, +8 Kind 2, +0x14 -1,
-// +0xC / +0x10 = 0, +0x24 Archetype = 0, the type-8 table (PTR_LAB_066294ac), FUN_0661acd0.
-// Every other member keeps what the allocation held.
+// FUN_0661ad50: +4 Owner, +8 Kind 2, +0x14 -1, +0xC / +0x10 = 0, +0x24 Archetype = 0, the
+// type-8 table (PTR_LAB_066294ac), then FUN_0661acd0. Every other member keeps what the
+// allocation held.
 FTypedChannel::FTypedChannel(IChannelOwner* NewOwner)
 {
     Owner = NewOwner;
@@ -2558,8 +2526,7 @@ FTypedChannel::FTypedChannel(IChannelOwner* NewOwner)
     TypedResetPlayState(this);
 }
 
-// FUN_0661acf0 thiscall RET 4 (Archetype), 0661acf0..2d: as FUN_0661ad50 with Owner = 0 and
-// +0x24 = Archetype, AddRef'd when non-null (0661ad15..1a), before the table and FUN_0661acd0.
+// FUN_0661acf0: as FUN_0661ad50 with Owner = 0 and +0x24 = Archetype, AddRef'd when non-null.
 FTypedChannel::FTypedChannel(FChannelArchetypeObject* NewArchetype)
 {
     Owner = nullptr;
@@ -2584,7 +2551,7 @@ FQuatTypedChannel::FQuatTypedChannel(FChannelArchetypeObject* NewArchetype) : FT
 FPosQuatTypedChannel::FPosQuatTypedChannel(IChannelOwner* NewOwner) : FTypedChannel(NewOwner) {}
 FPosQuatTypedChannel::FPosQuatTypedChannel(FChannelArchetypeObject* NewArchetype) : FTypedChannel(NewArchetype) {}
 
-// The switch every creation site runs on the type (1 / 2 / 4 / 6 / 8): operator new at the
+// The switch every creation site runs on the type (1 / 2 / 4 / 6 / 8).
 static FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner* Owner)
 {
     if (Type == 1)
@@ -2615,7 +2582,7 @@ static FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelA
     return nullptr;
 }
 
-// FUN_06612a00 thiscall RET 0 (06612a00..62): for every slot of the record's vector, a
+// FUN_06612a00.
 static void FreePlaybackTyped(FAnimPlayback* Playback)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
@@ -2637,7 +2604,7 @@ static void FreePlaybackTyped(FAnimPlayback* Playback)
     Playback->LongestTyped = nullptr;
 }
 
-// FUN_06611f90 thiscall RET 4 (NameEntry), 06611f90..06612133. record +0 = the entry
+// FUN_06611f90. Record +0 is the name entry.
 static void ClonePlaybackTypedChannels(FAnimPlayback* Playback, FAnimNameEntry* Entry)
 {
     Playback->Name = Entry;
@@ -2656,7 +2623,7 @@ static void ClonePlaybackTypedChannels(FAnimPlayback* Playback, FAnimNameEntry* 
     }
 }
 
-// FUN_06612250 thiscall RET 4 (Filter), 06612250..96: answer 1 up front (06612259); for every
+// FUN_06612250.
 static unsigned long PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
@@ -2674,8 +2641,7 @@ static unsigned long PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filt
     return 1;
 }
 
-// FUN_066122a0 thiscall RET 4 (Object), 066122a0..c6: 1 when the vector holds exactly that
-// pointer (066122b1..b3), else 0 (also for an empty vector). Sole XREF LAB_066150a0 066150c3.
+// FUN_066122a0. Sole XREF LAB_066150a0.
 static unsigned long PlaybackHasTyped(FAnimPlayback* Playback, void* Object)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
@@ -2688,7 +2654,7 @@ static unsigned long PlaybackHasTyped(FAnimPlayback* Playback, void* Object)
     return 0;
 }
 
-// FUN_066122d0 thiscall RET 8 (ArgA, ArgB), 066122d0..12: the first channel whose typed slot
+// FUN_066122d0.
 static unsigned long PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* ArgA, void* ArgB)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
@@ -2706,7 +2672,7 @@ static unsigned long PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* Arg
     return 0;
 }
 
-// The shared tail of IChannel::CreateTyped (06615a73..06615adc) and CreateFromObject
+// The shared tail of IChannel::CreateTyped and CreateFromObject.
 static unsigned long ChannelBindAndInsert(FAnimationObject* Animation, FTypedChannel* Typed,
                                           void* BindA, void* BindB, unsigned char bFreeOnRefusal)
 {
@@ -2714,14 +2680,14 @@ static unsigned long ChannelBindAndInsert(FAnimationObject* Animation, FTypedCha
         Typed->BindMap((unsigned long*)BindA, BindB);
     if ((bBound & 0xFF) == 0)
     {
-        if (bFreeOnRefusal != 0)                                 // 06615aab..06615ad1
+        if (bFreeOnRefusal != 0)
         {
             if (Typed->Archetype != nullptr)
             {
                 Typed->Archetype->Release();
                 Typed->Archetype = nullptr;
             }
-            ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.        // FUN_066281d0
+            ::operator delete(Typed); // FUN_066281d0; nonvirtual base, trivial tails.
         }
         return 0xFFFFFFFF;
     }
@@ -2729,7 +2695,7 @@ static unsigned long ChannelBindAndInsert(FAnimationObject* Animation, FTypedCha
     return (unsigned long)((size_t)Typed);
 }
 
-// LAB_06615950 / IChannel+0x0C RET 0x14 (Owner, Type, BindA, BindB). Owner null -> -1
+// LAB_06615950 (IChannel+0x0C).
 static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner, unsigned long Type,
                                                 void* BindA, void* BindB)
 {
@@ -2740,29 +2706,27 @@ static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner
         EngBaseFdump(kFdumpFatal, G_FdumpFileAnimComponent, 0x44D, "FATAL", "Unknown data type!\n");
         // Retail's invalid-type continuation reinterprets the owner as a channel.
         const unsigned long bBound =
-            ((FTypedChannel*)Owner)->BindMap((unsigned long*)BindA, BindB); // 06615a81
+            ((FTypedChannel*)Owner)->BindMap((unsigned long*)BindA, BindB);
         if ((bBound & 0xFF) == 0)
         {
             IDAComponent** Held =
                 (IDAComponent**)((unsigned char*)Owner + 0x24);
-            if (*Held != nullptr)                                // 06615ab5..c5
+            if (*Held != nullptr)
             {
                 (*Held)->Release();
                 *Held = nullptr;
             }
-            ::operator delete(Owner);                            // 06615acc FUN_066281d0
+            ::operator delete(Owner);                            // FUN_066281d0
             return 0xFFFFFFFF;
         }
         AnimationFromNested(ChannelThis, 8)->Channels->insert((FTypedChannel*)Owner);
         return (unsigned long)((size_t)Owner);
     }
-    // 0661597a..06615a40: operator new at the type's size, FUN_0661ad50 with the owner, the
-    // class tail (type 1: +0x40 = EBX = -1, OR EBX,-1 at 0661595a).
     FTypedChannel* Typed = NewTypedChannelWithOwner(Type, (IChannelOwner*)Owner);
     return ChannelBindAndInsert(AnimationFromNested(ChannelThis, 8), Typed, BindA, BindB, 1);
 }
 
-// LAB_06615b00 / IChannel+0x10 RET 0x10 (Object, BindA, BindB): the type is the archetype's
+// LAB_06615b00 (IChannel+0x10): the type is the archetype's flags.
 static unsigned long DACOM_API ChannelCreateFromObject(void* ChannelThis, void* Object, void* BindA,
                                                      void* BindB)
 {
@@ -2777,34 +2741,30 @@ static unsigned long DACOM_API ChannelCreateFromObject(void* ChannelThis, void* 
         EngBaseFdump(kFdumpFatal, G_FdumpFileAnimComponent, 0x479, "FATAL", "Unknown data type!\n");
         return 0xFFFFFFFF;
     }
-    // 06615b37..06615c05: operator new at the type's size, FUN_0661acf0 (stores and AddRefs the
-    // archetype, 0661ad12..1a), the class tail (type 1: +0x40 = EBX = -1, OR EBX,-1 at 06615b09).
     FTypedChannel* Typed = NewTypedChannelWithArchetype(Type, Archetype);
     return ChannelBindAndInsert(AnimationFromNested(ChannelThis, 8), Typed, BindA, BindB, 0);
 }
 
-// FUN_06615e10 / IChannel+0x14 RET 8: set lookup; FUN_06615ec0 (leave the mixer); release the
-// archetype (vtbl+8) and zero the field; free the channel; FUN_06617c90 erase; 0. Key -1 or
-// a miss -> -1.
+// FUN_06615e10 (IChannel+0x14). Retail frees the channel before erasing its pointer from the
+// set (FUN_06617c90).
 static unsigned long DACOM_API ChannelDestroy(void* ChannelThis, unsigned long Key)
 {
     FAnimationObject* Animation = AnimationFromNested(ChannelThis, 8);
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
     if (Typed == nullptr)
         return 0xFFFFFFFF;
-    MixerUnbindTyped(Animation, Typed);                          // 06615e6e..75
-    if (Typed->Archetype != nullptr)                             // 06615e83..90
+    MixerUnbindTyped(Animation, Typed);                          // FUN_06615ec0
+    if (Typed->Archetype != nullptr)
     {
         Typed->Archetype->Release();
         Typed->Archetype = nullptr;
     }
-    ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.                // 06615e93..94 FUN_066281d0
-    Animation->Channels->erase(Typed);                           // 06615e9c..a4
+    ::operator delete(Typed); // FUN_066281d0; nonvirtual base, trivial tails.
+    Animation->Channels->erase(Typed);
     return 0;
 }
 
-// LAB_06615d80 / IChannel+0x18 RET 0xC: *Out = the channel's archetype (+0x24), AddRef'd when
-// non-null; 0. Key -1 or a miss -> -1 with Out untouched.
+// LAB_06615d80 (IChannel+0x18): the archetype is at +0x24. A miss leaves Out untouched.
 static unsigned long DACOM_API ChannelGetObject(void* ChannelThis, unsigned long Key, void** Out)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2816,8 +2776,7 @@ static unsigned long DACOM_API ChannelGetObject(void* ChannelThis, unsigned long
     return 0;
 }
 
-// FUN_06616640 / IChannel+0x2C RET 0xC: the dword goes to typed +0x2C (Scale). Key -1 or a
-// miss writes nothing.
+// FUN_06616640 (IChannel+0x2C): the dword goes to typed +0x2C (Scale).
 static GENRESULT DACOM_API ChannelSetUser(void* ChannelThis, unsigned long Key, unsigned long User)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2827,7 +2786,7 @@ static GENRESULT DACOM_API ChannelSetUser(void* ChannelThis, unsigned long Key, 
     return GR_OK;
 }
 
-// FUN_066166a0 / IChannel+0x30 RET 8: FLD typed +0x2C (Scale); key -1 or a miss -> 0.0.
+// FUN_066166a0 (IChannel+0x30): typed +0x2C (Scale).
 static float DACOM_API ChannelGetUser(void* ChannelThis, unsigned long Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2836,8 +2795,8 @@ static float DACOM_API ChannelGetUser(void* ChannelThis, unsigned long Key)
     return Typed->Scale;
 }
 
-// FUN_06616ac0 / IChannel+0x48 RET 0xC: *Out = !(Weight < 0) -- FCOMP qword 0.0 on typed
-// +0x28, unordered counts as forward -- and 0. Key -1 or a miss -> -2, Out untouched.
+// FUN_06616ac0 (IChannel+0x48): Weight is +0x28; unordered counts as forward. A miss leaves
+// Out untouched.
 static GENRESULT DACOM_API ChannelGetMapped(void* ChannelThis, unsigned long Key, unsigned char* Out)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2847,8 +2806,7 @@ static GENRESULT DACOM_API ChannelGetMapped(void* ChannelThis, unsigned long Key
     return GR_OK;
 }
 
-// LAB_06616550 / IChannel+0x24 RET 8: FLD typed +0x1C (the channel's current time, despite
-// the slot's name); key -1 or a miss -> -1.0f (0661655f / 066165b8).
+// LAB_06616550 (IChannel+0x24): typed +0x1C, the channel's current time despite the slot's name.
 static float DACOM_API ChannelGetDuration(void* ChannelThis, unsigned long Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2857,7 +2815,7 @@ static float DACOM_API ChannelGetDuration(void* ChannelThis, unsigned long Key)
     return Typed->Time;
 }
 
-// LAB_066169b0 / IChannel+0x40 RET 0xC: Out always receives 16 bytes -- the channel's bind
+// LAB_066169b0 (IChannel+0x40): Out always receives 16 bytes, the defaults on a miss.
 static unsigned long* DACOM_API ChannelGetHeader(void* ChannelThis, unsigned long* Out, unsigned long Key)
 {
     unsigned long Default[4];
@@ -2873,20 +2831,19 @@ static unsigned long* DACOM_API ChannelGetHeader(void* ChannelThis, unsigned lon
     return Out;
 }
 
-// FUN_066164d0 / IChannel+0x20 RET 8: a playing channel (PlayState bit 0) is posed where it
-// stands (FUN_0661b070), stops playing, and the call answers 1. Otherwise 0.
+// FUN_066164d0 (IChannel+0x20): a playing channel (PlayState bit 0) is posed where it stands
+// and stops playing.
 static unsigned long DACOM_API ChannelStopGraph(void* ChannelThis, unsigned long Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
-    if (Typed == nullptr || (Typed->PlayState & 1) == 0)         // 06616527..2b
+    if (Typed == nullptr || (Typed->PlayState & 1) == 0)
         return 0;
-    TypedApplyFromArchetype(Typed);                              // 0661652d
-    Typed->PlayState &= 0xFE;                                    // 06616539
+    TypedApplyFromArchetype(Typed);
+    Typed->PlayState &= 0xFE;
     return 1;
 }
 
-// FUN_066165d0 / IChannel+0x28 RET 0xC: typed slot 0x10 (SetTime) with the float, answering
-// what it answers (06616625..36); key -1 or a miss -> 0.
+// FUN_066165d0 (IChannel+0x28): typed slot 0x10 (SetTime).
 static unsigned long DACOM_API ChannelBlend(void* ChannelThis, unsigned long Key, float Duration)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2895,8 +2852,7 @@ static unsigned long DACOM_API ChannelBlend(void* ChannelThis, unsigned long Key
     return Typed->SetTime(Duration);
 }
 
-// FUN_06616720 / IChannel+0x34 RET 0xC: typed slot 0x20 with the vector and nothing else --
-// unlike IAnimation2's playback setter (FUN_06612a70), no mixer overlay is touched here.
+// FUN_06616720 (IChannel+0x34): typed slot 0x20 and nothing else -- unlike IAnimation2's playback setter (FUN_06612a70), no mixer overlay is touched here.
 static GENRESULT DACOM_API ChannelSetOverlayPos(void* ChannelThis, unsigned long Key, float* Pos)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2906,7 +2862,7 @@ static GENRESULT DACOM_API ChannelSetOverlayPos(void* ChannelThis, unsigned long
     return GR_OK;
 }
 
-// FUN_06616790 / IChannel+0x38 RET 0xC: typed slot 0x24 only (066167e2..ee).
+// FUN_06616790 (IChannel+0x38): typed slot 0x24 only.
 static GENRESULT DACOM_API ChannelSetOverlayExtra(void* ChannelThis, unsigned long Key, float* Extra)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2916,7 +2872,7 @@ static GENRESULT DACOM_API ChannelSetOverlayExtra(void* ChannelThis, unsigned lo
     return GR_OK;
 }
 
-// FUN_066168f0 / IChannel+0x3C RET 8: 1 when the channel is a leaf of its mixer list.
+// FUN_066168f0 (IChannel+0x3C): 1 when the channel is a leaf of its mixer list.
 static unsigned long DACOM_API ChannelInMixer(void* ChannelThis, unsigned long Key)
 {
     FAnimationObject* Animation = AnimationFromNested(ChannelThis, 8);
@@ -2926,7 +2882,7 @@ static unsigned long DACOM_API ChannelInMixer(void* ChannelThis, unsigned long K
     return MixerHasLeaf(Animation, Typed);
 }
 
-// FUN_06616a50 / IChannel+0x44 RET 0xC: typed slot 0x28 only.
+// FUN_06616a50 (IChannel+0x44): typed slot 0x28 only.
 static GENRESULT DACOM_API ChannelAddOverlayPos(void* ChannelThis, unsigned long Key, float* Delta)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
@@ -2936,8 +2892,7 @@ static GENRESULT DACOM_API ChannelAddOverlayPos(void* ChannelThis, unsigned long
     return GR_OK;
 }
 
-// FUN_06627f40 / 06627f50 / 06627f60: replace `this` with the controlling unknown at +0x34 and
-// tail-jump through its vtable slot 0 / 1 / 2. No checks.
+// FUN_06627f40 / 06627f50 / 06627f60: forward to the controlling unknown at +0x34. No checks.
 static GENRESULT DACOM_API HardpointQueryInterface(FHardpointObject* This, const char* Iid,
                                                   void** Out)
 {
@@ -2975,8 +2930,7 @@ static unsigned long DACOM_API HardpointEngineComponentRelease(void* Nested)
     return HardpointRelease(HardpointFromNested(Nested, 4));
 }
 
-// LAB_0661e990, RET 4: INC +0x1c and return it. No check (until 2026-09-30 the port returned 0
-// for a null This).
+// LAB_0661e990: count at +0x1C. No null check.
 static unsigned long DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This)
 {
     This->RefCount += 1;
@@ -2989,8 +2943,7 @@ static unsigned long G_ChannelArchetypeLive = 0;
 static unsigned char* G_ChannelFramePool = nullptr;
 static unsigned long G_ChannelFramePoolSize = 0;
 
-// FUN_0661d730, thiscall: zero +0x10 / +0x14 / +0x18, vtable PTR_LAB_0662952c, INC
-// DAT_0662b10c. No check (until 2026-09-30 the port returned for a null This).
+// FUN_0661d730: zero +0x10 / +0x14 / +0x18, vtable PTR_LAB_0662952c. No null check.
 static void ChannelArchetypeInnerCtor(FChannelArchetypeObject* This)
 {
     This->Frames = nullptr;
@@ -2999,7 +2952,7 @@ static void ChannelArchetypeInnerCtor(FChannelArchetypeObject* This)
     G_ChannelArchetypeLive += 1;
 }
 
-// FUN_0661d750, thiscall: vtable PTR_LAB_0662952c; free +0x10 when non-null; DEC DAT_0662b10c
+// FUN_0661d750. The last live archetype also frees the shared frame pool.
 static void ChannelArchetypeTeardown(FChannelArchetypeObject* This)
 {
     if (This->Frames != nullptr)
@@ -3013,8 +2966,7 @@ static void ChannelArchetypeTeardown(FChannelArchetypeObject* This)
     }
 }
 
-// FUN_0661e9a0, RET 4: DEC +0x1c when above 0; at 0 set it to 1, FUN_0661d750, operator
-// delete, return 0; else return the count. No check (the port used to test This).
+// FUN_0661e9a0: at zero the count is reset to 1 before teardown. No null check.
 static unsigned long DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* This)
 {
     if (This->RefCount != 0)
@@ -3029,7 +2981,7 @@ static unsigned long DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* 
     return This->RefCount;
 }
 
-// LAB_0661e8e0, RET 0xC: walks the {iid, offset} table at 066295a4 -- one entry,
+// LAB_0661e8e0: the {iid, offset} table at 066295a4 has the one entry.
 static GENRESULT DACOM_API ChannelArchetypeQueryInterface(FChannelArchetypeObject* This,
                                                          const char* Iid, void** Out)
 {
@@ -3050,9 +3002,7 @@ static FEngBaseFreeList G_ArchetypeHandlePool = {sizeof(FArchetypeHandle), nullp
 static FEngBaseFreeList G_InstancePool = {sizeof(FEngineInstance), nullptr, 0x40, 0};         // DAT_0662b158
 static FEngBaseFreeList G_TransformPool = {sizeof(FInstanceTransform), nullptr, 0x40, 0};     // DAT_0662b114
 
-// FUN_06625bd0 (thiscall): pop the free-list head (its first dword is the next link) and
-// decrement the count; an empty list falls back to malloc(ElementSize). The memory is not
-// cleared.
+// FUN_06625bd0: an element's first dword is the next link. The memory is not cleared.
 static void* FreeListAlloc(FEngBaseFreeList* List)
 {
     void* Element = List->FreeHead;
@@ -3065,9 +3015,7 @@ static void* FreeListAlloc(FEngBaseFreeList* List)
     return std::malloc(List->ElementSize);
 }
 
-// FUN_06625c00 (thiscall, RET 4): 06625c06 CMP limit,count / JG push; 06625c0a TEST limit /
-// JL push -- a limit above the count, or a negative limit, keeps the element on the list
-// (count + 1, link through the first dword); otherwise free().
+// FUN_06625c00: a negative limit means unbounded.
 static void FreeListFree(FEngBaseFreeList* List, void* Element)
 {
     if (List->FreeLimit > List->FreeCount || List->FreeLimit < 0)
@@ -3080,8 +3028,7 @@ static void FreeListFree(FEngBaseFreeList* List, void* Element)
     std::free(Element);
 }
 
-// FUN_06625c40 (thiscall): free every cached element, then count = 0 and head = 0. Live
-// elements are not tracked and are not touched.
+// FUN_06625c40. Live elements are not tracked and are not touched.
 static void FreeListDrain(FEngBaseFreeList* List)
 {
     void* Element = List->FreeHead;
@@ -3095,8 +3042,8 @@ static void FreeListDrain(FEngBaseFreeList* List)
     List->FreeHead = nullptr;
 }
 
-// The list sentinel the ctor FUN_0661f550 builds for +0x48 and +0x54: operator new(0x3c)
-// linked to itself (0661f5fc..0661f60a, 0661f617..0661f61e). No null test.
+// The list sentinel the ctor FUN_0661f550 builds for +0x48 and +0x54 (operator new(0x3c)).
+// No null test.
 static FEngineChildNode* CreateListSentinel()
 {
     FEngineChildNode* Sentinel =
@@ -3113,8 +3060,7 @@ static void DestroyChildNodeValue(FEngineChildNode* Node)
     Node->Object = nullptr;
 }
 
-// FUN_06623620 (list erase(first, last), RET 0xC): unlink each node, zero name[0] and +0x38,
-// operator delete, count - 1.
+// FUN_06623620 (list erase(first, last)).
 static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, unsigned long* Count)
 {
     FEngineChildNode* Node = First;
@@ -3130,9 +3076,7 @@ static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, uns
     }
 }
 
-// FUN_066235d0 (list insert(where, value), RET 0xC): operator new(0x3c), link before Where
-// (Prev = Where->Prev, or the node itself when that is null), copy the 0x34-byte value (MOVSD
-// x 0xD), count + 1.
+// FUN_066235d0 (list insert(where, value)): operator new(0x3c), 0x34-byte value copy.
 static void InsertChildNode(FEngineChildNode* Where, unsigned long* Count, const char* Name,
                             IDAComponent* Object)
 {
@@ -3146,7 +3090,7 @@ static void InsertChildNode(FEngineChildNode* Where, unsigned long* Count, const
     *Count += 1;
 }
 
-// FUN_0661f550 (thiscall), in retail order: SearchPath (+4) = 0; instance-root map (+0x10,
+// FUN_0661f550, in retail order.
 static void EngineConstruct(FEngineObject* This)
 {
     new (This) FEngineObject();
@@ -3161,7 +3105,7 @@ static void EngineConstruct(FEngineObject* This)
     This->bInitialized = 0;
 }
 
-// FUN_0661f750 (thiscall), in retail order:
+// FUN_0661f750, in retail order (including the repeated erase of the engine-component list).
 static void EngineDestruct(FEngineObject* This)
 {
     FreeListDrain(&G_ArchetypeHandlePool);
@@ -3205,15 +3149,14 @@ static void EngineDestruct(FEngineObject* This)
     This->~FEngineObject();
 }
 
-// LAB_06625460 (RET 4): INC [this+0x60], return it.
+// LAB_06625460: count at +0x60.
 static unsigned long DACOM_API EngineAddRef(FEngineObject* This)
 {
     This->RefCount += 1;
     return This->RefCount;
 }
 
-// FUN_06625470 (RET 4): 06625478 TEST / JBE -- decrement only while above 0; at 0 the count
-// is pinned to 1, FUN_0661f750 runs, the block is freed and 0 returned; otherwise the count.
+// FUN_06625470: at zero the count is pinned to 1 before the dtor runs.
 static unsigned long DACOM_API EngineRelease(FEngineObject* This)
 {
     if (This->RefCount > 0)
@@ -3226,7 +3169,7 @@ static unsigned long DACOM_API EngineRelease(FEngineObject* This)
     return 0;
 }
 
-// LAB_06621ca0 (RET 0xC): the {iid, offset} table at 06629608 -- {"1.11_IEngine", 0},
+// LAB_06621ca0: the {iid, offset} table at 06629608, then each aggregated component.
 static GENRESULT DACOM_API EngineQueryInterface(FEngineObject* This, const char* Iid, void** Out)
 {
     if (std::strcmp(Iids::Engine, Iid) == 0 || std::strcmp(Iids::Engine2, Iid) == 0)
@@ -3247,9 +3190,7 @@ static GENRESULT DACOM_API EngineQueryInterface(FEngineObject* This, const char*
     return GR_INTERFACE_UNSUPPORTED;
 }
 
-// The smart-pointer assignment into +4 that FUN_0661fee0, LAB_0661fdf0 (0661fe97..ce) and
-// LAB_0661ffc0 (06620052..77) inline: equal -> nothing; else Release the old one when set
-// (+4 = 0), store the new one and AddRef it when non-null.
+// The smart-pointer assignment into +4 that FUN_0661fee0, LAB_0661fdf0 and LAB_0661ffc0 inline.
 static void ReplaceSearchPath(FEngineObject* This, IDAComponent* NewPath)
 {
     if (This->SearchPath == NewPath)
@@ -3367,8 +3308,7 @@ static GENRESULT DACOM_API EngineLoadEngineComponents(FEngineObject* This, IDACo
         EngBaseFdump(kFdumpNotice, G_FdumpFileEngine, 0x1FC, "NOTICE", Notice);
     }
 
-    // Pass 2. Aggregate is the smart pointer at [ESP+0x14]: released before every QI and once
-    // after the walk.
+    // Pass 2. Aggregate is a smart pointer: released before every QI and once after the walk.
     FEngineChildNode* Sentinel = This->ComponentList;
     IAggregateComponent* Aggregate = nullptr;
     FEngineChildNode* Node = Sentinel->Next;
@@ -3426,7 +3366,7 @@ static GENRESULT DACOM_API EngineLoadEngineComponents(FEngineObject* This, IDACo
     return GR_OK;
 }
 
-// LAB_0661fdf0 / IEngine +0x18 (RET 8). Created is the smart pointer at [ESP+4] (0 first).
+// LAB_0661fdf0 (IEngine +0x18).
 static GENRESULT DACOM_API EngineSetSearchPath(FEngineObject* This, const char* Path)
 {
     IDAComponent* Created = nullptr;
@@ -3457,15 +3397,15 @@ static GENRESULT DACOM_API EngineSetSearchPath(FEngineObject* This, const char* 
     return GR_OK;
 }
 
-// FUN_0661fee0 / IEngine +0x20 (RET 8): the smart-pointer assignment into +4. EAX is whatever
-// the last call left (AddRef / Release) or the old pointer; the port returns 0.
+// FUN_0661fee0 (IEngine +0x20). Retail returns whatever EAX the last AddRef / Release left (or
+// the old pointer); the port returns 0.
 static GENRESULT DACOM_API EngineSetFilesystem(FEngineObject* This, IDAComponent* NewPath)
 {
     ReplaceSearchPath(This, NewPath);
     return GR_OK;
 }
 
-// FUN_0661ff20 / IEngine +0x1C (RET 0xC). Local smart pointer = 0.
+// FUN_0661ff20 (IEngine +0x1C).
 static GENRESULT DACOM_API EngineQuerySearchPath(FEngineObject* This, char* Dest, unsigned long MaxChars)
 {
     ISearchPath* SearchPathIface = nullptr;
@@ -3487,9 +3427,8 @@ static GENRESULT DACOM_API EngineQuerySearchPath(FEngineObject* This, char* Dest
 static FArchetypeHandle* const G_InvalidArchetype =
     (FArchetypeHandle*)G_InvalidEngineHandle;
 
-// The 0x34 FileSystem descriptor every caller builds inline (LAB_0661ffc0 0661ffde..06620025,
-// FUN_066201b0, FUN_06611840 ...): zeroed, then size / "FileSystem" / +8 backend / +0xC path /
-// 0x80000000 / 1 / 3 / 0x8000080 / +0x30 = -1.
+// The 0x34 FileSystem descriptor every caller builds inline (LAB_0661ffc0, FUN_066201b0,
+// FUN_06611840, ...).
 static void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, const char* Backend)
 {
     std::memset(Desc, 0, sizeof(*Desc));
@@ -3504,7 +3443,7 @@ static void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, c
     Desc->FindHandle = 0xFFFFFFFF;
 }
 
-// 0662002f..0662003d: Path[1] == ':' or Path[0] == '\\' && Path[1] == '\\'. No other test.
+// Retail tests only these two forms.
 static bool IsAbsoluteFilePath(const char* Path)
 {
     if (Path[1] == ':')
@@ -3514,10 +3453,7 @@ static bool IsAbsoluteFilePath(const char* Path)
     return false;
 }
 
-
-// FUN_0661f8b0 (thiscall, RET 4): Crc (+4 of the name wrapper) == 0 -> -1; otherwise
-// find(Crc) in the map at +0x30 (lower_bound FUN_0661a260 and the unsigned JC test at
-// 0661f8f3); miss -> -1, hit -> the node value (+0x10).
+// FUN_0661f8b0: find(Crc) in the map at +0x30 (lower_bound FUN_0661a260).
 static FArchetypeHandle* LookupArchetype(FEngineObject* This, FArchetypeName* Name)
 {
     if (Name->Crc == 0)
@@ -3528,7 +3464,7 @@ static FArchetypeHandle* LookupArchetype(FEngineObject* This, FArchetypeName* Na
     return It->second;
 }
 
-// FUN_0661ea00 (thiscall, RET 4) on a block from FUN_0661e9e0 (free list DAT_0662b168): the
+// FUN_0661ea00, on a block from FUN_0661e9e0 (free list DAT_0662b168).
 FArchetypeHandle::FArchetypeHandle(const FArchetypeName* Source)
     : Name(Source->Text != nullptr ? Source->Text : "")
     , Crc(Source->Crc)
@@ -3536,9 +3472,8 @@ FArchetypeHandle::FArchetypeHandle(const FArchetypeName* Source)
 {
 }
 
-// FUN_0661eab0 (thiscall on the handle, RET 4): ref (+0x14) + 1, then every child of the
-// vector +0x1C..+0x20 (stride 0x48) goes through the engine's vtable +0x38 (slot 14) with its
-// +0x44 handle. No tests. Returns the new count.
+// FUN_0661eab0: ref at +0x14; every child of the vector at +0x1C (stride 0x48) goes through
+// IEngine slot 14 with its +0x44 handle. No tests.
 static unsigned long ArchetypeHandleAddRef(FArchetypeHandle* Handle, FEngineObject* Engine)
 {
     Handle->RefCount += 1;
@@ -3548,8 +3483,7 @@ static unsigned long ArchetypeHandleAddRef(FArchetypeHandle* Handle, FEngineObje
     return Handle->RefCount;
 }
 
-// FUN_0661eaf0 (thiscall on the handle, RET 4): ref - 1 (no floor, 0661eafe DEC), then every
-// child through vtable +0x3C (slot 15). Returns the new count.
+// FUN_0661eaf0: no floor on the decrement; children go through IEngine slot 15.
 static unsigned long ArchetypeHandleRelease(FArchetypeHandle* Handle, FEngineObject* Engine)
 {
     Handle->RefCount -= 1;
@@ -3559,8 +3493,8 @@ static unsigned long ArchetypeHandleRelease(FArchetypeHandle* Handle, FEngineObj
     return Handle->RefCount;
 }
 
-// LAB_066213b0 / IEngine +0x38 (RET 8): -1 or 0 -> return (EAX is not written on that path;
-// the port returns 0); otherwise FUN_0661eab0.
+// LAB_066213b0 (IEngine +0x38). Retail leaves EAX unwritten for an invalid handle; the port
+// returns 0.
 static unsigned long DACOM_API EngineAddRefHandle(FEngineObject* This, FArchetypeHandle* Handle)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
@@ -3568,7 +3502,7 @@ static unsigned long DACOM_API EngineAddRefHandle(FEngineObject* This, FArchetyp
     return ArchetypeHandleAddRef(Handle, This);
 }
 
-// LAB_066213d0 / IEngine +0x3C (RET 8):
+// LAB_066213d0 (IEngine +0x3C).
 static unsigned long DACOM_API EngineReleaseHandle(FEngineObject* This, FArchetypeHandle* Handle)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
@@ -3588,8 +3522,7 @@ static unsigned long DACOM_API EngineReleaseHandle(FEngineObject* This, FArchety
         EngBaseFdump(kFdumpError, G_FdumpFileEngine, 0x47E, "ERROR", Message);
     }
 
-    // 066214bc..0662150d: the inlined ~FArchetypeHandle -- constraint vector, child vector,
-    // then the string (members in reverse order); 06621510 FUN_0661e9f0 returns the block.
+    // Retail inlines ~FArchetypeHandle; FUN_0661e9f0 returns the block.
     Handle->~FArchetypeHandle();
     FreeListFree(&G_ArchetypeHandlePool, Handle);
     return 0;
@@ -3600,9 +3533,7 @@ static void CallEngineSlot14(FEngineObject* This, FArchetypeHandle* Handle)
     This->AddRefHandle(Handle);
 }
 
-// The Engine +0x58 walk of LAB_06621150 (0662127d..95): every node's +0x38 component gets
-// vtable +0x10 (CreateArchetype) (handle, FileSystem). No checks (until 2026-09-30 the port
-// tested the list head and skipped null components).
+// The Engine +0x58 walk of LAB_06621150: CreateArchetype on every engine component. No checks.
 static void FanoutIecCreateArchetype(FEngineObject* This, FArchetypeHandle* Handle, void* FileSystem)
 {
     FEngineChildNode* Sentinel = This->EngineComponentList;
@@ -3613,15 +3544,13 @@ static void FanoutIecCreateArchetype(FEngineObject* This, FArchetypeHandle* Hand
 static void FanoutIecDuplicateArchetype(FEngineObject* This, FArchetypeHandle* NewHandle,
                                        FArchetypeHandle* OldHandle)
 {
-    // 06621387..9f: IEC +0x14 (new, old) on every node of +0x54, no tests.
+    // IEC +0x14 on every node of +0x54, no tests.
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         AsEngineComponent(Node->Object)->DuplicateArchetype(NewHandle, OldHandle);
 }
 
-// LAB_0661fda0 / IEngine +0x10 (RET 8): a null callback returns the +0x5C count at once;
-// otherwise walk +0x54 calling cdecl callback(name @ +8, pointer @ +0x38) and stop when the
-// returned AL is 0 (0661fdc7 TEST AL,AL); return the count.
+// LAB_0661fda0 (IEngine +0x10): only the callback's low byte is tested.
 static unsigned long DACOM_API EngineEnumerateEngineComponents(FEngineObject* This,
                                                               int(__cdecl* Callback)(const char*,
                                                                                     void*))
@@ -3641,7 +3570,7 @@ static unsigned long DACOM_API EngineEnumerateEngineComponents(FEngineObject* Th
 static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Instance,
                                     unsigned long Flags, void* Arg);
 
-// FUN_06621de0 / IEngine+0x14 (stdcall RET 8). No checks.
+// FUN_06621de0 (IEngine+0x14). No checks.
 static GENRESULT DACOM_API EngineNotifyEngineComponents(FEngineObject* This, void* Arg)
 {
     FEngineChildNode* Sentinel = This->EngineComponentList;
@@ -3653,9 +3582,7 @@ static GENRESULT DACOM_API EngineNotifyEngineComponents(FEngineObject* This, voi
     return GR_OK;
 }
 
-// LAB_0661ff90 / IEngine+0x24 RET 8: *out = this+4 or DACOM_Acquire; AddRef.
-// No checks: *Out = +4; null -> *Out = DACOM_Acquire(); AddRef through *Out and return that
-// result.
+// LAB_0661ff90 (IEngine+0x24). No checks.
 static GENRESULT DACOM_API EngineGetSearchPath(FEngineObject* This, void** Out)
 {
     *Out = This->SearchPath;
@@ -3664,7 +3591,7 @@ static GENRESULT DACOM_API EngineGetSearchPath(FEngineObject* This, void** Out)
     return (GENRESULT)(((IDAComponent*)(*Out))->AddRef());
 }
 
-// LAB_0661ffc0 / IEngine +0x28 (RET 0x10): Path or Out null -> -2. Descriptor 0x34
+// LAB_0661ffc0 (IEngine +0x28).
 static GENRESULT DACOM_API EngineCreateFileSystem(FEngineObject* This, const char* Path, void** Out,
                                                  void* Factory)
 {
@@ -3693,7 +3620,7 @@ static GENRESULT DACOM_API EngineCreateFileSystem(FEngineObject* This, const cha
     return Creator->CreateInstance((AGGDESC*)(&Desc), Out);
 }
 
-// LAB_066200c0 / IEngine +0x2C (RET 8):
+// LAB_066200c0 (IEngine +0x2C).
 static FArchetypeHandle* DACOM_API EngineCreateCompoundArchetype(FEngineObject* This,
                                                                 FArchetypeName* Name)
 {
@@ -3725,7 +3652,7 @@ static FArchetypeHandle* DACOM_API EngineCreateCompoundArchetype(FEngineObject* 
     return Handle;
 }
 
-// The child vector's resize(size + 1, element) in FUN_06620500 (06620536..d7 / 06620700..a3,
+// The child vector's resize(size + 1, element) in FUN_06620500.
 static FArchetypeChild* AppendArchetypeChild(FArchetypeHandle* Handle)
 {
     const std::size_t Count = Handle->Children.size();
@@ -3733,16 +3660,14 @@ static FArchetypeChild* AppendArchetypeChild(FArchetypeHandle* Handle)
     return Handle->Children.data() + Count;
 }
 
-// The resize(n) back to the size before a failed FUN_066201b0 (06620636..ab / 066207de..4c):
-// the elements past n are erased (FUN_066230f0).
+// The resize(n) back to the size before a failed FUN_066201b0 (erase, FUN_066230f0).
 static void ShrinkArchetypeChildren(FArchetypeHandle* Handle, std::size_t Count)
 {
     Handle->Children.erase(Handle->Children.begin() + Count, Handle->Children.end());
 }
 
 // The IFileSystem calls every EngBase site makes inline through the vtable, without testing
-// the pointer or the arguments (until 2026-09-30 these wrappers returned 0 / -1 on a null
-// FileSystem, and two of them -- +0x70 and +0x5C -- had no caller at all and were removed).
+// the pointer or the arguments.
 static int FileSystemOpenNode(void* FileSystem, const char* Name)
 {
     return AsFileSystem(FileSystem)->OpenNode(Name); // +0x60
@@ -3764,7 +3689,6 @@ static void FileSystemFindClose(void* FileSystem, int FindHandle)
 {
     AsFileSystem(FileSystem)->FindClose((unsigned long)FindHandle); // +0x50
 }
-
 
 static unsigned long ChannelStrideFromHeader(unsigned long Flags, float SampleRate)
 {
@@ -3792,7 +3716,7 @@ static unsigned long ChannelStrideFromHeader(unsigned long Flags, float SampleRa
     return Stride;
 }
 
-// FUN_0661d7a0, thiscall RET 0x4 (Index), 0661d7a0..dc: Frames (+0x10) + Stride (+0x14) *
+// FUN_0661d7a0: Frames (+0x10), Stride (+0x14); time-stamped frames skip their leading time.
 static const unsigned char* ChannelFramePayload(const FChannelArchetypeObject* Channel,
                                                 unsigned long Index)
 {
@@ -3800,7 +3724,8 @@ static const unsigned char* ChannelFramePayload(const FChannelArchetypeObject* C
     return Channel->Frames + Channel->Stride * Index + Skip;
 }
 
-// The frame-time idiom every ChannelArchetype sampler inlines (0661d872..a5 in FUN_0661d820,
+// The frame-time idiom every ChannelArchetype sampler inlines (e.g. FUN_0661d820). A negative
+// SampleRate means each frame carries its own time stamp.
 static double ChannelFrameTime(const FChannelArchetypeObject* Channel, unsigned long Index)
 {
     if (!((double)(Channel->SampleRate) >= 0.0))
@@ -3813,7 +3738,7 @@ static double ChannelFrameTime(const FChannelArchetypeObject* Channel, unsigned 
            (double)(Channel->SampleRate);
 }
 
-// FUN_0661d820, thiscall RET 0x4 (Time), 0661d820..c8. No checks.
+// FUN_0661d820. No checks.
 static unsigned long ChannelFrameIndexAt(const FChannelArchetypeObject* Channel, float Time)
 {
     if ((double)(Channel->SampleRate) > 0.0)
@@ -3840,7 +3765,7 @@ static unsigned long ChannelFrameIndexAt(const FChannelArchetypeObject* Channel,
     return Mid;
 }
 
-// One output dword of FUN_0661db70 (`MOV [ESI],reg / ADD ESI,4` or `FSTP float [ESI]`).
+// One output dword of FUN_0661db70.
 static void ChannelPutDword(unsigned char*& Dst, const void* Value)
 {
     std::memcpy(Dst, Value, 4);
@@ -3852,8 +3777,8 @@ static void ChannelPutFloat(unsigned char*& Dst, float Value)
     ChannelPutDword(Dst, &Value);
 }
 
-// A packed quaternion component: MOVSX word, FILD, FMUL float DAT_0662955c (1/32767). A 16-bit
-// integer times a float is exact in a double, so this is the value the FPU holds.
+// A packed quaternion component times DAT_0662955c (1/32767). A 16-bit integer times a float is
+// exact in a double, so this is the value the FPU holds.
 static double ChannelUnpackShort(const unsigned char* Src)
 {
     short Packed = 0;
@@ -3861,7 +3786,7 @@ static double ChannelUnpackShort(const unsigned char* Src)
     return (double)Packed * (double)G_ShortToUnit;
 }
 
-// FUN_0661db70, thiscall, plain RET (called only from ChannelArchetype::Load at 0661dad6).
+// FUN_0661db70 (called only from ChannelArchetype::Load).
 static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
 {
     const unsigned long Flags = Channel->Flags;
@@ -3961,7 +3886,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
         }
         else if (bComp3)
         {
-            // 0661def2..df8c: X and Y stay on the FPU, Z goes through float [ESP+0x1c].
+            // X and Y stay on the FPU, Z is rounded to float.
             const double X = ChannelUnpackShort(Src);
             const double Y = ChannelUnpackShort(Src + 2);
             const float Z = (float)(ChannelUnpackShort(Src + 4));
@@ -3978,7 +3903,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
         }
         else if (bAxis)
         {
-            // 0661df9d..e056: Z is stored as float and the FPU value multiplied by it
+            // Z is stored as float and the FPU value multiplied by it.
             const double X = ChannelUnpackShort(Src);
             const double Y = ChannelUnpackShort(Src + 2);
             const double ZFull = ChannelUnpackShort(Src + 4);
@@ -4009,9 +3934,8 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
         }
         else if (bComp4)
         {
-            // 0661e067..e12c: X and Y stay on the FPU, Z goes through float, W is stored as
-            // float and the FPU value multiplied by it. Sum = W*Wf + Zf*Zf + Y*Y + X*X,
-            // M = (3.0f - Sum) * 0.5f, stored as Mf. Out = {M * X, Mf * Y, Mf * Zf, Mf * Wf}.
+            // X and Y stay on the FPU, Z is rounded to float, W is stored as float and the FPU
+            // value multiplied by it. Only the first output uses the unrounded Mid.
             const double X = ChannelUnpackShort(Src);
             const double Y = ChannelUnpackShort(Src + 2);
             const float Z = (float)(ChannelUnpackShort(Src + 4));
@@ -4038,7 +3962,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
     Channel->Frames = Out;
 }
 
-// LAB_0661d8d0, IChannelArchetype slot 3 (Load), RET 0x8. This is not tested.
+// LAB_0661d8d0, IChannelArchetype slot 3 (Load). This is not tested.
 static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, void* FileSystem)
 {
     if (FileSystem == nullptr)
@@ -4110,23 +4034,21 @@ static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, v
     return GR_OK;
 }
 
-// LAB_0661d800, IChannelArchetype slot 4, RET 0x8: *Out = Duration (+0x18), EAX = 0. No
-// checks (the port used to test Out and This).
+// LAB_0661d800, IChannelArchetype slot 4: Duration is +0x18. No checks.
 static GENRESULT DACOM_API ChannelArchetypeGetDuration(FChannelArchetypeObject* This, float* Out)
 {
     *Out = This->Duration;
     return GR_OK;
 }
 
-// LAB_0661d7e0, IChannelArchetype slot 5, RET 0x8: *Out = Flags (+0xC), EAX = 0. No checks
-// (the port used to test Out and This).
+// LAB_0661d7e0, IChannelArchetype slot 5: Flags is +0xC. No checks.
 static GENRESULT DACOM_API ChannelArchetypeGetFlags(FChannelArchetypeObject* This, unsigned long* Out)
 {
     *Out = This->Flags;
     return GR_OK;
 }
 
-// LAB_0661e1a0, IChannelArchetype slot 6, RET 0x14 (Time, OutA, OutB, Alpha), 0661e1a0..2d4.
+// LAB_0661e1a0, IChannelArchetype slot 6.
 static GENRESULT DACOM_API ChannelArchetypeSample(FChannelArchetypeObject* This, float Time,
                                                  const unsigned char** OutA,
                                                  const unsigned char** OutB, float* Alpha)
@@ -4155,7 +4077,7 @@ static GENRESULT DACOM_API ChannelArchetypeSample(FChannelArchetypeObject* This,
     return GR_OK;
 }
 
-// LAB_0661e670, IChannelArchetype slot 7, RET 0x1C (Time, OutLo, OutHi, TimeLo, TimeHi,
+// LAB_0661e670, IChannelArchetype slot 7.
 static GENRESULT DACOM_API ChannelArchetypeSamplePair(FChannelArchetypeObject* This, float Time,
                                                      const unsigned char** OutLo,
                                                      const unsigned char** OutHi, float* TimeLo,
@@ -4190,7 +4112,7 @@ static GENRESULT DACOM_API ChannelArchetypeSamplePair(FChannelArchetypeObject* T
     return GR_OK;
 }
 
-// LAB_0661e2e0, IChannelArchetype slot 8, RET 0xC (bLast, Out), 0661e2e0..308: index 0, or
+// LAB_0661e2e0, IChannelArchetype slot 8: the first or the last frame.
 static GENRESULT DACOM_API ChannelArchetypeGetFrame(FChannelArchetypeObject* This,
                                                    unsigned char bLast, const unsigned char** Out)
 {
@@ -4209,9 +4131,8 @@ static GENRESULT DACOM_API ChannelArchetypeGetFrame(FChannelArchetypeObject* Thi
 static const float G_ChannelTimeEpsNeg = -1.0000000116860974e-07f;
 static const float G_ChannelTimeEpsPos = 1.0000000116860974e-07f;
 
-// FUN_0661e3d0, thiscall RET 0x4 (Index), 0661e3d0..ee: *(dword*)FUN_0661d7a0(Index) +
-// Frames (+0x10) + Stride (+0x14) * FrameCount (+4). No checks (the port used to return 0
-// for a null payload, channel or Frames).
+// FUN_0661e3d0: the payload dword is an offset past the end of the frame block (FrameCount
+// at +4). No checks.
 static unsigned long ChannelRelocatedKey(const FChannelArchetypeObject* Channel, unsigned long Index)
 {
     const unsigned char* Payload = ChannelFramePayload(Channel, Index);
@@ -4221,7 +4142,7 @@ static unsigned long ChannelRelocatedKey(const FChannelArchetypeObject* Channel,
            Reloc;
 }
 
-// LAB_0661e400, IChannelArchetype slot 9, RET 0x18 (Time0, Time1, OutKeys, Capacity, Count),
+// LAB_0661e400, IChannelArchetype slot 9.
 static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject* This, float Time0,
                                                        float Time1, float* OutKeys,
                                                        unsigned long Capacity, unsigned long* Count)
@@ -4289,7 +4210,7 @@ static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject*
     return GR_OK;
 }
 
-// LAB_0661e310, IChannelArchetype slot 10, RET 0x14 (Time, OutKeys, Capacity, Count),
+// LAB_0661e310, IChannelArchetype slot 10.
 static GENRESULT DACOM_API ChannelArchetypeCollectAt(FChannelArchetypeObject* This, float Time,
                                                     float* OutKeys, unsigned long Capacity,
                                                     unsigned long* Count)
@@ -4316,8 +4237,7 @@ static GENRESULT DACOM_API ChannelArchetypeCollectAt(FChannelArchetypeObject* Th
     return Result;
 }
 
-
-// FUN_06611190 cdecl (From, Name), 06611190..0661127d. IEngine slot 26 GetInstanceName(Out,
+// FUN_06611190: From itself, then its descendants through IEngine GetRelatedInstance.
 static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, const char* Name)
 {
     FEngineInstance* const Invalid =
@@ -4342,7 +4262,7 @@ static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, cons
     return Invalid;
 }
 
-// FUN_06612320 cdecl (Out, Root, Track, ArgD, ArgE, Already), 06612320..d3. The caller seeds
+// FUN_06612320.
 static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, FAnimTrack* Track,
                                     void* ArgD, void* ArgE, unsigned char* Already)
 {
@@ -4400,7 +4320,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
     return ArgD != nullptr ? 1 : 0;
 }
 
-// FUN_066124e0 thiscall RET 0xC (Root, ArgD, ArgE), 066124e0..d6. record +4 = Root
+// FUN_066124e0. Record +4 is Root.
 static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* ArgD,
                                void* ArgE)
 {
@@ -4481,39 +4401,38 @@ static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, v
     }
 }
 
-// FUN_066128f0 thiscall RET 0: every channel stops playing (PlayState &= 0xFE) and is posed
-// where it stands (FUN_0661b070).
+// FUN_066128f0: clear the play bit first, then pose (unlike ChannelStopGraph).
 static void PlaybackStopTyped(FAnimPlayback* Playback)
 {
     unsigned long Index = 0;
     while (Index < Playback->Typed.size())
     {
         FTypedChannel* Typed = Playback->Typed[Index];
-        Typed->PlayState &= 0xFE;                                // 066128fc..04
-        TypedApplyFromArchetype(Typed);                          // 06612909
+        Typed->PlayState &= 0xFE;
+        TypedApplyFromArchetype(Typed);
         Index += 1;
     }
 }
 
-// FUN_06612920 thiscall RET 0: FUN_0661b070 on every channel, nothing else.
+// FUN_06612920.
 static void PlaybackApplyTyped(FAnimPlayback* Playback)
 {
     unsigned long Index = 0;
     while (Index < Playback->Typed.size())
     {
-        TypedApplyFromArchetype(Playback->Typed[Index]);    // 0661292e
+        TypedApplyFromArchetype(Playback->Typed[Index]);
         Index += 1;
     }
 }
 
-// Rebind every channel with one play header (FUN_0661ad90 each; 066127af..d0 / 066128b7..d8).
+// Rebind every channel with one play header (inlined in FUN_066126e0 and FUN_066127e0).
 static unsigned long PlaybackBindAll(FAnimPlayback* Playback, float* Header, unsigned long Result)
 {
     unsigned long Index = 0;
     while (Index < Playback->Typed.size())
     {
         if ((TypedTryBindIfTimeValid(Playback->Typed[Index], Header) & 0xFF) == 0)
-            Result = 0xFFFFFFFF;                                 // OR EBP,-1 -- no break
+            Result = 0xFFFFFFFF;                                 // no break
         Index += 1;
     }
     return Result;
@@ -4523,7 +4442,7 @@ static unsigned long PlaybackBindAll(FAnimPlayback* Playback, float* Header, uns
 static unsigned long PlaybackDurationsDiffer(FAnimPlayback* Playback)
 {
     unsigned long Result = 0;
-    float First = -1.0f;                                         // 0661274f / 06612857
+    float First = -1.0f;
     unsigned long Index = 0;
     while (Index < Playback->Typed.size())
     {
@@ -4542,13 +4461,12 @@ static unsigned long PlaybackDurationsDiffer(FAnimPlayback* Playback)
     return Result;
 }
 
-// FUN_066126e0 thiscall RET 0x1C (Flags, Start, Speed, P3, P4, P5, P6): build the seven-dword
+// FUN_066126e0: build the seven-dword play header and bind every channel with it.
 static unsigned long PlaybackEvalTyped(FAnimPlayback* Playback, unsigned long Flags, float Start,
                                       float Speed, unsigned long P3, unsigned long P4,
                                       unsigned long P5, unsigned long P6)
 {
-    // SETZ DL on (Flags & 1); LEA EDX,[EDX*2-1]: +1 when the bit is clear, -1 when set.
-    // FLD Speed; FABS; FILD sign; FMULP; FSTP dword.
+    // Flags bit 0 means reverse.
     const long Sign = (Flags & 1) == 0 ? 1 : -1;
     const float Rate = (float)(std::fabs((double)Speed) *
                                           (double)Sign);
@@ -4561,12 +4479,12 @@ static unsigned long PlaybackEvalTyped(FAnimPlayback* Playback, unsigned long Fl
     Header[5] = P5;
     Header[6] = P6;
     unsigned long Result = 0;
-    if ((Flags & 1) != 0 && Playback->Typed.size() != 0)      // 0661273d..57
+    if ((Flags & 1) != 0 && Playback->Typed.size() != 0)
         Result = PlaybackDurationsDiffer(Playback);
     return PlaybackBindAll(Playback, (float*)Header, Result);
 }
 
-// FUN_066127e0 thiscall RET 0: rebind every channel from the longest one's own state:
+// FUN_066127e0: rebind every channel from the longest one's own state.
 static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback)
 {
     FTypedChannel* Longest = Playback->LongestTyped;
@@ -4582,9 +4500,8 @@ static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback)
     return PlaybackBindAll(Playback, (float*)Header, 0);
 }
 
-// FUN_06612940 thiscall RET 4: the channel whose bind descriptor (typed +8) matches Header:
-// same kind, then kinds 0/1 compare the instance (+0xC), kind 2 the sink (+4); other kinds
-// never match. Miss -> -1.
+// FUN_06612940: match on the bind descriptor (typed +8). Kinds 0/1 compare the instance (+0xC),
+// kind 2 the sink (+4); other kinds never match.
 static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const FAnimBindOut* Header)
 {
     unsigned long Index = 0;
@@ -4592,14 +4509,14 @@ static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const F
     {
         FTypedChannel* Typed = Playback->Typed[Index];
         const FAnimBindOut* Desc = TypedBindDesc(Typed);
-        if (Desc->Kind == Header->Kind)                          // 06612966..7c
+        if (Desc->Kind == Header->Kind)
         {
-            if (Desc->Kind == 0 || Desc->Kind == 1)              // 0661297e..84 -> 0661298e
+            if (Desc->Kind == 0 || Desc->Kind == 1)
             {
                 if (Desc->Instance == Header->Instance)
                     return Typed;
             }
-            else if (Desc->Kind == 2)                            // 06612986..89
+            else if (Desc->Kind == 2)
             {
                 if (Desc->Extra == Header->Extra)
                     return Typed;
@@ -4610,7 +4527,7 @@ static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const F
     return (FTypedChannel*)((ptrdiff_t)(-1));
 }
 
-// FUN_066129c0 thiscall RET 4: typed slot 0x10 (SetTime) on every channel.
+// FUN_066129c0.
 static void PlaybackSetTypedTime(FAnimPlayback* Playback, float Time)
 {
     unsigned long Index = 0;
@@ -4622,13 +4539,13 @@ static void PlaybackSetTypedTime(FAnimPlayback* Playback, float Time)
     }
 }
 
-// FUN_066129f0 thiscall RET 0: MOV EAX,[this+0x18]; FLD [EAX+0x1C] -- the longest channel's
+// FUN_066129f0: the longest channel's current time (+0x1C), despite the caller's name.
 static float PlaybackStoredDuration(FAnimPlayback* Playback)
 {
     return Playback->LongestTyped->Time;
 }
 
-// FUN_06611290, thiscall on the track (unused), RET 0xC (FileSystem, Name, Out). No checks.
+// FUN_06611290 (thiscall on the track, which it does not use). No checks.
 static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** Out)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
@@ -4646,7 +4563,7 @@ static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** O
     return DACOM_CRC::GetCRC32(*Out);
 }
 
-// FUN_06611350, thiscall on the track, RET 4 (FileSystem). No checks.
+// FUN_06611350. No checks.
 static void LoadChannelNode(FAnimTrack* Track, void* FileSystem)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
@@ -4667,7 +4584,7 @@ static void LoadChannelNode(FAnimTrack* Track, void* FileSystem)
     Fs->OpenNode(G_NameParentDot); // +0x60
 }
 
-// FUN_06611440, thiscall on the name value, RET 8 (Name, FileSystem); returns AL = 1, which no
+// FUN_06611440. Retail returns 1, which no caller reads.
 static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* FileSystem)
 {
     Entry->Name = _strdup(Name);
@@ -4705,8 +4622,6 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
         Fs->CreateInstance((AGGDESC*)(&Desc), &MapFs); // +0xC
         if (std::strncmp(FindData.cFileName, G_NameEventMap, G_EventMapLength) != 0)
         {
-            // 06611614..dc: resize(size + 1) with a zeroed track; 066116e1..fc: the new last
-            // element (+0x18 end - 0x14) is the one filled below.
             Entry->Tracks.resize(Entry->Tracks.size() + 1, FAnimTrack());
             FAnimTrack* Track = &Entry->Tracks.back();
             if (std::strncmp(FindData.cFileName, G_NameJointMap, G_JointMapLength) == 0)
@@ -4749,7 +4664,7 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
     Fs->FindClose((unsigned long)FindHandle); // +0x50
 }
 
-// LAB_06614920 / IAnimation2+9 RET 0x18 (Script, Root, Name, ArgD, ArgE), 06614920..06614a4b.
+// LAB_06614920 (IAnimation2 slot 9).
 static unsigned long DACOM_API AnimationPlayScript(FAnimationObject* This, FAnimScript* Script,
                                                   FEngineInstance* Root, const char* Name,
                                                   void* ArgD, void* ArgE)
@@ -4773,27 +4688,28 @@ static unsigned long DACOM_API AnimationPlayScript(FAnimationObject* This, FAnim
         This->Channels->insert(*Cursor);
         ++Cursor;
     }
-    Script->AddRef(); // vtable +4 (066149cd..d0)
+    Script->AddRef();
     const unsigned long Id = This->NextPlaybackId;
     This->NextPlaybackId = Id + 1;
     This->Playbacks->insert(FAnimPlaybackMap::value_type((long)Id, Record));
     return Id;
 }
 
-// LAB_06614bb0 / IAnimation2+0x2C RET 0x24 (Id, Flags, Time, Scale, A, B, C, D): FUN_066126e0
+// LAB_06614bb0 (IAnimation2+0x2C): FUN_066126e0, then every channel joins its mixer with A as
+// the blend duration.
 static unsigned long DACOM_API AnimationEvalPlayback(FAnimationObject* This, unsigned long PlaybackId,
                                                     unsigned long Flags, float Time, float Scale,
                                                     void* A, void* B, void* C, void* D)
 {
     FAnimPlayback* Playback = nullptr;
-    if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)          // 06614bc5..cc
+    if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0xFFFFFFFF;
     const unsigned long Result = PlaybackEvalTyped(
         Playback, Flags, Time, Scale, (unsigned long)((size_t)A),
         (unsigned long)((size_t)B),
         (unsigned long)((size_t)C),
         (unsigned long)((size_t)D));
-    if (Result == 0xFFFFFFFF)                                    // 06614bfc..03
+    if (Result == 0xFFFFFFFF)
         return Result;
     const float BlendDuration = FloatFromOpaqueDword(A);
     unsigned long Index = 0;
@@ -4805,7 +4721,7 @@ static unsigned long DACOM_API AnimationEvalPlayback(FAnimationObject* This, uns
     return Result;
 }
 
-// LAB_06614c40 / IAnimation2+0x30 RET 8: FUN_066127e0, or -1 for an unknown id.
+// LAB_06614c40 (IAnimation2+0x30): FUN_066127e0.
 static unsigned long DACOM_API AnimationEvalStored(FAnimationObject* This, unsigned long PlaybackId)
 {
     (void)This;
@@ -4815,16 +4731,16 @@ static unsigned long DACOM_API AnimationEvalStored(FAnimationObject* This, unsig
     return PlaybackEvalStoredTyped(Playback);
 }
 
-// LAB_06614c70 / IAnimation2+0x38 RET 8: FUN_066128f0 (stop and pose every channel), then
-// every channel leaves its mixer (FUN_06615ec0).
+// LAB_06614c70 (IAnimation2+0x38): FUN_066128f0, then every channel leaves its mixer
+// (FUN_06615ec0).
 static unsigned long DACOM_API AnimationStopPlayback(FAnimationObject* This, unsigned long PlaybackId)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
-    PlaybackStopTyped(Playback);                                 // 06614c92
+    PlaybackStopTyped(Playback);
     unsigned long Index = 0;
-    while (Index < Playback->Typed.size())                    // 06614c97..b3
+    while (Index < Playback->Typed.size())
     {
         MixerUnbindTyped(This, Playback->Typed[Index]);
         Index += 1;
@@ -4832,7 +4748,7 @@ static unsigned long DACOM_API AnimationStopPlayback(FAnimationObject* This, uns
     return 0;
 }
 
-// LAB_06614cc0 / IAnimation2+0x34 RET 8: FUN_06612920 -- pose every channel, nothing more.
+// LAB_06614cc0 (IAnimation2+0x34): FUN_06612920.
 static unsigned long DACOM_API AnimationApplyChannels(FAnimationObject* This, unsigned long PlaybackId)
 {
     (void)This;
@@ -4842,8 +4758,7 @@ static unsigned long DACOM_API AnimationApplyChannels(FAnimationObject* This, un
     return 0;
 }
 
-// LAB_06614860 / IAnimation2+0x3C RET 0xC: FUN_066129c0 -- typed slot 0x10 (SetTime) with the
-// third argument on every channel. The interface carries that dword as void*.
+// LAB_06614860 (IAnimation2+0x3C): FUN_066129c0. The interface carries the time as void*.
 static unsigned long DACOM_API AnimationStopChannels(FAnimationObject* This, unsigned long PlaybackId,
                                                     void* Time)
 {
@@ -4854,7 +4769,7 @@ static unsigned long DACOM_API AnimationStopChannels(FAnimationObject* This, uns
     return 0;
 }
 
-// LAB_06614de0 / IAnimation2+0x48 RET 0xC: the playback's root entry in the mixer map
+// LAB_06614de0 (IAnimation2+0x48): the playback's root entry in the mixer map
 // (FUN_06614f70 on playback +4); when there is one, FUN_06612a70 writes the position into the
 // channels and the object overlays.
 static unsigned long DACOM_API AnimationSetOverlayPos(FAnimationObject* This, unsigned long PlaybackId,
@@ -4870,7 +4785,7 @@ static unsigned long DACOM_API AnimationSetOverlayPos(FAnimationObject* This, un
     return 0;
 }
 
-// LAB_06614fd0 / IAnimation2+0x4C RET 0xC: as above with FUN_06612b80 (orientation matrix).
+// LAB_06614fd0 (IAnimation2+0x4C): as above with FUN_06612b80 (orientation matrix).
 static unsigned long DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, unsigned long PlaybackId,
                                                        float* Extra)
 {
@@ -4884,9 +4799,7 @@ static unsigned long DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, 
     return 0;
 }
 
-// LAB_066150e0 / IAnimation2+0x54 RET 0x10 (PlaybackId, Pos, Extra): FUN_06614580; a miss
-// answers 0 (ESI, 066150ef / 06615111), a hit FUN_066122d0(Pos, Extra) (06615102..08). Until
-// 2026-09-30 the port resolved the id through its global list with a script-pointer retry.
+// LAB_066150e0 (IAnimation2+0x54): lookup FUN_06614580, then FUN_066122d0.
 static unsigned long DACOM_API AnimationTouchMapped(FAnimationObject* This, unsigned long PlaybackId,
                                                    float* Pos, float* Extra)
 {
@@ -4896,7 +4809,7 @@ static unsigned long DACOM_API AnimationTouchMapped(FAnimationObject* This, unsi
     return PlaybackTouchMappedTyped(Playback, Pos, Extra);
 }
 
-// LAB_06615120 / IAnimation2+0x58 RET 0xC: as SetOverlayPos with FUN_06612c60 (add a delta).
+// LAB_06615120 (IAnimation2+0x58): as SetOverlayPos with FUN_06612c60 (add a delta).
 static unsigned long DACOM_API AnimationAddOverlayPos(FAnimationObject* This, unsigned long PlaybackId,
                                                      float* Delta)
 {
@@ -4910,7 +4823,7 @@ static unsigned long DACOM_API AnimationAddOverlayPos(FAnimationObject* This, un
     return 0;
 }
 
-// LAB_06616800 / IAnimation2+0x6C RET 0xC (Key, Dt): walk every mixer list under one bind key
+// LAB_06616800 (IAnimation2+0x6C): walk every mixer list under one bind key
 // -- a playback's root, or the cookie an IChannel caller bound with. Not a playback id.
 static unsigned long DACOM_API AnimationMixerWalk(FAnimationObject* This, unsigned long Key,
                                                  float Time)
@@ -4919,7 +4832,7 @@ static unsigned long DACOM_API AnimationMixerWalk(FAnimationObject* This, unsign
     return 0;
 }
 
-// LAB_066157f0 / IAnimation2+0x70 RET 8 (Dt): every mixer list, then every playing channel no
+// LAB_066157f0 (IAnimation2+0x70): every mixer list, then every playing channel no
 // mixer leaf ticked.
 static unsigned long DACOM_API AnimationMixerWalkAll(FAnimationObject* This, float Time)
 {
@@ -4927,10 +4840,11 @@ static unsigned long DACOM_API AnimationMixerWalkAll(FAnimationObject* This, flo
     return 0;
 }
 
-// LAB_06616430 / IChannel+0x1C RET 0xC (Key, Header): rebind the channel with the caller's
+// LAB_06616430 (IChannel+0x1C): rebind the channel with the caller's play header; the play bit
+// follows the bind result, and a playing channel joins its mixer.
 static unsigned long DACOM_API ChannelPlay(void* ChannelThis, unsigned long Key, float* Time)
 {
-    if (Key == 0xFFFFFFFF || Time == nullptr)                    // 06616439..49
+    if (Key == 0xFFFFFFFF || Time == nullptr)
         return 0;
     FAnimationObject* Animation = AnimationFromNested(ChannelThis, 8);
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
@@ -4948,12 +4862,12 @@ static unsigned long DACOM_API ChannelPlay(void* ChannelThis, unsigned long Key,
     return bPlaying;
 }
 
-// LAB_06614b30 / IRootData+0x0C RET 0x24 (Id, TouchArg, Flags, Time, Scale, Arg6, Arg7, Arg8):
+// LAB_06614b30 (IRootData+0x0C).
 static unsigned char DACOM_API RootDataEval(void* RootThis, unsigned long PlaybackId,
                                            void* TouchArg, unsigned long Flags, float Time,
                                            float Scale, void* Arg6, void* Arg7, float Arg8)
 {
-    // 06614b43: LEA ECX,[EDX-0xC] -- the IRootData facet sits at Animation+0xC.
+    // The IRootData facet sits at Animation+0xC.
     FAnimationObject* This = AnimationFromNested(RootThis, 0xC);
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -4965,24 +4879,22 @@ static unsigned char DACOM_API RootDataEval(void* RootThis, unsigned long Playba
         (unsigned long)((size_t)Arg7), Arg8Bits, 0);
     if (Eval == 0xFFFFFFFF)
         return 0;
-    // 0x06614b85: the first argument is the address of a caller-frame local, the second is
-    // this function's own second argument.
-    unsigned char TouchLocal[0xC];                               // the SUB ESP,0xC frame
+    // The first argument is a 12-byte local of this frame, the second this function's own
+    // second argument.
+    unsigned char TouchLocal[0xC];
     std::memset(TouchLocal, 0, sizeof(TouchLocal));
     unsigned char bTouch = 0;
     if (PlaybackTouchMappedTyped(Playback, TouchLocal, TouchArg) != 0)
         bTouch = 1;
-    PlaybackStopTyped(Playback);                                 // 06614b98..9a FUN_066128f0
+    PlaybackStopTyped(Playback);
     return bTouch;
 }
-
 
 static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* This,
                                                               FArchetypeName* Name,
                                                               void* FileSystem);
 
-
-// The "Object name" / "File name" reads of FUN_066201b0 (06620249..c7 / 066202c7..5c): open
+// The "Object name" / "File name" reads of FUN_066201b0, capped at 0x3F bytes.
 static bool ReadPartNameField(IFileSystem* Fs, const char* Field, char* Buffer)
 {
     FEngBaseFileSystemDesc Desc;
@@ -5005,7 +4917,7 @@ static bool ReadPartNameField(IFileSystem* Fs, const char* Field, char* Buffer)
     return bRead;
 }
 
-// FUN_066201b0, thiscall on the engine, RET 0x14 (Name, CmpndFs, FindHandle, ParentFs, Child).
+// FUN_066201b0. Retries CreateFileSystem without the parent FS when the first attempt fails.
 static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, void* CmpndFs,
                                     unsigned long FindHandle, void* ParentFs, FArchetypeChild* Child)
 {
@@ -5136,7 +5048,7 @@ static void RemapJointPayload(unsigned long Type, const unsigned char* UtfExtra,
     }
 }
 
-// PTR_LAB_06621118: type → UTF record size only (not FUN_06625560 apply).
+// PTR_LAB_06621118: joint type to UTF record size (not the FUN_06625560 apply).
 static unsigned long JointUtfRecordSize(unsigned long Type)
 {
     if (Type == G_JointTypeFix || Type == G_JointTypeTrans || Type == G_JointTypeLoose)
@@ -5150,8 +5062,7 @@ static unsigned long JointUtfRecordSize(unsigned long Type)
     return 0;
 }
 
-// FUN_0661eb30 (thiscall on the handle, RET 4): the first child whose +0x40 equals the CRC
-// (+4) of the caller's {text, crc} wrapper, or 0. No tests.
+// FUN_0661eb30: the first child whose +0x40 equals the CRC. No tests.
 static FArchetypeChild* FindArchetypeChildByCrc(FArchetypeHandle* Handle, unsigned long Crc)
 {
     for (std::vector<FArchetypeChild>::iterator Child = Handle->Children.begin();
@@ -5163,7 +5074,7 @@ static FArchetypeChild* FindArchetypeChildByCrc(FArchetypeHandle* Handle, unsign
     return nullptr;
 }
 
-// The record loop of FUN_06620500 for one open Cons file (06620a75..066210c5, the part Ghidra
+// The record loop of FUN_06620500 for one open Cons file.
 static void ApplyConsFileRecords(FArchetypeHandle* Handle, IFileSystem* Fs, int File,
                                  unsigned long Type, unsigned long RecordSize, unsigned long FileSize)
 {
@@ -5190,8 +5101,7 @@ static void ApplyConsFileRecords(FArchetypeHandle* Handle, IFileSystem* Fs, int 
             }
             else
             {
-                // The record is a zeroed stack temporary (06620adb..aff) filled in place and
-                // appended with insert(end, 1, record) (FUN_066237a0, 0662105d..72).
+                // A zeroed temporary appended with insert(end, 1, record) (FUN_066237a0).
                 FConstraintRecord Record = {};
                 Record.ChildPart = SecondPart;
                 Record.ParentPart = FirstPart;
@@ -5204,7 +5114,7 @@ static void ApplyConsFileRecords(FArchetypeHandle* Handle, IFileSystem* Fs, int 
     }
 }
 
-// The Cons pass of FUN_06620500 (0662089c..06621109). OpenNode("Cons") (DAT_0662a788); 0:
+// The Cons pass of FUN_06620500 ("Cons" is DAT_0662a788).
 static void ParseConsConstraints(FArchetypeHandle* Handle, IFileSystem* Fs)
 {
     if (Fs->OpenNode(G_NameCons) == 0) // +0x60
@@ -5239,11 +5149,11 @@ static void ParseConsConstraints(FArchetypeHandle* Handle, IFileSystem* Fs)
     Fs->OpenNode(G_NameParentDot); // +0x60
 }
 
-// 0662061a / 06620857: the text both FUN_06620500 part failures push (0662a798).
+// .data:0662a798: the text both FUN_06620500 part failures push.
 static const char* const G_CmpndPartFailText =
     "Engine: create_compound_archetype: unable to create part archetype, ignoring...";
 
-// FUN_06620500, thiscall on the engine, RET 0xC (Handle, CmpndFs, ParentFs).
+// FUN_06620500.
 static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Handle, void* CmpndFs,
                                    void* ParentFs)
 {
@@ -5284,7 +5194,7 @@ static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Han
     return GR_OK;
 }
 
-// LAB_06621150, IEngine +0x30, RET 0xC (Name, FileSystem).
+// LAB_06621150 (IEngine +0x30).
 static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* This,
                                                               FArchetypeName* Name,
                                                               void* FileSystem)
@@ -5317,26 +5227,24 @@ static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* Th
     return Handle;
 }
 
-// LAB_06621850 / IEngine+0x40 RET 0xC, listing 06621850-06621898: (Out, Handle) -- Out at
-// [ESP+8], Handle at [ESP+0xC]. No null test on Out.
+// LAB_06621850 (IEngine+0x40). No null test on Out.
 static FArchetypeName* DACOM_API EngineGetArchetypeName(FEngineObject* This, FArchetypeName* Out,
                                                        FArchetypeHandle* Handle)
 {
     (void)This;
-    if (Handle == G_InvalidArchetype || Handle == nullptr)   // 06621855 / 0662185a
+    if (Handle == G_InvalidArchetype || Handle == nullptr)
     {
-        Out->Text = nullptr;                                 // 06621883
-        Out->Crc = DACOM_CRC::GetCRC32(nullptr);             // 06621889
+        Out->Text = nullptr;
+        Out->Crc = DACOM_CRC::GetCRC32(nullptr);
         return Out;
     }
-    // 0662185e..0662186b: the handle's string _Ptr (+4), or the std::string empty
-    // string (MSVCP60 _Nullstr) when it has none.
+    // Retail returns the string's _Ptr (+4), or MSVCP60's _Nullstr when it has none.
     Out->Text = Handle->Name.c_str();
-    Out->Crc = Handle->Crc;                                  // 0662186d [handle+0x10]
+    Out->Crc = Handle->Crc;                                  // +0x10
     return Out;
 }
 
-// LAB_06621530 / IEngine+0x44 RET 8: lookup + slot 14.
+// LAB_06621530 (IEngine+0x44): lookup + slot 14.
 static FArchetypeHandle* DACOM_API EngineFindArchetype(FEngineObject* This, FArchetypeName* Name)
 {
     FArchetypeHandle* Handle = LookupArchetype(This, Name);
@@ -5345,7 +5253,7 @@ static FArchetypeHandle* DACOM_API EngineFindArchetype(FEngineObject* This, FArc
     return Handle;
 }
 
-// LAB_06622400 / IEngine+0x4C RET 8: AL=1 if child count != 0.
+// LAB_06622400 (IEngine+0x4C).
 static unsigned long DACOM_API EngineIsCompoundArchetype(FEngineObject* This,
                                                         FArchetypeHandle* Handle)
 {
@@ -5377,10 +5285,9 @@ static bool IsValidInstance(FEngineInstance* Instance)
     return Instance != G_InvalidInstance && Instance != nullptr;
 }
 
-// Engine-owned transform; setters retain the existing return policy.
+// Engine-owned transform.
 
-// LAB_0661f340 (slot 0, RET 8): 3x3 identity (1.0 at +4 / +0x14 / +0x24, 0 elsewhere),
-// translation 0, extra 0, extra vector 0. +0x44 (user) is NOT touched.
+// LAB_0661f340 (slot 0). +0x44 (user) is NOT touched.
 GENRESULT DACOM_API FInstanceTransform::Init(void* Instance)
 {
     (void)Instance;
@@ -5392,7 +5299,7 @@ GENRESULT DACOM_API FInstanceTransform::Init(void* Instance)
     return GR_OK;
 }
 
-// LAB_06612160 (slots 1 and 2, RET 8): no body.
+// LAB_06612160 (slots 1 and 2): no body.
 GENRESULT DACOM_API FInstanceTransform::AddRef(void* Instance)
 {
     (void)Instance;
@@ -5405,7 +5312,7 @@ GENRESULT DACOM_API FInstanceTransform::Release(void* Instance)
     return GR_OK;
 }
 
-// LAB_0661f380 (slot 3, RET 0xC): three dwords to +0x28.
+// LAB_0661f380 (slot 3): +0x28.
 GENRESULT DACOM_API FInstanceTransform::SetPosition(void* Instance, const float* Position)
 {
     (void)Instance;
@@ -5415,14 +5322,14 @@ GENRESULT DACOM_API FInstanceTransform::SetPosition(void* Instance, const float*
     return GR_OK;
 }
 
-// LAB_0661f3a0 (slot 4, RET 8): this + 0x28.
+// LAB_0661f3a0 (slot 4): +0x28.
 float* DACOM_API FInstanceTransform::GetPosition(void* Instance)
 {
     (void)Instance;
     return Matrix + 9;
 }
 
-// LAB_0661f3b0 (slot 5, RET 0xC): MOVSD x9 to +4.
+// LAB_0661f3b0 (slot 5): nine dwords to +4.
 GENRESULT DACOM_API FInstanceTransform::SetOrientation(void* Instance, const float* Rows)
 {
     (void)Instance;
@@ -5430,7 +5337,7 @@ GENRESULT DACOM_API FInstanceTransform::SetOrientation(void* Instance, const flo
     return GR_OK;
 }
 
-// LAB_0661f3d0 (slots 6 and 8, RET 8): this + 4.
+// LAB_0661f3d0 (slots 6 and 8): +4.
 float* DACOM_API FInstanceTransform::GetOrientation(void* Instance)
 {
     (void)Instance;
@@ -5443,7 +5350,7 @@ float* DACOM_API FInstanceTransform::GetMatrix(void* Instance)
     return Matrix;
 }
 
-// LAB_0661f3e0 (slot 7, RET 0xC): MOVSD x0xC to +4.
+// LAB_0661f3e0 (slot 7): twelve dwords to +4.
 GENRESULT DACOM_API FInstanceTransform::SetMatrix(void* Instance, const float* NewMatrix)
 {
     (void)Instance;
@@ -5451,7 +5358,7 @@ GENRESULT DACOM_API FInstanceTransform::SetMatrix(void* Instance, const float* N
     return GR_OK;
 }
 
-// LAB_0661f400 (slot 9, RET 0x10): *OutExtra = +0x34, OutVec = +0x38..+0x40.
+// LAB_0661f400 (slot 9): +0x34, +0x38..+0x40.
 GENRESULT DACOM_API FInstanceTransform::GetExtra(void* Instance, float* OutExtra, float* OutVec)
 {
     (void)Instance;
@@ -5462,7 +5369,7 @@ GENRESULT DACOM_API FInstanceTransform::GetExtra(void* Instance, float* OutExtra
     return GR_OK;
 }
 
-// LAB_0661f430 (slot 10, RET 0x10): +0x34 = Extra (FLD/FSTP float), Vec to +0x38.
+// LAB_0661f430 (slot 10).
 GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra, const float* Vec)
 {
     (void)Instance;
@@ -5473,7 +5380,7 @@ GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra,
     return GR_OK;
 }
 
-// LAB_0661f460 (slot 11, RET 0xC): +0x44 = User.
+// LAB_0661f460 (slot 11).
 GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, unsigned long NewUser)
 {
     (void)Instance;
@@ -5481,23 +5388,22 @@ GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, unsigned long Ne
     return GR_OK;
 }
 
-// LAB_0661f470 (slot 12, RET 8): +0x44.
+// LAB_0661f470 (slot 12).
 unsigned long DACOM_API FInstanceTransform::GetUser(void* Instance)
 {
     (void)Instance;
     return User;
 }
 
-// LAB_0661f320 (slot 13, RET 8): XOR AL,AL.
-unsigned long DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance) // formerly Slot13
+// LAB_0661f320 (slot 13): returns 0.
+unsigned long DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance)
 {
     (void)Instance;
     return 0;
 }
 
-// FUN_0661f2f0 (free list DAT_0662b114) + FUN_0661f310 (ctor: +0x44 = 0, vtable 066295d0)
-// as 06621905..06621918 uses them; the rest of the block is left as the allocator hands it
-// out (slot 0 Init fills it). A null block yields 0.
+// FUN_0661f2f0 (free list DAT_0662b114) + FUN_0661f310 (ctor: +0x44 = 0, vtable 066295d0).
+// The rest of the block is left as the allocator hands it out (slot 0 Init fills it).
 static FInstanceTransform* AllocInstanceTransform()
 {
     void* Block = FreeListAlloc(&G_TransformPool);
@@ -5516,9 +5422,8 @@ static void FreeInstanceTransform(FInstanceTransform* Transform)
 static void CopyTransformState(IInstanceTransform* Dest, IInstanceTransform* Source,
                                FEngineInstance* Instance)
 {
-    // 06621935..06621975: get-matrix / set-matrix, get-extra / set-extra, get-user /
-    // set-user, in that order and always through the interface on both sides. No tests (the
-    // two stack locals of the extra pair are uninitialised in retail; the port zeroes them).
+    // Always through the interface on both sides. No tests. The two locals of the extra pair
+    // are uninitialised in retail; the port zeroes them.
     Dest->SetMatrix(Instance, Source->GetMatrix(Instance));
     float Extra = 0.0f;
     float ExtraVec[3] = {0.0f, 0.0f, 0.0f};
@@ -5528,8 +5433,7 @@ static void CopyTransformState(IInstanceTransform* Dest, IInstanceTransform* Sou
     Dest->SetUser(Instance, User);
 }
 
-// FUN_0661eb80 thiscall: zero lists/matrix extras, ident 3x3 @ +0x2c/3c/4c, Relative[0]=-1 then
-// 0x17 zeros, JointState ident W, bWorldDirty=1, Extent=-1, +8=param.
+// FUN_0661eb80.
 static FEngineInstance* EngineInstanceInit(FEngineInstance* This, FArchetypeHandle* Handle)
 {
     if (This == nullptr)
@@ -5544,9 +5448,8 @@ static FEngineInstance* EngineInstanceInit(FEngineInstance* This, FArchetypeHand
     return This;
 }
 
-// FUN_0661eb60 (pool DAT_0662b158, 0xEC) + FUN_0661eb80 (ctor) as 066216a5..066216c2 uses
-// them: a null allocation skips the ctor and yields 0 (XOR EDI,EDI), which retail then
-// dereferences -- no failure branch.
+// FUN_0661eb60 (pool DAT_0662b158, 0xEC) + FUN_0661eb80 (ctor). A null allocation yields 0,
+// which retail then dereferences -- no failure branch.
 static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 {
     FEngineInstance* Instance = (FEngineInstance*)(FreeListAlloc(&G_InstancePool));
@@ -5555,15 +5458,14 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
     return Instance;
 }
 
-// The instance-root map key: the instance pointer as a signed int (FUN_06612e70, JGE).
+// The instance-root map key: the instance pointer as a signed int (FUN_06612e70 compares signed).
 static long EngineInstanceKey(FEngineInstance* Instance)
 {
     return (long)((intptr_t)Instance);
 }
 
 // FUN_06623ac0 with the pair {Instance, Instance} and the cache update every caller does
-// after it (06622a96..abe, 06622107..22, 06622261..89): insert-if-absent; when the result
-// is not end() it becomes the cached node.
+// after it.
 static void InsertRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
 {
     FEngineInstanceMap::iterator It =
@@ -5576,9 +5478,7 @@ static void InsertRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
     }
 }
 
-// The erase every caller inlines (0662177f..066217f4, 0662205d..066220c4,
-// 066221e3..0662224c): clear the cache byte when the cached node's key is Instance, then
-// erase equal_range(Instance) (FUN_06625220 / FUN_06624ca0 / FUN_06625500 / FUN_06623200).
+// The erase every caller inlines (FUN_06625220 / FUN_06624ca0 / FUN_06625500 / FUN_06623200).
 static void EraseRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
 {
     const long Key = EngineInstanceKey(Instance);
@@ -5590,10 +5490,9 @@ static void EraseRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
 static unsigned char UnlinkInstanceChild(FEngineInstance* Parent, FEngineInstance* Node);
 static unsigned char EngineInvalidateExtentChain(FEngineInstance* This, unsigned char bFromThis);
 
-
-// FUN_06625560: this=inst+0x5C, dest=inst+0x2C, force. Jumptable PTR_LAB_0662aa84.
+// FUN_06625560: this = inst+0x5C, dest = inst+0x2C. Jump table PTR_LAB_0662aa84.
 // Relative: [0] type, [1..3] rest pos, [4..6] T @ +0x10, [7..15] 3x3 @ +0x1C, [16..18] axis @ +0x40.
-// DAT_06629510 = 0.5f (half-angle). 3DMath +0x20/+0x2C/+0x54 only — no invented IK.
+// DAT_06629510 = 0.5f (half-angle). Only 3DMath +0x20/+0x2C/+0x54 are used; there is no IK.
 static const float G_JointHalfAngle = 0.5f;
 
 static void CopyRelative3x3(float* Dest, const float* Rel)
@@ -5662,16 +5561,14 @@ static void MathTransformVec(I3DMathEngine* Math, float* Out3, const float* Matr
     MathTransformMatrix(Math, Out3, Matrix, In3);
 }
 
-// FUN_0661ed40, thiscall (Instance) RET 0x8 (OutExtent, OutVec), 0661ed40..56: the transform
-// at +4, slot 9 GetExtra(Instance, OutExtent, OutVec). Nothing else -- until 2026-09-30 the
-// port zero-filled both outputs first and returned early on a null Instance or Transform.
+// FUN_0661ed40: the transform at +4, slot 9. No checks.
 static void InstanceTransformExtra(FEngineInstance* Instance, float* OutExtent, float* OutVec)
 {
     Instance->Transform->GetExtra(Instance, OutExtent, OutVec);
 }
 
 // DAT_0662b1b0: the 3DMathEngine every joint helper re-checks before each call
-// (`if (!g) g = FUN_06628190()`, e.g. 0662566b / 0662568e / 066256c1).
+// (FUN_06628190 creates it).
 static I3DMathEngine* G_JointMath = nullptr;
 
 static I3DMathEngine* JointMath()
@@ -5681,7 +5578,7 @@ static I3DMathEngine* JointMath()
     return G_JointMath;
 }
 
-// Rev / Sphere tail: v = math +0x2C (Dest 3x3, Rel[4..6]); T = Rel[1..3] - v (float FSUBs).
+// Rev / Sphere tail: T = Rel[1..3] - Dest 3x3 * Rel[4..6], float subtractions.
 static void ApplyRestTranslation(float* Dest, const float* Rel)
 {
     float Rotated[3];
@@ -5701,8 +5598,7 @@ static void ApplyTransJoint(float* Dest, const float* Rel, const float* JointSta
     AddVec3(Dest + 9, JointState, Rel + 4);
 }
 
-// LAB_06625730 (Pris): Dest 3x3 = Rel 3x3 (MOVSD x9); v = math +0x2C (Dest, Rel[4..6]);
-// T = SlideTranslation(State[0]).
+// LAB_06625730 (Pris).
 static void ApplyPrisJoint(float* Dest, const float* Rel, const float* JointState)
 {
     CopyRelative3x3(Dest, Rel);
@@ -5711,9 +5607,7 @@ static void ApplyPrisJoint(float* Dest, const float* Rel, const float* JointStat
     SlideTranslation(Dest + 9, Rel, JointState[0], Rotated);
 }
 
-// LAB_066255e0 (Rev): q = AxisAngleToQuat(axis Rel[16..18], State[0]); R = math +0x54 (q);
-// Dest 3x3 = math +0x20 (R, Rel 3x3) -- the rotation on the LEFT (066256a3..b3); then the
-// rest translation.
+// LAB_066255e0 (Rev): the joint rotation multiplies on the LEFT of the rest 3x3.
 static void ApplyRevJoint(float* Dest, const float* Rel, const float* JointState)
 {
     float Quat[4];
@@ -5726,7 +5620,7 @@ static void ApplyRevJoint(float* Dest, const float* Rel, const float* JointState
     ApplyRestTranslation(Dest, Rel);
 }
 
-// LAB_066257f0 (Cyl): q from State[1] (FUN_0661c270 stores x/y/z, W kept aside);
+// LAB_066257f0 (Cyl): rotation from State[1] multiplies on the RIGHT; slide from State[0].
 static void ApplyCylJoint(float* Dest, const float* Rel, const float* JointState)
 {
     float Quat[4];
@@ -5741,8 +5635,7 @@ static void ApplyCylJoint(float* Dest, const float* Rel, const float* JointState
     SlideTranslation(Dest + 9, Rel, JointState[0], Rotated);
 }
 
-// LAB_06625980 (Sphere): q = State[3..6] (copied to a local); R = math +0x54 (q);
-// Dest 3x3 = math +0x20 (R, Rel 3x3); then the rest translation.
+// LAB_06625980 (Sphere): quaternion State[3..6].
 static void ApplySphereJoint(float* Dest, const float* Rel, const float* JointState)
 {
     float Quat[4];
@@ -5755,8 +5648,7 @@ static void ApplySphereJoint(float* Dest, const float* Rel, const float* JointSt
     ApplyRestTranslation(Dest, Rel);
 }
 
-// LAB_06625af0 (Loose): q = State[3..6]; R = math +0x54 (q); Dest 3x3 = math +0x20 (R, Rel 3x3);
-// T = State[0..2] + Rel[4..6] (float FADDs).
+// LAB_06625af0 (Loose): quaternion State[3..6], translation State[0..2] + Rel[4..6].
 static void ApplyLooseJoint(float* Dest, const float* Rel, const float* JointState)
 {
     float Quat[4];
@@ -5769,7 +5661,7 @@ static void ApplyLooseJoint(float* Dest, const float* Rel, const float* JointSta
     AddVec3(Dest + 9, JointState, Rel + 4);
 }
 
-// FUN_06625560 (thiscall on inst+0x5C, RET 8 (Dest, bForce); only caller FUN_0661f250 with
+// FUN_06625560 (thiscall on inst+0x5C); only caller FUN_0661f250.
 static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char bForce)
 {
     if (Instance->bWorldDirty == 0 && bForce == 0)
@@ -5801,28 +5693,28 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
     return 1;
 }
 
-// FUN_0661ec90: memcpy 0x17 dwords from constraint+8 → inst+0x5C, then link.
+// FUN_0661ec90: copy 0x17 dwords from constraint+8 to inst+0x5C, then link as the last child.
 static unsigned char ConnectInstanceChild(FEngineInstance* Parent, FEngineInstance* Child,
                                           const unsigned long* Payload)
 {
-    Child->bWorldDirty = 1;                                             // 0661eca4 [child+0xD4]
-    std::memcpy(Child->Relative, Payload, sizeof(Child->Relative));     // 0661eca8 REP MOVSD 0x17
-    FEngineInstance* Last = Parent->LastChild;                          // 0661ecaa
-    Parent->LastChild = Child;                                          // 0661ecad
+    Child->bWorldDirty = 1;
+    std::memcpy(Child->Relative, Payload, sizeof(Child->Relative));
+    FEngineInstance* Last = Parent->LastChild;
+    Parent->LastChild = Child;
     if (Last == nullptr)
-        Parent->FirstChild = Child;                                     // 0661ecb4
+        Parent->FirstChild = Child;
     else
-        Last->NextSibling = Child;                                      // 0661ecb9
-    Child->NextSibling = nullptr;                                       // 0661ecbc
-    Child->PrevSibling = Last;                                          // 0661ecc3
-    Parent->ChildCount += 1;                                            // 0661ecce
-    Child->Parent = Parent;                                             // 0661ecd1
-    EngineInvalidateExtentChain(Parent, 1);                             // 0661ecd4
-    return 1;                                                           // 0661ecda MOV AL,1
+        Last->NextSibling = Child;
+    Child->NextSibling = nullptr;
+    Child->PrevSibling = Last;
+    Parent->ChildCount += 1;
+    Child->Parent = Parent;
+    EngineInvalidateExtentChain(Parent, 1);
+    return 1;
 }
 
-// FUN_0661ed60 RET 4: flag==0 start at [this+0x10]; walk +0x10 while +0xD8 != -1 (dword
-// compare with 0xBF800000) write -1. No test of this. AL = 1.
+// FUN_0661ed60: walk up the parents (+0x10), writing -1 to the extent (+0xD8) until one already
+// holds -1 (a dword compare). No test of this.
 static unsigned char EngineInvalidateExtentChain(FEngineInstance* This, unsigned char bFromThis)
 {
     FEngineInstance* Cursor = This;
@@ -5840,7 +5732,7 @@ static unsigned char EngineInvalidateExtentChain(FEngineInstance* This, unsigned
     return 1;
 }
 
-// FUN_0661ece0 (thiscall on the instance, RET 0xC; its only caller is IEngine slot 33
+// FUN_0661ece0 (only caller IEngine slot 33).
 static void EngineSetExtentAndInvalidate(FEngineInstance* This, float Extent, const float* Vec,
                                          unsigned char bXform)
 {
@@ -5857,7 +5749,7 @@ static void EngineSetExtentAndInvalidate(FEngineInstance* This, float Extent, co
     EngineInvalidateExtentChain(This, 0);
 }
 
-// FUN_0661ec30 (thiscall, this = PARENT, RET 4): unlink Node from Parent's child list --
+// FUN_0661ec30 (thiscall, this = PARENT).
 static unsigned char UnlinkInstanceChild(FEngineInstance* Parent, FEngineInstance* Node)
 {
     if (Node->PrevSibling == nullptr)
@@ -5878,7 +5770,7 @@ static unsigned char UnlinkInstanceChild(FEngineInstance* Parent, FEngineInstanc
 static GENRESULT DACOM_API EngineSetInstanceTransform(FEngineObject* This, FEngineInstance* Instance,
                                                      IInstanceTransform* NewTransform);
 
-// FUN_06621630's leaf path, 06621698..0662170c. No failure branch and no instance-map insert
+// FUN_06621630's leaf path. No failure branch and no instance-map insert.
 static FEngineInstance* EngineCreateInstanceSimple(FEngineObject* This, FArchetypeHandle* Handle,
                                                   IInstanceTransform* Transform)
 {
@@ -5895,52 +5787,47 @@ static FEngineInstance* EngineCreateInstanceSimple(FEngineObject* This, FArchety
 static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
                                                       FArchetypeHandle* Handle, void* Transform);
 
-// FUN_06622860 (thiscall, this = engine) RET 8, listing 06622860-06622b5a. Called only from
+// FUN_06622860, called only from FUN_06621630 for compound archetypes.
 static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetypeHandle* Handle,
                                                 IInstanceTransform* Transform)
 {
-    // 06622875..0662287c: -1 / null handle -> OR EAX,-1.
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
 
-    std::map<unsigned long, FEngineInstance*> Parts; // 0662289e FUN_06623730, dtor 06622ac2..
+    std::map<unsigned long, FEngineInstance*> Parts; // FUN_06623730
 
-    // 066228a9 / 066228bd / 06622908: the caller's transform (EBP) goes to every child
-    // until the first one is created successfully; EBP is then zeroed, so every later part
-    // gets its own engine-owned transform. A failed child (066228c8 JZ) keeps EBP.
+    // The caller's transform goes to every child until the first one is created
+    // successfully; every later part then gets its own engine-owned transform.
     IInstanceTransform* ChildTransform = Transform;
     FArchetypeChild* Child = Handle->Children.data();
-    while (Child != Handle->Children.data() + Handle->Children.size()) // 066228b0 / 06622911 CMP EDI,end
+    while (Child != Handle->Children.data() + Handle->Children.size())
     {
-        // 066228b8..066228c0: IEngine slot 23 on child+0x44, no filtering -- slot 23 itself
-        // answers -1 for a -1/null handle.
+        // No filtering: slot 23 itself answers -1 for a -1/null handle.
         FEngineInstance* ChildInst =
             (FEngineInstance*)(This->CreateInstance(Child->Handle, ChildTransform));
-        if (ChildInst != G_InvalidInstance) // 066228c5 CMP ESI,-1
+        if (ChildInst != G_InvalidInstance)
         {
-            ChildInst->ParentArchetype = Handle; // 066228d5 [inst+0xC]
-            ChildInst->PartChild = Child;        // 066228d8 [inst+0xE8]
-            // 066228de..06622900: insert {child.Crc, 0}, then node->second = instance
-            // (overwrites an existing entry with the same CRC, as operator[] does).
+            ChildInst->ParentArchetype = Handle; // +0xC
+            ChildInst->PartChild = Child;        // +0xE8
+            // Overwrites an existing entry with the same CRC, as operator[] does.
             Parts[Child->Crc] = ChildInst;
-            This->AddRefHandle(Handle);          // 06622905 IEngine slot 14 (+0x38)
-            ChildTransform = nullptr;            // 06622908 XOR EBP,EBP
+            This->AddRefHandle(Handle);
+            ChildTransform = nullptr;
         }
-        Child += 1;                              // 0662290e ADD EDI,0x48
+        Child += 1;
     }
 
-    FEngineInstance* Root = nullptr;             // 06622922 XOR EBP,EBP
+    FEngineInstance* Root = nullptr;
     FConstraintRecord* Constraint = Handle->Constraints.data();
-    while (Constraint != Handle->Constraints.data() + Handle->Constraints.size()) // 06622924 / 06622a74
+    while (Constraint != Handle->Constraints.data() + Handle->Constraints.size())
     {
-        // 06622930..0662293f: a record with a null child or parent part is skipped silently.
+        // A record with a null child or parent part is skipped silently.
         if (Constraint->ChildPart != nullptr && Constraint->ParentPart != nullptr)
         {
             std::map<unsigned long, FEngineInstance*>::iterator ChildIt =
-                Parts.find(Constraint->ChildPart->Crc); // 06622952
+                Parts.find(Constraint->ChildPart->Crc);
             if (ChildIt == Parts.end())
             {
-                // 06622963..066229b0: IEngine slot 16 for the archetype name, "" when null.
                 FEngineName ArchName;
                 const char* ArchText = This->GetArchetypeName(&ArchName, Handle)->Text;
                 if (ArchText == nullptr)
@@ -5953,12 +5840,11 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
             }
             else
             {
-                FEngineInstance* ChildInst = ChildIt->second; // 066229bd
+                FEngineInstance* ChildInst = ChildIt->second;
                 std::map<unsigned long, FEngineInstance*>::iterator ParentIt =
-                    Parts.find(Constraint->ParentPart->Crc); // 066229cd
+                    Parts.find(Constraint->ParentPart->Crc);
                 if (ParentIt == Parts.end())
                 {
-                    // 066229de..06622a2e
                     FEngineName ArchName;
                     const char* ArchText = This->GetArchetypeName(&ArchName, Handle)->Text;
                     if (ArchText == nullptr)
@@ -5971,42 +5857,41 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
                 }
                 else
                 {
-                    // 06622a35: EBP = parent instance, kept even when the connect fails.
+                    // The parent is kept as Root even when the connect fails.
                     Root = ParentIt->second;
                     if (ConnectInstanceChild(Root, ChildInst, Constraint->Payload) == 0)
                         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x8EB, "WARNING",
-                                     "Unable to connect child to parent"); // 06622a48..06622a68
+                                     "Unable to connect child to parent");
                 }
             }
         }
-        Constraint += 1;                         // 06622a71 ADD ESI,0x64
+        Constraint += 1;
     }
 
     if (Root != nullptr)
     {
-        // 06622a80..06622a8b: climb +0x10 to the top of the last connected parent's tree.
+        // Climb to the top of the last connected parent's tree.
         while (Root->Parent != nullptr)
             Root = Root->Parent;
     }
     else
     {
-        // 06622a8d..06622a93: no constraint connected anything -> the part with the lowest
+        // No constraint connected anything: the part with the lowest CRC.
         if (Parts.empty())
             return G_InvalidInstance;
         Root = Parts.begin()->second;
     }
 
-    // 06622a96..06622abe: insert {Root, Root} into the engine's instance-root map (+0x10) and
-    // cache the result (+0x28 / byte +0x2C) when it is not end().
+    // Instance-root map at +0x10, cache at +0x28 / byte +0x2C.
     InsertRootInstance(This, Root);
-    return Root;                                 // 06622b4e MOV EAX,EBP
+    return Root;
 }
 
-// FUN_06621630 / IEngine+0x5C RET 0xC: children → FUN_06622860; else alloc + slot 28 + IEC+0x20.
+// FUN_06621630 (IEngine+0x5C): compound archetypes go through FUN_06622860; otherwise
+// allocate, slot 28 and IEC+0x20.
 static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
                                                       FArchetypeHandle* Handle, void* Transform)
 {
-    // 06621635..3d: -1 / 0 -> -1. 06621647..68: a non-empty child vector ((end - begin) / 0x48,
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
     IInstanceTransform* Xf = (IInstanceTransform*)Transform;
@@ -6021,7 +5906,7 @@ static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
     return EngineCreateInstanceSimple(This, Handle, Xf);
 }
 
-// FUN_06621710 (thiscall engine, RET 4), in retail order:
+// FUN_06621710, in retail order.
 static void EngineDestroyInstanceBody(FEngineObject* This, FEngineInstance* Instance)
 {
     while (Instance->FirstChild != nullptr)
@@ -6042,9 +5927,8 @@ static void EngineDestroyInstanceBody(FEngineObject* This, FEngineInstance* Inst
     FreeListFree(&G_InstancePool, Instance);
 }
 
-// LAB_06621830 / IEngine+0x60 (stdcall RET 8): -1 or 0 -> return with EAX still holding the
-// argument (06621830 loads it into EAX and never overwrites it on that path); otherwise
-// FUN_06621710 and EAX = 0.
+// LAB_06621830 (IEngine+0x60): an invalid instance is returned as the result, as retail leaves
+// the argument in EAX on that path.
 static GENRESULT DACOM_API EngineDestroyInstance(FEngineObject* This, FEngineInstance* Instance)
 {
     if (Instance == G_InvalidInstance || Instance == nullptr)
@@ -6053,7 +5937,7 @@ static GENRESULT DACOM_API EngineDestroyInstance(FEngineObject* This, FEngineIns
     return GR_OK;
 }
 
-// LAB_066215d0 / IEngine+0x58 RET 0x10: slot 12, slot 23 (+transform), slot 15.
+// LAB_066215d0 (IEngine+0x58): slot 12, slot 23, slot 15.
 static FEngineInstance* DACOM_API EngineCreateInstanceFromName(FEngineObject* This,
                                                               FArchetypeName* Name,
                                                               void* FileSystem, void* Transform)
@@ -6066,7 +5950,7 @@ static FEngineInstance* DACOM_API EngineCreateInstanceFromName(FEngineObject* Th
     return Instance;
 }
 
-// LAB_06622360 / IEngine +0x50 (RET 0x10): the argument is an archetype handle. -1 -> -1
+// LAB_06622360 (IEngine +0x50): the argument is an archetype handle; only -1 is tested.
 static GENRESULT DACOM_API EngineEnumerateArchetypeConstraints(FEngineObject* This,
                                                               FArchetypeHandle* Handle,
                                                               int(__cdecl* Callback)(void*, void*,
@@ -6089,7 +5973,7 @@ static GENRESULT DACOM_API EngineEnumerateArchetypeConstraints(FEngineObject* Th
     return GR_OK;
 }
 
-// FUN_066223b0 / IEngine +0x54 (RET 0x10): -1 -> -1 (066223b5..bd, OR EAX,EDI); nothing else
+// FUN_066223b0 (IEngine +0x54): only -1 is tested.
 static GENRESULT DACOM_API EngineEnumerateArchetypeChildren(FEngineObject* This,
                                                            FArchetypeHandle* Handle,
                                                            int(__cdecl* Callback)(void*, void*, int,
@@ -6110,7 +5994,7 @@ static GENRESULT DACOM_API EngineEnumerateArchetypeChildren(FEngineObject* This,
     return GR_OK;
 }
 
-// FUN_066218a0 / IEngine+0x64 RET 8: inst+8, slot 14.
+// FUN_066218a0 (IEngine+0x64): inst+8, slot 14.
 static FArchetypeHandle* DACOM_API EngineGetInstanceArchetype(FEngineObject* This,
                                                              FEngineInstance* Instance)
 {
@@ -6120,8 +6004,8 @@ static FArchetypeHandle* DACOM_API EngineGetInstanceArchetype(FEngineObject* Thi
     return Instance->Archetype;
 }
 
-// LAB_06622530 / IEngine+0x68 RET 0xC: stdcall (this, out, inst).
-// inst invalid or +0xC==0 → empty name; else Text=inst+0xE8, Crc=[that+0x40].
+// LAB_06622530 (IEngine+0x68): Text is the part child (+0xE8, whose name leads the record),
+// Crc its +0x40. A root instance (+0xC == 0) gets the empty name.
 static FArchetypeName* DACOM_API EngineGetInstanceName(FEngineObject* This, FArchetypeName* Out,
                                                       FEngineInstance* Instance)
 {
@@ -6142,12 +6026,11 @@ static FArchetypeName* DACOM_API EngineGetInstanceName(FEngineObject* This, FArc
     return Out;
 }
 
-// FUN_066219d0 / IEngine+0x78 RET 0x10: IEC+0x2C (inst, iid, out).
+// FUN_066219d0 (IEngine+0x78): IEC+0x2C on every engine component. Out is not tested; only
+// instance -1 is rejected.
 static GENRESULT DACOM_API EngineQueryInstance(FEngineObject* This, FEngineInstance* Instance,
                                               const char* Iid, void** Out)
 {
-    // 066219d0: *Out = 0 (no test); instance -1 (only) or Iid null -> -2; IEC +0x2C (inst,
-    // iid, out) over +0x54, the first hr >= 0 -> 0; none -> -1.
     *Out = nullptr;
     if (Instance == G_InvalidInstance || Iid == nullptr)
         return GR_INVALID_PARMS;
@@ -6161,7 +6044,7 @@ static GENRESULT DACOM_API EngineQueryInstance(FEngineObject* This, FEngineInsta
     return (GENRESULT)(-1);
 }
 
-// LAB_066218d0 / IEngine +0x70 (RET 0xC), in retail order:
+// LAB_066218d0 (IEngine +0x70), in retail order.
 static GENRESULT DACOM_API EngineSetInstanceTransform(FEngineObject* This, FEngineInstance* Instance,
                                                      IInstanceTransform* NewTransform)
 {
@@ -6196,8 +6079,8 @@ static GENRESULT DACOM_API EngineSetInstanceTransform(FEngineObject* This, FEngi
     return GR_OK;
 }
 
-// LAB_066219b0 / IEngine +0x74 (RET 0xC): *Out = 0; instance != -1 -> *Out = inst+4 (only -1
-// is tested). EAX = Out on return; the port returns 0.
+// LAB_066219b0 (IEngine +0x74): only -1 is tested. Retail returns Out in EAX; the port
+// returns 0.
 static GENRESULT DACOM_API EngineGetInstanceTransformObject(FEngineObject* This,
                                                            FEngineInstance* Instance,
                                                            IInstanceTransform** Out)
@@ -6209,7 +6092,7 @@ static GENRESULT DACOM_API EngineGetInstanceTransformObject(FEngineObject* This,
     return GR_OK;
 }
 
-// 06621eb5..d1: IEC +0x28 UpdateInstance(inst, arg) on every node of +0x54, no tests.
+// IEC +0x28 UpdateInstance on every node of +0x54, no tests.
 static void FanoutIecUpdateInstance(FEngineObject* This, FEngineInstance* Instance, void* Arg)
 {
     FEngineChildNode* Sentinel = This->EngineComponentList;
@@ -6229,8 +6112,8 @@ static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Insta
     FEngineInstance* Child = Instance->FirstChild;
     while (Child != nullptr)
     {
-        // FUN_06621ea0 always CALL FUN_0661f250 on each child; flag 8 is
-        // only tested in FUN_06621e60 before FUN_06621f20 (ancestors).
+        // FUN_06621ea0 always composes each child; flag 8 only gates the ancestor pass in
+        // FUN_06621e60.
         EngineComposeWorld(Child);
         EngineUpdateInstanceTree(This, Child, Flags, Arg);
         Child = Child->NextSibling;
@@ -6238,13 +6121,12 @@ static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Insta
 }
 
 // The transform's vtable +0x34 with the instance; its AL decides the FUN_0661f210 recursion.
-static unsigned char MarkInstanceWorldDirty(FEngineInstance* Instance) // formerly CallTransformSlot34
+static unsigned char MarkInstanceWorldDirty(FEngineInstance* Instance)
 {
     return (unsigned char)Instance->Transform->MarkWorldDirty(Instance);
 }
 
-// FUN_0661f210 (cdecl): children from FirstChild (+0x1C) through NextSibling (+0x14); a child
-// whose transform +0x34 answers AL != 0 is recursed into. No tests.
+// FUN_0661f210. No tests.
 static void EngineWalkDirtyChildren(FEngineInstance* Instance)
 {
     for (FEngineInstance* Child = Instance->FirstChild; Child != nullptr; Child = Child->NextSibling)
@@ -6254,10 +6136,10 @@ static void EngineWalkDirtyChildren(FEngineInstance* Instance)
     }
 }
 
-// DAT_0662b178: FUN_0661f250's own lazily created 3DMathEngine (0661f283..91).
+// DAT_0662b178: FUN_0661f250's own lazily created 3DMathEngine.
 static I3DMathEngine* G_ComposeMath = nullptr;
 
-// FUN_0661f250 (thiscall on the instance), in retail order:
+// FUN_0661f250, in retail order.
 static unsigned char EngineComposeWorld(FEngineInstance* Instance)
 {
     if (Instance->Parent == nullptr)
@@ -6282,8 +6164,7 @@ static unsigned char EngineComposeWorld(FEngineInstance* Instance)
     return 0;
 }
 
-// FUN_06621f20 (RET 4): instance non-null with a parent -> recurse on the parent, then
-// FUN_0661f250 on the instance.
+// FUN_06621f20.
 static void EngineComposeAncestors(FEngineInstance* Instance)
 {
     if (Instance == nullptr || Instance->Parent == nullptr)
@@ -6292,7 +6173,7 @@ static void EngineComposeAncestors(FEngineInstance* Instance)
     EngineComposeWorld(Instance);
 }
 
-// FUN_06621e60 / IEngine+0x6C RET 0x10: compose ancestors, IEC+0x28, walk children.
+// FUN_06621e60 (IEngine+0x6C): compose ancestors, IEC+0x28, walk children.
 static GENRESULT DACOM_API EngineUpdateInstance(FEngineObject* This, FEngineInstance* Instance,
                                                unsigned long Flags, void* Arg)
 {
@@ -6304,8 +6185,8 @@ static GENRESULT DACOM_API EngineUpdateInstance(FEngineObject* This, FEngineInst
     return GR_OK;
 }
 
-// LAB_06621a40 / IEngine +0x7C (RET 0xC): instance -1 / 0 -> return; inst+0x28 = value. EAX
-// is the instance argument on both paths; the port returns 0.
+// LAB_06621a40 (IEngine +0x7C): inst+0x28. Retail returns the instance argument; the port
+// returns 0.
 static GENRESULT DACOM_API EngineSetInstanceUserData(FEngineObject* This, FEngineInstance* Instance,
                                                     void* Value)
 {
@@ -6315,7 +6196,7 @@ static GENRESULT DACOM_API EngineSetInstanceUserData(FEngineObject* This, FEngin
     return GR_OK;
 }
 
-// LAB_06621a60 / IEngine +0x80 (RET 8): instance -1 / 0 -> 0; else inst+0x28.
+// LAB_06621a60 (IEngine +0x80): inst+0x28.
 static void* DACOM_API EngineGetInstanceUserData(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
@@ -6324,9 +6205,8 @@ static void* DACOM_API EngineGetInstanceUserData(FEngineObject* This, FEngineIns
     return Instance->UserData;
 }
 
-// LAB_06621a80 / IEngine +0x84 (RET 0x14): instance -1 / 0 -> return; otherwise
-// FUN_0661ece0(inst, Extent, Vec, Flags & 1). EAX is left from the callee (AL = 1 over the
-// instance pointer); the port returns 0.
+// LAB_06621a80 (IEngine +0x84): FUN_0661ece0. Retail leaves the callee's EAX; the port
+// returns 0.
 static GENRESULT DACOM_API EngineSetInstanceExtent(FEngineObject* This, FEngineInstance* Instance,
                                                   unsigned long Flags, float Extent, const float* Vec)
 {
@@ -6337,8 +6217,8 @@ static GENRESULT DACOM_API EngineSetInstanceExtent(FEngineObject* This, FEngineI
     return GR_OK;
 }
 
-// Distance on the FPU as FUN_0661ed90 does it (0661f0ac..d4 and 0661f14c..74): the three
-// differences stay unrounded and the squares are summed z, y, x.
+// Distance on the FPU as FUN_0661ed90 does it: the three differences stay unrounded and the
+// squares are summed z, y, x.
 static double ExtentDistance(const float* A, const float* B)
 {
     const double Dx = (double)(A[0]) - (double)(B[0]);
@@ -6347,7 +6227,7 @@ static double ExtentDistance(const float* A, const float* B)
     return std::sqrt(Dz * Dz + Dy * Dy + Dx * Dx);
 }
 
-// FUN_0661ed90, thiscall (Instance) RET 0xC (bRecursive, OutExtent, OutVec), 0661ed90..f209.
+// FUN_0661ed90: the bounding sphere of the instance and its children, cached in +0xD8.
 static void EngineComputeInstanceExtent(FEngineInstance* Instance, unsigned char bRecursive,
                                         float* OutExtent, float* OutVec)
 {
@@ -6452,7 +6332,7 @@ static void EngineComputeInstanceExtent(FEngineInstance* Instance, unsigned char
     OutVec[2] = LocalCenter[2];
 }
 
-// LAB_06621ab0, IEngine slot 34 (+0x88), RET 0x14 (Instance, Flags, OutExtent, OutVec),
+// LAB_06621ab0, IEngine slot 34 (+0x88).
 static GENRESULT DACOM_API EngineGetInstanceExtent(FEngineObject* This, FEngineInstance* Instance,
                                                   unsigned long Flags, float* OutExtent,
                                                   float* OutVec)
@@ -6475,7 +6355,6 @@ static GENRESULT DACOM_API EngineGetInstanceExtent(FEngineObject* This, FEngineI
     return GR_OK;
 }
 
-// The seven IEngine wrappers below used to go through two helpers that took the slot as a
 static GENRESULT DACOM_API EngineSetInstancePosition(FEngineObject* This, FEngineInstance* Instance,
                                                     void* Position)
 {
@@ -6485,7 +6364,7 @@ static GENRESULT DACOM_API EngineSetInstancePosition(FEngineObject* This, FEngin
     return Instance->Transform->SetPosition(Instance, (const float*)Position);
 }
 
-// LAB_06621b40 / IEngine +0x90 (RET 8) -> transform +0x10; fallback [DAT_0662b124].
+// LAB_06621b40 (IEngine +0x90) -> transform +0x10; fallback [DAT_0662b124].
 static float* DACOM_API EngineGetInstancePosition(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
@@ -6494,7 +6373,7 @@ static float* DACOM_API EngineGetInstancePosition(FEngineObject* This, FEngineIn
     return Instance->Transform->GetPosition(Instance);
 }
 
-// LAB_06621b70 / IEngine +0x94 (RET 0xC) -> transform +0x14.
+// LAB_06621b70 (IEngine +0x94) -> transform +0x14.
 static GENRESULT DACOM_API EngineSetInstanceOrientation(FEngineObject* This,
                                                        FEngineInstance* Instance, void* Rows)
 {
@@ -6504,7 +6383,7 @@ static GENRESULT DACOM_API EngineSetInstanceOrientation(FEngineObject* This,
     return Instance->Transform->SetOrientation(Instance, (const float*)Rows);
 }
 
-// LAB_06621ba0 / IEngine +0x98 (RET 8) -> transform +0x18; fallback [DAT_0662b110].
+// LAB_06621ba0 (IEngine +0x98) -> transform +0x18; fallback [DAT_0662b110].
 static float* DACOM_API EngineGetInstanceOrientation(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
@@ -6513,7 +6392,7 @@ static float* DACOM_API EngineGetInstanceOrientation(FEngineObject* This, FEngin
     return Instance->Transform->GetOrientation(Instance);
 }
 
-// LAB_06621bd0 / IEngine +0x9C (RET 0xC) -> transform +0x1C.
+// LAB_06621bd0 (IEngine +0x9C) -> transform +0x1C.
 static GENRESULT DACOM_API EngineSetInstanceMatrix(FEngineObject* This, FEngineInstance* Instance,
                                                   void* Matrix)
 {
@@ -6523,7 +6402,7 @@ static GENRESULT DACOM_API EngineSetInstanceMatrix(FEngineObject* This, FEngineI
     return Instance->Transform->SetMatrix(Instance, (const float*)Matrix);
 }
 
-// LAB_06621c00 / IEngine +0xA0 (RET 8) -> transform +0x20; fallback DAT_0662b128 itself.
+// LAB_06621c00 (IEngine +0xA0) -> transform +0x20; fallback DAT_0662b128 itself.
 static float* DACOM_API EngineGetInstanceTransform(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
@@ -6532,7 +6411,7 @@ static float* DACOM_API EngineGetInstanceTransform(FEngineObject* This, FEngineI
     return Instance->Transform->GetMatrix(Instance);
 }
 
-// LAB_06621c30 / IEngine +0xA8 and +0xB0 (RET 8): return [DAT_0662b124] -- the zero
+// LAB_06621c30 (IEngine +0xA8 and +0xB0): return [DAT_0662b124] -- the zero
 // translation of the identity, not the matrix.
 static float* DACOM_API EngineGetIdentityMatrix(FEngineObject* This, void* Unused)
 {
@@ -6541,7 +6420,7 @@ static float* DACOM_API EngineGetIdentityMatrix(FEngineObject* This, void* Unuse
     return G_IdentityMatrix + 9;
 }
 
-// LAB_06621c40 / IEngine +0xB4 (RET 0xC) -> transform +0x2C.
+// LAB_06621c40 (IEngine +0xB4) -> transform +0x2C.
 static GENRESULT DACOM_API EngineSetTransformUser(FEngineObject* This, FEngineInstance* Instance,
                                                  void* User)
 {
@@ -6551,7 +6430,7 @@ static GENRESULT DACOM_API EngineSetTransformUser(FEngineObject* This, FEngineIn
     return Instance->Transform->SetUser(Instance, (unsigned long)User);
 }
 
-// LAB_06621c70 / IEngine +0xB8 (RET 8) -> transform +0x30; fallback 0.
+// LAB_06621c70 (IEngine +0xB8) -> transform +0x30.
 static unsigned long DACOM_API EngineGetTransformUser(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
@@ -6560,7 +6439,7 @@ static unsigned long DACOM_API EngineGetTransformUser(FEngineObject* This, FEngi
     return Instance->Transform->GetUser(Instance);
 }
 
-// LAB_06622580 / IEngine+0xC4 RET 8: parent ? inst+0x5C : 0.
+// LAB_06622580 (IEngine+0xC4): inst+0x5C, or 0 for a root.
 static unsigned long* DACOM_API EngineGetInstanceRelative(FEngineObject* This,
                                                          FEngineInstance* Instance)
 {
@@ -6582,7 +6461,7 @@ static void CopyJointFloats(float* Dest, const float* Source, unsigned long Coun
     }
 }
 
-// LAB_066226e0 / IEngine+0xC8 RET 0x10: set stored joint state. No solver.
+// LAB_066226e0 (IEngine+0xC8): set stored joint state. No solver.
 static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngineInstance* Instance,
                                                    unsigned long Index, const float* Values)
 {
@@ -6591,7 +6470,7 @@ static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngine
         return 0;
     if (Index != 0)
     {
-        // LAB_066226e0 Index!=0 → caseD_6 copy 7 floats; +0xD4 only on Index==0 path.
+        // All 7 floats (the Loose case); only the Index == 0 path sets +0xD4.
         CopyJointFloats(Instance->JointState, Values, 7);
         return 1;
     }
@@ -6634,7 +6513,7 @@ static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngine
     return 1;
 }
 
-// LAB_066225b0 / IEngine+0xCC RET 0x10: get stored joint state. No solver.
+// LAB_066225b0 (IEngine+0xCC): get stored joint state. No solver.
 static unsigned long DACOM_API EngineGetJointParams(FEngineObject* This, FEngineInstance* Instance,
                                                    unsigned long Index, float* Out)
 {
@@ -6676,7 +6555,7 @@ static unsigned long DACOM_API EngineGetJointParams(FEngineObject* This, FEngine
     return 1;
 }
 
-// LAB_066224b0 / IEngine+0xD4 RET 8: inst+0x10 or -1.
+// LAB_066224b0 (IEngine+0xD4): inst+0x10.
 static FEngineInstance* DACOM_API EngineGetInstanceParent(FEngineObject* This,
                                                          FEngineInstance* Instance)
 {
@@ -6686,7 +6565,7 @@ static FEngineInstance* DACOM_API EngineGetInstanceParent(FEngineObject* This,
     return Instance->Parent;
 }
 
-// LAB_066224d0 / IEngine+0xD8 RET 0x10: first child / next sibling / parent-walk.
+// LAB_066224d0 (IEngine+0xD8): first child / next sibling / parent-walk.
 static FEngineInstance* DACOM_API EngineGetRelatedInstance(FEngineObject* This,
                                                           FEngineInstance* From,
                                                           unsigned long Flags,
@@ -6714,7 +6593,7 @@ static FEngineInstance* DACOM_API EngineGetRelatedInstance(FEngineObject* This,
     return G_InvalidInstance;
 }
 
-// LAB_06622480 / IEngine+0xDC RET 8: walk +0x10 to root.
+// LAB_06622480 (IEngine+0xDC): walk +0x10 to root.
 static FEngineInstance* DACOM_API EngineGetInstanceRoot(FEngineObject* This,
                                                        FEngineInstance* Instance)
 {
@@ -6726,27 +6605,26 @@ static FEngineInstance* DACOM_API EngineGetInstanceRoot(FEngineObject* This,
     return Instance;
 }
 
-// LAB_06622450 / IEngine+0xE0 RET 0xC: find archetype child record by nested handle.
+// LAB_06622450 (IEngine+0xE0): find the archetype child record by nested handle.
 static FArchetypeChild* DACOM_API EngineFindArchetypeChild(FEngineObject* This,
                                                           FArchetypeHandle* Handle,
                                                           FArchetypeHandle* ChildHandle)
 {
     (void)This;
-    if (Handle == G_InvalidArchetype || Handle == nullptr)    // 06622454 / 06622459
+    if (Handle == G_InvalidArchetype || Handle == nullptr)
         return nullptr;
-    FArchetypeChild* Child = Handle->Children.data();          // 0662245d..60: end read once
+    FArchetypeChild* Child = Handle->Children.data();          // end read once
     FArchetypeChild* const End = Child + Handle->Children.size();
     while (Child != End)
     {
-        if (Child->Handle == ChildHandle)                      // 0662246b
+        if (Child->Handle == ChildHandle)
             return Child;
         Child += 1;
     }
     return nullptr;
 }
 
-// LAB_06612df0 / IEngine+0xE4 RET 0xC: always −1. Not get/set.
-// formerly EngineSlot57ReturnNeg1
+// LAB_06612df0 (IEngine+0xE4): always -1.
 static unsigned long DACOM_API RejectEngineOperation(FEngineObject* This, void* A, void* B)
 {
     (void)This;
@@ -6755,7 +6633,7 @@ static unsigned long DACOM_API RejectEngineOperation(FEngineObject* This, void* 
     return 0xFFFFFFFF;
 }
 
-// LAB_066222a0 / IEngine+0xD0 (stdcall RET 8): iterate the instance-root map. No checks.
+// LAB_066222a0 (IEngine+0xD0): iterate the instance-root map. No checks.
 static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
                                                           FEngineInstance* Instance)
 {
@@ -6793,9 +6671,7 @@ static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
 
 static I3DMathEngine* G_MathEngine = nullptr;
 
-// FUN_06628190: descriptor {0xC, "3DMathEngine", 0} on the stack, DACOM_Acquire() +0xC
-// CreateInstance into a local, return the local (hr not tested; the local is uninitialised in
-// retail, 0 here). No other tests.
+// FUN_06628190. The hr is not tested; the out local is uninitialised in retail, 0 here.
 I3DMathEngine* Create3DMathEngine()
 {
     FAggDescC Desc = {};
@@ -6806,9 +6682,7 @@ I3DMathEngine* Create3DMathEngine()
     return (I3DMathEngine*)Created;
 }
 
-// Shared with EngBaseMixer.cpp (declared in EngBase.h). Retail keeps one lazily-filled global
-// per call site (DAT_0662acf4, DAT_0662b1b0, ...) with the same `if (!g) g = FUN_06628190()`
-// shape; the sites that still share this one cache are noted on the decomp-tracker EngBase items.
+// Shared with EngBaseMixer.cpp; see EngBase.h for the per-site caches retail keeps instead.
 I3DMathEngine* Acquire3DMathEngine()
 {
     if (G_MathEngine == nullptr)
@@ -6816,14 +6690,14 @@ I3DMathEngine* Acquire3DMathEngine()
     return G_MathEngine;
 }
 
-// LAB_066212c0 / IEngine+0x34 RET 0xC.
+// LAB_066212c0 (IEngine+0x34).
 static FArchetypeHandle* DACOM_API EngineDuplicateArchetype(FEngineObject* This,
                                                            FArchetypeHandle* ArchIn,
                                                            FArchetypeName* Name)
 {
     if (ArchIn == G_InvalidArchetype)
         return G_InvalidArchetype;
-    if (ArchIn != nullptr && ArchIn->Children.size() != 0) // 066212d6..fb
+    if (ArchIn != nullptr && ArchIn->Children.size() != 0)
     {
         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x42A, "WARNING",
                      "Engine: duplicate_archetype: arch_index is a compound archetype (not valid).");
@@ -6844,12 +6718,11 @@ static FArchetypeHandle* DACOM_API EngineDuplicateArchetype(FEngineObject* This,
     return NewHandle;
 }
 
-// FUN_06621560 / IEngine+0x48 RET 0x10: IEC+0x1C (id, name, out); first HRESULT>=0 wins.
+// FUN_06621560 (IEngine+0x48): IEC+0x1C on every engine component; the first hr >= 0 wins.
+// Out is not tested.
 static GENRESULT DACOM_API EngineQueryEngineComponent(FEngineObject* This, int Id, void* Name,
                                                      void** Out)
 {
-    // 06621560: *Out = 0 (no test); Id -1 or Name null -> -2; IEC +0x1C (Id, Name, Out) over
-    // +0x54, the first hr >= 0 -> 0; none -> -1. No other checks.
     *Out = nullptr;
     if (Id == -1 || Name == nullptr)
         return GR_INVALID_PARMS;
@@ -6865,13 +6738,13 @@ static GENRESULT DACOM_API EngineQueryEngineComponent(FEngineObject* This, int I
     return (GENRESULT)(-1);
 }
 
-// The map key: retail stores the archetype handle as a signed int (FUN_06612e70, JGE).
+// The map key: retail stores the archetype handle as a signed int (FUN_06612e70).
 static long HardpointKeyOf(FArchetypeHandle* Handle)
 {
     return (long)((intptr_t)Handle);
 }
 
-// The lookup every IHardpoint / IEngineComponent method of this object opens with (inline in
+// The cached lookup every IHardpoint / IEngineComponent method of this object inlines.
 static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetypeHandle* Handle)
 {
     const long Key = HardpointKeyOf(Handle);
@@ -6890,7 +6763,7 @@ static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetyp
     return Found;
 }
 
-// FUN_06626350 / IHardpoint+0x0C (stdcall RET 0x10). No argument checks.
+// FUN_06626350 (IHardpoint+0x0C). No argument checks.
 static unsigned long DACOM_API HardpointGetHardpoint(FHardpointObject* This,
                                                     FArchetypeHandle* Handle,
                                                     FHardpointKey const* Key, void* Out)
@@ -6910,7 +6783,7 @@ static unsigned long DACOM_API HardpointGetHardpoint(FHardpointObject* This,
     return 0;
 }
 
-// LAB_066263e0 / IHardpoint+0x10 (stdcall RET 0x10). No argument checks.
+// LAB_066263e0 (IHardpoint+0x10). No argument checks.
 static unsigned long DACOM_API HardpointAddHardpoint(FHardpointObject* This,
                                                     FArchetypeHandle* Handle,
                                                     FHardpointKey const* Key, const void* Data)
@@ -6944,7 +6817,7 @@ static unsigned long DACOM_API HardpointAddHardpoint(FHardpointObject* This,
     return 1;
 }
 
-// FUN_06626610 / IHardpoint+0x14 (stdcall RET 0x10). No argument checks.
+// FUN_06626610 (IHardpoint+0x14). No argument checks.
 static GENRESULT DACOM_API HardpointEnumerateHardpoints(FHardpointObject* This,
                                                        FHardpointEnumProc Callback,
                                                        FArchetypeHandle* Handle, void* Context)
@@ -6958,7 +6831,7 @@ static GENRESULT DACOM_API HardpointEnumerateHardpoints(FHardpointObject* This,
     return GR_OK;
 }
 
-// FUN_066269b0 / IHardpoint+0x1C (stdcall RET 0xC). No argument checks.
+// FUN_066269b0 (IHardpoint+0x1C). No argument checks.
 static char const* DACOM_API HardpointFindHardpoint(FHardpointObject* This,
                                                    FArchetypeHandle* Handle,
                                                    unsigned long const* Crc)
@@ -6975,7 +6848,8 @@ static char const* DACOM_API HardpointFindHardpoint(FHardpointObject* This,
     return nullptr;
 }
 
-// LAB_06626690 / IHardpoint+0x18 (stdcall RET 0x14): connect InstA's hardpoint KeyA to InstB's
+// LAB_06626690 (IHardpoint+0x18): connect InstA's hardpoint NameA to InstB's NameB with a joint.
+// Status 1/2/3 says which step failed; 0 is success.
 static unsigned long DACOM_API HardpointConnect(FHardpointObject* This, FEngineInstance* InstA,
                                                FHardpointKey const* NameA, FEngineInstance* InstB,
                                                FHardpointKey const* NameB)
@@ -7042,7 +6916,7 @@ static unsigned long DACOM_API HardpointConnect(FHardpointObject* This, FEngineI
     return Status;
 }
 
-// LAB_06621f90 / IEngine+0xBC (stdcall RET 0x10), listing 34640-34796:
+// LAB_06621f90 (IEngine+0xBC).
 static unsigned long DACOM_API EngineCreateJoint(FEngineObject* This, FEngineInstance* Parent,
                                                 FEngineInstance* Child, const unsigned long* Payload)
 {
@@ -7077,7 +6951,7 @@ static unsigned long DACOM_API EngineCreateJoint(FEngineObject* This, FEngineIns
     return 1;
 }
 
-// LAB_06622140 / IEngine+0xC0 (stdcall RET 0xC), listing 34798-34922. The instance acted on is
+// LAB_06622140 (IEngine+0xC0). The instance acted on is Child; Parent only feeds the messages.
 static unsigned long DACOM_API EngineDestroyJoint(FEngineObject* This, FEngineInstance* Parent,
                                                  FEngineInstance* Child)
 {
@@ -7110,7 +6984,7 @@ static unsigned long DACOM_API EngineDestroyJoint(FEngineObject* This, FEngineIn
     return 1;
 }
 
-// LAB_06625e00 / IEC+0xC (stdcall RET 4). QI through the IEC facet (-> 06628130 -> the
+// LAB_06625e00 (IEC+0xC). QI through the IEC facet to the controlling unknown.
 static GENRESULT DACOM_API HardpointEngineComponentInitialize(void* Nested)
 {
     FHardpointObject* Object = HardpointFromNested(Nested, 4);
@@ -7124,9 +6998,7 @@ static GENRESULT DACOM_API HardpointEngineComponentInitialize(void* Nested)
     return GR_OK;
 }
 
-// FUN_06626d00 (thiscall, ECX unused, RET 4). Case-sensitive compares, in this order:
-// "Fixed" -> 0, "Revolute" -> 2, "Prismatic" -> 1; anything else FDUMPs 0x100002
-// HardPoint.cpp 0x25F and returns 0 (JT_FIXED, as the message says). No null check.
+// FUN_06626d00 (thiscall, ECX unused). Case-sensitive compares, in this order. No null check.
 static long ParseHardpointJointType(const char* Name)
 {
     if (std::strcmp(Name, G_NameFixed) == 0)
@@ -7140,7 +7012,7 @@ static long ParseHardpointJointType(const char* Name)
     return 0;
 }
 
-// The fixed-size field read LAB_06625e60 inlines four times (Axis 066260b8..1e, Min
+// The fixed-size field read LAB_06625e60 inlines four times. Dest is written only on a full read.
 static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, unsigned long Size)
 {
     FEngBaseFileSystemDesc Desc;
@@ -7156,7 +7028,7 @@ static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, un
     Fs->CloseFile((unsigned long)FileHandle); // +0x10
 }
 
-// FUN_06627b30 (cdecl, FS, Name, Out): the same open as ReadHardpointField, a 0x24-byte Read
+// FUN_06627b30: the same open as ReadHardpointField, a 0x24-byte read.
 static GENRESULT ReadHardpointOrientation(IFileSystem* Fs, const char* Name, float* Out)
 {
     FEngBaseFileSystemDesc Desc;
@@ -7179,7 +7051,7 @@ static GENRESULT ReadHardpointOrientation(IFileSystem* Fs, const char* Name, flo
     return bRead ? GR_OK : GR_E_FAIL;
 }
 
-// LAB_06625e60 / IEC+0x10 (stdcall RET 0xC, this = obj+4). No argument checks.
+// LAB_06625e60 (IEC+0x10, this = obj+4). No argument checks.
 static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHandle* Handle,
                                                    void* FileSystem)
 {
@@ -7237,8 +7109,7 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                 unsigned char* Data = Entry->second.back().Data;
                 const long Type = ParseHardpointJointType(Outer.cFileName);
                 std::memcpy(Data, &Type, sizeof(Type));
-                // 066260a3 JZ (0 -> Position), 066260a9 JLE (< 0 -> FDUMP), 066260b2 JG (> 2 ->
-                // FDUMP): signed compares against 0 and 2.
+                // Signed compares against 0 and 2.
                 if (Type < 0 || Type > 2)
                 {
                     EngBaseFdump(kFdumpWarning, G_FdumpFileHardPoint, 0x120, "WARNING",
@@ -7269,7 +7140,7 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
     return Entry != Object->Archetypes.end() ? 1 : 0;
 }
 
-// LAB_06626b90 / IEC+0x14 (stdcall RET 0xC, this = obj+4; NewHandle = arg 2, OldHandle =
+// LAB_06626b90 (IEC+0x14, this = obj+4).
 static GENRESULT DACOM_API HardpointDuplicateArchetype(void* Nested, FArchetypeHandle* NewHandle,
                                                       FArchetypeHandle* OldHandle)
 {
@@ -7290,7 +7161,7 @@ static GENRESULT DACOM_API HardpointDuplicateArchetype(void* Nested, FArchetypeH
     return GR_OK;
 }
 
-// LAB_06626a30 / IEC+0x18 (stdcall RET 8, this = obj+4). No argument checks.
+// LAB_06626a30 (IEC+0x18, this = obj+4). No argument checks.
 static GENRESULT DACOM_API HardpointDestroyArchetype(void* Nested, FArchetypeHandle* Handle)
 {
     FHardpointObject* Object = HardpointFromNested(Nested, 4);
@@ -7303,7 +7174,6 @@ static GENRESULT DACOM_API HardpointDestroyArchetype(void* Nested, FArchetypeHan
     return GR_OK;
 }
 
-// Facet wrappers retain their specific interface receiver.
 unsigned long DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, unsigned long Type,
                                                             void* BindA, void* BindB)
 {
@@ -7384,7 +7254,7 @@ unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, void* T
                         Arg6, Arg7, Arg8);                                   // LAB_06614b30
 }
 
-// LAB_06625380 (RET 0xC): size != 8 or a name that differs from the factory's (inline strcmp)
+// LAB_06625380.
 GENRESULT DACOM_API EngineFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
     if (Desc->size != G_AggDescSizeEngine || std::strcmp(Desc->interface_name, This->Name) != 0)
@@ -7413,7 +7283,7 @@ GENRESULT DACOM_API EngineFactoryCreateInstance(FDacomFactory* This, AGGDESC* De
     return GR_OK;
 }
 
-// FUN_0661a750 (RET 0xC). No checks of This / Desc / Out.
+// FUN_0661a750. No checks of This / Desc / Out.
 GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
     if (Desc->size != G_AggDescSizeAnimation || std::strcmp(Desc->interface_name, This->Name) != 0)
@@ -7431,9 +7301,7 @@ GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC*
 
     new (Object) FAnimationObject(); // the four facet tables and the inner unknown's table
     Object->NextPlaybackId = G_AnimFirstPlaybackId;
-    // Retail constructs the three trees in place (+0x14 playback map, +0x28 set, +0x3C map;
-    // FUN_06616c10); the port holds them through pointers (see FAnimationObject) and frees
-    // them in DestroyAnimationLists.
+    // Retail constructs the three trees in place (FUN_06616c10); see FAnimationObject.
     Object->Playbacks = new FAnimPlaybackMap;
     Object->Channels = new FTypedChannelSet;
     Object->Mixers = new FMixerKeyMap;
@@ -7464,7 +7332,7 @@ GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     return GR_OK;
 }
 
-// FUN_06627c40 (RET 0xC). No checks of This / Desc / Out.
+// FUN_06627c40. No checks of This / Desc / Out.
 GENRESULT DACOM_API HardpointFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc, void** Out)
 {
     if (Desc->size != G_AggDescSizeHardpoint || std::strcmp(Desc->interface_name, This->Name) != 0)
@@ -7509,7 +7377,7 @@ GENRESULT DACOM_API HardpointFactoryCreateInstance(FDacomFactory* This, AGGDESC*
     return (GENRESULT)HookResult;
 }
 
-// LAB_0661e800, RET 0xC. No null checks of This / Desc / Out.
+// LAB_0661e800. No null checks of This / Desc / Out.
 GENRESULT DACOM_API ChannelArchetypeFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc,
                                                          void** Out)
 {
@@ -7541,7 +7409,6 @@ GENRESULT DACOM_API ChannelArchetypeFactoryCreateInstance(FDacomFactory* This, A
     *Out = Object;
     return (GENRESULT)HookResult;
 }
-
 
 static void* NestedThis(void* Object, unsigned long Offset)
 {
@@ -7723,7 +7590,6 @@ float* DACOM_API FEngineObject::GetInstanceTransform(void* Instance)
 {
     return EngineGetInstanceTransform(this, (FEngineInstance*)Instance);
 }
-// formerly UnusedSlot41
 GENRESULT DACOM_API FEngineObject::NoOp41(void* A, void* B)
 {
     return StubRetC(this, A, B);
@@ -7732,7 +7598,6 @@ float* DACOM_API FEngineObject::GetIdentityMatrix(void* Unused)
 {
     return EngineGetIdentityMatrix(this, Unused);
 }
-// formerly UnusedSlot43
 GENRESULT DACOM_API FEngineObject::NoOp43(void* A, void* B)
 {
     return StubRetC(this, A, B);
@@ -7796,7 +7661,6 @@ void* DACOM_API FEngineObject::FindArchetypeChild(void* Handle, void* ChildHandl
     return EngineFindArchetypeChild(this, (FArchetypeHandle*)Handle,
                                     (FArchetypeHandle*)ChildHandle);
 }
-// formerly UnusedSlot57
 unsigned long DACOM_API FEngineObject::RejectOperation(void* A, void* B)
 {
     return RejectEngineOperation(this, A, B);
@@ -8136,7 +8000,6 @@ GENRESULT DACOM_API FChannelArchetypeFactory::CreateInstance(AGGDESC* Desc, void
 {
     return ChannelArchetypeFactoryCreateInstance(this, Desc, Out);
 }
-
 
 static void RegisterFactory(FDacomFactory* Factory, const char* Name, unsigned long Priority)
 {

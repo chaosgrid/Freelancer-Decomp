@@ -8,8 +8,7 @@
 
 // The ToolTip hover record (0x64 bytes): packed on the stack by WinControl slot 34
 // (FUN_005a0530), ButtonControl FUN_0055bde0 and WireButton FUN_005a46c0, embedded in every
-// BaseRichTextWin at +0x40c (slot 46 FUN_005798a0 returns it), and consumed by the ToolTip
-// through FUN_004be370 -> FUN_004bdea0.
+// BaseRichTextWin at +0x40c, and consumed by the ToolTip through FUN_004be370 -> FUN_004bdea0.
 
 #include "Common/Fonts/font_string.h"
 
@@ -17,22 +16,14 @@
 
 struct FToolTipHoverInfo;
 
-// FUN_00444ee0 (the record's destructor, ~FToolTipHoverInfo): members in reverse -- the
-// Font::String at +0x10 (FUN_00444e50), then the caption buffer at +0x08 (FUN_00444e20: free,
-// +0x08 / +0x0c zeroed). Defined in cargo_bar_control.cpp.
+// FUN_00444ee0, the record's destructor: the Font::String at +0x10, then the caption buffer at
+// +0x08. Defined in cargo_bar_control.cpp.
 void ToolTipHoverDestroy(FToolTipHoverInfo* Info);
 
-// Hover blob packed by FUN_0055bde0 / FUN_005a46c0 and consumed by FUN_004bdea0.
-// Layout matches stack locals relative to the pointer passed to FUN_004be370.
-//
-// RAII holder (AGENTS.md RE rule 13): every retail site that builds one constructs the caption
-// buffer (+0x08 / +0x0c zeroed) and then the Font::String (FUN_004144b0), and tears the record
-// down through FUN_00444ee0 (or its inlined body) on the normal and the unwind path -- e.g.
-// WinControl slot 34 FUN_005a0530: construct 0x005a054e..0x005a055e, inlined teardown
-// 0x005a05c7..0x005a0630; FuncInfo_005fed48 unwinds state 0 with FUN_00444e20 on the caption
-// (Unwind@005c4f60) and state 1 with FUN_00444ee0 on the whole record (Unwind@005c4f58).
-// The rest of the record is written by each site (FUN_004963a0 or inline stores); retail leaves
-// it as stack garbage until then, the port starts it at zero.
+// Every retail site that builds one constructs the caption buffer and the Font::String, and
+// tears the record down through FUN_00444ee0 (or its inlined body) on the normal and the unwind
+// path (FuncInfo_005fed48 for FUN_005a0530). The rest of the record is written by each site;
+// retail leaves it as stack garbage until then, the port starts it at zero.
 struct FToolTipHoverInfo
 {
     FToolTipHoverInfo()
@@ -45,12 +36,10 @@ struct FToolTipHoverInfo
     FToolTipHoverInfo(FToolTipHoverInfo const&) = delete;
     FToolTipHoverInfo& operator=(FToolTipHoverInfo const&) = delete;
 
-    int Ids;                     // +0x00  LabelIds
+    int Ids;                     // +0x00  LabelIds; also the record's key
     int IdsAlt;                  // +0x04  IDS used by FUN_004bd880 (via +0xf8)
-    wchar_t* CaptionW;           // +0x08  null → resolve via IdsAlt
-    unsigned CaptionCapacity;    // +0x0c  wchar count of +0x08 (FUN_00413df0 grows it)
-    // +0x10 Font::String -- BaseRichTextWin's embedded copy (+0x40c) constructs it with
-    // FUN_004144b0 and tears it down in its dtor (0x0057969d..0x005796b6).
+    wchar_t* CaptionW;           // +0x08  null -> resolve via IdsAlt
+    unsigned CaptionCapacity;    // +0x0c  wchar count of +0x08
     FFontString Text;            // +0x10 .. +0x43
     int AuxField;                // +0x44  KeyCmd NicknameId (FUN_00577dd0)
     float WorldPos[3];           // +0x48
@@ -69,5 +58,5 @@ void NnToolTipFeedHover(FToolTipHoverInfo const* Info);
 
 // FUN_004963a0 (thiscall on the record) -- Ids -1, IdsAlt 0, AuxField 0, the caption emptied
 // when it has a non-empty buffer, bLive 0. WorldPos / HalfExtents / Text are untouched.
-// Callers: NeuroNetNavMap::Update (4 sites), 0x004b66f1, UiFastTable (0x0058d677 and siblings).
+// Callers: NeuroNetNavMap::Update, UiFastTable and one more site.
 void ToolTipHoverReset(FToolTipHoverInfo* Info);

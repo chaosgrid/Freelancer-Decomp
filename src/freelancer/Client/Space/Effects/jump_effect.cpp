@@ -34,15 +34,13 @@ namespace
     JumpShipEffectDesc* G_JumpShipEffectDesc = nullptr;
 
     // DAT_00674fd8 (sentinel) / DAT_00674fdc (count) -- the [JumpGateEffect] records, appended
-    // by JumpEffectIniLoad (FUN_005020a0, 0x0054ac15) and emptied by JumpEffectDescsClear
-    // (FUN_00502aa0, 0x0054afb1).
+    // by JumpEffectIniLoad (FUN_005020a0) and emptied by JumpEffectDescsClear (FUN_00502aa0).
     std::list<FJumpEffectDesc> G_JumpEffectDescs;
 
     // DAT_005d1f04 -- the jump camera-shake amplitude.
     constexpr float kJumpShakeAmplitude = 0.015f;
 
-    // FUN_004215b0 on a Transform's rotation, then a zero translation (the inline sequences
-    // at 0x005034a7..0x005034cb / 0x0050366e..0x005036a0 / 0x00503730..0x00503758).
+    // FUN_004215b0 on a Transform's rotation, then a zero translation (inlined in retail).
     void SetIdentityTransform(Transform& Xform)
     {
         Xform.Rotation.E[0][0] = 1.0f;
@@ -59,8 +57,7 @@ namespace
         Xform.Translation.z = 0.0f;
     }
 
-    // The inline CSolar fetch (0x00502cb0..0x00502cd3 / 0x0050363e..0x00503663): the object
-    // when its class has all of 0x303, else null.
+    // The inline CSolar fetch: the object when its class has all of 0x303, else null.
     CSolar const* AsSolar(CObject const* Obj)
     {
         if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) != 0x303u)
@@ -77,7 +74,7 @@ FJumpFxCompanion::~FJumpFxCompanion()
 
 FJumpGateRingFx::FJumpGateRingFx()
 {
-    // LAB_00502de0: byte +0 = 0, dwords +4..+0x20 = 0 (the companion by its constructor).
+    // LAB_00502de0.
     bCreated = 0;
     CreateTime = 0.0f;
     Position.x = 0.0f;
@@ -87,9 +84,7 @@ FJumpGateRingFx::FJumpGateRingFx()
 
 FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
 {
-    // FUN_00502ba0 (thiscall, RET 4). 0x00502bc4..0x00502be9: +0x1c..+0x28 zeroed and the
-    // five rings built by the eh vector constructor (LAB_00502de0) -- the member constructors.
-    // 0x00502bee..0x00502c20: +4 = the solar; a null one is reported (line 0xe3) but used.
+    // FUN_00502ba0. A null solar is reported but used.
     Solar = InSolar;
     if (InSolar == nullptr)
     {
@@ -97,8 +92,7 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
               "null solar passed to JumpGateEffect constructor");
     }
 
-    // 0x00502c23..0x00502c76: +0 = 0; the solar's +0x200 id, or CreateID("jump_effect_default")
-    // when it is empty, looked up in the DAT_00674fd8 list (payload at node +8).
+    // The solar's +0x200 id, or "jump_effect_default" when it is empty.
     Desc = nullptr;
     ID_String Wanted = Solar->JumpEffectId;
     if (Wanted.IsEmpty())
@@ -112,20 +106,17 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
             break;
         }
     }
-    // 0x00502c76..0x00502ca2: not found -> FDUMP 0x100001, line 0xf8.
     if (Desc == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: Missing jump effect: %s\n", kJumpEffectCpp, 0xf8,
               Wanted.get_string());
     }
 
-    // 0x00502ca5..0x00502cad.
     Clock = 0.0f;
     bFire = 0;
 
-    // 0x00502cb0..0x00502d0c: the solar's CSolar archetype +0xa4 (JumpOutHp) through
-    // FindHardpoint_PS on get_index (vt+0x1c); the result is not tested, the info's position
-    // is copied to +0x0c either way. The archetype read has no test (a non-solar crashes).
+    // The JumpOutHp lookup's result is not tested, the position is copied either way. The
+    // archetype read has no test (a non-solar crashes).
     CSolar const* const SolarObj = AsSolar(Solar != nullptr ? Solar->Object : nullptr);
     Archetype::Solar const* const Arch = static_cast<Archetype::Solar const*>(SolarObj->Archetype);
     HardpointInfo Info;
@@ -133,8 +124,7 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
     FindHardpoint_PS(Solar->get_index(), Arch->JumpOutHp.Value, HpHandle, Info);
     JumpOutPosition = Info.Position;
 
-    // 0x00502d0f..0x00502d6e: each descriptor ring (count re-read from +0x40 every lap, the
-    // descriptor used with no test): its hardpoint position and create time.
+    // Each descriptor ring (count re-read every lap, the descriptor used with no test).
     for (int Ring = 0; Ring < Desc->RingCount; ++Ring)
     {
         FindHardpoint_PS(Solar->get_index(), Desc->Rings[Ring].Hp.Value, HpHandle, Info);
@@ -145,10 +135,8 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
 
 FJumpGateEffect::~FJumpGateEffect()
 {
-    // FUN_00502e40 (thiscall). 0x00502e5f..0x00502e99: with a solar, every descriptor ring's
-    // companion leaves the solar's +0x28 effect list (FUN_004fcef0); the descriptor is used
-    // with no test. 0x00502e9a..0x00502eea: the rings (FUN_00502e00, eh vector destructor)
-    // and then +0x1c (inline FUN_00502d90) -- the member destructors.
+    // FUN_00502e40. The descriptor is used with no test; the rings and companions follow as
+    // member destruction.
     if (Solar != nullptr)
     {
         for (int Ring = 0; Ring < Desc->RingCount; ++Ring)
@@ -158,25 +146,22 @@ FJumpGateEffect::~FJumpGateEffect()
 
 void FJumpGateEffect::Update(float Dt)
 {
-    // FUN_00502f00 (thiscall, RET 4). 0x00502f07..0x00502f15: the clock stops once fired.
+    // FUN_00502f00. The clock stops once fired.
     if (bFire == 0)
         Clock = Clock + Dt;
 
-    // 0x00502f18..0x00503052: every descriptor ring, the count re-read from +0x40 after each
-    // lap and the descriptor used with no test.
+    // The count is re-read after each lap and the descriptor used with no test.
     for (int Ring = 0; Ring < Desc->RingCount; ++Ring)
     {
         FJumpGateRingFx& RingFx = Rings[Ring];
-        // 0x00502f33..0x00502f47: once only, and only when the clock is above the ring's create
-        // time (TEST AH,0x41 / JNZ: not-above and NaN skip).
+        // Once only, and only when the clock is above the ring's create time (NaN skips).
         if (RingFx.bCreated != 0)
             continue;
         if (!(Clock > RingFx.CreateTime))
             continue;
         RingFx.bCreated = 1;
 
-        // 0x00502f4d..0x00502fc6: identity orientation at the ring's hardpoint position, on the
-        // solar's own instance (its vt+0x1c).
+        // Identity orientation at the ring's hardpoint position, on the solar's own instance.
         FTransform Local;
         for (int Row = 0; Row < 3; ++Row)
         {
@@ -188,15 +173,14 @@ void FJumpGateEffect::Update(float Dt)
         Local.Translation.Z = RingFx.Position.z;
         int const Index = static_cast<int>(Solar->get_index());
 
-        // 0x00502fc0..0x00502ffd: the descriptor ring's effect (+4 + 0xc * Ring) through
-        // DAT_00674c60 (FUN_00503070) into the ring's companion, the solar as the list owner.
+        // The solar is the list owner.
         ID_String const& Effect = Desc->Rings[Ring].Effect;
         if (!Effect.IsEmpty() &&
             CliCreateEffectOneShot(FindEffectArch(&Effect.Id), Solar, Index, &Local,
                                    &RingFx.Fx) != 0)
             continue;
 
-        // 0x00502fff..0x00503031: an empty name or a failed start warns, line 0x12c.
+        // An empty name or a failed start warns.
         FDUMP(0x100002,
               "%s(%d) : *** WARNING: jump gate effect number (%d) named (%s) did not create.",
               kJumpEffectCpp, 0x12c, Ring, Effect.get_string());
@@ -211,9 +195,8 @@ void JumpGateEffectFire(FJumpGateEffect* Gate)
 
 JumpShipEffectDesc* JumpShipEffectDescGet()
 {
-    // FUN_00502b00 (0x00502b16..0x00502b97): DAT_00674fd0 when set; otherwise FDUMP 0x100002
-    // (line 0xd5) and operator new(0x14) with the five ids cleared (the inline form of
-    // FUN_00503a50); a failed new stores and returns null.
+    // FUN_00502b00: DAT_00674fd0 when set; otherwise a warning and a default (FUN_00503a50
+    // inlined); a failed new stores and returns null.
     if (G_JumpShipEffectDesc == nullptr)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xd5,
@@ -225,26 +208,21 @@ JumpShipEffectDesc* JumpShipEffectDescGet()
 
 void JumpEffectIniLoad()
 {
-    // FUN_005020a0 (no arguments). 0x005020c1..0x00502104: an INI_Reader on the stack, the
-    // [Data] jump_effect path (DAT_0067a334 = g_display.jump_effect.Text) through
-    // GetFileSysPath(.., 0), open(path, false).
+    // FUN_005020a0. The [Data] jump_effect path (DAT_0067a334).
     INI_Reader Reader;
     char Path[MAX_PATH];
     GetFileSysPath(Path, g_display.jump_effect.Text, nullptr);
     bool const bOpened = Reader.open(Path, false);
 
-    // 0x00502106..0x0050211c: the previous JumpShipEffectDesc is freed and DAT_00674fd0 cleared
-    // whether or not the file opened.
+    // The previous JumpShipEffectDesc is freed whether or not the file opened.
     if (G_JumpShipEffectDesc != nullptr)
         delete G_JumpShipEffectDesc;
     G_JumpShipEffectDesc = nullptr;
 
-    // 0x00502122..0x0050212a: the three per-ring key counts ([ESP+0x14] glow_ring_effect,
-    // [ESP+0x10] glow_ring_hp, [ESP+0x1c] glow_create_time) are zeroed ONCE, and the record
-    // [ESP+0x24] lives for the whole function: a later [JumpGateEffect] section that omits a
-    // key inherits the previous section's value, as in retail. Only the ids are re-cleared per
-    // section (0x0050217a..0x005021b0). Retail leaves the first section's unset fields as stack
-    // garbage; the port starts them at zero.
+    // The three per-ring key counts are zeroed ONCE, and the record lives for the whole
+    // function: a later [JumpGateEffect] section that omits a key inherits the previous
+    // section's value, as in retail. Only the ids are re-cleared per section. Retail leaves the
+    // first section's unset fields as stack garbage; the port starts them at zero.
     int EffectCount = 0;
     int HpCount = 0;
     int TimeCount = 0;
@@ -274,8 +252,7 @@ void JumpEffectIniLoad()
                 }
                 else if (Reader.is_value("glow_ring_effect"))
                 {
-                    // 0x00502205..0x00502246: every non-empty value i of the five sets the
-                    // count to i + 1.
+                    // Every non-empty value i of the five sets the count to i + 1.
                     for (int Index = 0; Index < 5; ++Index)
                     {
                         if (!Reader.is_value_empty(static_cast<unsigned>(Index)))
@@ -288,7 +265,6 @@ void JumpEffectIniLoad()
                 }
                 else if (Reader.is_value("glow_ring_hp"))
                 {
-                    // 0x0050226b..0x005022ad: StringAlloc(value, false) into the CacheString.
                     for (int Index = 0; Index < 5; ++Index)
                     {
                         if (!Reader.is_value_empty(static_cast<unsigned>(Index)))
@@ -341,7 +317,7 @@ void JumpEffectIniLoad()
                 }
                 else if (Reader.is_value("jump_ambient"))
                 {
-                    // 0x00502425..0x00502445: ftol of each float, low byte stored.
+                    // Each float truncated, low byte stored.
                     for (int Index = 0; Index < 3; ++Index)
                     {
                         Record.JumpAmbient[Index] = static_cast<unsigned char>(
@@ -358,28 +334,23 @@ void JumpEffectIniLoad()
                 }
                 else
                 {
-                    // 0x00502490..0x005024b2.
                     FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0x84,
                           "UNKNOWN jumpeffect parameter");
                 }
             }
 
-            // 0x005024ca..0x005024e8: the ring count is the smallest of the three key counts
-            // (signed compares: glow_create_time vs glow_ring_hp, then glow_ring_effect).
+            // The ring count is the smallest of the three key counts (signed).
             int Count = (TimeCount < HpCount) ? TimeCount : HpCount;
             if (EffectCount < Count)
                 Count = EffectCount;
             Record.RingCount = Count;
 
-            // 0x005024e2..0x00502541: a 0x70 node linked in front of the sentinel (push_back),
-            // the record copied in by FUN_005048a0 (a plain memberwise copy: the CacheString
-            // pointers are shared, not duplicated), ++DAT_00674fdc.
+            // A plain memberwise copy (FUN_005048a0): the CacheString pointers are shared, not
+            // duplicated.
             G_JumpEffectDescs.push_back(Record);
         }
         else if (Reader.is_header("JumpShipEffect"))
         {
-            // 0x00502565..0x005025c8: the previous descriptor freed, then operator new(0x14) with
-            // the five ids cleared (null on a failed new) into DAT_00674fd0.
             if (G_JumpShipEffectDesc != nullptr)
             {
                 delete G_JumpShipEffectDesc;
@@ -387,8 +358,7 @@ void JumpEffectIniLoad()
             }
             G_JumpShipEffectDesc = new (std::nothrow) JumpShipEffectDesc();
 
-            // 0x005025ce..0x005026c9: each key stores into DAT_00674fd0 with no test of it; the
-            // id at +0 is never written here.
+            // Each key stores with no test of the descriptor; the id at +0 is never written here.
             while (Reader.read_value())
             {
                 if (Reader.is_value("jump_out_effect"))
@@ -409,21 +379,17 @@ void JumpEffectIniLoad()
                 }
                 else
                 {
-                    // 0x00502696..0x005026b7.
                     FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xb1,
                           "UNKNOWN jump ship effect parameter");
                 }
             }
         }
     }
-    // 0x005026e4..: the INI_Reader's destructor (inlined in retail).
 }
 
 void JumpEffectDescsClear()
 {
-    // FUN_00502aa0 (no arguments; caller 0x0054afb1): every node of DAT_00674fd8 unlinked and
-    // freed with --DAT_00674fdc (no record destructor runs -- the glow_ring_hp strings are not
-    // freed), then DAT_00674fd0 freed and cleared when set.
+    // FUN_00502aa0. No record destructor runs: the glow_ring_hp strings are not freed.
     G_JumpEffectDescs.clear();
     if (G_JumpShipEffectDesc != nullptr)
     {
@@ -434,25 +400,19 @@ void JumpEffectDescsClear()
 
 FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip)
 {
-    // FUN_005038c0 (thiscall, RET 4).
-    // 0x005038dc: ID_String::clear on +0x18. 0x005038eb..0x0050391c: the four companions
-    // (+0x28..+0x67) zeroed -- here their constructors.
+    // FUN_005038c0. The four companions are zeroed by their constructors.
     TunnelEffect.clear();
 
-    // 0x0050391f..0x00503966: +0xa8 identity orientation, zero translation.
     SetIdentityTransform(GateHardpointFrame);
 
-    // 0x0050396c..0x005039d7: DAT_00674fd0, lazily defaulted with the FUN_00411c50(0x10000, 2)
-    // = 0x100002 warning -- FUN_00502b00 inlined.
+    // FUN_00502b00 inlined.
     Desc = JumpShipEffectDescGet();
-    // 0x005039d5..0x005039fd: no descriptor -> FDUMP 0x100001, line 0x1d5.
     if (Desc == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x1d5,
               "no JumpShipEffect descriptor found");
     }
 
-    // 0x00503a00..0x00503a35.
     JumpOutTunnelTime = 5.0f;
     JumpInTunnelTime = 5.0f;
     KillTimeBeforeDone = 0.5f;
@@ -470,18 +430,15 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip)
 
 FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj* GateSolar)
 {
-    // FUN_00503440 (thiscall, RET 8).
-    // 0x00503461..0x00503496: ID_String::clear on +0x18; the companions zeroed (constructors).
+    // FUN_00503440.
     TunnelEffect.clear();
-    // 0x005034a7..0x005034cb: FUN_004215b0 on +0xa8, zero translation.
     SetIdentityTransform(GateHardpointFrame);
 
-    // 0x005034bc..0x005034db: a null gate solar or ship returns at once, everything else as
-    // the member constructors left it.
+    // A null gate solar or ship returns at once, everything else as the member constructors
+    // left it.
     if (GateSolar == nullptr || InShip == nullptr)
         return;
 
-    // 0x005034e1..0x0050350e: FUN_00502b00; none -> FDUMP 0x100001, line 0x1d5.
     Desc = JumpShipEffectDescGet();
     if (Desc == nullptr)
     {
@@ -489,7 +446,6 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
               "no JumpShipEffect descriptor found");
     }
 
-    // 0x00503511..0x0050354d.
     Ship = InShip;
     Tunnel = nullptr;
     Field_0x6c = 0;
@@ -504,9 +460,8 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     Ambient = nullptr;
     Color = nullptr;
 
-    // 0x00503550..0x005035a3: the solar's +0x204 JumpGateEffect (FUN_00548890); without one a
-    // temporary is built (operator new(0xe0) + FUN_00502ba0), and a failed new skips to the
-    // hardpoint.
+    // The solar's +0x204 JumpGateEffect (FUN_00548890); without one a temporary is built, and a
+    // failed new skips to the hardpoint.
     FJumpGateEffect* Gate = static_cast<FJumpGateEffect*>(GateSolar->JumpGateEffect);
     FJumpGateEffect* Temp = nullptr;
     FJumpEffectDesc* GateDesc = nullptr;
@@ -520,8 +475,8 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
 
     if (bHaveGate)
     {
-        // 0x005035a9..0x0050360e: get_type (vt+0x88) on the gate solar; with the gate's
-        // descriptor, copy its ship parameters (JumpOutTime 0 when the type has bit 0x800).
+        // With the gate's descriptor, copy its ship parameters (JumpOutTime 0 when the solar's
+        // type has bit 0x800).
         unsigned Type = 0;
         GateSolar->get_type(Type);
         bool const bNoJumpOut = ((Type >> 11) & 1u) != 0;
@@ -539,15 +494,13 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         }
         else
         {
-            // 0x00503610..0x00503632: FDUMP 0x100001, line 0x181.
             FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x181,
                   "no jump descriptor in JumpGateEffect");
         }
     }
 
-    // 0x00503635..0x005036a0: the gate solar's cobject (vt+0x150) as a CSolar (0x303), used
-    // with no test; +0xa8 reset to identity; its archetype's JumpOutHp (+0xa4) looked up on
-    // its engine instance (+4).
+    // The gate solar's CSolar is used with no test; its archetype's JumpOutHp is looked up on
+    // its engine instance.
     CSolar const* const SolarObj = AsSolar(GateSolar->cobject());
     long const Instance = SolarObj->EngineInstanceId;
     Archetype::Solar const* const Arch = static_cast<Archetype::Solar const*>(SolarObj->Archetype);
@@ -556,24 +509,19 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     long HpHandle = 0;
     if (FindHardpoint_PS(Instance, Arch->JumpOutHp.Value, HpHandle, Info))
     {
-        // 0x005036bd..0x00503706: HardpointToWorld(instance, info), then +0xa8 = {orientation,
-        // position} of the info.
         HardpointToWorld(Instance, Info);
         GateHardpointFrame.Rotation = Info.Orient;
         GateHardpointFrame.Translation = Info.Position;
     }
     else
     {
-        // 0x00503708..0x00503758: FDUMP 0x100001 (line 0x196) and identity again.
         FDUMP(0x100001, "%s(%d) : *** ERROR: Hardpoint (%s) not found on jumpgate",
               kJumpEffectCpp, 0x196, Arch->JumpOutHp.Value);
         SetIdentityTransform(GateHardpointFrame);
     }
 
-    // 0x0050375b..0x005037e7: for the player's ship, the gate descriptor's jump_tunnel
-    // (FUN_004fedd0; not found -> FDUMP 0x100001, line 0x1a5, with the raw id dword where the
-    // format wants a string, as retail pushes it) becomes +0x24; a tunnel gets the ship
-    // (FUN_004ff3b0) and +0xa8 copied to its +0x230. +0xa4 = the CSolar's +0x1b4.
+    // For the player's ship, the gate descriptor's jump_tunnel. Retail quirk kept: the
+    // not-found error passes the raw id dword where the format wants a string.
     if (static_cast<void*>(static_cast<IObjRW*>(Ship)) == GetPlayerObjRW())
     {
         FGateTunnel* Found = nullptr;
@@ -595,49 +543,36 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         DestSystem = SolarObj->DestSystem;
     }
 
-    // 0x005037ed..0x00503896: a temporary gate is destroyed (FUN_00502e40 inline) and freed.
     delete Temp;
 }
 
 FJumpShipEffect::~FJumpShipEffect()
 {
-    // FUN_00503a80 (thiscall). The three stop-and-clear blocks are the inline
-    // CliEffectCompanionArmStop sequence followed by FUN_00502d90.
-    // 0x00503aa2..0x00503b10: +0x28.
+    // FUN_00503a80. The order is A, C, D, B; the ship pointer is used with no test.
     CliEffectCompanionArmStop(&FxA);
     CliEffectCompanionClear(&FxA);
-    // 0x00503b15..0x00503b7b: +0x48.
     CliEffectCompanionArmStop(&FxC);
     CliEffectCompanionClear(&FxC);
-    // 0x00503b80..0x00503b8e: FUN_004fcef0 on the ship's +0x28 effect list with +0x58; the
-    // ship pointer is used with no test.
     CliEffectListRemove(&Ship->EffectList, &FxD);
-    // 0x00503b93..0x00503bf9: +0x38.
     CliEffectCompanionArmStop(&FxB);
     CliEffectCompanionClear(&FxB);
-    // 0x00503bfe..0x00503cae: the member destructors (FUN_00502d90) in reverse order --
-    // +0x58, +0x48, +0x38, +0x28 -- run as the companions go out of scope.
 }
 
 double FJumpShipEffect::ShakeAmplitude() const
 {
-    // FUN_00503e20: switch on the ship's +0x158 - 1 (JA past 3 -> the 0.0f already loaded
-    // from DAT_005c7474).
+    // FUN_00503e20: on the ship's +0x158 jump state.
     switch (Ship->JumpState)
     {
     case 1:
-        // 0x00503e3c..0x00503e5a: JumpOutTime FCOMP 0.0f, TEST AH,0x41 / JNZ -- not above
-        // (NaN included) returns the amplitude itself; otherwise amplitude / JumpOutTime * +0x70.
+        // A JumpOutTime not above 0 (NaN included) returns the amplitude itself.
         if (JumpOutTime > 0.0f)
             return static_cast<double>(kJumpShakeAmplitude) / JumpOutTime * Clock;
         return kJumpShakeAmplitude;
     case 2:
     case 3:
-        // 0x00503e87..0x00503e8f.
         return kJumpShakeAmplitude;
     case 4:
-        // 0x00503e5b..0x00503e86: JumpInTime not above 0 (NaN included) -> 0.0f; otherwise
-        // (1.0f (DAT_005c75dc) - +0x70 / JumpInTime) * amplitude.
+        // A JumpInTime not above 0 (NaN included) gives 0.
         if (JumpInTime > 0.0f)
             return (1.0 - static_cast<double>(Clock) / JumpInTime) * kJumpShakeAmplitude;
         return 0.0;
@@ -648,9 +583,7 @@ double FJumpShipEffect::ShakeAmplitude() const
 
 namespace
 {
-    // The local Transform the four state hooks build on the stack (identity rotation: 1.0f
-    // stored to the three diagonal dwords, 0 to the other six) as the x86math FTransform the
-    // effect calls take.
+    // The identity-rotation local transform the four state hooks build.
     FTransform MakeLocalXform(float X, float Y, float Z)
     {
         FTransform Xform;
@@ -665,9 +598,7 @@ namespace
         return Xform;
     }
 
-    // One companion moved onto the ship: FUN_004f7d20 on the particle (+8) with the ship as the
-    // owner, the sound's slot 37 (+4, vt+0x94 SetPose) and FUN_005377c0 on the light (+0xc),
-    // each only when present (0x00504291..0x005042c8 / 0x005043ef..0x0050442b).
+    // One companion moved onto the ship (each part only when present).
     void AttachCompanionToShip(FJumpFxCompanion& Fx, FClientShipGameobj* Ship, int Index,
                                FTransform const& Xform)
     {
@@ -682,16 +613,14 @@ namespace
 
 void FJumpShipEffect::StartJumpOut()
 {
-    // FUN_00503ea0. Nothing without a tunnel (0x00503ea6..0x00503eab).
+    // FUN_00503ea0. Nothing without a tunnel.
     if (Tunnel == nullptr)
         return;
 
-    // 0x00503eb2: FUN_004ff360(1).
     Tunnel->SetState(1);
 
-    // 0x00503eb9..0x00503f06: a zero velocity; a named tunnel effect starts at +0xa8 through
-    // the jump-effect factory DAT_00674fcc into FxB. An empty name, or a start that fails,
-    // warns (0x100002, line 0x246) with the name.
+    // The tunnel effect starts at the gate hardpoint through the jump-effect factory
+    // DAT_00674fcc. An empty name, or a start that fails, warns.
     float const Velocity[3] = {0.0f, 0.0f, 0.0f};
     bool bStarted = false;
     if (!TunnelEffect.IsEmpty())
@@ -706,30 +635,25 @@ void FJumpShipEffect::StartJumpOut()
               kJumpEffectCpp, 0x246, TunnelEffect.get_string());
     }
 
-    // 0x00503f32.
     bTunnelEffectKilled = 0;
 }
 
 void FJumpShipEffect::EnterTunnel()
 {
-    // FUN_00504210. 0x00504217..0x00504221: FUN_004ff360(2) when there is a tunnel.
+    // FUN_00504210.
     if (Tunnel != nullptr)
         Tunnel->SetState(2);
 
-    // 0x00504226..0x005042c8: FxB onto the ship at its engine index, identity, no offset.
     {
         FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());
         AttachCompanionToShip(FxB, Ship, Index, Local);
     }
 
-    // 0x005042cd..0x00504347: the ship's position (vt+0) as the translation, a zero velocity.
     Vector const& ShipPos = Ship->get_position();
     FTransform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
     float const Velocity[3] = {0.0f, 0.0f, 0.0f};
 
-    // 0x0050432e..0x00504381: the descriptor's jump_out_effect (+4) through DAT_00674fcc into
-    // FxA; then 0x00504387..0x0050442b FxA onto the ship like FxB.
     ID_String const& JumpOutEffect = Desc->Ids[1];
     if (!JumpOutEffect.IsEmpty() &&
         CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpOutEffect.Id),
@@ -741,25 +665,21 @@ void FJumpShipEffect::EnterTunnel()
         return;
     }
 
-    // 0x00504437..0x0050445c: the warning names the TUNNEL effect (+0x18), not the one that
-    // failed, as retail does; line 0x25e.
+    // Retail quirk kept: the warning names the TUNNEL effect, not the one that failed.
     FDUMP(0x100002, "%s(%d) : *** WARNING: jump out effect (%s) did not create.",
           kJumpEffectCpp, 0x25e, TunnelEffect.get_string());
 }
 
 void FJumpShipEffect::StartJumpIn()
 {
-    // FUN_00504470. 0x00504477..0x00504481: FUN_004ff360(3) when there is a tunnel.
+    // FUN_00504470.
     if (Tunnel != nullptr)
         Tunnel->SetState(3);
 
-    // 0x00504486..0x00504500: the ship's position as the translation, a zero velocity.
     Vector const& ShipPos = Ship->get_position();
     FTransform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
     float const Velocity[3] = {0.0f, 0.0f, 0.0f};
 
-    // 0x005044e7..0x0050453a: the descriptor's jump_in_effect (+8) through DAT_00674fcc into
-    // FxC; then 0x00504540..0x005045e4 FxC onto the ship at its engine index.
     ID_String const& JumpInEffect = Desc->Ids[2];
     if (!JumpInEffect.IsEmpty() &&
         CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpInEffect.Id),
@@ -771,33 +691,29 @@ void FJumpShipEffect::StartJumpIn()
     }
     else
     {
-        // 0x005045f7..0x0050461e: line 0x277, with the jump_in_effect name.
         FDUMP(0x100002, "%s(%d) : *** WARNING: jump in effect (%s) did not create.",
               kJumpEffectCpp, 0x277, JumpInEffect.get_string());
     }
 
-    // 0x005045ea / 0x00504624: on every path.
+    // On every path.
     bSkipFirstJumpInTick = 1;
 }
 
 void FJumpShipEffect::FinishJump()
 {
-    // FUN_00504640. 0x00504648..0x00504652: FUN_004ff360(0) when there is a tunnel.
+    // FUN_00504640.
     if (Tunnel != nullptr)
         Tunnel->SetState(0);
 
-    // 0x00504657..0x00504669: the player's ship takes jump_done_effect_player (+0xc), any
-    // other jump_done_effect_nonplayer (+0x10); each with its own warning.
+    // The player's ship takes jump_done_effect_player, any other jump_done_effect_nonplayer.
     bool const bPlayer = static_cast<void*>(static_cast<IObjRW*>(Ship)) == GetPlayerObjRW();
     ID_String const& DoneEffect = bPlayer ? Desc->Ids[3] : Desc->Ids[4];
 
-    // 0x0050466f..0x00504676 / 0x00504771..0x00504778: an empty name returns quietly.
+    // An empty name returns quietly.
     if (DoneEffect.IsEmpty())
         return;
 
-    // 0x0050467c..0x00504737 / 0x0050477e..0x00504839: identity, no offset, the ship's engine
-    // index; the name tested a second time, then FUN_00503070 on DAT_00674c60 with the ship as
-    // the list owner into FxD.
+    // The name is tested a second time (retail); the ship is the list owner.
     FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
     int const Index = static_cast<int>(Ship->get_index());
     if (!DoneEffect.IsEmpty() &&
@@ -806,13 +722,11 @@ void FJumpShipEffect::FinishJump()
 
     if (bPlayer)
     {
-        // 0x0050483b..0x00504862: line 0x293.
         FDUMP(0x100002, "%s(%d) : *** WARNING: player jump done effect (%s) did not create.",
               kJumpEffectCpp, 0x293, DoneEffect.get_string());
     }
     else
     {
-        // 0x0050473d..0x00504764: line 0x28b.
         FDUMP(0x100002, "%s(%d) : *** WARNING: non-player jump done effect (%s) did not create.",
               kJumpEffectCpp, 0x28b, DoneEffect.get_string());
     }
@@ -820,43 +734,32 @@ void FJumpShipEffect::FinishJump()
 
 void FJumpShipEffect::Update(float Dt)
 {
-    // FUN_00503cd0 (thiscall, RET 4). The effect's clock (+0x70) is not advanced here.
-    // 0x00503cd7..0x00503cf8: in the tunnel states 2 and 3 the tunnel, when there is one,
-    // advances (FUN_004ff3c0).
+    // FUN_00503cd0. The effect's clock (+0x70) is not advanced here.
     int const State = Ship->JumpState;
     if ((State == 2 || State == 3) && Tunnel != nullptr)
         Tunnel->Update(Dt);
 
-    // 0x00503cfd..0x00503d07: everything else only in state 4 (jump in). The state is read
-    // again from the ship; FGateTunnel::Update does not touch it.
+    // Everything else only in state 4 (jump in), re-read from the ship.
     if (Ship->JumpState != 4)
         return;
 
-    // 0x00503d0d..0x00503d13 / 0x00503e11: the first update after StartJumpIn (which sets
-    // +0xd8) only clears the flag.
+    // The first update after StartJumpIn only clears the flag.
     if (bSkipFirstJumpInTick != 0)
     {
         bSkipFirstJumpInTick = 0;
         return;
     }
 
-    // 0x00503d19..0x00503d30: once only (+0x6d), and only when (JumpInTime - KillTimeBeforeDone)
-    // FCOMP clock gives C0 = 1: TEST AH,0x5 / JP skips on greater, equal and unordered, so the
-    // fall-through is "JumpInTime - KillTimeBeforeDone < clock". The difference stays on the
-    // x87 stack (not stored as float), hence the double arithmetic.
+    // Once only, and only when JumpInTime - KillTimeBeforeDone < clock (ordered). The
+    // difference is unrounded, hence the double arithmetic.
     if (bTunnelEffectKilled != 0)
         return;
     if (!(static_cast<double>(JumpInTime) - static_cast<double>(KillTimeBeforeDone) <
           static_cast<double>(Clock)))
         return;
 
-    // 0x00503d36..0x00503dd1: the tunnel effect companion FxB is stopped -- particle vt+4,
-    // sound SetPose(-1, identity with zero translation) + Stop (vt+0x94 / vt+0x60), light
-    // FUN_005379b0 + vt+8 -- which is CliEffectCompanionArmStop's sequence, in the same order.
+    // The tunnel effect companion is stopped and released (both inlined in retail).
     CliEffectCompanionArmStop(&FxB);
-    // 0x00503dd4..0x00503e02: then released -- particle FUN_004f7a90, sound Release (vt+8),
-    // light FUN_00537ad0, each zeroed, and slot 0 (+0x38) zeroed: FUN_00502d90's body.
     CliEffectCompanionClear(&FxB);
-    // 0x00503e05.
     bTunnelEffectKilled = 1;
 }

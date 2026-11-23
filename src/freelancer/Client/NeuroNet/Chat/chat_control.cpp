@@ -5,15 +5,6 @@
 // Author: Giperion.
 
 // ChatControl -- the NeuroNet chat panel (see chat_control.h for the object).
-//
-//   LAB_00464d90 factory init       FUN_00464dc0 ctor       FUN_00464f40 dtor (FUN_00464f20)
-//   LAB_004650f0 broadcast callback FUN_00465110 FillBroadcast
-//   LAB_00465a90 private callback   FUN_00465ab0 RenderPrivateRow
-//   LAB_004666d0..LAB_00466980 the eight qsort comparators (tables 0x006115a8 / 0x006115b8)
-//   FUN_004669c0 FillPrivate        FUN_00467030 Destroy    LAB_004670c0 Create
-//   LAB_00467f10 ProcessMessage             LAB_00468220 SetProperty
-//   FUN_00468260 Update             FUN_00468310 RefreshCounts
-//   LAB_0045fc50..LAB_0045fd50 the layout floats (DAT_0066d4a8..DAT_0066d4d8)
 
 #include "NeuroNet/Chat/chat_control.h"
 
@@ -36,15 +27,14 @@
 
 #include <vector>
 
-// Retail DAT_0066d450 -- WINFACTORY<ChatControl> (LAB_00464d90 -> FUN_0046c4e0("ChatControl"),
-// atexit LAB_00464db0; create FUN_0046c550: operator_new(0x3d0) + FUN_00464dc0, then Create).
+// Retail DAT_0066d450 -- WINFACTORY<ChatControl> (initializer LAB_00464d90).
 WINFACTORY<ChatControl> G_ChatControlFactory("ChatControl");
 
 namespace
 {
     // The CRT initializers LAB_0045fc50..LAB_0045fd50, in table order. Only DAT_0066d4d8 and
-    // DAT_0066d4a8..DAT_0066d4b8 are read (by Create); the rest are written by their initializer
-    // and read by nothing but the next initializer in the listing.
+    // DAT_0066d4a8..DAT_0066d4b8 are read (by Create); the rest are read only by the next
+    // initializer.
     float G_ChatHistoryWidth = 0.46f;                                   // DAT_0066d4d8
     float G_ChatUnused4d4 = 0.8f * -0.5f;                               // DAT_0066d4d4
     float G_ChatUnused4d0 = G_ChatUnused4d4;                            // DAT_0066d4d0
@@ -189,8 +179,7 @@ namespace
             static_cast<ChatControl*>(Context)->FillPrivate(FirstItem, VisibleRows);
     }
 
-    // The sequence every refresh site spells out inline: FUN_00468310, then FUN_004669c0 and
-    // FUN_00465110 with each list's FUN_0058f730 and its +0x4a0 vector size.
+    // The sequence every refresh site spells out inline.
     void ChatControlRefreshAll(ChatControl* Control)
     {
         Control->RefreshCounts();
@@ -200,8 +189,7 @@ namespace
                                static_cast<unsigned>(Control->BroadcastList->RowEdges.size()));
     }
 
-    // Create's row payload loop (0x004678e3..0x00467975 / 0x00467ab0..0x00467b42): a fresh
-    // RowData (count 1) assigned to the row (AddRef), then the local reference dropped.
+    // Create's row payload loop, inlined twice there.
     void ChatControlSeedRowPayloads(UiScrollTable* List, unsigned RowCount)
     {
         for (unsigned Row = 0; Row < RowCount; ++Row)
@@ -236,9 +224,8 @@ ChatControl::ChatControl()
     , PrivateList(nullptr)
     , BtnCCClose(nullptr)
 {
-    // FUN_00464dc0: WinControl, the four RDLs and the header array, the eight control pointers
-    // and +0x32c / +0x330 zeroed, +0x3a8 = 1, the +0x3ac dword = 0. The five image pointers
-    // (+0x394..+0x3a4) are not written by retail; the port starts them null.
+    // FUN_00464dc0. The five image pointers (+0x394..+0x3a4) are not written by retail; the
+    // port starts them null.
     SortAscending[0] = 0;
     SortAscending[1] = 0;
     SortAscending[2] = 0;
@@ -247,8 +234,7 @@ ChatControl::ChatControl()
 
 ChatControl::~ChatControl()
 {
-    // FUN_00464f40: the header array, then +0x358 / +0x34c / +0x340 / +0x334, then WinControl's
-    // dtor (FUN_0059fa50) -- member destruction order.
+    // FUN_00464f40.
 }
 
 bool ChatControl::Create(Win3D* NewParent, void* Data)
@@ -258,16 +244,12 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     if (!Win3D::Create(NewParent, nullptr))
         return false;
 
-    // 0x00467101..0x00467134
     Offset[0] = 0.0f;
     Offset[1] = 0.056f;     // 0x3d656042
     Offset[2] = 0.0f;
-    // 0x00467133..0x0046714d: slot 38 (+0x98), then +0x2d2 = 1.
     SetMesh("Interface\\NeuroNet\\Chat\\CHAT_background.cmp", 0);
     Field2d2 = 1;
 
-    // 0x00467144..0x0046765a: the titles, each a StyleNode(0xfaa9) then the IDS idiom; "None"
-    // without a style.
     {
         StyleNode Style(0xfaa9);
         AppendNodeClone(BroadcastTitleText, Style);
@@ -285,14 +267,13 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     LoadIdsTextIntoRdl(0x60033u, PrivateTitleText, L"DEBUG - Private Channels");
     LoadIdsTextIntoRdl(0x60054u, NoneText, L"DEBUG - None");
 
-    // 0x0046765a..0x004676a5: the headers -- FUN_0057da40 + FUN_0057eb40, no debug fallback.
+    // The headers have no debug fallback.
     for (unsigned Column = 0; Column < 4; ++Column)
     {
         if (LoadIdsIntoRdl(kChatHeaderIds[Column], Headers[Column]))
             RdlRemoveLastParagraph(Headers[Column]);
     }
 
-    // 0x004676a7..0x00467774
     HistoryDisplay = static_cast<MsgWin*>(WinFactoryCreate("HistoryDisplay", "MsgWin", this, nullptr));
     if (HistoryDisplay != nullptr)
     {
@@ -309,7 +290,6 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         HistoryDisplay->SetToolTipEnabled(true);
     }
 
-    // 0x00467779..0x004677dd
     {
         float const Position[3] = {0.44f, 0.23f, 0.0f};     // 0x3ee147ae / 0x3e6b851f
         float const Half[3] = {0.02f, 0.02f, 0.0f};         // 0x3ca3d70a
@@ -318,7 +298,6 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
                                          Half, 0, 0, 0, 0, 0x409, 0, 0);
     }
 
-    // 0x004677d7..0x00467975: BroadcastList, 0.35 x 0.05, 2 rows, 1 column.
     {
         FUiPayloadTable Payload;
         Payload.Right = G_ChatBroadcastWidth;   // DAT_0066d4b8
@@ -344,7 +323,6 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         ChatControlSeedRowPayloads(BroadcastList, 2);
     }
 
-    // 0x0046797b..0x00467bdf: PrivateList, 0.35 x 0.235, 11 rows, 4 columns.
     {
         FUiPayloadTable Payload;
         Payload.Right = G_ChatPrivateWidth;     // DAT_0066d4b0
@@ -372,8 +350,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         PrivateList->SetCallback(ChatControlPrivateCallback, this);
         ChatControlSeedRowPayloads(PrivateList, 0xb);
 
-        // 0x00467b48..0x00467bdf: FUN_0058d0f0, the first four column edges from DAT_005cef48,
-        // FUN_0058d250. Retail writes the four floats without a size test.
+        // Retail writes the four floats without a size test.
         FUiFastTableEdges Edges;
         PrivateList->GetEdges(&Edges);
         for (unsigned Column = 0; Column < 4; ++Column)
@@ -381,7 +358,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         PrivateList->SetEdges(&Edges);
     }
 
-    // 0x00467be4..0x00467c6f: the images, through the private list's TRC (no null test).
+    // Through the private list's TRC; retail does not test PrivateList for null.
     UpPipImage = PrivateList->GetDeviceTRC()->create_image("interface\\intro\\images\\uppip.bmp");
     DownPipImage = PrivateList->GetDeviceTRC()->create_image("interface\\intro\\images\\DownPip.bmp");
     GroupColorImage =
@@ -391,7 +368,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     InactiveColorImage =
         PrivateList->GetDeviceTRC()->create_image("interface\\intro\\images\\InactiveColor.bmp");
 
-    // 0x00467c75..0x00467de7: the three titles, 0.35 x 0.03, 0.03 above their panels.
+    // The three titles sit 0.03 above their panels.
     {
         float const AttachOffset[3] = {G_ChatBroadcastX, 0.03f + 0.215f, 0.0f};
         BroadcastTitle = CreateRichTextWin("BroadcastTitle", 0.35f, 0.03f, AttachOffset, false);
@@ -411,16 +388,14 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         PrivateTitle->AppendNode(Ref);
     }
 
-    // 0x00467de9..0x00467e56: bind the table when it exists and fill both lists ...
     if (G_ChatChannelTable != nullptr)
     {
         Table = G_ChatChannelTable;
         ChatControlRefreshAll(this);
     }
-    // 0x00467e5b..0x00467eb3: ... and then once more unconditionally.
+    // Retail refreshes once more unconditionally.
     ChatControlRefreshAll(this);
 
-    // 0x00467eb8..0x00467ec5
     WinControlHalfExtentsFromMesh(HalfExtents, &MeshHolder);
     return true;
 }
@@ -478,7 +453,7 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
 
     CHAT_ID const Current = G_ChatInputTarget;     // DAT_0066d3fc, read once
 
-    // 0x00465144..0x0046521f: the channel entries (byte 2 set, not None), alloca'd in retail.
+    // The channel entries, alloca'd in retail.
     std::vector<FChatControlEntry> Entries(Table->Names.size());
     int Count = 0;
     for (FChatChannelTable::FNameMap::const_iterator It = Table->Names.begin();
@@ -494,7 +469,6 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
         ++Count;
     }
 
-    // 0x00465224
     BroadcastList->ClearSelection();
 
     unsigned Row = 0;
@@ -502,7 +476,7 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
     {
         do
         {
-            // 0x00465250: out of visible rows ends the whole function.
+            // Out of visible rows ends the whole function.
             if (Row >= VisibleRows)
                 return;
 
@@ -547,7 +521,7 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
                             StyleNode Style(0xd801);
                             AppendNodeClone(Text, Style);
                         }
-                        // 0x004654be: the group channel is live only with group members.
+                        // The group channel is live only with group members.
                         if (G_ChatGroupControl != nullptr)
                             bEnabled = G_ChatGroupControl->GroupMembers.empty() ? 0 : 1;
                     }
@@ -568,7 +542,6 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
                     }
                 }
 
-                // 0x004655fd..0x0046565d: the row tooltip.
                 if (Entry.Key == G_ChatIdChannel1.Id)
                     TipIds = 0x1b76;
                 else if (Entry.Key == G_ChatIdChannel2.Id)
@@ -614,7 +587,6 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
                 }
                 ChatAppendRdlCopy(Text, *Entry.Name);
 
-                // 0x004659cb..0x00465a0d
                 FUiFastTableRow* const TableRow = BroadcastList->GetRow(Row);
                 TableRow->bHoverable = bEnabled;
                 TableRow->bSelectable = bEnabled;
@@ -628,7 +600,7 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
         } while (FirstItem + static_cast<int>(Row) < Count);
     }
 
-    // 0x00465a35..0x00465a6b: the rows past the last channel.
+    // The rows past the last channel.
     for (; Row < VisibleRows; ++Row)
     {
         BroadcastList->ClearCell(Row, 0);
@@ -646,7 +618,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
     unsigned char const bEnabledByte = bEnabled ? 1 : 0;
     FUiFastTableCell* Cell = nullptr;
 
-    // 0x00465adc..0x00465d31: the name cell, spanning the row.
+    // The name cell, spanning the row.
     if (PrivateList->GetCell(Row, 0, &Cell))
     {
         RenderDisplayList& Text = Cell->Source;
@@ -668,14 +640,12 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         PrivateList->SetCellSpanToEnd(Row, 0, true);
         PrivateList->InvalidateCell(Row, 0);
     }
-    // 0x00465d35..0x00465db4
     for (unsigned Column = 1; Column < 4; ++Column)
     {
         if (PrivateList->GetCell(Row, Column, &Cell))
             RdlClear(Cell->Source);
     }
 
-    // 0x00465db9..0x00465df2
     {
         FUiFastTableRow* const TableRow = PrivateList->GetRow(Row);
         TableRow->bHoverable = bEnabledByte;
@@ -687,7 +657,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
             PrivateList->SelectRow(Row);
     }
 
-    // 0x00465df7..0x00465e13: the detail row below.
+    // The detail row below.
     unsigned const Detail = Row + 1;
     FUiFastTableRow* const DetailRow = PrivateList->GetRow(Detail);
     if (DetailRow == nullptr)
@@ -697,7 +667,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         static_cast<unsigned short>(Entry->Key == Current.Id ? 0x3dbc : 0x5203);
     wchar_t Buffer[64];
 
-    // 0x00465e19..0x004660c6: column 1 -- GroupId, or the "None" text when zero.
+    // Column 1 -- GroupId, or the "None" text when zero.
     if (PrivateList->GetCell(Detail, 1, &Cell))
     {
         RenderDisplayList& Text = Cell->Source;
@@ -724,7 +694,7 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         PrivateList->SetCellSpanToEnd(Detail, 1, false);
         PrivateList->InvalidateCell(Detail, 1);
     }
-    // 0x004660ca..0x004662d6: column 2 -- the rank.
+    // Column 2 -- the rank.
     if (PrivateList->GetCell(Detail, 2, &Cell))
     {
         RenderDisplayList& Text = Cell->Source;
@@ -745,8 +715,8 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         PrivateList->SetCellSpanToEnd(Detail, 2, false);
         PrivateList->InvalidateCell(Detail, 2);
     }
-    // 0x004662da..0x00466684: column 3 -- the system name (the FUN_00466770 lookup inlined,
-    // only while the DAT_0066da70 cache exists).
+    // Column 3 -- the system name (FUN_00466770 inlined), only while the DAT_0066da70 cache
+    // exists.
     if (PrivateList->GetCell(Detail, 3, &Cell))
     {
         RenderDisplayList& Text = Cell->Source;
@@ -768,7 +738,6 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         PrivateList->InvalidateCell(Detail, 3);
     }
 
-    // 0x0046668a..0x004666aa
     DetailRow->bHoverable = bEnabledByte;
     DetailRow->bSelectable = bEnabledByte;
     DetailRow->bRowLine = 0;
@@ -782,8 +751,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
     if (Table == nullptr)
         return;
 
-    // 0x004669f3..0x00466a3d: the local player's key {DAT_00673344 word, 0, 0}; the group size
-    // read from DAT_0066da84 +0x350 without a null test.
+    // Retail reads the group size from DAT_0066da84 without a null test.
     unsigned const OwnKey = GetPlayerConnectionId() & 0xffffu;
     unsigned const GroupSize = static_cast<unsigned>(G_ChatGroupControl->GroupMembers.size());
 
@@ -798,8 +766,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         Entries[Index].Info = nullptr;
     }
 
-    // 0x00466a4c..0x00466b4c: own entry at [0], group members from [1], the rest after the
-    // group block.
+    // Own entry at [0], group members from [1], the rest after the group block.
     int OwnCount = 0;
     int GroupCount = 0;
     int OtherCount = 0;
@@ -831,7 +798,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
     }
     int const Total = OwnCount + GroupCount + OtherCount;
 
-    // 0x00466b52..0x00466be4: sort the group block and the rest separately.
+    // Sort the group block and the rest separately.
     FChatCompareFn const Compare =
         SortAscending[SortColumn] != 0 ? kChatCompareAsc[SortColumn] : kChatCompareDesc[SortColumn];
     if (GroupCount != 0)
@@ -840,7 +807,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         qsort(&Entries[static_cast<size_t>(GroupCount) + 1], static_cast<size_t>(OtherCount),
               sizeof(FChatControlEntry), Compare);
 
-    // 0x00466be7..0x00466eaa: the header row (no InvalidateCell in retail).
+    // The header row (no InvalidateCell in retail).
     for (unsigned Column = 0; Column < 4; ++Column)
     {
         FUiFastTableCell* Cell = nullptr;
@@ -868,7 +835,6 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         }
     }
 
-    // 0x00466eb0..0x00466eca
     {
         FUiFastTableRow* const HeaderRow = PrivateList->GetRow(0);
         HeaderRow->bHoverable = 0;
@@ -876,7 +842,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
     }
     PrivateList->ClearSelection();
 
-    // 0x00466ecf..0x00466f38: two table rows per entry from FirstItem / 2.
+    // Two table rows per entry from FirstItem / 2.
     unsigned Index = static_cast<unsigned>(FirstItem) >> 1;
     unsigned Row = 1;
     if (static_cast<int>(Index) < Total)
@@ -892,7 +858,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         } while (static_cast<int>(Index) < Total);
     }
 
-    // 0x00466f3a..0x00466f7b: the rows left, the first of them keeping its row line.
+    // The rows left, the first of them keeping its row line.
     unsigned char bFirst = 1;
     for (; Row < VisibleRows; ++Row)
     {
@@ -905,7 +871,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         bFirst = 0;
     }
 
-    // 0x00466f7d..0x00467008: "Private Channels (N)".
+    // "Private Channels (N)".
     PrivateTitle->ClearContent();
     {
         RDLRefNode Ref(PrivateTitleText);
@@ -924,12 +890,11 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     // LAB_00467f10
     if (Msg == 0xef01)
     {
-        // 0x00467f43: slot 5 with the parent's +0x60.
         if (Parent != nullptr)
             SetPosition(Parent->Position);
         ChatControlRefreshAll(this);
         Flags = static_cast<unsigned char>(Flags | 0x03);
-        // 0x00467fb3..0x00467fc9: slot 11, FUN_0057a680, FUN_00579a10 -- no null test.
+        // Retail does not test HistoryDisplay for null.
         HistoryDisplay->Update();
         HistoryDisplay->RebuildLayoutIfDirty();
         HistoryDisplay->ScrollToEnd();
@@ -939,7 +904,6 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     }
     if (Msg == 0xef02)
     {
-        // 0x004680c1
         if (Parent != nullptr)
             Win3DReparent(this, nullptr);
         Flags = static_cast<unsigned char>(Flags & 0xfc);
@@ -960,7 +924,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     if (Msg == 0x300d && bOwnList)
     {
-        // 0x00467fff: the selected row's target, or the system channel.
+        // The selected row's target, or the system channel.
         CHAT_ID Target = G_ChatIdChannel1;
         unsigned Selected = 0;
         if (List->GetSelectedRow(&Selected))
@@ -986,8 +950,8 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     }
     if (Msg == 0xf001 && bOwnList)
     {
-        // 0x00468165: a header click on the private list -- same column flips the direction,
-        // another column becomes the sort column.
+        // A header click on the private list -- same column flips the direction, another
+        // column becomes the sort column.
         if (List != PrivateList)
             return true;
         unsigned const Column = B & 0xffffu;

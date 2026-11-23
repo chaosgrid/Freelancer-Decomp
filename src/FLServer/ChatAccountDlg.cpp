@@ -42,8 +42,7 @@ CChatAccountDlg::CChatAccountDlg(CWnd* Parent)
 {
 }
 
-// .text:004140a0 — erases this window's entry from the map (equal_range(AccountName) and
-// erase of that range, 004154b0 / 00415360 / 00414830); members are then destroyed.
+// .text:004140a0 — erases this window's entry from the map.
 CChatAccountDlg::~CChatAccountDlg()
 {
 	GChatAccountDialogs.erase(AccountName);
@@ -63,7 +62,7 @@ BEGIN_MESSAGE_MAP(CChatAccountDlg, CDialog)
 	ON_BN_CLICKED(1053, &CChatAccountDlg::OnCloseButton)             // 00414690
 END_MESSAGE_MAP()
 
-// .text:004141e0 — map find (lower_bound plus the reverse compare 004157a0).
+// .text:004141e0
 CChatAccountDlg* CChatAccountDlg::FindByName(CiWString& Name)
 {
 	std::map<CiWString, CChatAccountDlg*>::iterator It = GChatAccountDialogs.find(Name);
@@ -93,15 +92,14 @@ void CChatAccountDlg::OnOK()
 {
 }
 
-// .text:00414660 — modeless and self-owned: DestroyWindow (vtable +0x60), then the scalar
-// deleting destructor (vtable +0x04, flag 1).
+// .text:00414660 — modeless and self-owned.
 void CChatAccountDlg::OnCancel()
 {
 	DestroyWindow();
 	delete this;
 }
 
-// .text:00414690 — JMP [vtable +0xd0], the OnCancel slot.
+// .text:00414690 — calls OnCancel through the vtable.
 void CChatAccountDlg::OnCloseButton()
 {
 	OnCancel();
@@ -128,10 +126,9 @@ void CChatAccountDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 		LockServer();
 		{
 			RenderDisplayList Rdl;
-			// Each node is cloned twice, as retail does: the handler clones its stack node into
-			// a holder (004142f7..00414306, EH state 2), the list insert 004149a0 clones that
-			// clone into the new cell, then the holder deletes the first clone (0041432a..
-			// 00414340) before the stack node's destructor runs (00414344..0041434f).
+			// Each node is cloned twice, as retail does: the stack node is cloned into a holder,
+			// the list insert 004149a0 clones that clone into the new cell, then the holder
+			// deletes the first clone before the stack node's destructor runs.
 			{
 				StyleNode Style(ChatAccountStyleId);
 				{
@@ -139,7 +136,7 @@ void CChatAccountDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 					AppendChatRdlNode(Rdl, FirstClone);
 				}
 			}
-			// 00414355..004143be, the same sequence for the text (EH states 3/4).
+			// The same for the text.
 			{
 				TextNode Line(Text, -1);
 				{
@@ -154,11 +151,11 @@ void CChatAccountDlg::OnMsgFilterInput(NMHDR* Header, LRESULT* Result)
 			{
 				CAccount* Account = Players.FindAccountFromName(AccountName);
 				// Retail builds the target id from the low word of m_ClientID (+0x34) and
-				// zeroes bytes 2 and 3 (0041440e..00414427).
+				// zeroes bytes 2 and 3.
 				const CHAT_ID Target(Account != nullptr ? (unsigned short)Account->m_ClientID : 0u);
 				Server.SubmitChat(GChatIdConsole, Size, GChatAccountBuffer, Target, -1);
 			}
-			// Retail releases the server lock before the list is destroyed (00414442).
+			// Retail releases the server lock before the list is destroyed.
 			UnlockServer();
 		}
 	}

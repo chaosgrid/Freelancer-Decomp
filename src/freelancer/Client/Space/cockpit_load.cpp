@@ -64,11 +64,9 @@ namespace
     bool GCockpitResourceStringLoading = false;
 
 
-    // FUN_00543350 (thiscall on the IObjRW, RET 0). The CEqObj is the IObjRW's +0x10 (retail
-    // tests `this`, then `this + 0xc` -- the CBase subobject -- then the pointer it reads at
-    // +0x10), and it counts only when its class word at +0x4c carries all of 0x503. The
-    // archetype at +0x88 is read from whatever survived: a failed test leaves EAX null and
-    // retail dereferences it anyway (0x00543375), so no guard is added here either.
+    // FUN_00543350 (thiscall on the IObjRW). The CEqObj is the IObjRW's +0x10, and it counts
+    // only when its class word at +0x4c carries all of 0x503. A failed test leaves null and
+    // retail dereferences it anyway, so no guard is added here either.
     Archetype::Root* ShipArchetypeOf(void* ObjRW)
     {
         FPlayerShipView* EqObj = nullptr;
@@ -94,14 +92,12 @@ const FCockpitMeshHolder& GetCockpitMeshHolder()
 
 bool InitPlayerCockpitSlice()
 {
-    // 0x0054acc7: the player's IObjRW -- the watcher at DAT_00679744 minus eight, or null.
+    // The player's IObjRW -- the watcher at DAT_00679744 minus eight, or null.
     void* const Watched = GetPlayerShipWatcher();
     void* const ObjRW =
         (Watched != nullptr) ? static_cast<unsigned char*>(Watched) - kWatchableOffset : nullptr;
 
-    // 0x0054acd7 .. 0x0054ace2: FUN_00543350, then archetype +0x04 (the CliShip companion) and
-    // its +0x60, the cockpit path. Retail tests only the first character -- the pointer itself
-    // is never null-tested.
+    // Retail tests only the first character -- the path pointer itself is never null-tested.
     Archetype::Root* const Arch = ShipArchetypeOf(ObjRW);
     const char* const CockpitPath =
         reinterpret_cast<FCliShipCompanionView*>(Arch->Companion)->CockpitIniPath;
@@ -109,26 +105,21 @@ bool InitPlayerCockpitSlice()
     char FullPath[MAX_PATH];
     if (CockpitPath[0] == '\0')
     {
-        // 0x0054ace6: warn, and fall back to the stock cockpit.
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kSpaceCpp, kNoCockpitWarningLine,
               "ship has no cockpit definition");
         GetFileSysPath(FullPath, kDefaultCockpitIniRel, nullptr);
     }
     else
     {
-        // 0x0054ad19.
         GetFileSysPath(FullPath, CockpitPath, nullptr);
     }
 
-    // 0x0054ad25 .. 0x0054ad5d: the four cockpit camera loaders, same path, in order -- the
-    // first-person one (FUN_005173c0) is what loads the cockpit mesh.
+    // The first-person loader (FUN_005173c0) is what loads the cockpit mesh.
     SpaceCameraLoadCockpit(FullPath);
 
-    // 0x0054ad62: FUN_004c73d0.
-    LoadHudElementsFromIni();
+    LoadHudElementsFromIni(); // FUN_004c73d0
 
-    // 0x0054ad67.. (+0xbaa, RefreshLoadingProgress, FUN_00549bc0(this, 0, 0)) continue in the
-    // space init itself (space_state.cpp InitSpaceState).
+    // The rest of FUN_0054ab40 continues in space_state.cpp InitSpaceState.
     return true;
 }
 

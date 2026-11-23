@@ -5,7 +5,7 @@
 // Author: Giperion.
 
 // Common.dll Watchable (the head of a BaseWatcher chain) and CommReferrable (the msg_id_prefix
-// holder). Split out of common_net.cpp.
+// holder).
 
 #include "common_net.h"
 #include "common_ini.h" // INI_Reader -- CommReferrable::read_comm_ini_data
@@ -35,8 +35,7 @@ Watchable& Watchable::operator=(const Watchable& Other)
 
 unsigned int Watchable::unwatch()
 {
-    // 0x063415e0: walk the chain from Head; for each node read next (+4), count it, zero its
-    // +0/+4, advance. Head = 0. Returns the count (0 on an empty chain).
+    // 0x063415e0: detaches every node and returns how many there were.
     unsigned int Count = 0;
     BaseWatcher* Node = Head;
     while (Node != nullptr)
@@ -57,14 +56,14 @@ unsigned int Watchable::unwatch()
 
 CommReferrable::CommReferrable()
 {
-    // .text:06261060: Length (+4) = 0, Data[0] (+8) = 0, vptr.
+    // .text:06261060
     MsgIdPrefix.Length = 0;
     MsgIdPrefix.Data[0] = '\0';
 }
 
 CommReferrable::CommReferrable(const CommReferrable& Other)
 {
-    // .text:06261080: `MOVSD.REP` of 0x11 dwords from Other+4 -- the whole TString<64>.
+    // .text:06261080: the whole TString<64> block-copied.
     memcpy(&MsgIdPrefix, &Other.MsgIdPrefix, sizeof(MsgIdPrefix));
 }
 
@@ -87,12 +86,12 @@ bool CommReferrable::read_comm_ini_data(INI_Reader& Reader)
 
 TString<64> const& CommReferrable::GetMsgIdPrefix() const
 {
-    // .text:0632e7a0: `LEA EAX,[ECX+4]; RET`.
+    // .text:0632e7a0
     return MsgIdPrefix;
 }
 
 bool CommReferrable::HasVoiceInfo() const
 {
-    // .text:0629d860: `return *(int*)(this+4) != 0;`
+    // .text:0629d860
     return MsgIdPrefix.Length != 0;
 }

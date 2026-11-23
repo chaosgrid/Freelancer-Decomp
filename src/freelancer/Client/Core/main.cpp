@@ -78,7 +78,7 @@ namespace
     // where G_CrashAppName begins in retail's .data.
     wchar_t G_CrashReportFiles[0x410];
 
-    // FUN_005a5390 (.text:005a5390-005a54dd): run "dxdiag.exe <temp>\dxdiag.txt", wait up to 60 s
+    // FUN_005a5390: run "dxdiag.exe <temp>\dxdiag.txt", wait up to 60 s
     // and, unless it timed out, append the report path to G_CrashReportFiles.
     void AppendDxDiagReport()
     {
@@ -108,7 +108,7 @@ namespace
             const size_t Length = wcslen(G_CrashReportFiles);
             MultiByteToWideChar(CP_UTF8, 0, ReportPath, -1, G_CrashReportFiles + Length,
                                 static_cast<int>(0x410 - Length));
-            // 0x005a54b8: retail's terminator lands 0x104 wchar past the old end, not after the
+            // Retail's terminator lands 0x104 wchar past the old end, not after the
             // appended text.
             G_CrashReportFiles[Length + 0x104] = L'\0';
         }
@@ -116,19 +116,19 @@ namespace
         CloseHandle(ProcessInfo.hThread);
     }
 
-    // FUN_005a54e0 (.text:005a54e0-005a5909), the unhandled-exception filter FUN_005a5910
+    // FUN_005a54e0, the unhandled-exception filter FUN_005a5910
     // installs. Breakpoint (0x80000003) and single-step (0x80000004) are left to the next handler.
     // Everything else: close a hosted DirectPlay session, then hand the crash to Dr. Watson
     // (dw15.exe, shipped next to freelancer.exe) through a 0x1c50-byte shared block and wait for
     // it. Returns EXCEPTION_EXECUTE_HANDLER unless dw15 says the process may continue.
     LONG WINAPI ClientCrashFilter(EXCEPTION_POINTERS* Info)
     {
-        LONG Result = 1; // local_20
+        LONG Result = 1;
         const DWORD Code = Info->ExceptionRecord->ExceptionCode;
         if (Code == 0x80000003 || Code == 0x80000004)
             return 0;
 
-        // 0x005a552d..0x005a5555: guarded by its own __try with a filter that returns 1.
+        // Guarded by its own __try with a filter that returns 1.
         __try
         {
             CDPServer::CrashCleanup();
@@ -152,13 +152,13 @@ namespace
         if (Block != nullptr)
         {
             memset(Block, 0, 0x714 * 4);
-            HANDLE const EventDone = CreateEventA(&Security, FALSE, FALSE, nullptr); // local_34
+            HANDLE const EventDone = CreateEventA(&Security, FALSE, FALSE, nullptr);
             if (EventDone != nullptr)
             {
-                HANDLE const EventAlive = CreateEventA(&Security, FALSE, FALSE, nullptr); // local_38
+                HANDLE const EventAlive = CreateEventA(&Security, FALSE, FALSE, nullptr);
                 if (EventAlive != nullptr)
                 {
-                    HANDLE const Mutex = CreateMutexA(&Security, FALSE, nullptr); // local_3c
+                    HANDLE const Mutex = CreateMutexA(&Security, FALSE, nullptr);
                     if (Mutex != nullptr)
                     {
                         if (DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(),
@@ -232,7 +232,6 @@ namespace
                             }
                             else
                             {
-                                // 0x005a5824..0x005a58a3.
                                 bool bWaiting = true;
                                 do
                                 {
@@ -287,7 +286,7 @@ namespace
         return Result;
     }
 
-    // FUN_005a5910 (.text:005a5910-005a593c).
+    // FUN_005a5910.
     void InstallClientCrashFilter(const wchar_t* AppName)
     {
         wcsncpy(G_CrashAppName, AppName, 0x80);
@@ -295,10 +294,9 @@ namespace
         SetUnhandledExceptionFilter(ClientCrashFilter);
     }
 
-    // DAT_005b08a0 -- installed into DALib::FatalErrorFn by WinMain (0x005b30e8). Ghidra left it
-    // as data; disassembled from the PE bytes. Loads caption 0xd1 and the message Id from the
-    // resources, appends Text, drops the render device (FUN_004247c0(1)), forces the cursor
-    // visible, shows the message box and exits.
+    // DAT_005b08a0 (code Ghidra left as data) -- installed into DALib::FatalErrorFn by WinMain.
+    // Loads caption 0xd1 and the message Id from the resources, appends Text, drops the render
+    // device (FUN_004247c0(1)), forces the cursor visible, shows the message box and exits.
     void __cdecl ClientFatalError(unsigned int Id, const char* Text)
     {
         wchar_t Caption[0x100];
@@ -325,7 +323,7 @@ namespace
         exit(1);
     }
 
-    // LAB_005b09b0 -- installed into DALib::CriticalWarningFn (0x005b30f4). Same text assembly
+    // LAB_005b09b0 -- installed into DALib::CriticalWarningFn. Same text assembly
     // with caption 0xd2; a Yes/No box. "No" drops the render device and exits; "Yes" puts the
     // cursor count back and returns true.
     bool __cdecl ClientCriticalWarning(unsigned int Id, const char* Text)
@@ -375,19 +373,17 @@ namespace
     char G_EulaFile[] = "..\\EULA.rtf";
     char G_WarrantyFile[] = "..\\Warranty.rtf";
 
-    // EBUEula.dll's "EBUEula" export as FUN_005b2d60 calls it: cdecl (ADD ESP,0x10 after the
-    // call at 0x005b2f31), four arguments, an int result tested for non-zero. EBUEula.dll is the
-    // retail third-party binary shipped in bin\ (not Digital Anvil code, not ported).
+    // EBUEula.dll's "EBUEula" export as FUN_005b2d60 calls it: cdecl, four arguments, an int
+    // result tested for non-zero. EBUEula.dll is the retail third-party binary shipped in bin\
+    // (not Digital Anvil code, not ported).
     typedef int(__cdecl* FEBUEulaFn)(const char* RegKey, char* EulaFile, char* WarrantyFile,
                                      int Arg4);
 
-    // The failure tail FUN_005b2d60 carries twice (0x005b2d94..0x005b2e3b after both
-    // LoadLibraryA calls fail, 0x005b2e5e..0x005b2f09 after GetProcAddress fails): caption ids
-    // 0xd1 and message ids 0xd9 from the resources (FUN_004347e0 with DAT_0067eca8) with the
-    // built-in fallbacks, the render device dropped (FUN_004247c0(1)), the cursor forced
-    // visible, MessageBoxW(DAT_0067eca0, message, caption, 0x10030), exit(1). No text is
-    // appended. GetProcAddress / MessageBoxW go through retail's lazy import thunks
-    // FUN_005b74fe / FUN_005b75b7 (kernel32 / user32 by name) -- the same APIs.
+    // The failure tail FUN_005b2d60 carries twice (after both LoadLibraryA calls fail, and after
+    // GetProcAddress fails): caption ids 0xd1 and message ids 0xd9 with the built-in fallbacks,
+    // the render device dropped, the cursor forced visible, the message box, exit(1). No text is
+    // appended. Retail reaches GetProcAddress / MessageBoxW through lazy import thunks
+    // FUN_005b74fe / FUN_005b75b7 -- the same APIs.
     __declspec(noreturn) void EulaLoadFailureExit()
     {
         wchar_t Caption[0x100];
@@ -406,11 +402,10 @@ namespace
         exit(1);
     }
 
-    // FUN_005b2d60 (.text:005b2d60-005b2f4e): the EULA gate WinMain runs after the ..\DATA
-    // probe (0x005b30bc). False (EBUEula returned 0) makes WinMain return 1.
+    // FUN_005b2d60: the EULA gate WinMain runs after the ..\DATA probe. False (EBUEula returned
+    // 0) makes WinMain return 1.
     bool RunEulaGate()
     {
-        // 0x005b2d6c..0x005b2d8e: "..\EBUEula.dll", then "EBUEula.dll"; neither -> fatal box.
         HMODULE Eula = LoadLibraryA("..\\EBUEula.dll");
         if (Eula == nullptr)
         {
@@ -419,8 +414,6 @@ namespace
                 EulaLoadFailureExit();
         }
 
-        // 0x005b2e41..0x005b2e58: GetProcAddress(module, "EBUEula"); a miss frees the module
-        // first, then the same fatal box.
         FEBUEulaFn const EulaFn = reinterpret_cast<FEBUEulaFn>(GetProcAddress(Eula, "EBUEula"));
         if (EulaFn == nullptr)
         {
@@ -428,25 +421,20 @@ namespace
             EulaLoadFailureExit();
         }
 
-        // 0x005b2f0f..0x005b2f26: GetFileAttributesA("..\Warranty.rtf"); INC / NEG / SBB / AND
-        // -> the path when the attributes are not INVALID_FILE_ATTRIBUTES, else null.
         char* const Warranty =
             (GetFileAttributesA(G_WarrantyFile) != INVALID_FILE_ATTRIBUTES) ? G_WarrantyFile : nullptr;
 
-        // 0x005b2f1f..0x005b2f31: EBUEula(.rdata:005e1f64 registry key, "..\EULA.rtf",
-        // warranty-or-null, 1).
+        // The registry key is .rdata:005e1f64.
         int const Result =
             EulaFn("Software\\Microsoft\\Microsoft Games\\Freelancer\\1.0", G_EulaFile, Warranty, 1);
 
-        // 0x005b2f36..0x005b2f44: FreeLibrary, then SETNZ on the result.
         FreeLibrary(Eula);
         return Result != 0;
     }
 
     // FUN_005b0b00 -- the assert callback WinMain hands ErrorHandler::activate. In a fullscreen
     // session (DAT_00679be5) with a registered Win3D (FUN_0059da50) the message goes to the
-    // NN_Error modal FUN_00473e00 and the result is 4 + (its bool) (005b0b1c..005b0b29);
-    // otherwise MessageBoxA.
+    // NN_Error modal FUN_00473e00 and the result is 4 + (its bool); otherwise MessageBoxA.
     int __cdecl ClientAssertHandler(const char* Message, const char* Caption, bool bOkCancel)
     {
         if (g_display.fullscreen != 0 && Win3DGetFirstRegistered() != nullptr)
@@ -455,7 +443,7 @@ namespace
         return MessageBoxA(nullptr, Message, Caption, Flags);
     }
 
-    // FUN_005b2cb0 (.text:005b2cb0-005b2d55), cdecl(FClientCommandLine*): "+G"/"-G", "+P<port>"
+    // FUN_005b2cb0, cdecl(FClientCommandLine*): "+G"/"-G", "+P<port>"
     // and "+S<host:port>" in either case, the sign ignored. A token without a sign matches
     // nothing.
     void ApplyClientCommandLineFlags(const FClientCommandLine* CommandLine)
@@ -482,15 +470,13 @@ namespace
             }
             else if (Letter == 'S' || Letter == 's')
             {
-                // 0x005b2d16..0x005b2d1c: FUN_005ac710 on the connect context DAT_0067e7b8; its
-                // answer is not read.
+                // FUN_005ac710 on the connect context DAT_0067e7b8; its answer is not read.
                 G_LoginMgr.AddDirectServer(Token);
             }
         }
     }
 
-    // WinMain's exception filter (.text:005b33a9-005b33c6): FUN_004247c0(1), ShowCursor(TRUE),
-    // EXCEPTION_CONTINUE_SEARCH.
+    // WinMain's exception filter: FUN_004247c0(1), ShowCursor(TRUE), EXCEPTION_CONTINUE_SEARCH.
     int ClientWinMainFilter()
     {
         ShutdownRenderMgr(true);
@@ -498,38 +484,32 @@ namespace
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    // LAB_005b2190 -- registered with atexit right after CoInitialize (0x005b3101), so it runs
-    // after WinMain has returned. Calls are in retail's order; a call the port has no retail
-    // counterpart for yet is named in place.
+    // LAB_005b2190 -- registered with atexit right after CoInitialize, so it runs after WinMain
+    // has returned. Calls are in retail's order.
     void __cdecl ClientAtExitTeardown()
     {
         CGunWrapper::Shutdown();
-        // 0x005b2195: FUN_005791c0 -- delete the loading screen's Image (DAT_0067c3bc) and its
-        // progress bar tree (DAT_0067c3c0), set DAT_0067c3db.
+        // FUN_005791c0 -- delete the loading screen's Image (DAT_0067c3bc) and its progress bar
+        // tree (DAT_0067c3c0), set DAT_0067c3db.
         LoadingScreenShutdown();
         Async::Shutdown();
         if (g_client.current_state != nullptr)
         {
-            // 0x005b21a0..0x005b21b9: slot 13 (+0x34, Destroy) of the current state object,
-            // then DAT_0067ecac = 0.
             g_client.current_state->Destroy();
             g_client.current_state = nullptr;
         }
         ShutdownServerConnection(); // FUN_005a8260
         G_LoginMgr.Reset();         // FUN_005a9300 on DAT_0067e7b8
         G_LoginMgr.DestroyGun();    // FUN_005abc60 on DAT_0067e7b8
-        // Singleton slot 9 (+0x24, Shutdown) on FUN_00575430 / FUN_00437420 / FUN_0054bd30 /
-        // FUN_0043d560 (0x005b21d2..0x005b21ff). IntroFocus's is 0x00401e90, a bare RET; GF's
-        // LAB_00437290 -> FUN_00558870, the space state's FUN_0054ab20, MissionBriefing's
-        // LAB_0043d260.
-        GetIntroFocusState()->Shutdown();      // 0x005b21d2..0x005b21db
-        GetGameflowState()->Shutdown();        // 0x005b21de..0x005b21e7
-        GetSpaceState()->Shutdown();           // 0x005b21ea..0x005b21f3
-        GetMissionBriefingState()->Shutdown(); // 0x005b21f6..0x005b21ff
-        ShutdownCharacterInfo();    // FUN_00435500 (0x005b2202)
-        // 0x005b2207..0x005b2224: the ToolTip singleton DAT_0067244c -- slot 10 (Destroy), then,
-        // re-read and still set, slot 0 with 1 (the scalar deleting dtor, FUN_004bd690 clears
-        // DAT_0067244c when it is this tooltip).
+        // Slot 9 of each singleton: IntroFocus's is 0x00401e90 (empty); GF's LAB_00437290 ->
+        // FUN_00558870, the space state's FUN_0054ab20, MissionBriefing's LAB_0043d260.
+        GetIntroFocusState()->Shutdown();
+        GetGameflowState()->Shutdown();
+        GetSpaceState()->Shutdown();
+        GetMissionBriefingState()->Shutdown();
+        ShutdownCharacterInfo();    // FUN_00435500
+        // The ToolTip singleton DAT_0067244c -- slot 10 (Destroy), then, re-read and still set,
+        // the scalar deleting dtor (FUN_004bd690 clears DAT_0067244c when it is this tooltip).
         if (GetNnToolTipSingleton() != nullptr)
         {
             GetNnToolTipSingleton()->Destroy();
@@ -537,27 +517,26 @@ namespace
             if (Tip != nullptr)
                 delete Tip;
         }
-        NnRolloverDestroyGlobal();  // FUN_004b6580 (0x005b2228)
-        ChatShutdown();            // FUN_00469b30 (0x005b222d; DAT_0066da60..88, FUN_00469d20)
-        NnSystemShutdown();         // FUN_0045a140 (0x005b2232)
-        ClearButtonMontage();       // FUN_00559d20 (0x005b2237)
-        // 0x005b223c..0x005b226f: the DAT_0067ecb4 tree -- FUN_0043d2a0 inlined (null -> skip;
-        // each child through FUN_0043d2a0 with the next sibling read first; slot 10; deleting
-        // dtor). The root is always null in retail (globals.h).
+        NnRolloverDestroyGlobal();  // FUN_004b6580
+        ChatShutdown();            // FUN_00469b30
+        NnSystemShutdown();         // FUN_0045a140
+        ClearButtonMontage();       // FUN_00559d20
+        // The DAT_0067ecb4 tree (FUN_0043d2a0 inlined). The root is always null in retail
+        // (globals.h).
         Win3DDeleteTree(G_WinDebugRoot);
-        Win3DShutdownManager(); // FUN_0059d6d0 (0x005b2271)
+        Win3DShutdownManager(); // FUN_0059d6d0
         ShutdownUiSoundTable(); // FUN_00564540
-        StopAllClientSounds();  // FUN_004284f0 (0x005b227b)
+        StopAllClientSounds();  // FUN_004284f0
         DataConfig::shutdown();
         GraphLibraryShutdown(); // FUN_00419e50
-        EffectSystemShutdown();   // FUN_004f7140 (0x005b228b)
-        ClearEffectShapesFiles(); // FUN_004f73b0 (0x005b2290)
+        EffectSystemShutdown();   // FUN_004f7140
+        ClearEffectShapesFiles(); // FUN_004f73b0
         UiScrollClearShapes(); // FUN_00595400
         ShutdownClientTickProfile(); // CLIENT-BETA-LABEL: release cached atlas owners first
-        FontShutdown(); // FUN_004174a0 (0x005b229a)
+        FontShutdown(); // FUN_004174a0
         ShutdownRichText();
-        ShutdownDebrisArchDb(); // FUN_00530fa0 (0x005b22a5)
-        EffectArchShutdown();      // FUN_0040ef30 (0x005b22aa)
+        ShutdownDebrisArchDb(); // FUN_00530fa0
+        EffectArchShutdown();      // FUN_0040ef30
         ClearClientVoices();       // FUN_00431850
         ShutdownClientSoundArch(); // FUN_0042b4d0
         ShutdownRenderMgr(false);  // FUN_004247c0(0)
@@ -565,17 +544,15 @@ namespace
         // Port-only: the Direct3D 9 extension objects and interfaces go before the pipeline.
         RenderEx::Shutdown();
 #endif
-        // 0x005b22c3 FUN_005b4050: frees every heap option object and list node of the
-        // PerfOptions std::list (DAT_0067ed04). The port's registry is the static G_Options
-        // table (perf_options.cpp), so there is nothing to free; nothing after this point reads
-        // the registry in retail either.
+        // Retail FUN_005b4050 frees the PerfOptions std::list (DAT_0067ed04) here. The port's
+        // registry is the static G_Options table (perf_options.cpp), so there is nothing to free.
         if (Reputation::Vibe::Count() != 0)
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: %d REP_INSTANCE(s) orphaned\n",
                   "E:\\FL\\Scratch\\Source\\Client\\main.cpp", 0x4be, Reputation::Vibe::Count());
         }
-        Archetype::FlushMaterialCache(); // FUN_0041b150 (0x005b22f6), result discarded
-        AleLibShutdown();                // FUN_00401380 (ALELib::Shutdown, 0x005b22fb)
+        Archetype::FlushMaterialCache(); // FUN_0041b150, result discarded
+        AleLibShutdown();                // FUN_00401380 (ALELib::Shutdown)
         DALib::CloseData();
         DALib::Shutdown(g_client.window);
         G_LoginMgr.Cleanup(); // CDPClient::Cleanup on DAT_0067e7bc
@@ -584,18 +561,18 @@ namespace
         ErrorHandler::deactivate();
         CFLIDMaker::Shutdown();
         StringShutdown();
-        ReleaseClientIMEFocus(); // FUN_005641d0 (0x005b2349): delete DAT_0067a4a4
+        ReleaseClientIMEFocus(); // FUN_005641d0: delete DAT_0067a4a4
         CoUninitialize();
     }
 }
 
-// FUN_005b33f0 (.text:005b33f0): `MOV dword ptr [ECX],0; RET`.
+// FUN_005b33f0.
 FClientCommandLine::FClientCommandLine()
 {
     Count = 0;
 }
 
-// FUN_005b3400 (.text:005b3400-005b34aa), __thiscall, RET 4.
+// FUN_005b3400.
 void FClientCommandLine::Parse(const char* CommandLine)
 {
     static const char kDelimiters[] = " \t"; // .rdata:005e6dec
@@ -653,10 +630,7 @@ void FClientCommandLine::Parse(const char* CommandLine)
     }
 }
 
-// FUN_005b27c0 -- developer FPU-exception-trap toggle, gated on "+X"/"-X" (G_bFpExceptionTrap).
-// Enabling unmasks FP exceptions (crash on NaN/overflow/etc.); retail calls this every frame with
-// Enable=false at frame-begin (FUN_00424f30) and Enable=true at frame-end (FUN_00425080), in
-// addition to the one-time WinMain call.
+// FUN_005b27c0. Enabling unmasks FP exceptions (crash on NaN/overflow/etc.).
 void SetFpuExceptionTrap(bool Enable)
 {
     if (Enable)
@@ -671,7 +645,7 @@ void SetFpuExceptionTrap(bool Enable)
     }
 }
 
-// FUN_005b2800 (.text:005b2800-005b2880).
+// FUN_005b2800.
 void OpenSpewLog()
 {
     char Path[0x104];
@@ -685,14 +659,13 @@ void OpenSpewLog()
 // FUN_005b2f50 -- Client/main.cpp WinMain.
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show*/)
 {
-    int ExitCode = 1; // local_20
+    int ExitCode = 1;
 
-    // The whole body runs under a frame handler (scope table .rdata:005e6de0) whose filter
-    // (0x005b33a9) drops the render device and shows the cursor, then lets the exception go on.
+    // The whole body runs under a frame handler whose filter drops the render device and shows
+    // the cursor, then lets the exception go on.
     __try
     {
-        // 0x005b2f87..0x005b2fac: the retail single-instance guard (named mutex; null handle or
-        // ERROR_ALREADY_EXISTS 0xb7 -> return 1). DEVIATION (deviations.md "Client: single-instance
+        // The retail single-instance guard. DEVIATION (deviations.md "Client: single-instance
         // guard behind FL_SINGLE_INSTANCE"): compiled only with FL_SINGLE_INSTANCE defined, so the
         // owner can run several clients on one machine for multiplayer tests.
 #if defined(FL_SINGLE_INSTANCE)
@@ -730,13 +703,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
             return 1;
         }
 
-        // 0x005b30bc..0x005b30df: FUN_005b2d60, the EULA gate; declined -> return EDI, which
-        // still holds the 1 loaded at 0x005b2f79.
         if (!RunEulaGate())
             return 1;
 
         // Global DALib data exports ?FatalErrorFn@@3P6AXIPBD@ZA / ?CriticalWarningFn@@3P6A_NIPBD@ZA
-        // (not in namespace DALib), stored at 0x005b30e2 / 0x005b30ee.
+        // (not in namespace DALib).
         ::FatalErrorFn = ClientFatalError;
         ::CriticalWarningFn = ClientCriticalWarning;
         CoInitialize(nullptr);
@@ -754,7 +725,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
         }
         else
         {
-            // 0x005b316a.
             Major = 1;
             Minor = 0;
             Build = 0xb;
@@ -795,7 +765,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
         {
             ClientNoteEngineReady(); // DAT_0067ecc8 = 1; FUN_00471f30(0) if a close came early
 
-            // 0x005b3324..0x005b3330: FUN_005b2a30(FUN_005b20a0(), nullptr) into DAT_0067ecac.
+            // FUN_005b2a30(FUN_005b20a0(), nullptr).
             g_client.current_state = EnterClientState(ComputeInitialEnvironment(), nullptr);
 
             RegisterAcceleratorGroup("IDR_ALWAYS_PRESENT"); // FUN_00577490
@@ -813,7 +783,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
     }
     __except (ClientWinMainFilter())
     {
-        // 0x005b33c7: unreachable, the filter never accepts.
+        // Unreachable: the filter never accepts.
     }
 
     // Retail WinMain returns straight away; the mutex is left to process exit and the teardown

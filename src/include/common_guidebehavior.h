@@ -17,38 +17,14 @@
 // GuideBehavior -- AI "guide/escort a point-to-point course" state (Behavior family)
 // ============================================================================
 //
-// RTTI identity (hand-decoded directly from EXE/Disasm/Common.dll.txt raw bytes, NOT from
-// Ghidra's .c decompilation -- see "ground truth precedence" in this marathon's
-// methodology). Already on file as decomp-tracker item 6609 (address 0x0639feb4):
+// RTTI: COL .rdata:0x063a91e4 -> ".?AVGuideBehavior@@", numBaseClasses = 2 (self +
+// Behavior): single inheritance, no secondary vtable.
 //
-//   RTTICompleteObjectLocator @ .rdata:0x063a91e4 (offset field = 0, i.e. the primary --
-//   and only -- vtable installs at object offset 0)
-//     -> pTypeDescriptor, name ".?AVGuideBehavior@@"
-//     -> pClassHierarchyDescriptor, numBaseClasses = 2, adjacent CHD sibling is
-//        LargeShipBehavior (see common_largeshipbehavior.h)
-//
-// Single-inheritance direct child of Behavior -- same shape as FleeBehavior/CruiseBehavior,
-// no secondary vtable.
-//
-// ----------------------------------------------------------------------------
-// Constructor: FUN_062cf230 (Common.dll.txt 205669-205723). Calls the shared base-init
-// field-initialising FUN_062d2020 (it writes +0x04..+0x29, see Behavior in common_behavior.h), zeroes WatcherA (+0x2c/+0x30, a BaseWatcher -- confirmed by the real
-// dtor FUN_062cf360 treating +0x2c as a BaseWatcher via BaseWatcher::set_pointer, see below),
-// default-constructs a REAL, already-ported `pub::AI::DirectiveGotoOp` (common_pub.h) at
-// +0x68 and a REAL, already-ported `pub::AI::DirectiveFollowOp` (common_pub.h) at +0xd8
-// (0xd8-0x68 == sizeof(DirectiveGotoOp) == 0x70, confirming back-to-back layout, same
-// pattern FleeBehavior uses for its own GotoOp/DockOp pair), zeroes WatcherB (+0xfc/+0x100,
-// a second BaseWatcher), installs the vtable, then sets THREE float defaults --
-// +0x11c=0x3ec90fdb (0.39269909f, pi/8), +0x114=-10.0f, +0x118=10.0f -- followed by more
-// field writes a prior pass's summary did NOT capture (re-verified this pass by reading the
-// raw bytes end to end): zeroes +0x108/+0x44/+0x34, sets +0x104=10.0f, +0x38=1.
-//
-// CONFIRMED DEAD CODE (matching this marathon's LootBehavior ctor precedent, common_lootbehavior.h):
-// right after installing the vtable and the three float defaults, retail emits
-// `CMP dword ptr [this+0xfc],0; JZ skip; CALL BaseWatcher::set_pointer(this+0xfc, nullptr)`.
-// The compared dword was JUST zeroed by this SAME ctor a few instructions earlier (WatcherB's
-// own zero-init) and nothing in between writes it, so the branch always takes the
-// "already null" path -- the BaseWatcher::set_pointer call is unreachable. Not reproduced.
+// Constructor FUN_062cf230: FUN_062d2020, zeroes WatcherA, builds DirectiveGotoOp at +0x68 and
+// DirectiveFollowOp at +0xd8, zeroes WatcherB, installs the vptr, then +0x11c = pi/8
+// (0x3ec90fdb), +0x114 = -10.0f, +0x118 = 10.0f, zeroes +0x108/+0x44/+0x34, +0x104 = 10.0f,
+// +0x38 = 1. The `CMP [this+0xfc],0; JZ` after the vptr store is always taken (dead, as in
+// LootBehavior).
 // ============================================================================
 
 class GuideBehavior : public Behavior
@@ -60,13 +36,7 @@ public:
     ~GuideBehavior() override;
 
     // ------------------------------------------------------------------
-    // Vtable (.rdata:0x0639feb4, 27 slots, 0x0639feb4-0x0639ff1c inclusive).
-    // CORRECTED this pass: the tracker item's byte_size=112 (112/4=28) is NOT the real slot
-    // count -- the 28th dword at 0x0639ff20 is LargeShipBehavior's own leading RTTI COL
-    // pointer (DAT_063a922c, the hidden [-4] slot preceding PTR_FUN_0639ff24), not a
-    // GuideBehavior vtable entry. Re-verified directly against the raw .rdata listing
-    // (Common.dll.txt 563239-563267): GuideBehavior's real vtable is the standard
-    // family-wide 27-slot shape (matches FleeBehavior/LaunchBehavior/LootBehavior).
+    // Vtable (.rdata:0x0639feb4, 27 slots; 0x0639ff20 is LargeShipBehavior's COL).
     //
     //   0  FUN_062cf340  scalar-deleting dtor around FUN_062cf360
     //   1  LAB_062cf3e0  SetContext (`JMP FUN_062d2090`)
@@ -80,10 +50,6 @@ public:
     //  24  LAB_062cf2f0  get_target
     // Every other slot is Behavior's own entry.
     // ------------------------------------------------------------------
-
-    // RE-PORTED 2026-10-08 (claude-code:cmn-ai5): slots 1/3/4/5/10/21/24 are overrides now.
-    // Until then slots 3 and 10 were unported and slots 1/4/5/21/24 were plain members that
-    // the manager's Behavior* dispatch never reached.
 
     // Slot 1, LAB_062cf3e0: `JMP FUN_062d2090` (BindContext), shared with Flee/Cruise/
     // DrasticEvade.
@@ -103,15 +69,9 @@ public:
     bool OnApplyDirective(void* DirectiveOp) override;
 
     // ------------------------------------------------------------------
-    // Own vtable slot 7 (offset 0x1c). LAB_062cf5f0, Common.dll.txt 206092-206730, 575
-    // instructions. PORTED IN FULL 2026-09-17 (claude:common-guide); body lives in
-    // src/Common/common_guidebehavior.cpp. It sat in src/Common/common_stubs.cpp until
-    // 2026-09-17 (claude:w16-behavior) because FUN_062ec520 was file-static there; that
-    // function is now non-static and declared at the bottom of this header, so the body is
-    // back in its own class's translation unit. Derived instruction-by-instruction from the
-    // raw listing.
+    // Slot 7, LAB_062cf5f0 (575 instructions), body in common_guidebehavior.cpp.
     //
-    // WHAT IT IS. This is the per-tick brain of the "guide/escort" behavior: an NPC leads
+    // The per-tick brain of the "guide/escort" behavior: an NPC leads
     // the watched object (WatcherA, in practice the player) along a course, hands the actual
     // flying to ONE OF TWO SIBLING Behavior objects owned by the manager, and emits a
     // numbered "guide event" to the manager's notification callback whenever the escort's
@@ -152,8 +112,8 @@ public:
     //        Flag120 clear (leading):  3 = fell behind hard, 1 = caught up and on course and
     //                                  inside EscortMaxClearance, 2 = steady but outside EscortMaxClearance,
     //                                  4 = the "leader is me" shortcut. 1 and 2 set Flag120.
-    //      The Dist < RadialClearance byte gates them unevenly, and the asymmetry is retail's,
-    //      not a transcription slip: 8/6/7/3/2 are SUPPRESSED when it is set, 4's second entry
+    //      The Dist < RadialClearance byte gates them unevenly (retail's asymmetry):
+    //      8/6/7/3/2 are suppressed when it is set, 4's second entry
     //      (via 062cfb2d) REQUIRES it, and 1, 5 and 4's bLeaderIsSelf entry ignore it entirely.
     //      Each event is a NotifyManagerGuideEvent(SelfId, WatchedId, Code, Clearance, GuideDestination).
     //   7. 062cfa15 / 062cfba7  Hand off to a sibling: Flag120 set -> FollowDelegate drives and
@@ -167,27 +127,16 @@ public:
     //      Flags28 bit 0x2, NotifyBehaviorDone(0xe, 0) and finish with UpdateResult10 = 2.
     //      (GotoDelegate's slot-7 result == 2 skips straight to the intercept test.)
     //
-    // FP-idiom care taken (this marathon's own standing warning): every FCOMP here was decoded
-    // from its mask AND its jump, not from the mask alone. `TEST AH,0x41` + `JNZ` guards a
-    // strictly-greater test (fall-through is greater); `TEST AH,0x41` + `JP` JUMPS on greater;
-    // `TEST AH,0x5` + `JP` jumps on NOT-less. The pair at 062cfab4-062cfad0 interleaves TWO
-    // compares through one AH: the first FNSTSW feeds the `TEST AH,0x41`/`JNZ`, the second
-    // (which does not touch EFLAGS) feeds the following `TEST AH,0x5`/`JP` and, at 062cfb3d,
-    // a `TEST AH,0x1` reading C0 of that same second compare.
+    // Compare polarity: the pair at 062cfab4-062cfad0 runs two compares through one AH -- the
+    // first FNSTSW feeds `TEST AH,0x41`/`JNZ` (strictly greater), the second `TEST AH,0x5`/`JP`
+    // (not less) and, at 062cfb3d, `TEST AH,0x1` (C0 of that second compare).
     //
-    // Two retail oddities reproduced/recorded rather than "fixed": the `TEST ECX,ECX; JNZ`
-    // at 062cf66d is dead (ECX was already proven zero at 062cf635), and event 5's arm is the
-    // only one that skips the Dist<RadialClearance suppression AND leaves Flag120 alone.
+    // Retail oddities kept: the `TEST ECX,ECX; JNZ` at 062cf66d is dead (ECX is zero since
+    // 062cf635), and event 5's arm alone skips the Dist<RadialClearance suppression and
+    // leaves Flag120 alone.
     int Update();
 
-    // Retail's per-tick entry point is vtable slot 7 (+0x1c), not a non-virtual member:
-    // IBehaviorManager::UpdateBehaviorTick writes the accumulated tick delta and then
-    // dispatches through it -- Common.dll.txt .text:062d335d-062d336a,
-    //     FLD float ptr [ESI + 0xd4]   /   FSTP float ptr [EDI + 0x1c]
-    //     CALL dword ptr [EAX + 0x1c]  ; vtable +0x1c IS OnUpdate
-    // EDI there is a bare Behavior* out of the dispatch table, so Update() below was
-    // unreachable through a Behavior* until this override existed. Base Behavior::OnUpdate is
-    // _purecall in retail; see common_behavior.h. Same wiring as TrailBehavior.
+    // Slot 7: IBehaviorManager::UpdateBehaviorTick dispatches through vtable +0x1c.
     int OnUpdate() override { return Update(); }
     // ------------------------------------------------------------------
 
@@ -199,17 +148,7 @@ public:
     IObjRW const* get_target() override;
 
 private:
-    // FULLPORT-DEFERRED stand-ins for not-yet-ported cross-cutting retail helpers this
-    // class's ported methods route through by name/role (shared with several other siblings
-    // in this family -- see the DockBehavior/IdleBehavior/LaunchBehavior precedents cited in
-    // the method comments above for each one's confirmed effect elsewhere).
-    // ReleaseCachedDirectivePoint (FUN_062d21c0) is GONE 2026-09-17: it is
-    // Behavior_ReleaseDirectiveTarget in common_behavior.h, shared with the two
-    // DockBehavior sites that had the same body under a different guessed name.
-
-
-    // FUN_062d2a70, decomp-tracker item 1551, Common.dll.txt 211770-211808 (28 insns),
-    // `__thiscall bool(IBehaviorManager*, uint, uint, int, float, Vector const*)`, RET 0x14 --
+    // FUN_062d2a70, `__thiscall bool(IBehaviorManager*, uint, uint, int, float, Vector const*)`, RET 0x14 --
     // the lead-event sibling of IBehaviorManager::NotifyFollowEvent (062d29c0) and
     // NotifyTetherEvent (062d2a10). ALL FOUR of its XREFs (062cf9b3/062cfa09/062cfb1f/062cfba2)
     // are inside Update() above. Retail: false unless Sys->Targeting.AttackState (+0x1434) is
@@ -229,75 +168,41 @@ private:
 
 public:
     // ------------------------------------------------------------------
-    // Confirmed fields, ascending absolute-offset order. Same shared context-prefix shape as
-    // every other sibling (own data starts right after the inherited vfptr @ +0x00), plus two
-    // real embedded pub::AI::Directive*Op sub-objects and a handful of GuideBehavior-own
-    // fields the ctor touches directly. Not sizeof()-asserted.
-    //
-    // 2026-09-17 (claude:common-guide): the padding runs this list used to carry at +0x18,
-    // +0x39 and +0x48 are now typed out, because Update() reads and writes every one of the
-    // fields inside them. The old note "+0x48/+0x54/+0x74/+0x78/+0x120 ... not individually
-    // typed" no longer applies: +0x74 and +0x78 were never GuideBehavior fields at all (they
-    // are GotoOp.Field_0C and GotoOp.Destination, reached through the embed), and the rest
-    // are named below.
+    // Fields, ascending offset; +0x04..+0x29 is Behavior's shared prefix. Retail size 0x124.
     // ------------------------------------------------------------------
-    int TypeId;  // +0x04. The type id retail's shared base ctor FUN_062d2020 parks here, taken
-                 // from this class's own ctor argument -- see Behavior::GetTypeId() (common_behavior.h)
-                 // for the twenty-one-factory evidence.
-    unsigned CachedHandle08;  // retyped 2026-09-16: this is IObjInspect::get_id()'s result,
-                              // an object id, not a handle. Retail slot 8 is `?get_id@IObjInspectImpl@@UBE?BIXZ`.      // +0x08. Set by SetContext() via the shared FUN_062d2090 effect.
-    int ModeSelector0xc;       // +0x0c. Written by the GAP'd Engage() (=1) and SetModeFromFlags() (0/2/3).
-    int UpdateResult10;        // +0x10. The GAP'd Update()'s own tri-state result.
+    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
+    unsigned CachedHandle08;   // +0x08, the binder's Owner->get_id() (an object id)
+    int ModeSelector0xc;       // +0x0c. OnEngage (=1) and OnEvaluateReadiness (0/2/3).
+    int UpdateResult10;        // +0x10. Update()'s tri-state result.
     void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1).
     IObjDB* ObjectDb;
-    float DeltaTime1c;         // +0x1c. Zeroed by the shared FUN_062d20d0 reset effect inside the
-                                // GAP'd Engage(). Update() accumulates it into SampleElapsed and copies
-                                // it into whichever of GotoDelegate/64 is driving, at that object's
-                                // OWN +0x1c -- the same per-tick delta slot BaseFollowerBehavior
-                                // already names DeltaTime at +0x1c (common_behavior.h), which is
-                                // what makes the float typing here evidence rather than a guess.
-    // +0x20. Set by SetContext() (Param2). TYPED 2026-09-17 (claude:common-behavior-fields)
-    // from GuideBehavior's OWN call sites, not by carrying TrailBehavior's proof across:
-    //   * .text:062cf9ae/062cfa04/062cfb1a/062cfb9d -- `MOV ECX,dword ptr [ESI + 0x20]`
-    //     immediately followed by `CALL FUN_062d2a70`, i.e. the field goes straight into ECX as
-    //     a __thiscall receiver. FUN_062d2a70's own body opens `MOV EAX,[ECX+0x8];
-    //     MOV EDX,[EAX+0x1434]` and then `CMP dword ptr [ECX+0xc0],0xe` -- +0x08 is the field
-    //     the NAMED retail symbol `IBehaviorManager::get_scan_response` dereferences the same
-    //     way (`MOV ECX,[ECX+0x8]; ADD ECX,0x142c`), and +0xc0 is the field the NAMED symbols
-    //     `update_current_behavior_throttle` / `reset_current_behavior_direction` /
-    //     `update_current_behavior_cruise` all read as the current-behavior index. Two
-    //     independent confirmed IBehaviorManager offsets in one eight-instruction prologue.
-    //   * .text:062cf56a/062cf64b/062cfc35 -- same `MOV ECX,[ESI+0x20]` shape into
-    //     `CALL FUN_062d29a0`, which writes +0x118/+0x11c: exactly the pair the big
-    //     IBehaviorManager tick function writes on its OWN `this` at .text:062d2ea9-062d2eb3.
-    //   * .text:062cf3fc -- `MOV EAX,[ESI+0x20]; MOV ECX,[EAX+0x17c]; MOV EDX,[EAX+0x1b8]`,
-    //     entries 2 and 18 of IBehaviorManager::BehaviorDispatchTable (+0x174, common_iface.h).
-    // The shared writer FUN_062d2090 was deliberately NOT used as evidence (fourteen callers,
-    // so Param2's type has to come from each class's own dereferences, as here).
+    float DeltaTime1c;         // +0x1c. Update() accumulates it into SampleElapsed and copies it
+                                // to the driving delegate's own +0x1c.
+    // +0x20, an IBehaviorManager: Update passes it as the receiver of FUN_062d2a70 (reads +0x08
+    // and +0xc0 like the named manager methods, .text:062cf9ae ...) and FUN_062d29a0
+    // (.text:062cf56a ...), and OnEngage reads BehaviorDispatchTable entries +0x17c / +0x1b8
+    // from it (.text:062cf3fc).
     IBehaviorManager* BehaviorMgrPtr20;
     SystemManager* NavHelperPtr24; // +0x24. Set by SetContext() (Param3).
-    unsigned char Flags28;     // +0x28. Tested by SetModeFromFlags().
-    unsigned char Flag29;      // +0x29. Tested by SetModeFromFlags().
+    unsigned char Flags28;     // +0x28. Tested by OnEvaluateReadiness().
+    unsigned char Flag29;      // +0x29. Tested by OnEvaluateReadiness().
     unsigned char Pad2a[0x2c - 0x2a];
 
-    BaseWatcher WatcherA;       // +0x2c (8 bytes, ends +0x34). Zeroed by ctor; cleared by dtor;
-                                 // read by SetModeFromFlags()/ReleaseWatcherAIfIdMatches()/GetRawBlockA().
-    float GuideRange;               // +0x34. Ctor 0. OnApplyDirective copies DirectiveGuideOp+0xb8; OnEvaluateReadiness hands
-                                  // it to FUN_062e4500 as the float range (062cf586), hence float.
-    unsigned char Flag38;        // +0x38. Set to 1 by ctor. The GAP'd ApplyDirective() overwrites it
-                                  // from DirectiveGuideOp::Field_A0 (retail default 1). Also read
-                                  // (copied to +0x120) by the GAP'd Engage()/Update().
+    BaseWatcher WatcherA;       // +0x2c (ends +0x34). Zeroed by ctor; cleared by dtor. The
+                                 // escorted object.
+    float GuideRange;               // +0x34. Ctor 0. OnApplyDirective copies DirectiveGuideOp+0xb8;
+                                  // OnEvaluateReadiness passes it to FUN_062e4500 as the range.
+    unsigned char Flag38;        // +0x38. Set to 1 by ctor. OnApplyDirective overwrites it from
+                                  // DirectiveGuideOp::Field_A0; OnEngage seeds Flag120 from it.
     unsigned char Pad39[0x3c - 0x39];
-    float EscortMaxClearance;                // +0x3c. Set by the GAP'd ApplyDirective() from
-                                   // DirectiveGuideOp::Field_6C (raw dword copy at 062cfd62). Update()
-                                   // FCOMPs the intercept clearance against it at 062cfac3 -- that
-                                   // read is what types it float.
-    unsigned Field40;             // +0x40. Set by the GAP'd ApplyDirective() from
-                                   // DirectiveGuideOp::Field_70 (062cfd68). Never read by any ported
-                                   // code; width is all that is proven. TODO: semantic role unknown.
-    float EscortMinClearance;                // +0x44. Zeroed by ctor. Conditionally written by the GAP'd
-                                   // Engage()/ApplyDirective() from an FPU vector-magnitude result.
-                                   // Update() FCOMPs the intercept clearance against it (062cf9be).
+    float EscortMaxClearance;                // +0x3c. OnApplyDirective: DirectiveGuideOp::Field_6C
+                                   // (062cfd62). Update() compares the intercept clearance with
+                                   // it (062cfac3).
+    unsigned Field40;             // +0x40. OnApplyDirective: DirectiveGuideOp::Field_70 (062cfd68).
+                                   // No reader found.
+    float EscortMinClearance;                // +0x44. Zeroed by ctor; written by OnEngage /
+                                   // OnApplyDirective from a vector magnitude. Update() compares
+                                   // the intercept clearance with it (062cf9be).
     Vector GuideDestination;               // +0x48..+0x54. The live "guide destination" point. Update()
                                    // refreshes it each tick (062cf637-062cf6bd) either from WatcherB's
                                    // world position or from GotoOp.Destination, then uses it as the
@@ -313,49 +218,33 @@ public:
                                    // the clamped dot between the escorted ship's negated forward axis
                                    // and the normalized delta to GuideDestination -- an angle in radians,
                                    // compared against AngleThreshold11c.
-    // +0x60/+0x64. Set by the GAP'd Engage() from BehaviorMgrPtr20's own +0x17c/+0x1b8.
-    // IDENTIFIED 2026-09-17 (claude:common-guide), previously "vtable-having, real class not
-    // identified": IBehaviorManager's own +0x174 is BehaviorDispatchTable[21] (common_iface.h),
-    // so +0x17c is entry 2 (Goto) and +0x1b8 is entry 17 (Follow; (0x1b8 - 0x174) / 4 == 17,
-    // corrected 2026-10-08 from "18") -- both are plain sibling `Behavior*`.
-    // Confirmed by every slot Update() touches lining up with the Behavior vtable this class
-    // itself implements: 0x0c == slot 3 (engage/reset), 0x10 == slot 4 (disengage), 0x1c ==
-    // slot 7 (Update), 0x28 == slot 10 (apply directive) -- plus each object's own +0x1c
-    // per-tick delta float. What settles WHICH siblings they are is the argument Update()
-    // hands slot 10: GotoDelegate always receives &GotoOp and FollowDelegate always receives
-    // &FollowOp, and the two are engaged in strict alternation by Flag120.
+    // +0x60/+0x64: the manager's Goto (BehaviorDispatchTable entry 2, +0x17c) and Follow
+    // (entry 17, +0x1b8) behaviors, captured by OnEngage. Update drives them through slots
+    // 3/4/7/10 and their +0x1c delta, handing GotoDelegate &GotoOp and FollowDelegate
+    // &FollowOp, alternating by Flag120.
     Behavior* GotoDelegate;
     Behavior* FollowDelegate;
 
-    pub::AI::DirectiveGotoOp GotoOp;    // +0x68. Real, already-ported type (common_pub.h).
-                                          // Ends at +0xd8 (sizeof(DirectiveGotoOp) == 0x70).
-    pub::AI::DirectiveFollowOp FollowOp; // +0xd8. Real, already-ported type (common_pub.h).
-                                          // Ends at +0xfc (sizeof(DirectiveFollowOp) == 0x24).
+    pub::AI::DirectiveGotoOp GotoOp;    // +0x68, ends +0xd8.
+    pub::AI::DirectiveFollowOp FollowOp; // +0xd8, ends +0xfc.
 
-    BaseWatcher WatcherB;        // +0xfc (8 bytes, ends +0x104). Zeroed by ctor; cleared by dtor.
-    float SampleInterval;               // +0x104. Set to 10.0f by ctor. The GAP'd ApplyDirective()
-                                   // overwrites it from DirectiveGuideOp::Field_A4 (retail default 10.0).
-    float SampleElapsed;                // +0x108. Zeroed by ctor. RETYPED int -> float 2026-09-17: the
-                                    // ctor's integer zero store is just `0.0f`'s bit pattern, and
-                                    // Update() genuinely does `FLD [+0x1c]; FADD [+0x108]; FSTP
-                                    // [+0x108]` (062cf8a5) on it. A sampling-period accumulator.
-    float LastSampleDistance;                 // +0x10c. Not touched by ctor. Update()'s cached "distance to
-                                     // GuideDestination as of the last sampling tick".
-    float Field110;                  // +0x110. Not touched by ctor. The GAP'd ApplyDirective() sets
-                                      // it from `(float)DirectiveGuideOp::Field_AC` (retail default 3).
-    float FieldLow114;                // +0x114. Set to -10.0f by ctor. The GAP'd ApplyDirective()
-                                       // overwrites it from DirectiveGuideOp::Field_B4 (retail default -10.0).
-    float FieldHigh118;                // +0x118. Set to 10.0f by ctor. The GAP'd ApplyDirective()
-                                        // overwrites it from DirectiveGuideOp::Field_B0 (retail default 10.0).
-    float AngleThreshold11c;            // +0x11c. Set to 0.39269909f (pi/8) by ctor. The GAP'd
-                                         // ApplyDirective() overwrites it from DirectiveGuideOp::Field_A8
-                                         // (retail default 0.3927, the SAME angle).
-    unsigned char Flag120;               // +0x120. ADDED 2026-09-17 -- the class used to end at +0x120
-                                          // while Update() reads and writes this byte eleven times
-                                          // (062cf7b8/062cf7ea/062cf8b4/062cfa0e/062cfa15/062cfb24/
-                                          // 062cfba7 ...). It is the "escort is following me" latch
-                                          // that selects which of GotoDelegate/FollowDelegate drives.
-                                          // Seeded from Flag38 by the GAP'd Engage().
+    BaseWatcher WatcherB;        // +0xfc (ends +0x104). Zeroed by ctor; cleared by dtor.
+    float SampleInterval;               // +0x104. Ctor 10.0f; OnApplyDirective:
+                                   // DirectiveGuideOp::Field_A4.
+    float SampleElapsed;                // +0x108. Zeroed by ctor; Update() adds DeltaTime1c
+                                    // (062cf8a5). The sampling-period accumulator.
+    float LastSampleDistance;                 // +0x10c. Not touched by ctor. Distance to
+                                     // GuideDestination at the last sampling tick.
+    float Field110;                  // +0x110. Not touched by ctor. OnApplyDirective:
+                                      // (float)DirectiveGuideOp::Field_AC.
+    float FieldLow114;                // +0x114. Ctor -10.0f; OnApplyDirective:
+                                       // DirectiveGuideOp::Field_B4.
+    float FieldHigh118;                // +0x118. Ctor 10.0f; OnApplyDirective:
+                                        // DirectiveGuideOp::Field_B0.
+    float AngleThreshold11c;            // +0x11c. Ctor pi/8; OnApplyDirective:
+                                         // DirectiveGuideOp::Field_A8.
+    unsigned char Flag120;               // +0x120. The "escort is following me" latch that picks
+                                          // which delegate drives; seeded from Flag38 by OnEngage.
 };
 
 static_assert(offsetof(GuideBehavior, CachedHandle08) == 0x08, "GuideBehavior::CachedHandle08 offset");
@@ -391,12 +280,6 @@ static_assert(offsetof(GuideBehavior, FieldHigh118) == 0x118, "GuideBehavior::Fi
 static_assert(offsetof(GuideBehavior, AngleThreshold11c) == 0x11c, "GuideBehavior::AngleThreshold11c offset");
 static_assert(offsetof(GuideBehavior, Flag120) == 0x120, "GuideBehavior::Flag120 offset");
 
-// Retail object size, read off the factory body that allocates this class (`PUSH 0x124`
-// immediately before `CALL operator_new`). This is an UPPER bound on purpose: the existing
-// `>=` asserts in this family prove the model reaches its furthest known field, but they
-// cannot catch the opposite error -- a field declared PAST the end of the retail object.
-// That is exactly what happened to FormationBehavior, which carried a block of DockBehavior
-// fields up to 0x470 behind a `>= 0x470` assert while retail allocates 0x2b8. An upper bound
-// cannot fail on an incomplete model, so it is safe to assert even where the port is short.
+// Retail object size from the factory's `PUSH 0x124` before operator_new.
 static_assert(sizeof(GuideBehavior) == 0x124, "GuideBehavior size == retail operator_new(0x124)");
 

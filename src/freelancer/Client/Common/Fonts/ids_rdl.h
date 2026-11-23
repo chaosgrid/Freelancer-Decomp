@@ -23,12 +23,8 @@
 
 #include "common_text.h"
 
-// The exe-side list append. Retail inlines std::list::push_back at every call site
-// (FUN_0046c800, and again at 0x0057e18b in the trailing flush); this is that, once.
-//
-// The cell is 0x0C -- {next, prev, RDLNode*} -- and the list is circular through the malloc'd
-// sentinel RenderDisplayList's ctor creates (sentinel[0] = head, sentinel[1] = tail); the node
-// goes in before the sentinel. Ownership follows retail: the list takes the node.
+// The exe-side list append. Retail inlines std::list::push_back (FUN_0046c800) at every call
+// site. The list takes the node.
 void RdlAppendNode(RenderDisplayList& Rdl, RDLNode* Node);
 
 // Releases every node and empties the list.
@@ -46,16 +42,9 @@ void AppendTextMaybeXmlRdl(const wchar_t* Text, unsigned int Count, RenderDispla
 // FUN_0057eb40: deletes the LAST ParagraphNode in the list, in insertion order, and returns
 // whether it found one.
 //
-// Retail spells the test as vtable slot 0x38 on each node. Dumping Common.dll's exported
-// vtables settles what that slot is: every class inherits RDLNode's 0x06325390
-// (`xor eax,eax; ret`) there EXCEPT ParagraphNode, which installs 0x06261260
-// (`mov eax,ecx; ret`, i.e. return `this`, always true). So the slot means "am I a paragraph
-// break?" and nothing else answers yes.
-//
-// The direction matters and is easy to get backwards: retail's cell convention is [0] = next,
-// [1] = prev with sentinel[1] = tail, and the walk starts at sentinel[1] and follows [1] --
-// so it scans from the END and stops at the first match. What it therefore strips is a
-// TRAILING break, which is exactly what a loaded IDS string needs: without it a label whose
+// Retail tests vtable slot 0x38 on each node: every class inherits RDLNode's 0x06325390
+// (null) there EXCEPT ParagraphNode, which installs 0x06261260 (returns `this`).
+// The walk scans from the END, so it strips a TRAILING break -- without it a label whose
 // resource ends in a newline would carry an extra blank line.
 bool RdlRemoveLastParagraph(RenderDisplayList& Rdl);
 
@@ -63,8 +52,7 @@ bool RdlRemoveLastParagraph(RenderDisplayList& Rdl);
 // Appends to whatever the list already holds. Returns false only when no module/resource.
 bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl);
 
-// The idiom every one of FUN_0057da40's 143 call sites spells out inline, and it is the same
-// five steps at all of them (checked at 0x0045ef7c, 0x004605e6 and 0x00469267):
+// The idiom every one of FUN_0057da40's 143 call sites spells out inline:
 //
 //     if (LoadIdsIntoRdl(ids, rdl))   RdlRemoveLastParagraph(rdl);
 //     else                          { append JustifyNode(1); append TextNode(debug); }

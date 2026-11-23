@@ -47,9 +47,8 @@ namespace
     const float kMinusPi = -3.1415927410125732f;
 
 
-    // FUN_0041a390 -- normalise in place. The x87 sequence loads z, y, x and sums
-    // (x*x + y*y) + z*z before the FSQRT; 1/len is kept on the stack and each component is
-    // multiplied by it.
+    // FUN_0041a390 -- normalise in place. Sum order (x*x + y*y) + z*z; 1/len is kept unrounded
+    // on the x87 stack and each component is multiplied by it.
     void NormalizeXyz(float* V)
     {
         const double Len = sqrt((static_cast<double>(V[0]) * V[0] +
@@ -62,7 +61,7 @@ namespace
     }
 
     // FUN_00556e00's second normalise loads the same three floats but sums
-    // (y*y + z*z) + x*x (0x00556ec0..0x00556ece).
+    // (y*y + z*z) + x*x.
     void NormalizeYzx(float* V)
     {
         const double Len = sqrt((static_cast<double>(V[1]) * V[1] +
@@ -98,8 +97,7 @@ I3DMathEngine* LightsCameraMath()
 FRoomCamera::FRoomCamera(ViewRect const& Viewport)
     : RefCount(1)
 {
-    // 0x005562f5 RefCount = 1; FUN_004215b0 on +0x5c (identity 3x3); +0x80..+0x88 = 0;
-    // FUN_004b5150 on +0x8c (identity 3x3 and a zero translation).
+    // FUN_00556280's head: FUN_004215b0 on +0x5c, FUN_004b5150 on +0x8c.
     int Index = 0;
     for (Index = 0; Index < 9; ++Index)
         Orient[Index] = 0.0f;
@@ -115,7 +113,6 @@ FRoomCamera::FRoomCamera(ViewRect const& Viewport)
     View[4] = 1.0f;
     View[8] = 1.0f;
 
-    // 0x00556327: FUN_005564b0(&ViewRect).
     InitFromViewRect(&Viewport.Left);
 }
 
@@ -126,14 +123,14 @@ FRoomCamera::~FRoomCamera()
 
 void FRoomCamera::InitFromViewRect(int const* ViewRect4)
 {
-    // FUN_005564b0 (RET 4).
+    // FUN_005564b0.
     YScale = 1.0f;
     XScale = -1.0f;
     ZNear = 1.0f;
-    ZFar = 100000.0f;                   // 0x47c35000
+    ZFar = 100000.0f;
     Aspect = 1.3333333730697632f;       // 0x3faaaaab
     TanHalfFovX = 1.0f;
-    TanHalfFovY = 0.75f;                // 0x3f400000
+    TanHalfFovY = 0.75f;
     if (ViewRect4 != nullptr)
     {
         Viewport[0] = ViewRect4[0];
@@ -149,13 +146,12 @@ void FRoomCamera::InitFromViewRect(int const* ViewRect4)
         Viewport[3] = 0x1df;
     }
 
-    // 0x0055651e..0x0055655a: the extents are right-left and bottom-top, no +1 here.
+    // The extents are right-left and bottom-top, no +1 here.
     HalfWidth = static_cast<float>(Viewport[2] - Viewport[0]) * 0.5f;
     HalfHeight = static_cast<float>(Viewport[3] - Viewport[1]) * 0.5f;
     XScale = HalfWidth;
     YScale = HalfHeight * kMinusFourThirds;
 
-    // 0x0055655d: atan(1.0 / 1) in degrees.
     HalfFovXDeg = static_cast<float>(atan2(1.0, 1.0) * kRadToDeg);
     PlaneX[0] = 1.0f;
     PlaneX[1] = 0.0f;
@@ -201,8 +197,7 @@ void FRoomCamera::RebuildPlaneY()
 
 GENRESULT DACOM_API FRoomCamera::QueryInterface(char const* Iid, void** Out)
 {
-    // LAB_00558600: one-entry table at .rdata 0x005e143c {"1.11_ICamera", offset 0}. A hit
-    // hands out `this` and AddRefs through slot 1; a miss nulls *Out and returns 0xfffffffd.
+    // LAB_00558600: one-entry table at .rdata 0x005e143c {"1.11_ICamera", offset 0}.
     if (strcmp(Iids::Camera, Iid) == 0)
     {
         AddRef();
@@ -222,8 +217,8 @@ unsigned long DACOM_API FRoomCamera::AddRef()
 
 unsigned long DACOM_API FRoomCamera::Release()
 {
-    // LAB_005586c0: unsigned decrement that stops at zero; at zero the count is set back to 1
-    // and slot 17 runs with 1 (FUN_005585e0 -> FUN_00556bd0 + free), returning 0.
+    // LAB_005586c0: the decrement stops at zero; at zero the count is set back to 1 and slot 17
+    // (the scalar deleting destructor FUN_005585e0) runs.
     if (RefCount > 0)
         RefCount -= 1;
     if (RefCount == 0)
@@ -275,7 +270,7 @@ float DACOM_API FRoomCamera::GetAspect()
     return Aspect;
 }
 
-// LAB_00556680 / LAB_00556690: FLD float, FDIV float, RET 4 -- the quotient stays unrounded.
+// LAB_00556680 / LAB_00556690: the quotient is returned unrounded on the x87 stack.
 double DACOM_API FRoomCamera::GetXScaleOverNear()
 {
     return static_cast<double>(XScale) / ZNear;
@@ -288,7 +283,7 @@ double DACOM_API FRoomCamera::GetYScaleOverNear()
 
 int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, float const* World)
 {
-    // LAB_005568b0 (RET 0x14). Slot 4 hands back +0x5c, which retail passes to the math
+    // LAB_005568b0. Slot 4 hands back +0x5c, which retail passes to the math
     // engine's InverseTransform (+0x3c) as a whole FTransform: the orientation and the
     // position that follows it at +0x80.
     FTransform const* Xform = reinterpret_cast<FTransform const*>(GetOrientation());
@@ -296,8 +291,7 @@ int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, float 
     FVector Local;
     Math->InverseTransform(Local, *Xform, *reinterpret_cast<FVector const*>(World));
 
-    // 0x005568e5: FLD near; FCHS; FCOMP local.z; TEST AH,1; JNZ -> fail when -near < z or
-    // the compare is unordered.
+    // Fails when -near < z or the compare is unordered.
     if (!(-ZNear >= Local.Z))
         return 0;
 
@@ -313,7 +307,7 @@ int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, float 
 
 void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float ScreenY)
 {
-    // LAB_00556950 (RET 0x10). Both screen offsets are rounded to float in their argument
+    // LAB_00556950. Both screen offsets are rounded to float in their argument
     // slots before the orientation is fetched through slot 4.
     const float A =
         static_cast<float>((ScreenX - (static_cast<double>(Viewport[0]) + HalfWidth)) / XScale);
@@ -321,8 +315,8 @@ void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float Scr
         static_cast<float>((ScreenY - (static_cast<double>(Viewport[1]) + HalfHeight)) / YScale);
     float const* M = GetOrientation();
 
-    // out = M * (A, B, -1), row by row, with retail's temporaries (0x0055697d..0x00556a31):
-    // M1*B, M0*A and M6*A are FSTP'd to floats; M4*B, M3*A and M7*B stay on the x87 stack.
+    // out = M * (A, B, -1), row by row, with retail's temporaries: M1*B, M0*A and M6*A are
+    // rounded to floats; M4*B, M3*A and M7*B stay on the x87 stack.
     const float M1B = static_cast<float>(static_cast<double>(M[1]) * static_cast<double>(B));
     const double M4B = static_cast<double>(M[4]) * static_cast<double>(B);
     const double M7B = static_cast<double>(M[7]) * static_cast<double>(B);
@@ -336,7 +330,6 @@ void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float Scr
     OutWorld3[1] = static_cast<float>(static_cast<double>(R1) - static_cast<double>(M[5]));
     OutWorld3[2] = static_cast<float>(static_cast<double>(R2) - static_cast<double>(M[8]));
 
-    // 0x00556a34: scale by ZNear.
     OutWorld3[0] = ZNear * OutWorld3[0];
     OutWorld3[1] = ZNear * OutWorld3[1];
     OutWorld3[2] = ZNear * OutWorld3[2];
@@ -344,32 +337,27 @@ void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float Scr
 
 int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
 {
-    // LAB_00556780 (RET 0xc). Centre is already in camera space (-Z forward).
+    // LAB_00556780. Centre is already in camera space (-Z forward).
     // 1 = outside, 2 = too small on screen, 3 = straddling a plane, 4 = inside. Every sum and
     // product below stays on the x87 stack in retail (double here); only the -R temporary is
     // stored as a float.
     const double Z = Center[2];
     const double R = Radius;
 
-    // 0x00556784..0x0055679a: R - near FCOMP z, TEST AH,5 / JP -- less returns 1.
+    // Each compare below keeps retail's polarity, so a NaN takes the same branch as on the x87.
     if (R - static_cast<double>(ZNear) < Z)
         return 1;
 
-    // 0x005567a3..0x005567bf: S = R + z kept; S FCOMPP -near, TEST AH,5 / JNP keeps 4 only when
-    // S < -near.
     int Result = 4;
     const double S = R + Z;
     if (!(S < -static_cast<double>(ZNear)))
         Result = 3;
-    // 0x005567c4..0x005567d4: S FCOMPP -far, TEST AH,5 / JP -- less returns 1.
     if (S < -static_cast<double>(ZFar))
         return 1;
-    // 0x005567dd..0x005567ee: R - far FCOMP z, TEST AH,5 / JNP -- not less makes it 3.
     if (!(R - static_cast<double>(ZFar) < Z))
         Result = 3;
 
-    // 0x005567f3..0x0055682d: side planes. FCOM R, TEST AH,0x41 / JNZ keeps going on <=, == or
-    // unordered (greater returns 1); then FCOMP the float -R, TEST AH,5 / JNP: not less is 3.
+    // Side planes, against the float -R.
     const float NegRadius = -Radius;
     double Dist = fabs(static_cast<double>(Center[0])) * static_cast<double>(PlaneX[0]) +
                   static_cast<double>(PlaneX[2]) * Z;
@@ -378,7 +366,6 @@ int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
     if (!(Dist < static_cast<double>(NegRadius)))
         Result = 3;
 
-    // 0x00556832..0x00556863: the same on y with PlaneY.
     Dist = fabs(static_cast<double>(Center[1])) * static_cast<double>(PlaneY[1]) +
            static_cast<double>(PlaneY[2]) * Z;
     if (Dist > R)
@@ -386,12 +373,11 @@ int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
     if (!(Dist < static_cast<double>(NegRadius)))
         Result = 3;
 
-    // 0x00556868: TEST AH,1 on |z| vs 1e-4 -- below it (or unordered) skips the size test.
+    // |z| below 1e-4 (or a NaN) skips the size test.
     if (!(fabs(Z) >= kClassifyEpsilon))
         return Result;
 
-    // 0x0055687a..0x005568a5: Q = -(R / z), ((YScale*XScale)*Q)*Q * -pi, FCOMP 1.0f,
-    // TEST AH,5 / JNP -- less returns 2.
+    // The projected area ((YScale*XScale)*Q)*Q * -pi against 1.0f.
     const double Q = -(R / Z);
     const double Area = static_cast<double>(YScale) * static_cast<double>(XScale) * Q * Q *
                         static_cast<double>(kMinusPi);
@@ -402,8 +388,7 @@ int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
 
 float const* DACOM_API FRoomCamera::GetViewTransform()
 {
-    // LAB_00556aa0 (RET 4): TransposeTransform(+0x5c, +0x80) through the shared math engine,
-    // then the transposed orientation and the negated result go to +0x8c.
+    // LAB_00556aa0.
     I3DMathEngine* Math = LightsCameraMath();
     FVector Rotated;
     Math->TransposeTransform(Rotated, *reinterpret_cast<FMatrix const*>(Orient),
@@ -470,7 +455,7 @@ void FRoomCamera::SetOrientation(float const* Orient9)
 
 void FRoomCamera::SetTransform(float const* Transform12)
 {
-    // LAB_00556bb0: MOVSD x 0xc into +0x5c -- the orientation and then the position.
+    // LAB_00556bb0: 0xc dwords into +0x5c -- the orientation and then the position.
     memcpy(Orient, Transform12, sizeof(float) * 12);
 }
 
@@ -481,7 +466,7 @@ FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
     const ViewRect Edges = Rect_to_ViewRect(Viewport);
     FRoomCamera* Cam = new FRoomCamera(Edges);
 
-    // 0x00556330: tan of the doubled angle times pi/360, rounded to float in the argument slot.
+    // Tan of the doubled angle times pi/360, rounded to float in the argument slot.
     const float Tan = static_cast<float>(
         tan((static_cast<double>(HalfFovXDeg) + HalfFovXDeg) * kPiOver360));
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -499,7 +484,7 @@ FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
     Cam->XScale = Cam->HalfWidth / Cam->TanHalfFovX;
     Cam->Aspect = Cam->TanHalfFovX / Cam->TanHalfFovY;
 
-    // 0x00556395: FILD Width / FIDIV Height of the Rect argument (extents, not edges).
+    // Width / Height of the Rect argument (extents, not edges), unrounded.
     const double RectAspect =
         static_cast<double>(Viewport.Width) / static_cast<double>(Viewport.Height);
     Cam->Aspect = static_cast<float>(RectAspect);
@@ -514,7 +499,7 @@ FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
     Cam->ZNear = ZNear;
     Cam->YScale = -(Cam->HalfHeight / Cam->TanHalfFovY);
 
-    // 0x005563f5: (x + x) * 0.5 is stored back, then tan(x * pi/180) and FUN_005566a0.
+    // (x + x) * 0.5 is stored back, then tan(x * pi/180) and FUN_005566a0.
     const double HalfX = (static_cast<double>(Cam->HalfFovXDeg) + Cam->HalfFovXDeg) * 0.5;
     Cam->HalfFovXDeg = static_cast<float>(HalfX);
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -532,7 +517,6 @@ FRoomCamera* RoomCameraConstruct(float const* PosOrient12, Rect const& Viewport,
     Cam->Aspect = Cam->TanHalfFovX / Cam->TanHalfFovY;
     Cam->ZFar = ZFar;
 
-    // 0x00556458 / 0x00556462: slots 19 and 20 with the position and the orientation.
     Cam->SetPosition(PosOrient12);
     Cam->SetOrientation(PosOrient12 + 3);
     return Cam;
@@ -602,7 +586,7 @@ void RoomCameraSetHalfFovXValue(FRoomCamera* Camera, const float* HalfFovXDeg)
     NormalizeXyz(Camera->PlaneX);
     Camera->XScale = Camera->HalfWidth / Camera->TanHalfFovX;
 
-    // 0x00556d7d: inclusive edges, so both extents get +1 here.
+    // Inclusive edges, so both extents get +1 here.
     const int Width = Edges[2] - Edges[0] + 1;
     const int Height = Edges[3] - Edges[1] + 1;
     const double EdgeAspect = static_cast<double>(Width) / static_cast<double>(Height);
@@ -660,7 +644,7 @@ void RoomCameraSetZNearValue(FRoomCamera* Camera, const float* ZNear)
     Camera->PlaneY[1] = 1.0f;
     NormalizeYzx(Camera->PlaneY);
 
-    // 0x00556ef4: 1 / TanHalfFovY is kept on the stack for both products.
+    // 1 / TanHalfFovY is kept unrounded for both products.
     const double InvTanY = 1.0 / static_cast<double>(Camera->TanHalfFovY);
     Camera->YScale = static_cast<float>(-(InvTanY * Camera->HalfHeight));
     Camera->Aspect = static_cast<float>(InvTanY * Camera->TanHalfFovX);

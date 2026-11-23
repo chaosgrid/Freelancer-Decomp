@@ -26,16 +26,15 @@
 #include <map>
 #include <string>
 
-// Retail DAT_0067dbc0 — the UI_PAGE widgets' shared lazy FUN_005b73e0 (3DMathEngine) cache,
-// used by every UI* slot-8 override (FUN_00599b70, FUN_0059a530, ...).
+// DAT_0067dbc0 -- the UI_PAGE widgets' shared lazily acquired 3DMathEngine, used by every UI*
+// SetTransform override.
 I3DMathEngine* UiWidgetMathEngine();
 
-// Shared body of the UI* slot-8 overrides after their SetLayout (+0x1c) / SetPosition (+0x14)
-// calls (FUN_00599b70 00599b8c.., FUN_0059a530 0059a54c..): with M = the 3x3 at +0x3c and
-// Z = the new translation Z,
+// Shared body of the UI* SetTransform overrides after their orientation / position calls: with
+// M = the 3x3 at +0x3c and Z = the new translation Z,
 //   OutWidth  = |(M * (Width, 0, Z)).x - (M * (0, 0, Z)).x|
 //   OutHeight = |(M * (0, Height, Z)).y - (M * (0, 0, Z)).y|
-// via four I3DMathEngine::TransformMatrix (+0x2c) calls in that order.
+// via four TransformMatrix calls in that order.
 void UiWidgetProjectExtent(float const Matrix[9], float Z, float Width, float Height,
                            float* OutWidth, float* OutHeight);
 
@@ -67,7 +66,7 @@ namespace UIPage
         // FUN_00591510 (via FUN_005914f0): delete every mapped widget, then the map.
         ~Page() override;
 
-        // LAB_00415070 — MOV EAX,[ECX+0x14] (map size).
+        // LAB_00415070.
         unsigned GetCount() override;
         // FUN_00591900
         char const* GetWidgetName(unsigned Index) override;
@@ -98,9 +97,8 @@ namespace UIPage
 
     // RTTI .?AVMasterWin@UIPage@@ : Win3D, IUIPage (+0x7c, vftable 0x005e534c), Event::Handler
     // (+0x80). vftable 0x005e5384 (28 slots). Retail +0x84 = FUiPageData*, +0x88 = Page*.
-    // Event::Handler face (event_handler.h) at +0x80, vftable 0x005e5364: slot 0 = 0053f330
-    // (XOR AL,AL / RET 4) -- MasterWin consumes no command; the PAGE screens that derive from it
-    // override the slot.
+    // Event::Handler face at +0x80, vftable 0x005e5364: slot 0 = FUN_0053f330 (false) --
+    // MasterWin consumes no command; the PAGE screens that derive from it override the slot.
     class MasterWin : public Win3D, public IUIPage, public EventHandler
     {
     public:
@@ -121,7 +119,6 @@ namespace UIPage
         Win3D* GetWidget(unsigned Index) override;
         Win3D* FindWidget(char const* Name) override;
 
-        // Event::Handler face at +0x80, slot 0 — FUN_0053f330: false.
         bool OnEvent(unsigned MsgId) override;
 
         Page* GetPage() const { return PageObject; }

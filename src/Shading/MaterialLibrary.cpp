@@ -21,7 +21,7 @@ FMaterialLibraryController::FMaterialLibraryController(FMaterialLibrary* InOwner
 
 GENRESULT DACOM_API FMaterialLibraryController::QueryInterface(const char* Iid, void** Out)
 {
-    // LAB_06ecf100: raw map06ed2fe0 contains only offsets0/4 and a null sentinel.
+    // LAB_06ecf100: interface table DAT_06ed2fe0 (IMaterialLibrary +0, IAggregateComponent +4).
     IDAComponent* Face;
     if (std::strcmp(Iid, Iids::MaterialLibrary) == 0)
         Face = Owner;
@@ -39,13 +39,13 @@ GENRESULT DACOM_API FMaterialLibraryController::QueryInterface(const char* Iid, 
 
 unsigned long DACOM_API FMaterialLibraryController::AddRef()
 {
-    // Shared ICF FUN_06ecb930. Factory f06d always installs the owning library.
+    // FUN_06ecb930 (identical-code-folded, shared).
     return ++Owner->RefCount;
 }
 
 unsigned long DACOM_API FMaterialLibraryController::Release()
 {
-    // LAB_06ecf1c0: zero never wraps, and destructor callbacks observe count one.
+    // LAB_06ecf1c0: the count saturates at 0; the destructor sees 1.
     if (Owner->RefCount > 0)
         --Owner->RefCount;
     const unsigned long Result = Owner->RefCount;
@@ -135,19 +135,17 @@ static_assert(offsetof(FMaterialLibrary, Aggregate) == 0x04, "IAggregateComponen
 
 GENRESULT DACOM_API FMaterialLibrary::QueryInterface(const char* Iid, void** Out)
 {
-    // Dedicated +44 controller; embedded library points to its batcher face.
+    // ControllingUnknown (+0x44) is the own controller, or the batcher when embedded in one.
     return ControllingUnknown->QueryInterface(Iid, Out);
 }
 
 unsigned long DACOM_API FMaterialLibrary::AddRef()
 {
-    // Dedicated +44 controller; embedded library points to its batcher face.
     return ControllingUnknown->AddRef();
 }
 
 unsigned long DACOM_API FMaterialLibrary::Release()
 {
-    // Dedicated +44 controller; embedded library points to its batcher face.
     return ControllingUnknown->Release();
 }
 
@@ -507,7 +505,6 @@ FCrcSlot* FMaterialLibrary::FindByCrc(unsigned long Crc)
 
 void FMaterialLibrary::StoreCrc(unsigned long Crc, IMaterial* Material)
 {
-    // 06ecc42d..06ecc449: store the material, take its reference, set count=1.
     FCrcSlot& Slot = CrcMap[Crc];
     Slot.Crc = Crc;
     Slot.Material = Material;
@@ -640,7 +637,7 @@ GENRESULT DACOM_API FMaterialLibrary::RemoveMaterial(unsigned long GroupId, void
         Slot->Material->Release();
         Slot->Material = nullptr;
     }
-    // 06ecd7c7 unconditionally re-reads the resolved record, even on a miss.
+    // Retail (06ecd7c7) re-reads the record unconditionally, even on a miss.
     if ((int)Slot->RefCount <= 1)
         CrcMap.erase(Crc);
     return Result;
@@ -797,7 +794,7 @@ static unsigned char* GlobalRecordAddress(unsigned char* Data, unsigned long Off
 static void CopyGlobalRecordBytes(unsigned char* Destination, const unsigned char* Source,
                                  unsigned long SizeBytes)
 {
-    // 69f0/fa80: two DWORDs per record, including compiler padding.
+    // Whole 8-byte records, padding included.
     for (unsigned long Offset = 0; Offset != SizeBytes; Offset += 8)
     {
         unsigned char* Target = GlobalRecordAddress(Destination, Offset);
@@ -819,7 +816,7 @@ static void FillGlobalRecords(unsigned char* Destination, unsigned long Count,
 
 static void ReserveGlobalRecords(FGlobalMaterialRecordBuffer& Records, unsigned long Capacity)
 {
-    // daa0..db7e: signed allocation count, unsigned 32-bit byte multiplication.
+    // Signed allocation count, wrapping 32-bit byte size.
     const unsigned long AllocationCount = (long)Capacity < 0 ? 0 : Capacity;
     unsigned char* Data = new unsigned char[AllocationCount * 8UL];
     CopyGlobalRecordBytes(Data, Records.Data, Records.SizeBytes);
@@ -832,7 +829,7 @@ static void ReserveGlobalRecords(FGlobalMaterialRecordBuffer& Records, unsigned 
 static void AppendGlobalRecords(FGlobalMaterialRecordBuffer& Records, unsigned long Count,
                                 const FGlobalMaterialRecord& Value)
 {
-    // df00 has only two retail callers (dbc6, f4f9), both insert at end.
+    // Retail's insert (06ecdf00) is only ever called at the end.
     const unsigned long Available = (unsigned long)((long)(Records.CapacityBytes - Records.SizeBytes) >> 3);
     if (Available >= Count)
     {
@@ -865,14 +862,14 @@ static void ResizeGlobalRecords(FGlobalMaterialRecordBuffer& Records, unsigned l
     }
     else if (Records.Data != nullptr && Size < OldSize)
     {
-        // e150 caller passes last=end: no tail copy, only the end changes.
+        // Retail's erase (06ece150) always runs to the end, so only the size changes.
         Records.SizeBytes = Size * 8UL;
     }
 }
 
 void ActivateMaterialGlobalRecord(unsigned long Index)
 {
-    // Each f440 activation reacquires the buffer after intervening registrations.
+    // FUN_06ecf440; the buffer is reacquired on every call.
     FGlobalMaterialRecordBuffer& Records = GlobalMaterialRecords();
     if (Records.Size() <= Index)
     {
@@ -901,7 +898,7 @@ unsigned long GetMaterialGlobalRecordValue(unsigned long Index)
 GENRESULT DACOM_API FMaterialLibrary::SetGlobalRecord(unsigned long Index,
                                                        const unsigned long* Value)
 {
-    // Full daa0..dc05: no range/input guard, including wrapping resize/erase.
+    // No range or input check.
     FGlobalMaterialRecordBuffer& Records = GlobalMaterialRecords();
     if (Records.Size() <= Index)
     {
@@ -921,7 +918,7 @@ GENRESULT DACOM_API FMaterialLibrary::SetGlobalRecordValue(unsigned long Index,
     FGlobalMaterialRecordBuffer& Records = GlobalMaterialRecords();
     unsigned long* RecordValue = (unsigned long*)((uintptr_t)Records.Data +
         Index * sizeof(FGlobalMaterialRecord) + offsetof(FGlobalMaterialRecord, Value));
-    // 06ecdc1c-06ecdc30: only the computed address is tested.
+    // Retail tests only the computed address; Index is not range-checked.
     if (RecordValue == nullptr)
         return (GENRESULT)-1;
     *RecordValue = *Value;
@@ -934,7 +931,7 @@ GENRESULT DACOM_API FMaterialLibrary::GetGlobalRecordValue(unsigned long Index,
     FGlobalMaterialRecordBuffer& Records = GlobalMaterialRecords();
     const unsigned long* RecordValue = (const unsigned long*)((uintptr_t)Records.Data +
         Index * sizeof(FGlobalMaterialRecord) + offsetof(FGlobalMaterialRecord, Value));
-    // 06ecdc4c-06ecdc60: the caller's output is mandatory on success.
+    // As above; OutValue is not null-checked.
     if (RecordValue == nullptr)
         return (GENRESULT)-1;
     *OutValue = *RecordValue;
@@ -1086,7 +1083,7 @@ FMaterialLibraryRecord* DACOM_API FMaterialLibrary::CreateAfterMap(const char* N
 
 GENRESULT FMaterialLibrary::ParseMaterialMap()
 {
-    // FUN_06ecbfe0: this parser independently acquires its own ProfileParser.
+    // FUN_06ecbfe0: acquires its own ProfileParser.
     IProfileParser* Parser = nullptr;
     const GENRESULT Result = DACOM_Acquire()->QueryInterface(
         Iids::ProfileParser, (void**)&Parser);

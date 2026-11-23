@@ -10,8 +10,7 @@
 // base (map DAT_06fcee70, key = base id), each with its [BaseFaction] list, [GF_NPC]
 // bar characters, [mRoom] rooms and fixtures, and [MVendor] offer counts. TU22
 // (06ed3d90-06ed4220, BaseNpcRecords.cpp) holds the parsers of the GF_NPC "bribe" /
-// "know" / "rumor" records kept by those characters. Lane CNT-GS (docs/re/content.md,
-// TU map).
+// "know" / "rumor" records kept by those characters.
 
 #include "common_ini.h"      // Vector
 #include "common_net.h"      // CommReferrable
@@ -65,14 +64,14 @@ struct FBaseNpcKnow
     int InfoIds;             // +0x04 value 1 (an ids number): the rumor record key, and
                                 // the string of mad-lib 0x3efe (FUN_06f01a30)
     int OfferIds;             // +0x08 value 0 (an ids number): the string of mad-lib
-                                // 0x3efd (FUN_06f01a30). TODO: names from BaseSupport.
+                                // 0x3efd (FUN_06f01a30)
     unsigned int RepLevel;      // +0x0c value 3, index into GBaseNpcRepThresholds; picks
                                 // the generic script 0x26/0x26/0x27/0x28 (FUN_06f01600)
 
     // FUN_06ed3fd0 (thiscall, RET 4): true when RepLevel < 4 (unsigned).
     bool Parse(INI_Reader* Reader);
     // FUN_06ed3f90 (thiscall, RET 8): Feeling reaches the level's threshold and the
-    // player has no rumor record for Field_0x04.
+    // player has no rumor record for InfoIds.
     bool IsOffered(FContentPlayerState const* Player, float Feeling) const;
 };
 
@@ -203,10 +202,6 @@ extern bool GBaseMissionTypesInSinglePlayer;
 extern bool GBaseMissionTypesInMultiplayer;
 
 // ---------------------------------------------------------------------------------------
-// TU17 -- the MBase record.
-// ---------------------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------------------
 // TU17 -- bar characters (the people standing in a room while players are in it).
 // ---------------------------------------------------------------------------------------
 
@@ -227,9 +222,8 @@ public:
                                     // offer text (TU34 FUN_06f019c0 begin_mad_lib)
 };
 
-// A generated random mission and the loader that made it (0x20 bytes): the local of
-// FUN_06ea8370 at [ESP+0x54] (zeroed at 06ea86ef), filled by TU35 FUN_06f041c0, then the
-// body of FBarMissionOffer.
+// A generated random mission and the loader that made it (0x20 bytes): a local of
+// FUN_06ea8370, filled by TU35 FUN_06f041c0, then the body of FBarMissionOffer.
 struct FBarMissionOfferData
 {
     FRandomMissionLoader* Loader = nullptr;     // +0x00 FUN_06f4d220
@@ -248,9 +242,8 @@ struct FBarMissionOfferData
 class FBarMissionOffer : public FContentRefObject
 {
 public:
-    // 06ea874e-06ea8773 (inlined): count 1, Data zeroed, then FUN_06eb2060 copies Loader,
-    // Mission and Type (strlen clamped to 23). The loader's reference moves in; nothing is
-    // AddRef'd.
+    // Inlined in FUN_06ea8370; the copy is FUN_06eb2060. The loader's reference moves in;
+    // nothing is AddRef'd.
     explicit FBarMissionOffer(FBarMissionOfferData const* InData);
     // FUN_06ea7b90: a held loader gets slot 5 (the mission), Release, and is cleared.
     ~FBarMissionOffer() override;
@@ -335,13 +328,12 @@ struct FBarCharacter
     void SetBehavior(unsigned long NewBehavior);
     // FUN_06ea7ef0 (thiscall, RET 4): Offer = NewOffer.
     void SetOffer(FBarOffer const* NewOffer);
-    // FUN_06ea7ee0: INC [ECX+0x50] (caller BaseSupport msg 0x1b 06eb4c4d).
+    // FUN_06ea7ee0 (caller BaseSupport msg 0x1b 06eb4c4d).
     void CountTalk() { ++TalkCount; }
 
     int UseCount;                  // +0x00 1; one per player visit holding it
     unsigned long Behavior;         // +0x04 -1, pub::GF::CharacterBehaviorCreate handle
-    int Field_0x08;               // +0x08 not written by the ctor or Create.
-                                    // TODO: find its writer/readers.
+    int Field_0x08;               // +0x08 not written by the ctor or Create; use unknown
     unsigned int CharacterId;       // +0x0c 0, pub::GF::CharacterCreate
     unsigned int RoomId;            // +0x10 0
     unsigned int Affiliation;       // +0x14 -1
@@ -510,12 +502,10 @@ struct FContentBase : public CommReferrable
     unsigned int FindDockObject(Vector* OutPosition) const;
     // FUN_06eac2c0 (thiscall, RET 4): character_density of a room, 0 when not listed.
     int GetRoomDensity(unsigned int RoomId) const;
-    // FUN_06eaa0f0 (thiscall, RET 4; callers TU44 06f3612e / 06f365fc / 06f369f8; added by
-    // CNT-POP7): Out gets {good, 1} for every commodity pub::Market sells at BaseId; with none,
+    // FUN_06eaa0f0 (thiscall, RET 4; callers TU44 06f3612e / 06f365fc / 06f369f8): Out gets {good, 1} for every commodity pub::Market sells at BaseId; with none,
     // Out is emptied (otherwise appended to).
     void GetCommoditiesForSale(std::vector<FBaseCommodity>* Out) const;
-    // FUN_06eaa250 (thiscall, RET 4; callers TU44 06f361f0 / 06f3639b / 06f36a92; added by
-    // CNT-POP7): Out gets {good, pub::Market::GetMinInventory} for every commodity in demand
+    // FUN_06eaa250 (thiscall, RET 4; callers TU44 06f361f0 / 06f3639b / 06f36a92): Out gets {good, pub::Market::GetMinInventory} for every commodity in demand
     // at BaseId; with none, Out is emptied (otherwise appended to).
     void GetCommoditiesInDemand(std::vector<FBaseCommodity>* Out) const;
     // FUN_06eab770 (thiscall, RET 4; callers TU53 06f6cb51, TU37 06f06260 / 06f06300): the

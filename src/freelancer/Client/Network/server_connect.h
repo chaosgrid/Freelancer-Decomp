@@ -28,6 +28,6 @@ void ShutdownServerConnection();
 void* GetLocalServerInterface();
 void* GetLocalChatServerInterface();
 
-// The server half of retail FUN_005b2890 (.text:005b293d-005b2970): when G_Server is set and
-// FUN_0042d740 does not hold the local server, Update (+0x2c) then ElapseTime (+0x30).
+// The server half of retail FUN_005b2890: when G_Server is set and FUN_0042d740 does not hold
+// the local server, Update (+0x2c) then ElapseTime (+0x30).
 void TickLocalServer(float DeltaSeconds);

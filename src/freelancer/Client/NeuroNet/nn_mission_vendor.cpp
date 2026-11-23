@@ -59,7 +59,7 @@ namespace
     // it; read only at 0x0048c9cb and 0x0048d2f7).
     int const G_MissionVendorIconIds[7] = {0, 0x32fa, 0x32fb, 0x32fc, 0x32fd, 0x32fe, 0x32ff};
 
-    // The seven paths Create stores into IconPaths (0x0048c36b..0x0048c3b8), in that order.
+    // The seven paths Create stores into IconPaths (0x0048c36b), in that order.
     char const* const kMissionIconMeshes[7] = {
         kHeadlineIconMesh,
         "Interface\\NeuroNet\\MissionVendor\\MV_missiondestroy.3db",
@@ -82,8 +82,7 @@ namespace
         return reinterpret_cast<uintptr_t>(Pointer);
     }
 
-    // The reward line of RefreshRows (0x0048ca54..0x0048cae2) and ShowSelected
-    // (0x0048cf03..0x0048cf95): mad-lib 0x732 with the credits, or 0x741 without any.
+    // The reward line retail inlines in RefreshRows (0x0048ca54) and ShowSelected (0x0048cf03).
     void FormatReward(MissionVendorProperties const& Offer, wchar_t* Buffer)
     {
         FmtStr Reward;
@@ -100,9 +99,7 @@ namespace
         FmtStrSprintf(&Reward, Buffer, 0x400);
     }
 
-    // The full-text idiom of ShowSelected (0x0048cd79..0x0048ce6b / 0x0048cfd4..0x0048d0c6): a
-    // style node 0x9ca4, the text (XML when it parses), then the pane cleared, refilled and
-    // scrolled to the top.
+    // The full-text idiom ShowSelected inlines twice (0x0048cd79 / 0x0048cfd4).
     void SetFullText(RichTextWin* Pane, wchar_t const* Buffer)
     {
         RenderDisplayList Text;
@@ -129,14 +126,12 @@ NnMissionVendor::NnMissionVendor()
     , IconPaths(nullptr)
     , IconPathCount(0)
 {
-    // FUN_0048b2e0. The members above are 0x0048b390..0x0048b3ae / 0x0048b3c3..0x0048b3d5.
-    // 0x0048b3b4..0x0048b3c1: FmtStr::destroy, then its six dwords zeroed.
+    // FUN_0048b2e0.
     StatusText.destroy();
     memset(static_cast<void*>(&StatusText), 0, sizeof(StatusText));
-    // 0x0048b3db..0x0048b4ad: the string emptied (erase(0, npos) inlined), FUN_0042cc30.
     VideoTexture.clear();
-    VideoMaterial.Reset();
-    // 0x0048b4bd..0x0048b4ca. MaterialGroup (+0x348) is not written.
+    VideoMaterial.Reset(); // FUN_0042cc30
+    // MaterialGroup (+0x348) is not written.
     Clicked = 0;
     bNoMissions = 0;
     Hovered = -1;
@@ -144,18 +139,13 @@ NnMissionVendor::NnMissionVendor()
 
 NnMissionVendor::~NnMissionVendor()
 {
-    // FUN_0048b510. 0x0048b54a..0x0048b593: the status text emptied, the offer array
-    // (vector delete, MissionVendorProperties' dtor) and the path array freed.
+    // FUN_0048b510.
     StatusText.destroy();
     delete[] Offers;
     ::operator delete(static_cast<void*>(IconPaths));
-    // 0x0048b593..0x0048b63f
     ResetVideo();
-    // 0x0048b644..0x0048b65f: MaterialLib slot 10.
-    DALib::MaterialLib->DeleteGroup(MaterialGroup);
+    DALib::MaterialLib->DeleteGroup(MaterialGroup); // slot 10
     MaterialGroup = -1;
-    // Then ~FmtStr, FUN_0042cc50 (~FSwappedMaterial), the string, FUN_00576010 and FUN_0059fa50
-    // -- the members' and bases' destructors in that order.
 }
 
 uintptr_t NnMissionVendor::RowDword(size_t ArrayOffset, int Index) const
@@ -189,9 +179,8 @@ void NnMissionVendor::ResetVideo()
 
 void NnMissionVendor::RevealSelectedOffer()
 {
-    // e.g. 0x0048c3e2..0x0048c40b: title, description, briefing.
+    // Inlined in retail, e.g. 0x0048c3e2.
     MissionVendorProperties const& Offer = Offers[Selected];
-    // FUN_00459950 on each (the KnowledgeMap reveal).
     KnowledgeMapRevealFmtStr(&Offer.Title);
     KnowledgeMapRevealFmtStr(&Offer.Description);
     KnowledgeMapRevealFmtStr(&Offer.Briefing);
@@ -199,7 +188,7 @@ void NnMissionVendor::RevealSelectedOffer()
 
 bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
 {
-    // LAB_0048b6e0 (RET 8). 0x0048b6eb..0x0048b781: extents, hit offset and the base position.
+    // LAB_0048b6e0 (RET 8).
     HalfExtents[0] = 0.43f; // +0xb4
     HalfExtents[1] = 0.3f;
     HalfExtents[2] = 0.0f;
@@ -214,14 +203,12 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
     float const Z = BasePosition[2];
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
 
-    // 0x0048b784..0x0048b7f8
     {
         float const Position[3] = {X, Y, Z};
         Background = CreateStaticControl("MissionVendorBackground",
                                          "Interface\\NeuroNet\\NewsVendor\\NEWS_background.cmp",
                                          Position, nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
     }
-    // 0x0048b7fe..0x0048b868
     {
         float const Position[3] = {X + 0.584f, Y + 0.455f, Z};
         float const Half[3] = {0.025f, 0.025f, 0.0f};
@@ -230,15 +217,14 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
                                           "ui_select_item", nullptr, Position, nullptr, Half, 0, 0,
                                           0, 0, 0x72e, 0, 0);
     }
-    // 0x0048b86e..0x0048b8cb
     {
         float const Position[3] = {X - 0.6f, Y + 0.486f, Z};
         Title = CreateTextControl("MissionVendorTitle", "PageHeader", Position, nullptr, 1.2f, 0.03f,
                                   2.0f, 0x72b, 1, 0, 1);
     }
 
-    // 0x0048b8d1..0x0048b91c: the offers of the base of the current room (FUN_0043a460's +0x34),
-    // counted with FUN_0043ce90.
+    // The offers of the base of the current room (FUN_0043a460's +0x34). Note LoadOffers reads
+    // those of DAT_0066873c instead.
     TMirrorPropertyBucket<MissionVendorProperties>* const Bucket = GetClientLocationBaseMissionOffers(
         GetRoomRuntimeBaseId(static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime())));
     int Count = 0;
@@ -248,7 +234,7 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
 
     if (Count == 0)
     {
-        // 0x0048b922..0x0048b9cb: why there is nothing to offer.
+        // Why there is nothing to offer.
         bNoMissions = 1;
         unsigned Ids = 0;
         if (GetPlayerShipArchetypeIdRetail() == 0)
@@ -275,7 +261,6 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
         return Win3D::Create(NewParent, Data);      // FUN_004b5060
     }
 
-    // 0x0048b9d0..0x0048bb75: the three frames.
     {
         float const Position[3] = {X - 0.215f, Y + 0.217f, Z};
         CreateStaticControl("MissionVendorHeadlinesFrame",
@@ -294,14 +279,12 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
                             "Interface\\NeuroNet\\NewsVendor\\NEWS_videowindow.3db", Position,
                             nullptr, Zero, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
     }
-    // 0x0048bb7a..0x0048bc16: the video screen's material group, then the screen itself.
     MaterialGroup = MiscUtilLoadMaterialLibrary(kVideoScreenMesh);
     {
         float const Position[3] = {X + 0.364f, Y + 0.288f, Z};
         CreateStaticControl("MissionVendorVideoScreen", kVideoScreenMesh, Position, nullptr, Zero, 0,
                             0, 0, 1, 1, 0, 1, 0, 0, 0, Zero);
     }
-    // 0x0048bc1b..0x0048bcd8: the accept caption and button.
     {
         float const Position[3] = {X + 0.237f, Y + 0.105f, Z};
         CreateTextControl("MissionVendorAcceptText", "ButtonText", Position, nullptr, 0.277f, 0.03f,
@@ -314,13 +297,11 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
                                                Position, Half, 0, 0, 0x331, 0, 0);
     }
 
-    // 0x0048bce3..0x0048c07b: five rows, 0.0615 apart from {x - 0.39, y + 0.36}.
     float const Top[3] = {X - 0.39f, Y + 0.36f, Z};
     char Name[0x100];
     for (int Row = 0; Row < 5; ++Row)
     {
-        // 0x0048bd21..0x0048bd45: FILD Row, FMUL 0.0615f, subtracted at extended precision and
-        // stored once as float.
+        // Subtracted at extended precision and stored once as float.
         float const RowPos[3] = {
             Top[0],
             static_cast<float>(static_cast<double>(Top[1]) -
@@ -367,14 +348,13 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
         }
     }
 
-    // 0x0048c081..0x0048c0d1: the scroll bar (0..5, page 5).
     {
         float const Position[3] = {X + 0.09f, Y + 0.397f, Z};
         SummaryScroll = CreateUIScroll("MissionVendorSummaryScroll", Position, 0.019f, 0.317f, 0, 5,
                                        5, 0);
     }
-    // 0x0048c0c4..0x0048c26f: the selected offer's lines (each name goes through sprintf into
-    // the name buffer first; none has a conversion).
+    // The selected offer's lines. Retail sprintf's each name into the buffer first (no
+    // conversions).
     {
         float const Position[3] = {X - 0.493f, Y + 0.0085f, Z};
         MissionReject = CreateTextControl("MissionVendorMissionReject", "Normal", Position, nullptr,
@@ -395,12 +375,11 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
         MissionReward = CreateTextControl("MissionVendorMissionReward", "NewsMission", Position,
                                           nullptr, 0.2f, 0.03f, 1.5f, 0, 2, 0, 1);
     }
-    // 0x0048c275..0x0048c2ad
     {
         float const Position[3] = {X - 0.556f, Y - 0.051f, Z};
         FullText = CreateRichTextWin("MissionVendorMissionFullText", 1.08f, 0.27f, Position, true);
     }
-    // 0x0048c2b2..0x0048c342: the selected offer's icon (fixed x / y, the base's z).
+    // Fixed x / y, the base's z.
     {
         float const Position[3] = {-0.535f, -0.111f, BasePosition[2]};
         float const Half[3] = {0.03f, 0.03f, 0.0f};
@@ -408,29 +387,25 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
                                           Half, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
     }
 
-    // 0x0048c347..0x0048c3b8
     DrawLayer = 0x64;
     IconPathCount = 7;
     IconPaths = static_cast<char const**>(::operator new(0x1c));
     for (int Index = 0; Index < 7; ++Index)
         IconPaths[Index] = kMissionIconMeshes[Index];
 
-    // 0x0048c3c2..0x0048c40b
     LoadOffers();
     RefreshRows();
     ShowSelected();
     if (Selected != -1)
         RevealSelectedOffer();
 
-    // 0x0048c40e..0x0048c437
     HudPushCancelHandler(AsHudCmdHandler(), 0); // FUN_00576360
     return Win3D::Create(NewParent, Data);      // FUN_004b5060
 }
 
 void NnMissionVendor::LoadOffers()
 {
-    // FUN_0048c770. 0x0048c788..0x0048c7c0: the offers of the base the player is in
-    // (DAT_0066873c), counted by walking Head / Next.
+    // FUN_0048c770: the offers of the base the player is in (DAT_0066873c).
     TMirrorPropertyBucket<MissionVendorProperties>* const Bucket =
         GetClientLocationBaseMissionOffers(GetClientLocationCurrentBase());
     int Count = 0;
@@ -438,12 +413,10 @@ void NnMissionVendor::LoadOffers()
     while (Bucket->List.traverse(Node, true))
         ++Count;
 
-    // 0x0048c7c2..0x0048c812: new[] (count prefix, MissionVendorProperties' ctor).
     Offers = new MissionVendorProperties[Count];
     OfferCount = Count;
 
-    // 0x0048c820..0x0048c858: element i is assigned from the list's i-th node (retail walks
-    // from the head for each i; one walk visits the same nodes in the same order).
+    // Retail walks from the head for each i; one walk visits the same nodes in the same order.
     Node = nullptr;
     for (int Index = 0; Index < Count; ++Index)
     {
@@ -451,7 +424,6 @@ void NnMissionVendor::LoadOffers()
         Offers[Index] = *Node->Data; // ??4MissionVendorProperties@@
     }
 
-    // 0x0048c85c..0x0048c881: the rows from the top, offer 0 selected, the scroll range.
     ScrollOffset = 0;
     Field_0x374 = 0;
     Selected = 0;
@@ -469,14 +441,12 @@ void NnMissionVendor::RefreshRows()
         WinControl* const Controls[6] = {SummaryIcons[Row], IconFrames[Row], SummaryBoxes[Row],
                                          SummaryDests[Row], SummaryTitles[Row], SummaryRewards[Row]};
 
-        // 0x0048c8f7..0x0048c9ab: the row's six controls, property 2 then property 1, with 0.
         for (int Slot = 0; Slot < 6; ++Slot)
             Controls[Slot]->SetProperty(2, 0, 0);
         for (int Slot = 0; Slot < 6; ++Slot)
             Controls[Slot]->SetProperty(1, 0, 0);
 
-        // 0x0048c9b1..0x0048ca05: the icon mesh and its tooltip; an unknown class keeps path 0
-        // and ids 0 (unsigned compare, JAE).
+        // An unknown class keeps path 0 and ids 0 (unsigned compare).
         char const* Path = IconPaths[0];
         int Ids = 0;
         if (Offer.MissionClass < IconPathCount)
@@ -488,29 +458,25 @@ void NnMissionVendor::RefreshRows()
         IconFrames[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
         SummaryBoxes[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
 
-        // 0x0048ca0b..0x0048ca4e: the offer's +0x14 and +0x2c texts.
+        // The offer's +0x14 and +0x2c texts.
         FmtStrSprintf(&Offer.Title, Buffer, 0x400);
         SummaryDests[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
         FmtStrSprintf(&Offer.Description, Buffer, 0x400);
         SummaryTitles[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
 
-        // 0x0048ca54..0x0048caf4
         FormatReward(Offer, Buffer);
         SummaryRewards[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
 
-        // 0x0048cafa..0x0048cb2f: the selected offer's frame and box lit (0xc with 1).
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
         IconFrames[Row]->SetProperty(0xc, bSelected, 0);
         SummaryBoxes[Row]->SetProperty(0xc, bSelected, 0);
 
-        // 0x0048cb35..0x0048cb53
         ++Row;
         if (Row >= 5)
             break;
     }
 
-    // 0x0048cb81..0x0048ccb4: every unused row, property 2 then property 1 with 1, the default
-    // icon mesh, the four text-bearing controls cleared (0x1e with 0).
+    // The unused rows.
     for (; Row < 5; ++Row)
     {
         WinControl* const Controls[6] = {SummaryIcons[Row], IconFrames[Row], SummaryBoxes[Row],
@@ -533,8 +499,7 @@ void NnMissionVendor::ShowSelected()
     wchar_t Buffer[0x400];
     if (Selected == -1)
     {
-        // 0x0048cd13..0x0048ce9e: the reject line's ids, the three lines cleared, the status
-        // text in the full-text pane. The video is left as it is.
+        // The video is left as it is.
         MissionReject->SetProperty(0x1e, 0x72f, 0);
         MissionDest->SetProperty(0x1e, 0, 0);
         MissionTitle->SetProperty(0x1e, 0, 0);
@@ -544,8 +509,8 @@ void NnMissionVendor::ShowSelected()
         return;
     }
 
-    // 0x0048cea3..0x0048d0cd. Selected is not range-checked (a click below the last offer
-    // selects past the array, as in retail).
+    // Selected is not range-checked (a click below the last offer selects past the array, as in
+    // retail).
     MissionVendorProperties const& Offer = Offers[Selected];
     FmtStrSprintf(&Offer.Title, Buffer, 0x400);
     MissionDest->SetProperty(0x1d, PointerArg(Buffer), 0);
@@ -561,26 +526,23 @@ void NnMissionVendor::ShowSelected()
 
 void NnMissionVendor::UpdateVideo()
 {
-    // FUN_0048d140. 0x0048d343: without a selection the icon is hidden.
+    // FUN_0048d140.
     if (Selected < 0)
     {
         MissionIcon->SetProperty(1, 1, 0);
         return;
     }
 
-    // 0x0048d155..0x0048d285: the offer's texture name (Common's get_icon_texture), the previous
-    // swap undone, the name kept in VideoTexture. Retail runs strlen on the result unchecked.
+    // Retail runs strlen on get_icon_texture's result unchecked.
     MissionVendorProperties const& Offer = Offers[Selected];
     char const* const Texture = Offer.get_icon_texture();
     ResetVideo();
     VideoTexture.assign(Texture, strlen(Texture));
 
-    // 0x0048d285..0x0048d2d8
     if (!VideoMaterial.Init(kVideoMaterialName))
         FDUMP(0x100001, kNoMaterialInVendor, kMissionVendorCpp, 0x3af, kVideoMaterialName);
     VideoMaterial.Swap(VideoTexture.c_str(), kVideoTextureLibrary);
 
-    // 0x0048d2dd..0x0048d335: the icon mesh, its tooltip, shown.
     char const* Path = IconPaths[0];
     int Ids = 0;
     if (Offer.MissionClass < IconPathCount)
@@ -598,9 +560,8 @@ void NnMissionVendor::Draw()
     // FUN_0048d360.
     if (bNoMissions == 0)
     {
-        // 0x0048d371..0x0048d3f1: every child at 0x64; the hovered row's frame or box 0x65, the
-        // selected row's 0x66 (gated on Clicked, indexed by Selected; the second test wins). The
-        // rows are Hovered / Selected minus the scroll offset and are not range-checked.
+        // The hovered row's frame or box draws at 0x65, the selected row's at 0x66 (gated on
+        // Clicked, indexed by Selected; the second test wins). The rows are not range-checked.
         int const SelectedRow = Selected - ScrollOffset;
         int const HoveredRow = Hovered - ScrollOffset;
         size_t const FramesOffset = offsetof(NnMissionVendor, IconFrames);
@@ -624,7 +585,6 @@ void NnMissionVendor::Draw()
             }
         }
 
-        // 0x0048d3f3..0x0048d427
         WireControlsJoinColumn(IconFrames, 5);   // FUN_005a4b50
         WireControlsJoinColumn(SummaryBoxes, 5);
         Background->DrawLayer = 0x63;
@@ -635,8 +595,7 @@ void NnMissionVendor::Draw()
 
 void NnMissionVendor::Update()
 {
-    // LAB_0048d440: the frame time is fetched and dropped (FSTP ST0), Win3D's Update, then a
-    // close OnAcceptResult asked for.
+    // LAB_0048d440: the frame time is fetched and dropped; then a close OnAcceptResult asked for.
     (void)GetClientFrameTimeCapped(); // FUN_0042d680
     Win3D::Update();                  // FUN_005a17b0
     if (bCloseRequested != 0)
@@ -649,20 +608,17 @@ void NnMissionVendor::Update()
 
 intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_0048c460 (RET 0xc): byte table 0x0048c6f0 over Msg - 0x26 (0..0x28) into the five
-    // cases at 0x0048c6dc. Every path returns 0.
+    // LAB_0048c460 (RET 0xc): byte table 0x0048c6f0 over Msg - 0x26. Every path returns 0.
     switch (Msg)
     {
     case 0x4e:
     {
-        // 0x0048c484..0x0048c4ba: closed from outside -- no callback, no NavBar. (Retail tests
-        // `this` first.)
+        // Closed from outside: no callback, no NavBar. (Retail tests `this` first.)
         DeleteSelf();
         return 0;
     }
     case 0x3e:
     {
-        // 0x0048c4bd..0x0048c4f0: the scroll bar moved.
         if (A == PointerArg(SummaryScroll) && static_cast<int>(B) != ScrollOffset)
         {
             ScrollOffset = static_cast<int>(B);
@@ -673,9 +629,9 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x2c:
     case 0x2d:
     {
-        // 0x0048c4f3..0x0048c580: the hovered row, written (0x2c) or cleared (0x2d) on every
-        // pass until the control is found; 0x2d compares against Row - ScrollOffset as retail
-        // does (0x0048c515..0x0048c51f). Then the row's other wire button gets the same message.
+        // Retail quirks kept: Hovered is written (0x2c) or cleared (0x2d) on every pass until the
+        // control is found, and 0x2d compares against Row - ScrollOffset (0x0048c515). Then the
+        // row's other wire button gets the same message.
         int Row = 0;
         for (; Row < 5; ++Row)
         {
@@ -698,7 +654,6 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         if (A == PointerArg(CloseButton))
         {
-            // 0x0048c58f..0x0048c5df
             if (ResultCallback != nullptr)
                 ResultCallback(ResultContext, 0);
             NavBarCloseService(false);
@@ -707,9 +662,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == PointerArg(AcceptButton))
         {
-            // 0x0048c5ea..0x0048c64a: accept the selected offer -- the callback with 1, then
-            // IServer slot 43 (+0xac) with the offer's +0x08 and +0x0c. The window stays open
-            // until OnAcceptResult.
+            // IServer slot 43 (+0xac). The window stays open until OnAcceptResult.
             if (Selected < 0)
                 return 0;
             if (ResultCallback != nullptr)
@@ -719,8 +672,8 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         }
 
-        // 0x0048c64d..0x0048c6ce: a row clicked. No match leaves Clicked at -1 and selects
-        // ScrollOffset - 1, as retail does.
+        // A row clicked. No match leaves Clicked at -1 and selects ScrollOffset - 1, as retail
+        // does.
         Clicked = -1;
         for (int Row = 0; Row < 5; ++Row)
         {
@@ -770,14 +723,14 @@ void NnMissionVendor::OnAcceptResult(MissionVendorAcceptance const& Result)
     if (Window == nullptr)
         return;
 
-    // 0x0048d4ba..0x0048d4d0: accepted (byte +0x08 == 1) -- close at the next Update.
+    // Accepted (+0x08): close at the next Update.
     if (Result.bAccepted)
     {
         Window->bCloseRequested = 1;
         return;
     }
 
-    // 0x0048d4d1..0x0048d537: refused -- no selection, the reason (+0x0c) as the status text.
+    // Refused: no selection, the reason (+0x0c) as the status text.
     Window->Selected = -1;
     Window->StatusText.destroy();
     Window->StatusText = Result.Reason;

@@ -30,10 +30,10 @@ namespace
     }
 }
 
-// FUN_06f67840 (06f67840-06f67bbe).
+// FUN_06f67840.
 int __cdecl LoadVoiceLines(INI_Reader* Reader)
 {
-    // [ESP+0x10]: zeroed once per call and kept across sections.
+    // Zeroed once per call and kept across sections.
     unsigned int VoiceId = 0;
 
     while (Reader->read_header())
@@ -58,8 +58,7 @@ int __cdecl LoadVoiceLines(INI_Reader* Reader)
                     Duration = Reader->get_value_float(0);
             }
 
-            // 06f67938: FCOMP against -1.0 (DAT_06fb78f0), TEST AH,0x44 + JNP skips on
-            // equal; not-equal and unordered both insert.
+            // DAT_06fb78f0 (-1.0): only equal skips; unordered inserts.
             if (!(Duration == -1.0))
             {
                 FVoiceLine Line;
@@ -71,14 +70,12 @@ int __cdecl LoadVoiceLines(INI_Reader* Reader)
         }
     }
 
-    // 06f6798a-06f67b87: VC6 std::sort of the whole table = ContentSort (median FUN_06f6b6f0,
-    // partition FUN_06f6b790, _Sort FUN_06f6b140, insertion sort FUN_06f6b600 and the
-    // unguarded tail FUN_06f6b3d0), so equal keys keep retail's order.
+    // The VC6 std::sort (ContentSort; _Sort FUN_06f6b140), so equal keys keep retail's order.
     ContentSort(GVoiceLines.data(), GVoiceLines.data() + GVoiceLines.size(), VoiceLineLess);
     return static_cast<int>(GVoiceLines.size());
 }
 
-// FUN_06f67780 (06f67780-06f67830): lower_bound, then an exact-key check.
+// FUN_06f67780: lower_bound, then an exact-key check.
 float __cdecl FindVoiceLineDuration(unsigned int const* VoiceId, unsigned int const* MsgId)
 {
     FVoiceLine Key;

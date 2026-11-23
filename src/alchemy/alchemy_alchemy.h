@@ -14,17 +14,10 @@
 // FAlchemy: the IAlchemy / IFxNodeLibrary component.
 namespace AlchemyImpl
 {
-    // FUN_0623f450: fixed particle-draw render-state block + two-stream
-    // vertex-format declaration applied to a render pipeline. Retail's own
-    // three XREFs are FAlchemy::BeginDraw (0x06201b5e, the "real" call site
-    // this port already wires below) plus FALBatchedMaterialFacet::Slot6
-    // and FALMaterial::Slot8 (LAB_06203300/LAB_06203320 in
-    // alchemy_material.cpp) which call the exact same function against the
-    // exact same DAT_06257bc0 (this port's G_RenderPipeline) with no other
-    // arguments — not a distinct "property batch" on a different object.
-    // Exposed here (out of alchemy_alchemy.cpp's file-local anonymous
-    // namespace) so alchemy_material.cpp can call the identical retail
-    // routine instead of re-implementing it.
+    // FUN_0623f450: the fixed particle-draw render-state block and two-stream
+    // vertex declaration, applied to G_RenderPipeline (DAT_06257bc0). Retail
+    // callers: FAlchemy::BeginDraw (0x06201b5e) and the two material Bind slots
+    // in alchemy_material.cpp (LAB_06203300 / LAB_06203320).
     void ApplyParticleDrawRenderState();
 
     class FAlchemy final : public IAlchemy
@@ -64,7 +57,7 @@ namespace AlchemyImpl
         {
             return HashNameCrc(Name);
         }
-        // FUN_062274b0 RET 0x10: name, prototype, optional output hash.
+        // FUN_062274b0: name, prototype, optional output hash.
         GENRESULT DACOM_API InsertNode(const char* Name, IDAComponent* Node,
                                        unsigned long* OutHash) override;
         GENRESULT DACOM_API RemoveNodeByHash(unsigned long Hash) override;
@@ -95,10 +88,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API SubmitNode(void* Node) override;
         GENRESULT DACOM_API SubmitChildNodes(void* Node) override;
         GENRESULT DACOM_API GetRootNode(void** Out) override;
-        // FUN_06202180: retail's real stack-slot usage is (Out, SearchKey,
-        // StartNode) — the first slot is written through as an out-pointer
-        // and the third is never read — not the header's placeholder (A,B,C)
-        // naming.
+        // FUN_06202180: Out is written through; StartNode is never read.
         GENRESULT DACOM_API FindNode(void* Out, void* SearchKey, void* StartNode) override;
         GENRESULT DACOM_API SetUpdateCallback(void* Fn) override;
         GENRESULT DACOM_API SetFilterCallback(void* Fn) override;

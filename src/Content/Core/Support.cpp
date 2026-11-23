@@ -31,10 +31,7 @@
 #include <new>
 #include <vector>
 
-// The GameSupport / SpaceSupport / BaseSupport controllers live in GameSupport.cpp,
-// SpaceSupport.cpp and BaseSupport.cpp; the player state core in PlayerState.cpp. The
-// random-mission offer (TU61) is RandomMissionOffer.h / RandomMissionRuntime.cpp, the offer
-// tree and its filters (TU63) RandomMissionGen.cpp.
+// TU46 player-state loading, stats and rank (the rest of TU46 is PlayerState.cpp).
 
 namespace
 {
@@ -61,11 +58,8 @@ namespace
         Visited.push_back(Id);
     }
 
-    // FRandomMissionData (TU27, 0x88; DestroyMission.cpp) and FRandomMissionLoader
-    // (FUN_06f4d220; RandomMissionDB.cpp / DestroyMission.cpp) are declared in
-    // RandomMission.h.
-    // Parms of message 0x100b, broadcast (Flid 0) after a saved random mission is
-    // re-created (FUN_06f483d0 06f486cf-06f486f7).
+    // Parms of message 0x100b, broadcast (controller 0) after a saved random mission is
+    // re-created (FUN_06f483d0).
     struct FRandomMissionAttachMessage
     {
         unsigned int MissionControllerId;
@@ -138,7 +132,7 @@ namespace
 
 void LoadPlayerToughnessScale(INI_Reader* Reader)
 {
-    // Content.dll FUN_06f49c50 (.text:06f49c50–06f49f8c, listing 287835–288111).
+    // FUN_06f49c50 (06f49c50-06f49f8c).
     int MaxExperience = 0;
     if (Reader->read_header())
     {
@@ -187,7 +181,6 @@ void LoadPlayerToughnessScale(INI_Reader* Reader)
 
     while (MaxExperience < 999999999)
     {
-        // Signed /8 via CDQ;AND 7;ADD;SAR — matches C++ /8 for non-negative values.
         MaxExperience = MaxExperience + (MaxExperience / 8);
 
         FPlayerToughPt Point;
@@ -199,7 +192,7 @@ void LoadPlayerToughnessScale(INI_Reader* Reader)
 
 void RecalculateContentPlayerRank(FContentPlayerState* State)
 {
-    // Content.dll FUN_06f49440 (.text:06f49440–06f495e4, listing 286859–287013).
+    // FUN_06f49440 (06f49440-06f495e4).
     int Cash = 0;
     float AssetValue = 0.0f;
     pub::Player::InspectCash(State->PlayerId, Cash);
@@ -265,8 +258,7 @@ void RecalculateContentPlayerRank(FContentPlayerState* State)
                 static_cast<float>(static_cast<unsigned int>(Found->Experience));
             if (NextThreshold != 0.0f)
             {
-                // 06f4958d: FILD qword worth, FSUBR float threshold - the
-                // difference stays on the x87 stack (double, not float).
+                // The difference stays on the x87 stack (double, not float).
                 double Remainder = static_cast<double>(NextThreshold) - static_cast<double>(Worth);
                 if (Remainder < 1.0)
                     Remainder = 1.0;
@@ -351,8 +343,7 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
         }
         else if (Reader->is_header("RandomMission"))
         {
-            // Listing 0x06f4863f–0x06f4872e: type string is copied then ignored by
-            // FUN_06f4d220; Load / Create / 0x100b / SetMsnID follow on success.
+            // The type string is copied, then ignored by FUN_06f4d220.
             while (Reader->read_value())
             {
                 if (!Reader->is_value("type"))
@@ -373,8 +364,6 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                         "content.dll", MissionType, Mission, pub::Controller::ABOVE_NORMAL);
                     State->ValueD8 = ControllerId;
 
-                    // 06f486cf-06f486f7: _SendMessage(&0 (all controllers), 0x100b,
-                    // {mission controller, player}).
                     FRandomMissionAttachMessage AttachMessage;
                     AttachMessage.MissionControllerId = ControllerId;
                     AttachMessage.PlayerId = State->PlayerId;
@@ -391,8 +380,7 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
         }
     }
 
-    // FUN_06f49440 recalculates rank and the next-rank cash threshold here.
-    RecalculateContentPlayerRank(State);
+    RecalculateContentPlayerRank(State);                                      // FUN_06f49440
     Reader->set_state(SavedState);
 }
 

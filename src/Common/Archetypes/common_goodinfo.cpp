@@ -7,10 +7,9 @@
 // Common.dll goods list (retail GoodList.cpp): GoodDesc / GoodDescList and the good-item helpers,
 // TradeResponseInfo, GoodInfo / GoodInfoList, GoodList_* and Good2Arch / Arch2Good, plus the
 // exported OwnerList<CargoDesc>, MetaList<GoodDesc> and OwnerList<GoodDesc> instantiations.
-// Split out of common_goods.cpp.
 //
 // Static-initialisation order: GGoodInfoList is dynamically initialised; this TU follows
-// common_equipdesc.cpp, common_constants.cpp and common_loadout.cpp, as in common_goods.cpp.
+// common_equipdesc.cpp, common_constants.cpp and common_loadout.cpp.
 
 #include "common_goods.h"
 #include "Archetypes/common_goods_internal.h" // kPathChars
@@ -39,7 +38,7 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
-// GoodDesc / GoodDescList (Common.dll GOODS batch). GoodDescList is
+// GoodDesc / GoodDescList. GoodDescList is
 // OwnerList<GoodDesc> plus retail's own copy members; the list operations are
 // the MetaList<T> / OwnerList<T> templates (common_metalist.h).
 // ---------------------------------------------------------------------------
@@ -86,9 +85,9 @@ GoodDescList const& GoodDescList::operator=(GoodDescList const& Other)
     return *this;
 }
 
-// 0xaa9d0. The walk keeps the LAST element whose GoodId matches. That element is
-// combined into (`CMP CL,1` on bCombinable) and 1 returned; otherwise a new
-// GoodDesc is appended and 0 returned. No null check on List.
+// 0xaa9d0. The walk keeps the LAST element whose GoodId matches; with bCombinable it is
+// combined into and 1 returned, otherwise a new GoodDesc is appended and 0 returned. No null
+// check on List.
 COMMON_API int __cdecl add_good_item(unsigned int GoodId, int Count, float Price, float Field0C,
                                      bool bCombinable, GoodDescList* List)
 {
@@ -115,10 +114,9 @@ COMMON_API int __cdecl add_good_item(unsigned int GoodId, int Count, float Price
     return 0;
 }
 
-// 0xaaab0. The walk keeps the LAST node whose GoodId matches; none -> -1. Count
-// -1 zeroes the element, anything else is subtracted. A non-zero result returns 1;
-// at zero the element is deleted (??3GoodDesc), Data nulled, and the node
-// removed (MetaList::remove inlined), returning 0. No null check on List.
+// 0xaaab0. The walk keeps the LAST node whose GoodId matches; none -> -1. Count -1 zeroes the
+// element. A non-zero result returns 1; at zero the element and its node are removed and 0
+// returned. No null check on List.
 COMMON_API int __cdecl remove_good_item(unsigned int GoodId, int Count, GoodDescList* List)
 {
     GoodDesc* Found = nullptr;
@@ -149,11 +147,8 @@ COMMON_API int __cdecl remove_good_item(unsigned int GoodId, int Count, GoodDesc
     return 0;
 }
 
-// 0xaa990. Re-derived from raw disasm (Common.dll.txt:303057-303098): walks the
-// *entire* list and keeps overwriting its result on every match, so it returns
-// the LAST node/GoodDesc with a matching GoodId, not the first. OutNode, when
-// non-null, receives that node (nullptr on no match). No null-check on List,
-// matching retail.
+// 0xaa990. Returns the LAST node/GoodDesc with a matching GoodId, not the first. No null check
+// on List.
 COMMON_API GoodDesc* __cdecl find_good_item(GoodDescList* List, unsigned int GoodId,
                                             MetaNode<GoodDesc>** OutNode)
 {
@@ -174,7 +169,7 @@ COMMON_API GoodDesc* __cdecl find_good_item(GoodDescList* List, unsigned int Goo
 }
 
 // ---------------------------------------------------------------------------
-// TradeResponseInfo — retail Common.dll GOODS batch network message.
+// TradeResponseInfo -- a network message.
 // ---------------------------------------------------------------------------
 
 // 0x1c2b0
@@ -221,8 +216,7 @@ GoodInfo::GoodInfo()
     , FreeAmmoArchId(0)
     , FreeAmmoCount(0)
 {
-    // 0626ff79-0626ffa2: CacheString::clear on +0x74..+0x84 -- the string pool's shared empty
-    // string, not a literal.
+    // +0x74..+0x84 get the string pool's shared empty string, not a literal.
     ShopArchetype.clear();
     ItemIcon.clear();
     MaterialLibrary.clear();
@@ -243,10 +237,7 @@ GoodInfoList::~GoodInfoList()
     destroy();
 }
 
-// 0x062704a0: .text:062704b1..062704cd -- every non-null GoodInfo* in the list gets
-// ~GoodInfo + free (a null one is skipped, .text:062704b6 TEST EBX,EBX / JZ); then
-// .text:062704cf..062704eb erases every list node; then the ById tree (+0x0c,
-// .text:062704ed..06270576) and the ByArch tree (+0x20, .text:0627057c..) are cleared.
+// 0x062704a0
 void GoodInfoList::destroy()
 {
     std::list<GoodInfo*>::iterator It = Goods.begin();
@@ -268,9 +259,7 @@ GoodInfo const* GoodInfoList::find_by_id(unsigned Id) const
     return Found->second;
 }
 
-// 0x06271290: .text:0627129d CALL CreateID, then the ById (+0x0c) lookup that
-// find_by_id does (.text:062712b5 FUN_062fcfb0 lower_bound, key compare at +0xc, value
-// at node+0x10, end -> 0).
+// 0x06271290
 GoodInfo const* GoodInfoList::find_by_name(char const* Name) const
 {
     return find_by_id(CreateID(Name));
@@ -286,10 +275,8 @@ GoodInfo const* GoodInfoList::find_by_archetype(unsigned ArchId) const
 
 GoodInfo const* GoodInfoList::find_by_ship_arch(unsigned ArchId) const
 {
-    // 0x06271300: .text:06271301 ESI = list head (this+4); .text:06271311..0627131d walk
-    // the nodes in insertion order and return the first GoodInfo whose ShipArchId
-    // (+0x54) equals ArchId; .text:06271306 XOR EAX,EAX -- nullptr when none matches.
-    // Retail dereferences each entry without a null test.
+    // 0x06271300: the first match in insertion order. Retail dereferences each entry without a
+    // null test.
     std::list<GoodInfo*>::const_iterator It = Goods.begin();
     for (; It != Goods.end(); ++It)
     {
@@ -321,15 +308,14 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         {"Ship", GoodCategoryShip},
     };
 
-    unsigned EquipmentArch = 0; // 0627063b
+    unsigned EquipmentArch = 0;
 
     while (Reader->read_value())
     {
         if (Reader->is_value("nickname"))
         {
-            // 06270672-062706af: a nickname already in this list's id map with a non-null
-            // GoodInfo ends the whole function at once (06270e40) -- the rest of the block and
-            // the post-loop equipment fix-up are skipped.
+            // A nickname already in this list's id map ends the whole function at once -- the
+            // rest of the block and the post-loop equipment fix-up are skipped.
             unsigned const NicknameId = CreateID(Reader->get_value_string());
             std::map<unsigned, GoodInfo*>::const_iterator Found = ById.find(NicknameId);
             if (Found != ById.end() && Found->second != nullptr)
@@ -355,7 +341,7 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else if (Reader->is_value("category"))
         {
-            // 06270791-062707f7. No match: FDUMP line 0xab and +0x4c keeps its value.
+            // No match: an error and +0x4c keeps its value.
             char const* const Text = Reader->get_value_string();
             bool bFound = false;
             unsigned Index = 0;
@@ -381,10 +367,8 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else if (Reader->is_value("price"))
         {
-            // 06270844-062708c4: FILD the int, FST float +0x58 while the exact integer stays
-            // on the x87 stack; each still-zero bound becomes integer * 0.95f / 1.05f
-            // (0x3f733333 / 0x3f866666) rounded once to float. The double product below is
-            // exact for any |price| < 2^29.
+            // Each still-zero bound becomes the exact integer price * 0.95f / 1.05f, rounded
+            // once. The double product is exact for any |price| < 2^29.
             int const Whole = Reader->get_value_int(0);
             double const Exact = Whole;
             float const kLow = 0.949999988079071f;   // .rdata:06399e78
@@ -401,9 +385,7 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else if (Reader->is_value("good_buy_price"))
         {
-            // 062708e0 (and 06270902 / 06270924 / 06270946 below): FMUL float [+0x58] on the
-            // unrounded get_value_float result (value_num = the same read, no float rounding),
-            // one FSTP float.
+            // The unrounded value times Price, rounded once (also the three below).
             Info->GoodBuyPrice = (float)(Reader->value_num(0) * Info->Price);
         }
         else if (Reader->is_value("bad_buy_price"))
@@ -444,9 +426,8 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else if (Reader->is_value("hull"))
         {
-            // 06270a8a-06270ac4: the lookup goes to the GLOBAL good list's id map
-            // (DAT_063fbb80), not this one, and the found GoodInfo is dereferenced with no
-            // null test (a miss reads +0x48 of address 0 -- retail's crash, kept).
+            // The lookup goes to the global good list's id map (DAT_063fbb80), not this one, and
+            // a miss dereferences null -- retail's crash, kept.
             unsigned const HullId = CreateID(Reader->get_value_string());
             std::map<unsigned, GoodInfo*>::const_iterator Found = GGoodInfoList.ById.find(HullId);
             GoodInfo* Hull = nullptr;
@@ -456,8 +437,8 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else if (Reader->is_value("addon"))
         {
-            // 06270ae3-06270d41. value(1) is StringAlloc'd before anything is decided, even
-            // when it turns out to be "internal".
+            // value(1) is StringAlloc'd before anything is decided, even when it turns out to be
+            // "internal".
             unsigned const AddonArch = CreateID(Reader->get_value_string(0));
             CacheString Hp;
             Hp.Value = StringAlloc(Reader->get_value_string(1), false);
@@ -465,7 +446,7 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
             if (Count <= 0)
                 Count = 1;
 
-            // 06270b2c-06270b8c: value(3) copied into a 0x40-byte buffer, at most 0x3f chars.
+            // value(3) into a 0x40-byte buffer, at most 0x3f chars.
             char Slot[0x40];
             Slot[0] = '\0';
             if (!Reader->is_value_empty(3))
@@ -505,15 +486,13 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
         }
         else
         {
-            // .text:06270d5f: the last fallback is CommReferrable slot 2 (read_comm_ini_data),
-            // which takes "msg_id_prefix" and ignores every other key.
+            // The last fallback takes "msg_id_prefix" and ignores every other key.
             Info->read_comm_ini_data(*Reader);
         }
     }
 
-    // 06270da1-06270e3d. Commodity and Equipment goods take their arch from "equipment" and
-    // inherit ids and, for attached equipment (Equipment slot 9), the visual strings from the
-    // archetype. GetEquipment's result is used with no null test, as in retail.
+    // Commodity and Equipment goods take their arch from "equipment" and inherit ids and, for
+    // attached equipment, the visual strings from the archetype. GetEquipment's result is used with no null test, as in retail.
     if (Info->Category == GoodCategoryCommodity || Info->Category == GoodCategoryEquipment)
     {
         Info->ArchId = EquipmentArch;
@@ -560,7 +539,7 @@ void GoodInfoList::load(char const* RelPath)
         {
             GoodInfo* Info = new GoodInfo();
             read_Good_block(&Reader, Info);
-            // .text:06270f42 FUN_0627f280: the list insert at end(), unconditional.
+            // Unconditional.
             Goods.push_back(Info);
             if (Info->Id != 0 && Info->ArchId != 0 && Info->Id != Info->ArchId)
             {
@@ -569,16 +548,13 @@ void GoodInfoList::load(char const* RelPath)
                 FDUMP(0x100002, "%s(%d) : *** WARNING: Good (%s) nickname different from equipment",
                       kGoodListSource, 0x1b0, Name.get_string());
             }
-            // .text:06270f9c/06270fc0 and .text:06270fd4/06270ff4: map insert of
-            // (key, 0) then the node's value set to Info -- operator[] on the ById tree
-            // (+0x0c, key GoodInfo+0x48) and the ByArch tree (+0x20, key +0x50), with no
-            // zero-key test: a later good with the same key overwrites the earlier one.
+            // No zero-key test: a later good with the same key overwrites the earlier one.
             ById[Info->Id] = Info;
             ByArch[Info->ArchId] = Info;
         }
         else if (Reader.is_header("GoodType"))
         {
-            // 0627100e: the argument is the caller's relative path, not the reader's name.
+            // The argument is the caller's relative path, not the reader's name.
             FDUMP(0x100002, "%s(%d) : *** WARNING: [GoodType] is obsolete in ini file %s\n",
                   kGoodListSource, 0x1ba, RelPath);
         }

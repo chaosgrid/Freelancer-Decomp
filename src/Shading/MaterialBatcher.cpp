@@ -47,7 +47,7 @@ unsigned short* FMaterialBatcher::CloneIndices(const unsigned short* Source, uns
     // FUN_06eca3d0: wrap the byte count in a DWORD, then copy every byte.
     const unsigned long Bytes = Count * 2;
     unsigned short* Dest = (unsigned short*)AllocateScratch(Bytes);
-    // REP MOVS with zero count performs no memory access.
+    // A zero-byte copy touches neither pointer.
     if (Bytes != 0)
         std::memcpy(Dest, Source, Bytes);
     return Dest;
@@ -111,8 +111,6 @@ FBatchRecord::FBatchRecord()
 
 FBatchBin::FBatchBin() : Pad0(0), SortKind(0), RecordCount(0) {}
 
-
-
 // Dispatch layout consumed by FUN_06ec9f10; the face is borrowed after flattening.
 struct FBatchDispatch
 {
@@ -133,9 +131,8 @@ struct FBatchTriangle
 
 static int CompareBatchKeys(float A, float B, bool bAscending)
 {
-    // Ascending TEST AH,05 + JP falls through only for less; descending
-    // TEST AH,41 + JNZ falls through only for greater. TEST AH,44 + JP
-    // yields +1 for unordered, 0 for equal, +1 for the remaining order.
+    // -1 only for ordered less (ascending) / greater (descending), 0 for equal,
+    // +1 otherwise, including unordered.
     if (bAscending ? A < B : A > B)
         return -1;
     return A == B ? 0 : 1;
@@ -167,7 +164,7 @@ static int __cdecl CompareBatchTriangleDescending(const void* A, const void* B)
 
 static double ComputeBatchPositionDepth(const FBatchRecord& Record, const float* Position)
 {
-    // x87 evaluates Z + Y, then X, then translation; no float spill occurs.
+    // Summed Z, Y, X, then translation, all in double.
     double Depth = (double)Record.Combined[8] * Position[2];
     Depth += (double)Record.Combined[5] * Position[1];
     Depth += (double)Record.Combined[2] * Position[0];
@@ -233,7 +230,7 @@ FMaterialBatcherController::FMaterialBatcherController(FMaterialBatcher* InOwner
 
 GENRESULT DACOM_API FMaterialBatcherController::QueryInterface(const char* Iid, void** Out)
 {
-    // LAB_06ecba70: fixed map 06ed2e34 has offsets 0, 0, 4, 8.
+    // LAB_06ecba70: interface table DAT_06ed2e34 (batcher/batcher2 +0, library +4, aggregate +8).
     IDAComponent* Face;
     if (std::strcmp(Iid, Iids::MaterialBatcher) == 0 || std::strcmp(Iid, Iids::MaterialBatcher2) == 0)
         Face = Owner;
@@ -316,19 +313,17 @@ static_assert(offsetof(FMaterialBatcher, Library) == 0x04, "IMaterialLibrary at 
 
 GENRESULT DACOM_API FMaterialBatcher::QueryInterface(const char* Iid, void** Out)
 {
-    // +90 is selected by the factory before descriptor initialization.
+    // ControllingUnknown (+0x90) is set by the factory before descriptor initialization.
     return ControllingUnknown->QueryInterface(Iid, Out);
 }
 
 unsigned long DACOM_API FMaterialBatcher::AddRef()
 {
-    // +90 is selected by the factory before descriptor initialization.
     return ControllingUnknown->AddRef();
 }
 
 unsigned long DACOM_API FMaterialBatcher::Release()
 {
-    // +90 is selected by the factory before descriptor initialization.
     return ControllingUnknown->Release();
 }
 
@@ -369,7 +364,7 @@ static unsigned long ReadBatcherProfileUnsigned(ICOManager* Manager, IProfilePar
     {
         if (Parser->GetString(Section, Key, GBatcherProfileValue, sizeof(GBatcherProfileValue)) != 0)
         {
-            // Raw PE 06ed4bb4: exact 37-byte accepted-prefix table, including NUL.
+            // DAT_06ed4bb4.
             const size_t Span = std::strspn(GBatcherProfileValue,
                 "0123456789truefalsynoxTRUEFALSYNOX+-");
             if (Span != 0)
@@ -455,8 +450,8 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     Bin1SortOrder = ReadBatcherProfileUnsigned(Manager, Parser, "Bin1SortOrder", 2);
     BinOrder[0] = 0;
     FBatchBin* FirstBin = new FBatchBin();
-    // LAB_06ec8b3c overwrites the old pointer without destroying its descriptor.
-    // Keep that ownership behavior on repeated Startup, including allocation order.
+    // LAB_06ec8b3c overwrites the old bin pointer without destroying it; the leak on a
+    // repeated Startup is kept.
     Bins[0].release();
     Bins[0].reset(FirstBin);
     Bins[0]->RecordCount = 0;
@@ -476,7 +471,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     return GR_OK;
 }
 
-// FUN_06ec8bd0: independent parser acquisition and section lifetime.
+// FUN_06ec8bd0: acquires and releases its own profile parser.
 void FMaterialBatcher::ParseBatchedMaterials()
 {
     IProfileParser* Parser = nullptr;
@@ -534,14 +529,14 @@ void FMaterialBatcher::ClearBin(FBatchBin* Bin)
 
 static void WarnUnsupportedBatchSort()
 {
-    // FUN_06eca370: exact five FDUMP arguments; no queue processing.
+    // FUN_06eca370: the bin is not processed.
     FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp", 0x5d2, "IMB_SO_PRIM_BACK_TO_FRONT/FRONT_TO_BACK sort order unimplemented, contact pbleisch\n");
 }
 
 static void WarnMalformedBatchSort()
 {
-    // FUN_06eca3a0: preserve the retail typo and exact diagnostic metadata.
+    // FUN_06eca3a0: the typo is retail's.
     FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp", 0x5d9, "MaterialBatcher: sort statte not well implemented, contact stravis\n");
 }
@@ -671,14 +666,12 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
 
 GENRESULT DACOM_API FMaterialBatcher::ClearRules()
 {
-    // ClearRuleList — retail takes no explicit arg.
     RuleList.clear();
     return GR_OK;
 }
 
 GENRESULT DACOM_API FMaterialBatcher::AddRule(unsigned long Kind, const char* Pattern)
 {
-    // 8fa0 duplicates before compiling, then 9050 transfers both owners to the node.
     FBatchRule Rule;
     Rule.Kind = Kind;
     Rule.Pattern.assign(Pattern);
@@ -689,7 +682,7 @@ GENRESULT DACOM_API FMaterialBatcher::AddRule(unsigned long Kind, const char* Pa
 
 GENRESULT DACOM_API FMaterialBatcher::RemoveRule(unsigned long Kind, const char* Pattern)
 {
-    // 9080 removes the first exact Kind/strcmp match, including duplicate rules.
+    // Only the first exact match is removed; duplicates stay.
     for (size_t Index = 0; Index < RuleList.size(); ++Index)
     {
         if (RuleList[Index].Kind == Kind && RuleList[Index].Pattern == Pattern)
@@ -746,7 +739,6 @@ GENRESULT DACOM_API FMaterialBatcher::SetBinOrder(unsigned long Index, long Key)
 
 GENRESULT DACOM_API FMaterialBatcher::FlushBin(unsigned long Index, unsigned char Clear)
 {
-    // Retail indexes exactly the same two descriptors as slots 6/7/8/12.
     if (Index >= 2)
         return (GENRESULT)-1;
     FBatchBin* Target = Bins[Index].get();
@@ -755,7 +747,7 @@ GENRESULT DACOM_API FMaterialBatcher::FlushBin(unsigned long Index, unsigned cha
     FlushOne(Target, Clear);
     if (Clear != 0)
     {
-        // 92ac/92b7 reload the indexed descriptor after foreign callbacks.
+        // Retail re-reads the bin after the callbacks.
         Bins[Index]->RecordCount = 0;
         ClearBin(Bins[Index].get());
     }
@@ -840,7 +832,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     GBatchMathEngine->MulTransform(Combined, *MatrixB, *MatrixA);
     const unsigned long QueuedFlags = Record.Flags;
     std::memcpy(Record.Combined, &Combined, sizeof(Record.Combined));
-    // 98fd/990a reread both context fields after the foreign math callback.
+    // Retail re-reads World/View after the math call.
     std::memcpy(Record.MatrixDataA,
         Source->World, sizeof(Record.MatrixDataA));
     std::memcpy(Record.MatrixDataB,
@@ -912,14 +904,14 @@ GENRESULT DACOM_API FMaterialBatcher::GetEvents(void* Arg)
 
 GENRESULT DACOM_API FMaterialBatcher::SetRecordTag(void* Value)
 {
-    // LAB_06ec9a40: plain store into this+0x78, no refcount management.
+    // LAB_06ec9a40: not reference counted.
     RecordTag = Value;
     return GR_OK;
 }
 
 GENRESULT DACOM_API FMaterialBatcher::GetRecordTag(void* Arg)
 {
-    // LAB_06ec9a50: *out = this+0x78.
+    // LAB_06ec9a50.
     if (Arg == nullptr)
         return GR_GENERIC;
     *(void**)Arg = RecordTag;
@@ -928,14 +920,14 @@ GENRESULT DACOM_API FMaterialBatcher::GetRecordTag(void* Arg)
 
 GENRESULT DACOM_API FMaterialBatcher::SetRecordTagContext(void* Value)
 {
-    // LAB_06ec9a70: plain store into this+0x7C, no refcount management.
+    // LAB_06ec9a70: not reference counted.
     RecordTagContext = Value;
     return GR_OK;
 }
 
 GENRESULT DACOM_API FMaterialBatcher::GetRecordTagContext(void* Arg)
 {
-    // LAB_06ec9a80: *out = this+0x7C.
+    // LAB_06ec9a80.
     if (Arg == nullptr)
         return GR_GENERIC;
     *(void**)Arg = RecordTagContext;

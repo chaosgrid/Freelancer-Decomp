@@ -23,10 +23,10 @@ struct IVP_Environment_Object_Notify_Event;
 // IVP_Universe_Manager -- the caller-supplied object at IVP_Environment+0x2C
 // (IVP_Environment_Create_Parms+0x14, never constructed or owned by IVP).
 // Abstract; no implementation lives in Common.dll. Slots from the call sites:
-//   slot 0  IVP_OV_Element re-file (.text:0634ecbe-0634ecc8): (object, &center, radius)
-//   slot 1  check_for_unused_objects 0634b230 (:0634b28d / :0634b2e2): (object)
-//   slot 2  IVP_Cluster_Manager::remove_object 0634b3e0 (:0634b467-0634b46a): (object)
-//   slot 3  check_for_unused_objects (:0634b23a): () -> the four-int settings block
+//   slot 0  IVP_OV_Element re-file (0634ecbe): (object, &center, radius)
+//   slot 1  check_for_unused_objects 0634b230: (object)
+//   slot 2  IVP_Cluster_Manager::remove_object 0634b3e0: (object)
+//   slot 3  check_for_unused_objects: () -> the four-int settings block
 // Names are the IVP SDK's.
 // ============================================================================
 struct IVP_Universe_Manager_Settings
@@ -48,10 +48,9 @@ public:
 
 // ============================================================================
 // The per-object listener tables the cluster manager keeps in its two hashes.
-// Layout from 0634aef0 (.text:0634af08-0634af24, the stack probe) and the fire
-// loops (`MOV SI,[EDI+6]`, `MOV EAX,[EDI+8]`): +0x00 the object (the hash key),
-// +0x04 an IVP_U_Vector of listeners whose inline sentinel is +0x0c. FUN_06348be0
-// (.text:06348be0-06348c0e) is the table's destructor (the vector's Clear).
+// Layout from the stack probe of 0634aef0 and the fire loops: +0x00 the object
+// (the hash key), +0x04 an IVP_U_Vector of listeners whose inline sentinel is
+// +0x0c. FUN_06348be0 is the table's destructor (the vector's Clear).
 // ============================================================================
 class IVP_Object_Callback_Table
 {
@@ -102,32 +101,32 @@ public:
 
 // ============================================================================
 // IVP_Cluster_Manager -- the 0x18-byte object at IVP_Environment+0x0C, no
-// vtable. ctor 0634ad70 (env ctor .text:0634c2a9-0634c2dc), dtor 0634b300
-// (env dtor). Class / method names are the IVP SDK's.
+// vtable. ctor 0634ad70 (from the env ctor, 0634c2a9), dtor 0634b300 (env
+// dtor). Class / method names are the IVP SDK's.
 // ============================================================================
 class IVP_Cluster_Manager
 {
 public:
-    // FUN_0634ad70 (.text:0634ad70-0634ae4c, RET 4).
+    // FUN_0634ad70 (RET 4).
     explicit IVP_Cluster_Manager(IVP_Environment* Environment);
 
-    // FUN_0634b300 (.text:0634b300-0634b340).
+    // FUN_0634b300.
     ~IVP_Cluster_Manager();
 
     // FUN_0634b3d0 (RET 4): number_of_real_objects++ (the object is not read).
     void add_object(IVP_Real_Object* Object);
 
-    // FUN_0634b3e0 (.text:0634b3e0-0634b470, RET 4).
+    // FUN_0634b3e0 (RET 4).
     void remove_object(IVP_Real_Object* Object);
 
-    // FUN_0634b1a0 (.text:0634b1a0-0634b222, RET 4): the object after `Object`
+    // FUN_0634b1a0 (RET 4): the object after `Object`
     // in a depth-first walk of the cluster tree, skipping clusters (object_type
     // 1); null when there are no real objects or the walk is exhausted. A null
     // `Object` starts at the root.
     IVP_Object* get_next_real_object_in_cluster_tree(IVP_Object* Object);
 
-    // FUN_0634b230 (.text:0634b230-0634b2f4, RET 4). Called from simulate_psi
-    // (0634d090 :0634d0c5-:0634d0d0) only when the universe manager is set.
+    // FUN_0634b230 (RET 4). Called from simulate_psi (0634d090) only when the
+    // universe manager is set.
     void check_for_unused_objects(IVP_Universe_Manager* UniverseManager);
 
     // The obj_callback_hash fire loops (+0x08), listener slots 0 / 3 / 2:
@@ -142,7 +141,7 @@ public:
     void fire_event_friction_created(IVP_Real_Object* Object, void* Event); // 0634b0e0, flag 4, slot 2
     void fire_event_friction_deleted(IVP_Real_Object* Object, void* Event); // 0634b140, flag 4, slot 3
 
-    // The ICF-shared getter 06261d90 (`MOV EAX,[ECX]; RET`) reached through
+    // The ICF-shared getter 06261d90 (returns +0x00) reached through
     // IVP_Environment::get_root_cluster (0634cb90).
     IVP_Cluster* get_root_cluster() { return root_cluster; }
 

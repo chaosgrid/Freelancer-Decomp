@@ -9,14 +9,14 @@
 namespace
 {
     // DAT_00615e70 (.data, 0x58 bytes): D3DFORMAT per id; ids 10..21 are FourCC codes
-    // ('DXT1'..'DXT5' first). Read verbatim from the PE bytes.
+    // ('DXT1'..'DXT5' first).
     unsigned long G_PixelFormatD3D[0x16] = {
         0,          41,         20,         23,         24,         26,
         25,         21,         22,         0,          827611204,  844388420,
         861165636,  877942852,  894720068,  1347371332, 1414480196, 1094795588,
         1279344964, 826360132,  876691780,  943800644};
 
-    // DAT_00615ec8 (.data, 15 x 0x4c bytes), read verbatim from the PE bytes.
+    // DAT_00615ec8 (.data, 15 x 0x4c bytes).
     FPixelFormatDesc G_PixelFormatDescs[15] = {
         {0, 0, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0},
         {1, 8, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0},
@@ -45,13 +45,13 @@ namespace
 
 unsigned long* PixelFormatGetD3DFormats()
 {
-    // FUN_005b7000: MOV EAX,DAT_00615e70.
+    // FUN_005b7000.
     return G_PixelFormatD3D;
 }
 
 int PixelFormatFromD3D(unsigned long D3DFormat)
 {
-    // FUN_005b7010: linear scan of the 0x16 entries, the index on a match, else 0.
+    // FUN_005b7010.
     unsigned long const* const Formats = PixelFormatGetD3DFormats();
     for (int Index = 0; Index < 0x16; ++Index)
     {
@@ -63,7 +63,7 @@ int PixelFormatFromD3D(unsigned long D3DFormat)
 
 FPixelFormatDesc* PixelFormatGetDesc(int Id)
 {
-    // FUN_005b7030: CMP EAX,0xe / JLE (signed) -> &DAT_00615ec8[Id], else &DAT_00615ec8[0].
+    // FUN_005b7030. Signed compare: a negative Id is not caught.
     if (Id > 0xe)
         return &G_PixelFormatDescs[0];
     return &G_PixelFormatDescs[Id];
@@ -72,13 +72,13 @@ FPixelFormatDesc* PixelFormatGetDesc(int Id)
 bool PixelFormatFind(unsigned long* OutId, unsigned long Bpp, unsigned long RedBits,
                      unsigned long GreenBits, unsigned long BlueBits, unsigned long AlphaBits)
 {
-    // FUN_005b7050: walk descriptors 0..8 from FUN_005b7030(0), stride 0x4c.
+    // FUN_005b7050: only descriptors 0..8 are searched.
     FPixelFormatDesc const* Desc = PixelFormatGetDesc(0);
     for (int Index = 0; Index < 9; ++Index, ++Desc)
     {
         if (Desc->Bpp != Bpp)
             continue;
-        // 005b707c..005b708a: the low byte of +0x48 against SETNZ (AlphaBits != 0).
+        // Only the low byte of +0x48 is compared.
         unsigned long const HasAlpha = static_cast<unsigned char>(Desc->HasAlpha);
         if ((AlphaBits != 0 ? 1u : 0u) != HasAlpha)
             continue;
@@ -86,7 +86,7 @@ bool PixelFormatFind(unsigned long* OutId, unsigned long Bpp, unsigned long RedB
             continue;
         if (Desc->Green.Bits != GreenBits)
             continue;
-        // 005b709c: retail compares the blue argument with the RED width (ECX = [EAX+8]).
+        // Retail quirk (see the header).
         if (Desc->Red.Bits != BlueBits)
             continue;
         if (Desc->Alpha.Bits != AlphaBits)

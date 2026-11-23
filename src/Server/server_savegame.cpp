@@ -9,21 +9,14 @@
 // post-save wrappers around it, the three save wrappers that end in the
 // serializer, and the record -> live-slot copy CharacterSelect runs.
 //
-// REWRITTEN 2026-09-24 (claude:srv-save). Every function here is a port of one
-// retail function, named in its header comment, and read off
-// EXE\Disasm\Server.dll.txt (string operands off the bytes of EXE\Server.dll,
-// where the listing truncates them). What used to be here was a hand-rolled
-// `key = value` scanner that wrote straight onto the LIVE slot; retail never
-// does that. Retail parses into the 0x398-byte record that lives in the map at
-// PlayerData+0x50 (PlayerData::FSavedCharacter), keyed by the file name, and
+// Retail never parses onto the live slot: it parses into the 0x398-byte record in the
+// map at PlayerData+0x50 (PlayerData::FSavedCharacter), keyed by file name, and
 // CharacterSelect copies that record onto the slot later.
 //
-// Still open (not accepted, see each function's own notes):
-//  * FUN_06d4a5d0's MP-only front section (.text:06d4a652 .. .text:06d4aa85:
-//    events 0x3a / 8 / 7, the CHARACTER_ID compare, the IClient +0x1bc/+0x1c0
-//    and reputation broadcast loops) is only approximated by
-//    IServerImpl::CharacterSelect; its tail (.text:06d4aa85 .. .text:06d4b1fa)
-//    is PlayerData_LoadSelectedCharacter below.
+// Still open: FUN_06d4a5d0's MP-only front section (.text:06d4a652 .. .text:06d4aa85:
+// events 0x3a / 8 / 7, the CHARACTER_ID compare, the IClient +0x1bc/+0x1c0 and
+// reputation broadcast loops) is only approximated by IServerImpl::CharacterSelect; its
+// tail is PlayerData_LoadSelectedCharacter below.
 
 #include "../include/common_pub.h"
 #include "../include/common_server.h"          // Players (PlayerDB::operator[])
@@ -72,10 +65,7 @@ namespace {
 char const* const PlayerDbSource = "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp";
 
 // ---------------------------------------------------------------------------
-// FUN_06d03cf0 (.text:06d03cf0 .. .text:06d03d31), cdecl (Dst, Size, Src).
-// A null Src returns 0 and leaves Dst alone; otherwise the length is clamped to
-// Size - 1 (`CMP EAX,ECX / JC / LEA EAX,[ECX-1]`), copied, NUL-terminated at
-// Dst[Len] and returned. Every caller stores the result as a TString length.
+// FUN_06d03cf0. Every caller stores the result as a TString length.
 // ---------------------------------------------------------------------------
 unsigned int CopyBoundedString(char* Dst, unsigned int Size, char const* Src) {
     if (Src == nullptr)
@@ -88,27 +78,23 @@ unsigned int CopyBoundedString(char* Dst, unsigned int Size, char const* Src) {
     return Length;
 }
 
-// FSaveFileBuffer (a SaveGame with a closing destructor) and SaveGame's
-// methods -- FUN_06d48960 is SaveGame::ReadTail, FUN_06d48b60 SaveGame::Encode
-// -- are declared in server_savefile.h and defined in server_savefile.cpp;
-// PlayerDB::ReadCharacterName uses them too.
+// FSaveFileBuffer (a SaveGame with a closing destructor) and SaveGame's methods
+// (FUN_06d48960 ReadTail, FUN_06d48b60 Encode) are in server_savefile.h/.cpp.
 
 } // namespace
 
 namespace {
 
-// The {Costume*, CostumeDescriptions const*} pair FUN_06d47120 keeps for each of
-// its two costumes (.text:06d47375 .. .text:06d47391: [ESP+0x1c]/[ESP+0x20] for
-// record+0x2d4, [ESP+0x24]/[ESP+0x28] for record+0x32c).
+// The {Costume*, CostumeDescriptions const*} pair FUN_06d47120 keeps on its frame for
+// each of its two costumes (record+0x2d4, record+0x32c).
 struct FCostumeTarget {
     Costume* Target;
     CostumeDescriptions const* Descriptions;
 };
 
 // ---------------------------------------------------------------------------
-// FUN_06d48c80 (thiscall on FCostumeTarget, `RET 0xc`): (TypeId, Name, File).
-// find_bodypart(TypeId, Name) (.text:06d48c91); a miss OR a part whose Id is 0
-// both warn (.text:06d48c99 / .text:06d48c9f) and return 0.
+// FUN_06d48c80 (thiscall on FCostumeTarget). A miss or a part whose Id is 0 both
+// warn and return 0.
 // ---------------------------------------------------------------------------
 unsigned int CostumeTarget_FindPartId(FCostumeTarget const& Holder, int TypeId,
                                       char const* Name, char const* File) {
@@ -124,8 +110,7 @@ unsigned int CostumeTarget_FindPartId(FCostumeTarget const& Holder, int TypeId,
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06d48cd0 (thiscall on FCostumeTarget, `RET 8`): (Name, File). Same shape
-// as FUN_06d48c80 over find_accessory(Name) (.text:06d48cdc), line 0x263.
+// FUN_06d48cd0 (thiscall on FCostumeTarget). Same shape over find_accessory.
 // ---------------------------------------------------------------------------
 unsigned int CostumeTarget_FindAccessoryId(FCostumeTarget const& Holder, char const* Name,
                                            char const* File) {
@@ -141,9 +126,8 @@ unsigned int CostumeTarget_FindAccessoryId(FCostumeTarget const& Holder, char co
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06d48940 (thiscall on Costume, `RET 4`):
-//   MOV EAX,[ECX+0x30] / MOV [ECX+EAX*4+0x10],EDX / INC [ECX+0x30]
-// No bound and no zero test: an id of 0 (the miss above) is appended too.
+// FUN_06d48940 (thiscall on Costume). No bound and no zero test: an id of 0 (the
+// miss above) is appended too.
 // ---------------------------------------------------------------------------
 void Costume_AddAccessory(Costume& Target, unsigned int AccessoryId) {
     Target.AccessoryIds[Target.AccessoryCount] = AccessoryId;
@@ -151,19 +135,8 @@ void Costume_AddAccessory(Costume& Target, unsigned int AccessoryId) {
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06d4ca60 (`RET 0xc`: Out, Reader, Index). One `log` line back into a
-// FmtStr -- the inverse of the writer FUN_06d4cc20 ("%u, %u" then
-// ", %u, %u, %u" per Val, recursing for tag 0x21):
-//   06d4ca9e  MadLibId = get_value_int((*Index)++)
-//   06d4caae  Count    = get_value_int((*Index)++)
-//   06d4cb05  begin_mad_lib(MadLibId) / 06d4cb0f end_mad_lib()
-//   loop Count times (06d4cb1b signed JLE):
-//     Data  = get_value_int((*Index)++)       06d4cb2f
-//     Tag   = get_value_int((*Index)++)       06d4cb3f
-//     Flags = (byte)get_value_int((*Index)++) 06d4cb4f
-//     if ((short)Tag == 0x21) Data = new FmtStr(<recursive read>)   06d4cb51
-//     append(new Val(Tag, Data, Flags))       06d4cb8f .. 06d4cbca
-//   *Out = copy of the local                  06d4cbe5
+// FUN_06d4ca60. One `log` line back into a FmtStr -- the inverse of the writer
+// FUN_06d4cc20 ("%u, %u" then ", %u, %u, %u" per Val, recursing for tag 0x21).
 // ---------------------------------------------------------------------------
 FmtStr ReadMissionLogEntry(INI_Reader& Reader, unsigned int& Index) {
     unsigned int const MadLibId = static_cast<unsigned int>(Reader.get_value_int(Index++));
@@ -179,8 +152,7 @@ FmtStr ReadMissionLogEntry(INI_Reader& Reader, unsigned int& Index) {
         unsigned char const Flags = static_cast<unsigned char>(Reader.get_value_int(Index++));
         void* DataPointer = reinterpret_cast<void*>(static_cast<intptr_t>(Data));
         if (static_cast<short>(Tag) == 0x21) {
-            // operator new(0x18) then this same function into it (.text:06d4cb5f /
-            // .text:06d4cb7b). The Val below owns it (FmtStr::Val::~Val deletes a
+            // operator new(0x18); the Val below owns it (FmtStr::Val::~Val deletes a
             // tag-0x21 subtree).
             DataPointer = new FmtStr(ReadMissionLogEntry(Reader, Index));
         }
@@ -192,15 +164,8 @@ FmtStr ReadMissionLogEntry(INI_Reader& Reader, unsigned int& Index) {
 
 // ---------------------------------------------------------------------------
 // The Reputation::RepGroupCB FUN_06d47120 builds on its frame for `group` /
-// `initial_rep` (.text:06d48616 .. .text:06d48628): vptr LAB_06d46f10,
-// +0x04 the record, +0x08 the player's own group id.
-//
-// Execute is LAB_06d46f10 (thiscall, `RET 4`):
-//   06d46f2b  get_feelings_towards(*GroupId, this->GroupId, &f)
-//   06d46f35  FCOMP double [06d64f00] = 1.0 ; TEST AH,0x1 ; JNZ keep
-//   06d46f45  f = 0x3f733333 (0.95f)          -- i.e. if (!(f < 1.0)) f = 0.95f
-//   06d46f4d  record->Relations.insert(end, 1, {*GroupId, f})
-//   returns 1
+// `initial_rep`: +0x04 the record, +0x08 the player's own group id. Execute is
+// LAB_06d46f10: a feeling of 1.0 or more (or unordered) is stored as 0.95f.
 // ---------------------------------------------------------------------------
 struct FRepGroupRelationsCB : public ::Reputation::RepGroupCB {
     PlayerData::FSavedCharacter* Record;
@@ -219,9 +184,7 @@ struct FRepGroupRelationsCB : public ::Reputation::RepGroupCB {
     }
 };
 
-// TString<16> from an INI string the way every rep-group key builds it: a null
-// string gives Length 0 / Data[0] 0 (.text:06d478bc), anything else goes
-// through FUN_06d03cf0 with size 0x10 (.text:06d478d8).
+// TString<16> from an INI string, the way every rep-group key builds it.
 TString<16> MakeGroupName(char const* Text) {
     TString<16> Name;
     Name.Length = 0;
@@ -231,11 +194,9 @@ TString<16> MakeGroupName(char const* Text) {
     return Name;
 }
 
-// The costume block, one call per costume (.text:06d47a4b .. .text:06d47bf9 for
-// the com_ costume on the suffix, .text:06d47c1a .. .text:06d47d98 for the bare
-// costume on the whole name). Every compare is REPE CMPSB with the terminator
-// counted (ECX = strlen + 1), i.e. an EXACT, case-SENSITIVE match.
-// Returns false when nothing matched, so the key chain continues.
+// The costume keys, one call per costume (com_ costume on the suffix, base costume on
+// the whole name). Retail compares inline with the terminator counted: an exact,
+// case-sensitive match, unlike the INI is_value keys. False when nothing matched.
 bool LoadCostumeKey(INI_Reader& Reader, FCostumeTarget const& Holder, char const* Suffix,
                     char const* File) {
     if (strcmp(Suffix, "body") == 0) {
@@ -277,10 +238,8 @@ bool LoadCostumeKey(INI_Reader& Reader, FCostumeTarget const& Holder, char const
     return false;
 }
 
-// `equip` / `base_equip` / `cargo` / `base_cargo` (.text:06d47f45 ..
-// .text:06d480d5): insert a default EquipDesc at the end of the list, read the
-// line into it (result ignored), then stamp it from the RECORD's EquipIdMaker
-// (.text:06d47fa9 CreateEquipID on record+0x360, .text:06d47fb2 set_id).
+// `equip` / `base_equip` / `cargo` / `base_cargo`: the read result is ignored, and the
+// id comes from the record's EquipIdMaker (record+0x360).
 void LoadEquipKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Record,
                   EquipDescList& List, bool bCargo) {
     List.Items.insert(List.Items.end(), EquipDesc());
@@ -292,8 +251,7 @@ void LoadEquipKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Record,
     Item.set_id(Record.EquipIdMaker.CreateEquipID());
 }
 
-// `collision_group` / `base_collision_group` (.text:06d480f7 .. .text:06d48238
-// and .text:06d481be .. .text:06d48274).
+// `collision_group` / `base_collision_group`.
 void LoadCollisionGroupKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Record,
                            std::list<CollisionGroupDesc>& Groups, int LineNotFound,
                            int LineBeforeShip) {
@@ -304,8 +262,7 @@ void LoadCollisionGroupKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Reco
               PlayerDbSource, LineBeforeShip, Name.Value);
         return;
     }
-    // No null test on GetShip: retail calls get_group_by_name on whatever it
-    // returns (.text:06d4811a .. .text:06d4812c).
+    // No null test on GetShip.
     Archetype::Ship const* Ship = Archetype::GetShip(Record.ShipArchetype);
     Archetype::CollisionGroup const* Group = Ship->get_group_by_name(Name);
     if (Group == nullptr) {
@@ -313,11 +270,10 @@ void LoadCollisionGroupKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Reco
               PlayerDbSource, LineNotFound, Name.Value, Ship->Nickname.get_string());
         return;
     }
-    // .text:06d48150 -- the first node whose Id matches gets Health = value 1;
-    // no match does nothing.
+    // Only an existing node is updated; no match adds nothing.
     for (std::list<CollisionGroupDesc>::iterator It = Groups.begin(); It != Groups.end(); ++It) {
         if (It->Id == Group->Id) {
-            It->Health = (float)Reader.get_value_float(1);         // .text:06d4822f FSTP float
+            It->Health = (float)Reader.get_value_float(1);
             return;
         }
     }
@@ -344,26 +300,23 @@ void BuildAccountDir(char* Out, PlayerData const& Slot) {
 } // namespace
 
 // ===========================================================================
-// PlayerData_LoadSaveRecord -- retail FUN_06d47120 (.text:06d47120 ..
-// .text:06d48786), thiscall on the PlayerData, (Path, Record), `RET 8`.
+// PlayerData_LoadSaveRecord -- retail FUN_06d47120, thiscall on the PlayerData.
 // ===========================================================================
 bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                                        PlayerData::FSavedCharacter& Record) {
-    (void)Slot; // only forwarded as the log reader's unused ECX (.text:06d48510)
+    (void)Slot; // only forwarded as the log reader's unused ECX
 
     bool bSawPlayer = false;
     FSaveFileBuffer Buffer;
     INI_Reader Reader;
 
-    // .text:06d47182 -- fopen(path, "rt"), then the first four bytes.
     Buffer.File = fopen(Path, "rt");
     if (Buffer.File == nullptr)
         return false;
     char Magic[4] = { 0, 0, 0, 0 };
     fread(Magic, 1, 4, Buffer.File);
     if (memcmp(Magic, Server_FLS1Magic, 4) == 0) {
-        // .text:06d471c5 -- "FLS1": close, reopen "rb" (.rdata:06d6aea8), read
-        // from offset 4 and decode in place (FUN_06d48b60).
+        // Encrypted: reopen binary, read from offset 4, decode in place.
         fclose(Buffer.File);
         Buffer.File = fopen(Path, "rb");
         if (Buffer.File == nullptr)
@@ -371,16 +324,13 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
         Buffer.ReadTail(4);
         Buffer.Encode();
     } else if (memcmp(Magic, "FLSG", 4) == 0) {
-        // .text:06d4720f -- .rdata:06d6b304 = "FLSG": straight to the exit,
-        // whose inlined FUN_06d48c20 (.text:06d488c5 .. .text:06d488ec) closes
-        // the file -- ~FSaveFileBuffer here.
+        // .rdata:06d6b304: refused; ~FSaveFileBuffer closes the file.
         return false;
     } else {
-        // .text:06d4721c -- plain text: the whole file from offset 0.
+        // Plain text.
         Buffer.ReadTail(0);
     }
 
-    // .text:06d4724c
     Reader.open_memory(Buffer.Contents.c_str(),
                        static_cast<unsigned int>(Buffer.Contents.size()));
 
@@ -388,38 +338,38 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
     FCostumeTarget BaseCostume = { &Record.BaseCostume, nullptr };
 
     while (Reader.read_header()) {
-        RefreshLoadingProgress();          // .text:06d47274
-        int CommentDepth = 0;              // .text:06d47286
+        RefreshLoadingProgress();
+        int CommentDepth = 0;
         if (!Reader.is_header("Player"))
             continue;
 
-        // ---- per-[Player] reset, .text:06d47298 .. .text:06d47430 ----------
+        // ---- per-[Player] reset ----------------------------------------------
         Record.Position[0] = 0.0f;
         Record.Position[1] = 0.0f;
         Record.Position[2] = 0.0f;
         for (int Row = 0; Row < 3; ++Row)
             for (int Col = 0; Col < 3; ++Col)
                 Record.Orientation[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
-        bSawPlayer = true;                 // .text:06d472ea
+        bSawPlayer = true;
         Record.SystemId = 0;
         Record.BaseId = 0;
         Record.LocationId = 0;             // +0x27c (last_base) is NOT reset
-        Record.Description = L"";          // .rdata:06d6b2f8
+        Record.Description = L"";
         Record.DescripStrId = 0;
-        Record.Money = 0x7b0;              // .text:06d47361
-        Record.Interface = 3;              // .text:06d4736b
+        Record.Money = 0x7b0;
+        Record.Interface = 3;
         ComCostume.Descriptions = GetCostumeDescriptions();
         BaseCostume.Descriptions = GetCostumeDescriptions();
-        Record.WeaponGroups.clear();       // .text:06d473a3 erase(0, npos)
-        Record.Visits.clear();             // .text:06d47430 erase(begin, end)
+        Record.WeaponGroups.clear();
+        Record.Visits.clear();
 
         while (Reader.read_value()) {
-            // .text:06d47450 -- block comments.
+            // Block comments; the depth test is signed.
             if (Reader.is_value("/*"))
                 ++CommentDepth;
             else if (Reader.is_value("*/"))
                 --CommentDepth;
-            if (CommentDepth > 0)          // .text:06d47490 signed JG
+            if (CommentDepth > 0)
                 continue;
 
             if (Reader.is_value("name")) {
@@ -449,8 +399,8 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 continue;
             }
             if (Reader.is_value("ship_archetype")) {
-                // .text:06d47626 MSVCRT.DLL::atoi: wraps mod 2^32, so a hash id above
-                // INT_MAX round-trips; the UCRT atoi would clamp it to 0x7fffffff.
+                // MSVCRT.DLL atoi wraps mod 2^32, so a hash id above INT_MAX
+                // round-trips; the UCRT atoi would clamp it to 0x7fffffff.
                 Record.ShipArchetype =
                     static_cast<unsigned int>(MsvcrtAtoi(Reader.get_value_string()));
                 if (Record.ShipArchetype == 0) {
@@ -458,7 +408,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                     Nickname.Id = CreateID(Reader.get_value_string());
                     Record.ShipArchetype = Archetype::GetShipID(Nickname);
                 }
-                // .text:06d47668 -- no null test on GetShip.
+                // No null test on GetShip.
                 Archetype::Ship const* Ship = Archetype::GetShip(Record.ShipArchetype);
                 Ship->get_undamaged_collision_group_list(Record.CollisionGroups);
                 Ship->get_undamaged_collision_group_list(Record.BaseCollisionGroups);
@@ -503,8 +453,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 continue;
             }
             if (Reader.is_value("group") || Reader.is_value("initial_rep")) {
-                // .text:06d485bb -- get_id, empty the relations (FUN_06d573e0),
-                // then enumerate every group through the callback.
+                // Rebuild the relations from every group's feeling towards this one.
                 TString<16> const GroupName = MakeGroupName(Reader.get_value_string());
                 FRepGroupRelationsCB Callback;
                 Callback.Record = &Record;
@@ -514,7 +463,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 continue;
             }
             if (Reader.is_value("rep_group")) {
-                // .text:06d47890 -- an empty value resolves "" (.rdata:06d66ee4).
+                // An empty value resolves "".
                 TString<16> const GroupName = Reader.is_value_empty(0)
                     ? MakeGroupName("")
                     : MakeGroupName(Reader.get_value_string(0));
@@ -522,12 +471,12 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 continue;
             }
             if (Reader.is_value("house")) {
-                float const Feeling = (float)Reader.get_value_float(0);   // .text:06d4795d FSTP float
+                float const Feeling = (float)Reader.get_value_float(0);
                 TString<16> const GroupName = MakeGroupName(Reader.get_value_string(1));
                 ::Reputation::Relation Entry;
                 Entry.GroupId = ::Reputation::get_id(GroupName);
                 Entry.Feeling = Feeling;
-                Record.Relations.push_back(Entry);   // FUN_06d58b40 insert(end, 1, v)
+                Record.Relations.push_back(Entry);   // FUN_06d58b40
                 continue;
             }
             if (Reader.is_value("voice")) {
@@ -541,7 +490,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 continue;
             }
 
-            // .text:06d47a1a -- the costume block, on the raw key name.
+            // The costume keys, on the raw key name.
             {
                 char const* const KeyName = Reader.get_name_ptr();
                 char const* const File = Reader.get_file_name();
@@ -549,7 +498,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                 if (strstr(KeyName, "com_") == KeyName)
                     bHandled = LoadCostumeKey(Reader, ComCostume, KeyName + strlen("com_"), File);
                 if (!bHandled) {
-                    // .text:06d47bfe -- name and file are fetched again.
+                    // Retail fetches name and file again.
                     char const* const BareName = Reader.get_name_ptr();
                     bHandled = LoadCostumeKey(Reader, BaseCostume, BareName,
                                               Reader.get_file_name());
@@ -558,8 +507,7 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
                     continue;
             }
 
-            // .text:06d47dbe / 06d47de8 / 06d47e12 / 06d47e3c -- MSVCRT ftol on the
-            // unrounded ST0 (64-bit truncation, low dword stored).
+            // MSVCRT ftol on the unrounded double: 64-bit truncation, low dword stored.
             if (Reader.is_value("money")) {
                 Record.Money = (int)(long long)Reader.get_value_float(0);
             } else if (Reader.is_value("num_kills")) {
@@ -569,16 +517,16 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
             } else if (Reader.is_value("num_misn_failures")) {
                 Record.NumMissionFailures = (int)(long long)Reader.get_value_float(0);
             } else if (Reader.is_value("pos")) {
-                Record.Position[0] = (float)Reader.get_value_float(0);   // .text:06d47e66..90 FSTP float
+                Record.Position[0] = (float)Reader.get_value_float(0);
                 Record.Position[1] = (float)Reader.get_value_float(1);
                 Record.Position[2] = (float)Reader.get_value_float(2);
             } else if (Reader.is_value("rotate")) {
                 Vector Angles;
-                Angles.x = (float)Reader.get_value_float(0);             // .text:06d47eb5..e1 FSTP float
+                Angles.x = (float)Reader.get_value_float(0);
                 Angles.y = (float)Reader.get_value_float(1);
                 Angles.z = (float)Reader.get_value_float(2);
                 Matrix const Rotation = EulerMatrix(Angles);
-                memcpy(Record.Orientation, Rotation.E, sizeof(Record.Orientation)); // REP MOVSD x9
+                memcpy(Record.Orientation, Rotation.E, sizeof(Record.Orientation));
             } else if (Reader.is_value("starting_ring")) {
                 Record.StartingRing = CreateID(Reader.get_value_string());
             } else if (Reader.is_value("equip")) {
@@ -594,15 +542,14 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
             } else if (Reader.is_value("base_collision_group")) {
                 LoadCollisionGroupKey(Reader, Record, Record.BaseCollisionGroups, 0x444, 0x449);
             } else if (Reader.is_value("wg")) {
-                // .text:06d48295 -- the whole raw line, then "\n".
+                // The whole raw line.
                 Record.WeaponGroups.append(Reader.get_line_ptr());
                 Record.WeaponGroups.append("\n");
             } else if (Reader.is_value("hull_status")) {
-                Record.HullStatus = (float)Reader.get_value_float(0);    // .text:06d48446 FSTP float
+                Record.HullStatus = (float)Reader.get_value_float(0);
             } else if (Reader.is_value("base_hull_status")) {
-                Record.BaseHullStatus = (float)Reader.get_value_float(0); // .text:06d4846b FSTP float
+                Record.BaseHullStatus = (float)Reader.get_value_float(0);
             } else if (Reader.is_value("visit")) {
-                // .text:06d48496 -- insert({id, 0}).first->second = (byte)v1.
                 unsigned int const SystemId = static_cast<unsigned int>(Reader.get_value_int(0));
                 unsigned char const Flags = static_cast<unsigned char>(Reader.get_value_int(1));
                 Record.Visits.insert(std::make_pair(SystemId, static_cast<unsigned char>(0)))
@@ -610,39 +557,37 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
             } else if (Reader.is_value("interface")) {
                 Record.Interface = static_cast<unsigned int>(Reader.get_value_int(0));
             } else if (Reader.is_value("log")) {
-                unsigned int LogIndex = 0;                                   // .text:06d48524
+                unsigned int LogIndex = 0;
                 Record.MissionLog.push_back(ReadMissionLogEntry(Reader, LogIndex));
             } else {
-                // .text:06d485a8 -- `logid` is tested and the result dropped.
+                // `logid` is tested and the result dropped.
                 Reader.is_value("logid");
             }
         }
     }
 
-    // .text:06d48682 -- "Deck2" folds back to "Deck".
+    // "Deck2" folds back to "Deck".
     if (MakeLocationID(Record.BaseId, "Deck2") == Record.LocationId)
         Record.LocationId = MakeLocationID(Record.BaseId, "Deck");
 
-    // .text:06d488c5 .. .text:06d488ec -- the inlined FUN_06d48c20 closes the
-    // file: ~FSaveFileBuffer.
+    // ~FSaveFileBuffer closes the file (retail's inlined FUN_06d48c20).
     return bSawPlayer;
 }
 
 // ===========================================================================
-// PlayerData_LoadSavedCharacter -- retail FUN_06d48d50 (.text:06d48d50 ..
-// .text:06d48e6e), thiscall, (Dir, FileName), `RET 8`.
+// PlayerData_LoadSavedCharacter -- retail FUN_06d48d50, thiscall.
 // ===========================================================================
 bool __cdecl PlayerData_LoadSavedCharacter(PlayerData& Slot, char const* Dir,
                                            char const* FileName) {
     CHARACTER_ID Key;
-    safe_strcpy(Key.Buffer, 0x200, FileName);                         // .text:06d48d79
+    safe_strcpy(Key.Buffer, 0x200, FileName);
     PlayerData::FSavedCharacter& Record = Slot.saved_characters[Key];  // FUN_06d57090
 
     char Path[0x104];
-    _makepath(Path, nullptr, Dir, FileName, nullptr);                  // .text:06d48dac
+    _makepath(Path, nullptr, Dir, FileName, nullptr);
 
     if (PlayerData_LoadSaveRecord(Slot, Path, Record)) {
-        safe_strcpy(Record.FileName, 0x200, FileName);                 // .text:06d48dcf
+        safe_strcpy(Record.FileName, 0x200, FileName);
         return true;
     }
     FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to load saved game %s",
@@ -655,26 +600,24 @@ bool __cdecl PlayerData_LoadSavedCharacter(PlayerData& Slot, char const* Dir,
 }
 
 // ===========================================================================
-// PlayerData_ReloadSavedCharacter -- retail FUN_06d4b5a0 (.text:06d4b5a0 ..
-// .text:06d4b781), thiscall, (FileName), `RET 4`.
+// PlayerData_ReloadSavedCharacter -- retail FUN_06d4b5a0, thiscall.
 // ===========================================================================
 void __cdecl PlayerData_ReloadSavedCharacter(PlayerData& Slot, char const* FileName) {
-    // .text:06d4b5b9 -- the extension is masked to NULL in MP:
-    // `NEG AL / SBB EAX,EAX / NOT EAX / AND EAX,"fl"`.
+    // No ".fl" extension in MP.
     char KeyName[0x104];
     _makepath(KeyName, nullptr, nullptr, FileName, IsMPServer() ? nullptr : "fl");
 
     char AccountDir[0x104];
-    BuildAccountDir(AccountDir, Slot);                                  // .text:06d4b5de .. 06d4b699
+    BuildAccountDir(AccountDir, Slot);
 
     char Path[0x104];
-    _makepath(Path, nullptr, AccountDir, KeyName, nullptr);            // .text:06d4b6b2
+    _makepath(Path, nullptr, AccountDir, KeyName, nullptr);
 
     CHARACTER_ID Key;
-    safe_strcpy(Key.Buffer, 0x200, KeyName);                           // .text:06d4b6d1
+    safe_strcpy(Key.Buffer, 0x200, KeyName);
     PlayerData::FSavedCharacter& Record = Slot.saved_characters[Key];
     if (PlayerData_LoadSaveRecord(Slot, Path, Record)) {
-        safe_strcpy(Record.FileName, 0x200, KeyName);                  // .text:06d4b70d
+        safe_strcpy(Record.FileName, 0x200, KeyName);
         return;
     }
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
@@ -684,14 +627,13 @@ void __cdecl PlayerData_ReloadSavedCharacter(PlayerData& Slot, char const* FileN
 }
 
 // ===========================================================================
-// PlayerData_SaveGame -- retail FUN_06d4c800 (.text:06d4c800 .. .text:06d4ca5c),
-// thiscall, (Name, Description, DescripStrId), `RET 0xc`.
+// PlayerData_SaveGame -- retail FUN_06d4c800, thiscall.
 // ===========================================================================
 bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
                                  wchar_t const* Description, unsigned int DescripStrId) {
     std::string FileName;
     if (Name[0] != '\0') {
-        // .text:06d4c850 -- REP MOVSD of 0x80 dwords, cut at the first '.'.
+        // A fixed 0x200-byte copy, cut at the first '.'.
         char Copy[0x200];
         memcpy(Copy, Name, sizeof(Copy));
         char* Dot = strchr(Copy, '.');
@@ -700,15 +642,14 @@ bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
         FileName.assign(Copy, strlen(Copy));
     } else {
         char AccountDir[0x104];
-        BuildAccountDir(AccountDir, Slot);                              // .text:06d4c8cc .. 06d4c919
+        BuildAccountDir(AccountDir, Slot);
 
-        // .text:06d4c91e -- ESI = rand(); up to 200 probes of <dir>\Save%04x.fl
-        // (the extension is NOT masked in MP here). A name is free when
-        // GetFileAttributesA fails with ERROR_FILE_NOT_FOUND.
+        // Up to 200 probes of <dir>\Save%04x.fl from rand() (extension kept even in
+        // MP). A name is free when GetFileAttributesA fails with ERROR_FILE_NOT_FOUND.
         int Seed = rand();
         for (int Attempt = 1; ; ++Attempt) {
             char Candidate[0x20];
-            sprintf(Candidate, "Save%04x", static_cast<int>(static_cast<short>(Seed))); // MOVSX
+            sprintf(Candidate, "Save%04x", static_cast<int>(static_cast<short>(Seed))); // sign-extended
             char Probe[0x104];
             _makepath(Probe, nullptr, AccountDir, Candidate, "fl");
             if (GetFileAttributesA(Probe) == INVALID_FILE_ATTRIBUTES &&
@@ -723,45 +664,40 @@ bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
     }
 
     if (PlayerData_SerializeToFile(Slot, FileName.c_str(), Description, DescripStrId)) {
-        PlayerData_ReloadSavedCharacter(Slot, FileName.c_str());        // .text:06d4c9e6
+        PlayerData_ReloadSavedCharacter(Slot, FileName.c_str());
         return true;
     }
-    ++Slot.save_failure_count;                                          // .text:06d4ca15
+    ++Slot.save_failure_count;
     return false;
 }
 
 // ===========================================================================
-// PlayerData_MissionSave -- retail FUN_06d4c600 (.text:06d4c600 .. .text:06d4c7f7),
-// thiscall, (DescripStrId), `RET 4`.
+// PlayerData_MissionSave -- retail FUN_06d4c600, thiscall.
 // ===========================================================================
 bool __cdecl PlayerData_MissionSave(PlayerData& Slot, unsigned int DescripStrId) {
     if (!PlayerData_SaveGame(Slot, "", nullptr, DescripStrId))
         return false;
 
-    // .text:06d4c639 .. .text:06d4c768 -- the account name (the inline copy of
-    // FUN_06d46370's hash in MP, wcstombs in SP), then .text:06d4c736
-    // GetUserDataPath + "Accts[\MultiPlayer]" into the global DAT_06d90158, which
-    // is exactly what Server_GetAccountsRoot builds.
+    // Retail inlines the account-name hash and rebuilds the accounts root into
+    // DAT_06d90158, which is what Server_GetAccountsRoot returns.
     char AccountDirName[0x104];
     BuildAccountDirName(AccountDirName, Slot);
     char AccountDir[0x104];
     _makepath(AccountDir, nullptr, Server_GetAccountsRoot(), AccountDirName, nullptr);
 
-    // .text:06d4c7b9 -- <dir>\AutoSave.fl, extension unmasked.
+    // Extension kept even in MP.
     char Destination[0x104];
     _makepath(Destination, nullptr, AccountDir, "AutoSave", "fl");
 
-    // .text:06d4c7e9 -- CopyFileA(last written path, dest, FALSE); its BOOL is
-    // what AL carries out.
+    // The just-written save is copied to AutoSave.fl.
     return CopyFileA(GServerLastSavePath, Destination, FALSE) != 0;
 }
 
 // ===========================================================================
-// PlayerData_AutoSave -- retail FUN_06d4c430 (.text:06d4c430 .. .text:06d4c5e0).
+// PlayerData_AutoSave -- retail FUN_06d4c430.
 // ===========================================================================
 bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
     if (IsMPServer()) {
-        // .text:06d4c447 .. .text:06d4c465
         if (IsMPServer() && !Slot.selected_character.is_valid())
             return false;
         if (Slot.system_id == 0)                                        // +0x3e0
@@ -769,13 +705,12 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
     }
 
     if (IsMPServer()) {
-        // .text:06d4c47f -- find(selected) with NO end() test: CharacterSelect
-        // stores +0x64 only after its own find succeeded (.text:06d4a62f), so
-        // retail never reaches here without a record.
+        // No end() test: CharacterSelect stores +0x64 only after its own find
+        // succeeded, so a record always exists.
         std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
             Slot.saved_characters.find(Slot.selected_character);
 
-        // .text:06d4c4f8 .. .text:06d4c52b -- "<date> <time>".
+        // "<date> <time>".
         char Time[0x10];
         char Date[0x10];
         wchar_t Description[0x200];
@@ -786,8 +721,7 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
         return PlayerData_SerializeToFile(Slot, It->second.FileName, Description, 0);
     }
 
-    // .text:06d4c557 -- single player. Universe::IBase vtable +0x54 is the
-    // port's IBase::bAutosaveForbidden field.
+    // Single player. Universe::IBase vt+0x54 is the port's IBase::bAutosaveForbidden.
     bool bAllowed = true;
     if ((Slot.current_base & 0x3fffffff) != 0) {
         Universe::IBase const* Base = Universe::get_base(Slot.current_base);
@@ -796,10 +730,10 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
     }
     if (Slot.bSkipNextAutosave == 0 && bAllowed) {
         char Name[0x200];
-        safe_strcpy(Name, 0x200, "AutoSave");                           // .text:06d4c5a5
-        return PlayerData_SaveGame(Slot, Name, nullptr, 0x65c);         // .text:06d4c5bf
+        safe_strcpy(Name, 0x200, "AutoSave");
+        return PlayerData_SaveGame(Slot, Name, nullptr, 0x65c);
     }
-    Slot.bSkipNextAutosave = 0;                                         // .text:06d4c5ce
+    Slot.bSkipNextAutosave = 0;
     return false;
 }
 
@@ -812,69 +746,63 @@ void __cdecl PlayerData_SkipNextAutosave(PlayerData& Slot) {
 
 // ===========================================================================
 // PlayerData_ApplySavedCharacter -- the record -> slot copy of retail
-// FUN_06d4a5d0, .text:06d4ac77 .. .text:06d4b089. EBP is the record, EBX the
-// slot.
+// FUN_06d4a5d0, .text:06d4ac77 .. .text:06d4b089.
 // ===========================================================================
 void __cdecl PlayerData_ApplySavedCharacter(PlayerData& Slot,
                                             PlayerData::FSavedCharacter const& Record,
                                             unsigned int SessionId) {
-    // .text:06d4ac77 .. .text:06d4acc7
     Slot.current_base = Record.BaseId;                                  // +0x3ec
     Slot.last_base_id = Record.LastBaseId;                              // +0x3f0
     Slot.current_location = Record.LocationId;                          // +0x3f8
     if ((Record.BaseId & 0x3fffffff) != 0) {
         Slot.last_base_id = Record.BaseId;
-        // IBase vtable +0x10 -- the port's IBase::SystemId field.
+        // IBase vt+0x10 is the port's IBase::SystemId.
         Slot.system_id = Universe::get_base(Record.BaseId)->SystemId;
     } else {
         Slot.system_id = Record.SystemId;
     }
 
-    // .text:06d4acc1 .. .text:06d4ada2 -- the rep vibe is rebuilt.
+    // The rep vibe is rebuilt.
     if (Slot.rep_vibe != -1) {
         ::Reputation::Vibe::Free(Slot.rep_vibe);
         Slot.rep_vibe = -1;
     }
     Server_VibeID_Alloc(reinterpret_cast<unsigned int*>(&Slot.rep_vibe)); // FUN_06d45b60
-    ::Reputation::Vibe::Alloc(Slot.rep_vibe);                           // .text:06d4ace9
+    ::Reputation::Vibe::Alloc(Slot.rep_vibe);
     ::Reputation::Vibe::SetClientID(Slot.rep_vibe, SessionId);
-    FmtStr const EmptyName;                                             // .text:06d4ad03
+    FmtStr const EmptyName;
     ::Reputation::Vibe::Set(Slot.rep_vibe, Record.RepGroup, Record.Rank,
                             static_cast<unsigned char>(Record.Relations.size()),
                             Record.Relations.empty() ? nullptr : &Record.Relations[0],
                             EmptyName, EmptyName, Record.Name.c_str());
 
-    // .text:06d4ada8 -- the com_ costume: four parts, the count, then only
-    // `count` accessory ids.
+    // The com_ costume: four parts, the count, then only `count` accessory ids.
     for (int Part = 0; Part < 4; ++Part)
         Slot.com_costume.PartIds[Part] = Record.ComCostume.PartIds[Part];
     Slot.com_costume.AccessoryCount = Record.ComCostume.AccessoryCount;
     for (int I = 0; I < static_cast<int>(Slot.com_costume.AccessoryCount); ++I)
         Slot.com_costume.AccessoryIds[I] = Record.ComCostume.AccessoryIds[I];
 
-    // .text:06d4adf2 -- FUN_06d03cf0(slot+0x2c4, 0x20, record+0x30c).
+    // slot+0x2c4 from record+0x30c.
     Slot.voice_length = CopyBoundedString(Slot.voice, 0x20, Record.Voice.Data);
 
-    // .text:06d4ae25 -- the bare costume, same shape.
+    // The base costume, same shape.
     for (int Part = 0; Part < 4; ++Part)
         Slot.costume.PartIds[Part] = Record.BaseCostume.PartIds[Part];
     Slot.costume.AccessoryCount = Record.BaseCostume.AccessoryCount;
     for (int I = 0; I < static_cast<int>(Slot.costume.AccessoryCount); ++I)
         Slot.costume.AccessoryIds[I] = Record.BaseCostume.AccessoryIds[I];
 
-    // .text:06d4ae70 .. .text:06d4ae9d
     Slot.initial_pos[0] = Record.Position[0];
     Slot.initial_pos[1] = Record.Position[1];
     Slot.initial_pos[2] = Record.Position[2];
     memcpy(Slot.initial_ornt, Record.Orientation, sizeof(Slot.initial_ornt));
 
-    // .text:06d4ae9f .. .text:06d4af28
     Slot.ship_archetype = Record.ShipArchetype;                         // +0x264
     Slot.relative_health = Record.HullStatus;                           // +0x268
-    Slot.equipment.Items = Record.Equipment.Items;                      // list::operator=
+    Slot.equipment.Items = Record.Equipment.Items;
     Slot.collision_groups = Record.CollisionGroups;                     // +0x26c
 
-    // .text:06d4af2e .. .text:06d4afab
     Slot.cash = Record.Money;                                           // +0x31c
     Slot.equip_id_maker = Record.EquipIdMaker;                          // +0x3c8
     Slot.num_kills = Record.NumKills;                                   // +0x334
@@ -890,7 +818,6 @@ void __cdecl PlayerData_ApplySavedCharacter(PlayerData& Slot,
     Slot.starting_ring = Record.StartingRing;                           // +0x414
     Slot.rank_level = Record.Rank;                                      // +0x284
 
-    // .text:06d4afc8 .. .text:06d4b096
     Slot.weapon_group_name = Record.WeaponGroups;                       // +0x380
     Slot.visit_map = Record.Visits;                                     // +0x3a0
     Slot.mission_log = Record.MissionLog;                               // +0x390
@@ -898,13 +825,10 @@ void __cdecl PlayerData_ApplySavedCharacter(PlayerData& Slot,
 }
 
 // ===========================================================================
-// PlayerData_SendVisitedState -- retail FUN_06d4b520 (.text:06d4b520 ..
-// .text:06d4b58f), thiscall on the slot, (SessionId), `RET 4`.
-//   06d4b527  n = [this+0x3b0] (visit map size) ; 06d4b52d size = n*5 + 4
-//   06d4b532  block = operator new(size) ; block[0] = n
-//   06d4b550  per map node in order: dword key (+0xc), byte flags (+0x10), 5-byte stride
-//   06d4b584  IClient +0x170 (slot 92)(SessionId, block, size) -- rpclocal's
-//             sender (0x06d8b540, ch1 op 0x13) keeps the block and frees it
+// PlayerData_SendVisitedState -- retail FUN_06d4b520, thiscall on the slot.
+// Block: dword count, then {dword system id, byte flags} per visit (5-byte stride).
+// Sent through IClient +0x170 (slot 92); rpclocal's sender (0x06d8b540, ch1 op 0x13)
+// keeps and frees the block.
 // ===========================================================================
 void __cdecl PlayerData_SendVisitedState(PlayerData& Slot, unsigned int SessionId) {
     unsigned int const Count = static_cast<unsigned int>(Slot.visit_map.size());
@@ -923,9 +847,8 @@ void __cdecl PlayerData_SendVisitedState(PlayerData& Slot, unsigned int SessionI
 
 namespace {
 
-// FUN_06d50850 (thiscall on FmtStr, plain RET): 6 + per Val 7, 0x17 for tag
-// 0x4e, (this function on the nested FmtStr) + 3 for tag 0x21. FUN_06d50740
-// inlines the same loop for each log entry (.text:06d50768 .. .text:06d507b7).
+// FUN_06d50850 (thiscall on FmtStr): the serialized size of one log entry.
+// FUN_06d50740 inlines the same loop.
 int MissionLogEntrySize(FmtStr const& Entry) {
     int Size = 6;
     for (FmtStr::Val const* Node = Entry.Head; Node != nullptr; Node = Node->Next) {
@@ -933,7 +856,7 @@ int MissionLogEntrySize(FmtStr const& Entry) {
         if (Tag == 0x21)
             Size += MissionLogEntrySize(*Node->Subtree) + 3;
         else
-            Size += (Tag == 0x4e) ? 0x17 : 7;   // SETE / DEC / AND 0xfffffff0 / ADD 0x17
+            Size += (Tag == 0x4e) ? 0x17 : 7;
     }
     return Size;
 }
@@ -941,14 +864,10 @@ int MissionLogEntrySize(FmtStr const& Entry) {
 } // namespace
 
 // ===========================================================================
-// PlayerData_SendMissionLog -- retail FUN_06d50740 (.text:06d50740 ..
-// .text:06d50844), thiscall on the slot, (SessionId), `RET 4`.
-//   size = 8 + sum(entry sizes)             .text:06d50762 .. .text:06d507b7
-//   block = operator new(size); [0] = 1, [1] = list size (+0x398)
-//   cursor = block + 8, offset = 8; AppendMissionLogData(&entry, cursor, offset, size)
-//   per entry (.text:06d50813), then IClient +0x184 (slot 97)(SessionId, block,
-//   offset) -- the running offset, not `size` (.text:06d50824). rpclocal keeps and
-//   frees the block (flag 1, sender 0x06d8b7f0).
+// PlayerData_SendMissionLog -- retail FUN_06d50740, thiscall on the slot.
+// Header {1, entry count (+0x398)}, then the entries. IClient +0x184 (slot 97) gets
+// the running offset, not `Size`; rpclocal keeps and frees the block (sender
+// 0x06d8b7f0).
 // ===========================================================================
 void __cdecl PlayerData_SendMissionLog(PlayerData& Slot, unsigned int SessionId) {
     int Size = 8;
@@ -969,25 +888,23 @@ void __cdecl PlayerData_SendMissionLog(PlayerData& Slot, unsigned int SessionId)
 
 // ===========================================================================
 // PlayerData_LoadSelectedCharacter -- the second half of retail FUN_06d4a5d0,
-// .text:06d4aa85 .. .text:06d4b1fa (both the SP and MP paths join here).
-// EBX is the slot, EBP the found record (node + 0x20c), [ESP+0x1924] the session.
+// .text:06d4aa85 .. .text:06d4b1fa, where the SP and MP paths join. The record is
+// the found map node + 0x20c.
 // ===========================================================================
 bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
                                               PlayerData::FSavedCharacter const& Record,
                                               unsigned int SessionId) {
-    // .text:06d4aa85 .. .text:06d4ab60 -- <accts>\<account dir>\<record file name>:
-    // FUN_06d46370 in MP / wcstombs in SP, the Accts root into DAT_06d90158,
-    // then _makepath(S+0x9c, NULL, S+0x9c, record+0x000, NULL).
+    // <accts>\<account dir>\<record file name>.
     char AccountDir[0x104];
     BuildAccountDir(AccountDir, Slot);
     char Path[0x104];
     _makepath(Path, nullptr, AccountDir, Record.FileName, nullptr);
 
-    // .text:06d4ab63 .. .text:06d4ac57 -- the file again, the same FLS1 / FLSG /
-    // plain three-way as FUN_06d47120. open_memory runs on every path, over an
-    // empty buffer when fopen failed or the file is FLSG (.text:06d4ac3d).
-    FSaveFileBuffer Buffer;                                             // S+0x4c, SaveGame ctor inlined
-    INI_Reader Reader;                                                  // S+0x3a8
+    // The file is read again with the same FLS1 / FLSG / plain three-way as
+    // FUN_06d47120. open_memory runs on every path, over an empty buffer when fopen
+    // failed or the file is FLSG.
+    FSaveFileBuffer Buffer;
+    INI_Reader Reader;
     Buffer.File = fopen(Path, "rt");
     if (Buffer.File != nullptr) {
         char Magic[4] = { 0, 0, 0, 0 };
@@ -996,8 +913,8 @@ bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
             fclose(Buffer.File);
             Buffer.File = fopen(Path, "rb");
             if (Buffer.File != nullptr) {
-                Buffer.ReadTail(4);                     // FUN_06d48960
-                Buffer.Encode();                        // FUN_06d48b60
+                Buffer.ReadTail(4);
+                Buffer.Encode();
             }
         } else if (memcmp(Magic, "FLSG", 4) != 0) {
             Buffer.ReadTail(0);
@@ -1006,74 +923,57 @@ bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
     Reader.open_memory(Buffer.Contents.c_str(),
                        static_cast<unsigned int>(Buffer.Contents.size()));
 
-    // .text:06d4ac5d .. .text:06d4ac6f -- single player only: [Time], feelings,
-    // controller event 0x40 (FUN_06d44810, IServerImpl.cpp).
+    // Single player only: [Time], feelings, controller event 0x40 (FUN_06d44810).
     if (SinglePlayer())
         Server_LoadSinglePlayerState(Reader);
 
-    // .text:06d4ac77 .. .text:06d4b096 -- the record -> slot copy.
     PlayerData_ApplySavedCharacter(Slot, Record, SessionId);
 
-    // .text:06d4b09f -- this->FUN_06d4b520(SessionId).
     PlayerData_SendVisitedState(Slot, SessionId);
 
-    // .text:06d4b0a4 .. .text:06d4b0d5 -- IClient +0x16c (slot 91)(SessionId,
-    // weapon groups c_str, strlen). rpclocal's sender leaves the not-owned flag
-    // clear (payload+0x08 = 0), so the string's own buffer goes out as is.
+    // IClient +0x16c (slot 91). rpclocal's sender leaves the not-owned flag clear
+    // (payload+0x08 = 0), so the string's own buffer goes out as is.
     char const* const WeaponGroups = Slot.weapon_group_name.c_str();
     g_pClientInterface->SendCommonSetWeaponGroup(SessionId,
                                                  reinterpret_cast<const unsigned char*>(WeaponGroups),
                                                  static_cast<unsigned int>(strlen(WeaponGroups)));
 
-    // .text:06d4b0e5 -- this->FUN_06d50740(SessionId).
     PlayerData_SendMissionLog(Slot, SessionId);
 
-    // .text:06d4b0f3 .. .text:06d4b10f -- a 4-byte operator new block holding
-    // +0x39c, IClient +0x188 (slot 98)(SessionId, block, 4); rpclocal owns it.
+    // A 4-byte block holding +0x39c, IClient +0x188 (slot 98); the packet takes it over.
     unsigned int* const InterfaceBlock = static_cast<unsigned int*>(::operator new(4));
     *InterfaceBlock = Slot.interface_state;
-    // A fresh operator-new block: SendCommonSetInterfaceState's packet takes it over.
     g_pClientInterface->SendCommonSetInterfaceState(SessionId,
                                                     reinterpret_cast<unsigned char*>(InterfaceBlock), 4);
 
-    // .text:06d4b115 .. .text:06d4b132 -- FUN_06d43650(5, &{SessionId, &reader}):
-    // the character-loaded broadcast hands the controllers the open reader.
+    // FUN_06d43650(5, ...): the character-loaded broadcast hands the controllers the
+    // open reader.
     struct FCharacterLoadedEvent {
-        unsigned int SessionId;                                         // S+0x64
-        INI_Reader* Reader;                                             // S+0x68
+        unsigned int SessionId;
+        INI_Reader* Reader;
     };
     FCharacterLoadedEvent Event;
     Event.SessionId = SessionId;
     Event.Reader = &Reader;
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLoad, &Event);
 
-    // .text:06d4b13a .. .text:06d4b1dc -- ~FmtStr, ~INI_Reader, fclose, the buffer.
     if (Buffer.File != nullptr) {
         fclose(Buffer.File);
         Buffer.File = nullptr;
     }
-    return true;                                                        // .text:06d4b1e2
+    return true;
 }
 
 // ===========================================================================
-// PlayerData_CreateNewCharacter -- retail FUN_06d4b790 (.text:06d4b790 ..
-// .text:06d4c227), thiscall on the PlayerData, (SCreateCharacterInfo const*),
-// `RET 4`. Only caller: PlayerDB::create_new_character, .text:06d541a0.
-//
-// Frame (S = ESP after the four register pushes): +0x13 result byte, +0x14 pilot,
-// +0x18 package, +0x1c home-base record, +0x6c faction, +0x24 the SaveGame_Writer
-// (vptr 06d6b5c0 then 06d6b5a0, FILE* +0x28, buffer +0x2c, path +0x3c), +0x54 the
-// template {FILE*, string}, +0x70 "<hash>.fl", +0x88 hash / module path / template
-// path, +0x18c the output path, +0x594 one substituted value, +0x994 the joined
-// value line, +0xd94 the INI_Reader.
+// PlayerData_CreateNewCharacter -- retail FUN_06d4b790, thiscall on the PlayerData.
+// Only caller: PlayerDB::create_new_character, .text:06d541a0. Writes
+// <account dir>\<name hash>.fl from (MP)NewCharacter.fl with the %%...%% placeholders
+// substituted from NewChar::TheDB.
 // ===========================================================================
 namespace {
 
-// FUN_06d464f0 (cdecl, (Out, AccountName)), .text:06d464f0 .. .text:06d466ea:
-// MP -- the FUN_06d46370 hash inlined (.text:06d46512 .. .text:06d465fb), SP --
-// wcstombs(buf, name, 0x104) (.text:06d46681); both then GetUserDataPath +
-// "Accts[\MultiPlayer]" into DAT_06d90158 (what Server_GetAccountsRoot builds)
-// and _makepath(Out, NULL, DAT_06d90158, buf, NULL).
+// FUN_06d464f0: <accounts root>\<account dir> for an account name (the FUN_06d46370
+// hash inlined in MP, wcstombs in SP).
 void BuildAccountDirForName(char* Out, wchar_t const* AccountName) {
     char AccountDirName[0x104];
     if (IsMPServer())
@@ -1086,49 +986,41 @@ void BuildAccountDirForName(char* Out, wchar_t const* AccountName) {
 } // namespace
 
 bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInfo const& Info) {
-    // .text:06d4b7d0 -- FUN_06d464f0(S+0x18c, this). The `this == NULL` arm
-    // (.text:06d4b7f2, empty directory) is unreachable: the only caller passes
-    // EBP = &m_PlayerArray[SessionId - 1] (.text:06d5416f).
+    // Retail's `this == NULL` arm (empty directory) is unreachable: the only caller
+    // passes &m_PlayerArray[SessionId - 1].
     char AccountDir[0x104];
     BuildAccountDirForName(AccountDir, Slot.AccountName);
 
-    // .text:06d4b80a -- FUN_06d46370 over the NEW character's name (always the
-    // hash, in SP too), then "<hash>" + "." + "fl" (.rdata:06d6aecc / 06d6aea4).
+    // The file name is the FUN_06d46370 hash of the new character's name, in SP too.
     char HashName[0x104];
     Server_AccountDirName(HashName, Info.Name);
     std::string FileName(HashName);
     FileName.append(".");
     FileName.append("fl");
 
-    // .text:06d4b899 -- _makepath(S+0x18c, NULL, S+0x18c, hash, "fl"); retail
-    // uses the same buffer as directory and destination.
+    // Retail uses one buffer as both directory and destination.
     char Path[0x104];
     _makepath(Path, nullptr, AccountDir, HashName, "fl");
-    _strlwr(HashName);                                   // .text:06d4b8a3
+    _strlwr(HashName);
 
-    // .text:06d4b8a9 .. .text:06d4b901 -- NewChar::TheDB slots 0, 1, 3, 2.
-    // Common's Load (Common.dll .text:063149d0) fills retail's four trees as
-    // [Faction] -> +0x04 (slot 6 insert, slot 0 find), [Package] -> +0x18
-    // (slot 7 / slot 1), [Pilot] -> +0x2c (slot 8 / slot 2), and every faction
-    // `base` -> +0x40 as {CreateID(base), base} (slot 9 / slot 3). The port calls
-    // those finds by name; common_newchar.h declares them in this slot order
-    // (labels corrected 2026-09-24).
+    // NewChar::TheDB find slots 0, 1, 3, 2 (Common.dll's Load, .text:063149d0, fills
+    // [Faction], [Package], [Pilot] and every faction `base`); common_newchar.h
+    // declares them in slot order.
     NewChar::IDatabase const* Database = NewChar::TheDB;
-    FNewCharFaction const* Faction = Database->FindFaction(Info.FactionId);   // S+0x6c
-    FNewCharPackage const* Package = Database->FindPackage(Info.PackageId);   // S+0x18
-    FNewCharExtra const* HomeBase = Database->FindExtra(Info.BaseId);      // S+0x1c
-    FNewCharPilot const* Pilot = Database->FindPilot(Info.PilotId);         // S+0x14
+    FNewCharFaction const* Faction = Database->FindFaction(Info.FactionId);
+    FNewCharPackage const* Package = Database->FindPackage(Info.PackageId);
+    FNewCharExtra const* HomeBase = Database->FindExtra(Info.BaseId);
+    FNewCharPilot const* Pilot = Database->FindPilot(Info.PilotId);
 
-    // .text:06d4b905 .. .text:06d4b93a -- all four missing: false, no file.
+    // Only all four missing returns early with no file.
     if (Faction == nullptr && Package == nullptr && HomeBase == nullptr && Pilot == nullptr)
         return false;
 
-    bool bResult = false;                                // S+0x13, .text:06d4b8ba
+    bool bResult = false;
     {
-        SaveGame_Writer Writer;                             // .text:06d4b93f .. 06d4b975
-        // .text:06d4b990 .. .text:06d4b9f7 -- path assigned, fopen(path, "w+t").
+        SaveGame_Writer Writer;
         if (Writer.Open(Path)) {
-            // .text:06d4ba0b .. .text:06d4ba5d -- the template beside the exe.
+            // The template beside the exe.
             char ModulePath[0x104];
             GetModuleFileNameA(nullptr, ModulePath, 0x104);
             char Drive[_MAX_DRIVE];
@@ -1138,64 +1030,57 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
             _makepath(TemplatePath, Drive, Dir,
                       SinglePlayer() ? "NewCharacter.fl" : "MPNewCharacter.fl", nullptr);
 
-            FSaveFileBuffer Template;                    // S+0x54, SaveGame ctor inlined
-            INI_Reader Reader;                           // S+0xd94
+            FSaveFileBuffer Template;
+            INI_Reader Reader;
 
-            // .text:06d4ba97 -- fopen "rt", then the same FLS1 / FLSG / plain
-            // three-way FUN_06d47120 uses.
+            // The same FLS1 / FLSG / plain three-way FUN_06d47120 uses.
             bool bOpened = false;
             Template.File = fopen(TemplatePath, "rt");
             if (Template.File != nullptr) {
                 char Magic[4] = { 0, 0, 0, 0 };
                 fread(Magic, 1, 4, Template.File);
                 if (memcmp(Magic, Server_FLS1Magic, 4) == 0) {
-                    fclose(Template.File);               // .text:06d4bae3
+                    fclose(Template.File);
                     Template.File = fopen(TemplatePath, "rb");
                     if (Template.File != nullptr) {
-                        Template.ReadTail(4);         // FUN_06d48960
-                        Template.Encode();            // FUN_06d48b60
+                        Template.ReadTail(4);
+                        Template.Encode();
                         bOpened = true;
                     }
                 } else if (memcmp(Magic, "FLSG", 4) != 0) {
-                    // .text:06d4bb33 -- plain text from offset 0. "FLSG" instead
-                    // jumps straight to .text:06d4bf63, file left open until the
-                    // teardown at .text:06d4c086.
+                    // Plain text. "FLSG" skips to the finalize, the file left open
+                    // until teardown.
                     Template.ReadTail(0);
                     bOpened = true;
                 }
             }
 
             if (bOpened) {
-                // .text:06d4bb68
                 Reader.open_memory(Template.Contents.c_str(),
                                    static_cast<unsigned int>(Template.Contents.size()));
-                // .text:06d4bb6e .. .text:06d4bb8e -- any one missing: close the
-                // reader, result stays false, but the (empty) output is still
-                // finalized below.
+                // Any one missing: result stays false, but the (empty) output is
+                // still finalized below.
                 if (Faction != nullptr && Package != nullptr && HomeBase != nullptr &&
                     Pilot != nullptr) {
-                    FILE* const Out = Writer.File;       // [writer+4], .text:06d4bbc2
-                    // S+0x994. Retail never clears it between keys: a key with no
-                    // values (.text:06d4bd06 JLE straight to the fprintf) prints
-                    // whatever the previous key joined. Its first contents are
-                    // stack garbage in retail; "" here is the only defined choice.
+                    FILE* const Out = Writer.File;
+                    // Retail never clears this between keys: a key with no values
+                    // prints whatever the previous key joined. Its first contents are
+                    // stack garbage in retail; "" is the only defined choice.
                     char Joined[0x400];
                     Joined[0] = '\0';
                     while (Reader.read_header()) {
-                        fprintf(Out, "\n[%s]\n", Reader.get_header_ptr());      // .text:06d4bbcd
+                        fprintf(Out, "\n[%s]\n", Reader.get_header_ptr());
                         while (Reader.read_value()) {
-                            char const* const Key = Reader.get_name_ptr();      // S+0x68
+                            char const* const Key = Reader.get_name_ptr();
                             if (_stricmp(Key, "%%Package%%") == 0) {
-                                // .text:06d4bc0f -- ship, then the loadout.
-                                // package +0x10 / +0x20, each through the c_str idiom.
+                                // Ship, then the loadout (package +0x10 / +0x20).
                                 fprintf(Out, "%s = %s\n", "ship_archetype", Package->Ship.c_str());
-                                // No null test on Loadout::Get (.text:06d4bc4e reads [EAX+8]).
+                                // No null test on Loadout::Get.
                                 Loadout::Map const* Map =
                                     Loadout::Get(Loadout::GetID(Package->Loadout.c_str()));
                                 for (std::vector<EquipDesc>::const_iterator It = Map->Items.begin();
                                      It != Map->Items.end(); ++It) {
-                                    // .text:06d4bc60 -- stride 0x20, byte +0xc picks
-                                    // equip vs cargo; an unknown arch is skipped.
+                                    // An unknown archetype is skipped.
                                     Archetype::Equipment const* Equipment =
                                         Archetype::GetEquipment(It->ArchId);
                                     if (Equipment == nullptr)
@@ -1212,8 +1097,7 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
                                 continue;
                             }
 
-                            // .text:06d4bcee -- every value, substituted, joined
-                            // with ", " (.rdata:06d6b564).
+                            // Every value, substituted, joined with ", ".
                             int const Count = static_cast<int>(Reader.get_num_parameters());
                             for (int Index = 0; Index < Count; ++Index) {
                                 if (Index == 0)
@@ -1221,13 +1105,13 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
                                 else
                                     strcat(Joined, ", ");
                                 char const* Value = Reader.get_value_string(static_cast<unsigned int>(Index));
-                                char Scratch[0x400];                              // S+0x594
+                                char Scratch[0x400];
                                 if (Value[0] == '%') {
                                     if (_stricmp(Value, "%%Name%%") == 0) {
-                                        WideToHex(Info.Name, Scratch);            // .text:06d4bd7d
+                                        WideToHex(Info.Name, Scratch);
                                         Value = Scratch;
                                     } else if (_stricmp(Value, "%%Faction%%") == 0) {
-                                        Value = Faction->RepGroup.c_str();        // faction +0x08 (the string's pointer)
+                                        Value = Faction->RepGroup.c_str();        // faction +0x08
                                     } else if (_stricmp(Value, "%%Money%%") == 0) {
                                         sprintf(Scratch, "%u", static_cast<unsigned int>(Package->Money)); // package +0x2c
                                         Value = Scratch;
@@ -1238,41 +1122,36 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
                                     } else if (_stricmp(Value, "%%Voice%%") == 0) {
                                         Value = Pilot->Voice.c_str();             // pilot +0x48
                                     } else if (_stricmp(Value, "%%Home_System%%") == 0) {
-                                        // .text:06d4be3d -- record +0x00 is the key the
-                                        // find matched; a missing base or system keeps
-                                        // the literal placeholder (.text:06d4be4f /
-                                        // .text:06d4be64 jump past the store).
+                                        // A missing base or system keeps the literal
+                                        // placeholder.
                                         Universe::IBase const* Base = Universe::get_base(Info.BaseId);
                                         if (Base != nullptr) {
-                                            // IBase vtable +0x10 / ISystem vtable +0x08 --
-                                            // the port's plain SystemId / Nickname fields.
+                                            // IBase vt+0x10 / ISystem vt+0x08 are the
+                                            // port's SystemId / Nickname fields.
                                             Universe::ISystem const* System =
                                                 Universe::get_system(Base->SystemId);
                                             if (System != nullptr)
                                                 Value = System->Nickname;
                                         }
                                     } else if (_stricmp(Value, "%%Home_Base%%") == 0) {
-                                        // .text:06d4be80-06d4be8b: [record+0x08] is the
-                                        // string's pointer, read through the c_str idiom.
+                                        // Home-base record +0x08.
                                         Value = HomeBase->Value.c_str();
                                     }
                                 }
-                                strcat(Joined, Value);                            // .text:06d4be91
+                                strcat(Joined, Value);
                             }
-                            fprintf(Out, "%s = %s\n", Key, Joined);               // .text:06d4beee
+                            fprintf(Out, "%s = %s\n", Key, Joined);
                         }
-                        fprintf(Out, "\n");                                       // .rdata:06d6af50
+                        fprintf(Out, "\n");
                     }
-                    bResult = true;                                               // .text:06d4bf3f
+                    bResult = true;
                 }
-                Reader.close();                                                   // .text:06d4bf46 / 06d4bf5b
+                Reader.close();
             }
 
-            // .text:06d4bf69 .. .text:06d4bfea -- the writer's encode-and-rewrite,
-            // on every path that opened the output.
+            // Encode-and-rewrite on every path that opened the output.
             Writer.Close();
 
-            // .text:06d4bfee .. .text:06d4c0b5 -- ~INI_Reader, close the template.
             if (Template.File != nullptr) {
                 fclose(Template.File);
                 Template.File = nullptr;
@@ -1280,20 +1159,13 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
         }
 
         if (bResult) {
-            // .text:06d4c0d7 -- this->FUN_06d4b5a0("<hash>.fl").
             PlayerData_ReloadSavedCharacter(Slot, FileName.c_str());
             if (!SinglePlayer()) {
                 FDUMP(0x100003, "LOG: Create character on account %S (\"%s\")\n",
-                      Slot.AccountName, Path);                                    // .text:06d4c0ff
+                      Slot.AccountName, Path);
             }
         }
-        // .text:06d4c104 -- the writer's destructor; its FILE* is already null.
+        // The writer's destructor finds its FILE* already null.
     }
     return bResult;
 }
-
-// DeleteCharacterSave / CharacterSaveExists were removed 2026-09-24
-// (claude:srv-save-2). Both built a path from a bare character NAME under the
-// accounts root, which retail never does. IServerImpl::DestroyCharacter now
-// runs retail's FUN_06d49f60 (PlayerData_DestroyCharacter, server_classes.cpp),
-// and CharacterSaveExists had no caller.

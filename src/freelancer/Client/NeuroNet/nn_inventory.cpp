@@ -91,26 +91,21 @@ FInventoryShipModel::FInventoryShipModel()
     , Loadout()
     , bFlag28(0)
 {
-    // FUN_004c6140: +0x1c allocator byte (an uninitialised stack byte), +0x20 head node,
-    // +0x24 = 0, then +0x00/+0x04/+0x08/+0x0c/+0x18 = 0. +0x10 and +0x14 are not written;
-    // the port zeroes them with the rest.
+    // FUN_004c6140. Retail leaves +0x10 and +0x14 unwritten; the port zeroes them with the rest.
     InfoText = nullptr;
 
-    // 004c618e..004c61c5: FUN_004c6250 inlined -- clear the (just created, so empty) list,
-    // +0x28 = 0, and the view calls behind `if (+0x00)`, which was zeroed above.
+    // FUN_004c6250 inlined; the list is still empty and the view null.
     Clear();
 }
 
 FInventoryShipModel::~FInventoryShipModel()
 {
-    // FUN_004c6200: erase every node, free the head, +0x20 = +0x24 = 0. The EquipDescList
-    // member's own destructor does the same.
+    // FUN_004c6200; the EquipDescList member's own destructor frees the list.
 }
 
 void FInventoryShipModel::Clear()
 {
-    // FUN_004c6250: unlink and free every node (size counted down), +0x28 = 0, then
-    // FUN_00585d90(0, 0) and FUN_00585bd0(-1, 0, 0) on the view if there is one.
+    // FUN_004c6250.
     Loadout.Items.clear();
     bFlag28 = 0;
     if (ShipView != nullptr)
@@ -131,11 +126,9 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bF
     if (ShipArch == nullptr)
         return;
 
-    // 004c62e6..004c6316: std::list::erase(begin, end) (the Common import), +0x28 = 0 and the
-    // view's two select calls -- FUN_004c6250's body.
+    // FUN_004c6250's body, inlined in retail.
     Clear();
 
-    // 004c631b..004c633b
     bFlag28 = bFlag;
     if (ShipView != nullptr)
     {
@@ -143,10 +136,8 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bF
         ShipView->LoadEquipment(Source);                          // FUN_005850f0
     }
 
-    // 004c6340..004c6344
     SortFrom(Source);
 
-    // 004c6349..004c6373: every item that is a good gets this model as its owner.
     for (std::list<EquipDesc>::iterator It = Loadout.Items.begin(); It != Loadout.Items.end(); ++It)
     {
         EquipDesc& Item = *It;
@@ -154,13 +145,10 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bF
             Item.set_owner(static_cast<int>(reinterpret_cast<intptr_t>(this)));
     }
 
-    // 004c6379..004c638b: the name label's slot 42 (0x1e, ids_name, 0).
     if (NameText != nullptr)
         NameText->SetProperty(0x1e, static_cast<uintptr_t>(ShipArch->IdsName), 0);
 
-    // 004c6391..004c63c6: the damage bar's slot 42 (0x40, 100, ftol(health * 100.0f)), then
-    // (3, 0x408, 0). The product is formed on the x87 stack; the double product of two floats
-    // is exact, as the extended one is.
+    // The x87 product of two floats is exact in double, as it is in extended precision.
     if (DamageBar != nullptr)
     {
         int const Health = static_cast<int>(static_cast<double>(GetPlayerHealthScaleRetail()) *
@@ -188,7 +176,6 @@ bool FInventoryShipModel::RemoveItem(EquipDesc const* Desc, int Count)
     if (Take == 0)
         Take = static_cast<unsigned>(Desc->Count);
 
-    // 004c6444..004c645b: find the node whose value is Desc.
     std::list<EquipDesc>::iterator Found = Loadout.Items.begin();
     for (; Found != Loadout.Items.end(); ++Found)
     {
@@ -198,8 +185,7 @@ bool FInventoryShipModel::RemoveItem(EquipDesc const* Desc, int Count)
     if (Found == Loadout.Items.end())
         return false;
 
-    // 004c6465..004c6490: all of it (unsigned compare) unlinks the node, otherwise the count
-    // drops by Take.
+    // Unsigned compare.
     EquipDesc& Item = *Found;
     unsigned const Have = static_cast<unsigned>(Item.Count);
     if (Take >= Have)
@@ -207,7 +193,6 @@ bool FInventoryShipModel::RemoveItem(EquipDesc const* Desc, int Count)
     else
         Item.set_count(static_cast<int>(Have - Take));
 
-    // 004c6496..004c64a0
     if (ShipView != nullptr)
         ShipView->LoadEquipment(&Loadout);
     return true;
@@ -238,8 +223,8 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
     if (Desc == nullptr || ShipView == nullptr)
         return false;
 
-    // 004c6564..004c65fd: does Count of it fit in the hold? The volume is taken for at least
-    // one unit; both sides are truncated and compared unsigned.
+    // Hold check: the volume is taken for at least one unit; both sides are truncated and
+    // compared unsigned.
     bool bNoRoom = false;
     int Mount = Count;
     if (Mount == 0)
@@ -265,20 +250,18 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
     if (Need > Free)
         bNoRoom = true;
 
-    // 004c6602..004c660c
     int const Saved = Desc->Count;
     Desc->set_count(Mount);
 
     if (Desc->is_internal() && Hardpoint->Value == EquipDesc::CARGO_BAY_HP_NAME.Value)
     {
-        // 004c662e..004c6698: cargo into the cargo bay.
+        // Cargo into the cargo bay.
         if (bNoRoom)
         {
             Desc->set_count(Saved);
             if (bPlaySound)
             {
-                // 004c664b..004c6653: FUN_00489e80(DAT_0067339c, 0) -- queue the
-                // "insufficient_cargo_space" voice line on the NeuroNet voice queue.
+                // "insufficient_cargo_space" voice line (DAT_0067339c).
                 NnVoiceEnqueue(G_NnInsufficientCargoSpaceId, 0);
             }
             return false;
@@ -290,19 +273,17 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
     }
     else
     {
-        // 004c669d..004c66bd: the hardpoints of the ship instance the view shows.
         HardpointSummary Summary;
         Summary.analyze_instance(ShipView->Instance);
 
         if (Hardpoint->Value == EquipDesc::CARGO_BAY_HP_NAME.Value)
         {
-            // 004c66d1..004c672b: equipment into the cargo bay.
+            // Equipment into the cargo bay.
             if (bNoRoom)
             {
                 Desc->set_count(Saved);
                 if (bPlaySound)
                 {
-                    // 004c66ea..004c66f2: FUN_00489e80(DAT_0067339c, 0).
                     NnVoiceEnqueue(G_NnInsufficientCargoSpaceId, 0);
                 }
                 return false;
@@ -312,13 +293,12 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
         }
         else
         {
-            // 004c672d..004c676e: onto a hardpoint the ship has.
+            // Onto a hardpoint; a missing hardpoint also plays the cargo-space line.
             if (Summary.find_name(Hardpoint->Value) == -1)
             {
                 Desc->set_count(Saved);
                 if (bPlaySound)
                 {
-                    // 004c674e..004c6757: FUN_00489e80(DAT_0067339c, 0).
                     NnVoiceEnqueue(G_NnInsufficientCargoSpaceId, 0);
                 }
                 return false;
@@ -328,7 +308,6 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
                 Desc->set_equipped(true);
         }
 
-        // 004c6776..004c67e8
         Loadout.add_equipment_item(*Desc, arch_is_combinable(Desc->ArchId));
         if (bPlaySound)
         {
@@ -339,7 +318,6 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
         }
     }
 
-    // 004c6802..004c6818
     ShipView->LoadEquipment(&Loadout);
     Desc->set_count(Saved);
     return true;
@@ -347,7 +325,7 @@ bool FInventoryShipModel::MountItem(EquipDesc* Desc, CacheString const* Hardpoin
 
 void FInventoryShipModel::PlayMountSound(unsigned ArchId)
 {
-    // FUN_004c6860 (RET 4): get_class_type (vt+0x10) - 6 through the byte table 0x004c68e8.
+    // FUN_004c6860; retail switches through the byte table 0x004c68e8.
     Archetype::Equipment* const Arch = Archetype::GetEquipment(ArchId);
     if (Arch == nullptr)
         return;
@@ -397,7 +375,7 @@ void FInventoryShipModel::SetItemHardpoint(EquipDesc* Desc, char const* Hardpoin
     CacheString NewHardpoint;
     NewHardpoint.Value = StringAlloc(Hardpoint, false);
     Desc->set_hardpoint(NewHardpoint);
-    // 004c6961: the caller's pointer, not the allocated one, is compared.
+    // Retail compares the caller's pointer, not the allocated one.
     if (Hardpoint != EquipDesc::CARGO_BAY_HP_NAME.Value)
         Desc->set_equipped(true);
     ShipView->LoadEquipment(&Loadout);
@@ -406,7 +384,7 @@ void FInventoryShipModel::SetItemHardpoint(EquipDesc* Desc, char const* Hardpoin
         PlayOrRewindUiSoundSlot(0x10);
         return;
     }
-    PlayMountSound(Desc->ArchId); // 004c699c..004c6a14, the same switch inlined
+    PlayMountSound(Desc->ArchId); // the same switch, inlined in retail
 }
 
 bool FInventoryShipModel::ShowItem(EquipDesc const* Item, bool bFlag, int Mode)
@@ -421,7 +399,7 @@ bool FInventoryShipModel::ShowItem(EquipDesc const* Item, bool bFlag, int Mode)
         return true;
     }
 
-    // 004c6a6b..004c6abb and 004c6ac0..004c6b13: the two branches are the same code.
+    // Retail has two identical branches here.
     if ((Item->is_internal() && Mode == 0) || (Item->is_internal() && Mode == 2))
     {
         Archetype::Equipment const* Weapon = nullptr;
@@ -434,14 +412,11 @@ bool FInventoryShipModel::ShowItem(EquipDesc const* Item, bool bFlag, int Mode)
 
     if (Item->is_internal())
     {
-        // 004c6b1e..004c6b64
         ShipView->SelectGood(0, bFlag);
         ShipView->SelectInstance(-1, false, 0);
         return true;
     }
 
-    // 004c6b27..004c6b46: FUN_00585bd0(FUN_00585e80(hp), 1, 0) -- the outer call's 1 and 0 are
-    // pushed before the inner call.
     ShipView->SelectEquipDesc(Item, bFlag);
     ShipView->SelectInstance(ShipView->GetInstanceOnHardpoint(Item->Hardpoint), true, 0);
     return true;
@@ -465,11 +440,8 @@ namespace
 void FInventoryShipModel::SortFrom(EquipDescList const* Source)
 {
     // FUN_004c6b80 (RET 4).
-    //
-    // 004c6b86..004c6ba1: empty the loadout (std::list::erase(begin, end)).
     Loadout.Items.clear();
 
-    // 004c6ba7..004c6cb1: one record per Source item.
     int const Count = static_cast<int>(Source->Items.size());
     std::vector<FInventorySortRecord> Records(static_cast<size_t>(Count < 0 ? 0 : Count));
     std::list<EquipDesc>::const_iterator SourceIt = Source->Items.begin();
@@ -485,8 +457,7 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
         Record.bHasName = 0;
         int const Filter = NnItemFilterMode(Item.ArchId); // FUN_0047e460
 
-        // 004c6c19..004c6c5e: can the ship use it? Weapons / equipment need a free-able
-        // hardpoint, ammo a launcher in Source.
+        // Usable: weapons / equipment need a free-able hardpoint, ammo a launcher in Source.
         if (Good != nullptr && ShipView != nullptr)
         {
             if (Filter == 0 || Filter == 2)
@@ -500,7 +471,7 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
             }
         }
 
-        // 004c6c60..004c6c95: commodities sort by their name.
+        // Commodities sort by their name.
         if (ShipView != nullptr && Filter == 4 && Record.Arch != nullptr && !Item.bMission)
         {
             Record.bHasName = 1;
@@ -509,7 +480,7 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
         }
     }
 
-    // 004c6cc0..004c6df1: bubble sort, swapping the whole record, until a pass swaps nothing.
+    // Bubble sort, swapping the whole record.
     bool bSorted = true;
     do
     {
@@ -523,8 +494,6 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
             bool bSwap = false;
             if (A.bHasName != 0)
             {
-                // 004c6cee..004c6d1d: a named record before an unnamed one; two named ones
-                // by _wcsicmp.
                 if (B.bHasName == 0)
                     bSwap = true;
                 else if (_wcsicmp(A.Name, B.Name) > 0)
@@ -532,8 +501,8 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
             }
             else if (B.bHasName == 0)
             {
-                // 004c6d34..004c6da1: unusable ones last, then mission ones, then by class,
-                // then by archetype id (unsigned).
+                // Unusable ones last, then mission ones, then by class, then by archetype id
+                // (unsigned).
                 if (A.bUsable == 0 && B.bUsable != 0)
                     bSwap = true;
                 else if (A.bUsable == B.bUsable)
@@ -567,8 +536,6 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
         }
     } while (!bSorted);
 
-    // 004c6df7..004c6e54: append a copy of each item in the sorted order (operator_new(0x28)
-    // node, FUN_004b7390 member copy, size + 1), then free the records.
     for (int Index = 0; Index < Count; ++Index)
         Loadout.Items.push_back(*Records[static_cast<size_t>(Index)].Desc);
 }
@@ -608,7 +575,7 @@ unsigned G_NnVoiceShipPurchaseCompleteId = CreateID("ship_purchase_complete");
 
 bool IsPlayerDockedRetail()
 {
-    // FUN_004c4810: AND 0x3fffffff / NEG / SBB / NEG.
+    // FUN_004c4810.
     return (GetPlayerBaseIdRetail() & 0x3fffffffu) != 0;
 }
 
@@ -687,30 +654,25 @@ void ReqAddPlayerCargoRetail(unsigned ArchId, int Count, float Health)
 
 bool ReqRemovePlayerEquipRetail(unsigned short Id, int Count)
 {
-    // FUN_004c4260 (cdecl). 004c4260..004c427f: G_Server slot 31 (+0x7c) -- (Id, Count,
-    // DAT_00673344).
+    // FUN_004c4260 (cdecl): G_Server slot 31 (+0x7c).
     G_Server->ReqRemoveItem(Id, Count, GetPlayerConnectionId());
-    // 004c4282..004c431b: byte for byte FUN_004c4320's body (find_equipment_item, the copy, the
-    // DAT_00673384 bump, remove_equipment_item(Id, Count), the ObjectShip notification); its
-    // result is this one's.
+    // FUN_004c4320's body, inlined in retail.
     return RemovePlayerEquipRetail(0, Id, Count);
 }
 
 int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* Owner,
                          EquipDescList* Saved)
 {
-    // FUN_004c6f70 (cdecl). 004c6f70..004c6f7f: not docked (DAT_0066873c == 0) -- 0.
+    // FUN_004c6f70 (cdecl).
     unsigned const BaseId = GetClientLocationCurrentBase();
     if (BaseId == 0)
         return 0;
 
-    // 004c6f80..004c6f96: FUN_0043a510(DAT_0066873c) on DAT_00668708; the null test never fails
-    // (the market is runtime + 0x30).
+    // The null test never fails (the market is runtime + 0x30).
     FClientMarket const* const Market = GetClientLocationBaseMarket(BaseId);
     if (Market == nullptr)
         return 0;
 
-    // 004c6f97..004c707b
     int Total = 0;
     unsigned const OwnerTag = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Owner));
     for (std::list<EquipDesc>::const_iterator It = List->Items.begin(); It != List->Items.end();
@@ -720,19 +682,16 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
         GoodInfo const* const Good = GoodList::find_by_archetype(Item.ArchId); // node +0xc
         if (Good == nullptr)
             continue;
-        // 004c6fcb..004c6fd6: only the Owner's items when an owner is given (node +0x24).
         if (Owner != nullptr && Item.Owner != OwnerTag)
             continue;
 
-        // 004c6fdc..004c6ff7: held -- no Saved list, or Saved has the item's id (node +0xa).
         bool bHeld = true;
         if (Saved != nullptr && Saved->find_equipment_item(Item.Id) == nullptr)
             bHeld = false;
 
         if (NnItemFilterMode(Item.ArchId) != 4 && !Good->bCombinable && bHeld) // +0x70
         {
-            // 004c7012..004c7043: used goods -- ftol(price * 0.3 + 0.4999990) (DAT_005d6d3c /
-            // DAT_005d1914), then ftol(Count * Health * that).
+            // Used goods (DAT_005d6d3c / DAT_005d1914).
             int const Unit = static_cast<int>(
                 static_cast<double>(ClientMarketGetPrice(Market, Good->Id)) * 0.30000001192092896 +
                 0.4999989867210388);
@@ -741,7 +700,6 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
         }
         else
         {
-            // 004c7049..004c7061: ftol(price) * Count.
             Total += static_cast<int>(ClientMarketGetPrice(Market, Good->Id)) * Item.Count;
         }
     }
@@ -750,7 +708,7 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
 
 int NnShipResaleValue(unsigned ShipArchId, bool bApplyCondition)
 {
-    // FUN_004c6e90 (cdecl). 004c6e93..004c6ebb: no ship, not docked, or no market -- 0.
+    // FUN_004c6e90 (cdecl).
     if (ShipArchId == 0)
         return 0;
     unsigned const BaseId = GetClientLocationCurrentBase(); // DAT_0066873c
@@ -760,7 +718,6 @@ int NnShipResaleValue(unsigned ShipArchId, bool bApplyCondition)
     if (Market == nullptr)
         return 0;
 
-    // 004c6ec1..004c6ee3: the ship's good and its market price.
     GoodInfo const* const Good = GoodList_get()->find_by_ship_arch(ShipArchId);
     if (Good == nullptr)
         return 0;
@@ -768,8 +725,8 @@ int NnShipResaleValue(unsigned ShipArchId, bool bApplyCondition)
     if (!bApplyCondition)
         return Price;
 
-    // 004c6ef4..004c6f33: the hull scale (FUN_004c4f70) and the mean health of the player's
-    // collision groups (FUN_004c3f00, node +0xc), 1.0 without any.
+    // Hull scale (FUN_004c4f70) and the mean collision-group health (FUN_004c3f00), 1.0
+    // without any.
     double const HullScale = static_cast<double>(GetPlayerHealthScaleRetail());
     std::list<CollisionGroupDesc> const& Groups = GetPlayerCollisionGroupListRetail();
     double Mean = 0.0;
@@ -785,7 +742,7 @@ int NnShipResaleValue(unsigned ShipArchId, bool bApplyCondition)
     else
         Mean = 1.0;
 
-    // 004c6f33..004c6f57: ftol(ftol(Price * Mean * HullScale) * 0.8) (DAT_005d6d38).
+    // Two truncations; 0.8 is DAT_005d6d38.
     int const Conditioned = static_cast<int>(static_cast<double>(Price) * Mean * HullScale);
     return static_cast<int>(static_cast<double>(Conditioned) * 0.800000011920929);
 }
@@ -797,10 +754,7 @@ int NnItemFilterMode(unsigned ArchId)
     if (Arch == nullptr || Arch->IdsName == 0)
         return 5;
 
-    // 0047e487..0047e4c0: when docked (DAT_0066873c, the LocationController's current base),
-    // FUN_0043a510 finds that base's market (null-tested) and FUN_00438060 prices
-    // Arch2Good(ArchId) in it; FCOMP 0.0, TEST AH,0x44 + JNP: a price of exactly 0.0 returns 5
-    // (unordered goes on).
+    // Docked: a market price of exactly 0.0 returns 5 (an unordered compare goes on).
     unsigned const BaseId = GetClientLocationCurrentBase();
     if (BaseId != 0)
     {
@@ -810,11 +764,10 @@ int NnItemFilterMode(unsigned ArchId)
             return 5;
     }
 
-    // 0047e4c2..0047e4d1
     if (GoodList::find_by_id(Arch2Good(ArchId)) == nullptr)
         return 5;
 
-    // 0047e4d3..0047e4ea: get_hp_type (vt+0x18) - 2 through the byte table 0x0047e540.
+    // Retail switches through the byte table 0x0047e540.
     int const HpType = static_cast<int>(Arch->get_hp_type());
     if (HpType == 2)
         return 3;
@@ -868,10 +821,7 @@ bool NnListHasLauncherFor(EquipDescList const* List, unsigned AmmoArchId)
 NnInventory::NnInventory()
     : Mode(0)
 {
-    // FUN_00477cf0: FUN_0059f860 (WinControl ctor), FUN_004c6140 on +0x330, the CacheString
-    // ctor on +0x394, the +0x3a8 list head, EquipDesc::EquipDesc on +0x94c, the two vptrs,
-    // then FUN_00477ee0. +0x32c is not written by the ctor (it is set by SetMode); the port
-    // starts it at 0.
+    // FUN_00477cf0. Retail leaves +0x32c (Mode) to SetMode; the port starts it at 0.
     PendingMountHardpoint.clear();
     ResetFields();
 }
@@ -879,7 +829,6 @@ NnInventory::NnInventory()
 void NnInventory::ResetFields()
 {
     // FUN_00477ee0, in the order the stores are made.
-    // 00477ee7..00477f6b
     FirstRow = 0;              // +0x3c4
     LastRowCount = -1;             // +0x3c8
     SelectedIndex = -1;        // +0x3a4
@@ -904,22 +853,20 @@ void NnInventory::ResetFields()
     FullCargoBar = nullptr;           // +0x4d0
     CloseButton = nullptr;        // +0x4d8
 
-    // 00477f71..00477fa7: five passes over the ten per-row arrays.
     for (int Row = 0; Row < kNnInventoryRows; ++Row)
     {
-        ItemName[Row] = nullptr;         // EDX - 0x14 (+0x3e8)
-        ItemView[Row] = nullptr;         // EDX        (+0x3fc)
-        ItemPrice[Row] = nullptr;        // EDX + 0x14 (+0x410)
-        ItemQuantity[Row] = nullptr;     // EDX + 0x28 (+0x424)
-        ItemButton[Row] = nullptr;       // EDX + 0x3c (+0x438)
-        ItemMesh[Row] = nullptr;         // EDX + 0x50 (+0x44c)
-        ItemGoodDeal[Row] = nullptr;     // EDX + 0x64 (+0x460)
-        CargoMissionText[Row] = nullptr; // EDX + 0xa0 (+0x49c)
-        ItemDamage[Row] = nullptr;       // EDX + 0x78 (+0x474)
-        EquipToggle[Row] = nullptr;      // EDX + 0x8c (+0x488)
+        ItemName[Row] = nullptr;         // +0x3e8
+        ItemView[Row] = nullptr;         // +0x3fc
+        ItemPrice[Row] = nullptr;        // +0x410
+        ItemQuantity[Row] = nullptr;     // +0x424
+        ItemButton[Row] = nullptr;       // +0x438
+        ItemMesh[Row] = nullptr;         // +0x44c
+        ItemGoodDeal[Row] = nullptr;     // +0x460
+        CargoMissionText[Row] = nullptr; // +0x49c
+        ItemDamage[Row] = nullptr;       // +0x474
+        EquipToggle[Row] = nullptr;      // +0x488
     }
 
-    // 00477fae..004780eb
     LastEquipRevision = -1;
     LastCollisionRevision = -1;
     Field4e1 = 0;
@@ -970,12 +917,7 @@ void NnInventory::ResetFields()
 
 NnInventory::~NnInventory()
 {
-    // FUN_00477da0.
-    //
-    // 00477dcf..00477e29: a dealer window still attached to this one is unlinked (FUN_0059dd00
-    // with a null parent), its subtree deleted (FUN_0043d2a0 per child), Destroy (slot 10) and
-    // the scalar deleting dtor run on it, +0x360 = 0, then FUN_00442850 (the NavBar's dealer
-    // tab back in place of the desk tab).
+    // FUN_00477da0. An attached dealer window is torn down and the NavBar's dealer tab put back.
     if (Dealer != nullptr)
     {
         Win3DReparent(Dealer, nullptr);
@@ -996,19 +938,13 @@ NnInventory::~NnInventory()
         NavBarShowDealerTab(); // FUN_00442850
     }
 
-    // 00477e2e..00477e4d: FUN_0045a780(0x66, {0, 0x3d9ba5e3, 0xbfa4dd2f}) -- hand the
-    // NN_MainButton the origin of panel 0x66.
     float const PanelOrigin[3] = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
     NnMainButtonSetPanelOrigin(0x66, PanelOrigin);
-
-    // 00477e52..00477ec3: the +0x3a8 list, FUN_004c6200 on +0x330 and FUN_0059fa50 run as the
-    // member and base destructors.
 }
 
 void NnInventory::SetPosition(float const* NewPosition)
 {
-    // FUN_0047fbb0 (RET 4): WinControl's FUN_005a0880, then the attached dealer's slot 5 with
-    // the same position.
+    // FUN_0047fbb0.
     WinControl::SetPosition(NewPosition);
     if (Dealer != nullptr)
         Dealer->SetPosition(NewPosition);
@@ -1016,8 +952,7 @@ void NnInventory::SetPosition(float const* NewPosition)
 
 bool NnInventory::Create(Win3D* NewParent, void* Data)
 {
-    // FUN_0047b3e0 (RET 8): FUN_0059dd00(this, NewParent), FUN_0059dbf0(this), flags &= 0xf8,
-    // +0x4e7 = 1, return true. Data is not read.
+    // FUN_0047b3e0. Data is not read.
     (void)Data;
     Win3DReparent(this, NewParent);
     Win3DRegister(this);
@@ -1028,10 +963,7 @@ bool NnInventory::Create(Win3D* NewParent, void* Data)
 
 void NnInventory::Update()
 {
-    // FUN_0047b310.
-    //
-    // 0047b316..0047b339: every child -- bit0 ? slot 11 : slot 12, the next sibling read before
-    // the call.
+    // FUN_0047b310. The next sibling is read before the call.
     Win3D* Child = ChildHead;
     while (Child != nullptr)
     {
@@ -1043,23 +975,18 @@ void NnInventory::Update()
         Child = Next;
     }
 
-    // 0047b33c..0047b353
     if (bNeedBind != 0)
     {
         BindControls();
-        // 0047b34d: MOV ECX,[DAT_0066d3f0] / CALL FUN_0045dc60 -- NN_MainButton drops its
-        // "ScaledBackground". No null test on the singleton.
+        // DAT_0066d3f0; no null test on the singleton.
         G_NnMainButton->FreeScaledBackground();
     }
 
-    // 0047b358..0047b365: FUN_0047d2f0(&+0x34c, 0, 1).
     RefreshItemList(&Ship.Loadout, 0, 1);
 
-    // 0047b36a..0047b383: no player ship -> Inventory_Scroll slot 42 (0x37, 0, 0).
     if (GetPlayerShipArchetypeIdRetail() == 0 && InventoryScroll != nullptr)
         InventoryScroll->SetProperty(0x37, 0, 0);
 
-    // 0047b389..0047b3c2: count +0x914 down by the capped frame time, clamping at 0.
     if (JettisonCooldown > 0.0f)
     {
         double const Remaining = static_cast<double>(JettisonCooldown) - GetClientFrameTimeCapped();
@@ -1071,7 +998,7 @@ void NnInventory::Update()
 
 void NnInventory::Close()
 {
-    // FUN_0047ad20. 0047ad23..0047ad4d: hide the attached dealer and reset its trade mode.
+    // FUN_0047ad20.
     if (Dealer != nullptr && (Dealer->Flags & kWin3DVisible) != 0)
     {
         Dealer->Flags = static_cast<unsigned char>(Dealer->Flags & 0xfc);
@@ -1079,10 +1006,8 @@ void NnInventory::Close()
             Dealer->TradeMode = 0;
     }
 
-    // 0047ad57..0047ad65: FUN_004c62b0(player's EquipDescList, 1).
     Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);
 
-    // 0047ad6a..0047ad90
     Field4e3 = 0;
     if (ResultFn != nullptr)
     {
@@ -1090,7 +1015,6 @@ void NnInventory::Close()
         ResultFn = nullptr;
     }
 
-    // 0047ad9a..0047add0: unlink, delete the subtree, Destroy, delete this.
     Win3DReparent(this, nullptr);
     Win3D* Child = ChildHead;
     while (Child != nullptr)
@@ -1108,15 +1032,13 @@ bool NnInventory::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     // FUN_0047ade0 (RET 0xc).
     if (Msg == 0xef02)
     {
-        // 0047adf2..0047aea2: the listing inlines FUN_0047ad20's body instruction for
-        // instruction (0047adf2..0047aea0 == 0047ad23..0047add0), then returns 1.
+        // Retail inlines FUN_0047ad20's body.
         Close();
         return true;
     }
 
     if (Msg == 0xef01)
     {
-        // 0047aeaf..0047af0c
         WinControl::ProcessMessage(0xef01, A, B);
         if (Dealer != nullptr)
             Dealer->Flags = static_cast<unsigned char>(Dealer->Flags | 3);
@@ -1134,7 +1056,6 @@ bool NnInventory::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    // 0047af15..0047af22
     return WinControl::ProcessMessage(Msg, A, B);
 }
 
@@ -1163,16 +1084,14 @@ void NnInventory::ShowQuantityControls(bool bShow)
 
 bool NnInventory::IsScanner()
 {
-    // FUN_0044fd00: XOR AL,AL / RET.
+    // FUN_0044fd00.
     return false;
 }
 
 void NnInventory::ClearSelection()
 {
-    // The sequence the listing inlines after most list changes (e.g. 0x0047f2a3..0x0047f2e2,
-    // 0x0047d432..0x0047d46f, 0x0047a33f..0x0047a37c): +0x3a4 = -1, +0x4f4 = 0,
-    // FUN_004c6a50(0, 0, 5) on +0x330, FUN_004795f0(0), and the attached dealer's +0x4e8 /
-    // +0x4ec = 0.
+    // Port-only helper: the sequence retail inlines after most list changes (e.g. 0x0047f2a3,
+    // 0x0047d432, 0x0047a33f).
     SelectedIndex = -1;
     SelectedItem = nullptr;
     Ship.ShowItem(nullptr, 0, 5);
@@ -1186,7 +1105,7 @@ void NnInventory::ClearSelection()
 
 void NnInventory::UpdateFilterButtons()
 {
-    // FUN_0047e590: slot 42 (0xc, Mode == N, 0) on each filter button that exists.
+    // FUN_0047e590.
     if (FilterCargoBay != nullptr)
         FilterCargoBay->SetProperty(0xc, Mode == 3 ? 1 : 0, 0);
     if (FilterWeapons != nullptr)
@@ -1213,22 +1132,18 @@ void NnInventory::SetMode(int NewMode, bool bPropagate)
     if (InventoryScroll != nullptr)
         InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
 
-    // 0047f2a2..0047f2e2
     ClearSelection();
 
     if (InventoryScroll != nullptr)
         InventoryScroll->SetProperty(0x38, 0, 0);
 
-    // 0047f2fe..0047f368: mirror the mode onto the dealer unless it is in trade mode 1.
     if (Dealer != nullptr && bPropagate && Dealer->TradeMode != 1)
     {
         Dealer->SetMode(Mode, true);
         Dealer->ClearSelection();
     }
 
-    // 0047f36e..0047f3b5: the ship view's slot 42 (0x4c, n, 0) -- 0 for weapons, 1 for
-    // equipment, 2 for ammo / cargo bay / commodity and the unused 5; nothing above 5. The
-    // switch reads the argument (param_1), not +0x32c.
+    // Retail switches on the argument, not +0x32c.
     if (Ship.ShipView == nullptr)
         return;
     switch (NewMode)
@@ -1269,25 +1184,18 @@ void NnInventory::TransferEquipmentFromDealer()
     if (ShipArch == nullptr)
         return;
 
-    // 0047af67..0047af7b: the dealer's model shows the player's list.
     Dealer->Ship.LoadShip(&GetPlayerEquipDescListRetail(), 0);
 
-    // 0047af80..0047afcc: one record per dealer item.
     EquipDescList& Source = Dealer->Ship.Loadout;
     int const Count = static_cast<int>(Source.Items.size());
     std::vector<FTransferRecord> Records(static_cast<size_t>(Count < 0 ? 0 : Count));
-    // 0047afa9..0047afcc: when docked (DAT_0066873c, JBE) FUN_0043a510 returns the base's
-    // market; otherwise none.
-    FClientMarket* Market = nullptr; // [ESP+0x14]
+    FClientMarket* Market = nullptr;
     unsigned const BaseId = GetClientLocationCurrentBase();
     if (BaseId != 0)
         Market = GetClientLocationBaseMarket(BaseId);
 
-    // 0047afd0..0047b074: per dealer item, the record {Id, price}. Without a market the price is
-    // DAT_005d15b8 = 1e8. With one: Arch2Good 0, or an engine (0xc) / scanner (0x14) / tractor
-    // (0x16) / power plant (0xb) (GetEquipment's result is not null-tested) -> record {0, 0}
-    // (0x0047b14a); otherwise FUN_00438060's price, 1e8 when it is exactly 0.0 (FCOM 0, TEST
-    // AH,0x44 + JP keeps any other price, unordered included).
+    // Engines, scanners, tractors and power plants are skipped (GetEquipment is not
+    // null-tested). A price of exactly 0.0 becomes 1e8; any other, unordered included, is kept.
     std::list<EquipDesc>::const_iterator SourceIt = Source.Items.begin();
     for (int Index = 0; Index < Count; ++Index, ++SourceIt)
     {
@@ -1312,8 +1220,7 @@ void NnInventory::TransferEquipmentFromDealer()
         Record.Price = static_cast<double>(Price) == 0.0 ? 100000000.0f : Price;
     }
 
-    // 0047b07e..0047b0c0: bubble sort, most expensive first (swap when the left price is below
-    // the right one, TEST AH,5 / JP skipping >= and unordered).
+    // Bubble sort, most expensive first; >= and unordered do not swap.
     int const Last = Count - 1;
     bool bSorted = true;
     do
@@ -1335,7 +1242,6 @@ void NnInventory::TransferEquipmentFromDealer()
         }
     } while (!bSorted);
 
-    // 0047b0c2..0047b24f: mount each onto this ship where it fits.
     for (int Index = 0; Index < Count; ++Index)
     {
         unsigned short const Id = Records[static_cast<size_t>(Index)].Id;
@@ -1345,14 +1251,13 @@ void NnInventory::TransferEquipmentFromDealer()
         if (Desc == nullptr)
             continue;
 
-        // 0047b0fa..0047b12c: the hardpoint the view picks; an empty name means the cargo bay.
         CacheString Hardpoint;
         Hardpoint.Value = StringAlloc(Ship.ShipView->FindHardpointForEquipDesc(Desc, false), false);
         if (Hardpoint.Value[0] == '\0')
             Hardpoint.Value = EquipDesc::CARGO_BAY_HP_NAME.Value;
 
-        // 0047b130..0047b176: nanobots and shield batteries are capped at the hull's limit
-        // (a negative limit caps nothing).
+        // Nanobots and shield batteries are capped at the hull's limit (a negative limit caps
+        // nothing).
         int Mount = Desc->Count;
         int Limit = 0;
         bool bLimited = false;
@@ -1369,14 +1274,13 @@ void NnInventory::TransferEquipmentFromDealer()
         if (bLimited && Mount > Limit && Limit >= 0)
             Mount = Limit;
 
-        // 0047b178..0047b1a3
         if (Ship.MountItem(Desc, &Hardpoint, Mount, false))
         {
             Dealer->Ship.RemoveItem(Desc, Mount);
             continue;
         }
 
-        // 0047b1a8..0047b238: a stack that did not fit moves as many units as the hold takes.
+        // A stack that did not fit moves as many units as the hold takes.
         if (Desc->Count <= 1)
             continue;
         float Capacity = 0.0f;
@@ -1399,8 +1303,6 @@ void NnInventory::TransferEquipmentFromDealer()
             Dealer->Ship.RemoveItem(Desc, Fit);
     }
 
-    // 0047b255..0047b2f6: free the records; the dealer's +0x4f4 = 0, then the same selection
-    // reset on this window and on the dealer.
     NnDealer* const Partner = Dealer;
     Partner->SelectedItem = nullptr;
     ClearSelection();
@@ -1419,9 +1321,7 @@ void NnInventory::TakeDealerSelection()
     if (Count == 0)
         return;
 
-    // 0047e953..0047e99d: into the ship's own list as an unmounted, internal item; the hardpoint
-    // is the one the ship view offers for it (FUN_00585ef0), else the cargo bay. The local
-    // CacheString is not released afterwards (retail has no clear on it either).
+    // The local CacheString is not released afterwards (retail has no clear on it either).
     Item->make_internal();
     Item->set_equipped(false);
     char const* Hardpoint = Ship.ShipView->FindHardpointForEquipDesc(Item, false);
@@ -1430,11 +1330,9 @@ void NnInventory::TakeDealerSelection()
     CacheString HardpointName;
     HardpointName.Value = StringAlloc(Hardpoint, false);
 
-    // 0047e9a1..0047e9b9: FUN_004c6530; when it took the item, FUN_004c6430 on the dealer's model.
     if (Ship.MountItem(Item, &HardpointName, Count, true))
         Dealer->Ship.RemoveItem(Item, Count);
 
-    // 0047e9be..0047e9cc
     SelectedItem = nullptr;         // +0x4f4
     Dealer->SelectedItem = nullptr; // dealer +0x4f4
 }
@@ -1451,35 +1349,27 @@ void NnInventory::BuyFromDealer(int Count)
     if (Good == nullptr)
         return;
 
-    // 0047eaf6..0047eb25: FUN_0043a510(DAT_0066873c) on DAT_00668708 (not null-tested) and its
-    // entry FUN_00437d90(GoodId); no entry, or none in stock (+0x1c <= 0) -- straight to the
-    // tail (0x0047ee4c).
+    // The market is not null-tested.
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
     FClientMarketGood* const Entry = ClientMarketFindEntry(Market, GoodId);
     if (Entry != nullptr && Entry->Stock > 0)
     {
-        // 0047eb2b..0047eb4b: Count = min(Count, stock) (JNC: unsigned), the market loses it and
-        // the server is asked to sell it (FUN_00438220(base, good, Count)).
+        // Unsigned min.
         if (static_cast<unsigned>(Entry->Stock) < static_cast<unsigned>(Count))
             Count = Entry->Stock;
         Entry->Stock -= Count;
         ClientMarketRequestBuy(Market, GetClientLocationCurrentBase(), GoodId, Count);
 
-        // 0047eb50..0047eb63: the last one gone with the info card up -- clear the card.
         if (Entry->Stock == 0 && InfoCardFacts != nullptr) // +0x398
             ClearInfoCard(); // FUN_0047e9e0
 
-        // 0047eb68..0047ecc7: where the good goes. [ESP+0x13] -- whether the good takes hold
-        // space -- starts 1.
         bool bInHold = true;
         if (Dealer->TradeMode == 3)
         {
             if (PendingMountHardpoint.Value[0] != '\0')
             {
-                // 0047eb95..0047ec2e: onto the hint hardpoint, one, at full health; it takes no
-                // hold space. A gun whose projectile (+0x98 by name) does not require ammo
-                // (Projectile +0x78 == 0) joins weapon group 0 (FUN_004f6200); voice "mounted";
-                // the mount sound (FUN_004c6860, this +0x330).
+                // Onto the pending hardpoint, one, at full health. A gun whose projectile does not
+                // require ammo joins weapon group 0 (FUN_004f6200).
                 ReqAddPlayerItemOnHardpointRetail(Good->ArchId, &PendingMountHardpoint, 1.0f); // FUN_004c41d0
                 char const* const Hardpoint = PendingMountHardpoint.Value;
                 bInHold = false;
@@ -1504,34 +1394,30 @@ void NnInventory::BuyFromDealer(int Count)
                      Good->ArchId != G_NanobotArchId && Good->ArchId != G_ShieldBatteryArchId &&
                      !HasEquippedOfClass(Good->ArchId))
             {
-                // 0047ec93..0047ecb6: a single cargo-bay item with nothing of its class equipped
-                // goes into the bay mounted; voice "mounted".
+                // A single cargo-bay item with nothing of its class equipped goes in mounted.
                 ReqAddPlayerMountedCargoRetail(Good->ArchId, 1.0f); // FUN_004c4200
                 NnVoiceEnqueue(G_NnVoiceMountedId, 0);
             }
             else
             {
-                // 0047ec6a..0047ec91: into the hold; voice "loaded into cargo hold".
                 ReqAddPlayerCargoRetail(Good->ArchId, Count, 1.0f); // FUN_004c4230
                 NnVoiceEnqueue(G_NnVoiceLoadedIntoCargoHoldId, 0); // DAT_00671c6c
             }
         }
         else
         {
-            // 0047ecb8..0047ecc7: the other dealers -- into the hold, no voice.
+            // The other dealers: into the hold, no voice.
             ReqAddPlayerCargoRetail(Good->ArchId, Count, 1.0f);
         }
 
-        // 0047ecca..0047ece4: pay the package price per unit (FUN_004c4d50); +0x4e5 = 0,
-        // +0x3b8 = 1.
         ReqPlayerSpendCashRetail(GetMarketPackagePrice(Entry->Info.GoodId) * Count);
         Result4e5 = 0;
         bTradePending = 1;
 
-        // 0047eceb..0047ee48: a good with an ammo package (GoodInfo +0xb8 / +0xbc > 0).
+        // A good with an ammo package (GoodInfo +0xb8 / +0xbc).
         if (Good->FreeAmmoArchId != 0 && Good->FreeAmmoCount > 0)
         {
-            // 0047ed0a..0047ed3c: the gun's volume, counted only while it went into the hold.
+            // The gun's volume counts only when it went into the hold.
             float GunVolume = 0.0f;
             Archetype::Equipment const* const Gun = Archetype::GetEquipment(Good->ArchId);
             if (Gun != nullptr)
@@ -1539,10 +1425,7 @@ void NnInventory::BuyFromDealer(int Count)
             if (!bInHold)
                 GunVolume = 0.0f;
 
-            // 0047ed3c..0047eda6: the ammo bought from the market -- only when the ammo has
-            // equipment: as much of its stock as the package holds (JGE keeps the package
-            // count), the market loses it, FUN_00438220; no entry or no stock -- none. Without
-            // equipment the package count stands and nothing is asked of the market.
+            // Without an ammo archetype the package count stands and the market is not asked.
             float AmmoVolume = 0.0f;
             int AmmoCount = Good->FreeAmmoCount;
             Archetype::Equipment const* const Ammo = Archetype::GetEquipment(Good->FreeAmmoArchId);
@@ -1563,9 +1446,8 @@ void NnInventory::BuyFromDealer(int Count)
                     AmmoCount = 0;
             }
 
-            // 0047eda8..0047edf8: what fits -- (hold size - used - Count (FILD qword: unsigned)
-            // * gun volume) / ammo volume, ftol, unclamped, then at most the ammo bought; an
-            // ammo volume of exactly 0.0 (TEST AH,0x44 + JNP) leaves the ammo bought.
+            // Count is widened as unsigned; the result is not clamped at 0. An ammo volume of
+            // exactly 0.0 leaves the ammo bought.
             float const HoldSize = GetPlayerShipHoldSizeRetail();                               // FUN_004c4610
             float const Used = GetPlayerEquipDescListRetail().get_cargo_space_occupied();       // FUN_004c4640
             double const Free = static_cast<double>(HoldSize) - static_cast<double>(Used) -
@@ -1579,9 +1461,6 @@ void NnInventory::BuyFromDealer(int Count)
                     Take = AmmoCount;
             }
 
-            // 0047edfc..0047ee45: at most MAX_PLAYER_AMMO less the ammo carried
-            // (find_matching_cargo(ammo, 0, 1.0f) on +0x34c); a positive count goes into the
-            // hold (FUN_004c4230).
             int Room = MAX_PLAYER_AMMO;
             EquipDesc const* const Carried =
                 Ship.Loadout.find_matching_cargo(Good->FreeAmmoArchId, 0, 1.0f);
@@ -1594,7 +1473,7 @@ void NnInventory::BuyFromDealer(int Count)
         }
     }
 
-    // 0047ee4c..0047ee85: remember the good for the next list refresh (not for ships).
+    // Remember the good for the next list refresh (not for ships).
     if (Dealer->TradeMode == 2)
         return;
     PendingBuyGoodId = GoodId; // +0x3bc
@@ -1615,24 +1494,20 @@ void NnInventory::SellSelected(int Count)
     if (Mode == 0) // +0x32c, weapons
         G_WeaponGroups.RemoveHardpoint(Item->Hardpoint); // FUN_004f6380
 
-    // 0047eedf..0047ef13: FUN_0043a510(DAT_0066873c) on DAT_00668708 (not null-tested), entry =
-    // FUN_00437d90(Arch2Good(Item->ArchId)); no entry -- straight to the NavBar refresh.
+    // The market is not null-tested.
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
-    unsigned const GoodId = Arch2Good(Item->ArchId); // [ESP+0x14]
+    unsigned const GoodId = Arch2Good(Item->ArchId);
     FClientMarketGood* const Entry = ClientMarketFindEntry(Market, GoodId);
     if (Entry != nullptr)
     {
-        // 0047ef19..0047ef26: Count = min(Count, the item's count) (JNC: unsigned); the market
-        // gains it.
-        int const ItemCount = Item->Count; // [ESP+0x18]
+        // Unsigned min.
+        int const ItemCount = Item->Count;
         if (static_cast<unsigned>(ItemCount) < static_cast<unsigned>(Count))
             Count = ItemCount;
         Entry->Stock += Count;
 
-        // 0047ef29..0047efbe: the payment. A used item -- not a commodity (filter mode != 4),
-        // not combinable, and in the saved loadout +0x3a8 (find_equipment_item(Id)) -- fetches
-        // ftol(Health * Count (FIMUL) * (price * 0.3 + 0.4999990)) (DAT_005d0e2c /
-        // DAT_005d1914, all on the x87 stack); anything else ftol(price * Count).
+        // A used item (not a commodity, not combinable, in the saved loadout +0x3a8) sells at
+        // the used price (DAT_005d0e2c / DAT_005d1914), all on the x87 stack.
         int Cash = 0;
         if (NnItemFilterMode(Item->ArchId) != 4 && !arch_is_combinable(Item->ArchId) &&
             SavedLoadout.find_equipment_item(Item->Id) != nullptr)
@@ -1652,9 +1527,6 @@ void NnInventory::SellSelected(int Count)
         }
         ReqPlayerGainCashRetail(Cash); // FUN_004c4d30
 
-        // 0047efc9..0047f011: +0x3b8 = 1; the server buys it (FUN_00438270(base, good, Count));
-        // the item leaves the player's loadout (FUN_004c4260(Id, Count)); the ship model shows
-        // the loadout again (FUN_004c62b0(FUN_004c4060(), 1)); +0x4e5 = 0.
         unsigned short const ItemId = Item->Id;
         bTradePending = 1;
         ClientMarketRequestSell(Market, GetClientLocationCurrentBase(), GoodId, Count);
@@ -1662,32 +1534,26 @@ void NnInventory::SellSelected(int Count)
         Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);
         Result4e5 = 0;
 
-        // 0047f00d..0047f026: the whole stack sold with the info card up -- clear the card.
         if (Count == ItemCount && InfoCardFacts != nullptr) // +0x398
             ClearInfoCard(); // FUN_0047e9e0
     }
 
-    // 0047f02b..0047f032: FUN_004427e0(0) -- the NavBar's repair tab refreshed.
     NavBarRefreshRepairTab(false);
 }
 
 int NnInventory::GetMarketPackagePrice(unsigned GoodId)
 {
-    // FUN_0047f040 (RET 4). 0047f043..0047f062: FUN_0043a510(DAT_0066873c) on DAT_00668708 --
-    // no market at the current base returns 0 (EAX is the null market).
+    // FUN_0047f040 (RET 4). The good's price plus its ammo package (GoodInfo +0xb8 / +0xbc),
+    // capped by market stock, free hold space and MAX_PLAYER_AMMO.
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
     if (Market == nullptr)
         return 0;
 
-    // 0047f065..0047f0a6: the good's own price; a good with an ammo package (GoodInfo +0xb8
-    // archetype, +0xbc count > 0) goes on.
     int Price = static_cast<int>(ClientMarketGetPrice(Market, GoodId)); // ftol
     GoodInfo const* const Good = GoodList::find_by_id(GoodId);
     if (Good == nullptr || Good->FreeAmmoArchId == 0 || Good->FreeAmmoCount <= 0)
         return Price;
 
-    // 0047f0ac..0047f0f7: the ammo good's price; n = the package count capped by the market's
-    // stock of it (entry +0x1c; 0 without an entry or a positive stock).
     unsigned const AmmoGood = Arch2Good(Good->FreeAmmoArchId);
     int const AmmoPrice = static_cast<int>(ClientMarketGetPrice(Market, AmmoGood)); // ftol
     int Count = Good->FreeAmmoCount;
@@ -1697,7 +1563,6 @@ int NnInventory::GetMarketPackagePrice(unsigned GoodId)
     else if (Entry->Stock < Count)
         Count = Entry->Stock;
 
-    // 0047f0f7..0047f151: the gun's and the ammo's volume (Equipment +0x5c; 0 without one).
     float GunVolume = 0.0f;
     unsigned const GunArch = Good2Arch(GoodId);
     if (GunArch != 0)
@@ -1718,8 +1583,7 @@ int NnInventory::GetMarketPackagePrice(unsigned GoodId)
     // The ship whose hold and loadout count: the partner's on a dealer (+0x35c), else this one's.
     NnInventory* const Owner = bDealerMode != 0 ? static_cast<NnDealer*>(this)->Inventory : this;
 
-    // 0047f151..0047f1d3: both volumes above 0 (FCOMP 0, TEST AH,0x41 + JNZ skips <= and
-    // unordered): n capped by ftol((capacity - used - gun volume) / ammo volume), at least 0.
+    // <= and unordered skip the hold cap.
     if (static_cast<double>(GunVolume) > 0.0 && static_cast<double>(AmmoVolume) > 0.0)
     {
         float Capacity = 0.0f;
@@ -1734,9 +1598,6 @@ int NnInventory::GetMarketPackagePrice(unsigned GoodId)
             Count = Fit;
     }
 
-    // 0047f1d9..0047f22c: n capped by MAX_PLAYER_AMMO less the ammo already carried
-    // (find_matching_cargo(ammo archetype, 0, 1.0f) on the owner's loadout), then the ammo's
-    // price n times.
     int Room = MAX_PLAYER_AMMO;
     EquipDesc const* const Carried =
         Owner->Ship.Loadout.find_matching_cargo(Good->FreeAmmoArchId, 0, 1.0f);
@@ -1750,20 +1611,19 @@ int NnInventory::GetMarketPackagePrice(unsigned GoodId)
 
 void NnInventory::CreateControls()
 {
-    // FUN_00478100 -- build the window's controls. Every position is a float[3] in the window's
-    // space; the retail code builds them on the stack (FUN_00422b80 / FUN_00423b30), the port
-    // with the same arithmetic. Where x87 keeps an intermediate at extended precision across
-    // two operations, the port carries it in double.
-    unsigned char bShowFilters = 1;    // [ESP+0x27]
-    unsigned char bShowCommodity = 1;  // [ESP+0x1f]
-    float Base[3] = {0.0f, 0.0f, 0.0f};         // [ESP+0x10] -- the item list's origin
-    float FilterBase[3] = {0.0f, 0.0f, 0.0f};   // [ESP+0x50] -- the filter row's origin
-    unsigned char bOwnWindow = 0;      // [ESP+0x1e] -- the player's own inventory
-    float PriceColumn = 0.025f;        // [ESP+0x20] (0x3ccccccd)
+    // FUN_00478100. Positions are float[3] in window space built with retail's arithmetic
+    // (FUN_00422b80 / FUN_00423b30); where x87 keeps an intermediate at extended precision
+    // across two operations, the port carries it in double.
+    unsigned char bShowFilters = 1;
+    unsigned char bShowCommodity = 1;
+    float Base[3] = {0.0f, 0.0f, 0.0f};         // the item list's origin
+    float FilterBase[3] = {0.0f, 0.0f, 0.0f};   // the filter row's origin
+    unsigned char bOwnWindow = 0;      // the player's own inventory
+    float PriceColumn = 0.025f;        // 0x3ccccccd
 
     if (Dealer != nullptr)
     {
-        // 0047815e..00478207: the half next to a dealer.
+        // The half next to a dealer.
         SetMesh("Interface\\NeuroNet\\Inventory\\INV_biginforcard.cmp", 0); // slot 38
         HalfExtents[0] = 0.66f;  // +0xb4
         HalfExtents[1] = 0.397f;
@@ -1784,7 +1644,7 @@ void NnInventory::CreateControls()
     }
     else if (bDealerMode == 0)
     {
-        // 0047821a..00478316: the player's own inventory window.
+        // The player's own inventory window.
         SetMesh("Interface\\NeuroNet\\Inventory\\CHAR_infowindow.cmp", 0); // slot 38
         float const ClosePosition[3] = {0.401f, 0.237f, 0.0f};
         float const CloseHalfExtents[3] = {0.02f, 0.02f, 0.0f};
@@ -1802,14 +1662,13 @@ void NnInventory::CreateControls()
         bOwnWindow = 1;
     }
 
-    // 0047831b..00478333: no ship and no dealer -- no filter buttons at all.
     if (GetPlayerShipArchetypeIdRetail() == 0 && Dealer == nullptr) // FUN_004c3e10
     {
         bShowFilters = 0;
         bShowCommodity = 0;
     }
 
-    // 00478338..004783d2: "PlayerTitle" (FUN_005a0e30); the result is not kept here.
+    // FUN_005a0e30; the result is not kept here.
     if (bOwnWindow != 0)
     {
         float const TitlePosition[3] = {-0.42f, 0.261f, 0.0f};
@@ -1825,7 +1684,6 @@ void NnInventory::CreateControls()
                           1.65f, 0x213f, 1, 0, 0);
     }
 
-    // 004783da..00478433: "PlayerCash".
     {
         float const Delta[3] = {0.219f, -0.072f, 0.0f};
         float const CashPosition[3] = {Base[0] + Delta[0], Base[1] + Delta[1],
@@ -1834,21 +1692,20 @@ void NnInventory::CreateControls()
                           0, 1, 0, 0);
     }
 
-    // 00478438..0047844e: the price column's x.
     float const PriceX = PriceColumn + 0.293f; // DAT_005d1554
 
-    // 0047844a..00478a85: the five item rows. Names count from 1, the row offset from 0.
+    // The five item rows. Names count from 1, the row offset from 0.
     char Name[0x100];
     for (int Row = 0; Row < kNnInventoryRows; ++Row)
     {
         int const Number = Row + 1;
 
-        // 00478461..004784fe: "ItemButton%d". The product is exact in double; x87 subtracts
-        // the double 0.131 (DAT_005d1538) from it before the float stores.
+        // The product is exact in double; x87 subtracts the double 0.131 (DAT_005d1538) from it
+        // before the float stores.
         sprintf(Name, "ItemButton%d", Number);
         double const RowOffset = static_cast<double>(Row) * static_cast<double>(-0.068f); // DAT_005d1540
-        float const RowY = static_cast<float>(RowOffset);                 // [ESP+0x20]
-        float const ButtonY = static_cast<float>(RowOffset - 0.131);      // [ESP+0x4c]
+        float const RowY = static_cast<float>(RowOffset);
+        float const ButtonY = static_cast<float>(RowOffset - 0.131);
         {
             float const ButtonPosition[3] = {Base[0] + 0.067f, Base[1] + ButtonY,
                                              Base[2] + 0.0f}; // FUN_00423b30
@@ -1857,7 +1714,6 @@ void NnInventory::CreateControls()
                                     0, 0, 0, 0, 0); // FUN_005a0d00
         }
 
-        // 00478503..0047859b: "ItemView0%d".
         sprintf(Name, "ItemView0%d", Number);
         {
             float const ViewPosition[3] = {Base[0] + 0.248f, Base[1] + ButtonY,
@@ -1867,10 +1723,10 @@ void NnInventory::CreateControls()
                                     0, 0, 0); // FUN_005a0d00
         }
 
-        // 004785a0..00478670: "ItemMesh%d" -- a static mesh placeholder.
+        // A static mesh placeholder.
         sprintf(Name, "ItemMesh%d", Number);
         double const MeshOffset = static_cast<double>(RowY) - static_cast<double>(0.131f); // DAT_005d150c
-        float const MeshRowY = static_cast<float>(MeshOffset); // [ESP+0x68]
+        float const MeshRowY = static_cast<float>(MeshOffset);
         {
             float const MeshPosition[3] = {Base[0] + 0.066999994f, // DAT_005d1508
                                            static_cast<float>(static_cast<double>(Base[1]) +
@@ -1883,7 +1739,6 @@ void NnInventory::CreateControls()
                                 0, 0, MeshVector338); // FUN_005a0db0
         }
 
-        // 00478675..004786eb: "ItemName0%d".
         sprintf(Name, "ItemName0%d", Number);
         {
             float const NamePosition[3] = {
@@ -1895,8 +1750,7 @@ void NnInventory::CreateControls()
                               0, 0); // FUN_005a0e30
         }
 
-        // 004786f0..0047876d: "ItemQuantity0%d". The row y it computes is kept for the "good
-        // deal" marker ([ESP+0x4c]).
+        // The row y computed here is reused for the "good deal" marker.
         sprintf(Name, "ItemQuantity0%d", Number);
         double const QuantityOffset = static_cast<double>(RowY) - static_cast<double>(0.148f); // DAT_005d14b0
         float const QuantityRowY = static_cast<float>(QuantityOffset);
@@ -1908,7 +1762,7 @@ void NnInventory::CreateControls()
                               0, 0xbcf, 0); // FUN_005a0e30
         }
 
-        // 00478772..00478818: "EquipToggle%d" -- mount / unmount toggle (FUN_005a0fb0).
+        // Mount / unmount toggle (FUN_005a0fb0).
         sprintf(Name, "EquipToggle%d", Number);
         {
             float const TogglePosition[3] = {
@@ -1923,8 +1777,8 @@ void NnInventory::CreateControls()
                                       0, 0, 0x426, 0x425);
         }
 
-        // 0047881d..004788b6: "ItemDamage%d" -- a horizontal cargo bar (FUN_005a1080) with the
-        // empty mesh path DAT_005c865c and the colour DAT_00679bac for both states.
+        // A horizontal cargo bar (FUN_005a1080) with the empty mesh path DAT_005c865c and the
+        // colour DAT_00679bac for both states.
         sprintf(Name, "ItemDamage%d", Number);
         {
             float const DamagePosition[3] = {
@@ -1937,7 +1791,6 @@ void NnInventory::CreateControls()
                                   G_NnPaletteArgb_679bac, G_NnPaletteArgb_679bac);
         }
 
-        // 004788bb..00478938: "ItemPrice0%d".
         sprintf(Name, "ItemPrice0%d", Number);
         {
             float const PricePosition[3] = {
@@ -1949,7 +1802,6 @@ void NnInventory::CreateControls()
                               2, 0xbd4, 0); // FUN_005a0e30
         }
 
-        // 0047893d..00478a02: "ItemGoodDeal0%d" -- only next to a dealer in trade mode 1.
         if (Dealer != nullptr && Dealer->TradeMode == 1)
         {
             sprintf(Name, "ItemGoodDeal0%d", Number);
@@ -1962,7 +1814,6 @@ void NnInventory::CreateControls()
                                 0, DealVector338); // FUN_005a0db0
         }
 
-        // 00478a07..00478a7b: "CargoMissionText%d", stored at +0x49c.
         sprintf(Name, "CargoMissionText%d", Number);
         {
             float const MissionPosition[3] = {Base[0] + 0.183f, // DAT_005d13e8
@@ -1972,21 +1823,21 @@ void NnInventory::CreateControls()
         }
     }
 
-    // 00478a8b..00478ac3: the info card text of the player's own window (FUN_005a10e0).
+    // FUN_005a10e0.
     if (bOwnWindow != 0)
     {
         float const InfoOffset[3] = {0.027f, 0.151f, 0.0f};
         CreateRichTextWin("InfoCard_Info", 0.36f, 0.31f, InfoOffset, true);
     }
 
-    // 00478ac8..00478b12: "Inventory_Scroll" (FUN_005a17e0).
+    // FUN_005a17e0.
     {
         float const ScrollPosition[3] = {Base[0] + 0.3989f, Base[1] - 0.099f, // DAT_005d13d0 / 13d4
                                          Base[2]};
         CreateUIScroll("Inventory_Scroll", ScrollPosition, 0.019f, 0.335f, 0, 5, 5, 0);
     }
 
-    // 00478b17..00478cda: the four filter buttons (FUN_005a0c90).
+    // FUN_005a0c90.
     float const FilterHalfExtents[3] = {0.017f, 0.017f, 0.0f};
     if (bShowFilters != 0)
     {
@@ -2010,7 +1861,6 @@ void NnInventory::CreateControls()
                             FilterHalfExtents, 0, 1, 0, 0, 0x2141, 0, 0);
     }
 
-    // 00478cdf..00478d5d: the commodity filter.
     if (bShowCommodity != 0)
     {
         float const CommodityPosition[3] = {FilterBase[0] + 0.364f, FilterBase[1] - 0.463f,
@@ -2020,7 +1870,6 @@ void NnInventory::CreateControls()
                             FilterHalfExtents, 0, 1, 0, 0, 0x2138, 0, 0);
     }
 
-    // 00478d62..00478e3a: the trade route button of the player's own window.
     if (bOwnWindow != 0)
     {
         float const RoutePosition[3] = {Base[0] + 0.641f, Base[1] - 0.455f, Base[2]};
@@ -2034,7 +1883,6 @@ void NnInventory::CreateControls()
                                            1); // +0x96c
     }
 
-    // 00478e40..00479074: the cargo bars and their label, when the player has a ship.
     if (GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
     {
         float const BarPosition[3] = {FilterBase[0] + 0.0984f, FilterBase[1] - 0.453f,
@@ -2062,20 +1910,19 @@ void NnInventory::CreateControls()
                                        0.06f, 1.5f, 0x43b, 0, 0, 0); // +0x4dc
     }
 
-    // 0047907a..0047913c: "ShipView_Control" (FUN_005a1020), hidden (flags bits 0..1 cleared).
+    // FUN_005a1020, created hidden.
     {
         float const ViewPosition[3] = {Base[0] + 0.25f, Base[1] - 0.245f, Base[2]}; // DAT_005c94f8
         float const RotSpeed[3] = {0.0f, 0.0f, 0.0f};
         float const Ypr[3] = {0.0f, 0.0f, 0.0f};
         float const ViewSize[3] = {0.13f, -0.147f, 0.0f};
-        unsigned const WireColor = 0xffffffffu; // four 0xff bytes at [ESP+0x20]
+        unsigned const WireColor = 0xffffffffu;
         WinControl* const View = CreateShipViewControl(
             "ShipView_Control", RotSpeed, ViewPosition, Ypr, ViewSize, nullptr, false, false,
             reinterpret_cast<unsigned const*>(G_HudChromeColorRgba), &WireColor);
         View->Flags = static_cast<unsigned char>(View->Flags & 0xfc);
     }
 
-    // 00479140..00479218
     if (GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
     {
         if (bOwnWindow != 0)
@@ -2094,12 +1941,11 @@ void NnInventory::CreateControls()
         }
     }
 
-    // 0047921d..00479227: docked (DAT_0066873c, the LocationController's current base) -- no
-    // jettison controls.
+    // No jettison controls while docked.
     if (GetClientLocationCurrentBase() != 0)
         return;
 
-    // 0047922d..0047929b: "JettisonButton" (FUN_005a0c90); the result is not kept here.
+    // The result is not kept here.
     {
         float const JettisonPosition[3] = {Base[0] + 0.42f, Base[1] - 0.076f, Base[2]};
         float const JettisonHalfExtents[3] = {0.014f, 0.014f, 0.0f};
@@ -2108,7 +1954,7 @@ void NnInventory::CreateControls()
                             JettisonHalfExtents, 0, 1, 0, 0, 0xbc6, 0, 0);
     }
 
-    // 004792a0..004795d5: the jettison quantity panel, +0x91c..+0x938.
+    // The jettison quantity panel, +0x91c..+0x938.
     {
         float const TitlePosition[3] = {Base[0] + 0.62f, Base[1] - 0.121f, Base[2]};
         QuantityControl[0] = CreateTextControl("Inv_Jettison_Title", "SubHeader", TitlePosition,
@@ -2163,18 +2009,13 @@ void NnInventory::CreateControls()
     ShowQuantityControls(false); // FUN_004795f0(0)
 }
 
-// --- Not ported yet (temporary stubs so the class links; each is `simplified` in the tracker
-// with the retail behaviour described there). ---
-
-// The quad block NN_Inventory's Draw runs twice (0x00479a64..0x00479b3e and
-// 0x00479bd5..0x00479cb8): the modelview from Bar's orientation (Win3D +0x3c) and its position
-// plus offset (+0x60 + +0xa8), texturing off, blending on with (2, 4), colour (0, 0, 0, 0x0a),
-// and a quad from x = X to x = -HalfX, y = +-HalfY at z = 0.001.
+// The quad block NN_Inventory's Draw inlines twice (0x00479a64 and 0x00479bd5): a shaded quad
+// in Bar's frame (Win3D +0x3c orientation, +0x60 + +0xa8 position) from x = X to x = -HalfX.
 static void NnInventoryDrawBarQuad(WinControl const* Bar, float X, float HalfX, float HalfY)
 {
     float Transform[12];
     for (int Index = 0; Index < 9; ++Index)
-        Transform[Index] = Bar->Orientation[Index]; // REP MOVSD, 9 dwords
+        Transform[Index] = Bar->Orientation[Index];
     Transform[9] = Bar->Offset[0] + Bar->Position[0];
     Transform[10] = Bar->Offset[1] + Bar->Position[1];
     Transform[11] = Bar->Offset[2] + Bar->Position[2];
@@ -2199,7 +2040,6 @@ void NnInventory::Draw()
     if (bNeedBind != 0)
         return;
 
-    // 0047972c..00479767: the hovered and the selected row on screen, -1 when off the page.
     int HoverRow = -1;
     if (HoverIndex >= 0)
     {
@@ -2215,8 +2055,7 @@ void NnInventory::Draw()
             SelectedRow = -1;
     }
 
-    // 0047976a..004797ff: every child's draw layer (+0x70): 1 for the hovered row's button /
-    // view / damage bar / equip toggle / mesh, 2 for the selected row's, else 0.
+    // Draw layer (+0x70): 1 for the hovered row's controls, 2 for the selected row's.
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
     {
         Child->DrawLayer = 0;
@@ -2242,18 +2081,16 @@ void NnInventory::Draw()
         }
     }
 
-    // 00479805..00479826
     WireControlsJoinColumn(ItemButton, kNnInventoryRows); // FUN_005a4b50
     WireControlsJoinColumn(ItemView, kNnInventoryRows);
     WinControl::Draw(); // FUN_005a0760
 
-    // 0047982b..0047984d: the cargo bar needs all three bar controls.
     if (EmptyCargoBar == nullptr || FullCargoBar == nullptr || SelectedCargoBar == nullptr)
         return;
 
-    // 00479853..0047991f: the volume the dealer's offer (+0x390 on the dealer, times its
-    // +0x988 count) adds (+0x910) or, with nothing selected, the volume it would take.
-    int OfferVolume = 0; // [ESP+0x1c]
+    // The volume the dealer's offer (dealer +0x390 times +0x988) frees (+0x910) or, with
+    // nothing selected, would take.
+    int OfferVolume = 0;
     if (HoveredCargoVolume == 0 && Dealer != nullptr && Dealer->TransferItemArchId != 0)
     {
         Archetype::Equipment* const Offer = Archetype::GetEquipment(Dealer->TransferItemArchId);
@@ -2285,16 +2122,14 @@ void NnInventory::Draw()
         }
     }
 
-    // 00479923..00479991: the hold (FUN_004c63e0) as fractions of its capacity. The free
-    // fraction stays on the x87 stack for the next block (0.0 when the capacity is not
-    // positive).
+    // The free fraction stays on the x87 stack for the next block, hence double.
     float Capacity = 0.0f;
     float Used = 0.0f;
     Ship.GetCargoCapacityAndUsed(&Capacity, &Used);
-    float Fill = 0.0f;     // [ESP+0x18]
-    float Offered = 0.0f;  // [ESP+0x30]
+    float Fill = 0.0f;
+    float Offered = 0.0f;
     double Free = 0.0;
-    if (Capacity > 0.0f) // TEST AH,0x41 / JNZ: skipped at <= 0 or unordered
+    if (Capacity > 0.0f) // skipped at <= 0 or unordered
     {
         float const Inverse = 1.0f / Capacity;
         Free = (static_cast<double>(Capacity) - static_cast<double>(Used)) *
@@ -2304,31 +2139,28 @@ void NnInventory::Draw()
                                      static_cast<double>(Inverse));
     }
 
-    // 00479995..004799cd: the full bar's extents; its right end moves left by the free part.
     WinControl* Bar = FullCargoBar;
     float const HalfX = Bar->HalfExtents[0];
     float const HalfY = Bar->HalfExtents[1];
     float const Width = HalfX + HalfX;
     float Right = static_cast<float>(static_cast<double>(HalfX) -
-                                     static_cast<double>(Width) * Free); // [ESP+0x14]
-    float Split = 0.0f;                                                  // [ESP+0x18]
+                                     static_cast<double>(Width) * Free);
+    float Split = 0.0f;
 
     bool bDrawFirst = true;
     if (HoveredCargoVolume > 0)
     {
-        // 004799e3..00479a08: at least 0.025 of the bar.
-        if (Fill < 0.025f) // DAT_005d15b4; TEST AH,5 / JP keeps it at >= or unordered
+        if (Fill < 0.025f) // DAT_005d15b4; unordered keeps Fill
             Fill = 0.025f;
         Split = static_cast<float>(static_cast<double>(Right) -
                                    static_cast<double>(Width) * static_cast<double>(Fill));
     }
     else if (OfferVolume <= 0)
     {
-        bDrawFirst = false; // 004799d9 -> 00479b97
+        bDrawFirst = false;
     }
     else
     {
-        // 00479a0e..00479a22
         Split = Right;
         Right = static_cast<float>(static_cast<double>(Width) * static_cast<double>(Offered) +
                                    static_cast<double>(Right));
@@ -2337,22 +2169,18 @@ void NnInventory::Draw()
     IRenderPipeline* const Pipe = DALib::Pipeline;
     if (bDrawFirst)
     {
-        // 00479a26..00479b94: the quad from the left end to Split in the full bar's frame, then
-        // the selected bar's mesh.
         Pipe->SetRenderState(D3DRS_ZENABLE, 1);
         Pipe->SetRenderState(D3DRS_ZFUNC, 8);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
         NnInventoryDrawBarQuad(Bar, Split, HalfX, HalfY);
         Pipe->SetRenderState(D3DRS_ZFUNC, 4);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 0);
-        Bar = SelectedCargoBar; // ESI now holds the selected bar
+        Bar = SelectedCargoBar;
         DALib::Renderer->RenderInstance(Win3DGetCamera(), Bar->MeshHolder.EngineInstance, 1.0f, 0, nullptr,
                                nullptr); // IRenderer2 +0x1c, &DAT_0067dbf8
     }
 
-    // 00479b97..00479cf9: the quad from the left end to Right in the frame of whichever bar ESI
-    // holds (the selected one when the first quad was drawn, else the full one), then the empty
-    // bar's mesh.
+    // The second quad uses the selected bar's frame when the first was drawn, else the full one's.
     Pipe->SetRenderState(D3DRS_ZENABLE, 1);
     Pipe->SetRenderState(D3DRS_ZFUNC, 8);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
@@ -2362,8 +2190,8 @@ void NnInventory::Draw()
                            nullptr, nullptr);
 }
 
-// The byte several NN_Inventory methods compute before FUN_004c6a50 (e.g. 0x0047e112..0x0047e135,
-// 0x0047f945..0x0047f969): true unless the window sits next to a dealer in trade mode 1.
+// The byte several NN_Inventory methods compute before FUN_004c6a50 (e.g. 0x0047e112,
+// 0x0047f945): true unless the window sits next to a dealer in trade mode 1.
 static bool NnInventoryShowFlag(NnDealer const* Dealer)
 {
     return Dealer == nullptr || Dealer->TradeMode == 2 || Dealer->TradeMode == 3;
@@ -2378,11 +2206,10 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
     case 0x4f:
     {
-        // 00479d52: a child asks for its tooltip.
+        // A child asks for its tooltip.
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
         if (Control == FullCargoBar)
         {
-            // 00479d65..00479dbf: "<IDS 0x49b>" formatted with the free and total hold.
             float Capacity = 0.0f;
             float Used = 0.0f;
             Ship.GetCargoCapacityAndUsed(&Capacity, &Used); // FUN_004c63e0
@@ -2391,14 +2218,12 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             int const Total = static_cast<int>(Capacity);                             // ftol
             swprintf(ToolTipText, 0xff, ToolTipFormat, Free, Total);
 
-            // 00479dc4..00479f7e: the hover record, keyed 0x43b, at the bar's instance.
             FToolTipHoverInfo Info;
             ToolTipHoverInit(&Info);
             ToolTipHoverSetCaption(&Info, ToolTipText);
             Info.IdsAlt = 0x43b;
             Info.Ids = 0x43b;
-            // IEngine slot 40 (+0xa0) -- the instance's 3x4 transform; floats 9..11 are the
-            // position.
+            // IEngine slot 40 (+0xa0): 3x4 transform, floats 9..11 the position.
             float const* const Transform =
                 DALib::Engine->GetInstanceTransform(FullCargoBar->MeshHolder.EngineInstance);
             Info.WorldPos[0] = Transform[9];
@@ -2412,7 +2237,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 1; // ~FToolTipHoverInfo
         }
 
-        // 00479f83..00479f9d: an item button; anything else returns 0 without the dealer block.
+        // An item button; anything else returns 0 without the dealer block.
         int Row = 0;
         for (; Row < kNnInventoryRows; ++Row)
         {
@@ -2427,9 +2252,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Control->ToolTipIds == 0)
             return 0;
 
-        // 00479fc9..0047a04c: the button's text followed by "equipped" (0x52a) or "not
-        // equipped" (0x52b), after the toggle's state. Retail does not initialise the state
-        // local before the toggle's slot 42 0x2f writes it.
+        // Retail does not initialise State before the toggle's slot 42 0x2f writes it.
         int State = 0;
         Toggle->SetProperty(0x2f, reinterpret_cast<uintptr_t>(&State), 0);
         GetIdsStringWWithRawFallback(static_cast<unsigned>(Control->ToolTipIds), G_NnTextScratchB,
@@ -2438,8 +2261,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                                      G_NnTextScratchCapacity);
         wcscat(G_NnTextScratchB, G_NnTextScratchA);
 
-        // 0047a04c..0047a1fb: the hover record, keyed by the button, at the button's wire
-        // centre (+0x350 of the 12 dwords copied from +0x32c).
+        // Keyed by the button, at its wire centre (+0x350).
         FToolTipHoverInfo Info;
         ToolTipHoverInit(&Info);
         ToolTipHoverSetCaption(&Info, G_NnTextScratchB);
@@ -2460,8 +2282,8 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x2c:
     case 0x2d:
     {
-        // 0047a200 / 0047a28e: the mouse enters (0x2c) or leaves (0x2d) a control of a row; the
-        // row's button and view (other than the sender) get the same message.
+        // The mouse enters (0x2c) or leaves (0x2d) a control of a row; the row's button and view
+        // (other than the sender) get the same message.
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
         int Row = 0;
         for (; Row < kNnInventoryRows; ++Row)
@@ -2490,8 +2312,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     case 0x15:
-        // 0047a314: the ship view picked an instance -- select the row of its hardpoint and
-        // clear the dealer's selection.
+        // The ship view picked an instance.
         SelectHardpoint(Ship.ShipView->GetHardpointOfInstance(static_cast<long>(A))); // FUN_00585e20
         if (Dealer != nullptr)
             Dealer->ClearSelection();
@@ -2499,14 +2320,14 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     case 0x16:
     {
-        // 0047a387: an item dropped on hardpoint A (docked only).
+        // An item dropped on hardpoint A (docked only).
         if (!IsPlayerDockedRetail()) // FUN_004c4810
             break;
         CacheString Hardpoint;
         Hardpoint.Value = StringAlloc(reinterpret_cast<char const*>(A), false);
         if (Dealer != nullptr && Dealer->GetSelectedItem() != nullptr)
         {
-            // 0047a3c6..0047a4cd: the dealer's selected item, mounted straight from the dealer.
+            // The dealer's selected item, mounted straight from the dealer.
             EquipDesc* const Item = Dealer->GetSelectedItem();
             if (Item == nullptr)
                 break;
@@ -2528,7 +2349,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             break;
         }
 
-        // 0047a4d2..0047a5ce: this window's selected item moves to the hardpoint.
+        // This window's selected item moves to the hardpoint.
         if (GetSelectedItem() == nullptr)
             break;
         EquipDesc* const Item = GetSelectedItem();
@@ -2549,8 +2370,6 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (!(Dealer != nullptr && Dealer->TradeMode == 2) && IsPlayerDockedRetail())
         {
             ReqPlayerEquipmentRetail(&Ship.Loadout); // FUN_004c4040
-            // 0047a56f..0047a584: FUN_00448540(&Ship.Loadout) and FUN_00447210() on the GF
-            // ObjectShip singleton (FUN_00446be0) when it exists.
             FObjectShip* const GfShip = GfObjectShip();
             if (GfShip != nullptr)
             {
@@ -2563,13 +2382,11 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     case 0x13:
-        // 0047a5d3: the ship dealer shows ship package A.
         if (Dealer != nullptr)
             Dealer->ShowShipPackage(static_cast<unsigned>(A)); // FUN_00483d40
         break;
 
     case 0x47:
-        // 0047a5f3: the dealer's trade mode.
         if (Dealer != nullptr)
         {
             Dealer->TradeMode = static_cast<int>(A);
@@ -2579,7 +2396,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     case 0x48:
     {
-        // 0047a623: open the window: A / B are the result callback's argument and function.
+        // Open the window: A / B are the result callback's argument and function.
         int const TradeMode = (Dealer != nullptr) ? Dealer->TradeMode : 0;
         if (Dealer != nullptr)
         {
@@ -2595,19 +2412,16 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         else if (TradeMode == 2 || TradeMode == 3)
             SetMode(0, true);
 
-        // 0047a697..0047a76a: +0x3a8 = the player's list (cleared first, then assigned unless
-        // it is the same list).
         SavedLoadout.Items.clear();
         EquipDescList& PlayerList = GetPlayerEquipDescListRetail(); // FUN_004c4060
         if (&SavedLoadout != &PlayerList)
             SavedLoadout = PlayerList;
 
-        // 0047a770..0047a78b
         Ship.ShipArchId = GetPlayerShipArchetypeIdRetail(); // FUN_004c3e10
         Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);   // FUN_004c62b0
-        // 0047a790..0047a79b: FUN_0053e4a0(+0x4e2) on +0x330 -- `RET 4`, nothing.
+        // Retail then calls FUN_0053e4a0(+0x4e2) on +0x330, an empty `RET 4`.
 
-        // 0047a7a0..0047a7f8: the dealer's +0x364..+0x37c.
+        // The dealer's +0x364..+0x37c.
         if (Dealer != nullptr)
         {
             TransferItemButton = Dealer->TransferItemButton;
@@ -2626,7 +2440,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     case 0x45:
     {
-        // 0047a82c: the quantity edit's text changed.
+        // The quantity edit's text changed.
         wchar_t const* const Text = reinterpret_cast<wchar_t const*>(A);
         if (Text == nullptr)
         {
@@ -2649,7 +2463,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     case 0x3e:
-        // 0047a8f1: a slider moved -- the list scroll or the quantity slider.
+        // A slider moved: the list scroll or the quantity slider.
         if (reinterpret_cast<WinControl*>(A) == InventoryScroll)
         {
             FirstRow = static_cast<int>(B);
@@ -2668,7 +2482,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x1a:
     case 0x26:
     {
-        // 0047a96d: a click.
+        // A click.
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
         if (Control == CloseButton)
         {
@@ -2677,7 +2491,6 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Control == TradeRouteButton)
         {
-            // 0047a993..0047a9d2: the trade routes of the selected commodity.
             if (Mode == 4 && SelectedIndex != -1)
             {
                 EquipDesc* const Item = GetSelectedItem();
@@ -2698,7 +2511,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Control == QuantityControl[6])
         {
-            // 0047a9fa..0047aa6b: jettison the chosen quantity. The item is not null-tested.
+            // Jettison the chosen quantity. The item is not null-tested.
             ShowQuantityControls(false);
             if (SelectedIndex != -1 && Field4e3 == 0)
             {
@@ -2711,7 +2524,6 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                         static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, JettisonQuantity,
                                                                   static_cast<int>(GetPlayerConnectionId()));
                         JettisonCooldown = 1.0f;
-                        // 0047aa56..0047aa63: FUN_00489e80(G_NnVoiceCargoJettisonedId, 0).
                         NnVoiceEnqueue(G_NnVoiceCargoJettisonedId, 0);
                     }
                 }
@@ -2719,7 +2531,6 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 1;
         }
 
-        // 0047aa70..0047ab35: a control of a row.
         for (int Row = 0; Row < kNnInventoryRows; ++Row)
         {
             if (Control == ItemButton[Row] || Control == ItemView[Row] ||
@@ -2743,7 +2554,6 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
         }
 
-        // 0047ab3b..0047abc7: the filter buttons, the jettison button, the ship view's info.
         if (Control == FilterCargoBay)
             SetMode(3, true);
         else if (Control == FilterWeapons)
@@ -2768,8 +2578,8 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         break;
     }
 
-    // 0047abce..0047ac8a: a ship dealer (trade mode 2) with a ship view shows this window's
-    // selected item on its own ship too.
+    // The shared tail (0x0047abce): a ship dealer (trade mode 2) with a ship view shows this
+    // window's selected item on its own ship too.
     if (Dealer != nullptr && Dealer->TradeMode == 2 && Dealer->Ship.ShipView != nullptr &&
         GetSelectedItem() != nullptr)
     {
@@ -2799,7 +2609,6 @@ void NnInventory::SelectRow(int Row, int Unused)
 
     if (Dealer != nullptr)
     {
-        // 0047e14d..0047e1c5: the dealer's quantity controls follow the row's count.
         int Count = 1;
         EquipDesc* const Selected = GetSelectedItem();
         if (Selected != nullptr)
@@ -2813,11 +2622,10 @@ void NnInventory::SelectRow(int Row, int Unused)
         Partner->QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Partner->ToolTipText), 0);
     }
 
-    // 0047e1c6..0047e1f3
     EquipDesc* const Item = GetSelectedItem();
     Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : 5);
 
-    // 0047e1f8..0047e25d: the dealer's selection is cleared, then its +0x4e8 / +0x4ec again.
+    // Retail clears +0x4e8 / +0x4ec a second time after ClearSelection.
     if (Dealer != nullptr)
     {
         Dealer->ClearSelection();
@@ -2834,7 +2642,6 @@ void NnInventory::SelectHardpoint(char const* Name)
     if (Dealer != nullptr && Dealer->TradeMode == 1)
         return;
 
-    // 0047e29e..0047e31a: the first row already holds it.
     SelectedIndex = 0;
     SelectedItem = nullptr;
     ShowQuantityControls(false);
@@ -2845,7 +2652,6 @@ void NnInventory::SelectHardpoint(char const* Name)
         return;
     }
 
-    // 0047e31d..0047e38a: remember the selection, switch to the hardpoint type's filter.
     int const SavedFirstRow = FirstRow;
     int const SavedIndex = SelectedIndex;
     EquipDesc* const SavedItem = First;
@@ -2858,8 +2664,7 @@ void NnInventory::SelectHardpoint(char const* Name)
     else if (Ship.ShipView->HasHpType(1)) // FUN_00586510
         SetMode(3, true);
 
-    // 0047e38f..0047e3e0: walk the list page by page until a row's item is on Name; stop after
-    // a page whose last row is empty.
+    // Walk the list page by page; stop after a page whose last row is empty.
     SelectRow(-1, 1);
     FirstRow = 0;
     EquipDesc* Found = nullptr;
@@ -2871,7 +2676,6 @@ void NnInventory::SelectHardpoint(char const* Name)
             Found = GetSelectedItem();
             if (Found != nullptr && _stricmp(Found->Hardpoint, Name) == 0)
             {
-                // 0047e414..0047e438
                 if (InventoryScroll != nullptr)
                     InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
                 return;
@@ -2880,7 +2684,6 @@ void NnInventory::SelectHardpoint(char const* Name)
         ++FirstRow;
     } while (Found != nullptr);
 
-    // 0047e3e2..0047e404
     FirstRow = SavedFirstRow;
     SelectedIndex = SavedIndex;
     SelectedItem = SavedItem;
@@ -2901,7 +2704,6 @@ void NnInventory::JettisonSelected()
     JettisonMaxQuantity = Item->Count;
     if (JettisonMaxQuantity != 1)
     {
-        // 0047e719..0047e77b: ask for the quantity.
         ShowQuantityControls(true);
         QuantityControl[1]->SetProperty(0x37, 1, static_cast<uintptr_t>(JettisonMaxQuantity));
         QuantityControl[1]->SetProperty(0x38, static_cast<uintptr_t>(JettisonQuantity), 0);
@@ -2910,7 +2712,7 @@ void NnInventory::JettisonSelected()
         return;
     }
 
-    // 0047e69d..0047e713: a single item goes at once (the conditions are tested again).
+    // A single item goes at once (the conditions are tested again).
     ShowQuantityControls(false);
     if (SelectedIndex == -1)
         return;
@@ -2925,14 +2727,13 @@ void NnInventory::JettisonSelected()
     static_cast<IObjAffect*>(Player)->jettison_cargo(Item->Id, JettisonQuantity,
                                               static_cast<int>(GetPlayerConnectionId()));
     JettisonCooldown = 1.0f;
-    // 0047e706..0047e70e: FUN_00489e80(G_NnVoiceCargoJettisonedId, 0).
     NnVoiceEnqueue(G_NnVoiceCargoJettisonedId, 0);
 }
 
 void NnInventory::ToggleEquip(EquipDesc* Item, int State)
 {
     // FUN_0047f720 (RET 8).
-    int Filter = 0; // EDI -- only read on the hardpoint path
+    int Filter = 0; // only read on the hardpoint path
     bool bHardpointItem = false;
     if (Item != nullptr)
     {
@@ -2942,8 +2743,8 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
 
     if (!bHardpointItem)
     {
-        // 0047f750..0047f875: an item without a hardpoint (Item is not null-tested here). In a
-        // dealer's trade mode 3 every change goes through the server (FUN_004c4540).
+        // An item without a hardpoint (Item is not null-tested here). In a dealer's trade mode 3
+        // every change goes through the server (FUN_004c4540).
         bool const bThroughServer = Dealer != nullptr && Dealer->TradeMode == 3;
         if (State != 0)
         {
@@ -2957,7 +2758,7 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
             return;
         }
 
-        // 0047f75c..0047f7fa: equip Item alone -- every other item of its class comes off.
+        // Equip Item alone: every other item of its class comes off.
         Archetype::Equipment* const Arch = Archetype::GetEquipment(Item->ArchId);
         if (Arch != nullptr)
         {
@@ -2990,11 +2791,11 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         return;
     }
 
-    // 0047f878: weapons and equipment.
+    // Weapons and equipment.
     FocusEquipId = Item->Id;
     if (State != 0)
     {
-        // 0047f88f..0047f914: into the cargo bay, when the hold has room for it.
+        // Into the cargo bay, when the hold has room for it.
         float Volume = 0.0f;
         if (Item->ArchId != 0)
         {
@@ -3008,19 +2809,17 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         float Capacity = 0.0f;
         float Used = 0.0f;
         Ship.GetCargoCapacityAndUsed(&Capacity, &Used); // FUN_004c63e0
-        // FILD / FMUL / ftol and FLD / FSUB / ftol, compared unsigned (JBE).
+        // 64-bit ftol on both sides, compared unsigned.
         unsigned const Need =
             static_cast<unsigned>(static_cast<long long>(static_cast<double>(Count) * Volume));
         unsigned const Free = static_cast<unsigned>(
             static_cast<long long>(static_cast<double>(Capacity) - Used));
         if (Need > Free)
         {
-            // 0047f8fc..0047f914: FUN_00489e80(G_NnVoiceInsufficientCargoSpaceId, 0).
             NnVoiceEnqueue(G_NnVoiceInsufficientCargoSpaceId, 0);
             return;
         }
 
-        // 0047f917..0047f984
         PlayOrRewindUiSoundSlot(0x11); // FUN_005645c0
         if (Filter == 0)
             G_WeaponGroups.RemoveHardpoint(Item->Hardpoint); // FUN_004f6380
@@ -3028,8 +2827,8 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         Item->set_equipped(false);
         Ship.ShowItem(Item, NnInventoryShowFlag(Dealer), NnItemFilterMode(Item->ArchId));
 
-        // 0047f989..0047f9da: no dealer -- a dealer window itself refreshes in trade mode 2,
-        // the player's own window syncs the server.
+        // No dealer: a dealer window itself refreshes in trade mode 2, the player's own window
+        // syncs the server.
         if (Dealer == nullptr)
         {
             if (bDealerMode != 0)
@@ -3048,11 +2847,10 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
     }
     else
     {
-        // 0047f9dd..0047fafe: onto the first free hardpoint that takes it.
+        // Onto the first free hardpoint that takes it.
         char const* const Hardpoint = Ship.ShipView->FindHardpointForEquipDesc(Item, false); // FUN_00585ef0
         if (Hardpoint == nullptr)
         {
-            // 0047f9f9..0047fa0f: FUN_00489e80(G_NnVoiceNoPlaceToMountId, 0).
             NnVoiceEnqueue(G_NnVoiceNoPlaceToMountId, 0);
             return;
         }
@@ -3060,13 +2858,12 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         NewHardpoint.Value = StringAlloc(Hardpoint, false);
         Item->set_hardpoint(NewHardpoint);
         Item->set_equipped(true);
-        // 0047fa37..0047fa3f: FUN_00489e80(G_NnVoiceMountedId, 0).
         NnVoiceEnqueue(G_NnVoiceMountedId, 0);
 
-        // 0047fa44..0047fa54: FUN_004c6860 is handed the GOOD id of the archetype.
+        // Retail quirk: FUN_004c6860 is handed the GOOD id, not the archetype id.
         FInventoryShipModel::PlayMountSound(Arch2Good(Item->ArchId));
 
-        // 0047fa59..0047faad: a gun whose projectile needs no ammo joins weapon group 0.
+        // A gun whose projectile needs no ammo joins weapon group 0.
         Archetype::Equipment* const Arch = Archetype::GetEquipment(Item->ArchId);
         if (Arch != nullptr && Arch->get_class_type() == Archetype::AClassGun)
         {
@@ -3080,7 +2877,6 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
             }
         }
 
-        // 0047fab2..0047fafe
         Ship.ShowItem(Item, NnInventoryShowFlag(Dealer), NnItemFilterMode(Item->ArchId));
         if (Dealer != nullptr && Dealer->TradeMode != 3)
         {
@@ -3089,12 +2885,9 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         }
     }
 
-    // 0047fb04..0047fb31: docked -- send the loadout to the server.
     if (IsPlayerDockedRetail()) // FUN_004c4810
     {
         ReqPlayerEquipmentRetail(&Ship.Loadout); // FUN_004c4040
-        // 0047fb1c..0047fb31: FUN_00448540(&Ship.Loadout) and FUN_00447210() on the GF
-        // ObjectShip singleton (FUN_00446be0) when it exists.
         FObjectShip* const GfShip = GfObjectShip();
         if (GfShip != nullptr)
         {
@@ -3115,10 +2908,10 @@ static char const* const G_NnGoodDealIcons[6] = {
     "Interface\\NeuroNet\\Inventory\\INV_yellow_square.3db",  // 005d0b80
 };
 
-// 0x0047c939..0x0047c950 with the byte table 0x0047d2bc: the class number (1..10) a hardpoint
-// type carries in the item name -- hp_gun_special_1..10 (0xf..0x18), hp_turret_special_1..10
-// (0x19..0x22) and the three shield-special runs (0x25..0x42); 0 for every other type (the
-// table's entry 10, which also covers 0x23 / 0x24, and the JA default).
+// Inlined in FUN_0047c740 (0x0047c939, byte table 0x0047d2bc): the class number (1..10) a
+// hardpoint type carries in the item name -- hp_gun_special_1..10 (0xf..0x18),
+// hp_turret_special_1..10 (0x19..0x22) and the three shield-special runs (0x25..0x42); 0 for
+// every other type.
 static int NnHpTypeClassNumber(int HpType)
 {
     unsigned const Index = static_cast<unsigned>(HpType - 0xf);
@@ -3141,19 +2934,17 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
     if (ArchId == 0 && EmptyIds == 0)
         return false;
 
-    // 0047c765..0047c7a4: the dealer's transfer panel mirrors the selected entry when all of
-    // it exists.
+    // The dealer's transfer panel mirrors the selected entry when all of it exists.
     unsigned char bTransfer = 0;
     if ((bDealerMode != 0 || Dealer != nullptr) && TransferItemMesh != nullptr &&
         TransferItemName != nullptr && TransferItemDamage != nullptr &&
         TransferItemPrice != nullptr && TransferItemGoodDeal != nullptr)
         bTransfer = 1;
 
-    // 0047c7a9..0047c7bc
     if (FilterMode != Mode && FilterMode != -1)
         return false;
 
-    // 0047c7c2..0047c851: the selected entry records itself on the dealer (or on this window).
+    // The selected entry records itself on the dealer (or on this window).
     unsigned char const bSelected = (*Counter == SelectedIndex) ? 1 : 0;
     if (bSelected == 0)
         bTransfer = 0;
@@ -3184,19 +2975,18 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
         }
     }
 
-    // 0047c855..0047c87e
     GoodInfo const* Good = nullptr;
     if (ArchId != 0)
         Good = GoodList::find_by_archetype(ArchId);
     if (Good == nullptr && EmptyIds == 0)
         return false;
 
-    // 0047c881..0047c88d: entries off the page are only counted.
+    // Entries off the page are only counted.
     unsigned const Row = static_cast<unsigned>(*Counter - FirstRow);
     if (Row < kNnInventoryRows)
     {
-        // 0047c893..0047cae6: the name -- in modes 0 / 2 a special hardpoint type adds its class
-        // number ("<name> <IDS 0x3df><n><IDS 0x3e0>").
+        // In modes 0 / 2 a special hardpoint type adds its class number to the name
+        // ("<name> <IDS 0x3df><n><IDS 0x3e0>").
         WinControl* const NameText = ItemName[Row];
         if (NameText != nullptr)
         {
@@ -3232,7 +3022,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                     }
                     if (ClassNumber != 0)
                     {
-                        // 0047c95c..0047ca2c
                         GetIdsStringWWithRawFallback(static_cast<unsigned>(Arch->IdsName), G_NnTextScratchB,
                                                      G_NnTextScratchCapacity);
                         GetIdsStringWWithRawFallback(0x3df, G_NnTextScratchA, G_NnTextScratchCapacity);
@@ -3247,7 +3036,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                     }
                     else
                     {
-                        // 0047ca8b..0047cac7
                         NameText->SetProperty(0x1e, static_cast<uintptr_t>(Arch->IdsName), 0);
                         if (bTransfer != 0)
                             TransferItemName->SetProperty(0x1e, static_cast<uintptr_t>(Arch->IdsName), 0);
@@ -3257,8 +3045,8 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             NameText->SetProperty(0xc, bSelected, 0);
         }
 
-        // 0047caea..0047cc39: the quantity. A dealer outside trade mode 2, or a ship dealer's
-        // non-combinable good, shows no count unless bAlwaysShowCount.
+        // A dealer outside trade mode 2, or a ship dealer's non-combinable good, shows no count
+        // unless bAlwaysShowCount.
         WinControl* const QuantityText = ItemQuantity[Row];
         if (QuantityText != nullptr)
         {
@@ -3294,7 +3082,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
             if (Mode == 3)
             {
-                // 0047cb92..0047cbce: nanobots, shield batteries and every dealer row hide it.
                 unsigned char bOn = 1;
                 if (ArchId == G_NanobotArchId || ArchId == G_ShieldBatteryArchId || bDealerMode != 0)
                     bOn = 0;
@@ -3312,8 +3099,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
         }
 
-        // 0047cc3f..0047cd75: the price (none for a mission item) and the good-deal marker's
-        // visibility.
         WinControl* const PriceText = ItemPrice[Row];
         if (PriceText != nullptr)
         {
@@ -3352,7 +3137,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
         }
 
-        // 0047cd7b..0047cda6: the mission marker text.
         if (CargoMissionText[Row] != nullptr)
         {
             if (bMission != 0)
@@ -3361,7 +3145,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 CargoMissionText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0);
         }
 
-        // 0047cdac..0047ce4c: the damage bar, green from 70, yellow from 30, red below.
         if (ItemDamage[Row] != nullptr)
         {
             ItemDamage[Row]->SetProperty(0x40, 100, static_cast<uintptr_t>(Health));
@@ -3378,8 +3161,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
         }
 
-        // 0047ce52..0047cef9: the equip toggle -- never for nanobots / shield batteries; in modes
-        // 0 / 2 an unequipped good needs a hardpoint of the ship that takes it.
+        // In modes 0 / 2 an unequipped good needs a hardpoint of the ship that takes it.
         if (EquipToggle[Row] != nullptr)
         {
             unsigned char bToggle = bShowToggle;
@@ -3399,23 +3181,19 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 EquipToggle[Row]->SetProperty(0x30, bEquipped != 0 ? 0 : 1, 0);
         }
 
-        // 0047ceff..0047d03a: the good-deal marker. Out of a base (DAT_0066873c, JBE) icon 0 and
-        // IDS 0. Docked: FUN_0043a510(DAT_0066873c) on DAT_00668708 (not null-tested) and the
-        // market price P of the good.
+        // The good-deal marker; the market is not null-tested.
         if (ItemGoodDeal[Row] != nullptr && Good != nullptr)
         {
-            int IconIndex = 0; // EBX
-            unsigned Ids = 0;  // EBP
+            int IconIndex = 0;
+            unsigned Ids = 0;
             unsigned const BaseId = GetClientLocationCurrentBase();
             if (BaseId != 0)
             {
                 FClientMarket* const Market = GetClientLocationBaseMarket(BaseId);
                 if (Dealer != nullptr)
                 {
-                    // 0047cf42..0047cf86: a dealer's list -- P = FUN_00438060(Good->Id) against
-                    // good_sell_price (+0x64: FCOM, TEST AH,1 + JNE: not less -> 0x41a, icon 0)
-                    // and bad_sell_price (+0x68: FCOMP, TEST AH,0x41 + JNE: less / equal /
-                    // unordered -> 0x41b, icon 1; greater -> 0x41c, icon 2).
+                    // Against good_sell_price (+0x64) and bad_sell_price (+0x68); unordered falls
+                    // to icon 1.
                     double const MarketPrice =
                         static_cast<double>(ClientMarketGetPrice(Market, Good->Id));
                     if (MarketPrice >= static_cast<double>(Good->GoodSellPrice)) // unordered: false
@@ -3436,10 +3214,8 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 }
                 else
                 {
-                    // 0047cf88..0047cfd7: the player's own list -- P = FUN_00438060(Arch2Good(
-                    // ArchId)) against good_buy_price (+0x5c: FCOMP, TEST AH,0x41 + JP: less or
-                    // equal -> 0x417, icon 3) and bad_buy_price (+0x60: FCOMP, TEST AH,5 + JP:
-                    // less -> 0x419, icon 5; greater / equal / unordered -> 0x418, icon 4).
+                    // Against good_buy_price (+0x5c) and bad_buy_price (+0x60); unordered falls
+                    // to icon 4.
                     double const MarketPrice =
                         static_cast<double>(ClientMarketGetPrice(Market, Arch2Good(ArchId)));
                     if (MarketPrice <= static_cast<double>(Good->GoodBuyPrice))
@@ -3468,11 +3244,9 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
         }
 
-        // 0047d040..0047d057
         if (ItemView[Row] != nullptr)
             ItemView[Row]->SetProperty(0xc, bSelected, 0);
 
-        // 0047d05d..0047d161: the item's icon mesh and the button's name IDS.
         WinControl* const Mesh = ItemMesh[Row];
         if (Mesh != nullptr && ItemButton[Row] != nullptr)
         {
@@ -3491,7 +3265,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             }
             else
             {
-                // 0047d0d3..0047d0f1: both EmptyIds branches issue the same call.
+                // Retail's two EmptyIds branches issue the same call.
                 Mesh->SetProperty(0x17, static_cast<uintptr_t>(-1), 0);
             }
             Mesh->SetProperty(0x19, 0x10000, 0x10000);
@@ -3502,7 +3276,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             ItemButton[Row]->SetProperty(3, static_cast<uintptr_t>(NameIds), 0);
         }
 
-        // 0047d167..0047d275: grey an unusable, unselected row.
+        // Grey an unusable, unselected row.
         if (ItemButton[Row] != nullptr && ItemView[Row] != nullptr && ItemName[Row] != nullptr &&
             ItemPrice[Row] != nullptr && ItemQuantity[Row] != nullptr)
         {
@@ -3521,7 +3295,6 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
         }
     }
 
-    // 0047d27b..0047d28c
     ++*Counter;
     return bSelected != 0;
 }
@@ -3580,9 +3353,7 @@ void NnInventory::BindControls()
     EquipToggle[3] = FindChild("EquipToggle4");
     EquipToggle[4] = FindChild("EquipToggle5");
 
-    // 0047b800..0047b86f: per row -- hit priority 100 on the good-deal mark, the mission text
-    // (set by slot 45) and the equip toggle; damage bar slot 42 (0x19, 0x10000, 0); toggle
-    // (0x34, 1, 0); button (0x35, 1, 0).
+    // HitPriority is set through slot 45 in retail.
     for (int Row = 0; Row < kNnInventoryRows; ++Row)
     {
         if (ItemGoodDeal[Row] != nullptr)
@@ -3600,7 +3371,6 @@ void NnInventory::BindControls()
             ItemButton[Row]->SetProperty(0x35, 1, 0);
     }
 
-    // 0047b871..0047b90d
     InfoCardBackground = FindChild("InfoCard_Background");
     InfoCardName = FindChild("InfoCard_Name");
     InfoCardInfo = static_cast<RichTextWin*>(FindChild("InfoCard_Info"));
@@ -3611,19 +3381,17 @@ void NnInventory::BindControls()
         InfoCardClose->HitPriority = 100;
     if (InfoCardView != nullptr)
     {
-        // 0047b906: AND byte [view+0x518],0x7f -- the view is a ShipViewControl.
+        // +0x518; the view is a ShipViewControl.
         ShipViewControl* const View = static_cast<ShipViewControl*>(InfoCardView);
         View->ViewFlags = static_cast<unsigned char>(View->ViewFlags & 0x7f);
     }
 
-    // 0047b90d..0047b970
     FilterWeapons = FindChild("Filter_Weapons");
     FilterCargoBay = FindChild("Filter_CargoBay");
     FilterEquipment = FindChild("Filter_Equipment");
     FilterCommodity = FindChild("Filter_Commodity");
     FilterAmmo = FindChild("Filter_Ammo");
 
-    // 0047b976..0047b9f4: the ship model's controls.
     Ship.InfoText = FindChild("ShipView_Info");
     Ship.Toggle = FindChild("ShipView_Toggle");
     Ship.DamageBar = FindChild("ShipView_DamageBar");
@@ -3631,10 +3399,8 @@ void NnInventory::BindControls()
     Ship.Frame = FindChild("Shipview_Frame");
     Ship.ShipView = static_cast<ShipViewControl*>(FindChild("ShipView_Control"));
 
-    // 0047b9f6..0047ba00
     SetMode(G_NnInventoryLastMode, true);
 
-    // 0047ba05..0047ba52
     JettisonButton = FindChild("JettisonButton");
     Ship.ShipArchId = GetPlayerShipArchetypeIdRetail(); // FUN_004c3e10
     Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);  // FUN_004c4060
@@ -3642,7 +3408,6 @@ void NnInventory::BindControls()
         Ship.ShipView->BuildHardpointList(); // FUN_00586b70
     RefreshItemList(&Ship.Loadout, 0, 1);
 
-    // 0047ba57..0047ba80
     PlayerTitle = FindChild("PlayerTitle");
     if (bDealerMode == 0 && Dealer == nullptr)
         bShowShipInfoCard = 1;
@@ -3650,21 +3415,20 @@ void NnInventory::BindControls()
 
 void NnInventory::ClearInfoCard()
 {
-    // FUN_0047e9e0. 0047e9e4..0047ea05: this window's card only on a dealer.
+    // FUN_0047e9e0. This window's own card is cleared only on a dealer.
     if (InfoCardInfo != nullptr && bDealerMode != 0)
     {
         InfoCardInfo->SetScrollOrigin(0, 0); // FUN_005798b0
         InfoCardInfo->ClearContent();        // FUN_0057b370
     }
 
-    // 0047ea0a..0047ea2b: the partner dealer's card.
     if (Dealer != nullptr && Dealer->InfoCardInfo != nullptr)
     {
         Dealer->InfoCardInfo->SetScrollOrigin(0, 0);
         Dealer->InfoCardInfo->ClearContent();
     }
 
-    // 0047ea30..0047ea77: the three dealer panes; only the first is null-tested.
+    // Only the first of the three dealer panes is null-tested.
     if (InfoCardFacts != nullptr)
     {
         InfoCardFacts->SetScrollOrigin(0, 0);
@@ -3675,8 +3439,7 @@ void NnInventory::ClearInfoCard()
         InfoCardValues->ClearContent();
     }
 
-    // 0047ea7c..0047eaa0: the partner dealer's +0x4e8 is stored twice (the listing reloads
-    // +0x360 between the two stores).
+    // Retail stores the partner dealer's +0x4e8 twice, reloading +0x360 in between.
     ShownInfoArchId = 0;
     if (Dealer != nullptr)
     {
@@ -3687,22 +3450,20 @@ void NnInventory::ClearInfoCard()
 
 void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 {
-    // FUN_0047ba90 (RET 8). 0047baad..0047babe: not while the quantity controls show.
+    // FUN_0047ba90 (RET 8).
     if (QuantityControl[0] != nullptr && (QuantityControl[0]->Flags & 2) != 0)
         return;
 
-    // 0047bac4..0047badc: borrow the partner dealer's card when this window has none.
+    // Borrow the partner dealer's card when this window has none.
     if (InfoCardInfo == nullptr && Dealer != nullptr)
         InfoCardInfo = Dealer->InfoCardInfo;
 
     if (ArchId == 0)
     {
-        // 0047baee..0047bb00
         ShownInfoArchId = 0;
         Field4e1 = 0;
         if (Ids == 0)
         {
-            // 0047bc6f..0047bcaf: nothing to show; forget the text and reset the partners.
             ShownInfoIds = 0;
             if (Dealer != nullptr)
             {
@@ -3718,7 +3479,6 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
             return;
         }
 
-        // 0047bb0c..0047bb3c
         if (Dealer != nullptr)
         {
             Dealer->ShownInfoArchId = 0;
@@ -3731,12 +3491,11 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
             Partner->ShownInfoIds = 0;
         }
 
-        // 0047bb42..0047bb53: the same text again changes nothing.
         if (ShownInfoIds == Ids)
             return;
         ShownInfoIds = Ids;
 
-        // 0047bb4e..0047bbe3: a style node, then the text; FUN_0057da40's result is not read.
+        // FUN_0057da40's result is not read.
         RenderDisplayList Text;
         {
             StyleNode Style(0x9ca4);
@@ -3744,8 +3503,8 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         }
         LoadIdsIntoRdl(ShownInfoIds, Text);
 
-        // 0047bbe8..0047bc31: the dealer panes give way to the single card; a window without
-        // them relabels its title (+0x944, IDS 0x388).
+        // The dealer panes give way to the single card; a window without them relabels its
+        // title (+0x944).
         if (InfoCardFacts != nullptr)
         {
             InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags & 0xfc);
@@ -3758,14 +3517,13 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
             InfoCardTitle->SetProperty(0x1e, 0x388, 0);
         }
 
-        // 0047bc37..0047bc65: the card is not null-tested here.
+        // The card is not null-tested here.
         InfoCardInfo->SetScrollOrigin(0, 0); // FUN_005798b0
         InfoCardInfo->ClearContent();        // FUN_0057b370
         InfoCardInfo->AppendContent(Text);   // FUN_0057b3e0
         return;                              // FUN_0046ba90: the list goes with Text
     }
 
-    // 0047bcb4..0047bd02: the same archetype again changes nothing.
     if (ShownInfoArchId == ArchId)
         return;
     ShownInfoArchId = ArchId;
@@ -3782,15 +3540,13 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         Partner->ShownInfoIds = 0;
     }
 
-    // 0047bd08..0047bd1a: the name, the two info texts and the trade-text flag.
-    int IdsName = 0;   // [ESP+0x10]
-    int IdsFirst = 0;  // [ESP+0x14]
-    int IdsSecond = 0; // [ESP+0x20]
-    bool bTradeText = false; // the second argument's byte, reused
+    int IdsName = 0;
+    int IdsFirst = 0;
+    int IdsSecond = 0;
+    bool bTradeText = false; // retail reuses the second argument's byte
 
     if (bShowShipInfoCard != 0)
     {
-        // 0047bd25..0047bd52: ship mode.
         Archetype::Ship const* const ShipArch = Archetype::GetShip(ArchId);
         if (ShipArch != nullptr)
         {
@@ -3798,11 +3554,9 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
             IdsName = ShipArch->IdsName;
             IdsSecond = ShipArch->IdsInfo;
 
-            // 0047bd56..0047bd6a: the three panes need a dealer (this one or the partner) and
-            // the panes themselves.
             if ((bDealerMode != 0 || Dealer != nullptr) && InfoCardFacts != nullptr)
             {
-                // 0047bd70..0047be04: pane 1, IdsInfo1 (+0xec).
+                // Panes 1..3: IdsInfo1..3 (+0xec / +0xf0 / +0xf4).
                 RenderDisplayList Facts;
                 {
                     StyleNode Style(0x9ca4);
@@ -3810,18 +3564,16 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 }
                 LoadIdsIntoRdl(static_cast<unsigned>(ShipArch->IdsInfo1), Facts);
 
-                // 0047be09..0047be36: show the panes, hide the single card (not null-tested).
+                // The single card is not null-tested.
                 InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags | 3);
                 InfoCardStats->Flags = static_cast<unsigned char>(InfoCardStats->Flags | 3);
                 InfoCardValues->Flags = static_cast<unsigned char>(InfoCardValues->Flags | 3);
                 InfoCardInfo->Flags = static_cast<unsigned char>(InfoCardInfo->Flags & 0xfc);
 
-                // 0047be39..0047be56
                 InfoCardFacts->SetScrollOrigin(0, 0);
                 InfoCardFacts->ClearContent();
                 InfoCardFacts->AppendContent(Facts);
 
-                // 0047be5b..0047bf11: pane 2, IdsInfo2 (+0xf0).
                 RenderDisplayList Stats;
                 {
                     StyleNode Style(0x9ca4);
@@ -3832,7 +3584,6 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 InfoCardStats->ClearContent();
                 InfoCardStats->AppendContent(Stats);
 
-                // 0047bf16..0047bfcc: pane 3, IdsInfo3 (+0xf4).
                 RenderDisplayList Values;
                 {
                     StyleNode Style(0x9ca4);
@@ -3843,20 +3594,20 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 InfoCardValues->ClearContent();
                 InfoCardValues->AppendContent(Values);
 
-                // 0047bfd1..0047c087: the three lists are freed; the name label is not set.
+                // The name label is not set on this path.
                 return;
             }
         }
     }
     else
     {
-        // 0047c08c..0047c0ef: item mode -- the good's texts, else the archetype's.
+        // Item mode: the good's texts, else the archetype's.
         Archetype::Equipment const* const Equip = Archetype::GetEquipment(ArchId);
         GoodInfo const* const Good = GoodList::find_by_archetype(ArchId);
         if (Good != nullptr)
         {
-            // 0047c0a6..0047c0d7: FUN_005835f0 == 1 (an item without a hp type) asks for the
-            // trade text; its two out-values land in slots the listing overwrites next.
+            // FUN_005835f0 == 1 (no hp type) asks for the trade text; retail's two out-values
+            // land in stack slots overwritten next.
             Archetype::Equipment const* OutWeapon = nullptr;
             Archetype::Equipment const* OutShield = nullptr;
             bTradeText = ShipViewEquipmentHpClass(ArchId, &OutWeapon, &OutShield) == 1;
@@ -3870,15 +3621,12 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         }
     }
 
-    // 0047c0f3..0047c107: the name label.
     if (InfoCardName != nullptr)
         InfoCardName->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
 
-    // 0047c10d..0047c113
     if (InfoCardInfo == nullptr)
         return;
 
-    // 0047c119..0047c1e7: the card's text -- a style node and the (non-zero) info texts.
     RenderDisplayList Card;
     {
         StyleNode Style(0x9ca4);
@@ -3889,9 +3637,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
     if (IdsSecond != 0)
         LoadIdsIntoRdl(static_cast<unsigned>(IdsSecond), Card);
 
-    // 0047c1ea..0047c232: items with a stat table get the three panes (switch table
-    // 0x0047c72c over class types 0xe..0x21: ShieldGenerator, Thruster, Gun, MineDropper,
-    // CounterMeasureDropper, RepairKit, ShieldBattery, Munition, Mine, CounterMeasure).
+    // Items with a stat table get the three panes (switch table 0x0047c72c).
     if (bShowShipInfoCard == 0 && InfoCardFacts != nullptr)
     {
         Archetype::Equipment* const Equip = Archetype::GetEquipment(ArchId);
@@ -3919,7 +3665,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 
             if (bTwoColumn)
             {
-                // 0047c239..0047c27e: panes on, card off; the info text goes to pane 1.
+                // The info text goes to pane 1.
                 InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags | 3);
                 InfoCardStats->Flags = static_cast<unsigned char>(InfoCardStats->Flags | 3);
                 InfoCardValues->Flags = static_cast<unsigned char>(InfoCardValues->Flags | 3);
@@ -3928,8 +3674,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 InfoCardFacts->ClearContent();
                 InfoCardFacts->AppendContent(Card);
 
-                // 0047c283..0047c438: pane 2 -- header style 0xf64, IDS 0x6e1, a line break
-                // (DAT_005d0254 L"\n"), body style 0x9ca4, then the stat labels.
+                // Pane 2: the stat labels (L"\n" is DAT_005d0254).
                 RenderDisplayList Labels;
                 {
                     StyleNode Style(0xf64);
@@ -3946,7 +3691,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 InfoCardStats->ClearContent();
                 InfoCardStats->AppendContent(Labels);
 
-                // 0047c43d..0047c54f: pane 3 -- body style, a line break, the stat values.
+                // Pane 3: the stat values.
                 RenderDisplayList Values;
                 {
                     StyleNode Style(0x9ca4);
@@ -3958,14 +3703,12 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 InfoCardValues->ClearContent();
                 InfoCardValues->AppendContent(Values);
 
-                // 0047c554..0047c5eb: the lists are freed.
                 return;
             }
         }
     }
 
-    // 0047c5f4..0047c64f: the single card; a window without panes relabels its title
-    // (+0x944, not null-tested): IDS 0x387 in ship mode, 0x388 otherwise.
+    // The single card; a window without panes relabels its title (+0x944, not null-tested).
     if (InfoCardFacts != nullptr)
     {
         InfoCardFacts->Flags = static_cast<unsigned char>(InfoCardFacts->Flags & 0xfc);
@@ -3982,11 +3725,9 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         InfoCardTitle->SetProperty(0x1e, 0x388, 0);
     }
 
-    // 0047c655..0047c692
     if (bTradeText && (bDealerMode != 0 || Dealer != nullptr))
     {
-        // 0047c66b..0047c676: FUN_004704d0(&Card, ArchId) -- the commodity's price at every
-        // known base.
+        // The commodity's price at every known base.
         AppendCommodityTradeReport(&Card, ArchId);
     }
     else if (bShowShipInfoCard == 0)
@@ -3994,7 +3735,6 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         BuildDealerEquipmentStatText(Card, ArchId, true, true); // FUN_00484090(,,1,1)
     }
 
-    // 0047c695..0047c6b2
     InfoCardInfo->SetScrollOrigin(0, 0);
     InfoCardInfo->ClearContent();
     InfoCardInfo->AppendContent(Card);
@@ -4002,25 +3742,24 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 
 void NnInventory::UpdateRowVisibility(int Count)
 {
-    // FUN_0047f3e0 (RET 4). 0047f3e7..0047f402: a dealer with +0x98c set hides every row.
+    // FUN_0047f3e0 (RET 4).
     bool bHideAll = false;
-    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->bPreviewingShip != 0)
+    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->bPreviewingShip != 0) // +0x98c
         bHideAll = true;
 
     for (int Row = 0; Row < kNnInventoryRows; ++Row)
     {
-        // 0047f413..0047f43a: past the end of the list (unsigned compare) or all hidden.
+        // Unsigned compare.
         bool const bHide =
             static_cast<unsigned>(FirstRow + Row) >= static_cast<unsigned>(Count) || bHideAll;
 
-        // 0047f43f..0047f457: the price columns also hide while the partner dealer is hidden.
+        // The price columns also hide while the partner dealer is hidden.
         bool bHidePrice = bHide;
         if (Dealer != nullptr && (Dealer->Flags & 2) == 0)
             bHidePrice = true;
 
-        // 0047f45c..0047f499: ...and when no price applies: an own inventory next to no dealer,
-        // a commodity trader (1) outside the commodity filter, an equipment dealer (3) on the
-        // commodity filter. A ship dealer (2) and a dealer window itself always price.
+        // ...and when no price applies: an own inventory next to no dealer, a commodity trader
+        // (1) outside the commodity filter, an equipment dealer (3) on the commodity filter.
         bool bNoPrice = true;
         if (Dealer != nullptr)
         {
@@ -4043,7 +3782,6 @@ void NnInventory::UpdateRowVisibility(int Count)
 
         uintptr_t const HidePriceValue = (bHidePrice || bNoPrice) ? 1 : 0;
 
-        // 0047f49b..0047f551
         if (ItemName[Row] != nullptr)
             ItemName[Row]->SetProperty(1, bHide ? 1 : 0, 0);
         if (ItemPrice[Row] != nullptr)
@@ -4057,9 +3795,6 @@ void NnInventory::UpdateRowVisibility(int Count)
         if (CargoMissionText[Row] != nullptr)
             CargoMissionText[Row]->SetProperty(1, bHide ? 1 : 0, 0);
 
-        // 0047f557..0047f5be: the equip toggle -- hidden on empty rows and on the ammo /
-        // commodity filters; disabled on a dealer other than the ship dealer, and on an own
-        // inventory while the player is in space.
         if (EquipToggle[Row] != nullptr)
         {
             if (bHide || Mode == 4 || Mode == 1)
@@ -4075,7 +3810,6 @@ void NnInventory::UpdateRowVisibility(int Count)
             }
         }
 
-        // 0047f5c4..0047f657: the view / button / mesh trio.
         if (ItemView[Row] != nullptr && ItemButton[Row] != nullptr && ItemMesh[Row] != nullptr)
         {
             uintptr_t const HideValue = bHide ? 1 : 0;
@@ -4092,18 +3826,15 @@ void NnInventory::UpdateRowVisibility(int Count)
         }
     }
 
-    // 0047f672..0047f688
     if (TradeRouteButton == nullptr || TradeRouteText == nullptr)
         return;
 
-    // 0047f68e..0047f6a2
     bool bMission = false;
     EquipDesc const* const Selected = GetSelectedItem(); // FUN_0047e790
     if (Selected != nullptr && Selected->bMission)
         bMission = true;
 
-    // 0047f6a4..0047f6f9: the trade-route pair shows for a selected, non-mission commodity,
-    // unless slot 46 says otherwise (NN_Scanner) or the quantity controls are up.
+    // IsScanner is slot 46 (true for NN_Scanner).
     if (Mode == 4 && SelectedIndex != -1 && !bMission && !IsScanner() &&
         (QuantityControl[0] == nullptr || (QuantityControl[0]->Flags & 2) == 0))
     {
@@ -4112,7 +3843,6 @@ void NnInventory::UpdateRowVisibility(int Count)
         return;
     }
 
-    // 0047f6fc..0047f712
     TradeRouteButton->Flags = static_cast<unsigned char>(TradeRouteButton->Flags & 0xfc);
     TradeRouteText->Flags = static_cast<unsigned char>(TradeRouteText->Flags & 0xfc);
 }
@@ -4126,15 +3856,11 @@ static unsigned const G_NnHpClassInfoIds[10] = {
 void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bArg3)
 {
     // FUN_0047d2f0 (RET 0xc). Arg2 is only handed on to the recursive call.
-
-    // 0047d30e..0047d326: the partner dealer's trade mode (0 without one).
     int const DealerTradeMode = (Dealer != nullptr) ? Dealer->TradeMode : 0;
 
-    // 0047d32a..0047d340: resync with the player's loadout when asked to and the player has a
-    // ship.
+    // Resync with the player's loadout.
     if (bArg3 != 0 && GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
     {
-        // 0047d346..0047d395: the loadout changed since the last look.
         if (LastEquipRevision != static_cast<int>(GetPlayerEquipRevisionRetail())) // FUN_004c4f90
         {
             bTradePending = 0;
@@ -4144,8 +3870,8 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             Ship.SortFrom(&GetPlayerEquipDescListRetail()); // FUN_004c6b80
             SelectedItem = nullptr;                          // +0x4f4
 
-            // 0047d39b..0047d3fe: next to an equipment dealer, the partner's +0x394 names the
-            // hardpoint the dealer's selected good would go on (weapons / equipment filters).
+            // Next to an equipment dealer, the partner's +0x394 names the hardpoint the dealer's
+            // selected good would go on (weapons / equipment filters).
             NnDealer* const Partner = Dealer;
             if (Partner != nullptr && Partner->TradeMode == 3 && Partner->Inventory != nullptr)
             {
@@ -4160,8 +3886,8 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 }
             }
 
-            // 0047d404..0047d46f: a pending good (+0x3bc) that no longer fits drops the partner
-            // dealer's selection. The ship view is not null-tested here.
+            // A pending good (+0x3bc) that no longer fits drops the partner dealer's selection.
+            // The ship view is not null-tested here.
             if (bCheckHardpointAfterBuy != 0)
             {
                 unsigned const PendingGood = PendingBuyGoodId;
@@ -4171,7 +3897,6 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                     Dealer->ClearSelection();
             }
 
-            // 0047d475..0047d486
             if (bCheckStockAfterBuy != 0)
             {
                 bCheckStockAfterBuy = 0;
@@ -4179,7 +3904,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             }
         }
 
-        // 0047d48d..0047d4ec: the ship's collision groups changed: reload the hull.
+        // The collision groups changed: reload the hull.
         if (LastCollisionRevision != static_cast<int>(GetPlayerCollisionRevisionRetail())) // FUN_004c4fa0
         {
             LastCollisionRevision = static_cast<int>(GetPlayerCollisionRevisionRetail());
@@ -4191,13 +3916,10 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 Ship.ShipView->LoadShip(&ShipArch->Nickname, true, true); // FUN_00585a90(+8, 1, 1)
             }
 
-            // 0047d4f1..0047d516
             if (Ship.ShipView != nullptr)
                 Ship.ShipView->LoadEquipment(&GetPlayerEquipDescListRetail());
             Ship.SortFrom(&GetPlayerEquipDescListRetail());
 
-            // 0047d51b..0047d53d: next to an equipment dealer, FUN_00446be0 (the GF ObjectShip)
-            // gets the new loadout (FUN_00448540(&+0x34c)) and FUN_00447210.
             if (DealerTradeMode == 3)
             {
                 FObjectShip* const GfShip = GfObjectShip();
@@ -4210,35 +3932,32 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         }
     }
 
-    // 0047d542..0047d570: the player's credits into the cash label.
     if (PlayerCash != nullptr)
     {
         FormatGroupedNumber(ToolTipText, static_cast<int>(GetPlayerCreditsRetail()), 0x476); // FUN_004779a0(,FUN_004c4ce0(),)
         PlayerCash->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
-    // 0047d576..0047d59e: docked at a base (DAT_0066873c > 0, JBE), FUN_0043a510 on
-    // DAT_00668708 finds the base's market ([ESP+0x14]); otherwise none. Every use below tests
-    // it for null.
+    // Every use of the market below tests it for null.
     FClientMarket* Market = nullptr;
     {
         unsigned const BaseId = GetClientLocationCurrentBase();
         if (BaseId != 0)
             Market = GetClientLocationBaseMarket(BaseId);
     }
-    int Counter = 0;                       // V_18
-    EquipDesc const* FirstSelected = nullptr; // V_1c
-    GoodInfo const* FirstGood = nullptr;   // V_30
-    EquipDesc const* Hovered = nullptr;    // V_2c
+    int Counter = 0;
+    EquipDesc const* FirstSelected = nullptr;
+    GoodInfo const* FirstGood = nullptr;
+    EquipDesc const* Hovered = nullptr;
 
-    // 0047d5a2..0047d5c8: a ship dealer lists every filter at once.
-    bool bAllModes = false; // V_11
+    // A ship dealer lists every filter at once.
+    bool bAllModes = false;
     if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2)
         bAllModes = true;
-    int FocusCounter = -1;  // V_40
-    int SelectedHpClass = -1; // V_50
+    int FocusCounter = -1;
+    int SelectedHpClass = -1;
 
-    // 0047d5cc..0047d7f1: an own inventory lists the ship's hardpoints first (empty ones too).
+    // An own inventory lists the ship's hardpoints first (empty ones too).
     if (bDealerMode == 0)
     {
         int const HardpointCount = Ship.ShipView->GetHardpointListCount(); // FUN_00587050
@@ -4248,22 +3967,20 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             if (Entry == nullptr)
                 continue;
 
-            unsigned ArchId = 0;           // V_20
-            int Price = 0;                 // V_28
-            int Health = 0;                // V_44
-            unsigned char bShowToggle = 0; // V_34
-            unsigned char bEquipped = 0;   // V_38
-            unsigned char bMission = 0;    // V_3c
-            int const RowMode = (Entry->Group == 1) ? 2 : 0; // V_24
+            unsigned ArchId = 0;
+            int Price = 0;
+            int Health = 0;
+            unsigned char bShowToggle = 0;
+            unsigned char bEquipped = 0;
+            unsigned char bMission = 0;
+            int const RowMode = (Entry->Group == 1) ? 2 : 0;
 
-            // 0047d639..0047d661: the item on this hardpoint.
             CacheString Hardpoint;
             Hardpoint.Value = StringAlloc(Entry->Name.c_str(), false);
             EquipDesc const* const Item = List->find_equipment_item(Hardpoint);
             GoodInfo const* Good = nullptr;
             if (Item != nullptr)
             {
-                // 0047d673..0047d69e
                 bMission = Item->bMission ? 1 : 0;
                 ArchId = Item->ArchId;
                 bShowToggle = 1;
@@ -4271,14 +3988,11 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 Health = static_cast<int>(static_cast<double>(Item->Health) * 100.0); // DAT_005ca230
                 Good = GoodList::find_by_archetype(ArchId);
 
-                // 0047d6a6..0047d6cf: the row under the mouse.
                 if ((RowMode == Mode || bAllModes) && Counter == HoverIndex && Hovered == nullptr)
                     Hovered = Item;
 
-                // 0047d6d3..0047d757: with a good and a market whose transaction type for it
-                // (FUN_00438100) is 0 or 1: ftol(FUN_00438060(Good->Id) * Item->Health); at type
-                // 0, for a non-combinable good (+0x70) whose item is in the saved loadout +0x3a8,
-                // ftol(price (FILD) * 0.3f (DAT_005d0e2c) + 0.49999f (DAT_005d1910)).
+                // Transaction type (FUN_00438100) 0 or 1 prices the item; at type 0 a used,
+                // non-combinable item takes the used rate (DAT_005d0e2c / DAT_005d1910).
                 Price = 0;
                 if (Good != nullptr && Market != nullptr)
                 {
@@ -4296,17 +4010,15 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                     }
                 }
 
-                // 0047d75b..0047d777: the item to keep in view.
                 if (FocusEquipId != SUBOBJ_ID_NONE && Item->Id == FocusEquipId)
                     FocusCounter = Counter;
             }
 
-            // 0047d77b..0047d7b6
             bool const bSelected = FillItemRow(&Counter, ArchId, RowMode, 1, Price, Health,
                                                bShowToggle, bEquipped, bMission, 1, Entry->Ids,
                                                Entry->Class, 0);
 
-            // 0047d7bb..0047d7de: the first selected row; an empty hardpoint keeps its class.
+            // An empty hardpoint keeps its class for the info card.
             if (FirstSelected == nullptr && bSelected)
             {
                 FirstSelected = Item;
@@ -4317,21 +4029,16 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         }
     }
 
-    // 0047d7f7..0047da9d: every item of the list.
     for (std::list<EquipDesc>::const_iterator It = List->Items.begin(); It != List->Items.end(); ++It)
     {
         EquipDesc const* const Item = &*It;
         GoodInfo const* const Good = GoodList::find_by_archetype(Item->ArchId);
-        int Filter = NnItemFilterMode(Item->ArchId); // FUN_0047e460, V_20
+        int Filter = NnItemFilterMode(Item->ArchId); // FUN_0047e460
 
-        // 0047d838..0047d921: the price in the base's market, with a good and a market whose
-        // transaction type for it (FUN_00438100) is 0 or 1: a commodity (filter 4)
-        // ftol(FUN_00438060(Good->Id)), anything else ftol(that * Item->Health). Then the
-        // used-goods rate ftol(price (FILD) * 0.3f + 0.49999f) for a non-commodity,
-        // non-combinable good (+0x70) whose item is in this window's saved loadout +0x3a8 (type
-        // 0 only), or -- any type -- on a ship dealer (+0x35c, trade mode 2) in its partner's
-        // +0x3a8 (the partner null-tested).
-        int Price = 0; // V_24
+        // Commodities are not scaled by health. The used rate applies to a non-combinable item
+        // in this window's saved loadout +0x3a8 (type 0 only), or -- any type -- on a ship
+        // dealer to one in its partner's +0x3a8.
+        int Price = 0;
         if (Good != nullptr && Market != nullptr)
         {
             int const Type = ClientMarketGetTransactionType(Market, Good->Id);
@@ -4362,30 +4069,27 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             }
         }
 
-        // 0047d925..0047d961
         int const Health = static_cast<int>(static_cast<double>(Item->Health) * 100.0);
-        unsigned char bShowToggle = 0; // V_38
-        unsigned char bEquipped = 0;   // V_34
+        unsigned char bShowToggle = 0;
+        unsigned char bEquipped = 0;
         if (Good != nullptr && Filter != 1 && Filter != 4)
         {
             bEquipped = Item->bEquipped ? 1 : 0;
             bShowToggle = 1;
         }
 
-        // 0047d965..0047d970
         if (bAllModes)
             Filter = -1;
 
-        // 0047d974..0047d981: mounted weapons and equipment are already on the hardpoint rows.
+        // Mounted weapons and equipment are already on the hardpoint rows.
         bool bSelected = false;
         if (!((Filter == 0 || Filter == 2) && bEquipped != 0))
         {
-            // 0047d987..0047d9a3
             if (FocusEquipId != SUBOBJ_ID_NONE && Item->Id == FocusEquipId)
                 FocusCounter = Counter;
 
-            // 0047d9a7..0047da06: whether the item can be used: a free hardpoint for an
-            // unmounted weapon / equipment of an own inventory, a launcher for ammo.
+            // Usable: a free hardpoint for an unmounted weapon / equipment of an own inventory,
+            // a launcher for ammo.
             bool bUnusable = false;
             if (bEquipped == 0 && bDealerMode == 0 && Good != nullptr && (Mode == 0 || Mode == 2))
             {
@@ -4397,17 +4101,14 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 bUnusable = !NnListHasLauncherFor(List, Item->ArchId); // FUN_00482d80
             }
 
-            // 0047da08..0047da30
             if ((Filter == Mode || bAllModes) && Counter == HoverIndex && Hovered == nullptr)
                 Hovered = Item;
 
-            // 0047da34..0047da74
             bSelected = FillItemRow(&Counter, Item->ArchId, Filter, Item->Count, Price, Health,
                                     bShowToggle, bEquipped, Item->bMission ? 1 : 0,
                                     bUnusable ? 0 : 1, 0, 0, 0);
         }
 
-        // 0047da79..0047da89
         if (FirstSelected == nullptr && bSelected)
         {
             FirstSelected = Item;
@@ -4415,14 +4116,13 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         }
     }
 
-    // 0047daa3..0047dd2f: ammo the list lacks for its launchers, once per ammo type.
-    std::vector<unsigned> ListedAmmo; // V_60
+    // Empty rows for ammo the list lacks for its launchers, once per ammo type.
+    std::vector<unsigned> ListedAmmo;
     for (std::list<EquipDesc>::const_iterator It = List->Items.begin(); It != List->Items.end(); ++It)
     {
         EquipDesc const* const Item = &*It;
 
-        // 0047dad8..0047db26: a gun / mine dropper / countermeasure dropper's projectile.
-        unsigned AmmoId = 0; // V_24
+        unsigned AmmoId = 0;
         Archetype::Equipment* const Arch = Archetype::GetEquipment(Item->ArchId);
         if (Arch != nullptr)
         {
@@ -4438,11 +4138,9 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         if (AmmoId == 0)
             continue;
 
-        // 0047db30..0047db47: the list holds some already.
         if (List->find_matching_cargo(AmmoId, 0, 1.0f) != nullptr)
             continue;
 
-        // 0047db4d..0047db7c: listed already.
         bool bListed = false;
         for (size_t Seen = 0; Seen < ListedAmmo.size(); ++Seen)
         {
@@ -4455,17 +4153,15 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         if (bListed)
             continue;
 
-        // 0047db7e..0047dba9: the hovered row is the launcher's.
+        // The hovered row is the launcher's.
         if ((Mode == 1 || bAllModes) && Counter == HoverIndex && Hovered == nullptr)
             Hovered = Item;
 
-        // 0047dbad..0047dbd2: an empty ammo row (ammo filter, count shown, health 100).
         bool const bSelected = FillItemRow(&Counter, AmmoId, 1, 0, 0, 100, 0, 0, 0, 0, 0, 0, 1);
 
-        // 0047dbce..0047dce4
         ListedAmmo.push_back(AmmoId);
 
-        // 0047dce8..0047dd1d: selecting it selects a stand-in item of that ammo (+0x94c).
+        // Selecting it selects a stand-in item of that ammo (+0x94c).
         if (FirstSelected == nullptr && bSelected)
         {
             EmptyAmmoStandIn.set_arch_id(AmmoId);
@@ -4474,9 +4170,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         }
     }
 
-    // 0047dd35..0047dd6b: +0x4e6 = the market takes the selected unmounted item: a first
-    // selected item that is not mounted (+0xc), a market, and FUN_00438100(FirstGood->Id) 0 or 1
-    // (FirstGood is not null-tested).
+    // FirstGood is not null-tested.
     bSelectedSellable = 0;
     if (FirstSelected != nullptr && !FirstSelected->bEquipped && Market != nullptr)
     {
@@ -4485,8 +4179,6 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             bSelectedSellable = 1;
     }
 
-    // 0047dd72..0047ddb3: the cargo space of the hovered item; mounted weapons / equipment and
-    // everything on a dealer take none.
     HoveredCargoVolume = 0;
     if (Hovered != nullptr)
     {
@@ -4495,19 +4187,15 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             HoveredCargoVolume = 0;
     }
 
-    // 0047ddb9..0047ddc0
     UpdateRowVisibility(Counter); // FUN_0047f3e0
 
-    // 0047ddc5..0047dde2: LAB_0053e4a0 (`RET 4`) on &+0x330 with (+0x4e1 ? 0 : +0x4e2) -- a
-    // no-op.
+    // Retail then calls LAB_0053e4a0 (an empty `RET 4`) on &+0x330.
 
-    // 0047dde7..0047de77: the jettison button needs a selected, unmounted, lootable item with
-    // no mission flag and no pending transfer (+0x914), and not the ammo stand-in.
     if (JettisonButton != nullptr)
     {
-        unsigned char bMission = 0;  // V_12
-        unsigned char bLootable = 0; // V_13
-        unsigned char bEquipped = 0; // BL
+        unsigned char bMission = 0;
+        unsigned char bLootable = 0;
+        unsigned char bEquipped = 0;
         if (FirstSelected != nullptr)
         {
             bMission = FirstSelected->bMission ? 1 : 0;
@@ -4516,7 +4204,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             if (Arch != nullptr)
                 bLootable = Arch->bLootable ? 1 : 0; // +0x6c
         }
-        // 0047de34..0047de45: TEST AH,0x41 / JZ -- disabled while +0x914 > 0.
+        // Disabled while the jettison cooldown (+0x914) runs.
         bool bDisabled = true;
         if (SelectedIndex != -1 && bEquipped == 0 && !(JettisonCooldown > 0.0f) && bMission == 0 &&
             bLootable != 0 && FirstSelected != &EmptyAmmoStandIn)
@@ -4524,7 +4212,6 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         JettisonButton->SetProperty(2, bDisabled ? 1 : 0, 0);
     }
 
-    // 0047de7d..0047dea7: the ship's damage bar.
     if (Ship.DamageBar != nullptr)
     {
         int const ShipHealth = static_cast<int>(static_cast<double>(GetPlayerHealthScaleRetail()) *
@@ -4532,8 +4219,8 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         Ship.DamageBar->SetProperty(0x40, 100, static_cast<uintptr_t>(ShipHealth));
     }
 
-    // 0047dead..0047df94: the row count changed: select the focused item, rescale the scroll
-    // bar, keep the focus on the page, then build the list again.
+    // The row count changed: select the focused item, rescale the scroll bar, keep the focus
+    // on the page, then build the list again.
     if (Counter != LastRowCount)
     {
         SelectedIndex = -1;
@@ -4542,7 +4229,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         if (InventoryScroll != nullptr)
             InventoryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Counter - 1));
 
-        // 0047dee7..0047df26 (unsigned compares)
+        // Unsigned compares.
         if (FocusCounter != -1)
         {
             if (static_cast<unsigned>(FocusCounter) > static_cast<unsigned>(FirstRow + 4))
@@ -4553,7 +4240,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
         }
 
-        // 0047df2c..0047df6e: no gap below the last row.
+        // No gap below the last row.
         if (FirstRow != 0 &&
             static_cast<unsigned>(FirstRow + 5) > static_cast<unsigned>(Counter))
         {
@@ -4565,14 +4252,12 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
         }
 
-        // 0047df74..0047df94
         LastRowCount = Counter;
         RefreshItemList(List, Arg2, bArg3);
     }
 
-    // 0047df99..0047dffe: +0x4e0 (the card shows the ship) holds on an own inventory with no
-    // dealer and no selection; any selection here or on the partner dealer clears it on all
-    // three windows.
+    // +0x4e0 (the card shows the ship) holds on an own inventory with no dealer and no
+    // selection; any selection here or on the partner dealer clears it on all three windows.
     if (SelectedIndex != -1 || (Dealer != nullptr && Dealer->SelectedIndex != -1))
     {
         bShowShipInfoCard = 0;
@@ -4584,7 +4269,6 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
     if (bDealerMode == 0 && Dealer == nullptr && SelectedIndex == -1)
         bShowShipInfoCard = 1;
 
-    // 0047e005..0047e0a4: the info card.
     if (bShowShipInfoCard != 0)
     {
         ShowInfoCard(Ship.ShipArchId, 0);
@@ -4606,7 +4290,6 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             ClearInfoCard(); // FUN_0047e9e0
     }
 
-    // 0047e0a9..0047e0be: the focus request is spent; the ammo list goes with ListedAmmo.
     FocusEquipId = SUBOBJ_ID_NONE;
 }
 
@@ -4641,17 +4324,16 @@ EquipDesc* NnInventory::GetSelectedItem()
     if (SelectedItem != nullptr)
         return SelectedItem;
 
-    // 0047e7c6..0047e7e4: a dealer (+0x35c) in trade mode 2 (+0x978) lists every mode.
+    // A dealer (+0x35c) in trade mode 2 (+0x978) lists every mode.
     unsigned char bAllModes = 0;
     if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2)
         bAllModes = 1;
 
-    int Counter = 0; // [ESP+0x14]
+    int Counter = 0;
     if (bDealerMode == 0)
     {
-        // 0047e7f4..0047e88f: the ship view's hardpoint rows first -- group 1 (+0x18) belongs
-        // to mode 2, every other group to mode 0. The row's item is looked up by hardpoint
-        // name through a StringAlloc'd CacheString.
+        // The ship view's hardpoint rows first: group 1 (+0x18) belongs to mode 2, every other
+        // group to mode 0.
         int const Count = Ship.ShipView->GetHardpointListCount(); // FUN_00587050
         for (int Index = 0; Index < Count; ++Index)
         {
@@ -4676,9 +4358,8 @@ EquipDesc* NnInventory::GetSelectedItem()
         }
     }
 
-    // 0047e895..0047e8fe: then the loadout's items of the mode (filter 5 = none never counts);
-    // a mounted item counts only outside modes 0 and 2, whose mounted rows came from the
-    // hardpoint list above.
+    // Then the loadout's items of the mode; a mounted item counts only outside modes 0 and 2,
+    // whose mounted rows came from the hardpoint list above.
     for (std::list<EquipDesc>::iterator It = Ship.Loadout.Items.begin();
          It != Ship.Loadout.Items.end(); ++It)
     {
@@ -4704,14 +4385,10 @@ void NnInventoryOpenDealer(int TradeMode, FNnInventoryResultFn ResultFn, void* R
                            unsigned ShipPackage)
 {
     // FUN_00477ab0 (cdecl).
-
-    // 0x00477ab5..0x00477ac4: an NN_Dealer window is already up -> nothing.
     if (Win3DFindByName("NN_Dealer") != nullptr)
         return;
 
-    // 0x00477aca..0x00477b12: the NN_Inventory window; made through the WinFactory (parent
-    // FUN_0045a7a0(0x66), no payload) when there is none or it carries flag 4, and then shown
-    // hidden (flags &= 0xfc). A failed create returns.
+    // Made anew when there is none or it carries flag 4.
     Win3D* Window = Win3DFindByName("NN_Inventory");
     bool bCreated = false;
     if (Window == nullptr || (Window->Flags & 4) != 0)
@@ -4724,39 +4401,33 @@ void NnInventoryOpenDealer(int TradeMode, FNnInventoryResultFn ResultFn, void* R
         bCreated = true;
     }
 
-    // 0x00477b14..0x00477b33: FUN_0045a780(0x66, {-0.64, 0.33, -1.288}).
+    // {-0.64, 0.33, -1.288}.
     float const PanelOrigin[3] = {NnFloatBits(0xbf23d70a), NnFloatBits(0x3ea8f5c3),
                                   NnFloatBits(0xbfa4dd2f)};
     NnMainButtonSetPanelOrigin(0x66, PanelOrigin);
-    // 0x00477b38..0x00477b41: FUN_0045dcb0 on DAT_0066d3f0 (not null-tested).
+    // FUN_0045dcb0 on DAT_0066d3f0 (not null-tested).
     G_NnMainButton->SetInfoCardLayout();
 
-    // 0x00477b46..0x00477b4d: slot 2 of the window.
     NnInventory* const Inventory = static_cast<NnInventory*>(Window->AsWinControl());
 
-    // 0x00477b4f..0x00477b69: an NN_Dealer under the inventory's parent.
     Win3D* const DealerWindow =
         WinFactoryCreate("NN_Dealer", "NN_Dealer", Inventory->Parent, nullptr);
     if (DealerWindow != nullptr)
     {
-        // 0x00477b6b..0x00477b89: hidden, linked as the inventory's +0x360, then the trade mode.
         DealerWindow->Flags = static_cast<unsigned char>(DealerWindow->Flags & 0xfc);
         Inventory->Dealer = static_cast<NnDealer*>(DealerWindow->AsWinControl());
         Inventory->SetProperty(0x47, static_cast<uintptr_t>(TradeMode), 0);
-        // 0x00477b8f..0x00477ba0: FUN_0047b410 on the dealer (not null-tested), and on the
-        // inventory when it was made here.
+        // The dealer is not null-tested here.
         Inventory->Dealer->BindControls();
         if (bCreated)
             Inventory->BindControls();
-        // 0x00477ba5..0x00477bbb: the dealer's +0x974 = the inventory, the dealer hidden again.
         if (Inventory->Dealer != nullptr)
         {
-            Inventory->Dealer->Inventory = Inventory;
+            Inventory->Dealer->Inventory = Inventory; // +0x974
             Inventory->Dealer->Flags = static_cast<unsigned char>(Inventory->Dealer->Flags & 0xfc);
         }
     }
 
-    // 0x00477bbf..0x00477be2: open with the result callback, then the ship package.
     Inventory->SetProperty(0x48, reinterpret_cast<uintptr_t>(ResultArg),
                            reinterpret_cast<uintptr_t>(ResultFn));
     Inventory->SetProperty(0x13, static_cast<uintptr_t>(ShipPackage), 0);
@@ -4764,16 +4435,12 @@ void NnInventoryOpenDealer(int TradeMode, FNnInventoryResultFn ResultFn, void* R
 
 void NnInventoryOpenShipDealer(int Index, FNnInventoryResultFn ResultFn, void* ResultArg)
 {
-    // FUN_00477bf0 (cdecl).
-
-    // 0x00477c08..0x00477c4b: the current base's market (FUN_0043a510(DAT_0066873c) on
-    // DAT_00668708), its category-3 goods collected into a local list (FUN_00437f70).
+    // FUN_00477bf0 (cdecl). Opens the ship dealer on the Index-th ship (category 3) of the
+    // current base's market, else the first.
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
     std::list<FClientMarketGood const*> Goods;
-    ClientMarketCollectCategory(Market, &Goods, 3);
+    ClientMarketCollectCategory(Market, &Goods, 3); // FUN_00437f70
 
-    // 0x00477c50..0x00477c77 / 0x00477ce8: the Index-th good, else the first; an empty list
-    // opens nothing.
     if (Goods.empty())
         return;
     FClientMarketGood const* Good = Goods.front();
@@ -4789,7 +4456,5 @@ void NnInventoryOpenShipDealer(int Index, FNnInventoryResultFn ResultFn, void* R
         ++Position;
     }
 
-    // 0x00477c7a..0x00477c89: FUN_00477ab0(2, ResultFn, ResultArg, good id). The list is freed
-    // on the way out (0x00477c95..0x00477cce).
     NnInventoryOpenDealer(2, ResultFn, ResultArg, Good->Info.GoodId);
 }

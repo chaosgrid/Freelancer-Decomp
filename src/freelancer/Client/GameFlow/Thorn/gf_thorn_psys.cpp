@@ -20,7 +20,7 @@ namespace
 {
     char const* const GScriptPsysFile = "E:\\FL\\Scratch\\Source\\Client\\GF\\ScriptPsys.cpp";
 
-    // IFxEffect slots 7 / 8 still use the existing Dt argument adapter.
+    // IFxEffect slots 7 / 8 take the float Dt through a pointer-sized argument.
     void* FloatArg(float Value)
     {
         void* Out = nullptr;
@@ -34,8 +34,7 @@ namespace
 // Thorn_Psys
 // ---------------------------------------------------------------------------------------
 
-// FUN_00453d70. Base ctor; +0x6c / +0x70 / +0x74 = 0; vptrs; +0x78 = 0 and +0x84 identity;
-// +0xa8 = 0.
+// FUN_00453d70.
 FThornPsys::FThornPsys(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
       Vis(nullptr),
@@ -49,9 +48,7 @@ FThornPsys::FThornPsys(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntity
     MatrixSetIdentity(Local.Orient);
 }
 
-// FUN_00453e60. 0x00453e62..0x00453e7a: StringAlloc(EffectName, 0), FUN_0042dd20 on it (the
-// VisEffect map lookup); +0x74 = the answer; non-null -> FUN_0042e080, else FDUMP(0x100001,
-// "Thorn_Psys: Failed to find [VisEffect] %s.", ScriptPsys.cpp, 0x4c, EffectName). The
+// FUN_00453e60. FindVisEffectByNickname is FUN_0042dd20, VisEffectArchAddRef FUN_0042e080. The
 // StringAlloc'd copy is never freed, as retail.
 void FThornPsys::BindVisEffect(char const* EffectName)
 {
@@ -65,7 +62,7 @@ void FThornPsys::BindVisEffect(char const* EffectName)
           GScriptPsysFile, 0x4c, EffectName);
 }
 
-// LAB_00453f00 (identity, RET 8). +0x78 = Transform+0x24, +0x84 = the rotation. No frame.
+// LAB_00453f00. No script-frame transform.
 GENRESULT DACOM_API FThornPsys::SetTransform(float const* Transform12)
 {
     Local.Pos.x = Transform12[9];
@@ -75,7 +72,7 @@ GENRESULT DACOM_API FThornPsys::SetTransform(float const* Transform12)
     return GR_OK;
 }
 
-// LAB_00453f60 (identity, RET 8). {+0x84 rotation, +0x78 position} copied out as 0xc dwords.
+// LAB_00453f60.
 GENRESULT DACOM_API FThornPsys::GetTransform(float* OutTransform12)
 {
     memcpy(OutTransform12, &Local.Orient, sizeof(Local.Orient));
@@ -85,7 +82,7 @@ GENRESULT DACOM_API FThornPsys::GetTransform(float* OutTransform12)
     return GR_OK;
 }
 
-// LAB_00453ec0 (geo facet, RET 8). Facet +0x6c = +0x78.
+// LAB_00453ec0.
 GENRESULT DACOM_API FThornPsys::SetPosition(float* Position)
 {
     Local.Pos.x = Position[0];
@@ -94,14 +91,14 @@ GENRESULT DACOM_API FThornPsys::SetPosition(float* Position)
     return GR_OK;
 }
 
-// LAB_00453ee0 (geo facet, RET 8). REP MOVSD 9 into facet +0x78 (= +0x84).
+// LAB_00453ee0.
 GENRESULT DACOM_API FThornPsys::SetOrientation(float* Orient9)
 {
     memcpy(&Local.Orient, Orient9, sizeof(Local.Orient));
     return GR_OK;
 }
 
-// LAB_00454770 (geo facet, RET 8).
+// LAB_00454770.
 GENRESULT DACOM_API FThornPsys::GetPosition(float* OutPosition)
 {
     OutPosition[0] = Local.Pos.x;
@@ -110,15 +107,14 @@ GENRESULT DACOM_API FThornPsys::GetPosition(float* OutPosition)
     return GR_OK;
 }
 
-// LAB_00453f40 (geo facet, RET 8).
+// LAB_00453f40.
 GENRESULT DACOM_API FThornPsys::GetOrientation(float* OutOrient9)
 {
     memcpy(OutOrient9, &Local.Orient, sizeof(Local.Orient));
     return GR_OK;
 }
 
-// LAB_00453fb0 (psys facet, RET 4). Facet +0x5c (= +0x74) non-null -> FUN_00557360 on facet
-// +0x54 (= +0x6c) with it. 0.
+// LAB_00453fb0. Particles.Create is FUN_00557360.
 GENRESULT DACOM_API FThornPsys::Start()
 {
     if (Vis != nullptr)
@@ -126,16 +122,14 @@ GENRESULT DACOM_API FThornPsys::Start()
     return GR_OK;
 }
 
-// LAB_00453fd0 (psys facet, RET 4). FUN_005574a0 on +0x6c. 0.
+// LAB_00453fd0. Particles.Destroy is FUN_005574a0.
 GENRESULT DACOM_API FThornPsys::StopEffect()
 {
     Particles.Destroy();
     return GR_OK;
 }
 
-// LAB_00453ff0 (psys facet, RET 8). Dt = DeltaMs * 0.001 (DAT_005c75f8, double, stored as a
-// float); with an effect: slot 3 (1, &{+0x84 rotation, +0x78 position}), slot 7 (Dt), slot 8
-// (Dt). 0.
+// LAB_00453ff0. 0.001 is the double DAT_005c75f8; Dt is stored as a float.
 GENRESULT DACOM_API FThornPsys::Tick(int DeltaMs)
 {
     float const Dt = static_cast<float>(static_cast<double>(DeltaMs) * 0.001);
@@ -153,8 +147,7 @@ GENRESULT DACOM_API FThornPsys::Tick(int DeltaMs)
     return GR_OK;
 }
 
-// LAB_00454070 (psys facet, RET 8). Facet +0x90 (= +0xa8) = Value; with an effect, its slot 6
-// with the value. 0.
+// LAB_00454070.
 GENRESULT DACOM_API FThornPsys::SetSparam(float Value)
 {
     Sparam = Value;
@@ -163,15 +156,15 @@ GENRESULT DACOM_API FThornPsys::SetSparam(float Value)
     return GR_OK;
 }
 
-// LAB_004540a0 (psys facet, RET 8).
+// LAB_004540a0.
 GENRESULT DACOM_API FThornPsys::GetSparam(float* OutValue)
 {
     *OutValue = Sparam;
     return GR_OK;
 }
 
-// FUN_00453e30. The psys facet's slot 4 through its vtable (0x00453e33..0x00453e3a), then
-// FUN_0042e160 on +0x74 when set; +0x74 keeps its value.
+// FUN_00453e30. StopEffect is called through the vtable; Vis keeps its value after the release
+// (FUN_0042e160).
 void FThornPsys::Stop()
 {
     static_cast<IPSysControl*>(this)->StopEffect();
@@ -185,7 +178,7 @@ void* FThornPsys::GetEngineInstance()
     return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 }
 
-// LAB_00453e50 -- ADD ECX,0x6c; JMP FUN_005574d0.
+// LAB_00453e50 -- FUN_005574d0 on +0x6c.
 void FThornPsys::DrawEffects(ICamera* Camera)
 {
     Particles.Draw(Camera);
@@ -195,7 +188,7 @@ void FThornPsys::DrawEffects(ICamera* Camera)
 // Thorn_PlayerEnginePsys
 // ---------------------------------------------------------------------------------------
 
-// FUN_004540c0. Base ctor, vptrs, 0x00454117 +0x6c = 0.
+// FUN_004540c0.
 FThornPlayerEnginePsys::FThornPlayerEnginePsys(Csys const& ScriptFrame, FGfScript* InOwner,
                                                FThornEntitySnap const* Desc)
     : FThornComponent(ScriptFrame, InOwner, Desc),
@@ -203,7 +196,7 @@ FThornPlayerEnginePsys::FThornPlayerEnginePsys(Csys const& ScriptFrame, FGfScrip
 {
 }
 
-// LAB_00454150 (psys facet, RET 4). FUN_00446be0; non-null -> FUN_00447d70 on it. 0.
+// LAB_00454150. GfObjectShip is FUN_00446be0, StartEngineEffects FUN_00447d70.
 GENRESULT DACOM_API FThornPlayerEnginePsys::Start()
 {
     FObjectShip* const Ship = GfObjectShip();
@@ -212,7 +205,7 @@ GENRESULT DACOM_API FThornPlayerEnginePsys::Start()
     return GR_OK;
 }
 
-// LAB_00454170 (psys facet, RET 4). FUN_00447f00 on the ship. 0.
+// LAB_00454170. StopEngineEffects is FUN_00447f00.
 GENRESULT DACOM_API FThornPlayerEnginePsys::StopEffect()
 {
     FObjectShip* const Ship = GfObjectShip();
@@ -221,8 +214,7 @@ GENRESULT DACOM_API FThornPlayerEnginePsys::StopEffect()
     return GR_OK;
 }
 
-// LAB_004541a0 (psys facet, RET 8). Facet +0x54 (= +0x6c) = Value, then FUN_00447f50(Value) on
-// the ship. 0.
+// LAB_004541a0. SetEngineSparam is FUN_00447f50.
 GENRESULT DACOM_API FThornPlayerEnginePsys::SetSparam(float Value)
 {
     Sparam = Value;
@@ -232,7 +224,7 @@ GENRESULT DACOM_API FThornPlayerEnginePsys::SetSparam(float Value)
     return GR_OK;
 }
 
-// LAB_004541d0 (psys facet, RET 8).
+// LAB_004541d0.
 GENRESULT DACOM_API FThornPlayerEnginePsys::GetSparam(float* OutValue)
 {
     *OutValue = Sparam;
@@ -245,7 +237,7 @@ void FThornPlayerEnginePsys::Stop()
     static_cast<IPSysControl*>(this)->StopEffect();
 }
 
-// LAB_00454140 -- MOV EAX,0xfffffff9: not -1, the "not implemented" code.
+// LAB_00454140 -- answers 0xfffffff9, the "not implemented" code, not -1.
 void* FThornPlayerEnginePsys::GetEngineInstance()
 {
     return reinterpret_cast<void*>(static_cast<intptr_t>(kThornSlotNotImplemented));

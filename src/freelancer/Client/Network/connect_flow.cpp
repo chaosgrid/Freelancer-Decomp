@@ -29,9 +29,7 @@ bool ConnectToServer(char const* IniPath)
         {
             return true;
         }
-        // .text:005a87a4-005a87d2: the NN_Error modal FUN_00473cb0(ids, 1, 0) -- 0x73e for 4 and
-        // 0x73f for 6 unconditionally; any other result shows 0x73d unless the server already
-        // dropped us (DAT_0067ecbe).
+        // A generic failure is not reported when the server already dropped us (DAT_0067ecbe).
         if (Result == 4)
         {
             NnErrorRunModal(0x73e, true, nullptr);
@@ -46,8 +44,7 @@ bool ConnectToServer(char const* IniPath)
         }
     }
 
-    // .text:005a87da-005a882a: ShutdownServerConnection's body, inlined.
-    ShutdownServerConnection();
+    ShutdownServerConnection(); // inlined in retail
     return false;
 }
 
@@ -62,11 +59,11 @@ bool LoginToServer()
     int Result;
     if (SinglePlayer())
     {
-        G_LoginMgr.bCreateAccount = 0;      // .text:005a885f DAT_0067e960
+        G_LoginMgr.bCreateAccount = 0;      // DAT_0067e960
         Result = G_LoginMgr.Login();
         if (Result != 1 && G_LoginMgr.LoginStatus == 2)
         {
-            G_LoginMgr.bCreateAccount = 1;  // .text:005a887c
+            G_LoginMgr.bCreateAccount = 1;
             Result = G_LoginMgr.Login();
         }
     }
@@ -77,15 +74,14 @@ bool LoginToServer()
 
     if (Result == 1)
     {
-        ChatResetForConnect(); // .text:005a894c FUN_0046b2b0 (returns at once in single player)
+        ChatResetForConnect(); // FUN_0046b2b0 (returns at once in single player)
         return true;
     }
 
     if (Result != 2)
     {
-        // .text:005a889b-005a88c6: the NN_Error modal FUN_00473cb0(ids, 1, 0) keyed on the login
-        // status byte (DAT_0067e969): 0x742 for 0, 0x753 for 1, 0x743 for 7 unconditionally;
-        // any other status shows 0x739 unless the server already dropped us (DAT_0067ecbe).
+        // Keyed on the login status byte (DAT_0067e969); a generic failure is not reported when
+        // the server already dropped us (DAT_0067ecbe).
         if (G_LoginMgr.LoginStatus == 0)
         {
             NnErrorRunModal(0x742, true, nullptr);
@@ -104,8 +100,7 @@ bool LoginToServer()
         }
     }
 
-    // .text:005a88ce-005a891f: ShutdownServerConnection's body, inlined.
-    ShutdownServerConnection();
+    ShutdownServerConnection(); // inlined in retail
     return false;
 }
 

@@ -9,18 +9,16 @@
 // GraphLibrary -- E:\FL\Scratch\Source\Client\cmn\GraphLibrary.cpp.
 //
 // Named keyframe curves ("IGraph") loaded from the [IGraph] sections of the file DATA's
-// freelancer.ini names under `igraph =` (FUN_005b0c30 @ 005b0ee1 -> FUN_004197e0). The library
-// is a std::list<GraphData> (DAT_0061669c allocator byte, DAT_006166a0 sentinel node,
-// DAT_006166a4 size) built by the static initializer LAB_00419050 and torn down twice: first by
-// FUN_00419e50 from the client atexit chain (005b2286), then by the static destructor
-// LAB_00419090.
+// freelancer.ini names under `igraph =` (FUN_005b0c30 -> FUN_004197e0). The library is a
+// std::list<GraphData> (DAT_0061669c allocator byte, DAT_006166a0 sentinel node, DAT_006166a4
+// size) built by the static initializer LAB_00419050 and torn down twice: first by FUN_00419e50
+// from WinMain's teardown, then by the static destructor LAB_00419090.
 //
 // [LightSource] names its ambient_curve / atten_curve / color_curve by nickname; the engine
 // light resolves them through GraphLibraryFind (FUN_00419760), which AddRefs the curve it
 // returns.
 //
-// This is an ordinary C++ object, not a DACOM component: every slot takes `this` in ECX
-// (__thiscall). The abstract IGraph vtable is PTR_LAB_005c8f4c (ten _purecall entries, so no
+// This is an ordinary C++ object (thiscall), not a DACOM component. The abstract IGraph vtable is PTR_LAB_005c8f4c (ten _purecall entries, so no
 // virtual destructor); GraphData's is PTR_LAB_005c8eb4.
 
 #include <string>
@@ -73,8 +71,8 @@ public:
     virtual FGraphRange* GetRange() = 0;                                      // 3  LAB_00431680 (ICF)
     virtual FGraphDesc* GetDesc(FGraphDesc* Out) = 0;                         // 4  LAB_004191f0
     virtual void SetData(FGraphDesc const* Desc) = 0;                         // 5  FUN_00419210
-    // Returned in ST0 unrounded (00419452): callers either FSTP it to a float (0041064e) or
-    // multiply with it first (00410934), so the port keeps the double.
+    // Returned in ST0 unrounded: some callers multiply with it before rounding, so the port
+    // keeps the double.
     virtual double Evaluate(float T, FGraphRange const* Range) = 0;           // 6  LAB_004192f0
     virtual unsigned EvaluateColor(float T, FGraphRange const* Range) = 0;    // 7  LAB_00419500
     virtual int AddRef() = 0;                                                 // 8  LAB_00419160

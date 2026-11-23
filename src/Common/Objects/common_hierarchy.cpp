@@ -22,9 +22,7 @@
 
 int __cdecl Hierarchy::GetDepth(long ParentInst, long ChildInst)
 {
-    // .text:0630e6d0..0630e707. Depth 0; child -1 -> -1; walk: child == parent returns the
-    // depth, else ++depth and child = Engine->GetInstanceParent(child) (slot +0xd4, no null
-    // test on DALib::Engine) until -1, which returns -1.
+    // FUN_0630e6d0. GetInstanceParent is slot +0xd4; no null test on DALib::Engine.
     int Depth = 0;
     while (ChildInst != -1)
     {
@@ -38,8 +36,7 @@ int __cdecl Hierarchy::GetDepth(long ParentInst, long ChildInst)
 
 bool __cdecl IsDescendant(long ParentInst, long ChildInst)
 {
-    // .text:0630e710..0630e74a: the GetDepth loop inlined, result depth != -1. A child of
-    // -1 is never a descendant, even of a parent of -1.
+    // FUN_0630e710, GetDepth inlined. A child of -1 is never a descendant, even of -1.
     int Depth = 0;
     while (true)
     {
@@ -58,12 +55,9 @@ bool __cdecl IsDescendant(long ParentInst, long ChildInst)
 
 bool __cdecl HardpointPosition(long Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient)
 {
-    // Common.dll.txt 0630ef30-0630f068. FUN_0630e870 (= FindHardpoint_OS, the search over
-    // Instance and its compound children) finds HpName and the instance it sits on; a miss
-    // returns false. That instance's world position (Engine +0x90) and orientation (Engine
-    // +0x98) are read; OutPos = orientation * hardpoint position (3DMathEngine +0x2c) +
-    // instance position, OutOrient = orientation * hardpoint orientation (+0x20). Each output
-    // is written only when non-null.
+    // FUN_0630ef30. FindHardpoint_OS (FUN_0630e870) searches Instance and its compound
+    // children; the result is moved into world space with the found instance's position
+    // (Engine +0x90) and orientation (+0x98).
     long FoundOn;
     HardpointInfo Info;
     if (!FindHardpoint_OS(Instance, HpName, FoundOn, Info))
@@ -94,8 +88,7 @@ bool __cdecl HardpointPosition(long Instance, char const* HpName, Vector* OutPos
     return true;
 }
 
-// HardpointPositionA (0630eda0) is defined after JointEnumCallback below: it walks the joint
-// list that callback builds.
+// HardpointPositionA is defined after JointEnumCallback, whose list it walks.
 
 // DACOM.DLL!stricmp through the isolated TU common_dacom_stricmp.cpp.
 int CallDacomStricmp(const char* Left, const char* Right);
@@ -112,9 +105,7 @@ namespace
 
 void __cdecl CompoundInstanceAnalyze(long Instance, void (__cdecl* Callback)(long, void*), void* Context)
 {
-    // Common.dll.txt 063034f0-06303541: Callback(Instance, Context), then for every child
-    // (Engine +0xd8, flag 1, starting from -1) recurse. No checks of Callback, Instance or
-    // DALib::Engine.
+    // FUN_063034f0. Pre-order. No checks of Callback, Instance or DALib::Engine.
     Callback(Instance, Context);
     long Child = -1;
     do
@@ -125,7 +116,7 @@ void __cdecl CompoundInstanceAnalyze(long Instance, void (__cdecl* Callback)(lon
     } while (Child != -1);
 }
 
-// FUN_06303550 (06303550-06303556): ++*(int*)Context.
+// FUN_06303550
 static void __cdecl CompoundInstanceCount_AnalyzeCallback(long /*Instance*/, void* Context)
 {
     int* const Count = (int*)Context;
@@ -134,8 +125,7 @@ static void __cdecl CompoundInstanceCount_AnalyzeCallback(long /*Instance*/, voi
 
 int __cdecl CompoundInstanceCount(long Instance)
 {
-    // Common.dll.txt 06303560-063035ae: Count = 1 (the root), then CompoundInstanceAnalyze
-    // over each direct child with FUN_06303550.
+    // FUN_06303560
     int Count = 1;
     long Child = -1;
     do
@@ -149,9 +139,8 @@ int __cdecl CompoundInstanceCount(long Instance)
 
 namespace
 {
-    // FUN_063036d0 (063036d0-06303713): Engine slot 26 (+0x68) fills an 8-byte record and
-    // returns a pointer to it; its first word is the instance name, null read as ""
-    // (DAT_063997b0). True when DACOM stricmp(name, Name) == 0.
+    // FUN_063036d0. Engine slot 26 (+0x68) fills an 8-byte record whose first word is the
+    // name; null reads as "" (DAT_063997b0).
     bool __cdecl CompoundInstanceNameMatches(long Instance, char const* Name)
     {
         FEngineName Info = {nullptr, 0};
@@ -162,9 +151,8 @@ namespace
         return CallDacomStricmp(Found, Name) == 0;
     }
 
-    // The 3-dword context of CompoundInstanceFindFirstName (06303731-06303741 / 063037a6-
-    // 063037b2): one dword that is the match counter on the first walk and the write cursor
-    // on the second, the predicate (always FUN_063036d0), and its Name argument.
+    // CompoundInstanceFindFirstName's context: the match counter on the first walk and the
+    // write cursor on the second, the predicate (always FUN_063036d0), and its Name.
     struct FNameScan
     {
         union
@@ -176,7 +164,7 @@ namespace
         char const* Name;
     };
 
-    // FUN_06303680 (06303680-0630369b): Predicate(Instance, Name) -> ++count.
+    // FUN_06303680
     void __cdecl CountMatchingName(long Instance, void* Context)
     {
         FNameScan* const Scan = (FNameScan*)Context;
@@ -184,8 +172,7 @@ namespace
             *Scan->MatchCount += 1;
     }
 
-    // FUN_063036a0 (063036a0-063036c2): Predicate(Instance, Name) -> *cursor = Instance,
-    // cursor += 4.
+    // FUN_063036a0
     void __cdecl AppendMatchingName(long Instance, void* Context)
     {
         FNameScan* const Scan = (FNameScan*)Context;
@@ -195,7 +182,7 @@ namespace
         Scan->Cursor += 1;
     }
 
-    // FUN_063035b0 (063035b0-063035bf): **Context = Instance, *Context += 4.
+    // FUN_063035b0
     void __cdecl AppendInstance(long Instance, void* Context)
     {
         long** const Cursor = (long**)Context;
@@ -206,11 +193,8 @@ namespace
 
 void __cdecl CompoundInstanceList(long Instance, int* OutCount, long** OutArray)
 {
-    // Common.dll.txt 063035c0-06303679: Count = 1 + every descendant (the CompoundInstanceCount
-    // walk, inlined); *OutCount = Count; Array = operator new(Count * 4); *OutArray = Array;
-    // Array[0] = Instance; then each direct child's subtree is appended through FUN_063035b0
-    // with the cursor at Array + 1. No null checks of OutCount / OutArray. The caller owns the
-    // array and frees it with operator delete, hence the raw allocation.
+    // FUN_063035c0, with CompoundInstanceCount inlined. No null checks of the outputs. The
+    // caller frees the array with operator delete, hence the raw allocation.
     int Count = 1;
     long Child = -1;
     do
@@ -237,11 +221,8 @@ void __cdecl CompoundInstanceList(long Instance, int* OutCount, long** OutArray)
 
 long __cdecl CompoundInstanceFindFirstName(long Instance, char const* Name)
 {
-    // Common.dll.txt 06303720-06303837. First walk: the root through FUN_063036d0 directly,
-    // then each child's subtree through FUN_06303680 - counts the matches. Array =
-    // operator new(Count * 4). Second walk: the same with FUN_063036a0, filling Array.
-    // Count == 0 -> delete Array, return -1 (ESI, the child walk's final value); else
-    // return Array[0] after deleting it. No null check of Name.
+    // FUN_06303720. Counts the matches, allocates, collects them in a second walk and returns
+    // the first; with none it returns the child walk's final value (-1). No null check of Name.
     FNameScan Scan;
     int Count = 0;
     Scan.MatchCount = &Count;
@@ -285,15 +266,10 @@ long __cdecl CompoundInstanceFindFirstName(long Instance, char const* Name)
     return Result;
 }
 
-// long __cdecl FindChild(long,char const*) -- .text:0630e750-0630e7ed, exported (ordinal 1439).
-// DFS over the engine child hierarchy (Engine slot 0xd8 GetRelatedInstance with flag 1, first
-// call with -1, then with the previous child) for the first descendant whose name matches Name.
-// Per child: Engine slot 0x68 GetInstanceName into an 8-byte scratch record, its first word
-// read back, null replaced by "" (.text:0630e79f DAT_063997b0); `_stricmp(ChildName, Name) == 0`
-// returns the child (.text:0630e7e4); else Found = FindChild(Child, Name) and advance. The loop
-// tests `Found != -1` at its TOP (.text:0630e780), so after a successful recursive find one more
-// sibling is fetched before returning -- reproduced literally. No null test of DALib::Engine or
-// of the GetInstanceName result. Caller: CArchGroup::CArchGroup (the group's root instance).
+// FUN_0630e750 (export ordinal 1439). DFS for the first descendant named Name (CRT _stricmp,
+// null name read as ""). Retail quirk kept: Found is tested at the top of the loop, so after a
+// successful recursive find one more sibling is fetched before returning. No null test of
+// DALib::Engine or the GetInstanceName result.
 long __cdecl FindChild(long Instance, char const* Name)
 {
     long Found = -1;
@@ -349,14 +325,10 @@ COMMON_API CObject* __cdecl GetRoot(CObject const* Obj)
 
 COMMON_API void __cdecl HardpointToObject(long Inst, HardpointInfo& Info)
 {
-    // Common.dll.txt 0630ec40-0630ed97 (Ghidra's pseudocode is register-mangled here). The
-    // mirror image of HardpointToWorld (common_hardpointsummary.cpp): converts Info, a WORLD
-    // space frame, into Inst's own object-local space.
-    // L = {Info.Orient, Info.Position}; T = Engine +0xa0 (no null checks); v =
-    // TransposeTransform(T.Rotation, T.Translation) (3DMathEngine +0x38, the shared singleton);
-    // Inv = {R^T built column-wise through the Matrix ctor FUN_06284f70, (-v.x, -v.y, -v.z)};
-    // Out = MulTransform(Inv, L) (+0x1c); Info.Position = Out.Translation, Info.Orient =
-    // Out.Rotation.
+    // FUN_0630ec40 (from the listing). The mirror of HardpointToWorld
+    // (common_hardpointsummary.cpp): a world-space frame into Inst's object space, through the
+    // inverse of Engine +0xa0 (TransposeTransform +0x38, Matrix ctor FUN_06284f70, MulTransform
+    // +0x1c). No null checks.
     Transform World;
     World.Rotation = Info.Orient;
     World.Translation = Info.Position;
@@ -386,10 +358,8 @@ COMMON_API void __cdecl HardpointToObject(long Inst, HardpointInfo& Info)
 
 namespace
 {
-    // Common.dll.txt 0x06303550 (FUN_06303550) is also the callback IHardpoint's
-    // EnumerateHardpoints (slot 5) gets here: it touches only its second argument
-    // (`MOV EAX,[ESP+8]; INC dword ptr [EAX]`). This wrapper has EnumerateHardpoints'
-    // callback signature.
+    // Retail passes FUN_06303550 (which touches only its second argument) to
+    // EnumerateHardpoints; this wrapper has that callback's signature.
     void __cdecl NumHardpoints_CountCallback(char const* /*Name*/, void* Context)
     {
         int* const Count = (int*)Context;
@@ -399,13 +369,9 @@ namespace
 
 COMMON_API int __cdecl NumHardpoints(long Inst, bool bFlag)
 {
-    // Common.dll.txt 0630f070-0630f13a (Ghidra's pseudocode is corrupt here). For Inst, and
-    // when bFlag is set also for every child from IEngine GetRelatedInstance (+0xd8) with
-    // flag 0 (not CompoundInstanceAnalyze's flag 1): GetInstanceArchetype (+0x64), release
-    // that handle at once (ReleaseHandle +0x3c; the value stays a valid lookup key), then
-    // IHardpoint EnumerateHardpoints (+0x14) counting each hardpoint. The `TEST AL,AL` after
-    // the first enumerate re-reads bFlag (ESP+8 at entry). No null test of DALib::Engine /
-    // DALib::Hardpoint (.text:0630f071-0630f08a, 0630f09e-0630f0b4).
+    // FUN_0630f070 (from the listing). With bFlag, also every child from GetRelatedInstance
+    // with flag 0 (not CompoundInstanceAnalyze's 1). The archetype handle (+0x64) is released
+    // at once (+0x3c) but stays a valid lookup key. No null tests on DALib.
     int Count = 0;
     auto const CountHardpointsOn = [&](long Handle)
     {
@@ -433,13 +399,9 @@ struct JointInfo;
 
 namespace
 {
-    // Common.dll.txt 0630e7f0-0630e86a. Context is a VC6 std::list of {Param1, Param2,
-    // JointInfo copy} records (HardpointPositionA builds it on its stack, 0630ede3-0630edfa:
-    // allocator byte, head sentinel, size). JointEnumCallback is that list's push_back: the
-    // record {Param1, Param2, *Joint as 0x5c raw bytes, zeroes for a null Joint} goes into a
-    // new 0x6c-byte node linked before the sentinel (node->Next = head, node->Prev =
-    // head->Prev or the node itself, head->Prev = node, node->Prev->Next = node), ++size,
-    // return true. JointInfo's layout is never read, so it stays an opaque blob.
+    // JointEnumCallback (FUN_0630e7f0) is push_back on a VC6 std::list of {Param1, Param2,
+    // JointInfo copy} records that HardpointPositionA builds on its stack. JointInfo is never
+    // read, so it stays an opaque 0x5c-byte blob (zeroes for a null Joint).
     struct JointEnumNode
     {
         JointEnumNode* Next;            // +0x00
@@ -484,13 +446,9 @@ COMMON_API bool __cdecl JointEnumCallback(long Param1, long Param2, struct Joint
 
 bool __cdecl HardpointPositionA(long Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient)
 {
-    // Common.dll.txt 0630eda0-0630ef2a. Engine +0x4c (IsCompoundArchetype) non-zero: collect
-    // the children with Engine +0x54 (EnumerateArchetypeChildren) and JointEnumCallback into
-    // a stack std::list, try HardpointPositionA on each child handle in order, the first hit
-    // gives true; then the list is erased and its sentinel freed. Otherwise: look HpName up
-    // on Instance itself (IHardpoint +0xc with {name, CRC32}); a miss gives false, a hit
-    // copies the hardpoint's position (+0x04) / orientation (+0x10) to the non-null outputs
-    // and gives true. Both are local to the hardpoint's archetype - no world transform.
+    // FUN_0630eda0. A compound archetype (Engine +0x4c) recurses into its children (+0x54)
+    // in order; otherwise IHardpoint +0xc on Instance. The outputs are archetype-local, with no
+    // world transform.
     bool bFound = false;
     if (DALib::Engine->IsCompoundArchetype((void*)Instance) != 0)
     {

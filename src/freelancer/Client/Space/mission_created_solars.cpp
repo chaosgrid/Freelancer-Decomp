@@ -17,11 +17,11 @@ unsigned char G_bMissionCreatedSolarsLoaded = 0;
 
 void LoadMissionCreatedSolars()
 {
-    // FUN_00476c40.
+    // FUN_00476c40
     if (G_bMissionCreatedSolarsLoaded != 0)
         return;
 
-    // 00476c71..00476c86: the latch first, then the path against no file system.
+    // The latch first, then the path against no file system.
     char Path[0x104];
     G_bMissionCreatedSolarsLoaded = 1;
     GetFileSysPath(Path, "Universe\\MissionCreatedSolars.ini", nullptr);
@@ -38,7 +38,6 @@ void LoadMissionCreatedSolars()
         if (!Reader.is_header("MissionCreatedSolar"))
             continue;
 
-        // 00476cec..00476cf7: the three "seen" flags cleared per section.
         bool bHasBase = false;
         bool bHasInfo = false;
         bool bHasPos = false;
@@ -62,7 +61,7 @@ void LoadMissionCreatedSolars()
                 bHasPos = true;
             }
 
-            // 00476dc1..00476e13: all three seen -> push the record, start over.
+            // All three seen -> push the record, start over (tested after every key).
             if (bHasBase && bHasInfo && bHasPos)
             {
                 FMissionCreatedSolar Record;
@@ -71,19 +70,18 @@ void LoadMissionCreatedSolars()
                 Record.Pos[1] = Pos[1];
                 Record.Pos[2] = Pos[2];
                 Record.IdsInfo = IdsInfo;
-                G_MissionCreatedSolars.push_back(Record); // FUN_00477510(end, 1, &Record)
+                G_MissionCreatedSolars.push_back(Record);
                 bHasBase = false;
                 bHasInfo = false;
                 bHasPos = false;
             }
         }
     }
-    // 00476e3d..00476fc4: the reader's destructor (inlined in retail).
 }
 
 bool FindMissionCreatedSolar(unsigned BaseId, float* OutPos, int* OutIdsInfo)
 {
-    // FUN_00476fe0.
+    // FUN_00476fe0
     LoadMissionCreatedSolars();
 
     int const Count = static_cast<int>(G_MissionCreatedSolars.size());

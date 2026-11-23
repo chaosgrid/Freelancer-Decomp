@@ -20,10 +20,8 @@
 #include <cstdint>
 #include "../ivp_utility/ivp_signed_byte.h" // IVP_SignedLowByte
 
-// The impact system, cmn-ivp3e 2026-10-08. Every function below was traced
-// against Common.dll.txt instruction by instruction; the x87 convention of the
-// IVP lanes holds: a value kept on the FPU stack is double here, every
-// `FSTP float` is a float rounding.
+// The impact system. A value kept on the x87 stack is double here; a float
+// store rounds.
 
 namespace
 {
@@ -32,14 +30,8 @@ namespace
     const float GIvpHalf = 0.5f;                // DAT_063a5460 (0x3f000000)
     const float GIvpOneTwentyFourth = 0x1.555556p-5f; // DAT_063a5660 (0x3d2aaaab)
 
-    // The kinetic energy of a core, as FUN_06358680 computes it inline four
-    // times (.text:06358762-063587dd for Objects[0]'s core, 063587e3-06358866
-    // for Objects[1]'s, 06358971-063589e1 and 063589e3-06358a5e after the
-    // impact). Both instruction orders reduce to the same expression:
-    //   linear     = (((v.z*v.z + v.y*v.y) + v.x*v.x) * Mass) * 0.5
-    //   rotational = (((w.z*I.z)*w.z + (w.y*I.y)*w.y) + (w.x*I.x)*w.x) * 0.5
-    //   result     = linear + rotational, left on the FPU stack.
-    // v = Speed (+0xa4), w = RotSpeed (+0x94), I = RotInertia (+0x14), Mass (+0x20).
+    // A core's kinetic energy as FUN_06358680 computes it inline four times
+    // (two instruction orders, same expression), left on the x87 stack.
     double IVP_Impact_Core_Energy(const IVP_Core* Core)
     {
         const double RotIx = (double)(Core->RotSpeed.x) * Core->RotInertia.x;
@@ -56,14 +48,8 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06358c00 (.text:06358c00-06358c48, 25 insns, RET 0x10).
-//   FLD p2; FSQRT; FADD 1.0f; FMUL p1        -> t = (sqrt(OrthComp) + 1) * FrictionVal
-//   FLD ST0; FLD1; FPATAN                    -> a = atan(t / 1)
-//   FLD ST0; FMULP                           -> a2 = a*a
-//   FLD ST0; FMUL 0.5f; FSUBR 1.0f           -> 1 - a2*0.5
-//   FLD ST1; FMUL ST2; FMUL 1/24f; FADDP     -> c = (1 - a2*0.5) + (a2*a2)*(1/24)
-//   FSTP ST1; FLD ST0; FSTP [p3]             -> *OutCos = float(c)
-//   FMUL ST1; FSTP [p4]                      -> *OutSin = float(c * t), c and t unrounded
+// FUN_06358c00. cos(atan(t)) by its Taylor terms; c and t stay unrounded until
+// the two float stores. FPATAN via X87Atan.
 // ---------------------------------------------------------------------------
 void IVP_Impact_Solver_Long_Term_Get_Cos_Sin_For_Impact(float FrictionVal, float OrthComp,
                                                          float* OutCos, float* OutSin)
@@ -77,27 +63,11 @@ void IVP_Impact_Solver_Long_Term_Get_Cos_Sin_For_Impact(float FrictionVal, float
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06358d60 (.text:06358d60-06358edd, 99 insns, thiscall, RET 0xc).
-// ECX = the long-term contact data (ESI). The 0x110-byte IVP_Impact_Solver is
-// the local at ESP+0x1c (local_110); local_120 is a negated copy of the
-// normal. FUN_06273bc0(&solver+0x84, 0x10, 2, Csys::Csys) at :06358d7b is the
-// MSVC vector-constructor iterator with a ctor that is `MOV EAX,ECX; RET`
-// (.text:06261260): no state, nothing to port.
-//   :06358d80-06358de0  contact core 1 (+0x74) null: the normal is negated
-//     into local_120, Cores = {Objects[1]->core, contact core 0 (+0x70)},
-//     obj points = {&CoordOS[1], &CoordOS[0]}, normal = &local_120.
-//   :06358de2-06358e21  otherwise Cores = {contact core 0, or Objects[0]->core
-//     when null; contact core 1}, obj points in order, normal = this.
-//   :06358e28-06358e40  Restitution (+0xfc) = +0x60 (also kept in local_124),
-//     the speed pointer (+0x10c) = this+0x10, UseFrictionConeBlend (+0xd4) = 0.
-//   :06358e4b-06358e93  both cores' +0x10 null: FUN_06358c00(Cp->+0x44,
-//     +0x60, &+0x100, &+0x104), then FUN_06359380(&solver, Cp) when the byte
-//     Cp->+0x34 is non-zero. Either core's +0x10 set: FUN_06358c00(0, +0x60,
-//     &+0x100, &+0x104).
-//   :06358eb5-06358ed0  FUN_063578a0(&solver, PushedCores, 1,
-//     MOVSX word +0x52, RescueSpeedVal).
-// No null test anywhere: a null contact core 0 in the first branch is read
-// through (`[ECX+0x10]`) exactly as retail does.
+// FUN_06358d60. The 0x110-byte IVP_Impact_Solver lives on the stack; the
+// vector-constructor call on its +0x84 runs a no-op ctor and is not ported.
+// With no second contact core the sides are swapped and the normal negated.
+// Friction only when neither core has an AxisLock. No null test anywhere: a
+// null contact core 0 in the first branch is dereferenced, as in retail.
 // ---------------------------------------------------------------------------
 void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term* LongTerm, IVP_Core* PushedCores[2],
                                                      float RescueSpeedVal, IVP_Contact_Point* Cp)
@@ -155,30 +125,12 @@ void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06358680 (.text:06358680-06358aff, 293 insns, cdecl, plain RET). EH frame
-// LAB_06398148 for the three impact-system vectors.
-//   :06358698-063586d6  SimUnitNotDestroy = (int)(ObjA->flags << 24) <
-//     0x08000000 ? ObjB->core->+0x15c : ObjA->core->+0x15c (signed compare of
-//     the low flags byte).
-//   :063586dd-063586ec  Cp = FUN_06356bc0(Mindist, &Fs, &HavingNew,
-//     SimUnitNotDestroy, 1); LongTerm = Cp->+0x40 (EBX).
-//   :063586fe-06358704  Pair = FUN_06356280(Fs, ObjA->core, ObjB->core).
-//   :0635870b-0635874c  Env = Mindist->synapse[0].l_obj (+0x28)->environment;
-//     the pair's last impact time (+0x1c/+0x20) is saved and replaced by
-//     Env->current_time.
-//   :0635873b-06358755  RescueSpeed = float(FUN_06359560(Cp, ObjA->environment)).
-//   :06358759-06358866  energies before, float (local_74 / local_70).
-//   :0635886c           FUN_06358d60(LongTerm, &PushedCores, RescueSpeed, Cp).
-//   :06358871-063588d5  LongTerm speed (+0x10..+0x18) saved, negated when
-//     ObjB->core has (Flags & 0xc).
-//   :063588d7-0635896c  impact system on the stack; FUN_06358f40(&System,
-//     Mindist, Fs, Pair, Cp); its three vectors destroyed.
-//   :06358971-06358a73  +0x48 = float(E0' - float E0) with E0' unrounded,
-//     +0x4c = float(float E1' - float E1).
-//   :06358a76-06358aa4  event {dt, Env, LongTerm}, dt = ((now.base -
-//     old.base) + now.offset) - old.offset; the saved speed is written back.
-//   :06358aa7-06358ae2  FUN_0634cf60(Env, &Event); for ObjA then ObjB with
-//     flags bit 0x2000: FUN_0634b030(Env->cluster_manager, Obj, &Event).
+// FUN_06358680. The sim unit not to destroy is ObjB's when ObjA's low flags
+// byte (signed) is < 8, else ObjA's. Energy deltas: +0x48 = float(E0' - float
+// E0) with E0' unrounded, +0x4c = float(float E1' - float E1). The contact
+// speed is saved (negated when CoreB is fixed) around the impact system and
+// written back before the collision listeners and, for objects with flag
+// 0x2000, the cluster manager's pre-collision event fire.
 // ---------------------------------------------------------------------------
 void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IVP_Real_Object* ObjB)
 {
@@ -250,21 +202,8 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06358f40 (.text:06358f40-0635907e, 120 insns, RET 0x10).
-//   :06358f41-06358f7b  Core0 = Cp->Object1->core, Core1 = Cp->Object2->core;
-//     ImpactsWhileSystem = 0; AssociatedFs = Fs; LEnvironment =
-//     Pair->CoreA->Environment.
-//   :06358f7d-06358f8f  Core0 non-null and neither (Flags & 0xc) nor
-//     (Flags & 0x300): add_pushed_core_with_pairs_except(Core0, Pair).
-//   :06358f94-06358fc7  Pair->CoreA dynamic in the same sense: SyncedCores.add
-//     (FUN_063441a0 grows when n_elems >= memsize).
-//   :06358fcb-06358fde  Core1 likewise; :06358fe3-06359012 Pair->CoreB likewise.
-//   :06359016-06359026  Pairs.add(Pair) (FUN_06359090); FUN_06358ee0(Pair, Cp).
-//   :0635902b-06359056  while test_loop_all_pairs() == 1: ++Count;
-//     ++ImpactsWhileSystem; past 5000 (`JG`) Mindist's slot 4 (the deleting
-//     destructor) with 1 when Mindist is non-null, then leave the loop.
-//   :06359067-06359074  LEnvironment->+0x50 += Count + 1;
-//     recalc_all_affected_cores().
+// FUN_06358f40. Loops test_loop_all_pairs; past 5000 iterations the mindist
+// is deleted (slot 4, when non-null) and the loop left.
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::init_and_solve_impact_system(IVP_Ledge_Mindist* Mindist, IVP_ListManager* Fs,
                                                      IVP_ListManager_CorePairEntry* Pair,
@@ -309,7 +248,7 @@ void IVP_Impact_System::init_and_solve_impact_system(IVP_Ledge_Mindist* Mindist,
             {
                 if (Mindist != nullptr)
                 {
-                    delete Mindist; // `MOV EDX,[ECX]; PUSH 1; CALL [EDX+0x10]`
+                    delete Mindist; // slot 4, deleting destructor
                 }
                 break;
             }
@@ -320,17 +259,14 @@ void IVP_Impact_System::init_and_solve_impact_system(IVP_Ledge_Mindist* Mindist,
         }
     }
 
-    LEnvironment->counter_50 += Count + 1; // .text:06359067-0635906f
+    LEnvironment->counter_50 += Count + 1;
     recalc_all_affected_cores(); // FUN_063596b0
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06358ee0 (.text:06358ee0-06358f3a, 37 insns, RET 8). this is spilled
-// to local_4 and read back only for AssociatedFs (+0x20). n_elems of the
-// pair's dist vector is read once (zero-extended word), elems every pass.
-// For every dist except CpNot, last first: FUN_0635a1e0(Cp); LongTerm =
-// Cp->+0x40 (read after that call); FUN_06358c50(Cp, LongTerm); when
-// (LongTerm->dword+0x54 & 0x300) == 0x100: FUN_06355490(AssociatedFs, Cp).
+// FUN_06358ee0. n_elems read once, elems every pass; Cp->Owner is read after
+// FUN_0635a1e0. Dists whose owner's +0x54 dword has (& 0x300) == 0x100 are
+// removed from the friction system.
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::recalc_pair_dists_except(IVP_ListManager_CorePairEntry* Pair,
                                                  IVP_Contact_Point* CpNot)
@@ -353,9 +289,8 @@ void IVP_Impact_System::recalc_pair_dists_except(IVP_ListManager_CorePairEntry* 
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063590c0 (.text:063590c0-063590d6, 7 insns, RET 4). ECX is replaced by
-// the argument before use. `SHL EAX,0x18; CMP EAX,0x8000000; JGE` -- the core
-// is synchronised when the signed low byte of MovementState (+0x60) is below 8.
+// FUN_063590c0. `this` is not used. Synchronises when the signed low byte of
+// MovementState (+0x60) is below 8.
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 {
@@ -366,14 +301,7 @@ void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063590e0 (.text:063590e0-0635916a, 54 insns, RET 8).
-//   :063590e6-0635910c  PushedCores.add(Core).
-//   :06359110-06359116  Core->+0x1b4->WasPushedDuringImpactSystem = 1.
-//   :0635911d-06359164  n = AssociatedFs->CorePairEntries.n_elems (read once),
-//     last first, elems re-read from AssociatedFs every pass: a pair that has
-//     Core as CoreA or CoreB, is not PairNot, is not already in Pairs
-//     (FUN_06359170) and whose FUN_06355c10(Pair, AssociatedFs) is > 0 is
-//     added to Pairs (FUN_06359090).
+// FUN_063590e0. n_elems read once, elems re-read every pass.
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::add_pushed_core_with_pairs_except(IVP_Core* Core, IVP_ListManager_CorePairEntry* PairNot)
 {
@@ -403,28 +331,11 @@ void IVP_Impact_System::add_pushed_core_with_pairs_except(IVP_Core* Core, IVP_Li
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063591a0 (.text:063591a0-06359332, 144 insns, no arguments).
-//   :063591a3-063591c7  Best = G_IVP_MindistSettings+0x108 (DAT_0658ab18),
-//     BestCp = BestPair = null; n = Pairs.n_elems read once; empty -> 0.
-//   :063591cd-06359203  per pair (last first, elems re-read): the pair is
-//     skipped when the two cores' packed state bits intersect:
-//       B = (int)((CoreB->Flags & ~3) << 28) >> 6 | (CoreB->MovementState & ~0xff) << 16
-//       A = (int)(CoreA->Flags << 28) >> 6        | CoreA->MovementState << 16
-//     (`SHL 0x1c; SAR 6` on both flags words, `TEST EAX,EBP; JNZ`).
-//   :06359205-0635924c  per dist of the pair (last first): a long-term state
-//     byte (+0x54) other than 1 -> ++LEnvironment->+0x60 and FUN_063595c0(Cp);
-//     then `FLD +0x5c; FCOMP Best; TEST AH,1; JZ` -- the dist becomes the best
-//     one when its priority is below Best (or unordered).
-//   :0635925d-0635925f  no best dist -> 0.
-//   :06359265-063592b8  for the best dist's contact core 1 then 0 (+0x74,
-//     +0x70, re-read through Cp->+0x40 each time): a non-null core whose
-//     +0x1b4 is null is added to SyncedCores and synchronised (FUN_063590c0).
-//   :063592ba-063592ce  ++LongTerm->+0x52; FUN_06358d60(LongTerm,
-//     &PushedCores, LongTerm->+0x58, Cp).
-//   :063592d3-0635931a  for PushedCores[1] then [0]: non-null, neither
-//     (Flags & 0xc) nor (Flags & 0x300): WasPushedDuringImpactSystem == 0 ->
-//     add_pushed_core_with_pairs_except(Core, BestPair), else
-//     FUN_06359340(Core). Returns 1.
+// FUN_063591a0. Picks the dist with the lowest priority (below
+// max_coll_dist, DAT_0658ab18; NaN also wins) over all pairs whose two cores'
+// packed state bits do not intersect (the bit packing is retail's, kept as
+// is), impacts it and extends the system by the pushed cores. Returns 0 when
+// no dist qualifies.
 // ---------------------------------------------------------------------------
 int32_t IVP_Impact_System::test_loop_all_pairs()
 {
@@ -451,7 +362,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
             IVP_Contact_Point* const Cp = Pair->AttachedCtx.elems[CpIndex];
             if (Cp->Owner->StateProcessed != 1)
             {
-                ++LEnvironment->counter_60; // .text:0635921f
+                ++LEnvironment->counter_60;
                 IVP_Contact_Point_Calc_Impact_Priority(Cp); // FUN_063595c0
             }
             const float Priority = Cp->Owner->WinnerPriority;
@@ -506,11 +417,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
 }
 
 // ---------------------------------------------------------------------------
-// FUN_06359340 (.text:06359340-06359370, 19 insns, RET 4).
-// Info = Core->find_object_hash_entry(AssociatedFs) (FUN_06347c40, no null
-// test of the result); for every dist of Info (n_elems read once, elems every
-// pass, last first): `AND dword [LongTerm+0x54],0xffffff00` -- the state byte
-// becomes 0.
+// FUN_06359340. No null test on the hash entry (FUN_06347c40).
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::clear_processed_state_of_core_dists(IVP_Core* Core)
 {
@@ -523,23 +430,8 @@ void IVP_Impact_System::clear_processed_state_of_core_dists(IVP_Core* Core)
 }
 
 // ---------------------------------------------------------------------------
-// FUN_063596b0 (.text:063596b0-0635984e, 121 insns, no arguments). The SEH
-// frame (LAB_0639818b) guards the stack hull-manager vector only.
-//   :063596cb-063596fe  SyncedCores, last first: WasPushedDuringImpactSystem
-//     == 0 -> FUN_063473b0 (restore); +0x1b4 = 0 either way.
-//   :06359700-0635974e  Delta = float(((next_psi.base - now.base) +
-//     next_psi.offset) - now.offset) from LEnvironment +0xf8..+0x104.
-//   :0635973a-06359749  IVP_U_Vector_Fixed<IVP_Hull_Manager, 0x100> on the
-//     stack (elems = the inline 0x400-byte buffer, memsize 0x100).
-//   :06359752-063597d6  PushedCores, last first, cores without (Flags & 0xc):
-//     event sim {Delta, float(1/Delta), Env} when Delta > 1e-10 (`TEST AH,0x41;
-//     JNZ`), else {Env->delta_time, Env->inv_delta_time, Env} (its +0xc is
-//     never written); FUN_06351310 on a solver holding the core; +0x1b4 = 0;
-//     FUN_06359340(Core).
-//   :063597d8-063597e0  FUN_06351f80(Env, &HullManagers) (cdecl).
-//   :063597e5-0635981b  the hull vector's destructor (free when not inline).
-//   :06359815-06359834  PushedCores, last first, cores without (Flags & 0xc):
-//     FUN_06347be0.
+// FUN_063596b0. The event sim's +0xc is never written. Delta > 1e-10 is an
+// ordered compare (NaN takes the environment's step).
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::recalc_all_affected_cores()
 {

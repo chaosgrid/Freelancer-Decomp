@@ -85,15 +85,15 @@ struct IComponentFactory : IDAComponent
 struct IRegExp : IDAComponent
 {
     // +0x0C 065b5ac0: frees the previous program, regcomp(pattern); true when it compiled.
-    virtual bool DACOM_API CompilePattern(const char* Pattern) = 0; // formerly Slot3
+    virtual bool DACOM_API CompilePattern(const char* Pattern) = 0;
     // +0x10 065b5b00: remembers subject, returns regexec(program, subject) (0 when no program).
-    virtual int DACOM_API Search(const char* Subject) = 0; // formerly Slot4
+    virtual int DACOM_API Search(const char* Subject) = 0;
     // +0x14: copies to Buffer or object-owned scratch and appends NUL.
-    virtual char* DACOM_API CopyCapture(int Index, char* Buffer, int Size, int Skip, int bNullOnFail) = 0; // formerly Slot5
+    virtual char* DACOM_API CopyCapture(int Index, char* Buffer, int Size, int Skip, int bNullOnFail) = 0;
     // +0x18 065b5be0: startp[index] - startp[0], or -1.
-    virtual int DACOM_API GetCaptureOffsetFromMatch(int Index) = 0; // formerly Slot6
+    virtual int DACOM_API GetCaptureOffsetFromMatch(int Index) = 0;
     // +0x1C 065b5c10: startp[index] - subject, or -1 (retail reads startp here, not endp).
-    virtual int DACOM_API GetCaptureOffsetFromSubject(int Index) = 0; // formerly Slot7
+    virtual int DACOM_API GetCaptureOffsetFromSubject(int Index) = 0;
 };
 
 namespace DACOM_CRC

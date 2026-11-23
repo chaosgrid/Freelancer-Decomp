@@ -21,14 +21,14 @@ namespace Archetype
 }
 
 // Retail VisEffect (Client\cmn\VisEffectArch.cpp), 0x38 bytes, held by value in the map
-// DAT_00667df0. Default state from the map's node build (FUN_0042eaa0, 0x0042eadf..0x0042eb07):
+// DAT_00667df0. Default state from the map's node build (FUN_0042eaa0):
 // both vectors empty, has_alpha 0, RefCount 0, AleHandle -1. Retail offsets in the comments;
 // the port's layout is its own (no VC6 ABI), and the ale name is held in a buffer rather than
 // as a StringAlloc'd CacheString.
 struct FVisEffectArch
 {
-    // +0x00  CacheString: the StringAlloc'd nickname FUN_0042dc40 stores (0x0042dca4); the
-    // node build clears it first (CacheString::clear, the port's "").
+    // +0x00  CacheString: the StringAlloc'd nickname FUN_0042dc40 stores; the node build clears
+    // it first (the port's "").
     char const* Nickname = "";
     char AlchemyPath[MAX_PATH];      // +0x08  "alchemy", StringAlloc'd
     unsigned long EffectCrc = 0;     // +0x04  "effect_crc" bit pattern (may be negative in source)
@@ -67,7 +67,7 @@ int AleLibLoad(char const* AleName);
 // FUN_00401300 -- -1 for handle -1 or an unknown handle; otherwise --count (an ERROR FDUMP
 // when it drops below zero) and the new count. Nothing is unloaded at zero.
 int AleLibRelease(int Handle);
-// FUN_00401380 (ALELib::Shutdown, client teardown 0x005b22fb) -- a WARNING FDUMP for every
+// FUN_00401380 (ALELib::Shutdown, WinMain teardown) -- a WARNING FDUMP for every
 // name whose count is still positive, then the registry emptied. Nothing is unloaded from
 // Alchemy. Returns how many names were still in use.
 int AleLibShutdown();
@@ -97,7 +97,7 @@ struct FEffectArch
 };
 static_assert(sizeof(FEffectArch) == 0x58, "EffectArch 0x58");
 
-// FUN_0040eac0 (cdecl Path, bReload; caller the [Data] effects = key, 0x005b0dd6 with 0) --
+// FUN_0040eac0 (cdecl Path, bReload; caller the [Data] effects = key, with 0) --
 // binds the FxRuntime once (FUN_0042e290), then reads [Effect] (new EffectArch into the
 // DAT_006164b0 registry; a repeated nickname is merged through FUN_0040e6e0 when bReload,
 // else warned about and dropped), [EffectLOD] (FUN_0042dae0), [EffectType] (FUN_004fd5a0),
@@ -111,7 +111,7 @@ void EffectArchConstruct(FEffectArch* Arch);
 // FUN_0040e2a0 (thiscall) -- EffectArch's destructor (inlined in FUN_0040eac0 and
 // FUN_0040ef30): with references still out, a warning, then every one of them dropped.
 void EffectArchDestruct(FEffectArch* Arch);
-// FUN_0040ef30 (client teardown 0x005b22aa) -- every registered EffectArch destroyed and
+// FUN_0040ef30 (WinMain teardown) -- every registered EffectArch destroyed and
 // freed, the registry emptied, then FUN_0042e2f0 unbinds the FxRuntime.
 void EffectArchShutdown();
 

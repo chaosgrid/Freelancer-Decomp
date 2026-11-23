@@ -4,9 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll BaseWatcher (one link of a Watchable's watcher chain). Split out of
-// common_goods.cpp. (The FUN_062ec590 / 5b0 / 5d0 / 610 / 650 accessors that passed through
-// this file are FGunConvergenceStateBlock members in common_gunconvergence.cpp.)
+// Common.dll BaseWatcher (one link of a Watchable's watcher chain).
 //
 // Retail's three "clear the BaseWatcher embedded at +0x14 / +0x28 / +0x8" helpers
 // (FUN_062c3040 / FUN_062c5c20 / FUN_062d27b0) are called only from EH unwind funclets
@@ -31,13 +29,8 @@ BaseWatcher::BaseWatcher(IObjRW* Target)
     : Watched(nullptr)
     , Next(nullptr)
 {
-    // Common.dll.c FUN_062c2920 (0x62920). Retail: zero Watched/Next, then if
-    // Target != null, set_pointer(Target+8) -- Target+8 is IObjRW's Watchable
-    // sub-object, same "+8" convention used everywhere else in this cluster
-    // (ScanList::add/remove, ScannerAddEntry/ScannerRemoveEntry). Retail also has
-    // a redundant "(Watchable*)(param_1+8) != 0" check that can never be false
-    // once param_1 != 0 (pointer arithmetic on a non-null pointer can't yield
-    // null here), so it's omitted.
+    // FUN_062c2920. Target+8 is IObjRW's Watchable sub-object. Retail's redundant
+    // "(Watchable*)(param_1+8) != 0" test, never false once param_1 != 0, is omitted.
     if (Target != nullptr)
     {
         Watchable* WatchedObj = Target;   // IObjRW -> its Watchable base (+8)
@@ -49,10 +42,8 @@ BaseWatcher::BaseWatcher(Watchable* const* Src)
     : Watched(nullptr)
     , Next(nullptr)
 {
-    // Common.dll.c FUN_062ed070 (0x62ed070). Verified against raw disasm
-    // (Common.dll.txt:253086-253125): dereferences Src once (no +8 adjustment,
-    // unlike the IObjRW* overload above) and additionally treats the literal
-    // pointer value 0x8 as a sentinel alongside null.
+    // FUN_062ed070. Dereferences Src once (no +8 adjustment, unlike the IObjRW* overload
+    // above) and also treats the literal pointer value 0x8 as a sentinel alongside null.
     Watchable* V = *Src;
     if (V != nullptr && V != (Watchable*)8)
         set_pointer(V);
@@ -80,13 +71,8 @@ void BaseWatcher::set(Watchable const* Target)
 
 void BaseWatcher::set_pointer(Watchable const* Target)
 {
-    // Retail 0xe1610: unlink `this` from whatever chain it is currently in --
-    // that chain is rooted at Watched->Head, NOT at this->Next (a prior version
-    // of this port walked from `Next`, which never finds `this` and, worse,
-    // never fixes up Watched->Head when `this` is the head of its chain --
-    // leaving a dangling head pointer. Retail instead walks a "pointer to the
-    // slot that currently holds `this`" starting at &Watched->Head, chasing
-    // ->Next, exactly like the pointer-to-pointer idiom below).
+    // Retail 0xe1610: unlink `this` from its current chain, which is rooted at
+    // Watched->Head (not this->Next): walk the slot that holds `this` from &Watched->Head.
     if (Watched != nullptr)
     {
         BaseWatcher** Slot = &const_cast<Watchable*>(Watched)->Head;
@@ -107,14 +93,8 @@ void BaseWatcher::set_pointer(Watchable const* Target)
 
 unsigned int BaseWatcher::get_watched_id() const
 {
-    // FUN_062c2ab0, Common.dll.txt .text:062c2ab0-062c2ac4 (thiscall, no args):
-    //   062c2ab0-062c2ab4  EAX = Watched; 0 -> return 0
-    //   062c2ab6-062c2abb  ECX = Watched - 8 (the Watchable -> IObjRW downcast); 0 -> return 0
-    //   062c2abd-062c2abf  tail JMP [vt + 0x20] with ECX = the IObjRW: IObjInspect slot 8,
-    //                      get_id(), a plain thiscall virtual (common_iface.h).
-    // The port used to call slot +0x20 through a DACOM_API (__stdcall) pointer with `this`
-    // pushed on the stack: get_id then ran with a garbage ECX (wild Object read on docking,
-    // CMN-BUG11) and the stack came back 4 bytes off. The typed call below is retail's.
+    // FUN_062c2ab0, thiscall: Watched - 8 (the Watchable -> IObjRW downcast), then a tail
+    // JMP to IObjInspect slot 0x20, get_id(), a plain thiscall virtual (not __stdcall).
     IObjRW* const Owner = ObjRwFromWatchable(const_cast<Watchable*>(Watched));
     if (Owner == nullptr)
         return 0;

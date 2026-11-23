@@ -21,7 +21,7 @@ namespace AlchemyImpl
         KindFxEffectLibrary,
         KindFxEffect,
         KindFxEffectArchetype,
-        // One kind per keyed-ramp class (ALC-2): each retail name has its own factory
+        // One kind per keyed-ramp class: each retail name has its own factory
         // CreateInstance and its own object vtable (alchemy_ramp.h).
         KindFxRampSingle,
         KindFxRampColor,

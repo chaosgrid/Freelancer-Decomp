@@ -62,9 +62,9 @@ void ClearButtonMontage();
 // 2 vertical, 3 both; other values keep the frame's rect), the "buttons" material key
 // (FUN_00402d30), the batch node for the frame (FUN_00402e30, blend 2, find), and one icon of
 // Size at Position through the Win3D camera (FUN_004034a0(&DAT_0067dbf8, ..., Angle, 0)) in
-// the colour of the RGBA bytes. True then. Callers: the 21 HUD_Targetable_Objects sites the
-// XREF header lists (FUN_004ef030, FUN_004f0620, FUN_004f0900) and ButtonControl's body draw
-// FUN_00559aa0 (0x00559b86, missing from that header; Mode 0, Angle 0).
+// the colour of the RGBA bytes. True then. Callers: 21 HUD_Targetable_Objects sites
+// (FUN_004ef030, FUN_004f0620, FUN_004f0900) and ButtonControl's body draw FUN_00559aa0
+// (0x00559b86; Mode 0, Angle 0).
 bool NnMontageDrawTileAt(FButtonMontageTile const* Tile, float const* Position,
                          unsigned char const* Rgba, float Size, int Mode, float Angle);
 

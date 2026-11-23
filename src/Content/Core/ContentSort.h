@@ -18,10 +18,9 @@
 // Less is the retail predicate (a strict weak order): Less(A, B) is true when A goes first.
 
 // _Median takes its three elements by value, as VC6's `_Median(_Ty _X, _Ty _Y, _Ty _Z, _Pr _P)`:
-// the caller copy-constructs the arguments and the callee destroys them (retail TU58
-// FZonePathLabel instance: argument copies in _Sort_0 06f7f370 states 1 / 2 and _Sort 06f7f990
-// states 0 / 1, parameter dtors in _Median 06f7fea0 states 0-2). Returning a parameter moves it
-// where retail copy-constructs the return slot; the returned value is the same.
+// the caller copy-constructs the arguments and the callee destroys them (seen in the TU58
+// FZonePathLabel instance, _Median FUN_06f7fea0). Returning a parameter moves it where retail
+// copy-constructs the return slot; the returned value is the same.
 template <typename TElement, typename TLess>
 TElement ContentSortMedian(TElement A, TElement B, TElement C, TLess Less)
 {

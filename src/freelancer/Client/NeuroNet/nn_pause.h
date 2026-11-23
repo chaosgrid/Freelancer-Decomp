@@ -11,8 +11,8 @@
 // (0x14) through FUN_004a75c0.
 //
 // WINFACTORY<NN_Pause> DAT_00672144 "NN_Pause": static init LAB_004a6ad0 (ctor FUN_004a76b0,
-// atexit LAB_004a6af0 -> FUN_00579380), Create FUN_004a7720 (operator_new(0x374), WinControl
-// ctor FUN_0059f860, the three vptrs, +0x331 = 0, slot 9; on failure the scalar deleting dtor).
+// atexit LAB_004a6af0 -> FUN_00579380), Create FUN_004a7720 (operator_new(0x374), the ctor
+// inlined).
 //
 // vftable 0x005d462c (45 slots, COL 0x005eb86c) -- WinControl's with these overrides:
 //   0 FUN_004a6b00 (scalar deleting dtor around FUN_004a6b20), 9 FUN_004a6ba0 Create,
@@ -39,7 +39,7 @@
 class NnPause : public WinControl, public EventHandler
 {
 public:
-    // Inlined into FUN_004a7720: WinControl ctor, +0x331 = 0.
+    // Inlined into FUN_004a7720.
     NnPause();
     // FUN_004a6b20
     ~NnPause() override;
@@ -73,9 +73,8 @@ public:
     int ButtonAction[5];             // +0x360
 
 private:
-    // The tail every closing path shares (0x004a7222..0x004a7270 and the copies after it):
-    // FUN_004a7690(+0x330) inline (FUN_0042d6f0(0), FUN_0041dda0), slot 33 ReleaseMouse,
-    // FUN_0043d2a0 on every child, slot 10 Destroy, the scalar deleting dtor.
+    // Port-only helper for the tail every closing path inlines (0x004a7222 and the copies after
+    // it): resume (FUN_004a7690), release the mouse, delete the window.
     void ResumeAndDelete();
 };
 

@@ -51,7 +51,7 @@ WINFACTORY<NnRichTextButtonControl> G_RichTextButtonControlFactory("RichTextButt
 namespace
 {
     // DAT_00679aec -- the 3DMathEngine this class acquires on first use (FUN_005b73e0), shared
-    // by SetOrientation (0x0055b5df) and MouseEvent (0x0055b9e6).
+    // by SetOrientation and MouseEvent.
     I3DMathEngine* G_ButtonMathEngine = nullptr;
 
     I3DMathEngine* ButtonMathEngine()
@@ -91,7 +91,7 @@ namespace
                                           0);
     }
 
-    // The tile search Init (0x0055ac5b..0x0055acf2) and Create (0x0055ab6d..0x0055ac04) inline:
+    // The tile search Init and Create inline:
     // load ButtonMontage on first use (FUN_00559db0), then the first tile whose name stricmp-
     // equals Path, else null.
     FButtonMontageTile* FindMontageTileForPath(char const* Path)
@@ -108,7 +108,7 @@ namespace
     }
 
     // The mouse ray LAB_0055b660 builds inline from the software cursor through the Win3D
-    // camera (0x0055b67a..0x0055b760): near-plane point, FUN_00423b90 with a copy of the camera
+    // camera: near-plane point, FUN_00423b90 with a copy of the camera
     // orientation, normalised by 1 / sqrt.
     void CursorRayForUpdate(float* Ray)
     {
@@ -135,8 +135,7 @@ namespace
         Ray[2] = static_cast<float>(World.Z * Inv);
     }
 
-    // The holder tint FUN_00559aa0 (0x00559b9b..0x00559bff) and Draw (0x0055b36d..0x0055b3d6)
-    // write before FUN_0059efa0: bytes 0..2 into +0x14 / +0x18 / +0x1c, byte 3 into +0x24,
+    // The holder tint FUN_00559aa0 and Draw write before FUN_0059efa0: bytes 0..2 into +0x14 / +0x18 / +0x1c, byte 3 into +0x24,
     // each times 1/255.
     void SetHolderTint(FClientMeshHolder* Holder, unsigned char const* Rgba)
     {
@@ -160,7 +159,7 @@ namespace
             Size = Tile->Scale;
             if (Size == 0.0f)
             {
-                // 0x00559ad3: GetInstanceExtent(+0x84, 1, &Size, &Centre) -- no instance test.
+                // GetInstanceExtent(+0x84, 1, &Size, &Centre) -- no instance test.
                 float Centre[3];
                 DALib::Engine->GetInstanceExtent(Button->MeshHolder.EngineInstance, 1, &Size,
                                                  Centre);
@@ -300,7 +299,7 @@ void NnButtonControl::SetPosition(float const* NewPosition)
     }
     WinControl::SetPosition(Placed); // FUN_005a0880
 
-    // 0x0055b522: the instance is placed again, at +0x60 (+ +0xa8 under PositionFlags bit 0).
+    // The instance is placed again, at +0x60 (+ +0xa8 under PositionFlags bit 0).
     if (!HasInstance(this))
         return;
     float Instance[3];
@@ -371,7 +370,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
             }
             if (Ini->is_value("event"))
             {
-                // 0x0055a834: a null value still reaches the lookup; only an empty one is
+                // A null value still reaches the lookup; only an empty one is
                 // skipped.
                 char const* const Value = Ini->get_value_string();
                 if (Value != nullptr && Value[0] == '\0')
@@ -391,7 +390,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
                 Offset[2] = Z;
                 if (HasInstance(this))
                 {
-                    // 0x0055a8e0: FUN_00422b80 builds {+0x60 + offset} and the instance moves.
+                    // FUN_00422b80 builds {+0x60 + offset} and the instance moves.
                     float Placed[3];
                     Placed[2] = Offset[2] + Position[2];
                     Placed[1] = Offset[1] + Position[1];
@@ -403,7 +402,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
             }
             if (Ini->is_value("hardpoint"))
             {
-                // 0x0055a94c: the attach transform is reset, then filled from the NEW parent's
+                // The attach transform is reset, then filled from the NEW parent's
                 // hardpoint of that name. The name itself is not kept (+0x1d0 is untouched).
                 AttachOrientation[0] = 1.0f;
                 AttachOrientation[1] = 0.0f;
@@ -467,11 +466,11 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
                 ToolTip2Ids = static_cast<int>(Ini->get_value_float(0)); // ftol
         }
 
-        // 0x0055ab6d: the ButtonMontage tile of the (possibly just loaded) mesh path.
+        // The ButtonMontage tile of the (possibly just loaded) mesh path.
         MontageTile = FindMontageTileForPath(MeshPath);
     }
 
-    // 0x0055ac04: the parent is re-placed at its own position (slot 5), which positions this
+    // The parent is re-placed at its own position (slot 5), which positions this
     // control with it.
     if (Parent != nullptr)
         Parent->SetPosition(Parent->Position);
@@ -483,7 +482,7 @@ void NnButtonControl::Update()
     // LAB_0055b660: Win3D's child walk (FUN_005a17b0) first.
     Win3D::Update();
 
-    // 0x0055b66d: while the button holds the capture, follow the cursor and light / unlight
+    // While the button holds the capture, follow the cursor and light / unlight
     // bit 2 as it moves on and off.
     if ((ButtonBits & 0x10) != 0)
     {
@@ -510,8 +509,8 @@ void NnButtonControl::Update()
         }
     }
 
-    // 0x0055b82d: the blink. The timer gains the frame time; every whole second past 1.0
-    // flips +0x334 (FCOM 1.0 / TEST AH,0x41: "not above" stops).
+    // The blink. The timer gains the frame time; every whole second past 1.0 flips +0x334
+    // (x87: "not above", unordered included, stops).
     if (bBlink == 0)
         return;
     double Timer = GetClientFrameTimeCapped() + static_cast<double>(BlinkTimer); // FUN_0042d680
@@ -555,7 +554,7 @@ void NnButtonControl::Draw()
 
     if (bSpin != 0)
     {
-        // 0x0055b02e: the spin. With a positive speed the angle runs forward while bit 0 is
+        // The spin. With a positive speed the angle runs forward while bit 0 is
         // set, otherwise it winds back to 0 the short way (up through 359, down through 1).
         double const Frame = GetClientFrameTimeCapped(); // FUN_0042d680
         if (SpinSpeed > 0.0f) // FCOMP 0 / TEST AH,0x41 / JNZ: not above skips
@@ -580,13 +579,13 @@ void NnButtonControl::Draw()
                     SpinAngle = 0.0f;
             }
         }
-        // 0x0055b0c5: wrap into (-360, 360) -- DAT_005ca23c / DAT_005e1730.
+        // Wrap into (-360, 360) -- DAT_005ca23c / DAT_005e1730.
         if (SpinAngle >= 360.0f)
             SpinAngle = SpinAngle - 360.0f;
         else if (SpinAngle <= -360.0f)
             SpinAngle = SpinAngle + 360.0f;
 
-        // 0x0055b105: RotateMatrix({0, angle, 0}) onto the instance (Engine vt+0x94, vt+0x6c).
+        // RotateMatrix({0, angle, 0}) onto the instance (Engine vt+0x94, vt+0x6c).
         // Retail tests no instance here.
         Vector Angles;
         Angles.x = 0.0f;
@@ -597,8 +596,8 @@ void NnButtonControl::Draw()
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
 
-    // 0x0055b167: the colours. Glow (local_3c) starts black; both +0x330 bit-3 arms of the
-    // listing (0x0055b18d / 0x0055b240) produce the same pair, so the test is not repeated.
+    // The colours. Glow starts black; both +0x330 bit-3 arms in retail produce the same pair,
+    // so the test is not repeated.
     unsigned char Glow[4] = {0, 0, 0, 0};
     unsigned char Body[4] = {0, 0, 0, 0};
     if ((Flags & kWin3DActive) == 0)
@@ -637,7 +636,7 @@ void NnButtonControl::Draw()
         memcpy(Glow, Colour, sizeof(Glow));
     }
 
-    // 0x0055b33d: the body, unless no_mesh_render.
+    // The body, unless no_mesh_render.
     if ((ButtonBits2 & 0x01) == 0)
     {
         if (bSpin != 0 && (ButtonBits & 0x01) != 0)
@@ -669,7 +668,7 @@ void NnButtonControl::Draw()
     }
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
 
-    // 0x0055b475: bit 6 goes back to what it was before the inactive arm could clear it.
+    // Bit 6 goes back to what it was before the inactive arm could clear it.
     ButtonBits = static_cast<unsigned char>((ButtonBits & 0xbf) | (SavedSelected << 6));
     Slot39(); // vt+0x9c
 }
@@ -701,7 +700,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
     // FUN_0055b950 (RET 4).
     if ((ButtonBits2 & 0x02) == 0)
         return false;
-    // 0x0055b965: while some control holds the mouse, a button whose WinControl parent does
+    // While some control holds the mouse, a button whose WinControl parent does
     // not hold it ignores the event.
     if (Parent != nullptr && Win3DAnyCaptured()) // FUN_0059e6a0
     {
@@ -712,14 +711,13 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
     if ((ButtonBits & 0x10) != 0)
     {
-        // 0x0055b9a3: the release of a press this button captured.
+        // The release of a press this button captured.
         if (Event->Field0 != -1 || Event->Field1 != 1)
             return false;
         ButtonBits = static_cast<unsigned char>(ButtonBits & 0xeb);
         Win3DRemoveCapture(this); // FUN_0059d960
 
-        // 0x0055b9c4..0x0055ba81: the cursor ray -- FUN_004bdd40 on DAT_0067dbf8, the engine's
-        // TransformMatrix (+0x2c) with a copy of the camera orientation, normalised inline.
+        // The cursor ray (FUN_004bdd40), through the math engine.
         FSpaceCamera* const Cam = Win3DGetCamera();
         int CursorX = 0;
         int CursorY = 0;
@@ -742,13 +740,13 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
         if (!HitTest(Ray)) // slot 4
         {
-            // 0x0055bb37: released off the button.
+            // Released off the button.
             TellParent(this, 0x29);
             ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfe);
             return true;
         }
 
-        // 0x0055ba8e: the click sound -- the UI sound slot, else the sound archetype named by
+        // The click sound -- the UI sound slot, else the sound archetype named by
         // a non-empty +0x360.
         if (UiSoundSlot != -1)
         {
@@ -764,7 +762,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
         if ((ButtonBits & 0x80) != 0)
         {
-            // 0x0055baef: a right click only tells the parent 0x27 (its answer is ignored).
+            // A right click only tells the parent 0x27 (its answer is ignored).
             TellParent(this, 0x27);
             return true;
         }
@@ -772,7 +770,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // 0x0055bb71: a press, left (Field1 2) or right (3).
+    // A press, left (Field1 2) or right (3).
     if (Event->Field0 != -1)
         return false;
     if (Event->Field1 != 2 && Event->Field1 != 3)
@@ -830,8 +828,7 @@ void NnButtonControl::ShowToolTip()
 
 intptr_t NnButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // FUN_0055bc30 (RET 0xc): jump table 0x0055bd6c indexed by 0x0055bd98[Msg - 0xc]; every
-    // own case answers 0, the rest tail-jump into WinControl's FUN_005a13c0.
+    // FUN_0055bc30. Every own case answers 0; the rest go to WinControl's FUN_005a13c0.
     switch (Msg)
     {
     case 0x0c:
@@ -894,8 +891,8 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
     {
         strcpy(MeshPath, NewMeshPath);
         MontageTile = FindMontageTileForPath(MeshPath);
-        // 0x0055acf6: without a tile, or with a tile of scale 0 (FCOMP 0 / TEST AH,0x44 / JP:
-        // a non-zero scale skips), the mesh itself is loaded (slot 38).
+        // Without a tile, or with a tile of scale 0 (x87: a non-zero or unordered scale skips),
+        // the mesh itself is loaded (slot 38).
         if (MontageTile == nullptr || MontageTile->Scale == 0.0f)
             SetMesh(NewMeshPath, 0);
     }
@@ -928,7 +925,7 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
 
     if (Hardpoint != nullptr)
     {
-        // 0x0055ae90: the name is kept, the attach transform reset and filled from the
+        // The name is kept, the attach transform reset and filled from the
         // parent's hardpoint of that name (slot 36; its answer is not used).
         strcpy(HardpointName, Hardpoint);
         AttachOrientation[0] = 1.0f;
@@ -992,7 +989,7 @@ namespace
         ParentControl->SetProperty(Msg, reinterpret_cast<uintptr_t>(Self->AsWinControl()), Value);
     }
 
-    // The hover record LAB_0055c690 packs inline (0x0055c835..0x0055ca82): the ids twice, no
+    // The hover record LAB_0055c690 packs inline: the ids twice, no
     // aux dword (unlike FUN_0055bde0 it leaves +0x44 at 0), the main instance's position
     // (Engine vt+0xa0 [9..11], no instance test), the half extents +0xb4 and the live byte;
     // FUN_004be370; then the record's teardown (~FToolTipHoverInfo).
@@ -1067,7 +1064,7 @@ bool NnToggleButtonControl::Create(Win3D* NewParent, void* Data)
     MontageMode = 1; // +0x335
     bool const bResult = NnButtonControl::Create(NewParent, Data); // FUN_0055a6b0
 
-    // 0x0055bff1: a non-empty "mesh2" goes into the +0x378 holder (FUN_0059ec80(path, 0, 0)),
+    // A non-empty "mesh2" goes into the +0x378 holder (FUN_0059ec80(path, 0, 0)),
     // whose instance takes the main holder's floats +0x94 as user data (Engine vt+0x7c).
     if (Mesh2.c_str()[0] != '\0')
     {
@@ -1076,7 +1073,7 @@ bool NnToggleButtonControl::Create(Win3D* NewParent, void* Data)
         PlaceToggleMesh();
     }
 
-    // 0x0055c12c: state 0, both state sounds from "button_sound", and their UI slots.
+    // State 0, both state sounds from "button_sound", and their UI slots.
     ToggleState = 0;
     SoundState0 = SoundName;
     SoundState1 = SoundName;
@@ -1100,7 +1097,7 @@ void NnToggleButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
                           bNoColorChange, bNewNoZEnable, NewToolTipIds, NewToolTip2Ids,
                           0); // FUN_0055ac30
 
-    // 0x0055c21d: a non-null NewMesh2 (only null is tested here) into the +0x378 holder.
+    // A non-null NewMesh2 (only null is tested here) into the +0x378 holder.
     if (NewMesh2 != nullptr)
     {
         ClientMeshLoadFromPath(&ToggleMesh, NewMesh2, 0, false); // FUN_0059ec80(path, 0, 0)
@@ -1108,7 +1105,7 @@ void NnToggleButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
         PlaceToggleMesh();
     }
 
-    // 0x0055c326: as Create's tail.
+    // As Create's tail.
     ToggleState = 0;
     SoundState0 = SoundName;
     SoundState1 = SoundName;
@@ -1161,7 +1158,7 @@ void NnToggleButtonControl::SetOrientation(float const* NewOrientation)
 
 void NnToggleButtonControl::Update()
 {
-    // LAB_0055c690. 0x0055c6b1: the +0x378 mesh is loaded late when it is still unbound and
+    // LAB_0055c690. The +0x378 mesh is loaded late when it is still unbound and
     // "mesh2" is set -- without the user data Create / Init give it.
     if (!ClientMeshHolderHasInstance(&ToggleMesh) && Mesh2.c_str()[0] != '\0') // FUN_00420d60
     {
@@ -1171,7 +1168,7 @@ void NnToggleButtonControl::Update()
 
     Win3D::Update(); // FUN_005a17b0
 
-    // 0x0055c7ee: under the cached mouse ray (FUN_0059da70, slot 4) the tooltip of the current
+    // Under the cached mouse ray (FUN_0059da70, slot 4) the tooltip of the current
     // state: +0x32c in state 1, else +0xcc -- each only when non-zero.
     float MouseRay[3];
     Win3DGetMouseRay(MouseRay);
@@ -1188,7 +1185,7 @@ void NnToggleButtonControl::Update()
         }
     }
 
-    // 0x0055ca87: while the button holds the capture -- the cursor ray (FUN_004bdd40 on
+    // While the button holds the capture -- the cursor ray (FUN_004bdd40 on
     // DAT_0067dbf8, the 3DMathEngine's TransformMatrix with a copy of the camera orientation,
     // normalised by 1 / sqrt), then slot 4. Unlike ButtonControl's LAB_0055b660 no +0x330 bit is
     // written: on the button it tests bit 0 (not bit 2), off it tests bit 2.
@@ -1235,7 +1232,7 @@ void NnToggleButtonControl::Update()
         }
     }
 
-    // 0x0055cc1c: the blink, as ButtonControl's.
+    // The blink, as ButtonControl's.
     if (bBlink == 0)
         return;
     double Timer = GetClientFrameTimeCapped() + static_cast<double>(BlinkTimer); // FUN_0042d680
@@ -1272,7 +1269,7 @@ void NnToggleButtonControl::Draw()
     }
 
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
-    // 0x0055c3f5: after a glow pass (+0x348 non-zero) the glow again, half a turn about y --
+    // After a glow pass (+0x348 non-zero) the glow again, half a turn about y --
     // the orientation {C,0,S, 0,1,0, -S,0,C} of DAT_005e1738 replaces the instance's (updated),
     // the tinted submit FUN_00434630 in the glow colour, and the saved orientation goes back
     // without an update.
@@ -1325,12 +1322,12 @@ bool NnToggleButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
 intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
-    // LAB_0055cf90 (RET 0xc): jump table 0x0055d200 indexed by 0x0055d214[Msg - 6].
+    // LAB_0055cf90.
     switch (Msg)
     {
     case 6:
     {
-        // 0x0055cfbb: the offset from A; with a MAIN instance bound the +0x378 instance moves to
+        // The offset from A; with a MAIN instance bound the +0x378 instance moves to
         // +0x60 (+ +0xa8 under +0x2f4 bit 0). Then ButtonControl's 6 as well.
         float const* const NewOffset = reinterpret_cast<float const*>(A);
         Offset[0] = NewOffset[0];
@@ -1364,7 +1361,7 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         ToggleState = (A == 0) ? 1 : 0;
         return 0;
     case 0x31:
-        // 0x0055d0a6: the two state sounds, each only when its pointer is non-null.
+        // The two state sounds, each only when its pointer is non-null.
         if (A != 0)
         {
             SoundState0.assign(reinterpret_cast<char const*>(A));

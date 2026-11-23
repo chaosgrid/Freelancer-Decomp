@@ -12,9 +12,8 @@
 
 namespace
 {
-    // Retail DAT_0067dcec — head of the factory list (next at factory+0x4). Zero-initialised
-    // before any dynamic initializer runs, so WINFACTORY<T> globals may register from their
-    // own static constructors in any order.
+    // DAT_0067dcec. Zero-initialised before any dynamic initializer runs, so WINFACTORY<T>
+    // globals may register from their own static constructors in any order.
     WinFactory* G_WinFactoryHead = nullptr;
 }
 
@@ -22,8 +21,7 @@ WinFactory::WinFactory(char const* Name)
     : Next(nullptr)
     , NameLength(0)
 {
-    // FUN_0059c360-shaped ctor: +0x8 = 0, +0xc = 0, +0x4 = 0; Name != 0 → strlen clamped to
-    // 0x1f, REP MOVSD/MOVSB copy, NUL; +0x8 = length; FUN_0059dab0(this).
+    // FUN_0059c360-shaped.
     ClassName[0] = '\0';
     unsigned Length = 0;
     if (Name != nullptr)
@@ -53,8 +51,7 @@ void WinFactoryRegister(WinFactory* Factory)
 
 void WinFactoryUnregister(WinFactory* Factory)
 {
-    // FUN_0059dad0: find Factory keeping the previous node; not found → return; unlink from
-    // prev->next or the head; Factory->next = 0.
+    // FUN_0059dad0
     WinFactory* Prev = nullptr;
     WinFactory* Walk = G_WinFactoryHead;
     while (Walk != nullptr)
@@ -83,7 +80,6 @@ Win3D* WinFactoryCreate(char const* Nickname, char const* ClassName, Win3D* Pare
     WinFactory* Factory = G_WinFactoryHead;
     while (Factory != nullptr)
     {
-        // Inline strcmp 0059db42..0059db72.
         if (strcmp(Factory->ClassName, ClassName) == 0)
             break;
         Factory = Factory->Next;
@@ -91,13 +87,11 @@ Win3D* WinFactoryCreate(char const* Nickname, char const* ClassName, Win3D* Pare
     if (Factory == nullptr)
         return nullptr;
 
-    // 0059db95 factory vftable[0](Parent, Payload).
     Win3D* Widget = Factory->Create(Parent, Payload);
     if (Widget == nullptr)
         return nullptr;
 
-    // 0059dba3..0059dbe1: widget +0x14 = length, +0x18 = name (clamped to 0x1f chars; a null
-    // Nickname gives the empty name) -- Win3D::SetName is that inline copy.
+    // Win3D::SetName is retail's inline copy.
     Widget->SetName(Nickname);
     return Widget;
 }

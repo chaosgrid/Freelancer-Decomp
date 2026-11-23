@@ -6,8 +6,7 @@
 
 #pragma once
 
-// Retail E:\FL\Scratch\Source\Client\space\StarSys.cpp and StarSphere.h -- freelancer.exe
-// .text 0x00552b60..0x00555760. The per-system hub: entering a system (FUN_005545a0) loads the
+// Retail E:\FL\Scratch\Source\Client\space\StarSys.cpp and StarSphere.h. The per-system hub: entering a system (FUN_005545a0) loads the
 // system INI (FUN_00553740), keeps the preload lists that pin archetypes, sounds and voice
 // lines for the stay, owns the nebula list, the [TexturePanels] shape DB and the background
 // star sphere, and ticks nebulae, texture panels, asteroid fields, space dust and the music
@@ -28,7 +27,7 @@
 //   0x00679958..70    music state machine
 //   0x00679978        double: player collisions suppressed until this time (FUN_005544d0)
 //
-// The VC6 std::list globals are modern std::lists here (No retail ABI); the static
+// The VC6 std::list globals are modern std::lists here (no retail ABI); the static
 // constructor / atexit destructor pairs retail emits for them are the lists' own ctors/dtors.
 
 #include "common_archetype.h" // CacheString
@@ -118,7 +117,7 @@ void StarSysUpdate(float Dt);
 // FUN_00553660 -- is (Voice, Msg) on the [Archetype] voice preload list?
 bool StarSysHasVoiceMessage(unsigned VoiceId, unsigned MsgId);
 // FUN_00553590 -- Acquire the voice message and append it to that list (the body is the
-// file-local PreloadVoiceLine). Also called by the NN voice queue FUN_00489a80 (0x00489ac8).
+// file-local PreloadVoiceLine). Also called by the NN voice queue FUN_00489a80.
 void StarSysPreloadVoiceMessage(unsigned VoiceId, unsigned MsgId);
 
 // FUN_00553340 -- music override (DAT_006798d8..e4, fade DAT_006798d4, flag DAT_006798d0).
@@ -136,12 +135,11 @@ void StarSysNoteTargetChange(unsigned ShipId);
 // FUN_005544d0 -- suppress player collision reporting for Seconds from now (DAT_00679978).
 void StarSysSuppressPlayerCollisions(double Seconds);
 
-// FUN_00554ab0 -- leave the current system (FUN_00554e80 passes a null player). Partial: the
-// callees that have no port yet are named in the body. Retail callers 0054aa88 / 0054af90
-// (the space teardown FUN_0054aec0 = DestroySpaceState, space_state.cpp) -- 0054af90 is ported,
-// 0054aa88 is not.
+// FUN_00554ab0 -- leave the current system (FUN_00554e80 passes a null player). Retail callers:
+// the system-switch step FUN_0054a940 and the space teardown FUN_0054aec0 (DestroySpaceState),
+// both in space_state.cpp.
 void StarSysLeave(IObjRW* Player);
-// FUN_00554e80 -- StarSysLeave(nullptr). Retail caller 0054ab23: ShutdownSpaceState (space_state.cpp).
+// FUN_00554e80 -- StarSysLeave(nullptr). Retail caller: ShutdownSpaceState (space_state.cpp).
 void StarSysLeaveWithoutPlayer();
 
 // FUN_0045a490(param_1 = Target, param_2 = Viewer) -- Viewer's attitude towards Target

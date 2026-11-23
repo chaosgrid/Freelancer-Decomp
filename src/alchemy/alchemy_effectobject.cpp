@@ -18,14 +18,13 @@
 // Out-of-line method bodies for FFxEffectObject.
 namespace AlchemyImpl
 {
-    // Every node this object holds is an IGenericFx. Retail reaches their slots straight
-    // off the stored pointer -- 0x0621f537 calls [node+0x2c] with no QueryInterface -- so
-    // this is a cast, not a query. It exists because the nodes are stored as IDAComponent*.
     static IAlchemy* AsAlchemy()
     {
         return G_EffectAlchemy;
     }
 
+    // Every node this object holds is an IGenericFx; retail calls their slots straight off
+    // the stored pointer (e.g. 0x0621f537) with no QueryInterface, so this is a cast.
     static IGenericFx* AsFx(IDAComponent* Node)
     {
         return static_cast<IGenericFx*>(Node);
@@ -152,31 +151,14 @@ namespace AlchemyImpl
 
     unsigned long DACOM_API FFxEffectObject::Release()
     {
-        // LAB_06222810 (alchemy.dll.txt:71219-71236): retail also guards the
-        // decrement itself against underflow (`if (refcount != 0)
-        // refcount--;` before the zero-check), not just the teardown step
-        // below -- the same underflow-guard pattern already fixed in
-        // FComponentFactory::Release, FFxRuntime::Release, and
-        // FFxEffectArchetype::Release. A stray extra Release() call past 0
-        // previously underflowed RefCount_ to 0xFFFFFFFF here instead of
-        // retail's no-op. Fixed as part of the wave-42 targeted COM-refcount
-        // sweep.
+        // LAB_06222810: the decrement saturates at 0.
         if (RefCount_ != 0)
             --RefCount_;
         const unsigned long Next = RefCount_;
         if (Next == 0)
         {
-            // retail resets the refcount to 1 before tearing the object down
-            // (CALL [vtable+0x44](this,1) == destructor+delete), guarding against
-            // a re-entrant Release() reaching zero again while teardown is
-            // still in progress. Mirror that guard here.
-            //
-            // wave63 (sonnet:alchemy-wave63-lane1, 2026-09-11): re-verified
-            // byte-for-byte against LAB_06222810 (alchemy.dll.txt:71226-
-            // 71233: `MOV dword ptr [ECX+0x20],0x1` immediately before
-            // `CALL dword ptr [EAX+0x44]`) as part of a module-wide sweep of
-            // this reentrancy-guard idiom -- confirmed already correctly
-            // ported here, no change needed.
+            // Retail sets the count (+0x20) back to 1 before the scalar deleting
+            // destructor (vtable+0x44), so a reentrant Release does not reach 0 again.
             RefCount_ = 1;
             this->~FFxEffectObject();
             ::operator delete(this);
@@ -187,18 +169,13 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::SetTransform(void* A, void* B)
     {
-        // FUN_0621f610 (alchemy.dll.txt:64408-64466):
-        //   if (this+0x18 != 0)  →  JMP (*(+0x18))->vtable+0x3C(node, A, B)
-        //   else walk Nodes_: Pad7 skip, then node+0x3C(A,B); FDUMP on fail.
-        // Initialize selects this+0x18 as an alias to the override-folder record. A and B
-        // are only forwarded to the nodes' vt+0x3c, which on an appearance
-        // is the this+0xc thunk (e.g. FUN_06226f80) into FUN_062400f0: A is the slot index
-        // (0 composed +0x4c, 1 raw +0x1c, else -2) and B the 12-float source. Callers:
-        // gf_thorn_psys.cpp (1, Xform), particle_effect.cpp (0, &World). A port-only copy of A
-        // as 16 floats into a Transform_ cache was removed 2026-09-26 -- A is an index.
+        // FUN_0621f610 (see the header). Initialize selects this+0x18 as an alias to the
+        // override-folder record. On an appearance the nodes' vt+0x3c is the this+0xc
+        // thunk (e.g. FUN_06226f80) into FUN_062400f0: A is the slot index (0 composed
+        // +0x4c, 1 raw +0x1c, else -2) and B the 12-float source. Callers:
+        // gf_thorn_psys.cpp (1, Xform), particle_effect.cpp (0, &World).
 
-        // 0621f611..0621f625: the override node's vt+0x3c takes the call alone (tail JMP),
-        // with no null test on the node.
+        // The override node takes the call alone, with no null test on the node.
         const unsigned long SlotIndex =
             static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
         const float* const Source12 = static_cast<const float*>(B);
@@ -208,9 +185,8 @@ namespace AlchemyImpl
             return AsFx(Node)->SetNodeTransform(SlotIndex, Source12);
         }
 
-        // 0621f628..0621f693: every root-prefix record (count +4), no null test on the
-        // node. vt+0x1c answering non-zero in AL skips it (0621f646); otherwise vt+0x3c(A, B),
-        // and a non-zero result is reported.
+        // Every root-prefix record (count +4), no null test on the node. Retail tests only
+        // AL of IsNodeDead.
         FFxEffectNodeRec* Record = Nodes_;
         for (long Index = 0; Index < RootNodeCount_; ++Index, ++Record)
         {
@@ -228,11 +204,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::GetTransform(void* A, void* B)
     {
-        // LAB_0621f6a0: this+0x18 (TransformExtra_) override target takes
-        // priority over the node list when set (previously not ported -- Slot4
-        // always fell through to Nodes_[0].Node regardless of TransformExtra_).
-        // 0621f6a0..0621f6b3: tail JMP to the override node's vt+0x40, no null test.
-        // A = slot index, B = float** out (FUN_062400b0 behind the node's vt+0x40).
+        // LAB_0621f6a0: TransformExtra_ (this+0x18) takes priority over the node list,
+        // no null test. A = slot index, B = float** out.
         const unsigned long SlotIndex =
             static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
         float** const OutSlot = static_cast<float**>(B);
@@ -241,29 +214,25 @@ namespace AlchemyImpl
             IDAComponent* const Node = TransformExtra_->Node;
             return AsFx(Node)->GetNodeTransform(SlotIndex, OutSlot);
         }
-        // 0621f6b6..0621f6c1: otherwise the first record's node (+0xc -> [0]) takes it, with
-        // neither a count nor a null test (the port-only Transform_ fallback is gone).
+        // Otherwise the first record's node takes it, with neither a count nor a null test.
         return AsFx(Nodes_[0].Node)->GetNodeTransform(SlotIndex, OutSlot);
     }
 
     GENRESULT DACOM_API FFxEffectObject::ComposeTransforms(void* Arg)
     {
-        // FUN_0621f6d0, re-verified: self-contained WalkNodesAlchemy(0x3C)
-        // only. No 0x64 call anywhere in this function's body.
+        // FUN_0621f6d0: the IAlchemy +0x3C walk only (no +0x64 call).
         return WalkNodesAlchemy(&IAlchemy::ComposeNodeTransforms, Arg);
     }
 
     GENRESULT DACOM_API FFxEffectObject::Update(void* Arg)
     {
-        // FUN_0621f730, re-verified: self-contained WalkNodesAlchemy(0x40)
-        // only. No 0x64 call anywhere in this function's body.
+        // FUN_0621f730: the IAlchemy +0x40 walk only.
         return WalkNodesAlchemy(&IAlchemy::UpdateNodes, Arg);
     }
 
     GENRESULT DACOM_API FFxEffectObject::Draw(void* Arg)
     {
-        // FUN_0621f790, re-verified: self-contained WalkNodesAlchemy(0x44)
-        // only. No 0x64 call anywhere in this function's body.
+        // FUN_0621f790: the IAlchemy +0x44 walk only.
         return WalkNodesAlchemy(&IAlchemy::DrawNodes, Arg);
     }
 
@@ -303,7 +272,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::GetBoundComponent(void** Out)
     {
-        // 0621fd00: publish the captured archetype, then acquire it unconditionally.
+        // 0621fd00: AddRef with no null test.
         IFxEffectArchetype* const Bound = Archetype_;
         *Out = Bound;
         Bound->AddRef();
@@ -328,18 +297,8 @@ namespace AlchemyImpl
 
     void FFxEffectObject::BindArchetype(IFxEffectArchetype* Archetype)
     {
-        // FUN_0621eed0's own inline rebind (alchemy.dll.c:18690-18697,
-        // alchemy.dll.txt:63762-...): `if (Archetype_ != New) { Release(old
-        // via FUN_062212e0); Archetype_ = New; if (New) AddRef(New); }` --
-        // re-verified this wave: no name-copy call of any kind appears here
-        // (FUN_062212e0 itself is a plain release-and-null helper, confirmed
-        // by its own bytes at alchemy.dll.txt:68030-68044). A pre-wave-61
-        // version of this port also cached the archetype's name into an
-        // unused Name_[256] buffer via CopyNameFromBound() -- that field had
-        // no retail counterpart (the class's real vtable, dumped in full at
-        // alchemy.dll.txt:162302-162323, has exactly 19 slots and none of
-        // them expose a name) and nothing in this class ever read it back.
-        // Removed along with the same-Archetype early-out's dead call.
+        // FUN_0621eed0's inline rebind: if the archetype changes, release the old
+        // (FUN_062212e0, release-and-null), store and AddRef the new.
         if (Archetype_ == Archetype)
             return;
         if (Archetype_ != nullptr)
@@ -359,8 +318,6 @@ namespace AlchemyImpl
         }
     }
 
-    // Was WalkNodesAlchemy(Off, Arg): IAlchemy's slot number as a runtime argument, for
-    // three different slots. IAlchemy has been public in src/include/alchemy.h all along.
     GENRESULT FFxEffectObject::WalkNodesAlchemy(
         GENRESULT (DACOM_API IAlchemy::*Method)(void*, void*), void* Arg)
     {
@@ -511,7 +468,7 @@ namespace AlchemyImpl
             else if (!(static_cast<double>(NodeSphere[3]) + Distance < Sphere[3]))
             {
                 const double NewRadius = ((static_cast<double>(NodeSphere[3]) + Sphere[3]) + Distance) * 0.5;
-                // TEST AH,0x41 / JNP skips <= epsilon; unordered continues.
+                // An ordered <= epsilon skips; unordered continues.
                 if (!(static_cast<double>(Distance) <= 1e-6))
                 {
                     const double Reciprocal = 1.0 / Distance;
@@ -563,8 +520,8 @@ namespace AlchemyImpl
         return NodeCount_ == 0 ? Nodes_ : Nodes_ + NodeCount_;
     }
 
-    // 06220ef0: copy ranges retain captured cursors; container endpoints are
-    // reloaded only where the listing reloads them after reference callbacks.
+    // 06220ef0: copy ranges keep captured cursors; container endpoints are reloaded only
+    // where retail reloads them after reference callbacks.
     void FFxEffectObject::InsertNodeRecords(unsigned long InsertIndex,
                                            unsigned long InsertCount,
                                            const FFxEffectNodeRec& Record)
@@ -681,11 +638,8 @@ namespace AlchemyImpl
             IDAComponent*& Node = Created.Value;
             if (Rec.A == 0)
             {
-                // FUN_0621eed0 @ 0621eff7-000: after PUSH OutNode, [ESP+0x40]
-                // aliases GetRec16 Out.B (hash), not Out.C. Out.C is the
-                // 0x8000 / small tag used later for list-insert kind.
-                // Rec.B = HashNameCrc(instance name) as inserted by
-                // LoadNodeLibrary → InsertNodeByName(InsertName).
+                // Rec.B is the node-name hash (HashNameCrc, as LoadNodeLibrary inserts it),
+                // not Rec.C, the parent tag used later for the list insert.
                 const GENRESULT Lookup =
                     G_EffectNodeLibrary->CreateNodeByHash(Rec.B, &Node);
                 if (Lookup < 0)
@@ -746,15 +700,10 @@ namespace AlchemyImpl
         FFxEffectNodeRec* const AttachedEnd = AttachAlchemyTree(Desc);
         BindRec8Associates(InitialArchetype);
 
-        // FUN_0621eed0 tail 0621f517..0621f5d1: for every record whose kind
-        // (record+4 = rec16 Rec.A, stored by the FUN_06220ef0 insert) is 1 --
-        // the CreateNamedFx("FxNode") groups -- Max = 0, walk the child chain
-        // (+0x2C first child, +0x34 next) taking the max of each child's
-        // Duration (+0x68) and of FUN_0621ee50 over its own children, then
-        // store it with +0x6C (SetNodeDuration, node+0x88). A group with no
-        // children gets 0. Until 2026-09-26 the port ran this on every record
-        // and +0x6C was a stub; now that +0x6C writes Duration, the kind gate
-        // is what keeps leaf nodes at their own 100.0 default.
+        // FUN_0621eed0's tail: every record of kind 1 (record+4 = Rec.A, the
+        // CreateNamedFx("FxNode") groups) gets the max Duration of its subtree
+        // (FUN_0621ee50) through SetNodeDuration; a group with no children gets 0. Leaf
+        // nodes keep their own 100.0 default.
         FFxEffectNodeRec* DurationRecord = Nodes_;
         for (; DurationRecord != AttachedEnd; ++DurationRecord)
         {

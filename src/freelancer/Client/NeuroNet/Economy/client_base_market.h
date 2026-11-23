@@ -15,7 +15,7 @@
 // methods below are thiscall on it.
 //
 // Map node: left +0x0, parent +0x4, right +0x8, key +0xc, value +0x10 (0x28 bytes), colour +0x38,
-// _Isnil +0x39 (the walk at 0x00437ffe reads it).
+// _Isnil +0x39.
 
 #include "common_goods.h"
 
@@ -24,7 +24,7 @@
 
 class BaseData;
 
-// The mapped value (0x28 bytes, copied as ten dwords at 0x00437f1a / 0x00437f46).
+// The mapped value (0x28 bytes, copied as ten dwords).
 struct FClientMarketGood
 {
     MarketGoodInfo Info; // +0x00 BaseData's entry, or {Id, GoodInfo price} when the base has none
@@ -32,9 +32,8 @@ struct FClientMarketGood
     float PriceScale;    // +0x20 1 - variance + rand() / 32768 * 2 * variance
     // +0x24 -- never written by FUN_00437de0 (the ten-dword copies take it from an unset stack
     // slot) and never read by the market methods. Its low byte is NN_Dealer::CanBuyGood's result,
-    // stored by the dealer's list sorts (0x0048304e in FUN_00482f10, 0x00483310 in FUN_00483230)
-    // and read by their comparisons; the list refresh FUN_00482a90 passes it on to the row
-    // (NnDealer::SortMarketGoodsByName / SortEquipmentMarketGoods / RefreshMarketList).
+    // stored by the dealer's list sorts (FUN_00482f10, FUN_00483230) and read by their
+    // comparisons; the list refresh FUN_00482a90 passes it on to the row.
     unsigned CanBuyFlags;
 };
 

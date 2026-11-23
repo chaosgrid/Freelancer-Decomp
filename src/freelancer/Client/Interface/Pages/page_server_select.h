@@ -13,17 +13,17 @@
 // FUN_0056d510, atexit LAB_00572690 -> dtor FUN_005723b0). vftables: main 0x005e2bdc, IUIPage
 // face (+0x7c) 0x00575d00, Event::Handler face (+0x80) 0x00572330.
 //
-// Call path: IntroFocus EnterState case 5 (0x00574b4e) resets the server lists, creates the
-// Gun, loads the page descriptor (+0x8c, DAT_0067abac), calls slot 9 Create(0, 0) and makes this
-// the active page (+0x228). IntroFocus::Update poll index 1 (0x00574006) moves to the state in
-// +0xb4 (DAT_0067abd4) and clears it. IntroFocus Exit calls slot 10 (0x00573e77).
+// IntroFocus EnterState case 5 resets the server lists, creates the Gun, loads the page
+// descriptor (+0x8c), calls Create(0, 0) and makes this the active page (+0x228).
+// IntroFocus::Update moves to the state in +0xb4 (DAT_0067abd4) and clears it; IntroFocus Exit
+// calls Destroy.
 //
 // The rows are CLoginMgr's servers (FUN_005aca40) filtered by +0x2a4 and sorted by one of the
 // sixteen column comparators (.data:00614aa0 ascending / 00614ac0 descending); each row keeps a
 // ServerRowData copy of its server as the UIFastTable payload.
 //
-// Retail layout past MasterWin (+0x00..+0x8b) is listed member by member below. The port's
-// MasterWin has no retail byte layout (see page_options.h), so the members keep only the order.
+// Member offsets are retail's (MasterWin is +0x00..+0x8b). The port's MasterWin has no retail
+// byte layout (see page_options.h), so the members keep only the order.
 
 #include "common_text.h"   // RenderDisplayList, TextRenderContext::Image
 #include "Network/login_mgr.h"     // FServerInfo
@@ -41,17 +41,14 @@ class PageServerSelect : public UIPage::MasterWin
 {
 public:
     // RTTI .?AVServerRowData@PageServerSelect@@ : UIFastTable::RefCounter, vftable 0x005e2e64
-    // (slot 0 the scalar deleting destructor FUN_00572370, dtor FUN_005725e0). 0xa4 bytes: the
-    // RefCounter (+0x00 vftable, +0x04 count) and a copy of one server (+0x08). FillRow
-    // (FUN_00570040) makes one per row; ProcessMessage reads the copy back through the row payload.
+    // (slot 0 the scalar deleting destructor FUN_00572370). 0xa4 bytes. FillRow makes one per
+    // row; ProcessMessage reads the copy back through the row payload.
     class ServerRowData : public UiFastTableRefCounter
     {
     public:
-        // FUN_00571280 (RET 4) -- the RefCounter (count 1), FServerInfo's defaults written
-        // inline (0x005712b4..0x00571385), then the vftable and Info = Source memberwise
-        // (0x0057138b..0x005714a8).
+        // FUN_00571280 (RET 4).
         explicit ServerRowData(FServerInfo const& Source);
-        // FUN_005725e0 -- Info's members torn down, then the RefCounter vftable.
+        // FUN_005725e0.
         ~ServerRowData() override;
 
         FServerInfo Info; // +0x08
@@ -124,8 +121,7 @@ public:
     TextRenderContext::Image* GraySkull;     // +0x280 -- GraySkull.bmp
     TextRenderContext::Image* BlueLock;      // +0x284 -- BlueLocked.bmp
     TextRenderContext::Image* BlueSkull;     // +0x288 -- BlueSkull.bmp
-    // Created and destroyed on Refresh's TRC; nothing in the exe draws them (no other access
-    // to +0x28c / +0x290 in the listing).
+    // Created and destroyed on Refresh's TRC; nothing in the exe draws them.
     TextRenderContext::Image* ServerConnectImage;   // +0x28c -- MULTI_ServerConnect.bmp
     TextRenderContext::Image* ServerNoConnectImage; // +0x290 -- MULTI_ServerNoConnect.bmp
     unsigned char bListRequested;            // +0x294 -- CLoginMgr::RequestServerList answered
@@ -159,10 +155,11 @@ private:
     void ShowServerDetails(FServerInfo const* Server, bool bNewServer);
     // FUN_00571f50 (RET 4) -- the tool tips on or off (Legend's always off).
     void SetToolTipsEnabled(bool bEnabled);
-    // FUN_00571fc0 -- the leave sequence (no direction); ProcessMessage spells it inline twice more.
+    // FUN_00571fc0 -- the leave sequence (no direction); retail also inlines it twice in
+    // ProcessMessage.
     void BeginLeave();
-    // FUN_00572100 (RET 4) -- the connect: current server, the password prompt, then
-    // ConnectToServer (FUN_005a8770) on the ini path. False when any step fails.
+    // FUN_00572100 (RET 4) -- the connect: current server, the password prompt, then the global
+    // ConnectToServer on the ini path. False when any step fails.
     bool ConnectToServer(FServerInfo const* Server);
     // The server ProcessMessage's 0x3003 and 0xf002 act on: the selected row's payload, else the
     // remembered id through CLoginMgr::FindServer; null when there is neither.

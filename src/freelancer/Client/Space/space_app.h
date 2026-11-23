@@ -13,8 +13,7 @@
 //
 // Size 0xbac: the docking camera at +0xa9c is 0x104 bytes and the controller's own words sit at
 // +0xba0..+0xbab. Built by the static initializer LAB_00548f00 (FUN_00549300 on DAT_00678b98,
-// then atexit(LAB_00548f20) -> FUN_00548f30). Every offset below is a store in the ctor
-// 0x00549300 or in the listed slot.
+// then atexit(LAB_00548f20) -> FUN_00548f30).
 //
 // The eight cameras are the retail classes at their retail offsets; FUN_00549e70 picks among
 // them, FUN_00549bc0 installs one into +0xba0.
@@ -32,9 +31,9 @@
 
 #include <stddef.h>
 
-// The Event::Handler face at +4. Its one slot is LAB_0054a580 (thiscall, RET 4) with `this` = the
-// face, so every controller field it touches is read at face-relative offsets (+0xba0 there is
-// the controller's +0xba4, and so on).
+// The Event::Handler face at +4. Its one slot is LAB_0054a580 with `this` = the face, so retail
+// reads every controller field at face-relative offsets (+0xba0 there is the controller's
+// +0xba4, and so on).
 class FSpaceAppEventFace : public EventHandler
 {
 public:
@@ -51,10 +50,9 @@ public:
     bool OnEvent(unsigned MsgId) override;
 };
 
-// The primary vftable .rdata 0x005e0554 (COL 0x005ef678), fifteen slots -- raw PE dwords; the
-// dword after slot 14 is the next vtable's COL 0x005ef664:
-//   0 LAB_0054a0e0  1 0x004b50e0 (XOR AL,AL / RET 0xc)  2 LAB_0054a210  3 LAB_0054a2e0
-//   4 LAB_0054a450  5 0x00401e90 (RET)  6 0x0053e4a0 (RET 4)  7 0x004b5010 (XOR EAX,EAX / RET)
+// The primary vftable .rdata 0x005e0554 (COL 0x005ef678), fifteen slots:
+//   0 LAB_0054a0e0  1 0x004b50e0 (returns false)  2 LAB_0054a210  3 LAB_0054a2e0
+//   4 LAB_0054a450  5 0x00401e90 (empty)  6 0x0053e4a0 (empty)  7 0x004b5010 (returns 0)
 //   8 0x00401e90  9 FUN_0054ab20  10 0x00401e90  11 LAB_0054a540  12 FUN_0054ab40
 //   13 FUN_0054aec0  14 LAB_0054b000.
 struct SpaceApp : public IEnvironment
@@ -81,7 +79,7 @@ struct SpaceApp : public IEnvironment
 
     //                                      +0x000  vptr .rdata 0x005e0554 (IEnvironment)
     FSpaceAppEventFace Events;              // +0x004  .rdata 0x005e0548
-    unsigned char      bCameraReady;        // +0x008  DAT_00678ba0 -- 1 at 0x0054ab8e, 0 at 0x0054af8d
+    unsigned char      bCameraReady;        // +0x008  DAT_00678ba0 -- set by Init, cleared by Destroy
     unsigned char      bPlayerLostHandled;  // +0x009  FUN_00471e80 already run for a lost ship
     unsigned char      bLeaveRequested;     // +0x00a  the frame returns 6 while set
     unsigned char      bInitInProgress;     // +0x00b  DAT_00678ba3 (FUN_0054bd40)
@@ -95,11 +93,11 @@ struct SpaceApp : public IEnvironment
     FDockingCamera     Docking;             // +0xa9c  ctor FUN_0051ea20
     FSpaceCamera*      ActiveCamera;        // +0xba0  DAT_00679738
     int                PlayerPreference;    // +0xba4  0 first person, 1 third (ctor 1)
-    // +0xba8 = DAT_00679740: raised by FUN_0054bb10 (a script camera was set up, 0x0054bb43) and
-    // read by FUN_0054bc90; the frame drops it when the view returns to "player" (0x0054b1fa),
-    // and FUN_0054b230 keeps the camera where it is while it is up.
+    // +0xba8 = DAT_00679740: raised by FUN_0054bb10 (a script camera was set up) and read by
+    // FUN_0054bc90; the frame drops it when the view returns to "player", and FUN_0054b230 keeps
+    // the camera where it is while it is up.
     unsigned char      bScriptCameraLatch;  // +0xba8
-    unsigned char      bSpaceReady;         // +0xba9  1 at 0x0054adf3, dropped once the launch ends
+    unsigned char      bSpaceReady;         // +0xba9  set by Init, dropped once the launch ends
     unsigned char      bDockingPending;     // +0xbaa
     unsigned char      bDockingActive;      // +0xbab
 
@@ -128,17 +126,15 @@ static_assert(sizeof(void*) != 4 || offsetof(SpaceApp, bDockingActive) == 0xbab,
 // DAT_00678b98 (space_state.cpp).
 extern SpaceApp G_SpaceApp;
 
-// FUN_00549830 (thiscall on the controller, no arguments): read cameras.ini and hand every
-// entry of [WinCamera] (the Win3D camera DAT_0067dbf8), [CockpitCamera], [ThirdPersonCamera],
-// [TurretCamera], [RearViewCamera] and [DeathCamera] to that camera's slot 0x4c. Caller: the
-// space init (0x0054ad86).
+// FUN_00549830: read cameras.ini and hand every entry of [WinCamera] (the Win3D camera
+// DAT_0067dbf8), [CockpitCamera], [ThirdPersonCamera], [TurretCamera], [RearViewCamera] and
+// [DeathCamera] to that camera's slot 0x4c. Caller: the space init.
 void SpaceAppLoadCamerasIni(SpaceApp* App);
 
-// FUN_0054b900 (cdecl, no arguments): the player's ship was destroyed -- arm the death camera
-// (+0x60c) from the listener camera's transform and switch to it. Caller: the IClient
-// DESTROYOBJECT handler (0x0053bcbc).
+// FUN_0054b900: the player's ship was destroyed -- arm the death camera (+0x60c) from the
+// listener camera's transform and switch to it. Caller: the IClient DESTROYOBJECT handler.
 void SpaceAppArmDeathCamera();
 
-// FUN_0054bb50 (cdecl, one argument): the static camera's Csys (+0x9a4 +0x04, twelve floats)
-// and view-dirty byte, then "static" when the controller is up. Caller: IClient 0x0053e154.
+// FUN_0054bb50: the static camera's Csys (+0x9a4 +0x04, twelve floats) and view-dirty byte,
+// then "static" when the controller is up. Caller: IClient SET_CAMERA.
 void SetStaticCameraTransform(const float* Csys12);

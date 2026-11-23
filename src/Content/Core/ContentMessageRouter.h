@@ -23,8 +23,7 @@ extern FContentMessageRouter* GMessageRouter;
 
 // Retail abstract base: vtable 06fb80d4 holds only the four IMessageRouter slots (all
 // purecall). Its ctor (inlined at the top of FUN_06f058d0) publishes the object in
-// DAT_06fcf254; its dtor FUN_06f05cf0 (also run from the ctor's unwind funclets
-// 06facd16 / 06facd52) clears it.
+// DAT_06fcf254; its dtor FUN_06f05cf0 clears it.
 class FContentMessageRouterBase : public IMessageRouter
 {
 protected:
@@ -33,11 +32,6 @@ protected:
 };
 
 // Retail object: 0x24 bytes, vtable 06fb80bc (6 slots).
-//   +0x04 pending delayed messages (VC6 list: proxy +4, head +8, size +0xc), ordered by
-//         delivery time
-//   +0x10 timer id (DAT_06fce76c++ at construction)
-//   +0x14 last handler id handed out
-//   +0x18 registered handlers (VC6 list: proxy +0x18, head +0x1c, size +0x20)
 class FContentMessageRouter : public FContentMessageRouterBase
 {
 public:
@@ -60,8 +54,8 @@ public:
     virtual void OnTimerExpired(pub::Controller::TimerExpired const* Timer);
 
 private:
-    std::list<StateMachineMessage*> PendingMessages;   // +0x04
-    unsigned int TimerId;                               // +0x10
-    unsigned int LastHandlerId;                         // +0x14
+    std::list<StateMachineMessage*> PendingMessages;   // +0x04 ordered by delivery time
+    unsigned int TimerId;                               // +0x10 DAT_06fce76c++ at construction
+    unsigned int LastHandlerId;                         // +0x14 last handler id handed out
     std::list<MessageHandler*> Handlers;                // +0x18
 };

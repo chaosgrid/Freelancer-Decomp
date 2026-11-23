@@ -15,7 +15,7 @@
 // RecoverFieldLimbsLocked / MapFieldLimbsLocked / ReleaseFieldContext
 // (FUN_06ac2ae0 / 28e0 / 3060 / 2e40 / 2b30).
 // The rest of this file is that cluster calling itself. Callees past 0x06ac3d40
-// stay declared in MovieGraph.cpp; this lane does not define them.
+// are declared in MovieGraph.cpp and defined elsewhere.
 
 // DAT_06ae0960, the CRITICAL_SECTION these helpers take. DAT_06ae0978 is the
 // one-shot init flag. DAT_06ae097c is the status dword FUN_06ac3d40 writes.
@@ -54,7 +54,7 @@ long __stdcall Movie_ReduceWithFixedWidth(void* Arg1, void* Arg2, int Arg3, void
 // FUN_06ac2b90. thiscall, RET 0xC. Four groups of five limbs into OutLimbs.
 long  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs);
 
-// FUN_06ac2de0. stdcall, RET 0x14. Five stack arguments; the .c signature dropped four.
+// FUN_06ac2de0. stdcall, RET 0x14. Five stack arguments (the decompiled signature shows one).
 long __stdcall Movie_ReduceExpandedRows(unsigned int* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5);
 
 // FUN_06ac2e40. thiscall, RET 0xC. MapFieldLimbs under the lock.

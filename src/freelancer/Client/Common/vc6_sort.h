@@ -12,8 +12,7 @@
 // orders equal elements differently, so a port whose retail call sorts with a comparator that
 // has ties uses this to keep retail's order.
 //
-// The freelancer.exe instantiation on FServerInfo* (GetFilteredServers, std::sort inlined at
-// 0x005acb92..0x005acca6):
+// The freelancer.exe instantiation on FServerInfo* (std::sort inlined in GetFilteredServers):
 //   FUN_005afea0  _Sort                 (the median and the partition inlined)
 //   FUN_005affc0  _Insertion_sort
 //   FUN_005b0060  _Median

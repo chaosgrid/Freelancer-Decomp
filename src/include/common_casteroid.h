@@ -14,34 +14,24 @@
 #include <map>
 #include <vector>
 
-// CmnAsteroid: the asteroid FIELD simulation (Common.dll.c ~0x43bb0..0x462a0, retail
-// addresses 0x62a2ff0-0x62a6190 per decomp-tracker). Distinct from the CAsteroid /
-// CDynamicAsteroid *object* classes in common_cobject.h -- this namespace owns the grid of
-// cubes that spawn and cull them.
+// CmnAsteroid: the asteroid FIELD simulation (0x062a2ff0-0x062a6190). Distinct from the
+// CAsteroid / CDynamicAsteroid *object* classes in common_cobject.h -- this namespace owns
+// the grid of cubes that spawn and cull them.
 //
-// Scope note: several retail internals here are hand-rolled VC6 std::list / std::map
-// (red-black tree) node layouts. Following this codebase's established convention for
-// such cases (see CArchGrpTraverser in common_cobject.h), the port uses real std::map /
-// std::list containers with equivalent observable behavior instead of replicating the
-// raw node byte layout -- so most classes below carry no static_assert on their layout.
+// Deviation: retail's VC6 std::list / std::map node layouts are replaced by real std::map /
+// std::list containers with the same observable behavior (as for CArchGrpTraverser), so
+// most classes below carry no layout static_assert.
 class INI_Reader;
 struct IObjDB;
 struct IObjRW;
 
 namespace CmnAsteroid
 {
-    // Common.dll.c 0x452a0 (CAsteroidField::update) stores one of these per cube.
-    // CubeStateActive=1 resolved 2026-09-10 (claude-casteroid-spawn-pipeline lane, item
-    // 70309's own trace): CAsteroidField::populate_asteroids_internal (Common.dll.txt
-    // 131989-131991) stamps a freshly map-inserted cube's State to 1 immediately, BEFORE
-    // CAsteroidCube::init() populates it with asteroids; the same function's existing-cube
-    // refresh path (131875-131878) treats State==1 exactly like State==2 (Near) -- skip,
-    // don't re-touch -- confirming 1 means "freshly created and actively populated",
-    // distinct from CubeStateNear's "still in range, timer reset" meaning. update()'s own
-    // handling of State==1 was not re-traced this pass (out of scope -- update() remains
-    // its own `simplified` item); this port's update() currently only transitions cubes
-    // out of CubeStateUnknown, so newly-active cubes are left alone until a future lane
-    // re-verifies update()'s full State machine.
+    // One per cube (CAsteroidField::update, 0x062a52a0).
+    // CubeStateActive (1): populate_asteroids_internal stamps it on a freshly inserted cube
+    // before CAsteroidCube::init() populates it; its existing-cube path treats 1 like 2
+    // (Near) and leaves the cube alone. update() only transitions cubes out of
+    // CubeStateUnknown.
     enum CubeState
     {
         CubeStateUnknown = 0,
@@ -50,8 +40,8 @@ namespace CmnAsteroid
         CubeStateFar = 3,
     };
 
-    // CmnAsteroid::compute_cube_orientation (Common.dll.c 0x44010) indexes each axis with
-    // a 0..3 random value into a 4-entry preset list; CAsteroidField's ctor (0x44660)
+    // CmnAsteroid::compute_cube_orientation (0x062a4010) indexes each axis with
+    // a 0..3 random value into a 4-entry preset list; CAsteroidField's ctor (0x062a4660)
     // initializes the default list for all 3 axes to exactly {0, PI/2, PI, 3*PI/2}
     // (0x50-0x5c / 0x60-0x6c / 0x70-0x7c), i.e. axis-aligned "snap" rotations.
     struct AxisRotations
@@ -61,19 +51,18 @@ namespace CmnAsteroid
 
     static_assert(sizeof(AxisRotations) == 0x30, "CmnAsteroid::AxisRotations sizeof 0x30");
 
-    // CmnAsteroid::closest_cube_coord (Common.dll.c 0x42ff0). Snaps Coord to the nearest
+    // CmnAsteroid::closest_cube_coord (0x062a2ff0). Snaps Coord to the nearest
     // multiple of CubeSize plus/minus HalfSize depending on sign.
     COMMON_API int __cdecl closest_cube_coord(int Coord, int CubeSize, int HalfSize);
 
-    // CmnAsteroid::compute_cube_id (Common.dll.c 0x46010). Packs a position's 128-unit
+    // CmnAsteroid::compute_cube_id (0x062a6010). Packs a position's 128-unit
     // grid coordinate into a single id: bit 0x15+ = X (11 bits + sign), bits 10-0x14 = Z
     // (10 bits + sign folded into bit 10), bits 0-9 = Y (9 bits + sign folded into bit
     // 0x200). Returns 0 if any axis falls outside the packable range.
     COMMON_API unsigned long __cdecl compute_cube_id(Vector const& Pos);
 
-    // CmnAsteroid::compute_cube_orientation (Common.dll.txt 0x44010 -- raw disasm only,
-    // the Ghidra .c decompiler dropped the ftol() call arguments here so this was
-    // reconstructed by hand from the FPU/LCG instruction trace). Reseeds a CRT-rand-style
+    // CmnAsteroid::compute_cube_orientation (0x062a4010; Ghidra drops the ftol() arguments,
+    // so read from the listing). Reseeds a CRT-rand-style
     // LCG directly from Seed (bypassing the process-wide rand() stream), burns 0-3 extra
     // steps, then (unless Freq < 0) rolls one probability draw against Freq and bails
     // returning false on failure. On success draws one axis-preset index per axis from
@@ -83,24 +72,12 @@ namespace CmnAsteroid
     // is what gives CAsteroidField its axis-aligned cube "snap" rotations).
     COMMON_API bool __cdecl compute_cube_orientation(unsigned long Seed, Matrix* InOutOrient, AxisRotations const& Rot, float Freq);
 
-    // CmnAsteroid::CAsteroidField::load's "[LootableZone]" header record (Common.dll.c
-    // 72686-72701, Common.dll.txt 130673-130696 -- retail heap-allocates one of these,
-    // operator_new(0x28), per [LootableZone] block: 4x ID_String::clear() at offsets
-    // 0x00/0x04/0x08/0x0c, then 6 defaulted dwords: 0x10=1/0x14=1/0x18=1/0x1c=1/0x20=100/
-    // 0x24=1). Two ID_String slots (+0x04/+0x0c) and three of the six trailing dwords
-    // (+0x18/+0x1c/+0x24) are written for real by the "dynamic_loot_container"/"dynamic_
-    // loot_commodity"/"dynamic_loot_count"/"dynamic_loot_difficulty" keys (see load()).
-    // The other two ID_String slots (+0x00/+0x08) and the other three dwords (+0x10/+0x14/
-    // +0x20) are recognized-but-inert in this exact retail build: the "asteroid_loot_
-    // container"/"asteroid_loot_commodity"/"asteroid_loot_count"/"asteroid_loot_difficulty"
-    // keys are matched by is_value() purely so the parser doesn't desync (Common.dll.txt
-    // 130799-130817 is four bare is_value() calls back-to-back with no get_value_*/store
-    // between any of them, cross-checked against the raw disasm, not just the Ghidra .c),
-    // but nothing ever writes to these four slots -- they stay at their ctor default
-    // forever in every traced path. Modeled here as named fields carrying their confirmed
-    // retail default value (this project's placeholder-field policy) rather than omitted,
-    // since they are real bytes retail still passes on to the [LootableZone]-target zone's
-    // IZone::vtbl[0x8c] call (see load()'s own note -- that call itself is unported).
+    // CAsteroidField::load's "[LootableZone]" record: operator_new(0x28) per block, four
+    // ID_String::clear() at +0x00..+0x0c, then dwords 1/1/1/1/100/1 at +0x10..+0x24.
+    // The dynamic_loot_* keys fill +0x04/+0x0c/+0x18/+0x1c/+0x24. Retail quirk: the
+    // asteroid_loot_* keys are matched by bare is_value() calls with no store, so
+    // +0x00/+0x08/+0x10/+0x14/+0x20 keep their defaults; they still reach the target zone's
+    // IZone slot +0x8c with the rest of the record.
     struct LootableZoneEntry
     {
         ID_String AsteroidLootContainerId;  // +0x00, default-cleared; "asteroid_loot_container" recognized-but-dead (see above)
@@ -119,23 +96,11 @@ namespace CmnAsteroid
 
     class CAsteroidField;
 
-    // CmnAsteroid::CAsteroidField's per-field "AsteroidCubeArch" spawn list (retail
-    // CAsteroidField+4 = Head / +8 = Count of a VC6 intrusive circular list). Confirmed by
-    // cross-referencing two independent sites: (1) CAsteroidField's ctor (Common.dll.c
-    // 72180-72183) allocates a 0x40-byte self-referential sentinel node via operator_new(0x40)
-    // and stores it at this+4 (Head), zeroing this+8 (Count) -- the same VC6 circular
-    // intrusive-list idiom used elsewhere in this codebase (e.g. Archetype::EqObj's
-    // CollisionGroups/ShieldLinks); (2) CAsteroidField::load's "asteroid" INI key
-    // (Common.dll.c 72423-72588) builds exactly one 0x40-byte node -- Archetype::Asteroid* at
-    // node+8, 3 extent floats at node+0xc/0x10/0x14, a 3x3 orientation Matrix at
-    // node+0x18..+0x3c, bMine/bInstantKill bytes at node+0x3c/0x3d -- and appends it via
-    // FUN_062a6930(&tmp, headNode, &out). CAsteroidCube::init (item 70318, Common.dll.txt
-    // 132662-132894) walks this SAME list to spawn one CAsteroid per node: its own
-    // "AsteroidCubeArch*" parameter is literally the owning CAsteroidField pointer
-    // reinterpreted (param+4/param+8 land exactly on this Head/Count pair -- confirmed by the
-    // empty-list check `*(int**)(param+4) == param+4`, the classic VC6 "Next of the sentinel
-    // points at itself" idiom). Ported as a std::list<AsteroidCubeArchEntry> (a list as in
-    // retail: entries never move, which matters because each one releases its archetype).
+    // One node of CAsteroidField's spawn list (retail field+4 Head / +8 Count, a VC6
+    // circular list with a 0x40-byte sentinel from the ctor). load()'s "asteroid" key builds
+    // one 0x40-byte node per rock and appends it via FUN_062a6930; CAsteroidCube::init walks
+    // the list to spawn one CAsteroid per node. Ported as std::list<AsteroidCubeArchEntry>
+    // (entries never move, which matters because each one releases its archetype).
     //
     // Lifetime (retail): load() builds a temporary entry {Arch 0, Extent 0, Orient identity
     // (FUN_062748a0), flags 0}, appends a plain copy (FUN_062a6930, no AddRef), destroys the
@@ -200,7 +165,7 @@ namespace CmnAsteroid
         // and set_cube_size store the field's cube size here as well as in CubeSize (MOV
         // [ESI+0x44],EAX / MOV [ESI+0xc],EAX), load's "asteroid" key reads it back (FILD
         // [this+0x0c] * 0.5) and the copy ctor copies it (.text:062a3443); the default ctor
-        // leaves it unwritten. Formerly Field_0x0C.
+        // leaves it unwritten.
         int ArchCubeSize;
     };
 
@@ -240,31 +205,17 @@ namespace CmnAsteroid
         asteroid_marker* Next;      // +0x10
     };
 
-    // CmnAsteroid::CAsteroidCube: one grid cell of a CAsteroidField. Retail fields
-    // confirmed by direct accessors and by cross-checking CAsteroidField::update's raw
-    // tree-node indexing (Common.dll.c 0x452a0, which reaches the embedded cube via
-    // node+0x10 -- the RB-tree's own 4-pointer node header -- exactly like
-    // CmnAsteroid::Find's node+0x10 for CAsteroidSystem): StateTimer +0x00 (zeroed and
-    // incremented by update(), NOT unresolved as previously assumed -- see update()'s
-    // "node+0x10 => piVar2[4]" indexing), Owner (owning CAsteroidField*) +0x04 (init/the
-    // CAsteroidField*-taking ctor), CubeId +0x08 (init), Orient +0x0c (9 floats,
-    // get_orient), Pos +0x30 (get_pos), State +0x40 (set_state -- a full dword, not
-    // folded into StateTimer), Asteroids list head +0x48 / count +0x4c, SystemId +0x50
-    // (set_system, also used as the CollisionGroupId handed to every CAsteroid spawned
-    // into this cube). A lone byte at +0x44 is written with indeterminate/uninitialized
-    // data by the CAsteroidField*-taking ctor (Common.dll.txt 0x46150: "this[0x44] =
-    // param_1._0_1_", the classic Ghidra rendering of an uninitialized member landing on
-    // whatever value happened to be in a reused register) and is never read anywhere in
-    // the traced call graph -- not modeled here (inert). A second byte at +0x54 (copied
-    // member-wise by the copy ctor/operator=) is init()'s "empty cube" flag (bEmpty below),
-    // read back by get_changes. The live
-    // asteroid population is an intrusive list of CObject* at retail +0x48
-    // (~CAsteroidCube releases each one then clears the list, Common.dll.c 0x46190) --
-    // ported here as a real std::list<CObject*>.
+    // CmnAsteroid::CAsteroidCube: one grid cell of a CAsteroidField (the map node holds it
+    // at node+0x10). Retail layout: StateTimer +0x00, Owner +0x04, CubeId +0x08, Orient +0x0c,
+    // Pos +0x30, Size +0x3c, State +0x40 (a full dword), Asteroids list head +0x48 / count
+    // +0x4c, SystemId +0x50 (also the CollisionGroupId of every CAsteroid spawned here),
+    // bEmpty +0x54. The byte at +0x44 is written with stale register data by the
+    // CAsteroidField*-taking ctor and never read; not modeled. ~CAsteroidCube (0x062a6190)
+    // releases each asteroid then clears the list. The port's member order is not retail's.
     class COMMON_API CAsteroidCube
     {
     public:
-        // Common.dll.txt 0x46150 (??0CAsteroidCube@CmnAsteroid@@QAE@PAVCAsteroidField@1@@Z).
+        // 0x062a6150 (??0CAsteroidCube@CmnAsteroid@@QAE@PAVCAsteroidField@1@@Z).
         // The "shell" ctor populate_asteroids_internal uses when it inserts a brand new
         // cube into the field's map: stamps the owning field, zeroes State/count, and
         // leaves CubeId/Orient/Pos/SystemId to be filled in by the following init() call.
@@ -309,7 +260,7 @@ namespace CmnAsteroid
         int Size;
         CubeState State;
         // Elapsed-time accumulator backing CAsteroidField::update's CubeStateUnknown ->
-        // CubeStateNear/Far transition. Retail offset +0x00 (see class-level note above).
+        // CubeStateNear/Far transition. Retail offset +0x00.
         float StateTimer;
         unsigned SystemId;
         std::list<CObject*> Asteroids;
@@ -319,7 +270,7 @@ namespace CmnAsteroid
         bool bEmpty;
 
     private:
-        // Common.dll.c 0x466c0. Packs Pos into a 20-bit local asteroid id (10 bits per
+        // 0x062a66c0. Packs Pos into a 20-bit local asteroid id (10 bits per
         // axis: abs(round(coord)) >> 1, sign folded into bit 9) via the same
         // truncate-with-epsilon convention as CAsteroidField::create_cube_id/
         // closest_cube_pos. Pure function of Pos -- does not read/write any CAsteroidCube
@@ -328,7 +279,7 @@ namespace CmnAsteroid
         bool compute_asteroid_id(Vector const& Pos, unsigned long& OutId);
     };
 
-    // CmnAsteroid::CAsteroidField (Common.dll.c 0x44660 ctor .. 0x45e50 Release). Owns a
+    // CmnAsteroid::CAsteroidField (0x062a4660 ctor .. 0x062a5e50 Release). Owns a
     // grid of CAsteroidCube (retail: RB-tree keyed by CmnAsteroid::compute_cube_id,
     // ported as std::map), plus field-wide spawn parameters and an optional exclusion
     // zone.
@@ -365,28 +316,24 @@ namespace CmnAsteroid
         // Dist <= 0 defaults to (FillDist + CubeSize) * 1.2.
         float near_field_fraction(Vector const& Pos, float Dist);
 
-        // CmnAsteroid::CAsteroidField::create_cube_id (Common.dll.c 0x43270). Snaps Pos to
+        // CmnAsteroid::CAsteroidField::create_cube_id (0x062a3270). Snaps Pos to
         // this field's cube grid (via closest_cube_coord using CubeSize/HalfSize) and
         // returns the packed id for that cube via compute_cube_id.
         unsigned long create_cube_id(Vector const& Pos);
 
-        // CmnAsteroid::CAsteroidField::closest_cube_pos (Common.dll.c 0x45ee0). Same
+        // CmnAsteroid::CAsteroidField::closest_cube_pos (0x062a5ee0). Same
         // per-axis snap as create_cube_id (closest_cube_coord + the same
         // truncate-with-epsilon convention), but returns the snapped Vector directly
         // instead of hashing it into a cube id.
         Vector closest_cube_pos(Vector const& Pos);
 
-        // CmnAsteroid::CAsteroidField::find_cube (Common.dll.c 0x46100). Retail's hand-
-        // rolled RB-tree lookup by CubeId, faithfully reproduced here as a std::map
-        // lookup: returns the cube if present, nullptr otherwise.
+        // CmnAsteroid::CAsteroidField::find_cube (0x062a6100). Map lookup by CubeId: the cube
+        // if present, nullptr otherwise.
         CAsteroidCube* find_cube(unsigned long CubeId);
 
-        // CmnAsteroid::CAsteroidField::populate_asteroids (item 70308, Common.dll.txt
-        // 131451-131803, no Ghidra .c -- raw disasm only, hand-traced 2026-09-10). Called
-        // from CAsteroidSystem::update (Common.dll.txt 129648) with Pos = the tracked
-        // observer's (e.g. player's) current position and Dir = its negated forward/look
-        // direction. PORTED FOR REAL 2026-09-10 (claude-casteroid-spawn-pipeline lane) --
-        // see the .cpp for the full evidence trail: snaps Pos onto this field's cube grid
+        // CmnAsteroid::CAsteroidField::populate_asteroids (no Ghidra decompile). Called
+        // from CAsteroidSystem::update with Pos = the tracked observer's (e.g. player's)
+        // current position and Dir = its negated forward direction. Snaps Pos onto this field's cube grid
         // (closest_cube_pos) and, gated by two always-true-by-default bool cvars
         // (DAT_063eb7fc/DAT_063eb7fd, no write site found for either), calls
         // populate_asteroids_internal for up to 8 grid-neighbor candidates around the
@@ -419,9 +366,8 @@ namespace CmnAsteroid
         void set_fill_dist(int Dist);
         void set_empty_freq(float Freq);
 
-        // Common.dll.c 0xdbae0 / ICF with CECargo::SetCount: `*(this+0x28) = param`.
-        // Written from freelancer.exe FUN_0051ff50 (CliAsteroid load), not from Common.dll
-        // itself -- earlier notes claiming Zone is "never assigned" only scanned Common.
+        // 0x0633bae0 (ICF with CECargo::SetCount): `*(this+0x28) = param`. Called only from
+        // freelancer.exe FUN_0051ff50 (CliAsteroid load), not from Common.dll.
         void set_zone(Universe::IZone const* InZone);
 
         int AddRef();
@@ -429,34 +375,25 @@ namespace CmnAsteroid
 
         int RefCount;
         std::map<unsigned long, CAsteroidCube> Cubes;
-        // Retail field+0x28: IZone pointer. Assigned by set_zone (exe CliAsteroid path);
-        // Common.dll load/exclusion only reads it. Stored as Universe::IZone* (port's
-        // plain struct); retail's polymorphic shape-base identity is item 2574.
+        // Retail field+0x28: IZone pointer, assigned by set_zone (exe CliAsteroid path);
+        // Common.dll only reads it. Typed as the port's plain Universe::IZone.
         Universe::IZone* Zone;
         // Retail field+0x2c: the cached asteroid_marker list built by get_changes and freed by
         // flush_changes; zeroed by the ctor (.text:062a475c).
         asteroid_marker* Changes;
-        // Retail field+0x30: owned, destroyed by ~CAsteroidField (Common.dll.c 0x447a0).
+        // Retail field+0x30: owned, destroyed by ~CAsteroidField (0x062a47a0).
         Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr;
-        // Retail field+0x40 (confirmed 2026-09-10, item 70309's own trace: populate_
-        // asteroids_internal's new-cube path, Common.dll.txt 131992/131997, reads this
-        // field and stamps it onto the newly-spawned CAsteroidCube::SystemId, which item
-        // 70318's init() spawn loop then uses as every new CAsteroid's CollisionGroupId).
+        // Retail field+0x40: populate_asteroids_internal stamps it onto each new cube's
+        // SystemId (every spawned CAsteroid's CollisionGroupId).
         unsigned SystemId;
-        // Retail field+0x50 (confirmed 2026-09-10, item 70309's own trace: populate_
-        // asteroids_internal's CAsteroidCube::init() call passes &(this+0x50) as the Rot
-        // argument, Common.dll.txt 131999-132000) -- sits right after EmptyFreq (+0x4c).
+        // Retail field+0x50: passed as init()'s Rot argument.
         AxisRotations Rotations;
-        // Retail field+0x44 (confirmed byte-identical to set_cube_size's whole body,
-        // Common.dll.txt 0x433a0/0x433b0; default 0xfa=250, ctor Common.dll.txt
-        // 0x62a4745). Also the value near_field/near_field_fraction sum with FillDist
-        // below to compute their near-zone margin -- see get_immersion/near_field note.
+        // Retail field+0x44 (set_cube_size, 0x062a33b0; default 250). near_field and
+        // near_field_fraction add FillDist to it for their margin.
         int CubeSize;
-        // Retail field+0x48 (confirmed byte-identical to set_fill_dist's whole body,
-        // Common.dll.txt 0x433c0; default 0x3e8=1000, ctor Common.dll.txt 0x62a474c).
+        // Retail field+0x48 (set_fill_dist, 0x062a33c0; default 1000).
         int FillDist;
-        // Retail field+0x4c (confirmed byte-identical to set_empty_freq's whole body,
-        // Common.dll.txt 0x433d0; default 0.0f, ctor Common.dll.txt 0x62a4753).
+        // Retail field+0x4c (set_empty_freq, 0x062a33d0; default 0.0f).
         float EmptyFreq;
         // Retail field+4 (Head) / +8 (Count), the per-field "AsteroidCubeArch" spawn list, is
         // AsteroidCubeArch::ArchList (the base above), populated by load()'s "asteroid" key and
@@ -468,9 +405,8 @@ namespace CmnAsteroid
         std::list<Universe::IZone*> LootZones;
 
     private:
-        // CmnAsteroid::CAsteroidField::populate_asteroids_internal (item 70309, private
-        // per retail's own mangled name -- see the .cpp for the full evidence trail).
-        // Pos = the fixed reference position populate_asteroids was called with; Candidate
+        // CmnAsteroid::CAsteroidField::populate_asteroids_internal (private per retail's
+        // mangled name). Pos = the fixed reference position populate_asteroids was called with; Candidate
         // = one grid-snapped cube-center position to evaluate; DistSqThreshold = the
         // caller-supplied squared-distance gate (populate_asteroids passes a different
         // fixed value per call site -- see its own comment).

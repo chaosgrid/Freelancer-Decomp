@@ -10,13 +10,9 @@
 
 struct ICamera;
 
-// alchemy.dll — DACOM particle FX scaffolding.
-// Shared constants, CRC/hash helpers, string helpers, FDUMP/debug helpers,
-// appearance-pool alloc/free, COM-pointer helpers, particle/math helpers,
-// mesh-pose helpers, byte-bag helpers, generic COM/VB call-thunk helpers and
-// the ALE node-lib parsing helpers used by more than one of the concrete
-// alchemy classes. Every shared global is declared extern here and defined
-// exactly once in alchemy_common.cpp.
+// alchemy.dll shared constants, globals and helpers (CRC/hash, strings, FDUMP, appearance
+// pools, COM pointers, particle/math, COM/VB call thunks, ALE node-library parsing) used by
+// more than one alchemy class. Globals are defined in alchemy_common.cpp.
 namespace AlchemyImpl
 {
     // ---- Constants ----------------------------------------------------
@@ -96,13 +92,8 @@ namespace AlchemyImpl
     extern const float kDefaultGravity;
     extern const float kDefaultAirApproach;
     extern const float kDefaultAirMagnitude;
-    // FUN_06235f50 SetKey literals 0x41200000/0x3e99999a/0x42480000
-    // (10.0/0.3/50.0), confirmed by direct disasm read wave 12
-    // (alchemy-wave12-lane2). Read order in FGenericFxObject::BeginField's
-    // FxRadialField branch matches the ctor's ramp-build order (Magnitude,
-    // Attenuation, Approach).
-    // ALC-4: FxRadialField's descriptor ramp defaults, named by the property table at
-    // .data 0x062569c8 (Magnitude 10.0, Approach 0.3, Radius 50.0).
+    // FxRadialField's descriptor ramp defaults (FUN_06235f50 SetKey literals), named by the
+    // property table at .data 0x062569c8: Magnitude 10.0, Approach 0.3, Radius 50.0.
     extern const float kDefaultRadialMagnitude;
     extern const float kDefaultRadialApproach;
     extern const float kDefaultRadialRadius;
@@ -110,9 +101,7 @@ namespace AlchemyImpl
     // TurbulenceField_Magnitude 10.0 (see alchemy_common.cpp).
     extern const float kDefaultTurbulenceApproach;
     extern const float kDefaultTurbulenceMagnitude;
-    // wave 14 (sonnet:alchemy-wave14-lane1): FUN_06219a30 (FxCollideField's
-    // real ctor) hardcodes 0.7f — the sole occurrence of that literal in the
-    // whole binary. Was previously an arbitrary 1.0f placeholder.
+    // FUN_06219a30 (FxCollideField's ctor) hardcodes the reflect 0.7f.
     extern const float kDefaultCollideReflect;
     extern const float kDefaultCollideWidth;
     extern const float kDefaultCollideHeight;
@@ -151,7 +140,7 @@ namespace AlchemyImpl
     // IFxRuntime Bind* raw stores (no AddRef): DAT_06257b98 (LAB_0623b670, the IAlchemy),
     // DAT_06257b94 (LAB_0623b680) and DAT_06257b90 (LAB_0623b690, the IFxEffectLibrary).
     // The particle appearance's child-effect spawn FUN_0622f6a0 / FUN_0622fcf0 reads
-    // b98 and b90 directly. Were FFxRuntime members until 2026-09-26.
+    // b98 and b90 directly.
     extern void* G_RuntimeAlchemy;
     extern void* G_RuntimeUnknown;
     extern void* G_RuntimeEffectLibrary;
@@ -206,25 +195,15 @@ namespace AlchemyImpl
     // Entry->Name is the instance-name key (Rec.B), not a DACOM class name.
     GENRESULT InstantiateFromNodeLibPrototype(IDAComponent* Prototype, IDAComponent** Out);
 
-    // Forward declaration only (defined in alchemy_genericfx.h): lets
-    // IntegratePool/ApplyFieldsToPool below take a pointer to the owning
-    // appearance instance without this header including
-    // alchemy_genericfx.h (which itself includes this header — a real
-    // include cycle). alchemy_common.cpp includes alchemy_genericfx.h
-    // directly in the .cpp (not here) to see the full type for member
-    // access; see IntegratePool/ApplyFieldsToPool's doc comments there.
+    // Defined in alchemy_genericfx.h, which includes this header.
     class FGenericFxObjectBase;
 
     // ---- Appearance-pool alloc/free --------------------------------------
     void UnlinkPoolNode(FPoolLink** Head, FPoolLink** Tail, FPoolLink* Node);
     void AppendPoolNode(FPoolLink** Head, FPoolLink** Tail, FPoolLink* Node);
-    // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): same shape as
-    // UnlinkPoolNode/AppendPoolNode above, but typed for FPooledParticle's
-    // OWN Next/Prev fields (alchemy_types.h) instead of FPoolLink's. Backs
-    // the per-owner-instance active-particle list (FGenericFxObjectBase::
-    // InstanceListHead_/InstanceListTail_, alchemy_genericfx.h) that
-    // IntegratePool/ApplyFieldsToPool now walk instead of Pool->UsedHead —
-    // see decomp-tracker item 132111 for the full retail trace this closes.
+    // As above, on FPooledParticle's own Next/Prev: the per-node particle list
+    // (FGenericFxObjectBase::InstanceListHead_/Tail_) that IntegratePool and
+    // ApplyFieldsToPool walk.
     void UnlinkParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node);
     void AppendParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node);
     void PrependParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node);
@@ -262,12 +241,7 @@ namespace AlchemyImpl
     void LerpVel3(float* Vel, const float* Target, float Alpha);
     void LerpVel3(float* Vel, double TargetX, float TargetY, float TargetZ, float Alpha);
     double AlchemyRand01(); // FUN_0623f1f0: the x87 product, unrounded
-    // wave23 (sonnet:alchemy-wave23-lane1, 2026-09-11): Owner is the
-    // appearance instance whose OWN active list (InstanceListHead_/
-    // InstanceListTail_) this walks — see the .cpp definition and
-    // decomp-tracker item 132111 for the full retail trace and the removal
-    // of wave21's now-superseded (and, if reinstated, actively unsafe —
-    // see Pad25's doc comment) ShouldRunPoolTick guard this replaces.
+    // Walks Owner's own particle list (InstanceListHead_/Tail_).
     void IntegratePool(FGenericFxObjectBase* Owner, FAppearancePool* Pool, const float& Dt);
 
     // ---- 3D-math / mesh-pose helpers ---------------------------------------
@@ -277,30 +251,19 @@ namespace AlchemyImpl
     bool GetDrawCameraPosition(float* Out);
     const float* GetDrawCameraTransform();
     const float* GetDrawCameraOrientation();
-    // wave48 (wave48-lane2, 2026-09-11): FUN_0622d2e0 (decomp-tracker item
-    // 133933) -- wraps I3DMathEngine::GeneralInverse (vtable+0x5c, see
-    // src/x86math/x86math.h) on a 12-float rest transform (this file's
-    // Xform12 layout). See the .cpp definition for the full retail trace and
-    // the three confirmed callers (Oriented/Perp/Rect's own per-appearance
-    // "local rest space" setup).
+    // ComputeGeneralInverseTransform is FUN_0622d2e0: I3DMathEngine::GeneralInverse
+    // (vtable+0x5c) on a 12-float transform; used by oriented/perp/rect.
     FVector* TransformOrientedBoundsCenter(const FTransform& Transform, FVector& Out,
                                            const FVector& Input);
     FVector* TransformPerpBoundsCenter(const FTransform& Transform, FVector& Out,
                                        const FVector& Input);
     FTransform* ComputeGeneralInverseTransform(const FTransform& Source,
                                               FTransform& Out, float& OutW);
-    // 2026-09-26: the node-transform cache (FUN_062400b0 / FUN_062400f0 / FUN_062401a0,
-    // node+0x4 flags, +0x1c raw, +0x4c composed, provider +0x80 -> Node_Transform) is
-    // now FGenericFxObjectBase itself (GetNodeTransform / SetNodeTransform /
-    // ComposeNodeTransform, alchemy_genericfx.h). The raw-offset helpers that stood in
-    // for it here (GetAppearanceXformSlot, SetAppearanceXformSlot,
-    // GetComposeMixinProvider, SetComposeMixinProvider, GetComposeAnimatedTransform,
-    // ComposeAppearanceWorldTransform) had no callers and are gone, as are the mesh-pose
-    // helpers (PoseOneMeshExtra2 / PoseMeshExtra2 / PoseAllMeshExtra2), replaced by
-    // FxMeshAppearance::ComposeNodeTransform (FUN_06225240). The old compose helper
-    // also had two defects: it multiplied by the unused first argument instead of the
-    // parent, and composed the animated tail as Mul(Local, world) where retail
-    // (0x062402dd) does Mul(world, Local).
+    // The node-transform cache (FUN_062400b0 / FUN_062400f0 / FUN_062401a0: node+0x4
+    // flags, +0x1c raw, +0x4c composed, provider +0x80 -> Node_Transform) lives in
+    // FGenericFxObjectBase (GetNodeTransform / SetNodeTransform / ComposeNodeTransform,
+    // alchemy_genericfx.h). Retail composes the animated tail as Mul(world, Local)
+    // (0x062402dd).
 
     void* AllocPoolItem(FAppearancePool* Pool);
     void FreePoolItem(FAppearancePool* Pool, void* Item);
@@ -309,8 +272,6 @@ namespace AlchemyImpl
     void FreeAllAppearancePools();
     unsigned long MaxULong(unsigned long Left, unsigned long Right);
     void ComputeDrawBufferHints();
-
-    // ---- Byte-bag helpers ---------------------------------------------------
 
     // ---- Generic COM/VB call-thunk helpers -----------------------------------
     GENRESULT CallIfaceQi(IDAComponent* Outer, const char* Iid, IDAComponent** Out);

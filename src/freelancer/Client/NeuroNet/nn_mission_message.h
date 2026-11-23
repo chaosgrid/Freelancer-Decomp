@@ -39,8 +39,7 @@ class RichTextWin;
 class NeuroNetMissionMessage : public WinControl
 {
 public:
-    // Inlined into FUN_0048b1c0 (0x0048b1f9..0x0048b21d): WinControl ctor, the vptrs,
-    // DAT_00671ff4 = this, +0x364 = 0, +0x368 = 0.
+    // Inlined into FUN_0048b1c0 (0x0048b1f9); sets DAT_00671ff4 = this.
     NeuroNetMissionMessage();
     // FUN_0048a440
     ~NeuroNetMissionMessage() override;
@@ -59,7 +58,7 @@ public:
     WinControl* CloseButton;        // +0x330 "MissionCloseButton"
     WinControl* Title;              // +0x334 "MissionMessageTitle"
     RichTextWin* Text;              // +0x338 "MissionMessageText"
-    int Field_0x33c;                // +0x33c -- TODO: never written or read by this class
+    int Field_0x33c;                // +0x33c -- never written or read by this class
     WinControl* DropCargoButton;    // +0x340 "DropCargoButton" (kind 4)
     WinControl* DropCargoText;      // +0x344 "DropCargoText"
     WinControl* CancelButton;       // +0x348 "DCCancelButton"

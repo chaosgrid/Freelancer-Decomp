@@ -67,7 +67,6 @@ static const unsigned long kBlendOne = 2;
 static const unsigned long kSubmitFlagIrDraw = 0x100;
 static const unsigned long kSubmitFlagSkipAlphaTest = 0x400;
 
-
 // DAT_06ed4848 dword[4]: NONE stays, CW↔CCW. Indexed by D3DRS_CULLMODE (0x16).
 static const unsigned long kCullFlip[4] = {0, 1, 3, 2};
 
@@ -104,8 +103,8 @@ enum EMaterialSubmit
     SubmitBtDetailTwo
 };
 
-// FShadingPropertyValue / FShadingPropertyRecord (FUN_06eb28f0, stride 0x4C) are public now:
-// render/shading.h (included above), because freelancer.exe's SwappedMaterial reads them.
+// FShadingPropertyValue / FShadingPropertyRecord (FUN_06eb28f0, stride 0x4C) live in
+// render/shading.h because freelancer.exe's SwappedMaterial reads them.
 
 inline bool IidEqual(const char* Left, const char* Right)
 {
@@ -349,7 +348,7 @@ inline void VbMgrUnlock(void* VbMgr, FVertexMemoryLock* Out)
     AsVbMgr(VbMgr)->UnlockVertexMemory(Out);
 }
 
-// IVertexBufferManager+0x20 FUN_06d114c5 → FUN_06d1f040. RET 0x18.
+// IVertexBufferManager+0x20 FUN_06d114c5 → FUN_06d1f040.
 inline void VbMgrCopy(IVertexBufferManager* VbMgr, void* Dest, unsigned long Fvf, const FRpVertexSrcDesc* Mesh,
                       unsigned long Start, unsigned long Count)
 {
@@ -500,8 +499,8 @@ inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, uns
     const int ReadOk =
         FileSystemRead(FileSystem, (unsigned long)Handle, Buffer, Size, &BytesRead);
     FileSystemClose(FileSystem, (unsigned long)Handle);
-    // FUN_06eb3450 treats a zero Read result as failure even if a provider
-    // happens to report the requested byte count; preserve that contract.
+    // FUN_06eb3450 treats a zero Read result as failure even when the requested
+    // byte count is reported.
     return ReadOk != 0 && BytesRead == Size;
 }
 
@@ -599,7 +598,7 @@ struct FTextureEntry
         Name[0] = '\0';
     }
 
-    // 06ec0ca4..0ceb: release the owned name, then child storage, then frames.
+    // 06ec0ca4: release the owned name, then child storage, then frames.
     ~FTextureEntry()
     {
         std::string().swap(FullName);

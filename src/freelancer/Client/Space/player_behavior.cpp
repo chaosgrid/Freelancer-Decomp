@@ -4,7 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// FUN_0054baf0 and the player behaviour command family at 0x004c7950 .. 0x004c7b8b.
+// FUN_0054baf0 and the player behaviour command family (FUN_004c7950 ..).
 
 #include "Space/player_behavior.h"
 
@@ -24,8 +24,7 @@
 
 namespace
 {
-    // 0x0051eac1 and every other camera in the file use the same eight: a BaseWatcher stores a
-    // Watchable*, which is the IObjRW plus eight.
+    // A BaseWatcher stores a Watchable*, which is the IObjRW plus eight.
     const int kWatchableOffset = 8;
 
     // .data:00673564. Retail keeps the clamped throttle here rather than on any object, and
@@ -43,45 +42,33 @@ namespace
     float G_MouseFlightOriginY = 0.0f;      // _DAT_0067355c -- cursor Y latched at timer==0 (same
                                              // invert-aware reading as every other cursor Y below)
 
-    // 0x004c7d90/0x004c7e5f/0x004c7f4c/0x004c88a9-equivalent: the hold threshold. 0.25s
-    // (DAT_00612270, .rdata 0x3E800000).
+    // DAT_00612270: the hold threshold.
     constexpr float kMouseFlightHoldThreshold = 0.25f;
 
-    // The repeated `cVar4 = FUN_0045a470(); if ((cVar4=='\0' && DAT_0067354c) ||
-    // DAT_00612270<=_DAT_00673550) && GetGameOption(INVERSE_MOUSE) then height-Y else Y` block --
-    // identical at all four sites in FUN_004c7cb0 (FUN_0045a470 is NnMainButtonHasActivePanel).
-    // Reading G_MouseFlightHoldTimer live (rather than taking it as a parameter) reproduces each
-    // call site's own point-in-time value automatically.
+    // The invert-aware cursor Y block repeated at all four sites in FUN_004c7cb0. Reading
+    // G_MouseFlightHoldTimer live reproduces each call site's own point-in-time value.
     int MouseFlightAdjustedCursorY(int RawCursorY)
     {
         bool const bLockOrHoldReady =
             (!NnMainButtonHasActivePanel() && G_MouseFlightLocked) ||
             (G_MouseFlightHoldTimer >= kMouseFlightHoldThreshold);
-        // 0x004c7ddb / 0x004c7e84 / 0x004c7f75: DAT_00610854 (the created surface height) minus
-        // DAT_00616844.
+        // The created surface height (DAT_00610854).
         if (bLockOrHoldReady && GetGameOption(kGameOptInverseMouse) != 0)
             return static_cast<int>(G_RenderSurfaceHeight) - RawCursorY;
         return RawCursorY;
     }
 
-    // The three lines every function in this family opens with. Retail spells them out at each
-    // site; there is no shared helper in the binary, but the sequence is byte-identical.
+    // The lines every function in this family opens with; retail spells them out at each site.
     IBehaviorManager* PlayerBehaviorManager()
     {
-        // 0x004c7950/0x004c7956: FUN_0054baf0's result goes straight into GetBehaviorManager,
-        // null included -- Common's own entry test (062d4ba6 `TEST EDI,EDI / JNZ`) is what turns
-        // a missing ship into a null manager.
+        // The result goes straight into GetBehaviorManager, null included -- Common's own entry
+        // test is what turns a missing ship into a null manager.
         return GetBehaviorManager(static_cast<IObjRW*>(GetPlayerObjRW()));
     }
 
-    // Shared preamble of FUN_004c7b90 / FUN_004c7be0: fetch the player's CEqObj directly (not
-    // through GetBehaviorManager's vtable-slot-84 path) and validate it is a ship.
-    //
-    // 0x004c7b99: `ADD EAX,0xc` then a null test -- the only way that is zero after a proven
-    // non-null pointer is EAX == -0xc, so -0xc is a distinguished "no object" sentinel some
-    // ObjRW accessors return.
-    // 0x004c7ba0: `MOV EAX,[EAX+0x4]` off the +0xc'd pointer reads [ObjRW+0x10], the CEqObj*.
-    // 0x004c7ba7: [CEqObj+0x4c] & 0x503 == 0x503 is the ship class check (CObject::ObjectClass).
+    // Shared preamble of FUN_004c7b90 / FUN_004c7be0: the player's CEqObj read directly (not
+    // through GetBehaviorManager), class-tested as a ship. Retail's null test after `+0xc` (the
+    // CBase this-adjustment) only fails for the pointer -0xc, kept as a sentinel.
     CEqObj* GetPlayerShipEqObj()
     {
         void* const ObjRW = GetPlayerObjRW();
@@ -100,9 +87,6 @@ namespace
     }
 
     // Shared tail of FUN_004c7b90 / FUN_004c7be0: the player's engine equipment, or null.
-    // 0x004c7bbd/0x004c7c0d: `LEA ECX,[EAX+0xe4]` is CEqObj::EquipManager taken by address (an
-    // embedded member, not a pointer), matching CShip::collect_force_components' own
-    // `EquipManager.FindFirst(0x20000)` elsewhere in Common.
     CEEngine* GetPlayerEngineEquip()
     {
         CEqObj* const Ship = GetPlayerShipEqObj();
@@ -116,8 +100,7 @@ namespace
 
 void* GetPlayerObjRW()
 {
-    // 0x0054baf0: read DAT_00679744, and when it is set subtract eight. A null watchable yields a
-    // null object rather than the address -8.
+    // FUN_0054baf0. A null watchable yields a null object rather than the address -8.
     void* const Watched = GetPlayerShipWatcher();
     if (Watched == nullptr)
         return nullptr;
@@ -127,7 +110,7 @@ void* GetPlayerObjRW()
 
 void ResetPlayerBehaviorDirection()
 {
-    // 0x004c7965: a tail JMP, so the manager's own return -- void -- is this function's.
+    // FUN_004c7950
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->reset_current_behavior_direction();
@@ -135,7 +118,7 @@ void ResetPlayerBehaviorDirection()
 
 void SetPlayerStrafeBurst(int Dir)
 {
-    // 0x004c7a4a.
+    // FUN_004c7a30
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_slide_strafe_burst(static_cast<StrafeDir>(Dir));
@@ -143,7 +126,7 @@ void SetPlayerStrafeBurst(int Dir)
 
 void SetPlayerAfterburner(bool bOn)
 {
-    // 0x004c798a.
+    // FUN_004c7970
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_afterburner(bOn);
@@ -151,7 +134,7 @@ void SetPlayerAfterburner(bool bOn)
 
 void SetPlayerAutoLevel(bool bOn)
 {
-    // 0x004c79ba.
+    // FUN_004c79a0
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_auto_level(bOn);
@@ -159,7 +142,7 @@ void SetPlayerAutoLevel(bool bOn)
 
 void SetPlayerAutoAvoidance(bool bOn)
 {
-    // 0x004c79ea.
+    // FUN_004c79d0
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_auto_avoidance(bOn);
@@ -167,7 +150,7 @@ void SetPlayerAutoAvoidance(bool bOn)
 
 void SetPlayerBrakeReverse(bool bOn)
 {
-    // 0x004c7a7a.
+    // FUN_004c7a60
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_brake_reverse(bOn);
@@ -175,7 +158,7 @@ void SetPlayerBrakeReverse(bool bOn)
 
 void SetPlayerCruise(bool bOn)
 {
-    // 0x004c7aaa.
+    // FUN_004c7a90
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_cruise(bOn);
@@ -183,7 +166,7 @@ void SetPlayerCruise(bool bOn)
 
 void SetPlayerEngageEngine(bool bOn)
 {
-    // 0x004c7ada.
+    // FUN_004c7ac0
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_engage_engine(bOn);
@@ -191,46 +174,35 @@ void SetPlayerEngageEngine(bool bOn)
 
 void SetPlayerThrottle(float Throttle)
 {
-    // 0x004c7afe: the argument is stored FIRST, unclamped, and only then overwritten if it is out
-    // of range. Nothing observes the intermediate value, but the order is retail's.
+    // FUN_004c7af0. The argument is stored first, unclamped, as retail orders it.
     G_PlayerThrottle = Throttle;
 
-    // 0x004c7af8: the low comparison is against a DOUBLE -1.0 at .rdata:005d5060, while the high
-    // one at 0x004c7b1a is against a FLOAT 1.0 at .rdata:005c75dc. Widening the float argument to
-    // compare it against the double is what the FPU does either way, so the asymmetry costs
-    // nothing -- it is just how the two constants were emitted.
+    // The low bound is a double -1.0 (.rdata:005d5060), the high a float 1.0 (.rdata:005c75dc).
     if (static_cast<double>(Throttle) < -1.0)
-        G_PlayerThrottle = -1.0f;               // 0x004c7b0a, 0xbf800000
+        G_PlayerThrottle = -1.0f;
     else if (Throttle > 1.0f)
-        G_PlayerThrottle = 1.0f;                // 0x004c7b27, 0x3f800000
+        G_PlayerThrottle = 1.0f;
 
-    // 0x004c7b58.
     IBehaviorManager* const Manager = PlayerBehaviorManager();
     if (Manager != nullptr)
         Manager->update_current_behavior_throttle(G_PlayerThrottle);
 
-    // 0x004c7b5e..0x004c7b6f: FCOMP 0.0f (DAT_005c7474), `TEST AH,0x44 / JP`. Equal leaves AH&0x44
-    // = 0x40 (odd parity, PF=0): no jump, fall through to the cruise drop. Greater / less (0) and
-    // unordered (0x44) have even parity and jump past it. A zero throttle cancels cruise.
+    // A zero throttle (ordered equal only) cancels cruise.
     if (G_PlayerThrottle == 0.0f)
     {
-        // 0x004c7b71: retail re-fetches the manager rather than reusing the one above.
+        // Retail re-fetches the manager rather than reusing the one above.
         IBehaviorManager* const Again = PlayerBehaviorManager();
         if (Again != nullptr)
-            Again->update_current_behavior_cruise(false);   // 0x004c7b80, PUSH 0
+            Again->update_current_behavior_cruise(false);
     }
 }
 
 float GetLastPlayerThrottle()
 {
-    // FUN_004c7a00 (cdecl, float on the FPU). 0x004c7a00..0x004c7a0f: no player object ->
-    // .rdata:005c7474 (0.0f).
+    // FUN_004c7a00. get_throttle's result is discarded.
     if (GetPlayerObjRW() == nullptr)
         return 0.0f;
 
-    // 0x004c7a10..0x004c7a27: FUN_0054baf0 again, then vt+0x4c = IObjInspect::get_throttle
-    // (IObjRW's first base) into DAT_00673564, and that global is what comes back. The int
-    // result is discarded.
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     Player->get_throttle(G_PlayerThrottle);
     return G_PlayerThrottle;
@@ -238,9 +210,7 @@ float GetLastPlayerThrottle()
 
 void SetPlayerBehaviorDirectionGated(float X, float Y, float Z)
 {
-    // 0x004c78d0..0x004c790c: X and Y both compare equal to zero (TEST AH,0x44: NaN is not
-    // zero), OR -- read only when they do not -- the HUD_Status bytes DAT_00674aa0+0x5b9 (turret
-    // view) and +0x5ba (rear view) are both clear. HUD_Status is read without a null test.
+    // FUN_004c78d0. NaN is not zero; HUD_Status is read without a null test.
     bool const bDirIsZero = (X == 0.0f) && (Y == 0.0f);
     if (bDirIsZero || (!HudStatusIsTurretView() && !HudStatusIsRearView()))
     {
@@ -274,7 +244,7 @@ bool GetPlayerEngineIsActive()
 
 bool IsMouseFlightUnlocked()
 {
-    // 0x004c7270: `if (FUN_0045a470()) return true; return DAT_0067354c == 0;`
+    // FUN_004c7270
     if (NnMainButtonHasActivePanel())
         return true;
     return !G_MouseFlightLocked;
@@ -282,7 +252,7 @@ bool IsMouseFlightUnlocked()
 
 bool IsMouseFlightLocked()
 {
-    // 0x004c7c80: `if (FUN_0045a470()) return false; return DAT_0067354c != 0;`
+    // FUN_004c7c80
     if (NnMainButtonHasActivePanel())
         return false;
     return G_MouseFlightLocked;
@@ -290,54 +260,46 @@ bool IsMouseFlightLocked()
 
 void ToggleMouseFlightLock()
 {
-    // 0x004c7c40.
+    // FUN_004c7c40
     G_MouseFlightLocked = !G_MouseFlightLocked;
-    PlayOrRewindUiSoundSlot(0x1c); // 004c7c52: FUN_005645c0(0x1c)
+    PlayOrRewindUiSoundSlot(0x1c); // FUN_005645c0
 }
 
 void OnMouseFlightRawMessage(unsigned Msg)
 {
-    // 0x004c80f0: `if (param_1 == 0x201) DAT_00673555 = 1;` -- WM_LBUTTONDOWN only.
+    // FUN_004c80f0: WM_LBUTTONDOWN only.
     if (Msg == 0x201u)
         G_MouseFlightButtonTrigger = true;
 }
 
 void UpdateMouseFlightDirection()
 {
-    // 0x004c7cc5..0x004c7d0a: the ship's behavior interface, when the player is in a ship in the
-    // required object-class state (GetPlayerShipEqObj already reproduces retail's -0xc-sentinel
-    // and 0x503 class-mask checks byte for byte).
+    // FUN_004c7cb0
     CEqObj* const ShipEqObj = GetPlayerShipEqObj();
     IBehaviorManager* const ShipBehavior =
         (ShipEqObj != nullptr) ? ShipEqObj->get_behavior_interface() : nullptr;
 
-    // 0x004c7d1c: `pIVar9[0x168] == 0`. IBehaviorManager has no name for this byte yet (see
-    // common_iface.h's Opaque168 field); read it raw the same way retail's own byte-sized
-    // "IBehaviorManager*" indexing does.
+    // The behavior manager's +0x168 byte.
     bool bSuppressMouseFlight = false;
     if (ShipBehavior != nullptr)
     {
         bSuppressMouseFlight = (ShipBehavior->bAllowUserSteering == 0);
     }
 
-    // 0x004c7d33/0x004c7d47: the cinematic letterbox, or riding a tradelane, forces the reset path
-    // below regardless of the byte above.
+    // The cinematic letterbox, or riding a tradelane, forces the reset path below regardless of
+    // the byte above.
     if (IsLetterboxVisible() ||
         (ShipEqObj != nullptr && static_cast<CShip*>(ShipEqObj)->is_using_tradelane()))
     {
         bSuppressMouseFlight = true;
     }
 
-    // 0x004c7d5a: `((DAT_00616850 & 1) != 1) && (DAT_0067354c == 0)`. DAT_00616850 is the mouse
-    // button bitmask FUN_0041fa10 / FUN_0041fd90 keep (input_manager.cpp); bit 0 is the left
-    // button.
+    // DAT_00616850 bit 0 is the left button (input_manager.cpp).
     bool const bMouseButtonHeld = (GetClientMouseButtons() & 1u) == 1u;
 
     if ((!bMouseButtonHeld && !G_MouseFlightLocked) || bSuppressMouseFlight)
     {
-        // 0x004c7fdd..0x004c807e: reset -- timer 0; when engaged, both latches cleared and the
-        // direction zeroed. The tail's call at 0x004c8079 (ship behavior +0xc0 == 0x12) goes to
-        // 0x0053e4a0, a bare RET 4 on the HUD_Maneuvers singleton: it has no effect (header).
+        // Reset. Retail's no-op tail call is described in the header.
         G_MouseFlightHoldTimer = 0.0f;
         if (G_MouseFlightEngaged)
         {
@@ -357,12 +319,10 @@ void UpdateMouseFlightDirection()
         return;
     }
 
-    // 0x004c7e35: `DAT_00673555 || DAT_0067354c`.
     if (!(G_MouseFlightButtonTrigger || G_MouseFlightLocked))
         return;
 
-    // 0x004c7d59..0x004c7d7b: not engaged yet and FUN_0059daa0 (the Win3D object under the mouse,
-    // DAT_0067dcd8) non-null -- the timer goes back to zero and nothing else happens.
+    // Not engaged yet and something under the mouse: the timer goes back to zero.
     if (!G_MouseFlightEngaged && Win3DGetHover() != nullptr)
     {
         G_MouseFlightHoldTimer = 0.0f;
@@ -374,30 +334,26 @@ void UpdateMouseFlightDirection()
     int CursorZ = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, &CursorZ);
 
-    // 0x004c7d83..0x004c7df7: FCOMP 0.0 / TEST AH,0x44 / JP -- only an ordered-equal zero timer
-    // latches the origin (DAT_00616840 FILD, and the invert-aware y).
+    // Only an ordered-equal zero timer latches the origin.
     if (G_MouseFlightHoldTimer == 0.0f)
     {
         G_MouseFlightOriginX = static_cast<float>(CursorX);
         G_MouseFlightOriginY = static_cast<float>(MouseFlightAdjustedCursorY(CursorY));
     }
 
-    // 0x004c7dfd..0x004c7e19: FUN_0042d680 (double on the FPU) + the float timer; FST float
-    // stores the sum, FCOMP compares the unrounded sum against DAT_00612270 (TEST AH,1 / JNZ:
-    // less or unordered goes to the cancel-radius test at 0x004c7f2c).
+    // The sum is stored as float; the unrounded sum is compared (less or unordered goes to the
+    // cancel-radius test).
     double const HoldSum =
         GetClientFrameTimeCapped() + static_cast<double>(G_MouseFlightHoldTimer);
     G_MouseFlightHoldTimer = static_cast<float>(HoldSum);
 
     if (HoldSum >= static_cast<double>(kMouseFlightHoldThreshold))
     {
-        // 0x004c7e1f..0x004c7e39: x from the centre of the created surface (DAT_00610850 * 0.5
-        // kept on the FPU), divided by the same half width, stored as float.
+        // The half width stays on the FPU.
         double const HalfW = static_cast<double>(static_cast<int>(G_RenderSurfaceWidth)) * 0.5;
         float const NormX =
             static_cast<float>((static_cast<double>(CursorX) - HalfW) / HalfW);
-        // 0x004c7e3b..0x004c7ea7: the half height is stored as a float first; the invert-aware
-        // y minus it, over it.
+        // The half height is stored as a float first.
         float const HalfH =
             static_cast<float>(static_cast<double>(static_cast<int>(G_RenderSurfaceHeight)) * 0.5);
         int const AdjustedY = MouseFlightAdjustedCursorY(CursorY);
@@ -405,20 +361,15 @@ void UpdateMouseFlightDirection()
             (static_cast<double>(AdjustedY) - static_cast<double>(HalfH)) /
             static_cast<double>(HalfH));
 
-        // 0x004c7eab..0x004c7f18: both zero (TEST AH,0x44 / JP|JNP: ordered-equal), or the
-        // HUD_Status turret / rear view bytes clear -> the behavior manager's direction
-        // {x, y, 0}. That is FUN_004c78d0's body, inlined here byte for byte.
+        // FUN_004c78d0's body, inlined in retail.
         SetPlayerBehaviorDirectionGated(NormX, NormY, 0.0f);
 
-        // 0x004c7f20: DAT_00673554 = 1.
         G_MouseFlightEngaged = true;
         return;
     }
 
-    // 0x004c7f2c..0x004c7fdc: below the threshold. dx is stored as a float, dy stays on the FPU;
-    // the radius is 800 / DAT_00610850 * 50 (DAT_005d6e20, DAT_005d440c). FCOMPP r*r against
-    // dx*dx + dy*dy, TEST AH,5 / JP: only an ordered r*r < sum forces the timer to the
-    // threshold (DAT_00612270).
+    // Below the threshold. dx is stored as a float, dy stays on the FPU; the constants are
+    // DAT_005d6e20 / DAT_005d440c. Only an ordered r*r < sum forces the timer to the threshold.
     float const DeltaX =
         static_cast<float>(static_cast<double>(CursorX) - static_cast<double>(G_MouseFlightOriginX));
     int const AdjustedY2 = MouseFlightAdjustedCursorY(CursorY);
@@ -434,7 +385,7 @@ void UpdateMouseFlightDirection()
 
 void ResetMouseFlightState()
 {
-    // 0x004c75c5 .. 0x004c75ee (inside FUN_004c73d0), in retail's store order.
+    // Inside FUN_004c73d0, in retail's store order.
     G_MouseFlightLocked = false;
     G_MouseFlightHoldTimer = 0.0f;
     G_MouseFlightEngaged = false;
@@ -445,8 +396,7 @@ void ResetMouseFlightState()
 
 bool IsMouseFlightHoldThresholdReached()
 {
-    // 0x004c7c60: DAT_00612270 (0.25f) <= _DAT_00673550, i.e. the hold timer UpdateMouseFlightDirection
-    // maintains has reached the engage threshold.
+    // FUN_004c7c60
     return G_MouseFlightHoldTimer >= kMouseFlightHoldThreshold;
 }
 
@@ -458,12 +408,12 @@ namespace
 
 void SetUnknownFloat673568(float Value)
 {
-    // 0x004c83a0.
+    // FUN_004c83a0
     G_UnknownFloat673568 = Value;
 }
 
 void SetUnknownFloat67356c(float Value)
 {
-    // 0x004c83b0.
+    // FUN_004c83b0
     G_UnknownFloat67356c = Value;
 }

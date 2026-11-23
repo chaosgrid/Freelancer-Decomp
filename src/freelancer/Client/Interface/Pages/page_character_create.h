@@ -11,27 +11,21 @@
 // page (PAGE_CharacterCreate.page: SelectShip, Back, Title, DataFrame, CharacterName,
 // BaseCostume, StartingDesc, NameLabel). One static instance, DAT_0067a890 (static init
 // LAB_00573580 -> ctor FUN_0055fea0(&DAT_0067bcf8), atexit LAB_005735a0 -> dtor FUN_005600c0).
-// vftables: main 0x005e1a4c (0 FUN_005600a0 scalar deleting dtor, 9 FUN_00560310 Create,
-// 10 FUN_005602f0 Destroy, 11 LAB_00561790 Update, 13 FUN_00566500 Draw, 19 LAB_00561730
-// MouseEvent, 23 LAB_00561630 ProcessMessage), IUIPage face (+0x7c) 0x005e1a34 (slot 0 LAB_00561bd0 =
-// the scalar deleting dtor through `this - 0x7c`), Event::Handler face (+0x80) 0x005e1a2c
-// (slot 0 LAB_00561700).
+// vftables: main 0x005e1a4c (slot 0 FUN_005600a0 scalar deleting dtor), IUIPage face (+0x7c)
+// 0x005e1a34, Event::Handler face (+0x80) 0x005e1a2c.
 //
-// Call path: IntroFocus EnterState case 14 (0x005752a0) releases the active page, loads the
-// descriptor through FUN_005602b0 (which calls slot 9 Create(0, 0)) and makes this the active
-// page, or moves to state 9 when the file does not load. IntroFocus::Update poll index 6
-// (0x0057415d) moves to the state FUN_005602a0 reports once FUN_005602e0 says there is one.
-// IntroFocus Exit (0x00573e6d) calls slot 10.
+// IntroFocus EnterState case 14 releases the active page and loads this one through Load, or
+// moves to state 9 when the file does not load. IntroFocus::Update moves to GetResult() once
+// HasResult(); IntroFocus Exit calls Destroy.
 //
 // The page shows the pick PageCharacterSelect wrote into DAT_0067bcf8 (G_CharacterCreateSelection):
 // the home base, the package's money, ship and description, and the pilot's body on a
 // UIWinDeform posed with its body.anim scripts. The typed name goes into the pick's Name and
 // CLoginMgr::CreateNewCharacter (FUN_005aa750) sends it.
 //
-// Retail layout past MasterWin (+0x00..+0x8b) is listed member by member below. The port's
-// MasterWin has no retail byte layout (see page_options.h), so the members keep only the order.
-// +0xe8..+0xf3 are neither read nor written by CharCreate.cpp and have no absolute reference
-// (DAT_0067a978..DAT_0067a983); the port does not hold them.
+// Member offsets are retail's (MasterWin is +0x00..+0x8b). The port's MasterWin has no retail
+// byte layout (see page_options.h), so the members keep only the order. +0xe8..+0xf3 are never
+// accessed and are not held.
 
 #include "common_text.h" // RenderDisplayList
 #include "Interface/ui_page.h"
@@ -68,12 +62,12 @@ public:
     // Event::Handler face (+0x80) slot 0 LAB_00561700 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
-    // FUN_005602a0 -- MOV EAX,[ECX+0xb4].
+    // FUN_005602a0.
     int GetResult() const;
-    // FUN_005602b0 (RET 4) -- the descriptor loaded from FullPath (FUN_00592230 on +0x8c); on
-    // success slot 9 Create(0, 0), whose result is not tested, and true.
+    // FUN_005602b0 (RET 4) -- the descriptor loaded from FullPath; on success Create(0, 0),
+    // whose result is not tested, and true.
     bool Load(char const* FullPath);
-    // FUN_005602e0 -- SETNZ on +0xb4.
+    // FUN_005602e0.
     bool HasResult() const;
 
     FUiPageDesc Desc;                    // +0x8c
@@ -94,9 +88,7 @@ public:
     UiRichTextWin* StartingDesc;         // +0x114 -- "StartingDesc"
     UiRichTextWin* Title;                // +0x118 -- "Title"
     UiRichTextWin* NameLabel;            // +0x11c -- "NameLabel"
-    // +0x120 -- constructed (0x0055ff5d) and destroyed (0x0056016c) only: no other access to
-    // DAT_0067a9b0 or to +0x120 of the page anywhere in the exe (checked 2026-09-30, W4-N3; the
-    // page is reached only through DAT_0067a890 and its own methods).
+    // +0x120 -- constructed and destroyed only; nothing in the exe reads or writes it.
     RenderDisplayList Unused120;
     RenderDisplayList NameLabelText;     // +0x12c -- IDS 0x6006c
     RenderDisplayList BaseLabelText;     // +0x138 -- IDS 0x6006b
@@ -115,8 +107,8 @@ private:
     void Confirm();
     // FUN_00561b20 -- start the leave slide.
     void BeginLeave();
-    // The name read-back ProcessMessage and Confirm spell inline (0x00561649..0x005616ad,
-    // 0x00561563..0x005615c4): GetText into the pick's Name (0x18 chars), and the easter egg.
+    // The name read-back retail inlines in ProcessMessage and Confirm: GetText into the pick's
+    // Name (0x18 chars), and the easter egg.
     void ReadNameIntoSelection();
 
     PageCharacterCreate(PageCharacterCreate const&) = delete;

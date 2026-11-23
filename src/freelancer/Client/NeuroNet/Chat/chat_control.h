@@ -7,18 +7,13 @@
 #pragma once
 
 // ChatControl -- the NeuroNet chat panel (RTTI .?AVChatControl@@ : WinControl). Retail
-// `NN_Chat.cpp`. NN_MainButton opens it by class name for panel 0x68 (0x0045cfda /
-// 0x0045d37b -> WinFactoryCreate(Name, Name, ...)).
+// `NN_Chat.cpp`. NN_MainButton opens it by class name for panel 0x68.
 //
 // Retail:
-//   WINFACTORY<ChatControl> DAT_0066d450, static init LAB_00464d90 (registrar FUN_0046c4e0,
-//   atexit LAB_00464db0); create FUN_0046c550: operator_new(0x3d0), ctor FUN_00464dc0.
-//   vftable 0x005cfac4 (WinControl's except):
-//      0 FUN_00464f20 (scalar deleting around the dtor FUN_00464f40)
-//      9 LAB_004670c0 Create          10 FUN_00467030 Destroy
-//     11 FUN_00468260 Update          12 LAB_004682f0 UpdateInactive (Win3D's, shared)
-//     23 LAB_00467f10 ProcessMessage          42 LAB_00468220 SetProperty
-//   The IDataViewOwner face at +0x7c keeps WinControl's entries.
+//   WINFACTORY<ChatControl> DAT_0066d450, static init LAB_00464d90; create FUN_0046c550:
+//   operator_new(0x3d0).
+//   vftable 0x005cfac4; scalar deleting dtor FUN_00464f20; slot 12 UpdateInactive is Win3D's
+//   shared LAB_004682f0. The IDataViewOwner face at +0x7c keeps WinControl's entries.
 //
 // Layout past WinControl (0x32c):
 //   +0x32c dword, ctor 0, no other access      +0x330 table generation last shown
@@ -54,8 +49,7 @@ class ChatControl : public WinControl
 public:
     // Retail ChatControl::RowData (RTTI .?AVRowData@ChatControl@@ : UIFastTable::RefCounter),
     // vftable 0x005cfc98 = {FUN_0056ae70} (scalar deleting around the RefCounter dtor
-    // FUN_00467ee0). Construction is inlined in Create (0x00467907..0x00467924): RefCount 1,
-    // +0x8 zeroed, then +0x8 = DAT_0066da40 (G_ChatIdChannel1). 0xc bytes.
+    // FUN_00467ee0). Construction is inlined in Create. 0xc bytes.
     class RowData : public UiFastTableRefCounter
     {
     public:

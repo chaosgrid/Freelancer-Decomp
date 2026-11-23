@@ -20,19 +20,14 @@
 // ---------------------------------------------------------------------------
 // IClient slot 66 (+0x108), ch2 op 0x29 FLPACKET_SERVER_SETREPUTATION.
 //
-// Server.dll's IServerImpl::CharacterSelect builds it at S+0x44 of its frame
-// (.text:06d45487 .. .text:06d45518): the two FmtStr default constructors
-// (FUN_06d55bc0) at +0x18 / +0x30, +0x10 = 0, byte +0x14 = 0, word +0x48 = 0,
-// +0x00 = the slot's rep vibe (.text:06d454af), +0x10 = operator new(
-// Reputation::group_count() * 8) (.text:06d454d2), then
-// Reputation::Vibe::Get(+0x00, +0x08, +0x0c, +0x14, +0x10, +0x18, +0x30, &name)
-// (.text:06d454ee) and wcscpy(+0x48, name) (.text:06d45512). Common's
-// ?Get@Vibe@Reputation@@YAHABHAAI1AAEQAURelation@2@AAUFmtStr@@4AAPBG@Z names the
-// Relation element type of +0x10.
+// Server.dll's IServerImpl::CharacterSelect builds it on its stack: zeroes, +0x00 = the
+// slot's rep vibe, +0x10 = operator new(Reputation::group_count() * 8), then
+// Reputation::Vibe::Get(+0x00, +0x08, +0x0c, +0x14, +0x10, +0x18, +0x30, &name) and
+// wcscpy(+0x48, name).
 //
-// rpclocal's sender (0x06d88d70) serializes +0x00, +0x04 and +0x08; +0x0c is
-// filled by Get and read by nothing. CharacterSelect never writes +0x04 (retail
-// ships whatever its stack held there).
+// rpclocal's sender (0x06d88d70) serializes +0x00, +0x04 and +0x08; +0x0c is filled by Get
+// and read by nothing. Retail quirk: CharacterSelect never writes +0x04, so it ships
+// whatever its stack held there.
 // ---------------------------------------------------------------------------
 struct FServerSetReputationInfo {
     int VibeHandle;                         // +0x00
@@ -52,11 +47,9 @@ static_assert(sizeof(FServerSetReputationInfo) == 0x78,
 // ---------------------------------------------------------------------------
 // IClient slot 14 (+0x38), ch2 op 0x08 FLPACKET_SERVER_CHARSELECTVERIFIED.
 //
-// IServerImpl::CharacterSelect builds it at S'+0x38 (.text:06d455ab ..
-// .text:06d455c8): +0x00 = the SETREPUTATION struct's vibe handle, +0x08 = the
-// server clock (FUN_06d447b0: DAT_06d8fb28 + DAT_06d8fb20). +0x04 is never
-// written. rpclocal's sender reads dwords 0, 2 and 3 (rpc_payload_ch2.cpp,
-// MarshalCharSelectVerified).
+// IServerImpl::CharacterSelect builds it: +0x00 = the SETREPUTATION struct's vibe handle,
+// +0x08 = the server clock (FUN_06d447b0). +0x04 is never written. rpclocal's sender reads
+// dwords 0, 2 and 3 (rpc_payload_ch2.cpp, MarshalCharSelectVerified).
 // ---------------------------------------------------------------------------
 struct FServerCharSelectVerifiedInfo {
     int VibeHandle;                         // +0x00
@@ -69,19 +62,10 @@ static_assert(sizeof(FServerCharSelectVerifiedInfo) == 0x10,
 // ---------------------------------------------------------------------------
 // IClient slot 56 (+0x0e0), ch2 op 0x0a FLPACKET_SERVER_ACTIVATEOBJECT.
 //
-// The 0x0c-byte argument IS the wire payload: rpclocal's sender (0x06d89770)
-// copies the three fields straight into packet+0x20 and its receiver (caseD_a,
-// 0x06d823ab) rebuilds the same three into its statics. Moved here from
-// src/rpclocal/rpc_payloads.h (2026-09-24, claude:srv-sys) because Server.dll
-// builds it too -- StarSystem::add_player's multiplayer solar walk, once per
-// set entry of CObject::get_activate_state (vtable +0xb8):
-//   .text:06d081a1  MOV [ESP + 0x7c],EDX        ; +0x00 = CObject::Id (+0xb0)
-//   .text:06d081b1  MOV byte [ESP + 0x84],0x1   ; +0x04 = 1   (one PUSH deep)
-//   .text:06d081b9  MOV [ESP + 0x88],ESI        ; +0x08 = the entry's index
-//   .text:06d081aa  MOV EDX,[ESP + 0x1f4]       ; the session id, BY VALUE
-//   .text:06d081c3  CALL [EAX + 0xe0]           ; SendServerActivateObject(session, &rec)
-// so +0x04 is "activated" and +0x08 is the index into the object's activation
-// state vector.
+// The 0x0c-byte argument is the wire payload: rpclocal's sender (0x06d89770) copies the
+// three fields into packet+0x20 and its receiver (caseD_a) rebuilds them. Server.dll's
+// StarSystem::add_player builds one per set entry of CObject::get_activate_state (vtable
+// +0xb8) in its multiplayer solar walk: {CObject::Id, 1, entry index}.
 // ---------------------------------------------------------------------------
 struct FPayloadServerActivateObject {
     unsigned int ObjectId;      // +0x00
@@ -93,20 +77,13 @@ static_assert(sizeof(FPayloadServerActivateObject) == 0x0c, "ACTIVATEOBJECT payl
 
 // ---------------------------------------------------------------------------
 // IClient slot 58 (+0x0e8), ch2 op 0x22 FLPACKET_SERVER_SYSTEM_SWITCH_IN. Registry
-// size 0x44, payload 0x24. Sender 0x06d8a8b0: two dwords straight through, then the
-// three-dword copier FUN_06d8f510 into packet+0x28 and the four-dword copier
-// FUN_06d8f4f0 into packet+0x34, in the SAME order as this struct. Receiver
-// caseD_22 at 0x06d822c6 spills all nine dwords into the file-static block at
-// .data:0x06dbb91c and passes ITS address.
+// size 0x44, payload 0x24. Sender 0x06d8a8b0 writes the fields in struct order; receiver
+// caseD_22 spills all nine dwords into the file-static block at .data:0x06dbb91c and
+// passes its address.
 //
-// Its only builder is Server.dll FUN_06d0cc00 (StarSystem::arrive_ship):
-//   .text:06d0ccb2 .. 06d0ccbf  +0x00 = Obj->get_id()      (IObjInspect vt +0x20)
-//   .text:06d0ccd0              +0x04 = the jump object's get_type_bits() (vt +0x154),
-//                                       0 when there is none
-//   .text:06d0ccb9 .. 06d0ccd8  +0x08 = *Pos (three dwords)
-//   .text:06d0cce8 .. 06d0cd17  +0x14 = MatrixToQuaternion(*Orient), I3DMathEngine
-//                                       vt +0x50, the four floats as written
-// The field names stay offset names because rpclocal's codec reads them so.
+// Its only builder is Server.dll FUN_06d0cc00 (StarSystem::arrive_ship): the ship's id,
+// the jump object's get_type_bits() (0 when there is none), *Pos, and
+// MatrixToQuaternion(*Orient).
 // ---------------------------------------------------------------------------
 struct FPayloadServerSystemSwitchIn {
     unsigned int ShipId;     // +0x00  object id              -> .data:0x06dbb91c
@@ -118,15 +95,9 @@ static_assert(sizeof(FPayloadServerSystemSwitchIn) == 0x24, "SYSTEM_SWITCH_IN pa
 
 // ---------------------------------------------------------------------------
 // IClient slot 64 (+0x100), ch2 op 0x38 FLPACKET_SERVER_ITEMTRACTORED. Registry
-// size 0x2c, payload 0x0c. Sender 0x06d88c60 (dword, dword, word, word straight
-// through), receiver caseD_38 at 0x06d81e3d (a straight copy).
-// Server.dll's only builder is StarSystem::tractor_loot (FUN_06d0ed40,
-// .text:06d0ee85 .. 06d0eecd) at S+0x24 of its frame:
-//   +0x00  the tractored loot's get_id()           (.text:06d0eeaa / 06d0eead)
-//   +0x04  the tractoring ship's get_id()          (.text:06d0eeb5 / 06d0eec1)
-//   +0x08  the tractor's equipment id (word)       (.text:06d0eebc / 06d0eec8)
-//   +0x0a  the units taken, low word               (.text:06d0eecd)
-// The field names stay offset names because rpclocal's codec reads them so.
+// size 0x2c, payload 0x0c. Sender 0x06d88c60 and receiver caseD_38 copy it straight.
+// Server.dll's only builder is StarSystem::tractor_loot (FUN_06d0ed40); UnitsTaken is the
+// low word of the count.
 // ---------------------------------------------------------------------------
 struct FPayloadServerItemTractored {
     unsigned int LootId;     // +0x00  loot object id
@@ -138,13 +109,8 @@ static_assert(sizeof(FPayloadServerItemTractored) == 0x0c, "ITEMTRACTORED payloa
 
 // ---------------------------------------------------------------------------
 // IClient slot 65 (+0x104), ch2 op 0x51 FLPACKET_SERVER_USE_ITEM. Registry size
-// 0x28, payload 0x08. Sender 0x06d88cc0, receiver caseD_51 at 0x06d81e77 (a
-// straight copy). Server.dll's only builder is StarSystem::use_item
-// (FUN_06d0efe0, .text:06d0f05c .. 06d0f073) at S+0x14 of its frame:
-//   +0x00  the object's get_id()                   (.text:06d0f060 / 06d0f067)
-//   +0x04  the equipment id (word)                 (.text:06d0f06e)
-//   +0x06  the count (low word)                    (.text:06d0f073)
-// The field names stay offset names because rpclocal's codec reads them so.
+// 0x28, payload 0x08. Sender 0x06d88cc0 and receiver caseD_51 copy it straight. Server.dll's
+// only builder is StarSystem::use_item (FUN_06d0efe0); Count is the low word.
 // ---------------------------------------------------------------------------
 struct FPayloadServerUseItem {
     unsigned int ObjectId;     // +0x00  object id
@@ -156,16 +122,10 @@ static_assert(sizeof(FPayloadServerUseItem) == 0x08, "USE_ITEM payload 0x08");
 // ---------------------------------------------------------------------------
 // IClient slot 60 (+0x0f0), ch2 op 0x07 FLPACKET_SERVER_LAUNCH -- the argument
 // struct (0x28). rpclocal's sender (0x06d8a080) reorders it into
-// FPayloadServerLaunch (rpc_payloads.h) and the receiver (caseD_7, 0x06d81951)
-// puts every dword back. Moved here from rpclocal's private header because
-// Server.dll builds it: IServerImpl::PlayerLaunch at S+0x48 of its frame
-// (.text:06cefd1e .. 06cefdd0), then IClient +0xf0 (sid, &it) at .text:06cefdd7:
-//   +0x00  the launching ship's id (PlayerLaunch's first argument) (.text:06cefd47)
-//   +0x04  the object launched from, Server_GetLaunchPosition's *OutObjId (.text:06cefd7f)
-//   +0x08  its launch_pos index, *OutKind, -1 without one        (.text:06cefd9c)
-//   +0x0c  the request's orientation quaternion as is            (.text:06cefd91 ..)
-//   +0x1c  the launch position minus the rotated HpMount offset  (.text:06cefd68 ..)
-// The field names stay offset names because rpclocal's codec reads them so.
+// FPayloadServerLaunch (rpc_payloads.h) and the receiver (caseD_7) puts every dword back.
+// Server.dll's IServerImpl::PlayerLaunch builds it: the ship id, the object launched from
+// and its launch_pos index (Server_GetLaunchPosition's outputs, -1 without one), the
+// request's orientation as is, and the launch position minus the rotated HpMount offset.
 // ---------------------------------------------------------------------------
 struct FServerLaunchInfo {
     unsigned int ShipId;        // +0x00  ship id
@@ -179,17 +139,10 @@ static_assert(sizeof(FServerLaunchInfo) == 0x28, "LAUNCH arg struct 0x28");
 // ---------------------------------------------------------------------------
 // IClient slot 54 (+0x0d8), ch1 op 0x01 FLPACKET_COMMON_UPDATEOBJECT. The argument
 // struct (0x2c); the wire payload FPayloadCommonUpdateObject (rpclocal) holds the
-// same fields in another order. Server.dll's only builder is StarSystem::
-// sp_obj_update (FUN_06d0bbc0, .text:06d0bc27 .. 06d0bc70) at S+0xc of its frame,
-// copied from the player's SSPObjUpdateInfo:
-//   +0x00  ObjectId                      <- info +0x00
-//   +0x04  Orientation                   <- info +0x04
-//   +0x14  Position                      <- info +0x14
-//   +0x20  the timestamp as a float      <- info +0x20 (FLD double / FSTP float)
-//   +0x24  a raw dword copy              <- info +0x28 (the wire and the client
-//                                           read it as a float)
-//   +0x28  a byte                        <- info +0x2c
-// The field names stay offset names because rpclocal's codec reads them so.
+// same fields in another order. Server.dll's only builder is StarSystem::sp_obj_update
+// (FUN_06d0bbc0), copying the player's SSPObjUpdateInfo: +0x20 is its double timestamp
+// narrowed to float, +0x24 a raw dword copy of info +0x28 (the wire and the client read
+// it as a float), +0x28 the byte at info +0x2c.
 // ---------------------------------------------------------------------------
 struct FCommonUpdateObjectInfo {
     unsigned int ObjectId;       // +0x00
@@ -206,12 +159,10 @@ static_assert(sizeof(FCommonUpdateObjectInfo) == 0x2c, "UPDATEOBJECT arg struct 
 // IClient slot 100 (+0x190), ch2 op 0x4e FLPACKET_SERVER_SETDIRECTIVE. Registry size
 // 0xb4, payload 0x94.
 //
-// The argument IS the wire payload: rpclocal's sender (0x06d8a480, RET 8) writes the same
-// offsets one by one and its receiver (caseD_4e, 0x06d81c3b) is `MOV ECX,0x25 ; REP MOVSD`
-// from packet+0x20. Moved here from src/rpclocal/rpc_payloads.h (2026-09-24,
-// claude:srv-ai) because Server.dll builds it: pub::AI::SubmitDirective
-// (.text:06d5cbb0), when the target ship belongs to a player, fills one at S+0x24 of its
-// frame and calls SendServerSetDirective(&OwnerPlayer, &Info) (.text:06d5d218 / .text:06d5d425).
+// The argument is the wire payload: rpclocal's sender (0x06d8a480) writes the same offsets
+// and its receiver (caseD_4e) copies 0x25 dwords from packet+0x20. Server.dll's
+// pub::AI::SubmitDirective fills one when the target ship belongs to a player and calls
+// SendServerSetDirective(&OwnerPlayer, &Info).
 //
 // Default construction is inlined at every one of SubmitDirective's six case entries (and
 // is rpclocal's FUN_06d84100): +0x18 = -1, +0x40 = 3, every other field 0, +0x00 unseeded.
@@ -280,15 +231,10 @@ static_assert(sizeof(FPayloadServerSetDirective) == 0x94, "SETDIRECTIVE payload 
 // ---------------------------------------------------------------------------
 // IClient slot 70 (+0x118), ch2 op 0x45 FLPACKET_SERVER_SET_MISSION_MESSAGE.
 //
-// Retail's own name: Server.dll exports
-// ?SetMissionMessage@CPlayerGroup@@QAEXAAUCSetMissionMessage@@@Z, which takes this
-// very record. pub::Player::DisplayMissionMessage (.text:06d55830) builds it at
-// ESP+0x8 of its frame: the FmtStr is default-constructed inline (.text:06d55887 ..
-// .text:06d558c3 -- two dwords and fourteen bytes zeroed), FmtStr::operator= from
-// the caller's text (.text:06d558d4), then +0x18 = the MissionMessageType argument
-// (.text:06d558e0). rpclocal's sender (0x06d8af60) flattens +0x00 and ships +0x18
-// (06d8afe9 / 06d8aff4). Moved here from src/rpclocal/rpc_payloads.h (2026-09-24,
-// claude-code:w5-server-06d4) because Server.dll builds it; rpclocal keeps its old
+// Retail's own name (Server.dll exports CPlayerGroup::SetMissionMessage taking it).
+// pub::Player::DisplayMissionMessage (.text:06d55830) builds it: the FmtStr default-
+// constructed inline then assigned from the caller's text, +0x18 = the MissionMessageType.
+// rpclocal's sender (0x06d8af60) flattens +0x00 and ships +0x18; rpclocal keeps its own
 // spelling through the typedef below.
 // ---------------------------------------------------------------------------
 struct CSetMissionMessage {
@@ -301,13 +247,9 @@ typedef CSetMissionMessage FServerSetMissionMessageInfo;
 // ---------------------------------------------------------------------------
 // IClient slot 71 (+0x11c), ch2 op 0x34 FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE.
 //
-// pub::Player::ReplaceMissionObjective (.text:06d55c10) builds it at ESP+0xc:
-// +0x00 = *MissionId (.text:06d55cb9), +0x04 the FmtStr, default-constructed inline
-// then FmtStr::operator=(&Objective.Description) (.text:06d55cca), +0x1c =
-// Objective.Type (.text:06d55cd0 MOV ECX,[ESI] / .text:06d55cd2), byte +0x20 = the
-// third argument (.text:06d55cc6). rpclocal's sender (0x06d8ad90) ships +0x00, the
-// byte at +0x20 and the flattened +0x04 -- it never reads +0x1c. Moved here from
-// src/rpclocal/rpc_payloads.h (2026-09-24, claude-code:w5-server-06d4).
+// pub::Player::ReplaceMissionObjective (.text:06d55c10) builds it: *MissionId, the
+// objective's Description, its Type and the third argument as a byte. rpclocal's sender
+// (0x06d8ad90) ships +0x00, the byte at +0x20 and the flattened +0x04; it never reads +0x1c.
 // ---------------------------------------------------------------------------
 struct FServerReplaceMissionObjectiveInfo {
     unsigned int MissionId;        // +0x00  mission id
@@ -322,12 +264,9 @@ static_assert(sizeof(FServerReplaceMissionObjectiveInfo) == 0x24,
 // ---------------------------------------------------------------------------
 // IClient slot 73 (+0x124), ch2 op 0x33 FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE.
 //
-// pub::Player::SetMissionObjectiveState (.text:06d55d20) builds it at ESP+0x4:
-// +0x00 = *MissionId (.text:06d55d61), byte +0x04 = the (int) third argument
-// truncated to a byte (.text:06d55d5d / .text:06d55d78), +0x08 = the fourth argument
-// (.text:06d55d69). rpclocal's sender (0x06d8ac40) reads the dword, the byte and the
-// low word of +0x08. Moved here from src/rpclocal/rpc_payloads.h (2026-09-24,
-// claude-code:w5-server-06d4).
+// pub::Player::SetMissionObjectiveState (.text:06d55d20) builds it: *MissionId, the third
+// argument truncated to a byte, the fourth argument. rpclocal's sender (0x06d8ac40) reads
+// the dword, the byte and the low word of +0x08.
 // ---------------------------------------------------------------------------
 struct FServerMissionObjectiveStateInfo {
     unsigned int MissionId;    // +0x00  mission id
@@ -340,15 +279,11 @@ static_assert(sizeof(FServerMissionObjectiveStateInfo) == 0x0c, "SETMISSIONOBJEC
 // ---------------------------------------------------------------------------
 // IClient slot 87 (+0x15c), ch2 op 0x41 FLPACKET_SERVER_BURNFUSE.
 //
-// EqObj::light_fuse (.text:06cec4d0) builds it at ESP+0x28 of its frame
-// (.text:06cec71c .. 06cec799): +0x00 = the igniting source id, +0x04 = the
-// object's own id (vt +0x20), +0x08 = the fuse's ID_String value, word +0x0c =
-// the sub-object (first SUBOBJ_ID_NONE, then the argument), +0x10 = the ignition
-// time, +0x14 = the lifetime (first -1.0f, then the argument), byte +0x18 = 1
-// (lit). EqObj::unlight_fuse (.text:06cec7f0) builds the same record with +0x18 = 0.
-// StarSystem FUN_06d0e750 reads +0x04 for its visibility test and hands the
-// record to IClient +0x15c; rpclocal's sender (0x06d8c170, MarshalBurnFuse) copies
-// +0x00 .. +0x18. Declared here 2026-09-24 (claude-code:w5-server-06ce).
+// EqObj::light_fuse (.text:06cec4d0) builds it: the igniting source id, the object's own
+// id, the fuse's ID_String value, the sub-object, the ignition time, the lifetime and
+// bLit = 1; EqObj::unlight_fuse (.text:06cec7f0) builds the same with bLit = 0.
+// StarSystem FUN_06d0e750 reads +0x04 for its visibility test and hands the record to
+// IClient +0x15c; rpclocal's sender (0x06d8c170, MarshalBurnFuse) copies +0x00 .. +0x18.
 // ---------------------------------------------------------------------------
 struct FServerBurnFuseInfo {
     unsigned int SourceId;      // +0x00
@@ -365,20 +300,12 @@ static_assert(sizeof(FServerBurnFuseInfo) == 0x1c, "BURNFUSE argument struct 0x1
 
 // ---------------------------------------------------------------------------
 // IClient slot 72 (+0x120), ch2 op 0x35 FLPACKET_SERVER_SETMISSIONOBJECTIVES.
-// The sender (rpclocal 0x06d8b020) takes the client id BY REFERENCE
-// (.text:06d8b1f3 MOV EDX,[ESP+0x28] / .text:06d8b1f7 MOV EDX,[EDX]) and reads
-// this record from the second argument: +0x00 (06d8b049), the two FmtStrs at
-// +0x0c / +0x24, the count at +0x08 and the entry array at +0x04 (06d8b11a /
-// 06d8b156), the byte at +0x3c (06d8b04e). Built by pub::Player::SetMissionObjectives
-// (.text:06d55960), CPlayerGroup::SetMissionObjectives (.text:06d5bfd0) and, empty,
-// CPlayerGroup::DelMember (.text:06d5ba56 .. 06d5ba96). Moved here from
-// rpclocal/rpc_payloads.h 2026-09-24 (claude-code:w5-server-06d4).
+// The sender (rpclocal 0x06d8b020) takes the client id by reference and reads every field
+// of this record. Built by pub::Player::SetMissionObjectives (.text:06d55960),
+// CPlayerGroup::SetMissionObjectives (.text:06d5bfd0) and, empty, CPlayerGroup::DelMember.
 // ---------------------------------------------------------------------------
-// The receiver rebuilds the element array with a VC6 vector-new: operator new(n*0x1c + 4),
-// count in the first dword, elements from +4, FmtStr ctor/dtor as the element hooks
-// (06d827bc..06d827ee, and the matching FUN_06db1dd6 teardown at 06d82887). The port uses
-// a plain array plus the count already in the struct instead of the +4 cookie, which is
-// the same thing for every reader the port has.
+// Deviation: the receiver rebuilds the element array with a VC6 vector-new (count cookie
+// in the first dword); the port uses a plain array plus the struct's Count.
 struct FServerMissionObjectiveEntry {
     FmtStr Text;                    // +0x00
     unsigned int State;             // +0x18  a BYTE on the wire, MOVZX'd to a dword here
@@ -401,17 +328,13 @@ static_assert(sizeof(FServerSetMissionObjectivesInfo) == 0x40,
 // ---------------------------------------------------------------------------
 // IClient slot 62 (+0xf8), ch2 op 0x32 FLPACKET_SERVER_REQUESTSPACESCRIPT.
 //
-// Built by Server.dll's pub::SpaceObj::RequestSpaceScript (.text:06cf9b40): +0x000 = the
-// object id (06cf9b62), +0x004 = safe_strcpy(.., 0x104, name) (06cf9ba3), +0x108..+0x110 =
-// the Vector (06cf9b6c / 06cf9b89 / 06cf9b7a), +0x114 = *param_3 (06cf9b9c); then
-// IClient+0xf8(param_4, &record). rpclocal's sender 0x06d8aa40 reads the same offsets, and
-// the client's handler LAB_0053d9d0 reads +0x000 (object), +0x004 (name), +0x108 (position)
-// and +0x114 (1 = keep the camera transform, 2 = identity orientation at +0x108).
-// Moved here from rpclocal/rpc_payloads.h 2026-09-26 (claude-code:exe-w3d).
+// Built by Server.dll's pub::SpaceObj::RequestSpaceScript (.text:06cf9b40): the object id,
+// the name (safe_strcpy, 0x104), the position, *param_3; then IClient+0xf8(param_4,
+// &record). rpclocal's sender 0x06d8aa40 reads the same offsets; the client's handler
+// LAB_0053d9d0 reads CameraMode as 1 = keep the camera transform, 2 = identity orientation
+// at the position.
 // ---------------------------------------------------------------------------
-// 0x104 is not a guess: the rpclocal receiver's string local starts at ESP+0x54 and the next
-// field it writes is at ESP+0x158 (06d81c8f), i.e. exactly 0x104 bytes later; Server.dll's
-// safe_strcpy bound is the same 0x104.
+// 0x104: Server.dll's safe_strcpy bound and the rpclocal receiver's string local.
 const unsigned int kRequestSpaceScriptNameSize = 0x104;
 
 struct FServerRequestSpaceScriptInfo {
@@ -427,14 +350,10 @@ static_assert(sizeof(FServerRequestSpaceScriptInfo) == 0x118, "REQUESTSPACESCRIP
 // ---------------------------------------------------------------------------
 // IClient slot 82 (+0x148), ch2 op 0x2b FLPACKET_SERVER_SETGROUPFEELINGS.
 //
-// rpclocal's receiver caseD_2b (0x06d815bb) strncpy()s the name to +0x00 (06d815f1), puts the
-// relation array at +0x10 and its non-null count (a byte) at +0x14 (06d8160c); its sender
-// 0x06d8a5c0 reads the same three fields (strlen of +0x00, the array at +0x10 while the index
-// is below the byte at +0x14). freelancer.exe's FUN_0053da90 reads them the same way (name
-// into a TString<16>, count * 8 bytes of Relation, Reputation::set). The inline name buffer
-// is exactly 0x10 bytes (the array pointer follows it).
-// Moved here from rpclocal/rpc_payloads.h 2026-09-26 (claude-code:exe-w3a, W4-C); the
-// relation array is typed as Common's Reputation::Relation, as FServerSetReputationInfo's is.
+// rpclocal's receiver caseD_2b (0x06d815bb) strncpy()s the name to +0x00 and stores the
+// relation array and its count (a byte); its sender 0x06d8a5c0 reads the same three fields.
+// freelancer.exe's FUN_0053da90 copies the name into a TString<16> and passes the relations
+// to Reputation::set.
 // ---------------------------------------------------------------------------
 struct FServerSetGroupFeelingsInfo {
     char Name[0x10];                        // +0x00
@@ -449,15 +368,11 @@ static_assert(sizeof(FServerSetGroupFeelingsInfo) == 0x18,
 // IClient::SendServerSystemSwitchOut (slot 57, +0x0e4), ch2 op 0x21
 // FLPACKET_SERVER_SYSTEM_SWITCH_OUT. Registry size 0x28, payload 0x08.
 //
-// rpclocal's sender 0x06d8a860 reads two dwords through its second argument
-// (06d8a87b MOV ECX,[EAX] -> packet+0x20; MOV EAX,[EAX+0x4] -> packet+0x24) and
-// its receiver caseD_21 spills them into a file-static pair. Server.dll's builder
-// (FUN_06cf6e60, .text:06cf6f89 / 06cf6f8f) puts *ObjId at +0x00 and *Destination
-// at +0x04; freelancer.exe's LAB_0053d500 reads +0x00 as the ship (bucket 1) and
-// +0x04 as the gate (bucket 2). Declared 2026-10-16 (IClient naming, phase 1) for
-// the new IClient signature; rpclocal still marshals it through its generic
-// FPayloadServerDwordPair and Server.dll through a local `unsigned int Wire[2]` --
-// both are to be switched to this type.
+// rpclocal's sender 0x06d8a860 copies the two dwords to packet+0x20 / +0x24 and its
+// receiver caseD_21 spills them into a file-static pair. Server.dll's builder
+// (FUN_06cf6e60) puts *ObjId at +0x00 and *Destination at +0x04; freelancer.exe's
+// LAB_0053d500 reads them as the ship and the gate. rpclocal still marshals it through
+// its generic FPayloadServerDwordPair.
 // ---------------------------------------------------------------------------
 struct FServerSystemSwitchOutInfo {
     unsigned int ShipId;        // +0x00
@@ -469,14 +384,11 @@ static_assert(sizeof(FServerSystemSwitchOutInfo) == 0x08, "SYSTEM_SWITCH_OUT arg
 // IClient::SendServerLand (slot 59, +0x0ec), ch2 op 0x0b FLPACKET_SERVER_LAND.
 // Registry size 0x2c, payload 0x0c.
 //
-// rpclocal's sender 0x06d8a990 copies three dwords through its second argument,
-// order preserved (+0x00 -> packet+0x20, +0x08 -> packet+0x28, +0x04 -> packet+0x24).
-// Server.dll's builder (FUN_06cf6fc0, .text:06cf702e .. 06cf7048) fills
-// {*ObjId, *Arg2, *Arg3}; freelancer.exe's FUN_0053d720 looks +0x00 up as the ship,
-// +0x04 as the dock object (its CEqObj +0x164 is the docking base) and hands &+0x08 to
-// FUN_00543b40 as the base id. Declared 2026-10-16 (IClient naming, phase 1); rpclocal
-// still marshals it through its generic FPayloadServerThreeDwords and Server.dll
-// through a local `unsigned int Wire[3]` -- both are to be switched to this type.
+// rpclocal's sender 0x06d8a990 copies the three dwords to packet+0x20.. in order.
+// Server.dll's builder (FUN_06cf6fc0) fills {*ObjId, *Arg2, *Arg3}; freelancer.exe's
+// FUN_0053d720 looks +0x00 up as the ship, +0x04 as the dock object (its CEqObj +0x164 is
+// the docking base) and hands &+0x08 to FUN_00543b40 as the base id. rpclocal still
+// marshals it through its generic FPayloadServerThreeDwords.
 // ---------------------------------------------------------------------------
 struct FServerLandInfo {
     unsigned int ShipId;        // +0x00
@@ -486,11 +398,9 @@ struct FServerLandInfo {
 static_assert(sizeof(FServerLandInfo) == 0x0c, "LAND argument struct 0x0c");
 
 // ===========================================================================
-// The five argument structs below were private to src/rpclocal/rpc_payloads.h until
-// 2026-10-16 (IClient naming, phase 2): Server.dll builds them and freelancer.exe /
-// RemoteClient.dll read the same records, so each is declared once, here. The ones whose
-// argument layout IS the wire payload keep their FPayload* name; rpclocal's codecs use
-// them for both.
+// Argument structs Server.dll builds and freelancer.exe / RemoteClient.dll read. The ones
+// whose layout is the wire payload keep their FPayload* name; rpclocal's codecs use them
+// for both.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -525,9 +435,8 @@ static_assert(sizeof(FServerRepairObjectInfo) == 0x0c, "REPAIROBJECT arg struct 
 // IClient::SendServerCfgInterfaceNotification (slot 76, +0x130), ch2 op 0x47
 // FLPACKET_SERVER_CFGINTERFACENOTIFICATION, size 0x2c -> payload 0x0c.
 // Sender 0x06d8ad30, receiver caseD_47 at 0x06d8244f, which normalises the flag through
-// TEST/SETNZ before storing it. The argument IS the wire payload. Server.dll's builder is
-// pub::Player::CfgInterfaceNotification (.text:06d54a10; block at .text:06d54a43..06d54a66:
-// notification type, the int param, the bool), which writes an int into +0x04;
+// TEST/SETNZ before storing it. The argument is the wire payload. Server.dll's builder
+// pub::Player::CfgInterfaceNotification (.text:06d54a10) writes an int into +0x04;
 // freelancer.exe reads +0x04 as float bits -- TODO(type).
 // ---------------------------------------------------------------------------
 struct FPayloadServerCfgInterfaceNotification {

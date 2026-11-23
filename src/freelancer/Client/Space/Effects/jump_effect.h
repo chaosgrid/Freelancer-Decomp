@@ -10,16 +10,8 @@
 // the 0xdc-byte object a client Ship keeps at +0x188 while it jumps (FClientShipGameobj::
 // JumpEffect). Built by FUN_00543530 (FUN_00503440(ship, gate solar)) or FUN_00543630
 // (FUN_005038c0(ship)), destroyed by FUN_00503a80 + operator delete (FUN_005437d0 case 0,
-// FUN_00543530, FUN_00543630 and the Ship dtor FUN_005444a0 at 0x0054456b).
-//
-// Ported here: both JumpShipEffect constructors (FUN_00503440, FUN_005038c0), its destructor
-// FUN_00503a80, the camera-shake amplitude FUN_00503e20, the descriptor getter FUN_00502b00,
-// and the JumpGateEffect constructor / destructor / ring (FUN_00502ba0, FUN_00502e40,
-// LAB_00502de0, FUN_00502e00), FUN_00503380, the [JumpGateEffect]/[JumpShipEffect] loader
-// FUN_005020a0 (its record copy FUN_005048a0 is the implicit copy) and the teardown
-// FUN_00502aa0, and the four jump-state hooks FUN_00503ea0 / FUN_00504210 / FUN_00504470 /
-// FUN_00504640 and the update FUN_00503cd0 (W3-A; called by the ship update FUN_00545050), and
-// the JumpGateEffect update FUN_00502f00 (W3-A; called by the solar update FUN_00547880).
+// FUN_00543530, FUN_00543630 and the Ship dtor FUN_005444a0). Also the JumpGateEffect a gate
+// solar keeps, and the [JumpGateEffect] / [JumpShipEffect] loader.
 
 #include "common_csys.h"
 #include "common_id.h"
@@ -34,8 +26,7 @@ struct FGateTunnel;           // gate_tunnel.h
 class FClientShipGameobj;     // client_gameobj.h
 
 // The 0x10-byte effect companion {slot0, ISoundSource*, particle, GameLight}. Its destructor is
-// FUN_00502d90 (CliEffectCompanionClear): FUN_00503a80's EH states 3..0 run it on the four
-// members in reverse order (0x00503c07, then inline 0x00503c0c.., 0x00503c43.., 0x00503c78..).
+// FUN_00502d90 (CliEffectCompanionClear).
 struct FJumpFxCompanion
 {
     void* EffectArch;               // +0x00
@@ -51,9 +42,8 @@ struct FJumpFxCompanion
 };
 static_assert(sizeof(FJumpFxCompanion) == 0x10, "effect companion 0x10");
 
-// One glow ring of a JumpGateEffect (0x24 bytes, five at +0x2c). Constructor LAB_00502de0
-// (byte +0 and dwords +4..+0x20 zeroed), destructor FUN_00502e00 (the companion at +0x14
-// released: particle +0x1c, sound +0x18, light +0x20, then +0x14 = 0 -- FUN_00502d90's body).
+// One glow ring of a JumpGateEffect (0x24 bytes, five at +0x2c). Constructor LAB_00502de0,
+// destructor FUN_00502e00 (the companion's FUN_00502d90 body inlined).
 struct FJumpGateRingFx
 {
     unsigned char bCreated;  // +0x00  FUN_00502f00 sets it when the ring's effect is made
@@ -69,20 +59,19 @@ static_assert(sizeof(FJumpGateRingFx) == 0x24, "gate ring 0x24");
 class FClientSolarGameobj; // client_gameobj.h
 
 // The JumpGateEffect a jump gate / hole solar keeps at +0x204 (operator new(0xe0)): built by
-// the solar notify (0x00547e1f) or, as a temporary, by FUN_00503440 (0x0050358a).
+// the solar notify or, as a temporary, by FUN_00503440.
 struct FJumpGateEffect
 {
-    // FUN_00502ba0 (thiscall, RET 4).
+    // FUN_00502ba0.
     explicit FJumpGateEffect(FClientSolarGameobj* Solar);
-    // FUN_00502e40 (thiscall). Callers: the solar dtor 0x005476d3 / notify 0x005479da, and
-    // inline in FUN_00503440 (0x005037ed..0x00503896).
+    // FUN_00502e40. Callers: the solar dtor and notify, and inline in FUN_00503440.
     ~FJumpGateEffect();
 
     FJumpGateEffect(FJumpGateEffect const&) = delete;
     FJumpGateEffect& operator=(FJumpGateEffect const&) = delete;
 
-    // FUN_00502f00 (thiscall, RET 4) -- the per-frame update. Caller: the solar update
-    // FUN_00547880 (0x005478d6) when the solar has one. The clock runs until bFire; each ring
+    // FUN_00502f00 -- the per-frame update. Caller: the solar update FUN_00547880 when the
+    // solar has one. The clock runs until bFire; each ring
     // whose create time the clock has passed starts its effect once, at its hardpoint.
     void Update(float Dt);
 
@@ -101,44 +90,44 @@ static_assert(offsetof(FJumpGateEffect, Fx) == 0x1c, "JumpGateEffect +0x1c");
 static_assert(offsetof(FJumpGateEffect, Rings) == 0x2c, "JumpGateEffect rings +0x2c");
 static_assert(sizeof(FJumpGateEffect) == 0xe0, "JumpGateEffect operator_new(0xe0)");
 
-// FUN_00503380 (thiscall) -- bFire = 1. Caller: solar notify 0x00547bda.
+// FUN_00503380 -- bFire = 1. Caller: the solar notify.
 void JumpGateEffectFire(FJumpGateEffect* Gate);
 
 struct FJumpShipEffect
 {
-    // FUN_005038c0 (thiscall, RET 4) -- the no-gate constructor.
+    // FUN_005038c0 -- the no-gate constructor.
     explicit FJumpShipEffect(FClientShipGameobj* Ship);
-    // FUN_00503440 (thiscall, RET 8) -- the constructor for a jump through GateSolar (a jump
-    // gate / hole solar gameobj). Caller: FUN_00543530 (0x00543595), not ported.
+    // FUN_00503440 -- the constructor for a jump through GateSolar (a jump gate / hole solar
+    // gameobj). Caller: FUN_00543530 (client_gameobj.cpp).
     FJumpShipEffect(FClientShipGameobj* Ship, FClientSolarGameobj* GateSolar);
-    // FUN_00503a80 (thiscall, RET 0).
+    // FUN_00503a80.
     ~FJumpShipEffect();
 
     FJumpShipEffect(FJumpShipEffect const&) = delete;
     FJumpShipEffect& operator=(FJumpShipEffect const&) = delete;
 
-    // FUN_00503e20 (thiscall, RET 0) -- the camera-shake amplitude for the ship's jump state
-    // (+0x68 -> +0x158), left on the FPU. Caller: HudCameraUpdateShake 0x0051dba8.
+    // FUN_00503e20 -- the camera-shake amplitude for the ship's jump state, unrounded. Caller:
+    // HudCameraUpdateShake.
     double ShakeAmplitude() const;
 
     // The four state hooks FUN_005437d0 (FClientShipGameobj::SetJumpState) calls. Its case 3
-    // calls a fifth, IDPMsgHandler::OnDisconnect (0x00401e90) -- a bare RET the linker folded
-    // it into, so there is nothing to port for it.
-    // FUN_00503ea0 (thiscall, RET 0), state 1: with a tunnel, tunnel state 1 and the tunnel
-    // effect (+0x18) started at +0xa8 into FxB.
+    // calls a fifth that the linker folded into an empty function (0x00401e90), so there is
+    // nothing to port for it.
+    // FUN_00503ea0, state 1: with a tunnel, tunnel state 1 and the tunnel effect (+0x18)
+    // started at +0xa8 into FxB.
     void StartJumpOut();
-    // FUN_00504210 (thiscall, RET 0), state 2: tunnel state 2; FxB moved onto the ship, and the
+    // FUN_00504210, state 2: tunnel state 2; FxB moved onto the ship, and the
     // descriptor's jump_out_effect started at the ship into FxA and moved onto the ship too.
     void EnterTunnel();
-    // FUN_00504470 (thiscall, RET 0), state 4: tunnel state 3; the descriptor's jump_in_effect
+    // FUN_00504470, state 4: tunnel state 3; the descriptor's jump_in_effect
     // started at the ship into FxC and moved onto it; +0xd8 = 1.
     void StartJumpIn();
-    // FUN_00504640 (thiscall, RET 0), state 5: tunnel state 0; the descriptor's jump done
+    // FUN_00504640, state 5: tunnel state 0; the descriptor's jump done
     // effect (player or non-player) started on the ship into FxD.
     void FinishJump();
 
-    // FUN_00503cd0 (thiscall, RET 4) -- the per-frame update. Caller: the ship update
-    // FUN_00545050 at 0x0054536f (FClientShipGameobj::update), with its clamped step. States
+    // FUN_00503cd0 -- the per-frame update. Caller: the ship update FUN_00545050
+    // (FClientShipGameobj::update), with its clamped step. States
     // 2/3 advance the tunnel; in state 4, once the clock passes JumpInTime - KillTimeBeforeDone,
     // the tunnel effect FxB is stopped and released and +0x6d latches.
     void Update(float Dt);
@@ -165,10 +154,9 @@ struct FJumpShipEffect
     unsigned char bTunnelEffectKilled;          // +0x6d  ctor 0; FUN_00503cd0 sets 1, FUN_00503ea0 0
     unsigned char Pad6e[2];
     float Clock;                  // +0x70  ctor 0; the effect's clock (FUN_00503e20)
-    // +0x74 / +0x80 -- where the ship comes out of the jump: FUN_00543630 copies 3 dwords of
-    // its Vector argument to +0x74 (0x0054366b..0x00543679 / 0x005436ff..0x0054370d) and 9 of
-    // its Matrix argument to +0x80 (MOVSD.REP ECX=9); FUN_005437d0 case 4 hands both to
-    // CShip::jump_in / CObject::beam_object as (Vector const&, Matrix const&).
+    // +0x74 / +0x80 -- where the ship comes out of the jump: FUN_00543630 copies its Vector and
+    // Matrix arguments here; FUN_005437d0 case 4 hands both to CShip::jump_in /
+    // CObject::beam_object.
     Vector JumpInPosition;             // +0x74
     Matrix JumpInOrientation;          // +0x80
     unsigned DestSystem;               // +0xa4  FUN_00503440: the gate CSolar's +0x1b4 (player)
@@ -189,16 +177,16 @@ static_assert(offsetof(FJumpShipEffect, GateHardpointFrame) == 0xa8, "JumpShipEf
 static_assert(offsetof(FJumpShipEffect, bSkipFirstJumpInTick) == 0xd8, "JumpShipEffect +0xd8");
 static_assert(sizeof(FJumpShipEffect) == 0xdc, "JumpShipEffect operator_new(0xdc)");
 
-// FUN_00502b00 (cdecl) -- DAT_00674fd0, the JumpShipEffectDesc the [JumpShipEffect] section
-// of the jump-effect INI (FUN_005020a0, not ported) loads; the first call without one warns
+// FUN_00502b00 -- DAT_00674fd0, the JumpShipEffectDesc the [JumpShipEffect] section
+// of the jump-effect INI (FUN_005020a0) loads; the first call without one warns
 // and news a default (five cleared ids).
 JumpShipEffectDesc* JumpShipEffectDescGet();
 
-// FUN_005020a0 (cdecl, no arguments; caller: the space init FUN_0054ab40 at 0x0054ac15) --
+// FUN_005020a0 (caller: the space init FUN_0054ab40) --
 // reads the [Data] jump_effect INI: every [JumpGateEffect] section is appended to the
 // DAT_00674fd8 record list, a [JumpShipEffect] section replaces DAT_00674fd0.
 void JumpEffectIniLoad();
 
-// FUN_00502aa0 (cdecl, no arguments; caller: the space teardown at 0x0054afb1) -- empties the
+// FUN_00502aa0 (caller: the space teardown) -- empties the
 // DAT_00674fd8 list and frees DAT_00674fd0.
 void JumpEffectDescsClear();

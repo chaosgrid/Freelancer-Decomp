@@ -9,17 +9,16 @@
 // Retail Intro.cpp (E:\FL\Scratch\Source\Client\Interface\Intro.cpp) -- the main-menu column.
 //
 // TypeSelect (RTTI .?AUTypeSelect@@ : Win3D, Event::Handler at +0x7c) is the five-button
-// column IntroFocus::EnterState state 1 (0x005743f8) builds: New Game / Load Game /
-// Multiplayer / Options / Exit. One static instance, DAT_0067b780 (static init LAB_00566180 ->
-// ctor FUN_005662a0, atexit LAB_005661a0 -> dtor FUN_005661b0). Earlier port notes called it
-// "CIntroScreen"; the RTTI name is TypeSelect.
+// column IntroFocus::EnterState state 1 builds: New Game / Load Game / Multiplayer / Options /
+// Exit. One static instance, DAT_0067b780 (static init LAB_00566180 -> ctor FUN_005662a0, atexit
+// LAB_005661a0 -> dtor FUN_005661b0).
 //
 // TextMsgButton (RTTI .?AUTextMsgButton@@ : TextWin, vftable 0x005e2844) is its caption
-// button: a TextWin whose click sends parent slot 23 (0x3004, command, 0).
+// button: a TextWin whose click sends the parent ProcessMessage(0x3004, command, 0).
 //
-// Call path: IntroFocus::Update (0x00573eb0) polls TypeSelect+0x80 (DAT_0067b800) in state 1;
-// TypeSelect::ProcessMessage starts the slide-out animation for commands 3 / 0xa / 0x10, and
-// TypeSelect::Update copies the command into +0x80 once the buttons are gone.
+// IntroFocus::Update polls TypeSelect+0x80 (DAT_0067b800) in state 1; ProcessMessage starts the
+// slide-out for commands 3 / 0xa / 0x10, and Update copies the command into +0x80 once the
+// buttons are gone.
 
 #include "Core/event_handler.h"
 #include "Interface/text_win.h"
@@ -31,27 +30,23 @@
 class TextMsgButton : public TextWin
 {
 public:
-    // FUN_00566380 -- the inlined Win3D + TextWin parts, +0xec = 0, vftable 0x005e2844,
-    // +0xe6 = 1.
+    // FUN_00566380.
     TextMsgButton();
-    // slot 0 FUN_0059cda0 -> FUN_0059ce40 = JMP FUN_005a1af0 (the TextWin dtor, nothing more)
+    // slot 0 FUN_0059cda0 -- the TextWin dtor, nothing more.
     ~TextMsgButton() override;
 
-    // slot 15 FUN_005664e0 (RET 4) -- if (+0xe6) FUN_00564700 (the rollover sound).
+    // slot 15 FUN_005664e0 (RET 4) -- the rollover sound while enabled (+0xe6).
     void MouseEnter(float const* Ray) override;
-    // slot 19 FUN_005664a0 (RET 4) -- Field1 == 2 && +0xe6 && Field0 == -1 && parent:
-    // return parent->slot23(0x3004, +0xec, 0); else false.
+    // slot 19 FUN_005664a0 (RET 4).
     bool MouseEvent(FWin3DMouseEvent const* Event) override;
 
-    // FUN_005753d0 (thiscall, RET 0x14) -- +0xec = Command, +0xe6 = 1, slot 9 Create(Parent, 0),
-    // +0xb4 = BoxWidth, +0xb8 = BoxHeight, slot 28 SetText(Caption),
-    // FUN_005a1cc0("ButtonText", 1.0f).
+    // FUN_005753d0 (thiscall, RET 0x14).
     void Init(Win3D* Parent, wchar_t const* Caption, float BoxWidth, float BoxHeight,
               int Command);
     // FUN_005753b0 (thiscall, RET 8) -- +0xe3 = 1, +0xe4 = A, +0xe5 = B.
     void SetFlagsE4E5(unsigned char A, unsigned char B);
 
-    int Command; // +0xec -- the slot 23 argument sent on a click
+    int Command; // +0xec -- the ProcessMessage argument sent on a click
 };
 
 static_assert(sizeof(TextMsgButton) == 0xf0, "retail TextMsgButton is 0xf0 bytes");
@@ -71,12 +66,12 @@ public:
     void Destroy() override;
     // slot 11 FUN_00566510
     void Update() override;
-    // slot 13 FUN_00566500 -- JMP FUN_0059e5c0
+    // slot 13 FUN_00566500 -- Win3D's sorted child draw
     void Draw() override;
     // slot 23 FUN_00566bd0 (RET 0xc)
     bool ProcessMessage(unsigned Msg, unsigned A, unsigned B) override;
 
-    // Event::Handler slot 0 at +0x7c, FUN_00566fc0 (RET 4) -- 0xf -> FUN_00471f30(0), true.
+    // Event::Handler slot 0 at +0x7c, FUN_00566fc0 (RET 4).
     bool OnEvent(unsigned MsgId) override;
 
     typedef BOOL(WINAPI* FIsNetworkAliveFn)(LPDWORD Flags);
@@ -97,7 +92,7 @@ public:
     int Phase;                        // +0x570 -- frames spent hidden after the slide-out
 
 private:
-    // The "is the network there" probe shared by Create (0x00566a4f) and Update (0x00566564).
+    // The "is the network there" probe retail inlines in Create and Update.
     unsigned char ProbeMultiplayerAvailable();
 };
 

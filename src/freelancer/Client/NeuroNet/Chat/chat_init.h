@@ -90,7 +90,7 @@ public:
     // on that order.
     typedef std::map<unsigned, RenderDisplayList*, std::greater<unsigned> > FNameMap;
 
-    // 0x0046977c..0x004697a8: both maps empty, generation 0.
+    // Inlined in ChatInit.
     FChatChannelTable();
     // FUN_00469e60
     ~FChatChannelTable();
@@ -160,8 +160,7 @@ struct FChatMessageStore
     // FUN_004686e0 -- rebuild All from every active message.
     void RebuildAll();
     // The inlined "unlink this entry from the active list and return it to the pool" tail of
-    // FUN_00463630 (0x00463706 / 0x00464c83) and FUN_0046a150 (0x0046a25e). False when Entry
-    // is not on the active list.
+    // FUN_00463630 and FUN_0046a150. False when Entry is not on the active list.
     bool Discard(FChatMessageEntry* Entry);
     // FUN_0046b170 / FUN_0046b2b0 (inlined): every active entry cleared and pooled, then both
     // snapshots rebuilt.
@@ -288,7 +287,6 @@ void ChatSetInputOpen(bool bOpen);
 // FUN_0046b170 / FUN_0046b2b0 (cdecl) -- multiplayer only: forget the group and its requests,
 // drop every player name, hide the MsgWin, close the input line, discard every message and
 // point the input line back at channel {1, 1}. The two bodies are identical apart from how
-// the set's begin is fetched. Callers: 0x005a8098 / 0x005a8269 / 0x005a87e3 / 0x005a88d7
-// (b170) and 0x0056ab93 / 0x005a894c (b2b0).
+// the set's begin is fetched.
 void ChatResetForDisconnect();
 void ChatResetForConnect();

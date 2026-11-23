@@ -4,41 +4,26 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// The IVP library's error-message sink. Moved verbatim from
-// src/Common/common_stubs.cpp (via common_stubs_a3.cpp) on 2026-10-14
-// (claude-code:cmn-a3). The name stays FUN_06356960 because the vendored
-// qhull sources call it at ~400 sites (declared in src/qhull/vendor/mem.h:173,
-// C linkage); C++ callers declare it extern "C" (ivp_environment.cpp).
+// The IVP library's error-message sink, FUN_06356960. C linkage because the
+// vendored qhull sources call it (declared in src/qhull/vendor/mem.h); C++
+// callers declare it extern "C" (ivp_environment.cpp).
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <windows.h>
 
-// ivp_message (item 3255, Common.dll.txt:437865-437897, 25 insns). Generic
-// "print an error message to the debugger" helper: reserves a 10000-byte
-// (0x2710) stack buffer (retail's own `_chkstk`-style probe via
-// FUN_06391dc0, see ivp_compact_ledge.h's own precedent for this exact
-// probe function), formats `Format`/varargs into it via vsprintf, then
-// OutputDebugStringA's the result.
+// ivp_message: vsprintf into a 10000-byte stack buffer (stack probe
+// FUN_06391dc0), then OutputDebugStringA.
 //
-// Retail curiosity, reproduced faithfully rather than "fixed": retail first
-// sprintf()s a literal "ERROR: " prefix into the SAME buffer address the
-// vsprintf() call immediately afterward also targets (both LEA computations
-// resolve to the identical stack offset, confirmed by hand-tracing every
-// intervening PUSH against ESP, Common.dll.txt:06356978-0635699d) -- so the
-// vsprintf() call unconditionally overwrites that prefix before
-// OutputDebugStringA ever sees it. The sprintf() call's own effect is
-// therefore always fully discarded; kept in this port anyway for 1:1
-// instruction-level fidelity since it's harmless and not a correctness risk.
-// Retail also zero-fills only the first 1000 bytes (0xfa dwords) of the
-// buffer before either call, not the whole 10000-byte reservation -- also
-// reproduced as-is.
+// Retail quirks kept: the "ERROR: " prefix is sprintf'd into the same buffer
+// address vsprintf then overwrites, so it never reaches the output; and only
+// the first 1000 bytes of the buffer are zeroed.
 extern "C" void ivp_message(const char* Format, ...)
 {
-    char Buffer[10000]; // retail's own 0x2710-byte stack reservation
+    char Buffer[10000]; // 0x2710
     memset(Buffer, 0, 1000); // retail only zero-fills the first 0xfa dwords
-    sprintf(Buffer, "ERROR: "); // retail's own dead write -- see comment above
+    sprintf(Buffer, "ERROR: "); // dead write, as in retail
     va_list Args;
     va_start(Args, Format);
     vsprintf(Buffer, Format, Args);

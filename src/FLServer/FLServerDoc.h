@@ -21,25 +21,25 @@ protected:
 public:
 	enum { LoadHistorySize = 64 };
 
-	// .text:0040daa0 — the last value given to SetLoad.
+	// The last value given to SetLoad.
 	int GetLoad();
-	// .text:0040dae0 — mean of the LoadHistorySize history slots; recomputed only when a
-	// SetLoad happened since the last call.
+	// Mean of the LoadHistorySize history slots; recomputed only when a SetLoad happened since
+	// the last call.
 	int GetAverageLoad();
-	// .text:0040db50 — records a load sample; fails (returns false) without blocking when the
-	// mutex is held elsewhere.
+	// Records a load sample; fails (returns false) without blocking when the mutex is held
+	// elsewhere.
 	bool SetLoad(int Load);
-	// .text:0040dbe0 — stores a ServerStats snapshot; fails without blocking like SetLoad.
+	// Stores a ServerStats snapshot; fails without blocking like SetLoad.
 	bool SetStats(const ServerStats* Stats);
-	// .text:0040dc50 — copies the snapshot out (blocks on the mutex).
+	// Copies the snapshot out (blocks on the mutex).
 	void GetStats(ServerStats* Stats);
 
-	virtual CRichEditCntrItem* CreateClientItem(REOBJECT* Preo) const;   // 0040d9d0
-	virtual BOOL OnNewDocument();                                       // 0040d9c0
-	virtual void Serialize(CArchive& Ar);                                // 0040da40
-	virtual void SetTitle(LPCTSTR Title);                                // 0040da80
-	virtual BOOL SaveModified();                                         // 0040da70
-	virtual COleClientItem* GetPrimarySelectedItem(CView* View);         // 0040dcb0
+	virtual CRichEditCntrItem* CreateClientItem(REOBJECT* Preo) const;
+	virtual BOOL OnNewDocument();
+	virtual void Serialize(CArchive& Ar);
+	virtual void SetTitle(LPCTSTR Title);
+	virtual BOOL SaveModified();
+	virtual COleClientItem* GetPrimarySelectedItem(CView* View);
 
 	virtual ~CFLServerDoc();
 

@@ -26,7 +26,7 @@ static unsigned int RotateLeft(unsigned int Value, unsigned int Bits)
     return (Value << Bits) | (Value >> (32u - Bits));
 }
 
-// REP MOVSD then REP MOVSB. Forward copy, same split as 0x06acedc0.
+// Forward copy, dwords then bytes (REP MOVSD / MOVSB), as in 0x06acedc0.
 static void CopyDwordsThenBytes(unsigned char* Dest, const unsigned char* Source, unsigned int Count)
 {
     unsigned int Words = Count >> 2;
@@ -68,9 +68,9 @@ static void Md4Step(unsigned int& A, unsigned int& B, unsigned int& C, unsigned 
     A = NextA;
 }
 
-// 0x06acef00. No branches. Round words and rotates were read off the unrolled body
-// through 0x06acf366. Round 1 has no constant. Round 2 adds 0x5A827999.
-// Round 3 adds 0x6ED9EBA1. The four state words are added back at 0x06acf346.
+// 0x06acef00. Straight-line MD4 block (retail is fully unrolled). Round 1 has
+// no constant, round 2 adds 0x5A827999, round 3 adds 0x6ED9EBA1; the four state
+// words are added back at the end.
 void __stdcall Md4Transform(unsigned int* State, const unsigned int* Block)
 {
     static const unsigned int Round2Index[16] = {
@@ -505,7 +505,7 @@ int __stdcall MixShaBlocks(const unsigned char* Data, unsigned int Length, unsig
     return 1;
 }
 
-// 0x06aced89. Caller at 0x06accf59 pushes a buffer and a DWORD* (0x40) and tests EAX.
+// 0x06aced89. Stub in retail: always 0. Its caller passes a buffer and a DWORD* (0x40).
 int __stdcall RngTryReadBlock(void*, unsigned int*)
 {
     return 0;

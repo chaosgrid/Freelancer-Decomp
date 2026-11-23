@@ -28,8 +28,6 @@
 //    5  FUN_062ccb70  OnEvaluateReadiness            6  LAB_062ccc10  evaluate
 //   10  FUN_062cd3d0  OnApplyDirective          27  LAB_062ccd30  UpdateFollowerSteering
 //   28  LAB_062cd4c0  GetRotatedOffset
-// Re-ported 2026-10-08 (claude-code:cmn-ai5): slots 3/4/5/6 were unbound members and slot 8
-// was a FollowBehavior-local stub of the base's own LAB_062cb6d0.
 // ============================================================================
 class FollowBehavior : public BaseFollowerBehavior
 {

@@ -98,11 +98,9 @@ bool ClientInputIsActive();
 // DAT_00616840 / DAT_00616844 / DAT_00616848.
 void GetClientSoftwareCursor(int* OutX, int* OutY, int* OutZ);
 void SetClientSoftwareCursor(int X, int Y);
-// DAT_0061684c -- the wheel delta of the last FUN_0041f150; read by FUN_0059d140 (event 4) and
-// 0x004d8354.
+// DAT_0061684c -- the wheel delta of the last FUN_0041f150; read by FUN_0059d140 (event 4).
 int GetClientMouseWheel();
-// DAT_00616850 -- button bits (bit n = button n held), kept by FUN_0041fa10 / FUN_0041fd90;
-// read by 0x004957f8, 0x004b9331, 0x004bde7e, FUN_004c7cb0, 0x0051a84c and 0x00578545.
+// DAT_00616850 -- button bits (bit n = button n held), kept by FUN_0041fa10 / FUN_0041fd90.
 unsigned GetClientMouseButtons();
 // LAB_0041d970 -- perf option "mouse_speed": DAT_006107d0 = clamp(Value, 0, 1) * 1.75 + 0.25.
 void ApplyMouseSpeedOption(float Value);

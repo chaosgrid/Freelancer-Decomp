@@ -36,7 +36,7 @@ namespace
 
     IMaterial* G_Overrides[kOverrideCount] = {};
 
-    // Slot 6 writes these; no readers in this DLL. CRT defaults from §11.2.
+    // Slot 6 writes these; no readers in this DLL. CRT-initialised defaults.
     float G_Slot6First[3] = {0.0f, -1.0f, 0.0f};
     float G_Slot6Second[3] = {1.0f, 1.0f, 1.0f};
     unsigned char G_Slot6Flag = 0;
@@ -646,7 +646,7 @@ namespace
                      "FLAppearance: Initialize: Unable to acquire IID_IRenderPipeline, unable to continue.");
             return GR_GENERIC;
         }
-        // 0x066fdacc..0x066fdad1: released unconditionally after the successful QI.
+        // Released right after the successful QI; the raw pointer is kept.
         Pipeline_->Release();
 
         Result =
@@ -858,7 +858,6 @@ namespace
         float Radius;
     };
 
-
     struct FShadowCorner
     {
         float X;
@@ -981,10 +980,10 @@ namespace
 
         PipelineApplyRsTable(Appearance->Pipeline_, kShadowDrawRs);
         PipelineSetModelview(Appearance->Pipeline_, ((ICamera*)A)->GetViewTransform());
-        FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, 4); // formerly Cull
-        FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, 1); // formerly ZWrite
-        FShadowRenderStateScope DepthBias(Appearance->Pipeline_, D3DRS_ZBIAS, 4); // formerly Fog
-        FShadowRenderStateScope DepthWrite(Appearance->Pipeline_, D3DRS_ZWRITEENABLE, 0); // formerly Lighting
+        FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, 4);
+        FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, 1);
+        FShadowRenderStateScope DepthBias(Appearance->Pipeline_, D3DRS_ZBIAS, 4);
+        FShadowRenderStateScope DepthWrite(Appearance->Pipeline_, D3DRS_ZWRITEENABLE, 0);
         PipelineSetTextureStageState(Appearance->Pipeline_, 0, D3DTSS_TEXCOORDINDEX, 0);
         PipelineSetTextureStageTexture(Appearance->Pipeline_, 0, Handle);
         PipelineApplyTssTable(Appearance->Pipeline_, 0, kShadowDrawTss0);
@@ -1034,12 +1033,12 @@ namespace
                     if (FlagC != 0)
                         Radius = (float)((double)Radius + Extents[3]);
                     double Fade = (double)PosY - Radius;
-                    // TEST AH,05 + JP preserves positive/equal/unordered; negative becomes zero.
+                    // Unordered is kept; only negative becomes zero.
                     if (Fade < 0.0)
                         Fade = 0.0;
                     if (G_ShadowFadeForce != 0)
                         Fade = kShadowFadeForce;
-                    // TEST AH,41 + JZ skips only ordered-greater values.
+                    // Skips only ordered-greater values.
                     if (Fade > kShadowFadeRange)
                         continue;
                     Fade /= kShadowFadeRange;
@@ -1049,13 +1048,13 @@ namespace
                     if (FlagA != 0)
                     {
                         Alpha = (double)kShadowAlphaSub - Fade;
-                        // TEST AH,05 + JNP skips negative; TEST AH,41 + JNZ retains <=1/unordered.
+                        // Negative skips; <= 1 and unordered are kept.
                         if (Alpha < 0.0)
                             continue;
                         if (Alpha > 1.0)
                             Alpha = 1.0;
                     }
-                    // TEST AH,41 + JNZ skips <=0 and unordered.
+                    // Skips <= 0 and unordered.
                     if (!(Alpha > 0.0))
                         continue;
                     const int ColorByte = (int)((Alpha * Alpha) * kShadowColorScale);
@@ -1137,7 +1136,7 @@ namespace
     {
         if (Renderer_ == nullptr)
             return GR_OK;
-        // 0x066fe598..0x066fe5cb: the pipeline (+0x14) is used with no null test.
+        // The pipeline (+0x14) is used with no null test, as in retail.
         FAppearanceRenderStateScope SavedState(Pipeline_);
         IDAComponent* const Override = G_Overrides[6];
         FCameraBlob* Camera = (FCameraBlob*)Scratch88_;

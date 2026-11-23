@@ -9,12 +9,9 @@
 #include <cstdint>
 #include <cstring>
 
-// ============================================================================
 // Small numeric helpers shared by the polygon / tetra / pointsoup builder
-// chain (2026-10-08, claude-code:cmn-ivp4b). Retail evaluates these on the
-// x87 stack; every intermediate that the listing keeps on the stack is a
-// double here and only the FSTP dword stores round to float.
-// ============================================================================
+// chain. Retail evaluates these on the x87 stack: intermediates are doubles
+// here and only the float stores round.
 
 // Raw .rdata float constants are written by their bit patterns.
 inline float IVP_BuilderBitsToFloat(uint32_t Bits)
@@ -31,11 +28,9 @@ inline double IVP_BuilderBitsToDouble(uint64_t Bits)
     return Value;
 }
 
-// Retail FUN_0628bed0 (thiscall: this = Out, stdcall A, B; RET 8), the
-// Vector cross product Out = A x B. Every product is formed on the x87 stack
-// and each component is rounded once by its FSTP dword:
-//   x = A.y*B.z - A.z*B.y, y = B.x*A.z - A.x*B.z, z = A.x*B.y - A.y*B.x
-// (.text:0628bed8-0628bf05). All inputs are read before Out is written.
+// Retail FUN_0628bed0 (thiscall: this = Out; RET 8), Vector cross product
+// Out = A x B. Each component is rounded once; y is formed as
+// B.x*A.z - A.x*B.z. All inputs are read before Out is written.
 inline void IVP_BuilderCrossProduct(float* Out, const float* A, const float* B)
 {
     const double AxBy = (double)(A[0]) * B[1];
